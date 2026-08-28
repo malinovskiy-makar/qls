@@ -94,6 +94,9 @@ class Command(BaseCommand):
                             help='только один источник')
         parser.add_argument('--limit', type=int,
                             help='только первые N задач (усечение называется в выводе)')
+        parser.add_argument('--report-dir',
+                            help='куда класть отчёт и бэкап; тесты обязаны давать '
+                                 'временную папку — иначе затирают боевой')
 
     def handle(self, *args, **options):
         do_apply = options['apply']
@@ -199,8 +202,9 @@ class Command(BaseCommand):
             lines.append(f'  ⚠️ ОХВАТ УСЕЧЁН: --limit {limit} — проверена только '
                          f'часть корпуса')
 
-        os.makedirs(OUT_DIR, exist_ok=True)
-        report_path = os.path.join(OUT_DIR, 'gate_new_sources.json')
+        out_dir = options.get('report_dir') or OUT_DIR
+        os.makedirs(out_dir, exist_ok=True)
+        report_path = os.path.join(out_dir, 'gate_new_sources.json')
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump({
                 'per_source': per_source,
@@ -214,7 +218,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.WARNING('\n'.join(lines)))
             return
 
-        backup_path = os.path.join(OUT_DIR, 'gate_new_sources_backup.json')
+        backup_path = os.path.join(out_dir, 'gate_new_sources_backup.json')
         backup = list(
             Problem.objects.filter(id__in=to_change)
             .values('id', 'content_format')) if to_change else []

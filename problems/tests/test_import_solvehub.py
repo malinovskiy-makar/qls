@@ -14,6 +14,7 @@
 """
 import json
 import os
+import tempfile
 from io import StringIO
 
 from django.core.management import call_command
@@ -26,9 +27,16 @@ FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures', 'solvehub')
 SOURCE_NAME = 'SolveHub — банк задач по экономике'
 
 
+#: Отчёты тестов уходят во ВРЕМЕННУЮ папку. Без этого прогон набора
+#: писал в reports/import_new_sources/ репозитория и затирал настоящие
+#: файлы — 933 предупреждения Школково превращались в четыре тестовых.
+REPORT_DIR = tempfile.mkdtemp(prefix='qls-report-')
+
+
 def run(*args, **kwargs):
     out = StringIO()
-    call_command('import_solvehub', *args, stdout=out, stderr=out, **kwargs)
+    call_command('import_solvehub', *args, '--report-dir', REPORT_DIR,
+                 stdout=out, stderr=out, **kwargs)
     return out.getvalue()
 
 

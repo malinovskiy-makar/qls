@@ -85,6 +85,8 @@ class Command(BaseCommand):
                             help='импортировать только первые N (усечение называется в выводе)')
         parser.add_argument('--data-dir',
                             help='папка выгрузки Школково (по умолчанию weconomics-data/shkolkovo)')
+        parser.add_argument('--report-dir',
+                            help='куда класть отчёт; тесты обязаны давать временную папку — иначе затирают боевой')
 
     def handle(self, *args, **options):
         do_apply = options['apply']
@@ -198,12 +200,14 @@ class Command(BaseCommand):
                 f'ИНВАРИАНТ НАРУШЕН: создано {created}, а Problem вырос на '
                 f'{after["Problem"] - before["Problem"]}')
 
-        self._report(problems_dir, paths, created, skipped_existing, converted,
+        self._report(options.get('report_dir'),
+                     problems_dir, paths, created, skipped_existing, converted,
                      skipped_empty, with_parts, with_answer, with_solution,
                      with_rubric, with_images, warnings, before, after,
                      do_apply, limit)
 
-    def _report(self, problems_dir, paths, created, skipped_existing, converted,
+    def _report(self, out_dir,
+                problems_dir, paths, created, skipped_existing, converted,
                 skipped_empty, with_parts, with_answer, with_solution,
                 with_rubric, with_images, warnings, before, after,
                 do_apply, limit):
@@ -230,5 +234,5 @@ class Command(BaseCommand):
             lines.append(f'  ⚠️ ОХВАТ УСЕЧЁН: --limit {limit} — '
                          f'обработана только часть корпуса')
         lines.append('  ' + write_warnings(
-            'shkolkovo_warnings.txt', warnings, converted))
+            'shkolkovo_warnings.txt', warnings, converted, out_dir))
         self.stdout.write(self.style.SUCCESS('\n'.join(lines)))

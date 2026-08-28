@@ -178,7 +178,17 @@ def create_problem(*, source, external_id, title, statement_md, answer_md,
     return problem
 
 
-def write_warnings(file_name, warnings, processed):
+#: Куда команды импорта кладут отчёты по умолчанию.
+DEFAULT_REPORT_DIR = ('reports', 'import_new_sources')
+
+
+def report_dir(explicit=None):
+    if explicit:
+        return explicit
+    return os.path.join(settings.BASE_DIR, *DEFAULT_REPORT_DIR)
+
+
+def write_warnings(file_name, warnings, processed, out_dir=None):
     """Выписать предупреждения конвертера в reports/import_new_sources/.
 
     ⚠️ Пустой результат НЕ затирает прошлый файл. Первый прогон
@@ -187,8 +197,13 @@ def write_warnings(file_name, warnings, processed):
     и предупреждений ноль) перезаписал файл пустотой. Молчаливая потеря
     отчёта читается как «предупреждений не было».
 
+    ⚠️ `out_dir` существует не для гибкости. Без него ТЕСТЫ этих же
+    команд писали в боевую папку отчётов репозитория и затирали настоящие
+    файлы: прогон набора после импорта превращал 933 предупреждения
+    Школково в четыре тестовых. Тесты обязаны писать во временную папку.
+
     Возвращает строку для вывода команды."""
-    out_dir = os.path.join(settings.BASE_DIR, 'reports', 'import_new_sources')
+    out_dir = report_dir(out_dir)
     os.makedirs(out_dir, exist_ok=True)
     out_path = os.path.join(out_dir, file_name)
     if not processed and os.path.exists(out_path):

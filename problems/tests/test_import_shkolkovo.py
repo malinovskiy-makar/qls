@@ -11,6 +11,7 @@
 """
 import json
 import os
+import tempfile
 
 from django.core.management import call_command
 from django.test import TestCase
@@ -24,9 +25,16 @@ FIXTURE_DIR = os.path.join(os.path.dirname(__file__), 'fixtures', 'shkolkovo')
 SOURCE_NAME = 'Школково — банк задач по экономике'
 
 
+#: Отчёты тестов уходят во ВРЕМЕННУЮ папку. Без этого прогон набора
+#: писал в reports/import_new_sources/ репозитория и затирал настоящие
+#: файлы — 933 предупреждения Школково превращались в четыре тестовых.
+REPORT_DIR = tempfile.mkdtemp(prefix='qls-report-')
+
+
 def run(*args, **kwargs):
     out = StringIO()
-    call_command('import_shkolkovo', *args, stdout=out, stderr=out, **kwargs)
+    call_command('import_shkolkovo', *args, '--report-dir', REPORT_DIR,
+                 stdout=out, stderr=out, **kwargs)
     return out.getvalue()
 
 
@@ -183,3 +191,47 @@ class ShkolkovoParityTests(TestCase):
             with open(os.path.join(disk_dir, name), encoding='utf-8') as f:
                 disk = json.load(f)
             self.assertEqual(fixture, disk, f'фикстура {name} разошлась с диском')
+
+
+class ReportDirIsolationTests(TestCase):
+    """Отчёт команды не имеет права попасть в боевую папку репозитория.
+
+    Найдено на живом прогоне: полный набор тестов после импорта переписал
+    `reports/import_new_sources/shkolkovo_warnings.txt` — 933 настоящих
+    предупреждения превратились в четыре тестовых. Испорченный отчёт
+    выглядит как настоящий, поэтому проверка нужна отдельная.
+    """
+
+    @staticmethod
+    def _snapshot(directory):
+        """Не список имён, а СОДЕРЖИМОЕ. Затирание файла имена не меняет,
+        и первая версия этой проверки на откате вела себя неустойчиво:
+        краснела только когда файла раньше не было."""
+        import hashlib
+        if not os.path.isdir(directory):
+            return {}
+        out = {}
+        for name in sorted(os.listdir(directory)):
+            path = os.path.join(directory, name)
+            if os.path.isfile(path):
+                with open(path, 'rb') as f:
+                    out[name] = hashlib.md5(
+                        f.read(), usedforsecurity=False).hexdigest()
+        return out
+
+    def test_report_goes_where_told_and_nowhere_else(self):
+        import shutil
+        from django.conf import settings
+        from problems.corpus_converter.ingest import report_dir
+
+        target = tempfile.mkdtemp(prefix='qls-report-check-')
+        production = report_dir()
+        before = self._snapshot(production)
+        try:
+            run('--data-dir', FIXTURE_DIR, '--apply', report_dir=target)
+            self.assertIn('shkolkovo_warnings.txt', os.listdir(target))
+            self.assertEqual(before, self._snapshot(production),
+                             'команда тронула боевую папку отчётов '
+                             f'{production} (BASE_DIR={settings.BASE_DIR})')
+        finally:
+            shutil.rmtree(target, ignore_errors=True)

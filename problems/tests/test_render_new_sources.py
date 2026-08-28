@@ -6,6 +6,7 @@
 берёт в кандидаты, кого не трогает никогда, что она пишет и что НЕ пишет.
 """
 from io import StringIO
+import tempfile
 from unittest import mock
 
 from django.core.management import call_command
@@ -33,6 +34,12 @@ class FakeChecker:
         return [None] * len(htmls)
 
 
+#: Отчёты тестов уходят во ВРЕМЕННУЮ папку. Без этого прогон набора
+#: писал в reports/import_new_sources/ репозитория и затирал настоящие
+#: файлы — 933 предупреждения Школково превращались в четыре тестовых.
+REPORT_DIR = tempfile.mkdtemp(prefix='qls-report-')
+
+
 def run(*args, verdicts=None):
     """`verdicts` — словарь id задачи -> проходит ли шлюз.
 
@@ -53,7 +60,8 @@ def run(*args, verdicts=None):
         'problems.management.commands.render_new_sources.verdict_for',
         fake_verdict,
     ):
-        call_command('render_new_sources', *args, stdout=out, stderr=out)
+        call_command('render_new_sources', *args, '--report-dir', REPORT_DIR,
+                     stdout=out, stderr=out)
     return out.getvalue()
 
 

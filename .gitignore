@@ -219,3 +219,21 @@ db_check.sqlite3
 # в истории git двоичный файл на 6,5 МБ остался бы навсегда. Тот же довод,
 # что у reviewer.html выше.
 qls_handover_*.zip
+
+# ИСКЛЮЧЕНИЕ (2026-08-28): импорт трёх новых источников. Тот же принцип,
+# что у corpus_converter_scaleup выше — читаемый отчёт и артефакты, без
+# которых нельзя ни откатить, ни перепроверить:
+#   report.md                    — итог сессии для владельца;
+#   baseline_before_import.json  — отпечатки 31 699 задач и 63 250
+#     подпунктов ДО импорта. Единственное доказательство утверждения
+#     «ни одна старая задача не изменилась»: после импорта его уже не
+#     снять, а import_invariants_check без него не запустить;
+#   gate_new_sources_backup.json — content_format 9 066 задач ДО шлюза,
+#     путь отката (та же логика, что у matek_fixed_backup.json).
+# *_warnings.txt и gate_new_sources.json остаются игнорируемыми — это
+# машинный вывод, пересобирается сухим прогоном команды за минуту.
+!reports/import_new_sources/
+reports/import_new_sources/*
+!reports/import_new_sources/report.md
+!reports/import_new_sources/baseline_before_import.json
+!reports/import_new_sources/gate_new_sources_backup.json

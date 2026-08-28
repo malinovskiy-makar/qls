@@ -81,6 +81,8 @@ class Command(BaseCommand):
                             help='импортировать только первые N (усечение называется в выводе)')
         parser.add_argument('--data-dir',
                             help='папка выгрузки SolveHub (по умолчанию weconomics-data/solvehub)')
+        parser.add_argument('--report-dir',
+                            help='куда класть отчёт; тесты обязаны давать временную папку — иначе затирают боевой')
 
     def handle(self, *args, **options):
         do_apply = options['apply']
@@ -222,5 +224,5 @@ class Command(BaseCommand):
             lines.append(f'  ⚠️ ОХВАТ УСЕЧЁН: --limit {limit} — '
                          f'обработана только часть корпуса')
         lines.append('  ' + write_warnings(
-            'solvehub_warnings.txt', warnings, converted))
+            'solvehub_warnings.txt', warnings, converted, options.get('report_dir')))
         self.stdout.write(self.style.SUCCESS('\n'.join(lines)))
