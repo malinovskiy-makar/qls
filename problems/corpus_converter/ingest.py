@@ -176,3 +176,23 @@ def create_problem(*, source, external_id, title, statement_md, answer_md,
                     order=order,
                 )
     return problem
+
+
+def write_warnings(file_name, warnings, processed):
+    """Выписать предупреждения конвертера в reports/import_new_sources/.
+
+    ⚠️ Пустой результат НЕ затирает прошлый файл. Первый прогон
+    `import_shkolkovo --apply` записал 933 предупреждения, а следующий
+    сухой прогон (проверка идемпотентности — импортировать нечего, значит
+    и предупреждений ноль) перезаписал файл пустотой. Молчаливая потеря
+    отчёта читается как «предупреждений не было».
+
+    Возвращает строку для вывода команды."""
+    out_dir = os.path.join(settings.BASE_DIR, 'reports', 'import_new_sources')
+    os.makedirs(out_dir, exist_ok=True)
+    out_path = os.path.join(out_dir, file_name)
+    if not processed and os.path.exists(out_path):
+        return f'предупреждения: обрабатывать было нечего, прежний {out_path} сохранён'
+    with open(out_path, 'w', encoding='utf-8') as f:
+        f.write('\n'.join(warnings))
+    return f'предупреждения ({len(warnings)}) выписаны в {out_path}'
