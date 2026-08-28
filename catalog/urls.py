@@ -8,6 +8,10 @@ urlpatterns = [
     path('',                                    views.problem_list,       name='problem_list'),
     path('random/',                             views.random_problem,     name='random_problem'),
     path('problem/<int:pk>/',                   views.problem_detail,     name='problem_detail'),
+    # Сгенерированные системой картинки (TikZ -> SVG). Отдаются ТОЛЬКО
+    # по первичному ключу ProblemFigure — адрес никогда не берётся из
+    # текста задачи (см. problems/figures.py).
+    path('figure/<int:pk>.svg',                 views.problem_figure_svg, name='problem_figure_svg'),
     # Публичный API для модального окна
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
 

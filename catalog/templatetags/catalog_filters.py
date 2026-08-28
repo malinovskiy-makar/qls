@@ -1,5 +1,6 @@
 from django import template
 
+from problems.figures import render_figures as _render_figures
 from problems.rendering import render_markdown as _render_markdown
 
 register = template.Library()
@@ -93,3 +94,20 @@ def render_markdown_filter(value):
     пользовательский ввод; безопасность гарантирует сама функция.
     """
     return _render_markdown(value)
+
+
+@register.filter(name='render_figures')
+def render_figures_filter(html, problem):
+    """Подставить сгенерированные картинки ПОСЛЕ санитайзера.
+
+    В шаблоне обязательно стоит вторым:
+        {{ problem.statement|render_markdown|render_figures:problem|safe }}
+
+    Порядок виден прямо в разметке и это намеренно: сначала `nh3`
+    вычищает вообще всё, включая любой `<img>`/`<svg>` из текста задачи,
+    и только потом маркер `[[FIGURE:<hex>]]` превращается в картинку,
+    адрес которой берётся из строки `ProblemFigure` ЭТОЙ задачи.
+    Расширять allow-list санитайзера при этом не нужно —
+    см. `problems/figures.py` и ADR 0031.
+    """
+    return _render_figures(html, problem)

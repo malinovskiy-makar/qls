@@ -38,6 +38,7 @@ from problems.corpus_converter.math_canon import canonicalize
 from problems.corpus_converter.sol_leak import detect_solution_leak
 from problems.corpus_converter.structure_guard import check_problem
 from problems.corpus_converter.text_env import convert_text_environments
+from problems.corpus_converter.tikz_render import MARKER_RE, extract_tikz_blocks
 from problems.corpus_converter.tex_lexer import environment_balance
 from problems.rendering import render_markdown
 
@@ -57,12 +58,15 @@ class GateVerdict:
 
 
 def polish_field(text_md):
-    """Фазы 4 → 5 → 1 поверх выхода `convert_text_field`.
+    r"""Фазы 4 → 5 → 1 поверх выхода `convert_text_field`.
 
     Порядок обязателен: сначала снимаются текстовые обёртки (иначе
-    `\\begin{quote}` мешает лексеру видеть настоящие границы), потом
-    чинятся опечатки макросов (иначе `\\Tilde` дойдёт до KaTeX
-    неизвестной командой), и только потом канонизируется математика."""
+    `\begin{quote}` мешает лексеру видеть настоящие границы), потом
+    чинятся опечатки макросов (иначе `\Tilde` дойдёт до KaTeX
+    неизвестной командой), и только потом канонизируется математика.
+
+    TikZ сюда уже не попадает: он вырезан из СЫРОГО текста раньше, до
+    стадии 1 (см. `convert_problem_v2`)."""
     text = convert_text_environments(text_md or '')
     text = apply_macro_fixes(text)
     return canonicalize(text)
@@ -73,6 +77,35 @@ def convert_problem_v2(statement, answer='', solution='', existing_parts=None):
 
     Стадия 1 не тронута — у неё свои живые регрессии (#41612, #26337,
     #47127, #41824), и они обязаны продолжать проходить."""
+    figures = []
+
+    def cut_figures(raw_text, source_field, part_label=None):
+        """Вырезать TikZ из СЫРОГО текста, до стадии 1.
+
+        ⚠️ Порядок выяснен прогоном компиляции, а не рассуждением.
+        Сначала извлечение стояло ПОСЛЕ стадии 1 — и картинки не
+        собирались: `normalize_dashes` в `core.py` успевала превратить
+        `--` в `–`, а ` - ` в ` — ` ВНУТРИ кода картинки, и latex падал
+        на `\\draw (0,1.5) – (4.5,1.5);` и `{52 — 0.5*x^2}` (живые
+        #43955, #30164, #30172). TikZ — не проза, и через
+        типографскую нормализацию проходить не должен вовсе.
+
+        Маркер `[[FIGURE:<hex>]]` стадию 1 переживает без изменений:
+        в нём нет ни дефисов, ни `%`, ни математики."""
+        out, blocks = extract_tikz_blocks(raw_text or '')
+        for digest, source in blocks:
+            if not any(f['hash'] == digest for f in figures):
+                figures.append({'hash': digest, 'source': source,
+                                'field': source_field, 'part': part_label})
+        return out
+
+    statement = cut_figures(statement, 'statement')
+    answer = cut_figures(answer, 'answer')
+    solution = cut_figures(solution, 'solution')
+    if existing_parts is not None:
+        existing_parts = [(label, cut_figures(text, 'part', label))
+                          for label, text in existing_parts]
+
     result = convert_problem(
         statement=statement, answer=answer, solution=solution,
         existing_parts=existing_parts,
@@ -82,6 +115,9 @@ def convert_problem_v2(statement, answer='', solution='', existing_parts=None):
         part['statement_md'] = polish_field(part['statement_md'])
     result['answer_md'] = polish_field(result['answer_md'])
     result['solution_md'] = polish_field(result['solution_md'])
+    #: Блоки TikZ, которые надо скомпилировать в ProblemFigure. Сам
+    #: конвертер в базу не пишет — это делает corpus_build_figures.
+    result['figures'] = figures
     return result
 
 
@@ -101,7 +137,8 @@ def build_blocks(raw_statement, raw_parts, raw_answer, raw_solution, result):
     return blocks
 
 
-def render_preflight_v2(blocks, checker, raw_statement=''):
+def render_preflight_v2(blocks, checker, raw_statement='',
+                        available_figures=None):
     """Вердикт шлюза по одной задаче.
 
     `blocks` — список `(имя, исходный_текст, канонизированный_md)`.
@@ -128,6 +165,23 @@ def render_preflight_v2(blocks, checker, raw_statement=''):
     if needs_content:
         add('EMPTY-SRC', 'у задачи нет содержимого ни в одном блоке — '
                          'дефект материала, не конвертера')
+
+    # --- 6б. маркер картинки без готовой картинки -----------------------
+    # Маркер, для которого нет строки ProblemFigure, на экране просто
+    # исчезает (см. problems/figures.py) — то есть график молча пропал бы.
+    # Это такой же дефект показа, как сырой ddplot, и пропускать его
+    # нельзя. Проверка включается только когда вызывающая сторона знает
+    # список готовых картинок (передала available_figures).
+    if available_figures is not None:
+        missing = sorted({
+            match.group(1)[:12]
+            for _name, _raw, canonical in blocks
+            for match in MARKER_RE.finditer(canonical or '')
+            if match.group(1) not in available_figures
+        })
+        if missing:
+            add('FIGURE-MISSING',
+                f'картинка не собрана для маркеров: {missing}')
 
     # --- 4. баланс окружений (до HTML-рендера) --------------------------
     for name, _raw, canonical in blocks:

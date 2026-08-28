@@ -9,7 +9,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
-from problems.models import Collection, Problem, Source, Topic
+from problems.models import (
+    Collection, Problem, ProblemFigure, Source, Topic,
+)
 from problems.management.commands.apply_topic_mapping import CANONICAL
 
 # ── Утилита: убираем LaTeX для превью ──────────────────────────────────────
@@ -697,3 +699,26 @@ def smart_search(request):
         'difficulty_choices': range(1, 6),
     })
 
+
+def problem_figure_svg(request, pk):
+    """Отдать СГЕНЕРИРОВАННУЮ системой картинку (ProblemFigure).
+
+    Отдаётся только то, что лежит в нашей таблице: адрес собирается по
+    первичному ключу, из текста задачи сюда не попадает ничего (см.
+    problems/figures.py). SVG уже санитизирован при генерации.
+
+    Заголовки — третий, независимый рубеж поверх чистки SVG и того, что
+    картинка вставляется тегом <img> (в <img> скрипты не исполняются):
+    CSP запрещает картинке вообще любые внешние обращения и скрипты,
+    nosniff не даёт браузеру передумать про тип, а Content-Disposition
+    inline исключает трактовку как загрузку.
+    """
+    figure = get_object_or_404(ProblemFigure, pk=pk)
+    response = HttpResponse(figure.svg, content_type='image/svg+xml')
+    response['Content-Security-Policy'] = (
+        "default-src 'none'; style-src 'unsafe-inline'; sandbox"
+    )
+    response['X-Content-Type-Options'] = 'nosniff'
+    response['Content-Disposition'] = 'inline'
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response

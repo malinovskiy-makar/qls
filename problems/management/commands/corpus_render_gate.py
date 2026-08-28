@@ -37,7 +37,7 @@ from problems.corpus_converter.preflight_gate import (  # noqa: E402
 from problems.corpus_converter.reshalki_dollar_exclusions import (  # noqa: E402
     FORCED_EXCLUDE_RESHALKI_DOLLAR_SPLIT,
 )
-from problems.models import Problem, ProblemPart  # noqa: E402
+from problems.models import Problem, ProblemFigure, ProblemPart  # noqa: E402
 
 SOURCES = {
     'archive3': (14, 'Overleaf Archive 3 (ОШ/ЛШ Олмат)'),
@@ -114,7 +114,13 @@ def _evaluate(problem, checker):
     old_pass = may_render_as_markdown(result) and not result['warnings']
     blocks = build_blocks(problem.statement, raw_parts, problem.answer,
                           problem.solution, result)
-    verdict = render_preflight_v2(blocks, checker, raw_statement=problem.statement)
+    # Готовые картинки ЭТОЙ задачи: маркер без строки ProblemFigure —
+    # это молча пропавший график, шлюз обязан его поймать.
+    available = set(ProblemFigure.objects.filter(problem=problem)
+                    .values_list('tikz_hash', flat=True))
+    verdict = render_preflight_v2(blocks, checker,
+                                  raw_statement=problem.statement,
+                                  available_figures=available)
     return verdict, old_pass
 
 

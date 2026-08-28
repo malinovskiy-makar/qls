@@ -50,7 +50,7 @@ from problems.corpus_converter.preflight_gate import (
 from problems.corpus_converter.reshalki_dollar_exclusions import (
     FORCED_EXCLUDE_RESHALKI_DOLLAR_SPLIT,
 )
-from problems.models import Problem
+from problems.models import Problem, ProblemFigure
 
 #: те же четыре легаси-источника и id, что у corpus_scaleup_legacy.py /
 #: corpus_manual_review_queue.py — единый список, не выдумывается заново.
@@ -131,8 +131,12 @@ class Command(BaseCommand):
                     )
                     blocks = build_blocks(p.statement, existing_parts, p.answer,
                                           p.solution, result)
-                    verdict = render_preflight_v2(blocks, checker,
-                                                  raw_statement=p.statement)
+                    available = set(
+                        ProblemFigure.objects.filter(problem=p)
+                        .values_list('tikz_hash', flat=True))
+                    verdict = render_preflight_v2(
+                        blocks, checker, raw_statement=p.statement,
+                        available_figures=available)
                     if verdict.ok:
                         pass_ids.append(p.id)
                     else:
