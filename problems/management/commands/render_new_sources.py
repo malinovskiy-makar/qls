@@ -32,11 +32,6 @@
 import json
 import os
 
-# Синхронный playwright поднимает event loop, после чего Django запрещает
-# ORM. Доступ к базе здесь на чтение и в один поток — ровно случай, для
-# которого флаг и предназначен (см. katex_preflight docstring).
-os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', '1')
-
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
@@ -99,6 +94,33 @@ class Command(BaseCommand):
                                  'временную папку — иначе затирают боевой')
 
     def handle(self, *args, **options):
+        """Обёртка: выставить DJANGO_ALLOW_ASYNC_UNSAFE на время прогона и
+        ВЕРНУТЬ окружение как было.
+
+        Синхронный playwright поднимает event loop, после чего Django
+        запрещает ORM; доступ к базе здесь на чтение и в один поток —
+        ровно случай, для которого флаг и предназначен (см. docstring
+        `katex_preflight`).
+
+        ⚠️ Ни на импорте модуля, ни «навсегда» эту переменную ставить
+        нельзя, и это не стиль. Django импортирует модули команд при
+        автопоиске, а тесты команду ещё и запускают — переменная
+        оставалась в процессе, и
+        `test_production_settings.test_check_deploy_is_clean` падал с
+        `async.E001` («не выставляйте DJANGO_ALLOW_ASYNC_UNSAFE в
+        развёртывании»). Поймано полным прогоном, не рассуждением.
+        """
+        previous = os.environ.get('DJANGO_ALLOW_ASYNC_UNSAFE')
+        os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = '1'
+        try:
+            return self._run(*args, **options)
+        finally:
+            if previous is None:
+                os.environ.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
+            else:
+                os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = previous
+
+    def _run(self, *args, **options):
         do_apply = options['apply']
         limit = options['limit']
         slugs = [options['source']] if options['source'] else list(SOURCES)

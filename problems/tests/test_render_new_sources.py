@@ -5,8 +5,9 @@
 у которого свои тесты. Здесь проверяется то, что вокруг него: кого команда
 берёт в кандидаты, кого не трогает никогда, что она пишет и что НЕ пишет.
 """
-from io import StringIO
+import os
 import tempfile
+from io import StringIO
 from unittest import mock
 
 from django.core.management import call_command
@@ -169,3 +170,57 @@ class RenderNewSourcesTests(TestCase):
         with self.assertRaises(CommandError) as ctx:
             run('--apply')
         self.assertIn(SOLVEHUB, str(ctx.exception))
+
+
+class AsyncUnsafeEnvTests(TestCase):
+    """Команда не имеет права оставлять DJANGO_ALLOW_ASYNC_UNSAFE в процессе.
+
+    Поймано полным прогоном, а не рассуждением. Переменная нужна на время
+    работы браузера (синхронный playwright + ORM), но если она остаётся,
+    `check --deploy` в том же процессе начинает ругаться `async.E001` —
+    «не выставляйте DJANGO_ALLOW_ASYNC_UNSAFE в развёртывании», — и
+    падает `test_production_settings.test_check_deploy_is_clean`. Django
+    импортирует модули команд при автопоиске, а тесты команду ещё и
+    запускают, поэтому проверяются оба случая: импорт и прогон.
+    """
+
+    VAR = 'DJANGO_ALLOW_ASYNC_UNSAFE'
+
+    def setUp(self):
+        self.sources = {
+            name: Source.objects.create(name=name)
+            for name in (SHKOLKOVO, SOLVEHUB, LESH)
+        }
+        self._saved = os.environ.pop(self.VAR, None)
+        self.addCleanup(self._restore)
+
+    def _restore(self):
+        if self._saved is None:
+            os.environ.pop(self.VAR, None)
+        else:
+            os.environ[self.VAR] = self._saved
+
+    def test_importing_the_module_does_not_set_the_variable(self):
+        import subprocess
+        import sys
+
+        code = (
+            'import os, django;'
+            "os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings');"
+            'django.setup();'
+            'import problems.management.commands.render_new_sources;'
+            f"print(os.environ.get('{self.VAR}', 'НЕ ЗАДАНА'))"
+        )
+        env = {k: v for k, v in os.environ.items() if k != self.VAR}
+        result = subprocess.run(
+            [sys.executable, '-c', code], capture_output=True, text=True,
+            env=env, encoding='utf-8', errors='replace')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn('НЕ ЗАДАНА', result.stdout)
+
+    def test_running_the_command_restores_the_environment(self):
+        problem = Problem.objects.create(statement='Условие $x=1$')
+        SourceReference.objects.create(
+            problem=problem, source=self.sources[SOLVEHUB], problem_number='1')
+        run('--apply')
+        self.assertNotIn(self.VAR, os.environ)
