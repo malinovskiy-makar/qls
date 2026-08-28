@@ -36,6 +36,16 @@ class Command(BaseCommand):
             '--apply', action='store_true',
             help='Боевой прогон. Без флага команда только считает.',
         )
+        # ⚠️ Путь снимка обязан настраиваться, иначе прогон тестов затирает
+        # боевой журнал отката: тест вызывает --apply, честно пишет в тот же
+        # фиксированный файл, и снимок 31 694 записей подменяется одной
+        # тестовой строкой. Ровно это и случилось 28.08 — поймано по размеру
+        # файла (124 байта вместо сотен килобайт).
+        parser.add_argument(
+            '--backup-path', default=None,
+            help='Куда положить снимок старых значений. По умолчанию '
+                 f'{BACKUP_DIR}/provenance_backfill_backup.json',
+        )
 
     def handle(self, *args, **options):
         apply_mode = options['apply']
@@ -65,8 +75,9 @@ class Command(BaseCommand):
             return
 
         # Обратимый журнал: старые значения четырёх полей до правки.
-        BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-        backup_path = BACKUP_DIR / 'provenance_backfill_backup.json'
+        backup_path = Path(options['backup_path'] or
+                           BACKUP_DIR / 'provenance_backfill_backup.json')
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
         backup = list(candidates.values(
             'id', 'embedding_version', 'embedding_model_build',
             'embedding_source_hash', 'embedding_built_at',

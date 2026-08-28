@@ -5,7 +5,9 @@
 ничего другого. Проверяется и то, и другое: что заполняет правильно и что
 падает, если защищённые поля разошлись.
 """
+import tempfile
 from io import StringIO
+from pathlib import Path
 from unittest import mock
 
 from django.core.management import call_command
@@ -19,13 +21,24 @@ from problems.models import Problem
 class BackfillCommandTests(TestCase):
 
     def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
         self.with_vector = Problem.objects.create(
             statement='Условие с вектором', embedding=b'\x00' * 4,
         )
         self.without_vector = Problem.objects.create(statement='Условие без вектора')
 
     def _run(self, *args):
+        """Прогон команды со снимком в свою временную папку.
+
+        Путь подставляется всегда, когда тест не задал его сам: без этого
+        каждый вызов --apply писал бы в боевой
+        reports/embeddings_scaleup/provenance_backfill_backup.json и затирал
+        журнал отката настоящего backfill.
+        """
         out = StringIO()
+        if '--backup-path' not in args:
+            args = args + ('--backup-path', str(Path(self.tmp.name) / 'snapshot.json'))
         call_command('backfill_embedding_provenance', *args, stdout=out, stderr=out)
         return out.getvalue()
 
@@ -85,3 +98,22 @@ class BackfillCommandTests(TestCase):
         with mock.patch.object(prov, 'protected_fingerprint', side_effect=['до', 'после']):
             with self.assertRaises(CommandError):
                 self._run('--apply')
+
+    def test_путь_снимка_настраивается(self):
+        """Иначе прогон тестов затирает боевой журнал отката.
+
+        Команда писала снимок в фиксированный
+        reports/embeddings_scaleup/provenance_backfill_backup.json. Тест,
+        вызывающий --apply, честно писал туда же — и боевой журнал,
+        снятый перед правкой 31 694 записей, подменялся одной тестовой
+        строкой. Обнаружено по размеру файла: 124 байта вместо ожидаемых сотен КБ.
+        """
+        import json as _json
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp) / 'snapshot.json'
+            self._run('--apply', '--backup-path', str(target))
+            self.assertTrue(target.exists(), 'снимок не записан по указанному пути')
+            self.assertEqual(len(_json.loads(target.read_text(encoding='utf-8'))), 1)
