@@ -1,0 +1,86 @@
+{
+  "Id": 112560,
+  "IsDeactivated": false,
+  "Name": "предкурс",
+  "QuestionTexSessionId": 231778,
+  "GradeCriteriaTexSessionId": 0,
+  "QuestionFiles": [],
+  "AnswerTypeId": 1,
+  "SolutionTexSessionId": 231783,
+  "SolutionFiles": null,
+  "Answer": {
+    "TexSessionId": 0,
+    "text": "цена 16, объем 68, дефицит 5"
+  },
+  "AnswerCheckoutFile": null,
+  "AnswerNeedsAttachment": false,
+  "RelatesToQuestionContentId": 0,
+  "NewTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "AnswerHiddenTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "IsPrivate": false,
+  "CreatedAt": "2025-03-27T14:14:03Z",
+  "UpdatedAt": "2025-03-27T14:20:13Z",
+  "AuthorUserId": 0,
+  "Faq": null,
+  "SortOrder": 0,
+  "SourceId": 0,
+  "AnswerIsProof": false,
+  "LessonId": 0,
+  "LessonTimeCode": 62412,
+  "IsSurvey": false,
+  "IsQuizQuestion": false,
+  "WrongAnswer": {
+    "String": "",
+    "Valid": false
+  },
+  "SolutionReasoning": "",
+  "Lessons": null,
+  "Timestamps": null,
+  "IsEGE": false,
+  "InputType": 1,
+  "AnswerProperty": {},
+  "IsNotTrainable": false,
+  "SolutionPlanTexSessionId": 0,
+  "DifficultyId": 0,
+  "ParentThemeId": 0,
+  "LaboratoryFileId": null,
+  "Files": null,
+  "Themes": [
+    4669
+  ],
+  "Tags": [],
+  "QuestionHomeworks": {},
+  "Sources": [],
+  "Theory": false,
+  "TheoryFacts": false,
+  "QuestionFragments": false,
+  "QuestionTaskReviews": false,
+  "QuestionSolutionPlans": false,
+  "QuestionReferenceMaterials": false,
+  "RelatedQuestions": [],
+  "ChainedQuestions": [],
+  "LaboratoryFileSrc": "",
+  "AlternativeSolutions": null,
+  "isNew": false,
+  "theme_memberships": [
+    {
+      "themeId": 4669,
+      "themeName": "Совершенная конкуренция - задачи",
+      "parentThemeName": "Совершенная конкуренция"
+    }
+  ],
+  "statement_tex": "На рынке товара X функция спроса задана уравнением \\( Q_d = 100 - 2P \\), а функция предложения -- \\( Q_s = 20 + 3P \\), где \\( Q_d \\) — объем спроса, \\( Q_s \\) — объем предложения, \\( P \\) — цена товара.  \n\nа) Найдите равновесную цену и равновесный объем. \n\nб) Что произойдет, если государство установит максимальную цену на уровне 15 денежных единиц?\n\nВведите ответы на пункты в формате: <<цена 10, объем 20, дефицит 10>>, если в пункте б) дефицит, или <<цена 10, объем 20, избыток 10>>, если - избыток.",
+  "solution_tex": "а) Нахождение равновесной цены и объема\n\nУсловие равновесия:\n\\[ Q_d = Q_s \\]\n\nПодставляем функции:\n\\[ 100 - 2P = 20 + 3P \\]\n\nРешаем уравнение:\n\n$$100 - 20 = 3P + 2P $$\n\n$$P_e = 16$$\n\n$$Q_e = 20+3 \\cdot 16 = 68 $$\n\n\nб) Установление максимальной цены 15 ден. ед.\n\nПри $P_{max} = 15$ ден. ед.:\n\nОбъем спроса:\n\\[ Q_d = 100 - 2 \\cdot 15 = 70  \\]\n\nОбъем предложения:\n\\[ Q_s = 20 + 3 \\cdot 15 = 65 \\]\n\n\nДефицит:\n\\[ Q_d - Q_s = 70 - 65 = 5  \\]",
+  "criteria_tex": null,
+  "answer_tex": null,
+  "source_names": [],
+  "source_name": null,
+  "_source_url": "https://3.shkolkovo.online/catalog/4669/112560",
+  "_fetched_at": "2026-08-20T16:30:02.068372+00:00"
+}

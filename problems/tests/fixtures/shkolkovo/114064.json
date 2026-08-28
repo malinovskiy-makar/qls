@@ -1,0 +1,86 @@
+{
+  "Id": 114064,
+  "IsDeactivated": false,
+  "Name": "эластичность",
+  "QuestionTexSessionId": 234414,
+  "GradeCriteriaTexSessionId": 0,
+  "QuestionFiles": [],
+  "AnswerTypeId": 1,
+  "SolutionTexSessionId": 234415,
+  "SolutionFiles": null,
+  "Answer": {
+    "TexSessionId": 0,
+    "text": "3"
+  },
+  "AnswerCheckoutFile": null,
+  "AnswerNeedsAttachment": false,
+  "RelatesToQuestionContentId": 0,
+  "NewTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "AnswerHiddenTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "IsPrivate": false,
+  "CreatedAt": "2025-03-31T00:42:50Z",
+  "UpdatedAt": "2026-01-21T04:28:36Z",
+  "AuthorUserId": 0,
+  "Faq": null,
+  "SortOrder": 0,
+  "SourceId": 0,
+  "AnswerIsProof": false,
+  "LessonId": 0,
+  "LessonTimeCode": 26916,
+  "IsSurvey": false,
+  "IsQuizQuestion": true,
+  "WrongAnswer": {
+    "String": "1\n2\n4",
+    "Valid": true
+  },
+  "SolutionReasoning": "",
+  "Lessons": null,
+  "Timestamps": null,
+  "IsEGE": false,
+  "InputType": 1,
+  "AnswerProperty": {},
+  "IsNotTrainable": false,
+  "SolutionPlanTexSessionId": 0,
+  "DifficultyId": 0,
+  "ParentThemeId": 0,
+  "LaboratoryFileId": null,
+  "Files": null,
+  "Themes": [
+    4650
+  ],
+  "Tags": [],
+  "QuestionHomeworks": {},
+  "Sources": [],
+  "Theory": false,
+  "TheoryFacts": false,
+  "QuestionFragments": false,
+  "QuestionTaskReviews": false,
+  "QuestionSolutionPlans": false,
+  "QuestionReferenceMaterials": false,
+  "RelatedQuestions": [],
+  "ChainedQuestions": [],
+  "LaboratoryFileSrc": "",
+  "AlternativeSolutions": null,
+  "isNew": false,
+  "theme_memberships": [
+    {
+      "themeId": 4650,
+      "themeName": "единственный ответ - эластичность",
+      "parentThemeName": "Эластичность"
+    }
+  ],
+  "statement_tex": "На линейной кривой спроса отмечены три точки. В какой из них спрос является наименее эластичным?  \n\n\\begin{center}\n    \\includegraphics[width=0.8\\textwidth]{ela.png} % Укажите нужную ширину (например, 0.8\\textwidth)\n\\end{center}\n\n1. A \\\\  \n2. B \\\\  \n3. C \\\\",
+  "solution_tex": "Эластичность спроса на линейной кривой $Q_d=a-bP$ определяется формулой:\n\n\\[\nE_d = {-b} \\cdot \\frac{P}{Q},\n\\]\n\nВспомним несколько важных свойств линейной функции спроса:\\\\\n- В верхней части кривой (высокая цена, низкий объём) эластичность больше 1.\\\\\n- В середине кривой эластичность равна 1.\\\\\n- В нижней части кривой (низкая цена, высокий объём) эластичность меньше 1.\\\\\n\nТаким образом, наименее эластичный спрос соответствует точке с наименьшим отношением \\(\\frac{P}{Q}\\), которая находится в нижней части кривой (точка C).\\\\",
+  "criteria_tex": null,
+  "answer_tex": null,
+  "source_names": [],
+  "source_name": null,
+  "_source_url": "https://3.shkolkovo.online/catalog/4650/114064",
+  "_fetched_at": "2026-08-20T16:29:44.776952+00:00"
+}
