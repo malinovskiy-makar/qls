@@ -11,9 +11,11 @@
 """
 import json
 import tempfile
+from io import StringIO
 from pathlib import Path
 
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
 from problems.models import Problem
@@ -90,6 +92,55 @@ class BuildEvalSetBTests(TestCase):
                 данные = json.loads(Path(путь).read_text(encoding='utf-8'))
             наборы.append([c['relevant_ids'] for c in данные['cases']])
         self.assertEqual(наборы[0], наборы[1])
+
+    def test_настоящий_расход_попадает_в_итог(self):
+        # ⚠️ ЭТОТ ТЕСТ ЛОВИТ УЖЕ СЛУЧИВШУЮСЯ ОШИБКУ. Первая версия команды
+        # читала расход как `итог.usage.cost` через getattr с умолчанием 0.0,
+        # а `usage` — это СЛОВАРЬ с ключом `cost_usd`. getattr на словаре
+        # всегда возвращал умолчание, и счётчик денег молча показывал ноль:
+        # прогон на тысяче задач отчитался бы «потрачено $0.00».
+        with tempfile.TemporaryDirectory() as d:
+            путь = self._путь(d)
+            вывод = StringIO()
+            call_command('build_eval_set_b', limit=3, out=путь, apply=True,
+                         stdout=вывод, verbosity=1)
+            данные = json.loads(Path(путь).read_text(encoding='utf-8'))
+        self.assertGreater(данные['spent_usd'], 0.0)
+
+    def test_прогон_останавливается_при_превышении_бюджета(self):
+        # Смета — это оценка, а оценка может ошибиться. Потолок считается по
+        # НАСТОЯЩИМ токенам из ответа, поэтому он держит даже тогда, когда
+        # смета промахнулась.
+        with tempfile.TemporaryDirectory() as d:
+            путь = self._путь(d)
+            with self.assertRaises(CommandError) as поймано:
+                call_command('build_eval_set_b', limit=3, out=путь,
+                             apply=True, max_cost=0.0000001, verbosity=0)
+        self.assertIn('бюджет', str(поймано.exception).lower())
+
+    def test_бюджет_не_мешает_когда_его_хватает(self):
+        with tempfile.TemporaryDirectory() as d:
+            путь = self._путь(d)
+            call_command('build_eval_set_b', limit=3, out=путь, apply=True,
+                         max_cost=100.0, verbosity=0)
+            данные = json.loads(Path(путь).read_text(encoding='utf-8'))
+        self.assertEqual(данные['count'], 9)
+
+    def test_смета_учитывает_кэш_системного_блока(self):
+        # Блок CORE помечен cache_control и на повторных обращениях стоит
+        # десятую часть цены. Смета, считающая его полным тарифом на каждой
+        # из тысячи задач, завышена почти вдвое — а завышенная смета так же
+        # мешает принять решение, как и заниженная.
+        with tempfile.TemporaryDirectory() as d:
+            вывод = StringIO()
+            call_command('build_eval_set_b', limit=10, out=self._путь(d),
+                         stdout=вывод, verbosity=1)
+        текст = вывод.getvalue()
+        self.assertIn('кэш', текст.lower())
+        # Смета показывает вилку, а не одно число: токенизатор русского
+        # текста у модели точно не известен, и делать вид, что известен,
+        # нельзя.
+        self.assertIn('…', текст.replace('...', '…'))
 
     def test_команда_не_меняет_защищённые_поля(self):
         поля = ('statement', 'solution', 'answer', 'embedding',

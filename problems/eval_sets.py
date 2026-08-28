@@ -100,7 +100,7 @@ def group_duplicates_by_text(rows, min_len=MIN_STATEMENT_LEN) -> list[list[int]]
 
 
 def save_eval_set(path, name, description, cases, warnings=None,
-                  mode='text') -> Path:
+                  mode='text', spent_usd=None) -> Path:
     """Пишет набор на диск. Перезаписывает файл целиком.
 
     mode — чем задаётся запрос:
@@ -124,6 +124,10 @@ def save_eval_set(path, name, description, cases, warnings=None,
         'mode': mode,
         'built_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         'count': len(cases),
+        # Сколько денег реально стоил набор. Нужен только набору B; у
+        # бесплатных наборов остаётся 0.0, а не отсутствует, — иначе
+        # сравнение стоимости между прогонами упирается в KeyError.
+        'spent_usd': float(spent_usd or 0.0),
         'warnings': list(warnings or []),
         'cases': [
             {
