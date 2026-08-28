@@ -1,0 +1,50 @@
+{
+  "id": 5518,
+  "hash": "00160353622325841791",
+  "external_id": null,
+  "parent_hash": "",
+  "subject_id": 1,
+  "title": "S022",
+  "md": "Для одного продавца функция спроса имеет вид: $Q_d=2,25-P^2$ Qd = 2,25 – P 2. Этот продавец очень плохо знает микроэкономику, поэтому он думает, что «предельная выручка» – это то же самое, что и «максимальная выручка». Опираясь на свои ошибочные представления, он выбрал такой объем выпуска, при котором выручка численно равна предельной выручке. \n\nСколько процентов от действительно максимальной выручки он сейчас получает?",
+  "answer_md": "$P = \\sqrt{2,25 - Q}. \\quad R = PQ = Q \\sqrt{2,25 - Q}. \\quad MR = R' = \\sqrt{2,25 - Q} - \\frac{Q}{2\\sqrt{2,25 - Q}}.$ \n\nПродавец ошибочно полагает, что $R$ должен быть равен $MR$. \n\n$Q \\sqrt{2,25 - Q} = \\sqrt{2,25 - Q} - \\frac{Q}{2\\sqrt{2,25 - Q}}. \\quad Q(2,25 - Q) = (2,25 - Q) - 0,5Q.$ \n\n$Q^2 - 3,75Q + 2,25 = 0. \\quad Q_{1,2} = \\frac{3,75 \\pm \\sqrt{14,0625 - 9}}{2} = \\frac{3,75 \\pm 2,25}{2}. \\quad Q_1 = 3.$  (не подходит, так как при этом $P=\\sqrt{2,25-3}$  ). \n\n$Q_2 = 0,75. \\quad P = \\sqrt{2,25 - 0,75} = \\sqrt{1,5}.$ Таким образом, в настоящий момент продавец получает выручку $R=PQ=0,75\\sqrt{1,5}$.\n\n Действительно максимальная выручка достигается при условии:\n\n$MR = R' = \\sqrt{2,25 - Q} - \\frac{Q}{2\\sqrt{2,25 - Q}} = 0. \\quad 2,25 - Q - 0,5Q = 0. \\quad Q = 1,5.$ \n\n$P = \\sqrt{2,25 - 1,5} = \\sqrt{0,75}.$  Максимальная выручка $R_{max}=\\sqrt{0,75}*1,5$. \n\nДоля максимальной выручки, получаемая продавцом: $\\frac{R}{R_{\\text{max}}} = \\frac{0,75 \\sqrt{1,5}}{1,5 \\sqrt{0,75}} = \\frac{1}{\\sqrt{2}} = 0,7071.$ \n\n*Ответ*: $70,71\\%$.",
+  "check_type": "single_freetext",
+  "check_options": "[]",
+  "correct_answer": "{\"type\":\"single_freetext\",\"value\":[\"70,71\",\"70,71%\",\"70.71\",\"70.71%\"]}",
+  "criteria": "[]",
+  "non_additive": false,
+  "criteria_max_points": null,
+  "created_date": "2026-05-25T17:11:49.000Z",
+  "updated_at": "2026-05-25T17:11:49.000Z",
+  "check_manual": 0,
+  "author_id": 0,
+  "author": "Фриц фон Шпицрутен",
+  "source_id": 0,
+  "source": "",
+  "difficulty": "level3",
+  "is_test": false,
+  "approved": false,
+  "ai_generated": false,
+  "visible": true,
+  "hidden": false,
+  "tagList": [
+    2,
+    10,
+    13
+  ],
+  "binaryTagList": [
+    {
+      "id": 2,
+      "value": true
+    },
+    {
+      "id": 3,
+      "value": false
+    }
+  ],
+  "userAnswer": null,
+  "myVote": null,
+  "author_object": null,
+  "source_object": null,
+  "_fetched_at": "2026-08-20T01:50:45.034196+00:00",
+  "_source_url": "https://solvehub.app/econ/problems/00160353622325841791"
+}

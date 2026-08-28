@@ -1,0 +1,48 @@
+{
+  "id": 10039,
+  "hash": "06470742608655646922",
+  "external_id": null,
+  "parent_hash": "",
+  "subject_id": 1,
+  "title": "Задание 2.2 Олимпиада Колокольникова 2024 (7 класс)",
+  "md": "На рынке футбольных мячей в стране ГОЛляндия спрос задается выражением $P_d=100-Q$, а предложение $P_s=20+Q$.  Правитель ГОЛляндии Месси Пелеевич обожает играть в футбол по выходным, поэтому решил сделать так, чтобы в стране продавалось больше мячей. Для этого он решил ввести потолок цен. При каких значениях потолка цен изменится рыночное равновесие?",
+  "answer_md": "*Решение*: \n\nНайдем рыночное равновесие до вмешательства: $P_d=P_s$, $100-Q=20+Q$ тогда $Q=40, \\ P=60$. Потолок цен - это ограничение на максимально возможную цену. При потолке цен $40$ или $50$ равновесная цена будет выше потолка, следовательно, равновесие изменится.\n\n( $3$ балла)",
+  "check_type": "multiple_choice",
+  "check_options": "[\"P = 85\",\"P = 40\",\"P = 60\",\"P = 50\"]",
+  "correct_answer": "{\"type\":\"multiple_choice\",\"value\":[false,true,false,true]}",
+  "criteria": "[]",
+  "non_additive": false,
+  "criteria_max_points": null,
+  "created_date": "2026-05-25T17:11:49.000Z",
+  "updated_at": "2026-05-25T17:11:49.000Z",
+  "check_manual": 0,
+  "author_id": 0,
+  "author": "",
+  "source_id": 0,
+  "source": "",
+  "difficulty": "none",
+  "is_test": true,
+  "approved": false,
+  "ai_generated": false,
+  "visible": true,
+  "hidden": false,
+  "tagList": [
+    10
+  ],
+  "binaryTagList": [
+    {
+      "id": 1,
+      "value": true
+    },
+    {
+      "id": 2,
+      "value": true
+    }
+  ],
+  "userAnswer": null,
+  "myVote": null,
+  "author_object": null,
+  "source_object": null,
+  "_fetched_at": "2026-08-20T02:09:27.604913+00:00",
+  "_source_url": "https://solvehub.app/econ/problems/06470742608655646922"
+}
