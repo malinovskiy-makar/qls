@@ -17,6 +17,12 @@ answer/solution/human_review. Починка текста, если понадо
 
     manage.py revert_gate_v2_blocked_markdown            # только показать
     manage.py revert_gate_v2_blocked_markdown --apply     # записать
+
+⚠️ Журнал отката кладётся в `--report-dir` (по умолчанию боевая папка
+отчётов). Аргумент существует ради тестов: без него прогон набора писал
+настоящий `gate_v2_blocked_revert_backup.json` тестовыми данными. Та же
+беда уже чинилась у команд импорта (коммит `2da55ee`) и решена так же в
+`render_new_sources` и `render_legacy_sources`.
 """
 import json
 import os
@@ -32,7 +38,7 @@ TARGET_IDS = [26603, 26632, 27371, 27422, 27496, 27509, 28772, 28775,
              28791, 28827, 28828, 28935, 29146, 29300, 29789]
 
 OUT_DIR = os.path.join(settings.BASE_DIR, 'reports', 'corpus_converter_scaleup')
-BACKUP_PATH = os.path.join(OUT_DIR, 'gate_v2_blocked_revert_backup.json')
+BACKUP_NAME = 'gate_v2_blocked_revert_backup.json'
 
 
 class Command(BaseCommand):
@@ -43,9 +49,13 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--apply', action='store_true',
                             help='записать в базу')
+        parser.add_argument('--report-dir',
+                            help='куда положить журнал отката '
+                                 '(по умолчанию reports/corpus_converter_scaleup)')
 
     def handle(self, *args, **opts):
         say = self.stdout.write
+        out_dir = opts.get('report_dir') or OUT_DIR
 
         found = {p.id: p for p in Problem.objects.filter(id__in=TARGET_IDS)}
         missing = sorted(set(TARGET_IDS) - set(found))
@@ -73,13 +83,14 @@ class Command(BaseCommand):
                 'с карточкой Notion — проверьте вручную, ничего не '
                 'записано.'.format(len(TARGET_IDS), len(to_revert)))
 
-        os.makedirs(OUT_DIR, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
+        backup_path = os.path.join(out_dir, BACKUP_NAME)
         backup = [{
             'problem_id': p.id,
             'content_format_before': p.content_format,
             'human_review': p.human_review,
         } for p in sorted(to_revert, key=lambda p: p.id)]
-        with open(BACKUP_PATH, 'w', encoding='utf-8') as f:
+        with open(backup_path, 'w', encoding='utf-8') as f:
             json.dump({
                 'note': ('Снимок ДО отката content_format markdown->plain '
                         'для 15 задач, заблокированных render_preflight_v2. '
@@ -88,7 +99,7 @@ class Command(BaseCommand):
                 'count': len(backup),
                 'problems': backup,
             }, f, ensure_ascii=False, indent=1)
-        say('Бэкап: {} ({} задач)'.format(BACKUP_PATH, len(backup)))
+        say('Бэкап: {} ({} задач)'.format(backup_path, len(backup)))
 
         ids = [p.id for p in to_revert]
         with transaction.atomic():

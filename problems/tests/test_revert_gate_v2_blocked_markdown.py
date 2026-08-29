@@ -9,12 +9,26 @@ fa93497/7952ff5) отбраковывает их, но команда render_leg
 statement/answer/solution/human_review.
 """
 import json
+import os
+import tempfile
 
 from django.core.management import CommandError, call_command
 from django.test import TestCase
 
 from problems.models import Problem
 from problems.tests.factories import make_problem
+
+#: Журнал отката уходит во ВРЕМЕННУЮ папку. Без этого прогон набора писал
+#: настоящий reports/corpus_converter_scaleup/gate_v2_blocked_revert_backup.json
+#: тестовыми данными — та же беда, что чинили у команд импорта (2da55ee).
+REPORT_DIR = tempfile.mkdtemp(prefix='qls-revert-report-')
+
+
+def run(*args):
+    """Прогон команды всегда с временной папкой отчётов."""
+    call_command('revert_gate_v2_blocked_markdown', *args,
+                 '--report-dir', REPORT_DIR)
+
 
 # Ровно список из карточки Notion (id: 3cab11c9-2bc1-81d0-ade2-f49d13029441).
 TARGET_IDS = [26603, 26632, 27371, 27422, 27496, 27509, 28772, 28775,
@@ -44,7 +58,7 @@ class RevertGateV2BlockedMarkdownTests(TestCase):
                              content_format=Problem.ContentFormat.MARKDOWN,
                              statement='Чужая задача, не трогать: $y=1$.')
 
-        call_command('revert_gate_v2_blocked_markdown', '--apply')
+        run('--apply')
 
         # Три живых id из списка карточки — точечная проверка.
         for pid in (26603, 27371, 29789):
@@ -66,7 +80,7 @@ class RevertGateV2BlockedMarkdownTests(TestCase):
     def test_dry_run_by_default_writes_nothing(self):
         _make_targets()
 
-        call_command('revert_gate_v2_blocked_markdown')
+        run()
 
         still_markdown = Problem.objects.filter(
             id__in=TARGET_IDS, content_format=Problem.ContentFormat.MARKDOWN)
@@ -75,13 +89,10 @@ class RevertGateV2BlockedMarkdownTests(TestCase):
     def test_apply_writes_backup_snapshot(self):
         _make_targets()
 
-        call_command('revert_gate_v2_blocked_markdown', '--apply')
+        run('--apply')
 
-        from django.conf import settings
-        import os
-        backup_path = os.path.join(
-            settings.BASE_DIR, 'reports', 'corpus_converter_scaleup',
-            'gate_v2_blocked_revert_backup.json')
+        backup_path = os.path.join(REPORT_DIR,
+                                   'gate_v2_blocked_revert_backup.json')
         with open(backup_path, encoding='utf-8') as f:
             payload = json.load(f)
         self.assertEqual(payload['count'], 15)
@@ -96,7 +107,7 @@ class RevertGateV2BlockedMarkdownTests(TestCase):
         targets[26603].delete()
 
         with self.assertRaisesMessage(CommandError, '26603'):
-            call_command('revert_gate_v2_blocked_markdown', '--apply')
+            run('--apply')
 
         # Ничего не записалось — даже у существующих 14.
         untouched = Problem.objects.filter(
@@ -105,14 +116,14 @@ class RevertGateV2BlockedMarkdownTests(TestCase):
 
     def test_second_apply_raises_because_nothing_left_to_revert(self):
         _make_targets()
-        call_command('revert_gate_v2_blocked_markdown', '--apply')
+        run('--apply')
 
         with self.assertRaisesMessage(CommandError, 'ожида'):
-            call_command('revert_gate_v2_blocked_markdown', '--apply')
+            run('--apply')
 
     def test_dry_run_after_apply_reports_zero_without_error(self):
         _make_targets()
-        call_command('revert_gate_v2_blocked_markdown', '--apply')
+        run('--apply')
 
         # Не должно падать — сухой прогон после отката просто видит 0.
-        call_command('revert_gate_v2_blocked_markdown')
+        run()
