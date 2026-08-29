@@ -263,6 +263,7 @@ reports/embeddings_scaleup/*
 !reports/embeddings_scaleup/session_c15_20260829.md
 !reports/embeddings_scaleup/corpus_diagnostics_c15.json
 !reports/embeddings_scaleup/eval_set_a_41307.json
+!reports/embeddings_scaleup/fixtures_status_backup.json
 
 # ИСКЛЮЧЕНИЕ (2026-08-28): импорт трёх новых источников. Тот же принцип,
 # что у corpus_converter_scaleup выше — читаемый отчёт и артефакты, без
