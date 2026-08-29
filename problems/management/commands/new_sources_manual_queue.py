@@ -60,6 +60,7 @@ class Command(BaseCommand):
         sections = []
         sections.append(self._gate_failures(rows))
         sections.append(self._images_without_files())
+        sections.append(self._plain_with_marker())
         sections.append(self._lesh_without_solution())
 
         total = sum(count for _title, count, _body in sections)
@@ -156,6 +157,45 @@ class Command(BaseCommand):
             'другим задачам (пересечение идентификаторов — ноль). Нужна '
             'повторная выгрузка картинок с сайта источника по этим id.\n')
         return ('Ссылка на картинку без файла', count,
+                note + '\n' + '\n'.join(lines))
+
+    def _plain_with_marker(self):
+        r"""`plain` + маркер картинки — публиковать НЕЛЬЗЯ.
+
+        Ветка `plain` боевого шаблона (`linebreaksbr`) подстановку не
+        делает, и ученик увидел бы `[[FIGURE:<64 hex>]]` дословно. Эти
+        задачи не прошли шлюз по другим причинам; починив их до
+        `markdown`, картинку получаем даром."""
+        names = [name for name, _loader in LOADERS.values()]
+        qs = (Problem.objects.filter(
+            source_references__source__name__in=names,
+            content_format=Problem.ContentFormat.PLAIN)
+            .distinct().prefetch_related('parts').order_by('id'))
+        lines = ['| id | где маркер | сколько |', '|---|---|---|']
+        count = 0
+        for problem in qs:
+            places = []
+            for name, text in (('условие', problem.statement),
+                               ('ответ', problem.answer),
+                               ('решение', problem.solution)):
+                found = len(re.findall(r'\[\[FIGURE:[0-9a-f]{64}\]\]', text or ''))
+                if found:
+                    places.append(f'{name} ×{found}')
+            for part in problem.parts.all():
+                found = len(re.findall(r'\[\[FIGURE:[0-9a-f]{64}\]\]',
+                                       part.statement or ''))
+                if found:
+                    places.append(f'подпункт {part.label} ×{found}')
+            if not places:
+                continue
+            count += 1
+            lines.append(f'| {problem.id} | {", ".join(places)} | '
+                         f'{sum(int(p.split("×")[1]) for p in places)} |')
+        note = ('Пока все они закрыты от учеников (`draft` + '
+                '`hidden_pending_review`), поэтому дефекта на экране нет. '
+                'Инвариант закреплён тестом `PlainFormatMarkerGuardTests`: '
+                'он краснеет, если такую задачу опубликуют.\n')
+        return ('`plain` с маркером картинки — не публиковать', count,
                 note + '\n' + '\n'.join(lines))
 
     def _lesh_without_solution(self):

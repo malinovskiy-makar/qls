@@ -152,6 +152,47 @@ class RasterFigureDisplayTests(TestCase):
         self.assertIn(b'circle', response.content)
 
 
+class PlainFormatMarkerGuardTests(TestCase):
+    r"""`plain` + маркер = сырой `[[FIGURE:…]]` на экране у ученика.
+
+    Ветка `plain` боевого шаблона — это `linebreaksbr`, без
+    `render_figures`: маркер уходит на экран дословно. Добавить туда
+    подстановку нельзя, не сняв экранирование со всей ветки, а вырезать
+    маркер молча — потерять картинку.
+
+    Поэтому инвариант такой: задача, ВИДИМАЯ ученику, не имеет права
+    одновременно быть `plain` и содержать маркер. Сегодня таких 12, и все
+    12 закрыты (`draft` + `hidden_pending_review`) — они в очереди
+    ручного разбора. Тест краснеет, если такую задачу опубликуют.
+    """
+
+    def test_visible_plain_problem_must_not_contain_marker(self):
+        marker = '[[FIGURE:' + 'a' * 64 + ']]'
+        visible = Problem.objects.filter(
+            status=Problem.Status.PUBLISHED,
+            needs_quality_review=False,
+            hidden_pending_review=False,
+            content_format=Problem.ContentFormat.PLAIN,
+        ).filter(statement__contains='[[FIGURE:')
+        self.assertEqual(list(visible), [])
+
+        # И сам механизм: у скрытой задачи маркер допустим, у видимой — нет.
+        hidden = Problem.objects.create(
+            statement=marker, answer='1',
+            content_format=Problem.ContentFormat.PLAIN,
+            status=Problem.Status.DRAFT, hidden_pending_review=True)
+        self.assertEqual(
+            Problem.objects.filter(
+                id=hidden.id, status=Problem.Status.PUBLISHED,
+                hidden_pending_review=False).count(), 0)
+
+    def test_plain_branch_shows_marker_verbatim(self):
+        """Свидетельство, а не рассуждение: вот что увидел бы ученик."""
+        from django.template.defaultfilters import linebreaksbr
+        marker = '[[FIGURE:' + 'a' * 64 + ']]'
+        self.assertIn('[[FIGURE:', linebreaksbr('график: ' + marker))
+
+
 class RasterSecurityPerimeterTests(TestCase):
     """Тот же класс атаки, что у собранных картинок, — на растровом пути.
 
