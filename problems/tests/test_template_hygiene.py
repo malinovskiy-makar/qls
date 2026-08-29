@@ -20,9 +20,16 @@ from django.conf import settings
 from django.test import TestCase
 
 # Куда не ходим: чужой код и сгенерированные отчёты.
+#
+# ⚠️ `.claude` — это рабочие папки git worktree и симлинки на соседние
+# каталоги данных. Внутри лежат ПОЛНЫЕ копии проекта другой ветки, и обход
+# без этого исключения судит чужие шаблоны как свои: 30.08 отсюда пришли 369
+# «нарушений» из одного katex-бандла в `.claude/worktrees/weconomics-data/`.
+# Причина та же, по которой исключены `materials` и `node_modules`, — просто
+# каталог появился позже, чем писался список.
 SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
               os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep)
+              os.sep + 'staticfiles' + os.sep, os.sep + '.claude' + os.sep)
 
 
 def template_files():
