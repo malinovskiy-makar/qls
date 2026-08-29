@@ -101,7 +101,8 @@ reports/corpus_converter_scaleup/*
 # команды `search_eval` и `search_eval_markup` пересобирают их за минуту.
 # Сами эталонные наборы лежат НЕ здесь, а в problems/data/ — это входные
 # данные команды, а не отчёт, и они версионируются.
-!reports/embeddings_scaleup/search_baseline_c14_20260828.md
+# (негация уехала ниже, в общий блок reports/embeddings_scaleup/ —
+#  выше по файлу каталог ещё исключён правилом reports/*)
 
 # ⚠️ Исходник владельца owner_queries_set_c.docx в репозиторий НЕ едет:
 # общее правило «*.docx» ниже перекрывает любое исключение здесь, потому что
@@ -247,8 +248,18 @@ qls_handover_*.zip
 # он восстанавливается из копии базы, а все 31 694 записи в нём пусты.
 !reports/embeddings_scaleup/
 reports/embeddings_scaleup/*
+!reports/embeddings_scaleup/search_baseline_c14_20260828.md
 !reports/embeddings_scaleup/corpus_diagnostics_c13_20260828.md
 !reports/embeddings_scaleup/corpus_diagnostics_c13.json
+
+# ИСКЛЮЧЕНИЕ (2026-08-29, С15): обновлённый набор C владельца — 65 строк
+# взамен прежних 62. В отличие от .docx версии С14, исходник пришёл в .md и
+# общее правило «*.docx» его не перекрывает, поэтому он едет в репозиторий
+# вместе с разобранным набором: это ВХОДНЫЕ данные измерителя, а не машинный
+# вывод, и без них замер не воспроизвести. Старый eval_set_c.json остаётся в
+# problems/data/ нетронутым — он база сравнения «было/стало».
+!reports/embeddings_scaleup/owner_queries_set_c_v2.md
+!reports/embeddings_scaleup/eval_set_c_v2.json
 
 # ИСКЛЮЧЕНИЕ (2026-08-28): импорт трёх новых источников. Тот же принцип,
 # что у corpus_converter_scaleup выше — читаемый отчёт и артефакты, без
