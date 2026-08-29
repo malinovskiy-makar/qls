@@ -241,5 +241,6 @@ reports/import_new_sources/*
 # текста и рубрик — единственный путь назад после боевых прогонов
 # reconvert_new_sources и rebuild_shkolkovo_rubrics, поэтому в репозитории.
 !reports/import_new_sources/manual_review_queue.md
+!reports/import_new_sources/report_20260829.md
 !reports/import_new_sources/reconvert_backup.json
 !reports/import_new_sources/rubrics_backup.json
