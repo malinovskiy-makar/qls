@@ -82,8 +82,16 @@ CROSS_LINKS_RAW = """
 """
 
 
-def parse_cross_links(raw: str = CROSS_LINKS_RAW) -> list[tuple[int, int, int, int]]:
-    """«4.9-10.5» → (4, 9, 10, 5). Порядок сохраняется, дубли не убираются."""
+def parse_cross_links(raw: str | None = None) -> list[tuple[int, int, int, int]]:
+    """«4.9-10.5» → (4, 9, 10, 5). Порядок сохраняется, дубли не убираются.
+
+    ⚠️ Список берётся ВНУТРИ функции, а не значением аргумента по умолчанию.
+    Значение по умолчанию вычисляется один раз при импорте модуля, и подмена
+    `CROSS_LINKS_RAW` (например, в тестах) на него уже не влияет — функция
+    молча продолжает разбирать прежний список.
+    """
+    if raw is None:
+        raw = CROSS_LINKS_RAW
     out = []
     for token in raw.split():
         m = re.fullmatch(r'(\d+)\.(\d+)-(\d+)\.(\d+)', token)

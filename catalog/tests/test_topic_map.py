@@ -224,3 +224,64 @@ class ParserUnitTests(SimpleTestCase):
                          [None, 42, 3153, 307, 338, 142])
         self.assertEqual(tags[3]['label'], 'Тег с двумя паттернами')
         self.assertEqual(tags[4]['label'], 'Тег с пояснением')
+
+
+class BuildGuardsTests(SimpleTestCase):
+    """Сборка обязана ОТВЕРГАТЬ битые данные, а не собирать битый граф.
+
+    ⚠️ Эти проверки появились после разбора зубастости остальных.
+    Тесты `GraphIntegrityTests` смотрят на результат `build_map()`, а он
+    никогда не бывает плохим, пока защиты внутри сборки целы: испорченная
+    связь роняет сборку исключением, и до проверок дело не доходит. То
+    есть сами защиты оставались без сторожа — их можно было удалить, и ни
+    один тест бы не покраснел (проверено: при снятой защите дефект ловят
+    уже `GraphIntegrityTests`, но пропажу самой защиты — никто).
+    """
+
+    def _tree(self):
+        """Крошечное дерево из двух тем — чтобы не зависеть от файла."""
+        md = ('### 1. Первая тема\n'
+              '*Определение.*\n'
+              '1. Альфа\n'
+              '2. Бета\n'
+              '\n'
+              '### 2. Вторая тема\n'
+              '*Определение.*\n'
+              '1. Гамма\n'
+              '2. Дельта\n')
+        return parse_tree(md)
+
+    def _build_with(self, raw):
+        from unittest import mock
+        with mock.patch('catalog.taxonomy_map.CROSS_LINKS_RAW', raw):
+            return build_map(self._tree())
+
+    def test_rejects_link_to_missing_tag(self):
+        with self.assertRaises(ValueError) as box:
+            self._build_with('1.1-2.99')
+        self.assertIn('несуществующий', str(box.exception))
+
+    def test_rejects_link_inside_one_theme(self):
+        with self.assertRaises(ValueError) as box:
+            self._build_with('1.1-1.2')
+        self.assertIn('внутри одной темы', str(box.exception))
+
+    def test_rejects_duplicate_link(self):
+        with self.assertRaises(ValueError) as box:
+            self._build_with('1.1-2.1  2.1-1.1')
+        self.assertIn('дважды', str(box.exception))
+
+    def test_rejects_theme_outside_groups(self):
+        """Тема, не попавшая ни в один раздел корпуса, не должна пройти молча:
+        без цвета раздела она станет невидимой на карте."""
+        md = ('### 41. Тема из ниоткуда\n'
+              '*Определение.*\n'
+              '1. Альфа\n')
+        with self.assertRaises(ValueError) as box:
+            build_map(parse_tree(md))
+        self.assertIn('вне разделов', str(box.exception))
+
+    def test_accepts_valid_pair(self):
+        data = self._build_with('1.1-2.2')
+        cross = [ln for ln in data['links'] if ln['k'] == 'cross']
+        self.assertEqual(len(cross), 1)
