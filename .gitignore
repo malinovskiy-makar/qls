@@ -260,6 +260,8 @@ reports/embeddings_scaleup/*
 # problems/data/ нетронутым — он база сравнения «было/стало».
 !reports/embeddings_scaleup/owner_queries_set_c_v2.md
 !reports/embeddings_scaleup/eval_set_c_v2.json
+!reports/embeddings_scaleup/session_c15_20260829.md
+!reports/embeddings_scaleup/corpus_diagnostics_c15.json
 
 # ИСКЛЮЧЕНИЕ (2026-08-28): импорт трёх новых источников. Тот же принцип,
 # что у corpus_converter_scaleup выше — читаемый отчёт и артефакты, без

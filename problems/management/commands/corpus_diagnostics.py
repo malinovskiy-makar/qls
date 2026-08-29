@@ -94,6 +94,17 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--skip-external', action='store_true',
                             help='Не трогать неимпортированные источники (Фаза 3).')
+        # ⚠️ Путь отчёта обязан настраиваться. С жёстко зашитым именем второй
+        # прогон молча затирал отчёт первого — а это не черновик, а база
+        # сравнения: на числа С13 (снимок 31 699 задач) ссылаются отчёты и
+        # карточки Notion, и пересобрать их после импорта уже нельзя, банк
+        # вырос. Ровно так 29.08 отчёт С13 был перезаписан числами С15 и
+        # восстанавливался из git. Та же ловушка уже ловилась в
+        # backfill_embedding_provenance — см. комментарий к её --backup-path.
+        parser.add_argument(
+            '--out', default=os.path.join(OUT_DIR, 'corpus_diagnostics_c13.json'),
+            help='Куда записать отчёт. По умолчанию — прежнее имя, чтобы не '
+                 'ломать старые инструкции.')
 
     # ------------------------------------------------------------------ #
 
@@ -118,8 +129,10 @@ class Command(BaseCommand):
             report['неимпортированные_источники'] = self._external()
             report['полный_корпус'] = self._full_corpus()
 
-        os.makedirs(OUT_DIR, exist_ok=True)
-        path = os.path.join(OUT_DIR, 'corpus_diagnostics_c13.json')
+        path = options['out']
+        каталог = os.path.dirname(path)
+        if каталог:
+            os.makedirs(каталог, exist_ok=True)
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
         self.stdout.write(self.style.SUCCESS(f'Готово: {path}'))
