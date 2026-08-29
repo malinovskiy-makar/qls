@@ -1,3 +1,4 @@
+import hashlib
 import json
 import re
 
@@ -720,5 +721,73 @@ def problem_figure_svg(request, pk):
     )
     response['X-Content-Type-Options'] = 'nosniff'
     response['Content-Disposition'] = 'inline'
+    response['Cache-Control'] = 'public, max-age=86400'
+    return response
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Карта тем и тегов — /catalog/map/
+# ═══════════════════════════════════════════════════════════════════════
+#
+# Данные берутся из справочника в репозитории, а не из базы: новой
+# таксономии в таблице `Tag` ещё нет (см. catalog/taxonomy_map.py).
+# Файл читается ОДИН РАЗ при первом запросе в модульную переменную —
+# 69 КБ JSON на каждый запрос это лишняя работа диска на ровном месте.
+
+_TOPIC_MAP_CACHE = {'text': None, 'etag': None}
+
+
+def _topic_map_payload():
+    """Отдаёт (текст JSON, ETag), читая файл один раз на процесс."""
+    if _TOPIC_MAP_CACHE['text'] is None:
+        from catalog.taxonomy_map import JSON_PATH
+        text = JSON_PATH.read_text(encoding='utf-8')
+        _TOPIC_MAP_CACHE['text'] = text
+        _TOPIC_MAP_CACHE['etag'] = '"%s"' % hashlib.sha256(
+            text.encode('utf-8')).hexdigest()[:32]
+    return _TOPIC_MAP_CACHE['text'], _TOPIC_MAP_CACHE['etag']
+
+
+def topic_map(request):
+    """Страница карты. Разметка — самостоятельный блок: позже он переедет
+    во всплывающее окно переработанного поиска без переделки."""
+    text, _etag = _topic_map_payload()
+    data = json.loads(text)
+    themes = [n for n in data['nodes'] if n['k'] == 'theme']
+    tags = [n for n in data['nodes'] if n['k'] == 'tag']
+    counted = [t for t in tags if t['c'] is not None]
+
+    tags_by_theme = {}
+    for t in tags:
+        tags_by_theme.setdefault(t['n'], []).append(t)
+
+    # Навигатор «Темы» справа: тот же список, но сгруппированный по разделам.
+    # Считается на сервере — на клиенте это была бы та же работа каждый раз.
+    sections = []
+    by_n = {t['n']: t for t in themes}
+    for g in data['groups']:
+        rows = []
+        for n in g['themes']:
+            th = by_n[n]
+            rows.append({'n': n, 'title': th['l'],
+                         'tags': len(tags_by_theme.get(n, []))})
+        sections.append({'key': g['k'], 'label': g['l'], 'themes': rows})
+
+    return render(request, 'catalog/topic_map.html', {
+        'theme_count': len(themes),
+        'tag_count': len(tags),
+        'counted_tags': len(counted),
+        'sections': sections,
+    })
+
+
+def topic_map_data(request):
+    """JSON карты. Кэш на сутки и ETag: файл меняется только с деплоем."""
+    text, etag = _topic_map_payload()
+    if request.headers.get('If-None-Match') == etag:
+        response = HttpResponse(status=304)
+    else:
+        response = HttpResponse(text, content_type='application/json')
+    response['ETag'] = etag
     response['Cache-Control'] = 'public, max-age=86400'
     return response

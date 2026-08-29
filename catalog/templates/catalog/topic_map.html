@@ -1,0 +1,154 @@
+{% extends 'catalog/base.html' %}
+{% load static %}
+
+{% comment %}
+Карта тем и тегов — трёхмерный граф корпуса.
+
+⚠️ ЭТО БУДУЩАЯ МОДАЛКА. Разметка собрана как самостоятельный блок `.tmap`
+с собственной шапкой и нижней полосой: когда карта переедет во всплывающее
+окно переработанного поиска, блок переносится целиком, без переделки.
+Поэтому у него своя шапка, а не шапка страницы, и своя кнопка закрытия.
+{% endcomment %}
+
+{% block title %}Карта тем и тегов{% endblock %}
+
+{% block extra_style %}
+/* Страница отдаёт карте всю ширину: полоса содержания в 860px здесь
+   означала бы холст в треть экрана. */
+.page-wrap { max-width: none; padding: 0; }
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'catalog/css/topic_map.css' %}">
+
+<div class="tmap" id="tmap">
+
+  <header class="tmap-head">
+    <div class="tmap-head-title">
+      <h1>Карта тем и тегов</h1>
+      <p class="tmap-sub">{{ theme_count }} тем&nbsp;· {{ tag_count }} тега&nbsp;·
+        нажмите на тег, чтобы подсветить дорогу к нему</p>
+    </div>
+
+    <div class="tmap-search">
+      <input type="search" id="tmap-q" autocomplete="off" spellcheck="false"
+             placeholder="Поиск по темам и тегам" aria-label="Поиск по темам и тегам">
+      <span class="tmap-search-count" id="tmap-q-count" aria-live="polite"></span>
+    </div>
+
+    <button type="button" class="tmap-icon-btn" id="tmap-help"
+            title="Как пользоваться картой" aria-label="Как пользоваться картой">?</button>
+    <a class="tmap-icon-btn" href="{% url 'catalog:problem_list' %}"
+       title="Закрыть и вернуться в каталог" aria-label="Закрыть и вернуться в каталог">✕</a>
+  </header>
+
+  <div class="tmap-body">
+
+    <div class="tmap-canvas-wrap" id="tmap-canvas-wrap">
+      <canvas id="tmap-canvas" tabindex="0"
+              aria-label="Трёхмерная карта тем и тегов корпуса"></canvas>
+
+      <div class="tmap-zoom" role="group" aria-label="Масштаб карты">
+        <span class="tmap-zoom-val" id="tmap-zoom-val">100%</span>
+        <button type="button" id="tmap-zoom-in"  aria-label="Приблизить">+</button>
+        <button type="button" id="tmap-zoom-out" aria-label="Отдалить">−</button>
+        <button type="button" id="tmap-zoom-fit" aria-label="Вернуть обзор">⟲</button>
+      </div>
+    </div>
+
+    <aside class="tmap-panel" id="tmap-panel">
+
+      <section class="tmap-block" id="tmap-hover-block">
+        <h2 class="tmap-block-h">Под курсором</h2>
+        <div id="tmap-hover"><!-- заполняется картой --></div>
+      </section>
+
+      <section class="tmap-block" id="tmap-picked-block" hidden>
+        <h2 class="tmap-block-h">Выбрано <span id="tmap-picked-n">0</span></h2>
+        <div class="tmap-chips" id="tmap-chips"></div>
+      </section>
+
+      <section class="tmap-block">
+        <h2 class="tmap-block-h">Темы</h2>
+        <div class="tmap-themes" id="tmap-themes">
+          {% for s in sections %}
+            <div class="tmap-themes-group">
+              <div class="tmap-themes-group-h">
+                <i class="tmap-dot" data-g="{{ s.key }}"></i>{{ s.label }}
+              </div>
+              {% for t in s.themes %}
+                <button type="button" class="tmap-theme-row"
+                        data-theme="{{ t.n }}" data-g="{{ s.key }}">
+                  <span class="tmap-theme-n">{{ t.n }}</span>
+                  <span class="tmap-theme-name">{{ t.title }}</span>
+                  <span class="tmap-theme-cnt">{{ t.tags }}</span>
+                </button>
+              {% endfor %}
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="tmap-block">
+        <h2 class="tmap-block-h">Разделы корпуса</h2>
+        <ul class="tmap-legend">
+          {% for s in sections %}
+            <li><i class="tmap-dot" data-g="{{ s.key }}"></i>{{ s.label }}</li>
+          {% endfor %}
+        </ul>
+      </section>
+
+    </aside>
+  </div>
+
+  <footer class="tmap-foot">
+    <div class="tmap-foot-left">
+      <div class="tmap-count" id="tmap-count">Выбрано: 0 тегов</div>
+      {% comment %}
+        Канон 2.3: неполное число сопровождается оговоркой. Счётчик задач
+        известен не у всех тегов, и молчаливое «примерно M» читалось бы как
+        точный итог по корпусу.
+      {% endcomment %}
+      <div class="tmap-note">Оценка снизу: счётчик задан
+        у {{ counted_tags }} тегов из {{ tag_count }}</div>
+    </div>
+    <div class="tmap-foot-right">
+      <span class="tmap-why" id="tmap-why">Выберите хотя бы один тег</span>
+      <button type="button" class="tmap-btn" id="tmap-reset">Сбросить</button>
+      <button type="button" class="tmap-btn tmap-btn--main" id="tmap-apply" disabled>
+        Показать задачи</button>
+    </div>
+  </footer>
+
+  {% comment %}
+    Обучение при первом заходе. Карточка и затемнение живут в разметке, а не
+    создаются скриптом: так их видно в исходнике страницы и можно править
+    стилем, не трогая JavaScript.
+    ⚠️ У затемнения НЕТ backdrop-filter — он роняет частоту кадров с 60 до
+    25, потому что браузер заново размывает подложку на каждом кадре.
+  {% endcomment %}
+  <div class="tmap-tour" id="tmap-tour" hidden>
+    <div class="tmap-tour-hole" id="tmap-tour-hole"></div>
+    <div class="tmap-tour-card" id="tmap-tour-card" role="dialog" aria-modal="true"
+         aria-labelledby="tmap-tour-title">
+      <div class="tmap-tour-step" id="tmap-tour-step">Шаг 1 из 5</div>
+      <h2 id="tmap-tour-title">Это весь корпус</h2>
+      <p id="tmap-tour-text">…</p>
+      <div class="tmap-tour-foot">
+        <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-skip">Пропустить</button>
+        <span class="tmap-tour-dots" id="tmap-tour-dots"></span>
+        <button type="button" class="tmap-btn" id="tmap-tour-prev">←</button>
+        <button type="button" class="tmap-btn tmap-btn--main" id="tmap-tour-next">Дальше</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  window.TMAP_URL = "{% url 'catalog:topic_map_data' %}";
+</script>
+<script defer src="{% static 'catalog/js/topic_map.js' %}"></script>
+{% endblock %}

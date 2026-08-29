@@ -18,6 +18,12 @@ urlpatterns = [
     # Семантический поиск (Стадия 1, локальный прототип)
     path('smart-search/',                         views.smart_search,       name='smart_search'),
 
+    # Карта тем и тегов — трёхмерный граф корпуса.
+    # Пока живёт отдельной страницей; позже станет всплывающим окном-фильтром
+    # в переработанном поиске+каталоге (карточка идеи в Notion).
+    path('map/',                                views.topic_map,          name='topic_map'),
+    path('map/data.json',                       views.topic_map_data,     name='topic_map_data'),
+
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),
     path('collection/<str:token>/',             views.collection_detail,  name='collection_detail'),
