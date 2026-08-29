@@ -226,12 +226,19 @@ class Command(BaseCommand):
 
         out_dir = options.get('report_dir') or OUT_DIR
         os.makedirs(out_dir, exist_ok=True)
-        report_path = os.path.join(out_dir, 'gate_new_sources.json')
+        # ⚠️ Усечённый прогон в общий отчёт не пишет. `--limit 5` по
+        # одному источнику затирал разбор по всему корпусу файлом на пять
+        # задач, и выглядело это как настоящий отчёт (та же беда, что с
+        # предупреждениями импорта — находка 3 в report.md).
+        truncated = limit is not None or options['source']
+        name = 'gate_new_sources_partial.json' if truncated else 'gate_new_sources.json'
+        report_path = os.path.join(out_dir, name)
         with open(report_path, 'w', encoding='utf-8') as f:
             json.dump({
                 'per_source': per_source,
                 'fail_codes': fail_codes,
                 'applied': do_apply,
+                'truncated': truncated,
             }, f, ensure_ascii=False, indent=1)
         lines.append(f'  разбор по источникам: {report_path}')
 
@@ -244,10 +251,24 @@ class Command(BaseCommand):
         backup = list(
             Problem.objects.filter(id__in=to_change)
             .values('id', 'content_format')) if to_change else []
+        # ⚠️ ДОПИСЫВАЕМ, а не перезаписываем. Файл — путь отката для ВСЕХ
+        # задач, которым шлюз когда-либо поставил markdown. Первая версия
+        # затирала его каждым --apply: второй прогон (29.08, 102 задачи)
+        # оставил от снимка на 9 066 задач файл на 102, и путь отката для
+        # остальных исчез бы, не лежи он в git.
+        previous = {}
+        if os.path.exists(backup_path):
+            with open(backup_path, encoding='utf-8') as f:
+                previous = {row['id']: row
+                            for row in json.load(f).get('problems', [])}
+        for row in backup:
+            previous.setdefault(row['id'], row)
         with open(backup_path, 'w', encoding='utf-8') as f:
             json.dump({
-                'note': 'Снимок content_format ДО шлюза новых источников — для отката.',
-                'count': len(backup), 'problems': backup,
+                'note': 'Снимок content_format ДО шлюза новых источников — '
+                        'для отката. Накапливается по всем прогонам --apply.',
+                'count': len(previous),
+                'problems': [previous[key] for key in sorted(previous)],
             }, f, ensure_ascii=False, indent=1)
 
         with transaction.atomic():

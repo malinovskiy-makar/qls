@@ -237,3 +237,9 @@ reports/import_new_sources/*
 !reports/import_new_sources/report.md
 !reports/import_new_sources/baseline_before_import.json
 !reports/import_new_sources/gate_new_sources_backup.json
+# Сессия 29.08: очередь ручного разбора и снимки для отката. Снимки
+# текста и рубрик — единственный путь назад после боевых прогонов
+# reconvert_new_sources и rebuild_shkolkovo_rubrics, поэтому в репозитории.
+!reports/import_new_sources/manual_review_queue.md
+!reports/import_new_sources/reconvert_backup.json
+!reports/import_new_sources/rubrics_backup.json
