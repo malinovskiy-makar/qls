@@ -1,0 +1,98 @@
+{
+  "Id": 112523,
+  "IsDeactivated": false,
+  "Name": "предкурс",
+  "QuestionTexSessionId": 231711,
+  "GradeCriteriaTexSessionId": 0,
+  "QuestionFiles": [],
+  "AnswerTypeId": 1,
+  "SolutionTexSessionId": 231712,
+  "SolutionFiles": null,
+  "Answer": {
+    "TexSessionId": 0,
+    "text": "50"
+  },
+  "AnswerCheckoutFile": null,
+  "AnswerNeedsAttachment": false,
+  "RelatesToQuestionContentId": 0,
+  "NewTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "AnswerHiddenTill": {
+    "Time": "0001-01-01T00:00:00Z",
+    "Valid": false
+  },
+  "IsPrivate": false,
+  "CreatedAt": "2025-03-27T13:11:39Z",
+  "UpdatedAt": "2025-03-27T14:32:51Z",
+  "AuthorUserId": 0,
+  "Faq": [
+    [
+      "Вопросы по задаче №1",
+      "Вопрос: С чего начать?",
+      "Запишите ограничение через две переменные и функцию, которую вам нужно минимизировать.",
+      "",
+      "Вопрос: Что взять за ограничение?",
+      "Например, то, что суммарное количество продукции, произведенное на 2 заводах, равно 10. Таким образом, q1+q2=10",
+      "",
+      "Вопрос: Что взять за функцию, минимум которой нужно найти?",
+      "Суммарное количество используемого труда. Если вы произвели q1 на первом заводе, то (q1)^2 труда вам необходимо использовать на нем."
+    ]
+  ],
+  "SortOrder": 0,
+  "SourceId": 0,
+  "AnswerIsProof": false,
+  "LessonId": 0,
+  "LessonTimeCode": 63170,
+  "IsSurvey": false,
+  "IsQuizQuestion": false,
+  "WrongAnswer": {
+    "String": "",
+    "Valid": false
+  },
+  "SolutionReasoning": "",
+  "Lessons": null,
+  "Timestamps": null,
+  "IsEGE": false,
+  "InputType": 1,
+  "AnswerProperty": {},
+  "IsNotTrainable": false,
+  "SolutionPlanTexSessionId": 0,
+  "DifficultyId": 0,
+  "ParentThemeId": 0,
+  "LaboratoryFileId": null,
+  "Files": null,
+  "Themes": [
+    4657
+  ],
+  "Tags": [],
+  "QuestionHomeworks": {},
+  "Sources": [],
+  "Theory": false,
+  "TheoryFacts": false,
+  "QuestionFragments": false,
+  "QuestionTaskReviews": false,
+  "QuestionSolutionPlans": false,
+  "QuestionReferenceMaterials": false,
+  "RelatedQuestions": [],
+  "ChainedQuestions": [],
+  "LaboratoryFileSrc": "",
+  "AlternativeSolutions": null,
+  "isNew": false,
+  "theme_memberships": [
+    {
+      "themeId": 4657,
+      "themeName": "Производство и издержки - задачи",
+      "parentThemeName": "Производство и издержки"
+    }
+  ],
+  "statement_tex": "Рассмотрите два завода в разных городах, которые изготавливают продукцию по технологии $q=\\sqrt{x}$, и вычислите какое минимальное количество труда необходимо для производства 10 единиц?",
+  "solution_tex": "1. Определим, сколько труда нужно одному заводу для производства \\( q \\) единиц.\n   Для этого из технологии \\( q = \\sqrt{x} \\) выразим $ x : x = q^2$.\n \n2. Пусть первый завод производит \\( q_1 \\), а второй — \\( q_2 \\). Тогда:\n   \\[\n   q_1 + q_2 = 10.\n   \\]\n   \n   Общие трудовые затраты:\n   \\[\n   X = x_1 + x_2 = q_1^2 + q_2^2.\n   \\]\n\n3. Минимизируем трудовые затраты, подставив \\( q_2 = 10 - q_1 \\):\n   \\[\n   X = q_1^2 + (10 - q_1)^2 = 2q_1^2 - 20q_1 + 100.\n   \\]\n   $X(q_1)$ - парабола с ветвями вниз, а значит минимум находится в вершине $q^*_1 = 5$.\n   Тогда \\( q^*_2 = 5 \\), и общие затраты труда:\n   \\[\n   X = 5^2 + 5^2 = 25 + 25 = 50.\n   \\]\n\n\n\\end{document}",
+  "criteria_tex": null,
+  "answer_tex": null,
+  "source_names": [],
+  "source_name": null,
+  "_source_url": "https://3.shkolkovo.online/catalog/4657/112523",
+  "_fetched_at": "2026-08-20T16:29:51.938186+00:00"
+}

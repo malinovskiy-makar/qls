@@ -1,0 +1,53 @@
+{
+  "id": 12118,
+  "hash": "00382383782316876614",
+  "external_id": null,
+  "parent_hash": "",
+  "subject_id": 1,
+  "title": "Задание 10. ШЭ ВСоШ Татарстан 2026 (7-8 класс)",
+  "md": "Ваша знакомая открыла мастерскую 3D-печати чехлов для смартфонов. Она оценилa функцию прибыли: $\\Pi=14Q-3Q^2$, где $Q$ — количество проданных чехлов за месяц. Какое целое $Q$ максимизирует прибыль, если количество чехлов может быть выражено только целым числом?",
+  "answer_md": "(б) $2$.\n\nПояснение: Вершина параболы $\\Pi(Q)$ достигается при $Q^*=14/6=2,(3)$.                 Нужно проверить соседние целые: $Q=2$ и $Q=3$.\n\n$\\Pi(2)=14*2-3*2^2=16$ \n\n$\\Pi(3)=14*3-3*3^2=15$ \n\nТак как $16>15$, оптимальный выбор — $Q=2$. В данном случае можно решить задачу и перебором.\n\n( $4$ балла)",
+  "check_type": "single_choice",
+  "check_options": "[\"(а) 1;\",\"(б) 2;\",\"(в) 3;\",\"(г) 4.\"]",
+  "correct_answer": "{\"type\":\"single_choice\",\"value\":1}",
+  "criteria": "[]",
+  "non_additive": false,
+  "criteria_max_points": null,
+  "created_date": "2026-05-25T17:11:49.000Z",
+  "updated_at": "2026-06-21T18:07:46.263Z",
+  "check_manual": 0,
+  "author_id": 0,
+  "author": "",
+  "source_id": 0,
+  "source": "",
+  "difficulty": "level1",
+  "is_test": true,
+  "approved": false,
+  "ai_generated": false,
+  "visible": true,
+  "hidden": false,
+  "tagList": [
+    2,
+    9
+  ],
+  "binaryTagList": [
+    {
+      "id": 1,
+      "value": false
+    },
+    {
+      "id": 2,
+      "value": true
+    },
+    {
+      "id": 3,
+      "value": false
+    }
+  ],
+  "userAnswer": null,
+  "myVote": null,
+  "author_object": null,
+  "source_object": null,
+  "_fetched_at": "2026-08-20T01:51:25.286243+00:00",
+  "_source_url": "https://solvehub.app/econ/problems/00382383782316876614"
+}

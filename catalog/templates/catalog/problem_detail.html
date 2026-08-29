@@ -252,7 +252,7 @@
 
 <!-- Условие задачи -->
 <div class="problem-statement">
-  <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.statement|render_markdown|safe }}{% else %}{{ problem.statement|linebreaksbr }}{% endif %}</div>
+  <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.statement|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.statement|linebreaksbr }}{% endif %}</div>
 </div>
 
 <!-- Подпункты -->
@@ -268,7 +268,7 @@
     <div class="part-header">
       <span class="part-label">{{ part.label|partlabel }}</span>
       {% if part.statement %}
-      <div class="part-statement math-content">{% if problem.content_format == 'markdown' %}{{ part.statement|render_markdown|safe }}{% else %}{{ part.statement|linebreaksbr }}{% endif %}</div>
+      <div class="part-statement math-content">{% if problem.content_format == 'markdown' %}{{ part.statement|render_markdown|render_figures:problem|safe }}{% else %}{{ part.statement|linebreaksbr }}{% endif %}</div>
       {% endif %}
     </div>
     {% if part.answer %}
@@ -282,7 +282,7 @@
       </button>
       <div id="part-answer-{{ part.pk }}" class="reveal-content">
         <div class="reveal-label">Ответ</div>
-        <div class="math-content">{% if problem.content_format == 'markdown' %}{{ part.answer|render_markdown|safe }}{% else %}{{ part.answer|linebreaksbr }}{% endif %}</div>
+        <div class="math-content">{% if problem.content_format == 'markdown' %}{{ part.answer|render_markdown|render_figures:problem|safe }}{% else %}{{ part.answer|linebreaksbr }}{% endif %}</div>
       </div>
     </div>
     {% endif %}
@@ -303,7 +303,7 @@
   </button>
   <div id="answer-block" class="reveal-content">
     <div class="reveal-label">Ответ</div>
-    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.answer|render_markdown|safe }}{% else %}{{ problem.answer|linebreaksbr }}{% endif %}</div>
+    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.answer|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.answer|linebreaksbr }}{% endif %}</div>
   </div>
 </div>
 {% endif %}
@@ -319,7 +319,7 @@
   </button>
   <div id="solution-block" class="reveal-content">
     <div class="reveal-label">Решение</div>
-    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.solution|render_markdown|safe }}{% else %}{{ problem.solution|linebreaksbr }}{% endif %}</div>
+    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.solution|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.solution|linebreaksbr }}{% endif %}</div>
   </div>
 </div>
 {% endif %}
