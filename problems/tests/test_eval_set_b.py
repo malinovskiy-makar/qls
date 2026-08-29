@@ -10,13 +10,15 @@
 требует этого от любой массовой команды; здесь цена ошибки прямая, в рублях.
 """
 import json
+import re
 import tempfile
 from io import StringIO
 from pathlib import Path
 
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, override_settings
 
 from problems.models import Problem
 from problems.tests.factories import make_problem
@@ -151,3 +153,146 @@ class BuildEvalSetBTests(TestCase):
                          apply=True, verbosity=0)
         после = list(Problem.objects.order_by('id').values('id', *поля))
         self.assertEqual(до, после)
+
+
+# ── Ограничения массивов в JSON-схеме ────────────────────────────────────
+#
+# ⚠️ ПОЧЕМУ ЭТО ОТДЕЛЬНЫЙ БЛОК ТЕСТОВ. Structured output Anthropic
+# поддерживает у массива `minItems` только 0 или 1; любое другое значение и
+# ЛЮБОЙ `maxItems` — это ошибка 400 на первом же обращении, до генерации:
+#
+#     output_config.format.schema: For 'array' type, 'minItems' values other
+#     than 0 or 1 are not supported (got: [2, 5])
+#
+# Схема с `minItems: 3, maxItems: 3` ровно так и уронила пилот набора B
+# 28.08. Ограничение документировано у Anthropic в разделе «Not supported»
+# и на нашей стороне не чинится — количество держат промпт и разбор ответа.
+
+ЗАПРЕЩЁННЫЕ_В_СХЕМЕ = re.compile(
+    r"""['"]maxItems['"]|['"]minItems['"]\s*:\s*(?!\s*[01]\s*[,}\]])\s*\d+""")
+
+
+def _обойти_схему(узел, путь='$'):
+    """Все пары (путь, узел-словарь) схемы, включая вложенные."""
+    if isinstance(узел, dict):
+        yield путь, узел
+        for ключ, значение in узел.items():
+            yield from _обойти_схему(значение, f'{путь}.{ключ}')
+    elif isinstance(узел, list):
+        for н, значение in enumerate(узел):
+            yield from _обойти_схему(значение, f'{путь}[{н}]')
+
+
+class ОграниченияМассивовВСхемахTests(SimpleTestCase):
+
+    def test_схема_набора_b_не_ограничивает_длину_массива(self):
+        from problems.management.commands.build_eval_set_b import СХЕМА
+
+        for путь, узел in _обойти_схему(СХЕМА):
+            self.assertNotIn(
+                'maxItems', узел,
+                f'{путь}: maxItems не поддерживается structured output')
+            if 'minItems' in узел:
+                self.assertIn(
+                    узел['minItems'], (0, 1),
+                    f'{путь}: minItems допускает только 0 или 1, '
+                    f'получено {узел["minItems"]!r}')
+
+    def test_все_схемы_слоя_ии_не_ограничивают_длину_массива(self):
+        from problems.hw_generator import PLAN_SCHEMA
+
+        for имя, схема in (('PLAN_SCHEMA', PLAN_SCHEMA),):
+            for путь, узел in _обойти_схему(схема, имя):
+                self.assertNotIn('maxItems', узел, путь)
+                if 'minItems' in узел:
+                    self.assertIn(узел['minItems'], (0, 1), путь)
+
+    def test_в_исходниках_нет_запрещённых_ограничений_массива(self):
+        """Сторож на будущие схемы, о которых этот файл ещё не знает.
+
+        Разбор схем по объектам ловит только те две, что перечислены выше.
+        Новая схема в новой команде проскочила бы мимо — и упала бы уже
+        деньгами на боевом прогоне. Поэтому вдобавок читаются исходники.
+        """
+        корень = Path(__file__).resolve().parents[2]
+        пакеты = ('problems', 'catalog', 'teacher', 'student', 'game',
+                  'calc2', 'config', 'calendar_stub', 'search_service')
+        нарушения = []
+        for пакет in пакеты:
+            for файл in (корень / пакет).rglob('*.py'):
+                if 'tests' in файл.parts or '__pycache__' in файл.parts:
+                    continue
+                текст = файл.read_text(encoding='utf-8', errors='replace')
+                for н, строка in enumerate(текст.splitlines(), start=1):
+                    if ЗАПРЕЩЁННЫЕ_В_СХЕМЕ.search(строка):
+                        нарушения.append(
+                            f'{файл.relative_to(корень)}:{н}: {строка.strip()}')
+        self.assertEqual(
+            нарушения, [],
+            'structured output Anthropic не поддерживает эти ограничения:\n'
+            + '\n'.join(нарушения))
+
+
+# ── Количество фраз держит разбор ответа, а не схема ─────────────────────
+
+ОТВЕТ_ДВЕ_ФРАЗЫ = json.dumps(
+    {'queries': ['потоварный налог на монополию', 'налог и выпуск фирмы']},
+    ensure_ascii=False)
+
+ОТВЕТ_ПЯТЬ_ФРАЗ = json.dumps(
+    {'queries': ['раз', 'два', 'три', 'четыре', 'пять']}, ensure_ascii=False)
+
+ОТВЕТ_ПУСТАЯ_СРЕДИ_ТРЁХ = json.dumps(
+    {'queries': ['потоварный налог на монополию', '   ', 'ставка сборов']},
+    ensure_ascii=False)
+
+
+@override_settings(AI_PROVIDER='fake')
+class ДлинаОтветаNabораBTests(TestCase):
+    """Схема больше не может требовать ровно три фразы — требует разбор."""
+
+    def setUp(self):
+        # ⚠️ ОБЩИЙ КЭШ ОТВЕТОВ МЕЖДУ ТЕСТАМИ. `core.run` кладёт ответ в кэш
+        # Django по ключу (профиль, модель, текст задачи), а LocMemCache живёт
+        # весь процесс — база откатывается, кэш нет. Условия здесь у всех
+        # тестов одинаковые, поэтому второй тест получил бы ответ первого и
+        # мерил бы не свой AI_FAKE_REPLY. Видно это только на тестах с РАЗНЫМИ
+        # ответами: пока ответ у всех один, подмена незаметна.
+        cache.clear()
+        for н in range(3):
+            p = make_problem(statement=f'Задача номер {н}. ' + 'Текст. ' * 40)
+            Problem.objects.filter(pk=p.pk).update(
+                status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                hidden_pending_review=False, embedding=b'\x00' * 4096)
+
+    def _собрать(self, ответ):
+        with override_settings(AI_FAKE_REPLY=ответ):
+            with tempfile.TemporaryDirectory() as d:
+                путь = str(Path(d) / 'eval_set_b.json')
+                вывод = StringIO()
+                call_command('build_eval_set_b', limit=3, out=путь, apply=True,
+                             stdout=вывод, verbosity=1)
+                return json.loads(Path(путь).read_text(encoding='utf-8'))
+
+    def test_две_фразы_вместо_трёх_это_ошибка_по_задаче(self):
+        данные = self._собрать(ОТВЕТ_ДВЕ_ФРАЗЫ)
+        self.assertEqual(данные['count'], 0)
+        self.assertIn('Ошибок при генерации: 3 из 3',
+                      ' '.join(данные['warnings']))
+
+    def test_пять_фраз_вместо_трёх_это_ошибка_по_задаче(self):
+        данные = self._собрать(ОТВЕТ_ПЯТЬ_ФРАЗ)
+        self.assertEqual(данные['count'], 0)
+        self.assertIn('Ошибок при генерации: 3 из 3',
+                      ' '.join(данные['warnings']))
+
+    def test_пустая_строка_среди_трёх_это_ошибка_а_не_молчаливый_пропуск(self):
+        """Иначе набор тихо недосчитался бы фраз, за которые заплачено."""
+        данные = self._собрать(ОТВЕТ_ПУСТАЯ_СРЕДИ_ТРЁХ)
+        self.assertEqual(данные['count'], 0)
+
+    def test_ровно_три_фразы_проходят(self):
+        данные = self._собрать(ОТВЕТ)
+        self.assertEqual(данные['count'], 9)
+        self.assertIn('Ошибок при генерации: 0 из 3',
+                      ' '.join(данные['warnings']))
