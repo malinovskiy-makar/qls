@@ -48,14 +48,23 @@ class ParseShkolkovoCriteriaTests(SimpleTestCase):
         self.assertEqual(result['criteria'][0]['max_points'], 1.0)
         self.assertEqual(result['criteria'][1]['max_points'], 5.0)
 
-    def test_unrecognized_shape_warns_when_zero_criteria_found(self):
-        # Реальная доминирующая форма Школково — \subsection*{(метка)}, а
-        # не \textbf{(метка)} — парсер её не разбирает вовсе (вне рамок
-        # этой fix-волны), но обязан честно предупредить, а не молчать.
+    def test_subsection_shape_is_now_recognized(self):
+        # Раньше этот тест закреплял ОГРАНИЧЕНИЕ: доминирующая форма
+        # Школково — \subsection*{(метка)} — не разбиралась вовсе. Сессия
+        # 29.08 сняла ограничение: заголовок пункта распознаётся в шести
+        # формах команд, и таких задач 319.
         text = '\\subsection*{(a)}\\begin{itemize}\\item 3 балла за верный ответ.\\end{itemize}'
         result = parse_shkolkovo_criteria(text)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertEqual(result['criteria'][0]['max_points'], 3.0)
+
+    def test_unrecognized_shape_warns_when_zero_criteria_found(self):
+        # Непустой criteria_tex без списка — критерии написаны прозой.
+        # Парсер обязан честно предупредить, а не выдумывать разбиение.
+        text = 'Выставлялось по 5 баллов за каждый верный аргумент.'
+        result = parse_shkolkovo_criteria(text)
         self.assertEqual(result['criteria'], [])
-        self.assertTrue(any('не распознано ни одного критерия' in w for w in result['warnings']))
+        self.assertTrue(any('прозой' in w for w in result['warnings']))
 
     def test_recognized_shape_does_not_warn(self):
         text = '\\textbf{(a)}\\begin{itemize}\\item 3 балла за верный ответ.\\end{itemize}'
@@ -174,3 +183,131 @@ class ParseSolvehubCriteriaMultiHeaderDefectTests(SimpleTestCase):
         unclaimed = [w for w in result['warnings'] if 'вне извлечённых критериев' in w]
         self.assertTrue(any('условие А' in w for w in unclaimed))
         self.assertTrue(any('условие Б' in w for w in unclaimed))
+
+
+
+class ShkolkovoWiderHeadersTests(SimpleTestCase):
+    r"""Расширение парсера: 319 задач Школково имели настоящий список.
+
+    Прежний парсер брал ровно одну форму заголовка пункта —
+    `\textbf{(метка)}` сразу перед `\begin{itemize}`. Свип по 836
+    непустым `criteria_tex` показал, что это меньшинство: те же по сути
+    критерии пишутся ещё как `\subsection*{(а)}` и `\textbf{Пункт (а)}
+    (6 баллов):`, а баллы стоят не только в начале пункта, но и в конце
+    (`~--- 2 балла`). Границы блоков ищутся ПО ЗАГОЛОВКАМ, а не жадным
+    захватом (тот же урок, что у SolveHub #3498).
+    """
+
+    def test_167074_subsection_header_with_itemize(self):
+        tex = ('\\subsection*{(а)}\n\\begin{itemize}\n'
+               '\\item 2 балла за запись прибыли фирмы.\n'
+               '\\item 1 балл за нахождение оптимального $L$.\n'
+               '\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 2)
+        self.assertEqual([c['max_points'] for c in result['criteria']], [2.0, 1.0])
+        self.assertTrue(result['criteria'][0]['name'].startswith('(а)'))
+
+    def test_167118_points_at_end_of_item(self):
+        r"""`~--- 2 балла` в КОНЦЕ пункта — самая частая форма семейства."""
+        tex = ('\\textbf{Пункт (а)} (6 баллов):\n\\begin{itemize}\n'
+               '\\item Расчет прибыли Беты и выбор объема~--- 2 балла\n'
+               '\\item За верные расчёты цен в каждом регионе~--- по 2 балла\n'
+               '\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 2)
+        self.assertEqual([c['max_points'] for c in result['criteria']], [2.0, 2.0])
+
+    def test_enumerate_is_read_like_itemize(self):
+        tex = ('\\textbf{(б)}\n\\begin{enumerate}\n'
+               '\\item 3 балла за верный график.\n\\end{enumerate}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertEqual(result['criteria'][0]['max_points'], 3.0)
+
+    def test_points_written_as_abbreviation(self):
+        r"""`2~б.` — так пишут баллы у #175879, слова «балл» там нет вовсе."""
+        tex = ('\\textbf{а)}\n\\begin{itemize}\n'
+               '\\item 2~б. Полностью описан механизм.\n\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertEqual(result['criteria'][0]['max_points'], 2.0)
+
+    def test_two_parts_do_not_bleed_into_each_other(self):
+        """Граница по заголовку: пункты (б) не приписываются к (а)."""
+        tex = ('\\subsection*{(а)}\n\\begin{itemize}\n\\item 2 балла за первое.\n'
+               '\\end{itemize}\n\\subsection*{(б)}\n\\begin{itemize}\n'
+               '\\item 5 баллов за второе.\n\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        names = [c['name'] for c in result['criteria']]
+        self.assertEqual(len(names), 2)
+        self.assertIn('(а)', names[0])
+        self.assertIn('(б)', names[1])
+        self.assertNotIn('второе', names[0])
+
+    def test_list_without_any_header_still_read(self):
+        """Список без заголовка пункта — критерии всё равно настоящие."""
+        tex = ('\\begin{itemize}\n\\item 4 балла за вывод.\n'
+               '\\item 1 балл за график.\n\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 2)
+
+    def test_criteria_none_marker_is_empty_without_warning(self):
+        """`% criteria: none` — это «критериев нет», а не «не разобрали».
+
+        110 задач из 836. Считать их неудачей парсера значит завышать
+        объём непокрытого."""
+        result = parse_shkolkovo_criteria('% criteria: none')
+        self.assertEqual(result['criteria'], [])
+        self.assertEqual(result['warnings'], [])
+
+    def test_free_prose_is_not_guessed(self):
+        """Проза без списка — баллы НЕ выдумываются, идёт предупреждение.
+
+        Угадывать разбиение свободного текста на критерии запрещено: это
+        было бы выдуманное, а не импортированное знание."""
+        tex = ('В задаче есть два сложных момента. Незначительная '
+               'арифметическая ошибка оценивается в 1 балл в каждом пункте.')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(result['criteria'], [])
+        self.assertTrue(result['warnings'])
+
+    def test_old_textbf_itemize_shape_still_works(self):
+        """Регрессия: 45 уже разбиравшихся задач не должны отвалиться."""
+        tex = ('\\textbf{(а)}\\begin{itemize}\\item 3 балла за вывод.'
+               '\\end{itemize}')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertEqual(result['criteria'][0]['max_points'], 3.0)
+
+    def test_item_without_points_still_becomes_criterion_with_warning(self):
+        """Пункт без баллов — критерий есть, балл неизвестен.
+
+        Прежнее поведение, и его надо сохранить: терять пункт нельзя,
+        а выдумывать за него балл — тем более."""
+        tex = ('\\textbf{(а)}\n\\begin{itemize}\n'
+               '\\item За аккуратность оформления.\n\\end{itemize}\n')
+        result = parse_shkolkovo_criteria(tex)
+        self.assertEqual(len(result['criteria']), 1)
+        self.assertIsNone(result['criteria'][0]['max_points'])
+        self.assertTrue(result['warnings'])
+
+    def test_167105_nested_list_does_not_leak_raw_latex(self):
+        r"""Вложенный список: внешний `\item` — заголовок, а не критерий.
+
+        43 задачи из 362 разобранных получали в имя критерия сырой
+        `\begin{itemize}`: нежадный `(.*?)` закрывал внешний список на
+        `\end` ВНУТРЕННЕГО."""
+        tex = ('\\begin{itemize}\n'
+               '\\item [А)] Определите функции спроса и предложения. (6 баллов)\n'
+               '\\begin{itemize}\n'
+               '\\item 3 балла за спрос.\n'
+               '\\item 3 балла за предложение.\n'
+               '\\end{itemize}\n'
+               '\\end{itemize}')
+        result = parse_shkolkovo_criteria(tex)
+        for criterion in result['criteria']:
+            self.assertNotIn('\\begin{', criterion['name'])
+            self.assertNotIn('\\end{', criterion['name'])
+        self.assertEqual([c['max_points'] for c in result['criteria']], [3.0, 3.0])
+        self.assertTrue(all('(А)' in c['name'] for c in result['criteria']))
