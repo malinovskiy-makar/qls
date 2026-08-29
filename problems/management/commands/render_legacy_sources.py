@@ -6,11 +6,35 @@
 карточка «Фаза 5 конвертера корпуса: одобрение по источникам после
 визуального ревью».
 
-Эта команда НЕ трогает `statement`/`answer`/`solution`/`ProblemPart` —
-только флаг `content_format`. Текст уже приведён к своему финальному виду
-предыдущими сессиями (МатЭк фикс-пак, автопочинка `\\begin{cases}`);
-здесь конвейер запускается ВТОРОЙ раз только чтобы СПРОСИТЬ у шлюза
-`render_preflight_v2()`, не чтобы получить новый текст.
+Команда СОХРАНЯЕТ канонизированный текст (`statement`/`answer`/
+`solution`/`ProblemPart.statement`) вместе с флагом `content_format`.
+
+⚠️ Сессия 2026-08-29: до неё команда писала ТОЛЬКО флаг, а её docstring
+утверждал, что текст «уже приведён к финальному виду предыдущими
+сессиями». Утверждение оказалось неверным: `convert_problem_v2()` меняет
+текст у 5 842 из 16 804 кандидатов (34,8 %). Шлюз при этом рендерит
+канонизированный текст, а шаблон `catalog/problem_detail.html` —
+СОХРАНЁННЫЙ (`problem.statement|render_markdown`). То есть проверяли
+одно, а показали бы другое.
+
+Замер боевым путём (500 случайных кандидатов, сид 20260829, тот же
+KaTeX): из 465 задач, прошедших шлюз, **70 (15,1 %) сайт показал бы
+сломанными** — сырые `\\begin{`/`\\end{` в видимом тексте, русский текст
+в math mode, настоящие `KaTeX parse error`. В пересчёте на PASS-множество
+это около 2 400 задач.
+
+Лечится не смягчением шлюза, а тем, что в базу ложится ровно тот текст,
+который шлюз проверил, — так уже устроены три новых источника
+([ADR 0033](../../../docs/adr/0033-new-sources-store-converted-text.md)):
+у них конвертер отработал на импорте, и расхождения нет по построению.
+
+Вторая страховка — **идемпотентность по построению**. Сохранять можно
+только текст, который является неподвижной точкой конвертера:
+`convert(convert(x)) == convert(x)`. У 53 из 16 804 кандидатов (0,32 %)
+это не так, и второй проход портит текст (живой минимальный случай —
+вложенный `enumerate`: `1. \\begin{enumerate}...` превращается в `1. `,
+содержимое теряется). Такие задачи получают код `NOT-IDEMPOTENT`,
+остаются на `plain` и уходят в очередь ручного разбора.
 
 ⚠️ Сессия 2026-08-27: шлюз заменён со старого `may_render_as_markdown()`
 на `render_preflight_v2()`. Старый отвечал на вопрос «разобрал ли
@@ -45,12 +69,12 @@ from django.db import transaction
 
 from problems.corpus_converter.katex_preflight import KatexPreflight
 from problems.corpus_converter.preflight_gate import (
-    build_blocks, convert_problem_v2, render_preflight_v2,
+    GateVerdict, build_blocks, convert_problem_v2, render_preflight_v2,
 )
 from problems.corpus_converter.reshalki_dollar_exclusions import (
     FORCED_EXCLUDE_RESHALKI_DOLLAR_SPLIT,
 )
-from problems.models import Problem, ProblemFigure
+from problems.models import Problem, ProblemFigure, ProblemPart
 
 #: те же четыре легаси-источника и id, что у corpus_scaleup_legacy.py /
 #: corpus_manual_review_queue.py — единый список, не выдумывается заново.
@@ -78,24 +102,68 @@ def _candidate_qs(slug, source_id):
     return qs
 
 
+def convert_for(problem):
+    """`(подпункты, пары-для-шлюза, результат конвертера)` для одной задачи.
+
+    Подпункты возвращаются объектами, а не метками: писать их потом надо
+    по `pk` — метки в корпусе не уникальны."""
+    parts = list(problem.parts.all())
+    existing_parts = [(part.label, part.statement) for part in parts]
+    result = convert_problem_v2(
+        statement=problem.statement, answer=problem.answer,
+        solution=problem.solution, existing_parts=existing_parts,
+    )
+    return parts, existing_parts, result
+
+
+def is_stable(result):
+    """Неподвижная ли точка конвертера — можно ли сохранять результат.
+
+    Сохранённый текст следующий прогон снова прогонит через конвертер.
+    Если второй проход даёт другой текст, задача будет «доедаться» с
+    каждым запуском, а проверка идемпотентности никогда не даст ноль."""
+    again = convert_problem_v2(
+        statement=result['statement_md'], answer=result['answer_md'],
+        solution=result['solution_md'],
+        existing_parts=[(part['label'], part['statement_md'])
+                        for part in result['parts']],
+    )
+    for field in ('statement_md', 'answer_md', 'solution_md'):
+        if (again[field] or '') != (result[field] or ''):
+            return False
+    if len(again['parts']) != len(result['parts']):
+        return False
+    return all((a['statement_md'] or '') == (b['statement_md'] or '')
+               for a, b in zip(result['parts'], again['parts']))
+
+
 class Command(BaseCommand):
     help = (
-        'Боевой рендер легаси-источников: content_format=markdown кандидатам, '
-        'прошедшим render_preflight_v2(). Без --apply — сухой прогон.'
+        'Боевой рендер легаси-источников: канонизированный текст и '
+        'content_format=markdown кандидатам, прошедшим render_preflight_v2(). '
+        'Без --apply — сухой прогон.'
     )
 
     def add_arguments(self, parser):
         parser.add_argument('--apply', action='store_true',
                             help='реально записать в базу (по умолчанию сухой прогон)')
+        parser.add_argument('--report-dir',
+                            help='куда класть отчёты и журнал отката '
+                                 '(по умолчанию reports/corpus_converter_scaleup)')
 
     def handle(self, *args, **options):
         do_apply = options['apply']
+        out_dir = options.get('report_dir') or OUT_DIR
 
         problems_before_total = Problem.objects.count()
+        parts_before_total = ProblemPart.objects.count()
 
         per_source = {}
         all_pass_ids = set()
         all_fail_ids = set()
+        #: id -> (statement_md, answer_md, solution_md, [(part_pk, текст)])
+        #: только для задач, у которых текст или флаг РЕАЛЬНО отличаются.
+        to_write = {}
 
         # Браузер поднимается ОДИН раз на весь корпус: шлюз рендерит
         # каждое поле настоящим KaTeX, и подъём на задачу стоил бы часы.
@@ -124,11 +192,7 @@ class Command(BaseCommand):
                 pass_ids, fail_ids = [], []
                 fail_codes = {}
                 for p in candidates_qs.prefetch_related('parts').iterator(chunk_size=500):
-                    existing_parts = [(part.label, part.statement) for part in p.parts.all()]
-                    result = convert_problem_v2(
-                        statement=p.statement, answer=p.answer, solution=p.solution,
-                        existing_parts=existing_parts,
-                    )
+                    parts, existing_parts, result = convert_for(p)
                     blocks = build_blocks(p.statement, existing_parts, p.answer,
                                           p.solution, result)
                     available = set(
@@ -137,8 +201,33 @@ class Command(BaseCommand):
                     verdict = render_preflight_v2(
                         blocks, checker, raw_statement=p.statement,
                         available_figures=available)
+
+                    # Шлюз пропустил, но конвертер на своём же результате
+                    # даёт другой текст — сохранять такое нельзя.
+                    if verdict.ok and not is_stable(result):
+                        verdict = GateVerdict(
+                            False, ['NOT-IDEMPOTENT'],
+                            ['второй проход конвертера меняет текст — '
+                             'сохранённый результат «доедался» бы при '
+                             'каждом следующем прогоне'])
+
                     if verdict.ok:
                         pass_ids.append(p.id)
+                        part_writes = [(part.pk, conv['statement_md'])
+                                       for part, conv in zip(parts, result['parts'])]
+                        changed = (
+                            p.content_format != Problem.ContentFormat.MARKDOWN
+                            or (p.statement or '') != (result['statement_md'] or '')
+                            or (p.answer or '') != (result['answer_md'] or '')
+                            or (p.solution or '') != (result['solution_md'] or '')
+                            or any((part.statement or '') != (text or '')
+                                   for part, (_pk, text) in zip(parts, part_writes))
+                        )
+                        if changed:
+                            to_write[p.id] = (
+                                result['statement_md'], result['answer_md'],
+                                result['solution_md'], part_writes,
+                            )
                     else:
                         fail_ids.append(p.id)
                         for code in verdict.codes:
@@ -202,7 +291,10 @@ class Command(BaseCommand):
                 id__in=all_pass_ids, content_format=Problem.ContentFormat.MARKDOWN,
             ).values_list('id', flat=True)
         )
-        to_change_ids = sorted(all_pass_ids - already_markdown_ids)
+        # «Изменится» теперь считается по ТЕКСТУ И флагу вместе: задача
+        # может уже стоять на markdown, но хранить неканонизированный
+        # текст — до этой сессии именно так и было.
+        to_change_ids = sorted(to_write)
 
         self.stdout.write(
             f'\nPASS всего (все 4 источника): {len(all_pass_ids)}. '
@@ -230,7 +322,7 @@ class Command(BaseCommand):
                 f'за владельцем. id: {already_md_failing}'
             ))
 
-        os.makedirs(OUT_DIR, exist_ok=True)
+        os.makedirs(out_dir, exist_ok=True)
 
         if not do_apply:
             self.stdout.write(self.style.WARNING(
@@ -240,23 +332,41 @@ class Command(BaseCommand):
             ))
             return
 
-        # --- Запись ---
-        backup_path = os.path.join(OUT_DIR, 'render_legacy_sources_backup.json')
-        backup = list(
-            Problem.objects.filter(id__in=to_change_ids)
-            .values('id', 'content_format')
-        )
+        # --- Журнал отката: и флаг, и ТЕКСТ, и подпункты -------------------
+        backup_path = os.path.join(out_dir, 'render_legacy_sources_backup.json')
+        backup = [{
+            'problem_id': p.id,
+            'content_format': p.content_format,
+            'statement': p.statement,
+            'answer': p.answer,
+            'solution': p.solution,
+            'parts': [{'id': part.id, 'label': part.label,
+                       'statement': part.statement} for part in p.parts.all()],
+        } for p in (Problem.objects.filter(id__in=to_change_ids)
+                    .prefetch_related('parts').order_by('id'))]
         with open(backup_path, 'w', encoding='utf-8') as f:
             json.dump({
-                'note': 'Снимок content_format ДО боевого рендера — для отката.',
+                'note': 'Снимок текста и content_format ДО боевого рендера — '
+                        'для отката.',
                 'count': len(backup),
                 'problems': backup,
             }, f, ensure_ascii=False, indent=1)
 
+        # --- Запись ---
+        updated = 0
+        parts_updated = 0
         with transaction.atomic():
-            updated = Problem.objects.filter(id__in=to_change_ids).update(
-                content_format=Problem.ContentFormat.MARKDOWN,
-            )
+            for pid in to_change_ids:
+                statement_md, answer_md, solution_md, part_writes = to_write[pid]
+                updated += Problem.objects.filter(id=pid).update(
+                    statement=statement_md,
+                    answer=answer_md,
+                    solution=solution_md,
+                    content_format=Problem.ContentFormat.MARKDOWN,
+                )
+                for part_pk, text in part_writes:
+                    parts_updated += ProblemPart.objects.filter(
+                        pk=part_pk).update(statement=text)
 
         problems_after_total = Problem.objects.count()
         if problems_before_total != problems_after_total:
@@ -264,8 +374,16 @@ class Command(BaseCommand):
                 f'ИНВАРИАНТ НАРУШЕН: Problem.objects.count() было '
                 f'{problems_before_total}, стало {problems_after_total}'
             )
+        parts_after_total = ProblemPart.objects.count()
+        if parts_before_total != parts_after_total:
+            raise CommandError(
+                f'ИНВАРИАНТ НАРУШЕН: ProblemPart.objects.count() было '
+                f'{parts_before_total}, стало {parts_after_total}'
+            )
 
         self.stdout.write(self.style.SUCCESS(
-            f'ЗАПИСАНО. content_format=markdown поставлен {updated} задачам. '
-            f'Бэкап: {backup_path}. Инвариант count() сошёлся ({problems_before_total}).'
+            f'ЗАПИСАНО. Задач: {updated} (канонизированный текст + '
+            f'content_format=markdown). Подпунктов: {parts_updated}. '
+            f'Бэкап: {backup_path}. Инварианты сошлись: '
+            f'Problem={problems_before_total}, ProblemPart={parts_before_total}.'
         ))
