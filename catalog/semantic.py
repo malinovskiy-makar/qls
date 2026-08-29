@@ -112,10 +112,41 @@ def _deserialize(blob) -> np.ndarray:
     return np.frombuffer(bytes(blob), dtype=np.float32)
 
 
-def _build_index():
+def index_queryset(scope='prod'):
+    """Кого пускаем в индекс. Единственная точка правды на оба среза.
+
+    'prod' — ровно то, что видно на сайте: опубликовано, не забраковано
+             детектором качества, просмотрено человеком. Так индекс строился
+             всегда, и это умолчание.
+    'all'  — весь банк, у которого есть вектор. Нужно измерителю (С14): по
+             этому срезу видно качество поиска «как есть», до чистки корпуса.
+
+    ⚠️ УМОЛЧАНИЕ МЕНЯТЬ НЕЛЬЗЯ. Этой же функцией строится индекс каталога;
+    сделай умолчанием 'all' — и в выдачу сайта поедут скрытые и забракованные
+    задачи, причём молча. Стережёт `test_search_eval_scope.py`.
+
+    ⚠️ НЕИЗВЕСТНЫЙ СРЕЗ — ОШИБКА, А НЕ ТИХИЙ ОТКАТ К 'prod'. Опечатка в имени
+    иначе дала бы отчёт с подписью «весь банк», посчитанный по пяти тысячам.
+    """
+    from problems.models import Problem
+
+    if scope not in ('prod', 'all'):
+        raise ValueError(
+            f'Неизвестный срез индекса: {scope!r}. Допустимы «prod» и «all».')
+    qs = Problem.objects.filter(embedding__isnull=False)
+    if scope == 'prod':
+        qs = qs.filter(
+            status=Problem.Status.PUBLISHED,
+            needs_quality_review=False,
+            hidden_pending_review=False,
+        )
+    return qs
+
+
+def _build_index(scope='prod'):
     """Строит индекс: матрица нормализованных эмбеддингов + список id.
 
-    Включает только published-задачи без флага качества и с эмбеддингом.
+    Кого включаем — решает `index_queryset` (по умолчанию срез сайта).
     Нормализует строки сразу, чтобы косинус = скалярное произведение (быстрее).
     """
     from problems.models import Problem
@@ -133,13 +164,7 @@ def _build_index():
     )
 
     qs = (
-        Problem.objects
-        .filter(
-            status=Problem.Status.PUBLISHED,
-            needs_quality_review=False,
-            hidden_pending_review=False,
-            embedding__isnull=False,
-        )
+        index_queryset(scope)
         .only('id', 'embedding', 'problem_type')
         .values_list('id', 'embedding', 'problem_type')
     )
