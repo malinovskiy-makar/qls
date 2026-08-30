@@ -80,6 +80,35 @@ class MacroFixTests(SimpleTestCase):
         self.assertEqual(apply_macro_fixes(r'\right)'), r'\right)')
         self.assertEqual(apply_macro_fixes(r'\Tilder'), r'\Tilder')
 
+    def test_53763_sized_delimiter_in_group(self):
+        r"""`\bigg{(}` — KaTeX требует разделитель, а не группу.
+
+        Ошибка `Invalid delimiter type 'ordgroup'` (живые #53763, #53768).
+        Это не догадка про чужой макрос: `\bigg` — команда самого KaTeX,
+        и правильная форма её записи однозначна."""
+        self.assertEqual(apply_macro_fixes(r"AC'=\bigg{(}\frac{a}{b}\bigg{)}"),
+                         r"AC'=\bigg(\frac{a}{b}\bigg)")
+
+    def test_sized_delimiter_all_sizes(self):
+        for cmd in (r'\big', r'\Big', r'\bigg', r'\Bigg'):
+            self.assertEqual(apply_macro_fixes(cmd + '{[}'), cmd + '[')
+
+    def test_sized_delimiter_group_with_command_delimiter(self):
+        r"""`\bigg{\{}` — фигурная скобка как разделитель, тоже группа."""
+        self.assertEqual(apply_macro_fixes(r'\bigg{\{}x\bigg{\}}'),
+                         r'\bigg\{x\bigg\}')
+
+    def test_sized_delimiter_correct_form_untouched(self):
+        r"""Уже правильная запись не трогается."""
+        self.assertEqual(apply_macro_fixes(r'\bigg(x\bigg)'), r'\bigg(x\bigg)')
+
+    def test_sized_delimiter_does_not_eat_real_group(self):
+        r"""`\bigg` перед НЕразделителем — не наш случай, не трогаем.
+
+        `{abc}` разделителем быть не может; молча выкидывать скобки
+        значило бы менять смысл формулы."""
+        self.assertEqual(apply_macro_fixes(r'\bigg{abc}'), r'\bigg{abc}')
+
     def test_42463_unknown_macro_not_guessed(self):
         # `\soso` остаётся как есть — его поймает шлюз кодом MACRO.
         self.assertIn(r'\soso', apply_macro_fixes(r'x=1\soso y=2'))
@@ -274,3 +303,46 @@ class LeftoverTextCommandsTests(SimpleTestCase):
                 '\\end{tabular}')
         result = convert_text_environments(text)
         self.assertIn('а & б \\\\ в & г', result)
+
+    def test_54159_leftover_itemize_wrapper_unwrapped(self):
+        r"""`\begin{itemize}` без единого `\item` — обёртка-пустышка.
+
+        Стадия 1 (`convert_lists`) такое окружение не берёт: пункты в нём
+        уже записаны markdown-маркерами, а `\item` нет вовсе. Обёртка
+        доезжала до экрана сырой (живой #54159, всего 5 задач трёх новых
+        источников). Снимаем её тем же механизмом, что и `quote`/`center`:
+        текст остаётся, разметка исчезает."""
+        text = ('\\begin{itemize}\n- владея первым билетом\n'
+                '- владея вторым билетом\n\\end{itemize}')
+        result = convert_text_environments(text)
+        self.assertNotIn('\\begin{itemize}', result)
+        self.assertNotIn('\\end{itemize}', result)
+        self.assertIn('- владея первым билетом', result)
+        self.assertIn('- владея вторым билетом', result)
+
+    def test_63309_leftover_enumerate_wrapper_unwrapped(self):
+        r"""То же для `enumerate` с абзацами вместо пунктов (живой #63309)."""
+        text = ('\\begin{enumerate}\n\nПри потолках выше цены\n\n'
+                'Далее монополист идёт по спросу\n\n\\end{enumerate}')
+        result = convert_text_environments(text)
+        self.assertNotIn('\\begin{enumerate}', result)
+        self.assertIn('При потолках выше цены', result)
+        self.assertIn('Далее монополист идёт по спросу', result)
+
+    def test_orphaned_item_becomes_list_marker(self):
+        r"""Осиротевший `\item` — пункт списка, а не сырая команда.
+
+        До стадии 4 доезжает только тот `\item`, который стадия 1 не
+        разобрала; оставлять его обратным слешем на экране нельзя."""
+        text = '\\item Первый пункт\n\\item Второй пункт'
+        result = convert_text_environments(text)
+        self.assertNotIn('\\item', result)
+        self.assertIn('- Первый пункт', result)
+        self.assertIn('- Второй пункт', result)
+
+    def test_item_with_optional_label(self):
+        r"""`\item[а)]` — метка в необязательном аргументе, её видно."""
+        result = convert_text_environments('\\item[а)] текст пункта')
+        self.assertNotIn('\\item', result)
+        self.assertIn('а)', result)
+        self.assertIn('текст пункта', result)

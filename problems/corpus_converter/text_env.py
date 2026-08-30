@@ -31,11 +31,19 @@ from problems.corpus_converter.tex_lexer import TokenKind, tokenize
 
 #: Окружения-обёртки: снимаются, содержимое остаётся. Ни одно из них не
 #: несёт смысла, который выжил бы в текущем allow-list.
+#:
+#: `itemize`/`enumerate`/`description` — СТРАХОВКА после стадии 1.
+#: `convert_lists` в `core.py` разбирает нормальный список в markdown и
+#: обёртку убирает сам; сюда доезжает только то, что он взять не смог —
+#: окружение, в котором пункты уже записаны markdown-маркерами, а `\item`
+#: нет вовсе (живой #54159), либо вместо пунктов идут абзацы (живой
+#: #63309). Текст в них осмысленный, теряется только сырая обёртка.
 UNWRAP_ENVIRONMENTS = frozenset({
     'quote', 'quotation', 'center', 'flushleft', 'flushright', 'abstract',
     'minipage', 'tcolorbox', 'figure', 'figure*', 'table', 'table*',
     'small', 'large', 'footnotesize', 'scriptsize', 'spacing', 'adjustbox',
     'wrapfigure', 'samepage', 'sloppypar', 'multicols',
+    'itemize', 'enumerate', 'description',
 })
 
 #: Команды с одним аргументом, у которых виден и нужен сам аргумент.
@@ -137,6 +145,18 @@ _LINE_BREAK_RE = re.compile(
     r'[ \t]*\\\\\*?(?:[ \t]*\[[^\]\n]{0,20}\])?[ \t]*\n?'
 )
 
+#: Осиротевший `\item` — пункт списка, а не разметка. До стадии 4
+#: доезжает только тот, который `convert_lists` не разобрал (окружение
+#: без пары, вложенное или уже с markdown-маркерами внутри). Метка из
+#: необязательного аргумента (`\item[а)]`) видна и сохраняется — это
+#: содержание, а не оформление.
+_ITEM_RE = re.compile(r'[ \t]*\\item\b[ \t]*(?:\[([^\]\n]{0,40})\])?[ \t]*')
+
+
+def _item_to_marker(match):
+    label = match.group(1)
+    return '\n- ' + (label + ' ' if label else '')
+
 #: Плейсхолдер для математики и нетронутых окружений на время чистки
 #: команд. Внутри — только цифры: ни скобок, ни обратного слеша, поэтому
 #: счётчик скобок в `_unwrap_keep_arg` о него не спотыкается.
@@ -207,6 +227,7 @@ def _unwrap_keep_arg(text):
 
 def _clean_commands(chunk):
     chunk = _LINE_BREAK_RE.sub('\n', chunk)
+    chunk = _ITEM_RE.sub(_item_to_marker, chunk)
     chunk = _ADDCONTENTS_RE.sub('', chunk)
     chunk = _HREF_RE.sub(r'\1', chunk)
     chunk = _HYPERLINK_RE.sub(r'\1', chunk)
