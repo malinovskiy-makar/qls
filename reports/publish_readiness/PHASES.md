@@ -443,3 +443,35 @@ $2 в виде трансфертов» (#26724) и «привязка к дол
 `audit_render_quality` и судит ВЕСЬ банк, а прочие источники этим промптом
 явно исключены. Вынесено карточкой в Notion, решение за владельцем.
 Список: `reports/publish_readiness/regressions.txt`.
+
+
+## Фаза 7 — полный прогон (2026-08-30)
+
+Прогнаны ВСЕ ПЯТЬ джобов `ci.yml` поимённо, как требует корневой CLAUDE.md.
+
+| джоб | команда | результат |
+|---|---|---|
+| 1. lint | `ruff check .` | **зелёный** — All checks passed |
+| 2. security | `bandit -r … -ll` | **зелёный** — 0 Medium, 0 High (297 Low ниже порога `-ll`) |
+| 2. security | `pip-audit -r requirements/base.txt` | **зелёный** — No known vulnerabilities found |
+| 3. migrations | `migrate` + `makemigrations --check` на пустой PG 17 | **зелёный** |
+| 4. tests | `scripts/run_tests.py … --settings=config.settings_test_pg` | см. ниже |
+| 5. deploy-check | `check --deploy --fail-level WARNING` | **зелёный** — no issues (1 silenced) |
+
+Для джоба 3 база создавалась ОТДЕЛЬНАЯ (`qls_dev_scratch`, потом
+`qls_scratch2`): существующая `qls_dev` была уже мигрирована и дала бы
+ложное «No migrations to apply». Первый прогон это и показал.
+
+### `test_design_canon` и ловушка, в которую я чуть не попал
+
+Первый прогон дал `FAILED (failures=1)` на `CanonBrowserChecks.test_canon`:
+метрика `math_line_height` показала 66 при потолке 68, и сам тест написал
+«стало ЛУЧШЕ, опусти потолок до 66».
+
+**Потолок опускать нельзя, и это написано прямо над строкой потолка:**
+локально на Windows число ниже CI ровно на 2 из-за хинтинга шрифтов в
+безголовом Chromium, и комментарий требует опускать потолок «только по
+прогону CI или контейнера с Linux». 66 = 68 − 2 — ровно тот самый сдвиг.
+
+Потолок был опущен и тут же возвращён на 68. Красный `test_design_canon`
+на Windows — известный артефакт окружения, а не регрессия этой сессии.
