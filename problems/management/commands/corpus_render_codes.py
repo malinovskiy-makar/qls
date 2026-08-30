@@ -29,6 +29,9 @@ from problems.rendering import render_markdown
 
 LEGACY = {14: 'archive3', 13: 'matek', 3: 'lsh2025', 16: 'reshalki'}
 OUT_DIR = os.path.join(settings.BASE_DIR, 'reports', 'corpus_render_codes')
+#: Отсюда `quality_gate` собирает списки детекторов. Формат файла — тот
+#: же, что у соседей: `id<TAB>пояснение`, строки с `#` игнорируются.
+GATE_DIR = os.path.join(settings.BASE_DIR, 'reports', 'quality_audit')
 
 
 class Command(BaseCommand):
@@ -44,6 +47,8 @@ class Command(BaseCommand):
                             help='мерить ширину формул настоящим браузером '
                                  '(коды OVER и OVER-M)')
         parser.add_argument('--report-dir', default=OUT_DIR)
+        parser.add_argument('--gate-dir', default=GATE_DIR,
+                            help='куда положить список id для quality_gate')
 
     def handle(self, *args, **options):
         ids = set(SourceReference.objects
@@ -99,6 +104,7 @@ class Command(BaseCommand):
             json.dump({'by_code': {k: sorted(v) for k, v in by_code.items()},
                        'by_problem': {str(k): v for k, v in details.items()}},
                       fh, ensure_ascii=False)
+        gate_path = self._write_gate_list(details, options['gate_dir'])
 
         self.stdout.write('проверено задач: %d' % total)
         self.stdout.write('без единого кода: %d (%.1f %%)'
@@ -130,11 +136,40 @@ class Command(BaseCommand):
         self.stdout.write('')
         self.stdout.write('отчёт: %s'
                           % os.path.join(report_dir, 'codes.json'))
+        self.stdout.write('список для quality_gate: %s' % gate_path)
         if probe is None:
             self.stdout.write('⚠ ширина формул НЕ мерилась: коды OVER и '
                               'OVER-M в числах отсутствуют (нужен --widths).')
 
     # ------------------------------------------------------------------
+
+    @staticmethod
+    def _write_gate_list(details, gate_dir):
+        """Список id для `quality_gate` — только P0 и P1.
+
+        P2 не флагуется намеренно: это косметика, а два кода из трёх
+        (`TABLE`, `OVER-M`) сняты правкой шаблона показа, а не задачами.
+        Флаг за косметику скрыл бы 365 годных карточек.
+
+        Сам файл ничего не скрывает: флаги ставит `quality_gate --apply`,
+        и это отдельное решение владельца — команда глобальная, она
+        сбрасывает и пересчитывает флаги по ВСЕМУ банку."""
+        os.makedirs(gate_dir, exist_ok=True)
+        path = os.path.join(gate_dir, 'render_codes_ids.txt')
+        rows = []
+        for pid, codes in sorted(details.items()):
+            worst = min(rc.PRIORITY[c] for c in codes)
+            if worst == 'P2':
+                continue
+            rows.append('%d	%s	%s' % (pid, worst, ','.join(codes)))
+        header = [
+            '# Коды читаемости аудита 3 000 карточек. Только P0 и P1.',
+            '# Формат: id<TAB>приоритет<TAB>коды. Собирает quality_gate.',
+            '# Регенерация: manage.py corpus_render_codes --widths',
+        ]
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write('\n'.join(header + rows) + '\n')
+        return path
 
     @staticmethod
     def _render(problem):
