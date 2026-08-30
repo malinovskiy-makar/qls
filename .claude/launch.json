@@ -101,6 +101,17 @@
         "--noreload"
       ],
       "port": 8010
+    },
+    {
+      "name": "gate-revert",
+      "runtimeExecutable": "C:\\Users\\shipu\\qls\\venv313\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8412",
+        "--noreload"
+      ],
+      "port": 8412
     }
   ]
 }
