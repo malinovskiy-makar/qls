@@ -49,11 +49,34 @@ _FIX_RE = re.compile(
     '(' + '|'.join(re.escape(k) for k in MACRO_FIXES) + r')(?![A-Za-z])'
 )
 
+#: Разделители, которые KaTeX принимает после `\big`/`\Big`/`\bigg`/`\Bigg`.
+#: Список закрытый и короткий намеренно: снимать группу можно ТОЛЬКО
+#: когда внутри действительно разделитель. `\bigg{abc}` — не наш случай,
+#: и молча выкидывать скобки там значило бы менять смысл формулы.
+_DELIMITERS = (
+    r'\{', r'\}', r'\lvert', r'\rvert', r'\lVert', r'\rVert',
+    r'\langle', r'\rangle', r'\lfloor', r'\rfloor', r'\lceil', r'\rceil',
+    r'\uparrow', r'\downarrow', r'\|', r'\backslash',
+    '(', ')', '[', ']', '|', '/', '.',
+)
+
+#: `\bigg{(}` вместо `\bigg(` — KaTeX отвечает
+#: `Invalid delimiter type 'ordgroup'` (живые #53763, #53768). Это не
+#: догадка про чужой макрос: `\big`-семейство — команды самого KaTeX,
+#: и правильная форма их записи однозначна, поэтому правка законна по
+#: правилу модуля («опечатки чиним, неизвестное не гадаем»).
+_SIZED_DELIM_RE = re.compile(
+    r'(\\[Bb]igg?[lrm]?)\s*\{\s*('
+    + '|'.join(re.escape(d) for d in _DELIMITERS)
+    + r')\s*\}'
+)
+
 
 def apply_macro_fixes(text):
     """Заменить известные опечатки макросов. Неизвестные не трогаются —
     их поймает шлюз кодом `MACRO`."""
-    return _FIX_RE.sub(lambda m: MACRO_FIXES[m.group(1)], text)
+    text = _FIX_RE.sub(lambda m: MACRO_FIXES[m.group(1)], text)
+    return _SIZED_DELIM_RE.sub(r'\1\2', text)
 
 
 def find_unresolved_macros(katex_error_messages):

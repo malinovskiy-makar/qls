@@ -7,14 +7,18 @@
 `Content-Type` вместо `svg`), и класс атаки «произвольный `src` из
 текста задачи» обязан быть закрыт и на нём.
 """
+import json
+import os
 import re
+import tempfile
 
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from problems.corpus_converter.images import (
-    image_hash, replace_images, sniff_content_type,
+    image_hash, qualify_shkolkovo_images, replace_images, sniff_content_type,
 )
+from problems.corpus_converter.reconvert import shkolkovo_resolver
 from problems.figures import render_figures
 from problems.models import Problem, ProblemFigure
 from problems.rendering import render_markdown
@@ -152,6 +156,47 @@ class RasterFigureDisplayTests(TestCase):
         self.assertIn(b'circle', response.content)
 
 
+class PlainFormatMarkerGuardTests(TestCase):
+    r"""`plain` + маркер = сырой `[[FIGURE:…]]` на экране у ученика.
+
+    Ветка `plain` боевого шаблона — это `linebreaksbr`, без
+    `render_figures`: маркер уходит на экран дословно. Добавить туда
+    подстановку нельзя, не сняв экранирование со всей ветки, а вырезать
+    маркер молча — потерять картинку.
+
+    Поэтому инвариант такой: задача, ВИДИМАЯ ученику, не имеет права
+    одновременно быть `plain` и содержать маркер. Сегодня таких 12, и все
+    12 закрыты (`draft` + `hidden_pending_review`) — они в очереди
+    ручного разбора. Тест краснеет, если такую задачу опубликуют.
+    """
+
+    def test_visible_plain_problem_must_not_contain_marker(self):
+        marker = '[[FIGURE:' + 'a' * 64 + ']]'
+        visible = Problem.objects.filter(
+            status=Problem.Status.PUBLISHED,
+            needs_quality_review=False,
+            hidden_pending_review=False,
+            content_format=Problem.ContentFormat.PLAIN,
+        ).filter(statement__contains='[[FIGURE:')
+        self.assertEqual(list(visible), [])
+
+        # И сам механизм: у скрытой задачи маркер допустим, у видимой — нет.
+        hidden = Problem.objects.create(
+            statement=marker, answer='1',
+            content_format=Problem.ContentFormat.PLAIN,
+            status=Problem.Status.DRAFT, hidden_pending_review=True)
+        self.assertEqual(
+            Problem.objects.filter(
+                id=hidden.id, status=Problem.Status.PUBLISHED,
+                hidden_pending_review=False).count(), 0)
+
+    def test_plain_branch_shows_marker_verbatim(self):
+        """Свидетельство, а не рассуждение: вот что увидел бы ученик."""
+        from django.template.defaultfilters import linebreaksbr
+        marker = '[[FIGURE:' + 'a' * 64 + ']]'
+        self.assertIn('[[FIGURE:', linebreaksbr('график: ' + marker))
+
+
 class RasterSecurityPerimeterTests(TestCase):
     """Тот же класс атаки, что у собранных картинок, — на растровом пути.
 
@@ -222,3 +267,67 @@ class RasterSecurityPerimeterTests(TestCase):
         через текст задачи не появляется."""
         self.assertEqual(imgs(self._render(
             '![](data:image/png;base64,iVBORw0KGgo=)')), [])
+
+
+class ShkolkovoImageKeyTests(SimpleTestCase):
+    r"""Ключ картинки Школково — «id сессии | имя файла», а не имя файла.
+
+    ⚠️ Это исправление вывода прошлой сессии. Она сравнила ПРЕФИКСЫ имён
+    скачанных файлов с `Id` задач, получила пересечение ноль и записала
+    «453 файла принадлежат 328 ДРУГИМ задачам, картинок нет вовсе».
+    Префикс — это `TexSessionId` службы latex-service, а не `Id` задачи;
+    по нему пересечение полное: все 328 префиксов ведут ровно к тем 298
+    задачам, у которых в тексте есть `\includegraphics`.
+
+    В одной задаче условие и решение приходят РАЗНЫМИ сессиями, поэтому
+    голое имя (`7.png`) ссылкой быть не может: оно указывает на разные
+    файлы в разных задачах."""
+
+    def test_reference_gets_session_prefix(self):
+        text = r'график \includegraphics[width=0.3\linewidth]{ela.png} ниже'
+        self.assertEqual(
+            qualify_shkolkovo_images(text, 234414),
+            r'график \includegraphics[width=0.3\linewidth]{234414|ela.png} ниже')
+
+    def test_two_fields_of_one_problem_get_different_prefixes(self):
+        """Условие и решение — разные сессии, значит разные ссылки."""
+        st = qualify_shkolkovo_images(r'\includegraphics{7.png}', 111)
+        sol = qualify_shkolkovo_images(r'\includegraphics{7.png}', 222)
+        self.assertNotEqual(st, sol)
+        self.assertNotEqual(image_hash('111|7.png'), image_hash('222|7.png'))
+
+    def test_idempotent(self):
+        """Второй прогон не должен приписать префикс дважды."""
+        once = qualify_shkolkovo_images(r'\includegraphics{ela.png}', 234414)
+        self.assertEqual(qualify_shkolkovo_images(once, 234414), once)
+
+    def test_no_session_id_leaves_reference_alone(self):
+        """Без id сессии ссылку не разрешить — оставляем видимой.
+
+        Молча стирать её нельзя: маркер без строки `ProblemFigure` на
+        экране исчезает (ADR 0035)."""
+        text = r'\includegraphics{ela.png}'
+        for empty in (0, None, ''):
+            self.assertEqual(qualify_shkolkovo_images(text, empty), text)
+
+    def test_markdown_image_not_touched(self):
+        """У Школково картинки только LaTeX-ные; markdown-ссылку,
+        если она вдруг встретится, трогать нечем — сессия не её."""
+        text = '![](https://example.org/x.png)'
+        self.assertEqual(qualify_shkolkovo_images(text, 111), text)
+
+    def test_resolver_finds_file_by_session_key(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            images = os.path.join(tmp, 'images')
+            os.makedirs(images)
+            with open(os.path.join(images, '234414_ela.png'), 'wb') as f:
+                f.write(PNG_1PX)
+            with open(os.path.join(tmp, 'image_map.json'), 'w',
+                      encoding='utf-8') as f:
+                json.dump({'234414|ela.png': '234414_ela.png'}, f)
+            resolver = shkolkovo_resolver(tmp)
+            self.assertTrue(resolver('234414|ela.png'))
+            self.assertFalse(resolver('ela.png'))
+            self.assertFalse(resolver('999999|ela.png'))
+            self.assertTrue(
+                resolver.path_for('234414|ela.png').endswith('234414_ela.png'))

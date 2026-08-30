@@ -554,6 +554,29 @@ def append_footnote_notes(text, notes):
 _TABLE_DELIMITER_ROW_RE = re.compile(r'^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$')
 
 
+#: Неразрывный пробел LaTeX. Одиночная тильда — всегда пробел; `~~`
+#: (чужая разметка зачёркивания) не трогается вовсе.
+_NBSP_RE = re.compile(r'(?<!~)~(?!~)')
+
+
+def normalize_nbsp(text):
+    """`~` -> обычный пробел.
+
+    Пробел ОБЫЧНЫЙ, а не U+00A0: `strip_control_and_bom_chars` на шаге 0
+    конвейера сознательно чистит nbsp как мусор источников, и класть его
+    обратно на шаге 8 значило бы спорить с этим решением.
+
+    ⚠️ Тот же класс, что `[htpb]` и `\\\\`: имени команды нет, поэтому
+    ни `R-CMD` шлюза (ищет обратный слеш + слово), ни KaTeX (математики
+    тут нет) этого не видят, и тильда доезжает до экрана буквально.
+    Свипом по трём новым источникам: 187 задач из уже прошедших шлюз,
+    407 случаев (живой #56899 — тильда одна в строке вместо отбивки).
+
+    Идёт по ЗАЩИЩЁННОМУ тексту, как и `normalize_dashes`: внутри формулы
+    `~` — это `\\sim`/`\\tilde`, и трогать его нельзя."""
+    return _NBSP_RE.sub(' ', text)
+
+
 def normalize_dashes(text):
     """--- -> —, -- -> –, ' - ' (тире между словами) -> ' — '.
 
@@ -582,10 +605,19 @@ def normalize_dashes(text):
 _STRAIGHT_QUOTE_RE = re.compile(r'"([^"]*)"')
 _ANGLE_QUOTE_RE = re.compile(r'<<([^>]*)>>')
 
+#: Кавычки LaTeX: ``открывающие'' и парная форма ''…''. Пара обязательна,
+#: одиночный `''` не трогается — в математике это два штриха (`f''(x)`),
+#: и там нормализация не идёт вовсе (текст защищён плейсхолдерами), но
+#: правило всё равно требует пары: молча менять непарный знак нельзя.
+#: Живые #61625, #54041, #56545, #53990 — 4 задачи показывали
+#: ``first-to-file'' на экране как есть.
+_TEX_QUOTE_RE = re.compile(r"``([^`']*)''|''([^`']*)''")
+
 
 def normalize_quotes(text):
-    """<<...>>, "..." -> «...» — подтверждённый домашний стандарт
+    """<<...>>, "...", ``...'' -> «...» — подтверждённый домашний стандарт
     (test_fix_latex_junk.py:66: <<Ромашка>> -> «Ромашка» — починка, не порча)."""
+    text = _TEX_QUOTE_RE.sub(lambda m: '«' + (m.group(1) or m.group(2)) + '»', text)
     text = _ANGLE_QUOTE_RE.sub(r'«\1»', text)
     text = _STRAIGHT_QUOTE_RE.sub(r'«\1»', text)
     return text
@@ -702,10 +734,23 @@ def convert_text_field(text):
     # снова становится видимым текстом и ловится этими же regex —
     # round-trip тест через problems.rendering.render_markdown поймал
     # именно эту порчу при обратном порядке.
+    protected_text = normalize_nbsp(protected_text)
     protected_text = normalize_dashes(protected_text)
     protected_text = normalize_quotes(protected_text)
     restored = restore_math(protected_text, protected)
-    restored = append_footnote_notes(restored, [restore_math(note, protected) for note in notes])
+    # Сноска обязана пройти ТУ ЖЕ типографику, что и остальной текст.
+    # `extract_footnotes` вырезает её ДО нормализации, а
+    # `append_footnote_notes` дописывает ПОСЛЕ — сноска проскакивала мимо
+    # целиком, и на экран доезжало «Примечание: Косатка~--- крупное»
+    # (живой #54489, плюс ещё 5 задач с `--` и задачи с кавычками ``…'').
+    # Нормализация идёт по ЕЩЁ защищённому тексту сноски, тем же порядком
+    # и по той же причине, что и выше: формула внутри сноски не должна
+    # попасть под правила для прозы.
+    restored = append_footnote_notes(restored, [
+        restore_math(normalize_quotes(normalize_dashes(normalize_nbsp(note))),
+                     protected)
+        for note in notes
+    ])
 
     return {
         'text_md': restored,

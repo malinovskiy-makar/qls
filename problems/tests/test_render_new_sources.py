@@ -103,6 +103,54 @@ class RenderNewSourcesTests(TestCase):
         self.assertEqual(good.content_format, Problem.ContentFormat.MARKDOWN)
         self.assertEqual(bad.content_format, Problem.ContentFormat.PLAIN)
 
+    def test_flag_fails_marks_only_failing(self):
+        """Критерий готовности: дефект либо починен, либо ЯВНО помечен.
+
+        `hidden_pending_review` значит «человек ещё не смотрел», а
+        `needs_quality_review` — «это плохо». Разные вещи, и отказ шлюза
+        обязан ставить именно вторую."""
+        good = self._problem(SOLVEHUB)
+        bad = self._problem(SOLVEHUB)
+        run('--apply', '--flag-fails', verdicts={bad.id: False})
+        good.refresh_from_db()
+        bad.refresh_from_db()
+        self.assertFalse(good.needs_quality_review)
+        self.assertTrue(bad.needs_quality_review)
+
+    def test_flag_fails_needs_apply(self):
+        """Без `--apply` флаг не ставится: сухой прогон ничего не пишет."""
+        bad = self._problem(SOLVEHUB)
+        run('--flag-fails', verdicts={bad.id: False})
+        bad.refresh_from_db()
+        self.assertFalse(bad.needs_quality_review)
+
+    def test_flag_fails_is_off_by_default(self):
+        bad = self._problem(SOLVEHUB)
+        run('--apply', verdicts={bad.id: False})
+        bad.refresh_from_db()
+        self.assertFalse(bad.needs_quality_review)
+
+    def test_flag_fails_also_marks_markdown_that_now_fails(self):
+        """Задача уже на markdown, но шлюз её больше не пропускает.
+
+        Снимать markdown команда не вправе (решение владельца), но
+        промолчать о дефекте — тем более: помечаем."""
+        bad = self._problem(SOLVEHUB,
+                            content_format=Problem.ContentFormat.MARKDOWN)
+        run('--apply', '--flag-fails', verdicts={bad.id: False})
+        bad.refresh_from_db()
+        self.assertEqual(bad.content_format, Problem.ContentFormat.MARKDOWN)
+        self.assertTrue(bad.needs_quality_review)
+
+    def test_flag_fails_does_not_publish_anything(self):
+        """Инвариант сессии: draft и hidden_pending_review не трогаются."""
+        bad = self._problem(SOLVEHUB, status='draft',
+                            hidden_pending_review=True)
+        run('--apply', '--flag-fails', verdicts={bad.id: False})
+        bad.refresh_from_db()
+        self.assertEqual(bad.status, 'draft')
+        self.assertTrue(bad.hidden_pending_review)
+
     def test_approved_problems_are_never_candidates(self):
         """Абсолютный инвариант проекта: подтверждённое человеком не трогаем."""
         approved = self._problem(
