@@ -254,5 +254,12 @@ reports/import_new_sources/s20260830/*
 !reports/import_new_sources/s20260830/report_20260830.md
 !reports/import_new_sources/s20260830/reconvert_backup.json
 !reports/import_new_sources/s20260830/snapshot_before.json
+# ⚠️ Бэкап ПЕРВОГО боевого прогона под своим именем: каждый следующий
+# --apply перезаписывает reconvert_backup.json, и без этой копии путь
+# отката к тексту до 30.08 исчез бы.
+!reports/import_new_sources/s20260830/reconvert_backup_pass1.json
+!reports/import_new_sources/s20260830/changed_ids_for_embeddings.json
+!reports/import_new_sources/s20260830/manual_review_queue.md
+!reports/import_new_sources/s20260830/gate_fail_flags.json
 # Копия базы (432 МБ) и HTML-предпросмотры остаются игнорируемыми:
 # первая слишком велика для репозитория, вторые пересобираются командой.
