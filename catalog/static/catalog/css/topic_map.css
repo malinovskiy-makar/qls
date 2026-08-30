@@ -2,7 +2,8 @@
  *
  * Все цвета берутся из токенов (`templates/_tokens.html`): собственных
  * значений здесь нет, карта следует теме сайта, а не задаёт свою.
- * Семь цветов разделов корпуса — `--g-base` … `--g-tools`.
+ * Цвет узла один на всю карту — `--map-node`; всё подсвеченное рисуется
+ * акцентом платформы `--accent` (ADR 0038).
  *
  * ⚠️ НИ ОДИН СЛОЙ НАД ХОЛСТОМ НЕ ИМЕЕТ backdrop-filter. Браузер размывает
  * подложку заново на каждом кадре, и карта падала с 60 кадров до 25.
@@ -92,6 +93,7 @@
   display: flex;
   flex: 1;
   min-height: 0;
+  position: relative;              /* якорь для полосы затухания панели */
 }
 .tmap-canvas-wrap {
   position: relative;
@@ -151,11 +153,32 @@
 .tmap-panel {
   width: 290px;
   flex-shrink: 0;
+  /* ⚠️ ГРАНИЦА В ДВЕ ВОЛОСИНЫ, А НЕ В ОДНУ. В светлой теме холст (--bg,
+     #f5f5f3) и панель (--surface, #ffffff) отличаются на четыре процента
+     светлоты, и одинокая линия в 12 % непрозрачности между ними
+     пропадала: панель выглядела продолжением холста. Вторая волосина
+     кладётся тенью внутрь — она не занимает места в раскладке и не
+     сдвигает содержимое панели на пиксель. */
   border-left: var(--line) solid var(--border);
+  box-shadow: inset var(--line) 0 0 var(--border);
   background: var(--surface);
   overflow-y: auto;
   overscroll-behavior: contain;
 }
+
+/* Полоса затухания у нижней кромки панели: намёк, что список продолжается.
+   Гаснет, когда прокручивать больше нечего (класс ставит скрипт). */
+.tmap-panel-fade {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 290px;
+  height: 44px;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+              rgba(0, 0, 0, 0), var(--surface) 88%);
+  transition: opacity var(--t-slow);
+}
+.tmap-panel-fade.is-off { opacity: 0; }
 .tmap-block {
   padding: 14px 16px;
   border-bottom: var(--line) solid var(--border-soft);
@@ -282,9 +305,6 @@
 .tmap-themes-group { margin-bottom: 12px; }
 .tmap-themes-group:last-child { margin-bottom: 0; }
 .tmap-themes-group-h {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-size: 11px;
   color: var(--text3);
   margin-bottom: 4px;
@@ -328,30 +348,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Легенда разделов */
-.tmap-legend { list-style: none; }
-.tmap-legend li {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  color: var(--text2);
-  padding: 3px 0;
-}
-.tmap-dot {
-  width: 9px; height: 9px;
-  flex-shrink: 0;
-  border-radius: var(--r-pill);
-  background: var(--g-tools);
-}
-.tmap-dot[data-g="base"]   { background: var(--g-base); }
-.tmap-dot[data-g="market"] { background: var(--g-market); }
-.tmap-dot[data-g="firm"]   { background: var(--g-firm); }
-.tmap-dot[data-g="state"]  { background: var(--g-state); }
-.tmap-dot[data-g="macro"]  { background: var(--g-macro); }
-.tmap-dot[data-g="fin"]    { background: var(--g-fin); }
-.tmap-dot[data-g="tools"]  { background: var(--g-tools); }
-
 /* ── Нижняя полоса ───────────────────────────────────────────────────── */
 .tmap-foot {
   display: flex;
@@ -389,6 +385,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;             /* надпись не ломается на две строки */
   color: var(--text);
   background: var(--surface-2);
   border: var(--line) solid var(--border);
@@ -409,11 +406,19 @@
   border-color: transparent;
   color: var(--text2);
 }
+/* ⚠️ ВЫКЛЮЧЕННАЯ КНОПКА ОБЯЗАНА ЧИТАТЬСЯ ВЫКЛЮЧЕННОЙ.
+   При 0.5 «Показать задачи» в светлой теме выглядела почти как рабочая:
+   заливка тёмная, и половина непрозрачности всё равно даёт плотный
+   прямоугольник. Причина рядом остаётся текстом (.tmap-why) — подсказка
+   при наведении тут не годится, курсор на выключенной кнопке её и не
+   вызовет. */
 .tmap-btn:disabled {
-  opacity: .5;
+  opacity: .4;
   cursor: default;
   transform: none;
 }
+.tmap-btn:disabled:hover { background: var(--btn-bg); }
+.tmap-btn:not(.tmap-btn--main):disabled:hover { background: var(--surface-2); }
 
 /* ── Обучение при первом заходе ──────────────────────────────────────── */
 .tmap-tour {
@@ -484,6 +489,7 @@
    Карточка идеи: Notion 3cbb11c92bc181629f4aff24af52d837. */
 @media (max-width: 899px) {
   .tmap-panel { display: none; }
+  .tmap-panel-fade { display: none; }
   .tmap-search input { width: 150px; }
   .tmap-sub { display: none; }
 }

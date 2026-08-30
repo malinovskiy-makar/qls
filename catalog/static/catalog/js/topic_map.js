@@ -46,13 +46,18 @@ function makeRandom(seed) {
 }
 
 /* ── Цвет ──────────────────────────────────────────────────────────────
-   Внутри раздела темы разводятся оттенком и светлотой от базового цвета.
+   ВСЕ 372 УЗЛА ОДНОГО ЦВЕТА — нейтрального `--map-node`. Тема отличается
+   от тега размером и непрозрачностью (1 против 0,72), а не оттенком; всё
+   подсвеченное рисуется акцентом платформы. Раньше здесь разводились семь
+   предметных цветов разделов оттенком и светлотой, с дотяжкой контраста
+   после разведения (ADR 0036); от этого отказались в ADR 0038 — цвет
+   пестрил и ничего не сообщал, потому что легенду никто не помнит.
    ⚠️ ЛОВУШКА, ИЗ-ЗА КОТОРОЙ КАРТА ТЕРЯЛА КАДРЫ: строку цвета нельзя
    собирать на каждый узел каждый кадр — 372 разбора CSS-цвета за кадр
-   стоят дороже всей остальной отрисовки. Поэтому цвет узла переводится в
-   rgb ОДИН раз при чтении токенов, и заранее строится массив готовых
-   строк 'rgba(r,g,b,a)' по ступеням прозрачности; в кадре только
-   индексация по номеру ступени. */
+   стоят дороже всей остальной отрисовки. Поэтому цвет переводится в rgb
+   ОДИН раз при чтении токенов, и заранее строится массив готовых строк
+   'rgba(r,g,b,a)' по ступеням прозрачности; в кадре только индексация по
+   номеру ступени. */
 
 var ALPHA_STEPS = 15;              /* ступени прозрачности: 0 … 1 */
 
@@ -69,75 +74,6 @@ function hexToRgb(hex) {
     return [parseInt(p[0], 10) || 0, parseInt(p[1], 10) || 0, parseInt(p[2], 10) || 0];
   }
   return [128, 128, 128];
-}
-
-function rgbToHsl(rgb) {
-  var r = rgb[0] / 255, g = rgb[1] / 255, b = rgb[2] / 255;
-  var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
-  var h = 0, s = 0, l = (mx + mn) / 2;
-  var d = mx - mn;
-  if (d > 0) {
-    s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn);
-    if (mx === r)      h = ((g - b) / d + (g < b ? 6 : 0));
-    else if (mx === g) h = ((b - r) / d + 2);
-    else               h = ((r - g) / d + 4);
-    h *= 60;
-  }
-  return [h, s * 100, l * 100];
-}
-
-function hslToRgb(h, s, l) {
-  h = ((h % 360) + 360) % 360; s = Math.max(0, Math.min(100, s)) / 100;
-  l = Math.max(0, Math.min(100, l)) / 100;
-  var c = (1 - Math.abs(2 * l - 1)) * s;
-  var x = c * (1 - Math.abs(((h / 60) % 2) - 1));
-  var m = l - c / 2, r = 0, g = 0, b = 0;
-  if (h < 60)       { r = c; g = x; }
-  else if (h < 120) { r = x; g = c; }
-  else if (h < 180) { g = c; b = x; }
-  else if (h < 240) { g = x; b = c; }
-  else if (h < 300) { r = x; b = c; }
-  else              { r = c; b = x; }
-  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)];
-}
-
-function relLum(rgb) {
-  var a = rgb.map(function (v) {
-    v /= 255;
-    return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
-  });
-  return 0.2126 * a[0] + 0.7152 * a[1] + 0.0722 * a[2];
-}
-
-function contrast(a, b) {
-  var la = relLum(a), lb = relLum(b);
-  var hi = Math.max(la, lb), lo = Math.min(la, lb);
-  return (hi + 0.05) / (lo + 0.05);
-}
-
-/* Дотяжка светлоты до порога контраста.
-   ⚠️ ЭТО НЕ КОСТЫЛЬ ВМЕСТО ПРАВКИ ТОКЕНА, А ПОЧИНКА САМОГО РАЗВЕДЕНИЯ.
-   Все семь цветов разделов проходят порог с запасом (3,94..9,64). Ломает
-   их производная операция: сдвиг тона на ±12° уводит янтарь в жёлтый, а
-   жёлтый при той же светлоте гораздо ярче — и на светлом фоне шесть
-   узлов падали до 2,16:1 при норме 3:1. Зажим по светлоте это не чинит
-   (проверено: результат не меняется), потому что виноват тон. Поэтому
-   после разведения светлота подтягивается в безопасную сторону, пока
-   контраст к фону не достигнет порога. Считается один раз при чтении
-   токенов, не в кадре. */
-var MIN_NODE_CONTRAST = 3.0;
-
-function pullToContrast(h, s, l, bg, dark) {
-  var step = dark ? 1 : -1;        /* на тёмном фоне светлеем, на светлом темнеем */
-  var rgb = hslToRgb(h, s, l);
-  for (var i = 0; i < 90; i++) {
-    if (contrast(rgb, bg) >= MIN_NODE_CONTRAST) return rgb;
-    var next = l + step;
-    if (next < 0 || next > 100) return rgb;
-    l = next;
-    rgb = hslToRgb(h, s, l);
-  }
-  return rgb;
 }
 
 function makeShades(rgb) {
@@ -174,43 +110,31 @@ function readPalette() {
   PAL.textCss = 'rgb(' + PAL.text.join(',') + ')';
   PAL.text2Css = 'rgb(' + PAL.text2.join(',') + ')';
   PAL.accentShades = makeShades(PAL.accent);
-  PAL.borderShades = makeShades(hexToRgb(dark ? '#8e96a4' : '#687180'));
+  PAL.borderShades = makeShades(hexToRgb(dark ? '#8e96a4' : '#5a6472'));
+
+  /* ⚠️ В СВЕТЛОЙ ТЕМЕ РЁБРА РИСУЮТСЯ ПЛОТНЕЕ, И ЭТО НЕ ПРИХОТЬ.
+     Тонкая линия в один пиксель на белом холсте видна заметно хуже, чем
+     та же линия на тёмном: глаз хуже различает тёмное на светлом при
+     малой площади. С прежними ступенями светлая карта выглядела почти без
+     связей — узлы висели в пустоте. Ступени подобраны отдельно на тему. */
+  PAL.edge = dark
+    ? { far: 0.42, near: 0.90, cross: 0.75 }
+    : { far: 0.58, near: 1.00, cross: 0.88 };
+  PAL.edgeDim = dark
+    ? { far: 0.14, near: 0.26, cross: 0.20 }
+    : { far: 0.22, near: 0.38, cross: 0.30 };
 
   /* Подложка под подписью — цвет холста, чтобы текст не перечёркивался
      рёбрами (дефект Б). Прозрачность 0.88 задаётся здесь же. */
   PAL.plate = 'rgba(' + bg[0] + ',' + bg[1] + ',' + bg[2] + ',0.88)';
 
-  /* Цвет каждой темы и её тегов. */
-  groups.forEach(function (g) {
-    var base = cs.getPropertyValue('--g-' + g.k);
-    var rgb = hexToRgb(base && base.trim() ? base : (dark ? g.cd : g.cl));
-    var hsl = rgbToHsl(rgb);
-    var n = g.themes.length;
-    var mid = (n - 1) / 2;
-    var half = mid > 0 ? mid : 1;
-    g.rgb = rgb;
-    g.css = 'rgb(' + rgb.join(',') + ')';
-    g.themes.forEach(function (num, idx) {
-      var k = (idx - mid) / half;
-      var h = hsl[0] + k * 12;
-      var l = Math.max(26, Math.min(78, hsl[2] + k * 10));
-      var themeRgb = pullToContrast(h, hsl[1], l, bg, dark);
-      /* Тег — тот же цвет со сдвигом светлоты в сторону фона: иначе на
-         белом холсте светлые теги пропадают, а на тёмном тонут. */
-      var lTag = Math.max(26, Math.min(78, l + (dark ? 8 : -6)));
-      var tagRgb = pullToContrast(h, hsl[1], lTag, bg, dark);
-      var themeNode = byId['t' + num];
-      if (!themeNode) return;
-      themeNode.rgb = themeRgb;
-      themeNode.css = 'rgb(' + themeRgb.join(',') + ')';
-      themeNode.shades = makeShades(themeRgb);
-      var tagShades = makeShades(tagRgb);
-      var tagCss = 'rgb(' + tagRgb.join(',') + ')';
-      (tagsOfTheme[num] || []).forEach(function (t) {
-        t.rgb = tagRgb; t.css = tagCss; t.shades = tagShades;
-      });
-    });
-  });
+  /* Один цвет на все узлы. Своих полей цвета у узла больше нет вовсе:
+     раньше каждый узел носил `shades` и `css` от цвета своего раздела,
+     теперь набор ступеней ровно один на карту — и второй, акцентный, для
+     всего подсвеченного. */
+  PAL.node = hexToRgb(cs.getPropertyValue('--map-node') ||
+                      (dark ? '#C8CEDA' : '#4A5260'));
+  PAL.nodeShades = makeShades(PAL.node);
 }
 
 /* ── Раскладка ───────────────────────────────────────────────────────── */
@@ -401,7 +325,40 @@ function settle(iterations) {
     step();
     alpha *= 0.995;
   }
-  alpha = 0.2;
+  /* ⚠️ ПОСЛЕ ПРОГОНА РАСКЛАДКА ЗАМОРАЖИВАЕТСЯ (alpha = 0), А НЕ ДОСТЫВАЕТ
+     В КАДРАХ. Раньше здесь оставалось 0.2, и симуляция доигрывала ещё
+     секунду в цикле кадров. Теперь после прогона координаты растягиваются
+     под форму холста (spreadCloud), и живая симуляция стянула бы их
+     обратно к шару — растяжение продержалось бы ровно до первого кадра. */
+  alpha = 0;
+}
+
+/* Центр облака — в начало координат. Камера смотрит в ноль, и если облако
+   стоит смещённым, поле с одной стороны шире, чем с другой, а вписывание
+   по половинам разлёта теряет ровно эту разницу. */
+function recentre() {
+  var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, z0 = 1e9, z1 = -1e9, i, n;
+  for (i = 0; i < nodes.length; i++) {
+    n = nodes[i];
+    if (n.x < x0) x0 = n.x; if (n.x > x1) x1 = n.x;
+    if (n.y < y0) y0 = n.y; if (n.y > y1) y1 = n.y;
+    if (n.z < z0) z0 = n.z; if (n.z > z1) z1 = n.z;
+  }
+  var cx = (x0 + x1) / 2, cy = (y0 + y1) / 2, cz = (z0 + z1) / 2;
+  for (i = 0; i < nodes.length; i++) {
+    n = nodes[i];
+    n.x -= cx; n.y -= cy; n.z -= cz;
+  }
+}
+
+/* Базовые координаты: от них считается растяжение под холст. Хранить их
+   обязательно — иначе повторное растяжение (смена размера окна, будущая
+   модалка) множилось бы на прежнее и облако уезжало бы в блин. */
+function snapshotLayout() {
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i];
+    n.bx = n.x; n.by = n.y; n.bz = n.z;
+  }
 }
 
 /* Диагностика раскладки: медианное расстояние между темами внутри раздела
@@ -432,8 +389,12 @@ function layoutStats() {
 var DIST = 1240, FOCAL = 900;
 var ZOOM_MIN = 0.45, ZOOM_MAX = 4.5;
 
+/* Стартовый ракурс. По нему считаются и растяжение облака, и обзор: это
+   тот угол, под которым человек открывает карту. */
+var START_YAW = 0.35, START_PITCH = -0.22;
+
 var cam = {
-  yaw: 0.35, pitch: -0.22,
+  yaw: START_YAW, pitch: START_PITCH,
   zoom: 1, zoomTarget: 1,
   tx: 0, ty: 0, tz: 0,               /* точка, вокруг которой вращаемся */
   goalX: null, goalY: null, goalZ: null, goalZoom: null
@@ -448,37 +409,128 @@ var CY = 1, SY = 0, CP = 1, SP = 0;
    карта и первый шаг обучения, это «весь корпус целиком». Поэтому за
    100 % принят масштаб, при котором граф помещается в холст с полями;
    пределы 0,45..4,5 и кнопка «⟲» отсчитываются от него же.
-   Считается один раз после раскладки, по СТАРТОВОМУ ракурсу: минимум по
-   восьми поворотам ужимал карту вчетверо (при развороте на 90° узлы
-   подходят ближе к камере и разлёт на экране растёт), и весь корпус
-   оказывался комком в середине пустого холста. Поворот человек делает
-   сам и сам же видит, что уезжает за край, — а вот открыть карту он
-   должен на всём корпусе сразу. */
+   Считается по СТАРТОВОМУ ракурсу, а не по текущему: минимум по восьми
+   поворотам ужимал карту вчетверо (при развороте на 90° узлы подходят
+   ближе к камере и разлёт на экране растёт), и весь корпус оказывался
+   комком в середине пустого холста. Поворот человек делает сам и сам же
+   видит, что уезжает за край, — а вот открыть карту он должен на всём
+   корпусе сразу. */
+var FIT_MARGIN = 0.08;       /* поле по каждому краю холста, доля стороны */
 var fitScale = 1;
 
-function computeFit() {
-  var saveYaw = cam.yaw, savePitch = cam.pitch;
-  var saveTx = cam.tx, saveTy = cam.ty, saveTz = cam.tz;
-  var saveZoom = cam.zoom;
-  cam.tx = cam.ty = cam.tz = 0;
-  cam.zoom = 1;
-  var marginX = 84, marginY = 46;      /* поля под подписи тем */
-  camPrepare();
-  var maxDx = 1, maxDy = 1;
+/* Половины разлёта облака на экране при стартовом ракурсе, zoom = 1 и
+   fitScale = 1. Камера здесь не трогается вовсе: углы взяты из констант,
+   и функцию можно звать в любой момент, не сохраняя и не восстанавливая
+   состояние камеры. */
+function viewSpread() {
+  var cy = Math.cos(START_YAW), sy = Math.sin(START_YAW);
+  var cp = Math.cos(START_PITCH), sp = Math.sin(START_PITCH);
+  var hx = 1, hy = 1;
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
-    var ax = n.x * CY + n.z * SY, az = -n.x * SY + n.z * CY;
-    var ay = n.y * CP - az * SP, pz = n.y * SP + az * CP + DIST;
+    var ax = n.x * cy + n.z * sy, az = -n.x * sy + n.z * cy;
+    var ay = n.y * cp - az * sp, pz = n.y * sp + az * cp + DIST;
     if (pz < 60) continue;
     var s = FOCAL / pz;
-    maxDx = Math.max(maxDx, Math.abs(ax * s));
-    maxDy = Math.max(maxDy, Math.abs(ay * s));
+    hx = Math.max(hx, Math.abs(ax * s));
+    hy = Math.max(hy, Math.abs(ay * s));
   }
-  var best = Math.min((W / 2 - marginX) / maxDx, (H / 2 - marginY) / maxDy);
-  cam.yaw = saveYaw; cam.pitch = savePitch;
-  cam.tx = saveTx; cam.ty = saveTy; cam.tz = saveTz;
-  cam.zoom = saveZoom;
-  fitScale = Math.max(0.15, Math.min(1, best));
+  return { hx: hx, hy: hy };
+}
+
+/* ⚠️ ФОРМА ОБЛАКА ПРИВОДИТСЯ К ФОРМЕ ХОЛСТА — САМИМИ КООРДИНАТАМИ, А НЕ
+   МАСШТАБОМ КАМЕРЫ.
+   Замер до правки: холст 911×534, узлы занимали 424×415 — 46,6 % ширины
+   при 77,7 % высоты, то есть слева и справа по 240 px пустоты, а сверху и
+   снизу впритык. Причина не в камере: силовая раскладка даёт облако,
+   близкое к шару, а холст широкий (16:9). Обзор вписывается по узкой
+   оси — по высоте, — и по ширине неизбежно остаётся пустота. Прибавить
+   масштаб нельзя: узлы тут же уедут за верхний и нижний край.
+
+   ⚠️ ПРИВОДИМ СЖАТИЕМ ПО ВЕРТИКАЛИ, А НЕ РАСТЯЖЕНИЕМ ПО ГОРИЗОНТАЛИ, И НА
+   ТО ДВЕ ПРИЧИНЫ — обе проверены на живой карте.
+   Первая: карта сама поворачивается вокруг вертикали. Растянутая
+   горизонтальная ось через четверть оборота уходит в глубину, и граф
+   снова становится узким столбиком; сжатие по вертикали от угла поворота
+   не зависит вовсе.
+   Вторая: горизонтальные оси участвуют в перспективе. Раздвигая узлы
+   вбок, мы подводим часть из них вплотную к камере: замер показал разлёт
+   7 744 px при доступных 383 — облако вывернулось наизнанку и вылезло за
+   край на 184 % ширины. Вертикаль в знаменатель перспективы почти не
+   входит, и сжатие по ней ведёт себя линейно.
+   На экране это выглядит ровно как растяжение вбок: облако стало ниже,
+   обзор — крупнее, и по горизонтали узлы разъехались вместе с местом для
+   подписей.
+
+   Проход не один: сжатие по Y всё же чуть меняет глубину, поэтому
+   коэффициент уточняется, пока не сойдётся (обычно за два прохода). */
+function spreadCloud() {
+  var i, n0;
+  for (i = 0; i < nodes.length; i++) {
+    n0 = nodes[i];
+    n0.x = n0.bx; n0.y = n0.by; n0.z = n0.bz;
+  }
+
+  /* Оси камеры в мировых координатах при стартовом ракурсе.
+     ⚠️ СДВИГ ПО НИМ — ТОЧНЫЙ, И ЭТО НЕ СЛУЧАЙНОСТЬ. Обе оси
+     перпендикулярны направлению взгляда: сдвиг вдоль «вправо» меняет
+     ТОЛЬКО горизонталь на экране, сдвиг вдоль «вверх» — только вертикаль,
+     а глубина (а значит, и перспектива, и размер узла) не меняется ни от
+     того, ни от другого. Сдвиг по голым осям мира так не умеет. */
+  var cy = Math.cos(START_YAW), sy = Math.sin(START_YAW);
+  var cp = Math.cos(START_PITCH), sp = Math.sin(START_PITCH);
+  var rx = cy, rz = sy;                       /* ось «вправо» */
+  var ux = sy * sp, uy = cp, uz = -cy * sp;   /* ось «вверх»  */
+
+  var want = W / H;                           /* форма холста */
+  for (var pass = 0; pass < 8; pass++) {
+    /* Собственно облако на экране: и края, и середина. */
+    var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, sSum = 0, cnt = 0;
+    for (i = 0; i < nodes.length; i++) {
+      n0 = nodes[i];
+      var ax = n0.x * cy + n0.z * sy, az = -n0.x * sy + n0.z * cy;
+      var ay = n0.y * cp - az * sp, pz = n0.y * sp + az * cp + DIST;
+      if (pz < 60) continue;
+      var sc = FOCAL / pz, X = ax * sc, Y = ay * sc;
+      sSum += sc; cnt++;
+      if (X < x0) x0 = X; if (X > x1) x1 = X;
+      if (Y < y0) y0 = Y; if (Y > y1) y1 = Y;
+    }
+    if (!cnt) return;
+    var sAvg = sSum / cnt;
+
+    /* ⚠️ СНАЧАЛА СЕРЕДИНА, ПОТОМ ФОРМА. Обзор вписывается по САМОМУ
+       дальнему узлу от центра холста, а не по ширине облака: если облако
+       стоит смещённым, половина поля с одной стороны пропадает впустую.
+       Замер: смещение вниз на 65 px при половине разлёта 313 съедало
+       пятую часть высоты — заполнение падало с 84 % до 66,6 %. */
+    var dax = -((x0 + x1) / 2) / sAvg, day = -((y0 + y1) / 2) / sAvg;
+    for (i = 0; i < nodes.length; i++) {
+      n0 = nodes[i];
+      n0.x += rx * dax + ux * day;
+      n0.y += uy * day;
+      n0.z += rz * dax + uz * day;
+    }
+
+    var m = (x1 - x0) / (want * (y1 - y0));   /* во сколько раз сжать вертикаль */
+    if (m > 2.5) m = 2.5;
+    if (m < 0.4) m = 0.4;
+    for (i = 0; i < nodes.length; i++) { nodes[i].y *= m; }
+
+    if (Math.abs(m - 1) < 0.004 && Math.abs(dax) < 1 && Math.abs(day) < 1) break;
+  }
+}
+
+/* Обзор подбирается ПО ОБЕИМ ОСЯМ СРАЗУ: берётся меньший из двух
+   масштабов, поэтому ни один узел не выходит за край ни по ширине, ни по
+   высоте. Верхнего ограничения «не больше единицы» здесь нет намеренно:
+   после растяжения облако вписывается в холст масштабом больше единицы,
+   и прежний потолок оставил бы карту мелкой. */
+function computeFit() {
+  var sp = viewSpread();
+  var availX = W * (0.5 - FIT_MARGIN);
+  var availY = H * (0.5 - FIT_MARGIN);
+  fitScale = Math.max(0.15, Math.min(4, Math.min(availX / sp.hx, availY / sp.hy)));
 }
 
 function camPrepare() {
@@ -556,6 +608,11 @@ var searchHits = null;       /* null = поиск пуст; иначе объе�
 var order = [];              /* порядок отрисовки по глубине              */
 var lastThemeBoxes = [];     /* занятые места последнего кадра (для замеров) */
 var lastThemeFrom = 0;       /* с какого индекса в нём начинаются темы      */
+
+/* Базовая непрозрачность узла: тема в полную силу, тег вполсилы с
+   небольшим запасом. Это второй после размера признак «тема или тег» —
+   цвет у них один и тот же. */
+var BASE_ALPHA_THEME = 1, BASE_ALPHA_TAG = 0.72;
 
 /* Приглушение: на белом фоне гасить надо СЛАБЕЕ, иначе карта исчезает. */
 function dimFloor(kind) {
@@ -706,19 +763,41 @@ function layoutFocusLabels(theme) {
 
   function place(list, side) {
     list.sort(function (a, b) { return a.py - b.py; });
+    ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    var wMax = 0;
     var items = list.map(function (t) {
       var lines = wrapLabel(t.l, TAG_WRAP_CHARS, 2);
-      return { node: t, lines: lines, h: lines.length > 1 ? ROW_MIN_2 : ROW_MIN, y: t.py };
+      var w = 0;
+      for (var i = 0; i < lines.length; i++) {
+        w = Math.max(w, ctx.measureText(lines[i]).width);
+      }
+      if (w > wMax) wMax = w;
+      return { node: t, lines: lines, w: w,
+               h: lines.length > 1 ? ROW_MIN_2 : ROW_MIN, y: t.py };
     });
-    /* Раздвигаем по вертикали, центрируя разброс вокруг исходного y. */
+
+    /* Раздвигаем по вертикали, центрируя разброс вокруг исходного y.
+       ⚠️ СТОЛБИК ПРИЖИМАЕТСЯ К ХОЛСТУ, А НЕ ВЫЕЗЖАЕТ ЗА НЕГО. У темы,
+       стоящей у верхнего или нижнего края, половина имён уходила за кадр
+       молча — на глаз это читалось как «у темы меньше тегов». */
     var total = items.reduce(function (s, it) { return s + it.h; }, 0);
     var start = theme.py - total / 2;
+    if (start < 12) start = 12;
+    if (start + total > H - 12) start = Math.max(12, H - 12 - total);
     var y = start;
     items.forEach(function (it) {
       it.y = y + it.h / 2;
       y += it.h;
     });
+
+    /* ⚠️ И ПО ГОРИЗОНТАЛИ ТОЖЕ. Колонка стоит на COL_DX от узла, но у тем
+       ближе к краю холста самое длинное имя не помещалось: замер — семь
+       тем из 29 обрезались, у «Олигополии и теории игр» правая колонка
+       уходила за край на 141 px. Двигаем всю колонку целиком, чтобы
+       имена остались на одной вертикали. */
     var x = theme.px + (side < 0 ? -COL_DX : COL_DX);
+    if (side < 0) x = Math.max(x, wMax + 8);
+    else x = Math.min(x, W - wMax - 8);
     items.forEach(function (it) { it.x = x; it.side = side; });
     return items;
   }
@@ -728,7 +807,16 @@ function layoutFocusLabels(theme) {
 
 /* ── Кадр ────────────────────────────────────────────────────────────── */
 
-var LABEL_BUDGET = 90;       /* лимит подписей вне фокус-режима */
+var LABEL_BUDGET = 90;       /* лимит подписей тегов на кадр            */
+var LABEL_MAX_AWAY = 90;     /* дальше подпись темы от узла не уходит   */
+var LABEL_LEADER_MIN = 24;   /* ближе выноска не нужна                  */
+var THEME_QUIET_ALPHA = 0.3; /* чужое имя темы в фокус-режиме           */
+
+/* Счётчики последнего кадра — для приёмки через window.TMAP. */
+var lastQuietCount = 0;      /* приглушённых имён тем                   */
+var lastThemeMissing = 0;    /* тем, которым места не нашлось           */
+var lastThemeMissingNames = [];
+var lastThemeAway = 0;       /* самая дальняя подпись темы от узла, px  */
 
 function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -759,26 +847,29 @@ function draw() {
     path.lineTo(b.px, b.py);
   }
 
+  var ed = dim ? PAL.edgeDim : PAL.edge;
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
-  ctx.strokeStyle = PAL.borderShades[shadeIndex(dim ? 0.14 : 0.42)];
+  ctx.strokeStyle = PAL.borderShades[shadeIndex(ed.far)];
   ctx.stroke(pFar);
-  ctx.strokeStyle = PAL.borderShades[shadeIndex(dim ? 0.26 : 0.9)];
+  ctx.strokeStyle = PAL.borderShades[shadeIndex(ed.near)];
   ctx.stroke(pNear);
   ctx.setLineDash([3, 4]);
-  ctx.strokeStyle = PAL.borderShades[shadeIndex(dim ? 0.2 : 0.75)];
+  ctx.strokeStyle = PAL.borderShades[shadeIndex(ed.cross)];
   ctx.stroke(pCross);
   ctx.setLineDash([]);
 
-  /* Подсвеченные дороги — их единицы, поэтому штучно и цветом темы. */
+  /* Подсвеченные дороги — их единицы, поэтому штучно и акцентом.
+     Прямая дорога тема→тег сплошная и в полную силу; смежный тег из
+     чужой темы — тот же акцент, но пунктиром и вполсилы: связь по смыслу
+     слабее принадлежности теме, и на глаз это должно быть видно. */
   for (i = 0; i < roads.length; i++) {
     var rd = roads[i];
-    var owner = rd.a.k === 'theme' ? rd.a : rd.b;
-    ctx.strokeStyle = (owner.shades || PAL.accentShades)[shadeIndex(0.95)];
+    ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95)];
     ctx.lineWidth = 2.2;
     if (rd.k === 'cross') {
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.7)];
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.5)];
     }
     ctx.beginPath();
     ctx.moveTo(rd.a.px, rd.a.py);
@@ -805,15 +896,22 @@ function draw() {
     else if (near) a2 = 0.62;
     else a2 = dimFloor(n.k);
     if (n.k === 'theme' && a2 < 0.5) a2 = 0.5;
+    /* Тема и тег отличаются РАЗМЕРОМ И СИЛОЙ ЦВЕТА, а не оттенком: цвет
+       у всех один. Базовая непрозрачность домножается на состояние. */
+    a2 *= n.k === 'theme' ? BASE_ALPHA_THEME : BASE_ALPHA_TAG;
 
-    ctx.fillStyle = (n.shades || PAL.accentShades)[shadeIndex(a2)];
+    /* Подсветка — всегда акцент, и наведение, и выбор, и найденное
+       поиском: один цвет на все случаи, чтобы человек не гадал, что
+       означает второй. */
+    var hot = dim && (on || near);
+    ctx.fillStyle = (hot ? PAL.accentShades : PAL.nodeShades)[shadeIndex(a2)];
     ctx.beginPath();
     ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
     ctx.fill();
 
     if (picked[n.id]) {
-      /* Ореол своим цветом плюс обводка акцентом — выбранное видно всегда. */
-      ctx.strokeStyle = (n.shades || PAL.accentShades)[shadeIndex(0.35)];
+      /* Ореол и обводка — тем же акцентом: выбранное видно всегда. */
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.35)];
       ctx.lineWidth = 5;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 3.5, 0, 6.283185307179586); ctx.stroke();
       ctx.strokeStyle = PAL.accentCss;
@@ -831,6 +929,37 @@ function draw() {
   drawLabels(dim);
 }
 
+/* Просвет между узлом и подписью: расстояние от центра узла до ближней
+   точки прямоугольника подписи. Ноль — подпись накрывает узел. Это же
+   число — длина выноски, поэтому ограничение радиуса и длина выноски
+   меряются одним и тем же. */
+function labelGap(node, cx, cy, w, h) {
+  var dx = Math.max(Math.abs(node.px - cx) - w / 2, 0);
+  var dy = Math.max(Math.abs(node.py - cy) - h / 2, 0);
+  return Math.hypot(dx, dy);
+}
+
+/* Тема сохраняет своё имя в фокус-режиме, если она сама в фокусе либо
+   хоть один её тег подсвечен — как свой или как смежный. */
+function themeSpeaks(th) {
+  if (th === focusTheme) return true;
+  var tags = tagsOfTheme[th.n] || [];
+  for (var i = 0; i < tags.length; i++) {
+    var id = tags[i].id;
+    if ((litSet && litSet[id]) || (litNear && litNear[id])) return true;
+  }
+  return false;
+}
+
+/* Кто важнее, когда места на всех не хватает: тема в фокусе, затем
+   выбранные, затем найденные поиском, затем — крупные по числу задач. */
+function themeRank(th) {
+  if (focusTheme === th) return 0;
+  if (picked[th.id]) return 1;
+  if (searchHits && searchHits[th.id]) return 2;
+  return 3;
+}
+
 function drawLabels(dim) {
   var i;
   /* ⚠️ ПОДПИСИ ТЕГОВ И ПОДПИСИ ТЕМ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК
@@ -840,16 +969,53 @@ function drawLabels(dim) {
      тегов. */
   var taken = [];
 
+  /* ⚠️ ПЛАН ПОДПИСЕЙ ТЕМ СЧИТАЕТСЯ ДО ТЕГОВ, ХОТЯ САМИ ТЕМЫ РИСУЮТСЯ ПОСЛЕ.
+     В фокус-режиме имена ЧУЖИХ тем гаснут и НЕ УЧАСТВУЮТ В РАСКЛАДКЕ:
+     рисуются первыми, под тегами, и в список занятых мест не попадают.
+     Иначе раскрытые теги темы разъезжаются к краям холста, обходя два
+     десятка чужих имён, — а место нужно им, а не приглушённым соседям. */
+  ctx.font = '500 ' + LABEL_THEME_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  var plan = [], quiet = [];
+  for (i = 0; i < themeList.length; i++) {
+    var th = themeList[i];
+    if (th.pz < 0) continue;
+    if (th.px < -60 || th.px > W + 60 || th.py < -40 || th.py > H + 40) continue;
+    var text = cutLabel(th.l, THEME_MAX_CHARS);
+    var item = {
+      node: th, text: text,
+      w: ctx.measureText(text).width,
+      y: th.py - nodeRadius(th) - 11,
+      lit: !dim || isLit(th) || (focusTheme === th)
+    };
+    (focusTheme && !themeSpeaks(th) ? quiet : plan).push(item);
+  }
+
+  for (i = 0; i < quiet.length; i++) {
+    var q = quiet[i];
+    var qHalf = q.w / 2 + 5;
+    drawLabelLines([q.text],
+                   Math.max(qHalf + 4, Math.min(W - qHalf - 4, q.node.px)),
+                   Math.max(12, Math.min(H - 12, q.y)),
+                   'center', THEME_QUIET_ALPHA, PAL.textCss, LABEL_THEME_PX);
+  }
+  lastQuietCount = quiet.length;
+
   /* ── Теги ───────────────────────────────────────────────────────────
-     Сначала фокус-режим: у темы под курсором подписываются ВСЕ теги,
-     двумя колонками, с выносками. */
+     ⚠️ МАСШТАБ БОЛЬШЕ НЕ ПОДПИСЫВАЕТ ТЕГИ. Раньше при zoom ≥ 1.25 имена
+     тегов проступали сами: на 276 % экран превращался в кашу из полусотни
+     строк, и разглядеть в ней что-либо было нельзя. Теперь имя тега
+     появляется РОВНО в четырёх случаях, и все четыре — по воле человека:
+     курсор на самом теге, курсор на его теме (фокус-режим ниже), тег
+     выбран, тег найден поиском. */
   if (focusTheme && focusTheme.pz > 0) {
+    /* Фокус-режим: у темы под курсором подписаны ВСЕ теги, двумя
+       колонками, с выносками. */
     var items = layoutFocusLabels(focusTheme);
     for (i = 0; i < items.length; i++) {
       var it = items[i];
       var t = it.node;
       /* Выноска: от узла до края колонки, внутрь плашки не заходит. */
-      ctx.strokeStyle = (t.shades || PAL.borderShades)[shadeIndex(0.55)];
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.55)];
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(t.px + (it.side < 0 ? -1 : 1) * (nodeRadius(t) + 2), t.py);
@@ -861,23 +1027,21 @@ function drawLabels(dim) {
       taken.push({ x: box.left + box.w / 2, y: it.y, w: box.w,
                    h: box.h, l: it.node.l });
     }
-  } else if (cam.zoom >= 1.25 || litSet || searchHits) {
-    /* Вне фокус-режима — при приближении либо у подсвеченных, с лимитом. */
+  } else if (litSet || searchHits) {
+    /* Вне фокус-режима — только у подсвеченных, с лимитом. */
     var shown = 0;
     var boxes = [];
     for (i = 0; i < order.length && shown < LABEL_BUDGET; i++) {
       var n = order[order.length - 1 - i];        /* ближние раньше */
       if (!n || n.k !== 'tag' || n.pz < 0) continue;
-      var lit = isLit(n) || (litNear && litNear[n.id]);
-      if (dim && !lit) continue;
-      if (!dim && cam.zoom < 1.25) continue;
+      if (!(isLit(n) || (litNear && litNear[n.id]))) continue;
       if (n.px < 0 || n.px > W || n.py < 0 || n.py > H) continue;
 
       var lines = wrapLabel(n.l, TAG_WRAP_CHARS, 2);
       ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
       var wMax = 0;
-      for (var q = 0; q < lines.length; q++) {
-        wMax = Math.max(wMax, ctx.measureText(lines[q]).width);
+      for (var qq = 0; qq < lines.length; qq++) {
+        wMax = Math.max(wMax, ctx.measureText(lines[qq]).width);
       }
       var hAll = lines.length * LINE_H;
       var gap = nodeRadius(n) + 12;               /* подпись не ближе 12px */
@@ -909,27 +1073,20 @@ function drawLabels(dim) {
      ⚠️ «Видны всегда» означает и «не наезжают друг на друга»: темы стоят
      плотно, и без раздвижки соседние имена сливались в нечитаемую кашу
      («Другое» поверх «Данные, статистика и причинность»). Раздвигаем по
-     вертикали, НИ ОДНУ не выбрасывая: ближние к камере занимают своё
-     место первыми, дальние уступают. */
-  ctx.font = '500 ' + LABEL_THEME_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  var plan = [];
-  for (i = 0; i < themeList.length; i++) {
-    var th = themeList[i];
-    if (th.pz < 0) continue;
-    if (th.px < -60 || th.px > W + 60 || th.py < -40 || th.py > H + 40) continue;
-    var text = cutLabel(th.l, THEME_MAX_CHARS);
-    plan.push({
-      node: th, text: text,
-      w: ctx.measureText(text).width,
-      y: th.py - nodeRadius(th) - 11,
-      lit: !dim || isLit(th) || (focusTheme === th)
-    });
-  }
-  plan.sort(function (p, q) { return p.node.pz - q.node.pz; });   /* ближние раньше */
+     вертикали в порядке важности: кому места не досталось — тот остаётся
+     без подписи, и это честнее оторванной. */
+  plan.sort(function (a, b) {
+    var ra = themeRank(a.node), rb = themeRank(b.node);
+    if (ra !== rb) return ra - rb;
+    return (b.node.c || 0) - (a.node.c || 0);     /* крупные важнее */
+  });
 
   var placed = taken;            /* темы обходят и подписи тегов тоже */
   lastThemeBoxes = placed;
   lastThemeFrom = taken.length;
+  lastThemeMissing = 0;
+  lastThemeMissingNames = [];
+  lastThemeAway = 0;
   for (i = 0; i < plan.length; i++) {
     var it2 = plan[i];
     var half = it2.w / 2 + 5;
@@ -939,16 +1096,20 @@ function drawLabels(dim) {
        отправляет обратно к первой, попытки кончаются — и подпись остаётся
        лежать поверх соседки. Замер на 29 подписях: 16 пересечений. Здесь
        позиции перебираются по возрастанию смещения от исходной, и берётся
-       первая, свободная ОТ ВСЕХ уже размещённых. */
-    var x0 = it2.node.px, y0 = it2.y;
-    var foundX = x0, foundY = y0, ok = false;
+       первая, свободная ОТ ВСЕХ уже размещённых.
 
-    /* Ищем по кольцам вокруг исходного места: сначала чисто вертикальные
-       сдвиги (они не отрывают подпись от своей колонки), потом с уходом
-       вбок. Одной вертикали не хватает — в плотной середине колонка бывает
-       занята целиком, и подпись оставалась лежать поверх соседки. */
-    var STEP_Y = LINE_H + 7, STEP_X = 48;
-    for (var d = 0; d <= 15 && !ok; d++) {
+       ⚠️ РАДИУС ПОИСКА ОГРАНИЧЕН, И ЭТО ГЛАВНОЕ ПРАВИЛО ЭТОГО МЕСТА.
+       Двумерный поиск без ограничения доводил пересечения до нуля ценой
+       смысла: «Международная торговля» и «Инфляция и индексы цен» уезжали
+       к левому краю холста, а их узлы оставались в середине — выноска
+       тянулась через полэкрана и читалась как случайная линия. Дальше
+       LABEL_MAX_AWAY от своего узла подпись не ставится ВОВСЕ: имя без
+       адреса хуже, чем его отсутствие. */
+    var x0 = it2.node.px, y0 = it2.y;
+    var foundX = 0, foundY = 0, ok = false;
+
+    var STEP_Y = LINE_H + 5, STEP_X = 24;
+    for (var d = 0; d <= 14 && !ok; d++) {
       for (var sx = 0; sx <= d && !ok; sx++) {
         var dy = d - sx;
         var xs = sx === 0 ? [0] : [-sx, sx];
@@ -958,11 +1119,20 @@ function drawLabels(dim) {
             var cx = x0 + xs[a1] * STEP_X, cy = y0 + ys[a2] * STEP_Y;
             if (cy < 12 || cy > H - 12) continue;
             if (cx - half < 4 || cx + half > W - 4) continue;
+            /* ⚠️ МЕРЯЕМ ДО БЛИЖНЕЙ КРОМКИ ПОДПИСИ, А НЕ ДО ЕЁ СЕРЕДИНЫ, И
+               ЭТО НЕ ПОБЛАЖКА. Ровно это расстояние человек видит: оно и
+               есть длина выноски от кружка до плашки. Мерить до середины
+               значило бы наказывать длинное имя за длину — у «Монетарной
+               политики и банковской системы» середина отстоит на 96 px,
+               когда сама подпись начинается в 12 px от узла. Замер на
+               29 подписях: по кромке не размещается 0 тем, по середине —
+               шесть, и пять из них только потому, что имя длинное. */
+            if (labelGap(it2.node, cx, cy, it2.w, LINE_H) > LABEL_MAX_AWAY) continue;
             var clear = true;
             for (var b2 = 0; b2 < placed.length; b2++) {
               var pb = placed[b2];
               if (Math.abs(pb.x - cx) < half + pb.w / 2 + 5 &&
-                  Math.abs(pb.y - cy) < (pb.h || LINE_H) / 2 + LINE_H / 2 + 6) {
+                  Math.abs(pb.y - cy) < (pb.h || LINE_H) / 2 + LINE_H / 2 + 4) {
                 clear = false; break;
               }
             }
@@ -971,16 +1141,19 @@ function drawLabels(dim) {
         }
       }
     }
-    it2.x = Math.max(half + 4, Math.min(W - half - 4, foundX));
-    it2.y = Math.max(12, Math.min(H - 12, foundY));
+    if (!ok) { lastThemeMissing++; lastThemeMissingNames.push(it2.text); continue; }
+
+    it2.x = foundX;
+    it2.y = foundY;
     placed.push({ x: it2.x, y: it2.y, w: it2.w, h: LINE_H, l: it2.text });
 
-    /* Подпись, уступившая место соседке, могла уехать далеко от своего
-       узла. Тонкая выноска возвращает ей адрес: иначе имя темы висит в
-       пустоте и человек не знает, к какому кружку оно относится. */
-    var away = Math.hypot(it2.x - it2.node.px,
-                          it2.y - (it2.node.py - nodeRadius(it2.node) - 11));
-    if (away > 24) {
+    /* Подпись, уступившая место соседке, могла отойти от своего узла.
+       Тонкая выноска возвращает ей адрес: иначе имя темы висит в пустоте и
+       человек не знает, к какому кружку оно относится. Длина выноски по
+       построению не больше LABEL_MAX_AWAY. */
+    var away = labelGap(it2.node, it2.x, it2.y, it2.w, LINE_H);
+    if (away > lastThemeAway) lastThemeAway = away;
+    if (away > LABEL_LEADER_MIN) {
       /* Выноска ведёт к ближайшему краю плашки, а не в её середину: линия
          не должна заходить под текст. */
       var tx = it2.x + (it2.node.px > it2.x ? it2.w / 2 + 4 : -(it2.w / 2 + 4));
@@ -988,7 +1161,7 @@ function drawLabels(dim) {
       var ty = it2.y + (it2.y > it2.node.py ? -10 : 10);
       var rr = nodeRadius(it2.node) + 2;
       var ang = Math.atan2(ty - it2.node.py, tx - it2.node.px);
-      ctx.strokeStyle = (it2.node.shades || PAL.borderShades)[shadeIndex(0.45)];
+      ctx.strokeStyle = PAL.borderShades[shadeIndex(0.45)];
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       ctx.moveTo(it2.node.px + Math.cos(ang) * rr, it2.node.py + Math.sin(ang) * rr);
@@ -1232,7 +1405,7 @@ function resetView() {
   cam.goalX = cam.goalY = cam.goalZ = null;
   cam.tx = cam.ty = cam.tz = 0;
   cam.zoomTarget = 1;
-  cam.pitch = -0.22;
+  cam.pitch = START_PITCH;
   if (reduceMotion) cam.zoom = 1;
   showZoom();
   wake();
@@ -1250,16 +1423,28 @@ document.getElementById('tmap-zoom-fit').addEventListener('click', function () {
 });
 
 /* ── Выбор ───────────────────────────────────────────────────────────── */
+/* Последний выбранный узел: его показывает панель, когда курсор ни на
+   чём. Хранится отдельно от `picked`, потому что порядок ключей объекта
+   для этого — не источник правды. */
+var lastPickedId = null;
+
 function togglePick(n) {
-  if (picked[n.id]) delete picked[n.id];
-  else picked[n.id] = true;
+  if (picked[n.id]) {
+    delete picked[n.id];
+    if (lastPickedId === n.id) lastPickedId = null;
+  } else {
+    picked[n.id] = true;
+    lastPickedId = n.id;
+  }
   rebuildHighlight();
   renderPicked();
+  if (!hoverNode) renderHover(null);
   wake();
 }
 
 function clearPick() {
   picked = {};
+  lastPickedId = null;
   var q = document.getElementById('tmap-q');
   if (q) q.value = '';
   applySearch('');
@@ -1315,9 +1500,18 @@ var HOWTO = '<ul class="tmap-howto">' +
 function renderHover(n) {
   if (!hoverBox) return;
   if (!n) {
-    var any = false;
-    for (var k in picked) { if (picked[k]) { any = true; break; } }
-    hoverBox.innerHTML = any ? '<div class="tmap-def">Наведите на узел, чтобы увидеть подробности.</div>' : HOWTO;
+    /* ⚠️ КУРСОР УШЁЛ — ПАНЕЛЬ НЕ ПУСТЕЕТ. Раньше здесь стояло «Наведите на
+       узел, чтобы увидеть подробности», и человек, выбравший тег и
+       отведший мышь, видел вместо своего тега приглашение навести: выбор
+       на экране будто пропадал. Теперь панель показывает ПОСЛЕДНИЙ
+       выбранный тег, и только когда выбора нет вовсе — «Как читать
+       карту». */
+    var last = (lastPickedId && picked[lastPickedId]) ? byId[lastPickedId] : null;
+    if (!last) {
+      for (var k in picked) { if (picked[k]) { last = byId[k]; break; } }
+    }
+    if (last) { renderHover(last); return; }
+    hoverBox.innerHTML = HOWTO;
     return;
   }
   var html = '';
@@ -1435,6 +1629,7 @@ var TOUR = [
     p: '29 тем и 343 тега — всё, из чего состоит банк задач. Крупные узлы это темы, ' +
        'мелкие вокруг них — теги.',
     at: function () { return wrap; },
+    zone: 'canvas-bottom',
     go: function () { resetView(); }
   },
   {
@@ -1442,6 +1637,7 @@ var TOUR = [
     p: 'Колесо приближает и отдаляет, причём к той точке, где стоит курсор. ' +
        'Кнопки в углу холста делают то же самое.',
     at: function () { return wrap; },
+    zone: 'canvas-bottom',
     go: function () {
       if (reduceMotion) return;
       var from = cam.yaw;
@@ -1453,6 +1649,7 @@ var TOUR = [
     p: 'Справа появится тема, число задач и смежные теги из других тем. ' +
        'Дорога от тега до его темы подсвечивается прямо на карте.',
     at: function () { return document.getElementById('tmap-hover-block'); },
+    zone: 'canvas-left',
     go: function () {
       var t = findTag('Кривая Лаффера');
       if (!t) return;
@@ -1466,6 +1663,7 @@ var TOUR = [
     p: 'Выбранный тег попадает в список справа, а внизу считается, сколько задач ' +
        'он примерно даёт. Тегов можно набрать сколько угодно, даже из разных тем.',
     at: function () { return document.getElementById('tmap-picked-block'); },
+    zone: 'canvas-left',
     go: function () {
       var a = findTag('Кривая Лаффера');
       var b = findTag('Расчёт коэффициента Джини');
@@ -1482,7 +1680,7 @@ var TOUR = [
     p: 'Поиск в шапке подсвечивает совпавшие узлы. А список тем справа — второй, ' +
        'надёжный способ: клик по строке наводит камеру на нужную тему.',
     at: function () { return document.getElementById('tmap-q'); },
-    at2: function () { return document.getElementById('tmap-themes'); },
+    zone: 'under-search',
     go: function () {}
   }
 ];
@@ -1514,8 +1712,11 @@ function tourShow(i) {
     'Шаг ' + (tourStep + 1) + ' из ' + TOUR.length;
   document.getElementById('tmap-tour-title').textContent = s.t;
   document.getElementById('tmap-tour-text').textContent = s.p;
+  /* «Начать», а не «Понятно, начать»: длинная надпись ломалась на две
+     строки и кнопка вырастала вдвое. Ширину держит ещё и white-space в
+     стилях — на случай другого шрифта. */
   document.getElementById('tmap-tour-next').textContent =
-    tourStep === TOUR.length - 1 ? 'Понятно, начать' : 'Дальше';
+    tourStep === TOUR.length - 1 ? 'Начать' : 'Дальше';
   document.getElementById('tmap-tour-prev').disabled = tourStep === 0;
 
   var dots = document.getElementById('tmap-tour-dots');
@@ -1530,18 +1731,47 @@ function tourShow(i) {
     tourHole.style.top = (r.top - 6) + 'px';
     tourHole.style.width = (r.width + 12) + 'px';
     tourHole.style.height = (r.height + 12) + 'px';
-    placeTourCard(r);
   }
+  placeTourCard(s.zone);
   if (s.go) s.go();
   wake();
 }
 
-function placeTourCard(r) {
-  var cw = 340, ch = tourCard.offsetHeight || 190, pad = 14;
-  var left = r.left + r.width / 2 - cw / 2;
-  var top = r.bottom + pad;
-  if (top + ch > window.innerHeight - 8) top = Math.max(8, r.top - ch - pad);
+/* ⚠️ ЗОНУ КАРТОЧКИ ЗАДАЁТ САМ ШАГ, А НЕ ГЕОМЕТРИЯ ПОДСВЕЧЕННОГО МЕСТА.
+   Прежнее правило «под подсвеченным элементом, а не влезает — над ним»
+   знает про край окна и не знает, что именно закрывает. Итог был виден
+   глазами: шаги «Наведите на узел» и «Не нашли на карте — ищите»
+   ложились ровно на правую панель, где и происходит показ, а шаги 1 и 4
+   залезали на шапку сайта с логотипом и меню.
+   Зон три, и все три оставляют открытым то, про что идёт рассказ:
+     canvas-bottom — про холст: слева внизу, ВЫШЕ кнопок масштаба, о
+                     которых говорит второй шаг;
+     canvas-left   — про правую панель: слева по центру холста, панель
+                     остаётся видна целиком;
+     under-search  — про поиск: под самим полем, прижата к его правому
+                     краю.
+   Нижняя граница шапки сайта берётся у блока карты, а не числом: высота
+   шапки задана стилями и может поменяться. */
+function placeTourCard(zone) {
+  var cw = tourCard.offsetWidth || 340, ch = tourCard.offsetHeight || 190;
+  var box = wrap.getBoundingClientRect();
+  var headBottom = root.getBoundingClientRect().top;
+  var left, top;
+
+  if (zone === 'under-search') {
+    var q = document.getElementById('tmap-q').getBoundingClientRect();
+    left = q.right - cw;
+    top = q.bottom + 12;
+  } else if (zone === 'canvas-left') {
+    left = box.left + 16;
+    top = box.top + (box.height - ch) / 2;
+  } else {
+    left = box.left + 16;
+    top = box.bottom - ch - 56;      /* 56px — над кнопками масштаба */
+  }
+
   left = Math.max(8, Math.min(window.innerWidth - cw - 8, left));
+  top = Math.max(headBottom + 8, Math.min(window.innerHeight - ch - 8, top));
   tourCard.style.left = left + 'px';
   tourCard.style.top = top + 'px';
 }
@@ -1621,7 +1851,10 @@ document.getElementById('tmap-chips').addEventListener('click', function (e) {
   var b = e.target.closest('[data-drop]');
   if (!b) return;
   delete picked[b.dataset.drop];
-  rebuildHighlight(); renderPicked(); wake();
+  if (lastPickedId === b.dataset.drop) lastPickedId = null;
+  rebuildHighlight(); renderPicked();
+  if (!hoverNode) renderHover(null);
+  wake();
   touchActivity();
 });
 
@@ -1663,6 +1896,19 @@ if (themesBox) {
   });
 }
 
+/* Полоса затухания у нижней кромки панели гаснет, когда список
+   докручен до конца или прокручивать нечего вовсе. */
+var panelBox = document.getElementById('tmap-panel');
+var panelFade = document.getElementById('tmap-panel-fade');
+
+function showPanelFade() {
+  if (!panelBox || !panelFade) return;
+  var rest = panelBox.scrollHeight - panelBox.scrollTop - panelBox.clientHeight;
+  panelFade.classList.toggle('is-off', rest <= 2);
+}
+
+if (panelBox) panelBox.addEventListener('scroll', showPanelFade, { passive: true });
+
 /* ⚠️ СЛЕДИМ ЗА РАЗМЕРОМ САМОГО КОНТЕЙНЕРА, А НЕ ТОЛЬКО ОКНА.
    Холст меняет размер и без изменения окна: скрытая и снова показанная
    панель, схлопнутая правая колонка, а в будущем — открытие карты во
@@ -1672,7 +1918,11 @@ function onBoxResize() {
   var r = wrap.getBoundingClientRect();
   if (r.width < 2 || r.height < 2) return;   /* холст ещё не разложен */
   resize();
-  if (ready) computeFit();
+  /* Форма холста поменялась — значит, и растяжение облака под неё, и
+     обзор. Растяжение всегда считается ОТ БАЗОВЫХ координат, поэтому
+     повторный вызов не множится на прежний. */
+  if (ready) { spreadCloud(); computeFit(); }
+  showPanelFade();
 }
 
 window.addEventListener('resize', onBoxResize);
@@ -1716,14 +1966,18 @@ fetch(window.TMAP_URL, { credentials: 'same-origin' })
 
     readPalette();
     seedLayout();
-    /* 300 итераций синхронно: карта открывается уже почти собранной. */
+    /* 300 итераций синхронно: карта открывается уже собранной. */
     settle(300);
+    recentre();
+    snapshotLayout();
 
     resize();
-    computeFit();
+    spreadCloud();          /* облако под форму холста */
+    computeFit();           /* и обзор по обеим осям сразу */
     ready = true;
     renderHover(null);
     renderPicked();
+    showPanelFade();
     wake();
 
     var show = false;
@@ -1751,6 +2005,18 @@ window.TMAP = {
   /* Все подписи кадра — и тегов, и тем: они делят холст, и проверять их
      на пересечение надо вместе, а не по слоям. */
   allBoxes: function () { draw(); return lastThemeBoxes.slice(); },
+  /* Что кадр НЕ показал и как далеко увёл: приглушённые имена тем,
+     ненарисованные имена тем и самое дальнее отстояние подписи от узла. */
+  labelReport: function () {
+    draw();
+    return { drawn: lastThemeBoxes.length,
+             themes: lastThemeBoxes.length - lastThemeFrom,
+             tags: lastThemeFrom,
+             quiet: lastQuietCount,
+             missing: lastThemeMissing,
+             missingNames: lastThemeMissingNames.slice(),
+             maxAway: +lastThemeAway.toFixed(1) };
+  },
   /* Стоимость кадра. Частоту через requestAnimationFrame в скрытой вкладке
      измерить нельзя — браузер её там не гоняет вовсе; поэтому меряем, во
      что обходится САМ кадр, и переводим в кадры в секунду. */
@@ -1777,9 +2043,7 @@ window.TMAP = {
       wake();
       var items = layoutFocusLabels(themeList[i]);
       return items.map(function (it) {
-        ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-        var w = 0;
-        it.lines.forEach(function (l) { w = Math.max(w, ctx.measureText(l).width); });
+        var w = it.w;
         var h = it.lines.length * LINE_H;
         return {
           id: it.node.id, label: it.node.l, lines: it.lines.length, side: it.side,

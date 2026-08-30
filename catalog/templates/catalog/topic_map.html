@@ -73,9 +73,11 @@
         <div class="tmap-themes" id="tmap-themes">
           {% for s in sections %}
             <div class="tmap-themes-group">
-              <div class="tmap-themes-group-h">
-                <i class="tmap-dot" data-g="{{ s.key }}"></i>{{ s.label }}
-              </div>
+              {% comment %}
+                Заголовок раздела — метка без точки: у раздела больше нет
+                своего цвета (ADR 0038), он только структурирует список.
+              {% endcomment %}
+              <div class="tmap-themes-group-h">{{ s.label }}</div>
               {% for t in s.themes %}
                 <button type="button" class="tmap-theme-row"
                         data-theme="{{ t.n }}" data-g="{{ s.key }}">
@@ -89,16 +91,15 @@
         </div>
       </section>
 
-      <section class="tmap-block">
-        <h2 class="tmap-block-h">Разделы корпуса</h2>
-        <ul class="tmap-legend">
-          {% for s in sections %}
-            <li><i class="tmap-dot" data-g="{{ s.key }}"></i>{{ s.label }}</li>
-          {% endfor %}
-        </ul>
-      </section>
-
     </aside>
+
+    {% comment %}
+      Намёк на прокрутку: полоса затухания у нижней кромки панели. Живёт
+      СНАРУЖИ прокручиваемой панели — внутри она уезжала бы вместе с
+      содержимым и переставала быть кромкой. Скрипт гасит её, когда
+      прокручивать больше нечего.
+    {% endcomment %}
+    <div class="tmap-panel-fade" id="tmap-panel-fade" aria-hidden="true"></div>
   </div>
 
   <footer class="tmap-foot">

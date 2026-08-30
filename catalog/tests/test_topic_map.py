@@ -5,6 +5,8 @@
 в базе ещё нет — см. `catalog/taxonomy_map.py`).
 """
 import json
+import pathlib
+import re
 import statistics
 
 from django.test import SimpleTestCase
@@ -168,7 +170,7 @@ class GraphIntegrityTests(SimpleTestCase):
 
     def test_every_theme_belongs_to_exactly_one_group(self):
         seen = {}
-        for key, _label, _cl, _cd, nums in GROUPS:
+        for key, _label, nums in GROUPS:
             for n in nums:
                 self.assertNotIn(n, seen, 'тема %d в двух разделах' % n)
                 seen[n] = key
@@ -180,12 +182,111 @@ class GraphIntegrityTests(SimpleTestCase):
             if n['k'] == 'tag':
                 self.assertEqual(n['g'], theme_group[n['n']])
 
-    def test_seven_groups_with_two_colours_each(self):
+    def test_seven_groups_and_none_of_them_carries_a_colour(self):
+        """Раздел остался структурным: имя и состав есть, цвета нет.
+
+        ⚠️ ЭТО СТОРОЖ ОТКАЗА ОТ СЕМИ ЦВЕТОВ (ADR 0038), а не придирка к
+        полям. Пока раздел носил свою пару цветов, их читал JavaScript
+        карты; вернуть поля `cl`/`cd` — значит вернуть и разноцветные узлы,
+        и никакой другой тест этого не заметит.
+        """
         self.assertEqual(len(self.data['groups']), 7)
         for g in self.data['groups']:
-            self.assertRegex(g['cl'], r'^#[0-9A-Fa-f]{6}$')
-            self.assertRegex(g['cd'], r'^#[0-9A-Fa-f]{6}$')
             self.assertTrue(g['l'])
+            self.assertTrue(g['themes'])
+            self.assertNotIn('cl', g, 'у раздела снова появился цвет: %s' % g['k'])
+            self.assertNotIn('cd', g, 'у раздела снова появился цвет: %s' % g['k'])
+
+
+class NodeColourContrastTests(SimpleTestCase):
+    """Один нейтральный цвет узла и акцент подсветки видны на холсте.
+
+    ⚠️ ЭТО ЗАМЕНА СЕМИ ПРОВЕРОК СРАЗУ. До ADR 0038 карта разводила семь
+    предметных цветов оттенком и светлотой, и контраст держала дотяжка
+    внутри `topic_map.js`. Цветов больше нет — значит, нет и дотяжки, и
+    порог теперь держат сами значения токенов. Проверяются ТРИ краски, из
+    которых состоит вся карта: узел темы (в полную силу), узел тега (тот
+    же цвет с прозрачностью 0,72) и акцент подсветки.
+
+    Порог 3:1 — это норма для НЕтекстовой графики (WCAG 1.4.11): узел это
+    кружок, а не буква.
+    """
+
+    TOKENS = pathlib.Path('templates/_tokens.html')
+    MIN = 3.0
+    TAG_ALPHA = 0.72          # то же число, что BASE_ALPHA_TAG в topic_map.js
+
+    @staticmethod
+    def _rgb(value):
+        value = value.strip().lstrip('#')
+        return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
+
+    @staticmethod
+    def _over(top, bottom, alpha):
+        """Полупрозрачная краска поверх непрозрачного фона."""
+        return tuple(top[i] * alpha + bottom[i] * (1 - alpha) for i in range(3))
+
+    @staticmethod
+    def _luminance(rgb):
+        def channel(part):
+            part /= 255
+            return (part / 12.92 if part <= 0.03928
+                    else ((part + 0.055) / 1.055) ** 2.4)
+        red, green, blue = (channel(p) for p in rgb)
+        return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+    @classmethod
+    def _contrast(cls, first, second):
+        high, low = sorted((cls._luminance(first), cls._luminance(second)),
+                           reverse=True)
+        return round((high + 0.05) / (low + 0.05), 2)
+
+    @classmethod
+    def _themes(cls):
+        css = cls.TOKENS.read_text(encoding='utf-8')
+        cut = css.index('[data-theme="dark"]')
+        return {'светлая': css[:cut], 'тёмная': css[cut:]}
+
+    @staticmethod
+    def _token(css, name):
+        found = re.search(r'--%s:\s*([^;]+);' % re.escape(name), css)
+        return found.group(1).strip() if found else None
+
+    def _measure(self, css):
+        """Три контраста к фону холста: тема, тег, акцент."""
+        bg = self._token(css, 'bg')
+        node = self._token(css, 'map-node')
+        accent = self._token(css, 'accent')
+        self.assertIsNotNone(bg, 'нет токена --bg')
+        self.assertIsNotNone(node, 'нет токена --map-node')
+        self.assertIsNotNone(accent, 'нет токена --accent')
+        bg = self._rgb(bg)
+        node = self._rgb(node)
+        return {
+            'узел темы': self._contrast(node, bg),
+            'узел тега': self._contrast(self._over(node, bg, self.TAG_ALPHA), bg),
+            'акцент': self._contrast(self._rgb(accent), bg),
+        }
+
+    def test_node_and_accent_stand_out_in_both_themes(self):
+        for theme, css in self._themes().items():
+            for what, value in self._measure(css).items():
+                self.assertGreaterEqual(
+                    value, self.MIN,
+                    '%s тема, %s: контраст к холсту %s при норме %s'
+                    % (theme, what, value, self.MIN))
+
+    def test_only_one_node_colour_is_declared(self):
+        """Семи цветов разделов в токенах больше нет.
+
+        Без этой проверки токены `--g-base` … `--g-tools` можно вернуть, и
+        покраснеет только глаз владельца.
+        """
+        css = self.TOKENS.read_text(encoding='utf-8')
+        for key, _label, _nums in GROUPS:
+            self.assertIsNone(
+                re.search(r'--g-%s:' % re.escape(key), css),
+                'в токенах снова цвет раздела: --g-%s' % key)
 
 
 class BuiltJsonTests(SimpleTestCase):
