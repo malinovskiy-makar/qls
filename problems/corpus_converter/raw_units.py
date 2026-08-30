@@ -149,3 +149,127 @@ def field_for(text, left, right, offset):
     if m and offset > m.start():
         return 'solution'
     return 'statement'
+
+
+# --- преамбула проекта -----------------------------------------------------
+
+#: Объявления, без которых не собирается TikZ из чужого проекта. Список
+#: закрытый и намеренно узкий: берутся ОПРЕДЕЛЕНИЯ, а не произвольный
+#: код преамбулы. Живые отказы компиляции — `style=style1` (объявлен
+#: через `\tikzset`) и `\circled{1}` (через `\newcommand`).
+_DECLARATIONS = (
+    'newcommand', 'renewcommand', 'providecommand', 'DeclareMathOperator',
+    'tikzset', 'tikzstyle', 'pgfplotsset', 'definecolor', 'usetikzlibrary',
+    'newlength', 'setlength', 'newif',
+)
+_DECL_RE = re.compile(
+    BS + BS + r'(' + '|'.join(_DECLARATIONS) + r')(?![A-Za-z@])')
+
+
+def _group_end(text, start):
+    """Конец одной группы `{...}` или `[...]`, начинающейся на `start`."""
+    opener = text[start]
+    closer = '}' if opener == '{' else ']'
+    depth = 0
+    i = start
+    while i < len(text):
+        if text[i] == opener:
+            depth += 1
+        elif text[i] == closer:
+            depth -= 1
+            if depth == 0:
+                return i + 1
+        i += 1
+    return -1
+
+
+def _balanced_end(text, start):
+    """Конец объявления: команда и ВСЕ её группы подряд.
+
+    Групп несколько, и это не мелочь: `\\definecolor{urlcolor}{rgb}{0,0,1}`
+    — три аргумента. Остановка на первой группе давала обрезанное
+    `\\definecolor{urlcolor}`, и вся преамбула роняла компиляцию (живой
+    отказ задачи #31019)."""
+    i = text.find('{', start)
+    j = text.find('[', start)
+    if i < 0 or (0 <= j < i):
+        i = j
+    if i < 0 or text[start:i].strip(BS + 'abcdefghijklmnopqrstuvwxyz'
+                                    'ABCDEFGHIJKLMNOPQRSTUVWXYZ@*'):
+        # За командой нет ни одной группы — берём саму команду.
+        end = start
+        while end < len(text) and (text[end] == BS or text[end].isalpha()
+                                   or text[end] == '@'):
+            end += 1
+        return end
+    end = i
+    while end < len(text) and text[end] in '{[':
+        nxt = _group_end(text, end)
+        if nxt < 0:
+            return len(text)
+        end = nxt
+        # Пробелы и ОДИН перевод строки между аргументами: тело часто
+        # пишут со следующей строки. Без этого `\newcommand{\x}[1]`
+        # оставался без тела, и latex падал на `\@argdef` (#31019).
+        peek = end
+        while peek < len(text) and text[peek] in ' \t\r':
+            peek += 1
+        if peek < len(text) and text[peek] == '\n':
+            peek += 1
+            while peek < len(text) and text[peek] in ' \t\r':
+                peek += 1
+        if peek < len(text) and text[peek] in '{[':
+            end = peek
+    return end
+
+
+def harvest_preamble(paths, limit=60000):
+    """Объявления из `.tex`/`.sty` проекта — одной строкой для компиляции.
+
+    Читается ТОЛЬКО преамбула (до `\begin{document}`): после неё те же
+    команды уже относятся к телу конкретного листочка."""
+    out = []
+    seen = set()
+    total = 0
+    for path in paths:
+        try:
+            with open(path, 'rb') as fh:
+                text = fh.read().decode('utf-8', 'replace')
+        except OSError:
+            continue
+        cut = text.find(BS + 'begin{document}')
+        if cut > 0:
+            text = text[:cut]
+        for m in _DECL_RE.finditer(text):
+            chunk = text[m.start():_balanced_end(text, m.start())].strip()
+            if not chunk or chunk in seen:
+                continue
+            # Многострочные определения ломают шаблон реже, чем помогают,
+            # но гигантские блоки в преамбулу не тащим.
+            if len(chunk) > 2000:
+                continue
+            seen.add(chunk)
+            out.append(chunk)
+            total += len(chunk)
+            if total > limit:
+                return '\n'.join(out)
+    return '\n'.join(out)
+
+
+def project_style_files(root, tex_dir):
+    """Файлы, где у этих проектов лежат объявления: `.sty` и преамбулы."""
+    found = []
+    for base in (tex_dir, root):
+        if not os.path.isdir(base):
+            continue
+        for dirpath, _dirnames, names in os.walk(base):
+            for name in sorted(names):
+                if name.lower().endswith(('.sty', '.cls')):
+                    found.append(os.path.join(dirpath, name))
+            if base == tex_dir:
+                break
+    for name in ('preamble.tex', 'main.tex', 'style.tex'):
+        candidate = os.path.join(tex_dir, name)
+        if os.path.isfile(candidate):
+            found.append(candidate)
+    return found

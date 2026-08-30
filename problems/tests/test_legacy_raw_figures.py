@@ -191,3 +191,57 @@ class MarkerAppendRuleTests(SimpleTestCase):
     def test_repeat_is_idempotent(self):
         once = self.append('Условие.', '[[FIGURE:aa]]')
         self.assertEqual(self.append(once, '[[FIGURE:aa]]'), once)
+
+
+class HarvestPreambleTests(SimpleTestCase):
+    r"""Объявления из преамбулы проекта для сборки чужого TikZ.
+
+    Домашние стили авторов (`style=style1`, `\circled{1}`) без них не
+    собираются. Обрезанное объявление хуже отсутствующего: оно роняет
+    ВСЮ компиляцию — живой отказ #31019 с `\definecolor{urlcolor}`."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+
+    def _write(self, body, name='olmath_style.sty'):
+        path = os.path.join(self.dir.name, name)
+        with open(path, 'w', encoding='utf-8') as fh:
+            fh.write(body)
+        return [path]
+
+    def test_multi_argument_declaration_is_kept_whole(self):
+        paths = self._write(BS + r'definecolor{urlcolor}{rgb}{0,0,1}')
+        self.assertIn('{urlcolor}{rgb}{0,0,1}', ru.harvest_preamble(paths))
+
+    def test_body_on_the_next_line_is_kept(self):
+        paths = self._write(BS + r'newcommand{' + BS + r'circled}[1]'
+                            + '\n    {(#1)}')
+        got = ru.harvest_preamble(paths)
+        self.assertIn('{(#1)}', got)
+
+    def test_nested_braces_survive(self):
+        paths = self._write(BS + r'tikzset{style1/.style={thick, red}}')
+        self.assertIn('{thick, red}}', ru.harvest_preamble(paths))
+
+    def test_command_without_arguments(self):
+        paths = self._write(BS + r'newif' + BS + r'ifdraft')
+        self.assertIn('newif', ru.harvest_preamble(paths))
+
+    def test_only_preamble_is_read(self):
+        """После `\begin{document}` те же команды относятся к телу
+        конкретного листочка, а не к стилю проекта."""
+        paths = self._write(
+            BS + r'newcommand{' + BS + r'inpre}{1}' + '\n'
+            + BS + r'begin{document}' + '\n'
+            + BS + r'newcommand{' + BS + r'inbody}{2}')
+        got = ru.harvest_preamble(paths)
+        self.assertIn('inpre', got)
+        self.assertNotIn('inbody', got)
+
+    def test_unrelated_commands_are_not_harvested(self):
+        paths = self._write(BS + r'input{secrets}' + '\n'
+                            + BS + r'write18{del *}')
+        got = ru.harvest_preamble(paths)
+        self.assertNotIn('input', got)
+        self.assertNotIn('write18', got)
