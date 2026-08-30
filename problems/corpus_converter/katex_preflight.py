@@ -107,10 +107,16 @@ window.__preflight = function (html) {
   box.innerHTML = html;
 
   var DOLLAR_SENTINEL = '';
+  // Пара `\\` (перенос строки) пропускается наравне с `\$`: иначе в
+  // `\\$` второй слеш вместе с `$` читается как экранированный доллар,
+  // формула не закрывается и съедает текст до следующего `$`.
+  // Зеркало _find_close из problems/rendering.py и findClose из
+  // templates/_katex_dollars.html — три реализации обязаны совпадать,
+  // иначе замер перестаёт быть замером боевого показа.
   function findClose(s, from, close) {
     var i = from;
     while (i < s.length) {
-      if (s.charAt(i) === '\\' && s.charAt(i + 1) === '$') { i += 2; continue; }
+      if (s.charAt(i) === '\\' && (s.charAt(i + 1) === '$' || s.charAt(i + 1) === '\\')) { i += 2; continue; }
       if (s.substr(i, close.length) === close) return i;
       i++;
     }
