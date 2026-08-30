@@ -30,7 +30,7 @@ from problems.management.commands.corpus_render_gate import (  # noqa: E402
     SOURCES, _candidate_qs,
 )
 from problems.management.commands.corpus_review_html import (  # noqa: E402
-    _HTML_HEAD, _HTML_FOOT_TEMPLATE, _esc, _render_sample_card,
+    _HTML_FOOT_TEMPLATE, _esc, _render_sample_card, html_head,
 )
 from problems.models import Problem, ProblemPart  # noqa: E402
 
@@ -146,7 +146,7 @@ class Command(BaseCommand):
 
                 self.stdout.write(f'  {name}: PASS {len(passed)}, блок {len(blocked)}')
 
-        html = [_HTML_HEAD,
+        html = [html_head(),
                 '<h1>Боевой рендер — визуальная проверка по НОВОМУ шлюзу (v2)</h1>',
                 '<div class="subtitle">PASS определяет render_preflight_v2 — '
                 'настоящий KaTeX 0.16.9 (throwOnError=true, trust=false), а не '

@@ -24,6 +24,7 @@ READ-ONLY. Чем отличается от `render_legacy_review_v2`: та ст
 без стратификации по источникам: доля источника в выборке отражает его
 реальную долю. Сид фиксирован и печатается.
 """
+import base64
 import json
 import os
 import random
@@ -31,9 +32,10 @@ import random
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
+from problems.corpus_converter import render_codes as rc
 from problems.corpus_converter.tikz_render import MARKER_RE
 from problems.management.commands.corpus_review_html import (
-    _HTML_FOOT_TEMPLATE, _HTML_HEAD, _esc,
+    _HTML_FOOT_TEMPLATE, _esc, html_head,
 )
 from problems.models import Problem, ProblemFigure
 from problems.rendering import render_markdown
@@ -47,19 +49,43 @@ DEFAULT_OUT = os.path.join(
 
 
 def _render_field(text, figures):
-    """Боевой конвейер показа + встроенный SVG вместо ссылки."""
+    """Боевой конвейер показа + встроенная картинка вместо ссылки.
+
+    Отличие от сайта одно: там `<img src="/catalog/figure/N.svg">`, здесь
+    содержимое вшито в файл — иначе страницу нельзя открыть без
+    поднятого сервера. Показывается ровно то же, что отдал бы сайт.
+
+    Два происхождения байтов, и оба надо вшить: собранные из TikZ лежат
+    в `svg`, импортированные из архивов — в `image_data` (их 930, и без
+    этой ветки на месте картинки был бы пустой абзац)."""
     html = render_markdown(text or '')
     if '[[FIGURE:' not in html:
         return html
 
     def repl(match):
         figure = figures.get(match.group(1))
-        return f'<div class="problem-figure">{figure.svg}</div>' if figure else ''
+        if figure is None:
+            return ''
+        if figure.svg:
+            return f'<div class="problem-figure">{figure.svg}</div>'
+        if figure.image_data:
+            data = base64.b64encode(bytes(figure.image_data)).decode('ascii')
+            return (f'<img class="problem-figure" alt="График к задаче" '
+                    f'src="data:{figure.content_type};base64,{data}">')
+        return ''
 
     return MARKER_RE.sub(repl, html)
 
 
 def _card(problem, sources, figures):
+    """Карточка задачи вместе с ЧЕСТНЫМ вердиктом о её читаемости.
+
+    ⚠️ Раньше класс `no-warnings` стоял здесь строкой, безусловно. Аудит
+    3 000 карточек отметил это первым пунктом глобальных дефектов: все
+    3 000 были помечены «без замечаний», хотя 390 из них человек признал
+    сломанными. Страница проверки, которая сама себе ставит зачёт,
+    проверкой не является. Теперь коды считает
+    `render_codes.analyze_problem` по ТОМУ ЖЕ HTML, что показан ниже."""
     blocks = [('Условие', problem.statement)]
     for part in problem.parts.all():
         blocks.append((f'Часть {part.label}', part.statement))
@@ -69,17 +95,35 @@ def _card(problem, sources, figures):
         blocks.append(('Решение', problem.solution))
 
     body = []
+    htmls = []
     for name, text in blocks:
+        html = _render_field(text, figures)
+        htmls.append(html)
         body.append(
             f'<div class="block"><div class="block-name">{_esc(name)}</div>'
-            f'<div class="math-content">{_render_field(text, figures)}</div></div>'
+            f'<div class="math-content">{html}</div></div>'
         )
+
+    found = rc.analyze_problem(
+        [(name, '', text or '') for name, text in blocks], htmls,
+        figure_svgs=[f.svg for f in figures.values() if f.svg])
+    codes = sorted(found, key=lambda c: (rc.PRIORITY[c], c))
+    worst = min((rc.PRIORITY[c] for c in codes), default='')
+    state = 'has-warnings' if codes else 'no-warnings'
+    chips = ''.join(
+        f'<span class="badge warn" title="{_esc(rc.MEANING[c])}">'
+        f'{_esc(c)}</span> ' for c in codes)
+
     return (
-        f'<div class="sample-card no-warnings" data-id="{problem.id}">'
+        f'<div class="sample-card {state}" data-id="{problem.id}" '
+        f'data-has-warnings="{"true" if codes else "false"}" '
+        f'data-priority="{worst}" data-codes="{_esc(",".join(codes))}" '
+        f'data-reviewed="false">'
         f'<div class="sample-header">'
         f'<span class="sample-id">#{problem.id}</span> '
         f'<span class="sample-label">{_esc(sources)}</span> '
-        f'<span class="badge">{_esc(problem.content_format)}</span>'
+        f'<span class="badge">{_esc(problem.content_format)}</span> '
+        f'{chips}'
         f'</div>{"".join(body)}</div>'
     )
 
@@ -141,11 +185,19 @@ class Command(BaseCommand):
             f'KaTeX 0.16.9, что и на сайте. Картинки встроены как '
             f'<code>&lt;svg&gt;</code>, чтобы файл открывался без сервера.</p>'
             f'<ul>{summary}</ul>'
+            # Кнопки фильтра: JS подвала ищет `#filters button[data-filter]`,
+            # но рисовать их было некому — аудит отметил это восьмым пунктом
+            # («контроль качества фактически недоступен»).
+            f'<div id="filters">'
+            f'<button data-filter="all">все ({len(cards)})</button>'
+            f'<button data-filter="warnings">только с кодами '
+            f'({sum(1 for c in cards if "has-warnings" in c)})</button>'
+            f'</div>'
         )
 
         os.makedirs(os.path.dirname(options['out']), exist_ok=True)
         with open(options['out'], 'w', encoding='utf-8') as f:
-            f.write(_HTML_HEAD)
+            f.write(html_head())
             f.write(head)
             f.write(''.join(cards))
             f.write(_HTML_FOOT_TEMPLATE)
