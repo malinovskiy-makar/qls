@@ -91,6 +91,9 @@ _LEFTOVER_TEX_CMD_RE = re.compile(r'\\[A-Za-z]{2,}')
 UNICODE_TEXT_ALLOWLIST: frozenset[str] = frozenset()
 
 
+from problems.corpus_converter.width_probe import MEASURE_WIDTHS_JS  # noqa: E402
+
+
 def _read_asset(*parts):
     with open(os.path.join(KATEX_DIR, *parts), encoding='utf-8') as f:
         return f.read()
@@ -197,13 +200,19 @@ window.__preflight = function (html) {
 
 
 def build_sandbox_html():
-    """HTML песочницы: вендорный KaTeX 0.16.9 + измеритель."""
+    """HTML песочницы: вендорный KaTeX 0.16.9 + измеритель.
+
+    Рядом с проверкой разбора живёт измеритель ширины (коды `OVER` и
+    `OVER-M` аудита). Тот же браузер и та же версия KaTeX намеренно:
+    ширина формулы зависит от шрифта, и мерить её в другой песочнице
+    значило бы мерить не то, что видит ученик."""
     css = _read_asset('katex.min.css')
     js = _read_asset('katex.min.js')
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
         f'<style>{css}</style><script>{js}</script>'
         f'<script>{_MEASURE_JS}</script>'
+        f'<script>{MEASURE_WIDTHS_JS}</script>'
         '</head><body><div id="box"></div></body></html>'
     )
 
@@ -250,6 +259,12 @@ class KatexPreflight:
     def check(self, html):
         """Один HTML-фрагмент → отчёт preflight (см. `summarize`)."""
         return self._page.evaluate('(h) => window.__preflight(h)', html)
+
+    def widths_many(self, htmls):
+        """Список HTML → список списков измеренных ширин формул (px)."""
+        return self._page.evaluate(
+            '(items) => items.map(h => window.__widths(h))', htmls,
+        )
 
     def check_many(self, htmls):
         """Список HTML → список отчётов, одним заходом в браузер.

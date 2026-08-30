@@ -48,6 +48,36 @@
 .math-content p { margin-bottom: .75em; }
 .math-content .katex-display { margin: 1em 0; }
 
+/* Широкая формула прокручивается внутри себя, а не растягивает карточку.
+   Замер боевым KaTeX 0.16.9: у 100 задач формула шире 800 px (самые
+   длинные — 3 033 px при карточке около 800), ещё у 137 — шире 600 px,
+   то есть не влезает на телефон. Без этого правила такая формула
+   раздвигает карточку и уносит вёрстку всей страницы. */
+.math-content .katex-display { overflow-x: auto; overflow-y: hidden; }
+
+/* ⚠️ Таблице мало `overflow-x: auto`, и это проверено в браузере, а не
+   выведено из спецификации: у бокса `display: table` вычисленный
+   `overflow-x` остаётся `visible`, и правило не делает ничего. Работает
+   только перевод самой таблицы в блок — внутренняя раскладка при этом
+   сохраняется, браузер строит анонимный табличный бокс. */
+.math-content table {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* Картинки задачи (`[[FIGURE:…]]` → `<img>` после санитайзера,
+   `problems/figures.py`). Правила появились вместе с картинками: их
+   737 у легаси-источников, и среди них есть скриншоты в 2 000 px —
+   без `max-width` они ломают вёрстку, а не просто выглядят крупно. */
+.math-content .problem-figure {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+}
+
 /* Таблицы из markdown-рендерера (content_format='markdown', см.
    problems/rendering.py). Стиль — тот же язык, что у .stats-table и
    .wk-table (platform/_stats_style.html): заголовок отличается весом

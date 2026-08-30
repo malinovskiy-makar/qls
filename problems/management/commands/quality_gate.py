@@ -166,7 +166,15 @@ class Command(BaseCommand):
                       # вопросы без условия (G14) — оба уже через 5%-предохранитель
                       # внутри detect_missing_refs.
                       'missing_figure_ids.txt',
-                      'no_premise_ids.txt'):
+                      'no_premise_ids.txt',
+                      # сессия 2026-08-30: 19 кодов читаемости из аудита
+                      # 3 000 карточек — потерянные рисунки, неполные
+                      # карточки, сырой служебный синтаксис, утечка
+                      # решения в условие. Список пишет
+                      # `manage.py corpus_render_codes` (только P0 и P1:
+                      # P2 — косметика, и TABLE/OVER-M из неё уже сняты
+                      # правкой шаблона). Регенерация — той же командой.
+                      'render_codes_ids.txt'):
             path = os.path.join(REPORT_DIR, fname)
             if not os.path.exists(path):
                 continue

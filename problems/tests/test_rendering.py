@@ -331,10 +331,20 @@ class TableCssTests(SimpleTestCase):
             'заголовок таблицы ничем не отличим от обычной ячейки: %r' % rule)
 
     def test_table_does_not_force_full_width(self):
-        """Требование владельца: не растягивать таблицу без нужды."""
+        """Требование владельца: не растягивать таблицу без нужды.
+
+        Ловятся `width` и `min-width` — оба растягивают. `max-width` НЕ
+        ловится: он ровно наоборот, ОГРАНИЧИВАЕТ ширину.
+
+        ⚠️ Различать их обязательно. Прежняя проверка искала подстроку
+        `width: 100%` и потому срабатывала на `max-width: 100%`. 30.08 на
+        этом покраснела правка, которая требование как раз усилила:
+        `width: fit-content` — таблица ровно по содержимому, а
+        `max-width: 100%` не даёт ей вылезти из колонки."""
         m = re.search(r'\.math-content table\s*\{([^}]*)\}', self.source)
         self.assertIsNotNone(m, 'нет правила .math-content table')
-        self.assertNotRegex(m.group(1), r'width\s*:\s*100%')
+        self.assertNotRegex(m.group(1),
+                            r'(?<![-\w])(?:min-)?width\s*:\s*100%')
 
     def test_table_colors_use_design_tokens_not_hardcoded_hex(self):
         """catalog/CLAUDE.md: хардкод hex ломает тёмную тему — цвета только

@@ -238,6 +238,22 @@ reports/import_new_sources/*
 !reports/import_new_sources/baseline_before_import.json
 !reports/import_new_sources/gate_new_sources_backup.json
 
+# Фаза 3 легаси-картинок. Как и у соседних отчётов: папка закрыта, из неё
+# пускаются только обратимый журнал и очередь ручного разбора. Предпросмотр
+# (11 МБ картинок в base64) — артефакт для глаз, в истории ему не место.
+!reports/corpus_legacy_figures/
+reports/corpus_legacy_figures/*
+!reports/corpus_legacy_figures/texts_backup.json
+!reports/corpus_legacy_figures/unresolved.json
+!reports/corpus_legacy_figures/stats.json
+!reports/corpus_legacy_figures/plan.json
+
+# Диагностика 19 кодов читаемости: список id по кодам — это результат
+# замера, он нужен следующим фазам и должен быть в истории.
+!reports/corpus_render_codes/
+reports/corpus_render_codes/*
+!reports/corpus_render_codes/codes.json
+
 # ИСКЛЮЧЕНИЕ (2026-08-30): сессия «готовность к показу» — слияние двух веток
 # (легаси-рендер и три новых источника) в одну каноническую базу. Тот же
 # принцип, что у import_new_sources выше: в git едет только то, без чего

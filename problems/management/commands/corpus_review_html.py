@@ -11,12 +11,14 @@ READ-ONLY, как corpus_scaleup_*.py. Ничего не создаётся и �
 report.md (corpus_scaleup_legacy/solvehub/lesh) — переиспользована точная
 логика выборки, а не написана заново, чтобы сэмплы двух артефактов
 совпадали."""
+import base64
 import glob
 import hashlib
 import html
 import json
 import os
 import random
+import re
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
@@ -376,6 +378,52 @@ def _collect_lesh():
 # HTML-рендер
 # ---------------------------------------------------------------------------
 
+#: KaTeX кладётся В САМ ФАЙЛ, а не тянется с jsDelivr. Аудит 29.08:
+#: при офлайне, CSP или сетевом сбое все 11 808 формул страницы
+#: превратились бы в сырой TeX, и проверка показала бы не то, что есть.
+#: Плюс версия: вендорный каталог — это ровно 0.16.9, та же, что на
+#: боевом показе, а CDN однажды отдаст другую.
+#:
+#: Шрифты вшиваются как data:-адреса, и только woff2: без них KaTeX
+#: считает ширины системным шрифтом, а ширина формулы — это код `OVER`,
+#: который мы же и меряем. woff/ttf выбрасываются — их понимает только
+#: браузер, которого здесь нет.
+_KATEX_DIR = os.path.join(settings.BASE_DIR, 'problems',
+                          'review_bundle_assets', 'vendor', 'katex')
+_FONT_URL_RE = re.compile(r'url\(fonts/([^)]+)\)')
+
+
+def _katex_assets():
+    """`<style>` и `<script>` вендорного KaTeX 0.16.9 одним куском."""
+    with open(os.path.join(_KATEX_DIR, 'katex.min.css'), encoding='utf-8') as fh:
+        css = fh.read()
+
+    cache = {}
+
+    def inline(match):
+        name = match.group(1)
+        if not name.endswith('.woff2'):
+            # Ветку woff/ttf убираем целиком вместе с адресом: пусть
+            # останется единственный формат, который точно вшит.
+            return "url('')"
+        if name not in cache:
+            with open(os.path.join(_KATEX_DIR, 'fonts', name), 'rb') as fh:
+                cache[name] = base64.b64encode(fh.read()).decode('ascii')
+        return "url(data:font/woff2;base64,%s)" % cache[name]
+
+    css = _FONT_URL_RE.sub(inline, css)
+    parts = ['<style>%s</style>' % css]
+    for name in ('katex.min.js', os.path.join('contrib', 'auto-render.min.js')):
+        with open(os.path.join(_KATEX_DIR, name), encoding='utf-8') as fh:
+            parts.append('<script>%s</script>' % fh.read())
+    return '\n'.join(parts)
+
+
+def html_head():
+    """Шапка страницы проверки с вшитым KaTeX."""
+    return _HTML_HEAD.replace('__KATEX_ASSETS__', _katex_assets())
+
+
 #: Копия конфигурации из catalog/templates/catalog/base.html + partial
 #: templates/_katex_dollars.html — ТОТ ЖЕ рендерер, что видит ученик на
 #: странице задачи. Версия KaTeX и порядок разделителей ($$ раньше $)
@@ -386,9 +434,7 @@ _HTML_HEAD = """<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Ревью конвертера корпуса — 6 источников</title>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+__KATEX_ASSETS__
 <style>
 :root {
   --bg: #f7f7f5; --surface: #ffffff; --border: #ddd; --text: #1a1a1a;
@@ -411,7 +457,10 @@ details.reviewed-section { background: var(--reviewed-bg); border: 2px solid var
 summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; padding: 4px 0; }
 .sample-card { border: 1px solid var(--border); border-radius: 6px; margin: 12px 0; padding: 10px 12px; background: var(--ok-bg); }
 .sample-card.has-warnings { background: var(--warn-bg); border-color: var(--warn-border); border-left: 5px solid var(--warn-border); }
-.sample-card.no-warnings { opacity: 0.65; }
+/* opacity НЕ ставим: аудит 29.08 отдельно отметил, что серые
+   карточки мешают смотреть корпус глазами. Чистая карточка
+   отличается фоном, а не читаемостью. */
+.sample-card.no-warnings { background: var(--ok-bg); }
 .sample-card.is-reviewed { border-left: 5px solid var(--reviewed-border); }
 .sample-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 8px; }
 .sample-id { font-weight: 700; font-family: monospace; }
@@ -423,8 +472,17 @@ summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; padding: 4px 0;
 .sample-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
 @media (max-width: 900px) { .sample-body { grid-template-columns: 1fr; } }
 .col h4 { margin: 0 0 4px; font-size: 0.8rem; text-transform: uppercase; color: var(--muted); }
-.col pre { white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px; margin: 0 0 8px; max-height: 420px; overflow-y: auto; }
-.col .converted-block { border: 1px solid #eee; border-radius: 4px; padding: 8px; margin: 0 0 8px; background: #fff; max-height: 420px; overflow-y: auto; }
+.col pre { white-space: pre-wrap; word-break: break-word; font-size: 0.82rem; background: #fafafa; border: 1px solid #eee; border-radius: 4px; padding: 8px; margin: 0 0 8px; }
+/* Без max-height: обрезанное до прокрутки условие нельзя
+   проверить глазами — а ровно для этого страница и делается. */
+.col .converted-block { border: 1px solid #eee; border-radius: 4px; padding: 8px; margin: 0 0 8px; background: #fff; }
+/* Те же правила, что на боевой странице задачи
+   (catalog/problem_detail.html): широкое прокручивается
+   внутри себя, картинка не шире колонки. */
+.math-content .katex-display { overflow-x: auto; overflow-y: hidden; }
+.math-content table { display: block; width: fit-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.math-content th, .math-content td { padding: 6px 12px; text-align: left; border-bottom: 1px solid #e3e3e3; }
+.math-content .problem-figure, .math-content svg { display: block; max-width: 100%; height: auto; }
 .col .converted-block p { margin: 0 0 0.6em; }
 .images-note, .warnings-note { font-size: 0.82rem; margin-top: 6px; }
 .warnings-note ul { margin: 2px 0; padding-left: 18px; }
@@ -502,7 +560,12 @@ function initKaTeX() {
       { left: '\\\\[',  right: '\\\\]',  display: true  },
       { left: '\\\\(',  right: '\\\\)',  display: false }
     ],
-    throwOnError: false,
+    // В ИНСТРУМЕНТЕ ПРОВЕРКИ ошибка обязана быть видна: с false
+    // сломанная формула молча превращается в сырой TeX, и
+    // страница выглядит исправной. На боевом показе остаётся
+    // false — там ученику незачем видеть красный текст ошибки.
+    throwOnError: true,
+    errorColor: "#c0392b",
     trust: false
   });
   fixCurrencyDollars(document.body);
@@ -683,7 +746,7 @@ class Command(BaseCommand):
         reviewed_samples.append(s)
 
         # --- Сборка HTML -----------------------------------------------------
-        html_parts = [_HTML_HEAD]
+        html_parts = [html_head()]
         html_parts.append('<h1>Ревью конвертера корпуса — 6 источников</h1>')
         html_parts.append(
             '<div class="subtitle">problems/corpus_converter/, read-only, '

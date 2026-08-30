@@ -28,7 +28,7 @@ from problems.corpus_converter.reshalki_dollar_exclusions import (
     FORCED_EXCLUDE_RESHALKI_DOLLAR_SPLIT,
 )
 from problems.management.commands.corpus_review_html import (
-    _HTML_HEAD, _HTML_FOOT_TEMPLATE, _esc, _render_sample_card,
+    _HTML_FOOT_TEMPLATE, _esc, _render_sample_card, html_head,
 )
 from problems.management.commands.render_legacy_sources import (
     SOURCES, EXCLUDED_SOURCE_NAME, _candidate_qs,
@@ -168,7 +168,7 @@ class Command(BaseCommand):
                 f'(cases-принудительно={len(cases_items)})'
             )
 
-        html_parts = [_HTML_HEAD]
+        html_parts = [html_head()]
         html_parts.append('<h1>Боевой рендер легаси-источников — визуальная проверка</h1>')
         html_parts.append(
             '<div class="subtitle">Только PASS-кандидаты (пройдут may_render_as_markdown() '
