@@ -156,6 +156,35 @@ class DisplayMathTests(SimpleTestCase):
         text = r'начало $x + 1 без закрытия'
         self.assertEqual(of_kind(text, TokenKind.INLINE_MATH), [])
 
+    def test_row_break_before_closing_dollar_closes_math(self):
+        r"""`\\` перед закрывающим `$` — перенос строки, а не экран доллара.
+
+        ⚠️ ЧЕТВЁРТОЕ зеркало `findClose`. Первые три — `rendering.py`,
+        `templates/_katex_dollars.html`, `katex_preflight._MEASURE_JS`.
+        Здесь та же ошибка стоила дороже: непарные `$` лексер объявляет
+        ВАЛЮТОЙ, `math_canon` экранирует их в `\$`, и вся формула
+        деградирует в прозу — `\quad` и `\text` доезжают до экрана сырыми
+        (живой #59624). Замер по сырью: 36 задач SolveHub."""
+        text = r'$y \geq 0 \quad f_{\max} = 0 \\$ и текст'
+        math = of_kind(text, TokenKind.INLINE_MATH)
+        self.assertEqual(len(math), 1)
+        self.assertEqual(math[0].raw, r'$y \geq 0 \quad f_{\max} = 0 \\$')
+        self.assertEqual(of_kind(text, TokenKind.CURRENCY), [])
+
+    def test_escaped_dollar_still_does_not_close_math(self):
+        r"""Обратная сторона: одиночный `\$` внутри формулы — символ."""
+        text = r'$x = \$5 + y$'
+        math = of_kind(text, TokenKind.INLINE_MATH)
+        self.assertEqual(len(math), 1)
+        self.assertEqual(math[0].raw, text)
+
+    def test_row_break_does_not_eat_display_close(self):
+        r"""`\\` перед `$$` не должен съесть сам разделитель."""
+        text = r'$$a = 1 \\$$'
+        math = of_kind(text, TokenKind.DISPLAY_MATH)
+        self.assertEqual(len(math), 1)
+        self.assertEqual(math[0].raw, text)
+
     def test_roundtrip_preserves_original_text(self):
         # Инвариант лексера: склейка raw всех токенов == исходный текст.
         for text in [
