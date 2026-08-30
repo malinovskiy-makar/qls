@@ -88,6 +88,40 @@ class Command(BaseCommand):
         """Сузить выборку до области, если она задана."""
         return queryset if scope_ids is None else queryset.filter(id__in=scope_ids)
 
+    @staticmethod
+    def _false_positives():
+        r"""Задачи, которые детектор считает браком, а человек — нет.
+
+        Формат файла тот же, что у остальных списков: `id<TAB>причина`,
+        строки с `#` пропускаются.
+
+        Зачем отдельный список, а не правка детектора. Живой случай —
+        `unpaired_dollar` на суммах в долларах: «Правительство заплатило
+        $2 в виде трансфертов» (#26724), «привязка к доллару: $35 могли
+        быть обменены на унцию» (#29691). Непарный `$` здесь ДЕНЬГИ, а не
+        обрывок формулы, и на экране всё в порядке — закрывающего `$` нет,
+        поэтому KaTeX не превращает фразу в математику.
+
+        Сузить сам детектор («`$` перед цифрой — валюта») было бы
+        соблазнительно, но замер по ВСЕМУ банку говорит не делать этого
+        мимоходом: нечётный `$` у 163 задач, под правило «валюта» попали
+        бы 46, и **41 из них — в источниках вне текущей работы**. Менять
+        приговор сорока одной чужой карточке заодно нельзя; это отдельное
+        решение с отдельным просмотром. Поимённый список — честная
+        середина: он чинит ровно то, что человек посмотрел, и оставляет
+        детектор в покое.
+        """
+        path = os.path.join(REPORT_DIR, 'gate_false_positive_ids.txt')
+        if not os.path.exists(path):
+            return set()
+        ids = set()
+        with open(path, encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    ids.add(int(line.split('\t')[0]))
+        return ids
+
     def handle(self, *args, **options):
         scope_ids = self._scope(options['sources'])
         if scope_ids is not None:
@@ -281,6 +315,21 @@ class Command(BaseCommand):
                 ln = ln.strip()
                 if ln and not ln.startswith('#'):
                     solution_review_ids.append(int(ln.split('\t')[0]))
+
+        # ── подтверждённые человеком ложные срабатывания ──
+        false_positives = self._false_positives()
+        if false_positives:
+            before = len(set(flag_ids) | set(detector_ids))
+            flag_ids = [i for i in flag_ids if i not in false_positives]
+            detector_ids = [i for i in detector_ids if i not in false_positives]
+            solution_review_ids = [i for i in solution_review_ids
+                                   if i not in false_positives]
+            after = len(set(flag_ids) | set(detector_ids))
+            report_lines.append(
+                '- снято по списку ложных срабатываний: %d' % (before - after))
+            self.stdout.write(
+                'ложные срабатывания (проверены человеком): не флагуем %d'
+                % (before - after))
 
         # ── применяем: сброс + установка ──
         # ⚠️ При `--sources` И СБРОС, И УСТАНОВКА идут только внутри области.

@@ -8,6 +8,10 @@
 про то, что осталось нетронутым.
 """
 import io
+import os
+import shutil
+import tempfile
+from unittest import mock
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -94,6 +98,39 @@ class GateScopeTests(TestCase):
     def test_garbage_argument_is_refused(self):
         with self.assertRaises(CommandError):
             self.run_gate(apply=True, sources='четырнадцать')
+
+    def test_false_positive_list_keeps_a_card_visible(self):
+        """Карточку из списка ложных срабатываний шлюз не флагует.
+
+        Живой случай: `unpaired_dollar` на суммах в долларах (#26724,
+        #29691). Человек посмотрел — это деньги, а не обрывок формулы.
+
+        ⚠️ REPORT_DIR подменяется на временную папку. Без подмены прогон
+        набора писал бы тестовые id в БОЕВОЙ список ложных срабатываний —
+        ровно та беда, что уже случалась с журналами отката."""
+        from problems.management.commands import quality_gate as qg
+        # Источнику нужны чистые задачи: у шлюза есть предохранитель «больше
+        # 5 % кандидатов — источник пропускаем целиком», и на двух задачах
+        # он сработал бы раньше проверяемого правила.
+        for i in range(30):
+            link_source(make_problem('Чистая задача про спрос номер %d.' % i),
+                        self.our)
+        bad = make_problem('Цена $2 в виде трансфертов, закрывающего доллара нет.')
+        link_source(bad, self.our)
+        self.run_gate(apply=True, sources=str(self.our.id))
+        bad.refresh_from_db()
+        self.assertTrue(bad.needs_quality_review, 'детектор обязан её ловить')
+
+        tmp = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp, ignore_errors=True)
+        with open(os.path.join(tmp, 'gate_false_positive_ids.txt'), 'w',
+                  encoding='utf-8') as fh:
+            fh.write('# тест\n%d\tденьги, а не формула\n' % bad.id)
+        with mock.patch.object(qg, 'REPORT_DIR', tmp):
+            self.run_gate(apply=True, sources=str(self.our.id))
+        bad.refresh_from_db()
+        self.assertFalse(bad.needs_quality_review,
+                         'из списка ложных срабатываний флаг ставиться не должен')
 
     def test_empty_sources_means_no_limit(self):
         """Пустая строка — это «без ограничения», а не «ни одной задачи»."""

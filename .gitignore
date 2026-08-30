@@ -307,3 +307,10 @@ reports/publish_readiness/*
 #   stub_cleanup_backup.json — путь отката для карточек-заглушек,
 #     спрятанных статусом hidden. Без него не вернуть.
 !reports/publish_readiness/stub_cleanup_backup.json
+
+# Список ложных срабатываний шлюза, проверенных человеком. В git,
+# потому что это РЕШЕНИЕ, а не машинный вывод: без него следующий
+# прогон quality_gate снова спрячет карточки, которые человек одобрил.
+!reports/quality_audit/
+reports/quality_audit/*
+!reports/quality_audit/gate_false_positive_ids.txt
