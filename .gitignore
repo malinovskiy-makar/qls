@@ -237,3 +237,24 @@ reports/import_new_sources/*
 !reports/import_new_sources/report.md
 !reports/import_new_sources/baseline_before_import.json
 !reports/import_new_sources/gate_new_sources_backup.json
+
+# ИСКЛЮЧЕНИЕ (2026-08-30): сессия «готовность к показу» — слияние двух веток
+# (легаси-рендер и три новых источника) в одну каноническую базу. Тот же
+# принцип, что у import_new_sources выше: в git едет только то, без чего
+# нельзя ни откатить, ни перепроверить, ни понять, на чём сессия встала.
+#   PHASES.md            — файл-метка: какие фазы сделаны. Следующая сессия
+#     читает его первым и не повторяет уже сделанное;
+#   report.md            — итог сессии для владельца;
+#   gate_backup.json     — снимок id/status/needs_quality_review ВСЕХ задач
+#     до quality_gate. Единственное доказательство «вне шести источников не
+#     изменилось ничего» и путь отката;
+#   miss_decisions.json  — вердикты по ложным MISS («ученик рисует сам»):
+#     решение по каждой карточке, иначе разбор не воспроизвести.
+# Предпросмотры (*.html) и машинные срезы (*_audit.json) остаются
+# игнорируемыми: пересобираются командой, а весят много.
+!reports/publish_readiness/
+reports/publish_readiness/*
+!reports/publish_readiness/PHASES.md
+!reports/publish_readiness/report.md
+!reports/publish_readiness/gate_backup.json
+!reports/publish_readiness/miss_decisions.json
