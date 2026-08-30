@@ -183,6 +183,73 @@ class HomePageTests(TestCase):
         self.assertEqual(resp.status_code, 200)
 
 
+class HomeCounterTests(TestCase):
+    """Счётчик «задач в базе» считает ДОСТУПНЫЕ ДЛЯ РЕШЕНИЯ задачи.
+
+    Решение владельца 2026-08-30: на главной должно стоять число задач,
+    которые человек может открыть и решить, а не объём базы. Раньше там
+    стоял `Problem.objects.count()` — сырой итог вместе с черновиками,
+    скрытым браком и непросмотренным. Разница не косметическая: на
+    момент решения это 41 307 против нескольких тысяч видимых.
+
+    Тройка условий взята НЕ из головы: ровно так фильтрует сам каталог
+    (`problem_list`, `problem_detail`, `random_problem`). Счётчик и
+    каталог обязаны говорить одно и то же — иначе человек видит на
+    главной одно число, а в каталоге другое."""
+
+    def setUp(self):
+        self.visible = make_problem('Видимая задача.')
+
+    def test_counts_visible_problem(self):
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1')
+
+    def test_draft_is_not_counted(self):
+        make_problem('Черновик.', status=Problem.Status.DRAFT)
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1')
+
+    def test_flagged_as_defective_is_not_counted(self):
+        make_problem('Брак.', flagged=True)
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1')
+
+    def test_hidden_pending_review_is_not_counted(self):
+        make_problem('Человек ещё не смотрел.', hidden_pending_review=True)
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1')
+
+    def test_hidden_status_is_not_counted(self):
+        make_problem('Убрана руками.', status=Problem.Status.HIDDEN)
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1')
+
+    def test_counter_matches_the_catalog_listing(self):
+        """Число на главной = число задач, которые каталог реально отдаёт."""
+        make_problem('Вторая видимая.')
+        make_problem('Черновик.', status=Problem.Status.DRAFT)
+        make_problem('Брак.', flagged=True)
+        make_problem('Непросмотренная.', hidden_pending_review=True)
+        listed = Problem.objects.filter(
+            status=Problem.Status.PUBLISHED, needs_quality_review=False,
+            hidden_pending_review=False).count()
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], str(listed))
+        self.assertEqual(listed, 2)
+
+    def test_thousands_separator_is_kept(self):
+        """Разделитель — УЗКИЙ неразрывный пробел U+202F, а не обычный.
+
+        Проверка стоит здесь потому, что новая формула трогает ту же
+        строку: замена запроса не должна заодно испортить оформление
+        числа. Обычный пробел разорвал бы «41 307» переносом строки."""
+        Problem.objects.bulk_create([
+            Problem(statement='З%d' % i, status=Problem.Status.PUBLISHED)
+            for i in range(1234)])
+        resp = self.client.get('/')
+        self.assertEqual(resp.context['problems_count'], '1 235')
+
+
 class CurrencyEscapeFrontendTests(TestCase):
     """Сессия E: страница задачи с литеральными \\$ отдаёт и данные,
     и расширенную чистку \\$ \\_ \\& \\# со страховочным вызовом

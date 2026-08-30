@@ -63,8 +63,19 @@ def _fmt_number(n):
 
 
 def home(request):
+    # ⚠️ Счётчик показывает ДОСТУПНЫЕ ДЛЯ РЕШЕНИЯ задачи, а не объём базы.
+    # Раньше здесь стоял `Problem.objects.count()`, и на главной висел
+    # сырой итог вместе с черновиками, скрытым браком и непросмотренным.
+    # Тройка условий — ровно та, по которой каталог отдаёт список
+    # (`problem_list`, `problem_detail`, `random_problem`): число на
+    # главной обязано совпадать с тем, что человек найдёт в каталоге.
     context = {
-        'problems_count': _fmt_number(Problem.objects.count()),
+        'problems_count': _fmt_number(
+            Problem.objects.filter(
+                status=Problem.Status.PUBLISHED,
+                needs_quality_review=False,
+                hidden_pending_review=False,
+            ).count()),
         'sources_count':  Source.objects.count(),
         'topics_count':   Topic.objects.filter(name__in=CANONICAL).count(),
     }
