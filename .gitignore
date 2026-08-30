@@ -307,6 +307,10 @@ reports/publish_readiness/*
 #   stub_cleanup_backup.json — путь отката для карточек-заглушек,
 #     спрятанных статусом hidden. Без него не вернуть.
 !reports/publish_readiness/stub_cleanup_backup.json
+#   borderline_hold_ids.txt — сомнительные, которые НЕ выпущены
+#     из-под шлюза ручного ревью. Без него не воспроизвести,
+#     кого и почему придержали.
+!reports/publish_readiness/borderline_hold_ids.txt
 
 # Список ложных срабатываний шлюза, проверенных человеком. В git,
 # потому что это РЕШЕНИЕ, а не машинный вывод: без него следующий
