@@ -89,6 +89,9 @@ class Command(BaseCommand):
                             help='только один источник')
         parser.add_argument('--limit', type=int,
                             help='только первые N задач (усечение называется в выводе)')
+        parser.add_argument('--flag-fails', action='store_true',
+                            help='отказавшим шлюзу поставить needs_quality_review '
+                                 '(только вместе с --apply)')
         parser.add_argument('--report-dir',
                             help='куда класть отчёт и бэкап; тесты обязаны давать '
                                  'временную папку — иначе затирают боевой')
@@ -271,9 +274,35 @@ class Command(BaseCommand):
                 'problems': [previous[key] for key in sorted(previous)],
             }, f, ensure_ascii=False, indent=1)
 
+        # Отказ шлюза — это «показывать нельзя», и сказать об этом надо
+        # флагом, а не только строкой в отчёте. `hidden_pending_review`
+        # для этого не годится: он значит «человек ещё не смотрел», а не
+        # «плохо» — три механизма скрытия в CLAUDE.md намеренно разные.
+        # Флаг ставится и тем задачам, что уже стоят на markdown и шлюз
+        # больше не проходят: снимать markdown команда не вправе (решение
+        # владельца), но промолчать о дефекте — тем более.
+        flagged = 0
+        flag_backup_path = None
+        if options['flag_fails'] and fail_ids:
+            newly = sorted(Problem.objects.filter(
+                id__in=fail_ids, needs_quality_review=False,
+            ).values_list('id', flat=True))
+            flag_backup_path = os.path.join(out_dir, 'gate_fail_flags.json')
+            with open(flag_backup_path, 'w', encoding='utf-8') as f:
+                json.dump({
+                    'note': 'Задачи, которым ЭТОТ прогон поставил '
+                            'needs_quality_review=True. Откат: снять флаг '
+                            'ровно этим id — у остальных он мог стоять раньше.',
+                    'count': len(newly), 'problems': newly,
+                }, f, ensure_ascii=False, indent=1)
+
         with transaction.atomic():
             updated = Problem.objects.filter(id__in=to_change).update(
                 content_format=Problem.ContentFormat.MARKDOWN)
+            if options['flag_fails'] and fail_ids:
+                flagged = Problem.objects.filter(
+                    id__in=fail_ids, needs_quality_review=False,
+                ).update(needs_quality_review=True)
 
         problems_after = Problem.objects.count()
         if problems_before != problems_after:
@@ -284,4 +313,9 @@ class Command(BaseCommand):
         lines.append(f'ЗАПИСАНО: content_format=markdown поставлен {updated} задачам.')
         lines.append(f'  бэкап для отката: {backup_path}')
         lines.append(f'  Problem.objects.count() не изменился: {problems_before}')
+        if options['flag_fails']:
+            lines.append(f'  needs_quality_review поставлен {flagged} задачам '
+                         f'(из {len(fail_ids)} отказавших; остальным он уже стоял)')
+            if flag_backup_path:
+                lines.append(f'  бэкап флагов: {flag_backup_path}')
         self.stdout.write(self.style.SUCCESS('\n'.join(lines)))
