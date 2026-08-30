@@ -247,3 +247,9 @@ reports/corpus_legacy_figures/*
 !reports/corpus_legacy_figures/unresolved.json
 !reports/corpus_legacy_figures/stats.json
 !reports/corpus_legacy_figures/plan.json
+
+# Диагностика 19 кодов читаемости: список id по кодам — это результат
+# замера, он нужен следующим фазам и должен быть в истории.
+!reports/corpus_render_codes/
+reports/corpus_render_codes/*
+!reports/corpus_render_codes/codes.json
