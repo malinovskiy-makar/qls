@@ -132,12 +132,40 @@ class RenderLegacySourcesTests(TestCase):
         """Текст, который конвертер портит на втором проходе, не пишется.
 
         Иначе повторный прогон «доедал» бы задачу, а проверка
-        идемпотентности никогда не давала бы ноль."""
-        p = self._problem(14, statement=NESTED_ENUMERATE)
+        идемпотентности никогда не давала бы ноль.
+
+        ⚠️ Нестабильность подделывается патчем `is_stable`, а не живым
+        примером, и это осознанно. Раньше здесь стоял вложенный
+        `enumerate` (`NESTED_ENUMERATE`): у конвертера ветки
+        `feat/boevoi-render-legacy` он на втором проходе терял
+        содержимое. После слияния с веткой трёх новых источников
+        конвертер стал устойчивее — тот же текст сворачивается сразу и
+        дальше не меняется, и по всему корпусу легаси кода
+        `NOT-IDEMPOTENT` не осталось НИ ОДНОГО (было 53). Живого примера
+        для этой проверки больше нет, а сам предохранитель нужен: он
+        страхует от будущих правок конвертера. Поэтому проверяется его
+        КОНТРАКТ — «нестабильный результат не пишется», — а не частный
+        случай, который очередная правка конвертера снова отменит."""
+        p = self._problem(14, statement=DASHES_RAW)
+        with mock.patch(
+            'problems.management.commands.render_legacy_sources.is_stable',
+            return_value=False,
+        ):
+            run('--apply')
+        p.refresh_from_db()
+        self.assertEqual(p.statement, DASHES_RAW)
+        self.assertEqual(p.content_format, Problem.ContentFormat.PLAIN)
+
+    def test_stable_text_is_written(self):
+        """Обратная сторона того же предохранителя: стабильный текст пишется.
+
+        Без этой проверки предыдущая была бы зелёной и в том случае,
+        если бы команда перестала писать вообще что-либо."""
+        p = self._problem(14, statement=DASHES_RAW)
         run('--apply')
         p.refresh_from_db()
-        self.assertEqual(p.statement, NESTED_ENUMERATE)
-        self.assertEqual(p.content_format, Problem.ContentFormat.PLAIN)
+        self.assertEqual(p.statement, DASHES_CANON)
+        self.assertEqual(p.content_format, Problem.ContentFormat.MARKDOWN)
 
     def test_approved_problem_is_never_touched(self):
         """Подтверждённую человеком задачу не трогаем ни текстом, ни флагом."""
