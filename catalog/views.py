@@ -701,20 +701,35 @@ def smart_search(request):
 
 
 def problem_figure_svg(request, pk):
-    """Отдать СГЕНЕРИРОВАННУЮ системой картинку (ProblemFigure).
+    """Отдать картинку задачи (ProblemFigure).
+
+    Два вида в одной таблице: СГЕНЕРИРОВАННАЯ из TikZ (лежит в `svg`) и
+    ИМПОРТИРОВАННАЯ вместе с задачей растровая (лежит в `image_data`,
+    тип — в `content_type`). Путь показа у них общий.
 
     Отдаётся только то, что лежит в нашей таблице: адрес собирается по
     первичному ключу, из текста задачи сюда не попадает ничего (см.
-    problems/figures.py). SVG уже санитизирован при генерации.
+    problems/figures.py). SVG уже санитизирован при генерации; растровый
+    файл исполняемого содержимого не несёт в принципе.
 
     Заголовки — третий, независимый рубеж поверх чистки SVG и того, что
     картинка вставляется тегом <img> (в <img> скрипты не исполняются):
     CSP запрещает картинке вообще любые внешние обращения и скрипты,
     nosniff не даёт браузеру передумать про тип, а Content-Disposition
     inline исключает трактовку как загрузку.
+
+    ⚠️ Адрес по-прежнему кончается на `.svg` — это ИМЯ маршрута, а не
+    обещание формата: тип определяет заголовок `Content-Type`, а
+    `nosniff` запрещает браузеру гадать по расширению. Менять адрес
+    значило бы менять ссылки на уже показанных страницах.
     """
     figure = get_object_or_404(ProblemFigure, pk=pk)
-    response = HttpResponse(figure.svg, content_type='image/svg+xml')
+    if figure.image_data:
+        body = bytes(figure.image_data)
+        content_type = figure.content_type or 'application/octet-stream'
+    else:
+        body, content_type = figure.svg, 'image/svg+xml'
+    response = HttpResponse(body, content_type=content_type)
     response['Content-Security-Policy'] = (
         "default-src 'none'; style-src 'unsafe-inline'; sandbox"
     )
