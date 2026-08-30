@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 """`publish_ready_sources`: в published уходят только чистые черновики."""
 import io
+import shutil
+import tempfile
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -15,6 +17,13 @@ class PublishReadyTests(TestCase):
     def setUp(self):
         self.src = make_source('Новый источник')
         self.other = make_source('Чужой источник')
+        # ⚠️ Свой --report-dir ОБЯЗАТЕЛЕН. Без него прогон набора пишет
+        # журнал отката тестовыми данными прямо в боевую папку отчётов и
+        # затирает настоящий: путь отката после этого ведёт в никуда.
+        # Та же беда уже чинилась у команд импорта (коммит 2da55ee) и в
+        # revert_gate_v2_blocked_markdown.
+        self.reports = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.reports, ignore_errors=True)
 
     def draft(self, text='Черновик.', source=None, **kwargs):
         kwargs.setdefault('content_format', Problem.ContentFormat.MARKDOWN)
@@ -25,6 +34,7 @@ class PublishReadyTests(TestCase):
     def run_cmd(self, **kwargs):
         out = io.StringIO()
         kwargs.setdefault('sources', str(self.src.id))
+        kwargs.setdefault('report_dir', self.reports)
         call_command('publish_ready_sources', stdout=out, **kwargs)
         return out.getvalue()
 
@@ -90,6 +100,19 @@ class PublishReadyTests(TestCase):
         self.run_cmd(apply=True)
         out = self.run_cmd()
         self.assertIn('из них к публикации          0', out)
+
+    def test_journal_goes_to_the_given_report_dir(self):
+        """Журнал отката обязан лечь в --report-dir, а не в боевую папку.
+
+        Без этого прогон набора затирает настоящий журнал тестовыми
+        данными, и путь отката ведёт в никуда. Именно так и случилось
+        30.08: боевой журнал на 9 418 строк был затёрт одной строкой из
+        теста и восстанавливался из снимка gate_backup.json."""
+        import os
+        self.draft()
+        self.run_cmd(apply=True)
+        self.assertTrue(os.path.isfile(
+            os.path.join(self.reports, 'publish_ready_backup.json')))
 
     def test_unknown_source_is_refused(self):
         with self.assertRaises(CommandError):

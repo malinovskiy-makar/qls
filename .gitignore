@@ -301,3 +301,6 @@ reports/publish_readiness/*
 !reports/publish_readiness/report.md
 !reports/publish_readiness/gate_backup.json
 !reports/publish_readiness/miss_decisions.json
+#   publish_ready_backup.json — путь отката для 9 418 задач,
+#     переведённых из draft в published. Без него откат невозможен.
+!reports/publish_readiness/publish_ready_backup.json
