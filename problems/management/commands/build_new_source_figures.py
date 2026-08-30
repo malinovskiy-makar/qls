@@ -173,10 +173,12 @@ class Command(BaseCommand):
 
     def _resolver_for(self, slug, data_dir):
         from problems.corpus_converter.reconvert import (
-            ImageResolver, solvehub_resolver,
+            ImageResolver, shkolkovo_resolver, solvehub_resolver,
         )
         if slug == 'solvehub':
             return solvehub_resolver(data_dir)
+        if slug == 'shkolkovo':
+            return shkolkovo_resolver(data_dir)
         if slug == 'lesh':
             from problems.management.commands.import_lesh import _lesh_dir
             root = _lesh_dir(data_dir)
@@ -190,6 +192,4 @@ class Command(BaseCommand):
                     mapping[rel] = os.path.relpath(full, root)
                     mapping.setdefault(name, os.path.relpath(full, root))
             return ImageResolver(mapping, root)
-        # Школково: файлов картинок у импортированных задач нет вовсе —
-        # см. `reconvert._no_images`.
         return None

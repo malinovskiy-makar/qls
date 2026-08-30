@@ -25,7 +25,9 @@ import os
 from problems.corpus_converter.criteria import (
     parse_shkolkovo_criteria, parse_solvehub_criteria,
 )
-from problems.corpus_converter.images import CONTENT_TYPES, replace_images
+from problems.corpus_converter.images import (
+    CONTENT_TYPES, qualify_shkolkovo_images, replace_images,
+)
 from problems.corpus_converter.ingest import convert_for_import, data_root
 from problems.corpus_converter.lesh import interpret_z_args, parse_z_blocks
 from problems.corpus_converter.solvehub import (
@@ -78,12 +80,8 @@ class ImageResolver:
 def _no_images(_reference):
     """Источник, у которого файлов картинок нет вовсе.
 
-    Школково: 298 задач ссылаются на картинки (`ela.png`, `7.png`, …),
-    и НИ ОДНОЙ из них нет в выгрузке — `QuestionFiles` пуст у всех 3 414
-    записей, а 453 скачанных файла принадлежат 328 ДРУГИМ задачам, ни
-    одна из которых в импорт не входила (пересечение id — ноль). Ставить
-    маркер здесь значило бы молча стереть ссылку: маркер без строки
-    `ProblemFigure` на экране исчезает."""
+    Оставлена как явная точка для источника без выгрузки картинок.
+    Школково сюда больше НЕ относится — см. `shkolkovo_resolver`."""
     return False
 
 
@@ -103,9 +101,24 @@ def _shkolkovo_dir(explicit=None):
     return nested if os.path.isdir(nested) else base
 
 
+def shkolkovo_resolver(data_dir=None):
+    """Карта «`<id сессии>|<имя файла>` → файл в `images/`» у Школково.
+
+    Ключи `image_map.json` уже записаны в этом виде, поэтому ключ карты и
+    ссылка в тексте — одно и то же, если ссылку заранее квалифицировать
+    (`qualify_shkolkovo_images`)."""
+    base = data_dir or os.path.join(data_root(), 'shkolkovo')
+    if os.path.basename(base) == 'problems':
+        base = os.path.dirname(base)
+    map_path = os.path.join(base, 'image_map.json')
+    mapping = _load_json(map_path) if os.path.isfile(map_path) else {}
+    return ImageResolver(mapping, os.path.join(base, 'images'))
+
+
 def shkolkovo_records(data_dir=None, only=None):
     """`{внешний id: Record}`. `only` — множество нужных id или None."""
     out = {}
+    resolve = shkolkovo_resolver(data_dir)
     for path in sorted(glob.glob(os.path.join(_shkolkovo_dir(data_dir), '*.json'))):
         raw = _load_json(path)
         external_id = str(raw.get('Id') or '')
@@ -117,16 +130,33 @@ def shkolkovo_records(data_dir=None, only=None):
         # `_answer_text` из import_shkolkovo, дословно: развёрнутый ответ
         # приоритетнее краткого.
         answer = raw.get('answer_tex') or ((raw.get('Answer') or {}).get('text') or '')
-        # `_no_images`: у Школково файлов картинок нет вовсе — см. её
-        # docstring. Вызов оставлен явным, чтобы это было видно в коде,
-        # а не подразумевалось отсутствием строки.
-        statement_tex, _none = replace_images(statement_tex, _no_images)
+        solution_tex = raw.get('solution_tex') or ''
+        # Ссылка квалифицируется id ТОЙ сессии, из которой пришёл этот
+        # кусок текста: условие и решение одной задачи приходят разными
+        # сессиями, а голое имя файла (`7.png`) в разных задачах means
+        # разные файлы. Маркеры ставятся по СЫРОМУ тексту, до конвертера
+        # — он их не трогает, а второй прогон находит ноль ссылок.
+        figures = []
+        statement_tex, found = replace_images(
+            qualify_shkolkovo_images(statement_tex,
+                                     raw.get('QuestionTexSessionId')),
+            resolve)
+        figures += found
+        solution_tex, found = replace_images(
+            qualify_shkolkovo_images(solution_tex,
+                                     raw.get('SolutionTexSessionId')),
+            resolve)
+        figures += found
         result = convert_for_import(
             statement=statement_tex, answer=answer,
-            solution=raw.get('solution_tex') or '', existing_parts=None)
+            solution=solution_tex, existing_parts=None)
+        # Картинки внутри criteria_tex (2 ссылки на весь источник) НЕ
+        # трогаем: рубрика — отдельная модель, показа картинок у неё нет,
+        # и маркер там просто исчез бы. Ссылка остаётся видимой (ADR 0035).
         criteria = parse_shkolkovo_criteria(raw.get('criteria_tex') or '')
         out[external_id] = Record(
-            external_id, result, result['warnings'] + criteria['warnings'])
+            external_id, result, result['warnings'] + criteria['warnings'],
+            figures=figures)
     return out
 
 

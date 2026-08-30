@@ -48,6 +48,48 @@ _MATH_ONLY_MARKER_RE = re.compile(
     r'(?:\$\$|\\\]|\\\)|\$)')
 
 
+#: Разделитель в ключе картинки Школково: `<id сессии>|<имя файла>`.
+#: Ровно так устроены ключи `image_map.json` в выгрузке, поэтому ключ и
+#: ссылка — одно и то же, и отдельной карты «ссылка → ключ» не нужно.
+SHKOLKOVO_KEY_SEPARATOR = '|'
+
+
+def qualify_shkolkovo_images(text, session_id):
+    r"""Дописать к ссылке Школково id сессии, из которой взят этот текст.
+
+    ⚠️ Почему без этого ссылка неразрешима. В выгрузке Школково файл
+    называется `<TexSessionId>_<имя>`, а в тексте стоит голое имя
+    (`\includegraphics{ela.png}`). Имена НЕ уникальны: `7.png` встречается
+    в разных задачах и означает разные файлы. Условие и решение ОДНОЙ
+    задачи приходят разными сессиями (`QuestionTexSessionId` и
+    `SolutionTexSessionId`), поэтому квалифицировать нужно тем id, из
+    которого пришёл именно этот кусок текста.
+
+    ⚠️ Прошлая сессия сравнила префиксы файлов с `Id` задачи, получила
+    пересечение ноль и заключила, что картинок Школково нет вовсе
+    (см. `reconvert.shkolkovo_records`). Префикс — это `TexSessionId`,
+    а не `Id`: по правильному ключу совпадают все 328 префиксов и
+    разрешаются 452 ссылки из 454 у 296 задач из 298. Две оставшиеся
+    не скачались при выгрузке и честно названы в `failed_images.json`.
+
+    Без id сессии (0/None — так у `GradeCriteriaTexSessionId` почти
+    везде) ссылка остаётся как была: разрешить её нечем, а молча стереть
+    нельзя (ADR 0035).
+    """
+    if not text or not session_id:
+        return text
+
+    def add_prefix(match):
+        reference = match.group(1).strip()
+        if SHKOLKOVO_KEY_SEPARATOR in reference:
+            return match.group(0)          # уже квалифицирована
+        return match.group(0).replace(
+            match.group(1),
+            f'{session_id}{SHKOLKOVO_KEY_SEPARATOR}{reference}')
+
+    return INCLUDEGRAPHICS_RE.sub(add_prefix, text)
+
+
 def image_hash(reference):
     """Хеш ссылки — он же тело маркера.
 
