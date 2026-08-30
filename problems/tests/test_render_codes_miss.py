@@ -84,6 +84,21 @@ class RealMissStillCaughtTests(SimpleTestCase):
         self.assertIn('MISS', codes(
             'На диаграмме изображено распределение доходов. Найдите Джини.'))
 
+    def test_first_person_narration_is_not_an_imperative(self):
+        """«Изобразим» — автор ведёт решение, а не велит ученику рисовать.
+
+        Живая #33576: короткая форма `изобрази` совпадала внутри
+        «ИзобразИМ», и карточка ошибочно переставала быть дефектом.
+        Поймано выборочной проверкой глазами, а не тестом, — поэтому
+        тест появился здесь."""
+        self.assertIn('MISS', codes(
+            'На графике равновесие. Изобразим эти случаи на графике.'))
+
+    def test_past_tense_of_build_is_not_an_imperative(self):
+        """«построил» не должно совпадать с короткой формой `построй`."""
+        self.assertIn('MISS', codes(
+            'Экономист построил график спроса и получил равновесие.'))
+
 
 class MissUnaffectedWhenObjectPresentTests(SimpleTestCase):
     """Если картинка на экране есть — кода нет в любом случае."""
