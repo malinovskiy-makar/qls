@@ -1127,6 +1127,27 @@ class FootnoteTypographyTests(SimpleTestCase):
         self.assertNotIn('---', result)
         self.assertIn('Примечание: Косатка — крупное хищное животное.', result)
 
+    def test_latex_quotes_in_main_text_normalized(self):
+        r"""``…'' — кавычки LaTeX, на экране видны как есть.
+
+        `normalize_quotes` знал только "…" и <<…>>. Живые #61625, #54041,
+        #56545, #53990 — 4 задачи уже прошедших шлюз показывали
+        ``first-to-file'' с двойными апострофами."""
+        result = convert_text_field("система ``first-to-file'' работает")['text_md']
+        self.assertNotIn('``', result)
+        self.assertNotIn("''", result)
+        self.assertIn('«first-to-file»', result)
+
+    def test_lone_double_apostrophe_pair_normalized(self):
+        r"""''может'' — закрывающая форма без открывающей (живой #56545)."""
+        result = convert_text_field("слово ''может'' здесь")['text_md']
+        self.assertIn('«может»', result)
+
+    def test_prime_in_math_not_touched(self):
+        r"""Штрихи в формуле (`f''(x)`) — не кавычки, трогать нельзя."""
+        result = convert_text_field("производная $f''(x) > 0$ растёт")['text_md']
+        self.assertIn("$f''(x) > 0$", result)
+
     def test_footnote_quotes_normalized(self):
         text = 'система\\footnote{право "first-to-file" в Китае.} работает'
         result = convert_text_field(text)['text_md']

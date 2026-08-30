@@ -244,3 +244,15 @@ reports/import_new_sources/*
 !reports/import_new_sources/report_20260829.md
 !reports/import_new_sources/reconvert_backup.json
 !reports/import_new_sources/rubrics_backup.json
+# Сессия 30.08 живёт в своей подпапке, чтобы боевые прогоны не затирали
+# снимки предыдущей сессии (её бэкапы — единственный путь назад к
+# состоянию до 29.08). Правило выше исключает саму подпапку, поэтому её
+# нужно вернуть отдельной строкой: git не может вернуть файл, у которого
+# исключён родительский каталог.
+!reports/import_new_sources/s20260830/
+reports/import_new_sources/s20260830/*
+!reports/import_new_sources/s20260830/report_20260830.md
+!reports/import_new_sources/s20260830/reconvert_backup.json
+!reports/import_new_sources/s20260830/snapshot_before.json
+# Копия базы (432 МБ) и HTML-предпросмотры остаются игнорируемыми:
+# первая слишком велика для репозитория, вторые пересобираются командой.
