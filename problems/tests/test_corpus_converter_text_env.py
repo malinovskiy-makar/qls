@@ -219,3 +219,58 @@ class LeftoverTextCommandsTests(SimpleTestCase):
         text = r'начало \textbf{без закрытия и дальше важный текст'
         result = convert_text_environments(text)
         self.assertIn('важный текст', result)
+
+    def test_63316_forced_line_break_becomes_newline(self):
+        r"""`\\` вне математики — принудительный перенос строки LaTeX.
+
+        До правки доезжал до экрана обратным слешем: «покупателей.\
+        Группа A» (живой #63316). Имени команды в `\\` нет, поэтому
+        `R-CMD` шлюза его не ловил, а KaTeX молчал — математики тут нет.
+        Найдено свипом по корпусу: 174 задачи из PASS, 834 случая.
+
+        В `render_markdown` стоит `breaks: True`, поэтому одиночный
+        перевод строки даёт ровно `<br>` — семантика LaTeX сохраняется.
+        """
+        text = 'группы покупателей.' + '\\\\' + ' **Группа A** Спрос'
+        result = convert_text_environments(text)
+        self.assertNotIn('\\', result)
+        self.assertIn('покупателей.\n**Группа A**', result)
+
+    def test_63299_line_break_before_newline_not_doubled(self):
+        r"""`\\` перед переводом строки не должен рождать пустую строку.
+
+        `\\` + `\n` в LaTeX — один перенос. Если оставить оба, markdown
+        увидит пустую строку и разорвёт абзац (живой #63299)."""
+        text = 'торговую точку.' + '\\\\' + '\n* Равновесием называется'
+        result = convert_text_environments(text)
+        self.assertNotIn('\\', result)
+        self.assertIn('торговую точку.\n* Равновесием', result)
+
+    def test_59624_line_breaks_split_separate_functions(self):
+        r"""Три функции спроса, склеенные в одну строку (живой #59624)."""
+        text = 'Q(s) = -2 + P ' + '\\\\' + ' Q(d) = 12 — 2P ' + '\\\\' + ' Q(d) = 3'
+        result = convert_text_environments(text)
+        self.assertNotIn('\\', result)
+        self.assertEqual(result.count('\n'), 2)
+
+    def test_line_break_with_spacing_argument(self):
+        r"""`\\[2mm]` — тот же перенос с отбивкой; отбивку не рисуем."""
+        result = convert_text_environments('первая' + '\\\\[2mm]' + 'вторая')
+        self.assertNotIn('\\', result)
+        self.assertNotIn('[2mm]', result)
+        self.assertIn('первая\nвторая', result)
+
+    def test_line_break_inside_math_untouched(self):
+        r"""ВНУТРИ математики `\\` — разделитель строк `cases`/матрицы.
+
+        Тронуть его — сломать формулу, которая сейчас рендерится."""
+        text = r'$$\begin{cases} x = 1 \\ y = 2 \end{cases}$$'
+        result = convert_text_environments(text)
+        self.assertIn(r'x = 1 \\ y = 2', result)
+
+    def test_line_break_inside_tabular_untouched(self):
+        r"""ВНУТРИ `tabular` `\\` — конец строки таблицы, не текста."""
+        text = ('\\begin{tabular}{ll}\nа & б \\\\ в & г\n'
+                '\\end{tabular}')
+        result = convert_text_environments(text)
+        self.assertIn('а & б \\\\ в & г', result)

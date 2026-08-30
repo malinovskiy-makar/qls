@@ -8,7 +8,7 @@ from problems.corpus_converter.core import (
     strip_junk_commands, convert_tables, strip_center_wrapper,
     reconstruct_bare_ampersand_table, has_unreconstructed_bare_ampersand_rows,
     reconstruct_cases_row_separators, has_broken_cases_rows,
-    may_render_as_markdown,
+    may_render_as_markdown, normalize_nbsp,
 )
 
 
@@ -1067,3 +1067,74 @@ class RealDataRegressionTests(SimpleTestCase):
         self.assertIn('| Доходность | Сценарий 1 | Сценарий 2 | Сценарий 3 |', result['text_md'])
         self.assertIn('$\\alpha \\in [0,1]$', result['text_md'])
         self.assertIn('\\[\nH=\\alpha \\cdot \\max\\{R_1,R_2,R_3\\}\n\\]', result['text_md'])
+
+
+class NonBreakingSpaceTests(SimpleTestCase):
+    r"""`~` в LaTeX — неразрывный пробел, на экране виден тильдой.
+
+    Тот же класс, что `[htpb]` и `\\`: имени команды нет, поэтому ни
+    `R-CMD` шлюза, ни KaTeX его не видят. Свипом по трём новым
+    источникам: 187 задач из уже прошедших шлюз, 407 случаев."""
+
+    def test_tilde_between_words_becomes_space(self):
+        self.assertEqual(normalize_nbsp('цена~100 руб.'), 'цена 100 руб.')
+
+    def test_tilde_before_dash_survives_into_dash_rule(self):
+        """`Косатка~--- крупное` (живой #54489) — сначала пробел, потом тире."""
+        result = normalize_dashes(normalize_nbsp('Косатка~--- крупное'))
+        self.assertEqual(result, 'Косатка — крупное')
+
+    def test_double_tilde_left_alone(self):
+        """`~~` — не наш случай; молча менять чужую разметку нельзя."""
+        self.assertEqual(normalize_nbsp('a ~~b~~ c'), 'a ~~b~~ c')
+
+    def test_tilde_removed_by_whole_pipeline(self):
+        """Главный случай: тильда в ОБЫЧНОМ тексте, весь конвейер.
+
+        Функция сама по себе ничего не доказывает — важно, что она
+        реально включена в `convert_text_field` (187 задач)."""
+        result = convert_text_field('цена~100 руб. и~ещё раз')['text_md']
+        self.assertNotIn('~', result)
+        self.assertIn('цена 100 руб. и ещё раз', result)
+
+    def test_tilde_in_math_survives_whole_pipeline(self):
+        """`\\sim` внутри формулы конвейер не трогает."""
+        result = convert_text_field('пусть $x \\sim U[0,1]$ и y~z')['text_md']
+        self.assertIn('$x \\sim U[0,1]$', result)
+        self.assertIn('y z', result)
+
+    def test_math_placeholder_untouched(self):
+        """Тильда ВНУТРИ формулы (`\\tilde`, `\\sim`) сюда не доходит:
+        нормализация идёт по защищённому тексту. Проверяем, что сама
+        функция плейсхолдер не трогает."""
+        protected, saved = protect_math('пусть $x \\sim U[0,1]$ и y~z')
+        result = normalize_nbsp(protected)
+        self.assertEqual(restore_math(result, saved), 'пусть $x \\sim U[0,1]$ и y z')
+
+
+class FootnoteTypographyTests(SimpleTestCase):
+    """Текст сноски обязан проходить ту же типографику, что и остальной.
+
+    `extract_footnotes` вырезает сноску ДО `normalize_dashes`, а
+    `append_footnote_notes` дописывает её ПОСЛЕ — сноска проскакивала
+    мимо нормализации целиком. Так на экран доехали `Примечание:
+    Косатка~--- крупное` (живой #54489) и ещё 5 задач с `--`, плюс
+    задачи с кавычками ``…''."""
+
+    def test_footnote_dashes_normalized(self):
+        text = 'Косатка\\footnote{Косатка~--- крупное хищное животное.} плавает'
+        result = convert_text_field(text)['text_md']
+        self.assertNotIn('---', result)
+        self.assertIn('Примечание: Косатка — крупное хищное животное.', result)
+
+    def test_footnote_quotes_normalized(self):
+        text = 'система\\footnote{право "first-to-file" в Китае.} работает'
+        result = convert_text_field(text)['text_md']
+        self.assertIn('«first-to-file»', result)
+
+    def test_footnote_math_still_survives(self):
+        """Нормализация сноски не должна портить формулу внутри неё."""
+        text = 'ставка\\footnote{здесь $r - i$ и $\\pi = P \\cdot Q - C(Q)$.} растёт'
+        result = convert_text_field(text)['text_md']
+        self.assertIn('$r - i$', result)
+        self.assertIn('$\\pi = P \\cdot Q - C(Q)$', result)
