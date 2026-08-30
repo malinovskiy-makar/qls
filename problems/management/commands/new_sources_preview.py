@@ -185,7 +185,10 @@ class Command(BaseCommand):
                 + '. Показ дословно повторяет боевой шаблон: markdown → '
                 'render_markdown + render_figures, plain → linebreaksbr; '
                 'KaTeX 0.16.9 вендорный, конфигурация боевая.')
-        path = os.path.join(out_dir, 'random_300.html')
+        # Имя несёт РЕАЛЬНЫЙ размер выборки, а не число из умолчания:
+        # с `--size 400` файл назывался `random_300.html`, и по имени
+        # нельзя было понять, что именно просмотрено.
+        path = os.path.join(out_dir, f'random_{options["size"]}.html')
         self._write_page(path, f'Новые источники — случайные {len(picked)}',
                          meta, picked, embed_images=True)
         return [path]
