@@ -112,6 +112,18 @@
         "--noreload"
       ],
       "port": 8412
+    },
+    {
+      "name": "reports-static",
+      "runtimeExecutable": "C:\\Users\\shipu\\qls\\venv313\\Scripts\\python.exe",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8413",
+        "--directory",
+        "reports"
+      ],
+      "port": 8413
     }
   ]
 }

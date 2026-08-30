@@ -1198,7 +1198,14 @@ details.fold > summary:hover,
 /* ⚠️ РАСКРЫТОЕ ЗАНИМАЕТ ВСЮ ШИРИНУ (п. 1.3). `flex: 1 0 100%` в карточке
    отбора и в строке состава: оба контейнера — флекс-ряды с колонкой
    кнопок справа, и без этого текст обрывался на двух третях. */
-.wk-full { flex: 1 0 100%; margin-top: 10px; padding: 12px 14px;
+/* ⚠️ `min-width: 0` ОБЯЗАТЕЛЕН, и без него прокрутка широкого ниже не
+   работает вовсе. У флекс-элемента по умолчанию `min-width: auto`: он
+   не даёт себя сжать уже содержимого и растёт под него. Замер на живом
+   `/teacher/work/` (30.08): формула в 2 600 px растягивала `.wk-full` до
+   2 630 px, страницу уносило вбок на 1 559 px, а `overflow-x: auto` у
+   таблицы и формулы не срабатывал — сжимать было нечего. С `min-width: 0`
+   контейнер 880 px, оба ребёнка прокручиваются внутри себя, вынос 0. */
+.wk-full { flex: 1 0 100%; min-width: 0; margin-top: 10px; padding: 12px 14px;
            border-radius: var(--r);
            background: var(--surface-2); border: 0.5px solid var(--border);
            font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
@@ -1214,7 +1221,17 @@ details.fold > summary:hover,
 .wk-full ul.wk-opts { margin: 8px 0 0; padding-left: 18px; }
 .wk-full .wk-flags { margin-top: 10px; display: flex; gap: 8px;
                      flex-wrap: wrap; font-size: 11px; color: var(--text3); }
-.wk-full :is(table, .katex-display) { overflow-x: auto; }
+/* ⚠️ Широкое прокручивается ВНУТРИ СЕБЯ, и у формулы с таблицей это
+   делается по-разному. Формула — блок, ей хватает `overflow-x`. Таблице
+   не хватает: у бокса `display: table` вычисленный `overflow-x` остаётся
+   `visible`, и правило не делает ничего. Проверено в браузере 30.08 —
+   раньше здесь стояло общее `:is(table, .katex-display) { overflow-x:
+   auto; }`, и таблицу оно не прокручивало, а страницу уносило вбок.
+   Работает только перевод самой таблицы в блок: внутренняя раскладка
+   сохраняется, браузер строит анонимный табличный бокс. */
+.wk-full .katex-display { overflow-x: auto; overflow-y: hidden; }
+.wk-full table { display: block; width: fit-content; max-width: 100%;
+                 overflow-x: auto; }
 
 /* ── Лист работы: одна разметка на все предпросмотры ───────────────────
    Рисует `teacher/work/_sheet_js.html`, показывают окно «глазами ученика»
@@ -1240,7 +1257,11 @@ details.fold > summary:hover,
 .sheet-task__field { margin-top: 8px; height: 34px; border-radius: var(--r);
                      border: 1px dashed var(--border);
                      background: var(--surface-2); }
-.sheet-task :is(table, .katex-display) { overflow-x: auto; }
+/* Прокрутка широкого — как у `.wk-full` выше: таблице мало `overflow-x`,
+   нужен перевод в блок. Причина расписана там. */
+.sheet-task .katex-display { overflow-x: auto; overflow-y: hidden; }
+.sheet-task table { display: block; width: fit-content; max-width: 100%;
+                    overflow-x: auto; }
 
 /* Полоса собранного у нижнего края: она же несёт переход к следующему шагу. */
 .wk-bar { position: sticky; bottom: 0; z-index: 20; display: flex;
