@@ -237,3 +237,13 @@ reports/import_new_sources/*
 !reports/import_new_sources/report.md
 !reports/import_new_sources/baseline_before_import.json
 !reports/import_new_sources/gate_new_sources_backup.json
+
+# Фаза 3 легаси-картинок. Как и у соседних отчётов: папка закрыта, из неё
+# пускаются только обратимый журнал и очередь ручного разбора. Предпросмотр
+# (11 МБ картинок в base64) — артефакт для глаз, в истории ему не место.
+!reports/corpus_legacy_figures/
+reports/corpus_legacy_figures/*
+!reports/corpus_legacy_figures/texts_backup.json
+!reports/corpus_legacy_figures/unresolved.json
+!reports/corpus_legacy_figures/stats.json
+!reports/corpus_legacy_figures/plan.json
