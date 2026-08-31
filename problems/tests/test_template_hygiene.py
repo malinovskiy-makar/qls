@@ -22,7 +22,8 @@ from django.test import TestCase
 # Куда не ходим: чужой код и сгенерированные отчёты.
 SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
               os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep)
+              os.sep + 'staticfiles' + os.sep,
+              os.sep + '.claude' + os.sep + 'worktrees' + os.sep)
 
 
 def template_files():
