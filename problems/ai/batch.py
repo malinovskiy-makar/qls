@@ -166,8 +166,19 @@ def load_manifest(path):
         return json.load(fh)
 
 
-FILE_PROPAGATION_RETRIES = 5
-FILE_PROPAGATION_WAIT_SECONDS = 5
+# ⚠️ КАЛИБРОВКА РЕАЛЬНЫМ ЗАМЕРОМ (Б4, 31.08.2026), НЕ ДОГАДКА. Крошечный
+# файл (1 строка) стал виден Batch API мгновенно. Файл замера Б4 (100
+# строк, 7,3 МБ) — только с ТРЕТЬЕЙ попытки, спустя ~10 минут после
+# загрузки; первые две (сразу и через ~4 минуты) упали с той же ошибкой
+# `Cannot find file …`. Задержка явно растёт с размером файла — почему
+# именно так, неизвестно (не описано в документации). Боевые файлы будут
+# до 180 МБ (см. докстринг модуля) — во сколько раз дольше ждать там,
+# ЭТИМ ЗАМЕРОМ НЕ ПРОВЕРЕНО. Экспоненциальный бэкофф с большим общим
+# бюджетом — подстраховка, а не гарантия; для файла на 180 МБ, возможно,
+# и её будет мало, и это надо будет проверить отдельно перед боевым
+# прогоном, а не полагаться на цифры ниже.
+FILE_PROPAGATION_RETRIES = 8
+FILE_PROPAGATION_WAIT_SECONDS = 15  # начальная пауза, дальше ×2 на попытку
 
 
 def submit_pending(client, manifest, manifest_path):
@@ -199,7 +210,7 @@ def submit_pending(client, manifest, manifest_path):
         last_error = None
         for attempt in range(FILE_PROPAGATION_RETRIES):
             if attempt:
-                time.sleep(FILE_PROPAGATION_WAIT_SECONDS)
+                time.sleep(FILE_PROPAGATION_WAIT_SECONDS * (2 ** (attempt - 1)))
             try:
                 batch = client.batches.create(
                     input_file_id=uploaded.id,
