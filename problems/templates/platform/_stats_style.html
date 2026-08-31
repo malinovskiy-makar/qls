@@ -201,11 +201,19 @@
    (контраст 1,01 — шесть залитых клеток из восемнадцати). Заливка теперь
    `rgba(var(--accent-rgb), …)`, цифра сохраняет свой цвет целиком.
    Чернила — двумя токенами, и в тёмной теме они меняются местами: сам
-   акцент там светлый. Обе пары замерены тестом, не на глаз. */
+   акцент там светлый. Обе пары замерены тестом, не на глаз.
+   ⚠️ ПЛОТНОСТИ ЖИВУТ В ТОКЕНАХ (31.08.2026), А НЕ ЗДЕСЬ, И ОНИ РАЗНЫЕ ПО
+   ТЕМАМ. Зашитые .22/.45/.70 были одни на обе темы, а акцент в темах разной
+   светлоты: тёмная бирюза в светлой теме и светлая в тёмной. Поэтому третий
+   уровень проваливал норму СРАЗУ В ОБЕИХ по противоположным причинам —
+   в светлой 70 % давали #4da09a, на котором не выживали ни тёмные чернила
+   (4,47), ни белые (3,08); в тёмной .45 на новой карточке давали 4,22.
+   Одной шкалой на обе темы это не чинится, поэтому шкалы две: значения и
+   замеры — в `templates/_tokens.html`. Здесь остаются только имена. */
 .act-l0 { background: var(--surface-2); color: var(--text2); }
-.act-l1 { background: rgba(var(--accent-rgb), .22); color: var(--act-ink); }
-.act-l2 { background: rgba(var(--accent-rgb), .45); color: var(--act-ink); }
-.act-l3 { background: rgba(var(--accent-rgb), .70); color: var(--act-ink); }
+.act-l1 { background: rgba(var(--accent-rgb), var(--act-a1)); color: var(--act-ink); }
+.act-l2 { background: rgba(var(--accent-rgb), var(--act-a2)); color: var(--act-ink); }
+.act-l3 { background: rgba(var(--accent-rgb), var(--act-a3)); color: var(--act-ink); }
 .act-l4 { background: rgb(var(--accent-rgb));
           color: var(--act-ink-solid); }
 .act-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
