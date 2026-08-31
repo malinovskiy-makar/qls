@@ -598,13 +598,77 @@ function nodeRadius(n) {
    ⚠️ ЧИТАЕТ ТЕ ЖЕ ПОЛЯ, ЧТО ПИШЕТ ПРОЕКЦИЯ (px, py, ps, pz). Если
    переименовать поля в рендере и забыть здесь, клики молча перестают
    работать — без единой ошибки в консоли. */
+var HIT_NODE = 10;           /* порог попадания по узлу, px             */
+var HIT_EDGE = 6;            /* по связи — уже: линия тоньше кружка     */
+
 function hitTest(mx, my) {
-  var best = null, bestD = 10;
+  var best = null, bestD = HIT_NODE;
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
     if (n.pz < 0) continue;
     var d = Math.hypot(n.px - mx, n.py - my) - Math.max(3, n.r0 * n.ps);
-    if (d < bestD) { bestD = d; best = n; }
+    if (d < bestD) { bestD = d; best = n; hitNodeDist = d; }
+  }
+  if (!best) hitNodeDist = 1e9;
+  return best;
+}
+
+/* Насколько далеко был узел, выигравший последний hitTest. Нужно, чтобы
+   решить спор «узел или связь» — см. pick() ниже. */
+var hitNodeDist = 1e9;
+
+/* ⚠️ КТО СТАРШЕ, УЗЕЛ ИЛИ СВЯЗЬ. Узел старше — но при РАВНОМ ИЛИ МЕНЬШЕМ
+   расстоянии, а не безусловно. Безусловное старшинство сделало бы
+   хождение по линии невозможным: карта плотная, и посторонние узлы стоят
+   прямо на пунктире. Замер на связи «Монопсония и покупательная власть» ↔
+   «Монопсония на рынке труда»: на её отрезке лежат t10.2 в 2,6 px от
+   линии, t8.18 в 3,3 и t10.3 в 3,5 — курсор, идущий ТОЧНО по пунктиру
+   (расстояние до линии 0), отдавался им, и связь терялась на 7 точках из
+   20. Теперь узел выигрывает, когда он ближе или на том же расстоянии:
+   у самого кружка это всегда так (внутри него расстояние отрицательное),
+   а на голом участке линии побеждает линия — куда человек и целится. */
+function pick(mx, my) {
+  var n = hitTest(mx, my);
+  var e = hitTestEdge(mx, my);
+  if (n && e) return hitNodeDist <= e.d ? { node: n } : { edge: e };
+  if (n) return { node: n };
+  if (e) return { edge: e };
+  return {};
+}
+
+/* Расстояние от точки до отрезка в экранных координатах. */
+function distToSeg(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx * dx + dy * dy;
+  var t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  var cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+/* Попадание по перекрёстной связи. Спор с узлом разрешает pick() ниже. */
+function hitTestEdge(mx, my) {
+  var best = null, bestD = HIT_EDGE, bestZ = 0;
+  for (var i = 0; i < links.length; i++) {
+    var ln = links[i];
+    if (ln.k !== 'cross') continue;
+    var a = byId[ln.s], b = byId[ln.t];
+    /* Оба конца перед камерой: у отрезка с концом за спиной экранных
+       координат нет вовсе, и расстояние до него считать не по чему. */
+    if (a.pz <= 0 || b.pz <= 0) continue;
+    /* Быстрый отсев по рамке: расстояние считается только для тех
+       немногих отрезков, рядом с которыми курсор вообще может быть. */
+    if (mx < Math.min(a.px, b.px) - HIT_EDGE || mx > Math.max(a.px, b.px) + HIT_EDGE ||
+        my < Math.min(a.py, b.py) - HIT_EDGE || my > Math.max(a.py, b.py) + HIT_EDGE) continue;
+    var d = distToSeg(mx, my, a.px, a.py, b.px, b.py);
+    if (d > HIT_EDGE) continue;
+    var z = (a.pz + b.pz) / 2;
+    /* Ближайшая линия, а при равном расстоянии — та, что ближе к камере. */
+    if (d < bestD - 0.01 || (Math.abs(d - bestD) <= 0.01 && best && z < bestZ)) {
+      bestD = d; bestZ = z;
+      /* Расстояние кладём в саму находку: оно нужно спору с узлом. */
+      best = { key: edgeKey(a.id, b.id), a: a, b: b, why: ln.w || '', link: ln, d: d };
+    }
   }
   return best;
 }
@@ -652,9 +716,22 @@ function edgeKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 function rebuildHighlight() {
   var any = false, k;
   for (k in picked) { if (picked[k]) { any = true; break; } }
-  if (!any && !hoverNode) { litSet = litNear = litEdges = null; return; }
+  if (!any && !hoverNode && !hoverEdge) { litSet = litNear = litEdges = null; return; }
 
   litSet = {}; litNear = {}; litEdges = {};
+
+  /* Связь под курсором: подсвечены оба тега, обе их темы, обе дороги
+     тема→тег и сама линия. Видно, откуда куда идёт связь. */
+  if (hoverEdge) {
+    var ends = [hoverEdge.a, hoverEdge.b];
+    litEdges[hoverEdge.key] = true;
+    for (var e = 0; e < 2; e++) {
+      var tg = ends[e];
+      litSet[tg.id] = true;
+      var th = byId['t' + tg.n];
+      if (th) { litSet[th.id] = true; litEdges[edgeKey(th.id, tg.id)] = true; }
+    }
+  }
 
   var seeds = [];
   for (k in picked) if (picked[k]) seeds.push(byId[k]);
@@ -989,6 +1066,9 @@ function draw() {
   project();
 
   var dim = !!(litSet || searchHits);
+  /* Сила подсветки. Пока она гаснет, карта плавно возвращается к обычному
+     виду: подсвеченное теряет акцент, приглушённое — приглушение. */
+  var hl = dim ? hlAlpha : 0;
 
   /* ── Рёбра батчами ──────────────────────────────────────────────────
      Не 425 отдельных обводок, а четыре Path2D и четыре stroke(): каждая
@@ -1001,7 +1081,7 @@ function draw() {
     var a = byId[ln.s], b = byId[ln.t];
     if (a.pz < 0 || b.pz < 0) continue;
     var lit = litEdges && litEdges[edgeKey(a.id, b.id)];
-    if (lit) { roads.push({ a: a, b: b, k: ln.k }); continue; }
+    if (lit) { roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id) }); continue; }
     var path;
     if (ln.k === 'cross') path = pCross;
     else path = ((a.pz + b.pz) / 2 < DIST) ? pNear : pFar;
@@ -1027,11 +1107,17 @@ function draw() {
      слабее принадлежности теме, и на глаз это должно быть видно. */
   for (i = 0; i < roads.length; i++) {
     var rd = roads[i];
-    ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95)];
+    ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95 * hl)];
     ctx.lineWidth = 2.2;
     if (rd.k === 'cross') {
+      /* Пунктир остаётся пунктиром и под курсором: он означает «связь по
+         смыслу», а не «принадлежность теме», и менять его значение при
+         наведении — врать про природу линии. Толщина и сила цвета говорят,
+         что курсор именно на ней. */
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.5)];
+      var own = hoverEdge && rd.key === hoverEdge.key;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex((own ? 0.95 : 0.5) * hl)];
+      if (own) ctx.lineWidth = 2.6;
     }
     ctx.beginPath();
     ctx.moveTo(rd.a.px, rd.a.py);
@@ -1058,18 +1144,30 @@ function draw() {
     else if (near) a2 = 0.62;
     else a2 = dimFloor(n.k);
     if (n.k === 'theme' && a2 < 0.5) a2 = 0.5;
+    /* ⚠️ ПРИГЛУШЕНИЕ СМЕШИВАЕТСЯ С ОБЫЧНЫМ ВИДОМ ПО СИЛЕ ПОДСВЕТКИ, а не
+       включается щелчком. Иначе после соскальзывания с линии карта
+       возвращалась бы к обычному виду рывком, ровно тем самым миганием,
+       ради которого и заведена липкость. */
+    a2 = a2 * hl + (1 - hl);
     /* Тема и тег отличаются РАЗМЕРОМ И СИЛОЙ ЦВЕТА, а не оттенком: цвет
        у всех один. Базовая непрозрачность домножается на состояние. */
     a2 *= n.k === 'theme' ? BASE_ALPHA_THEME : BASE_ALPHA_TAG;
 
     /* Подсветка — всегда акцент, и наведение, и выбор, и найденное
        поиском: один цвет на все случаи, чтобы человек не гадал, что
-       означает второй. */
+       означает второй. Акцент кладётся ПОВЕРХ обычного цвета с силой
+       подсветки: так он не переключается, а проступает и тает. */
     var hot = dim && (on || near);
-    ctx.fillStyle = (hot ? PAL.accentShades : PAL.nodeShades)[shadeIndex(a2)];
+    ctx.fillStyle = PAL.nodeShades[shadeIndex(a2)];
     ctx.beginPath();
     ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
     ctx.fill();
+    if (hot && hl > 0.01) {
+      ctx.fillStyle = PAL.accentShades[shadeIndex(a2 * hl)];
+      ctx.beginPath();
+      ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
+      ctx.fill();
+    }
 
     if (picked[n.id]) {
       /* Ореол и обводка — тем же акцентом: выбранное видно всегда. */
@@ -1081,7 +1179,7 @@ function draw() {
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2, 0, 6.283185307179586); ctx.stroke();
       ctx.lineWidth = 1;
     } else if (n === hoverNode) {
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.8)];
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.8 * hl)];
       ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2.5, 0, 6.283185307179586); ctx.stroke();
       ctx.lineWidth = 1;
@@ -1321,7 +1419,9 @@ function drawLabels(dim) {
     else { nodeWant[n.id] = item; want.push(item); }
   }
 
-  /* Узел под курсором и его контекст: тег — вместе со своей темой. */
+  /* Узел под курсором и его контекст: тег — вместе со своей темой.
+     Прозрачность берётся у подсветки: подпись обязана таять вместе с ней,
+     иначе имя висит над уже погасшим узлом. */
   if (hoverNode) {
     askNode(hoverNode, 0, true);
     if (hoverNode.k === 'tag') askNode(byId['t' + hoverNode.n], 1, true);
@@ -1360,6 +1460,16 @@ function drawLabels(dim) {
                 talpha: EDGE_LABEL_ALPHA, prio: 0, stick: true,
                 px: EDGE_LABEL_PX, weight: 500, spacing: 0,
                 maxAway: 1e9, plate: true });
+  }
+
+  /* Наведение тает вместе с подсветкой; выбранное и найденное — нет. */
+  if (hlAlpha < 1 && (hoverNode || hoverEdge)) {
+    for (i = 0; i < want.length; i++) {
+      var wq = want[i];
+      if (wq.kind === 'group') continue;
+      if (wq.node && picked[wq.node.id]) continue;
+      if (wq.talpha > hlAlpha) wq.talpha = hlAlpha;
+    }
   }
 
   /* ── 2. Гашение на время движения ────────────────────────────────────
@@ -1527,6 +1637,71 @@ function drawLeader(node, lx, ly, w, alpha) {
 var dirty = true;
 function wake() { dirty = true; }
 
+/* ── Липкость подсветки ──────────────────────────────────────────────
+   ⚠️ БЕЗ НЕЁ «ИДТИ ПО ЛИНИИ» НЕВОЗМОЖНО. Пунктир тонкий, рука дрожит, и
+   курсор соскальзывает с него на пиксель по десять раз на пути. Мгновенное
+   гашение читалось бы как мигание, а вести мышью вдоль связи было бы
+   нельзя вовсе.
+
+   Потеряли цель — держим подсветку ещё STICKY_MS без единого изменения,
+   потом гасим за HL_FADE_MS. Нашли НОВУЮ цель за это время — переключаемся
+   немедленно; нашли ТУ ЖЕ — просто сбрасываем таймер, и никакого мигания. */
+var STICKY_MS = 280;
+var HL_FADE_MS = 200;
+var stickyUntil = 0;         /* до какого времени держим без изменений  */
+var hlAlpha = 0;             /* сила подсветки: 1 — полная, 0 — нет     */
+var hlTarget = 0;
+var lastFrameAt = 0;
+
+function hasPicked() {
+  for (var k in picked) if (picked[k]) return true;
+  return false;
+}
+
+/* Курсор нашёл цель — подсветка включается сразу, без плавности:
+   ожидание при наведении читается как задержка отклика. */
+function holdHighlight() {
+  stickyUntil = 0;
+  hlTarget = 1;
+  hlAlpha = 1;
+}
+
+/* Курсор цель потерял. Ничего не меняем — только заводим часы. */
+function releaseHighlight(now) {
+  if (!hoverNode && !hoverEdge) return;
+  if (!stickyUntil) stickyUntil = now + STICKY_MS;
+}
+
+function highlightTick(now) {
+  var dt = lastFrameAt ? Math.min(64, now - lastFrameAt) : 16;
+  lastFrameAt = now;
+
+  /* Выбранное и найденное держат подсветку сами: гаснет только наведение. */
+  if (hasPicked() || searchHits) { hlTarget = 1; if (hlAlpha < 1) hlAlpha = 1; }
+
+  if (stickyUntil && now >= stickyUntil) {
+    stickyUntil = 0;
+    hoverNode = null; hoverEdge = null; focusTheme = null;
+    /* Выбранное и найденное держат подсветку сами — гасить нечего. */
+    if (hasPicked() || searchHits) { rebuildHighlight(); }
+    else { hlTarget = 0; }
+    renderHover(null);
+    canvas.classList.remove('is-hit');
+    wake();
+  }
+
+  if (hlAlpha !== hlTarget) {
+    var step = dt / HL_FADE_MS;
+    if (hlAlpha < hlTarget) hlAlpha = Math.min(hlTarget, hlAlpha + step);
+    else hlAlpha = Math.max(hlTarget, hlAlpha - step);
+    /* Догорело — только теперь снимаем подсветку по-настоящему. */
+    if (hlAlpha === 0) rebuildHighlight();
+    wake();
+    return true;
+  }
+  return false;
+}
+
 /* ── Авто-вращение ───────────────────────────────────────────────────── */
 var SPIN_START = 0.0011;      /* при открытии карты                       */
 var SPIN_IDLE = 0.00088;      /* после бездействия — на 20% медленнее     */
@@ -1599,6 +1774,7 @@ function frame(now) {
   /* Скорость сцены и шаг анимации подписей — до отрисовки: кадр рисует
      то, куда подписи доехали к этому моменту. */
   frameNow = now;
+  if (highlightTick(now)) moved = true;
   sceneTick(now);
   labelTick();
 
@@ -1663,14 +1839,30 @@ canvas.addEventListener('pointermove', function (e) {
     touchActivity(); wake();
     return;
   }
-  var hit = hitTest(p[0], p[1]);
-  canvas.classList.toggle('is-hit', !!hit);
-  if (hit !== hoverNode) {
-    hoverNode = hit;
-    focusTheme = (hit && hit.k === 'theme') ? hit : null;
-    rebuildHighlight();
-    renderHover(hit);
-    wake();
+  var got = pick(p[0], p[1]);
+  var hit = got.node || null, edge = got.edge || null;
+  canvas.classList.toggle('is-hit', !!(hit || edge));
+
+  if (hit) {
+    holdHighlight();
+    if (hit !== hoverNode) {
+      hoverNode = hit; hoverEdge = null;
+      focusTheme = (hit.k === 'theme') ? hit : null;
+      rebuildHighlight();
+      renderHover(hit);
+      wake();
+    }
+  } else if (edge) {
+    holdHighlight();
+    if (!hoverEdge || hoverEdge.key !== edge.key) {
+      hoverEdge = edge; hoverNode = null; focusTheme = null;
+      rebuildHighlight();
+      renderHoverEdge(edge);
+      wake();
+    }
+  } else {
+    /* Соскользнули — подсветка держится, часы пошли. */
+    releaseHighlight(performance.now());
   }
   touchActivity();
 });
@@ -1680,17 +1872,33 @@ canvas.addEventListener('pointerup', function (e) {
   canvas.classList.remove('is-drag');
   if (dragMoved < 5) {
     var p = localPoint(e);
-    var hit = hitTest(p[0], p[1]);
-    if (hit) togglePick(hit);
+    var got2 = pick(p[0], p[1]);
+    var hit = got2.node;
+    if (hit) {
+      togglePick(hit);
+    } else {
+      /* Клик по связи берёт ОБА её тега: человек выбирает не линию, а то,
+         что она соединяет. */
+      var edge = got2.edge;
+      if (edge) {
+        var want = !(picked[edge.a.id] && picked[edge.b.id]);
+        picked[edge.a.id] = want;
+        picked[edge.b.id] = want;
+        if (!want) { delete picked[edge.a.id]; delete picked[edge.b.id]; }
+        lastPickedId = want ? edge.b.id : null;
+        rebuildHighlight();
+        renderPicked();
+      }
+    }
   }
   touchActivity(); wake();
 });
 
 canvas.addEventListener('pointerleave', function () {
-  if (hoverNode) {
-    hoverNode = null; focusTheme = null;
-    rebuildHighlight(); renderHover(null); wake();
-  }
+  /* Курсор ушёл с холста — гасим по тем же часам, что и соскальзывание с
+     линии: отдельный мгновенный путь давал бы рывок там, где везде плавно. */
+  releaseHighlight(performance.now());
+  wake();
 });
 
 canvas.addEventListener('dblclick', function (e) {
@@ -1788,7 +1996,7 @@ function togglePick(n) {
   }
   rebuildHighlight();
   renderPicked();
-  if (!hoverNode) renderHover(null);
+  if (!hoverNode) refreshHoverPanel();
   wake();
 }
 
@@ -1800,7 +2008,7 @@ function clearPick() {
   applySearch('');
   rebuildHighlight();
   renderPicked();
-  renderHover(hoverNode);
+  refreshHoverPanel();
   wake();
 }
 
@@ -1845,7 +2053,10 @@ var HOWTO = '<ul class="tmap-howto">' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" opacity=".7"/></svg>' +
   '<span>Сплошная линия — дорога <b>тема → тег</b>.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/></svg>' +
-  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li></ul>';
+  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li>' +
+  '<li><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 10 L13 4" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
+  '<span>По пунктирной линии можно <b>вести курсором</b> — покажет, ' +
+  'чем теги родственны.</span></li></ul>';
 
 function renderHover(n) {
   if (!hoverBox) return;
@@ -1898,6 +2109,34 @@ function renderHover(n) {
       html += '</div>';
     }
   }
+  hoverBox.innerHTML = html;
+}
+
+/* Панель «Под курсором» по текущему состоянию. ⚠️ ОДНА ТОЧКА НА ВСЕХ:
+   пока сброс выбора звал renderHover(hoverNode) напрямую, он затирал
+   карточку связи подсказкой «Как читать карту» — курсор всё ещё стоял на
+   линии, а панель об этом уже не знала. */
+function refreshHoverPanel() {
+  if (hoverEdge) renderHoverEdge(hoverEdge);
+  else renderHover(hoverNode);
+}
+
+/* Панель для связи под курсором: сначала — ЧЕМ теги родственны, потом сами
+   теги. Пояснение крупно, потому что оно и есть ответ на вопрос «что это
+   за линия»; номера тем и числа задач — адрес и вес. */
+function renderHoverEdge(edge) {
+  if (!hoverBox) return;
+  var html = '<span class="tmap-kind">связь</span>';
+  html += '<div class="tmap-name">' + esc(edge.why || 'связь по смыслу') + '</div>';
+  html += '<div class="tmap-near">';
+  [edge.a, edge.b].forEach(function (t) {
+    var num = (t.c === null || t.c === undefined) ? '' :
+              '<span class="tmap-near-c">' + fmtNum(t.c) + '</span>';
+    html += '<button type="button" class="tmap-near-item" data-go="' + t.id + '">' +
+            '<span class="tmap-near-n">' + t.n + '.</span>' +
+            '<span>' + esc(t.l) + '</span>' + num + '</button>';
+  });
+  html += '</div>';
   hoverBox.innerHTML = html;
 }
 
@@ -2384,6 +2623,21 @@ window.TMAP = {
   /* Самый большой шаг смещения подписи за кадр — инвариант плавности. */
   jump: function (reset) { var v = +lbJumpMax.toFixed(3); if (reset) lbJumpMax = 0; return v; },
   settleLabels: labelSettle,
+  /* Что сейчас под курсором — узел, связь или ничего; и жива ли липкость. */
+  hoverState: function () {
+    return { node: hoverNode ? hoverNode.id : null,
+             edge: hoverEdge ? hoverEdge.key : null,
+             why: hoverEdge ? hoverEdge.why : null,
+             hl: +hlAlpha.toFixed(3),
+             sticky: stickyUntil ? +(stickyUntil - performance.now()).toFixed(0) : 0 };
+  },
+  /* Прямой хит-тест по экранной точке — без событий мыши. */
+  probe: function (x, y) {
+    var g = pick(x, y);
+    if (g.node) return { kind: 'node', id: g.node.id, label: g.node.l };
+    if (g.edge) return { kind: 'edge', id: g.edge.key, why: g.edge.why };
+    return { kind: 'none' };
+  },
   /* Поставить масштаб мгновенно — для проверки затухания ориентиров. */
   zoomTo: function (z) {
     cam.zoom = cam.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
@@ -2405,6 +2659,7 @@ window.TMAP = {
       cam.yaw += step;
       t += 16.7;
       frameNow = t;
+      highlightTick(t);
       sceneTick(t);
       labelTick();
       draw();
