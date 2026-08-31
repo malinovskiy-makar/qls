@@ -168,6 +168,30 @@ class GraphIntegrityTests(SimpleTestCase):
     def test_cross_link_list_parses_to_eighty_two_pairs(self):
         self.assertEqual(len(parse_cross_links()), 82)
 
+    def test_every_cross_link_carries_an_explanation(self):
+        """У каждой из 82 связей есть пояснение, и оно осмысленной длины.
+
+        ⚠️ ЭТО СТОРОЖ СМЫСЛА СВЯЗИ, а не придирка к полю. Без пояснения
+        линия между двумя тегами не говорит человеку ничего: он видит, что
+        связь есть, и не видит, в чём она. Нижняя граница в 5 символов
+        отсекает заглушки вроде «—» и «ок», верхняя в 40 — фразу, которая
+        не влезет ни в подпись посередине линии, ни в карточку панели.
+        """
+        cross = [ln for ln in self.links if ln['k'] == 'cross']
+        self.assertEqual(len(cross), 82)
+        for ln in cross:
+            why = ln.get('w', '')
+            self.assertTrue(
+                why, 'связь без пояснения: %s ↔ %s' % (ln['s'], ln['t']))
+            self.assertGreaterEqual(
+                len(why), 5,
+                'пояснение короче пяти символов: %s ↔ %s — %r'
+                % (ln['s'], ln['t'], why))
+            self.assertLessEqual(
+                len(why), 40,
+                'пояснение длиннее сорока символов: %s ↔ %s — %r'
+                % (ln['s'], ln['t'], why))
+
     def test_every_theme_belongs_to_exactly_one_group(self):
         seen = {}
         for key, _label, nums in GROUPS:
@@ -276,6 +300,51 @@ class NodeColourContrastTests(SimpleTestCase):
                     '%s тема, %s: контраст к холсту %s при норме %s'
                     % (theme, what, value, self.MIN))
 
+    #: Порог для надписи-ориентира — 4,5:1, а не 3:1. Это ТЕКСТ, а не
+    #: кружок, и норма у него текстовая (WCAG 1.4.3).
+    MIN_TEXT = 4.5
+
+    def test_region_label_colour_is_readable_in_both_themes(self):
+        """Надписи-ориентиры по разделам читаются на холсте.
+
+        ⚠️ ЭТО СТОРОЖ ТРЕТЬЕГО ЦВЕТА КАРТЫ (ADR 0046). До него ориентиры
+        писались тем же `--map-node`, что и узлы, и терялись среди них —
+        это и увидел владелец на приёмке. Порог здесь текстовый, 4,5:1:
+        ориентир — надпись, а не графический элемент. Замер на момент
+        ввода: 5,05 в светлой теме и 9,32 в тёмной.
+
+        Прозрачность в расчёт НЕ входит намеренно: под буквами лежит
+        обводка цветом холста толщиной 3 px, и глаз сравнивает букву именно
+        с ней, а не с тем, что под надписью оказалось.
+        """
+        for theme, css in self._themes().items():
+            region = self._token(css, 'map-region')
+            bg = self._token(css, 'bg')
+            self.assertIsNotNone(
+                region, '%s тема: нет токена --map-region' % theme)
+            value = self._contrast(self._rgb(region), self._rgb(bg))
+            self.assertGreaterEqual(
+                value, self.MIN_TEXT,
+                '%s тема, надпись раздела: контраст к холсту %s при норме %s'
+                % (theme, value, self.MIN_TEXT))
+
+    def test_region_colour_differs_from_node_and_accent(self):
+        """Третий цвет — именно третий, а не переименованный первый.
+
+        Написать ориентиры цветом узлов или акцентом — значит соврать про
+        слой: серым они теряются среди узлов, малиновым притворяются
+        подсветкой. Совпадение значений вернуло бы ровно тот дефект, ради
+        которого цвет и заводился.
+        """
+        for theme, css in self._themes().items():
+            region = self._token(css, 'map-region')
+            self.assertNotEqual(
+                self._rgb(region), self._rgb(self._token(css, 'map-node')),
+                '%s тема: ориентир окрашен цветом узла' % theme)
+            self.assertNotEqual(
+                self._rgb(region), self._rgb(self._token(css, 'accent')),
+                '%s тема: ориентир окрашен акцентом подсветки' % theme)
+
     def test_only_one_node_colour_is_declared(self):
         """Семи цветов разделов в токенах больше нет.
 
@@ -368,9 +437,23 @@ class BuildGuardsTests(SimpleTestCase):
         self.assertIn('внутри одной темы', str(box.exception))
 
     def test_rejects_duplicate_link(self):
+        # ⚠️ Записи разделяются «|», а не пробелом: пробел теперь отделяет
+        # код связи от её пояснения.
         with self.assertRaises(ValueError) as box:
-            self._build_with('1.1-2.1  2.1-1.1')
+            self._build_with('1.1-2.1 | 2.1-1.1')
         self.assertIn('дважды', str(box.exception))
+
+    def test_link_explanation_is_parsed_and_stored(self):
+        data = self._build_with('1.1-2.2 общая тема')
+        cross = [ln for ln in data['links'] if ln['k'] == 'cross']
+        self.assertEqual(cross[0]['w'], 'общая тема')
+
+    def test_link_without_explanation_still_parses(self):
+        """Разбор пояснения не требует: обязательность — дело отдельного
+        теста на боевом списке, а проверкам разбора важна только пара."""
+        data = self._build_with('1.1-2.2')
+        cross = [ln for ln in data['links'] if ln['k'] == 'cross']
+        self.assertEqual(cross[0]['w'], '')
 
     def test_rejects_theme_outside_groups(self):
         """Тема, не попавшая ни в один раздел корпуса, не должна пройти молча:

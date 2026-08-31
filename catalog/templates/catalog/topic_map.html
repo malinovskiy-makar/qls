@@ -27,7 +27,7 @@
     <div class="tmap-head-title">
       <h1>Карта тем и тегов</h1>
       <p class="tmap-sub">{{ theme_count }} тем&nbsp;· {{ tag_count }} тега&nbsp;·
-        нажмите на тег, чтобы подсветить дорогу к нему</p>
+        наведитесь на тег и уходите от него по линиям</p>
     </div>
 
     <div class="tmap-search">
@@ -58,10 +58,24 @@
 
     <aside class="tmap-panel" id="tmap-panel">
 
+      {% comment %}
+        ⚠️ БЛОК «ПОД КУРСОРОМ» ФИКСИРОВАН ПО ВЫСОТЕ И ПРОКРУЧИВАЕТСЯ САМ.
+        Раньше вся панель была одним скроллером, а этот блок рос и сжимался
+        под длину описания темы (196 px на «Введении», 178 на «Асимметрии»).
+        Список тем лежал ниже и ехал вместе с ним: верх первой строки прыгал
+        на 18 px, строка уезжала из-под курсора, наведение слетало, блок
+        возвращался — и всё повторялось. Это и было дрожание.
+      {% endcomment %}
       <section class="tmap-block" id="tmap-hover-block">
         <h2 class="tmap-block-h">Под курсором</h2>
         <div id="tmap-hover"><!-- заполняется картой --></div>
       </section>
+
+      {% comment %}
+        Всё, что ниже, прокручивается в СВОЁМ контейнере. Блок «Под курсором»
+        над ним неподвижен, поэтому его высота больше ни на что не влияет.
+      {% endcomment %}
+      <div class="tmap-panel-scroll" id="tmap-panel-scroll">
 
       <section class="tmap-block" id="tmap-picked-block" hidden>
         <h2 class="tmap-block-h">Выбрано <span id="tmap-picked-n">0</span></h2>
@@ -90,6 +104,8 @@
           {% endfor %}
         </div>
       </section>
+
+      </div><!-- /.tmap-panel-scroll -->
 
     </aside>
 

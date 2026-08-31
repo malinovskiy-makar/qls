@@ -162,6 +162,31 @@
   border-left: var(--line) solid var(--border);
   box-shadow: inset var(--line) 0 0 var(--border);
   background: var(--surface);
+  /* ⚠️ ПАНЕЛЬ БОЛЬШЕ НЕ ОБЩИЙ СКРОЛЛЕР. Пока она им была, блок «Под
+     курсором» менял высоту под длину описания и тащил за собой список тем:
+     верх первой строки прыгал на 18 px, строка уходила из-под курсора,
+     наведение слетало, блок возвращался — самоподдерживающееся дрожание.
+     Теперь панель — колонка на всю высоту: неподвижная шапка сверху,
+     прокрутка внутри нижнего контейнера. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Блок «Под курсором»: высота задана и НЕ зависит от содержимого.
+   210 px хватает самому высокому виду (тег с описанием и списком смежных);
+   что не влезло — прокручивается внутри самого блока. */
+#tmap-hover-block {
+  flex: none;
+  height: 210px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Прокручиваемая часть панели: «Выбрано», «Темы», «Разделы». */
+.tmap-panel-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -262,6 +287,34 @@
   flex-shrink: 0;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
+}
+/* Число задач у тега в карточке связи: прижато вправо, чтобы два тега
+   читались списком с общей колонкой чисел, а не строками разной длины. */
+.tmap-near-c {
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Пока человек идёт по линии: чем родственны теги и откуда он вышел.
+   «Откуда» — мельче и тише: главный вопрос в пути «куда приду», а не
+   «откуда шёл», и строка не должна спорить с именем цели. */
+.tmap-why-link {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.tmap-why-link b { font-weight: 600; color: var(--text); }
+.tmap-from {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Подсказка «Как читать карту» — когда ничего не выбрано и не наведено. */

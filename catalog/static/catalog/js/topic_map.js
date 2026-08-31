@@ -135,6 +135,13 @@ function readPalette() {
   PAL.node = hexToRgb(cs.getPropertyValue('--map-node') ||
                       (dark ? '#C8CEDA' : '#4A5260'));
   PAL.nodeShades = makeShades(PAL.node);
+
+  /* Надписи-ориентиры по разделам — третий цвет карты, не узел и не
+     подсветка (ADR 0046). Ступеней не нужно: прозрачность у них своя, и
+     задаётся она globalAlpha сразу обоим проходам — обводке и заливке. */
+  PAL.region = hexToRgb(cs.getPropertyValue('--map-region') ||
+                        (dark ? '#8FBEE0' : '#3E6C99'));
+  PAL.regionCss = 'rgb(' + PAL.region.join(',') + ')';
 }
 
 /* ── Раскладка ───────────────────────────────────────────────────────── */
@@ -555,6 +562,21 @@ function project() {
   }
 }
 
+/* Та же проекция для одной произвольной точки — нужна подписям разделов:
+   у раздела нет своего узла, его якорь — центр масс тем. */
+function projectPoint(x, y, z, out) {
+  var dx = x - cam.tx, dy = y - cam.ty, dz = z - cam.tz;
+  var ax = dx * CY + dz * SY, az = -dx * SY + dz * CY;
+  var ay = dy * CP - az * SP, pz = dy * SP + az * CP + DIST;
+  if (pz < 60) { out.pz = -1; return out; }
+  var s = FOCAL / pz * cam.zoom * fitScale;
+  out.px = W / 2 + ax * s;
+  out.py = H / 2 + ay * s;
+  out.ps = s;
+  out.pz = pz;
+  return out;
+}
+
 /* Обратное преобразование экранной точки в мировую на глубине DIST —
    нужно, чтобы зумить К ТОЧКЕ ПОД КУРСОРОМ, а не к центру экрана. */
 function screenToWorld(sx, sy, depth) {
@@ -583,15 +605,143 @@ function nodeRadius(n) {
    ⚠️ ЧИТАЕТ ТЕ ЖЕ ПОЛЯ, ЧТО ПИШЕТ ПРОЕКЦИЯ (px, py, ps, pz). Если
    переименовать поля в рендере и забыть здесь, клики молча перестают
    работать — без единой ошибки в консоли. */
+var HIT_NODE = 10;           /* порог попадания по узлу, px             */
+var HIT_EDGE = 6;            /* по связи — уже: линия тоньше кружка     */
+
 function hitTest(mx, my) {
-  var best = null, bestD = 10;
+  var best = null, bestD = HIT_NODE;
   for (var i = 0; i < nodes.length; i++) {
     var n = nodes[i];
     if (n.pz < 0) continue;
     var d = Math.hypot(n.px - mx, n.py - my) - Math.max(3, n.r0 * n.ps);
-    if (d < bestD) { bestD = d; best = n; }
+    if (d < bestD) { bestD = d; best = n; hitNodeDist = d; }
+  }
+  if (!best) hitNodeDist = 1e9;
+  return best;
+}
+
+/* Насколько далеко был узел, выигравший последний hitTest. Нужно, чтобы
+   решить спор «узел или связь» — см. pick() ниже. */
+var hitNodeDist = 1e9;
+
+/* Расстояние от точки до отрезка в экранных координатах. */
+function distToSeg(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx * dx + dy * dy;
+  var t = len2 ? ((px - x1) * dx + (py - y1) * dy) / len2 : 0;
+  t = t < 0 ? 0 : t > 1 ? 1 : t;
+  var cx = x1 + t * dx, cy = y1 + t * dy;
+  return Math.hypot(px - cx, py - cy);
+}
+
+/* ── Проходимые рёбра активного узла ──────────────────────────────────
+
+   ⚠️ ЭТО ЗАМЕНА ПРЕЖНЕГО ПОВЕДЕНИЯ, А НЕ ДОБАВКА К НЕМУ. Раньше подсветка
+   включалась от наведения на ЛЮБОЕ из 425 рёбер, и любое случайное движение
+   мыши что-то подсвечивало — шум. Теперь модель другая: человек встаёт на
+   узел и уходит от него ПО ЕГО ЛИНИЯМ, как по дорогам с перекрёстка.
+
+   Отсюда и широкий коридор. Кандидатов теперь единицы — только рёбра
+   active, а не сотни, — поэтому 16 px не создают конфликтов и попадать
+   пиксель в пиксель не требуется. */
+var HIT_CORRIDOR = 16;       /* коридор попадания вдоль ребра active, px */
+var ROUTE_START = 20;        /* ближе к active маршрут не начинается    */
+var ROUTE_ARRIVE_T = 0.78;   /* доля пути, после которой переходим      */
+var ROUTE_ARRIVE_PX = 12;    /* или подошли к дальнему узлу ближе этого */
+
+/* Доля вдоль отрезка, куда проецируется точка (0 — у первого конца). */
+function projT(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx * dx + dy * dy;
+  if (!len2) return 0;
+  var t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/* Ищем ребро active, в коридор которого попал курсор.
+   ⚠️ ВПЛОТНУЮ К УЗЛУ МАРШРУТ НЕ НАЧИНАЕТСЯ. У тега сходится веером до
+   десятка спиц, и в первых двадцати пикселях их коридоры перекрываются:
+   курсор дребезжал бы между соседними линиями, не давая выбрать ни одну. */
+function hitTestRoute(mx, my) {
+  if (!active || active.pz <= 0) return null;
+  var best = null, bestD = HIT_CORRIDOR;
+  for (var i = 0; i < links.length; i++) {
+    var ln = links[i];
+    var a = byId[ln.s], b = byId[ln.t];
+    var far;
+    if (a === active) far = b;
+    else if (b === active) far = a;
+    else continue;                          /* чужие рёбра не проходимы */
+    if (far.pz <= 0) continue;
+
+    /* Быстрый отсев по рамке: расстояние считается только для тех
+       отрезков, рядом с которыми курсор вообще может быть. */
+    if (mx < Math.min(active.px, far.px) - HIT_CORRIDOR ||
+        mx > Math.max(active.px, far.px) + HIT_CORRIDOR ||
+        my < Math.min(active.py, far.py) - HIT_CORRIDOR ||
+        my > Math.max(active.py, far.py) + HIT_CORRIDOR) continue;
+
+    var d = distToSeg(mx, my, active.px, active.py, far.px, far.py);
+    if (d > HIT_CORRIDOR) continue;
+
+    var t = projT(mx, my, active.px, active.py, far.px, far.py);
+    var len = Math.hypot(far.px - active.px, far.py - active.py);
+    if (t * len < ROUTE_START) continue;    /* слишком близко к active */
+
+    if (d < bestD) {
+      bestD = d;
+      best = { key: edgeKey(active.id, far.id), a: active, b: far,
+               why: (ln.k === 'cross' ? (ln.w || '') : ''), link: ln,
+               t: t, d: d, len: len,
+               cx: active.px + (far.px - active.px) * t,
+               cy: active.py + (far.py - active.py) * t };
+    }
   }
   return best;
+}
+
+/* ── Кто старше: узел или линия ───────────────────────────────────────
+
+   ⚠️ ЭТО ПРАВИЛО ПЕРЕПИСАНО ПОД МОДЕЛЬ ХОЖДЕНИЯ, и его прежний числовой
+   вид («узел старше при равном или меньшем расстоянии», ADR 0045) здесь не
+   работает. Причина: карта плотная, и чужие узлы стоят вплотную к линиям —
+   на отрезке «Монопсония и покупательная власть» ↔ «Монопсония на рынке
+   труда» лежат t8.8 в 5,0 px от линии, t10.2 в 2,6, t8.18 в 3,3, t10.3 в
+   3,5. Пока старшинство решалось сравнением расстояний, они забирали
+   курсор: по самой линии маршрут доходил до цели 3 раза из 20, а при
+   небрежном ведении в 12 px от неё — ни разу.
+
+   Дух ADR 0045 сохранён: узел НЕ забирает курсор, который явно целится в
+   линию. Изменилась буква — вместо сравнения расстояний старшинство теперь
+   такое:
+
+     1. точное попадание в кружок (расстояние отрицательное) сильнее всего —
+        так с маршрута можно сойти намеренно;
+     2. иначе, если стоишь на узле и курсор в коридоре одной из ЕГО линий, —
+        идёшь по линии;
+     3. иначе ближняя зона своего узла принадлежит ему, а не соседям;
+     4. и только потом — обычное попадание по узлу. */
+function pick(mx, my) {
+  var n = hitTest(mx, my);
+  var e = active ? hitTestRoute(mx, my) : null;
+
+  /* 1. Внутри кружка — это узел, и спорить не о чем. */
+  if (n && hitNodeDist <= 0) return { node: n };
+
+  if (active && active.pz > 0) {
+    /* 2. В коридоре своей линии — идём по ней. */
+    if (e) return { route: e };
+    /* 3. Ближняя зона своего узла: там маршрут ещё не начинается (спицы
+       сходятся веером), и отдавать её соседям нельзя — иначе путь рвётся
+       на первом же шаге. */
+    if (Math.hypot(mx - active.px, my - active.py) < ROUTE_START) {
+      return { node: active };
+    }
+  }
+
+  /* 4. Обычное попадание по узлу — так и входят в режим хождения. */
+  if (n) return { node: n };
+  return {};
 }
 
 
@@ -601,7 +751,12 @@ function hitTest(mx, my) {
 
 /* Состояние подсветки. */
 var picked = {};             /* id → true: выбранные теги и темы          */
-var hoverNode = null;        /* узел под курсором                         */
+/* ⚠️ ACTIVE — ЭТО НЕ «УЗЕЛ ПОД КУРСОРОМ», А «УЗЕЛ, НА КОТОРОМ ТЫ СТОИШЬ».
+   Разница важна: курсор может уйти с узла вдоль линии, а стоишь ты всё ещё
+   на нём. Войти в режим можно ТОЛЬКО через узел; ни одно ребро само по себе
+   active не задаёт. */
+var active = null;           /* узел, на котором стоит человек, либо null  */
+var route = null;            /* ребро active, по которому идёт курсор      */
 var focusTheme = null;       /* тема, у которой раскрыт список тегов      */
 var searchHits = null;       /* null = поиск пуст; иначе объект id → true */
 
@@ -636,13 +791,17 @@ function edgeKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 function rebuildHighlight() {
   var any = false, k;
   for (k in picked) { if (picked[k]) { any = true; break; } }
-  if (!any && !hoverNode) { litSet = litNear = litEdges = null; return; }
+  if (!any && !active) { litSet = litNear = litEdges = null; return; }
 
   litSet = {}; litNear = {}; litEdges = {};
 
+  /* ⚠️ ПОДСВЕТКУ ЗАДАЁТ ТОЛЬКО ACTIVE, А НЕ МАРШРУТ. Пока курсор идёт по
+     ребру, подсвечено ровно то же, что было на самом узле: маршрут —
+     визуальный слой поверх, а не второй источник подсветки. Иначе картина
+     перестраивалась бы на каждом шаге пути. */
   var seeds = [];
   for (k in picked) if (picked[k]) seeds.push(byId[k]);
-  if (hoverNode) seeds.push(hoverNode);
+  if (active) seeds.push(active);
 
   seeds.forEach(function (n) {
     if (!n) return;
@@ -727,8 +886,17 @@ function plate(x, y, w, h) {
   ctx.fill();
 }
 
-function drawLabelLines(lines, x, y, align, alpha, colour, px) {
-  ctx.font = '500 ' + px + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+/* Шрифт подписи. Разрядка (letterSpacing) нужна только надписям-
+   ориентирам; там, где её нет, поле обязано сбрасываться в ноль — иначе
+   она протекает на следующую подпись и на замер ширины. */
+function setLabelFont(px, weight, spacing) {
+  ctx.font = (weight || 500) + ' ' + px +
+             'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.letterSpacing = spacing ? (spacing * px).toFixed(2) + 'px' : '0px';
+}
+
+function drawLabelLines(lines, x, y, align, alpha, colour, px, weight, spacing, withPlate, halo) {
+  setLabelFont(px, weight, spacing);
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   var wMax = 0;
@@ -738,12 +906,38 @@ function drawLabelLines(lines, x, y, align, alpha, colour, px) {
   var hAll = lines.length * LINE_H;
   var px0 = align === 'right' ? x - wMax : (align === 'center' ? x - wMax / 2 : x);
   ctx.globalAlpha = alpha;
-  plate(px0 - 4, y - hAll / 2 - 2, wMax + 8, hAll + 4);
+  /* Подложка цвета холста рисуется ДО текста и поверх рёбер — иначе буквы
+     перечёркиваются спицами и линиями. Надписям-ориентирам она не нужна:
+     ⚠️ ПЛАШКА ВЫРЕЗАЛА БЫ В ГРАФЕ ПРЯМОУГОЛЬНЫЕ ДЫРЫ. Ориентир широкий, и
+     под ним всегда есть линии и узлы; закрасив их фоном, мы порвали бы граф
+     ради подписи. Читаемость даёт ОБВОДКА: она облегает буквы и оставляет
+     всё между ними видимым. */
+  if (withPlate !== false) plate(px0 - 4, y - hAll / 2 - 2, wMax + 8, hAll + 4);
+
+  var ty;
+  /* ⚠️ ОБВОДКА И ЗАЛИВКА ИДУТ ПОД ОДНОЙ И ТОЙ ЖЕ ПРОЗРАЧНОСТЬЮ, и меняется
+     она ОДИН раз на оба прохода. Задай их порознь — на просвет вылезет
+     ореол: полупрозрачная обводка проступит из-под полупрозрачных букв
+     светлым контуром. */
+  if (halo) {
+    ctx.strokeStyle = PAL.bgCss;
+    ctx.lineWidth = halo;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    for (i = 0; i < lines.length; i++) {
+      ty = y - hAll / 2 + LINE_H / 2 + i * LINE_H;
+      ctx.strokeText(lines[i], x, ty);
+    }
+    ctx.lineWidth = 1;
+    ctx.lineJoin = 'miter';
+  }
+
   ctx.fillStyle = colour;
   for (i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], x, y - hAll / 2 + LINE_H / 2 + i * LINE_H);
   }
   ctx.globalAlpha = 1;
+  ctx.letterSpacing = '0px';
   return { w: wMax, h: hAll, left: px0 };
 }
 
@@ -807,16 +1001,162 @@ function layoutFocusLabels(theme) {
 
 /* ── Кадр ────────────────────────────────────────────────────────────── */
 
+/* ── Надписи-ориентиры по разделам ────────────────────────────────────
+   Семь названий разделов корпуса вместо двадцати девяти имён тем. Вид
+   намеренно другой: прописные, разрядка, вполсилы — это ориентир, как
+   название страны на карте, а не подпись объекта. */
+var GROUP_PX = 17;           /* кегль надписи раздела                   */
+var GROUP_SPACING = 0.07;    /* разрядка, доля кегля                    */
+var GROUP_ALPHA = 0.62;      /* в покое                                 */
+var GROUP_ALPHA_DIM = 0.28;  /* при любой подсветке — остаётся фоном    */
+var GROUP_HALO = 3;          /* толщина обводки цветом холста, px       */
+/* Вблизи ориентир уже не нужен: человек смотрит на конкретные узлы.
+   Гаснет не щелчком на пороге, а рампой, иначе дрожание масштаба около
+   порога читалось бы как мигание. */
+var GROUP_ZOOM_FROM = 1.9, GROUP_ZOOM_TO = 2.2;
+
+var EDGE_LABEL_PX = 11;      /* пояснение связи                         */
+var EDGE_LABEL_ALPHA = 0.85;
+
+var gAnchor = { px: 0, py: 0, pz: 1, r: 0, cx: 0, cy: 0 };
+
 var LABEL_BUDGET = 90;       /* лимит подписей тегов на кадр            */
-var LABEL_MAX_AWAY = 90;     /* дальше подпись темы от узла не уходит   */
+var LABEL_MAX_AWAY = 90;     /* дальше подпись от своего узла не уходит */
 var LABEL_LEADER_MIN = 24;   /* ближе выноска не нужна                  */
 var THEME_QUIET_ALPHA = 0.3; /* чужое имя темы в фокус-режиме           */
 
 /* Счётчики последнего кадра — для приёмки через window.TMAP. */
 var lastQuietCount = 0;      /* приглушённых имён тем                   */
-var lastThemeMissing = 0;    /* тем, которым места не нашлось           */
+var lastThemeMissing = 0;    /* подписей, которым места не нашлось      */
 var lastThemeMissingNames = [];
-var lastThemeAway = 0;       /* самая дальняя подпись темы от узла, px  */
+var lastThemeAway = 0;       /* самая дальняя подпись от узла, px       */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ПАМЯТЬ ПОДПИСЕЙ
+
+   ⚠️ РАНЬШЕ МЕСТО ДЛЯ ПОДПИСИ ИСКАЛОСЬ ЗАНОВО КАЖДЫЙ КАДР, И ЭТО БЫЛО
+   ПРИЧИНОЙ ДРОЖАНИЯ. Узел сдвигался на полпикселя — алгоритм находил уже
+   другое свободное место, и текст перепрыгивал. Плюс подписи включались и
+   выключались мгновенно, а глаз читает мгновенное включение как рывок.
+
+   Теперь у каждой подписи есть объект, который живёт МЕЖДУ кадрами:
+
+     key      — id узла, id ребра или ключ раздела: по нему подпись
+                находится в следующем кадре и НЕ создаётся заново;
+     kind     — 'group' | 'theme' | 'tag' | 'edge';
+     ax, ay   — якорь: экранная позиция узла, середины ребра или облака;
+     ox, oy   — где подпись стоит СЕЙЧАС относительно якоря;
+     tox, toy — куда её положила раскладка (цель);
+     alpha    — какая она сейчас; talpha — какой должна стать;
+     placedAt — когда раскладка считалась в последний раз.
+
+   Рисуем всегда в (ax + ox, ay + oy) — то есть там, где подпись доехала,
+   а не там, куда раскладка положила её прямо сейчас. */
+var LB = {};                 /* key → объект подписи                    */
+
+var LB_FADE = 0.18;          /* шаг прозрачности за кадр                */
+var LB_SLIDE = 0.2;          /* доля пути к цели за кадр                */
+/* ⚠️ ПОТОЛОК 2 px, А НЕ 3, И ЭТО ПО ОТСМОТРУ ВЛАДЕЛЬЦА. При 3 px за кадр
+   подпись движется со скоростью 180 px/с, и это читалось не как «едет за
+   узлом», а как «уползает». */
+var LB_SLIDE_MAX = 2;        /* и не больше 2 px за кадр                */
+/* ⚠️ МЁРТВАЯ ЗОНА. Раскладка каждые 180 мс возвращает чуть иную цель — на
+   полпикселя-пиксель, — и подпись бесконечно подрагивала, догоняя её.
+   Разница меньше 2 px не двигает подпись вовсе. */
+var LB_DEAD = 2;             /* ближе этого к цели не шевелимся, px     */
+var LB_MIN_ALPHA = 0.02;     /* ниже — не рисуем и места не занимаем    */
+
+var lbJumpMax = 0;           /* самый большой шаг ox/oy — для приёмки   */
+
+function labelOf(key, kind, text) {
+  var L = LB[key];
+  if (!L) {
+    L = LB[key] = { key: key, kind: kind, text: text,
+                    ax: 0, ay: 0, ox: 0, oy: 0, tox: 0, toy: 0,
+                    alpha: 0, talpha: 0, placedAt: 0,
+                    w: 0, h: LINE_H, born: true };
+  }
+  if (L.text !== text) { L.text = text; L.w = 0; }
+  L.kind = kind;
+  return L;
+}
+
+/* Шаг анимации подписей. Живёт в цикле кадра, а НЕ в draw(): draw() зовут
+   ещё и замеры (TMAP.bench гоняет её шестьдесят раз подряд), и анимация
+   внутри неё пролетала бы шестьдесят шагов за один кадр. */
+function labelTick() {
+  var k, L, dx, dy, mx, my;
+  for (k in LB) {
+    L = LB[k];
+    L.alpha += (L.talpha - L.alpha) * LB_FADE;
+    dx = L.tox - L.ox; dy = L.toy - L.oy;
+    /* Мёртвая зона: цель почти там же, где подпись, — не шевелимся.
+       ⚠️ Это НЕ выход из шага: погасшую подпись всё равно надо выбросить
+       ниже, иначе объекты копятся без конца. */
+    if (Math.abs(dx) >= LB_DEAD || Math.abs(dy) >= LB_DEAD) {
+      mx = dx * LB_SLIDE; my = dy * LB_SLIDE;
+      if (mx > LB_SLIDE_MAX) mx = LB_SLIDE_MAX;
+      else if (mx < -LB_SLIDE_MAX) mx = -LB_SLIDE_MAX;
+      if (my > LB_SLIDE_MAX) my = LB_SLIDE_MAX;
+      else if (my < -LB_SLIDE_MAX) my = -LB_SLIDE_MAX;
+      L.ox += mx; L.oy += my;
+      var jump = Math.max(Math.abs(mx), Math.abs(my));
+      if (jump > lbJumpMax) lbJumpMax = jump;
+    }
+    /* Погасшую подпись выбрасываем: иначе объекты копятся без конца. */
+    if (L.talpha < LB_MIN_ALPHA && L.alpha < LB_MIN_ALPHA) delete LB[k];
+  }
+}
+
+/* Едет ли ещё хоть одна подпись: пока едет — кадр нужен. */
+function labelsBusy() {
+  for (var k in LB) {
+    var L = LB[k];
+    if (Math.abs(L.talpha - L.alpha) > 0.004) return true;
+    if (Math.abs(L.tox - L.ox) > 0.4 || Math.abs(L.toy - L.oy) > 0.4) return true;
+  }
+  return false;
+}
+
+/* Досчитать анимацию до конца одним махом — для приёмки: инварианты
+   меряются «в покое», а не через двадцать кадров плавного проявления. */
+function labelSettle() {
+  var k, L;
+  for (var pass = 0; pass < 200; pass++) labelTick();
+  for (k in LB) { L = LB[k]; L.alpha = L.talpha; L.ox = L.tox; L.oy = L.toy; }
+}
+
+/* ── Спокойствие сцены ───────────────────────────────────────────────── */
+
+/* Скорость сцены за кадр: повороты в радианах плюс изменение масштаба.
+   ⚠️ ПОРОГ ВЫШЕ СКОРОСТИ АВТОВРАЩЕНИЯ (0,00088), И ЭТО НАРОЧНО. Тихое
+   вращение подписи НЕ гасит: они просто плавно едут за своими узлами.
+   Гаснут только от активного движения — тянут мышью, крутят колесо,
+   летит камера после двойного клика. */
+var SPEED_QUIET = 0.0016;    /* рад/кадр: граница «сцена спокойна»      */
+var CALM_MS = 150;           /* столько тишины до возвращения подписей  */
+var LAYOUT_MS = 180;         /* реже раскладку не пересчитываем         */
+
+/* Часы кадра. ⚠️ ОДНИ НА ВСЕХ: скорость сцены, возвращение подписей и
+   пересчёт раскладки обязаны мерить время по одному и тому же источнику,
+   иначе замер прогоняет сцену по виртуальным часам, а раскладку — по
+   настоящим, и числа расходятся. */
+var frameNow = 0;
+var sceneSpeed = 0;          /* скорость последнего кадра               */
+var lastYaw = START_YAW, lastPitch = START_PITCH, lastZoom = 1;
+var lastLoudAt = -1e9;       /* когда сцена в последний раз шумела      */
+var labelsCalm = true;       /* можно ли показывать фоновые подписи     */
+var labelLayoutAt = -1e9;    /* когда раскладывали в последний раз      */
+var labelSig = '';           /* состав подписей прошлого кадра          */
+
+function sceneTick(now) {
+  var d = Math.abs(cam.yaw - lastYaw) + Math.abs(cam.pitch - lastPitch) +
+          Math.abs(cam.zoom - lastZoom) * 0.5;
+  lastYaw = cam.yaw; lastPitch = cam.pitch; lastZoom = cam.zoom;
+  sceneSpeed = d;
+  if (d > SPEED_QUIET) lastLoudAt = now;
+  labelsCalm = (now - lastLoudAt) >= CALM_MS;
+}
 
 function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -827,6 +1167,9 @@ function draw() {
   project();
 
   var dim = !!(litSet || searchHits);
+  /* Сила подсветки. Пока она гаснет, карта плавно возвращается к обычному
+     виду: подсвеченное теряет акцент, приглушённое — приглушение. */
+  var hl = dim ? hlAlpha : 0;
 
   /* ── Рёбра батчами ──────────────────────────────────────────────────
      Не 425 отдельных обводок, а четыре Path2D и четыре stroke(): каждая
@@ -839,7 +1182,7 @@ function draw() {
     var a = byId[ln.s], b = byId[ln.t];
     if (a.pz < 0 || b.pz < 0) continue;
     var lit = litEdges && litEdges[edgeKey(a.id, b.id)];
-    if (lit) { roads.push({ a: a, b: b, k: ln.k }); continue; }
+    if (lit) { roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id) }); continue; }
     var path;
     if (ln.k === 'cross') path = pCross;
     else path = ((a.pz + b.pz) / 2 < DIST) ? pNear : pFar;
@@ -865,11 +1208,14 @@ function draw() {
      слабее принадлежности теме, и на глаз это должно быть видно. */
   for (i = 0; i < roads.length; i++) {
     var rd = roads[i];
-    ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95)];
+    ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95 * hl)];
     ctx.lineWidth = 2.2;
     if (rd.k === 'cross') {
+      /* Пунктир остаётся пунктиром: он означает «связь по смыслу», а не
+         «принадлежность теме», и менять его значение при наведении — врать
+         про природу линии. */
       ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.5)];
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.5 * hl)];
     }
     ctx.beginPath();
     ctx.moveTo(rd.a.px, rd.a.py);
@@ -878,6 +1224,28 @@ function draw() {
     ctx.setLineDash([]);
   }
   ctx.lineWidth = 1;
+
+  /* ── Маршрут: линия, по которой человек идёт прямо сейчас ────────────
+     Рисуется ПОСЛЕ всех прочих рёбер и СПЛОШНОЙ, даже если это пунктирная
+     перекрёстная связь: пунктир говорит, какого рода связь, а сплошная
+     жирная линия — «ты сейчас идёшь здесь». Второе важнее в момент пути. */
+  if (route && hl > 0.01 && route.a.pz > 0 && route.b.pz > 0) {
+    ctx.strokeStyle = PAL.accentShades[shadeIndex(hl)];
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(route.a.px, route.a.py);
+    ctx.lineTo(route.b.px, route.b.py);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    /* Каретка — проекция курсора на линию. Она делает движение
+       буквальным: видно не только КУДА идёшь, но и ГДЕ ты на пути. */
+    ctx.fillStyle = PAL.accentShades[shadeIndex(hl)];
+    ctx.beginPath();
+    ctx.arc(route.cx, route.cy, 4, 0, 6.283185307179586);
+    ctx.fill();
+  }
 
   /* ── Узлы: дальние раньше ближних ─────────────────────────────────── */
   order.sort(function (p, q) { return q.pz - p.pz; });
@@ -896,18 +1264,30 @@ function draw() {
     else if (near) a2 = 0.62;
     else a2 = dimFloor(n.k);
     if (n.k === 'theme' && a2 < 0.5) a2 = 0.5;
+    /* ⚠️ ПРИГЛУШЕНИЕ СМЕШИВАЕТСЯ С ОБЫЧНЫМ ВИДОМ ПО СИЛЕ ПОДСВЕТКИ, а не
+       включается щелчком. Иначе после соскальзывания с линии карта
+       возвращалась бы к обычному виду рывком, ровно тем самым миганием,
+       ради которого и заведена липкость. */
+    a2 = a2 * hl + (1 - hl);
     /* Тема и тег отличаются РАЗМЕРОМ И СИЛОЙ ЦВЕТА, а не оттенком: цвет
        у всех один. Базовая непрозрачность домножается на состояние. */
     a2 *= n.k === 'theme' ? BASE_ALPHA_THEME : BASE_ALPHA_TAG;
 
     /* Подсветка — всегда акцент, и наведение, и выбор, и найденное
        поиском: один цвет на все случаи, чтобы человек не гадал, что
-       означает второй. */
+       означает второй. Акцент кладётся ПОВЕРХ обычного цвета с силой
+       подсветки: так он не переключается, а проступает и тает. */
     var hot = dim && (on || near);
-    ctx.fillStyle = (hot ? PAL.accentShades : PAL.nodeShades)[shadeIndex(a2)];
+    ctx.fillStyle = PAL.nodeShades[shadeIndex(a2)];
     ctx.beginPath();
     ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
     ctx.fill();
+    if (hot && hl > 0.01) {
+      ctx.fillStyle = PAL.accentShades[shadeIndex(a2 * hl)];
+      ctx.beginPath();
+      ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
+      ctx.fill();
+    }
 
     if (picked[n.id]) {
       /* Ореол и обводка — тем же акцентом: выбранное видно всегда. */
@@ -918,8 +1298,8 @@ function draw() {
       ctx.lineWidth = 1.8;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2, 0, 6.283185307179586); ctx.stroke();
       ctx.lineWidth = 1;
-    } else if (n === hoverNode) {
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.8)];
+    } else if (n === active) {
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.8 * hl)];
       ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2.5, 0, 6.283185307179586); ctx.stroke();
       ctx.lineWidth = 1;
@@ -939,240 +1319,428 @@ function labelGap(node, cx, cy, w, h) {
   return Math.hypot(dx, dy);
 }
 
-/* Тема сохраняет своё имя в фокус-режиме, если она сама в фокусе либо
-   хоть один её тег подсвечен — как свой или как смежный. */
-function themeSpeaks(th) {
-  if (th === focusTheme) return true;
-  var tags = tagsOfTheme[th.n] || [];
-  for (var i = 0; i < tags.length; i++) {
-    var id = tags[i].id;
-    if ((litSet && litSet[id]) || (litNear && litNear[id])) return true;
+/* ── Якорь подписи раздела ────────────────────────────────────────────
+   Раздел — не узел, у него нет своего места на карте. Его якорь: центр
+   масс ТЕМ раздела в трёхмерных координатах, спроецированный на экран и
+   приподнятый на 0,6 экранного радиуса ОБЛАКА раздела (тем и их тегов).
+   Приподнятый — потому что надпись-ориентир стоит НАД скоплением, как
+   название страны над её городами, а не поверх них. */
+var groupPt = { px: 0, py: 0, ps: 1, pz: 1 };
+
+function groupAnchor(g, out) {
+  var i, j, th, tags, cnt = 0, sx = 0, sy = 0, sz = 0;
+  for (i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th) continue;
+    sx += th.x; sy += th.y; sz += th.z; cnt++;
   }
-  return false;
+  if (!cnt) { out.pz = -1; return out; }
+  projectPoint(sx / cnt, sy / cnt, sz / cnt, groupPt);
+  if (groupPt.pz < 0) { out.pz = -1; return out; }
+  /* Дальше нужны экранные центры соседей — см. подъём ниже. */
+
+  /* Экранный радиус облака.
+     ⚠️ СРЕДНЕКВАДРАТИЧНЫЙ, А НЕ МАКСИМАЛЬНЫЙ. По максимуму один-
+     единственный далеко улетевший тег раздувал радиус вчетверо (у «Фирмы
+     и структур рынка» 520 px против 190 по среднему), и надпись улетала
+     на треть холста от своего скопления. Среднеквадратичное расстояние
+     описывает облако, а не его самый дальний выброс. */
+  var s2 = 0, m = 0;
+  for (i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th || th.pz < 0) continue;
+    s2 += (th.px - groupPt.px) * (th.px - groupPt.px) +
+          (th.py - groupPt.py) * (th.py - groupPt.py);
+    m++;
+    tags = tagsOfTheme[g.themes[i]] || [];
+    for (j = 0; j < tags.length; j++) {
+      if (tags[j].pz < 0) continue;
+      s2 += (tags[j].px - groupPt.px) * (tags[j].px - groupPt.px) +
+            (tags[j].py - groupPt.py) * (tags[j].py - groupPt.py);
+      m++;
+    }
+  }
+  var R = m ? Math.sqrt(s2 / m) : 0;
+
+  /* ⚠️ ПОДЪЁМ ОГЛЯДЫВАЕТСЯ НА СОСЕДЕЙ, А НЕ ТОЛЬКО НА СВОЙ РАДИУС.
+     Облака разделов на экране пересекаются: центры масс «Основ и выбора»
+     и «Рынка и потребителя» отстоят на 49 px. Подъём на 0,6 радиуса уводил
+     надпись мимо своего скопления прямо к чужому — у трёх разделов из семи
+     она оказывалась ближе к чужому центру масс, чем к своему.
+
+     Сколько поднимать можно, считается точно, а не на глаз. Надпись стоит
+     в (cx, cy − h); чужой центр в (ox, oy); dx = cx − ox, dy = cy − oy.
+     Условие «ближе к своему» h² < dx² + (dy − h)² сводится к
+     2·h·dy < dx² + dy². Соседи НИЖЕ нас (dy ≤ 0) подъёму не мешают вовсе,
+     а каждый сосед выше даёт свой потолок D²/(2·dy). */
+  var lift = R * 0.6;
+  for (i = 0; i < groups.length; i++) {
+    if (groups[i].k === g.k) continue;
+    var o = groupCentre(groups[i], groupOther);
+    if (o.pz < 0) continue;
+    var dx = groupPt.px - o.px, dy = groupPt.py - o.py;
+    if (dy <= 0) continue;                    /* сосед ниже — не мешает */
+    var cap = (dx * dx + dy * dy) / (2 * dy) * 0.9;   /* с полем в 10 % */
+    if (cap < lift) lift = cap;
+  }
+  if (lift < 0) lift = 0;
+
+  out.px = groupPt.px;
+  out.py = groupPt.py - lift;
+  out.pz = groupPt.pz;
+  out.r = R;
+  out.lift = lift;
+  out.cx = groupPt.px;
+  out.cy = groupPt.py;
+  return out;
 }
 
-/* Кто важнее, когда места на всех не хватает: тема в фокусе, затем
-   выбранные, затем найденные поиском, затем — крупные по числу задач. */
-function themeRank(th) {
-  if (focusTheme === th) return 0;
-  if (picked[th.id]) return 1;
-  if (searchHits && searchHits[th.id]) return 2;
-  return 3;
+/* Только центр масс раздела, без радиуса и подъёма: нужен и самому
+   groupAnchor (чтобы оглядываться на соседей), и сторожу раскладки. */
+var groupOther = { px: 0, py: 0, pz: 1 };
+
+function groupCentre(g, out) {
+  var cnt = 0, sx = 0, sy = 0, sz = 0, th;
+  for (var i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th) continue;
+    sx += th.x; sy += th.y; sz += th.z; cnt++;
+  }
+  if (!cnt) { out.pz = -1; return out; }
+  return projectPoint(sx / cnt, sy / cnt, sz / cnt, out);
+}
+
+/* Сторож надписи-ориентира: точка годится, только если она ближе к центру
+   масс СВОЕГО раздела, чем к центру масс любого чужого. Это и есть
+   инвариант «надпись принадлежит своему скоплению», проверяемый прямо, а
+   не через запас по расстоянию. Соседние центры снимаются один раз на
+   кадр: внутри перебора позиций их пересчёт стоил бы семикратно. */
+function groupGuard(g, cx, cy) {
+  var others = [];
+  for (var i = 0; i < groups.length; i++) {
+    if (groups[i].k === g.k) continue;
+    var o = groupCentre(groups[i], { });
+    if (o.pz > 0) others.push([o.px, o.py]);
+  }
+  return function (x, y) {
+    var own = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+    for (var j = 0; j < others.length; j++) {
+      var dx = x - others[j][0], dy = y - others[j][1];
+      if (dx * dx + dy * dy <= own) return false;
+    }
+    return true;
+  };
+}
+
+/* ── Поиск свободного места ───────────────────────────────────────────
+   Позиции перебираются по возрастанию смещения от исходной, берётся
+   первая свободная ОТ ВСЕХ уже размещённых. Отпрыгивание «от первой
+   помехи» здесь не годится: оно загоняет подпись в объятия второй, та
+   отправляет обратно к первой, попытки кончаются — и подпись остаётся
+   лежать поверх соседки (замер на 29 подписях: 16 пересечений).
+
+   ⚠️ РАДИУС ПОИСКА ОГРАНИЧЕН. Двумерный поиск без ограничения доводил
+   пересечения до нуля ценой смысла: подпись уезжала к краю холста, а её
+   узел оставался в середине, и выноска читалась как случайная линия.
+   Дальше maxAway от своего узла подпись не ставится ВОВСЕ: имя без
+   адреса хуже, чем его отсутствие. */
+function findSpot(x0, y0, w, h, node, maxAway, placed, guard) {
+  var half = w / 2 + 5;
+  var STEP_Y = LINE_H + 5, STEP_X = 24;
+  for (var d = 0; d <= 14; d++) {
+    for (var sx = 0; sx <= d; sx++) {
+      var dy = d - sx;
+      var xs = sx === 0 ? [0] : [-sx, sx];
+      var ys = dy === 0 ? [0] : [-dy, dy];
+      for (var a1 = 0; a1 < xs.length; a1++) {
+        for (var a2 = 0; a2 < ys.length; a2++) {
+          var cx = x0 + xs[a1] * STEP_X, cy = y0 + ys[a2] * STEP_Y;
+          if (cy - h / 2 < 6 || cy + h / 2 > H - 6) continue;
+          if (cx - half < 4 || cx + half > W - 4) continue;
+          /* ⚠️ Меряем до БЛИЖНЕЙ КРОМКИ подписи, а не до её середины: ровно
+             это расстояние человек видит — оно и есть длина выноски. */
+          if (node && labelGap(node, cx, cy, w, h) > maxAway) continue;
+          /* Сторож: у надписи-ориентира нет своего узла, зато есть своё
+             скопление, с которого она не должна сходить. */
+          if (guard && !guard(cx, cy)) continue;
+          var clear = true;
+          for (var b = 0; b < placed.length; b++) {
+            var pb = placed[b];
+            if (Math.abs(pb.x - cx) < half + pb.w / 2 + 5 &&
+                Math.abs(pb.y - cy) < (pb.h + h) / 2 + 4) { clear = false; break; }
+          }
+          if (clear) return [cx, cy];
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function drawLabels(dim) {
-  var i;
-  /* ⚠️ ПОДПИСИ ТЕГОВ И ПОДПИСИ ТЕМ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК
-     ЗАНЯТЫХ МЕСТ. Пока каждый слой раскладывался сам по себе, они честно
-     не пересекались внутри себя и дружно налезали друг на друга: имя темы
-     рисуется последним и своей подложкой затирало половину раскрытых имён
-     тегов. */
-  var taken = [];
+  var i, k, L;
+  var now = frameNow || performance.now();
 
-  /* ⚠️ ПЛАН ПОДПИСЕЙ ТЕМ СЧИТАЕТСЯ ДО ТЕГОВ, ХОТЯ САМИ ТЕМЫ РИСУЮТСЯ ПОСЛЕ.
-     В фокус-режиме имена ЧУЖИХ тем гаснут и НЕ УЧАСТВУЮТ В РАСКЛАДКЕ:
-     рисуются первыми, под тегами, и в список занятых мест не попадают.
-     Иначе раскрытые теги темы разъезжаются к краям холста, обходя два
-     десятка чужих имён, — а место нужно им, а не приглушённым соседям. */
-  ctx.font = '500 ' + LABEL_THEME_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  var plan = [], quiet = [];
-  for (i = 0; i < themeList.length; i++) {
-    var th = themeList[i];
-    if (th.pz < 0) continue;
-    if (th.px < -60 || th.px > W + 60 || th.py < -40 || th.py > H + 40) continue;
-    var text = cutLabel(th.l, THEME_MAX_CHARS);
-    var item = {
-      node: th, text: text,
-      w: ctx.measureText(text).width,
-      y: th.py - nodeRadius(th) - 11,
-      lit: !dim || isLit(th) || (focusTheme === th)
-    };
-    (focusTheme && !themeSpeaks(th) ? quiet : plan).push(item);
-  }
+  /* ⚠️ ВСЕ ПОДПИСИ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК ЗАНЯТЫХ МЕСТ.
+     Пока каждый слой раскладывался сам по себе, они честно не пересекались
+     внутри себя и дружно налезали друг на друга. */
+  var placed = [];
 
-  for (i = 0; i < quiet.length; i++) {
-    var q = quiet[i];
-    var qHalf = q.w / 2 + 5;
-    drawLabelLines([q.text],
-                   Math.max(qHalf + 4, Math.min(W - qHalf - 4, q.node.px)),
-                   Math.max(12, Math.min(H - 12, q.y)),
-                   'center', THEME_QUIET_ALPHA, PAL.textCss, LABEL_THEME_PX);
-  }
-  lastQuietCount = quiet.length;
+  /* ── 1. Кто вообще должен быть виден ─────────────────────────────────
+     ⚠️ ИМЁН ТЕМ И ТЕГОВ В ПОКОЕ БОЛЬШЕ НЕТ. Двадцать девять подписей во
+     вращающейся сцене читались как каша: ни один живой аналог столько
+     текста в движении не держит (3d-force-graph, Obsidian, Map of Reddit,
+     Embedding Projector — обзор владельца, ADR 0039). Вместо них семь
+     надписей-ориентиров по разделам корпуса, как названия стран на карте.
+     Имя темы или тега появляется ровно в четырёх случаях, и все четыре —
+     по воле человека: узел под курсором, связь под курсором, узел выбран,
+     узел найден поиском. */
+  var want = [];
+  var lit = !!(litSet || searchHits);
 
-  /* ── Теги ───────────────────────────────────────────────────────────
-     ⚠️ МАСШТАБ БОЛЬШЕ НЕ ПОДПИСЫВАЕТ ТЕГИ. Раньше при zoom ≥ 1.25 имена
-     тегов проступали сами: на 276 % экран превращался в кашу из полусотни
-     строк, и разглядеть в ней что-либо было нельзя. Теперь имя тега
-     появляется РОВНО в четырёх случаях, и все четыре — по воле человека:
-     курсор на самом теге, курсор на его теме (фокус-режим ниже), тег
-     выбран, тег найден поиском. */
-  if (focusTheme && focusTheme.pz > 0) {
-    /* Фокус-режим: у темы под курсором подписаны ВСЕ теги, двумя
-       колонками, с выносками. */
-    var items = layoutFocusLabels(focusTheme);
-    for (i = 0; i < items.length; i++) {
-      var it = items[i];
-      var t = it.node;
-      /* Выноска: от узла до края колонки, внутрь плашки не заходит. */
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.55)];
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(t.px + (it.side < 0 ? -1 : 1) * (nodeRadius(t) + 2), t.py);
-      ctx.lineTo(it.x - it.side * 10, it.y);
-      ctx.stroke();
-      ctx.lineWidth = 1;
-      var box = drawLabelLines(it.lines, it.x, it.y, it.side < 0 ? 'right' : 'left',
-                               1, PAL.textCss, LABEL_TAG_PX);
-      taken.push({ x: box.left + box.w / 2, y: it.y, w: box.w,
-                   h: box.h, l: it.node.l });
+  /* Разделы. */
+  var zoomFade = 1 - (cam.zoom - GROUP_ZOOM_FROM) / (GROUP_ZOOM_TO - GROUP_ZOOM_FROM);
+  if (zoomFade > 1) zoomFade = 1; else if (zoomFade < 0) zoomFade = 0;
+  var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade;
+  if (!focusTheme) {
+    for (i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var a = groupAnchor(g, gAnchor);
+      if (a.pz < 0) continue;
+      want.push({ key: 'g:' + g.k, kind: 'group', text: g.l.toUpperCase(),
+                  lines: null, node: null, ax: a.px, ay: a.py,
+                  talpha: groupAlpha, prio: 9, stick: false,
+                  px: GROUP_PX, weight: 600, spacing: GROUP_SPACING,
+                  maxAway: 1e9, plate: false,
+                  guard: groupGuard(g, a.cx, a.cy) });
     }
-  } else if (litSet || searchHits) {
-    /* Вне фокус-режима — только у подсвеченных, с лимитом. */
-    var shown = 0;
-    var boxes = [];
-    for (i = 0; i < order.length && shown < LABEL_BUDGET; i++) {
-      var n = order[order.length - 1 - i];        /* ближние раньше */
-      if (!n || n.k !== 'tag' || n.pz < 0) continue;
-      if (!(isLit(n) || (litNear && litNear[n.id]))) continue;
-      if (n.px < 0 || n.px > W || n.py < 0 || n.py > H) continue;
+  }
 
-      var lines = wrapLabel(n.l, TAG_WRAP_CHARS, 2);
-      ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      var wMax = 0;
-      for (var qq = 0; qq < lines.length; qq++) {
-        wMax = Math.max(wMax, ctx.measureText(lines[qq]).width);
-      }
-      var hAll = lines.length * LINE_H;
-      var gap = nodeRadius(n) + 12;               /* подпись не ближе 12px */
-      var side = (n.px + gap + wMax < W) ? 1 : -1;
-      var lx = n.px + side * gap;
-      var ly = n.py, tries = 0, hit = true;
-      while (tries < 3 && hit) {
-        hit = false;
-        for (var b = 0; b < boxes.length; b++) {
-          var bx = boxes[b];
-          if (Math.abs(bx.y - ly) < (bx.h + hAll) / 2 + 3 &&
-              Math.abs(bx.x - lx) < (bx.w + wMax) / 2 + 6) { hit = true; break; }
-        }
-        if (hit) { ly += hAll + 4; tries++; }
-      }
-      if (hit) continue;
-      var left = side > 0 ? lx : lx - wMax;
-      boxes.push({ x: left + wMax / 2, y: ly, w: wMax, h: hAll });
-      taken.push({ x: left + wMax / 2, y: ly, w: wMax, h: hAll, l: n.l });
-      drawLabelLines(lines, lx, ly, side > 0 ? 'left' : 'right',
-                     1, PAL.textCss, LABEL_TAG_PX);
+  /* Узлы: под курсором, выбранные, найденные поиском. */
+  var nodeWant = {};
+  function askNode(n, prio, stick) {
+    if (!n || n.pz < 0) return;
+    if (n.px < 0 || n.px > W || n.py < 0 || n.py > H) return;
+    /* Теги темы в фокусе рисует раскладка по колонкам — не дублируем. */
+    if (focusTheme && n.k === 'tag' && n.n === focusTheme.n) return;
+    var was = nodeWant[n.id];
+    if (was && was.prio <= prio) { if (stick) was.stick = true; return; }
+    var isTheme = n.k === 'theme';
+    var item = {
+      key: n.id, kind: n.k,
+      text: isTheme ? cutLabel(n.l, THEME_MAX_CHARS) : n.l,
+      lines: isTheme ? null : wrapLabel(n.l, TAG_WRAP_CHARS, 2),
+      node: n, ax: n.px, ay: n.py,
+      talpha: 1, prio: prio, stick: !!stick,
+      px: isTheme ? LABEL_THEME_PX : LABEL_TAG_PX, weight: 500, spacing: 0,
+      maxAway: LABEL_MAX_AWAY, plate: true
+    };
+    if (was) { for (var f in item) was[f] = item[f]; }
+    else { nodeWant[n.id] = item; want.push(item); }
+  }
+
+  /* Узел под курсором и его контекст: тег — вместе со своей темой.
+     Прозрачность берётся у подсветки: подпись обязана таять вместе с ней,
+     иначе имя висит над уже погасшим узлом. */
+  if (active) {
+    askNode(active, 0, true);
+    if (active.k === 'tag') askNode(byId['t' + active.n], 1, true);
+  }
+  /* Идём по маршруту — подписан узел на ДАЛЬНЕМ конце: видно, куда придёшь.
+     Ближний конец — это сам active, он подписан выше. */
+  if (route) askNode(route.b, 0, true);
+  /* Выбранное. */
+  for (k in picked) {
+    if (!picked[k]) continue;
+    var pn = byId[k];
+    askNode(pn, 2, true);
+    if (pn && pn.k === 'tag') askNode(byId['t' + pn.n], 3, true);
+  }
+  /* Найденное поиском — с лимитом: сотня строк на экране это не помощь. */
+  if (searchHits) {
+    var shown = 0;
+    for (i = order.length - 1; i >= 0 && shown < LABEL_BUDGET; i--) {
+      var sn = order[i];
+      if (!sn || !searchHits[sn.id] || sn.pz < 0) continue;
+      askNode(sn, 4, false);
       shown++;
     }
   }
 
-  /* ── Темы: подписаны ВСЕГДА ─────────────────────────────────────────
-     Включая режим приглушения. Иначе при выборе тега имена остальных тем
-     гаснут, и человек ищет нужную тему наугад.
-     ⚠️ «Видны всегда» означает и «не наезжают друг на друга»: темы стоят
-     плотно, и без раздвижки соседние имена сливались в нечитаемую кашу
-     («Другое» поверх «Данные, статистика и причинность»). Раздвигаем по
-     вертикали в порядке важности: кому места не досталось — тот остаётся
-     без подписи, и это честнее оторванной. */
-  plan.sort(function (a, b) {
-    var ra = themeRank(a.node), rb = themeRank(b.node);
-    if (ra !== rb) return ra - rb;
-    return (b.node.c || 0) - (a.node.c || 0);     /* крупные важнее */
-  });
+  /* Пояснение — только у перекрёстной связи: у дороги тема→тег пояснять
+     нечего, там связь и так очевидна из имён. */
+  if (route && route.why) {
+    want.push({ key: 'e:' + route.key, kind: 'edge', text: route.why,
+                lines: null, node: null,
+                ax: (route.a.px + route.b.px) / 2,
+                ay: (route.a.py + route.b.py) / 2,
+                talpha: EDGE_LABEL_ALPHA, prio: 0, stick: true,
+                px: EDGE_LABEL_PX, weight: 500, spacing: 0,
+                maxAway: 1e9, plate: true });
+  }
 
-  var placed = taken;            /* темы обходят и подписи тегов тоже */
-  lastThemeBoxes = placed;
-  lastThemeFrom = taken.length;
+  /* Наведение тает вместе с подсветкой; выбранное и найденное — нет. */
+  if (hlAlpha < 1 && active) {
+    for (i = 0; i < want.length; i++) {
+      var wq = want[i];
+      if (wq.kind === 'group') continue;
+      if (wq.node && picked[wq.node.id]) continue;
+      if (wq.talpha > hlAlpha) wq.talpha = hlAlpha;
+    }
+  }
+
+  /* ── 2. Гашение на время движения ────────────────────────────────────
+     Активное движение уводит прозрачность в ноль у всего, кроме того, что
+     человек держит под курсором или выбрал: иначе невозможно рассмотреть
+     то, что держишь. Порог выше скорости автовращения, поэтому тихое
+     вращение подписи не гасит — они просто едут за узлами. */
+  if (!labelsCalm) {
+    for (i = 0; i < want.length; i++) if (!want[i].stick) want[i].talpha = 0;
+  }
+
+  /* ── 3. Обновляем память подписей ────────────────────────────────────*/
+  var sig = '';
+  for (i = 0; i < want.length; i++) {
+    var it = want[i];
+    if (it.talpha >= LB_MIN_ALPHA) sig += it.key + '|';
+  }
+  var composed = (sig !== labelSig);
+  labelSig = sig;
+
+  /* Раскладка запускается, когда сцена спокойна и с прошлой прошло не
+     меньше LAYOUT_MS, либо когда изменился сам состав подписей. Во время
+     движения раскладка НЕ считается: подписи едут за якорями с прежним
+     смещением — от этого и уходит дрожание. */
+  var relayout = composed || (labelsCalm && now - labelLayoutAt >= LAYOUT_MS);
+
+  var live = [];
+  for (i = 0; i < want.length; i++) {
+    var w0 = want[i];
+    L = labelOf(w0.key, w0.kind, w0.text);
+    L.ax = w0.ax; L.ay = w0.ay;
+    L.talpha = w0.talpha;
+    L.prio = w0.prio;
+    L.lines = w0.lines || [w0.text];
+    L.pxSize = w0.px; L.weight = w0.weight; L.spacing = w0.spacing;
+    L.plate = w0.plate; L.node = w0.node; L.maxAway = w0.maxAway;
+    L.guard = w0.guard || null;
+    /* Размеры меряются в текущем шрифте — они нужны и раскладке, и
+       отрисовке, и проверке на пересечение. */
+    setLabelFont(L.pxSize, L.weight, L.spacing);
+    var wMax = 0;
+    for (k = 0; k < L.lines.length; k++) {
+      wMax = Math.max(wMax, ctx.measureText(L.lines[k]).width);
+    }
+    L.w = wMax;
+    L.h = L.lines.length * LINE_H;
+    live.push(L);
+  }
+  /* Подпись, которой в этом кадре не попросили, гаснет — плавно. */
+  for (k in LB) if (LB[k].talpha !== 0 && live.indexOf(LB[k]) < 0) LB[k].talpha = 0;
+
+  /* ── 4. Раскладка ────────────────────────────────────────────────────*/
   lastThemeMissing = 0;
   lastThemeMissingNames = [];
   lastThemeAway = 0;
-  for (i = 0; i < plan.length; i++) {
-    var it2 = plan[i];
-    var half = it2.w / 2 + 5;
 
-    /* ⚠️ ИЩЕМ БЛИЖАЙШЕЕ СВОБОДНОЕ МЕСТО, А НЕ «ОТПРЫГИВАЕМ ОТ СОСЕДА».
-       Отпрыгивание от первой помехи загоняет подпись в объятия второй, та
-       отправляет обратно к первой, попытки кончаются — и подпись остаётся
-       лежать поверх соседки. Замер на 29 подписях: 16 пересечений. Здесь
-       позиции перебираются по возрастанию смещения от исходной, и берётся
-       первая, свободная ОТ ВСЕХ уже размещённых.
-
-       ⚠️ РАДИУС ПОИСКА ОГРАНИЧЕН, И ЭТО ГЛАВНОЕ ПРАВИЛО ЭТОГО МЕСТА.
-       Двумерный поиск без ограничения доводил пересечения до нуля ценой
-       смысла: «Международная торговля» и «Инфляция и индексы цен» уезжали
-       к левому краю холста, а их узлы оставались в середине — выноска
-       тянулась через полэкрана и читалась как случайная линия. Дальше
-       LABEL_MAX_AWAY от своего узла подпись не ставится ВОВСЕ: имя без
-       адреса хуже, чем его отсутствие. */
-    var x0 = it2.node.px, y0 = it2.y;
-    var foundX = 0, foundY = 0, ok = false;
-
-    var STEP_Y = LINE_H + 5, STEP_X = 24;
-    for (var d = 0; d <= 14 && !ok; d++) {
-      for (var sx = 0; sx <= d && !ok; sx++) {
-        var dy = d - sx;
-        var xs = sx === 0 ? [0] : [-sx, sx];
-        var ys = dy === 0 ? [0] : [-dy, dy];
-        for (var a1 = 0; a1 < xs.length && !ok; a1++) {
-          for (var a2 = 0; a2 < ys.length && !ok; a2++) {
-            var cx = x0 + xs[a1] * STEP_X, cy = y0 + ys[a2] * STEP_Y;
-            if (cy < 12 || cy > H - 12) continue;
-            if (cx - half < 4 || cx + half > W - 4) continue;
-            /* ⚠️ МЕРЯЕМ ДО БЛИЖНЕЙ КРОМКИ ПОДПИСИ, А НЕ ДО ЕЁ СЕРЕДИНЫ, И
-               ЭТО НЕ ПОБЛАЖКА. Ровно это расстояние человек видит: оно и
-               есть длина выноски от кружка до плашки. Мерить до середины
-               значило бы наказывать длинное имя за длину — у «Монетарной
-               политики и банковской системы» середина отстоит на 96 px,
-               когда сама подпись начинается в 12 px от узла. Замер на
-               29 подписях: по кромке не размещается 0 тем, по середине —
-               шесть, и пять из них только потому, что имя длинное. */
-            if (labelGap(it2.node, cx, cy, it2.w, LINE_H) > LABEL_MAX_AWAY) continue;
-            var clear = true;
-            for (var b2 = 0; b2 < placed.length; b2++) {
-              var pb = placed[b2];
-              if (Math.abs(pb.x - cx) < half + pb.w / 2 + 5 &&
-                  Math.abs(pb.y - cy) < (pb.h || LINE_H) / 2 + LINE_H / 2 + 4) {
-                clear = false; break;
-              }
-            }
-            if (clear) { foundX = cx; foundY = cy; ok = true; }
-          }
-        }
+  if (relayout) {
+    labelLayoutAt = now;
+    /* Порядок важности: связь и то, что под курсором, — раньше фона. */
+    live.sort(function (p, q) { return p.prio - q.prio; });
+    for (i = 0; i < live.length; i++) {
+      L = live[i];
+      if (L.talpha < LB_MIN_ALPHA) continue;
+      var y0 = L.node ? L.ay - nodeRadius(L.node) - 11 - (L.h - LINE_H) / 2 : L.ay;
+      var spot = findSpot(L.ax, y0, L.w, L.h, L.node, L.maxAway, placed, L.guard);
+      if (!spot) {
+        L.missed = true;
+        lastThemeMissing++;
+        lastThemeMissingNames.push(L.text);
+        continue;
       }
+      L.missed = false;
+      L.tox = spot[0] - L.ax;
+      L.toy = spot[1] - L.ay;
+      L.placedAt = now;
+      if (L.born) { L.ox = L.tox; L.oy = L.toy; L.born = false; }
+      placed.push({ x: spot[0], y: spot[1], w: L.w, h: L.h, l: L.text });
     }
-    if (!ok) { lastThemeMissing++; lastThemeMissingNames.push(it2.text); continue; }
+  }
 
-    it2.x = foundX;
-    it2.y = foundY;
-    placed.push({ x: it2.x, y: it2.y, w: it2.w, h: LINE_H, l: it2.text });
+  /* ── 5. Отрисовка ────────────────────────────────────────────────────
+     Рисуем в (ax + ox, ay + oy) — там, куда подпись ДОЕХАЛА, а не там,
+     куда раскладка положила её прямо сейчас. Фоновые подписи разделов
+     идут первыми, под всем остальным. */
+  var boxes = [];
+  live.sort(function (p, q) { return q.prio - p.prio; });
+  for (i = 0; i < live.length; i++) {
+    L = live[i];
+    if (L.alpha < LB_MIN_ALPHA || L.missed) continue;
+    var lx = L.ax + L.ox, ly = L.ay + L.oy;
 
-    /* Подпись, уступившая место соседке, могла отойти от своего узла.
-       Тонкая выноска возвращает ей адрес: иначе имя темы висит в пустоте и
-       человек не знает, к какому кружку оно относится. Длина выноски по
-       построению не больше LABEL_MAX_AWAY. */
-    var away = labelGap(it2.node, it2.x, it2.y, it2.w, LINE_H);
-    if (away > lastThemeAway) lastThemeAway = away;
-    if (away > LABEL_LEADER_MIN) {
-      /* Выноска ведёт к ближайшему краю плашки, а не в её середину: линия
-         не должна заходить под текст. */
-      var tx = it2.x + (it2.node.px > it2.x ? it2.w / 2 + 4 : -(it2.w / 2 + 4));
-      if (Math.abs(it2.node.px - it2.x) < it2.w / 2) tx = it2.node.px;
-      var ty = it2.y + (it2.y > it2.node.py ? -10 : 10);
-      var rr = nodeRadius(it2.node) + 2;
-      var ang = Math.atan2(ty - it2.node.py, tx - it2.node.px);
-      ctx.strokeStyle = PAL.borderShades[shadeIndex(0.45)];
+    /* Выноска: подпись, уступившая место соседке, могла отойти от узла —
+       тонкая линия возвращает ей адрес. */
+    if (L.node) {
+      var away = labelGap(L.node, lx, ly, L.w, L.h);
+      if (away > lastThemeAway) lastThemeAway = away;
+      if (away > LABEL_LEADER_MIN) drawLeader(L.node, lx, ly, L.w, L.alpha);
+    }
+
+    setLabelFont(L.pxSize, L.weight, L.spacing);
+    var isRegion = L.kind === 'group';
+    drawLabelLines(L.lines, lx, ly, 'center', L.alpha,
+                   isRegion ? PAL.regionCss : PAL.textCss,
+                   L.pxSize, L.weight, L.spacing, L.plate,
+                   isRegion ? GROUP_HALO : 0);
+    boxes.push({ x: lx, y: ly, w: L.w, h: L.h, l: L.text, kind: L.kind });
+  }
+  ctx.letterSpacing = '0px';
+
+  /* ── 6. Фокус-режим: у темы под курсором подписаны ВСЕ теги ──────────
+     Единственное место, где текста на экране много, и там он оправдан:
+     человек сам раскрыл тему и смотрит её состав. */
+  lastQuietCount = 0;
+  if (focusTheme && focusTheme.pz > 0) {
+    var items = layoutFocusLabels(focusTheme);
+    for (i = 0; i < items.length; i++) {
+      var it2 = items[i];
+      var t = it2.node;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.55)];
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.moveTo(it2.node.px + Math.cos(ang) * rr, it2.node.py + Math.sin(ang) * rr);
-      ctx.lineTo(tx, ty);
+      ctx.moveTo(t.px + (it2.side < 0 ? -1 : 1) * (nodeRadius(t) + 2), t.py);
+      ctx.lineTo(it2.x - it2.side * 10, it2.y);
       ctx.stroke();
       ctx.lineWidth = 1;
+      var box = drawLabelLines(it2.lines, it2.x, it2.y,
+                               it2.side < 0 ? 'right' : 'left',
+                               1, PAL.textCss, LABEL_TAG_PX, 500, 0, true);
+      boxes.push({ x: box.left + box.w / 2, y: it2.y, w: box.w, h: box.h,
+                   l: t.l, kind: 'tag' });
     }
-
-    drawLabelLines([it2.text], it2.x, it2.y, 'center',
-                   it2.lit ? 1 : 0.55, PAL.textCss, LABEL_THEME_PX);
   }
+
+  lastThemeBoxes = boxes;
+  lastThemeFrom = 0;
+}
+
+/* Выноска от узла к ближнему краю плашки: линия не должна заходить под
+   текст, иначе она перечёркивает буквы. */
+function drawLeader(node, lx, ly, w, alpha) {
+  var tx = lx + (node.px > lx ? w / 2 + 4 : -(w / 2 + 4));
+  if (Math.abs(node.px - lx) < w / 2) tx = node.px;
+  var ty = ly + (ly > node.py ? -10 : 10);
+  var rr = nodeRadius(node) + 2;
+  var ang = Math.atan2(ty - node.py, tx - node.px);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = PAL.borderShades[shadeIndex(0.45)];
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(node.px + Math.cos(ang) * rr, node.py + Math.sin(ang) * rr);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
 }
 
 
@@ -1188,6 +1756,71 @@ function drawLabels(dim) {
    изменение размера окна, смена темы. */
 var dirty = true;
 function wake() { dirty = true; }
+
+/* ── Липкость подсветки ──────────────────────────────────────────────
+   ⚠️ БЕЗ НЕЁ «ИДТИ ПО ЛИНИИ» НЕВОЗМОЖНО. Пунктир тонкий, рука дрожит, и
+   курсор соскальзывает с него на пиксель по десять раз на пути. Мгновенное
+   гашение читалось бы как мигание, а вести мышью вдоль связи было бы
+   нельзя вовсе.
+
+   Потеряли цель — держим подсветку ещё STICKY_MS без единого изменения,
+   потом гасим за HL_FADE_MS. Нашли НОВУЮ цель за это время — переключаемся
+   немедленно; нашли ТУ ЖЕ — просто сбрасываем таймер, и никакого мигания. */
+var STICKY_MS = 280;
+var HL_FADE_MS = 200;
+var stickyUntil = 0;         /* до какого времени держим без изменений  */
+var hlAlpha = 0;             /* сила подсветки: 1 — полная, 0 — нет     */
+var hlTarget = 0;
+var lastFrameAt = 0;
+
+function hasPicked() {
+  for (var k in picked) if (picked[k]) return true;
+  return false;
+}
+
+/* Курсор нашёл цель — подсветка включается сразу, без плавности:
+   ожидание при наведении читается как задержка отклика. */
+function holdHighlight() {
+  stickyUntil = 0;
+  hlTarget = 1;
+  hlAlpha = 1;
+}
+
+/* Курсор цель потерял. Ничего не меняем — только заводим часы. */
+function releaseHighlight(now) {
+  if (!active) return;
+  if (!stickyUntil) stickyUntil = now + STICKY_MS;
+}
+
+function highlightTick(now) {
+  var dt = lastFrameAt ? Math.min(64, now - lastFrameAt) : 16;
+  lastFrameAt = now;
+
+  /* Выбранное и найденное держат подсветку сами: гаснет только наведение. */
+  if (hasPicked() || searchHits) { hlTarget = 1; if (hlAlpha < 1) hlAlpha = 1; }
+
+  if (stickyUntil && now >= stickyUntil) {
+    stickyUntil = 0;
+    active = null; route = null; focusTheme = null;
+    /* Выбранное и найденное держат подсветку сами — гасить нечего. */
+    if (hasPicked() || searchHits) { rebuildHighlight(); }
+    else { hlTarget = 0; }
+    renderHover(null);
+    canvas.classList.remove('is-hit');
+    wake();
+  }
+
+  if (hlAlpha !== hlTarget) {
+    var step = dt / HL_FADE_MS;
+    if (hlAlpha < hlTarget) hlAlpha = Math.min(hlTarget, hlAlpha + step);
+    else hlAlpha = Math.max(hlTarget, hlAlpha - step);
+    /* Догорело — только теперь снимаем подсветку по-настоящему. */
+    if (hlAlpha === 0) rebuildHighlight();
+    wake();
+    return true;
+  }
+  return false;
+}
 
 /* ── Авто-вращение ───────────────────────────────────────────────────── */
 var SPIN_START = 0.0011;      /* при открытии карты                       */
@@ -1258,6 +1891,19 @@ function frame(now) {
   var spin = spinSpeed(now);
   if (spin > 0) { cam.yaw += spin; moved = true; }
 
+  /* Скорость сцены и шаг анимации подписей — до отрисовки: кадр рисует
+     то, куда подписи доехали к этому моменту. */
+  frameNow = now;
+  if (highlightTick(now)) moved = true;
+  sceneTick(now);
+  labelTick();
+
+  /* Подписи едут или проявляются — значит кадру есть что показать, даже
+     если камера стоит. И раз в LAYOUT_MS в покое кадр нужен, чтобы
+     раскладка пересчиталась и подписи вернулись после движения. */
+  if (labelsBusy()) moved = true;
+  else if (labelsCalm && now - labelLayoutAt > LAYOUT_MS) moved = true;
+
   if (moved || dirty) {
     dirty = false;
     draw();
@@ -1313,34 +1959,91 @@ canvas.addEventListener('pointermove', function (e) {
     touchActivity(); wake();
     return;
   }
-  var hit = hitTest(p[0], p[1]);
-  canvas.classList.toggle('is-hit', !!hit);
-  if (hit !== hoverNode) {
-    hoverNode = hit;
-    focusTheme = (hit && hit.k === 'theme') ? hit : null;
-    rebuildHighlight();
-    renderHover(hit);
-    wake();
+  var got = pick(p[0], p[1]);
+  var hit = got.node || null, r = got.route || null;
+  canvas.classList.toggle('is-hit', !!(hit || r));
+
+  if (hit) {
+    /* Встали на узел. Маршрут при этом сбрасывается: путь кончился. */
+    holdHighlight();
+    if (hit !== active) {
+      setActive(hit);
+    } else if (route) {
+      route = null; wake();
+    }
+  } else if (r) {
+    /* Идём по ребру active. Сам active НЕ меняется — пока не дойдём. */
+    holdHighlight();
+    /* ⚠️ ПЕРЕХОД ТОЛЬКО ВПЕРЁД. Прошли больше ROUTE_ARRIVE_T пути либо
+       подошли к дальнему узлу ближе ROUTE_ARRIVE_PX — оказались в нём.
+       Движение НАЗАД по той же линии не переключает ничего: доля пути
+       уменьшается, ни одно из двух условий не выполняется. */
+    var toFar = Math.hypot(p[0] - r.b.px, p[1] - r.b.py);
+    if (r.t > ROUTE_ARRIVE_T || toFar < ROUTE_ARRIVE_PX) {
+      setActive(r.b);
+    } else if (!route || route.key !== r.key) {
+      route = r;
+      renderRoute(r);
+      wake();
+    } else {
+      /* Та же линия — обновляем только положение каретки. */
+      route = r;
+      wake();
+    }
+  } else {
+    /* Соскользнули — подсветка держится, часы пошли. */
+    releaseHighlight(performance.now());
   }
   touchActivity();
 });
+
+/* Встать на узел: одна точка входа в режим хождения. */
+function setActive(n) {
+  active = n;
+  route = null;
+  focusTheme = (n && n.k === 'theme') ? n : null;
+  rebuildHighlight();
+  renderHover(n);
+  wake();
+}
 
 canvas.addEventListener('pointerup', function (e) {
   dragging = false;
   canvas.classList.remove('is-drag');
   if (dragMoved < 5) {
     var p = localPoint(e);
-    var hit = hitTest(p[0], p[1]);
-    if (hit) togglePick(hit);
+    var got2 = pick(p[0], p[1]);
+    var hit = got2.node;
+    if (hit) {
+      togglePick(hit);
+    } else {
+      /* Клик посреди пути берёт ОБА конца маршрута — удобный способ взять
+         связанную пару целиком, не кликая по каждому узлу отдельно. */
+      var r2 = got2.route;
+      if (r2) {
+        var want = !(picked[r2.a.id] && picked[r2.b.id]);
+        if (want) {
+          picked[r2.a.id] = true;
+          picked[r2.b.id] = true;
+          lastPickedId = r2.b.id;
+        } else {
+          delete picked[r2.a.id];
+          delete picked[r2.b.id];
+          if (lastPickedId === r2.a.id || lastPickedId === r2.b.id) lastPickedId = null;
+        }
+        rebuildHighlight();
+        renderPicked();
+      }
+    }
   }
   touchActivity(); wake();
 });
 
 canvas.addEventListener('pointerleave', function () {
-  if (hoverNode) {
-    hoverNode = null; focusTheme = null;
-    rebuildHighlight(); renderHover(null); wake();
-  }
+  /* Курсор ушёл с холста — гасим по тем же часам, что и соскальзывание с
+     линии: отдельный мгновенный путь давал бы рывок там, где везде плавно. */
+  releaseHighlight(performance.now());
+  wake();
 });
 
 canvas.addEventListener('dblclick', function (e) {
@@ -1438,7 +2141,7 @@ function togglePick(n) {
   }
   rebuildHighlight();
   renderPicked();
-  if (!hoverNode) renderHover(null);
+  if (!active) refreshHoverPanel();
   wake();
 }
 
@@ -1450,7 +2153,7 @@ function clearPick() {
   applySearch('');
   rebuildHighlight();
   renderPicked();
-  renderHover(hoverNode);
+  refreshHoverPanel();
   wake();
 }
 
@@ -1495,7 +2198,10 @@ var HOWTO = '<ul class="tmap-howto">' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" opacity=".7"/></svg>' +
   '<span>Сплошная линия — дорога <b>тема → тег</b>.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/></svg>' +
-  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li></ul>';
+  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li>' +
+  '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="2.5" cy="11" r="2" fill="currentColor" opacity=".7"/><path d="M4 10 L12 3.5" stroke="currentColor" stroke-width="1.5" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
+  '<span><b>Встаньте на тег</b> — и от него можно уходить по линиям ' +
+  'к его теме и родственным тегам.</span></li></ul>';
 
 function renderHover(n) {
   if (!hoverBox) return;
@@ -1548,6 +2254,45 @@ function renderHover(n) {
       html += '</div>';
     }
   }
+  hoverBox.innerHTML = html;
+}
+
+/* Панель «Под курсором» по текущему состоянию. ⚠️ ОДНА ТОЧКА НА ВСЕХ:
+   пока сброс выбора звал renderHover(active) напрямую, он затирал
+   карточку связи подсказкой «Как читать карту» — курсор всё ещё стоял на
+   линии, а панель об этом уже не знала. */
+function refreshHoverPanel() {
+  if (route) renderRoute(route);
+  else renderHover(active);
+}
+
+/* Панель, пока человек идёт по линии. Главный вопрос в этот момент —
+   «куда я приду», поэтому дальний узел стоит первым и крупно. Пояснение
+   показывается только у перекрёстной связи: у дороги тема→тег пояснять
+   нечего. */
+function renderRoute(r) {
+  if (!hoverBox) return;
+  var far = r.b;
+  var isCross = r.link.k === 'cross';
+  var html = '<span class="tmap-kind">' +
+             (isCross ? 'идём к смежному тегу' : 'идём по дороге') + '</span>';
+  html += '<div class="tmap-name">' + esc(far.l) + '</div>';
+
+  if (far.k === 'theme') {
+    html += '<div class="tmap-parent"><span>тема ' + far.n + ' · ' +
+            (tagsOfTheme[far.n] || []).length + ' тегов</span></div>';
+  } else {
+    var th = byId['t' + far.n];
+    if (th) html += '<div class="tmap-parent"><span>' + esc(th.l) + '</span></div>';
+  }
+  html += (far.c === null || far.c === undefined)
+    ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет</span></div>'
+    : '<div class="tmap-num"><b>' + fmtNum(far.c) + '</b> задач</div>';
+
+  if (isCross && r.why) {
+    html += '<div class="tmap-why-link">Родство: <b>' + esc(r.why) + '</b></div>';
+  }
+  html += '<div class="tmap-from">от: ' + esc(r.a.l) + '</div>';
   hoverBox.innerHTML = html;
 }
 
@@ -1653,7 +2398,7 @@ var TOUR = [
     go: function () {
       var t = findTag('Кривая Лаффера');
       if (!t) return;
-      hoverNode = t; focusTheme = null;
+      active = t; focusTheme = null;
       rebuildHighlight(); renderHover(t);
       flyTo(byId['t' + t.n], 1.6);
     }
@@ -1671,7 +2416,7 @@ var TOUR = [
       [a, b].forEach(function (t) {
         if (t && !picked[t.id]) { picked[t.id] = true; tourDemo.push(t.id); }
       });
-      hoverNode = null;
+      active = null;
       rebuildHighlight(); renderPicked(); renderHover(null);
     }
   },
@@ -1790,7 +2535,7 @@ function tourEnd() {
   /* Тур убирает за собой свой показательный выбор и возвращает обзор. */
   tourDemo.forEach(function (id) { delete picked[id]; });
   tourDemo = [];
-  hoverNode = null; focusTheme = null;
+  active = null; focusTheme = null;
   rebuildHighlight(); renderPicked(); renderHover(null);
   resetView();
   try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
@@ -1853,7 +2598,7 @@ document.getElementById('tmap-chips').addEventListener('click', function (e) {
   delete picked[b.dataset.drop];
   if (lastPickedId === b.dataset.drop) lastPickedId = null;
   rebuildHighlight(); renderPicked();
-  if (!hoverNode) renderHover(null);
+  if (!active) renderHover(null);
   wake();
   touchActivity();
 });
@@ -1874,14 +2619,14 @@ if (themesBox) {
     var row = e.target.closest('.tmap-theme-row');
     if (!row) return;
     var n = byId['t' + row.dataset.theme];
-    if (n && n !== hoverNode) {
-      hoverNode = n; focusTheme = n;
+    if (n && n !== active) {
+      active = n; focusTheme = n;
       rebuildHighlight(); renderHover(n); wake();
     }
   });
   themesBox.addEventListener('mouseleave', function () {
-    if (hoverNode && hoverNode.k === 'theme') {
-      hoverNode = null; focusTheme = null;
+    if (active && active.k === 'theme') {
+      active = null; focusTheme = null;
       rebuildHighlight(); renderHover(null); wake();
     }
   });
@@ -1898,7 +2643,9 @@ if (themesBox) {
 
 /* Полоса затухания у нижней кромки панели гаснет, когда список
    докручен до конца или прокручивать нечего вовсе. */
-var panelBox = document.getElementById('tmap-panel');
+/* ⚠️ Опрашиваем НЕ панель, а её прокручиваемую часть: панель стала
+   неподвижной flex-колонкой и сама не прокручивается вовсе. */
+var panelBox = document.getElementById('tmap-panel-scroll');
 var panelFade = document.getElementById('tmap-panel-fade');
 
 function showPanelFade() {
@@ -1997,6 +2744,12 @@ window.TMAP = {
   fps: function () { return fpsValue; },
   stats: layoutStats,
   nodes: function () { return nodes; },
+  /* Рёбра с уже разрешёнными концами — для замеров попадания. */
+  links: function () {
+    return links.map(function (ln) {
+      return { a: byId[ln.s], b: byId[ln.t], k: ln.k, w: ln.w || '' };
+    });
+  },
   search: function (q) { return applySearch(q); },
   draw: function () { draw(); },
   /* Прямоугольники подписей тем после раздвижки — чтобы проверить, что ни
@@ -2007,15 +2760,118 @@ window.TMAP = {
   allBoxes: function () { draw(); return lastThemeBoxes.slice(); },
   /* Что кадр НЕ показал и как далеко увёл: приглушённые имена тем,
      ненарисованные имена тем и самое дальнее отстояние подписи от узла. */
-  labelReport: function () {
+  labelReport: function (settle) {
+    /* Инварианты меряются В ПОКОЕ: если не досчитать анимацию, замер
+       поймает подписи на полпути к своей прозрачности. */
+    if (settle !== false) { draw(); labelSettle(); }
     draw();
+    var by = { group: 0, theme: 0, tag: 0, edge: 0 };
+    for (var i = 0; i < lastThemeBoxes.length; i++) {
+      var kk = lastThemeBoxes[i].kind || 'tag';
+      by[kk] = (by[kk] || 0) + 1;
+    }
     return { drawn: lastThemeBoxes.length,
-             themes: lastThemeBoxes.length - lastThemeFrom,
-             tags: lastThemeFrom,
+             groups: by.group, themes: by.theme, tags: by.tag, edges: by.edge,
              quiet: lastQuietCount,
              missing: lastThemeMissing,
              missingNames: lastThemeMissingNames.slice(),
              maxAway: +lastThemeAway.toFixed(1) };
+  },
+  /* Скорость сцены и спокойствие — для проверки гашения при движении. */
+  motion: function () {
+    return { speed: +sceneSpeed.toFixed(5), calm: labelsCalm,
+             threshold: SPEED_QUIET, spinIdle: SPIN_IDLE };
+  },
+  /* Самый большой шаг смещения подписи за кадр — инвариант плавности. */
+  jump: function (reset) { var v = +lbJumpMax.toFixed(3); if (reset) lbJumpMax = 0; return v; },
+  settleLabels: labelSettle,
+  /* Что сейчас под курсором — узел, связь или ничего; и жива ли липкость. */
+  hoverState: function () {
+    return { node: active ? active.id : null,
+             edge: route ? route.key : null,
+             why: route ? route.why : null,
+             far: route ? route.b.id : null,
+             t: route ? +route.t.toFixed(3) : null,
+             hl: +hlAlpha.toFixed(3),
+             sticky: stickyUntil ? +(stickyUntil - performance.now()).toFixed(0) : 0 };
+  },
+  /* Прямой хит-тест по экранной точке — без событий мыши. */
+  probe: function (x, y) {
+    var g = pick(x, y);
+    if (g.node) return { kind: 'node', id: g.node.id, label: g.node.l };
+    if (g.route) return { kind: 'route', id: g.route.key, far: g.route.b.id,
+                          why: g.route.why, t: +g.route.t.toFixed(3),
+                          d: +g.route.d.toFixed(2) };
+    return { kind: 'none' };
+  },
+  /* Встать на узел без событий мыши — для замеров хождения. */
+  setActive: function (id) { var n = byId[id]; if (n) setActive(n); return !!n; },
+  /* Прогнать курсор через обработчик: тот же путь, что у живой мыши. */
+  move: function (x, y) {
+    var cr = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new PointerEvent('pointermove',
+      { bubbles: true, clientX: cr.left + x, clientY: cr.top + y }));
+    return { active: active ? active.id : null,
+             route: route ? route.key : null,
+             far: route ? route.b.id : null,
+             t: route ? +route.t.toFixed(3) : null,
+             litOn: !!litSet };
+  },
+  region: function () {
+    var L = LB['g:' + groups[0].k];
+    return { css: PAL.regionCss, alpha: L ? +L.alpha.toFixed(3) : 0,
+             px: GROUP_PX, halo: GROUP_HALO };
+  },
+  /* Поставить масштаб мгновенно — для проверки затухания ориентиров. */
+  zoomTo: function (z) {
+    cam.zoom = cam.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    lastZoom = cam.zoom; showZoom(); draw(); labelSettle(); draw();
+    var a = LB['g:' + groups[0].k];
+    return { zoom: +cam.zoom.toFixed(2), groupAlpha: a ? +a.alpha.toFixed(3) : 0 };
+  },
+  /* Прогон N кадров тихого автовращения БЕЗ requestAnimationFrame: в
+     скрытой вкладке браузер кадры не гоняет вовсе, и замер плавности там
+     не снять. Здесь кадр воспроизводится вручную — поворот, скорость,
+     шаг подписей, отрисовка, — ровно в том же порядке, что в frame(). */
+  spinFrames: function (n, speed) {
+    n = n || 120;
+    var step = speed === undefined ? SPIN_IDLE : speed;
+    var t = Math.max(frameNow, performance.now());
+    lbJumpMax = 0;
+    var minVisible = 1e9, maxVisible = 0;
+    for (var i = 0; i < n; i++) {
+      cam.yaw += step;
+      t += 16.7;
+      frameNow = t;
+      highlightTick(t);
+      sceneTick(t);
+      labelTick();
+      draw();
+      var vis = 0;
+      for (var k in LB) if (LB[k].alpha >= LB_MIN_ALPHA) vis++;
+      if (vis < minVisible) minVisible = vis;
+      if (vis > maxVisible) maxVisible = vis;
+    }
+    var layouts = 0;
+    return { frames: n, jumpMax: +lbJumpMax.toFixed(3),
+             speed: +sceneSpeed.toFixed(5), calm: labelsCalm,
+             visibleMin: minVisible, visibleMax: maxVisible,
+             visibleEnd: (function () { var c = 0; for (var q in LB) if (LB[q].alpha >= LB_MIN_ALPHA) c++; return c; })() };
+  },
+  /* Якоря разделов: центр масс своих тем и куда встала надпись. */
+  groupAnchors: function () {
+    draw();
+    var out = [];
+    for (var i = 0; i < groups.length; i++) {
+      var a = groupAnchor(groups[i], { });
+      var L = LB['g:' + groups[i].k];
+      out.push({ key: groups[i].k, label: groups[i].l,
+                 cx: a.cx, cy: a.cy, r: +(a.r || 0).toFixed(1),
+                 anchorY: a.py,
+                 x: L ? L.ax + L.ox : null, y: L ? L.ay + L.oy : null,
+                 alpha: L ? +L.alpha.toFixed(3) : 0 });
+    }
+    return out;
   },
   /* Стоимость кадра. Частоту через requestAnimationFrame в скрытой вкладке
      измерить нельзя — браузер её там не гоняет вовсе; поэтому меряем, во
@@ -2037,7 +2893,7 @@ window.TMAP = {
   focusBoxes: function (name) {
     for (var i = 0; i < themeList.length; i++) {
       if (themeList[i].nl.indexOf(norm(name)) < 0) continue;
-      hoverNode = themeList[i]; focusTheme = themeList[i];
+      active = themeList[i]; focusTheme = themeList[i];
       rebuildHighlight();
       draw();                                /* проекция должна быть свежей */
       wake();
