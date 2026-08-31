@@ -1384,7 +1384,22 @@ function sumPriceTop(ls) {
   return Math.max(100, top * 2);
 }
 
-function sumLinearRecord(groups) {
+/* ⚠️ СТОРОНА РЫНКА ЗДЕСЬ НЕ УКРАШЕНИЕ, А ЧАСТЬ ОТВЕТА.
+   Границы у спроса и предложения РАЗНОЙ ПРИРОДЫ, и различить их по одной
+   только арифметике участков нельзя:
+     • у СПРОСА последний участок кончается при P = 0 — все группы исчерпаны,
+       дальше покупателей нет. Для 100−Q и 60−Q это Q = 160, и это настоящая
+       экономическая граница;
+     • у ПРЕДЛОЖЕНИЯ верхней границы НЕ СУЩЕСТВУЕТ. Последний участок обрывался
+       на `sumPriceTop` — служебной подпорке для перебора участков по ценам
+       (max(100, 2 × макс. запретительная цена)). Для S₁ = Q, S₂ = Q + 20 это
+       ровно 100, при P = 100 объём равен 180 — и число 180 уезжало в
+       `sumDomainTo`, а оттуда в условие «20 ≤ Q ≤ 180» и в обрыв линии.
+   Почему формула последнего участка верна и выше потолка: потолок по
+   построению строго больше любой запретительной цены, значит выше него ни
+   одна новая группа войти уже не может, набор торгующих не меняется, и
+   участок тянется сколь угодно далеко. */
+function sumLinearRecord(groups, side) {
   if (!groups.length) return null;
   const ls = [];
   for (const c of groups) {
@@ -1417,6 +1432,8 @@ function sumLinearRecord(groups) {
   }
   if (!segs.length) return null;
   segs.sort((x, y) => x.lo - y.lo);
+  // У предложения последний участок не имеет правого края — см. выше.
+  const openRight = (side === 'S');
 
   /* ⚠️ ЗАПИСЬ ОБЯЗАНА БЫТЬ СПЛОШНОЙ ОТ Q = 0.
 
@@ -1459,7 +1476,7 @@ function sumLinearRecord(groups) {
      Отдаём правый конец отдельным полем. В `breaks` его дописывать НЕЛЬЗЯ:
      оттуда читают ключевые точки (лишняя отметка на графике) и
      integrateBroken — а конец кривой изломом не является. */
-  const domainTo = segs[segs.length - 1].hi;
+  const domainTo = openRight ? Infinity : segs[segs.length - 1].hi;
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
      показывать её плоским списком умеет condChainToCases (82-input.js).
      Хвост NaN означает «вне участков функции нет» — там она не рисуется. */
@@ -1467,7 +1484,9 @@ function sumLinearRecord(groups) {
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i];
     const last = (i === segs.length - 1);
-    const cond = '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
+    const cond = (last && openRight)
+      ? '(Q >= ' + s.lo + ')'
+      : '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
     const body = (s.body != null) ? s.body : sumSegExpr(s.A, s.C);
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
@@ -1574,7 +1593,7 @@ function sumRebuildSide(side) {
   cur.sumGhostTo = 0;
   cur.sumDomainTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
-  const rec = sumLinearRecord(groups);
+  const rec = sumLinearRecord(groups, side);
   if (rec) {
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК. Аналитическая запись не рисуется
        рядом с кривой «для красоты»: по ней кривая и считается. Второй

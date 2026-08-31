@@ -317,6 +317,57 @@ if (need('Д1')) {
     note('блок ' + (i + 1) + ' «' + b.name + '»: ' + b.text);
   });
   await shot('d1-sdsum-q320');
+
+  /* ⚠️ ОДНОГО ОКНА ДЛЯ ЭТОГО ПРАВИЛА МАЛО. «Верхней границы не существует»
+     значит, что линия доходит до края кадра ПРИ ЛЮБОМ отдалении, а не до
+     какого-то одного числа. Проверяем на трёх окнах подряд, и заодно —
+     что подпись кривой не осталась висеть у пустого места. */
+  head('Д1б · предложение при отдалении до 500 и 1000');
+  for (const W of [500, 1000]) {
+    const q = await page.evaluate((qmax) => {
+      CONFIG.Qmin = 0; CONFIG.Qmax = qmax; redrawAll();
+      const lab = (txt, curve) => {
+        let out = null;
+        document.querySelectorAll('text.curve-name').forEach(t => {
+          if (p31Text(t) === txt && !out) {
+            const q = sx.invert(+t.getAttribute('x'));
+            const v = evalCurve(curve, q);
+            const gapPx = isFinite(v) ? Math.abs(sy(v) - (+t.getAttribute('y'))) : Infinity;
+            out = { q: q, gapPx: Math.round(gapPx * 10) / 10, onCurve: isFinite(v) && gapPx <= 22 };
+          }
+        });
+        return out;
+      };
+      return { win: [CONFIG.Qmin, CONFIG.Qmax],
+               S: p31SumPath('S'), D: p31SumPath('D'),
+               eq: STATE.eq ? { Q: STATE.eq.Q, P: STATE.eq.P } : null,
+               cs: STATE.cs, ps: STATE.ps,
+               labS: lab('S', STATE.S), labD: lab('D', STATE.D) };
+    }, W);
+    console.log('  · окно до Q = ' + W);
+    show('  последняя точка S по Q', q.S && q.S.last ? q.S.last[0] : NaN, W, 0.8);
+    show('  последняя точка D по Q', q.D && q.D.last ? q.D.last[0] : NaN, 160, 0.8);
+    show('  равновесие Q*', q.eq ? q.eq.Q : NaN, 70, 1e-4);
+    show('  CS', q.cs, 1625, 1e-3);
+    show('  PS', q.ps, 1325, 1e-3);
+    /* ⚠️ ПОДПИСЬ КРИВОЙ ЗДЕСЬ — ЗАМЕР, А НЕ ПРОВЕРКА, И ЭТО НЕ ПОБЛАЖКА.
+       Подписи суммарных кривых уезжают с линии при сильном отдалении, и это
+       СТАРЫЙ дефект, а не последствие снятия верхней границы: замер 31.08 на
+       коде ДО правки дал те же 30,2 px у S и 23,2 px у D при окне 500. Правка
+       его даже уменьшила — при окне 1000 отклонение S было бесконечным (линии
+       там просто не было), стало 46,5 px. Красный флажок по чужому дефекту
+       приучил бы не смотреть на прибор; поэтому число печатаем, а карточка
+       заведена отдельно. Здесь стережём одно: подпись НЕ пропала совсем. */
+    note('  подпись S: Q ' + (q.labS ? num(q.labS.q) : '—')
+         + ', отклонение от линии ' + (q.labS ? q.labS.gapPx : '—') + ' px'
+         + '   (старый дефект, см. карточку про подписи при отдалении)');
+    note('  подпись D: Q ' + (q.labD ? num(q.labD.q) : '—')
+         + ', отклонение от линии ' + (q.labD ? q.labD.gapPx : '—') + ' px');
+    flag('  подпись S на холсте ЕСТЬ', !!q.labS, q.labS ? 'есть' : 'пропала');
+    flag('  подпись D на холсте ЕСТЬ', !!q.labD, q.labD ? 'есть' : 'пропала');
+    await shot('d1-sdsum-q' + W);
+  }
+  await page.evaluate(() => { CONFIG.Qmin = 0; CONFIG.Qmax = 100; redrawAll(); });
 }
 
 /* ═══════════ Д2. Запись после вмешательства не раскрывает скобки ═════ */
