@@ -260,6 +260,11 @@ class AsyncUnsafeEnvTests(TestCase):
             f"print(os.environ.get('{self.VAR}', 'НЕ ЗАДАНА'))"
         )
         env = {k: v for k, v in os.environ.items() if k != self.VAR}
+        # Windows: без PYTHONUTF8 дочерний процесс печатает кириллицу в
+        # локальной кодировке консоли (cp1251), а не в UTF-8 — родитель
+        # читает `encoding='utf-8'` и получает кашу молча (см.
+        # problems/management/commands/CLAUDE.md, «Кодировка на Windows»).
+        env['PYTHONUTF8'] = '1'
         result = subprocess.run(
             [sys.executable, '-c', code], capture_output=True, text=True,
             env=env, encoding='utf-8', errors='replace')

@@ -239,6 +239,10 @@ class DeployCheckTests(unittest.TestCase):
         env = dict(os.environ)
         env.update(FAKE_ENV)
         env.pop('DJANGO_DEBUG', None)
+        # Второй слой защиты рядом с первым (команды рендера обязаны сами
+        # восстанавливать переменную) — дочерний check --deploy не должен
+        # унаследовать флаг ни при каких обстоятельствах.
+        env.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
         # ⚠️ Вывод команды по-русски: без явной кодировки Windows отдаёт его
         # в cp1251, и текст превращается в «РѕР±С‹С‡РЅС‹Р№».
         env['PYTHONIOENCODING'] = 'utf-8'
