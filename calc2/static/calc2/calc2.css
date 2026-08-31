@@ -412,6 +412,10 @@ input:focus-visible, select:focus-visible {
    (fitTipMath в 86-workspace.js). */
 #hint-tip.tip-math { max-width: min(560px, calc(100vw - 24px)); }
 #hint-tip hr { border: none; border-top: var(--line) solid var(--border); margin: 7px 0; }
+/* Компактная запись внутри плашки подсказки — та же разметка, что в блоке
+   «Итоговая функция» (одно место правды на весь калькулятор), только без
+   отбивки сверху: в плашке она стоит не карточкой, а строкой текста. */
+#hint-tip .ff-math { margin-top: 0; color: var(--text); }
 .hint code { background: var(--surface-2); border: 1px solid var(--border-soft);
   padding: 1px 4px; border-radius: var(--r-sm); font-size: 11px; }
 
@@ -656,9 +660,19 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   border-left: 3px solid var(--ff-c, var(--border));
   border-radius: var(--r);
 }
-.ff-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.ff-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+/* Кнопки блока держатся вместе и при нехватке ширины уезжают своей строкой —
+   надзаголовок остаётся в одной строке при любой ширине панели. */
+.ff-acts { display: flex; align-items: baseline; gap: 10px; margin-left: auto; }
 .ff-eyebrow {
-  font-size: 9.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+  /* ⚠️ НАДЗАГОЛОВОК СТОИТ В ОДНУ СТРОКУ (указание владельца 31.08).
+     «ИТОГОВАЯ ФУНКЦИЯ» ломалось надвое и съедало высоту блока: замер 31.08 —
+     две строки и на 1440, и на 1000 px. Текст сокращать нельзя, поэтому
+     уменьшены трекинг (.08em → .04em) и кегль (9,5 → 9 px), а перенос
+     запрещён явно. Девятка допущена каноном для служебной надписи в кружке,
+     и здесь она в том же качестве — метка блока, а не читаемый текст. */
+  white-space: nowrap;
+  font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   /* ⚠️ ЦВЕТ КРИВОЙ ПОДМЕШАН, А НЕ ВЗЯТ ЧИСТЫМ, И ЭТО НЕ ПРИДИРКА К ОТТЕНКУ.
      Цвета кривых подобраны под контраст 3:1 к ХОЛСТУ — этого хватает линии, но
      не мелкому тексту: замер 26.08 дал 3,46 у синего спроса на светлой теме
@@ -678,8 +692,51 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   border-bottom: 1px dotted var(--text2); line-height: 1.2;
 }
 .ff-copy:hover { color: var(--text); border-bottom-color: var(--text); }
+/* «Развернуть» — та же кнопка-ссылка, что и «копировать»: они стоят рядом и
+   обязаны читаться как пара, а не как кнопка и ссылка. */
+.ff-expand {
+  border: none; background: none; padding: 0; cursor: pointer;
+  font: inherit; font-size: 11px; font-weight: 400; color: var(--text2);
+  border-bottom: 1px dotted var(--text2); line-height: 1.2;
+}
+.ff-expand:hover { color: var(--text); border-bottom-color: var(--text); }
 .ff-name { margin-top: 3px; font-size: 11.5px; color: var(--text2); }
 .ff-math { margin-top: 4px; font-size: 15px; color: var(--text); }
+
+/* ── КОМПАКТНАЯ ЗАПИСЬ: ОДИН УЧАСТОК — ОДНА СТРОКА ───────────────────
+   Решение владельца 31.08. Формула слева кеглем 15 и по левому краю, условие
+   второй колонкой справа кеглем 11 и серым, без слова «если». Двухстрочной
+   формы (условие ПОД формулой) больше нет ни как запасного пути, ни как
+   настройки: она и была причиной «запись выглядит кривой».
+
+   ⚠️ КОЛОНКА ФОРМУЛ ОБЪЯВЛЕНА `max-content` НАМЕРЕННО. Формула не усекается
+   никогда; не влезает — уменьшается кегль (до 13 px, ниже нельзя), и это
+   делает ffFitCases. Ужимается только колонка условий. */
+.ff-math.ff-cases {
+  display: flex; align-items: center; column-gap: 6px; max-width: 100%;
+}
+.ff-lhs { flex: 0 0 auto; }
+.ff-brace {
+  flex: 0 0 9px; align-self: stretch; color: var(--text3); min-height: 34px;
+}
+.ff-rows {
+  flex: 1 1 auto; min-width: 0;
+  display: grid; grid-template-columns: max-content minmax(0, max-content);
+  column-gap: 10px; row-gap: 1px; align-items: baseline;
+}
+.ff-f { white-space: nowrap; }
+.ff-c {
+  font-size: 11px; color: var(--text3);
+  white-space: nowrap; overflow: hidden; min-width: 0; position: relative;
+}
+/* Усечение — последняя мера перед уменьшением кегля формулы. Многоточие
+   рисуется накладкой, а не свойством text-overflow: внутри ячейки лежит
+   набранный KaTeX (inline-block), и до него text-overflow не достаёт. */
+.ff-c.ff-cut::after {
+  content: '…'; position: absolute; right: 0; top: 0; bottom: 0;
+  display: flex; align-items: center; padding-left: 3px;
+  background: var(--surface-2);
+}
 /* Последняя ступень правила ширины: запись не влезла даже второй формой при
    кегле 13. Прокручиваем её, а не ужимаем дальше — читать нечем. Затухание
    у правого края говорит, что запись продолжается. */
@@ -1950,6 +2007,30 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    92 % ширины браузера — верхняя граница: на 1280 px окно выходит 720 px
    (56 %), на 1440 px те же 720 px (50 %), и в упор оно не встаёт нигде. */
 #pw-modal .modal-card { width: min(720px, 92vw); }
+
+/* ── ОКНО РАЗВОРОТА ИТОГОВОЙ ФУНКЦИИ ──────────────────────────────────
+   Решение владельца 31.08. Запись во всю ширину окна кеглем 20 px, СО словом
+   «если», по левому краю. Окно шире общих 380 px по той же причине, что и у
+   конструктора кусочной: в записи может быть пять участков, и каждый — целая
+   строка «формула + условие». */
+#ff-modal .modal-card { width: min(720px, 92vw); position: relative; }
+.ff-modal-math {
+  font-size: 20px; color: var(--text); line-height: 1.5;
+  /* ⚠️ ПРОКРУТКА ЗДЕСЬ СВОЯ И НЕ ДОЛЖНА УХОДИТЬ НА ХОЛСТ.
+     Колесо над окном обязано прокручивать запись, а не менять масштаб
+     графика; сам обработчик масштаба висит на #graph-wrap, поэтому события
+     туда не доходят, но `overscroll-behavior` закрывает и цепочку прокрутки
+     родителей, когда запись домотана до края. */
+  overflow: auto; overscroll-behavior: contain;
+  margin: 4px 0 4px; padding: 2px 0;
+}
+.ff-modal-x {
+  position: absolute; top: 10px; right: 12px;
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text2); font-size: 16px; line-height: 1; cursor: pointer;
+}
+.ff-modal-x:hover { color: var(--text); border-color: var(--text3); }
 
 .modal-title { font-size: 15px; font-weight: 700; color: var(--text); margin: 0 0 4px; }
 .modal-sub { font-size: 12px; color: var(--text2); margin: 0 0 16px; line-height: 1.5; }

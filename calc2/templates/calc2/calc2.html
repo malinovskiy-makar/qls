@@ -2428,6 +2428,27 @@
     </div>
   </div>
 
+  <!-- ── РАЗВОРОТ ИТОГОВОЙ ФУНКЦИИ ───────────────────────────────────
+       Решение владельца 31.08. В панели запись стоит КОМПАКТНО: один участок
+       — одна строка, без слова «если», кегль условия 11 px. Полная учебная
+       запись — здесь: во всю ширину окна, кеглем 20 px и СО словом «если».
+       Кнопка копирования одна и та же, формат один — синтаксис Math.js
+       (отдельное решение владельца 31.08, второй формат не добавлять). -->
+  <div class="modal" id="ff-modal" role="dialog" aria-modal="true" aria-labelledby="ff-modal-title" inert>
+    <div class="modal-card">
+      <h2 class="modal-title" id="ff-modal-title">Итоговая функция</h2>
+      <p class="modal-sub" id="ff-modal-name"></p>
+      <div class="ff-modal-math" id="ff-modal-math"></div>
+      <div class="modal-foot">
+        <button class="btn-sm" id="ff-modal-close" type="button">Закрыть</button>
+        <button class="btn" id="ff-modal-copy" type="button" data-ff-expr="">Копировать запись</button>
+      </div>
+      <!-- Крестик стоит поверх карточки: владелец назвал три способа закрыть
+           окно, и «крестик» — один из них. -->
+      <button class="ff-modal-x" id="ff-modal-x" type="button" aria-label="Закрыть">×</button>
+    </div>
+  </div>
+
 </div>
 
 {% csrf_token %}

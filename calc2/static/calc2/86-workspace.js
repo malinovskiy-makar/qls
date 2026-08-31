@@ -803,8 +803,13 @@ function hintTip() {
    запись суммарного спроса торчала за правый край плашки на 165 px, прямо на
    холст. Ужимать её нечем (кегль подсказки и так 12), поэтому правило то же,
    что у блока «Итоговая функция»: сперва даём плашке ширину по содержимому,
-   а если и этого мало — пересобираем ВТОРОЙ формой, где условие уходит на
-   свою строку под формулу.
+   а если и этого мало — пересобираем КОМПАКТНОЙ формой.
+
+   ⚠️ ЗДЕСЬ БЫЛА ВТОРАЯ ФОРМА (условие под формулой), И ЕЁ БОЛЬШЕ НЕТ.
+   Указание владельца 31.08 запрещает двухстрочную запись «во всех видах», а
+   не только в панели, — поэтому пересборка идёт тем же помощником, что и в
+   блоке «Итоговая функция». Плашке это ничего не стоит: с классом `tip-math`
+   у неё до 560 px, а компактная запись просит около 215.
 
    Исходный LaTeX берём из самой набранной записи: KaTeX кладёт его рядом, в
    `<annotation encoding="application/x-tex">`. Второго места хранения (а
@@ -818,11 +823,13 @@ function fitTipMath(t) {
   if (fits()) return;
   const ann = k.querySelector('annotation[encoding="application/x-tex"]');
   const src = ann ? ann.textContent : '';
-  const alt = src ? ffCasesStacked(src) : null;
-  if (!alt || alt === src) return;
+  const cs = src ? ffParseCases(src) : null;
+  if (!cs) return;
   const host = k.parentNode;
   if (!host) return;
-  katexInto(host, alt);
+  host.innerHTML = ffMathHtml(src, cs, '');
+  if (typeof renderMathIn === 'function') renderMathIn(host);
+  ffFitCases(host.querySelector('.ff-math'));
 }
 
 function showHintTip(dot, html) {
@@ -990,6 +997,12 @@ function tipPlain(text) { return String(text || '').replace(/\$/g, ''); }
 
 const FF_MAX_PX = 15;   // канонический кегль записи: крупнее чисел табло (13)
 const FF_MIN_PX = 13;   // ниже НЕ опускаемся — подгонку до 10 владелец забраковал
+/* Кегль УСЛОВИЯ участка (решение владельца 31.08): 11 px в покое, 10 px —
+   первый шаг отступления при нехватке ширины. Условие набирается своим KaTeX
+   в своей ячейке, поэтому кегль ему можно задавать точно, а не долями от
+   основного, как умеет само окружение cases. */
+const FF_COND_MAX_PX = 11;
+const FF_COND_MIN_PX = 10;
 
 function ffEsc(s) {
   return String(s == null ? '' : s)
@@ -1029,58 +1042,169 @@ function finalFunctionHtml(o) {
   const note = o.note ? String(o.note) : '';
   if (!tex && !note) return '';
   const color = o.color || 'var(--text)';
+  const cs = tex ? ffParseCases(tex) : null;
   let h = '<div class="ff" style="--ff-c: ' + ffEsc(color) + '">';
-  h += '<div class="ff-top"><span class="ff-eyebrow">Итоговая функция</span>';
+  h += '<div class="ff-top"><span class="ff-eyebrow">Итоговая функция</span><span class="ff-acts">';
+  /* ⚠️ КНОПКА «РАЗВЕРНУТЬ» — ТОЛЬКО У КУСОЧНОЙ ЗАПИСИ. У однострочной
+     разворачивать нечего: в панели она стоит целиком и со всеми словами. */
+  if (cs) h += '<button class="ff-expand" type="button" data-tip="Показать запись целиком">развернуть</button>';
   if (o.expr) h += '<button class="ff-copy" type="button" data-tip="Скопировать запись"'
                  + ' data-ff-expr="' + ffEsc(o.expr) + '">копировать</button>';
-  h += '</div>';
+  h += '</span></div>';
   h += '<div class="ff-name">' + (o.name || '') + '</div>';
-  /* Сам LaTeX едет и в атрибуте: вторую форму записи (условие под формулой)
-     собирать надо из исходника, а из набранного KaTeX его уже не достать. */
-  if (tex) h += '<div class="ff-math" data-ff-tex="' + ffEsc(tex) + '">$' + tex + '$</div>';
+  if (tex) h += ffMathHtml(tex, cs, o.name || '');
   if (note) h += '<div class="ff-note">' + note + '</div>';
   h += '</div>';
   return h;
 }
 
-/* ВТОРАЯ ФОРМА ЗАПИСИ: условие куска уходит на свою строку ПОД формулу,
-   фигурная скобка остаётся, кегль не трогается (решение владельца 26.08).
-   Возвращает null, если это не фигурная скобка или в ней меньше двух кусков. */
-function ffCasesStacked(tex) {
+/* Разобрать набранную запись на участки.
+   Возвращает null, если это не фигурная скобка, если кусок один или если за
+   скобкой есть хвост: тогда запись однострочная и разбирать нечего. */
+function ffParseCases(tex) {
   const s = String(tex || '');
   const B = '\\begin{cases}', E = '\\end{cases}';
   const i = s.indexOf(B), j = s.lastIndexOf(E);
   if (i < 0 || j <= i) return null;
-  const head = s.slice(0, i), tail = s.slice(j + E.length);
-  const rows = s.slice(i + B.length, j).split('\\\\').map(r => r.trim()).filter(r => r.length);
-  if (rows.length < 2) return null;
-  const out = rows.map(r => {
-    const k = r.indexOf('&');
-    if (k < 0) return r;
-    const body = r.slice(0, k).trim().replace(/,\s*$/, '');
-    const cond = r.slice(k + 1).trim();
-    if (!body || !cond) return r;
-    /* `gathered` KaTeX 0.16 понимает; кегль условия снижается ГРУППОЙ, вместе
-       со словом «если», если оно в условии уже стоит. */
-    return '\\begin{gathered}' + body + '\\\\[-2pt]{\\footnotesize ' + cond + '}\\end{gathered}';
+  if (s.slice(j + E.length).trim()) return null;
+  const rows = [];
+  s.slice(i + B.length, j).split('\\\\').forEach(r => {
+    const t = r.trim();
+    if (!t) return;
+    const k = t.indexOf('&');
+    if (k < 0) { rows.push({ body: t, cond: '' }); return; }
+    rows.push({ body: t.slice(0, k).trim().replace(/,\s*$/, ''), cond: t.slice(k + 1).trim() });
   });
-  return head + B + out.join('\\\\[4pt]') + E + tail;
+  if (rows.length < 2) return null;
+  return { head: s.slice(0, i).trim(), rows: rows };
 }
 
-/* Набрать запись в узел заново (обе формы идут одним путём). */
-function ffTypeset(host, tex) {
-  host.textContent = '$' + tex + '$';
-  if (typeof renderMathIn === 'function') renderMathIn(host);
-  return host.querySelector('.katex');
+/* ⚠️ СЛОВО «ЕСЛИ» СНИМАЕТСЯ ТОЛЬКО С КОМПАКТНОЙ ЗАПИСИ.
+   Именно оно не давало однострочной форме уложиться в панель: замер 31.08 —
+   271,6 px без него против 311,5 px с ним при кегле 15. В развороте слово
+   обязано быть: там запись учебная, и места хватает (решение владельца 31.08). */
+function ffCondCompact(cond) {
+  return String(cond || '').replace(/\\text\{\s*если\s*\}\s*/g, '').trim();
 }
 
-/* ПРАВИЛО ШИРИНЫ (решение владельца 26.08, исполнять буквально).
+/* ═══════════════════════════════════════════════════════════════════════
+   КОМПАКТНАЯ ЗАПИСЬ: ОДИН УЧАСТОК — ОДНА СТРОКА (решение владельца 31.08)
+
+   ⚠️ ⚠️ ДВУХСТРОЧНОЙ ФОРМЫ БОЛЬШЕ НЕТ, И ВЕРНУТЬ ЕЁ НЕЛЬЗЯ.
+   До 31.08 при нехватке ширины условие уезжало на свою строку ПОД формулу,
+   окружением `gathered`. Владелец забраковал это прямо: «запись участка и её
+   условие стоят на разных строчках, это нечитаемо». Окружение `gathered`
+   удалено из кода целиком — чтобы форму нельзя было вернуть по
+   невнимательности. Порядок отступления при нехватке ширины стоит в
+   `ffFitCases` и к двум строкам не приводит НИ НА КАКОМ шаге.
+
+   ⚠️ ПОЧЕМУ РАЗМЕТКА, А НЕ ОДИН KaTeX НА ВСЮ ЗАПИСЬ.
+   Внутри одного окружения `cases` у колонки условий не задать ни кегль 11 px
+   (KaTeX умеет только доли 0,5 / 0,7 / 0,8 / 0,9 от основного — из 15 px это
+   10,5, а не 11), ни цвет токеном `var(--text3)`, ни усечение многоточием.
+   Задавать кегль колонке СНАРУЖИ, стилем, нельзя: замер 31.08 — строки второй
+   колонки разъезжаются с первой (10,9/73,3 против 11,2/27/64,8), потому что
+   KaTeX ставит строки в `em` от кегля самой колонки.
+   Поэтому участок — это две ячейки сетки, и каждая набирается своим KaTeX.
+   ═══════════════════════════════════════════════════════════════════════ */
+function ffMathHtml(tex, cs, name) {
+  const a = ' data-ff-tex="' + ffEsc(tex) + '"';
+  if (!cs) return '<div class="ff-math"' + a + '>$' + tex + '$</div>';
+  let h = '<div class="ff-math ff-cases"' + a + ' data-ff-name="' + ffEsc(name) + '">';
+  if (cs.head) h += '<span class="ff-lhs">$' + cs.head + '$</span>';
+  /* Скобка — та же настоящая фигурная скобка системы, что у конструктора
+     кусочной функции: SVG с `preserveAspectRatio="none"`, растянутый по высоте
+     строк. Мерить её нечем и не надо — тянет CSS. */
+  h += '<svg class="ff-brace" viewBox="0 0 12 100" preserveAspectRatio="none" aria-hidden="true">'
+     + '<path d="M11 1 C6 1 7 8 7 20 C7 40 1 44 1 50 C1 56 7 60 7 80 C7 92 6 99 11 99"'
+     + ' fill="none" stroke="currentColor" stroke-width="1.6"'
+     + ' vector-effect="non-scaling-stroke" stroke-linecap="round"/></svg>';
+  h += '<span class="ff-rows">';
+  cs.rows.forEach(r => {
+    const c = ffCondCompact(r.cond);
+    h += '<span class="ff-f">$' + r.body + '$</span>';
+    h += '<span class="ff-c">' + (c ? '$' + c + '$' : '') + '</span>';
+  });
+  h += '</span></div>';
+  return h;
+}
+
+/* Ширина набранного куска: мерить надо ВНУТРЕННИЙ узел `.katex`, а не
+   ячейку — у обрезанной записи ячейка показывает «влезло». */
+function ffKatexW(el) {
+  const k = el && el.querySelector('.katex');
+  return k ? k.getBoundingClientRect().width : 0;
+}
+
+/* ПОРЯДОК ОТСТУПЛЕНИЯ ПРИ НЕХВАТКЕ ШИРИНЫ (решение владельца 31.08,
+   исполнять буквально и строго в этом порядке):
+     1. слова «если» в компактной записи нет вовсе — это уже сделано разметкой;
+     2. кегль УСЛОВИЯ 11 → 10 px, формула остаётся 15;
+     3. усечь УСЛОВИЕ многоточием, полное — в развороте;
+     4. кегль ФОРМУЛЫ ступенями 15 → 13 px, ниже 13 нельзя.
+   ⚠️ ФОРМУЛА НЕ УСЕКАЕТСЯ НИКОГДА, и возврата к двум строкам нет ни на одном
+   шаге. Поэтому колонка формул в сетке объявлена `max-content`: она не
+   ужимается, а если не влезает — работает шаг 4.
+   Возвращает false, если померить было НЕЧЕМ (панель свёрнута, ширина нулевая):
+   значит подгонка не сделана и повторить её надо при следующей возможности. */
+function ffFitCases(host) {
+  const rows = host.querySelector('.ff-rows');
+  if (!rows) return true;
+  const fs = Array.prototype.slice.call(host.querySelectorAll('.ff-f'));
+  const cds = Array.prototype.slice.call(host.querySelectorAll('.ff-c'));
+  host.style.fontSize = '';
+  fs.forEach(e => { e.style.fontSize = ''; });
+  cds.forEach(e => { e.style.fontSize = ''; e.classList.remove('ff-cut'); });
+  const have = host.clientWidth;
+  if (!(have > 0)) return false;
+  const gap = parseFloat(getComputedStyle(rows).columnGap) || 0;
+  const lhs = host.querySelector('.ff-lhs');
+  const brace = host.querySelector('.ff-brace');
+  const outerGap = parseFloat(getComputedStyle(host).columnGap) || 0;
+  /* Постоянная часть строки: «P =», скобка и отбивки между ними. */
+  const fixed = (lhs ? lhs.getBoundingClientRect().width : 0)
+              + (brace ? brace.getBoundingClientRect().width : 0)
+              + outerGap * (lhs ? 2 : 1);
+  const widest = (list) => list.reduce((m, e) => Math.max(m, ffKatexW(e)), 0);
+  const need = () => fixed + widest(fs) + (widest(cds) > 0 ? gap + widest(cds) : 0);
+  const fits = () => need() <= have + 0.5;
+  if (fits()) return true;
+  // Шаг 2 — кегль условия.
+  cds.forEach(e => { e.style.fontSize = FF_COND_MIN_PX + 'px'; });
+  if (fits()) return true;
+  // Шаг 3 — усечь условие: сколько места осталось после формулы, столько и есть.
+  const roomFor = () => have - fixed - widest(fs) - gap;
+  const markCuts = () => {
+    const room = roomFor();
+    let any = false;
+    cds.forEach(e => {
+      const cut = ffKatexW(e) > room + 0.5;
+      e.classList.toggle('ff-cut', cut);
+      if (cut) any = true;
+    });
+    return any;
+  };
+  let cut = markCuts();
+  /* Шаг 4 — кегль ФОРМУЛЫ ступенями до 13 px, ниже нельзя.
+     ⚠️ Он работает не только когда не влезает сама формула, но и когда после
+     шага 3 условие ОСТАЛОСЬ усечённым: каждая ступень вниз возвращает условию
+     место, и обрезка получается меньше. Иначе шаг 4 был бы мёртвым — после
+     усечения ведь ничего уже не торчит, — а лестница отступления обязана
+     доходить до конца. Формула при этом не усекается никогда: усечение живёт
+     только у условия. */
+  for (let px = FF_MAX_PX - 1; px >= FF_MIN_PX; px--) {
+    if (!cut && fixed + widest(fs) <= have + 0.5) break;
+    fs.forEach(e => { e.style.fontSize = px + 'px'; });
+    cut = markCuts();
+  }
+  return true;
+}
+
+/* ПРАВИЛО ШИРИНЫ ОДНОСТРОЧНОЙ ЗАПИСИ (решение владельца 26.08).
      ШАГ 1. Обычная форма, кегль 15 px.
-     ШАГ 2. Мерить ВНУТРЕННИЙ узел `.katex`, а не внешний: у обрезанной
-            записи внешний узел показывает «влезло».
-     ШАГ 3. Шире контейнера — вторая форма (условие под формулой).
-     ШАГ 4. И она шире — кегль ступенями до 13 px, НИЖЕ 13 НЕ ОПУСКАТЬ.
-            Дальше горизонтальная прокрутка с затуханием у правого края.
+     ШАГ 2. Мерить ВНУТРЕННИЙ узел `.katex`, а не внешний.
+     ШАГ 3. Кегль ступенями до 13 px, НИЖЕ 13 НЕ ОПУСКАТЬ.
+     ШАГ 4. Дальше горизонтальная прокрутка с затуханием у правого края.
    Подгонка вниз до 10 px, как делает fitPanelMath, здесь ЗАПРЕЩЕНА: ровно её
    владелец и забраковал. */
 /* Возвращает false, если померить было НЕЧЕМ: панель свёрнута, ширина нулевая.
@@ -1094,25 +1218,18 @@ function fitFinalMath(root) {
   if (!box) return true;
   let measured = true;
   box.querySelectorAll('.ff-math').forEach(host => {
+    if (host.classList.contains('ff-cases')) {
+      if (!ffFitCases(host)) measured = false;
+      return;
+    }
     host.classList.remove('ff-scroll');
-    host.removeAttribute('data-ff-form');
     host.style.fontSize = '';
-    const tex = host.getAttribute('data-ff-tex') || '';
-    let k = host.querySelector('.katex');
-    if (!k || !tex) return;
+    const k = host.querySelector('.katex');
+    if (!k) return;
     const have = host.clientWidth;
     if (!(have > 0)) { measured = false; return; }
     const over = () => k.getBoundingClientRect().width > have - 1;
     if (!over()) return;
-    const alt = ffCasesStacked(tex);
-    if (alt && alt !== tex) {
-      k = ffTypeset(host, alt) || k;
-      /* Пометка «набрано второй формой» — для проверок и для выгрузки: сам
-         `data-ff-tex` остаётся ИСХОДНЫМ, иначе повторная подгонка складывала
-         бы вторую форму из второй формы. */
-      host.setAttribute('data-ff-form', 'stacked');
-      if (!over()) return;
-    }
     for (let px = FF_MAX_PX - 1; px >= FF_MIN_PX; px--) {
       host.style.fontSize = px + 'px';
       if (!over()) return;
@@ -1149,11 +1266,61 @@ function wireFinalCopy() {
   if (wireFinalCopy._done) return;
   wireFinalCopy._done = true;
   document.addEventListener('click', (e) => {
-    const b = e.target && e.target.closest ? e.target.closest('.ff-copy') : null;
-    if (!b) return;
-    e.preventDefault();
-    ffCopyText(b.getAttribute('data-ff-expr') || '');
+    const t = e.target && e.target.closest ? e.target : null;
+    if (!t) return;
+    const c = t.closest('.ff-copy, #ff-modal-copy');
+    if (c) { e.preventDefault(); ffCopyText(c.getAttribute('data-ff-expr') || ''); return; }
+    const x = t.closest('.ff-expand');
+    if (x) { e.preventDefault(); ffOpenExpand(x.closest('.ff')); return; }
   });
+  /* Закрытие тремя способами: крестик, кнопка, щелчок мимо окна и Esc. */
+  const m = document.getElementById('ff-modal');
+  if (!m) return;
+  ['ff-modal-close', 'ff-modal-x'].forEach(id => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', () => ffCloseExpand());
+  });
+  m.addEventListener('click', (e) => { if (e.target === m) ffCloseExpand(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && m.classList.contains('open')) ffCloseExpand();
+  });
+  /* ⚠️ КОЛЕСО НАД ОКНОМ НЕ ДОЛЖНО МЕНЯТЬ МАСШТАБ ГРАФИКА.
+     Обработчик масштаба висит на #graph-wrap, и до него события из окна не
+     доходят; но окно лежит поверх страницы, и если запись домотана до края,
+     прокрутка по цепочке ушла бы родителям. Гасим цепочку явно и здесь, и
+     стилем overscroll-behavior: два независимых заслона лучше одного. */
+  m.addEventListener('wheel', (e) => { e.stopPropagation(); }, { passive: true });
+}
+
+/* Развернуть запись: полная учебная форма во всю ширину окна, СО словом
+   «если» (решение владельца 31.08). Исходный TeX лежит в `data-ff-tex` —
+   компактная разметка его не портит, поэтому разворачивать есть из чего. */
+function ffOpenExpand(ff) {
+  const m = document.getElementById('ff-modal');
+  if (!m || !ff) return;
+  const host = ff.querySelector('.ff-math');
+  const tex = host ? (host.getAttribute('data-ff-tex') || '') : '';
+  const nameEl = ff.querySelector('.ff-name');
+  const box = document.getElementById('ff-modal-math');
+  const nm = document.getElementById('ff-modal-name');
+  if (nm) { nm.innerHTML = nameEl ? nameEl.innerHTML : ''; }
+  if (box) {
+    box.textContent = '$' + tex + '$';
+    if (typeof renderMathIn === 'function') renderMathIn(box);
+  }
+  const cp = document.getElementById('ff-modal-copy');
+  const src = ff.querySelector('.ff-copy');
+  if (cp) cp.setAttribute('data-ff-expr', src ? (src.getAttribute('data-ff-expr') || '') : '');
+  m.classList.add('open');
+  m.removeAttribute('inert');
+  const cl = document.getElementById('ff-modal-close');
+  if (cl) cl.focus();
+}
+function ffCloseExpand() {
+  const m = document.getElementById('ff-modal');
+  if (!m) return;
+  m.classList.remove('open');
+  m.setAttribute('inert', '');
 }
 
 /**

@@ -113,9 +113,59 @@ function p31Final() {
       rec.hostW = Math.round(host.clientWidth * 10) / 10;
       rec.fontPx = Math.round(parseFloat(getComputedStyle(host).fontSize) * 10) / 10;
     }
-    if (k) {
+    /* ⚠️ У КОМПАКТНОЙ ЗАПИСИ ОДНОГО .katex НЕТ, И МЕРИТЬ ПЕРВЫЙ — ВРАТЬ.
+       Здесь прибор соврал 31.08 второй раз: после правки Фазы 1 запись
+       собрана из отдельных ячеек, каждая со своим KaTeX, и первый из них —
+       это приставка «P =». Замер давал 33,3 px и бодрое «переполнения нет»
+       на записи, у которой условия были усечены многоточием.
+       Считаем так же, как считает сама подгонка: постоянная часть (приставка,
+       скобка, отбивки) плюс самая широкая формула плюс отбивка колонок плюс
+       самое широкое условие. */
+    var kw = function (el) {
+      var kk = el && el.querySelector('.katex');
+      return kk ? kk.getBoundingClientRect().width : 0;
+    };
+    var widest = function (list) {
+      var m = 0;
+      Array.prototype.forEach.call(list, function (e) { m = Math.max(m, kw(e)); });
+      return m;
+    };
+    if (host && host.classList.contains('ff-cases')) {
+      var rowsEl = host.querySelector('.ff-rows');
+      var lhs = host.querySelector('.ff-lhs');
+      var brace = host.querySelector('.ff-brace');
+      var gap = parseFloat(getComputedStyle(rowsEl).columnGap) || 0;
+      var outer = parseFloat(getComputedStyle(host).columnGap) || 0;
+      var fixed = (lhs ? lhs.getBoundingClientRect().width : 0)
+                + (brace ? brace.getBoundingClientRect().width : 0)
+                + outer * (lhs ? 2 : 1);
+      var fW = widest(host.querySelectorAll('.ff-f'));
+      var cW = widest(host.querySelectorAll('.ff-c'));
+      rec.katexW = Math.round((fixed + fW + (cW > 0 ? gap + cW : 0)) * 10) / 10;
+      rec.over = Math.round((rec.katexW - rec.hostW) * 10) / 10;
+      rec.fixedW = Math.round(fixed * 10) / 10;
+      rec.formulaW = Math.round(fW * 10) / 10;
+      rec.condW = Math.round(cW * 10) / 10;
+      var f0 = host.querySelector('.ff-f'), c0 = host.querySelector('.ff-c');
+      rec.fontPx = f0 ? Math.round(parseFloat(getComputedStyle(f0).fontSize) * 10) / 10 : rec.fontPx;
+      rec.condPx = c0 ? Math.round(parseFloat(getComputedStyle(c0).fontSize) * 10) / 10 : 0;
+      rec.cut = host.querySelectorAll('.ff-c.ff-cut').length;
+      rec.conds = host.querySelectorAll('.ff-c').length;
+      /* ⚠️ «ВЛЕЗЛО» У КОМПАКТНОЙ ЗАПИСИ — ЭТО «НИЧЕГО НЕ ТОРЧИТ», А НЕ
+         «полная запись поместилась». Лестница отступления штатно кончается
+         усечением условия: полная запись шире панели, а на экране при этом
+         всё ровно. Меряем реальный вылет разметки. */
+      rec.spill = Math.round((host.scrollWidth - host.clientWidth) * 10) / 10;
+      var lastRow = host.querySelector('.ff-c:last-child');
+      rec.rowSpill = 0;
+      Array.prototype.forEach.call(host.querySelectorAll('.ff-f, .ff-c'), function (e) {
+        var d = e.getBoundingClientRect().right - host.getBoundingClientRect().right;
+        if (d > rec.rowSpill) rec.rowSpill = Math.round(d * 10) / 10;
+      });
+    } else if (k) {
       rec.katexW = Math.round(k.getBoundingClientRect().width * 10) / 10;
       rec.over = Math.round((rec.katexW - rec.hostW) * 10) / 10;
+      rec.cut = 0; rec.conds = 0; rec.condPx = 0;
     }
     /* ⚠️ СТРОКИ НАДЗАГОЛОВКА СЧИТАЮТСЯ ПО ДИАПАЗОНУ, А НЕ ПО САМОМУ УЗЛУ.
        Здесь прибор уже соврал 31.08: узел .ff-eyebrow лежит внутри флексбокса и
@@ -359,8 +409,17 @@ if (need('Д3')) {
   show('ширина внутри .katex, px', b ? b.katexW : NaN, null);
   show('ширина контейнера, px', b ? b.hostW : NaN, null);
   show('переполнение (katex − контейнер), px', b ? b.over : NaN, null);
-  show('кегль записи, px', b ? b.fontPx : NaN, null);
-  flag('переполнения НЕТ', !!(b && b.over <= 0), b ? (b.katexW + ' против ' + b.hostW) : '—');
+  show('кегль формулы, px', b ? b.fontPx : NaN, null);
+  show('кегль условия, px', b ? b.condPx : NaN, null);
+  note('раскладка: постоянная часть ' + (b ? b.fixedW : '—')
+       + ' + формула ' + (b ? b.formulaW : '—') + ' + условие ' + (b ? b.condW : '—'));
+  note('условий усечено многоточием: ' + (b ? b.cut : '—') + ' из ' + (b ? b.conds : '—'));
+  show('вылет разметки за контейнер, px', b ? b.spill : NaN, null);
+  show('вылет самой правой ячейки, px', b ? b.rowSpill : NaN, null);
+  flag('НИЧЕГО НЕ ТОРЧИТ за контейнер', !!(b && b.spill <= 1 && b.rowSpill <= 1),
+       b ? ('вылет ' + b.spill + ' / ячейка ' + b.rowSpill) : '—');
+  flag('формула НЕ мельче 13 px', !!(b && b.fontPx >= 13), b ? String(b.fontPx) : '—');
+  flag('условие НЕ мельче 10 px', !!(b && b.condPx >= 10), b ? String(b.condPx) : '—');
   show('участков в записи', r.segs, null);
   show('визуальных строк внутри скобки', b ? b.rows : NaN, null);
   flag('строк РОВНО столько же, сколько участков', !!(b && b.rows === r.segs),
@@ -378,7 +437,7 @@ if (need('Д3')) {
      Владелец видел «ИТОГОВАЯ ФУНКЦИЯ» в две строки; на широком окне надпись
      стоит в одну. Проходим по ширинам и печатаем, где именно ломается. */
   head('Д3б · надзаголовок и ширина записи по ширинам окна');
-  for (const W of [1440, 1000, 760, 380]) {
+  for (const W of [1920, 1440, 1000, 760, 380]) {
     await page.setViewportSize({ width: W, height: 950 });
     await page.waitForTimeout(350);
     const q = await page.evaluate(() => {
@@ -386,16 +445,177 @@ if (need('Д3')) {
       if (typeof fitFinalMath === 'function') fitFinalMath();
       const f = p31Final(); const b = f && f.blocks[0];
       return b ? { lines: b.eyebrowLines, katexW: b.katexW, hostW: b.hostW,
-                   over: b.over, fontPx: b.fontPx, rows: b.rows, form: b.form } : null;
+                   over: b.over, fontPx: b.fontPx, condPx: b.condPx, rows: b.rows,
+                   form: b.form, cut: b.cut, conds: b.conds,
+                   spill: b.spill, rowSpill: b.rowSpill } : null;
     });
     if (!q) { note('окно ' + W + ': блока нет'); continue; }
     note('окно ' + W + ' px: надзаголовок строк ' + q.lines
          + ', запись ' + q.katexW + ' против ' + q.hostW + ' (переполнение ' + q.over + ')'
-         + ', кегль ' + q.fontPx + ', строк в скобке ' + q.rows + ', форма «' + q.form + '»');
+         + ', кегль ' + q.fontPx + '/' + q.condPx
+         + ', строк в скобке ' + q.rows + ', усечено ' + q.cut + ' из ' + q.conds
+         + ', вылет ' + q.spill + '/' + q.rowSpill);
     await shot('d3-eyebrow-' + W);
   }
   await page.setViewportSize({ width: 1440, height: 950 });
   await page.waitForTimeout(300);
+}
+
+/* ═══════════ Д4. Окно разворота записи ══════════════════════════════ */
+if (need('Д4')) {
+  head('Д4 · разворот записи: слово «если», кегль, колесо, guardPanelBoxes');
+  await page.setViewportSize({ width: 1440, height: 950 });
+  const pre = await page.evaluate(() => {
+    resetSceneMemory(); pickScene('sdsum'); redrawAll();
+    p31Expand(); redrawAll();
+    /* Метка на узле набранной формулы: если панель ПЕРЕНАБЕРУТ, узел будет
+       новый и метка пропадёт. Это и есть проверка guardPanelBoxes. */
+    const k = document.querySelector('#info-final .ff-f .katex');
+    if (k) k.setAttribute('data-p31mark', '1');
+    const box = document.getElementById('info-final');
+    return { dom: sx.domain().slice(), marked: !!k, srcLen: (box._srcHtml || '').length };
+  });
+  note('масштаб до: Q от ' + num(pre.dom[0]) + ' до ' + num(pre.dom[1]));
+  // Открываем окно кнопкой, как это делает человек.
+  await page.click('#info-final .ff .ff-expand');
+  await page.waitForTimeout(350);
+  const open = await page.evaluate(() => {
+    const m = document.getElementById('ff-modal');
+    const mm = document.getElementById('ff-modal-math');
+    const k = mm ? mm.querySelector('.katex') : null;
+    return {
+      open: !!(m && m.classList.contains('open')),
+      inert: !!(m && m.hasAttribute('inert')),
+      text: p31Text(mm),
+      fontPx: mm ? Math.round(parseFloat(getComputedStyle(mm).fontSize) * 10) / 10 : 0,
+      align: mm ? getComputedStyle(mm).textAlign : '',
+      copies: m ? m.querySelectorAll('[data-ff-expr]').length : 0,
+      expr: (document.getElementById('ff-modal-copy') || {}).getAttribute
+            ? document.getElementById('ff-modal-copy').getAttribute('data-ff-expr') : '',
+      name: p31Text(document.getElementById('ff-modal-name')),
+      rect: m ? (() => { const c = m.querySelector('.modal-card').getBoundingClientRect();
+                         return { x: Math.round(c.x), y: Math.round(c.y),
+                                  w: Math.round(c.width), h: Math.round(c.height) }; })() : null,
+      dom: sx.domain().slice(),
+    };
+  });
+  flag('окно открылось', open.open, String(open.open));
+  flag('окно НЕ inert, когда открыто', !open.inert, String(open.inert));
+  note('запись в окне: ' + open.text);
+  flag('в РАЗВОРОТЕ слово «если» ЕСТЬ', open.text.indexOf('если') >= 0, open.text.slice(0, 60));
+  show('кегль записи в окне, px', open.fontPx, 20, 0.5);
+  flag('выравнивание по левому краю', open.align === 'left' || open.align === 'start', open.align);
+  flag('кнопка копирования РОВНО одна', open.copies === 1, String(open.copies));
+  note('формат копирования (Math.js): ' + open.expr);
+  flag('копируется синтаксис Math.js, а не TeX',
+       open.expr.indexOf('?') >= 0 && open.expr.indexOf('\\') < 0, open.expr.slice(0, 50));
+  note('имя записи в окне: ' + open.name);
+  note('окно: ' + JSON.stringify(open.rect));
+  flag('окно помещается в экран', !!(open.rect && open.rect.x >= 0 && open.rect.y >= 0
+       && open.rect.w <= 1440 && open.rect.h <= 950),
+       open.rect ? (open.rect.w + '×' + open.rect.h + ' при ' + 1440 + '×' + 950) : '—');
+  await shot('d4-modal-open');
+
+  /* ⚠️ КОЛЕСО ВНУТРИ ОКНА НЕ ДОЛЖНО МЕНЯТЬ МАСШТАБ ГРАФИКА.
+     Крутим ровно над записью — то есть поверх холста, который лежит под окном. */
+  const cx = open.rect.x + Math.round(open.rect.w / 2);
+  const cy = open.rect.y + Math.round(open.rect.h / 2);
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(250);
+  await page.mouse.wheel(0, -400);
+  await page.waitForTimeout(250);
+  const after = await page.evaluate(() => ({ dom: sx.domain().slice() }));
+  note('масштаб после прокрутки в окне: Q от ' + num(after.dom[0]) + ' до ' + num(after.dom[1]));
+  flag('масштаб графика НЕ изменился прокруткой в окне',
+       Math.abs(after.dom[0] - pre.dom[0]) < 1e-9 && Math.abs(after.dom[1] - pre.dom[1]) < 1e-9,
+       num(pre.dom[1]) + ' → ' + num(after.dom[1]));
+
+  /* ⚠️ КОНТРОЛЬ ОСМЫСЛЕННОСТИ. Проверка выше стоит чего-то только если в той
+     же точке БЕЗ окна колесо масштаб МЕНЯЕТ. Иначе она зелёная всегда — хоть
+     с заслоном, хоть без него. Закрываем окно и крутим ровно там же. */
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  await page.mouse.move(cx, cy);
+  await page.mouse.wheel(0, 400);
+  await page.waitForTimeout(300);
+  const bare = await page.evaluate(() => ({ dom: sx.domain().slice() }));
+  note('масштаб после прокрутки БЕЗ окна: Q от ' + num(bare.dom[0]) + ' до ' + num(bare.dom[1]));
+  flag('контроль: без окна та же прокрутка масштаб МЕНЯЕТ',
+       Math.abs(bare.dom[1] - pre.dom[1]) > 1e-6,
+       num(pre.dom[1]) + ' → ' + num(bare.dom[1]));
+  await page.evaluate(() => { CONFIG.Qmin = 0; CONFIG.Qmax = 100; redrawAll(); });
+  await page.waitForTimeout(200);
+
+  // Закрытие по Esc.
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(250);
+  const closed = await page.evaluate(() => {
+    const m = document.getElementById('ff-modal');
+    const k = document.querySelector('#info-final .ff-f .katex');
+    return { open: !!(m && m.classList.contains('open')),
+             inert: !!(m && m.hasAttribute('inert')),
+             mark: !!(k && k.getAttribute('data-p31mark') === '1') };
+  });
+  flag('Esc закрывает окно', !closed.open, String(closed.open));
+  flag('закрытое окно снова inert', closed.inert, String(closed.inert));
+  flag('открытие и закрытие НЕ перенабрали табло (guardPanelBoxes)', closed.mark,
+       'метка на узле формулы ' + (closed.mark ? 'цела' : 'пропала — табло перенабрано'));
+
+  /* Закрытие щелчком мимо окна.
+     ⚠️ ТОЧКУ «МИМО» НАДО ВЫБИРАТЬ, А НЕ БРАТЬ УГОЛ ЭКРАНА. В левом верхнем
+     углу лежит шапка сайта, и она выше окна по слоям: щелчок туда попадает в
+     неё, а не в подложку. Берём точку слева от карточки, на её высоте. */
+  await page.click('#info-final .ff .ff-expand');
+  await page.waitForTimeout(300);
+  await page.mouse.click(Math.max(4, Math.round(open.rect.x / 2)),
+                         Math.round(open.rect.y + open.rect.h / 2));
+  await page.waitForTimeout(250);
+  const c2 = await page.evaluate(() => !!document.getElementById('ff-modal').classList.contains('open'));
+  flag('щелчок мимо окна закрывает', !c2, String(c2));
+
+  // Закрытие крестиком.
+  await page.click('#info-final .ff .ff-expand');
+  await page.waitForTimeout(300);
+  await page.click('#ff-modal-x');
+  await page.waitForTimeout(250);
+  const c3 = await page.evaluate(() => !!document.getElementById('ff-modal').classList.contains('open'));
+  flag('крестик закрывает', !c3, String(c3));
+}
+
+/* ═══════════ Д5. Блок «Итоговая функция» во всех четырёх сценах ═════ */
+if (need('Д5')) {
+  head('Д5 · компактная запись в четырёх сценах: ширина внутри .katex против контейнера');
+  const scenes = [
+    ['sdsum', 'Сложение спросов и предложений', () => { resetSceneMemory(); pickScene('sdsum'); redrawAll(); }],
+    ['ppfsum', 'Сложение КПВ', () => { resetSceneMemory(); pickScene('ppfsum'); redrawAll(); }],
+    ['trade', 'КТВ. Одна страна', () => { resetSceneMemory(); pickScene('trade'); redrawAll(); }],
+    ['taxes', 'Налоги и субсидии', () => { p31TaxSetup('100 - Q', 'Q', 'subsidy', '', 'seller', 20); }],
+  ];
+  for (const [key, name] of scenes) {
+    const r = await page.evaluate((k) => {
+      if (k === 'taxes') { p31TaxSetup('100 - Q', 'Q', 'subsidy', '', 'seller', 20); }
+      else { resetSceneMemory(); pickScene(k); redrawAll(); }
+      p31Expand(); redrawAll();
+      if (typeof fitFinalMath === 'function') fitFinalMath();
+      return p31Final();
+    }, key);
+    console.log('  · сцена «' + key + '» — ' + name);
+    if (!r || !r.blocks.length) { note('блоков «Итоговая функция» нет'); continue; }
+    r.blocks.forEach((b, i) => {
+      const kind = b.katexW != null && b.conds ? 'кусочная' : 'однострочная';
+      note('  блок ' + (i + 1) + ' «' + b.name + '» (' + kind + '): '
+           + 'внутри .katex ' + b.katexW + ' px против контейнера ' + b.hostW + ' px'
+           + ', кегль ' + b.fontPx + (b.condPx ? '/' + b.condPx : '')
+           + ', строк ' + b.rows + ', усечено ' + (b.cut || 0) + ' из ' + (b.conds || 0));
+      flag('    ничего не торчит за контейнер', (b.spill == null || b.spill <= 1)
+           && (b.rowSpill == null || b.rowSpill <= 1),
+           'вылет ' + b.spill + ' / ячейка ' + b.rowSpill);
+      flag('    слова «если» в компактной записи нет', b.text.indexOf('если') < 0, b.text.slice(0, 70));
+      flag('    кегль формулы не ниже 13 px', b.fontPx >= 13, String(b.fontPx));
+    });
+    await shot('d5-' + key);
+  }
 }
 
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }
