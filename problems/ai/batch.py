@@ -36,6 +36,7 @@ complete()` зовёт `client.responses.create(...)` (Responses API), и `ENDPO
 """
 import json
 import os
+import time
 from pathlib import Path
 
 MAX_REQUESTS_PER_BATCH = 50000
@@ -165,6 +166,10 @@ def load_manifest(path):
         return json.load(fh)
 
 
+FILE_PROPAGATION_RETRIES = 5
+FILE_PROPAGATION_WAIT_SECONDS = 5
+
+
 def submit_pending(client, manifest, manifest_path):
     """Отправляет файлы манифеста, у которых ещё нет `batch_id`.
 
@@ -172,17 +177,41 @@ def submit_pending(client, manifest, manifest_path):
     после каждой успешной отправки — прервали процесс на файле 3 из 5,
     перезапустили: файлы 1–2 не отправляются повторно, потому что у их
     записей уже есть `batch_id`.
+
+    ⚠️ ГОНКА ЗАГРУЗКИ ФАЙЛА — ПОДТВЕРЖДЕНО РЕАЛЬНЫМ ВЫЗОВОМ (замер Б4,
+    31.08.2026). `client.files.create(purpose='batch')` возвращает файл со
+    статусом `processed` СРАЗУ, но сервис Batch API видит его не мгновенно:
+    первая попытка `client.batches.create()` сразу после загрузки упала с
+    `invalid_request` / `Cannot find file …, or organization … does not
+    have access to it`, хотя `client.files.retrieve()` тем же секундами
+    позже уже показывал файл нормально. Ни одного запроса при этом не
+    ушло и не оплачено (`request_counts` и `usage` батча — нули), поэтому
+    ретрай с паузой безопасен по деньгам. Раньше это место было НЕ
+    проверено реальным вызовом (см. докстринг модуля) — теперь проверено.
     """
     for entry in manifest:
         if entry.get('batch_id'):
             continue
         with open(entry['path'], 'rb') as fh:
             uploaded = client.files.create(file=fh, purpose='batch')
-        batch = client.batches.create(
-            input_file_id=uploaded.id,
-            endpoint=ENDPOINT,
-            completion_window=COMPLETION_WINDOW,
-        )
+
+        batch = None
+        last_error = None
+        for attempt in range(FILE_PROPAGATION_RETRIES):
+            if attempt:
+                time.sleep(FILE_PROPAGATION_WAIT_SECONDS)
+            try:
+                batch = client.batches.create(
+                    input_file_id=uploaded.id,
+                    endpoint=ENDPOINT,
+                    completion_window=COMPLETION_WINDOW,
+                )
+                break
+            except Exception as error:  # см. докстринг — гонка, не ошибка данных
+                last_error = error
+        if batch is None:
+            raise last_error
+
         entry['input_file_id'] = uploaded.id
         entry['batch_id'] = batch.id
         entry['status'] = batch.status
