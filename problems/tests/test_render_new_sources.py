@@ -276,4 +276,8 @@ class AsyncUnsafeEnvTests(TestCase):
         SourceReference.objects.create(
             problem=problem, source=self.sources[SOLVEHUB], problem_number='1')
         run('--apply')
-        self.assertNotIn(self.VAR, os.environ)
+        # assertNotIn() на провале печатает repr(os.environ) целиком — в
+        # нём реальные секреты (например OPENAI_API_KEY) из окружения
+        # разработчика. assertTrue не показывает контейнер.
+        self.assertTrue(self.VAR not in os.environ,
+                        f'{self.VAR} осталась в окружении после запуска')

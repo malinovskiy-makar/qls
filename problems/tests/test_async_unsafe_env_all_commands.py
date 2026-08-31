@@ -124,7 +124,7 @@ class AsyncUnsafeEnvAllCommandsTests(TestCase):
         ):
             call_command('corpus_render_codes', '--widths',
                          '--report-dir', report_dir, '--gate-dir', gate_dir)
-        self.assertNotIn(VAR, os.environ)
+        self.assertTrue(VAR not in os.environ, f'{VAR} осталась в окружении после запуска')
 
     def test_running_corpus_render_gate_restores_the_environment(self):
         with mock.patch(
@@ -132,7 +132,7 @@ class AsyncUnsafeEnvAllCommandsTests(TestCase):
             FakeChecker,
         ):
             call_command('corpus_render_gate', '--fixtures')
-        self.assertNotIn(VAR, os.environ)
+        self.assertTrue(VAR not in os.environ, f'{VAR} осталась в окружении после запуска')
 
     def test_running_render_legacy_sources_restores_the_environment(self):
         import tempfile
@@ -149,7 +149,7 @@ class AsyncUnsafeEnvAllCommandsTests(TestCase):
             FakeChecker,
         ):
             call_command('render_legacy_sources', '--report-dir', report_dir)
-        self.assertNotIn(VAR, os.environ)
+        self.assertTrue(VAR not in os.environ, f'{VAR} осталась в окружении после запуска')
 
     def test_running_render_legacy_review_v2_restores_the_environment(self):
         import tempfile
@@ -163,4 +163,4 @@ class AsyncUnsafeEnvAllCommandsTests(TestCase):
             out_path,
         ):
             call_command('render_legacy_review_v2')
-        self.assertNotIn(VAR, os.environ)
+        self.assertTrue(VAR not in os.environ, f'{VAR} осталась в окружении после запуска')
