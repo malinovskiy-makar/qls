@@ -99,6 +99,21 @@ def _resolve_color(block, name):
     raise AssertionError(f"{name} = {value!r} не hex-цвет — проверка ждёт сплошной цвет")
 
 
+def _accent_rgb(block):
+    """`--accent-rgb` как тройка чисел — из неё собираются заливки шкалы."""
+    raw = _token_value(block, "--accent-rgb")
+    return tuple(int(part) for part in raw.split(","))
+
+
+def _over(top, alpha, below):
+    """Полупрозрачный цвет поверх сплошного → сплошной.
+
+    ⚠️ У `rgba(...)` яркости НЕТ, пока он не лёг на подложку. Мерить контраст
+    по самой заливке значит мерить контраст с прозрачностью.
+    """
+    return tuple(top[i] * alpha + below[i] * (1 - alpha) for i in range(3))
+
+
 class PaletteTokensTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
@@ -118,8 +133,14 @@ class PaletteTokensTests(SimpleTestCase):
         )
 
     def test_2_dark_surface_lighter_than_bg(self):
-        self.assertEqual(_token_value(self.dark_block, "--bg"), "#191612")
-        self.assertEqual(_token_value(self.dark_block, "--surface"), "#242019")
+        """⚠️ Конкретные значения здесь БОЛЬШЕ НЕ ЗАШИТЫ (31.08.2026, вечер).
+
+        Раньше тест требовал ровно `#191612` / `#242019`. Владелец принял
+        пару дизайнера `#232322` / `#3f3f3d` — и тест покраснел, не сказав
+        ни слова о читаемости: цвет поменялся, и что? Свойство, ради которого
+        он писался, от значения не зависит — карточка обязана быть светлее
+        фона. Его и проверяем.
+        """
         bg = _resolve_color(self.dark_block, "--bg")
         surface = _resolve_color(self.dark_block, "--surface")
         self.assertGreater(
@@ -163,6 +184,56 @@ class PaletteTokensTests(SimpleTestCase):
                 de, 30,
                 f"{theme} тема: ΔE(--brand-amber, --amber) = {de:.1f}, нужно ≥ 30 "
                 "(иначе бренд и сигнал «сложность» путаются)",
+            )
+
+    def test_8_activity_ink_on_the_densest_fill(self):
+        """Цифра дня на самой плотной ПОЛУПРОЗРАЧНОЙ заливке шкалы.
+
+        Третий уровень — последний, где клетка ещё не сплошной акцент, и
+        именно он проваливался в обеих темах сразу. Заливка полупрозрачная,
+        поэтому считается композит на карточке, а не сам `rgba(...)`.
+        """
+        for block, theme in ((self.root_block, "светлая"), (self.dark_block, "тёмная")):
+            alpha = float(_token_value(block, "--act-a3"))
+            fill = _over(_accent_rgb(block), alpha, _resolve_color(block, "--surface"))
+            ink = _resolve_color(block, "--act-ink")
+            ratio = _contrast_ratio(ink, fill)
+            self.assertGreaterEqual(
+                ratio, 4.6,
+                f"{theme} тема: --act-ink на заливке --act-a3 даёт {ratio:.2f}, нужно ≥ 4,6",
+            )
+
+    def test_9_signals_readable_on_both_surfaces(self):
+        """Сигналы и третьестепенный текст живут И на карточке, И на фоне.
+
+        ⚠️ Мерить только карточку — половина правды: тот же чип «частично
+        верно» встречается и прямо на поле страницы, а поверхности разной
+        светлоты. Ровно так и вскрылся провал янтарных чернил светлой темы.
+        """
+        for block, theme in ((self.root_block, "светлая"), (self.dark_block, "тёмная")):
+            for name in ("--text3", "--amber", "--error"):
+                colour = _resolve_color(block, name)
+                for surface_name in ("--surface", "--bg"):
+                    below = _resolve_color(block, surface_name)
+                    ratio = _contrast_ratio(colour, below)
+                    self.assertGreaterEqual(
+                        ratio, 4.6,
+                        f"{theme} тема: {name} на {surface_name} даёт {ratio:.2f}, нужно ≥ 4,6",
+                    )
+
+    def test_10_button_ink_meets_aaa_in_both_themes(self):
+        """Текст на главной кнопке — порог AAA 7,0, в каждой теме свой.
+
+        ⚠️ Чернила берутся из `--on-btn` СВОЕЙ темы, а не считаются белыми:
+        в тёмной теме кнопка светлая и текст на ней тёмный.
+        """
+        for block, theme in ((self.root_block, "светлая"), (self.dark_block, "тёмная")):
+            btn = _resolve_color(block, "--btn-bg")
+            ink = _resolve_color(block, "--on-btn")
+            ratio = _contrast_ratio(ink, btn)
+            self.assertGreaterEqual(
+                ratio, 7.0,
+                f"{theme} тема: --on-btn на --btn-bg даёт {ratio:.2f}, нужно ≥ 7,0 (AAA)",
             )
 
     def test_7_new_tokens_not_duplicated(self):
