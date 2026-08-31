@@ -16,6 +16,7 @@
 флагом `--widths`: разбором строки ширину не узнать.
 """
 import collections
+import contextlib
 import json
 import os
 
@@ -73,8 +74,8 @@ class Command(BaseCommand):
         details = {}
         total = clean = 0
 
-        probe = self._open_probe() if options['widths'] else None
-        try:
+        with contextlib.ExitStack() as stack:
+            probe = self._open_probe(stack) if options['widths'] else None
             for problem in qs.iterator(chunk_size=200):
                 total += 1
                 slug = source_of.get(problem.pk, '?')
@@ -93,9 +94,6 @@ class Command(BaseCommand):
                 details[problem.pk] = sorted(found)
                 for code in found:
                     by_code[code].append(problem.pk)
-        finally:
-            if probe is not None:
-                probe.__exit__(None, None, None)
 
         report_dir = options['report_dir']
         os.makedirs(report_dir, exist_ok=True)
@@ -186,13 +184,16 @@ class Command(BaseCommand):
         return blocks, htmls
 
     @staticmethod
-    def _open_probe():
+    def _open_probe(stack):
         # Синхронный playwright поднимает event loop, после чего Django
         # запрещает ORM. Здесь доступ к базе только на чтение и в один
-        # поток — ровно случай, для которого флаг и предназначен.
-        os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', '1')
-        from problems.corpus_converter.katex_preflight import KatexPreflight
-        return KatexPreflight().__enter__()
+        # поток — ровно случай, для которого флаг и предназначен. Флаг
+        # живёт до выхода из ExitStack — то есть весь срок жизни probe.
+        from problems.corpus_converter.katex_preflight import (
+            KatexPreflight, async_unsafe_for_playwright,
+        )
+        stack.enter_context(async_unsafe_for_playwright())
+        return stack.enter_context(KatexPreflight())
 
     @staticmethod
     def _widths(probe, htmls):
