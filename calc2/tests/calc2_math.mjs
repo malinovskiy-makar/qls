@@ -5715,6 +5715,13 @@ const CASES = [
        пройдёт, и удаление всего разбора осталось бы незамеченным. Поэтому
        рядом стоит второй край — карточка на месте и остальные абзацы в ней. */
     name: 'Приёмка · врезки про вертикальное сложение нет, а разбор не опустел',
+    /* ⚠️ ПРОВЕРКА СМОТРИТ И В ИСХОДНИКИ, А НЕ ТОЛЬКО НА ЭКРАН.
+       Указание владельца — убрать врезку ВЕЗДЕ, а на экране за один прогон
+       видна одна сцена. Первая версия проверки читала только панель сцены
+       «Сложение КПВ», и проверка зубастости это поймала: врезка, возвращённая
+       в СОСЕДНЮЮ сцену (обычная КПВ), проходила мимо неё незамеченной.
+       Поэтому текст ищется ещё и в самих файлах calc2: их адреса известны
+       странице, и скачать их дешевле, чем обойти сорок четыре сцены. */
     run: `resetSceneMemory(); pickScene('ppfsum'); redrawAll();
           document.querySelectorAll('.fold-btn').forEach(function (b) {
             if (b.getAttribute('aria-expanded') !== 'true') b.click();
@@ -5728,7 +5735,18 @@ const CASES = [
           }).join(' ').replace(/\s+/g, ' ');
           var note = document.querySelector('#ex-body .sb-note, #info-ppfsum .sb-note');
           var noteLen = note ? note.textContent.replace(/\s+/g, ' ').trim().length : 0;
+          /* Исходники калькулятора: ищем текст врезки во всех файлах сразу. */
+          var srcs = Array.prototype.map.call(document.querySelectorAll('script[src]'),
+            function (t) { return t.src; }).filter(function (u) { return u.indexOf('/calc2/') >= 0; });
+          var joined = '';
+          for (var i = 0; i < srcs.length; i++) {
+            try { joined += await (await fetch(srcs[i])).text(); } catch (e) { joined += ''; }
+          }
+          var inSrc = (joined.indexOf('сложить по вертикали') >= 0
+                       || joined.indexOf('Вертикальная сумма') >= 0) ? 1 : 0;
           return {
+            srcFiles: srcs.length,
+            noVertSrc: inSrc ? 0 : 1,
             noVert: parts.indexOf('сложить по вертикали') < 0 ? 1 : 0,
             noVertSum: parts.indexOf('Вертикальная сумма') < 0 ? 1 : 0,
             noMink: parts.indexOf('Минковск') < 0 ? 1 : 0,
@@ -5742,7 +5760,13 @@ const CASES = [
             hasKink: (parts.indexOf('Излом появляется') >= 0
                       || parts.indexOf('Изломов нет') >= 0) ? 1 : 0,
             hasWhere: parts.indexOf('Саму запись суммарной кривой') >= 0 ? 1 : 0 };`,
-    checks: [['абзаца «сложить по вертикали» нет', 'noVert', 1, 0],
+    checks: [['абзаца «сложить по вертикали» нет на экране', 'noVert', 1, 0],
+             /* ⚠️ ВТОРОЙ КРАЙ — ИСХОДНИКИ. Экран за один прогон показывает одну
+                сцену, а убрать врезку велено ВЕЗДЕ. Проверка зубастости это и
+                поймала: врезка, возвращённая в соседнюю сцену, проходила мимо
+                экранной проверки незамеченной. */
+             ['файлы calc2 прочитаны', 'srcFiles', 22, 8],
+             ['текста нет и в исходниках calc2', 'noVertSrc', 1, 0],
              ['слов «Вертикальная сумма» нет', 'noVertSum', 1, 0],
              ['формулы Минковского нет', 'noMink', 1, 0],
              ['разбор «Как это получилось» на месте', 'hasNote', 1, 0],
@@ -5988,7 +6012,12 @@ for (const c of CASES) {
        и твои изменения. Контрольный прогон от этого зависеть не должен: каждый
        случай ставит свою обстановку сам, поэтому память забываем перед каждым. */
     await page.evaluate(() => { if (typeof resetSceneMemory === 'function') resetSceneMemory(); });
-    res = await page.evaluate('(function(){ ' + c.run + ' })()');
+    /* ⚠️ ОБЁРТКА АСИНХРОННАЯ, И ЭТО НЕ УКРАШЕНИЕ. Синхронные тела случаев от
+       этого не меняются (Playwright дожидается обещания), а тем, кому нужно
+       что-то ДОЖДАТЬСЯ — например скачать исходники calc2 и поискать в них
+       текст, — становится доступен await. Без этого проверка «врезки нет
+       нигде» могла бы смотреть только на одну открытую сцену. */
+    res = await page.evaluate('(async function(){ ' + c.run + ' })()');
   } catch (e) {
     fail++; failures.push(`${c.name}\n    setup упал: ${e.message}`);
     console.log(`✗ ${c.name}\n    setup упал: ${e.message}`);
