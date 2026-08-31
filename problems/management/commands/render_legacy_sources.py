@@ -54,20 +54,26 @@ KaTeX): из 465 задач, прошедших шлюз, **70 (15,1 %) сайт
 принудительно, отдельным списком id, независимо от результата шлюза.
 
 По умолчанию — сухой прогон (ничего не пишется). Запись — только с
-`--apply`."""
+`--apply`.
+
+⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE` выставляется на время работы с
+`KatexPreflight` (см. `async_unsafe_for_playwright` в
+katex_preflight.py): синхронный playwright поднимает event loop,
+после чего Django запрещает ORM. Доступ к базе тут только на чтение и
+в один поток — ровно случай, для которого этот флаг и предназначен.
+Ставить его на уровне модуля НЕЛЬЗЯ: Django импортирует модули команд
+при автопоиске, и флаг утекал бы в процесс от одного факта импорта.
+"""
 import json
 import os
-
-# Синхронный playwright поднимает event loop, после чего Django запрещает
-# ORM. Здесь доступ к базе только на чтение и в один поток — ровно случай,
-# для которого этот флаг и предназначен (см. katex_preflight docstring).
-os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', '1')
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from problems.corpus_converter.katex_preflight import KatexPreflight
+from problems.corpus_converter.katex_preflight import (
+    KatexPreflight, async_unsafe_for_playwright,
+)
 from problems.corpus_converter.preflight_gate import (
     GateVerdict, build_blocks, convert_problem_v2, render_preflight_v2,
 )
@@ -167,7 +173,7 @@ class Command(BaseCommand):
 
         # Браузер поднимается ОДИН раз на весь корпус: шлюз рендерит
         # каждое поле настоящим KaTeX, и подъём на задачу стоил бы часы.
-        with KatexPreflight() as checker:
+        with async_unsafe_for_playwright(), KatexPreflight() as checker:
             for slug, (source_id, name) in SOURCES.items():
                 base_qs = (
                     Problem.objects.filter(source_references__source_id=source_id)
