@@ -703,6 +703,77 @@ if (need('Д5')) {
   }
 }
 
+/* ═══════════ Д6. Обзор: обрезанные подписи и чужие поля у ползунков ══ */
+if (need('Д6')) {
+  head('Д6 · обзор всех сцен: обрезанные подписи и числовые поля у ползунков');
+  const keys = await page.evaluate(() => Object.keys(SCENE_NAMES));
+  note('сцен к обходу: ' + keys.length);
+  const cutAll = [], numAll = [];
+  for (const k of keys) {
+    const r = await page.evaluate((key) => {
+      try { resetSceneMemory(); pickScene(key); redrawAll(); } catch (e) { return { err: String(e.message) }; }
+      p31Expand(); redrawAll();
+      const vis = (el) => {
+        if (!el) return false;
+        if (!(el.offsetParent || el.getClientRects().length)) return false;
+        const cs = getComputedStyle(el);
+        return cs.display !== 'none' && cs.visibility !== 'hidden' && parseFloat(cs.opacity || '1') > 0.01;
+      };
+      /* ОБРЕЗАННЫЕ ПОДПИСИ. Меряем сам узел: содержимое шире коробки —
+         значит текст обрезан. Считаем только видимые. */
+      const cut = [];
+      document.querySelectorAll('label, .pchip-label, .chk-label, .seg-btn, .sb-sub').forEach(el => {
+        if (!vis(el)) return;
+        if (el.querySelector('input[type=range], input[type=number]')) {
+          // у поля регулятора подпись — свой узел, коробку меряем не здесь
+        }
+        const over = el.scrollWidth - el.clientWidth;
+        if (over > 1 && el.clientWidth > 0) {
+          const t = el.textContent.replace(/\s+/g, ' ').trim().slice(0, 60);
+          if (t) cut.push({ t: t, over: Math.round(over), cls: String(el.className).slice(0, 30) });
+        }
+      });
+      /* ЧУЖИЕ ЧИСЛОВЫЕ ПОЛЯ. Правило владельца: рядом с ползунком числовому
+         полю не место, значение вводится щелчком по числу НАД дорожкой. */
+      const nums = [];
+      document.querySelectorAll('input[type=range]').forEach(sl => {
+        if (!vis(sl)) return;
+        const field = sl.closest('.field, .pchip') || sl.parentElement;
+        if (!field) return;
+        const n = field.querySelector('input[type=number]');
+        if (n && vis(n)) {
+          nums.push({ field: field.id || String(field.className).slice(0, 24),
+                      slider: sl.id || '(без id)', num: n.id || '(без id)' });
+        }
+      });
+      return { cut: cut, nums: nums };
+    }, k);
+    if (r.err) { note('сцена «' + k + '»: ' + r.err); continue; }
+    r.cut.forEach(c => cutAll.push(Object.assign({ scene: k }, c)));
+    r.nums.forEach(n => numAll.push(Object.assign({ scene: k }, n)));
+  }
+  // Схлопываем: одна и та же подпись в двадцати сценах — это одна находка.
+  const uniq = (list, key) => {
+    const m = new Map();
+    list.forEach(x => { const k = key(x); if (!m.has(k)) m.set(k, { x: x, scenes: [] }); m.get(k).scenes.push(x.scene); });
+    return Array.from(m.values());
+  };
+  console.log('\n  ОБРЕЗАННЫЕ ПОДПИСИ:');
+  const cu = uniq(cutAll, x => x.t);
+  if (!cu.length) console.log('     нет ни одной');
+  cu.forEach(o => console.log('     «' + o.x.t + '» — не влезает ' + o.x.over
+    + ' px, сцен: ' + o.scenes.length + ' (' + o.scenes.slice(0, 4).join(', ')
+    + (o.scenes.length > 4 ? ', …' : '') + ')'));
+  console.log('\n  ЧИСЛОВЫЕ ПОЛЯ РЯДОМ С ПОЛЗУНКАМИ:');
+  const nu = uniq(numAll, x => x.field + '|' + x.num);
+  if (!nu.length) console.log('     нет ни одного');
+  nu.forEach(o => console.log('     поле «' + o.x.field + '»: ползунок ' + o.x.slider
+    + ' + число ' + o.x.num + ', сцен: ' + o.scenes.length
+    + ' (' + o.scenes.slice(0, 4).join(', ') + (o.scenes.length > 4 ? ', …' : '') + ')'));
+  flag('обрезанных подписей нет', cu.length === 0, cu.length + ' шт.');
+  flag('числовых полей рядом с ползунками нет', nu.length === 0, nu.length + ' шт.');
+}
+
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }
 console.log('\nИТОГО провалов: ' + bad);
 await browser.close();

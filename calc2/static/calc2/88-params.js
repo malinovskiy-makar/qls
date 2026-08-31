@@ -27,7 +27,8 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'ineq-alpha-field',                                                  // неравенство: α (формула)
   'cons-px1-row',                                                      // потребитель: новая цена Px₁
   'lr-price-field', 'pl-q-field',                                      // фирма: цена P / выпуск двух заводов
-  'ma-dg-field', 'ma-fx-fixed-field'];                                 // макро: дефицит ΔG / фикс. курс
+  'ma-dg-field', 'ma-fx-fixed-field',                                  // макро: дефицит ΔG / фикс. курс
+  'mathx0-field'];                                                     // математика: точка касания x₀
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 /* ⚠️ ОРГАНЫ УПРАВЛЕНИЯ ВМЕШАТЕЛЬСТВОМ ОСТАЮТСЯ В СВОЕЙ КАРТОЧКЕ.
@@ -57,6 +58,9 @@ const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
    содержимое одной карточки. */
 const PULT_STAY_HOME = new Set([
   'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',
+  /* Точка касания живёт в своей карточке рядом с формулой и переезжать в ленту
+     не должна — а общий компонент регулятора ей нужен ровно тот же. */
+  'mathx0-field',
 ]);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -71,7 +75,14 @@ function pultRegulatorIds() {
       return ids;
     }
     const bs = baseScene();   // 'mono-nat' и т.п. для пульта — та же сцена 'mono'
-    const interventionScene = (bs === 'tax' || bs === 'ceil' || bs === 'mono');
+    /* ⚠️ СЦЕНА «КВОТЫ» ЗДЕСЬ ОТСУТСТВОВАЛА, И ИЗ-ЗА ЭТОГО ЕЁ ПОЛЗУНОК ОСТАЛСЯ
+       БЕЗ ОБЩЕГО КОМПОНЕНТА. Список писался, когда квота была подрежимом сцены
+       налогов; при переходе на 10 блоков она стала отдельной карточкой со
+       своим ключом 'quota' и своим маршрутом БЕЗ поля base — то есть перестала
+       считаться сценой вмешательства вовсе. Отсюда и «чужое числовое поле»,
+       найденное на приёмке 31.08: доводку регулятора поле quota-field не
+       получало никогда, а с ней прячется и это поле. */
+    const interventionScene = (bs === 'tax' || bs === 'ceil' || bs === 'quota' || bs === 'mono');
     if (!interventionScene) return [];
     // Монополия: переключатель под-режима — главный регулятор сцены, поэтому он в ленте
     // (Фаза 3а: раньше жил только в свёрнутых «Инструментах» и был не виден).
@@ -107,6 +118,13 @@ function pultRegulatorIds() {
     if (STATE.laborStruct === 'union' && STATE.unionModel === 'wagefloor') ids.push('union-wage-field');
     if (STATE.laborStruct !== 'union' && STATE.laborMinOn) ids.push('labmin-field');
     return ids;
+  }
+  /* Математика: в сюжете про касательную живой регулятор один — точка x₀.
+     В ленту он не переезжает (см. PULT_STAY_HOME), но общий компонент
+     получает: правило владельца «числовых полей рядом с ползунками не бывает»
+     действует во всех сценах, а не только в рыночных. */
+  if (STATE.mode === 'math') {
+    return (STATE.mathSub === 'tangent') ? ['mathx0-field'] : [];
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
@@ -755,6 +773,9 @@ const REGULATOR_SHORT = {
   'ppft-price-field': 'Pw', 'tb-price-field': 'Pw', 'open-pw-field': 'Pw',
   'pc-field': 'Preg', 'union-wage-field': 'Wu',
   'labmin-field': 'Wmin', 'ineq-alpha-field': 'alpha',
+  /* Цена внутри коридора при квоте. Без записи в реестре общее правило режет
+     подпись по длине и даёт «Цена внутри…» — многоточие вместо смысла. */
+  'quota-price-field': 'Pk',
 };
 function shortRegulatorName(id, raw) {
   /* ⚠️ У СТАВКИ ОБОЗНАЧЕНИЕ ЗАВИСИТ ОТ ФОРМЫ, поэтому в готовом списке его
