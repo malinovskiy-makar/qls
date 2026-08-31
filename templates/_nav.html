@@ -1,4 +1,25 @@
-<nav style="background:var(--nav-bg,#1a1f2e);padding:0 20px;display:flex;align-items:center;height:48px;gap:0;position:sticky;top:0;z-index:200;">
+<style>
+/* ⚠️ ОТСТУПЫ ШАПКИ — ПЕРЕМЕННЫМИ, И ЭТО НЕ УКРАШАТЕЛЬСТВО.
+   Шапка — единственная строка на сайте, которая не переносится: логотип,
+   до восьми ссылок и блок пользователя стоят в один ряд и своей шириной
+   РАСПИРАЮТ ДОКУМЕНТ. Пока подписи были 13 px, ряд помещался до 740 px
+   ширины окна; на 14 px он перестал помещаться уже на 820, и появлялась
+   горизонтальная прокрутка ВСЕЙ страницы — замерено сравнением с копией
+   репозитория до правки.
+   Кегль возвращать нельзя (14 — пол интерфейса), поэтому на узких окнах
+   ужимаются отступы. Значения подобраны так, чтобы прежняя граница 740 px
+   восстановилась; ниже неё сайт не помещался и ДО этой сессии.
+   Переменными, а не media-запросом на сами ссылки: у ссылок стиль стоит
+   атрибутом, и правило из таблицы стилей его не перебьёт без !important. */
+nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14px; }
+@media (max-width: 1060px) {
+  nav { --nav-pad: 8px; --nav-edge: 12px; --nav-logo-gap: 12px; --nav-btn-pad: 10px; }
+}
+@media (max-width: 900px) {
+  nav { --nav-pad: 5px; --nav-edge: 8px; --nav-logo-gap: 8px; --nav-btn-pad: 8px; }
+}
+</style>
+<nav style="background:var(--nav-bg,#1a1f2e);padding:0 var(--nav-edge);display:flex;align-items:center;height:48px;gap:0;position:sticky;top:0;z-index:200;">
   {% comment %}
   ⚠️ ОБВОДКИ У КРУГА В ШАПКЕ НЕТ, И ЭТО ЗАМЕР, А НЕ ВКУС. Присланный SVG
   рисует круг обводкой #333331; против шапки --nav-bg #3c3531 она даёт 1,05
@@ -8,7 +29,7 @@
   ⚠️ SVG вставлен СТРОКОЙ, а не через <img>: так он не даёт лишнего запроса,
   а размеры заданы атрибутами — иначе при загрузке страница дёрнется.
   {% endcomment %}
-  <a href="/" style="display:flex;align-items:center;flex-shrink:0;margin-right:20px;text-decoration:none;" aria-label="Weconomics — на главную">
+  <a href="/" style="display:flex;align-items:center;flex-shrink:0;margin-right:var(--nav-logo-gap);text-decoration:none;" aria-label="Weconomics — на главную">
     <svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" role="img" aria-hidden="true" focusable="false" style="display:block;">
       <circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"/>
       <path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"/>
@@ -23,44 +44,44 @@
       через открытие каждого занятия. Пункт «Группы» стал «Учениками»:
       там теперь и группы, и индивидуальные занятия.
       {% endcomment %}
-      <a href="{% url 'teacher:groups' %}" style="font-size:14px;color:{% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Ученики</a>
-      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
-      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:{% if request.resolver_match.url_name == 'smart_search' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.url_name == 'smart_search' %}var(--accent){% else %}transparent{% endif %};">Умный поиск</a>
-      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
-      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
+      <a href="{% url 'teacher:groups' %}" style="font-size:14px;color:{% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Ученики</a>
+      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
+      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:{% if request.resolver_match.url_name == 'smart_search' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.url_name == 'smart_search' %}var(--accent){% else %}transparent{% endif %};">Умный поиск</a>
+      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
+      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
+      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
       {% if user.is_staff %}
-      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
+      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
       {% endif %}
 
     {% elif user.role == 'student' %}
-      <a href="/student/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}var(--accent){% else %}transparent{% endif %};">Домашки</a>
+      <a href="/student/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}var(--accent){% else %}transparent{% endif %};">Домашки</a>
       {# «Прогресс» поглощён экраном статистики — двух похожих разделов нет. #}
-      <a href="/profile/stats/" style="font-size:14px;color:{% if 'student_stats' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'student_stats' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Статистика</a>
-      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
-      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:{% if request.resolver_match.url_name == 'smart_search' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.url_name == 'smart_search' %}var(--accent){% else %}transparent{% endif %};">Умный поиск</a>
-      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
-      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
+      <a href="/profile/stats/" style="font-size:14px;color:{% if 'student_stats' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'student_stats' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Статистика</a>
+      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
+      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:{% if request.resolver_match.url_name == 'smart_search' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.url_name == 'smart_search' %}var(--accent){% else %}transparent{% endif %};">Умный поиск</a>
+      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
+      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
+      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
 
     {% else %}
       {% if user.profile.is_parent %}
-      <a href="{% url 'parent_home' %}" style="font-size:14px;color:{% if 'parent' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'parent' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Мои дети</a>
+      <a href="{% url 'parent_home' %}" style="font-size:14px;color:{% if 'parent' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'parent' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Мои дети</a>
       {% endif %}
-      <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
-      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Умный поиск</a>
-      <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
+      <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
+      <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Умный поиск</a>
+      <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
+      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
       {% if user.is_staff %}
-      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
+      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
       {% endif %}
     {% endif %}
 
   {% else %}
-    <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
-    <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Умный поиск</a>
-    <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
-    <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 12px;height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
+    <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
+    <a href="{% url 'catalog:smart_search' %}" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Умный поиск</a>
+    <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
+    <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Игра</a>
   {% endif %}
 
   <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
@@ -68,7 +89,7 @@
             style="font-size:14px;color:rgba(255,255,255,0.6);width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:none;border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">☾</button>
     {% if user.is_authenticated %}
       <span style="font-size:14px;color:rgba(255,255,255,0.7);">{{ user.get_full_name|default:user.username }}</span>
-      <a href="/logout/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:6px 14px;border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;text-decoration:none;">Выйти</a>
+      <a href="/logout/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:6px var(--nav-btn-pad);border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;text-decoration:none;">Выйти</a>
     {% else %}
       <a href="/login/" style="font-size:14px;color:var(--act-ink-solid);padding:6px 14px;background:var(--accent);border-radius:8px;text-decoration:none;font-weight:500;">Войти</a>
     {% endif %}

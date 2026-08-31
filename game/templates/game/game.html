@@ -30,7 +30,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -2247,32 +2247,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     ctx.fillRect(0, 0, 10, H);
 
     ctx.fillStyle = '#96969f';
-    ctx.font = '600 26px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '600 26px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('Weconomics · Econ Rush', 64, 74);
 
     ctx.fillStyle = '#fff';
-    ctx.font = '800 140px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '800 140px Montserrat, -apple-system, "Segoe UI", sans-serif';
     var scoreText = s.score.toLocaleString('ru-RU');
     ctx.fillText(scoreText, 64, 210);
     var scoreW = ctx.measureText(scoreText).width;   // «очков» ставим за счётом
     ctx.fillStyle = '#96969f';
-    ctx.font = '600 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '600 30px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('очков', 64 + scoreW + 14, 210);
 
     ctx.fillStyle = '#fff';
-    ctx.font = '600 34px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '600 34px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('Режим «' + s.mode_title + '»', 64, 290);
     ctx.fillStyle = '#96969f';
-    ctx.font = '400 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '400 30px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('верных ' + s.correct + '/' + s.total + ' · точность '
                  + s.accuracy + '% · комбо ×' + s.max_multiplier, 64, 340);
 
     ctx.fillStyle = '#FF4D94';
-    ctx.font = '800 44px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '800 44px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('Обгонишь?', 64, 430);
 
     ctx.fillStyle = '#6b6b78';
-    ctx.font = '400 24px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '400 24px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText((shareInfo && shareInfo.url) || '', 64, H - 44);
   }
 

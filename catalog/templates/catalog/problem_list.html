@@ -418,9 +418,17 @@
   letter-spacing: .5px; white-space: nowrap; padding-top: 2px;
 }
 .prow-main { flex: 1; min-width: 0; }
+/* ⚠️ ДВЕ СТРОКИ, А НЕ ОДНА С МНОГОТОЧИЕМ. Одна строка теряла у длинных
+   заголовков до 164 px текста на узком окне — «Можно решить без
+   использования калькулятора» обрывалось на середине. Многоточие осталось,
+   но включается вдвое позже.
+   На рабочих ширинах (1100 и шире) НИЧЕГО НЕ МЕНЯЕТСЯ: там заголовки
+   помещаются в одну строку, замер это подтверждает. Высота строки растёт
+   только там, где иначе текст просто пропал бы. */
 .prow-title {
   font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 .prow:hover .prow-title { color: var(--accent-ink); }
 .prow-preview {
