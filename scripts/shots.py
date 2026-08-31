@@ -39,7 +39,7 @@ PAGES = {
     "styleguide": "/teacher/styleguide/",
     "catalog": "/catalog/",
     "problem": "/catalog/problem/{pid}/",
-    "search": "/catalog/search/",
+    "search": "/catalog/smart-search/",
     "stats": "/profile/stats/",
     "game": "/game/",
     "calendar": "/calendar/",

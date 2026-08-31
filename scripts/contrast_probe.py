@@ -33,7 +33,11 @@ PAGES = {
     "catalog": "/catalog/",
     "catalog_found": "/catalog/?topic=&q=спрос",
     "problem": "/catalog/problem/63321/",
-    "search": "/catalog/search/",
+    "search": "/catalog/smart-search/",
+    # ⚠️ Пустой экран поиска показывает 16 кусков текста, а найденное —
+    #    больше сотни. Мерить надо ОБА: роль --surface-info живёт только
+    #    в результатах, и на пустом экране её просто нет.
+    "search_found": "/catalog/smart-search/?q=эластичность спроса",
     "stats": "/profile/stats/",
     "game": "/game/",
     "calendar": "/calendar/",
