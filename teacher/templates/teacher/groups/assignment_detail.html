@@ -5,7 +5,7 @@
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .export-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-  margin: -8px 0 20px; font-size: 13px; }
+  margin: -8px 0 20px; font-size: 14px; }
 .export-cap { color: var(--text2); }
 .export-row a { color: var(--text); text-decoration: none;
   border: 0.5px solid var(--border); border-radius: var(--r);
@@ -19,7 +19,7 @@
   background: var(--surface); border: 0.5px solid var(--border);
   border-radius: 10px; padding: 12px 14px;
 }
-.summary-label { font-size: 11px; color: var(--text2); }
+.summary-label { font-size: 13px; color: var(--text2); }
 .summary-value { font-size: 16px; font-weight: 600; margin-top: 4px; }
 
 /* ── Карточка позиции задания (фаза 6) ─────────────────────────
@@ -32,7 +32,7 @@
              gap: 2px; text-align: center; }
 /* Номер стоит у НАЗВАНИЯ задачи, не над баллом: два числа друг под другом
    читались как одно («1 · 2»). */
-.item-num { font-size: 12px; color: var(--text3); font-weight: 600;
+.item-num { font-size: 13px; color: var(--text3); font-weight: 600;
             margin-right: 7px; }
 /* ⚠️ «баллов» и «тест» шли двумя подписями подряд и склеивались в фразу
    «2 баллов тест». «баллов» — единица измерения числа, «тест» — вид
@@ -43,17 +43,17 @@
    как продолжение числа; кроме того, она отвечала сразу на два вопроса —
    «своя или каталог» и «тест или задача». Теперь два ответа, две метки. */
 .item-kind { display: flex; align-items: center; gap: 8px; margin: 6px 0 10px; }
-.item-from { font-size: 11px; color: var(--chip-text);
+.item-from { font-size: 13px; color: var(--chip-text);
              background: var(--chip-bg); border-radius: 999px;
              padding: 2px 9px; }
 /* Тихая подпись у запертого балла: цифра осталась крупной, а править её
    нельзя — без объяснения это читается как поломка. */
-.pts-lock { font-size: 11px;
+.pts-lock { font-size: 13px;
             border-bottom: 1px dotted var(--text3); }
 .item-body { min-width: 0; }
-.item-title { font-size: 15px; font-weight: 600; line-height: 1.35;
+.item-title { font-size: 16px; font-weight: 600; line-height: 1.35;
               margin: 0 0 8px; }
-.pts-status { font-size: 11px; min-height: 14px; }
+.pts-status { font-size: 13px; min-height: 14px; }
 
 /* ── Блок состояния проверки ───────────────────────────────────
    ⚠️ ОДИН блок: и статус, и кнопка. Пока их было двое (бейдж-капслок
@@ -83,38 +83,38 @@
 .check-icon { font-weight: 700; flex-shrink: 0; }
 .is-warn .check-icon { color: var(--amber); }
 .is-ok   .check-icon { color: var(--green); }
-.check-title { font-size: 13px; font-weight: 600; }
-.check-gist { font-size: 12px; color: var(--text2); min-width: 0;
+.check-title { font-size: 14px; font-weight: 600; }
+.check-gist { font-size: 13px; color: var(--text2); min-width: 0;
               overflow-wrap: anywhere; }
 /* Значок раскрытия со словом рядом: сам по себе треугольник владелец
    не нашёл. Слово прячется на узком экране, значок остаётся. */
 .check-open { margin-left: auto; display: inline-flex; align-items: center;
-  gap: 5px; font-size: 12px; font-weight: 600; color: var(--text2);
+  gap: 5px; font-size: 13px; font-weight: 600; color: var(--text2);
   flex-shrink: 0; }
-.check-open::after { content: '▾'; font-size: 12px; }
+.check-open::after { content: '▾'; font-size: 13px; }
 .check-fold[open] .check-open::after { content: '▴'; }
 .check-fold[open] .check-open { font-size: 0; gap: 0; }
-.check-fold[open] .check-open::after { font-size: 12px; }
+.check-fold[open] .check-open::after { font-size: 13px; }
 /* ⚠️ Заголовок — это СОСТОЯНИЕ, тело — ДЕЙСТВИЕ. В раскрытом виде они
    стояли встык, и «Проверяется само» читалось как подпись к кнопке,
    которая это самое и выключает. Черта разводит «что сейчас» и «что
    сделать». */
 .check-fold[open] .check-head { border-bottom: 0.5px solid var(--border); }
 .check-body { padding: 12px 14px 13px; }
-.check-why { font-size: 12px; color: var(--text2); line-height: 1.6;
+.check-why { font-size: 13px; color: var(--text2); line-height: 1.6;
              margin: 0 0 12px; }
 .check-hint { border-bottom: 1px dotted var(--text3); }
 
 .ans-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
            margin-bottom: 8px; }
-.ans-label { flex: none; min-width: 54px; font-size: 13px; font-weight: 600;
+.ans-label { flex: none; min-width: 54px; font-size: 14px; font-weight: 600;
              color: var(--text2); }
 .ans-input { flex: 1; min-width: 160px; width: auto; }
-.ans-src { font-size: 12px; color: var(--text2); }
+.ans-src { font-size: 13px; color: var(--text2); }
 .ans-none { font-style: italic; }
 .ans-actions { display: flex; gap: 10px; align-items: center;
                flex-wrap: wrap; margin-top: 12px; }
-.ans-status { font-size: 12px; }
+.ans-status { font-size: 13px; }
 
 @media (max-width: 560px) {
   /* Рейка уезжает наверх строкой: 84px колонки на 380px экрана съедают
@@ -443,13 +443,13 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
       </div>
       {% endif %}
       <textarea class="sol-text" data-mathfield rows="5"
-                style="width:100%;font:inherit;font-size:13px;padding:8px 10px;
+                style="width:100%;font:inherit;font-size:14px;padding:8px 10px;
                        border-radius:var(--r);border:0.5px solid var(--border);
                        background:var(--surface);color:var(--text);"
                 placeholder="Своё решение (пусто — берётся решение каталога)">{{ row.item.solution_override }}</textarea>
       {% if row.item.has_solution and row.item.solution_source == 'catalog' %}
       <div style="margin-top:8px;padding:10px 12px;background:var(--surface);
-                  border-radius:var(--r);font-size:13px;line-height:1.7;">
+                  border-radius:var(--r);font-size:14px;line-height:1.7;">
         {{ row.item.solution_text|linebreaksbr }}
       </div>
       {% endif %}

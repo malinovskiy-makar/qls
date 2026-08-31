@@ -9,12 +9,12 @@
    эта страница НЕ подключает — тот же класс дефекта, что дал баг 7.6 с
    кнопками `.pf-btn`. Правило приведено сюда, а не добавлен лишний include:
    тянуть ради одной строки весь набор стилей статистики незачем. */
-.empty-note { font-size: 13px; color: var(--text2); text-align: center;
+.empty-note { font-size: 14px; color: var(--text2); text-align: center;
               padding: 18px; }
 {% include "teacher/_ask_style.html" %}
 /* Подписи полей строки плана: два голых числа читались загадкой. */
 .plan-field { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
-.plan-cap { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.plan-cap { font-size: 13px; color: var(--text3); white-space: nowrap; }
 /* ⚠️ ПОЛЕ «НУЖНО ЗАДАЧ» — УЗКОЕ. Сетка `auto 1fr 110px 110px` роняла его
    во вторую колонку (1fr), и в поле на одну цифру уезжала половина ширины
    карточки. Строка собрана флексом: формулировка занимает всю ширину,
@@ -26,20 +26,20 @@
 .plan-row .q { flex: 1 1 100%; order: -1; }
 .plan-row input[type=text], .plan-row select {
   width: 100%; box-sizing: border-box; font: inherit;
-  font-size: 13px; padding: 7px 10px; border-radius: var(--r);
+  font-size: 14px; padding: 7px 10px; border-radius: var(--r);
   border: 1px solid var(--border); background: var(--surface);
   color: var(--text); }
 .plan-row .k-num { width: 62px; min-width: 62px; }
 .gen-note { background: var(--surface-2); border: 1px solid var(--border);
-            border-radius: var(--r); padding: 10px 14px; font-size: 13px;
+            border-radius: var(--r); padding: 10px 14px; font-size: 14px;
             line-height: 1.6; margin-bottom: 14px; }
-.gen-cost { font-size: 12px; color: var(--text2); margin-top: 10px; }
+.gen-cost { font-size: 13px; color: var(--text2); margin-top: 10px; }
 .res-card { border: 1px solid var(--border); border-radius: 10px;
             padding: 12px 14px; margin-bottom: 8px; background: var(--surface); }
 .res-card.is-off { opacity: .45; }
 .res-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
 .res-title { font-weight: 600; font-size: 14px; flex: 1; min-width: 0; }
-.res-body { font-size: 13px; color: var(--text2); line-height: 1.55;
+.res-body { font-size: 14px; color: var(--text2); line-height: 1.55;
             margin-top: 6px; overflow-wrap: anywhere; }
 /* Сообщение об отказе модели — прямо над кнопкой, а не вверху страницы. */
 /* ── Стоп-гейт: найденные задачи, а не темы (Фаза B.5) ─────────
@@ -51,7 +51,7 @@
   overflow: hidden; }
 .plan-found { list-style: none; margin: 0; padding: 0; display: flex;
   flex-direction: column; gap: 6px; }
-.pf-none { color: var(--text2); font-style: italic; font-size: 13px; }
+.pf-none { color: var(--text2); font-style: italic; font-size: 14px; }
 
 /* ── Карточка запроса: свёрнута/раскрыта ПРЯМО ЗДЕСЬ ──────────────────
    Раскрытие без перезагрузки: репетитор сравнивает строки между собой,
@@ -65,19 +65,19 @@
 .q-head { display: flex; gap: 10px; align-items: center; width: 100%;
   padding: 12px 14px; background: none; border: 0; cursor: pointer;
   font: inherit; color: var(--text); text-align: left; }
-.q-arrow { color: var(--text3); font-size: 11px; width: 10px;
+.q-arrow { color: var(--text3); font-size: 13px; width: 10px;
   flex-shrink: 0; }
 .q-text { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; }
-.q-query { display: block; font-weight: 400; font-size: 12px;
+.q-query { display: block; font-weight: 400; font-size: 13px;
            color: var(--text3); margin-top: 3px; overflow-wrap: anywhere; }
 .cand-st { white-space: pre-line; }
 .cand-part { margin-top: 6px; }
 .cand-part b { color: var(--accent); }
-.cand-ans { display: block; margin-top: 4px; font-size: 12px;
+.cand-ans { display: block; margin-top: 4px; font-size: 13px;
             color: var(--text3); }
 .cand-flags { margin-top: 8px; display: flex; gap: 10px; flex-wrap: wrap;
-              font-size: 11px; color: var(--text3); }
-.q-tally { font-size: 12px; color: var(--text3); white-space: nowrap;
+              font-size: 13px; color: var(--text3); }
+.q-tally { font-size: 13px; color: var(--text3); white-space: nowrap;
   padding: 3px 8px; border-radius: 999px; }
 /* Недобрали — тихая жёлтая плашка. Не тревога, а «здесь ещё не готово». */
 .q-tally.is-short { background: var(--amber-tint); color: var(--amber-ink); }
@@ -107,10 +107,10 @@
 {% endcomment %}
 .cand.is-taken:hover { background: none; }
 .cand-main { flex: 1; min-width: 0; }
-.cand-name { font-size: 13px; font-weight: 600; line-height: 1.4;
+.cand-name { font-size: 14px; font-weight: 600; line-height: 1.4;
   cursor: pointer; }
-.cand-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
-.cand-body { display: none; font-size: 13px; color: var(--text2);
+.cand-meta { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.cand-body { display: none; font-size: 14px; color: var(--text2);
   line-height: 1.55; margin-top: 6px; padding-left: 10px;
   border-left: 2px solid var(--border); overflow-wrap: anywhere; }
 .cand.is-shown .cand-body { display: block; }
@@ -118,7 +118,7 @@
    Зелёный и янтарный здесь в своём законном смысле: «набрали сколько
    просили» и «есть расхождение». Строка стоит первой на шаге. */
 .gen-tally { display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-             margin-bottom: 14px; font-size: 13px; }
+             margin-bottom: 14px; font-size: 14px; }
 .tally { display: inline-flex; align-items: baseline; gap: 4px;
          padding: 5px 10px; border-radius: 999px; border: 1px solid; }
 .tally--ok { color: var(--green); border-color: var(--green-border);
@@ -129,19 +129,19 @@
 /* Раскрыли условие целиком — две строки превью убираем: одно и то же
    начало не должно стоять дважды подряд. */
 .cand.is-shown .cand-lead { display: none; }
-.cand-taken { display: none; font-size: 12px; color: var(--text3);
+.cand-taken { display: none; font-size: 13px; color: var(--text3);
   font-style: italic; margin-top: 2px; }
 .cand.is-taken .cand-taken { display: block; }
 .cand.is-taken .cand-meta { display: none; }
 .q-more { margin-top: 8px; }
 /* Капслоком не кричим: пометка уверенности — уточнение, а не тревога. */
-.conf { font-size: 11px; font-weight: 600;
+.conf { font-size: 13px; font-weight: 600;
   letter-spacing: .04em; padding: 2px 8px; border-radius: 999px;
   white-space: nowrap; }
 .conf-exact { background: var(--green-tint); color: var(--green); }
 .conf-close { background: var(--amber-tint); color: var(--amber-ink); }
 .conf-far   { background: var(--chip-bg); color: var(--chip-text); }
-.res-row-label { font-size: 12px; color: var(--text2); margin: 2px 0 6px; }
+.res-row-label { font-size: 13px; color: var(--text2); margin: 2px 0 6px; }
 @media (max-width: 560px) {
   .conf { white-space: normal; }
 }

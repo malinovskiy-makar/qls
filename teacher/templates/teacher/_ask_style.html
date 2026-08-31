@@ -24,7 +24,7 @@
 .gen-card h2 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
 /* Заголовок карточки первого шага — тихая подпись, а не крупный заголовок:
    вес должен быть у поля ввода, а не у надписи над ним. */
-.gen-cap { font-size: 12px; font-weight: 600; color: var(--text2);
+.gen-cap { font-size: 13px; font-weight: 600; color: var(--text2);
            margin-bottom: 6px; }
 /* Примеры — тихая раскрывашка: это подсказка, а не второй раздел формы. */
 .gen-examples { margin-top: 14px; }
@@ -33,15 +33,15 @@
    «▸»→«▾», от которой надпись рядом дёргалась вбок. */
 /* ⚠️ Счётчик обращений — ОТДЕЛЬНОЙ СТРОКОЙ под кнопкой (п. 2.8): рядом с
    ней он читался как её подпись, то есть как предупреждение. */
-.gen-used { font-size: 12px; color: var(--text3); margin-top: 10px; }
+.gen-used { font-size: 13px; color: var(--text3); margin-top: 10px; }
 /* ⚠️ ПРИМЕР ПЕРЕНОСИТСЯ ПО СЛОВАМ. У кнопок набора `white-space: nowrap` —
    правильное умолчание для «Сохранить», но пример это целая фраза, и на
    узком экране она выносила страницу вбок. Поймано замером на 380px. */
 .gen-example { white-space: normal; line-height: 1.45; }
-.gen-card .sub { font-size: 13px; color: var(--text2); margin-bottom: 16px;
+.gen-card .sub { font-size: 14px; color: var(--text2); margin-bottom: 16px;
                  line-height: 1.6; }
 textarea.gen-text { width: 100%; box-sizing: border-box; min-height: 110px;
-  resize: vertical; font: inherit; font-size: 15px; line-height: 1.6;
+  resize: vertical; font: inherit; font-size: 16px; line-height: 1.6;
   padding: 12px 14px; border-radius: var(--r); border: 1px solid var(--border);
   background: var(--surface); color: var(--text); outline: none; }
 textarea.gen-text:focus { border-color: var(--focus); }
@@ -66,5 +66,5 @@ textarea.gen-text:focus { border-color: var(--focus); }
    таблица стилей экрана отбора, и тянуть её на шаг «Что кладём» ради двух
    строк незачем; без них подпись поля выходит браузерной. */
 .form-group { margin-bottom: 14px; }
-.form-label { display: block; font-size: 12px; font-weight: 600;
+.form-label { display: block; font-size: 13px; font-weight: 600;
               color: var(--text2); margin-bottom: 6px; }

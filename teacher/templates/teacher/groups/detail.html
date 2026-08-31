@@ -26,8 +26,8 @@
 .ass-group { margin-bottom: 26px; }
 .ass-group-head { display: flex; align-items: baseline; gap: 8px;
                   margin-bottom: 10px; }
-.ass-group-title { font-size: 12px; font-weight: 600; color: var(--text2); }
-.ass-group-count { font-size: 12px; color: var(--text3); }
+.ass-group-title { font-size: 13px; font-weight: 600; color: var(--text2); }
+.ass-group-count { font-size: 13px; color: var(--text3); }
 /* Счётчик ждущих проверки — справа над списком (фаза 11.1). Спокойная
    плашка нейтрального фона: красный кружок здесь читался бы как авария. */
 .ass-head { display: flex; align-items: center; justify-content: space-between;
@@ -36,8 +36,8 @@
                      background: var(--surface-2);
                      border: 1px solid var(--border);
                      border-radius: 999px; padding: 5px 12px; }
-.ass-waiting-count b { font-size: 15px; font-variant-numeric: tabular-nums; }
-.ass-waiting-count span { font-size: 12px; color: var(--text2); }
+.ass-waiting-count b { font-size: 16px; font-variant-numeric: tabular-nums; }
+.ass-waiting-count span { font-size: 13px; color: var(--text2); }
 
 .ass-card { display: flex; align-items: center; justify-content: space-between;
             gap: 14px; flex-wrap: wrap; margin-bottom: 8px; padding: 14px 16px;
@@ -52,13 +52,13 @@
    ⚠️ Стоит ПЕРЕД названием и имеет фиксированную ширину: после названия он
    уезжал к правому краю у длинных заголовков, а теперь названия всех
    карточек начинаются на одной вертикали. */
-.ass-kind { font-size: 11px; font-weight: 500; color: var(--text2);
+.ass-kind { font-size: 13px; font-weight: 500; color: var(--text2);
             border: 1px solid var(--border); border-radius: 999px;
             padding: 1px 8px; margin-right: 9px; white-space: nowrap;
             display: inline-block; min-width: 88px; text-align: center;
             vertical-align: 1px; }
-.ass-meta { font-size: 12px; color: var(--text2); }
-.ass-waiting { font-size: 12px; }
+.ass-meta { font-size: 13px; color: var(--text2); }
+.ass-waiting { font-size: 13px; }
 /* ⚠️ ПРАВАЯ ЗОНА ОДНОЙ ШИРИНЫ У ВСЕХ КАРТОЧЕК СПИСКА (ревью 17.08, п. 3.6).
    У требующей проверки справа стояла тёмная кнопка, у проверенной — три
    строки мелким серым, у идущей — два слова: правый край не имел общей оси,
@@ -69,7 +69,7 @@
 /* Правая часть проверенной работы — ДВЕ строки, не три: крупный процент и
    одна подпись под ним. Сложность переехала в подсказку у процента —
    третья строка мелким серым читалась как сноска, которую никто не читает. */
-.ass-figures { text-align: right; font-size: 12px; color: var(--text2);
+.ass-figures { text-align: right; font-size: 13px; color: var(--text2);
                white-space: nowrap; line-height: 1.5; }
 .ass-figures b { display: block; font-size: 17px; color: var(--text);
                  font-variant-numeric: tabular-nums; }
