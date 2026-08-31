@@ -36,7 +36,15 @@ page.on('pageerror', e => errs.push(e.message));
 page.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
 
 let bad = 0;
-const num = (v) => (typeof v === 'number' && isFinite(v)) ? (Math.round(v * 1e4) / 1e4) : String(v);
+/* ⚠️ ОКРУГЛЕНИЕ ПЕЧАТИ НЕ ДОЛЖНО ПРЯТАТЬ ЧИСЛО. Здесь прибор соврал 31.08
+   третий раз: разрыв записи в узлах был 1,13·10⁻⁶, округление до четырёх
+   знаков печатало «0», и рядом стояло «FAIL … = 0 (ожид 0 ±0,000001)» —
+   строка, по которой понять нечего. Малое, но ненулевое печатаем как есть. */
+const num = (v) => {
+  if (typeof v !== 'number' || !isFinite(v)) return String(v);
+  if (v !== 0 && Math.abs(v) < 1e-4) return v.toExponential(3);
+  return Math.round(v * 1e4) / 1e4;
+};
 function show(label, got, wanted, tol) {
   if (wanted == null) { console.log('     ' + label + ' = ' + num(got)); return; }
   const good = typeof got === 'number' && isFinite(got) && Math.abs(got - wanted) <= tol;
@@ -955,6 +963,131 @@ if (need('Д8')) {
      с выключенным monopolyQuota матрица находит ровно одну дыру, ту самую. */
   flag('дыр в матрице охвата нет', holes.length === 0,
        (holes.length - crash.length) + ' «не подключено», ' + crash.length + ' падений');
+}
+
+/* ═══════════ Д9. Смешанные пары КПВ и параметрическая запись ════════ */
+if (need('Д9')) {
+  head('Д9 · смешанная пара: 100 − x² (растут) и 20 − 10√x (убывают)');
+  const r = await page.evaluate(() => {
+    const setUp = (list) => {
+      resetSceneMemory(); pickScene('ppfsum');
+      STATE.ppfSumCount = list.length;
+      list.forEach((e, i) => ppfSumSet(i, 'y = ' + e));
+      if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+      recomputePpfSum(); redrawAll();
+      document.querySelectorAll('.fold-btn').forEach(b => {
+        if (b.getAttribute('aria-expanded') !== 'true') b.click();
+      });
+      redrawAll();
+      return STATE.ppfSumData || {};
+    };
+    const d = setUp(['100 - x^2', '20 - 10*sqrt(x)']);
+    const r1 = compileFormula('100 - x^2'), r2 = compileFormula('20 - 10*sqrt(x)');
+    const f1 = (x) => ppfEvalWith(r1.compiled, x), f2 = (x) => ppfEvalWith(r2.compiled, x);
+    const cs = [classifyPpf(f1), classifyPpf(f2)];
+    const rec = ppfSumMixedPair(cs);
+    /* СВЕРКА С ЧИСЛЕННЫМ МИНКОВСКИМ в 200 точках — обязательна и здесь. */
+    let worst = 0;
+    for (let i = 0; i <= 200; i++) {
+      const X = 14 * i / 200;
+      const a = rec ? rec.evalY(X) : NaN, b = maxAllocY(f1, f2, X, 10, 4);
+      if (isFinite(a) && isFinite(b)) worst = Math.max(worst, Math.abs(a - b));
+    }
+    /* НЕПРЕРЫВНОСТЬ В УЗЛАХ — по САМОЙ записи, слева и справа от узла.
+       Мерить разрыв против нарисованной ломаной нельзя: у неё 240 узлов на
+       [0; 14], и на кривом участке хорда сама отходит на сотые. */
+    let gap = 0;
+    if (rec) (rec.kinks || []).forEach(k => {
+      const e = 1e-7;
+      const a = rec.evalY(k.x - e), b = rec.evalY(k.x + e);
+      if (isFinite(a) && isFinite(b)) gap = Math.max(gap, Math.abs(a - b));
+    });
+    /* УГЛЫ БЕЗ КАНДИДАТА (5): что дал бы ответ, если внутреннее решение потерять. */
+    const F1 = ppfFam(cs[0]), F2 = ppfFam(cs[1]);
+    const X1 = F1.Xmax(cs[0]), X2 = F2.Xmax(cs[1]);
+    const corner = (X) => {
+      const vals = [];
+      if (X <= X2) vals.push(F1.Ymax(cs[0]) + F2.f(cs[1], X));
+      if (X <= X1) vals.push(F2.Ymax(cs[1]) + F1.f(cs[0], X));
+      if (X >= X1) vals.push(F2.f(cs[1], X - X1));
+      if (X >= X2) vals.push(F1.f(cs[0], X - X2));
+      return Math.max.apply(null, vals.filter(isFinite));
+    };
+    const ff = document.querySelector('#info-final .ff');
+    const cl = (el) => { if (!el) return ''; const c = el.cloneNode(true);
+      c.querySelectorAll('.katex-mathml, annotation').forEach(n => n.remove());
+      return c.textContent.replace(/\s+/g, ' ').trim(); };
+    /* 7.4 — три кривые смешанного набора остаются численными с ПРИЧИНОЙ. */
+    const d3 = setUp(['100 - x^2', '20 - 10*sqrt(x)', '50 - 5*x']);
+    return {
+      cls: cs.map(c => c.type + '/' + ppfCostOf(c)),
+      tex: String(d.formulaTex || ''), expr: d.formulaExpr,
+      note: String(d.formulaNote || ''),
+      Xtot: d.Xtot, Ytot: d.Ytot,
+      at5: rec ? rec.evalY(5) : NaN, corner5: corner(5),
+      numAt5: maxAllocY(f1, f2, 5, 10, 4),
+      worst: worst, gap: gap,
+      pieces: rec ? rec.pieces.map(p => p.kind) : [],
+      hasParam: rec ? (rec.pieces.some(p => p.kind === 'param') ? 1 : 0) : 0,
+      ffRows: ff ? ff.querySelectorAll('.ff-f').length : 0,
+      ffNote: cl(ff && ff.querySelector('.ff-note')),
+      ffCopy: ff ? ff.querySelectorAll('.ff-copy').length : 0,
+      three: { tex: String(d3.formulaTex || ''), why: String(d3.formulaText || '') },
+    };
+  });
+  note('кривые: ' + r.cls.join(', '));
+  note('запись: ' + r.tex.slice(0, 200));
+  flag('пара распознана как смешанная (растут + убывают)',
+       r.cls.join(',').indexOf('up') >= 0 && r.cls.join(',').indexOf('down') >= 0, r.cls.join(', '));
+  flag('аналитическая запись ЕСТЬ (отказа больше нет)', r.tex.length > 0, r.tex.slice(0, 40));
+  note('участки: ' + r.pieces.join(', '));
+  flag('среди участков есть параметрический', r.hasParam === 1, r.pieces.join(', '));
+  show('конец по X', r.Xtot, 14, 1e-4);
+  show('конец по Y', r.Ytot, 120, 1e-6);
+  console.log('  · ЗУБАСТОСТЬ КАНДИДАТА (5)');
+  show('  ответ при X = 5', r.at5, 99.07, 0.01);
+  show('  он же численным Минковским', r.numAt5, 99.07, 0.01);
+  show('  ответ по ОДНИМ УГЛАМ (без кандидата 5)', r.corner5, 99.00, 1e-6);
+  flag('  внутреннее решение выше углового на 0,07',
+       Math.abs((r.at5 - r.corner5) - 0.0746) < 0.005,
+       num(r.at5) + ' против ' + num(r.corner5) + ', разница ' + num(r.at5 - r.corner5));
+  console.log('  · СВЕРКА И НЕПРЕРЫВНОСТЬ');
+  show('  наибольшее расхождение с численным Минковским в 200 точках', r.worst, 0, 1e-6);
+  /* ⚠️ РАЗРЫВ МЕРЯЕМ ОТНОСИТЕЛЬНО МАСШТАБА КРИВОЙ, А НЕ АБСОЛЮТНО.
+     Оставшийся абсолютный остаток (около 1,1·10⁻⁶ при Y порядка 120) берётся
+     не из решателя, а из ОКРУГЛЕНИЯ границы участка: границы записи проходят
+     через ppfSnap, чтобы человек читал 4,39, а не 4,386027…; при наклоне
+     кривой около 8,8 сдвиг границы на 10⁻⁷ и даёт этот остаток. Это не разрыв
+     кривой, а разница двух формул в округлённой точке. */
+  show('  наибольший разрыв записи в узлах, абсолютный', r.gap, null);
+  show('  он же относительно Ymax', r.gap / r.Ytot, 0, 1e-7);
+  console.log('  · ПАРАМЕТРИЧЕСКАЯ ЗАПИСЬ');
+  flag('в записи есть X(λ) и Y(λ)',
+       r.tex.indexOf('X(\\lambda)') >= 0 && r.tex.indexOf('Y(\\lambda)') >= 0, 'нет');
+  flag('строк в панели РОВНО столько же, сколько участков',
+       r.ffRows === r.pieces.length, r.ffRows + ' против ' + r.pieces.length);
+  note('приписка: ' + r.ffNote.slice(0, 140));
+  flag('сказано словами, что такое λ',
+       r.ffNote.indexOf('альтернативные издержки единицы') >= 0, r.ffNote.slice(0, 60));
+  flag('кнопки копирования у параметрической записи НЕТ', r.ffCopy === 0, String(r.ffCopy));
+  flag('записи для поля ввода нет (expr пуст)', !r.expr, String(r.expr));
+  console.log('  · ТРИ КРИВЫЕ СМЕШАННОГО НАБОРА (пункт 7.4)');
+  flag('аналитической записи НЕТ', !r.three.tex, r.three.tex.slice(0, 40));
+  note('причина: ' + r.three.why.slice(0, 160));
+  flag('причина названа словами', r.three.why.length > 30, r.three.why.slice(0, 40));
+  // Снимок — именно ПАРЫ: проверка выше оставила на экране набор из трёх.
+  await page.evaluate(() => {
+    resetSceneMemory(); pickScene('ppfsum');
+    STATE.ppfSumCount = 2; ppfSumSet(0, 'y = 100 - x^2'); ppfSumSet(1, 'y = 20 - 10*sqrt(x)');
+    if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+    recomputePpfSum(); redrawAll();
+    document.querySelectorAll('.fold-btn').forEach(b => {
+      if (b.getAttribute('aria-expanded') !== 'true') b.click();
+    });
+    redrawAll();
+  });
+  await page.waitForTimeout(500);
+  await shot('d9-mixed-pair');
 }
 
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }

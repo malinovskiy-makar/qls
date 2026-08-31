@@ -5481,6 +5481,95 @@ const CASES = [
              ['подсказка у покупателя называет D', 'hintBuy', 1, 0]],
   },
   {
+    /* СМЕШАННАЯ ПАРА КПВ (решение владельца 31.08): у одной кривой издержки
+       растут, у другой убывают. Раньше такой набор получал честный отказ.
+       ⚠️ ГЛАВНОЕ ЗДЕСЬ — КАНДИДАТ (5), внутреннее решение по равным издержкам.
+       «В смешанном случае оптимум всегда в углу» — неправда: вторая производная
+       суммы равна f₁'' + f₂'' и при вогнутой f₁ с выпуклой f₂ бывает
+       отрицательной. Проверка это стережёт числом: огибающая по одним УГЛАМ
+       даёт при X = 5 ровно 99,00, а верный ответ 99,07. Разница 0,07 обязана
+       ловиться, поэтому рядом с ответом считается и угловой вариант.
+       ⚠️ Сверка с численным Минковским обязательна и здесь. */
+    name: 'Сложение КПВ · смешанная пара и параметрическая запись',
+    run: `resetSceneMemory(); pickScene('ppfsum');
+          STATE.ppfSumCount = 2;
+          ppfSumSet(0, 'y = 100 - x^2'); ppfSumSet(1, 'y = 20 - 10*sqrt(x)');
+          if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+          recomputePpfSum(); redrawAll();
+          var d = STATE.ppfSumData || {};
+          var r1 = compileFormula('100 - x^2'), r2 = compileFormula('20 - 10*sqrt(x)');
+          var f1 = function (x) { return ppfEvalWith(r1.compiled, x); };
+          var f2 = function (x) { return ppfEvalWith(r2.compiled, x); };
+          var cs = [classifyPpf(f1), classifyPpf(f2)];
+          var rec = ppfSumMixedPair(cs);
+          var worst = 0;
+          for (var i = 0; i <= 200; i++) {
+            var X = 14 * i / 200;
+            var a = rec ? rec.evalY(X) : NaN, b = maxAllocY(f1, f2, X, 10, 4);
+            if (isFinite(a) && isFinite(b)) worst = Math.max(worst, Math.abs(a - b));
+          }
+          var gap = 0;
+          if (rec) (rec.kinks || []).forEach(function (k) {
+            var e = 1e-7, u = rec.evalY(k.x - e), v = rec.evalY(k.x + e);
+            if (isFinite(u) && isFinite(v)) gap = Math.max(gap, Math.abs(u - v));
+          });
+          // Ответ по одним углам — без кандидата (5).
+          var F1 = ppfFam(cs[0]), F2 = ppfFam(cs[1]);
+          var X1 = F1.Xmax(cs[0]), X2 = F2.Xmax(cs[1]);
+          var corner = function (X) {
+            var v = [];
+            if (X <= X2) v.push(F1.Ymax(cs[0]) + F2.f(cs[1], X));
+            if (X <= X1) v.push(F2.Ymax(cs[1]) + F1.f(cs[0], X));
+            if (X >= X1) v.push(F2.f(cs[1], X - X1));
+            if (X >= X2) v.push(F1.f(cs[0], X - X2));
+            return Math.max.apply(null, v.filter(isFinite));
+          };
+          var tex = String(d.formulaTex || '');
+          // Три кривые смешанного набора остаются численными (пункт 7.4).
+          resetSceneMemory(); pickScene('ppfsum');
+          STATE.ppfSumCount = 3;
+          ppfSumSet(0, 'y = 100 - x^2'); ppfSumSet(1, 'y = 20 - 10*sqrt(x)'); ppfSumSet(2, 'y = 50 - 5*x');
+          if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+          recomputePpfSum(); redrawAll();
+          var d3 = STATE.ppfSumData || {};
+          return {
+            mixed: (ppfCostOf(cs[0]) === 'up' && ppfCostOf(cs[1]) === 'down') ? 1 : 0,
+            hasRec: tex ? 1 : 0,
+            hasParam: (rec && rec.pieces.some(function (p) { return p.kind === 'param'; })) ? 1 : 0,
+            hasXlam: tex.indexOf('X(\\\\lambda)') >= 0 ? 1 : 0,
+            hasYlam: tex.indexOf('Y(\\\\lambda)') >= 0 ? 1 : 0,
+            nPieces: rec ? rec.pieces.length : 0,
+            Xtot: d.Xtot, Ytot: d.Ytot,
+            at5: rec ? rec.evalY(5) : NaN,
+            corner5: corner(5),
+            numAt5: maxAllocY(f1, f2, 5, 10, 4),
+            worst: worst,
+            gapRel: gap / (d.Ytot || 1),
+            /* Записи для поля ввода у параметрической формы нет, и придумывать
+               её нельзя: λ поле не понимает. */
+            noExpr: d.formulaExpr ? 0 : 1,
+            note: String(d.formulaNote || '').indexOf('альтернативные издержки единицы') >= 0 ? 1 : 0,
+            threeNumeric: String(d3.formulaTex || '') ? 0 : 1,
+            threeWhy: String(d3.formulaText || '').length > 30 ? 1 : 0 };`,
+    checks: [['пара смешанная: растут + убывают', 'mixed', 1, 0],
+             ['аналитическая запись есть (отказа нет)', 'hasRec', 1, 0],
+             ['участков три', 'nPieces', 3, 0],
+             ['среди участков есть параметрический', 'hasParam', 1, 0],
+             ['в записи есть X(λ)', 'hasXlam', 1, 0],
+             ['в записи есть Y(λ)', 'hasYlam', 1, 0],
+             ['конец по X', 'Xtot', 14, 1e-4],
+             ['конец по Y', 'Ytot', 120, 1e-6],
+             ['ответ при X = 5 — внутреннее решение', 'at5', 99.0746, 1e-3],
+             ['он же численным Минковским', 'numAt5', 99.0746, 1e-3],
+             ['по одним углам вышло бы ровно 99', 'corner5', 99, 1e-6],
+             ['сверка с Минковским в 200 точках', 'worst', 0, 1e-6],
+             ['разрыв в узлах относительно Ymax', 'gapRel', 0, 1e-7],
+             ['записи для поля ввода нет', 'noExpr', 1, 0],
+             ['словами сказано, что такое λ', 'note', 1, 0],
+             ['три кривые: аналитики нет', 'threeNumeric', 1, 0],
+             ['три кривые: причина названа', 'threeWhy', 1, 0]],
+  },
+  {
     /* НОВЫЕ СЕМЕЙСТВА КРИВЫХ КПВ (приёмка 31.08): общий многочлен второй
        степени и общая степенная. Оба добавлены СТРОКОЙ в таблицу PPF_FAMILIES,
        а не ветками по файлу.
@@ -5796,10 +5885,19 @@ const CASES = [
           var g = ppfSumAnalytic(cs);
           var at = function (x) { if (!g) return NaN; var v = g.evalY(x); return isNaN(v) ? null : Math.round(v * 1e6) / 1e6; };
           var kinds = ppfCostKinds(cs).map(function (o) { return o.kind; }).join(',');
-          var mix = ppfSumAnalytic(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2']
-                    .map(function (e) { return classifyPpf(parsePpfEquation(e).f); }));
-          var why = ppfWhyNumeric(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2']
-                    .map(function (e) { return classifyPpf(parsePpfEquation(e).f); }));
+          /* ⚠️ ПРАВИЛО ЗДЕСЬ ИЗМЕНИЛОСЬ 31.08, И ЭТО НЕ ПОДГОНКА ПРОВЕРКИ.
+             До приёмки смешанный набор (растущие издержки + убывающие) закрытой
+             формы не получал НИКОГДА. Решением владельца пара таких кривых
+             решается полностью — пять кандидатов и верхняя огибающая, с
+             параметрической записью на участке равных издержек. Для трёх и
+             больше перебор растёт как n·2ⁿ⁻¹, и там по-прежнему численно.
+             Поэтому стережём ОБА края: пара запись получает, тройка нет. */
+          var mkCs = function (list) {
+            return list.map(function (e) { return classifyPpf(parsePpfEquation(e).f); });
+          };
+          var mixPair = ppfSumAnalytic(mkCs(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2']));
+          var mixThree = ppfSumAnalytic(mkCs(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2', 'y = 50 - 5*x']));
+          var why = ppfWhyNumeric(mkCs(['y = 60 - 20*sqrt(x)', 'y = 16 - x^2', 'y = 50 - 5*x']));
           return { ok: g ? 1 : 0, y0: at(0), y2: at(2), y4: at(4), y625: at(6.25),
                    y9: at(9), y11: at(11), y13: at(13), out: (at(13.5) === null) ? 1 : 0,
                    /* ⚠️ НЕПРЕРЫВНОСТЬ — ЭТО НЕ «СЛЕВА И СПРАВА ОДНО ЧИСЛО».
@@ -5823,7 +5921,8 @@ const CASES = [
                      return (big < 1e-9) ? 0 : sml / big;
                    })(),
                    kinds: (kinds === 'down,const') ? 1 : 0,
-                   mixNull: mix ? 0 : 1,
+                   mixPairOk: mixPair ? 1 : 0,
+                   mixThreeNull: mixThree ? 0 : 1,
                    whyNamed: (/растущими издержками/.test(why) && /убывающими/.test(why)) ? 1 : 0 };`,
     checks: [['закрытая форма нашлась', 'ok', 1, 0],
              ['Y(0) = 100', 'y0', 100, 1e-6],
@@ -5837,7 +5936,8 @@ const CASES = [
              ['в узле X = 4 кривая непрерывна (скачок падает вместе с шагом)', 'jump4', 0, 0.02],
              ['в узле X = 9 кривая непрерывна (скачок падает вместе с шагом)', 'jump9', 0, 0.02],
              ['тип издержек взят из формы кривой', 'kinds', 1, 0],
-             ['смешанный набор закрытой формы НЕ получает', 'mixNull', 1, 0],
+             ['смешанная ПАРА закрытую форму получает', 'mixPairOk', 1, 0],
+             ['смешанная ТРОЙКА — по-прежнему нет', 'mixThreeNull', 1, 0],
              ['и причина названа словами', 'whyNamed', 1, 0]],
   },
 ];
