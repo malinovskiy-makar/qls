@@ -81,10 +81,22 @@ class RulesLiveInTheKitTests(TestCase):
         self.assertNotIn('--text3', line)
 
     def test_arrow_is_drawn_by_css_and_is_accent(self):
+        """⚠️ Стрелка — ЭТО ТЕКСТ, значит `--accent-ink`, а не `--accent`.
+
+        Раньше здесь стояло `assertIn('var(--accent)')`. 01.09.2026 все 137 мест,
+        красивших ТЕКСТ заливочным `--accent`, переведены на `--accent-ink`
+        — токен, заведённый ровно для этого (на светлой подложке заливочный
+        давал 3,95 при норме 4,5). Проверка требует именно чернильный
+        токен, а заливочный запрещает: иначе откат назад прошёл бы молча.
+        """
         kit = read('templates', '_kit.html')
         block = kit.split('.crumbs > * + *::before')[1].split('}')[0]
         self.assertIn("content: '→'", block)
-        self.assertIn('var(--accent)', block)
+        self.assertIn('var(--accent-ink)', block)
+        # заливочный токен здесь запрещён: убрав чернильный, не должно
+        # остаться ни одного `var(--accent)`
+        self.assertNotIn('var(--accent)',
+                         block.replace('var(--accent-ink)', ''))
 
     def test_arrow_does_not_catch_the_hover_underline(self):
         """⚠️ Подчёркивание наследуется; `inline-block` его останавливает."""

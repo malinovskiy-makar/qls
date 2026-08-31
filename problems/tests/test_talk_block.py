@@ -85,10 +85,17 @@ class TalkStyleTests(TestCase):
 
         Свой стиль в шаблоне разошёлся бы с соседними экранами.
         """
+        import re as _re
         kit = read(KIT)
         self.assertIn('.k-sep--loud', kit)
-        self.assertIn('.k-sep--loud .k-sep__cap { font-size: 13px; '
-                      'font-weight: 700;', kit)
+        # ⚠️ Кегль сверяется с ПОЛОМ канона, а не с числом. Раньше здесь
+        # стояла целиком строка правила с 13 px; от поднятия пола 01.09.2026
+        # стало 14, и проверка покраснела, хотя разделитель на месте и всё
+        # так же громок. Сторожить надо «громкость», а не конкретный кегль.
+        правило = kit.split('.k-sep--loud .k-sep__cap {')[1].split('}')[0]
+        кегль = float(_re.search(r'font-size:\s*([\d.]+)px', правило).group(1))
+        self.assertGreaterEqual(кегль, 13, 'пол подписи по канону — 13 px')
+        self.assertIn('font-weight: 700', правило)
 
     def test_hidden_select_wrapper_really_hides(self):
         """⚠️ `display` из набора СИЛЬНЕЕ браузерного `[hidden]`.
