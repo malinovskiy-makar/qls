@@ -1153,6 +1153,7 @@ function ffFitCases(host) {
   const fs = Array.prototype.slice.call(host.querySelectorAll('.ff-f'));
   const cds = Array.prototype.slice.call(host.querySelectorAll('.ff-c'));
   host.style.fontSize = '';
+  host.classList.remove('ff-scroll');
   fs.forEach(e => { e.style.fontSize = ''; });
   cds.forEach(e => { e.style.fontSize = ''; e.classList.remove('ff-cut'); });
   const have = host.clientWidth;
@@ -1196,6 +1197,26 @@ function ffFitCases(host) {
     if (!cut && fixed + widest(fs) <= have + 0.5) break;
     fs.forEach(e => { e.style.fontSize = px + 'px'; });
     cut = markCuts();
+  }
+  /* ⚠️ ПОСЛЕДНЯЯ СТУПЕНЬ — ПРОКРУТКА, А НЕ ВЫЛЕТ ЗА КРАЙ.
+     Правило владельца от 26.08 кончается так же: «кегль ступенями до 13 px,
+     ниже 13 не опускать; дальше горизонтальная прокрутка с затуханием у
+     правого края». У компактной записи этот случай наступает дважды:
+       • на узком окне — замер 31.08 при ширине браузера 380 px панель даёт под
+         запись 99 px, а одна формула при кегле 13 просит 79 плюс 54 на
+         приставку со скобкой;
+       • у параметрического участка смешанной пары — сама строка участка просит
+         275 px при контейнере 191.
+     Уложиться нечем: усечение условия тут уже не помогает, а формулу резать и
+     ужимать дальше запрещено.
+     В режиме прокрутки колонки берут ЕСТЕСТВЕННУЮ ширину (стиль
+     .ff-scroll .ff-rows), поэтому усечение условия снимаем: прокруткой видно
+     всё целиком, и многоточие было бы враньём. */
+  if (fixed + widest(fs) > have + 0.5) {
+    host.classList.add('ff-scroll');
+    cds.forEach(e => e.classList.remove('ff-cut'));
+  } else {
+    host.classList.remove('ff-scroll');
   }
   return true;
 }

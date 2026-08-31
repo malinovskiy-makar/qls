@@ -173,8 +173,19 @@ function p31Final() {
     } else if (k) {
       rec.katexW = Math.round(k.getBoundingClientRect().width * 10) / 10;
       rec.over = Math.round((rec.katexW - rec.hostW) * 10) / 10;
+      rec.spill = Math.round((host.scrollWidth - host.clientWidth) * 10) / 10;
       rec.cut = 0; rec.conds = 0; rec.condPx = 0;
     }
+    /* ⚠️ ВЫЛЕТ КАРТОЧКИ МЕРЯЕТСЯ ВСЕГДА, А НЕ ТОЛЬКО У КУСОЧНОЙ ЗАПИСИ.
+       Здесь прибор соврал 31.08 в четвёртый раз: замер стоял внутри ветки
+       кусочной записи, и у однострочной (КТВ, налоги) отдавал undefined —
+       проверка краснела на исправном коде, ничего не сообщая по существу.
+       ⚠️ ПРОКРУТКА — ЭТО НЕ ВЫЛЕТ. Последняя ступень правила ширины разрешает
+       горизонтальную прокрутку записи: тогда scrollWidth законно больше
+       clientWidth, а на экране ничего не торчит. Настоящий вылет — это когда
+       за свои края уезжает КАРТОЧКА блока. */
+    rec.scrolls = (host && host.classList.contains('ff-scroll')) ? 1 : 0;
+    rec.cardSpill = Math.round((ff.scrollWidth - ff.clientWidth) * 10) / 10;
     /* ⚠️ СТРОКИ НАДЗАГОЛОВКА СЧИТАЮТСЯ ПО ДИАПАЗОНУ, А НЕ ПО САМОМУ УЗЛУ.
        Здесь прибор уже соврал 31.08: узел .ff-eyebrow лежит внутри флексбокса и
        потому сам является блоком, а у блока getClientRects() отдаёт ОДНУ
@@ -199,31 +210,41 @@ function p31Final() {
        (двухстрочной) формы внутри каждой строки заводится своё окружение
        gathered, и строк становится вдвое больше. */
     rec.rows = p31RowCount(ff);
+    rec.condsOffLine = p31CondsInline(ff);
     out.blocks.push(rec);
   });
   return out;
 }
 /* СКОЛЬКО ВИЗУАЛЬНЫХ СТРОК реально видит человек внутри записи.
 
-   ⚠️ СЧИТАЕМ ТЕКСТ, А НЕ РАЗМЕТКУ. Разметка у двух форм записи разная
-   (окружение cases против вложенного gathered, а после правки 31.08 — вообще
-   свои узлы), и счёт по ней был бы отпечатком реализации, а не правилом.
-   Правило же простое: сколько строк текста стоит одна под другой. Поэтому
-   берём прямоугольники САМИХ ТЕКСТОВЫХ УЗЛОВ и группируем по вертикали.
-   Скрытую копию MathML и подпись annotation выбрасываем: их не видно. */
+   ⚠️ СЧИТАТЬ ПОЯСА ТЕКСТА ЗДЕСЬ НЕЛЬЗЯ, И ЭТО ВЫЯСНИЛОСЬ ЗАМЕРОМ 31.08.
+   Первая версия группировала прямоугольники текстовых узлов по вертикали — и
+   на параметрическом участке смешанной пары насчитала 5 строк при 3 участках.
+   Никакой двухстрочности там нет: в записи стоят дроби вида \dfrac{\lambda}{2},
+   у которых числитель и знаменатель ЗАКОННО на разной высоте. Дробь — это
+   по-прежнему одна строка записи.
+
+   Поэтому у компактной записи строки считаются по РАЗМЕТКЕ: один участок —
+   одна ячейка формулы в сетке, и их число и есть число строк. А правило
+   «формула и условие на ОДНОЙ строке» стережётся отдельно и точно: у каждого
+   участка условие обязано быть непустым и стоять на той же высоте, что и его
+   формула (см. p31CondsInline). Ровно это и ломала двухстрочная форма.
+
+   У однострочной записи (скобки нет вовсе) разметки участков нет, и там
+   по-прежнему считаем пояса: это ловит перенос записи по словам. */
 function p31RowCount(ff) {
   var host = ff.querySelector('.ff-math');
   if (!host) return 0;
-  /* «Внутри скобки» — это область участков, а не весь блок: приставка «P =»
-     стоит сбоку, а сама скобка у KaTeX склеена из трёх глифов друг под другом
-     и дала бы три лишние строки. */
-  var root = host.querySelector('.ff-rows') || host.querySelector('.mtable') || host;
+  var cells = host.querySelectorAll('.ff-f');
+  if (cells.length) return cells.length;
+  var root = host.querySelector('.mtable') || host;
   var bands = [];
   var w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: function (n) {
       if (!n.nodeValue || !n.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
       var p = n.parentElement;
-      if (!p || p.closest('.katex-mathml, annotation')) return NodeFilter.FILTER_REJECT;
+      if (!p || p.closest('.katex-mathml, annotation, .delimsizing, .nulldelimiter'))
+        return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
@@ -234,18 +255,34 @@ function p31RowCount(ff) {
     var r = rg.getBoundingClientRect();
     rg.detach && rg.detach();
     if (!(r.height > 0.5) || !(r.width > 0.2)) continue;
-    var mid = r.top + r.height / 2;
-    var hit = false;
-    for (var i = 0; i < bands.length; i++) {
-      /* Полосой считаем то, что пересекается по вертикали больше чем на
-         половину: подстрочные индексы и дроби внутри одной строки не должны
-         давать вторую строку. */
-      if (Math.abs(bands[i] - mid) <= 5) { hit = true; break; }
-    }
+    var mid = r.top + r.height / 2, hit = false;
+    for (var i = 0; i < bands.length; i++) if (Math.abs(bands[i] - mid) <= 5) { hit = true; break; }
     if (!hit) bands.push(mid);
   }
   return bands.length;
 }
+
+/* ⚠️ ГЛАВНАЯ ПРОВЕРКА ПОПРАВКИ 1: у КАЖДОГО участка условие стоит НА ОДНОЙ
+   СТРОКЕ с его формулой. Возвращает число участков, у которых это не так:
+   условие пустое (уехало в ячейку формулы) либо стоит на другой высоте. */
+function p31CondsInline(ff) {
+  var host = ff.querySelector('.ff-math');
+  if (!host) return -1;
+  var fs = host.querySelectorAll('.ff-f'), cs = host.querySelectorAll('.ff-c');
+  if (!fs.length) return 0;                 // однострочная запись — участок один
+  var wrong = 0;
+  for (var i = 0; i < fs.length; i++) {
+    var f = fs[i], c = cs[i];
+    if (!c || !c.textContent.replace(/\s+/g, '')) { wrong++; continue; }
+    var rf = f.getBoundingClientRect(), rc = c.getBoundingClientRect();
+    if (!(rf.height > 0) || !(rc.height > 0)) { wrong++; continue; }
+    // Пересечение по вертикали: на одной строке — значит перекрываются.
+    var over = Math.min(rf.bottom, rc.bottom) - Math.max(rf.top, rc.top);
+    if (over < Math.min(rf.height, rc.height) * 0.5) wrong++;
+  }
+  return wrong;
+}
+
 /* Ширина набранной записи ВНУТРИ .katex против ширины контейнера. */
 function p31Width() {
   var host = document.querySelector('#info-final .ff-math');
@@ -277,6 +314,7 @@ window.p31Text = p31Text;
 window.p31SumPath = p31SumPath;
 window.p31Final = p31Final;
 window.p31RowCount = p31RowCount;
+window.p31CondsInline = p31CondsInline;
 window.p31Width = p31Width;
 window.p31TaxSetup = p31TaxSetup;
 `;
@@ -509,8 +547,9 @@ if (need('Д3')) {
   note('условий усечено многоточием: ' + (b ? b.cut : '—') + ' из ' + (b ? b.conds : '—'));
   show('вылет разметки за контейнер, px', b ? b.spill : NaN, null);
   show('вылет самой правой ячейки, px', b ? b.rowSpill : NaN, null);
-  flag('НИЧЕГО НЕ ТОРЧИТ за контейнер', !!(b && b.spill <= 1 && b.rowSpill <= 1),
-       b ? ('вылет ' + b.spill + ' / ячейка ' + b.rowSpill) : '—');
+  flag('НИЧЕГО НЕ ТОРЧИТ за контейнер',
+       !!(b && b.cardSpill <= 1 && (b.spill <= 1 || b.scrolls === 1)),
+       b ? ('вылет ' + b.spill + ', карточка ' + b.cardSpill + ', прокрутка ' + b.scrolls) : '—');
   flag('формула НЕ мельче 13 px', !!(b && b.fontPx >= 13), b ? String(b.fontPx) : '—');
   flag('условие НЕ мельче 10 px', !!(b && b.condPx >= 10), b ? String(b.condPx) : '—');
   show('участков в записи', r.segs, null);
@@ -518,6 +557,8 @@ if (need('Д3')) {
   flag('строк РОВНО столько же, сколько участков', !!(b && b.rows === r.segs),
        (b ? b.rows : '—') + ' строк при ' + r.segs + ' участках');
   flag('форма записи НЕ двухстрочная', !r.stacked, 'data-ff-form = «' + (b ? b.form : '') + '»');
+  flag('у КАЖДОГО участка условие на ОДНОЙ строке с формулой',
+       !!(b && b.condsOffLine === 0), (b ? b.condsOffLine : '—') + ' участков не так');
   flag('в компактной записи НЕТ слова «если»', !r.ifInText, b ? b.text : '—');
   show('строк в надзаголовке', b ? b.eyebrowLines : NaN, null);
   flag('надзаголовок в ОДНУ строку', !!(b && b.eyebrowLines === 1), b ? String(b.eyebrowLines) : '—');
@@ -540,7 +581,8 @@ if (need('Д3')) {
       return b ? { lines: b.eyebrowLines, katexW: b.katexW, hostW: b.hostW,
                    over: b.over, fontPx: b.fontPx, condPx: b.condPx, rows: b.rows,
                    form: b.form, cut: b.cut, conds: b.conds,
-                   spill: b.spill, rowSpill: b.rowSpill } : null;
+                   spill: b.spill, rowSpill: b.rowSpill,
+                   scrolls: b.scrolls, cardSpill: b.cardSpill } : null;
     });
     if (!q) { note('окно ' + W + ': блока нет'); continue; }
     note('окно ' + W + ' px: надзаголовок строк ' + q.lines
@@ -701,9 +743,13 @@ if (need('Д5')) {
            + 'внутри .katex ' + b.katexW + ' px против контейнера ' + b.hostW + ' px'
            + ', кегль ' + b.fontPx + (b.condPx ? '/' + b.condPx : '')
            + ', строк ' + b.rows + ', усечено ' + (b.cut || 0) + ' из ' + (b.conds || 0));
-      flag('    ничего не торчит за контейнер', (b.spill == null || b.spill <= 1)
-           && (b.rowSpill == null || b.rowSpill <= 1),
-           'вылет ' + b.spill + ' / ячейка ' + b.rowSpill);
+      flag('    карточка не выходит за края', (b.cardSpill == null || b.cardSpill <= 1),
+           'карточка ' + b.cardSpill + ' px');
+      flag('    запись влезла либо прокручивается',
+           (b.spill == null || b.spill <= 1) || b.scrolls === 1,
+           'вылет ' + b.spill + ', прокрутка ' + b.scrolls);
+      flag('    условия на одной строке с формулами', b.condsOffLine === 0,
+           b.condsOffLine + ' участков не так');
       flag('    слова «если» в компактной записи нет', b.text.indexOf('если') < 0, b.text.slice(0, 70));
       flag('    кегль формулы не ниже 13 px', b.fontPx >= 13, String(b.fontPx));
     });
@@ -1088,6 +1134,198 @@ if (need('Д9')) {
   });
   await page.waitForTimeout(500);
   await shot('d9-mixed-pair');
+}
+
+/* ═══════════ Д10. Узкое окно: 1000 px и 380 px ══════════════════════ */
+if (need('Д10')) {
+  head('Д10 · блок «Итоговая функция» при ширине окна 1000 и 380 px');
+  for (const W of [1000, 380]) {
+    await page.setViewportSize({ width: W, height: 900 });
+    await page.waitForTimeout(400);
+    const r = await page.evaluate(() => {
+      resetSceneMemory(); pickScene('sdsum'); redrawAll();
+      p31Expand(); redrawAll();
+      if (typeof fitFinalMath === 'function') fitFinalMath();
+      const vis = (el) => !!(el && (el.offsetParent || el.getClientRects().length));
+      const ff = document.querySelector('#info-final .ff');
+      const host = ff && ff.querySelector('.ff-math');
+      const btn = ff && ff.querySelector('.ff-expand');
+      const panel = document.getElementById('params-panel');
+      const f = p31Final();
+      const b = f && f.blocks[0];
+      return {
+        panelVisible: vis(panel),
+        panelW: panel ? Math.round(panel.getBoundingClientRect().width) : 0,
+        ffVisible: vis(ff), hostW: host ? host.clientWidth : 0,
+        btn: vis(btn) ? 1 : 0,
+        spill: b ? b.spill : null, rowSpill: b ? b.rowSpill : null,
+        scrolls: b ? b.scrolls : 0, cardSpill: b ? b.cardSpill : 0,
+        eyebrowLines: b ? b.eyebrowLines : null,
+        rows: b ? b.rows : null, fontPx: b ? b.fontPx : null, condPx: b ? b.condPx : null,
+        /* Горизонтальной прокрутки у СТРАНИЦЫ быть не должно ни на какой ширине. */
+        pageSpill: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth),
+      };
+    });
+    console.log('  · окно ' + W + ' px');
+    note('  правая панель видима: ' + r.panelVisible + ', ширина ' + r.panelW + ' px');
+    if (!r.ffVisible) {
+      /* ⚠️ СВЁРНУТАЯ ПАНЕЛЬ — НЕ ОТВЕТ. На узком окне правая панель свёрнута
+         раскладкой в полоску 26 px, и блока не видно. Но человек её РАСКРОЕТ:
+         стрелка на месте. Проверять надо раскрытое состояние — иначе проверка
+         на узком окне не проверяет ничего. */
+      note('  панель свёрнута раскладкой — раскрываем, как это сделает человек');
+      await page.evaluate(() => {
+        if (typeof setParamsOpen === 'function') setParamsOpen(true);
+        const t = document.getElementById('params-toggle');
+        const pn = document.getElementById('params-panel');
+        if (t && pn && pn.classList.contains('collapsed')) t.click();
+        redrawAll();
+      });
+      await page.waitForTimeout(400);
+      const r2 = await page.evaluate(() => {
+        p31Expand(); redrawAll();
+        if (typeof fitFinalMath === 'function') fitFinalMath();
+        const vis = (el) => !!(el && (el.offsetParent || el.getClientRects().length));
+        const ff = document.querySelector('#info-final .ff');
+        const panel = document.getElementById('params-panel');
+        const f = p31Final(); const b = f && f.blocks[0];
+        return { panelW: panel ? Math.round(panel.getBoundingClientRect().width) : 0,
+                 ffVisible: vis(ff), hostW: b ? b.hostW : 0,
+                 btn: vis(ff && ff.querySelector('.ff-expand')) ? 1 : 0,
+                 spill: b ? b.spill : null, rowSpill: b ? b.rowSpill : null,
+                 scrolls: b ? b.scrolls : 0, cardSpill: b ? b.cardSpill : 0,
+                 eyebrowLines: b ? b.eyebrowLines : null, rows: b ? b.rows : null,
+                 fontPx: b ? b.fontPx : null, condPx: b ? b.condPx : null,
+                 pageSpill: Math.max(0, document.documentElement.scrollWidth - document.documentElement.clientWidth) };
+      });
+      note('  после раскрытия: панель ' + r2.panelW + ' px, контейнер записи ' + r2.hostW
+           + ' px, кегль ' + r2.fontPx + '/' + r2.condPx + ', строк ' + r2.rows);
+      flag('  блок показан', r2.ffVisible, String(r2.ffVisible));
+      note('  запись прокручивается: ' + (r2.scrolls ? 'да' : 'нет')
+           + ', вылет карточки ' + r2.cardSpill + ' px');
+      flag('  карточка блока не выходит за края', r2.cardSpill <= 1, r2.cardSpill + ' px');
+      flag('  запись либо влезла, либо прокручивается',
+           (r2.spill <= 1) || r2.scrolls === 1, 'вылет ' + r2.spill + ', прокрутка ' + r2.scrolls);
+      flag('  надзаголовок в одну строку', r2.eyebrowLines === 1, String(r2.eyebrowLines));
+      flag('  строк в скобке = участков (2)', r2.rows === 2, String(r2.rows));
+      flag('  кнопка «развернуть» доступна', r2.btn === 1, String(r2.btn));
+      flag('  страница не едет вбок', r2.pageSpill <= 1, r2.pageSpill + ' px');
+      if (r2.btn) {
+        await page.click('#info-final .ff .ff-expand');
+        await page.waitForTimeout(350);
+        const m2 = await page.evaluate((w) => {
+          const card = document.querySelector('#ff-modal .modal-card');
+          if (!card) return null;
+          const c = card.getBoundingClientRect();
+          const mm = document.getElementById('ff-modal-math');
+          const k = mm ? mm.querySelector('.katex') : null;
+          return { w: Math.round(c.width), h: Math.round(c.height), x: Math.round(c.x), y: Math.round(c.y),
+                   inScreen: (c.x >= -1 && c.y >= -1 && c.right <= w + 1 && c.bottom <= 900 + 1) ? 1 : 0,
+                   scrollable: (mm && k) ? (mm.scrollWidth > mm.clientWidth ? 1 : 0) : 0 };
+        }, W);
+        note('  окно разворота: ' + (m2 ? (m2.w + '×' + m2.h + ' при (' + m2.x + '; ' + m2.y + ')') : '—')
+             + (m2 && m2.scrollable ? ', запись прокручивается внутри окна' : ''));
+        flag('  окно разворота помещается в экран', !!(m2 && m2.inScreen === 1),
+             m2 ? (m2.w + '×' + m2.h) : '—');
+        await shot('d10-' + W + '-modal');
+        await page.keyboard.press('Escape');
+        await page.waitForTimeout(200);
+      }
+      await shot('d10-' + W);
+      continue;
+    }
+    note('  контейнер записи ' + r.hostW + ' px, кегль ' + r.fontPx + '/' + r.condPx
+         + ', строк в скобке ' + r.rows);
+    flag('  блок показан', r.ffVisible, String(r.ffVisible));
+    note('  запись прокручивается: ' + (r.scrolls ? 'да' : 'нет')
+         + ', вылет карточки ' + r.cardSpill + ' px');
+    flag('  карточка блока не выходит за края', r.cardSpill <= 1, r.cardSpill + ' px');
+    flag('  запись либо влезла, либо прокручивается',
+         (r.spill <= 1) || r.scrolls === 1, 'вылет ' + r.spill + ', прокрутка ' + r.scrolls);
+    flag('  надзаголовок в одну строку', r.eyebrowLines === 1, String(r.eyebrowLines));
+    flag('  строк в скобке = участков (2)', r.rows === 2, String(r.rows));
+    flag('  кнопка «развернуть» доступна', r.btn === 1, String(r.btn));
+    flag('  страница не едет вбок', r.pageSpill <= 1, r.pageSpill + ' px');
+    // Окно разворота обязано помещаться в экран.
+    await page.click('#info-final .ff .ff-expand');
+    await page.waitForTimeout(350);
+    const m = await page.evaluate((w) => {
+      const card = document.querySelector('#ff-modal .modal-card');
+      if (!card) return null;
+      const c = card.getBoundingClientRect();
+      const mm = document.getElementById('ff-modal-math');
+      const k = mm ? mm.querySelector('.katex') : null;
+      return { x: Math.round(c.x), y: Math.round(c.y), w: Math.round(c.width), h: Math.round(c.height),
+               inScreen: (c.x >= -1 && c.y >= -1 && c.right <= w + 1 && c.bottom <= 900 + 1) ? 1 : 0,
+               mathSpill: (mm && k) ? Math.round(k.getBoundingClientRect().width - mm.clientWidth) : null,
+               scrollable: mm ? (mm.scrollWidth > mm.clientWidth ? 1 : 0) : 0 };
+    }, W);
+    note('  окно разворота: ' + (m ? (m.w + '×' + m.h + ' при (' + m.x + '; ' + m.y + ')') : '—'));
+    flag('  окно разворота помещается в экран', !!(m && m.inScreen === 1),
+         m ? (m.w + '×' + m.h) : '—');
+    note('  запись в окне шире контейнера на ' + (m ? m.mathSpill : '—') + ' px'
+         + (m && m.scrollable ? ' (прокручивается внутри окна)' : ''));
+    await shot('d10-' + W + '-modal');
+    await page.keyboard.press('Escape');
+    await page.waitForTimeout(200);
+    await shot('d10-' + W);
+  }
+  await page.setViewportSize({ width: 1440, height: 950 });
+  await page.waitForTimeout(300);
+}
+
+/* ═══════════ Д11. Единообразие блока: 4 сцены × 2 темы ══════════════ */
+if (need('Д11')) {
+  head('Д11 · блок «Итоговая функция» в четырёх сценах и двух темах');
+  await page.setViewportSize({ width: 1440, height: 950 });
+  const scenes = [['sdsum', 'Сложение спросов и предложений'],
+                  ['ppfsum', 'Сложение КПВ'],
+                  ['trade', 'КТВ. Одна страна'],
+                  ['taxes', 'Налоги и субсидии']];
+  for (const theme of ['light', 'dark']) {
+    await page.evaluate(t => { if (typeof setCalcTheme === 'function') setCalcTheme(t); }, theme);
+    await page.waitForTimeout(250);
+    for (const [key, name] of scenes) {
+      const r = await page.evaluate((k) => {
+        if (k === 'taxes') p31TaxSetup('100 - Q', 'Q', 'subsidy', '', 'seller', 20);
+        else { resetSceneMemory(); pickScene(k); redrawAll(); }
+        p31Expand(); redrawAll();
+        if (typeof fitFinalMath === 'function') fitFinalMath();
+        const box = document.getElementById('info-final');
+        const f = p31Final(); const b = f && f.blocks[0];
+        const rect = box ? box.getBoundingClientRect() : null;
+        return { has: !!(f && f.blocks.length), n: f ? f.blocks.length : 0,
+                 eyebrow: b ? b.eyebrow : '', eyebrowLines: b ? b.eyebrowLines : 0,
+                 fontPx: b ? b.fontPx : 0, condPx: b ? b.condPx : 0,
+                 cardSpill: b ? b.cardSpill : 0, scrolls: b ? b.scrolls : 0,
+                 mathLines: b ? b.rows : 0, segs: b ? Math.max(1, (b.tex.split('\\\\').length)) : 1,
+                 condsOffLine: b ? b.condsOffLine : 0,
+                 rect: rect ? { x: Math.round(rect.x) - 6, y: Math.round(rect.y) - 6,
+                                width: Math.round(rect.width) + 12,
+                                height: Math.round(rect.height) + 12 } : null };
+      }, key);
+      note(theme + ' · ' + name + ': блоков ' + r.n + ', строк записи ' + r.mathLines
+           + ', надзаголовок «' + r.eyebrow
+           + '» в ' + r.eyebrowLines + ' строку, кегль ' + r.fontPx
+           + (r.condPx ? '/' + r.condPx : '') + ', вылет карточки ' + r.cardSpill + ' px');
+      flag('  ' + theme + '/' + key + ': надзаголовок в одну строку и не усечён',
+           r.eyebrowLines === 1 && r.eyebrow.indexOf('…') < 0, r.eyebrow);
+      flag('  ' + theme + '/' + key + ': карточка не выходит за края', r.cardSpill <= 1,
+           r.cardSpill + ' px');
+      /* ⚠️ ЖЁСТКОЕ ПРАВИЛО ВЛАДЕЛЬЦА: строк записи ровно столько, сколько
+         участков. Относится и к однострочной записи без скобки. */
+      flag('  ' + theme + '/' + key + ': строк записи = участков',
+           r.mathLines === r.segs, r.mathLines + ' строк при ' + r.segs + ' участках');
+      flag('  ' + theme + '/' + key + ': условия на одной строке с формулами',
+           r.condsOffLine === 0, r.condsOffLine + ' участков не так');
+      if (r.rect && r.rect.height > 10) {
+        const p = SHOTS + '/d11-' + theme + '-' + key + '.png';
+        await page.screenshot({ path: p, clip: r.rect });
+        console.log('     снимок: ' + p);
+      }
+    }
+  }
+  await page.evaluate(() => { if (typeof setCalcTheme === 'function') setCalcTheme('light'); });
 }
 
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }

@@ -707,8 +707,15 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 }
 .ff-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
 /* Кнопки блока держатся вместе и при нехватке ширины уезжают своей строкой —
-   надзаголовок остаётся в одной строке при любой ширине панели. */
-.ff-acts { display: flex; align-items: baseline; gap: 10px; margin-left: auto; }
+   надзаголовок остаётся в одной строке при любой ширине панели.
+   ⚠️ И САМИ КНОПКИ ПЕРЕНОСЯТСЯ, если ширины мало даже им. Замер 31.08 при
+   ширине браузера 380 px: панель даёт под содержимое 99 px, а пара кнопок
+   «развернуть» и «копировать» просит 135 — без переноса они выталкивали
+   карточку блока за её собственные края на 26 px. */
+.ff-acts {
+  display: flex; align-items: baseline; flex-wrap: wrap; justify-content: flex-end;
+  gap: 10px; row-gap: 2px; margin-left: auto; min-width: 0;
+}
 .ff-eyebrow {
   /* ⚠️ НАДЗАГОЛОВОК СТОИТ В ОДНУ СТРОКУ (указание владельца 31.08).
      «ИТОГОВАЯ ФУНКЦИЯ» ломалось надвое и съедало высоту блока: замер 31.08 —
@@ -717,6 +724,12 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
      запрещён явно. Девятка допущена каноном для служебной надписи в кружке,
      и здесь она в том же качестве — метка блока, а не читаемый текст. */
   white-space: nowrap;
+  /* ⚠️ УСЕЧЕНИЕ ЗДЕСЬ — ПОСЛЕДНЯЯ МЕРА, А НЕ СПОСОБ СОКРАТИТЬ ТЕКСТ.
+     На всех рабочих ширинах панели (215, 191, 147 px) надпись стоит целиком и
+     в одну строку — это и требовалось. Но на 99 px, куда панель сжимается при
+     ширине браузера 380 px, не помещается ничто: сама надпись просит 111 px.
+     Тогда лучше усечь метку блока, чем вытолкнуть карточку за её края. */
+  min-width: 0; overflow: hidden; text-overflow: ellipsis;
   font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
   /* ⚠️ ЦВЕТ КРИВОЙ ПОДМЕШАН, А НЕ ВЗЯТ ЧИСТЫМ, И ЭТО НЕ ПРИДИРКА К ОТТЕНКУ.
      Цвета кривых подобраны под контраст 3:1 к ХОЛСТУ — этого хватает линии, но
@@ -747,6 +760,14 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .ff-expand:hover { color: var(--text); border-bottom-color: var(--text); }
 .ff-name { margin-top: 3px; font-size: 11.5px; color: var(--text2); }
 .ff-math { margin-top: 4px; font-size: 15px; color: var(--text); }
+/* ⚠️ ЗАПИСЬ НЕ ПЕРЕНОСИТСЯ ПО СЛОВАМ, И ЭТО ТО ЖЕ САМОЕ ЖЁСТКОЕ ПРАВИЛО.
+   «Формула участка и её условие ВСЕГДА на одной строке» (владелец, 31.08)
+   относится и к однострочной записи — той, у которой скобки нет вовсе.
+   KaTeX ставит на свой корень `white-space: normal`, и запись КТВ
+   «Y = 200 − 2X, 0 ≤ X ≤ 100» разъезжалась на две строки: замер 31.08 в
+   сцене «КТВ. Одна страна». Переноса нет — значит правило ширины видит
+   настоящее переполнение и отрабатывает ступенями, как и задумано. */
+.ff-math .katex { white-space: nowrap; }
 
 /* ── КОМПАКТНАЯ ЗАПИСЬ: ОДИН УЧАСТОК — ОДНА СТРОКА ───────────────────
    Решение владельца 31.08. Формула слева кеглем 15 и по левому краю, условие
@@ -770,6 +791,11 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
   column-gap: 10px; row-gap: 1px; align-items: baseline;
 }
 .ff-f { white-space: nowrap; }
+/* Последняя ступень правила ширины у КУСОЧНОЙ записи: уложиться нечем, и
+   запись прокручивается. Колонки берут естественную ширину — иначе сетка
+   по-прежнему ужимала бы условие в ноль, а формула торчала бы за край. */
+.ff-math.ff-cases.ff-scroll { overflow-x: auto; overflow-y: hidden; }
+.ff-math.ff-cases.ff-scroll .ff-rows { grid-template-columns: max-content max-content; }
 .ff-c {
   font-size: 11px; color: var(--text3);
   white-space: nowrap; overflow: hidden; min-width: 0; position: relative;
