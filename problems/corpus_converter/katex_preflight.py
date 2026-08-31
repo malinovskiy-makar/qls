@@ -46,14 +46,18 @@ Node-скрипты рядом (`scripts/katex_render_check.js`) для этог
 
 ⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE`. Синхронный API playwright поднимает
 event loop, и Django после этого запрещает обращения к ORM
-(`SynchronousOnlyOperation`). Вызывающая сторона обязана выставить
-`DJANGO_ALLOW_ASYNC_UNSAFE=1` — здесь это безопасно и ровно для того
-и предназначено: доступ к базе ТОЛЬКО на чтение, один поток, никаких
-async-драйверов. Ставится не здесь, а в вызывающей команде, явно и
-с комментарием — чтобы модуль не трогал глобальное состояние молча.
+(`SynchronousOnlyOperation`). Вызывающая сторона обязана обернуть
+работу с `KatexPreflight` в `async_unsafe_for_playwright()` (ниже) —
+это безопасно и ровно для того и предназначено: доступ к базе ТОЛЬКО
+на чтение, один поток, никаких async-драйверов. Ставить переменную
+на уровне модуля или без восстановления НЕЛЬЗЯ: Django импортирует
+модули команд при автопоиске, и переменная утекала бы в процесс от
+одного факта импорта, роняя `test_check_deploy_is_clean` (`async.E001`)
+в этом же процессе — уже случалось, см. `problems/management/commands/CLAUDE.md`.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -241,6 +245,21 @@ window.__preflight = function (html) {
   };
 };
 """
+
+
+@contextlib.contextmanager
+def async_unsafe_for_playwright():
+    """Ставит `DJANGO_ALLOW_ASYNC_UNSAFE` на время блока, возвращает
+    окружение ровно как было при выходе (даже при исключении)."""
+    previous = os.environ.get('DJANGO_ALLOW_ASYNC_UNSAFE')
+    os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = '1'
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
+        else:
+            os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = previous
 
 
 def build_sandbox_html():
