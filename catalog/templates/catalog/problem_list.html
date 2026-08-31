@@ -384,9 +384,20 @@
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
   margin-bottom: 14px;
 }
+  /* ⚠️ ПОД ПОЛУПРОЗРАЧНЫМ ТИНТОМ — ПЛОТНАЯ ПОДЛОЖКА ЦВЕТОМ СТРАНИЦЫ.
+     Иначе сквозь тинт просвечивает фоновый паттерн, и текст читается уже
+     не на тинте, а на «тинт + знак»: замер дал 4,17 в светлой теме и 3,90
+     в тёмной при норме 4,5. Плотностью паттерна это не лечится — даже при
+     .04 светлая тема даёт 4,49: у пары «--accent-ink на --accent-tint» и
+     без всякого паттерна всего 4,71 запаса.
+     Цвет не выдуман: тинт кладётся картинкой поверх плотного --bg, то есть
+     получается ровно тот же оттенок, что и был, но непрозрачный. Обе темы
+     обслуживаются теми же токенами. */
 .fchip {
   display: inline-flex; align-items: center; gap: 4px;
-  background: var(--accent-tint); color: var(--accent-ink);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
+  color: var(--accent-ink);
   border-radius: 20px; padding: 3px 5px 3px 11px;
   font-size: 13px; font-weight: 500; text-decoration: none;
 }

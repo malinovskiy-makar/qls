@@ -97,7 +97,10 @@
   border: .5px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--accent-tint);  /* лёгкий малиновый фон — отличие от условия */
+  /* Плотная подложка под тинтом — см. объяснение у .fchip в каталоге:
+     сквозь прозрачный тинт просвечивал фоновый паттерн и съедал контраст. */
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
 }
 .part-header {
   display: flex;

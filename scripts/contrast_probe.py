@@ -71,18 +71,57 @@ JS = r"""
   // фон под элементом: копим полупрозрачные слои, пока не упрёмся в плотный
   const backdrop = (el) => {
     const stack = [];
-    let node = el;
+    let node = el, stopper = null;
     while (node) {
       const bg = parse(getComputedStyle(node).backgroundColor);
       if (bg && bg.a > 0) {
         stack.push(bg);
-        if (bg.a >= 0.999) break;
+        if (bg.a >= 0.999) { stopper = node; break; }
       }
       node = node.parentElement;
     }
     let base = {r: 255, g: 255, b: 255, a: 1};
     for (let i = stack.length - 1; i >= 0; i--) base = over(stack[i], base);
+    // на ком остановились — важно: паттерн лежит ПОД телом страницы, и любой
+    // непрозрачный блок выше закрывает его собой
+    base.onBody = (stopper === document.body
+                   || stopper === document.documentElement || stopper === null);
     return base;
+  };
+
+  // ⚠️ ФОНОВЫЙ ПАТТЕРН ЛЕЖИТ ОТДЕЛЬНЫМ СЛОЕМ, И backdrop() ЕГО НЕ ВИДИТ.
+  //    Он нарисован в `body::before`, то есть не является фоном ни одного
+  //    родителя. Текст, лежащий прямо на фоне страницы, на самом деле лежит
+  //    на «фон + знак паттерна», и мерить надо ХУДШУЮ точку, а не среднюю.
+  //    Худшая — там, где знак сильнее всего сдвигает фон в сторону цвета
+  //    текста: в светлой теме это самый тёмный знак, в тёмной — самый светлый.
+  const patternAlpha = parseFloat(
+    getComputedStyle(document.documentElement)
+      .getPropertyValue('--bg-pattern-alpha') || '0') || 0;
+  const patternOff = !document.body ||
+    getComputedStyle(document.body, '::before').display === 'none';
+  const pageBg = parse(getComputedStyle(document.body).backgroundColor)
+                 || {r: 255, g: 255, b: 255, a: 1};
+  const dark = lum(pageBg) < 0.5;
+  // цвета знаков запечены в кусочек: бирюза, янтарь, светлая бирюза
+  const marks = [{r: 0, g: 121, b: 122, a: patternAlpha},
+                 {r: 214, g: 165, b: 37, a: patternAlpha},
+                 {r: 129, g: 181, b: 180, a: patternAlpha}];
+  const worstOverPage = (bg) => {
+    if (patternOff || !patternAlpha) return bg;
+    // ⚠️ ПО ПРИЗНАКУ «ОСТАНОВИЛИСЬ НА ТЕЛЕ», А НЕ ПО СОВПАДЕНИЮ ЦВЕТА.
+    //    Первая версия сравнивала цвет фона с цветом страницы — и накладывала
+    //    паттерн на всё, что просто ОКРАШЕНО в --bg: например на демо-коробку
+    //    стайлгайда, которая непрозрачна и паттерн собой закрывает. Один
+    //    выдуманный провал так и получился.
+    if (!bg.onBody) return bg;
+    let worst = bg;
+    for (const m of marks) {
+      const c = over(m, bg);
+      // худшая точка — та, что ближе к светлоте текста
+      if (dark ? lum(c) > lum(worst) : lum(c) < lum(worst)) worst = c;
+    }
+    return worst;
   };
 
   const out = [];
@@ -99,7 +138,7 @@ JS = r"""
     if (el.closest('.katex-mathml, [aria-hidden=true]')) continue;
     const fg = parse(cs.color);
     if (!fg || fg.a === 0) continue;
-    const bg = backdrop(el);
+    const bg = worstOverPage(backdrop(el));
     const ink = fg.a < 1 ? over(fg, bg) : fg;
     const size = parseFloat(cs.fontSize);
     const bold = parseInt(cs.fontWeight, 10) >= 700;
