@@ -40,24 +40,58 @@ def css_blocks(text):
 
 
 def unbalanced(text):
-    """Номера строк с лишним закрытием и остаток открытых комментариев."""
-    extra, depth = [], 0
+    """Номера строк с лишним закрытием и остаток открытых комментариев.
+
+    ⚠️ КОММЕНТАРИИ CSS НЕ ВКЛАДЫВАЮТСЯ. Разборщик открывает комментарий на
+    `/*` и закрывает на ПЕРВОМ же `*/`; вложенное `/*` внутри — это обычные
+    символы текста, а не второй уровень. Первая версия этой проверки считала
+    глубину счётчиком, как в языках с вложенными комментариями, и потому
+    пропустила настоящую поломку: в `_tokens.html` объяснение приводило знаки
+    комментария как ПРИМЕР, счётчик сошёлся в ноль, а браузер закрыл
+    комментарий на середине абзаца и съел следующее объявление `--font-ui`.
+    Весь сайт рисовался Times с засечками при зелёной проверке.
+
+    Поэтому состояния ровно два: внутри комментария и снаружи.
+    """
+    extra, inside = [], False
     for number, line in enumerate(text.split('\n'), 1):
         index = 0
         while index < len(line):
-            if line.startswith('/*', index):
-                depth += 1
-                index += 2
-                continue
-            if line.startswith('*/', index):
-                depth -= 1
-                if depth < 0:
+            if inside:
+                if line.startswith('*/', index):
+                    inside = False
+                    index += 2
+                    continue
+            else:
+                if line.startswith('/*', index):
+                    inside = True
+                    index += 2
+                    continue
+                if line.startswith('*/', index):
+                    # закрытие вне комментария: всё, что до него, разборщик
+                    # уже прочитал как код
                     extra.append(number)
-                    depth = 0
-                index += 2
-                continue
+                    index += 2
+                    continue
             index += 1
-    return extra, depth
+    return extra, inside
+
+
+def comment_bodies(text):
+    """(номер строки открытия, тело) каждого комментария CSS."""
+    out, index, line_no = [], 0, 1
+    while True:
+        start = text.find('/*', index)
+        if start < 0:
+            break
+        line_no = text.count('\n', 0, start) + 1
+        end = text.find('*/', start + 2)
+        if end < 0:
+            out.append((line_no, text[start + 2:]))
+            break
+        out.append((line_no, text[start + 2:end]))
+        index = end + 2
+    return out
 
 
 def template_files():
@@ -103,6 +137,29 @@ class CssCommentsAreBalancedTests(SimpleTestCase):
         self.assertEqual(broken, [], 'Незакрытый комментарий в стилях: %s'
                                      % ', '.join(broken))
 
+    def test_no_open_marker_inside_a_comment(self):
+        """Знак ОТКРЫТИЯ внутри комментария — тоже поломка, и молчаливая.
+
+        Он означает, что автор считает комментарии вложенными. Браузер так не
+        считает: он закроет комментарий на ближайшем закрытии, а хвост
+        объяснения прочтёт как код и разбором ошибки съест следующее
+        объявление. Ровно так пропал `--font-ui` 31.08.2026.
+        """
+        broken = []
+        for path in template_files():
+            with open(path, encoding='utf-8') as handle:
+                text = handle.read()
+            for block in css_blocks(text):
+                for line_no, body in comment_bodies(block):
+                    if '/*' in body:
+                        broken.append('%s: комментарий со строки %d'
+                                      % (os.path.relpath(path,
+                                                         settings.BASE_DIR),
+                                         line_no))
+        self.assertEqual(broken, [], 'Знак открытия комментария внутри '
+                                     'комментария — следующее объявление '
+                                     'будет съедено: %s' % '; '.join(broken))
+
     def test_the_guard_catches_the_real_case(self):
         """Проверка на зубастость: тот самый обломок, что жил в наборе."""
         sample = ('/* подпись */\n'
@@ -110,3 +167,18 @@ class CssCommentsAreBalancedTests(SimpleTestCase):
                   '.k-kind { color: red; }\n')
         extra, _ = unbalanced(sample)
         self.assertEqual(extra, [2])
+
+    def test_the_guard_catches_the_font_case(self):
+        """Зубастость на настоящем случае 31.08.2026 — съеденный `--font-ui`.
+
+        Счётчик глубины сходился в ноль и молчал; правильный разбор видит
+        и лишнее закрытие, и знак открытия внутри тела.
+        """
+        sample = (':root {\n'
+                  '  /* пример записи: /* … */ внутри объяснения */\n'
+                  '  --font-ui: Montserrat, sans-serif;\n'
+                  '}\n')
+        extra, _ = unbalanced(sample)
+        self.assertEqual(extra, [2], 'лишнее закрытие не найдено')
+        inner = [n for n, body in comment_bodies(sample) if '/*' in body]
+        self.assertEqual(inner, [2], 'знак открытия внутри тела не найден')
