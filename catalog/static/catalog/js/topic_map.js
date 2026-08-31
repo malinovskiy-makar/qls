@@ -135,6 +135,13 @@ function readPalette() {
   PAL.node = hexToRgb(cs.getPropertyValue('--map-node') ||
                       (dark ? '#C8CEDA' : '#4A5260'));
   PAL.nodeShades = makeShades(PAL.node);
+
+  /* Надписи-ориентиры по разделам — третий цвет карты, не узел и не
+     подсветка (ADR 0046). Ступеней не нужно: прозрачность у них своя, и
+     задаётся она globalAlpha сразу обоим проходам — обводке и заливке. */
+  PAL.region = hexToRgb(cs.getPropertyValue('--map-region') ||
+                        (dark ? '#8FBEE0' : '#3E6C99'));
+  PAL.regionCss = 'rgb(' + PAL.region.join(',') + ')';
 }
 
 /* ── Раскладка ───────────────────────────────────────────────────────── */
@@ -617,25 +624,6 @@ function hitTest(mx, my) {
    решить спор «узел или связь» — см. pick() ниже. */
 var hitNodeDist = 1e9;
 
-/* ⚠️ КТО СТАРШЕ, УЗЕЛ ИЛИ СВЯЗЬ. Узел старше — но при РАВНОМ ИЛИ МЕНЬШЕМ
-   расстоянии, а не безусловно. Безусловное старшинство сделало бы
-   хождение по линии невозможным: карта плотная, и посторонние узлы стоят
-   прямо на пунктире. Замер на связи «Монопсония и покупательная власть» ↔
-   «Монопсония на рынке труда»: на её отрезке лежат t10.2 в 2,6 px от
-   линии, t8.18 в 3,3 и t10.3 в 3,5 — курсор, идущий ТОЧНО по пунктиру
-   (расстояние до линии 0), отдавался им, и связь терялась на 7 точках из
-   20. Теперь узел выигрывает, когда он ближе или на том же расстоянии:
-   у самого кружка это всегда так (внутри него расстояние отрицательное),
-   а на голом участке линии побеждает линия — куда человек и целится. */
-function pick(mx, my) {
-  var n = hitTest(mx, my);
-  var e = hitTestEdge(mx, my);
-  if (n && e) return hitNodeDist <= e.d ? { node: n } : { edge: e };
-  if (n) return { node: n };
-  if (e) return { edge: e };
-  return {};
-}
-
 /* Расстояние от точки до отрезка в экранных координатах. */
 function distToSeg(px, py, x1, y1, x2, y2) {
   var dx = x2 - x1, dy = y2 - y1;
@@ -646,31 +634,114 @@ function distToSeg(px, py, x1, y1, x2, y2) {
   return Math.hypot(px - cx, py - cy);
 }
 
-/* Попадание по перекрёстной связи. Спор с узлом разрешает pick() ниже. */
-function hitTestEdge(mx, my) {
-  var best = null, bestD = HIT_EDGE, bestZ = 0;
+/* ── Проходимые рёбра активного узла ──────────────────────────────────
+
+   ⚠️ ЭТО ЗАМЕНА ПРЕЖНЕГО ПОВЕДЕНИЯ, А НЕ ДОБАВКА К НЕМУ. Раньше подсветка
+   включалась от наведения на ЛЮБОЕ из 425 рёбер, и любое случайное движение
+   мыши что-то подсвечивало — шум. Теперь модель другая: человек встаёт на
+   узел и уходит от него ПО ЕГО ЛИНИЯМ, как по дорогам с перекрёстка.
+
+   Отсюда и широкий коридор. Кандидатов теперь единицы — только рёбра
+   active, а не сотни, — поэтому 16 px не создают конфликтов и попадать
+   пиксель в пиксель не требуется. */
+var HIT_CORRIDOR = 16;       /* коридор попадания вдоль ребра active, px */
+var ROUTE_START = 20;        /* ближе к active маршрут не начинается    */
+var ROUTE_ARRIVE_T = 0.78;   /* доля пути, после которой переходим      */
+var ROUTE_ARRIVE_PX = 12;    /* или подошли к дальнему узлу ближе этого */
+
+/* Доля вдоль отрезка, куда проецируется точка (0 — у первого конца). */
+function projT(px, py, x1, y1, x2, y2) {
+  var dx = x2 - x1, dy = y2 - y1;
+  var len2 = dx * dx + dy * dy;
+  if (!len2) return 0;
+  var t = ((px - x1) * dx + (py - y1) * dy) / len2;
+  return t < 0 ? 0 : t > 1 ? 1 : t;
+}
+
+/* Ищем ребро active, в коридор которого попал курсор.
+   ⚠️ ВПЛОТНУЮ К УЗЛУ МАРШРУТ НЕ НАЧИНАЕТСЯ. У тега сходится веером до
+   десятка спиц, и в первых двадцати пикселях их коридоры перекрываются:
+   курсор дребезжал бы между соседними линиями, не давая выбрать ни одну. */
+function hitTestRoute(mx, my) {
+  if (!active || active.pz <= 0) return null;
+  var best = null, bestD = HIT_CORRIDOR;
   for (var i = 0; i < links.length; i++) {
     var ln = links[i];
-    if (ln.k !== 'cross') continue;
     var a = byId[ln.s], b = byId[ln.t];
-    /* Оба конца перед камерой: у отрезка с концом за спиной экранных
-       координат нет вовсе, и расстояние до него считать не по чему. */
-    if (a.pz <= 0 || b.pz <= 0) continue;
+    var far;
+    if (a === active) far = b;
+    else if (b === active) far = a;
+    else continue;                          /* чужие рёбра не проходимы */
+    if (far.pz <= 0) continue;
+
     /* Быстрый отсев по рамке: расстояние считается только для тех
-       немногих отрезков, рядом с которыми курсор вообще может быть. */
-    if (mx < Math.min(a.px, b.px) - HIT_EDGE || mx > Math.max(a.px, b.px) + HIT_EDGE ||
-        my < Math.min(a.py, b.py) - HIT_EDGE || my > Math.max(a.py, b.py) + HIT_EDGE) continue;
-    var d = distToSeg(mx, my, a.px, a.py, b.px, b.py);
-    if (d > HIT_EDGE) continue;
-    var z = (a.pz + b.pz) / 2;
-    /* Ближайшая линия, а при равном расстоянии — та, что ближе к камере. */
-    if (d < bestD - 0.01 || (Math.abs(d - bestD) <= 0.01 && best && z < bestZ)) {
-      bestD = d; bestZ = z;
-      /* Расстояние кладём в саму находку: оно нужно спору с узлом. */
-      best = { key: edgeKey(a.id, b.id), a: a, b: b, why: ln.w || '', link: ln, d: d };
+       отрезков, рядом с которыми курсор вообще может быть. */
+    if (mx < Math.min(active.px, far.px) - HIT_CORRIDOR ||
+        mx > Math.max(active.px, far.px) + HIT_CORRIDOR ||
+        my < Math.min(active.py, far.py) - HIT_CORRIDOR ||
+        my > Math.max(active.py, far.py) + HIT_CORRIDOR) continue;
+
+    var d = distToSeg(mx, my, active.px, active.py, far.px, far.py);
+    if (d > HIT_CORRIDOR) continue;
+
+    var t = projT(mx, my, active.px, active.py, far.px, far.py);
+    var len = Math.hypot(far.px - active.px, far.py - active.py);
+    if (t * len < ROUTE_START) continue;    /* слишком близко к active */
+
+    if (d < bestD) {
+      bestD = d;
+      best = { key: edgeKey(active.id, far.id), a: active, b: far,
+               why: (ln.k === 'cross' ? (ln.w || '') : ''), link: ln,
+               t: t, d: d, len: len,
+               cx: active.px + (far.px - active.px) * t,
+               cy: active.py + (far.py - active.py) * t };
     }
   }
   return best;
+}
+
+/* ── Кто старше: узел или линия ───────────────────────────────────────
+
+   ⚠️ ЭТО ПРАВИЛО ПЕРЕПИСАНО ПОД МОДЕЛЬ ХОЖДЕНИЯ, и его прежний числовой
+   вид («узел старше при равном или меньшем расстоянии», ADR 0045) здесь не
+   работает. Причина: карта плотная, и чужие узлы стоят вплотную к линиям —
+   на отрезке «Монопсония и покупательная власть» ↔ «Монопсония на рынке
+   труда» лежат t8.8 в 5,0 px от линии, t10.2 в 2,6, t8.18 в 3,3, t10.3 в
+   3,5. Пока старшинство решалось сравнением расстояний, они забирали
+   курсор: по самой линии маршрут доходил до цели 3 раза из 20, а при
+   небрежном ведении в 12 px от неё — ни разу.
+
+   Дух ADR 0045 сохранён: узел НЕ забирает курсор, который явно целится в
+   линию. Изменилась буква — вместо сравнения расстояний старшинство теперь
+   такое:
+
+     1. точное попадание в кружок (расстояние отрицательное) сильнее всего —
+        так с маршрута можно сойти намеренно;
+     2. иначе, если стоишь на узле и курсор в коридоре одной из ЕГО линий, —
+        идёшь по линии;
+     3. иначе ближняя зона своего узла принадлежит ему, а не соседям;
+     4. и только потом — обычное попадание по узлу. */
+function pick(mx, my) {
+  var n = hitTest(mx, my);
+  var e = active ? hitTestRoute(mx, my) : null;
+
+  /* 1. Внутри кружка — это узел, и спорить не о чем. */
+  if (n && hitNodeDist <= 0) return { node: n };
+
+  if (active && active.pz > 0) {
+    /* 2. В коридоре своей линии — идём по ней. */
+    if (e) return { route: e };
+    /* 3. Ближняя зона своего узла: там маршрут ещё не начинается (спицы
+       сходятся веером), и отдавать её соседям нельзя — иначе путь рвётся
+       на первом же шаге. */
+    if (Math.hypot(mx - active.px, my - active.py) < ROUTE_START) {
+      return { node: active };
+    }
+  }
+
+  /* 4. Обычное попадание по узлу — так и входят в режим хождения. */
+  if (n) return { node: n };
+  return {};
 }
 
 
@@ -680,8 +751,12 @@ function hitTestEdge(mx, my) {
 
 /* Состояние подсветки. */
 var picked = {};             /* id → true: выбранные теги и темы          */
-var hoverNode = null;        /* узел под курсором                         */
-var hoverEdge = null;        /* связь под курсором (фаза «ходим по линии») */
+/* ⚠️ ACTIVE — ЭТО НЕ «УЗЕЛ ПОД КУРСОРОМ», А «УЗЕЛ, НА КОТОРОМ ТЫ СТОИШЬ».
+   Разница важна: курсор может уйти с узла вдоль линии, а стоишь ты всё ещё
+   на нём. Войти в режим можно ТОЛЬКО через узел; ни одно ребро само по себе
+   active не задаёт. */
+var active = null;           /* узел, на котором стоит человек, либо null  */
+var route = null;            /* ребро active, по которому идёт курсор      */
 var focusTheme = null;       /* тема, у которой раскрыт список тегов      */
 var searchHits = null;       /* null = поиск пуст; иначе объект id → true */
 
@@ -716,26 +791,17 @@ function edgeKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 function rebuildHighlight() {
   var any = false, k;
   for (k in picked) { if (picked[k]) { any = true; break; } }
-  if (!any && !hoverNode && !hoverEdge) { litSet = litNear = litEdges = null; return; }
+  if (!any && !active) { litSet = litNear = litEdges = null; return; }
 
   litSet = {}; litNear = {}; litEdges = {};
 
-  /* Связь под курсором: подсвечены оба тега, обе их темы, обе дороги
-     тема→тег и сама линия. Видно, откуда куда идёт связь. */
-  if (hoverEdge) {
-    var ends = [hoverEdge.a, hoverEdge.b];
-    litEdges[hoverEdge.key] = true;
-    for (var e = 0; e < 2; e++) {
-      var tg = ends[e];
-      litSet[tg.id] = true;
-      var th = byId['t' + tg.n];
-      if (th) { litSet[th.id] = true; litEdges[edgeKey(th.id, tg.id)] = true; }
-    }
-  }
-
+  /* ⚠️ ПОДСВЕТКУ ЗАДАЁТ ТОЛЬКО ACTIVE, А НЕ МАРШРУТ. Пока курсор идёт по
+     ребру, подсвечено ровно то же, что было на самом узле: маршрут —
+     визуальный слой поверх, а не второй источник подсветки. Иначе картина
+     перестраивалась бы на каждом шаге пути. */
   var seeds = [];
   for (k in picked) if (picked[k]) seeds.push(byId[k]);
-  if (hoverNode) seeds.push(hoverNode);
+  if (active) seeds.push(active);
 
   seeds.forEach(function (n) {
     if (!n) return;
@@ -829,7 +895,7 @@ function setLabelFont(px, weight, spacing) {
   ctx.letterSpacing = spacing ? (spacing * px).toFixed(2) + 'px' : '0px';
 }
 
-function drawLabelLines(lines, x, y, align, alpha, colour, px, weight, spacing, withPlate) {
+function drawLabelLines(lines, x, y, align, alpha, colour, px, weight, spacing, withPlate, halo) {
   setLabelFont(px, weight, spacing);
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
@@ -842,8 +908,30 @@ function drawLabelLines(lines, x, y, align, alpha, colour, px, weight, spacing, 
   ctx.globalAlpha = alpha;
   /* Подложка цвета холста рисуется ДО текста и поверх рёбер — иначе буквы
      перечёркиваются спицами и линиями. Надписям-ориентирам она не нужна:
-     они намеренно лежат в фоне и подложкой затирали бы карту. */
+     ⚠️ ПЛАШКА ВЫРЕЗАЛА БЫ В ГРАФЕ ПРЯМОУГОЛЬНЫЕ ДЫРЫ. Ориентир широкий, и
+     под ним всегда есть линии и узлы; закрасив их фоном, мы порвали бы граф
+     ради подписи. Читаемость даёт ОБВОДКА: она облегает буквы и оставляет
+     всё между ними видимым. */
   if (withPlate !== false) plate(px0 - 4, y - hAll / 2 - 2, wMax + 8, hAll + 4);
+
+  var ty;
+  /* ⚠️ ОБВОДКА И ЗАЛИВКА ИДУТ ПОД ОДНОЙ И ТОЙ ЖЕ ПРОЗРАЧНОСТЬЮ, и меняется
+     она ОДИН раз на оба прохода. Задай их порознь — на просвет вылезет
+     ореол: полупрозрачная обводка проступит из-под полупрозрачных букв
+     светлым контуром. */
+  if (halo) {
+    ctx.strokeStyle = PAL.bgCss;
+    ctx.lineWidth = halo;
+    ctx.lineJoin = 'round';
+    ctx.miterLimit = 2;
+    for (i = 0; i < lines.length; i++) {
+      ty = y - hAll / 2 + LINE_H / 2 + i * LINE_H;
+      ctx.strokeText(lines[i], x, ty);
+    }
+    ctx.lineWidth = 1;
+    ctx.lineJoin = 'miter';
+  }
+
   ctx.fillStyle = colour;
   for (i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], x, y - hAll / 2 + LINE_H / 2 + i * LINE_H);
@@ -917,10 +1005,11 @@ function layoutFocusLabels(theme) {
    Семь названий разделов корпуса вместо двадцати девяти имён тем. Вид
    намеренно другой: прописные, разрядка, вполсилы — это ориентир, как
    название страны на карте, а не подпись объекта. */
-var GROUP_PX = 16;           /* кегль надписи раздела                   */
-var GROUP_SPACING = 0.06;    /* разрядка, доля кегля                    */
-var GROUP_ALPHA = 0.42;      /* в покое                                 */
-var GROUP_ALPHA_DIM = 0.18;  /* при любой подсветке — остаётся фоном    */
+var GROUP_PX = 17;           /* кегль надписи раздела                   */
+var GROUP_SPACING = 0.07;    /* разрядка, доля кегля                    */
+var GROUP_ALPHA = 0.62;      /* в покое                                 */
+var GROUP_ALPHA_DIM = 0.28;  /* при любой подсветке — остаётся фоном    */
+var GROUP_HALO = 3;          /* толщина обводки цветом холста, px       */
 /* Вблизи ориентир уже не нужен: человек смотрит на конкретные узлы.
    Гаснет не щелчком на пороге, а рампой, иначе дрожание масштаба около
    порога читалось бы как мигание. */
@@ -967,7 +1056,14 @@ var LB = {};                 /* key → объект подписи             
 
 var LB_FADE = 0.18;          /* шаг прозрачности за кадр                */
 var LB_SLIDE = 0.2;          /* доля пути к цели за кадр                */
-var LB_SLIDE_MAX = 3;        /* и не больше 3 px за кадр                */
+/* ⚠️ ПОТОЛОК 2 px, А НЕ 3, И ЭТО ПО ОТСМОТРУ ВЛАДЕЛЬЦА. При 3 px за кадр
+   подпись движется со скоростью 180 px/с, и это читалось не как «едет за
+   узлом», а как «уползает». */
+var LB_SLIDE_MAX = 2;        /* и не больше 2 px за кадр                */
+/* ⚠️ МЁРТВАЯ ЗОНА. Раскладка каждые 180 мс возвращает чуть иную цель — на
+   полпикселя-пиксель, — и подпись бесконечно подрагивала, догоняя её.
+   Разница меньше 2 px не двигает подпись вовсе. */
+var LB_DEAD = 2;             /* ближе этого к цели не шевелимся, px     */
 var LB_MIN_ALPHA = 0.02;     /* ниже — не рисуем и места не занимаем    */
 
 var lbJumpMax = 0;           /* самый большой шаг ox/oy — для приёмки   */
@@ -994,14 +1090,19 @@ function labelTick() {
     L = LB[k];
     L.alpha += (L.talpha - L.alpha) * LB_FADE;
     dx = L.tox - L.ox; dy = L.toy - L.oy;
-    mx = dx * LB_SLIDE; my = dy * LB_SLIDE;
-    if (mx > LB_SLIDE_MAX) mx = LB_SLIDE_MAX;
-    else if (mx < -LB_SLIDE_MAX) mx = -LB_SLIDE_MAX;
-    if (my > LB_SLIDE_MAX) my = LB_SLIDE_MAX;
-    else if (my < -LB_SLIDE_MAX) my = -LB_SLIDE_MAX;
-    L.ox += mx; L.oy += my;
-    var jump = Math.max(Math.abs(mx), Math.abs(my));
-    if (jump > lbJumpMax) lbJumpMax = jump;
+    /* Мёртвая зона: цель почти там же, где подпись, — не шевелимся.
+       ⚠️ Это НЕ выход из шага: погасшую подпись всё равно надо выбросить
+       ниже, иначе объекты копятся без конца. */
+    if (Math.abs(dx) >= LB_DEAD || Math.abs(dy) >= LB_DEAD) {
+      mx = dx * LB_SLIDE; my = dy * LB_SLIDE;
+      if (mx > LB_SLIDE_MAX) mx = LB_SLIDE_MAX;
+      else if (mx < -LB_SLIDE_MAX) mx = -LB_SLIDE_MAX;
+      if (my > LB_SLIDE_MAX) my = LB_SLIDE_MAX;
+      else if (my < -LB_SLIDE_MAX) my = -LB_SLIDE_MAX;
+      L.ox += mx; L.oy += my;
+      var jump = Math.max(Math.abs(mx), Math.abs(my));
+      if (jump > lbJumpMax) lbJumpMax = jump;
+    }
     /* Погасшую подпись выбрасываем: иначе объекты копятся без конца. */
     if (L.talpha < LB_MIN_ALPHA && L.alpha < LB_MIN_ALPHA) delete LB[k];
   }
@@ -1110,14 +1211,11 @@ function draw() {
     ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95 * hl)];
     ctx.lineWidth = 2.2;
     if (rd.k === 'cross') {
-      /* Пунктир остаётся пунктиром и под курсором: он означает «связь по
-         смыслу», а не «принадлежность теме», и менять его значение при
-         наведении — врать про природу линии. Толщина и сила цвета говорят,
-         что курсор именно на ней. */
+      /* Пунктир остаётся пунктиром: он означает «связь по смыслу», а не
+         «принадлежность теме», и менять его значение при наведении — врать
+         про природу линии. */
       ctx.setLineDash([3, 4]);
-      var own = hoverEdge && rd.key === hoverEdge.key;
-      ctx.strokeStyle = PAL.accentShades[shadeIndex((own ? 0.95 : 0.5) * hl)];
-      if (own) ctx.lineWidth = 2.6;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.5 * hl)];
     }
     ctx.beginPath();
     ctx.moveTo(rd.a.px, rd.a.py);
@@ -1126,6 +1224,28 @@ function draw() {
     ctx.setLineDash([]);
   }
   ctx.lineWidth = 1;
+
+  /* ── Маршрут: линия, по которой человек идёт прямо сейчас ────────────
+     Рисуется ПОСЛЕ всех прочих рёбер и СПЛОШНОЙ, даже если это пунктирная
+     перекрёстная связь: пунктир говорит, какого рода связь, а сплошная
+     жирная линия — «ты сейчас идёшь здесь». Второе важнее в момент пути. */
+  if (route && hl > 0.01 && route.a.pz > 0 && route.b.pz > 0) {
+    ctx.strokeStyle = PAL.accentShades[shadeIndex(hl)];
+    ctx.lineWidth = 3;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(route.a.px, route.a.py);
+    ctx.lineTo(route.b.px, route.b.py);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+
+    /* Каретка — проекция курсора на линию. Она делает движение
+       буквальным: видно не только КУДА идёшь, но и ГДЕ ты на пути. */
+    ctx.fillStyle = PAL.accentShades[shadeIndex(hl)];
+    ctx.beginPath();
+    ctx.arc(route.cx, route.cy, 4, 0, 6.283185307179586);
+    ctx.fill();
+  }
 
   /* ── Узлы: дальние раньше ближних ─────────────────────────────────── */
   order.sort(function (p, q) { return q.pz - p.pz; });
@@ -1178,7 +1298,7 @@ function draw() {
       ctx.lineWidth = 1.8;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2, 0, 6.283185307179586); ctx.stroke();
       ctx.lineWidth = 1;
-    } else if (n === hoverNode) {
+    } else if (n === active) {
       ctx.strokeStyle = PAL.accentShades[shadeIndex(0.8 * hl)];
       ctx.lineWidth = 1.6;
       ctx.beginPath(); ctx.arc(n.px, n.py, r + 2.5, 0, 6.283185307179586); ctx.stroke();
@@ -1376,7 +1496,7 @@ function drawLabels(dim) {
      по воле человека: узел под курсором, связь под курсором, узел выбран,
      узел найден поиском. */
   var want = [];
-  var lit = !!(litSet || searchHits || hoverEdge);
+  var lit = !!(litSet || searchHits);
 
   /* Разделы. */
   var zoomFade = 1 - (cam.zoom - GROUP_ZOOM_FROM) / (GROUP_ZOOM_TO - GROUP_ZOOM_FROM);
@@ -1422,17 +1542,13 @@ function drawLabels(dim) {
   /* Узел под курсором и его контекст: тег — вместе со своей темой.
      Прозрачность берётся у подсветки: подпись обязана таять вместе с ней,
      иначе имя висит над уже погасшим узлом. */
-  if (hoverNode) {
-    askNode(hoverNode, 0, true);
-    if (hoverNode.k === 'tag') askNode(byId['t' + hoverNode.n], 1, true);
+  if (active) {
+    askNode(active, 0, true);
+    if (active.k === 'tag') askNode(byId['t' + active.n], 1, true);
   }
-  /* Связь под курсором: оба тега и обе их темы. */
-  if (hoverEdge) {
-    askNode(hoverEdge.a, 0, true);
-    askNode(hoverEdge.b, 0, true);
-    askNode(byId['t' + hoverEdge.a.n], 1, true);
-    askNode(byId['t' + hoverEdge.b.n], 1, true);
-  }
+  /* Идём по маршруту — подписан узел на ДАЛЬНЕМ конце: видно, куда придёшь.
+     Ближний конец — это сам active, он подписан выше. */
+  if (route) askNode(route.b, 0, true);
   /* Выбранное. */
   for (k in picked) {
     if (!picked[k]) continue;
@@ -1451,19 +1567,20 @@ function drawLabels(dim) {
     }
   }
 
-  /* Пояснение связи под курсором — посередине её отрезка. */
-  if (hoverEdge && hoverEdge.why) {
-    want.push({ key: 'e:' + hoverEdge.key, kind: 'edge', text: hoverEdge.why,
+  /* Пояснение — только у перекрёстной связи: у дороги тема→тег пояснять
+     нечего, там связь и так очевидна из имён. */
+  if (route && route.why) {
+    want.push({ key: 'e:' + route.key, kind: 'edge', text: route.why,
                 lines: null, node: null,
-                ax: (hoverEdge.a.px + hoverEdge.b.px) / 2,
-                ay: (hoverEdge.a.py + hoverEdge.b.py) / 2,
+                ax: (route.a.px + route.b.px) / 2,
+                ay: (route.a.py + route.b.py) / 2,
                 talpha: EDGE_LABEL_ALPHA, prio: 0, stick: true,
                 px: EDGE_LABEL_PX, weight: 500, spacing: 0,
                 maxAway: 1e9, plate: true });
   }
 
   /* Наведение тает вместе с подсветкой; выбранное и найденное — нет. */
-  if (hlAlpha < 1 && (hoverNode || hoverEdge)) {
+  if (hlAlpha < 1 && active) {
     for (i = 0; i < want.length; i++) {
       var wq = want[i];
       if (wq.kind === 'group') continue;
@@ -1570,8 +1687,11 @@ function drawLabels(dim) {
     }
 
     setLabelFont(L.pxSize, L.weight, L.spacing);
-    drawLabelLines(L.lines, lx, ly, 'center', L.alpha, PAL.textCss,
-                   L.pxSize, L.weight, L.spacing, L.plate);
+    var isRegion = L.kind === 'group';
+    drawLabelLines(L.lines, lx, ly, 'center', L.alpha,
+                   isRegion ? PAL.regionCss : PAL.textCss,
+                   L.pxSize, L.weight, L.spacing, L.plate,
+                   isRegion ? GROUP_HALO : 0);
     boxes.push({ x: lx, y: ly, w: L.w, h: L.h, l: L.text, kind: L.kind });
   }
   ctx.letterSpacing = '0px';
@@ -1668,7 +1788,7 @@ function holdHighlight() {
 
 /* Курсор цель потерял. Ничего не меняем — только заводим часы. */
 function releaseHighlight(now) {
-  if (!hoverNode && !hoverEdge) return;
+  if (!active) return;
   if (!stickyUntil) stickyUntil = now + STICKY_MS;
 }
 
@@ -1681,7 +1801,7 @@ function highlightTick(now) {
 
   if (stickyUntil && now >= stickyUntil) {
     stickyUntil = 0;
-    hoverNode = null; hoverEdge = null; focusTheme = null;
+    active = null; route = null; focusTheme = null;
     /* Выбранное и найденное держат подсветку сами — гасить нечего. */
     if (hasPicked() || searchHits) { rebuildHighlight(); }
     else { hlTarget = 0; }
@@ -1840,24 +1960,34 @@ canvas.addEventListener('pointermove', function (e) {
     return;
   }
   var got = pick(p[0], p[1]);
-  var hit = got.node || null, edge = got.edge || null;
-  canvas.classList.toggle('is-hit', !!(hit || edge));
+  var hit = got.node || null, r = got.route || null;
+  canvas.classList.toggle('is-hit', !!(hit || r));
 
   if (hit) {
+    /* Встали на узел. Маршрут при этом сбрасывается: путь кончился. */
     holdHighlight();
-    if (hit !== hoverNode) {
-      hoverNode = hit; hoverEdge = null;
-      focusTheme = (hit.k === 'theme') ? hit : null;
-      rebuildHighlight();
-      renderHover(hit);
-      wake();
+    if (hit !== active) {
+      setActive(hit);
+    } else if (route) {
+      route = null; wake();
     }
-  } else if (edge) {
+  } else if (r) {
+    /* Идём по ребру active. Сам active НЕ меняется — пока не дойдём. */
     holdHighlight();
-    if (!hoverEdge || hoverEdge.key !== edge.key) {
-      hoverEdge = edge; hoverNode = null; focusTheme = null;
-      rebuildHighlight();
-      renderHoverEdge(edge);
+    /* ⚠️ ПЕРЕХОД ТОЛЬКО ВПЕРЁД. Прошли больше ROUTE_ARRIVE_T пути либо
+       подошли к дальнему узлу ближе ROUTE_ARRIVE_PX — оказались в нём.
+       Движение НАЗАД по той же линии не переключает ничего: доля пути
+       уменьшается, ни одно из двух условий не выполняется. */
+    var toFar = Math.hypot(p[0] - r.b.px, p[1] - r.b.py);
+    if (r.t > ROUTE_ARRIVE_T || toFar < ROUTE_ARRIVE_PX) {
+      setActive(r.b);
+    } else if (!route || route.key !== r.key) {
+      route = r;
+      renderRoute(r);
+      wake();
+    } else {
+      /* Та же линия — обновляем только положение каретки. */
+      route = r;
       wake();
     }
   } else {
@@ -1866,6 +1996,16 @@ canvas.addEventListener('pointermove', function (e) {
   }
   touchActivity();
 });
+
+/* Встать на узел: одна точка входа в режим хождения. */
+function setActive(n) {
+  active = n;
+  route = null;
+  focusTheme = (n && n.k === 'theme') ? n : null;
+  rebuildHighlight();
+  renderHover(n);
+  wake();
+}
 
 canvas.addEventListener('pointerup', function (e) {
   dragging = false;
@@ -1877,15 +2017,20 @@ canvas.addEventListener('pointerup', function (e) {
     if (hit) {
       togglePick(hit);
     } else {
-      /* Клик по связи берёт ОБА её тега: человек выбирает не линию, а то,
-         что она соединяет. */
-      var edge = got2.edge;
-      if (edge) {
-        var want = !(picked[edge.a.id] && picked[edge.b.id]);
-        picked[edge.a.id] = want;
-        picked[edge.b.id] = want;
-        if (!want) { delete picked[edge.a.id]; delete picked[edge.b.id]; }
-        lastPickedId = want ? edge.b.id : null;
+      /* Клик посреди пути берёт ОБА конца маршрута — удобный способ взять
+         связанную пару целиком, не кликая по каждому узлу отдельно. */
+      var r2 = got2.route;
+      if (r2) {
+        var want = !(picked[r2.a.id] && picked[r2.b.id]);
+        if (want) {
+          picked[r2.a.id] = true;
+          picked[r2.b.id] = true;
+          lastPickedId = r2.b.id;
+        } else {
+          delete picked[r2.a.id];
+          delete picked[r2.b.id];
+          if (lastPickedId === r2.a.id || lastPickedId === r2.b.id) lastPickedId = null;
+        }
         rebuildHighlight();
         renderPicked();
       }
@@ -1996,7 +2141,7 @@ function togglePick(n) {
   }
   rebuildHighlight();
   renderPicked();
-  if (!hoverNode) refreshHoverPanel();
+  if (!active) refreshHoverPanel();
   wake();
 }
 
@@ -2054,9 +2199,9 @@ var HOWTO = '<ul class="tmap-howto">' +
   '<span>Сплошная линия — дорога <b>тема → тег</b>.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/></svg>' +
   '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li>' +
-  '<li><svg width="14" height="14" viewBox="0 0 14 14"><path d="M1 10 L13 4" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
-  '<span>По пунктирной линии можно <b>вести курсором</b> — покажет, ' +
-  'чем теги родственны.</span></li></ul>';
+  '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="2.5" cy="11" r="2" fill="currentColor" opacity=".7"/><path d="M4 10 L12 3.5" stroke="currentColor" stroke-width="1.5" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
+  '<span><b>Встаньте на тег</b> — и от него можно уходить по линиям ' +
+  'к его теме и родственным тегам.</span></li></ul>';
 
 function renderHover(n) {
   if (!hoverBox) return;
@@ -2113,30 +2258,41 @@ function renderHover(n) {
 }
 
 /* Панель «Под курсором» по текущему состоянию. ⚠️ ОДНА ТОЧКА НА ВСЕХ:
-   пока сброс выбора звал renderHover(hoverNode) напрямую, он затирал
+   пока сброс выбора звал renderHover(active) напрямую, он затирал
    карточку связи подсказкой «Как читать карту» — курсор всё ещё стоял на
    линии, а панель об этом уже не знала. */
 function refreshHoverPanel() {
-  if (hoverEdge) renderHoverEdge(hoverEdge);
-  else renderHover(hoverNode);
+  if (route) renderRoute(route);
+  else renderHover(active);
 }
 
-/* Панель для связи под курсором: сначала — ЧЕМ теги родственны, потом сами
-   теги. Пояснение крупно, потому что оно и есть ответ на вопрос «что это
-   за линия»; номера тем и числа задач — адрес и вес. */
-function renderHoverEdge(edge) {
+/* Панель, пока человек идёт по линии. Главный вопрос в этот момент —
+   «куда я приду», поэтому дальний узел стоит первым и крупно. Пояснение
+   показывается только у перекрёстной связи: у дороги тема→тег пояснять
+   нечего. */
+function renderRoute(r) {
   if (!hoverBox) return;
-  var html = '<span class="tmap-kind">связь</span>';
-  html += '<div class="tmap-name">' + esc(edge.why || 'связь по смыслу') + '</div>';
-  html += '<div class="tmap-near">';
-  [edge.a, edge.b].forEach(function (t) {
-    var num = (t.c === null || t.c === undefined) ? '' :
-              '<span class="tmap-near-c">' + fmtNum(t.c) + '</span>';
-    html += '<button type="button" class="tmap-near-item" data-go="' + t.id + '">' +
-            '<span class="tmap-near-n">' + t.n + '.</span>' +
-            '<span>' + esc(t.l) + '</span>' + num + '</button>';
-  });
-  html += '</div>';
+  var far = r.b;
+  var isCross = r.link.k === 'cross';
+  var html = '<span class="tmap-kind">' +
+             (isCross ? 'идём к смежному тегу' : 'идём по дороге') + '</span>';
+  html += '<div class="tmap-name">' + esc(far.l) + '</div>';
+
+  if (far.k === 'theme') {
+    html += '<div class="tmap-parent"><span>тема ' + far.n + ' · ' +
+            (tagsOfTheme[far.n] || []).length + ' тегов</span></div>';
+  } else {
+    var th = byId['t' + far.n];
+    if (th) html += '<div class="tmap-parent"><span>' + esc(th.l) + '</span></div>';
+  }
+  html += (far.c === null || far.c === undefined)
+    ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет</span></div>'
+    : '<div class="tmap-num"><b>' + fmtNum(far.c) + '</b> задач</div>';
+
+  if (isCross && r.why) {
+    html += '<div class="tmap-why-link">Родство: <b>' + esc(r.why) + '</b></div>';
+  }
+  html += '<div class="tmap-from">от: ' + esc(r.a.l) + '</div>';
   hoverBox.innerHTML = html;
 }
 
@@ -2242,7 +2398,7 @@ var TOUR = [
     go: function () {
       var t = findTag('Кривая Лаффера');
       if (!t) return;
-      hoverNode = t; focusTheme = null;
+      active = t; focusTheme = null;
       rebuildHighlight(); renderHover(t);
       flyTo(byId['t' + t.n], 1.6);
     }
@@ -2260,7 +2416,7 @@ var TOUR = [
       [a, b].forEach(function (t) {
         if (t && !picked[t.id]) { picked[t.id] = true; tourDemo.push(t.id); }
       });
-      hoverNode = null;
+      active = null;
       rebuildHighlight(); renderPicked(); renderHover(null);
     }
   },
@@ -2379,7 +2535,7 @@ function tourEnd() {
   /* Тур убирает за собой свой показательный выбор и возвращает обзор. */
   tourDemo.forEach(function (id) { delete picked[id]; });
   tourDemo = [];
-  hoverNode = null; focusTheme = null;
+  active = null; focusTheme = null;
   rebuildHighlight(); renderPicked(); renderHover(null);
   resetView();
   try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
@@ -2442,7 +2598,7 @@ document.getElementById('tmap-chips').addEventListener('click', function (e) {
   delete picked[b.dataset.drop];
   if (lastPickedId === b.dataset.drop) lastPickedId = null;
   rebuildHighlight(); renderPicked();
-  if (!hoverNode) renderHover(null);
+  if (!active) renderHover(null);
   wake();
   touchActivity();
 });
@@ -2463,14 +2619,14 @@ if (themesBox) {
     var row = e.target.closest('.tmap-theme-row');
     if (!row) return;
     var n = byId['t' + row.dataset.theme];
-    if (n && n !== hoverNode) {
-      hoverNode = n; focusTheme = n;
+    if (n && n !== active) {
+      active = n; focusTheme = n;
       rebuildHighlight(); renderHover(n); wake();
     }
   });
   themesBox.addEventListener('mouseleave', function () {
-    if (hoverNode && hoverNode.k === 'theme') {
-      hoverNode = null; focusTheme = null;
+    if (active && active.k === 'theme') {
+      active = null; focusTheme = null;
       rebuildHighlight(); renderHover(null); wake();
     }
   });
@@ -2588,6 +2744,12 @@ window.TMAP = {
   fps: function () { return fpsValue; },
   stats: layoutStats,
   nodes: function () { return nodes; },
+  /* Рёбра с уже разрешёнными концами — для замеров попадания. */
+  links: function () {
+    return links.map(function (ln) {
+      return { a: byId[ln.s], b: byId[ln.t], k: ln.k, w: ln.w || '' };
+    });
+  },
   search: function (q) { return applySearch(q); },
   draw: function () { draw(); },
   /* Прямоугольники подписей тем после раздвижки — чтобы проверить, что ни
@@ -2625,9 +2787,11 @@ window.TMAP = {
   settleLabels: labelSettle,
   /* Что сейчас под курсором — узел, связь или ничего; и жива ли липкость. */
   hoverState: function () {
-    return { node: hoverNode ? hoverNode.id : null,
-             edge: hoverEdge ? hoverEdge.key : null,
-             why: hoverEdge ? hoverEdge.why : null,
+    return { node: active ? active.id : null,
+             edge: route ? route.key : null,
+             why: route ? route.why : null,
+             far: route ? route.b.id : null,
+             t: route ? +route.t.toFixed(3) : null,
              hl: +hlAlpha.toFixed(3),
              sticky: stickyUntil ? +(stickyUntil - performance.now()).toFixed(0) : 0 };
   },
@@ -2635,8 +2799,28 @@ window.TMAP = {
   probe: function (x, y) {
     var g = pick(x, y);
     if (g.node) return { kind: 'node', id: g.node.id, label: g.node.l };
-    if (g.edge) return { kind: 'edge', id: g.edge.key, why: g.edge.why };
+    if (g.route) return { kind: 'route', id: g.route.key, far: g.route.b.id,
+                          why: g.route.why, t: +g.route.t.toFixed(3),
+                          d: +g.route.d.toFixed(2) };
     return { kind: 'none' };
+  },
+  /* Встать на узел без событий мыши — для замеров хождения. */
+  setActive: function (id) { var n = byId[id]; if (n) setActive(n); return !!n; },
+  /* Прогнать курсор через обработчик: тот же путь, что у живой мыши. */
+  move: function (x, y) {
+    var cr = canvas.getBoundingClientRect();
+    canvas.dispatchEvent(new PointerEvent('pointermove',
+      { bubbles: true, clientX: cr.left + x, clientY: cr.top + y }));
+    return { active: active ? active.id : null,
+             route: route ? route.key : null,
+             far: route ? route.b.id : null,
+             t: route ? +route.t.toFixed(3) : null,
+             litOn: !!litSet };
+  },
+  region: function () {
+    var L = LB['g:' + groups[0].k];
+    return { css: PAL.regionCss, alpha: L ? +L.alpha.toFixed(3) : 0,
+             px: GROUP_PX, halo: GROUP_HALO };
   },
   /* Поставить масштаб мгновенно — для проверки затухания ориентиров. */
   zoomTo: function (z) {
@@ -2709,7 +2893,7 @@ window.TMAP = {
   focusBoxes: function (name) {
     for (var i = 0; i < themeList.length; i++) {
       if (themeList[i].nl.indexOf(norm(name)) < 0) continue;
-      hoverNode = themeList[i]; focusTheme = themeList[i];
+      active = themeList[i]; focusTheme = themeList[i];
       rebuildHighlight();
       draw();                                /* проекция должна быть свежей */
       wake();

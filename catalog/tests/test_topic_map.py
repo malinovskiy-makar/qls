@@ -300,6 +300,51 @@ class NodeColourContrastTests(SimpleTestCase):
                     '%s тема, %s: контраст к холсту %s при норме %s'
                     % (theme, what, value, self.MIN))
 
+    #: Порог для надписи-ориентира — 4,5:1, а не 3:1. Это ТЕКСТ, а не
+    #: кружок, и норма у него текстовая (WCAG 1.4.3).
+    MIN_TEXT = 4.5
+
+    def test_region_label_colour_is_readable_in_both_themes(self):
+        """Надписи-ориентиры по разделам читаются на холсте.
+
+        ⚠️ ЭТО СТОРОЖ ТРЕТЬЕГО ЦВЕТА КАРТЫ (ADR 0046). До него ориентиры
+        писались тем же `--map-node`, что и узлы, и терялись среди них —
+        это и увидел владелец на приёмке. Порог здесь текстовый, 4,5:1:
+        ориентир — надпись, а не графический элемент. Замер на момент
+        ввода: 5,05 в светлой теме и 9,32 в тёмной.
+
+        Прозрачность в расчёт НЕ входит намеренно: под буквами лежит
+        обводка цветом холста толщиной 3 px, и глаз сравнивает букву именно
+        с ней, а не с тем, что под надписью оказалось.
+        """
+        for theme, css in self._themes().items():
+            region = self._token(css, 'map-region')
+            bg = self._token(css, 'bg')
+            self.assertIsNotNone(
+                region, '%s тема: нет токена --map-region' % theme)
+            value = self._contrast(self._rgb(region), self._rgb(bg))
+            self.assertGreaterEqual(
+                value, self.MIN_TEXT,
+                '%s тема, надпись раздела: контраст к холсту %s при норме %s'
+                % (theme, value, self.MIN_TEXT))
+
+    def test_region_colour_differs_from_node_and_accent(self):
+        """Третий цвет — именно третий, а не переименованный первый.
+
+        Написать ориентиры цветом узлов или акцентом — значит соврать про
+        слой: серым они теряются среди узлов, малиновым притворяются
+        подсветкой. Совпадение значений вернуло бы ровно тот дефект, ради
+        которого цвет и заводился.
+        """
+        for theme, css in self._themes().items():
+            region = self._token(css, 'map-region')
+            self.assertNotEqual(
+                self._rgb(region), self._rgb(self._token(css, 'map-node')),
+                '%s тема: ориентир окрашен цветом узла' % theme)
+            self.assertNotEqual(
+                self._rgb(region), self._rgb(self._token(css, 'accent')),
+                '%s тема: ориентир окрашен акцентом подсветки' % theme)
+
     def test_only_one_node_colour_is_declared(self):
         """Семи цветов разделов в токенах больше нет.
 

@@ -298,6 +298,25 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* Пока человек идёт по линии: чем родственны теги и откуда он вышел.
+   «Откуда» — мельче и тише: главный вопрос в пути «куда приду», а не
+   «откуда шёл», и строка не должна спорить с именем цели. */
+.tmap-why-link {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.tmap-why-link b { font-weight: 600; color: var(--text); }
+.tmap-from {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* Подсказка «Как читать карту» — когда ничего не выбрано и не наведено. */
 .tmap-howto { font-size: 12px; color: var(--text2); line-height: 1.5; }
 .tmap-howto li { list-style: none; display: flex; gap: 8px; margin-top: 7px; }
