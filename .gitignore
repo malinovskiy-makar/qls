@@ -318,3 +318,11 @@ reports/publish_readiness/*
 !reports/quality_audit/
 reports/quality_audit/*
 !reports/quality_audit/gate_false_positive_ids.txt
+
+# Сухой прогон load_taxonomy. В git, потому что это ВНИМАНИЕ ВЛАДЕЛЬЦА,
+# а не машинный вывод: 114 имён составителей и 52 мусорные строки он
+# просмотрел глазами и утвердил разметку. Без файла следующая сессия
+# не сможет отличить проверенное от заново угаданного.
+!reports/taxonomy_v2/
+reports/taxonomy_v2/*
+!reports/taxonomy_v2/load_taxonomy_dry_run.txt

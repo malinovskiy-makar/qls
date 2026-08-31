@@ -1,0 +1,168 @@
+=== author (владелец сверяет глазами) ===
+David Luenberger
+Hal Varian
+А.А. Мицкевич
+Акимов Д.В.
+Александр Малайрев
+Александр Свиркин
+Александр Челеховский
+Алексей Вереникин
+Алексей Зайцев
+Алексей Киселёв
+Алексей Суздальцев
+Алёна Тимофеева
+Анастасия Горбатенко
+Анатолий Воробей
+Андраник Аюнц
+Андрей Макаров
+Анна Буфетова
+Анна Вурос
+Анна Зотова
+Антон Суворов
+Антон Трусов
+Араик Косян
+Баранюк Е.Г.
+Вадим Нелидов
+Вадим Храмов
+Валентина Мелентьева
+Варламова Эвита
+Винокуров Д.Ф.
+Влад Косарев
+Владимир Иванов
+Владислав Матюшонок
+Горев Евгений
+Григорий Косенок
+Д.В. Акимов
+Давыдова Е.А.
+Дан Лифшиц
+Данил Фёдоровых
+Данила Делия
+Дмитрий Акимов
+Дмитрий Дагаев
+Дмитрий Сироткин
+Дмитрий Сорокин
+Дмитрий Федоряев
+Евгений Дрынкин
+Егор Малков
+Елена Давыдова
+Елена Пикулина
+Елена Семерикова
+Елизавета Гусева
+Иван Королев
+Иван Лазарев
+Иван Лашин
+Игорь Ким
+Илья Воробьев
+Илья Лукибанов
+Ирина Андронова
+Ирина Графова
+Кадогробов Максим Сергеевич
+Катерина Потапова
+Кирилл Букин
+Коновалов Владислав
+Константин Зайцев
+Коряков Антон
+Крюков Сергей
+Ксения Паниди
+Ленар Исхаков
+Людмила Веселая
+Людмила Щукина
+Максим Горюнов
+Максим Нежельский
+Максим Савостьянов
+Мария Чадерина
+Марк Ражев
+Мартынов Петр
+Митюков Евгений
+Михаил Дмитриев
+Михаил Лобанов
+Михаил Можевитин
+Мицкевич А.А.
+Никита Мельников
+Николай Саперов
+Николай Фролов
+Ольга Клачкова
+Павел Кривенко
+Павел Лебедев
+Павел Мозгунов
+Пермяков Г.В.
+Попов Александр Михайлович
+Пётр Фомин
+Савушкин Алексей
+Саперов Николай
+Сборник Харива
+Сергей Васильев
+Сергей Кравченко
+Сергей Крюков
+Сергей Попов
+Станислав Анатольев
+Станислав Еговцев
+Сурен Аванян
+Татьяна Балакина
+Татьяна Зуева
+Татьяна Кулакова
+Татьяна Хронусова
+Тимур Аббясов
+Тимур Тваури
+Филипп Картаев
+Хэл Вэриан
+Эрик Абуталиев
+Юлия Жесткова
+Юлия Полозова
+Юрий Габуев
+Ярослав Волков
+Яцюк Дмитрий
+
+=== junk (владелец сверяет глазами) ===
+http://dxdy.ru/topic18777-15.html
+http://iloveeconomics.ru/zadachi/z1057
+http://iloveeconomics.ru/zadachi/z1065#comment-15271
+http://iloveeconomics.ru/zadachi/z1066#comment-15302
+http://iloveeconomics.ru/zadachi/z1068#comment-15386
+http://iloveeconomics.ru/zadachi/z129
+http://iloveeconomics.ru/zadachi/z1348
+http://iloveeconomics.ru/zadachi/z1417
+http://iloveeconomics.ru/zadachi/z1862
+http://iloveeconomics.ru/zadachi/z1931
+http://iloveeconomics.ru/zadachi/z1963
+http://iloveeconomics.ru/zadachi/z197
+http://iloveeconomics.ru/zadachi/z215#comment-1715
+http://iloveeconomics.ru/zadachi/z251
+http://iloveeconomics.ru/zadachi/z276#comment-5192
+http://iloveeconomics.ru/zadachi/z286
+http://iloveeconomics.ru/zadachi/z29
+http://iloveeconomics.ru/zadachi/z292
+http://iloveeconomics.ru/zadachi/z301#comment-2319
+http://iloveeconomics.ru/zadachi/z351
+http://iloveeconomics.ru/zadachi/z36
+http://iloveeconomics.ru/zadachi/z370
+http://iloveeconomics.ru/zadachi/z379
+http://iloveeconomics.ru/zadachi/z383#comment-3020
+http://iloveeconomics.ru/zadachi/z396
+http://iloveeconomics.ru/zadachi/z420
+http://iloveeconomics.ru/zadachi/z432
+http://iloveeconomics.ru/zadachi/z436
+http://iloveeconomics.ru/zadachi/z441#comment-6091
+http://iloveeconomics.ru/zadachi/z455#comment-5049
+http://iloveeconomics.ru/zadachi/z475#comment-5873
+http://iloveeconomics.ru/zadachi/z479#comment-11551
+http://iloveeconomics.ru/zadachi/z489
+http://iloveeconomics.ru/zadachi/z492
+http://iloveeconomics.ru/zadachi/z523#comment-7220
+http://iloveeconomics.ru/zadachi/z552#comment-7627
+http://iloveeconomics.ru/zadachi/z569#comment-7925
+http://iloveeconomics.ru/zadachi/z570#comment-7966
+http://iloveeconomics.ru/zadachi/z571#comment-8015
+http://iloveeconomics.ru/zadachi/z58
+http://iloveeconomics.ru/zadachi/z592#comment-9940
+http://iloveeconomics.ru/zadachi/z6
+http://iloveeconomics.ru/zadachi/z604
+http://iloveeconomics.ru/zadachi/z620#comment-8920
+http://iloveeconomics.ru/zadachi/z634#comment-9092
+http://iloveeconomics.ru/zadachi/z639
+http://iloveeconomics.ru/zadachi/z676#comment-9795
+http://iloveeconomics.ru/zadachi/z691
+http://iloveeconomics.ru/zadachi/z771
+http://www.iloveeconomics.ru/zadachi/z167#comment-1118
+http://www.iloveeconomics.ru/zadachi/z1722
+reshenie_zadachi_ekonomika_i_shahmaty.pdf

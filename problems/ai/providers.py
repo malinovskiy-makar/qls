@@ -7,9 +7,10 @@
 
 Как переключить (`config/settings*.py`):
 
-    AI_PROVIDER = 'anthropic'      # по умолчанию
+    AI_PROVIDER = 'anthropic'      # по умолчанию; ещё 'openai', 'fake'
     AI_MODEL = 'claude-haiku-4-5'
-    AI_PRICES = {'claude-haiku-4-5': (1.0, 5.0)}   # $ за млн: вход, выход
+    AI_PRICES = {'claude-haiku-4-5': (1.0, 0.1, 5.0)}  # $ за млн: вход, кэш, выход
+    AI_REASONING_EFFORT = 'none'   # none/low/medium/high/xhigh/max (OpenAI)
 
 Подставной поставщик для тестов:
 
@@ -22,15 +23,24 @@ import os
 
 
 class Reply(object):
-    """Ответ поставщика: текст плюс счётчики токенов."""
+    """Ответ поставщика: текст плюс счётчики токенов.
+
+    ⚠️ `reasoning_tokens` — ЧАСТЬ `output_tokens`, а не добавка к ним.
+    У моделей с рассуждением токены рассуждения тарифицируются как
+    выходные и уже входят в `output_tokens`; отдельное поле нужно, чтобы
+    понять, куда ушёл бюджет, а не чтобы посчитать деньги дважды.
+    Поэтому `_cost` его НЕ прибавляет — см. problems/ai/core.py.
+    """
 
     def __init__(self, text, input_tokens=0, output_tokens=0,
-                 cache_write_tokens=0, cache_read_tokens=0):
+                 cache_write_tokens=0, cache_read_tokens=0,
+                 reasoning_tokens=0):
         self.text = text
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.cache_write_tokens = cache_write_tokens
         self.cache_read_tokens = cache_read_tokens
+        self.reasoning_tokens = reasoning_tokens
 
 
 logger = logging.getLogger(__name__)
@@ -187,6 +197,174 @@ class AnthropicProvider(BaseProvider):
         )
 
 
+class OpenAIProvider(BaseProvider):
+    """GPT через OpenAI Responses API. Тот же контракт, что у Anthropic.
+
+    ⚠️ ВХОДНЫЕ И КЭШИРОВАННЫЕ ТОКЕНЫ РАЗВОДЯТСЯ ЗДЕСЬ. У OpenAI
+    `usage.input_tokens` — ПОЛНЫЙ вход, и прочитанное из кэша сидит
+    ВНУТРИ него (`input_tokens_details.cached_tokens` — подмножество).
+    У Anthropic наоборот: `input_tokens` и `cache_read_input_tokens`
+    не пересекаются, и `_cost` считает их сложением. Отдай мы сюда
+    сырые числа OpenAI — кэшированная часть посчиталась бы дважды.
+    Поэтому наружу отдаём НЕПЕРЕСЕКАЮЩИЕСЯ значения: свежий вход и
+    отдельно кэш. Сумма (вход + кэш) сходится с полным входом OpenAI.
+    """
+
+    name = 'openai'
+    key_env = 'OPENAI_API_KEY'
+
+    # Минимальная длина префикса, с которой у GPT-5.6 вообще включается
+    # кэш. Ядро короче — скидки не будет ни при каких условиях, и это
+    # надо увидеть в журнале, а не гадать по нулям в отчёте.
+    CACHE_MIN_TOKENS = 1024
+    # Грубая оценка «символов на токен» для предупреждения выше. Точный
+    # счёт требует токенизатора модели; для проверки «явно короче тысячи»
+    # хватает и оценки, а ошибиться она может только в сторону запаса.
+    CHARS_PER_TOKEN = 4
+
+    def is_available(self):
+        if not self.api_key():
+            return False
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def unavailable_reason(self):
+        if not self.api_key():
+            return ('Работа с моделью выключена: не задан ключ '
+                    'OPENAI_API_KEY. Всё остальное работает как обычно — '
+                    'соберите домашку вручную, поиск и фильтры на месте.')
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return ('Работа с моделью выключена: на этом сервере не '
+                    'установлена библиотека openai. Соберите домашку '
+                    'вручную.')
+        return ''
+
+    def _warn_if_cache_too_short(self, system_blocks):
+        """Кэш у GPT-5.6 берётся от префикса длиной от 1024 токенов.
+
+        Ядро короче — кэш не включится вовсе, и нули в отчёте будут
+        означать «слишком короткое ядро», а не «кэш не сработал».
+        Различить эти два случая постфактум нельзя, поэтому предупреждаем
+        сразу.
+        """
+        core = system_blocks[0] if system_blocks else ''
+        approx = len(core) // self.CHARS_PER_TOKEN
+        if approx < self.CACHE_MIN_TOKENS:
+            logger.warning(
+                'Ядро промпта короче %d токенов (оценка: %d) — кэш префикса '
+                'у GPT-5.6 не включится, скидки не будет.',
+                self.CACHE_MIN_TOKENS, approx)
+
+    def complete(self, system_blocks, user_text, schema, model, max_tokens):
+        """⚠️ СХЕМА СТРОГАЯ (`strict: true`) — иначе ответ не принимается.
+
+        Всё, что модель написала мимо схемы, отбрасывается на стороне
+        поставщика: разбирать «почти JSON» на прогоне в 41 307 задач
+        некому. Кэш префикса у OpenAI автоматический, помечать блок,
+        как у Anthropic, не нужно — достаточно неизменного начала.
+        """
+        import openai
+
+        from django.conf import settings
+
+        self._warn_if_cache_too_short(system_blocks)
+
+        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
+
+        client = openai.OpenAI(api_key=self.api_key())
+        try:
+            response = client.responses.create(
+                model=model,
+                max_output_tokens=max_tokens,
+                instructions='\n\n'.join(system_blocks),
+                input=user_text,
+                reasoning={'effort': effort},
+                text={'format': {'type': 'json_schema',
+                                 'name': 'reply',
+                                 'strict': True,
+                                 'schema': schema}},
+            )
+        except openai.APIConnectionError as error:
+            raise self._fail(
+                error,
+                'Не удалось связаться с сервисом разбора запроса. Проверьте '
+                'сеть или соберите домашку вручную.')
+        except openai.RateLimitError as error:
+            raise self._fail(
+                error,
+                'Сервис разбора сейчас перегружен. Попробуйте через минуту '
+                'или соберите домашку вручную.',
+                kind='limit')
+        except openai.APIStatusError as error:
+            # 401/403 — ключ не принят: это «не настроен доступ», а не
+            # «сервис молчит», и совет репетитору другой.
+            kind = 'no_key' if error.status_code in (401, 403) else 'other'
+            raise self._fail(
+                error,
+                'Сервис разбора вернул ошибку (%s).' % error.status_code,
+                kind=kind)
+        except Exception as error:
+            raise self._fail(
+                error,
+                'Сервис разбора запроса недоступен. Соберите домашку '
+                'вручную.')
+
+        return self._reply_from(response)
+
+    def _reply_from(self, response):
+        """Разбор ответа: текст плюс четыре счётчика токенов."""
+        usage = getattr(response, 'usage', None)
+        total_input = _num(usage, 'input_tokens')
+        output = _num(usage, 'output_tokens')
+
+        in_details = getattr(usage, 'input_tokens_details', None)
+        cache_read = _num(in_details, 'cached_tokens')
+        cache_write = _num(in_details, 'cache_write_tokens')
+
+        out_details = getattr(usage, 'output_tokens_details', None)
+        reasoning = _num(out_details, 'reasoning_tokens')
+
+        return Reply(
+            text=_output_text(response),
+            # Кэш вычитается из входа — см. докстринг класса.
+            input_tokens=max(total_input - cache_read, 0),
+            output_tokens=output,
+            cache_write_tokens=cache_write,
+            cache_read_tokens=cache_read,
+            reasoning_tokens=reasoning,
+        )
+
+
+def _num(holder, name):
+    """Число из поля SDK: и объект, и словарь, и отсутствие поля."""
+    if holder is None:
+        return 0
+    if isinstance(holder, dict):
+        value = holder.get(name)
+    else:
+        value = getattr(holder, name, None)
+    return int(value or 0)
+
+
+def _output_text(response):
+    """Текст ответа: `output_text` у SDK, иначе сборка из блоков."""
+    text = getattr(response, 'output_text', None)
+    if text:
+        return text
+    parts = []
+    for item in getattr(response, 'output', None) or []:
+        for block in getattr(item, 'content', None) or []:
+            piece = getattr(block, 'text', None)
+            if piece:
+                parts.append(piece)
+    return ''.join(parts)
+
+
 class FakeProvider(BaseProvider):
     """Подставной поставщик — доказательство сменяемости, а не заглушка.
 
@@ -221,6 +399,7 @@ class FakeProvider(BaseProvider):
 
 PROVIDERS = {
     AnthropicProvider.name: AnthropicProvider,
+    OpenAIProvider.name: OpenAIProvider,
     FakeProvider.name: FakeProvider,
 }
 

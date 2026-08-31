@@ -22,5 +22,9 @@ scipy
 # выключается — на проде не нужен.
 anthropic
 
+# Прогон обогащения на GPT-5.6. Без ключа OPENAI_API_KEY и без самого
+# пакета провайдер честно отдаёт is_available() = False, а не падает.
+openai
+
 PyYAML
 cryptography

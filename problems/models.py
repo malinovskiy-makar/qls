@@ -64,6 +64,8 @@ class Topic(models.Model):
                             unique=True, blank=True)
     description = models.TextField('Описание', blank=True)
     order = models.PositiveIntegerField('Порядок', default=0)
+    is_canonical = models.BooleanField('Каноническая тема таксономии', default=False,
+                                       db_index=True)
 
     class Meta:
         verbose_name = 'Тема'
@@ -95,9 +97,18 @@ class Subtopic(models.Model):
 class Tag(models.Model):
     """Свободная метка (тег), которую можно повесить на любую задачу."""
 
+    KIND_CHOICES = [
+        ('canonical', 'Канонический тег таксономии'),
+        ('author',    'Имя составителя задачи'),
+        ('legacy',    'Наследие импорта, не используется'),
+        ('junk',      'Мусор: URL, обрывок комментария'),
+    ]
+
     name = models.CharField('Название', max_length=100, unique=True)
     slug = models.SlugField('Короткий код', max_length=120, unique=True,
                             blank=True)
+    kind = models.CharField('Вид тега', max_length=16, choices=KIND_CHOICES,
+                            default='legacy', db_index=True)
 
     class Meta:
         verbose_name = 'Тег'

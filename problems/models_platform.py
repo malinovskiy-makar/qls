@@ -1203,6 +1203,12 @@ class AiUsageLog(models.Model):
         'Токенов записано в кэш', default=0)
     cache_read_tokens = models.PositiveIntegerField(
         'Токенов прочитано из кэша', default=0)
+    # ⚠️ ТОКЕНЫ РАССУЖДЕНИЯ СЧИТАЕМ ОТДЕЛЬНО. У моделей с рассуждением они
+    # тарифицируются как выходные, но в output_tokens от полезного ответа
+    # неотличимы — без отдельного поля нельзя понять, куда ушла половина
+    # бюджета прогона.
+    reasoning_tokens = models.IntegerField(
+        'Токенов рассуждения', default=0)
     provider = models.CharField('Поставщик', max_length=40, blank=True)
     seconds = models.FloatField('Секунд', default=0)
     ok = models.BooleanField('Успешно', default=True)
