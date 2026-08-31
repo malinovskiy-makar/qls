@@ -555,6 +555,21 @@ function project() {
   }
 }
 
+/* Та же проекция для одной произвольной точки — нужна подписям разделов:
+   у раздела нет своего узла, его якорь — центр масс тем. */
+function projectPoint(x, y, z, out) {
+  var dx = x - cam.tx, dy = y - cam.ty, dz = z - cam.tz;
+  var ax = dx * CY + dz * SY, az = -dx * SY + dz * CY;
+  var ay = dy * CP - az * SP, pz = dy * SP + az * CP + DIST;
+  if (pz < 60) { out.pz = -1; return out; }
+  var s = FOCAL / pz * cam.zoom * fitScale;
+  out.px = W / 2 + ax * s;
+  out.py = H / 2 + ay * s;
+  out.ps = s;
+  out.pz = pz;
+  return out;
+}
+
 /* Обратное преобразование экранной точки в мировую на глубине DIST —
    нужно, чтобы зумить К ТОЧКЕ ПОД КУРСОРОМ, а не к центру экрана. */
 function screenToWorld(sx, sy, depth) {
@@ -602,6 +617,7 @@ function hitTest(mx, my) {
 /* Состояние подсветки. */
 var picked = {};             /* id → true: выбранные теги и темы          */
 var hoverNode = null;        /* узел под курсором                         */
+var hoverEdge = null;        /* связь под курсором (фаза «ходим по линии») */
 var focusTheme = null;       /* тема, у которой раскрыт список тегов      */
 var searchHits = null;       /* null = поиск пуст; иначе объект id → true */
 
@@ -727,8 +743,17 @@ function plate(x, y, w, h) {
   ctx.fill();
 }
 
-function drawLabelLines(lines, x, y, align, alpha, colour, px) {
-  ctx.font = '500 ' + px + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+/* Шрифт подписи. Разрядка (letterSpacing) нужна только надписям-
+   ориентирам; там, где её нет, поле обязано сбрасываться в ноль — иначе
+   она протекает на следующую подпись и на замер ширины. */
+function setLabelFont(px, weight, spacing) {
+  ctx.font = (weight || 500) + ' ' + px +
+             'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.letterSpacing = spacing ? (spacing * px).toFixed(2) + 'px' : '0px';
+}
+
+function drawLabelLines(lines, x, y, align, alpha, colour, px, weight, spacing, withPlate) {
+  setLabelFont(px, weight, spacing);
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
   var wMax = 0;
@@ -738,12 +763,16 @@ function drawLabelLines(lines, x, y, align, alpha, colour, px) {
   var hAll = lines.length * LINE_H;
   var px0 = align === 'right' ? x - wMax : (align === 'center' ? x - wMax / 2 : x);
   ctx.globalAlpha = alpha;
-  plate(px0 - 4, y - hAll / 2 - 2, wMax + 8, hAll + 4);
+  /* Подложка цвета холста рисуется ДО текста и поверх рёбер — иначе буквы
+     перечёркиваются спицами и линиями. Надписям-ориентирам она не нужна:
+     они намеренно лежат в фоне и подложкой затирали бы карту. */
+  if (withPlate !== false) plate(px0 - 4, y - hAll / 2 - 2, wMax + 8, hAll + 4);
   ctx.fillStyle = colour;
   for (i = 0; i < lines.length; i++) {
     ctx.fillText(lines[i], x, y - hAll / 2 + LINE_H / 2 + i * LINE_H);
   }
   ctx.globalAlpha = 1;
+  ctx.letterSpacing = '0px';
   return { w: wMax, h: hAll, left: px0 };
 }
 
@@ -807,16 +836,149 @@ function layoutFocusLabels(theme) {
 
 /* ── Кадр ────────────────────────────────────────────────────────────── */
 
+/* ── Надписи-ориентиры по разделам ────────────────────────────────────
+   Семь названий разделов корпуса вместо двадцати девяти имён тем. Вид
+   намеренно другой: прописные, разрядка, вполсилы — это ориентир, как
+   название страны на карте, а не подпись объекта. */
+var GROUP_PX = 16;           /* кегль надписи раздела                   */
+var GROUP_SPACING = 0.06;    /* разрядка, доля кегля                    */
+var GROUP_ALPHA = 0.42;      /* в покое                                 */
+var GROUP_ALPHA_DIM = 0.18;  /* при любой подсветке — остаётся фоном    */
+/* Вблизи ориентир уже не нужен: человек смотрит на конкретные узлы.
+   Гаснет не щелчком на пороге, а рампой, иначе дрожание масштаба около
+   порога читалось бы как мигание. */
+var GROUP_ZOOM_FROM = 1.9, GROUP_ZOOM_TO = 2.2;
+
+var EDGE_LABEL_PX = 11;      /* пояснение связи                         */
+var EDGE_LABEL_ALPHA = 0.85;
+
+var gAnchor = { px: 0, py: 0, pz: 1, r: 0, cx: 0, cy: 0 };
+
 var LABEL_BUDGET = 90;       /* лимит подписей тегов на кадр            */
-var LABEL_MAX_AWAY = 90;     /* дальше подпись темы от узла не уходит   */
+var LABEL_MAX_AWAY = 90;     /* дальше подпись от своего узла не уходит */
 var LABEL_LEADER_MIN = 24;   /* ближе выноска не нужна                  */
 var THEME_QUIET_ALPHA = 0.3; /* чужое имя темы в фокус-режиме           */
 
 /* Счётчики последнего кадра — для приёмки через window.TMAP. */
 var lastQuietCount = 0;      /* приглушённых имён тем                   */
-var lastThemeMissing = 0;    /* тем, которым места не нашлось           */
+var lastThemeMissing = 0;    /* подписей, которым места не нашлось      */
 var lastThemeMissingNames = [];
-var lastThemeAway = 0;       /* самая дальняя подпись темы от узла, px  */
+var lastThemeAway = 0;       /* самая дальняя подпись от узла, px       */
+
+/* ═══════════════════════════════════════════════════════════════════════
+   ПАМЯТЬ ПОДПИСЕЙ
+
+   ⚠️ РАНЬШЕ МЕСТО ДЛЯ ПОДПИСИ ИСКАЛОСЬ ЗАНОВО КАЖДЫЙ КАДР, И ЭТО БЫЛО
+   ПРИЧИНОЙ ДРОЖАНИЯ. Узел сдвигался на полпикселя — алгоритм находил уже
+   другое свободное место, и текст перепрыгивал. Плюс подписи включались и
+   выключались мгновенно, а глаз читает мгновенное включение как рывок.
+
+   Теперь у каждой подписи есть объект, который живёт МЕЖДУ кадрами:
+
+     key      — id узла, id ребра или ключ раздела: по нему подпись
+                находится в следующем кадре и НЕ создаётся заново;
+     kind     — 'group' | 'theme' | 'tag' | 'edge';
+     ax, ay   — якорь: экранная позиция узла, середины ребра или облака;
+     ox, oy   — где подпись стоит СЕЙЧАС относительно якоря;
+     tox, toy — куда её положила раскладка (цель);
+     alpha    — какая она сейчас; talpha — какой должна стать;
+     placedAt — когда раскладка считалась в последний раз.
+
+   Рисуем всегда в (ax + ox, ay + oy) — то есть там, где подпись доехала,
+   а не там, куда раскладка положила её прямо сейчас. */
+var LB = {};                 /* key → объект подписи                    */
+
+var LB_FADE = 0.18;          /* шаг прозрачности за кадр                */
+var LB_SLIDE = 0.2;          /* доля пути к цели за кадр                */
+var LB_SLIDE_MAX = 3;        /* и не больше 3 px за кадр                */
+var LB_MIN_ALPHA = 0.02;     /* ниже — не рисуем и места не занимаем    */
+
+var lbJumpMax = 0;           /* самый большой шаг ox/oy — для приёмки   */
+
+function labelOf(key, kind, text) {
+  var L = LB[key];
+  if (!L) {
+    L = LB[key] = { key: key, kind: kind, text: text,
+                    ax: 0, ay: 0, ox: 0, oy: 0, tox: 0, toy: 0,
+                    alpha: 0, talpha: 0, placedAt: 0,
+                    w: 0, h: LINE_H, born: true };
+  }
+  if (L.text !== text) { L.text = text; L.w = 0; }
+  L.kind = kind;
+  return L;
+}
+
+/* Шаг анимации подписей. Живёт в цикле кадра, а НЕ в draw(): draw() зовут
+   ещё и замеры (TMAP.bench гоняет её шестьдесят раз подряд), и анимация
+   внутри неё пролетала бы шестьдесят шагов за один кадр. */
+function labelTick() {
+  var k, L, dx, dy, mx, my;
+  for (k in LB) {
+    L = LB[k];
+    L.alpha += (L.talpha - L.alpha) * LB_FADE;
+    dx = L.tox - L.ox; dy = L.toy - L.oy;
+    mx = dx * LB_SLIDE; my = dy * LB_SLIDE;
+    if (mx > LB_SLIDE_MAX) mx = LB_SLIDE_MAX;
+    else if (mx < -LB_SLIDE_MAX) mx = -LB_SLIDE_MAX;
+    if (my > LB_SLIDE_MAX) my = LB_SLIDE_MAX;
+    else if (my < -LB_SLIDE_MAX) my = -LB_SLIDE_MAX;
+    L.ox += mx; L.oy += my;
+    var jump = Math.max(Math.abs(mx), Math.abs(my));
+    if (jump > lbJumpMax) lbJumpMax = jump;
+    /* Погасшую подпись выбрасываем: иначе объекты копятся без конца. */
+    if (L.talpha < LB_MIN_ALPHA && L.alpha < LB_MIN_ALPHA) delete LB[k];
+  }
+}
+
+/* Едет ли ещё хоть одна подпись: пока едет — кадр нужен. */
+function labelsBusy() {
+  for (var k in LB) {
+    var L = LB[k];
+    if (Math.abs(L.talpha - L.alpha) > 0.004) return true;
+    if (Math.abs(L.tox - L.ox) > 0.4 || Math.abs(L.toy - L.oy) > 0.4) return true;
+  }
+  return false;
+}
+
+/* Досчитать анимацию до конца одним махом — для приёмки: инварианты
+   меряются «в покое», а не через двадцать кадров плавного проявления. */
+function labelSettle() {
+  var k, L;
+  for (var pass = 0; pass < 200; pass++) labelTick();
+  for (k in LB) { L = LB[k]; L.alpha = L.talpha; L.ox = L.tox; L.oy = L.toy; }
+}
+
+/* ── Спокойствие сцены ───────────────────────────────────────────────── */
+
+/* Скорость сцены за кадр: повороты в радианах плюс изменение масштаба.
+   ⚠️ ПОРОГ ВЫШЕ СКОРОСТИ АВТОВРАЩЕНИЯ (0,00088), И ЭТО НАРОЧНО. Тихое
+   вращение подписи НЕ гасит: они просто плавно едут за своими узлами.
+   Гаснут только от активного движения — тянут мышью, крутят колесо,
+   летит камера после двойного клика. */
+var SPEED_QUIET = 0.0016;    /* рад/кадр: граница «сцена спокойна»      */
+var CALM_MS = 150;           /* столько тишины до возвращения подписей  */
+var LAYOUT_MS = 180;         /* реже раскладку не пересчитываем         */
+
+/* Часы кадра. ⚠️ ОДНИ НА ВСЕХ: скорость сцены, возвращение подписей и
+   пересчёт раскладки обязаны мерить время по одному и тому же источнику,
+   иначе замер прогоняет сцену по виртуальным часам, а раскладку — по
+   настоящим, и числа расходятся. */
+var frameNow = 0;
+var sceneSpeed = 0;          /* скорость последнего кадра               */
+var lastYaw = START_YAW, lastPitch = START_PITCH, lastZoom = 1;
+var lastLoudAt = -1e9;       /* когда сцена в последний раз шумела      */
+var labelsCalm = true;       /* можно ли показывать фоновые подписи     */
+var labelLayoutAt = -1e9;    /* когда раскладывали в последний раз      */
+var labelSig = '';           /* состав подписей прошлого кадра          */
+
+function sceneTick(now) {
+  var d = Math.abs(cam.yaw - lastYaw) + Math.abs(cam.pitch - lastPitch) +
+          Math.abs(cam.zoom - lastZoom) * 0.5;
+  lastYaw = cam.yaw; lastPitch = cam.pitch; lastZoom = cam.zoom;
+  sceneSpeed = d;
+  if (d > SPEED_QUIET) lastLoudAt = now;
+  labelsCalm = (now - lastLoudAt) >= CALM_MS;
+}
 
 function draw() {
   ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
@@ -939,240 +1101,416 @@ function labelGap(node, cx, cy, w, h) {
   return Math.hypot(dx, dy);
 }
 
-/* Тема сохраняет своё имя в фокус-режиме, если она сама в фокусе либо
-   хоть один её тег подсвечен — как свой или как смежный. */
-function themeSpeaks(th) {
-  if (th === focusTheme) return true;
-  var tags = tagsOfTheme[th.n] || [];
-  for (var i = 0; i < tags.length; i++) {
-    var id = tags[i].id;
-    if ((litSet && litSet[id]) || (litNear && litNear[id])) return true;
+/* ── Якорь подписи раздела ────────────────────────────────────────────
+   Раздел — не узел, у него нет своего места на карте. Его якорь: центр
+   масс ТЕМ раздела в трёхмерных координатах, спроецированный на экран и
+   приподнятый на 0,6 экранного радиуса ОБЛАКА раздела (тем и их тегов).
+   Приподнятый — потому что надпись-ориентир стоит НАД скоплением, как
+   название страны над её городами, а не поверх них. */
+var groupPt = { px: 0, py: 0, ps: 1, pz: 1 };
+
+function groupAnchor(g, out) {
+  var i, j, th, tags, cnt = 0, sx = 0, sy = 0, sz = 0;
+  for (i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th) continue;
+    sx += th.x; sy += th.y; sz += th.z; cnt++;
   }
-  return false;
+  if (!cnt) { out.pz = -1; return out; }
+  projectPoint(sx / cnt, sy / cnt, sz / cnt, groupPt);
+  if (groupPt.pz < 0) { out.pz = -1; return out; }
+  /* Дальше нужны экранные центры соседей — см. подъём ниже. */
+
+  /* Экранный радиус облака.
+     ⚠️ СРЕДНЕКВАДРАТИЧНЫЙ, А НЕ МАКСИМАЛЬНЫЙ. По максимуму один-
+     единственный далеко улетевший тег раздувал радиус вчетверо (у «Фирмы
+     и структур рынка» 520 px против 190 по среднему), и надпись улетала
+     на треть холста от своего скопления. Среднеквадратичное расстояние
+     описывает облако, а не его самый дальний выброс. */
+  var s2 = 0, m = 0;
+  for (i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th || th.pz < 0) continue;
+    s2 += (th.px - groupPt.px) * (th.px - groupPt.px) +
+          (th.py - groupPt.py) * (th.py - groupPt.py);
+    m++;
+    tags = tagsOfTheme[g.themes[i]] || [];
+    for (j = 0; j < tags.length; j++) {
+      if (tags[j].pz < 0) continue;
+      s2 += (tags[j].px - groupPt.px) * (tags[j].px - groupPt.px) +
+            (tags[j].py - groupPt.py) * (tags[j].py - groupPt.py);
+      m++;
+    }
+  }
+  var R = m ? Math.sqrt(s2 / m) : 0;
+
+  /* ⚠️ ПОДЪЁМ ОГЛЯДЫВАЕТСЯ НА СОСЕДЕЙ, А НЕ ТОЛЬКО НА СВОЙ РАДИУС.
+     Облака разделов на экране пересекаются: центры масс «Основ и выбора»
+     и «Рынка и потребителя» отстоят на 49 px. Подъём на 0,6 радиуса уводил
+     надпись мимо своего скопления прямо к чужому — у трёх разделов из семи
+     она оказывалась ближе к чужому центру масс, чем к своему.
+
+     Сколько поднимать можно, считается точно, а не на глаз. Надпись стоит
+     в (cx, cy − h); чужой центр в (ox, oy); dx = cx − ox, dy = cy − oy.
+     Условие «ближе к своему» h² < dx² + (dy − h)² сводится к
+     2·h·dy < dx² + dy². Соседи НИЖЕ нас (dy ≤ 0) подъёму не мешают вовсе,
+     а каждый сосед выше даёт свой потолок D²/(2·dy). */
+  var lift = R * 0.6;
+  for (i = 0; i < groups.length; i++) {
+    if (groups[i].k === g.k) continue;
+    var o = groupCentre(groups[i], groupOther);
+    if (o.pz < 0) continue;
+    var dx = groupPt.px - o.px, dy = groupPt.py - o.py;
+    if (dy <= 0) continue;                    /* сосед ниже — не мешает */
+    var cap = (dx * dx + dy * dy) / (2 * dy) * 0.9;   /* с полем в 10 % */
+    if (cap < lift) lift = cap;
+  }
+  if (lift < 0) lift = 0;
+
+  out.px = groupPt.px;
+  out.py = groupPt.py - lift;
+  out.pz = groupPt.pz;
+  out.r = R;
+  out.lift = lift;
+  out.cx = groupPt.px;
+  out.cy = groupPt.py;
+  return out;
 }
 
-/* Кто важнее, когда места на всех не хватает: тема в фокусе, затем
-   выбранные, затем найденные поиском, затем — крупные по числу задач. */
-function themeRank(th) {
-  if (focusTheme === th) return 0;
-  if (picked[th.id]) return 1;
-  if (searchHits && searchHits[th.id]) return 2;
-  return 3;
+/* Только центр масс раздела, без радиуса и подъёма: нужен и самому
+   groupAnchor (чтобы оглядываться на соседей), и сторожу раскладки. */
+var groupOther = { px: 0, py: 0, pz: 1 };
+
+function groupCentre(g, out) {
+  var cnt = 0, sx = 0, sy = 0, sz = 0, th;
+  for (var i = 0; i < g.themes.length; i++) {
+    th = byId['t' + g.themes[i]];
+    if (!th) continue;
+    sx += th.x; sy += th.y; sz += th.z; cnt++;
+  }
+  if (!cnt) { out.pz = -1; return out; }
+  return projectPoint(sx / cnt, sy / cnt, sz / cnt, out);
+}
+
+/* Сторож надписи-ориентира: точка годится, только если она ближе к центру
+   масс СВОЕГО раздела, чем к центру масс любого чужого. Это и есть
+   инвариант «надпись принадлежит своему скоплению», проверяемый прямо, а
+   не через запас по расстоянию. Соседние центры снимаются один раз на
+   кадр: внутри перебора позиций их пересчёт стоил бы семикратно. */
+function groupGuard(g, cx, cy) {
+  var others = [];
+  for (var i = 0; i < groups.length; i++) {
+    if (groups[i].k === g.k) continue;
+    var o = groupCentre(groups[i], { });
+    if (o.pz > 0) others.push([o.px, o.py]);
+  }
+  return function (x, y) {
+    var own = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+    for (var j = 0; j < others.length; j++) {
+      var dx = x - others[j][0], dy = y - others[j][1];
+      if (dx * dx + dy * dy <= own) return false;
+    }
+    return true;
+  };
+}
+
+/* ── Поиск свободного места ───────────────────────────────────────────
+   Позиции перебираются по возрастанию смещения от исходной, берётся
+   первая свободная ОТ ВСЕХ уже размещённых. Отпрыгивание «от первой
+   помехи» здесь не годится: оно загоняет подпись в объятия второй, та
+   отправляет обратно к первой, попытки кончаются — и подпись остаётся
+   лежать поверх соседки (замер на 29 подписях: 16 пересечений).
+
+   ⚠️ РАДИУС ПОИСКА ОГРАНИЧЕН. Двумерный поиск без ограничения доводил
+   пересечения до нуля ценой смысла: подпись уезжала к краю холста, а её
+   узел оставался в середине, и выноска читалась как случайная линия.
+   Дальше maxAway от своего узла подпись не ставится ВОВСЕ: имя без
+   адреса хуже, чем его отсутствие. */
+function findSpot(x0, y0, w, h, node, maxAway, placed, guard) {
+  var half = w / 2 + 5;
+  var STEP_Y = LINE_H + 5, STEP_X = 24;
+  for (var d = 0; d <= 14; d++) {
+    for (var sx = 0; sx <= d; sx++) {
+      var dy = d - sx;
+      var xs = sx === 0 ? [0] : [-sx, sx];
+      var ys = dy === 0 ? [0] : [-dy, dy];
+      for (var a1 = 0; a1 < xs.length; a1++) {
+        for (var a2 = 0; a2 < ys.length; a2++) {
+          var cx = x0 + xs[a1] * STEP_X, cy = y0 + ys[a2] * STEP_Y;
+          if (cy - h / 2 < 6 || cy + h / 2 > H - 6) continue;
+          if (cx - half < 4 || cx + half > W - 4) continue;
+          /* ⚠️ Меряем до БЛИЖНЕЙ КРОМКИ подписи, а не до её середины: ровно
+             это расстояние человек видит — оно и есть длина выноски. */
+          if (node && labelGap(node, cx, cy, w, h) > maxAway) continue;
+          /* Сторож: у надписи-ориентира нет своего узла, зато есть своё
+             скопление, с которого она не должна сходить. */
+          if (guard && !guard(cx, cy)) continue;
+          var clear = true;
+          for (var b = 0; b < placed.length; b++) {
+            var pb = placed[b];
+            if (Math.abs(pb.x - cx) < half + pb.w / 2 + 5 &&
+                Math.abs(pb.y - cy) < (pb.h + h) / 2 + 4) { clear = false; break; }
+          }
+          if (clear) return [cx, cy];
+        }
+      }
+    }
+  }
+  return null;
 }
 
 function drawLabels(dim) {
-  var i;
-  /* ⚠️ ПОДПИСИ ТЕГОВ И ПОДПИСИ ТЕМ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК
-     ЗАНЯТЫХ МЕСТ. Пока каждый слой раскладывался сам по себе, они честно
-     не пересекались внутри себя и дружно налезали друг на друга: имя темы
-     рисуется последним и своей подложкой затирало половину раскрытых имён
-     тегов. */
-  var taken = [];
+  var i, k, L;
+  var now = frameNow || performance.now();
 
-  /* ⚠️ ПЛАН ПОДПИСЕЙ ТЕМ СЧИТАЕТСЯ ДО ТЕГОВ, ХОТЯ САМИ ТЕМЫ РИСУЮТСЯ ПОСЛЕ.
-     В фокус-режиме имена ЧУЖИХ тем гаснут и НЕ УЧАСТВУЮТ В РАСКЛАДКЕ:
-     рисуются первыми, под тегами, и в список занятых мест не попадают.
-     Иначе раскрытые теги темы разъезжаются к краям холста, обходя два
-     десятка чужих имён, — а место нужно им, а не приглушённым соседям. */
-  ctx.font = '500 ' + LABEL_THEME_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-  var plan = [], quiet = [];
-  for (i = 0; i < themeList.length; i++) {
-    var th = themeList[i];
-    if (th.pz < 0) continue;
-    if (th.px < -60 || th.px > W + 60 || th.py < -40 || th.py > H + 40) continue;
-    var text = cutLabel(th.l, THEME_MAX_CHARS);
-    var item = {
-      node: th, text: text,
-      w: ctx.measureText(text).width,
-      y: th.py - nodeRadius(th) - 11,
-      lit: !dim || isLit(th) || (focusTheme === th)
-    };
-    (focusTheme && !themeSpeaks(th) ? quiet : plan).push(item);
-  }
+  /* ⚠️ ВСЕ ПОДПИСИ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК ЗАНЯТЫХ МЕСТ.
+     Пока каждый слой раскладывался сам по себе, они честно не пересекались
+     внутри себя и дружно налезали друг на друга. */
+  var placed = [];
 
-  for (i = 0; i < quiet.length; i++) {
-    var q = quiet[i];
-    var qHalf = q.w / 2 + 5;
-    drawLabelLines([q.text],
-                   Math.max(qHalf + 4, Math.min(W - qHalf - 4, q.node.px)),
-                   Math.max(12, Math.min(H - 12, q.y)),
-                   'center', THEME_QUIET_ALPHA, PAL.textCss, LABEL_THEME_PX);
-  }
-  lastQuietCount = quiet.length;
+  /* ── 1. Кто вообще должен быть виден ─────────────────────────────────
+     ⚠️ ИМЁН ТЕМ И ТЕГОВ В ПОКОЕ БОЛЬШЕ НЕТ. Двадцать девять подписей во
+     вращающейся сцене читались как каша: ни один живой аналог столько
+     текста в движении не держит (3d-force-graph, Obsidian, Map of Reddit,
+     Embedding Projector — обзор владельца, ADR 0039). Вместо них семь
+     надписей-ориентиров по разделам корпуса, как названия стран на карте.
+     Имя темы или тега появляется ровно в четырёх случаях, и все четыре —
+     по воле человека: узел под курсором, связь под курсором, узел выбран,
+     узел найден поиском. */
+  var want = [];
+  var lit = !!(litSet || searchHits || hoverEdge);
 
-  /* ── Теги ───────────────────────────────────────────────────────────
-     ⚠️ МАСШТАБ БОЛЬШЕ НЕ ПОДПИСЫВАЕТ ТЕГИ. Раньше при zoom ≥ 1.25 имена
-     тегов проступали сами: на 276 % экран превращался в кашу из полусотни
-     строк, и разглядеть в ней что-либо было нельзя. Теперь имя тега
-     появляется РОВНО в четырёх случаях, и все четыре — по воле человека:
-     курсор на самом теге, курсор на его теме (фокус-режим ниже), тег
-     выбран, тег найден поиском. */
-  if (focusTheme && focusTheme.pz > 0) {
-    /* Фокус-режим: у темы под курсором подписаны ВСЕ теги, двумя
-       колонками, с выносками. */
-    var items = layoutFocusLabels(focusTheme);
-    for (i = 0; i < items.length; i++) {
-      var it = items[i];
-      var t = it.node;
-      /* Выноска: от узла до края колонки, внутрь плашки не заходит. */
-      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.55)];
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      ctx.moveTo(t.px + (it.side < 0 ? -1 : 1) * (nodeRadius(t) + 2), t.py);
-      ctx.lineTo(it.x - it.side * 10, it.y);
-      ctx.stroke();
-      ctx.lineWidth = 1;
-      var box = drawLabelLines(it.lines, it.x, it.y, it.side < 0 ? 'right' : 'left',
-                               1, PAL.textCss, LABEL_TAG_PX);
-      taken.push({ x: box.left + box.w / 2, y: it.y, w: box.w,
-                   h: box.h, l: it.node.l });
+  /* Разделы. */
+  var zoomFade = 1 - (cam.zoom - GROUP_ZOOM_FROM) / (GROUP_ZOOM_TO - GROUP_ZOOM_FROM);
+  if (zoomFade > 1) zoomFade = 1; else if (zoomFade < 0) zoomFade = 0;
+  var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade;
+  if (!focusTheme) {
+    for (i = 0; i < groups.length; i++) {
+      var g = groups[i];
+      var a = groupAnchor(g, gAnchor);
+      if (a.pz < 0) continue;
+      want.push({ key: 'g:' + g.k, kind: 'group', text: g.l.toUpperCase(),
+                  lines: null, node: null, ax: a.px, ay: a.py,
+                  talpha: groupAlpha, prio: 9, stick: false,
+                  px: GROUP_PX, weight: 600, spacing: GROUP_SPACING,
+                  maxAway: 1e9, plate: false,
+                  guard: groupGuard(g, a.cx, a.cy) });
     }
-  } else if (litSet || searchHits) {
-    /* Вне фокус-режима — только у подсвеченных, с лимитом. */
-    var shown = 0;
-    var boxes = [];
-    for (i = 0; i < order.length && shown < LABEL_BUDGET; i++) {
-      var n = order[order.length - 1 - i];        /* ближние раньше */
-      if (!n || n.k !== 'tag' || n.pz < 0) continue;
-      if (!(isLit(n) || (litNear && litNear[n.id]))) continue;
-      if (n.px < 0 || n.px > W || n.py < 0 || n.py > H) continue;
+  }
 
-      var lines = wrapLabel(n.l, TAG_WRAP_CHARS, 2);
-      ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
-      var wMax = 0;
-      for (var qq = 0; qq < lines.length; qq++) {
-        wMax = Math.max(wMax, ctx.measureText(lines[qq]).width);
-      }
-      var hAll = lines.length * LINE_H;
-      var gap = nodeRadius(n) + 12;               /* подпись не ближе 12px */
-      var side = (n.px + gap + wMax < W) ? 1 : -1;
-      var lx = n.px + side * gap;
-      var ly = n.py, tries = 0, hit = true;
-      while (tries < 3 && hit) {
-        hit = false;
-        for (var b = 0; b < boxes.length; b++) {
-          var bx = boxes[b];
-          if (Math.abs(bx.y - ly) < (bx.h + hAll) / 2 + 3 &&
-              Math.abs(bx.x - lx) < (bx.w + wMax) / 2 + 6) { hit = true; break; }
-        }
-        if (hit) { ly += hAll + 4; tries++; }
-      }
-      if (hit) continue;
-      var left = side > 0 ? lx : lx - wMax;
-      boxes.push({ x: left + wMax / 2, y: ly, w: wMax, h: hAll });
-      taken.push({ x: left + wMax / 2, y: ly, w: wMax, h: hAll, l: n.l });
-      drawLabelLines(lines, lx, ly, side > 0 ? 'left' : 'right',
-                     1, PAL.textCss, LABEL_TAG_PX);
+  /* Узлы: под курсором, выбранные, найденные поиском. */
+  var nodeWant = {};
+  function askNode(n, prio, stick) {
+    if (!n || n.pz < 0) return;
+    if (n.px < 0 || n.px > W || n.py < 0 || n.py > H) return;
+    /* Теги темы в фокусе рисует раскладка по колонкам — не дублируем. */
+    if (focusTheme && n.k === 'tag' && n.n === focusTheme.n) return;
+    var was = nodeWant[n.id];
+    if (was && was.prio <= prio) { if (stick) was.stick = true; return; }
+    var isTheme = n.k === 'theme';
+    var item = {
+      key: n.id, kind: n.k,
+      text: isTheme ? cutLabel(n.l, THEME_MAX_CHARS) : n.l,
+      lines: isTheme ? null : wrapLabel(n.l, TAG_WRAP_CHARS, 2),
+      node: n, ax: n.px, ay: n.py,
+      talpha: 1, prio: prio, stick: !!stick,
+      px: isTheme ? LABEL_THEME_PX : LABEL_TAG_PX, weight: 500, spacing: 0,
+      maxAway: LABEL_MAX_AWAY, plate: true
+    };
+    if (was) { for (var f in item) was[f] = item[f]; }
+    else { nodeWant[n.id] = item; want.push(item); }
+  }
+
+  /* Узел под курсором и его контекст: тег — вместе со своей темой. */
+  if (hoverNode) {
+    askNode(hoverNode, 0, true);
+    if (hoverNode.k === 'tag') askNode(byId['t' + hoverNode.n], 1, true);
+  }
+  /* Связь под курсором: оба тега и обе их темы. */
+  if (hoverEdge) {
+    askNode(hoverEdge.a, 0, true);
+    askNode(hoverEdge.b, 0, true);
+    askNode(byId['t' + hoverEdge.a.n], 1, true);
+    askNode(byId['t' + hoverEdge.b.n], 1, true);
+  }
+  /* Выбранное. */
+  for (k in picked) {
+    if (!picked[k]) continue;
+    var pn = byId[k];
+    askNode(pn, 2, true);
+    if (pn && pn.k === 'tag') askNode(byId['t' + pn.n], 3, true);
+  }
+  /* Найденное поиском — с лимитом: сотня строк на экране это не помощь. */
+  if (searchHits) {
+    var shown = 0;
+    for (i = order.length - 1; i >= 0 && shown < LABEL_BUDGET; i--) {
+      var sn = order[i];
+      if (!sn || !searchHits[sn.id] || sn.pz < 0) continue;
+      askNode(sn, 4, false);
       shown++;
     }
   }
 
-  /* ── Темы: подписаны ВСЕГДА ─────────────────────────────────────────
-     Включая режим приглушения. Иначе при выборе тега имена остальных тем
-     гаснут, и человек ищет нужную тему наугад.
-     ⚠️ «Видны всегда» означает и «не наезжают друг на друга»: темы стоят
-     плотно, и без раздвижки соседние имена сливались в нечитаемую кашу
-     («Другое» поверх «Данные, статистика и причинность»). Раздвигаем по
-     вертикали в порядке важности: кому места не досталось — тот остаётся
-     без подписи, и это честнее оторванной. */
-  plan.sort(function (a, b) {
-    var ra = themeRank(a.node), rb = themeRank(b.node);
-    if (ra !== rb) return ra - rb;
-    return (b.node.c || 0) - (a.node.c || 0);     /* крупные важнее */
-  });
+  /* Пояснение связи под курсором — посередине её отрезка. */
+  if (hoverEdge && hoverEdge.why) {
+    want.push({ key: 'e:' + hoverEdge.key, kind: 'edge', text: hoverEdge.why,
+                lines: null, node: null,
+                ax: (hoverEdge.a.px + hoverEdge.b.px) / 2,
+                ay: (hoverEdge.a.py + hoverEdge.b.py) / 2,
+                talpha: EDGE_LABEL_ALPHA, prio: 0, stick: true,
+                px: EDGE_LABEL_PX, weight: 500, spacing: 0,
+                maxAway: 1e9, plate: true });
+  }
 
-  var placed = taken;            /* темы обходят и подписи тегов тоже */
-  lastThemeBoxes = placed;
-  lastThemeFrom = taken.length;
+  /* ── 2. Гашение на время движения ────────────────────────────────────
+     Активное движение уводит прозрачность в ноль у всего, кроме того, что
+     человек держит под курсором или выбрал: иначе невозможно рассмотреть
+     то, что держишь. Порог выше скорости автовращения, поэтому тихое
+     вращение подписи не гасит — они просто едут за узлами. */
+  if (!labelsCalm) {
+    for (i = 0; i < want.length; i++) if (!want[i].stick) want[i].talpha = 0;
+  }
+
+  /* ── 3. Обновляем память подписей ────────────────────────────────────*/
+  var sig = '';
+  for (i = 0; i < want.length; i++) {
+    var it = want[i];
+    if (it.talpha >= LB_MIN_ALPHA) sig += it.key + '|';
+  }
+  var composed = (sig !== labelSig);
+  labelSig = sig;
+
+  /* Раскладка запускается, когда сцена спокойна и с прошлой прошло не
+     меньше LAYOUT_MS, либо когда изменился сам состав подписей. Во время
+     движения раскладка НЕ считается: подписи едут за якорями с прежним
+     смещением — от этого и уходит дрожание. */
+  var relayout = composed || (labelsCalm && now - labelLayoutAt >= LAYOUT_MS);
+
+  var live = [];
+  for (i = 0; i < want.length; i++) {
+    var w0 = want[i];
+    L = labelOf(w0.key, w0.kind, w0.text);
+    L.ax = w0.ax; L.ay = w0.ay;
+    L.talpha = w0.talpha;
+    L.prio = w0.prio;
+    L.lines = w0.lines || [w0.text];
+    L.pxSize = w0.px; L.weight = w0.weight; L.spacing = w0.spacing;
+    L.plate = w0.plate; L.node = w0.node; L.maxAway = w0.maxAway;
+    L.guard = w0.guard || null;
+    /* Размеры меряются в текущем шрифте — они нужны и раскладке, и
+       отрисовке, и проверке на пересечение. */
+    setLabelFont(L.pxSize, L.weight, L.spacing);
+    var wMax = 0;
+    for (k = 0; k < L.lines.length; k++) {
+      wMax = Math.max(wMax, ctx.measureText(L.lines[k]).width);
+    }
+    L.w = wMax;
+    L.h = L.lines.length * LINE_H;
+    live.push(L);
+  }
+  /* Подпись, которой в этом кадре не попросили, гаснет — плавно. */
+  for (k in LB) if (LB[k].talpha !== 0 && live.indexOf(LB[k]) < 0) LB[k].talpha = 0;
+
+  /* ── 4. Раскладка ────────────────────────────────────────────────────*/
   lastThemeMissing = 0;
   lastThemeMissingNames = [];
   lastThemeAway = 0;
-  for (i = 0; i < plan.length; i++) {
-    var it2 = plan[i];
-    var half = it2.w / 2 + 5;
 
-    /* ⚠️ ИЩЕМ БЛИЖАЙШЕЕ СВОБОДНОЕ МЕСТО, А НЕ «ОТПРЫГИВАЕМ ОТ СОСЕДА».
-       Отпрыгивание от первой помехи загоняет подпись в объятия второй, та
-       отправляет обратно к первой, попытки кончаются — и подпись остаётся
-       лежать поверх соседки. Замер на 29 подписях: 16 пересечений. Здесь
-       позиции перебираются по возрастанию смещения от исходной, и берётся
-       первая, свободная ОТ ВСЕХ уже размещённых.
-
-       ⚠️ РАДИУС ПОИСКА ОГРАНИЧЕН, И ЭТО ГЛАВНОЕ ПРАВИЛО ЭТОГО МЕСТА.
-       Двумерный поиск без ограничения доводил пересечения до нуля ценой
-       смысла: «Международная торговля» и «Инфляция и индексы цен» уезжали
-       к левому краю холста, а их узлы оставались в середине — выноска
-       тянулась через полэкрана и читалась как случайная линия. Дальше
-       LABEL_MAX_AWAY от своего узла подпись не ставится ВОВСЕ: имя без
-       адреса хуже, чем его отсутствие. */
-    var x0 = it2.node.px, y0 = it2.y;
-    var foundX = 0, foundY = 0, ok = false;
-
-    var STEP_Y = LINE_H + 5, STEP_X = 24;
-    for (var d = 0; d <= 14 && !ok; d++) {
-      for (var sx = 0; sx <= d && !ok; sx++) {
-        var dy = d - sx;
-        var xs = sx === 0 ? [0] : [-sx, sx];
-        var ys = dy === 0 ? [0] : [-dy, dy];
-        for (var a1 = 0; a1 < xs.length && !ok; a1++) {
-          for (var a2 = 0; a2 < ys.length && !ok; a2++) {
-            var cx = x0 + xs[a1] * STEP_X, cy = y0 + ys[a2] * STEP_Y;
-            if (cy < 12 || cy > H - 12) continue;
-            if (cx - half < 4 || cx + half > W - 4) continue;
-            /* ⚠️ МЕРЯЕМ ДО БЛИЖНЕЙ КРОМКИ ПОДПИСИ, А НЕ ДО ЕЁ СЕРЕДИНЫ, И
-               ЭТО НЕ ПОБЛАЖКА. Ровно это расстояние человек видит: оно и
-               есть длина выноски от кружка до плашки. Мерить до середины
-               значило бы наказывать длинное имя за длину — у «Монетарной
-               политики и банковской системы» середина отстоит на 96 px,
-               когда сама подпись начинается в 12 px от узла. Замер на
-               29 подписях: по кромке не размещается 0 тем, по середине —
-               шесть, и пять из них только потому, что имя длинное. */
-            if (labelGap(it2.node, cx, cy, it2.w, LINE_H) > LABEL_MAX_AWAY) continue;
-            var clear = true;
-            for (var b2 = 0; b2 < placed.length; b2++) {
-              var pb = placed[b2];
-              if (Math.abs(pb.x - cx) < half + pb.w / 2 + 5 &&
-                  Math.abs(pb.y - cy) < (pb.h || LINE_H) / 2 + LINE_H / 2 + 4) {
-                clear = false; break;
-              }
-            }
-            if (clear) { foundX = cx; foundY = cy; ok = true; }
-          }
-        }
+  if (relayout) {
+    labelLayoutAt = now;
+    /* Порядок важности: связь и то, что под курсором, — раньше фона. */
+    live.sort(function (p, q) { return p.prio - q.prio; });
+    for (i = 0; i < live.length; i++) {
+      L = live[i];
+      if (L.talpha < LB_MIN_ALPHA) continue;
+      var y0 = L.node ? L.ay - nodeRadius(L.node) - 11 - (L.h - LINE_H) / 2 : L.ay;
+      var spot = findSpot(L.ax, y0, L.w, L.h, L.node, L.maxAway, placed, L.guard);
+      if (!spot) {
+        L.missed = true;
+        lastThemeMissing++;
+        lastThemeMissingNames.push(L.text);
+        continue;
       }
+      L.missed = false;
+      L.tox = spot[0] - L.ax;
+      L.toy = spot[1] - L.ay;
+      L.placedAt = now;
+      if (L.born) { L.ox = L.tox; L.oy = L.toy; L.born = false; }
+      placed.push({ x: spot[0], y: spot[1], w: L.w, h: L.h, l: L.text });
     }
-    if (!ok) { lastThemeMissing++; lastThemeMissingNames.push(it2.text); continue; }
+  }
 
-    it2.x = foundX;
-    it2.y = foundY;
-    placed.push({ x: it2.x, y: it2.y, w: it2.w, h: LINE_H, l: it2.text });
+  /* ── 5. Отрисовка ────────────────────────────────────────────────────
+     Рисуем в (ax + ox, ay + oy) — там, куда подпись ДОЕХАЛА, а не там,
+     куда раскладка положила её прямо сейчас. Фоновые подписи разделов
+     идут первыми, под всем остальным. */
+  var boxes = [];
+  live.sort(function (p, q) { return q.prio - p.prio; });
+  for (i = 0; i < live.length; i++) {
+    L = live[i];
+    if (L.alpha < LB_MIN_ALPHA || L.missed) continue;
+    var lx = L.ax + L.ox, ly = L.ay + L.oy;
 
-    /* Подпись, уступившая место соседке, могла отойти от своего узла.
-       Тонкая выноска возвращает ей адрес: иначе имя темы висит в пустоте и
-       человек не знает, к какому кружку оно относится. Длина выноски по
-       построению не больше LABEL_MAX_AWAY. */
-    var away = labelGap(it2.node, it2.x, it2.y, it2.w, LINE_H);
-    if (away > lastThemeAway) lastThemeAway = away;
-    if (away > LABEL_LEADER_MIN) {
-      /* Выноска ведёт к ближайшему краю плашки, а не в её середину: линия
-         не должна заходить под текст. */
-      var tx = it2.x + (it2.node.px > it2.x ? it2.w / 2 + 4 : -(it2.w / 2 + 4));
-      if (Math.abs(it2.node.px - it2.x) < it2.w / 2) tx = it2.node.px;
-      var ty = it2.y + (it2.y > it2.node.py ? -10 : 10);
-      var rr = nodeRadius(it2.node) + 2;
-      var ang = Math.atan2(ty - it2.node.py, tx - it2.node.px);
-      ctx.strokeStyle = PAL.borderShades[shadeIndex(0.45)];
+    /* Выноска: подпись, уступившая место соседке, могла отойти от узла —
+       тонкая линия возвращает ей адрес. */
+    if (L.node) {
+      var away = labelGap(L.node, lx, ly, L.w, L.h);
+      if (away > lastThemeAway) lastThemeAway = away;
+      if (away > LABEL_LEADER_MIN) drawLeader(L.node, lx, ly, L.w, L.alpha);
+    }
+
+    setLabelFont(L.pxSize, L.weight, L.spacing);
+    drawLabelLines(L.lines, lx, ly, 'center', L.alpha, PAL.textCss,
+                   L.pxSize, L.weight, L.spacing, L.plate);
+    boxes.push({ x: lx, y: ly, w: L.w, h: L.h, l: L.text, kind: L.kind });
+  }
+  ctx.letterSpacing = '0px';
+
+  /* ── 6. Фокус-режим: у темы под курсором подписаны ВСЕ теги ──────────
+     Единственное место, где текста на экране много, и там он оправдан:
+     человек сам раскрыл тему и смотрит её состав. */
+  lastQuietCount = 0;
+  if (focusTheme && focusTheme.pz > 0) {
+    var items = layoutFocusLabels(focusTheme);
+    for (i = 0; i < items.length; i++) {
+      var it2 = items[i];
+      var t = it2.node;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(0.55)];
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.moveTo(it2.node.px + Math.cos(ang) * rr, it2.node.py + Math.sin(ang) * rr);
-      ctx.lineTo(tx, ty);
+      ctx.moveTo(t.px + (it2.side < 0 ? -1 : 1) * (nodeRadius(t) + 2), t.py);
+      ctx.lineTo(it2.x - it2.side * 10, it2.y);
       ctx.stroke();
       ctx.lineWidth = 1;
+      var box = drawLabelLines(it2.lines, it2.x, it2.y,
+                               it2.side < 0 ? 'right' : 'left',
+                               1, PAL.textCss, LABEL_TAG_PX, 500, 0, true);
+      boxes.push({ x: box.left + box.w / 2, y: it2.y, w: box.w, h: box.h,
+                   l: t.l, kind: 'tag' });
     }
-
-    drawLabelLines([it2.text], it2.x, it2.y, 'center',
-                   it2.lit ? 1 : 0.55, PAL.textCss, LABEL_THEME_PX);
   }
+
+  lastThemeBoxes = boxes;
+  lastThemeFrom = 0;
+}
+
+/* Выноска от узла к ближнему краю плашки: линия не должна заходить под
+   текст, иначе она перечёркивает буквы. */
+function drawLeader(node, lx, ly, w, alpha) {
+  var tx = lx + (node.px > lx ? w / 2 + 4 : -(w / 2 + 4));
+  if (Math.abs(node.px - lx) < w / 2) tx = node.px;
+  var ty = ly + (ly > node.py ? -10 : 10);
+  var rr = nodeRadius(node) + 2;
+  var ang = Math.atan2(ty - node.py, tx - node.px);
+  ctx.globalAlpha = alpha;
+  ctx.strokeStyle = PAL.borderShades[shadeIndex(0.45)];
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(node.px + Math.cos(ang) * rr, node.py + Math.sin(ang) * rr);
+  ctx.lineTo(tx, ty);
+  ctx.stroke();
+  ctx.lineWidth = 1;
+  ctx.globalAlpha = 1;
 }
 
 
@@ -1257,6 +1595,18 @@ function frame(now) {
 
   var spin = spinSpeed(now);
   if (spin > 0) { cam.yaw += spin; moved = true; }
+
+  /* Скорость сцены и шаг анимации подписей — до отрисовки: кадр рисует
+     то, куда подписи доехали к этому моменту. */
+  frameNow = now;
+  sceneTick(now);
+  labelTick();
+
+  /* Подписи едут или проявляются — значит кадру есть что показать, даже
+     если камера стоит. И раз в LAYOUT_MS в покое кадр нужен, чтобы
+     раскладка пересчиталась и подписи вернулись после движения. */
+  if (labelsBusy()) moved = true;
+  else if (labelsCalm && now - labelLayoutAt > LAYOUT_MS) moved = true;
 
   if (moved || dirty) {
     dirty = false;
@@ -1898,7 +2248,9 @@ if (themesBox) {
 
 /* Полоса затухания у нижней кромки панели гаснет, когда список
    докручен до конца или прокручивать нечего вовсе. */
-var panelBox = document.getElementById('tmap-panel');
+/* ⚠️ Опрашиваем НЕ панель, а её прокручиваемую часть: панель стала
+   неподвижной flex-колонкой и сама не прокручивается вовсе. */
+var panelBox = document.getElementById('tmap-panel-scroll');
 var panelFade = document.getElementById('tmap-panel-fade');
 
 function showPanelFade() {
@@ -2007,15 +2359,80 @@ window.TMAP = {
   allBoxes: function () { draw(); return lastThemeBoxes.slice(); },
   /* Что кадр НЕ показал и как далеко увёл: приглушённые имена тем,
      ненарисованные имена тем и самое дальнее отстояние подписи от узла. */
-  labelReport: function () {
+  labelReport: function (settle) {
+    /* Инварианты меряются В ПОКОЕ: если не досчитать анимацию, замер
+       поймает подписи на полпути к своей прозрачности. */
+    if (settle !== false) { draw(); labelSettle(); }
     draw();
+    var by = { group: 0, theme: 0, tag: 0, edge: 0 };
+    for (var i = 0; i < lastThemeBoxes.length; i++) {
+      var kk = lastThemeBoxes[i].kind || 'tag';
+      by[kk] = (by[kk] || 0) + 1;
+    }
     return { drawn: lastThemeBoxes.length,
-             themes: lastThemeBoxes.length - lastThemeFrom,
-             tags: lastThemeFrom,
+             groups: by.group, themes: by.theme, tags: by.tag, edges: by.edge,
              quiet: lastQuietCount,
              missing: lastThemeMissing,
              missingNames: lastThemeMissingNames.slice(),
              maxAway: +lastThemeAway.toFixed(1) };
+  },
+  /* Скорость сцены и спокойствие — для проверки гашения при движении. */
+  motion: function () {
+    return { speed: +sceneSpeed.toFixed(5), calm: labelsCalm,
+             threshold: SPEED_QUIET, spinIdle: SPIN_IDLE };
+  },
+  /* Самый большой шаг смещения подписи за кадр — инвариант плавности. */
+  jump: function (reset) { var v = +lbJumpMax.toFixed(3); if (reset) lbJumpMax = 0; return v; },
+  settleLabels: labelSettle,
+  /* Поставить масштаб мгновенно — для проверки затухания ориентиров. */
+  zoomTo: function (z) {
+    cam.zoom = cam.zoomTarget = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, z));
+    lastZoom = cam.zoom; showZoom(); draw(); labelSettle(); draw();
+    var a = LB['g:' + groups[0].k];
+    return { zoom: +cam.zoom.toFixed(2), groupAlpha: a ? +a.alpha.toFixed(3) : 0 };
+  },
+  /* Прогон N кадров тихого автовращения БЕЗ requestAnimationFrame: в
+     скрытой вкладке браузер кадры не гоняет вовсе, и замер плавности там
+     не снять. Здесь кадр воспроизводится вручную — поворот, скорость,
+     шаг подписей, отрисовка, — ровно в том же порядке, что в frame(). */
+  spinFrames: function (n, speed) {
+    n = n || 120;
+    var step = speed === undefined ? SPIN_IDLE : speed;
+    var t = Math.max(frameNow, performance.now());
+    lbJumpMax = 0;
+    var minVisible = 1e9, maxVisible = 0;
+    for (var i = 0; i < n; i++) {
+      cam.yaw += step;
+      t += 16.7;
+      frameNow = t;
+      sceneTick(t);
+      labelTick();
+      draw();
+      var vis = 0;
+      for (var k in LB) if (LB[k].alpha >= LB_MIN_ALPHA) vis++;
+      if (vis < minVisible) minVisible = vis;
+      if (vis > maxVisible) maxVisible = vis;
+    }
+    var layouts = 0;
+    return { frames: n, jumpMax: +lbJumpMax.toFixed(3),
+             speed: +sceneSpeed.toFixed(5), calm: labelsCalm,
+             visibleMin: minVisible, visibleMax: maxVisible,
+             visibleEnd: (function () { var c = 0; for (var q in LB) if (LB[q].alpha >= LB_MIN_ALPHA) c++; return c; })() };
+  },
+  /* Якоря разделов: центр масс своих тем и куда встала надпись. */
+  groupAnchors: function () {
+    draw();
+    var out = [];
+    for (var i = 0; i < groups.length; i++) {
+      var a = groupAnchor(groups[i], { });
+      var L = LB['g:' + groups[i].k];
+      out.push({ key: groups[i].k, label: groups[i].l,
+                 cx: a.cx, cy: a.cy, r: +(a.r || 0).toFixed(1),
+                 anchorY: a.py,
+                 x: L ? L.ax + L.ox : null, y: L ? L.ay + L.oy : null,
+                 alpha: L ? +L.alpha.toFixed(3) : 0 });
+    }
+    return out;
   },
   /* Стоимость кадра. Частоту через requestAnimationFrame в скрытой вкладке
      измерить нельзя — браузер её там не гоняет вовсе; поэтому меряем, во
