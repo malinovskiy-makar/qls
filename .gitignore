@@ -326,3 +326,9 @@ reports/quality_audit/*
 !reports/taxonomy_v2/
 reports/taxonomy_v2/*
 !reports/taxonomy_v2/load_taxonomy_dry_run.txt
+
+# Формулировки промпта пилота v2 — дословный текст, который владелец читает
+# перед стоп-гейтом (фаза 2.1, замер Б4). Не машинный вывод.
+!reports/enrich_pilot/
+reports/enrich_pilot/*
+!reports/enrich_pilot/prompt_wordings_v2.md
