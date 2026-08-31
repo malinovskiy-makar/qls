@@ -363,6 +363,109 @@ function monopolyFloor(Pf) {
   return { binding: true, Pf, Q, price, csM, vcM, psM, dwl };
 }
 
+/* ---------------------------------------------------------------------
+   КВОТА В МОНОПОЛИИ (приёмка владельца 31.08).
+
+   ⚠️ ЭТОГО СЛУЧАЯ ЗДЕСЬ НЕ БЫЛО ВОВСЕ, И ИМЕННО ПОЭТОМУ КВОТА «НЕ РАБОТАЛА».
+   Каскад вмешательства в монополии разбирал три вида — налог/субсидию, потолок
+   и пол, — а «квота» не совпадала ни с одним, и ветка просто не исполнялась:
+   ни расчёта, ни отрисовки, ни строки на табло. Механизм квоты, написанный для
+   конкурентного рынка, сюда попасть не мог по другой причине: он опирается на
+   кривую предложения S и на равновесие D = S, а в монополии нет ни того, ни
+   другого — есть спрос и предельные издержки MC.
+
+   ЭКОНОМИКА СЮЖЕТА.
+     • Квота ограничивает выпуск СВЕРХУ и связывает, только если Qk < Qm.
+     • Связывающая квота: монополист выпускает ровно Qk и назначает
+       МАКСИМАЛЬНУЮ цену, по которой этот объём выбирают, то есть P = D(Qk).
+     • ⚠️ КОРИДОРА ЦЕН ЗДЕСЬ НЕТ, и это главное отличие от конкурентного рынка.
+       Там цена при квоте не определена однозначно и лежит между S(Qk) и D(Qk),
+       потому что назначать её некому. У монополиста есть рыночная власть, и он
+       всегда берёт ВЕРХНИЙ край. Ползунок «цена внутри коридора» в монополии не
+       появляется — не потому, что его забыли, а потому, что выбирать нечего.
+     • Квота монополисту НЕВЫГОДНА: его излишек падает. Если в модели он от
+       квоты выигрывает — это знак ошибки, а не открытие.
+   --------------------------------------------------------------------- */
+
+// Оптимум монополиста при квоте Qk (верхняя граница выпуска).
+// Возвращает { binding, Qk, Q, price, csM, vcM, psM, dwl } либо null.
+function monopolyQuota(Qk) {
+  const D = STATE.D, m = STATE.mono;
+  if (!D || !m || !(Qk > 0)) return null;
+  // Квота не ниже монопольного выпуска — не связывает, всё как без неё.
+  if (Qk >= m.Qm - 1e-9) {
+    return { binding: false, Qk, Q: m.Qm, price: m.Pm,
+             csM: m.csM, vcM: m.vcM, psM: m.psM, dwl: m.dwl };
+  }
+  const Q = Qk;
+  const price = evalCurve(D, Q);          // максимальная цена, по которой берут Qk
+  if (isNaN(price)) return null;
+  const csM = integrate(q => evalCurve(D, q) - price, 0, Q);
+  const vcM = integrate(q => mcAt(q), 0, Q);
+  const psM = integrate(q => price - mcAt(q), 0, Q);
+  /* Потери считаются против ЭФФЕКТИВНОГО выпуска (D = MC), как и у остальных
+     видов вмешательства в монополии: квота уводит выпуск дальше от него. */
+  let dwl = null;
+  if (m.Qc != null) {
+    const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc);
+    dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi);
+  }
+  return { binding: true, Qk, Q, price, csM, vcM, psM, dwl };
+}
+
+// Заливки при связывающей квоте: CS/VC/PS до Qk (при цене D(Qk)) + DWL до Qc.
+function drawMonoQuotaAreas() {
+  const qt = STATE.monoQuota, m = STATE.mono;
+  if (!qt || !qt.binding || !m) return;
+  const D = STATE.D, g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  if (qt.Q > 1e-6) {
+    const s1 = samp(0, qt.Q);
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(qt.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(qt.price)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
+  }
+  if (m.Qc != null) {
+    const lo = Math.min(qt.Q, m.Qc), hi = Math.max(qt.Q, m.Qc);
+    if (hi > lo) {
+      const s2 = samp(lo, hi);
+      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
+      g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
+    }
+  }
+}
+
+// Точки при связывающей квоте: призрак M₀(Qm,Pm) + новый M(Qk, D(Qk)).
+function drawMonoQuotaPoints() {
+  const qt = STATE.monoQuota, m = STATE.mono;
+  if (!qt || !qt.binding || !m) return;
+  const ox = sx(0), oy = sy(0), g = svg.append('g');
+  const dash = (x1, y1, x2, y2) => g.append('line').attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2).attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+  if (STATE.showGhost) {
+    const [px0, py0] = toPx(m.Qm, m.Pm);
+    g.append('circle').attr('cx', px0).attr('cy', py0).attr('r', 4).attr('fill', COL.halo).attr('stroke', COL.ghost).attr('stroke-width', 1.5);
+    g.append('text').attr('x', px0 + 7).attr('y', py0 - 6).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.inkSoft).attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('M₀');
+  }
+  if (qt.Q > 1e-6) {
+    const [pxm, pym] = toPx(qt.Q, qt.price);
+    dash(ox, pym, pxm, pym);
+    g.append('circle').attr('cx', pxm).attr('cy', pym).attr('r', 4.5).attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    pointName(g, pxm, pym, 'M', COL.ink);
+    axisValueY(g, ox, pym, fmt(qt.price), '');
+  }
+}
+
+/* Вертикаль разрешённого объёма — она же сама квота. Рисуется и тогда, когда
+   квота НЕ связывает: человек двигает ползунок и должен видеть, где линия
+   стоит и почему пока ничего не меняется. */
+function drawMonoQuotaLine() {
+  if (STATE.intervType !== 'quota' || !(STATE.quota > 0)) return;
+  const oy = sy(0), g = svg.append('g'), xQ = sx(STATE.quota);
+  g.append('line').attr('x1', xQ).attr('y1', oy).attr('x2', xQ).attr('y2', sy(CONFIG.Pmax))
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
+  axisValueX(g, xQ, oy, fmt(STATE.quota), 'к');
+}
+
 /* =====================================================================
    БЛОК 8ж. ЕСТЕСТВЕННАЯ МОНОПОЛИЯ И РЕГУЛИРОВАНИЕ (Фаза 3в).
    Та же база, что у обычной монополии (спрос D + предельные издержки MC),
@@ -694,6 +797,55 @@ function updateMonoInterventionPanel() {
     const dq = mc.Qstar - m.Qm;
     html += `<div class="hint" style="margin-top:6px;">${dq > 1e-6 ? 'Грамотный потолок увеличил выпуск (парадокс монополии).' : (dq < -1e-6 ? 'Слишком низкий потолок: выпуск упал, возник дефицит.' : 'Выпуск не изменился.')}</div>`;
     box.innerHTML = html;
+    return;
+  }
+  if (it === 'quota') {
+    const qt = STATE.monoQuota;
+    /* ⚠️ РАЗБОР ПРО ОТСУТСТВИЕ КОРИДОРА СТОИТ ЗДЕСЬ, А НЕ В ПОДСКАЗКЕ, И
+       ВЫВОДИТСЯ ВСЕГДА, ПОКА ВЫБРАНА КВОТА. Класс `sb-note` уносит его в
+       «Объяснение модели» (moveExplanations). Без этих слов ученик, знакомый
+       с квотой на конкурентном рынке, решит, что коридор просто забыли
+       нарисовать, — указание владельца 31.08. */
+    const why = '<div class="sb-note"><b>Как это получилось</b>'
+      + '<p><b>Почему у квоты в монополии НЕТ коридора цен?</b> На конкурентном рынке '
+      + 'цену не назначает никто, поэтому при квоте она не определена однозначно и может '
+      + 'стоять где угодно между $S(Q_к)$ и $D(Q_к)$ — этот промежуток и рисуется коридором. '
+      + 'У монополиста рыночная власть: цену назначает он сам и всегда берёт ВЕРХНИЙ край, '
+      + 'то есть максимальную цену, по которой разрешённый объём ещё выбирают, $P = D(Q_к)$. '
+      + 'Выбирать не из чего, поэтому ползунка цены здесь нет — его не забыли.</p>'
+      + '<p><b>Выгодна ли квота монополисту?</b> Нет. Он и без неё выпускал ровно столько, '
+      + 'сколько считал выгодным; запрет может только помешать. Излишек производителя падает, '
+      + 'потери общества растут: квота ниже монопольного выпуска уводит рынок ЕЩЁ ДАЛЬШЕ от '
+      + 'эффективного объёма, а не приближает к нему.</p></div>';
+    if (!qt || !(STATE.quota > 0)) {
+      box.innerHTML = '<div class="muted">Двигайте ползунок квоты $Q_к$: она ограничивает выпуск сверху. '
+        + 'Связывает, только если ниже монопольного выпуска.</div>' + why;
+      return;
+    }
+    if (!qt.binding) {
+      box.innerHTML = `<div class="warn">Квота Q<sub>к</sub>=${fmt(qt.Qk)} не ниже монопольного выпуска `
+        + `(Q<sub>m</sub>=${fmt(m.Qm)}), поэтому не связывает: монополист и так выпускает меньше.</div>` + why;
+      return;
+    }
+    const rows = [
+      ['Q (выпуск)', m.Qm, qt.Q],
+      ['P (цена)', m.Pm, qt.price],
+      ['CS', m.csM, qt.csM],
+      ['PS', m.psM, qt.psM],
+      ['DWL', m.dwl, qt.dwl],
+    ];
+    let html = `<div class="stat"><span>Квота $Q_к$</span><b>${fmt(qt.Qk)}</b></div>`;
+    html += '<table class="tx-table"><tr><th></th><th>Было</th><th>Стало</th><th>Δ</th></tr>';
+    rows.forEach(([k, a, b]) => {
+      if (a == null || b == null) return;
+      const d = b - a, ds = (d > 0 ? '+' : '') + fmt(d);
+      html += `<tr><td>${k}</td><td>${fmt(a)}</td><td>${fmt(b)}</td><td>${ds}</td></tr>`;
+    });
+    html += '</table>';
+    html += '<div class="hint" style="margin-top:6px;">Выпуск падает до квоты, цена растёт до '
+          + 'спроса при этом объёме. Коридора цен нет: монополист назначает цену сам и берёт '
+          + 'верхний край. Его излишек при этом ПАДАЕТ — квота монополисту невыгодна.</div>';
+    box.innerHTML = html + why;
     return;
   }
   if (it === 'floor') {

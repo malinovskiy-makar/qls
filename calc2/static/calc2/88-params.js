@@ -92,7 +92,12 @@ function pultRegulatorIds() {
       if (STATE.monoMode !== 'simple') return ['mono-submode'];
       const t0 = STATE.intervType;
       const ids = ['mono-submode'];
-      if (t0 === 'tax' || t0 === 'subsidy') ids.push('tax-field'); else ids.push('pc-field');
+      /* ⚠️ КВОТА ЗДЕСЬ ОТСУТСТВОВАЛА, И В МОНОПОЛИИ ЕЁ ПОЛЕ ОСТАВАЛОСЬ БЕЗ
+         ОБЩЕГО КОМПОНЕНТА: при выборе «Квота» в ленту уходило поле ЦЕНЫ, и
+         числовое поле рядом с ползунком квоты возвращалось (замер 31.08). */
+      if (t0 === 'tax' || t0 === 'subsidy') ids.push('tax-field');
+      else if (t0 === 'quota') ids.push('quota-field');
+      else ids.push('pc-field');
       return ids;
     }
     const t = STATE.intervType;

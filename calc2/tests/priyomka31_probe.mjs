@@ -774,6 +774,189 @@ if (need('Д6')) {
   flag('числовых полей рядом с ползунками нет', nu.length === 0, nu.length + ' шт.');
 }
 
+/* ═══════════ Д7. Квота в монополии ══════════════════════════════════ */
+if (need('Д7')) {
+  head('Д7 · квота в монополии: D = 100 − Q, MC = 20');
+  const r = await page.evaluate(() => {
+    const snap = () => {
+      const m = STATE.mono || {}, q = STATE.monoQuota;
+      const box = document.getElementById('info-tax');
+      const ex = document.getElementById('ex-body');
+      const txt = ((box ? box.textContent : '') + ' ' + (ex ? ex.textContent : '')).replace(/\s+/g, ' ');
+      return { Qm: m.Qm, Pm: m.Pm, psM: m.psM, csM: m.csM, dwl: m.dwl,
+               has: q ? 1 : 0, binding: (q && q.binding) ? 1 : 0,
+               Q: q ? q.Q : null, P: q ? q.price : null,
+               PS: q ? q.psM : null, CS: q ? q.csM : null, DWL: q ? q.dwl : null,
+               /* Ползунок цены внутри коридора в монополии появляться не должен. */
+               corridor: (() => { const e = document.getElementById('quota-price-field');
+                 return (e && (e.offsetParent || e.getClientRects().length)) ? 1 : 0; })(),
+               noCorridorWords: txt.indexOf('коридора цен') >= 0 || txt.indexOf('НЕТ коридора') >= 0 ? 1 : 0,
+               /* Подсказка конкурентного рынка в монополии прямо врёт: там нет
+                  ни коридора, ни выбора цены человеком. */
+               noCompHint: txt.indexOf('Двигайте цену внутри коридора') < 0 ? 1 : 0,
+               /* Числовое поле рядом с ползунком квоты — в монополии тоже нет. */
+               numField: (() => { const e = document.getElementById('quota-input');
+                 return (e && (e.offsetParent || e.getClientRects().length)) ? 1 : 0; })(),
+               explainWords: txt.indexOf('верхний край') >= 0 || txt.indexOf('ВЕРХНИЙ край') >= 0 ? 1 : 0,
+               lossWords: txt.indexOf('невыгодна') >= 0 ? 1 : 0 };
+    };
+    const setQ = (v) => {
+      resetSceneMemory(); pickScene('mono'); redrawAll();
+      setType('quota'); setQuota(v); redrawAll();
+      document.querySelectorAll('.fold-btn').forEach(b => {
+        if (b.getAttribute('aria-expanded') !== 'true') b.click();
+      });
+      redrawAll();
+      return snap();
+    };
+    resetSceneMemory(); pickScene('mono'); redrawAll();
+    const base = snap();
+    return { base: base, q60: setQ(60), q40: setQ(40), q20: setQ(20) };
+  });
+  console.log('  · без квоты');
+  show('Qm', r.base.Qm, 40, 1e-6);
+  show('Pm', r.base.Pm, 60, 1e-6);
+  show('PS', r.base.psM, 1600, 1e-3);
+  show('CS', r.base.csM, 800, 1e-3);
+  show('DWL', r.base.dwl, 800, 1e-3);
+  console.log('  · квота 60 — выше выпуска, связывать не должна');
+  flag('  расчёт квоты выполнен вообще', r.q60.has === 1, String(r.q60.has));
+  flag('  квота НЕ связывает', r.q60.binding === 0, String(r.q60.binding));
+  show('  Qm не сдвинулся', r.q60.Qm, 40, 1e-6);
+  show('  Pm не сдвинулся', r.q60.Pm, 60, 1e-6);
+  console.log('  · квота 40 — ровно выпуск, связывать не должна');
+  flag('  квота НЕ связывает', r.q40.binding === 0, String(r.q40.binding));
+  show('  Qm не сдвинулся', r.q40.Qm, 40, 1e-6);
+  show('  Pm не сдвинулся', r.q40.Pm, 60, 1e-6);
+  console.log('  · квота 20 — ниже выпуска, СВЯЗЫВАЕТ');
+  flag('  квота связывает', r.q20.binding === 1, String(r.q20.binding));
+  show('  выпуск Q', r.q20.Q, 20, 1e-6);
+  show('  цена P', r.q20.P, 80, 1e-6);
+  show('  PS', r.q20.PS, 1200, 1e-3);
+  show('  CS', r.q20.CS, 200, 1e-3);
+  show('  DWL', r.q20.DWL, 1800, 1e-3);
+  flag('  излишек монополиста УПАЛ (квота ему невыгодна)',
+       r.q20.PS < r.base.psM - 1e-6, num(r.base.psM) + ' → ' + num(r.q20.PS));
+  flag('  потери общества ВЫРОСЛИ', r.q20.DWL > r.base.dwl - 1e-6,
+       num(r.base.dwl) + ' → ' + num(r.q20.DWL));
+  flag('  ползунка цены внутри коридора в монополии НЕТ', r.q20.corridor === 0, String(r.q20.corridor));
+  flag('  про отсутствие коридора сказано словами', r.q20.noCorridorWords === 1, String(r.q20.noCorridorWords));
+  flag('  сказано, что монополист берёт верхний край', r.q20.explainWords === 1, String(r.q20.explainWords));
+  flag('  сказано, что квота монополисту невыгодна', r.q20.lossWords === 1, String(r.q20.lossWords));
+  flag('  конкурентной подсказки про коридор в монополии НЕТ', r.q20.noCompHint === 1, String(r.q20.noCompHint));
+  flag('  числового поля рядом с ползунком квоты НЕТ', r.q20.numField === 0, String(r.q20.numField));
+  await page.evaluate(() => { resetSceneMemory(); pickScene('mono'); setType('quota'); setQuota(20); redrawAll();
+    document.querySelectorAll('.fold-btn').forEach(b => { if (b.getAttribute('aria-expanded') !== 'true') b.click(); }); redrawAll(); });
+  await page.waitForTimeout(400);
+  await shot('d7-mono-quota-20');
+}
+
+/* ═══════════ Д8. Матрица охвата: сцена × вид вмешательства ══════════ */
+if (need('Д8')) {
+  head('Д8 · матрица охвата: все сцены × все виды вмешательства');
+  const keys = await page.evaluate(() => Object.keys(SCENE_NAMES));
+  const TYPES = [
+    ['налог потоварный', 'tax', 'unit'],
+    ['налог процентный', 'tax', 'excise'],
+    ['субсидия потоварная', 'subsidy', 'unit'],
+    ['субсидия процентная', 'subsidy', 'subbuyer'],
+    ['потолок', 'ceiling', null],
+    ['пол', 'floor', null],
+    ['квота', 'quota', null],
+  ];
+  const rows = [];
+  for (const k of keys) {
+    const r = await page.evaluate(([key, TYPES]) => {
+      /* ⚠️ ОТПЕЧАТКОМ СЛУЖИТ ИСХОД МОДЕЛИ, А НЕ КАРТИНКА И НЕ ТЕКСТ ТАБЛО.
+         Первая версия этой матрицы сравнивала пути SVG плюс текст панели — и
+         оказалась беззубой: проверка на возвращённом дефекте (квота в
+         монополии выключена) всё равно писала «да». Причина в том, что от
+         выбора вида меняются и подпись, и вертикаль квоты на холсте, даже
+         когда САМА МОДЕЛЬ стоит на месте.
+         Правило же простое: связывающее вмешательство обязано сдвинуть исход —
+         объём и цену. Их и сравниваем. Механизмы перечислены поимённо; появится
+         новый и сюда не попадёт — ячейка честно скажет «не подключено», то
+         есть ошибётся в безопасную сторону. */
+      const outcome = () => {
+        if (STATE.market === 'monopoly') {
+          const r = STATE.monoTax || STATE.monoCeil || STATE.monoFloor || STATE.monoQuota;
+          if (r && r.binding !== false) {
+            const q = (r.Qt != null) ? r.Qt : ((r.Qstar != null) ? r.Qstar : r.Q);
+            const p = (r.Pt != null) ? r.Pt : r.price;
+            if (q != null && p != null) return [q, p];
+          }
+          return STATE.mono ? [STATE.mono.Qm, STATE.mono.Pm] : null;
+        }
+        if (STATE.taxEq) return [STATE.taxEq.Q, STATE.taxEq.Pb];
+        if (STATE.qt && STATE.qt.P != null) return [STATE.qt.Qq, STATE.qt.P];
+        /* Потолок и пол: объём торговли Qtrade при регулируемой цене Preg.
+           ⚠️ Имена полей здесь СВОИ, и на этом матрица уже споткнулась: с
+           «.Q» и «.P» она не находила ничего, откатывалась к исходному
+           равновесию и объявляла дырами работающие потолок и пол в сцене
+           «Пол и потолок цены». */
+        if (STATE.pc && STATE.pc.binding) return [STATE.pc.Qtrade, STATE.pc.Preg];
+        return STATE.eq ? [STATE.eq.Q, STATE.eq.P] : null;
+      };
+      const stamp = () => {
+        const o = outcome();
+        return o ? (Math.round(o[0] * 1e6) + '|' + Math.round(o[1] * 1e6)) : 'нет исхода';
+      };
+      const out = { scene: key, avail: false, cells: [] };
+      try { resetSceneMemory(); pickScene(key); redrawAll(); }
+      catch (e) { out.err = String(e.message); return out; }
+      const sec = document.getElementById('sec-tax');
+      /* Блок вмешательства бывает заперт маршрутом сцены (SCENE_ROUTE.lock) —
+         тогда вида вмешательства у сцены нет вовсе, и это не дыра. */
+      out.avail = !!(sec && !sec.classList.contains('scoped-off')
+                     && (sec.offsetParent || sec.getClientRects().length));
+      if (!out.avail) return out;
+      const base = stamp();
+      /* Значения подбираем ПОД СЦЕНУ: не связывающее вмешательство ничего не
+         меняет законно, и принять это за дыру было бы враньём. */
+      const eq = STATE.eq || (STATE.mono ? { Q: STATE.mono.Qm, P: STATE.mono.Pm } : null);
+      const P0 = eq ? eq.P : 50, Q0 = eq ? eq.Q : 50;
+      TYPES.forEach(([name, type, form]) => {
+        const cell = { name: name };
+        try {
+          resetSceneMemory(); pickScene(key); redrawAll();
+          setType(type);
+          if (form && typeof setTaxForm === 'function') setTaxForm(form);
+          if (type === 'tax' || type === 'subsidy') setTax(form === 'unit' ? Math.max(1, P0 * 0.3) : 30);
+          else if (type === 'ceiling') setPReg(P0 * 0.5);
+          else if (type === 'floor') setPReg(P0 * 1.5);
+          else if (type === 'quota') setQuota(Q0 * 0.5);
+          redrawAll();
+          cell.state = (stamp() === base) ? 'не подключено' : 'работает';
+        } catch (e) { cell.state = 'падает'; cell.err = String(e.message).slice(0, 60); }
+        out.cells.push(cell);
+      });
+      return out;
+    }, [k, TYPES]);
+    rows.push(r);
+  }
+  const names = TYPES.map(t => t[0]);
+  const withInterv = rows.filter(r => r.avail);
+  note('сцен всего: ' + rows.length + ', с блоком вмешательства: ' + withInterv.length);
+  const holes = [];
+  console.log('\n  СЦЕНА                    ' + names.map(n => n.slice(0, 9).padEnd(10)).join(''));
+  withInterv.forEach(r => {
+    const mark = (c) => c.state === 'работает' ? 'да' : (c.state === 'падает' ? 'ПАДАЕТ' : 'НЕТ');
+    console.log('  ' + r.scene.padEnd(24) + r.cells.map(c => mark(c).padEnd(10)).join(''));
+    r.cells.forEach(c => { if (c.state !== 'работает') holes.push(r.scene + ' × ' + c.name + ' — ' + c.state + (c.err ? ' (' + c.err + ')' : '')); });
+  });
+  console.log('\n  ДЫРЫ:');
+  if (!holes.length) console.log('     нет ни одной');
+  holes.forEach(h => console.log('     ' + h));
+  const crash = holes.filter(h => h.indexOf('падает') >= 0);
+  flag('ни одно вмешательство не падает с ошибкой', crash.length === 0, crash.length + ' шт.');
+  /* ⚠️ ПУСТАЯ МАТРИЦА — ЭТО ПРАВИЛО, А НЕ СВОДКА. Дыра здесь означает, что
+     вид вмешательства можно ВЫБРАТЬ, а модель на него не отзывается: ровно
+     так вела себя квота в монополии до 31.08. Проверено возвратом дефекта:
+     с выключенным monopolyQuota матрица находит ровно одну дыру, ту самую. */
+  flag('дыр в матрице охвата нет', holes.length === 0,
+       (holes.length - crash.length) + ' «не подключено», ' + crash.length + ' падений');
+}
+
 if (errs.length) { console.log('\nОШИБКИ СТРАНИЦЫ: ' + errs.slice(0, 6).join(' | ')); bad++; }
 console.log('\nИТОГО провалов: ' + bad);
 await browser.close();
