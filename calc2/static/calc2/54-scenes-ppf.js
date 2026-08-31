@@ -617,11 +617,60 @@ function fitLinear(xs, ys) {
   return { slope, intercept, r2 };
 }
 
+/* ⚠️ КРИВАЯ МОЖЕТ КАСАТЬСЯ ОСИ, А НЕ ПЕРЕСЕКАТЬ ЕЁ, И ТОГДА ГРАНИЦЫ НЕ ВИДНО.
+   ppfXmaxOf ищет СМЕНУ ЗНАКА, и для обычных КПВ этого довольно. Но многочлен
+   вида 100 − 20x + x² это (x − 10)²: он доходит до нуля при x = 10 и дальше
+   снова РАСТЁТ, отрицательным не становясь нигде. Смены знака нет, граница не
+   находится, и кривая объявлялась нераспознанной (замер 31.08).
+
+   Ищем минимум и принимаем его за конец области определения, только если он
+   действительно лежит НА оси. Проверка идёт по масштабу самой кривой: ноль
+   здесь — это «на девять порядков меньше, чем Ymax», а не «меньше 1e-9».
+
+   ⚠️ ЭТА ДВЕРЬ ОТКРЫВАЕТСЯ ТОЛЬКО ТАМ, ГДЕ СЕГОДНЯ ОТВЕТ «НЕ РАСПОЗНАНО».
+   Она зовётся после ppfXmaxOf и лишь при его отказе, поэтому ни на одну
+   существующую форму повлиять не может. */
+function ppfTouchXmax(f) {
+  const y0 = f(0);
+  if (!(y0 > 0)) return null;
+  /* ⚠️ ГРАНИЦУ ПОИСКА РАСШИРЯЕМ, ПОКА ФУНКЦИЯ УБЫВАЕТ, А НЕ «ПОКА ОПРЕДЕЛЕНА».
+     Многочлен определён везде и за минимумом снова растёт: расширение по
+     определённости уводило hi на 1e12, шаг скана становился 5·10⁸, и минимум
+     при x = 10 терялся между узлами — кривая оставалась нераспознанной. */
+  let hi = 1, prev = y0;
+  for (let k = 0; k < 60; k++) {
+    const v = f(hi);
+    if (isNaN(v) || v > prev) break;      // пошла вверх — минимум уже позади
+    prev = v; hi *= 2;
+  }
+  // Грубый скан + тернарный поиск: минимум у многочлена ровно один.
+  const N = 2000;
+  let bx = 0, bv = y0;
+  for (let i = 1; i <= N; i++) {
+    const x = hi * i / N, v = f(x);
+    if (isNaN(v)) break;
+    if (v < bv) { bv = v; bx = x; }
+  }
+  if (!(bx > 0)) return null;
+  let lo = Math.max(0, bx - hi / N), up = Math.min(hi, bx + hi / N);
+  for (let k = 0; k < 200; k++) {
+    const m1 = lo + (up - lo) / 3, m2 = up - (up - lo) / 3;
+    const v1 = f(m1), v2 = f(m2);
+    if (isNaN(v1) || isNaN(v2)) break;
+    if (v1 < v2) up = m2; else lo = m1;
+  }
+  const x = (lo + up) / 2, v = f(x);
+  if (!isFinite(v) || Math.abs(v) > Math.abs(y0) * 1e-9) return null;   // минимум не на оси
+  return (x > 0) ? x : null;
+}
+
 // Распознать тип КПВ из набора по пробным точкам внутри домена.
 // Возвращает { type, a, b, Xmax, Ymax }: linear (a-b·x), ellipse (sqrt(a-b·x²)),
 // parabola (a-b·x²), convex (a-b·√x) или { type:'unknown' }.
 function classifyPpf(f) {
-  const Xmax = ppfXmaxOf(f);
+  let Xmax = ppfXmaxOf(f);
+  // Кривая может КАСАТЬСЯ оси, не переходя её (см. ppfTouchXmax).
+  if (Xmax == null || !(Xmax > 0)) Xmax = ppfTouchXmax(f);
   if (Xmax == null || !(Xmax > 0)) return { type: 'unknown', Xmax: null };
   const Ymax = f(0);
   const xs = [0.2, 0.4, 0.6, 0.8].map(t => Xmax * t);
@@ -636,7 +685,62 @@ function classifyPpf(f) {
   if (par && par.r2 > 1 - TOL) return { type: 'parabola', a: Ymax, b: -par.slope, Xmax, Ymax };
   const cvx = fitLinear(xs.map(x => Math.sqrt(x)), ys);            // y vs √x   →  выпуклая
   if (cvx && cvx.r2 > 1 - TOL) return { type: 'convex', a: Ymax, b: -cvx.slope, Xmax, Ymax };
+
+  /* ─ ОБЩИЙ МНОГОЧЛЕН ВТОРОЙ СТЕПЕНИ ────────────────────────────────
+     ⚠️ ПОДГОНКА ИДЁТ НЕ ПО ТРЁМ НЕИЗВЕСТНЫМ, А ПО ДВУМ, И ЭТО ТОЧНЕЕ.
+     Свободный член известен ТОЧНО: c₀ = f(0) = Ymax, мерить его незачем.
+     Остаток делим на x и получаем ПРЯМУЮ: (y − c₀)/x = c₁ + c₂·x. Дальше
+     работает та же подгонка прямой, что и у остальных форм, а нормальные
+     уравнения с четвёртыми степенями x — с их обусловленностью — не нужны.
+     Согласие проверяем на ИСХОДНЫХ y, а не на преобразованных: r² по
+     промежуточной величине сказал бы не о том. */
+  const inner = xs.map((x, i) => (ys[i] - Ymax) / x);
+  const pq = fitLinear(xs, inner);            // inner = c₁ + c₂·x
+  if (pq) {
+    const cand = { type: 'poly2', c0: Ymax, c1: pq.intercept, c2: pq.slope, Xmax, Ymax };
+    if (ppfFitR2(xs, ys, (x) => cand.c0 + cand.c1 * x + cand.c2 * x * x) > 1 - TOL
+        && ppfValid(cand)) {
+      /* Конец области берём из САМОЙ формулы (меньший положительный корень), а
+         не из численного поиска: у касания он точен, а поиск даёт 10,000000076. */
+      cand.Xmax = ppfPoly2Xmax(cand);
+      return cand;
+    }
+  }
+
+  /* ─ ОБЩАЯ СТЕПЕННАЯ f(x) = a − b·x^k ──────────────────────────────
+     a = f(0) известно; подгоняем ln(a − y) по ln(x): наклон даёт k, свободный
+     член — ln b. Пробные точки строго внутри домена, поэтому a − y > 0 и
+     логарифм определён. */
+  const okLog = xs.every((x, i) => x > 0 && (Ymax - ys[i]) > 0);
+  if (okLog) {
+    const pw = fitLinear(xs.map(Math.log), xs.map((x, i) => Math.log(Ymax - ys[i])));
+    if (pw && isFinite(pw.slope) && isFinite(pw.intercept)) {
+      const cand = { type: 'power', a: Ymax, b: Math.exp(pw.intercept), k: pw.slope, Xmax, Ymax };
+      if (ppfFitR2(xs, ys, (x) => cand.a - cand.b * Math.pow(Math.max(0, x), cand.k)) > 1 - TOL
+          && ppfValid(cand)) {
+        cand.Xmax = Math.pow(cand.a / cand.b, 1 / cand.k);
+        return cand;
+      }
+    }
+  }
   return { type: 'unknown', Xmax, Ymax };
+}
+
+/* Коэффициент согласия модели g с пробными точками — по САМИМ y, каким бы
+   преобразованием ни пользовалась подгонка. */
+function ppfFitR2(xs, ys, g) {
+  const n = ys.length;
+  let mean = 0;
+  for (let i = 0; i < n; i++) mean += ys[i];
+  mean /= n;
+  let ssRes = 0, ssTot = 0;
+  for (let i = 0; i < n; i++) {
+    const p = g(xs[i]);
+    if (!isFinite(p)) return -Infinity;
+    ssRes += (ys[i] - p) * (ys[i] - p);
+    ssTot += (ys[i] - mean) * (ys[i] - mean);
+  }
+  return (ssTot < 1e-12) ? 1 : (1 - ssRes / ssTot);
 }
 
 // Ближайшее «красивое» число ≥ v (для подгонки масштаба осей).
@@ -978,6 +1082,8 @@ const PPF_FAMILIES = {
     Ymax: (c) => c.a,
     f: (c, x) => c.a - c.b * x * x,
     xOf: (c, lam) => lam / (2 * c.b),
+    // x(λ) = λ / (2b)
+    xOfTex: (c) => '\\dfrac{\\lambda}{' + fmt(2 * c.b) + '}',
     ocAt0: () => 0,
     ocAtMax: (c) => 2 * Math.sqrt(c.a * c.b),
   },
@@ -988,6 +1094,9 @@ const PPF_FAMILIES = {
     f: (c, x) => { const v = c.a - c.b * x * x; return v > 0 ? Math.sqrt(v) : 0; },
     xOf: (c, lam) => (isFinite(lam) ? lam * Math.sqrt(c.a / (c.b * (c.b + lam * lam)))
                                     : Math.sqrt(c.a / c.b)),
+    // x(λ) = λ·√( a / (b·(b + λ²)) )
+    xOfTex: (c) => '\\lambda\\sqrt{\\dfrac{' + fmt(c.a) + '}{' + fmt(c.b)
+                 + '\\,(' + fmt(c.b) + ' + \\lambda^{2})}}',
     ocAt0: () => 0,
     /* Насыщения при конечном λ у дуги НЕТ: у самого края издержки уходят в
        бесконечность. Последний участок доводится до Xᵐᵃˣ аналитически, и
@@ -1000,10 +1109,94 @@ const PPF_FAMILIES = {
     Ymax: (c) => c.a,
     f: (c, x) => c.a - c.b * Math.sqrt(Math.max(0, x)),
     xOf: (c, lam) => (lam > 0 ? (c.b / (2 * lam)) * (c.b / (2 * lam)) : Infinity),
+    // x(λ) = b² / (4λ²)
+    xOfTex: (c) => '\\dfrac{' + fmt(c.b * c.b / 4) + '}{\\lambda^{2}}',
     ocAt0: () => Infinity,
     ocAtMax: (c) => c.b * c.b / (2 * c.a),
   },
+  /* ─ ОБЩИЙ МНОГОЧЛЕН ВТОРОЙ СТЕПЕНИ: f(x) = c₀ + c₁·x + c₂·x² ─────────
+     ⚠️ ТИП ИЗДЕРЖЕК ЧИТАЕТСЯ ПО ЗНАКУ c₂, А НЕ МЕРЯЕТСЯ ЧИСЛЕННО.
+     OC(x) = −(c₁ + 2·c₂·x) — она линейна по x, и её наклон это −2·c₂:
+     c₂ < 0 → издержки растут, c₂ = 0 → постоянны, c₂ > 0 → УБЫВАЮТ.
+     ⚠️ Парабола (c₁ = 0) — частный случай этого семейства, и распознаётся
+     ОТДЕЛЬНО и РАНЬШЕ: у неё приняты свои контрольные числа, и переписывать
+     принятое ради единообразия нельзя. */
+  poly2: {
+    cost: (c) => (c.c2 < -PPF_EPS ? 'up' : (c.c2 > PPF_EPS ? 'down' : 'const')),
+    valid: (c) => isFinite(c.c0) && isFinite(c.c1) && isFinite(c.c2)
+                  && c.c0 > 0 && isFinite(ppfPoly2Xmax(c)) && ppfPoly2Xmax(c) > 0,
+    Xmax: (c) => ppfPoly2Xmax(c),
+    Ymax: (c) => c.c0,
+    f: (c, x) => c.c0 + c.c1 * x + c.c2 * x * x,
+    xOf: (c, lam) => ((Math.abs(c.c2) < PPF_EPS) ? NaN : (-lam - c.c1) / (2 * c.c2)),
+    // x(λ) = (−λ − c₁) / (2c₂)
+    xOfTex: (c) => '\\dfrac{' + fmt(-c.c1) + ' - \\lambda}{' + fmt(2 * c.c2) + '}',
+    ocAt0: (c) => -c.c1,
+    ocAtMax: (c) => -(c.c1 + 2 * c.c2 * ppfPoly2Xmax(c)),
+  },
+  /* ─ ОБЩАЯ СТЕПЕННАЯ: f(x) = a − b·x^k, a > 0, b > 0, k > 0 ──────────
+     OC(x) = b·k·x^(k−1): k > 1 — издержки растут, k = 1 — постоянны,
+     0 < k < 1 — убывают.
+     ⚠️ Семейство поглощает и параболу (k = 2), и выпуклую (k = 0,5). Обе
+     существующие строки ОСТАВЛЕНЫ и пробуются раньше — их контрольные числа
+     приняты. Степенная идёт ПОСЛЕДНЕЙ, как запасной путь. */
+  power: {
+    cost: (c) => (c.k > 1 + PPF_EPS ? 'up' : (c.k < 1 - PPF_EPS ? 'down' : 'const')),
+    valid: (c) => isFinite(c.a) && isFinite(c.b) && isFinite(c.k)
+                  && c.a > 0 && c.b > 0 && c.k > 0,
+    Xmax: (c) => Math.pow(c.a / c.b, 1 / c.k),
+    Ymax: (c) => c.a,
+    f: (c, x) => c.a - c.b * Math.pow(Math.max(0, x), c.k),
+    xOf: (c, lam) => {
+      if (Math.abs(c.k - 1) < PPF_EPS) return NaN;      // OC постоянна, обратной нет
+      const t = lam / (c.b * c.k);
+      if (!(t > 0)) return (c.k > 1) ? 0 : Infinity;
+      return Math.pow(t, 1 / (c.k - 1));
+    },
+    // x(λ) = (λ / (b·k))^(1/(k−1))
+    xOfTex: (c) => '\\left(\\dfrac{\\lambda}{' + fmt(c.b * c.k) + '}\\right)^{'
+                 + fmt(1 / (c.k - 1)) + '}',
+    ocAt0: (c) => (c.k > 1 + PPF_EPS ? 0 : (c.k < 1 - PPF_EPS ? Infinity : c.b)),
+    ocAtMax: (c) => c.b * c.k * Math.pow(Math.pow(c.a / c.b, 1 / c.k), c.k - 1),
+  },
 };
+
+/* Меньший положительный корень c₂x² + c₁x + c₀ = 0 — там многочлен впервые
+   касается оси X, и это и есть конец области определения. */
+function ppfPoly2Xmax(c) {
+  if (Math.abs(c.c2) < PPF_EPS) return (c.c1 < 0) ? (-c.c0 / c.c1) : NaN;
+  let D = c.c1 * c.c1 - 4 * c.c2 * c.c0;
+  /* ⚠️ КАСАНИЕ ОСИ — ЭТО ДИСКРИМИНАНТ РОВНО НОЛЬ, А РОВНО НОЛЯ В ПЛАВАЮЩЕЙ
+     ТОЧКЕ НЕ БЫВАЕТ. У 100 − 20x + x² корень двойной, и коэффициенты приходят
+     из подгонки: дискриминант выходит порядка 1e-11 то в плюс, то в минус.
+     Отрицательный на волосок означает то же касание, а не «корней нет».
+     Допуск берём относительный — по масштабу самих слагаемых. */
+  const scale = Math.max(Math.abs(c.c1 * c.c1), Math.abs(4 * c.c2 * c.c0), 1);
+  if (D < 0) { if (D >= -1e-9 * scale) D = 0; else return NaN; }
+  const s = Math.sqrt(D), d = 2 * c.c2;
+  const roots = [(-c.c1 - s) / d, (-c.c1 + s) / d].filter(r => r > PPF_EPS).sort((u, v) => u - v);
+  return roots.length ? roots[0] : NaN;
+}
+
+/* ⚠️ ТИП ИЗДЕРЖЕК У ДВУХ СЕМЕЙСТВ ЗАВИСИТ ОТ САМИХ ЧИСЕЛ, А НЕ ОТ СТРОКИ.
+   У прямой, параболы, дуги и выпуклой он постоянен и записан словом; у общего
+   многочлена он читается по знаку c₂, у степенной — по показателю k. Поэтому
+   спрашивать `F.cost` напрямую больше нельзя: спрашиваем через эту дверь. */
+function ppfCostOf(c) {
+  const F = ppfFam(c);
+  if (!F) return 'unknown';
+  return (typeof F.cost === 'function') ? F.cost(c) : F.cost;
+}
+
+/* Годятся ли числа кривой для аналитики. У старых семейств проверка одна и та
+   же (a и b положительны и конечны), у новых — своя: у многочлена параметров
+   три, и «b» у него нет вовсе. */
+function ppfValid(c) {
+  const F = ppfFam(c);
+  if (!F) return false;
+  if (F.valid) return F.valid(c);
+  return isFinite(c.a) && isFinite(c.b) && c.a > 0 && c.b > 0;
+}
 
 const PPF_EPS = 1e-9;
 function ppfFam(c) { return (c && PPF_FAMILIES[c.type]) || null; }
@@ -1038,6 +1231,13 @@ function ppfReduceActive(list) {
 /* Набор математикой и запись Math.js для одного участка. Оба берутся из одних
    и тех же чисел: разъехаться им негде. */
 function ppfPieceTex(p) {
+  if (p.kind === 'param') {
+    /* Одна строка, как и у всех остальных участков (правило владельца 31.08).
+       Обе x(λ) — закрытые формы из таблицы семейств. */
+    return 'X(\\lambda) = ' + p.x1tex + ' + ' + p.x2tex
+         + ',\\; Y(\\lambda) = f_1\\!\\left(' + p.x1tex + '\\right) + f_2\\!\\left('
+         + p.x2tex + '\\right)';
+  }
   if (p.kind === 'linear') {
     const c0 = p.y0 + p.b * p.x0;
     return fmt(c0) + ' - ' + ppfCoefTex(p.b);
@@ -1056,12 +1256,63 @@ function ppfPieceTex(p) {
     const co = (Math.abs(p.c.b - 1) < 1e-12) ? '' : fmt(p.c.b);
     return fmt(K) + ' - ' + co + '\\sqrt{' + (shifted ? ('X - ' + fmt(sh)) : 'X') + '}';
   }
+  if (p.kind === 'poly2') {
+    return ppfPolyJoin(ppfPoly2Terms(p), fmt, '', 'X^2');
+  }
+  if (p.kind === 'power') {
+    // Степенная: Y = yConst + a − b·(X − sh)^k. Форма та же, что у параболы.
+    const K = p.yConst + p.c.a;
+    const cw = (Math.abs(p.c.b - 1) < 1e-12) ? '' : (fmt(p.c.b) + (shifted ? '\\cdot ' : ''));
+    return fmt(K) + ' - ' + cw + arg + '^{' + fmt(p.c.k) + '}';
+  }
   // дуга: Y = yConst + √(a − b·(X − sh)²)
   const co = (Math.abs(p.c.b - 1) < 1e-12) ? '' : (fmt(p.c.b) + '\\cdot ');
   const root = '\\sqrt{' + fmt(p.c.a) + ' - ' + co + arg + '^2}';
   return (Math.abs(p.yConst) > 1e-9) ? (fmt(p.yConst) + ' + ' + root) : root;
 }
+/* ⚠️ МНОГОЧЛЕН ПЕЧАТАЕТСЯ РАСКРЫТЫМ, А НЕ СДВИНУТЫМ.
+   У параболы, дуги и выпуклой участок записывается сдвигом — «64 − (X − 2,5)³»
+   читается как «та же кривая, начатая позже». У общего многочлена сдвиг
+   ничего не объясняет: «100 − 20(X − 10) + (X − 10)²» это тот же многочлен
+   второй степени, только в неудобном виде. Раскрываем и печатаем по убыванию
+   степени: X² − 40X + 400.
+   Коэффициенты раскрытия: Y = yConst + c₀ + c₁(X − s) + c₂(X − s)²
+     при X²  →  c₂
+     при X   →  c₁ − 2·c₂·s
+     свободный →  yConst + c₀ − c₁·s + c₂·s² */
+function ppfPoly2Terms(p) {
+  const s = p.xConst, c = p.c;
+  return { q: c.c2,
+           l: c.c1 - 2 * c.c2 * s,
+           k: p.yConst + c.c0 - c.c1 * s + c.c2 * s * s };
+}
+/* Собрать многочлен из коэффициентов: знаки, единичные множители и пропуск
+   нулевых слагаемых — в одном месте, чтобы TeX и запись Math.js не разъехались.
+   `mul` — как печатать умножение на X (в TeX его нет, в Math.js это «*»),
+   `pow` — как печатать степень. */
+function ppfPolyJoin(t, num, mul, powX2) {
+  const parts = [];
+  const term = (v, tail) => {
+    if (Math.abs(v) < 1e-12) return;
+    const first = !parts.length;
+    const sign = (v < 0) ? (first ? '-' : ' - ') : (first ? '' : ' + ');
+    const a = Math.abs(v);
+    const co = (tail && Math.abs(a - 1) < 1e-12) ? '' : (num(a) + (tail ? mul : ''));
+    parts.push(sign + co + (tail || ''));
+  };
+  term(t.q, powX2);
+  term(t.l, 'X');
+  term(t.k, '');
+  return parts.length ? parts.join('') : '0';
+}
+
 function ppfPieceBody(p) {
+  /* ⚠️ У ПАРАМЕТРИЧЕСКОГО УЧАСТКА ЗАПИСИ ДЛЯ ПОЛЯ ВВОДА НЕТ, И ПРИДУМЫВАТЬ ЕЁ
+     НЕЛЬЗЯ. Кнопка «копировать» возвращает запись в поле формулы; параметр λ
+     поле не понимает, а подсунуть вместо него численную подгонку значило бы
+     отдать человеку не ту функцию. Возвращаем null — запись целиком остаётся
+     без кнопки копирования (см. ppfPiecesRecord). */
+  if (p.kind === 'param') return null;
   if (p.kind === 'linear') {
     const c0 = p.y0 + p.b * p.x0;
     return ppfNum(c0) + ' - ' + (Math.abs(p.b - 1) < 1e-12 ? 'X' : ppfNum(p.b) + '*X');
@@ -1080,6 +1331,13 @@ function ppfPieceBody(p) {
     const inner = (Math.abs(sh) > 1e-9) ? ('X - ' + ppfNum(sh)) : 'X';
     return ppfNum(K) + ' - ' + co + 'sqrt(' + inner + ')';
   }
+  if (p.kind === 'poly2') {
+    return ppfPolyJoin(ppfPoly2Terms(p), ppfNum, '*', 'X^2');
+  }
+  if (p.kind === 'power') {
+    const K = p.yConst + p.c.a;
+    return ppfNum(K) + ' - ' + co + arg + '^' + ppfNum(p.c.k);
+  }
   const root = 'sqrt(' + ppfNum(p.c.a) + ' - ' + co + arg + '^2)';
   return (Math.abs(p.yConst) > 1e-9) ? (ppfNum(p.yConst) + ' + ' + root) : root;
 }
@@ -1087,6 +1345,9 @@ function ppfPieceBody(p) {
    Y = yConst + f(X − xConst), — поэтому считает их одна строка через таблицу
    семейств: второго описания парабол, дуг и выпуклых здесь нет. */
 function ppfPieceAt(p, X) {
+  /* Численная подстановка: решаем X(λ) = X и берём Y(λ). Это допущено решением
+     владельца 31.08 — численна только отрисовка, а печатается закрытая запись. */
+  if (p.kind === 'param') return p.solveY(X);
   if (p.kind === 'linear') return p.y0 - p.b * (X - p.x0);
   const F = ppfFam(p.c);
   if (!F) return NaN;
@@ -1118,7 +1379,11 @@ function ppfPiecesRecord(pieces, kind) {
   const latex = (ps.length === 1)
     ? ('Y = ' + ppfPieceTex(ps[0]) + ',\\ 0 \\le X \\le ' + fmt(Xtot))
     : ('Y = \\begin{cases} ' + rows.join(' \\\\ ') + ' \\end{cases}');
-  const expr = ppfPiecesToExpr(ps.map(p => ({ x0: p.x0, x1: p.x1, body: ppfPieceBody(p) })));
+  const bodies = ps.map(p => ppfPieceBody(p));
+  // Хоть один участок без записи для поля — записи для поля нет у всей функции.
+  const expr = bodies.some(b => b == null)
+    ? null
+    : ppfPiecesToExpr(ps.map((p, i) => ({ x0: p.x0, x1: p.x1, body: bodies[i] })));
   const evalY = (X) => {
     if (X < -1e-9 || X > Xtot + 1e-9) return NaN;
     for (const p of ps) if (X <= p.x1 + 1e-9) return ppfPieceAt(p, X);
@@ -1137,8 +1402,8 @@ function ppfSumByEqualCost(cs) {
   if (!cs || cs.length < 2) return null;
   for (const c of cs) {
     const F = ppfFam(c);
-    if (!F || F.cost === 'down') return null;             // это не случай A
-    if (!isFinite(c.a) || !isFinite(c.b) || !(c.b > 0) || !(c.a > 0)) return null;
+    if (!F || ppfCostOf(c) === 'down') return null;       // это не случай A
+    if (!ppfValid(c)) return null;
   }
   const lin = cs.filter(c => c.type === 'linear');
   const nl = cs.filter(c => c.type !== 'linear');
@@ -1242,8 +1507,9 @@ function ppfSumByEnvelope(cs) {
   if (!cs || cs.length < 2 || cs.length > 5) return null;
   for (const c of cs) {
     const F = ppfFam(c);
-    if (!F || (F.cost !== 'down' && F.cost !== 'const')) return null;
-    if (!isFinite(c.a) || !isFinite(c.b) || !(c.a > 0) || !(c.b > 0)) return null;
+    const kind = ppfCostOf(c);
+    if (!F || (kind !== 'down' && kind !== 'const')) return null;
+    if (!ppfValid(c)) return null;
   }
   const n = cs.length;
   const Xof = (c) => ppfFam(c).Xmax(c);
@@ -1361,7 +1627,7 @@ function ppfCostKinds(cs) {
   return (cs || []).map((c, i) => {
     const F = ppfFam(c);
     if (!F) return { i, kind: 'unknown', name: ppfSumName(i) };
-    return { i, name: ppfSumName(i), kind: F.cost,
+    return { i, name: ppfSumName(i), kind: ppfCostOf(c),
              from: F.ocAt0(c), to: F.ocAtMax(c) };
   });
 }
@@ -1381,7 +1647,8 @@ function ppfWhyNumeric(cs) {
   const bad = ks.filter(o => o.kind === 'unknown');
   if (bad.length) {
     return 'Построена численно: ' + bad.map(o => o.name).join(', ')
-      + ' не удалось отнести ни к одной известной форме (прямая, парабола, дуга, выпуклая).';
+      + ' не удалось отнести ни к одной известной форме (прямая, парабола, дуга, '
+      + 'выпуклая, общий многочлен второй степени, степенная).';
   }
   const up = ks.filter(o => o.kind === 'up'), down = ks.filter(o => o.kind === 'down');
   if (up.length && down.length) {
@@ -1397,6 +1664,197 @@ function ppfWhyNumeric(cs) {
     + 'у этого набора не удаётся: закрытой формы по участкам у него нет.';
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   СЛУЧАЙ В — СМЕШАННАЯ ПАРА: у одной кривой издержки РАСТУТ, у другой УБЫВАЮТ.
+   Решение владельца 31.08. До него такой набор получал честный отказ.
+
+   Для ДВУХ кривых кандидатов ровно пять, и каждый — закрытая форма:
+     (1) x₁ = 0      → Y = Ymax₁ + f₂(X),        X ∈ [0; Xmax₂]
+     (2) x₂ = 0      → Y = Ymax₂ + f₁(X),        X ∈ [0; Xmax₁]
+     (3) x₁ = Xmax₁  → Y = f₂(X − Xmax₁),        X ∈ [Xmax₁; Xtot]
+     (4) x₂ = Xmax₂  → Y = f₁(X − Xmax₂),        X ∈ [Xmax₂; Xtot]
+     (5) равные издержки: x₁(λ), x₂(λ) при общем λ, обе внутри своих отрезков
+   Ответ — ВЕРХНЯЯ ОГИБАЮЩАЯ пяти кандидатов.
+
+   ⚠️ КАНДИДАТА (5) ВЫБРОСИТЬ НЕЛЬЗЯ, и «в смешанном случае оптимум всегда в
+   углу» — неправда. Вторая производная суммы равна f₁'' + f₂'', и при вогнутой
+   f₁ и выпуклой f₂ она может быть отрицательной: внутренний максимум там
+   существует. Контрольное число это стережёт: на паре 100 − x² и 20 − 10√x при
+   X = 5 ответ 99,07 (внутреннее решение), а огибающая по одним углам даёт
+   ровно 99,00.
+
+   ⚠️ ГРАНИЦЫ УЧАСТКОВ ИЩУТСЯ ЧИСЛЕННО, А САМИ УЧАСТКИ ОСТАЮТСЯ ФОРМУЛАМИ.
+   Выдавать это за полностью символьное решение нельзя, и в отчёте так и
+   написано. То же самое уже сказано про случай Б.
+
+   ⚠️ ПАРАМЕТРИЧЕСКИЙ УЧАСТОК — ЭТО ЗАКРЫТАЯ ЗАПИСЬ, А НЕ ЧИСЛЕННЫЙ ОТВЕТ.
+   Уравнение равных издержек в смешанной паре даёт кубическое; явное Y(X)
+   технически выразимо, но нечитаемо. Поэтому участок печатается через общий
+   уровень издержек λ: X(λ) = x₁(λ) + x₂(λ), Y(λ) = f₁(x₁(λ)) + f₂(x₂(λ)).
+   Обе x(λ) берутся из xOfTex таблицы семейств.
+   Численно здесь только ПОДСТАНОВКА при отрисовке: чтобы нарисовать точку по
+   заданному X, надо решить X(λ) = X. Это допущено решением владельца.
+   ═══════════════════════════════════════════════════════════════════════ */
+function ppfSumMixedPair(cs) {
+  if (!cs || cs.length !== 2) return null;
+  const c1 = cs[0], c2 = cs[1];
+  const F1 = ppfFam(c1), F2 = ppfFam(c2);
+  if (!F1 || !F2 || !ppfValid(c1) || !ppfValid(c2)) return null;
+  const X1 = F1.Xmax(c1), X2 = F2.Xmax(c2);
+  const Y1 = F1.Ymax(c1), Y2 = F2.Ymax(c2);
+  if (!(X1 > 0) || !(X2 > 0) || !isFinite(Y1) || !isFinite(Y2)) return null;
+  const Xtot = X1 + X2, Ytot = Y1 + Y2;
+  const val = (F, c, x) => F.f(c, ppfClamp(x, 0, F.Xmax(c)));
+
+  /* Кандидаты 1–4 — сдвинутые копии, ровно та же форма участка, что у случая Б. */
+  const shifts = [
+    { kind: c2.type, c: c2, F: F2, xConst: 0,  yConst: Y1, lo: 0,  hi: X2 },
+    { kind: c1.type, c: c1, F: F1, xConst: 0,  yConst: Y2, lo: 0,  hi: X1 },
+    { kind: c2.type, c: c2, F: F2, xConst: X1, yConst: 0,  lo: X1, hi: Xtot },
+    { kind: c1.type, c: c1, F: F1, xConst: X2, yConst: 0,  lo: X2, hi: Xtot },
+  ];
+  const cands = shifts.map(o => Object.assign({ param: false }, o));
+
+  /* Кандидат 5. Отрезок по λ — пересечение отрезков, на которых x(λ) каждой
+     кривой лежит внутри своего домена. У растущих издержек x(λ) возрастает,
+     у убывающих убывает, поэтому концы берём по min/max, не гадая о знаке. */
+  const span = (F, c) => {
+    const u = F.ocAt0(c), v = F.ocAtMax(c);
+    return [Math.min(u, v), Math.max(u, v)];
+  };
+  const s1 = span(F1, c1), s2 = span(F2, c2);
+  let lamLo = Math.max(s1[0], s2[0]), lamHi = Math.min(s1[1], s2[1]);
+  /* Бесконечный верх (у дуги издержки уходят в бесконечность у самого края)
+     обрезаем: считать по бесконечному отрезку нечем, а всё существенное
+     происходит на конечном. */
+  if (!isFinite(lamHi)) lamHi = Math.max(lamLo * 1e6, 1e6);
+  let par = null;
+  if (isFinite(lamLo) && lamLo >= 0 && lamHi > lamLo + PPF_EPS
+      && typeof F1.xOf === 'function' && typeof F2.xOf === 'function'
+      && typeof F1.xOfTex === 'function' && typeof F2.xOfTex === 'function') {
+    const x1of = (lam) => ppfClamp(F1.xOf(c1, lam), 0, X1);
+    const x2of = (lam) => ppfClamp(F2.xOf(c2, lam), 0, X2);
+    const Xof = (lam) => x1of(lam) + x2of(lam);
+    const Yof = (lam) => val(F1, c1, x1of(lam)) + val(F2, c2, x2of(lam));
+    /* ⚠️ X(λ) НЕ ОБЯЗАНА БЫТЬ МОНОТОННОЙ. На паре 100 − x² и 20 − 10√x она
+       сперва убывает, потом растёт, и одному X отвечают ДВА значения λ.
+       Значит обращать надо перебором всех смен знака, а из найденных решений
+       брать наибольший Y: огибающая — это максимум. */
+    const solveY = (X) => {
+      const N = 400;
+      let best = NaN, prevL = lamLo, prevD = Xof(lamLo) - X;
+      for (let i = 1; i <= N; i++) {
+        const lam = lamLo + (lamHi - lamLo) * i / N, d = Xof(lam) - X;
+        if (isFinite(prevD) && isFinite(d) && prevD * d <= 0 && prevD !== d) {
+          let a = prevL, b = lam;
+          for (let k = 0; k < 60; k++) {
+            const m = (a + b) / 2;
+            if ((Xof(a) - X) * (Xof(m) - X) <= 0) b = m; else a = m;
+          }
+          const y = Yof((a + b) / 2);
+          if (isFinite(y) && (!isFinite(best) || y > best)) best = y;
+        }
+        prevL = lam; prevD = d;
+      }
+      return best;
+    };
+    const xs = [Xof(lamLo), Xof(lamHi)];
+    par = { param: true, kind: 'param', lamLo, lamHi, Xof, Yof, solveY,
+            x1tex: F1.xOfTex(c1), x2tex: F2.xOfTex(c2),
+            lo: Math.min(xs[0], xs[1]), hi: Math.max(xs[0], xs[1]) };
+    /* Внутри отрезка X(λ) может уходить ниже концов — расширяем область
+       кандидата по фактическому ходу. */
+    for (let i = 0; i <= 400; i++) {
+      const v = Xof(lamLo + (lamHi - lamLo) * i / 400);
+      if (isFinite(v)) { par.lo = Math.min(par.lo, v); par.hi = Math.max(par.hi, v); }
+    }
+    cands.push(par);
+  }
+
+  const atCand = (o, X) => {
+    if (X < o.lo - 1e-9 || X > o.hi + 1e-9) return NaN;
+    if (o.param) return o.solveY(X);
+    const v = o.yConst + val(o.F, o.c, X - o.xConst);
+    return isFinite(v) ? v : NaN;
+  };
+  const bestAt = (X) => {
+    let bi = -1, bv = -Infinity;
+    for (let i = 0; i < cands.length; i++) {
+      const v = atCand(cands[i], X);
+      if (isFinite(v) && v > bv + 1e-12) { bv = v; bi = i; }
+    }
+    return { i: bi, v: bv };
+  };
+
+  /* Разбиваем [0; Xtot] на участки по тому, КТО побеждает. Границу между
+     соседними победителями уточняем бисекцией по разности кандидатов. */
+  const N = 600;
+  const marks = [];
+  let prev = bestAt(0);
+  if (prev.i < 0) return null;
+  let start = 0, cur = prev.i;
+  for (let i = 1; i <= N; i++) {
+    const X = Xtot * i / N;
+    const b = bestAt(X);
+    if (b.i < 0) return null;
+    if (b.i !== cur) {
+      // Граница между cur и b.i где-то на (Xprev, X].
+      let a = Xtot * (i - 1) / N, z = X;
+      for (let k = 0; k < 60; k++) {
+        const m = (a + z) / 2;
+        const d = atCand(cands[cur], m) - atCand(cands[b.i], m);
+        if (isFinite(d) && d > 0) a = m; else z = m;
+      }
+      const cut = ppfSnap((a + z) / 2);
+      if (cut > start + 1e-7) { marks.push({ i: cur, x0: start, x1: cut }); start = cut; }
+      cur = b.i;
+    }
+  }
+  if (Xtot > start + 1e-7) marks.push({ i: cur, x0: start, x1: ppfSnap(Xtot) });
+  if (!marks.length) return null;
+
+  // Соседние куски одного кандидата склеиваем: излома между ними нет.
+  const merged = [];
+  marks.forEach(m => {
+    const last = merged[merged.length - 1];
+    if (last && last.i === m.i) last.x1 = m.x1; else merged.push(Object.assign({}, m));
+  });
+
+  const pieces = merged.map(m => {
+    const o = cands[m.i];
+    if (o.param) {
+      /* Концы по λ у КУСКА, а не у всего кандидата: печатать надо тот отрезок,
+         на котором этот кусок и стоит. */
+      const lamAt = (X) => {
+        let a = o.lamLo, b = o.lamHi, best = null, bd = Infinity;
+        const M = 400;
+        for (let i = 0; i <= M; i++) {
+          const lam = o.lamLo + (o.lamHi - o.lamLo) * i / M;
+          const d = Math.abs(o.Xof(lam) - X);
+          if (d < bd) { bd = d; best = lam; }
+        }
+        return best;
+      };
+      return { kind: 'param', x0: m.x0, x1: m.x1, lam0: lamAt(m.x0), lam1: lamAt(m.x1),
+               x1tex: o.x1tex, x2tex: o.x2tex, solveY: o.solveY };
+    }
+    return { kind: o.kind, c: o.c, xConst: o.xConst, yConst: o.yConst, x0: m.x0, x1: m.x1 };
+  });
+
+  const rec = ppfPiecesRecord(pieces, 'смешанная пара');
+  if (!rec) return null;
+  if (Math.abs(rec.Xtot - Xtot) > 1e-6 * Math.max(1, Xtot)) return null;
+  if (Math.abs(rec.evalY(0) - Ytot) > 1e-6 * Math.max(1, Ytot)) return null;
+  /* Слова про λ — рядом с записью, а не внутри неё: участок обязан остаться
+     одной строкой (правило владельца 31.08 про компактную запись). */
+  if (pieces.some(p => p.kind === 'param')) {
+    rec.note = 'На параметрическом участке $X$ и $Y$ заданы через общий уровень '
+      + 'альтернативных издержек. Здесь $\\lambda$ это альтернативные издержки единицы '
+      + '$X$, выраженные в $Y$. Явного $Y(X)$ там нет в элементарных функциях.';
+  }
+  return rec;
+}
+
 /* Единая точка входа в аналитику суммарной КПВ. Метод выбирается по ТИПУ
    альтернативных издержек набора, и это не мелочь: при растущих АИ оптимум
    внутренний (равенство издержек), при убывающих его нет вовсе (полная
@@ -1405,13 +1863,15 @@ function ppfWhyNumeric(cs) {
 function ppfSumAnalytic(cs) {
   if (!cs || cs.length < 2) return null;
   if (!cs.every(c => ppfFam(c))) return null;            // есть нераспознанная кривая
-  const kinds = new Set(cs.map(c => ppfFam(c).cost));
+  const kinds = new Set(cs.map(c => ppfCostOf(c)));
   if (!kinds.has('down')) return ppfSumByEqualCost(cs);  // случай A: растут или постоянны
   if (!kinds.has('up')) return ppfSumByEnvelope(cs);     // случай Б: убывают или постоянны
-  /* Случай В — в наборе есть и растущие издержки, и убывающие. Закрытой формы
-     общим механизмом здесь нет: у одних полей оптимум внутри, у других в углу.
-     Молча возвращать null мало — причину называет ppfCostKinds, и панель её
-     печатает словами (фаза 10). */
+  /* Случай В — в наборе есть и растущие издержки, и убывающие.
+     Для ДВУХ кривых он решается полностью (решение владельца 31.08): пять
+     кандидатов, верхняя огибающая, параметрическая запись на участке равных
+     издержек. Для трёх и больше перебор кандидатов растёт как n·2ⁿ⁻¹, и это
+     отдельная задача — там по-прежнему численно, с названной причиной. */
+  if (cs.length === 2) return ppfSumMixedPair(cs);
   return null;
 }
 
@@ -1593,6 +2053,7 @@ function recomputePpfSumRaw() {
      распознавателем, три и больше честно строятся численно. */
   let formulaText, formulaTex = null, formulaType = null, kinksXY;
   let formulaExpr = null;                     // та же запись в синтаксисе Math.js
+  let formulaNote = null;                     // приписка словами под записью
   const lin = combinedPpfLinearRecord(cs);
   /* ⚠️ ОБЩИЙ МЕХАНИЗМ РАЗВОРАЧИВАНИЯ ПО λ ИДЁТ ВТОРЫМ, А НЕ ПЕРВЫМ.
      Он умеет и линейные наборы (они его частный случай, и постоянная проверка
@@ -1614,6 +2075,9 @@ function recomputePpfSumRaw() {
     formulaExpr = gen.expr;
     formulaText = null;
     formulaType = gen.type;
+    /* Приписка к записи (у смешанной пары — что такое λ). Живёт РЯДОМ с
+       записью, а не внутри неё: участок обязан остаться одной строкой. */
+    formulaNote = gen.note || null;
     kinksXY = gen.kinks;
   } else if (n === 2) {
     const fr = combinedPpfFormula(cs[0], cs[1]);
@@ -1646,7 +2110,7 @@ function recomputePpfSumRaw() {
     ok: true, points, n, parts: pts,
     c1pts: pts[0], c2pts: pts[1],                   // прежние имена для старой отрисовки
     Xtot, Ytot, x1max: xmax[0], x2max: xmax[1], xmax,
-    formulaText, formulaTex, formulaExpr,
+    formulaText, formulaTex, formulaExpr, formulaNote,
     costs: ppfCostKinds(cs),          // тип альт. издержек каждой кривой
     kinks, type: formulaType || (n === 2 ? combinedPpfFormula(cs[0], cs[1]).type : 'numeric'),
     order,
@@ -1787,7 +2251,8 @@ function updatePpfSumPanel() {
   if (typeof setFinalFunctions === 'function') {
     const color = STATE.ppfSumColor || COL.D;
     setFinalFunctions([d.formulaTex
-      ? { name: 'Суммарная КПВ', color, latex: d.formulaTex, expr: d.formulaExpr || '' }
+      ? { name: 'Суммарная КПВ', color, latex: d.formulaTex, expr: d.formulaExpr || '',
+          note: d.formulaNote || '' }
       : { name: 'Суммарная КПВ', color, note: d.formulaText || 'Форма кривой не подобралась.' }]);
   }
   const ord = d.order || [];
@@ -1817,12 +2282,14 @@ function updatePpfSumPanel() {
   }
 
   html += '<div class="sb-note"><b>Как это получилось</b>';
-  html += '<p><b>Почему кривые нельзя просто сложить по вертикали?</b> Потому что участники ДЕЛЯТ общий выпуск. Складываем по Минковскому: для каждого суммарного выпуска '
-        + '$X$ перебираем все способы разделить его между участниками и берём тот, где общий '
-        + '$Y$ наибольший. Формально это '
-        + '$Y(X) = \\max\\{\\, \\sum_i f_i(x_i) \\;:\\; \\sum_i x_i = X \\,\\}$. '
-        + 'Вертикальная сумма $f_1(X) + f_2(X)$ дала бы другую и неверную кривую: '
-        + 'она означала бы, что каждый выпускает по $X$ единиц, а не что они делят общий выпуск.</p>';
+  /* ⚠️ АБЗАЦА «ПОЧЕМУ КРИВЫЕ НЕЛЬЗЯ ПРОСТО СЛОЖИТЬ ПО ВЕРТИКАЛИ» ЗДЕСЬ
+     БОЛЬШЕ НЕТ, И ВОЗВРАЩАТЬ ЕГО НЕЛЬЗЯ (указание владельца 31.08).
+     Он открывал карточку разбора и объяснял, чего делать НЕ надо, — вместе с
+     формулой Минковского $Y(X) = \max\{\sum f_i(x_i) : \sum x_i = X\}$.
+     Карточка отвечает на вопрос «как это получилось», а не «как это НЕ
+     получилось»; всё нужное говорят оставшиеся абзацы: кто начинает первым,
+     откуда излом, где концы кривой и где искать саму запись.
+     На отсутствие абзаца стоит постоянная проверка. */
 
   /* ⚠️ ТАБЛИЦА ОЧЕРЕДИ ГОДИТСЯ НЕ ВСЕГДА, И МОЛЧА ПОКАЗЫВАТЬ ЕЁ НЕЛЬЗЯ.
      Она ставит поля по ОДНОМУ числу — альтернативным издержкам X. Это верно,

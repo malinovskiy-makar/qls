@@ -116,6 +116,14 @@ function redrawScene() {
       drawMonopoly();
       drawMonoFloorPoints();     // новый M(Q,Pf) + призрак M₀(Qm,Pm)
       drawMonoFloorLine();       // перетаскиваемая линия пола
+    } else if (STATE.monoQuota && STATE.monoQuota.binding) {
+      // Связывающая квота (приёмка 31.08): выпуск = Qk, цена = D(Qk).
+      // Коридора цен здесь нет — монополист берёт верхний край (см. monopolyQuota).
+      drawMonoQuotaAreas();
+      drawCurves();
+      drawMonopoly();
+      drawMonoQuotaPoints();     // новый M(Qk, D(Qk)) + призрак M₀(Qm,Pm)
+      drawMonoQuotaLine();       // вертикаль разрешённого объёма
     } else {
       // Обычная монополия (вмешательства нет / не связывает): потери DWL, D/MC, MR, точки.
       drawMonopolyAreas();
@@ -124,6 +132,7 @@ function redrawScene() {
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
       if (STATE.intervType === 'ceiling' && STATE.pReg > 0) drawMonoCeilingLine();  // линия видна, но не связывает
       else if (STATE.intervType === 'floor' && STATE.pReg > 0) drawMonoFloorLine(); // линия видна, но не связывает
+      else if (STATE.intervType === 'quota' && STATE.quota > 0) drawMonoQuotaLine();// вертикаль видна, но не связывает
     }
   } else if (STATE.scenario === 'externality') {
     // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).
