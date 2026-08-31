@@ -124,6 +124,17 @@
         "reports"
       ],
       "port": 8413
+    },
+    {
+      "name": "tmap",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv313/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8414",
+        "--noreload"
+      ],
+      "port": 8414
     }
   ]
 }

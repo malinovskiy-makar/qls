@@ -1,0 +1,553 @@
+/* Карта тем и тегов — /catalog/map/
+ *
+ * Все цвета берутся из токенов (`templates/_tokens.html`): собственных
+ * значений здесь нет, карта следует теме сайта, а не задаёт свою.
+ * Цвет узла один на всю карту — `--map-node`; всё подсвеченное рисуется
+ * акцентом платформы `--accent` (ADR 0038).
+ *
+ * ⚠️ НИ ОДИН СЛОЙ НАД ХОЛСТОМ НЕ ИМЕЕТ backdrop-filter. Браузер размывает
+ * подложку заново на каждом кадре, и карта падала с 60 кадров до 25.
+ * Обычной полупрозрачной заливки достаточно.
+ */
+
+.tmap {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 52px);      /* 52px — высота шапки сайта */
+  min-height: 480px;
+  overflow: hidden;                /* правило 1.9.1: страница не едет вбок */
+}
+
+/* ── Шапка карты ─────────────────────────────────────────────────────── */
+.tmap-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  border-bottom: var(--line) solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.tmap-head-title { min-width: 0; }
+.tmap-head h1 {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  letter-spacing: -.2px;
+}
+.tmap-sub {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+
+.tmap-search {
+  margin-left: auto;
+  position: relative;
+  flex-shrink: 0;
+}
+.tmap-search input {
+  width: 260px;
+  height: 32px;
+  padding: 0 46px 0 10px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.tmap-search input::placeholder { color: var(--text3); }
+.tmap-search input:focus {
+  outline: none;
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+.tmap-search-count {
+  position: absolute;
+  right: 9px; top: 50%;
+  transform: translateY(-50%);
+  font-size: 11px;
+  color: var(--text3);
+  pointer-events: none;
+}
+
+.tmap-icon-btn {
+  width: 30px; height: 30px;
+  flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  color: var(--text2);
+  text-decoration: none;
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.tmap-icon-btn:hover { background: var(--chip-bg); color: var(--text); }
+
+/* ── Тело: холст и панель ────────────────────────────────────────────── */
+.tmap-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  position: relative;              /* якорь для полосы затухания панели */
+}
+.tmap-canvas-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+}
+/* ⚠️ ХОЛСТ АБСОЛЮТНЫЙ, И ЭТО НЕ УКРАШЕНИЕ.
+   Скрипт задаёт ему точные `style.width/height` в пикселях (нужно для
+   чёткости на экранах с удвоенной плотностью). В обычном потоке эта
+   ширина распирает контейнер: стоило сузить окно, и холст оставался
+   прежним — страница ехала вбок, нарушая правило 1.9.1 канона. Абсолютный
+   холст размер контейнера не задаёт, а получает. */
+#tmap-canvas {
+  display: block;
+  position: absolute;
+  top: 0; left: 0;
+  cursor: grab;
+  touch-action: none;
+}
+#tmap-canvas.is-drag { cursor: grabbing; }
+#tmap-canvas.is-hit  { cursor: pointer; }
+#tmap-canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+
+/* Масштаб — в углу холста, поверх, без фильтров. */
+.tmap-zoom {
+  position: absolute;
+  left: 14px; bottom: 14px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+}
+.tmap-zoom-val {
+  font-size: 11px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+  padding: 0 6px 0 4px;
+  min-width: 42px;
+}
+.tmap-zoom button {
+  width: 24px; height: 24px;
+  font: inherit; font-size: 13px; line-height: 1;
+  color: var(--text2);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.tmap-zoom button:hover { background: var(--chip-bg); color: var(--text); }
+
+/* ── Правая панель ───────────────────────────────────────────────────── */
+.tmap-panel {
+  width: 290px;
+  flex-shrink: 0;
+  /* ⚠️ ГРАНИЦА В ДВЕ ВОЛОСИНЫ, А НЕ В ОДНУ. В светлой теме холст (--bg,
+     #f5f5f3) и панель (--surface, #ffffff) отличаются на четыре процента
+     светлоты, и одинокая линия в 12 % непрозрачности между ними
+     пропадала: панель выглядела продолжением холста. Вторая волосина
+     кладётся тенью внутрь — она не занимает места в раскладке и не
+     сдвигает содержимое панели на пиксель. */
+  border-left: var(--line) solid var(--border);
+  box-shadow: inset var(--line) 0 0 var(--border);
+  background: var(--surface);
+  /* ⚠️ ПАНЕЛЬ БОЛЬШЕ НЕ ОБЩИЙ СКРОЛЛЕР. Пока она им была, блок «Под
+     курсором» менял высоту под длину описания и тащил за собой список тем:
+     верх первой строки прыгал на 18 px, строка уходила из-под курсора,
+     наведение слетало, блок возвращался — самоподдерживающееся дрожание.
+     Теперь панель — колонка на всю высоту: неподвижная шапка сверху,
+     прокрутка внутри нижнего контейнера. */
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Блок «Под курсором»: высота задана и НЕ зависит от содержимого.
+   210 px хватает самому высокому виду (тег с описанием и списком смежных);
+   что не влезло — прокручивается внутри самого блока. */
+#tmap-hover-block {
+  flex: none;
+  height: 210px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Прокручиваемая часть панели: «Выбрано», «Темы», «Разделы». */
+.tmap-panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* Полоса затухания у нижней кромки панели: намёк, что список продолжается.
+   Гаснет, когда прокручивать больше нечего (класс ставит скрипт). */
+.tmap-panel-fade {
+  position: absolute;
+  right: 0; bottom: 0;
+  width: 290px;
+  height: 44px;
+  pointer-events: none;
+  background: linear-gradient(to bottom,
+              rgba(0, 0, 0, 0), var(--surface) 88%);
+  transition: opacity var(--t-slow);
+}
+.tmap-panel-fade.is-off { opacity: 0; }
+.tmap-block {
+  padding: 14px 16px;
+  border-bottom: var(--line) solid var(--border-soft);
+}
+.tmap-block:last-child { border-bottom: none; }
+.tmap-block-h {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+  color: var(--text3);
+  margin-bottom: 10px;
+}
+
+/* Блок «Под курсором» */
+.tmap-kind {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: .4px;
+  text-transform: uppercase;
+  color: var(--chip-text);
+  background: var(--chip-bg);
+  padding: 2px 7px;
+  border-radius: var(--r-pill);
+  margin-bottom: 7px;
+}
+.tmap-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.tmap-parent {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text2);
+  margin-top: 5px;
+}
+.tmap-def {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.45;
+  margin-top: 6px;
+}
+.tmap-num {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.tmap-num b { font-weight: 600; }
+/* Канон 2.3: отсутствие числа — прочерк и объяснение, а не пустота. */
+.tmap-num--none { color: var(--text3); }
+.tmap-near-h {
+  font-size: 11px;
+  color: var(--text3);
+  margin: 12px 0 5px;
+}
+.tmap-near {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.tmap-near-item {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.35;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 2px 0;
+  cursor: pointer;
+}
+.tmap-near-item:hover { color: var(--text); }
+.tmap-near-n {
+  flex-shrink: 0;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+/* Число задач у тега в карточке связи: прижато вправо, чтобы два тега
+   читались списком с общей колонкой чисел, а не строками разной длины. */
+.tmap-near-c {
+  margin-left: auto;
+  padding-left: 8px;
+  flex-shrink: 0;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Пока человек идёт по линии: чем родственны теги и откуда он вышел.
+   «Откуда» — мельче и тише: главный вопрос в пути «куда приду», а не
+   «откуда шёл», и строка не должна спорить с именем цели. */
+.tmap-why-link {
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.4;
+  margin-top: 8px;
+}
+.tmap-why-link b { font-weight: 600; color: var(--text); }
+.tmap-from {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Подсказка «Как читать карту» — когда ничего не выбрано и не наведено. */
+.tmap-howto { font-size: 12px; color: var(--text2); line-height: 1.5; }
+.tmap-howto li { list-style: none; display: flex; gap: 8px; margin-top: 7px; }
+.tmap-howto li:first-child { margin-top: 0; }
+.tmap-howto svg { flex-shrink: 0; margin-top: 3px; }
+
+/* Чипы выбранного */
+.tmap-chips { display: flex; flex-wrap: wrap; gap: 5px; }
+.tmap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  font-size: 11.5px;
+  color: var(--text);
+  background: var(--accent-tint);
+  border: var(--line) solid var(--accent-ring);
+  border-radius: var(--r-pill);
+  padding: 3px 5px 3px 9px;
+}
+.tmap-chip-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tmap-chip button {
+  flex-shrink: 0;
+  width: 15px; height: 15px;
+  display: flex; align-items: center; justify-content: center;
+  font: inherit; font-size: 11px; line-height: 1;
+  color: var(--text2);
+  background: none; border: none;
+  border-radius: var(--r-pill);
+  cursor: pointer;
+}
+.tmap-chip button:hover { color: var(--text); background: var(--chip-bg); }
+
+/* Навигатор «Темы» */
+.tmap-themes-group { margin-bottom: 12px; }
+.tmap-themes-group:last-child { margin-bottom: 0; }
+.tmap-themes-group-h {
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 4px;
+}
+.tmap-theme-row {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text2);
+  text-align: left;
+  background: none;
+  border: none;
+  border-radius: var(--r-sm);
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.tmap-theme-row:hover,
+.tmap-theme-row.is-on { background: var(--chip-bg); color: var(--text); }
+.tmap-theme-n {
+  flex-shrink: 0;
+  width: 18px;
+  font-size: 11px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+.tmap-theme-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tmap-theme-cnt {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Нижняя полоса ───────────────────────────────────────────────────── */
+.tmap-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 20px;
+  border-top: var(--line) solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+}
+.tmap-count {
+  font-size: 13px;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.tmap-note {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+}
+.tmap-foot-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+/* Канон 2.7: у выключенной кнопки причина стоит РЯДОМ, а не в подсказке. */
+.tmap-why {
+  font-size: 11.5px;
+  color: var(--text3);
+}
+.tmap-btn {
+  height: 32px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;             /* надпись не ломается на две строки */
+  color: var(--text);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: background var(--t), color var(--t), border-color var(--t);
+}
+.tmap-btn:hover { background: var(--chip-bg); }
+.tmap-btn:active { transform: translateY(1px); }
+.tmap-btn--main {
+  color: var(--on-btn);
+  background: var(--btn-bg);
+  border-color: transparent;
+}
+.tmap-btn--main:hover { background: var(--btn-bg-hover); }
+.tmap-btn--quiet {
+  background: none;
+  border-color: transparent;
+  color: var(--text2);
+}
+/* ⚠️ ВЫКЛЮЧЕННАЯ КНОПКА ОБЯЗАНА ЧИТАТЬСЯ ВЫКЛЮЧЕННОЙ.
+   При 0.5 «Показать задачи» в светлой теме выглядела почти как рабочая:
+   заливка тёмная, и половина непрозрачности всё равно даёт плотный
+   прямоугольник. Причина рядом остаётся текстом (.tmap-why) — подсказка
+   при наведении тут не годится, курсор на выключенной кнопке её и не
+   вызовет. */
+.tmap-btn:disabled {
+  opacity: .4;
+  cursor: default;
+  transform: none;
+}
+.tmap-btn:disabled:hover { background: var(--btn-bg); }
+.tmap-btn:not(.tmap-btn--main):disabled:hover { background: var(--surface-2); }
+
+/* ── Обучение при первом заходе ──────────────────────────────────────── */
+.tmap-tour {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+}
+/* Вырез-подсветка: прозрачный блок с огромной тенью наружу. Затемнение
+   рисует сама тень — отдельного слоя над холстом нет. */
+.tmap-tour-hole {
+  position: absolute;
+  border-radius: var(--r-card);
+  box-shadow: 0 0 0 9999px rgba(8, 11, 18, .58);
+  transition: all var(--t-slow) ease;
+  pointer-events: none;
+}
+.tmap-tour-card {
+  position: absolute;
+  width: 340px;
+  max-width: calc(100vw - 32px);
+  padding: 16px 18px;
+  background: var(--surface);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+}
+.tmap-tour-step {
+  font-size: 11px;
+  color: var(--text3);
+  margin-bottom: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.tmap-tour-card h2 {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  line-height: 1.35;
+}
+.tmap-tour-card p {
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.5;
+  margin-top: 7px;
+}
+.tmap-tour-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+.tmap-tour-dots {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+.tmap-tour-dots i {
+  width: 5px; height: 5px;
+  border-radius: var(--r-pill);
+  background: var(--border);
+}
+.tmap-tour-dots i.is-on { background: var(--accent); }
+.tmap-tour-foot .tmap-btn { height: 28px; padding: 0 11px; }
+
+/* ── Узкое окно ──────────────────────────────────────────────────────── */
+/* ⚠️ ВРЕМЕННОЕ РЕШЕНИЕ: правая панель прячется, карта остаётся целиком.
+   TODO: мобильная версия продумывается отдельно — на узком экране холст
+   становится маленьким, а навигатор по темам и чипы выбора недоступны.
+   Карточка идеи: Notion 3cbb11c92bc181629f4aff24af52d837. */
+@media (max-width: 899px) {
+  .tmap-panel { display: none; }
+  .tmap-panel-fade { display: none; }
+  .tmap-search input { width: 150px; }
+  .tmap-sub { display: none; }
+}
+@media (max-width: 620px) {
+  .tmap-foot { flex-wrap: wrap; gap: 8px; }
+  .tmap-foot-right { margin-left: 0; width: 100%; }
+  .tmap-why { flex: 1; }
+}

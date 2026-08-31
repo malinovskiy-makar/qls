@@ -134,12 +134,17 @@ function recompute() {
     // texExpr — запись той же кривой формулой, для выгрузки в LaTeX (А49).
     // Отдельное поле, а не expr: движок кривых поле expr понимает по-своему,
     // и подкладывать ему выражение в объект, у которого есть только fn, нельзя.
+    /* ⚠️ ЗАПИСЬ УПРОЩАЕТСЯ, А НЕ ОСТАЁТСЯ ШАБЛОНОМ (приёмка владельца 31.08).
+       Подстановка в шаблон давала человеку «(Q) + (-20)» и «(100 - Q) - (-20)»:
+       пока запись не показывалась, это было неважно, а теперь она стоит в
+       блоке «Итоговая функция». simplifyRecord упрощает ПОКУСОЧНО и сверяет
+       результат с исходником численно — не сошлось, оставит исходник. */
     const sSrc = (STATE.S && STATE.S.expr) ? String(STATE.S.expr) : '';
     const sAfter = adv
       ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; },
-          texExpr: sSrc ? '(' + sSrc + ') * ' + factor : '' }
+          texExpr: sSrc ? simplifyRecord('(' + sSrc + ') * ' + factor) : '' }
       : { fn: q => evalCurve(STATE.S, q) + shift,
-          texExpr: sSrc ? '(' + sSrc + ') + (' + shift + ')' : '' };
+          texExpr: sSrc ? simplifyRecord('(' + sSrc + ') + (' + shift + ')') : '' };
     /* Кривая после вмешательства готова — её и рисуем, независимо от того,
        найдётся ли дальше новое равновесие. */
     STATE.shift = shift;
@@ -152,7 +157,7 @@ function recompute() {
     const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
     STATE.taxAfterD = adv
       ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
-          texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
+          texExpr: dSrc ? simplifyRecord('(' + dSrc + ') / ' + factor) : '' }
       /* ⚠️ ЗНАК БЕРЁТСЯ У `shift`, А НЕ У СТАВКИ.
          Здесь стояло `- STATE.tax`, то есть знак был жёстко налоговым: при
          субсидии покупателю эффективный спрос ПОДНИМАЕТСЯ на ставку, а
@@ -161,7 +166,7 @@ function recompute() {
          D + s. Процентную ветку (`d / factor`) это не касается — она верна
          для всех четырёх форм таблицы PCT_FORMS. */
       : { fn: q => evalCurve(STATE.D, q) - shift,
-          texExpr: dSrc ? '(' + dSrc + ') - (' + shift + ')' : '' };
+          texExpr: dSrc ? simplifyRecord('(' + dSrc + ') - (' + shift + ')') : '' };
     STATE.taxCurveOn = true;
 
     const te = findEquilibrium(STATE.D, sAfter);
@@ -327,7 +332,7 @@ function recompute() {
   // оптимум MR = MC ± ставка), потолок (готовая ломаная-MR логика) и пол цены.
   // Активно только в обычной монополии и обычном сценарии; управляется ОБЩИМ
   // блоком «Вмешательство» — теми же intervType / STATE.tax / STATE.pReg, что и конкуренция.
-  STATE.monoCeil = null; STATE.monoTax = null; STATE.monoFloor = null;
+  STATE.monoCeil = null; STATE.monoTax = null; STATE.monoFloor = null; STATE.monoQuota = null;
   if (STATE.market === 'monopoly' && STATE.monoMode === 'simple' && scenarioNone && STATE.mono) {
     const it = STATE.intervType;
     if ((it === 'tax' || it === 'subsidy') && STATE.tax > 0) {
@@ -336,6 +341,15 @@ function recompute() {
       STATE.monoCeil = monopolyCeiling(STATE.pReg);
     } else if (it === 'floor' && STATE.pReg > 0) {
       STATE.monoFloor = monopolyFloor(STATE.pReg);
+    } else if (it === 'quota' && STATE.quota > 0) {
+      /* ⚠️ ЭТОЙ ВЕТКИ ЗДЕСЬ НЕ БЫЛО, И ИМЕННО ПОЭТОМУ КВОТА В МОНОПОЛИИ «НЕ
+         РАБОТАЛА» (приёмка владельца 31.08). Каскад разбирал три вида из
+         четырёх, «квота» не совпадала ни с одним, и не исполнялось ничего:
+         ни расчёта, ни отрисовки, ни строки на табло. Конкурентный механизм
+         квоты (выше в этой же функции) сюда попасть не мог: он опирается на
+         кривую предложения S и на равновесие D = S, а в монополии есть спрос
+         и предельные издержки. Подробности — в monopolyQuota. */
+      STATE.monoQuota = monopolyQuota(STATE.quota);
     }
   }
 
@@ -1384,7 +1398,22 @@ function sumPriceTop(ls) {
   return Math.max(100, top * 2);
 }
 
-function sumLinearRecord(groups) {
+/* ⚠️ СТОРОНА РЫНКА ЗДЕСЬ НЕ УКРАШЕНИЕ, А ЧАСТЬ ОТВЕТА.
+   Границы у спроса и предложения РАЗНОЙ ПРИРОДЫ, и различить их по одной
+   только арифметике участков нельзя:
+     • у СПРОСА последний участок кончается при P = 0 — все группы исчерпаны,
+       дальше покупателей нет. Для 100−Q и 60−Q это Q = 160, и это настоящая
+       экономическая граница;
+     • у ПРЕДЛОЖЕНИЯ верхней границы НЕ СУЩЕСТВУЕТ. Последний участок обрывался
+       на `sumPriceTop` — служебной подпорке для перебора участков по ценам
+       (max(100, 2 × макс. запретительная цена)). Для S₁ = Q, S₂ = Q + 20 это
+       ровно 100, при P = 100 объём равен 180 — и число 180 уезжало в
+       `sumDomainTo`, а оттуда в условие «20 ≤ Q ≤ 180» и в обрыв линии.
+   Почему формула последнего участка верна и выше потолка: потолок по
+   построению строго больше любой запретительной цены, значит выше него ни
+   одна новая группа войти уже не может, набор торгующих не меняется, и
+   участок тянется сколь угодно далеко. */
+function sumLinearRecord(groups, side) {
   if (!groups.length) return null;
   const ls = [];
   for (const c of groups) {
@@ -1417,6 +1446,8 @@ function sumLinearRecord(groups) {
   }
   if (!segs.length) return null;
   segs.sort((x, y) => x.lo - y.lo);
+  // У предложения последний участок не имеет правого края — см. выше.
+  const openRight = (side === 'S');
 
   /* ⚠️ ЗАПИСЬ ОБЯЗАНА БЫТЬ СПЛОШНОЙ ОТ Q = 0.
 
@@ -1459,7 +1490,7 @@ function sumLinearRecord(groups) {
      Отдаём правый конец отдельным полем. В `breaks` его дописывать НЕЛЬЗЯ:
      оттуда читают ключевые точки (лишняя отметка на графике) и
      integrateBroken — а конец кривой изломом не является. */
-  const domainTo = segs[segs.length - 1].hi;
+  const domainTo = openRight ? Infinity : segs[segs.length - 1].hi;
   /* Собираем цепочку условий тем же способом, что и конструктор кусочной:
      показывать её плоским списком умеет condChainToCases (82-input.js).
      Хвост NaN означает «вне участков функции нет» — там она не рисуется. */
@@ -1467,7 +1498,9 @@ function sumLinearRecord(groups) {
   for (let i = segs.length - 1; i >= 0; i--) {
     const s = segs[i];
     const last = (i === segs.length - 1);
-    const cond = '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
+    const cond = (last && openRight)
+      ? '(Q >= ' + s.lo + ')'
+      : '(Q >= ' + s.lo + ' and Q ' + (last ? '<= ' : '< ') + s.hi + ')';
     const body = (s.body != null) ? s.body : sumSegExpr(s.A, s.C);
     if (out === null) { out = cond + ' ? ' + body + ' : NaN'; continue; }
     out = cond + ' ? ' + body + ' : (' + out + ')';
@@ -1574,7 +1607,7 @@ function sumRebuildSide(side) {
   cur.sumGhostTo = 0;
   cur.sumDomainTo = 0;
   if (!groups.length) { cur.expr = ''; cur.sumNumeric = false; return; }
-  const rec = sumLinearRecord(groups);
+  const rec = sumLinearRecord(groups, side);
   if (rec) {
     /* ⚠️ ОДНО ЗНАЧЕНИЕ — ОДИН ИСТОЧНИК. Аналитическая запись не рисуется
        рядом с кривой «для красоты»: по ней кривая и считается. Второй
@@ -2576,7 +2609,30 @@ function applyTaxRateBounds() {
    при выборе «Субсидию получает: Покупатель» он врал вместе с графиком
    (замер 26.08). Собирается здесь, вместе с остальным каскадом, поэтому
    меняется вслед за стороной, а не живёт своей жизнью. */
+/* ⚠️ ПОДСКАЗКА КВОТЫ ЗАВИСИТ ОТ СТРОЕНИЯ РЫНКА, А НЕ ТОЛЬКО ОТ ВИДА
+   ВМЕШАТЕЛЬСТВА. В разметке лежит текст конкурентного рынка — про коридор
+   возможных цен и про то, что цену внутри него выбирает человек. В монополии
+   он прямо ВРЁТ: коридора там нет, цену назначает монополист и берёт верхний
+   край. На приёмке 31.08 этот текст стоял под связывающей квотой в монополии
+   рядом с таблицей, где никакого коридора не было. */
+const QUOTA_HINT_COMP =
+  'Квота ограничивает объём напрямую. Если она НИЖЕ равновесного количества, рыночная цена '
+  + 'не определена однозначно: подойдёт любая цена от той, по которой продавцы готовы отдать '
+  + 'этот объём, до той, по которой покупатели готовы его выбрать. Двигайте цену внутри '
+  + 'коридора: излишки перетекают между сторонами, а их сумма и потери общества не меняются.';
+const QUOTA_HINT_MONO =
+  'Квота ограничивает выпуск сверху и связывает, только если она НИЖЕ монопольного выпуска. '
+  + 'Коридора цен здесь нет: цену назначает сам монополист и берёт верхний край, то есть '
+  + 'максимальную цену, по которой разрешённый объём ещё выбирают. Квота монополисту '
+  + 'невыгодна: его излишек падает, а потери общества растут.';
+function syncQuotaHint() {
+  const h = document.getElementById('quota-hint');
+  if (!h) return;
+  h.textContent = (STATE.market === 'monopoly') ? QUOTA_HINT_MONO : QUOTA_HINT_COMP;
+}
+
 function syncTaxHint() {
+  syncQuotaHint();
   const h = document.getElementById('tax-hint');
   if (!h) return;
   const pf = pctForm();

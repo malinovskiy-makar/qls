@@ -263,6 +263,100 @@ r = await run(`setMode('math'); setMathSub('minmax'); STATE.mathFormula = 'x^2';
 cmp('пересечение f₁ и f₂: x', r.x, 1.5616, 1e-3);
 cmp('пересечение f₁ и f₂: y', r.y, 2.4384, 1e-3);
 
+/* --- приёмка 31.08: новые семейства КПВ и смешанные пары -------------- */
+head('Приёмка 31.08 · многочлен второй степени и степенная кривая');
+r = await run(`
+  var cls = function (e) { var q = compileFormula(e);
+    return classifyPpf(function (x) { return ppfEvalWith(q.compiled, x); }); };
+  var sum = function (a, b) {
+    resetSceneMemory(); pickScene('ppfsum');
+    STATE.ppfSumCount = 2; ppfSumSet(0, 'y = ' + a); ppfSumSet(1, 'y = ' + b);
+    if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+    recomputePpfSum(); redrawAll();
+    var d = STATE.ppfSumData || {};
+    return { tex: String(d.formulaTex || ''), Xtot: d.Xtot, Ytot: d.Ytot, kinks: d.kinks || [] };
+  };
+  var p = cls('100 - 20*x + x^2'), w = cls('64 - x^3');
+  var A = sum('100 - 20*x + x^2', '50 - 5*x'), B = sum('64 - x^3', '30 - 12*x');
+  var kx = function (o, i) { return (o.kinks[i] || [])[0]; };
+  var ky = function (o, i) { return (o.kinks[i] || [])[1]; };
+  return { pType: p.type, pCost: ppfCostOf(p), pXmax: p.Xmax, pYmax: p.Ymax, pC1: p.c1, pC2: p.c2,
+           wType: w.type, wCost: ppfCostOf(w), wK: w.k, wXmax: w.Xmax, wYmax: w.Ymax,
+           aP1: A.tex.indexOf('150 - 5X') >= 0 ? 1 : 0,
+           aP2: A.tex.indexOf('X^2 - 40X + 400') >= 0 ? 1 : 0,
+           aP3: A.tex.indexOf('100 - 5X') >= 0 ? 1 : 0,
+           aXtot: A.Xtot, aYtot: A.Ytot,
+           aK1x: kx(A, 0), aK1y: ky(A, 0), aK2x: kx(A, 1), aK2y: ky(A, 1),
+           bP1: B.tex.indexOf('94 - X^{3}') >= 0 ? 1 : 0,
+           bP2: B.tex.indexOf('110 - 12X') >= 0 ? 1 : 0,
+           bP3: B.tex.indexOf('64 - (X - 2,5)^{3}') >= 0 ? 1 : 0,
+           bXtot: B.Xtot, bYtot: B.Ytot,
+           bK1x: kx(B, 0), bK1y: ky(B, 0), bK2x: kx(B, 1), bK2y: ky(B, 1) };`);
+cmp('100 − 20x + x²: семейство', r.pType, 'poly2', 0);
+cmp('100 − 20x + x²: издержки', r.pCost, 'down', 0);
+cmp('100 − 20x + x²: Xmax', r.pXmax, 10, 1e-6);
+cmp('100 − 20x + x²: Ymax', r.pYmax, 100, 1e-9);
+cmp('100 − 20x + x²: c₁', r.pC1, -20, 1e-6);
+cmp('100 − 20x + x²: c₂', r.pC2, 1, 1e-6);
+cmp('64 − x³: семейство', r.wType, 'power', 0);
+cmp('64 − x³: издержки', r.wCost, 'up', 0);
+cmp('64 − x³: показатель k', r.wK, 3, 1e-6);
+cmp('64 − x³: Xmax', r.wXmax, 4, 1e-6);
+cmp('64 − x³: Ymax', r.wYmax, 64, 1e-9);
+cmp('многочлен+прямая: участок 150 − 5X', r.aP1, 1, 0);
+cmp('многочлен+прямая: участок X² − 40X + 400', r.aP2, 1, 0);
+cmp('многочлен+прямая: участок 100 − 5X', r.aP3, 1, 0);
+cmp('многочлен+прямая: конец X', r.aXtot, 20, 1e-4);
+cmp('многочлен+прямая: конец Y', r.aYtot, 150, 1e-6);
+cmp('многочлен+прямая: узел 1 X', r.aK1x, 10, 1e-6);
+cmp('многочлен+прямая: узел 1 Y', r.aK1y, 100, 1e-6);
+cmp('многочлен+прямая: узел 2 X', r.aK2x, 15, 1e-6);
+cmp('многочлен+прямая: узел 2 Y', r.aK2y, 25, 1e-6);
+cmp('степенная+прямая: участок 94 − X³', r.bP1, 1, 0);
+cmp('степенная+прямая: участок 110 − 12X', r.bP2, 1, 0);
+cmp('степенная+прямая: участок 64 − (X − 2,5)³', r.bP3, 1, 0);
+cmp('степенная+прямая: конец X', r.bXtot, 6.5, 1e-4);
+cmp('степенная+прямая: конец Y', r.bYtot, 94, 1e-6);
+cmp('степенная+прямая: узел 1 X', r.bK1x, 2, 1e-6);
+cmp('степенная+прямая: узел 1 Y', r.bK1y, 86, 1e-6);
+cmp('степенная+прямая: узел 2 X', r.bK2x, 4.5, 1e-6);
+cmp('степенная+прямая: узел 2 Y', r.bK2y, 56, 1e-6);
+
+head('Приёмка 31.08 · смешанная пара КПВ и параметрическая запись');
+r = await run(`
+  resetSceneMemory(); pickScene('ppfsum');
+  STATE.ppfSumCount = 2; ppfSumSet(0, 'y = 100 - x^2'); ppfSumSet(1, 'y = 20 - 10*sqrt(x)');
+  if (typeof renderPpfSumRows === 'function') renderPpfSumRows();
+  recomputePpfSum(); redrawAll();
+  var d = STATE.ppfSumData || {};
+  var q1 = compileFormula('100 - x^2'), q2 = compileFormula('20 - 10*sqrt(x)');
+  var f1 = function (x) { return ppfEvalWith(q1.compiled, x); };
+  var f2 = function (x) { return ppfEvalWith(q2.compiled, x); };
+  var cs = [classifyPpf(f1), classifyPpf(f2)];
+  var rec = ppfSumMixedPair(cs);
+  var worst = 0;
+  for (var i = 0; i <= 200; i++) {
+    var X = 14 * i / 200;
+    var a = rec ? rec.evalY(X) : NaN, b = maxAllocY(f1, f2, X, 10, 4);
+    if (isFinite(a) && isFinite(b)) worst = Math.max(worst, Math.abs(a - b));
+  }
+  var F1 = ppfFam(cs[0]), F2 = ppfFam(cs[1]);
+  var corner5 = Math.max(F2.Ymax(cs[1]) + F1.f(cs[0], 5), F1.f(cs[0], 5 - F2.Xmax(cs[1])));
+  return { n: rec ? rec.pieces.length : 0, Xtot: d.Xtot, Ytot: d.Ytot,
+           at5: rec ? rec.evalY(5) : NaN, corner5: corner5, worst: worst,
+           k1x: (d.kinks[0] || [])[0], k1y: (d.kinks[0] || [])[1],
+           k2x: (d.kinks[1] || [])[0], k2y: (d.kinks[1] || [])[1] };`);
+cmp('смешанная пара: участков', r.n, 3, 0);
+cmp('смешанная пара: конец X', r.Xtot, 14, 1e-4);
+cmp('смешанная пара: конец Y', r.Ytot, 120, 1e-6);
+cmp('смешанная пара: узел 1 X', r.k1x, 4.386, 1e-3);
+cmp('смешанная пара: узел 1 Y', r.k1y, 100.7628, 1e-3);
+cmp('смешанная пара: узел 2 X', r.k2x, 5.25, 1e-3);
+cmp('смешанная пара: узел 2 Y', r.k2y, 98.4375, 1e-3);
+cmp('смешанная пара: Y при X = 5 (внутреннее решение)', r.at5, 99.0746, 1e-3);
+cmp('то же по одним УГЛАМ — было бы ровно 99', r.corner5, 99, 1e-6);
+cmp('сверка с численным Минковским, 200 точек', r.worst, 0, 1e-6);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
