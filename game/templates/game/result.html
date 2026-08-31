@@ -48,7 +48,7 @@ body {
   font-size: 14px; font-weight: 700; color: var(--text3);
   text-decoration: none; letter-spacing: .3px;
 }
-.brand b { color: var(--accent); }
+.brand b { color: var(--accent-ink); }
 .card {
   margin-top: 16px;
   background: var(--surface);
@@ -59,7 +59,7 @@ body {
 .chip {
   display: inline-block;
   padding: 3px 10px; border-radius: 999px;
-  background: var(--accent-tint); color: var(--accent);
+  background: var(--accent-tint); color: var(--accent-ink);
   font-size: 13px; font-weight: 700;
 }
 .date { margin-left: 6px; font-size: 13px; color: var(--text3); }
@@ -95,7 +95,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
   display: block; margin-top: 26px;
   height: 54px; line-height: 54px;
   border-radius: 12px;
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--act-ink-solid);  /* белый даёт 2,28 в тёмной */
   font-size: 17px; font-weight: 700; text-align: center;
   text-decoration: none;
   transition: filter .12s, transform .1s;
@@ -111,9 +111,9 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
   background: var(--surface); color: var(--text2);
   cursor: pointer;
 }
-.share-row button:hover { border-color: var(--accent); color: var(--accent); }
+.share-row button:hover { border-color: var(--accent); color: var(--accent-ink); }
 .foot { margin-top: 18px; font-size: 13px; color: var(--text3); text-align: center; }
-.foot a { color: var(--accent); }
+.foot a { color: var(--accent-ink); }
 @media (max-width: 480px) {
   .facts { gap: 14px; }
   .score { font-size: 44px; }

@@ -11,6 +11,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
   font-family: var(--font-ui);
+  /* ⚠️ ЦВЕТ ТЕКСТА ОБЯЗАТЕЛЕН, А НЕ «И ТАК ЧЁРНЫЙ». Страница самостоятельная
+     и base не наследует; без этой строки заголовок берёт чёрный по умолчанию
+     от браузера. В светлой теме это сходит за --text, а в тёмной остаётся
+     ЧЁРНЫМ на тёмной карточке: «Войти» давал 1,99 при норме 3,0 и не читался
+     вовсе. Нашлось замером по экрану — по токенам такой пары нет. */
+  color: var(--text);
   background: var(--bg);
   min-height: 100vh;
   display: flex;
@@ -111,7 +117,7 @@ a:focus-visible, button:focus-visible {
   color: var(--text2);
   text-decoration: none;
 }
-.back-link:hover { color: var(--accent); }
+.back-link:hover { color: var(--accent-ink); }
   </style>
 </head>
 <body>

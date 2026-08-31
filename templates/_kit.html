@@ -563,7 +563,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
   border-color: var(--accent); border-width: 1px;
   background: var(--accent-tint);
 }
-.k-tile--on .k-tile__name { color: var(--accent); }
+.k-tile--on .k-tile__name { color: var(--accent-ink); }
 .k-tile--on:hover { background: var(--accent-tint); border-color: var(--accent); }
 .k-tile input { position: absolute; opacity: 0; pointer-events: none; }
 
@@ -703,7 +703,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    свои — они правда про разное. Общий только знак и цвет. */
 .k-disc { display: inline-flex; align-items: center; gap: 5px;
           font: inherit; font-size: 14px; font-weight: 500;
-          color: var(--accent); background: none; border: 0;
+          color: var(--accent-ink); background: none; border: 0;
           padding: 6px 0; cursor: pointer; }
 .k-disc:hover { color: var(--accent-deep); }
 .k-disc__tri { display: inline-block; font-size: 13px; line-height: 1;
@@ -720,7 +720,7 @@ details.fold > summary,
 .pf-fold > summary {
   display: flex; align-items: center; gap: 5px; list-style: none;
   cursor: pointer; font-size: 14px; font-weight: 500;
-  color: var(--accent); padding: 6px 0;
+  color: var(--accent-ink); padding: 6px 0;
 }
 .k-details > summary::-webkit-details-marker,
 .gen-examples > summary::-webkit-details-marker,
@@ -865,10 +865,10 @@ details.fold > summary:hover,
    владелец отдельно просил, чтобы оно не гасло в серый. */
 .crumbs { font-size: 14px; line-height: 1.7; margin-bottom: 14px;
           color: var(--text); }
-.crumbs a { color: var(--accent); text-decoration: none; }
+.crumbs a { color: var(--accent-ink); text-decoration: none; }
 .crumbs a:hover { text-decoration: underline; }
 .crumbs > * + *::before {
-  content: '→'; color: var(--accent); margin: 0 7px;
+  content: '→'; color: var(--accent-ink); margin: 0 7px;
   font-weight: 400; text-decoration: none; display: inline-block;
 }
 .crumbs__here { color: var(--text); }
@@ -944,7 +944,7 @@ details.fold > summary:hover,
                      text-decoration: line-through; }
 .k-cal__day.is-off:hover { background: none; }
 .k-cal__day.is-today { border-color: var(--border); font-weight: 700; }
-.k-cal__day.is-picked { background: var(--accent); color: #fff;
+.k-cal__day.is-picked { background: var(--accent); color: var(--act-ink-solid);
                         border-color: var(--accent); font-weight: 700; }
 .k-cal__foot { display: flex; align-items: center; justify-content: space-between;
                gap: 8px; margin-top: 10px; padding-top: 10px;
@@ -960,9 +960,9 @@ details.fold > summary:hover,
                background: none; color: var(--text); cursor: pointer;
                font: inherit; font-size: 34px; font-weight: 700;
                line-height: 1.1; font-variant-numeric: tabular-nums; }
-.k-time__num:hover { color: var(--accent); }
+.k-time__num:hover { color: var(--accent-ink); }
 .k-time__num:focus { outline: none; }
-.k-time__num.is-on { color: var(--accent); border-bottom-color: var(--accent); }
+.k-time__num.is-on { color: var(--accent-ink); border-bottom-color: var(--accent); }
 .k-time__colon { font-size: 30px; font-weight: 700; color: var(--text2);
                  line-height: 1.1; }
 .k-time__hint { font-size: 13px; color: var(--text3); text-align: center;
@@ -1092,7 +1092,7 @@ details.fold > summary:hover,
 .row-side { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
 .row-go { font-size: 13px; font-weight: 600; color: var(--text3);
           white-space: nowrap; }
-.row-link:hover .row-go { color: var(--accent); }
+.row-link:hover .row-go { color: var(--accent-ink); }
 @media (max-width: 560px) {
   .row-link { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
@@ -1120,7 +1120,7 @@ details.fold > summary:hover,
 .wk-rail__s.is-on .wk-rail__n { background: var(--accent);
               border-color: var(--accent); color: #fff; }
 .wk-rail__s.is-done .wk-rail__n { background: var(--accent-tint);
-              border-color: var(--accent-tint); color: var(--accent); }
+              border-color: var(--accent-tint); color: var(--accent-ink); }
 
 /* Пять способов набора одной строкой. */
 .wk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -1205,7 +1205,7 @@ details.fold > summary:hover,
 .wk-full[hidden] { display: none; }
 .wk-full .wk-st { white-space: pre-line; }
 .wk-full .wk-part { margin-top: 8px; }
-.wk-full .wk-part b { color: var(--accent); }
+.wk-full .wk-part b { color: var(--accent-ink); }
 .wk-full .wk-ans { margin-top: 6px; font-size: 13px; color: var(--text2); }
 .wk-full .wk-ans b { color: var(--text); }
 .wk-full .wk-sol { margin-top: 10px; padding-top: 10px;
@@ -1234,7 +1234,7 @@ details.fold > summary:hover,
                    white-space: nowrap; }
 .sheet-task__st { white-space: pre-line; line-height: 1.6; margin-top: 4px; }
 .sheet-task__part { margin-top: 8px; margin-left: 12px; }
-.sheet-task__part b { color: var(--accent); }
+.sheet-task__part b { color: var(--accent-ink); }
 .sheet-task__opt { margin-top: 4px; margin-left: 12px; }
 /* Место под ответ — пунктирная строка: это не поле ввода, а лист. */
 .sheet-task__field { margin-top: 8px; height: 34px; border-radius: var(--r);

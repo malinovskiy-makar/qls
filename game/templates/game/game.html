@@ -121,7 +121,7 @@ a:focus-visible, button:focus-visible {
 .topic-chip.active {
   background: var(--rush-accent);
   border-color: var(--rush-accent);
-  color: #fff;
+  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы — 2,28 */
   font-weight: 600;
 }
 /* Карточки режимов: клик по карточке = старт забега в этом режиме */
@@ -542,7 +542,7 @@ a:focus-visible, button:focus-visible {
 .opt.selected .key {
   background: var(--rush-accent);
   border-color: var(--rush-accent);
-  color: #fff;
+  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы — 2,28 */
 }
 .multi-actions {
   display: flex;
@@ -895,7 +895,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   line-height: 1.45;
 }
 .miss-item .mi-topic { font-size: 13px; color: var(--text3); display: block; margin-bottom: 2px; }
-.miss-item a { color: var(--accent); text-decoration: none; font-size: 13px; }
+.miss-item a { color: var(--accent-ink); text-decoration: none; font-size: 13px; }
 .miss-item a:hover { text-decoration: underline; }
 
 /* Чип «Тренировочный» на карточке сгенерированного вопроса — в стиле

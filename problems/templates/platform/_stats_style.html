@@ -15,7 +15,10 @@
   border: none; background: transparent; color: var(--text2); font: inherit;
   font-size: 14px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
 }
-.period-bar button.is-active { background: var(--accent); color: #fff; font-weight: 600; }
+/* ⚠️ ЧЕРНИЛА НА СПЛОШНОМ АКЦЕНТЕ — ТОКЕНОМ, А НЕ БЕЛЫМ. Акцент светлеет
+   в тёмной теме (#81b5b4), и белым по нему выходит 2,28 при норме 4,5.
+   --act-ink-solid меняется вместе с темой: 5,23 в светлой, 6,89 в тёмной. */
+.period-bar button.is-active { background: var(--accent); color: var(--act-ink-solid); font-weight: 600; }
 
 /* ── Шапка героя ────────────────────────────────────── */
 .hero {
@@ -54,7 +57,7 @@
              color: var(--text2); font: inherit; font-size: 13px;
              border-radius: var(--r); padding: 3px 8px; cursor: pointer;
              margin-top: 6px; }
-.goal-edit:hover { border-color: var(--accent); color: var(--accent); }
+.goal-edit:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 /* ── Карточки-метрики ───────────────────────────────── */
 .metric-grid { display: grid; gap: 12px; margin-bottom: 26px;
@@ -227,7 +230,7 @@
 .rush-logo--sm { font-size: 18px; line-height: 1; }
 .rush-logo .bolt { margin: 0 .08em; }
 .rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
-.rush-logo .rush { color: var(--accent); display: inline-block;
+.rush-logo .rush { color: var(--accent-ink); display: inline-block;
                    transform: rotate(-2deg) skewX(-6deg); }
 
 .act-facts { display: grid; gap: 12px; }
@@ -254,7 +257,7 @@
 .achv-filter button { border: 1px solid var(--border); background: transparent;
   color: var(--text2); font: inherit; font-size: 13px; padding: 4px 10px;
   border-radius: 999px; cursor: pointer; }
-.achv-filter button.is-active { border-color: var(--accent); color: var(--accent); }
+.achv-filter button.is-active { border-color: var(--accent); color: var(--accent-ink); }
 
 /* ── Рекорды и списки ───────────────────────────────── */
 .record-grid { display: grid; gap: 10px;
@@ -282,7 +285,7 @@
                 font-size: 14px; }
 .list-rows li:last-child { border-bottom: none; }
 .list-rows a { color: var(--text); text-decoration: none; }
-.list-rows a:hover { color: var(--accent); }
+.list-rows a:hover { color: var(--accent-ink); }
 .muted { color: var(--text2); font-size: 13px; }
 
 /* ── Блок игры — визуально отделён ──────────────────── */
@@ -300,11 +303,11 @@
 .miss-num { font-size: 13px; color: var(--text2); margin-top: 2px;
             font-variant-numeric: tabular-nums; }
 .miss-go { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
-.miss-go a { font-size: 13px; color: var(--accent); text-decoration: none;
+.miss-go a { font-size: 13px; color: var(--accent-ink); text-decoration: none;
              border-bottom: 1px solid var(--accent-ring); }
 .miss-go a:hover { color: var(--accent-deep); }
 .game-badge { font-size: 13px; font-weight: 700; letter-spacing: .06em;
-              text-transform: uppercase; color: var(--text2);
+              text-transform: uppercase; color: var(--chip-text);
               background: var(--chip-bg); border-radius: 999px; padding: 2px 8px; }
 
 /* ── Таблицы репетитора ─────────────────────────────── */
