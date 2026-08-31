@@ -64,9 +64,30 @@ def _fmt_number(n):
 
 
 def home(request):
+    """Показатели лендинга считаются ЖИВЫМ запросом, и по тем же правилам,
+    что и каталог.
+
+    ⚠️ РАНЬШЕ ЛЕНДИНГ ОБЕЩАЛ ТО, ЧЕГО НЕТ. `Problem.objects.count()` — это
+    ВЕСЬ банк, вместе с непроверенным и забракованным: на этой базе 41 307.
+    А пройти по ссылке человек может к 14 458 — остальное скрыто двумя
+    шлюзами (`needs_quality_review` прячет плохое, `hidden_pending_review` —
+    то, чего человек ещё не смотрел). Разница почти втрое, и обнаружил бы её
+    первый же посетитель, нажавший «Каталог задач».
+
+    Поэтому фильтр здесь ровно тот же, что в `problem_list`, а источники
+    считаются тем же запросом, которым каталог наполняет свой список
+    фильтра. Иначе числа снова разъедутся при первой правке одной из сторон.
+    """
+    visible = Problem.objects.filter(
+        status=Problem.Status.PUBLISHED,
+        needs_quality_review=False,
+        hidden_pending_review=False,
+    )
     context = {
-        'problems_count': _fmt_number(Problem.objects.count()),
-        'sources_count':  Source.objects.count(),
+        'problems_count': _fmt_number(visible.count()),
+        'sources_count':  (Source.objects
+                           .filter(references__problem__status=Problem.Status.PUBLISHED)
+                           .distinct().count()),
         'topics_count':   Topic.objects.filter(name__in=CANONICAL).count(),
     }
     return render(request, 'catalog/home.html', context)
