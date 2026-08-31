@@ -435,6 +435,40 @@ if (need('Д2')) {
   note('taxAfterD.texExpr = ' + nums.pct.afterD);
   note('на табло: ' + nums.pct.shown);
   await shot('d2-taxes-subsidy');
+
+  /* ⚠️ КУСОЧНАЯ КРИВАЯ — ГЛАВНЫЙ СЛУЧАЙ, А НЕ КРАЕВОЙ.
+     Простое math.simplify на цепочке «?:» не работает вовсе: Math.js отвечает
+     «Unimplemented node type in simplifyConstant: ConditionalNode». Упрощение
+     обязано идти ПОКУСОЧНО, условия — не трогать. */
+  head('Д2б · упрощение кусочной записи: ветки упрощены, условия целы');
+  const pw = await page.evaluate(() => {
+    const D = '(Q >= 0 and Q < 40) ? 100 - Q : ((Q >= 40 and Q <= 160) ? 80 - 0.5*Q : NaN)';
+    p31TaxSetup(D, 'Q', 'subsidy', '', 'buyer', 20);
+    const after = STATE.taxAfterD ? String(STATE.taxAfterD.texExpr || '') : '';
+    /* Сверяем сами: обе записи в 40 точках, включая границы участков. */
+    const src = '(' + D + ') - (' + (-20) + ')';
+    let worst = 0, both = 0;
+    for (let i = 0; i <= 40; i++) {
+      const q = 200 * i / 40;
+      let a = NaN, b = NaN;
+      try { a = math.evaluate(src, axisScope(q)); } catch (e) { a = NaN; }
+      try { b = math.evaluate(after, axisScope(q)); } catch (e) { b = NaN; }
+      const na = !(typeof a === 'number' && isFinite(a));
+      const nb = !(typeof b === 'number' && isFinite(b));
+      if (na !== nb) { worst = Infinity; break; }
+      if (na && nb) { both++; continue; }
+      worst = Math.max(worst, Math.abs(a - b));
+    }
+    return { after: after, worst: worst, bothNaN: both,
+             conds: (after.match(/Q >=/g) || []).length };
+  });
+  note('запись после субсидии покупателю: ' + pw.after);
+  flag('условия участков целы (два «Q >=»)', pw.conds === 2, String(pw.conds));
+  flag('ветки упрощены: нет «- (-»', pw.after.indexOf('- (-') < 0, pw.after);
+  flag('первая ветка стала «120 - Q»', /\?\s*120 - Q/.test(pw.after), pw.after);
+  show('наибольшее расхождение старой и новой записи в 40 точках', pw.worst, 0, 1e-9);
+  note('точек, где обе записи говорят «функции здесь нет»: ' + pw.bothNaN);
+  flag('такие точки есть, то есть сверка их и правда трогала', pw.bothNaN > 0, String(pw.bothNaN));
 }
 
 /* ═══════════ Д3. Запись выглядит кривой ═════════════════════════════ */

@@ -54,6 +54,190 @@ function compileFormula(expr) {
   }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   УПРОЩЕНИЕ ЗАПИСИ КРИВОЙ (приёмка владельца 31.08)
+
+   Запись кривой ПОСЛЕ вмешательства собиралась подстановкой в шаблон и
+   никогда не упрощалась: `(100 - Q) - (-20)` у покупателя, `(Q) + (-20)` у
+   продавца. Пока эта запись человеку не показывалась, беды не было; теперь
+   она стоит в блоке «Итоговая функция».
+
+   ⚠️ УПРОЩАЕМ ПОКУСОЧНО, А НЕ ЦЕЛИКОМ. Math.js на цепочке условий отвечает
+   «Unimplemented node type in simplifyConstant: ConditionalNode» — проверено
+   31.08 на записи суммарного спроса. Поэтому идём по веткам: условия не
+   трогаем вовсе, упрощаем только тела.
+
+   ⚠️ КРАСИВАЯ ВРУЩАЯ ЗАПИСЬ ХУЖЕ ЧЕСТНОЙ НЕКРАСИВОЙ. После упрощения обе
+   записи сверяются численно в 20 точках области; расхождение больше 1e-9 —
+   оставляем ИСХОДНУЮ. Упрощение это удобство чтения, а не право менять
+   функцию.
+   ═══════════════════════════════════════════════════════════════════════ */
+const SIMPLIFY_PROBES = 20;    // точек численной сверки
+const SIMPLIFY_TOL = 1e-9;     // допуск сверки
+/* Память: recompute зовётся на КАЖДОЙ перерисовке, в том числе на каждом кадре
+   протяжки ползунка ставки, а упрощение стоит около 0,8 мс на запись. Ответ
+   зависит только от строки (и от того, считаются ли одиночные буквы
+   параметрами), поэтому ключ составной.
+   ⚠️ ПРЕДЕЛ ВЗЯТ НЕ С ПОТОЛКА. Ползунок ставки — шаг 1 в диапазоне 0…100, то
+   есть 101 значение, и записей на полную протяжку выходит 202 (спрос и
+   предложение). При пределе 200 память сбрасывалась бы ровно в конце каждой
+   протяжки, и следующая шла бы снова вхолодную. */
+const SIMPLIFY_CACHE_MAX = 600;
+const _simpCache = new Map();
+
+function simplifyRecord(expr) {
+  const src = String(expr == null ? '' : expr).trim();
+  if (!src || typeof math === 'undefined') return src;
+  const key = src + '|' + (typeof paramsAllowed === 'function' && paramsAllowed() ? '1' : '0');
+  if (_simpCache.has(key)) return _simpCache.get(key);
+  let out = src;
+  try {
+    const node = math.parse(prepExpr(src));
+    const got = simplifyChainStr(liftConditional(node));
+    if (got && got !== src && sameNumerically(node, src, got)) out = got;
+  } catch (e) { out = src; }
+  // Записи меняются, пока человек печатает; память не должна расти бесконечно.
+  if (_simpCache.size > SIMPLIFY_CACHE_MAX) _simpCache.clear();
+  _simpCache.set(key, out);
+  return out;
+}
+
+/* «Здесь функции нет» — служебный хвост участка. Узел константы со значением
+   NaN; вносить в него операцию нельзя, иначе вместо честного «функции нет»
+   на экране появится «NaN + 20». */
+function isNaNNode(n) {
+  return !!n && n.type === 'ConstantNode' && typeof n.value === 'number' && isNaN(n.value);
+}
+
+/* ⚠️ УСЛОВИЕ ПОДНИМАЕТСЯ НАВЕРХ, ИНАЧЕ УПРОЩАТЬ НЕЧЕГО.
+   Запись после вмешательства собирается как `(кривая) + (ставка)`, и когда
+   кривая кусочная, условие лежит ВНУТРИ сложения: наверху OperatorNode, а не
+   ConditionalNode. Обход по веткам туда не заглядывает, а math.simplify об это
+   условие спотыкается — и запись оставалась шаблоном (замер 31.08: кусочный
+   спрос с субсидией печатался целиком со скобками и «- (-20)» на хвосте).
+
+   Разносим операцию по веткам: `(cond ? a : b) + t` → `cond ? (a + t) : (b + t)`.
+   Это тождественное преобразование — операция применяется к тому же значению,
+   какое ветка и давала, — и после него условия стоят наверху, а тела стали
+   обычными выражениями. */
+function liftConditional(node) {
+  const n = (typeof unwrapParens === 'function') ? unwrapParens(node) : node;
+  if (!n) return node;
+  if (n.type === 'ConditionalNode') {
+    return new math.ConditionalNode(n.condition,
+      liftConditional(n.trueExpr), liftConditional(n.falseExpr));
+  }
+  if (n.type === 'OperatorNode' && Array.isArray(n.args)) {
+    const args = n.args.map(liftConditional);
+    for (let i = 0; i < args.length; i++) {
+      const a = args[i];
+      if (!a || a.type !== 'ConditionalNode') continue;
+      const withBranch = (branch) => {
+        if (isNaNNode(branch)) return branch;      // «функции нет» остаётся собой
+        const copy = args.slice();
+        copy[i] = branch;
+        return liftConditional(new math.OperatorNode(n.op, n.fn, copy, n.implicit));
+      };
+      return new math.ConditionalNode(a.condition,
+        withBranch(a.trueExpr), withBranch(a.falseExpr));
+    }
+    return new math.OperatorNode(n.op, n.fn, args, n.implicit);
+  }
+  return n;
+}
+
+/* Ветку за веткой: условие переписывается КАК ЕСТЬ, упрощается только тело. */
+function simplifyChainStr(node) {
+  const bare = (x) => (typeof unwrapParens === 'function') ? unwrapParens(x) : x;
+  const n = bare(node);
+  if (n && n.type === 'ConditionalNode') {
+    /* Скобки вокруг условия ставим САМИ и ровно одну: узел условия часто уже
+       скобочный, и вторая пара давала «((Q >= 0 and Q < 40))». Хвост берём в
+       скобки только когда он сам цепочка — как это делает sumLinearRecord. */
+    const f = bare(n.falseExpr);
+    const fs = simplifyChainStr(n.falseExpr);
+    return '(' + bare(n.condition).toString() + ') ? ' + simplifyChainStr(n.trueExpr)
+         + ' : ' + ((f && f.type === 'ConditionalNode') ? '(' + fs + ')' : fs);
+  }
+  /* Служебный хвост «здесь функции нет» упрощать нечем и незачем. */
+  if (isNaNNode(n)) return 'NaN';
+  return simplifyBody(n);
+}
+
+/* ⚠️ СПОСОБОВ УПРОСТИТЬ У Math.js НЕСКОЛЬКО, И ОДНОГО НА ВСЕ СЛУЧАИ НЕТ.
+   Замер 31.08 на девяти записях:
+     • `simplify` с точными дробями превращает 0,666… в 2/3 — это нужно, — но
+       пишет вычитание сложением с минусом: «Q * -1 / 2 + 100» вместо
+       «100 - 0.5 * Q»;
+     • он же без точных дробей пишет по-человечески, но оставляет на экране
+       «0.6666666666666666 * Q»;
+     • `rationalize` вдобавок раскрывает скобки, и это тоже нужно:
+       «180 - 1.5 * Q» вместо «(120 - Q) * 3 / 2».
+   Поэтому идём ступенями и берём первое, что вышло без длинного хвоста
+   десятичных. Длину строк не сравниваем: «Q / 2 + 30» короче «0.5 * Q + 30»,
+   но записи калькулятора всюду пишут коэффициент множителем, и разнобой хуже
+   лишнего символа. */
+const UGLY_DECIMAL = /\d*\.\d{8,}/;
+function simplifyBody(n) {
+  /* ШАГ 1. Человеческая печать без точных дробей. Самый дешёвый способ
+     (0,79 мс против 2,16 у полного набора) и в большинстве записей сразу
+     верный: «(80 - 0.5*Q) + 20» → «100 - 0.5 * Q». */
+  let plain = null;
+  try { plain = math.simplify(n, {}, { exactFractions: false }).toString(); } catch (e) {}
+  if (plain && !UGLY_DECIMAL.test(plain) && plain.indexOf('(') < 0) return plain;
+  /* ШАГ 2. Скобки остались — их раскрывает rationalize: «1.5 * (120 - Q)»
+     превращается в «180 - 1.5 * Q».
+     ⚠️ ЗОВЁМ ЕГО ТОЛЬКО ЗДЕСЬ, И ЭТО НЕ ПРИДИРКА К МИЛЛИСЕКУНДАМ. rationalize
+     стоит 1,39 мс — вшестеро дороже разбора со сверкой вместе взятых, — а
+     simplifyRecord зовётся из recompute, то есть на каждом кадре протяжки
+     ползунка ставки. Пока раскрывать нечего, платить за него не за что. */
+  if (plain && plain.indexOf('(') >= 0) {
+    let expanded = null;
+    try {
+      expanded = math.simplify(math.rationalize(n), {}, { exactFractions: false }).toString();
+    } catch (e) {}
+    if (expanded && !UGLY_DECIMAL.test(expanded)) return expanded;
+  }
+  /* ШАГ 3. Длинный десятичный хвост лечится точными дробями: множитель
+     процентной формы 0,6666666666666666 становится 2/3. */
+  let frac = null;
+  try { frac = math.simplify(n).toString(); } catch (e) {}
+  if (frac && !UGLY_DECIMAL.test(frac)) return frac;
+  return plain || frac || n.toString();
+}
+
+/* Совпадают ли две записи ЧИСЛЕННО. «Функции здесь нет» (NaN) — это тоже
+   ответ, и он обязан совпасть: запись, у которой участок вдруг появился или
+   пропал, не упрощение, а другая функция. */
+/* ⚠️ СВЕРКА ЗОВЁТСЯ ИЗ recompute, ТО ЕСТЬ НА КАЖДОЙ ПЕРЕРИСОВКЕ.
+   При протяжке ползунка ставки строка записи каждый кадр НОВАЯ, и память не
+   спасает. Поэтому здесь ни одного лишнего разбора: узел исходника приходит
+   уже разобранным, области подстановки строятся ПО РАЗУ на запись, а по
+   точкам меняются только буквы оси. Замер 31.08: без этого recompute стоил
+   3,98 мс против 0,22 мс без упрощения вовсе. */
+function sameNumerically(srcNode, srcStr, bStr) {
+  let ca, cb;
+  try {
+    ca = srcNode.compile();
+    cb = math.parse(prepExpr(bStr)).compile();
+  } catch (e) { return false; }
+  const hi = (typeof CONFIG !== 'undefined' && isFinite(CONFIG.Qmax) && CONFIG.Qmax > 0)
+    ? CONFIG.Qmax : 100;
+  const sa = scopeFor(srcStr, {}), sb = scopeFor(bStr, {});
+  for (let i = 0; i <= SIMPLIFY_PROBES; i++) {
+    const q = hi * i / SIMPLIFY_PROBES;
+    let va, vb;
+    try { va = ca.evaluate(axisScope(q, sa)); } catch (e) { va = NaN; }
+    try { vb = cb.evaluate(axisScope(q, sb)); } catch (e) { vb = NaN; }
+    const na = !(typeof va === 'number' && isFinite(va));
+    const nb = !(typeof vb === 'number' && isFinite(vb));
+    if (na !== nb) return false;
+    if (na && nb) continue;
+    if (Math.abs(va - vb) > SIMPLIFY_TOL) return false;
+  }
+  return true;
+}
+
 // Значение кривой в точке Q. Возвращает число или NaN (на ошибке/разрыве).
 function evalCurve(curve, q) {
   // Вертикальная кривая (Фаза 15) не задаёт цену как функцию количества.

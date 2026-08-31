@@ -134,12 +134,17 @@ function recompute() {
     // texExpr — запись той же кривой формулой, для выгрузки в LaTeX (А49).
     // Отдельное поле, а не expr: движок кривых поле expr понимает по-своему,
     // и подкладывать ему выражение в объект, у которого есть только fn, нельзя.
+    /* ⚠️ ЗАПИСЬ УПРОЩАЕТСЯ, А НЕ ОСТАЁТСЯ ШАБЛОНОМ (приёмка владельца 31.08).
+       Подстановка в шаблон давала человеку «(Q) + (-20)» и «(100 - Q) - (-20)»:
+       пока запись не показывалась, это было неважно, а теперь она стоит в
+       блоке «Итоговая функция». simplifyRecord упрощает ПОКУСОЧНО и сверяет
+       результат с исходником численно — не сошлось, оставит исходник. */
     const sSrc = (STATE.S && STATE.S.expr) ? String(STATE.S.expr) : '';
     const sAfter = adv
       ? { fn: q => { const s = evalCurve(STATE.S, q); return isNaN(s) ? NaN : s * factor; },
-          texExpr: sSrc ? '(' + sSrc + ') * ' + factor : '' }
+          texExpr: sSrc ? simplifyRecord('(' + sSrc + ') * ' + factor) : '' }
       : { fn: q => evalCurve(STATE.S, q) + shift,
-          texExpr: sSrc ? '(' + sSrc + ') + (' + shift + ')' : '' };
+          texExpr: sSrc ? simplifyRecord('(' + sSrc + ') + (' + shift + ')') : '' };
     /* Кривая после вмешательства готова — её и рисуем, независимо от того,
        найдётся ли дальше новое равновесие. */
     STATE.shift = shift;
@@ -152,7 +157,7 @@ function recompute() {
     const dSrc = (STATE.D && STATE.D.expr) ? String(STATE.D.expr) : '';
     STATE.taxAfterD = adv
       ? { fn: q => { const d = evalCurve(STATE.D, q); return isNaN(d) ? NaN : d / factor; },
-          texExpr: dSrc ? '(' + dSrc + ') / ' + factor : '' }
+          texExpr: dSrc ? simplifyRecord('(' + dSrc + ') / ' + factor) : '' }
       /* ⚠️ ЗНАК БЕРЁТСЯ У `shift`, А НЕ У СТАВКИ.
          Здесь стояло `- STATE.tax`, то есть знак был жёстко налоговым: при
          субсидии покупателю эффективный спрос ПОДНИМАЕТСЯ на ставку, а
@@ -161,7 +166,7 @@ function recompute() {
          D + s. Процентную ветку (`d / factor`) это не касается — она верна
          для всех четырёх форм таблицы PCT_FORMS. */
       : { fn: q => evalCurve(STATE.D, q) - shift,
-          texExpr: dSrc ? '(' + dSrc + ') - (' + shift + ')' : '' };
+          texExpr: dSrc ? simplifyRecord('(' + dSrc + ') - (' + shift + ')') : '' };
     STATE.taxCurveOn = true;
 
     const te = findEquilibrium(STATE.D, sAfter);
