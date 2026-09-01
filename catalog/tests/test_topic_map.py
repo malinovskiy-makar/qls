@@ -469,3 +469,120 @@ class BuildGuardsTests(SimpleTestCase):
         data = self._build_with('1.1-2.2')
         cross = [ln for ln in data['links'] if ln['k'] == 'cross']
         self.assertEqual(len(cross), 1)
+
+
+class PreviewModeTests(SimpleTestCase):
+    """Встраиваемый режим карты: маленькое окно для чужого экрана.
+
+    ⚠️ ЭТО ПРОВЕРКИ ПО ТЕКСТУ ФАЙЛА, И ЭТО ОСОЗНАННО. Своего прогона
+    JavaScript в проекте нет, поведение снимается глазами и через
+    `TopicMapPreview.all()[0].stats()` в браузере. Здесь сторожатся ровно те
+    свойства, потерю которых текстом заметить МОЖНО: подписей нет, курсор не
+    слушается, цикл кадров снимается вне экрана и при отключённом движении,
+    точка подключения на месте, вес не разросся до полного движка.
+
+    Требования — решение владельца от 01.09.2026 «Предпросмотр карты тем:
+    сейчас готовим только место и архитектуру»
+    (https://app.notion.com/p/3ceb11c92bc18146a098f0e93526c347).
+    """
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map_preview.js')
+    CSS = pathlib.Path('catalog/static/catalog/css/topic_map_preview.css')
+    FULL_JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+
+    def test_preview_draws_no_labels_at_all(self):
+        """Ни одной подписи: только узлы и связи.
+
+        Подпись на холсте рисуется единственным способом — `fillText` или
+        `strokeText`. Нет их в файле — нет и подписей, и никакая правка не
+        протащит их незаметно.
+        """
+        for call in ('fillText', 'strokeText', 'measureText'):
+            self.assertNotIn(
+                call, self.src,
+                'в предпросмотре появился вывод текста: %s' % call)
+
+    def test_preview_listens_to_no_pointer_events(self):
+        """Курсор на карту не влияет — и это держится устройством.
+
+        У холста `pointer-events: none`, а обработчиков указателя в модуле
+        нет вовсе. Появится хоть один — вернётся и остановка вращения при
+        наведении, ради отсутствия которой режим и заводился.
+        """
+        self.assertIn("canvas.style.pointerEvents = 'none'", self.src)
+        for event in ('pointerdown', 'pointermove', 'pointerup', 'wheel',
+                      'mouseover', 'mousemove', 'dblclick'):
+            self.assertNotIn(
+                "'%s'" % event, self.src,
+                'предпросмотр начал слушать курсор: %s' % event)
+
+    def test_preview_stops_off_screen_and_without_motion(self):
+        """Вне экрана и при prefers-reduced-motion кадры не просто одинаковые,
+        а не запрашиваются вовсе: заявка на кадр снимается."""
+        self.assertIn('IntersectionObserver', self.src)
+        self.assertIn('cancelAnimationFrame', self.src)
+        self.assertIn('prefers-reduced-motion', self.src)
+
+    def test_preview_waits_for_the_host_screen(self):
+        """Данные тянутся после отрисовки экрана-хозяина, а не вместе с ним."""
+        self.assertIn('requestIdleCallback', self.src)
+        self.assertIn("'load'", self.src)
+
+    def test_preview_exposes_the_mount_point(self):
+        """Точка подключения — то, ради чего режим и делался.
+
+        Другая сессия монтирует предпросмотр в свой блок, не заглядывая
+        внутрь движка: либо атрибутом `data-tmap-preview`, либо вызовом
+        `TopicMapPreview.mount(el, opts)`.
+        """
+        self.assertIn('window.TopicMapPreview', self.src)
+        self.assertIn('data-tmap-preview', self.src)
+        for name in ('mount:', 'scan:', 'version:'):
+            self.assertIn(name, self.src)
+
+    def test_preview_stays_far_lighter_than_the_full_engine(self):
+        """Вес — весь смысл отдельного файла.
+
+        Полный движок около 150 КБ, и тянуть его на каждое открытие каталога
+        ради вращающегося окошка дорого (это и есть причина решения). Если
+        предпросмотр однажды дорастёт до четверти движка, значит в него
+        переехало то, чего он не показывает.
+        """
+        small = len(self.src.encode('utf-8'))
+        big = len(self.FULL_JS.read_text(encoding='utf-8').encode('utf-8'))
+        self.assertLess(
+            small, big / 4,
+            'предпросмотр разросся: %d байт против %d у полной карты'
+            % (small, big))
+
+    def test_preview_styles_live_in_their_own_file(self):
+        """Стили предпросмотра отдельно от стилей полной карты: экрану-хозяину
+        не нужны шапка, панель, тур и нижняя полоса."""
+        css = self.CSS.read_text(encoding='utf-8')
+        self.assertIn('.tmap-preview', css)
+        self.assertIn('pointer-events: none', css)
+
+    def test_demo_page_shows_two_preview_blocks(self):
+        """Стенд приёмки: один блок виден сразу, второй лежит ниже экрана.
+
+        Второй нужен именно для проверки ленивости: пока до него не
+        доскроллили, данные не запрашиваются вовсе.
+        """
+        response = self.client.get('/catalog/map/preview-demo/')
+        self.assertEqual(response.status_code, 200)
+        html = response.content.decode('utf-8')
+        self.assertEqual(html.count('class="tmap-preview"'), 2)
+        self.assertEqual(len(re.findall(r'data-tmap-preview(?![-\w])', html)), 2)
+        self.assertIn('topic_map_preview.js', html)
+        self.assertIn('topic_map_preview.css', html)
+
+    def test_demo_blocks_lead_to_the_full_map(self):
+        """Клик по блоку ведёт на полную карту — адрес берётся из маршрута,
+        а не переписан строкой."""
+        html = self.client.get('/catalog/map/preview-demo/').content.decode('utf-8')
+        self.assertIn('href="/catalog/map/"', html)

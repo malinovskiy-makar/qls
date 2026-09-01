@@ -1,0 +1,66 @@
+{% extends 'catalog/base.html' %}
+{% load static %}
+
+{% comment %}
+Демо-страница встраиваемого предпросмотра карты — ТОЛЬКО ДЛЯ ПРИЁМКИ.
+
+В навигации её нет и не будет: это стенд, на котором проверяется поведение
+блока перед тем, как его смонтируют в «Умный каталог». Здесь два блока:
+первый виден сразу, второй лежит ниже экрана — на нём проверяется, что
+данные не грузятся, пока блок не показался, и что цикл кадров
+останавливается, когда блок уехал за край.
+{% endcomment %}
+
+{% block title %}Предпросмотр карты — стенд{% endblock %}
+
+{% block extra_style %}
+/* Стенд, а не экран продукта: своих классов у него нет, три правила под
+   заголовки и пояснения хватает. */
+.demo-h  { font-size: var(--fs-h1); font-weight: 600; color: var(--text);
+           margin-bottom: 8px; }
+.demo-h2 { font-size: var(--fs-h2); font-weight: 600; color: var(--text);
+           margin: 28px 0 10px; }
+.demo-p  { font-size: var(--fs-meta); color: var(--text2); line-height: 1.5;
+           max-width: 60ch; margin-bottom: 18px; }
+{% endblock %}
+
+{% block content %}
+<link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
+
+<h1 class="demo-h">Предпросмотр карты — стенд</h1>
+<p class="demo-p">
+  Служебная страница. Проверяются: отсутствие подписей, медленное вращение,
+  безразличие к курсору, клик в любом месте, остановка вне экрана и при
+  <code>prefers-reduced-motion</code>.
+</p>
+
+<h2 class="demo-h2">Блок в размере будущего каталога</h2>
+<a class="tmap-preview" id="demo-a"
+   style="width: 360px; height: 260px;"
+   data-tmap-preview
+   data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
+   href="{% url 'catalog:topic_map' %}"
+   aria-label="Интерактивная карта тем и тегов — открыть">
+  <span class="tmap-preview-cap"><b>Карта тем и тегов</b> · 29 тем, 343 тега</span>
+</a>
+
+<div style="height: 130vh"></div>
+
+<h2 class="demo-h2">Второй блок — ниже первого экрана</h2>
+<p class="demo-p">
+  До прокрутки сюда данные не запрашиваются вовсе: у блока свой наблюдатель
+  видимости.
+</p>
+<a class="tmap-preview" id="demo-b"
+   style="width: 280px; height: 200px;"
+   data-tmap-preview
+   data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
+   href="{% url 'catalog:topic_map' %}"
+   aria-label="Интерактивная карта тем и тегов — открыть"></a>
+
+<div style="height: 40vh"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script defer src="{% static 'catalog/js/topic_map_preview.js' %}"></script>
+{% endblock %}

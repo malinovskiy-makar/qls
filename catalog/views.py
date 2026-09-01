@@ -802,6 +802,17 @@ def topic_map(request):
     })
 
 
+def topic_map_preview_demo(request):
+    """Стенд встраиваемого предпросмотра карты — ТОЛЬКО ДЛЯ ПРИЁМКИ.
+
+    В навигации страницы нет: она нужна, чтобы проверить поведение блока
+    (нет подписей, медленное вращение, безразличие к курсору, остановка вне
+    экрана и при prefers-reduced-motion) до того, как его смонтируют в
+    «Умный каталог». Данных ей не нужно — блок сам идёт за map/data.json.
+    """
+    return render(request, 'catalog/topic_map_preview_demo.html')
+
+
 def topic_map_data(request):
     """JSON карты. Кэш на сутки и ETag: файл меняется только с деплоем."""
     text, etag = _topic_map_payload()
