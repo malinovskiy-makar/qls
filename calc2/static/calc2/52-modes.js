@@ -492,6 +492,16 @@ function flushWheel() {
 function initZoom() {
   const gw = document.getElementById('graph-wrap');
   if (!gw) return;
+  /* ⚠️ ПОЗИЦИЯ КУРСОРА — ОБЩЕЕ ЗНАНИЕ, А НЕ ЧАСТНОЕ ДЕЛО ОБРАБОТЧИКА.
+     По ней `activePanel()` решает, чьи шкалы отдать тому, кто спросил без
+     аргумента. Слушаем в фазе погружения и отдельно от жестов: тот
+     обработчик ниже выходит рано (нет протяжки — нечего делать), и позиция
+     обновлялась бы только во время перетаскивания. */
+  gw.addEventListener('pointermove', (e) => {
+    const r = gw.getBoundingClientRect();
+    STATE.pointerPx = e.clientX - r.left;
+    STATE.pointerPy = e.clientY - r.top;
+  }, true);
   gw.addEventListener('wheel', (e) => {
     e.preventDefault();
     let dy = e.deltaY, dx = e.deltaX;

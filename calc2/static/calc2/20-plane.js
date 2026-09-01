@@ -142,6 +142,89 @@ function makeScales() {
   const m = CONFIG.margin;
   sx = d3.scaleLinear().domain([CONFIG.Qmin, CONFIG.Qmax]).range([m.left, W - m.right]);
   sy = d3.scaleLinear().domain([CONFIG.Pmin, CONFIG.Pmax]).range([H - m.bottom, m.top]);
+  /* Обычная сцена — одна панель на весь холст, и её шкалы это и есть sx/sy.
+     Регистрируем прямо здесь: makeScales зовут все сцены без своей геометрии,
+     и держать список «кто должен зарегистрироваться» пришлось бы вручную. */
+  registerPanel('main', sx, sy, {
+    x0: m.left, y0: m.top, x1: W - m.right, y1: H - m.bottom,
+  });
+}
+
+/* ---------------------------------------------------------------------
+   РЕЕСТР ПАНЕЛЕЙ
+   --------------------------------------------------------------------- */
+/* ⚠️ СЛОЙ ПОВЕРХ СЦЕНЫ ЖИВЁТ В ПАНЕЛИ, А НЕ В ГЛОБАЛЬНЫХ ГРАНИЦАХ.
+
+   `mainScales()` строил свои шкалы из CONFIG.Qmin/Qmax на всю ширину холста.
+   Сделано это было нарочно — чтобы не брать глобальные sx/sy, в которых у
+   многопанельных сцен остаётся шкала ПОСЛЕДНЕЙ панели. Лечение вышло хуже
+   болезни: слой перестал совпадать НИ С ОДНОЙ панелью. В «Неравенстве
+   доходов» кривая Лоренца рисуется в квадрате 0…100, а вершины площадей и
+   ключевые точки считались по шкале на всю ширину — отклонение по X около
+   54 px, и оно росло при зуме. В сюжете про производную площадь натягивалась
+   полигоном между верхним и нижним графиком, а на нижнем мышь липла к f(x),
+   которой там нет.
+
+   Панель — это прямоугольный кусок холста со своими шкалами. Сцена объявляет
+   свои панели сама, сразу после того, как построила шкалы. Точка, вершина и
+   посчитанная площадь помнят, в какой панели их поставили, и рисуются по её
+   шкалам. Второго механизма «границы кадра» заводить нельзя. */
+/* Сцена, у которой геометрия своя, объявляет об этом ОДНОЙ строкой: сначала
+   гасит то, что успел зарегистрировать makeScales, потом заводит свои панели.
+   Без этого 'main' на весь холст остался бы рядом с квадратом Лоренца и с
+   панелями производной, и панель под курсором выбиралась бы наугад. */
+function clearPanels() { STATE.panels = []; }
+
+function registerPanel(id, mx, my, rect) {
+  const r = rect || {};
+  const p = {
+    id: String(id),
+    mx, my,
+    x0: Math.min(r.x0, r.x1), x1: Math.max(r.x0, r.x1),
+    y0: Math.min(r.y0, r.y1), y1: Math.max(r.y0, r.y1),
+  };
+  if (!Array.isArray(STATE.panels)) STATE.panels = [];
+  // Перерисовка в один кадр бывает вложенной (сцена зовёт makeScales дважды);
+  // панель с тем же id заменяем, а не копим дубли.
+  const i = STATE.panels.findIndex(o => o.id === p.id);
+  if (i >= 0) STATE.panels[i] = p; else STATE.panels.push(p);
+  return p;
+}
+
+// Расстояние от пикселя до прямоугольника панели (0 — внутри).
+function panelDist(p, px, py) {
+  const dx = Math.max(p.x0 - px, 0, px - p.x1);
+  const dy = Math.max(p.y0 - py, 0, py - p.y1);
+  return Math.hypot(dx, dy);
+}
+
+/* Панель под пикселем. Мимо всех прямоугольников — ближайшая: курсор в поле
+   холста (там же оси и подписи) обязан вести себя как курсор в панели, иначе
+   постановка точки у самой оси уходила бы в чужие шкалы. */
+function panelAt(px, py) {
+  const list = STATE.panels || [];
+  if (!list.length) return null;
+  let best = null, bd = Infinity;
+  list.forEach(p => {
+    const d = panelDist(p, px, py);
+    if (d < bd) { bd = d; best = p; }
+  });
+  return best;
+}
+
+// Панель под последней известной позицией курсора; курсора не было — первая.
+function activePanel() {
+  const list = STATE.panels || [];
+  if (!list.length) return null;
+  if (STATE.pointerPx == null || STATE.pointerPy == null) return list[0];
+  return panelAt(STATE.pointerPx, STATE.pointerPy) || list[0];
+}
+
+// Панель по id (для точек и вершин, помнящих свою). Нет такой — активная.
+function panelById(id) {
+  const list = STATE.panels || [];
+  if (!id) return activePanel();
+  return list.find(p => p.id === id) || activePanel();
 }
 
 /* ⚠️ ДВЕ РАЗНЫЕ ВЕЩИ, КОТОРЫЕ РАНЬШЕ БЫЛИ ОДНИМ ФЛАГОМ.
