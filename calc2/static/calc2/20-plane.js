@@ -227,6 +227,65 @@ function panelById(id) {
   return list.find(p => p.id === id) || activePanel();
 }
 
+/* ── ОКНО ПАНЕЛИ, ВЫБРАННОЕ ЧЕЛОВЕКОМ ─────────────────────────────────
+   Колесо и перетаскивание фона меняют окно ТОЙ панели, над которой курсор.
+   У панели со своими границами (мини-рынок, квадрат Лоренца) окно считает
+   сама сцена — по своим кривым. Как только человек покрутил колесо, окно
+   становится ЕГО, и сцена больше его не пересчитывает: то же правило, что у
+   `STATE.zoomLock` для главной панели.
+
+   ⚠️ Живёт это в STATE, а не в записи панели: записи пересобираются на каждой
+   перерисовке, а выбор человека обязан её пережить. */
+function panelWin(id, x0, x1, y0, y1) {
+  const st = STATE.panelWin || (STATE.panelWin = {});
+  return st[id] || { x0, x1, y0, y1 };
+}
+function resetPanelWins() { STATE.panelWin = {}; }
+
+/* Приблизить окно панели к точке (px, py). Возвращает false, если панели нет
+   или окно выродилось — тогда жест просто ничего не делает.
+   ⚠️ КВАДРАТ ЛОРЕНЦА ОСТАЁТСЯ КВАДРАТОМ: обе оси умножаются на ОДИН и тот же
+   множитель, поэтому равные размахи остаются равными сами собой. Оси там
+   несут проценты, и растянуть одну без другой значит соврать про смысл
+   картинки. */
+function panelZoomBy(id, factor, px, py) {
+  const p = (STATE.panels || []).find(q => q.id === id);
+  if (!p || !isFinite(factor) || factor <= 0) return false;
+  const [x0, x1] = p.mx.domain(), [y0, y1] = p.my.domain();
+  const w = Math.max(1, p.x1 - p.x0), h = Math.max(1, p.y1 - p.y0);
+  const tx = Math.min(1, Math.max(0, (px - p.x0) / w));
+  const ty = Math.min(1, Math.max(0, (py - p.y0) / h));
+  const xc = x0 + (x1 - x0) * tx, yc = y1 - (y1 - y0) * ty;
+  const nx0 = xc - (xc - x0) * factor, nx1 = xc + (x1 - xc) * factor;
+  const ny0 = yc - (yc - y0) * factor, ny1 = yc + (y1 - yc) * factor;
+  if (!((nx1 - nx0) > 1e-9) || !((ny1 - ny0) > 1e-9)) return false;
+  if (!isFinite(nx0) || !isFinite(nx1) || !isFinite(ny0) || !isFinite(ny1)) return false;
+  (STATE.panelWin || (STATE.panelWin = {}))[id] = { x0: nx0, x1: nx1, y0: ny0, y1: ny1 };
+  return true;
+}
+
+// Сдвинуть окно панели на столько единиц, на сколько уехал курсор.
+function panelPanBy(id, dxPx, dyPx) {
+  const p = (STATE.panels || []).find(q => q.id === id);
+  if (!p) return false;
+  const [x0, x1] = p.mx.domain(), [y0, y1] = p.my.domain();
+  const w = Math.max(1, p.x1 - p.x0), h = Math.max(1, p.y1 - p.y0);
+  const dx = (x1 - x0) * dxPx / w, dy = (y1 - y0) * dyPx / h;
+  (STATE.panelWin || (STATE.panelWin = {}))[id] =
+    { x0: x0 - dx, x1: x1 - dx, y0: y0 + dy, y1: y1 + dy };
+  return true;
+}
+
+/* Панель, окном которой распоряжается ЖЕСТ, а не сцена. У 'main' окном
+   по-прежнему распоряжаются CONFIG.Qmax/Pmax, у панелей производной — их
+   собственный, давно написанный механизм tanWin. Остальные ходят сюда. */
+function gesturePanelId(px, py) {
+  const p = panelAt(px, py);
+  if (!p || p.id === 'main') return null;
+  if (p.id === 'deriv-top' || p.id === 'deriv-bottom') return null;
+  return p.id;
+}
+
 /* ⚠️ ДВЕ РАЗНЫЕ ВЕЩИ, КОТОРЫЕ РАНЬШЕ БЫЛИ ОДНИМ ФЛАГОМ.
 
    До 24.08 `STATE.firstQuad` делал две работы сразу: он был и «сцена

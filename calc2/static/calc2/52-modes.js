@@ -300,6 +300,16 @@ function zoomRound(v) {
 
 function zoomBy(factor, px, py) {
   if (!isFinite(factor) || factor <= 0) return;
+  /* ⚠️ КОЛЕСО КРУТИТ ПАНЕЛЬ ПОД КУРСОРОМ, А НЕ ХОЛСТ ЦЕЛИКОМ.
+     Раньше здесь всегда менялись CONFIG.Qmax/Pmax, поэтому в многопанельных
+     сценах колесо действовало только там, где панель на CONFIG и опирается:
+     у мини-рынка с горизонтальной мировой ценой своего масштаба нет, и он
+     откатывался к CONFIG — колесо над ЛЕВОЙ панелью меняло ПРАВУЮ. */
+  const gid = gesturePanelId(px, py);
+  if (gid) {
+    if (panelZoomBy(gid, factor, px, py)) { markViewDirty(); redrawAll(); }
+    return;
+  }
   if (STATE.mode === 'math') {
     const m = CONFIG.margin;
     const w = Math.max(1, W - m.left - m.right);
@@ -374,6 +384,11 @@ function zoomBy(factor, px, py) {
 function panByPixels(dxPx, dyPx, panel) {
   const m = CONFIG.margin;
   const w = Math.max(1, W - m.left - m.right), h = Math.max(1, H - m.top - m.bottom);
+  // Тянем окно ТОЙ панели, с которой начали жест (её запомнил pointerdown).
+  if (panel && panel.gesture) {
+    if (panelPanBy(panel.gesture, dxPx, dyPx)) { markViewDirty(); syncViewFields(); redrawAll(); }
+    return;
+  }
   if (STATE.mode === 'math') {
     // Сюжет про производную: двигаем только ту панель, с которой начали.
     if (STATE.mathSub === 'tangent') {
@@ -444,6 +459,7 @@ function resetZoom() {
   STATE.zoomLock = false;
   STATE.viewDirty = false;
   tanResetWindows();
+  resetPanelWins();      // окна панелей тоже возвращаются к тому, что даёт сцена
   if (STATE.mode === 'math') {
     /* Н20: подбор работает и здесь. Пресет сюжета берём за основу (в
        «Математике» нужен полный план, а не только первая четверть), но окно
@@ -484,7 +500,9 @@ function flushWheel() {
   const a = _wheelAcc;
   _wheelAcc = null;
   if (!a) return;
-  const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent') ? tangentPanelAt(a.py) : null;
+  const gid = gesturePanelId(a.px, a.py);
+  const panel = gid ? { gesture: gid }
+    : ((STATE.mode === 'math' && STATE.mathSub === 'tangent') ? tangentPanelAt(a.py) : null);
   if (a.panX || a.panY) panByPixels(a.panX, a.panY, panel);
   else if (a.factor !== 1) zoomBy(a.factor, a.px, a.py);
 }
@@ -540,8 +558,10 @@ function initZoom() {
     if (forcePan) {
       if (canvasArmed()) return;
       const rp = gw.getBoundingClientRect();
-      const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
-        ? tangentPanelAt(e.clientY - rp.top) : null;
+      const gid = gesturePanelId(e.clientX - rp.left, e.clientY - rp.top);
+      const panel = gid ? { gesture: gid }
+        : ((STATE.mode === 'math' && STATE.mathSub === 'tangent')
+            ? tangentPanelAt(e.clientY - rp.top) : null);
       pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, panel };
       e.preventDefault();
       return;
@@ -594,8 +614,10 @@ function initZoom() {
     }
     // Панель запоминаем в момент нажатия: у сюжета про производную их две,
     // и вести надо ту, с которой начали, даже если курсор ушёл на соседнюю.
-    const panel = (STATE.mode === 'math' && STATE.mathSub === 'tangent')
-      ? tangentPanelAt(e.clientY - r0.top) : null;
+    const gid2 = gesturePanelId(e.clientX - r0.left, e.clientY - r0.top);
+    const panel = gid2 ? { gesture: gid2 }
+      : ((STATE.mode === 'math' && STATE.mathSub === 'tangent')
+          ? tangentPanelAt(e.clientY - r0.top) : null);
     pan = { x: e.clientX, y: e.clientY, moved: false, id: e.pointerId, panel };
   });
   gw.addEventListener('pointermove', (e) => {

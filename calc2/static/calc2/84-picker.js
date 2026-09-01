@@ -534,6 +534,7 @@ function pickScene(key) {
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
   resetDecor();           // П20: новая модель начинается с чистого состояния
   STATE.zoomLock = false; // и своего масштаба, а не унаследованного от колеса
+  if (typeof resetPanelWins === 'function') resetPanelWins();   // и окон её панелей
   /* ⚠️ ВХОД В ЛЮБУЮ МОДЕЛЬ ОБНУЛЯЕТ КРИВЫЕ (п. 11).
      Девятнадцать маршрутов из сорока одного зовут loadScene, и он чистит
      STATE.curves сам. Остальные двадцать два (вся «Математика», КПВ, торговля,

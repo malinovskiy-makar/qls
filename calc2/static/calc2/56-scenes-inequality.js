@@ -416,8 +416,13 @@ function redrawInequality() {
   const m = CONFIG.margin;
   const availW = W - m.left - m.right, availH = H - m.top - m.bottom;
   const side = Math.max(60, Math.min(availW, availH));
-  sx = d3.scaleLinear().domain([0, 100]).range([m.left, m.left + side]);
-  sy = d3.scaleLinear().domain([0, 100]).range([m.top + side, m.top]);
+  /* Окно квадрата: 0…100 по обеим осям, пока человек не покрутил колесо.
+     ⚠️ КВАДРАТ ОСТАЁТСЯ КВАДРАТОМ при любом зуме — обе оси меняются на один и
+     тот же множитель (за это отвечает panelZoomBy). Оси здесь несут проценты,
+     и растянуть одну без другой значит соврать про смысл картинки. */
+  const wnd = panelWin('lorenz', 0, 100, 0, 100);
+  sx = d3.scaleLinear().domain([wnd.x0, wnd.x1]).range([m.left, m.left + side]);
+  sy = d3.scaleLinear().domain([wnd.y0, wnd.y1]).range([m.top + side, m.top]);
   /* Поле здесь КВАДРАТ со своими шкалами 0…100, а не холст целиком: слой
      поверх сцены обязан считать по ним. Раньше кривая Лоренца рисовалась в
      квадрате, а вершины площадей и ключевые точки — по шкале на всю ширину:

@@ -971,8 +971,15 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   if (right <= left || bottom <= top) return;
   let Xmax = invCurve(D, 0); if (Xmax == null || !(Xmax > 0)) Xmax = CONFIG.Qmax; Xmax = padMax(Xmax);
   let Ymax = evalCurve(D, 0); if (isNaN(Ymax) || !(Ymax > 0)) Ymax = CONFIG.Pmax; Ymax = padMax(Ymax);
-  const lx = d3.scaleLinear().domain([0, Xmax]).range([left, right]);
-  const ly = d3.scaleLinear().domain([0, Ymax]).range([bottom, top]);
+  /* Окно панели: своё, пока человек его не покрутил. Тронул колесом — окно
+     стало ЕГО, и подгонка под кривую отступает (то же правило, что у
+     STATE.zoomLock у главной панели). У горизонтальной мировой цены своего
+     масштаба нет вовсе, и раньше эта панель откатывалась к CONFIG — из-за
+     чего колесо над ЛЕВОЙ панелью меняло ПРАВУЮ. */
+  const wnd = panelWin('mini-' + idx, 0, Xmax, 0, Ymax);
+  Xmax = wnd.x1;
+  const lx = d3.scaleLinear().domain([wnd.x0, wnd.x1]).range([left, right]);
+  const ly = d3.scaleLinear().domain([wnd.y0, wnd.y1]).range([bottom, top]);
   // Мини-рынок — самостоятельная панель со своими шкалами (реестр чистит
   // redrawDiscr3 перед первым из двух вызовов).
   registerPanel('mini-' + idx, lx, ly, { x0: left, y0: top, x1: right, y1: bottom });
