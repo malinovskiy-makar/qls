@@ -1636,8 +1636,11 @@ function wireControls() {
   const chartEl = document.getElementById('chart');
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.markArm) return;
-    const { mx, my } = mainScales();
+    // Панель решает МЕСТО ЩЕЛЧКА: в многопанельной сцене это не одно и то же.
     const [px, py] = d3.pointer(ev, chartEl);
+    const pan = panelAt(px, py);
+    const pid = pan ? pan.id : null;
+    const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     armMark(false);
     showSnapHint(null);
@@ -1651,7 +1654,7 @@ function wireControls() {
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     // К пересечению и к особой точке не привязываем: скольжение по одной из
     // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
-    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null);
+    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid);
   });
   // Набор вершин площади: щелчок ставит вершину и режим не снимается —
   // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
@@ -1659,14 +1662,16 @@ function wireControls() {
     if (!STATE.vertArm || STATE.markArm) return;
     // Только что сняли вершину щелчком по ней — этот щелчок уже отработан (П42).
     if (STATE._vertClickEaten) { STATE._vertClickEaten = false; return; }
-    const { mx, my } = mainScales();
     const [px, py] = d3.pointer(ev, chartEl);
+    const pan = panelAt(px, py);
+    const pid = pan ? pan.id : null;
+    const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     const hit = snapVertexAt(px, py);
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    addAreaVert(x, y, hit && hit.key ? hit.name : '');
+    addAreaVert(x, y, hit && hit.key ? hit.name : '', pid);
   });
   // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
   // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.

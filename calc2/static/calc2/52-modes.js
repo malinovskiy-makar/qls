@@ -605,7 +605,8 @@ function initZoom() {
         if (Math.hypot(e.clientX - roll.x0, e.clientY - roll.y0) < ROLL_START_PX) return;
         roll.live = true;
         STATE.roller = { f: roll.hit.f, name: roll.hit.name,
-                         color: roll.hit.color || null, x: 0, y: 0, pinned: true };
+                         color: roll.hit.color || null, panel: roll.hit.panel || null,
+                         x: 0, y: 0, pinned: true };
         try { gw.setPointerCapture(roll.id); } catch (err) {}
       }
       rollerMove(e.clientX - gw.getBoundingClientRect().left, e.clientX, e.clientY);

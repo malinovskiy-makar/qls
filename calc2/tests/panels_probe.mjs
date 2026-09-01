@@ -176,14 +176,14 @@ head('Площадь считается внутри одной панели');
 r = await run(TAN + `setup();
   var top = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-top'; })[0];
   var bot = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-bottom'; })[0];
-  STATE.areaVerts = [];
+  STATE.areaVerts = []; STATE.areaCalcMode = 'poly';
   STATE.pointerPx = (top.x0 + top.x1) / 2; STATE.pointerPy = (top.y0 + top.y1) / 2;
   addAreaVert(1, 1, ''); addAreaVert(2, 4, '');
   STATE.pointerPx = (bot.x0 + bot.x1) / 2; STATE.pointerPy = (bot.y0 + bot.y1) / 2;
   addAreaVert(3, 6, '');
   redrawAll();
-  var btn = document.getElementById('btn-area-poly');
-  var note = document.querySelector('#vert-list .vert-mixed');
+  var btn = document.getElementById('ac-calc');
+  var note = document.querySelector('#ac-verts .vert-mixed');
   return { panels: STATE.areaVerts.map(function (v) { return v.panel; }),
            disabled: btn ? !!btn.disabled : null,
            note: note ? note.textContent.trim() : '' };`);
@@ -194,11 +194,11 @@ cmp('в списке вершин стоит строка-объяснение',
 // Все вершины в одной панели — кнопка снова живая.
 r = await run(TAN + `setup();
   var top = (STATE.panels || []).filter(function (q) { return q.id === 'deriv-top'; })[0];
-  STATE.areaVerts = [];
+  STATE.areaVerts = []; STATE.areaCalcMode = 'poly';
   STATE.pointerPx = (top.x0 + top.x1) / 2; STATE.pointerPy = (top.y0 + top.y1) / 2;
   addAreaVert(1, 1, ''); addAreaVert(2, 4, ''); addAreaVert(3, 9, '');
   redrawAll();
-  var btn = document.getElementById('btn-area-poly');
+  var btn = document.getElementById('ac-calc');
   return btn ? !!btn.disabled : null;`);
 cmp('вершины в одной панели: кнопка активна', r, false);
 
