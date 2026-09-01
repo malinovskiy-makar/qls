@@ -2152,11 +2152,10 @@ function renderPpfSumRows() {
     inp.value = ppfSumGet(i);
     inp.placeholder = 'Например: ' + (DEF[i] || 'y = 50 - x');
     inp.autocomplete = 'off';
-    inp.addEventListener('input', () => { ppfSumSet(i, inp.value.trim()); });
-    inp.addEventListener('change', () => { STATE.ppfSumData = null; redrawAll(); });
-    inp.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { ppfSumSet(i, inp.value.trim()); STATE.ppfSumData = null; redrawAll(); }
-    });
+    /* Набранное слышится сразу: раньше `input` только клал строку в состояние,
+       а пересчёт суммы ждал `change` — то есть ухода из поля. С мостом
+       MathLive `change` не приходит вовсе, и кривая не двигалась. */
+    onFormulaInput(inp, () => { ppfSumSet(i, inp.value.trim()); STATE.ppfSumData = null; redrawAll(); });
     row.appendChild(inp);
     wrap.append(lab, row);
     box.appendChild(wrap);

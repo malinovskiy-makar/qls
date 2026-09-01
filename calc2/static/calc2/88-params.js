@@ -1249,8 +1249,7 @@ function wireControls() {
         STATE[key + 'Expr'] = (inp.value || '').trim();
         recompileSocial(); redrawAll();
       };
-      inp.addEventListener('change', apply);
-      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+      onFormulaInput(inp, apply);   // input + change + Enter, см. 82-input.js
     }
   });
   const extPigou = document.getElementById('ext-pigou');
@@ -1359,8 +1358,7 @@ function wireControls() {
   const isoInp = document.getElementById('inp-iso');
   if (isoInp) {
     const applyIso = () => { STATE.isoExpr = (isoInp.value || '').trim(); redrawAll(); };
-    isoInp.addEventListener('change', applyIso);
-    isoInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyIso(); });
+    onFormulaInput(isoInp, applyIso);
   }
   attachFormulaHelp('fh-iso', 'fp-iso', 'inp-iso', 'ISO');
   [['iso-w', 'isoW'], ['iso-r', 'isoR'], ['iso-c', 'isoC']].forEach(([id, key]) => {
@@ -1780,8 +1778,11 @@ function wireControls() {
       _wantRangeAnim = true;
       redrawAll();
     };
-    e.addEventListener('change', apply);
-    if (!isNum) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+    /* Числовое поле оставляем на `change`: там дребезг только мешал бы —
+       набранное «12» на полпути читалось бы как «1». Поле ФОРМУЛЫ слышит
+       набранное, иначе оно глухо к мосту MathLive. */
+    if (isNum) e.addEventListener('change', apply);
+    else onFormulaInput(e, apply);
   };
   macroField('ma-lras', 'adas', 'lras', true);
   macroField('ma-sras', 'adas', 'sras', false);

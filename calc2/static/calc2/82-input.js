@@ -1413,6 +1413,33 @@ function closeAllKeyboardsExcept(slot) {
    Каждое поле, прошедшее через equipFormulaField, попадает сюда. По реестру
    собираются буквы-параметры: формулы сцен лежат в своих полях, а не в
    STATE.curves, и без реестра «a - Q» в КПВ или в макро ползунка бы не дало. */
+/* ⚠️ ПОЛЕ ФОРМУЛЫ ОБЯЗАНО СЛУШАТЬ `input`, А НЕ ТОЛЬКО `change`.
+
+   Поля формул — это поля MathLive, и мост между набранным полем и скрытым
+   `<input>` (`toInput` ниже) шлёт ТОЛЬКО событие `input`. Программная запись
+   в `input.value` события `change` не порождает вовсе. Поле, подписанное на
+   один `change`, набранного не слышит: человек печатает «100 − aQ», ползунок
+   `a` появляется (`syncParams` читает поля прямо из DOM), а состояние
+   остаётся с прежней формулой — и общественная кривая рисуется поверх D.
+
+   Дребезг нужен: пересобирать формулу на каждый знак дорого, а на кадре
+   протяжки это заметно. `change` и Enter применяют немедленно и отменяют
+   отложенное — иначе после Enter прилетел бы ещё один расчёт.
+
+   Один помощник на все поля: четырнадцать копий этой подписки разошлись бы. */
+const FORMULA_INPUT_DELAY = 220;
+function onFormulaInput(inp, apply) {
+  if (!inp || typeof apply !== 'function') return;
+  let timer = null;
+  const now = () => { if (timer) { clearTimeout(timer); timer = null; } apply(); };
+  inp.addEventListener('input', () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => { timer = null; apply(); }, FORMULA_INPUT_DELAY);
+  });
+  inp.addEventListener('change', now);
+  inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') now(); });
+}
+
 const FORMULA_FIELDS = [];
 /* П19: панель ползунков обновляется прямо во время набора формулы.
    Раньше буква становилась ползунком только после «Построить» или Enter:
