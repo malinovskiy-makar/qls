@@ -637,6 +637,93 @@ class BuildGuardsTests(SimpleTestCase):
 
 
 
+
+class LayoutLabelsAndFontTests(SimpleTestCase):
+    """Раскладка просторнее, ориентиры живут с поворотом, шрифт общий с сайтом."""
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+    TOKENS = pathlib.Path('templates/_tokens.html')
+
+    _rgb = staticmethod(NodeColourContrastTests._rgb)
+    _luminance = staticmethod(NodeColourContrastTests._luminance)
+    _contrast = classmethod(NodeColourContrastTests._contrast.__func__)
+    _token = staticmethod(NodeColourContrastTests._token)
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+        tokens = cls.TOKENS.read_text(encoding='utf-8')
+        cut = tokens.index('[data-theme="dark"]')
+        cls.tokens = {'светлая': tokens[:cut], 'тёмная': tokens[cut:]}
+
+    def test_tag_crown_stays_roomy(self):
+        """Венец тегов — главный рычаг тесноты, и он замерен.
+
+        Венец это длина связи тема→тег. Поднять вместо него отталкивание
+        бесполезно: обзор вписывает облако в холст, и равномерно раздутая
+        раскладка возвращается на экран того же размера — замер показал ровно
+        ноль изменений. А венец +20 % убрал треть тесноты: узлов, у которых
+        сосед ближе 6 px, стало 32 из 372 вместо 46.
+        """
+        found = re.search(r'return ([\d.]+) \+ ([\d.]+) \* count;', self.src)
+        self.assertIsNotNone(found, 'формула венца тегов пропала')
+        base, per_tag = float(found.group(1)), float(found.group(2))
+        self.assertGreaterEqual(base, 55, 'венец ужался обратно: %s' % base)
+        self.assertGreaterEqual(per_tag, 6.6, 'венец ужался обратно: %s' % per_tag)
+
+    def test_region_labels_depend_on_the_current_turn(self):
+        """Набор надписей-ориентиров пересчитывается по глубине скопления.
+
+        ⚠️ РАНЬШЕ ВСЕ СЕМЬ ГОРЕЛИ ОДИНАКОВО И ВСЕГДА. Сцена поворачивается,
+        скопления меняются местами, а подписи стояли как вкопанные; надпись
+        уехавшего за граф раздела проецировалась в середину экрана поверх
+        чужих узлов. Теперь вес надписи считается от глубины её скопления в
+        ТЕКУЩЕЙ ориентации, а ушедшее за спину не рисуется вовсе.
+        """
+        self.assertIn('GROUP_DEPTH_FLOOR', self.src)
+        self.assertIn('GROUP_DEPTH_DROP', self.src)
+        # доля считается от размаха кадра, а не от абсолютной глубины
+        self.assertIn('(zMax - a.pz) / span', self.src)
+
+    def test_canvas_labels_use_the_site_font(self):
+        """Подписи на холсте пишутся тем же шрифтом, что весь сайт.
+
+        ⚠️ ЭТО ЛОВИТСЯ ГЛАЗОМ ПЛОХО. Системный гротеск похож на Montserrat
+        ровно настолько, чтобы разницу списали на сглаживание холста, —
+        поэтому семейство обязано браться из токена, а не быть зашитым.
+        """
+        self.assertIn("cs.getPropertyValue('--font-ui')", self.src)
+        font_call = self.src[self.src.index('function setLabelFont('):]
+        font_call = font_call[:font_call.index('\n}')]
+        self.assertIn('PAL.font', font_call)
+        self.assertNotIn('-apple-system', font_call)
+
+    def test_region_label_reads_as_one_colour_in_both_themes(self):
+        """Ориентир в двух темах — один цвет, а не два похожих.
+
+        ⚠️ ПРОВЕРЯЕТСЯ ТОН И НАСЫЩЕННОСТЬ, А НЕ КОНТРАСТ. Контраст обе версии
+        проходили и раньше: тёмная давала 8,76 при пороге 4,5 — то есть вдвое
+        громче нужного, и рядом со светлой читалась как другая краска
+        (светлота 72 % против 42 %, насыщенность 57 % против 42 %). Порог
+        сторожит соседний тест; этот сторожит УЗНАВАЕМОСТЬ.
+        """
+        import colorsys
+        hues, sats = {}, {}
+        for theme in ('светлая', 'тёмная'):
+            red, green, blue = self._rgb(self._token(self.tokens[theme], 'map-region'))
+            hue, light, sat = colorsys.rgb_to_hls(red / 255, green / 255, blue / 255)
+            hues[theme] = hue * 360
+            sats[theme] = sat * 100
+        self.assertLess(
+            abs(hues['светлая'] - hues['тёмная']), 8,
+            'тон ориентира разошёлся: %.0f и %.0f' % (hues['светлая'], hues['тёмная']))
+        self.assertLess(
+            abs(sats['светлая'] - sats['тёмная']), 10,
+            'насыщенность ориентира разошлась: %.0f%% и %.0f%%'
+            % (sats['светлая'], sats['тёмная']))
+
+
 class SelectionAndViewTests(SimpleTestCase):
     """Пять точечных правок карты: выбор, счётчик, сброс вида, толщина дороги.
 

@@ -164,14 +164,33 @@ function readPalette() {
      подсветка (ADR 0046). Ступеней не нужно: прозрачность у них своя, и
      задаётся она globalAlpha сразу обоим проходам — обводке и заливке. */
   PAL.region = hexToRgb(cs.getPropertyValue('--map-region') ||
-                        (dark ? '#8FBEE0' : '#3E6C99'));
+                        (dark ? '#6794C1' : '#3E6C99'));
   PAL.regionCss = 'rgb(' + PAL.region.join(',') + ')';
+
+  /* Семейство шрифта — тем же путём, что и цвета: из токенов. */
+  PAL.font = (cs.getPropertyValue('--font-ui') || '').trim() ||
+             '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 }
 
 /* ── Раскладка ───────────────────────────────────────────────────────── */
 
 var R_SPHERE = 470;          /* радиус сферы тем */
 var Y_SQUASH = 0.78;         /* сплющивание по вертикали */
+/* ⚠️ ПРОСТОРНЕЕ ДЕЛАЕТ НЕ РАЗМЕР ОБЛАКА, А ЕГО ФОРМА, и это замер, а не
+   рассуждение. Поднять все силы и длины разом бесполезно: обзор вписывает
+   облако в холст (computeFit), и равномерно раздутая раскладка вернётся на
+   экран ровно того же размера. Проверено — отталкивание +18 % вместе с
+   перекрёстной нитью +15 % не сдвинули ни одного числа: узлов ближе 6 px
+   друг к другу осталось 46 из 372, как и было.
+   Расходится ровно то, что растёт ОТНОСИТЕЛЬНО остального. Здесь это венец
+   тегов: он и есть длина связи тема→тег. Замер по числу узлов, у которых
+   сосед ближе 6 px (меньше — лучше):
+     46 + 5,5·n  (было)      46
+     55 + 6,6·n  (+20 %)     32   ← взято
+     58 + 7,0·n и пружина слабее  41
+     60 + 7,2·n  (+30 %)     48
+   Дальше +20 % венец начинает налезать на соседние темы, и теснота
+   возвращается уже между темами, а не внутри них. */
 var REP = 1450;              /* сила отталкивания */
 var REP_CUT2 = 640000;       /* дальше 800 не считаем */
 var K_TREE = 0.055;          /* пружина тема→тег */
@@ -183,8 +202,9 @@ var alpha = 1;
 var themeAffinity = [];      /* пары тем: {a, b, L, K, both} */
 
 function tagRadius(count) {
-  /* Венец тегов: у темы с 5 тегами ~74, с 18 — ~145. */
-  return 46 + 5.5 * count;
+  /* Венец тегов: у темы с 5 тегами ~88, с 18 — ~174. Он же длина связи
+     тема→тег, и он же главный рычаг тесноты — см. замер выше. */
+  return 55 + 6.6 * count;
 }
 
 function fibSphere(i, n, rnd) {
@@ -921,10 +941,15 @@ function plate(x, y, w, h) {
 
 /* Шрифт подписи. Разрядка (letterSpacing) нужна только надписям-
    ориентирам; там, где её нет, поле обязано сбрасываться в ноль — иначе
-   она протекает на следующую подпись и на замер ширины. */
+   она протекает на следующую подпись и на замер ширины.
+
+   ⚠️ СЕМЕЙСТВО БЕРЁТСЯ ИЗ ТОКЕНА `--font-ui`, А НЕ ЗАШИТО ЗДЕСЬ. Раньше в
+   этой строке стоял свой набор (-apple-system, Segoe UI), и подписи на
+   холсте единственные на всём сайте рисовались НЕ фирменным шрифтом. На
+   глаз это ловится плохо: системный гротеск похож на Montserrat ровно
+   настолько, чтобы разницу списали на сглаживание холста. */
 function setLabelFont(px, weight, spacing) {
-  ctx.font = (weight || 500) + ' ' + px +
-             'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.font = (weight || 500) + ' ' + px + 'px ' + PAL.font;
   ctx.letterSpacing = spacing ? (spacing * px).toFixed(2) + 'px' : '0px';
 }
 
@@ -990,7 +1015,7 @@ function layoutFocusLabels(theme) {
 
   function place(list, side) {
     list.sort(function (a, b) { return a.py - b.py; });
-    ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    setLabelFont(LABEL_TAG_PX, 500, 0);
     var wMax = 0;
     var items = list.map(function (t) {
       var lines = wrapLabel(t.l, TAG_WRAP_CHARS, 2);
@@ -1040,8 +1065,19 @@ function layoutFocusLabels(theme) {
    название страны на карте, а не подпись объекта. */
 var GROUP_PX = 17;           /* кегль надписи раздела                   */
 var GROUP_SPACING = 0.07;    /* разрядка, доля кегля                    */
-var GROUP_ALPHA = 0.62;      /* в покое                                 */
+var GROUP_ALPHA = 0.62;      /* в покое, у САМОГО БЛИЖНЕГО раздела      */
 var GROUP_ALPHA_DIM = 0.28;  /* при любой подсветке — остаётся фоном    */
+/* ── Ориентир гаснет с глубиной ───────────────────────────────────────
+   ⚠️ РАНЬШЕ ВСЕ СЕМЬ НАДПИСЕЙ ГОРЕЛИ ОДИНАКОВО И ВСЕГДА, и это был дефект:
+   сцена поворачивается, скопления меняются местами, а подписи стоят как
+   вкопанные. Хуже того, надпись раздела, уехавшего ЗА граф, проецируется в
+   середину экрана поверх чужих узлов и врёт про то, что под ней.
+   Теперь у каждой надписи свой вес по глубине её скопления в ТЕКУЩЕЙ
+   ориентации: ближнее скопление подписано в полную силу, дальнее тает, а
+   то, что ушло за спину, не рисуется вовсе. При повороте набор ярких
+   надписей меняется сам — считать его отдельно не нужно. */
+var GROUP_DEPTH_FLOOR = 0.34;   /* во сколько раз тише самый дальний   */
+var GROUP_DEPTH_DROP = 0.16;    /* ниже этой доли не рисуем вовсе      */
 var GROUP_HALO = 3;          /* толщина обводки цветом холста, px       */
 /* Вблизи ориентир уже не нужен: человек смотрит на конкретные узлы.
    Гаснет не щелчком на пороге, а рампой, иначе дрожание масштаба около
@@ -1547,13 +1583,29 @@ function drawLabels(dim) {
   if (zoomFade > 1) zoomFade = 1; else if (zoomFade < 0) zoomFade = 0;
   var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade;
   if (!focusTheme) {
+    /* Сначала глубины всех разделов — доля считается от РАЗМАХА этого
+       кадра, а не от абсолютного pz: облако то ближе, то дальше, и
+       постоянный порог гасил бы то все надписи разом, то ни одной. */
+    var anchors = [], zMin = 1e9, zMax = -1e9;
+    for (i = 0; i < groups.length; i++) {
+      var a0 = groupAnchor(groups[i], { });
+      anchors.push(a0);
+      if (a0.pz < 0) continue;
+      if (a0.pz < zMin) zMin = a0.pz;
+      if (a0.pz > zMax) zMax = a0.pz;
+    }
+    var span = zMax - zMin;
     for (i = 0; i < groups.length; i++) {
       var g = groups[i];
-      var a = groupAnchor(g, gAnchor);
+      var a = anchors[i];
       if (a.pz < 0) continue;
+      /* 1 у самого ближнего скопления, 0 у самого дальнего. */
+      var front = span > 1 ? (zMax - a.pz) / span : 1;
+      if (front < GROUP_DEPTH_DROP) continue;      /* ушло за спину */
+      var depth = GROUP_DEPTH_FLOOR + (1 - GROUP_DEPTH_FLOOR) * front;
       want.push({ key: 'g:' + g.k, kind: 'group', text: g.l.toUpperCase(),
                   lines: null, node: null, ax: a.px, ay: a.py,
-                  talpha: groupAlpha, prio: 9, stick: false,
+                  talpha: groupAlpha * depth, prio: 9 - front, stick: false,
                   px: GROUP_PX, weight: 600, spacing: GROUP_SPACING,
                   maxAway: 1e9, plate: false,
                   guard: groupGuard(g, a.cx, a.cy) });
@@ -2759,6 +2811,13 @@ new MutationObserver(function () {
   readPalette(); wake();
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
+/* ⚠️ ФИРМЕННЫЙ ШРИФТ ПРИЕЗЖАЕТ ПОЗЖЕ ПЕРВОГО КАДРА. Пока он грузится,
+   measureText меряет запасным, и раскладка подписей считается по чужим
+   ширинам. Дождавшись загрузки, пересчитываем: это один кадр, а не цикл. */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { labelSig = ''; wake(); });
+}
+
 window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', function (e) {
   reduceMotion = e.matches;
   if (reduceMotion) spinMode = 'off';
@@ -2943,6 +3002,7 @@ window.TMAP = {
       var L = LB['g:' + groups[i].k];
       out.push({ key: groups[i].k, label: groups[i].l,
                  cx: a.cx, cy: a.cy, r: +(a.r || 0).toFixed(1),
+                 pz: +(a.pz || 0).toFixed(1),
                  anchorY: a.py,
                  x: L ? L.ax + L.ox : null, y: L ? L.ay + L.oy : null,
                  alpha: L ? +L.alpha.toFixed(3) : 0 });
