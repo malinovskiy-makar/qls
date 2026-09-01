@@ -640,6 +640,94 @@ class BuildGuardsTests(SimpleTestCase):
 
 
 
+
+class MapTextsTests(SimpleTestCase):
+    """Тексты карты: легенда, описания тем, витрина страницы."""
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+    CSS = pathlib.Path('catalog/static/catalog/css/topic_map.css')
+
+    #: Служебные пометки редактора, которым не место в тексте для человека.
+    EDITORIAL = re.compile(
+        r'НОВАЯ|НОВЫЙ|Переименован|Самый крупный|Целевая доля|'
+        r'\d[\d\s]*задач|~\s*\d|в текущей теме|суммарно')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+        cls.tree = load_tree()
+
+    def test_legend_is_titled_as_a_legend(self):
+        """Над легендой стоит «Как пользоваться», а не «Под курсором».
+
+        ⚠️ БЛОК ОДИН, СОСТОЯНИЙ ДВА, И ЗАГОЛОВОК ОБЯЗАН ИДТИ ЗА
+        СОДЕРЖИМЫМ. Пока ничего не наведено, в блоке объяснение знаков —
+        а заголовок «Под курсором» над ним сообщал неправду: под курсором
+        в этот момент ровно ничего.
+        """
+        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        self.assertIn('id="tmap-hover-head">Как пользоваться<', html)
+        self.assertIn("setHoverHead('Как пользоваться')", self.src)
+        self.assertIn("setHoverHead('Под курсором')", self.src)
+
+    def test_legend_text_has_no_long_dashes(self):
+        """Длинных тире в легенде нет: пять коротких фраз читаются быстрее
+        одной длинной с оговорками."""
+        howto = self.src[self.src.index('var HOWTO ='):]
+        howto = howto[:howto.index("</ul>';")]
+        self.assertNotIn('—', howto)
+
+    def test_hover_block_hides_its_scrollbar(self):
+        """У блока фиксированная высота, и системная полоса стояла в нём
+        постоянно — даже когда прокручивать нечего."""
+        css = self.CSS.read_text(encoding='utf-8')
+        block = css[css.index('#tmap-hover-block {'):]
+        block = block[:block.index('/* Прокручиваемая часть панели')]
+        self.assertIn('scrollbar-width: none', block)
+        self.assertIn('#tmap-hover-block:hover { scrollbar-width: thin; }', block)
+
+    def test_theme_descriptions_carry_no_editorial_notes(self):
+        """Описания тем — текст для человека, а не заметки редактора.
+
+        ⚠️ «НОВАЯ ТЕМА», «Самый крупный блок корпуса», «2 525 задач
+        упоминают монополию» — всё это про РАБОТУ НАД таксономией, а не про
+        предмет. Человеку, открывшему карту, они не говорят ничего: он не
+        знает, относительно чего тема новая и когда её переименовали.
+        """
+        for theme in self.tree:
+            found = self.EDITORIAL.search(theme['desc'])
+            self.assertIsNone(
+                found,
+                'тема %d: в описании служебная пометка «%s»'
+                % (theme['n'], found.group(0) if found else ''))
+
+    def test_theme_descriptions_are_short_and_uniform(self):
+        """Единый шаблон: одна фраза о сути.
+
+        Число задач в описании не повторяется НАРОЧНО: панель печатает его
+        сама отдельной строкой, и второй источник того же числа разошёлся бы
+        с первым при ближайшем пересчёте корпуса.
+        """
+        for theme in self.tree:
+            self.assertTrue(theme['desc'], 'тема %d без описания' % theme['n'])
+            self.assertLessEqual(
+                len(theme['desc']), 110,
+                'тема %d: описание в %d знаков, длиннее одной фразы'
+                % (theme['n'], len(theme['desc'])))
+
+    def test_page_says_what_it_is_not_what_to_do(self):
+        """Витрина страницы отвечает «что это», а не «как этим пользоваться».
+
+        Инструкция «наведитесь на тег и уходите от него по линиям» уместна в
+        обучении, а не в шапке: человек читает её раньше, чем понял, зачем
+        ему карта. Тому же учит теперь интерактивный тур.
+        """
+        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        self.assertIn('<h1>Интерактивная карта задач</h1>', html)
+        self.assertNotIn('наведитесь на тег', html)
+
+
 class PanelTreeTests(SimpleTestCase):
     """Правая панель — дерево разделы → темы → теги.
 

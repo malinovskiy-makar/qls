@@ -2349,18 +2349,35 @@ function fmtNum(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
+/* ⚠️ ЭТО ЛЕГЕНДА, А НЕ «ПОД КУРСОРОМ», И ЗАГОЛОВОК БЛОКА МЕНЯЕТСЯ ВМЕСТЕ С
+   СОДЕРЖИМЫМ. Блок один, состояний два: пока ничего не наведено и не
+   выбрано, в нём объяснение знаков, и над ним обязано стоять «Как
+   пользоваться». Заголовок «Под курсором» над легендой сообщал неправду —
+   под курсором в этот момент ровно ничего.
+
+   Текст переписан короче и без длинных тире: пять строк, каждая про один
+   знак, глагол в начале там, где от человека ждут действия. */
 var HOWTO = '<ul class="tmap-howto">' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="currentColor" opacity=".7"/></svg>' +
-  '<span>Крупный узел — <b>тема</b>, их 29.</span></li>' +
+  '<span>Крупный узел это <b>тема</b>. Их 29.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.6" fill="currentColor" opacity=".7"/></svg>' +
-  '<span>Мелкий узел — <b>тег</b>, их 343.</span></li>' +
+  '<span>Мелкий узел это <b>тег</b>. Их 343.</span></li>' +
+  '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="currentColor" opacity=".28"/><circle cx="7" cy="7" r="2.6" fill="currentColor"/></svg>' +
+  '<span>Цвет узла это его <b>раздел</b>, они перечислены ниже.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" opacity=".7"/></svg>' +
-  '<span>Сплошная линия — дорога <b>тема → тег</b>.</span></li>' +
+  '<span>Сплошная линия ведёт от темы к её тегу.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/></svg>' +
-  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li>' +
+  '<span>Пунктир связывает близкие теги разных тем. Таких пар 82.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="2.5" cy="11" r="2" fill="currentColor" opacity=".7"/><path d="M4 10 L12 3.5" stroke="currentColor" stroke-width="1.5" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
-  '<span><b>Встаньте на тег</b> — и от него можно уходить по линиям ' +
-  'к его теме и родственным тегам.</span></li></ul>';
+  '<span><b>Встаньте на тег</b> и уходите по линиям к его теме и ' +
+  'соседям.</span></li></ul>';
+
+/* Заголовок блока живёт вместе с его содержимым. */
+var hoverHead = document.getElementById('tmap-hover-head');
+
+function setHoverHead(text) {
+  if (hoverHead) hoverHead.textContent = text;
+}
 
 function renderHover(n) {
   if (!hoverBox) return;
@@ -2377,8 +2394,10 @@ function renderHover(n) {
     }
     if (last) { renderHover(last); return; }
     hoverBox.innerHTML = HOWTO;
+    setHoverHead('Как пользоваться');
     return;
   }
+  setHoverHead('Под курсором');
   var html = '';
   if (n.k === 'theme') {
     var cnt = (tagsOfTheme[n.n] || []).length;
@@ -2431,6 +2450,7 @@ function refreshHoverPanel() {
    нечего. */
 function renderRoute(r) {
   if (!hoverBox) return;
+  setHoverHead('Под курсором');
   var far = r.b;
   var isCross = r.link.k === 'cross';
   var html = '<span class="tmap-kind">' +
