@@ -41,16 +41,20 @@ OpenAIProvider.complete()` напрямую; уровень рассуждени
 """
 import json
 import random
+import re
 from decimal import Decimal
 from pathlib import Path
 
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Q
 from django.test import override_settings
 
 from problems.ai import providers
-from problems.enrich import prompts_v2
-from problems.enrich.text import is_english_text, problem_full_text
+from problems.enrich import prompts_v2, taxonomy
+from problems.enrich.text import (has_graph_in_statement,
+                                  has_table_in_statement, is_english_text,
+                                  problem_full_text)
 from problems.enrich.shortlist import shortlist_for
 from problems.models import Problem
 
@@ -80,14 +84,20 @@ INTERNATIONAL_TOPICS = ['Международная торговля']
 INEQUALITY_LABOR_TOPICS = ['Рынок труда', 'Неравенство доходов']
 
 # (ключ страты, доля по умолчанию из 300, названия тем | None для особых страт)
+# Фаза 6.1 (2026-09-01): добавлены визуальные страты (фигура/маркер, таблица)
+# — раньше задачи с картинками и таблицами попадали в выборку случайно, и
+# инвариант «не потеряли визуальное» было нечем проверить целенаправленно.
+# Доли остальных страт УМЕНЬШЕНЫ пропорционально, чтобы сумма осталась 300.
 STRATA = [
-    ('микро', 100, MICRO_TOPICS),
-    ('макро', 60, MACRO_TOPICS),
-    ('финансы', 40, FINANCE_TOPICS),
-    ('международка', 30, INTERNATIONAL_TOPICS),
-    ('неравенство и труд', 30, INEQUALITY_LABOR_TOPICS),
+    ('микро', 80, MICRO_TOPICS),
+    ('макро', 50, MACRO_TOPICS),
+    ('финансы', 30, FINANCE_TOPICS),
+    ('международка', 25, INTERNATIONAL_TOPICS),
+    ('неравенство и труд', 25, INEQUALITY_LABOR_TOPICS),
     ('англоязычные', 20, None),  # эвристика is_english_text
     ('заведомо сломанные', 20, 'DEFECT'),  # human_review == DEFECT
+    ('с фигурой/маркером', 25, 'FIGURE'),  # ProblemFigure или [[FIGURE:/tikz
+    ('с таблицей', 25, 'TABLE'),  # tabular/array/table/markdown-таблица
 ]
 STRATA_TOTAL = sum(target for _, target, _ in STRATA)  # 300 — база --limit
 
@@ -156,16 +166,42 @@ def scale_strata(limit):
     ⚠️ Это предположение, не часть исходного задания: там расписан только
     состав выборки на 300. Явно зафиксировано здесь и в отчёте, а не
     выбрано молча.
+
+    ГАРАНТИЯ: при `limit >= len(STRATA)` ни одна страта не обнуляется —
+    каждая получает минимум 1 (Фаза 6.1, 2026-09-01). До этой правки
+    `round()` мог округлить малую страту в 0, а при отрицательном остатке
+    вычитание из «самой большой» страты могло увести и её в 0 (например
+    `limit=9` реально обнулял «микро» старым кодом). При `limit < len(STRATA)`
+    гарантия буквально невыполнима (задач меньше, чем страт) — берём по 1
+    для `limit` страт с наибольшей исходной долей, остальные — 0, и это
+    явный частный случай, а не побочный эффект округления.
     """
     if limit == STRATA_TOTAL:
         return [(key, target, spec) for key, target, spec in STRATA]
+
+    n = len(STRATA)
+    if limit <= 0:
+        return [(key, 0, spec) for key, _, spec in STRATA]
+    if limit < n:
+        order = sorted(range(n), key=lambda i: -STRATA[i][1])
+        chosen = set(order[:limit])
+        return [(STRATA[i][0], 1 if i in chosen else 0, STRATA[i][2])
+               for i in range(n)]
+
     scaled = []
     for key, target, spec in STRATA:
-        scaled.append([key, round(target * limit / STRATA_TOTAL), spec])
+        count = max(1, round(target * limit / STRATA_TOTAL))
+        scaled.append([key, count, spec])
     diff = limit - sum(s[1] for s in scaled)
-    if diff:
+    while diff > 0:
         biggest = max(range(len(scaled)), key=lambda i: scaled[i][1])
         scaled[biggest][1] += diff
+        diff = 0
+    while diff < 0:
+        shrinkable = [i for i in range(len(scaled)) if scaled[i][1] > 1]
+        biggest = max(shrinkable, key=lambda i: scaled[i][1])
+        scaled[biggest][1] -= 1
+        diff += 1
     return [tuple(s) for s in scaled]
 
 
@@ -194,6 +230,38 @@ def build_sample(limit, seed):
                 .values_list('id', 'statement').iterator(chunk_size=500)
                 if is_english_text(text)
             ]
+        elif spec == 'FIGURE':
+            # ProblemFigure ИЛИ маркер `[[FIGURE:`/сырой tikzpicture — в
+            # statement ИЛИ в тексте подпункта (см. Фаза 1, docs/TAXONOMY.md
+            # §7 «график в условии»).
+            figure_regex = r'\[\[FIGURE:|\\begin\{tikzpicture\}'
+            candidates = list(
+                Problem.objects.filter(
+                    Q(figures__isnull=False)
+                    | Q(statement__iregex=figure_regex)
+                    | Q(parts__statement__iregex=figure_regex))
+                .exclude(id__in=used).distinct().order_by('id')
+                .values_list('id', flat=True))
+        elif spec == 'TABLE':
+            # tabular/array/table/HTML — SQL-стороной (быстро); markdown-
+            # таблица (строка с ≥2 символами `|`) не выражается regex-ом с
+            # подсчётом одинаковых символов в SQLite — добираем в Python
+            # ТОЛЬКО по statement (как и страта «англоязычные» выше), без
+            # обхода всех parts — компромисс ради скорости на 41 307 задач.
+            table_regex = r'\\begin\{tabular\}|\\begin\{array\}|\\begin\{table\}|<table'
+            sql_ids = set(
+                Problem.objects.filter(
+                    Q(statement__iregex=table_regex)
+                    | Q(parts__statement__iregex=table_regex))
+                .exclude(id__in=used).distinct()
+                .values_list('id', flat=True))
+            md_ids = {
+                pid for pid, text in
+                Problem.objects.exclude(id__in=used).order_by('id')
+                .values_list('id', 'statement').iterator(chunk_size=500)
+                if has_table_in_statement(text)
+            }
+            candidates = sorted(sql_ids | md_ids)
         else:
             candidates = list(
                 Problem.objects.filter(topics__name__in=spec)
@@ -224,14 +292,136 @@ def validate_call1(data, with_concepts=True):
         violations.append('tags вне диапазона 1..5 (%d)' % len(tags))
     if with_concepts:
         concepts = data.get('econ_concepts') or []
-        if not 3 <= len(concepts) <= 6:
-            violations.append(
-                'econ_concepts вне диапазона 3..6 (%d)' % len(concepts))
+        # Пустой список — законное исключение при `не_задача` (Фаза 4.5):
+        # промпт разрешает 0 понятий именно в этом случае, счётчик не имеет
+        # права ругаться на него как на промах мимо диапазона 3..6.
+        if not (len(concepts) == 0 and data.get('task_nature') == 'не_задача'):
+            if not 3 <= len(concepts) <= 6:
+                violations.append(
+                    'econ_concepts вне диапазона 3..6 (%d)' % len(concepts))
         if len(data.get('concepts_offlist') or []) > 2:
             violations.append('concepts_offlist длиннее 2')
     if len(data.get('features_1') or []) > 8:
         violations.append('features_1 длиннее 8')
     return (not violations, violations)
+
+
+# ---------------------------------------------------------------------------
+# Инварианты «не потеряли визуальное» (Фаза 6.2) — пилот НЕ пишет в
+# statement/answer/solution/ProblemPart.statement (P0), так что расхождение
+# здесь сигналит о нарушении этого правила, а не об ожидаемом результате.
+# ---------------------------------------------------------------------------
+
+_FIGURE_MARKER_RE = re.compile(r'\[\[FIGURE:')
+_TABLE_ENV_RE = re.compile(
+    r'\\begin\{tabular\}|\\begin\{array\}|\\begin\{table\}')
+
+
+def visual_snapshot(sample_ids):
+    """Снимок «сколько визуального» и хеш текстовых полей — берётся ДО и
+    ПОСЛЕ прогона по одним и тем же id, сравнивается `diff_visual_snapshots`.
+    """
+    problems = list(Problem.objects.filter(id__in=sample_ids)
+                    .prefetch_related('parts', 'figures'))
+    markers = 0
+    table_envs = 0
+    figure_rows = 0
+    text_hash = {}
+    for p in problems:
+        parts = list(p.parts.all())
+        markers += len(_FIGURE_MARKER_RE.findall(p.statement or ''))
+        table_envs += len(_TABLE_ENV_RE.findall(p.statement or ''))
+        for part in parts:
+            markers += len(_FIGURE_MARKER_RE.findall(part.statement or ''))
+            table_envs += len(_TABLE_ENV_RE.findall(part.statement or ''))
+        figure_rows += len(list(p.figures.all()))
+        text_hash[p.id] = (
+            p.statement, p.answer, p.solution,
+            tuple(part.statement for part in parts))
+    return {'figure_markers': markers, 'table_envs': table_envs,
+            'problem_figure_rows': figure_rows, 'text_hash': text_hash}
+
+
+def diff_visual_snapshots(before, after):
+    """Строки отчёта — числа до/после и список id, где текст ИЗМЕНИЛСЯ
+    (свип-детектор). Ожидание по всем строкам — 0 расхождений."""
+    lines = []
+    for key, label in (('figure_markers', 'маркеров [[FIGURE:'),
+                       ('table_envs', 'table-окружений (tabular/array/table)'),
+                       ('problem_figure_rows', 'строк ProblemFigure')):
+        b, a = before[key], after[key]
+        lines.append('%s до/после: %d / %d — %s' % (
+            label, b, a, 'совпало' if b == a else 'РАСХОЖДЕНИЕ'))
+    changed = sorted(
+        pid for pid, snap in before['text_hash'].items()
+        if snap != after['text_hash'].get(pid))
+    lines.append(
+        'свип-детектор statement/answer/solution/ProblemPart.statement: '
+        'расхождений %d%s' % (
+            len(changed), (' — id: %s' % changed) if changed else ''))
+    return lines
+
+
+def is_visual_problem(problem):
+    """Задача из визуальных страт — ProblemFigure, маркер/tikz или таблица."""
+    has_pf = problem.figures.exists()
+    text = problem_full_text(problem.statement, problem.parts.all())
+    return (has_graph_in_statement(text, has_problem_figure=has_pf)
+           or has_table_in_statement(text))
+
+
+def visual_flag_lists(rows):
+    """Два списка для глаз владельца (Фаза 6.2):
+    - задачи с ProblemFigure, помеченные «содержание в утраченном
+      визуальном элементе» — ожидание: список пуст;
+    - задачи из визуальных страт, помеченные «это не задача» вызовом 1.
+    """
+    ids = [row['problem_id'] for row in rows]
+    problems_by_id = {
+        p.id: p for p in
+        Problem.objects.filter(id__in=ids).prefetch_related('parts', 'figures')
+    }
+    lost_visual = []
+    not_task_visual = []
+    for row in rows:
+        problem = problems_by_id.get(row['problem_id'])
+        if problem is None:
+            continue
+        call1 = row.get('call1') or {}
+        call2 = row.get('call2') or {}
+        if (problem.figures.exists()
+                and 'содержание в утраченном визуальном элементе' in
+                (call2.get('text_quality_note') or '')):
+            lost_visual.append(problem.id)
+        if is_visual_problem(problem) and call1.get('task_nature') == 'не_задача':
+            not_task_visual.append(problem.id)
+    return lost_visual, not_task_visual
+
+
+def task_nature_divergence(rows):
+    """Инвариант Фазы 5: доля задач, где вызов 1 (`task_nature`) и вызов 2
+    (`problem_type`) расходятся в оценке «это задача / это не задача».
+    Ожидание на пилоте — единицы процентов; больше — сигнал, что одна из
+    формулировок промпта плывёт. Возвращает `(расхождений, пар, доля_%)`.
+    """
+    divergent = 0
+    total = 0
+    for row in rows:
+        call2_data = row.get('call2')
+        if call2_data is None:
+            continue
+        call1_data = row.get('call1') or {}
+        total += 1
+        not_task_1 = call1_data.get('task_nature') == 'не_задача'
+        not_task_2 = call2_data.get('problem_type') == 'не_задача'
+        if not_task_1 != not_task_2:
+            divergent += 1
+    pct = (divergent / total * 100) if total else 0.0
+    return divergent, total, pct
+
+
+_TITLE_CANDIDATE_DIGIT_RE = re.compile(r'\d')
+_TITLE_CANDIDATE_LATEX_RE = re.compile(r'[$\\]')
 
 
 def validate_call2(data):
@@ -242,6 +432,28 @@ def validate_call2(data):
     hints = data.get('hints')
     if hints is not None and not 3 <= len(hints) <= 5:
         violations.append('hints вне диапазона 3..5 (%d)' % len(hints))
+
+    # `title_candidate` (§5.8, Фаза 4.1/6.4) — границы не выражаются
+    # схемой (maxLength не пробовали на этой schema, чтобы не рисковать
+    # `strict` перед смок-тестом), проверяем в Python.
+    title = data.get('title_candidate') or ''
+    if not title:
+        violations.append('title_candidate пуст')
+    else:
+        if len(title) > 40:
+            violations.append('title_candidate длиннее 40 символов (%d)' % len(title))
+        word_count = len(title.split())
+        if not 1 <= word_count <= 4:
+            violations.append('title_candidate не 1..4 слова (%d)' % word_count)
+        if not title[:1].isupper():
+            violations.append('title_candidate не с заглавной буквы')
+        if title.endswith('.'):
+            violations.append('title_candidate заканчивается точкой')
+        if _TITLE_CANDIDATE_DIGIT_RE.search(title):
+            violations.append('title_candidate содержит цифру')
+        if _TITLE_CANDIDATE_LATEX_RE.search(title):
+            violations.append('title_candidate содержит $ или \\')
+
     return (not violations, violations)
 
 
@@ -404,9 +616,16 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
             stopped_early = True
             break
 
+        try:
+            topic_primary_name = taxonomy.theme_name_from_id(
+                data1.get('topic_primary', ''))
+        except KeyError:
+            topic_primary_name = ''
         user2 = prompts_v2.call2_user_text(
             text, data1.get('given', ''), data1.get('find', ''),
-            problem.solution, problem.answer)
+            problem.solution, problem.answer,
+            topic_primary_name=topic_primary_name,
+            task_nature=data1.get('task_nature', ''))
         reply2 = complete_fn(variant['call2_model'], core2_blocks, user2,
                              schema2, variant['call2_effort'])
         spent += real_call_cost(variant['call2_model'], reply2)
@@ -509,9 +728,12 @@ class Command(BaseCommand):
                 '(problems/ai/batch.py) построен отдельно, интеграция '
                 'сюда — после замера Б4.')
 
+        visual_before = visual_snapshot(sample_ids)
+
         complete_fn = make_openai_complete_fn()
         out_path = Path(options['out'])
         report_lines = []
+        all_rows = []
         for key in variants:
             variant = VARIANTS[key]
             self.stdout.write('')
@@ -522,11 +744,37 @@ class Command(BaseCommand):
                 max_cost=per_variant_cap,
                 on_progress=lambda pid, s: self.stdout.write(
                     '  #%d готово, потрачено $%.4f' % (pid, s)))
+            all_rows.extend(rows)
             report_lines.append('=== %s: обработано %d, потрачено $%.4f%s ===' % (
                 key, len(rows), spent,
                 ' (остановлено по --max-cost)' if stopped_early else ''))
+            divergent, pairs, pct = task_nature_divergence(rows)
+            report_lines.append(
+                '=== %s: расхождение вызов1/вызов2 по «это задача» — '
+                '%d/%d (%.1f%%) ===' % (key, divergent, pairs, pct))
             for row in rows:
                 report_lines.append(json.dumps(row, ensure_ascii=False, default=str))
+
+        visual_after = visual_snapshot(sample_ids)
+        diff_lines = diff_visual_snapshots(visual_before, visual_after)
+        lost_visual, not_task_visual = visual_flag_lists(all_rows)
+        diff_lines.append(
+            'задач с ProblemFigure, помеченных «содержание в утраченном '
+            'визуальном элементе»: %d%s' % (
+                len(lost_visual),
+                (' — id: %s' % lost_visual) if lost_visual else ''))
+        diff_lines.append(
+            'задач из визуальных страт, помеченных «это не задача»: %d%s' % (
+                len(not_task_visual),
+                (' — id: %s' % not_task_visual) if not_task_visual else ''))
+
+        report_lines.append('')
+        report_lines.append('=== ИНВАРИАНТЫ «НЕ ПОТЕРЯЛИ ВИЗУАЛЬНОЕ» (Фаза 6.2) ===')
+        report_lines.extend(diff_lines)
+        self.stdout.write('')
+        self.stdout.write('=== ИНВАРИАНТЫ «НЕ ПОТЕРЯЛИ ВИЗУАЛЬНОЕ» ===')
+        for line in diff_lines:
+            self.stdout.write('  ' + line)
 
         with open(out_path, 'w', encoding='utf-8') as fh:
             fh.write('\n'.join(report_lines))

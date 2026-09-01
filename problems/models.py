@@ -227,6 +227,28 @@ class Problem(models.Model):
 
     title = models.CharField('Заголовок', max_length=300, blank=True,
                              help_text='Необязательно. Краткое имя задачи.')
+
+    class TitleSource(models.TextChoices):
+        """Откуда взялся `title_candidate` — для стоп-гейта перед тем, как
+        решать, переписывать ли им `title` (Фаза 4.1, Б5). Решение о
+        перезаписи в этой сессии НЕ принимается, поле только заполняется
+        моделью и размечается кодом по `problems/enrich/title_rules.py`.
+        """
+        MODEL_EMPTY = 'model-empty', 'Модель: старый заголовок пуст/заглушка'
+        MODEL_BROKEN = 'model-broken', 'Модель: старый заголовок сломан'
+        MODEL_FIRSTLINE = 'model-firstline', 'Модель: старый заголовок — эхо начала условия'
+        KEPT = 'kept', 'Старый заголовок оставлен как есть'
+
+    #: Заголовок-кандидат от модели (вызов 2, §5.8) — НЕ показывается
+    #: ученику напрямую, пока владелец не решит применить поверх `title`.
+    title_candidate = models.CharField('Заголовок-кандидат', max_length=60,
+                                       blank=True)
+    #: Категория текущего `title` на момент, когда кандидат был предложен —
+    #: см. `problems/enrich/title_rules.py::classify_current_title`.
+    title_source = models.CharField('Источник заголовка-кандидата',
+                                     max_length=20,
+                                     choices=TitleSource.choices, blank=True)
+
     statement = models.TextField(
         'Условие',
         help_text='Основной текст задачи. Можно использовать LaTeX-формулы.',

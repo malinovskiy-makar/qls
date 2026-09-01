@@ -30,6 +30,39 @@ def problem_full_text(statement, parts):
     return '\n'.join(pieces)
 
 
+# «График в условии» / «Табличка в условии» — особенности 11 и 12 из
+# docs/TAXONOMY.md §7. Модель картинку не видит и таблицу распознаёт хуже
+# регулярки — обе считаются кодом, а не спрашиваются у модели.
+_GRAPH_MARKER_RE = re.compile(r'\[\[FIGURE:|\\begin\{tikzpicture\}')
+_TABLE_MARKER_RE = re.compile(
+    r'\\begin\{tabular\}|\\begin\{array\}|\\begin\{table\}|<table', re.IGNORECASE)
+
+
+def has_graph_in_statement(text, has_problem_figure=False):
+    """«График в условии» (docs/TAXONOMY.md §7, особенность 11).
+
+    `has_problem_figure` — есть ли у задачи строка `ProblemFigure`; сюда
+    передаётся вызывающим кодом, т.к. эта функция работает с голым текстом
+    и к БД не обращается. Считается истиной ещё и по маркеру `[[FIGURE:`
+    или сырому `tikzpicture`-блоку в тексте (задача до сборки ассета).
+    """
+    if has_problem_figure:
+        return True
+    return bool(_GRAPH_MARKER_RE.search(text or ''))
+
+
+def has_table_in_statement(text):
+    """«Табличка в условии» (docs/TAXONOMY.md §7, особенность 12).
+
+    LaTeX-окружения `tabular`/`array`/`table`, HTML `<table`, либо
+    markdown-таблица (строка с двумя и более символами `|`).
+    """
+    text = text or ''
+    if _TABLE_MARKER_RE.search(text):
+        return True
+    return any(line.count('|') >= 2 for line in text.splitlines())
+
+
 def is_english_text(text):
     """Эвристика, а не поле в базе — такого поля у `Problem` нет вовсе.
 
