@@ -90,25 +90,32 @@ JS = r"""
   };
 
   // ⚠️ ФОНОВЫЙ ПАТТЕРН ЛЕЖИТ ОТДЕЛЬНЫМ СЛОЕМ, И backdrop() ЕГО НЕ ВИДИТ.
-  //    Он нарисован в `body::before`, то есть не является фоном ни одного
-  //    родителя. Текст, лежащий прямо на фоне страницы, на самом деле лежит
-  //    на «фон + знак паттерна», и мерить надо ХУДШУЮ точку, а не среднюю.
-  //    Худшая — там, где знак сильнее всего сдвигает фон в сторону цвета
-  //    текста: в светлой теме это самый тёмный знак, в тёмной — самый светлый.
-  const patternAlpha = parseFloat(
-    getComputedStyle(document.documentElement)
-      .getPropertyValue('--bg-pattern-alpha') || '0') || 0;
+  //    Он нарисован в `body::before` и `body::after`, то есть не является
+  //    фоном ни одного родителя. Текст, лежащий прямо на фоне страницы, на
+  //    самом деле лежит на «фон + знак паттерна», и мерить надо ХУДШУЮ точку,
+  //    а не среднюю. Худшая — там, где знак сильнее всего сдвигает фон в
+  //    сторону цвета текста: в светлой теме самый тёмный знак, в тёмной —
+  //    самый светлый.
+  //    ⚠️ У БИРЮЗЫ И ЯНТАРЯ РАЗНАЯ ПЛОТНОСТЬ, И ЧИТАТЬ НАДО ОБА ТОКЕНА.
+  //    Слоёв два (бирюзовый кусочек и янтарный), потому что в тёмной теме
+  //    янтарь при общей плотности звучал громче бирюзы. Одно значение на все
+  //    знаки завысило бы замер янтаря почти вдвое.
+  const cssvar = (n, d) => parseFloat(
+    getComputedStyle(document.documentElement).getPropertyValue(n) || d) || 0;
+  const tealAlpha  = cssvar('--bg-pattern-alpha', '0');
+  const amberAlpha = cssvar('--bg-pattern-amber-alpha', '0');
   const patternOff = !document.body ||
     getComputedStyle(document.body, '::before').display === 'none';
   const pageBg = parse(getComputedStyle(document.body).backgroundColor)
                  || {r: 255, g: 255, b: 255, a: 1};
   const dark = lum(pageBg) < 0.5;
-  // цвета знаков запечены в кусочек: бирюза, янтарь, светлая бирюза
-  const marks = [{r: 0, g: 121, b: 122, a: patternAlpha},
-                 {r: 214, g: 165, b: 37, a: patternAlpha},
-                 {r: 129, g: 181, b: 180, a: patternAlpha}];
+  // цвета знаков запечены в кусочки: бирюза и светлая бирюза — в один файл,
+  // янтарь — во второй, у каждого своя плотность слоя
+  const marks = [{r: 0, g: 121, b: 122, a: tealAlpha},
+                 {r: 129, g: 181, b: 180, a: tealAlpha},
+                 {r: 214, g: 165, b: 37, a: amberAlpha}];
   const worstOverPage = (bg) => {
-    if (patternOff || !patternAlpha) return bg;
+    if (patternOff || (!tealAlpha && !amberAlpha)) return bg;
     // ⚠️ ПО ПРИЗНАКУ «ОСТАНОВИЛИСЬ НА ТЕЛЕ», А НЕ ПО СОВПАДЕНИЮ ЦВЕТА.
     //    Первая версия сравнивала цвет фона с цветом страницы — и накладывала
     //    паттерн на всё, что просто ОКРАШЕНО в --bg: например на демо-коробку

@@ -43,10 +43,27 @@ PAGES = {
     "stats": "/profile/stats/",
     "game": "/game/",
     "calendar": "/calendar/",
+    "calc2": "/calc2/",
+    "calc2work": "/calc2/",
 }
 
 # Страницы, которые снимаются БЕЗ входа (иначе редиректит на кабинет).
 ANONYMOUS = {"login"}
+
+# ⚠️ ГОСТЬ ВИДИТ ДРУГУЮ ШАПКУ. У вошедшего там имя и «Выйти», у гостя —
+#    кнопка «Войти». Снимок под ботом её не показывает вовсе, а именно её
+#    и просили посмотреть. Флаг --anon снимает страницы без входа.
+
+# ⚠️ РАБОЧИЙ ЭКРАН КАЛЬКУЛЯТОРА СВОИМ АДРЕСОМ НЕ ОТКРЫВАЕТСЯ. У /calc2/ один
+#    маршрут, сцену выбирают щелчками: сначала блок, потом модель. Без этих
+#    двух щелчков снимок показывает окно выбора, а не холст с кривыми — то
+#    есть ровно НЕ ТО, что нужно проверять при правках фона и шрифта.
+AFTER_LOAD = {
+    "calc2work": [
+        "#picker-blocks button >> nth=1",          # блок «Совершенная конкуренция»
+        ".picker-group.open .scard:not(.soon) >> nth=0",   # первая рабочая модель
+    ],
+}
 
 
 def theme_script(theme: str) -> str:
@@ -99,6 +116,7 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=1440)
     ap.add_argument("--height", type=int, default=1000)
     ap.add_argument("--full", action="store_true", help="снимать страницу целиком")
+    ap.add_argument("--anon", action="store_true", help="снимать гостем, без входа")
     args = ap.parse_args()
 
     pid = args.pid or "63321"
@@ -120,15 +138,20 @@ def main() -> int:
         page = ctx.new_page()
 
         # Вход один раз на весь прогон.
-        page.goto(f"{BASE}/login/", wait_until="networkidle")
+        if args.anon:
+            print("снимаем гостем: вход пропущен")
         try:
+            if args.anon:
+                raise RuntimeError("--anon")
+            page.goto(f"{BASE}/login/", wait_until="networkidle")
             page.fill("input[name=username]", USER)
             page.fill("input[name=password]", PASSWORD)
             page.click("button[type=submit], input[type=submit]")
             page.wait_for_load_state("networkidle")
             print(f"вход: {page.url}")
         except Exception as exc:  # форма могла смениться — снимем анонимно
-            print(f"ВХОД НЕ УДАЛСЯ: {exc}")
+            if not args.anon:
+                print(f"ВХОД НЕ УДАЛСЯ: {exc}")
 
         for name in wanted:
             if name not in PAGES:
@@ -146,6 +169,14 @@ def main() -> int:
                 # шрифтам дают доехать: снимок до загрузки покажет запасной
                 page.evaluate("() => document.fonts.ready")
                 page.wait_for_timeout(400)
+                for step in AFTER_LOAD.get(name, []):
+                    try:
+                        page.click(step, timeout=8000)
+                        page.wait_for_timeout(900)
+                    except Exception as exc:
+                        print(f"  {name}/{theme}: шаг «{step}» не сработал — {exc}")
+                if name in AFTER_LOAD:
+                    page.wait_for_timeout(900)
                 shot = out / f"{name}_{theme}.png"
                 page.screenshot(path=str(shot), full_page=args.full)
                 if theme == "light":
