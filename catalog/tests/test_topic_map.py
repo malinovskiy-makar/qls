@@ -347,16 +347,14 @@ class NodeColourContrastTests(SimpleTestCase):
                 '%s тема: ориентир окрашен акцентом подсветки' % theme)
 
     def test_only_one_node_colour_is_declared(self):
-        """Старых токенов `--g-base` … `--g-tools` в общем файле нет.
+        """Старых имён `--g-base` … `--g-tools` в токенах нет.
 
         ⚠️ СМЫСЛ ПРОВЕРКИ ПОМЕНЯЛСЯ ВМЕСТЕ С ADR 0053. Раньше она сторожила
-        отказ от цветов; теперь цвета есть, но живут в topic_map.css под
-        именами `--map-g-*` — общий файл токенов 01.09.2026 правит
-        параллельная сессия по палитре, и трогать его нельзя.
-        Проверка стережёт ровно эту границу: старые имена не должны
-        вернуться в токены исподволь.
-        ДОЛГ: когда работа по палитре вольётся в main и `--map-g-*`
-        переедут в токены, этот тест переписывается на новые имена.
+        отказ от цветов разделов; теперь цвета вернулись, но под ИНЫМИ
+        именами — `--map-g-*`, рядом с прочими ролями карты. Старая пара
+        имён осталась бы вторым объявлением того же смысла, а два места
+        объявления одной роли неизбежно расходятся: проверка стережёт
+        именно это, а не сам факт цвета.
         """
         css = self.TOKENS.read_text(encoding='utf-8')
         for key, _label, _nums in GROUPS:
@@ -374,12 +372,10 @@ class SectionColourTests(SimpleTestCase):
     теперь легенда всегда на экране: заголовок раздела в правой панели
     написан своим цветом. См. ADR 0053.
 
-    Значения читаются из `catalog/static/catalog/css/topic_map.css`, а не
-    из общих токенов: 01.09.2026 файл токенов правит параллельная сессия по
-    палитре. Долг записан в самом CSS рядом с цветами.
+    Значения живут в `templates/_tokens.html` рядом с `--map-node` и
+    `--map-region`: это роли палитры, а не частность одного экрана.
     """
 
-    CSS = pathlib.Path('catalog/static/catalog/css/topic_map.css')
     TOKENS = pathlib.Path('templates/_tokens.html')
     JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
     PREVIEW_JS = pathlib.Path('catalog/static/catalog/js/topic_map_preview.js')
@@ -410,13 +406,11 @@ class SectionColourTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.css = cls.CSS.read_text(encoding='utf-8')
         tokens = cls.TOKENS.read_text(encoding='utf-8')
         cut = tokens.index('[data-theme="dark"]')
         cls.tokens = {'светлая': tokens[:cut], 'тёмная': tokens[cut:]}
-        # Два блока в topic_map.css: обычный и под [data-theme="dark"].
-        dark_at = cls.css.index('[data-theme="dark"] .tmap')
-        cls.blocks = {'светлая': cls.css[:dark_at], 'тёмная': cls.css[dark_at:]}
+        # Цвета разделов лежат там же, где остальные роли карты.
+        cls.blocks = cls.tokens
 
     def _colours(self, theme):
         """{ключ раздела: rgb} для одной темы."""
