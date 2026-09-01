@@ -788,6 +788,11 @@ var order = [];              /* порядок отрисовки по глуб�
 var lastThemeBoxes = [];     /* занятые места последнего кадра (для замеров) */
 var lastThemeFrom = 0;       /* с какого индекса в нём начинаются темы      */
 
+/* Толщина главной дороги «тег → его тема». Прочие подсвеченные связи
+   рисуются в 2,2 px; 3,8 отличается от них заметно и на глаз, и на
+   замере — полторы толщины, а не десятая доля. */
+var ROAD_HOME_WIDTH = 3.8;
+
 /* Базовая непрозрачность узла: тема в полную силу, тег вполсилы с
    небольшим запасом. Это второй после размера признак «тема или тег» —
    цвет у них общий, раздела. */
@@ -841,12 +846,16 @@ function rebuildHighlight() {
       var parent = byId['t' + n.n];
       if (parent) {
         litSet[parent.id] = true;
-        litEdges[edgeKey(parent.id, n.id)] = true;
+        /* ⚠️ ГЛАВНАЯ ДОРОГА ПОМЕЧАЕТСЯ ОТДЕЛЬНО (2, а не true). Связь тега
+           со СВОЕЙ темой отвечает на вопрос «откуда этот тег», и среди
+           десятка подсвеченных линий она обязана читаться первой. Одной
+           толщиной со смежными связями она в них терялась. */
+        litEdges[edgeKey(parent.id, n.id)] = 2;
       }
       /* Смежные теги — второй, тихий уровень. */
       (nearOf[n.id] || []).forEach(function (otherId) {
         litNear[otherId] = true;
-        litEdges[edgeKey(n.id, otherId)] = true;
+        litEdges[edgeKey(n.id, otherId)] = 1;
       });
     }
   });
@@ -1206,7 +1215,11 @@ function draw() {
     var a = byId[ln.s], b = byId[ln.t];
     if (a.pz < 0 || b.pz < 0) continue;
     var lit = litEdges && litEdges[edgeKey(a.id, b.id)];
-    if (lit) { roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id) }); continue; }
+    if (lit) {
+      roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id),
+                   home: lit === 2 });
+      continue;
+    }
     var path;
     if (ln.k === 'cross') path = pCross;
     else path = ((a.pz + b.pz) / 2 < DIST) ? pNear : pFar;
@@ -1234,6 +1247,12 @@ function draw() {
     var rd = roads[i];
     ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95 * hl)];
     ctx.lineWidth = 2.2;
+    /* Дорога тега к своей теме — толще и в полную силу: это ответ на
+       вопрос «откуда он», и он важнее прочих подсвеченных связей. */
+    if (rd.home) {
+      ctx.lineWidth = ROAD_HOME_WIDTH;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(hl)];
+    }
     if (rd.k === 'cross') {
       /* Пунктир остаётся пунктиром: он означает «связь по смыслу», а не
          «принадлежность теме», и менять его значение при наведении — врать
@@ -2037,28 +2056,26 @@ canvas.addEventListener('pointerup', function (e) {
   canvas.classList.remove('is-drag');
   if (dragMoved < 5) {
     var p = localPoint(e);
-    var got2 = pick(p[0], p[1]);
-    var hit = got2.node;
+    /* ⚠️ КЛИК ЦЕЛИТСЯ В УЗЕЛ, А НЕ В ЛИНИЮ, И ЭТО ОТДЕЛЬНОЕ ПРАВИЛО ОТ
+       НАВЕДЕНИЯ. У pick() старшинство настроено под ХОЖДЕНИЕ: стоишь на
+       узле — коридор его линии сильнее соседнего кружка (ADR 0047). Для
+       наведения это верно, для клика — нет: попасть в тег требовалось
+       пиксель в пиксель (кружок тега 3–5 px), промах на шесть пикселей
+       отдавал клик линии, а клик по линии брал ОБА её конца — то есть тег
+       вместе с его темой. Человек видел «кликнул по тегу, выбралась вся
+       тема», и это был не каприз выделения, а промах прицела.
+       Поэтому у клика свой прицел: hitTest с допуском 10 px. */
+    var hit = hitTest(p[0], p[1]);
     if (hit) {
-      togglePick(hit);
+      selectNode(hit);
     } else {
-      /* Клик посреди пути берёт ОБА конца маршрута — удобный способ взять
-         связанную пару целиком, не кликая по каждому узлу отдельно. */
-      var r2 = got2.route;
-      if (r2) {
-        var want = !(picked[r2.a.id] && picked[r2.b.id]);
-        if (want) {
-          picked[r2.a.id] = true;
-          picked[r2.b.id] = true;
-          lastPickedId = r2.b.id;
-        } else {
-          delete picked[r2.a.id];
-          delete picked[r2.b.id];
-          if (lastPickedId === r2.a.id || lastPickedId === r2.b.id) lastPickedId = null;
-        }
-        rebuildHighlight();
-        renderPicked();
-      }
+      /* Не попали ни в один узел — значит, клик пришёлся на линию.
+         ⚠️ БЕРЁМ ТОЛЬКО ДАЛЬНИЙ КОНЕЦ, А НЕ ОБА. Панель в этот момент
+         крупно показывает именно его («идём к …»), и выбраться должно то,
+         что человек читает. Прежний захват пары молча добавлял второй
+         узел, которого на экране никто не обещал. */
+      var r2 = pick(p[0], p[1]).route;
+      if (r2) selectNode(r2.b);
     }
   }
   touchActivity(); wake();
@@ -2074,7 +2091,11 @@ canvas.addEventListener('pointerleave', function () {
 canvas.addEventListener('dblclick', function (e) {
   var p = localPoint(e);
   var hit = hitTest(p[0], p[1]);
+  /* По узлу — подлёт к нему; по пустому месту — возврат к исходному виду.
+     Двойной клик по пустоте это привычный жест «покажи всё целиком», и
+     доходить до кнопки ⟲ в углу ради него не нужно. */
   if (hit) flyTo(hit, 2.1);
+  else resetView();
   touchActivity();
 });
 
@@ -2129,10 +2150,17 @@ function flyTo(n, zoom) {
   wake();
 }
 
+/* Возврат к тому виду, с которого карта открылась.
+   ⚠️ ПОВОРОТ ВОЗВРАЩАЕТСЯ ТОЖЕ. Раньше здесь сбрасывались смещение,
+   масштаб и наклон, а yaw оставался где был — и «вернуть обзор» возвращало
+   не тот вид, с которого человек начал: карта успевает уехать сама, она
+   тихо вращается. Обзор — это ВЕСЬ ракурс целиком, иначе кнопка не
+   отвечает на вопрос «как было в начале». */
 function resetView() {
   cam.goalX = cam.goalY = cam.goalZ = null;
   cam.tx = cam.ty = cam.tz = 0;
   cam.zoomTarget = 1;
+  cam.yaw = START_YAW;
   cam.pitch = START_PITCH;
   if (reduceMotion) cam.zoom = 1;
   showZoom();
@@ -2156,7 +2184,16 @@ document.getElementById('tmap-zoom-fit').addEventListener('click', function () {
    для этого — не источник правды. */
 var lastPickedId = null;
 
-function togglePick(n) {
+/* ⚠️ ЕДИНСТВЕННАЯ ТОЧКА ВЫБОРА НА ВСЮ КАРТУ. Через неё идут и клик по
+   холсту, и строки правой панели, и обучение. Правило у неё одно и
+   короткое: ВЫБИРАЕТСЯ РОВНО ТОТ УЗЕЛ, КОТОРЫЙ ПЕРЕДАЛИ, — ни его тема,
+   ни его теги, ни второй конец линии. Всё остальное (подсветка соседей,
+   подсчёт задач) считается уже ОТ выбранного, а не подмешивается в него.
+
+   Заводить второй путь выбора мимо этой функции нельзя: каждый такой путь
+   заново решает, что значит «выбрать тег», и решает по-своему. */
+function selectNode(n) {
+  if (!n) return false;
   if (picked[n.id]) {
     delete picked[n.id];
     if (lastPickedId === n.id) lastPickedId = null;
@@ -2168,6 +2205,7 @@ function togglePick(n) {
   renderPicked();
   if (!active) refreshHoverPanel();
   wake();
+  return !!picked[n.id];
 }
 
 function clearPick() {
@@ -2348,15 +2386,28 @@ function renderPicked() {
     (tagsOfTheme[byId[id].n] || []).forEach(function (t) { all[t.id] = true; });
   });
   var keys = Object.keys(all);
+  /* ⚠️ СУММИРУЕМ ТОЛЬКО ТЕ ТЕГИ, У КОТОРЫХ СЧЁТЧИК ЗАДАН. Счётчик известен
+     не у всех: часть тегов размечается вручную и числа ещё не имеет.
+     Пока отсутствие числа считалось нулём, выбор из одних таких тегов давал
+     «примерно 0 задач» — а это читается как «ничего не нашлось», то есть
+     ровно противоположное правде («неизвестно»). */
+  var counted = keys.filter(function (id) {
+    var n = byId[id];
+    return n && n.c !== null && n.c !== undefined;
+  });
   var sum = 0;
-  keys.forEach(function (id) { sum += byId[id].c || 0; });
+  counted.forEach(function (id) { sum += byId[id].c; });
 
   var cEl = document.getElementById('tmap-count');
   if (cEl) {
-    cEl.textContent = keys.length
-      ? 'Выбрано: ' + keys.length + ' ' + plural(keys.length, 'тег', 'тега', 'тегов') +
-        ' · примерно ' + fmtNum(sum) + ' ' + plural(sum, 'задача', 'задачи', 'задач')
-      : 'Выбрано: 0 тегов';
+    var head = 'Выбрано: ' + keys.length + ' ' +
+               plural(keys.length, 'тег', 'тега', 'тегов');
+    cEl.textContent = !keys.length
+      ? 'Выбрано: 0 тегов'
+      : head + ' · ' + (counted.length
+          ? 'примерно ' + fmtNum(sum) + ' ' +
+            plural(sum, 'задача', 'задачи', 'задач')
+          : 'число задач пока неизвестно');
   }
   var apply = document.getElementById('tmap-apply');
   var why = document.getElementById('tmap-why');
@@ -2661,7 +2712,7 @@ if (themesBox) {
     var n = byId['t' + row.dataset.theme];
     if (!n) return;
     flyTo(n, 2.1);
-    togglePick(n);
+    selectNode(n);
     touchActivity();
   });
 }

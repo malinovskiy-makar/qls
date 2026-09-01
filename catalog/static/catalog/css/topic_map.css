@@ -430,11 +430,6 @@
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }
-.tmap-note {
-  font-size: 11px;
-  color: var(--text3);
-  margin-top: 2px;
-}
 .tmap-foot-right {
   margin-left: auto;
   display: flex;

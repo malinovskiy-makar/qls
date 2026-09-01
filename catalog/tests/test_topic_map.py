@@ -636,6 +636,109 @@ class BuildGuardsTests(SimpleTestCase):
         self.assertEqual(len(cross), 1)
 
 
+
+class SelectionAndViewTests(SimpleTestCase):
+    """Пять точечных правок карты: выбор, счётчик, сброс вида, толщина дороги.
+
+    ⚠️ ПРОВЕРКИ ПО ТЕКСТУ ФАЙЛА — своего прогона JavaScript в проекте нет.
+    Поведение снималось в браузере через `window.TMAP`; здесь сторожится то,
+    потерю чего текстом заметить МОЖНО: единственная точка выбора, отсутствие
+    захвата пары, «неизвестно» вместо нуля, возврат поворота и толщина
+    главной дороги.
+    """
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+
+    def test_lower_bound_note_is_gone_from_the_screen(self):
+        """Строки «Оценка снизу: счётчик задан у N тегов из M» нет нигде.
+
+        Это была служебная бухгалтерия, которую человек читает всегда, а
+        относится она к случаю, который может его и не касаться. Неполнота
+        теперь проговаривается в самом счётчике и только когда она есть.
+        """
+        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        self.assertNotIn('Оценка снизу', html)
+        self.assertNotIn('tmap-note', html)
+
+    def test_selection_has_exactly_one_entry_point(self):
+        """Выбор идёт через `selectNode`, и второго пути нет.
+
+        ⚠️ ЭТО НЕ ПРИДИРКА К ИМЕНИ. Каждый обход общей функции заново решает,
+        что значит «выбрать тег», и решает по-своему — ровно так и появился
+        дефект «кликнул тег, выбралась вся тема».
+        """
+        self.assertIn('function selectNode(', self.src)
+        self.assertNotIn('togglePick', self.src)
+
+    def test_click_never_takes_both_ends_of_a_line(self):
+        """Клик выбирает РОВНО ОДИН узел.
+
+        Прежний код на клике по линии писал в `picked` оба её конца, и у тега
+        в выбранное молча уезжала его тема. Сторожим сам приём: двух присвоений
+        подряд быть не должно.
+        """
+        self.assertNotIn('picked[r2.a.id] = true', self.src)
+        self.assertNotIn('picked[r2.b.id] = true', self.src)
+
+    def test_click_aims_at_a_node_not_at_a_line(self):
+        """У клика свой прицел, шире чем у наведения.
+
+        Кружок тега 3–5 px: пока клик разбирался тем же pick(), что и
+        хождение, промах на шесть пикселей отдавал его линии. Клик обязан
+        сначала спросить hitTest с его допуском в 10 px.
+        """
+        after = self.src[self.src.index("addEventListener('pointerup'"):]
+        head = after[:after.index('touchActivity()')]
+        self.assertIn('hitTest(', head)
+        self.assertLess(head.index('hitTest('), head.index('selectNode('))
+
+    def test_missing_counter_is_called_unknown_not_zero(self):
+        """«Примерно 0 задач» читается как «ничего не нашлось».
+
+        А означает противоположное: у тега счётчика ещё нет. Суммируются
+        только теги с заданным счётчиком; если таких среди выбранных нет —
+        так и пишем.
+        """
+        self.assertIn('число задач пока неизвестно', self.src)
+        self.assertNotIn('sum += byId[id].c || 0', self.src)
+
+    def test_reset_returns_the_whole_view_including_the_turn(self):
+        """«Вернуть обзор» возвращает и поворот.
+
+        Карта тихо вращается сама; сброс без yaw возвращал не тот вид, с
+        которого человек начал. Двойной клик по пустому месту делает то же
+        самое — привычный жест «покажи всё целиком».
+        """
+        reset = self.src[self.src.index('function resetView()'):]
+        reset = reset[:reset.index('\n}')]
+        self.assertIn('cam.yaw = START_YAW', reset)
+        self.assertIn('cam.pitch = START_PITCH', reset)
+        self.assertIn('cam.zoomTarget = 1', reset)
+
+        dbl = self.src[self.src.index("addEventListener('dblclick'"):]
+        dbl = dbl[:dbl.index('});')]
+        self.assertIn('else resetView();', dbl)
+
+    def test_home_road_is_visibly_thicker_than_the_others(self):
+        """Дорога тега к СВОЕЙ теме толще прочих подсвеченных связей.
+
+        Она отвечает на вопрос «откуда этот тег» и среди десятка подсвеченных
+        линий обязана читаться первой; одной с ними толщиной терялась.
+        Разница должна быть заметной, а не десятой долей пикселя.
+        """
+        found = re.search(r'var ROAD_HOME_WIDTH = ([\d.]+);', self.src)
+        self.assertIsNotNone(found, 'толщина главной дороги больше не названа')
+        home = float(found.group(1))
+        self.assertGreaterEqual(
+            home, 3.0,
+            'главная дорога %s px — на глаз не отличается от обычных 2,2' % home)
+
+
 class PreviewModeTests(SimpleTestCase):
     """Встраиваемый режим карты: маленькое окно для чужого экрана.
 

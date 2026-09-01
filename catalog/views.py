@@ -800,7 +800,6 @@ def topic_map(request):
     data = json.loads(text)
     themes = [n for n in data['nodes'] if n['k'] == 'theme']
     tags = [n for n in data['nodes'] if n['k'] == 'tag']
-    counted = [t for t in tags if t['c'] is not None]
 
     tags_by_theme = {}
     for t in tags:
@@ -821,7 +820,6 @@ def topic_map(request):
     return render(request, 'catalog/topic_map.html', {
         'theme_count': len(themes),
         'tag_count': len(tags),
-        'counted_tags': len(counted),
         'sections': sections,
     })
 
