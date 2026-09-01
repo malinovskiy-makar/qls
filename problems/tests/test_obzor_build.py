@@ -306,14 +306,35 @@ class FiltersRowTests(Base):
         css = read('teacher', 'templates', 'teacher', '_picker_style.html')
         self.assertIn('.filters-row .k-btn { flex: 0 0 auto; }', css)
 
-    def test_all_seven_controls_are_still_there(self):
-        # ⚠️ Ряд отбора переехал в поток и называется `wk-filters`
-        # (ревью 17.08, п. 4.5). Ни один элемент не потерян — это и
-        # проверяется.
-        html = self.client.get(reverse('teacher:work_pick')).content.decode()
-        row = html.split('class="wk-filters"')[1].split('</form>')[0]
-        for name in ('name="q"', 'name="topic"', 'name="difficulty"',
-                     'name="type"', 'name="has_solution"'):
-            self.assertIn(name, row)
-        self.assertIn('Найти', row)
-        self.assertIn('Сброс', row)
+    def test_no_control_of_the_old_row_was_lost(self):
+        """Ни один орган прежнего ряда отбора не потерян при переезде.
+
+        ⚠️ РЯДА `wk-filters` БОЛЬШЕ НЕТ: отбор перешёл на ОБЩИЙ компонент
+        фильтров каталога в режиме «панель» (решение владельца
+        01.09.2026). Проверка сохраняет прежний смысл — «ни один элемент
+        не потерян», — но ищет их там, где они теперь живут: поиск и
+        кнопка в форме, остальное группами компонента. Имена групп взяты
+        те же, что были у полей старого ряда, поэтому пропажа любой из
+        них по-прежнему красит эту проверку.
+        """
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import Problem, Topic
+
+        # Компонент показывает группу, только если поле размечено хоть у
+        # одной задачи, — поэтому проверка сначала заводит такую задачу.
+        # Без неё «пусто» и «фильтр потерян» были бы неотличимы.
+        topic = Topic.objects.create(name=CANONICAL[0])
+        problem = Problem.objects.create(
+            statement='Условие для проверки набора фильтров.',
+            solution='Решение есть.', difficulty=3,
+            status=Problem.Status.PUBLISHED)
+        problem.topics.add(topic)
+
+        html = self.client.get(reverse('teacher:work_pick'),
+                               {'difficulty': '3'}).content.decode()
+        panel = html.split('class="wk-side"')[1].split('</aside>')[0]
+        self.assertIn('name="q"', panel)
+        self.assertIn('Найти', panel)
+        self.assertIn('Сбросить', panel)
+        for key in ('topic', 'difficulty', 'kind', 'has_solution'):
+            self.assertIn('data-fl="%s"' % key, panel)

@@ -248,9 +248,14 @@ class PendingColourTests(TestCase):
         self.assertEqual(bad, [], bad)
 
     def test_stars_keep_the_signal_colour(self):
-        """⚠️ Звёзды сложности — САМ СИГНАЛ, их цвет не трогали."""
+        """⚠️ Звёзды сложности — САМ СИГНАЛ, их цвет не трогали.
+
+        ⚠️ КЛАСС ПЕРЕИМЕНОВАН ПРИ СЛИЯНИИ ЭКРАНОВ: `.card-stars` старого
+        каталога стал `.ct-stars` объединённого. Требование не
+        менялось — звёзды остаются сигнальным янтарём.
+        """
         page = read('catalog', 'templates', 'catalog', 'problem_list.html')
-        stars = [l for l in page.split('\n') if '.card-stars' in l][0]
+        stars = [l for l in page.split('\n') if '.ct-stars' in l][0]
         self.assertIn('var(--amber)', stars)
         self.assertNotIn('amber-ink', stars)
 

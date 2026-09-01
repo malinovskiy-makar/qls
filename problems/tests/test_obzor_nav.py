@@ -253,22 +253,37 @@ class CheckButtonTests(TestCase):
 class MenuAndIconTests(TestCase):
     """1.4 и 1.5 — пункт меню и контурная иконка вместо эмодзи."""
 
-    def test_menu_item_matches_the_screen_title(self):
+    def test_menu_has_no_separate_smart_search_item(self):
+        """⚠️ ПУНКТ УБРАН ЦЕЛИКОМ (решение владельца 01.09.2026).
+
+        Прежняя проверка требовала ровно четыре пункта «Умный поиск» — по
+        одному на каждую роль. Экран слился с каталогом: поиск там один и
+        всегда по смыслу, а два входа в один банк заставляли человека
+        выбирать способ ДО того, как он сформулировал, что ищет. Ни одной
+        роли пункт больше не показывается, и это стережётся здесь же.
+        """
         nav = read('templates', '_nav.html')
         self.assertNotIn('Подобрать похожие', nav)
-        self.assertEqual(nav.count('>Умный поиск</a>'), 4)
+        self.assertEqual(nav.count('>Умный поиск</a>'), 0)
+        self.assertNotIn('catalog:smart_search', nav)
 
-    def test_screen_title_untouched(self):
-        """Заголовок экрана точнее описывает суть — его не трогали."""
-        page = read('catalog', 'templates', 'catalog', 'smart_search.html')
-        self.assertIn('Умный поиск задач', page)
+    def test_smart_search_address_still_answers(self):
+        """Старый адрес жив постоянным редиректом — ради закладок."""
+        ответ = self.client.get(reverse('catalog:smart_search'))
+        self.assertEqual(ответ.status_code, 301)
+        self.assertEqual(ответ['Location'], reverse('catalog:problem_list'))
 
-    def test_empty_state_has_no_emoji(self):
-        page = read('catalog', 'templates', 'catalog', 'smart_search.html')
+    def test_search_screen_has_no_emoji(self):
+        """⚠️ ЭКРАН ПОИСКА ТЕПЕРЬ КАТАЛОГ — смотрим требование там.
+
+        Файла `smart_search.html` больше нет: экран слился с каталогом.
+        Требование п. 1.5 (никаких эмодзи в пустом состоянии) от этого не
+        отменилось и проверяется на том экране, который его заменил.
+        """
+        page = read('catalog', 'templates', 'catalog', 'problem_list.html')
         for emoji in ('💡', '🔍'):
             self.assertNotIn(emoji, page)
-        self.assertIn("_icon.html' with name='bulb'", page)
-        self.assertIn("_icon.html' with name='search'", page)
+
 
     def test_new_icons_match_in_both_sources(self):
         """Разметка и скрипты берут ОДНУ строку — иначе наборы разойдутся."""

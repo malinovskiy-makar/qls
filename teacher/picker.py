@@ -259,36 +259,53 @@ def card_facts(problem, is_test, parts_count):
 def picker_context(request, per_page=20, sortable=False):
     """Контекст списка задач каталога: фильтры, карточки, пагинация.
 
-    Возвращает готовый словарь — оба конструктора кладут его в свой
-    контекст как есть.
+    Возвращает готовый словарь — конструктор кладёт его в свой контекст
+    как есть.
+
+    ⚠️ ФИЛЬТРЫ СОБИРАЕТ ОБЩИЙ МОДУЛЬ `catalog.filters`, А НЕ ЭТОТ ФАЙЛ.
+    Здесь жила ВТОРАЯ копия разбора параметров и построения запроса, и она
+    уже разошлась с каталогом: там был фильтр «Источник», здесь его не
+    было. В таксономии v2 будет 29 тем, 343 тега и 11 особенностей —
+    каждое добавление пришлось бы делать дважды (решение владельца
+    01.09.2026, https://app.notion.com/p/3ceb11c92bc1817d89e1c7274fd0a88c).
+
+    ⚠️ НАБОР ЗАДАЧ У РЕПЕТИТОРА ДРУГОЙ, И ЭТО СОХРАНЕНО. Каталог показывает
+    только проверенное человеком (14 458 задач), экран домашки — всё
+    опубликованное без брака (28 593): репетитор собирает работу из более
+    широкого набора. Сведение этих правил в одно молча поменяло бы ему
+    список, поэтому шлюз назван параметром: `gate='tutor'`.
+
+    ⚠️ «ЕСТЬ РЕШЕНИЕ» ЗДЕСЬ МЯГЧЕ, ЧЕМ В КАТАЛОГЕ, И ТОЖЕ НАРОЧНО. Каталог
+    прячет непроверенные решения (`solution_needs_review`), конструктор —
+    нет, так было всегда. `solution_strict=False` называет это различие
+    вслух вместо того, чтобы прятать его в двух разных `filter(...)`.
 
     ⚠️ `sortable` ВЫКЛЮЧЕН ПО УМОЛЧАНИЮ НАРОЧНО. Порядок выдачи — это
     поведение, а не оформление: включив сортировку всем, я поменял бы
     список на прежних экранах отбора, которых эта сессия не касается.
-    Новый поток просит её явно.
     """
-    from problems.management.commands.apply_topic_mapping import CANONICAL
-    from problems.models import CustomProblem, Problem, Topic
+    from catalog import filters as F
 
-    qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+    from problems.models import CustomProblem
 
-    f_q = request.GET.get('q', '').strip()
-    f_topic = request.GET.get('topic', '').strip()
-    f_diff = request.GET.get('difficulty', '').strip()
-    f_type = request.GET.get('type', '').strip()
-    f_sol = request.GET.get('has_solution', '').strip()
+    active = F.parse(request.GET)
+    base = F.base_queryset('tutor')
 
+    # «Чужие» параметры экрана, которые обязаны пережить смену фильтра:
+    # занятие, вид работы и открытая вкладка. Без них поиск по каталогу
+    # молча выбрасывал бы репетитора из занятия (фаза 12.1).
+    carry = {}
+    for name in ('group', 'kind', 'tab'):
+        value = (request.GET.get(name) or '').strip()
+        if value:
+            carry[name] = value
+
+    qs, filters_ctx = F.build(base, active, mode='panel',
+                              carry=carry, solution_strict=False)
+
+    f_q = active['q']
     if f_q:
         qs = qs.filter(Q(statement__icontains=f_q) | Q(title__icontains=f_q))
-    if f_topic:
-        qs = qs.filter(topics__id=f_topic)
-    if f_diff:
-        qs = qs.filter(difficulty=f_diff)
-    if f_type:
-        qs = qs.filter(problem_type=f_type)
-    if f_sol == '1':
-        qs = qs.exclude(solution='')
 
     # ⚠️ ПОРЯДОК ПО УМОЛЧАНИЮ — ТОТ ЖЕ, ЧТО БЫЛ (`-id`). «Сначала
     # подходящие по теме» и есть естественный порядок отфильтрованного
@@ -349,15 +366,6 @@ def picker_context(request, per_page=20, sortable=False):
             'is_test': is_test,
         })
 
-    problem_types = list(
-        Problem.objects.filter(status=Problem.Status.PUBLISHED)
-        .exclude(problem_type='')
-        .values_list('problem_type', flat=True)
-        .distinct().order_by('problem_type'))
-
-    topics = sorted(Topic.objects.filter(name__in=CANONICAL),
-                    key=lambda t: CANONICAL.index(t.name))
-
     query = request.GET.copy()
     query.pop('page', None)
 
@@ -381,18 +389,14 @@ def picker_context(request, per_page=20, sortable=False):
         # занятий много.
         'storage': storage_keys(group_id_param(request)),
         'total': paginator.count,
+        # Общий компонент фильтров — та же сборка, что у каталога.
+        'filters': filters_ctx,
         # ⚠️ Был ли ЗАПРОС. Число «найдено» показываем только после него:
         # при пустом поиске это просто размер каталога, и на экране сборки
         # домашки оно читается как «в домашке 18865 задач».
-        'has_query': bool(f_q or f_topic or f_diff or f_type or f_sol),
-        'topics': topics,
-        'problem_types': problem_types,
+        'has_query': bool(f_q) or not F.is_empty(active),
         'base_query': query.urlencode(),
         'f_q': f_q,
-        'f_topic': f_topic,
-        'f_diff': f_diff,
-        'f_type': f_type,
-        'f_sol': f_sol,
         'f_sort': f_sort,
         'sorts': SORTS,
         'preselect_id': request.GET.get('preselect', '').strip(),

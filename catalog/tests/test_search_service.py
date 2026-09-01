@@ -190,7 +190,7 @@ class DegradationWithoutServiceTests(_БазаДеградации):
     """
 
     def test_страница_поиска_отвечает_200_без_сервиса(self):
-        ответ = self.client.get(reverse('catalog:smart_search'),
+        ответ = self.client.get(reverse('catalog:problem_list'),
                                 {'q': 'эластичность спроса'})
         self.assertEqual(
             ответ.status_code, 200,
@@ -209,7 +209,7 @@ class DegradationWithoutServiceTests(_БазаДеградации):
         Правильная деградация: плашка «ищем по словам» (`degraded`),
         результаты есть, строки `error` нет.
         """
-        ответ = self.client.get(reverse('catalog:smart_search'),
+        ответ = self.client.get(reverse('catalog:problem_list'),
                                 {'q': 'эластичность спроса'})
         контекст = ответ.context
 
@@ -217,13 +217,17 @@ class DegradationWithoutServiceTests(_БазаДеградации):
             контекст['degraded'],
             'Флаг degraded не выставлен: человеку не сказали, что ищем '
             'только по словам.')
-        self.assertIsNone(
-            контекст['error'],
-            'На экран уехала строка ошибки «%s». Лежащий сервис — это не '
-            'ошибка человека, и адрес внутреннего сервиса ему не нужен.'
-            % контекст['error'])
+        # ⚠️ КЛЮЧА `error` В КОНТЕКСТЕ БОЛЬШЕ НЕТ, И ЭТО НЕ ОСЛАБЛЕНИЕ
+        # ПРОВЕРКИ, А УСИЛЕНИЕ. Объединённый экран каталога деградирует на
+        # ЛЮБОЙ поломке поиска, поэтому места, где строка ошибки могла бы
+        # родиться, не осталось вовсе. Смотрим на то, что видит человек:
+        # ни слова «ошибка», ни адреса внутреннего сервиса на экране.
+        тело = ответ.content.decode()
+        self.assertNotIn('Ошибка поиска', тело)
+        self.assertNotIn('search:8001', тело)
+        self.assertNotIn('нет связи с сервисом', тело)
         self.assertTrue(
-            контекст['results'],
+            контекст['cards'],
             'Деградация не нашла ничего. Поиск по словам обязан работать '
             'без сервиса — иначе это отказ, а не деградация.')
 
@@ -272,7 +276,7 @@ class DegradationWithoutServiceTests(_БазаДеградации):
         ловушка = _ЛовушкаИмпорта(МОДУЛИ_МОДЕЛИ)
         sys.meta_path.insert(0, ловушка)
         try:
-            ответ = self.client.get(reverse('catalog:smart_search'),
+            ответ = self.client.get(reverse('catalog:problem_list'),
                                     {'q': 'эластичность спроса'})
         finally:
             sys.meta_path.remove(ловушка)

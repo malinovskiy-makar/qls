@@ -237,6 +237,18 @@ def query(carry, active, **changes):
     return ('?' + urlencode(pairs)) if pairs else '?'
 
 
+def _hidden_fields(carry, active):
+    """Пары (имя, значение) для скрытых полей GET-формы. Без `q`."""
+    pairs = list(carry.items())
+    for name, param in PARAM.items():
+        if active.get(name):
+            pairs.append((param, active[name]))
+    pairs += [('tag', tag_id) for tag_id in active.get('tags') or ()]
+    if active.get('has_solution'):
+        pairs.append(('has_solution', '1'))
+    return pairs
+
+
 def is_empty(active):
     """Ни один фильтр не выбран (запрос `q` фильтром не считается)."""
     return not any((active['topic'], active['tags'], active['difficulty'],
@@ -588,6 +600,11 @@ def build(base, active, *, mode='strip', action='', hidden=(), carry=None,
         'chosen': [g for g in shown if g['value']],
         'has_any': not is_empty(active),
         'carry': carry,
+        # ⚠️ АКТИВНЫЕ ФИЛЬТРЫ СКРЫТЫМИ ПОЛЯМИ — ДЛЯ ЛЮБОЙ GET-ФОРМЫ НА
+        # ЭКРАНЕ. Варианты фильтров это ссылки, а поиск — форма; без этих
+        # полей нажатие «Найти» молча снимало бы всё выбранное. Своего `q`
+        # здесь нет: его печатают в самой форме.
+        'hidden_fields': _hidden_fields(carry, active),
         # Сброс снимает ФИЛЬТРЫ, но не запрос: человек, нажавший «сбросить
         # фильтры», не просил забыть, что он искал.
         'reset_url': query(carry, {'q': active['q']}),

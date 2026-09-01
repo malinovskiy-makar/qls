@@ -190,10 +190,20 @@ class WayNamesTests(PickBase):
 # ══════════════════════════════════════════════════════════════════════════
 class CatalogPanelTests(PickBase):
 
-    def test_search_is_twice_as_wide(self):
-        kit = read('templates', '_kit.html')
-        rule = re.search(r'\.wk-filters \{([^}]*)\}', kit).group(1)
-        self.assertIn('grid-template-columns: 2fr 1fr 1fr 1fr', rule)
+    def test_search_takes_the_whole_panel_width(self):
+        """Поле поиска — главное на панели, и оно занимает её ширину.
+
+        ⚠️ ПРЕЖНЯЯ ПРОВЕРКА СТОРОЖИЛА СЕТКУ `2fr 1fr 1fr 1fr` У РЯДА
+        ФИЛЬТРОВ. Ряда больше нет: отбор перешёл на общий компонент
+        каталога в режиме «панель» (решение владельца 01.09.2026), и
+        списки стоят не рядом с поиском, а под ним. Смысл требования тот
+        же — поиск не должен оказаться самым узким элементом отбора, — но
+        держится он теперь не долями сетки, а тем, что поле растягивается
+        на всю строку формы.
+        """
+        page = read('teacher', 'templates', 'teacher', 'work', 'pick.html')
+        rule = re.search(r'\.wk-qform \.k-input \{([^}]*)\}', page).group(1)
+        self.assertIn('flex: 1 1 auto', rule)
 
     def test_the_sort_control_is_gone(self):
         html = self.page()
@@ -206,12 +216,21 @@ class CatalogPanelTests(PickBase):
         asked = re.findall(r'data-pid="(\d+)"', self.page('?sort=easy'))
         self.assertEqual(plain, asked)
 
-    def test_the_counter_stands_with_the_buttons(self):
+    def test_no_row_of_controls_above_the_list(self):
+        """Над задачами не выстраивается ряд органов управления.
+
+        ⚠️ ПРЕЖНЯЯ ПРОВЕРКА ТРЕБОВАЛА СЧЁТЧИК В ОДНОМ РЯДУ С КНОПКАМИ. Она
+        закрывала настоящую беду п. 2.5 — три ряда органов управления
+        подряд над списком. Рядов над списком больше нет вовсе: отбор
+        уехал в панель слева, и над задачами осталась одна строка —
+        счётчик. Сторожим это, а не разметку исчезнувшего ряда.
+        """
         html = self.page()
-        row = html.split('class="wk-frow"')[1].split('</div>')[0]
-        self.assertIn('Найти', row)
-        self.assertIn('Сброс', row)
-        self.assertIn('wk-count', row)
+        self.assertNotIn('class="wk-frow"', html)
+        self.assertNotIn('class="wk-filters"', html)
+        # Счётчик стоит в колонке списка, а не в панели отбора.
+        listing = html.split('class="wk-cat-list"')[1]
+        self.assertIn('wk-count', listing)
 
 
 # ══════════════════════════════════════════════════════════════════════════

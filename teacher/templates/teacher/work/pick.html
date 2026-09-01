@@ -1,5 +1,5 @@
 {% extends "teacher/base.html" %}
-{% load ru %}
+{% load ru catalog_filters %}
 
 {% comment %}
 ШАГ 1 «ЧТО КЛАДЁМ» — пять способов набора одной страницей.
@@ -22,6 +22,35 @@
 Отступ снизу — чтобы полоса собранного не накрывала последнюю карточку
 списка: она липкая и стоит поверх содержимого.
 {% endcomment %}
+{% comment %}
+Стили общего компонента фильтров — тем же включением, что в каталоге.
+Пока они лежали внутри `problem_list.html`, панель приезжала сюда без вида.
+{% endcomment %}
+{% include "catalog/_filters_css.html" %}
+
+/* ── Две колонки способа «Искать самому» ─────────────────────────────
+   Панель фильтров слева, список задач справа. Прежний ряд из четырёх
+   выпадающих списков стоял над списком; вертикальная панель — второй
+   режим общего компонента (решение владельца), и в ряд она не ложится.
+   ⚠️ ПРАВАЯ КОЛОНКА ШАГА ПО-ПРЕЖНЕМУ ПУСТА: настройки работы живут на
+   шаге «Выдача», и сюда они не возвращаются. Слева — отбор, а не
+   настройки. */
+.wk-cat { display: flex; gap: 20px; align-items: flex-start; }
+.wk-side { flex: 0 0 250px; position: sticky; top: 60px;
+           max-height: calc(100vh - 90px); overflow: auto;
+           padding-right: 4px; }
+.wk-cat-list { flex: 1 1 auto; min-width: 0; }
+.wk-qform { display: flex; gap: 6px; margin: 0 0 16px; }
+.wk-qform .k-input { flex: 1 1 auto; min-width: 0; }
+/* Сам счётчик описан в `_kit.html` — здесь только его место. */
+.wk-cat-list > .wk-count { margin: 0 0 12px; }
+.wk-reset { display: inline-flex; margin-top: 4px; }
+@media (max-width: 900px) {
+  .wk-cat { flex-direction: column; }
+  .wk-side { flex-basis: auto; position: static; max-height: none;
+             width: 100%; }
+}
+
 .wk-panes { padding-bottom: 6px; }
 .wk-pane[hidden] { display: none; }
 .wk-pages { display: flex; gap: 6px; justify-content: center;
@@ -48,76 +77,60 @@
 
 <div class="wk-panes">
 <div class="wk-pane" id="pane-catalog" {% if way != 'catalog' %}hidden{% endif %}>
-  <form method="get" action="{% url 'teacher:work_pick' %}"
-        class="k-card k-filters" id="wk-filter-form">
-    {% comment %}
-    ⚠️ ЗАНЯТИЕ И ВИД РАБОТЫ ЕДУТ СКРЫТЫМИ ПОЛЯМИ. Форма отбора — это GET, и
-    без них поиск по каталогу молча выбрасывал бы человека из занятия
-    (фаза 12.1): крошка теряет имя, «кому выдать» на последнем шаге
-    перестаёт быть отмеченным заранее.
-    {% endcomment %}
-    {% if group_id %}<input type="hidden" name="group" value="{{ group_id }}">{% endif %}
-    {% if is_exam %}<input type="hidden" name="kind" value="exam">{% endif %}
-    <div class="wk-filters">
-      <input class="k-input" type="text" name="q" value="{{ f_q }}"
-             placeholder="Поиск по условию…">
-      <span class="k-select-wrap">
-        <select class="k-select" name="topic">
-          <option value="">Все темы</option>
-          {% for topic in topics %}
-          <option value="{{ topic.id }}"
-            {% if f_topic == topic.id|stringformat:"s" %}selected{% endif %}>{{ topic.name }}</option>
-          {% endfor %}
-        </select>
-      </span>
-      <span class="k-select-wrap">
-        <select class="k-select" name="difficulty">
-          <option value="">Любая сложность</option>
-          {% for level in "12345" %}
-          <option value="{{ level }}" {% if f_diff == level %}selected{% endif %}>
-            сложность {{ level }}</option>
-          {% endfor %}
-        </select>
-      </span>
-      <span class="k-select-wrap">
-        <select class="k-select" name="type">
-          <option value="">Любой тип</option>
-          <option value="тест: один ответ" {% if f_type == "тест: один ответ" %}selected{% endif %}>Тест</option>
-          {% for pt in problem_types %}
-          {% if pt != "тест: один ответ" %}
-          <option value="{{ pt }}" {% if f_type == pt %}selected{% endif %}>{{ pt }}</option>
-          {% endif %}
-          {% endfor %}
-        </select>
-      </span>
-    </div>
+  {% comment %}
+  ⚠️ ФИЛЬТРЫ ЗДЕСЬ — ТОТ ЖЕ КОМПОНЕНТ, ЧТО В КАТАЛОГЕ, В РЕЖИМЕ «ПАНЕЛЬ»
+  (решение владельца 01.09.2026). Раньше тут стоял свой ряд из четырёх
+  выпадающих списков, и он уже разошёлся с каталогом: там был фильтр
+  «Источник», здесь его не было. Разметку и разбор параметров теперь даёт
+  `catalog/_filters.html` и `catalog/filters.py`; добавить фильтр в один
+  экран и забыть про другой стало нельзя по устройству.
 
-    {% comment %}
-    ⚠️ СЧЁТЧИК СТОИТ В ОДНОМ РЯДУ С КНОПКАМИ (п. 2.5). Он жил отдельной
-    строкой под фильтрами вместе с выбором сортировки — и получалось три
-    ряда органов управления подряд над списком.
-    ⚠️ «НАШЛОСЬ N» ГОВОРИМ ТОЛЬКО ПОСЛЕ ЗАПРОСА. Без фильтров это размер
-    каталога, и на экране сборки работы он читается как «в работе 18 865
-    задач» — поэтому число там названо своим именем.
-    ⚠️ ВЫБОРА СОРТИРОВКИ ЗДЕСЬ БОЛЬШЕ НЕТ (решение владельца). Порядок
-    «сначала подходящие по теме» остался поведением по умолчанию, просто
-    молча: он и есть естественный порядок отфильтрованного списка.
-    {% endcomment %}
-    <div class="wk-frow">
-      <label class="k-check">
-        <input type="checkbox" name="has_solution" value="1"
-               {% if f_sol == "1" %}checked{% endif %}> с решением
-      </label>
-      <button class="k-btn k-btn--main k-btn--sm" type="submit">Найти</button>
-      <a href="{{ reset_url }}" class="k-btn k-btn--quiet k-btn--sm">Сброс</a>
-      <span class="wk-count">{% if has_query %}Нашлось <b>{{ total }}</b>
+  ⚠️ НАБОР ЗАДАЧ У РЕПЕТИТОРА ШИРЕ, чем в каталоге: он видит и то, чего
+  человек ещё не смотрел (28 593 против 14 458). Это сохранено —
+  `picker_context` просит у компонента шлюз `tutor`.
+
+  ⚠️ ПОИСК ЗДЕСЬ ПО-ПРЕЖНЕМУ ПО СЛОВАМ, А НЕ ПО СМЫСЛУ. Способ «Искать
+  самому» так и называется — ручной поиск по каталогу; смысловой подбор
+  живёт на соседней вкладке отдельным инструментом, и сводить их владелец
+  просил НЕ надо.
+  {% endcomment %}
+  <div class="wk-cat">
+    <aside class="wk-side">
+      <form method="get" action="{% url 'teacher:work_pick' %}"
+            class="wk-qform" id="wk-filter-form">
+        {% comment %}
+        ⚠️ ЗАНЯТИЕ, ВИД РАБОТЫ И АКТИВНЫЕ ФИЛЬТРЫ ЕДУТ СКРЫТЫМИ ПОЛЯМИ.
+        Форма отбора — это GET, и без них поиск по каталогу молча
+        выбрасывал бы человека из занятия (фаза 12.1), а заодно снимал бы
+        всё выбранное в панели.
+        {% endcomment %}
+        {% for name, value in filters.hidden_fields %}
+        <input type="hidden" name="{{ name }}" value="{{ value }}">
+        {% endfor %}
+        <input class="k-input" type="search" name="q" value="{{ f_q }}"
+               placeholder="Поиск по условию…" aria-label="Поиск по условию">
+        <button class="k-btn k-btn--main k-btn--sm" type="submit">Найти</button>
+      </form>
+
+      {% include "catalog/_filters.html" with groups=filters.groups mode="panel" %}
+
+      {% if filters.has_any or f_q %}
+      <a href="{{ reset_url }}" class="k-btn k-btn--quiet k-btn--sm wk-reset">Сбросить всё</a>
+      {% endif %}
+    </aside>
+
+    <div class="wk-cat-list">
+      {% comment %}
+      ⚠️ «НАШЛОСЬ N» ГОВОРИМ ТОЛЬКО ПОСЛЕ ЗАПРОСА. Без фильтров это размер
+      каталога, и на экране сборки работы он читается как «в работе 28 593
+      задачи» — поэтому число там названо своим именем.
+      {% endcomment %}
+      <div class="wk-count">{% if has_query %}Нашлось <b>{{ total|spaceint }}</b>
         {{ total|plural_ru:"задача,задачи,задач" }}{% else %}В каталоге
-        <b>{{ total }}</b> {{ total|plural_ru:"задача,задачи,задач" }} —
-        задайте фильтры или листайте{% endif %}</span>
-    </div>
-  </form>
+        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }} —
+        задайте фильтры или листайте{% endif %}</div>
 
-  {% for card in cards %}
+      {% for card in cards %}
   {% include "teacher/work/_card.html" with key=card.problem.pk title=card.card_title facts=card.facts source=card.source preview=card.preview is_test=card.is_test %}
   {% empty %}
   <div class="wk-empty">
@@ -143,6 +156,8 @@
     {% endif %}
   </div>
   {% endif %}
+    </div>{# /wk-cat-list #}
+  </div>{# /wk-cat #}
 </div>
 
 {% comment %}
