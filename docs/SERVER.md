@@ -6,7 +6,7 @@
 
 Что это: VDS в Selectel (Москва, РФ), на котором живёт платформа.
 На нём подняты база, Redis, **Django** и nginx с сертификатом.
-Сайт https://weconomics.site открывает настоящее приложение.
+Сайт https://weconomics.site и https://weconomics.ai открывает настоящее приложение.
 
 Паролей и ключей в этом файле нет и быть не должно. Пароли служб живут
 в `/srv/weconomics/.env` на сервере; пароль root — в менеджере паролей
@@ -174,7 +174,7 @@ ssh -T git@github.com     # «Hi malinovskiy-makar/qls! You've successfully auth
 | `REDIS_URL` | `redis://:ПАРОЛЬ@redis:6379` — **без номера базы** |
 | `SECRET_KEY` | ключ подписи Django |
 | `DJANGO_SETTINGS_MODULE` | `config.settings_production` |
-| `ALLOWED_HOSTS` | `weconomics.site,www.weconomics.site` |
+| `ALLOWED_HOSTS` | `weconomics.site,www.weconomics.site,weconomics.ai,www.weconomics.ai` |
 | `CSRF_TRUSTED_ORIGINS` | они же со схемой `https://` |
 | `SEMANTIC_SEARCH_ENABLED` | `0` — см. [ADR 0012](adr/0012-semantic-search-flag-off-in-prod.md) |
 | `GUNICORN_WORKERS` | `4` |
@@ -413,11 +413,22 @@ sudo fail2ban-client status sshd     # кого забанили
 
 ## Сертификат
 
-Let's Encrypt, на оба имени сразу (`weconomics.site` и `www.weconomics.site`).
+Let's Encrypt, на четыре имени (`weconomics.site`, `www.weconomics.site`,
+`weconomics.ai`, `www.weconomics.ai`).
 
 ```bash
 cd /srv/weconomics/app/deploy
 docker compose run --rm certbot certificates     # что есть и до какого числа
+```
+
+Команда расширения на добавленные имена (папка сертификата остаётся
+`live/weconomics.site/` — это метка, не домен, nginx-пути менять не нужно):
+
+```bash
+cd /srv/weconomics/app/deploy
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot \
+  --cert-name weconomics.site --expand \
+  -d weconomics.site -d www.weconomics.site -d weconomics.ai -d www.weconomics.ai
 ```
 
 Продление автоматическое: systemd-таймер `weconomics-certbot.timer`
