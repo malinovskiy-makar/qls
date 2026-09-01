@@ -63,6 +63,25 @@ def _fmt_number(n):
     return f'{n:,}'.replace(',', ' ')
 
 
+# ⚠️ ВРЕМЕННО ЗАШИТО ДО ЗАЛИВКИ ТАКСОНОМИИ v2 — ВЕРНУТЬ НА ЖИВОЙ ПОДСЧЁТ.
+# Решение владельца (01.09.2026): на лендинге стоят эти два числа, хотя база
+# сегодня даёт другие. Оба расхождения известны и приняты осознанно:
+#
+#   «олимпиад 25+» — в базе 25 источников, но не все они олимпиады: там есть
+#   Школково, Айлав и другие сборники. Слово поменялось на понятное посетителю,
+#   а число округлено вперёд знаком «+», чтобы не обещать точность, которой у
+#   новой формулировки нет.
+#
+#   «тем 29» — число тем таксономии v2, которая ещё НЕ ЗАЛИТА. Живой подсчёт по
+#   старому списку CANONICAL даёт 23, и ровно 23 показывает фильтр каталога. То
+#   есть до прогона обогащения главная и фильтр расходятся, и это ожидаемо.
+#
+# ЧТО СДЕЛАТЬ ПОСЛЕ ПРОГОНА ОБОГАЩЕНИЯ: удалить обе константы и вернуть в
+# `home()` живые запросы — они лежат там же, строкой ниже, в комментарии.
+LANDING_OLYMPIADS = '25+'
+LANDING_TOPICS = '29'
+
+
 def home(request):
     """Показатели лендинга считаются ЖИВЫМ запросом, и по тем же правилам,
     что и каталог.
@@ -84,11 +103,16 @@ def home(request):
         hidden_pending_review=False,
     )
     context = {
+        # Живое число — оно и верное, и проверяемое ссылкой «Каталог задач».
         'problems_count': _fmt_number(visible.count()),
-        'sources_count':  (Source.objects
-                           .filter(references__problem__status=Problem.Status.PUBLISHED)
-                           .distinct().count()),
-        'topics_count':   Topic.objects.filter(name__in=CANONICAL).count(),
+        # ⚠️ Два числа ниже — временные константы, см. блок над функцией.
+        # Живой подсчёт, к которому надо вернуться после таксономии v2:
+        #   'olympiads_count': (Source.objects
+        #                       .filter(references__problem__status=Problem.Status.PUBLISHED)
+        #                       .distinct().count()),
+        #   'topics_count':    Topic.objects.filter(name__in=CANONICAL).count(),
+        'olympiads_count': LANDING_OLYMPIADS,
+        'topics_count':    LANDING_TOPICS,
     }
     return render(request, 'catalog/home.html', context)
 
