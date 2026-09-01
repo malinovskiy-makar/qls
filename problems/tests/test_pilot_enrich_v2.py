@@ -968,6 +968,36 @@ class ResumableRunTests(TestCase):
         self.assertEqual(skipped2, len(self.problems))
         self.assertEqual(len(rows2), 0)
 
+    def test_разный_reasoning_effort_не_считается_готовым_на_тех_же_моделях(self):
+        """Баг Фазы 5 (боевой пилот, 01.09.2026): `base` и `terra-low`
+        зовут ОДНИ И ТЕ ЖЕ модели (Terra/Luna), отличаются только
+        `call1_effort` ('none' vs 'low') — старая проверка сравнивала
+        только модель и приняла результаты `base` за готовые для
+        `terra-low`, тихо пропустив всю ветку (0 обращений к API вместо
+        ожидаемых 600 на боевом прогоне)."""
+        base = cmd.VARIANTS['base']
+        terra_low = cmd.VARIANTS['terra-low']
+        self.assertEqual(base['call1_model'], terra_low['call1_model'])
+        self.assertEqual(base['call2_model'], terra_low['call2_model'])
+        self.assertNotEqual(base['call1_effort'], terra_low['call1_effort'])
+
+        complete_fn1, calls1 = self._counting_complete_fn()
+        cmd.resumable_run_variant(
+            self.problems, base, complete_fn1, self.shortlists,
+            self.log_path, run_id='r-base', prompt_version='pv-shared')
+
+        complete_fn2, calls2 = self._counting_complete_fn()
+        rows2, spent2, stop2, skipped2 = cmd.resumable_run_variant(
+            self.problems, terra_low, complete_fn2, self.shortlists,
+            self.log_path, run_id='r-terra-low', prompt_version='pv-shared')
+
+        self.assertEqual(
+            len(calls2), len(self.problems) * 2,
+            'ветка с другим effort обязана прогнаться заново, а не '
+            'быть принята за уже готовую по чужим результатам')
+        self.assertEqual(skipped2, 0)
+        self.assertEqual(len(rows2), len(self.problems))
+
     def test_другая_версия_промпта_не_считается_готовой(self):
         """Резюме матчит по prompt_version — иначе после правки промпта
         резюме молча пропустило бы задачи, разобранные СТАРЫМ текстом."""
@@ -989,6 +1019,61 @@ class ResumableRunTests(TestCase):
 # Фаза 2Б.3 (2026-09-01): репетиция записи `title_candidate`/`title_source`
 # на КОПИИ db.sqlite3 — канон не трогается никогда.
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Фаза 5 (боевой пилот, 01.09.2026): устойчивость к обрыву сети — у
+# владельца постоянно включён VPN, luna-luna упала на 86-й задаче именно
+# из-за таймаута. Повтор с нарастающей паузой на transient-отказы
+# провайдера (kind='other'/'limit'), без повтора на постоянные (no_key).
+# ---------------------------------------------------------------------------
+
+class RetryOnNetworkErrorTests(TestCase):
+
+    def test_повторяет_и_получается_после_двух_transient_отказов(self):
+        good_reply = _FakeReply(CALL1_OK_JSON)
+        with mock.patch.object(
+                providers.OpenAIProvider, 'complete',
+                side_effect=[
+                    providers.ProviderError('таймаут 1', kind='other'),
+                    providers.ProviderError('таймаут 2', kind='other'),
+                    good_reply,
+                ]) as fake_complete, \
+                mock.patch('problems.management.commands.pilot_enrich_v2.time.sleep') as fake_sleep:
+            complete_fn = cmd.make_openai_complete_fn()
+            reply = complete_fn(cmd.TERRA, ['ядро'], 'текст',
+                                {'type': 'object'}, 'none')
+        self.assertIs(reply, good_reply)
+        self.assertEqual(fake_complete.call_count, 3)
+        self.assertEqual(fake_sleep.call_count, 2)
+        # нарастающая пауза — вторая ждёт дольше первой.
+        waits = [c.args[0] for c in fake_sleep.call_args_list]
+        self.assertLess(waits[0], waits[1])
+
+    def test_не_повторяет_на_отсутствии_ключа(self):
+        with mock.patch.object(
+                providers.OpenAIProvider, 'complete',
+                side_effect=providers.ProviderError(
+                    'ключ не настроен', kind='no_key')) as fake_complete, \
+                mock.patch('problems.management.commands.pilot_enrich_v2.time.sleep') as fake_sleep:
+            complete_fn = cmd.make_openai_complete_fn()
+            with self.assertRaises(providers.ProviderError):
+                complete_fn(cmd.TERRA, ['ядро'], 'текст',
+                           {'type': 'object'}, 'none')
+        self.assertEqual(fake_complete.call_count, 1)
+        fake_sleep.assert_not_called()
+
+    def test_сдаётся_и_кидает_ошибку_после_исчерпания_попыток(self):
+        with mock.patch.object(
+                providers.OpenAIProvider, 'complete',
+                side_effect=providers.ProviderError(
+                    'сеть недоступна', kind='other')) as fake_complete, \
+                mock.patch('problems.management.commands.pilot_enrich_v2.time.sleep'):
+            complete_fn = cmd.make_openai_complete_fn()
+            with self.assertRaises(providers.ProviderError):
+                complete_fn(cmd.TERRA, ['ядро'], 'текст',
+                           {'type': 'object'}, 'none')
+        self.assertEqual(fake_complete.call_count, cmd.NETWORK_RETRIES)
+
 
 class TitleCandidateUpdatesTests(TestCase):
 

@@ -46,6 +46,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import time
 from decimal import Decimal
 from pathlib import Path
 
@@ -560,22 +561,43 @@ def real_call_cost(model, reply):
     return total / Decimal(10 ** 6)
 
 
+NETWORK_RETRIES = 5
+NETWORK_RETRY_BASE_SECONDS = 2  # 2, 4, 8, 16 — растёт на каждой попытке
+RETRYABLE_PROVIDER_ERROR_KINDS = ('other', 'limit')
+
+
 def make_openai_complete_fn():
     """Обёртка над `OpenAIProvider.complete` для боевого `--apply`.
 
     ⚠️ ОБХОД `core.run()` — см. докстринг модуля целиком.
+
+    ⚠️ ПОВТОР НА ОБРЫВЕ СЕТИ (Фаза 5, боевой пилот 01.09.2026) — у
+    владельца постоянно включён VPN, и `luna-luna` упала на 86-й задаче из
+    3000 запланированных именно на таймауте. `kind='no_key'` (ключ не
+    настроен) НЕ повторяется — ждать тут нечего, отказ постоянный.
     """
     provider = providers.OpenAIProvider()
 
-    def complete_fn(model, blocks, user_text, schema, effort):
+    def _call_once(model, blocks, user_text, schema, effort):
         if effort is None:
-            reply = provider.complete(blocks, user_text, schema, model,
-                                      _setting_max_tokens())
-        else:
-            with override_settings(AI_REASONING_EFFORT=effort):
-                reply = provider.complete(blocks, user_text, schema, model,
-                                          _setting_max_tokens())
-        return reply
+            return provider.complete(blocks, user_text, schema, model,
+                                     _setting_max_tokens())
+        with override_settings(AI_REASONING_EFFORT=effort):
+            return provider.complete(blocks, user_text, schema, model,
+                                     _setting_max_tokens())
+
+    def complete_fn(model, blocks, user_text, schema, effort):
+        last_error = None
+        for attempt in range(NETWORK_RETRIES):
+            if attempt:
+                time.sleep(NETWORK_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
+            try:
+                return _call_once(model, blocks, user_text, schema, effort)
+            except providers.ProviderError as error:
+                if error.kind not in RETRYABLE_PROVIDER_ERROR_KINDS:
+                    raise
+                last_error = error
+        raise last_error
 
     return complete_fn
 
@@ -733,14 +755,24 @@ def read_raw_log(path):
 # ---------------------------------------------------------------------------
 
 def _done_problem_ids(log_entries, prompt_version, variant):
+    """⚠️ МОДЕЛЬ + EFFORT, НЕ ТОЛЬКО МОДЕЛЬ (баг Фазы 5, боевой пилот
+    01.09.2026). `base` и `terra-low` зовут ОДНИ И ТЕ ЖЕ модели — их
+    различает только `call1_effort` ('none' vs 'low'). Проверка по одной
+    модели приняла результаты `base` за готовые для `terra-low` и тихо
+    пропустила всю ветку: 0 обращений к API вместо 600 на боевом прогоне.
+    """
     have_call1 = set()
     have_call2 = set()
     for entry in log_entries:
         if entry.get('prompt_version') != prompt_version:
             continue
-        if entry['call'] == 'call1' and entry['model'] == variant['call1_model']:
+        if (entry['call'] == 'call1'
+                and entry['model'] == variant['call1_model']
+                and entry.get('effort') == variant['call1_effort']):
             have_call1.add(entry['problem_id'])
-        elif entry['call'] == 'call2' and entry['model'] == variant['call2_model']:
+        elif (entry['call'] == 'call2'
+                and entry['model'] == variant['call2_model']
+                and entry.get('effort') == variant['call2_effort']):
             have_call2.add(entry['problem_id'])
     return have_call1 & have_call2
 
