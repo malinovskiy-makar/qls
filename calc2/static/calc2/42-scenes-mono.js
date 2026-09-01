@@ -997,7 +997,27 @@ function recomputeDiscr3() {
     return Math.max(isNaN(m1) ? -Infinity : m1, isNaN(m2) ? -Infinity : m2);   // MR следующей единицы (в лучшем рынке)
   };
   const Qtot = findRootIn((Q) => commonMR(Q) - mc(Q), 1e-6, 2 * CONFIG.Qmax);
-  if (Qtot == null || !(Qtot > 0)) { STATE.discr3 = { c1, c2, cm, found: false }; return; }
+  if (Qtot == null || !(Qtot > 0)) {
+    /* ⚠️ «ОБЩЕГО ВЫПУСКА НЕТ» НЕ ЗНАЧИТ «ОТВЕТА НЕТ». Если предельные издержки
+       нигде не дорастают до мировой цены, выгодна любая лишняя единица, и
+       суммарный выпуск действительно не ограничен. Но ВНУТРЕННИЙ рынок при
+       этом совершенно обычный: альтернативная стоимость домашней единицы —
+       это Pw, по которой её можно было продать за границу, поэтому дома
+       продаётся столько, что MR внутри = Pw. Раньше эта ветка не считала
+       ничего, и сцена оставалась без обеих панелей. */
+    let ub = null;
+    if (STATE.d3World) {
+      const Pw = evalCurve(c2, 0);                     // мировая цена = уровень горизонтального спроса
+      const mcFar = evalCurve(cm, 2 * CONFIG.Qmax);    // куда дорастают предельные издержки
+      if (!isNaN(Pw) && !isNaN(mcFar) && mcFar < Pw) {
+        const q1 = findRootIn(q => marginalRevenue(c1, q) - Pw, 1e-9, 2 * CONFIG.Qmax);
+        const has = (q1 != null && q1 > 0);
+        ub = { Pw, q1: has ? q1 : 0, P1: has ? evalCurve(c1, q1) : NaN };
+      }
+    }
+    STATE.discr3 = { c1, c2, cm, found: false, unbounded: ub };
+    return;
+  }
   const q1 = allocateMR(c1, c2, Qtot), q2 = Qtot - q1;
   const P1 = evalCurve(c1, q1), P2 = evalCurve(c2, q2), mcLevel = mc(Qtot);
   STATE.discr3 = { c1, c2, cm, found: true, Qtot, q1, q2, P1, P2, mcLevel };
@@ -1106,13 +1126,26 @@ function redrawDiscr3() {
   svg.selectAll('*').remove();
   addDefs();
   const d = STATE.discr3;
-  if (!d || !d.found) {
+  // Левая панель начинается ПОСЛЕ дока (56px), иначе её ось и цифры уходят под него.
+  const gxLeft = 64, midX = gxLeft + (W - gxLeft) / 2;
+  if (!d || (!d.found && !d.unbounded)) {
     drawGrid(); drawAxes();
     updateDiscr3Panel();
     return;
   }
-  // Левая панель начинается ПОСЛЕ дока (56px), иначе её ось и цифры уходят под него.
-  const gxLeft = 64, midX = gxLeft + (W - gxLeft) / 2;
+  /* Неограниченный экспорт — тоже ответ, и рисуется он ДВУМЯ панелями, как
+     обычный случай. Прежний ранний выход рисовал пустую сетку на весь холст:
+     текст в панели был, а на экране одно пустое поле вместо двух. */
+  if (!d.found) {
+    clearPanels();
+    drawMiniMarket(gxLeft, midX, 'Внутренний рынок', d.c1, d.unbounded.q1, d.unbounded.P1, d.cm, 1);
+    drawMiniMarket(midX, W, 'Экспорт по мировой цене', d.c2, null, null, d.cm, 2);
+    svg.append('line').attr('x1', midX).attr('y1', 52).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
+    haloText(svg.append('g'), (midX + W - 18) / 2, H / 2, 'Объём экспорта не ограничен', 'middle', 'middle')
+      .attr('fill', COL.inkSoft).attr('font-weight', 600);
+    updateDiscr3Panel();
+    return;
+  }
   // Фаза 4г: в сюжете «монополист и мировой рынок» те же два мини-графика подписаны
   // как внутренний рынок и экспорт по мировой цене (математика та же, discr3).
   const t1 = STATE.d3World ? 'Внутренний рынок' : 'Рынок 1';
@@ -1135,22 +1168,38 @@ function updateDiscr3Panel() {
     // Фаза 4г: вырожденный случай мировой торговли — если предельные издержки НИГДЕ
     // не дорастают до мировой цены, оптимальный экспорт математически не ограничен.
     // Это свойство модели, а не сбой солвера, — так и пишем.
-    if (world) {
-      const Pw = evalCurve(d.c2, 0);                       // мировая цена = уровень горизонтального спроса
-      const mcFar = evalCurve(d.cm, 2 * CONFIG.Qmax);      // куда дорастают предельные издержки
-      if (!isNaN(Pw) && !isNaN(mcFar) && mcFar < Pw) {
-        box.innerHTML = '<div class="warn">При постоянных предельных издержках ниже мировой цены оптимальный ' +
-          'объём экспорта не ограничен: фирме выгодна любая дополнительная единица. Это нормальное свойство ' +
-          'модели, а не ошибка расчёта: используйте возрастающие MC (например <code>Q</code>).</div>';
-        return;
-      }
+    if (world && d.unbounded) {
+      const u = d.unbounded;
+      /* Числа внутреннего рынка стоят ПЕРЕД предупреждением: у сцены есть
+         ответ, и человек должен увидеть сначала его, а потом оговорку. */
+      let html = '';
+      if (u.q1 > 1e-9 && !isNaN(u.P1))
+        html += `<div class="stat"><span>Внутри: (q₁; P₁)</span><b>(${fmt(u.q1)}; ${fmt(u.P1)})</b></div>`;
+      else
+        html += '<div class="stat"><span>Внутри</span><b>рынка нет (выпуск 0)</b></div>';
+      html += `<div class="stat"><span>Мировая цена $P_w$</span><b>${fmt(u.Pw)}</b></div>`;
+      html += '<div class="stat"><span>Экспорт</span><b>не ограничен</b></div>';
+      html += '<div class="warn" style="margin-top:6px;">При предельных издержках ниже мировой цены оптимальный ' +
+        'объём экспорта не ограничен: фирме выгодна любая дополнительная единица. Это нормальное свойство ' +
+        'модели, а не ошибка расчёта: используйте возрастающие MC (например <code>Q</code>).</div>';
+      html += '<div class="hint">Внутренний рынок при этом обычный: домашнюю единицу можно было продать за ' +
+        'границу по $P_w$, поэтому дома продаётся столько, что <b>MR внутри = $P_w$</b>.</div>';
+      box.innerHTML = html;
+      return;
     }
     box.innerHTML = '<div class="warn">Оптимум MR = MC не найден.</div>'; return;
   }
   if (world) {
     // Экспорт по мировой цене: сегмент 2 — горизонтальный спрос, поэтому MR₂ = Pw.
     let html = '';
-    html += `<div class="stat"><span>Внутри: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
+    /* ⚠️ ВНУТРЕННЕЙ ЦЕНЫ ПРИ НУЛЕВОМ ВЫПУСКЕ НЕ СУЩЕСТВУЕТ. Когда мировая цена
+       выше резервной цены покупателя (Pw > D(0)), дома не покупает никто:
+       весь выпуск идёт на экспорт. Прежняя строка печатала «(0; 100)» —
+       цену, по которой ничего не продано. */
+    if (d.q1 > 1e-9)
+      html += `<div class="stat"><span>Внутри: (q₁; P₁)</span><b>(${fmt(d.q1)}; ${fmt(d.P1)})</b></div>`;
+    else
+      html += '<div class="stat"><span>Внутри</span><b>рынка нет (выпуск 0): $P_w$ выше резервной цены покупателя</b></div>';
     html += `<div class="stat"><span>Экспорт q₂ (по Pw)</span><b>${fmt(d.q2)} / ${fmt(d.P2)}</b></div>`;
     html += `<div class="stat"><span>Σ выпуск</span><b>${fmt(d.Qtot)}</b></div>`;
     html += `<div class="stat"><span>$MR_1 = P_w = MC$</span><b>${fmt(d.mcLevel)}</b></div>`;

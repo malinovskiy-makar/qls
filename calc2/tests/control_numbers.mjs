@@ -584,6 +584,56 @@ cmp('нарисован DWL', r.aDWL, 900, 0.5);
 cmp('площадь между ломаным спросом и MC', r.whole, 4000, 1e-2);
 cmp('тождество CS + PS + DWL', r.ident, 4000, 1);
 
+head('Сессия 01.09 (2) · монополист и внешний рынок');
+/* Проверяется НАБЛЮДАЕМОЕ: нарисованы ли обе панели (по их заголовкам и по
+   реестру панелей) и что говорит табло. Число узлов и порядок элементов не
+   закрепляются. */
+const D3 = `
+  var seen = function (s) {
+    return [].slice.call(document.querySelectorAll('#chart text'))
+      .some(function (e) { return (e.textContent || '').indexOf(s) >= 0; }) ? 1 : 0;
+  };
+  var pans = function () { return (STATE.panels || []).map(function (p) { return p.id; }).sort().join(','); };
+  var told = function (s) { return ((document.getElementById('d3-panel-probe') || document.getElementById('info-d3') || {}).textContent || '').indexOf(s) >= 0 ? 1 : 0; };
+  var world = function (d1, d2, mc) {
+    resetSceneMemory(); pickScene('monoexport');
+    STATE.d3D1 = d1; STATE.d3D2 = d2; STATE.d3MC = mc; redrawAll();
+  };
+`;
+for (const [tag, d2, mc, wQ, wq1, wP1, wq2] of [
+  ['норма Pw = 50, MC = Q', '50', 'Q', 50, 25, 75, 25],
+  ['Pw = 120 выше резервной цены', '120', 'Q', 120, 0, null, 120]]) {
+  r = await run(D3 + `world('100 - Q', '${d2}', '${mc}');
+    var d = STATE.discr3 || {};
+    return { found: d.found ? 1 : 0, Qtot: d.Qtot, q1: d.q1, P1: d.P1, q2: d.q2,
+             t1: seen('Внутренний рынок'), t2: seen('Экспорт по мировой цене'),
+             pans: pans(), noHome: told('рынка нет') };`);
+  cmp(tag + ': общий выпуск', r.Qtot, wQ, 1e-3);
+  cmp(tag + ': внутри q₁', r.q1, wq1, 1e-3);
+  if (wP1 != null) cmp(tag + ': внутри P₁', r.P1, wP1, 1e-3);
+  cmp(tag + ': экспорт q₂', r.q2, wq2, 1e-3);
+  cmp(tag + ': обе панели нарисованы', r.t1 + r.t2, 2, 0);
+  cmp(tag + ': реестр панелей', r.pans, 'mini-1,mini-2', 0);
+}
+r = await run(D3 + `world('100 - Q', '120', 'Q');
+  return { noHome: told('рынка нет') };`);
+cmp('Pw выше резервной цены: «внутреннего рынка нет»', r.noHome, 1, 0);
+
+r = await run(D3 + `world('100 - Q', '50', '5');
+  var d = STATE.discr3 || {}, u = d.unbounded || {};
+  return { found: d.found ? 1 : 0, unb: d.unbounded ? 1 : 0, q1: u.q1, P1: u.P1, Pw: u.Pw,
+           t1: seen('Внутренний рынок'), t2: seen('Экспорт по мировой цене'),
+           note: seen('Объём экспорта не ограничен'), pans: pans(),
+           says: told('не ограничен') };`);
+cmp('MC = 5 ниже Pw: общий выпуск не найден', r.found, 0, 0);
+cmp('MC = 5 ниже Pw: внутренний рынок посчитан', r.unb, 1, 0);
+cmp('MC = 5 ниже Pw: внутри q₁', r.q1, 25, 1e-3);
+cmp('MC = 5 ниже Pw: внутри P₁', r.P1, 75, 1e-3);
+cmp('MC = 5 ниже Pw: обе панели нарисованы', r.t1 + r.t2, 2, 0);
+cmp('MC = 5 ниже Pw: реестр панелей', r.pans, 'mini-1,mini-2', 0);
+cmp('MC = 5 ниже Pw: подпись на правой панели', r.note, 1, 0);
+cmp('MC = 5 ниже Pw: табло говорит «не ограничен»', r.says, 1, 0);
+
 head('Сессия 01.09 (2) · квота 31.08 не сдвинулась');
 r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(20); redrawAll();
   var t = STATE.monoQuota || {};
