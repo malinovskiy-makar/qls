@@ -39,8 +39,10 @@
           align-items: baseline; padding: 6px 9px; border-radius: 8px;
           text-decoration: none; color: var(--text); font-size: 14px; }
 .fl-opt:hover { background: var(--surface-2); }
-.fl-opt.is-on { background: var(--accent); color: var(--accent-on); }
-.fl-opt.is-on .fl-opt-n { color: var(--accent-on); opacity: .8; }
+/* ⚠️ ЧЕРНИЛА НА АКЦЕНТЕ — `--on-btn`, а не `--accent-on`: второй
+   держит 2,63 в светлой теме и 1,93 в тёмной при норме 4,5. */
+.fl-opt.is-on { background: var(--accent); color: var(--on-btn); }
+.fl-opt.is-on .fl-opt-n { color: var(--on-btn); opacity: .85; }
 .fl-opt-n { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; }
 .fl-opts--wrap .fl-opt { border: 1px solid var(--border); }
 .fl-group { border-top: 1px solid var(--border-soft); }
@@ -71,7 +73,7 @@
 .fl-tag-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
                 margin: 8px 0 0; padding: 0; }
 .fl-tag-chip { display: inline-flex; gap: 6px; align-items: center;
-               background: var(--accent); color: var(--accent-on);
+               background: var(--accent); color: var(--on-btn);
                border-radius: 999px; padding: 5px 11px; font-size: 13px;
                text-decoration: none; }
 .fl-tag-of { font-size: 13px; color: var(--text3); margin: 10px 0 4px; }

@@ -30,7 +30,10 @@ PAGES = {
     "catalog": "/catalog/",
     "catalog_found": "/catalog/?q=спрос",
     "problem": "/catalog/problem/63321/",
-    "search_found": "/catalog/smart-search/?q=эластичность спроса",
+    # Экран поиска слился с каталогом (01.09.2026): состояние «найдено»
+    # меряется на нём же, а `/catalog/smart-search/` теперь редирект.
+    "catalog_table": "/catalog/?view=table&q=эластичность спроса",
+    "work": "/teacher/work/",
     "stats": "/profile/stats/",
     "progress": "/student/progress/",
     "game": "/game/",

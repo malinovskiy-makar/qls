@@ -33,11 +33,12 @@ PAGES = {
     "catalog": "/catalog/",
     "catalog_found": "/catalog/?topic=&q=спрос",
     "problem": "/catalog/problem/63321/",
-    "search": "/catalog/smart-search/",
-    # ⚠️ Пустой экран поиска показывает 16 кусков текста, а найденное —
-    #    больше сотни. Мерить надо ОБА: роль --surface-info живёт только
-    #    в результатах, и на пустом экране её просто нет.
-    "search_found": "/catalog/smart-search/?q=эластичность спроса",
+    # ⚠️ ОТДЕЛЬНОГО ЭКРАНА ПОИСКА БОЛЬШЕ НЕТ: он слился с каталогом
+    #    (решение владельца 01.09.2026), а `/catalog/smart-search/` теперь
+    #    отвечает редиректом — мерить на нём нечего. Оба состояния,
+    #    которые он давал, меряются на каталоге: пустой экран и найденное.
+    "catalog_search": "/catalog/?q=эластичность спроса",
+    "catalog_table": "/catalog/?view=table&q=эластичность спроса",
     "stats": "/profile/stats/",
     "game": "/game/",
     "calendar": "/calendar/",
