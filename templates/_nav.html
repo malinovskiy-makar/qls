@@ -91,7 +91,7 @@ nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14
       <span style="font-size:14px;color:rgba(255,255,255,0.7);">{{ user.get_full_name|default:user.username }}</span>
       <a href="/logout/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:6px var(--nav-btn-pad);border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;text-decoration:none;">Выйти</a>
     {% else %}
-      {# Кнопка входа — брендовый янтарь, как в макете. Шапка публичная, и правило территории янтаря её разрешает. Тёмные чернила --brand-amber-ink на #d6a525 дают 6,08 (AA держит с запасом, AAA 7,0 на этом цвете недостижим), сама плашка к шапке #3c3531 — 5,31. Цвет один на обе темы: янтарь брендовый, а не тематический. #}
+      {# Кнопка входа — брендовый янтарь, как в макете. Шапка публичная, и правило территории янтаря её разрешает. Чернила --brand-amber-ink #1d1a16 на #d6a525 дают 7,65 — порог AAA взят; сама плашка к шапке #3c3531 — 5,31. Цвет один на обе темы: янтарь брендовый, а не тематический. #}
       <a href="/login/" style="font-size:14px;color:var(--brand-amber-ink);padding:6px 14px;background:var(--brand-amber);border-radius:8px;text-decoration:none;font-weight:600;">Войти</a>
     {% endif %}
   </div>

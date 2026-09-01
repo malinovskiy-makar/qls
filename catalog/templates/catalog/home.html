@@ -91,14 +91,27 @@
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
-  color: var(--on-btn);
-  background: var(--btn-bg);
+  /* ⚠️ ЯНТАРНАЯ, А НЕ ГРАФИТОВАЯ — ИСКЛЮЧЕНИЕ, ВЫБРАННОЕ ПО ЗАМЕРУ.
+     Владелец просил кнопку ярче, а правило проекта требует от текста на
+     крупной сплошной кнопке порога AAA (7,0). Разбор пяти вариантов показал,
+     что «ярко» и AAA совместимы, просто не в тех парах, что пробовали:
+       бирюза #00797a + белый          5,23  — не проходит
+       янтарь #d6a525 + --text #2d2d2d 6,08  — не проходит
+       янтарь #d6a525 + #1d1a16        7,65  — проходит  ← взято
+       бирюза #005f60 + белый          7,48  — проходит, но в тёмной теме
+                                              к полю всего 1,93 и сливается
+     Порог не понижен и тест не тронут: он сторожит токены --btn-bg/--on-btn,
+     а здесь своя пара. Против поля кнопка даёт 2,19 в светлой и 6,39 в
+     тёмной. Территория янтаря лендинг разрешает — поверхность публичная,
+     и та же пара стоит на кнопке входа в шапке. */
+  color: var(--brand-amber-ink);
+  background: var(--brand-amber);
   border: none;
   border-radius: 20px;
   cursor: pointer;
   transition: background .15s;
 }
-.home-search button:hover { background: var(--btn-bg-hover); }
+.home-search button:hover { background: var(--brand-amber-hover); }
 
 /* ── Статистика ─────────────────────────────────────── */
 .home-stats {
@@ -261,7 +274,7 @@
       <div class="card-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5"/><path d="M12 3v3"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2.4 1.7"/></svg>
       </div>
-      <div class="card-title">Тренажер для тестов</div>
+      <div class="card-title">Тренажёр для тестов</div>
       <div class="card-desc">Решайте в условиях ограниченного времени и бросьте вызов друзьям</div>
     </a>
     <a class="home-card" href="/calendar/">
