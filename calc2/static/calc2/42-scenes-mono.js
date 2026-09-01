@@ -11,6 +11,10 @@
 function mcSourceCurve() {
   return curveByRole('mc') || curveByRole('supply') || null;
 }
+// То же для интерфейса и пресетов: роль занята и погашенной кривой тоже.
+function mcSourceCurveAny() {
+  return curveByRoleAny('mc') || curveByRoleAny('supply') || null;
+}
 
 // Предельные издержки в точке Q: прямая кривая MC/S, иначе d(TC)/dQ.
 function mcAt(q) {
@@ -307,7 +311,7 @@ function drawMonoCeilingPoints() {
 // Перетаскиваемая линия потолка (рисуется всегда, пока тип = потолок и Pc задан).
 // Уровень — общий STATE.pReg; перетаскивание — общий attachPcDrag → setPReg.
 function drawMonoCeilingLine() {
-  if (STATE.intervType !== 'ceiling' || !(STATE.pReg > 0)) return;
+  if (STATE.intervType !== 'ceiling' || !STATE.pRegSet) return;
   const ox = sx(0), xMax = sx(CONFIG.Qmax), yPc = sy(STATE.pReg);
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPc).attr('x2', xMax).attr('y2', yPc)
@@ -391,7 +395,10 @@ function monopolyFloor(Pf) {
 // Возвращает { binding, Qk, Q, price, csM, vcM, psM, dwl } либо null.
 function monopolyQuota(Qk) {
   const D = STATE.D, m = STATE.mono;
-  if (!D || !m || !(Qk > 0)) return null;
+  /* ⚠️ КВОТА НОЛЬ СВЯЗЫВАЕТ, И ОТВЕТ У НЕЁ ЕСТЬ: выпуска нет, излишков нет,
+     потери равны всему, что рынок давал раньше. Прежнее `Qk > 0` понимало
+     ноль как «квоты не задали» и показывало обычную монополию. */
+  if (!D || !m || !(Qk >= 0) || !STATE.quotaSet) return null;
   // Квота не ниже монопольного выпуска — не связывает, всё как без неё.
   if (Qk >= m.Qm - 1e-9) {
     return { binding: false, Qk, Q: m.Qm, price: m.Pm,
@@ -459,7 +466,7 @@ function drawMonoQuotaPoints() {
    квота НЕ связывает: человек двигает ползунок и должен видеть, где линия
    стоит и почему пока ничего не меняется. */
 function drawMonoQuotaLine() {
-  if (STATE.intervType !== 'quota' || !(STATE.quota > 0)) return;
+  if (STATE.intervType !== 'quota' || !STATE.quotaSet) return;
   const oy = sy(0), g = svg.append('g'), xQ = sx(STATE.quota);
   g.append('line').attr('x1', xQ).attr('y1', oy).attr('x2', xQ).attr('y2', sy(CONFIG.Pmax))
     .attr('stroke', COL.reg).attr('stroke-width', 2.5).style('pointer-events', 'none');
@@ -734,7 +741,7 @@ function drawMonoFloorPoints() {
 
 // Перетаскиваемая линия пола цены Pf (общий STATE.pReg, перетаскивание attachPcDrag → setPReg).
 function drawMonoFloorLine() {
-  if (STATE.intervType !== 'floor' || !(STATE.pReg > 0)) return;
+  if (STATE.intervType !== 'floor' || !STATE.pRegSet) return;
   const ox = sx(0), xMax = sx(CONFIG.Qmax), yPf = sy(STATE.pReg);
   const g = svg.append('g');
   g.append('line').attr('x1', ox).attr('y1', yPf).attr('x2', xMax).attr('y2', yPf)
@@ -787,7 +794,7 @@ function updateMonoInterventionPanel() {
   }
   if (it === 'ceiling') {
     const mc = STATE.monoCeil;
-    if (!mc || !(STATE.pReg > 0)) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать потолок Pc.</div>'; return; }
+    if (!mc || !STATE.pRegSet) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать потолок Pc.</div>'; return; }
     if (!mc.binding) { box.innerHTML = `<div class="warn">Потолок Pc=${fmt(mc.Pc)} не ниже монопольной цены (Pm=${fmt(m.Pm)}), поэтому не связывает.</div>`; return; }
     let html = `<div class="stat"><span>Потолок Pc</span><b>${fmt(mc.Pc)}</b></div>`;
     html += `<div class="stat"><span>Выпуск</span><b>${fmt(mc.Qstar)} (было ${fmt(m.Qm)})</b></div>`;
@@ -817,7 +824,7 @@ function updateMonoInterventionPanel() {
       + 'сколько считал выгодным; запрет может только помешать. Излишек производителя падает, '
       + 'потери общества растут: квота ниже монопольного выпуска уводит рынок ЕЩЁ ДАЛЬШЕ от '
       + 'эффективного объёма, а не приближает к нему.</p></div>';
-    if (!qt || !(STATE.quota > 0)) {
+    if (!qt || !STATE.quotaSet) {
       box.innerHTML = '<div class="muted">Двигайте ползунок квоты $Q_к$: она ограничивает выпуск сверху. '
         + 'Связывает, только если ниже монопольного выпуска.</div>' + why;
       return;
@@ -850,7 +857,7 @@ function updateMonoInterventionPanel() {
   }
   if (it === 'floor') {
     const fl = STATE.monoFloor;
-    if (!fl || !(STATE.pReg > 0)) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать пол Pf.</div>'; return; }
+    if (!fl || !STATE.pRegSet) { box.innerHTML = '<div class="muted">Двигайте линию/ползунок цены, чтобы задать пол Pf.</div>'; return; }
     if (!fl.binding) { box.innerHTML = `<div class="warn">Пол Pf=${fmt(fl.Pf)} не выше монопольной цены (Pm=${fmt(m.Pm)}), поэтому не связывает.</div>`; return; }
     let html = `<div class="stat"><span>Пол Pf</span><b>${fmt(fl.Pf)}</b></div>`;
     html += `<div class="stat"><span>Цена</span><b>${fmt(fl.price)} (было ${fmt(m.Pm)})</b></div>`;
@@ -1310,10 +1317,12 @@ function applyMonoVisibility() {
 // «Обычная»/«Дискр.1» работают на кривых D и MC из списка; «Дискр.3»/«Ломаный» — на полях формул.
 // Не перетирает уже заданное пользователем.
 function ensureMonopolyCurves() {
-  if (!curveByRole('demand')) {                       // нет спроса → добавить D = 100 − Q
+  /* Здесь спрашивают «есть ли РОЛЬ», а не «есть ли кривая для модели»: у
+     погашенной кривой роль занята, и curveByRole завёл бы вторую такую же. */
+  if (!curveByRoleAny('demand')) {                    // нет спроса → добавить D = 100 − Q
     addCurve('100 - Q'); const c = STATE.curves[STATE.curves.length - 1]; if (c) setRole(c, 'demand');
   }
-  if (!mcSourceCurve() && !curveByRole('tc')) {        // нет источника MC (mc/S/TC) → добавить MC = 20
+  if (!mcSourceCurveAny() && !curveByRoleAny('tc')) {  // нет источника MC (mc/S/TC) → добавить MC = 20
     addCurve('20'); const c = STATE.curves[STATE.curves.length - 1]; if (c) setRole(c, 'mc');
   }
 }

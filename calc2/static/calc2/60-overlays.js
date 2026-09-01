@@ -135,9 +135,9 @@ function redrawScene() {
       drawCurves();              // спрос D и (если задана явно) кривая MC
       drawMonopoly();            // MR + (если MC выведена из TC) сама MC
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
-      if (STATE.intervType === 'ceiling' && STATE.pReg > 0) drawMonoCeilingLine();  // линия видна, но не связывает
-      else if (STATE.intervType === 'floor' && STATE.pReg > 0) drawMonoFloorLine(); // линия видна, но не связывает
-      else if (STATE.intervType === 'quota' && STATE.quota > 0) drawMonoQuotaLine();// вертикаль видна, но не связывает
+      if (STATE.intervType === 'ceiling' && STATE.pRegSet) drawMonoCeilingLine();  // линия видна, но не связывает
+      else if (STATE.intervType === 'floor' && STATE.pRegSet) drawMonoFloorLine(); // линия видна, но не связывает
+      else if (STATE.intervType === 'quota' && STATE.quotaSet) drawMonoQuotaLine();// вертикаль видна, но не связывает
     }
   } else if (STATE.scenario === 'externality') {
     // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).

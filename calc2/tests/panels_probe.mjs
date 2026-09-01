@@ -226,7 +226,8 @@ else {
 
 /* ── 6. Ключевая точка — это то, что сцена нарисовала (фаза 4) ────────── */
 head('Ключевые точки: нарисованное, проекции, изломы');
-const MKT = `
+let MKT;
+MKT = `
   var setDS = function (scene, d, s) {
     resetSceneMemory(); pickScene(scene);
     updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), d);
@@ -287,6 +288,58 @@ cmp('  числа сложения не сдвинулись: Q*', r.Q, 70, 1e-4
 cmp('  P*', r.P, 45, 1e-4);
 cmp('  CS', r.cs, 1625, 1e-3);
 cmp('  PS', r.ps, 1325, 1e-3);
+
+/* ── 7. Ноль значит ноль, погашенная кривая отсутствует (фаза 5) ──────── */
+head('Ноль значит ноль · погашенная кривая отсутствует');
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('ceiling'); setPReg(0); redrawAll();
+  var e = document.getElementById('info-eq');
+  return { Q: STATE.pc.Qtrade, cs: STATE.pc.cs, ps: STATE.pc.ps, dwl: STATE.pc.dwl,
+           нет: /Равновесия нет/.test(e ? e.textContent : '') };`);
+cmp('потолок 0: объём торговли', r.Q, 0, 1e-9);
+cmp('потолок 0: CS', r.cs, 0, 1e-9);
+cmp('потолок 0: PS', r.ps, 0, 1e-9);
+cmp('потолок 0: DWL', r.dwl, 2500, 1e-3);
+cmp('потолок 0: в табло «Равновесия нет»', r['нет'], true);
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('floor'); setPReg(101); redrawAll();
+  return { Q: STATE.pc.Qtrade, dwl: STATE.pc.dwl };`);
+cmp('пол 101: объём торговли', r.Q, 0, 1e-9);
+cmp('пол 101: DWL', r.dwl, 2500, 1e-3);
+// Связывающий потолок 40 не сдвинулся — правка нуля его не задела.
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('ceiling'); setPReg(40); redrawAll();
+  return { Q: STATE.pc.Qtrade, gap: STATE.pc.gap, no: !!STATE.pc.noMarket };`);
+cmp('потолок 40: объём торговли', r.Q, 40, 1e-6);
+cmp('потолок 40: дефицит', r.gap, 20, 1e-6);
+cmp('потолок 40: рынок есть', r.no, false);
+// Крестик гасит кривую, а не удаляет: для модели её нет, на холсте соседка цела.
+r = await run(MKT + `setDS('sd', '100-Q', 'Q');
+  var s = STATE.curves.find(function (c) { return c.role === 'supply'; });
+  s.visible = false; redrawAll();
+  var e = document.getElementById('info-eq');
+  var out = { S: !!STATE.S, eq: !!STATE.eq, cs: STATE.cs, ps: STATE.ps,
+              видимых: STATE.curves.filter(function (c) { return c.visible !== false; }).length,
+              нет: /Равновесия нет/.test(e ? e.textContent : '') };
+  s.visible = true; redrawAll();
+  out.вернулось = !!(STATE.eq && Math.abs(STATE.eq.Q - 50) < 1e-6 && Math.abs(STATE.cs - 1250) < 1e-3);
+  return out;`);
+cmp('погасили S: для модели её нет', r.S, false);
+cmp('погасили S: равновесия нет', r.eq, false);
+cmp('погасили S: излишки пусты', r.cs === null && r.ps === null, true);
+cmp('погасили S: спрос на месте', r['видимых'], 1);
+cmp('погасили S: в табло «Равновесия нет»', r['нет'], true);
+cmp('галочка вернула всё как было', r['вернулось'], true);
+// Квота в монополии: ноль связывает, приёмочные числа 31.08 не сдвинулись.
+const QUOTA = (q) => MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(${q}); redrawAll();
+  var t = STATE.monoQuota || {};
+  return { bind: !!t.binding, Q: t.Q, P: t.price, ps: t.psM, cs: t.csM, dwl: t.dwl };`;
+r = await run(QUOTA(0));
+cmp('монополия, квота 0: связывает', r.bind, true);
+cmp('  Q', r.Q, 0, 1e-9); cmp('  PS', r.ps, 0, 1e-9); cmp('  CS', r.cs, 0, 1e-9);
+cmp('  DWL', r.dwl, 3200, 1e-3);
+r = await run(QUOTA(20));
+cmp('квота 20: Q', r.Q, 20, 1e-6); cmp('  P', r.P, 80, 1e-6);
+cmp('  PS', r.ps, 1200, 1e-3); cmp('  CS', r.cs, 200, 1e-3); cmp('  DWL', r.dwl, 1800, 1e-3);
+cmp('квота 40 не связывает', (await run(QUOTA(40))).bind, false);
+cmp('квота 60 не связывает', (await run(QUOTA(60))).bind, false);
 
 console.log('\nОшибок страницы: ' + errs.length);
 errs.slice(0, 5).forEach(e => console.log('  ! ' + e));

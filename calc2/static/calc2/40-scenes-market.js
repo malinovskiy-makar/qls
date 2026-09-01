@@ -3,8 +3,21 @@
    БЛОК 5. РАВНОВЕСИЕ — численный поиск и отрисовка точки D = S.
    --------------------------------------------------------------------- */
 
-// Найти кривую с заданной ролью ('demand' / 'supply'), либо null.
-function curveByRole(role) { return STATE.curves.find(c => c.role === role) || null; }
+/* ⚠️ ПОГАШЕННАЯ КРИВАЯ ДЛЯ МОДЕЛИ ОТСУТСТВУЕТ (решение владельца 01.09).
+
+   Крестик у кривой со штатной ролью не удаляет её, а ГАСИТ (`curve.visible =
+   false`, решение владельца 22.08 — гашение вместо удаления оставлено
+   намеренно). А эта функция про видимость не спрашивала вовсе, поэтому
+   STATE.S продолжала указывать на погашенную кривую, и равновесие с излишками
+   считались как ни в чём не бывало: на экране кривой нет, а числа есть.
+
+   Для МОДЕЛИ спрашивают `curveByRole` — она отдаёт только видимую.
+   Для ИНТЕРФЕЙСА (список ролей, выпадашка) есть `curveByRoleAny`: там кривая
+   нужна независимо от видимости, иначе строка сама себя потеряет. */
+function curveByRole(role) {
+  return STATE.curves.find(c => c.role === role && c.visible !== false) || null;
+}
+function curveByRoleAny(role) { return STATE.curves.find(c => c.role === role) || null; }
 
 // Пересчёт сценария БЕЗ рисования: складываем результаты в STATE,
 // чтобы функции отрисовки и табло читали готовые числа.
@@ -218,7 +231,7 @@ function recompute() {
   /* Равновесие здесь тоже не пропуск: фиксированная цена и короткая сторона
      рынка считаются по самим кривым. Ниже равновесие входит только туда, где
      оно действительно нужно, — в проверку «связывает ли» и в потери. */
-  if (STATE.pcMode && STATE.D && STATE.S && STATE.pReg > 0) {
+  if (STATE.pcMode && STATE.D && STATE.S && STATE.pRegSet) {
     const Preg = STATE.pReg;
     const isCeiling = (STATE.intervType === 'ceiling');
     // Связывает ли регулирование: потолок ниже равновесия / пол выше равновесия.
@@ -233,15 +246,26 @@ function recompute() {
           const a = invCurve(STATE.D, Preg), b = invCurve(STATE.S, Preg);
           return (a != null && b != null) ? Math.abs(a - b) > 1e-9 : false;
         })();
-    const Qd = invCurve(STATE.D, Preg);   // объём спроса при цене Preg (D⁻¹)
-    const Qs = invCurve(STATE.S, Preg);   // объём предложения при цене Preg (S⁻¹)
+    /* ⚠️ ОТРИЦАТЕЛЬНОГО ОБЪЁМА НЕ БЫВАЕТ, И ЭТО НЕ ОКРУГЛЕНИЕ, А ЭКОНОМИКА.
+       Пол выше резервной цены покупателя (Pf > D(0)) даёт формальный Qd < 0,
+       потолок ниже резервной цены продавца (Pc < S(0)) — формальный Qs < 0.
+       И то и другое означает одно: по этой цене не торгует никто. Считаем по
+       САМИМ КРИВЫМ, а не сравнением с равновесием: равновесия может и не быть. */
+    const clamp0 = (v) => (v == null ? null : Math.max(0, v));
+    const Qd = clamp0(invCurve(STATE.D, Preg));   // объём спроса при цене Preg (D⁻¹)
+    const Qs = clamp0(invCurve(STATE.S, Preg));   // объём предложения при цене Preg (S⁻¹)
     const Qtrade = (Qd != null && Qs != null) ? Math.min(Qd, Qs) : null;  // короткая сторона
+    const dRes = evalCurve(STATE.D, 0), sRes = evalCurve(STATE.S, 0);     // резервные цены
+    const killed = (!isCeiling && isFinite(dRes) && Preg > dRes)
+                || (isCeiling && isFinite(sRes) && Preg < sRes);
     /* Дефицит и избыток существуют, только когда регулирование СВЯЗЫВАЕТ.
        Раньше разность считалась всегда, и у несвязывающего потолка в состоянии
        лежало «40» — число, которого на этом рынке нет: по равновесной цене
        рынок расчищается. Панель его не показывала, но состояние врало. */
     const gap = (binding && Qd != null && Qs != null) ? Math.abs(Qd - Qs) : null;
-    STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap };
+    // Рынка нет: торговать нечего, а не «вмешательства нет».
+    const noMarket = killed || (Qtrade != null && Qtrade <= 1e-9);
+    STATE.pc = { Preg, isCeiling, binding, Qd, Qs, Qtrade, gap, noMarket };
     if (binding && Qtrade != null) {
       // CS / PS считаем интегрированием по фактическому объёму торговли.
       STATE.pc.cs = integrate(q => quadPrice(STATE.D, q) - Preg, 0, Qtrade);
@@ -280,7 +304,7 @@ function recompute() {
   STATE.quotaMode = compMarket && scenarioNone && (STATE.intervType === 'quota');
   STATE.quotaActive = false;
   STATE.qt = null;
-  if (STATE.quotaMode && STATE.D && STATE.S && STATE.eq && STATE.quota > 0) {
+  if (STATE.quotaMode && STATE.D && STATE.S && STATE.eq && STATE.quotaSet) {
     const Qq = STATE.quota;
     const binding = Qq < STATE.eq.Q;
     const Plo = evalCurve(STATE.S, Qq);   // нижняя граница коридора: цена предложения
@@ -337,11 +361,11 @@ function recompute() {
     const it = STATE.intervType;
     if ((it === 'tax' || it === 'subsidy') && STATE.tax > 0) {
       STATE.monoTax = monopolyTax(it === 'subsidy' ? -STATE.tax : STATE.tax);   // shift: +t налог / −s субсидия
-    } else if (it === 'ceiling' && STATE.pReg > 0) {
+    } else if (it === 'ceiling' && STATE.pRegSet) {
       STATE.monoCeil = monopolyCeiling(STATE.pReg);
-    } else if (it === 'floor' && STATE.pReg > 0) {
+    } else if (it === 'floor' && STATE.pRegSet) {
       STATE.monoFloor = monopolyFloor(STATE.pReg);
-    } else if (it === 'quota' && STATE.quota > 0) {
+    } else if (it === 'quota' && STATE.quotaSet) {
       /* ⚠️ ЭТОЙ ВЕТКИ ЗДЕСЬ НЕ БЫЛО, И ИМЕННО ПОЭТОМУ КВОТА В МОНОПОЛИИ «НЕ
          РАБОТАЛА» (приёмка владельца 31.08). Каскад разбирал три вида из
          четырёх, «квота» не совпадала ни с одним, и не исполнялось ничего:
@@ -469,7 +493,7 @@ function recompute() {
    ===================================================================== */
 function recomputeOpenEconomy() {
   const D = STATE.D, S = STATE.S, Pw = STATE.openPw;
-  if (!(Pw > 0)) return;
+  if (!STATE.openPwSet) return;   // ноль — тоже цена: «мир отдаёт даром»
   const Qd = invCurve(D, Pw), Qs = invCurve(S, Pw);
   if (Qd == null || Qs == null) { STATE.open = { Pw, error: 'При такой мировой цене объёмы спроса/предложения не определены.' }; return; }
   const importing = (Qd > Qs);
@@ -627,6 +651,7 @@ function attachOpenPwDrag(sel) {
 function setOpenPw(p) {
   p = Math.max(0, Math.min(p, CONFIG.Pmax));
   STATE.openPw = p;
+  STATE.openPwSet = true;   // мировую цену задали — ноль тоже значение
   const s = document.getElementById('open-pw-slider'); if (s) s.value = p;
   const l = document.getElementById('open-pw-val');    if (l) l.textContent = fmt(p);
   const i = document.getElementById('open-pw-input');  if (i) i.value = fmtInput(p);
@@ -1198,6 +1223,20 @@ function interventionKeyValues() {
   if (STATE.pcActive && STATE.pc) {
     const pc = STATE.pc;
     const isC = pc.isCeiling;
+    /* ⚠️ РЫНКА НЕТ — ЭТО ЧЕСТНЫЙ ОТВЕТ, А НЕ ПУСТОЕ ТАБЛО.
+       Потолок ниже резервной цены продавца и пол выше резервной цены
+       покупателя оставляют объём торговли нулевым. Числа при этом настоящие:
+       излишков нет вовсе, а потери общества равны всему прежнему излишку. */
+    if (pc.noMarket) {
+      return `<div class="stat"><span>${isC ? '$P_c$ (потолок цены)' : '$P_f$ (пол цены)'}</span><b>${fmt(pc.Preg)}</b></div>` +
+        `<div class="stat"><span>$Q$ (объём торговли)</span><b>0</b></div>` +
+        `<div class="stat"><span>$CS$</span><b>0</b></div>` +
+        `<div class="stat"><span>$PS$</span><b>0</b></div>` +
+        `<div class="stat"><span>$DWL$ (потери общества)</span><b>${fmt(pc.dwl)}</b></div>` +
+        `<div class="warn">Равновесия нет: по цене ${fmt(pc.Preg)} ` +
+        (isC ? 'ни один продавец не выходит на рынок' : 'ни один покупатель не готов платить') +
+        `, торговля не идёт вовсе. Весь прежний излишек стал потерями. ` + was + `</div>`;
+    }
     return `<div class="stat"><span>${isC ? '$P_c$ (потолок цены)' : '$P_f$ (пол цены)'}</span><b>${fmt(pc.Preg)}</b></div>` +
       `<div class="stat"><span>$Q_d$ (величина спроса)</span><b>${fmt(pc.Qd)}</b></div>` +
       `<div class="stat"><span>$Q_s$ (величина предложения)</span><b>${fmt(pc.Qs)}</b></div>` +
@@ -1254,7 +1293,15 @@ function updateInfoPanel() {
      нет, и подсказка про «отметьте кривую S» тут была бы неправдой. */
   if (isMonopolyScene()) { box.innerHTML = ''; return; }
   if (!STATE.D || !STATE.S) {
-    box.innerHTML = '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос), другую как S&nbsp;(предложение) в списке кривых.</div>';
+    /* ⚠️ «РОЛЬ НЕ НАЗНАЧЕНА» И «КРИВАЯ ПОГАШЕНА» — РАЗНЫЕ СЛУЧАИ, И ОТВЕТЫ
+       У НИХ РАЗНЫЕ. Крестик у кривой со штатной ролью её гасит, а роль
+       остаётся за ней. Совет «отметьте одну кривую как D» здесь был бы
+       неправдой: кривая отмечена, её просто выключили. */
+    const off = (!STATE.D && curveByRoleAny('demand')) || (!STATE.S && curveByRoleAny('supply'));
+    box.innerHTML = off
+      ? '<div class="warn">Равновесия нет: одна из кривых выключена. ' +
+        'Верните галочку слева от её имени в списке кривых.</div>'
+      : '<div class="muted">Отметьте одну кривую как D&nbsp;(спрос), другую как S&nbsp;(предложение) в списке кривых.</div>';
     return;
   }
   if (!STATE.eq) {
@@ -2009,7 +2056,7 @@ function drawAreas() {
    не говорило, что верхнее относится к рынку ДО вмешательства. Оговорка стоит
    ПОД числами, а не в сноске, и называет область действия. */
 function beforeInterventionNote() {
-  const pcOn = !!(STATE.pc && STATE.pc.binding && STATE.pReg > 0);
+  const pcOn = !!(STATE.pc && STATE.pc.binding && STATE.pRegSet);
   /* Квота — тоже вмешательство. Замер 24.08: при связывающей квоте оговорки
      не было вовсе, и «CS 1 250» в «Излишках» читалось как нынешнее число,
      хотя на деле относилось к рынку без квоты. */
@@ -2516,6 +2563,8 @@ function setTaxForm(form) {
 
 // Переключение типа вмешательства: налог <-> субсидия <-> потолок <-> пол.
 function setType(type) {
+  // Сменили вид вмешательства — прежние значения к новому отношения не имеют.
+  STATE.pRegSet = false; STATE.quotaSet = false;
   STATE.intervType = type;
   const map = { tax: 'seg-tax', subsidy: 'seg-sub', ceiling: 'seg-ceil', floor: 'seg-floor', quota: 'seg-quota' };
   Object.values(map).forEach(id => {
@@ -2535,7 +2584,7 @@ function setType(type) {
        Пустая квота показывала бы обычное равновесие и «задайте объём», то есть
        выбор вида ничего не менял бы на графике. Стартуем связывающей квотой
        в четырёх пятых равновесного объёма — коридор виден сразу. */
-    if (!(STATE.quota > 0) && STATE.eq && STATE.eq.Q > 0) {
+    if (!STATE.quotaSet && STATE.eq && STATE.eq.Q > 0) {
       STATE.quotaPos = 0.5;
       setQuotaFields(Math.round(STATE.eq.Q * 0.8 * 10) / 10);
     }
@@ -2544,7 +2593,7 @@ function setType(type) {
     if (pl) pl.textContent = (type === 'ceiling') ? 'Pc' : 'Pf';
     // Стартовая цена линии: в монополии — монопольная Pm, иначе равновесная P*
     // (линия появляется сразу, пока не связывает).
-    if (STATE.pReg <= 0) {
+    if (!STATE.pRegSet) {
       const base = (STATE.market === 'monopoly' && STATE.mono) ? STATE.mono.Pm : (STATE.eq ? STATE.eq.P : 0);
       if (base > 0) setPRegFields(Math.round(base));
     }
@@ -3154,6 +3203,7 @@ function recompileSocial() {
 // Записать регулируемую цену в поля панели (без перерисовки).
 function setPRegFields(p) {
   STATE.pReg = p;
+  STATE.pRegSet = true;     // цену задали — ноль тоже значение
   const slider = document.getElementById('pc-slider'); if (slider) slider.value = p;
   const lbl = document.getElementById('pc-val');       if (lbl) lbl.textContent = fmt(p);
   const inp = document.getElementById('pc-input');     if (inp) inp.value = fmtInput(p);
@@ -3258,7 +3308,7 @@ function updatePcPanel() {
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return; }
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Равновесие не найдено.</div>'; return; }
   const pc = STATE.pc;
-  if (!pc || STATE.pReg <= 0) {
+  if (!pc || !STATE.pRegSet) {
     box.innerHTML = `<div class="muted">Двигайте ползунок или тяните линию цены, чтобы задать ${isCeiling ? 'потолок' : 'пол'} цены.</div>`;
     return;
   }
@@ -3301,6 +3351,7 @@ function setQuotaFields(q) {
   const maxQ = slider ? (parseFloat(slider.max) || CONFIG.Qmax) : CONFIG.Qmax;
   q = Math.max(0, Math.min(q, maxQ));
   STATE.quota = q;
+  STATE.quotaSet = true;    // объём задали — ноль тоже значение
   if (slider) slider.value = q;
   const lbl = document.getElementById('quota-val'); if (lbl) lbl.textContent = fmt(q);
   const inp = document.getElementById('quota-input'); if (inp) inp.value = fmtInput(q);
@@ -3433,7 +3484,7 @@ function updateQuotaPanel() {
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Сначала отметьте кривые D и S.</div>'; return; }
   if (!STATE.eq) { box.innerHTML = '<div class="warn">Равновесие не найдено.</div>'; return; }
   const q = STATE.qt;
-  if (!q || !(STATE.quota > 0)) {
+  if (!q || !STATE.quotaSet) {
     box.innerHTML = '<div class="muted">Задайте разрешённый объём, который допускает квота.</div>';
     return;
   }

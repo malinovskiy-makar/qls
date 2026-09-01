@@ -779,7 +779,8 @@ function setMode(mode) {
   // Теперь пресет восстанавливается всякий раз, когда нужной роли не хватает;
   // свои кривые пользователя при этом не трогаются.
   if (mode === 'labor') {
-    if (!curveByRole('demand') || !curveByRole('supply')) {
+    // Роль, а не видимость: погашенная кривая роль всё равно занимает.
+    if (!curveByRoleAny('demand') || !curveByRoleAny('supply')) {
       STATE.curves = []; curveCounter = 0;
       addCurve('100 - L'); if (STATE.curves[0]) setRole(STATE.curves[0], 'demand');
       addCurve('L');       if (STATE.curves[1]) setRole(STATE.curves[1], 'supply');
