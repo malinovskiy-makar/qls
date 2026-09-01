@@ -1,0 +1,71 @@
+/* Предпросмотр карты тем — стиль встраиваемого блока.
+ *
+ * Отдельный файл, а не часть topic_map.css: экрану-хозяину (каталог) не
+ * нужны 18 КБ стилей панели, шапки, тура и нижней полосы ради одного
+ * вращающегося окошка.
+ *
+ * Размер блока задаёт ХОЗЯИН — здесь только вид. Скрипт подгоняет холст
+ * под фактический размер контейнера сам.
+ */
+
+.tmap-preview {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--bg);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r-card, 10px);
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: border-color var(--t), box-shadow var(--t);
+}
+.tmap-preview:hover { border-color: var(--focus, var(--border)); }
+.tmap-preview:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* ⚠️ ХОЛСТ ЛЕЖИТ АБСОЛЮТНО И НЕ ЛОВИТ КУРСОР.
+   Скрипт задаёт ему точные пиксели (нужно на экранах удвоенной плотности);
+   в обычном потоке эта ширина распирала бы карточку хозяина. А
+   pointer-events: none — это и есть требование «курсор ни на что не
+   реагирует»: клик всегда достаётся блоку-ссылке. */
+.tmap-preview-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Подпись поверх карты. Живёт в разметке хозяина, поэтому здесь только
+   раскладка: скрипт её не трогает. */
+.tmap-preview-cap {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 1;
+  padding: 22px 12px 10px;
+  font-size: var(--fs-meta, 13px);
+  font-weight: 500;
+  color: var(--text2);
+  pointer-events: none;
+  /* ⚠️ ПОДПИСЬ ЛЕЖИТ НА ГРАФЕ, И БЕЗ ПОДЛОЖКИ ЕЁ ПЕРЕЧЁРКИВАЮТ ЛИНИИ.
+     Плашкой прямоугольником вырезать нельзя — она отрежет низ карты; мягкая
+     растяжка цветом холста гасит граф ровно под буквами. */
+  background: linear-gradient(to top,
+              var(--bg) 34%, rgba(0, 0, 0, 0));
+}
+.tmap-preview-cap b { color: var(--text); font-weight: 600; }
+
+/* Данные не пришли — блок остаётся кликабельной ссылкой, но не притворяется
+   картой. Пустое окно без объяснения читалось бы как поломка страницы. */
+.tmap-preview.is-failed::after {
+  content: 'Карта не загрузилась';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--fs-meta, 13px);
+  color: var(--text3);
+}

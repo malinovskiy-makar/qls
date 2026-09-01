@@ -800,30 +800,54 @@ def topic_map(request):
     data = json.loads(text)
     themes = [n for n in data['nodes'] if n['k'] == 'theme']
     tags = [n for n in data['nodes'] if n['k'] == 'tag']
-    counted = [t for t in tags if t['c'] is not None]
 
     tags_by_theme = {}
     for t in tags:
         tags_by_theme.setdefault(t['n'], []).append(t)
 
-    # Навигатор «Темы» справа: тот же список, но сгруппированный по разделам.
-    # Считается на сервере — на клиенте это была бы та же работа каждый раз.
+    # Навигатор справа — дерево: разделы, внутри темы, внутри теги.
+    # Считается на сервере целиком: 372 строки это 30 КБ разметки, а на
+    # клиенте пришлось бы держать вторую копию справочника и собирать те же
+    # строки при каждом раскрытии.
+    #
+    # ⚠️ ЧИСЛО РЯДОМ СО СТРОКОЙ — ЭТО ЧИСЛО ЗАДАЧ, А НЕ ЧИСЛО ДЕТЕЙ. У темы
+    # оно есть не всегда (складывается из счётчиков её тегов, а те заданы у
+    # 180 из 343), и тогда вместо него ставится прочерк — канон 2.3:
+    # отсутствие числа это прочерк и причина, а не пустое место.
     sections = []
     by_n = {t['n']: t for t in themes}
     for g in data['groups']:
         rows = []
         for n in g['themes']:
             th = by_n[n]
-            rows.append({'n': n, 'title': th['l'],
-                         'tags': len(tags_by_theme.get(n, []))})
+            rows.append({
+                'n': n,
+                'title': th['l'],
+                'count': _fmt_number(th['c']) if th['c'] is not None else None,
+                'tags': [
+                    {'id': t['id'], 'label': t['l'],
+                     'count': _fmt_number(t['c']) if t['c'] is not None else None}
+                    for t in tags_by_theme.get(n, [])
+                ],
+            })
         sections.append({'key': g['k'], 'label': g['l'], 'themes': rows})
 
     return render(request, 'catalog/topic_map.html', {
         'theme_count': len(themes),
         'tag_count': len(tags),
-        'counted_tags': len(counted),
         'sections': sections,
     })
+
+
+def topic_map_preview_demo(request):
+    """Стенд встраиваемого предпросмотра карты — ТОЛЬКО ДЛЯ ПРИЁМКИ.
+
+    В навигации страницы нет: она нужна, чтобы проверить поведение блока
+    (нет подписей, медленное вращение, безразличие к курсору, остановка вне
+    экрана и при prefers-reduced-motion) до того, как его смонтируют в
+    «Умный каталог». Данных ей не нужно — блок сам идёт за map/data.json.
+    """
+    return render(request, 'catalog/topic_map_preview_demo.html')
 
 
 def topic_map_data(request):

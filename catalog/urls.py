@@ -23,6 +23,10 @@ urlpatterns = [
     # в переработанном поиске+каталоге (карточка идеи в Notion).
     path('map/',                                views.topic_map,          name='topic_map'),
     path('map/data.json',                       views.topic_map_data,     name='topic_map_data'),
+    # Стенд предпросмотра карты для чужого экрана. Не в навигации: он нужен
+    # приёмке встраиваемого режима, а не человеку в каталоге.
+    path('map/preview-demo/',                   views.topic_map_preview_demo,
+         name='topic_map_preview_demo'),
 
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),

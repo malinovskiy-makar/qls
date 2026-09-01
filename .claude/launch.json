@@ -112,6 +112,17 @@
         "--noreload"
       ],
       "port": 8412
+    },
+    {
+      "name": "tmap-v2",
+      "runtimeExecutable": "C:/Users/shipu/qls/venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8421",
+        "--noreload"
+      ],
+      "port": 8421
     }
   ]
 }
