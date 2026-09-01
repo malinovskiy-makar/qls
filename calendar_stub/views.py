@@ -249,13 +249,21 @@ def calendar_view(request):
     """
     user = request.user
     role = getattr(user, 'role', '')
+    # ⚠️ ПРАВО СОЗДАВАТЬ СПРАШИВАЕТСЯ ТОЙ ЖЕ ПРОВЕРКОЙ, ЧТО И В API.
+    # Шаблон решал это по СТАРОМУ полю `user.role`, а `event_create` — по
+    # `is_tutor`, который знает обе системы ролей. Репетитор, заведённый
+    # только через `UserProfile` (`profile.role == 'tutor'`, а `user.role`
+    # другое), кнопки не видел, хотя API его пускает. Прав это не
+    # расширяет: сервер и раньше разрешал ему создавать событие — экран
+    # просто врал, что нельзя.
+    can_create = bool(user.is_superuser or is_tutor(user))
 
     if user.is_superuser:
         groups = list(StudentGroup.objects.values('id', 'name'))
         assignments = list(
             Assignment.objects.order_by('-created_at').values('id', 'name')[:50]
         )
-    elif role == 'teacher':
+    elif is_tutor(user):
         groups = list(user.teaching_groups.values('id', 'name'))
         now = timezone.now()
         assignments = list(
@@ -270,6 +278,10 @@ def calendar_view(request):
 
     return render(request, 'calendar_stub/calendar.html', {
         'user_role': 'admin' if user.is_superuser else role,
+        # Отдельным признаком, а не выводом из `user_role` в разметке:
+        # правило доступа должно жить в одном месте с тем, которое его
+        # проверяет на сервере.
+        'can_create': can_create,
         # ⚠️ НЕ `json.dumps`. Названия занятий и работ печатает репетитор, а
         # уезжают они прямо внутрь тега <script>. `json.dumps` оставляет `<`
         # как есть, поэтому занятие с названием `</script><img ...>` закрывало
