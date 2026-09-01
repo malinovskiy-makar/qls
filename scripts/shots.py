@@ -50,6 +50,10 @@ PAGES = {
 # Страницы, которые снимаются БЕЗ входа (иначе редиректит на кабинет).
 ANONYMOUS = {"login"}
 
+# ⚠️ ГОСТЬ ВИДИТ ДРУГУЮ ШАПКУ. У вошедшего там имя и «Выйти», у гостя —
+#    кнопка «Войти». Снимок под ботом её не показывает вовсе, а именно её
+#    и просили посмотреть. Флаг --anon снимает страницы без входа.
+
 # ⚠️ РАБОЧИЙ ЭКРАН КАЛЬКУЛЯТОРА СВОИМ АДРЕСОМ НЕ ОТКРЫВАЕТСЯ. У /calc2/ один
 #    маршрут, сцену выбирают щелчками: сначала блок, потом модель. Без этих
 #    двух щелчков снимок показывает окно выбора, а не холст с кривыми — то
@@ -112,6 +116,7 @@ def main() -> int:
     ap.add_argument("--width", type=int, default=1440)
     ap.add_argument("--height", type=int, default=1000)
     ap.add_argument("--full", action="store_true", help="снимать страницу целиком")
+    ap.add_argument("--anon", action="store_true", help="снимать гостем, без входа")
     args = ap.parse_args()
 
     pid = args.pid or "63321"
@@ -133,15 +138,20 @@ def main() -> int:
         page = ctx.new_page()
 
         # Вход один раз на весь прогон.
-        page.goto(f"{BASE}/login/", wait_until="networkidle")
+        if args.anon:
+            print("снимаем гостем: вход пропущен")
         try:
+            if args.anon:
+                raise RuntimeError("--anon")
+            page.goto(f"{BASE}/login/", wait_until="networkidle")
             page.fill("input[name=username]", USER)
             page.fill("input[name=password]", PASSWORD)
             page.click("button[type=submit], input[type=submit]")
             page.wait_for_load_state("networkidle")
             print(f"вход: {page.url}")
         except Exception as exc:  # форма могла смениться — снимем анонимно
-            print(f"ВХОД НЕ УДАЛСЯ: {exc}")
+            if not args.anon:
+                print(f"ВХОД НЕ УДАЛСЯ: {exc}")
 
         for name in wanted:
             if name not in PAGES:
