@@ -153,11 +153,20 @@
       <div class="tmap-tour-step" id="tmap-tour-step">Шаг 1 из 5</div>
       <h2 id="tmap-tour-title">Это весь корпус</h2>
       <p id="tmap-tour-text">…</p>
+      {% comment %}
+        ⚠️ КНОПКИ «ДАЛЬШЕ» ЗДЕСЬ НЕТ, И ЭТО ГЛАВНОЕ В ЭТОМ БЛОКЕ. Шаг
+        засчитывается настоящим действием на карте, а не нажатием: пока
+        человек не повернул, не приблизил, не встал на тег, не прошёл по
+        линии и не выбрал — тур стоит. Строка подсказки говорит, что делать,
+        и она же превращается в «Получилось», когда шаг взят.
+        «Пропустить шаг» — выход для мыши без колеса и сенсорного экрана.
+      {% endcomment %}
+      <div class="tmap-tour-ask" id="tmap-tour-hint">…</div>
       <div class="tmap-tour-foot">
         <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-skip">Пропустить</button>
         <span class="tmap-tour-dots" id="tmap-tour-dots"></span>
         <button type="button" class="tmap-btn" id="tmap-tour-prev">←</button>
-        <button type="button" class="tmap-btn tmap-btn--main" id="tmap-tour-next">Дальше</button>
+        <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-next">Пропустить шаг</button>
       </div>
     </div>
   </div>

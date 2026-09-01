@@ -638,6 +638,87 @@ class BuildGuardsTests(SimpleTestCase):
 
 
 
+
+class InteractiveTourTests(SimpleTestCase):
+    """Обучение требует действий, а не досматривания.
+
+    ⚠️ ПРЕЖНИЙ ТУР САМ ДВИГАЛ КАМЕРУ И САМ ДЕЛАЛ ПОКАЗАТЕЛЬНЫЙ ВЫБОР, а
+    человек нажимал «дальше» пять раз. Руками он к карте так и не
+    прикасался — и закрывал обучение, не научившись. Теперь каждый шаг ждёт
+    настоящего действия и засчитывается слушателем этого действия.
+    """
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+    CSS = pathlib.Path('catalog/static/catalog/css/topic_map.css')
+    TPL = pathlib.Path('catalog/templates/catalog/topic_map.html')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+
+    def test_tour_version_is_bumped_so_returning_people_see_it_once(self):
+        """Логика шагов изменилась целиком — значит и ключ другой.
+
+        Оставь прежний ключ, и тот, кто видел рассказ, не увидит практики
+        никогда: флаг в localStorage у него уже стоит.
+        """
+        self.assertIn("var TOUR_KEY = 'weconomics.map.tour.v2';", self.src)
+
+    def test_every_step_waits_for_a_real_action(self):
+        """Пять шагов — пять условий `want`, и ни одного «показать самому».
+
+        `go:` у шага означал «тур сам сделает это за человека» — ровно то, от
+        чего уходим. Появится снова — шаг опять станет роликом.
+        """
+        tour = self.src[self.src.index('var TOUR = ['):]
+        tour = tour[:tour.index('\n];')]
+        self.assertEqual(tour.count('want: function'), 5)
+        self.assertEqual(tour.count('    t: '), 5)
+        self.assertNotIn('go: function', tour)
+
+    def test_steps_are_counted_by_events_not_by_a_button(self):
+        """Кнопки «Дальше» нет; шаг двигают сообщения из мест взаимодействия.
+
+        Каждое `tourNotice` стоит в том обработчике, где действие реально
+        происходит: перетаскивание, колесо, наведение, приход по линии, выбор.
+        """
+        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        self.assertNotIn('>Дальше<', html)
+        self.assertIn('Пропустить шаг', html)
+        for call in ("tourNotice('drag'", "tourNotice('zoom'", "tourNotice('pick'",
+                     "tourNotice(viaRoute ? 'walk' : 'node'"):
+            # ⚠️ Сообщение об ошибке короткое нарочно: подставь сюда весь
+            # файл — и провал теста утонет в 150 КБ исходника.
+            self.assertTrue(call in self.src,
+                            'действие никто не засчитывает: %s' % call)
+
+    def test_tour_overlay_does_not_swallow_the_cursor(self):
+        """Слой тура не ловит курсор — иначе работать по карте нельзя.
+
+        Пока тур только рассказывал, слой на всю страницу был безобиден.
+        Теперь каждый шаг требует перетаскивания, колеса и наведения ПО
+        ХОЛСТУ, и слой перехватывал бы их все.
+        """
+        css = self.CSS.read_text(encoding='utf-8')
+        layer = css[css.index('.tmap-tour {'):]
+        layer = layer[:layer.index('}')]
+        self.assertIn('pointer-events: none', layer)
+        self.assertIn('.tmap-tour-card { pointer-events: auto; }', css)
+
+    def test_tour_card_stands_in_the_free_corner(self):
+        """Карточка больше не закрывает нижний левый угол графа.
+
+        Слева внизу кнопки масштаба, сверху шапка с поиском, справа за краем
+        холста панель с результатом. Свободен правый нижний угол самого
+        холста — от него и считаем.
+        """
+        place = self.src[self.src.index('function placeTourCard()'):]
+        place = place[:place.index('\n}')]
+        self.assertIn('box.right - cw', place)
+        self.assertIn('box.bottom - ch', place)
+
+
 class LayoutLabelsAndFontTests(SimpleTestCase):
     """Раскладка просторнее, ориентиры живут с поворотом, шрифт общий с сайтом."""
 

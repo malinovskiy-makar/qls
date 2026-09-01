@@ -483,11 +483,36 @@
 .tmap-btn:not(.tmap-btn--main):disabled:hover { background: var(--surface-2); }
 
 /* ── Обучение при первом заходе ──────────────────────────────────────── */
+/* ⚠️ СЛОЙ ТУРА НЕ ЛОВИТ КУРСОР. Пока тур только рассказывал, это было
+   неважно; теперь каждый шаг требует работы руками ПО КАРТЕ, и слой на всю
+   страницу перехватывал бы и перетаскивание, и колесо, и наведение.
+   Курсор ловит только сама карточка. */
 .tmap-tour {
   position: fixed;
   inset: 0;
   z-index: 200;
+  pointer-events: none;
 }
+.tmap-tour-card { pointer-events: auto; }
+
+/* Задание шага. Оно же место ответа: когда шаг взят, строка превращается
+   в «Получилось» и окрашивается акцентом. */
+.tmap-tour-ask {
+  margin-top: 12px;
+  padding: 7px 10px;
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+}
+.tmap-tour-card.is-done .tmap-tour-ask {
+  color: var(--on-btn);
+  background: var(--accent);
+  border-color: transparent;
+}
+.tmap-tour-dots i.is-past { background: var(--accent); opacity: .45; }
 /* Вырез-подсветка: прозрачный блок с огромной тенью наружу. Затемнение
    рисует сама тень — отдельного слоя над холстом нет. */
 .tmap-tour-hole {

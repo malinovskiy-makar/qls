@@ -2052,6 +2052,7 @@ canvas.addEventListener('pointermove', function (e) {
     cam.pitch += dy * 0.005;
     cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch));
     dragX = e.clientX; dragY = e.clientY;
+    tourNotice('drag', dragMoved);
     touchActivity(); wake();
     return;
   }
@@ -2076,7 +2077,7 @@ canvas.addEventListener('pointermove', function (e) {
        уменьшается, ни одно из двух условий не выполняется. */
     var toFar = Math.hypot(p[0] - r.b.px, p[1] - r.b.py);
     if (r.t > ROUTE_ARRIVE_T || toFar < ROUTE_ARRIVE_PX) {
-      setActive(r.b);
+      setActive(r.b, true);
     } else if (!route || route.key !== r.key) {
       route = r;
       renderRoute(r);
@@ -2093,13 +2094,16 @@ canvas.addEventListener('pointermove', function (e) {
   touchActivity();
 });
 
-/* Встать на узел: одна точка входа в режим хождения. */
-function setActive(n) {
+/* Встать на узел: одна точка входа в режим хождения.
+   `viaRoute` — пришли ли сюда, пройдя линию до конца: тур различает
+   «навёл курсор» и «дошёл по дороге», это разные умения. */
+function setActive(n, viaRoute) {
   active = n;
   route = null;
   focusTheme = (n && n.k === 'theme') ? n : null;
   rebuildHighlight();
   renderHover(n);
+  if (n) tourNotice(viaRoute ? 'walk' : 'node', n);
   wake();
 }
 
@@ -2178,7 +2182,11 @@ function zoomAt(mx, my, factor) {
 canvas.addEventListener('wheel', function (e) {
   e.preventDefault();
   var p = localPoint(e);
+  var was = cam.zoomTarget;
   zoomAt(p[0], p[1], e.deltaY < 0 ? 1.12 : 0.893);
+  /* Сообщаем туру только о зуме, который ЧТО-ТО изменил: на упоре шкалы
+     колесо крутится, а масштаб стоит, и шаг засчитывать не за что. */
+  if (cam.zoomTarget !== was) tourNotice('zoom', cam.zoomTarget);
   touchActivity();
 }, { passive: false });
 
@@ -2256,6 +2264,7 @@ function selectNode(n) {
   rebuildHighlight();
   renderPicked();
   if (!active) refreshHoverPanel();
+  if (picked[n.id]) tourNotice('pick', n);
   wake();
   return !!picked[n.id];
 }
@@ -2486,115 +2495,115 @@ function plural(n, one, few, many) {
    ЧАСТЬ 5. ОБУЧЕНИЕ ПРИ ПЕРВОМ ЗАХОДЕ
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Версия в ключе нужна, чтобы при серьёзной переделке карты показать тур
-   заново, не трогая тех, кто его уже видел на прежней версии. */
-var TOUR_KEY = 'weconomics.map.tour.v1';
+/* ⚠️ ТУР НЕ РАССКАЗЫВАЕТ, А ЗАСТАВЛЯЕТ ПОПРОБОВАТЬ. Прежняя версия
+   показывала пять карточек и сама двигала камеру: человек досматривал её
+   как ролик и закрывал, ничего не научившись — руками он к карте так и не
+   прикоснулся. Теперь каждый шаг ждёт НАСТОЯЩЕГО действия и засчитывается
+   слушателем этого действия, а не кнопкой «дальше» и не таймером.
+
+   Пять шагов — пять разных механик: повернуть, приблизить, встать на узел,
+   уйти по линии, выбрать тег. Кнопки «дальше» у шага нет вовсе; есть
+   «пропустить шаг» — на случай мыши без колеса или сенсорного экрана — и
+   «пропустить» на весь тур.
+
+   Версия в ключе поднята до v2: логика шагов изменилась целиком, и те, кто
+   видел рассказ, должны один раз увидеть и практику. */
+var TOUR_KEY = 'weconomics.map.tour.v2';
 
 var tourBox = document.getElementById('tmap-tour');
 var tourHole = document.getElementById('tmap-tour-hole');
 var tourCard = document.getElementById('tmap-tour-card');
-var tourStep = 0, tourOn = false, tourDemo = [];
+var tourStep = 0, tourOn = false, tourDone = false;
 
-/* Тур не рассказывает, а ПОКАЗЫВАЕТ: каждый шаг сам управляет картой. */
+/* ⚠️ ШАГ ЗАСЧИТЫВАЕТСЯ СОБЫТИЕМ, А НЕ СОСТОЯНИЕМ. Проверять «стоит ли
+   курсор на теге» опросом нельзя: человек мог оказаться там случайно ещё
+   до того, как прочёл задание, и шаг засчитался бы сам. Поэтому места
+   взаимодействия сообщают туру, ЧТО ИМЕННО СЕЙЧАС ПРОИЗОШЛО, а шаг решает,
+   его ли это событие. */
 var TOUR = [
   {
-    t: 'Это весь корпус',
-    p: '29 тем и 343 тега — всё, из чего состоит банк задач. Крупные узлы это темы, ' +
-       'мелкие вокруг них — теги.',
+    t: 'Поверните корпус',
+    p: 'Возьмите карту мышью и потяните в сторону. Она объёмная: то, что ' +
+       'сейчас далеко, повернётся к вам.',
+    hint: 'Тяните мышью по холсту',
     at: function () { return wrap; },
-    zone: 'canvas-bottom',
-    go: function () { resetView(); }
+    want: function (kind, value) { return kind === 'drag' && value >= 60; }
   },
   {
-    t: 'Тяните мышью — карта поворачивается',
-    p: 'Колесо приближает и отдаляет, причём к той точке, где стоит курсор. ' +
-       'Кнопки в углу холста делают то же самое.',
+    t: 'Приблизьте',
+    p: 'Покрутите колесо. Масштаб идёт к точке под курсором, поэтому целиться ' +
+       'можно прямо в скопление, которое хочется рассмотреть.',
+    hint: 'Колесо мыши над холстом',
     at: function () { return wrap; },
-    zone: 'canvas-bottom',
-    go: function () {
-      if (reduceMotion) return;
-      var from = cam.yaw;
-      spinTo(from + 0.7, 700, function () { spinTo(from, 700); });
-    }
+    want: function (kind) { return kind === 'zoom'; }
   },
   {
-    t: 'Наведите на узел',
-    p: 'Справа появится тема, число задач и смежные теги из других тем. ' +
-       'Дорога от тега до его темы подсвечивается прямо на карте.',
-    at: function () { return document.getElementById('tmap-hover-block'); },
-    zone: 'canvas-left',
-    go: function () {
-      var t = findTag('Кривая Лаффера');
-      if (!t) return;
-      active = t; focusTheme = null;
-      rebuildHighlight(); renderHover(t);
-      flyTo(byId['t' + t.n], 1.6);
-    }
+    t: 'Встаньте на тег',
+    p: 'Наведите курсор на любой мелкий узел. Справа появится его тема, число ' +
+       'задач и смежные теги из других тем.',
+    hint: 'Мелкий узел — это тег',
+    at: function () { return wrap; },
+    want: function (kind, node) { return kind === 'node' && node.k === 'tag'; }
   },
   {
-    t: 'Клик выбирает тег',
-    p: 'Выбранный тег попадает в список справа, а внизу считается, сколько задач ' +
-       'он примерно даёт. Тегов можно набрать сколько угодно, даже из разных тем.',
-    at: function () { return document.getElementById('tmap-picked-block'); },
-    zone: 'canvas-left',
-    go: function () {
-      var a = findTag('Кривая Лаффера');
-      var b = findTag('Расчёт коэффициента Джини');
-      tourDemo = [];
-      [a, b].forEach(function (t) {
-        if (t && !picked[t.id]) { picked[t.id] = true; tourDemo.push(t.id); }
-      });
-      active = null;
-      rebuildHighlight(); renderPicked(); renderHover(null);
-    }
+    t: 'Уйдите по линии',
+    p: 'Не спеша ведите курсор от тега вдоль линии до её дальнего конца. Так по ' +
+       'карте и ходят: встают на узел и уходят по его дорогам.',
+    hint: 'Ведите курсор вдоль линии до конца',
+    at: function () { return wrap; },
+    want: function (kind) { return kind === 'walk'; }
   },
   {
-    t: 'Не нашли на карте — ищите',
-    p: 'Поиск в шапке подсвечивает совпавшие узлы. А список тем справа — второй, ' +
-       'надёжный способ: клик по строке наводит камеру на нужную тему.',
-    at: function () { return document.getElementById('tmap-q'); },
-    zone: 'under-search',
-    go: function () {}
+    t: 'Выберите тег',
+    p: 'Кликните по тегу. Он попадёт в список справа, а внизу посчитается, ' +
+       'сколько задач он примерно даёт. Тегов можно набрать сколько угодно.',
+    hint: 'Клик по мелкому узлу',
+    at: function () { return root; },
+    want: function (kind, node) { return kind === 'pick' && node.k === 'tag'; }
   }
 ];
 
-function findTag(part) {
-  var q = norm(part);
-  for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].k === 'tag' && nodes[i].nl.indexOf(q) >= 0) return nodes[i];
-  }
-  return null;
+/* Единственный вход для всех сообщений о действиях человека.
+   ⚠️ Зовётся ИЗ мест взаимодействия, а не наоборот: тур не вешает своих
+   слушателей на холст и не может перехватить или сломать обычную работу
+   карты. Выключен тур — вызов стоит ровно ничего. */
+function tourNotice(kind, value) {
+  if (!tourOn || tourDone) return;
+  var step = TOUR[tourStep];
+  if (!step.want(kind, value)) return;
+  tourPass();
 }
 
-/* Плавный поворот камеры для показа — только когда движение разрешено. */
-function spinTo(target, ms, done) {
-  var from = cam.yaw, t0 = performance.now();
-  (function tick() {
-    var k = Math.min(1, (performance.now() - t0) / ms);
-    cam.yaw = from + (target - from) * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
-    wake();
-    if (k < 1) requestAnimationFrame(tick);
-    else if (done) done();
-  })();
+/* Шаг взят. Показываем это отдельным состоянием и только потом идём
+   дальше: мгновенный перескок читается как сбой, а не как «получилось». */
+function tourPass() {
+  tourDone = true;
+  tourCard.classList.add('is-done');
+  var next = document.getElementById('tmap-tour-hint');
+  if (next) next.textContent = 'Получилось';
+  setTimeout(function () {
+    if (!tourOn) return;
+    if (tourStep === TOUR.length - 1) tourEnd();
+    else tourShow(tourStep + 1);
+  }, reduceMotion ? 200 : 620);
 }
 
 function tourShow(i) {
   tourStep = Math.max(0, Math.min(TOUR.length - 1, i));
+  tourDone = false;
+  tourCard.classList.remove('is-done');
   var s = TOUR[tourStep];
   document.getElementById('tmap-tour-step').textContent =
     'Шаг ' + (tourStep + 1) + ' из ' + TOUR.length;
   document.getElementById('tmap-tour-title').textContent = s.t;
   document.getElementById('tmap-tour-text').textContent = s.p;
-  /* «Начать», а не «Понятно, начать»: длинная надпись ломалась на две
-     строки и кнопка вырастала вдвое. Ширину держит ещё и white-space в
-     стилях — на случай другого шрифта. */
-  document.getElementById('tmap-tour-next').textContent =
-    tourStep === TOUR.length - 1 ? 'Начать' : 'Дальше';
+  var hint = document.getElementById('tmap-tour-hint');
+  if (hint) hint.textContent = s.hint;
   document.getElementById('tmap-tour-prev').disabled = tourStep === 0;
 
   var dots = document.getElementById('tmap-tour-dots');
   dots.innerHTML = TOUR.map(function (_, j) {
-    return '<i class="' + (j === tourStep ? 'is-on' : '') + '"></i>';
+    return '<i class="' + (j === tourStep ? 'is-on' : (j < tourStep ? 'is-past' : '')) + '"></i>';
   }).join('');
 
   var el = s.at && s.at();
@@ -2605,46 +2614,25 @@ function tourShow(i) {
     tourHole.style.width = (r.width + 12) + 'px';
     tourHole.style.height = (r.height + 12) + 'px';
   }
-  placeTourCard(s.zone);
-  if (s.go) s.go();
+  placeTourCard();
   wake();
 }
 
-/* ⚠️ ЗОНУ КАРТОЧКИ ЗАДАЁТ САМ ШАГ, А НЕ ГЕОМЕТРИЯ ПОДСВЕЧЕННОГО МЕСТА.
-   Прежнее правило «под подсвеченным элементом, а не влезает — над ним»
-   знает про край окна и не знает, что именно закрывает. Итог был виден
-   глазами: шаги «Наведите на узел» и «Не нашли на карте — ищите»
-   ложились ровно на правую панель, где и происходит показ, а шаги 1 и 4
-   залезали на шапку сайта с логотипом и меню.
-   Зон три, и все три оставляют открытым то, про что идёт рассказ:
-     canvas-bottom — про холст: слева внизу, ВЫШЕ кнопок масштаба, о
-                     которых говорит второй шаг;
-     canvas-left   — про правую панель: слева по центру холста, панель
-                     остаётся видна целиком;
-     under-search  — про поиск: под самим полем, прижата к его правому
-                     краю.
-   Нижняя граница шапки сайта берётся у блока карты, а не числом: высота
-   шапки задана стилями и может поменяться. */
-function placeTourCard(zone) {
+/* ⚠️ КАРТОЧКА СТОИТ В ПРАВОМ НИЖНЕМ УГЛУ ХОЛСТА, И ЭТО ЕДИНСТВЕННОЕ МЕСТО,
+   КОТОРОЕ НИЧЕМУ НЕ МЕШАЕТ. Прежде она вставала слева внизу и закрывала
+   угол графа — а теперь работать руками надо именно по графу. Слева внизу
+   кнопки масштаба (о них второй шаг), сверху шапка с поиском, справа за
+   краем холста панель, где показывается результат третьего и пятого шага.
+   Остаётся правый нижний угол САМОГО ХОЛСТА: панель он не закрывает,
+   потому что лежит левее её кромки. */
+function placeTourCard() {
   var cw = tourCard.offsetWidth || 340, ch = tourCard.offsetHeight || 190;
   var box = wrap.getBoundingClientRect();
-  var headBottom = root.getBoundingClientRect().top;
-  var left, top;
-
-  if (zone === 'under-search') {
-    var q = document.getElementById('tmap-q').getBoundingClientRect();
-    left = q.right - cw;
-    top = q.bottom + 12;
-  } else if (zone === 'canvas-left') {
-    left = box.left + 16;
-    top = box.top + (box.height - ch) / 2;
-  } else {
-    left = box.left + 16;
-    top = box.bottom - ch - 56;      /* 56px — над кнопками масштаба */
-  }
-
+  var left = box.right - cw - 16;
+  var top = box.bottom - ch - 16;
   left = Math.max(8, Math.min(window.innerWidth - cw - 8, left));
-  top = Math.max(headBottom + 8, Math.min(window.innerHeight - ch - 8, top));
+  top = Math.max(root.getBoundingClientRect().top + 8,
+                 Math.min(window.innerHeight - ch - 8, top));
   tourCard.style.left = left + 'px';
   tourCard.style.top = top + 'px';
 }
@@ -2654,18 +2642,20 @@ function tourStart() {
   tourBox.hidden = false;
   tourShow(0);
   document.addEventListener('keydown', tourKeys);
+  window.addEventListener('resize', placeTourCard);
 }
 
 function tourEnd() {
   tourOn = false;
+  tourDone = false;
   tourBox.hidden = true;
+  tourCard.classList.remove('is-done');
   document.removeEventListener('keydown', tourKeys);
-  /* Тур убирает за собой свой показательный выбор и возвращает обзор. */
-  tourDemo.forEach(function (id) { delete picked[id]; });
-  tourDemo = [];
-  active = null; focusTheme = null;
-  rebuildHighlight(); renderPicked(); renderHover(null);
-  resetView();
+  window.removeEventListener('resize', placeTourCard);
+  /* ⚠️ ЗА СОБОЙ ТУР БОЛЬШЕ НЕ УБИРАЕТ, И ЭТО НАРОЧНО. Раньше он сам делал
+     показательный выбор и сам его снимал. Теперь всё, что на карте, —
+     сделано руками человека: снимать его выбор и уводить камеру значило бы
+     стереть результат его же работы на глазах. */
   try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
   wake();
 }
@@ -2673,16 +2663,19 @@ function tourEnd() {
 function tourKeys(e) {
   if (!tourOn) return;
   if (e.key === 'Escape') { tourEnd(); e.preventDefault(); }
-  else if (e.key === 'ArrowRight') { tourNext(); e.preventDefault(); }
+  else if (e.key === 'ArrowRight') { tourSkipStep(); e.preventDefault(); }
   else if (e.key === 'ArrowLeft') { tourShow(tourStep - 1); e.preventDefault(); }
 }
 
-function tourNext() {
+/* Пропуск ОДНОГО шага: у человека может не быть колеса мыши или он на
+   сенсорном экране. Это выход из положения, а не обычный путь — потому и
+   написано «пропустить шаг», а не «дальше». */
+function tourSkipStep() {
   if (tourStep === TOUR.length - 1) tourEnd();
   else tourShow(tourStep + 1);
 }
 
-document.getElementById('tmap-tour-next').addEventListener('click', tourNext);
+document.getElementById('tmap-tour-next').addEventListener('click', tourSkipStep);
 document.getElementById('tmap-tour-prev').addEventListener('click', function () {
   tourShow(tourStep - 1);
 });
