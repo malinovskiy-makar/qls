@@ -1108,6 +1108,9 @@ function pointName(g, px, py, sym, color, opts) {
     .attr('paint-order', 'stroke').attr('stroke', COL.halo)
     .attr('stroke-width', o.halo == null ? 5 : o.halo).attr('stroke-linejoin', 'round');
   renderLabelText(t, sym);
+  /* Буква у точки — её настоящее имя, и слой поверх сцены зовёт точку так же,
+     как названа она на холсте. Пиксель здесь тот самый, что у пунктиров. */
+  if (typeof kpName === 'function') kpName(g, px, py, sym);
   return t;
 }
 

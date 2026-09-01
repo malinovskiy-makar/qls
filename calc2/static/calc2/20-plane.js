@@ -687,10 +687,104 @@ function coordAlreadyAt(px, horiz, text) {
   return found;
 }
 
+/* ---------------------------------------------------------------------
+   НАРИСОВАННЫЕ КЛЮЧЕВЫЕ ТОЧКИ
+   --------------------------------------------------------------------- */
+/* ⚠️ КЛЮЧЕВАЯ ТОЧКА — ЭТО ТО, ЧТО СЦЕНА НАРИСОВАЛА (решение владельца 01.09).
+
+   Равновесие E, оптимум монополиста M, Qопт и Qрын, точка на границе квоты —
+   всё это точки с пунктиром к обеим осям и числом на каждой оси. Раньше слой
+   поверх сцены о них не знал вовсе: он считал только пересечения кривых.
+
+   Список берётся У НАРИСОВАННОГО, а не у второй копии правила — тем же
+   приёмом, что `offQuadShownPoints()` читает `data-marginal-tail` с холста
+   ([ADR 0026]). Порядок вызовов это позволяет: `redrawScene()` рисует сцену
+   целиком, и только потом `drawOverlays()` спрашивает ключевые точки.
+
+   Помечать точки поштучно в тридцати с лишним местах не пришлось: число на
+   оси печатают ровно два помощника, `axisValueX` и `axisValueY`, и сцены
+   зовут их ПАРОЙ с одним и тем же различителем idx. Пара с обеими половинами
+   и есть нарисованная точка. Имя ей даёт `pointName` — та самая буква, что
+   стоит на холсте («E», «M»); её нет — имя собирается из различителя.
+
+   ⚠️ Записывать намерение ДО отрисовки нельзя: сцена, вышедшая раньше срока,
+   объявила бы точку, которой на экране нет. Поэтому запись идёт из самих
+   помощников, в тот момент, когда они печатают. */
+let _kpX = [], _kpY = [], _kpNames = [];
+function resetDrawnKeyPoints() { _kpX = []; _kpY = []; _kpNames = []; }
+
+// Панель, чьи шкалы сейчас лежат в глобальных sx/sy: их и печатают помощники.
+function panelOfGlobalScales() {
+  return (STATE.panels || []).find(p => p.mx === sx && p.my === sy) || null;
+}
+
+function kpNode(g) { return (g && g.node) ? g.node() : g; }
+
+/* Пункт (б) собирается ПОСЛЕ отрисовки сцены, в один проход. Раньше пары
+   искались по различителю `idx`, и это покрывало равновесие и оптимум
+   монополиста, но не налог (одно Q на две цены), не потолок (одна цена на два
+   Q) и не квоту. Пара ищется по ГЕОМЕТРИИ: угол (число на оси Q, число на оси
+   P) считается точкой ровно тогда, когда из него выходит ПУНКТИР — то самое,
+   по чему точку узнаёт и человек. Лишние углы (у монополии их два из четырёх)
+   пунктира не имеют и отсеиваются сами. */
+/* Пунктиры ищем по ВСЕМУ холсту, а не внутри одной группы: линию МРОТ и
+   числа при ней печатают разные группы, и точка занятости иначе терялась.
+   Сетку исключаем — её штрих не проекция точки, а фон. */
+function dashEndsNear(px, py) {
+  let found = false;
+  try {
+    svg.selectAll('line[stroke-dasharray]').each(function () {
+      if (found || (this.getAttribute('class') || '').indexOf('grid') >= 0) return;
+      const x1 = +this.getAttribute('x1'), y1 = +this.getAttribute('y1');
+      const x2 = +this.getAttribute('x2'), y2 = +this.getAttribute('y2');
+      if (Math.hypot(x1 - px, y1 - py) <= 2 || Math.hypot(x2 - px, y2 - py) <= 2) found = true;
+    });
+  } catch (e) { return false; }
+  return found;
+}
+
+function flushDrawnKeyPoints() {
+  const pan = panelOfGlobalScales();
+  const pid = pan ? pan.id : '';
+  const seen = [];
+  _kpX.forEach(a => {
+    _kpY.forEach(b => {
+      if (!dashEndsNear(a.px, b.py)) return;   // угол без пунктира — не точка
+      if (seen.some(s => Math.abs(s[0] - a.px) <= 2 && Math.abs(s[1] - b.py) <= 2)) return;
+      seen.push([a.px, b.py]);
+      // Имя точки — буква, которую сцена написала рядом; нет буквы — по различителю.
+      let nm = null, bd = 10;
+      _kpNames.forEach(n => {
+        const d = Math.hypot(n.px - a.px, n.py - b.py);
+        if (d <= bd) { bd = d; nm = n.sym; }
+      });
+      if (!nm) {
+        const qs = a.idx ? ('Q' + a.idx) : '', ps = b.idx ? ('P' + b.idx) : '';
+        nm = (qs && ps) ? ('точка ' + qs + ' и ' + ps)
+           : (qs || ps ? ('точка ' + (qs || ps)) : 'отмеченная точка');
+      }
+      d3.select(a.node).append('circle').attr('class', 'kp-mark')
+        .attr('cx', a.px).attr('cy', b.py).attr('r', 0)
+        .attr('fill', 'none').attr('pointer-events', 'none')
+        .attr('data-skip-export', '1')
+        .attr('data-key-point', nm)
+        .attr('data-kp-x', a.x).attr('data-kp-y', b.y)
+        .attr('data-kp-panel', pid);
+    });
+  });
+}
+
+// Буква у точки — её настоящее имя на холсте («E», «M»).
+function kpName(g, px, py, sym) {
+  if (!sym || !isFinite(px) || !isFinite(py)) return;
+  _kpNames.push({ node: kpNode(g), px, py, sym: String(sym) });
+}
+
 function axisValueX(g, px, oy, value, idx) {
   if (!isFinite(px)) return null;
   const v = coordValue(value);
   if (!v) return null;
+  if (isFinite(v.num)) _kpX.push({ node: kpNode(g), px, x: v.num, idx: String(idx || '') });
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
                  (isFinite(v.num) && xTicks().some(t => Math.abs(t - v.num) < span * 0.02));
@@ -718,6 +812,7 @@ function axisValueY(g, ox, py, value, idx) {
   if (!isFinite(py)) return null;
   const v = coordValue(value);
   if (!v) return null;
+  if (isFinite(v.num)) _kpY.push({ node: kpNode(g), py, y: v.num, idx: String(idx || '') });
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
                  (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));

@@ -70,6 +70,7 @@ function redrawScene() {
      Панели прошлого кадра не имеют права дожить до нового: сцена сменилась,
      а слой поверх неё считал бы по чужим шкалам. */
   clearPanels();
+  resetDrawnKeyPoints();   // и пары нарисованных ключевых точек — тоже заново
   computeSize();
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
@@ -435,6 +436,10 @@ function mainScales(panelId) {
 
 function drawOverlays() {
   if (!svg || !svg.node()) return;
+  /* Сцена дорисована — объявляем на холсте её ключевые точки. Строго ЗДЕСЬ:
+     раньше сцены нет целиком, а пары ищутся по пунктиру, который сцена рисует
+     то до числа на оси, то после него. */
+  flushDrawnKeyPoints();
   invalidateKeyTargets();    // особые точки считаются заново под новую картинку
   /* ⚠️ ПЕРЕСЕЧЕНИЯ СЧИТАЮТСЯ ЗДЕСЬ, А НЕ ТАМ, ГДЕ ИХ РИСУЮТ.
 
@@ -1318,11 +1323,25 @@ function keyTargets(panelId) {
 
      Хозяин записывается ИМЕНЕМ, тем же, что печатает snapTargets: по имени же
      сверяет взведение, и второго способа отождествить кривую заводить нельзя. */
+  /* ⚠️ ДУБЛЬ СХЛОПЫВАЕТСЯ СО СЛИЯНИЕМ ХОЗЯЕВ, А НЕ МОЛЧА РОНЯЕТСЯ.
+     Одна и та же точка приходит сюда с разных сторон: равновесие E — и как
+     пересечение D и S, и как нарисованная сценой точка; излом суммарного
+     спроса в наборе владельца стоит ровно там же, где пересечение двух других
+     кривых. Прежний push просто выходил на дубле — и излом ТЕРЯЛ хозяина, то
+     есть переставал загораться при щелчке по своей кривой (замер: излом
+     рыночного спроса (40; 60) не загорался вовсе). Имя у точки остаётся
+     первое — оно содержательнее; хозяева складываются. */
   const push = (x, y, name, kind, owners) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
-    if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
-    out.push({ x, y, name, kind: kind || 'cross', owners: owners || [] });
+    const same = out.find(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy);
+    if (same) {
+      (owners || []).forEach(nm => { if (!same.owners.includes(nm)) same.owners.push(nm); });
+      return same;
+    }
+    const rec = { x, y, name, kind: kind || 'cross', owners: (owners || []).slice() };
+    out.push(rec);
+    return rec;
   };
   const curveNames = new Set(snapTargets(panelId).map(t => t.name));
   /* Готовые пересечения берём с полки, только если их считали ДЛЯ ЭТОЙ ЖЕ
@@ -1340,6 +1359,34 @@ function keyTargets(panelId) {
      если кривая и так пересекает ось в нуле, это одна и та же точка, и имя у
      неё должно остаться содержательным, а не превратиться в «начало координат».
      Сам push отсеет повтор по координатам. */
+  /* ── (б) и (в): точки, которые НАРИСОВАЛА сама сцена, и их проекции ──
+     Читаем метки с холста (`data-key-point`), а не считаем правило второй раз:
+     сцена уже отрисована, и на ней стоит ровно то, что человек видит.
+     Хозяева — кривые, на которых точка лежит: равновесие принадлежит и спросу,
+     и предложению, и загорается при щелчке по любой из них. */
+  const drawn = [];
+  try {
+    svg.selectAll('[data-key-point]').each(function () {
+      const pl = this.getAttribute('data-kp-panel') || '';
+      if (pl && ck && pl !== ck) return;
+      const x = +this.getAttribute('data-kp-x'), y = +this.getAttribute('data-kp-y');
+      if (!isFinite(x) || !isFinite(y)) return;
+      drawn.push({ x, y, name: this.getAttribute('data-key-point') || 'отмеченная точка' });
+    });
+  } catch (e) { /* холста ещё нет — нарисованных точек тоже */ }
+  const targets = snapTargets(panelId);
+  const onCurves = (x, y) => targets.filter(t => {
+    let v; try { v = t.f(x); } catch (e) { return false; }
+    return isFinite(v) && Math.abs(v - y) <= Math.max(dy * 8, (w.y1 - w.y0) * 1e-3);
+  }).map(t => t.name);
+  const [xAxisNm, yAxisNm] = axisWords();
+  drawn.forEach(p => {
+    const own = onCurves(p.x, p.y);
+    push(p.x, p.y, p.name, 'drawn', own);
+    // Проекции на обе оси: для равновесия (50; 50) это (0; 50) и (50; 0).
+    push(0, p.y, 'проекция ' + p.name + ' на ' + yAxisNm.replace('ось ', 'ось '), 'drawn', own);
+    push(p.x, 0, 'проекция ' + p.name + ' на ' + xAxisNm.replace('ось ', 'ось '), 'drawn', own);
+  });
   push(0, 0, 'начало координат', 'cross', []);
   if (!(w.x1 > w.x0)) { _keyPtsCache[ck] = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
@@ -1381,11 +1428,16 @@ function keyTargets(panelId) {
        высоте, то есть совсем другая точка. Замер 24.08 в сюжете сложения: излом
        рыночного предложения (20; 20) пропадал из списка, потому что рядом стояло
        пересечение двух групп в (20; 40). Один и тот же Q, разные точки. */
+    /* ⚠️ Излом, совпавший с уже найденной точкой, НЕ выбрасывается: он отдаёт
+       ей своего хозяина (см. push выше). Раньше здесь стоял выход, и излом
+       суммарного спроса пропадал из списка целиком — вместе с возможностью
+       зажечь его щелчком по самой суммарной кривой. */
     const nearX = (w.x1 - w.x0) * 0.02, nearY = (w.y1 - w.y0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
       const y = t.f(x);
       if (!isFinite(y)) return;
-      if (out.some(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY)) return;
+      const near = out.find(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY);
+      if (near) { if (!near.owners.includes(t.name)) near.owners.push(t.name); return; }
       push(x, y, 'излом ' + t.name, 'kink', [t.name]);
     });
   });

@@ -224,6 +224,70 @@ else {
   cmp('колесо справа: левая панель НЕ изменилась', Math.abs(r.afterR[0] - r.afterL[0]), 0, 1e-9);
 }
 
+/* ── 6. Ключевая точка — это то, что сцена нарисовала (фаза 4) ────────── */
+head('Ключевые точки: нарисованное, проекции, изломы');
+const MKT = `
+  var setDS = function (scene, d, s) {
+    resetSceneMemory(); pickScene(scene);
+    updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), d);
+    var low = STATE.curves.find(function (c) { return c.role === 'supply' || c.role === 'mc'; });
+    if (low) updateCurveExpr(low, s);
+    redrawAll();
+  };
+`;
+r = await run(MKT + `setDS('sd', '100-Q', 'Q');
+  var k = keyTargets();
+  var at = function (x, y) { return k.some(function (p) {
+    return Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5; }); };
+  var s = mainScales();
+  var h1 = snapVertexAt(s.mx(0), s.my(50)), h2 = snapVertexAt(s.mx(50), s.my(0));
+  var e = k.filter(function (p) { return Math.abs(p.x - 50) < 0.5 && Math.abs(p.y - 50) < 0.5; })[0];
+  return { n: k.length, eq: at(50, 50), d0: at(0, 100), d1: at(100, 0),
+           pr1: at(0, 50), pr2: at(50, 0), origin: at(0, 0),
+           owners: e ? e.owners.slice().sort().join(',') : '',
+           snap1: !!(h1 && h1.key && Math.abs(h1.x) < 1e-6 && Math.abs(h1.y - 50) < 1e-6),
+           snap2: !!(h2 && h2.key && Math.abs(h2.x - 50) < 1e-6 && Math.abs(h2.y) < 1e-6) };`);
+cmp('«Спрос и предложение»: ключевых точек', r.n, 6);
+cmp('  равновесие (50; 50)', r.eq, true);
+cmp('  начало D (0; 100)', r.d0, true);
+cmp('  конец D (100; 0)', r.d1, true);
+cmp('  проекция равновесия (0; 50)', r.pr1, true);
+cmp('  проекция равновесия (50; 0)', r.pr2, true);
+cmp('  начало координат (0; 0)', r.origin, true);
+cmp('  у равновесия оба хозяина', r.owners, 'D,S');
+cmp('  мышь притягивается к (0; 50)', r.snap1, true);
+cmp('  мышь притягивается к (50; 0)', r.snap2, true);
+
+// Нарисованная точка объявлена на холсте и названа своей буквой.
+r = await run(MKT + `setDS('sd', '100-Q', 'Q');
+  var n = document.querySelector('[data-key-point]');
+  return n ? { name: n.getAttribute('data-key-point'),
+               x: +n.getAttribute('data-kp-x'), y: +n.getAttribute('data-kp-y'),
+               panel: n.getAttribute('data-kp-panel') } : null;`);
+cmp('равновесие объявлено на холсте именем', r && r.name, 'E');
+cmp('  его координаты: x', r && r.x, 50, 1e-6);
+cmp('  его координаты: y', r && r.y, 50, 1e-6);
+cmp('  и его панель', r && r.panel, 'main');
+
+/* Излом суммарного спроса. Он стоит ровно там же, где пересечение двух других
+   кривых, и раньше выбрасывался дедупликацией ЦЕЛИКОМ — вместе с хозяином,
+   то есть переставал загораться щелчком по своей кривой. */
+r = await run(`pickScene('sdsum'); redrawAll();
+  var k = keyTargets().filter(function (p) {
+    return Math.abs(p.x - 40) < 0.5 && Math.abs(p.y - 60) < 0.5; })[0];
+  armCurve('рыночный спрос');
+  var lit = keyTargets().filter(keyPointLit)
+    .some(function (p) { return Math.abs(p.x - 40) < 0.5 && Math.abs(p.y - 60) < 0.5; });
+  return { есть: !!k, хозяин: !!(k && k.owners.indexOf('рыночный спрос') >= 0), горит: lit,
+           Q: STATE.eq.Q, P: STATE.eq.P, cs: STATE.cs, ps: STATE.ps };`);
+cmp('«Сложение»: излом (40; 60) в списке', r['есть'], true);
+cmp('  его хозяин — суммарный спрос', r['хозяин'], true);
+cmp('  загорается щелчком по нему', r['горит'], true);
+cmp('  числа сложения не сдвинулись: Q*', r.Q, 70, 1e-4);
+cmp('  P*', r.P, 45, 1e-4);
+cmp('  CS', r.cs, 1625, 1e-3);
+cmp('  PS', r.ps, 1325, 1e-3);
+
 console.log('\nОшибок страницы: ' + errs.length);
 errs.slice(0, 5).forEach(e => console.log('  ! ' + e));
 console.log(bad ? ('ПРОВАЛЕНО ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' ПРОВЕРОК ПАНЕЛЕЙ СОШЛИСЬ'));
