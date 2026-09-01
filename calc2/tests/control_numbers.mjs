@@ -444,6 +444,104 @@ cmp('числа сложения не сдвинулись: Q*', r.Q, 70, 1e-4);
 cmp('CS', r.cs, 1625, 1e-3);
 cmp('PS', r.ps, 1325, 1e-3);
 
+
+/* ================================================================
+   СЕССИЯ 01.09 (2) · МОНОПОЛИЯ: ИЗЛИШКИ СЧИТАЮТСЯ И РИСУЮТСЯ.
+
+   ⚠️ ПЛОЩАДИ БЕРУТСЯ У НАРИСОВАННОГО, а не у состояния. Иначе проверка не
+   заметила бы ровно того дефекта, ради которого заведена: числа PS и VC в
+   монополии под налогом считались бы верно, а заливок на холсте не было бы
+   вовсе. Площадь фигуры меряется по её же пути: точки пути переводятся
+   обратно в координаты модели и складываются формулой площади многоугольника.
+   Числом узлов пути и порядком элементов НИЧЕГО не закрепляется.
+   ================================================================ */
+const AREA = `
+  var areaOf = function (legend) {
+    var el = document.querySelector('#chart [data-legend="' + legend + '"]');
+    if (!el) return 0;
+    var pts = [];
+    String(el.getAttribute('d') || '').replace(
+      /[ML](-?[\\d.]+),(-?[\\d.]+)/g,
+      function (_, x, y) { pts.push([sx.invert(+x), sy.invert(+y)]); return ''; });
+    if (pts.length < 3) return 0;
+    var a = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var j = (i + 1) % pts.length;
+      a += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
+    }
+    return Math.abs(a) / 2;
+  };
+  var CSA = 'Излишек покупателя (CS)', PSA = 'Излишек производителя (TR - VC)';
+  var VCA = 'Переменные издержки (VC)', DWLA = 'Потери общества (DWL)';
+`;
+
+head('Сессия 01.09 (2) · монополия под налогом');
+r = await run(MKT + AREA + `setDS('mono', '100-Q', '20');
+  STATE.showMonoVC = true; STATE.showMonoPS = true; STATE.showMonoCS = true;
+  setType('tax'); setTaxForm('unit'); setTax(20); redrawAll();
+  var t = STATE.monoTax || {}, m = STATE.mono || {};
+  var whole = integrate(function (q) { return evalCurve(STATE.D, q) - mcAt(q); }, 0, m.Qc);
+  var money = areaOf('Сбор бюджета');
+  return { Q: t.Qt, P: t.Pt, cs: t.csM, vc: t.vcM, ps: t.psM, bud: t.budget, dwl: t.dwl,
+           aCS: areaOf(CSA), aVC: areaOf(VCA), aPS: areaOf(PSA), aDWL: areaOf(DWLA),
+           aMoney: money, whole: whole,
+           ident: areaOf(CSA) + areaOf(PSA) + money + areaOf(DWLA) };`);
+cmp('налог 20: Q', r.Q, 30, 1e-3);
+cmp('налог 20: P', r.P, 70, 1e-3);
+cmp('налог 20: CS', r.cs, 450, 1e-2);
+cmp('налог 20: VC', r.vc, 600, 1e-2);
+cmp('налог 20: PS', r.ps, 900, 1e-2);
+cmp('налог 20: сбор бюджета', r.bud, 600, 1e-2);
+cmp('налог 20: DWL', r.dwl, 1250, 1e-2);
+cmp('нарисован CS', r.aCS, 450, 0.5);
+cmp('нарисован VC', r.aVC, 600, 0.5);
+cmp('нарисован PS', r.aPS, 900, 0.5);
+cmp('нарисована полоса сбора', r.aMoney, 600, 0.5);
+cmp('нарисован DWL', r.aDWL, 1250, 0.5);
+cmp('весь общественный излишек', r.whole, 3200, 1e-2);
+cmp('тождество CS + PS + сбор + DWL', r.ident, 3200, 1);
+
+head('Сессия 01.09 (2) · монополия под субсидией');
+r = await run(MKT + AREA + `setDS('mono', '100-Q', '20');
+  STATE.showMonoVC = true; STATE.showMonoPS = true; STATE.showMonoCS = true;
+  setType('subsidy'); setTaxForm('unit'); setTax(10); redrawAll();
+  var t = STATE.monoTax || {}, m = STATE.mono || {};
+  var whole = integrate(function (q) { return evalCurve(STATE.D, q) - mcAt(q); }, 0, m.Qc);
+  var money = areaOf('Расход бюджета');
+  return { Q: t.Qt, P: t.Pt, cs: t.csM, vc: t.vcM, ps: t.psM, bud: t.budget, dwl: t.dwl,
+           aCS: areaOf(CSA), aVC: areaOf(VCA), aPS: areaOf(PSA), aDWL: areaOf(DWLA),
+           aMoney: money, whole: whole,
+           ident: areaOf(CSA) + areaOf(PSA) - money + areaOf(DWLA) };`);
+cmp('субсидия 10: Q', r.Q, 45, 1e-3);
+cmp('субсидия 10: P', r.P, 55, 1e-3);
+cmp('субсидия 10: CS', r.cs, 1012.5, 1e-2);
+cmp('субсидия 10: VC', r.vc, 900, 1e-2);
+cmp('субсидия 10: PS', r.ps, 2025, 1e-2);
+cmp('субсидия 10: расход бюджета', r.bud, -450, 1e-2);
+cmp('субсидия 10: DWL', r.dwl, 612.5, 1e-2);
+cmp('нарисован CS', r.aCS, 1012.5, 0.5);
+cmp('нарисован VC', r.aVC, 900, 0.5);
+cmp('нарисован PS', r.aPS, 2025, 0.5);
+cmp('нарисована полоса расхода', r.aMoney, 450, 0.5);
+cmp('нарисован DWL', r.aDWL, 612.5, 0.5);
+cmp('тождество CS + PS − расход + DWL', r.ident, 3200, 1);
+
+head('Сессия 01.09 (2) · квота 31.08 не сдвинулась');
+r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(20); redrawAll();
+  var t = STATE.monoQuota || {};
+  return { b: t.binding ? 1 : 0, Q: t.Q, P: t.price, ps: t.psM, cs: t.csM, dwl: t.dwl };`);
+cmp('квота 20: связывает', r.b, 1, 0);
+cmp('квота 20: Q', r.Q, 20, 1e-3);
+cmp('квота 20: P', r.P, 80, 1e-3);
+cmp('квота 20: PS', r.ps, 1200, 1e-2);
+cmp('квота 20: CS', r.cs, 200, 1e-2);
+cmp('квота 20: DWL', r.dwl, 1800, 1e-2);
+for (const qk of [40, 60]) {
+  r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(${qk}); redrawAll();
+    var t = STATE.monoQuota || {}; return { b: t.binding ? 1 : 0 };`);
+  cmp('квота ' + qk + ' не связывает', r.b, 0, 0);
+}
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

@@ -344,10 +344,18 @@ function monopolyTax(shift) {
   const rate = Math.abs(shift), isTax = (shift > 0);
   const budget = (isTax ? 1 : -1) * rate * Qt;                  // +сбор / −расход = ставка·Q
   const csM = integrate(q => evalCurve(D, q) - Pt, 0, Qt);       // CS при новой цене
+  /* VC — НАСТОЯЩИЕ издержки ресурсов, под социальной MC: ставка на них не
+     влияет. PS — между ФАКТИЧЕСКОЙ границей монополиста (MC+t при налоге,
+     MC−s при субсидии) и его ценой: деньги бюджета лежат между MC и MC±ставка
+     и в излишек производителя НЕ входят, это перевод, а не излишек.
+     Отсюда тождество CS + PS + сбор + DWL = весь общественный излишек
+     (при субсидии расход вычитается). */
+  const vcM = integrate(q => mcAt(q), 0, Qt);
+  const psM = integrate(q => Pt - mcEff(q), 0, Qt);
   // DWL — против эффективного выпуска (D = СОЦИАЛЬНАЯ MC, без ставки): вмешательство его увеличивает.
   let dwl = null;
   if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi); }
-  return { isTax, shift, rate, Qt, Pt, budget, csM, dwl, mcAtQt: mcAt(Qt) };
+  return { isTax, shift, rate, Qt, Pt, budget, csM, vcM, psM, dwl, mcAtQt: mcAt(Qt) };
 }
 
 // Оптимум монополиста при поле цены Pf (минимальная допустимая цена).
@@ -645,20 +653,40 @@ function updateNaturalPanel() {
   box.innerHTML = html;
 }
 
-// Заливки при налоге/субсидии: CS, прямоугольник денег бюджета (между MC и MC±ставка), DWL.
+/* Заливки при налоге/субсидии: VC, PS, CS, полоса денег бюджета и DWL.
+
+   ⚠️ VC и PS ЗДЕСЬ РАНЬШЕ НЕ РИСОВАЛИСЬ ВОВСЕ, хотя галочки «Показывать VC» и
+   «Показывать PS» стояли и работали в соседних сюжетах (квота, пол цены).
+   Порядок фигур снизу вверх ПРИ НАЛОГЕ: VC (0…MC), полоса сбора (MC…MC+t),
+   PS (MC+t…цена), CS (цена…спрос) — они не накладываются.
+   ПРИ СУБСИДИИ полоса расхода лежит НИЖЕ кривой MC, между MC−s и MC, то есть
+   внутри PS и внутри VC: субсидия и есть часть выигрыша производителя, за
+   которую заплатил бюджет. Поэтому полоса денег рисуется ПОСЛЕДНЕЙ — иначе
+   при субсидии её накрыла бы заливка PS. */
 function drawMonoTaxAreas() {
   const t = STATE.monoTax, m = STATE.mono;
   if (!t || !m) return;
   const D = STATE.D, g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+  const mcEff = (d) => mcAt(d) + t.shift;      // фактическая граница монополиста
   if (t.Qt > 1e-6) {
     const s1 = samp(0, t.Qt);
+    // VC — под СОЦИАЛЬНОЙ MC: издержки ресурсов настоящие, ставка их не меняет.
+    if (STATE.showMonoVC) {
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
+    }
+    // PS — между фактической границей (MC ± ставка) и ценой монополиста.
+    if (STATE.showMonoPS) {
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcEff(d))).y1(sy(t.Pt));
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
+    }
     if (STATE.showMonoCS) {   // CS — между ценой Pt (низ) и спросом (верх)
       const a = d3.area().x(d => sx(d)).y0(sy(t.Pt)).y1(d => sy(evalCurve(D, d)));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
     }
     // Деньги бюджета — полоса между MC и MC±ставка на [0,Qt]; её площадь = ставка·Qt = бюджет.
-    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(mcAt(d) + t.shift));
+    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(mcEff(d)));
     g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
   }
   // DWL — между D и социальной MC от Qt до конкурентного Qc.
@@ -782,6 +810,8 @@ function updateMonoInterventionPanel() {
       ['P (цена)', m.Pm, t.Pt],
       [isSub ? 'Бюджет (расход)' : 'Бюджет (сбор)', 0, t.budget],
       ['CS', m.csM, t.csM],
+      ['PS', m.psM, t.psM],
+      ['VC', m.vcM, t.vcM],
       ['DWL', m.dwl, t.dwl],
     ];
     let html = `<div class="stat"><span>${isSub ? 'Субсидия s' : 'Налог t'}</span><b>${fmt(STATE.tax)}</b></div>`;
