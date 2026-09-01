@@ -82,24 +82,68 @@
         <div class="tmap-chips" id="tmap-chips"></div>
       </section>
 
+      {% comment %}
+        ⚠️ ЗАГОЛОВОК РАЗДЕЛА НАПИСАН ЕГО ЦВЕТОМ, И ЭТО НЕ УКРАШЕНИЕ, А
+        ЛЕГЕНДА. Семь цветов узлов вернулись (ADR 0053); прошлый раз от них
+        отказались с доводом «легенду никто не помнит». Легенда, которую надо
+        вспоминать, и правда не работает — поэтому отдельного блока-легенды
+        здесь нет, а цвет назван прямо на органе управления: раздел написан
+        своей краской, и темы раздела лежат под ним. Соответствие не
+        запоминают, его видят, пока пользуются списком.
+
+        Раньше эти заголовки были бледнее самих строк и читались как
+        отключённые. Теперь это кнопки: стрелка, имя цветом раздела, число
+        тем.
+      {% endcomment %}
       <section class="tmap-block">
-        <h2 class="tmap-block-h">Темы</h2>
-        <div class="tmap-themes" id="tmap-themes">
+        <h2 class="tmap-block-h">Разделы корпуса</h2>
+        <div class="tmap-tree" id="tmap-themes">
           {% for s in sections %}
-            <div class="tmap-themes-group">
-              {% comment %}
-                Заголовок раздела — метка без точки: у раздела больше нет
-                своего цвета (ADR 0038), он только структурирует список.
-              {% endcomment %}
-              <div class="tmap-themes-group-h">{{ s.label }}</div>
-              {% for t in s.themes %}
-                <button type="button" class="tmap-theme-row"
-                        data-theme="{{ t.n }}" data-g="{{ s.key }}">
-                  <span class="tmap-theme-n">{{ t.n }}</span>
-                  <span class="tmap-theme-name">{{ t.title }}</span>
-                  <span class="tmap-theme-cnt">{{ t.tags }}</span>
-                </button>
-              {% endfor %}
+            <div class="tmap-tree-sec" data-sec="{{ s.key }}">
+              <button type="button" class="tmap-sec-row" data-open="sec"
+                      aria-expanded="false">
+                <span class="tmap-arrow" aria-hidden="true"></span>
+                <span class="tmap-sec-name">{{ s.label }}</span>
+                <span class="tmap-sec-cnt">{{ s.themes|length }}</span>
+              </button>
+              <div class="tmap-sec-body" hidden>
+                {% for t in s.themes %}
+                  <div class="tmap-tree-theme">
+                    <button type="button" class="tmap-theme-row" data-open="theme"
+                            data-theme="{{ t.n }}" aria-expanded="false">
+                      <span class="tmap-arrow" aria-hidden="true"></span>
+                      <span class="tmap-theme-n">{{ t.n }}</span>
+                      <span class="tmap-theme-name">{{ t.title }}</span>
+                      {% comment %}
+                        Число у темы — сумма по её тегам, а тег может стоять
+                        у той же задачи не один: это оценка объёма темы, а не
+                        поголовье задач. Подсказка говорит это прямо, чтобы
+                        голое число не читалось как точный итог.
+                      {% endcomment %}
+                      {% if t.count %}
+                        <span class="tmap-theme-cnt"
+                              title="{{ t.count }} задач по тегам темы">{{ t.count }}</span>
+                      {% else %}
+                        <span class="tmap-theme-cnt tmap-cnt--none"
+                              title="счётчик задач у тегов темы не задан">—</span>
+                      {% endif %}
+                    </button>
+                    <div class="tmap-theme-body" hidden>
+                      {% for g in t.tags %}
+                        <button type="button" class="tmap-tag-row" data-go-tag="{{ g.id }}">
+                          <span class="tmap-tag-name">{{ g.label }}</span>
+                          {% if g.count %}
+                            <span class="tmap-tag-cnt">{{ g.count }}</span>
+                          {% else %}
+                            <span class="tmap-tag-cnt tmap-cnt--none"
+                                  title="счётчика нет, тег размечается вручную">—</span>
+                          {% endif %}
+                        </button>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
             </div>
           {% endfor %}
         </div>

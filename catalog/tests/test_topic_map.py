@@ -639,6 +639,111 @@ class BuildGuardsTests(SimpleTestCase):
 
 
 
+
+class PanelTreeTests(SimpleTestCase):
+    """Правая панель — дерево разделы → темы → теги.
+
+    Плоский список из 29 тем с бледными заголовками разделов заменён на
+    дерево, свёрнутое по умолчанию. Заголовок раздела написан цветом
+    раздела — он же легенда к цветам на карте (ADR 0053).
+    """
+
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+    CSS = pathlib.Path('catalog/static/catalog/css/topic_map.css')
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.src = cls.JS.read_text(encoding='utf-8')
+        cls.css = cls.CSS.read_text(encoding='utf-8')
+        cls.html = None
+
+    def _page(self):
+        if self.html is None:
+            type(self).html = self.client.get('/catalog/map/').content.decode('utf-8')
+        return self.html
+
+    def test_tree_carries_all_three_levels(self):
+        """Семь разделов, 29 тем, 343 тега — весь справочник, а не выборка.
+
+        Дерево печатается на сервере целиком: 372 строки это около 30 КБ
+        разметки, а собирать их на клиенте значило бы держать вторую копию
+        справочника ради того же результата.
+        """
+        html = self._page()
+        self.assertEqual(html.count('class="tmap-sec-row"'), 7)
+        self.assertEqual(html.count('class="tmap-theme-row"'), 29)
+        self.assertEqual(html.count('class="tmap-tag-row"'), 343)
+
+    def test_tree_starts_collapsed(self):
+        """Свёрнуто по умолчанию: семь строк вместо двадцати девяти.
+
+        Именно из-за этого в покое не нужна и полоса прокрутки.
+        """
+        html = self._page()
+        self.assertEqual(html.count('aria-expanded="false"'), 7 + 29)
+        self.assertNotIn('aria-expanded="true"', html)
+
+    def test_section_headers_are_painted_with_their_colour(self):
+        """Заголовок раздела — легенда, а не украшение.
+
+        ⚠️ КЛЮЧ РАЗДЕЛА ВСТРЕЧАЕТСЯ СО СВОЕЙ КРАСКОЙ РОВНО В ОДНОМ МЕСТЕ —
+        в этих семи правилах. Разметка про цвета не знает и печатает только
+        `data-sec`; разъедется — покраснеет здесь.
+        """
+        for key, _label, _nums in GROUPS:
+            rule = '.tmap-tree-sec[data-sec="%s"]' % key
+            self.assertIn(rule, self.css, 'у раздела %s нет цвета в дереве' % key)
+            self.assertIn('--sec: var(--map-g-%s)' % key, self.css)
+        self.assertIn('color: var(--sec', self.css)
+
+    def test_clicking_a_tag_goes_to_the_tag_and_shows_where_it_belongs(self):
+        """Клик по тегу ведёт камеру к ТЕГУ, а не к его теме.
+
+        Дерево пользуется тем же исправлением, что и холст: выбирается и
+        показывается ровно тот узел, по которому кликнули. Принадлежность
+        показывается отдельно — импульсом по ребру к теме и мягкой вторичной
+        подсветкой самой темы.
+        """
+        self.assertIn('function revealTag(', self.src)
+        reveal = self.src[self.src.index('function revealTag('):]
+        reveal = reveal[:reveal.index('\n}')]
+        self.assertIn('flyTo(n, 2.1)', reveal)
+        self.assertIn('pulse =', reveal)
+        # тема попадает во ВТОРОЙ уровень подсветки, а не в первый
+        self.assertIn('litNear[parent.id] = true;', self.src)
+        self.assertNotIn('litSet[parent.id] = true;', self.src)
+
+    def test_expanding_and_selecting_are_different_actions(self):
+        """Клик по теме раскрывает, а не выбирает.
+
+        Раньше одна кнопка делала два дела разом: наводила камеру и
+        добавляла тему в выбранное. Человек, открывший список посмотреть
+        состав, молча получал полтора десятка тегов в подборке.
+        """
+        panel = self.src[self.src.index("var themesBox = document.getElementById('tmap-themes');"):]
+        # ⚠️ Сторожим ЛЮБОЙ вызов выбора из дерева, а не одну его запись:
+        # узкая проверка на `selectNode(n)` пропустила бы `selectNode(byId[…])`.
+        self.assertNotIn('selectNode(', panel)
+        self.assertIn("e.target.closest('[data-open]')", panel)
+
+    def test_pulse_stops_when_motion_is_switched_off(self):
+        """Импульс — украшение поверх подсветки, и при отключённом движении
+        его нет вовсе: подсветка сообщает то же самое и без него."""
+        self.assertIn('if (pulse && !reduceMotion)', self.src)
+
+    def test_scrollbar_is_hidden_until_the_panel_is_hovered(self):
+        """Полосы прокрутки не видно, пока на панель не навелись.
+
+        Прокрутка при этом работает всегда: убрана полоса, а не возможность.
+        """
+        block = self.css[self.css.index('.tmap-panel-scroll {'):]
+        block = block[:block.index('.tmap-block {')]
+        self.assertIn('scrollbar-width: none', block)
+        self.assertIn('.tmap-panel-scroll:hover { scrollbar-width: thin; }', block)
+        self.assertIn('overflow-y: auto', block)
+
+
 class InteractiveTourTests(SimpleTestCase):
     """Обучение требует действий, а не досматривания.
 

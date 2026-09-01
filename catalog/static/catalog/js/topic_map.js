@@ -793,6 +793,17 @@ function pick(mx, my) {
    ЧАСТЬ 3. ОТРИСОВКА
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── Импульс по ребру ────────────────────────────────────────────────
+   Когда тег выбирают в дереве, а не на холсте, связи с темой не видно: в
+   списке они стоят рядом, а на карте могут оказаться в разных концах
+   экрана. Импульс — точка, пробегающая по ребру от тега к его теме, —
+   показывает принадлежность движением, не занимая места.
+   ⚠️ ПРИ prefers-reduced-motion ИМПУЛЬСА НЕТ ВОВСЕ: он ничего не сообщает
+   сверх подсветки, которая остаётся. */
+var PULSE_MS = 620;          /* один пробег                             */
+var PULSE_TIMES = 3;         /* столько раз                             */
+var pulse = null;            /* {from, to, t0} либо null                */
+
 /* Состояние подсветки. */
 var picked = {};             /* id → true: выбранные теги и темы          */
 /* ⚠️ ACTIVE — ЭТО НЕ «УЗЕЛ ПОД КУРСОРОМ», А «УЗЕЛ, НА КОТОРОМ ТЫ СТОИШЬ».
@@ -865,7 +876,11 @@ function rebuildHighlight() {
       litSet[n.id] = true;
       var parent = byId['t' + n.n];
       if (parent) {
-        litSet[parent.id] = true;
+        /* ⚠️ СВОЯ ТЕМА — ВТОРОЙ УРОВЕНЬ, А НЕ ПЕРВЫЙ. Тег и его тема
+           отвечают на разные вопросы: тег это «вот что ты держишь», тема —
+           «вот чьё оно». Гори они одинаково, глазу не за что зацепиться, и
+           выбранный тег теряется рядом с крупным узлом темы. */
+        litNear[parent.id] = true;
         /* ⚠️ ГЛАВНАЯ ДОРОГА ПОМЕЧАЕТСЯ ОТДЕЛЬНО (2, а не true). Связь тега
            со СВОЕЙ темой отвечает на вопрос «откуда этот тег», и среди
            десятка подсвеченных линий она обязана читаться первой. Одной
@@ -1324,6 +1339,25 @@ function draw() {
     ctx.beginPath();
     ctx.arc(route.cx, route.cy, 4, 0, 6.283185307179586);
     ctx.fill();
+  }
+
+  /* ── Импульс: бежит по ребру от тега к его теме ──────────────────── */
+  if (pulse && !reduceMotion) {
+    var age = (frameNow || performance.now()) - pulse.t0;
+    if (age > PULSE_MS * PULSE_TIMES) {
+      pulse = null;
+    } else if (pulse.from.pz > 0 && pulse.to.pz > 0) {
+      var k = (age % PULSE_MS) / PULSE_MS;
+      /* Ход не линейный: точка выходит быстро и подходит к теме мягко —
+         так читается направление, а не просто мигание. */
+      var ease = 1 - Math.pow(1 - k, 3);
+      var ux = pulse.from.px + (pulse.to.px - pulse.from.px) * ease;
+      var uy = pulse.from.py + (pulse.to.py - pulse.from.py) * ease;
+      ctx.fillStyle = PAL.accentShades[shadeIndex(1 - k * 0.55)];
+      ctx.beginPath();
+      ctx.arc(ux, uy, 4.5 - k * 1.5, 0, 6.283185307179586);
+      ctx.fill();
+    }
   }
 
   /* ── Узлы: дальние раньше ближних ─────────────────────────────────── */
@@ -1999,6 +2033,7 @@ function frame(now) {
      раскладка пересчиталась и подписи вернулись после движения. */
   if (labelsBusy()) moved = true;
   else if (labelsCalm && now - labelLayoutAt > LAYOUT_MS) moved = true;
+  if (pulse) moved = true;
 
   if (moved || dirty) {
     dirty = false;
@@ -2476,9 +2511,13 @@ function renderPicked() {
   /* Канон 2.7: причина выключенной кнопки стоит РЯДОМ, а не в подсказке. */
   if (why) why.hidden = keys.length > 0;
 
-  /* Подсветка строк навигатора «Темы». */
+  /* Отметка выбранного в дереве: и темы, и теги. Дерево — второй экран
+     того же состояния, и оно обязано показывать выбор так же, как чипы. */
   Array.prototype.forEach.call(document.querySelectorAll('.tmap-theme-row'), function (row) {
     row.classList.toggle('is-on', !!picked['t' + row.dataset.theme]);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.tmap-tag-row'), function (row) {
+    row.classList.toggle('is-on', !!picked[row.dataset.goTag]);
   });
 }
 
@@ -2732,10 +2771,61 @@ hoverBox.addEventListener('click', function (e) {
   if (n) { flyTo(n, 2.1); touchActivity(); }
 });
 
-/* Навигатор «Темы»: наведение подсвечивает, клик наводит камеру и выделяет.
-   Это второй, надёжный способ найти тему, когда на карте её не видно. */
+/* ── Дерево «Разделы → Темы → Теги» ───────────────────────────────────
+   Второй, надёжный способ дойти до нужного места, когда на карте его не
+   видно. Свёрнуто по умолчанию: семь строк вместо двадцати девяти.
+
+   ⚠️ РАЗДЕЛЫ И ТЕМЫ РАСКРЫВАЮТСЯ, А НЕ ВЫБИРАЮТСЯ. Раньше клик по теме
+   разом и наводил камеру, и добавлял тему в выбранное — одна кнопка делала
+   два разных дела, и человек, открывавший список посмотреть состав, молча
+   получал 16 тегов в подборке. Раскрытие и выбор разведены: клик по
+   разделу и по теме раскрывает, выбор живёт на холсте, а клик по ТЕГУ
+   ведёт к нему камеру.
+   Наведение по-прежнему подсвечивает тему на карте: это подсказка, она
+   ничего не меняет. */
 var themesBox = document.getElementById('tmap-themes');
+
+/* Показать тег на карте: камера к нему, подсветка на него, импульс по
+   ребру к его теме. Тема при этом подсвечена мягче — см. rebuildHighlight. */
+function revealTag(n) {
+  if (!n) return;
+  flyTo(n, 2.1);
+  active = n;
+  focusTheme = null;
+  rebuildHighlight();
+  renderHover(n);
+  holdHighlight();
+  var parent = byId['t' + n.n];
+  pulse = parent ? { from: n, to: parent, t0: performance.now() } : null;
+  /* ⚠️ КЛАСС ЗДЕСЬ ДРУГОЙ, НЕ `is-on`. `is-on` означает «выбрано» и его
+     ставит renderPicked по `picked`; «камера стоит здесь» — другое
+     состояние, и делить с ним один класс значит, что один из двух будет
+     затирать другой при каждом обновлении. */
+  Array.prototype.forEach.call(themesBox.querySelectorAll('.tmap-tag-row'),
+    function (row) { row.classList.toggle('is-at', row.dataset.goTag === n.id); });
+  wake();
+}
+
 if (themesBox) {
+  themesBox.addEventListener('click', function (e) {
+    var open = e.target.closest('[data-open]');
+    if (open) {
+      var body = open.nextElementSibling;
+      var was = open.getAttribute('aria-expanded') === 'true';
+      open.setAttribute('aria-expanded', was ? 'false' : 'true');
+      if (body) body.hidden = was;
+      showPanelFade();
+      return;
+    }
+    var tagRow = e.target.closest('[data-go-tag]');
+    if (tagRow) {
+      revealTag(byId[tagRow.dataset.goTag]);
+      touchActivity();
+    }
+  });
+
+  /* Наведение на строку темы подсвечивает её на карте — но только если
+     человек не держит что-то своё: перебивать выбранное подсказкой нельзя. */
   themesBox.addEventListener('mouseover', function (e) {
     var row = e.target.closest('.tmap-theme-row');
     if (!row) return;
@@ -2750,15 +2840,6 @@ if (themesBox) {
       active = null; focusTheme = null;
       rebuildHighlight(); renderHover(null); wake();
     }
-  });
-  themesBox.addEventListener('click', function (e) {
-    var row = e.target.closest('.tmap-theme-row');
-    if (!row) return;
-    var n = byId['t' + row.dataset.theme];
-    if (!n) return;
-    flyTo(n, 2.1);
-    selectNode(n);
-    touchActivity();
   });
 }
 

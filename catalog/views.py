@@ -805,16 +805,31 @@ def topic_map(request):
     for t in tags:
         tags_by_theme.setdefault(t['n'], []).append(t)
 
-    # Навигатор «Темы» справа: тот же список, но сгруппированный по разделам.
-    # Считается на сервере — на клиенте это была бы та же работа каждый раз.
+    # Навигатор справа — дерево: разделы, внутри темы, внутри теги.
+    # Считается на сервере целиком: 372 строки это 30 КБ разметки, а на
+    # клиенте пришлось бы держать вторую копию справочника и собирать те же
+    # строки при каждом раскрытии.
+    #
+    # ⚠️ ЧИСЛО РЯДОМ СО СТРОКОЙ — ЭТО ЧИСЛО ЗАДАЧ, А НЕ ЧИСЛО ДЕТЕЙ. У темы
+    # оно есть не всегда (складывается из счётчиков её тегов, а те заданы у
+    # 180 из 343), и тогда вместо него ставится прочерк — канон 2.3:
+    # отсутствие числа это прочерк и причина, а не пустое место.
     sections = []
     by_n = {t['n']: t for t in themes}
     for g in data['groups']:
         rows = []
         for n in g['themes']:
             th = by_n[n]
-            rows.append({'n': n, 'title': th['l'],
-                         'tags': len(tags_by_theme.get(n, []))})
+            rows.append({
+                'n': n,
+                'title': th['l'],
+                'count': _fmt_number(th['c']) if th['c'] is not None else None,
+                'tags': [
+                    {'id': t['id'], 'label': t['l'],
+                     'count': _fmt_number(t['c']) if t['c'] is not None else None}
+                    for t in tags_by_theme.get(n, [])
+                ],
+            })
         sections.append({'key': g['k'], 'label': g['l'], 'themes': rows})
 
     return render(request, 'catalog/topic_map.html', {
