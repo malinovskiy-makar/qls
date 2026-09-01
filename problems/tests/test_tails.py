@@ -158,7 +158,12 @@ class GameMissLinkTests(TestCase):
         response = self.client.get(
             reverse('catalog:problem_list') + '?topic=%d' % topic.pk)
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context['f_topic'], str(topic.pk))
+        # ⚠️ КЛЮЧА `f_topic` В КОНТЕКСТЕ БОЛЬШЕ НЕТ. Активные фильтры
+        # каталога живут в общем компоненте (`catalog/filters.py`), и
+        # второй копии их состояния рядом не заводится. Требование то же:
+        # каталог обязан ПРОЧИТАТЬ параметр темы, а не просто открыться.
+        self.assertEqual(response.context['filters']['active']['topic'],
+                         str(topic.pk))
 
 
 class DemoGameTopicsTests(TestCase):

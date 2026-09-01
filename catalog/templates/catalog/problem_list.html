@@ -157,6 +157,10 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
             border-bottom: 1px solid var(--border-soft); vertical-align: top; }
 .ct-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
             color: var(--text2); background: var(--surface-2); }
+/* ⚠️ СТОЛБЕЦ СЛОЖНОСТИ — ПО ЦЕНТРУ, И ЭТО ТРЕБОВАНИЕ ПРОШЛОГО РЕВЮ (r15,
+   «столбец сложности каталога — тоже по центру»). Новая таблица сперва
+   прижала его вправо заодно с номером, и проверка это поймала. */
+.ct-table .col-diff { text-align: center; }
 .ct-table td.num, .ct-table th.num { text-align: right;
             font-variant-numeric: tabular-nums; color: var(--text3);
             white-space: nowrap; }
@@ -314,7 +318,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
     {% if view_mode == 'table' %}
     <table class="ct-table">
       <thead><tr>
-        <th>Тема</th><th>Условие</th><th>Сложность</th>
+        <th>Тема</th><th>Условие</th><th class="col-diff">Сложность</th>
         {% if searched and not degraded %}<th>Похоже</th>{% endif %}
         <th class="num">№</th>
       </tr></thead>
@@ -323,7 +327,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
       <tr>
         <td>{% for t in card.topics %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
         <td><a href="{% url 'catalog:problem_detail' card.problem.pk %}">{{ card.preview|truncatechars:110 }}</a></td>
-        <td class="num"><span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span></td>
+        <td class="col-diff"><span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span></td>
         {% comment %}
         ⚠️ КОЛОНКА НАЗЫВАЕТСЯ СЛОВОМ, А НЕ ДОЛЕЙ. Число близости наружу не
         идёт (просьба владельца) — показываем ступень словами.

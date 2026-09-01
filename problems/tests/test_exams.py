@@ -665,12 +665,23 @@ class ExamCreationTests(TestCase):
         # ⚠️ ОТБОР ЗАДАЧ ПЕРЕЕХАЛ НА ПЕРВЫЙ ШАГ ПОТОКА (ревью 17.08, п. 4.5):
         # конструктор контрольной удалён, вид работы стал параметром.
         # Требование прежнее: берём из ВСЕГО каталога, а не из отложенного.
+        # ⚠️ ТЕМА ЗАДАЁТСЯ ЯВНО. Группа фильтра показывается, только если
+        # поле размечено хоть у одной задачи, — иначе «фильтра нет, потому
+        # что нечего фильтровать» и «фильтр потеряли» неотличимы.
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import Topic
+
         fresh = make_problem('Не сохранённая задача каталога', difficulty=4)
+        fresh.topics.add(Topic.objects.create(name=CANONICAL[0]))
         body = self.client.get(self.pick_url).content.decode()
         self.assertIn('Не сохранённая задача каталога', body)
-        self.assertIn('name="q"', body)          # поиск
-        self.assertIn('name="topic"', body)      # фильтр темы
-        self.assertIn('name="difficulty"', body)  # фильтр сложности
+        # ⚠️ ФИЛЬТРЫ СТАЛИ ССЫЛКАМИ, А НЕ ПОЛЯМИ ФОРМЫ: отбор перешёл на
+        # общий компонент каталога (решение владельца 01.09.2026).
+        # Требование прежнее — на странице есть поиск и фильтры по теме и
+        # сложности; ищем их там, где они теперь живут.
+        self.assertIn('name="q"', body)                 # поиск
+        self.assertIn('data-fl="topic"', body)          # фильтр темы
+        self.assertIn('data-fl="difficulty"', body)     # фильтр сложности
 
         self._post(problem_ids=[str(fresh.pk)])
         exam = Assignment.objects.filter(kind='exam').first()

@@ -200,6 +200,10 @@ class CatalogDifficultyTests(TestCase):
     """Столбец сложности каталога — тоже по центру."""
 
     def test_difficulty_column_is_centred(self):
+        # ⚠️ ТАБЛИЦА КАТАЛОГА ПЕРЕСОБРАНА ПРИ СЛИЯНИИ ЭКРАНОВ: `.ptable`
+        # стала `.ct-table`. Требование не менялось — столбец сложности
+        # стоит по центру, и первая версия новой таблицы его нарушила
+        # (прижала вправо вместе с номером). Поймано этой проверкой.
         page = read('catalog', 'templates', 'catalog', 'problem_list.html')
-        rule = page.split('.ptable .col-diff')[1].split('}')[0]
+        rule = page.split('.ct-table .col-diff')[1].split('}')[0]
         self.assertIn('text-align: center', rule)

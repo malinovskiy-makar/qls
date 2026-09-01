@@ -438,8 +438,12 @@ class CatalogFocusRingTests(TestCase):
 
     PAGES = (
         'catalog/templates/catalog/home.html',
-        'catalog/templates/catalog/smart_search.html',
+        # ⚠️ `smart_search.html` УДАЛЁН: экран слился с каталогом (решение
+        # владельца 01.09.2026). Требование «в правилах фокуса нет акцента»
+        # никуда не делось и проверяется на экране, который его заменил, —
+        # `problem_list.html` в списке был и остался.
         'catalog/templates/catalog/problem_list.html',
+        'catalog/templates/catalog/_filters_css.html',
         'catalog/templates/catalog/collection_new.html',
         'catalog/templates/catalog/collection_detail.html',
     )

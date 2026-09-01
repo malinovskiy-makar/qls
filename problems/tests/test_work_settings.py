@@ -221,25 +221,45 @@ class ManualSearchFiltersStayComplete(TestCase):
         self.tutor = make_tutor('ws_filters')
         self.client.force_login(self.tutor)
 
-    def test_all_seven_controls_are_there(self):
+    def test_all_controls_are_there(self):
+        """Ни один орган отбора не потерян при переезде в компонент.
+
+        ⚠️ РЯДА ФИЛЬТРОВ БОЛЬШЕ НЕТ: отбор перешёл на ОБЩИЙ компонент
+        каталога в режиме «панель» (решение владельца 01.09.2026), и
+        варианты стали ссылками, а не полями формы. Поэтому поиск и
+        кнопка ищутся в форме, а остальное — группами компонента. Смысл
+        прежний: пропажа любого из них красит проверку.
+        """
+        from problems.management.commands.apply_topic_mapping import CANONICAL
+        from problems.models import Problem, Topic
+
+        # Группа компонента показывается, только если поле размечено хоть
+        # у одной задачи. Без этой задачи «пусто» и «фильтр потерян» были
+        # бы неотличимы.
+        topic = Topic.objects.create(name=CANONICAL[0])
+        problem = Problem.objects.create(
+            statement='Условие для проверки набора фильтров.',
+            solution='Решение есть.', difficulty=3,
+            status=Problem.Status.PUBLISHED)
+        problem.topics.add(topic)
+
         body = self.client.get(reverse('teacher:work_pick')).content.decode()
-        # ⚠️ Форма отбора переехала в поток и называется `wk-filter-form`
-        # (ревью 17.08, п. 4.5). Проверка та же: ни один элемент ряда
-        # фильтров не потерян.
         form = body[body.index('id="wk-filter-form"'):]
         form = form[:form.index('</form>')]
-        for field in ('name="q"', 'name="topic"', 'name="difficulty"',
-                      'name="type"', 'name="has_solution"'):
-            self.assertIn(field, form)
+        self.assertIn('name="q"', form)
         self.assertIn('>Найти<', form)
-        self.assertIn('Сброс', form)
 
-    def test_the_row_lives_in_a_kit_card(self):
+        panel = body.split('class="wk-side"')[1].split('</aside>')[0]
+        for key in ('topic', 'difficulty', 'kind', 'has_solution'):
+            self.assertIn('data-fl="%s"' % key, panel)
+
+    def test_the_panel_stands_beside_the_list(self):
+        """Панель отбора — колонка рядом со списком, а не ряд над ним."""
         body = self.client.get(reverse('teacher:work_pick')).content.decode()
-        self.assertRegex(
-            body,
-            r'id="wk-filter-form"[^>]*class="k-card k-filters"'
-            r'|class="k-card k-filters"[^>]*id="wk-filter-form"')
+        self.assertIn('class="wk-cat"', body)
+        self.assertIn('class="wk-side"', body)
+        self.assertIn('class="wk-cat-list"', body)
+        self.assertNotIn('class="k-card k-filters"', body)
 
 
 class DateFieldMarkup(TestCase):
