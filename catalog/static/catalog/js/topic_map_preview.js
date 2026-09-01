@@ -287,11 +287,23 @@ function mount(el, options) {
   /* ── Отрисовка ─────────────────────────────────────────────────────── */
 
   function readPalette() {
+    /* Читаем у САМОГО БЛОКА: цвета разделов объявлены в скоупе
+       `.tmap-preview`, а общие токены сайта блок наследует. */
     var cs = getComputedStyle(el);
-    var root = getComputedStyle(document.documentElement);
-    PAL.node = hexToRgb(cs.getPropertyValue('--map-node') ||
-                        root.getPropertyValue('--map-node') || '#4A5260');
+    PAL.node = hexToRgb(cs.getPropertyValue('--map-node') || '#4A5260');
     PAL.dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    /* Готовые строки цвета по разделам: в кадре разбирать CSS-цвет 372
+       раза дороже всей отрисовки. Ключи берём из самих узлов — списка
+       разделов у предпросмотра нет, он его и не показывает. */
+    PAL.theme = {}; PAL.tag = {};
+    for (var i = 0; i < nodes.length; i++) {
+      var g = nodes[i].g;
+      if (PAL.theme[g]) continue;
+      var raw = cs.getPropertyValue('--map-g-' + g);
+      var col = raw && raw.trim() ? hexToRgb(raw) : PAL.node;
+      PAL.theme[g] = rgba(col, 1);
+      PAL.tag[g] = rgba(col, 0.72);
+    }
   }
 
   function draw() {
@@ -339,14 +351,15 @@ function mount(el, options) {
     /* Узлы: дальние раньше ближних. Порядок пересобирается каждый кадр —
        сцена вращается, и глубина меняется у всех. */
     nodes.sort(function (p, q) { return q.pz - p.pz; });
-    var themeCss = rgba(PAL.node, 1);
-    var tagCss = rgba(PAL.node, 0.72);
+    var fallbackTheme = rgba(PAL.node, 1), fallbackTag = rgba(PAL.node, 0.72);
     for (i = 0; i < nodes.length; i++) {
       n = nodes[i];
       if (n.pz < 0) continue;
       if (n.px < -20 || n.px > W + 20 || n.py < -20 || n.py > H + 20) continue;
       var r = Math.max(0.8, n.r0 * n.ps * opt.nodeScale);
-      ctx.fillStyle = n.k === 'theme' ? themeCss : tagCss;
+      ctx.fillStyle = n.k === 'theme'
+        ? (PAL.theme[n.g] || fallbackTheme)
+        : (PAL.tag[n.g] || fallbackTag);
       ctx.beginPath();
       ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
       ctx.fill();

@@ -207,12 +207,13 @@ class GraphIntegrityTests(SimpleTestCase):
                 self.assertEqual(n['g'], theme_group[n['n']])
 
     def test_seven_groups_and_none_of_them_carries_a_colour(self):
-        """Раздел остался структурным: имя и состав есть, цвета нет.
+        """У раздела есть имя и состав; цвет — есть, но не здесь.
 
-        ⚠️ ЭТО СТОРОЖ ОТКАЗА ОТ СЕМИ ЦВЕТОВ (ADR 0038), а не придирка к
-        полям. Пока раздел носил свою пару цветов, их читал JavaScript
-        карты; вернуть поля `cl`/`cd` — значит вернуть и разноцветные узлы,
-        и никакой другой тест этого не заметит.
+        ⚠️ СЕМЬ ЦВЕТОВ ВЕРНУЛИСЬ (ADR 0053), А ПОЛЯ `cl`/`cd` — НЕТ, и это
+        не мелочь. Цвет раздела — оформление, его место в CSS
+        (`--map-g-*` в topic_map.css), где его меняет дизайн и сторожит
+        замер контраста. Данные карты остаются данными: положи цвет в JSON
+        — и он разъедется с темой сайта, потому что тем две, а поле одно.
         """
         self.assertEqual(len(self.data['groups']), 7)
         for g in self.data['groups']:
@@ -346,16 +347,186 @@ class NodeColourContrastTests(SimpleTestCase):
                 '%s тема: ориентир окрашен акцентом подсветки' % theme)
 
     def test_only_one_node_colour_is_declared(self):
-        """Семи цветов разделов в токенах больше нет.
+        """Старых токенов `--g-base` … `--g-tools` в общем файле нет.
 
-        Без этой проверки токены `--g-base` … `--g-tools` можно вернуть, и
-        покраснеет только глаз владельца.
+        ⚠️ СМЫСЛ ПРОВЕРКИ ПОМЕНЯЛСЯ ВМЕСТЕ С ADR 0053. Раньше она сторожила
+        отказ от цветов; теперь цвета есть, но живут в topic_map.css под
+        именами `--map-g-*` — общий файл токенов 01.09.2026 правит
+        параллельная сессия по палитре, и трогать его нельзя.
+        Проверка стережёт ровно эту границу: старые имена не должны
+        вернуться в токены исподволь.
+        ДОЛГ: когда работа по палитре вольётся в main и `--map-g-*`
+        переедут в токены, этот тест переписывается на новые имена.
         """
         css = self.TOKENS.read_text(encoding='utf-8')
         for key, _label, _nums in GROUPS:
             self.assertIsNone(
                 re.search(r'--g-%s:' % re.escape(key), css),
                 'в токенах снова цвет раздела: --g-%s' % key)
+
+
+
+class SectionColourTests(SimpleTestCase):
+    """Семь цветов разделов: видны на холсте, различимы, не врут про слой.
+
+    ⚠️ ЭТО ВОЗВРАТ ЦВЕТА, ОТМЕНЁННОГО В ADR 0038, и вернулся он не «как
+    было». Прошлый отказ опирался на довод «легенду никто не помнит» —
+    теперь легенда всегда на экране: заголовок раздела в правой панели
+    написан своим цветом. См. ADR 0053.
+
+    Значения читаются из `catalog/static/catalog/css/topic_map.css`, а не
+    из общих токенов: 01.09.2026 файл токенов правит параллельная сессия по
+    палитре. Долг записан в самом CSS рядом с цветами.
+    """
+
+    CSS = pathlib.Path('catalog/static/catalog/css/topic_map.css')
+    TOKENS = pathlib.Path('templates/_tokens.html')
+    JS = pathlib.Path('catalog/static/catalog/js/topic_map.js')
+    PREVIEW_JS = pathlib.Path('catalog/static/catalog/js/topic_map_preview.js')
+
+    #: Цвет здесь НЕСЁТ СМЫСЛ (в каком разделе узел), а не украшает, поэтому
+    #: порог взят текстовый, 4,5:1, а не 3:1 как у нетекстовой графики.
+    MIN_BG = 4.5
+    #: Тег рисуется тем же цветом с прозрачностью 0,72 — то же число, что
+    #: BASE_ALPHA_TAG в topic_map.js. Полупрозрачный кружок это уже графика,
+    #: и порог у него 3:1.
+    TAG_ALPHA = 0.72
+    MIN_TAG = 3.0
+    #: Насколько краски обязаны отличаться друг от друга и от чужих ролей.
+    #: ΔE76 около 15 — это «видно, что цвета разные» на соседних пятнах;
+    #: берём с запасом, замер даёт не меньше 23.
+    MIN_APART = 15.0
+    MIN_FROM_ROLE = 25.0
+
+    # Считалки контраста берём у соседнего класса, а не переписываем: две
+    # копии формулы WCAG неизбежно разойдутся. Обёртки нужны потому, что при
+    # присваивании через класс статический метод теряет свою обёртку.
+    _rgb = staticmethod(NodeColourContrastTests._rgb)
+    _over = staticmethod(NodeColourContrastTests._over)
+    _luminance = staticmethod(NodeColourContrastTests._luminance)
+    _contrast = classmethod(NodeColourContrastTests._contrast.__func__)
+    _token = staticmethod(NodeColourContrastTests._token)
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.css = cls.CSS.read_text(encoding='utf-8')
+        tokens = cls.TOKENS.read_text(encoding='utf-8')
+        cut = tokens.index('[data-theme="dark"]')
+        cls.tokens = {'светлая': tokens[:cut], 'тёмная': tokens[cut:]}
+        # Два блока в topic_map.css: обычный и под [data-theme="dark"].
+        dark_at = cls.css.index('[data-theme="dark"] .tmap')
+        cls.blocks = {'светлая': cls.css[:dark_at], 'тёмная': cls.css[dark_at:]}
+
+    def _colours(self, theme):
+        """{ключ раздела: rgb} для одной темы."""
+        out = {}
+        for key, _label, _nums in GROUPS:
+            found = re.search(r'--map-g-%s:\s*(#[0-9A-Fa-f]{6})' % re.escape(key),
+                              self.blocks[theme])
+            self.assertIsNotNone(
+                found, '%s тема: нет цвета раздела --map-g-%s' % (theme, key))
+            out[key] = self._rgb(found.group(1))
+        return out
+
+    @staticmethod
+    def _lab(rgb):
+        def inv(part):
+            part /= 255
+            return (part / 12.92 if part <= 0.04045
+                    else ((part + 0.055) / 1.055) ** 2.4)
+        red, green, blue = (inv(p) for p in rgb)
+        x = (0.4124 * red + 0.3576 * green + 0.1805 * blue) / 0.95047
+        y = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        z = (0.0193 * red + 0.1192 * green + 0.9505 * blue) / 1.08883
+
+        def f(t):
+            return t ** (1 / 3) if t > 0.008856 else 7.787 * t + 16 / 116
+        fx, fy, fz = f(x), f(y), f(z)
+        return (116 * fy - 16, 500 * (fx - fy), 200 * (fy - fz))
+
+    @classmethod
+    def _delta(cls, first, second):
+        one, two = cls._lab(first), cls._lab(second)
+        return round(sum((one[i] - two[i]) ** 2 for i in range(3)) ** 0.5, 1)
+
+    def test_all_seven_sections_have_a_colour_in_both_themes(self):
+        for theme in ('светлая', 'тёмная'):
+            self.assertEqual(len(self._colours(theme)), 7)
+
+    def test_every_section_colour_is_visible_on_the_canvas(self):
+        """Порог 4,5:1 к фону холста — цвет отвечает на вопрос «где я»."""
+        for theme in ('светлая', 'тёмная'):
+            bg = self._rgb(self._token(self.tokens[theme], 'bg'))
+            for key, colour in self._colours(theme).items():
+                value = self._contrast(colour, bg)
+                self.assertGreaterEqual(
+                    value, self.MIN_BG,
+                    '%s тема, раздел %s: контраст к холсту %s при норме %s'
+                    % (theme, key, value, self.MIN_BG))
+
+    def test_tag_shade_of_every_section_still_stands_out(self):
+        """Тег — тот же цвет вполсилы. Он не обязан быть текстом, но обязан
+        быть видимым кружком: порог 3:1 (WCAG 1.4.11)."""
+        for theme in ('светлая', 'тёмная'):
+            bg = self._rgb(self._token(self.tokens[theme], 'bg'))
+            for key, colour in self._colours(theme).items():
+                mixed = self._over(colour, bg, self.TAG_ALPHA)
+                value = self._contrast(mixed, bg)
+                self.assertGreaterEqual(
+                    value, self.MIN_TAG,
+                    '%s тема, тег раздела %s: контраст к холсту %s при норме %s'
+                    % (theme, key, value, self.MIN_TAG))
+
+    def test_sections_do_not_blend_into_each_other(self):
+        """Семь красок должны читаться как семь, а не как «примерно две».
+
+        ⚠️ РАЗВЕДЕНЫ НЕ ТОЛЬКО ТОНОМ, НО И СВЕТЛОТОЙ. Пары с близким тоном
+        (два зелёных, два фиолетовых) отличаются ещё и светлотой — иначе
+        для того, кто путает красный с зелёным, они сливаются в одну.
+        """
+        for theme in ('светлая', 'тёмная'):
+            colours = self._colours(theme)
+            keys = list(colours)
+            for i, first in enumerate(keys):
+                for second in keys[i + 1:]:
+                    value = self._delta(colours[first], colours[second])
+                    self.assertGreaterEqual(
+                        value, self.MIN_APART,
+                        '%s тема: разделы %s и %s почти одного цвета (dE %s)'
+                        % (theme, first, second, value))
+
+    def test_sections_are_not_the_accent_and_not_the_region_label(self):
+        """Цвет раздела не притворяется ни подсветкой, ни ориентиром.
+
+        Акцент означает «вот то, что ты держишь», `--map-region` — «вот где
+        ты на карте». Совпади с ними цвет раздела — и человек прочитает
+        обычный узел как выделенный.
+        """
+        for theme in ('светлая', 'тёмная'):
+            accent = self._rgb(self._token(self.tokens[theme], 'accent'))
+            region = self._rgb(self._token(self.tokens[theme], 'map-region'))
+            for key, colour in self._colours(theme).items():
+                for name, other in (('акцентом', accent), ('ориентиром', region)):
+                    value = self._delta(colour, other)
+                    self.assertGreaterEqual(
+                        value, self.MIN_FROM_ROLE,
+                        '%s тема: раздел %s путается с %s (dE %s)'
+                        % (theme, key, name, value))
+
+    def test_both_map_modes_actually_read_the_section_colours(self):
+        """Объявленный, но никем не читаемый цвет — не введённый цвет.
+
+        ⚠️ ЭТО ПРЯМОЕ ПРИМЕНЕНИЕ ADR 0051: токен считается введённым только
+        тогда, когда его кто-то читает. Полная карта и предпросмотр обязаны
+        брать `--map-g-*`, иначе замеры выше сторожат красивые числа в файле
+        и ничего на экране.
+        """
+        for name, path in (('полная карта', self.JS),
+                           ('предпросмотр', self.PREVIEW_JS)):
+            src = path.read_text(encoding='utf-8')
+            self.assertIn("'--map-g-'", src,
+                          '%s не читает цвета разделов' % name)
 
 
 class BuiltJsonTests(SimpleTestCase):
