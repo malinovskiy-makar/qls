@@ -43,10 +43,23 @@ PAGES = {
     "stats": "/profile/stats/",
     "game": "/game/",
     "calendar": "/calendar/",
+    "calc2": "/calc2/",
+    "calc2work": "/calc2/",
 }
 
 # Страницы, которые снимаются БЕЗ входа (иначе редиректит на кабинет).
 ANONYMOUS = {"login"}
+
+# ⚠️ РАБОЧИЙ ЭКРАН КАЛЬКУЛЯТОРА СВОИМ АДРЕСОМ НЕ ОТКРЫВАЕТСЯ. У /calc2/ один
+#    маршрут, сцену выбирают щелчками: сначала блок, потом модель. Без этих
+#    двух щелчков снимок показывает окно выбора, а не холст с кривыми — то
+#    есть ровно НЕ ТО, что нужно проверять при правках фона и шрифта.
+AFTER_LOAD = {
+    "calc2work": [
+        "#picker-blocks button >> nth=1",          # блок «Совершенная конкуренция»
+        ".picker-group.open .scard:not(.soon) >> nth=0",   # первая рабочая модель
+    ],
+}
 
 
 def theme_script(theme: str) -> str:
@@ -146,6 +159,14 @@ def main() -> int:
                 # шрифтам дают доехать: снимок до загрузки покажет запасной
                 page.evaluate("() => document.fonts.ready")
                 page.wait_for_timeout(400)
+                for step in AFTER_LOAD.get(name, []):
+                    try:
+                        page.click(step, timeout=8000)
+                        page.wait_for_timeout(900)
+                    except Exception as exc:
+                        print(f"  {name}/{theme}: шаг «{step}» не сработал — {exc}")
+                if name in AFTER_LOAD:
+                    page.wait_for_timeout(900)
                 shot = out / f"{name}_{theme}.png"
                 page.screenshot(path=str(shot), full_page=args.full)
                 if theme == "light":

@@ -612,9 +612,21 @@
    просит убрать всё, что снижает контраст. Гасить надо ОБА слоя.
 
    Слои `fixed`: они не перерисовываются при прокрутке, потому что не
-   двигаются вместе с содержимым. */
+   двигаются вместе с содержимым.
+
+   ⚠️ КЛАСС `.bg-pattern-host` — ДЛЯ ПОЛНОЭКРАННЫХ НЕПРОЗРАЧНЫХ СЛОЁВ.
+   Обычно фон страницы виден сам, и хватает слоёв на теле. Но там, где
+   поверх лежит собственный непрозрачный экран во всю высоту, он закрывает
+   паттерн собой, и повесить слой надо на него. Сегодня такой экран один —
+   окно выбора модели в /calc2/ (`.picker`, `z-index: 60`), и прозрачным его
+   не сделать: за ним стоит белый холст рабочего места. Слой внутри такого
+   экрана при `z-index: -1` ложится ВЫШЕ его собственного фона и НИЖЕ его
+   содержимого — это порядок отрисовки внутри слоя наложения, а не хитрость.
+   Шапка сайта (`z-index: 200`) остаётся выше и паттерном не закрывается. */
 body::before,
-body::after {
+body::after,
+.bg-pattern-host::before,
+.bg-pattern-host::after {
   content: '';
   position: fixed;
   inset: 0;
@@ -623,18 +635,22 @@ body::after {
   background-repeat: repeat;
   background-size: 360px 360px;
 }
-body::before {
+body::before,
+.bg-pattern-host::before {
   background-image: url("{% static 'img/bg-pattern.svg' %}");
   opacity: var(--bg-pattern-alpha, .15);
 }
-body::after {
+body::after,
+.bg-pattern-host::after {
   background-image: url("{% static 'img/bg-pattern-amber.svg' %}");
   opacity: var(--bg-pattern-amber-alpha, .08);
 }
 @media (prefers-reduced-motion: reduce) {
-  body::before, body::after { display: none; }
+  body::before, body::after,
+  .bg-pattern-host::before, .bg-pattern-host::after { display: none; }
 }
 @media (prefers-contrast: more) {
-  body::before, body::after { display: none; }
+  body::before, body::after,
+  .bg-pattern-host::before, .bg-pattern-host::after { display: none; }
 }
 </style>
