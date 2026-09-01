@@ -526,6 +526,27 @@ cmp('нарисована полоса расхода', r.aMoney, 450, 0.5);
 cmp('нарисован DWL', r.aDWL, 612.5, 0.5);
 cmp('тождество CS + PS − расход + DWL', r.ident, 3200, 1);
 
+head('Сессия 01.09 (2) · дискриминация 1-й степени в первой четверти');
+r = await run(MKT + AREA + `setDS('mono-d1', '100-Q', 'Q-30');
+  var d = STATE.discr1 || {};
+  return { Q: d.Qcomp, P: evalCurve(STATE.D, d.Qcomp), profit: d.profit,
+           drawn: areaOf('Излишек фирмы: весь излишек рынка'),
+           raw: integrate(function (q) { return evalCurve(STATE.D, q) - mcAt(q); }, 0, d.Qcomp),
+           cut: integrate(function (q) { return -mcAt(q); }, 0, 30) };`);
+cmp('MC = Q − 30: выпуск', r.Q, 65, 1e-3);
+cmp('MC = Q − 30: цена', r.P, 35, 1e-3);
+cmp('MC = Q − 30: прибыль', r.profit, 3775, 1e-2);
+cmp('нарисованная прибыль', r.drawn, 3775, 0.5);
+cmp('прибыль без отсечения (было)', r.raw, 4225, 1e-2);
+cmp('кусок под осью', r.cut, 450, 1e-2);
+cmp('4225 − 3775 = кусок под осью', r.raw - r.profit, 450, 2e-2);
+r = await run(MKT + AREA + `setDS('mono-d1', '100-Q', 'Q');
+  var d = STATE.discr1 || {};
+  return { Q: d.Qcomp, profit: d.profit, drawn: areaOf('Излишек фирмы: весь излишек рынка') };`);
+cmp('контроль MC = Q: выпуск', r.Q, 50, 1e-3);
+cmp('контроль MC = Q: прибыль', r.profit, 2500, 1e-2);
+cmp('контроль MC = Q: нарисовано', r.drawn, 2500, 0.5);
+
 head('Сессия 01.09 (2) · квота 31.08 не сдвинулась');
 r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(20); redrawAll();
   var t = STATE.monoQuota || {};

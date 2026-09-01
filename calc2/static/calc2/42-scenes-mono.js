@@ -929,9 +929,13 @@ function drawDiscr1() {
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
   }
   if (!d1) return;
-  // Заливка прибыли — между MC (низ) и D (верх) от 0 до Qcomp.
+  /* Заливка прибыли — между MC (низ) и D (верх) от 0 до Qcomp.
+     ⚠️ Низ — max(0, MC), а не сама MC: при MC, пересекающей ось P ниже нуля,
+     заливка уезжала вместе с кривой в четвёртую четверть. Ровно то же
+     ограничение стоит у ЧИСЛА прибыли в recompute — поправить одно без
+     другого значит развести картинку с числом. */
   const samp = []; for (let i = 0; i <= 120; i++) samp.push(d1.Qcomp * i / 120);
-  const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
+  const a = d3.area().x(d => sx(d)).y0(d => sy(Math.max(0, mcAt(d)))).y1(d => sy(evalCurve(D, d)));
   g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20).attr('data-legend', 'Излишек фирмы: весь излишек рынка');
   // Точка Qcomp на спросе + проекции.
   const ox = sx(0), oy = sy(0), Pq = evalCurve(D, d1.Qcomp);
