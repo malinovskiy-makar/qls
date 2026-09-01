@@ -357,6 +357,93 @@ cmp('смешанная пара: Y при X = 5 (внутреннее реше�
 cmp('то же по одним УГЛАМ — было бы ровно 99', r.corner5, 99, 1e-6);
 cmp('сверка с численным Минковским, 200 точек', r.worst, 0, 1e-6);
 
+/* --- Сессия 01.09: ноль значит ноль, погашенная кривая, MSB/MSC ------- */
+head('Сессия 01.09 · ноль значит ноль');
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('ceiling'); setPReg(0); redrawAll();
+  return { Q: STATE.pc.Qtrade, cs: STATE.pc.cs, ps: STATE.pc.ps, dwl: STATE.pc.dwl,
+           no: !!STATE.pc.noMarket };`);
+cmp('потолок 0: объём торговли', r.Q, 0, 1e-9);
+cmp('потолок 0: CS', r.cs, 0, 1e-9);
+cmp('потолок 0: PS', r.ps, 0, 1e-9);
+cmp('потолок 0: DWL', r.dwl, 2500, 1e-3);
+cmp('потолок 0: рынка нет', r.no, true, 0);
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('floor'); setPReg(101); redrawAll();
+  return { Q: STATE.pc.Qtrade, dwl: STATE.pc.dwl };`);
+cmp('пол 101: объём торговли', r.Q, 0, 1e-9);
+cmp('пол 101: DWL', r.dwl, 2500, 1e-3);
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('ceiling'); setPReg(40); redrawAll();
+  return { Q: STATE.pc.Qtrade, gap: STATE.pc.gap };`);
+cmp('потолок 40 (связывает): Q', r.Q, 40, 1e-6);
+cmp('потолок 40: дефицит', r.gap, 20, 1e-6);
+r = await run(MKT + `setDS('sd', '100-Q', 'Q');
+  var s = STATE.curves.find(function (c) { return c.role === 'supply'; });
+  s.visible = false; redrawAll();
+  var out = { S: STATE.S ? 1 : 0, eq: STATE.eq ? 1 : 0, cs: STATE.cs, ps: STATE.ps };
+  s.visible = true; redrawAll();
+  out.backQ = STATE.eq.Q; out.backCs = STATE.cs;
+  return out;`);
+cmp('погашенная S: для модели её нет', r.S, 0, 0);
+cmp('погашенная S: равновесия нет', r.eq, 0, 0);
+cmp('погашенная S: CS пуст', r.cs === null, true, 0);
+cmp('галочка вернула равновесие', r.backQ, 50, 1e-6);
+cmp('галочка вернула CS', r.backCs, 1250, 1e-3);
+r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(0); redrawAll();
+  var t = STATE.monoQuota || {}; return { b: t.binding ? 1 : 0, Q: t.Q, ps: t.psM, cs: t.csM, dwl: t.dwl };`);
+cmp('монополия, квота 0: связывает', r.b, 1, 0);
+cmp('квота 0: Q', r.Q, 0, 1e-9);
+cmp('квота 0: PS', r.ps, 0, 1e-9);
+cmp('квота 0: CS', r.cs, 0, 1e-9);
+cmp('квота 0: DWL', r.dwl, 3200, 1e-3);
+
+head('Сессия 01.09 · MSB и MSC слышат набранное');
+r = await page.evaluate(async () => {
+  const wait = (ms) => new Promise(r => setTimeout(r, ms));
+  resetSceneMemory(); pickScene('ext');
+  updateCurveExpr(STATE.curves.find(c => c.role === 'demand'), '100-Q');
+  updateCurveExpr(STATE.curves.find(c => c.role === 'supply'), 'Q');
+  redrawAll();
+  ['msb', 'msc'].forEach(k => { STATE[k + 'On'] = true; });
+  // Печатаем ТОЛЬКО событием input — так же, как шлёт мост MathLive.
+  const put = (id, txt) => {
+    const i = document.getElementById(id);
+    i.disabled = false; i.value = txt;
+    i.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  put('inp-msb', '100 - a*Q'); put('inp-msc', 'b*Q');
+  await wait(420);
+  STATE.params.a = Object.assign({ min: 0, max: 10, step: 0.1 }, STATE.params.a, { value: 3.3 });
+  STATE.params.b = Object.assign({ min: 0, max: 10, step: 0.1 }, STATE.params.b, { value: 2.6 });
+  redrawAll();
+  await wait(200);
+  const e = STATE.ext || {};
+  return { msb: STATE.msbExpr, msc: STATE.mscExpr, Qopt: e.Qopt, Popt: e.Popt, Qmkt: e.Qmkt };
+});
+cmp('MSB дошла до состояния', r.msb, '100 - a*Q', 0);
+cmp('MSC дошла до состояния', r.msc, 'b*Q', 0);
+cmp('общественный оптимум Q', r.Qopt, 16.9492, 1e-3);
+cmp('общественный оптимум P', r.Popt, 44.0678, 1e-3);
+cmp('рыночное равновесие не сдвинулось', r.Qmkt, 50, 1e-4);
+
+head('Сессия 01.09 · ключевые точки');
+r = await run(MKT + `setDS('sd', '100-Q', 'Q');
+  var k = keyTargets();
+  var at = function (x, y) { return k.some(function (p) {
+    return Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5; }) ? 1 : 0; };
+  return { n: k.length, pr1: at(0, 50), pr2: at(50, 0) };`);
+cmp('«Спрос и предложение»: ключевых точек', r.n, 6, 0);
+cmp('проекция равновесия (0; 50)', r.pr1, 1, 0);
+cmp('проекция равновесия (50; 0)', r.pr2, 1, 0);
+r = await run(`pickScene('sdsum'); redrawAll();
+  var k = keyTargets().filter(function (p) {
+    return Math.abs(p.x - 40) < 0.5 && Math.abs(p.y - 60) < 0.5; })[0];
+  return { есть: k ? 1 : 0, хоз: (k && k.owners.indexOf('рыночный спрос') >= 0) ? 1 : 0,
+           Q: STATE.eq.Q, cs: STATE.cs, ps: STATE.ps };`);
+cmp('излом суммарного спроса (40; 60) в списке', r['есть'], 1, 0);
+cmp('его хозяин — суммарный спрос', r['хоз'], 1, 0);
+cmp('числа сложения не сдвинулись: Q*', r.Q, 70, 1e-4);
+cmp('CS', r.cs, 1625, 1e-3);
+cmp('PS', r.ps, 1325, 1e-3);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
