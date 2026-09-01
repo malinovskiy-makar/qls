@@ -8,6 +8,8 @@
 """
 import re
 
+from problems.templatetags.ru import pick
+
 _CYRILLIC_RE = re.compile(r'[а-яёА-ЯЁ]')
 _LATIN_RE = re.compile(r'[a-zA-Z]')
 
@@ -61,6 +63,28 @@ def has_table_in_statement(text):
     if _TABLE_MARKER_RE.search(text):
         return True
     return any(line.count('|') >= 2 for line in text.splitlines())
+
+
+_FIGURE_MARKER_ONLY_RE = re.compile(r'\[\[FIGURE:')
+
+
+def with_figure_note(text, figure_count):
+    """Служебная строка `[[FIGURE: к задаче приложено N изображений]]` в
+    КОНЦЕ payload — только если у задачи есть строки `ProblemFigure`
+    (`figure_count > 0`), а в самом тексте нет ни одного маркера
+    `[[FIGURE:` (Фаза 2, 2026-09-01: 732 задачи, 28% визуального
+    множества, без этой строки модель видит «на рисунке…» без единого
+    сигнала, что рисунок вообще есть).
+
+    Правит только то, что уходит в API — `statement`/`ProblemPart.statement`
+    в базе не трогает ни на байт.
+    """
+    if figure_count <= 0 or _FIGURE_MARKER_ONLY_RE.search(text or ''):
+        return text
+    note = '[[FIGURE: к задаче приложено %d %s]]' % (
+        figure_count,
+        pick(figure_count, 'изображение', 'изображения', 'изображений'))
+    return '%s\n%s' % (text or '', note)
 
 
 def is_english_text(text):

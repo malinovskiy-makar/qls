@@ -47,6 +47,10 @@ MAX_BYTES_PER_FILE = 180 * 1024 * 1024
 MAX_LINES_PER_FILE = 45000
 
 ENDPOINT = '/v1/responses'
+# Второй эндпойнт (Фаза 3, 2026-09-01) — замер на 200 строках проверяет,
+# какой из двух Batch API реально принимает и кэширует префикс: сравнение
+# делает выбор фактом, а не гаданием по неполной документации OpenAI.
+CHAT_ENDPOINT = '/v1/chat/completions'
 COMPLETION_WINDOW = '24h'
 
 # Статусы Batch API, при которых батч ещё выполняется — не пора качать
@@ -80,6 +84,35 @@ def build_request(custom_id, model, system_blocks, user_text, schema,
         'custom_id': custom_id,
         'method': 'POST',
         'url': ENDPOINT,
+        'body': body,
+    }
+
+
+def build_chat_request(custom_id, model, system_blocks, user_text, schema,
+                       max_tokens, reasoning_effort=None):
+    """Та же строка JSONL, что `build_request`, но тело — Chat Completions,
+    а не Responses API (`CHAT_ENDPOINT`, не `ENDPOINT`). Формат ДВУХ
+    эндпойнтов Batch API у OpenAI разный — этой функцией собирается вторая
+    половина сравнения из Фазы 3.
+    """
+    body = {
+        'model': model,
+        'max_completion_tokens': max_tokens,
+        'messages': [
+            {'role': 'system', 'content': '\n\n'.join(system_blocks)},
+            {'role': 'user', 'content': user_text},
+        ],
+        'response_format': {
+            'type': 'json_schema',
+            'json_schema': {'name': 'reply', 'strict': True, 'schema': schema},
+        },
+    }
+    if reasoning_effort is not None:
+        body['reasoning_effort'] = reasoning_effort
+    return {
+        'custom_id': custom_id,
+        'method': 'POST',
+        'url': CHAT_ENDPOINT,
         'body': body,
     }
 
@@ -181,8 +214,12 @@ FILE_PROPAGATION_RETRIES = 8
 FILE_PROPAGATION_WAIT_SECONDS = 15  # начальная пауза, дальше ×2 на попытку
 
 
-def submit_pending(client, manifest, manifest_path):
+def submit_pending(client, manifest, manifest_path, endpoint=ENDPOINT):
     """Отправляет файлы манифеста, у которых ещё нет `batch_id`.
+
+    `endpoint` — какой Batch API дёргать (`ENDPOINT` или `CHAT_ENDPOINT`,
+    Фаза 3, 2026-09-01): манифест строится под ОДИН эндпойнт целиком, файл
+    из `build_chat_request` с эндпойнтом Responses API не отправить.
 
     ⚠️ ВОЗОБНОВЛЕНИЕ С МЕСТА ОБРЫВА. Манифест сохраняется на диск СРАЗУ
     после каждой успешной отправки — прервали процесс на файле 3 из 5,
@@ -214,7 +251,7 @@ def submit_pending(client, manifest, manifest_path):
             try:
                 batch = client.batches.create(
                     input_file_id=uploaded.id,
-                    endpoint=ENDPOINT,
+                    endpoint=endpoint,
                     completion_window=COMPLETION_WINDOW,
                 )
                 break
@@ -326,6 +363,55 @@ def parse_results(path):
                 continue
             results[custom_id] = {'data': data, 'error': None}
     return results
+
+
+def usage_from_responses_body(body):
+    """Счётчики токенов из тела строки результата `/v1/responses` (Фаза 3,
+    2026-09-01) — `cached_tokens` сидит ВНУТРИ `input_tokens`, как и в
+    синхронном `OpenAIProvider._reply_from`."""
+    usage = body.get('usage') or {}
+    details = usage.get('input_tokens_details') or {}
+    return {
+        'input_tokens': usage.get('input_tokens', 0),
+        'output_tokens': usage.get('output_tokens', 0),
+        'cached_tokens': details.get('cached_tokens', 0),
+    }
+
+
+def usage_from_chat_body(body):
+    """То же самое для `/v1/chat/completions` — другие имена полей
+    (`prompt_tokens`/`completion_tokens`/`prompt_tokens_details`)."""
+    usage = body.get('usage') or {}
+    details = usage.get('prompt_tokens_details') or {}
+    return {
+        'input_tokens': usage.get('prompt_tokens', 0),
+        'output_tokens': usage.get('completion_tokens', 0),
+        'cached_tokens': details.get('cached_tokens', 0),
+    }
+
+
+def parse_results_usage(path, usage_fn):
+    """`custom_id -> usage` (см. `usage_from_responses_body`/
+    `usage_from_chat_body`) для успешных строк файла результатов Batch API.
+    Отдельно от `parse_results` — не меняет форму существующего разбора.
+    """
+    usage_by_id = {}
+    with open(path, encoding='utf-8') as fh:
+        for raw_line in fh:
+            raw_line = raw_line.strip()
+            if not raw_line:
+                continue
+            try:
+                row = json.loads(raw_line)
+            except ValueError:
+                continue
+            custom_id = row.get('custom_id')
+            if not custom_id or row.get('error'):
+                continue
+            response = row.get('response') or {}
+            body = response.get('body') or {}
+            usage_by_id[custom_id] = usage_fn(body)
+    return usage_by_id
 
 
 def _output_text_from_batch_body(body):

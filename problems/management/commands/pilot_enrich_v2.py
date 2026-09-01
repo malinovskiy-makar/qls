@@ -39,9 +39,13 @@ OpenAIProvider.complete()` напрямую; уровень рассуждени
     venv313\\Scripts\\python.exe manage.py pilot_enrich_v2
     venv313\\Scripts\\python.exe manage.py pilot_enrich_v2 --apply --max-cost 5.0
 """
+import hashlib
 import json
 import random
 import re
+import shutil
+import sqlite3
+import tempfile
 from decimal import Decimal
 from pathlib import Path
 
@@ -51,10 +55,10 @@ from django.db.models import Q
 from django.test import override_settings
 
 from problems.ai import providers
-from problems.enrich import prompts_v2, taxonomy
+from problems.enrich import prompts_v2, taxonomy, title_rules
 from problems.enrich.text import (has_graph_in_statement,
                                   has_table_in_statement, is_english_text,
-                                  problem_full_text)
+                                  problem_full_text, with_figure_note)
 from problems.enrich.shortlist import shortlist_for
 from problems.models import Problem
 
@@ -301,8 +305,8 @@ def validate_call1(data, with_concepts=True):
                     'econ_concepts вне диапазона 3..6 (%d)' % len(concepts))
         if len(data.get('concepts_offlist') or []) > 2:
             violations.append('concepts_offlist длиннее 2')
-    if len(data.get('features_1') or []) > 8:
-        violations.append('features_1 длиннее 8')
+    if len(data.get('features_1') or []) > 6:
+        violations.append('features_1 длиннее 6')
     return (not violations, violations)
 
 
@@ -507,6 +511,7 @@ def estimate_variant_cost(sample_problems, variant, shortlists):
     call2_has_solution = []
     for problem in sample_problems:
         text = problem_full_text(problem.statement, problem.parts.all())
+        text = with_figure_note(text, problem.figures.count())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
         call1_texts.append(prompts_v2.call1_user_text(text, shortlist_terms))
         has_solution = bool(problem.solution)
@@ -580,9 +585,13 @@ def _setting_max_tokens():
 
 
 def run_variant(sample_problems, variant, complete_fn, shortlists,
-                max_cost=None, on_progress=None):
+                max_cost=None, on_progress=None, on_row=None):
     """Реальный прогон одной ветки. Останавливается, как только
     накопленный ФАКТИЧЕСКИЙ расход достигает `max_cost` — не по смете.
+
+    `on_row(row)` — опционально, зовётся сразу после того, как строка
+    добавлена в `rows` (Фаза 2Б.1/2Б.2, 2026-09-01): туда вешается запись
+    сырого ответа в журнал, не трогая саму функцию прогона.
     """
     with_concepts = variant['concepts']
     core1_blocks = [prompts_v2.call1_core(with_concepts=with_concepts)]
@@ -600,6 +609,7 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
             break
 
         text = problem_full_text(problem.statement, problem.parts.all())
+        text = with_figure_note(text, problem.figures.count())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
         user1 = prompts_v2.call1_user_text(text, shortlist_terms)
         reply1 = complete_fn(variant['call1_model'], core1_blocks, user1,
@@ -613,6 +623,8 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
 
         if max_cost is not None and spent >= Decimal(str(max_cost)):
             rows.append(row)
+            if on_row:
+                on_row(row)
             stopped_early = True
             break
 
@@ -636,11 +648,204 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
         row['call2_violations'] = violations2
         row['call2_usage'] = reply2
         rows.append(row)
+        if on_row:
+            on_row(row)
 
         if on_progress:
             on_progress(problem.id, spent)
 
     return rows, spent, stopped_early
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.1 (2026-09-01): сырой ответ модели ЦЕЛИКОМ — JSONL, одна строка на
+# вызов. Разбор в Python может содержать баг или не сохранить поле, которое
+# понадобится позже; сырой JSON рядом с манифестом (run_id, версия промпта,
+# модель, usage) позволяет восстановить что угодно БЕЗ повторной оплаты
+# прогона. НЕ путать с отчётом `--out`: тот — для глаз владельца, этот —
+# архив на случай, если разбор придётся переделать.
+# ---------------------------------------------------------------------------
+
+def prompt_fingerprint(with_concepts=True):
+    """Короткий отпечаток ТЕКСТА обоих ядер — «версия промпта» без ручного
+    номера, который легко забыть увеличить. Меняется сам, как только
+    меняется хоть один символ `call1_core()`/`call2_core()`."""
+    blob = prompts_v2.call1_core(with_concepts=with_concepts) + '\x00' + \
+        prompts_v2.call2_core()
+    return hashlib.sha256(blob.encode('utf-8')).hexdigest()[:12]
+
+
+def append_raw_log(path, run_id, prompt_version, model, problem_id,
+                   call_name, effort, reply, data):
+    """Дописывает ОДНУ строку JSONL — один вызов (`call_name` = 'call1' или
+    'call2') одной задачи. `data` — уже `json.loads(reply.text)`, но это
+    ТОТ ЖЕ САМЫЙ ответ без потерь: разбор строки в словарь ничего не роняет,
+    в отличие от прежнего бага, где в отчёт уходил `repr()` объекта `Reply`
+    (`default=str` в `json.dumps`) вместо чисел usage.
+    """
+    entry = {
+        'run_id': run_id,
+        'prompt_version': prompt_version,
+        'model': model,
+        'effort': effort,
+        'problem_id': problem_id,
+        'call': call_name,
+        'raw_response': data,
+        'usage': {
+            'input_tokens': reply.input_tokens,
+            'output_tokens': reply.output_tokens,
+            'cache_write_tokens': reply.cache_write_tokens,
+            'cache_read_tokens': reply.cache_read_tokens,
+            'reasoning_tokens': reply.reasoning_tokens,
+        },
+    }
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, 'a', encoding='utf-8') as fh:
+        fh.write(json.dumps(entry, ensure_ascii=False))
+        fh.write('\n')
+    return entry
+
+
+def read_raw_log(path):
+    """Все строки журнала обратно в список словарей. Нет файла — пустой
+    список (первый прогон, резюмировать ещё нечего)."""
+    path = Path(path)
+    if not path.exists():
+        return []
+    entries = []
+    with open(path, encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                entries.append(json.loads(line))
+    return entries
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.2 (2026-09-01): резюмирование без повторной оплаты. «Уже
+# обработана» — задача, у которой в журнале ЕСТЬ и call1, и call2 с той же
+# версией промпта и той же моделью ветки. Задача, упавшая ровно между
+# call1 и call2 (частичная строка), «обработанной» не считается и будет
+# пересчитана целиком заново — это осознанное упрощение, не баг: различать
+# «допилить только call2» от «начать с нуля» посреди строки `run_variant`
+# не умеет, а такое падение — редкий пограничный случай, не типичный сбой.
+# ---------------------------------------------------------------------------
+
+def _done_problem_ids(log_entries, prompt_version, variant):
+    have_call1 = set()
+    have_call2 = set()
+    for entry in log_entries:
+        if entry.get('prompt_version') != prompt_version:
+            continue
+        if entry['call'] == 'call1' and entry['model'] == variant['call1_model']:
+            have_call1.add(entry['problem_id'])
+        elif entry['call'] == 'call2' and entry['model'] == variant['call2_model']:
+            have_call2.add(entry['problem_id'])
+    return have_call1 & have_call2
+
+
+def resumable_run_variant(sample_problems, variant, complete_fn, shortlists,
+                          log_path, run_id, prompt_version,
+                          max_cost=None, on_progress=None):
+    """Обёртка над `run_variant`: сначала читает журнал, выкидывает из
+    выборки уже полностью обработанные задачи (см. докстринг выше), затем
+    прогоняет ОСТАВШИЕСЯ и дописывает каждую строку в журнал сразу — не
+    в конце, чтобы падение на середине не потеряло уже оплаченное.
+
+    Возвращает `(rows, spent, stopped_early, skipped)`.
+    """
+    existing = read_raw_log(log_path)
+    done = _done_problem_ids(existing, prompt_version, variant)
+    todo = [p for p in sample_problems if p.id not in done]
+    skipped = len(sample_problems) - len(todo)
+
+    def on_row(row):
+        append_raw_log(log_path, run_id, prompt_version,
+                       variant['call1_model'], row['problem_id'], 'call1',
+                       variant['call1_effort'], row['call1_usage'],
+                       row['call1'])
+        if 'call2' in row:
+            append_raw_log(log_path, run_id, prompt_version,
+                           variant['call2_model'], row['problem_id'],
+                           'call2', variant['call2_effort'],
+                           row['call2_usage'], row['call2'])
+
+    rows, spent, stopped_early = run_variant(
+        todo, variant, complete_fn, shortlists, max_cost=max_cost,
+        on_progress=on_progress, on_row=on_row)
+    return rows, spent, stopped_early, skipped
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.3 (2026-09-01): путь записи `title_candidate`/`title_source` —
+# ЕДИНСТВЕННЫЕ поля таксономии v2, у которых уже есть место в `Problem`
+# (миграция 0049). Остальные поля вызова 1/2 (topic_primary, tags,
+# econ_concepts, ...) своих колонок в базе пока не имеют — заводить их не
+# входит в эту сессию (решение о хранении/схеме — отдельный разговор).
+# Репетиция ПИШЕТ ТОЛЬКО В КОПИЮ db.sqlite3 — канон не трогает НИКОГДА.
+# ---------------------------------------------------------------------------
+
+def title_candidate_updates(rows, problems_by_id):
+    """`(problem_id, title_candidate, title_source)` для задач, чья
+    категория (§ `title_rules.classify_current_title`) требует записи —
+    категория `CATEGORY_KEEP` ('D') сюда не попадает, значит их
+    `title_candidate` останется как есть (обычно пустым)."""
+    updates = []
+    for row in rows:
+        problem = problems_by_id.get(row['problem_id'])
+        if problem is None:
+            continue
+        category, source = title_rules.classify_and_pick_source(
+            problem.title, problem.statement)
+        if category == title_rules.CATEGORY_KEEP:
+            continue
+        candidate = (row.get('call2') or {}).get('title_candidate', '')
+        updates.append((row['problem_id'], candidate, source))
+    return updates
+
+
+def rehearse_db_write(db_path, updates):
+    """Копирует `db_path` во временный файл, применяет `updates`
+    (`title_candidate`/`title_source`) SQL-запросом К КОПИИ и возвращает
+    `(путь_к_копии, список_инвариантов)`. Канон (`db_path`) не открывается
+    на запись НИ РАЗУ — только `shutil.copy2` на чтение исходника.
+    """
+    table = Problem._meta.db_table
+    canon_before = Path(db_path).stat().st_mtime_ns
+
+    tmp_dir = tempfile.mkdtemp(prefix='pilot_enrich_rehearsal_')
+    tmp_path = str(Path(tmp_dir) / 'rehearsal.sqlite3')
+    shutil.copy2(db_path, tmp_path)
+
+    conn = sqlite3.connect(tmp_path)
+    try:
+        cur = conn.cursor()
+        applied = 0
+        for problem_id, candidate, source in updates:
+            cur.execute(
+                'UPDATE %s SET title_candidate=?, title_source=? '
+                'WHERE id=?' % table, (candidate, source, problem_id))
+            if cur.rowcount:
+                applied += 1
+        conn.commit()
+        cur.execute(
+            "SELECT COUNT(*) FROM %s WHERE title_candidate != ''" % table)
+        nonempty = cur.fetchone()[0]
+    finally:
+        conn.close()
+
+    canon_after = Path(db_path).stat().st_mtime_ns
+    invariants = [
+        'строк со сменой title_candidate/title_source: %d из %d запрошенных'
+        % (applied, len(updates)),
+        'title_candidate непусто в копии: %d' % nonempty,
+        'канон (%s) не тронут: mtime %s' % (
+            db_path, 'совпадает' if canon_before == canon_after
+            else 'ИЗМЕНИЛСЯ — ОСТАНОВИСЬ'),
+        'копия: %s' % tmp_path,
+    ]
+    return tmp_path, invariants
 
 
 # ---------------------------------------------------------------------------

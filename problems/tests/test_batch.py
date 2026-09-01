@@ -56,6 +56,88 @@ class BuildRequestTests(SimpleTestCase):
         self.assertEqual(text_format['schema'], schema)
 
 
+def _chat_request(custom_id, filler=''):
+    return batch.build_chat_request(
+        custom_id=custom_id, model='gpt-5.6-luna',
+        system_blocks=['ЯДРО' + filler, 'ПРОФИЛЬ'],
+        user_text='текст задачи', schema={'type': 'object'},
+        max_tokens=500)
+
+
+class BuildChatRequestTests(SimpleTestCase):
+    """Фаза 3 (2026-09-01): второй эндпойнт для замера батча на 200
+    строках — /v1/chat/completions вместо /v1/responses."""
+
+    def test_custom_id_и_эндпойнт_на_месте(self):
+        request = _chat_request('42:1')
+        self.assertEqual(request['custom_id'], '42:1')
+        self.assertEqual(request['method'], 'POST')
+        self.assertEqual(request['url'], batch.CHAT_ENDPOINT)
+        self.assertNotEqual(batch.CHAT_ENDPOINT, batch.ENDPOINT)
+
+    def test_ядро_и_профиль_склеены_в_system_message(self):
+        request = batch.build_chat_request(
+            'id', 'gpt-5.6-terra', ['ЯДРО', 'ПРОФИЛЬ'], 'текст',
+            {'type': 'object'}, 500)
+        messages = request['body']['messages']
+        self.assertEqual(messages[0], {'role': 'system',
+                                       'content': 'ЯДРО\n\nПРОФИЛЬ'})
+        self.assertEqual(messages[1], {'role': 'user', 'content': 'текст'})
+
+    def test_effort_не_передан_если_не_задан(self):
+        request = _chat_request('id')
+        self.assertNotIn('reasoning_effort', request['body'])
+
+    def test_effort_передан_если_задан(self):
+        request = batch.build_chat_request(
+            'id', 'gpt-5.6-terra', ['ЯДРО'], 'текст', {'type': 'object'},
+            500, reasoning_effort='low')
+        self.assertEqual(request['body']['reasoning_effort'], 'low')
+
+    def test_схема_строгая(self):
+        schema = {'type': 'object', 'properties': {}}
+        request = batch.build_chat_request(
+            'id', 'gpt-5.6-luna', ['ЯДРО'], 'текст', schema, 500)
+        json_schema = request['body']['response_format']['json_schema']
+        self.assertTrue(json_schema['strict'])
+        self.assertEqual(json_schema['schema'], schema)
+
+
+class UsageFromBodyTests(SimpleTestCase):
+    """Фаза 3 (2026-09-01): разбор usage из строки результата батча — у
+    двух эндпойнтов разные имена полей `cached_tokens`."""
+
+    def test_responses_cached_tokens_из_input_details(self):
+        body = {'usage': {'input_tokens': 12000, 'output_tokens': 150,
+                          'input_tokens_details': {'cached_tokens': 11995}}}
+        usage = batch.usage_from_responses_body(body)
+        self.assertEqual(usage, {'input_tokens': 12000, 'output_tokens': 150,
+                                 'cached_tokens': 11995})
+
+    def test_chat_cached_tokens_из_prompt_details(self):
+        body = {'usage': {'prompt_tokens': 12000, 'completion_tokens': 150,
+                          'prompt_tokens_details': {'cached_tokens': 11995}}}
+        usage = batch.usage_from_chat_body(body)
+        self.assertEqual(usage, {'input_tokens': 12000, 'output_tokens': 150,
+                                 'cached_tokens': 11995})
+
+    def test_parse_results_usage_пропускает_ошибочные_строки(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = os.path.join(tmp, 'result.jsonl')
+            with open(path, 'w', encoding='utf-8') as fh:
+                fh.write(json.dumps({
+                    'custom_id': 'a', 'error': None,
+                    'response': {'body': {'usage': {
+                        'input_tokens': 100, 'output_tokens': 10,
+                        'input_tokens_details': {'cached_tokens': 90}}}}
+                }) + '\n')
+                fh.write(json.dumps({'custom_id': 'b', 'error': 'boom'}) + '\n')
+            usage_by_id = batch.parse_results_usage(
+                path, batch.usage_from_responses_body)
+        self.assertEqual(set(usage_by_id), {'a'})
+        self.assertEqual(usage_by_id['a']['cached_tokens'], 90)
+
+
 class SplitIntoFilesTests(SimpleTestCase):
 
     def test_режет_по_числу_строк(self):

@@ -25,10 +25,22 @@ junk/echo_stub/raw_latex/tail_stub), но НЕ переиспользует ег
 import difflib
 import re
 
+from problems.models import Problem
+
 CATEGORY_EMPTY_OR_STUB = 'A'
 CATEGORY_BROKEN = 'B'
 CATEGORY_ECHO = 'C'
 CATEGORY_KEEP = 'D'
+
+# Категория → `Problem.TitleSource` (Фаза 2Б.3, 2026-09-01): единственное
+# место, где категория A/B/C/D превращается в значение поля `title_source` —
+# соответствие 1:1 с формулировками choices на самой модели.
+CATEGORY_TITLE_SOURCE = {
+    CATEGORY_EMPTY_OR_STUB: Problem.TitleSource.MODEL_EMPTY,
+    CATEGORY_BROKEN: Problem.TitleSource.MODEL_BROKEN,
+    CATEGORY_ECHO: Problem.TitleSource.MODEL_FIRSTLINE,
+    CATEGORY_KEEP: Problem.TitleSource.KEPT,
+}
 
 MAX_CLEAN_LENGTH = 80
 ECHO_PREFIX_LENGTH = 60
@@ -87,3 +99,9 @@ def classify_current_title(title, statement):
         return CATEGORY_ECHO
 
     return CATEGORY_KEEP
+
+
+def classify_and_pick_source(title, statement):
+    """`(категория, Problem.TitleSource)` для текущего заголовка задачи."""
+    category = classify_current_title(title, statement)
+    return category, CATEGORY_TITLE_SOURCE[category]

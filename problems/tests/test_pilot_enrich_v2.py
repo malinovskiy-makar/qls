@@ -8,8 +8,13 @@
 ровно 8 запросов...) проверяются в Python, а не схемой.
 """
 import io
+import json
 import re
+import shutil
+import sqlite3
+import tempfile
 from decimal import Decimal
+from pathlib import Path
 from unittest import mock
 
 from django.core.management import call_command
@@ -17,10 +22,10 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
 from problems.ai import providers
-from problems.enrich import prompts_v2, text as enrich_text
+from problems.enrich import prompts_v2, text as enrich_text, title_rules
 from problems.enrich.shortlist import load_df_cache, shortlist_for
 from problems.management.commands import pilot_enrich_v2 as cmd
-from problems.models import Problem, Topic
+from problems.models import Problem, ProblemFigure, Topic
 
 PRICES = {
     cmd.TERRA: (2.00, 0.20, 12.00),
@@ -216,7 +221,7 @@ class ValidateCall1Tests(TestCase):
         self.assertFalse(ok)
         self.assertTrue(any('econ_concepts' in v for v in violations))
 
-    def test_восемь_признаков_это_максимум(self):
+    def test_шесть_признаков_это_максимум(self):
         ok, _ = cmd.validate_call1(self._base(features_1=list(prompts_v2.FEATURES_1)))
         self.assertTrue(ok)
         ok, violations = cmd.validate_call1(
@@ -625,6 +630,37 @@ class ProblemTextHelpersTests(TestCase):
         self.assertFalse(enrich_text.has_table_in_statement(
             'Обычное условие без таблиц.'))
 
+    def test_with_figure_note_добавляет_маркер_когда_фигура_есть_а_маркера_нет(self):
+        problem = _make_problem('Обычное условие про рынок, без маркера.')
+        ProblemFigure.objects.create(problem=problem, tikz_hash='abc123',
+                                     tikz_source='x')
+        text = enrich_text.problem_full_text(problem.statement,
+                                             problem.parts.all())
+        payload = enrich_text.with_figure_note(text, problem.figures.count())
+        self.assertIn('[[FIGURE:', payload)
+        self.assertIn('приложено 1 изображение', payload)
+        self.assertTrue(payload.startswith(text))
+
+    def test_with_figure_note_склонение_по_числу(self):
+        problem = _make_problem('Условие с несколькими картинками.')
+        for i in range(3):
+            ProblemFigure.objects.create(
+                problem=problem, tikz_hash='hash%d' % i, tikz_source='x')
+        payload = enrich_text.with_figure_note('текст', problem.figures.count())
+        self.assertIn('приложено 3 изображения', payload)
+
+    def test_with_figure_note_не_дублирует_уже_существующий_маркер(self):
+        text = 'На рисунке [[FIGURE:deadbeef]] показан спрос.'
+        payload = enrich_text.with_figure_note(text, figure_count=1)
+        self.assertEqual(payload, text)
+        self.assertEqual(payload.count('[[FIGURE:'), 1)
+
+    def test_with_figure_note_без_фигур_текст_не_меняется(self):
+        text = 'Обычное условие без картинок вовсе.'
+        payload = enrich_text.with_figure_note(text, figure_count=0)
+        self.assertEqual(payload, text)
+        self.assertNotIn('[[FIGURE:', payload)
+
 
 # ---------------------------------------------------------------------------
 # Фаза 3 (2026-09-01): три примера разбора в WORKED_EXAMPLES построены на
@@ -766,3 +802,267 @@ class WorkedExamplesShortlistTests(TestCase):
         with self.assertRaises(AssertionError):
             for concept in broken_parsed['A']['econ_concepts']:
                 self.assertIn(concept, shortlist)
+
+
+# Решение владельца 01.09.2026 (Notion «Решения»): модель больше не
+# определяет «Реальные данные» и «Нестандартный поворот» — двух особенностей
+# из FEATURES_1 не существует нигде под этими файлами/схемой, точка.
+# «Нестандартный поворот» как ФРАЗА в тексте якорей сложности (уровень 4/5,
+# DIFFICULTY_ANCHORS) — легитимна и не про эту особенность, поэтому в
+# проверку взяты только реальные представления убранной особенности:
+# код-слаг с подчёркиванием и капитализированная витринная форма, а не
+# любое упоминание слов «нестандартный»/«реальные» по отдельности.
+_REMOVED_FEATURE_NEEDLES = (
+    'реальные_данные', 'нестандартный_поворот',
+    'Реальные данные', 'Нестандартный поворот',
+)
+
+_REMOVED_FEATURE_SCAN_ROOTS = (
+    Path(__file__).resolve().parent.parent / 'enrich',
+    Path(__file__).resolve().parent.parent / 'ai',
+    Path(__file__).resolve().parent.parent / 'management' / 'commands' /
+    'pilot_enrich_v2.py',
+)
+
+
+def _scan_removed_feature_hits():
+    hits = []
+    for root in _REMOVED_FEATURE_SCAN_ROOTS:
+        paths = [root] if root.is_file() else sorted(
+            p for p in root.rglob('*.py') if '__pycache__' not in p.parts)
+        for path in paths:
+            source = path.read_text(encoding='utf-8')
+            for needle in _REMOVED_FEATURE_NEEDLES:
+                if needle in source:
+                    hits.append((str(path), needle))
+    return hits
+
+
+class RemovedFeaturesTests(TestCase):
+    """Зубастость: временно верни 'реальные_данные' в FEATURES_1 — этот
+    тест обязан покраснеть (проверено вручную, не автоматизировано здесь,
+    т.к. правит исходник на диске)."""
+
+    def test_убранные_особенности_нигде_не_встречаются_в_коде(self):
+        hits = _scan_removed_feature_hits()
+        self.assertEqual(
+            hits, [],
+            'Найдены следы убранных особенностей «Реальные данные» / '
+            '«Нестандартный поворот»: %r' % (hits,))
+
+    def test_features_1_ровно_шесть_без_убранных_особенностей(self):
+        self.assertEqual(
+            prompts_v2.FEATURES_1,
+            (
+                'графическое_решение',
+                'нужен_график_в_ответе',
+                'на_доказательство',
+                'целочисленность_или_дискретный_выбор',
+                'параметры',
+                'бизнесовое',
+            ),
+            prompts_v2.FEATURES_1)
+
+    def test_схема_вызова_1_не_содержит_убранные_особенности(self):
+        schema = prompts_v2.call1_schema()
+        enum = schema['properties']['features_1']['items']['enum']
+        self.assertNotIn('реальные_данные', enum)
+        self.assertNotIn('нестандартный_поворот', enum)
+        self.assertEqual(len(enum), 6, enum)
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.1 (2026-09-01): сырой ответ модели целиком — JSONL рядом с
+# манифестом, восстановление без обращения к API.
+# ---------------------------------------------------------------------------
+
+class RawResponseLogTests(TestCase):
+
+    def setUp(self):
+        self.tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp_dir, ignore_errors=True)
+        self.log_path = Path(self.tmp_dir) / 'raw_log.jsonl'
+
+    def test_запись_и_чтение_восстанавливают_поля_без_api(self):
+        reply = _FakeReply('{}', input_tokens=100, output_tokens=50,
+                           cache_write_tokens=10, cache_read_tokens=20)
+        data = {'topic_primary': 'X', 'title_candidate': 'Рынок кофе'}
+        cmd.append_raw_log(self.log_path, run_id='r1', prompt_version='pv1',
+                           model=cmd.TERRA, problem_id=42, call_name='call1',
+                           effort='none', reply=reply, data=data)
+
+        entries = cmd.read_raw_log(self.log_path)
+
+        self.assertEqual(len(entries), 1)
+        entry = entries[0]
+        self.assertEqual(entry['run_id'], 'r1')
+        self.assertEqual(entry['prompt_version'], 'pv1')
+        self.assertEqual(entry['model'], cmd.TERRA)
+        self.assertEqual(entry['problem_id'], 42)
+        self.assertEqual(entry['call'], 'call1')
+        self.assertEqual(entry['raw_response'], data)
+        self.assertEqual(entry['usage']['input_tokens'], 100)
+        self.assertEqual(entry['usage']['output_tokens'], 50)
+        self.assertEqual(entry['usage']['cache_write_tokens'], 10)
+        self.assertEqual(entry['usage']['cache_read_tokens'], 20)
+
+    def test_несколько_вызовов_пишутся_по_одной_строке_каждый(self):
+        reply = _FakeReply('{}')
+        for i in range(3):
+            cmd.append_raw_log(self.log_path, run_id='r1', prompt_version='pv1',
+                               model=cmd.TERRA, problem_id=i, call_name='call1',
+                               effort=None, reply=reply, data={})
+        entries = cmd.read_raw_log(self.log_path)
+        self.assertEqual([e['problem_id'] for e in entries], [0, 1, 2])
+
+    def test_чтение_несуществующего_файла_даёт_пустой_список(self):
+        missing = Path(self.tmp_dir) / 'нет-такого.jsonl'
+        self.assertEqual(cmd.read_raw_log(missing), [])
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.2 (2026-09-01): резюмирование прогона без повторной оплаты —
+# повторный запуск на готовых результатах не должен звать API вовсе.
+# ---------------------------------------------------------------------------
+
+@override_settings(AI_PRICES=PRICES)
+class ResumableRunTests(TestCase):
+
+    def setUp(self):
+        self.problems = [_make_problem('Задача %d про равновесие.' % i)
+                         for i in range(3)]
+        self.shortlists = {p.id: [] for p in self.problems}
+        self.tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.tmp_dir, ignore_errors=True)
+        self.log_path = Path(self.tmp_dir) / 'raw_log.jsonl'
+
+    def _counting_complete_fn(self):
+        calls = []
+
+        def complete_fn(model, blocks, user_text, schema, effort):
+            calls.append((model, effort))
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+
+        return complete_fn, calls
+
+    def test_повторный_прогон_на_готовых_результатах_не_зовёт_api(self):
+        variant = cmd.VARIANTS['base']
+        complete_fn1, calls1 = self._counting_complete_fn()
+        rows1, spent1, stop1, skipped1 = cmd.resumable_run_variant(
+            self.problems, variant, complete_fn1, self.shortlists,
+            self.log_path, run_id='r1', prompt_version='pv-test')
+        self.assertEqual(len(calls1), len(self.problems) * 2)
+        self.assertEqual(skipped1, 0)
+        self.assertEqual(len(rows1), len(self.problems))
+
+        complete_fn2, calls2 = self._counting_complete_fn()
+        rows2, spent2, stop2, skipped2 = cmd.resumable_run_variant(
+            self.problems, variant, complete_fn2, self.shortlists,
+            self.log_path, run_id='r2', prompt_version='pv-test')
+        self.assertEqual(
+            len(calls2), 0,
+            'повторный прогон на тех же задачах обязан пропустить всё — '
+            'ноль обращений к API')
+        self.assertEqual(skipped2, len(self.problems))
+        self.assertEqual(len(rows2), 0)
+
+    def test_другая_версия_промпта_не_считается_готовой(self):
+        """Резюме матчит по prompt_version — иначе после правки промпта
+        резюме молча пропустило бы задачи, разобранные СТАРЫМ текстом."""
+        variant = cmd.VARIANTS['base']
+        complete_fn1, calls1 = self._counting_complete_fn()
+        cmd.resumable_run_variant(
+            self.problems, variant, complete_fn1, self.shortlists,
+            self.log_path, run_id='r1', prompt_version='pv-old')
+
+        complete_fn2, calls2 = self._counting_complete_fn()
+        rows2, spent2, stop2, skipped2 = cmd.resumable_run_variant(
+            self.problems, variant, complete_fn2, self.shortlists,
+            self.log_path, run_id='r2', prompt_version='pv-new')
+        self.assertEqual(len(calls2), len(self.problems) * 2)
+        self.assertEqual(skipped2, 0)
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2Б.3 (2026-09-01): репетиция записи `title_candidate`/`title_source`
+# на КОПИИ db.sqlite3 — канон не трогается никогда.
+# ---------------------------------------------------------------------------
+
+class TitleCandidateUpdatesTests(TestCase):
+
+    def test_категория_keep_не_попадает_в_список_на_запись(self):
+        keep_problem = _make_problem(
+            'Два производителя минеральной воды выбирают объёмы выпуска '
+            'одновременно, функции издержек заданы.')
+        keep_problem.title = 'Известная задача про олигополию'
+        keep_problem.save()
+        self.assertEqual(
+            title_rules.classify_current_title(
+                keep_problem.title, keep_problem.statement),
+            title_rules.CATEGORY_KEEP)
+
+        empty_problem = _make_problem('Условие про рынок кофе и налог.')
+
+        rows = [
+            {'problem_id': keep_problem.id,
+            'call2': {'title_candidate': 'что-то от модели'}},
+            {'problem_id': empty_problem.id,
+            'call2': {'title_candidate': 'Рынок кофе'}},
+        ]
+        problems_by_id = {keep_problem.id: keep_problem,
+                          empty_problem.id: empty_problem}
+
+        updates = cmd.title_candidate_updates(rows, problems_by_id)
+        ids_written = {pid for pid, _, _ in updates}
+
+        self.assertNotIn(keep_problem.id, ids_written)
+        self.assertIn(empty_problem.id, ids_written)
+        candidate, source = next(
+            (c, s) for pid, c, s in updates if pid == empty_problem.id)
+        self.assertEqual(candidate, 'Рынок кофе')
+        self.assertEqual(source, Problem.TitleSource.MODEL_EMPTY)
+
+
+class RehearseDbWriteTests(TestCase):
+
+    def _make_sqlite_copy_source(self):
+        tmp_dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, tmp_dir, ignore_errors=True)
+        db_path = str(Path(tmp_dir) / 'rehearsal_source.sqlite3')
+        conn = sqlite3.connect(db_path)
+        conn.execute(
+            'CREATE TABLE problems_problem (id INTEGER PRIMARY KEY, '
+            'title TEXT, statement TEXT, title_candidate TEXT, '
+            'title_source TEXT)')
+        conn.execute(
+            "INSERT INTO problems_problem VALUES "
+            "(1, '', 'Условие про рынок кофе.', '', '')")
+        conn.execute(
+            "INSERT INTO problems_problem VALUES "
+            "(2, 'Дуополия Курно', 'Дуополия Курно, два случая.', '', '')")
+        conn.commit()
+        conn.close()
+        return db_path
+
+    def test_репетиция_пишет_в_копию_и_не_трогает_канон(self):
+        db_path = self._make_sqlite_copy_source()
+        original_bytes = Path(db_path).read_bytes()
+        updates = [(1, 'Рынок кофе', Problem.TitleSource.MODEL_EMPTY)]
+
+        tmp_copy_path, invariants = cmd.rehearse_db_write(db_path, updates)
+
+        self.assertEqual(Path(db_path).read_bytes(), original_bytes,
+                         'канон db.sqlite3 не должен измениться НИ БАЙТОМ')
+        conn = sqlite3.connect(tmp_copy_path)
+        row = conn.execute(
+            'SELECT title_candidate, title_source FROM problems_problem '
+            'WHERE id=1').fetchone()
+        untouched = conn.execute(
+            'SELECT title_candidate, title_source FROM problems_problem '
+            'WHERE id=2').fetchone()
+        conn.close()
+        self.assertEqual(row, ('Рынок кофе', Problem.TitleSource.MODEL_EMPTY))
+        self.assertEqual(untouched, ('', ''))
+        self.assertTrue(any('1' in line for line in invariants))
