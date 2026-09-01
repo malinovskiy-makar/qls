@@ -11,7 +11,7 @@
   align-items: center;
   gap: 10px;
   margin-bottom: 20px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
 }
 .problem-stars { color: var(--amber); letter-spacing: 1px; font-size: 14px; }
@@ -28,7 +28,7 @@
   color: var(--chip-text);
   border-radius: 20px;
   padding: 3px 10px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -41,7 +41,7 @@
 
 /* ── Блок с текстом (KaTeX рендерится внутри) ──── */
 .math-content {
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.7;
   color: var(--text);
 }
@@ -80,7 +80,7 @@
 
 /* ── Подпункты ───────────────────────────────────── */
 .parts-intro {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .5px;
@@ -97,7 +97,10 @@
   border: .5px solid var(--border);
   border-radius: 10px;
   overflow: hidden;
-  background: var(--accent-tint);  /* лёгкий малиновый фон — отличие от условия */
+  /* Плотная подложка под тинтом — см. объяснение у .fchip в каталоге:
+     сквозь прозрачный тинт просвечивал фоновый паттерн и съедал контраст. */
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
 }
 .part-header {
   display: flex;
@@ -108,7 +111,7 @@
 }
 .part-label {
   font-weight: 700;
-  color: var(--accent);
+  color: var(--accent-ink);
   font-size: 14px;
   min-width: 20px;
 }
@@ -125,7 +128,7 @@
   border: .5px solid var(--border);
   background: var(--surface);
   border-radius: var(--r);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text2);
   cursor: pointer;
@@ -143,7 +146,7 @@
 }
 .reveal-content.visible { display: block; }
 .reveal-label {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .6px;
@@ -194,9 +197,9 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.similar-stars { color: var(--amber); font-size: 12px; letter-spacing: 1px; }
+.similar-stars { color: var(--amber); font-size: 13px; letter-spacing: 1px; }
 .similar-topic {
-  font-size: 11px;
+  font-size: 13px;
   color: var(--chip-text);
   background: var(--chip-bg);
   border-radius: 20px;
@@ -219,7 +222,7 @@
 <button type="button" id="save-problem-btn" data-problem="{{ problem.pk }}"
         style="border:0.5px solid var(--border);border-radius:var(--r);
                background:transparent;color:var(--text2);font:inherit;
-               font-size:12px;padding:4px 10px;cursor:pointer;
+               font-size:13px;padding:4px 10px;cursor:pointer;
                margin-bottom:12px;">
   <span id="save-problem-label">☆ Сохранить</span>
 </button>

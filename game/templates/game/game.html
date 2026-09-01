@@ -28,9 +28,9 @@
   <style>
 /* ── База страницы (в духе catalog/base.html) ─────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: 16px; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -108,7 +108,7 @@ a:focus-visible, button:focus-visible {
 }
 .topic-chip {
   font: inherit;
-  font-size: 13px;
+  font-size: 14px;
   padding: 6px 13px;
   border-radius: 20px;
   border: 1px solid var(--rush-border);
@@ -121,7 +121,7 @@ a:focus-visible, button:focus-visible {
 .topic-chip.active {
   background: var(--rush-accent);
   border-color: var(--rush-accent);
-  color: #fff;
+  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы — 2,28 */
   font-weight: 600;
 }
 /* Карточки режимов: клик по карточке = старт забега в этом режиме */
@@ -162,12 +162,12 @@ a:focus-visible, button:focus-visible {
 .mode-name .mode-icon .qi { width: 18px; height: 18px; }
 .mode-kind {
   margin-top: 3px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text2);
 }
 .mode-terms {
   margin-top: 8px;
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
 }
@@ -176,7 +176,7 @@ a:focus-visible, button:focus-visible {
 .mt-hearts { color: var(--rush-bad); letter-spacing: 1px; }
 .mode-best {
   margin-top: 6px;
-  font-size: 11.5px;
+  font-size: 13px;
   color: var(--rush-accent);
   font-weight: 600;
   min-height: 14px;
@@ -190,7 +190,7 @@ a:focus-visible, button:focus-visible {
   position: absolute;
   top: 12px;
   right: 12px;
-  font-size: 10.5px;
+  font-size: 13px;
   font-weight: 700;
   letter-spacing: .5px;
   text-transform: uppercase;
@@ -202,7 +202,7 @@ a:focus-visible, button:focus-visible {
 }
 .best-line {
   margin-top: 16px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text3);
 }
 .best-line .kbd-hint { white-space: nowrap; }
@@ -249,7 +249,7 @@ a:focus-visible, button:focus-visible {
   font-variant-numeric: tabular-nums;
   min-width: 90px;
 }
-.hud-score small { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .5px; display: block; }
+.hud-score small { font-size: 13px; font-weight: 600; color: var(--text3); letter-spacing: .5px; display: block; }
 .hud-timer {
   font-size: 34px;
   font-weight: 800;
@@ -272,7 +272,7 @@ a:focus-visible, button:focus-visible {
   justify-content: center;
   gap: 5px;
   margin-top: 2px;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1;
 }
 .heart .qi { width: 15px; height: 15px; display: block; }
@@ -332,7 +332,7 @@ a:focus-visible, button:focus-visible {
 .hud-combo {
   min-width: 90px;
   text-align: right;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   color: var(--text3);
   opacity: 0;
@@ -416,7 +416,7 @@ a:focus-visible, button:focus-visible {
 .hud-combo .qi, .record-badge .qi { width: 1em; height: 1em;
                                     vertical-align: -.15em; }
 .go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
-.go-card p { font-size: 15px; opacity: .8; margin: 0; }
+.go-card p { font-size: 16px; opacity: .8; margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   .gameover-overlay { animation: none; }
 }
@@ -450,7 +450,7 @@ a:focus-visible, button:focus-visible {
 }
 .opt {
   font: inherit;
-  font-size: 15px;
+  font-size: 16px;
   line-height: 1.4;
   min-height: 56px;
   padding: 12px 14px 12px 12px;
@@ -479,7 +479,7 @@ a:focus-visible, button:focus-visible {
   border-radius: 6px;
   background: var(--surface-2);
   color: var(--text3);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
 }
 .opt.is-correct {
@@ -515,7 +515,7 @@ a:focus-visible, button:focus-visible {
 .opt.is-wrong .opt-mark { color: var(--rush-bad); }
 .opt-caption {
   flex: 1 0 100%;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--rush-ok);
 }
@@ -542,7 +542,7 @@ a:focus-visible, button:focus-visible {
 .opt.selected .key {
   background: var(--rush-accent);
   border-color: var(--rush-accent);
-  color: #fff;
+  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы — 2,28 */
 }
 .multi-actions {
   display: flex;
@@ -550,7 +550,7 @@ a:focus-visible, button:focus-visible {
   margin-top: 14px;
 }
 .btn-submit {
-  font: inherit; font-size: 15px; font-weight: 600;
+  font: inherit; font-size: 16px; font-weight: 600;
   height: 46px; padding: 0 36px;
   border: none; border-radius: 10px;
   background: var(--btn-bg); color: var(--on-btn);
@@ -587,12 +587,12 @@ a:focus-visible, button:focus-visible {
   outline-offset: 2px;
   border-color: var(--rush-accent);
 }
-.num-hint { font-size: 12.5px; color: var(--text3); }
+.num-hint { font-size: 13px; color: var(--text3); }
 /* единица измерения ответа («ответ в %») — приходит с вопросом Классики */
 .num-unit { font-size: 14.5px; font-weight: 600; color: var(--text2); }
 .numeric-actions { display: flex; gap: 10px; }
 .btn-skip {
-  font: inherit; font-size: 15px; font-weight: 500;
+  font: inherit; font-size: 16px; font-weight: 500;
   height: 46px; padding: 0 20px;
   border: 1px solid var(--rush-border); border-radius: 10px;
   background: var(--rush-surface); color: var(--text2);
@@ -601,7 +601,7 @@ a:focus-visible, button:focus-visible {
 }
 .btn-skip:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .num-feedback {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   min-height: 20px;
   text-align: center;
@@ -612,7 +612,7 @@ a:focus-visible, button:focus-visible {
 .keys-hint {
   margin-top: 14px;
   text-align: center;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text3);
 }
 
@@ -672,18 +672,18 @@ a:focus-visible, button:focus-visible {
   border-radius: 999px;
   background: var(--rush-accent-tint);
   color: var(--rush-accent);
-  font-size: 12.5px;
+  font-size: 13px;
   font-weight: 700;
 }
 /* чип целевого забега — не акцент: акцент на экране занят блоком
    «Работа над ошибками», а это просто пометка, чем был забег */
 .fin-chip-alt { background: var(--surface-2); color: var(--text2); font-weight: 600; }
 .fin-chip-alt[hidden] { display: none; }
-.fin-date { font-size: 12.5px; color: var(--text3); }
+.fin-date { font-size: 13px; color: var(--text3); }
 .fin-head-r { text-align: right; flex-shrink: 0; }
 .fin-hearts { font-size: 17px; letter-spacing: 3px; line-height: 1; }
 .fin-hearts .heart.lost { opacity: .35; }
-.fin-reason { margin-top: 7px; font-size: 12.5px; color: var(--text3); }
+.fin-reason { margin-top: 7px; font-size: 13px; color: var(--text3); }
 
 .fin-metrics {
   display: grid;
@@ -696,7 +696,7 @@ a:focus-visible, button:focus-visible {
   border-radius: 12px;
   padding: 12px 14px;
 }
-.metric small { font-size: 11px; font-weight: 600; color: var(--text3); letter-spacing: .3px; }
+.metric small { font-size: 13px; font-weight: 600; color: var(--text3); letter-spacing: .3px; }
 .metric b {
   display: block;
   margin-top: 2px;
@@ -704,7 +704,7 @@ a:focus-visible, button:focus-visible {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
-.metric > span { font-size: 12px; color: var(--text3); }
+.metric > span { font-size: 13px; color: var(--text3); }
 .metric-main b.final-score {
   font-size: 38px;
   letter-spacing: -1.5px;
@@ -718,7 +718,7 @@ a:focus-visible, button:focus-visible {
   background: var(--rush-accent);
   color: #fff;
   font-weight: 700;
-  font-size: 11.5px;
+  font-size: 13px;
 }
 .record-badge.on { display: inline-block; }
 
@@ -731,7 +731,7 @@ a:focus-visible, button:focus-visible {
 }
 .fin-mistakes[hidden], .fin-clean[hidden], .fin-topics[hidden] { display: none; }
 .fin-mistakes h3 { font-size: 17px; font-weight: 800; color: var(--rush-accent); }
-.fm-lead { margin-top: 3px; font-size: 13.5px; color: var(--text2); }
+.fm-lead { margin-top: 3px; font-size: 14px; color: var(--text2); }
 /* полоса пропорции: доли тем в будущем забеге, ширина = доля */
 .fm-bar {
   display: flex;
@@ -743,10 +743,10 @@ a:focus-visible, button:focus-visible {
 }
 .fm-bar i { display: block; height: 100%; }
 .fm-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.fm-legend li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); }
+.fm-legend li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); }
 .fm-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 .fm-go {
-  font: inherit; font-size: 15px; font-weight: 700;
+  font: inherit; font-size: 16px; font-weight: 700;
   margin-top: 14px;
   height: 46px; padding: 0 22px;
   border: none; border-radius: 10px;
@@ -764,7 +764,7 @@ a:focus-visible, button:focus-visible {
   padding: 16px 20px;
 }
 .fin-clean b { font-size: 16px; color: var(--rush-ok); }
-.fin-clean p { margin-top: 3px; font-size: 13.5px; color: var(--text2); }
+.fin-clean p { margin-top: 3px; font-size: 14px; color: var(--text2); }
 /* текстовая кнопка-ссылка (внутри предложения) */
 .link-btn {
   font: inherit; font-weight: 700;
@@ -777,8 +777,8 @@ a:focus-visible, button:focus-visible {
 .fin-topics h3, .fin-details h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
 .tp-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
 .tp-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
-.tp-name { font-size: 13.5px; font-weight: 600; }
-.tp-num { font-size: 12.5px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tp-name { font-size: 14px; font-weight: 600; }
+.tp-num { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
 .tp-bar {
   grid-column: 1 / -1;
   display: flex;
@@ -791,7 +791,7 @@ a:focus-visible, button:focus-visible {
 .tp-ok { background: var(--rush-ok); }
 .tp-bad { background: var(--rush-bad); }
 .tp-skip { background: var(--text3); opacity: .45; }
-.tp-key { margin-top: 12px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text3); }
+.tp-key { margin-top: 12px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
 .tp-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 10px; }
 .tp-key .k:first-child { margin-left: 0; }
 .k-ok { background: var(--rush-ok); }
@@ -819,14 +819,14 @@ a:focus-visible, button:focus-visible {
   border-radius: 12px;
   padding: 14px 16px;
 }
-.chart-card h4 { font-size: 13px; font-weight: 700; margin-bottom: 10px; }
+.chart-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
 .chart-box { width: 100%; }
 /* SVG рисуем сами: цвета идут через var(--…), поэтому переключение темы
    сайта перекрашивает графики без единой строки JS. Обводки не тончают
    при масштабировании — vector-effect в самих линиях. */
 .chart-box svg { display: block; width: 100%; height: auto; }
-.chart-empty { font-size: 12.5px; color: var(--text3); padding: 18px 0; text-align: center; }
-.chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text3); }
+.chart-empty { font-size: 13px; color: var(--text3); padding: 18px 0; text-align: center; }
+.chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
 .chart-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 8px; }
 .chart-key .k:first-child { margin-left: 0; }
 .k-score { background: var(--rush-accent); }
@@ -837,7 +837,7 @@ a:focus-visible, button:focus-visible {
 /* Кольцевая сложностей: легенда рядом с кольцом */
 .chart-donut { display: flex; align-items: center; gap: 14px; }
 .chart-donut svg { width: 104px; flex-shrink: 0; }
-.donut-legend { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 12px; }
+.donut-legend { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
 .donut-legend li { display: flex; align-items: center; gap: 6px; color: var(--text2); }
 .donut-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
 /* сложность: лёгкие → средние → сложные. Янтарь тут в своём законном
@@ -848,10 +848,10 @@ a:focus-visible, button:focus-visible {
 
 .fin-share[hidden] { display: none; }
 .fin-share h3 { font-size: 16px; font-weight: 700; }
-.share-lead { margin-top: 3px; font-size: 12.5px; color: var(--text3); }
+.share-lead { margin-top: 3px; font-size: 13px; color: var(--text3); }
 .share-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .share-row button {
-  font: inherit; font-size: 13.5px; font-weight: 600;
+  font: inherit; font-size: 14px; font-weight: 600;
   height: 42px; padding: 0 16px;
   border: 1px solid var(--rush-border); border-radius: 10px;
   background: var(--rush-surface); color: var(--text2);
@@ -864,7 +864,7 @@ a:focus-visible, button:focus-visible {
 
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
-  font: inherit; font-size: 15px; font-weight: 600;
+  font: inherit; font-size: 16px; font-weight: 600;
   height: 46px; padding: 0 28px;
   border: none; border-radius: 10px;
   background: var(--btn-bg); color: var(--on-btn);
@@ -874,7 +874,7 @@ a:focus-visible, button:focus-visible {
 .btn-again:hover { background: var(--btn-bg-hover); }
 .btn-again:active { transform: scale(.97); }
 .btn-copy {
-  font: inherit; font-size: 15px; font-weight: 500;
+  font: inherit; font-size: 16px; font-weight: 500;
   height: 46px; padding: 0 20px;
   border: 1px solid var(--rush-border); border-radius: 10px;
   background: var(--rush-surface); color: var(--text2);
@@ -891,18 +891,18 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   border: 1px solid var(--rush-border);
   border-radius: 10px;
   padding: 10px 12px;
-  font-size: 13.5px;
+  font-size: 14px;
   line-height: 1.45;
 }
-.miss-item .mi-topic { font-size: 11px; color: var(--text3); display: block; margin-bottom: 2px; }
-.miss-item a { color: var(--accent); text-decoration: none; font-size: 12.5px; }
+.miss-item .mi-topic { font-size: 13px; color: var(--text3); display: block; margin-bottom: 2px; }
+.miss-item a { color: var(--accent-ink); text-decoration: none; font-size: 13px; }
 .miss-item a:hover { text-decoration: underline; }
 
 /* Чип «Тренировочный» на карточке сгенерированного вопроса — в стиле
    topic-chip, только меньше и некликабельный (токены --rush-*). */
 .gen-chip {
   display: inline-block;
-  font-size: 10.5px;
+  font-size: 13px;
   line-height: 1;
   padding: 4px 8px;
   margin-bottom: 8px;
@@ -917,7 +917,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 /* Разбор сгенерированного вопроса: кнопка-ссылка + разворачиваемое решение */
 .mi-sol-btn {
   background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--rush-accent); font-size: 12.5px; font-family: inherit;
+  color: var(--rush-accent); font-size: 13px; font-family: inherit;
 }
 .mi-sol-btn:hover { text-decoration: underline; }
 .mi-solution {
@@ -925,7 +925,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   padding: 8px 10px;
   border-left: 2px solid var(--rush-accent);
   background: var(--rush-surface);
-  font-size: 13px;
+  font-size: 14px;
   white-space: pre-line;   /* шаги решения разделены \n */
 }
 .miss-empty { color: var(--text3); font-size: 14px; }
@@ -2247,32 +2247,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     ctx.fillRect(0, 0, 10, H);
 
     ctx.fillStyle = '#96969f';
-    ctx.font = '600 26px -apple-system, "Segoe UI", sans-serif';
-    ctx.fillText('ЭкЗадачи · Econ Rush', 64, 74);
+    ctx.font = '600 26px Montserrat, -apple-system, "Segoe UI", sans-serif';
+    ctx.fillText('Weconomics · Econ Rush', 64, 74);
 
     ctx.fillStyle = '#fff';
-    ctx.font = '800 140px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '800 140px Montserrat, -apple-system, "Segoe UI", sans-serif';
     var scoreText = s.score.toLocaleString('ru-RU');
     ctx.fillText(scoreText, 64, 210);
     var scoreW = ctx.measureText(scoreText).width;   // «очков» ставим за счётом
     ctx.fillStyle = '#96969f';
-    ctx.font = '600 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '600 30px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('очков', 64 + scoreW + 14, 210);
 
     ctx.fillStyle = '#fff';
-    ctx.font = '600 34px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '600 34px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('Режим «' + s.mode_title + '»', 64, 290);
     ctx.fillStyle = '#96969f';
-    ctx.font = '400 30px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '400 30px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('верных ' + s.correct + '/' + s.total + ' · точность '
                  + s.accuracy + '% · комбо ×' + s.max_multiplier, 64, 340);
 
     ctx.fillStyle = '#FF4D94';
-    ctx.font = '800 44px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '800 44px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText('Обгонишь?', 64, 430);
 
     ctx.fillStyle = '#6b6b78';
-    ctx.font = '400 24px -apple-system, "Segoe UI", sans-serif';
+    ctx.font = '400 24px Montserrat, -apple-system, "Segoe UI", sans-serif';
     ctx.fillText((shareInfo && shareInfo.url) || '', 64, H - 44);
   }
 

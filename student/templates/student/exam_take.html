@@ -19,11 +19,11 @@
               letter-spacing: .02em; }
 .exam-timer.warn { color: var(--amber-ink); }
 .exam-timer.danger { color: var(--error); }
-.exam-bar-cap { font-size: 11px; color: var(--text2); text-transform: uppercase;
+.exam-bar-cap { font-size: 13px; color: var(--text2); text-transform: uppercase;
                 letter-spacing: .06em; }
-.answered-count { font-size: 12px; color: var(--text2); margin-left: auto; }
+.answered-count { font-size: 13px; color: var(--text2); margin-left: auto; }
 .answered-count b { color: var(--text); font-weight: 700; }
-.save-state { font-size: 12px; color: var(--text2); }
+.save-state { font-size: 13px; color: var(--text2); }
 .save-state.is-saving { color: var(--amber-ink); }
 .save-state.is-offline { color: var(--error); font-weight: 600; }
 
@@ -31,14 +31,14 @@
 .qnav { display: flex; gap: 6px; flex-wrap: wrap; }
 .qnav a {
   width: 30px; height: 30px; display: flex; align-items: center;
-  justify-content: center; border-radius: 7px; font-size: 13px;
+  justify-content: center; border-radius: 7px; font-size: 14px;
   text-decoration: none; color: var(--text2);
   border: 1px solid var(--border); background: var(--surface-2);
 }
 .qnav a.is-answered { border-color: var(--green-border);
                       background: var(--green-tint); color: var(--green);
                       font-weight: 700; }
-.qnav a:hover { border-color: var(--accent); color: var(--accent); }
+.qnav a:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 .exam-finish-row { margin-top: 28px; display: flex; align-items: center;
                    gap: 16px; flex-wrap: wrap; }
@@ -84,7 +84,7 @@
 
   <div class="exam-finish-row">
     <button type="button" class="btn-submit" id="finish-btn">Завершить</button>
-    <span style="font-size:13px;color:var(--text2);">
+    <span style="font-size:14px;color:var(--text2);">
       После завершения дописать будет нельзя.
     </span>
   </div>

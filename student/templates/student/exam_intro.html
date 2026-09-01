@@ -6,8 +6,8 @@
 {% include "student/_work_style.html" %}
 .exam-intro { background: var(--surface); border: 1px solid var(--border);
               border-radius: 10px; padding: 28px; max-width: 620px; }
-.exam-kind { font-size: 11px; font-weight: 700; letter-spacing: .08em;
-             text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+.exam-kind { font-size: 13px; font-weight: 700; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--accent-ink); margin-bottom: 10px; }
 .exam-name { font-size: 22px; font-weight: 700; margin-bottom: 20px; }
 .exam-facts { list-style: none; margin: 0 0 24px; padding: 0; }
 .exam-facts li { display: flex; gap: 12px; padding: 10px 0;
@@ -15,12 +15,12 @@
 .exam-facts li:last-child { border-bottom: none; }
 .exam-facts .k { color: var(--text2); min-width: 150px; }
 .exam-warn { background: var(--amber-tint); border: 1px solid var(--amber-border);
-             border-radius: var(--r); padding: 12px 14px; font-size: 13px;
+             border-radius: var(--r); padding: 12px 14px; font-size: 14px;
              line-height: 1.6; margin-bottom: 20px; }
 @media (max-width: 560px) {
   .exam-intro { padding: 18px; }
   .exam-facts li { flex-direction: column; gap: 2px; }
-  .exam-facts .k { min-width: 0; font-size: 12px; }
+  .exam-facts .k { min-width: 0; font-size: 13px; }
 }
 {% endblock %}
 
@@ -65,7 +65,7 @@
       <div class="submit-row" style="margin-top:0;">
         <button type="submit" class="btn-submit">Начать</button>
         {% if minutes is not None %}
-        <span style="font-size:13px;color:var(--text2);">
+        <span style="font-size:14px;color:var(--text2);">
           на решение — {{ minutes }} мин
         </span>
         {% endif %}

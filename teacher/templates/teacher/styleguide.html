@@ -9,11 +9,37 @@
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .sg-block { margin-bottom: 34px; }
-.sg-h { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.sg-d { font-size: 12px; color: var(--text2); margin-bottom: 12px;
+.sg-h { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.sg-d { font-size: 13px; color: var(--text2); margin-bottom: 12px;
         line-height: 1.6; max-width: 640px; }
 .sg-demo { background: var(--bg); border: 0.5px solid var(--border);
            border-radius: 10px; padding: 18px; }
+/* ⚠️ ЭТИ РАЗДЕЛЫ ПОКАЗЫВАЮТ ПАНЕЛЬ ИНСТРУМЕНТА, А НЕ ПРОСТО ФОН.
+   Роль цвета: всё, что относится к вводу, поиску и отбору, красится
+   --surface-tool. Стайлгайд — полигон приёмки, и если роль не показана
+   здесь, её на экранах и не заметят: ровно так шесть новых токенов
+   прожили сутки объявленными и ни разу не применёнными.
+   ⚠️ На бирюзе живёт только основной текст (6,03); --text2 даёт 3,31,
+   поэтому подписи внутри демо обязаны лежать в светлых полях. */
+.sg-demo--tool { background: var(--surface-tool); border-color: var(--border); }
+/* Правило «на бирюзе только основной текст» применено ЗДЕСЬ, а не в самом
+   наборе: `.k-label`, `.k-hint` и `.k-score__cap` живут на всех экранах
+   платформы, и там второстепенный тон на месте. Переопределение прицельное —
+   действует только внутри бирюзовой панели.
+   Замер до правки: 3,31 у подписи поля, 2,80 у приписки «баллов», 3,90 у
+   пояснения под полем в тёмной теме. */
+.sg-demo--tool .k-label,
+.sg-demo--tool .k-hint,
+.sg-demo--tool .k-score__cap,
+.sg-demo--tool .k-check { color: var(--text); }
+/* Выключенная строка — тоже. WCAG 1.4.3 выключенные элементы от нормы
+   освобождает, и на обычном фоне приглушённый тон здесь уместен: --text3
+   даёт там 6,19, то есть «тише», но читаемо. На бирюзе тот же тон падает
+   до 2,80 — это уже не «тише», а «не видно». Признак выключенности несёт
+   сама галочка (серая, курсор not-allowed), поэтому подпись возвращается
+   к основному тону. Селектор повторяет `:has()` из набора, иначе не
+   перебьёт его по весу. */
+.sg-demo--tool .k-check--box:has(input:disabled) { color: var(--text); }
 .sg-grid { display: grid; gap: 14px;
            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 {% endblock %}
@@ -45,7 +71,7 @@
   <div class="sg-d">Ни одного браузерного элемента по умолчанию: список и
     галочка нарисованы своими, иначе в тёмной теме просвечивает светлый
     системный виджет.</div>
-  <div class="sg-demo sg-grid">
+  <div class="sg-demo sg-demo--tool sg-grid">
     <div>
       <label class="k-label" for="sg1">Название работы</label>
       <input class="k-input" id="sg1" type="text" placeholder="Например: КПВ и альтернативные издержки">
@@ -137,7 +163,7 @@
   <div class="sg-h">Крупное числовое поле</div>
   <div class="sg-d">Максимальный балл за позицию. Цифра крупная, подпись мелкой:
     так балл и метка источника перестают сливаться в серую кашу.</div>
-  <div class="sg-demo k-row" style="gap:26px">
+  <div class="sg-demo sg-demo--tool k-row" style="gap:26px">
     <label class="k-score">
       <input type="number" value="10" min="0" max="100">
       <span class="k-score__cap">баллов</span>

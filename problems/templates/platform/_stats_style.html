@@ -6,16 +6,19 @@
 .stats-head { display: flex; align-items: flex-start; justify-content: space-between;
               gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .stats-title { font-size: 24px; font-weight: 700; }
-.stats-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.stats-sub { font-size: 14px; color: var(--text2); margin-top: 4px; }
 
 /* ── Переключатель периода ──────────────────────────── */
 .period-bar { display: inline-flex; gap: 2px; background: var(--surface-2);
               border: 1px solid var(--border); border-radius: 999px; padding: 3px; }
 .period-bar button {
   border: none; background: transparent; color: var(--text2); font: inherit;
-  font-size: 13px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
+  font-size: 14px; padding: 6px 14px; border-radius: 999px; cursor: pointer;
 }
-.period-bar button.is-active { background: var(--accent); color: #fff; font-weight: 600; }
+/* ⚠️ ЧЕРНИЛА НА СПЛОШНОМ АКЦЕНТЕ — ТОКЕНОМ, А НЕ БЕЛЫМ. Акцент светлеет
+   в тёмной теме (#81b5b4), и белым по нему выходит 2,28 при норме 4,5.
+   --act-ink-solid меняется вместе с темой: 5,23 в светлой, 6,89 в тёмной. */
+.period-bar button.is-active { background: var(--accent); color: var(--act-ink-solid); font-weight: 600; }
 
 /* ── Шапка героя ────────────────────────────────────── */
 .hero {
@@ -27,7 +30,7 @@
 }
 .hero-level { display: flex; align-items: baseline; gap: 10px; }
 .hero-level b { font-size: 40px; line-height: 1; font-weight: 800; }
-.hero-level span { font-size: 13px; color: var(--text2); }
+.hero-level span { font-size: 14px; color: var(--text2); }
 /* ⚠️ ШКАЛА ТОНКАЯ — 5 px (ревью 17.08, п. 4.2). Их на экране две, у уровня
    и у недельной цели, и обе обязаны выглядеть одной величиной: разная
    толщина читается как разная важность. */
@@ -35,7 +38,7 @@
             overflow: hidden; margin-top: 10px; border: 1px solid var(--border-soft); }
 .hero-bar i { display: block; height: 100%; background: var(--accent); }
 .hero-bar--thin { margin-top: 8px; }
-.hero-note { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.hero-note { font-size: 13px; color: var(--text2); margin-top: 6px; }
 /* ⚠️ ВСЕ ЧЕТЫРЕ ЯЧЕЙКИ ВЫРОВНЕНЫ ВЛЕВО (ревью 17.08, п. 2.4). Первая
    (уровень со шкалой) прижата влево по устройству, три остальные стояли по
    центру своих колонок — смешанное выравнивание в одном ряду читается
@@ -48,13 +51,13 @@
    «двадцать» рядом с «двенадцать». */
 .hero-cell .big .of { font-size: 14px; font-weight: 600; color: var(--text2);
                       margin-left: 4px; }
-.hero-cell .cap { font-size: 12px; color: var(--text2); margin-top: 4px; }
-.hero-cell .tiny { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.hero-cell .cap { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.hero-cell .tiny { font-size: 13px; color: var(--text3); margin-top: 2px; }
 .goal-edit { border: 1px solid var(--border); background: transparent;
-             color: var(--text2); font: inherit; font-size: 11px;
+             color: var(--text2); font: inherit; font-size: 13px;
              border-radius: var(--r); padding: 3px 8px; cursor: pointer;
              margin-top: 6px; }
-.goal-edit:hover { border-color: var(--accent); color: var(--accent); }
+.goal-edit:hover { border-color: var(--accent); color: var(--accent-ink); }
 
 /* ── Карточки-метрики ───────────────────────────────── */
 .metric-grid { display: grid; gap: 12px; margin-bottom: 26px;
@@ -63,13 +66,13 @@
   background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; padding: 16px 18px;
 }
-.metric .cap { font-size: 11px; color: var(--text2); text-transform: uppercase;
+.metric .cap { font-size: 13px; color: var(--text2); text-transform: uppercase;
                letter-spacing: .06em; }
 .metric .big { font-size: 26px; font-weight: 800; margin-top: 6px; }
 /* Пустое состояние карточки: мельче и тише соседних чисел — это ответ
    «пока нечего показать», а не показатель (ревью 17.08, п. 4.4). */
 .metric .big.is-empty { font-size: 18px; font-weight: 600; color: var(--text3); }
-.metric .chg { font-size: 12px; margin-top: 4px; color: var(--text2); }
+.metric .chg { font-size: 13px; margin-top: 4px; color: var(--text2); }
 .chg.up { color: var(--green); }
 .chg.down { color: var(--error); }
 
@@ -78,8 +81,8 @@
          border-radius: 12px; padding: 20px 22px; margin-bottom: 20px; }
 .panel-head { display: flex; align-items: baseline; justify-content: space-between;
               gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
-.panel-title { font-size: 15px; font-weight: 700; }
-.panel-hint { font-size: 12px; color: var(--text2); }
+.panel-title { font-size: 16px; font-weight: 700; }
+.panel-hint { font-size: 13px; color: var(--text2); }
 /* ⚠️ Правила пометки периода у заголовка блока БОЛЬШЕ НЕТ (сессия 9,
    фаза 6.1). Оно требовалось, пока теплокарта игнорировала переключатель
    периода; теперь она его слушается, и пометка стала бы враньём. Удалено
@@ -112,7 +115,7 @@
               grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); }
 .chart-box { position: relative; height: 240px; }
 .chart-box.tall { height: 300px; }
-.empty-note { font-size: 13px; color: var(--text2); text-align: center;
+.empty-note { font-size: 14px; color: var(--text2); text-align: center;
               padding: 28px 12px; background: var(--surface-2);
               border-radius: var(--r); }
 
@@ -125,15 +128,15 @@
   background: var(--surface-2); transition: border-color .12s, transform .12s;
 }
 .topic-card:hover { border-color: var(--accent); transform: translateY(-1px); }
-.topic-card .name { font-size: 13px; font-weight: 600; line-height: 1.35;
+.topic-card .name { font-size: 14px; font-weight: 600; line-height: 1.35;
                     margin-bottom: 8px; }
 .topic-card .row { display: flex; align-items: center; justify-content: space-between;
                    gap: 2px 8px; flex-wrap: wrap;
-                   font-size: 12px; color: var(--text2); }
+                   font-size: 13px; color: var(--text2); }
 /* Числа справа не разрываются: длинная метка («стоит подтянуть») переносится
    сама, а «40% · 2/5» разъезжалось на две строки посреди дроби. */
 .topic-card .row > span + span { white-space: nowrap; }
-.mastery { font-size: 10px; font-weight: 700; text-transform: uppercase;
+.mastery { font-size: 13px; font-weight: 700; text-transform: uppercase;
            letter-spacing: .05em; padding: 2px 7px; border-radius: 999px; }
 /* ⚠️ ЧЕТЫРЕ МЕТКИ — ЧЕТЫРЕ ЦВЕТА, И ПОЛОСА ПОД КАРТОЧКОЙ БЕРЁТ ТОТ ЖЕ
    (ревью 17.08, п. 4.5). Шкала идёт от лучшего к худшему: зелёный —
@@ -144,9 +147,9 @@
    Чернила на подложке — только `--*-ink` там, где пара иначе не держит AA
    (замерено тестом, не на глаз). */
 .mastery-thin   { background: var(--chip-bg); color: var(--chip-text); }
-.mastery-weak   { background: var(--error-tint); color: var(--error); }
+.mastery-weak   { background: var(--error-tint); color: var(--error-ink); }
 .mastery-good   { background: var(--amber-tint); color: var(--amber-ink); }
-.mastery-master { background: var(--green-tint); color: var(--green); }
+.mastery-master { background: var(--green-tint); color: var(--green-ink); }
 .topic-bar { height: 4px; background: var(--surface); border-radius: 999px;
              overflow: hidden; margin-top: 8px; border: 1px solid var(--border-soft); }
 .topic-bar i { display: block; height: 100%; background: var(--border); }
@@ -162,7 +165,7 @@
 .heat-cell-3 { fill: var(--accent); opacity: .70; }
 .heat-cell-4 { fill: var(--accent); opacity: 1; }
 .heat-month { font-size: 9px; fill: var(--text2); }
-.heat-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
+.heat-legend { display: flex; align-items: center; gap: 6px; font-size: 13px;
                color: var(--text2); margin-top: 8px; }
 .heat-legend i { width: 11px; height: 11px; border-radius: 2px; display: block; }
 
@@ -177,7 +180,7 @@
 .act-scroll { overflow-x: auto; padding-bottom: 6px; }
 .act-dow { display: grid; grid-template-columns: repeat(7, 34px); gap: 4px;
            margin-bottom: 4px; }
-.act-dow span { font-size: 10px; color: var(--text3); text-align: center; }
+.act-dow span { font-size: 13px; color: var(--text3); text-align: center; }
 .act-grid--days { display: grid; grid-template-columns: repeat(7, 34px);
                   gap: 4px; }
 /* Годовой вид: клетки идут столбцами-неделями, чисел в них нет — 365 цифр
@@ -185,7 +188,7 @@
 .act-grid--year { display: grid; grid-template-rows: repeat(7, 11px);
                   grid-auto-flow: column; grid-auto-columns: 11px; gap: 3px; }
 .act-day { border-radius: 5px; background: var(--surface-2);
-           color: var(--text2); font-size: 11px; line-height: 1;
+           color: var(--text2); font-size: 13px; line-height: 1;
            display: flex; align-items: center; justify-content: center;
            font-variant-numeric: tabular-nums; }
 .act-grid--days .act-day { height: 34px; }
@@ -201,14 +204,22 @@
    (контраст 1,01 — шесть залитых клеток из восемнадцати). Заливка теперь
    `rgba(var(--accent-rgb), …)`, цифра сохраняет свой цвет целиком.
    Чернила — двумя токенами, и в тёмной теме они меняются местами: сам
-   акцент там светлый. Обе пары замерены тестом, не на глаз. */
+   акцент там светлый. Обе пары замерены тестом, не на глаз.
+   ⚠️ ПЛОТНОСТИ ЖИВУТ В ТОКЕНАХ (31.08.2026), А НЕ ЗДЕСЬ, И ОНИ РАЗНЫЕ ПО
+   ТЕМАМ. Зашитые .22/.45/.70 были одни на обе темы, а акцент в темах разной
+   светлоты: тёмная бирюза в светлой теме и светлая в тёмной. Поэтому третий
+   уровень проваливал норму СРАЗУ В ОБЕИХ по противоположным причинам —
+   в светлой 70 % давали #4da09a, на котором не выживали ни тёмные чернила
+   (4,47), ни белые (3,08); в тёмной .45 на новой карточке давали 4,22.
+   Одной шкалой на обе темы это не чинится, поэтому шкалы две: значения и
+   замеры — в `templates/_tokens.html`. Здесь остаются только имена. */
 .act-l0 { background: var(--surface-2); color: var(--text2); }
-.act-l1 { background: rgba(var(--accent-rgb), .22); color: var(--act-ink); }
-.act-l2 { background: rgba(var(--accent-rgb), .45); color: var(--act-ink); }
-.act-l3 { background: rgba(var(--accent-rgb), .70); color: var(--act-ink); }
+.act-l1 { background: rgba(var(--accent-rgb), var(--act-a1)); color: var(--act-ink); }
+.act-l2 { background: rgba(var(--accent-rgb), var(--act-a2)); color: var(--act-ink); }
+.act-l3 { background: rgba(var(--accent-rgb), var(--act-a3)); color: var(--act-ink); }
 .act-l4 { background: rgb(var(--accent-rgb));
           color: var(--act-ink-solid); }
-.act-legend { display: flex; align-items: center; gap: 6px; font-size: 11px;
+.act-legend { display: flex; align-items: center; gap: 6px; font-size: 13px;
               color: var(--text2); margin-top: 10px; flex-wrap: wrap; }
 .act-sw { width: 12px; height: 12px; border-radius: 3px; display: block; }
 /* ── Логотип Econ Rush в строке заголовка ──────────────────────────────
@@ -219,14 +230,14 @@
 .rush-logo--sm { font-size: 18px; line-height: 1; }
 .rush-logo .bolt { margin: 0 .08em; }
 .rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
-.rush-logo .rush { color: var(--accent); display: inline-block;
+.rush-logo .rush { color: var(--accent-ink); display: inline-block;
                    transform: rotate(-2deg) skewX(-6deg); }
 
 .act-facts { display: grid; gap: 12px; }
 .act-fact { border-left: 2px solid var(--border); padding-left: 10px; }
 .act-fact__v { font-size: 19px; font-weight: 700; color: var(--text);
                font-variant-numeric: tabular-nums; }
-.act-fact__k { font-size: 11px; color: var(--text2); margin-top: 1px; }
+.act-fact__k { font-size: 13px; color: var(--text2); margin-top: 1px; }
 @media (max-width: 720px) {
   .act { grid-template-columns: 1fr; }
   .act-facts { grid-template-columns: repeat(2, 1fr); }
@@ -239,14 +250,14 @@
         background: var(--surface-2); }
 .achv.is-locked { opacity: .55; }
 .achv .ico { font-size: 22px; }
-.achv .ttl { font-size: 13px; font-weight: 600; margin-top: 6px; }
-.achv .cond { font-size: 11px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
-.achv .meta { font-size: 10px; color: var(--text3); margin-top: 6px; }
+.achv .ttl { font-size: 14px; font-weight: 600; margin-top: 6px; }
+.achv .cond { font-size: 13px; color: var(--text2); margin-top: 4px; line-height: 1.4; }
+.achv .meta { font-size: 13px; color: var(--text3); margin-top: 6px; }
 .achv-filter { display: flex; gap: 6px; flex-wrap: wrap; }
 .achv-filter button { border: 1px solid var(--border); background: transparent;
-  color: var(--text2); font: inherit; font-size: 12px; padding: 4px 10px;
+  color: var(--text2); font: inherit; font-size: 13px; padding: 4px 10px;
   border-radius: 999px; cursor: pointer; }
-.achv-filter button.is-active { border-color: var(--accent); color: var(--accent); }
+.achv-filter button.is-active { border-color: var(--accent); color: var(--accent-ink); }
 
 /* ── Рекорды и списки ───────────────────────────────── */
 .record-grid { display: grid; gap: 10px;
@@ -254,7 +265,7 @@
 .record { border: 1px solid var(--border); border-radius: 10px; padding: 14px;
           background: var(--surface-2); text-align: center; }
 .record .big { font-size: 24px; font-weight: 800; }
-.record .cap { font-size: 11px; color: var(--text2); margin-top: 4px; }
+.record .cap { font-size: 13px; color: var(--text2); margin-top: 4px; }
 /* ── Сильные и слабые темы ──────────────────────────
    Две половины одной сетки. Правила стоят здесь, потому что блок собран
    ОДНИМ партиалом `templates/_ranking.html` и рисуется на трёх экранах;
@@ -267,15 +278,15 @@
    отступами по 28 px. На карточке ученика он весил больше, чем блок с
    данными, и читался как сообщение об ошибке. Общую плашку не трогаем —
    на других экранах она к месту (там пустой блок и правда занимает экран). */
-.rank-none { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.rank-none { font-size: 14px; color: var(--text2); line-height: 1.6; }
 .list-rows { list-style: none; margin: 0; padding: 0; }
 .list-rows li { display: flex; align-items: center; justify-content: space-between;
                 gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--border-soft);
-                font-size: 13px; }
+                font-size: 14px; }
 .list-rows li:last-child { border-bottom: none; }
 .list-rows a { color: var(--text); text-decoration: none; }
-.list-rows a:hover { color: var(--accent); }
-.muted { color: var(--text2); font-size: 12px; }
+.list-rows a:hover { color: var(--accent-ink); }
+.muted { color: var(--text2); font-size: 13px; }
 
 /* ── Блок игры — визуально отделён ──────────────────── */
 .game-panel { border-style: dashed; }
@@ -283,20 +294,20 @@
    Числа тихие, ссылки обычные — это не ещё один показатель, а переход. */
 .miss { margin-top: 16px; padding-top: 14px;
         border-top: 1px solid var(--border-soft); }
-.miss-cap { font-size: 12px; font-weight: 600; color: var(--text2);
+.miss-cap { font-size: 13px; font-weight: 600; color: var(--text2);
             margin-bottom: 10px; }
 .miss-grid { display: grid; gap: 10px;
              grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); }
 .miss-row { border-left: 3px solid var(--error); padding-left: 10px; }
-.miss-name { font-size: 13px; font-weight: 600; line-height: 1.35; }
-.miss-num { font-size: 12px; color: var(--text2); margin-top: 2px;
+.miss-name { font-size: 14px; font-weight: 600; line-height: 1.35; }
+.miss-num { font-size: 13px; color: var(--text2); margin-top: 2px;
             font-variant-numeric: tabular-nums; }
 .miss-go { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 5px; }
-.miss-go a { font-size: 12px; color: var(--accent); text-decoration: none;
+.miss-go a { font-size: 13px; color: var(--accent-ink); text-decoration: none;
              border-bottom: 1px solid var(--accent-ring); }
 .miss-go a:hover { color: var(--accent-deep); }
-.game-badge { font-size: 10px; font-weight: 700; letter-spacing: .06em;
-              text-transform: uppercase; color: var(--text2);
+.game-badge { font-size: 13px; font-weight: 700; letter-spacing: .06em;
+              text-transform: uppercase; color: var(--chip-text);
               background: var(--chip-bg); border-radius: 999px; padding: 2px 8px; }
 
 /* ── Таблицы репетитора ─────────────────────────────── */
@@ -316,7 +327,7 @@
                  margin-top: 7px; font-size: 14px; color: var(--text); }
 .student-facts span { display: inline-flex; align-items: baseline; gap: 6px;
                       min-width: 0; }
-.student-facts .cap { font-size: 11px; color: var(--text3);
+.student-facts .cap { font-size: 13px; color: var(--text3);
                       white-space: nowrap; }
 .student-facts .fact { font-weight: 600; overflow-wrap: anywhere; }
 /* Разделитель между фактами рисует CSS: литеральной точки в разметке нет,
@@ -350,7 +361,7 @@
 .card3 { background: var(--surface); border: 1px solid var(--border);
          border-radius: 10px; padding: 16px 18px;
          display: flex; flex-direction: column; }
-.card3-cap { font-size: 12px; color: var(--text2); margin-bottom: 8px;
+.card3-cap { font-size: 13px; color: var(--text2); margin-bottom: 8px;
              display: flex; align-items: center; }
 .card3-value { font-size: 26px; font-weight: 700;
                font-variant-numeric: tabular-nums; margin-top: auto; }
@@ -380,13 +391,13 @@
 .tp-half .tp-bar { flex: 1; }
 .tp-half .tp-value { width: 58px; flex-shrink: 0; }
 /* Шапка колонок: без неё две одинаковые шкалы в строке неразличимы. */
-.tp-head { font-size: 11px; font-weight: 600; color: var(--text2);
+.tp-head { font-size: 13px; font-weight: 600; color: var(--text2);
            padding-bottom: 6px; border-bottom: 1px solid var(--border);
            margin-bottom: 6px; }
 /* Разделитель половин — тонкая вертикаль, а не отступ: без неё взгляд
    склеивает значение задач с началом шкалы тестов. */
 .tp-split { background: var(--border); align-self: stretch; min-height: 18px; }
-.tp-name { font-size: 13px; overflow: hidden; text-overflow: ellipsis;
+.tp-name { font-size: 14px; overflow: hidden; text-overflow: ellipsis;
            white-space: nowrap; }
 .tp-empty .tp-name { color: var(--text3); }
 /* ⚠️ ШКАЛА ДВУХЦВЕТНАЯ И НЕ АКЦЕНТНАЯ. Слева доля верных — цвет по уровню
@@ -403,7 +414,7 @@
 .tp-rest { background: var(--chip-bg); }
 /* Тема без попыток — пустая шкала пунктиром: это факт, а не ноль процентов. */
 .tp-bar--empty { border: 1px dashed var(--border); background: transparent; }
-.tp-value { font-size: 13px; text-align: right;
+.tp-value { font-size: 14px; text-align: right;
             font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tp-value .frac { display: none; color: var(--text2); }
 .tp-value .pct { display: inline; }
@@ -416,15 +427,15 @@
 .tp-half:hover .tp-value .pct { display: none; }
 .tp-half:hover .tp-value .frac { display: inline; }
 .tp-row:hover .tp-name { color: var(--text); }
-.tp-none { font-size: 12px; color: var(--text3); }
+.tp-none { font-size: 13px; color: var(--text3); }
 /* ⚠️ ПУСТЫЕ ТЕМЫ — ПОД РАСКРЫВАШКОЙ (ревью 17.08, п. 3.2). Из 23 строк
    двадцать бывают пустыми, и двадцать пунктирных шкал подряд дают полторы
    прокрутки шума. Раскрытие — общий `.k-details` из набора; своих правил
    вида у него здесь нет, только отступы, чтобы строки внутри стояли на той
    же вертикали, что и снаружи. */
 .tp-rest-fold { margin-top: 4px; }
-.tp-rest-fold > summary { font-size: 12px; }
-.tp-none-all { font-size: 13px; color: var(--text2); padding: 10px 0; }
+.tp-rest-fold > summary { font-size: 13px; }
+.tp-none-all { font-size: 14px; color: var(--text2); padding: 10px 0; }
 /* Строка «Всего» — отделена чертой, шкала выше, значение полужирным. */
 .tp-total { border-top: 1px solid var(--border); margin-top: 10px;
             padding-top: 12px; }
@@ -441,7 +452,7 @@
   .tp-split, .tp-head { display: none; }
   /* Подпись половины появляется ТОЛЬКО здесь — в широком виде её роль
      играет шапка колонок. */
-  .tp-half::before { content: attr(data-cap); font-size: 11px;
+  .tp-half::before { content: attr(data-cap); font-size: 13px;
                      color: var(--text3); width: 46px; flex-shrink: 0; }
 }
 
@@ -450,7 +461,7 @@
    `currentColor`, поэтому тема переключается сама. */
 /* Дата под личным рекордом: тихо, но обязательно — «7» без дня это не
    рекорд, а число. */
-.record .when { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.record .when { font-size: 13px; color: var(--text3); margin-top: 2px; }
 .qi-inline { display: inline-flex; vertical-align: -.12em; }
 .qi-inline .qi { width: 1em; height: 1em; }
 
@@ -461,7 +472,7 @@
 там, где этот файл не подключают — сводка «по задачам», правая панель
 конструктора, календарь активности. Класс дефекта тот же, что у `.crumbs`.
 {% endcomment %}
-table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.stats-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 /* ⚠️ СЕЛЕКТОР НАМЕРЕННО БЕЗ `table` ВПЕРЕДИ. С ним правило весило столько
    же, сколько общее `table td[data-type="num"]` из набора, и, стоя ниже,
    побеждало его: числовой столбец оставался прижат влево, а набор выглядел
@@ -469,14 +480,14 @@ table.stats-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .stats-table th, .stats-table td {
   padding: 9px 10px; text-align: left; border-bottom: 1px solid var(--border-soft);
   white-space: nowrap; }
-table.stats-table th { font-size: 11px;
+table.stats-table th { font-size: 13px;
   letter-spacing: .05em; color: var(--text2); font-weight: 600; cursor: pointer;
   user-select: none; }
 table.stats-table th.no-sort { cursor: default; }
 table.stats-table tbody tr:hover { background: var(--surface-2); }
 
 /* Тепловая матрица «ученики × темы» */
-.matrix-cell { font-size: 11px; text-align: center; border-radius: 4px;
+.matrix-cell { font-size: 13px; text-align: center; border-radius: 4px;
                padding: 5px 4px; min-width: 46px; display: block; color: var(--text); }
 .matrix-none { background: var(--surface-2); color: var(--text3); }
 .matrix-bad  { background: var(--error-tint); color: var(--error); font-weight: 700; }
@@ -513,7 +524,7 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
    высоты блока. При 118 px и четырнадцати символах 23 темы переставали
    различаться («Теория…», «Введение в…»). 22 символа × 7,6 px = 167 px,
    потолок стоит под них. Высота блока при этом выросла — принято осознанно. */
-.matrix-head { font-size: 11px; color: var(--text2); writing-mode: vertical-rl;
+.matrix-head { font-size: 13px; color: var(--text2); writing-mode: vertical-rl;
                transform: rotate(180deg); max-height: 170px;
                text-transform: none; }
 
@@ -525,7 +536,7 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
                  border-left: 3px solid var(--amber);
                  background: var(--surface-2);
                  border-radius: 0 var(--r) var(--r) 0;
-                 padding: 10px 14px; margin-bottom: 8px; font-size: 13px;
+                 padding: 10px 14px; margin-bottom: 8px; font-size: 14px;
                  line-height: 1.6; }
 .attention-row b { font-weight: 600; }
 .attention-row a { color: var(--text2); }
@@ -549,7 +560,7 @@ table.stats-table tbody tr:hover { background: var(--surface-2); }
 .stu-ava { display: inline-flex; align-items: center; justify-content: center;
            width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
            background: var(--chip-bg); color: var(--text2);
-           font-size: 12px; font-weight: 700; }
+           font-size: 13px; font-weight: 700; }
 /* Строка целиком кликабельна. Кнопка «открыть» остаётся: кликабельность
    строки нигде не подписана, и без кнопки способ пришлось бы угадывать. */
 tr.row-click { cursor: pointer; }
@@ -558,8 +569,8 @@ tr.row-click { cursor: pointer; }
    Разметка — `teacher/_work_history.html`, сборка — `problems/stats.py`.
    Стили держим здесь: страницы разные, а таблица одна. */
 /* ── История работ ──────────────────────────────────────────────────── */
-.wk-table { width: 100%; border-collapse: collapse; font-size: 13px; }
-.wk-table th { text-align: left; padding: 8px 10px; font-size: 11px;
+.wk-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.wk-table th { text-align: left; padding: 8px 10px; font-size: 13px;
                font-weight: 600; color: var(--text2);
                border-bottom: 1px solid var(--border); white-space: nowrap; }
 .wk-table td { padding: 10px; border-bottom: 1px solid var(--border-soft);
@@ -574,7 +585,7 @@ tr.row-click { cursor: pointer; }
    ⚠️ Имя убранного класса здесь НЕ ПОВТОРЯЕТСЯ намеренно: проверка ищет
    его по файлу и поймала бы собственное объяснение. По проекту это уже
    шестой раз. */
-.wk-none { display: inline-block; font-size: 11px; color: var(--text2);
+.wk-none { display: inline-block; font-size: 13px; color: var(--text2);
            background: var(--pending-tint); border: 1px solid var(--pending-border);
            border-radius: 999px; padding: 1px 8px; white-space: nowrap; }
 .wk-name { font-weight: 700; }
@@ -593,17 +604,17 @@ tr.row-click { cursor: pointer; }
 .wk-table tbody tr:nth-child(even) { background: var(--border-soft); }
 .wk-table tbody tr:hover { background: var(--surface-2); }
 /* Тип работы — тихий чип тонкой рамкой, как на карточках заданий. */
-.wk-kind { font-size: 11px; font-weight: 500; color: var(--text2);
+.wk-kind { font-size: 13px; font-weight: 500; color: var(--text2);
            border: 1px solid var(--border); border-radius: 999px;
            padding: 1px 8px; white-space: nowrap; }
 /* Пометки в столбце «Сдано» у индивидуального занятия: опоздание и
    несдача. Чип, а не слово в строке: дата рядом, и два текста подряд
    читались бы как одно предложение. */
-.wk-flag { font-size: 11px; font-weight: 600; border-radius: 999px;
+.wk-flag { font-size: 13px; font-weight: 600; border-radius: 999px;
            padding: 1px 8px; white-space: nowrap; }
 .wk-flag--late { background: var(--amber-tint); color: var(--amber-ink); }
 .wk-flag--none { background: var(--error-tint); color: var(--error); }
 /* «Нет тестов» / «нет задач»: ТИХИЙ СЕРЫЙ, без плашки и без цвета. Это не
    результат и не сигнал — это ответ «такого в работе не было». Плашка
    любого цвета встала бы в один ряд с процентами и читалась бы как оценка. */
-.wk-nothing { font-size: 12px; color: var(--text3); white-space: nowrap; }
+.wk-nothing { font-size: 13px; color: var(--text3); white-space: nowrap; }

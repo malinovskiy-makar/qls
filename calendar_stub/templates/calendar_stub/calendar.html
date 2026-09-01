@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Календарь — ЭкЗадачи</title>
+<title>Календарь — Weconomics</title>
 {% include '_tokens.html' %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  body { font-family: var(--font-ui);
          background: var(--bg); color: var(--text);
          transition: background-color .2s ease, color .2s ease; }
 
@@ -28,7 +28,7 @@
     border: 1px solid var(--border);
     border-radius: 7px;
     background: var(--surface);
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     color: var(--text);
     display: flex; align-items: center;
@@ -39,14 +39,14 @@
   }
   #cal-toolbar .btn-primary:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
   #cal-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     min-width: 160px;
     text-align: center;
   }
   .legend {
     display: flex; align-items: center; gap: 14px;
-    margin-left: auto; font-size: 12px; color: var(--text2);
+    margin-left: auto; font-size: 13px; color: var(--text2);
   }
   .legend-item { display: flex; align-items: center; gap: 5px; }
   .legend-dot {
@@ -83,7 +83,7 @@
   .fc-event { cursor: pointer; }
   .fc-event-inner {
     padding: 1px 4px;
-    font-size: 11px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -98,10 +98,10 @@
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
-    font-size: 11px !important;
+    font-size: 13px !important;
   }
   .fc-daygrid-event {
-    font-size: 11px !important;
+    font-size: 13px !important;
   }
 
   /* ---- Модальное окно ---- */
@@ -140,17 +140,17 @@
   .type-badge {
     display: inline-block;
     padding: 2px 10px; border-radius: 99px;
-    font-size: 11px; font-weight: 600; color: var(--on-btn);
+    font-size: 13px; font-weight: 600; color: var(--on-btn);
   }
 
   /* Строки деталей */
   .detail-row {
     display: flex; gap: 8px;
-    font-size: 13px; color: var(--text);
+    font-size: 14px; color: var(--text);
     margin-top: 10px;
   }
   .detail-row .label { color: var(--text2); min-width: 80px; }
-  .detail-row a { color: var(--accent); text-decoration: none; }
+  .detail-row a { color: var(--accent-ink); text-decoration: none; }
   .detail-row a:hover { text-decoration: underline; }
 
   /* Кнопки модала */
@@ -158,18 +158,18 @@
     margin-top: 18px;
     display: flex; gap: 8px; flex-wrap: wrap;
   }
-  .modal-actions .btn { height: 36px; font-size: 13px; }
+  .modal-actions .btn { height: 36px; font-size: 14px; }
 
   /* ---- Форма создания/редактирования ---- */
   .form-group { margin-bottom: 14px; }
   .form-group label {
-    display: block; font-size: 12px; font-weight: 600;
+    display: block; font-size: 13px; font-weight: 600;
     color: var(--text2); margin-bottom: 5px;
   }
   .form-group input, .form-group textarea, .form-group select {
     width: 100%; padding: 8px 10px;
     border: 1px solid var(--border); border-radius: 8px;
-    font-size: 13px; color: var(--text);
+    font-size: 14px; color: var(--text);
     background: var(--surface);
   }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
@@ -183,7 +183,7 @@
     padding: 5px 14px;
     border-radius: 99px;
     border: 1.5px solid var(--border);
-    background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2);
+    background: var(--surface); font-size: 13px; cursor: pointer; color: var(--text2);
     transition: all .15s;
   }
   .pill-btn.active {
@@ -201,7 +201,7 @@
   }
   .group-list label {
     display: flex; align-items: center; gap: 7px;
-    font-size: 13px; font-weight: 400; color: var(--text);
+    font-size: 14px; font-weight: 400; color: var(--text);
     padding: 3px 4px; cursor: pointer;
   }
   .group-list label:hover { background: var(--surface-2); border-radius: 5px; }
@@ -326,7 +326,7 @@
             <div onclick="pickColor('#6b7280')" style="width:20px;height:20px;border-radius:50%;background:#6b7280;cursor:pointer;border:2px solid transparent" title="Серый"></div>
           </div>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
       </div>
 
       <!-- Название -->
@@ -368,7 +368,7 @@
         <label>Группы</label>
         <div class="group-list" id="group-checkboxes">
           <!-- Заполняется JS -->
-          <span style="font-size:12px;color:var(--text3);padding:4px;">Нет групп</span>
+          <span style="font-size:13px;color:var(--text3);padding:4px;">Нет групп</span>
         </div>
       </div>
 
@@ -405,7 +405,7 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="edit-save-btn">Сохранить</button>
         <button class="btn" id="edit-cancel-btn">Отмена</button>
-        <span id="edit-error" style="font-size:12px;color:var(--error);align-self:center;"></span>
+        <span id="edit-error" style="font-size:13px;color:var(--error);align-self:center;"></span>
       </div>
     </div>
   </div>

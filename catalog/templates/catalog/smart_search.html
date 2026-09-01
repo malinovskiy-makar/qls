@@ -24,8 +24,13 @@
 }
 
 /* ── Форма ──────────────────────────────────────────── */
+/* ⚠️ ФОРМА УМНОГО ПОИСКА — ПАНЕЛЬ ИНСТРУМЕНТА (--surface-tool), как и
+   рельс фильтров каталога: роль цвета одна на весь поиск и отбор.
+   ⚠️ НА БИРЮЗЕ ДОПУСТИМ ТОЛЬКО ОСНОВНОЙ ТЕКСТ (--text 6,03; --text2 даёт
+   3,31). Поле ввода, списки и подпись галочки поэтому живут внутри
+   светлого поля --surface, а не прямо на панели. */
 .ss-form {
-  background: var(--surface);
+  background: var(--surface-tool);
   border: 1px solid var(--border, #e8e8e4);
   border-radius: 12px;
   padding: 24px;
@@ -37,7 +42,7 @@
   font-size: .95rem;
   font-family: inherit;
   color: var(--text);
-  background: var(--surface-2, #f7f7f5);
+  background: var(--surface);   /* светлое поле НА бирюзовой панели */
   border: 1px solid var(--border, #e8e8e4);
   border-radius: 8px;
   padding: 12px 14px;
@@ -64,7 +69,7 @@
   font-size: .875rem;
   font-family: inherit;
   color: var(--text);
-  background: var(--surface-2, #f7f7f5);
+  background: var(--surface);   /* светлое поле НА бирюзовой панели */
   border: 1px solid var(--border, #e8e8e4);
   border-radius: 7px;
   padding: 7px 12px;
@@ -79,7 +84,7 @@
   align-items: center;
   gap: 6px;
   font-size: .875rem;
-  color: var(--text2);
+  color: var(--text);          /* прямо на бирюзе: --text2 даёт 3,31 */
   cursor: pointer;
 }
 .ss-checkbox-wrap input[type=checkbox] {
@@ -128,8 +133,8 @@
 
 /* ── Карточка результата ────────────────────────────── */
 .ss-result-item {
-  background: var(--surface);
-  border: 1px solid var(--border, #e8e8e4);
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
   border-radius: 10px;
   padding: 18px 20px;
   margin-bottom: 12px;
@@ -157,10 +162,14 @@
   font-size: 1.05rem;
   line-height: 1;
 }
+/* ⚠️ 10,4 px под прозрачностью .75 — подпись «по словам» на экране
+   практически отсутствовала. Прозрачность у ТЕКСТА запрещена той же
+   причиной, что и у клетки теплокарты (см. --act-a1 в токенах): она
+   гасит контраст, и его уже ничем не вернуть. Кегль поднят до пола
+   подписи, приглушение отдано цвету. */
 .ss-score-badge span {
-  font-size: .65rem;
+  font-size: 13px;
   font-weight: 500;
-  opacity: .75;
   margin-top: 2px;
 }
 
@@ -181,7 +190,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.ss-result-title:hover { color: var(--accent); }
+.ss-result-title:hover { color: var(--accent-ink); }
 
 .ss-result-meta {
   display: flex;
@@ -191,7 +200,7 @@
   margin-bottom: 8px;
 }
 .ss-chip {
-  font-size: .75rem;
+  font-size: 13px;   /* пол подписи; .75rem давал 12 px */
   background: var(--chip-bg, #f0f0ee);
   color: var(--chip-text, #555);
   border-radius: 4px;
@@ -199,7 +208,7 @@
   white-space: nowrap;
 }
 .ss-chip.topic { background: var(--accent-tint, #fce7f3); color: var(--accent-deep, #9d174d); }
-.ss-stars { color: var(--amber, #b26b00); font-size: .8rem; }
+.ss-stars { color: var(--amber-ink); font-size: 13px; }
 
 .ss-result-preview {
   font-size: .85rem;
@@ -384,7 +393,7 @@
               {% endfor %}
 
               {% if p.solution and not p.solution_needs_review %}
-                <span class="ss-chip" style="color:var(--green);background:var(--green-tint)">✓ есть решение</span>
+                <span class="ss-chip" style="color:var(--green-ink);background:var(--green-tint)">✓ есть решение</span>
               {% endif %}
             </div>
 

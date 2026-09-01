@@ -17,7 +17,7 @@
 {% block title %}Состав работы{% endblock %}
 
 {% block extra_style %}
-.wk-sum { display: flex; gap: 20px; flex-wrap: wrap; font-size: 13px;
+.wk-sum { display: flex; gap: 20px; flex-wrap: wrap; font-size: 14px;
           color: var(--text2); margin: 0 2px 14px; }
 .wk-sum b { color: var(--text); }
 
@@ -35,11 +35,11 @@
    себе. Акцентом они не становятся: главное действие экрана не здесь. */
 .wk-grip { color: var(--text2); cursor: grab; font-size: 16px;
            line-height: 1.4; user-select: none; }
-.wk-no { font-size: 13px; font-weight: 700; color: var(--text3);
+.wk-no { font-size: 14px; font-weight: 700; color: var(--text3);
          min-width: 20px; line-height: 1.5; }
 .wk-body { flex: 1; min-width: 0; }
 .wk-title { font-size: 14px; font-weight: 600; line-height: 1.4; }
-.wk-sub { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.wk-sub { font-size: 13px; color: var(--text3); margin-top: 4px; }
 {% comment %}
 Вид раскрывашки задаёт НАБОР (`.k-disc`): своё правило здесь перебивало бы
 общее — оно ниже и той же силы, — и «Целиком» на этом шаге выглядело бы
@@ -52,7 +52,7 @@
    та же причина, по которой этот токен заводили для правимого числа. */
 .wk-move button { background: none; border: 1px solid var(--num-line);
                   border-radius: 5px; color: var(--text2); cursor: pointer;
-                  font-size: 12px; line-height: 1; padding: 3px 6px; }
+                  font-size: 13px; line-height: 1; padding: 3px 6px; }
 .wk-move button:hover:not(:disabled) { color: var(--text);
                                        border-color: var(--text2); }
 /* ⚠️ НЕДОСТУПНОЕ СОСТОЯНИЕ — ЦВЕТОМ, А НЕ `opacity`. Прозрачность гасит
@@ -60,7 +60,7 @@
    17.08); здесь она к тому же делала невидимой и без того бледную рамку. */
 .wk-move button:disabled { color: var(--text3); border-color: var(--border);
                            cursor: default; }
-.wk-pts { display: flex; align-items: center; gap: 5px; font-size: 12px;
+.wk-pts { display: flex; align-items: center; gap: 5px; font-size: 13px;
           color: var(--text3); }
 {% comment %}
 Балл позиции — число без рамки (`.k-num` из набора). Ширину переопределяем
@@ -79,9 +79,9 @@
 {% comment %}
 Пометка правленного руками балла: тихая, в одну строку под полем.
 {% endcomment %}
-.wk-manual { font-size: 11px; color: var(--text3); white-space: nowrap; }
+.wk-manual { font-size: 13px; color: var(--text3); white-space: nowrap; }
 .wk-rerule { background: none; border: 0; padding: 0; cursor: pointer;
-             font-size: 11px; color: var(--accent); }
+             font-size: 13px; color: var(--accent-ink); }
 .wk-rerule:hover { text-decoration: underline; }
 .wk-pts { flex-wrap: wrap; justify-content: flex-end; max-width: 150px; }
 .wk-x { background: none; border: 0; color: var(--text3); cursor: pointer;
@@ -96,7 +96,7 @@
                   border-radius: 12px; padding: 22px 26px 26px; }
 .wk-eyes__head { display: flex; align-items: baseline; gap: 12px; }
 .wk-eyes__head h2 { font-size: 17px; font-weight: 700; flex: 1; }
-.wk-eyes__note { font-size: 12px; color: var(--text3); margin: 6px 0 14px; }
+.wk-eyes__note { font-size: 13px; color: var(--text3); margin: 6px 0 14px; }
 {% comment %}
 ⚠️ Правила самого листа переехали в НАБОР (`templates/_kit.html`, ревью
 17.08, п. 6.1): та же разметка рисуется и на шаге выдачи. Класс, чей стиль

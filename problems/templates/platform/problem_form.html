@@ -21,7 +21,7 @@
           gap: 20px; align-items: start; }
 .form-field { margin-bottom: 14px; }
 .form-field:last-child { margin-bottom: 0; }
-.form-field label { display: block; font-size: 12px; font-weight: 600;
+.form-field label { display: block; font-size: 13px; font-weight: 600;
                     color: var(--text2); margin-bottom: 5px; }
 {% comment %}
 ⚠️ `:not(.k-num)` — ЧИСЛА ЗДЕСЬ БЕЗ РАМОК (визуальная сессия 17.08, п. 1.1).
@@ -66,7 +66,7 @@
 .zoom-box.is-zoomed .zoom-head { display: flex; align-items: center;
                                  gap: 12px; position: absolute; top: 12px;
                                  left: 20px; right: 20px; }
-.zoom-head__name { font-size: 13px; font-weight: 700; flex: 1; }
+.zoom-head__name { font-size: 14px; font-weight: 700; flex: 1; }
 .zoom-preview { display: none; }
 /* Живой предпросмотр рядом с полем: в развёрнутом виде правая колонка
    «Так увидит ученик» не видна, а формулы проверяют глазами. */
@@ -74,7 +74,7 @@
   overflow: auto; font-size: 14px; line-height: 1.7; padding: 12px 14px;
   background: var(--surface-2); border: 0.5px solid var(--border);
   border-radius: var(--r); overflow-wrap: anywhere; }
-.zoom-preview__cap { font-size: 11px; text-transform: uppercase;
+.zoom-preview__cap { font-size: 13px; text-transform: uppercase;
                      letter-spacing: .04em; color: var(--text3);
                      margin-bottom: 6px; }
 @media (min-width: 900px) {
@@ -87,15 +87,15 @@
 }
 .errors { background: var(--error-tint); border: 1px solid var(--error-border);
           color: var(--error); border-radius: var(--r); padding: 12px 14px;
-          font-size: 13px; line-height: 1.7; margin-bottom: 18px; }
+          font-size: 14px; line-height: 1.7; margin-bottom: 18px; }
 .errors ul { margin: 0; padding-left: 18px; }
 
 /* Карточки левой колонки — из набора деталей, со своим заголовком. */
 .ed-card { margin-bottom: 14px; }
 .ed-card__head { display: flex; align-items: baseline; gap: 10px;
                  margin-bottom: 12px; }
-.ed-card__name { font-size: 13px; font-weight: 700; }
-.ed-card__note { font-size: 12px; color: var(--text3); }
+.ed-card__name { font-size: 14px; font-weight: 700; }
+.ed-card__note { font-size: 13px; color: var(--text3); }
 
 /* Кнопки формул и графиков — ОДНА строка под полем условия.
    ⚠️ Отступы поджаты: три кнопки в 404-пиксельной колонке не помещались
@@ -111,7 +111,7 @@
    start`). Раньше превью уезжало вверх при прокрутке. */
 .preview { position: sticky; top: 68px; max-height: calc(100vh - 88px);
            overflow: auto; }
-.preview-label { font-size: 11px; text-transform: uppercase;
+.preview-label { font-size: 13px; text-transform: uppercase;
                  letter-spacing: .05em; color: var(--text2);
                  margin-bottom: 10px; }
 .preview-body { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere;
@@ -121,17 +121,17 @@
 .pv-part b { margin-right: 4px; }
 .pv-sol { margin-top: 16px; padding-top: 12px;
           border-top: 1px solid var(--border-soft); }
-.pv-sol__cap { font-size: 11px; text-transform: uppercase;
+.pv-sol__cap { font-size: 13px; text-transform: uppercase;
                letter-spacing: .05em; color: var(--text2);
                margin-bottom: 6px; }
-.pv-sol__body { font-size: 13px; line-height: 1.65; color: var(--text2);
+.pv-sol__body { font-size: 14px; line-height: 1.65; color: var(--text2);
                 overflow-wrap: anywhere; }
 
 .opt-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .opt-row input[type=text] { flex: 1; }
 .opt-move { border: 0.5px solid var(--border); border-radius: var(--r);
             background: transparent; color: var(--text2); cursor: pointer;
-            font: inherit; font-size: 12px; padding: 4px 7px; }
+            font: inherit; font-size: 13px; padding: 4px 7px; }
 .opt-move:hover { background: var(--panel); }
 
 /* ── Пункт задачи ──────────────────────────────────────────────────────
@@ -158,11 +158,11 @@
 (метки бывают «I», «10»), а прижимает букву выравнивание вправо.
 {% endcomment %}
 .part-chip input { width: 1.6em; min-width: 1.6em; border: 0; padding: 0;
-                   background: none; color: var(--accent); font: inherit;
+                   background: none; color: var(--accent-ink); font: inherit;
                    text-align: right; }
 .part-chip input:focus { outline: none; }
-.part-chip__tail { color: var(--accent); }
-.part-of { font-size: 12px; color: var(--text3); }
+.part-chip__tail { color: var(--accent-ink); }
+.part-of { font-size: 13px; color: var(--text3); }
 .part-drop { margin-left: auto; background: none; border: 0;
              color: var(--text3); cursor: pointer; font-size: 17px;
              line-height: 1; padding: 2px 6px; }
@@ -193,11 +193,11 @@
 .part-grid .k-num, #whole-answer .k-num { width: 100%; min-width: 0;
                                           text-align: left; padding-left: 2px; }
 .part-grid label { white-space: normal; line-height: 1.25; }
-.part-grid .k-hint { margin-top: 4px; font-size: 11px; }
+.part-grid .k-hint { margin-top: 4px; font-size: 13px; }
 
 .graph-plate {
   display: inline-block; border: 1px dashed var(--border);
-  border-radius: var(--r); padding: 6px 12px; font-size: 13px;
+  border-radius: var(--r); padding: 6px 12px; font-size: 14px;
   color: var(--text2); background: var(--surface-2); margin: 6px 0;
 }
 dialog.modal { border: 0.5px solid var(--border); border-radius: 10px;

@@ -28,8 +28,18 @@
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
 }
+/* ⚠️ РЕЛЬС ФИЛЬТРОВ — ПАНЕЛЬ ИНСТРУМЕНТА, А НЕ ЕЩЁ ОДНА КАРТОЧКА.
+   Роль цвета из решения владельца и дизайнера 31.08.2026: всё, что
+   относится к поиску и отбору, красится --surface-tool. До 01.09 токен был
+   объявлен, но не читался ни одним экраном, и рельс был того же кремового,
+   что и карточки, — семь цветов палитры давали на экране один.
+   ⚠️ НА ЭТОЙ ПАНЕЛИ ДОПУСТИМ ТОЛЬКО ОСНОВНОЙ ТЕКСТ: --text даёт 6,03,
+   --text2 — 3,31, то есть хуже нормы AA. Поэтому подписи разделов и ссылка
+   сброса ниже переведены на --text, а всё остальное живёт внутри светлых
+   полей (--surface), а не прямо на панели. Осветлить панель нельзя — это
+   цвет бренда. */
 .filter-card {
-  background: var(--panel);
+  background: var(--surface-tool);
   border: .5px solid var(--border);
   border-radius: 10px;
   padding: 18px 16px;
@@ -38,11 +48,11 @@
 .filter-section:last-child { margin-bottom: 0; }
 .filter-label {
   display: block;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .5px;
-  color: var(--text2);
+  color: var(--text);          /* прямо на бирюзе: --text2 даёт 3,31 */
   margin-bottom: 8px;
 }
 
@@ -53,7 +63,7 @@
   border: .5px solid var(--border);
   border-radius: var(--r);
   padding: 7px 10px;
-  font-size: 13px;
+  font-size: 14px;
   background: var(--surface);
   color: var(--text);
   transition: border-color .12s;
@@ -78,7 +88,7 @@
   border: .5px solid var(--border);
   border-radius: var(--r);
   padding: 7px 8px;
-  font-size: 13px;
+  font-size: 14px;
   background: var(--surface);
   color: var(--text);
   cursor: pointer;
@@ -93,7 +103,7 @@
   border: .5px solid var(--border);
   border-radius: var(--r);
   background: var(--surface);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--amber);
   cursor: pointer;
   text-decoration: none;
@@ -111,14 +121,14 @@
   border: .5px solid var(--border);
   border-radius: var(--r);
   background: var(--surface);
-  font-size: 12px;
+  font-size: 13px;
   color: var(--text2);
   cursor: pointer;
   text-decoration: none;
   text-align: left;
   transition: background .1s, border-color .1s, color .1s;
 }
-.type-btn:hover { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); }
+.type-btn:hover { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent); }
 .type-btn.active { background: var(--accent); color: var(--on-btn); border-color: var(--accent); }
 
 /* Чекбокс */
@@ -126,7 +136,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   cursor: pointer;
 }
@@ -140,8 +150,8 @@
 .reset-link {
   display: block;
   text-align: center;
-  font-size: 12px;
-  color: var(--text2);
+  font-size: 13px;
+  color: var(--text);          /* прямо на бирюзе: --text2 даёт 3,31 */
   text-decoration: none;
   padding: 7px;
   border-radius: var(--r);
@@ -158,13 +168,13 @@
   align-items: center;
   margin-bottom: 14px;
 }
-.results-count { font-size: 13px; color: var(--text2); }
+.results-count { font-size: 14px; color: var(--text2); }
 .results-count strong { color: var(--text); font-weight: 600; }
 
 /* ── Карточка задачи ──────────────────────────────── */
 .problem-card {
-  background: var(--surface);
-  border: .5px solid var(--border);
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
   border-radius: 10px;
   padding: 16px 20px;
   margin-bottom: 10px;
@@ -191,25 +201,25 @@
   line-height: 1.4;
   flex: 1;
 }
-.problem-card:hover .card-title { color: var(--accent); }
+.problem-card:hover .card-title { color: var(--accent-ink); }
 .card-meta {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-shrink: 0;
 }
-.card-stars { font-size: 12px; color: var(--amber); letter-spacing: .5px; white-space: nowrap; }
+.card-stars { font-size: 13px; color: var(--amber); letter-spacing: .5px; white-space: nowrap; }
 .card-sol-badge {
   background: var(--green-tint);
   color: var(--green);
-  font-size: 10px;
+  font-size: 13px;
   font-weight: 700;
   border-radius: 20px;
   padding: 2px 7px;
   white-space: nowrap;
 }
 .card-preview {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
   line-height: 1.55;
   margin-bottom: 10px;
@@ -220,7 +230,7 @@
   color: var(--chip-text);
   border-radius: 20px;
   padding: 2px 9px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -233,7 +243,7 @@
 .ca-btn {
   padding: 4px 11px;
   border-radius: var(--r);
-  font-size: 12px;
+  font-size: 13px;
   cursor: pointer;
   white-space: nowrap;
   transition: background .12s, color .12s, border-color .12s;
@@ -244,11 +254,11 @@
   background: var(--surface);
   color: var(--text2);
 }
-.ca-preview:hover { border-color: var(--accent); color: var(--accent); }
+.ca-preview:hover { border-color: var(--accent); color: var(--accent-ink); }
 .ca-add {
   border: .5px solid var(--accent);
   background: var(--surface);
-  color: var(--accent);
+  color: var(--accent-ink);
   font-weight: 500;
 }
 .ca-add:hover { background: var(--accent); color: var(--on-btn); }
@@ -272,7 +282,7 @@
 .ca-dropdown.open { display: block; }
 .ca-dd-head {
   padding: 8px 12px 6px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--text2);
   text-transform: uppercase;
@@ -286,7 +296,7 @@
   border: none;
   background: none;
   text-align: left;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text);
   cursor: pointer;
   transition: background .1s;
@@ -294,7 +304,7 @@
 }
 .ca-dd-item:last-child { border-bottom: none; }
 .ca-dd-item:hover { background: var(--surface-2); }
-.ca-dd-item.new-hw { color: var(--accent); font-weight: 500; }
+.ca-dd-item.new-hw { color: var(--accent-ink); font-weight: 500; }
 .ca-dd-item.done   { color: var(--green); pointer-events: none; }
 
 /* ── Пустой результат ─────────────────────────────── */
@@ -306,8 +316,8 @@
   border: .5px solid var(--border);
   border-radius: 10px;
 }
-.empty-state p { font-size: 15px; margin-bottom: 6px; color: var(--text); }
-.empty-state small { font-size: 13px; }
+.empty-state p { font-size: 16px; margin-bottom: 6px; color: var(--text); }
+.empty-state small { font-size: 14px; }
 
 /* ── Пагинация ────────────────────────────────────── */
 .pagination {
@@ -323,18 +333,18 @@
   display: inline-flex; align-items: center; justify-content: center;
   border: .5px solid var(--border);
   border-radius: var(--r);
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
   text-decoration: none;
   background: var(--surface);
   padding: 0 10px;
   transition: background .1s, color .1s, border-color .1s;
 }
-.page-btn:hover { background: var(--accent-tint); color: var(--accent); border-color: var(--accent); }
+.page-btn:hover { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent); }
 .page-btn.active { background: var(--accent); color: var(--on-btn); border-color: var(--accent); font-weight: 600; }
 .page-btn.disabled { opacity: .35; pointer-events: none; }
 .page-ellipsis {
-  font-size: 13px; color: var(--text2);
+  font-size: 14px; color: var(--text2);
   display: inline-flex; align-items: center;
   height: 36px; padding: 0 4px;
 }
@@ -345,10 +355,10 @@
 }
 .toolbar-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .sort-wrap { display: flex; align-items: center; gap: 6px; }
-.sort-label { font-size: 12px; color: var(--text3); }
+.sort-label { font-size: 13px; color: var(--text3); }
 .sort-select {
   border: .5px solid var(--border); border-radius: var(--r);
-  padding: 5px 8px; font-size: 12px; background: var(--surface);
+  padding: 5px 8px; font-size: 13px; background: var(--surface);
   color: var(--text); cursor: pointer;
 }
 .sort-select:focus { outline: none; border-color: var(--focus); }
@@ -366,7 +376,7 @@
 }
 .seg-btn:last-child { border-right: none; }
 .seg-btn:hover { background: var(--surface-2); color: var(--text); }
-.seg-btn.active { background: var(--accent-tint); color: var(--accent); }
+.seg-btn.active { background: var(--accent-tint); color: var(--accent-ink); }
 .seg-btn svg { width: 16px; height: 16px; }
 
 /* ── Чипы активных фильтров ────────────────────────── */
@@ -374,19 +384,30 @@
   display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
   margin-bottom: 14px;
 }
+  /* ⚠️ ПОД ПОЛУПРОЗРАЧНЫМ ТИНТОМ — ПЛОТНАЯ ПОДЛОЖКА ЦВЕТОМ СТРАНИЦЫ.
+     Иначе сквозь тинт просвечивает фоновый паттерн, и текст читается уже
+     не на тинте, а на «тинт + знак»: замер дал 4,17 в светлой теме и 3,90
+     в тёмной при норме 4,5. Плотностью паттерна это не лечится — даже при
+     .04 светлая тема даёт 4,49: у пары «--accent-ink на --accent-tint» и
+     без всякого паттерна всего 4,71 запаса.
+     Цвет не выдуман: тинт кладётся картинкой поверх плотного --bg, то есть
+     получается ровно тот же оттенок, что и был, но непрозрачный. Обе темы
+     обслуживаются теми же токенами. */
 .fchip {
   display: inline-flex; align-items: center; gap: 4px;
-  background: var(--accent-tint); color: var(--accent);
+  background-color: var(--bg);
+  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
+  color: var(--accent-ink);
   border-radius: 20px; padding: 3px 5px 3px 11px;
-  font-size: 12px; font-weight: 500; text-decoration: none;
+  font-size: 13px; font-weight: 500; text-decoration: none;
 }
 .fchip .x {
   display: inline-flex; align-items: center; justify-content: center;
   width: 16px; height: 16px; border-radius: 50%;
-  font-size: 13px; line-height: 1; color: var(--accent);
+  font-size: 14px; line-height: 1; color: var(--accent-ink);
 }
 .fchip:hover .x { background: var(--accent); color: var(--on-btn); }
-.chips-clear { font-size: 12px; color: var(--text2); text-decoration: none; padding: 3px 8px; }
+.chips-clear { font-size: 13px; color: var(--text2); text-decoration: none; padding: 3px 8px; }
 .chips-clear:hover { color: var(--text); }
 
 /* ── Вид «Строки» (по умолчанию) ───────────────────── */
@@ -404,24 +425,34 @@
 .prow:last-child  { border-bottom: none; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
 .prow:hover { background: var(--surface-2); }
 .prow-stars {
-  width: 66px; flex-shrink: 0; font-size: 12px; color: var(--amber);
+  width: 66px; flex-shrink: 0; font-size: 13px; color: var(--amber);
   letter-spacing: .5px; white-space: nowrap; padding-top: 2px;
 }
 .prow-main { flex: 1; min-width: 0; }
+/* ⚠️ ДВЕ СТРОКИ, А НЕ ОДНА С МНОГОТОЧИЕМ. Одна строка теряла у длинных
+   заголовков до 164 px текста на узком окне — «Можно решить без
+   использования калькулятора» обрывалось на середине. Многоточие осталось,
+   но включается вдвое позже.
+   На рабочих ширинах (1100 и шире) НИЧЕГО НЕ МЕНЯЕТСЯ: там заголовки
+   помещаются в одну строку, замер это подтверждает. Высота строки растёт
+   только там, где иначе текст просто пропал бы. */
 .prow-title {
   font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
+  overflow: hidden;
 }
-.prow:hover .prow-title { color: var(--accent); }
+.prow:hover .prow-title { color: var(--accent-ink); }
 .prow-preview {
-  font-size: 12.5px; color: var(--text2); line-height: 1.5; margin-top: 3px;
+  font-size: 13px; color: var(--text2); line-height: 1.5; margin-top: 3px;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .prow-meta {
   display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  margin-top: 7px; font-size: 11.5px; color: var(--text3);
+  margin-top: 7px; font-size: 13px; color: var(--text3);
 }
-.prow-meta .mid { color: var(--border); }
+/* Разделитель — цветом ТЕКСТА, а не рамки. --border это rgba(45,45,45,.14),
+   цвет для линии в 1 px; точкой он даёт контраст 1,30 и не виден вовсе. */
+.prow-meta .mid { color: var(--text3); }
 .prow-meta .chip {
   background: var(--chip-bg); color: var(--chip-text);
   border-radius: 20px; padding: 1px 8px; font-weight: 500;
@@ -434,9 +465,9 @@
   background: var(--surface); border: .5px solid var(--border);
   border-radius: 10px; overflow: hidden;
 }
-.ptable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 13px; }
+.ptable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
 .ptable th {
-  text-align: left; font-size: 11px; font-weight: 600;
+  text-align: left; font-size: 13px; font-weight: 600;
   text-transform: uppercase; letter-spacing: .4px; color: var(--text3);
   background: var(--surface-2); padding: 9px 12px; border-bottom: .5px solid var(--border);
 }
@@ -458,7 +489,7 @@
 .ptable .col-sol .yes { color: var(--green); font-weight: 700; }
 .ptable .col-act   { width: 92px; }
 .ptable a.t-title { color: var(--text); font-weight: 500; text-decoration: none; }
-.ptable a.t-title:hover { color: var(--accent); }
+.ptable a.t-title:hover { color: var(--accent-ink); }
 
 /* ── Вид «Галерея» ─────────────────────────────────── */
 .gallery-grid {
@@ -468,20 +499,27 @@
 
 /* ── Атлас тем (нулевое состояние) ─────────────────── */
 .atlas-head { font-size: 19px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.atlas-sub { font-size: 13px; color: var(--text2); margin-bottom: 18px; }
+.atlas-sub { font-size: 14px; color: var(--text2); margin-bottom: 18px; }
 .atlas-grid {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
 }
+/* ⚠️ ПЛИТКА ТЕМЫ И КАРТОЧКА ЗАДАЧИ — ИНФОРМАЦИОННЫЕ БЛОКИ (--surface-info),
+   И РАМКА ЯНТАРЁМ ОБЯЗАТЕЛЬНА. Плашка против фона страницы даёт 1,06 —
+   как отдельный блок она не читается вовсе; границу держит только рамка
+   --brand-amber: 1,94 против фона и 1,84 против самой плашки. Без рамки
+   блока на экране физически нет. */
 .atlas-tile {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: var(--surface); border: .5px solid var(--border); border-radius: 10px;
+  background: var(--surface-info); border: 1px solid var(--brand-amber); border-radius: 10px;
   padding: 14px 16px; text-decoration: none; color: var(--text);
   transition: border-color .12s, background .12s, transform .12s;
 }
 .atlas-tile:hover { border-color: var(--accent); background: var(--accent-tint); transform: translateY(-1px); }
-.atlas-name { font-size: 13.5px; font-weight: 600; line-height: 1.3; }
-.atlas-count { font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.atlas-tile:hover .atlas-count { color: var(--accent); }
+.atlas-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
+/* --text2, а не --text3: на тёмной плашке #504a2d третий уровень даёт
+   3,92 при норме 4,5, второй — 4,70. */
+.atlas-count { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.atlas-tile:hover .atlas-count { color: var(--accent-ink); }
 
 /* ── Модальное окно ───────────────────────────────── */
 .modal-backdrop {
@@ -514,7 +552,7 @@
 }
 .c-modal-title {
   flex: 1;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -529,7 +567,7 @@
   color: var(--chip-text);
   border-radius: 20px;
   padding: 2px 8px;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 500;
 }
 .c-modal-tag.sol { background: var(--green-tint); color: var(--green); }
@@ -553,7 +591,7 @@
 }
 .c-modal-part { margin-top: 14px; }
 .c-modal-part-label {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--text2);
   text-transform: uppercase;
@@ -568,7 +606,7 @@
   justify-content: space-between;
   gap: 12px;
 }
-.c-modal-source { font-size: 12px; color: var(--text2); flex: 1; }
+.c-modal-source { font-size: 13px; color: var(--text2); flex: 1; }
 .c-modal-loading {
   display: flex; align-items: center; justify-content: center;
   height: 100px; color: var(--text2); font-size: 14px;
@@ -892,7 +930,7 @@
     <div class="c-modal-foot">
       <span class="c-modal-source" id="c-modal-source"></span>
       <a id="c-modal-link" href="#" class="ca-btn ca-add"
-         style="font-size:13px;padding:6px 16px;text-decoration:none;">
+         style="font-size:14px;padding:6px 16px;text-decoration:none;">
         Открыть задачу →
       </a>
     </div>
@@ -961,7 +999,7 @@ function renderCatalogModal(data) {
   meta.textContent = '';
   if (data.difficulty_str) {
     const d = document.createElement('span');
-    d.style.cssText = 'font-size:13px;color:var(--amber);';
+    d.style.cssText = 'font-size:14px;color:var(--amber);';
     d.textContent = data.difficulty_str;
     meta.appendChild(d);
   }
@@ -991,7 +1029,7 @@ function renderCatalogModal(data) {
       }
       if (part.points) {
         const pts = document.createElement('span');
-        pts.style.cssText = 'color:var(--text2);font-size:12px;';
+        pts.style.cssText = 'color:var(--text2);font-size:13px;';
         pts.textContent = ' (' + part.points + ' б.)';
         label.appendChild(pts);
       }

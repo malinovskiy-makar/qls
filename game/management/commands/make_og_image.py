@@ -86,7 +86,7 @@ class Command(BaseCommand):
         d.text((80, 300), 'Игра на скорость по олимпиадной экономике',
                font=f_sub, fill=MUTED)
         d.text((80, 380), '3 жизни · 4 режима · обгонишь?', font=f_sub, fill=ACCENT)
-        d.text((80, H - 90), 'ЭкЗадачи', font=f_small, fill=MUTED)
+        d.text((80, H - 90), 'Weconomics', font=f_small, fill=MUTED)
 
         img.save(out, 'PNG', optimize=True)
         self.stdout.write(self.style.SUCCESS(

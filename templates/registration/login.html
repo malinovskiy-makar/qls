@@ -1,15 +1,22 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Вход — ЭкЗадачи</title>
+  <title>Вход — Weconomics</title>
   {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
   <style>
 /* Цветовые токены — в общем партиале _tokens.html (свет + тьма). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
+  /* ⚠️ ЦВЕТ ТЕКСТА ОБЯЗАТЕЛЕН, А НЕ «И ТАК ЧЁРНЫЙ». Страница самостоятельная
+     и base не наследует; без этой строки заголовок берёт чёрный по умолчанию
+     от браузера. В светлой теме это сходит за --text, а в тёмной остаётся
+     ЧЁРНЫМ на тёмной карточке: «Войти» давал 1,99 при норме 3,0 и не читался
+     вовсе. Нашлось замером по экрану — по токенам такой пары нет. */
+  color: var(--text);
   background: var(--bg);
   min-height: 100vh;
   display: flex;
@@ -32,31 +39,23 @@ body {
   gap: 10px;
   margin-bottom: 32px;
 }
-.login-logo-icon {
-  width: 36px; height: 36px; border-radius: 9px;
-  background: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; color: #fff;
-}
-.login-logo-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-.login-logo-name span { color: var(--accent); }
+/* Высотой, а не шириной: замок горизонтальный (884×194), и ширина у него
+   производная. 34 px по высоте дают ~155 px по ширине — меньше половины
+   карточки, то есть знак не спорит с заголовком «Войти». */
+.login-logo-lockup { height: 34px; width: auto; display: block; }
 h1 {
   font-size: 20px;
   font-weight: 700;
   margin-bottom: 6px;
 }
 .login-sub {
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
   margin-bottom: 28px;
 }
 label {
   display: block;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   color: var(--text);
   margin-bottom: 6px;
@@ -92,7 +91,7 @@ a:focus-visible, button:focus-visible {
   border-radius: var(--r);
   padding: 10px 14px;
   margin-bottom: 16px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--error);
 }
 .btn-login {
@@ -114,18 +113,27 @@ a:focus-visible, button:focus-visible {
   display: block;
   text-align: center;
   margin-top: 20px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
   text-decoration: none;
 }
-.back-link:hover { color: var(--accent); }
+.back-link:hover { color: var(--accent-ink); }
   </style>
 </head>
 <body>
 <div class="login-card">
+  {% comment %}
+  ⚠️ ЗДЕСЬ ГОТОВЫЙ ЛОГО-ЗАМОК ЦЕЛИКОМ, А НЕ «ЗНАК ПЛЮС СЛОВО ШРИФТОМ».
+  Сравнили оба варианта на экране (reports/shots/…/login_variants.png).
+  Пара «круглый знак + слово, набранное Montserrat» даёт на карточке ДВЕ
+  разные буквы W: нарисованную в кружке и наборную рядом — глаз читает это
+  как два знака одного бренда, поставленные рядом по ошибке. Плюс тонкая
+  обводка круга на 36 px растворяется. Замок `logo-medium.svg` — один
+  объект, буква W в нём и есть фирменный росчерк.
+  {% endcomment %}
   <div class="login-logo">
-    <div class="login-logo-icon">Эк</div>
-    <div class="login-logo-name">Эк<span>Задачи</span></div>
+    <img src="{% static 'img/logo-medium.svg' %}" alt="Weconomics"
+         class="login-logo-lockup">
   </div>
   <h1>Войти</h1>
   <p class="login-sub">Введите логин и пароль</p>

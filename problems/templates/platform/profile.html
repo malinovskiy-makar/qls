@@ -4,7 +4,7 @@
 
 {% block extra_style %}
 .form-field { margin-bottom: 14px; }
-.form-field label { display: block; font-size: 13px; font-weight: 500;
+.form-field label { display: block; font-size: 14px; font-weight: 500;
                     margin-bottom: 6px; }
 .form-field input, .form-field select {
   width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
@@ -20,18 +20,18 @@
 .saved-item {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; flex-wrap: wrap;
-  padding: 10px 0; border-bottom: 0.5px solid var(--border); font-size: 13px;
+  padding: 10px 0; border-bottom: 0.5px solid var(--border); font-size: 14px;
 }
 .saved-item:last-child { border-bottom: none; }
-.saved-link { color: var(--accent); text-decoration: none; }
+.saved-link { color: var(--accent-ink); text-decoration: none; }
 .saved-link:hover { text-decoration: underline; }
 /* Пометка снятой с витрины задачи: приглушённая, это не ошибка ученика. */
 .saved-off {
-  font-size: 11px; padding: 2px 7px; border-radius: 999px;
+  font-size: 13px; padding: 2px 7px; border-radius: 999px;
   background: var(--line); color: var(--text2); white-space: nowrap;
 }
 .saved-actions { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.saved-actions select { font: inherit; font-size: 12px; padding: 4px 8px;
+.saved-actions select { font: inherit; font-size: 13px; padding: 4px 8px;
   border-radius: var(--r); border: 0.5px solid var(--border);
   background: var(--surface-2); color: var(--text); }
 .folder-block { margin-bottom: 20px; }
@@ -123,7 +123,7 @@
 
 <div style="display:flex;gap:8px;align-items:center;margin-bottom:18px;flex-wrap:wrap;">
   <input type="text" id="new-folder-name" placeholder="Название новой папки"
-         style="font:inherit;font-size:13px;padding:7px 10px;border-radius:var(--r);
+         style="font:inherit;font-size:14px;padding:7px 10px;border-radius:var(--r);
                 border:0.5px solid var(--border);background:var(--surface-2);color:var(--text);">
   <button type="button" class="btn-outline btn-small" id="new-folder-btn">+ Создать папку</button>
   <span id="folder-status" class="row-meta"></span>

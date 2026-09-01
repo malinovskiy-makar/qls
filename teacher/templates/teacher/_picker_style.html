@@ -73,16 +73,16 @@
 .filters-row .k-select { min-width: 0; width: 100%;
                          text-overflow: ellipsis; }
 .checkbox-label {
-  display: flex; align-items: center; gap: 6px; font-size: 13px;
+  display: flex; align-items: center; gap: 6px; font-size: 14px;
   color: var(--text); cursor: pointer; white-space: nowrap; height: 34px;
 }
 .checkbox-label input { accent-color: var(--accent); width: 14px; height: 14px; }
 .reset-link {
-  font-size: 12px; color: var(--text2); text-decoration: none; height: 34px;
+  font-size: 13px; color: var(--text2); text-decoration: none; height: 34px;
   display: flex; align-items: center; padding: 0 4px;
 }
 .reset-link:hover { color: var(--text); }
-.results-count { font-size: 13px; color: var(--text2); margin-bottom: 10px; }
+.results-count { font-size: 14px; color: var(--text2); margin-bottom: 10px; }
 .results-count strong { color: var(--text); font-weight: 600; }
 
 /* ── Карточка задачи (сессия 8, п. 13) ────────────────────────────────
@@ -98,20 +98,20 @@
 .card-main { flex: 1; min-width: 0; }
 .card-title { font-size: 14px; font-weight: 600; color: var(--text);
               line-height: 1.4; overflow-wrap: anywhere; }
-.card-meta { font-size: 12px; color: var(--text3); margin-top: 2px; }
-.card-stars { font-size: 12px; color: var(--amber); white-space: nowrap;
+.card-meta { font-size: 13px; color: var(--text3); margin-top: 2px; }
+.card-stars { font-size: 13px; color: var(--amber); white-space: nowrap;
               flex-shrink: 0; }
-.card-preview { font-size: 12px; color: var(--text2); line-height: 1.5;
+.card-preview { font-size: 13px; color: var(--text2); line-height: 1.5;
                 margin-top: 6px; overflow-wrap: anywhere; }
 .card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
 .card-tag { background: var(--chip-bg); color: var(--chip-text);
-            border-radius: 20px; padding: 2px 8px; font-size: 11px;
+            border-radius: 20px; padding: 2px 8px; font-size: 13px;
             font-weight: 500; }
 .card-tag.source { background: var(--surface-2); color: var(--text2); }
 .card-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
 .btn-preview {
   padding: 5px 12px; border: .5px solid var(--border); border-radius: var(--r);
-  background: var(--surface); font-size: 12px; color: var(--text2);
+  background: var(--surface); font-size: 13px; color: var(--text2);
   cursor: pointer; white-space: nowrap;
   transition: border-color .12s, color .12s;
 }
@@ -133,11 +133,11 @@
 .page-btn {
   min-width: 34px; height: 34px; display: inline-flex; align-items: center;
   justify-content: center; border: .5px solid var(--border);
-  border-radius: var(--r); font-size: 13px; color: var(--text2);
+  border-radius: var(--r); font-size: 14px; color: var(--text2);
   text-decoration: none; background: var(--surface); padding: 0 8px;
   transition: background .1s, color .1s;
 }
-.page-btn:hover { background: var(--accent-tint); color: var(--accent); }
+.page-btn:hover { background: var(--accent-tint); color: var(--accent-ink); }
 .page-btn.active { background: var(--accent); color: var(--on-btn); font-weight: 600; }
 .page-btn.disabled { opacity: .35; pointer-events: none; }
 
@@ -147,10 +147,10 @@
    отступы совпадают с `.k-card`, поля — с `.k-input`. */
 .sidebar-card { background: var(--surface); border: .5px solid var(--border);
                 border-radius: 10px; padding: 18px 20px; margin-bottom: 12px; }
-.sidebar-title { font-size: 12px; font-weight: 600; color: var(--text2);
+.sidebar-title { font-size: 13px; font-weight: 600; color: var(--text2);
                  margin-bottom: 10px; }
 .form-group { margin-bottom: 14px; }
-.form-label { display: block; font-size: 12px; font-weight: 600;
+.form-label { display: block; font-size: 13px; font-weight: 600;
               color: var(--text2); margin-bottom: 6px; }
 .form-control {
   width: 100%; box-sizing: border-box; border: .5px solid var(--border);
@@ -159,33 +159,33 @@
   transition: border-color .12s; font-family: inherit;
 }
 .form-control:focus { outline: none; border-color: var(--focus); }
-.form-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.form-hint { font-size: 13px; color: var(--text2); margin-top: 6px; }
 
 .groups-list {
   display: flex; flex-direction: column; gap: 8px;
   max-height: 200px; overflow-y: auto;
 }
-.group-row { display: flex; align-items: center; gap: 8px; font-size: 13px;
+.group-row { display: flex; align-items: center; gap: 8px; font-size: 14px;
              cursor: pointer; }
 .group-row input[type="checkbox"] { accent-color: var(--accent);
                                     width: 14px; height: 14px; }
-.group-count { font-size: 11px; color: var(--text2); margin-left: 4px; }
+.group-count { font-size: 13px; color: var(--text2); margin-left: 4px; }
 
 /* ── Корзина ─────────────────────────────────────── */
 .cart-header { display: flex; align-items: center; justify-content: space-between;
                margin-bottom: 10px; gap: 8px; flex-wrap: wrap; }
-.cart-count { font-size: 13px; color: var(--text2); }
+.cart-count { font-size: 14px; color: var(--text2); }
 .cart-count strong { color: var(--text); font-weight: 600; }
 .cart-list { display: flex; flex-direction: column; gap: 5px;
              max-height: 220px; overflow-y: auto; margin-bottom: 14px; }
 .cart-item { display: flex; align-items: center; gap: 8px; padding: 6px 8px;
-             background: var(--panel); border-radius: 6px; font-size: 12px; }
+             background: var(--panel); border-radius: 6px; font-size: 13px; }
 .cart-item-title { flex: 1; overflow: hidden; text-overflow: ellipsis;
                    white-space: nowrap; color: var(--text); }
 .cart-remove { border: none; background: none; color: var(--text2);
                cursor: pointer; font-size: 14px; padding: 0 2px; line-height: 1; }
 .cart-remove:hover { color: var(--error); }
-.cart-empty { font-size: 12px; color: var(--text2); text-align: center;
+.cart-empty { font-size: 13px; color: var(--text2); text-align: center;
               padding: 16px 0; font-style: italic; }
 .btn-submit {
   width: 100%; padding: 10px; background: var(--btn-bg); color: var(--on-btn);
@@ -199,7 +199,7 @@
 .picker-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
 .picker-tab {
   border: .5px solid var(--border); border-radius: var(--r); padding: 6px 14px;
-  font-size: 13px; background: var(--surface); color: var(--text2);
+  font-size: 14px; background: var(--surface); color: var(--text2);
   cursor: pointer; font-family: inherit;
 }
 .picker-tab.is-on { border-color: var(--text3); color: var(--text);
@@ -217,10 +217,10 @@
 }
 .modal-head { padding: 18px 22px 14px; border-bottom: .5px solid var(--border);
               display: flex; align-items: flex-start; gap: 12px; }
-.modal-title { flex: 1; font-size: 15px; font-weight: 700; line-height: 1.4; }
+.modal-title { flex: 1; font-size: 16px; font-weight: 700; line-height: 1.4; }
 .modal-meta { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .modal-tag { background: var(--chip-bg); color: var(--chip-text);
-             border-radius: 20px; padding: 2px 8px; font-size: 11px;
+             border-radius: 20px; padding: 2px 8px; font-size: 13px;
              font-weight: 500; }
 .modal-tag.type { background: var(--green-tint); color: var(--green); }
 .modal-close { border: none; background: none; font-size: 18px;
@@ -230,16 +230,16 @@
 .modal-body { padding: 18px 22px; overflow-y: auto; flex: 1; font-size: 14px;
               line-height: 1.65; overflow-wrap: anywhere; }
 .modal-part { margin-top: 14px; }
-.modal-part-label { font-size: 12px; font-weight: 700; color: var(--text2);
+.modal-part-label { font-size: 13px; font-weight: 700; color: var(--text2);
                     text-transform: uppercase; letter-spacing: .4px;
                     margin-bottom: 4px; }
 .modal-foot { padding: 14px 22px; border-top: .5px solid var(--border);
               display: flex; align-items: center; justify-content: space-between;
               gap: 12px; flex-wrap: wrap; }
-.modal-source { font-size: 12px; color: var(--text2); }
+.modal-source { font-size: 13px; color: var(--text2); }
 .btn-modal-add {
   padding: 7px 18px; background: var(--btn-bg); color: var(--on-btn);
-  border: none; border-radius: var(--r); font-size: 13px; font-weight: 600;
+  border: none; border-radius: var(--r); font-size: 14px; font-weight: 600;
   cursor: pointer; transition: background .12s;
 }
 .btn-modal-add:hover { background: var(--btn-bg-hover); }
@@ -248,7 +248,7 @@
                  height: 120px; color: var(--text2); font-size: 14px; }
 
 /* Одна тихая строка вместо ряда цветных тегов и звёздочек (фаза 16). */
-.card-meta { font-size: 12px; color: var(--text3); margin-top: 6px; }
+.card-meta { font-size: 13px; color: var(--text3); margin-top: 6px; }
 {% comment %}
 ⚠️ ЗДЕСЬ СТОЯЛ ВТОРОЙ НАБОР ПРАВИЛ ДЛЯ ТЕХ ЖЕ КЛАССОВ и, стоя ниже, побеждал
 первый: `flex: 0 1 auto` и `min-width: 150px` — из-за них список тем и
@@ -259,7 +259,7 @@
 /* ── Строка кандидата: две строки условия и кнопка «Целиком» ───────────
    (ревью 16.08, п. 9.2). Обрезка по CSS: резать число символов значит
    рвать формулу посередине, и в карточке остаётся «$Q_d = 100 -». */
-.cand-lead { font-size: 12px; color: var(--text2); line-height: 1.5;
+.cand-lead { font-size: 13px; color: var(--text2); line-height: 1.5;
              margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 2;
              -webkit-box-orient: vertical; overflow: hidden; }
 .cand.is-open .cand-lead { display: none; }

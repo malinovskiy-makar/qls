@@ -237,3 +237,7 @@ reports/import_new_sources/*
 !reports/import_new_sources/report.md
 !reports/import_new_sources/baseline_before_import.json
 !reports/import_new_sources/gate_new_sources_backup.json
+
+# Инвентарь цветов перед дизайн-работой: человекочитаемый отчёт нужен в
+# истории (по нему возвращают цвет «как было»), машинный JSON — нет.
+!reports/color_inventory_*.md
