@@ -476,6 +476,16 @@ function drawMathTangent(f) {
   const s1 = tanScales('top', L.top, L.yMid);
   const s2 = tanScales('bot', L.botTop, L.bottom);
 
+  /* Панели объявляются реестру: слой поверх сцены обязан считать по шкалам
+     ТОЙ панели, в которой стоит точка. Без этого площадь натягивалась
+     полигоном между графиком функции и графиком её производной, а на нижнем
+     графике мышь липла к f(x), которой там нет. */
+  clearPanels();
+  registerPanel('deriv-top', s1.mx, s1.my,
+    { x0: m.left, y0: L.top, x1: W - m.right, y1: L.yMid });
+  registerPanel('deriv-bottom', s2.mx, s2.my,
+    { x0: m.left, y0: L.botTop, x1: W - m.right, y1: L.bottom });
+
   // Каждая панель рисуется в своём прямоугольнике и за него не выходит.
   const defs = svg.append('defs');
   const clipRect = (id, y0, y1) => {
@@ -1064,6 +1074,15 @@ function updateMathPanel() {
 function redrawMath() {
   svg.selectAll('*').remove();
   addDefs();
+  /* Панель раздела: окно здесь полный план, а не первая четверть, поэтому
+     'main', зарегистрированная makeScales по CONFIG, тут не годится совсем.
+     Сюжет про производную заменит эту запись двумя своими. */
+  {
+    const m = CONFIG.margin, ms = mathScales();
+    clearPanels();
+    registerPanel('main', ms.mx, ms.my,
+      { x0: m.left, y0: m.top, x1: W - m.right, y1: H - m.bottom });
+  }
   const err = document.getElementById('math-error');
   // Сюжеты со своей формулой f(x) не нужны «Ограничению» и «Осям наоборот».
   if (STATE.mathSub === 'constraint') { if (err) err.style.display = 'none'; drawMathConstraint(); return; }

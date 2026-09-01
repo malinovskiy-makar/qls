@@ -418,6 +418,13 @@ function redrawInequality() {
   const side = Math.max(60, Math.min(availW, availH));
   sx = d3.scaleLinear().domain([0, 100]).range([m.left, m.left + side]);
   sy = d3.scaleLinear().domain([0, 100]).range([m.top + side, m.top]);
+  /* Поле здесь КВАДРАТ со своими шкалами 0…100, а не холст целиком: слой
+     поверх сцены обязан считать по ним. Раньше кривая Лоренца рисовалась в
+     квадрате, а вершины площадей и ключевые точки — по шкале на всю ширину:
+     координаты были правильные, а нарисованы не там. */
+  clearPanels();
+  registerPanel('lorenz', sx, sy,
+    { x0: m.left, y0: m.top, x1: m.left + side, y1: m.top + side });
   svg.selectAll('*').remove();
   addDefs();
   drawGrid();

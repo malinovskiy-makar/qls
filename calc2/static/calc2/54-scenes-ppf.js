@@ -2890,6 +2890,11 @@ function tradeBPanels() {
 // Отрисовка сценария Б: два графика рядом, у каждого своя КПВ и своя КТВ.
 function drawTradeB(d) {
   const panels = tradeBPanels();
+  // Два поля со своими масштабами — две панели реестра; 'main' на весь холст
+  // здесь не описывает ни одно из них.
+  clearPanels();
+  panels.forEach((p, i) => registerPanel('trade-' + (i + 1), p.mx, p.my,
+    { x0: p.x0, y0: p.yTop, x1: p.x1, y1: p.yBot }));
   [d.co1, d.co2].forEach((co, i) => {
     const p = panels[i];
     const clipId = 'tb-clip-' + i;

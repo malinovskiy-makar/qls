@@ -973,6 +973,9 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
   let Ymax = evalCurve(D, 0); if (isNaN(Ymax) || !(Ymax > 0)) Ymax = CONFIG.Pmax; Ymax = padMax(Ymax);
   const lx = d3.scaleLinear().domain([0, Xmax]).range([left, right]);
   const ly = d3.scaleLinear().domain([0, Ymax]).range([bottom, top]);
+  // Мини-рынок — самостоятельная панель со своими шкалами (реестр чистит
+  // redrawDiscr3 перед первым из двух вызовов).
+  registerPanel('mini-' + idx, lx, ly, { x0: left, y0: top, x1: right, y1: bottom });
   const g = svg.append('g');
   drawGrid(lx, ly, g);               // у мини-рынка свои шкалы — сетку считаем по ним
   const cid = 'mini-clip-' + idx;
@@ -1066,6 +1069,8 @@ function redrawDiscr3() {
   // как внутренний рынок и экспорт по мировой цене (математика та же, discr3).
   const t1 = STATE.d3World ? 'Внутренний рынок' : 'Рынок 1';
   const t2 = STATE.d3World ? 'Экспорт по мировой цене' : 'Рынок 2';
+  // Панели здесь свои: 'main' на весь холст, заведённая makeScales, тут лишняя.
+  clearPanels();
   drawMiniMarket(gxLeft, midX, t1, d.c1, d.q1, d.P1, d.cm, 1);
   drawMiniMarket(midX, W, t2, d.c2, d.q2, d.P2, d.cm, 2);
   // Разделитель между панелями.
