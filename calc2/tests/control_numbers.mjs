@@ -634,6 +634,25 @@ cmp('MC = 5 ниже Pw: реестр панелей', r.pans, 'mini-1,mini-2', 
 cmp('MC = 5 ниже Pw: подпись на правой панели', r.note, 1, 0);
 cmp('MC = 5 ниже Pw: табло говорит «не ограничен»', r.says, 1, 0);
 
+head('Сессия 01.09 (2) · ключевые точки мини-панелей');
+r = await run(D3 + `world('100 - Q', '50', 'Q');
+  var at = function (list, x, y) { return list.some(function (p) {
+    return Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5; }) ? 1 : 0; };
+  var L = keyTargets('mini-1'), R = keyTargets('mini-2');
+  var proj = L.filter(function (p) { return /^проекция/.test(p.name); })[0];
+  /* ⚠️ Различающая точка — та, что бывает ТОЛЬКО на своей панели. Проекция
+     (25; 0) есть у обеих законно: внутри продают 25 и на экспорт идёт 25.
+     А цена 75 существует лишь на внутреннем рынке. */
+  return { l: at(L, 25, 75), lx: at(L, 25, 0), ly: at(L, 0, 75),
+           r: at(R, 25, 75) + at(R, 0, 75), rOwn: at(R, 25, 50),
+           name: proj ? proj.name : '' };`);
+cmp('левая панель: точка (25; 75)', r.l, 1, 0);
+cmp('левая панель: проекция (0; 75)', r.ly, 1, 0);
+cmp('левая панель: проекция (25; 0)', r.lx, 1, 0);
+cmp('правая панель: точки левой не появились', r.r, 0, 0);
+cmp('правая панель: своя точка (25; 50)', r.rOwn, 1, 0);
+cmp('имя проекции без мёртвой замены', /^проекция .* на ось [QP]$/.test(r.name), true, 0);
+
 head('Сессия 01.09 (2) · квота 31.08 не сдвинулась');
 r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(20); redrawAll();
   var t = STATE.monoQuota || {};

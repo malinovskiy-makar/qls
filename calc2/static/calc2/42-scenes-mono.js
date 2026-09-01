@@ -1117,6 +1117,14 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
     haloText(g, left - 5, py, fmt(Pi), 'end', 'middle')
       .attr('class', 'coord-num')
       .attr('fill', cssVar('--accent')).attr('font-weight', 700);
+    /* ⚠️ ПЕЧАТАЕМ САМИ — ЗНАЧИТ, САМИ И ОБЪЯВЛЯЕМ. Механизм ключевых точек
+       читает то, что напечатали axisValueX/axisValueY, а мини-рынок печатает
+       мимо них (у него свои шкалы lx/ly и своё правило уступки делений). Пока
+       он молчал, «Дискриминация 3-й степени» и «Монополист и внешний рынок»
+       оставались вовсе без ключевых точек. Объявляем ТЕМ ЖЕ списком, называя
+       свою панель: угол составляется из чисел одной панели. */
+    noteAxisX(g, px, fmt(qi), '', 'mini-' + idx);
+    noteAxisY(g, py, fmt(Pi), '', 'mini-' + idx);
   }
 }
 

@@ -1384,8 +1384,12 @@ function keyTargets(panelId) {
     const own = onCurves(p.x, p.y);
     push(p.x, p.y, p.name, 'drawn', own);
     // Проекции на обе оси: для равновесия (50; 50) это (0; 50) и (50; 0).
-    push(0, p.y, 'проекция ' + p.name + ' на ' + yAxisNm.replace('ось ', 'ось '), 'drawn', own);
-    push(p.x, 0, 'проекция ' + p.name + ' на ' + xAxisNm.replace('ось ', 'ось '), 'drawn', own);
+    /* Имя оси подставляется как есть: axisWords отдаёт «ось Q» / «ось P», и
+       «проекция E на ось P» уже по-русски. Здесь стояла замена строки на саму
+       себя — след от попытки склонять, доведённой до конца строчкой выше, где
+       у пересечения падеж действительно другой («пересечение с осью Q»). */
+    push(0, p.y, 'проекция ' + p.name + ' на ' + yAxisNm, 'drawn', own);
+    push(p.x, 0, 'проекция ' + p.name + ' на ' + xAxisNm, 'drawn', own);
   });
   push(0, 0, 'начало координат', 'cross', []);
   if (!(w.x1 > w.x0)) { _keyPtsCache[ck] = out; return out; }

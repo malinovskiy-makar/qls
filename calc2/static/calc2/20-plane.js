@@ -729,49 +729,97 @@ function kpNode(g) { return (g && g.node) ? g.node() : g; }
    пунктира не имеют и отсеиваются сами. */
 /* Пунктиры ищем по ВСЕМУ холсту, а не внутри одной группы: линию МРОТ и
    числа при ней печатают разные группы, и точка занятости иначе терялась.
-   Сетку исключаем — её штрих не проекция точки, а фон. */
-function dashEndsNear(px, py) {
-  let found = false;
+   Сетку исключаем — её штрих не проекция точки, а фон.
+
+   ⚠️ СПИСОК СЧИТАЕТСЯ ОДИН РАЗ НА КАДР. Раньше запрос по всему SVG уходил
+   ВНУТРИ двойного цикла — на каждую пару «число на оси Q × число на оси P»,
+   то есть до девяти раз за кадр по одному и тому же холсту. */
+function collectDashes() {
+  const out = [];
   try {
     svg.selectAll('line[stroke-dasharray]').each(function () {
-      if (found || (this.getAttribute('class') || '').indexOf('grid') >= 0) return;
-      const x1 = +this.getAttribute('x1'), y1 = +this.getAttribute('y1');
-      const x2 = +this.getAttribute('x2'), y2 = +this.getAttribute('y2');
-      if (Math.hypot(x1 - px, y1 - py) <= 2 || Math.hypot(x2 - px, y2 - py) <= 2) found = true;
+      if ((this.getAttribute('class') || '').indexOf('grid') >= 0) return;
+      out.push([+this.getAttribute('x1'), +this.getAttribute('y1'),
+                +this.getAttribute('x2'), +this.getAttribute('y2')]);
     });
-  } catch (e) { return false; }
-  return found;
+  } catch (e) { /* холста ещё нет — пунктиров тоже */ }
+  return out;
+}
+
+/* ⚠️ ПУНКТИР ЗАСЧИТЫВАЕТСЯ ТОЛЬКО СВОЕЙ ПАНЕЛИ. В двухпанельной сцене штрих
+   из соседней панели подтверждал бы угол в этой, стоило пикселям совпасть.
+   Допуск 6 px нужен потому, что пунктир к оси упирается ровно в границу
+   панели; расстояние между соседними панелями — десятки пикселей, так что
+   перепутать их этот допуск не даёт. */
+function dashEndsNear(dashes, px, py, rect) {
+  const T = 6;
+  const inside = (x, y) => !rect ||
+    (x >= rect.x0 - T && x <= rect.x1 + T && y >= rect.y0 - T && y <= rect.y1 + T);
+  for (let i = 0; i < dashes.length; i++) {
+    const d = dashes[i];
+    if (!inside(d[0], d[1]) || !inside(d[2], d[3])) continue;
+    if (Math.hypot(d[0] - px, d[1] - py) <= 2 || Math.hypot(d[2] - px, d[3] - py) <= 2) return true;
+  }
+  return false;
 }
 
 function flushDrawnKeyPoints() {
-  const pan = panelOfGlobalScales();
-  const pid = pan ? pan.id : '';
-  const seen = [];
-  _kpX.forEach(a => {
-    _kpY.forEach(b => {
-      if (!dashEndsNear(a.px, b.py)) return;   // угол без пунктира — не точка
-      if (seen.some(s => Math.abs(s[0] - a.px) <= 2 && Math.abs(s[1] - b.py) <= 2)) return;
-      seen.push([a.px, b.py]);
-      // Имя точки — буква, которую сцена написала рядом; нет буквы — по различителю.
-      let nm = null, bd = 10;
-      _kpNames.forEach(n => {
-        const d = Math.hypot(n.px - a.px, n.py - b.py);
-        if (d <= bd) { bd = d; nm = n.sym; }
+  const fb = panelOfGlobalScales();
+  const fid = fb ? fb.id : '';
+  const dashes = collectDashes();
+  /* ⚠️ УГОЛ СОСТАВЛЯЕТСЯ ИЗ ЧИСЕЛ ОДНОЙ ПАНЕЛИ. Числа помнят, где их
+     напечатали; без панели — значит на общих осях, и хозяйку им отдаёт
+     panelOfGlobalScales, как и раньше. Так мини-рынки объявляют свои точки
+     наравне с общими осями, не заводя второго механизма. */
+  const groups = new Map();
+  const bag = (id) => { if (!groups.has(id)) groups.set(id, { x: [], y: [] }); return groups.get(id); };
+  _kpX.forEach(a => bag(a.panel || fid).x.push(a));
+  _kpY.forEach(b => bag(b.panel || fid).y.push(b));
+  groups.forEach((grp, pid) => {
+    const rect = (STATE.panels || []).find(p => p.id === pid) || null;
+    const seen = [];
+    grp.x.forEach(a => {
+      grp.y.forEach(b => {
+        if (!dashEndsNear(dashes, a.px, b.py, rect)) return;   // угол без пунктира — не точка
+        if (seen.some(s => Math.abs(s[0] - a.px) <= 2 && Math.abs(s[1] - b.py) <= 2)) return;
+        seen.push([a.px, b.py]);
+        // Имя точки — буква, которую сцена написала рядом; нет буквы — по различителю.
+        let nm = null, bd = 10;
+        _kpNames.forEach(n => {
+          const d = Math.hypot(n.px - a.px, n.py - b.py);
+          if (d <= bd) { bd = d; nm = n.sym; }
+        });
+        if (!nm) {
+          const qs = a.idx ? ('Q' + a.idx) : '', ps = b.idx ? ('P' + b.idx) : '';
+          nm = (qs && ps) ? ('точка ' + qs + ' и ' + ps)
+             : (qs || ps ? ('точка ' + (qs || ps)) : 'отмеченная точка');
+        }
+        d3.select(a.node).append('circle').attr('class', 'kp-mark')
+          .attr('cx', a.px).attr('cy', b.py).attr('r', 0)
+          .attr('fill', 'none').attr('pointer-events', 'none')
+          .attr('data-skip-export', '1')
+          .attr('data-key-point', nm)
+          .attr('data-kp-x', a.x).attr('data-kp-y', b.y)
+          .attr('data-kp-panel', pid);
       });
-      if (!nm) {
-        const qs = a.idx ? ('Q' + a.idx) : '', ps = b.idx ? ('P' + b.idx) : '';
-        nm = (qs && ps) ? ('точка ' + qs + ' и ' + ps)
-           : (qs || ps ? ('точка ' + (qs || ps)) : 'отмеченная точка');
-      }
-      d3.select(a.node).append('circle').attr('class', 'kp-mark')
-        .attr('cx', a.px).attr('cy', b.py).attr('r', 0)
-        .attr('fill', 'none').attr('pointer-events', 'none')
-        .attr('data-skip-export', '1')
-        .attr('data-key-point', nm)
-        .attr('data-kp-x', a.x).attr('data-kp-y', b.y)
-        .attr('data-kp-panel', pid);
     });
   });
+}
+
+/* Объявление «на этой оси, в этом пикселе, напечатано это число». Зовут его
+   ДВА печатника общих осей (axisValueX/axisValueY) и мини-рынок, который свои
+   числа печатает сам — по причинам, записанным у него в коде. Это один
+   механизм с параметром, а не второй рядом: список, поиск пар и правило
+   пунктира общие. Панель нужна потому, что у мини-рынка свои шкалы. */
+function noteAxisX(g, px, value, idx, panel) {
+  const v = coordValue(value);
+  if (v && isFinite(v.num)) _kpX.push({ node: kpNode(g), px, x: v.num, idx: String(idx || ''), panel: panel || '' });
+  return v;
+}
+function noteAxisY(g, py, value, idx, panel) {
+  const v = coordValue(value);
+  if (v && isFinite(v.num)) _kpY.push({ node: kpNode(g), py, y: v.num, idx: String(idx || ''), panel: panel || '' });
+  return v;
 }
 
 // Буква у точки — её настоящее имя на холсте («E», «M»).
@@ -782,9 +830,8 @@ function kpName(g, px, py, sym) {
 
 function axisValueX(g, px, oy, value, idx) {
   if (!isFinite(px)) return null;
-  const v = coordValue(value);
+  const v = noteAxisX(g, px, value, idx);
   if (!v) return null;
-  if (isFinite(v.num)) _kpX.push({ node: kpNode(g), px, x: v.num, idx: String(idx || '') });
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
                  (isFinite(v.num) && xTicks().some(t => Math.abs(t - v.num) < span * 0.02));
@@ -810,9 +857,8 @@ function axisValueX(g, px, oy, value, idx) {
    раза — по ней подпись «не влезала» там, где на самом деле влезает. */
 function axisValueY(g, ox, py, value, idx) {
   if (!isFinite(py)) return null;
-  const v = coordValue(value);
+  const v = noteAxisY(g, py, value, idx);
   if (!v) return null;
-  if (isFinite(v.num)) _kpY.push({ node: kpNode(g), py, y: v.num, idx: String(idx || '') });
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||
                  (isFinite(v.num) && yTicks().some(t => Math.abs(t - v.num) < span * 0.02));
