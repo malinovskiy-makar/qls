@@ -1260,7 +1260,25 @@ function recomputeKinked() {
   if (!cands.length) { STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: false }; return; }
   let best = cands[0]; cands.forEach(c => { if (c.profit > best.profit + 1e-6) best = c; });
   best.win = true;
-  STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: true, Qstar: best.Q, Pstar: Dfn(best.Q), profit: best.profit, winKind: best.kind, cands };
+  const Qstar = best.Q, Pstar = Dfn(Qstar);
+  /* Конкурентный выпуск: там, где ЛОМАНЫЙ спрос встречает MC. Ищем по каждому
+     куску и берём последний найденный — куски идут слева направо, а у
+     убывающего спроса нужен самый правый корень. */
+  let Qc = null;
+  segs.forEach(s => { const r = findRootIn(q => Dfn(q) - mc(q), s.q0, s.q1); if (r != null && r > 0) Qc = r; });
+  /* ⚠️ ПЛОЩАДИ СЧИТАЮТСЯ ПО КУСКАМ. Метод трапеций точен на прямой только
+     тогда, когда излом попал в УЗЕЛ сетки, а излом ломаного спроса туда
+     попадает случайно. Изломы отдаются интегратору списком — тем же приёмом,
+     что у излишков суммарных кривых (quadBreaks). Второго механизма не
+     заводим. */
+  const csM = integrateBroken(q => Dfn(q) - Pstar, 0, Qstar, kinks);
+  const vcM = integrate(mc, 0, Qstar);
+  const psM = integrate(q => Pstar - mc(q), 0, Qstar);
+  const dwl = (Qc != null && Qc > Qstar)
+    ? integrateBroken(q => Dfn(q) - mc(q), Qstar, Qc, kinks) : null;
+  STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: true, Qstar, Pstar,
+                   profit: best.profit, winKind: best.kind, cands,
+                   Qc, csM, vcM, psM, dwl };
 }
 
 function drawKinkedFull() {
@@ -1271,6 +1289,39 @@ function drawKinkedFull() {
   if (!k) { updateKinkPanel(); return; }
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
+  /* Заливки — ПЕРВЫМИ, чтобы лежать под кривыми. Точки для них берутся так,
+     чтобы КАЖДЫЙ ИЗЛОМ БЫЛ УЗЛОМ: иначе многоугольник срезает угол ломаного
+     спроса, и нарисованная площадь расходится с числом. То же правило, что у
+     интеграла по кускам в recomputeKinked. */
+  const mcK = (q) => evalCurve(k.mcCurve, q);
+  const sampK = (a, b) => {
+    const inner = k.kinks.filter(x => x > a + 1e-9 && x < b - 1e-9).sort((x, y) => x - y);
+    const ends = [a].concat(inner, [b]), out = [];
+    for (let i = 0; i < ends.length - 1; i++)
+      for (let j = 0; j < 60; j++) out.push(ends[i] + (ends[i + 1] - ends[i]) * j / 60);
+    out.push(b);
+    return out;
+  };
+  if (k.found && k.Qstar > 1e-6) {
+    const s1 = sampK(0, k.Qstar);
+    if (STATE.showMonoVC) {
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcK(d)));
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
+    }
+    if (STATE.showMonoPS) {
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcK(d))).y1(sy(k.Pstar));
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
+    }
+    if (STATE.showMonoCS) {
+      const a = d3.area().x(d => sx(d)).y0(sy(k.Pstar)).y1(d => sy(k.Dfn(d)));
+      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
+    }
+    if (k.Qc != null && k.Qc > k.Qstar + 1e-9) {
+      const s2 = sampK(k.Qstar, k.Qc);
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcK(d))).y1(d => sy(k.Dfn(d)));
+      g.append('path').datum(s2).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
+    }
+  }
   // Ломаный спрос (по Dfn).
   const dPts = []; for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = k.Dfn(q); dPts.push((isNaN(v) || v < 0) ? null : [q, v]); }
   g.append('path').datum(dPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
@@ -1316,6 +1367,11 @@ function updateKinkPanel() {
   html += `<div class="stat"><span>$Q^*$ (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
   html += `<div class="stat"><span>$P^*$ (цена)</span><b>${fmt(k.Pstar)}</b></div>`;
   html += `<div class="stat"><span>Прибыль π</span><b>${fmt(k.profit)}</b></div>`;
+  if (k.csM != null) html += `<div class="stat"><span>$CS$</span><b>${fmt(k.csM)}</b></div>`;
+  if (k.psM != null) html += `<div class="stat"><span>$PS$ (TR − VC)</span><b>${fmt(k.psM)}</b></div>`;
+  if (k.vcM != null) html += `<div class="stat"><span>$VC$</span><b>${fmt(k.vcM)}</b></div>`;
+  if (k.Qc != null) html += `<div class="stat"><span>Конкурентный выпуск</span><b>${fmt(k.Qc)}</b></div>`;
+  if (k.dwl != null) html += `<div class="stat"><span>$DWL$</span><b>${fmt(k.dwl)}</b></div>`;
   html += `<div class="stat"><span>Победил кандидат</span><b>${k.winKind} @ Q = ${fmt(k.Qstar)}</b></div>`;
   // Таблица всех кандидатов с прибылью (видно сравнение).
   html += '<table class="tx-table" style="margin-top:6px;"><tr><th>Кандидат</th><th>Q</th><th>π</th></tr>';
@@ -1335,7 +1391,9 @@ function applyMonoVisibility() {
   const inMono = (STATE.market === 'monopoly'), mm = STATE.monoMode;
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
   show('mono-submode', inMono);
-  show('mono-areas-chk', inMono && mm === 'simple');
+  // Галочки заливок — общие с обычной монополией; ломаный спрос рисует те же
+  // четыре фигуры теми же STATE.showMono*, своих галочек не заводит.
+  show('mono-areas-chk', inMono && (mm === 'simple' || mm === 'kinked'));
   show('mono-interv-hint', inMono && mm === 'simple');
   show('mono-d1-pane', inMono && mm === 'discr1');
   show('mono-d3-pane', inMono && mm === 'discr3');

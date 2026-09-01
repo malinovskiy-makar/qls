@@ -547,6 +547,43 @@ cmp('контроль MC = Q: выпуск', r.Q, 50, 1e-3);
 cmp('контроль MC = Q: прибыль', r.profit, 2500, 1e-2);
 cmp('контроль MC = Q: нарисовано', r.drawn, 2500, 0.5);
 
+head('Сессия 01.09 (2) · составной спрос: излишки');
+r = await run(AREA + `resetSceneMemory(); pickScene('mono-kink');
+  STATE.kinkInput = 'individual'; STATE.kiD1 = '100 - Q'; STATE.kiD2 = '60 - Q'; STATE.kiD3 = '';
+  STATE.kinkMC = '20';
+  STATE.showMonoVC = true; STATE.showMonoPS = true; STATE.showMonoCS = true;
+  redrawAll();
+  var k = STATE.kinked || {};
+  var mc = function (q) { return evalCurve(k.mcCurve, q); };
+  var at40 = k.cands.filter(function (c) { return Math.abs(c.Q - 40) < 1e-6; })[0] || {};
+  return { Q: k.Qstar, P: k.Pstar, prof: k.profit,
+           cs: k.csM, vc: k.vcM, ps: k.psM, Qc: k.Qc, dwl: k.dwl,
+           aCS: areaOf(CSA), aVC: areaOf(VCA), aPS: areaOf(PSA), aDWL: areaOf(DWLA),
+           ident: areaOf(CSA) + areaOf(PSA) + areaOf(DWLA),
+           whole: integrateBroken(function (q) { return k.Dfn(q) - mc(q); }, 0, k.Qc, k.kinks),
+           kink: k.kinks[0], kinkP: k.Dfn(k.kinks[0]),
+           mrLo: marginalRevenue(k.segs[0].D, 40), mrHi: marginalRevenue(k.segs[1].D, 40),
+           profAt40: at40.profit };`);
+cmp('излом ломаного спроса: Q', r.kink, 40, 1e-6);
+cmp('излом ломаного спроса: P', r.kinkP, 60, 1e-6);
+cmp('MR в изломе снизу', r.mrLo, 20, 1e-6);
+cmp('MR в изломе сверху', r.mrHi, 40, 1e-6);
+cmp('оптимум Q', r.Q, 60, 1e-3);
+cmp('оптимум P', r.P, 50, 1e-3);
+cmp('прибыль в оптимуме', r.prof, 1800, 1e-2);
+cmp('кандидат Q = 40 даёт прибыль', r.profAt40, 1600, 1e-2);
+cmp('CS', r.cs, 1300, 1e-2);
+cmp('VC', r.vc, 1200, 1e-2);
+cmp('PS', r.ps, 1800, 1e-2);
+cmp('конкурентный выпуск', r.Qc, 120, 1e-3);
+cmp('DWL', r.dwl, 900, 1e-2);
+cmp('нарисован CS', r.aCS, 1300, 0.5);
+cmp('нарисован VC', r.aVC, 1200, 0.5);
+cmp('нарисован PS', r.aPS, 1800, 0.5);
+cmp('нарисован DWL', r.aDWL, 900, 0.5);
+cmp('площадь между ломаным спросом и MC', r.whole, 4000, 1e-2);
+cmp('тождество CS + PS + DWL', r.ident, 4000, 1);
+
 head('Сессия 01.09 (2) · квота 31.08 не сдвинулась');
 r = await run(MKT + `setDS('mono', '100-Q', '20'); setType('quota'); setQuota(20); redrawAll();
   var t = STATE.monoQuota || {};
