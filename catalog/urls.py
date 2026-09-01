@@ -14,8 +14,14 @@ urlpatterns = [
     path('figure/<int:pk>.svg',                 views.problem_figure_svg, name='problem_figure_svg'),
     # Публичный API для модального окна
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
+    # Подсказки тегов для поля фильтра: тегов 552, списком их не показать.
+    path('api/tags/',                           views.api_tags,           name='api_tags'),
 
-    # Семантический поиск (Стадия 1, локальный прототип)
+    # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
+    # 01.09.2026): он слился с каталогом, поиск там один и всегда по
+    # смыслу. Адрес оставлен ПОСТОЯННЫМ редиректом — по нему ходят
+    # закладки и поисковые системы, а маршрут ещё зовут по имени
+    # `catalog:smart_search` старые ссылки в шаблонах и тестах.
     path('smart-search/',                         views.smart_search,       name='smart_search'),
 
     # Карта тем и тегов — трёхмерный граф корпуса.

@@ -110,6 +110,13 @@ button:focus-visible {
 {% include "_table_align.html" %}
 {% block extra_style %}{% endblock %}
   </style>
+{% comment %}
+⚠️ БЛОК ДЛЯ <link> И ПРОЧЕГО, ЧТО ОБЯЗАНО СТОЯТЬ В <head> ЦЕЛИКОМ.
+`extra_style` лежит ВНУТРИ <style>: туда можно положить только правила,
+но не тег. Отдельным файлам стилей (например, предпросмотру карты тем)
+до этого блока места не было, и они уезжали в тело страницы.
+{% endcomment %}
+{% block extra_head %}{% endblock %}
 </head>
 <body>
 

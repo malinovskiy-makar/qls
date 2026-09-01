@@ -1,0 +1,28 @@
+{% comment %}
+МОДАЛЬНОЕ ОКНО С ТЕКСТОМ ЗАДАЧИ — работающая часть каталога, вынесенная
+из `problem_list.html` при слиянии экранов БЕЗ изменений. Данные тянет
+`catalog:api_problem`, разметку собирает `_catalog_js.html` через
+textContent, а не innerHTML.
+{% endcomment %}
+<!-- ── Модальное окно условия задачи ── -->
+<div class="modal-backdrop" id="c-modal-backdrop" onclick="closeCatalogModal(event)">
+  <div class="c-modal" id="c-modal-box">
+    <div class="c-modal-head">
+      <div style="flex:1;">
+        <div class="c-modal-title" id="c-modal-title">…</div>
+        <div class="c-modal-meta" id="c-modal-meta"></div>
+      </div>
+      <button class="c-modal-close" onclick="closeCatalogModalDirect()">×</button>
+    </div>
+    <div class="c-modal-body" id="c-modal-body">
+      <div class="c-modal-loading">Загрузка…</div>
+    </div>
+    <div class="c-modal-foot">
+      <span class="c-modal-source" id="c-modal-source"></span>
+      <a id="c-modal-link" href="#" class="ca-btn ca-add"
+         style="font-size:14px;padding:6px 16px;text-decoration:none;">
+        Открыть задачу →
+      </a>
+    </div>
+  </div>
+</div>

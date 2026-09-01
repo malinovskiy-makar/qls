@@ -1,0 +1,336 @@
+{% comment %}
+СКРИПТ ЭКРАНА КАТАЛОГА.
+
+Первая половина — новая: окно «Все фильтры», подсказки тегов, честное
+«ищу» на первом запросе. Вторая — БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего
+`problem_list.html`: модальное окно задачи и кнопка «+ В домашку».
+Это работающие возможности каталога, слияние экранов их не касалось.
+
+⚠️ ФИЛЬТРЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА. Каждый вариант — обычная ссылка с
+готовым адресом; скрипт добавляет удобство (окно, подсказки), но не
+является условием того, что каталогом можно пользоваться.
+{% endcomment %}
+<script>
+/* ── Окно «Все фильтры» ───────────────────────────────────────────────
+   Настоящий <dialog> с showModal(): ловушка фокуса, Escape и возврат
+   фокуса приходят от браузера, а не пишутся руками. Окно встаёт НАД
+   выдачей — под задачами ему не место (замечание владельца). */
+(function () {
+  var dlg = document.getElementById('ct-all');
+  var open = document.getElementById('ct-all-open');
+  if (!dlg || !open) return;
+  open.addEventListener('click', function () {
+    if (typeof dlg.showModal === 'function') dlg.showModal();
+    else dlg.setAttribute('open', '');       /* старый браузер: без затемнения */
+  });
+})();
+
+/* ── Чипы полосы: открытый закрывается щелчком мимо ───────────────── */
+document.addEventListener('click', function (e) {
+  document.querySelectorAll('details.fl-chip[open]').forEach(function (d) {
+    if (!d.contains(e.target)) d.removeAttribute('open');
+  });
+});
+
+/* ── Подсказки тегов ──────────────────────────────────────────────────
+   Тегов 552, списком их не показать. Подсказки идут с двух символов;
+   выбранный тег уходит в адрес обычной ссылкой, как и все остальные
+   фильтры, — состояние экрана всегда честно лежит в URL.
+
+   ⚠️ ИМЯ ТЕГА КЛАДЁТСЯ ЧЕРЕЗ textContent. Таблица тегов засорена
+   импортом (ссылки, обрывки комментариев), и это чужой текст: собирать
+   из него разметку нельзя ни при каких обстоятельствах. */
+(function () {
+  document.querySelectorAll('[data-tag-box]').forEach(function (box) {
+    var input = box.querySelector('[data-tag-input]');
+    var list = box.querySelector('[data-tag-sug]');
+    if (!input || !list) return;
+    var timer = null;
+
+    function urlWithTag(id) {
+      var params = new URLSearchParams(location.search);
+      params.delete('show');            /* новый фильтр — снова первые 20 */
+      params.append('tag', id);
+      return location.pathname + '?' + params.toString();
+    }
+
+    function render(tags) {
+      list.textContent = '';
+      if (!tags.length) { list.hidden = true; return; }
+      tags.forEach(function (t) {
+        var li = document.createElement('li');
+        var a = document.createElement('a');
+        a.className = 'fl-opt';
+        a.href = urlWithTag(t.id);
+        var name = document.createElement('span');
+        name.className = 'fl-opt-l';
+        name.textContent = t.name;
+        var n = document.createElement('span');
+        n.className = 'fl-opt-n';
+        n.textContent = t.count;
+        a.appendChild(name); a.appendChild(n); li.appendChild(a);
+        list.appendChild(li);
+      });
+      list.hidden = false;
+    }
+
+    input.addEventListener('input', function () {
+      var needle = input.value.trim();
+      window.clearTimeout(timer);
+      if (needle.length < 2) { list.textContent = ''; list.hidden = true; return; }
+      timer = window.setTimeout(function () {
+        fetch(input.dataset.tagUrl + '?q=' + encodeURIComponent(needle),
+              { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+          .then(function (r) { return r.json(); })
+          .then(function (d) { render(d.tags || []); })
+          .catch(function () { list.hidden = true; });
+      }, 200);
+    });
+  });
+})();
+
+/* ── Честное «ищу» ────────────────────────────────────────────────────
+   Первый смысловой запрос идёт около семи секунд: модель грузится
+   лениво. Пока поиск жил отдельной страницей, это была плата за вход
+   именно на неё; теперь каталог — главный вход. Молчащий экран в эти
+   секунды выглядит зависшим, поэтому кнопка честно говорит, что ищет. */
+(function () {
+  var form = document.getElementById('ct-ask-form');
+  var busy = document.getElementById('ct-busy');
+  var field = document.getElementById('ct-q');
+  if (!form || !busy || !field) return;
+  form.addEventListener('submit', function () {
+    if (field.value.trim()) busy.hidden = false;
+  });
+  /* Ctrl/⌘+Enter отправляет: поле многострочное, и Enter в нём — перевод
+     строки, а не отправка. */
+  field.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) form.requestSubmit();
+  });
+})();
+
+
+</script>
+<script>
+// ── Домашки учителя (JSON из view) ───────────────
+const TEACHER_ASSIGNMENTS = {{ teacher_assignments_json|safe }};
+
+// ── Модальное окно ────────────────────────────────
+function openCatalogModal(pid, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  document.getElementById('c-modal-backdrop').classList.add('open');
+  document.getElementById('c-modal-title').textContent = '…';
+  document.getElementById('c-modal-meta').innerHTML = '';
+  document.getElementById('c-modal-source').textContent = '';
+  document.getElementById('c-modal-body').innerHTML = '<div class="c-modal-loading">Загрузка…</div>';
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + pid + '/';
+
+  fetch('/catalog/api/problem/' + pid + '/')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('c-modal-body').textContent = 'Ошибка загрузки.';
+        return;
+      }
+      renderCatalogModal(data);
+    })
+    .catch(() => {
+      document.getElementById('c-modal-body').textContent = 'Ошибка сети.';
+    });
+}
+
+// ⚠️ ОКНО СОБИРАЕТСЯ УЗЛАМИ, А НЕ СТРОКОЙ HTML, И ЭТО НЕ СТИЛЬ.
+//
+// Раньше условие подставлялось в шаблонную строку разметки, и готовая
+// строка уезжала в innerHTML. Условие приходит из JSON каталога, то есть
+// прямо из банка: 31 690 задач приехали из внешних источников. Задача с
+// текстом-нагрузкой (битая картинка с обработчиком onerror) выполняла бы
+// чужой код в браузере
+// КАЖДОГО посетителя каталога — вход для этого не нужен, страница публичная.
+//
+// `textContent` кладёт строку как текст: браузер не разбирает её как
+// разметку. KaTeX это не мешает — он и так ходит по текстовым узлам, ровно
+// как на серверной странице задачи, где условие всегда выводилось
+// экранированным.
+//
+// Единственные строки, которые здесь по-прежнему становятся разметкой, —
+// наши собственные («решение ✓», скобка после метки пункта). Всё, что
+// пришло из данных, идёт через textContent.
+function chip(text, extraClass) {
+  const el = document.createElement('span');
+  el.className = 'c-modal-tag' + (extraClass ? ' ' + extraClass : '');
+  el.textContent = text;
+  return el;
+}
+
+function renderCatalogModal(data) {
+  document.getElementById('c-modal-title').textContent = data.title;
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
+
+  const meta = document.getElementById('c-modal-meta');
+  meta.textContent = '';
+  if (data.difficulty_str) {
+    const d = document.createElement('span');
+    d.style.cssText = 'font-size:14px;color:var(--amber);';
+    d.textContent = data.difficulty_str;
+    meta.appendChild(d);
+  }
+  (data.topics || []).forEach(t => meta.appendChild(chip(t)));
+  if (data.problem_type) { meta.appendChild(chip(data.problem_type)); }
+  if (data.has_solution) { meta.appendChild(chip('решение ✓', 'sol')); }
+
+  if (data.sources && data.sources.length) {
+    document.getElementById('c-modal-source').textContent = data.sources.join(', ');
+  }
+
+  const body = document.getElementById('c-modal-body');
+  body.textContent = '';
+  const stmt = document.createElement('div');
+  stmt.textContent = data.statement || '';
+  body.appendChild(stmt);
+
+  if (data.parts && data.parts.length) {
+    data.parts.forEach(part => {
+      const wrap = document.createElement('div');
+      wrap.className = 'c-modal-part';
+
+      const label = document.createElement('div');
+      label.className = 'c-modal-part-label';
+      if (part.label) {
+        label.textContent = String(part.label).replace(/[).．。\s]+$/, '') + ')';
+      }
+      if (part.points) {
+        const pts = document.createElement('span');
+        pts.style.cssText = 'color:var(--text2);font-size:13px;';
+        pts.textContent = ' (' + part.points + ' б.)';
+        label.appendChild(pts);
+      }
+      wrap.appendChild(label);
+
+      const text = document.createElement('div');
+      text.textContent = part.text || '';
+      wrap.appendChild(text);
+
+      body.appendChild(wrap);
+    });
+  }
+
+  maskEscapedDollars(document.getElementById('c-modal-body'));
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(document.getElementById('c-modal-body'), {
+      delimiters: [
+        { left: '$$', right: '$$', display: true  },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\[', right: '\\]', display: true  },
+        { left: '\\(', right: '\\)', display: false }
+      ],
+      throwOnError: false,
+      trust: false
+    });
+  }
+  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
+  fixCurrencyDollars(document.getElementById('c-modal-body'));
+}
+
+function closeCatalogModal(e) {
+  if (e.target === document.getElementById('c-modal-backdrop')) {
+    closeCatalogModalDirect();
+  }
+}
+function closeCatalogModalDirect() {
+  document.getElementById('c-modal-backdrop').classList.remove('open');
+  closeAllDropdowns();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCatalogModalDirect();
+});
+
+// ── Dropdown "+ В домашку" для учителей ──────────
+let openDropdownPid = null;
+
+function closeAllDropdowns() {
+  if (openDropdownPid !== null) {
+    const dd = document.getElementById('hw-dd-' + openDropdownPid);
+    if (dd) dd.classList.remove('open');
+    openDropdownPid = null;
+  }
+}
+
+function toggleHwDropdown(pid, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+
+  if (openDropdownPid === pid) {
+    closeAllDropdowns();
+    return;
+  }
+  closeAllDropdowns();
+
+  const dd = document.getElementById('hw-dd-' + pid);
+  if (!dd) return;
+
+  // ⚠️ Собираем узлами: название работы печатает человек, и через
+  // innerHTML оно становилось разметкой.
+  dd.textContent = '';
+  const head = document.createElement('div');
+  head.className = 'ca-dd-head';
+  head.textContent = 'Добавить в:';
+  dd.appendChild(head);
+
+  TEACHER_ASSIGNMENTS.forEach(a => {
+    const btn = document.createElement('button');
+    btn.className = 'ca-dd-item';
+    btn.textContent = a.name;
+    btn.addEventListener('click', ev => {
+      addToAssignment(a.id, pid, btn);
+      ev.stopPropagation();
+    });
+    dd.appendChild(btn);
+  });
+
+  const link = document.createElement('a');
+  link.className = 'ca-dd-item new-hw';
+  link.href = '/teacher/assignment/create/?preselect=' + pid;
+  link.textContent = '+ Новая домашка';
+  link.addEventListener('click', ev => ev.stopPropagation());
+  dd.appendChild(link);
+
+  dd.classList.add('open');
+  openDropdownPid = pid;
+}
+
+function addToAssignment(assignmentId, problemId, btn) {
+  const csrfToken = '{{ csrf_token }}';
+  fetch(`/teacher/api/assignment/${assignmentId}/add_problem/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-CSRFToken': csrfToken,
+    },
+    body: JSON.stringify({ problem_id: problemId }),
+  })
+  .then(r => r.json())
+  .then(data => {
+    if (data.ok) {
+      btn.textContent = '✓ Добавлено';
+      btn.classList.add('done');
+      const hwBtn = document.getElementById('hw-btn-' + problemId);
+      if (hwBtn) {
+        hwBtn.textContent = '✓ Добавлено';
+        hwBtn.classList.add('added');
+      }
+      setTimeout(closeAllDropdowns, 600);
+    }
+  })
+  .catch(() => {});
+}
+
+// Закрываем dropdown при клике вне
+document.addEventListener('click', e => {
+  if (openDropdownPid !== null) {
+    const wrap = document.getElementById('hw-wrap-' + openDropdownPid);
+    if (wrap && !wrap.contains(e.target)) {
+      closeAllDropdowns();
+    }
+  }
+});
+</script>

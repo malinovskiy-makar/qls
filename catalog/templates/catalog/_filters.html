@@ -1,0 +1,48 @@
+{% load ru catalog_filters %}{% comment %}
+ФИЛЬТРЫ — ОДИН КОМПОНЕНТ НА ДВА ЭКРАНА (каталог и шаг мастера домашки).
+
+Решение владельца 01.09.2026: два набора фильтров, повторённых вручную,
+неизбежно разойдутся — в таксономии v2 будет 29 тем, 343 тега и 11
+особенностей, и каждое добавление пришлось бы делать дважды.
+https://app.notion.com/p/3ceb11c92bc1817d89e1c7274fd0a88c
+
+Что ждёт шаблон:
+    groups — список групп фильтров (`filters.strip`, `filters.modal_left`,
+             `filters.modal_right` или `filters.groups`), СОБРАННЫЙ В
+             `catalog/filters.py`. Порядок и состав решает питон, а не
+             разметка: иначе «одинаковый набор» держался бы на честном
+             слове двух шаблонов.
+    mode   — «strip» (лента чипов сверху) или «panel» (вертикальный блок).
+             Режим ПЕРЕДАЁТСЯ, а не угадывается компонентом.
+
+⚠️ ВАРИАНТЫ — ССЫЛКИ, А НЕ ФОРМА. Адрес каждого варианта уже собран в
+питоне вместе с «чужими» параметрами экрана (режим отображения у каталога,
+занятие и вид работы у домашки). Поэтому фильтры работают без единой
+строки JavaScript, а состояние всегда честно лежит в адресе.
+
+⚠️ ЦВЕТ. Компонент живёт на бирюзовой панели --surface-tool, где норму
+держит ТОЛЬКО основной текст (--text 6,03; --text2 всего 3,31). Поэтому
+любой вариант с числом — это светлое поле (--surface) поверх панели, а не
+текст прямо на бирюзе. Замер и правило — в templates/_tokens.html.
+{% endcomment %}
+{% for g in groups %}
+{% if mode == 'strip' %}
+<details class="fl-chip{% if g.value %} is-on{% endif %}" data-fl="{{ g.key }}">
+  <summary>
+    <span class="fl-chip-name">{{ g.label }}{% if g.value_label %}: <b>{{ g.value_label }}</b>{% endif %}</span>
+    <span class="fl-chip-caret" aria-hidden="true"></span>
+  </summary>
+  <div class="fl-pop">{% include "catalog/_filters_body.html" with g=g %}</div>
+</details>
+{% if g.value %}<a class="fl-chip-x" href="{{ g.clear_url }}"
+   aria-label="Снять фильтр «{{ g.label }}»">✕</a>{% endif %}
+{% else %}
+<div class="fl-block" data-fl="{{ g.key }}">
+  <div class="fl-block-head">
+    <span class="fl-block-name">{{ g.label }}</span>
+    {% if g.value %}<a class="fl-block-clear" href="{{ g.clear_url }}">снять</a>{% endif %}
+  </div>
+  {% include "catalog/_filters_body.html" with g=g %}
+</div>
+{% endif %}
+{% endfor %}

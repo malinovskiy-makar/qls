@@ -7,13 +7,25 @@ from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
+from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
+
+from . import filters
 from problems.models import (
     Collection, Problem, ProblemFigure, Source, Topic,
 )
 from problems.management.commands.apply_topic_mapping import CANONICAL
+
+# Сколько карточек добавляет одно нажатие «Показать ещё».
+PAGE_STEP = 20
+# Сколько кандидатов просим у смыслового поиска ДО фильтров. Фильтры
+# срезают выдачу, и запас нужен, чтобы после трёх галочек осталось что
+# показывать; больше пятисот брать незачем — дальше близость падает
+# ниже порога у всех.
+SEARCH_CANDIDATES = 500
 
 # ── Утилита: убираем LaTeX для превью ──────────────────────────────────────
 _RX_DISPLAY = re.compile(r'\$\$.*?\$\$|\\\[.*?\\\]', re.DOTALL)
@@ -132,173 +144,272 @@ def random_problem(request):
 
 
 # ── Список задач ────────────────────────────────────────────────────────────
+def _card(problem, score=None):
+    """Одна карточка выдачи.
+
+    ⚠️ НОМЕР ЗАДАЧИ НЕ ПЕРВЫЙ СЛЕВА (решение владельца). Он нужен, чтобы на
+    задачу сослаться, но глаз должен цепляться за тему и условие: слева
+    тема, теги, сложность и флаг решения, номер — мелким и приглушённым
+    справа.
+    """
+    raw = _strip_latex(problem.statement)
+    refs = list(problem.source_references.all())
+    d = problem.difficulty or 0
+    return {
+        'problem':          problem,
+        'preview':          raw[:180] + ('…' if len(raw) > 180 else ''),
+        'topics':           [t for t in problem.topics.all()
+                             if t.name in CANONICAL][:2],
+        'difficulty':       d,
+        'difficulty_stars': range(d),
+        'difficulty_empty': range(5 - d),
+        'has_solution':     bool(problem.solution)
+                            and not problem.solution_needs_review,
+        'source':           refs[0].source.name if refs else '',
+        'grade':            refs[0].grade if refs else '',
+        'is_test':          (problem.problem_type or '')
+                            .lower().startswith('тест'),
+        # Близость показывается ТОЛЬКО в таблице и только при смысловом
+        # поиске: в строках и галерее ей места нет, а числа «кухни» наружу
+        # не идут — колонка называется словом, не долей.
+        'score':            score,
+    }
+
+
+def _teacher_assignments(request):
+    """Активные домашки репетитора — для кнопки «в домашку» на карточке."""
+    if not (request.user.is_authenticated
+            and getattr(request.user, 'role', '') == 'teacher'):
+        return '[]'
+    from django.utils import timezone
+
+    from problems.models import Assignment
+
+    active_qs = (Assignment.objects
+                 .filter(author=request.user)
+                 .filter(Q(deadline__isnull=True)
+                         | Q(deadline__gte=timezone.now()))
+                 .order_by('-id')[:50])
+    # Названия работ печатает репетитор, а уезжают они в <script>:
+    # экранируем `<`, `>`, `&` (см. problems/jsonsafe.py).
+    return dumps_for_script([{'id': a.pk, 'name': a.name} for a in active_qs])
+
+
+def _search_ids(query, limit):
+    """Кандидаты смыслового поиска: id по убыванию близости.
+
+    Возвращает `(ids, scores, degraded)`. `degraded=True` — смысловой поиск
+    недоступен и мы честно пошли по словам. Это ДЕГРАДАЦИЯ, А НЕ ОТКАЗ
+    (правило 6.13 docs/EMBEDDINGS.md): страница обязана ответить 200 и
+    что-то найти. Пятисотка и вечный спиннер — худшее, что можно сделать с
+    человеком, который просто искал задачу.
+
+    ⚠️ ФИЛЬТРЫ ЗДЕСЬ НЕ НАКЛАДЫВАЮТСЯ НАРОЧНО. У `semantic.search` есть свои
+    три (тема, сложность, решение), но на экране их восемь, и все восемь
+    умеет общий компонент. Две накладки одних и тех же условий — ровно то
+    расхождение, ради которого компонент и заводился. Поиск отвечает на
+    «что похоже», фильтры — на «что подходит».
+    """
+    import logging
+
+    from django.conf import settings
+
+    from . import hybrid, semantic
+    from .search_client import SearchServiceUnavailable
+
+    logger = logging.getLogger(__name__)
+    floor = getattr(settings, 'SEMANTIC_SEARCH_MIN_SCORE', 0.0)
+
+    def by_words():
+        ids, _hits, _picked = hybrid.lexical_search(query, limit, 'all')
+        return ids, {}, True
+
+    if not semantic.is_enabled():
+        return by_words()
+    try:
+        raw = semantic.search(query_text=query, content_kind='all',
+                              limit=limit)
+    except SearchServiceUnavailable as exc:
+        logger.warning('search service unavailable: %s — идём по словам', exc)
+        return by_words()
+    except Exception as exc:                       # noqa: BLE001
+        # ⚠️ ЛЮБАЯ ДРУГАЯ ПОЛОМКА ПОИСКА — ТОЖЕ ДЕГРАДАЦИЯ. Раньше здесь
+        # человек получал «Ошибка поиска: …» с нашей внутренней кухней
+        # вместо задач. Поиск по словам работает и без модели.
+        logger.warning('смысловой поиск упал (%s) — идём по словам', exc)
+        return by_words()
+
+    # ⚠️ ПОРОГ БЛИЗОСТИ — НАСТРОЙКА, А НЕ ЧИСЛО В КОДЕ: его придётся
+    # калибровать на Dataset B, и он поедет после прогона обогащения.
+    scores = {item['problem'].pk: item['score'] for item in raw
+              if item['score'] >= floor}
+    return [pid for pid in (i['problem'].pk for i in raw) if pid in scores], \
+        scores, False
+
+
+def _relief(base, active, candidate_ids):
+    """Какой фильтр снять, если запрос и фильтры вместе почти ничего не дали.
+
+    Возвращает `(подпись, сколько будет без него)` для самого «дорогого»
+    фильтра — или None. Экран обязан назвать причину: схлопнувшаяся выдача
+    без объяснения читается как «в банке этого нет», хотя на деле сошлись
+    запрос и три галочки.
+    """
+    best = None
+    for key in ('topic', 'tag', 'difficulty', 'kind', 'source',
+                'has_solution'):
+        value = active['tags'] if key == 'tag' else active[key]
+        if not value:
+            continue
+        loose = filters.apply(base, active, skip=(key,))
+        if candidate_ids is not None:
+            loose = loose.filter(pk__in=candidate_ids)
+        n = loose.distinct().count()
+        if best is None or n > best[1]:
+            best = (filters.RELIEF_LABEL[key], n)
+    if best is None or best[1] < 1:
+        return None
+    return {'label': best[0], 'count': best[1]}
+
+
 def problem_list(request):
-    # Два шлюза сразу и по разным поводам: качественный прячет битый
-    # рендер (quality_gate), второй — то, чего человек ещё не смотрел
-    # (pending_review_gate). Оба снимаются своим --revert.
-    qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False,
-                                hidden_pending_review=False)
+    """Умный каталог: один экран, один поиск, восемь фильтров.
 
-    f_q      = request.GET.get('q',           '').strip()
-    f_topic  = request.GET.get('topic',        '').strip()
-    f_diff   = request.GET.get('difficulty',   '').strip()
-    f_type   = request.GET.get('type',         '').strip()
-    f_sol    = request.GET.get('has_solution', '').strip()
-    f_source = request.GET.get('source',       '').strip()
-    f_sort   = request.GET.get('sort',         '').strip()
+    ⚠️ ЭКРАН ОБЪЕДИНЁН С «УМНЫМ ПОИСКОМ» (решение владельца 01.09.2026).
+    `/catalog/smart-search/` ведёт сюда постоянным редиректом, пункт
+    «Умный поиск» ушёл из шапки: два входа в один банк заставляли человека
+    выбирать способ ДО того, как он сформулировал, что ищет.
 
-    # Режим отображения: строки (по умолчанию) / таблица / галерея
-    view_mode = request.GET.get('view', 'rows').strip()
+    ⚠️ ПРИ ПУСТОМ ЗАПРОСЕ СМЫСЛОВОЙ ПОИСК НЕ ТРОГАЕТСЯ ВООБЩЕ. Модель
+    грузится лениво, первый раз около семи секунд. Пока поиск жил
+    отдельной страницей, это была плата за вход именно на неё; теперь
+    каталог — главный вход, и секунды достались бы каждому, кто просто
+    зашёл посмотреть банк.
+    """
+    active = filters.parse(request.GET)
+    query = active['q']
+
+    view_mode = (request.GET.get('view') or 'rows').strip()
     if view_mode not in ('rows', 'table', 'gallery'):
         view_mode = 'rows'
 
-    if f_q:
-        qs = qs.filter(Q(statement__icontains=f_q) | Q(title__icontains=f_q))
-    if f_topic:
-        qs = qs.filter(topics__id=f_topic)
-    if f_diff:
-        qs = qs.filter(difficulty=f_diff)
-    if f_type:
-        qs = qs.filter(problem_type=f_type)
-    if f_sol == '1':
-        qs = qs.exclude(solution='').filter(solution_needs_review=False)
-    if f_source:
-        qs = qs.filter(source_references__source_id=f_source)
+    # ⚠️ ЧИСТО ЧИСЛОВОЙ ЗАПРОС — ЭТО НОМЕР ЗАДАЧИ, А НЕ ОПИСАНИЕ. У числа
+    # нет смысла, который можно с чем-то сравнить: смысловой поиск на
+    # «1065» вернёт мусор. Ведём прямо на задачу; нет такой — говорим.
+    # Видимость проверяется та же, что у самой страницы задачи, иначе
+    # ответ «есть/нет» стал бы оглавлением скрытого.
+    missing_id = ''
+    if query.isdigit() and len(query) <= 9:
+        found_id = (Problem.objects
+                    .filter(pk=int(query), status=Problem.Status.PUBLISHED,
+                            needs_quality_review=False,
+                            hidden_pending_review=False)
+                    .values_list('pk', flat=True).first())
+        if found_id:
+            return redirect('catalog:problem_detail', pk=found_id)
+        missing_id = query
 
-    # Сортировка (поверх существующих фильтров; не меняет их логику)
-    order_map = {
-        'diff_asc':  [F('difficulty').asc(nulls_last=True), '-id'],
-        'diff_desc': [F('difficulty').desc(nulls_last=True), '-id'],
-        'new':       ['-id'],
-        'relevance': ['-id'],
-    }
-    order_by = order_map.get(f_sort, ['-id'])
+    base = filters.base_queryset('catalog')
+    carry = {}
+    if view_mode != 'rows':
+        carry['view'] = view_mode
+    qs, fctx = filters.build(base, active, mode='strip', carry=carry)
 
-    qs = (qs.prefetch_related('topics', 'source_references__source')
-            .order_by(*order_by).distinct())
+    # Сколько подходит под ФИЛЬТРЫ без запроса — второе число счётчика.
+    filtered_total = qs.distinct().count()
 
-    paginator = Paginator(qs, 20)
-    page_obj  = paginator.get_page(request.GET.get('page', 1))
-    total     = paginator.count
+    # ⚠️ «ПОКАЗАТЬ ЕЩЁ» ВМЕСТО СТРАНИЦ. Номер страницы у ранжированного
+    # списка ничего не значит: «страница 7» смыслового поиска — это не
+    # место в банке, а место в ответе на конкретный запрос.
+    try:
+        shown = int(request.GET.get('show') or PAGE_STEP)
+    except (TypeError, ValueError):
+        shown = PAGE_STEP
+    shown = max(PAGE_STEP, min(shown, PAGE_STEP * 25))
 
-    # Карточки: превью текста + звёздочки + флаг решения
-    cards = []
-    for p in page_obj:
-        raw     = _strip_latex(p.statement)
-        preview = raw[:180] + ('…' if len(raw) > 180 else '')
-        d       = p.difficulty or 0
-        refs    = list(p.source_references.all())
-        cards.append({
-            'problem':          p,
-            'preview':          preview,
-            'topics':           list(p.topics.all())[:3],
-            'difficulty_stars': range(d),
-            'difficulty_empty': range(5 - d),
-            'has_solution':     bool(p.solution) and not p.solution_needs_review,
-            'source':           refs[0].source.name if refs else '',
-            'grade':            refs[0].grade if refs else '',
-        })
+    degraded = False
+    searched = bool(query) and not missing_id
+    scores = {}
+    relief = None
+    capped = False
 
-    # Типы задач среди опубликованных (для кнопок фильтра)
-    problem_types = list(
-        Problem.objects
-        .filter(status=Problem.Status.PUBLISHED)
-        .exclude(problem_type='')
-        .values_list('problem_type', flat=True)
-        .distinct()
-        .order_by('problem_type')
-    )
+    if searched:
+        ids, scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
+        # ⚠️ ПОЛУЧАЕМ СНАЧАЛА ОДНИ КЛЮЧИ, А ЗАДАЧИ — ТОЛЬКО НА СТРАНИЦУ.
+        # Первый вариант тянул из базы все пятьсот кандидатов со связями
+        # ради двадцати показанных карточек.
+        passed = set(qs.filter(pk__in=ids).values_list('pk', flat=True))
+        ranked = [pid for pid in ids if pid in passed]
+        total = len(ranked)
+        # ⚠️ ЧИСЛО — ОЦЕНКА СНИЗУ, КОГДА СПИСОК УПЁРСЯ В ПОТОЛОК. Мы просим
+        # у индекса пятьсот лучших; если порог прошли все пятьсот, похожих
+        # в банке может быть и три тысячи. Писать «500» в этом случае —
+        # врать точным числом, поэтому счётчик говорит «не меньше».
+        capped = len(ids) >= SEARCH_CANDIDATES
+        window = ranked[:shown]
+        by_id = {p.pk: p for p in
+                 qs.filter(pk__in=window)
+                 .prefetch_related('topics', 'parts',
+                                   'source_references__source')}
+        page_rows = [by_id[pid] for pid in window if pid in by_id]
+        has_more = total > shown
+        if total <= 2 and not filters.is_empty(active):
+            relief = _relief(base, active, ids)
+    else:
+        ordered = (qs.prefetch_related('topics', 'parts',
+                                       'source_references__source')
+                   .order_by('-id').distinct())
+        total = filtered_total
+        page_rows = list(ordered[:shown])
+        has_more = total > shown
 
-    # Строка параметров без page — для ссылок пагинации
-    qp = request.GET.copy()
-    qp.pop('page', None)
-    base_query = qp.urlencode()
+    cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
 
-    # Источники с опубликованными задачами
-    sources = (
-        Source.objects
-        .filter(references__problem__status=Problem.Status.PUBLISHED)
-        .distinct()
-        .order_by('name')
-    )
-
-    # Для учителя: активные домашки (без дедлайна или с будущим дедлайном)
-    teacher_assignments_json = '[]'
-    if request.user.is_authenticated and request.user.role == 'teacher':
-        from problems.models import Assignment
-        from django.utils import timezone
-        active_qs = Assignment.objects.filter(
-            author=request.user
-        ).filter(
-            Q(deadline__isnull=True) | Q(deadline__gte=timezone.now())
-        ).order_by('-id')[:50]
-        # Названия работ печатает репетитор, а уезжают они в <script>:
-        # экранируем `<`, `>`, `&` (см. problems/jsonsafe.py).
-        teacher_assignments_json = dumps_for_script([
-            {'id': a.pk, 'name': a.name}
-            for a in active_qs
-        ])
-
-    # 21 каноническая тема в каноническом порядке (фильтр + чипы + атлас).
-    # Этап А3: микро → макро → прочее.
-    canonical_topics = sorted(
-        Topic.objects.filter(name__in=CANONICAL),
-        key=lambda t: CANONICAL.index(t.name),
-    )
-
-    # Нулевое состояние: нет поиска и ни одного фильтра → показываем атлас тем
-    # (21 каноническая тема с числом опубликованных задач) вместо списка.
-    is_zero_state = not any([f_q, f_topic, f_diff, f_type, f_sol, f_source])
-    atlas = []
-    if is_zero_state:
-        counted = (
-            Topic.objects.filter(name__in=CANONICAL)
-            .annotate(n=Count('problems', filter=Q(
-                problems__status=Problem.Status.PUBLISHED,
-                problems__needs_quality_review=False,
-                problems__hidden_pending_review=False,
-            )))
-        )
-        by_name = {t.name: t for t in counted}
-        atlas = [by_name[name] for name in CANONICAL if name in by_name]
-
-    # Подписи активных фильтров для чипов
-    f_topic_name = next((t.name for t in canonical_topics
-                         if str(t.id) == f_topic), '')
-    f_source_name = ''
-    if f_source:
-        f_source_name = (Source.objects.filter(id=f_source)
-                         .values_list('name', flat=True).first() or '')
+    # Подпись второго числа счётчика: «из 294 по теме „Монополия“».
+    scope = ''
+    for group in fctx['chosen']:
+        scope = filters.SCOPE_LABEL[group['key']] % group['value_label']
+        break
 
     context = {
-        'page_obj':      page_obj,
-        'cards':         cards,
-        'total':         total,
-        'topics':        canonical_topics,
-        'sources':       sources,
-        'problem_types': problem_types,
-        'page_range':    _page_range(page_obj),
-        'base_query':    base_query,
-        # режим отображения и сортировка
-        'view_mode':     view_mode,
-        'f_sort':        f_sort or 'relevance',
-        # нулевое состояние и атлас тем
-        'is_zero_state': is_zero_state,
-        'atlas':         atlas,
-        # текущие значения фильтров
-        'f_q':           f_q,
-        'f_topic':       f_topic,
-        'f_topic_name':  f_topic_name,
-        'f_diff':        f_diff,
-        'f_type':        f_type,
-        'f_sol':         f_sol,
-        'f_source':      f_source,
-        'f_source_name': f_source_name,
-        # Домашки учителя для dropdown
-        'teacher_assignments_json': teacher_assignments_json,
+        'filters':        fctx,
+        'cards':          cards,
+        'view_mode':      view_mode,
+        'query':          query,
+        'searched':       searched,
+        'degraded':       degraded,
+        'missing_id':     missing_id,
+        'total':          total,
+        'capped':         capped,
+        'filtered_total': filtered_total,
+        'scope':          scope,
+        'shown':          len(cards),
+        'has_more':       has_more,
+        'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
+        'step':           PAGE_STEP,
+        'relief':         relief,
+        'view_urls':      {mode: filters.query(dict(carry, view=mode), active)
+                           for mode in ('rows', 'table', 'gallery')},
+        'teacher_assignments_json': _teacher_assignments(request),
     }
     return render(request, 'catalog/problem_list.html', context)
+
+
+def smart_search(request):
+    """Старый адрес умного поиска. Постоянный редирект в каталог.
+
+    ⚠️ 301, А НЕ 302 (решение владельца): экрана больше нет и не вернётся,
+    и поисковые системы с закладками должны узнать об этом один раз.
+    Запрос переносим — человек, пришедший по своей же старой ссылке с
+    `?q=…`, обязан увидеть результат, а не пустой каталог.
+    """
+    from django.http import HttpResponsePermanentRedirect
+
+    url = reverse('catalog:problem_list')
+    query = (request.GET.get('q') or '').strip()
+    if query:
+        url += '?' + urlencode({'q': query})
+    return HttpResponsePermanentRedirect(url)
 
 
 # ── Страница задачи ─────────────────────────────────────────────────────────
@@ -593,159 +704,6 @@ def catalog_api_problem(request, pk):
     })
 
 
-# ── Семантический поиск (Стадия 1, прототип) ─────────────────────────────────
-
-def _lexical_fallback(query, topic_id, difficulty, has_solution, kind):
-    """Поиск по СЛОВАМ, когда смысловой выключен.
-
-    ⚠️ ЭТО ДЕГРАДАЦИЯ, А НЕ ОТКАЗ (правило 6.13 docs/EMBEDDINGS.md).
-    Страница обязана ответить 200 и что-то найти: пятисотка и вечный
-    спиннер — худшее, что можно сделать с человеком, который просто искал
-    задачу. Отдаём тот же формат результатов, что и смысловой поиск,
-    чтобы шаблон не пришлось раздваивать.
-    """
-    from problems.models import Problem
-
-    from . import hybrid
-
-    ids, _hits, _picked = hybrid.lexical_search(query, 20, kind)
-    if not ids:
-        return []
-
-    qs = (Problem.objects.filter(pk__in=ids)
-          .prefetch_related('topics', 'parts'))
-    if topic_id.isdigit():
-        qs = qs.filter(topics__id=int(topic_id))
-    if difficulty.isdigit():
-        qs = qs.filter(difficulty=int(difficulty))
-    if has_solution:
-        qs = qs.exclude(solution='').filter(solution__isnull=False)
-
-    by_id = {p.pk: p for p in qs}
-    результаты = []
-    for pid in ids:                       # порядок задаёт лексический поиск
-        problem = by_id.get(pid)
-        if problem is None:
-            continue
-        preview = _strip_latex(problem.statement)[:200].strip()
-        if not preview:
-            first_part = problem.parts.first()
-            if first_part:
-                preview = _strip_latex(first_part.statement)[:200].strip()
-        результаты.append({
-            'problem': problem,
-            # Балла осмысленной близости у поиска по словам нет, и врать
-            # числом нельзя: шаблон показывает score только когда он есть.
-            'score': None,
-            'preview': preview,
-            'topics_display': [t.name for t in problem.topics.all()
-                               if t.name in CANONICAL][:2],
-        })
-    return результаты
-
-
-@login_required
-def smart_search(request):
-    """Поиск задач по текстовому описанию через эмбеддинги.
-
-    Стадия 1: нет HyDE, нет новых моделей — только уже посчитанные векторы.
-    Загрузка модели и индекса происходит лениво при первом запросе (~7 с),
-    последующие запросы мгновенны (всё в памяти).
-    """
-    import logging
-
-    from . import semantic
-    from .search_client import SearchServiceUnavailable
-    from .semantic import search as semantic_search
-
-    logger = logging.getLogger(__name__)
-
-    # 21 каноническая тема для фильтра (тот же порядок, что в каталоге).
-    canonical_topics = sorted(
-        Topic.objects.filter(name__in=CANONICAL),
-        key=lambda t: CANONICAL.index(t.name),
-    )
-
-    query = request.GET.get('q', '').strip()
-    topic_id = request.GET.get('topic_id', '')
-    difficulty = request.GET.get('difficulty', '')
-    has_solution = request.GET.get('has_solution', '') == '1'
-    kind = request.GET.get('kind', 'problems')
-
-    results = []
-    error = None
-    searched = False
-    # Смысловой поиск выключен настройкой — работаем по словам и говорим
-    # об этом. Не «ошибка»: человек ничего не сделал не так.
-    degraded = not semantic.is_enabled()
-
-    if query and degraded:
-        searched = True
-        results = _lexical_fallback(query, topic_id, difficulty,
-                                    has_solution, kind)
-    elif query:
-        searched = True
-        try:
-            raw = semantic_search(
-                query_text=query,
-                topic_id=int(topic_id) if topic_id.isdigit() else None,
-                difficulty=int(difficulty) if difficulty.isdigit() else None,
-                has_solution=has_solution,
-                content_kind=kind,
-                limit=20,
-            )
-            # Обогащаем каждый результат превью-текстом без LaTeX.
-            for item in raw:
-                p = item['problem']
-                preview = _strip_latex(p.statement)[:200].strip()
-                if not preview:
-                    # Берём первый подпункт если условие пустое.
-                    first_part = p.parts.first()
-                    if first_part:
-                        preview = _strip_latex(first_part.statement)[:200].strip()
-                item['preview'] = preview
-                # Канонические темы задачи для отображения.
-                item['topics_display'] = [
-                    t.name for t in p.topics.all() if t.name in CANONICAL
-                ][:2]
-            results = raw
-        except SearchServiceUnavailable as exc:
-            # ⚠️ СЕРВИС ЛЁГ — ЭТО ДЕГРАДАЦИЯ, А НЕ ОШИБКА ЧЕЛОВЕКА.
-            # Раньше этот случай попадал в `except Exception` ниже и человек
-            # видел «Ошибка поиска: нет связи с сервисом…» — то есть нашу
-            # внутреннюю кухню вместо результатов, хотя поиск по словам
-            # прекрасно работает и без сервиса. Ведём себя ровно так же, как
-            # при выключенном флаге выше: ищем словами и честно говорим об
-            # этом плашкой. Ни пятисотки, ни пустого экрана, ни адреса
-            # внутреннего сервиса наружу.
-            logger.warning('search service unavailable: %s — идём по словам',
-                           exc)
-            degraded = True
-            results = _lexical_fallback(query, topic_id, difficulty,
-                                        has_solution, kind)
-        except ImportError:
-            error = (
-                'Модель эмбеддингов не установлена. '
-                'Запустите: pip install sentence-transformers'
-            )
-        except Exception as exc:
-            error = f'Ошибка поиска: {exc}'
-
-    return render(request, 'catalog/smart_search.html', {
-        'query': query,
-        'topic_id': topic_id,
-        'difficulty': difficulty,
-        'has_solution': has_solution,
-        'kind': kind,
-        'results': results,
-        'error': error,
-        'degraded': degraded,
-        'searched': searched,
-        'canonical_topics': canonical_topics,
-        'difficulty_choices': range(1, 6),
-    })
-
-
 def problem_figure_svg(request, pk):
     """Отдать СГЕНЕРИРОВАННУЮ системой картинку (ProblemFigure).
 
@@ -860,3 +818,36 @@ def topic_map_data(request):
     response['ETag'] = etag
     response['Cache-Control'] = 'public, max-age=86400'
     return response
+
+
+# ── Подсказки тегов для поля фильтра ─────────────────────────────────────
+
+def api_tags(request):
+    """Подсказки тегов по двум и более символам. Публично, только чтение.
+
+    ⚠️ ТОЛЬКО ТЕГИ ВИДИМЫХ ЗАДАЧ. Тег, висящий на скрытой задаче, не должен
+    даже подсказываться: иначе поле подсказок становится оглавлением того,
+    что каталог намеренно не показывает.
+
+    ⚠️ БАЗУ ТЕГОВ ЗДЕСЬ НЕ ЧИСТИМ. Она засорена импортом (ссылки на чужие
+    комментарии, фамилии составителей — 22 и 5 записей среди видимых), и
+    это отдельная задача владельца, а не побочная правка этой сессии.
+    Порядок по числу задач держит мусор внизу: у всего найденного хлама
+    ровно по одной задаче.
+    """
+    from problems.models import Tag
+
+    needle = (request.GET.get('q') or '').strip()
+    if len(needle) < 2:
+        return JsonResponse({'tags': []})
+
+    visible = Q(problems__status=Problem.Status.PUBLISHED,
+                problems__needs_quality_review=False,
+                problems__hidden_pending_review=False)
+    rows = (Tag.objects
+            .filter(name__icontains=needle)
+            .annotate(n=Count('problems', filter=visible, distinct=True))
+            .filter(n__gt=0)
+            .order_by('-n', 'name')[:10])
+    return JsonResponse({'tags': [{'id': t.pk, 'name': t.name, 'count': t.n}
+                                  for t in rows]})

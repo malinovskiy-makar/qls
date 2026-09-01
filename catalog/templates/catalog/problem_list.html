@@ -1,1165 +1,486 @@
 {% extends "catalog/base.html" %}
-{% load catalog_filters %}
+{% load ru catalog_filters %}
 
-{% block title %}Каталог задач{% endblock %}
+{% comment %}
+УМНЫЙ КАТАЛОГ — ОДИН ЭКРАН НА ПОИСК И ФИЛЬТРЫ.
+
+Решение владельца 01.09.2026: отдельного «Умного поиска» больше нет, он
+слился с каталогом. Два входа в один банк заставляли человека выбирать
+способ ДО того, как он сформулировал, что ищет.
+
+⚠️ РОЛИ ЦВЕТА (решение владельца и дизайнера, 31.08–01.09.2026):
+    поиск и фильтры        → --surface-tool (бирюза бренда);
+    блок найденных задач   → --surface-info + рамка --brand-amber;
+    карточка с текстом     → --surface.
+Рамка янтарём — ЗАПИСАННОЕ ИСКЛЮЧЕНИЕ из правила территории: сама плашка
+против фона даёт 1,06 и без рамки блока на экране физически нет.
+https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
+
+⚠️ НА БИРЮЗЕ ЖИВЁТ ТОЛЬКО ОСНОВНОЙ ТЕКСТ. --text даёт 6,03 и норму
+держит, --text2 — 3,31, то есть хуже AA. Поэтому каждый чип, счётчик и
+подпись внутри бирюзовой панели лежат в СВЕТЛОМ ПОЛЕ (--surface), а не
+прямо на панели. Осветлить панель нельзя — это цвет бренда.
+
+⚠️ ШИРИНА КОЛОНКИ — 860 px, ЗНАЧЕНИЕ САМОГО САЙТА. Прежний каталог
+переопределял её на 1140; владелец попросил больше воздуха по бокам.
+860 — это `.page-wrap` из `catalog/base.html`, по нему живут страница
+задачи и остальные экраны каталога, поэтому переопределения здесь больше
+нет вовсе: своё число не изобретается, берётся общее.
+{% endcomment %}
+
+{% block title %}Умный каталог{% endblock %}
 
 {% block extra_style %}
-/* ── Широкий layout для каталога ──────────────────── */
-.page-wrap {
-  max-width: 1140px;
-  padding: 28px 24px 60px;
+/* ── Заголовок экрана ───────────────────────────────────────────── */
+.ct-head { margin: 0 0 22px; }
+.ct-head h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: -.01em; }
+.ct-head p { margin: 0; color: var(--text2); font-size: 16px;
+             line-height: 1.5; max-width: 46em; }
+
+/* ── Панель инструмента: поиск, карта, фильтры ───────────────────── */
+.ct-tool { background: var(--surface-tool); border-radius: 16px;
+           padding: 18px; margin: 0 0 22px; color: var(--text); }
+.ct-tool-top { display: flex; gap: 16px; align-items: stretch; }
+.ct-ask { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+
+/* Поле поиска — ГЛАВНЫЙ ОБЪЕКТ ЭКРАНА. Владелец: «пока будто просто
+   какое-то поле, нужно больше эмфасиса что он умный». Отсюда высота под
+   несколько строк описания, крупный кегль ввода и подсказка, которая
+   объясняет СПОСОБ, а не повторяет слово «поиск». */
+.ct-ask-field { position: relative; background: var(--surface);
+                border: 1.5px solid var(--brand-amber); border-radius: 12px;
+                padding: 10px 12px 8px; }
+.ct-ask-field textarea {
+  width: 100%; border: 0; background: transparent; resize: vertical;
+  font: 500 19px/1.45 var(--font-ui); color: var(--text);
+  min-height: 84px; outline: none; display: block;
+}
+.ct-ask-field textarea::placeholder { color: var(--text3); font-weight: 400;
+                                      font-size: 17px; }
+/* ⚠️ ПОДСКАЗКА ЛЕЖИТ В СВЕТЛОМ ПОЛЕ, А НЕ ПРЯМО НА БИРЮЗЕ. Первый вариант
+   писал её цветом --text3 по --surface-tool: замер дал 2,45 при норме 4,5.
+   Правило панели («на бирюзе только основной текст») ловится именно так —
+   глазами и замером, а не намерением. */
+.ct-ask-hint { font-size: 13px; color: var(--text2); margin: 6px 0 0;
+               background: var(--surface); border-radius: 8px;
+               padding: 7px 11px; line-height: 1.45; }
+.ct-ask-row { display: flex; gap: 8px; align-items: center;
+              margin-top: 10px; flex-wrap: wrap; }
+/* ⚠️ ОБЕ КНОПКИ ОДНОГО РАЗМЕРА (замечание владельца): «Найти» была
+   заметно крупнее «Очистить», и ряд читался кривым. */
+.ct-btn { font: 600 14px/1 var(--font-ui); padding: 10px 18px;
+          border-radius: 9px; border: 1px solid transparent; cursor: pointer;
+          text-decoration: none; display: inline-flex; align-items: center; }
+.ct-btn--go { background: var(--brand-amber); color: var(--brand-amber-ink); }
+.ct-btn--go:hover { background: var(--brand-amber-hover); }
+.ct-btn--quiet { background: var(--surface); color: var(--text);
+                 border-color: var(--border); }
+.ct-busy { font-size: 13px; color: var(--text); background: var(--surface);
+           padding: 6px 10px; border-radius: 8px; }
+.ct-busy[hidden] { display: none; }
+
+/* Блок карты — ВХОД В КОРПУС, а не сужение выдачи, поэтому он стоит
+   рядом с полем поиска, а не в ряду фильтров. */
+.ct-map { flex: 0 0 300px; display: flex; }
+.ct-map .tmap-preview { width: 100%; }
+
+/* ── Полоса фильтров ─────────────────────────────────────────────── */
+.ct-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+            margin-top: 14px; }
+.fl-chip { position: relative; }
+.fl-chip > summary {
+  list-style: none; cursor: pointer; display: inline-flex; gap: 8px;
+  align-items: center; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 13px; font-size: 14px; white-space: nowrap;
+}
+.fl-chip > summary::-webkit-details-marker { display: none; }
+.fl-chip.is-on > summary { border-color: var(--brand-amber);
+                           border-width: 1.5px; padding: 6.5px 12.5px; }
+.fl-chip-caret { width: 0; height: 0; border: 4px solid transparent;
+                 border-top-color: var(--text2); margin-top: 3px; }
+.fl-chip[open] .fl-chip-caret { transform: rotate(180deg); margin-top: -3px; }
+.fl-chip-x { background: var(--surface); color: var(--text);
+             border: 1px solid var(--border); border-radius: 999px;
+             width: 28px; height: 28px; display: inline-flex;
+             align-items: center; justify-content: center;
+             text-decoration: none; font-size: 12px; margin-left: -6px; }
+.fl-pop { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0;
+          min-width: 280px; max-width: 380px; max-height: 60vh;
+          overflow: auto; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 12px;
+          padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+
+/* ── Варианты фильтра ────────────────────────────────────────────── */
+.fl-opts { list-style: none; margin: 0; padding: 0; }
+.fl-opts--wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.fl-opts--tall { max-height: 260px; overflow: auto; }
+.fl-opt { display: flex; gap: 10px; justify-content: space-between;
+          align-items: baseline; padding: 6px 9px; border-radius: 8px;
+          text-decoration: none; color: var(--text); font-size: 14px; }
+.fl-opt:hover { background: var(--surface-2); }
+.fl-opt.is-on { background: var(--accent); color: var(--accent-on); }
+.fl-opt.is-on .fl-opt-n { color: var(--accent-on); opacity: .8; }
+.fl-opt-n { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.fl-opts--wrap .fl-opt { border: 1px solid var(--border); }
+.fl-group { border-top: 1px solid var(--border-soft); }
+.fl-group:first-child { border-top: 0; }
+.fl-group > summary { list-style: none; cursor: pointer; display: flex;
+    justify-content: space-between; gap: 10px; padding: 8px 9px;
+    font-size: 14px; font-weight: 600; color: var(--text); }
+.fl-group > summary::-webkit-details-marker { display: none; }
+.fl-group-n { font-weight: 400; font-size: 13px; color: var(--text3); }
+.fl-two { display: flex; gap: 10px; align-items: flex-start; }
+.fl-two .fl-opts { flex: 1 1 0; min-width: 0; }
+/* ⚠️ ВТОРОЙ СТОЛБЕЦ, А НЕ СПИСОК ВНИЗ: выбор формата теста — это
+   ПРОДОЛЖЕНИЕ выбора вбок (решение владельца). */
+.fl-opts--next { border-left: 1px solid var(--border); padding-left: 10px; }
+
+.fl-tag-input { width: 100%; font: 400 14px/1.4 var(--font-ui);
+                padding: 9px 11px; border-radius: 9px; color: var(--text);
+                border: 1px solid var(--border); background: var(--surface); }
+.fl-tag-sug { list-style: none; margin: 4px 0 0; padding: 4px;
+              border: 1px solid var(--border); border-radius: 9px;
+              background: var(--surface); max-height: 220px; overflow: auto; }
+.fl-tag-sug[hidden] { display: none; }
+.fl-tag-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
+                margin: 8px 0 0; padding: 0; }
+.fl-tag-chip { display: inline-flex; gap: 6px; align-items: center;
+               background: var(--accent); color: var(--accent-on);
+               border-radius: 999px; padding: 5px 11px; font-size: 13px;
+               text-decoration: none; }
+.fl-tag-of { font-size: 13px; color: var(--text3); margin: 10px 0 4px; }
+
+/* ── Блок и панель в окне «Все фильтры» ──────────────────────────── */
+.fl-block { margin: 0 0 16px; }
+.fl-block-head { display: flex; justify-content: space-between;
+                 align-items: baseline; margin: 0 0 6px; }
+.fl-block-name { font-size: 13px; font-weight: 700; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--text2); }
+.fl-block-clear { font-size: 13px; color: var(--accent-ink); }
+
+/* ⚠️ `margin: auto` ЗАДАЁТСЯ ЯВНО. Браузерное правило центрирования у
+   <dialog> завязано на `width: fit-content`; как только ширину назначили
+   своей, окно уезжает в левый верхний угол — что и было видно на снимке. */
+.ct-all { border: 0; padding: 0; background: transparent; max-width: 900px;
+          width: calc(100vw - 32px); margin: auto; }
+.ct-all::backdrop { background: rgba(20,18,14,.45); }
+.ct-all-box { background: var(--surface); border-radius: 16px;
+              border: 1.5px solid var(--brand-amber); overflow: hidden; }
+.ct-all-head { display: flex; justify-content: space-between;
+               align-items: center; padding: 16px 20px;
+               border-bottom: 1px solid var(--border-soft); }
+.ct-all-head h2 { margin: 0; font-size: 19px; }
+.ct-all-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+               padding: 18px 20px; max-height: 66vh; overflow: auto; }
+.ct-all-foot { display: flex; justify-content: space-between;
+               align-items: center; gap: 12px; padding: 14px 20px;
+               border-top: 1px solid var(--border-soft);
+               background: var(--surface-2); }
+
+/* ── Блок найденных задач ────────────────────────────────────────── */
+.ct-results { background: var(--surface-info); border: 1.5px solid var(--brand-amber);
+              border-radius: 16px; padding: 16px 18px 20px; }
+.ct-count-row { display: flex; justify-content: space-between; gap: 14px;
+                align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+.ct-count { font-size: 15px; color: var(--text); }
+.ct-count b { font-size: 17px; }
+.ct-count small { color: var(--text2); font-size: 14px; }
+.ct-views { display: flex; gap: 4px; background: var(--surface);
+            border-radius: 9px; padding: 3px; }
+.ct-view { font-size: 13px; padding: 5px 11px; border-radius: 7px;
+           color: var(--text2); text-decoration: none; }
+.ct-view.is-on { background: var(--accent); color: var(--accent-on); }
+
+.ct-note { background: var(--surface); border-radius: 10px; padding: 11px 14px;
+           font-size: 14px; color: var(--text); margin: 0 0 14px;
+           border-left: 3px solid var(--brand-amber); }
+.ct-note a { color: var(--accent-ink); }
+
+/* Карточка задачи — на --surface, а не на песочной плашке. */
+.ct-card { display: flex; gap: 14px; background: var(--surface);
+           border: 1px solid var(--border-soft); border-radius: 12px;
+           padding: 13px 15px; margin: 0 0 8px; text-decoration: none;
+           color: var(--text); }
+.ct-card:hover { border-color: var(--accent); }
+.ct-card-main { flex: 1 1 auto; min-width: 0; }
+/* ⚠️ НОМЕР ЗАДАЧИ — МЕЛКИЙ И СПРАВА (решение владельца). Он нужен, чтобы
+   сослаться, но глаз должен цепляться за тему и условие. */
+.ct-card-id { flex: 0 0 auto; font-size: 12px; color: var(--text3);
+              font-variant-numeric: tabular-nums; align-self: flex-start; }
+.ct-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+           margin: 0 0 5px; }
+.ct-topic { font-size: 12px; background: var(--surface-2); color: var(--text2);
+            border-radius: 999px; padding: 3px 9px; }
+.ct-stars { color: var(--amber); font-size: 12px; letter-spacing: .5px; }
+.ct-sol { font-size: 12px; color: var(--green); }
+.ct-kind { font-size: 12px; color: var(--text3); }
+.ct-card-title { font-weight: 600; font-size: 15px; margin: 0 0 3px; }
+.ct-card-preview { font-size: 14px; color: var(--text2); line-height: 1.5;
+                   margin: 0; }
+.ct-acts { display: flex; gap: 6px; margin-top: 9px; }
+
+.ct-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+              gap: 10px; }
+.ct-gallery .ct-card { flex-direction: column; }
+
+.ct-table { width: 100%; border-collapse: collapse; background: var(--surface);
+            border-radius: 12px; overflow: hidden; font-size: 14px; }
+.ct-table th, .ct-table td { padding: 9px 11px; text-align: left;
+            border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+.ct-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
+            color: var(--text2); background: var(--surface-2); }
+.ct-table td.num, .ct-table th.num { text-align: right;
+            font-variant-numeric: tabular-nums; color: var(--text3);
+            white-space: nowrap; }
+/* Ссылка в таблице — обычный текст строки, а не синее подчёркивание
+   браузера: подчёркнутая синева в песочной таблице читается как чужой
+   элемент, а вся строка и так ведёт на задачу. */
+.ct-table a { color: var(--text); text-decoration: none; }
+.ct-table tr:hover a { color: var(--accent-ink); text-decoration: underline; }
+
+.ct-more { text-align: center; margin: 16px 0 0; }
+.ct-more small { display: block; margin-top: 7px; font-size: 13px;
+                 color: var(--text2); }
+.ct-empty { background: var(--surface); border-radius: 12px; padding: 26px;
+            text-align: center; color: var(--text2); }
+
+@media (max-width: 760px) {
+  .ct-tool-top { flex-direction: column; }
+  .ct-map { flex-basis: auto; height: 170px; }
+  .ct-all-cols { grid-template-columns: 1fr; }
 }
 
-/* ── Двухколоночный layout ────────────────────────── */
-.catalog-layout {
-  display: flex;
-  gap: 24px;
-  align-items: flex-start;
-}
+{% include "catalog/_catalog_actions_css.html" %}
+{% endblock %}
 
-/* ── Сайдбар с фильтрами ──────────────────────────── */
-.filter-sidebar {
-  width: 240px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 72px;
-  max-height: calc(100vh - 90px);
-  overflow-y: auto;
-  scrollbar-width: thin;
-  scrollbar-color: var(--border) transparent;
-}
-/* ⚠️ РЕЛЬС ФИЛЬТРОВ — ПАНЕЛЬ ИНСТРУМЕНТА, А НЕ ЕЩЁ ОДНА КАРТОЧКА.
-   Роль цвета из решения владельца и дизайнера 31.08.2026: всё, что
-   относится к поиску и отбору, красится --surface-tool. До 01.09 токен был
-   объявлен, но не читался ни одним экраном, и рельс был того же кремового,
-   что и карточки, — семь цветов палитры давали на экране один.
-   ⚠️ НА ЭТОЙ ПАНЕЛИ ДОПУСТИМ ТОЛЬКО ОСНОВНОЙ ТЕКСТ: --text даёт 6,03,
-   --text2 — 3,31, то есть хуже нормы AA. Поэтому подписи разделов и ссылка
-   сброса ниже переведены на --text, а всё остальное живёт внутри светлых
-   полей (--surface), а не прямо на панели. Осветлить панель нельзя — это
-   цвет бренда. */
-.filter-card {
-  background: var(--surface-tool);
-  border: .5px solid var(--border);
-  border-radius: 10px;
-  padding: 18px 16px;
-}
-.filter-section { margin-bottom: 20px; }
-.filter-section:last-child { margin-bottom: 0; }
-.filter-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--text);          /* прямо на бирюзе: --text2 даёт 3,31 */
-  margin-bottom: 8px;
-}
-
-/* Поиск */
-.search-row { display: flex; gap: 6px; }
-.search-input {
-  flex: 1; min-width: 0;
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  padding: 7px 10px;
-  font-size: 14px;
-  background: var(--surface);
-  color: var(--text);
-  transition: border-color .12s;
-}
-/* Кольцо фокуса нейтральное (сессия 7, фаза 6). */
-.search-input:focus { outline: none; border-color: var(--focus);
-                      box-shadow: 0 0 0 3px var(--focus-ring); }
-.search-btn {
-  padding: 7px 12px;
-  background: var(--btn-bg);
-  color: var(--on-btn);
-  border: none;
-  border-radius: var(--r);
-  font-size: 14px;
-  cursor: pointer;
-}
-.search-btn:hover { background: var(--btn-bg-hover); }
-
-/* Тема и Источник — одинаковые select */
-.topic-select {
-  width: 100%;
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  padding: 7px 8px;
-  font-size: 14px;
-  background: var(--surface);
-  color: var(--text);
-  cursor: pointer;
-}
-.topic-select:focus { outline: none; border-color: var(--focus); }
-
-/* Сложность — кнопки-звёздочки: сетка 3×2 (ровные колонки), а не рваный wrap */
-.diff-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; }
-.diff-btn {
-  padding: 5px 6px;
-  text-align: center;
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  background: var(--surface);
-  font-size: 13px;
-  color: var(--amber);
-  cursor: pointer;
-  text-decoration: none;
-  transition: background .1s, border-color .1s;
-  white-space: nowrap;
-  line-height: 1;
-}
-.diff-btn:hover { background: var(--amber-tint); border-color: var(--amber); }
-.diff-btn.active { background: var(--amber-tint); border-color: var(--amber); font-weight: 600; }
-
-/* Типы задач */
-.type-btns { display: flex; flex-direction: column; gap: 4px; }
-.type-btn {
-  padding: 6px 10px;
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  background: var(--surface);
-  font-size: 13px;
-  color: var(--text2);
-  cursor: pointer;
-  text-decoration: none;
-  text-align: left;
-  transition: background .1s, border-color .1s, color .1s;
-}
-.type-btn:hover { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent); }
-.type-btn.active { background: var(--accent); color: var(--on-btn); border-color: var(--accent); }
-
-/* Чекбокс */
-.checkbox-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-}
-.checkbox-label input[type=checkbox] {
-  width: 15px; height: 15px;
-  cursor: pointer;
-  accent-color: var(--accent);
-}
-
-/* Сброс */
-.reset-link {
-  display: block;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text);          /* прямо на бирюзе: --text2 даёт 3,31 */
-  text-decoration: none;
-  padding: 7px;
-  border-radius: var(--r);
-  margin-top: 4px;
-  transition: color .1s, background .1s;
-}
-.reset-link:hover { color: var(--text); background: var(--border-soft); }
-
-/* ── Основная область ─────────────────────────────── */
-.problems-main { flex: 1; min-width: 0; }
-
-.results-bar {
-  display: flex;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.results-count { font-size: 14px; color: var(--text2); }
-.results-count strong { color: var(--text); font-weight: 600; }
-
-/* ── Карточка задачи ──────────────────────────────── */
-.problem-card {
-  background: var(--surface-info);
-  border: 1px solid var(--brand-amber);
-  border-radius: 10px;
-  padding: 16px 20px;
-  margin-bottom: 10px;
-  text-decoration: none;
-  display: block;
-  color: inherit;
-  transition: box-shadow .15s, border-color .15s;
-}
-.problem-card:hover {
-  box-shadow: 0 2px 14px rgba(0,0,0,.07);
-  border-color: var(--border);
-}
-.card-top {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-.card-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--text);
-  line-height: 1.4;
-  flex: 1;
-}
-.problem-card:hover .card-title { color: var(--accent-ink); }
-.card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-}
-.card-stars { font-size: 13px; color: var(--amber); letter-spacing: .5px; white-space: nowrap; }
-.card-sol-badge {
-  background: var(--green-tint);
-  color: var(--green);
-  font-size: 13px;
-  font-weight: 700;
-  border-radius: 20px;
-  padding: 2px 7px;
-  white-space: nowrap;
-}
-.card-preview {
-  font-size: 14px;
-  color: var(--text2);
-  line-height: 1.55;
-  margin-bottom: 10px;
-}
-.card-tags { display: flex; flex-wrap: wrap; gap: 5px; }
-.card-tag {
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  border-radius: 20px;
-  padding: 2px 9px;
-  font-size: 13px;
-  font-weight: 500;
-}
-
-/* ── Кнопки действий на карточке ─────────────────── */
-.card-action-row {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-}
-.ca-btn {
-  padding: 4px 11px;
-  border-radius: var(--r);
-  font-size: 13px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: background .12s, color .12s, border-color .12s;
-  line-height: 1.5;
-}
-.ca-preview {
-  border: .5px solid var(--border);
-  background: var(--surface);
-  color: var(--text2);
-}
-.ca-preview:hover { border-color: var(--accent); color: var(--accent-ink); }
-.ca-add {
-  border: .5px solid var(--accent);
-  background: var(--surface);
-  color: var(--accent-ink);
-  font-weight: 500;
-}
-.ca-add:hover { background: var(--accent); color: var(--on-btn); }
-.ca-add.added { background: var(--green-tint); border-color: var(--green); color: var(--green); }
-
-/* Dropdown домашек */
-.ca-hw-wrap { position: relative; }
-.ca-dropdown {
-  display: none;
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0,0,0,.12);
-  min-width: 220px;
-  z-index: 200;
-  overflow: hidden;
-}
-.ca-dropdown.open { display: block; }
-.ca-dd-head {
-  padding: 8px 12px 6px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text2);
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  border-bottom: .5px solid var(--border);
-}
-.ca-dd-item {
-  display: block;
-  width: 100%;
-  padding: 9px 12px;
-  border: none;
-  background: none;
-  text-align: left;
-  font-size: 14px;
-  color: var(--text);
-  cursor: pointer;
-  transition: background .1s;
-  border-bottom: .5px solid var(--border-soft);
-}
-.ca-dd-item:last-child { border-bottom: none; }
-.ca-dd-item:hover { background: var(--surface-2); }
-.ca-dd-item.new-hw { color: var(--accent-ink); font-weight: 500; }
-.ca-dd-item.done   { color: var(--green); pointer-events: none; }
-
-/* ── Пустой результат ─────────────────────────────── */
-.empty-state {
-  background: var(--surface);
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text2);
-  border: .5px solid var(--border);
-  border-radius: 10px;
-}
-.empty-state p { font-size: 16px; margin-bottom: 6px; color: var(--text); }
-.empty-state small { font-size: 14px; }
-
-/* ── Пагинация ────────────────────────────────────── */
-.pagination {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  margin-top: 24px;
-  flex-wrap: wrap;
-}
-.page-btn {
-  min-width: 36px; height: 36px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  font-size: 14px;
-  color: var(--text2);
-  text-decoration: none;
-  background: var(--surface);
-  padding: 0 10px;
-  transition: background .1s, color .1s, border-color .1s;
-}
-.page-btn:hover { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent); }
-.page-btn.active { background: var(--accent); color: var(--on-btn); border-color: var(--accent); font-weight: 600; }
-.page-btn.disabled { opacity: .35; pointer-events: none; }
-.page-ellipsis {
-  font-size: 14px; color: var(--text2);
-  display: inline-flex; align-items: center;
-  height: 36px; padding: 0 4px;
-}
-/* ── Тулбар результатов ───────────────────────────── */
-.toolbar {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 12px; margin-bottom: 12px; flex-wrap: wrap;
-}
-.toolbar-controls { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.sort-wrap { display: flex; align-items: center; gap: 6px; }
-.sort-label { font-size: 13px; color: var(--text3); }
-.sort-select {
-  border: .5px solid var(--border); border-radius: var(--r);
-  padding: 5px 8px; font-size: 13px; background: var(--surface);
-  color: var(--text); cursor: pointer;
-}
-.sort-select:focus { outline: none; border-color: var(--focus); }
-
-/* Переключатель вида (сегментированный контрол) */
-.view-seg {
-  display: inline-flex; border: .5px solid var(--border);
-  border-radius: var(--r); overflow: hidden; flex-shrink: 0;
-}
-.seg-btn {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 30px; background: var(--surface);
-  color: var(--text2); text-decoration: none; cursor: pointer;
-  border-right: .5px solid var(--border); transition: background .12s, color .12s;
-}
-.seg-btn:last-child { border-right: none; }
-.seg-btn:hover { background: var(--surface-2); color: var(--text); }
-.seg-btn.active { background: var(--accent-tint); color: var(--accent-ink); }
-.seg-btn svg { width: 16px; height: 16px; }
-
-/* ── Чипы активных фильтров ────────────────────────── */
-.chips-bar {
-  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-  margin-bottom: 14px;
-}
-  /* ⚠️ ПОД ПОЛУПРОЗРАЧНЫМ ТИНТОМ — ПЛОТНАЯ ПОДЛОЖКА ЦВЕТОМ СТРАНИЦЫ.
-     Иначе сквозь тинт просвечивает фоновый паттерн, и текст читается уже
-     не на тинте, а на «тинт + знак»: замер дал 4,17 в светлой теме и 3,90
-     в тёмной при норме 4,5. Плотностью паттерна это не лечится — даже при
-     .04 светлая тема даёт 4,49: у пары «--accent-ink на --accent-tint» и
-     без всякого паттерна всего 4,71 запаса.
-     Цвет не выдуман: тинт кладётся картинкой поверх плотного --bg, то есть
-     получается ровно тот же оттенок, что и был, но непрозрачный. Обе темы
-     обслуживаются теми же токенами. */
-.fchip {
-  display: inline-flex; align-items: center; gap: 4px;
-  background-color: var(--bg);
-  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
-  color: var(--accent-ink);
-  border-radius: 20px; padding: 3px 5px 3px 11px;
-  font-size: 13px; font-weight: 500; text-decoration: none;
-}
-.fchip .x {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 16px; height: 16px; border-radius: 50%;
-  font-size: 14px; line-height: 1; color: var(--accent-ink);
-}
-.fchip:hover .x { background: var(--accent); color: var(--on-btn); }
-.chips-clear { font-size: 13px; color: var(--text2); text-decoration: none; padding: 3px 8px; }
-.chips-clear:hover { color: var(--text); }
-
-/* ── Вид «Строки» (по умолчанию) ───────────────────── */
-.rows-list {
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: 10px;
-}
-.prow {
-  display: flex; align-items: flex-start; gap: 14px;
-  padding: 13px 18px; border-bottom: .5px solid var(--border);
-  text-decoration: none; color: inherit; transition: background .12s;
-}
-.prow:first-child { border-top-left-radius: 10px; border-top-right-radius: 10px; }
-.prow:last-child  { border-bottom: none; border-bottom-left-radius: 10px; border-bottom-right-radius: 10px; }
-.prow:hover { background: var(--surface-2); }
-.prow-stars {
-  width: 66px; flex-shrink: 0; font-size: 13px; color: var(--amber);
-  letter-spacing: .5px; white-space: nowrap; padding-top: 2px;
-}
-.prow-main { flex: 1; min-width: 0; }
-/* ⚠️ ДВЕ СТРОКИ, А НЕ ОДНА С МНОГОТОЧИЕМ. Одна строка теряла у длинных
-   заголовков до 164 px текста на узком окне — «Можно решить без
-   использования калькулятора» обрывалось на середине. Многоточие осталось,
-   но включается вдвое позже.
-   На рабочих ширинах (1100 и шире) НИЧЕГО НЕ МЕНЯЕТСЯ: там заголовки
-   помещаются в одну строку, замер это подтверждает. Высота строки растёт
-   только там, где иначе текст просто пропал бы. */
-.prow-title {
-  font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.4;
-  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2;
-  overflow: hidden;
-}
-.prow:hover .prow-title { color: var(--accent-ink); }
-.prow-preview {
-  font-size: 13px; color: var(--text2); line-height: 1.5; margin-top: 3px;
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.prow-meta {
-  display: flex; flex-wrap: wrap; align-items: center; gap: 6px;
-  margin-top: 7px; font-size: 13px; color: var(--text3);
-}
-/* Разделитель — цветом ТЕКСТА, а не рамки. --border это rgba(45,45,45,.14),
-   цвет для линии в 1 px; точкой он даёт контраст 1,30 и не виден вовсе. */
-.prow-meta .mid { color: var(--text3); }
-.prow-meta .chip {
-  background: var(--chip-bg); color: var(--chip-text);
-  border-radius: 20px; padding: 1px 8px; font-weight: 500;
-}
-.prow-sol { color: var(--green); font-weight: 600; }
-.prow-actions { display: flex; align-items: flex-start; gap: 6px; flex-shrink: 0; }
-
-/* ── Вид «Таблица» ─────────────────────────────────── */
-.ptable-wrap {
-  background: var(--surface); border: .5px solid var(--border);
-  border-radius: 10px; overflow: hidden;
-}
-.ptable { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: 14px; }
-.ptable th {
-  text-align: left; font-size: 13px; font-weight: 600;
-  text-transform: uppercase; letter-spacing: .4px; color: var(--text3);
-  background: var(--surface-2); padding: 9px 12px; border-bottom: .5px solid var(--border);
-}
-.ptable td {
-  padding: 10px 12px; border-bottom: .5px solid var(--border-soft);
-  color: var(--text2); vertical-align: middle;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-}
-.ptable tr:last-child td { border-bottom: none; }
-/* ⚠️ Столбец сложности — по центру, как все числовые столбцы платформы
-   (ревью 15.08, фаза 3). Звёзды это запись ЧИСЛА, и их количество
-   меняется от строки к строке: общей оси у левого края нет. */
-.ptable .col-diff  { width: 80px; color: var(--amber); white-space: nowrap;
-                     text-align: center; }
-.ptable .col-topic { width: 150px; }
-.ptable .col-type  { width: 120px; }
-.ptable .col-src   { width: 130px; }
-.ptable .col-sol   { width: 60px; text-align: center; }
-.ptable .col-sol .yes { color: var(--green); font-weight: 700; }
-.ptable .col-act   { width: 92px; }
-.ptable a.t-title { color: var(--text); font-weight: 500; text-decoration: none; }
-.ptable a.t-title:hover { color: var(--accent-ink); }
-
-/* ── Вид «Галерея» ─────────────────────────────────── */
-.gallery-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px;
-}
-.gallery-grid .problem-card { margin-bottom: 0; height: 100%; }
-
-/* ── Атлас тем (нулевое состояние) ─────────────────── */
-.atlas-head { font-size: 19px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
-.atlas-sub { font-size: 14px; color: var(--text2); margin-bottom: 18px; }
-.atlas-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px;
-}
-/* ⚠️ ПЛИТКА ТЕМЫ И КАРТОЧКА ЗАДАЧИ — ИНФОРМАЦИОННЫЕ БЛОКИ (--surface-info),
-   И РАМКА ЯНТАРЁМ ОБЯЗАТЕЛЬНА. Плашка против фона страницы даёт 1,06 —
-   как отдельный блок она не читается вовсе; границу держит только рамка
-   --brand-amber: 1,94 против фона и 1,84 против самой плашки. Без рамки
-   блока на экране физически нет. */
-.atlas-tile {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  background: var(--surface-info); border: 1px solid var(--brand-amber); border-radius: 10px;
-  padding: 14px 16px; text-decoration: none; color: var(--text);
-  transition: border-color .12s, background .12s, transform .12s;
-}
-.atlas-tile:hover { border-color: var(--accent); background: var(--accent-tint); transform: translateY(-1px); }
-.atlas-name { font-size: 14px; font-weight: 600; line-height: 1.3; }
-/* --text2, а не --text3: на тёмной плашке #504a2d третий уровень даёт
-   3,92 при норме 4,5, второй — 4,70. */
-.atlas-count { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; flex-shrink: 0; }
-.atlas-tile:hover .atlas-count { color: var(--accent-ink); }
-
-/* ── Модальное окно ───────────────────────────────── */
-.modal-backdrop {
-  display: none;
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,.45);
-  z-index: 1000;
-  align-items: center;
-  justify-content: center;
-}
-.modal-backdrop.open { display: flex; }
-.c-modal {
-  background: var(--surface);
-  border-radius: 12px;
-  border: .5px solid var(--border);
-  width: 640px;
-  max-width: 96vw;
-  max-height: 85vh;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 8px 40px rgba(0,0,0,.18);
-}
-.c-modal-head {
-  padding: 18px 22px 14px;
-  border-bottom: .5px solid var(--border);
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-}
-.c-modal-title {
-  flex: 1;
-  font-size: 16px;
-  font-weight: 700;
-  line-height: 1.4;
-}
-.c-modal-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 6px;
-}
-.c-modal-tag {
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  border-radius: 20px;
-  padding: 2px 8px;
-  font-size: 13px;
-  font-weight: 500;
-}
-.c-modal-tag.sol { background: var(--green-tint); color: var(--green); }
-.c-modal-close {
-  border: none;
-  background: none;
-  font-size: 20px;
-  color: var(--text2);
-  cursor: pointer;
-  padding: 0 4px;
-  line-height: 1;
-  flex-shrink: 0;
-}
-.c-modal-close:hover { color: var(--text); }
-.c-modal-body {
-  padding: 20px 22px;
-  overflow-y: auto;
-  flex: 1;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.c-modal-part { margin-top: 14px; }
-.c-modal-part-label {
-  font-size: 13px;
-  font-weight: 700;
-  color: var(--text2);
-  text-transform: uppercase;
-  letter-spacing: .4px;
-  margin-bottom: 4px;
-}
-.c-modal-foot {
-  padding: 12px 22px;
-  border-top: .5px solid var(--border);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-.c-modal-source { font-size: 13px; color: var(--text2); flex: 1; }
-.c-modal-loading {
-  display: flex; align-items: center; justify-content: center;
-  height: 100px; color: var(--text2); font-size: 14px;
-}
+{% block extra_head %}
+{% load static %}
+{% comment %}
+Предпросмотр карты тем подключается ровно так, как написано в шапке
+`catalog/static/catalog/js/topic_map_preview.js`: стиль, контейнер с
+`data-tmap-preview` (он в теле страницы) и отложенный скрипт. Скрипт сам
+находит контейнер, ждёт простоя и появления блока на экране и только
+тогда идёт за данными — дописывать нечего.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
+<script defer src="{% static 'catalog/js/topic_map_preview.js' %}"></script>
 {% endblock %}
 
 {% block content %}
-<div class="catalog-layout">
+<header class="ct-head">
+  <h1>Это умный каталог.</h1>
+  <p>Исследуйте самый обширный банк олимпиадных заданий по экономике
+     и находите задачи с помощью умного поиска, привычных фильтров
+     или 3D&nbsp;карты</p>
+</header>
 
-  <!-- ── Сайдбар ── -->
-  <aside class="filter-sidebar">
-    <div class="filter-card">
-      <form method="get" action="" id="filter-form">
-
-        <div class="filter-section">
-          <label class="filter-label">Поиск</label>
-          <div class="search-row">
-            <input class="search-input" type="text" name="q"
-                   value="{{ f_q }}" placeholder="Слово из условия…">
-            <button class="search-btn" type="submit">→</button>
-          </div>
-        </div>
-
-        <div class="filter-section">
-          <label class="filter-label" for="id_topic">Тема</label>
-          <select class="topic-select" name="topic" id="id_topic"
-                  onchange="this.form.submit()">
-            <option value="">Все темы</option>
-            {% for topic in topics %}
-            <option value="{{ topic.id }}"
-              {% if f_topic == topic.id|stringformat:"s" %}selected{% endif %}>
-              {{ topic.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-
-        {% if sources %}
-        <div class="filter-section">
-          <label class="filter-label" for="id_source">Источник</label>
-          <select class="topic-select" name="source" id="id_source"
-                  onchange="this.form.submit()">
-            <option value="">Все источники</option>
-            {% for src in sources %}
-            <option value="{{ src.id }}"
-              {% if f_source == src.id|stringformat:"s" %}selected{% endif %}>
-              {{ src.name }}
-            </option>
-            {% endfor %}
-          </select>
-        </div>
-        {% endif %}
-
-        <div class="filter-section">
-          <span class="filter-label">Сложность</span>
-          <div class="diff-btns">
-            {% for n in "12345" %}
-            <a class="diff-btn{% if f_diff == n %} active{% endif %}"
-               href="?{% filter_param request 'difficulty' n %}">
-              {% for i in n|make_stars %}★{% endfor %}
-            </a>
-            {% endfor %}
-          </div>
-        </div>
-
-        {% if problem_types %}
-        <div class="filter-section">
-          <span class="filter-label">Тип задачи</span>
-          <div class="type-btns">
-            {% for pt in problem_types %}
-            <a class="type-btn{% if f_type == pt %} active{% endif %}"
-               href="?{% filter_param request 'type' pt %}">
-              {{ pt }}
-            </a>
-            {% endfor %}
-          </div>
-        </div>
-        {% endif %}
-
-        <div class="filter-section">
-          <label class="checkbox-label">
-            <input type="checkbox" name="has_solution" value="1"
-                   {% if f_sol == '1' %}checked{% endif %}
-                   onchange="this.form.submit()">
-            Только с решением
-          </label>
-        </div>
-
-        <a href="/catalog/" class="reset-link">✕ Сбросить фильтры</a>
-
-      </form>
-    </div>
-  </aside>
-
-  <!-- ── Список задач ── -->
-  <div class="problems-main">
-
-    {% if is_zero_state %}
-    <!-- ── Нулевое состояние: атлас 21 канонической темы ── -->
-    <h1 class="atlas-head">Каталог задач</h1>
-    <p class="atlas-sub">Выберите тему — или воспользуйтесь поиском и фильтрами слева</p>
-    <div class="atlas-grid">
-      {% for t in atlas %}
-      <a class="atlas-tile" href="?{% set_param request 'topic' t.id %}">
-        <span class="atlas-name">{{ t.name }}</span>
-        <span class="atlas-count">{{ t.n|spaceint }}</span>
-      </a>
-      {% endfor %}
-    </div>
-
-    {% else %}
-    <!-- ── Тулбар: счётчик · сортировка · вид ── -->
-    <div class="toolbar">
-      <span class="results-count">
-        Найдено: <strong>{{ total|spaceint }}</strong>{% if f_q %} по запросу «{{ f_q }}»{% endif %}
-      </span>
-      <div class="toolbar-controls">
-        <div class="sort-wrap">
-          <span class="sort-label">Сортировка</span>
-          <select class="sort-select" aria-label="Сортировка" onchange="if(this.value)location.href=this.value">
-            <option value="?{% set_param request 'sort' 'relevance' %}"{% if f_sort == 'relevance' %} selected{% endif %}>По релевантности</option>
-            <option value="?{% set_param request 'sort' 'diff_asc' %}"{% if f_sort == 'diff_asc' %} selected{% endif %}>Сложность ↑</option>
-            <option value="?{% set_param request 'sort' 'diff_desc' %}"{% if f_sort == 'diff_desc' %} selected{% endif %}>Сложность ↓</option>
-            <option value="?{% set_param request 'sort' 'new' %}"{% if f_sort == 'new' %} selected{% endif %}>Сначала новые</option>
-          </select>
-        </div>
-        <div class="view-seg" role="group" aria-label="Вид списка">
-          <a class="seg-btn{% if view_mode == 'rows' %} active{% endif %}" href="?{% set_param request 'view' 'rows' %}" title="Строки" aria-label="Строки">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h11"/></svg>
-          </a>
-          <a class="seg-btn{% if view_mode == 'table' %} active{% endif %}" href="?{% set_param request 'view' 'table' %}" title="Таблица" aria-label="Таблица">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="3" width="11" height="10" rx="1"/><path d="M2.5 6.5h11M6.5 6.5V13"/></svg>
-          </a>
-          <a class="seg-btn{% if view_mode == 'gallery' %} active{% endif %}" href="?{% set_param request 'view' 'gallery' %}" title="Галерея" aria-label="Галерея">
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2.5" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="9" y="2.5" width="4.5" height="4.5" rx="1"/><rect x="2.5" y="9" width="4.5" height="4.5" rx="1"/><rect x="9" y="9" width="4.5" height="4.5" rx="1"/></svg>
-          </a>
-        </div>
+<section class="ct-tool">
+  <div class="ct-tool-top">
+    <form class="ct-ask" method="get" action="{% url 'catalog:problem_list' %}"
+          id="ct-ask-form">
+      {% comment %}
+      ⚠️ ПОЛЕ — МНОГОСТРОЧНОЕ НАРОЧНО. Поиск ждёт ОПИСАНИЕ задачи, а не
+      слово; однострочная щель просит слово одним своим видом.
+      ⚠️ ЧИСЕЛ БЛИЗОСТИ И СЛОВА «эмбеддинги» В ИНТЕРФЕЙСЕ НЕТ — прямая
+      просьба владельца: это наша кухня, наружу она не идёт.
+      {% endcomment %}
+      <div class="ct-ask-field">
+        <textarea name="q" rows="3" id="ct-q"
+                  placeholder="Опишите задачу словами — точные формулировки совпадать не обязаны">{{ query }}</textarea>
       </div>
-    </div>
-
-    <!-- ── Чипы активных фильтров ── -->
-    {% if f_q or f_topic or f_diff or f_type or f_sol == '1' or f_source %}
-    <div class="chips-bar">
-      {% if f_q %}<a class="fchip" href="?{% remove_param request 'q' %}">Поиск: «{{ f_q }}»<span class="x">×</span></a>{% endif %}
-      {% if f_topic %}<a class="fchip" href="?{% remove_param request 'topic' %}">{{ f_topic_name|default:'Тема' }}<span class="x">×</span></a>{% endif %}
-      {% if f_source %}<a class="fchip" href="?{% remove_param request 'source' %}">{{ f_source_name|default:'Источник' }}<span class="x">×</span></a>{% endif %}
-      {% if f_diff %}<a class="fchip" href="?{% remove_param request 'difficulty' %}">Сложность {% for i in f_diff|make_stars %}★{% endfor %}<span class="x">×</span></a>{% endif %}
-      {% if f_type %}<a class="fchip" href="?{% remove_param request 'type' %}">{{ f_type }}<span class="x">×</span></a>{% endif %}
-      {% if f_sol == '1' %}<a class="fchip" href="?{% remove_param request 'has_solution' %}">С решением<span class="x">×</span></a>{% endif %}
-      <a class="chips-clear" href="/catalog/">Сбросить всё</a>
-    </div>
-    {% endif %}
-
-    {% if cards %}
-
-    {% if view_mode == 'table' %}
-    <!-- ── Вид: таблица ── -->
-    <div class="ptable-wrap">
-      <table class="ptable">
-        <thead>
-          <tr>
-            <th class="col-diff" data-type="num">Сложн.</th>
-            <th class="col-title">Название</th>
-            <th class="col-topic">Тема</th>
-            <th class="col-type">Тип</th>
-            <th class="col-src">Источник</th>
-            <th class="col-sol" data-type="num">Реш.</th>
-            <th class="col-act" data-type="num">Действие</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for card in cards %}
-          <tr>
-            <td class="col-diff" data-type="num">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% else %}—{% endif %}</td>
-            <td class="col-title"><a class="t-title" href="/catalog/problem/{{ card.problem.pk }}/">{% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}</a></td>
-            <td class="col-topic">{% if card.topics %}{{ card.topics.0.name }}{% else %}—{% endif %}</td>
-            <td class="col-type">{{ card.problem.problem_type|default:'—' }}</td>
-            <td class="col-src">{{ card.source|default:'—' }}</td>
-            <td class="col-sol" data-type="num">{% if card.has_solution %}<span class="yes">✓</span>{% else %}—{% endif %}</td>
-            <td class="col-act" data-type="num"><button class="ca-btn ca-preview" onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-
-    {% elif view_mode == 'gallery' %}
-    <!-- ── Вид: галерея ── -->
-    <div class="gallery-grid">
-      {% for card in cards %}
-      <a class="problem-card" href="/catalog/problem/{{ card.problem.pk }}/">
-        <div class="card-top">
-          <span class="card-title">
-            {% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}
-          </span>
-          <div class="card-meta">
-            {% if card.problem.difficulty %}
-            <span class="card-stars">
-              {% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}
-            </span>
-            {% endif %}
-            {% if card.has_solution %}
-            <span class="card-sol-badge">решение ✓</span>
-            {% endif %}
-          </div>
-        </div>
-        {% if card.preview %}
-        <p class="card-preview">{{ card.preview }}</p>
-        {% endif %}
-        {% if card.topics %}
-        <div class="card-tags">
-          {% for topic in card.topics %}
-          <span class="card-tag">{{ topic.name }}</span>
-          {% endfor %}
-        </div>
-        {% endif %}
-        <!-- Кнопки действий — stopPropagation чтобы не переходить по ссылке -->
-        <div class="card-action-row" onclick="event.stopPropagation();">
-          <button class="ca-btn ca-preview"
-                  onclick="openCatalogModal({{ card.problem.pk }}, event)">
-            👁 Условие
-          </button>
-          {% if user.is_authenticated and user.role == 'teacher' %}
-          <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
-            <button class="ca-btn ca-add" id="hw-btn-{{ card.problem.pk }}"
-                    onclick="toggleHwDropdown({{ card.problem.pk }}, event)">
-              + В домашку ▾
-            </button>
-            <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
-          </div>
-          {% endif %}
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-
-    {% else %}
-    <!-- ── Вид: строки (по умолчанию) ── -->
-    <div class="rows-list">
-      {% for card in cards %}
-      <a class="prow" href="/catalog/problem/{{ card.problem.pk }}/">
-        <span class="prow-stars">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}{% endif %}</span>
-        <div class="prow-main">
-          <div class="prow-title">{% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}</div>
-          {% if card.preview %}<div class="prow-preview">{{ card.preview }}</div>{% endif %}
-          <div class="prow-meta">
-            {% for topic in card.topics %}<span class="chip">{{ topic.name }}</span>{% endfor %}
-            {% if card.problem.problem_type %}{% if card.topics %}<span class="mid">·</span>{% endif %}<span>{{ card.problem.problem_type }}</span>{% endif %}
-            {% if card.source %}<span class="mid">·</span><span>{{ card.source }}</span>{% endif %}
-            {% if card.grade %}<span class="mid">·</span><span>{{ card.grade }}</span>{% endif %}
-            {% if card.has_solution %}<span class="mid">·</span><span class="prow-sol">решение ✓</span>{% endif %}
-          </div>
-        </div>
-        <div class="prow-actions" onclick="event.stopPropagation();">
-          <button class="ca-btn ca-preview" onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button>
-          {% if user.is_authenticated and user.role == 'teacher' %}
-          <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
-            <button class="ca-btn ca-add" id="hw-btn-{{ card.problem.pk }}"
-                    onclick="toggleHwDropdown({{ card.problem.pk }}, event)">+ В домашку ▾</button>
-            <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
-          </div>
-          {% endif %}
-        </div>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}{# /view_mode #}
-
-    {% else %}
-      <div class="empty-state">
-        <p>Задач не найдено</p>
-        <small>Попробуйте изменить фильтры или <a href="/catalog/">сбросить их</a></small>
+      <div class="ct-ask-hint">Ищем по смыслу: «монополист с линейным спросом
+        и постоянными издержками» найдётся, даже если этих слов в условии нет</div>
+      <div class="ct-ask-row">
+        <button class="ct-btn ct-btn--go" type="submit">Найти</button>
+        <a class="ct-btn ct-btn--quiet" href="{% url 'catalog:problem_list' %}">Очистить</a>
+        {% comment %}
+        ⚠️ ПЕРВЫЙ ЗАПРОС ИДЁТ ДОЛГО (модель грузится лениво, около семи
+        секунд), и молчащий экран в эти секунды выглядит зависшим.
+        {% endcomment %}
+        <span class="ct-busy" id="ct-busy" hidden>Ищу…</span>
       </div>
+    </form>
+
+    {% comment %}
+    Встраиваемый режим карты (`topic_map_preview.js`) подключается ровно
+    так, как написано в шапке самого файла. Скрипт сам находит контейнер,
+    ждёт простоя и появления блока на экране и только тогда идёт за
+    данными — дописывать здесь нечего.
+    {% endcomment %}
+    <div class="ct-map">
+      <a class="tmap-preview" data-tmap-preview
+         data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
+         href="{% url 'catalog:topic_map' %}"
+         aria-label="Интерактивная карта тем и тегов">
+        <span class="tmap-preview-cap"><b>Карта тем и тегов</b> · 29 тем, 343 тега</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="ct-strip">
+    {% include "catalog/_filters.html" with groups=filters.strip mode="strip" %}
+    <button class="ct-btn ct-btn--quiet" type="button" id="ct-all-open">Все фильтры</button>
+    {% if filters.has_any %}
+    <a class="ct-btn ct-btn--quiet" href="{{ filters.reset_url }}">Сбросить</a>
     {% endif %}
+  </div>
+</section>
 
-    <!-- Пагинация -->
-    {% if page_obj.paginator.num_pages > 1 %}
-    <nav class="pagination">
-      {% if page_obj.has_previous %}
-      <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">←</a>
+{% if degraded %}
+<div class="ct-note">Ищем по словам. Смысловой поиск сейчас недоступен,
+  результаты могут быть беднее обычного. Фильтры работают как всегда.</div>
+{% endif %}
+
+{% if missing_id %}
+<div class="ct-note">Задачи с номером {{ missing_id }} в каталоге нет.
+  Возможно, она ещё не прошла проверку или номер набран с опечаткой.</div>
+{% endif %}
+
+<section class="ct-results">
+  <div class="ct-count-row">
+    <div class="ct-count">
+      {% if searched %}
+        {% comment %}
+        ⚠️ «НЕ МЕНЬШЕ» — КОГДА СПИСОК УПЁРСЯ В ПОТОЛОК КАНДИДАТОВ. У поиска
+        по смыслу нет числа «сколько всего подходит»: есть «сколько мы
+        попросили и сколько из них прошло порог». Писать это число точным
+        значило бы врать точностью, которой у поиска нет.
+        {% endcomment %}
+        Похожих задач: {% if capped %}не меньше {% endif %}<b>{{ total|spaceint }}</b>
+        <small>· из {{ filtered_total|spaceint }} {{ filtered_total|plural_ru:"задачи,задач,задач" }}{% if scope %} {{ scope }}{% endif %}</small>
       {% else %}
-      <span class="page-btn disabled">←</span>
+        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }}{% if scope %}
+        <small>{{ scope }}</small>{% endif %}
       {% endif %}
-
-      {% for num in page_range %}
-        {% if num == 0 %}
-          <span class="page-ellipsis">…</span>
-        {% elif num == page_obj.number %}
-          <span class="page-btn active">{{ num }}</span>
-        {% else %}
-          <a class="page-btn" href="?{{ base_query }}&page={{ num }}">{{ num }}</a>
-        {% endif %}
-      {% endfor %}
-
-      {% if page_obj.has_next %}
-      <a class="page-btn" href="?{{ base_query }}&page={{ page_obj.next_page_number }}">→</a>
-      {% else %}
-      <span class="page-btn disabled">→</span>
-      {% endif %}
+    </div>
+    <nav class="ct-views" aria-label="Как показывать">
+      <a class="ct-view{% if view_mode == 'rows' %} is-on{% endif %}" href="{{ view_urls.rows }}">Строки</a>
+      <a class="ct-view{% if view_mode == 'table' %} is-on{% endif %}" href="{{ view_urls.table }}">Таблица</a>
+      <a class="ct-view{% if view_mode == 'gallery' %} is-on{% endif %}" href="{{ view_urls.gallery }}">Галерея</a>
     </nav>
+  </div>
+
+  {% if relief %}
+  {% comment %}
+  СХЛОПНУВШАЯСЯ ВЫДАЧА. Запрос дал кандидатов, фильтры срезали их почти
+  до нуля. Экран обязан назвать причину и предложить, что снять: пустота
+  без объяснения читается как «в банке этого нет».
+  {% endcomment %}
+  <div class="ct-note">По запросу и фильтрам вместе
+    {% if total == 0 %}не нашлось ничего{% else %}нашлось {{ total }}
+    {{ total|plural_ru:"задача,задачи,задач" }}{% endif %}.
+    Попробуйте снять фильтр «{{ relief.label }}» — без него подходящих
+    {{ relief.count }}.</div>
+  {% endif %}
+
+  {% if cards %}
+    {% if view_mode == 'table' %}
+    <table class="ct-table">
+      <thead><tr>
+        <th>Тема</th><th>Условие</th><th>Сложность</th>
+        {% if searched and not degraded %}<th>Похоже</th>{% endif %}
+        <th class="num">№</th>
+      </tr></thead>
+      <tbody>
+      {% for card in cards %}
+      <tr>
+        <td>{% for t in card.topics %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
+        <td><a href="{% url 'catalog:problem_detail' card.problem.pk %}">{{ card.preview|truncatechars:110 }}</a></td>
+        <td class="num"><span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span></td>
+        {% comment %}
+        ⚠️ КОЛОНКА НАЗЫВАЕТСЯ СЛОВОМ, А НЕ ДОЛЕЙ. Число близости наружу не
+        идёт (просьба владельца) — показываем ступень словами.
+        {% endcomment %}
+        {% if searched and not degraded %}<td>{% if card.score >= 0.75 %}очень{% elif card.score >= 0.6 %}заметно{% else %}немного{% endif %}</td>{% endif %}
+        <td class="num">{{ card.problem.pk }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+
+    {% else %}
+    <div class="{% if view_mode == 'gallery' %}ct-gallery{% endif %}">
+      {% for card in cards %}
+      <a class="ct-card" href="{% url 'catalog:problem_detail' card.problem.pk %}">
+        <div class="ct-card-main">
+          <div class="ct-line">
+            {% for t in card.topics %}<span class="ct-topic">{{ t.name }}</span>{% endfor %}
+            {% if card.difficulty %}<span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span>{% endif %}
+            {% if card.is_test %}<span class="ct-kind">тест</span>{% endif %}
+            {% if card.has_solution %}<span class="ct-sol">решение ✓</span>{% endif %}
+          </div>
+          {% if card.problem.title %}<div class="ct-card-title">{{ card.problem.title }}</div>{% endif %}
+          <p class="ct-card-preview">{{ card.preview }}</p>
+          <div class="ct-acts" onclick="event.stopPropagation();">
+            <button class="ca-btn ca-preview" type="button"
+                    onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button>
+            {% if user.is_authenticated and user.role == 'teacher' %}
+            <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
+              <button class="ca-btn ca-add" type="button" id="hw-btn-{{ card.problem.pk }}"
+                      onclick="toggleHwDropdown({{ card.problem.pk }}, event)">+ В домашку ▾</button>
+              <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        <span class="ct-card-id">№&nbsp;{{ card.problem.pk }}</span>
+      </a>
+      {% endfor %}
+    </div>
     {% endif %}
 
-    {% endif %}{# /is_zero_state #}
+    {% comment %}
+    ⚠️ «ПОКАЗАТЬ ЕЩЁ» ВМЕСТО СТРАНИЦ. Подпись под кнопкой меняется по
+    ситуации: без запроса это место в банке, с запросом — конец
+    ранжированного списка, и говорить о нём номером страницы нечестно.
+    Порог числом наружу не идёт.
+    {% endcomment %}
+    <div class="ct-more">
+      {% if has_more %}
+        <a class="ct-btn ct-btn--go" href="{{ more_url }}">Показать ещё {{ step }}</a>
+        <small>показано {{ shown }} из {{ total|spaceint }}</small>
+      {% else %}
+        <small>{% if searched %}больше похожих задач нет{% else %}показаны все {{ total|spaceint }}{% endif %}</small>
+      {% endif %}
+    </div>
 
-  </div>
-</div>
+  {% else %}
+    <div class="ct-empty">
+      {% if searched %}По этому описанию похожих задач не нашлось.
+        Попробуйте другими словами или снимите фильтры.
+      {% else %}Под эти фильтры не подходит ни одна задача.{% endif %}
+      {% if filters.has_any %}<br><a href="{{ filters.reset_url }}">Сбросить фильтры</a>{% endif %}
+    </div>
+  {% endif %}
+</section>
 
-<!-- ── Модальное окно условия задачи ── -->
-<div class="modal-backdrop" id="c-modal-backdrop" onclick="closeCatalogModal(event)">
-  <div class="c-modal" id="c-modal-box">
-    <div class="c-modal-head">
-      <div style="flex:1;">
-        <div class="c-modal-title" id="c-modal-title">…</div>
-        <div class="c-modal-meta" id="c-modal-meta"></div>
-      </div>
-      <button class="c-modal-close" onclick="closeCatalogModalDirect()">×</button>
+{% comment %}
+⚠️ ОКНО «ВСЕ ФИЛЬТРЫ» ОТКРЫВАЕТСЯ НАД ВЫДАЧЕЙ, А НЕ ПОД НЕЙ (прямое
+замечание владельца: под задачами это нелогично). Настоящий <dialog>
+с showModal даёт ловушку фокуса, Escape и возврат фокуса даром.
+{% endcomment %}
+<dialog class="ct-all" id="ct-all" aria-labelledby="ct-all-title">
+  <form method="dialog" class="ct-all-box">
+    <div class="ct-all-head">
+      <h2 id="ct-all-title">Все фильтры</h2>
+      <button class="ct-btn ct-btn--quiet" value="close">Закрыть</button>
     </div>
-    <div class="c-modal-body" id="c-modal-body">
-      <div class="c-modal-loading">Загрузка…</div>
+    <div class="ct-all-cols">
+      <div>{% include "catalog/_filters.html" with groups=filters.modal_left mode="panel" %}</div>
+      <div>{% include "catalog/_filters.html" with groups=filters.modal_right mode="panel" %}</div>
     </div>
-    <div class="c-modal-foot">
-      <span class="c-modal-source" id="c-modal-source"></span>
-      <a id="c-modal-link" href="#" class="ca-btn ca-add"
-         style="font-size:14px;padding:6px 16px;text-decoration:none;">
-        Открыть задачу →
-      </a>
+    <div class="ct-all-foot">
+      <a class="ct-btn ct-btn--quiet" href="{{ filters.reset_url }}">Сбросить всё</a>
+      <button class="ct-btn ct-btn--go" value="close">Показать {{ filtered_total|spaceint }}
+        {{ filtered_total|plural_ru:"задачу,задачи,задач" }}</button>
     </div>
-  </div>
-</div>
+  </form>
+</dialog>
+
+{% include "catalog/_problem_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
-<script>
-// ── Домашки учителя (JSON из view) ───────────────
-const TEACHER_ASSIGNMENTS = {{ teacher_assignments_json|safe }};
-
-// ── Модальное окно ────────────────────────────────
-function openCatalogModal(pid, e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-  document.getElementById('c-modal-backdrop').classList.add('open');
-  document.getElementById('c-modal-title').textContent = '…';
-  document.getElementById('c-modal-meta').innerHTML = '';
-  document.getElementById('c-modal-source').textContent = '';
-  document.getElementById('c-modal-body').innerHTML = '<div class="c-modal-loading">Загрузка…</div>';
-  document.getElementById('c-modal-link').href = '/catalog/problem/' + pid + '/';
-
-  fetch('/catalog/api/problem/' + pid + '/')
-    .then(r => r.json())
-    .then(data => {
-      if (data.error) {
-        document.getElementById('c-modal-body').textContent = 'Ошибка загрузки.';
-        return;
-      }
-      renderCatalogModal(data);
-    })
-    .catch(() => {
-      document.getElementById('c-modal-body').textContent = 'Ошибка сети.';
-    });
-}
-
-// ⚠️ ОКНО СОБИРАЕТСЯ УЗЛАМИ, А НЕ СТРОКОЙ HTML, И ЭТО НЕ СТИЛЬ.
-//
-// Раньше условие подставлялось в шаблонную строку разметки, и готовая
-// строка уезжала в innerHTML. Условие приходит из JSON каталога, то есть
-// прямо из банка: 31 690 задач приехали из внешних источников. Задача с
-// текстом-нагрузкой (битая картинка с обработчиком onerror) выполняла бы
-// чужой код в браузере
-// КАЖДОГО посетителя каталога — вход для этого не нужен, страница публичная.
-//
-// `textContent` кладёт строку как текст: браузер не разбирает её как
-// разметку. KaTeX это не мешает — он и так ходит по текстовым узлам, ровно
-// как на серверной странице задачи, где условие всегда выводилось
-// экранированным.
-//
-// Единственные строки, которые здесь по-прежнему становятся разметкой, —
-// наши собственные («решение ✓», скобка после метки пункта). Всё, что
-// пришло из данных, идёт через textContent.
-function chip(text, extraClass) {
-  const el = document.createElement('span');
-  el.className = 'c-modal-tag' + (extraClass ? ' ' + extraClass : '');
-  el.textContent = text;
-  return el;
-}
-
-function renderCatalogModal(data) {
-  document.getElementById('c-modal-title').textContent = data.title;
-  document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
-
-  const meta = document.getElementById('c-modal-meta');
-  meta.textContent = '';
-  if (data.difficulty_str) {
-    const d = document.createElement('span');
-    d.style.cssText = 'font-size:14px;color:var(--amber);';
-    d.textContent = data.difficulty_str;
-    meta.appendChild(d);
-  }
-  (data.topics || []).forEach(t => meta.appendChild(chip(t)));
-  if (data.problem_type) { meta.appendChild(chip(data.problem_type)); }
-  if (data.has_solution) { meta.appendChild(chip('решение ✓', 'sol')); }
-
-  if (data.sources && data.sources.length) {
-    document.getElementById('c-modal-source').textContent = data.sources.join(', ');
-  }
-
-  const body = document.getElementById('c-modal-body');
-  body.textContent = '';
-  const stmt = document.createElement('div');
-  stmt.textContent = data.statement || '';
-  body.appendChild(stmt);
-
-  if (data.parts && data.parts.length) {
-    data.parts.forEach(part => {
-      const wrap = document.createElement('div');
-      wrap.className = 'c-modal-part';
-
-      const label = document.createElement('div');
-      label.className = 'c-modal-part-label';
-      if (part.label) {
-        label.textContent = String(part.label).replace(/[).．。\s]+$/, '') + ')';
-      }
-      if (part.points) {
-        const pts = document.createElement('span');
-        pts.style.cssText = 'color:var(--text2);font-size:13px;';
-        pts.textContent = ' (' + part.points + ' б.)';
-        label.appendChild(pts);
-      }
-      wrap.appendChild(label);
-
-      const text = document.createElement('div');
-      text.textContent = part.text || '';
-      wrap.appendChild(text);
-
-      body.appendChild(wrap);
-    });
-  }
-
-  maskEscapedDollars(document.getElementById('c-modal-body'));
-  if (typeof renderMathInElement !== 'undefined') {
-    renderMathInElement(document.getElementById('c-modal-body'), {
-      delimiters: [
-        { left: '$$', right: '$$', display: true  },
-        { left: '$',  right: '$',  display: false },
-        { left: '\\[', right: '\\]', display: true  },
-        { left: '\\(', right: '\\)', display: false }
-      ],
-      throwOnError: false,
-      trust: false
-    });
-  }
-  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
-  fixCurrencyDollars(document.getElementById('c-modal-body'));
-}
-
-function closeCatalogModal(e) {
-  if (e.target === document.getElementById('c-modal-backdrop')) {
-    closeCatalogModalDirect();
-  }
-}
-function closeCatalogModalDirect() {
-  document.getElementById('c-modal-backdrop').classList.remove('open');
-  closeAllDropdowns();
-}
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeCatalogModalDirect();
-});
-
-// ── Dropdown "+ В домашку" для учителей ──────────
-let openDropdownPid = null;
-
-function closeAllDropdowns() {
-  if (openDropdownPid !== null) {
-    const dd = document.getElementById('hw-dd-' + openDropdownPid);
-    if (dd) dd.classList.remove('open');
-    openDropdownPid = null;
-  }
-}
-
-function toggleHwDropdown(pid, e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-
-  if (openDropdownPid === pid) {
-    closeAllDropdowns();
-    return;
-  }
-  closeAllDropdowns();
-
-  const dd = document.getElementById('hw-dd-' + pid);
-  if (!dd) return;
-
-  // ⚠️ Собираем узлами: название работы печатает человек, и через
-  // innerHTML оно становилось разметкой.
-  dd.textContent = '';
-  const head = document.createElement('div');
-  head.className = 'ca-dd-head';
-  head.textContent = 'Добавить в:';
-  dd.appendChild(head);
-
-  TEACHER_ASSIGNMENTS.forEach(a => {
-    const btn = document.createElement('button');
-    btn.className = 'ca-dd-item';
-    btn.textContent = a.name;
-    btn.addEventListener('click', ev => {
-      addToAssignment(a.id, pid, btn);
-      ev.stopPropagation();
-    });
-    dd.appendChild(btn);
-  });
-
-  const link = document.createElement('a');
-  link.className = 'ca-dd-item new-hw';
-  link.href = '/teacher/assignment/create/?preselect=' + pid;
-  link.textContent = '+ Новая домашка';
-  link.addEventListener('click', ev => ev.stopPropagation());
-  dd.appendChild(link);
-
-  dd.classList.add('open');
-  openDropdownPid = pid;
-}
-
-function addToAssignment(assignmentId, problemId, btn) {
-  const csrfToken = '{{ csrf_token }}';
-  fetch(`/teacher/api/assignment/${assignmentId}/add_problem/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrfToken,
-    },
-    body: JSON.stringify({ problem_id: problemId }),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.ok) {
-      btn.textContent = '✓ Добавлено';
-      btn.classList.add('done');
-      const hwBtn = document.getElementById('hw-btn-' + problemId);
-      if (hwBtn) {
-        hwBtn.textContent = '✓ Добавлено';
-        hwBtn.classList.add('added');
-      }
-      setTimeout(closeAllDropdowns, 600);
-    }
-  })
-  .catch(() => {});
-}
-
-// Закрываем dropdown при клике вне
-document.addEventListener('click', e => {
-  if (openDropdownPid !== null) {
-    const wrap = document.getElementById('hw-wrap-' + openDropdownPid);
-    if (wrap && !wrap.contains(e.target)) {
-      closeAllDropdowns();
-    }
-  }
-});
-</script>
+{% include "catalog/_catalog_js.html" %}
 {% endblock %}
