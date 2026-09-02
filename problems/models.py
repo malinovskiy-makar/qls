@@ -1568,6 +1568,65 @@ class ReviewVerdict(models.Model):
         return f'#{self.problem_id}: {self.get_category_display()} ({self.reviewer or "аноним"})'
 
 
+class AnswerSecondOpinion(models.Model):
+    """Ответ модели на тест, полученный ВСЛЕПУЮ — без ответа банка.
+
+    Зачем. Выборочная проверка 30 тестов SolveHub нашла два неверных ответа
+    (#62000 и #61009). Два из тридцати — это не «пара опечаток», это 6-7 %
+    выборки, и проверять весь корпус глазами нереально. Модель отвечает на
+    вопрос сама, ответы сравнивает КОД, и человек смотрит только расхождения.
+
+    ⚠️ В БАНКЕ ЭТА ТАБЛИЦА НИЧЕГО НЕ МЕНЯЕТ. Ни `answer`, ни `solution`, ни
+    `human_review` отсюда не переписываются: расхождение — повод показать
+    задачу человеку, а не повод молча переставить ответ. Правку вносит
+    ревьюер штатными командами вердиктов (запрет P0).
+
+    ⚠️ СТРОКА НА КАЖДЫЙ ПРОГОН, а не на задачу. Промпт и модель меняются, и
+    сравнивать надо прогон с прогоном, а не затирать историю. «Текущее»
+    мнение — последнее по `created_at` (см. `latest_for`).
+    """
+
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='second_opinions',
+                                verbose_name='Задача')
+    provider = models.CharField('Поставщик', max_length=32, default='anthropic')
+    model = models.CharField('Модель', max_length=64)
+    # Ответ модели и ответ банка — как ТЕКСТ, ровно в том виде, в каком их
+    # сравнивали. Нормализованные формы не храним: правило сравнения ещё
+    # будет меняться, а сырые ответы должны пережить его смену.
+    model_answer = models.TextField('Ответ модели', blank=True)
+    bank_answer = models.TextField('Ответ банка', blank=True)
+    agrees = models.BooleanField('Сошлось', db_index=True)
+    confidence = models.FloatField('Уверенность модели', default=0.0)
+    created_at = models.DateTimeField('Когда', default=timezone.now,
+                                      db_index=True)
+
+    # Разбор расхождения человеком. resolved=False у спорной задачи означает
+    # «ещё не смотрели» — именно такие сборщик пула держит вне игры.
+    resolved = models.BooleanField('Разобрано человеком', default=False,
+                                   db_index=True)
+    RESOLUTIONS = [
+        ('', 'не разобрано'),
+        ('bank_right', 'прав банк'),
+        ('model_right', 'права модель, задача в брак'),
+        ('unclear', 'вопрос сам по себе спорный'),
+    ]
+    resolution = models.CharField('Чем кончилось', max_length=16, blank=True,
+                                  default='', choices=RESOLUTIONS)
+
+    class Meta:
+        verbose_name = 'Второе мнение по ответу'
+        verbose_name_plural = 'Вторые мнения по ответам'
+        indexes = [
+            models.Index(fields=['problem', '-created_at'],
+                         name='idx_opinion_problem_time'),
+        ]
+
+    def __str__(self):
+        mark = 'сошлось' if self.agrees else 'РАСХОЖДЕНИЕ'
+        return f'#{self.problem_id}: {mark} ({self.model})'
+
+
 # ===========================================================================
 # Платформа для репетиторов — модели вынесены в отдельный модуль.
 # Импорт в самом конце, чтобы Django их увидел (app_label='problems').

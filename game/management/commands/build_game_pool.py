@@ -44,7 +44,7 @@ import re
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from problems.models import Problem
+from problems.models import AnswerSecondOpinion, Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from game.sources import group_of
 from game.models import GameQuestion
@@ -601,8 +601,23 @@ class Command(BaseCommand):
               .prefetch_related('parts', 'topics', 'tags',
                                 'source_references__source'))
 
+        # ⚠️ СПОРНЫЙ ОТВЕТ ДЕРЖИМ ВНЕ ИГРЫ, ПОКА ЕГО НЕ ПОСМОТРЕЛ ЧЕЛОВЕК.
+        # Модель отвечала на тест вслепую (answer_second_opinion), и её ответ
+        # не сошёлся с банком. Это ещё не доказательство ошибки банка — но
+        # неверный ключ бьёт по игроку молча: задача выглядит безупречно, а
+        # жизнь снимается за верный ответ. Разобранные расхождения
+        # (resolved=True) возвращаются в пул сами, пересборкой.
+        disputed = set(
+            AnswerSecondOpinion.objects
+            .filter(agrees=False, resolved=False)
+            .values_list('problem_id', flat=True))
+
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
+        if disputed:
+            self.stdout.write(
+                f'Спорных ответов вне пула (второе мнение не разобрано): '
+                f'{len(disputed)}')
 
         pool_by_key = {}      # ключ схлопывания -> (GameQuestion, raw_question)
         rejected = {}
@@ -628,6 +643,9 @@ class Command(BaseCommand):
             current['id'] = p.id
             current['source'] = first.source.name if first else ''
             current['type'] = p.problem_type
+            if p.id in disputed:
+                reject('answer_disputed')
+                continue
             correct_index = None
             correct_indices = None
             correct_value = ''
