@@ -275,7 +275,14 @@ class GameResult(models.Model):
     # единицей, и на карточке шеринга серия из четырёх выглядела как её
     # отсутствие.
     max_combo = models.FloatField('Макс. множитель', default=1.0)
-    ended_reason = models.CharField('Чем кончился', max_length=8, default='time')
+    # ⚠️ ДЛИНА 16, А НЕ 8, И ЭТО НЕ ЗАПАС «НА ВСЯКИЙ». Ветка `figure`
+    # ввела исход `pool_empty` — десять знаков в поле на восемь. SQLite
+    # длину varchar игнорирует и проглотил это молча; PostgreSQL (а он и
+    # стоит на проде) валит сохранение забега целиком:
+    # `StringDataRightTruncation: value too long for type varying(8)`.
+    # Поймано только полным прогоном на PostgreSQL.
+    ended_reason = models.CharField('Чем кончился', max_length=16,
+                                    default='time')
     # [{topic, correct, wrong, skip, total, accuracy}, ...]
     topic_breakdown = models.JSONField('Разбивка по темам', default=list, blank=True)
     # [{key, title, total, correct}, ...]
