@@ -30,7 +30,11 @@ FAKE_CONFIG = (
     '{"modes":{"blitz":{"key":"blitz","title":"Блиц","question_type":"single",'
     '"duration":120,"time_correct":5,"time_wrong":0,"time_skip":0,"lives":3}},'
     '"default_mode":"blitz","pool_counts":{"blitz":10},"base_points":100,'
-    '"combo_steps":[[9,4],[6,3],[3,2]],"mistakes_run_size":10}'
+    '"combo_steps":[[9,4],[6,3],[3,2]],"mistakes_run_size":10,'
+    '"difficulty_min":1,"difficulty_max":5,'
+    '"topic_groups":[{"key":"micro","title":"Микро","topics":["Эластичность"]}],'
+    '"source_groups":[{"key":"vsosh","title":"ВсОШ"}],'
+    '"has_daily":false,"has_duel":false}'
 )
 
 
@@ -43,7 +47,9 @@ def inline_js(src):
     """Инлайн-скрипт страницы с подставленным конфигом."""
     m = re.search(r'<script>\n(.*?)\n</script>', src, re.S)
     assert m, 'инлайн-скрипт не найден'
-    return m.group(1).replace('{{ config_json|safe }}', FAKE_CONFIG)
+    js = m.group(1).replace('{{ config_json|safe }}', FAKE_CONFIG)
+    # Забег по набору: на обычной странице сервер кладёт сюда null.
+    return js.replace('{{ auto_set_json|safe }}', 'null')
 
 
 class PageJsTests(TestCase):
@@ -119,12 +125,63 @@ class PageJsTests(TestCase):
 
         Нажали «картинкой» — получите картинку: текст и ссылка живут на
         своих кнопках."""
-        m = re.search(r"\$\('btn-share-img'\)\.addEventListener\("
-                      r"'click', function \(\) \{(.*?)\n  \}\);", self.js, re.S)
-        self.assertIsNotNone(m, 'обработчик кнопки-картинки не найден')
+        # обе кнопки карточки (широкая и вертикальная) ходят через один
+        # shareCard — запасной путь у них общий
+        m = re.search(r'function shareCard\(btn, kind, label\) \{(.*?)\n  \}\n',
+                      self.js, re.S)
+        self.assertIsNotNone(m, 'shareCard не найден')
         handler = m.group(1)
         self.assertIn('downloadCard', handler)
         self.assertNotIn('shareText', handler)
+        for btn in ('btn-share-img', 'btn-share-story'):
+            self.assertRegex(
+                self.js,
+                r"\$\('%s'\)\.addEventListener\('click', function \(\) \{\s*"
+                r"shareCard\(" % btn)
+
+    def test_filter_state_is_persisted_and_sent(self):
+        """Фильтр живёт в localStorage и уезжает на сервер — иначе выбор
+        игрока сбрасывался бы на каждом «сыграть ещё раз»."""
+        self.assertIn("var FILTER_KEY = 'econ_rush_filter';", self.js)
+        self.assertIn('filterQuery()', self.js)
+        self.assertIn('localStorage.setItem(FILTER_KEY', self.js)
+
+    def test_all_four_endings_have_their_own_text(self):
+        """Развилка исходов забега четырёхветочная: lives / time /
+        pool_empty / set_done. Пропущенная ветка молча показала бы
+        «время вышло» там, где время не при чём."""
+        m = re.search(r'function reasonText\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m)
+        body = m.group(1)
+        for reason in ('lives', 'set_done', 'pool_empty'):
+            self.assertIn("'%s'" % reason, body)
+        m2 = re.search(r'function titleText\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m2)
+        for reason in ('lives', 'set_done', 'pool_empty'):
+            self.assertIn("'%s'" % reason, m2.group(1))
+
+    def test_clean_badge_requires_at_least_one_correct_answer(self):
+        """«Чисто! Ошибок нет» ошибочно показывалась и при 0/0 (пустой
+        забег из нуля вопросов) — s.wrong > 0 у пустого забега тоже false.
+        Ловим регрессию: условие обязано требовать s.correct > 0."""
+        m = re.search(r'var clean = (.*?);', self.js)
+        self.assertIsNotNone(m, 'условие clean не найдено')
+        self.assertIn('s.correct > 0', m.group(1))
+
+    def test_start_refusal_shows_a_calm_banner_not_an_alert(self):
+        """Отказ сервера начать забег (режим за флагом, пустой пул под
+        фильтром — Задачи 2 и 3) — спокойная строка на стартовом экране,
+        а не alert() и не переход на игровой экран."""
+        # ни одного ИСПОЛНЯЕМОГО вызова alert( — только упоминания в
+        # комментариях (тексте самого регресс-теста этой ошибки).
+        code_alerts = [line for line in self.js.splitlines()
+                      if 'alert(' in line and not line.strip().startswith(('*', '//'))
+                      and 'НЕ alert' not in line and 'не alert' not in line]
+        self.assertEqual(code_alerts, [])
+        self.assertIn('showStartNotice', self.js)
+        self.assertIn('hideStartNotice', self.js)
+        m = re.search(r'if \(!d\.ok\) \{ showStartNotice\(', self.js)
+        self.assertIsNotNone(m, 'startRun не показывает баннер на !d.ok')
 
     def test_mechanics_numbers_come_from_config(self):
         """Числа механики клиент не выдумывает: 3 жизни и размер целевого

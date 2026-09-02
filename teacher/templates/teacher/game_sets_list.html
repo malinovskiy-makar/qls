@@ -1,0 +1,68 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+  Список игровых наборов учителя. Набор — забег с зафиксированным списком
+  вопросов: собрал, получил код, раздал классу, посмотрел доску.
+{% endcomment %}
+{% block title %}Игровые наборы{% endblock %}
+
+{% block extra_style %}
+<style>
+  .gs-head { display: flex; align-items: center; justify-content: space-between;
+             gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
+  .gs-lead { color: var(--text2); margin-bottom: 18px; max-width: 70ch; }
+  .gs-btn {
+    display: inline-block; padding: 9px 18px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; font-size: .92rem;
+    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  }
+  .gs-box { border: 1px solid var(--border); border-radius: 12px;
+            background: var(--surface); overflow-x: auto; }
+  table.gs { border-collapse: collapse; width: 100%; font-size: .92rem; }
+  table.gs th, table.gs td { padding: 10px 12px; text-align: left;
+                             border-bottom: 1px solid var(--border); }
+  table.gs th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  table.gs td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .gs-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             letter-spacing: .1em; font-weight: 700; }
+  .gs-empty { padding: 30px; text-align: center; color: var(--text2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="gs-head">
+  <h1>Игровые наборы</h1>
+  <a class="gs-btn" href="{% url 'teacher:game_set_create' %}">Собрать набор</a>
+</div>
+<p class="gs-lead">
+  Набор — забег в Econ Rush с зафиксированным списком вопросов: у всех, кто
+  играет по коду, вопросы одни и те же и в одном порядке. Поэтому результаты
+  сравнимы и складываются в доску.
+</p>
+
+<div class="gs-box">
+  <table class="gs">
+    <thead>
+      <tr>
+        <th>Название</th><th>Режим</th><th class="num">Вопросов</th>
+        <th>Код</th><th class="num">Прошло</th><th>Доска</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for r in rows %}
+      <tr>
+        <td>{{ r.gset.title }}</td>
+        <td>{{ r.mode_title }}</td>
+        <td class="num">{{ r.gset.size }}</td>
+        <td><span class="gs-code">{{ r.gset.code }}</span></td>
+        <td class="num">{{ r.played }}</td>
+        <td><a href="{% url 'teacher:game_set_detail' r.gset.code %}">открыть</a></td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="gs-empty">
+        Наборов пока нет. Соберите первый — это пять минут.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -21,7 +21,7 @@ from game.generators import base as gbase
 from game.generators.base import fmt_num, is_nice, LIMIT_FULL, LIMIT_SHORT
 from game.generators.registry import ARCHETYPES
 from game.models import GameQuestion
-from game.views import parse_exact_number
+from game.views import parse_exact_number, SESSION_KEY
 
 N_SAMPLES = 500          # сэмплов на архетип (распределяются по трём типам)
 MIN_INT_SHARE = 0.6      # доля целых ответов среди numeric (правило ≥80%
@@ -538,14 +538,16 @@ class StorageTests(TestCase):
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         n_eq = GameQuestion.objects.filter(
             is_generated=True, generator_key='equilibrium').count()
-        self.assertEqual(n_eq, 6)  # 2 вопроса × 3 типа
+        # 2 вопроса × 4 типа: у equilibrium есть чертёж, значит к трём
+        # обычным типам добавляется figure_choice (режим «График»).
+        self.assertEqual(n_eq, 8)
         self.assertTrue(GameQuestion.objects.filter(pk=baseline).exists())
 
         # повторный запуск того же ключа не плодит дубли
         call_command('generate_game_questions', '--per-archetype', '2',
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         self.assertEqual(GameQuestion.objects.filter(
-            is_generated=True, generator_key='equilibrium').count(), 6)
+            is_generated=True, generator_key='equilibrium').count(), 8)
 
         call_command('purge_generated', verbosity=0)
         self.assertEqual(
@@ -562,8 +564,13 @@ class ServingTests(TestCase):
         make_generated_question()
         with self.settings(GAME_GENERATED_ENABLED=False):
             resp = self._start_session()
-            # других numeric в пуле нет → пул пуст
-            self.assertEqual(resp.status_code, 503)
+            # других numeric в пуле нет → пул режима пуст целиком, значит
+            # забег не начинается вовсе (Задача 3), а не стартует и сразу
+            # хоронит себя причиной pool_empty.
+            self.assertEqual(resp.status_code, 200)
+            body = resp.json()
+            self.assertFalse(body['ok'])
+            self.assertIsNone(self.client.session.get(SESSION_KEY))
 
     def test_flag_on_serves_generated_with_anticheat(self):
         gq = make_generated_question()
@@ -666,21 +673,25 @@ class FlagHoldsEverywhereTests(TestCase):
         self.assertEqual(
             GameQuestion.objects.filter(id__in=served, is_generated=True).count(), 0)
 
-    def test_flag_off_hides_topic_chip_of_generated_only_topic(self):
-        """Тема, которая держится только на сгенерированных, чипом не встаёт.
+    def test_flag_off_keeps_generated_out_of_the_start_screen_counts(self):
+        """Счётчик пула на стартовом экране не считает сгенерированные.
 
-        Иначе игрок ткнул бы в чип и получил пустой забег (503)."""
-        # MIN_TOPIC_POOL=30 — берём с запасом, тема канонична
+        Чипов тем на экране больше нет (панель фильтров показывает все 21
+        тему без счётчиков — указание Макара), но счётчик режимов остался
+        и ходит через тот же _pool_qs. Утечка здесь показала бы игроку
+        вопросы, которых при выключенном флаге не существует."""
         self.make_gen(35, topic=self.TOPIC)
 
-        def has_chip():
+        def blitz_count():
             html = self.client.get('/game/').content.decode('utf-8')
-            return 'data-topic="{}"'.format(self.TOPIC) in html
+            m = re.search(r'"pool_counts": \{[^}]*"blitz": (\d+)', html)
+            return int(m.group(1))
 
         with self.settings(GAME_GENERATED_ENABLED=False):
-            self.assertFalse(has_chip())
+            off = blitz_count()
         with self.settings(GAME_GENERATED_ENABLED=True):
-            self.assertTrue(has_chip())
+            on = blitz_count()
+        self.assertEqual(on - off, 35)
 
     def test_flag_off_mistakes_run_pulls_no_generated(self):
         """Работа над ошибками — курированная очередь, отдельная поверхность.

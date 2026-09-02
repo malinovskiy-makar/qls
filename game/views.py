@@ -19,14 +19,18 @@
   Серверного лидерборда пока нет, поэтому анти-чит сводится к сокрытию
   правильных ответов.
 """
+import datetime
 import json
 import random
 from fractions import Fraction
+from urllib.parse import quote
 
 from django.conf import settings
+from django.contrib.admin.views.decorators import staff_member_required
 from django.db import IntegrityError
-from django.http import JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.db.models import Q
+from django.http import Http404, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.urls import reverse
 from django.utils import timezone
@@ -35,12 +39,20 @@ from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from problems.jsonsafe import dumps_for_script
 from problems.management.commands.apply_topic_mapping import CANONICAL
-from .models import GameQuestion, GameResult, make_result_code
-from . import config
+from . import sources as game_sources
+from .sources import GROUP_KEYS
+from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
+                     make_result_code)
+from . import config, stats as stats_mod
+from .figures import base as figures_base
+from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
 SESSION_KEY = 'econ_rush'        # состояние текущего забега
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
 SEEN_LIMIT = 1500                # сколько последних id помнить на режим
+COUNTED_KEY = 'econ_rush_counted'  # id вопросов, уже учтённых в статистике
+COUNTED_LIMIT = 6000               # столько последних помним (id пула
+                                   # меняются при каждой пересборке кэша)
 LAST_KEY = 'econ_rush_last'      # {mode, log} завершённого забега — для
                                  # «работы над ошибками» (переживает старт
                                  # нового забега, в отличие от SESSION_KEY)
@@ -49,6 +61,12 @@ NO_TOPIC = 'Без темы'            # вопрос без каноничес
 # на будущее — отдельный режим). Минимум вопросов на тему для чипа на старте.
 GAME_LANG = 'ru'
 MIN_TOPIC_POOL = 30
+
+# Готовность поверхностей нижнего ряда стартового экрана. Ставится в TRUE
+# той фазой, которая приносит соответствующую страницу; до этого вход
+# помечен «скоро» и никуда не ведёт.
+HAS_DAILY = True     # Фаза 4 — /game/daily/
+HAS_DUEL = True      # Фаза 5 — /game/duel/new/ и /game/d/<код>/
 
 
 def parse_exact_number(s):
@@ -72,13 +90,157 @@ def parse_exact_number(s):
 
 
 def _pool_qs():
-    """Базовый queryset игрового пула с учётом флага GAME_GENERATED_ENABLED:
-    при False сгенерированные вопросы полностью исключаются из выдачи
-    (единая точка — счётчики страницы и выбор вопроса ходят только сюда)."""
-    qs = GameQuestion.objects.filter(lang=GAME_LANG)
+    """Базовый queryset игрового пула — ЕДИНАЯ точка входа в пул.
+
+    Здесь же живут оба флага выдачи. Все поверхности (счётчики стартовой
+    страницы, чипы тем, выбор вопроса, очередь работы над ошибками, наборы)
+    ходят только сюда — это и делает флаги герметичными.
+
+    ⚠️ Флага два, и они НЕЗАВИСИМЫ:
+    - `GAME_GENERATED_ENABLED` — семнадцать архетипов (`game/generators/`);
+    - `GAME_FIGURE_ENABLED` — сюжеты режима «График» (`game/figures/`).
+
+    Вопросы аудита обязаны иметь `is_generated=True`, иначе `build_game_pool`
+    снесёт их при первой же пересборке пула (она удаляет все строки с
+    is_generated=False). Отсюда и исключение ниже: без него выключенный
+    `GAME_GENERATED_ENABLED` гасил бы и «График», и флаги перестали бы быть
+    независимыми.
+
+    ⚠️ Вопросы прежнего типа `figure_choice` не выдаются НИКОГДА: слот
+    режима «График» занял аудит чужого решения. Строки в базе остаются.
+    """
+    qs = GameQuestion.objects.filter(lang=GAME_LANG).exclude(
+        question_type='figure_choice')
+    if not getattr(settings, 'GAME_FIGURE_ENABLED', False):
+        qs = qs.exclude(question_type=FIGURE_AUDIT)
     if not getattr(settings, 'GAME_GENERATED_ENABLED', False):
-        qs = qs.filter(is_generated=False)
+        qs = qs.filter(Q(is_generated=False) | Q(question_type=FIGURE_AUDIT))
     return qs
+
+
+def _mode_enabled(mode):
+    """Есть ли у режима вообще вопросы в пуле — БЕЗ учёта фильтра забега.
+
+    Отличает две разные пустоты, которые раньше были слиты в одну
+    (`pool_empty`): режим, выключенный флагом (сегодня — «График» при
+    `GAME_FIGURE_ENABLED=False`), не наберёт вопросов ни под каким
+    фильтром — это НЕДОСТИЖИМОСТЬ режима. Пустой пул ПОД ФИЛЬТРОМ у
+    режима, у которого вопросы вообще есть, — другая вещь (см.
+    `_candidate_rows` в `api_session_start`)."""
+    qtype = config.MODES[mode]['question_type']
+    return _pool_qs().filter(question_type=qtype).exists()
+
+
+def empty_filter():
+    """Фильтр «ничего не выбрано» = играем всем пулом режима."""
+    return {'topics': [], 'sources': [],
+            'dmin': config.DIFFICULTY_MIN, 'dmax': config.DIFFICULTY_MAX}
+
+
+def parse_filter(request):
+    """Фильтр забега из query-параметров.
+
+    Понимает и новый мульти-выбор (`topics=A&topics=B`, `sources=vsosh`,
+    `dmin`/`dmax`), и старый одиночный `topic=` — ссылками со старым
+    параметром могли уже поделиться, ломать их незачем.
+
+    Неизвестные значения молча отбрасываются: фильтр — это удобство, а не
+    контракт, и падать из-за подсунутой темы забег не должен.
+    """
+    f = empty_filter()
+    topics = [t.strip() for t in request.GET.getlist('topics') if t.strip()]
+    legacy = request.GET.get('topic', '').strip()
+    if legacy:
+        topics.append(legacy)
+    # dict.fromkeys — уникальность с сохранением порядка выбора
+    f['topics'] = [t for t in dict.fromkeys(topics) if t in CANONICAL]
+
+    sources = [s.strip() for s in request.GET.getlist('sources') if s.strip()]
+    f['sources'] = [s for s in dict.fromkeys(sources) if s in GROUP_KEYS]
+
+    def _level(name, default):
+        try:
+            v = int(request.GET.get(name, default))
+        except (TypeError, ValueError):
+            return default
+        return min(max(v, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+
+    f['dmin'] = _level('dmin', config.DIFFICULTY_MIN)
+    f['dmax'] = _level('dmax', config.DIFFICULTY_MAX)
+    if f['dmin'] > f['dmax']:            # ползунок перевернули — не спорим
+        f['dmin'], f['dmax'] = f['dmax'], f['dmin']
+    return f
+
+
+def normalize_filter(f):
+    """Фильтр из состояния забега → в нормальную форму (на случай старого
+    состояния в сессии, где его ещё не было)."""
+    base = empty_filter()
+    if isinstance(f, dict):
+        base.update({k: f[k] for k in base if k in f})
+    return base
+
+
+def _filter_matches(f, topics, source_group, difficulty):
+    """Подходит ли вопрос под фильтр. Пустой список тем/источников значит
+    «любые» — так фильтр не превращается в запрет."""
+    if f['topics'] and not (set(topics or []) & set(f['topics'])):
+        return False
+    if f['sources'] and (source_group or 'other') not in f['sources']:
+        return False
+    return f['dmin'] <= difficulty <= f['dmax']
+
+
+def _candidate_rows(state):
+    """Кандидаты режима под фильтром забега: [(id, difficulty, topics), ...].
+
+    Читается плоским values_list по трём причинам: JSONField.__contains не
+    работает на SQLite, пул маленький (тысячи строк), а join на источники
+    дал бы дубли строк у задач с несколькими привязками.
+
+    Сложность берётся через измеренную, если она есть (см. game/stats.py):
+    пользовательский фильтр сложности обязан опираться на ту же величину,
+    что и всё остальное в игре.
+    """
+    f = normalize_filter(state.get('filter'))
+    qtype = config.MODES[state['mode']]['question_type']
+    bank_map, arch_map = stats_mod.difficulty_overrides()
+    rows = _pool_qs().filter(question_type=qtype).values_list(
+        'id', 'topics', 'source_group', 'difficulty',
+        'problem_id', 'part_id', 'generator_key')
+    out = []
+    for pk, topics, group, difficulty, problem_id, part_id, gen_key in rows:
+        if problem_id is not None:
+            difficulty = bank_map.get((problem_id, part_id), difficulty)
+        elif gen_key:
+            difficulty = arch_map.get(gen_key, difficulty)
+        if _filter_matches(f, topics, group, difficulty):
+            out.append((pk, difficulty, topics or []))
+    return out
+
+
+def escalation_slice(rows, streak):
+    """Кандидаты из целевой полосы сложности — МЯГКО.
+
+    rows — [(id, difficulty), ...] уже под пользовательским фильтром
+    (он жёсткая рамка, эскалация ходит только внутри неё).
+
+    Полоса задаётся комбо (config.ESCALATION_BANDS). Если в ней пусто,
+    полоса РАСШИРЯЕТСЯ на шаг в обе стороны, пока кто-нибудь не найдётся;
+    расширять больше нечего — отдаём всё, что есть. Забег из-за эскалации
+    кончиться не может: она делает игру интереснее, а не короче.
+    """
+    if not rows:
+        return []
+    lo, hi = config.escalation_band(streak)
+    while True:
+        band = [r for r in rows if lo <= r[1] <= hi]
+        if band:
+            return band
+        if lo <= config.DIFFICULTY_MIN and hi >= config.DIFFICULTY_MAX:
+            return rows          # полоса уже во весь диапазон — берём всё
+        lo = max(config.DIFFICULTY_MIN, lo - 1)
+        hi = min(config.DIFFICULTY_MAX, hi + 1)
 
 
 def _mode_payload(mode_key):
@@ -99,14 +261,19 @@ def _mode_payload(mode_key):
 @ensure_csrf_cookie
 def game_page(request):
     """Страница игры: три экрана в одном шаблоне, управляются JS."""
-    # Чипы тем: только канонические темы, по которым в пуле достаточно вопросов.
-    counts = {}
-    for g in _pool_qs().values_list('topics', flat=True):
-        for name in g:
-            counts[name] = counts.get(name, 0) + 1
-    topics = [name for name in CANONICAL
-              if counts.get(name, 0) >= MIN_TOPIC_POOL]
+    return render(request, 'game/game.html', _game_page_context(request))
 
+
+def _game_page_context(request):
+    """Контекст страницы игры. Общий у обычного входа и забега по набору
+    (`/game/s/<код>/`): страница одна, набор лишь подставляет очередь.
+
+    ⚠️ Счётчиков у тем и источников на экране НЕТ, и «пустые» сочетания
+    фильтров не гасятся — прямое указание Макара: фильтр работает так,
+    будто задач по каждой теме и источнику неограниченно. Единственный
+    счётчик, который считается по пулу, — пустой ли пул РЕЖИМА: режим без
+    единого вопроса на экране не показывается вовсе (играть в него нечем).
+    """
     # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
     type_counts = {}
     for qtype in _pool_qs().values_list('question_type', flat=True):
@@ -114,8 +281,18 @@ def game_page(request):
     pool_counts = {key: type_counts.get(m['question_type'], 0)
                    for key, m in config.MODES.items()}
 
-    return render(request, 'game/game.html', {
-        'topics': topics,
+    return {
+        'auto_set': None,
+        'auto_set_json': 'null',
+        # Темы — все 21 каноническая, сгруппированы по колонкам панели.
+        'topic_groups': [{'key': key, 'title': title, 'topics': names}
+                         for key, title, names in config.TOPIC_GROUPS],
+        'source_groups': [{'key': key, 'title': title}
+                          for key, title in game_sources.GROUPS],
+        # «Вопросов из реальных олимпиад» — считаем ТОЛЬКО вопросы банка:
+        # сгенерированные тренировочные из олимпиад не приходили, и врать
+        # в цифре на первом экране нельзя.
+        'pool_total': _pool_qs().filter(is_generated=False).count(),
         # JSON для JS-клиента: механика читается только из config.py
         # Здесь лежат только константы из game/config.py, но правило
         # одно на проект: JSON внутри <script> собирается помощником.
@@ -126,8 +303,20 @@ def game_page(request):
             'base_points': config.BASE_POINTS,
             'combo_steps': config.COMBO_STEPS,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
+            'last_life_multiplier': config.LAST_LIFE_MULTIPLIER,
+            'difficulty_min': config.DIFFICULTY_MIN,
+            'difficulty_max': config.DIFFICULTY_MAX,
+            'topic_groups': [{'key': key, 'title': title, 'topics': names}
+                             for key, title, names in config.TOPIC_GROUPS],
+            'source_groups': [{'key': key, 'title': title}
+                              for key, title in game_sources.GROUPS],
+            # Входы нижнего ряда включаются, когда их страницы появляются
+            # (отдельными фазами). Кнопка в никуда хуже честной пометки
+            # «скоро», поэтому знание о готовности приходит с сервера.
+            'has_daily': HAS_DAILY,
+            'has_duel': HAS_DUEL,
         }),
-    })
+    }
 
 
 def _question_payload(gq, number):
@@ -148,6 +337,13 @@ def _question_payload(gq, number):
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
         payload['unit'] = gq.unit
+    if gq.question_type == FIGURE_AUDIT:
+        # ⚠️ Показанный чертёж — это САМ ВОПРОС, без него играть нечем,
+        # поэтому он входит в payload. А вот эталонный чертёж (figure_ref),
+        # верный вариант и вид внедрённой ошибки (gen_params['_inject'])
+        # сюда не попадают НИКОГДА: по ним ответ вычисляется мгновенно.
+        payload['figure'] = gq.figure
+        payload['prompt'] = figures_base.QUESTION_PROMPT
     return payload
 
 
@@ -160,22 +356,19 @@ def _pick_next(request, state):
     ничего не осталось — список режима очищается (цикл по кругу) и выбор
     идёт из всех оставшихся. Пул забега исчерпан полностью → None.
 
-    У целевого забега («работа над ошибками») вопросы заданы списком
-    заранее — тогда просто выдаём их по очереди.
+    У целевого забега («работа над ошибками», набор, дуэль, вызов дня)
+    вопросы заданы списком заранее — тогда просто выдаём их по очереди.
 
-    Фильтр по теме — в Python: JSONField.__contains не работает на SQLite,
-    а пул маленький (тысячи строк), перебор дешёвый."""
+    Фильтр (темы, источники, сложность) применяется в _candidate_rows."""
     mode = state['mode']
-    qtype = config.MODES[mode]['question_type']
     seen_run = set(state['seen'])
-    topic = state.get('topic')
 
     if state.get('queue') is not None:
         return _pick_from_queue(request, state)
 
-    rows = _pool_qs().filter(question_type=qtype).values_list('id', 'topics')
-    candidates = [pk for pk, topics in rows
-                  if pk not in seen_run and (not topic or topic in topics)]
+    rows = [(pk, d) for pk, d, _t in _candidate_rows(state)
+            if pk not in seen_run]
+    candidates = [pk for pk, _d in escalation_slice(rows, state.get('streak', 0))]
     if not candidates:
         return None  # пул исчерпан в этом забеге
 
@@ -187,12 +380,48 @@ def _pick_next(request, state):
         fresh = candidates
 
     gq = GameQuestion.objects.get(id=random.choice(fresh))
+    _remember_seen(request, state, gq)
+    return gq
+
+
+def _remember_seen(request, state, gq):
+    """Пометить вопрос выданным — и запомнить, ПЕРВАЯ ли это встреча.
+
+    Статистика вопроса (game/stats.py) считает только первые встречи:
+    второй раз тот же человек отвечает уже зная ответ, и складывать это
+    с чужими первыми ответами значит портить выборку.
+
+    ⚠️ Список SEEN_KEY для этого НЕ годится: он умышленно очищается, когда
+    пул режима пройден целиком («цикл по кругу», см. _pick_next), — иначе
+    игра кончилась бы у того, кто прошёл весь пул. Поэтому у статистики
+    свой список COUNTED_KEY, который не чистится никогда. Он плоский (без
+    разбивки по режимам): один и тот же вопрос в двух режимах не окажется,
+    типы разные.
+    """
+    mode = state['mode']
+    counted = request.session.get(COUNTED_KEY) or []
+    state.setdefault('first_seen', {})[str(gq.id)] = gq.id not in counted
+
     state['seen'].append(gq.id)
-    mode_seen = seen_map.get(mode, [])
-    mode_seen.append(gq.id)
+    seen_map = request.session.get(SEEN_KEY) or {}
+    mode_seen = list(seen_map.get(mode, [])) + [gq.id]
     seen_map[mode] = mode_seen[-SEEN_LIMIT:]
     request.session[SEEN_KEY] = seen_map
-    return gq
+
+
+def _mark_counted(request, qid):
+    """Запомнить, что ответ на этот вопрос уже учтён в статистике.
+
+    Помечаем при ОТВЕТЕ, а не при выдаче: игрок мог закрыть вкладку, не
+    ответив, — тогда вопрос обязан остаться «первой встречей» на будущее.
+    Список ограничен: id пула всё равно меняются при каждой пересборке
+    кэша, помнить их вечно бессмысленно.
+    """
+    counted = request.session.get(COUNTED_KEY) or []
+    if qid in counted:
+        return
+    counted.append(qid)
+    request.session[COUNTED_KEY] = counted[-COUNTED_LIMIT:]
 
 
 def _pick_from_queue(request, state):
@@ -206,23 +435,22 @@ def _pick_from_queue(request, state):
             gq = GameQuestion.objects.get(id=pk)
         except GameQuestion.DoesNotExist:
             continue
-        state['seen'].append(gq.id)
-        seen_map = request.session.get(SEEN_KEY) or {}
-        mode_seen = seen_map.get(state['mode'], [])
-        mode_seen.append(gq.id)
-        seen_map[state['mode']] = mode_seen[-SEEN_LIMIT:]
-        request.session[SEEN_KEY] = seen_map
+        _remember_seen(request, state, gq)
         return gq
     return None
 
 
-def _new_state(mode, topic):
+def _new_state(mode, topic, run_filter=None):
     """Чистое состояние забега. Очки/серия/жизни — серверные, клиент их
     только рисует; ended заполняется на третьей ошибке (api_answer) либо
     при завершении забега (api_session_finish)."""
     return {
         'mode': mode,
         'topic': topic,
+        # Фильтр забега живёт в состоянии, а не только в URL старта: его
+        # НАСЛЕДУЮТ «сыграть ещё раз» и «работа над ошибками». Раньше они
+        # сбрасывали выбор игрока молча.
+        'filter': normalize_filter(run_filter),
         'seen': [],
         'answered': {},
         'lives': config.MODES[mode]['lives'],
@@ -230,6 +458,10 @@ def _new_state(mode, topic):
         'streak': 0,            # текущая серия верных подряд
         'best_streak': 0,       # лучшая серия за забег
         'ended': None,          # None | 'lives' | 'time' | 'done'
+        # {id вопроса: True/False} — первая ли это встреча игрока с вопросом.
+        # Ставится при выдаче (см. _remember_seen), читается при ответе:
+        # в статистику вопроса идут ТОЛЬКО первые встречи.
+        'first_seen': {},
         # Журнал забега: по записи на КАЖДЫЙ сыгранный вопрос, в порядке
         # игры. Из него целиком считается сводка (см. build_summary) —
         # отдельных счётчиков «сколько ошибок в теме» не заводим, иначе
@@ -240,23 +472,65 @@ def _new_state(mode, topic):
 
 @require_GET
 def api_session_start(request):
-    """Начать забег: режим + тема (или «все») → первый вопрос и тайминги."""
+    """Начать забег: режим + фильтр (темы, источники, сложность).
+
+    Старый одиночный `topic=` продолжает работать — ссылками с ним могли
+    поделиться. Пустой фильтр = весь пул режима.
+
+    ⚠️ Панель фильтра НЕ гасит сочетания заранее и не показывает счётчики —
+    прямое указание Макара: фильтр работает так, будто задач по каждой теме
+    и источнику неограниченно. Но забег из НУЛЯ вопросов не существует
+    (решение 2026-07-27): если под режимом или под конкретным фильтром не
+    нашлось ни одного вопроса, сессия не создаётся вовсе, и клиент остаётся
+    на стартовом экране с честной строкой. Раньше сервер стартовал такой
+    забег и сразу сам его завершал причиной `pool_empty` — с точки зрения
+    игрока это неотличимо от настоящего конца забега (тот же экран
+    результатов, «Вопросы кончились», 0/0, и даже плашка «Чисто!»).
+    `pool_empty` остаётся как причина конца ПОСРЕДИ забега, когда вопросы
+    уже были и пул под фильтром исчерпался в процессе (см. `_end_reason`).
+    """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
-    topic = request.GET.get('topic', '').strip()
-    if topic and topic not in CANONICAL:
-        return JsonResponse({'error': 'Неизвестная тема'}, status=400)
 
-    state = _new_state(mode, topic or None)
+    # Режим существует в конфиге, но у него сейчас нет ни одного вопроса —
+    # либо погашен своим флагом (сегодня «График» при
+    # GAME_FIGURE_ENABLED=False), либо пуст сам по себе. Ни под каким
+    # фильтром вопросов не появится — это НЕДОСТИЖИМОСТЬ режима, а не
+    # пустой результат конкретного фильтра (см. _mode_enabled).
+    if not _mode_enabled(mode):
+        return JsonResponse({'ok': False, 'reason': 'mode_unavailable',
+                             'error': 'Этот режим пока недоступен'})
+
+    # Мусор среди выбранных значений отбрасываем молча (одна кривая тема
+    # не должна ронять забег), но если не уцелело НИ ОДНОГО из явно
+    # запрошенных — это опечатка, и молчать нечестно: игрок получил бы
+    # весь пул вместо того, что просил.
+    asked_topics = [t for t in (request.GET.getlist('topics')
+                                + [request.GET.get('topic', '')]) if t.strip()]
+    asked_sources = [s for s in request.GET.getlist('sources') if s.strip()]
+    run_filter = parse_filter(request)
+    if asked_topics and not run_filter['topics']:
+        return JsonResponse({'error': 'Неизвестная тема'}, status=400)
+    if asked_sources and not run_filter['sources']:
+        return JsonResponse({'error': 'Неизвестный источник'}, status=400)
+    legacy_topic = request.GET.get('topic', '').strip() or None
+    state = _new_state(mode, legacy_topic, run_filter)
     gq = _pick_next(request, state)
     if gq is None:
-        return JsonResponse({'error': 'Пул вопросов пуст'}, status=503)
+        # Под этим конкретным фильтром вопросов нет — забег не начинается
+        # (в отличие от _mode_enabled выше, у режима вопросы ЕСТЬ, просто не
+        # под этими темами/источниками/сложностью). Состояние в сессию не
+        # пишем — начинать и сразу же хоронить забег незачем.
+        return JsonResponse({
+            'ok': False, 'reason': 'pool_empty',
+            'error': 'Под этими настройками вопросов нет — измени фильтры'})
     request.session[SESSION_KEY] = state
     return JsonResponse({
         'ok': True,
         'mode': _mode_payload(mode),
         'lives': state['lives'],
+        'filter': run_filter,
         'question': _question_payload(gq, 1),
     })
 
@@ -302,7 +576,7 @@ def _check_answer(gq, body):
         return False, (given is not None and expected is not None
                        and given == expected)
 
-    # boolean / single
+    # boolean / single / figure_audit (везде один выбранный вариант)
     choice = body.get('choice', None)
     if choice is None:
         return True, False
@@ -477,7 +751,13 @@ def api_answer(request):
         delta = mode_cfg['time_correct']
         state['streak'] += 1
         state['best_streak'] = max(state['best_streak'], state['streak'])
-        points = config.BASE_POINTS * config.combo_multiplier(state['streak'])
+        # Очки: база по сложности вопроса (сегодня везде одинаковая — это
+        # задел, см. config.POINTS_BY_DIFFICULTY) × множитель комбо ×
+        # множитель последней жизни. Считает СЕРВЕР, клиент только рисует.
+        base = config.points_for(stats_mod.effective_difficulty(gq))
+        points = base * config.combo_multiplier(state['streak'])
+        if state['lives'] == 1:
+            points *= config.LAST_LIFE_MULTIPLIER
         state['score'] += points
     else:
         # Ошибка: минус жизнь и комбо в ноль. Время НЕ трогаем —
@@ -508,6 +788,18 @@ def api_answer(request):
         'running_combo': state['streak'],
         'lives_after': state['lives'],
     })
+    # Счётчики вопроса — в той же точке, что и журнал: разъехаться им
+    # нельзя. Только первая встреча игрока с вопросом (см. _remember_seen):
+    # повторный ответ того же человека уже знает правильный вариант.
+    if (state.get('first_seen') or {}).get(str(qid)):
+        stat = stats_mod.record_answer(gq, result, elapsed_ms)
+        # У «Графика» второй счётчик — по ВИДУ внедрённой ошибки: экземпляры
+        # у сюжета каждый раз новые, а вид ошибки устойчив, и знать, какая из
+        # них чаще обманывает, полезнее средней доли по сюжету.
+        stats_mod.record_variant(gq, result, elapsed_ms)
+        _mark_counted(request, qid)
+    else:
+        stat = stats_mod.get_stat(gq)
     request.session[SESSION_KEY] = state
 
     payload = {
@@ -538,6 +830,20 @@ def api_answer(request):
     # нет: игрок получает его только после того, как вопрос сыгран.
     if gq.is_generated and gq.figure:
         payload['figure'] = gq.figure
+    # Режим «График»: разбор показывает ДВА чертежа рядом — «как было в
+    # решении» (он у клиента уже есть, это сам вопрос) и «как правильно».
+    # Эталон уходит только сейчас, после ответа: до ответа он и есть ответ.
+    if gq.question_type == FIGURE_AUDIT and gq.figure_ref:
+        payload['figure_ref'] = gq.figure_ref
+        payload['injected_step'] = (gq.gen_params or {}).get('_step', '')
+    # Как этот вопрос решают остальные — чип на карточке обратной связи.
+    # Именно в ОТВЕТЕ, а не в payload вопроса: доля верных у данетки почти
+    # выдавала бы правильный вариант. Ниже порога попыток поля нет вовсе —
+    # клиенту нечего рисовать, и он чипа не покажет.
+    pub = stats_mod.public_stat(stat)
+    if pub:
+        payload['p_correct'] = pub['p_correct']
+        payload['attempts'] = pub['attempts']
     return JsonResponse(payload)
 
 
@@ -651,9 +957,11 @@ def api_session_start_mistakes(request):
     if not counts:
         return JsonResponse({'error': 'В этом забеге не было ошибок'}, status=400)
 
-    qtype = config.MODES[mode]['question_type']
-    rows = list(_pool_qs().filter(question_type=qtype)
-                .values_list('id', 'topics'))
+    # Фильтр наследуется от разбираемого забега: игрок выбрал источники и
+    # сложность не для того, чтобы разбор ошибок молча вернул ему весь пул.
+    run_filter = normalize_filter(last.get('filter'))
+    probe = _new_state(mode, None, run_filter)
+    rows = [(pk, topics) for pk, _d, topics in _candidate_rows(probe)]
     quotas = allocate_quotas(counts, config.MISTAKES_RUN_SIZE)
     seen_map = request.session.get(SEEN_KEY) or {}
     queue = build_mistakes_run(rows, quotas, config.MISTAKES_RUN_SIZE,
@@ -662,7 +970,7 @@ def api_session_start_mistakes(request):
         return JsonResponse({'error': 'Вопросов по этим темам не нашлось'},
                             status=503)
 
-    state = _new_state(mode, None)
+    state = _new_state(mode, None, run_filter)
     state['queue'] = queue
     state['mistakes_run'] = True
     gq = _pick_next(request, state)
@@ -674,6 +982,462 @@ def api_session_start_mistakes(request):
         'mistakes_run': True,
         'topics': sorted(quotas, key=lambda t: (-quotas[t], t)),
         'question': _question_payload(gq, 1),
+    })
+
+
+# ---------------------------------------------------------------------------
+# Забег по НАБОРУ (вызов дня, набор учителя, дуэль — одна механика)
+# ---------------------------------------------------------------------------
+
+ATTEMPTS_KEY = 'econ_rush_sets_played'   # коды сыгранных наборов (сессия)
+
+
+def played_set_codes(request):
+    return request.session.get(ATTEMPTS_KEY) or []
+
+
+def mark_set_played(request, code):
+    codes = played_set_codes(request)
+    if code not in codes:
+        codes.append(code)
+        request.session[ATTEMPTS_KEY] = codes[-200:]
+
+
+def attempts_used(request, gset):
+    """Сколько попыток по набору уже израсходовано этим игроком.
+
+    Авторизованный — считаем по базе (надёжно). Аноним — по сессии и
+    localStorage клиента; ⚠️ это заведомо слабая защита, обходится чисткой
+    браузера. Так решено сознательно (решение в Notion): требование
+    регистрации убило бы публичность игры, ради которой она и делалась.
+    """
+    if request.user.is_authenticated:
+        return GameResult.objects.filter(game_set=gset,
+                                         user=request.user).count()
+    return 1 if gset.code in played_set_codes(request) else 0
+
+
+def set_run_allowed(request, gset):
+    """(можно ли играть, причина отказа)."""
+    now = timezone.now()
+    if gset.opens_at and now < gset.opens_at:
+        return False, 'Набор ещё не открыт'
+    if gset.closes_at and now >= gset.closes_at:
+        return False, 'Набор уже закрыт'
+    if attempts_used(request, gset) >= gset.attempts_allowed:
+        return False, 'Попытка уже использована'
+    return True, ''
+
+
+def start_set_state(request, gset):
+    """Состояние забега по набору: очередь = список набора целиком.
+
+    Добор из общего пула ЗАПРЕЩЁН (_pick_from_queue не добирает), значит
+    все игроки получат ровно те же вопросы в том же порядке. Вопрос мог
+    исчезнуть из кэша (пул пересобрали) — он молча пропускается, забег
+    станет короче: это не ошибка, а честное поведение кэша.
+    """
+    state = _new_state(gset.mode, None, gset.filter_snapshot)
+    state['queue'] = list(gset.question_ids or [])
+    state['set_code'] = gset.code
+    state['curated'] = True     # эскалации сложности тут нет: список задан
+    return state
+
+
+@require_GET
+def api_session_start_set(request, code):
+    """Начать забег по набору. Код нечувствителен к регистру и пробелам."""
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    if gset.mode not in config.MODES:
+        return JsonResponse({'error': 'Неизвестный режим набора'}, status=400)
+    allowed, why = set_run_allowed(request, gset)
+    if not allowed:
+        return JsonResponse({'error': why}, status=409)
+
+    state = start_set_state(request, gset)
+    gq = _pick_next(request, state)
+    if gq is None:
+        # Все вопросы набора исчезли из кэша между сборкой очереди и стартом
+        # (пул пересобрали) — забег из нуля вопросов не начинается (Задача 3
+        # действует и на наборы, не только на свободный выбор режима).
+        return JsonResponse({
+            'ok': False, 'reason': 'pool_empty',
+            'error': 'В этом наборе не осталось доступных вопросов'})
+    request.session[SESSION_KEY] = state
+    return JsonResponse({
+        'ok': True,
+        'mode': _mode_payload(gset.mode),
+        'lives': state['lives'],
+        'filter': normalize_filter(gset.filter_snapshot),
+        'set': {'code': gset.code, 'kind': gset.kind, 'title': gset.title,
+                'size': gset.size},
+        'question': _question_payload(gq, 1),
+    })
+
+
+def make_code_lookup(raw):
+    """Код из адреса — в нормальную форму (регистр и пробелы не значат)."""
+    from .models import normalize_code
+    return normalize_code(raw)
+
+
+@ensure_csrf_cookie
+@require_safe
+def set_page(request, code):
+    """Страница забега по набору `/game/s/<код>/`.
+
+    Это та же страница игры: набор просто подставляет курированную очередь.
+    Отдельного экрана с превью вопросов НЕТ и быть не может — иначе автор
+    дуэли увидел бы задания до игры.
+
+    ⚠️ ensure_csrf_cookie обязателен: со страницы уходят POST-ы ответов, и
+    без куки они получают 403 (ловилось в браузере — забег молча вставал
+    на первом же ответе).
+    """
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    allowed, why = set_run_allowed(request, gset)
+    ctx = _game_page_context(request)
+    ctx['auto_set'] = {
+        'code': gset.code,
+        'kind': gset.kind,
+        'title': gset.title or dict(GameSet.KINDS).get(gset.kind, 'Набор'),
+        'size': gset.size,
+        'mode': gset.mode,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'allowed': allowed,
+        'why': why,
+        'board_url': reverse('game:set_board', args=[gset.code]),
+    }
+    # ?auto=1 — начать сразу, без карточки-заставки: так уходит играть
+    # автор дуэли, который вопросов ещё не видел (и не должен увидеть).
+    ctx['auto_set']['autostart'] = (request.GET.get('auto') == '1'
+                                    and allowed)
+    ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
+    return render(request, 'game/game.html', ctx)
+
+
+@require_safe
+def set_board(request, code):
+    """Доска набора: кто прошёл и на каких вопросах посыпался класс.
+
+    ⚠️ Тексты вопросов показываются НЕ ВСЕМ. Доска публичная, и ученик,
+    который ещё не играл контрольную, мог бы прочитать её вопросы отсюда —
+    это нашёл тест дуэли (первая версия доски выдавала весь список ДО
+    игры). Тексты видят: автор набора, персонал и тот, кто уже сыграл.
+    Остальным — «Вопрос N»: доля верных остаётся видна, содержание нет.
+    """
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    if gset.kind == 'duel':
+        # У дуэли своя страница, и на ней вопросов нет вовсе.
+        return redirect('game:duel', code=gset.code)
+    rows = list(gset.results.select_related('user').order_by(
+        '-score', 'created_at'))
+    board = [{
+        'place': i + 1,
+        'name': (r.user.username if r.user else 'аноним'),
+        'score': r.score,
+        'accuracy': r.accuracy,
+        'max_combo': r.max_combo,
+        'reason': r.ended_reason,
+        'at': r.created_at,
+        'is_me': bool(request.user.is_authenticated
+                      and r.user_id == request.user.id),
+    } for i, r in enumerate(rows)]
+    show_text = bool(
+        request.user.is_authenticated
+        and (request.user.is_staff or gset.author_id == request.user.id)
+    ) or my_result_for(request, gset) is not None
+    return render(request, 'game/set_board.html', {
+        'gset': gset,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'board': board,
+        'questions': set_question_stats(gset, show_text=show_text),
+        'show_text': show_text,
+        'play_url': reverse('game:set_page', args=[gset.code]),
+    })
+
+
+def set_question_stats(gset, show_text=True):
+    """Разбивка по вопросам НАБОРА — самое ценное для учителя.
+
+    Доля верных считается ВНУТРИ набора (по журналам его забегов), а не по
+    всему сайту: учителю важно, на чём посыпался его класс, а не средний
+    игрок интернета.
+
+    Журналы забегов лежат в сессиях игроков и до нас не доходят — поэтому
+    считаем по сохранённым результатам: у каждого результата есть разбивка
+    по вопросам (question_outcomes), которую кладёт finish.
+
+    show_text=False — вместо текста «Вопрос N»: доска публичная, и тому,
+    кто набор ещё не играл, содержание вопросов знать рано.
+    """
+    counts = {}
+    for r in gset.results.all():
+        for item in (r.question_outcomes or []):
+            cell = counts.setdefault(item.get('question_id'),
+                                     {'correct': 0, 'wrong': 0, 'skip': 0})
+            outcome = item.get('outcome')
+            if outcome in cell:
+                cell[outcome] += 1
+    rows = []
+    order = list(gset.question_ids or [])
+    texts = dict(GameQuestion.objects.filter(id__in=order)
+                 .values_list('id', 'question'))
+    for i, qid in enumerate(order):
+        cell = counts.get(qid, {'correct': 0, 'wrong': 0, 'skip': 0})
+        tries = cell['correct'] + cell['wrong']
+        rows.append({
+            'number': i + 1,
+            'id': qid,
+            'text': ((texts.get(qid) or '(вопрос исчез из пула)')[:160]
+                     if show_text else 'Вопрос %d' % (i + 1)),
+            'correct': cell['correct'],
+            'wrong': cell['wrong'],
+            'skip': cell['skip'],
+            'percent': round(100 * cell['correct'] / tries) if tries else None,
+        })
+    return rows
+
+
+# ---------------------------------------------------------------------------
+# Асинхронная дуэль по ссылке
+# ---------------------------------------------------------------------------
+
+MY_RESULTS_KEY = 'econ_rush_set_results'   # {код набора: код результата}
+
+
+def remember_my_result(request, set_code, result_code):
+    """Запомнить свой результат по набору — чтобы страница дуэли узнала
+    анонимного игрока (у авторизованного есть user, у анонима только
+    сессия)."""
+    mine = request.session.get(MY_RESULTS_KEY) or {}
+    mine[set_code] = result_code
+    request.session[MY_RESULTS_KEY] = mine
+
+
+def my_result_for(request, gset):
+    """Мой результат по этому набору — или None."""
+    if request.user.is_authenticated:
+        r = gset.results.filter(user=request.user).first()
+        if r:
+            return r
+    code = (request.session.get(MY_RESULTS_KEY) or {}).get(gset.code)
+    return gset.results.filter(code=code).first() if code else None
+
+
+@require_GET
+def duel_new(request):
+    """Создать дуэль и СРАЗУ уйти играть.
+
+    ⚠️ Набор дуэли собирается СЛУЧАЙНО под выбранные фильтры, и автор
+    вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую первым, наравне
+    с соперником. Поэтому экрана «вот твой набор, поехали» не существует —
+    ни одна вьюха не отдаёт список вопросов до того, как игрок их сыграл.
+    """
+    mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        return JsonResponse({'error': 'Неизвестный режим'}, status=400)
+    run_filter = parse_filter(request)
+    probe = _new_state(mode, None, run_filter)
+    ids = [pk for pk, _d, _t in _candidate_rows(probe)]
+    if not ids:
+        # Под фильтром пусто — не создаём пустую дуэль, а честно говорим.
+        return render(request, 'game/duel_empty.html', {
+            'mode_title': config.MODES[mode]['title']}, status=200)
+    random.shuffle(ids)
+    gset = GameSet.objects.create(
+        code=make_result_code(), mode=mode, kind='duel',
+        title='Дуэль · %s' % config.MODES[mode]['title'],
+        author=request.user if request.user.is_authenticated else None,
+        question_ids=ids[:config.DUEL_SIZE],
+        filter_snapshot=run_filter, attempts_allowed=1)
+    return redirect(reverse('game:set_page', args=[gset.code]) + '?auto=1')
+
+
+@require_safe
+def duel_page(request, code):
+    """Страница дуэли `/game/d/<код>/`.
+
+    Соперник видит: кто вызвал, режим, фильтры, число вопросов, результат
+    вызвавшего — и кнопку «Играть». ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ.
+
+    Ссылку могут открыть больше двух человек — тогда страница показывает
+    всех сыгравших доской, автор помечен. Это надмножество сравнения двоих
+    и стоит ровно ничего.
+    """
+    gset = get_object_or_404(GameSet, code=make_code_lookup(code), kind='duel')
+    results = list(gset.results.select_related('user').order_by('created_at'))
+    mine = my_result_for(request, gset)
+
+    author_result = None
+    for r in results:
+        if gset.author_id and r.user_id == gset.author_id:
+            author_result = r
+            break
+    if author_result is None and results:
+        author_result = results[0]   # аноним-автор: первый сыгравший
+
+    rows = []
+    for r in sorted(results, key=lambda x: (-x.score, x.created_at)):
+        rows.append({
+            'name': (r.user.username if r.user else 'аноним'),
+            'score': r.score,
+            'accuracy': r.accuracy,
+            'max_combo': r.max_combo,
+            'reason': r.ended_reason,
+            'is_author': author_result is not None and r.id == author_result.id,
+            'is_me': mine is not None and r.id == mine.id,
+        })
+
+    allowed, why = set_run_allowed(request, gset)
+    compare = _duel_compare(gset, author_result, mine) \
+        if (mine and author_result and mine.id != author_result.id) else None
+
+    f = normalize_filter(gset.filter_snapshot)
+    return render(request, 'game/duel.html', {
+        'gset': gset,
+        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
+        'author_name': (gset.author.username if gset.author else 'аноним'),
+        'author_result': author_result,
+        'rows': rows,
+        'mine': mine,
+        'compare': compare,
+        'allowed': allowed,
+        'why': why,
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'again_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                      + _filter_query(f)),
+        'filter_text': _filter_text(f),
+        'page_url': request.build_absolute_uri(
+            reverse('game:duel', args=[gset.code])),
+    })
+
+
+def _filter_query(f):
+    parts = ['&topics=' + quote(t) for t in f['topics']]
+    parts += ['&sources=' + quote(s) for s in f['sources']]
+    parts.append('&dmin=%d&dmax=%d' % (f['dmin'], f['dmax']))
+    return ''.join(parts)
+
+
+def _filter_text(f):
+    """Фильтр словами — соперник должен понимать, во что его зовут."""
+    topics = ', '.join(f['topics']) if f['topics'] else 'все темы'
+    if f['sources']:
+        sources = ', '.join(game_sources.group_title(s) for s in f['sources'])
+    else:
+        sources = 'все источники'
+    if f['dmin'] == config.DIFFICULTY_MIN and f['dmax'] == config.DIFFICULTY_MAX:
+        diff = 'любая сложность'
+    else:
+        diff = 'сложность %d–%d' % (f['dmin'], f['dmax'])
+    return '%s · %s · %s' % (topics, sources, diff)
+
+
+def _duel_compare(gset, a, b):
+    """Сравнение двух забегов лоб в лоб: метрики и полоса «кто что взял».
+
+    Полоса строится по question_outcomes: у каждого вопроса набора два
+    значка — верно / неверно / пропуск / не дошёл.
+    """
+    def by_qid(result):
+        return {item.get('question_id'): item.get('outcome')
+                for item in (result.question_outcomes or [])}
+
+    ma, mb = by_qid(a), by_qid(b)
+    strip = []
+    for i, qid in enumerate(gset.question_ids or []):
+        strip.append({'number': i + 1,
+                      'a': ma.get(qid, 'none'),
+                      'b': mb.get(qid, 'none')})
+    if a.score > b.score:
+        verdict = 'Побеждает %s' % (a.user.username if a.user else 'вызвавший')
+    elif b.score > a.score:
+        verdict = 'Побеждает %s' % (b.user.username if b.user else 'соперник')
+    else:
+        verdict = 'Ничья'
+    return {
+        'a': {'name': (a.user.username if a.user else 'вызвавший'),
+              'score': a.score, 'accuracy': a.accuracy,
+              'max_combo': a.max_combo, 'reason': a.ended_reason},
+        'b': {'name': (b.user.username if b.user else 'соперник'),
+              'score': b.score, 'accuracy': b.accuracy,
+              'max_combo': b.max_combo, 'reason': b.ended_reason},
+        'strip': strip,
+        'verdict': verdict,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Вызов дня
+# ---------------------------------------------------------------------------
+
+@require_safe
+def daily_page(request):
+    """Четыре карточки вызова дня — по одной на режим."""
+    from . import daily as daily_mod
+    day = daily_mod.today()
+    cards = []
+    for key, m in config.MODES.items():
+        gset = daily_mod.get_daily_set(key, day)
+        if gset is None:
+            continue     # в пуле нет вопросов этого типа — вызова нет
+        mine = None
+        if request.user.is_authenticated:
+            mine = gset.results.filter(user=request.user).first()
+        played = bool(mine) or gset.code in played_set_codes(request)
+        cards.append({
+            'mode': key,
+            'title': m['title'],
+            'size': gset.size,
+            'code': gset.code,
+            'played': played,
+            'my_score': mine.score if mine else None,
+            'play_url': reverse('game:set_page', args=[gset.code]),
+            'board_url': reverse('game:daily_board', args=[key]),
+        })
+    return render(request, 'game/daily.html', {
+        'cards': cards,
+        'day': day,
+        'reset_at': daily_mod.next_reset().isoformat(),
+    })
+
+
+@require_safe
+def daily_board(request, mode, day=None):
+    """Доска вызова дня: топ-50 + твоё место, если ты вне топа."""
+    from . import daily as daily_mod
+    if mode not in config.MODES:
+        raise Http404('Неизвестный режим')
+    if day:
+        try:
+            day_obj = datetime.datetime.strptime(day, '%Y-%m-%d').date()
+        except ValueError:
+            raise Http404('Неверная дата')
+    else:
+        day_obj = daily_mod.today()
+    # Вчерашнюю доску показываем, но задним числом наборы не создаём:
+    # архив дальше вчера не требуется, а плодить наборы за прошлое нечестно.
+    create = day_obj == daily_mod.today()
+    gset = daily_mod.get_daily_set(mode, day_obj, create=create)
+    if gset is None:
+        raise Http404('Вызова на этот день нет')
+
+    me = request.user if request.user.is_authenticated else None
+    top, my_row, total = daily_mod.board_rows(gset, me)
+    yesterday = day_obj - datetime.timedelta(days=1)
+    return render(request, 'game/daily_board.html', {
+        'gset': gset,
+        'mode': mode,
+        'mode_title': config.MODES[mode]['title'],
+        'day': day_obj,
+        'is_today': day_obj == daily_mod.today(),
+        'top': top,
+        'my_row': my_row,
+        'total': total,
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'yesterday_url': reverse('game:daily_board_day',
+                                 args=[mode, yesterday.isoformat()]),
     })
 
 
@@ -696,13 +1460,14 @@ def api_session_finish(request):
     except json.JSONDecodeError:
         body = {}
     if not state.get('ended'):
-        reason = body.get('reason')
-        state['ended'] = reason if reason in ('time', 'done') else 'time'
+        state['ended'] = _end_reason(state, body.get('reason'))
     request.session[SESSION_KEY] = state
     # Журнал завершённого забега — отдельным ключом: с него живёт «работа
     # над ошибками», а SESSION_KEY затрётся, как только начнётся новый
-    # забег. Храним только нужное ей: режим и журнал.
-    request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log']}
+    # забег. Храним нужное ей: режим, журнал и фильтр (его наследует
+    # целевой забег — иначе выбор игрока молча сбрасывался бы).
+    request.session[LAST_KEY] = {'mode': state['mode'], 'log': state['log'],
+                                 'filter': normalize_filter(state.get('filter'))}
 
     summary = build_summary(state)
     share = _save_result(request, state, summary)
@@ -763,6 +1528,26 @@ def _log_learning_events(request, state):
             },
         )
 
+def _end_reason(state, claimed):
+    """Чем кончился забег. Слово клиента НЕ перебивает сервер.
+
+    Четыре исхода:
+      lives      — выбыл, кончились жизни (ставит сам сервер в api_answer);
+      time       — вышло время (знает только клиент, у него таймер);
+      pool_empty — вопросы под фильтром игрока кончились;
+      set_done   — курированный список пройден до конца (набор, дуэль,
+                   вызов дня, работа над ошибками).
+
+    Клиент знает про конец вопросов, но НЕ знает, курированный это забег
+    или свободный, — а сервер знает. Поэтому он присылает нейтральное
+    'done' (и старые клиенты тоже), а разделение делает сервер.
+    """
+    if claimed == 'time':
+        return 'time'
+    if claimed in ('done', 'pool_empty', 'set_done'):
+        return 'set_done' if state.get('queue') is not None else 'pool_empty'
+    return 'time'
+
 
 def _save_result(request, state, summary):
     """Сохранить результат забега и отдать ссылку на публичную страницу.
@@ -775,6 +1560,12 @@ def _save_result(request, state, summary):
     """
     code = state.get('result_code')
     result = GameResult.objects.filter(code=code).first() if code else None
+    # Забег по набору попадает на его доску. Попытка засчитывается ровно
+    # здесь, при сохранении результата: начатый и брошенный забег попытку
+    # не тратит.
+    gset = None
+    if state.get('set_code'):
+        gset = GameSet.objects.filter(code=state['set_code']).first()
     if result is None:
         for _ in range(5):   # коллизия кода почти невероятна, но не 500
             try:
@@ -789,6 +1580,13 @@ def _save_result(request, state, summary):
                     topic_breakdown=summary['topic_rows'],
                     difficulty_breakdown=summary['difficulty'],
                     score_curve=summary['score_curve'],
+                    question_outcomes=[
+                        {'question_id': r['question_id'],
+                         'number': r['number'],
+                         'outcome': r['outcome']}
+                        for r in (state.get('log') or [])],
+                    game_set=gset,
+                    user=request.user if request.user.is_authenticated else None,
                 )
                 break
             except IntegrityError:
@@ -797,11 +1595,26 @@ def _save_result(request, state, summary):
             return None      # не смогли сохранить — забег важнее ссылки
         state['result_code'] = result.code
         request.session[SESSION_KEY] = state
-    return {
+        if gset is not None:
+            mark_set_played(request, gset.code)
+            remember_my_result(request, gset.code, result.code)
+    out = {
         'code': result.code,
         'url': request.build_absolute_uri(
             reverse('game:result', args=[result.code])),
     }
+    if gset is not None:
+        # У дуэли «доска» — это её страница сравнения, а не общая доска
+        # набора: соперника интересует счёт лоб в лоб.
+        board = reverse('game:duel', args=[gset.code]) if gset.kind == 'duel' \
+            else reverse('game:set_board', args=[gset.code])
+        out['set'] = {
+            'code': gset.code,
+            'kind': gset.kind,
+            'title': gset.title,
+            'board_url': request.build_absolute_uri(board),
+        }
+    return out
 
 
 @require_safe
@@ -830,6 +1643,84 @@ def result_page(request, code):
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),
+    })
+
+
+@staff_member_required
+@require_safe
+def stats_page(request):
+    """Служебная страница статистики пула — только для персонала.
+
+    Смотрят её ради двух хвостов распределения: вопросы с долей верных
+    ниже STATS_BROKEN_BELOW почти наверняка сломаны (не тот ключ ответа,
+    потерялась формула при импорте), выше STATS_TRIVIAL_ABOVE — тривиальны
+    и только разбавляют пул. Середина интересна как измеренная сложность.
+
+    Вопросы без набранных попыток внизу списка: у них ещё нечего смотреть.
+    """
+    tab = 'arch' if request.GET.get('tab') == 'arch' else 'pool'
+    min_attempts = config.STATS_MIN_ATTEMPTS
+
+    if tab == 'arch':
+        rows = []
+        for st in ArchetypeStat.objects.all():
+            rows.append({
+                'key': st.generator_key,
+                'shown': st.shown,
+                'attempts': st.attempts,
+                'skipped': st.skipped,
+                'percent': (round(100 * st.p_correct)
+                            if st.attempts >= min_attempts else None),
+                'avg_ms': st.avg_ms,
+            })
+        rows.sort(key=lambda r: (r['percent'] is None,
+                                 r['percent'] if r['percent'] is not None else 0,
+                                 r['key']))
+        return render(request, 'game/stats.html', {
+            'tab': tab, 'arch_rows': rows, 'rows': [],
+            'min_attempts': min_attempts,
+            'broken_pct': round(100 * config.STATS_BROKEN_BELOW),
+            'trivial_pct': round(100 * config.STATS_TRIVIAL_ABOVE),
+        })
+
+    questions = list(_pool_qs().order_by('id'))
+    by_id = stats_mod.bulk_stats(questions)
+    rows = []
+    for gq in questions:
+        st = by_id.get(gq.id)
+        attempts = st.attempts if st else 0
+        percent = (round(100 * st.p_correct)
+                   if st and attempts >= min_attempts else None)
+        rows.append({
+            'id': gq.id,
+            'text': gq.question[:140],
+            'type': gq.get_question_type_display(),
+            'topics': ', '.join(gq.topics or []) or '—',
+            'shown': st.shown if st else 0,
+            'attempts': attempts,
+            'percent': percent,
+            'avg_ms': st.avg_ms if st else 0,
+            'difficulty': stats_mod.effective_difficulty(gq, st),
+            'measured': percent is not None,
+            'problem_id': gq.problem_id,
+            'generated': gq.is_generated,
+            'broken': percent is not None and percent < 100 * config.STATS_BROKEN_BELOW,
+            'trivial': percent is not None and percent > 100 * config.STATS_TRIVIAL_ABOVE,
+        })
+    # Сортировка по доле верных: сломанные — вверху, вопросы без данных —
+    # внизу (у них смотреть пока нечего).
+    rows.sort(key=lambda r: (r['percent'] is None,
+                             r['percent'] if r['percent'] is not None else 0,
+                             r['id']))
+    return render(request, 'game/stats.html', {
+        'tab': tab,
+        'rows': rows,
+        'arch_rows': [],
+        'total': len(rows),
+        'measured': sum(1 for r in rows if r['measured']),
+        'min_attempts': min_attempts,
+        'broken_pct': round(100 * config.STATS_BROKEN_BELOW),
+        'trivial_pct': round(100 * config.STATS_TRIVIAL_ABOVE),
     })
 
 

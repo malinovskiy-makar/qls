@@ -355,6 +355,27 @@ class GameApiTests(TestCase):
         r = self.client.get('/game/api/session/start/', {'topic': 'Нет такой'})
         self.assertEqual(r.status_code, 400)
 
+    def test_one_bad_topic_among_good_ones_is_dropped_silently(self):
+        """Мульти-выбор: кривое значение не роняет забег, если уцелело
+        хоть что-то осмысленное — фильтр это удобство, а не контракт."""
+        p = make_test_problem(statement='Вопрос про эластичность?', answer='A')
+        GameQuestion.objects.create(
+            problem=p, question=p.statement,
+            options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
+            correct_index=0, difficulty=2, topics=['Эластичность'], lang='ru')
+        r = self.client.get('/game/api/session/start/',
+                            {'mode': 'blitz', 'topics': ['Эластичность',
+                                                         'Нет такой']})
+        self.assertEqual(r.status_code, 200)
+        d = r.json()
+        self.assertTrue(d['ok'])
+        self.assertEqual(d['filter']['topics'], ['Эластичность'])
+
+    def test_bad_source_400(self):
+        r = self.client.get('/game/api/session/start/',
+                            {'mode': 'blitz', 'sources': 'нетакая'})
+        self.assertEqual(r.status_code, 400)
+
 
 class LivesTests(TestCase):
     """Жизни вместо штрафа временем: ошибка стоит жизнь, третья завершает
@@ -675,11 +696,14 @@ class FinishTests(TestCase):
         self.assertEqual(s['lives_left'], 0)
         self.assertEqual(s['last_number'], 3)
 
-    def test_finish_by_done(self):
+    def test_finish_by_done_in_a_free_run_means_pool_empty(self):
+        """Клиент знает, что вопросы кончились, но не знает, какой это был
+        забег: свободный под фильтром или курированный список. Разделение
+        делает сервер — 'done' от клиента становится 'pool_empty'."""
         qid = self.start()
         self.answer(qid, 0)
         s = self.finish('done')
-        self.assertEqual(s['ended_reason'], 'done')
+        self.assertEqual(s['ended_reason'], 'pool_empty')
 
     def test_unknown_reason_falls_back_to_time(self):
         self.answer(self.start(), 0)

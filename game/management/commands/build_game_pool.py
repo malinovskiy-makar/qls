@@ -44,6 +44,7 @@ from django.db import transaction
 
 from problems.models import Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
+from game.sources import group_of
 from game.models import GameQuestion
 from game.views import parse_exact_number
 
@@ -460,7 +461,7 @@ class Command(BaseCommand):
         qs = (Problem.objects
               .filter(status='published', needs_quality_review=False,
                       problem_type__in=GAME_TYPES)
-              .prefetch_related('parts', 'topics', 'source_references'))
+              .prefetch_related('parts', 'topics', 'source_references__source'))
 
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
@@ -516,6 +517,15 @@ class Command(BaseCommand):
                     if m:
                         unit = m.group(1).strip()
                     break
+            # Источник — первая привязка задачи. Денормализуем ради фильтра
+            # «источники» на стартовом экране: выбор вопроса читает пул
+            # плоским values_list, а join на SourceReference дал бы дубли
+            # строк у задач с несколькими привязками.
+            source_id, source_group = None, ''
+            first_ref = next(iter(p.source_references.all()), None)
+            if first_ref is not None:
+                source_id = first_ref.source_id
+                source_group = group_of(first_ref.source.name)
             gq = GameQuestion(
                 problem=p,
                 part=None,
@@ -532,6 +542,8 @@ class Command(BaseCommand):
                 year=year,
                 grade=grade,
                 unit=unit if qtype == 'numeric' else '',
+                source_id=source_id,
+                source_group=source_group,
             )
 
             # Схлопывание повторов на сборке пула (контент-таблицы Problem/

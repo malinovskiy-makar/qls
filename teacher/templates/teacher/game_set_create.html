@@ -1,0 +1,347 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+  Конструктор игрового набора. Три шага, и порядок принципиален:
+
+  Шаг 1 — ВЫБОР РЕЖИМА ПЕРВЫМ. Набор для «Классики» может содержать только
+  числовые вопросы, для «Пули» — только данетки. Дай собирать сначала —
+  половина набора окажется несовместимой, и работу придётся выбрасывать.
+
+  Шаг 2 — две колонки, как в конструкторе домашек: слева пул (уже
+  отфильтрованный по типу вопроса режима), справа собранный набор с
+  перетаскиванием порядка.
+
+  Шаг 3 — название и сохранение (форма внизу правой колонки).
+{% endcomment %}
+{% block title %}Собрать игровой набор{% endblock %}
+
+{% block extra_style %}
+<style>
+  .sc-steps { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+  .sc-step { font-size: .8rem; padding: 4px 12px; border-radius: 999px;
+             border: 1px solid var(--border); color: var(--text2); }
+  .sc-step.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sc-lead { color: var(--text2); max-width: 72ch; margin-bottom: 18px; }
+
+  .mode-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
+               gap: 12px; }
+  .mode-pick a {
+    display: block; padding: 16px 18px; border: 1px solid var(--border);
+    border-radius: 14px; background: var(--surface); text-decoration: none;
+    color: var(--text);
+  }
+  .mode-pick a:hover { border-color: var(--accent); }
+  .mode-pick b { font-size: 1.05rem; }
+  .mode-pick small { display: block; color: var(--text2); margin-top: 4px; font-size: .84rem; }
+
+  .sc-cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; align-items: start; }
+  @media (max-width: 900px) { .sc-cols { grid-template-columns: 1fr; } }
+  .sc-panel { border: 1px solid var(--border); border-radius: 14px;
+              background: var(--surface); padding: 14px; }
+  .sc-warn {
+    border: 1px solid var(--border); border-left: 3px solid var(--accent);
+    border-radius: 10px; background: var(--surface-2);
+    padding: 10px 12px; font-size: .86rem; color: var(--text2);
+    margin-bottom: 12px;
+  }
+  .sc-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .sc-filters input, .sc-filters select {
+    font: inherit; font-size: .86rem; padding: 6px 9px;
+    border: 1px solid var(--border); border-radius: 8px;
+    background: var(--surface-2); color: var(--text);
+  }
+  .sc-filters button {
+    font: inherit; font-size: .86rem; padding: 6px 14px; border-radius: 8px;
+    border: 1px solid var(--btn-bg); background: var(--btn-bg);
+    color: var(--on-btn); cursor: pointer;
+  }
+  .q-item {
+    border: 1px solid var(--border); border-radius: 10px;
+    padding: 9px 11px; margin-bottom: 8px; background: var(--surface-2);
+  }
+  .q-item .q-text { font-size: .88rem; }
+  .q-item .q-meta { font-size: .76rem; color: var(--text2); margin-top: 4px;
+                    display: flex; gap: 10px; flex-wrap: wrap; }
+  .q-item .q-ans { color: var(--green); font-weight: 600; }
+  .q-item .q-act {
+    float: right; font: inherit; font-size: .8rem; padding: 3px 10px;
+    border-radius: 7px; border: 1px solid var(--border);
+    background: var(--surface); color: var(--text2); cursor: pointer;
+  }
+  .q-item .q-act:hover { border-color: var(--accent); color: var(--accent); }
+  #picked .q-item { cursor: grab; }
+  #picked .q-item.drag { opacity: .45; }
+  .sc-count { font-size: .86rem; color: var(--text2); margin-bottom: 8px; }
+  .sc-pager { margin-top: 10px; font-size: .86rem; display: flex; gap: 10px; }
+  .sc-save { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
+  .sc-save label { display: block; font-size: .82rem; color: var(--text2); margin-bottom: 4px; }
+  .sc-save input[type=text], .sc-save input[type=number] {
+    font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px;
+    border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+    margin-bottom: 10px;
+  }
+  .sc-save button {
+    font: inherit; font-size: .95rem; font-weight: 600; width: 100%;
+    padding: 10px; border-radius: 10px; border: 1px solid var(--btn-bg);
+    background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
+  }
+  .sc-save button[disabled] { opacity: .5; cursor: default; }
+</style>
+{% endblock %}
+
+{% block content %}
+<h1>Собрать игровой набор</h1>
+
+<div class="sc-steps">
+  <span class="sc-step {% if step == 1 %}on{% endif %}">1 · Режим</span>
+  <span class="sc-step {% if step == 2 %}on{% endif %}">2 · Вопросы</span>
+  <span class="sc-step {% if step == 2 %}on{% endif %}">3 · Название и код</span>
+</div>
+
+{% if step == 1 %}
+  <p class="sc-lead">
+    Сначала режим — это не формальность. В «Классике» бывают только числовые
+    вопросы, в «Пуле» — только данетки. Выберете режим потом — половина
+    собранного набора окажется несовместимой с ним.
+  </p>
+  <div class="mode-pick">
+    {% for m in modes %}
+    <a href="?mode={{ m.key }}">
+      <b>{{ m.title }}</b>
+      <small>
+        {{ m.duration }} с · {{ m.lives }} ♥ ·
+        в пуле {{ m.pool }} вопр. типа «{{ m.question_type }}»
+      </small>
+    </a>
+    {% empty %}
+    <p class="sc-lead">В игровом пуле нет ни одного вопроса — собирать не из чего.</p>
+    {% endfor %}
+  </div>
+
+{% else %}
+  <p class="sc-lead">
+    Режим: <b>{{ mode_title }}</b> (вопросы типа «{{ question_type }}»).
+    <a href="{% url 'teacher:game_set_create' %}">сменить режим</a>
+  </p>
+
+  <div class="sc-cols">
+    <!-- ЛЕВАЯ КОЛОНКА: пул -->
+    <div class="sc-panel">
+      <div class="sc-warn">
+        Здесь только вопросы, пригодные для игры. Часть задач каталога
+        в игру не конвертируется (длинные условия, рисунки, сложная вёрстка) —
+        их тут не будет.
+      </div>
+
+      <form class="sc-filters" method="get">
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <input type="search" name="q" value="{{ f_q }}" placeholder="поиск по тексту">
+        <select name="topic">
+          <option value="">все темы</option>
+          {% for t in topics %}
+          <option value="{{ t }}" {% if f_topic == t %}selected{% endif %}>{{ t }}</option>
+          {% endfor %}
+        </select>
+        <select name="source">
+          <option value="">все источники</option>
+          {% for key, title in source_groups %}
+          <option value="{{ key }}" {% if f_source == key %}selected{% endif %}>{{ title }}</option>
+          {% endfor %}
+        </select>
+        <select name="dmin">
+          <option value="">сложность от</option>
+          {% for i in levels %}
+          <option value="{{ i }}" {% if f_dmin == i|stringformat:'s' %}selected{% endif %}>от {{ i }}</option>
+          {% endfor %}
+        </select>
+        <select name="dmax">
+          <option value="">до</option>
+          {% for i in levels %}
+          <option value="{{ i }}" {% if f_dmax == i|stringformat:'s' %}selected{% endif %}>до {{ i }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit">Найти</button>
+      </form>
+
+      <div class="sc-count">Найдено: {{ total }}</div>
+
+      <div id="pool">
+        {% for c in cards %}
+        {# исходный текст и ответ — в data-*: справа они пересобираются
+           заново, а textContent уже отрисованной KaTeX-формулы вернул бы
+           «Qd=165−PQ_d = 165 - P» (разметка + исходник вперемешку) #}
+        <div class="q-item" data-id="{{ c.q.id }}"
+             data-text="{{ c.q.question }}" data-answer="{{ c.answer }}"
+             data-topics="{{ c.topics }}">
+          <button type="button" class="q-act" data-add="{{ c.q.id }}">＋</button>
+          <div class="q-text math">{{ c.q.question }}</div>
+          <div class="q-meta">
+            <span class="q-ans">ответ: {{ c.answer }}</span>
+            <span>{{ c.topics }}</span>
+            <span>сложность {{ c.difficulty }}</span>
+            {% if c.percent is not None %}<span>верно {{ c.percent }}%</span>{% endif %}
+          </div>
+        </div>
+        {% empty %}
+        <p class="sc-lead">Под эти фильтры ничего не нашлось.</p>
+        {% endfor %}
+      </div>
+
+      <div class="sc-pager">
+        {% if page_obj.has_previous %}
+        <a href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">← назад</a>
+        {% endif %}
+        <span>стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        {% if page_obj.has_next %}
+        <a href="?{{ base_query }}&page={{ page_obj.next_page_number }}">вперёд →</a>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ПРАВАЯ КОЛОНКА: набор -->
+    <div class="sc-panel">
+      <div class="sc-count">
+        В наборе: <b id="picked-count">0</b> / {{ max_size }}
+        <button type="button" class="q-act" id="btn-fill">добрать 5 случайных</button>
+      </div>
+      <div id="picked"></div>
+
+      <form class="sc-save" method="post" id="save-form">
+        {% csrf_token %}
+        <input type="hidden" name="mode" value="{{ mode }}">
+        <input type="hidden" name="question_ids" id="question_ids" value="">
+        <label for="title">Название набора</label>
+        <input type="text" id="title" name="title" maxlength="120"
+               placeholder="Контрольная по спросу, 10 класс">
+        <label for="attempts">Сколько попыток на человека</label>
+        <input type="number" id="attempts" name="attempts" min="1" max="10" value="1">
+        <button type="submit" id="btn-save" disabled>Сохранить и получить код</button>
+      </form>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if step == 2 %}
+<script>
+/* Конструктор набора: две колонки, перетаскивание порядка справа.
+   Порядок вопросов — часть контракта набора: при разном порядке сравнение
+   результатов нечестно, поэтому он сохраняется ровно так, как собран. */
+(function () {
+  'use strict';
+  var MAX = {{ max_size }};
+  var MODE = '{{ mode }}';
+  var picked = [];   // [{id, text, answer, topics, difficulty}]
+
+  function $(id) { return document.getElementById(id); }
+
+  function renderPicked() {
+    var box = $('picked');
+    box.innerHTML = '';
+    picked.forEach(function (item, i) {
+      var el = document.createElement('div');
+      el.className = 'q-item';
+      el.draggable = true;
+      el.dataset.idx = i;
+      var btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'q-act';
+      btn.textContent = '✕';
+      btn.addEventListener('click', function () {
+        picked.splice(i, 1);
+        renderPicked();
+      });
+      el.appendChild(btn);
+      var t = document.createElement('div');
+      t.className = 'q-text math';
+      t.textContent = (i + 1) + '. ' + item.text;
+      el.appendChild(t);
+      var m = document.createElement('div');
+      m.className = 'q-meta';
+      m.innerHTML = '<span class="q-ans"></span><span></span>';
+      m.children[0].textContent = 'ответ: ' + item.answer;
+      m.children[1].textContent = item.topics;
+      el.appendChild(m);
+      box.appendChild(el);
+    });
+    $('picked-count').textContent = picked.length;
+    $('question_ids').value = picked.map(function (p) { return p.id; }).join(',');
+    $('btn-save').disabled = picked.length === 0;
+    // KaTeX грузится с defer — на первом проходе его ещё нет
+    if (window.initKaTeX && typeof renderMathInElement === 'function') {
+      window.initKaTeX();
+    }
+  }
+
+  function addFromCard(card) {
+    var id = parseInt(card.dataset.id, 10);
+    if (picked.some(function (p) { return p.id === id; })) return;
+    if (picked.length >= MAX) { alert('В наборе уже ' + MAX + ' вопросов.'); return; }
+    picked.push({
+      id: id,
+      text: card.dataset.text || '',
+      answer: card.dataset.answer || '—',
+      topics: card.dataset.topics || ''
+    });
+    renderPicked();
+  }
+
+  $('pool').addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-add]');
+    if (!btn) return;
+    addFromCard(btn.closest('.q-item'));
+  });
+
+  /* Перетаскивание порядка в правой колонке */
+  var dragIdx = null;
+  $('picked').addEventListener('dragstart', function (e) {
+    var item = e.target.closest('.q-item');
+    if (!item) return;
+    dragIdx = parseInt(item.dataset.idx, 10);
+    item.classList.add('drag');
+  });
+  $('picked').addEventListener('dragend', function (e) {
+    var item = e.target.closest('.q-item');
+    if (item) item.classList.remove('drag');
+  });
+  $('picked').addEventListener('dragover', function (e) { e.preventDefault(); });
+  $('picked').addEventListener('drop', function (e) {
+    e.preventDefault();
+    var item = e.target.closest('.q-item');
+    if (!item || dragIdx === null) return;
+    var to = parseInt(item.dataset.idx, 10);
+    var moved = picked.splice(dragIdx, 1)[0];
+    picked.splice(to, 0, moved);
+    dragIdx = null;
+    renderPicked();
+  });
+
+  /* «Добрать N случайных по текущему фильтру» — сервер отдаёт готовые
+     строки, чтобы не тащить сюда второй запрос за текстами. */
+  $('btn-fill').addEventListener('click', function () {
+    var params = new URLSearchParams(location.search);
+    fetch('{% url "teacher:api_game_set_fill" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+      body: JSON.stringify({
+        mode: MODE, n: 5,
+        exclude: picked.map(function (p) { return p.id; }),
+        q: params.get('q') || '', topic: params.get('topic') || '',
+        source: params.get('source') || ''
+      })
+    }).then(function (r) { return r.json(); }).then(function (d) {
+      (d.questions || []).forEach(function (q) {
+        if (picked.length >= MAX) return;
+        if (picked.some(function (p) { return p.id === q.id; })) return;
+        picked.push(q);
+      });
+      renderPicked();
+    });
+  });
+
+  renderPicked();
+})();
+</script>
+{% endif %}
+{% endblock %}
