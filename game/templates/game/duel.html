@@ -30,7 +30,8 @@
   .du-btn.ghost { background: var(--surface); color: var(--text);
                   border-color: var(--border); }
   .du-btn[disabled] { opacity: .5; cursor: default; }
-  .du-share { margin-top: 14px; display: flex; gap: 8px; justify-content: center;
+  .du-note { margin-top: 8px; font-size: 13px; color: var(--text3); }
+.du-share { margin-top: 14px; display: flex; gap: 8px; justify-content: center;
               flex-wrap: wrap; align-items: center; }
   .du-share input {
     font: inherit; font-size: .85rem; padding: 7px 10px; min-width: 300px;
@@ -106,8 +107,12 @@
 
   <div class="du-share">
     <input type="text" id="link" value="{{ page_url }}" readonly>
-    <button class="du-btn ghost" id="copy">Скопировать ссылку</button>
+    <button class="du-btn ghost" id="copy">Скопировать ссылку-приглашение</button>
   </div>
+  {# Сказано ЗАРАНЕЕ, а не после нажатия «Играть»: соперник должен понимать
+     условие до того, как потратит на него время. #}
+  <p class="du-note">Принять вызов могут только вошедшие: дуэль сравнивает
+    двоих по имени.</p>
 
   {% if compare %}
     <div class="du-cols">
@@ -193,7 +198,7 @@ document.getElementById('copy').addEventListener('click', function () {
   var input = document.getElementById('link');
   var btn = this;
   function done() { btn.textContent = 'Скопировано ✓';
-                    setTimeout(function () { btn.textContent = 'Скопировать ссылку'; }, 2000); }
+                    setTimeout(function () { btn.textContent = 'Скопировать ссылку-приглашение'; }, 2000); }
   if (navigator.clipboard && navigator.clipboard.writeText) {
     navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
   } else { input.select(); document.execCommand('copy'); done(); }

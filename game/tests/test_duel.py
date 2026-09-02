@@ -37,6 +37,11 @@ def make_q(n, topic='Спрос и предложение', group='books'):
 class DuelCreationTests(TestCase):
     def setUp(self):
         self.qs = make_q(30)
+        # ⚠️ Дуэль теперь только для вошедших: она сравнивает двоих ПО
+        # ИМЕНИ, а у анонима имени нет и на доске он был бы «кто-то».
+        from problems.models import User
+        self.me = User.objects.create_user(username='duelist', password='p12345')
+        self.client.force_login(self.me)
 
     def test_new_duel_creates_a_set_and_sends_to_play(self):
         r = self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
@@ -75,6 +80,9 @@ class DuelSecrecyTests(TestCase):
 
     def setUp(self):
         self.qs = make_q(20)
+        from problems.models import User
+        self.client.force_login(
+            User.objects.create_user(username='duelist', password='p12345'))
         self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
         self.gset = GameSet.objects.get(kind='duel')
 
@@ -108,6 +116,9 @@ class DuelSecrecyTests(TestCase):
 class DuelFlowTests(TestCase):
     def setUp(self):
         self.qs = make_q(20)
+        from problems.models import User
+        self.me = User.objects.create_user(username='duelist', password='p12345')
+        self.client.force_login(self.me)
 
     def _play(self, client, code, wrong=0):
         """Сыграть дуэль до конца. wrong — сколько ответов сделать неверными."""
@@ -138,14 +149,21 @@ class DuelFlowTests(TestCase):
                                     args=[gset.code]))
         self.assertEqual(r.status_code, 409)
 
-    def test_comparison_is_computed_for_two_players(self):
+    def _logged(self, name):
+        """Отдельный вошедший клиент: дуэль сравнивает людей по имени."""
         from django.test import Client
-        author = Client()
+        from problems.models import User
+        c = Client()
+        c.force_login(User.objects.create_user(username=name, password='p12345'))
+        return c
+
+    def test_comparison_is_computed_for_two_players(self):
+        author = self._logged('avtor')
         author.get(reverse('game:duel_new'), {'mode': 'blitz'})
         gset = GameSet.objects.get(kind='duel')
         self._play(author, gset.code)              # автор — без ошибок
 
-        rival = Client()
+        rival = self._logged('sopernik')
         self._play(rival, gset.code, wrong=1)      # соперник ошибается
 
         page = rival.get(reverse('game:duel', args=[gset.code]))
@@ -157,8 +175,9 @@ class DuelFlowTests(TestCase):
         self.assertGreater(cmp_['a']['score'], cmp_['b']['score'])
 
     def test_third_player_appears_on_the_board(self):
-        from django.test import Client
-        a, b, c = Client(), Client(), Client()
+        a = self._logged('igrok_a')
+        b = self._logged('igrok_b')
+        c = self._logged('igrok_v')
         a.get(reverse('game:duel_new'), {'mode': 'blitz'})
         gset = GameSet.objects.get(kind='duel')
         for cl in (a, b, c):
@@ -216,3 +235,74 @@ class DuelPageTests(TestCase):
                              'dmin': 2, 'dmax': 4})
         self.assertIn('Эластичность', text)
         self.assertIn('2★', text)
+
+
+class DuelLoginBoundaryTests(TestCase):
+    u"""Дуэль — только для вошедших (решение владельца, фаза 7).
+
+    Отрицательные тесты: аноним не создаёт вызов и не принимает его.
+    Страница дуэли при этом ОТКРЫТА всем — по ссылке приходит соперник, и
+    первое, что он должен увидеть, это во что его зовут.
+    """
+
+    def setUp(self):
+        from problems.models import User
+        self.qs = make_q(20)
+        self.author = User.objects.create_user(username='avtor',
+                                               password='p12345')
+        self.client.force_login(self.author)
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        self.gset = GameSet.objects.get(kind='duel')
+        self.client.logout()
+
+    def test_anonymous_cannot_create_a_duel(self):
+        r = self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        self.assertIn(r.status_code, (302, 403), r.status_code)
+        self.assertEqual(GameSet.objects.filter(kind='duel').count(), 1)
+
+    def test_anonymous_cannot_accept_a_duel(self):
+        r = self.client.get(reverse('game:session_start_set',
+                                    args=[self.gset.code]))
+        self.assertEqual(r.status_code, 409)
+        self.assertIn('вошедшие', r.json()['error'])
+
+    def test_anonymous_still_sees_the_invitation_page(self):
+        u"""Страницу закрывать нельзя: соперник должен понять условие ДО
+        того, как потратит время на вход."""
+        r = self.client.get(reverse('game:duel', args=[self.gset.code]))
+        self.assertEqual(r.status_code, 200)
+        html = r.content.decode('utf-8')
+        self.assertIn('только вошедшие', html)
+        self.assertIn('Скопировать ссылку-приглашение', html)
+
+    def test_logged_in_player_can_accept(self):
+        from problems.models import User
+        rival = User.objects.create_user(username='sopernik', password='p12345')
+        self.client.force_login(rival)
+        d = self.client.get(reverse('game:session_start_set',
+                                    args=[self.gset.code])).json()
+        self.assertTrue(d.get('ok'), d)
+
+    def test_duel_run_is_unranked_but_lands_in_personal_stats(self):
+        u"""У дуэли своя доска; в общую таблицу её забег не идёт, но в
+        личной статистике игрока он есть — это его забег."""
+        from problems.models import User
+        from game.models import GameResult
+        rival = User.objects.create_user(username='sopernik2', password='p12345')
+        self.client.force_login(rival)
+        d = self.client.get(reverse('game:session_start_set',
+                                    args=[self.gset.code])).json()
+        qid = d['question']['id']
+        gq = GameQuestion.objects.get(id=qid)
+        self.client.post(reverse('game:answer'),
+                         json.dumps({'question_id': qid,
+                                     'choice': gq.correct_index}),
+                         content_type='application/json')
+        self.client.post(reverse('game:session_finish'),
+                         json.dumps({'reason': 'done'}),
+                         content_type='application/json')
+        r = GameResult.objects.filter(user=rival).first()
+        self.assertIsNotNone(r)
+        self.assertFalse(r.ranked)
+        self.assertEqual(r.unranked_reason, 'set_run')
+        self.assertEqual(r.user, rival)

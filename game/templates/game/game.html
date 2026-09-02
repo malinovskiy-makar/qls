@@ -1900,6 +1900,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <div class="filter-chips" id="filter-chips"></div>
       <p class="filter-note" id="filter-note"></p>
       {% if ranked_quota %}<p class="filter-note">{{ ranked_quota }}</p>{% endif %}
+      {# Скромная строка входов: сами карточки «Вызов дня» и «Бросить вызов»
+         стоят ниже, здесь — короткий путь для тех, кто уже знает, зачём. #}
+      <p class="filter-note"><a href="/game/daily/">Вызов дня</a> ·
+        <a href="/game/duel/new/">Дуэль с другом</a></p>
 
       </div><!-- /start-left -->
 
