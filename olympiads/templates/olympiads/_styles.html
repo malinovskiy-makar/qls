@@ -275,3 +275,43 @@
   font-size: 15px; line-height: var(--lh-body);
   max-width: var(--w-read);
 }
+
+/* ── Таблицы раздела ────────────────────────────────── */
+/* Обёртка со своей прокруткой и затенением края: страница целиком
+   горизонтально ехать не должна, а таблица льгот в 960 не влезает. */
+.ol-tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  background: var(--surface);
+  -webkit-mask-image: linear-gradient(to right, var(--fade-edge) 0, #000 14px,
+                      #000 calc(100% - 14px), var(--fade-edge) 100%);
+          mask-image: linear-gradient(to right, var(--fade-edge) 0, #000 14px,
+                      #000 calc(100% - 14px), var(--fade-edge) 100%);
+}
+.ol-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ol-table th, .ol-table td {
+  text-align: left; padding: 10px 14px; vertical-align: top;
+}
+.ol-table th {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  border-bottom: var(--line) solid var(--border);
+  white-space: nowrap;
+}
+.ol-table td { border-bottom: var(--line) solid var(--border-soft); }
+.ol-table tr:last-child td { border-bottom: 0; }
+.ol-table .ol-status { margin-top: 0; }
+.ol-checked { display: block; font-size: 11px; color: var(--text3); margin-top: 4px; }
+.ol-checked a { color: var(--accent-ink); }
+.ol-mute { color: var(--text3); }
+
+/* Предупреждение под таблицей — янтарь на информационной поверхности. */
+.ol-warn {
+  margin-top: 12px;
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 13px;
+  max-width: var(--w-read);
+}

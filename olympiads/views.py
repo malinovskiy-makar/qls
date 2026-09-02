@@ -3,6 +3,7 @@
 Раздел публичный и вход не требует — как каталог. Ничего не пишет: все
 четыре функции только читают.
 """
+from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 
 from . import services
@@ -51,9 +52,17 @@ def olympiad_detail(request, slug):
         slug=slug,
     )
     stages = list(olympiad.stages.all())
+    year = current_academic_year()
+    events = list(
+        olympiad.events.filter(academic_year=year)
+        .select_related('stage', 'source')
+        .order_by(F('stage__order').asc(nulls_first=True), 'date_start', 'kind')
+    )
     return render(request, 'olympiads/detail.html', {
         'olympiad': olympiad,
         'stages': stages,
+        'events': events,
+        'academic_year': year,
         'has_placeholder': _has_placeholder([olympiad]),
     })
 

@@ -51,4 +51,50 @@
   {% endif %}
 </section>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Ключевые даты</h2>
+  {% if events %}
+  <div class="ol-tablewrap">
+    <table class="ol-table">
+      <thead>
+        <tr><th>Этап</th><th>Когда</th><th>Статус</th><th>Как попасть</th></tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td>{% if event.stage %}{{ event.stage.name }}{% else %}{{ event.get_kind_display }}{% endif %}</td>
+          <td>{{ event.display_date }}</td>
+          <td>
+            <span class="ol-status ol-status--{{ event.date_status }}">
+              <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
+            </span>
+            {% if event.source %}
+            <span class="ol-checked">
+              {% if event.source.verified_at %}Проверено {{ event.source.verified_at|date:"j E Y" }}{% endif %}
+              <a href="{{ event.source.url }}" target="_blank" rel="noopener">источник</a>
+            </span>
+            {% endif %}
+          </td>
+          <td>{% if event.stage.how_to_qualify %}{{ event.stage.how_to_qualify }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="ol-empty">Даты сезона пока не объявлены.</p>
+  {% endif %}
+
+  <p class="ol-warn">
+    {% if olympiad.kind == 'vsosh' %}
+    Даты школьного и муниципального этапов устанавливает каждый регион и
+    муниципалитет отдельно, поэтому они различаются по стране. Точные числа
+    для своего региона уточняйте у регионального организатора — список ниже
+    на этой странице.
+    {% else %}
+    Даты могут измениться, проверяйте на официальном сайте.
+    {% endif %}
+  </p>
+</section>
+
 {% endblock %}
