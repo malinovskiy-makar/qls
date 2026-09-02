@@ -37,6 +37,8 @@ ProblemPart.answer. Если оба сигнала есть и расходят�
 Запуск: ./venv/bin/python manage.py build_game_pool
         (полная пересборка: пул очищается и наполняется заново)
 """
+import json
+import os
 import re
 
 from django.core.management.base import BaseCommand
@@ -218,11 +220,26 @@ def pool_dedup_wins(candidate, incumbent):
     return candidate.problem_id < incumbent.problem_id
 
 
+# Латинские двойники кириллических букв-меток. В ответах Сборника АА
+# встречается латинская «a» при кириллических метках «а, б, в, г»: на глаз
+# буквы неразличимы, а по коду это разные символы, и сопоставление рушилось.
+# Замер 2026-09-02: так терялись 6 задач АА («aг», «aбг», «a» дважды и др.),
+# причём каждая с виду выглядела правильной. Чиним извлекатель, а не
+# пропускаем задачу.
+# Только НЕОТЛИЧИМЫЕ на глаз пары. Похожие, но различимые («m» и «м»,
+# «h» и «н») сюда не входят: подменять их значило бы гадать.
+LATIN_LOOKALIKES = str.maketrans({
+    'a': 'а', 'e': 'е', 'o': 'о', 'c': 'с', 'p': 'р', 'x': 'х', 'y': 'у',
+})
+
+
 def normalize_label(s):
-    """Нормализация метки/ответа — 1-в-1 как в student.views.auto_check_submission."""
+    """Нормализация метки/ответа — 1-в-1 как в student.views.auto_check_submission,
+    плюс сведение латинских двойников к кириллице (см. LATIN_LOOKALIKES)."""
     if not s:
         return ''
-    return s.lower().strip().rstrip('.').rstrip(')').strip()
+    cleaned = s.lower().strip().rstrip('.').rstrip(')').strip()
+    return cleaned.translate(LATIN_LOOKALIKES)
 
 
 def clean_text(s):
@@ -558,6 +575,10 @@ class Command(BaseCommand):
         parser.add_argument(
             '--dry-run', action='store_true',
             help='ничего не писать: только посчитать и показать отчёт')
+        parser.add_argument(
+            '--audit-json', type=str, default='',
+            help='выгрузить судьбу каждого кандидата в JSON (id, источник, '
+                 'причина отказа) для разбора по источникам')
 
     def handle(self, *args, **options):
         dry = options.get('dry_run')
@@ -587,11 +608,23 @@ class Command(BaseCommand):
         debris_fixed = []    # (problem_id, текст до чистки) — аудит Бага 2
         tall_formula = []    # (problem_id, вопрос) — аудит Бага 1
 
+        # Судьба каждого кандидата: id -> (источник, тип, причина или None).
+        # Нужна, чтобы разбирать отсев ПО ИСТОЧНИКАМ, а не общим счётчиком:
+        # «правильный ответ не определён: 492» ничего не говорит о том, чей
+        # это источник и чинить ли извлекатель.
+        audit = {}
+        current = {'id': None, 'source': '', 'type': ''}
+
         def reject(reason):
             rejected[reason] = rejected.get(reason, 0) + 1
+            audit[current['id']] = (current['source'], current['type'], reason)
 
         for p in qs:
             qtype = GAME_TYPES[p.problem_type]
+            first = next(iter(p.source_references.all()), None)
+            current['id'] = p.id
+            current['source'] = first.source.name if first else ''
+            current['type'] = p.problem_type
             correct_index = None
             correct_indices = None
             correct_value = ''
@@ -670,12 +703,18 @@ class Command(BaseCommand):
             # итоговый кэш). Совпадение ключа → оставляем более свежий year,
             # при равенстве — меньший problem_id; проигравший считается в
             # duplicate_in_pool и не попадает в built.
+            audit[p.id] = (current['source'], current['type'], None)
             key = pool_dedup_key(qtype, question, opts, correct_value)
             incumbent = pool_by_key.get(key)
             if incumbent is not None:
                 duplicate_in_pool += 1
                 if pool_dedup_wins(gq, incumbent[0]):
+                    loser = incumbent[0].problem_id
                     pool_by_key[key] = (gq, raw_question)
+                else:
+                    loser = p.id
+                was = audit.get(loser, ('', '', None))
+                audit[loser] = (was[0], was[1], 'схлопнут повтор')
                 continue
             pool_by_key[key] = (gq, raw_question)
 
@@ -716,6 +755,18 @@ class Command(BaseCommand):
         self.stdout.write('Отсев по причинам:')
         for reason, n in sorted(rejected.items(), key=lambda kv: -kv[1]):
             self.stdout.write(f'  {reason}: {n}')
+
+        audit_path = options.get('audit_json')
+        if audit_path:
+            folder = os.path.dirname(audit_path)
+            if folder and not os.path.isdir(folder):
+                os.makedirs(folder)
+            with open(audit_path, 'w', encoding='utf-8') as fh:
+                json.dump({str(pid): {'source': row[0], 'type': row[1],
+                                      'reason': row[2]}
+                           for pid, row in audit.items()},
+                          fh, ensure_ascii=False)
+            self.stdout.write(f'Разбор судьбы кандидатов: {audit_path}')
 
         self.stdout.write('')
         self.stdout.write(self.style.WARNING(

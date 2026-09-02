@@ -178,7 +178,9 @@ class DisagreementTests(ClassifyTestTypesBase):
     u"""Расхождение сигналов не пишется никогда."""
 
     def test_source_type_unconfirmed_by_content_is_disputed(self):
-        final, _ = combine(T_ALL, T_ONE)
+        final, _ = combine(T_BOOL, T_ONE)
+        self.assertEqual(final, B_DISPUTED)
+        final, _ = combine(T_ONE, B_FULL_PROBLEM)
         self.assertEqual(final, B_DISPUTED)
 
     def test_content_type_against_source_is_disputed(self):
@@ -188,6 +190,18 @@ class DisagreementTests(ClassifyTestTypesBase):
     def test_agreement_is_written(self):
         final, _ = combine(T_BOOL, T_BOOL)
         self.assertEqual(final, T_BOOL)
+
+    def test_multichoice_with_single_correct_is_written_as_multi(self):
+        # Решение владельца: формат задаёт источник, один верный вариант
+        # в мультивыборе законен.
+        final, _ = combine(T_ALL, T_ONE)
+        self.assertEqual(final, T_ALL)
+
+    def test_reverse_direction_is_still_disputed(self):
+        # Обратное направление исключением не является: источник назвал
+        # одиночный выбор, а ответов несколько, и это противоречие.
+        final, _ = combine(T_ONE, T_ALL)
+        self.assertEqual(final, B_DISPUTED)
 
 
 class WriteAndRevertTests(ClassifyTestTypesBase):
@@ -207,16 +221,19 @@ class WriteAndRevertTests(ClassifyTestTypesBase):
             'w3',
             'Фирма на рынке.\n\nа) Выведите функцию.\nб) Найдите цену.\n',
             '7', solution='Решение третье.')
+        # Обратное направление исключения про мультивыбор: источник назвал
+        # одиночный выбор, а ответов оказалось два. Это противоречие, и
+        # запись не делается.
         self.disputed = self.make(
             'w4',
-            'Выберите все верные:\n\nВарианты ответа:\n\n'
+            'Что из перечисленного верно:\n\nВарианты ответа:\n\n'
             '1. первое\n2. второе\n3. третье',
-            '2. второе', solution='Решение четвёртое.')
+            '1. первое\n2. второе', solution='Решение четвёртое.')
         return {
             'w1': self.passport(True, 'single_choice'),
             'w2': self.passport(True, 'true_false'),
             'w3': self.passport(False, 'single_freetext'),
-            'w4': self.passport(True, 'multiple_choice'),
+            'w4': self.passport(True, 'single_choice'),
         }
 
     def analyse(self, raw):
