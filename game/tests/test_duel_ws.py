@@ -249,3 +249,41 @@ class AsgiWiringTests(TransactionTestCase):
 
     def test_http_keeps_django_and_adds_health(self):
         self.assertIn('http', application.application_mapping)
+
+
+class RematchTests(TransactionTestCase):
+    u"""Кнопка «Реванш» зовёт заново, а не переигрывает те же вопросы.
+
+    ⚠️ Набор собирается ЗАНОВО намеренно: играть второй раз те же вопросы
+    значило бы соревноваться в памяти, а не в экономике. `rematch` несёт
+    только понятное название, чтобы соперник по ссылке видел, во что зовут.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user('rem', password='x')
+        self.qs = [make_question() for _ in range(15)]
+
+    def test_rematch_makes_a_new_set_with_a_clear_title(self):
+        self.client.force_login(self.user)
+        first = self.client.get('/game/duel/new/?mode=blitz')
+        code = first.url.split('/s/')[1].split('/')[0]
+        old = GameSet.objects.get(code=code)
+        self.assertTrue(old.title.startswith('Дуэль'))
+
+        second = self.client.get('/game/duel/new/?mode=blitz&rematch=' + code)
+        new_code = second.url.split('/s/')[1].split('/')[0]
+        self.assertNotEqual(new_code, code)
+        fresh = GameSet.objects.get(code=new_code)
+        self.assertTrue(fresh.title.startswith('Реванш'),
+                        'реванш не назван реваншем: %s' % fresh.title)
+        # Вопросы собраны заново, а не скопированы.
+        self.assertEqual(len(fresh.question_ids), len(old.question_ids))
+
+    def test_unknown_rematch_code_is_ignored(self):
+        u"""Чужой или протухший код не роняет создание дуэли."""
+        self.client.force_login(self.user)
+        resp = self.client.get('/game/duel/new/?mode=blitz&rematch=NOSUCH99')
+        code = resp.url.split('/s/')[1].split('/')[0]
+        self.assertTrue(GameSet.objects.get(code=code).title
+                        .startswith('Дуэль'))

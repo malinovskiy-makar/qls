@@ -1646,9 +1646,18 @@ def duel_new(request):
         return render(request, 'game/duel_empty.html', {
             'mode_title': config.MODES[mode]['title']}, status=200)
     random.shuffle(ids)
+    # ⚠️ РЕВАНШ — ЭТО ЗАГОЛОВОК, А НЕ ОСОБЫЙ МЕХАНИЗМ. Набор всё равно
+    # собирается заново: играть второй раз ТЕ ЖЕ вопросы значило бы
+    # соревноваться в памяти, а не в экономике. Единственное, что несёт
+    # `rematch`, — понятное название, чтобы соперник по ссылке видел, во что
+    # его зовут. Несуществующий код молча игнорируется: это украшение.
+    rematch = (GameSet.objects.filter(
+        code=make_code_lookup(request.GET.get('rematch', '')), kind='duel')
+        .first() if request.GET.get('rematch') else None)
+    title = ('Реванш · %s' if rematch else 'Дуэль · %s')         % config.MODES[mode]['title']
     gset = GameSet.objects.create(
         code=make_result_code(), mode=mode, kind='duel',
-        title='Дуэль · %s' % config.MODES[mode]['title'],
+        title=title,
         author=request.user if request.user.is_authenticated else None,
         question_ids=ids[:config.DUEL_SIZE],
         filter_snapshot=run_filter, attempts_allowed=1)
