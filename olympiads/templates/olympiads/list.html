@@ -8,6 +8,21 @@
 
 {% include 'olympiads/_dates_feed.html' %}
 {% include 'olympiads/_filters.html' %}
+
+<div data-group="main">
+  <ul class="ol-grid" id="ol-grid-main">
+    {% for olympiad in main %}{% include 'olympiads/_card.html' %}{% endfor %}
+  </ul>
+</div>
+
+{% if related %}
+<div data-group="related">
+  <p class="ol-divider">Смежные направления</p>
+  <ul class="ol-grid" id="ol-grid-related">
+    {% for olympiad in related %}{% include 'olympiads/_card.html' %}{% endfor %}
+  </ul>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% endblock %}

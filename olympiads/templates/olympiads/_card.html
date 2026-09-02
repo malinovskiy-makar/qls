@@ -1,0 +1,53 @@
+{% comment %}
+Карточка олимпиады. data-tags читает клиентская фильтрация — запросов на
+сервер полоса чипов не делает.
+{% endcomment %}
+<li class="ol-card" data-tags="{{ olympiad.tags|join:' ' }}" style="view-transition-name: ol-card-{{ olympiad.slug }};">
+  <a class="ol-card-link" href="{% url 'olympiads:detail' olympiad.slug %}">
+    <div class="ol-card-top">
+      {% if olympiad.logo %}
+      <img class="ol-logo" src="{{ olympiad.logo.url }}" alt="" width="48" height="48">
+      {% else %}
+      {% comment %}
+      Место под логотип занято всегда: иначе карточки прыгнут в тот день,
+      когда логотипы появятся.
+      {% endcomment %}
+      <span class="ol-logo ol-logo--empty" aria-hidden="true">{{ olympiad.abbr }}</span>
+      {% endif %}
+      <div class="ol-card-names">
+        <span class="ol-card-name">{{ olympiad.name_full }}{% if olympiad.name_short and olympiad.name_short != olympiad.name_full %} ({{ olympiad.name_short }}){% endif %}</span>
+        <span class="ol-card-org">{{ olympiad.organizer }}</span>
+      </div>
+    </div>
+
+    {% if olympiad.tag_labels %}
+    <ul class="ol-card-tags">
+      {% for code, label in olympiad.tag_labels %}
+      <li class="ol-tag" data-tag="{{ code }}">{{ label }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+
+    <div class="ol-card-next">
+      {% with event=olympiad.next_event %}
+      {% if event %}
+        <span class="ol-card-next-what">{{ event.get_kind_display }}</span>
+        <span class="ol-card-next-when">{{ event.display_date }}</span>
+        <span class="ol-status ol-status--{{ event.date_status }}">
+          <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
+        </span>
+      {% else %}
+        <span class="ol-card-next-none">Даты сезона пока не объявлены</span>
+      {% endif %}
+      {% endwith %}
+    </div>
+
+    <div class="ol-card-foot">
+      {% if olympiad.problem_count or olympiad.variant_count %}
+        {{ olympiad.problem_count }} задач · {{ olympiad.variant_count }} вариантов
+      {% else %}
+        Задания пока не размечены
+      {% endif %}
+    </div>
+  </a>
+</li>
