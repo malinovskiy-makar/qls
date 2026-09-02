@@ -31,5 +31,9 @@ urlpatterns = [
     path('api/answer/', views.api_answer, name='answer'),
     # Живые счётчики окна фильтров: сколько вопросов даст каждый режим.
     path('api/pool_counts/', views.api_pool_counts, name='pool_counts'),
+    # Доска лидеров: публичная (её смысл в том, чтобы её видели все).
+    path('api/leaderboard/', views.api_leaderboard, name='leaderboard'),
+    # Личная статистика: только своя, аноним сюда не проходит.
+    path('api/me/stats/', views.api_my_stats, name='my_stats'),
     path('api/session/finish/', views.api_session_finish, name='session_finish'),
 ]

@@ -539,6 +539,130 @@ a:focus-visible, button:focus-visible {
 }
 .btn-board:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 
+/* ── Правая колонка: доска лидеров и своя статистика ──────────────
+   ⚠️ ДВЕ КОЛОНКИ ТОЛЬКО ОТ 1100px. Уже — доска уезжает ПОД режимы, а не
+   ужимается: сжатая таблица из пяти столбцов не читается ни на телефоне,
+   ни на планшете, а выбирают на этом экране всё-таки режим. */
+.start-cols {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: start;
+  text-align: left;
+}
+@media (min-width: 1100px) {
+  .start-cols { grid-template-columns: minmax(0, 1fr) 380px; }
+  /* ⚠️ ШИРЕ СТАНОВИТСЯ ВНЕШНЯЯ ОБЁРТКА, А НЕ ТОЛЬКО .col. Настоящий
+     потолок держит `.rush-wrap` (880px), и правка одного `.col` ничего не
+     меняла: замер показал ширину 840 при max-width 1280. При 880px доска
+     отъедала 380, и на карточки режимов оставалось по двести пикселей —
+     подпись «Данетки: Верно или Неверно» ломалась на две строки.
+     ⚠️ Игровой и финальный экраны при этом НЕ разъезжаются: они держат
+     свою ширину сами (`#screen-play .scene` и `#screen-final .final` —
+     по 760px). Поэтому обёртку можно расширить безусловно, без `:has()`
+     и без второго класса на body. */
+  .rush-wrap { max-width: 1320px; }
+  #screen-start .col { max-width: 1280px; }
+}
+.start-left { min-width: 0; }
+.start-right { display: flex; flex-direction: column; gap: 16px; }
+
+.lb-card {
+  border: 1px solid var(--rush-border);
+  border-radius: 16px;
+  background: var(--rush-surface);
+  padding: 16px;
+}
+.lb-head {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 16px; font-weight: 800; margin-bottom: 12px;
+}
+/* Вкладки режимов и сегменты показателей — по канону 3.8/3.9. */
+.lb-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+.lb-tab {
+  font: inherit; font-size: 13px; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 6px 10px; border-radius: 9px;
+  border: 1px solid transparent; background: none;
+  color: var(--text2); cursor: pointer;
+}
+.lb-tab .qi { width: 14px; height: 14px; }
+.lb-tab:hover { color: var(--rush-accent); }
+.lb-tab[aria-selected="true"] {
+  background: var(--rush-accent-tint);
+  border-color: var(--rush-accent);
+  color: var(--rush-accent);
+}
+.lb-seg {
+  display: inline-flex; border: 1px solid var(--rush-border);
+  border-radius: 9px; overflow: hidden; margin-bottom: 10px;
+}
+.lb-seg + .lb-seg { margin-left: 8px; }
+.lb-seg button {
+  font: inherit; font-size: 13px; font-weight: 600;
+  padding: 6px 12px; border: none; background: none;
+  color: var(--text2); cursor: pointer;
+}
+.lb-seg button[aria-pressed="true"] {
+  background: var(--rush-accent); color: var(--act-ink-solid);
+}
+
+.lb-rows { display: flex; flex-direction: column; }
+.lb-row {
+  display: grid;
+  grid-template-columns: 26px 1fr auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+.lb-row .pl { color: var(--text3); font-variant-numeric: tabular-nums; }
+.lb-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lb-row .vl { font-weight: 700; font-variant-numeric: tabular-nums; }
+.lb-row .dt { grid-column: 2 / -1; font-size: 12px; color: var(--text3); }
+/* Первые три места — тинтом из набора, сырого hex тут нет. */
+.lb-row.p1 { background: var(--amber-tint); }
+.lb-row.p2, .lb-row.p3 { background: var(--surface-2); }
+.lb-row.me { background: var(--accent-tint); font-weight: 600; }
+/* Своя строка, пришпиленная под таблицей, когда игрок вне двадцатки. */
+.lb-pinned { margin-top: 8px; border-top: 1px dashed var(--rush-border);
+             padding-top: 8px; }
+.lb-empty { font-size: 14px; color: var(--text3); padding: 14px 4px; }
+
+/* Знак вопроса и его подсказка — те же значения, что в общем наборе
+   (`templates/_kit.html`). Целиком набор сюда не тащим: страница игры
+   живёт на своём слое --rush-*, и половина его правил спорила бы с ним. */
+.k-hintmark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 15px; height: 15px; flex-shrink: 0;
+  border: 1px solid var(--border); border-radius: 50%;
+  font-size: 13px; font-weight: 700; line-height: 1;
+  color: var(--text3); background: var(--surface-2);
+  vertical-align: middle; margin-left: 5px; cursor: help;
+}
+.k-hintmark:hover { color: var(--text2); border-color: var(--text3); }
+.k-hintmark:focus-visible { outline: 2px solid var(--rush-accent);
+                            outline-offset: 2px; }
+.k-tip {
+  position: fixed; z-index: 900; max-width: 300px;
+  padding: 8px 11px; border-radius: 8px;
+  border: 1px solid var(--rush-border); background: var(--surface-2);
+  color: var(--text); font-size: 13px; line-height: 1.45;
+  box-shadow: var(--shadow-pop);
+  pointer-events: none; white-space: normal; text-align: left;
+  font-weight: 400; letter-spacing: 0;
+}
+.k-tip[hidden] { display: none; }
+.lb-foot { margin-top: 10px; font-size: 13px; color: var(--text3); }
+.lb-foot a { color: var(--accent-ink); }
+
+.ms-rows { display: flex; flex-direction: column; gap: 7px; }
+.ms-row { display: flex; justify-content: space-between; gap: 12px;
+          font-size: 14px; }
+.ms-row span { color: var(--text2); }
+.ms-row b { font-variant-numeric: tabular-nums; }
+
 /* ── Нижний ряд входов ──────────────────────────────────────────── */
 .entry-row {
   margin-top: 22px;
@@ -1759,6 +1883,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <p class="rush-count"><b>{{ pool_total }}</b> вопросов из реальных олимпиад</p>
       </header>
 
+      <div class="start-cols">
+      <div class="start-left">
       <div class="mode-grid" id="mode-grid"></div>
 
       <!-- Сервер честно отказался начинать забег (режим за флагом или
@@ -1774,6 +1900,40 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <div class="filter-chips" id="filter-chips"></div>
       <p class="filter-note" id="filter-note"></p>
       {% if ranked_quota %}<p class="filter-note">{{ ranked_quota }}</p>{% endif %}
+
+      </div><!-- /start-left -->
+
+      <aside class="start-right">
+        <section class="lb-card" id="lb-card">
+          <div class="lb-head">
+            Лидерборд
+            {% include '_hint.html' with hint='Как сравниваются разные забеги. У каждого вопроса есть сложность от 1 до 5 звёзд, и она уточняется по ответам всех игроков. Очки за верный ответ растут со сложностью (от 20 за одну звезду до 250 за пять), за скорость ответа и за серию верных подряд. Забег без фильтров получает ×1,3, точность ниже 85 % уменьшает итог, а забег с фильтром по сложности – тренировочный и в таблицу не попадает. Поэтому в таблице сравнивается умение, а не удачная выборка вопросов.' %}
+          </div>
+          <div class="lb-tabs" id="lb-modes" role="tablist"></div>
+          <div>
+            <span class="lb-seg" id="lb-period" role="group" aria-label="Окно">
+              <button type="button" data-period="week" aria-pressed="false">Неделя</button>
+              <button type="button" data-period="all" aria-pressed="true">Всё время</button>
+            </span>
+            <span class="lb-seg" id="lb-metric" role="group" aria-label="Показатель">
+              <button type="button" data-metric="score" aria-pressed="true">Очки</button>
+              <button type="button" data-metric="correct" aria-pressed="false">Верных</button>
+              <button type="button" data-metric="speed" aria-pressed="false">Скорость</button>
+            </span>
+          </div>
+          <div class="lb-rows" id="lb-rows"></div>
+          <div id="lb-pinned"></div>
+          <p class="lb-foot" id="lb-foot"></p>
+        </section>
+
+        {% if request.user.is_authenticated %}
+        <section class="lb-card" id="ms-card">
+          <div class="lb-head">Моя статистика</div>
+          <div class="ms-rows" id="ms-rows"></div>
+        </section>
+        {% endif %}
+      </aside>
+      </div><!-- /start-cols -->
 
       <!-- Нижний ряд входов -->
       <div class="entry-row" id="entry-row">
@@ -2012,6 +2172,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 </div>
 
 {% include '_icons.html' %}
+{% include '_hint_js.html' %}
 <div class="vignette" id="vignette"></div>
 <!-- ОКНО «ВСЕ ФИЛЬТРЫ».
      Разложено как в умном каталоге: слева то, что задаёт КОРПУС (тема,
@@ -3097,6 +3258,197 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function multText(m) {
     return (Math.round(m * 100) / 100).toLocaleString('ru-RU');
   }
+
+  /* ═══ ДОСКА ЛИДЕРОВ И СВОЯ СТАТИСТИКА ════════════════════════════════
+     ⚠️ В ТАБЛИЦЕ ЛИЧНЫЕ РЕКОРДЫ, а не суммы: иначе выигрывал бы тот, кто
+     больше сыграл, а не тот, кто лучше. Считает всё сервер, клиент рисует.
+
+     Первая вкладка приходит вместе со страницей (CFG.leaderboard) — иначе
+     доска показывает пустоту и через полсекунды дёргается. */
+  var LB = {
+    mode: (CFG.leaderboard || {}).mode || CFG.default_mode,
+    period: (CFG.leaderboard || {}).period || 'all',
+    metric: (CFG.leaderboard || {}).metric || 'score'
+  };
+  var METRIC_UNIT = { score: '', correct: '', speed: 'мс' };
+
+  function lbValue(metric, v) {
+    if (v == null) return '–';
+    if (metric === 'speed') {
+      // Среднее время читается секундами: «3,2 с» понятнее, чем «3200 мс».
+      return (v / 1000).toLocaleString('ru-RU',
+        { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' с';
+    }
+    return v.toLocaleString('ru-RU');
+  }
+
+  function lbDate(iso) {
+    if (!iso) return '';
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    return d.toLocaleDateString('ru-RU',
+      { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function lbRowNode(r, pinned) {
+    var row = document.createElement('div');
+    row.className = 'lb-row'
+      + (r.place <= 3 && !pinned ? ' p' + r.place : '')
+      + (r.is_me ? ' me' : '');
+    var pl = document.createElement('span');
+    pl.className = 'pl';
+    pl.textContent = r.place;
+    var nm = document.createElement('span');
+    nm.className = 'nm';
+    nm.textContent = r.username;      // textContent: имя пришло от человека
+    var vl = document.createElement('span');
+    vl.className = 'vl';
+    vl.textContent = lbValue(LB.metric, r.value);
+    var dt = document.createElement('span');
+    dt.className = 'dt';
+    dt.textContent = lbDate(r.achieved_at);
+    row.appendChild(pl); row.appendChild(nm); row.appendChild(vl);
+    row.appendChild(dt);
+    return row;
+  }
+
+  function paintBoard(d) {
+    var box = $('lb-rows');
+    var pin = $('lb-pinned');
+    var foot = $('lb-foot');
+    box.innerHTML = '';
+    pin.innerHTML = '';
+    if (!d.rows || !d.rows.length) {
+      var em = document.createElement('p');
+      em.className = 'lb-empty';
+      em.textContent = 'Пока никого. Сыграйте зачётный забег.';
+      box.appendChild(em);
+    } else {
+      d.rows.forEach(function (r) { box.appendChild(lbRowNode(r)); });
+    }
+    // Свою строку пришпиливаем внизу, только если её нет в верхушке.
+    if (d.me && !(d.rows || []).some(function (r) { return r.is_me; })) {
+      var wrap = document.createElement('div');
+      wrap.className = 'lb-pinned';
+      wrap.appendChild(lbRowNode(d.me, true));
+      pin.appendChild(wrap);
+    }
+    if (!CFG.is_authenticated) {
+      foot.innerHTML = '';
+      foot.appendChild(document.createTextNode('Войдите, чтобы попасть в таблицу: '));
+      var a = document.createElement('a');
+      a.href = '/login/';
+      a.textContent = 'вход';
+      foot.appendChild(a);
+    } else {
+      foot.textContent = d.total_players
+        ? 'Игроков в таблице: ' + d.total_players.toLocaleString('ru-RU') : '';
+    }
+  }
+
+  function loadBoard() {
+    api('/game/api/leaderboard/?mode=' + encodeURIComponent(LB.mode)
+        + '&period=' + LB.period + '&metric=' + LB.metric)
+      .then(paintBoard)
+      .catch(function () { /* доска не критична для игры */ });
+  }
+
+  function paintBoardControls() {
+    var tabs = $('lb-modes');
+    tabs.innerHTML = '';
+    visibleModes().forEach(function (key) {
+      var m = CFG.modes[key];
+      var meta = MODE_META[key] || {};
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'lb-tab';
+      b.setAttribute('role', 'tab');
+      b.setAttribute('aria-selected', key === LB.mode ? 'true' : 'false');
+      b.dataset.mode = key;
+      b.innerHTML = (ICONS[meta.icon] || '');
+      b.appendChild(document.createTextNode(m.title));
+      tabs.appendChild(b);
+    });
+    $('lb-period').querySelectorAll('button').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.period === LB.period ? 'true' : 'false');
+    });
+    $('lb-metric').querySelectorAll('button').forEach(function (b) {
+      b.setAttribute('aria-pressed', b.dataset.metric === LB.metric ? 'true' : 'false');
+    });
+  }
+
+  if ($('lb-card')) {
+    paintBoardControls();
+    paintBoard(CFG.leaderboard || { rows: [] });
+    $('lb-modes').addEventListener('click', function (e) {
+      var b = e.target.closest('.lb-tab');
+      if (!b) return;
+      LB.mode = b.dataset.mode;
+      paintBoardControls(); loadBoard(); loadMyStats();
+    });
+    $('lb-period').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      LB.period = b.dataset.period;
+      paintBoardControls(); loadBoard();
+    });
+    $('lb-metric').addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      LB.metric = b.dataset.metric;
+      paintBoardControls(); loadBoard();
+    });
+  }
+
+  /* Своя статистика: видна ТОЛЬКО вошедшему, и блок для анонима вообще не
+     рендерится сервером — просить его нечего. */
+  function msRow(label, value) {
+    var row = document.createElement('div');
+    row.className = 'ms-row';
+    var s1 = document.createElement('span');
+    s1.textContent = label;
+    var b = document.createElement('b');
+    b.textContent = value;
+    row.appendChild(s1); row.appendChild(b);
+    return row;
+  }
+
+  function loadMyStats() {
+    var box = $('ms-rows');
+    if (!box) return;
+    api('/game/api/me/stats/?mode=' + encodeURIComponent(LB.mode))
+      .then(function (d) {
+        var st = d.stats || {};
+        box.innerHTML = '';
+        if (!st.runs) {
+          var em = document.createElement('p');
+          em.className = 'lb-empty';
+          em.textContent = 'В этом режиме вы ещё не играли.';
+          box.appendChild(em);
+          return;
+        }
+        box.appendChild(msRow('Забегов', st.runs.toLocaleString('ru-RU')));
+        box.appendChild(msRow('Лучший счёт',
+          st.best_score.toLocaleString('ru-RU')
+          + (st.best_score_at ? ' · ' + lbDate(st.best_score_at) : '')));
+        box.appendChild(msRow('Больше всего верных за забег',
+                              st.best_correct.toLocaleString('ru-RU')));
+        box.appendChild(msRow('Средняя точность', st.accuracy + ' %'));
+        box.appendChild(msRow('Среднее время верного',
+          st.avg_correct_ms
+            ? (st.avg_correct_ms / 1000).toLocaleString('ru-RU',
+                { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + ' с'
+            : '–'));
+        box.appendChild(msRow('Всего верных',
+                              st.correct_total.toLocaleString('ru-RU')));
+        if (st.place) {
+          box.appendChild(msRow('Моё место (очки, всё время)',
+            st.place + ' из ' + st.total_players));
+        }
+      })
+      .catch(function () { /* статистика не критична для игры */ });
+  }
+  loadMyStats();
 
   /* ---------- ВОПРОСЫ ---------- */
   function showQuestion(q) {

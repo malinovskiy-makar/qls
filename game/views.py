@@ -28,6 +28,7 @@ from urllib.parse import quote
 
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
+from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError
 from django.db.models import Q
 from django.http import Http404, JsonResponse
@@ -44,7 +45,8 @@ from . import sources as game_sources
 from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
-from . import config, filters as game_filters, scoring, stats as stats_mod
+from . import (config, filters as game_filters, leaderboard as lb,
+               scoring, stats as stats_mod)
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
@@ -350,6 +352,51 @@ def topic_counts():
 
 
 @require_GET
+def api_leaderboard(request):
+    u"""Доска лидеров: топ-20 плюс строка «я».
+
+    ⚠️ ЭНДПОИНТ ПУБЛИЧНЫЙ ОСОЗНАННО. Таблицу видно всем, включая анонимов, —
+    в этом её смысл (решение владельца). Наружу уходит ровно то, что доска
+    и обещает: имя, значение, дата. Внутренних идентификаторов, почты и
+    любых других полей профиля в выдаче НЕТ.
+    """
+    mode = request.GET.get('mode') or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        mode = config.DEFAULT_MODE
+    period = request.GET.get('period')
+    period = period if period in lb.PERIODS else 'all'
+    metric = request.GET.get('metric')
+    metric = metric if metric in lb.METRICS else 'score'
+    user = request.user if request.user.is_authenticated else None
+    return JsonResponse({
+        'mode': mode, 'period': period, 'metric': metric,
+        # ⚠️ Пометка «это я» ставится ПОСЛЕ кэша: сами строки общие на всех.
+        'rows': lb.mark_me(lb.top(mode, period, metric), user),
+        # ⚠️ Строка «я» считается живым запросом и в кэш не кладётся: попади
+        # она в общий ключ — один игрок увидел бы чужое место как своё.
+        'me': lb.my_row(user, mode, period, metric),
+        'total_players': lb.total_players(mode, period, metric),
+        'generated_at': timezone.now().isoformat(timespec='seconds'),
+    })
+
+
+@login_required
+@require_GET
+def api_my_stats(request):
+    u"""Личная статистика игрока. ВИДНА ТОЛЬКО ЕМУ САМОМУ.
+
+    ⚠️ ПОЛЬЗОВАТЕЛЬ БЕРЁТСЯ ИЗ `request.user` И БОЛЬШЕ НИОТКУДА. Параметра
+    «чей» здесь нет и не будет: он немедленно превратил бы личную статистику
+    в публичную по перебору номеров. Аноним сюда не проходит вовсе.
+    """
+    mode = request.GET.get('mode') or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        mode = config.DEFAULT_MODE
+    return JsonResponse({'mode': mode,
+                         'stats': lb.personal_stats(request.user, mode)})
+
+
+@require_GET
 def api_pool_counts(request):
     u"""Живые счётчики окна фильтров: «Пуля N · Блиц N · Рапид N · Классика N».
 
@@ -485,6 +532,22 @@ def _game_page_context(request):
             'has_daily': HAS_DAILY,
             'has_duel': HAS_DUEL,
             'min_playable': config.MIN_PLAYABLE,
+            # ⚠️ ПЕРВАЯ ВКЛАДКА ДОСКИ ЕДЕТ ВМЕСТЕ СО СТРАНИЦЕЙ. Иначе экран
+            # показывает пустую таблицу и через полсекунды дёргается — а
+            # доска стоит на первом экране, это первое, что видит человек.
+            'leaderboard': {
+                'mode': config.DEFAULT_MODE, 'period': 'all',
+                'metric': 'score',
+                'rows': lb.mark_me(
+                    lb.top(config.DEFAULT_MODE, 'all', 'score'),
+                    request.user if request.user.is_authenticated else None),
+                'me': lb.my_row(
+                    request.user if request.user.is_authenticated else None,
+                    config.DEFAULT_MODE, 'all', 'score'),
+                'total_players': lb.total_players(config.DEFAULT_MODE, 'all',
+                                                  'score'),
+            },
+            'is_authenticated': request.user.is_authenticated,
             'pool_tags': pool_tags(),
             'topic_counts': topic_counts(),
         }),
