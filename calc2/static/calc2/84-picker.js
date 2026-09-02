@@ -22,6 +22,12 @@ function loadScene(name) {
   // Каскад вмешательства возвращается к началу: потоварный вид, продавец.
   // Иначе НДС, акциз или «платит покупатель» протекают из прошлой сцены.
   STATE.taxForm = 'unit'; STATE.subKind = 'unit'; STATE.taxSide = 'seller';
+  /* Сюжет «второй сегмент — это мировой рынок» тоже протекал: его ставит только
+     «Монополист и внешний рынок», а снять было некому, и «Дискриминация 3-й
+     степени», открытая следом, доставалась с подписями про Pw. Пока обе сцены
+     рисовали по два мини-графика, это было видно лишь в словах; теперь у них
+     разная КОМПОНОВКА (один график против двух), и молчать об этом нельзя. */
+  STATE.d3World = false;
   STATE.quota = 0; STATE.quotaPos = 0.5; STATE.qt = null;
   ['quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const qv = document.getElementById('quota-val'); if (qv) qv.textContent = '0';

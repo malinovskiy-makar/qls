@@ -1156,39 +1156,167 @@ function drawMiniMarket(gx0, gx1, title, D, qi, Pi, mcCurve, idx) {
 // Полная перерисовка дискриминации 3-й степени: два мини-графика бок о бок.
 function redrawDiscr3() {
   recomputeDiscr3();
+  /* «Монополист и внешний рынок» — не два рынка, а ОДИН график: см.
+     drawMonoExport ниже. Два мини-графика остаются у настоящей
+     дискриминации 3-й степени, где рынка действительно два. */
+  if (STATE.d3World) { drawMonoExport(); return; }
   svg.selectAll('*').remove();
   addDefs();
   const d = STATE.discr3;
   // Левая панель начинается ПОСЛЕ дока (56px), иначе её ось и цифры уходят под него.
   const gxLeft = 64, midX = gxLeft + (W - gxLeft) / 2;
-  if (!d || (!d.found && !d.unbounded)) {
+  if (!d || !d.found) {
     drawGrid(); drawAxes();
     updateDiscr3Panel();
     return;
   }
-  /* Неограниченный экспорт — тоже ответ, и рисуется он ДВУМЯ панелями, как
-     обычный случай. Прежний ранний выход рисовал пустую сетку на весь холст:
-     текст в панели был, а на экране одно пустое поле вместо двух. */
-  if (!d.found) {
-    clearPanels();
-    drawMiniMarket(gxLeft, midX, 'Внутренний рынок', d.c1, d.unbounded.q1, d.unbounded.P1, d.cm, 1);
-    drawMiniMarket(midX, W, 'Экспорт по мировой цене', d.c2, null, null, d.cm, 2);
-    svg.append('line').attr('x1', midX).attr('y1', 52).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
-    haloText(svg.append('g'), (midX + W - 18) / 2, H / 2, 'Объём экспорта не ограничен', 'middle', 'middle')
-      .attr('fill', COL.inkSoft).attr('font-weight', 600);
+  // Панели здесь свои: 'main' на весь холст, заведённая makeScales, тут лишняя.
+  clearPanels();
+  drawMiniMarket(gxLeft, midX, 'Рынок 1', d.c1, d.q1, d.P1, d.cm, 1);
+  drawMiniMarket(midX, W, 'Рынок 2', d.c2, d.q2, d.P2, d.cm, 2);
+  // Разделитель между панелями.
+  svg.append('line').attr('x1', midX).attr('y1', 52).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
+  updateDiscr3Panel();
+}
+
+/* --- Монополист и внешний рынок: ОДИН график на общий выпуск --- */
+
+/* ⚠️ ЗДЕСЬ ОДИН ГРАФИК, А НЕ ДВА, И ЭТО РЕШЕНИЕ О СМЫСЛЕ, А НЕ ЭКОНОМИЯ МЕСТА.
+
+   Мировая цена работает сразу в ДВУХ ролях: она предельный доход от каждой
+   вывезенной единицы (поэтому дома продают ровно столько, что MR внутри = Pw)
+   и она же ориентир, до которого фирма наращивает ОБЩИЙ выпуск (поэтому
+   MC = Pw). Обе роли — про одну и ту же горизонталь, и увидеть это можно
+   только тогда, когда обе точки стоят на ОДНОЙ оси Q. У двух панелей оси Q
+   разные: общий выпуск на них не читается вовсе, а экспорт приходилось
+   считать в уме как разность двух чисел с разных картинок.
+
+   ⚠️ Дискриминации 3-й степени это НЕ касается: там два разных рынка со своими
+   спросами, общей у них только MC, и две панели остаются (drawMiniMarket).
+
+   Панель у сцены одна — 'main', та самая, что заводит makeScales. Поэтому
+   точки, площади, ключевые точки и колесо мыши работают общим механизмом, и
+   clearPanels() здесь не зовётся ([ADR 0054]). */
+function drawMonoExport() {
+  const d = STATE.discr3;
+  if (!d || (!d.found && !d.unbounded)) {
+    svg.selectAll('*').remove();
+    addDefs(); drawGrid(); drawAxes();
     updateDiscr3Panel();
     return;
   }
-  // Фаза 4г: в сюжете «монополист и мировой рынок» те же два мини-графика подписаны
-  // как внутренний рынок и экспорт по мировой цене (математика та же, discr3).
-  const t1 = STATE.d3World ? 'Внутренний рынок' : 'Рынок 1';
-  const t2 = STATE.d3World ? 'Экспорт по мировой цене' : 'Рынок 2';
-  // Панели здесь свои: 'main' на весь холст, заведённая makeScales, тут лишняя.
-  clearPanels();
-  drawMiniMarket(gxLeft, midX, t1, d.c1, d.q1, d.P1, d.cm, 1);
-  drawMiniMarket(midX, W, t2, d.c2, d.q2, d.P2, d.cm, 2);
-  // Разделитель между панелями.
-  svg.append('line').attr('x1', midX).attr('y1', 52).attr('x2', midX).attr('y2', H - 30).attr('stroke', COL.grid).attr('stroke-width', 1);
+  const u = d.unbounded;
+  // Мировая цена — уровень горизонтального «спроса» второго сегмента. Спрашиваем
+  // его в нуле: при нулевом экспорте (вывозить невыгодно) q₂ = 0, и брать
+  // значение в точке q₂ было бы тем же самым числом окольным путём.
+  const Pw = d.found ? evalCurve(d.c2, 0) : u.Pw;
+  const q1 = d.found ? d.q1 : u.q1;
+  const P1 = d.found ? d.P1 : u.P1;
+  const Qtot = d.found ? d.Qtot : null;
+  /* Экспорт есть только тогда, когда общий выпуск больше внутреннего. Мировая
+     цена ниже предельных издержек в оптимуме — вывозить невыгодно, и фирма
+     ведёт себя как обычный монополист внутри страны. Отрицательного экспорта
+     не бывает: q₂ = Qtot − q₁, и решатель отдаёт весь выпуск дому сам. */
+  const hasExport = (Qtot != null && Qtot > q1 + 1e-6);
+
+  /* Окно сцена подбирает САМА: мировая цена бывает выше резервной цены
+     покупателя, а общий выпуск — дальше конца внутреннего спроса, и в кадр
+     до ста ни то ни другое не помещается. Общий проход такой кадр пропускает
+     (_sceneRangedFrame), см. правило «окно расширяется, но не сжимается». */
+  const dEnd = curveZeroQ(d.c1, Math.max(CONFIG.Qmax, 1) * 4);
+  const dTop = evalCurve(d.c1, 0);
+  const qWant = Math.max(dEnd || 0, q1 || 0, Qtot || 0);
+  const pWant = Math.max(isFinite(dTop) ? dTop : 0, isFinite(Pw) ? Pw : 0);
+  applyAutoRanges(padMax(qWant), padMax(pWant));
+  makeScales();          // applyAutoRanges мог сдвинуть границы — шкалы заново
+
+  svg.selectAll('*').remove();
+  addDefs(); drawGrid(); drawAxes();
+  const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+  const line = d3.line().defined(p => p !== null).x(p => sx(p[0])).y(p => sy(p[1]));
+  const sample = (f) => {
+    const o = [];
+    for (let i = 0; i <= 400; i++) {
+      const q = CONFIG.Qmax * i / 400, v = f(q);
+      o.push((isNaN(v) || v < 0) ? null : [q, v]);
+    }
+    return o;
+  };
+  // Внутренний спрос.
+  g.append('path').datum(sample(q => evalCurve(d.c1, q)))
+    .attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
+  // Предельный доход внутреннего рынка — пунктиром, как в обычной монополии;
+  // продолжение ниже оси Q дорисовывает общий помощник.
+  drawMarginalCurve(g, q => marginalRevenue(d.c1, q), d.c1, COL.MR, { width: 2 });
+  // Предельные издержки от ОБЩЕГО выпуска — они и связывают два рынка в один.
+  g.append('path').datum(sample(q => evalCurve(d.cm, q)))
+    .attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
+
+  // Мировая цена — горизонталь через весь кадр, цветом регулятора: та же роль
+  // и тот же вид, что у линии Pw в малой открытой экономике.
+  const ox = sx(0), oy = sy(0), xMax = sx(CONFIG.Qmax), yPw = sy(Pw);
+  const gl = svg.append('g');
+  gl.append('line').attr('x1', ox).attr('y1', yPw).attr('x2', xMax).attr('y2', yPw)
+    .attr('stroke', COL.reg).attr('stroke-width', 2.5);
+  axisValueY(gl, ox, yPw, fmt(Pw), 'w');
+  // Подписи линий — общим помощником: он же разводит их у края кадра.
+  labelCurve(gl, q => evalCurve(d.c1, q), 'D', COL.D, { key: 'mx-d' });
+  labelCurve(gl, q => marginalRevenue(d.c1, q), 'MR', COL.MR, { key: 'mx-mr', below: true });
+  labelCurve(gl, q => evalCurve(d.cm, q), 'MC', COL.S, { key: 'mx-mc' });
+  labelCurve(gl, () => Pw, 'P_w', COL.reg, { key: 'mx-pw', below: true });
+
+  const og = svg.append('g');
+  const dash = (x1, y1, x2, y2) => og.append('line')
+    .attr('x1', x1).attr('y1', y1).attr('x2', x2).attr('y2', y2)
+    .attr('stroke', COL.inkSoft).attr('stroke-width', 1).attr('stroke-dasharray', '4 3');
+
+  /* Отметка 1: внутренний оптимум (q₁; P₁) — с пунктиром к ОБЕИМ осям, как
+     точка M в обычной монополии. Пунктир к двум осям и есть то, по чему
+     точку узнаёт и человек, и механизм ключевых точек ([ADR 0055]). */
+  if (isFinite(q1) && q1 > 1e-9 && isFinite(P1)) {
+    const [px, py] = toPx(q1, P1);
+    dash(px, py, px, oy); dash(px, py, ox, py);
+    /* Маленькая точка на вертикали — там, где предельный доход внутреннего
+       рынка сравнялся с альтернативой. Экспорт есть — она ложится ровно на
+       линию мировой цены (MR = Pw); экспорта нет — на MC, и это обычное
+       MR = MC закрытой монополии. Уровень спрашиваем у самого MR, а не
+       подставляем Pw: подстановка врала бы во втором случае. */
+    const mr1 = marginalRevenue(d.c1, q1);
+    if (isFinite(mr1)) og.append('circle').attr('cx', px).attr('cy', sy(mr1)).attr('r', 3.5)
+      .attr('fill', COL.MR).attr('stroke', COL.halo).attr('stroke-width', 1.2);
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+      .attr('fill', COL.ink).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    pointName(og, px, py, 'M', COL.ink);
+    axisValueX(og, px, oy, fmt(q1), '1');
+    axisValueY(og, ox, py, fmt(P1), '1');
+  }
+
+  /* Отметка 2: общий выпуск (Q; Pw) — там, где предельные издержки дорастают
+     до мировой цены. Рисуется только при живом экспорте: без него общий
+     выпуск равен внутреннему, и второй пунктир встал бы поверх первого. */
+  if (hasExport) {
+    const [px, py] = toPx(Qtot, Pw);
+    dash(px, py, px, oy);
+    og.append('circle').attr('cx', px).attr('cy', py).attr('r', 4.5)
+      .attr('fill', COL.S).attr('stroke', COL.halo).attr('stroke-width', 1.5);
+    /* Различитель «Σ» — тот же, которым это число названо в панели («Σ выпуск»).
+       Он же становится именем ключевой точки: без него угол (Q; Pw) назывался
+       бы просто «точка Pw» и не отличался бы словами от самой линии цены. */
+    axisValueX(og, px, oy, fmt(Qtot), 'Σ');
+  }
+
+  /* Отметка 3: отрезок экспорта прямо на линии мировой цены — тем же приёмом,
+     что полоса импорта в малой открытой экономике. */
+  const qLo = Math.max(q1 > 0 ? q1 : 0, 0);
+  const band = (xa, xb, txt) => {
+    if (!(xb > xa + 1)) return;
+    gl.append('line').attr('x1', xa).attr('y1', yPw).attr('x2', xb).attr('y2', yPw)
+      .attr('stroke', COL.S).attr('stroke-width', 6).attr('opacity', 0.45);
+    haloText(gl, (xa + xb) / 2, yPw - 12, txt, 'middle', 'auto');
+  };
+  if (hasExport) band(sx(qLo), sx(Qtot), 'Экспорт = ' + fmt(Qtot - qLo));
+  else if (!d.found) band(sx(qLo), xMax, 'Объём экспорта не ограничен');
+
   updateDiscr3Panel();
 }
 

@@ -3575,20 +3575,31 @@ function snapTargetsAll() {
     out.push({ name: 'TP', f: prodEval, panel: 'prod-top' });
     return out;
   }
-  /* Дискриминация 3-й степени и «Монополист и внешний рынок»: два мини-рынка,
-     у каждого свой спрос, и предельные издержки общие. Кривые лежат в
+  /* Дискриминация 3-й степени и «Монополист и внешний рынок»: кривые лежат в
      STATE.discr3, а не в STATE.curves, поэтому раньше список молча
      проваливался в общую ветку и отдавал спрос с издержками ГЛАВНОЙ сцены
-     монополии — кривые, которых на этом холсте нет вовсе. */
+     монополии — кривые, которых на этом холсте нет вовсе.
+     ⚠️ Сцены здесь ДВЕ, и панелей у них разное число. У дискриминации два
+     разных рынка и два мини-графика, у внешнего рынка — один график на общий
+     выпуск (см. drawMonoExport), и обе его кривые живут в панели 'main'. */
   if (STATE.mode === 'market' && STATE.market === 'monopoly'
-      && STATE.monoMode === 'discr3' && STATE.discr3 && STATE.discr3.found) {
+      && STATE.monoMode === 'discr3' && STATE.discr3) {
     const d = STATE.discr3;
-    const nm1 = STATE.d3World ? 'D внутри' : 'D₁';
-    const nm2 = STATE.d3World ? 'Pw' : 'D₂';
-    out.push({ name: nm1, f: (q) => evalCurve(d.c1, q), color: COL.D, panel: 'mini-1' });
-    out.push({ name: nm2, f: (q) => evalCurve(d.c2, q), color: COL.D, panel: 'mini-2' });
-    out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-1' });
-    out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-2' });
+    if (STATE.d3World) {
+      // Мировая цена — прямая линия холста, а не кривая, по которой катаются:
+      // её пересечения уже объявлены нарисованными точками сцены.
+      if (!d.found && !d.unbounded) return out;
+      out.push({ name: 'D внутри', f: (q) => evalCurve(d.c1, q), color: COL.D });
+      out.push({ name: 'MC', f: (q) => evalCurve(d.cm, q), color: COL.S });
+      return out;
+    }
+    if (d.found) {
+      out.push({ name: 'D₁', f: (q) => evalCurve(d.c1, q), color: COL.D, panel: 'mini-1' });
+      out.push({ name: 'D₂', f: (q) => evalCurve(d.c2, q), color: COL.D, panel: 'mini-2' });
+      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-1' });
+      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-2' });
+      return out;
+    }
     return out;
   }
   // Изокванта задана уровнем выпуска, а не формулой K = f(L): её точки считает

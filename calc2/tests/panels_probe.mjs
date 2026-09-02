@@ -78,13 +78,23 @@ cmp('панелей за краем холста', inv.reduce((a, r) => a + (r.b
 cmp('сцен, уронивших перерисовку', inv.filter(r => r.err).length, 0);
 inv.filter(r => r.err).forEach(r => console.log('    ! ' + r.key + ': ' + r.err));
 
-/* Сцены с двумя полями обязаны отдать ДВЕ панели. Список именно этих сцен —
-   правило, а не отпечаток: у сюжета два графика, значит и панелей две. */
-head('Двухпанельные сюжеты');
-[['mono-d3', 2], ['monoexport', 2], ['prod', 2], ['tradeprice', 2], ['ineq', 1]].forEach(([k, n]) => {
+/* Сцена отдаёт РОВНО СТОЛЬКО панелей, сколько графиков рисует. Список именно
+   этих сцен — правило, а не отпечаток.
+   ⚠️ «Монополист и внешний рынок» стоит здесь с ЕДИНИЦЕЙ, и это не послабление
+   проверки. У него один график на ОБЩИЙ выпуск: мировая цена работает сразу
+   двумя ролями (предельный доход от вывезенной единицы и ориентир для общего
+   выпуска), и увидеть это можно только на одной оси Q. Панель у него общая,
+   'main', поэтому точки и площади считает общий механизм. У «Дискриминации
+   3-й степени» рынка по-прежнему два, и панелей у неё две. */
+head('Сколько панелей у сцены');
+[['mono-d3', 2], ['monoexport', 1], ['prod', 2], ['tradeprice', 2], ['ineq', 1]].forEach(([k, n]) => {
   const row = inv.find(r => r.key === k);
   cmp(k + ': панелей', row ? row.ids.length : 0, n);
 });
+{
+  const row = inv.find(r => r.key === 'monoexport');
+  cmp('monoexport: панель общая', row ? row.ids.join(',') : '', 'main');
+}
 {
   const tan = await run(`setMode('math'); setMathSub('tangent'); redrawAll();
     return (STATE.panels || []).map(function (p) { return p.id; });`);
@@ -203,10 +213,15 @@ r = await run(TAN + `setup();
 cmp('вершины в одной панели: кнопка активна', r, false);
 
 /* ── 5. Колесо работает в панели под курсором ────────────────────────── */
+/* ⚠️ Сцену взяли ДРУГУЮ, а правило прежнее. Замер стоял на «Монополисте и
+   внешнем рынке», пока у того было две мини-панели; теперь у него один график
+   на панели 'main', а её окном распоряжаются общие CONFIG.Qmax/Pmax
+   (gesturePanelId про 'main' отвечает «не моё»). Двухпанельным сюжетом с теми
+   же мини-рынками осталась «Дискриминация 3-й степени» — на ней и меряем. */
 head('Колесо крутит панель под курсором');
 r = await run(`
-  pickScene('monoexport');
-  updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+  pickScene('mono-d3');
+  STATE.d3D1 = '100 - Q'; STATE.d3D2 = '60 - Q'; STATE.d3MC = 'Q';
   redrawAll();
   var before = (STATE.panels || []).map(function (p) { return p.mx.domain()[1]; });
   var left = (STATE.panels || [])[0], right = (STATE.panels || [])[1];
@@ -216,7 +231,7 @@ r = await run(`
   zoomBy(0.8, (right.x0 + right.x1) / 2, (right.y0 + right.y1) / 2);
   var afterR = (STATE.panels || []).map(function (p) { return p.mx.domain()[1]; });
   return { before: before, afterL: afterL, afterR: afterR };`);
-if (r.err) { cmp('монополист и внешний рынок: две панели', r.err, 'две панели'); }
+if (r.err) { cmp('дискриминация 3-й степени: две панели', r.err, 'две панели'); }
 else {
   cmp('колесо слева: левая панель изменилась', r.afterL[0] !== r.before[0], true);
   cmp('колесо слева: правая панель НЕ изменилась', Math.abs(r.afterL[1] - r.before[1]), 0, 1e-9);
