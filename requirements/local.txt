@@ -15,24 +15,52 @@ anyio==4.14.2
 asgiref==3.12.1
     # via
     #   -r requirements/base.in
+    #   channels
+    #   channels-redis
+    #   daphne
     #   django
+attrs==26.1.0
+    # via
+    #   service-identity
+    #   twisted
+autobahn==26.7.1
+    # via daphne
+automat==25.4.16
+    # via twisted
+cbor2==6.1.4
+    # via autobahn
 certifi==2026.7.22
     # via
     #   httpcore
     #   httpx
     #   requests
 cffi==2.1.1
-    # via cryptography
+    # via
+    #   autobahn
+    #   cryptography
+channels==4.3.2
+    # via
+    #   -r requirements/base.in
+    #   channels-redis
+channels-redis==4.3.0
+    # via -r requirements/base.in
 charset-normalizer==3.5.1
     # via
     #   pdfminer-six
     #   requests
 colorama==0.4.6
     # via tqdm
+constantly==23.10.4
+    # via twisted
 cryptography==50.0.0
     # via
     #   -r requirements/local.in
+    #   autobahn
     #   pdfminer-six
+    #   pyopenssl
+    #   service-identity
+daphne==4.2.3
+    # via -r requirements/base.in
 distro==1.9.0
     # via anthropic
 dj-database-url==3.1.2
@@ -40,6 +68,7 @@ dj-database-url==3.1.2
 django==5.2.17
     # via
     #   -r requirements/base.in
+    #   channels
     #   dj-database-url
     #   django-redis
 django-redis==7.0.0
@@ -69,11 +98,19 @@ huggingface-hub==0.36.2
     #   sentence-transformers
     #   tokenizers
     #   transformers
+hyperlink==21.0.0
+    # via
+    #   autobahn
+    #   twisted
 idna==3.19
     # via
     #   anyio
     #   httpx
+    #   hyperlink
     #   requests
+    #   twisted
+incremental==24.11.0
+    # via twisted
 jinja2==3.1.6
     # via torch
 jiter==0.16.0
@@ -88,6 +125,10 @@ mdurl==0.1.2
     # via markdown-it-py
 mpmath==1.3.0
     # via sympy
+msgpack==1.2.2
+    # via
+    #   autobahn
+    #   channels-redis
 narwhals==2.24.0
     # via scikit-learn
 networkx==3.6.1
@@ -103,6 +144,7 @@ numpy==2.5.2
 packaging==26.3
     # via
     #   huggingface-hub
+    #   incremental
     #   transformers
 pdfminer-six==20260107
     # via -r requirements/base.in
@@ -122,6 +164,8 @@ pydantic-core==2.46.4
     # via pydantic
 pymupdf==1.26.7
     # via -r requirements/base.in
+pyopenssl==26.4.0
+    # via twisted
 pypandoc==1.17
     # via -r requirements/base.in
 pyyaml==6.0.3
@@ -132,6 +176,7 @@ pyyaml==6.0.3
 redis==8.1.0
     # via
     #   -r requirements/base.in
+    #   channels-redis
     #   django-redis
 regex==2026.7.19
     # via transformers
@@ -154,6 +199,8 @@ scipy==1.18.0
     #   sentence-transformers
 sentence-transformers==5.1.2
     # via -r requirements/local.in
+service-identity==26.1.0
+    # via twisted
 sniffio==1.3.1
     # via anthropic
 sqlparse==0.6.0
@@ -181,6 +228,10 @@ transformers==4.57.6
     # via
     #   -r requirements/local.in
     #   sentence-transformers
+twisted[tls]==26.4.0
+    # via daphne
+txaio==26.6.1
+    # via autobahn
 typing-extensions==4.16.0
     # via
     #   anthropic
@@ -189,6 +240,7 @@ typing-extensions==4.16.0
     #   pydantic-core
     #   sentence-transformers
     #   torch
+    #   twisted
     #   typing-inspection
 typing-inspection==0.4.4
     # via pydantic
@@ -196,10 +248,14 @@ tzdata==2026.3
     # via
     #   django
     #   psycopg
+ujson==5.13.0
+    # via autobahn
 urllib3==2.7.0
     # via requests
 whitenoise==6.12.0
     # via -r requirements/base.in
+zope-interface==8.6
+    # via twisted
 
 # The following packages are considered to be unsafe in a requirements file:
 # setuptools
