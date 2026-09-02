@@ -5,6 +5,7 @@
 """
 from django.shortcuts import get_object_or_404, render
 
+from . import services
 from .models import Olympiad, current_academic_year
 
 
@@ -32,9 +33,12 @@ def olympiad_list(request):
          if o.display_group == Olympiad.DisplayGroup.RELATED],
         key=lambda o: o.sort_key(),
     )
+    feed_events, feed_has_confirmed = services.upcoming_events(limit=5)
     return render(request, 'olympiads/list.html', {
         'main': main,
         'related': related,
+        'feed_events': feed_events,
+        'feed_has_confirmed': feed_has_confirmed,
         'has_placeholder': _has_placeholder(olympiads),
     })
 

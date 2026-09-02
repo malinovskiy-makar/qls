@@ -34,3 +34,77 @@
   font-size: 14px;
   color: var(--text2);
 }
+
+/* ── Лента ближайших дат ────────────────────────────── */
+.ol-feed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 18px 20px 20px;
+}
+.ol-feed-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.ol-feed-title { font-size: 17px; font-weight: 700; }
+.ol-feed-link { font-size: 14px; color: var(--accent-ink); text-decoration: none; }
+.ol-feed-link:hover { text-decoration: underline; }
+.ol-feed-note, .ol-feed-empty {
+  font-size: 14px; color: var(--text2); max-width: var(--w-read);
+}
+.ol-feed-note { margin-bottom: 12px; }
+
+.ol-feed-grid {
+  list-style: none; display: grid; gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .ol-feed-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .ol-feed-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .ol-feed-grid { grid-template-columns: 1fr; } }
+
+.ol-ev {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-card);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+/* Неподтверждённое приглушается, но не прячется: школьнику важно знать,
+   что тур вообще будет, даже когда числа ещё нет. */
+.ol-ev--dim { opacity: .78; }
+.ol-ev-day { font-size: 28px; font-weight: 700; line-height: var(--lh-tight); }
+.ol-ev-month { font-size: 13px; color: var(--text2); }
+.ol-ev-approx { font-size: 15px; font-weight: 600; line-height: var(--lh-tight); }
+.ol-ev-olymp { font-size: 14px; font-weight: 600; margin-top: 6px; }
+.ol-ev-what { font-size: 13px; color: var(--text2); }
+
+.ol-chip-type {
+  align-self: flex-start; margin-top: 6px;
+  font-size: 12px; padding: 2px 8px;
+  background: var(--chip-bg); color: var(--chip-text);
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+}
+
+/* ── Статус даты: точка плюс слово ──────────────────── */
+/* Новых цветов не заводим — все три состояния собраны из токенов. */
+.ol-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; margin-top: 8px;
+}
+.ol-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; box-sizing: border-box;
+}
+.ol-status--confirmed { color: var(--accent-ink); }
+.ol-status--confirmed .ol-dot { background: var(--accent); }
+.ol-status--approx_last_year { color: var(--text2); }
+/* Половина заливки — половина уверенности. */
+.ol-status--approx_last_year .ol-dot {
+  border: 1px solid currentColor;
+  background: linear-gradient(to right, currentColor 50%, transparent 50%);
+}
+.ol-status--awaiting { color: var(--pending); }
+.ol-status--awaiting .ol-dot {
+  border: 1px dashed currentColor;
+  background: none;
+}

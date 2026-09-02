@@ -476,6 +476,28 @@ class OlympiadEvent(models.Model):
     def is_confirmed(self):
         return self.date_status == self.DateStatus.CONFIRMED
 
+    @property
+    def status_word(self):
+        """Короткая подпись статуса рядом с точкой: она стоит в карточке
+        события, где длинное «Ориентировочно по прошлому году» не помещается.
+        """
+        if self.date_status == self.DateStatus.CONFIRMED:
+            return 'дата подтверждена'
+        if self.date_status == self.DateStatus.APPROX_LAST_YEAR:
+            return 'ориентировочно'
+        return 'ждём объявления'
+
+    @property
+    def day_number(self):
+        """Крупное число дня — только у подтверждённой даты."""
+        return self.date_start.day if self.is_confirmed and self.date_start else None
+
+    @property
+    def month_word(self):
+        if self.is_confirmed and self.date_start:
+            return MONTHS_GENITIVE[self.date_start.month - 1]
+        return ''
+
 
 class UniversityProgram(models.Model):
     """Программа вуза — строка в таблице льгот."""
