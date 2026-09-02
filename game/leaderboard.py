@@ -191,3 +191,56 @@ def personal_stats(user, mode):
         'place': place['place'] if place else None,
         'total_players': total_players(mode, 'all', 'score'),
     }
+
+
+def duel_stats(user):
+    u"""Сводка по дуэлям игрока. Новых таблиц не заводим.
+
+    Считается из `GameSet(kind='duel')` и результатов в них: у дуэли ровно
+    две стороны, и «победа» — это чей счёт выше. Ничья считается ничьёй, а
+    не округляется в чью-то пользу: два одинаковых счёта в игре на скорость
+    случаются чаще, чем кажется.
+
+    ⚠️ ЗАСЧИТЫВАЮТСЯ ТОЛЬКО СЫГРАННЫЕ ОБОИМИ. Дуэль, где соперник так и не
+    пришёл, — это не победа: играть было не с кем. Она не попадает ни в
+    победы, ни в поражения, ни в знаменатель процента.
+    """
+    from game.models import GameSet
+
+    sets = (GameSet.objects.filter(kind='duel')
+            .filter(results__user=user).distinct()
+            .prefetch_related('results__user').order_by('-created'))
+    wins = losses = draws = 0
+    rivals = {}
+    last_rival = None
+    played = 0
+    for gset in sets:
+        rows = [r for r in gset.results.all() if r.user_id]
+        mine = next((r for r in rows if r.user_id == user.id), None)
+        rival = next((r for r in rows if r.user_id != user.id), None)
+        if mine is None or rival is None:
+            continue
+        played += 1
+        if mine.score > rival.score:
+            wins += 1
+        elif mine.score < rival.score:
+            losses += 1
+        else:
+            draws += 1
+        name = rival.user.get_username()
+        rivals[name] = rivals.get(name, 0) + 1
+        if last_rival is None:
+            last_rival = name
+
+    top = max(rivals.items(), key=lambda kv: (kv[1], kv[0])) if rivals \
+        else None
+    return {
+        'played': played,
+        'wins': wins,
+        'losses': losses,
+        'draws': draws,
+        'win_percent': round(100 * wins / played) if played else None,
+        'top_rival': top[0] if top else None,
+        'top_rival_games': top[1] if top else 0,
+        'last_rival': last_rival,
+    }

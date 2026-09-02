@@ -131,6 +131,71 @@ def drop_run(request):
     request.session.modified = True
 
 
+# ---------------------------------------------------------------------------
+# Комната дуэли
+# ---------------------------------------------------------------------------
+#
+# ⚠️ ЗАЧЕМ ОТДЕЛЬНАЯ ЗАПИСЬ. Живой забег адресуется по `run_id`, а сокет
+# соперника знает только код набора и id пользователя. Связку «код дуэли +
+# игрок → его забег» и держит эта запись. В `GameResult` её не положить:
+# результат появляется только когда забег ЗАКОНЧЕН, а табло нужно во время.
+#
+# Запись одна на дуэль: {'runs': {user_id: run_id}, 'present': {user_id: ts}}.
+# Гонки за неё нет по существу — игроков двое, и пишут они в разные ключи
+# словаря; редкая потеря «кто на месте» стоит одного лишнего обратного
+# отсчёта, а не поломки забега.
+DUEL_PREFIX = 'rush:duel:'
+# Живём дольше самого длинного забега: дуэль в Классике идёт до получаса,
+# и комната не должна истечь у соперника, который ещё играет.
+DUEL_TTL = 2 * 600 + TTL_SLACK
+
+
+def duel_key(code):
+    return DUEL_PREFIX + code
+
+
+def _duel_room(code):
+    return cache.get(duel_key(code)) or {'runs': {}, 'present': {}}
+
+
+def duel_register_run(code, user_id, run_id):
+    u"""Запомнить, каким забегом этот игрок играет эту дуэль."""
+    if not code or not user_id:
+        return
+    room = _duel_room(code)
+    room['runs'][str(user_id)] = run_id
+    cache.set(duel_key(code), room, DUEL_TTL)
+
+
+def duel_run_of(code, user_id):
+    return _duel_room(code)['runs'].get(str(user_id))
+
+
+def duel_rivals(code, user_id):
+    u"""Идентификаторы забегов ВСЕХ, кроме этого игрока."""
+    runs = _duel_room(code)['runs']
+    return [(int(uid), rid) for uid, rid in runs.items()
+            if str(uid) != str(user_id)]
+
+
+def duel_join(code, user_id):
+    room = _duel_room(code)
+    room['present'][str(user_id)] = True
+    cache.set(duel_key(code), room, DUEL_TTL)
+    return sorted(int(u) for u in room['present'])
+
+
+def duel_leave(code, user_id):
+    room = _duel_room(code)
+    room['present'].pop(str(user_id), None)
+    cache.set(duel_key(code), room, DUEL_TTL)
+    return sorted(int(u) for u in room['present'])
+
+
+def duel_present(code):
+    return sorted(int(u) for u in _duel_room(code)['present'])
+
+
 def _legacy(request):
     u"""Забег, начатый ДО выкатки: он лежит в сессии целиком.
 

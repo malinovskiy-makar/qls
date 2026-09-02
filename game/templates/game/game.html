@@ -777,6 +777,71 @@ a:focus-visible, button:focus-visible {
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
 
+/* ── Дуэль в реальном времени ──────────────────────────────────────
+   Полоса соперника стоит РЯДОМ со своим HUD, а не под ним: сравнение
+   работает только когда оба числа видны одним движением глаз.
+   Блока нет в разметке вовсе, когда забег не дуэльный. */
+.duel-bar {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  margin: 0 0 12px; padding: 10px 14px;
+  border: 1px solid var(--rush-line); border-radius: 12px;
+  background: var(--rush-surface); font-size: 14px;
+}
+.duel-bar__who { font-weight: 600; }
+.duel-bar__num { font-variant-numeric: tabular-nums; font-weight: 700; }
+.duel-bar__lives { display: inline-flex; gap: 3px; }
+.duel-bar__lives .qi { width: 15px; height: 15px; }
+.duel-bar__lives .is-lost { opacity: .22; }
+.duel-bar--off { opacity: .55; }
+.duel-bar__state { margin-left: auto; color: var(--rush-dim); }
+
+/* Восемь реакций. Значки свои (templates/_icons.html), не эмодзи: эмодзи
+   рисует операционная система, они всегда цветные и мимо палитры. */
+.duel-emoji { display: flex; gap: 6px; flex-wrap: wrap; }
+.duel-emoji button {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 34px; height: 34px; padding: 0; cursor: pointer;
+  border: 1px solid var(--rush-line); border-radius: 9px;
+  background: transparent; color: var(--rush-text);
+}
+.duel-emoji button:hover { border-color: var(--rush-accent); }
+.duel-emoji button:disabled { opacity: .35; cursor: default; }
+.duel-emoji .qi { width: 19px; height: 19px; }
+
+/* Прилетевшая реакция соперника: всплывает и тает. */
+.duel-flyer {
+  position: fixed; right: 26px; bottom: 90px; z-index: 40;
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 12px; border-radius: 12px;
+  border: 1px solid var(--rush-line); background: var(--rush-surface);
+  animation: duel-fly 2.2s ease-out forwards; pointer-events: none;
+}
+.duel-flyer .qi { width: 22px; height: 22px; }
+@keyframes duel-fly {
+  0%   { opacity: 0; transform: translateY(14px) scale(.9); }
+  12%  { opacity: 1; transform: translateY(0) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-26px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .duel-flyer { animation: none; opacity: 1; }
+}
+
+/* Лобби: ждём соперника. */
+.duel-lobby { margin: 18px 0 0; padding: 16px 18px;
+  border: 1px dashed var(--rush-line); border-radius: 12px; }
+.duel-lobby h3 { font-size: 16px; margin: 0 0 6px; }
+.duel-lobby p { margin: 0 0 10px; color: var(--rush-dim); font-size: 14px; }
+.duel-lobby__row { display: flex; gap: 8px; flex-wrap: wrap;
+  align-items: center; }
+.duel-lobby input {
+  flex: 1 1 260px; font: inherit; padding: 8px 10px;
+  border: 1px solid var(--rush-line); border-radius: 9px;
+  background: var(--rush-bg); color: var(--rush-text);
+}
+.duel-countdown { font-size: 44px; font-weight: 700; text-align: center;
+  margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+
 /* ── Панель прослушивания звука (staff, ?sound_check=1) ─────────────
    Служебный блок: намеренно неброский, без фирменных акцентов. Он не
    часть экрана игрока и не должен на него претендовать. */
@@ -2010,6 +2075,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <a class="set-back" href="/game/">В обычную игру</a>
         </div>
       </div>
+    {% if auto_set and auto_set.kind == 'duel' %}
+    {# ── Лобби дуэли ───────────────────────────────────────────────────
+         Показывается на карточке набора: соперника надо позвать, а ссылку
+         скопировать. Обратный отсчёт прилетает по сокету, когда оба на
+         месте (game/consumers.py). #}
+    <div class="duel-lobby" id="duel-lobby">
+      <h3>Позовите соперника</h3>
+      <p>Вопросы у вас будут одни и те же и в одном порядке. Пока соперника
+        нет, играть можно: он догонит и увидит ваш счёт на своей полосе.</p>
+      <div class="duel-lobby__row">
+        <input type="text" id="duel-link" readonly value="{{ duel_url }}">
+        <button class="set-play" id="duel-copy" type="button">Скопировать</button>
+      </div>
+      <p class="duel-countdown" id="duel-countdown" hidden></p>
+    </div>
+    {% endif %}
     </div>
 
     {% if sound_check %}
@@ -2041,6 +2122,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <button class="quit-x" id="btn-quit" title="Выйти из забега" aria-label="Выйти из забега">✕</button>
       <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
+      {# ── Дуэль: полоса соперника ────────────────────────────────
+           Блока нет вовсе, когда забег не дуэльный: рисовать пустую
+           полосу «соперника нет» на обычном забеге незачем. #}
+      <div class="duel-bar duel-bar--off" id="duel-bar" hidden>
+        <span class="duel-bar__who" id="duel-who">соперник</span>
+        <span>очки <b class="duel-bar__num" id="duel-score">0</b></span>
+        <span>верных <b class="duel-bar__num" id="duel-correct">0</b></span>
+        <span class="duel-bar__lives" id="duel-lives"></span>
+        <span class="duel-bar__state" id="duel-state">ждём соперника</span>
+      </div>
+      <div class="duel-emoji" id="duel-emoji" hidden></div>
       <div class="hud">
         <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
         <div class="hud-timer">
@@ -3504,6 +3596,25 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         if (st.place) {
           box.appendChild(msRow('Моё место (очки, всё время)',
             st.place + ' из ' + st.total_players));
+        }
+        // ── Дуэли ────────────────────────────────────────────────────
+        // Блок общий на все режимы: дуэль это набор, а не режим, и
+        // разбивать её по режимам значило бы дробить и без того редкое.
+        // Незасчитанные (соперник не пришёл) сюда не входят вовсе.
+        var du = d.duels || {};
+        if (du.played) {
+          box.appendChild(msRow('Дуэли', ''));
+          box.appendChild(msRow('Сыграно', du.played));
+          box.appendChild(msRow('Победы / поражения / ничьи',
+            du.wins + ' / ' + du.losses + ' / ' + du.draws));
+          box.appendChild(msRow('Процент побед', du.win_percent + ' %'));
+          if (du.top_rival) {
+            box.appendChild(msRow('Самый частый соперник',
+              du.top_rival + ' (' + du.top_rival_games + ')'));
+          }
+          if (du.last_rival) {
+            box.appendChild(msRow('Последний соперник', du.last_rival));
+          }
         }
       })
       .catch(function () { /* статистика не критична для игры */ });
@@ -5244,6 +5355,160 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       }
     }
   });
+
+
+  // ── Дуэль в реальном времени ───────────────────────────────────────
+  //
+  // ⚠️ ИГРА НЕ ИДЁТ ПО СОКЕТУ. Вопросы и ответы — обычный HTTP, очки
+  // считает сервер там же. Здесь только табло соперника и реакции.
+  // Отсюда главное: обрыв соединения забег не ломает, пропадает табло.
+  //
+  // ⚠️ СВОЙ СЧЁТ В СОКЕТ НЕ ОТПРАВЛЯЕТСЯ. Его рассылает сервер из
+  // api_answer; сообщение `score` от клиента консьюмер игнорирует.
+  (function () {
+    var isDuel = AUTO_SET && AUTO_SET.kind === 'duel';
+    if (!isDuel) return;
+
+    var bar = $('duel-bar');
+    var panel = $('duel-emoji');
+    var lobby = $('duel-lobby');
+    var countdown = $('duel-countdown');
+    var NAMES = ['gg', 'wow', 'fire', 'think', 'oops', 'fast', 'close', 'gl'];
+    var TITLES = {
+      gg: 'Хорошая игра', wow: 'Ого', fire: 'Горячо', think: 'Думаю',
+      oops: 'Промах', fast: 'Быстро', close: 'Близко', gl: 'Удачи'
+    };
+    var COOLDOWN_MS = 2000;
+    var lastSent = 0;
+    var sock = null;
+
+    NAMES.forEach(function (name) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.title = TITLES[name];
+      b.setAttribute('aria-label', TITLES[name]);
+      b.innerHTML = (window.QLS_ICONS && window.QLS_ICONS['duel_' + name])
+        || TITLES[name];
+      b.addEventListener('click', function () { sendEmoji(name, b); });
+      panel.appendChild(b);
+    });
+
+    function sendEmoji(name, button) {
+      var now = Date.now();
+      if (!sock || sock.readyState !== 1 || now - lastSent < COOLDOWN_MS) return;
+      lastSent = now;
+      sock.send(JSON.stringify({ type: 'emoji', name: name }));
+      // Задержка видна: кнопки гаснут ровно на те же две секунды, что
+      // сервер отбрасывает лишнее. Иначе нажатия пропадали бы молча.
+      var all = panel.querySelectorAll('button');
+      all.forEach(function (x) { x.disabled = true; });
+      setTimeout(function () {
+        all.forEach(function (x) { x.disabled = false; });
+      }, COOLDOWN_MS);
+      if (button) button.blur();
+    }
+
+    function livesHtml(n) {
+      // ⚠️ Запас жизней НЕ ВЫДУМЫВАЕМ. Он приходит из config.py вместе с
+      // режимом: «три» здесь числом означало бы второй источник правды о
+      // механике, и он разошёлся бы с сервером при первой же правке.
+      var mode = CFG.modes[AUTO_SET.mode] || {};
+      var max = mode.lives || n;
+      var out = '';
+      for (var i = 0; i < max; i++) {
+        out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
+          + (window.QLS_ICONS ? window.QLS_ICONS.heart : '') + '</span>';
+      }
+      return out;
+    }
+
+    function showScore(row) {
+      bar.hidden = false;
+      bar.classList.remove('duel-bar--off');
+      $('duel-who').textContent = row.username || 'соперник';
+      $('duel-score').textContent = row.score;
+      $('duel-correct').textContent = row.correct;
+      $('duel-lives').innerHTML = livesHtml(row.lives);
+      $('duel-state').textContent = '';
+    }
+
+    function flyer(name, who) {
+      var el = document.createElement('div');
+      el.className = 'duel-flyer';
+      el.innerHTML = ((window.QLS_ICONS
+        && window.QLS_ICONS['duel_' + name]) || '')
+        + '<span>' + (who || 'соперник') + '</span>';
+      document.body.appendChild(el);
+      setTimeout(function () { el.remove(); }, 2400);
+    }
+
+    function tick(seconds) {
+      if (!countdown) return;
+      countdown.hidden = false;
+      countdown.textContent = seconds;
+      if (seconds <= 0) {
+        countdown.textContent = 'Поехали';
+        setTimeout(function () { countdown.hidden = true; }, 900);
+        return;
+      }
+      setTimeout(function () { tick(seconds - 1); }, 1000);
+    }
+
+    function connect() {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      try {
+        sock = new WebSocket(proto + location.host + '/ws/duel/'
+                             + AUTO_SET.code + '/');
+      } catch (e) { return; }
+
+      sock.addEventListener('open', function () {
+        bar.hidden = false;
+        panel.hidden = false;
+        // «Привет» просит табло: после обрыва счёт соперника надо
+        // восстановить, а не ждать его следующего ответа.
+        sock.send(JSON.stringify({ type: 'hello' }));
+      });
+      sock.addEventListener('message', function (e) {
+        var m;
+        try { m = JSON.parse(e.data); } catch (err) { return; }
+        if (m.type === 'score') { showScore(m); }
+        else if (m.type === 'emoji') { flyer(m.name, m.username); }
+        else if (m.type === 'start') { tick(m.in || 3); }
+        else if (m.type === 'finished') {
+          showScore(m);
+          $('duel-state').textContent = 'финишировал';
+        } else if (m.type === 'presence') {
+          if (m.action === 'leave') {
+            bar.classList.add('duel-bar--off');
+            $('duel-state').textContent = 'соперник отключился';
+          }
+        }
+      });
+      sock.addEventListener('close', function () {
+        // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться.
+        bar.classList.add('duel-bar--off');
+        $('duel-state').textContent = 'связь потеряна';
+        setTimeout(connect, 4000);
+      });
+    }
+
+    if (lobby) {
+      var copy = $('duel-copy');
+      if (copy) {
+        copy.addEventListener('click', function () {
+          var input = $('duel-link');
+          input.select();
+          try {
+            navigator.clipboard.writeText(input.value);
+            copy.textContent = 'Скопировано';
+            setTimeout(function () { copy.textContent = 'Скопировать'; }, 1500);
+          } catch (e) { /* старый браузер: текст уже выделен */ }
+        });
+      }
+    }
+
+    connect();
+  })();
 
   // ── Панель прослушивания (только staff, только ?sound_check=1) ────────
   // Блока в разметке нет вовсе, когда панель не запрошена, поэтому здесь

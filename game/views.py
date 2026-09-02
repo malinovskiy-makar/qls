@@ -21,6 +21,7 @@
 """
 import datetime
 import json
+import logging
 import random
 import time
 from fractions import Fraction
@@ -55,6 +56,8 @@ from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 # соперника, а состояние соперника лежало бы в ЕГО куке и до сервера
 # не доходило. Имя ниже осталось ради ОДНОГО релиза совместимости —
 # забег, начатый до выкатки, доигрывается (state._legacy).
+logger = logging.getLogger(__name__)
+
 SESSION_KEY = run_state.LEGACY_SESSION_KEY
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
 SEEN_LIMIT = 1500                # сколько последних id помнить на режим
@@ -408,8 +411,14 @@ def api_my_stats(request):
     mode = request.GET.get('mode') or config.DEFAULT_MODE
     if mode not in config.MODES:
         mode = config.DEFAULT_MODE
-    return JsonResponse({'mode': mode,
-                         'stats': lb.personal_stats(request.user, mode)})
+    return JsonResponse({
+        'mode': mode,
+        'stats': lb.personal_stats(request.user, mode),
+        # ⚠️ Дуэли считаются по НАБОРАМ и результатам, новых таблиц нет:
+        # вторая таблица разъехалась бы с фактом при первом же удалении
+        # забега руками (тот же довод, что у лидерборда, ADR 0056).
+        'duels': lb.duel_stats(request.user),
+    })
 
 
 @require_GET
@@ -1164,6 +1173,7 @@ def api_answer(request):
     else:
         stat = stats_mod.get_stat(gq)
     run_state.save_run(request, state)
+    _duel_broadcast(request, state)
 
     payload = {
         'result': result,
@@ -1413,7 +1423,15 @@ def start_set_state(request, gset):
     state = _new_state(gset.mode, None, gset.filter_snapshot)
     state['queue'] = list(gset.question_ids or [])
     state['set_code'] = gset.code
+    state['duel'] = gset.kind == 'duel'
     state['curated'] = True     # эскалации сложности тут нет: список задан
+    # ⚠️ ЗАБЕГ ДУЭЛИ ЗАПИСЫВАЕТСЯ В КОМНАТУ. Сокет соперника знает
+    # только код набора и id игрока; связку «дуэль + игрок -> его
+    # забег» держит запись комнаты (game/state.py), и без неё живого
+    # табло не собрать: GameResult появляется только по окончании.
+    if state['duel'] and request.user.is_authenticated:
+        run_state.duel_register_run(gset.code, request.user.id,
+                                    state['run_id'])
     return state
 
 
@@ -1485,6 +1503,10 @@ def set_page(request, code):
     # автор дуэли, который вопросов ещё не видел (и не должен увидеть).
     ctx['auto_set']['autostart'] = (request.GET.get('auto') == '1'
                                     and allowed)
+    # Ссылка-приглашение для лобби дуэли. Ведёт на страницу дуэли, а не на
+    # забег: соперник должен сначала увидеть, во что его зовут.
+    ctx['duel_url'] = request.build_absolute_uri(
+        reverse('game:duel', args=[gset.code])) if gset.kind == 'duel' else ''
     ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
     return render(request, 'game/game.html', ctx)
 
@@ -1724,6 +1746,38 @@ def _filter_text(f):
         diff = 'сложность ' + ', '.join('%d★' % d for d in f['stars'])
     return '%s · %s · %s' % (topics, sources, diff)
 
+
+
+def _duel_broadcast(request, state, finished=False):
+    u"""Разослать табло сопернику. Ошибка слоя каналов забег не роняет.
+
+    ⚠️ ЗОВЁТСЯ ИЗ HTTP, А НЕ ИЗ СОКЕТА, И ЭТО НЕ СЛУЧАЙНОСТЬ. Счёт считает
+    `api_answer`; он же и единственный, кто вправе о нём объявить. Клиентское
+    сообщение `score` консьюмер игнорирует.
+
+    ⚠️ ПАДАТЬ ЗДЕСЬ НЕЛЬЗЯ. Слой каналов может быть недоступен (Redis лёг,
+    процесс `ws` не поднят) — тогда пропадает ТАБЛО, а забег продолжается.
+    Пятисотка на ответе из-за украшения недопустима.
+    """
+    code = state.get('set_code')
+    if not state.get('duel') or not code:
+        return
+    if not request.user.is_authenticated:
+        return
+    try:
+        from asgiref.sync import async_to_sync
+        from channels.layers import get_channel_layer
+        from game.consumers import duel_score_event, room_name
+
+        layer = get_channel_layer()
+        if layer is None:
+            return
+        event = duel_score_event(state, request.user)
+        if finished:
+            event = dict(event, type='duel.finished')
+        async_to_sync(layer.group_send)(room_name(code), event)
+    except Exception:            # noqa: BLE001 — украшение забег не роняет
+        logger.warning('дуэль %s: табло не разослано', code, exc_info=True)
 
 def _duel_compare(gset, a, b):
     """Сравнение двух забегов лоб в лоб: метрики и полоса «кто что взял».
