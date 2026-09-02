@@ -273,15 +273,21 @@ function texifyName(name) {
 function editEqValue(lab, name, current, apply) {
   if (lab.querySelector('input')) return;
   lab.innerHTML = '';
-  const head = document.createElement('span');
-  head.className = 'param-eq-head';
-  if (typeof katex !== 'undefined') {
-    if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
-  } else head.textContent = name + ' =';
   const inp = document.createElement('input');
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
-  lab.append(head, inp);
+  /* Приписка «имя =» нужна там, где правят строку «a = 1». У чипа сцены имя
+     стоит СЛЕВА отдельной подписью, а правят число справа: голова там встала
+     бы вторым именем в той же строке. Пустое имя — просто поле. */
+  if (name) {
+    const head = document.createElement('span');
+    head.className = 'param-eq-head';
+    if (typeof katex !== 'undefined') {
+      if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
+    } else head.textContent = name + ' =';
+    lab.appendChild(head);
+  }
+  lab.appendChild(inp);
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
@@ -847,14 +853,33 @@ function ppfSetSum(which, maxX, maxY) {
 }
 
 // Один сцен-слайдер (метка + число сверху, range снизу). onInput(value) применяет состояние.
-function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr) {
-  const { chip, val } = makePchip(label, fmt(value), null);
+/* `show` — как печатать значение (у силы неравенства это проценты). Нужен
+   потому, что число теперь пишется в ДВУХ местах: при движении ползунка и
+   после точного ввода, и оба обязаны печатать одинаково. */
+function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr, show) {
+  const { chip, lab, val } = makePchip(label, fmt(value), null);
+  const print = show || fmt;
   const sl = document.createElement('input');
   sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
   sl.value = Math.round(value); sl.style.accentColor = color || cssVar('--accent');
   if (idAttr) { sl.id = idAttr; val.id = idAttr + '-val'; }
-  sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = fmt(v); onInput(v); });
+  val.textContent = print(value);
+  sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = print(v); onInput(v); });
+  /* ⚠️ ЩЕЛЧОК ПО ЧИСЛУ ОТКРЫВАЕТ ТОЧНЫЙ ВВОД — как у буквы-параметра и у
+     регуляторов сцены. Раньше «125%» рядом с ползунком не нажималось вовсе, и
+     точное значение силы неравенства задать было нечем (замечание владельца
+     01.09). Механизм тот же самый, editEqValue, второго не заводим. */
+  val.classList.add('pchip-editable');
+  val.setAttribute('data-tip', 'Щёлкните, чтобы ввести точное значение');
+  val.addEventListener('click', () => {
+    editEqValue(val, '', parseFloat(sl.value), (v) => {
+      v = Math.max(min, Math.min(max, isFinite(v) ? v : parseFloat(sl.value)));
+      sl.value = v;
+      sl.dispatchEvent(new Event('input', { bubbles: true }));   // один путь: печать значения и onInput
+    });
+  });
   chip.appendChild(sl); box.appendChild(chip);
+  return { chip, lab, val, sl };
 }
 
 // Пересобрать сцен-слайдеры под текущую сцену.
@@ -936,9 +961,13 @@ function ineqMasterDetach() {         // ручная правка профил�
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
-  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v), 'ineq-master-slider');
+  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v),
+               'ineq-master-slider', v => fmt(v) + '%');
   const val = document.getElementById('ineq-master-slider-val');
-  if (val) val.textContent = detached ? 'Своё' : (pct + '%');
+  // Отвязанный мастер процентов не показывает: профиль правили руками, и доля
+  // от прежней базы к нему уже не относится. Щелчок по слову всё равно
+  // открывает точный ввод — он-то мастера обратно и привяжет.
+  if (val && detached) val.textContent = 'Своё';
 }
 
 function showPult(on) {

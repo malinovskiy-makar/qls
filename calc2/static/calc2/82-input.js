@@ -1153,14 +1153,36 @@ function buildMathfield(inp) {
      Тот же дефект и той же природы уже чинили 20.08 у редактора границ
      ползунка («значение дописывается вместо замены», п. 18). У полей формул
      он остался. */
+  /* ⚠️ ВЫДЕЛЕНИЕ ДЕЛАЕТСЯ КОМАНДОЙ, А НЕ МЕТОДОМ `select()`, И ЭТО НЕ ВКУС.
+     `mf.select()` меняет ТОЛЬКО модель: замер 01.09 — `selectionIsCollapsed`
+     становится false, а в теневом дереве по-прежнему ноль узлов `.ML__selected`
+     и ни одной подложки `.ML__selection`. Отсюда ровно то, что видел владелец:
+     «оно как будто выделяется полностью, первый набранный символ стирает всё,
+     а выделения не видно». Молчаливое выделение — худший из вариантов.
+     `executeCommand('selectAll')` ставит тот же самый диапазон И перерисовывает
+     поле: подложка цветом `--selection-background-color` (у нас токен `--pick`,
+     свой в каждой теме). Курсор поставить в место щелчка нельзя по причине
+     выше (grabKeys уводит его в конец), поэтому выбран путь «выделение есть и
+     его видно».
+
+     ⚠️ ВЫДЕЛЯЕМ ТОЛЬКО ПО ЖИВОМУ ЩЕЛЧКУ, А НЕ НА ЛЮБОЙ ФОКУС. Фокус полю
+     ставит и код: «Поставить в поле» у конструктора кусочной, подстановка
+     примера, разбор очереди MathLive. Перерисовка выделением в этот миг
+     попадает в середину подбора кегля (fitFormulaField меряет поле сразу
+     после присвоения значения), и запись зря уходила в узкий вид. Живой
+     щелчок приходит через pointer-события, и там подбор кегля уже позади. */
   let hadFocus = false;
   const selectAllOnEntry = () => {
     if (hadFocus) return;
     hadFocus = true;
-    try { mf.select(); } catch (e) {}
+    try { mf.executeCommand('selectAll'); } catch (e) {}
   };
   mf.addEventListener('blur', () => { hadFocus = false; });
-  ['pointerdown', 'pointerup', 'focus'].forEach(ev => {
+  mf.addEventListener('focus', () => {
+    grabKeys();
+    setTimeout(grabKeys, 0);
+  });
+  ['pointerdown', 'pointerup'].forEach(ev => {
     mf.addEventListener(ev, () => {
       grabKeys();
       setTimeout(() => { grabKeys(); selectAllOnEntry(); }, 0);

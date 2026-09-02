@@ -1017,6 +1017,108 @@ cmp('«Неравенство»: поля «α (точное значение)»
 cmp('«Неравенство»: галочки «было → стало» нет', r.ghost, 0, 0);
 cmp('«Неравенство»: сам ползунок α на месте', r.slider, 1, 0);
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · ПОЛЯ ВВОДА И СПИСКИ.
+   ================================================================ */
+head('Сессия 01.09 (3) · выделение в поле формулы видно');
+r = await run(`resetSceneMemory(); pickScene('sd'); redrawAll();
+  var inp = document.querySelector('.f-slot input[type=text]');
+  inp.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  inp.focus();
+  return { woke: 1 };`);
+await page.waitForTimeout(700);
+r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+  var mf = inp && inp._mf;
+  if (!mf) return { noMf: 1 };
+  mf.blur();
+  return { blurred: 1 };`);
+await page.waitForTimeout(200);
+r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+  var mf = inp._mf;
+  mf.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+  mf.focus();
+  return { ok: 1 };`);
+await page.waitForTimeout(500);
+r = await run(`var inp = document.querySelector('.f-slot input[type=text]');
+  var mf = inp._mf, sr = mf.shadowRoot;
+  var box = sr.querySelector('.ML__selection');
+  var cs = box ? getComputedStyle(box) : null;
+  var rc = box ? box.getBoundingClientRect() : null;
+  return { collapsed: mf.selectionIsCollapsed ? 1 : 0,
+           atoms: sr.querySelectorAll('.ML__selected').length,
+           boxes: sr.querySelectorAll('.ML__selection').length,
+           bg: cs ? cs.backgroundColor : '',
+           w: rc ? Math.round(rc.width) : 0, h: rc ? Math.round(rc.height) : 0 };`);
+/* ⚠️ Правило, а не отпечаток: выделение ЕСТЬ (модель) и его ВИДНО (подложка с
+   непрозрачным фоном и ненулевым размером). Ни ширина в пикселях, ни число
+   выделенных узлов не закрепляются: они зависят от самой формулы. */
+cmp('выделение в модели есть', r.collapsed, 0, 0);
+cmp('выделенные узлы отрисованы', r.atoms > 0, true, 0);
+cmp('подложка выделения нарисована', r.boxes > 0, true, 0);
+cmp('подложка не прозрачная', /rgba?\(.*[1-9].*\)/.test(r.bg) && !/, 0\)$/.test(r.bg), true, 0);
+cmp('подложка ненулевого размера', r.w > 2 && r.h > 2, true, 0);
+
+head('Сессия 01.09 (3) · свои выпадающие списки вместо системных');
+for (const [tag, scene, id] of [
+  ['деформации графика', 'm-transform', 'math-trans'],
+  ['число групп неравенства', 'ineq', 'ineq-ngroups']]) {
+  r = await run(`resetSceneMemory(); pickScene('${scene}'); redrawAll();
+    var sel = document.getElementById('${id}');
+    var btn = sel && sel.parentNode.querySelector('.sel-btn');
+    var hidden = sel ? sel.classList.contains('sel-native-hidden') : false;
+    var n = sel ? sel.options.length : 0;
+    if (btn) btn.click();
+    var menu = document.querySelector('.sel-menu');
+    var items = menu ? menu.querySelectorAll('.sel-item').length : 0;
+    var picked = '';
+    if (menu) { var last = menu.querySelectorAll('.sel-item')[items - 1]; last.click(); picked = sel.value; }
+    return { btn: btn ? 1 : 0, hidden: hidden ? 1 : 0, n: n, items: items,
+             picked: picked, lastVal: sel ? sel.options[n - 1].value : '' };`);
+  cmp(tag + ': своя кнопка вместо коробочки ОС', r.btn, 1, 0);
+  cmp(tag + ': системный список спрятан', r.hidden, 1, 0);
+  cmp(tag + ': в меню столько же вариантов, сколько в списке', r.items, r.n, 0);
+  cmp(tag + ': выбор из меню доходит до модели', r.picked, r.lastVal, 0);
+}
+
+head('Сессия 01.09 (3) · силу неравенства можно задать числом');
+r = await run(`resetSceneMemory(); pickScene('ineq'); redrawAll();
+  var val = document.getElementById('ineq-master-slider-val');
+  var sl = document.getElementById('ineq-master-slider');
+  var clickable = val ? (val.classList.contains('pchip-editable') ? 1 : 0) : 0;
+  val.click();
+  var inp = val.querySelector('input');
+  if (!inp) return { clickable: clickable, opened: 0 };
+  inp.value = 137;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.blur();
+  return { clickable: clickable, opened: 1, sl: parseFloat(sl.value),
+           shown: val.textContent.trim(), s: STATE.ineqMasterS };`);
+cmp('число помечено как правимое', r.clickable, 1, 0);
+cmp('щелчок открывает поле точного ввода', r.opened, 1, 0);
+cmp('ползунок встал на набранное', r.sl, 137, 1e-6);
+cmp('на экране снова проценты', r.shown, '137%', 0);
+cmp('модель приняла значение', r.s, 1.37, 1e-6);
+r = await run(`var val = document.getElementById('ineq-master-slider-val');
+  val.click();
+  var inp = val.querySelector('input');
+  inp.value = 999; inp.dispatchEvent(new Event('input', { bubbles: true })); inp.blur();
+  var sl = document.getElementById('ineq-master-slider');
+  return { sl: parseFloat(sl.value), max: parseFloat(sl.max) };`);
+cmp('значение за границей зажимается потолком ползунка', r.sl, r.max, 1e-6);
+
+head('Сессия 01.09 (3) · пол цены выше резервной цены покупателя');
+r = await run(MKT + `setDS('ceil', '100-Q', 'Q'); setType('floor'); setPReg(101); redrawAll();
+  var sl = document.getElementById('pc-slider');
+  return { pReg: STATE.pReg, max: parseFloat(sl.max), Q: STATE.pc.Qtrade,
+           dwl: STATE.pc.dwl, no: !!STATE.pc.noMarket, cs: STATE.pc.cs, ps: STATE.pc.ps };`);
+cmp('пол 101 действительно задан (не зажат сотней)', r.pReg, 101, 1e-9);
+cmp('потолок ползунка поднят выше резервной цены', r.max > 100, true, 0);
+cmp('пол 101: объём торговли', r.Q, 0, 1e-9);
+cmp('пол 101: рынка нет', r.no, true, 0);
+cmp('пол 101: CS', r.cs, 0, 1e-9);
+cmp('пол 101: PS', r.ps, 0, 1e-9);
+cmp('пол 101: потери общества', r.dwl, 2500, 1e-3);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
