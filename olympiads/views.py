@@ -7,7 +7,8 @@ from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 
 from . import services
-from .models import TAG_LABELS, Olympiad, current_academic_year
+from .models import (TAG_LABELS, Olympiad, RegionalCoordinator,
+                     current_academic_year)
 
 
 def _has_placeholder(objects):
@@ -60,6 +61,12 @@ def olympiad_detail(request, slug):
         olympiad.variants.select_related('stage')
         .order_by('-year', 'stage__order', 'grade')
     )
+    # Блок региональных организаторов есть только у ВсОШ: школьный и
+    # муниципальный этапы назначает субъект, и только у неё это так.
+    regions = (
+        list(RegionalCoordinator.objects.all())
+        if olympiad.kind == Olympiad.Kind.VSOSH else []
+    )
     score_rows, score_years = services.pass_score_rows(olympiad)
     year = current_academic_year()
     events = list(
@@ -80,6 +87,7 @@ def olympiad_detail(request, slug):
         'variant_stages': stages,
         'variant_grades': sorted({v.grade for v in variants if v.grade}),
         'variant_years': sorted({v.year for v in variants}, reverse=True),
+        'regions': regions,
         # Год берётся из данных, а не зашивается в шаблон: правила приёма
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,

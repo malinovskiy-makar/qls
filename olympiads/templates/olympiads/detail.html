@@ -348,6 +348,46 @@
   {% endif %}
 </section>
 
+{% if regions %}
+<section class="ol-section">
+  <details class="ol-regions">
+    <summary class="ol-regions-sum">Региональные организаторы — {{ regions|length }} регионов</summary>
+    <p class="ol-note">Точные даты школьного и муниципального этапов, площадки
+      и проходные баллы устанавливает ваш регион. Уточняйте их у регионального
+      организатора.</p>
+    <ul class="ol-regions-list">
+      {% for region in regions %}
+      <li class="ol-region{% if not region.url %} ol-region--nourl{% endif %}">
+        <span class="ol-region-mark" aria-hidden="true"></span>
+        <span>
+          {% if region.url %}
+          <a href="{{ region.url }}" target="_blank" rel="noopener">{{ region.region_name }}</a>
+          {% else %}
+          {{ region.region_name }}
+          <span class="ol-region-soon">ссылка уточняется</span>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+
+<section class="ol-section ol-sources">
+  <h2 class="ol-sources-title">Официальные источники</h2>
+  {% if olympiad.official_url or olympiad.archive_url or olympiad.registration_url or olympiad.source %}
+  <ul class="ol-sources-list">
+    {% if olympiad.official_url %}<li><a href="{{ olympiad.official_url }}" target="_blank" rel="noopener">Официальный сайт</a></li>{% endif %}
+    {% if olympiad.archive_url %}<li><a href="{{ olympiad.archive_url }}" target="_blank" rel="noopener">Архив заданий</a></li>{% endif %}
+    {% if olympiad.registration_url %}<li><a href="{{ olympiad.registration_url }}" target="_blank" rel="noopener">Страница регистрации</a></li>{% endif %}
+    {% if olympiad.source %}<li><a href="{{ olympiad.source.url }}" target="_blank" rel="noopener">{{ olympiad.source.title|default:"Документ-источник" }}</a></li>{% endif %}
+  </ul>
+  {% else %}
+  <p class="ol-sources-empty">Ссылки на официальные документы пока не собраны.</p>
+  {% endif %}
+</section>
+
 {% endblock %}
 
 {% block extra_js %}{% include 'olympiads/_variants_js.html' %}{% endblock %}

@@ -265,7 +265,7 @@
 }
 .ol-btn--off:hover { background: var(--surface); border-color: var(--border); }
 
-/* ── Описание ───────────────────────────────────────── */
+/* ── Панель с рассказом об олимпиаде ────────────────── */
 .ol-desc {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -357,7 +357,7 @@
 .ol-bar-fill { display: block; height: 100%; background: var(--accent); }
 .ol-bar-num { text-align: right; color: var(--text2); }
 
-/* ── Три панели «что за задачи» ─────────────────────── */
+/* ── Три панели разбора банка ───────────────────────── */
 .ol-panels {
   display: grid; gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -388,7 +388,7 @@
 }
 .ol-uni-name { display: block; font-weight: 600; }
 .ol-uni-prog { display: block; color: var(--text2); }
-/* Строка «льготы нет» приглушается целиком, чтобы взгляд не спотыкался
+/* Строка без права приглушается целиком, чтобы взгляд не спотыкался
    о неё при просмотре сверху вниз. */
 .ol-row--none td { color: var(--text3); }
 .ol-row--none .ol-uni-name { font-weight: 500; }
@@ -398,7 +398,7 @@
   max-width: var(--w-read);
 }
 
-/* ── Проходные баллы по годам ───────────────────────── */
+/* ── Полоски баллов по годам ────────────────────────── */
 .ol-scores {
   display: grid; gap: 12px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -412,7 +412,7 @@
 }
 .ol-bar--score { grid-template-columns: 44px 1fr 84px; font-size: 12px; }
 
-/* ── Комплекты прошлых лет ──────────────────────────── */
+/* ── Список комплектов и их чипы ────────────────────── */
 .ol-vfilters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
 .ol-vrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
 .ol-vrow-label { font-size: 12px; color: var(--text2); width: 58px; flex-shrink: 0; }
@@ -431,3 +431,38 @@
 .ol-variant-meta { display: block; font-size: 12px; color: var(--text2); margin-top: 2px; }
 .ol-variant-acts { display: flex; gap: 6px; flex-wrap: wrap; }
 .ol-btn--sm { font-size: 13px; padding: 6px 12px; }
+
+/* ── Раскрывающийся список субъектов РФ ─────────────── */
+.ol-regions {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 12px 16px;
+}
+.ol-regions-sum { font-size: 15px; font-weight: 600; cursor: pointer; }
+.ol-regions-list {
+  list-style: none; columns: 3; column-gap: 24px; margin-top: 12px;
+}
+@media (max-width: 900px) { .ol-regions-list { columns: 2; } }
+@media (max-width: 620px) { .ol-regions-list { columns: 1; } }
+.ol-region {
+  display: flex; gap: 8px; align-items: flex-start;
+  break-inside: avoid; padding: 4px 0; font-size: 13px;
+}
+/* Место под эмблему региона занято заранее — по той же причине, что и
+   место под логотип на карточке. */
+.ol-region-mark {
+  width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;
+  background: var(--surface-2); border-radius: var(--r-sm);
+}
+.ol-region a { color: var(--accent-ink); }
+.ol-region--nourl { color: var(--text3); }
+.ol-region-soon { display: block; font-size: 11px; color: var(--text3); }
+
+/* ── Справочный хвост страницы ──────────────────────── */
+/* Скромнее остальных секций намеренно: это не содержание страницы. */
+.ol-sources { border-top: 1px solid var(--line); padding-top: 18px; }
+.ol-sources-title { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.ol-sources-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.ol-sources-list a { font-size: 13px; color: var(--accent-ink); }
+.ol-sources-empty { font-size: 13px; color: var(--text3); }
