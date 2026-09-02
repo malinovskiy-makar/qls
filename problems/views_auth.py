@@ -76,6 +76,15 @@ class RoleBasedLoginView(LoginView):
         return super().form_invalid(form)
 
     def get_success_url(self):
+        # ⚠️ `next` — ПЕРВЫМ, иначе ссылки вида /login/?next=/game/duel/...
+        # (анонимный переход по приглашению в дуэль) всегда сбрасывают
+        # человека на дефолтный экран роли, а не туда, куда он шёл.
+        # `get_redirect_url()` — штатная проверка Django на чужой хост
+        # (открытый редирект), поэтому небезопасный next отбрасывается
+        # сам, без своей проверки здесь.
+        redirect_to = self.get_redirect_url()
+        if redirect_to:
+            return redirect_to
         user = self.request.user
         if user.role == 'student':
             return '/student/'
