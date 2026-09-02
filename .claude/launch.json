@@ -135,6 +135,17 @@
         "--settings=config.settings_figure"
       ],
       "port": 8011
+    },
+    {
+      "name": "olympiads",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv313/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8433",
+        "--noreload"
+      ],
+      "port": 8433
     }
   ]
 }

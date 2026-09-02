@@ -29,6 +29,20 @@ MONTHS_GENITIVE = (
 )
 
 
+# Подписи тегов и их порядок. Одно место на два экрана: полосу чипов и
+# карточку — иначе список на карточке однажды разойдётся с фильтром.
+TAG_LABELS = (
+    ('law_bvi', 'Без экзаменов по закону'),
+    ('level_1', 'I уровень'),
+    ('level_23', 'II–III уровень'),
+    ('registration_open', 'Идёт регистрация'),
+    ('young', 'Можно с 5–8 класса'),
+    ('online_qual', 'Онлайн отборочный'),
+    ('online_final', 'Онлайн финал'),
+    ('team', 'Командная'),
+)
+
+
 def current_academic_year(today=None):
     """Текущий учебный год строкой «2026/27».
 
@@ -239,6 +253,29 @@ class Olympiad(models.Model):
     @property
     def variant_count(self):
         return self.variants.count()
+
+    @property
+    def tag_labels(self):
+        """Активные теги парами «код + подпись», в порядке полосы чипов."""
+        active = set(self.tags)
+        return [(code, label) for code, label in TAG_LABELS if code in active]
+
+    @property
+    def next_event(self):
+        """Ближайшее событие для карточки.
+
+        Сначала подтверждённые начиная с сегодня, потом — ориентиры. У
+        ориентира числа нет, и вперёд настоящей даты он не встаёт.
+        """
+        today = date.today()
+        confirmed = [
+            e for e in self.events.all()
+            if e.is_confirmed and e.date_start and e.date_start >= today
+        ]
+        if confirmed:
+            return min(confirmed, key=lambda e: e.date_start)
+        approximate = [e for e in self.events.all() if not e.is_confirmed]
+        return approximate[0] if approximate else None
 
     @property
     def grades_label(self):

@@ -6,7 +6,7 @@
 from django.shortcuts import get_object_or_404, render
 
 from . import services
-from .models import Olympiad, current_academic_year
+from .models import TAG_LABELS, Olympiad, current_academic_year
 
 
 def _has_placeholder(objects):
@@ -39,6 +39,7 @@ def olympiad_list(request):
         'related': related,
         'feed_events': feed_events,
         'feed_has_confirmed': feed_has_confirmed,
+        'tag_labels': TAG_LABELS,
         'has_placeholder': _has_placeholder(olympiads),
     })
 

@@ -1,0 +1,109 @@
+<script>
+/* Фильтрация карточек чипами. Обычный JavaScript, без библиотек:
+   данные тегов уже лежат в data-tags при отрисовке шаблона, и запросов
+   на сервер полоса чипов не делает. */
+(function () {
+  var bar = document.getElementById('ol-filters');
+  if (!bar) { return; }
+  var chips = Array.prototype.slice.call(bar.querySelectorAll('.ol-chip'));
+  var cards = Array.prototype.slice.call(document.querySelectorAll('.ol-card'));
+  var nores = document.getElementById('ol-nores');
+  var resetBtn = document.getElementById('ol-reset');
+  var groups = Array.prototype.slice.call(document.querySelectorAll('[data-group]'));
+  var LEVELS = ['level_1', 'level_23'];
+
+  cards.forEach(function (card, i) {
+    card.olTags = (card.getAttribute('data-tags') || '').split(/\s+/).filter(Boolean);
+    card.olBase = i;
+  });
+
+  function selected() {
+    return chips
+      .filter(function (c) { return c.getAttribute('aria-pressed') === 'true'; })
+      .map(function (c) { return c.getAttribute('data-tag'); });
+  }
+
+  function apply() {
+    var on = selected();
+    var levelsOn = on.filter(function (t) { return LEVELS.indexOf(t) >= 0; });
+    var othersOn = on.filter(function (t) { return LEVELS.indexOf(t) < 0; });
+    var shown = 0;
+
+    cards.forEach(function (card) {
+      var tags = card.olTags;
+      var okOthers = othersOn.every(function (t) { return tags.indexOf(t) >= 0; });
+      /* Пара уровней между собой — ИЛИ. Уровень у олимпиады один, и «И»
+         между двумя уровнями не оставило бы вообще ничего. */
+      var okLevels = !levelsOn.length || levelsOn.some(function (t) {
+        return tags.indexOf(t) >= 0;
+      });
+      var ok = okOthers && okLevels;
+      card.hidden = !ok;
+      if (ok) {
+        shown++;
+        var matched = on.filter(function (t) { return tags.indexOf(t) >= 0; }).length;
+        /* Больше совпавших тегов — выше. Базовый порядок сохраняется
+           внутри одинакового числа совпадений. */
+        card.style.order = String(card.olBase - matched * 1000);
+      } else {
+        card.style.order = '';
+      }
+      Array.prototype.forEach.call(card.querySelectorAll('.ol-tag'), function (el) {
+        if (on.indexOf(el.getAttribute('data-tag')) >= 0) {
+          el.setAttribute('data-on', '1');
+        } else {
+          el.removeAttribute('data-on');
+        }
+      });
+    });
+
+    /* Пустая сетка вместе со своим заголовком прячется целиком: подпись
+       над пустотой читается как поломка. */
+    groups.forEach(function (group) {
+      var alive = Array.prototype.slice
+        .call(group.querySelectorAll('.ol-card'))
+        .some(function (c) { return !c.hidden; });
+      group.hidden = !alive;
+    });
+
+    if (nores) { nores.hidden = shown !== 0; }
+    writeUrl(on);
+  }
+
+  function writeUrl(on) {
+    var url = new URL(window.location.href);
+    if (on.length) { url.searchParams.set('tags', on.join(',')); }
+    else { url.searchParams.delete('tags'); }
+    window.history.replaceState(null, '', url.toString());
+  }
+
+  function readUrl() {
+    var raw = new URL(window.location.href).searchParams.get('tags');
+    if (!raw) { return; }
+    var wanted = raw.split(',');
+    chips.forEach(function (c) {
+      if (wanted.indexOf(c.getAttribute('data-tag')) >= 0) {
+        c.setAttribute('aria-pressed', 'true');
+      }
+    });
+  }
+
+  chips.forEach(function (chip) {
+    chip.addEventListener('click', function () {
+      var on = chip.getAttribute('aria-pressed') === 'true';
+      chip.setAttribute('aria-pressed', on ? 'false' : 'true');
+      apply();
+    });
+  });
+
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      chips.forEach(function (c) { c.setAttribute('aria-pressed', 'false'); });
+      apply();
+    });
+  }
+
+  readUrl();
+  apply();
+})();
+</script>

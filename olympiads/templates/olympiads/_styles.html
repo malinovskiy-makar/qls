@@ -18,6 +18,10 @@
 }
 
 /* ── Общая рамка раздела ────────────────────────────── */
+/* Раздел шире каталога: таблица льгот — семь колонок, и на 860 она не
+   помещается вовсе. Правило действует только здесь: партиал стилей
+   подключён единственно на экранах олимпиад. */
+.page-wrap { max-width: 960px; }
 .ol-head { margin-bottom: 28px; }
 .ol-title { font-size: 30px; font-weight: 700; line-height: var(--lh-tight); }
 .ol-sub {
@@ -35,7 +39,7 @@
   color: var(--text2);
 }
 
-/* ── Лента ближайших дат ────────────────────────────── */
+/* ── Панель дат сверху главной ──────────────────────── */
 .ol-feed {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -107,4 +111,114 @@
 .ol-status--awaiting .ol-dot {
   border: 1px dashed currentColor;
   background: none;
+}
+
+/* ── Полоса чипов-фильтров ──────────────────────────── */
+.ol-filters {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 24px 0 4px;
+}
+.ol-chip {
+  font: inherit; font-size: 13px; cursor: pointer;
+  padding: 5px 12px; border-radius: var(--r-pill);
+  background: var(--chip-bg); color: var(--chip-text);
+  border: 1px solid var(--border);
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+.ol-chip:hover { border-color: var(--accent); }
+.ol-chip[aria-pressed="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ol-nores[hidden] { display: none; }
+.ol-nores {
+  margin-top: 18px; font-size: 14px; color: var(--text2);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.ol-reset {
+  font: inherit; font-size: 13px; cursor: pointer;
+  padding: 5px 12px; border-radius: var(--r);
+  background: var(--btn-bg); color: var(--on-btn); border: 0;
+}
+.ol-reset:hover { background: var(--btn-bg-hover); }
+
+/* ── Сетка карточек ─────────────────────────────────── */
+.ol-grid {
+  list-style: none; display: grid; gap: 12px; margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .ol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .ol-grid { grid-template-columns: 1fr; } }
+
+.ol-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 36px 0 0; font-size: 14px; color: var(--text2);
+}
+.ol-divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--line);
+}
+
+.ol-card[hidden] { display: none; }
+.ol-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  transition: transform var(--t), border-color var(--t), background var(--t);
+}
+/* ⚠️ ТЕНИ ПРИ НАВЕДЕНИИ НЕТ, И ЭТО КАНОН, А НЕ ЗАБЫВЧИВОСТЬ.
+   У поверхности в покое и под курсором тени нет: отличие дают рамка и
+   фон. Тень оставлена только всплывающей подсказке, которая физически
+   висит над страницей. */
+.ol-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.ol-card-link {
+  display: flex; flex-direction: column; gap: 8px; height: 100%;
+  padding: 14px; text-decoration: none; color: inherit;
+}
+.ol-card-top { display: flex; gap: 10px; align-items: flex-start; }
+.ol-logo {
+  width: 48px; height: 48px; flex-shrink: 0;
+  border-radius: var(--r-card); object-fit: contain;
+}
+.ol-logo--empty {
+  background: var(--surface-2); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; letter-spacing: .5px;
+}
+.ol-card-names { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ol-card-name { font-size: 15px; font-weight: 600; line-height: var(--lh-tight); }
+.ol-card-org { font-size: 13px; color: var(--text2); }
+
+.ol-card-tags { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.ol-tag {
+  font-size: 11px; padding: 2px 7px; border-radius: var(--r-pill);
+  background: var(--chip-bg); color: var(--text3);
+  border: 1px solid var(--border-soft);
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+/* Тег загорается, когда пользователь выбрал этот же чип наверху: видно,
+   ПОЧЕМУ карточка осталась в выдаче. */
+.ol-tag[data-on="1"] {
+  background: var(--accent-tint); border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ol-card-next {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  font-size: 13px; margin-top: auto; padding-top: 4px;
+}
+.ol-card-next-what { color: var(--text2); }
+.ol-card-next-when { font-weight: 600; }
+.ol-card-next-none, .ol-card-foot { color: var(--text2); }
+.ol-card-next .ol-status { margin-top: 0; flex-basis: 100%; }
+.ol-card-foot {
+  border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ol-card:hover { transform: none; }
 }

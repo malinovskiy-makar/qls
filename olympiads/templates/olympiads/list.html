@@ -7,4 +7,7 @@
 </div>
 
 {% include 'olympiads/_dates_feed.html' %}
+{% include 'olympiads/_filters.html' %}
 {% endblock %}
+
+{% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% endblock %}
