@@ -56,7 +56,16 @@ async function startRun(p, mode) {
     await shot('run_' + mode);
   }
 
-  // 3. Экран результатов: доигрываем блиц до конца пропусками.
+  // 3. Окно выхода — своё, не браузерное. Снимаем поверх забега, чтобы
+  //    было видно размытие карточки вопроса за ним.
+  await startRun(p, 'blitz');
+  await p.click('#btn-quit');
+  await p.waitForSelector('#quit-modal:not([hidden])', { timeout: 5000 });
+  await p.waitForTimeout(250);
+  await shot('quit_modal');
+  await p.click('#quit-no');
+
+  // 4. Экран результатов: доигрываем блиц до конца пропусками.
   await startRun(p, 'blitz');
   for (let i = 0; i < 80; i++) {
     const state = await p.evaluate(() => {

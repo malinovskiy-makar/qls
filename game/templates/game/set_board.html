@@ -112,7 +112,7 @@
           <td class="num">{{ q.wrong }}</td>
           <td class="num">{{ q.skip }}</td>
           <td class="num {% if q.percent is not None and q.percent < 50 %}bd-hard{% endif %}">
-            {% if q.percent is not None %}{{ q.percent }}%{% else %}—{% endif %}
+            {% if q.percent is not None %}{{ q.percent }}%{% else %}–{% endif %}
           </td>
         </tr>
       {% empty %}
@@ -123,12 +123,12 @@
   </div>
   {% if not show_text %}
   <p class="bd-note">
-    Тексты вопросов скрыты: набор ещё не сыгран вами. Доля верных видна —
+    Тексты вопросов скрыты: набор ещё не сыгран вами. Доля верных видна –
     содержание вопросов появится после того, как вы их сыграете.
   </p>
   {% endif %}
   <p class="bd-note">
-    Доля верных считается ВНУТРИ этого набора — по забегам тех, кто его
+    Доля верных считается ВНУТРИ этого набора: по забегам тех, кто его
     играл, а не по всему сайту. Пропуск в долю не входит.
   </p>
 </div>

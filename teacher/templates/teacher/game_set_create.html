@@ -166,9 +166,9 @@
 
       <div id="pool">
         {% for c in cards %}
-        {# исходный текст и ответ — в data-*: справа они пересобираются
+        {% comment %}исходный текст и ответ в data-*: справа они пересобираются
            заново, а textContent уже отрисованной KaTeX-формулы вернул бы
-           «Qd=165−PQ_d = 165 - P» (разметка + исходник вперемешку) #}
+           «Qd=165−PQ_d = 165 - P» (разметка и исходник вперемешку){% endcomment %}
         <div class="q-item" data-id="{{ c.q.id }}"
              data-text="{{ c.q.question }}" data-answer="{{ c.answer }}"
              data-topics="{{ c.topics }}">

@@ -20,9 +20,13 @@ from django.conf import settings
 from django.test import TestCase
 
 # Куда не ходим: чужой код и сгенерированные отчёты.
+# ⚠️ `.claude` исключена по той же причине, что `materials`: в
+# `.claude/worktrees/` лежат рабочие копии ДРУГИХ веток репозитория. Их
+# шаблоны — не шаблоны этой ветки, и судить их отсюда бессмысленно; без
+# исключения прогон краснеет от чужого кода и этим прячет своё.
 SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
               os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep)
+              os.sep + 'staticfiles' + os.sep, os.sep + '.claude' + os.sep)
 
 
 def template_files():

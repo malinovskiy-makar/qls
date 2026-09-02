@@ -150,11 +150,11 @@ class PageJsTests(TestCase):
         """Развилка исходов забега четырёхветочная: lives / time /
         pool_empty / set_done. Пропущенная ветка молча показала бы
         «время вышло» там, где время не при чём."""
-        m = re.search(r'function reasonText\(s\) \{(.*?)\n  \}', self.js, re.S)
-        self.assertIsNotNone(m)
-        body = m.group(1)
-        for reason in ('lives', 'set_done', 'pool_empty'):
-            self.assertIn("'%s'" % reason, body)
+        # ⚠️ Строку причины в углу шапки результатов владелец убрал
+        # (сессия «Wecon Rush», 1.12) вместе с функцией `reasonText`.
+        # Развилка исходов при этом обязана остаться четырёхветочной —
+        # теперь её сторожит только заголовок.
+        self.assertNotIn('function reasonText', self.js)
         m2 = re.search(r'function titleText\(s\) \{(.*?)\n  \}', self.js, re.S)
         self.assertIsNotNone(m2)
         for reason in ('lives', 'set_done', 'pool_empty'):

@@ -1,5 +1,5 @@
 """
-Бэкенд Econ Rush.
+Бэкенд Wecon Rush.
 
 Принципы:
 - Страница и API публичные (без логина) — игра работает как инструмент
@@ -524,7 +524,7 @@ def api_session_start(request):
         # пишем — начинать и сразу же хоронить забег незачем.
         return JsonResponse({
             'ok': False, 'reason': 'pool_empty',
-            'error': 'Под этими настройками вопросов нет — измени фильтры'})
+            'error': 'Под этими настройками вопросов нет. Измените фильтры'})
     request.session[SESSION_KEY] = state
     return JsonResponse({
         'ok': True,
@@ -1639,7 +1639,7 @@ def result_page(request, code):
         'page_url': page_url,
         'game_url': request.build_absolute_uri(reverse('game:page')),
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': f'{result.score} очков в Econ Rush — обгонишь?',
+        'og_title': f'{result.score} очков в Wecon Rush — обгонишь?',
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),

@@ -1,5 +1,5 @@
 """
-Тесты Econ Rush: отборщики пула (парсинг), API забега (анти-чит, повторы),
+Тесты Wecon Rush: отборщики пула (парсинг), API забега (анти-чит, повторы),
 четыре режима (типы вопросов, проверка multi/numeric, «сначала невиданные»).
 """
 import json
@@ -1035,7 +1035,7 @@ class ResultPageTests(TestCase):
                     'twitter:card']:
             self.assertIn(tag, html)
         self.assertIn('summary_large_image', html)
-        self.assertIn('100 очков в Econ Rush', html)   # счёт в тексте превью
+        self.assertIn('100 очков в Wecon Rush', html)   # счёт в тексте превью
         # og:url и og:image — абсолютные
         m = re.search(r'property="og:url" content="([^"]+)"', html)
         self.assertTrue(m.group(1).startswith('http://'))

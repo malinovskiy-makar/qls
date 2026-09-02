@@ -1,6 +1,6 @@
 {% load static %}
 {% comment %}
-  Econ Rush — публичная игра на скорость. Три экрана (старт / игра / финал)
+  Wecon Rush — публичная игра на скорость. Три экрана (старт / игра / финал)
   в одном шаблоне, переключаются JS-машиной состояний.
 
   Дизайн — «Сцена»: токены сайта из _tokens.html, свой слой --rush-* маппится
@@ -16,7 +16,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Econ Rush — игра на скорость по экономике</title>
+  <title>Wecon Rush – игра на скорость по экономике</title>
 
   {% include '_tokens.html' %}
 
@@ -92,6 +92,16 @@ a:focus-visible, button:focus-visible {
   letter-spacing: -1.5px;
   line-height: 1.05;
   user-select: none;
+}
+/* Знак W: высота = высота заглавных (cap-height Montserrat 700 ≈ 0,7em),
+   сидит на базовой линии, вплотную к «ECON» — WECON одно слово. Ширина
+   считается из плотного bbox: 411,00 / 298,78 = 1,3756. */
+.rush-logo .w-mark {
+  height: .7em;
+  width: calc(.7em * 1.3756);
+  display: inline-block;
+  vertical-align: baseline;
+  color: var(--rush-accent);
 }
 .rush-logo .bolt { margin: 0 .08em; }
 .rush-logo .rush {
@@ -412,13 +422,6 @@ a:focus-visible, button:focus-visible {
   text-decoration: none; display: inline-flex; align-items: center;
 }
 .btn-board:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-
-.best-line {
-  margin-top: 16px;
-  font-size: 14px;
-  color: var(--text3);
-}
-.best-line .kbd-hint { white-space: nowrap; }
 
 /* ── Нижний ряд входов ──────────────────────────────────────────── */
 .entry-row {
@@ -896,7 +899,60 @@ body.figfull .last-life-frame.on { opacity: .42; }
   font-size: 18px;
   cursor: pointer;
 }
-.quit-x:hover { color: var(--text); background: var(--surface-2); }
+/* ⚠️ 1.10 При наведении крестик НЕ получает песочную заливку — только
+   чуть тяжелеет и подрастает. Заливка на прозрачном фоне игры читалась
+   как вторая кнопка. Кольцо фокуса для клавиатуры остаётся. */
+.quit-x:hover { color: var(--text); font-weight: 700; transform: scale(1.1); }
+.quit-x:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
+
+/* ── Окно «Закончить игру?» ────────────────────────────────────────────
+   ⚠️ СВОЁ окно, а не нативное. Нативный диалог замораживает вкладку
+   целиком и выглядит чужим на странице (канон 2.8). Здесь это важнее
+   вдвойне: таймер забега продолжает идти, пока окно открыто, — окно не
+   должно быть бесплатной паузой. Карточка вопроса за окном размыта:
+   читать её, пока думаешь над выходом, нельзя. */
+.quit-modal[hidden] { display: none; }
+.quit-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .45);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+}
+.quit-card {
+  background: var(--surface);
+  border: 1px solid var(--rush-border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-pop);
+  padding: 22px 24px 20px;
+  max-width: 380px;
+  width: 100%;
+  text-align: center;
+}
+.quit-card p { font-size: 16px; line-height: 1.5; color: var(--text); }
+.quit-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+}
+.quit-actions button { font: inherit; font-size: 16px; height: 44px;
+                       padding: 0 26px; border-radius: 10px; cursor: pointer; }
+/* «Нет» — главное действие: вернуться в забег. Оно ярче. */
+.quit-no { border: none; background: var(--btn-bg); color: var(--on-btn);
+           font-weight: 600; }
+.quit-no:hover { background: var(--btn-bg-hover); }
+/* «Да» — тихое: выйти и потерять результат. */
+.quit-yes { border: 1px solid var(--rush-border); background: var(--rush-surface);
+            color: var(--text2); font-weight: 500; }
+.quit-yes:hover { border-color: var(--rush-bad); color: var(--rush-bad); }
+.quit-actions button:focus-visible { outline: 2px solid var(--rush-accent);
+                                     outline-offset: 2px; }
 
 .q-card {
   background: var(--rush-surface);
@@ -1126,7 +1182,6 @@ body.figfull .last-life-frame.on { opacity: .42; }
   outline-offset: 2px;
   border-color: var(--rush-accent);
 }
-.num-hint { font-size: 13px; color: var(--text3); }
 /* единица измерения ответа («ответ в %») — приходит с вопросом Классики */
 .num-unit { font-size: 14.5px; font-weight: 600; color: var(--text2); }
 .numeric-actions { display: flex; gap: 10px; }
@@ -1219,10 +1274,6 @@ body.figfull .last-life-frame.on { opacity: .42; }
 .fin-chip-alt { background: var(--surface-2); color: var(--text2); font-weight: 600; }
 .fin-chip-alt[hidden] { display: none; }
 .fin-date { font-size: 13px; color: var(--text3); }
-.fin-head-r { text-align: right; flex-shrink: 0; }
-.fin-hearts { font-size: 17px; letter-spacing: 3px; line-height: 1; }
-.fin-hearts .heart.lost { opacity: .35; }
-.fin-reason { margin-top: 7px; font-size: 13px; color: var(--text3); }
 
 .fin-metrics {
   display: grid;
@@ -1437,26 +1488,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 .miss-item a { color: var(--accent-ink); text-decoration: none; font-size: 13px; }
 .miss-item a:hover { text-decoration: underline; }
 
-/* Чип «Тренировочный» на карточке сгенерированного вопроса — в стиле
-   topic-chip, только меньше и некликабельный (токены --rush-*). */
 .q-chips {
   display: flex;
   justify-content: center;
   gap: 6px;
   min-height: 22px;
 }
-.gen-chip {
-  display: inline-block;
-  font-size: 13px;
-  line-height: 1;
-  padding: 4px 8px;
-  border: 1px solid var(--rush-border);
-  border-radius: 999px;
-  background: var(--rush-surface);
+/* Пометка о происхождении вопроса — мелкой строкой ПОД карточкой, справа.
+   Плашка внутри карточки спорила с условием за внимание; здесь она честно
+   сообщает происхождение и не мешает читать. Ставится всем вопросам с
+   `generated: true` — и архетипам-генераторам, и ручным «по мотивам». */
+.gen-note {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
   color: var(--text3);
-  letter-spacing: .04em;
-  text-transform: uppercase;
 }
+.gen-note[hidden] { display: none; }
 
 /* Чип «верно отвечают N %» — появляется ПОСЛЕ ответа, рядом с разбором.
    Показывается только когда попыток набралось достаточно (порог в
@@ -1513,7 +1561,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   .fin-metrics { grid-template-columns: 1fr 1fr; }
   .det-body { grid-template-columns: 1fr; }
   .fin-head { flex-direction: column; }
-  .fin-head-r { text-align: left; }
   .final-actions { flex-direction: column; align-items: stretch; }
   .final-actions .btn-again, .final-actions .btn-copy { width: 100%; }
   .btn-catalog { display: flex; align-items: center; justify-content: center; }
@@ -1522,7 +1569,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 @media (hover: none) {
   .opt .key { display: none; }
   .keys-hint { display: none; }
-  .best-line .kbd-hint { display: none; }
 }
 
 /* ── Уменьшенное движение: мгновенные замены ───────────────────── */
@@ -1556,14 +1602,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <section id="screen-start" class="screen active">
     <div class="col">
       {% comment %}
-      ⚠️ Разметка знака — ОБЩАЯ с блоком «Econ Rush» в личной статистике
+      ⚠️ Разметка знака — ОБЩАЯ с блоком «Wecon Rush» в личной статистике
       (`templates/_rush_logo.html`). Копия разошлась бы с оригиналом при
       первой же правке. Размер задаёт `.rush-logo` этой страницы, молния
       приезжает из общего набора иконок.
       {% endcomment %}
       <header class="rush-head">
         <h1>{% include "_rush_logo.html" %}</h1>
-        <p class="rush-sub">Вопросы по экономике на время. Четыре режима — как в шахматах.</p>
+        <p class="rush-sub">Решайте тестовые задачи в условиях ограниченного времени. Чем точнее вы отвечаете, тем дольше длится ваша игра!</p>
         <p class="rush-count"><b>{{ pool_total }}</b> вопросов из реальных олимпиад</p>
       </header>
 
@@ -1632,7 +1678,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </div>
       </div>
 
-      <p class="best-line" id="best-line">Клик по режиму — старт забега<span class="kbd-hint"> · 1–5 — выбрать режим · Enter — последний</span></p>
 
       <!-- Нижний ряд входов -->
       <div class="entry-row" id="entry-row">
@@ -1692,12 +1737,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <!-- Чипы вынесены НАД карточкой: .q-card — flex-обёртка ровно с
            одним ребёнком (см. её стиль), а лишние дети вставали в ряд
            рядом с текстом вопроса. -->
-      <div class="q-chips"><span class="gen-chip" id="gen-chip" hidden>Тренировочный</span><span class="stat-chip" id="stat-chip" hidden></span></div>
+      <div class="q-chips"><span class="stat-chip" id="stat-chip" hidden></span></div>
       <!-- Формулировка режима «График» — ОТДЕЛЬНОЙ строкой над условием:
            она одна и та же на все сюжеты, и слипаясь с условием, читается
            как часть задачи. -->
       <p class="q-prompt" id="q-prompt" hidden></p>
       <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
+      <p class="gen-note" id="gen-note" hidden>Вопрос сгенерирован ИИ</p>
       <!-- Режим «График»: чертёж чужого решения. Разворачивается на весь
            экран НАЛОЖЕНИЕМ (CSS), варианты и таймер при этом остаются
            видимыми и рабочими. -->
@@ -1712,7 +1758,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <button class="fig-btn" id="fig-close" type="button" hidden>✕ Свернуть (Esc)</button>
         </div>
         <div class="fig-holder" id="fig-holder"></div>
-        <p class="fig-hint" id="fig-hint">Клик по чертежу, F или пробел — развернуть на весь экран</p>
+        <p class="fig-hint" id="fig-hint">Клик по чертежу, F или пробел разворачивают его на весь экран</p>
       </div>
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
@@ -1728,14 +1774,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <div class="num-unit" id="num-unit" hidden></div>
         <input id="num-input" class="num-input" inputmode="decimal"
                autocomplete="off" spellcheck="false" placeholder="Например: 12,5">
-        <div class="num-hint">Дробь можно вводить как 1/3 · запятая или точка — не важно</div>
         <div class="numeric-actions">
           <button class="btn-submit" id="btn-num-submit">Ответить</button>
-          <button class="btn-skip" id="btn-num-skip">Пропустить</button>
         </div>
         <div class="num-feedback" id="num-feedback"></div>
       </div>
-      <p class="keys-hint" id="keys-hint">Клавиши 1–4 — ответ · пробел — пропустить</p>
+      <p class="keys-hint" id="keys-hint">Используйте клавиши 1–4 для быстрого ответа, а пробел для пропуска задания</p>
     </div>
   </section>
 
@@ -1756,10 +1800,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             <span class="fin-chip fin-chip-set" id="fin-set-chip" hidden></span>
             <span class="fin-date" id="fin-date"></span>
           </p>
-        </div>
-        <div class="fin-head-r">
-          <div class="fin-hearts" id="fin-hearts" aria-label="Жизни"></div>
-          <div class="fin-reason" id="fin-reason"></div>
         </div>
       </header>
 
@@ -1876,6 +1916,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 {% include '_icons.html' %}
 <div class="vignette" id="vignette"></div>
 <div class="last-life-frame" id="last-life-frame"></div>
+<div class="quit-modal" id="quit-modal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="quit-text">
+  <div class="quit-card">
+    <p id="quit-text">Закончить игру? Результат не сохранится.</p>
+    <div class="quit-actions">
+      <button type="button" class="quit-no" id="quit-no">Нет</button>
+      <button type="button" class="quit-yes" id="quit-yes">Да</button>
+    </div>
+  </div>
+</div>
 <div class="gameover-overlay" id="gameover-overlay" hidden>
   <div class="go-card">
     <div class="go-hearts"><span class="qi-slot"></span></div>
@@ -1887,7 +1937,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 <script>
 /* ============================================================
-   Econ Rush — клиент. Маленькая явная машина состояний:
+   Wecon Rush — клиент. Маленькая явная машина состояний:
    start → playing → finished. Таймер — requestAnimationFrame
    от performance.now() (без дрейфа setInterval).
    Правильные ответы приходят ТОЛЬКО после ответа игрока.
@@ -1916,14 +1966,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var MODE_META = {
     bullet:  { icon: 'bolt',   kind: 'Данетки: Верно или Неверно',
                mock: 'toggle' },
-    blitz:   { icon: 'flame',  kind: 'Один верный из вариантов',
+    blitz:   { icon: 'flame',  kind: 'Один верный ответ',
                mock: 'radio' },
-    rapid:   { icon: 'target', kind: 'Несколько верных из вариантов',
+    rapid:   { icon: 'target', kind: 'Несколько верных ответов',
                mock: 'check' },
-    classic: { icon: 'keypad', kind: 'Числовой ответ — впиши сам',
+    classic: { icon: 'keypad', kind: 'Числовой ответ без решения',
                mock: 'input' },
     figure:  { icon: 'chart',
-               kind: 'как разбор у доски — найди первый неверный шаг в чужом решении',
+               kind: 'как разбор у доски: найди первый неверный шаг в чужом решении',
                mock: 'audit' }
   };
   var MODE_ORDER = ['bullet', 'blitz', 'rapid', 'classic', 'figure'];
@@ -2099,7 +2149,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   /* «−1 ♥» на всплывашке ошибки: иконка вместо типографского сердца. */
   function wrongDeltaHTML(d) {
     return d.time_delta ? (d.time_delta + ' с')
-                        : ('−1 ' + (ICONS.heart || ''));
+                        : ('−1 ' + (ICONS.heart_fill || ''));
   }
 
   /* Цена пропуска берётся из конфига: сейчас 0 (пропуск бесплатный),
@@ -2194,7 +2244,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       bs[0].textContent = (m.duration >= 60 ? (m.duration / 60) + ' мин' : m.duration + ' с');
       bs[1].textContent = formatSec(m.time_correct);
       // Запас жизней на карточке режима — теми же иконками, что в игре.
-      bs[2].innerHTML = new Array(m.lives + 1).join(ICONS.heart || '');
+      bs[2].innerHTML = new Array(m.lives + 1).join(ICONS.heart_fill || '');
       card.appendChild(terms);
 
       var bestEl = document.createElement('div');
@@ -2388,6 +2438,19 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
         shareInfo = null;
         $('gameover-overlay').hidden = true;
+        /* ⚠️ ПЛАШКА ДЕЛЬТЫ У ТАЙМЕРА ЧИСТИТСЯ ЯВНО, И ЭТО НЕ ПЕДАНТИЗМ.
+           У неё анимация `deltaFloat ... forwards`, а CSS-анимация
+           ПЕРЕЗАПУСКАЕТСЯ, когда элемент снова становится видимым
+           (`display: none` → блок при возврате на экран игры). Без очистки
+           новый забег начинался бы с «−1» от прошлого — при трёх целых
+           жизнях. Ровно это владелец и видел, входя в Рапид после Блица;
+           замер: 100 и 400 мс, непрозрачность 1, жизней 3 из 3. */
+        var deltaChip = $('time-delta');
+        deltaChip.className = 'time-delta';
+        deltaChip.innerHTML = '';
+        deltaChip.style.opacity = '';
+        clearTimeout(deltaTimer1);
+        clearTimeout(deltaTimer2);
         timeLeft = MODE.duration;
         show('playing');
         rush('start');
@@ -2475,7 +2538,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       h.className = 'heart' + (lost ? ' lost' : '');
       // ⚠️ Погашенная жизнь — ТА ЖЕ иконка с прозрачностью, а не другой
       // символ: запас виден целиком, «сколько было и сколько осталось».
-      h.innerHTML = ICONS.heart || '';
+      h.innerHTML = ICONS.heart_fill || '';
       if (pop && !REDUCED && i === lives) h.classList.add('pop');
       box.appendChild(h);
     }
@@ -2508,7 +2571,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('q-prompt').hidden = !isAudit;
     $('q-prompt').textContent = isAudit ? q.prompt : '';
     paintAuditFigure(isAudit ? q : null);
-    $('gen-chip').hidden = !q.generated;
+    $('gen-note').hidden = !q.generated;
     $('stat-chip').hidden = true;   // статистика приходит только с ответом
     if (!REDUCED) {
       card.classList.remove('q-slide-in');
@@ -2587,23 +2650,31 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var hint = $('keys-hint');
     if (hint) {
       if (isAudit) {
-        hint.textContent = 'Клавиши 1–4 — ответ · F или пробел — развернуть '
-          + 'чертёж · S — ' + skipLabel();
+        hint.textContent = 'Используйте клавиши 1–4 для ответа, F или '
+          + 'пробел чтобы развернуть чертёж, S чтобы ' + skipLabel();
       } else if (isFigure) {
         hint.textContent = NARROW()
-          ? 'Тап — увеличить чертёж, второй тап — ответить · пробел — '
+          ? 'Тап увеличивает чертёж, второй тап отвечает. Пробел чтобы '
             + skipLabel()
-          : 'Клавиши 1–4 — выбрать чертёж · пробел — ' + skipLabel();
+          : 'Используйте клавиши 1–4 для выбора чертежа, а пробел чтобы '
+            + skipLabel();
       } else if (isBool) {
-        hint.textContent = '1 — Верно · 2 — Неверно · пробел — ' + skipLabel();
+        hint.textContent = 'Используйте клавиши 1–2 для быстрого ответа, '
+          + 'а пробел для пропуска задания';
       } else if (isMulti) {
-        hint.textContent = 'Клавиши 1–' + q.options.length +
-          ' — выбрать · Enter — ответить · пробел — ' + skipLabel();
+        // Enter здесь обязателен: без него несколько выбранных вариантов
+        // не отправить.
+        hint.textContent = 'Используйте клавиши 1–' + q.options.length
+          + ' для выбора вариантов, Enter для ответа, а пробел для пропуска '
+          + 'задания';
       } else if (isNumeric) {
-        hint.textContent = 'Enter — отправить ответ';
+        // ОДНА подсказка вместо двух: вторая строка («Enter — отправить»,
+        // «дробь как 1/3») больше не показывается.
+        hint.textContent = 'Дроби можно вводить через слэш, точку или '
+          + 'запятую. Используйте пробел для пропуска задания.';
       } else {
-        hint.textContent = 'Клавиши 1–' + q.options.length +
-          ' — ответ · пробел — ' + skipLabel();
+        hint.textContent = 'Используйте клавиши 1–' + q.options.length
+          + ' для быстрого ответа, а пробел для пропуска задания';
       }
     }
   }
@@ -2944,7 +3015,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   $('btn-submit').addEventListener('click', submitMulti);
   $('btn-num-submit').addEventListener('click', submitNumeric);
-  $('btn-num-skip').addEventListener('click', skip);
   // разрешённые символы числового ответа: цифры , . / -
   $('num-input').addEventListener('input', function () {
     var cleaned = this.value.replace(/[^0-9,.\/\-]/g, '');
@@ -3029,12 +3099,43 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   paintSoundBtn();
 
   /* ---------- ВЫХОД ИЗ ЗАБЕГА ---------- */
-  $('btn-quit').addEventListener('click', function () {
+  /* ⚠️ ТАЙМЕР ПРОДОЛЖАЕТ ИДТИ, пока окно открыто: цикл rAF не трогаем.
+     Иначе окно выхода стало бы бесплатной паузой посреди забега. */
+  var quitPrevFocus = null;
+
+  function openQuit() {
     if (state !== 'playing') return;
-    if (confirm('Прервать забег? Результат не сохранится.')) {
-      cancelAnimationFrame(rafId);
-      show('start');
-      renderModeCards();
+    quitPrevFocus = document.activeElement;
+    $('quit-modal').hidden = false;
+    $('quit-no').focus();               // главное действие — остаться
+  }
+
+  function closeQuit() {
+    $('quit-modal').hidden = true;
+    if (quitPrevFocus && quitPrevFocus.focus) quitPrevFocus.focus();
+  }
+
+  function quitRun() {
+    closeQuit();
+    cancelAnimationFrame(rafId);
+    show('start');
+    renderModeCards();
+  }
+
+  $('btn-quit').addEventListener('click', openQuit);
+  $('quit-no').addEventListener('click', closeQuit);
+  $('quit-yes').addEventListener('click', quitRun);
+
+  /* Клавиатура окна: Esc = «Нет», Tab не выпускает фокус наружу. Обработчик
+     стоит на СВОЁМ узле и гасит событие, чтобы пробел и цифры не уходили в
+     забег, пока окно открыто. */
+  $('quit-modal').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); closeQuit(); return; }
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      var no = $('quit-no'), yes = $('quit-yes');
+      (document.activeElement === no ? yes : no).focus();
     }
   });
 
@@ -3132,32 +3233,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      вопросы» сервер уже разделил на pool_empty (свободный забег под
      фильтром) и set_done (курированный список пройден): клиент знает про
      конец вопросов, но не знает, какой это был забег. */
-  function reasonText(s) {
-    if (s.ended_reason === 'lives') return 'выбыл на вопросе ' + s.last_number;
-    if (s.ended_reason === 'set_done') return 'список пройден до конца';
-    if (s.ended_reason === 'pool_empty') return 'вопросы под настройками кончились';
-    return 'время вышло';
-  }
-
   function titleText(s) {
     if (s.ended_reason === 'lives') return 'Забег окончен';
     if (s.ended_reason === 'set_done') return 'Пройдено!';
     if (s.ended_reason === 'pool_empty') return 'Вопросы кончились';
     return 'Время вышло!';
-  }
-
-  function paintHearts(box, left, max) {
-    box.innerHTML = '';
-    for (var i = 0; i < max; i++) {
-      var h = document.createElement('span');
-      var lost = i >= left;
-      h.className = 'heart' + (lost ? ' lost' : '');
-      // ⚠️ Погашенная жизнь — ТА ЖЕ иконка с прозрачностью, а не другой
-      // символ: запас виден целиком, «сколько было и сколько осталось».
-      h.innerHTML = ICONS.heart || '';
-      box.appendChild(h);
-    }
-    box.setAttribute('aria-label', 'Жизни: ' + left + ' из ' + max);
   }
 
   function paintFinal() {
@@ -3172,8 +3252,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         : setRun.kind === 'duel' ? 'дуэль' : 'набор ' + setRun.code;
     }
     $('fin-date').textContent = formatDate(s.played_at);
-    paintHearts($('fin-hearts'), s.lives_left, s.lives_max);
-    $('fin-reason').textContent = reasonText(s);
 
     /* метрики */
     $('st-correct').textContent = s.correct + '/' + s.total;
@@ -3253,7 +3331,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       sw.style.background = 'var(--rush-accent)';
       sw.style.opacity = segAlpha(i);
       var txt = document.createElement('span');
-      txt.textContent = t.topic + ' — ' + t.wrong;
+      txt.textContent = t.topic + ': ' + t.wrong;
       li.appendChild(sw);
       li.appendChild(txt);
       leg.appendChild(li);
@@ -3267,7 +3345,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     sub.textContent = '';
     var next = MODE_ORDER[MODE_ORDER.indexOf(mode) + 1];
     if (next && CFG.pool_counts[next]) {
-      sub.appendChild(document.createTextNode('Попробуйте режим сложнее — '));
+      sub.appendChild(document.createTextNode('Попробуйте режим сложнее: '));
       var b = document.createElement('button');
       b.type = 'button';
       b.className = 'link-btn';
@@ -3275,7 +3353,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       b.addEventListener('click', function () { mode = next; startRun(); });
       sub.appendChild(b);
     } else {
-      sub.textContent = 'Чище уже некуда — попробуйте побить свой рекорд.';
+      sub.textContent = 'Чище уже некуда. Попробуйте побить свой рекорд.';
     }
   }
 
@@ -3352,7 +3430,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
              подписями «как было» и «как правильно» — это загадка, а не
              разбор. Видно только в браузере на живом промахе. */
           var rows = m.step === 'clean'
-            ? [['решение было верным — ошибки нет', m.figureRef]]
+            ? [['решение было верным, ошибки нет', m.figureRef]]
             : [['как было в решении', m.figure],
                ['как правильно', m.figureRef]];
           rows.forEach(function (row) {
@@ -3404,9 +3482,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      о шрифтах, а серверу не придётся держать рендер картинок. */
   function shareText() {
     var s = summary;
-    return 'Econ Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
+    return 'Wecon Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
       + ' очков · ' + s.correct + '/' + s.total + ' · комбо ×' + s.max_multiplier
-      + ' — обгонишь?';
+      + ' – обгонишь?';
   }
 
   function paintShare(s) {
@@ -3704,7 +3782,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
          системное окно «Поделиться» на десктопе берёт текст и ВЫБРАСЫВАЕТ
          картинку: именно так кнопка «поделиться картинкой» уходила текстовой
          подписью. Проверено в браузере: было {files, text, url} → уезжал текст. */
-      navigator.share({ files: [file], title: 'Econ Rush' })
+      navigator.share({ files: [file], title: 'Wecon Rush' })
         .catch(function (e) {
           // Игрок передумал (AbortError) — не ошибка, ничего не делаем.
           // Любой другой отказ значит, что систему файл не взяла — скачиваем.
@@ -3737,7 +3815,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   $('btn-share-native').addEventListener('click', function () {
     if (!navigator.share || !shareInfo) return;
-    navigator.share({ title: 'Econ Rush', text: shareText(), url: shareInfo.url })
+    navigator.share({ title: 'Wecon Rush', text: shareText(), url: shareInfo.url })
       .catch(function () { /* игрок передумал — не ошибка */ });
   });
 
@@ -3895,7 +3973,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var sw = document.createElement('i');
       sw.className = 'd-' + g.key;
       var txt = document.createElement('span');
-      txt.textContent = g.title + ' — ' + g.total + ' (верно ' + g.correct + ')';
+      txt.textContent = g.title + ': ' + g.total + ' (верно ' + g.correct + ')';
       li.appendChild(sw);
       li.appendChild(txt);
       leg.appendChild(li);
@@ -3910,7 +3988,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var rows = loadHistory().filter(function (r) { return r.mode === mode; });
     rows = rows.slice(-HISTORY_SHOWN);
     if (rows.length < 2) {
-      chartEmpty(box, 'Это ваш первый забег в этом режиме — будет с чем сравнить');
+      chartEmpty(box, 'Это ваш первый забег в этом режиме. Будет с чем сравнить');
       return;
     }
     var W = 400, H = 130, P = 8, BOT = 18;
@@ -3934,9 +4012,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         svg.appendChild(v);
       }
     });
-    var l = svgEl('text', { x: P, y: H - 5, class: 'chart-lbl' });
-    l.textContent = 'последние ' + rows.length + ' — правый столбец этот забег';
-    svg.appendChild(l);
   }
 
   function buildCharts() {
@@ -4017,7 +4092,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var name = document.createElement('span');
       name.textContent = CFG.modes[key].title;
       var val = document.createElement('b');
-      val.textContent = best > 0 ? best.toLocaleString('ru-RU') : '—';
+      val.textContent = best > 0 ? best.toLocaleString('ru-RU') : '–';
       if (best > 0) any = true;
       row.appendChild(name);
       row.appendChild(val);
@@ -4026,7 +4101,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (!any) {
       var hint = document.createElement('div');
       hint.className = 'rec-row';
-      hint.textContent = 'Рекордов пока нет — сыграй первый забег.';
+      hint.textContent = 'Рекордов пока нет. Сыграйте первый забег.';
       box.appendChild(hint);
     }
     box.hidden = false;
@@ -4038,7 +4113,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      как в любом забеге. */
   (function initAutoSet() {
     if (!AUTO_SET) return;
-    ['mode-grid', 'setup-bar', 'setup-panel', 'best-line', 'entry-row',
+    ['mode-grid', 'setup-bar', 'setup-panel', 'entry-row',
      'records-box'].forEach(function (id) {
       var el = $(id);
       if (el) el.hidden = true;
@@ -4055,7 +4130,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       btn.disabled = true;
       btn.textContent = AUTO_SET.why || 'Играть нельзя';
       $('set-note').textContent = AUTO_SET.why === 'Попытка уже использована'
-        ? 'Попытка на этот набор одна — результат уже на доске.'
+        ? 'Попытка на этот набор одна, результат уже на доске.'
         : ($('set-note').textContent);
     }
     $('set-play').addEventListener('click', function () {
@@ -4147,8 +4222,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         return;
       }
       if (current.type === 'numeric') {
-        // цифры и знаки идут в поле ввода; глобально ловим только Enter
-        if (e.key === 'Enter') { e.preventDefault(); submitNumeric(); }
+        // цифры и знаки идут в поле ввода; глобально ловим Enter и пробел
+        if (e.key === 'Enter') { e.preventDefault(); submitNumeric(); return; }
+        /* ⚠️ Пробел ПРОПУСКАЕТ и здесь, хотя фокус стоит в поле ввода.
+           В числовом ответе пробел не нужен (фильтр `input` его и так
+           вырезает), а пропуск обязан работать одинаково во всех режимах:
+           отдельной кнопки «Пропустить» в Классике больше нет. */
+        if (e.key === ' ') { e.preventDefault(); skip(); return; }
         return;
       }
       if (e.key >= '1' && e.key <= '6') {

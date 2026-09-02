@@ -83,7 +83,7 @@
     блоке одна крупная величина, три остальные равновесны между собой.
     {% endcomment %}
     <div class="big">{{ w.done }}<span class="of">/ {{ w.goal }}</span></div>
-    <div class="cap">верных за неделю{% include '_hint.html' with hint='Сколько задач и тестов вы решили верно с понедельника. Ответы в Econ Rush сюда не идут: цель — про разбор задач, а не про скорость узнавания. В «Лучшем дне» игра, наоборот, считается — это рекорд, а не цель.' %}</div>
+    <div class="cap">верных за неделю{% include '_hint.html' with hint='Сколько задач и тестов вы решили верно с понедельника. Ответы в Wecon Rush сюда не идут: цель — про разбор задач, а не про скорость узнавания. В «Лучшем дне» игра, наоборот, считается — это рекорд, а не цель.' %}</div>
     <div class="hero-bar hero-bar--thin"><i style="width:{{ w.percent }}%"></i></div>
     <button type="button" class="goal-edit" id="goal-edit">изменить</button>
     <form method="post" action="{% url 'set_weekly_goal' %}" id="goal-form" hidden
@@ -413,7 +413,7 @@
   </div>
   {% endif %}
   {% else %}
-  <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent-ink)">Попробовать Econ Rush</a></div>
+  <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent-ink)">Попробовать Wecon Rush</a></div>
   {% endif %}
 </div>
 </div>{# конец группы «игра» #}

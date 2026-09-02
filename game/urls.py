@@ -1,4 +1,4 @@
-"""Маршруты игры Econ Rush."""
+"""Маршруты игры Wecon Rush."""
 from django.urls import path
 
 from . import views

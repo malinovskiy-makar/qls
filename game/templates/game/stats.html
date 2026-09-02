@@ -52,7 +52,7 @@
   <h1>Статистика игрового пула</h1>
   <p class="st-lead">
     Считается только ПЕРВАЯ встреча игрока с вопросом: повторный ответ того
-    же человека уже знает правильный вариант. Доля верных — от попыток
+    же человека уже знает правильный вариант. Доля верных – от попыток
     (верные + неверные), пропуск её не портит. Пока попыток меньше
     {{ min_attempts }}, процент не показываем: на пяти ответах это шум,
     а не сложность.
@@ -67,8 +67,8 @@
     <p class="st-legend">
       <span>Всего в пуле: <b>{{ total }}</b></span>
       <span>С набранной статистикой: <b>{{ measured }}</b></span>
-      <span style="color:var(--error)">красный — доля &lt; {{ broken_pct }} % (вопрос скорее всего сломан)</span>
-      <span>серый — доля &gt; {{ trivial_pct }} % (тривиален, кандидат на вылет)</span>
+      <span style="color:var(--error)">красный: доля &lt; {{ broken_pct }} % (вопрос скорее всего сломан)</span>
+      <span>серый: доля &gt; {{ trivial_pct }} % (тривиален, кандидат на вылет)</span>
     </p>
     <div class="st-table-box">
       <table class="st">
@@ -84,12 +84,12 @@
         {% for r in rows %}
           <tr class="{% if r.broken %}broken{% elif r.trivial %}trivial{% endif %}">
             <td class="num pct">
-              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">—</span>{% endif %}
+              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">–</span>{% endif %}
             </td>
             <td class="num">{{ r.attempts }}</td>
             <td class="num">{{ r.shown }}</td>
             <td class="num">
-              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">—</span>{% endif %}
+              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">–</span>{% endif %}
             </td>
             <td class="num">{{ r.difficulty }}{% if r.measured %}<span title="измерено">*</span>{% endif %}</td>
             <td>{{ r.type }}</td>
@@ -108,7 +108,7 @@
       </table>
     </div>
     <p class="st-legend" style="margin-top:12px">
-      «Ср. время» — среднее, не медиана: хранится сумма времени ответов,
+      «Ср. время» – среднее, не медиана: хранится сумма времени ответов,
       медиану по ней не восстановить. Звёздочка у сложности значит,
       что она измерена, а не взята из эвристики сборки пула.
     </p>
@@ -130,10 +130,10 @@
             <td class="num">{{ r.attempts }}</td>
             <td class="num">{{ r.skipped }}</td>
             <td class="num pct">
-              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">—</span>{% endif %}
+              {% if r.percent is not None %}{{ r.percent }} %{% else %}<span class="st-dash">–</span>{% endif %}
             </td>
             <td class="num">
-              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">—</span>{% endif %}
+              {% if r.avg_ms %}{% widthratio r.avg_ms 1000 1 %} с{% else %}<span class="st-dash">–</span>{% endif %}
             </td>
           </tr>
         {% empty %}
