@@ -37,10 +37,18 @@ SOURCE_NAME = 'SolveHub — банк задач по экономике'
 
 
 def fingerprint(problem):
-    u"""Отпечаток содержания задачи: три поля, которые трогать запрещено."""
+    u"""Отпечаток содержания задачи: три поля, которые трогать запрещено.
+
+    ⚠️ `usedforsecurity=False` ОБЯЗАТЕЛЕН, и не ради тишины линтера. Это
+    отпечаток СОДЕРЖАНИЯ для сравнения «до и после», а не защита: подписи
+    им не проверяются и пароли не хранятся. Без флага bandit справедливо
+    считает любой MD5 криптографическим и красит джоб «Безопасность» в
+    красный — ровно так же, как это уже было с sha1 в calc2_static.py.
+    """
     raw = u'\x00'.join([problem.statement or '', problem.answer or '',
                         problem.solution or ''])
-    return hashlib.md5(raw.encode('utf-8')).hexdigest()
+    return hashlib.md5(raw.encode('utf-8'),
+                       usedforsecurity=False).hexdigest()
 
 
 class ClassifyTestTypesBase(TestCase):
