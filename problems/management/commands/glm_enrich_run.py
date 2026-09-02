@@ -9,10 +9,15 @@
 - Фаза 4: возобновление (журнал уже резюмируем — Фаза 1/2Б), устойчивость
   к сети (повтор внутри `complete_fn`), `--max-cost` по фактическому
   usage.
-- Фаза 5: первые 300 задач — КОНТРОЛЬНАЯ ТОЧКА, не отдельная выборка.
-  Эта команда сама себя не запускает на весь корпус — `--limit` решает
-  человек, и по умолчанию (без флага) он БЕЗ ограничения, что для этой
-  сессии означает: запускать ТОЛЬКО с `--limit 300`.
+- Фаза 5: 300 задач — КОНТРОЛЬНАЯ ТОЧКА. НЕ «первые 300 по id» (решение
+  02.09.2026: id 1-300 оказались целиком легаси без единой картинки —
+  images_sent_total=0, tikz_replaced_total=0 на прошлой попытке) — Фаза C
+  заменила это на стратифицированную случайную выборку с гарантиями на
+  визуальный пласт, см. `stratified_checkpoint_sample()`. Список id
+  сохраняется в `SAMPLE_MANIFEST_PATH` ДО первого обращения к API и
+  переиспользуется при повторном запуске. Эта команда сама себя не
+  запускает на весь корпус — `--limit` решает человек, и для этой сессии
+  это ТОЛЬКО 300.
 
 ⚠️ В базу НИЧЕГО не пишет. Ни `topic_candidate`, ни `title`, ни любое
 другое поле `Problem` — только файлы. Установка в банк — отдельная сессия
@@ -26,6 +31,7 @@
     manage.py glm_enrich_run --limit 300 --max-cost 3.0 --workers 50
 """
 import json
+import random
 import statistics
 import threading
 import time
@@ -39,9 +45,9 @@ from django.test import override_settings
 from problems.ai import providers
 from problems.enrich import prompts_v2, taxonomy, text as enrich_text
 from problems.enrich.shortlist import shortlist_for
-from problems.enrich.text import problem_full_text
+from problems.enrich.text import looks_like_tikz, problem_full_text
 from problems.management.commands import pilot_enrich_v2 as pilot
-from problems.models import Problem
+from problems.models import Problem, ProblemFigure, SourceReference
 
 GLM_MODEL = 'glm-5.3-flash'
 GLM_PRICES_PROMO = (0.075, 0.015, 0.25)  # скидка 50% до 24:00 09.09.2026 (UTC+8)
@@ -50,7 +56,12 @@ GLM_PRICES_PROMO = (0.075, 0.015, 0.25)  # скидка 50% до 24:00 09.09.202
 # всех уровнях, 50 — разрешённый максимум Z.AI для GLM-5.3-Flash (§3.6).
 WORKERS_DEFAULT = 50
 
-FIRST_PASS_FAIL_STOP_PCT = 3.0
+# Фаза B задания сессии 02.09: 3% было взято ДО того, как мы увидели
+# реальное поведение GLM без строгой схемы — на боевом чек-поинте доля
+# повтора была 85,5%, а итоговый брак (после повтора) — 13%. 3% упёрся бы
+# в стоп даже на хорошем результате. Пороговое значение — уже ПОСЛЕ фиксов
+# Фазы A/B (шорт-лист, given/find без цифр, примеры «было→стало»).
+FIRST_PASS_FAIL_STOP_PCT = 10.0
 FIRST_PASS_FAIL_MIN_SAMPLE = 20  # не судить о доле брака по первым 2-3 задачам
 CHECKPOINT_EVERY = 2000
 
@@ -72,11 +83,162 @@ GLM_VARIANT = {
 
 def battle_queryset():
     """Все задачи, кроме пяти служебных фикстур рендерера (Фаза 4),
-    упорядоченные по id — детерминированно, чтобы «первые 300» были
-    воспроизводимым подмножеством прогона, а не случайным."""
+    упорядоченные по id — детерминированный полный корпус боевого прогона.
+    Проверка `--ids` идёт по нему; сама выборка контрольной точки — Фаза C,
+    см. `stratified_checkpoint_sample()` ниже (id 1-300 по возрастанию
+    оказались целиком легаси без единой картинки — решение владельца
+    02.09.2026 заменило «первые N» на стратифицированную выборку)."""
     return (Problem.objects
            .exclude(source_references__source__name=SERVICE_FIXTURE_SOURCE)
            .distinct().order_by('id'))
+
+
+# ---------------------------------------------------------------------------
+# Фаза C (боевой прогон 02.09.2026): контрольная точка — стратифицированная
+# случайная выборка по всему корпусу, не «первые N по id». Гарантии на
+# визуальный пласт нужны буквально: на прошлой контрольной точке (id 1-300)
+# путь картинок и TikZ не проверился НИ РАЗУ — images_sent_total=0,
+# tikz_replaced_total=0.
+# ---------------------------------------------------------------------------
+
+CHECKPOINT_SEED = 20260902
+MIN_TIKZ = 10          # в банке всего 7 настоящих — берём все, что есть
+MIN_RASTER_IMAGES = 40
+MIN_SOLUTION_IMAGES = 15
+SAMPLE_MANIFEST_PATH = REPORT_DIR / 'run300_sample_ids.json'
+
+
+def _proportional_by_source(pool_ids, remaining_slots, rng):
+    """Распределяет `remaining_slots` id из `pool_ids` пропорционально по
+    источнику (`SourceReference.source.name`; задача без источника или с
+    несколькими — берётся по ПЕРВОЙ найденной ссылке, простое приближение,
+    не точный учёт). Округление — методом наибольшего остатка, чтобы сумма
+    точно совпала с `remaining_slots`, а не «примерно»."""
+    if remaining_slots <= 0 or not pool_ids:
+        return [], {}
+
+    pool_set = set(pool_ids)
+    by_source = {}
+    seen = set()
+    # ⚠️ НЕ `filter(problem_id__in=pool_set)` — на полном корпусе pool_set
+    # доходит до ~41 тысячи id, а SQLite падает с «too many SQL variables»
+    # на IN-списке такого размера. Таблица SourceReference сама по себе не
+    # огромна — читаем её целиком одним запросом и фильтруем в Python.
+    for problem_id, source_name in (
+            SourceReference.objects.order_by('id')
+            .values_list('problem_id', 'source__name')):
+        if problem_id not in pool_set or problem_id in seen:
+            continue
+        seen.add(problem_id)
+        by_source.setdefault(source_name or 'без источника', []).append(problem_id)
+    orphans = pool_set - seen
+    if orphans:
+        by_source.setdefault('без источника', []).extend(sorted(orphans))
+
+    total = sum(len(v) for v in by_source.values())
+    if total == 0:
+        return [], {}
+
+    raw_shares = {name: remaining_slots * len(ids) / total
+                 for name, ids in by_source.items()}
+    base = {name: min(int(share), len(by_source[name]))
+           for name, share in raw_shares.items()}
+    assigned = sum(base.values())
+    remainder = remaining_slots - assigned
+    # наибольший остаток первым — пока есть что распределять и есть кому.
+    order = sorted(by_source, key=lambda n: -(raw_shares[n] - base[n]))
+    i = 0
+    while remainder > 0 and any(base[n] < len(by_source[n]) for n in by_source):
+        name = order[i % len(order)]
+        if base[name] < len(by_source[name]):
+            base[name] += 1
+            remainder -= 1
+        i += 1
+
+    chosen = []
+    counts = {}
+    for name, ids in by_source.items():
+        take = base.get(name, 0)
+        if take:
+            picked = sorted(rng.sample(ids, take))
+            chosen.extend(picked)
+            counts[name] = take
+    return chosen, counts
+
+
+def stratified_checkpoint_sample(limit=300, seed=CHECKPOINT_SEED):
+    """Контрольная точка Фазы 5 — id ЗАРАНЕЕ, до единого обращения к API
+    (список сохраняется в `SAMPLE_MANIFEST_PATH` вызывающим кодом,
+    чтобы повторный запуск с тем же журналом резюмировался на тех же id).
+
+    Гарантии, в порядке резервирования (каждая следующая не трогает уже
+    занятые id из предыдущей):
+    1. ВСЕ настоящие TikZ (`looks_like_tikz`) — их 7 в банке, меньше
+       `MIN_TIKZ`, поэтому «минимум 10» на деле значит «все, что есть».
+    2. `MIN_RASTER_IMAGES` растровых картинок УСЛОВИЯ
+       (`source_field in ('import', 'statement')`).
+    3. `MIN_SOLUTION_IMAGES` картинок у РЕШЕНИЯ (`source_field='solution'`)
+       — иначе кодовая половина «Графического решения» снова не
+       проверится ни разу.
+    4. Остаток — пропорционально по источнику.
+
+    Возвращает `(ids, report_lines)` — `report_lines` печатается владельцу
+    целиком: сколько по каждому источнику, сколько с картинкой, сколько с
+    TikZ, сколько с картинкой у решения.
+    """
+    rng = random.Random(seed)
+    allowed_ids = set(battle_queryset().values_list('id', flat=True))
+    report = []
+
+    # ⚠️ НЕ `filter(problem_id__in=allowed_ids)` — то же самое ограничение
+    # SQLite, что и в `_proportional_by_source()`. `ProblemFigure` — таблица
+    # в тысячи строк, не в десятки тысяч — читаем целиком, фильтруем в Python.
+    figures = [
+        (pid, field, tikz_source, img) for pid, field, tikz_source, img in
+        ProblemFigure.objects.values_list(
+            'problem_id', 'source_field', 'tikz_source', 'image_data')
+        if pid in allowed_ids
+    ]
+    tikz_ids = sorted({pid for pid, _field, tikz_source, _img in figures
+                       if looks_like_tikz(tikz_source)})
+    raster_condition_ids = sorted({
+        pid for pid, field, tikz_source, img in figures
+        if field in ('import', 'statement') and img and not looks_like_tikz(tikz_source)
+    })
+    raster_solution_ids = sorted({
+        pid for pid, field, tikz_source, img in figures
+        if field == 'solution' and img and not looks_like_tikz(tikz_source)
+    })
+
+    chosen = []
+    chosen_set = set()
+
+    def reserve(pool, want, label):
+        available = [i for i in pool if i not in chosen_set]
+        take_n = min(want, len(available))
+        picked = sorted(rng.sample(available, take_n)) if take_n else []
+        chosen.extend(picked)
+        chosen_set.update(picked)
+        report.append('%s: нужно >= %d, доступно %d, взято %d'
+                      % (label, want, len(available), take_n))
+        return picked
+
+    reserve(tikz_ids, len(tikz_ids), 'настоящий TikZ')
+    reserve(raster_condition_ids, MIN_RASTER_IMAGES, 'растровая картинка условия')
+    reserve(raster_solution_ids, MIN_SOLUTION_IMAGES, 'картинка у решения')
+
+    remaining_slots = max(0, limit - len(chosen))
+    pool = sorted(allowed_ids - chosen_set)
+    extra, source_counts = _proportional_by_source(pool, remaining_slots, rng)
+    chosen.extend(extra)
+    chosen_set.update(extra)
+
+    report.append('добор пропорционально по источнику (%d слотов):' % remaining_slots)
+    for name, n in sorted(source_counts.items(), key=lambda kv: -kv[1]):
+        report.append('  %s: %d' % (name, n))
+    report.append('итого в выборке: %d (лимит %d)' % (len(chosen), limit))
+
+    return sorted(chosen), report
 
 
 def make_glm_complete_fn():
@@ -215,6 +377,10 @@ def build_metrics(rows, problems_by_id, usage_totals):
     find_lens = [len(p['find']) for p in ok if p.get('find')]
     tags_counts = [len(p['tags'] or []) for p in ok]
     graphical = Counter(p['graphical_solution_source'] for p in parsed)
+    # Фаза B.3: нижняя граница снижена 8 → 5 — сколько всё же осталось
+    # ровно с восемью (не сама по себе плохо, просто числовой факт для
+    # чтения владельцем на контрольной точке).
+    queries_counts = Counter(len(p['search_queries'] or []) for p in ok)
 
     return {
         'total_processed': n,
@@ -238,6 +404,9 @@ def build_metrics(rows, problems_by_id, usage_totals):
             'both': graphical.get('both', 0), 'none': graphical.get('none', 0),
             'total': graphical.get('model', 0) + graphical.get('code', 0) + graphical.get('both', 0),
         },
+        'search_queries_count_distribution': dict(queries_counts),
+        'search_queries_exactly_8_pct': (
+            queries_counts.get(8, 0) / len(ok) * 100 if ok else 0.0),
         'usage_totals': usage_totals,
     }
 
@@ -274,8 +443,10 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument('--limit', type=int, default=None,
-                            help='Число задач с начала battle_queryset(). '
-                                 'ФАЗА 5 ЭТОЙ СЕССИИ: обязательно 300.')
+                            help='Размер стратифицированной выборки Фазы C '
+                                 '(stratified_checkpoint_sample) — НЕ '
+                                 '«первые N по id». ФАЗА 5 ЭТОЙ СЕССИИ: '
+                                 'обязательно 300.')
         parser.add_argument('--max-cost', type=float, required=True)
         parser.add_argument('--workers', type=int, default=WORKERS_DEFAULT)
         parser.add_argument('--run-id', type=str, default=None)
@@ -309,11 +480,29 @@ class Command(BaseCommand):
             if missing:
                 self.stdout.write('⚠️ вне battle_queryset() (фикстуры или не '
                                   'существуют), пропущены: %s' % sorted(missing))
+        elif SAMPLE_MANIFEST_PATH.exists():
+            # Фаза C: список id сохраняется в файл ДО первого обращения к
+            # API — повторный запуск (резюмирование после обрыва, добавка
+            # к --max-cost) обязан взять ТУ ЖЕ выборку, а не пересчитать
+            # заново со смещённым состоянием случайности.
+            with open(SAMPLE_MANIFEST_PATH, encoding='utf-8') as fh:
+                manifest = json.load(fh)
+            problem_ids = manifest['ids']
+            self.stdout.write('=== ВЫБОРКА: манифест уже существует, беру его '
+                              '(%s, seed=%s) ===' % (SAMPLE_MANIFEST_PATH, manifest.get('seed')))
         else:
-            qs = battle_queryset()
-            problem_ids = list(qs.values_list('id', flat=True))
-            if limit is not None:
-                problem_ids = problem_ids[:limit]
+            problem_ids, sample_report = stratified_checkpoint_sample(
+                limit=limit or 300, seed=CHECKPOINT_SEED)
+            self.stdout.write('=== ВЫБОРКА (стратифицированная, seed=%d) ==='
+                              % CHECKPOINT_SEED)
+            for line in sample_report:
+                self.stdout.write('  ' + line)
+            SAMPLE_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(SAMPLE_MANIFEST_PATH, 'w', encoding='utf-8') as fh:
+                json.dump({'seed': CHECKPOINT_SEED, 'limit': limit or 300,
+                          'ids': problem_ids, 'report': sample_report},
+                         fh, ensure_ascii=False, indent=2)
+            self.stdout.write('манифест сохранён: %s' % SAMPLE_MANIFEST_PATH)
         problems = list(
             Problem.objects.filter(id__in=problem_ids)
             .prefetch_related('parts', 'figures'))
@@ -391,8 +580,8 @@ class Command(BaseCommand):
             if tracker.breached:
                 self.stdout.write('')
                 self.stdout.write('🔴 СТОП: доля задач, потребовавших повтор, — %.1f%% '
-                                  '(порог 3%%). Прогон остановлен сам, дальше решает '
-                                  'владелец.' % tracker.pct())
+                                  '(порог %.0f%%). Прогон остановлен сам, дальше решает '
+                                  'владелец.' % (tracker.pct(), FIRST_PASS_FAIL_STOP_PCT))
 
             # --- Фаза 3.2/3.3 -------------------------------------------
             all_entries = pilot.read_raw_log(str(RAW_LOG_PATH))
@@ -415,6 +604,10 @@ class Command(BaseCommand):
                              metrics['graphical_solution']['code'],
                              metrics['graphical_solution']['both'],
                              metrics['graphical_solution']['total']))
+        self.stdout.write('search_queries: распределение по числу запросов %s, '
+                          'ровно 8 у %.1f%% задач'
+                          % (metrics['search_queries_count_distribution'],
+                             metrics['search_queries_exactly_8_pct']))
         self.stdout.write('расход по журналу (все попытки): $%s'
                           % usage_totals['cost_usd'])
         self.stdout.write('журналы: %s, %s' % (RAW_LOG_PATH, parsed_out))

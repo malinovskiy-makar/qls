@@ -273,9 +273,29 @@ class ValidateCall2Tests(TestCase):
         ok, violations = cmd.validate_call2(self._base())
         self.assertTrue(ok, violations)
 
-    def test_не_восемь_запросов(self):
-        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 7))
+    def test_запросов_меньше_пяти_нарушение(self):
+        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 4))
         self.assertFalse(ok)
+        self.assertTrue(any('search_queries' in v for v in violations))
+
+    def test_запросов_больше_восьми_нарушение(self):
+        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 9))
+        self.assertFalse(ok)
+
+    def test_пять_запросов_законно(self):
+        """Фаза B.3: нижняя граница снижена с 8 до 5 — лучше пять точных,
+        чем восемь с натяжкой (боевой прогон 02.09: восьмой запрос у #32
+        был откровенным добиванием до счёта, к задаче не относился)."""
+        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 5))
+        self.assertTrue(ok, violations)
+
+    def test_семь_запросов_законно(self):
+        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 7))
+        self.assertTrue(ok, violations)
+
+    def test_восемь_запросов_всё_ещё_законно(self):
+        ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 8))
+        self.assertTrue(ok, violations)
 
     def test_hints_null_допустим(self):
         ok, _ = cmd.validate_call2(self._base(hints=None))
@@ -638,6 +658,43 @@ class RunVariantMaxCostTests(TestCase):
             max_cost=5.0)
         self.assertTrue(stopped_early)
         self.assertEqual(len(rows), 1)  # первый call1 уже перевалил потолок
+
+
+class StripGivenFindPrefixTests(TestCase):
+    """Фаза B.2 (боевой прогон 02.09): поле уже называется given/find —
+    приставка «Дано:»/«Найти:» это мусор, который иначе уходит в эмбеддинг.
+    Срезается КОДОМ, БЕЗ повтора — это не нарушение схемы."""
+
+    def test_срезает_дано(self):
+        data = {'given': 'Дано: линейная функция спроса'}
+        cmd.strip_given_find_prefixes(data)
+        self.assertEqual(data['given'], 'линейная функция спроса')
+
+    def test_срезает_найти(self):
+        data = {'find': 'Найти: точку равновесия'}
+        cmd.strip_given_find_prefixes(data)
+        self.assertEqual(data['find'], 'точку равновесия')
+
+    def test_регистронезависимо_и_с_пробелами(self):
+        data = {'given': '  дано:   структура рынка'}
+        cmd.strip_given_find_prefixes(data)
+        self.assertEqual(data['given'], 'структура рынка')
+
+    def test_без_приставки_не_трогает(self):
+        data = {'given': 'линейная функция спроса', 'find': 'точку равновесия'}
+        cmd.strip_given_find_prefixes(data)
+        self.assertEqual(data['given'], 'линейная функция спроса')
+        self.assertEqual(data['find'], 'точку равновесия')
+
+    def test_пустое_значение_и_отсутствующий_ключ_не_падают(self):
+        cmd.strip_given_find_prefixes({'given': None, 'find': ''})
+        cmd.strip_given_find_prefixes({})
+        cmd.strip_given_find_prefixes(None)  # не должно бросить исключение
+
+    def test_другие_поля_не_трогает(self):
+        data = {'given': 'Дано: X', 'topic_primary': '1'}
+        cmd.strip_given_find_prefixes(data)
+        self.assertEqual(data['topic_primary'], '1')
 
 
 class CallWithRetryTests(TestCase):

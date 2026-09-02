@@ -15,7 +15,7 @@ from django.test import TestCase, override_settings
 from problems.ai import providers
 from problems.enrich import taxonomy
 from problems.management.commands import glm_enrich_run as run_cmd
-from problems.models import Problem, Source, SourceReference
+from problems.models import Problem, ProblemFigure, Source, SourceReference
 
 
 def _valid_call1_json(theme_idx=0):
@@ -70,6 +70,7 @@ class GlmEnrichRunSmokeTests(TestCase):
         self.raw_path = self.tmp_dir / 'run_raw.jsonl'
         self.parsed_path = self.tmp_dir / 'run_parsed.jsonl'
         self.metrics_path = self.tmp_dir / 'run_metrics.json'
+        self.manifest_path = self.tmp_dir / 'run300_sample_ids.json'
 
     def _patch_paths(self):
         return mock.patch.multiple(
@@ -77,6 +78,7 @@ class GlmEnrichRunSmokeTests(TestCase):
             RAW_LOG_PATH=self.raw_path,
             PARSED_LOG_PATH=self.parsed_path,
             METRICS_PATH=self.metrics_path,
+            SAMPLE_MANIFEST_PATH=self.manifest_path,
         )
 
     def test_полный_прогон_без_брака_создаёт_три_файла(self):
@@ -185,6 +187,108 @@ class GlmEnrichRunSmokeTests(TestCase):
         self.assertTrue(all(p.id in ids for p in self.problems))
 
 
+class StratifiedCheckpointSampleTests(TestCase):
+    """Фаза C задания сессии 02.09: контрольная точка — не первые N по id
+    (id 1-300 оказались целиком легаси без единой картинки, см. решение
+    владельца), а стратифицированная случайная выборка с гарантиями на
+    визуальный пласт и пропорцией по источникам."""
+
+    REAL_TIKZ = r'\draw[->] (0,0) -- (1,1);'
+
+    def _make_source(self, name):
+        return Source.objects.create(name=name)
+
+    def _make_problem_with_source(self, source, statement='Задача.'):
+        p = Problem.objects.create(statement=statement)
+        SourceReference.objects.create(problem=p, source=source)
+        return p
+
+    def setUp(self):
+        self.src_a = self._make_source('Источник A')
+        self.src_b = self._make_source('Источник B')
+
+        # 5 настоящих TikZ (все должны попасть в выборку — их меньше
+        # MIN_TIKZ).
+        self.tikz_problems = []
+        for i in range(5):
+            p = self._make_problem_with_source(self.src_a, 'Задача с чертежом %d.' % i)
+            ProblemFigure.objects.create(
+                problem=p, tikz_hash='tikz%d' % i, source_field='statement',
+                tikz_source=self.REAL_TIKZ)
+            self.tikz_problems.append(p)
+
+        # 60 задач с растровой картинкой в условии — больше MIN_RASTER_IMAGES.
+        self.raster_condition_problems = []
+        for i in range(60):
+            p = self._make_problem_with_source(self.src_a, 'Задача с картинкой %d.' % i)
+            ProblemFigure.objects.create(
+                problem=p, tikz_hash='raster%d' % i, source_field='statement',
+                content_type='image/png', image_data=b'\x89PNG\r\n\x1a\n' + b'0' * 20)
+            self.raster_condition_problems.append(p)
+
+        # 25 задач с картинкой у решения — больше MIN_SOLUTION_IMAGES.
+        self.raster_solution_problems = []
+        for i in range(25):
+            p = self._make_problem_with_source(self.src_b, 'Задача, решение %d.' % i)
+            ProblemFigure.objects.create(
+                problem=p, tikz_hash='sol%d' % i, source_field='solution',
+                content_type='image/png', image_data=b'\x89PNG\r\n\x1a\n' + b'0' * 20)
+            self.raster_solution_problems.append(p)
+
+        # 300 обычных задач без визуального пласта — фон для пропорции.
+        self.plain_problems = [
+            self._make_problem_with_source(self.src_a if i % 2 else self.src_b,
+                                           'Обычная задача %d.' % i)
+            for i in range(300)
+        ]
+
+        # служебная фикстура — не должна попасть в выборку никогда.
+        fixture_source = Source.objects.create(name=run_cmd.SERVICE_FIXTURE_SOURCE)
+        self.fixture_problem = Problem.objects.create(statement='Фикстура.')
+        SourceReference.objects.create(problem=self.fixture_problem, source=fixture_source)
+
+    def test_все_настоящие_tikz_попадают_в_выборку(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        tikz_ids = {p.id for p in self.tikz_problems}
+        self.assertTrue(tikz_ids.issubset(set(ids)))
+
+    def test_минимум_растровых_картинок_условия(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        raster_ids = {p.id for p in self.raster_condition_problems}
+        self.assertGreaterEqual(len(raster_ids & set(ids)), run_cmd.MIN_RASTER_IMAGES)
+
+    def test_минимум_картинок_у_решения(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        solution_ids = {p.id for p in self.raster_solution_problems}
+        self.assertGreaterEqual(len(solution_ids & set(ids)), run_cmd.MIN_SOLUTION_IMAGES)
+
+    def test_размер_выборки_не_больше_лимита_и_без_дублей(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        self.assertLessEqual(len(ids), 120)
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_фикстура_рендерера_никогда_не_попадает(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        self.assertNotIn(self.fixture_problem.id, ids)
+
+    def test_детерминирована_одним_зерном(self):
+        ids1, _ = run_cmd.stratified_checkpoint_sample(limit=120, seed=42)
+        ids2, _ = run_cmd.stratified_checkpoint_sample(limit=120, seed=42)
+        self.assertEqual(ids1, ids2)
+
+    def test_разное_зерно_разная_выборка(self):
+        ids1, _ = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        ids2, _ = run_cmd.stratified_checkpoint_sample(limit=120, seed=2)
+        self.assertNotEqual(ids1, ids2)
+
+    def test_отчёт_упоминает_источники_и_визуальные_числа(self):
+        ids, report = run_cmd.stratified_checkpoint_sample(limit=120, seed=1)
+        text = '\n'.join(report)
+        self.assertIn('Источник A', text)
+        self.assertIn('Источник B', text)
+        self.assertIn('TikZ', text)
+
+
 class GlmEnrichRunPricesRegressionTests(TestCase):
     """Регресс на баг боевого чек-поинта 02.09.2026: команда сама
     оборачивает `AI_PRICES` для GLM через `override_settings` (Фаза 3.3
@@ -200,6 +304,7 @@ class GlmEnrichRunPricesRegressionTests(TestCase):
         self.raw_path = self.tmp_dir / 'run_raw.jsonl'
         self.parsed_path = self.tmp_dir / 'run_parsed.jsonl'
         self.metrics_path = self.tmp_dir / 'run_metrics.json'
+        self.manifest_path = self.tmp_dir / 'run300_sample_ids.json'
 
     def test_метрики_считаются_без_внешнего_ai_prices(self):
         from django.conf import settings
@@ -211,7 +316,7 @@ class GlmEnrichRunPricesRegressionTests(TestCase):
 
         with mock.patch.multiple(
                 run_cmd, RAW_LOG_PATH=self.raw_path, PARSED_LOG_PATH=self.parsed_path,
-                METRICS_PATH=self.metrics_path), \
+                METRICS_PATH=self.metrics_path, SAMPLE_MANIFEST_PATH=self.manifest_path), \
                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
             call_command('glm_enrich_run', limit=len(self.problems),
                         max_cost=100.0, workers=2, run_id='prices-regression')

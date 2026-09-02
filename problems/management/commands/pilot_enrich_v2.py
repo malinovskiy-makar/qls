@@ -296,6 +296,27 @@ def build_sample(limit, seed):
 #: econ_concepts, plot, поисковых запросах и заголовке» — код, не промпт.
 _DIGIT_RE = re.compile(r'\d')
 
+#: Фаза B.2 (боевой прогон 02.09.2026): поле уже называется given/find —
+#: приставка «Дано:»/«Найти:» это мусор, который иначе уходит в эмбеддинг.
+#: Промпт больше не просит её (см. prompts_v2.CALL1_FIELDS), но старая
+#: привычка модели срезается кодом на всякий случай — БЕЗ повтора, это не
+#: нарушение схемы, а мелкая уборка после парсинга.
+_GIVEN_PREFIX_RE = re.compile(r'^\s*дано\s*[:：]\s*', re.IGNORECASE)
+_FIND_PREFIX_RE = re.compile(r'^\s*найти\s*[:：]\s*', re.IGNORECASE)
+
+
+def strip_given_find_prefixes(data):
+    """Срезает «Дано:»/«Найти:» из `data['given']`/`data['find']` на
+    месте. `data` может быть `None`/не-словарём (после неудачного разбора
+    JSON) — тогда просто ничего не делает."""
+    if not isinstance(data, dict):
+        return data
+    if data.get('given'):
+        data['given'] = _GIVEN_PREFIX_RE.sub('', data['given'])
+    if data.get('find'):
+        data['find'] = _FIND_PREFIX_RE.sub('', data['find'])
+    return data
+
 
 def validate_call1(data, with_concepts=True):
     if not isinstance(data, dict):
@@ -470,8 +491,13 @@ def validate_call2(data):
         return (False, ['ответ вызова 2 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
     queries = data.get('search_queries') or []
-    if len(queries) != 8:
-        violations.append('search_queries не равно 8 (%d)' % len(queries))
+    # Фаза B.3 (боевой прогон 02.09): было РОВНО 8, теперь 5..8 — восьмой
+    # запрос у части задач оказывался явным добиванием до счёта, к задаче
+    # не относящимся («уравнение Слуцкого MRS равна отношению цен» у #32,
+    # где о Слуцком в условии ни слова). Лучше пять точных, чем восемь с
+    # натяжкой.
+    if not 5 <= len(queries) <= 8:
+        violations.append('search_queries вне диапазона 5..8 (%d)' % len(queries))
     for i, query in enumerate(queries):
         if _DIGIT_RE.search(query or ''):
             violations.append('search_queries[%d] содержит цифру' % i)
@@ -932,6 +958,7 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
         complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
         variant['call1_effort'], images1,
         lambda d: validate_call1_full(d, with_concepts))
+    strip_given_find_prefixes(data1)
     row = {'problem_id': problem.id, 'call1': data1,
           'call1_violations': violations1, 'call1_usage': reply1,
           'call1_ok': ok1, 'call1_retried': retried1,
