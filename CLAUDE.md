@@ -198,7 +198,8 @@ build_topic_map [--check]                # справочник карты /cata
 
 ## Боевой сервер — коротко
 
-Живёт на `https://weconomics.site` (Selectel VDS, Москва). Подробности,
+Живёт на `https://weconomics.site` и `https://weconomics.ai` (один сервер,
+два имени; Selectel VDS, Москва). Подробности,
 команды и ловушки — [docs/SERVER.md](docs/SERVER.md), здесь только главное:
 
 - Клон репозитория — `/srv/weconomics/app`, доступ к GitHub **отдельным
