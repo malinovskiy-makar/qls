@@ -71,20 +71,33 @@ def calendar_months(academic_year=None, slug=None):
     events = list(events)
 
     months = []
+    placed = set()
     for month in ACADEMIC_MONTHS:
         year = start_year if month >= 9 else start_year + 1
+        in_month = [
+            e for e in events
+            if e.date_start and e.date_start.month == month
+            and e.date_start.year == year
+        ]
+        placed.update(e.pk for e in in_month)
         months.append({
             'number': month,
             'year': year,
             'name': MONTHS_NOMINATIVE[month - 1],
-            'events': [
-                e for e in events
-                if e.date_start and e.date_start.month == month
-                and e.date_start.year == year
-            ],
+            'events': in_month,
         })
+
     undated = [e for e in events if not e.date_start]
-    return months, undated
+    # ⚠️ Событие С ДАТОЙ, которая в двенадцать месяцев сетки не попала.
+    # Случай не выдуманный: регистрацию на сезон 2026/27 открывают в
+    # августе 2026, то есть ДО сентября, с которого сетка начинается.
+    # Без этой корзины оно пропадало бы с экрана молча — а это ровно та
+    # дата, к которой школьник должен успеть.
+    outside = [
+        e for e in events
+        if e.date_start and e.pk not in placed
+    ]
+    return months, undated, outside
 
 
 def events_for_external_calendar(academic_year=None):

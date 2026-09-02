@@ -96,11 +96,29 @@ def olympiad_detail(request, slug):
 
 
 def calendar(request):
-    """Собственный календарь раздела — учебный год с сентября по август."""
+    """Собственный календарь раздела — учебный год с сентября по август.
+
+    Отдельный от `calendar_stub` намеренно, решением владельца: тот
+    календарь про занятия репетитора, этот про туры. Заготовка связки —
+    `services.events_for_external_calendar()`.
+    """
+    year = current_academic_year()
+    chosen = (request.GET.get('olympiad') or '').strip()
+    olympiads = list(
+        Olympiad.objects.filter(is_published=True).order_by('name_short')
+    )
+    known = {o.slug for o in olympiads}
+    if chosen not in known:
+        chosen = ''
+    months, undated, outside = services.calendar_months(year, chosen or None)
     return render(request, 'olympiads/calendar.html', {
-        'academic_year': current_academic_year(),
-        'has_placeholder': Olympiad.objects.filter(
-            is_placeholder=True, is_published=True).exists(),
+        'academic_year': year,
+        'months': months,
+        'undated': undated,
+        'outside': outside,
+        'olympiads': olympiads,
+        'chosen': chosen,
+        'has_placeholder': any(o.is_placeholder for o in olympiads),
     })
 
 
