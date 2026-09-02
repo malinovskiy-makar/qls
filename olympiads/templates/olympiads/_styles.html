@@ -21,7 +21,7 @@
 /* Раздел шире каталога: таблица льгот — семь колонок, и на 860 она не
    помещается вовсе. Правило действует только здесь: партиал стилей
    подключён единственно на экранах олимпиад. */
-.page-wrap { max-width: 960px; }
+.page-wrap { max-width: var(--w-page); }
 .ol-head { margin-bottom: 28px; }
 .ol-title { font-size: 30px; font-weight: 700; line-height: var(--lh-tight); }
 .ol-sub {
@@ -264,3 +264,14 @@
   color: var(--text3); cursor: default; opacity: .75;
 }
 .ol-btn--off:hover { background: var(--surface); border-color: var(--border); }
+
+/* ── Описание ───────────────────────────────────────── */
+.ol-desc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: var(--stripe) solid var(--accent);
+  border-radius: var(--r-panel);
+  padding: 16px 18px;
+  font-size: 15px; line-height: var(--lh-body);
+  max-width: var(--w-read);
+}

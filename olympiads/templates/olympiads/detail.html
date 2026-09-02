@@ -42,4 +42,13 @@
   </div>
 </header>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Описание</h2>
+  {% if olympiad.description %}
+  <div class="ol-desc">{{ olympiad.description }}</div>
+  {% else %}
+  <p class="ol-empty">Описание готовится.</p>
+  {% endif %}
+</section>
+
 {% endblock %}
