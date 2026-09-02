@@ -56,6 +56,7 @@ def olympiad_detail(request, slug):
         olympiad.benefits.select_related('program')
         .order_by('-admission_year', 'program__order')
     )
+    score_rows, score_years = services.pass_score_rows(olympiad)
     year = current_academic_year()
     events = list(
         olympiad.events.filter(academic_year=year)
@@ -69,6 +70,8 @@ def olympiad_detail(request, slug):
         'academic_year': year,
         'stats': services.problem_stats(olympiad),
         'benefits': benefits,
+        'score_rows': score_rows,
+        'score_years': score_years,
         # Год берётся из данных, а не зашивается в шаблон: правила приёма
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,

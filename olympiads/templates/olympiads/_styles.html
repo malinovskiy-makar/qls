@@ -397,3 +397,17 @@
   margin-top: 12px; font-size: 13px; color: var(--text2);
   max-width: var(--w-read);
 }
+
+/* ── Проходные баллы по годам ───────────────────────── */
+.ol-scores {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 780px) { .ol-scores { grid-template-columns: 1fr; } }
+.ol-score-grade {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 14px 16px;
+}
+.ol-bar--score { grid-template-columns: 44px 1fr 84px; font-size: 12px; }

@@ -253,4 +253,34 @@
   {% endif %}
 </section>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Анализ проходных баллов</h2>
+  {% if score_rows %}
+  <div class="ol-scores">
+    {% for row in score_rows %}
+    <div class="ol-score-grade">
+      <h3 class="ol-panel-title">{{ row.grade }} класс</h3>
+      {% for cell in row.cells %}
+      <span class="ol-bar ol-bar--score">
+        <span class="ol-bar-name">{{ cell.year }}</span>
+        <span class="ol-bar-track">
+          {% if not cell.missing %}<span class="ol-bar-fill" style="width: {{ cell.pct }}%;"></span>{% endif %}
+        </span>
+        <span class="ol-bar-num">
+          {% if cell.missing %}<span class="ol-mute">нет данных</span>
+          {% else %}{{ cell.value }}{% if cell.max_value %} из {{ cell.max_value }}{% endif %}{% endif %}
+        </span>
+      </span>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="ol-note">Проходные баллы на муниципальный и региональный этапы
+    устанавливает каждый регион отдельно, единого числа по стране не
+    существует.</p>
+  {% else %}
+  <p class="ol-empty">Данные о проходных баллах пока не собраны.</p>
+  {% endif %}
+</section>
+
 {% endblock %}

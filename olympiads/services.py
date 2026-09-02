@@ -194,3 +194,43 @@ def problem_stats(olympiad):
             for name, count in formats.most_common(6)
         ],
     }
+
+
+def pass_score_rows(olympiad, years_back=5):
+    """Проходные на заключительный этап: строка на класс, колонка на год.
+
+    Год, по которому данных нет, НЕ пропускается и НЕ интерполируется —
+    он возвращается пустой ячейкой. Дыра в данных это тоже сведение:
+    сглаженная кривая соврала бы школьнику про год, которого мы не знаем.
+    """
+    from .models import OlympiadScore
+
+    scores = list(
+        olympiad.scores
+        .filter(score_type=OlympiadScore.ScoreType.PASS_TO_FINAL)
+        .order_by('grade', 'year')
+    )
+    if not scores:
+        return [], []
+
+    years = sorted({s.year for s in scores})[-years_back:]
+    grades = sorted({s.grade for s in scores if s.grade is not None})
+    by_key = {(s.grade, s.year): s for s in scores}
+
+    rows = []
+    for grade in grades:
+        cells = []
+        for year in years:
+            score = by_key.get((grade, year))
+            if score is None:
+                cells.append({'year': year, 'missing': True})
+            else:
+                cells.append({
+                    'year': year,
+                    'missing': False,
+                    'value': score.value,
+                    'max_value': score.max_value,
+                    'pct': round(100 * score.share) if score.share else 0,
+                })
+        rows.append({'grade': grade, 'cells': cells})
+    return rows, years
