@@ -36,8 +36,14 @@ class FigureDrawLayoutTest(SimpleTestCase):
                                           'playwright')):
             raise unittest.SkipTest('playwright не установлен')
         try:
+            # ⚠️ encoding обязателен. Без него Python декодирует вывод
+            # раннера кодировкой консоли (на русской Windows это cp1251),
+            # спотыкается о «✓» и отдаёт ПУСТУЮ строку при returncode 0 —
+            # то есть тест «зеленел» бы, ничего не проверив. Ровно это и
+            # поймала проверка на слово «провалено» ниже.
             res = subprocess.run([node, RUNNER], cwd=str(settings.BASE_DIR),
-                                 capture_output=True, text=True, timeout=300)
+                                 capture_output=True, text=True, timeout=300,
+                                 encoding='utf-8', errors='replace')
         except (OSError, subprocess.TimeoutExpired) as exc:
             raise unittest.SkipTest('раннер не запустился: %s' % exc)
         out = (res.stdout or '') + (res.stderr or '')

@@ -286,22 +286,33 @@ def _candidate_rows(state):
     Сложность берётся через измеренную, если она есть (см. game/stats.py):
     пользовательский фильтр сложности обязан опираться на ту же величину,
     что и всё остальное в игре.
+
+    ⚠️ ДЛИНА УСЛОВИЯ РЕЖЕТСЯ ЗДЕСЬ, А НЕ В ПУЛЕ. У Пули на вопрос уходят
+    секунды, у Классики — минута, и один порог на всех отсекал бы либо
+    слишком много, либо слишком мало (config.MODE_MAX_CHARS). Сборщик пула
+    считает длину чуть иначе — таблицу как плейсхолдер (reading_length), —
+    и здесь длинная таблица честно засчитывается целиком: на замере это
+    разошлось у 2 вопросов из 10 076, и всегда в СТРОГУЮ сторону.
     """
     f = normalize_filter(state.get('filter'))
-    qtype = config.MODES[state['mode']]['question_type']
+    mode = state['mode']
+    qtype = config.MODES[mode]['question_type']
+    max_chars = config.MODE_MAX_CHARS.get(mode)
     bank_map, arch_map = stats_mod.difficulty_overrides()
     rows = _pool_qs().filter(question_type=qtype).values_list(
         'id', 'topics', 'source_group', 'difficulty',
-        'problem_id', 'part_id', 'generator_key', 'tag_ids')
+        'problem_id', 'part_id', 'generator_key', 'tag_ids', 'question')
     out = []
     for (pk, topics, group, difficulty, problem_id, part_id, gen_key,
-         tag_ids) in rows:
+         tag_ids, question) in rows:
+        if max_chars is not None and len(question or '') > max_chars:
+            continue
         if problem_id is not None:
             difficulty = bank_map.get((problem_id, part_id), difficulty)
         elif gen_key:
             difficulty = arch_map.get(gen_key, difficulty)
         if _filter_matches(f, topics, group, difficulty, tag_ids):
-            out.append((pk, difficulty, topics or []))
+            out.append((pk, difficulty, topics or [], bool(gen_key)))
     return out
 
 
@@ -585,6 +596,29 @@ def _question_payload(gq, number):
     return payload
 
 
+def _cap_generated(state, band):
+    u"""Отсечь сгенерированные, если их доля в забеге уже дошла до потолка.
+
+    band — [(id, difficulty, сгенерирован), ...]. Правило простое: очередной
+    вопрос может быть машинным, только если ПОСЛЕ него доля не превысит
+    config.GENERATED_SHARE_MAX. При потолке 0,25 это «не чаще одного из
+    четырёх», и первый вопрос забега всегда из банка.
+
+    ⚠️ Потолок ОТСТУПАЕТ, если банковских кандидатов не осталось: иначе
+    забег кончался бы не по жизням и не по времени, а по квоте, и игрок не
+    понял бы почему. По той же причине правило не касается «Графика»: там
+    все вопросы сгенерированы по устройству.
+    """
+    if config.MODES[state['mode']]['question_type'] == FIGURE_AUDIT:
+        return band
+    served = len(state.get('seen') or [])
+    gen_served = int(state.get('generated_served') or 0)
+    if gen_served + 1 <= config.GENERATED_SHARE_MAX * (served + 1):
+        return band
+    from_bank = [r for r in band if not r[2]]
+    return from_bank or band
+
+
 def _pick_next(request, state):
     """Выбирает следующий вопрос режима: случайный, но «сначала невиданные».
 
@@ -604,9 +638,10 @@ def _pick_next(request, state):
     if state.get('queue') is not None:
         return _pick_from_queue(request, state)
 
-    rows = [(pk, d) for pk, d, _t in _candidate_rows(state)
+    rows = [(pk, d, gen) for pk, d, _t, gen in _candidate_rows(state)
             if pk not in seen_run]
-    candidates = [pk for pk, _d in escalation_slice(rows, state.get('streak', 0))]
+    band = escalation_slice(rows, state.get('streak', 0))
+    candidates = [pk for pk, _d, _g in _cap_generated(state, band)]
     if not candidates:
         return None  # пул исчерпан в этом забеге
 
@@ -641,6 +676,10 @@ def _remember_seen(request, state, gq):
     state.setdefault('first_seen', {})[str(gq.id)] = gq.id not in counted
 
     state['seen'].append(gq.id)
+    # Счётчик машинных вопросов забега — им живёт потолок доли
+    # (config.GENERATED_SHARE_MAX, см. _cap_generated).
+    if gq.is_generated:
+        state['generated_served'] = int(state.get('generated_served') or 0) + 1
     # Момент выдачи — серверными часами. Отсюда считается время ответа.
     state.setdefault('issued_at', {})[str(gq.id)] = time.time()
     seen_map = request.session.get(SEEN_KEY) or {}
@@ -1255,7 +1294,8 @@ def api_session_start_mistakes(request):
     # сложность не для того, чтобы разбор ошибок молча вернул ему весь пул.
     run_filter = normalize_filter(last.get('filter'))
     probe = _new_state(mode, None, run_filter)
-    rows = [(pk, topics) for pk, _d, topics in _candidate_rows(probe)]
+    rows = [(pk, topics)
+            for pk, _d, topics, _g in _candidate_rows(probe)]
     quotas = allocate_quotas(counts, config.MISTAKES_RUN_SIZE)
     seen_map = request.session.get(SEEN_KEY) or {}
     queue = build_mistakes_run(rows, quotas, config.MISTAKES_RUN_SIZE,
@@ -1545,7 +1585,7 @@ def duel_new(request):
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
     run_filter = parse_filter(request)
     probe = _new_state(mode, None, run_filter)
-    ids = [pk for pk, _d, _t in _candidate_rows(probe)]
+    ids = [pk for pk, _d, _t, _g in _candidate_rows(probe)]
     if not ids:
         # Под фильтром пусто — не создаём пустую дуэль, а честно говорим.
         return render(request, 'game/duel_empty.html', {

@@ -50,25 +50,37 @@ class Story(object):
                альтернативной стоимости);
       x_count— «сайтов», «центнеров пшеницы» (в счётных оборотах);
       x_good — «сайтов», «пшеницы» (в единице ответа «ед. …»);
-      x_axis — подпись оси графика.
+      x_axis — подпись оси графика;
+      x_meas — счётная единица ответа: «ед.» по умолчанию, но у поля урожай
+               меряют центнерами, и «ед. пшеницы» под условием, где всё
+               считано в центнерах, читается как чужая единица.
     """
 
     def __init__(self, key, actor, x_one, x_count, x_good, x_axis,
-                 y_one, y_count, y_good, y_axis, full):
+                 y_one, y_count, y_good, y_axis, full,
+                 x_meas=u'ед.', y_meas=u'ед.'):
         self.key = key
         self.actor = actor
         self.x_one, self.x_count, self.x_good, self.x_axis = (
             x_one, x_count, x_good, x_axis)
         self.y_one, self.y_count, self.y_good, self.y_axis = (
             y_one, y_count, y_good, y_axis)
+        self.x_meas, self.y_meas = x_meas, y_meas
         self.full = full
+
+    def unit_x(self):
+        u"""Единица ответа, выраженного в товаре X: «ед. булок», «ц. пшеницы»."""
+        return u'{} {}'.format(self.x_meas, self.x_good)
+
+    def unit_y(self):
+        return u'{} {}'.format(self.y_meas, self.y_good)
 
 
 def _bakery(p, st):
     return (u'В пекарне «Тёплый угол» одна печь и один рабочий день, и '
             u'делить их приходится между двумя противнями: на булки или на '
             u'пирожные. Если печь весь день занята только булками, выходит '
-            u'{} штук; если только пирожными — {} штук. Пекарь может '
+            u'{} штук; если только пирожными, то {} штук. Пекарь может '
             u'разделить день в любой пропорции, и тогда выпуск падает '
             u'ровно пропорционально отданному времени.').format(
                 p['mx'], p['my'])
@@ -77,7 +89,7 @@ def _bakery(p, st):
 def _field(p, st):
     return (u'У фермера в деревне N одно поле, и засеять его надо целиком: '
             u'земля простаивать не должна. Всё поле под пшеницу даёт {} '
-            u'центнеров за сезон, всё поле под картофель — {} центнеров. '
+            u'центнеров за сезон, а всё поле под картофель {} центнеров. '
             u'Землю можно поделить в любой пропорции, урожай меняется '
             u'пропорционально отведённой площади.').format(p['mx'], p['my'])
 
@@ -86,23 +98,23 @@ def _workshop(p, st):
     return (u'Столярная мастерская «Рубанок» работает одной бригадой: '
             u'сколько часов ушло на столы, столько не досталось стульям. '
             u'За месяц бригада делает либо {} столов, либо {} стульев, '
-            u'либо любую промежуточную комбинацию — время делится '
+            u'либо любую промежуточную комбинацию, ведь время делится '
             u'пропорционально.').format(p['mx'], p['my'])
 
 
 def _studio(p, st):
     return (u'В студии «Пиксель» одна команда и один спринт: взяли задачу '
-            u'по сайтам — не взяли по мобильным приложениям. За спринт '
+            u'по сайтам, значит не взяли по мобильным приложениям. За спринт '
             u'команда успевает либо {} сайтов, либо {} приложений, либо '
             u'поделить силы в любой пропорции.').format(p['mx'], p['my'])
 
 
 def _country(p, st):
-    return (u'Экономика страны Альфа выпускает два товара — станки и '
-            u'холодильники, — и ресурсы (труд, металл, энергия) у неё '
+    return (u'Экономика страны Альфа выпускает два товара, станки и '
+            u'холодильники, и ресурсы (труд, металл, энергия) у неё '
             u'ограничены и используются полностью. Бросив все ресурсы на '
             u'станки, страна выпустит за год {} штук; бросив все на '
-            u'холодильники — {} штук. КПВ линейна: ресурсы одинаково '
+            u'холодильники, {} штук. КПВ линейна: ресурсы одинаково '
             u'годятся для обоих производств.').format(p['mx'], p['my'])
 
 
@@ -115,7 +127,7 @@ STORIES = [
           u'одного центнера пшеницы', u'центнеров пшеницы', u'пшеницы',
           u'Пшеница, ц.',
           u'одного центнера картофеля', u'центнеров картофеля', u'картофеля',
-          u'Картофель, ц.', _field),
+          u'Картофель, ц.', _field, x_meas=u'ц.', y_meas=u'ц.'),
     Story('workshop', u'бригада',
           u'одного стола', u'столов', u'столов', u'Столы, шт.',
           u'одного стула', u'стульев', u'стульев', u'Стулья, шт.', _workshop),
@@ -201,12 +213,12 @@ class PpfSingleArchetype(Archetype):
             Asked('oc_x',
                   nom=u'альтернативная стоимость производства {}'.format(st.x_one),
                   acc=u'альтернативную стоимость производства {}'.format(st.x_one),
-                  gender='f', unit=u'ед. {}'.format(st.y_good), difficulty=2),
+                  gender='f', unit=st.unit_y(), difficulty=2),
             Asked('oc_y',
                   nom=u'альтернативная стоимость производства {}'.format(st.y_one),
                   acc=u'альтернативную стоимость производства {}'.format(st.y_one),
-                  gender='f', unit=u'ед. {}'.format(st.x_good), difficulty=2),
-            Asked('y_at_x', unit=u'ед. {}'.format(st.y_good), difficulty=3,
+                  gender='f', unit=st.unit_x(), difficulty=2),
+            Asked('y_at_x', unit=st.unit_y(), difficulty=3,
                   question=(u'Какое наибольшее количество {} можно получить, '
                             u'если выпустить {} {}?'
                             ).format(st.y_count, params['x0'], st.x_count),
@@ -216,8 +228,9 @@ class PpfSingleArchetype(Archetype):
                   nom=u'максимальный выпуск второго товара', gender='m'),
             Asked('point_class', kind='class', class_options=list(POINT_LABELS),
                   difficulty=3,
-                  question=(u'Как расположена точка ({}; {}) — {} и {} '
-                            u'соответственно — относительно КПВ?').format(
+                  question=(u'Как расположена относительно КПВ точка '
+                            u'({}; {}), то есть {} и {} '
+                            u'соответственно?').format(
                                 params['x0'], params['y0'],
                                 st.x_count, st.y_count),
                   claim_tpl=(u'точка ({}; {}) {{V}}').format(
@@ -261,68 +274,68 @@ class PpfSingleArchetype(Archetype):
         oc = _ppf.oc_x(mx, my)
         eq_step = (u'Ресурс общий, поэтому потраченное на один товар '
                    u'недоступно для другого. КПВ линейна, её уравнение: '
-                   u'$Y = {} \\cdot (1 - X/{})$, где $X$ — выпуск {}, '
-                   u'$Y$ — выпуск {}.').format(
+                   u'$Y = {} \\cdot (1 - X/{})$, где $X$ обозначает '
+                   u'выпуск {}, а $Y$ выпуск {}.').format(
                        fmt_num(my, latex=True), fmt_num(mx, latex=True),
                        st.x_count, st.y_count)
         if asked.key in ('oc_x', 'oc_y'):
             num, den = (my, mx) if asked.key == 'oc_x' else (mx, my)
             one = st.x_one if asked.key == 'oc_x' else st.y_one
             count = st.x_count if asked.key == 'oc_x' else st.y_count
-            in_what = st.y_good if asked.key == 'oc_x' else st.x_good
+            in_what = st.unit_y() if asked.key == 'oc_x' else st.unit_x()
             return [
-                u'Альтернативная стоимость — это то, ЧЕМ ЖЕРТВУЮТ ради '
+                u'Альтернативная стоимость показывает, ЧЕМ ЖЕРТВУЮТ ради '
                 u'товара, а не сколько за него платят деньгами.',
-                u'Отказавшись от всех {} {}, {} получает {} ед. {}. КПВ '
+                u'Отказавшись от всех {} {}, {} получает {} {}. КПВ '
                 u'линейна, значит курс обмена одинаков на всём протяжении '
                 u'границы.'.format(
                     fmt_num(den, latex=True), count, st.actor,
                     fmt_num(num, latex=True), in_what),
                 u'Делим на количество: ради {} приходится жертвовать '
-                u'${} / {} = {}$ ед. {}.'.format(
+                u'${} / {} = {}$ {}.'.format(
                     one, fmt_num(num, latex=True), fmt_num(den, latex=True),
                     fmt_num(solved[asked.key], latex=True), in_what),
             ]
         if asked.key == 'y_at_x':
             return [
                 eq_step,
-                u'На {} {} уходит доля ${}/{}$ всего ресурса — значит на '
+                u'На {} {} уходит доля ${}/{}$ всего ресурса, значит на '
                 u'второй товар остаётся остальное.'.format(
                     params['x0'], st.x_count, params['x0'],
                     fmt_num(mx, latex=True)),
-                u'Подставим $X = {}$: $Y = {} \\cdot (1 - {}/{}) = {}$ ед. '
+                u'Подставим $X = {}$: $Y = {} \\cdot (1 - {}/{}) = {}$ '
                 u'{}'.format(
                     params['x0'], fmt_num(my, latex=True), params['x0'],
                     fmt_num(mx, latex=True),
-                    fmt_num(solved['y_at_x'], latex=True), st.y_good),
+                    fmt_num(solved['y_at_x'], latex=True), st.unit_y()),
                 u'Проверка через альтернативную стоимость: {} {} стоят '
-                u'${} \\cdot {} = {}$ ед. {} — ровно на столько выпуск '
+                u'${} \\cdot {} = {}$ {}, ровно на столько выпуск '
                 u'меньше максимума {}.'.format(
                     params['x0'], st.x_count, params['x0'],
                     fmt_num(oc, latex=True),
-                    fmt_num(F(params['x0']) * oc, latex=True), st.y_good,
+                    fmt_num(F(params['x0']) * oc, latex=True), st.unit_y(),
                     fmt_num(my, latex=True)),
             ]
         # point_class
         y0 = params['y0']
         border = solved['y_at_x']
         if F(y0) == border:
-            why = (u'Столько и получается — точка лежит НА границе: ресурсы '
+            why = (u'Столько и получается, значит точка лежит НА границе: ресурсы '
                    u'заняты полностью и без потерь.')
         elif F(y0) < border:
-            why = (u'Это меньше границы — значит часть ресурса простаивает '
+            why = (u'Это меньше границы, значит часть ресурса простаивает '
                    u'или тратится впустую. Точка достижима, но неэффективна: '
                    u'можно выпустить больше, ничего не отнимая.')
         else:
-            why = (u'Это больше границы — таких ресурсов у хозяйства просто '
+            why = (u'Это больше границы, а таких ресурсов у хозяйства просто '
                    u'нет. Точка недостижима.')
         return [
             eq_step,
             u'Найдём границу при $X = {}$: $Y = {} \\cdot (1 - {}/{}) = {}$ '
-            u'ед. {}'.format(
+            u'{}'.format(
                 params['x0'], fmt_num(my, latex=True), params['x0'],
                 fmt_num(mx, latex=True), fmt_num(border, latex=True),
-                st.y_good),
+                st.unit_y()),
             u'У точки $Y = {}$. {}'.format(y0, why),
             u'Вывод: точка {}.'.format(solved['point_class']),
         ]

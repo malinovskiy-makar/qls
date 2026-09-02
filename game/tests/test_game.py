@@ -80,9 +80,15 @@ class ExtractQuestionTests(TestCase):
         self.assertEqual(reason, 'правильный ответ не определён')
 
     def test_long_statement_rejected(self):
-        p = make_test_problem(statement='Ы' * 301)
+        """В пул не берём длиннее 700; кто из режимов выдержит 450 знаков —
+        решает отбор при выдаче (config.MODE_MAX_CHARS)."""
+        p = make_test_problem(statement='Ы' * 701)
         q, opts, correct, reason = extract_question(p)
-        self.assertEqual(reason, 'условие длиннее 300')
+        self.assertEqual(reason, 'условие длиннее 700')
+
+        p = make_test_problem(statement='Ы' * 450)
+        q, opts, correct, reason = extract_question(p)
+        self.assertIsNone(reason)
 
     def test_figure_reference_rejected(self):
         p = make_test_problem(statement='Определите по графику ниже равновесную цену.')

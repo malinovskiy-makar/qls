@@ -302,6 +302,10 @@ def generate_question(arch, rng, question_type):
             labels = list(asked.class_options)
             correct_label = solved[asked.key]
             if question_type == 'single':
+                # ⚠️ Тасуем, как и числовые варианты: без этого правильный
+                # ответ стоит там, куда его поставило объявление
+                # class_options, и запоминается позицией, а не смыслом.
+                rng.shuffle(labels)
                 options = labels
                 correct_index = labels.index(correct_label)
                 q_sentence = asked.question

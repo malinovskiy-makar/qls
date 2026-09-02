@@ -33,7 +33,7 @@ GOODS = [
     (u'кофе в зёрнах', u'кофе в зёрнах'),
 ]
 
-WHERE_PQ = u'где $P$ — цена (в ден. ед.), $Q$ — количество (в шт.)'
+WHERE_PQ = u'где цена $P$ задана в ден. ед., а количество $Q$ в шт.'
 
 
 def sample_market(rng, p_grid=None, q_grid=None, slopes=None):
@@ -78,8 +78,8 @@ def setup_full(params, solved=None):
 def setup_full_country(params, solved=None):
     good = GOODS[params['good']]
     return (u'В стране Альфа спрос на {} описывается уравнением {}, '
-            u'а предложение — уравнением {} ($P$ — цена в ден. ед., '
-            u'$Q$ — количество в шт.).').format(
+            u'а предложение уравнением {} (цена $P$ в ден. ед., '
+            u'количество $Q$ в шт.).').format(
                 good[1], demand_eq(params), supply_eq(params))
 
 
@@ -92,13 +92,13 @@ def setup_full_analysts(params, solved=None):
 
 def setup_short(params, solved=None):
     """Сжатая декорация (для single/boolean): только функции."""
-    return (u'На рынке {}: спрос {}, предложение {} ($P$ — в ден. ед., '
-            u'$Q$ — в шт.).').format(
+    return (u'На рынке {}: спрос {}, предложение {} ($P$ в ден. ед., '
+            u'$Q$ в шт.).').format(
                 GOODS[params['good']][0], demand_eq(params), supply_eq(params))
 
 
 def setup_short_bare(params, solved=None):
-    return u'Спрос: {}, предложение: {} ($P$ — в ден. ед., $Q$ — в шт.).'.format(
+    return u'Спрос: {}, предложение: {} ($P$ в ден. ед., $Q$ в шт.).'.format(
         demand_eq(params), supply_eq(params))
 
 

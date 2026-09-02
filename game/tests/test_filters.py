@@ -317,3 +317,64 @@ class EmptyFilterNeverStartsARunTests(TestCase):
                 self.assertEqual(d['reason'], 'pool_empty', mode)
                 self.assertNotIn('question', d)
                 self.assertIsNone(self.client.session.get(views.SESSION_KEY))
+
+
+class ModeLengthCutTests(TestCase):
+    u"""Длину условия режет ОТБОР ПРИ ВЫДАЧЕ, а не сборщик пула.
+
+    В пуле лежат вопросы до 700 знаков. Пуле достаётся 300, Блицу 400,
+    Рапиду 600, Классике 700 (config.MODE_MAX_CHARS): у Пули на вопрос
+    уходят секунды, у Классики минута.
+    """
+
+    TEXT = {
+        'bullet': ('boolean', 290),
+        'blitz': ('single', 390),
+        'rapid': ('multi', 590),
+        'classic': ('numeric', 690),
+    }
+
+    def _counts(self):
+        return views.pool_counts_for(views.empty_filter())
+
+    def test_each_mode_takes_its_own_length(self):
+        for mode, (qtype, size) in self.TEXT.items():
+            GameQuestion.objects.all().delete()
+            kw = {'question': 'Ы' * size, 'qtype': qtype}
+            if qtype == 'numeric':
+                kw.update(options=[], correct_index=None, correct_value='5')
+            elif qtype == 'multi':
+                kw.update(correct_index=None, correct_indices=[0])
+            make_q(**kw)
+            self.assertEqual(
+                self._counts()[mode], 1,
+                u'{}: вопрос на {} знаков обязан подойти'.format(mode, size))
+
+    def test_a_question_over_the_cap_is_not_served(self):
+        for mode, (qtype, _) in self.TEXT.items():
+            cap = config.MODE_MAX_CHARS[mode]
+            GameQuestion.objects.all().delete()
+            kw = {'question': 'Ы' * (cap + 1), 'qtype': qtype}
+            if qtype == 'numeric':
+                kw.update(options=[], correct_index=None, correct_value='5')
+            elif qtype == 'multi':
+                kw.update(correct_index=None, correct_indices=[0])
+            make_q(**kw)
+            self.assertEqual(
+                self._counts()[mode], 0,
+                u'{}: вопрос на {} знаков длиннее потолка {}'.format(
+                    mode, cap + 1, cap))
+
+    def test_one_long_question_is_seen_by_rapid_and_hidden_from_bullet(self):
+        u"""Тот самый случай, ради которого порог уехал из пула.
+
+        Вопрос на 450 знаков раньше не попадал в БАЗУ вовсе, и его терял не
+        только Пуля, но и Рапид, где на ответ есть полминуты."""
+        GameQuestion.objects.all().delete()
+        make_q(question='Ы' * 450, qtype='boolean',
+               options=[u'Верно', u'Неверно'])
+        make_q(question='Ы' * 450, qtype='multi',
+               correct_index=None, correct_indices=[0])
+        counts = self._counts()
+        self.assertEqual(counts['rapid'], 1)
+        self.assertEqual(counts['bullet'], 0)

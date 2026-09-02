@@ -932,3 +932,139 @@ class FigureServingTests(TestCase):
                 data='{"question_id": %d, "value": "5"}' % gq.pk,
                 content_type='application/json')
             self.assertNotIn('figure', resp.json())
+
+
+
+# ---------------------------------------------------------------------------
+# Гигиена текста генераторов (сессия «Wecon Rush — закрытие», фаза 1)
+# ---------------------------------------------------------------------------
+
+# Архетипы с качественными (kind='class') вопросами: у них есть порядок
+# вариантов, который можно забыть перетасовать.
+CLASS_ARCHETYPES = ['comparative_advantage', 'ppf_single', 'elasticity_point',
+                    'elasticity_arc']
+
+DASH = u'\u2014'      # длинное тире, запрещённое в текстах сайта
+
+
+def asked_kind(arch, params):
+    """kind того Asked, который выпал этому вопросу ('value' или 'class')."""
+    for a in arch.asked_values(params):
+        if a.key == params['_asked']:
+            return a.kind
+    return None
+
+
+class GeneratorTextHygieneTests(SimpleTestCase):
+    u"""Дефекты, найденные замером по базе (reports/game/generated_audit.html).
+
+    Проверки идут по СВЕЖЕ СГЕНЕРИРОВАННОМУ тексту, а не по строкам файлов:
+    длинное тире жило в БАЗЕ, а сканер по каталогу game честно показывал
+    ноль. Файловый сканер такой дефект не видит по устройству.
+    """
+
+    def sample(self, key, qtype, n, seed=20260902):
+        arch = ARCHETYPES[key]
+        rng = random.Random(seed)
+        for _ in range(n):
+            yield arch, gbase.generate_question(arch, rng, qtype)
+
+    def test_class_options_are_shuffled(self):
+        u"""Порядок вариантов качественного вопроса тасуется.
+
+        Без тасовки правильный ответ стоит там, куда его поставило
+        объявление class_options, и запоминается позицией, а не смыслом."""
+        for key in CLASS_ARCHETYPES:
+            orders = set()
+            for arch, q in self.sample(key, 'single', 200):
+                if asked_kind(arch, q['params']) != 'class':
+                    continue
+                orders.add(tuple(q['options']))
+            self.assertTrue(orders, u'{}: качественных вопросов не выпало'
+                                    .format(key))
+            self.assertGreater(
+                len(orders), 1,
+                u'{}: порядок вариантов всегда один и тот же: {}'.format(
+                    key, orders))
+
+    def test_no_em_dash_in_anything_the_player_sees(self):
+        u"""Ни в условии, ни в вариантах, ни в решении нет «—»."""
+        for key in sorted(ARCHETYPES):
+            for qtype in ('numeric', 'single', 'boolean'):
+                for _, q in self.sample(key, qtype, 40):
+                    texts = [q['statement'], q['solution_text']]
+                    texts += [o for o in q['options']
+                              if isinstance(o, str)]
+                    for text in texts:
+                        self.assertNotIn(
+                            DASH, text,
+                            u'{}/{}: длинное тире в «{}»'.format(
+                                key, qtype, text[:140]))
+
+    def test_equilibrium_speaks_one_currency(self):
+        u"""Условие равновесия и его вопрос — про одни и те же деньги.
+
+        Замер по базе: 45 вопросов говорили «$P$ — в ден. ед.», а спрашивали
+        «(в руб.)». Сжатую форму собирал общий помощник Блока А."""
+        for _, q in self.sample('equilibrium', 'single', 200):
+            self.assertNotIn(u'ден. ед.', q['statement'], q['statement'])
+        for _, q in self.sample('equilibrium', 'boolean', 200):
+            self.assertNotIn(u'ден. ед.', q['statement'], q['statement'])
+
+    def test_equilibrium_quantity_unit_matches_the_story(self):
+        u"""Кофе меряют в кг: и в условии, и у поля ввода."""
+        for _, q in self.sample('equilibrium', 'single', 200):
+            if u'кофе' in q['statement']:
+                self.assertIn(u'$Q$ в кг', q['statement'], q['statement'])
+                self.assertNotIn(u'$Q$ в шт.', q['statement'], q['statement'])
+
+    def test_ppf_single_answer_unit_matches_the_story(self):
+        u"""Урожай меряют центнерами, значит и единица ответа центнеры."""
+        seen = 0
+        for _, q in self.sample('ppf_single', 'numeric', 300):
+            if u'центнер' not in q['statement']:
+                continue
+            seen += 1
+            self.assertFalse(
+                q['unit'].startswith(u'ед. '),
+                u'условие в центнерах, а ответ в «{}»'.format(q['unit']))
+        self.assertGreater(seen, 0, u'сюжет с центнерами не выпал ни разу')
+
+    def test_comparative_advantage_uses_the_right_case(self):
+        u"""«по мёда» — не по-русски: преимущество бывает В ПРОИЗВОДСТВЕ."""
+        from game.generators import _ppf
+        bad = re.compile(u'\\bпо (%s)\\b' % u'|'.join(
+            g[1] for g in _ppf.PPF_GOODS))
+        for _, q in self.sample('comparative_advantage', 'single', 200):
+            text = q['statement'] + u'\n' + q['solution_text']
+            self.assertIsNone(bad.search(text), text)
+
+
+class GeneratedPoolHasNoEmDashTests(TestCase):
+    u"""Ноль длинных тире у сгенерированных вопросов — ПО БАЗЕ, не по файлам.
+
+    ⚠️ Именно по базе. Сканер scripts/check_em_dash.py читает каталог game и
+    честно показывает ноль, а игрок при этом видел 4 979 вопросов с
+    запрещённым знаком: тире приезжало из строк генератора в БАЗУ. Файловый
+    сканер такой дефект не увидит по устройству, поэтому проверка здесь
+    сначала НАПОЛНЯЕТ пул, а потом читает его.
+    """
+
+    def test_pool_built_by_both_generators_is_clean(self):
+        call_command('generate_game_questions', '--per-archetype', '3',
+                     '--confirm', verbosity=0)
+        call_command('generate_figure_questions', '--per-scenario', '3',
+                     '--confirm', verbosity=0)
+
+        rows = list(GameQuestion.objects.filter(is_generated=True))
+        self.assertGreater(len(rows), 100, u'пул не наполнился')
+
+        bad = []
+        for q in rows:
+            texts = [q.question or '', q.gen_solution or '']
+            texts += [o for o in (q.options or []) if isinstance(o, str)]
+            for text in texts:
+                if DASH in text:
+                    bad.append((q.generator_key, text[:120]))
+        self.assertEqual(bad[:5], [], u'тире в базе: {} вопросов'.format(
+            len(bad)))

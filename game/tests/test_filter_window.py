@@ -47,7 +47,7 @@ class TagFilterTests(TestCase):
         from django.test import RequestFactory
         req = RequestFactory().get('/game/', params)
         f = views.parse_filter(req)
-        return {pk for pk, _d, _t in
+        return {pk for pk, _d, _t, _g in
                 views._candidate_rows({'mode': 'blitz', 'filter': f})}
 
     def test_tag_filter_narrows_the_pool(self):
@@ -86,7 +86,7 @@ class StarsFilterTests(TestCase):
         from django.test import RequestFactory
         req = RequestFactory().get('/game/', params)
         f = views.parse_filter(req)
-        return {pk for pk, _d, _t in
+        return {pk for pk, _d, _t, _g in
                 views._candidate_rows({'mode': 'blitz', 'filter': f})}
 
     def test_gap_subset_is_possible(self):
