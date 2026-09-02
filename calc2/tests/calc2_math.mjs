@@ -3243,7 +3243,15 @@ const CASES = [
     /* «Равновесие𝐷 = 𝑆» без пробела: .section-title — flex-контейнер, и в нём
        текстовый узел перед span.tex теряет конечный пробел. */
     name: 'Заголовок раздела · зазор между текстом и формулой («Равновесие D = S»)',
+    /* ⚠️ ПРИБОР САМ РАСКРЫВАЕТ КАРТОЧКИ. Раздел равновесия переезжает в
+       «Ключевые значения» правой панели, а она с 01.09 сворачивается при
+       смене модели вместе с левой. У свёрнутого узла прямоугольник нулевой,
+       и зазор мерился бы как ноль на верной вёрстке. Правило записано в
+       calc2/CLAUDE.md и теперь касается обеих панелей. */
     run: `loadScene('sd'); redrawAll();
+          document.querySelectorAll('.fold-btn').forEach(function (b) {
+            if (b.getAttribute('aria-expanded') !== 'true') b.click();
+          });
           var t = document.getElementById('sec-eq').querySelector('.section-title');
           var textNode = Array.prototype.filter.call(t.childNodes, function (n) { return n.nodeType === 3; })[0];
           var texSpan = t.querySelector('.tex');

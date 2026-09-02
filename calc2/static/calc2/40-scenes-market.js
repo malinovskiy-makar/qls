@@ -2582,9 +2582,16 @@ function applyIntervCascade() {
   const show = (id, on) => { const e = document.getElementById(id); if (e) e.style.display = on ? '' : 'none'; };
   // Уровень 5 — значение: ставка у налога/субсидии, цена у потолка/пола,
   // объём у квоты (и вслед за ним — выбор цены внутри коридора).
-  show('tax-field', isRate);    show('tax-hint', isRate);
-  show('pc-field', isPrice);    show('pc-hint', isPrice);
-  show('quota-field', isQuota); show('quota-hint', isQuota);
+  show('tax-field', isRate);
+  show('pc-field', isPrice);
+  show('quota-field', isQuota);
+  /* ⚠️ ПОЯСНЕНИЯ ПОД ПОЛЗУНКАМИ БОЛЬШЕ НЕ ПОКАЗЫВАЮТСЯ ЗДЕСЬ. Их место —
+     «Объяснение модели» (решение владельца 01.09): абзац текста в панели
+     органов управления отодвигал сами органы вниз и читался как часть
+     регулятора. Каскад по-прежнему решает, какое из трёх относится к делу, —
+     только теперь помечает его классом, а не ставит display: инлайновый стиль
+     победил бы `.sb-note-src`, и текст снова повис бы под ползунком. */
+  markCurrentIntervHint(isRate ? 'tax-hint' : (isPrice ? 'pc-hint' : (isQuota ? 'quota-hint' : null)));
   // Ползунок цены появляется ТОЛЬКО когда коридор существует: квота задана и
   // связывает. Пока квоты нет или она не связывает, выбирать нечего.
   show('quota-price-field', isQuota && !!STATE.quotaActive);
@@ -2802,8 +2809,61 @@ function syncQuotaHint() {
   h.textContent = (STATE.market === 'monopoly') ? QUOTA_HINT_MONO : QUOTA_HINT_COMP;
 }
 
+/* Потолок и пол — РАЗНЫЕ сюжеты, и текст у них разный (замечание владельца
+   01.09: пояснение было одно на оба случая). Потолок ниже равновесия даёт
+   дефицит и очередь, пол выше равновесия — избыток и нераспроданное. */
+const PC_HINT_CEIL =
+  'Потолок цены это верхняя граница: продавать дороже нельзя. Потолок ниже равновесной цены '
+  + 'даёт дефицит: купить хотят больше, чем выставлено, и часть покупателей уходит ни с чем, '
+  + 'а за товаром выстраивается очередь. Линию цены можно тянуть мышью.';
+const PC_HINT_FLOOR =
+  'Пол цены это нижняя граница: продавать дешевле нельзя. Пол выше равновесной цены даёт '
+  + 'избыток: выставлено больше, чем готовы купить, и часть товара остаётся непроданной. '
+  + 'Линию цены можно тянуть мышью.';
+function syncPcHint() {
+  const h = document.getElementById('pc-hint');
+  if (!h) return;
+  h.textContent = (STATE.intervType === 'floor') ? PC_HINT_FLOOR : PC_HINT_CEIL;
+}
+
+// Какое из трёх пояснений вмешательства относится к делу прямо сейчас.
+// В панели не показывается ни одно: их собирает «Объяснение модели».
+function markCurrentIntervHint(id) {
+  ['tax-hint', 'pc-hint', 'quota-hint'].forEach(h => {
+    const e = document.getElementById(h);
+    if (e) e.classList.toggle('hint-current', h === id);
+  });
+}
+
+/* Ключ текущего пояснения: по нему «Объяснение модели» понимает, что абзац
+   пора пересобрать. Сцена та же, а вид вмешательства другой — текст другой. */
+function intervHintKey() {
+  const cur = document.querySelector('#sec-tax .hint-current');
+  return cur ? (cur.id + '/' + String(STATE.intervType) + '/' + taxFormKey()
+                + '/' + String(STATE.taxSide) + '/' + String(STATE.market)) : '';
+}
+
+/* Пояснение вмешательства для «Объяснения модели». Собирается ТЕМ ЖЕ приёмом,
+   что разбор процентной формы и пересечения вне четверти: отдельным абзацем
+   в конец, а не вместо общего рассказа сцены. Текст берётся у скрытого
+   источника в карточке — одна точка правды, её пишет syncTaxHint. */
+function intervHintHtml() {
+  /* ⚠️ ДВА РАЗНЫХ СПОСОБА СПРЯТАТЬ КАРТОЧКУ, И СПРАШИВАТЬ НАДО ОБА.
+     `scoped-off` вешает маршрут сцены («этот орган ей не выдан»), а `display`
+     ставит applyScenarioVisibility по МОДЕЛИ: в КПВ, неравенстве и математике
+     вмешательства нет вовсе. Класс `hint-current` при этом переживает смену
+     сцены, и без второй проверки абзац про налог всплывал в сцене «Сложение
+     КПВ» и вытеснял оттуда её собственный разбор. */
+  const sec = document.getElementById(L_INTERV);
+  if (!sec || sec.classList.contains('scoped-off') || sec.style.display === 'none') return '';
+  const cur = document.querySelector('#sec-tax .hint-current');
+  if (!cur || !cur.innerHTML.trim()) return '';
+  return '<div class="sb-note">' + cur.innerHTML + '</div>';
+}
+
 function syncTaxHint() {
   syncQuotaHint();
+  syncPcHint();
   const h = document.getElementById('tax-hint');
   if (!h) return;
   const pf = pctForm();

@@ -911,6 +911,112 @@ r = await run(MKT + `setDS('mono-nat', '100-Q', 'Q-20'); STATE.natFC = 100; redr
 cmp('естественная монополия: ATC(40) считается', isFinite(r.atc40), true, 0);
 cmp('естественная монополия: VC(40) обрезан нулём', r.vcOnly, 200, 0.5);
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · ПРАВАЯ ПАНЕЛЬ.
+   Карточки справа сворачиваются при смене модели; пояснения под ползунками
+   вмешательства живут в «Объяснении модели» и меняются вместе со смыслом;
+   лишние строки убраны.
+   ================================================================ */
+const PANEL = `
+  var opened = function (sel) {
+    return [].slice.call(document.querySelectorAll(sel))
+      .filter(function (e) { return e.classList.contains('open'); }).length;
+  };
+  var explain = function () {
+    var e = document.getElementById('ex-body');
+    return e ? (e.textContent || '').replace(/\\s+/g, ' ').trim() : '';
+  };
+  /* Абзац ПРО ВМЕШАТЕЛЬСТВО, а не весь разбор сцены. Общий рассказ сцены
+     «Потолок и пол цены» законно называет оба случая сразу, поэтому искать
+     в нём слово «дефицит» бессмысленно: оно там есть всегда. */
+  var intervPara = function () {
+    var e = document.querySelector('#ex-body .sb-note');
+    return e ? (e.textContent || '').replace(/\\s+/g, ' ').trim() : '';
+  };
+  var panelText = function () {
+    var e = document.getElementById('sec-tax');
+    return e ? (e.textContent || '').replace(/\\s+/g, ' ').trim() : '';
+  };
+  var shown = function (id) {
+    var e = document.getElementById(id);
+    if (!e) return 0;
+    return (e.offsetParent !== null && e.getClientRects().length > 0) ? 1 : 0;
+  };
+`;
+
+head('Сессия 01.09 (3) · карточки справа сворачиваются при смене модели');
+r = await run(PANEL + `resetSceneMemory(); pickScene('sd'); redrawAll();
+  openSection('scoreboard'); openSection('explain');
+  var before = opened('#params-panel .side-part > .fold-body');
+  resetSceneMemory(); pickScene('mono'); redrawAll();
+  var after = opened('#params-panel .side-part > .fold-body');
+  var left = opened('#tools-panel .tools-body > .section > .fold-body');
+  var inp = document.getElementById('sec-input');
+  var inpOpen = (inp && inp.querySelector(':scope > .fold-body').classList.contains('open')) ? 1 : 0;
+  return { before: before, after: after, left: left, inpOpen: inpOpen };`);
+cmp('раскрыли две карточки справа', r.before, 2, 0);
+cmp('после смены модели справа раскрытых нет', r.after, 0, 0);
+/* Слева раскрытой остаётся РОВНО ОДНА карточка — «Ввод функций»: она открыта
+   всегда и во всех моделях (решение владельца 22.08), и правило это. */
+cmp('слева раскрыт ровно «Ввод функций»', r.left, 1, 0);
+cmp('и это именно он', r.inpOpen, 1, 0);
+r = await run(PANEL + `resetSceneMemory(); pickScene('mono'); redrawAll();
+  openSection('scoreboard');
+  return { ok: opened('#params-panel .side-part > .fold-body') };`);
+cmp('прибор по-прежнему может раскрыть карточку сам', r.ok, 1, 0);
+
+head('Сессия 01.09 (3) · пояснения вмешательства переехали в «Объяснение модели»');
+for (const [tag, setup, mark] of [
+  ['потоварный налог',      `setType('tax'); setTaxForm('unit'); setTaxSide('seller');`, 'Потоварный налог на стороне производителя'],
+  ['налог от цены продавца',`setType('tax'); setTaxForm('vat');`,                        'продавца'],
+  ['налог от цены покупателя',`setType('tax'); setTaxForm('excise');`,                   'покупателя'],
+  ['потоварная субсидия',   `setType('subsidy'); setTaxForm('unit'); setTaxSide('seller');`, 'Потоварная субсидия на стороне производителя'],
+  ['субсидия от цены продавца',`setType('subsidy'); setTaxForm('subseller');`,           'продавца'],
+  ['субсидия от цены покупателя',`setType('subsidy'); setTaxForm('subbuyer');`,          'покупателя']]) {
+  r = await run(MKT + PANEL + `setDS('taxes', '100-Q', 'Q'); ${setup} setTax(20); redrawAll();
+    openSection('explain');
+    return { ex: explain().indexOf(${JSON.stringify(mark)}) >= 0 ? 1 : 0,
+             hintShown: shown('tax-hint'),
+             exLen: explain().length };`);
+  cmp(tag + ': текст в «Объяснении модели»', r.ex, 1, 0);
+  cmp(tag + ': под ползунком его нет', r.hintShown, 0, 0);
+  cmp(tag + ': «Объяснение модели» не пусто', r.exLen > 80, true, 0);
+}
+
+head('Сессия 01.09 (3) · у потолка и пола пояснения РАЗНЫЕ');
+r = await run(MKT + PANEL + `setDS('ceil', '100-Q', 'Q'); setType('ceiling'); setPReg(40); redrawAll();
+  openSection('explain');
+  var c = intervPara();
+  setType('floor'); setPReg(60); redrawAll();
+  var f = intervPara();
+  return { cDef: /дефицит/.test(c) ? 1 : 0, cSur: /избыток/.test(c) ? 1 : 0,
+           fSur: /избыток/.test(f) ? 1 : 0, fDef: /дефицит/.test(f) ? 1 : 0,
+           same: (c === f) ? 1 : 0, hintShown: shown('pc-hint'),
+           cQueue: /очеред/.test(c) ? 1 : 0, fUnsold: /непродан/.test(f) ? 1 : 0 };`);
+cmp('потолок: сказано про дефицит', r.cDef, 1, 0);
+cmp('потолок: про избыток не сказано', r.cSur, 0, 0);
+cmp('потолок: сказано про очередь', r.cQueue, 1, 0);
+cmp('пол: сказано про избыток', r.fSur, 1, 0);
+cmp('пол: про дефицит не сказано', r.fDef, 0, 0);
+cmp('пол: сказано про нераспроданное', r.fUnsold, 1, 0);
+cmp('тексты у пола и потолка разные', r.same, 0, 0);
+cmp('под ползунком цены пояснения нет', r.hintShown, 0, 0);
+
+head('Сессия 01.09 (3) · убранные строки');
+r = await run(`resetSceneMemory(); pickScene('m-constraint'); redrawAll();
+  var sb = document.getElementById('sb-body');
+  var t = sb ? (sb.textContent || '') : '';
+  return { seek: /Ищем/.test(t) ? 1 : 0, len: t.length };`);
+cmp('«Оптимум на ограничении»: строки «Ищем» в ключевых значениях нет', r.seek, 0, 0);
+cmp('ключевые значения не опустели', r.len > 20, true, 0);
+r = await run(`resetSceneMemory(); pickScene('ineq'); redrawAll();
+  return { alpha: document.getElementById('ineq-alpha-num') ? 1 : 0,
+           ghost: document.getElementById('ineq-ghost') ? 1 : 0,
+           slider: document.getElementById('ineq-alpha') ? 1 : 0 };`);
+cmp('«Неравенство»: поля «α (точное значение)» нет', r.alpha, 0, 0);
+cmp('«Неравенство»: галочки «было → стало» нет', r.ghost, 0, 0);
+cmp('«Неравенство»: сам ползунок α на месте', r.slider, 1, 0);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

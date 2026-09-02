@@ -155,7 +155,11 @@ function moveExplanations() {
      просто вычистил бы «Объяснение модели» досуха: замер 25.08 — разбор в
      «Построении графиков» становился пустым на втором кадре.
      Ничего в табло не изменилось и сцена та же — значит разбор уже на месте. */
-  const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '');
+  /* ⚠️ В КЛЮЧЕ ЕЩЁ И ВИД ВМЕШАТЕЛЬСТВА. Пояснение под ползунком переехало
+     сюда (01.09), а вид вмешательства меняется БЕЗ смены сцены: с одним
+     только именем сцены абзац «про потолок» остался бы висеть у пола. */
+  const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '')
+              + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '');
   const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
   if (!changed && to._explainFor === scene && to.children.length) return;
   to._explainFor = scene;
@@ -205,6 +209,14 @@ function moveExplanations() {
   if (typeof pctFormExplainHtml === 'function') {
     const pct = pctFormExplainHtml();
     if (pct) to.insertAdjacentHTML('beforeend', pct);
+  }
+  /* Пояснение под ползунком вмешательства (налог, субсидия, потолок, пол,
+     квота) — тем же приёмом. В самой карточке его больше нет: там органы
+     управления, а не текст (решение владельца 01.09). Абзац идёт ПЕРВЫМ:
+     он объясняет то, чем человек только что двигал. */
+  if (typeof intervHintHtml === 'function') {
+    const ih = intervHintHtml();
+    if (ih) to.insertAdjacentHTML('afterbegin', ih);
   }
 }
 
@@ -341,16 +353,26 @@ function cardifySections() {
   syncFirstCard();
 }
 
-// Новая сцена открывается со всеми закрытыми карточками: что было развёрнуто
-// в прошлом сюжете, к новому отношения не имеет.
+/* Новая сцена открывается со всеми закрытыми карточками: что было развёрнуто
+   в прошлом сюжете, к новому отношения не имеет.
+
+   ⚠️ ОБЕ ПАНЕЛИ, А НЕ ОДНА ЛЕВАЯ. Список стоял на `#tools-panel`, и правая
+   панель не сворачивалась вовсе: «Ключевые значения» и «Объяснение модели»
+   переносили раскрытое состояние из прошлой сцены (замечание владельца 01.09).
+   Складные карточки правой панели — это `.side-part`, у них тот же скелет
+   «кнопка + тело», поэтому и гасятся они тем же кодом.
+
+   ⚠️ Прибор, считающий что-либо на экране, обязан раскрывать карточки САМ —
+   правило записано в calc2/CLAUDE.md, и теперь оно касается обеих панелей. */
 function collapseCards() {
-  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
-    const btn = sec.querySelector(':scope > .fold-btn');
-    const box = sec.querySelector(':scope > .fold-body');
-    if (btn) btn.setAttribute('aria-expanded', 'false');
-    if (box) box.classList.remove('open');
-    sec.classList.remove('open-card');
-  });
+  document.querySelectorAll('#tools-panel .tools-body > .section, #params-panel .side-part')
+    .forEach(sec => {
+      const btn = sec.querySelector(':scope > .fold-btn');
+      const box = sec.querySelector(':scope > .fold-body');
+      if (btn) btn.setAttribute('aria-expanded', 'false');
+      if (box) box.classList.remove('open');
+      sec.classList.remove('open-card');
+    });
 }
 
 /* Три буквы «А» и размер, который каждая ставит (Н31). Список один на файл:

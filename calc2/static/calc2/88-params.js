@@ -1738,15 +1738,10 @@ function wireControls() {
   // Задача 3: ползунок и поле α для семейства L(p)=p^α.
   const ineqAlpha = document.getElementById('ineq-alpha');
   if (ineqAlpha) ineqAlpha.addEventListener('input', () => setIneqAlpha(ineqAlpha.value));
-  const ineqAlphaNum = document.getElementById('ineq-alpha-num');
-  if (ineqAlphaNum) ineqAlphaNum.addEventListener('change', () => setIneqAlpha(ineqAlphaNum.value));
-  // ЧК2: галочка «Исходное состояние» — снимок текущей кривой как «было».
-  const ineqGhostChk = document.getElementById('ineq-ghost');
-  if (ineqGhostChk) ineqGhostChk.addEventListener('change', () => {
-    STATE.showIneqGhost = ineqGhostChk.checked;
-    if (ineqGhostChk.checked) ineqSnapshot(); else STATE.ineqGhost = null;
-    redrawAll();
-  });
+  /* Отдельного числового поля α и галочки «Исходное состояние» в этой сцене
+     больше нет (01.09). Точное значение α вводится щелчком по самому ползунку
+     (общий компонент регулятора), а сравнивать кривую Лоренца не с чем: для
+     «до и после» есть «Перераспределение». */
   // ЧК3: перераспределение — галочка, инструмент, ползунки τ и T.
   const ineqRedistChk = document.getElementById('ineq-redist');
   if (ineqRedistChk) ineqRedistChk.addEventListener('change', () => {

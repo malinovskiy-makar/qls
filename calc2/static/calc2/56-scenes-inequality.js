@@ -348,12 +348,6 @@ function drawRedistArrow(base, redist) {
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К равенству');
 }
 
-// Снимок текущей кривой как «было» (для сравнения двух кривых, ЧК2).
-function ineqSnapshot() {
-  if (!STATE.ineqLorenz || !STATE.ineqStats) { STATE.ineqGhost = null; return; }
-  STATE.ineqGhost = { lorenz: STATE.ineqLorenz.map(p => [p[0], p[1]]), gini: STATE.ineqStats.gini };
-}
-
 // Подсказка о пересортировке — показываем только в активном способе ввода и только
 // когда сортировка реально изменила порядок (STATE.ineqSortNote).
 function updateIneqSortNote() {
@@ -396,13 +390,6 @@ function updateInequalityPanel() {
     html += `<div class="stat"><span>Джини после</span><b>${fmt(r.gini)}</b></div>`;
     html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? COL.tax : (d > 1e-6 ? COL.S : COL.inkSoft)}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
     html += `<div class="stat"><span>Робин Гуда до/после</span><b>${fmt(s.hoover)} / ${fmt(r.hoover)}</b></div>`;
-  } else if (STATE.showIneqGhost && STATE.ineqGhost) {
-    // Сравнение двух кривых «было → стало» (ЧК2).
-    const g0 = STATE.ineqGhost.gini, g1 = s.gini, d = g1 - g0;
-    html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-    html += `<div class="stat"><span>Джини было</span><b>${fmt(g0)}</b></div>`;
-    html += `<div class="stat"><span>Джини стало</span><b>${fmt(g1)}</b></div>`;
-    html += `<div class="stat"><span>Δ Джини</span><b style="color:${d < -1e-6 ? COL.tax : (d > 1e-6 ? COL.S : COL.inkSoft)}">${d >= 0 ? '+' : ''}${fmt(d)}</b></div>`;
   }
   html += '<div class="hint" style="margin-top:6px;">Джини: 0 значит полное равенство, 1 значит весь доход у одного. ' +
     'Робин Гуда показывает, какую долю дохода нужно перераспределить для равенства (макс. разрыв с диагональю). ' +
@@ -450,8 +437,6 @@ function redrawInequality() {
     } else {
       drawInequalityAreas(STATE.ineqLorenz);
       drawInequalityDiagonal();
-      // «Было» — бледная пунктирная кривая (снимок ЧК2), под текущей «стало».
-      if (STATE.showIneqGhost && STATE.ineqGhost) drawLorenzCurve(STATE.ineqGhost.lorenz, COL.dwl, true);
       drawLorenzCurve(STATE.ineqLorenz, COL.D, false);
       drawRobinHood();
       drawLorenzNodes();
@@ -491,10 +476,11 @@ function setIneqAlpha(a) {
   if (isNaN(a) || a < 1) a = 1;
   STATE.ineqAlpha = Math.round(a * 100) / 100;
   STATE.ineqFormula = 'p^' + STATE.ineqAlpha;
-  const sl = document.getElementById('ineq-alpha'), num = document.getElementById('ineq-alpha-num'),
+  // Отдельного числового поля α больше нет (01.09): точное значение вводится
+  // щелчком по самому ползунку, общим компонентом регулятора.
+  const sl = document.getElementById('ineq-alpha'),
         val = document.getElementById('ineq-alpha-val'), fm = document.getElementById('ineq-formula');
   if (sl) sl.value = STATE.ineqAlpha;
-  if (num) num.value = STATE.ineqAlpha;
   if (val) val.textContent = fmt(STATE.ineqAlpha);
   if (fm) fm.value = STATE.ineqFormula;
   ineqRedraw();   // живой ползунок α — пересчёт троттлом (без мигания)
