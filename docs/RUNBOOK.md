@@ -157,6 +157,127 @@ DJANGO_SETTINGS_MODULE=config.settings_production SECRET_KEY=любой \
 
 ---
 
+## Выкатка Wecon Rush
+
+> Репетиция проведена на ЧИСТОЙ PostgreSQL 17 (сессия «Wecon Rush —
+> закрытие», фаза 8). Времена ниже замерены, а не оценены.
+> ⚠️ **Три решения остаются за владельцем и здесь не приняты:** заливать ли
+> на прод полный банк (сегодня там 505 smoke-задач), включать ли
+> `GAME_GENERATED_ENABLED`, включать ли режим «График». Порядок ниже
+> написан так, что каждое из них выключается отдельным шагом.
+
+Игра ссылается на `Problem` по внешнему ключу. **Без банка на проде игры
+нет:** `build_game_pool` соберёт пул из тех задач, что есть, и на 505
+smoke-задачах он выйдет крошечным.
+
+### Порядок
+
+```bash
+# 0. БЭКАП. Первым шагом и без исключений.
+cd /srv/weconomics/app/deploy
+docker compose exec -T postgres pg_dump -U "$POSTGRES_USER" -Fc "$POSTGRES_DB" \
+    > /srv/weconomics/backups/before_rush_$(date +%Y%m%d_%H%M).dump
+
+# 1. Код.
+cd /srv/weconomics/app
+git pull --ff-only
+
+# 2. Образ. Один на оба сервиса: ws использует тот же weconomics-web:latest.
+cd deploy
+docker compose build web
+
+# 3. Миграции — ОДНИМ контейнером. Их накатывает web при старте.
+docker compose up -d web
+docker compose logs -f web | head -40     # дождаться «gunicorn…»
+
+# 4. Банк (только если владелец решил заливать полный).
+#    Выгрузка делается ЛОКАЛЬНО из канона db.sqlite3, заливка — по сети.
+#    Порядок и две мины — раздел «Данные: заливка в прод» выше.
+
+# 5. Пул игры.
+docker compose exec -T web python manage.py build_game_pool
+
+# 6. Сгенерированные вопросы — ТОЛЬКО если флаг включён.
+#    На проде GAME_GENERATED_ENABLED=False, и тогда шаг пропускается:
+#    5 500 строк кэша, которые никто не увидит, класть незачем.
+docker compose exec -T web python manage.py generate_game_questions \
+    --per-archetype 100 --confirm
+
+# 7. WebSocket дуэли.
+docker compose up -d ws
+docker compose ps ws                       # healthy
+
+# 8. nginx: проверить конфигурацию и перечитать её БЕЗ перезапуска.
+docker compose exec nginx nginx -t
+docker compose exec nginx nginx -s reload
+```
+
+### Smoke после выкатки
+
+```bash
+# страница игры
+curl -fsS -o /dev/null -w '%{http_code}\n' https://weconomics.site/game/
+
+# лидерборд отвечает JSON
+curl -fsS 'https://weconomics.site/game/api/leaderboard/?mode=blitz' | head -c 200
+
+# живость ASGI-процесса (без входа, без базы)
+curl -fsS https://weconomics.site/ws/health/          # ws ok
+
+# один забег целиком: старт, вопрос, ответ
+curl -fsS -c /tmp/rush.jar 'https://weconomics.site/game/api/session/start/?mode=blitz'
+curl -fsS -b /tmp/rush.jar  https://weconomics.site/game/api/question/
+```
+
+⚠️ **`/ws/health/` проверять обязательно.** gunicorn может отвечать, а
+daphne лежать: сайт при этом полностью живой, а дуэль молча превращается в
+асинхронную. Заметил бы это только игрок посреди забега.
+
+### Что проверить глазами
+
+- `/game/` — карточки режимов, числа под ними, лидерборд справа;
+- один забег в Блице до конца: очки, жизни, экран итогов;
+- `/game/duel/new/` из-под двух разных пользователей в двух браузерах:
+  полоса соперника, обратный отсчёт, реакции;
+- карточка ссылки: отправить `https://weconomics.site/game/` в мессенджер
+  и посмотреть превью (`og:image` берётся из
+  `game/static/game/og_default.png`).
+
+### Откат каждого шага
+
+| Шаг | Откат |
+|---|---|
+| 7 (`ws`) | `docker compose stop ws` — дуэль становится асинхронной, сайт цел |
+| 8 (nginx) | `git checkout -- deploy/nginx` на сервере, затем `nginx -t` и reload |
+| 6 (генерация) | `docker compose exec -T web python manage.py purge_generated` |
+| 5 (пул) | `build_game_pool` идемпотентен: повторный прогон пересобирает |
+| 4 (банк) | восстановление из дампа шага 0 |
+| 3 (миграции) | `migrate game 0012` и `migrate problems 0046` откатывают то, что добавила эта ветка |
+| 1–2 (код) | `git checkout <прежний хеш>` + `docker compose build web` + `up -d web ws` |
+
+Полный откат к заглушке — раздел «Откат» в [SERVER.md](SERVER.md).
+
+### Времена, замеренные на репетиции
+
+Репетиция шла на локальной машине против чистой PostgreSQL 17 в Docker;
+на сервере числа будут другими, но порядок величин тот же.
+
+| Шаг | Время |
+|---|---|
+| Миграции с нуля (все приложения) | 12 с |
+| `makemigrations --check` | 1,5 с |
+| Выгрузка банка из канона `db.sqlite3` | 3 мин 5 с |
+| Заливка банка в чистую базу | 36 с |
+| `fix_sequences --apply` | 2 с |
+| `build_game_pool` | 6 с |
+| `generate_game_questions --per-archetype 100` | 4 с |
+| `generate_figure_questions --per-scenario 60` | 2 с |
+
+⚠️ **Выгрузка занимает больше, чем всё остальное вместе.** Планируя окно,
+считайте по ней, а не по миграциям.
+
+---
+
 ## Бэкап и восстановление
 
 Встроенный бэкап хостинга — не гарантия (на прежнем free-тарифе Render его не

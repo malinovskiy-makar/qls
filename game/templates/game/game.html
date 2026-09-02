@@ -2076,10 +2076,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </div>
       </div>
     {% if auto_set and auto_set.kind == 'duel' %}
-    {# ── Лобби дуэли ───────────────────────────────────────────────────
+    {% comment %} ── Лобби дуэли ───────────────────────────────────────────────────
          Показывается на карточке набора: соперника надо позвать, а ссылку
          скопировать. Обратный отсчёт прилетает по сокету, когда оба на
-         месте (game/consumers.py). #}
+         месте (game/consumers.py). {% endcomment %}
     <div class="duel-lobby" id="duel-lobby">
       <h3>Позовите соперника</h3>
       <p>Вопросы у вас будут одни и те же и в одном порядке. Пока соперника
@@ -2094,12 +2094,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     </div>
 
     {% if sound_check %}
-    {# ── Панель прослушивания звука ─────────────────────────────────────
+    {% comment %} ── Панель прослушивания звука ─────────────────────────────────────
        Служебная: только staff и только по ?sound_check=1. Нужна для приёмки
        НА СЛУХ — иначе, чтобы услышать «жизнь», надо трижды ошибиться, а
        чтобы услышать «рекорд», сначала его поставить.
        Кнопки зовут ровно те же функции, что и игра (window.rushSound), а не
-       свои копии: панель, играющая другой звук, бесполезна. #}
+       свои копии: панель, играющая другой звук, бесполезна. {% endcomment %}
     <div class="sound-check" id="sound-check">
       <b>Прослушать звуки</b>
       <div class="sound-check__row">
@@ -2122,9 +2122,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <button class="quit-x" id="btn-quit" title="Выйти из забега" aria-label="Выйти из забега">✕</button>
       <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
-      {# ── Дуэль: полоса соперника ────────────────────────────────
+      {% comment %} ── Дуэль: полоса соперника ────────────────────────────────
            Блока нет вовсе, когда забег не дуэльный: рисовать пустую
-           полосу «соперника нет» на обычном забеге незачем. #}
+           полосу «соперника нет» на обычном забеге незачем. {% endcomment %}
       <div class="duel-bar duel-bar--off" id="duel-bar" hidden>
         <span class="duel-bar__who" id="duel-who">соперник</span>
         <span>очки <b class="duel-bar__num" id="duel-score">0</b></span>
