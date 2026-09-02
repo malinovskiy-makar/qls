@@ -113,3 +113,37 @@ class LinkOlympiadRefsTests(TestCase):
 
         self.assertEqual(OlympiadRef.objects.count(), count_до)
         self.assertEqual(OlympiadRef.objects.count(), 0)
+
+    def test_www_нормализация_находит_совпадение_с_пониженным_score(self):
+        db_url = 'https://www.iloveeconomics.ru/z/6246'
+        export_url = 'https://iloveeconomics.ru/z/6246'  # без www — как в реальном экспорте
+        ile_problem = make_problem(statement='Условие про эластичность спроса.')
+        link_source(ile_problem, self.source, url=db_url)
+
+        export_path = self.export([make_row(
+            source_url=export_url,
+            source_site='ile',
+            event_id='ile-event-1',
+            record_id='ile:record:1')])
+
+        call_command('link_olympiad_refs', export_path=export_path,
+                    apply=True, verbosity=0)
+
+        ref = OlympiadRef.objects.get(problem=ile_problem)
+        self.assertEqual(ref.match_method, 'url_www_normalized')
+        self.assertEqual(ref.match_score, 0.97)
+        # official_url — настоящий url ИЗ БАЗЫ, а не из экспорта (без www не сохраняется как истина).
+        self.assertEqual(ref.official_url, db_url)
+
+    def test_разные_домены_без_www_не_матчатся(self):
+        """Страховка от слишком широкой нормализации: срезаем 'www.', но
+        НЕ трогаем сам домен — example.com и example.org разные сайты."""
+        link_source(self.problem, self.source, url='https://example.com/task/1')
+        export_path = self.export([make_row(
+            source_url='https://example.org/task/1',
+            event_id='cross-domain-event')])
+
+        call_command('link_olympiad_refs', export_path=export_path,
+                    apply=True, verbosity=0)
+
+        self.assertEqual(OlympiadRef.objects.count(), 0)

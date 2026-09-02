@@ -1,12 +1,17 @@
 """
 Команда link_olympiad_refs — привязывает задачи банка к реальным олимпиадам
-через точное совпадение SourceReference.url с external_export
+через совпадение SourceReference.url с external_export
 (SolveHub/ILE, обход официальных публичных индексов, 01.09.2026).
 
-Основание: у SolveHub (6119 SourceReference) и ILE (3978 SourceReference)
-url заполнен на 100% — совпадение строки ссылки достаточно, каскад
-SHA-1/fuzzy/эмбеддингов не нужен. Экспорт даёт для каждого найденного там
-вхождения (data/all_problem_occurrences.jsonl) ту же самую ссылку.
+Два метода, в порядке приоритета:
+  1. url_exact — точное совпадение строки, match_score=1.0.
+  2. url_www_normalized — совпадение после нормализации (схема → https,
+     срезан 'www.', путь без хвостового '/'), match_score=0.97. Найден
+     после того как ILE дал 0 точных совпадений: у ILE в базе 99,7% url
+     с 'www.', во внешнем экспорте — 0% с 'www.' (все 1169 строк).
+     Нормализация — ТОЛЬКО для сравнения; в official_url всегда пишется
+     настоящий SourceReference.url как есть, нормализованная форма нигде
+     не сохраняется как истина.
 
 Каждое совпадение — одна строка OlympiadRef (get_or_create по
 (problem, event_id) в --apply). Ничего в Problem/SourceReference не меняется.
@@ -19,6 +24,7 @@ SHA-1/fuzzy/эмбеддингов не нужен. Экспорт даёт дл
 import json
 import os
 import random
+from urllib.parse import urlsplit, urlunsplit
 
 from django.core.management.base import BaseCommand, CommandError
 
@@ -39,7 +45,21 @@ EXPLICIT_FIELDS = {
     'event_id', 'record_id', 'source_site', 'source_url', 'olympiad_slug',
 }
 
-NEAR_MISS_REPORT_PATH = 'reports/olympiad_link/near_miss_urls.jsonl'
+UNMATCHED_REPORT_PATH = 'reports/olympiad_link/unmatched_urls.jsonl'
+
+
+def normalize_url_for_matching(url):
+    """Схема → https, срезан 'www.' с домена, путь без хвостового '/'.
+
+    Только для СРАВНЕНИЯ — настоящий url (exact или из базы) в результат
+    не подставляется, чтобы нормализованная форма нигде не осела как истина.
+    """
+    s = urlsplit(url)
+    netloc = s.netloc.lower()
+    if netloc.startswith('www.'):
+        netloc = netloc[4:]
+    path = s.path.rstrip('/')
+    return urlunsplit(('https', netloc, path, s.query, s.fragment))
 
 
 def load_olympiad_names(export_path):
@@ -60,15 +80,23 @@ def load_olympiad_names(export_path):
     return names
 
 
-def load_url_index():
-    """url -> [problem_id, ...] по ВСЕМ SourceReference с непустым url."""
-    index = {}
+def load_url_indexes():
+    """Строит два индекса по ВСЕМ SourceReference с непустым url:
+      - exact_index:  url -> [problem_id, ...]
+      - norm_index:   normalize_url_for_matching(url) -> [(problem_id, url), ...]
+    norm_index хранит НАСТОЯЩИЙ url из базы (не нормализованный) —
+    он и пойдёт в official_url при совпадении вторым методом.
+    """
+    exact_index = {}
+    norm_index = {}
     qs = (SourceReference.objects
           .exclude(url='')
           .values_list('url', 'problem_id'))
     for url, pid in qs.iterator(chunk_size=5000):
-        index.setdefault(url, []).append(pid)
-    return index
+        exact_index.setdefault(url, []).append(pid)
+        norm_key = normalize_url_for_matching(url)
+        norm_index.setdefault(norm_key, []).append((pid, url))
+    return exact_index, norm_index
 
 
 class Command(BaseCommand):
@@ -97,7 +125,7 @@ class Command(BaseCommand):
             raise CommandError(f'Файл не найден: {export_path}')
 
         olympiad_names = load_olympiad_names(export_path)
-        url_index = load_url_index()
+        url_index, norm_index = load_url_indexes()
 
         rows = []
         with open(export_path, encoding='utf-8') as fh:
@@ -109,16 +137,16 @@ class Command(BaseCommand):
 
         total = len(rows)
         by_site_total = {}
+        # by_site_matched[site][method] = count
         by_site_matched = {}
         by_site_unmatched = {}
-        by_slug = {}  # slug -> {'matched': int, 'unmatched': int, 'problem_ids': set}
-        matched_rows = []       # (row, problem_id) — для сэмпла и записи
+        # by_slug[slug] = {'matched': {method: int}, 'unmatched': int, 'problem_ids': set}
+        by_slug = {}
+        matched_rows = []       # (row, problem_id, method, official_url)
         unmatched_rows = []
-        near_misses = []
         matched_problem_ids = set()
+        matched_problem_ids_by_method = {'url_exact': set(), 'url_www_normalized': set()}
         flagged_matches = []    # matched строки по FLAGGED_SLUGS
-
-        rstrip_index = None  # строим лениво, только если понадобится
 
         for row in rows:
             site = row.get('source_site', '?')
@@ -127,76 +155,99 @@ class Command(BaseCommand):
 
             by_site_total[site] = by_site_total.get(site, 0) + 1
             slug_stat = by_slug.setdefault(
-                slug, {'matched': 0, 'unmatched': 0, 'problem_ids': set()})
+                slug, {'matched': {}, 'unmatched': 0, 'problem_ids': set()})
 
-            pids = url_index.get(url)
-            if pids:
-                by_site_matched[site] = by_site_matched.get(site, 0) + 1
-                slug_stat['matched'] += 1
-                for pid in pids:
-                    matched_rows.append((row, pid))
+            pairs = None       # [(problem_id, official_url), ...]
+            method = None
+
+            exact_pids = url_index.get(url)
+            if exact_pids:
+                method = 'url_exact'
+                pairs = [(pid, url) for pid in exact_pids]
+            else:
+                norm_pairs = norm_index.get(normalize_url_for_matching(url))
+                if norm_pairs:
+                    method = 'url_www_normalized'
+                    pairs = norm_pairs
+
+            if pairs:
+                site_stat = by_site_matched.setdefault(site, {})
+                site_stat[method] = site_stat.get(method, 0) + 1
+                slug_stat['matched'][method] = slug_stat['matched'].get(method, 0) + 1
+                for pid, official_url in pairs:
+                    matched_rows.append((row, pid, method, official_url))
                     matched_problem_ids.add(pid)
+                    matched_problem_ids_by_method[method].add(pid)
                     slug_stat['problem_ids'].add(pid)
                     if slug in FLAGGED_SLUGS:
-                        flagged_matches.append((row, pid))
+                        flagged_matches.append((row, pid, method))
             else:
                 by_site_unmatched[site] = by_site_unmatched.get(site, 0) + 1
                 slug_stat['unmatched'] += 1
                 unmatched_rows.append(row)
 
-                if rstrip_index is None:
-                    rstrip_index = {}
-                    for u in url_index:
-                        rstrip_index.setdefault(u.rstrip('/'), []).append(u)
-                stripped = url.rstrip('/')
-                if stripped in rstrip_index and stripped != url:
-                    near_misses.append({
-                        'event_id': row.get('event_id'),
-                        'record_id': row.get('record_id'),
-                        'export_url': url,
-                        'matched_db_url_candidates': rstrip_index[stripped],
-                    })
-
         # ── Отчёт: общие числа ────────────────────────────────────────────
         self.stdout.write(f'Строк в экспорте: {total}')
         for site in sorted(by_site_total):
+            site_stat = by_site_matched.get(site, {})
+            matched_total = sum(site_stat.values())
             self.stdout.write(
                 f'  {site}: {by_site_total[site]} '
-                f'(совпало: {by_site_matched.get(site, 0)}, '
+                f'(совпало: {matched_total} '
+                f'[url_exact: {site_stat.get("url_exact", 0)}, '
+                f'url_www_normalized: {site_stat.get("url_www_normalized", 0)}], '
                 f'не совпало: {by_site_unmatched.get(site, 0)})')
 
         self.stdout.write('')
-        self.stdout.write(f'Всего точных совпадений по url: {len(matched_rows)}')
+        self.stdout.write(f'Всего совпадений: {len(matched_rows)} '
+                          f'(url_exact: {sum(1 for *_, m, _ in matched_rows if m == "url_exact")}, '
+                          f'url_www_normalized: '
+                          f'{sum(1 for *_, m, _ in matched_rows if m == "url_www_normalized")})')
         self.stdout.write(f'Уникальных Problem.id с хотя бы одной привязкой: '
-                          f'{len(matched_problem_ids)}')
-        self.stdout.write(f'Не найдено совпадений: {len(unmatched_rows)}')
-        self.stdout.write(f'Near-miss (совпадает после rstrip("/"), '
-                          f'НЕ подставляется автоматически): {len(near_misses)}')
+                          f'{len(matched_problem_ids)} '
+                          f'(из них только через url_www_normalized: '
+                          f'{len(matched_problem_ids_by_method["url_www_normalized"] - matched_problem_ids_by_method["url_exact"])})')
+        self.stdout.write(f'Не найдено совпадений ни одним методом: {len(unmatched_rows)}')
 
-        if near_misses:
-            os.makedirs(os.path.dirname(NEAR_MISS_REPORT_PATH), exist_ok=True)
-            with open(NEAR_MISS_REPORT_PATH, 'w', encoding='utf-8') as fh:
-                for item in near_misses:
-                    fh.write(json.dumps(item, ensure_ascii=False) + '\n')
-            self.stdout.write(f'  → записаны в {NEAR_MISS_REPORT_PATH}')
+        if unmatched_rows:
+            os.makedirs(os.path.dirname(UNMATCHED_REPORT_PATH), exist_ok=True)
+            with open(UNMATCHED_REPORT_PATH, 'w', encoding='utf-8') as fh:
+                for row in unmatched_rows:
+                    fh.write(json.dumps({
+                        'event_id': row.get('event_id'),
+                        'record_id': row.get('record_id'),
+                        'source_site': row.get('source_site'),
+                        'export_url': row.get('source_url'),
+                    }, ensure_ascii=False) + '\n')
+            self.stdout.write(f'  → записаны в {UNMATCHED_REPORT_PATH}')
 
         # ── Сравнение с ожидаемыми числами из coverage.json ─────────────────
+        # Сравниваем УНИКАЛЬНЫЕ Problem.id (а не строки/совпадения) — coverage.json
+        # считает уникальные задачи источника, а не вхождения.
         self.stdout.write('')
-        self._report_drift('SolveHub', by_site_matched.get('solvehub', 0),
+        self._report_drift('SolveHub (уникальных Problem.id)',
+                           len({pid for r, pid, *_ in matched_rows
+                                if r.get('source_site') == 'solvehub'}),
                            EXPECTED_SOLVEHUB_MATCHES)
-        self._report_drift('ILE', by_site_matched.get('ile', 0),
+        self._report_drift('ILE (уникальных Problem.id)',
+                           len({pid for r, pid, *_ in matched_rows
+                                if r.get('source_site') == 'ile'}),
                            EXPECTED_ILE_MATCHES)
         self._report_drift('Всего уникальных Problem.id',
                            len(matched_problem_ids), EXPECTED_TOTAL_UNIQUE)
 
         # ── Разбивка по olympiad_slug ────────────────────────────────────
         self.stdout.write('')
-        self.stdout.write('Разбивка по olympiad_slug (совпало / не совпало / уникальных задач):')
-        for slug in sorted(by_slug, key=lambda s: -by_slug[s]['matched']):
+        self.stdout.write('Разбивка по olympiad_slug '
+                          '(url_exact / url_www_normalized / не совпало / уникальных задач):')
+        for slug in sorted(by_slug,
+                          key=lambda s: -sum(by_slug[s]['matched'].values())):
             stat = by_slug[slug]
             flag = '  ⚠️ ПРЕДПРИНИМАТЕЛЬСТВО, НЕ ЭКОНОМИКА' if slug in FLAGGED_SLUGS else ''
             self.stdout.write(
-                f'  {slug:28s} {stat["matched"]:5d} / {stat["unmatched"]:5d} / '
+                f'  {slug:28s} {stat["matched"].get("url_exact", 0):5d} / '
+                f'{stat["matched"].get("url_www_normalized", 0):5d} / '
+                f'{stat["unmatched"]:5d} / '
                 f'{len(stat["problem_ids"]):5d}{flag}')
 
         # ── Флаг-профили: показать НАЙДЕННЫЕ совпадения отдельно ────────────
@@ -208,37 +259,29 @@ class Command(BaseCommand):
                 f'Это профиль «предпринимательство», не «экономика» — '
                 f'решение нужны ли они в банке, за владельцем. '
                 f'НИЧЕГО не записано в базу по этим строкам до явного решения.'))
-            for row, pid in flagged_matches[:20]:
+            for row, pid, method in flagged_matches[:20]:
                 problem = Problem.objects.filter(id=pid).only('statement').first()
                 snippet = (problem.statement[:120] if problem and problem.statement
                           else '(нет статьи)')
                 self.stdout.write(
                     f'    Problem #{pid} | {row.get("olympiad_slug")} '
-                    f'{row.get("year")} {row.get("stage")} | {snippet}')
+                    f'{row.get("year")} {row.get("stage")} | [{method}] | {snippet}')
 
         # ── Случайная выборка совпадений для визуальной приёмки ─────────────
         # (флаг-профили исключены из выборки — они уже показаны отдельно выше)
-        sample_pool = [(r, p) for r, p in matched_rows
-                       if r.get('olympiad_slug') not in FLAGGED_SLUGS]
-        if sample_pool:
-            self.stdout.write('')
-            self.stdout.write(f'Случайная выборка совпадений '
-                              f'(seed={options["seed"]}):')
-            rng = random.Random(options['seed'])
-            sample = rng.sample(sample_pool, min(options['sample_size'],
-                                                 len(sample_pool)))
-            problem_ids = [pid for _, pid in sample]
-            problems_by_id = {p.id: p for p in
-                              Problem.objects.filter(id__in=problem_ids).only(
-                                  'id', 'statement')}
-            for row, pid in sample:
-                problem = problems_by_id.get(pid)
-                snippet = (problem.statement[:150] if problem and problem.statement
-                          else '(нет статьи)')
-                self.stdout.write(
-                    f'  Problem #{pid} | {row.get("olympiad_slug")} '
-                    f'{row.get("year")} / {row.get("stage")} / '
-                    f'№{row.get("number")} | {snippet}')
+        rng = random.Random(options['seed'])
+        self._print_sample(
+            'Случайная выборка совпадений (оба метода)', rng,
+            [(r, p, m) for r, p, m, _ in matched_rows
+             if r.get('olympiad_slug') not in FLAGGED_SLUGS],
+            options['sample_size'])
+        self._print_sample(
+            'Случайная выборка совпадений ТОЛЬКО через url_www_normalized',
+            rng,
+            [(r, p, m) for r, p, m, _ in matched_rows
+             if m == 'url_www_normalized'
+             and r.get('olympiad_slug') not in FLAGGED_SLUGS],
+            options['sample_size'])
 
         if not apply_mode:
             self.stdout.write('')
@@ -246,8 +289,14 @@ class Command(BaseCommand):
             return
 
         # ── Запись ───────────────────────────────────────────────────────
-        created, existing = 0, 0
-        for row, pid in matched_rows:
+        # Флаг-профили (предпринимательство) НИКОГДА не пишутся, даже если
+        # найдены — это соответствует тому, что напечатано в отчёте выше.
+        match_scores = {'url_exact': 1.0, 'url_www_normalized': 0.97}
+        created_by_method = {'url_exact': 0, 'url_www_normalized': 0}
+        existing = 0
+        for row, pid, method, official_url in matched_rows:
+            if row.get('olympiad_slug') in FLAGGED_SLUGS:
+                continue
             raw_meta = {k: v for k, v in row.items() if k not in EXPLICIT_FIELDS}
             _, was_created = OlympiadRef.objects.get_or_create(
                 problem_id=pid,
@@ -263,21 +312,43 @@ class Command(BaseCommand):
                     'variant': row.get('variant') or '',
                     'number': row.get('number') or '',
                     'record_id': row.get('record_id', ''),
-                    'match_method': 'url_exact',
-                    'match_score': 1.0,
-                    'official_url': row.get('source_url', ''),
+                    'match_method': method,
+                    'match_score': match_scores[method],
+                    'official_url': official_url,
                     'raw_meta': raw_meta,
                 },
             )
             if was_created:
-                created += 1
+                created_by_method[method] += 1
             else:
                 existing += 1
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
-            f'Готово: создано {created}, уже было {existing}, '
+            f'Готово: создано {sum(created_by_method.values())} '
+            f'(url_exact: {created_by_method["url_exact"]}, '
+            f'url_www_normalized: {created_by_method["url_www_normalized"]}), '
+            f'уже было {existing}, '
             f'всего OlympiadRef в базе: {OlympiadRef.objects.count()}'))
+
+    def _print_sample(self, title, rng, pool, sample_size):
+        if not pool:
+            return
+        self.stdout.write('')
+        self.stdout.write(f'{title} (seed воспроизводим для этой команды):')
+        sample = rng.sample(pool, min(sample_size, len(pool)))
+        problem_ids = [pid for _, pid, _ in sample]
+        problems_by_id = {p.id: p for p in
+                          Problem.objects.filter(id__in=problem_ids).only(
+                              'id', 'statement')}
+        for row, pid, method in sample:
+            problem = problems_by_id.get(pid)
+            snippet = (problem.statement[:150] if problem and problem.statement
+                      else '(нет статьи)')
+            self.stdout.write(
+                f'  Problem #{pid} | {row.get("olympiad_slug")} '
+                f'{row.get("year")} / {row.get("stage")} / '
+                f'№{row.get("number")} | [{method}] | {snippet}')
 
     def _report_drift(self, label, actual, expected):
         if expected:

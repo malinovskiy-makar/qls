@@ -1350,7 +1350,10 @@ class OlympiadRef(models.Model):
 
     match_method = models.CharField(
         'Метод сопоставления', max_length=30,
-        choices=[('url_exact', 'Точное совпадение ссылки')],
+        choices=[
+            ('url_exact', 'Точное совпадение ссылки'),
+            ('url_www_normalized', 'Совпадение после нормализации www/схемы'),
+        ],
         default='url_exact')
     match_score = models.FloatField('Уверенность сопоставления', default=1.0)
     official_url = models.URLField('Ссылка-источник сопоставления', max_length=500, blank=True)
