@@ -85,3 +85,95 @@ class DumpGraphTests(SimpleTestCase):
             if order[first] > order[second]:
                 wrong.append('%s обязан идти РАНЬШЕ %s' % (first, second))
         self.assertEqual(wrong, [], '\n  '.join(wrong))
+
+
+# ---------------------------------------------------------------------------
+# --bank-only: только банк задач, без работ учеников/преподавателя/аккаунтов
+# ---------------------------------------------------------------------------
+#
+# Решение владельца 2026-09-02: на прод заливается ПОЛНЫЙ БАНК И ТОЛЬКО БАНК
+# (152-ФЗ) — без Submission/TeacherFeedback/AssignmentItem и без самих
+# пользователей. dump_for_deploy получил флаг --bank-only с собственным,
+# более узким списком моделей (dfd.BANK_ONLY / dfd.BANK_ONLY_MISC).
+
+BANK_ONLY_EXPLICIT = [
+    'problems.Problem', 'problems.SourceReference', 'problems.ProblemPart',
+]
+
+
+def bank_only_dumped_models():
+    labels = list(dfd.BANK_ONLY) + list(dfd.BANK_ONLY_MISC) + BANK_ONLY_EXPLICIT
+    out = set()
+    for label in labels:
+        out.add(apps.get_model(*label.split('.')))
+    return out
+
+
+class BankOnlyGraphTests(SimpleTestCase):
+
+    def test_bank_only_has_no_foreign_key_pointing_outside_the_dump(self):
+        u"""Тот же граф-замок, что у полного дампа, но для --bank-only.
+
+        Учитывает поля, которые команда сознательно вырезает при сериализации
+        (dfd.BANK_ONLY_PROBLEM_STRIP) — иначе Problem.owner (-> User, вне
+        дампа) и Problem.files (-> FileAsset, вне дампа) ложно красили бы
+        тест, хотя в файл они не попадают вовсе."""
+        dumped = bank_only_dumped_models()
+        problem_model = apps.get_model('problems', 'Problem')
+        stripped = {problem_model: set(dfd.BANK_ONLY_PROBLEM_STRIP)}
+        holes = []
+        for model in sorted(dumped, key=lambda m: m.__name__):
+            skip = stripped.get(model, set())
+            for field in model._meta.get_fields():
+                if field.name in skip:
+                    continue
+                if not (getattr(field, 'many_to_one', False)
+                        or getattr(field, 'one_to_one', False)
+                        or getattr(field, 'many_to_many', False)):
+                    continue
+                if not getattr(field, 'concrete', False):
+                    continue
+                target = field.related_model
+                if target is None or target in dumped:
+                    continue
+                holes.append('%s.%s -> %s'
+                             % (model.__name__, field.name, target.__name__))
+        self.assertEqual(
+            holes, [],
+            u'--bank-only ссылается на модели, которых в дампе нет. Заливка '
+            u'в чистую PostgreSQL упадёт на внешнем ключе:\n  '
+            + '\n  '.join(holes))
+
+
+class BankOnlyNoPersonLinkedFieldTests(SimpleTestCase):
+    u"""Ловит будущее добавление в --bank-only модели, привязанной к
+    человеку — пользователю, ученику или преподавателю.
+
+    Проверяются только КОНКРЕТНЫЕ поля (обычные, FK/O2O, M2M) — то, что
+    реально сериализуется в JSON. Обратные связи (reverse accessor) в
+    сериализацию не попадают, поэтому не проверяются: иначе тест красил бы
+    Skill за то, что где-то в другом приложении на Skill ссылается модель
+    ученика — а такая ссылка в дамп --bank-only всё равно не пишется."""
+
+    FORBIDDEN = ('user', 'student', 'teacher')
+
+    def test_bank_only_models_have_no_field_naming_a_person(self):
+        problem_model = apps.get_model('problems', 'Problem')
+        stripped = {problem_model: set(dfd.BANK_ONLY_PROBLEM_STRIP)}
+        offenders = []
+        for model in bank_only_dumped_models():
+            skip = stripped.get(model, set())
+            for field in model._meta.get_fields():
+                if not getattr(field, 'concrete', False):
+                    continue
+                if field.name in skip:
+                    continue
+                lowered = field.name.lower()
+                if any(word in lowered for word in self.FORBIDDEN):
+                    offenders.append('%s.%s' % (model.__name__, field.name))
+        self.assertEqual(
+            offenders, [],
+            u'В --bank-only попала модель с полем, ссылающимся на человека '
+            u'(ученика/преподавателя/пользователя) — заливка вынесет его '
+            u'данные на прод в обход решения владельца о банке-и-только-'
+            u'банке:\n  ' + '\n  '.join(offenders))
