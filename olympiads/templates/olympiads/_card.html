@@ -3,6 +3,14 @@
 сервер полоса чипов не делает.
 {% endcomment %}
 <li class="ol-card" data-tags="{{ olympiad.tags|join:' ' }}" style="view-transition-name: ol-card-{{ olympiad.slug }};">
+  {% comment %}
+  Галочка стоит РЯДОМ со ссылкой, а не внутри неё: поле ввода внутри
+  ссылки браузер отдаёт как ссылку, и мышью выбрать было бы нельзя.
+  {% endcomment %}
+  <label class="ol-pick">
+    <input type="checkbox" class="ol-pick-box" value="{{ olympiad.slug }}">
+    <span>Сравнить</span>
+  </label>
   <a class="ol-card-link" href="{% url 'olympiads:detail' olympiad.slug %}">
     <div class="ol-card-top">
       {% if olympiad.logo %}

@@ -1,7 +1,47 @@
 {% extends 'olympiads/base_olymp.html' %}
 {% block title %}Сравнение олимпиад{% endblock %}
 {% block olymp_content %}
+
+<nav class="ol-crumbs" aria-label="Хлебные крошки">
+  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
+  <span aria-hidden="true">→</span>
+  <span>Сравнение</span>
+</nav>
+
 <div class="ol-head">
   <h1 class="ol-title">Сравнение олимпиад</h1>
+  {% if trimmed %}
+  <p class="ol-sub">Можно сравнить не больше {{ limit }} — показаны первые.</p>
+  {% endif %}
 </div>
+
+{% if olympiads %}
+<div class="ol-tablewrap">
+  <table class="ol-table ol-table--compare">
+    <thead>
+      <tr>
+        <th>Характеристика</th>
+        {% for olympiad in olympiads %}
+        <th><a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a></th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in rows %}
+      <tr class="{% if row.differs %}ol-row--diff{% else %}ol-row--same{% endif %}">
+        <th scope="row">{{ row.label }}</th>
+        {% for value in row.values %}<td>{{ value }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="ol-note">Строки, где значения совпали, приглушены. Различия
+  выделены полосой слева — это и есть смысл экрана.</p>
+{% else %}
+<p class="ol-empty">Не выбрано ни одной олимпиады. Вернитесь
+  <a href="{% url 'olympiads:list' %}">к списку</a> и отметьте до {{ limit }}
+  штук галочкой «Сравнить».</p>
+{% endif %}
+
 {% endblock %}

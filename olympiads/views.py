@@ -123,9 +123,29 @@ def calendar(request):
 
 
 def compare(request):
-    """Сравнение до трёх олимпиад: `?slugs=vseros,mosh,vp`."""
+    """Сравнение до трёх олимпиад: `?slugs=vseros,mosh,vp`.
+
+    Слагов пришло больше трёх — берём первые три и говорим об этом, а не
+    падаем: ссылку могли прислать из чата, и ошибка вместо экрана здесь
+    хуже, чем усечение.
+    """
+    raw = [s for s in (request.GET.get('slugs') or '').split(',') if s.strip()]
+    wanted = [s.strip() for s in raw]
+    trimmed = len(wanted) > services.COMPARE_LIMIT
+    wanted = wanted[:services.COMPARE_LIMIT]
+
+    found = {
+        o.slug: o for o in
+        services.published_olympiads().filter(slug__in=wanted)
+    }
+    # Порядок задаёт адрес, а не база: пользователь выбирал именно так.
+    olympiads = [found[slug] for slug in wanted if slug in found]
     return render(request, 'olympiads/compare.html', {
-        'has_placeholder': False,
+        'olympiads': olympiads,
+        'rows': services.compare_rows(olympiads) if olympiads else [],
+        'trimmed': trimmed,
+        'limit': services.COMPARE_LIMIT,
+        'has_placeholder': _has_placeholder(olympiads),
     })
 
 

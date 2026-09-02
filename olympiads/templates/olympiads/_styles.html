@@ -507,3 +507,39 @@
   border-radius: var(--r-card); padding: 10px 12px; font-size: 13px;
 }
 .ol-cal-ev--flat .ol-status, .ol-cal-ev--flat .ol-chip-type { margin-top: 0; }
+
+/* ── Галочка выбора и липкая полоса ─────────────────── */
+.ol-card { position: relative; }
+.ol-pick {
+  position: absolute; top: 8px; right: 8px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text3); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill); padding: 3px 8px 3px 6px;
+}
+.ol-pick:hover { border-color: var(--accent); color: var(--accent-ink); }
+.ol-pick-box { accent-color: var(--accent); margin: 0; }
+.ol-pick-box:disabled + span { opacity: .5; }
+
+.ol-picked[hidden] { display: none; }
+.ol-picked {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px;
+  z-index: 120; display: flex; align-items: center; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 10px 14px; font-size: 13px;
+}
+.ol-picked-hint[hidden] { display: none; }
+.ol-picked-hint { color: var(--pending); }
+
+/* ── Таблица сравнения ──────────────────────────────── */
+.ol-table--compare th[scope="row"] {
+  font-weight: 600; color: var(--text); white-space: normal;
+  border-bottom: var(--line) solid var(--border-soft);
+}
+/* Совпало у всех — строка приглушена; различается — обычная яркость и
+   полоса слева. Читать надо различия, а не одинаковое. */
+.ol-row--same th, .ol-row--same td { color: var(--text3); }
+.ol-row--diff th[scope="row"] { border-left: var(--stripe-thin) solid var(--accent); }

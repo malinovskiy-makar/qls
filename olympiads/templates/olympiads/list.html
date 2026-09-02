@@ -23,6 +23,12 @@
   </ul>
 </div>
 {% endif %}
+
+<div class="ol-picked" id="ol-picked" hidden>
+  <span id="ol-picked-count">Выбрано 0.</span>
+  <a class="ol-btn ol-btn--sm" id="ol-picked-go" href="{% url 'olympiads:compare' %}">Сравнить</a>
+  <span class="ol-picked-hint" id="ol-picked-hint" hidden>Можно сравнить не больше трёх</span>
+</div>
 {% endblock %}
 
-{% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% endblock %}
+{% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% include 'olympiads/_compare_js.html' %}{% endblock %}

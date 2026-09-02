@@ -247,3 +247,82 @@ def pass_score_rows(olympiad, years_back=5):
                 })
         rows.append({'grade': grade, 'cells': cells})
     return rows, years
+
+
+# Больше трёх колонок в таблицу сравнения не помещается — ни на 960
+# пикселях, ни в голове читающего.
+COMPARE_LIMIT = 3
+
+
+def compare_rows(olympiads):
+    """Строки таблицы сравнения плюс признак «значения различаются».
+
+    Совпавшая строка приглушается, различающаяся — нет. Смысл экрана
+    именно в этом: школьник должен с одного взгляда видеть, что у
+    олимпиад одинаково, а что нет.
+    """
+    from .models import OlympiadBenefit, UniversityProgram
+
+    programs_total = UniversityProgram.objects.count()
+
+    def level(olympiad):
+        value = olympiad.level_for()
+        if value:
+            return '{} уровень'.format(value)
+        if olympiad.kind == olympiad.Kind.VSOSH:
+            return 'Не в перечне: льгота по закону'
+        return 'Уровня нет'
+
+    def admission(olympiad):
+        benefits = list(olympiad.benefits.all())
+        if not benefits:
+            return 'Данных нет'
+        bvi = sum(1 for b in benefits
+                  if b.benefit_type == OlympiadBenefit.BenefitType.BVI)
+        if olympiad.kind == olympiad.Kind.VSOSH:
+            return 'Без вступительных испытаний, ЕГЭ подтверждать не нужно'
+        return 'Льготы есть' if bvi else 'Только сто баллов или ничего'
+
+    def stage_format(olympiad, index):
+        stages = list(olympiad.stages.all())
+        if not stages:
+            return 'Данных нет'
+        return stages[index].get_format_display()
+
+    def benefit_summary(olympiad):
+        benefits = [b for b in olympiad.benefits.all()
+                    if b.benefit_type == OlympiadBenefit.BenefitType.BVI]
+        if not olympiad.benefits.all():
+            return 'Данных нет'
+        return 'БВИ на {} из {}'.format(len(benefits), programs_total)
+
+    def next_event(olympiad):
+        event = olympiad.next_event
+        if not event:
+            return 'Дат пока нет'
+        return '{}: {}'.format(event.get_kind_display(), event.display_date)
+
+    spec = [
+        ('Уровень в перечне', level),
+        ('Что даёт при поступлении', admission),
+        ('Классы', lambda o: o.grades_label or 'Данных нет'),
+        ('Число этапов', lambda o: str(o.stages.count())),
+        ('Формат отбора', lambda o: stage_format(o, 0)),
+        ('Формат финала', lambda o: stage_format(o, -1)),
+        ('Командная или личная', lambda o: 'Командная' if o.is_team else 'Личная'),
+        ('Города проведения', lambda o: o.cities_summary or 'Данных нет'),
+        ('Ближайшее событие', next_event),
+        ('Льгота на ключевых программах', benefit_summary),
+        ('Задач у нас', lambda o: str(o.problem_count)),
+        ('Вариантов у нас', lambda o: str(o.variant_count)),
+    ]
+
+    rows = []
+    for label, getter in spec:
+        values = [getter(o) for o in olympiads]
+        rows.append({
+            'label': label,
+            'values': values,
+            'differs': len(set(values)) > 1,
+        })
+    return rows
