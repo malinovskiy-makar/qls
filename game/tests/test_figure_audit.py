@@ -349,8 +349,11 @@ class ClientTests(TestCase):
         self.assertIn("e.key === 's' || e.key === 'S'", self.src)
         self.assertIn('id="fig-skip"', self.src)
 
-    def test_last_life_vignette_is_dimmer_in_fullscreen(self):
-        self.assertIn('body.figfull .last-life-frame.on { opacity: .42; }',
+    def test_alarm_vignette_is_dimmer_in_fullscreen(self):
+        u"""В развороте чертежа тревога обязана напоминать, но не мешать
+        читать. Рамка последней жизни заменена общей виньеткой тревоги
+        (сессия «Wecon Rush», фаза 2), правило приглушения переехало на неё."""
+        self.assertIn('body.figfull .vignette.alarm { opacity: .42; }',
                       self.src)
 
     def test_review_shows_two_figures_and_one_for_a_clean_solution(self):

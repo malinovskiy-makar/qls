@@ -49,10 +49,10 @@ body {
   --rush-ok-tint: var(--green-tint);
   --rush-bad: var(--error);
   --rush-bad-tint: var(--error-tint);
-  /* цвета полосы времени (исключение таймера, см. шапку файла) */
+  /* Цвет полосы времени. Ступени «амбер» и «красный» убраны вместе с
+     абсолютными порогами: полоса теперь плавно перетекает от акцента к
+     --rush-bad по величине тревоги (последние 10 % запаса режима). */
   --rush-time-hi: var(--accent);
-  --rush-time-mid: var(--amber);
-  --rush-time-low: var(--error);
   --rush-ease: cubic-bezier(.23, 1, .32, 1);
 }
 
@@ -701,30 +701,10 @@ body.figfull .opts {
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   background: var(--rush-bg); border-top: 1px solid var(--rush-line);
 }
-/* Виньетка последней жизни в развороте вдвое бледнее: она обязана
+/* Виньетка тревоги в развороте чертежа вдвое бледнее: она обязана
    напоминать, но не мешать читать чертёж. */
-body.figfull .last-life-frame.on { opacity: .42; }
+body.figfull .vignette.alarm { opacity: .42; }
 
-/* ── Последняя жизнь ──────────────────────────────────────────────
-   Красная виньетка по краю, пульсация сердец и полоса времени
-   принудительно в своём красном режиме — независимо от остатка времени.
-   Всё это ДУБЛИРУЕТ то, что и так видно (одно сердце вместо трёх):
-   звук и цвет усиливают сигнал, а не заменяют его. */
-.last-life-frame {
-  position: fixed; inset: 0; pointer-events: none; z-index: 40;
-  box-shadow: inset 0 0 90px 10px var(--rush-bad-tint),
-              inset 0 0 0 3px var(--rush-bad);
-  opacity: 0;
-  transition: opacity .35s ease;
-}
-.last-life-frame.on { opacity: .85; }
-@media (prefers-reduced-motion: no-preference) {
-  .last-life-frame.on { animation: lastLifeBreath 1.9s ease-in-out infinite; }
-}
-@keyframes lastLifeBreath {
-  0%, 100% { opacity: .55; }
-  50% { opacity: .95; }
-}
 .hud-lives.last-life .heart:not(.lost) {
   color: var(--rush-bad);
 }
@@ -747,6 +727,7 @@ body.figfull .last-life-frame.on { opacity: .42; }
   cursor: pointer; padding: 0;
 }
 .sound-x:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.sound-x .qi { width: 16px; height: 16px; display: block; margin: 0 auto; }
 .sound-x.off { opacity: .5; }
 
 /* ── Экран 2: игра ─────────────────────────────────────────────── */
@@ -766,13 +747,20 @@ body.figfull .last-life-frame.on { opacity: .42; }
   height: 100%;
   width: 100%;
   border-radius: 4px;
-  background: var(--rush-time-hi);
+  /* ⚠️ ЦВЕТ ПОЛОСЫ ВЕДЁТ ТРЕВОГА, а не абсолютные секунды. Прежние пороги
+     (амбер < 15 с, красный < 7 с) были одинаковыми для Пули и Классики,
+     где запас отличается в десять раз: в Пуле «амбер» наступал ещё до
+     старта, в Классике — когда всё уже потеряно. Теперь один закон:
+     последние 10 % запаса режима. Амбер на полосе больше не используется. */
+  background: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%),
+                        var(--rush-time-hi));
   transform-origin: left center;
   /* ширина через transform: scaleX — без reflow на каждый кадр */
 }
-.time-fill.mid { background: var(--rush-time-mid); }
-.time-fill.low { background: var(--rush-time-low); animation: lowPulse 1s ease-in-out infinite; }
-@keyframes lowPulse { 50% { opacity: .55; } }
+/* Импульс полосы остался, но идёт В ТАКТ УДАРУ СЕРДЦА, а не сам по себе:
+   бесконечная CSS-анимация жила своей жизнью и расходилась со звуком. */
+.time-fill.beat { animation: barBeat .3s ease-out; }
+@keyframes barBeat { 0%, 100% { opacity: 1; } 35% { opacity: .55; } }
 .time-flash { animation: trackFlash .4s var(--rush-ease); }
 @keyframes trackFlash { 0% { box-shadow: 0 0 0 3px var(--accent-ring); } 100% { box-shadow: none; } }
 .time-flash-bad { animation: trackFlashBad .4s var(--rush-ease); }
@@ -838,7 +826,13 @@ body.figfull .last-life-frame.on { opacity: .42; }
   .heart.pop { animation: none; }
 }
 
-.timer-num { transition: color .12s ease; }
+/* Цифры краснеют ПОСТЕПЕННО вместе с тревогой: --alarm ставит JS каждый
+   кадр. Вспышки ответа (flash-*) специфичнее и перебивают её на 400 мс. */
+.timer-num {
+  transition: color .12s ease;
+  color: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%),
+                   var(--text));
+}
 .timer-num.flash-plus { color: var(--rush-ok); }
 .timer-num.flash-minus { color: var(--rush-bad); }
 .timer-num.flash-skip { color: var(--text3); }
@@ -1221,6 +1215,39 @@ body.figfull .last-life-frame.on { opacity: .42; }
 }
 .vignette.on { animation: vin .45s ease-out; }
 @keyframes vin { 0% { opacity: 0; } 25% { opacity: 1; } 100% { opacity: 0; } }
+
+/* ── ТРЕВОГА ────────────────────────────────────────────────────────────
+   Одна виньетка на два повода: время на исходе (последние 10 % запаса
+   режима) и последняя жизнь. Раньше поводов было два и виньеток тоже две —
+   на последней жизни в конце времени они накладывались друг на друга.
+
+   ⚠️ ЦЕНТР ОБЯЗАН ОСТАВАТЬСЯ ПРОЗРАЧНЫМ. Овал горизонтальный, его размер
+   считает JS по блоку `.scene` с запасом 24 px и кладёт в --al-rx/--al-ry:
+   иначе на узком экране красная кайма наползла бы на условие задачи, и
+   тревога начала бы мешать играть вместо того, чтобы подгонять.
+
+   Непрозрачность каймы растёт с тревогой от 25 до 45 % — дальше она
+   перестаёт быть каймой и становится шторой. */
+.vignette.alarm {
+  opacity: 1;
+  box-shadow: none;
+  background: radial-gradient(
+      ellipse var(--al-rx, 62%) var(--al-ry, 58%) at 50% 50%,
+      transparent 55%,
+      color-mix(in srgb, var(--rush-bad)
+                calc(25% + var(--alarm, 0) * 20%), transparent) 100%);
+}
+/* Виньетка сужается и расширяется В ТАКТ УДАРУ СЕРДЦА — по событию
+   `rush:beat`, а не своим таймером: иначе картинка и звук разъезжаются. */
+.vignette.alarm.beat { animation: alarmBeat .3s ease-out; }
+@keyframes alarmBeat {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.04); }
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Тревога остаётся, пульс — нет: сообщение то же, движения нет. */
+  .vignette.alarm.beat { animation: none; }
+}
 
 /* всплывашка «Комбо ×N!» */
 .combo-toast {
@@ -1723,7 +1750,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <section id="screen-play" class="screen">
     <div class="scene">
       <button class="quit-x" id="btn-quit" title="Выйти из забега" aria-label="Выйти из забега">✕</button>
-      <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук">♪</button>
+      <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
       <div class="hud">
         <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
@@ -1915,7 +1942,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 {% include '_icons.html' %}
 <div class="vignette" id="vignette"></div>
-<div class="last-life-frame" id="last-life-frame"></div>
 <div class="quit-modal" id="quit-modal" hidden role="dialog" aria-modal="true"
      aria-labelledby="quit-text">
   <div class="quit-card">
@@ -2475,6 +2501,105 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     rafId = requestAnimationFrame(tick);
   }
 
+  /* ─── ТРЕВОГА ────────────────────────────────────────────────────────
+     Два повода, одна величина: время на исходе или последняя жизнь.
+
+     ⚠️ ФУНКЦИЯ ЧИСТАЯ И ВЫНЕСЕНА НАРУЖУ НАМЕРЕННО. Пороги тревоги — это
+     числа, которые надо уметь проверить арифметикой, а не «посмотреть на
+     экран и решить, что похоже». Проверяется тремя точками: 12 с из 120 →
+     0, 6 с → 0,5, 0 → 1 (game/tests/test_alarm.py). */
+  var ALARM_TIME_SHARE = 0.10;   // последние 10 % СТАРТОВОГО запаса режима
+  var ALARM_LAST_LIFE = 0.35;    // последняя жизнь без нехватки времени
+  var ALARM_BPM_MIN = 70;
+  var ALARM_BPM_MAX = 130;
+
+  function alarmByTime(timeLeft, duration) {
+    var win = ALARM_TIME_SHARE * duration;
+    if (!(win > 0) || timeLeft >= win) return 0;
+    return Math.max(0, Math.min(1, (win - timeLeft) / win));
+  }
+
+  function alarmLevel(timeLeft, duration, lives) {
+    var byLife = lives === 1 ? ALARM_LAST_LIFE : 0;
+    return Math.max(alarmByTime(timeLeft, duration), byLife);
+  }
+
+  /* ⚠️ ТЕМП ВЕДЁТ ТОЛЬКО НЕХВАТКА ВРЕМЕНИ. Последняя жизнь поднимает
+     тревогу глазами (виньетка 0,35), но сердце при этом стучит спокойные
+     70 — «не очень частое». Считай темп от общей тревоги, на последней
+     жизни он сразу дал бы 91, и запас нагнетания кончился бы раньше
+     времени. */
+  function alarmBpm(timeLeft, duration) {
+    return Math.round(ALARM_BPM_MIN
+      + (ALARM_BPM_MAX - ALARM_BPM_MIN) * alarmByTime(timeLeft, duration));
+  }
+
+  /* Прозрачная сердцевина овала обязана накрывать карточку вопроса и
+     варианты при ЛЮБОЙ ширине. Считаем от .scene с запасом 24 px: у
+     градиента прозрачная зона кончается на 55 % радиуса, отсюда деление.
+
+     ⚠️ МНОЖИТЕЛЬ √2 — НЕ ЗАПАС «НА ГЛАЗОК». Овал не прямоугольник: УГОЛ
+     блока с полуосями (a, b) лежит ВНЕ эллипса с такими же полуосями —
+     сумма квадратов там даёт 2, а не 1. Без множителя красная кайма
+     срезала бы углы карточки; замер до правки: k = 1,845 при пороге 1
+     (scripts/rush_alarm_probe.js). С √2 угол ложится ровно на границу. */
+  var ALARM_PAD = 24;
+  var ALARM_CORNER = Math.SQRT2;
+  function sizeAlarm(v) {
+    var sc = document.querySelector('#screen-play .scene');
+    if (!sc) return;
+    var r = sc.getBoundingClientRect();
+    if (!r.width) return;
+    /* ⚠️ Мерим от ЦЕНТРА ЭКРАНА, а не половину блока. Виньетка лежит
+       `position: fixed; inset: 0`, и её овал центрируется по вьюпорту, а
+       `.scene` по вертикали смещён вверх. Половина высоты блока дала бы
+       овал, у которого нижний край карточки уже снаружи. */
+    var cx = window.innerWidth / 2;
+    var cy = window.innerHeight / 2;
+    var dx = Math.max(Math.abs(r.left - cx), Math.abs(r.right - cx)) + ALARM_PAD;
+    var dy = Math.max(Math.abs(r.top - cy), Math.abs(r.bottom - cy)) + ALARM_PAD;
+    v.style.setProperty('--al-rx', Math.round(ALARM_CORNER * dx / 0.55) + 'px');
+    v.style.setProperty('--al-ry', Math.round(ALARM_CORNER * dy / 0.55) + 'px');
+  }
+
+  /* Единая точка входа в сердцебиение: модуль звука мог не загрузиться. */
+  function beatApi(method, arg) {
+    var hb = window.rushSound && window.rushSound.heartbeat;
+    if (hb && typeof hb[method] === 'function') {
+      try { hb[method](arg); } catch (e) { /* звук не критичен */ }
+    }
+  }
+
+  var alarmOn = false;
+  function paintAlarm() {
+    var a = (state === 'playing' && MODE)
+      ? alarmLevel(timeLeft, MODE.duration, lives) : 0;
+    document.documentElement.style.setProperty('--alarm', a.toFixed(3));
+    var v = $('vignette');
+    var on = a > 0;
+    v.classList.toggle('alarm', on);
+    if (on) sizeAlarm(v);
+    if (on !== alarmOn) {
+      alarmOn = on;
+      if (on) { beatApi('start', alarmBpm(timeLeft, MODE.duration)); }
+      else { beatApi('stop'); }
+    } else if (on) {
+      beatApi('set', alarmBpm(timeLeft, MODE.duration));
+    }
+  }
+
+  /* Пульс картинки — по удару сердца, а не по своему таймеру. Событие
+     приходит и при выключенном звуке: планировщик работает всегда. */
+  window.addEventListener('rush:beat', function () {
+    if (REDUCED || !alarmOn) return;
+    [$('vignette'), $('time-fill')].forEach(function (el) {
+      if (!el) return;
+      el.classList.remove('beat');
+      void el.offsetWidth;          // перезапуск анимации
+      el.classList.add('beat');
+    });
+  });
+
   function paintHud() {
     var t = $('hud-timer');
     t.textContent = timeLeft <= 10 ? timeLeft.toFixed(1).replace('.', ',') : Math.ceil(timeLeft);
@@ -2490,23 +2615,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // На последней жизни полоса времени принудительно в красном режиме,
     // сколько бы времени ни осталось: она перестаёт быть про время и
     // становится про опасность.
-    var last = isLastLife();
-    fill.classList.toggle('low', last || timeLeft < 7);
-    fill.classList.toggle('mid', !last && timeLeft >= 7 && timeLeft < 15);
+    paintAlarm();
     tickSoundMaybe();
   }
 
-  /* Последняя жизнь: один и тот же вопрос задают четыре места (полоса
-     времени, сердца, виньетка, звук) — ответ обязан быть один. */
+  /* Последняя жизнь: один и тот же вопрос задают три места (сердца,
+     виньетка тревоги, сердцебиение) — ответ обязан быть один. */
   function isLastLife() {
     return state === 'playing' && lives === 1;
   }
 
   function paintLastLife() {
-    var on = isLastLife();
-    $('last-life-frame').classList.toggle('on', on);
-    $('hud-lives').classList.toggle('last-life', on);
-    if (on) { rush('lowLayerOn'); } else { rush('lowLayerOff'); }
+    // ⚠️ Виньетку и звук здесь НЕ трогаем: и то и другое ведёт `paintAlarm`
+    // по общей величине тревоги. Раньше рамка последней жизни жила отдельно
+    // и на исходе времени накладывалась на виньетку времени.
+    $('hud-lives').classList.toggle('last-life', isLastLife());
   }
 
   /* Тик последних секунд — один раз на каждую целую секунду. */
@@ -3088,7 +3211,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var on = !window.rushSound || window.rushSound.isOn();
     var btn = $('btn-sound');
     btn.classList.toggle('off', !on);
-    btn.textContent = on ? '♪' : '♪̸';
+    var slot = btn.querySelector('.qi-slot');
+    if (slot) slot.innerHTML = (on ? ICONS.sound_on : ICONS.sound_off) || '';
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
     btn.title = on ? 'Звук включён' : 'Звук выключен';
   }
@@ -3151,8 +3275,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     show('finished');
     // Экран результатов и перерисовка графиков звука не издают: он
     // сопровождает забег, а не отчёт о нём. Одно исключение — рекорд.
-    rush('lowLayerOff');
-    $('last-life-frame').classList.remove('on');
+    beatApi('stop');
     rush('over');
 
     // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,

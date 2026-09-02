@@ -1,4 +1,4 @@
-/* Звук Econ Rush.
+/* Звук Wecon Rush.
 
    СИНТЕЗ через Web Audio API, БЕЗ звуковых файлов. Довод тот же, по
    которому графики рисуются руками, а не библиотекой: нет мегабайтов, нет
@@ -20,7 +20,6 @@
   var KEY = 'econ_rush_sound';   // 'on' | 'off', по умолчанию включён
   var ctx = null;                // AudioContext, создаётся лениво
   var master = null;
-  var lowLayer = null;           // фоновый гул последней жизни
 
   function enabled() {
     try { return localStorage.getItem(KEY) !== 'off'; }
@@ -29,7 +28,8 @@
 
   function setEnabled(on) {
     try { localStorage.setItem(KEY, on ? 'on' : 'off'); } catch (e) {}
-    if (!on) stopLowLayer();
+    // ⚠️ Планировщик сердцебиения НЕ останавливаем: по его ударам
+    // пульсируют виньетка и полоса времени, а они нужны и без звука.
   }
 
   function audio() {
@@ -76,15 +76,99 @@
     return base * Math.pow(2, steps / 12);
   }
 
-  function stopLowLayer() {
-    if (!lowLayer) return;
-    try {
-      lowLayer.gain.gain.exponentialRampToValueAtTime(
-        0.0001, ctx.currentTime + 0.3);
-      lowLayer.osc.stop(ctx.currentTime + 0.4);
-    } catch (e) {}
-    lowLayer = null;
+  /* ─── СЕРДЦЕБИЕНИЕ ────────────────────────────────────────────────────
+     Заменяет прежний фоновый гул последней жизни: два разных звука об
+     одной и той же опасности спорили бы друг с другом.
+
+     ⚠️ ПЛАНИРОВЩИК РАБОТАЕТ И ПРИ ВЫКЛЮЧЕННОМ ЗВУКЕ. Удар — это ещё и
+     событие `rush:beat`, по которому пульсируют виньетка и полоса времени.
+     Замолчи планировщик вместе со звуком — картинка застыла бы у того, кто
+     играет без звука, а это половина игроков.
+
+     ⚠️ ВРЕМЯ БЕРЁТСЯ У AudioContext, а не у setInterval. setInterval
+     плывёт на десятки миллисекунд, и удары начали бы «шататься»
+     относительно друг друга. Здесь классическая схема: раз в 25 мс
+     заглядываем на 120 мс вперёд и назначаем удары на точные моменты
+     звуковых часов. Если AudioContext создать не удалось (нет Web Audio,
+     нет жеста пользователя) — те же удары идут по performance.now(),
+     чтобы картинка всё равно жила. */
+  var hb = { on: false, bpm: 70, next: 0, timer: null, silent: false };
+  var HB_LOOKAHEAD = 0.12;   // на сколько секунд вперёд назначаем
+  var HB_POLL = 25;          // как часто заглядываем, мс
+
+  /* Один «туп»: синус 55 → 40 Гц с быстрым спадом. Низко и коротко —
+     это удар, а не нота. */
+  function thump(t0, vol) {
+    var c = ctx;
+    if (!c || !master) return;
+    var osc = c.createOscillator();
+    var gain = c.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(55, t0);
+    osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.12);
+    gain.gain.setValueAtTime(0.0001, t0);
+    gain.gain.exponentialRampToValueAtTime(vol, t0 + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.12);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(t0);
+    osc.stop(t0 + 0.14);
   }
+
+  /* «Туп-туп»: второй удар через 140 мс и тише — так стучит сердце. */
+  function beatAt(t0) {
+    if (enabled() && !hb.silent) {
+      thump(t0, 0.5);
+      thump(t0 + 0.14, 0.3);
+    }
+    var delay = Math.max(0, (t0 - hbNow()) * 1000);
+    setTimeout(function () {
+      try {
+        window.dispatchEvent(new CustomEvent('rush:beat'));
+      } catch (e) { /* старый браузер — пульса картинки не будет, звук есть */ }
+    }, delay);
+  }
+
+  function hbNow() {
+    return ctx ? ctx.currentTime : performance.now() / 1000;
+  }
+
+  function hbTick() {
+    if (!hb.on) return;
+    var period = 60 / hb.bpm;
+    var horizon = hbNow() + HB_LOOKAHEAD;
+    while (hb.next < horizon) {
+      beatAt(hb.next);
+      hb.next += period;
+    }
+    hb.timer = setTimeout(hbTick, HB_POLL);
+  }
+
+  var heartbeat = {
+    /* Запустить. Первый удар — сразу, чтобы тревога не «включалась
+       молча» на полсекунды. */
+    start: function (bpm) {
+      if (hb.on) { heartbeat.set(bpm); return; }
+      audio();                       // может вернуть null — это нормально
+      hb.on = true;
+      hb.bpm = bpm || 70;
+      hb.next = hbNow() + 0.05;
+      clearTimeout(hb.timer);
+      hbTick();
+    },
+    /* Сменить темп на ходу: уже назначенные удары не трогаем, следующий
+       период считается новым. */
+    set: function (bpm) {
+      if (bpm) hb.bpm = Math.max(40, Math.min(200, bpm));
+    },
+    stop: function () {
+      hb.on = false;
+      clearTimeout(hb.timer);
+      hb.timer = null;
+    },
+    isOn: function () { return hb.on; },
+    bpm: function () { return hb.bpm; }
+  };
 
   var api = {
     isOn: enabled,
@@ -139,26 +223,7 @@
       });
     },
 
-    /* Низкий фоновый слой последней жизни: не мелодия, а давление.
-       Включается один раз и висит до конца забега. */
-    lowLayerOn: function () {
-      if (lowLayer || !enabled()) return;
-      var c = audio();
-      if (!c) return;
-      try {
-        var osc = c.createOscillator();
-        var gain = c.createGain();
-        osc.type = 'sine';
-        osc.frequency.value = 55;
-        gain.gain.setValueAtTime(0.0001, c.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.14, c.currentTime + 0.6);
-        osc.connect(gain);
-        gain.connect(master);
-        osc.start();
-        lowLayer = { osc: osc, gain: gain };
-      } catch (e) { lowLayer = null; }
-    },
-    lowLayerOff: stopLowLayer
+    heartbeat: heartbeat
   };
 
   window.rushSound = api;
