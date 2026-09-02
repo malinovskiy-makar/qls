@@ -291,6 +291,50 @@ class Olympiad(models.Model):
         return ''
 
     @property
+    def format_label(self):
+        """Формат одной строкой.
+
+        Если отборочный и финал устроены по-разному — так и пишем, а не
+        усредняем в «смешанный»: школьнику важно, куда ехать.
+        """
+        stages = list(self.stages.all())
+        if not stages:
+            return ''
+        words = {'online': 'онлайн', 'offline': 'очно', 'mixed': 'смешанно'}
+        formats = {stage.format for stage in stages}
+        if len(formats) == 1:
+            single = {'online': 'Онлайн', 'offline': 'Очно',
+                      'mixed': 'Смешанный'}
+            return single[formats.pop()]
+        first, last = stages[0], stages[-1]
+        return 'Отбор {}, финал {}'.format(words[first.format],
+                                           words[last.format])
+
+    @property
+    def cities_summary(self):
+        """Города всех очных этапов одной строкой, без повторов."""
+        seen, out = set(), []
+        for stage in self.stages.all():
+            for city in (stage.cities or []):
+                if city and city not in seen:
+                    seen.add(city)
+                    out.append(city)
+        if not out:
+            return ''
+        if len(out) <= 3:
+            return ', '.join(out)
+        return '{} и ещё {}'.format(out[0], len(out) - 1)
+
+    @property
+    def registration_label(self):
+        """Строка факта «Регистрация» в шапке страницы."""
+        if self.registration_is_open:
+            return 'Идёт'
+        if self.registration_url:
+            return 'Пока не открыта'
+        return 'Нет данных'
+
+    @property
     def abbr(self):
         """Две-три буквы для квадрата на месте ненайденного логотипа."""
         source = (self.name_short or self.name_full).strip()

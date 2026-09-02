@@ -50,8 +50,10 @@ def olympiad_detail(request, slug):
         Olympiad.objects.prefetch_related('levels', 'events', 'stages'),
         slug=slug,
     )
+    stages = list(olympiad.stages.all())
     return render(request, 'olympiads/detail.html', {
         'olympiad': olympiad,
+        'stages': stages,
         'has_placeholder': _has_placeholder([olympiad]),
     })
 

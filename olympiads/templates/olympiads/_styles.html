@@ -222,3 +222,45 @@
 @media (prefers-reduced-motion: reduce) {
   .ol-card:hover { transform: none; }
 }
+
+/* ── Шапка страницы олимпиады ───────────────────────── */
+.ol-crumbs {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--text2); margin-bottom: 14px;
+}
+.ol-crumbs a { color: var(--accent-ink); text-decoration: none; }
+.ol-crumbs a:hover { text-decoration: underline; }
+
+.ol-hero { margin-bottom: 8px; }
+.ol-hero-top { display: flex; gap: 14px; align-items: flex-start; }
+.ol-logo--big { width: 64px; height: 64px; font-size: 15px; }
+
+.ol-facts {
+  display: flex; flex-wrap: wrap; gap: 8px 26px;
+  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+}
+.ol-facts dt { font-size: 12px; color: var(--text2); }
+.ol-facts dd { font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+.ol-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Крупная сплошная кнопка — графитовая. Акцент оставлен мелочам:
+   ссылкам, активному чипу, полосе слева. */
+.ol-btn {
+  display: inline-flex; align-items: center;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  padding: 9px 16px; border-radius: var(--r);
+  background: var(--btn-bg); color: var(--on-btn); border: 1px solid transparent;
+  transition: background var(--t), border-color var(--t);
+}
+.ol-btn:hover { background: var(--btn-bg-hover); }
+.ol-btn--second {
+  background: var(--surface); color: var(--text);
+  border-color: var(--border);
+}
+.ol-btn--second:hover { background: var(--surface-2); border-color: var(--accent); }
+/* Заготовка видна и в пустом состоянии: кнопка не исчезает, а честно
+   говорит, что нажимать пока некуда. */
+.ol-btn--off {
+  color: var(--text3); cursor: default; opacity: .75;
+}
+.ol-btn--off:hover { background: var(--surface); border-color: var(--border); }

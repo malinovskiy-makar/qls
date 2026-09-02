@@ -1,8 +1,45 @@
 {% extends 'olympiads/base_olymp.html' %}
 {% block title %}{{ olympiad.name_short }}{% endblock %}
 {% block olymp_content %}
-<div class="ol-head">
-  <h1 class="ol-title">{{ olympiad.name_full }}</h1>
-  <p class="ol-sub">{{ olympiad.organizer }}</p>
-</div>
+
+<nav class="ol-crumbs" aria-label="Хлебные крошки">
+  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
+  <span aria-hidden="true">→</span>
+  <span>{{ olympiad.name_short }}</span>
+</nav>
+
+<header class="ol-hero" style="view-transition-name: ol-card-{{ olympiad.slug }};">
+  <div class="ol-hero-top">
+    {% if olympiad.logo %}
+    <img class="ol-logo ol-logo--big" src="{{ olympiad.logo.url }}" alt="" width="64" height="64">
+    {% else %}
+    <span class="ol-logo ol-logo--big ol-logo--empty" aria-hidden="true">{{ olympiad.abbr }}</span>
+    {% endif %}
+    <div>
+      <h1 class="ol-title">{{ olympiad.name_full }}</h1>
+      <p class="ol-sub">{{ olympiad.organizer }}</p>
+    </div>
+  </div>
+
+  <dl class="ol-facts">
+    {% if olympiad.grades_label %}<div><dt>Классы</dt><dd>{{ olympiad.grades_label }}</dd></div>{% endif %}
+    <div><dt>Этапов</dt><dd>{{ stages|length }}</dd></div>
+    {% if olympiad.format_label %}<div><dt>Формат</dt><dd>{{ olympiad.format_label }}</dd></div>{% endif %}
+    <div><dt>Регистрация</dt><dd>{{ olympiad.registration_label }}</dd></div>
+    {% if olympiad.cities_summary %}<div><dt>Города</dt><dd>{{ olympiad.cities_summary }}</dd></div>{% endif %}
+    <div><dt>Задач у нас</dt><dd>{{ olympiad.problem_count }}</dd></div>
+  </dl>
+
+  <div class="ol-actions">
+    {% if olympiad.official_url %}
+    <a class="ol-btn" href="{{ olympiad.official_url }}" target="_blank" rel="noopener">Официальный сайт</a>
+    {% endif %}
+    {% if olympiad.registration_url %}
+    <a class="ol-btn ol-btn--second" href="{{ olympiad.registration_url }}" target="_blank" rel="noopener">Регистрация на олимпиаду</a>
+    {% else %}
+    <span class="ol-btn ol-btn--second ol-btn--off" aria-disabled="true">Регистрация ещё не открыта</span>
+    {% endif %}
+  </div>
+</header>
+
 {% endblock %}
