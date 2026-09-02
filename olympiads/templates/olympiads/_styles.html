@@ -543,3 +543,21 @@
    полоса слева. Читать надо различия, а не одинаковое. */
 .ol-row--same th, .ol-row--same td { color: var(--text3); }
 .ol-row--diff th[scope="row"] { border-left: var(--stripe-thin) solid var(--accent); }
+
+/* ── Переход между экранами ─────────────────────────── */
+/* Прогрессивное улучшение, а не зависимость: в Chrome и Safari карточка
+   разворачивается в страницу и сворачивается обратно, в Firefox страница
+   просто открывается, как раньше. Библиотек не подключаем.
+   Имя перехода уникально на странице — оно собрано из слага и стоит
+   атрибутом style прямо на карточке и на шапке страницы олимпиады. */
+@view-transition { navigation: auto; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Человек попросил не двигать — не двигаем ничего: ни переход между
+     экранами, ни сдвиг карточки под курсором. */
+  @view-transition { navigation: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+  .ol-card, .ol-chip, .ol-btn, .ol-tag { transition: none !important; }
+}
