@@ -158,4 +158,47 @@
   {% endif %}
 </section>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Что за задачи</h2>
+  <div class="ol-panels">
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Сложность</h3>
+      {% if stats %}
+        {% for row in stats.difficulty %}
+        <span class="ol-bar">
+          <span class="ol-bar-name">{{ row.level }} из 5</span>
+          <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {{ row.pct }}%;"></span></span>
+          <span class="ol-bar-num">{{ row.pct }}%</span>
+        </span>
+        {% endfor %}
+        {% if stats.unknown_difficulty %}
+        <p class="ol-panel-note">Без оценки сложности: {{ stats.unknown_difficulty }}.</p>
+        {% endif %}
+      {% else %}
+        <p class="ol-panel-note">Задания пока не размечены.</p>
+      {% endif %}
+    </div>
+
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Форматы заданий</h3>
+      {% if stats %}
+        {% for row in stats.formats %}
+        <span class="ol-bar">
+          <span class="ol-bar-name">{{ row.name }}</span>
+          <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {{ row.pct }}%;"></span></span>
+          <span class="ol-bar-num">{{ row.pct }}%</span>
+        </span>
+        {% endfor %}
+      {% else %}
+        <p class="ol-panel-note">Задания пока не размечены.</p>
+      {% endif %}
+    </div>
+
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Частые темы</h3>
+      <p class="ol-panel-note">Появится, когда закончится разметка банка по темам.</p>
+    </div>
+  </div>
+</section>
+
 {% endblock %}

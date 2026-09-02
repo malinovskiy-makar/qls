@@ -63,6 +63,7 @@ def olympiad_detail(request, slug):
         'stages': stages,
         'events': events,
         'academic_year': year,
+        'stats': services.problem_stats(olympiad),
         'has_placeholder': _has_placeholder([olympiad]),
     })
 

@@ -3,6 +3,7 @@
 Здесь живёт то, что нужно сразу нескольким экранам, — чтобы лента дат на
 главной и календарь раздела не разошлись однажды в отборе событий.
 """
+from collections import Counter
 from datetime import date
 
 from .models import Olympiad, OlympiadEvent, current_academic_year
@@ -141,3 +142,55 @@ def published_olympiads():
         Olympiad.objects.filter(is_published=True)
         .prefetch_related('levels', 'events', 'stages', 'variants')
     )
+
+
+# ⚠️ РАЗБИВКА ПО 900 — НЕ ПРИДИРКА. SQLite падает с «too many SQL
+# variables» на filter(id__in=...) с десятками тысяч ключей, а у крупной
+# олимпиады их столько и будет. Ошибка вылезла бы не сегодня, а в день
+# первой удачной привязки — то есть в самый неудобный момент.
+ID_CHUNK = 900
+
+
+def problem_stats(olympiad):
+    """Распределение сложности и форматов по привязанным задачам банка.
+
+    Возвращает None, если привязок нет вовсе, — тогда панели честно
+    говорят «Задания пока не размечены» вместо нулевых полосок.
+    """
+    from problems.models import OlympiadRef, Problem
+
+    ids = sorted(set(
+        OlympiadRef.objects
+        .filter(olympiad_slug=olympiad.slug)
+        .values_list('problem_id', flat=True)
+    ))
+    if not ids:
+        return None
+
+    difficulty = Counter()
+    formats = Counter()
+    total = 0
+    for start in range(0, len(ids), ID_CHUNK):
+        chunk = ids[start:start + ID_CHUNK]
+        for level, kind in (Problem.objects.filter(id__in=chunk)
+                            .values_list('difficulty', 'problem_type')):
+            total += 1
+            difficulty[level] += 1
+            formats[(kind or '').strip() or 'без пометки'] += 1
+
+    def pct(count):
+        return round(100 * count / total) if total else 0
+
+    return {
+        'total': total,
+        'difficulty': [
+            {'level': level, 'count': difficulty.get(level, 0),
+             'pct': pct(difficulty.get(level, 0))}
+            for level in (1, 2, 3, 4, 5)
+        ],
+        'unknown_difficulty': difficulty.get(None, 0),
+        'formats': [
+            {'name': name, 'count': count, 'pct': pct(count)}
+            for name, count in formats.most_common(6)
+        ],
+    }

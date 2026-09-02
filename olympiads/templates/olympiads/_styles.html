@@ -356,3 +356,19 @@
 }
 .ol-bar-fill { display: block; height: 100%; background: var(--accent); }
 .ol-bar-num { text-align: right; color: var(--text2); }
+
+/* ── Три панели «что за задачи» ─────────────────────── */
+.ol-panels {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 780px) { .ol-panels { grid-template-columns: 1fr; } }
+.ol-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 14px 16px;
+}
+.ol-panel-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.ol-panel-note { font-size: 13px; color: var(--text2); }
+.ol-panel .ol-bar { grid-template-columns: 74px 1fr 38px; font-size: 12px; }
