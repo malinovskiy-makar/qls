@@ -771,7 +771,16 @@ class Command(BaseCommand):
         # расхождений, и это надо ПОКАЗАТЬ числом, а не утверждать.
         sweep_before = protected_fields_digest(problem_ids)
 
-        def on_progress(problem_id, spent):
+        # ⚠️ Расход завершённых кусков. `on_progress` получает от
+        # `run_variant_concurrent` расход ТЕКУЩЕГО КУСКА (его `state['spent']`
+        # начинается с нуля на каждый вызов), и печатать его как «потрачено»
+        # значит врать: на боевом прогоне 02.09.2026 контрольная строка
+        # показала $1,0814 на 2000 задачах и $1,0411 на 4000 — расход как
+        # будто уменьшился. Правильное число — сумма завершённых кусков плюс
+        # расход текущего.
+        spent_done = {'v': Decimal('0')}
+
+        def on_progress(problem_id, chunk_spent):
             with count_lock:
                 processed_count['n'] += 1
                 n = processed_count['n']
@@ -781,12 +790,13 @@ class Command(BaseCommand):
                 remaining = todo_total - n
                 eta_min = remaining / rate if rate else float('inf')
                 defect_pct, retry_pct, soft_pct = tracker.pcts()
+                total_spent = spent_done['v'] + Decimal(str(chunk_spent))
                 self.stdout.write(
                     '  [%d/%d] брак %.1f%% (порог %.0f%%), повторы %.1f%%, '
                     'мягкие %.1f%%, потрачено $%.4f, %.1f задач/мин, '
                     'прогноз оставшегося: %.0f мин'
                     % (n, todo_total, defect_pct, tracker.stop_pct,
-                       retry_pct, soft_pct, spent, rate, eta_min))
+                       retry_pct, soft_pct, total_spent, rate, eta_min))
                 self.stdout.flush()
 
         def extra_on_row(row):
@@ -837,6 +847,7 @@ class Command(BaseCommand):
                             on_progress=on_progress, stop_event=stop_event,
                             extra_on_row=extra_on_row, done_ids=set()))
                     spent += chunk_spent
+                    spent_done['v'] = spent
                     processed_now += len(rows)
                     errors.extend(chunk_errors)
                     # Куски держатся в памяти по одному: 41 тысяча задач с

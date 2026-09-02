@@ -161,6 +161,32 @@ class GlmEnrichRunSmokeTests(TestCase):
         self.assertEqual(len(ids), len(set(ids)))
         self.assertEqual(sorted(ids), sorted(p.id for p in self.problems))
 
+    def test_контрольная_строка_показывает_расход_всего_прогона(self):
+        """⚠️ Расход в контрольной строке НЕ МОЖЕТ УМЕНЬШАТЬСЯ. Баг боевого
+        прогона 02.09.2026: `on_progress` получает расход текущего КУСКА
+        (его счётчик начинается с нуля на каждый кусок), и строка показала
+        $1,0814 на 2000 задачах, затем $1,0411 на 4000 — как будто деньги
+        вернулись. На многочасовом прогоне без человека рядом такое число
+        вводит в заблуждение ровно там, где смотрят на бюджет."""
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        out = io.StringIO()
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete), \
+                mock.patch.object(run_cmd, 'CHECKPOINT_EVERY', 2):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=1, chunk=2,
+                        run_id='test-progress-1', stdout=out)
+
+        spends = [float(m) for m in
+                 re.findall(r'потрачено \$([0-9.]+)', out.getvalue())]
+        self.assertGreaterEqual(len(spends), 3, out.getvalue())
+        self.assertEqual(spends, sorted(spends),
+                         'расход в контрольной строке уменьшился: %s' % spends)
+        self.assertGreater(spends[-1], spends[0])
+
     def test_потолок_расхода_общий_на_все_куски(self):
         """`--max-cost` считается по ВСЕМУ прогону, а не заново на каждый
         кусок: иначе потолок $70 при двадцати кусках означал бы $1400."""
