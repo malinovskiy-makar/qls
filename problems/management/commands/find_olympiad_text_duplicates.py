@@ -196,14 +196,25 @@ class Command(BaseCommand):
         anchor_pairs = anchor_pairs_a + anchor_pairs_b
         conflict_rows = self._step_c_report(anchor_pairs)
 
+        # ⚠️ ПОРЯДОК ЗДЕСЬ ЗНАЧИМ: слабый числовой отпечаток снимается ПОСЛЕ
+        # разбора конфликтов, а не до. Сними раньше — и кандидат, у которого
+        # один якорь сильный, а второй слабый, потерял бы второго и перестал
+        # выглядеть спорным: мы записали бы одну олимпиаду из двух, ни о чём
+        # не сказав. Конфликт весомее слабости, и решается первым.
+        to_write, weak_queue = [], []
+        for match in decided:
+            (weak_queue if self._numeric_is_weak(match.candidate_id)
+             else to_write).append(match)
+
         clusters = self._build_clusters(decided, conflicts, anchor_pairs)
         self._score_clusters(clusters)
 
-        self._write_review_queue(queue_band, conflicts)
-        self._write_preview(decided)
+        self._write_review_queue(queue_band, conflicts, weak_queue)
+        self._write_preview(to_write)
 
         self._report(
             matches_a=matches_a, matches_b=matches_b, decided=decided,
+            to_write=to_write, weak_queue=weak_queue,
             conflicts=conflicts, queue_band=queue_band,
             shortlist_total=shortlist_total,
             numeric_rejects_a=numeric_rejects_a,
@@ -212,7 +223,7 @@ class Command(BaseCommand):
         )
 
         if options['apply']:
-            self._apply(decided)
+            self._apply(to_write)
         else:
             self.stdout.write('')
             self.stdout.write(self.style.WARNING(
@@ -661,8 +672,14 @@ class Command(BaseCommand):
         refs = self.refs_by_anchor[match.anchor_id]
         merged = merge_grades_by_event(refs)
         first = refs[0]
+        numbers = self.numeric(match.candidate_id)
         return {
             'reason': reason,
+            # Подпризнак слабости: чисел нет вовсе — числовая проверка
+            # совпала автоматически (пустое множество равно пустому);
+            # числа есть, но их мало и они ходовые — сигнал есть, но слаб.
+            'numbers_present': 'no' if not numbers else 'yes',
+            'numbers': ' '.join(sorted(numbers.elements())),
             'conflict': 'true' if conflict else 'false',
             'candidate_id': match.candidate_id,
             'anchor_id': match.anchor_id,
@@ -680,7 +697,7 @@ class Command(BaseCommand):
             'anchor_text_300': self.raw_text[match.anchor_id][:300],
         }
 
-    def _write_review_queue(self, queue_band, conflicts):
+    def _write_review_queue(self, queue_band, conflicts, weak_queue):
         rows = [self._queue_row(m, 'band_0.90_0.97', False) for m in queue_band]
         by_candidate = defaultdict(list)
         for m in conflicts:
@@ -691,8 +708,14 @@ class Command(BaseCommand):
                 for m in group))
             rows.extend(self._queue_row(m, 'anchor_conflict', True, variants)
                         for m in group)
+        # Отдельная причина, а не общая куча: пары с дырявым числовым
+        # отпечатком прошли текст на ≥0,97, но числа за них не поручились —
+        # разбирать их надо иначе, чем пограничные 0,90–0,97.
+        rows.extend(self._queue_row(m, 'weak_numeric_signal', False)
+                    for m in weak_queue)
         self._write_csv(REVIEW_QUEUE, rows, [
-            'reason', 'conflict', 'candidate_id', 'anchor_id', 'method',
+            'reason', 'numbers_present', 'numbers', 'conflict',
+            'candidate_id', 'anchor_id', 'method',
             'cosine', 'fuzzy', 'numeric_match', 'olympiad_slug',
             'olympiad_name', 'year', 'stage', 'grade_merged', 'variants',
             'candidate_text_300', 'anchor_text_300'])
@@ -787,15 +810,24 @@ th{background:#f2f2f2;text-align:left}
         w(f'  отброшено как «сходство ниже {self.opts["fuzzy_min"]}»         : '
           f'{k["fuzzy_dropped"]}')
 
-        candidates = {m.candidate_id for m in k['decided']}
+        weak = k['weak_queue']
+        candidates = {m.candidate_id for m in k['to_write']}
+        weak_candidates = {m.candidate_id for m in weak}
         w('')
-        w(f'РАЗНЫЕ ЗАДАЧИ-КОПИИ, готовые к записи        : {len(candidates)}')
-        w(f'Строк OlympiadRef будет создано              : '
-          f'{self._planned_row_count(k["decided"])}')
+        w('ЧТО РЕАЛЬНО ЗАПИШЕТСЯ (после снятия слабого отпечатка)')
+        w(f'  пар к записи                               : {len(k["to_write"])}')
+        w(f'  РАЗНЫХ ЗАДАЧ-КОПИЙ                         : {len(candidates)}')
+        w(f'  строк OlympiadRef будет создано            : '
+          f'{self._planned_row_count(k["to_write"])}')
+        w('')
+        w(f'  снято в очередь как weak_numeric_signal    : {len(weak)} пар')
+        w(f'    из них задач, ушедших ЦЕЛИКОМ            : '
+          f'{len(weak_candidates - candidates)}')
+        w(f'    задач, у которых осталась сильная пара   : '
+          f'{len(weak_candidates & candidates)}')
 
         w('')
         w('НА ЧТО ОПИРАЕТСЯ ЧИСЛОВАЯ ПРОВЕРКА')
-        weak = [m for m in k['decided'] if self._numeric_is_weak(m.candidate_id)]
         buckets = Counter()
         for m in k['decided']:
             count = len(self.numeric(m.candidate_id))
@@ -804,13 +836,21 @@ th{background:#f2f2f2;text-align:left}
                     '5–9 чисел' if count <= 9 else '10 и больше'] += 1
         for name in ('0 чисел', '1–4 числа', '5–9 чисел', '10 и больше'):
             w(f'   {buckets[name]:6d}  {name} в условии кандидата')
-        w(f'   {len(weak):6d}  пар с ДЫРЯВЫМ числовым отпечатком '
-          f'(чисел нет или это 1–{WEAK_NUMERIC_LIMIT} однозначных)')
-        if weak:
-            w('   ⚠️  У таких пар числа не доказывают ничего: у теста с '
-              'вариантами')
-            w('       ответа они служебные. Список — в файле ниже, решение '
-              'за владельцем.')
+        no_numbers = [m for m in weak if not self.numeric(m.candidate_id)]
+        few_numbers = [m for m in weak if self.numeric(m.candidate_id)]
+        w('')
+        w(f'  ДЫРЯВЫЙ ОТПЕЧАТОК, всего пар              : {len(weak)}')
+        w(f'    чисел в условии НЕТ ВОВСЕ               : {len(no_numbers)}')
+        w('      ⚠️  проверка совпала автоматически: пустое множество '
+          'равно пустому')
+        w(f'    числа есть, но их 1–{WEAK_NUMERIC_LIMIT} и все однозначные: '
+          f'{len(few_numbers)}')
+        if few_numbers:
+            sets = Counter(' '.join(sorted(self.numeric(m.candidate_id).elements()))
+                           for m in few_numbers)
+            w('      какими наборами совпали (эти числа ходят по разным задачам):')
+            for value, count in sets.most_common(10):
+                w(f'        {count:4d} × «{value}»')
         self._write_csv(WEAK_NUMERIC, [{
             'candidate_id': m.candidate_id, 'anchor_id': m.anchor_id,
             'method': m.method,

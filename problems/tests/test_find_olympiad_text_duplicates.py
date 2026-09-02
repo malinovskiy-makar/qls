@@ -45,6 +45,28 @@ def other_numbers():
     return BASE.replace('100', '900') + TAIL
 
 
+# Условие БЕЗ единой цифры: числовая проверка на нём совпадает
+# автоматически и не доказывает ничего.
+NO_NUMBERS = (
+    'Объясните, почему при прочих равных рост благосостояния потребителей '
+    'обычно сопровождается изменением структуры потребления в пользу услуг. '
+    'Приведите пример отрасли, для которой такой сдвиг означает рост спроса, '
+    'и отрасли, для которой он означает сокращение. Ответ обоснуйте. ')
+
+# Условие, где все числа — служебные номера вариантов ответа: сигнал есть,
+# но такой же есть у любого другого теста.
+FEW_NUMBERS = (
+    'Какое из следующих утверждений верно? Варианты ответа: '
+    '1. Рост процентной ставки удешевляет облигации. '
+    '2. Нулевая нижняя граница ограничивает денежную политику. '
+    '3. Оба утверждения неверны. Выберите один вариант и поясните выбор. ')
+
+
+def no_numbers_variant(changed):
+    """`NO_NUMBERS` с изменёнными буквами в хвосте — сходство остаётся ≥0,97."""
+    return NO_NUMBERS + 'э' * (60 - changed) + 'ю' * changed
+
+
 def unit_vector(seed):
     """Нормированный вектор нужной размерности — как в банке (norm = 1)."""
     rng = np.random.default_rng(seed)
@@ -271,6 +293,66 @@ class Тест7ЯкоряСогласныTests(БазаStendaMixin, TestCase):
         self.run_command()
 
         self.assertEqual(self.read_csv('anchor_metadata_conflicts.csv'), [])
+
+
+class Тест10СлабыйЧисловойОтпечатокTests(БазаStendaMixin, TestCase):
+    """Высокое текстовое сходство БЕЗ чисел — не повод писать в базу.
+
+    ⚠️ У условия без чисел числовая проверка совпадает АВТОМАТИЧЕСКИ:
+    пустое множество равно пустому. То есть гейт, который отсеял 1 485
+    ложных пар на боевых данных, здесь не работает вовсе, и за привязку
+    отвечает один только текст. Решение владельца 02.09.2026: такие пары
+    идут в очередь на ручной разбор, а не в `OlympiadRef`.
+    """
+
+    def test_пара_без_чисел_уходит_в_очередь_а_не_в_базу(self):
+        anchor = self.anchor(NO_NUMBERS + TAIL, seed=41)
+        кандидат = self.problem(no_numbers_variant(3), seed=41)
+
+        self.run_command()
+
+        self.assertEqual(self.propagated(кандидат).count(), 0,
+                         'пара без чисел записана в базу')
+        self.assertEqual(OlympiadRef.objects.count(), 1)
+
+        rows = [r for r in self.read_csv('text_dedup_review_queue.csv')
+                if str(r['candidate_id']) == str(кандидат.id)]
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]['reason'], 'weak_numeric_signal')
+        self.assertEqual(rows[0]['numbers_present'], 'no')
+        self.assertEqual(rows[0]['numbers'], '')
+        self.assertEqual(rows[0]['anchor_id'], str(anchor.id))
+        self.assertGreaterEqual(float(rows[0]['fuzzy']), 0.97)
+
+    def test_подпризнак_различает_нет_чисел_и_мало_чисел(self):
+        """«Чисел нет» и «числа есть, но ходовые» разбираются по-разному."""
+        self.anchor(NO_NUMBERS + TAIL, seed=42)
+        без_чисел = self.problem(no_numbers_variant(3), seed=42)
+        self.anchor(FEW_NUMBERS + TAIL, seed=43)
+        мало_чисел = self.problem(FEW_NUMBERS + TAIL, seed=43)
+
+        self.run_command()
+
+        by_id = {r['candidate_id']: r
+                 for r in self.read_csv('text_dedup_review_queue.csv')}
+        self.assertEqual(by_id[str(без_чисел.id)]['numbers_present'], 'no')
+        self.assertEqual(by_id[str(мало_чисел.id)]['numbers_present'], 'yes')
+        # Сами числа выписаны — по ним видно, насколько сигнал ходовой.
+        self.assertEqual(by_id[str(мало_чисел.id)]['numbers'], '1 2 3')
+        for row in (by_id[str(без_чисел.id)], by_id[str(мало_чисел.id)]):
+            self.assertEqual(row['reason'], 'weak_numeric_signal')
+
+    def test_пара_с_богатым_отпечатком_по_прежнему_пишется(self):
+        """Контраст: фильтр снимает слабое, а не всё подряд."""
+        self.anchor(BASE + TAIL, seed=44)
+        копия = self.problem(BASE + TAIL, seed=44)
+
+        self.run_command()
+
+        self.assertEqual(self.propagated(копия).count(), 1)
+        self.assertEqual(
+            [r for r in self.read_csv('text_dedup_review_queue.csv')
+             if str(r['candidate_id']) == str(копия.id)], [])
 
 
 class Тест9ЛучшийВКластереTests(БазаStendaMixin, TestCase):
