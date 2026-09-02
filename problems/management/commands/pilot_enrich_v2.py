@@ -1309,19 +1309,34 @@ def append_raw_log(path, run_id, prompt_version, model, problem_id,
     return entry
 
 
-def read_raw_log(path):
-    """Все строки журнала обратно в список словарей. Нет файла — пустой
-    список (первый прогон, резюмировать ещё нечего)."""
+def iter_raw_log(path):
+    """Строки журнала ПО ОДНОЙ, генератором. Нет файла — пусто (первый
+    прогон, резюмировать ещё нечего).
+
+    ⚠️ Для боевого прогона это не украшательство: 41 тысяча задач даёт
+    журнал под 150 МБ текста, и `read_raw_log` (список всех разобранных
+    ответов сразу) на машине с полутора свободными гигабайтами его просто
+    не удержит. Всё, что читает журнал целиком, обязано идти отсюда."""
     path = Path(path)
     if not path.exists():
-        return []
-    entries = []
+        return
     with open(path, encoding='utf-8') as fh:
         for line in fh:
             line = line.strip()
             if line:
-                entries.append(json.loads(line))
-    return entries
+                yield json.loads(line)
+
+
+def read_raw_log(path):
+    """Все строки журнала обратно в СПИСОК словарей — удобно на пилотах и
+    в тестах, где журнал маленький. На боевом прогоне — `iter_raw_log`."""
+    return list(iter_raw_log(path))
+
+
+def done_problem_ids_from_log(path, prompt_version, variant):
+    """`_done_problem_ids`, но потоком по файлу — без списка всех записей
+    в памяти (см. предупреждение в `iter_raw_log`)."""
+    return _done_problem_ids(iter_raw_log(path), prompt_version, variant)
 
 
 # ---------------------------------------------------------------------------
@@ -1393,7 +1408,7 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
                                      shortlists, log_path, run_id,
                                      prompt_version, workers, max_cost=None,
                                      on_progress=None, stop_event=None,
-                                     extra_on_row=None):
+                                     extra_on_row=None, done_ids=None):
     """`resumable_run_variant` + `run_variant_concurrent` — журнал (Фаза 3)
     и резюмируемость (Фаза 4) вместе с пулом воркеров (Фаза 1). Боевая
     команда прогона использует именно эту функцию — `on_row` здесь
@@ -1404,11 +1419,16 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
     лок) — боевая команда вешает сюда автостоп при доле брака выше 3%
     (Фаза 2): журнал уже видел эту задачу, отменять нечего.
 
+    `done_ids`, если задан, ЗАМЕНЯЕТ чтение журнала: боевой прогон идёт
+    кусками по 2000 задач, и перечитывать журнал на каждый кусок значило
+    бы разобрать его двадцать раз подряд (см. `iter_raw_log`).
+
     Возвращает `(rows, spent, stopped_early, skipped, errors)`.
     """
-    existing = read_raw_log(log_path)
-    done = _done_problem_ids(existing, prompt_version, variant)
-    todo = [p for p in sample_problems if p.id not in done]
+    if done_ids is None:
+        done_ids = _done_problem_ids(iter_raw_log(log_path), prompt_version,
+                                     variant)
+    todo = [p for p in sample_problems if p.id not in done_ids]
     skipped = len(sample_problems) - len(todo)
 
     log_lock = threading.Lock()

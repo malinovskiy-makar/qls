@@ -47,7 +47,8 @@ from django.test import override_settings
 from problems.ai import providers
 from problems.enrich import prompts_v2, taxonomy, text as enrich_text
 from problems.enrich.shortlist import shortlist_for
-from problems.enrich.text import (images_for_call1, looks_like_tikz,
+from problems.enrich.text import (RASTER_CALL1_SOURCE_FIELDS,
+                                  images_for_call1, looks_like_tikz,
                                   problem_full_text, with_figure_note,
                                   with_tikz_sources)
 from problems.management.commands import pilot_enrich_v2 as pilot
@@ -124,6 +125,22 @@ MIN_TIKZ = 10          # в банке всего 7 настоящих — бе�
 MIN_RASTER_IMAGES = 40
 MIN_SOLUTION_IMAGES = 15
 SAMPLE_MANIFEST_PATH = REPORT_DIR / 'run300_sample_ids.json'
+
+#: Размер контрольной точки. `--limit` БОЛЬШЕ этого числа означает боевой
+#: прогон по всему корпусу — своя выборка, свой манифест (см.
+#: `Command._battle_sample`), чек-поинт не затирается.
+CHECKPOINT_LIMIT = 300
+BATTLE_MANIFEST_PATH = REPORT_DIR / 'run_full_sample_ids.json'
+
+#: Сколько задач держится в памяти одновременно. Весь корпус сразу не
+#: помещается: 41 302 задачи это 338 МБ байтов изображений плюс 38 МБ
+#: текста плюс объекты Django, а свободной памяти на машине владельца
+#: было полтора гигабайта.
+CHUNK_SIZE_DEFAULT = 2000
+
+#: Сколько id за раз уходит в `filter(id__in=[...])`. Больше — риск
+#: «too many SQL variables» у SQLite.
+_SQL_IN_CHUNK = 900
 
 
 def _proportional_by_source(pool_ids, remaining_slots, rng):
@@ -377,6 +394,14 @@ def parsed_row(row, problem):
         call1.get('features_1'), problem)
     soft = list(row.get('call1_soft_violations') or []) + \
         list(row.get('call2_soft_violations') or [])
+    figures = list(problem.figures.all())
+    tikz_figures = [f for f in figures if looks_like_tikz(f.tikz_source or '')]
+    has_raster = any(
+        f.source_field in RASTER_CALL1_SOURCE_FIELDS and f.image_data
+        and not looks_like_tikz(f.tikz_source or '') for f in figures)
+    has_tikz = bool(tikz_figures)
+    has_tikz_statement = any(
+        f.source_field in RASTER_CALL1_SOURCE_FIELDS for f in tikz_figures)
     return {
         'problem_id': row['problem_id'],
         'defect': is_defect,
@@ -415,72 +440,51 @@ def parsed_row(row, problem):
         'title_candidate': call2.get('title_candidate'),
         'images_sent': row.get('images_sent', 0),
         'tikz': row.get('tikz'),
+        # ⚠️ Три признака визуального пласта пишутся В СТРОКУ, а не
+        # считаются потом по базе: на боевом прогоне метрики собираются
+        # кусками по 2000 задач, и держать 41 тысячу объектов `Problem` с
+        # картинками в памяти нельзя (338 МБ одних только байтов
+        # изображений при полутора свободных гигабайтах свободной памяти).
+        # Строка журнала обязана быть самодостаточной.
+        'has_raster': has_raster,
+        'has_tikz': has_tikz,
+        'has_tikz_in_statement': has_tikz_statement,
     }
 
 
-def write_parsed_log(path, rows, problems_by_id):
+def write_parsed_rows(path, parsed, append=False):
+    """Дописывает готовые строки `parsed_row` в JSONL. `append=False` —
+    файл создаётся заново (первый кусок боевого прогона)."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, 'w', encoding='utf-8') as fh:
-        for row in rows:
-            problem = problems_by_id.get(row['problem_id'])
-            if problem is None:
-                continue
-            fh.write(json.dumps(parsed_row(row, problem), ensure_ascii=False))
+    with open(path, 'a' if append else 'w', encoding='utf-8') as fh:
+        for row in parsed:
+            fh.write(json.dumps(row, ensure_ascii=False))
             fh.write('\n')
+
+
+def parsed_rows_for(rows, problems_by_id):
+    return [parsed_row(row, problems_by_id[row['problem_id']])
+            for row in rows if row['problem_id'] in problems_by_id]
 
 
 # ---------------------------------------------------------------------------
 # Фаза 3.3: run_metrics.json — сводка.
 # ---------------------------------------------------------------------------
 
-def _count_problems_with_raster(parsed, problems_by_id):
-    """Сколько задач выборки ИМЕЮТ растровую картинку условия — по базе,
-    независимо от того, дошла ли она до вызова 1."""
-    from problems.enrich.text import RASTER_CALL1_SOURCE_FIELDS
-    count = 0
-    for row in parsed:
-        problem = problems_by_id.get(row['problem_id'])
-        if problem is None:
-            continue
-        if any(f.source_field in RASTER_CALL1_SOURCE_FIELDS
-               and f.image_data and not looks_like_tikz(f.tikz_source or '')
-               for f in problem.figures.all()):
-            count += 1
-    return count
+def build_metrics(parsed, usage_totals, sweep=None):
+    """Сводка по УЖЕ РАЗОБРАННЫМ строкам (`parsed_row`). База здесь не
+    нужна вовсе — всё, что раньше пересчитывалось по `Problem`, лежит в
+    самой строке (`has_raster`, `has_tikz`, ...), и метрики боевого
+    прогона собираются кусками, не держа корпус в памяти.
 
-
-def _count_problems_with_tikz(parsed, problems_by_id):
-    """`(всего задач с настоящим TikZ, из них с TikZ У УСЛОВИЯ)`.
-
-    ⚠️ Разделять обязательно. §3.4 API_RUN_MASTER: решение НЕ подаётся в
-    вызов 1 — значит чертёж, привязанный к РЕШЕНИЮ (`source_field
-    ='solution'`), в вызов 1 уходить не имеет права, и его отсутствие там
-    это работающее правило, а не потеря. Сравнивать с «подставлено» можно
-    только второе число: замер чек-поинта 02.09.2026 дал 4 задачи с TikZ,
-    из них 2 у условия — и ровно 2 подстановки. Обе задачи с TikZ у
-    решения ловятся кодовой половиной «Графического решения»
-    (`merge_graphical_solution`), для этого она и заведена."""
-    from problems.enrich.text import RASTER_CALL1_SOURCE_FIELDS
-    total = 0
-    in_statement = 0
-    for row in parsed:
-        problem = problems_by_id.get(row['problem_id'])
-        if problem is None:
-            continue
-        tikz_figures = [f for f in problem.figures.all()
-                        if looks_like_tikz(f.tikz_source or '')]
-        if not tikz_figures:
-            continue
-        total += 1
-        if any(f.source_field in RASTER_CALL1_SOURCE_FIELDS for f in tikz_figures):
-            in_statement += 1
-    return total, in_statement
-
-
-def build_metrics(rows, problems_by_id, usage_totals, sweep=None):
-    parsed = [parsed_row(row, problems_by_id[row['problem_id']])
-             for row in rows if row['problem_id'] in problems_by_id]
+    ⚠️ TikZ считается ДВУМЯ числами. §3.4 API_RUN_MASTER: решение не
+    подаётся в вызов 1 — значит чертёж, привязанный к РЕШЕНИЮ, туда
+    уходить не имеет права, и его отсутствие это работающее правило, а не
+    потеря. Сравнивать с «подставлено» можно только «TikZ у условия»:
+    замер чек-поинта 02.09.2026 дал 4 задачи с TikZ, из них 2 у условия —
+    и ровно 2 подстановки. Задачи с TikZ у решения ловятся кодовой
+    половиной «Графического решения» (`merge_graphical_solution`)."""
     n = len(parsed)
     defects = [p for p in parsed if p['defect']]
     ok = [p for p in parsed if not p['defect']]
@@ -525,7 +529,8 @@ def build_metrics(rows, problems_by_id, usage_totals, sweep=None):
     # владельца 02.09.2026): для остановки есть `defect_pct` выше.
     retried_rows = sum(1 for p in parsed
                        if p['call1_retried'] or p['call2_retried'])
-    tikz_total, tikz_in_statement = _count_problems_with_tikz(parsed, problems_by_id)
+    tikz_total = sum(1 for p in parsed if p.get('has_tikz'))
+    tikz_in_statement = sum(1 for p in parsed if p.get('has_tikz_in_statement'))
 
     return {
         'total_processed': n,
@@ -558,7 +563,7 @@ def build_metrics(rows, problems_by_id, usage_totals, sweep=None):
         # БАЗЫ (есть растровая картинка условия), числитель — из журнала
         # (картинка реально ушла в вызов 1); расхождение означает, что
         # `images_for_call1` что-то отбросил (битые байты, конверсия).
-        'problems_with_raster': _count_problems_with_raster(parsed, problems_by_id),
+        'problems_with_raster': sum(1 for p in parsed if p.get('has_raster')),
         'problems_image_sent': sum(1 for p in parsed if p['images_sent']),
         'problems_with_tikz': tikz_total,
         'problems_with_tikz_in_statement': tikz_in_statement,
@@ -600,26 +605,31 @@ def protected_fields_digest(problem_ids):
     `values_list` + `iterator()` — построчно, без загрузки объектов
     `Problem` целиком.
     """
-    wanted = set(problem_ids)
+    # ⚠️ Запрос идёт ПОРЦИЯМИ по 900 id: `filter(id__in=[...])` с
+    # десятками тысяч значений роняет SQLite («too many SQL variables») —
+    # та же ловушка, что уже описана в `_proportional_by_source`.
+    ids = list(problem_ids)
     digests = {}
-    for pid, statement, answer, solution in (
-            Problem.objects.filter(id__in=list(wanted))
-            .values_list('id', 'statement', 'answer', 'solution')
-            .iterator()):
-        h = hashlib.md5()
-        for value in (statement, answer, solution):
-            h.update((value or '').encode('utf-8'))
-            h.update(b'\x00')
-        digests[pid] = h
-    for pid, part_id, part_statement in (
-            ProblemPart.objects.filter(problem_id__in=list(wanted))
-            .order_by('problem_id', 'id')
-            .values_list('problem_id', 'id', 'statement')
-            .iterator()):
-        h = digests.get(pid)
-        if h is not None:
-            h.update(('%d:%s' % (part_id, part_statement or '')).encode('utf-8'))
-            h.update(b'\x00')
+    for start in range(0, len(ids), _SQL_IN_CHUNK):
+        batch = ids[start:start + _SQL_IN_CHUNK]
+        for pid, statement, answer, solution in (
+                Problem.objects.filter(id__in=batch)
+                .values_list('id', 'statement', 'answer', 'solution')
+                .iterator()):
+            h = hashlib.md5()
+            for value in (statement, answer, solution):
+                h.update((value or '').encode('utf-8'))
+                h.update(b'\x00')
+            digests[pid] = h
+        for pid, part_id, part_statement in (
+                ProblemPart.objects.filter(problem_id__in=batch)
+                .order_by('problem_id', 'id')
+                .values_list('problem_id', 'id', 'statement')
+                .iterator()):
+            h = digests.get(pid)
+            if h is not None:
+                h.update(('%d:%s' % (part_id, part_statement or '')).encode('utf-8'))
+                h.update(b'\x00')
     return {pid: h.hexdigest() for pid, h in digests.items()}
 
 
@@ -686,6 +696,11 @@ class Command(BaseCommand):
         parser.add_argument(
             '--metrics-out', type=str, default=None,
             help='Переопределить путь run_metrics.json — как --parsed-out.')
+        parser.add_argument(
+            '--chunk', type=int, default=CHUNK_SIZE_DEFAULT,
+            help='Сколько задач держать в памяти одновременно. Корпус '
+                 'целиком не помещается: 41 тысяча задач это 338 МБ одних '
+                 'только байтов изображений плюс тексты и подпункты.')
 
     def handle(self, *args, **options):
         run_id = options['run_id'] or ('glm-enrich-%d' % int(time.time()))
@@ -701,6 +716,13 @@ class Command(BaseCommand):
             if missing:
                 self.stdout.write('⚠️ вне battle_queryset() (фикстуры или не '
                                   'существуют), пропущены: %s' % sorted(missing))
+        elif limit is not None and limit > CHECKPOINT_LIMIT:
+            # ⚠️ БОЕВОЙ ПРОГОН. `--limit` больше размера контрольной точки
+            # означает «весь корпус», и манифест чек-поинта здесь брать
+            # НЕЛЬЗЯ: он содержит ровно те 300 задач, и `--limit 50000`
+            # молча прогнал бы их же по второму разу вместо корпуса.
+            # Своя выборка — свой манифест, чек-поинт не затирается.
+            problem_ids = self._battle_sample(limit)
         elif SAMPLE_MANIFEST_PATH.exists():
             # Фаза C: список id сохраняется в файл ДО первого обращения к
             # API — повторный запуск (резюмирование после обрыва, добавка
@@ -724,21 +746,17 @@ class Command(BaseCommand):
                           'ids': problem_ids, 'report': sample_report},
                          fh, ensure_ascii=False, indent=2)
             self.stdout.write('манифест сохранён: %s' % SAMPLE_MANIFEST_PATH)
-        problems = list(
-            Problem.objects.filter(id__in=problem_ids)
-            .prefetch_related('parts', 'figures'))
-        problems_by_id = {p.id: p for p in problems}
-        problems = [problems_by_id[pid] for pid in problem_ids if pid in problems_by_id]
-        if not problems:
+
+        if not problem_ids:
             raise CommandError('Выборка пуста.')
+        total_ids = len(problem_ids)
+        chunk_size = options['chunk']
 
         self.stdout.write('=== БОЕВОЙ ПРОГОН GLM-5.3-Flash: %d задач, run_id=%s ==='
-                          % (len(problems), run_id))
-        self.stdout.write('workers=%d, max-cost=$%.4f' % (
-            options['workers'], options['max_cost']))
+                          % (total_ids, run_id))
+        self.stdout.write('workers=%d, max-cost=$%.4f, кусок=%d задач' % (
+            options['workers'], options['max_cost'], chunk_size))
 
-        shortlists = {p.id: shortlist_for(problem_full_text(p.statement, p.parts.all()))
-                     for p in problems}
         prompt_version = pilot.prompt_fingerprint(GLM_VARIANT['concepts'])
         complete_fn = make_glm_complete_fn()
 
@@ -760,20 +778,37 @@ class Command(BaseCommand):
             if n % CHECKPOINT_EVERY == 0:
                 elapsed = time.monotonic() - start_time
                 rate = n / elapsed * 60 if elapsed else 0.0
-                remaining = len(problems) - n
+                remaining = todo_total - n
                 eta_min = remaining / rate if rate else float('inf')
                 defect_pct, retry_pct, soft_pct = tracker.pcts()
                 self.stdout.write(
                     '  [%d/%d] брак %.1f%% (порог %.0f%%), повторы %.1f%%, '
                     'мягкие %.1f%%, потрачено $%.4f, %.1f задач/мин, '
                     'прогноз оставшегося: %.0f мин'
-                    % (n, len(problems), defect_pct, tracker.stop_pct,
+                    % (n, todo_total, defect_pct, tracker.stop_pct,
                        retry_pct, soft_pct, spent, rate, eta_min))
+                self.stdout.flush()
 
         def extra_on_row(row):
             tracker.record(row)
             if tracker.breached:
                 stop_event.set()
+
+        # ⚠️ Журнал читается ОДИН раз, потоком (`iter_raw_log`), а не на
+        # каждый кусок: на 41 тысяче задач в нём 80+ тысяч строк, и
+        # двадцать перечитываний стоили бы дороже самого прогона.
+        done_ids = pilot.done_problem_ids_from_log(
+            str(RAW_LOG_PATH), prompt_version, GLM_VARIANT)
+        todo_ids = [pid for pid in problem_ids if pid not in done_ids]
+        todo_total = len(todo_ids)
+        skipped = total_ids - todo_total
+        self.stdout.write('уже в журнале (платить заново не нужно): %d, '
+                          'к обработке: %d' % (skipped, todo_total))
+
+        spent = Decimal('0')
+        stopped = False
+        errors = []
+        processed_now = 0
 
         # ⚠️ AI_PRICES для GLM оборачивает и сам прогон, и подсчёт метрик
         # НИЖЕ (usage_totals_from_rows -> real_call_cost тоже читает эту
@@ -782,12 +817,35 @@ class Command(BaseCommand):
         # уже после того, как деньги были потрачены и журнал записан.
         with override_settings(AI_PRICES={GLM_MODEL: GLM_PRICES_PROMO}):
             try:
-                rows, spent, stopped, skipped, errors = pilot.resumable_run_variant_concurrent(
-                    problems, GLM_VARIANT, complete_fn, shortlists,
-                    str(RAW_LOG_PATH), run_id, prompt_version,
-                    options['workers'], max_cost=options['max_cost'],
-                    on_progress=on_progress, stop_event=stop_event,
-                    extra_on_row=extra_on_row)
+                for start in range(0, todo_total, chunk_size):
+                    chunk_ids = todo_ids[start:start + chunk_size]
+                    problems, _by_id = self._load_problems(chunk_ids)
+                    shortlists = {
+                        p.id: shortlist_for(
+                            problem_full_text(p.statement, p.parts.all()))
+                        for p in problems}
+                    remaining_budget = float(
+                        Decimal(str(options['max_cost'])) - spent)
+                    if remaining_budget <= 0:
+                        stopped = True
+                        break
+                    rows, chunk_spent, chunk_stopped, _s, chunk_errors = (
+                        pilot.resumable_run_variant_concurrent(
+                            problems, GLM_VARIANT, complete_fn, shortlists,
+                            str(RAW_LOG_PATH), run_id, prompt_version,
+                            options['workers'], max_cost=remaining_budget,
+                            on_progress=on_progress, stop_event=stop_event,
+                            extra_on_row=extra_on_row, done_ids=set()))
+                    spent += chunk_spent
+                    processed_now += len(rows)
+                    errors.extend(chunk_errors)
+                    # Куски держатся в памяти по одному: 41 тысяча задач с
+                    # картинками сразу не помещается (338 МБ одних байтов
+                    # изображений).
+                    del problems, _by_id, shortlists, rows
+                    if chunk_stopped or stop_event.is_set():
+                        stopped = chunk_stopped
+                        break
             except KeyboardInterrupt:
                 self.stdout.write('')
                 self.stdout.write('⚠️ ОСТАНОВЛЕНО ПО Ctrl+C. Журнал %s уже содержит '
@@ -798,7 +856,7 @@ class Command(BaseCommand):
 
             self.stdout.write('')
             self.stdout.write('обработано сейчас: %d, пропущено (уже в журнале): %d'
-                              % (len(rows), skipped))
+                              % (processed_now, skipped))
             self.stdout.write('потрачено: $%.4f%s' % (
                 spent, ' (остановлено потолком)' if stopped else ''))
             if errors:
@@ -824,13 +882,9 @@ class Command(BaseCommand):
             # --- Фаза 3.2/3.3 -------------------------------------------
             sweep = sweep_report(sweep_before,
                                  protected_fields_digest(problem_ids))
-            all_entries = pilot.read_raw_log(str(RAW_LOG_PATH))
-            all_rows = self._rows_from_log(all_entries, problem_ids, GLM_VARIANT,
-                                           prompt_version, shortlists, problems_by_id)
-            write_parsed_log(parsed_out, all_rows, problems_by_id)
-            usage_totals = usage_totals_from_rows(all_rows)
-            metrics = build_metrics(all_rows, problems_by_id, usage_totals,
-                                    sweep=sweep)
+            parsed_all, usage_totals = self._collect_parsed(
+                problem_ids, chunk_size, prompt_version, parsed_out)
+            metrics = build_metrics(parsed_all, usage_totals, sweep=sweep)
 
         metrics_out.parent.mkdir(parents=True, exist_ok=True)
         with open(metrics_out, 'w', encoding='utf-8') as fh:
@@ -883,6 +937,98 @@ class Command(BaseCommand):
         self.stdout.write('расход по журналу (все попытки): $%s'
                           % usage_totals['cost_usd'])
         self.stdout.write('журналы: %s, %s' % (RAW_LOG_PATH, parsed_out))
+
+    # --- работа кусками -------------------------------------------------
+
+    def _battle_sample(self, limit):
+        """Весь корпус `battle_queryset()`, перемешанный тем же зерном, что
+        и контрольная точка, и урезанный до `limit`.
+
+        Перемешивание — не украшательство. Урок Фазы C: id идут пластами
+        (визуальный пласт лежит в диапазоне 57000-63000), и при обходе по
+        возрастанию любой начальный кусок прогона непредставителен —
+        автостоп судил бы о качестве корпуса по одному источнику. Порядок
+        детерминирован зерном и сохраняется в свой манифест, поэтому
+        возобновление берёт ту же выборку в том же порядке."""
+        if BATTLE_MANIFEST_PATH.exists():
+            with open(BATTLE_MANIFEST_PATH, encoding='utf-8') as fh:
+                manifest = json.load(fh)
+            self.stdout.write('=== БОЕВАЯ ВЫБОРКА: манифест уже существует, '
+                              'беру его (%s, seed=%s, задач %d) ==='
+                              % (BATTLE_MANIFEST_PATH, manifest.get('seed'),
+                                 len(manifest['ids'])))
+            return manifest['ids']
+        ids = list(battle_queryset().values_list('id', flat=True))
+        random.Random(CHECKPOINT_SEED).shuffle(ids)
+        if limit < len(ids):
+            ids = ids[:limit]
+        BATTLE_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with open(BATTLE_MANIFEST_PATH, 'w', encoding='utf-8') as fh:
+            json.dump({'seed': CHECKPOINT_SEED, 'limit': limit, 'ids': ids},
+                     fh, ensure_ascii=False)
+        self.stdout.write('=== БОЕВАЯ ВЫБОРКА: весь корпус кроме служебных '
+                          'фикстур, %d задач, перемешан зерном %d ==='
+                          % (len(ids), CHECKPOINT_SEED))
+        self.stdout.write('манифест сохранён: %s' % BATTLE_MANIFEST_PATH)
+        return ids
+
+    def _load_problems(self, chunk_ids):
+        """Задачи одного куска, В ТОМ ЖЕ ПОРЯДКЕ, что и `chunk_ids`."""
+        by_id = {p.id: p for p in
+                Problem.objects.filter(id__in=list(chunk_ids))
+                .prefetch_related('parts', 'figures')}
+        return [by_id[pid] for pid in chunk_ids if pid in by_id], by_id
+
+    def _collect_parsed(self, problem_ids, chunk_size, prompt_version,
+                        parsed_out):
+        """Строки `run_parsed.jsonl` и суммарный расход — КУСКАМИ.
+
+        Журнал перечитывается потоком на каждый кусок (`iter_raw_log`), но
+        в памяти остаются только маленькие разобранные строки: держать
+        одновременно 80 тысяч сырых ответов И корпус с картинками нельзя."""
+        parsed_all = []
+        usage_totals = {'input_tokens': 0, 'cache_read_tokens': 0,
+                        'cache_write_tokens': 0, 'output_tokens': 0,
+                        'reasoning_tokens': 0, 'cost_usd': '0'}
+        cost = Decimal('0')
+        written = False
+        for start in range(0, len(problem_ids), chunk_size):
+            chunk_ids = problem_ids[start:start + chunk_size]
+            wanted = set(chunk_ids)
+            entries = [e for e in pilot.iter_raw_log(str(RAW_LOG_PATH))
+                       if e.get('problem_id') in wanted]
+            # Задачи, которых в журнале НЕТ (прогон остановился раньше),
+            # незачем ни грузить, ни считать им шорт-лист: строки в
+            # `run_parsed.jsonl` у них всё равно не будет.
+            in_log = {e['problem_id'] for e in entries}
+            chunk_ids = [pid for pid in chunk_ids if pid in in_log]
+            if not chunk_ids:
+                del entries
+                continue
+            problems, by_id = self._load_problems(chunk_ids)
+            shortlists = {
+                p.id: shortlist_for(problem_full_text(p.statement, p.parts.all()))
+                for p in problems}
+            rows = self._rows_from_log(entries, chunk_ids, GLM_VARIANT,
+                                       prompt_version, shortlists, by_id)
+            chunk_usage = usage_totals_from_rows(rows)
+            for key in ('input_tokens', 'cache_read_tokens', 'cache_write_tokens',
+                        'output_tokens', 'reasoning_tokens'):
+                usage_totals[key] += chunk_usage[key]
+            cost += Decimal(chunk_usage['cost_usd'])
+            parsed_chunk = parsed_rows_for(rows, by_id)
+            # ⚠️ `append` считается по УЖЕ ЗАПИСАННОМУ, а не по номеру
+            # куска: первый кусок может целиком отсутствовать в журнале
+            # (прогон остановился раньше), и тогда `append=start > 0`
+            # дописывал бы в старый файл, не обнулив его.
+            write_parsed_rows(parsed_out, parsed_chunk, append=written)
+            written = True
+            parsed_all.extend(parsed_chunk)
+            del entries, problems, by_id, shortlists, rows, parsed_chunk
+        if not written:  # в журнале нет ни одной задачи выборки
+            write_parsed_rows(parsed_out, [])
+        usage_totals['cost_usd'] = str(cost)
+        return parsed_all, usage_totals
 
     def _rows_from_log(self, entries, problem_ids, variant, prompt_version,
                        shortlists, problems_by_id):

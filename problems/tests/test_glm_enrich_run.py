@@ -102,6 +102,7 @@ class GlmEnrichRunSmokeTests(TestCase):
         self.parsed_path = self.tmp_dir / 'run_parsed.jsonl'
         self.metrics_path = self.tmp_dir / 'run_metrics.json'
         self.manifest_path = self.tmp_dir / 'run300_sample_ids.json'
+        self.battle_manifest_path = self.tmp_dir / 'run_full_sample_ids.json'
 
     def _patch_paths(self):
         return mock.patch.multiple(
@@ -110,7 +111,76 @@ class GlmEnrichRunSmokeTests(TestCase):
             PARSED_LOG_PATH=self.parsed_path,
             METRICS_PATH=self.metrics_path,
             SAMPLE_MANIFEST_PATH=self.manifest_path,
+            BATTLE_MANIFEST_PATH=self.battle_manifest_path,
         )
+
+    def test_боевой_лимит_берёт_весь_корпус_а_не_манифест_чек_поинта(self):
+        """⚠️ Самая дорогая ошибка этого пути: манифест контрольной точки
+        содержит ровно её 300 задач, и `--limit 50000` при живом манифесте
+        молча прогнал бы их по второму разу вместо корпуса. Боевой лимит
+        (больше `CHECKPOINT_LIMIT`) обязан взять `battle_queryset()` и
+        писать СВОЙ манифест, не трогая чек-поинт."""
+        with open(self.manifest_path, 'w', encoding='utf-8') as fh:
+            json.dump({'seed': 1, 'limit': 300,
+                      'ids': [self.problems[0].id]}, fh)
+        before = self.manifest_path.read_text(encoding='utf-8')
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=50000, max_cost=100.0,
+                        workers=3, chunk=2, run_id='test-battle-1')
+
+        battle = json.loads(self.battle_manifest_path.read_text(encoding='utf-8'))
+        self.assertEqual(sorted(battle['ids']),
+                         sorted(p.id for p in self.problems))
+        # манифест чек-поинта не тронут
+        self.assertEqual(self.manifest_path.read_text(encoding='utf-8'), before)
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['total_processed'], len(self.problems))
+
+    def test_куски_не_теряют_и_не_дублируют_задачи(self):
+        """Прогон кусками по 2 задачи обязан дать ровно тот же журнал, что
+        и одним куском: ни потерь, ни дублей строк в run_parsed.jsonl."""
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=2, chunk=2,
+                        run_id='test-chunk-1')
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        ids = [row['problem_id'] for row in parsed]
+        self.assertEqual(len(ids), len(set(ids)))
+        self.assertEqual(sorted(ids), sorted(p.id for p in self.problems))
+
+    def test_потолок_расхода_общий_на_все_куски(self):
+        """`--max-cost` считается по ВСЕМУ прогону, а не заново на каждый
+        кусок: иначе потолок $70 при двадцати кусках означал бы $1400."""
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON,
+                             input_tokens=2_000_000, cache_read_tokens=0)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=0.20, workers=1, chunk=1,
+                        run_id='test-budget-1')
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        # 2 млн входных токенов по $0.075/млн = $0.15 за вызов; потолок
+        # $0.20 обязан остановить прогон задолго до шести задач.
+        self.assertLess(metrics['total_processed'], len(self.problems))
+        self.assertLessEqual(Decimal(metrics['usage_totals']['cost_usd']),
+                             Decimal('0.45'))
 
     def test_полный_прогон_без_брака_создаёт_три_файла(self):
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
