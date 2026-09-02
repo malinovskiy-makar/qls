@@ -60,9 +60,14 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from problems.embedding_config import EMBEDDING_DIM
-from problems.models import OlympiadRef, Problem, SourceReference
+from problems.models import (
+    OlympiadRef, Problem, ProblemFigure, ProblemPart, SourceReference,
+)
 from problems.olympiad_grades import (
     classify_refs, event_key, keys_agree, keys_conflict, merge_grades_by_event,
+)
+from problems.olympiad_quality import (
+    COMPONENT_NAMES, explain, pick_best, quality_components, quality_score,
 )
 from problems.text_dedup import (
     extract_numeric_tokens, fuzzy_ratio, normalize_for_compare,
@@ -188,7 +193,11 @@ class Command(BaseCommand):
 
         all_matches = matches_a + matches_b
         decided, conflicts = self._resolve_conflicts(all_matches)
-        conflict_rows = self._step_c_report(anchor_pairs_a + anchor_pairs_b)
+        anchor_pairs = anchor_pairs_a + anchor_pairs_b
+        conflict_rows = self._step_c_report(anchor_pairs)
+
+        clusters = self._build_clusters(decided, conflicts, anchor_pairs)
+        self._score_clusters(clusters)
 
         self._write_review_queue(queue_band, conflicts)
         self._write_preview(decided)
@@ -542,6 +551,102 @@ class Command(BaseCommand):
             (conflicts if disputed else decided).extend(group)
         return decided, conflicts
 
+    # ── кластеры дублей и лучшая версия в каждом ─────────────────────────
+
+    def _build_clusters(self, decided, conflicts, anchor_pairs):
+        """Связные компоненты по ВСЕМ найденным текстовым совпадениям.
+
+        Кластер — это одна и та же реальная задача во всех её экземплярах:
+        якорь, его копии из Шагов A и B, и другие якоря той же задачи из
+        Шага C. Группировка та же, что уже разделила дубли, — второго
+        определения «одинаковости» здесь не заводится.
+
+        Кандидаты, снятые конфликтом метаданных, в кластер ВХОДЯТ: спор о
+        том, какой это тур, не отменяет того, что текст один и тот же, а
+        качество версий сравнивается именно по тексту.
+        """
+        parent = {}
+
+        def find(node):
+            parent.setdefault(node, node)
+            while parent[node] != node:
+                parent[node] = parent[parent[node]]
+                node = parent[node]
+            return node
+
+        def union(left, right):
+            a, b = find(left), find(right)
+            if a != b:
+                parent[a] = b
+
+        for match in list(decided) + list(conflicts):
+            union(match.candidate_id, match.anchor_id)
+        for left, right, *_ in anchor_pairs:
+            union(left, right)
+
+        grouped = defaultdict(set)
+        for node in list(parent):
+            grouped[find(node)].add(node)
+        return [sorted(members) for members in grouped.values()
+                if len(members) > 1]
+
+    def _score_clusters(self, clusters):
+        """Счёт качества каждому участнику и пометка лучшего в кластере."""
+        members = {pid for cluster in clusters for pid in cluster}
+        if not members:
+            self.cluster_results, self.scores, self.components = [], {}, {}
+            self.best_ids = set()
+            return []
+
+        fields = ('id', 'status', 'content_format', 'human_review',
+                  'needs_quality_review', 'solution_needs_review')
+        meta = {row['id']: row for row in
+                Problem.objects.filter(id__in=members).values(*fields)}
+        parts = defaultdict(list)
+        for pid, statement in ProblemPart.objects.filter(
+                problem_id__in=members).values_list('problem_id', 'statement'):
+            parts[pid].append(statement)
+        figures = Counter(ProblemFigure.objects.filter(
+            problem_id__in=members).values_list('problem_id', flat=True))
+
+        self.components = {}
+        self.scores = {}
+        for pid in members:
+            row = meta.get(pid, {})
+            parts_of = parts.get(pid, [])
+            component = quality_components(
+                human_review=row.get('human_review', ''),
+                status=row.get('status', 'published'),
+                needs_quality_review=row.get('needs_quality_review', False),
+                solution_needs_review=row.get('solution_needs_review', False),
+                content_format=row.get('content_format', 'plain'),
+                text=self.raw_text.get(pid, ''),
+                figure_rows=figures.get(pid, 0),
+                part_statements=parts_of,
+            )
+            self.components[pid] = component
+            self.scores[pid] = quality_score(component)
+
+        results = []
+        for cluster in clusters:
+            inside = {pid: self.scores[pid] for pid in cluster}
+            best, tie = pick_best(inside)
+            runner = min((p for p in cluster if p != best),
+                         key=lambda p: (-self.scores[p], p), default=None)
+            results.append({
+                'members': cluster,
+                'best': best,
+                'tie': tie,
+                'best_score': self.scores[best],
+                'runner_up': runner,
+                'runner_score': self.scores[runner] if runner else None,
+                'why': (explain(self.components[best], self.components[runner])
+                        if runner else {}),
+            })
+        self.cluster_results = results
+        self.best_ids = {r['best'] for r in results}
+        return results
+
     # ── отчёты ───────────────────────────────────────────────────────────
 
     def _write_csv(self, name, rows, columns):
@@ -751,6 +856,35 @@ th{background:#f2f2f2;text-align:left}
                   f'{row["a_grade"]!r} + {row["b_grade"]!r} → {row["merged_grade"]!r}')
 
         w('')
+        w('ЛУЧШАЯ ВЕРСИЯ В КЛАСТЕРЕ ДУБЛЕЙ (только разметка, ничего не скрывает)')
+        results = self.cluster_results
+        ties = [r for r in results if r['tie']]
+        w(f'  кластеров всего                            : {len(results)}')
+        w(f'  с явным лидером                            : {len(results) - len(ties)}')
+        w(f'  ничья (победил наименьший problem_id)      : {len(ties)}')
+        sizes = Counter(len(r['members']) for r in results)
+        w(f'  размеры кластеров                          : {dict(sorted(sizes.items()))}')
+        played = Counter()
+        for r in results:
+            played.update(r['why'].keys())
+        w('  какие сигналы вообще решали исход:')
+        for name, count in played.most_common():
+            w(f'     {count:5d}  {COMPONENT_NAMES.get(name, name)}')
+        for name in COMPONENT_NAMES:
+            if name not in played:
+                w(f'     {0:5d}  {COMPONENT_NAMES[name]}  ← ни разу не решил исход')
+        rng = random.Random(self.opts['seed'])
+        shown = [r for r in results if r['why']]
+        for r in rng.sample(shown, min(15, len(shown))):
+            w('')
+            w(f'    кластер {r["members"]}')
+            w(f'      победил #{r["best"]} (счёт {r["best_score"]:.3f}) '
+              f'против #{r["runner_up"]} ({r["runner_score"]:.3f})')
+            for name, (win, lose) in r['why'].items():
+                w(f'        {COMPONENT_NAMES.get(name, name)}: '
+                  f'{win:+.2f} против {lose:+.2f}')
+
+        w('')
         w('ОТЧЁТЫ')
         for name in (REVIEW_QUEUE, ANCHOR_CONFLICTS, GRADE_MERGES, WEAK_NUMERIC):
             w(f'   {os.path.join(self.reports_dir, name)}')
@@ -816,26 +950,49 @@ th{background:#f2f2f2;text-align:left}
                             'fuzzy_ratio': m.fuzzy,
                             'numeric_match': True,
                         },
+                        quality_score=self.scores.get(m.candidate_id),
+                        is_best_in_cluster=(m.candidate_id in self.best_ids),
                         **{f: getattr(ref, f) for f in COPIED_FIELDS},
                     )
                     row.save()
                     created.append(row.id)
+
+            # ⚠️ ЕДИНСТВЕННОЕ МЕСТО, ГДЕ КОМАНДА МЕНЯЕТ УЖЕ СУЩЕСТВУЮЩИЕ
+            # СТРОКИ, И ТОЛЬКО ДВА ПОЛЯ. Иначе «ровно один лучший в
+            # кластере» недостижимо: победителем часто оказывается якорь,
+            # чья строка была заведена прошлым прогоном. Метаданные
+            # олимпиады, event_id, match_method и score не трогаются.
+            updated = 0
+            for pid, score in self.scores.items():
+                updated += OlympiadRef.objects.filter(problem_id=pid).update(
+                    quality_score=score,
+                    is_best_in_cluster=(pid in self.best_ids))
 
         journal = os.path.join(self.reports_dir, APPLIED_JOURNAL)
         with open(journal, 'w', encoding='utf-8') as handle:
             json.dump({
                 'created_olympiadref_ids': created,
                 'candidates': sorted({m.candidate_id for m in decided}),
+                'quality_marked_problem_ids': sorted(self.scores),
+                'best_in_cluster_problem_ids': sorted(self.best_ids),
                 'how_to_revert': (
-                    'OlympiadRef.objects.filter(id__in=created_olympiadref_ids)'
-                    '.delete() — строки только добавлялись, Problem и '
-                    'SourceReference не менялись.'),
+                    'OlympiadRef.objects.filter(id__in='
+                    'created_olympiadref_ids).delete(), затем '
+                    'OlympiadRef.objects.filter(problem_id__in='
+                    'quality_marked_problem_ids).update(quality_score=None, '
+                    'is_best_in_cluster=False). Problem, SourceReference и '
+                    'ProblemPart не менялись; у существующих строк '
+                    'OlympiadRef менялись ТОЛЬКО эти два поля.'),
             }, handle, ensure_ascii=False, indent=2)
 
         self.stdout.write('')
         self.stdout.write(self.style.SUCCESS(
             f'ЗАПИСАНО: {len(created)} строк OlympiadRef на '
             f'{len({m.candidate_id for m in decided})} задач.'))
+        self.stdout.write(
+            f'Счёт качества проставлен у {updated} строк '
+            f'({len(self.scores)} задач), метка лучшего — у '
+            f'{len(self.best_ids)} задач.')
         if skipped_long:
             self.stdout.write(self.style.WARNING(
                 f'⚠️  Пропущено по длине event_id (>{EVENT_ID_MAX}): '

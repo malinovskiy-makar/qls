@@ -273,6 +273,70 @@ class Тест7ЯкоряСогласныTests(БазаStendaMixin, TestCase):
         self.assertEqual(self.read_csv('anchor_metadata_conflicts.csv'), [])
 
 
+class Тест9ЛучшийВКластереTests(БазаStendaMixin, TestCase):
+    """Разметка лучшей версии. Ничего не скрывает и не удаляет."""
+
+    def test_ровно_одна_задача_кластера_помечена_лучшей(self):
+        # ⚠️ ПЛОХАЯ ЗАДАЧА СОЗДАЁТСЯ ПЕРВОЙ, И ЭТО СУТЬ ТЕСТА.
+        # При равных счетах побеждает наименьший problem_id. Создай якорь
+        # первым — и он выиграл бы по правилу ничьей даже с выключенным
+        # сигналом статуса, то есть тест молча перестал бы что-либо
+        # проверять. Зубастость это и вскрыла: с якорем впереди дефект
+        # «не считать статус» тест не ронял.
+        плохая = self.problem(BASE + TAIL, seed=9)
+        плохая.status = 'duplicate'          # сильный минус в счёте
+        плохая.save(update_fields=['status'])
+        anchor = self.anchor(BASE + TAIL, seed=9)
+        обычная = self.problem(variant(2), seed=9)
+        self.assertLess(плохая.id, anchor.id,
+                        'плохая версия обязана иметь МЕНЬШИЙ id, иначе '
+                        'победа якоря ничего не доказывает')
+
+        self.run_command()
+
+        marked = set(OlympiadRef.objects
+                     .filter(is_best_in_cluster=True)
+                     .values_list('problem_id', flat=True))
+        self.assertEqual(marked, {anchor.id},
+                         'лучшей должна быть ровно одна задача кластера')
+        # Счёт проставлен всем участникам, а не только победителю.
+        scored = set(OlympiadRef.objects
+                     .exclude(quality_score=None)
+                     .values_list('problem_id', flat=True))
+        self.assertEqual(scored, {anchor.id, плохая.id, обычная.id})
+        # Проигравшие явно помечены как НЕ лучшие.
+        self.assertFalse(OlympiadRef.objects
+                         .filter(problem_id=плохая.id, is_best_in_cluster=True)
+                         .exists())
+
+    def test_при_ничьей_побеждает_наименьший_id(self):
+        """Побайтово одинаковые задачи дают равные счета сплошь и рядом."""
+        anchor = self.anchor(BASE + TAIL, seed=19)
+        копия = self.problem(BASE + TAIL, seed=19)
+
+        self.run_command()
+
+        marked = set(OlympiadRef.objects
+                     .filter(is_best_in_cluster=True)
+                     .values_list('problem_id', flat=True))
+        self.assertEqual(marked, {min(anchor.id, копия.id)})
+
+    def test_разметка_не_скрывает_и_не_удаляет_задачи(self):
+        anchor = self.anchor(BASE + TAIL, seed=29)
+        копия = self.problem(BASE + TAIL, seed=29)
+        было = {p.id: (p.status, p.statement, p.needs_quality_review)
+                for p in Problem.objects.all()}
+
+        self.run_command()
+
+        стало = {p.id: (p.status, p.statement, p.needs_quality_review)
+                 for p in Problem.objects.all()}
+        self.assertEqual(стало, было, 'команда изменила Problem')
+        self.assertEqual(Problem.objects.count(), 2)
+        self.assertTrue(Problem.objects.filter(id=копия.id).exists())
+        self.assertTrue(Problem.objects.filter(id=anchor.id).exists())
+
+
 class Тест8ЯкоряСпорятTests(БазаStendaMixin, TestCase):
 
     def test_разная_олимпиада_попадает_в_файл_и_база_не_меняется(self):

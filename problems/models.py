@@ -1371,6 +1371,25 @@ class OlympiadRef(models.Model):
     reviewed_by_human = models.BooleanField('Проверено человеком', default=False)
     created_at = models.DateTimeField('Найдено', auto_now_add=True)
 
+    # --- Какая версия задачи внутри кластера дублей лучше -----------------
+    # Считает `find_olympiad_text_duplicates` по уже существующим сигналам
+    # качества (`problems/olympiad_quality.py`). Ничего не скрывает и не
+    # схлопывает — это разметка на будущее, для выбора канонической версии
+    # при показе. Показ на сайте от неё пока не зависит.
+    quality_score = models.FloatField(
+        'Счёт качества версии', null=True, blank=True,
+        help_text='Больше — лучше. Осмысленно только при сравнении версий '
+                  'ОДНОЙ задачи внутри кластера дублей; абсолютное значение '
+                  'ни о чём не говорит.',
+    )
+    is_best_in_cluster = models.BooleanField(
+        'Лучшая версия в кластере', default=False, db_index=True,
+        help_text='Стоит у всех строк задачи-победителя кластера. При равных '
+                  'счетах побеждает наименьший problem_id — правило '
+                  'детерминировано, иначе победитель менялся бы от прогона '
+                  'к прогону.',
+    )
+
     class Meta:
         unique_together = ('problem', 'event_id')
         ordering = ['olympiad_slug', 'year', 'stage']
