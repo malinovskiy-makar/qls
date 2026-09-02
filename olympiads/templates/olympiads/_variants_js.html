@@ -1,0 +1,51 @@
+<script>
+/* Фильтры комплектов: три полосы чипов. Внутри полосы ИЛИ, между
+   полосами И. Тот же обычный JavaScript, что и на главной. */
+(function () {
+  var list = document.getElementById('ol-vlist');
+  if (!list) { return; }
+  var rows = Array.prototype.slice.call(document.querySelectorAll('.ol-vrow'));
+  var items = Array.prototype.slice.call(list.querySelectorAll('.ol-variant'));
+  var nores = document.getElementById('ol-vnores');
+  var resetBtn = document.getElementById('ol-vreset');
+
+  function apply() {
+    var shown = 0;
+    var wanted = rows.map(function (row) {
+      return {
+        kind: row.getAttribute('data-kind'),
+        on: Array.prototype.slice.call(row.querySelectorAll('.ol-chip'))
+          .filter(function (c) { return c.getAttribute('aria-pressed') === 'true'; })
+          .map(function (c) { return c.getAttribute('data-value'); })
+      };
+    });
+    items.forEach(function (item) {
+      var ok = wanted.every(function (group) {
+        if (!group.on.length) { return true; }
+        return group.on.indexOf(item.getAttribute('data-' + group.kind)) >= 0;
+      });
+      item.hidden = !ok;
+      if (ok) { shown++; }
+    });
+    if (nores) { nores.hidden = shown !== 0; }
+  }
+
+  rows.forEach(function (row) {
+    Array.prototype.forEach.call(row.querySelectorAll('.ol-chip'), function (chip) {
+      chip.addEventListener('click', function () {
+        var on = chip.getAttribute('aria-pressed') === 'true';
+        chip.setAttribute('aria-pressed', on ? 'false' : 'true');
+        apply();
+      });
+    });
+  });
+  if (resetBtn) {
+    resetBtn.addEventListener('click', function () {
+      Array.prototype.forEach.call(list.ownerDocument.querySelectorAll('.ol-vrow .ol-chip'),
+        function (c) { c.setAttribute('aria-pressed', 'false'); });
+      apply();
+    });
+  }
+  apply();
+})();
+</script>

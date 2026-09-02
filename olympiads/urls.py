@@ -14,5 +14,7 @@ urlpatterns = [
     path('', views.olympiad_list, name='list'),
     path('calendar/', views.calendar, name='calendar'),
     path('compare/', views.compare, name='compare'),
+    path('<slug:slug>/variant/<int:pk>/solve/', views.variant_solve,
+         name='variant_solve'),
     path('<slug:slug>/', views.olympiad_detail, name='detail'),
 ]

@@ -56,6 +56,10 @@ def olympiad_detail(request, slug):
         olympiad.benefits.select_related('program')
         .order_by('-admission_year', 'program__order')
     )
+    variants = list(
+        olympiad.variants.select_related('stage')
+        .order_by('-year', 'stage__order', 'grade')
+    )
     score_rows, score_years = services.pass_score_rows(olympiad)
     year = current_academic_year()
     events = list(
@@ -72,6 +76,10 @@ def olympiad_detail(request, slug):
         'benefits': benefits,
         'score_rows': score_rows,
         'score_years': score_years,
+        'variants': variants,
+        'variant_stages': stages,
+        'variant_grades': sorted({v.grade for v in variants if v.grade}),
+        'variant_years': sorted({v.year for v in variants}, reverse=True),
         # Год берётся из данных, а не зашивается в шаблон: правила приёма
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,
@@ -92,4 +100,28 @@ def compare(request):
     """Сравнение до трёх олимпиад: `?slugs=vseros,mosh,vp`."""
     return render(request, 'olympiads/compare.html', {
         'has_placeholder': False,
+    })
+
+
+def variant_solve(request, slug, pk):
+    """Заглушка «Скоро» для кнопок решения комплекта.
+
+    ⚠️ РЕЖИМ КОНТРОЛЬНОЙ НЕ ПЕРЕДЕЛАН НАМЕРЕННО. `student/views_exam.py`
+    рассчитан на НАЗНАЧЕННУЮ работу: `_exam_or_404` ищет
+    `Assignment(kind=EXAM, students=request.user)`, набор задач собирает
+    `problems.assignment_rows.build_rows(assignment, user)` из
+    `assignment.items`, а лимит времени считает
+    `exam_engine.available_minutes(assignment, now)` по расписанию
+    работы. Собрать набор по внешнему признаку (комплекту олимпиады) он
+    не умеет, и ломать работающий режим ради кнопки нельзя.
+
+    Что нужно доработать — подробно в отчёте сессии.
+    """
+    olympiad = get_object_or_404(Olympiad, slug=slug)
+    variant = get_object_or_404(olympiad.variants.select_related('stage'), pk=pk)
+    return render(request, 'olympiads/variant_soon.html', {
+        'olympiad': olympiad,
+        'variant': variant,
+        'with_timer': request.GET.get('timer') == '1',
+        'has_placeholder': _has_placeholder([olympiad]),
     })
