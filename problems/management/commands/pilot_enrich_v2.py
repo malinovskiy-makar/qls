@@ -59,7 +59,8 @@ from problems.ai import providers
 from problems.enrich import prompts_v2, taxonomy, title_rules
 from problems.enrich.text import (has_graph_in_statement,
                                   has_table_in_statement, is_english_text,
-                                  problem_full_text, with_figure_note)
+                                  problem_full_text, with_figure_note,
+                                  with_tikz_sources, TIKZ_MAX_TOKENS)
 from problems.enrich.shortlist import shortlist_for
 from problems.models import Problem
 
@@ -501,7 +502,8 @@ def estimate_call_cost(model, effort, core_chars, variable_chars_list,
     return (cache_write + cache_read + variable_cost + output_cost) / Decimal(10 ** 6)
 
 
-def estimate_variant_cost(sample_problems, variant, shortlists):
+def estimate_variant_cost(sample_problems, variant, shortlists,
+                          with_tikz=True):
     """Смета одной ветки на всю выборку. Возвращает `(total, breakdown)`."""
     with_concepts = variant['concepts']
     core1 = prompts_v2.call1_core(with_concepts=with_concepts)
@@ -513,8 +515,13 @@ def estimate_variant_cost(sample_problems, variant, shortlists):
     for problem in sample_problems:
         text = problem_full_text(problem.statement, problem.parts.all())
         text = with_figure_note(text, problem.figures.count())
+        # §3.5: чертёж уходит ТОЛЬКО в вызов 1, поэтому и в смете он
+        # считается только там — `text` для вызова 2 остаётся прежним.
+        text1 = text
+        if with_tikz:
+            text1, _ = with_tikz_sources(text, problem.figures.all())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
-        call1_texts.append(prompts_v2.call1_user_text(text, shortlist_terms))
+        call1_texts.append(prompts_v2.call1_user_text(text1, shortlist_terms))
         has_solution = bool(problem.solution)
         call2_texts.append(prompts_v2.call2_user_text(
             text, '', '', problem.solution, problem.answer))
@@ -607,7 +614,8 @@ def _setting_max_tokens():
 
 
 def run_variant(sample_problems, variant, complete_fn, shortlists,
-                max_cost=None, on_progress=None, on_row=None):
+                max_cost=None, on_progress=None, on_row=None,
+                with_tikz=True):
     """Реальный прогон одной ветки. Останавливается, как только
     накопленный ФАКТИЧЕСКИЙ расход достигает `max_cost` — не по смете.
 
@@ -632,8 +640,17 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
 
         text = problem_full_text(problem.statement, problem.parts.all())
         text = with_figure_note(text, problem.figures.count())
+        # §3.5 API_RUN_MASTER: маркер чертежа заменяется его исходником —
+        # ТОЛЬКО в вызове 1. Порядок с `with_figure_note` не случайный:
+        # она смотрит, есть ли в тексте маркер, и подстановка съедает его.
+        # `text` ниже (вызов 2) остаётся БЕЗ чертежа — там его смысл уже
+        # несут `given`/`find`.
+        text1 = text
+        tikz_stats = {'replaced': 0, 'truncated': 0}
+        if with_tikz:
+            text1, tikz_stats = with_tikz_sources(text, problem.figures.all())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
-        user1 = prompts_v2.call1_user_text(text, shortlist_terms)
+        user1 = prompts_v2.call1_user_text(text1, shortlist_terms)
         reply1 = complete_fn(variant['call1_model'], core1_blocks, user1,
                              schema1, variant['call1_effort'])
         spent += real_call_cost(variant['call1_model'], reply1)
@@ -641,7 +658,8 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
         ok1, violations1 = validate_call1(data1, with_concepts)
 
         row = {'problem_id': problem.id, 'call1': data1,
-              'call1_violations': violations1, 'call1_usage': reply1}
+              'call1_violations': violations1, 'call1_usage': reply1,
+              'tikz': tikz_stats}
 
         if max_cost is not None and spent >= Decimal(str(max_cost)):
             rows.append(row)
@@ -898,6 +916,11 @@ class Command(BaseCommand):
         parser.add_argument('--out', type=str, default='pilot_v2_results.txt')
         parser.add_argument('--seed', type=int, default=SEED_DEFAULT)
         parser.add_argument('--mode', choices=['sync', 'batch'], default='sync')
+        parser.add_argument(
+            '--no-tikz', dest='with_tikz', action='store_false',
+            help='Не подставлять исходник чертежа вместо маркера (§3.5). '
+                 'Нужен ровно для замера «с чертежом против без»; в боевом '
+                 'прогоне подстановка включена.')
 
     def handle(self, *args, **options):
         if options['apply'] and options['max_cost'] is None:
@@ -927,7 +950,8 @@ class Command(BaseCommand):
         grand_total = Decimal('0')
         for key in variants:
             variant = VARIANTS[key]
-            total, breakdown = estimate_variant_cost(problems, variant, shortlists)
+            total, breakdown = estimate_variant_cost(
+                problems, variant, shortlists, with_tikz=options['with_tikz'])
             grand_total += total
             self.stdout.write('  %-14s %-55s ~$%.4f (вызов1 ~$%.4f + вызов2 ~$%.4f)' % (
                 key, variant['label'], total, breakdown['call1'], breakdown['call2']))
@@ -978,13 +1002,19 @@ class Command(BaseCommand):
             per_variant_cap = options['max_cost'] / len(variants)
             rows, spent, stopped_early = run_variant(
                 problems, variant, complete_fn, shortlists,
-                max_cost=per_variant_cap,
+                max_cost=per_variant_cap, with_tikz=options['with_tikz'],
                 on_progress=lambda pid, s: self.stdout.write(
                     '  #%d готово, потрачено $%.4f' % (pid, s)))
             all_rows.extend(rows)
             report_lines.append('=== %s: обработано %d, потрачено $%.4f%s ===' % (
                 key, len(rows), spent,
                 ' (остановлено по --max-cost)' if stopped_early else ''))
+            tikz_done = sum(r.get('tikz', {}).get('replaced', 0) for r in rows)
+            tikz_cut = sum(r.get('tikz', {}).get('truncated', 0) for r in rows)
+            report_lines.append(
+                '=== %s: чертежей подставлено в вызов 1 — %d (обрезано по '
+                'потолку %d токенов — %d) ===' % (
+                    key, tikz_done, TIKZ_MAX_TOKENS, tikz_cut))
             divergent, pairs, pct = task_nature_divergence(rows)
             report_lines.append(
                 '=== %s: расхождение вызов1/вызов2 по «это задача» — '

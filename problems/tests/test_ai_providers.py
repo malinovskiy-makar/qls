@@ -16,6 +16,7 @@
   - цена считается по трёхэлементному кортежу, но двухэлементный
     продолжает работать.
 """
+import base64
 import sys
 import types
 from decimal import Decimal
@@ -335,3 +336,71 @@ class RegistrationTests(TestCase):
     @override_settings(AI_PROVIDER='openai')
     def test_настройка_выбирает_провайдер(self):
         self.assertIsInstance(core._provider(), OpenAIProvider)
+
+
+class OpenAIImageInputTests(TestCase):
+    """Картинка задачи уходит в модель через тот же слой `problems/ai/`.
+
+    Проверяется ровно то, что можно проверить без сети: как собирается
+    поле `input` запроса. Сам запрос — дело `complete()`, у него свои
+    тесты выше.
+    """
+
+    def setUp(self):
+        self.provider = providers.OpenAIProvider()
+        self.png = b'\x89PNG\r\n\x1a\n' + b'0' * 32
+
+    def test_без_картинок_вход_остаётся_простой_строкой(self):
+        """Не косметика: строка — ровно то, что уходило до правки. Смена
+        формы входа на списке без картинок сломала бы кэш префикса на
+        всех 41 307 задачах ради двух тысяч с картинкой."""
+        payload = self.provider._input_payload('текст задачи', None)
+        self.assertEqual(payload, 'текст задачи')
+        self.assertEqual(self.provider._input_payload('текст', []), 'текст')
+
+    def test_картинка_уходит_data_url_рядом_с_текстом(self):
+        payload = self.provider._input_payload(
+            'текст задачи', [('image/png', self.png)])
+
+        self.assertIsInstance(payload, list)
+        self.assertEqual(len(payload), 1)
+        content = payload[0]['content']
+        self.assertEqual(payload[0]['role'], 'user')
+        self.assertEqual(content[0], {'type': 'input_text',
+                                      'text': 'текст задачи'})
+        self.assertEqual(content[1]['type'], 'input_image')
+        self.assertTrue(content[1]['image_url'].startswith(
+            'data:image/png;base64,'))
+        self.assertIn(base64.b64encode(self.png).decode('ascii'),
+                      content[1]['image_url'])
+
+    def test_несколько_картинок_идут_все(self):
+        payload = self.provider._input_payload(
+            'текст', [('image/png', self.png), ('image/jpeg', b'\xff\xd8ab')])
+        kinds = [block['type'] for block in payload[0]['content']]
+        self.assertEqual(kinds, ['input_text', 'input_image', 'input_image'])
+
+    def test_неподдерживаемый_формат_отбрасывается(self):
+        """`image/bmp` Responses API не принимает. Молча отправить его —
+        значит получить отказ на боевом прогоне вместо ответа."""
+        payload = self.provider._input_payload(
+            'текст', [('image/bmp', b'BM..'), ('image/png', self.png)])
+        kinds = [block['type'] for block in payload[0]['content']]
+        self.assertEqual(kinds, ['input_text', 'input_image'])
+
+    def test_если_все_картинки_отброшены_вход_снова_строка(self):
+        payload = self.provider._input_payload('текст', [('image/bmp', b'BM')])
+        self.assertEqual(payload, 'текст')
+
+    def test_пустые_байты_не_отправляются(self):
+        payload = self.provider._input_payload('текст', [('image/png', b'')])
+        self.assertEqual(payload, 'текст')
+
+    def test_подставной_поставщик_видит_картинки(self):
+        """Контракт `complete(..., images=...)` общий для слоя, а не
+        особенность одного поставщика."""
+        fake = providers.FakeProvider()
+        with override_settings(AI_FAKE_REPLY='{"ok": 1}'):
+            fake.complete(['ядро'], 'текст', {}, 'm', 100,
+                          images=[('image/png', self.png)])
+        self.assertEqual(fake.last_images, [('image/png', self.png)])

@@ -332,3 +332,9 @@ reports/taxonomy_v2/*
 !reports/enrich_pilot/
 reports/enrich_pilot/*
 !reports/enrich_pilot/prompt_wordings_v2.md
+# Разбор визуального пласта и сводка по выбору модели (сессия 02.09.2026).
+# Только .md: HTML и JSON — рабочие артефакты прогонов, они пересобираются
+# командой. ⚠️ blind_models_key.json НЕ ДОБАВЛЯТЬ НИКОГДА — это ключ слепого
+# сравнения, и в репозитории ему не место.
+!reports/enrich_pilot/raster_inventory.md
+!reports/enrich_pilot/model_choice_summary.md

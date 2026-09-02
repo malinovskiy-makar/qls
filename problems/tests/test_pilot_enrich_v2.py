@@ -1151,3 +1151,185 @@ class RehearseDbWriteTests(TestCase):
         self.assertEqual(row, ('Рынок кофе', Problem.TitleSource.MODEL_EMPTY))
         self.assertEqual(untouched, ('', ''))
         self.assertTrue(any('1' in line for line in invariants))
+
+
+class TikzSourceInPayloadTests(TestCase):
+    """§3.5 API_RUN_MASTER: исходник чертежа уходит в вызов 1 текстом.
+
+    Зубастость по каждому правилу отдельно — подстановка, потолок,
+    отсутствие дублирования, и главное: НЕ подставлять ссылку на растровый
+    файл (в банке она лежит в том же поле `tikz_source`, 2 491 запись из
+    2 498 на 02.09.2026).
+    """
+
+    TIKZ = (r'\begin{tikzpicture}\draw[->] (0,0) -- (5,0) node {$Q$};'
+            r'\draw[->] (0,0) -- (0,5) node {$P$};'
+            r'\draw (0,4) -- (4,0) node[right] {$D$};\end{tikzpicture}')
+
+    def test_маркер_заменяется_исходником_чертежа(self):
+        problem = _make_problem('На рисунке [[FIGURE:deadbeef]] показан спрос.')
+        problem.figures.create(tikz_hash='deadbeef', tikz_source=self.TIKZ)
+
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+
+        self.assertEqual(stats['replaced'], 1)
+        self.assertNotIn('[[FIGURE:deadbeef]]', out)
+        self.assertIn(r'\draw (0,4) -- (4,0)', out)
+        self.assertIn('ЧЕРТЁЖ К ЗАДАЧЕ', out)
+        self.assertIn('КОНЕЦ ЧЕРТЕЖА', out)
+        self.assertIn('описание графика', out.lower())
+
+    def test_ссылка_на_растровый_файл_НЕ_подставляется(self):
+        """Главный капкан: у 2 491 записи из 2 498 в `tikz_source` лежит
+        ссылка на картинку, а не чертёж. Подставить её под заголовком
+        «читай как описание графика» — соврать модели."""
+        problem = _make_problem('На рисунке [[FIGURE:cafe01]] показан спрос.')
+        problem.figures.create(
+            tikz_hash='cafe01',
+            tikz_source='https://api.solvehub.app/uploads/images/f-2024.png')
+
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+
+        self.assertEqual(stats['replaced'], 0)
+        self.assertEqual(out, problem.statement)
+        self.assertNotIn('ЧЕРТЁЖ К ЗАДАЧЕ', out)
+        self.assertIn('[[FIGURE:cafe01]]', out)
+
+    def test_потолок_обрезает_и_говорит_об_этом(self):
+        long_tikz = (r'\begin{tikzpicture}'
+                     + r'\draw (0,0) -- (1,1) node {точка};' * 400
+                     + r'\end{tikzpicture}')
+        self.assertGreater(enrich_text.count_tokens(long_tikz), 800)
+        problem = _make_problem('Смотри [[FIGURE:long01]].')
+        problem.figures.create(tikz_hash='long01', tikz_source=long_tikz)
+
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+
+        self.assertEqual(stats['truncated'], 1)
+        self.assertIn('ЧЕРТЁЖ ОБРЕЗАН', out)
+        self.assertLess(len(out), len(long_tikz))
+
+        # обрезано РОВНО по потолку, а не «примерно»: сам резак меряется
+        # отдельно, чтобы токены обёртки не смазывали проверку
+        body, was_cut = enrich_text.truncate_to_tokens(
+            long_tikz, enrich_text.TIKZ_MAX_TOKENS)
+        self.assertTrue(was_cut)
+        self.assertEqual(enrich_text.count_tokens(body),
+                         enrich_text.TIKZ_MAX_TOKENS)
+        self.assertTrue(long_tikz.startswith(body[:200]),
+                        'обрезок обязан быть НАЧАЛОМ исходника, не серединой')
+
+    def test_короткий_чертёж_не_обрезается(self):
+        problem = _make_problem('Смотри [[FIGURE:short1]].')
+        problem.figures.create(tikz_hash='short1', tikz_source=self.TIKZ)
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+        self.assertEqual(stats['truncated'], 0)
+        self.assertNotIn('ЧЕРТЁЖ ОБРЕЗАН', out)
+        self.assertIn(r'\end{tikzpicture}', out)
+
+    def test_один_чертёж_подставляется_один_раз(self):
+        """Тот же маркер дважды в тексте — исходник встаёт один раз, за
+        второй копией никто не платит."""
+        problem = _make_problem(
+            'Сначала [[FIGURE:twice1]], потом снова [[FIGURE:twice1]].')
+        problem.figures.create(tikz_hash='twice1', tikz_source=self.TIKZ)
+
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+
+        self.assertEqual(stats['replaced'], 1)
+        self.assertEqual(out.count('ЧЕРТЁЖ К ЗАДАЧЕ'), 1)
+        self.assertEqual(out.count('[[FIGURE:twice1]]'), 1)
+
+    def test_два_разных_чертежа_подставляются_оба(self):
+        problem = _make_problem('Раз [[FIGURE:aa11]] и два [[FIGURE:bb22]].')
+        problem.figures.create(tikz_hash='aa11', tikz_source=self.TIKZ)
+        problem.figures.create(tikz_hash='bb22',
+                               tikz_source=self.TIKZ.replace('$Q$', '$Y$'))
+
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+
+        self.assertEqual(stats['replaced'], 2)
+        self.assertEqual(out.count('ЧЕРТЁЖ К ЗАДАЧЕ'), 2)
+        self.assertIn('$Y$', out)
+
+    def test_чертёж_без_маркера_в_тексте_не_дописывается(self):
+        """Нет маркера — за такую задачу отвечает `with_figure_note`,
+        дописывать сюда ещё и исходник значило бы платить дважды."""
+        problem = _make_problem('Условие вообще без маркера.')
+        problem.figures.create(tikz_hash='nomark', tikz_source=self.TIKZ)
+        out, stats = enrich_text.with_tikz_sources(
+            problem.statement, problem.figures.all())
+        self.assertEqual(stats['replaced'], 0)
+        self.assertEqual(out, problem.statement)
+
+    def test_база_не_меняется(self):
+        problem = _make_problem('Смотри [[FIGURE:keep01]].')
+        figure = problem.figures.create(tikz_hash='keep01',
+                                        tikz_source=self.TIKZ)
+        before_stmt = problem.statement
+        before_src = figure.tikz_source
+
+        enrich_text.with_tikz_sources(problem.statement, problem.figures.all())
+
+        problem.refresh_from_db()
+        figure.refresh_from_db()
+        self.assertEqual(problem.statement, before_stmt)
+        self.assertEqual(figure.tikz_source, before_src)
+
+    def test_looks_like_tikz_отличает_код_от_ссылки(self):
+        self.assertTrue(enrich_text.looks_like_tikz(self.TIKZ))
+        self.assertTrue(enrich_text.looks_like_tikz(r'\begin{axis}\addplot{x};'))
+        self.assertFalse(enrich_text.looks_like_tikz(
+            'https://iloveeconomics.ru/system/files/images/u1/graph.png'))
+        self.assertFalse(enrich_text.looks_like_tikz('234414|ela.png'))
+        self.assertFalse(enrich_text.looks_like_tikz(''))
+
+
+class TikzInCall1OnlyTests(TestCase):
+    """§3.5: чертёж уходит ТОЛЬКО в вызов 1. В вызове 2 смысл чертежа уже
+    несут `given`/`find`, платить за LaTeX второй раз незачем."""
+
+    TIKZ = (r'\begin{tikzpicture}\draw (0,4) -- (4,0) node {$D$};'
+            r'\end{tikzpicture}')
+
+    def _run(self, with_tikz):
+        problem = _make_problem('Смотри [[FIGURE:c1only]] и найди равновесие.',
+                                solution='Решение.', answer='42')
+        problem.figures.create(tikz_hash='c1only', tikz_source=self.TIKZ)
+        seen = []
+
+        def fake_complete(model, core_blocks, user_text, schema, effort):
+            seen.append(user_text)
+            payload = ({'topic_primary': 'MIC-01', 'topics_secondary': [],
+                        'tags': ['t'], 'econ_concepts': ['a', 'b', 'c'],
+                        'given': 'дано', 'find': 'найти',
+                        'task_nature': 'задача'} if len(seen) == 1 else
+                       {'search_queries': ['q'] * 8,
+                        'problem_type': 'расчётная', 'difficulty': 3})
+            return providers.Reply(
+                text=json.dumps(payload, ensure_ascii=False),
+                input_tokens=10, output_tokens=10, cache_write_tokens=0,
+                cache_read_tokens=0, reasoning_tokens=0)
+
+        with override_settings(AI_PRICES=PRICES):
+            cmd.run_variant([problem], cmd.VARIANTS['base'], fake_complete,
+                            {problem.id: None}, with_tikz=with_tikz)
+        return seen
+
+    def test_чертёж_есть_в_вызове_1_и_нет_в_вызове_2(self):
+        call1, call2 = self._run(with_tikz=True)
+        self.assertIn('ЧЕРТЁЖ К ЗАДАЧЕ', call1)
+        self.assertIn(r'\begin{tikzpicture}', call1)
+        self.assertNotIn('ЧЕРТЁЖ К ЗАДАЧЕ', call2)
+        self.assertNotIn(r'\begin{tikzpicture}', call2)
+
+    def test_без_подстановки_вызов_1_видит_голый_маркер(self):
+        call1, _ = self._run(with_tikz=False)
+        self.assertIn('[[FIGURE:c1only]]', call1)
+        self.assertNotIn('ЧЕРТЁЖ К ЗАДАЧЕ', call1)

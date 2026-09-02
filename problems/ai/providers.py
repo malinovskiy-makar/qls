@@ -90,7 +90,8 @@ class BaseProvider(object):
     def unavailable_reason(self):
         raise NotImplementedError
 
-    def complete(self, system_blocks, user_text, schema, model, max_tokens):
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 images=None):
         raise NotImplementedError
 
 
@@ -260,13 +261,22 @@ class OpenAIProvider(BaseProvider):
                 'у GPT-5.6 не включится, скидки не будет.',
                 self.CACHE_MIN_TOKENS, approx)
 
-    def complete(self, system_blocks, user_text, schema, model, max_tokens):
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 images=None):
         """⚠️ СХЕМА СТРОГАЯ (`strict: true`) — иначе ответ не принимается.
 
         Всё, что модель написала мимо схемы, отбрасывается на стороне
         поставщика: разбирать «почти JSON» на прогоне в 41 307 задач
         некому. Кэш префикса у OpenAI автоматический, помечать блок,
         как у Anthropic, не нужно — достаточно неизменного начала.
+
+        `images` — необязательный список пар `(MIME-тип, байты)`: картинки
+        САМОЙ ЗАДАЧИ из `ProblemFigure.image_data`. Уходят они через этот
+        же слой и по тому же правилу «наружу только содержимое задачи»
+        (problems/ai/CLAUDE.md): картинка условия — часть условия, поля
+        профиля пользователя сюда не попадают и попасть не могут.
+        Без картинок вход остаётся ПРОСТОЙ СТРОКОЙ — ровно тем же, что
+        уходило до этой правки, чтобы кэш префикса не сломался.
         """
         import openai
 
@@ -282,7 +292,7 @@ class OpenAIProvider(BaseProvider):
                 model=model,
                 max_output_tokens=max_tokens,
                 instructions='\n\n'.join(system_blocks),
-                input=user_text,
+                input=self._input_payload(user_text, images),
                 reasoning={'effort': effort},
                 text={'format': {'type': 'json_schema',
                                  'name': 'reply',
@@ -315,6 +325,35 @@ class OpenAIProvider(BaseProvider):
                 'вручную.')
 
         return self._reply_from(response)
+
+    #: Форматы, которые Responses API принимает как `input_image`.
+    #: `image/bmp` в список не входит — в банке такая картинка одна.
+    IMAGE_TYPES = ('image/png', 'image/jpeg', 'image/gif', 'image/webp')
+
+    def _input_payload(self, user_text, images):
+        """Вход для Responses API: строка без картинок, список блоков — с
+        ними.
+
+        Картинка уходит как `data:`-URL внутри запроса, а не ссылкой:
+        байты лежат в базе (`ProblemFigure.image_data`), файла на диске
+        нет, и внешний адрес источника мог давно протухнуть.
+        """
+        if not images:
+            return user_text
+        import base64
+
+        content = [{'type': 'input_text', 'text': user_text}]
+        for content_type, data in images:
+            if content_type not in self.IMAGE_TYPES or not data:
+                continue
+            content.append({
+                'type': 'input_image',
+                'image_url': 'data:%s;base64,%s' % (
+                    content_type, base64.b64encode(bytes(data)).decode('ascii')),
+            })
+        if len(content) == 1:  # ни одна картинка не подошла
+            return user_text
+        return [{'role': 'user', 'content': content}]
 
     def _reply_from(self, response):
         """Разбор ответа: текст плюс четыре счётчика токенов."""
@@ -380,9 +419,11 @@ class FakeProvider(BaseProvider):
     def unavailable_reason(self):
         return ''
 
-    def complete(self, system_blocks, user_text, schema, model, max_tokens):
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 images=None):
         from django.conf import settings
 
+        self.last_images = list(images or [])
         reply = getattr(settings, 'AI_FAKE_REPLY', None)
         if callable(reply):
             reply = reply(system_blocks, user_text)
