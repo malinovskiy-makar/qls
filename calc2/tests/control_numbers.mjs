@@ -669,6 +669,168 @@ for (const qk of [40, 60]) {
   cmp('квота ' + qk + ' не связывает', r.b, 0, 0);
 }
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · МЕЖДУНАРОДНАЯ ТОРГОВЛЯ.
+   Квота идёт за направлением торговли, тариф упирается в цену автаркии,
+   мировая цена выше резервной цены покупателя это «внутри не покупают».
+   ⚠️ Площади меряются У НАРИСОВАННОГО (тот же приём, что в ADR 0057):
+   треугольников потерь ДВА, поэтому складываются все фигуры с этой подписью,
+   а полоса денег — прямоугольник, и площадь у неё считается по сторонам.
+   ================================================================ */
+const OPEN = `
+  var openWorld = function (pw, tool, rate) {
+    resetSceneMemory(); pickScene('smallopen');
+    updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'demand'; }), '100-Q');
+    updateCurveExpr(STATE.curves.find(function (c) { return c.role === 'supply'; }), 'Q');
+    redrawAll();
+    setOpenPw(pw); setOpenTool(tool);
+    if (tool === 'tariff') STATE.openTariff = rate;
+    if (tool === 'quota')  STATE.openQuota  = rate;
+    redrawAll();
+  };
+  var polyArea = function (el) {
+    var pts = [];
+    String(el.getAttribute('d') || '').replace(
+      /[ML](-?[\\d.]+),(-?[\\d.]+)/g,
+      function (_, x, y) { pts.push([sx.invert(+x), sy.invert(+y)]); return ''; });
+    if (pts.length < 3) return 0;
+    var a = 0;
+    for (var i = 0; i < pts.length; i++) {
+      var j = (i + 1) % pts.length;
+      a += pts[i][0] * pts[j][1] - pts[j][0] * pts[i][1];
+    }
+    return Math.abs(a) / 2;
+  };
+  var dwlDrawn = function () {
+    var t = 0;
+    [].slice.call(document.querySelectorAll('#chart path[data-legend="Потери общества (DWL)"]'))
+      .forEach(function (el) { t += polyArea(el); });
+    return t;
+  };
+  var moneyDrawn = function (legend) {
+    var el = document.querySelector('#chart rect[data-legend="' + legend + '"]');
+    if (!el) return 0;
+    var x = +el.getAttribute('x'), y = +el.getAttribute('y');
+    var w = +el.getAttribute('width'), h = +el.getAttribute('height');
+    if (!(w > 0) || !(h > 0)) return 0;
+    return Math.abs((sx.invert(x + w) - sx.invert(x)) * (sy.invert(y + h) - sy.invert(y)));
+  };
+  var quotaLabel = function () {
+    var n = document.getElementById('open-quota-name');
+    return n ? n.textContent.trim() : '';
+  };
+  var openSays = function (s) {
+    return ((document.getElementById('info-open') || {}).textContent || '').indexOf(s) >= 0 ? 1 : 0;
+  };
+`;
+
+head('Сессия 01.09 (3) · свободная торговля при Pw = 62 (экспорт)');
+r = await run(OPEN + `openWorld(62, 'none', 0);
+  var o = STATE.open || {};
+  return { Qd: o.Qd, Qs: o.Qs, vol: o.volume, imp: o.importing ? 1 : 0, cs: o.csFree, ps: o.psFree };`);
+cmp('Qd', r.Qd, 38, 1e-3); cmp('Qs', r.Qs, 62, 1e-3);
+cmp('экспорт', r.vol, 24, 1e-3); cmp('страна экспортирует', r.imp, 0, 0);
+cmp('CS свободной торговли', r.cs, 722, 1e-2);
+cmp('PS свободной торговли', r.ps, 1922, 1e-2);
+
+head('Сессия 01.09 (3) · квота становится КВОТОЙ ЭКСПОРТА');
+r = await run(OPEN + `openWorld(62, 'quota', 10);
+  var o = STATE.open || {};
+  return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, vol1: o.vol1, money: o.money,
+           dP: o.dwlProd, dC: o.dwlCons, dT: o.dwlTotal, cs1: o.cs1, ps1: o.ps1,
+           label: quotaLabel(), aDwl: dwlDrawn(), aMoney: moneyDrawn('Рента квоты'),
+           free: o.csFree + o.psFree, after: o.cs1 + o.ps1 + o.money };`);
+cmp('экспортная квота 10: внутренняя цена', r.P1, 55, 1e-3);
+cmp('экспортная квота 10: Qd′', r.Qd1, 45, 1e-3);
+cmp('экспортная квота 10: Qs′', r.Qs1, 55, 1e-3);
+cmp('экспортная квота 10: экспорт', r.vol1, 10, 1e-3);
+cmp('экспортная квота 10: рента', r.money, 70, 1e-2);
+cmp('экспортная квота 10: CS', r.cs1, 1012.5, 1e-2);
+cmp('экспортная квота 10: PS', r.ps1, 1512.5, 1e-2);
+cmp('экспортная квота 10: потери производства', r.dP, 24.5, 1e-2);
+cmp('экспортная квота 10: потери потребления', r.dC, 24.5, 1e-2);
+cmp('экспортная квота 10: потери всего', r.dT, 49, 1e-2);
+cmp('подпись ползунка сменила смысл', r.label, 'Квота вывоза', 0);
+cmp('нарисованы оба треугольника потерь', r.aDwl, 49, 0.5);
+cmp('нарисована полоса ренты', r.aMoney, 70, 0.5);
+cmp('было: CS + PS свободной торговли', r.free, 2644, 1e-2);
+cmp('стало: CS + PS + рента', r.after, 2595, 1e-2);
+cmp('разница ровно в потерях', r.free - r.after, 49, 1e-2);
+
+r = await run(OPEN + `openWorld(30, 'quota', 20);
+  var o = STATE.open || {};
+  return { P1: o.P1, imp: o.importing ? 1 : 0, label: quotaLabel(), rent: o.money };`);
+cmp('импортная квота 20 не сдвинулась: цена', r.P1, 40, 1e-3);
+cmp('импортная квота 20 не сдвинулась: рента', r.rent, 200, 1e-2);
+cmp('у импортёра квота снова ввозная', r.label, 'Квота ввоза', 0);
+
+head('Сессия 01.09 (3) · запретительный тариф');
+r = await run(OPEN + `openWorld(43, 'tariff', 11);
+  var o = STATE.open || {};
+  return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, vol1: o.vol1, money: o.money,
+           dT: o.dwlTotal, cs1: o.cs1, ps1: o.ps1, proh: o.prohibitive ? 1 : 0,
+           aDwl: dwlDrawn(), aMoney: moneyDrawn('Доход бюджета'),
+           says: openSays('Тариф запретительный') };`);
+cmp('тариф 11: внутренняя цена равна автаркической', r.P1, 50, 1e-3);
+cmp('тариф 11: Qd′', r.Qd1, 50, 1e-3);
+cmp('тариф 11: Qs′', r.Qs1, 50, 1e-3);
+cmp('тариф 11: импорт', r.vol1, 0, 1e-6);
+cmp('тариф 11: доход бюджета', r.money, 0, 1e-6);
+cmp('тариф 11: потерь нет', r.dT, 0, 1e-6);
+cmp('тариф 11: CS', r.cs1, 1250, 1e-2);
+cmp('тариф 11: PS', r.ps1, 1250, 1e-2);
+cmp('тариф 11: тариф назван запретительным', r.proh + r.says, 2, 0);
+cmp('тариф 11: треугольников не нарисовано', r.aDwl, 0, 1e-6);
+cmp('тариф 11: полосы бюджета не нарисовано', r.aMoney, 0, 1e-6);
+
+r = await run(OPEN + `openWorld(43, 'tariff', 5);
+  var o = STATE.open || {};
+  return { P1: o.P1, Qd1: o.Qd1, Qs1: o.Qs1, vol1: o.vol1, money: o.money,
+           dT: o.dwlTotal, proh: o.prohibitive ? 1 : 0, aDwl: dwlDrawn() };`);
+cmp('обычный тариф 5: внутренняя цена', r.P1, 48, 1e-3);
+cmp('обычный тариф 5: Qd′', r.Qd1, 52, 1e-3);
+cmp('обычный тариф 5: Qs′', r.Qs1, 48, 1e-3);
+cmp('обычный тариф 5: импорт', r.vol1, 4, 1e-3);
+cmp('обычный тариф 5: доход бюджета', r.money, 20, 1e-2);
+cmp('обычный тариф 5: потери общества', r.dT, 25, 1e-2);
+cmp('обычный тариф 5: не запретительный', r.proh, 0, 0);
+cmp('обычный тариф 5: потери нарисованы', r.aDwl, 25, 0.5);
+
+head('Сессия 01.09 (3) · мировая цена выше резервной цены покупателя');
+r = await run(OPEN + `openWorld(120, 'none', 0);
+  var o = STATE.open || {};
+  return { pw: o.Pw, Qd: o.Qd, Qs: o.Qs, vol: o.volume, imp: o.importing ? 1 : 0,
+           cs: o.csFree, ps: o.psFree, err: o.error ? 1 : 0,
+           says: openSays('Внутри не покупают') };`);
+cmp('Pw = 120 задаётся (потолок у модели, а не у кадра)', r.pw, 120, 1e-6);
+cmp('ошибки нет', r.err, 0, 0);
+cmp('Qd', r.Qd, 0, 1e-6);
+cmp('Qs', r.Qs, 120, 1e-3);
+cmp('экспорт', r.vol, 120, 1e-3);
+cmp('страна экспортирует', r.imp, 0, 0);
+cmp('CS', r.cs, 0, 1e-6);
+cmp('PS', r.ps, 7200, 1e-2);
+cmp('табло говорит «Внутри не покупают»', r.says, 1, 0);
+
+r = await run(OPEN + `openWorld(0, 'none', 0);
+  var o = STATE.open || {};
+  return { pw: o.Pw, Qd: o.Qd, Qs: o.Qs, imp: o.importing ? 1 : 0, cs: o.csFree, ps: o.psFree };`);
+cmp('Pw = 0 (первая сессия) не сдвинулось: Pw', r.pw, 0, 1e-6);
+cmp('Pw = 0: Qd', r.Qd, 100, 1e-3);
+cmp('Pw = 0: Qs', r.Qs, 0, 1e-3);
+cmp('Pw = 0: страна импортирует', r.imp, 1, 0);
+cmp('Pw = 0: CS', r.cs, 5000, 1e-2);
+cmp('Pw = 0: PS', r.ps, 0, 1e-6);
+
+head('Сессия 01.09 (3) · сцена «Автаркия» убрана, галочка переименована');
+r = await run(`return {
+    card: document.querySelector('[data-scene="autarky"]') ? 1 : 0,
+    old: (document.body.textContent || '').indexOf('Два треугольника потерь') >= 0 ? 1 : 0,
+    now: ((document.querySelector('#chk-open-dwl') || {}).parentElement || {}).textContent || '' };`);
+cmp('карточки «Автаркия» больше нет', r.card, 0, 0);
+cmp('слов «Два треугольника потерь» на странице нет', r.old, 0, 0);
+cmp('галочка называется «Потери общества»', /Потери общества/.test(r.now), true, 0);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

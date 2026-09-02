@@ -751,6 +751,7 @@ function upgradeRegulator(field) {
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
         sl.min = b.min; sl.max = b.max;
+        sl.dataset.boundsByHand = '1';   // границы переставил человек — модель их больше не двигает
       }
       sl.value = v;
       sl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -762,6 +763,7 @@ function upgradeRegulator(field) {
     (key) => sl[key],
     (key, v) => {
       sl[key] = v;
+      sl.dataset.boundsByHand = '1';     // границы переставил человек — модель их больше не двигает
       if (+sl.max <= +sl.min) sl.max = +sl.min + 1;
       if (num) { if (key === 'min') num.min = sl.min; if (key === 'max') num.max = sl.max; if (key === 'step') num.step = sl.step; }
       const cur = Math.max(+sl.min, Math.min(+sl.max, +sl.value));
@@ -789,6 +791,10 @@ function shortRegulatorName(id, raw) {
      рублей — ровно та запись в деньгах, которой у процентной формы быть не
      должно. Берём ту же букву, что и панель: одна точка правды. */
   if (id === 'tax-field') return rateLetter();
+  /* У квоты смысл тоже не постоянный: он задан НАПРАВЛЕНИЕМ ТОРГОВЛИ, а оно
+     меняется одним движением мировой цены. Поэтому имени в готовом списке нет
+     — его каждый раз спрашивают у модели, как и букву ставки. */
+  if (id === 'open-quota-field' && typeof openQuotaName === 'function') return openQuotaName();
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
   if (!s) return 'Значение';

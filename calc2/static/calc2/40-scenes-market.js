@@ -28,6 +28,7 @@ function recompute() {
   sumRebuild();
   STATE.D = curveByRole('demand');
   STATE.S = curveByRole('supply');
+  applyPriceRegBounds();   // потолки ценовых регуляторов идут за масштабом модели
 
   /* ⚠️ В СЦЕНЕ СЛОЖЕНИЯ РАВНОВЕСИЕ И ИЗЛИШКИ СЧИТАЮТСЯ РАЗ НА НАБОР ФОРМУЛ.
 
@@ -251,9 +252,8 @@ function recompute() {
        потолок ниже резервной цены продавца (Pc < S(0)) — формальный Qs < 0.
        И то и другое означает одно: по этой цене не торгует никто. Считаем по
        САМИМ КРИВЫМ, а не сравнением с равновесием: равновесия может и не быть. */
-    const clamp0 = (v) => (v == null ? null : Math.max(0, v));
-    const Qd = clamp0(invCurve(STATE.D, Preg));   // объём спроса при цене Preg (D⁻¹)
-    const Qs = clamp0(invCurve(STATE.S, Preg));   // объём предложения при цене Preg (S⁻¹)
+    const Qd = qtyAtPrice(STATE.D, Preg, true);    // объём спроса при цене Preg (D⁻¹)
+    const Qs = qtyAtPrice(STATE.S, Preg, false);   // объём предложения при цене Preg (S⁻¹)
     const Qtrade = (Qd != null && Qs != null) ? Math.min(Qd, Qs) : null;  // короткая сторона
     const dRes = evalCurve(STATE.D, 0), sRes = evalCurve(STATE.S, 0);     // резервные цены
     const killed = (!isCeiling && isFinite(dRes) && Preg > dRes)
@@ -497,10 +497,34 @@ function recompute() {
    Потери разбиты на ДВА треугольника — искажение производства и искажение
    потребления; они не суммируются в одно число без разбивки.
    ===================================================================== */
+/* ОБЪЁМ СТОРОНЫ ПРИ ЗАДАННОЙ ЦЕНЕ — один помощник на все сюжеты с ценой
+   извне: мировая цена, потолок, пол.
+
+   ⚠️ ЦЕНА ЗА РЕЗЕРВНОЙ — ЭТО НЕ «ОБЪЁМ НЕ ОПРЕДЕЛЁН», А ЧЕСТНЫЙ НОЛЬ.
+   Выше D(0) покупатель просто не покупает, ниже S(0) продавец не производит.
+   `invCurve` в обоих случаях отдаёт null (корня при Q ≥ 0 нет), и null тёк
+   дальше по модели: у мировой цены он давал ветку ошибки, а у пола цены выше
+   резервной — пустой объём торговли вместо нуля. Спрашиваем У САМИХ КРИВЫХ
+   (цена против значения в нуле) — тем же приёмом, каким решается «рынка здесь
+   нет» (ADR 0056). Второго механизма не заводим. */
+function qtyAtPrice(curve, price, isDemand) {
+  const q = invCurve(curve, price);
+  if (q != null) return Math.max(0, q);
+  const edge = evalCurve(curve, 0);          // цена, с которой кривая начинается
+  if (!isFinite(edge)) return null;
+  return (isDemand ? (price >= edge) : (price <= edge)) ? 0 : null;
+}
+
+// Имя квоты: ограничивает она ВВОЗ или ВЫВОЗ, решает направление торговли.
+// Считается каждый раз: направление меняется одним движением мировой цены.
+function openQuotaName() {
+  return (STATE.open && STATE.open.importing === false) ? 'Квота вывоза' : 'Квота ввоза';
+}
+
 function recomputeOpenEconomy() {
   const D = STATE.D, S = STATE.S, Pw = STATE.openPw;
   if (!STATE.openPwSet) return;   // ноль — тоже цена: «мир отдаёт даром»
-  const Qd = invCurve(D, Pw), Qs = invCurve(S, Pw);
+  const Qd = qtyAtPrice(D, Pw, true), Qs = qtyAtPrice(S, Pw, false);
   if (Qd == null || Qs == null) { STATE.open = { Pw, error: 'При такой мировой цене объёмы спроса/предложения не определены.' }; return; }
   const importing = (Qd > Qs);
   const volume = Math.abs(Qd - Qs);
@@ -514,50 +538,77 @@ function recomputeOpenEconomy() {
   const gain = (swAut != null) ? swFree - swAut : null;
 
   const res = { Pw, Qd, Qs, importing, volume, csFree, psFree, swFree, swAut, gain,
-                tool: STATE.openTool, aut };
+                tool: STATE.openTool, aut,
+                noBuyers: (Qd <= 1e-9), noSellers: (Qs <= 1e-9) };
 
-  // Инструменты применяются только к импорту (экспортные — отложены, см. отчёт).
-  if (STATE.openTool !== 'none' && importing) {
-    let P1 = null, note = null;
-    if (STATE.openTool === 'tariff') {
-      P1 = Pw + STATE.openTariff;
+  let P1 = null, note = null, prohibitive = false;
+  if (STATE.openTool === 'tariff') {
+    if (!importing) {
+      note = 'Тариф это пошлина на ввоз, и действует он, когда страна импортирует. Сейчас при такой мировой цене страна экспортирует.';
     } else {
-      // Квота: ищем внутреннюю цену, при которой избыточный спрос равен квоте.
-      // Избыточный спрос Qd(P) − Qs(P) убывает по цене ⇒ корень единственный.
-      const q = Math.max(0, STATE.openQuota);
-      const excess = (p) => {
-        const a = invCurve(D, p), b = invCurve(S, p);
-        return (a == null || b == null) ? NaN : (a - b) - q;
-      };
-      const hiP = Math.max(Pw, CONFIG.Pmax);
-      const root = findRootIn(excess, Pw, hiP);
-      if (root != null) P1 = root;
-      else { P1 = null; note = 'Цена под такую квоту не найдена: возможно, квота не меньше свободного импорта.'; }
+      /* ⚠️ ЗАПРЕТИТЕЛЬНЫЙ ТАРИФ: ВНУТРЕННЯЯ ЦЕНА = min(Pw + t, ЦЕНА АВТАРКИИ).
+         Тариф не может поднять её выше автаркической: как только ввоз стал
+         невыгоден, страна закрывается сама, и дальше ставку хоть удесятеряй —
+         на рынке ничего не меняется. Без ставки потолка стояло голое Pw + t, и
+         модель показывала «импорт», который на деле был избытком предложения.
+         Автаркического равновесия нет — сравнивать не с чем, потолка нет. */
+      const raw = Pw + STATE.openTariff;
+      const pAut = (aut && isFinite(aut.P)) ? aut.P : null;
+      if (pAut != null && raw >= pAut - 1e-9) { P1 = pAut; prohibitive = true; }
+      else P1 = raw;
     }
-    if (P1 != null) {
-      const Qd1 = invCurve(D, P1), Qs1 = invCurve(S, P1);
-      if (Qd1 != null && Qs1 != null) {
-        const vol1 = Math.max(0, Qd1 - Qs1);
-        const money = (P1 - Pw) * vol1;                  // тариф → бюджет; квота → рента
-        // ДВА треугольника потерь, по отдельности:
-        //  производство — площадь между S и Pw на [Qs, Qs′] (дороже произвели дома);
-        //  потребление  — площадь между D и Pw на [Qd′, Qd] (недопотребили).
-        const dwlProd = areaBetween(q => evalCurve(S, q) - Pw, Qs, Qs1);
-        const dwlCons = areaBetween(q => Pw - evalCurve(D, q), Qd1, Qd);
-        const cs1 = integrate(q => evalCurve(D, q) - P1, 0, Qd1);
-        const ps1 = integrate(q => P1 - evalCurve(S, q), 0, Qs1);
-        res.tool = STATE.openTool;
-        res.P1 = P1; res.Qd1 = Qd1; res.Qs1 = Qs1; res.vol1 = vol1;
-        res.money = money; res.dwlProd = dwlProd; res.dwlCons = dwlCons;
-        res.dwlTotal = dwlProd + dwlCons;
-        res.cs1 = cs1; res.ps1 = ps1;
-        res.sw1 = cs1 + ps1 + (STATE.openTool === 'tariff' ? money : 0);   // рента квоты — не доход государства
-      }
-    }
-    res.note = note;
-  } else if (STATE.openTool !== 'none' && !importing) {
-    res.note = 'Тариф и импортная квота действуют, когда страна импортирует. Сейчас при Pw страна экспортирует.';
+  } else if (STATE.openTool === 'quota') {
+    /* ⚠️ СМЫСЛ КВОТЫ ЗАДАЁТ НАПРАВЛЕНИЕ ТОРГОВЛИ (решение владельца 01.09).
+       Страна ввозит — квота ограничивает ввоз, и цену поиск ищет ВЫШЕ мировой:
+       избыточный спрос душится ростом цены. Страна вывозит — квота ограничивает
+       вывоз, и цену ищем НИЖЕ мировой: избыточное предложение душится её
+       падением. Раньше инструмент молча не работал у экспортёра. */
+    const qLimit = Math.max(0, STATE.openQuota);
+    const flow = (p) => {
+      const a = qtyAtPrice(D, p, true), b = qtyAtPrice(S, p, false);
+      if (a == null || b == null) return NaN;
+      return (importing ? (a - b) : (b - a)) - qLimit;
+    };
+    const root = importing ? findRootIn(flow, Pw, Math.max(Pw, CONFIG.Pmax))
+                           : findRootIn(flow, 0, Pw);
+    if (root != null) P1 = root;
+    else note = importing
+      ? 'Цена под такую квоту не найдена: возможно, квота не меньше свободного импорта.'
+      : 'Цена под такую квоту не найдена: возможно, квота не меньше свободного экспорта.';
   }
+
+  if (P1 != null) {
+    const Qd1 = qtyAtPrice(D, P1, true), Qs1 = qtyAtPrice(S, P1, false);
+    if (Qd1 != null && Qs1 != null) {
+      const vol1 = Math.max(0, importing ? (Qd1 - Qs1) : (Qs1 - Qd1));
+      // Тариф → доход бюджета; квота → рента. У экспортёра выигрыш идёт с
+      // разницы «купил внутри дёшево — продал за границу дорого», поэтому модуль.
+      const money = Math.abs(P1 - Pw) * vol1;
+      /* ДВА треугольника потерь, по отдельности:
+           производство — площадь между S и Pw между старым и новым выпуском;
+           потребление  — площадь между D и Pw между старым и новым спросом.
+         ⚠️ Концы УПОРЯДОЧИВАЮТСЯ: у импортёра выпуск растёт, а потребление
+         падает, у экспортёра ровно наоборот, и жёсткий порядок концов дал бы
+         экспортёру нули. areaBetween считает по модулю, знак роли не играет.
+         ⚠️ У ЗАПРЕТИТЕЛЬНОГО ТАРИФА ПОТЕРЬ НЕТ: на экране обычная автаркия,
+         треугольников не рисуется, и число обязано говорить то же самое.
+         Цена самой закрытости — это «выигрыш от торговли», который теперь не
+         получен, и он назван словами отдельной строкой. */
+      const dwlProd = prohibitive ? 0 : areaBetween(x => evalCurve(S, x) - Pw, Math.min(Qs, Qs1), Math.max(Qs, Qs1));
+      const dwlCons = prohibitive ? 0 : areaBetween(x => Pw - evalCurve(D, x), Math.min(Qd, Qd1), Math.max(Qd, Qd1));
+      const cs1 = integrate(q => evalCurve(D, q) - P1, 0, Qd1);
+      const ps1 = integrate(q => P1 - evalCurve(S, q), 0, Qs1);
+      res.tool = STATE.openTool;
+      res.P1 = P1; res.Qd1 = Qd1; res.Qs1 = Qs1; res.vol1 = vol1;
+      res.money = prohibitive ? 0 : money;
+      res.prohibitive = prohibitive;
+      res.dwlProd = dwlProd; res.dwlCons = dwlCons;
+      res.dwlTotal = dwlProd + dwlCons;
+      res.cs1 = cs1; res.ps1 = ps1;
+      res.sw1 = cs1 + ps1 + (STATE.openTool === 'tariff' ? res.money : 0);   // рента квоты — не доход государства
+    }
+  }
+  res.note = note;
   STATE.open = res;
 }
 
@@ -579,22 +630,30 @@ function drawOpenAreas() {
     g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
   }
   if (o.P1 == null) return;
-  // Прямоугольник денег: между Pw и внутренней ценой, шириной в фактический импорт.
+  /* Прямоугольник денег: между Pw и внутренней ценой, шириной в фактический
+     объём торговли. ⚠️ КОНЦЫ УПОРЯДОЧИВАЮТСЯ: у экспортёра внутренняя цена
+     НИЖЕ мировой, а Qs правее Qd, и жёсткий порядок дал бы отрицательные
+     ширину и высоту — прямоугольник просто не рисовался бы. */
   if (STATE.showOpenMoney && o.vol1 > 1e-9) {
-    g.append('rect').attr('x', sx(qS)).attr('y', sy(o.P1))
-      .attr('width', sx(qD) - sx(qS)).attr('height', sy(o.Pw) - sy(o.P1))
+    const xa = Math.min(sx(qS), sx(qD)), xb = Math.max(sx(qS), sx(qD));
+    const ya = Math.min(sy(o.P1), sy(o.Pw)), yb = Math.max(sy(o.P1), sy(o.Pw));
+    g.append('rect').attr('x', xa).attr('y', ya)
+      .attr('width', xb - xa).attr('height', yb - ya)
       .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.openTool === 'quota' ? 'Рента квоты' : 'Доход бюджета');
   }
-  // Два треугольника потерь — рисуем отдельными фигурами, чтобы их было ВИДНО как два.
-  if (STATE.showOpenDwl) {
-    if (o.Qs1 > o.Qs + 1e-9) {
-      const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(S, d)));
-      g.append('path').datum(samp(o.Qs, o.Qs1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
-    }
-    if (o.Qd > o.Qd1 + 1e-9) {
-      const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(D, d)));
-      g.append('path').datum(samp(o.Qd1, o.Qd)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
-    }
+  /* Два треугольника потерь — отдельными фигурами, чтобы их было ВИДНО как два.
+     ⚠️ Концы упорядочиваются: у импортёра выпуск растёт и потребление падает,
+     у экспортёра наоборот. ⚠️ У запретительного тарифа их нет вовсе — на
+     экране обычная автаркия, и число потерь там тоже ноль. */
+  if (STATE.showOpenDwl && !o.prohibitive) {
+    const band = (lo, hi, curve) => {
+      const a1 = Math.min(lo, hi), b1 = Math.max(lo, hi);
+      if (!(b1 > a1 + 1e-9)) return;
+      const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(curve, d)));
+      g.append('path').datum(samp(a1, b1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
+    };
+    band(o.Qs, o.Qs1, S);
+    band(o.Qd1, o.Qd, D);
   }
 }
 
@@ -655,7 +714,9 @@ function attachOpenPwDrag(sel) {
 
 // Единый путь смены мировой цены (ползунок, поле, перетаскивание линии).
 function setOpenPw(p) {
-  p = Math.max(0, Math.min(p, CONFIG.Pmax));
+  // Потолок — у модели, а не у кадра: мировая цена выше резервной цены
+  // покупателя это законный случай («внутри не покупают»), а не ошибка ввода.
+  p = Math.max(0, Math.min(p, modelPriceTop()));
   STATE.openPw = p;
   STATE.openPwSet = true;   // мировую цену задали — ноль тоже значение
   const s = document.getElementById('open-pw-slider'); if (s) s.value = p;
@@ -676,38 +737,66 @@ function setOpenTool(tool) {
   redrawAll();
 }
 
+/* Подпись ползунка квоты идёт за смыслом инструмента: ввоз или вывоз.
+   Зовётся из updateOpenPanel, то есть на каждой перерисовке — направление
+   меняется одним движением мировой цены. Ленту регуляторов это тоже покрывает:
+   там имя берётся у shortRegulatorName, и оно считается каждый раз. */
+function syncOpenQuotaLabel() {
+  const n = document.getElementById('open-quota-name');
+  if (n) n.textContent = openQuotaName();
+}
+
 // Табло открытой экономики: направление торговли, выигрыш, разбивка потерь.
 function updateOpenPanel() {
   const box = document.getElementById('info-open'); if (!box) return;
+  syncOpenQuotaLabel();
   if (!STATE.D || !STATE.S) { box.innerHTML = '<div class="muted">Отметьте кривые D и S.</div>'; return; }
   const o = STATE.open;
   if (!o) { box.innerHTML = '<div class="muted">Задайте мировую цену Pw.</div>'; return; }
   if (o.error) { box.innerHTML = '<div class="warn">' + o.error + '</div>'; return; }
+  const dir = o.importing ? 'Импорт' : 'Экспорт';
   let html = `<div class="stat"><span>Мировая цена Pw</span><b>${fmt(o.Pw)}</b></div>`;
   if (o.aut) html += `<div class="stat"><span>Автаркия: $(Q^*; P^*)$</span><b>(${fmt(o.aut.Q)}; ${fmt(o.aut.P)})</b></div>`;
   html += `<div class="stat"><span>При Pw: (Qd; Qs)</span><b>(${fmt(o.Qd)}; ${fmt(o.Qs)})</b></div>`;
-  html += `<div class="stat"><span>${o.importing ? 'Импорт' : 'Экспорт'}</span><b>${fmt(o.volume)}</b></div>`;
+  html += `<div class="stat"><span>${dir}</span><b>${fmt(o.volume)}</b></div>`;
+  /* Вырожденные края — словами, а не нулём в скобках. Мировая цена выше того,
+     что готов заплатить внутренний покупатель, это не поломка модели: внутри
+     не покупают, и всё, что произведено, уходит за границу. */
+  if (o.noBuyers) html += '<div class="hint">Внутри не покупают: мировая цена выше той, которую готов заплатить покупатель. Весь выпуск уходит на экспорт, излишек покупателя равен нулю.</div>';
+  else if (o.noSellers) html += '<div class="hint">Внутри не производят: мировая цена ниже той, с которой предложение только начинается. Всё, что куплено, ввезено из-за границы.</div>';
   html += `<div class="stat"><span>(CS; PS) при своб. торговле</span><b>(${fmt(o.csFree)}; ${fmt(o.psFree)})</b></div>`;
   if (o.gain != null) html += `<div class="stat"><span>Выигрыш от торговли</span><b>${(o.gain >= 0 ? '+' : '') + fmt(o.gain)}</b></div>`;
   if (o.note) html += `<div class="warn" style="margin-top:6px;">${o.note}</div>`;
   if (o.P1 != null) {
     const isTar = (o.tool === 'tariff');
     html += '<div style="margin-top:8px;padding-top:8px;border-top:.5px solid var(--border);"></div>';
-    html += `<div class="stat"><span>${isTar ? 'Тариф t' : 'Квота'}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
+    html += `<div class="stat"><span>${isTar ? 'Тариф t' : openQuotaName()}</span><b>${fmt(isTar ? STATE.openTariff : STATE.openQuota)}</b></div>`;
     html += `<div class="stat"><span>Внутренняя цена P₁</span><b>${fmt(o.P1)}</b></div>`;
     html += `<div class="stat"><span>($Q_d^{\\prime}$; $Q_s^{\\prime}$)</span><b>(${fmt(o.Qd1)}; ${fmt(o.Qs1)})</b></div>`;
-    html += `<div class="stat"><span>Импорт после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
+    html += `<div class="stat"><span>${dir} после</span><b>${fmt(o.vol1)} (было ${fmt(o.volume)})</b></div>`;
     html += `<div class="stat"><span>${isTar ? 'Доход бюджета' : 'Рента от квоты'}</span><b>${fmt(o.money)}</b></div>`;
-    if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +
-      'зависит от того, как распределены лицензии на импорт (могут получить импортёры, иностранные ' +
-      'поставщики или бюджет, если лицензии продаются).</div>';
-    // Разбивка потерь — по отдельности, без «одного числа».
-    html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
-    html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
-    html += `<div class="stat"><span>Итого потери</span><b>${fmtSum(o.dwlProd, o.dwlCons)}</b></div>`;
-    html += '<div class="hint">Левый треугольник это производственное искажение: часть импорта заместили ' +
-      'более дорогим отечественным выпуском. Правый это потребительское искажение: часть покупателей ушла с рынка ' +
-      'из-за выросшей цены.</div>';
+    if (o.prohibitive) {
+      /* Запретительный тариф. Цена самой закрытости не пропадает: она равна
+         выигрышу от торговли, который теперь не получен, и стоит строкой выше.
+         Двух треугольников тут нет — на экране обычная автаркия. */
+      html += '<div class="hint">Тариф запретительный: при такой ставке ввоз невыгоден уже при цене автаркии, и страна закрывается сама. Внутренняя цена дальше не растёт, сколько ставку ни поднимай, импорта нет, бюджет ничего не собирает. Цена закрытости это весь выигрыш от торговли' +
+        (o.gain != null ? ' (' + fmt(o.gain) + ')' : '') + ', который теперь не получен.</div>';
+    } else {
+      if (!isTar) html += '<div class="hint">Рента от квоты это не доход государства: кому она достанется, ' +
+        'зависит от того, как распределены лицензии' + (o.importing ? ' на ввоз' : ' на вывоз') + ' (могут получить торговцы, иностранные ' +
+        'партнёры или бюджет, если лицензии продаются).</div>';
+      // Разбивка потерь — по отдельности, без «одного числа».
+      html += `<div class="stat" style="margin-top:4px;"><span>Потери: искажение производства</span><b>${fmt(o.dwlProd)}</b></div>`;
+      html += `<div class="stat"><span>Потери: искажение потребления</span><b>${fmt(o.dwlCons)}</b></div>`;
+      html += `<div class="stat"><span>Итого потери</span><b>${fmtSum(o.dwlProd, o.dwlCons)}</b></div>`;
+      html += o.importing
+        ? '<div class="hint">Левый треугольник это производственное искажение: часть импорта заместили ' +
+          'более дорогим отечественным выпуском. Правый это потребительское искажение: часть покупателей ушла с рынка ' +
+          'из-за выросшей цены.</div>'
+        : '<div class="hint">Правый треугольник это производственное искажение: часть выпуска, за который мир ' +
+          'заплатил бы больше, чем он стоит стране, просто не произвели. Левый это потребительское искажение: ' +
+          'внутри купили то, что мир ценил дороже.</div>';
+    }
   }
   box.innerHTML = html;
 }
@@ -2637,7 +2726,14 @@ function rateUnit() { return pctForm() ? '%' : ''; }
    (для параллельного сдвига важна именно она), полтора запаса сверху и
    округление до круглого числа. Кадр остаётся нижней границей — сузить
    прежний предел эта правка не может ни в одном случае. */
-function unitRateMax() {
+/* ЦЕНОВОЙ МАСШТАБ МОДЕЛИ — самая высокая цена, которая на этих кривых вообще
+   что-то значит. На нём стоят и предел ставки, и потолки ЦЕНОВЫХ регуляторов
+   (пол, потолок, цена внутри коридора, мировая цена).
+   ⚠️ CONFIG.Pmax это размер КАДРА, а не рынка. Пока потолки брались у него,
+   пол цены выше резервной цены покупателя нельзя было задать вовсе: при
+   D = 100 − Q значение зажималось сотней, и случай «пол 101, рынка нет»
+   на экране не воспроизводился, хотя расчёт его обрабатывает верно. */
+function modelPriceTop() {
   let far = 0;
   [STATE.D, STATE.S].forEach(c => {
     if (!c) return;
@@ -2646,6 +2742,23 @@ function unitRateMax() {
   });
   if (!(far > 0)) return CONFIG.Pmax;
   return Math.max(CONFIG.Pmax, niceMax(far * 1.5));
+}
+
+function unitRateMax() { return modelPriceTop(); }
+
+/* Потолки ценовых регуляторов подтягиваются к масштабу модели.
+   ⚠️ ТОЛЬКО ВВЕРХ И ТОЛЬКО ПОКА ГРАНИЦЫ НЕ ТРОГАЛ ЧЕЛОВЕК. Выбор человека
+   сильнее: правка границ в меню дорожки помечает ползунок `boundsByHand`, и
+   дальше модель в его границы не лезет — то же правило, что у зума. */
+const PRICE_REG_FIELDS = ['pc-slider', 'pc-input', 'open-pw-slider', 'open-pw-input',
+                          'quota-price-slider'];
+function applyPriceRegBounds() {
+  const top = modelPriceTop();
+  PRICE_REG_FIELDS.forEach(id => {
+    const e = document.getElementById(id);
+    if (!e || e.dataset.boundsByHand === '1') return;
+    if (!((parseFloat(e.max) || 0) >= top - 1e-9)) e.max = top;
+  });
 }
 
 function applyTaxRateBounds() {
