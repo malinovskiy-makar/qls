@@ -17,6 +17,7 @@ from django.urls import reverse
 
 from game import config, views
 from game.figures.base import QUESTION_TYPE as FIGURE_AUDIT
+from game import state as run_state
 from game.models import GameQuestion
 from game import sources as game_sources
 from problems.models import Problem
@@ -179,7 +180,8 @@ class FilterInheritanceTests(TestCase):
                          content_type='application/json')
         r = self.client.get(reverse('game:session_start_mistakes')).json()
         self.assertTrue(r['ok'])
-        state = self.client.session['econ_rush']
+        state = run_state.load_by_id(
+            self.client.session[run_state.RUN_ID_KEY])
         queue = [r['question']['id']] + list(state['queue'])
         self.assertTrue(set(queue) <= {q.id for q in self.elastic},
                         'в целевой забег попали вопросы вне фильтра')

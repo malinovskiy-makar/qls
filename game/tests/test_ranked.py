@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from problems.models import Problem, User
 from game import config, views
+from game import state as run_state
 from game.models import GameQuestion, GameResult, GameSet, make_result_code
 
 MSK = ZoneInfo('Europe/Moscow')
@@ -334,6 +335,7 @@ class AntiCheatTests(RunHelper):
 
     def test_issued_at_is_stored_server_side(self):
         self.client.get(reverse('game:session_start') + '?mode=blitz')
-        state = self.client.session[views.SESSION_KEY]
+        state = run_state.load_by_id(
+            self.client.session[run_state.RUN_ID_KEY])
         self.assertTrue(state.get('issued_at'))
         self.assertTrue(state.get('started_at'))

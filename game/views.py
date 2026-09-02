@@ -46,11 +46,16 @@ from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
 from . import (config, filters as game_filters, leaderboard as lb,
-               scoring, stats as stats_mod)
+               scoring, state as run_state, stats as stats_mod)
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
-SESSION_KEY = 'econ_rush'        # состояние текущего забега
+# ⚠️ СОСТОЯНИЕ ЗАБЕГА БОЛЬШЕ НЕ В СЕССИИ. Оно живёт в кэше под своим
+# `run_id` (game/state.py): дуэли в реальном времени нужен счёт
+# соперника, а состояние соперника лежало бы в ЕГО куке и до сервера
+# не доходило. Имя ниже осталось ради ОДНОГО релиза совместимости —
+# забег, начатый до выкатки, доигрывается (state._legacy).
+SESSION_KEY = run_state.LEGACY_SESSION_KEY
 SEEN_KEY = 'econ_rush_seen'      # {mode: [id, ...]} — виданные МЕЖДУ забегами
 SEEN_LIMIT = 1500                # сколько последних id помнить на режим
 COUNTED_KEY = 'econ_rush_counted'  # id вопросов, уже учтённых в статистике
@@ -739,6 +744,11 @@ def _new_state(mode, topic, run_filter=None):
     только рисует; ended заполняется на третьей ошибке (api_answer) либо
     при завершении забега (api_session_finish)."""
     return {
+        # ⚠️ У КАЖДОГО ЗАБЕГА СВОЙ ИДЕНТИФИКАТОР, а не один на сессию.
+        # Дуэль адресует чужой забег по нему (state.load_by_id), и если бы
+        # id переиспользовался, «сыграть ещё раз» подменяло бы соперника
+        # табло уже другого забега.
+        'run_id': run_state.new_run_id(),
         'mode': mode,
         'topic': topic,
         # Фильтр забега живёт в состоянии, а не только в URL старта: его
@@ -830,7 +840,7 @@ def api_session_start(request):
         return JsonResponse({
             'ok': False, 'reason': 'pool_empty',
             'error': 'Под этими настройками вопросов нет. Измените фильтры'})
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
         'mode': _mode_payload(mode),
@@ -843,13 +853,17 @@ def api_session_start(request):
 @require_GET
 def api_question(request):
     """Следующий вопрос текущего забега."""
-    state = request.session.get(SESSION_KEY)
+    state = run_state.load_run(request)
     if not state:
-        return JsonResponse({'error': 'Забег не начат'}, status=400)
+        # ⚠️ ПРИЧИНА МАШИНОЧИТАЕМАЯ. Забега нет по двум причинам — его не
+        # начинали или состояние истекло по TTL, — и для игрока они
+        # неразличимы. Клиенту нужен признак, а не разбор текста ошибки.
+        return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
+                            status=400)
     gq = _pick_next(request, state)
     if gq is None:
         return JsonResponse({'exhausted': True})
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
     return JsonResponse({'question': _question_payload(gq, len(state['seen']))})
 
 
@@ -1035,9 +1049,13 @@ def api_answer(request):
     (null/отсутствие = пропуск). Ответ: верно/нет, правильный ответ
     (по типу вопроса), дельта времени, а также посчитанные СЕРВЕРОМ очки,
     серия и жизни. Когда жизни кончились — game_over с причиной 'lives'."""
-    state = request.session.get(SESSION_KEY)
+    state = run_state.load_run(request)
     if not state:
-        return JsonResponse({'error': 'Забег не начат'}, status=400)
+        # ⚠️ ПРИЧИНА МАШИНОЧИТАЕМАЯ. Забега нет по двум причинам — его не
+        # начинали или состояние истекло по TTL, — и для игрока они
+        # неразличимы. Клиенту нужен признак, а не разбор текста ошибки.
+        return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
+                            status=400)
     if state.get('ended'):
         return JsonResponse({'error': 'Забег уже завершён'}, status=409)
     try:
@@ -1145,7 +1163,7 @@ def api_answer(request):
         _mark_counted(request, qid)
     else:
         stat = stats_mod.get_stat(gq)
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
 
     payload = {
         'result': result,
@@ -1323,7 +1341,7 @@ def api_session_start_mistakes(request):
     state['queue'] = queue
     state['mistakes_run'] = True
     gq = _pick_next(request, state)
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
         'mode': _mode_payload(mode),
@@ -1418,7 +1436,7 @@ def api_session_start_set(request, code):
         return JsonResponse({
             'ok': False, 'reason': 'pool_empty',
             'error': 'В этом наборе не осталось доступных вопросов'})
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
         'mode': _mode_payload(gset.mode),
@@ -1825,16 +1843,20 @@ def api_session_finish(request):
 
     Идемпотентен: повторный вызов просто пересчитает ту же сводку.
     """
-    state = request.session.get(SESSION_KEY)
+    state = run_state.load_run(request)
     if not state:
-        return JsonResponse({'error': 'Забег не начат'}, status=400)
+        # ⚠️ ПРИЧИНА МАШИНОЧИТАЕМАЯ. Забега нет по двум причинам — его не
+        # начинали или состояние истекло по TTL, — и для игрока они
+        # неразличимы. Клиенту нужен признак, а не разбор текста ошибки.
+        return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
+                            status=400)
     try:
         body = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:
         body = {}
     if not state.get('ended'):
         state['ended'] = _end_reason(state, body.get('reason'))
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
     # Журнал завершённого забега — отдельным ключом: с него живёт «работа
     # над ошибками», а SESSION_KEY затрётся, как только начнётся новый
     # забег. Храним нужное ей: режим, журнал и фильтр (его наследует
@@ -1884,7 +1906,7 @@ def _log_learning_events(request, state):
     if not log or state.get('events_logged'):
         return
     state['events_logged'] = True
-    request.session[SESSION_KEY] = state
+    run_state.save_run(request, state)
 
     try:
         from problems.models import Topic
@@ -2078,7 +2100,7 @@ def _save_result(request, state, summary):
         if result is None:
             return None      # не смогли сохранить — забег важнее ссылки
         state['result_code'] = result.code
-        request.session[SESSION_KEY] = state
+        run_state.save_run(request, state)
         if gset is not None:
             mark_set_played(request, gset.code)
             remember_my_result(request, gset.code, result.code)
