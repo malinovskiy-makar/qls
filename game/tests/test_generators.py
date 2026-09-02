@@ -13,10 +13,12 @@ import json
 import random
 import re
 from fractions import Fraction
+from unittest import mock
 
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
+from game import config as game_config
 from game.generators import base as gbase
 from game.generators.base import fmt_num, is_nice, LIMIT_FULL, LIMIT_SHORT
 from game.generators.registry import ARCHETYPES
@@ -739,6 +741,50 @@ class FlagHoldsEverywhereTests(TestCase):
                 content_type='application/json')
         self.assertEqual(r.status_code, 404)
         self.assertNotIn('solution', r.json())
+
+    def test_generated_share_max_has_no_effect_while_flag_is_off(self):
+        """При выключенном GAME_GENERATED_ENABLED значение GENERATED_SHARE_MAX
+        не имеет значения вовсе — потолок доли действует внутри
+        `_cap_generated` над кандидатами, УЖЕ прошедшими через `_pool_qs`,
+        а тот при выключенном флаге исключает сгенерированные раньше, чем
+        до потолка вообще доходит очередь (game/views.py, `_pool_qs` и
+        `_cap_generated`).
+
+        Сессия «Wecon Rush — подготовка к выкатке» (02.09): на проде флаг
+        выключен решением владельца, а `GENERATED_SHARE_MAX` в
+        конфигурации остаётся ненулевым — тест доказывает, что это
+        безопасно, а не просто «по факту сегодня не течёт»."""
+        self.make_base(3)
+        self.make_gen(40)
+
+        def play_a_whole_run():
+            with self.settings(GAME_GENERATED_ENABLED=False):
+                r = self.client.get('/game/api/session/start/?mode=blitz').json()
+                served = [r['question']['id']]
+                while True:
+                    nxt = self.client.get('/game/api/question/').json()
+                    if 'question' not in nxt:
+                        break
+                    served.append(nxt['question']['id'])
+                self.client.post('/game/api/session/finish/',
+                                 json.dumps({'reason': 'time'}),
+                                 content_type='application/json')
+            return served
+
+        # GENERATED_SHARE_MAX — константа модуля game/config.py, а не
+        # Django-настройка: override_settings() её не тронет, патчим сам
+        # атрибут модуля (views.py держит ссылку на модуль и читает
+        # config.GENERATED_SHARE_MAX динамически при каждом вызове).
+        with mock.patch.object(game_config, 'GENERATED_SHARE_MAX', 1.0):
+            served_unlimited = play_a_whole_run()          # потолка фактически нет
+        with mock.patch.object(game_config, 'GENERATED_SHARE_MAX', 0.0):
+            served_zero = play_a_whole_run()                # потолок «вообще ноль»
+
+        self.assertEqual(set(served_unlimited), set(served_zero))
+        self.assertEqual(
+            GameQuestion.objects.filter(
+                id__in=served_unlimited + served_zero, is_generated=True
+            ).count(), 0)
 
 
 # Архетипы, переработанные под ЭТАЛОН качества (решение в Notion, 2026-07-16:
