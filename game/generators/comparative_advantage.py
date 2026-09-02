@@ -94,8 +94,9 @@ class ComparativeAdvantageArchetype(Archetype):
             gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
             return (u'Страны Альфа и Бета производят {} и {}; КПВ обеих '
                     u'линейны. За год Альфа может выпустить максимум {} ед. '
-                    u'{} либо {} ед. {}; Бета — {} ед. {} либо {} ед. {}. '
-                    u'Страны рассматривают специализацию и обмен.').format(
+                    u'{} либо {} ед. {}, а Бета выпустит {} ед. {} либо '
+                    u'{} ед. {}. Страны рассматривают специализацию '
+                    u'и обмен.').format(
                         gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
                         p['mxb'], gx[1], p['myb'], gy[1])
 
@@ -106,7 +107,79 @@ class ComparativeAdvantageArchetype(Archetype):
                         p['mxa'], gx[1], p['mya'], gy[1],
                         p['mxb'], gx[1], p['myb'], gy[1])
 
-        return [Wrapper('countries', full, short)]
+        def full_neighbours(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Соседние страны Альфа и Бета до сих пор торговали мало. '
+                    u'Обе производят {} и {}, КПВ обеих линейны: за год Альфа '
+                    u'может выпустить максимум {} ед. {} либо {} ед. {}, '
+                    u'а Бета {} ед. {} либо {} ед. {}. Открывать ли '
+                    u'границу.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_islands(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Островные государства Альфа и Бета наладили паром и '
+                    u'думают, чем торговать. Обе производят {} и {}, КПВ '
+                    u'обеих линейны: за год Альфа выпускает максимум {} ед. '
+                    u'{} либо {} ед. {}, а Бета {} ед. {} либо {} ед. '
+                    u'{}.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_talks(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'На переговорах о торговом договоре страны Альфа и Бета '
+                    u'выложили свои возможности. Обе производят {} и {}, КПВ '
+                    u'обеих линейны: Альфа за год может выпустить максимум '
+                    u'{} ед. {} либо {} ед. {}, а Бета {} ед. {} либо {} ед. '
+                    u'{}.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_class(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Классическая задача на сравнительное преимущество. '
+                    u'Страны Альфа и Бета производят {} и {}, КПВ обеих '
+                    u'линейны: за год Альфа даёт максимум {} ед. {} либо '
+                    u'{} ед. {}, Бета {} ед. {} либо {} ед. {}. '
+                    u'Рассматривается специализация.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_neighbours(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Соседи, КПВ линейны. Альфа: {} ед. {} либо {} ед. {}; '
+                    u'Бета: {} ед. {} либо {} ед. {}.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_islands(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Два острова, КПВ линейны. Альфа: {} ед. {} либо {} ед. '
+                    u'{}; Бета: {} ед. {} либо {} ед. {}.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_talks(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Переговоры о договоре. Альфа: {} ед. {} либо {} ед. {}; '
+                    u'Бета: {} ед. {} либо {} ед. {}.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_class(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Разбор задачи. Альфа: {} ед. {} либо {} ед. {}; '
+                    u'Бета: {} ед. {} либо {} ед. {}.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        return [Wrapper('countries', full, short),
+                Wrapper('neighbours', full_neighbours, short_neighbours),
+                Wrapper('islands', full_islands, short_islands),
+                Wrapper('talks', full_talks, short_talks),
+                Wrapper('class', full_class, short_class)]
 
     def solution(self, params, solved, asked):
         gx = _ppf.PPF_GOODS[params['gx']]
@@ -119,8 +192,9 @@ class ComparativeAdvantageArchetype(Archetype):
         ]
         if asked.key in ('adv_x', 'adv_y'):
             steps.append(
-                (u'Сравнительное преимущество — у того, чья альтернативная '
-                 u'стоимость ниже: по {} это {}, по {} — {}.').format(
+                (u'Сравнительное преимущество принадлежит тому, чья '
+                 u'альтернативная стоимость ниже: в производстве {} '
+                 u'это {}, в производстве {} это {}.').format(
                     gx[1], solved['adv_x'], gy[1], solved['adv_y']))
         else:
             steps.append(

@@ -1,0 +1,99 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Вызов дня: четыре набора в сутки, по одному на каждый режим. Набор
+  создаётся ЛЕНИВО при первом обращении — крона нет и не будет (бесплатный
+  хостинг засыпает), поэтому список собирается детерминированно от даты.
+  Отсечка суток — по Москве.
+{% endcomment %}
+{% block title %}Вызов дня – Wecon Rush{% endblock %}
+
+{% block extra_style %}
+<style>
+  .dl-wrap { max-width: 860px; margin: 0 auto; padding: 26px 20px 60px; }
+  .dl-head { text-align: center; margin-bottom: 22px; }
+  .dl-wrap h1 { font-size: 1.7rem; }
+  .dl-sub { color: var(--muted); margin-top: 6px; }
+  .dl-timer { margin-top: 10px; font-size: .92rem; color: var(--text); }
+  .dl-timer b { color: var(--accent); font-variant-numeric: tabular-nums; }
+  .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 640px) { .dl-grid { grid-template-columns: 1fr; } }
+  .dl-card {
+    border: 1px solid var(--border); border-radius: 16px;
+    background: var(--surface); padding: 16px 18px;
+  }
+  .dl-card h2 { font-size: 1.15rem; }
+  .dl-meta { color: var(--muted); font-size: .86rem; margin-top: 4px; }
+  .dl-state { margin-top: 10px; font-size: .92rem; }
+  .dl-state.done { color: var(--green); font-weight: 600; }
+  .dl-acts { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .dl-btn {
+    display: inline-block; padding: 8px 16px; border-radius: 10px;
+    text-decoration: none; font-weight: 600; font-size: .9rem;
+    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  }
+  .dl-btn.ghost { background: var(--surface); color: var(--text);
+                  border-color: var(--border); }
+  .dl-note { margin-top: 20px; font-size: .85rem; color: var(--muted);
+             text-align: center; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dl-wrap">
+  <header class="dl-head">
+    <h1>Вызов дня</h1>
+    <p class="dl-sub">
+      Один и тот же набор вопросов у всех, одна попытка. {{ day|date:"d E Y" }}.
+    </p>
+    <p class="dl-timer">Новый вызов через <b id="countdown">–</b></p>
+  </header>
+
+  <div class="dl-grid">
+    {% for c in cards %}
+    <section class="dl-card">
+      <h2>{{ c.title }}</h2>
+      <p class="dl-meta">{{ c.size }} вопр. · код {{ c.code }}</p>
+      <p class="dl-state {% if c.played %}done{% endif %}">
+        {% if c.played %}
+          Сыграно{% if c.my_score is not None %} · {{ c.my_score }} очков{% endif %}
+        {% else %}
+          Ещё не сыграно
+        {% endif %}
+      </p>
+      <div class="dl-acts">
+        {% if not c.played %}
+        <a class="dl-btn" href="{{ c.play_url }}">Играть</a>
+        {% endif %}
+        <a class="dl-btn ghost" href="{{ c.board_url }}">Доска</a>
+      </div>
+    </section>
+    {% empty %}
+    <p class="dl-note">Сегодня вызовов нет: в пуле не нашлось вопросов.</p>
+    {% endfor %}
+  </div>
+
+  <p class="dl-note">
+    На доску попадают только вошедшие в аккаунт: у анонимного игрока нет
+    имени. Играть можно и без входа: результат покажем, на доску не поставим.
+  </p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Обратный отсчёт до смены вызова. Момент считает сервер (московская
+   полночь) — клиент только рисует остаток. */
+(function () {
+  var target = new Date('{{ reset_at }}');
+  var el = document.getElementById('countdown');
+  function tick() {
+    var left = Math.max(0, Math.floor((target - new Date()) / 1000));
+    var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
+    el.textContent = h + ' ч ' + String(m).padStart(2, '0') + ' мин '
+      + String(s).padStart(2, '0') + ' с';
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+{% endblock %}

@@ -11,7 +11,7 @@
 Главное на экране — итоговый балл.
 {% endcomment %}
 
-{% block title %}{% if unchecked %}Проверено частично{% else %}Работа проверена{% endif %} — {{ student.get_full_name|default:student.username }}{% endblock %}
+{% block title %}{% if unchecked %}Проверено частично{% else %}Работа проверена{% endif %} · {{ student.get_full_name|default:student.username }}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .done-total { text-align: center; padding: 26px 20px 22px; }
@@ -118,7 +118,7 @@
       <span class="done-row-score">
         {% if row.score is not None %}{{ row.score|ball }}<small>
           / {{ row.max_points|ball }} б.</small>
-        {% else %}—{% endif %}
+        {% else %}–{% endif %}
       </span>
     </span>
   </div>

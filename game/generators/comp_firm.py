@@ -85,7 +85,7 @@ class CompFirmArchetype(Archetype):
             good = _market.GOODS[p['good']]
             return (u'Совершенно конкурентная фирма продаёт {} по рыночной '
                     u'цене {} ден. ед. за штуку. Её общие издержки: {} '
-                    u'($Q$ — выпуск в шт.).').format(
+                    u'(выпуск $Q$ в шт.).').format(
                         good[1], p['p'], tc_formula(p))
 
         def full_workshop(p, s):
@@ -93,12 +93,12 @@ class CompFirmArchetype(Archetype):
             return (u'Мастерская выпускает {} и работает на совершенно '
                     u'конкурентном рынке: сложившаяся цена равна {} ден. ед. '
                     u'Функция общих издержек мастерской: {} '
-                    u'($Q$ — выпуск в шт.).').format(
+                    u'(выпуск $Q$ в шт.).').format(
                         good[1], p['p'], tc_formula(p))
 
         def short(p, s):
             return (u'Конкурентная фирма: цена {} ден. ед., издержки {} '
-                    u'($Q$ — шт.).').format(p['p'], tc_formula(p))
+                    u'($Q$ в шт.).').format(p['p'], tc_formula(p))
 
         return [Wrapper('firm', full, short),
                 Wrapper('workshop', full_workshop, short)]

@@ -88,15 +88,70 @@ class PerfectPDArchetype(Archetype):
             return (u'Монополист на рынке {} знает готовность платить каждого '
                     u'покупателя и назначает каждому индивидуальную цену '
                     u'(совершенная ценовая дискриминация). Спрос: {} '
-                    u'($P$ — в ден. ед., $Q$ — в шт.); предельные издержки '
+                    u'($P$ в ден. ед., $Q$ в шт.); предельные издержки '
                     u'постоянны и равны {} ден. ед., постоянных издержек '
                     u'нет.').format(good[0], demand(p), p['mc'])
+
+        def full_auction(p, s):
+            good = _market.GOODS[p['good']]
+            return (u'Аукционист продаёт {} по одной единице и знает, сколько '
+                    u'готов заплатить каждый в зале, поэтому каждому называет '
+                    u'свою цену. Спрос: {} ($P$ в ден. ед., $Q$ в шт.); '
+                    u'предельные издержки постоянны и равны {} ден. ед., '
+                    u'постоянных издержек нет.').format(
+                        good[0], demand(p), p['mc'])
+
+        def full_airline(p, s):
+            good = _market.GOODS[p['good']]
+            return (u'Продавец {} назначает цену каждому покупателю отдельно: '
+                    u'о готовности платить он знает всё. Спрос: {} ($P$ в '
+                    u'ден. ед., $Q$ в шт.); предельные издержки постоянны и '
+                    u'равны {} ден. ед., постоянных издержек нет.').format(
+                        good[0], demand(p), p['mc'])
+
+        def full_tutor(p, s):
+            good = _market.GOODS[p['good']]
+            return (u'Единственный поставщик {} в городе торгуется с каждым '
+                    u'покупателем и всегда выторговывает ровно ту цену, '
+                    u'которую тот готов отдать. Спрос: {} ($P$ в ден. ед., '
+                    u'$Q$ в шт.); предельные издержки постоянны и равны {} '
+                    u'ден. ед., постоянных издержек нет.').format(
+                        good[0], demand(p), p['mc'])
+
+        def full_school(p, s):
+            good = _market.GOODS[p['good']]
+            return (u'На занятии разбирают предельный случай: монополист на '
+                    u'рынке {} видит кривую спроса и продаёт каждую единицу '
+                    u'по её цене спроса. Спрос: {} ($P$ в ден. ед., $Q$ в '
+                    u'шт.); предельные издержки постоянны и равны {} ден. ед., '
+                    u'постоянных издержек нет.').format(
+                        good[0], demand(p), p['mc'])
 
         def short(p, s):
             return (u'Монополист-совершенный дискриминатор: спрос {}, '
                     u'$MC = {}$ (пост. изд. нет).').format(demand(p), p['mc'])
 
-        return [Wrapper('pd', full, short)]
+        def short_auction(p, s):
+            return (u'Аукцион с индивидуальной ценой каждому: спрос {}, '
+                    u'$MC = {}$ (пост. изд. нет).').format(demand(p), p['mc'])
+
+        def short_airline(p, s):
+            return (u'Цена каждому своя: спрос {}, $MC = {}$ '
+                    u'(пост. изд. нет).').format(demand(p), p['mc'])
+
+        def short_tutor(p, s):
+            return (u'Торгуется с каждым и выторговывает всё: спрос {}, '
+                    u'$MC = {}$ (пост. изд. нет).').format(demand(p), p['mc'])
+
+        def short_school(p, s):
+            return (u'Предельный случай дискриминации: спрос {}, $MC = {}$ '
+                    u'(пост. изд. нет).').format(demand(p), p['mc'])
+
+        return [Wrapper('pd', full, short),
+                Wrapper('auction', full_auction, short_auction),
+                Wrapper('airline', full_airline, short_airline),
+                Wrapper('tutor', full_tutor, short_tutor),
+                Wrapper('school', full_school, short_school)]
 
     def solution(self, params, solved, asked):
         a, b, mc = params['a'], params['b'], params['mc']
@@ -104,7 +159,7 @@ class PerfectPDArchetype(Archetype):
             (u'Дискриминатор продаёт каждую единицу по цене спроса, пока она '
              u'не ниже $MC$: выпуск из $P(Q) = MC$: $Q = {}$ шт.').format(
                 fmt_num(solved['q_pd'], latex=True)),
-            (u'Прибыль — весь треугольник между спросом и $MC$: '
+            (u'Прибыль составляет весь треугольник между спросом и $MC$: '
              u'$\\pi = \\frac{{1}}{{2}} ({} - {}) \\cdot {} = {}$ '
              u'ден. ед.').format(
                 fmt_num(a, latex=True), fmt_num(mc, latex=True),

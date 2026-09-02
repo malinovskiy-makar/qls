@@ -39,7 +39,7 @@
   {% endcomment %}
   {% for row in attention %}
   <div class="attention-row">
-    {% if not solo %}<b>{{ row.student.get_full_name|default:row.student.username }}</b> — {% endif %}
+    {% if not solo %}<b>{{ row.student.get_full_name|default:row.student.username }}</b>: {% endif %}
     {{ row.reasons|join:"; " }}.
     <a href="{% url 'teacher:student_stats' row.student.pk %}">посмотреть</a>
   </div>
@@ -61,22 +61,22 @@
 {% endcomment %}
 <div class="cards3">
   <div class="card3">
-    <div class="card3-cap">Процент верно решённых задач{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-cap">Процент верно решённых задач{% include '_hint.html' with hint='Первое число считается по всем задачам, решённым на сайте. Второе только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
     <div class="card3-value">
       <span class="k-pair">
-        {% if solo_open.all is not None %}{{ solo_open.all }}%{% else %}—{% endif %}
+        {% if solo_open.all is not None %}{{ solo_open.all }}%{% else %}–{% endif %}
         <span class="k-pair__slash">/</span>
-        <span class="k-pair__mine">{% if solo_open.mine is not None %}{{ solo_open.mine }}%{% else %}—{% endif %}</span>
+        <span class="k-pair__mine">{% if solo_open.mine is not None %}{{ solo_open.mine }}%{% else %}–{% endif %}</span>
       </span>
     </div>
   </div>
   <div class="card3">
-    <div class="card3-cap">Процент верно решённых тестов{% include '_hint.html' with hint='Первое число — по всем тестам, решённым на сайте. Второе — только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-cap">Процент верно решённых тестов{% include '_hint.html' with hint='Первое число считается по всем тестам, решённым на сайте. Второе только по вашим домашкам и контрольным. Игра не входит ни в одно из них.' %}</div>
     <div class="card3-value">
       <span class="k-pair">
-        {% if solo_test.all is not None %}{{ solo_test.all }}%{% else %}—{% endif %}
+        {% if solo_test.all is not None %}{{ solo_test.all }}%{% else %}–{% endif %}
         <span class="k-pair__slash">/</span>
-        <span class="k-pair__mine">{% if solo_test.mine is not None %}{{ solo_test.mine }}%{% else %}—{% endif %}</span>
+        <span class="k-pair__mine">{% if solo_test.mine is not None %}{{ solo_test.mine }}%{% else %}–{% endif %}</span>
       </span>
     </div>
   </div>
@@ -127,7 +127,7 @@
           «везде / у вас» ОТМЕНЕНО ВЛАДЕЛЬЦЕМ (обзор 13.08, п. 19).
           Вопросик с подсказкой на месте: в нём и объяснение пары чисел.
           {% endcomment %}
-          <th data-type="num">Доля верных{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам и контрольным этой группы. Игра не входит ни в одно из них.' %}</th>
+          <th data-type="num">Доля верных{% include '_hint.html' with hint='Первое число считается по всем задачам, решённым на сайте. Второе только по домашкам и контрольным этой группы. Игра не входит ни в одно из них.' %}</th>
           <th data-type="num">Сдано работ</th>
           <th data-type="date">Последняя активность</th>
           <th class="no-sort"></th>
@@ -154,9 +154,9 @@
             <span class="k-pair">
               {% if row.accuracy_all is not None %}
               <span class="k-level k-level--{{ row.level_all }}">{{ row.accuracy_all }}%</span>
-              {% else %}<span class="k-level k-level--none">—</span>{% endif %}
+              {% else %}<span class="k-level k-level--none">–</span>{% endif %}
               <span class="k-pair__slash">/</span>
-              <span class="k-pair__mine">{% if row.accuracy_mine is not None %}{{ row.accuracy_mine }}%{% else %}—{% endif %}</span>
+              <span class="k-pair__mine">{% if row.accuracy_mine is not None %}{{ row.accuracy_mine }}%{% else %}–{% endif %}</span>
             </span>
           </td>
           <td data-type="num" data-sort="{{ row.submitted }}">
@@ -256,7 +256,7 @@
             <span class="matrix-cell {% if cell.accuracy < 50 %}matrix-bad{% elif cell.accuracy < 75 %}matrix-mid{% else %}matrix-good{% endif %}"
                   data-hint="{{ cell.solved }} из {{ cell.attempted }}">{{ cell.accuracy }}%</span>
             {% else %}
-            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
+            <span class="matrix-cell matrix-none" data-hint="нет попыток">–</span>
             {% endif %}
           </td>
           {% endfor %}
@@ -285,7 +285,7 @@
               {{ column.accuracy }}%
             </span>
             {% else %}
-            <span class="matrix-cell matrix-none" data-hint="нет попыток">—</span>
+            <span class="matrix-cell matrix-none" data-hint="нет попыток">–</span>
             {% endif %}
           </td>
           {% endfor %}
@@ -295,7 +295,7 @@
   </div>
   </div>
   {% else %}
-  <div class="empty-note">Ученики ещё не решали задач с темами — матрице
+  <div class="empty-note">Ученики ещё не решали задач с темами, и матрице
     нечего показать.</div>
   {% endif %}
 </div>

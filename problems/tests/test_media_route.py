@@ -189,3 +189,63 @@ class MediaIsNotServedByNginxTests(TestCase):
     def test_media_block_returns_404_unconditionally(self):
         body = self._media_block()
         self.assertIn('return 404', body)
+
+
+class WebSocketDuelIsProxiedByNginxTests(TestCase):
+    """`location /ws/` обязан существовать, проксировать в `ws:8001` с
+    заголовками апгрейда протокола, и стоять ВЫШЕ `location /`.
+
+    Сессия «Wecon Rush — подготовка к выкатке» (02.09) нашла живой дрейф:
+    `deploy/nginx/conf.d/weconomics.conf` (снимок «что реально стоит на
+    сервере») уже нёс рабочий блок `/ws/`, а
+    `deploy/nginx/available/django.conf` (канонический шаблон — именно его
+    RUNBOOK велит копировать на сервер при любом обновлении конфигурации,
+    docs/RUNBOOK.md «⚠️ Если менялась конфигурация nginx») блока не имел
+    вовсе. При следующем `cp available/django.conf nginx/available/django.
+    conf` дуэль в реальном времени молча перестала бы работать: запрос к
+    `/ws/` ушёл бы в `location /`, то есть к gunicorn, который про сокеты
+    не знает вовсе."""
+
+    CONF_PATH = Path(__file__).resolve().parents[2] / 'deploy' / 'nginx' / \
+        'available' / 'django.conf'
+
+    def _read(self):
+        return self.CONF_PATH.read_text(encoding='utf-8')
+
+    def _ws_block(self):
+        text = self._read()
+        match = re.search(
+            r'location\s+/ws/\s*\{(?P<body>.*?)\n    \}',
+            text, re.DOTALL)
+        self.assertIsNotNone(
+            match, 'Блок `location /ws/` отсутствует в django.conf — без '
+            'него WebSocket дуэли не проксируются вовсе, запрос уходит в '
+            'location / и до daphne не доезжает.')
+        return match.group('body')
+
+    def test_ws_block_proxies_to_ws_service(self):
+        body = self._ws_block()
+        self.assertIn('proxy_pass http://ws:8001', body)
+
+    def test_ws_block_upgrades_the_protocol(self):
+        body = self._ws_block()
+        self.assertIn('Upgrade', body)
+        self.assertIn('"upgrade"', body,
+                      'Connection обязан быть задан явно строкой "upgrade" — '
+                      'у location / ниже он гасится пустой строкой, и без '
+                      'явного значения здесь блок унаследовал бы это.')
+
+    def test_ws_block_comes_before_catch_all_location(self):
+        text = self._read()
+        ws_pos = text.find('location /ws/')
+        # Не первый попавшийся `location / {` — их несколько (есть ещё
+        # заглушка `return 444;` у server_name _ вначале файла). Ищем
+        # именно проксирующий в Django блок по его proxy_pass.
+        catch_all_pos = text.find('proxy_pass http://web:8000')
+        self.assertGreater(ws_pos, -1)
+        self.assertGreater(catch_all_pos, -1)
+        self.assertLess(
+            ws_pos, catch_all_pos,
+            '`location /ws/` обязан идти РАНЬШЕ проксирующего в Django '
+            '`location /` в этом файле — дублирует порядок из деплоя, где '
+            'это буквально необходимо для nginx (см. docstring класса).')

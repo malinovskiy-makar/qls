@@ -208,7 +208,7 @@ class OneMarkupTests(TestCase):
         found = []
         for folder, _dirs, files in os.walk(ROOT):
             if any(part in folder for part in
-                   ('venv', 'node_modules', '.git', 'materials')):
+                   ('venv', 'node_modules', '.git', 'materials', '.claude')):
                 continue
             for name in files:
                 if not name.endswith('.html'):

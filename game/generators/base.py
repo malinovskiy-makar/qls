@@ -302,6 +302,10 @@ def generate_question(arch, rng, question_type):
             labels = list(asked.class_options)
             correct_label = solved[asked.key]
             if question_type == 'single':
+                # ⚠️ Тасуем, как и числовые варианты: без этого правильный
+                # ответ стоит там, куда его поставило объявление
+                # class_options, и запоминается позицией, а не смыслом.
+                rng.shuffle(labels)
                 options = labels
                 correct_index = labels.index(correct_label)
                 q_sentence = asked.question
@@ -398,6 +402,165 @@ def generate_question(arch, rng, question_type):
             arch.key, question_type, MAX_SAMPLE_ATTEMPTS))
 
 
+# ---------------------------------------------------------------------------
+# Режим «График»: выбор верного чертежа из четырёх
+# ---------------------------------------------------------------------------
+
+FIGURE_CHOICE_OPTIONS = 4     # один верный + три неверных
+
+
+def _figure_axes(fig):
+    return Fraction(str(fig['xmax'])), Fraction(str(fig['ymax']))
+
+
+def _spoil_figure(fig, v_true, v_err):
+    """Чертёж, на котором ИСКОМАЯ величина отмечена НЕВЕРНО.
+
+    Кривые, оси и заливки остаются как есть — двигаются только точки,
+    засечки и пунктирные выноски, стоявшие на верном значении.
+
+    ⚠️ Почему не «пересчитать figure() на испорченном solved»: архетип
+    строит рамку от решения (axis_max(q_star·2)) и обрезает кривые по ней
+    (clip_linear). Испорченное значение меняет рамку, и после подгонки к
+    общей от кривых остаются обрубки — вариант отличается не экономикой,
+    а поломанным рисунком. Ровно это и вышло на первом прогоне (видно на
+    скриншоте p7 первой версии). Здесь же меняется только то, что игрок
+    и должен сравнивать: где отмечен оптимум.
+
+    Возвращает None, если ничего не сдвинулось (вариант неотличим) или
+    неверное значение вышло за рамку чертежа.
+    """
+    xmax, ymax = Fraction(str(fig['xmax'])), Fraction(str(fig['ymax']))
+    if not (0 < v_err <= max(xmax, ymax)):
+        return None
+    import copy
+    out = copy.deepcopy(fig)
+    changed = [False]
+
+    def swap(value, limit):
+        if Fraction(str(value)) != v_true:
+            return value
+        if v_err > limit:
+            return value
+        changed[0] = True
+        f = Fraction(v_err)
+        return int(f) if f.denominator == 1 else round(float(f), 6)
+
+    for p in out.get('points', []):
+        p['x'] = swap(p['x'], xmax)
+        p['y'] = swap(p['y'], ymax)
+    for mk in out.get('marks', []):
+        mk['at'] = swap(mk['at'], xmax if mk['axis'] == 'x' else ymax)
+    for ln in out.get('lines', []):
+        if not ln.get('dash'):
+            continue          # сплошные — это сами кривые, их не трогаем
+        ln['from'] = [swap(ln['from'][0], xmax), swap(ln['from'][1], ymax)]
+        ln['to'] = [swap(ln['to'][0], xmax), swap(ln['to'][1], ymax)]
+    return out if changed[0] else None
+
+
+def generate_figure_choice(arch, rng):
+    """Вопрос режима «График»: четыре чертежа, верен ровно один.
+
+    Неверные варианты — НЕ выдуманные картинки: это чертёж того же
+    архетипа, посчитанный на его ТИПОВОЙ ОШИБКЕ (error_variants уже умеет
+    их вычислять для дистракторов). Налог сдвинул не ту кривую, оптимум
+    отмечен не там — ошибка настоящая, экономическая, а новой математики
+    писать не пришлось.
+
+    Архетип без чертежа сюда не попадает (figure() вернёт None →
+    пересэмплирование → GenerationError).
+    """
+    for _ in range(MAX_SAMPLE_ATTEMPTS):
+        params = arch.sample(rng)
+        solved = arch.solve(params)
+
+        candidates = [a for a in arch.asked_values(params)
+                      if a.kind == 'value' and is_nice(solved[a.key])]
+        if not candidates:
+            continue
+        asked = rng.choice(candidates)
+
+        correct = arch.figure(params, solved, asked)
+        if not correct:
+            continue
+
+        answer = Fraction(solved[asked.key])
+        errors = _clean_distractors(
+            arch.error_variants(params, solved, asked), answer,
+            max_value=asked.max_value)
+        answer_f = Fraction(solved[asked.key])
+        variants, seen = [], {json.dumps(correct, sort_keys=True)}
+        for err in errors:
+            # Ошибка обязана быть ЦЕЛЫМ числом: её значение попадает
+            # засечкой на ось чертежа, и «86,6666» там налезает на соседей.
+            if Fraction(err).denominator != 1:
+                continue
+            fig = _spoil_figure(correct, answer_f, Fraction(err))
+            if not fig:
+                continue
+            key = json.dumps(fig, sort_keys=True)
+            if key in seen:     # чертёж не отличается от верного — не вариант
+                continue
+            seen.add(key)
+            variants.append(fig)
+            if len(variants) >= FIGURE_CHOICE_OPTIONS - 1:
+                break
+        if len(variants) < FIGURE_CHOICE_OPTIONS - 1:
+            continue            # меньше трёх дистракторов — пересэмплировать
+
+        figs = [correct] + variants
+        correct_fig = correct
+        options = list(figs)
+        rng.shuffle(options)
+        correct_index = options.index(correct_fig)
+
+        # Короткий вопрос текстом: завязка сюжета + «какой чертёж?».
+        wrappers = list(arch.wrappers())
+        rng.shuffle(wrappers)
+        statement = None
+        used_wrapper = None
+        tail = u'На каком чертеже эта ситуация показана верно?'
+        for w in wrappers:
+            text = w.short(params, solved).strip() + ' ' + tail
+            if len(text) <= LIMIT_SHORT:
+                statement = text
+                used_wrapper = w
+                break
+        if statement is None:
+            continue
+
+        steps = arch.solution(params, solved, asked)
+        gen_params = dict(params)
+        gen_params['_asked'] = asked.key
+        gen_params['_wrapper'] = used_wrapper.key
+        json.dumps(gen_params)
+
+        difficulty = asked.difficulty if asked.difficulty is not None \
+            else _difficulty(len(steps), asked.trivial)
+
+        return {
+            'question_type': 'figure_choice',
+            'statement': statement,
+            # options — САМИ ЧЕРТЕЖИ: игроку нужно их видеть, это и есть
+            # варианты ответа. Правильный индекс сюда не входит.
+            'options': options,
+            'correct_index': correct_index,
+            'correct_value': '',
+            'unit': '',
+            'solution_text': _numbered(steps),
+            'difficulty': difficulty,
+            'topics': list(arch.topics),
+            'generator_key': arch.key,
+            'params': gen_params,
+            'figure': correct_fig,     # для разбора после ответа
+        }
+
+    raise GenerationError(
+        u'{}: не собрался валидный figure_choice за {} попыток'.format(
+            arch.key, MAX_SAMPLE_ATTEMPTS))
+
+
 def generate_batch(arch, rng, question_type, n):
     """n УНИКАЛЬНЫХ вопросов (ключ: текст + правильный ответ). Если истощили
     попытки (комбинаторика сеток меньше n) — возвращаем сколько есть."""
@@ -407,11 +570,13 @@ def generate_batch(arch, rng, question_type, n):
     while len(out) < n and attempts < n * 60:
         attempts += 1
         try:
-            q = generate_question(arch, rng, question_type)
+            q = (generate_figure_choice(arch, rng)
+                 if question_type == 'figure_choice'
+                 else generate_question(arch, rng, question_type))
         except GenerationError:
             break
         key = (q['statement'], q['correct_value'], q['correct_index'],
-               tuple(q['options']))
+               json.dumps(q['options'], sort_keys=True))
         if key in seen:
             continue
         seen.add(key)

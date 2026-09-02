@@ -78,7 +78,7 @@ class PriceControlArchetype(Archetype):
 
     def _control_sentence(self, params):
         if params['kind'] == 'ceiling':
-            return (u'Власти установили потолок цены — не выше {} ден. ед. '
+            return (u'Власти установили потолок цены: не выше {} ден. ед. '
                     u'за единицу.').format(params['limit'])
         return (u'Власти установили минимальную цену (ценовой пол) {} ден. ед. '
                 u'за единицу.').format(params['limit'])
@@ -98,7 +98,7 @@ class PriceControlArchetype(Archetype):
         ceiling = params['kind'] == 'ceiling'
         limit = fmt_num(params['limit'], latex=True)
         steps = [
-            (u'Равновесная цена ${}$ ден. ед. — ограничение {} её, '
+            (u'Равновесная цена равна ${}$ ден. ед., а ограничение {} её, '
              u'поэтому оно связывает рынок.').format(
                 fmt_num(solved['p0'], latex=True),
                 u'ниже' if ceiling else u'выше'),

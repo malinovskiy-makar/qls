@@ -342,8 +342,24 @@ def problem_detail(request, pk):
         'difficulty_stars': range(difficulty),
         'difficulty_empty': range(5 - difficulty),
         'similar':          similar,
+        # Как эту задачу решают в игре. None, если она в игровой пул не
+        # попала либо попыток ещё мало (порог — game.config.STATS_MIN_ATTEMPTS):
+        # процент на пяти ответах врёт, честнее не показывать ничего.
+        'game_stat':        _game_stat(problem.pk),
     }
     return render(request, 'catalog/problem_detail.html', context)
+
+
+def _game_stat(problem_id):
+    """Статистика задачи в игре — мягко, без жёсткой связи каталога с игрой.
+
+    Приложение `game` может быть выключено или его таблиц может не быть на
+    свежей базе: страница задачи из-за этого падать не должна."""
+    try:
+        from game.stats import problem_stat_summary
+        return problem_stat_summary(problem_id)
+    except Exception:
+        return None
 
 
 # ── Конструктор подборок (Этап Б1) ─────────────────────────────────────────

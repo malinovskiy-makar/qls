@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Календарь — Weconomics</title>
+<title>Календарь · Weconomics</title>
 {% include '_tokens.html' %}
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
@@ -326,7 +326,7 @@
             <div onclick="pickColor('#6b7280')" style="width:20px;height:20px;border-radius:50%;background:#6b7280;cursor:pointer;border:2px solid transparent" title="Серый"></div>
           </div>
         </div>
-        <div style="font-size:13px;color:var(--text3);margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">По умолчанию: синий у занятия, оранжевый у домашки, зелёный у олимпиады</div>
       </div>
 
       <!-- Название -->
@@ -382,7 +382,7 @@
       <div class="form-group" id="assignment-section" style="display:none;">
         <label for="edit-assignment">Связать с домашкой</label>
         <select id="edit-assignment">
-          <option value="">— не привязывать —</option>
+          <option value="">не привязывать</option>
           <!-- Заполняется JS -->
         </select>
       </div>
@@ -492,9 +492,9 @@ function openViewModal(fcEvent) {
   document.getElementById('view-title').textContent = ep.full_title;
 
   // Время
-  const startDt = fcEvent.start ? formatDt(fcEvent.start) : '—';
+  const startDt = fcEvent.start ? formatDt(fcEvent.start) : '–';
   const endDt   = fcEvent.end   ? formatDt(fcEvent.end)   : '';
-  document.getElementById('view-time-val').textContent = endDt ? `${startDt} — ${endDt}` : startDt;
+  document.getElementById('view-time-val').textContent = endDt ? `${startDt} – ${endDt}` : startDt;
 
   // Группы — берём из fcEvent (нет готового поля, скроем строку)
   const groupsRow = document.getElementById('view-groups-row');
@@ -565,7 +565,7 @@ document.getElementById('view-delete-btn').addEventListener('click', () => {
   const ep = _currentEvent.extendedProps;
   if (ep.is_recurring || ep.parent_event_id) {
     const choice = confirm(
-      'Удалить все повторения этого события?\n\nОК — удалить всю серию\nОтмена — только это событие'
+      'Удалить все повторения этого события?\n\nОК: удалить всю серию\nОтмена: только это событие'
     );
     deleteEvent(_currentEvent.id, choice);
   } else {

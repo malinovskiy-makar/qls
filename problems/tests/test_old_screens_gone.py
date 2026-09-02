@@ -257,7 +257,10 @@ class TabTitleTests(Base):
     def test_the_suffix_lives_in_the_base_template(self):
         base = read('teacher', 'templates', 'teacher', 'base.html')
         self.assertIn('{% block title %}', base)
-        self.assertIn('— Weconomics</title>', base)
+        # ⚠️ Разделитель — точка посередине, а не длинное тире: длинное
+        # тире ушло из текстов сайта целиком (правило владельца, 2026-09-02).
+        # Проверяем, что суффикс на месте, а не какой перед ним знак.
+        self.assertIn('Weconomics</title>', base)
 
     def test_no_page_adds_it_by_hand(self):
         """⚠️ Проверка обходит ВСЕ шаблоны кабинета: дефект завёлся тем, что

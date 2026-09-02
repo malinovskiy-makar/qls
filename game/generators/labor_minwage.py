@@ -105,12 +105,12 @@ class LaborMinwageArchetype(Archetype):
         sup = linear_eq('L_s', params['c'], F(params['d']), 'W')
         if full:
             return (u'На рынке труда города N спрос и предложение задаются '
-                    u'функциями {} и {}, где $W$ — часовая ставка оплаты '
-                    u'(в ден. ед.), $L$ — число работников (чел.). '
+                    u'функциями {} и {}, где часовая ставка оплаты $W$ '
+                    u'задана в ден. ед., а число работников $L$ в чел. '
                     u'Государство ввело минимальную ставку оплаты труда '
                     u'(МРОТ) {} ден. ед. в час.').format(
                         dem, sup, params['wm'])
-        return (u'Рынок труда: {} и {} ($W$ — ставка в ден. ед., $L$ — чел.). '
+        return (u'Рынок труда: {} и {} (ставка $W$ в ден. ед., $L$ в чел.). '
                 u'Введён МРОТ {} ден. ед.').format(dem, sup, params['wm'])
 
     def wrappers(self):
@@ -121,9 +121,9 @@ class LaborMinwageArchetype(Archetype):
             dem = linear_eq('L_d', p['a'], -F(p['b']), 'W')
             sup = linear_eq('L_s', p['c'], F(p['d']), 'W')
             return (u'В отрасли лёгкой промышленности страны Икс спрос '
-                    u'фирм на труд равен {}, предложение труда — {} '
-                    u'($W$ — часовая ставка в ден. ед., $L$ — число '
-                    u'работников, чел.). Правительство установило '
+                    u'фирм на труд равен {}, предложение труда равно {} '
+                    u'(часовая ставка $W$ в ден. ед., число '
+                    u'работников $L$ в чел.). Правительство установило '
                     u'минимальную часовую ставку {} ден. ед.').format(
                         dem, sup, p['wm'])
 
@@ -141,8 +141,9 @@ class LaborMinwageArchetype(Archetype):
         ]
         if asked.key in ('unemployment', 'employment'):
             steps.append(
-                (u'МРОТ ${}$ выше равновесной ставки — рынок не приходит '
-                 u'в равновесие. При $W = {}$: $L_d = {}$, $L_s = {}$ чел.').format(
+                (u'МРОТ ${}$ выше равновесной ставки, поэтому рынок не '
+                 u'приходит в равновесие. При $W = {}$: $L_d = {}$, '
+                 u'$L_s = {}$ чел.').format(
                     params['wm'], params['wm'],
                     fmt_num(solved['ld_m'], latex=True),
                     fmt_num(solved['ls_m'], latex=True)))
@@ -154,7 +155,7 @@ class LaborMinwageArchetype(Archetype):
                     fmt_num(solved['unemployment'], latex=True)))
         elif asked.key == 'employment':
             steps.append(
-                u'Занятость определяет короткая сторона рынка — спрос: '
+                u'Занятость определяет короткая сторона рынка, то есть спрос: '
                 u'$L = {}$ чел.'.format(fmt_num(solved['ld_m'], latex=True)))
         return steps
 

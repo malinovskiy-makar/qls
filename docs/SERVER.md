@@ -124,10 +124,33 @@ ssh -T git@github.com     # «Hi malinovskiy-makar/qls! You've successfully auth
 | `postgres` | postgres:17-alpine | **нет** | база |
 | `redis` | redis:7-alpine | **нет** | кэш, сессии, счётчики частоты |
 | `web` | `weconomics-web:latest` (собирается на месте) | **нет** | Django под gunicorn |
+| `ws` | тот же `weconomics-web:latest` | **нет** | WebSocket дуэли под daphne |
+| `search` | `weconomics-search:latest` | **нет** | кодирование поисковых запросов |
 | `nginx` | nginx:1.27-alpine | 80, 443 | единственная дверь снаружи |
 | `certbot` | certbot/certbot | — | выпуск и продление сертификата |
 
 `certbot` сам не поднимается (он в профиле `tools`), его вызывают точечно.
+
+### ⚠️ У `ws` СВОЙ entrypoint, и в нём НЕТ миграций
+
+Образ у `web` и `ws` один, а точки входа разные:
+`deploy/entrypoint.sh` против `deploy/entrypoint-ws.sh`. Это прямое следствие
+запрета ниже: миграции накатывает ровно один процесс. В `entrypoint-ws.sh`
+нет ни `migrate`, ни `collectstatic` — только ожидание служб и запуск daphne.
+
+Живость `ws` проверяется своей ручкой `/ws/health/`: она **не ходит ни в
+Django, ни в базу** и отвечает на вопрос «жив ли ASGI-процесс». gunicorn
+может отвечать, а daphne лежать; сайт при этом полностью живой, а дуэль молча
+превращается в асинхронную, и заметил бы это только игрок посреди забега.
+
+Погасить дуэль в реальном времени, не трогая сайт:
+
+```bash
+cd /srv/weconomics/app/deploy
+docker compose stop ws
+```
+
+Обоснование устройства — [ADR 0062](adr/0062-game-realtime-duel-implemented.md).
 
 ### ⚠️ Контейнер `web` ровно один, и второй поднимать нельзя
 
@@ -204,8 +227,14 @@ URL. Значение вида `a(b)c` для оболочки — уже син
 | 0 | кэш приложения (алиас `default`) |
 | 1 | сессии (алиас `sessions`) |
 | 2 | брокер Celery — зарезервировано |
-| 3 | channel layer для WebSocket — зарезервировано |
+| 3 | channel layer WebSocket-дуэлей (алиас `channels`, `config/settings.py::CHANNEL_LAYERS`) |
 | 14, 15 | только прогоны тестов |
+
+⚠️ **База 3 больше не «зарезервировано» — с ADR 0062 она в работе.**
+`CHANNEL_LAYERS['default']['CONFIG']['hosts']` читает `f'{REDIS_URL}/3'`:
+контейнер `ws` (daphne) и `web` (gunicorn) обмениваются через неё табло
+дуэли и восемь реакций. `REDIS_URL` в `.env` номер базы не содержит — его
+дописывают настройки, как и для кэша/сессий выше.
 
 Кэш и сессии разведены по разным базам не для порядка: `cache.clear()` у
 Redis-бэкенда Django — это `FLUSHDB`, он вычищает базу целиком. Лежи

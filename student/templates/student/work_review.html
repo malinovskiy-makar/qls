@@ -1,7 +1,7 @@
 {% extends "student/base.html" %}
 {% load score %}{% load catalog_filters %}
 
-{% block title %}{{ assignment.name }} — разбор{% endblock %}
+{% block title %}{{ assignment.name }} · разбор{% endblock %}
 
 {% block extra_style %}
 {% include "student/_work_style.html" %}
@@ -149,7 +149,7 @@
 <div class="wr-asstudent">
   <b>Вы смотрите работу глазами ученика.</b>
   {{ student.get_full_name|default:student.username }} видит эту страницу
-  ровно так же. Задачи свёрнуты — раскройте нужную, чтобы поставить балл
+  ровно так же. Задачи свёрнуты: раскройте нужную, чтобы поставить балл
   прямо здесь; сплошной поток проверки живёт на
   <a href="{{ back_url }}">{{ back_label|lower }}</a>.
 </div>
@@ -191,10 +191,10 @@
   <div class="wr-cap" data-wr-cap>по проверенным задачам</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
-  <div class="wr-score">—</div>
+  <div class="wr-score">–</div>
   <div class="wr-cap">ещё ничего не проверено</div>
   {% else %}
-  <div class="wr-score">—</div>
+  <div class="wr-score">–</div>
   <div class="wr-cap">преподаватель откроет результат после проверки</div>
   {% endif %}
 
@@ -236,7 +236,7 @@
      data-chosen="{% if difficulty_vote %}{{ difficulty_vote.value }}{% endif %}">
   <div class="wr-diff-q">Насколько сложной была работа?</div>
   <div class="wr-diff-scale">
-    <span class="wr-diff-end">1 — легко</span>
+    <span class="wr-diff-end">1, легко</span>
     <span class="wr-diff-marks">
       {% for value in difficulty_range %}
       <button type="button" class="wr-diff-mark{% if difficulty_vote and difficulty_vote.value == value %} is-on{% endif %}"
@@ -244,7 +244,7 @@
               aria-label="сложность {{ value }} из 10">{{ value }}</button>
       {% endfor %}
     </span>
-    <span class="wr-diff-end">10 — очень сложно</span>
+    <span class="wr-diff-end">10, очень сложно</span>
   </div>
   <div class="wr-diff-said" id="wr-diff-said"
        {% if not difficulty_vote %}hidden{% endif %}>Спасибо, записали.</div>
@@ -301,7 +301,7 @@
     <span class="wr-points">
       {# Прочерк остался ровно там, где балла ещё НЕТ: задача не сдана или #}
       {# ждёт преподавателя. Пустая задача сданной работы получает честный 0. #}
-      <span data-wr-got>{% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}—{% endif %}</span><small> / {{ row.max_points|ball }} б.</small>
+      <span data-wr-got>{% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}–{% endif %}</span><small> / {{ row.max_points|ball }} б.</small>
     </span>
   </summary>
 
@@ -337,10 +337,10 @@
         {% endcomment %}
         {% include "student/_option_review.html" with option_rows=row.option_review %}
         {% if not row.answer_display %}
-        <div class="wr-mine" style="margin-top:8px;">— ничего не отмечено</div>
+        <div class="wr-mine" style="margin-top:8px;">ничего не отмечено</div>
         {% endif %}
       {% else %}
-        <div class="wr-mine">{% if row.answer_display %}{{ row.answer_display }}{% else %}— не отвечено{% endif %}</div>
+        <div class="wr-mine">{% if row.answer_display %}{{ row.answer_display }}{% else %}не отвечено{% endif %}</div>
         {% if row.item.correct_answer %}
         <div class="part-result-answers" style="margin-top:8px;">
           <span><b>верный ответ:</b> {{ row.item.correct_answer }}</span>
@@ -527,7 +527,7 @@
       })
       .catch(function () {
         save.disabled = false;
-        said.textContent = 'не сохранилось — попробуйте ещё раз';
+        said.textContent = 'не сохранилось, попробуйте ещё раз';
         said.hidden = false;
       });
   });
@@ -578,7 +578,7 @@
         .catch(function () {
           button.classList.remove('is-on');
           said.hidden = false;
-          said.textContent = 'Не удалось сохранить — попробуйте ещё раз.';
+          said.textContent = 'Не удалось сохранить, попробуйте ещё раз.';
         });
     });
   });

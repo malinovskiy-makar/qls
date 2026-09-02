@@ -37,13 +37,16 @@ ProblemPart.answer. Если оба сигнала есть и расходят�
 Запуск: ./venv/bin/python manage.py build_game_pool
         (полная пересборка: пул очищается и наполняется заново)
 """
+import json
+import os
 import re
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-from problems.models import Problem
+from problems.models import AnswerSecondOpinion, Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
+from game.sources import group_of
 from game.models import GameQuestion
 from game.views import parse_exact_number
 
@@ -62,10 +65,13 @@ MAX_NUMERIC_ANSWER_LEN = 50
 # записывает import_vsosh_region, пул денормализует в GameQuestion.unit.
 UNIT_NOTE_RE = re.compile(r'единица ответа:\s*([^;]+)')
 
-MAX_QUESTION_LEN = 300   # символов после чистки переносов
-# numeric (Классика, 600 с на вопрос) — полноценные расчётные задачи с
-# развёрнутым условием, не куцые тестовые вопросы; лимит мягче, чем у
-# быстрых режимов (Пуля/Блиц/Рапид), где длинный текст не читается за секунды.
+# ⚠️ ПОРОГ ДЛИНЫ В ПУЛЕ ОДИН И МЯГКИЙ ДЛЯ ВСЕХ ТИПОВ. Раньше их было два:
+# 300 для boolean/single/multi и 700 для numeric — и вопрос на 450 знаков не
+# попадал в БАЗУ вовсе, хотя Рапиду с его полуминутой на ответ он подходит.
+# Кто из режимов какую длину выдержит, решает отбор при выдаче
+# (config.MODE_MAX_CHARS, game/views.py::_candidate_rows): там это правится
+# одной константой, а здесь — пересборкой пула.
+MAX_QUESTION_LEN = 700   # символов после чистки переносов
 MAX_QUESTION_LEN_NUMERIC = 700
 MIN_QUESTION_LEN = 15
 MAX_OPTION_LEN = 160
@@ -217,11 +223,26 @@ def pool_dedup_wins(candidate, incumbent):
     return candidate.problem_id < incumbent.problem_id
 
 
+# Латинские двойники кириллических букв-меток. В ответах Сборника АА
+# встречается латинская «a» при кириллических метках «а, б, в, г»: на глаз
+# буквы неразличимы, а по коду это разные символы, и сопоставление рушилось.
+# Замер 2026-09-02: так терялись 6 задач АА («aг», «aбг», «a» дважды и др.),
+# причём каждая с виду выглядела правильной. Чиним извлекатель, а не
+# пропускаем задачу.
+# Только НЕОТЛИЧИМЫЕ на глаз пары. Похожие, но различимые («m» и «м»,
+# «h» и «н») сюда не входят: подменять их значило бы гадать.
+LATIN_LOOKALIKES = str.maketrans({
+    'a': 'а', 'e': 'е', 'o': 'о', 'c': 'с', 'p': 'р', 'x': 'х', 'y': 'у',
+})
+
+
 def normalize_label(s):
-    """Нормализация метки/ответа — 1-в-1 как в student.views.auto_check_submission."""
+    """Нормализация метки/ответа — 1-в-1 как в student.views.auto_check_submission,
+    плюс сведение латинских двойников к кириллице (см. LATIN_LOOKALIKES)."""
     if not s:
         return ''
-    return s.lower().strip().rstrip('.').rstrip(')').strip()
+    cleaned = s.lower().strip().rstrip('.').rstrip(')').strip()
+    return cleaned.translate(LATIN_LOOKALIKES)
 
 
 def clean_text(s):
@@ -280,9 +301,14 @@ def reading_length(text):
     return len(GOOD_ARRAY_RE.sub('[таблица]', text))
 
 
-def clean_question(problem, max_len=MAX_QUESTION_LEN):
-    """Чистит текст условия. Возвращает (question, причина_брака)."""
-    question = strip_label_debris(clean_text(problem.statement))
+def clean_question(problem, max_len=MAX_QUESTION_LEN, text=None):
+    """Чистит текст условия. Возвращает (question, причина_брака).
+
+    `text` подменяет problem.statement: у источников со встроенным блоком
+    «Варианты ответа:» вопросом служит только его голова, без вариантов.
+    """
+    source_text = problem.statement if text is None else text
+    question = strip_label_debris(clean_text(source_text))
     question = normalize_formulas(question)
     if len(question) < MIN_QUESTION_LEN:
         return None, 'условие слишком короткое'
@@ -308,11 +334,11 @@ def _has_glued_label(text):
     return bool(GLUED_LABEL_RE.search(text))
 
 
-def clean_options(parts):
-    """Чистит варианты ответа из подпунктов. Возвращает (options, причина).
+def clean_options(texts):
+    """Чистит варианты ответа. Возвращает (options, причина).
     Огрызки меток срезаем только у вопроса: у вариантов ответа ведущая цифра
     часто настоящее число («-$1400», «0.75%») — срезать метку там нельзя."""
-    options = [normalize_formulas(clean_text(p.statement)) for p in parts]
+    options = [normalize_formulas(clean_text(t)) for t in texts]
     if any(not o for o in options):
         return None, 'пустой вариант'
     if any(_has_glued_label(o) for o in options):
@@ -324,18 +350,86 @@ def clean_options(parts):
     return options, None
 
 
+# ── Варианты, вшитые в текст условия ────────────────────────────────────────
+# Так лежит SolveHub: подпунктов ProblemPart у него нет ни у одного теста
+# (2724 из 2729), а варианты стоят прямо в statement блоком «Варианты
+# ответа:», и Problem.answer называет правильный номером строки («3. дохода»).
+# Разбор сверен с сырой выгрузкой источника 2026-09-02: 2724 из 2729 совпали
+# и по составу вариантов, и по правильному ответу, ноль конфликтов; остальные
+# 5 потеряли блок вариантов ещё на импорте. Без этого разбора весь SolveHub
+# отсеивался с причиной «вариантов не 2–6», сколько бы типов ему ни проставили.
+INLINE_MARKER = 'Варианты ответа:'
+INLINE_OPTION_RE = re.compile(r'^\s*(\d{1,2})\.\s+(.*)$')
+
+
+def inline_choice(problem):
+    """Вопрос, варианты и позиции правильных из встроенного блока.
+
+    Возвращает (вопрос, options, positions) либо (None, None, None).
+    Нумерация обязана идти 1, 2, 3 подряд: дыра значит, что за варианты
+    принято что-то другое, и тогда честнее отказаться, чем угадывать.
+    """
+    statement = problem.statement or ''
+    if INLINE_MARKER not in statement:
+        return None, None, None
+    head, _, tail = statement.partition(INLINE_MARKER)
+    options = []
+    expected = 1
+    for line in tail.splitlines():
+        if not line.strip():
+            continue
+        matched = INLINE_OPTION_RE.match(line)
+        if not matched:
+            if options:            # перенос длинного варианта
+                options[-1] += ' ' + line.strip()
+                continue
+            return None, None, None
+        if int(matched.group(1)) != expected:
+            return None, None, None
+        options.append(matched.group(2).strip())
+        expected += 1
+    if not (MIN_OPTIONS <= len(options) <= MAX_OPTIONS):
+        return None, None, None
+
+    positions = []
+    for line in (problem.answer or '').splitlines():
+        matched = INLINE_OPTION_RE.match(line)
+        if matched:
+            index = int(matched.group(1)) - 1
+            if 0 <= index < len(options):
+                positions.append(index)
+    return head.strip(), options, sorted(set(positions))
+
+
+def choice_material(problem):
+    """Сырьё для вопроса с вариантами: подпункты либо встроенный блок.
+
+    Возвращает (голова_условия, тексты_вариантов, метки, позиции_правильных).
+    Голова None значит «вопрос это весь statement» (путь подпунктов),
+    позиции None значат «правильный определяется по меткам подпунктов».
+    """
+    parts = list(problem.parts.all())  # ordering = ['order', 'label']
+    if MIN_OPTIONS <= len(parts) <= MAX_OPTIONS:
+        return (None, [p.statement for p in parts],
+                [normalize_label(p.label) for p in parts], None)
+    head, options, positions = inline_choice(problem)
+    if options is None:
+        return None, None, None, None
+    return head, options, [str(i + 1) for i in range(len(options))], positions
+
+
 def extract_question(problem):
     # single: возвращает (question, options, correct_index, reason_отказа).
     # Любое сомнение → (None, None, None, 'причина').
-    parts = list(problem.parts.all())  # ordering = ['order', 'label']
-    if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
+    head, texts, labels, positions = choice_material(problem)
+    if texts is None:
         return None, None, None, 'вариантов не 2–6'
 
-    question, reason = clean_question(problem)
+    question, reason = clean_question(problem, text=head)
     if reason:
         return None, None, None, reason
 
-    options, reason = clean_options(parts)
+    options, reason = clean_options(texts)
     if reason:
         return None, None, None, reason
 
@@ -343,9 +437,15 @@ def extract_question(problem):
     if reason:
         return None, None, None, reason
 
+    if positions is not None:
+        # Путь встроенного блока: правильный назван номером строки в ответе.
+        if len(positions) != 1:
+            return None, None, None, 'правильный ответ не определён'
+        return question, options, positions[0], None
+
     # Правильный ответ: два независимых сигнала, при конфликте — брак.
+    parts = list(problem.parts.all())
     ans = normalize_label(problem.answer)
-    labels = [normalize_label(p.label) for p in parts]
     marks = [normalize_label(p.answer) == 'верно' for p in parts]
 
     idx_by_label = labels.index(ans) if ans and ans in labels else None
@@ -373,6 +473,20 @@ def extract_boolean(problem):
     независимо от порядка подпунктов в задаче."""
     parts = list(problem.parts.all())
     stmts = [normalize_label(p.statement) for p in parts]
+    if not parts:
+        # Данетка без подпунктов: утверждение это всё условие, а «Верно» или
+        # «Неверно» стоит прямо в Problem.answer. Так лежат 531 данетка
+        # SolveHub; с подпунктами их не сравнить, потому что подпунктов нет.
+        plain = normalize_label(problem.answer)
+        if plain not in ('верно', 'неверно'):
+            return None, None, BOOLEAN_FALLBACK
+        question, reason = clean_question(problem)
+        if reason:
+            return None, None, reason
+        reason = content_reason(question)
+        if reason:
+            return None, None, reason
+        return question, (0 if plain == 'верно' else 1), None
     if sorted(stmts) != ['верно', 'неверно']:
         return None, None, BOOLEAN_FALLBACK
 
@@ -400,23 +514,28 @@ def extract_multi(problem):
     """multi: возвращает (question, options, correct_indices, reason_отказа).
     Правильные — буквы из Problem.answer (строка вида «аб», «а, в»);
     любая буква без пары среди меток или ноль правильных = брак, не гадаем."""
-    parts = list(problem.parts.all())
-    if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
+    head, texts, labels, positions = choice_material(problem)
+    if texts is None:
         return None, None, None, 'вариантов не 2–6'
 
-    question, reason = clean_question(problem)
+    question, reason = clean_question(problem, text=head)
     if reason:
         return None, None, None, reason
-    options, reason = clean_options(parts)
+    options, reason = clean_options(texts)
     if reason:
         return None, None, None, reason
     reason = content_reason(question + ' ' + ' '.join(options))
     if reason:
         return None, None, None, reason
 
-    labels = [normalize_label(p.label) for p in parts]
     if len(set(labels)) != len(labels):
         return None, None, None, 'метки дублируются'
+
+    if positions is not None:
+        # Путь встроенного блока: правильные названы номерами строк в ответе.
+        if not positions:
+            return None, None, None, 'правильный ответ не определён'
+        return question, options, positions, None
 
     letters = [ch for ch in normalize_label(problem.answer)
                if ch not in ANSWER_SEPARATORS]
@@ -455,15 +574,50 @@ def extract_numeric(problem):
 class Command(BaseCommand):
     help = 'Пересобирает игровой пул Econ Rush (кэш GameQuestion) из тестов.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run', action='store_true',
+            help='ничего не писать: только посчитать и показать отчёт')
+        parser.add_argument(
+            '--audit-json', type=str, default='',
+            help='выгрузить судьбу каждого кандидата в JSON (id, источник, '
+                 'причина отказа) для разбора по источникам')
+
     def handle(self, *args, **options):
+        dry = options.get('dry_run')
         canonical_set = set(CANONICAL)
         qs = (Problem.objects
+              # ⚠️ БРАК, НАЙДЕННЫЙ ЧЕЛОВЕКОМ, В ИГРУ НЕ ИДЁТ. `human_review`
+              # ставится по вердиктам ревьюера (см. human_review_mark);
+              # это сильнее любого автоматического детектора качества.
+              .exclude(human_review='defect')
+              # ⚠️ `hidden_pending_review` НЕ ТРЕБУЕМ. Правило пула игры —
+              # «опубликовано и без брака», как у конструктора домашки, а
+              # НЕ правило каталога «только проверенное человеком». Иначе
+              # 562 задачи Сборника АА и весь SolveHub не попали бы в игру
+              # никогда: их просто ещё не смотрели глазами.
               .filter(status='published', needs_quality_review=False,
                       problem_type__in=GAME_TYPES)
-              .prefetch_related('parts', 'topics', 'source_references'))
+              .prefetch_related('parts', 'topics', 'tags',
+                                'source_references__source'))
+
+        # ⚠️ СПОРНЫЙ ОТВЕТ ДЕРЖИМ ВНЕ ИГРЫ, ПОКА ЕГО НЕ ПОСМОТРЕЛ ЧЕЛОВЕК.
+        # Модель отвечала на тест вслепую (answer_second_opinion), и её ответ
+        # не сошёлся с банком. Это ещё не доказательство ошибки банка — но
+        # неверный ключ бьёт по игроку молча: задача выглядит безупречно, а
+        # жизнь снимается за верный ответ. Разобранные расхождения
+        # (resolved=True) возвращаются в пул сами, пересборкой.
+        disputed = set(
+            AnswerSecondOpinion.objects
+            .filter(agrees=False, resolved=False)
+            .values_list('problem_id', flat=True))
 
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
+        if disputed:
+            self.stdout.write(
+                f'Спорных ответов вне пула (второе мнение не разобрано): '
+                f'{len(disputed)}')
 
         pool_by_key = {}      # ключ схлопывания -> (GameQuestion, raw_question)
         rejected = {}
@@ -472,11 +626,26 @@ class Command(BaseCommand):
         debris_fixed = []    # (problem_id, текст до чистки) — аудит Бага 2
         tall_formula = []    # (problem_id, вопрос) — аудит Бага 1
 
+        # Судьба каждого кандидата: id -> (источник, тип, причина или None).
+        # Нужна, чтобы разбирать отсев ПО ИСТОЧНИКАМ, а не общим счётчиком:
+        # «правильный ответ не определён: 492» ничего не говорит о том, чей
+        # это источник и чинить ли извлекатель.
+        audit = {}
+        current = {'id': None, 'source': '', 'type': ''}
+
         def reject(reason):
             rejected[reason] = rejected.get(reason, 0) + 1
+            audit[current['id']] = (current['source'], current['type'], reason)
 
         for p in qs:
             qtype = GAME_TYPES[p.problem_type]
+            first = next(iter(p.source_references.all()), None)
+            current['id'] = p.id
+            current['source'] = first.source.name if first else ''
+            current['type'] = p.problem_type
+            if p.id in disputed:
+                reject('answer_disputed')
+                continue
             correct_index = None
             correct_indices = None
             correct_value = ''
@@ -516,6 +685,15 @@ class Command(BaseCommand):
                     if m:
                         unit = m.group(1).strip()
                     break
+            # Источник — первая привязка задачи. Денормализуем ради фильтра
+            # «источники» на стартовом экране: выбор вопроса читает пул
+            # плоским values_list, а join на SourceReference дал бы дубли
+            # строк у задач с несколькими привязками.
+            source_id, source_group = None, ''
+            first_ref = next(iter(p.source_references.all()), None)
+            if first_ref is not None:
+                source_id = first_ref.source_id
+                source_group = group_of(first_ref.source.name)
             gq = GameQuestion(
                 problem=p,
                 part=None,
@@ -532,6 +710,13 @@ class Command(BaseCommand):
                 year=year,
                 grade=grade,
                 unit=unit if qtype == 'numeric' else '',
+                source_id=source_id,
+                source_group=source_group,
+                # ⚠️ Теги — СПИСКОМ id, как темы списком названий. Не M2M:
+                # выбор вопроса читает пул одним плоским values_list, и join
+                # на теги дал бы дубли строк у задачи с тремя тегами — она
+                # выпадала бы игроку втрое чаще прочих.
+                tag_ids=sorted(t.id for t in p.tags.all()),
             )
 
             # Схлопывание повторов на сборке пула (контент-таблицы Problem/
@@ -539,12 +724,18 @@ class Command(BaseCommand):
             # итоговый кэш). Совпадение ключа → оставляем более свежий year,
             # при равенстве — меньший problem_id; проигравший считается в
             # duplicate_in_pool и не попадает в built.
+            audit[p.id] = (current['source'], current['type'], None)
             key = pool_dedup_key(qtype, question, opts, correct_value)
             incumbent = pool_by_key.get(key)
             if incumbent is not None:
                 duplicate_in_pool += 1
                 if pool_dedup_wins(gq, incumbent[0]):
+                    loser = incumbent[0].problem_id
                     pool_by_key[key] = (gq, raw_question)
+                else:
+                    loser = p.id
+                was = audit.get(loser, ('', '', None))
+                audit[loser] = (was[0], was[1], 'схлопнут повтор')
                 continue
             pool_by_key[key] = (gq, raw_question)
 
@@ -556,17 +747,23 @@ class Command(BaseCommand):
                 tall_formula.append((gq.problem_id, gq.question[:60]))
             built.append(gq)
 
-        with transaction.atomic():
-            # Сгенерированные вопросы (is_generated=True) — отдельный слой
-            # кэша, ими управляют generate_game_questions/purge_generated;
-            # пересборка пула из тестов их НЕ трогает.
-            deleted, _ = GameQuestion.objects.filter(
-                is_generated=False).delete()
-            GameQuestion.objects.bulk_create(built, batch_size=500)
-
-        self.stdout.write(self.style.SUCCESS(
-            f'Пул пересобран: {len(built)} вопросов (было {deleted}), '
-            f'схлопнуто повторов: {duplicate_in_pool}.'))
+        if dry:
+            deleted = GameQuestion.objects.filter(is_generated=False).count()
+            self.stdout.write(self.style.WARNING(
+                f'СУХОЙ ПРОГОН, база не тронута. Собралось бы {len(built)} '
+                f'вопросов (сейчас {deleted}), схлопнуто повторов: '
+                f'{duplicate_in_pool}.'))
+        else:
+            with transaction.atomic():
+                # Сгенерированные вопросы (is_generated=True) — отдельный
+                # слой кэша, ими управляют generate_game_questions и
+                # purge_generated; пересборка пула из тестов их НЕ трогает.
+                deleted, _ = GameQuestion.objects.filter(
+                    is_generated=False).delete()
+                GameQuestion.objects.bulk_create(built, batch_size=500)
+            self.stdout.write(self.style.SUCCESS(
+                f'Пул пересобран: {len(built)} вопросов (было {deleted}), '
+                f'схлопнуто повторов: {duplicate_in_pool}.'))
         by_type = {}
         for g in built:
             key = (g.question_type, g.lang)
@@ -579,6 +776,18 @@ class Command(BaseCommand):
         self.stdout.write('Отсев по причинам:')
         for reason, n in sorted(rejected.items(), key=lambda kv: -kv[1]):
             self.stdout.write(f'  {reason}: {n}')
+
+        audit_path = options.get('audit_json')
+        if audit_path:
+            folder = os.path.dirname(audit_path)
+            if folder and not os.path.isdir(folder):
+                os.makedirs(folder)
+            with open(audit_path, 'w', encoding='utf-8') as fh:
+                json.dump({str(pid): {'source': row[0], 'type': row[1],
+                                      'reason': row[2]}
+                           for pid, row in audit.items()},
+                          fh, ensure_ascii=False)
+            self.stdout.write(f'Разбор судьбы кандидатов: {audit_path}')
 
         self.stdout.write('')
         self.stdout.write(self.style.WARNING(

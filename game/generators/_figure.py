@@ -1,10 +1,16 @@
 u"""
-Схема чертежа к сгенерированной задаче.
+Схема чертежа — ОДНА на все семейства задач.
 
 Чертёж — ДЕКЛАРАТИВНАЯ геометрия в JSON: питон считает числа, браузер рисует
-SVG (game.html::drawFigure). Схема одна на все архетипы — поэтому рисователь
-один и не знает ни про монополию, ни про КПВ. Добавить график новому
-архетипу = вернуть отсюда собранный dict, рисователь трогать не нужно.
+SVG (game/static/game/figure.js). Схема одна на все архетипы — поэтому
+рисователь один и не знает ни про монополию, ни про КПВ. Добавить график
+новому архетипу = вернуть отсюда собранный dict, рисователь трогать не нужно.
+
+⚠️ Файл лежит в `generators/`, но с ветки `feat/econ-rush-figure` его читает и
+второе семейство — сюжеты режима «График» (`game/figures/`). Схему НЕ копируем
+и второго модуля не заводим: рисователь один, значит и словарь его языка один.
+Копия разошлась бы с оригиналом ровно так же, как разошёлся бы второй
+рисователь.
 
 Формат (всё в координатах ЗАДАЧИ, не в пикселях — пересчёт делает клиент):
 
@@ -26,9 +32,11 @@ SVG (game.html::drawFigure). Схема одна на все архетипы �
 """
 from fractions import Fraction
 
-# Смысловые слои, которые понимает рисователь (game.html::FIG_ROLES).
+# Смысловые слои, которые понимает рисователь (figure.js::FIG_ROLES).
+# atc  — средние издержки (янтарный из палитры чертежа);
+# zone — область, которую игрок обязан проверить (акцент игры).
 ROLES = ('d', 's', 'mr', 'mc', 'tax', 'dwl', 'reg', 'ghost', 'cs', 'ps',
-         'ppf', 'feasible')
+         'ppf', 'feasible', 'atc', 'zone')
 
 
 def num(v):
@@ -55,17 +63,55 @@ def line(role, label, p_from, p_to, dash=False):
             'dash': bool(dash)}
 
 
-def area(role, points, label=''):
-    """Заливка по вершинам многоугольника (излишки, потери, налог)."""
+def area(role, points, label='', outline=False):
+    u"""Заливка по вершинам многоугольника (излишки, потери, налог).
+
+    outline=True — заливка светлее, зато по контуру идёт сплошная линия.
+    Так область читается как «вот эта фигура», а не как цветное пятно поверх
+    кривых. Значение по умолчанию оставлено прежним, иначе у семнадцати
+    архетипов молча изменился бы вид уже проверенных чертежей.
+
+    ⚠️ Порядок обхода вершин значения не имеет: рисователь не считает
+    ориентацию (и по часовой, и против даёт один и тот же многоугольник).
+    """
     assert role in ROLES, role
-    return {'role': role, 'label': label,
-            'points': [pt(p[0], p[1]) for p in points]}
+    a = {'role': role, 'label': label,
+         'points': [pt(p[0], p[1]) for p in points]}
+    if outline:
+        a['outline'] = True
+    return a
 
 
-def point(x, y, label='', role='d'):
-    """Ключевая точка (равновесие, оптимум монополиста)."""
+def rect_area(role, x0, y0, x1, y1, label='', outline=True):
+    u"""Прямоугольник области: прибыль, сбор государства, выручка.
+
+    Отдельная функция, а не «многоугольник из четырёх точек от руки»: у
+    прямоугольника всегда одна и та же геометрия, и собирать её каждый раз
+    заново — верный способ однажды перепутать порядок вершин и получить
+    «бабочку». Углы можно задавать в любом порядке.
+    """
     assert role in ROLES, role
-    return {'x': num(x), 'y': num(y), 'label': label, 'role': role}
+    lo_x, hi_x = sorted([Fraction(x0), Fraction(x1)])
+    lo_y, hi_y = sorted([Fraction(y0), Fraction(y1)])
+    a = area(role, [(lo_x, lo_y), (hi_x, lo_y), (hi_x, hi_y), (lo_x, hi_y)],
+             label=label, outline=outline)
+    a['shape'] = 'rect'
+    return a
+
+
+def point(x, y, label='', role='d', coords=False):
+    u"""Ключевая точка (равновесие, оптимум монополиста).
+
+    coords=True — рядом с именем рисуются сами координаты: «E_0 (40; 60)».
+    В режиме «График» игрок обязан их СЧИТАТЬ, а не угадывать по картинке,
+    поэтому числа стоят прямо у точки. Собирает подпись рисователь: числа он
+    и так знает, а склеивать их здесь значило бы дублировать данные.
+    """
+    assert role in ROLES, role
+    p = {'x': num(x), 'y': num(y), 'label': label, 'role': role}
+    if coords:
+        p['coords'] = True
+    return p
 
 
 def mark(axis, at, label):
@@ -74,8 +120,33 @@ def mark(axis, at, label):
     return {'axis': axis, 'at': num(at), 'label': label}
 
 
+def broken_line(role, label, points, dash=False):
+    u"""Ломаная по точкам — совместная КПВ с изломом и подобное.
+
+    Двумя отдельными `line` это не собрать: в изломе они разошлись бы на
+    полпикселя, а подпись встала бы дважды.
+    """
+    assert role in ROLES, role
+    return {'role': role, 'label': label,
+            'points': [pt(p[0], p[1]) for p in points],
+            'dash': bool(dash)}
+
+
+def callout(text, points, role='zone'):
+    u"""Выноска с числом у своей области.
+
+    points — вершины области, к которой относится число. Помещается ли текст
+    внутрь, решает РИСОВАТЕЛЬ: он один знает ширину надписи в пикселях. Не
+    помещается — выносит наружу и ведёт к области хвостик.
+    """
+    assert role in ROLES, role
+    return {'text': text, 'role': role,
+            'points': [pt(p[0], p[1]) for p in points]}
+
+
 def figure(kind, xmax, ymax, xlabel, ylabel,
-           lines=None, areas=None, points=None, marks=None):
+           lines=None, areas=None, points=None, marks=None,
+           polylines=None, callouts=None):
     """Собирает чертёж. Пустые слои не кладём — JSON в базе меньше и чище."""
     fig = {'kind': kind,
            'xmax': num(xmax), 'ymax': num(ymax),
@@ -88,6 +159,10 @@ def figure(kind, xmax, ymax, xlabel, ylabel,
         fig['points'] = points
     if marks:
         fig['marks'] = marks
+    if polylines:
+        fig['polylines'] = polylines
+    if callouts:
+        fig['callouts'] = callouts
     return fig
 
 

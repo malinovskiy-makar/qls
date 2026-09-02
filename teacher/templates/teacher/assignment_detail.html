@@ -1,6 +1,6 @@
 {% extends "teacher/base.html" %}
 
-{% block title %}{{ assignment.name }} — проверка{% endblock %}
+{% block title %}{{ assignment.name }} · проверка{% endblock %}
 
 {% block extra_style %}
 /* На узком экране таблица прокручивается ВНУТРИ себя, а не тянет страницу. */
@@ -139,7 +139,7 @@
 </div>
 
 <div class="k-hint" style="margin-bottom:18px">
-  Тесты и утверждённые задачи оценены автоматически — вам остаются
+  Тесты и утверждённые задачи оценены автоматически, вам остаются
   открытые задачи.
 </div>
 
@@ -185,7 +185,7 @@
         {% if sub.submitted_at %}
           {{ sub.submitted_at|date:"d.m.Y H:i" }}
         {% else %}
-          —
+          –
         {% endif %}
       </td>
       <td>

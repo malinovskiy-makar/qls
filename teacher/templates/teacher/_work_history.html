@@ -42,7 +42,7 @@
         <th data-type="num">Оценка</th>
         {% if for_group and not solo %}
         <th data-type="num">Невовремя / не сдано
-          {% include "_hint.html" with hint="Первое число — сдали после срока. Второе — не сдали совсем." %}
+          {% include "_hint.html" with hint="Первое число: сдали после срока. Второе: не сдали совсем." %}
         </th>
         {% elif solo %}
         {% comment %}
@@ -72,18 +72,18 @@
           {% if row.open_percent is not None %}
           <span class="k-level k-level--{{ row.open_level }}">{{ row.open_percent }} %</span>
           {% elif not row.has_open %}<span class="wk-nothing">нет задач</span>
-          {% else %}—{% endif %}
+          {% else %}–{% endif %}
         </td>
         <td class="wk-num" data-type="num" data-sort="{{ row.test_percent|default:-1 }}">
           {% if row.test_percent is not None %}
           <span class="k-level k-level--{{ row.test_level }}">{{ row.test_percent }} %</span>
           {% elif not row.has_test %}<span class="wk-nothing">нет тестов</span>
-          {% else %}—{% endif %}
+          {% else %}–{% endif %}
         </td>
         <td class="wk-num" data-type="num" data-sort="{{ row.mark|default:-1 }}">
           {% if row.mark is not None %}
           <span class="k-level k-level--{{ row.mark_level }}">{{ row.mark }} %</span>
-          {% else %}—{% endif %}
+          {% else %}–{% endif %}
         </td>
         {% if for_group and not solo %}
         {% comment %}
@@ -98,7 +98,7 @@
         {% endcomment %}
         <td class="wk-num" data-type="num" data-sort="{{ row.missing }}">
           {% if row.not_submitted %}<span class="wk-none">никто не сдал</span>
-          {% else %}{% if row.late is not None %}{{ row.late }}{% else %}—{% endif %} / {{ row.missing }}{% endif %}</td>
+          {% else %}{% if row.late is not None %}{{ row.late }}{% else %}–{% endif %} / {{ row.missing }}{% endif %}</td>
         {% elif solo %}
         {% comment %}
         ⚠️ У ОДНОГО УЧЕНИКА два числа «невовремя / не сдано» вырождаются в
@@ -111,7 +111,7 @@
           {% else %}<span class="wk-flag wk-flag--none">не сдана</span>{% endif %}
         </td>
         {% else %}
-        <td class="wk-num" data-type="date" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+        <td class="wk-num" data-type="date" data-sort="{{ row.submitted_at|date:'U'|default:0 }}">{% if row.submitted_at %}{{ row.submitted_at|date:"d.m.Y" }}{% else %}–{% endif %}</td>
         {% endif %}
         <td class="wk-num" data-type="date" data-sort="{{ row.deadline|date:'U'|default:0 }}">{% if row.deadline %}{{ row.deadline|date:"d.m.Y" }}{% else %}без срока{% endif %}</td>
       </tr>

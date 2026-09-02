@@ -1,6 +1,6 @@
 {% extends "catalog/base.html" %}
 
-{% block title %}Экспорт — {{ collection.name }}{% endblock %}
+{% block title %}Экспорт · {{ collection.name }}{% endblock %}
 
 {% block extra_style %}
 .export-wrap {
@@ -260,7 +260,7 @@
         <button class="dl-btn dl-btn-disabled" disabled>Скачать PDF</button>
         <p class="no-xelatex-note">
           PDF-компиляция недоступна на сервере.<br>
-          Скачайте <strong>.tex</strong> ниже и откройте в <a href="https://overleaf.com" target="_blank">Overleaf</a> — там бесплатная компиляция.
+          Скачайте <strong>.tex</strong> ниже и откройте в <a href="https://overleaf.com" target="_blank">Overleaf</a>, там бесплатная компиляция.
         </p>
       {% endif %}
     </div>

@@ -273,7 +273,7 @@
         ⚠️ Текст подсказки про сложность ТОТ ЖЕ, что у карточки «Средняя
         сложность работ»: два объяснения одного числа разъехались бы.
         {% endcomment %}
-        {% if row.percent is not None %}<b>{{ row.percent }}%</b>{% if solo %}оценка{% else %}средняя оценка{% endif %}{% else %}<b>—</b>{% if solo %}работа не сдана{% else %}никто не сдал{% endif %}{% endif %}{% if row.difficulty_hint %}{% include '_hint.html' with hint=row.difficulty_hint %}{% endif %}
+        {% if row.percent is not None %}<b>{{ row.percent }}%</b>{% if solo %}оценка{% else %}средняя оценка{% endif %}{% else %}<b>–</b>{% if solo %}работа не сдана{% else %}никто не сдал{% endif %}{% endif %}{% if row.difficulty_hint %}{% include '_hint.html' with hint=row.difficulty_hint %}{% endif %}
       </div>
       {% endif %}
       </div>
@@ -303,7 +303,7 @@
   {% else %}
   <div class="empty-state">
     <p>{% if solo %}У этого ученика пока нет заданий.{% else %}В группе пока нет заданий.{% endif %}</p>
-    <p>Создайте домашку или контрольную — они появятся здесь.</p>
+    <p>Создайте домашку или контрольную, и они появятся здесь.</p>
   </div>
   {% endif %}
 

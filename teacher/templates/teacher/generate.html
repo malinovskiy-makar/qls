@@ -213,7 +213,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
   <div class="gen-card">
     <h2>Вот что нашлось по вашему запросу</h2>
     <div class="sub">
-      Под каждой строкой — реальные задачи из банка. Не то? Поправьте
+      Под каждой строкой стоят реальные задачи из банка. Не то? Поправьте
       формулировку строки своими словами и нажмите «Переискать»: обращения
       к модели это не стоит.
     </div>
@@ -223,7 +223,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     сложность это предпочтение, а «сколько задач» — точное число.
     {% endcomment %}
     <div class="k-hint" style="margin-bottom:10px">
-      «Сколько задач» — точное число. «Сложность» — предпочтение, а не
+      «Сколько задач» задаёт точное число. «Сложность» это предпочтение, а не
       жёсткий отбор: задачи другой сложности встанут ниже, но могут попасть.
     </div>
 
@@ -238,7 +238,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     <div class="gen-tally">
       {% for line in plan_summary %}
       <span class="tally tally--{{ line.state }}">
-        <b>{{ line.word }}: {{ line.got }}{% if line.show_need %} из {{ line.need }}{% endif %}</b>{% if line.why %} — {{ line.why }}{% endif %}
+        <b>{{ line.word }}: {{ line.got }}{% if line.show_need %} из {{ line.need }}{% endif %}</b>{% if line.why %}: {{ line.why }}{% endif %}
       </span>
       {% if line.missing %}
       <button type="submit" class="k-btn k-btn--plain k-btn--sm"
@@ -342,7 +342,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
           {% endcomment %}
           <li class="pf-none">По этой строке в банке ничего не нашлось.
             Поправьте формулировку своими словами и нажмите
-            «Переискать» — это бесплатно, к модели обращаться не нужно.
+            «Переискать» бесплатно, к модели обращаться не нужно.
             Или уберите строку и доберите задачу из каталога на следующем
             шаге.</li>
           {% endfor %}
@@ -355,7 +355,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
                   {% if not preview.has_more %}disabled{% endif %}>
             Показать ещё 5
           </button>
-          <span class="k-hint" style="margin-left:8px">поиск по банку —
+          <span class="k-hint" style="margin-left:8px">поиск по банку,
             обращений к модели не стоит</span>
         </div>
         {% endif %}
@@ -379,7 +379,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
               data-exam="{% if is_exam %}1{% else %}0{% endif %}"
               data-group="{{ group_id }}"
               data-build-url="{% url 'teacher:work_compose' %}">
-        Дальше — состав →
+        Дальше состав →
       </button>
       <button type="submit" class="k-btn k-btn--plain" name="step_action" value="research">
         Переискать по моим формулировкам
@@ -394,7 +394,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
     первом шаге. Расход по-прежнему пишется построчно в `AiUsageLog`.
     {% endcomment %}
     <div class="gen-cost">
-      {% if cached %}Ответ взят из кэша — обращения не было.
+      {% if cached %}Ответ взят из кэша, обращения не было.
       {% endif %}осталось {{ left_today|count_ru:"разбор,разбора,разборов" }} сегодня
     </div>
   </div>
@@ -406,7 +406,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
   <h2>Найдено задач: {{ results|length }}</h2>
   <div class="sub">
     Снимите галочку у ненужной задачи. «Подобрать другие» ищет заново, минуя
-    уже показанные. Готово — отправьте в конструктор домашки.
+    уже показанные. Готово? Отправьте в конструктор домашки.
     {% if far_count %}
     <br><b>{{ far_count }}</b> из них помечены «ближайшее что нашлось»: по
     вашей формулировке точнее в банке не оказалось, и вместо пустого места
@@ -479,7 +479,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
             data-exam="{% if is_exam %}1{% else %}0{% endif %}"
             data-group="{{ group_id }}"
             data-build-url="{% url 'teacher:work_compose' %}">
-      Дальше — состав →
+      Дальше состав →
     </button>
     <button type="button" class="k-btn k-btn--plain" id="again">Подобрать другие</button>
     <a href="{% url 'teacher:assignment_generate' %}" class="k-btn k-btn--quiet">Начать заново</a>
@@ -731,7 +731,7 @@ HTMLInputElement]» — 404. Чиним обеими сторонами: имя 
         syncPicks();
       })
       .catch(function () {
-        button.textContent = 'Не получилось — нажмите ещё раз';
+        button.textContent = 'Не получилось, нажмите ещё раз';
         button.disabled = false;
       });
   }

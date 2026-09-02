@@ -122,7 +122,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 </head>
 <body>
 <div class="wrap">
-  <a class="brand" href="{{ game_url }}"><b>Weconomics</b> · Econ Rush</a>
+  <a class="brand" href="{{ game_url }}"><b>Weconomics</b> · Wecon Rush</a>
 
   <div class="card">
     <span class="chip">{{ mode_title }}</span>
@@ -140,7 +140,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
         <span>макс. комбо</span>
       </div>
       <div class="fact">
-        <b>{% if r.ended_reason == 'lives' %}0/3{% else %}—{% endif %}</b>
+        <b>{% if r.ended_reason == 'lives' %}0/3{% else %}–{% endif %}</b>
         <span>{% if r.ended_reason == 'lives' %}жизни кончились{% else %}время вышло{% endif %}</span>
       </div>
     </div>
@@ -180,7 +180,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
     </div>
   </div>
 
-  <p class="foot">Econ Rush — игра на скорость по олимпиадной экономике.
+  <p class="foot">Wecon Rush – игра на скорость по олимпиадной экономике.
     <a href="{{ game_url }}">Играть</a></p>
 </div>
 
@@ -195,7 +195,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 
   copy.addEventListener('click', function () {
     function done(ok) {
-      copy.textContent = ok ? 'Скопировано ✓' : 'Не вышло — скопируйте вручную';
+      copy.textContent = ok ? 'Скопировано ✓' : 'Не вышло, скопируйте вручную';
       setTimeout(function () { copy.textContent = 'Скопировать ссылку'; }, 2000);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {

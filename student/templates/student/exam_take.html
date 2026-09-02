@@ -1,7 +1,7 @@
 {% extends "student/base.html" %}
 {% load static %}
 
-{% block title %}{{ assignment.name }} — идёт контрольная{% endblock %}
+{% block title %}{{ assignment.name }} · идёт контрольная{% endblock %}
 
 {% block extra_style %}
 {% include "student/_work_style.html" %}
@@ -56,7 +56,7 @@
     <div class="exam-bar-cap">осталось</div>
     <div class="exam-timer" id="timer"
          data-seconds="{{ seconds_left|default_if_none:'' }}">
-      {% if seconds_left is None %}без ограничения{% else %}—:—{% endif %}
+      {% if seconds_left is None %}без ограничения{% else %}–:–{% endif %}
     </div>
   </div>
   <div class="qnav" id="qnav">

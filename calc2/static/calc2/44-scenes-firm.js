@@ -394,9 +394,9 @@ function updateCostsPanel() {
   if (mATC && mAVC)
     html += '<div class="hint">В точках закрытия и безубыточности MC пересекает соответственно AVC и ATC (в их минимумах).</div>';
   else if (mATC)
-    html += '<div class="hint">В точке безубыточности MC пересекает ATC — ровно в её минимуме.</div>';
+    html += '<div class="hint">В точке безубыточности MC пересекает ATC ровно в её минимуме.</div>';
   else if (mAVC)
-    html += '<div class="hint">В точке закрытия MC пересекает AVC — ровно в её минимуме.</div>';
+    html += '<div class="hint">В точке закрытия MC пересекает AVC ровно в её минимуме.</div>';
   html = updateLongRunPanel(html);   // 9в — цена, оптимум P = MC, прибыль/убыток
   box.innerHTML = html;
 }
@@ -646,7 +646,7 @@ function updateLongRunPanel(html) {
      Разбирается ПЕРВЫМ: у закрытия числа есть, и они важнее объяснения. */
   if (lr.shutdown) {
     html += '<div class="stat"><span>Выпуск Q</span><b>0</b></div>';
-    html += `<div class="stat"><span>Убыток = FC</span><b>${lr.profit == null ? '—' : fmt(-lr.profit)}</b></div>`;
+    html += `<div class="stat"><span>Убыток = FC</span><b>${lr.profit == null ? '–' : fmt(-lr.profit)}</b></div>`;
     if (lr.Qmc != null) html += `<div class="stat"><span>Корень P = MC (не выбор фирмы)</span><b>${fmt(lr.Qmc)}</b></div>`;
     if (lr.breakeven != null) html += `<div class="stat"><span>Вход/выход: P = min ATC</span><b>${fmt(lr.breakeven)}</b></div>`;
     if (lr.note || lr.extra) html += `<div class="hint" style="margin-top:4px;">${lr.note || lr.extra}</div>`;
@@ -1075,7 +1075,7 @@ function redrawPlants() {
     markExpr(g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
              STATE.pl2, 'Q', [0, p.qMax]);
     g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line)
-      .attr('data-numeric', 'совокупная TC — минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет');
+      .attr('data-numeric', 'совокупная TC это минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет');
     label(p.qMax * 0.7, plantTC(p.c1, p.qMax * 0.7), 'TC₁', COL.tax);
     label(p.qMax * 0.45, plantTC(p.c2, p.qMax * 0.45), 'TC₂', COL.reg);
     const mid = plantsAt(p.Qtot * 0.7); if (mid) label(mid.Q, mid.tcDirect, 'TC совокупная', COL.D);

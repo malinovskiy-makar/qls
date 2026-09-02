@@ -75,7 +75,7 @@
     timeUp = true;
     paintTimer();
     if (stateNode) {
-      stateNode.textContent = 'время вышло — работа сдаётся';
+      stateNode.textContent = 'время вышло, работа сдаётся';
     }
     flushAll(true);
   }
@@ -101,7 +101,7 @@
     stateNode.classList.toggle('is-offline', offline);
     stateNode.classList.toggle('is-saving', !offline && saving > 0);
     if (offline) {
-      stateNode.textContent = 'нет связи — ответы сохранены на странице, '
+      stateNode.textContent = 'нет связи, ответы сохранены на странице, '
         + 'пробуем отправить';
     } else if (saving > 0) {
       stateNode.textContent = 'сохраняем…';

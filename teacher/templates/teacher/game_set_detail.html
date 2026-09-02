@@ -1,0 +1,138 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+  Доска набора глазами автора. Самое ценное здесь — не список счетов, а
+  нижняя таблица: на каких вопросах посыпался класс. Доля верных считается
+  ВНУТРИ набора, а не по всему сайту.
+{% endcomment %}
+{% block title %}Набор {{ gset.code }}{% endblock %}
+
+{% block extra_style %}
+<style>
+  .sd-kind { font-size: .78rem; font-weight: 700; letter-spacing: .08em;
+             text-transform: uppercase; color: var(--accent); }
+  .sd-meta { color: var(--text2); margin-top: 6px; font-size: .92rem; }
+  .sd-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+             letter-spacing: .12em; font-weight: 700; font-size: 1.05rem; }
+  .sd-share { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;
+              align-items: center; }
+  .sd-share input {
+    font: inherit; font-size: .86rem; padding: 8px 10px; min-width: 320px;
+    border: 1px solid var(--border); border-radius: 9px;
+    background: var(--surface-2); color: var(--text);
+  }
+  .sd-btn { font: inherit; font-size: .9rem; font-weight: 600;
+            padding: 8px 16px; border-radius: 9px; cursor: pointer;
+            border: 1px solid var(--btn-bg); background: var(--btn-bg);
+            color: var(--on-btn); text-decoration: none; display: inline-block; }
+  .sd-btn.ghost { background: var(--surface); color: var(--text);
+                  border-color: var(--border); }
+  h2 { font-size: 1.05rem; margin: 26px 0 10px; }
+  .sd-box { border: 1px solid var(--border); border-radius: 12px;
+            background: var(--surface); overflow-x: auto; }
+  table.sd { border-collapse: collapse; width: 100%; font-size: .9rem; }
+  table.sd th, table.sd td { padding: 9px 12px; text-align: left;
+                             border-bottom: 1px solid var(--border); }
+  table.sd th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
+  table.sd td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  table.sd td.q { max-width: 460px; }
+  .sd-hard { color: var(--error); font-weight: 700; }
+  .sd-empty { padding: 28px; text-align: center; color: var(--text2); }
+  .sd-note { margin-top: 10px; font-size: .82rem; color: var(--text2); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="sd-kind">{{ gset.get_kind_display }}</div>
+<h1>{{ gset.title }}</h1>
+<p class="sd-meta">
+  Режим «{{ mode_title }}» · {{ gset.size }} вопр. ·
+  попыток на человека: {{ gset.attempts_allowed }} ·
+  код <span class="sd-code">{{ gset.code }}</span>
+</p>
+
+<div class="sd-share">
+  <input type="text" id="link" value="{{ play_url }}" readonly>
+  <button class="sd-btn" id="copy">Скопировать ссылку</button>
+  <a class="sd-btn ghost" href="{{ play_url }}">Открыть</a>
+  <a class="sd-btn ghost" href="{{ board_url }}">Публичная доска</a>
+  <a class="sd-btn ghost" href="{% url 'teacher:game_sets' %}">Все наборы</a>
+</div>
+
+<h2>Кто прошёл</h2>
+<div class="sd-box">
+  <table class="sd">
+    <thead>
+      <tr><th>#</th><th>Игрок</th><th class="num">Счёт</th>
+          <th class="num">Точность</th><th class="num">Макс. комбо</th>
+          <th>Чем кончилось</th><th>Когда</th></tr>
+    </thead>
+    <tbody>
+    {% for r in board %}
+      <tr>
+        <td class="num">{{ r.place }}</td>
+        <td>{{ r.name }}</td>
+        <td class="num">{{ r.score }}</td>
+        <td class="num">{{ r.accuracy }}%</td>
+        <td class="num">×{{ r.max_combo }}</td>
+        <td>
+          {% if r.reason == 'lives' %}выбыл
+          {% elif r.reason == 'set_done' %}прошёл до конца
+          {% elif r.reason == 'pool_empty' %}вопросы кончились
+          {% else %}время вышло{% endif %}
+        </td>
+        <td>{{ r.at|date:"d.m H:i" }}</td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="7" class="sd-empty">
+        Набор ещё никто не сыграл. Раздайте код классу.
+      </td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2>На чём посыпался класс</h2>
+<div class="sd-box">
+  <table class="sd">
+    <thead>
+      <tr><th>№</th><th>Вопрос</th><th class="num">Верно</th>
+          <th class="num">Неверно</th><th class="num">Пропуск</th>
+          <th class="num">% верных</th></tr>
+    </thead>
+    <tbody>
+    {% for q in questions %}
+      <tr>
+        <td class="num">{{ q.number }}</td>
+        <td class="q">{{ q.text }}</td>
+        <td class="num">{{ q.correct }}</td>
+        <td class="num">{{ q.wrong }}</td>
+        <td class="num">{{ q.skip }}</td>
+        <td class="num {% if q.percent is not None and q.percent < 50 %}sd-hard{% endif %}">
+          {% if q.percent is not None %}{{ q.percent }}%{% else %}–{% endif %}
+        </td>
+      </tr>
+    {% empty %}
+      <tr><td colspan="6" class="sd-empty">В наборе нет вопросов.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="sd-note">
+  Доля верных считается ВНУТРИ этого набора, по забегам тех, кто его играл.
+  Пропуск в долю не входит: он не ответ.
+</p>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.getElementById('copy').addEventListener('click', function () {
+  var input = document.getElementById('link');
+  var btn = this;
+  function done() { btn.textContent = 'Скопировано ✓';
+                    setTimeout(function () { btn.textContent = 'Скопировать ссылку'; }, 2000); }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
+  } else { input.select(); document.execCommand('copy'); done(); }
+});
+</script>
+{% endblock %}
