@@ -53,6 +53,38 @@ def has_graph_in_statement(text, has_problem_figure=False):
     return bool(_GRAPH_MARKER_RE.search(text or ''))
 
 
+def graphical_solution_signal(problem):
+    """Код-признак §6.2 / 0-бис.3: у задачи есть `ProblemFigure`,
+    привязанная к РЕШЕНИЮ (`source_field='solution'`).
+
+    Особенность «Графическое решение» определена через solution
+    («решение по существу опирается на построение или чтение графика»),
+    но спрашивается у модели в вызове 1, куда solution не подаётся вовсе
+    (§3.4) — прямое доказательство физически не может дойти до модели.
+    Картинка у УСЛОВИЯ (`statement`/`import`) сюда не считается: она
+    доказывает другое — что график есть в условии, а не в решении.
+    """
+    return problem.figures.filter(source_field='solution').exists()
+
+
+def merge_graphical_solution(features_1, problem):
+    """`(итог, источник)` — особенность «графическое_решение» объединена
+    по ИЛИ с `graphical_solution_signal`. `источник` — 'model' / 'code' /
+    'both' / 'none', нужен для разбивки инварианта («сколько от модели,
+    сколько добавил код, сколько совпало»)."""
+    from_model = 'графическое_решение' in (features_1 or [])
+    from_code = graphical_solution_signal(problem)
+    if from_model and from_code:
+        source = 'both'
+    elif from_model:
+        source = 'model'
+    elif from_code:
+        source = 'code'
+    else:
+        source = 'none'
+    return (from_model or from_code), source
+
+
 def has_table_in_statement(text):
     """«Табличка в условии» (docs/TAXONOMY.md §7, особенность 12).
 
@@ -169,6 +201,126 @@ def truncate_to_tokens(source, max_tokens):
     if len(pieces) <= max_tokens:
         return source, False
     return enc.decode(pieces[:max_tokens]), True
+
+
+
+# ---------------------------------------------------------------------------
+# Фаза 0.4 (подготовка боевого прогона, 02.09.2026): растровая картинка
+# уходит В ВЫЗОВ 1 КАРТИНКОЙ — вслед за подтверждённым фактом, что
+# GLM-5.3-Flash её читает (проверено реальным вызовом, токены изображения
+# в usage ненулевые). Чертёж-TikZ (`looks_like_tikz`) уже ушёл текстом
+# через `with_tikz_sources` — картинкой его дублировать не за чем.
+# ---------------------------------------------------------------------------
+
+#: Картинка относится к УСЛОВИЮ — только эти `source_field` идут в вызов 1.
+#: `solution` тоже бывает у ProblemFigure, но решение в вызов 1 не подаётся
+#: (§3.4 API_RUN_MASTER), и картинка к нему для понимания условия бесполезна.
+RASTER_CALL1_SOURCE_FIELDS = ('import', 'statement')
+
+#: Форматы, которые принимает `GLMProvider`/`OpenAIProvider` без конверсии.
+NATIVE_IMAGE_TYPES = ('image/png', 'image/jpeg')
+
+#: Длинная сторона и потолок байт после сжатия — ориентир, а не измеренный
+#: лимит Z.AI (в документации не опубликован). Выбран с запасом: типичные
+#: multimodal-эндпоинты сжимают/режут крупнее этого сами, а картинки корпуса
+#: (медиана заметно меньше) под потолок почти никогда не попадают.
+MAX_IMAGE_LONG_SIDE = 2048
+MAX_IMAGE_BYTES = 5_000_000
+
+
+def prepare_raster_image(content_type, data,
+                         max_long_side=MAX_IMAGE_LONG_SIDE,
+                         max_bytes=MAX_IMAGE_BYTES):
+    """`(content_type, bytes, статистика)` — картинка, готовая к отправке.
+
+    Конвертирует не-PNG/JPEG в PNG (GIF, BMP — 5 записей в банке на
+    02.09.2026), уменьшает по длинной стороне, если она больше
+    `max_long_side`, либо байт больше `max_bytes`. Оригинал в базе не
+    трогает — работает с байтами, переданными в память.
+
+    Статистика: `{'converted': bool, 'resized': bool}` — печатается в
+    отчёте Фазы 0, чтобы не молчать о том, скольких картинок это коснулось.
+    """
+    from PIL import Image
+    import io
+
+    stats = {'converted': False, 'resized': False}
+    needs_convert = content_type not in NATIVE_IMAGE_TYPES
+
+    try:
+        with Image.open(io.BytesIO(data)) as img:
+            img.load()  # ⚠️ Image.open ленивый — распознаёт заголовок, но
+            # не тело; без .load() усечённый/битый файл проходит эту
+            # проверку и падает позже, уже за пределами try. Тест на это
+            # есть отдельно (b'...not-a-real-png').
+            if not needs_convert and len(data) <= max_bytes and max(img.size) <= max_long_side:
+                return content_type, data, stats
+
+            img = img.convert('RGB') if img.mode not in ('RGB', 'RGBA') else img
+            if max(img.size) > max_long_side:
+                ratio = max_long_side / max(img.size)
+                new_size = (max(1, int(img.width * ratio)),
+                           max(1, int(img.height * ratio)))
+                img = img.resize(new_size, Image.LANCZOS)
+                stats['resized'] = True
+
+            out = io.BytesIO()
+            fmt = 'JPEG' if content_type == 'image/jpeg' and not needs_convert else 'PNG'
+            if fmt == 'JPEG':
+                img.save(out, format='JPEG', quality=90)
+                new_type = 'image/jpeg'
+            else:
+                img.save(out, format='PNG')
+                new_type = 'image/png'
+            if needs_convert:
+                stats['converted'] = True
+
+            new_bytes = out.getvalue()
+            if len(new_bytes) > max_bytes and not stats['resized']:
+                # Ещё слишком тяжёлая (например огромный PNG без лишних
+                # пикселей) — жмём по длинной стороне жёстче одним шагом,
+                # не гоняясь за точным байтовым потолком итеративно.
+                ratio = 0.7
+                new_size = (max(1, int(img.width * ratio)),
+                           max(1, int(img.height * ratio)))
+                img = img.resize(new_size, Image.LANCZOS)
+                stats['resized'] = True
+                out = io.BytesIO()
+                img.save(out, format='JPEG' if fmt == 'JPEG' else 'PNG',
+                         **({'quality': 85} if fmt == 'JPEG' else {}))
+                new_bytes = out.getvalue()
+            return new_type, new_bytes, stats
+    except Exception:
+        # Битый/нераспознанный файл — не роняем прогон, картинку просто
+        # не отправляем (вызывающий код увидит это по пустому результату
+        # и учтёт в очереди на ручной разбор).
+        return content_type, b'', stats
+
+
+def images_for_call1(figures):
+    """`[(content_type, bytes), ...]` — растровые картинки вызова 1.
+
+    Только `source_field` из `RASTER_CALL1_SOURCE_FIELDS` и только НЕ
+    настоящий TikZ (тот уже ушёл текстом — см. докстринг `with_tikz_sources`,
+    дважды за один чертёж не платим). Битые/пустые байты и неудачная
+    конверсия дают пустую строку из `prepare_raster_image` — такая картинка
+    в список не попадает.
+    """
+    out = []
+    for figure in figures:
+        if getattr(figure, 'source_field', '') not in RASTER_CALL1_SOURCE_FIELDS:
+            continue
+        if looks_like_tikz(getattr(figure, 'tikz_source', '') or ''):
+            continue
+        data = getattr(figure, 'image_data', None)
+        content_type = getattr(figure, 'content_type', '') or ''
+        if not data:
+            continue
+        new_type, new_data, _stats = prepare_raster_image(content_type, bytes(data))
+        if not new_data:
+            continue
+        out.append((new_type, new_data))
+    return out
 
 
 def with_tikz_sources(text, figures, max_tokens=TIKZ_MAX_TOKENS):

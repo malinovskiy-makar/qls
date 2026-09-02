@@ -404,6 +404,165 @@ def _output_text(response):
     return ''.join(parts)
 
 
+class GLMProvider(BaseProvider):
+    """GLM (Z.AI) через OpenAI-совместимый `chat.completions` эндпоинт.
+
+    ⚠️ НЕ ТОТ ЖЕ КОНТРАКТ, ЧТО У OpenAIProvider — три отличия документации
+    Z.AI (проверено обращением к их `docs.z.ai`, сентябрь 2026):
+    1. Эндпоинт `client.chat.completions.create`, а не Responses API —
+       у Z.AI своей Responses-совместимой версии нет.
+    2. `response_format` принимает только `text`/`json_object` —
+       `json_schema` и `strict` НЕ поддерживаются вовсе. Схема поэтому
+       уходит ТЕКСТОМ внутри системного сообщения (см. `_schema_instruction`),
+       а не отдельным параметром API, и соответствие ей проверяется на
+       нашей стороне уже ПОСЛЕ ответа — гарантии поставщика здесь нет,
+       это и есть предмет замера «доля ответов, прошедших схему».
+    3. Рассуждение переключается `thinking.type` (`enabled`/`disabled`) +
+       `reasoning_effort`, а не одним полем `reasoning.effort`, как у
+       OpenAI.
+    """
+
+    name = 'glm'
+    key_env = 'GLM_API_KEY'
+    BASE_URL = 'https://api.z.ai/api/paas/v4/'
+
+    def is_available(self):
+        if not self.api_key():
+            return False
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def unavailable_reason(self):
+        if not self.api_key():
+            return ('Работа с моделью выключена: не задан ключ '
+                    'GLM_API_KEY. Всё остальное работает как обычно — '
+                    'соберите домашку вручную, поиск и фильтры на месте.')
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return ('Работа с моделью выключена: на этом сервере не '
+                    'установлена библиотека openai. Соберите домашку '
+                    'вручную.')
+        return ''
+
+    def _schema_instruction(self, schema):
+        return ('\n\nОТВЕЧАЙ РОВНО ОДНИМ JSON-ОБЪЕКТОМ, СТРОГО '
+                'СООТВЕТСТВУЮЩИМ ЭТОЙ JSON-СХЕМЕ (никакого текста ни до, '
+                'ни после, никакого markdown-обрамления ```):\n%s'
+                % json.dumps(schema, ensure_ascii=False))
+
+    #: Форматы, которые Z.AI chat.completions принимает как `image_url`
+    #: (тот же список, что у OpenAIProvider — см. её докстринг).
+    IMAGE_TYPES = ('image/png', 'image/jpeg', 'image/gif', 'image/webp')
+
+    def _user_content(self, user_text, images):
+        """Вход для `chat.completions`: строка без картинок, массив
+        content-блоков — с ними. Формат `image_url` с `data:`-URL — тот
+        же, что у OpenAI vision, Z.AI заявляет OpenAI-совместимость.
+        Диагностический вызов Фазы 0 проверяет, читает ли модель это
+        вообще (по `usage` — есть ли токены изображения)."""
+        if not images:
+            return user_text
+        import base64
+
+        content = [{'type': 'text', 'text': user_text}]
+        for content_type, data in images:
+            if content_type not in self.IMAGE_TYPES or not data:
+                continue
+            content.append({
+                'type': 'image_url',
+                'image_url': {'url': 'data:%s;base64,%s' % (
+                    content_type, base64.b64encode(bytes(data)).decode('ascii'))},
+            })
+        if len(content) == 1:  # ни одна картинка не подошла
+            return user_text
+        return content
+
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 images=None):
+        import openai
+
+        from django.conf import settings
+
+        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
+
+        # ⚠️ GLM-5.3-Flash ВСЕГДА рассуждает — `thinking.type: disabled`
+        # отклоняется API кодом 1210 («This model always engages in
+        # thinking and cannot be disabled; please use low, high, or max»).
+        # `low` — ближайший доступный заменитель «выключено», а не выбор
+        # по вкусу; сравнение с моделями, где reasoning=none реален,
+        # честно только с пометкой об этом отличии.
+        extra_body = {'thinking': {'type': 'enabled'}}
+        extra_body['reasoning_effort'] = effort if effort in (
+            'low', 'high', 'max') else 'low'
+
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': self._user_content(user_text, images)},
+                ],
+                response_format={'type': 'json_object'},
+                extra_body=extra_body,
+            )
+        except openai.APIConnectionError as error:
+            raise self._fail(
+                error,
+                'Не удалось связаться с сервисом разбора запроса. Проверьте '
+                'сеть или соберите домашку вручную.')
+        except openai.RateLimitError as error:
+            raise self._fail(
+                error,
+                'Сервис разбора сейчас перегружен. Попробуйте через минуту '
+                'или соберите домашку вручную.',
+                kind='limit')
+        except openai.APIStatusError as error:
+            kind = 'no_key' if error.status_code in (401, 403) else 'other'
+            raise self._fail(
+                error,
+                'Сервис разбора вернул ошибку (%s).' % error.status_code,
+                kind=kind)
+        except Exception as error:
+            raise self._fail(
+                error,
+                'Сервис разбора запроса недоступен. Соберите домашку '
+                'вручную.')
+
+        return self._reply_from(response)
+
+    def _reply_from(self, response):
+        """Разбор ответа: `prompt_tokens_details.cached_tokens` — то же
+        разведение «свежий вход / кэш», что у OpenAI (см. докстринг
+        `OpenAIProvider`) — Z.AI считает `prompt_tokens` ПОЛНЫМ входом,
+        кэш сидит внутри него."""
+        usage = getattr(response, 'usage', None)
+        total_input = _num(usage, 'prompt_tokens')
+        output = _num(usage, 'completion_tokens')
+
+        details = getattr(usage, 'prompt_tokens_details', None)
+        cache_read = _num(details, 'cached_tokens')
+
+        text = ''
+        choices = getattr(response, 'choices', None) or []
+        if choices:
+            message = getattr(choices[0], 'message', None)
+            text = getattr(message, 'content', None) or ''
+
+        return Reply(
+            text=text,
+            input_tokens=max(total_input - cache_read, 0),
+            output_tokens=output,
+            cache_read_tokens=cache_read,
+        )
+
+
 class FakeProvider(BaseProvider):
     """Подставной поставщик — доказательство сменяемости, а не заглушка.
 
@@ -441,6 +600,7 @@ class FakeProvider(BaseProvider):
 PROVIDERS = {
     AnthropicProvider.name: AnthropicProvider,
     OpenAIProvider.name: OpenAIProvider,
+    GLMProvider.name: GLMProvider,
     FakeProvider.name: FakeProvider,
 }
 

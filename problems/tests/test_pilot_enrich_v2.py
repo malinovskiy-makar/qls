@@ -22,7 +22,7 @@ from django.core.management.base import CommandError
 from django.test import TestCase, override_settings
 
 from problems.ai import providers
-from problems.enrich import prompts_v2, text as enrich_text, title_rules
+from problems.enrich import prompts_v2, taxonomy, text as enrich_text, title_rules
 from problems.enrich.shortlist import load_df_cache, shortlist_for
 from problems.management.commands import pilot_enrich_v2 as cmd
 from problems.models import Problem, ProblemFigure, Topic
@@ -228,6 +228,33 @@ class ValidateCall1Tests(TestCase):
             self._base(features_1=list(prompts_v2.FEATURES_1) + ['лишний']))
         self.assertFalse(ok)
 
+    # -----------------------------------------------------------------
+    # §12 правило 3 API_RUN_MASTER: «Ни одной цифры в given, find,
+    # econ_concepts... — проверка регуляркой, а не просьбой в промпте.»
+    # Зубастость задания сессии называет «цифра в given» прямым текстом.
+    # -----------------------------------------------------------------
+
+    def test_цифра_в_given_нарушение(self):
+        ok, violations = cmd.validate_call1(self._base(given='Цена P=10'))
+        self.assertFalse(ok)
+        self.assertTrue(any('given' in v for v in violations))
+
+    def test_цифра_в_find_нарушение(self):
+        ok, violations = cmd.validate_call1(self._base(find='Найти Q при P=5'))
+        self.assertFalse(ok)
+        self.assertTrue(any('find' in v for v in violations))
+
+    def test_цифра_в_econ_concepts_нарушение(self):
+        ok, violations = cmd.validate_call1(
+            self._base(econ_concepts=['эластичность', 'налог 2 рода', 'спрос']))
+        self.assertFalse(ok)
+        self.assertTrue(any('econ_concepts' in v for v in violations))
+
+    def test_given_и_find_без_цифр_проходят(self):
+        ok, violations = cmd.validate_call1(
+            self._base(given='Линейная функция спроса', find='Точку равновесия'))
+        self.assertTrue(ok, violations)
+
 
 class ValidateCall2Tests(TestCase):
 
@@ -308,6 +335,82 @@ class ValidateCall2Tests(TestCase):
         ok, violations = cmd.validate_call2(
             self._base(title_candidate='Дуополия Курно'))
         self.assertTrue(ok, violations)
+
+    # -----------------------------------------------------------------
+    # §12 правило 3: та же проверка цифр — для `plot` и восьми запросов.
+    # -----------------------------------------------------------------
+
+    def test_цифра_в_plot_нарушение(self):
+        ok, violations = cmd.validate_call2(
+            self._base(plot='Монополист продаёт 2 товара двум группам'))
+        self.assertFalse(ok)
+        self.assertTrue(any('plot' in v for v in violations))
+
+    def test_цифра_в_одном_из_search_queries_нарушение(self):
+        queries = ['a'] * 7 + ['запрос с числом 5']
+        ok, violations = cmd.validate_call2(self._base(search_queries=queries))
+        self.assertFalse(ok)
+        self.assertTrue(any('search_queries' in v for v in violations))
+
+    def test_plot_без_цифр_проходит(self):
+        ok, violations = cmd.validate_call2(
+            self._base(plot='Монополист продаёт товар нескольким группам'))
+        self.assertTrue(ok, violations)
+
+
+class CheckAgainstSchemaTests(TestCase):
+    """§12 правило 4 / зубастость «несуществующий номер тега»: у Z.AI нет
+    строгого `enum` на стороне поставщика — эту проверку обязан сделать
+    наш код, тем же способом, каким её уже делает `glm_eval.py`."""
+
+    def _valid_call1(self):
+        theme_id = taxonomy.theme_ids()[0]
+        tag_id = taxonomy.tag_ids()[0]
+        return {
+            'topic_primary': theme_id, 'topics_secondary': [],
+            'tags': [tag_id], 'given': 'Дано', 'find': 'Найти',
+            'econ_concepts': ['спрос', 'предложение', 'равновесие'],
+            'concepts_offlist': [], 'task_nature': 'расчётная',
+            'features_1': [], 'topic_confidence': 'высокая',
+        }
+
+    def test_валидный_ответ_проходит_схему(self):
+        violations = cmd.check_against_schema(
+            self._valid_call1(), prompts_v2.call1_schema(with_concepts=True))
+        self.assertEqual(violations, [])
+
+    def test_несуществующий_номер_темы(self):
+        data = self._valid_call1()
+        data['topic_primary'] = '999'  # заведомо не существующая тема
+        violations = cmd.check_against_schema(
+            data, prompts_v2.call1_schema(with_concepts=True))
+        self.assertTrue(any('topic_primary' in v for v in violations))
+
+    def test_несуществующий_номер_тега(self):
+        data = self._valid_call1()
+        data['tags'] = ['999.99']  # заведомо не существующий тег
+        violations = cmd.check_against_schema(
+            data, prompts_v2.call1_schema(with_concepts=True))
+        self.assertTrue(any('tags' in v for v in violations))
+
+    def test_отсутствует_обязательное_поле(self):
+        data = self._valid_call1()
+        del data['find']
+        violations = cmd.check_against_schema(
+            data, prompts_v2.call1_schema(with_concepts=True))
+        self.assertTrue(any('find' in v for v in violations))
+
+    def test_лишнее_поле_вне_схемы(self):
+        data = self._valid_call1()
+        data['совсем_левое_поле'] = 'x'
+        violations = cmd.check_against_schema(
+            data, prompts_v2.call1_schema(with_concepts=True))
+        self.assertTrue(any('лишние поля' in v for v in violations))
+
+    def test_не_json_объект(self):
+        violations = cmd.check_against_schema(
+            None, prompts_v2.call1_schema(with_concepts=True))
+        self.assertTrue(violations)
 
 
 class Call2UserTextContextTests(TestCase):
@@ -454,7 +557,13 @@ class _FakeReply(object):
 
 
 CALL1_OK_JSON = (
-    '{"topic_primary": "X", "topics_secondary": [], "tags": ["a"], '
+    # topic_primary/tags — НАСТОЯЩИЕ id из data/taxonomy.json (не "X"/"a"):
+    # с тех пор как `_process_one_problem` проверяет ответ и `check_against_
+    # schema` (боевой путь GLM, §12 правило 4), фиктивные id читались бы
+    # как нарушение enum и запускали лишний повтор — здесь это сбило бы с
+    # толку тесты, которые проверяют СОВСЕМ ДРУГОЕ (параллельность, дедуп,
+    # учёт расхода), а не содержимое ответа.
+    '{"topic_primary": "1", "topics_secondary": [], "tags": ["1.1"], '
     '"given": "Дано", "find": "Найти", "econ_concepts": ["a","b","c"], '
     '"concepts_offlist": [], "task_nature": "расчётная", "features_1": [], '
     '"topic_confidence": "высокая"}'
@@ -482,7 +591,7 @@ class RunVariantMaxCostTests(TestCase):
         # достаточно грубо подобрать input_tokens под нужную цену.
         calls = []
 
-        def complete_fn(model, blocks, user_text, schema, effort):
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
             calls.append((model, effort))
             is_call1 = 'topic_primary' in _schema_names(schema)
             text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
@@ -529,6 +638,311 @@ class RunVariantMaxCostTests(TestCase):
             max_cost=5.0)
         self.assertTrue(stopped_early)
         self.assertEqual(len(rows), 1)  # первый call1 уже перевалил потолок
+
+
+class CallWithRetryTests(TestCase):
+    """Фаза 2 задания сессии: у Z.AI нет строгой схемы — весь контроль
+    держит наш код. «Механика при нарушении: один повтор с коротким
+    сообщением, что именно не так. Не помогло — задача в очередь брака.»"""
+
+    def test_валидный_ответ_с_первого_раза_без_повтора(self):
+        calls = []
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            calls.append(user_text)
+            return _FakeReply(CALL1_OK_JSON)
+
+        reply, data, ok, violations, retried, attempts = cmd.call_with_retry(
+            complete_fn, 'm', ['ядро'], 'текст', {}, None, None,
+            lambda d: cmd.validate_call1(d, True))
+
+        self.assertTrue(ok)
+        self.assertEqual(violations, [])
+        self.assertFalse(retried)
+        self.assertEqual(len(calls), 1)
+
+    def test_нарушение_даёт_один_повтор_с_объяснением(self):
+        bad_json = CALL1_OK_JSON.replace('"tags": ["1.1"]', '"tags": []')
+        calls = []
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            calls.append(user_text)
+            if len(calls) == 1:
+                return _FakeReply(bad_json)
+            return _FakeReply(CALL1_OK_JSON)
+
+        reply, data, ok, violations, retried, attempts = cmd.call_with_retry(
+            complete_fn, 'm', ['ядро'], 'текст', {}, None, None,
+            lambda d: cmd.validate_call1(d, True))
+
+        self.assertTrue(ok)
+        self.assertTrue(retried)
+        self.assertEqual(len(calls), 2)
+        # повторный промпт содержит явное объяснение, что не так — не
+        # молчаливая перепосылка того же текста.
+        self.assertIn('tags', calls[1])
+        self.assertIn('текст', calls[1])  # исходный текст задачи никуда не делся
+
+    def test_если_и_повтор_не_помог_идёт_в_брак(self):
+        bad_json = CALL1_OK_JSON.replace('"tags": ["1.1"]', '"tags": []')
+        calls = []
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            calls.append(user_text)
+            return _FakeReply(bad_json)
+
+        reply, data, ok, violations, retried, attempts = cmd.call_with_retry(
+            complete_fn, 'm', ['ядро'], 'текст', {}, None, None,
+            lambda d: cmd.validate_call1(d, True))
+
+        self.assertFalse(ok)
+        self.assertTrue(retried)
+        self.assertEqual(len(calls), 2)  # ровно один повтор, не бесконечный цикл
+        self.assertTrue(violations)
+
+    def test_битый_json_тоже_считается_нарушением_а_не_падением(self):
+        calls = []
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            calls.append(user_text)
+            if len(calls) == 1:
+                return _FakeReply('это не json')
+            return _FakeReply(CALL1_OK_JSON)
+
+        reply, data, ok, violations, retried, attempts = cmd.call_with_retry(
+            complete_fn, 'm', ['ядро'], 'текст', {}, None, None,
+            lambda d: cmd.validate_call1(d, True))
+
+        self.assertTrue(ok)
+        self.assertTrue(retried)
+        self.assertEqual(len(calls), 2)
+
+
+class RunVariantConcurrentTests(TestCase):
+    """Фаза 1 задания сессии: пул воркеров для боевого прогона на GLM.
+    Зубастость — реально проверяем ОДНОВРЕМЕННОСТЬ (счётчик в локе, а не
+    просто «правильное число строк на выходе»), потому что баг вида
+    «ThreadPoolExecutor создан, но семафора нет» дал бы точно такой же
+    результат на маленькой тестовой выборке, просто без реального
+    параллелизма — и остался бы незамеченным без явного счётчика пиков."""
+
+    def setUp(self):
+        self.problems = [_make_problem('Задача %d.' % i) for i in range(8)]
+        self.shortlists = {p.id: [] for p in self.problems}
+
+    def _tracking_complete_fn(self, sleep_seconds=0.03):
+        import threading
+        import time as _time
+        lock = threading.Lock()
+        state = {'inflight': 0, 'peak': 0, 'calls': 0}
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            with lock:
+                state['inflight'] += 1
+                state['peak'] = max(state['peak'], state['inflight'])
+                state['calls'] += 1
+            _time.sleep(sleep_seconds)
+            with lock:
+                state['inflight'] -= 1
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+
+        return complete_fn, state
+
+    def test_не_превышает_потолок_одновременных_вызовов(self):
+        complete_fn, state = self._tracking_complete_fn()
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            self.problems, variant, complete_fn, self.shortlists, workers=3)
+
+        self.assertEqual(errors, [])
+        self.assertLessEqual(state['peak'], 3)
+        # хотя бы раз пул реально заполнился до потолка — иначе тест не
+        # доказывает параллельность, а просто не противоречит ей.
+        self.assertEqual(state['peak'], 3)
+        self.assertEqual(len(rows), 8)
+        self.assertFalse(stopped)
+
+    def test_обрабатывает_всю_выборку(self):
+        complete_fn, state = self._tracking_complete_fn(sleep_seconds=0.01)
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            self.problems, variant, complete_fn, self.shortlists, workers=4)
+
+        got_ids = sorted(r['problem_id'] for r in rows)
+        want_ids = sorted(p.id for p in self.problems)
+        self.assertEqual(got_ids, want_ids)
+        self.assertEqual(state['calls'], 16)  # 8 задач × 2 вызова
+
+    def test_max_cost_реально_останавливает_новые_вызовы(self):
+        import threading
+        calls = []
+        calls_lock = threading.Lock()
+
+        def expensive_complete_fn(model, blocks, user_text, schema, effort, images=None):
+            with calls_lock:
+                calls.append(model)
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            price_in = PRICES[model][0]
+            # каждый вызов сам по себе дороже потолка — после первой же
+            # задачи расход обязан перевалить $0.5 и остановить пул.
+            input_tokens = int(Decimal('0.6') / Decimal(str(price_in)) * Decimal(10 ** 6))
+            return _FakeReply(text, input_tokens=input_tokens)
+
+        variant = cmd.VARIANTS['base']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            self.problems, variant, expensive_complete_fn, self.shortlists,
+            workers=2, max_cost=0.5)
+
+        self.assertEqual(errors, [])
+        self.assertTrue(stopped)
+        self.assertGreaterEqual(spent, Decimal('0.5'))
+        self.assertLess(len(rows), len(self.problems))
+
+    def test_on_progress_и_on_row_вызываются_на_каждую_строку(self):
+        complete_fn, state = self._tracking_complete_fn(sleep_seconds=0.01)
+        variant = cmd.VARIANTS['luna-luna']
+        seen_rows = []
+        seen_progress = []
+        cmd.run_variant_concurrent(
+            self.problems, variant, complete_fn, self.shortlists, workers=3,
+            on_row=lambda row: seen_rows.append(row['problem_id']),
+            on_progress=lambda pid, spent: seen_progress.append(pid))
+
+        self.assertEqual(sorted(seen_rows), sorted(p.id for p in self.problems))
+        self.assertEqual(sorted(seen_progress), sorted(p.id for p in self.problems))
+
+    def test_единственный_воркер_ведёт_себя_как_последовательный_прогон(self):
+        """workers=1 — не особый случай в коде, но полезно знать, что
+        итог совпадает с `run_variant` по набору id и числу строк."""
+        complete_fn, state = self._tracking_complete_fn(sleep_seconds=0.0)
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            self.problems, variant, complete_fn, self.shortlists, workers=1)
+        self.assertEqual(errors, [])
+        self.assertEqual(len(rows), 8)
+        self.assertEqual(state['peak'], 1)
+
+    def test_одна_упавшая_задача_не_роняет_остальные(self):
+        """Ключевая устойчивость Фазы 1/4: обрыв на ОДНОЙ задаче из 300
+        не имеет права стоить прогону остальных 299 уже оплаченных.
+        Битый JSON сюда не годится — `call_with_retry` теперь обрабатывает
+        его как нарушение схемы (повтор, потом брак), а не как исключение;
+        нужен настоящий сбой, который переживает и повтор complete_fn."""
+        bad_problem = _make_problem('СЛОМАННАЯ_МЕТКА задача.')
+        problems = self.problems + [bad_problem]
+        shortlists = {p.id: [] for p in problems}
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            if 'СЛОМАННАЯ_МЕТКА' in user_text:
+                raise RuntimeError('внутренняя ошибка, не связанная с форматом ответа')
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            problems, variant, complete_fn, shortlists, workers=3)
+
+        self.assertEqual(len(errors), 1)
+        self.assertEqual(errors[0][0], bad_problem.id)
+        self.assertEqual(len(rows), len(problems) - 1)
+        self.assertEqual(sorted(r['problem_id'] for r in rows),
+                         sorted(p.id for p in self.problems))
+
+
+class StopEventTests(TestCase):
+    """Фаза 2: автостоп при доле брака выше 3% дёргает `stop_event`, а не
+    падает исключением — новые задачи перестают стартовать, уже летящие
+    доигрывают."""
+
+    def test_stop_event_останавливает_новые_задачи(self):
+        import threading
+        problems = [_make_problem('Задача %d.' % i) for i in range(10)]
+        shortlists = {p.id: [] for p in problems}
+        stop_event = threading.Event()
+        stop_event.set()  # уже взведён ДО прогона — ни одна задача не должна уйти
+
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, errors = cmd.run_variant_concurrent(
+            problems, variant, complete_fn, shortlists, workers=3,
+            stop_event=stop_event)
+
+        self.assertEqual(rows, [])
+        self.assertTrue(stopped)
+
+
+class ResumableRunConcurrentTests(TestCase):
+    """Фаза 3/4 задания сессии: `resumable_run_variant_concurrent` пишет
+    журнал ПОД ЛОКОМ — без него параллельные `append_raw_log` из разных
+    потоков могут перемешать строки JSONL (каждая строка сама по себе
+    валидна, но запись не атомарна на уровне ОС при одновременном append
+    из нескольких потоков одного процесса без синхронизации на стороне
+    Python)."""
+
+    def setUp(self):
+        self.problems = [_make_problem('Задача %d.' % i) for i in range(12)]
+        self.shortlists = {p.id: [] for p in self.problems}
+        self.log_path = Path(tempfile.mkdtemp()) / 'raw.jsonl'
+
+    def _complete_fn(self):
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+        return complete_fn
+
+    def test_журнал_остаётся_валидным_jsonl_под_нагрузкой(self):
+        variant = cmd.VARIANTS['luna-luna']
+        rows, spent, stopped, skipped, errors = cmd.resumable_run_variant_concurrent(
+            self.problems, variant, self._complete_fn(), self.shortlists,
+            str(self.log_path), 'run-1', 'promptver', workers=6)
+
+        self.assertEqual(errors, [])
+        self.assertEqual(skipped, 0)
+        entries = cmd.read_raw_log(str(self.log_path))
+        # 12 задач × 2 вызова = 24 строки, каждая — валидный JSON (иначе
+        # read_raw_log сам бы упал на json.loads одной из перемешанных строк).
+        self.assertEqual(len(entries), 24)
+
+    def test_повторный_запуск_не_платит_за_готовые_задачи(self):
+        variant = cmd.VARIANTS['luna-luna']
+        cmd.resumable_run_variant_concurrent(
+            self.problems, variant, self._complete_fn(), self.shortlists,
+            str(self.log_path), 'run-1', 'promptver', workers=4)
+
+        calls = []
+
+        def counting_complete_fn(model, blocks, user_text, schema, effort, images=None):
+            calls.append(model)
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return _FakeReply(text)
+
+        rows, spent, stopped, skipped, errors = cmd.resumable_run_variant_concurrent(
+            self.problems, variant, counting_complete_fn, self.shortlists,
+            str(self.log_path), 'run-1', 'promptver', workers=4)
+
+        self.assertEqual(len(calls), 0)
+        self.assertEqual(skipped, len(self.problems))
+
+    def test_extra_on_row_зовётся_на_каждую_обработанную_задачу(self):
+        """Боевая команда вешает сюда счётчик доли брака (Фаза 2) — без
+        вызова автостоп никогда не сработает."""
+        variant = cmd.VARIANTS['luna-luna']
+        seen = []
+        cmd.resumable_run_variant_concurrent(
+            self.problems, variant, self._complete_fn(), self.shortlists,
+            str(self.log_path), 'run-1', 'promptver', workers=4,
+            extra_on_row=lambda row: seen.append(row['problem_id']))
+        self.assertEqual(sorted(seen), sorted(p.id for p in self.problems))
 
 
 def _schema_names(schema):
@@ -939,7 +1353,7 @@ class ResumableRunTests(TestCase):
     def _counting_complete_fn(self):
         calls = []
 
-        def complete_fn(model, blocks, user_text, schema, effort):
+        def complete_fn(model, blocks, user_text, schema, effort, images=None):
             calls.append((model, effort))
             is_call1 = 'topic_primary' in _schema_names(schema)
             text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
@@ -1304,7 +1718,7 @@ class TikzInCall1OnlyTests(TestCase):
         problem.figures.create(tikz_hash='c1only', tikz_source=self.TIKZ)
         seen = []
 
-        def fake_complete(model, core_blocks, user_text, schema, effort):
+        def fake_complete(model, core_blocks, user_text, schema, effort, images=None):
             seen.append(user_text)
             payload = ({'topic_primary': 'MIC-01', 'topics_secondary': [],
                         'tags': ['t'], 'econ_concepts': ['a', 'b', 'c'],
@@ -1333,3 +1747,238 @@ class TikzInCall1OnlyTests(TestCase):
         call1, _ = self._run(with_tikz=False)
         self.assertIn('[[FIGURE:c1only]]', call1)
         self.assertNotIn('ЧЕРТЁЖ К ЗАДАЧЕ', call1)
+
+
+def _real_png(size=(20, 20)):
+    """Настоящий декодируемый PNG — `prepare_raster_image` открывает байты
+    через Pillow, суррогатный заголовок (как в `test_ai_providers.py`,
+    там `complete()` картинку не декодирует) здесь не подходит."""
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new('RGB', size, color=(200, 50, 50)).save(buf, format='PNG')
+    return buf.getvalue()
+
+
+class RasterImageForCall1Tests(TestCase):
+    """Фаза 0.4 подготовки боевого прогона (02.09.2026): растровая картинка
+    условия уходит В КАРТИНКУ вызова 1 — GLM-5.3-Flash подтверждённо её
+    читает (реальный вызов, токены изображения в usage). Зубастость по
+    четырём случаям: подстановка растра, задача без визуального содержимого
+    не получает лишнего, картинка решения не идёт в вызов 1, битые байты не
+    роняют сборку."""
+
+    def test_растровая_картинка_условия_идёт_в_список(self):
+        problem = _make_problem('На рисунке [[FIGURE:img001]] показан спрос.')
+        problem.figures.create(tikz_hash='img001', source_field='statement',
+                               content_type='image/png', image_data=_real_png())
+
+        images = enrich_text.images_for_call1(problem.figures.all())
+
+        self.assertEqual(len(images), 1)
+        content_type, data = images[0]
+        self.assertEqual(content_type, 'image/png')
+        self.assertTrue(data)
+
+    def test_задача_без_визуального_содержимого_ничего_не_получает(self):
+        problem = _make_problem('Обычная задача без картинок и чертежей.')
+        self.assertEqual(enrich_text.images_for_call1(problem.figures.all()), [])
+
+    def test_картинка_только_у_решения_в_вызов_1_не_идёт(self):
+        """§3.4/§3.5: решение в вызов 1 не подаётся вовсе — картинка,
+        которая иллюстрирует только решение, для понимания УСЛОВИЯ
+        бесполезна."""
+        problem = _make_problem('Задача без картинки в условии.',
+                                solution='Решение с рисунком.')
+        problem.figures.create(tikz_hash='sol001', source_field='solution',
+                               content_type='image/png', image_data=_real_png())
+        self.assertEqual(enrich_text.images_for_call1(problem.figures.all()), [])
+
+    def test_настоящий_tikz_не_дублируется_картинкой(self):
+        """Чертёж с реальным TikZ уже уходит текстом (with_tikz_sources) —
+        отправить его ЕЩЁ и картинкой значило бы заплатить дважды за одно
+        и то же."""
+        problem = _make_problem('Смотри [[FIGURE:tikz01]].')
+        problem.figures.create(
+            tikz_hash='tikz01', source_field='statement',
+            tikz_source=r'\begin{tikzpicture}\draw (0,0) -- (1,1);\end{tikzpicture}',
+            content_type='image/png', image_data=_real_png())
+        self.assertEqual(enrich_text.images_for_call1(problem.figures.all()), [])
+
+    def test_битые_байты_не_роняют_сборку(self):
+        """Пустые/повреждённые байты — не крах, а просто отсутствие
+        картинки в списке. `ProblemFigure` без реального импорта файла —
+        такая же битая ссылка, как и в тексте, только на уровне байтов."""
+        problem = _make_problem('Задача с неудавшимся импортом картинки.')
+        problem.figures.create(tikz_hash='empty1', source_field='import',
+                               content_type='image/png', image_data=b'')
+        problem.figures.create(tikz_hash='broken1', source_field='import',
+                               content_type='image/png',
+                               image_data=b'\x89PNG\r\n\x1a\nnot-a-real-png')
+
+        # не должно бросить исключение
+        images = enrich_text.images_for_call1(problem.figures.all())
+        self.assertEqual(images, [])
+
+    def test_run_variant_передаёт_картинки_в_complete_fn(self):
+        """Сквозная проверка: `run_variant` реально прокидывает картинки в
+        `complete_fn`, а не только собирает список сам по себе."""
+        problem = _make_problem('На рисунке [[FIGURE:end2end]] показан спрос.')
+        problem.figures.create(tikz_hash='end2end', source_field='statement',
+                               content_type='image/png', image_data=_real_png())
+        seen_images = []
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in _schema_names(schema)
+            seen_images.append((is_call1, images))
+            text = CALL1_OK_JSON if is_call1 else CALL2_OK_JSON
+            return providers.Reply(text=text, input_tokens=10, output_tokens=10)
+
+        with override_settings(AI_PRICES=PRICES):
+            cmd.run_variant([problem], cmd.VARIANTS['base'], fake_complete,
+                            {problem.id: None})
+
+        call1_images = [images for is_call1, images in seen_images if is_call1][0]
+        call2_images = [images for is_call1, images in seen_images if not is_call1][0]
+        self.assertEqual(len(call1_images), 1)
+        self.assertIn(call2_images, (None, []))
+
+
+class PrepareRasterImageTests(TestCase):
+    """`prepare_raster_image` — конверсия форматов и сжатие по длинной
+    стороне (§0.4 задания сессии: PNG/JPEG форматы, остальное —
+    сконвертировать; слишком большие — ужать)."""
+
+    def test_маленький_png_не_трогается(self):
+        original = _real_png((20, 20))
+        content_type, data, stats = enrich_text.prepare_raster_image(
+            'image/png', original)
+        self.assertEqual(content_type, 'image/png')
+        self.assertFalse(stats['converted'])
+        self.assertFalse(stats['resized'])
+
+    def test_gif_конвертируется_в_png(self):
+        from PIL import Image
+        buf = io.BytesIO()
+        Image.new('RGB', (10, 10), color=(0, 100, 200)).save(buf, format='GIF')
+
+        content_type, data, stats = enrich_text.prepare_raster_image(
+            'image/gif', buf.getvalue())
+
+        self.assertEqual(content_type, 'image/png')
+        self.assertTrue(stats['converted'])
+        self.assertTrue(data.startswith(b'\x89PNG'))
+
+    def test_крупная_картинка_ужимается_по_длинной_стороне(self):
+        big = _real_png((3000, 100))
+        content_type, data, stats = enrich_text.prepare_raster_image(
+            'image/png', big, max_long_side=1000)
+
+        self.assertTrue(stats['resized'])
+        from PIL import Image
+        with Image.open(io.BytesIO(data)) as img:
+            self.assertLessEqual(max(img.size), 1000)
+
+    def test_битые_байты_не_бросают_исключение(self):
+        content_type, data, stats = enrich_text.prepare_raster_image(
+            'image/png', b'not a real image at all, just garbage bytes')
+        self.assertEqual(data, b'')
+
+
+class GraphicalSolutionMergeTests(TestCase):
+    """0-бис.3 (02.09.2026): особенность «Графическое решение» определена
+    через РЕШЕНИЕ (§6.1 API_RUN_MASTER), а спрашивается в вызове 1, где
+    решения нет вовсе (§3.4) — прямое доказательство (картинка, привязанная
+    к solution) физически не может попасть модели в промпт. Объединение по
+    ИЛИ с кодовым признаком «есть ProblemFigure у решения» чинит это без
+    единого лишнего запроса к модели."""
+
+    def test_есть_у_решения_код_даёт_сигнал(self):
+        problem = _make_problem('Задача без картинки в условии.',
+                                solution='Решение с рисунком.')
+        problem.figures.create(tikz_hash='s1', source_field='solution',
+                               content_type='image/png', image_data=b'\x89PNG...')
+        self.assertTrue(enrich_text.graphical_solution_signal(problem))
+
+    def test_картинка_только_у_условия_не_считается_сигналом_кода(self):
+        """Картинка к УСЛОВИЮ ничего не говорит о том, что РЕШЕНИЕ
+        опирается на график — это разные вещи, и код не имеет права их
+        путать."""
+        problem = _make_problem('Задача с картинкой в условии.')
+        problem.figures.create(tikz_hash='s2', source_field='statement',
+                               content_type='image/png', image_data=b'\x89PNG...')
+        self.assertFalse(enrich_text.graphical_solution_signal(problem))
+
+    def test_нет_фигур_вовсе_сигнала_нет(self):
+        problem = _make_problem('Обычная задача без картинок.')
+        self.assertFalse(enrich_text.graphical_solution_signal(problem))
+
+    def test_объединение_модель_да_код_нет(self):
+        problem = _make_problem('Задача.')
+        merged, source = enrich_text.merge_graphical_solution(
+            ['графическое_решение'], problem)
+        self.assertTrue(merged)
+        self.assertEqual(source, 'model')
+
+    def test_объединение_модель_нет_код_да_зубастость(self):
+        """ГЛАВНЫЙ случай задания: модель НЕ поставила особенность (текст
+        решения без чисел на график не намекает), но у задачи физически
+        есть картинка, привязанная к решению — код обязан её всё равно
+        засчитать."""
+        problem = _make_problem('Задача.', solution='Решение с графиком.')
+        problem.figures.create(tikz_hash='s3', source_field='solution',
+                               content_type='image/png', image_data=b'\x89PNG...')
+        merged, source = enrich_text.merge_graphical_solution([], problem)
+        self.assertTrue(merged)
+        self.assertEqual(source, 'code')
+
+    def test_объединение_оба_согласны(self):
+        problem = _make_problem('Задача.', solution='Решение с графиком.')
+        problem.figures.create(tikz_hash='s4', source_field='solution',
+                               content_type='image/png', image_data=b'\x89PNG...')
+        merged, source = enrich_text.merge_graphical_solution(
+            ['графическое_решение'], problem)
+        self.assertTrue(merged)
+        self.assertEqual(source, 'both')
+
+    def test_объединение_ни_то_ни_другое(self):
+        problem = _make_problem('Задача без графиков вовсе.')
+        merged, source = enrich_text.merge_graphical_solution([], problem)
+        self.assertFalse(merged)
+        self.assertEqual(source, 'none')
+
+    def test_пустой_features_1_не_роняет(self):
+        problem = _make_problem('Задача.')
+        merged, source = enrich_text.merge_graphical_solution(None, problem)
+        self.assertFalse(merged)
+        self.assertEqual(source, 'none')
+
+
+class GraphicalSolutionInvariantTests(TestCase):
+    """Инвариант §5 задания сессии: число задач с «Графическим решением»
+    после объединения печатается вместе с разбивкой модель/код/совпало."""
+
+    def test_счётчик_разбивки_по_рядам(self):
+        p_model = _make_problem('Задача A.')
+        p_code = _make_problem('Задача B.', solution='Решение.')
+        p_code.figures.create(tikz_hash='b1', source_field='solution',
+                              content_type='image/png', image_data=b'\x89PNG...')
+        p_both = _make_problem('Задача C.', solution='Решение.')
+        p_both.figures.create(tikz_hash='c1', source_field='solution',
+                              content_type='image/png', image_data=b'\x89PNG...')
+        p_none = _make_problem('Задача D.')
+
+        rows = [
+            {'problem_id': p_model.id, 'call1': {'features_1': ['графическое_решение']}},
+            {'problem_id': p_code.id, 'call1': {'features_1': []}},
+            {'problem_id': p_both.id, 'call1': {'features_1': ['графическое_решение']}},
+            {'problem_id': p_none.id, 'call1': {'features_1': []}},
+        ]
+        problems_by_id = {p.id: p for p in (p_model, p_code, p_both, p_none)}
+
+        breakdown = cmd.graphical_solution_breakdown(rows, problems_by_id)
+
+        self.assertEqual(breakdown['model'], 1)
+        self.assertEqual(breakdown['code'], 1)
+        self.assertEqual(breakdown['both'], 1)
+        self.assertEqual(breakdown['none'], 1)
+        self.assertEqual(breakdown['total_graphical'], 3)

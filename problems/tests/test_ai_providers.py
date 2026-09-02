@@ -404,3 +404,56 @@ class OpenAIImageInputTests(TestCase):
             fake.complete(['ядро'], 'текст', {}, 'm', 100,
                           images=[('image/png', self.png)])
         self.assertEqual(fake.last_images, [('image/png', self.png)])
+
+
+class GLMImageInputTests(TestCase):
+    """Фаза 0.1/0.4 подготовки боевого прогона (02.09.2026): реальным
+    вызовом подтверждено, что GLM-5.3-Flash читает картинку (в `usage`
+    появляются токены изображения, а описание совпадает с содержимым).
+    Здесь — то же самое, что у `OpenAIImageInputTests`, но для формата
+    `chat.completions` (`image_url`, а не `input_image`)."""
+
+    def setUp(self):
+        self.provider = providers.GLMProvider()
+        self.png = b'\x89PNG\r\n\x1a\n' + b'0' * 32
+
+    def test_без_картинок_вход_остаётся_простой_строкой(self):
+        """Кэш префикса у GLM тоже зависит от неизменной формы входа —
+        задачи без картинки не должны получить список из одного элемента
+        вместо строки."""
+        self.assertEqual(self.provider._user_content('текст задачи', None),
+                         'текст задачи')
+        self.assertEqual(self.provider._user_content('текст', []), 'текст')
+
+    def test_картинка_уходит_data_url_рядом_с_текстом(self):
+        content = self.provider._user_content(
+            'текст задачи', [('image/png', self.png)])
+
+        self.assertIsInstance(content, list)
+        self.assertEqual(content[0], {'type': 'text', 'text': 'текст задачи'})
+        self.assertEqual(content[1]['type'], 'image_url')
+        url = content[1]['image_url']['url']
+        self.assertTrue(url.startswith('data:image/png;base64,'))
+        self.assertIn(base64.b64encode(self.png).decode('ascii'), url)
+
+    def test_несколько_картинок_идут_все(self):
+        content = self.provider._user_content(
+            'текст', [('image/png', self.png), ('image/jpeg', b'\xff\xd8ab')])
+        kinds = [block['type'] for block in content]
+        self.assertEqual(kinds, ['text', 'image_url', 'image_url'])
+
+    def test_неподдерживаемый_формат_отбрасывается(self):
+        content = self.provider._user_content(
+            'текст', [('image/bmp', b'BM..'), ('image/png', self.png)])
+        kinds = [block['type'] for block in content]
+        self.assertEqual(kinds, ['text', 'image_url'])
+
+    def test_если_все_картинки_отброшены_вход_снова_строка(self):
+        self.assertEqual(
+            self.provider._user_content('текст', [('image/bmp', b'BM')]),
+            'текст')
+
+    def test_пустые_байты_не_отправляются(self):
+        self.assertEqual(
+            self.provider._user_content('текст', [('image/png', b'')]),
+            'текст')

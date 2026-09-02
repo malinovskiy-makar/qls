@@ -39,6 +39,7 @@ OpenAIProvider.complete()` напрямую; уровень рассуждени
     venv313\\Scripts\\python.exe manage.py pilot_enrich_v2
     venv313\\Scripts\\python.exe manage.py pilot_enrich_v2 --apply --max-cost 5.0
 """
+import concurrent.futures
 import hashlib
 import json
 import random
@@ -46,6 +47,7 @@ import re
 import shutil
 import sqlite3
 import tempfile
+import threading
 import time
 from decimal import Decimal
 from pathlib import Path
@@ -56,11 +58,12 @@ from django.db.models import Q
 from django.test import override_settings
 
 from problems.ai import providers
-from problems.enrich import prompts_v2, taxonomy, title_rules
+from problems.enrich import prompts_v2, taxonomy, text as enrich_text, title_rules
 from problems.enrich.text import (has_graph_in_statement,
-                                  has_table_in_statement, is_english_text,
-                                  problem_full_text, with_figure_note,
-                                  with_tikz_sources, TIKZ_MAX_TOKENS)
+                                  has_table_in_statement, images_for_call1,
+                                  is_english_text, problem_full_text,
+                                  with_figure_note, with_tikz_sources,
+                                  TIKZ_MAX_TOKENS)
 from problems.enrich.shortlist import shortlist_for
 from problems.models import Problem
 
@@ -289,7 +292,14 @@ def build_sample(limit, seed):
 # structured output OpenAI не принимает maxItems (см. prompts_v2.py).
 # ---------------------------------------------------------------------------
 
+#: §12 правило 3 API_RUN_MASTER: «Ни одной цифры в given, find,
+#: econ_concepts, plot, поисковых запросах и заголовке» — код, не промпт.
+_DIGIT_RE = re.compile(r'\d')
+
+
 def validate_call1(data, with_concepts=True):
+    if not isinstance(data, dict):
+        return (False, ['ответ вызова 1 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
     if len(data.get('topics_secondary') or []) > 2:
         violations.append('topics_secondary длиннее 2')
@@ -307,8 +317,15 @@ def validate_call1(data, with_concepts=True):
                     'econ_concepts вне диапазона 3..6 (%d)' % len(concepts))
         if len(data.get('concepts_offlist') or []) > 2:
             violations.append('concepts_offlist длиннее 2')
+        for i, concept in enumerate(concepts):
+            if _DIGIT_RE.search(concept or ''):
+                violations.append('econ_concepts[%d] содержит цифру' % i)
     if len(data.get('features_1') or []) > 6:
         violations.append('features_1 длиннее 6')
+    if _DIGIT_RE.search(data.get('given') or ''):
+        violations.append('given содержит цифру')
+    if _DIGIT_RE.search(data.get('find') or ''):
+        violations.append('find содержит цифру')
     return (not violations, violations)
 
 
@@ -404,6 +421,24 @@ def visual_flag_lists(rows):
     return lost_visual, not_task_visual
 
 
+def graphical_solution_breakdown(rows, problems_by_id):
+    """0-бис.3: разбивка особенности «Графическое решение» после
+    объединения по ИЛИ (`enrich_text.merge_graphical_solution`) —
+    `{'model': N, 'code': N, 'both': N, 'none': N, 'total_graphical': N}`.
+    `total_graphical` — итог для инварианта (model+code+both), печатается
+    рядом с разбивкой, а не вместо неё (задание требует именно три числа)."""
+    counts = {'model': 0, 'code': 0, 'both': 0, 'none': 0}
+    for row in rows:
+        problem = problems_by_id.get(row['problem_id'])
+        if problem is None:
+            continue
+        features_1 = (row.get('call1') or {}).get('features_1')
+        _, source = enrich_text.merge_graphical_solution(features_1, problem)
+        counts[source] += 1
+    counts['total_graphical'] = counts['model'] + counts['code'] + counts['both']
+    return counts
+
+
 def task_nature_divergence(rows):
     """Инвариант Фазы 5: доля задач, где вызов 1 (`task_nature`) и вызов 2
     (`problem_type`) расходятся в оценке «это задача / это не задача».
@@ -431,13 +466,21 @@ _TITLE_CANDIDATE_LATEX_RE = re.compile(r'[$\\]')
 
 
 def validate_call2(data):
+    if not isinstance(data, dict):
+        return (False, ['ответ вызова 2 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
     queries = data.get('search_queries') or []
     if len(queries) != 8:
         violations.append('search_queries не равно 8 (%d)' % len(queries))
+    for i, query in enumerate(queries):
+        if _DIGIT_RE.search(query or ''):
+            violations.append('search_queries[%d] содержит цифру' % i)
     hints = data.get('hints')
     if hints is not None and not 3 <= len(hints) <= 5:
         violations.append('hints вне диапазона 3..5 (%d)' % len(hints))
+    plot = data.get('plot')
+    if plot and _DIGIT_RE.search(plot):
+        violations.append('plot содержит цифру')
 
     # `title_candidate` (§5.8, Фаза 4.1/6.4) — границы не выражаются
     # схемой (maxLength не пробовали на этой schema, чтобы не рисковать
@@ -461,6 +504,156 @@ def validate_call2(data):
             violations.append('title_candidate содержит $ или \\')
 
     return (not violations, violations)
+
+
+# ---------------------------------------------------------------------------
+# §12 правило 4 API_RUN_MASTER: «Понятия только из шорт-листа, теги только
+# из 344, темы только из 29. Всё вне списка — в отчёт, не в базу.» У
+# OpenAI/Anthropic это держит `strict: true` на стороне поставщика; у GLM
+# (Z.AI) `response_format` не принимает `json_schema`/`strict` вовсе (см.
+# докстринг `providers.GLMProvider`) — enum/тип/обязательность проверяет
+# ТОЛЬКО этот код. `validate_call1`/`validate_call2` выше НЕ включают эту
+# проверку специально: они гоняются в 130+ тестах с плейсхолдерами вида
+# `topic_primary: 'X'`, `tags: ['a']`, которые не обязаны быть настоящими
+# id из `data/taxonomy.json` — совмещать со схемой их вызывающий код должен
+# сам (см. `_process_one_problem` для боевого пути).
+# ---------------------------------------------------------------------------
+
+_JSON_TYPE_MAP = {'string': str, 'integer': int, 'array': list, 'object': dict,
+                  'boolean': bool, 'null': type(None)}
+
+
+def _json_type_ok(value, types):
+    for t in types:
+        if t == 'integer' and isinstance(value, bool):
+            continue  # bool — подкласс int, схема integer его не разрешает
+        py = _JSON_TYPE_MAP.get(t)
+        if py and isinstance(value, py):
+            return True
+    return False
+
+
+def _check_schema_value(label, value, spec):
+    violations = []
+    types = spec.get('type')
+    types = [types] if isinstance(types, str) else list(types or [])
+    if 'null' in types and value is None:
+        return violations
+    if types and not _json_type_ok(value, types):
+        violations.append('%s: тип %s не входит в %s' % (label, type(value).__name__, types))
+        return violations
+    if 'enum' in spec and value not in spec['enum']:
+        violations.append('%s: значение %r вне enum' % (label, value))
+    if isinstance(value, list):
+        items_spec = spec.get('items')
+        if items_spec:
+            for i, item in enumerate(value):
+                violations.extend(_check_schema_value('%s[%d]' % (label, i), item, items_spec))
+    return violations
+
+
+def check_against_schema(data, schema):
+    """Полная проверка JSON Schema верхнего уровня — required/
+    additionalProperties/type/enum, рекурсивно по элементам массивов. Тем
+    же способом, каким это уже делает `glm_eval.py::validate_schema` —
+    отдельная копия здесь, а не импорт из `glm_eval`, потому что тот файл
+    — разовый замер сравнения моделей, а этот — постоянный боевой путь;
+    менять их синхронно означало бы держать связь там, где её не должно
+    быть."""
+    if not isinstance(data, dict):
+        return ['ответ — не JSON-объект (%s)' % type(data).__name__]
+    violations = []
+    props = schema.get('properties', {})
+    for key in schema.get('required', []):
+        if key not in data:
+            violations.append('нет обязательного поля %s' % key)
+    if schema.get('additionalProperties') is False:
+        extra = sorted(set(data) - set(props))
+        if extra:
+            violations.append('лишние поля вне схемы: %s' % extra)
+    for key, spec in props.items():
+        if key in data:
+            violations.extend(_check_schema_value(key, data[key], spec))
+    return violations
+
+
+def validate_call1_full(data, with_concepts=True):
+    """`validate_call1` + `check_against_schema` вместе — боевой путь
+    (GLM), где enum/тип поставщик не проверяет вовсе."""
+    schema_violations = check_against_schema(
+        data, prompts_v2.call1_schema(with_concepts=with_concepts))
+    ok, violations = validate_call1(data, with_concepts=with_concepts)
+    all_violations = schema_violations + violations
+    return (not all_violations, all_violations)
+
+
+def validate_call2_full(data):
+    """`validate_call2` + `check_against_schema` вместе — боевой путь."""
+    schema_violations = check_against_schema(data, prompts_v2.CALL2_SCHEMA)
+    ok, violations = validate_call2(data)
+    all_violations = schema_violations + violations
+    return (not all_violations, all_violations)
+
+
+# ---------------------------------------------------------------------------
+# Фаза 2 (боевой прогон на GLM, 02.09.2026): у Z.AI нет строгой схемы
+# (`response_format` принимает только `text`/`json_object`, не
+# `json_schema` со `strict`) — весь контроль формата держит наш код, а не
+# поставщик. §12 правило 4: «Механика при нарушении: один повтор с коротким
+# сообщением, что именно не так. Не помогло — задача в очередь брака, а не
+# в результат.»
+# ---------------------------------------------------------------------------
+
+def _safe_json_loads(text):
+    """`None` вместо исключения — для журналирования неудачных попыток,
+    где сам факт «не распарсилось» и есть содержательный результат."""
+    try:
+        return json.loads(text)
+    except (ValueError, TypeError):
+        return None
+
+
+RETRY_PROMPT_TEMPLATE = (
+    '\n\n=== ПРЕДЫДУЩИЙ ОТВЕТ НЕ ПРОШЁЛ ПРОВЕРКУ ===\n'
+    'Вот что было не так:\n- %s\n'
+    'Ответь ЗАНОВО, тем же JSON-объектом целиком, исправив ровно это. '
+    'Остальное в ответе не трогай, если оно не упомянуто выше.'
+)
+
+
+def call_with_retry(complete_fn, model, blocks, user_text, schema, effort,
+                    images, validate_fn):
+    """Один вызов; если `validate_fn(data)` вернула нарушения (включая
+    «это вообще не JSON») — ровно ОДИН повторный вызов с явным списком
+    нарушений в промпте. Не помогло — возвращается `ok=False` с
+    нарушениями второй попытки, дальше решает вызывающий код (очередь
+    брака, не результат).
+
+    Возвращает `(reply, data, ok, violations, retried, attempts)` —
+    `reply`/`data` от ПОСЛЕДНЕЙ попытки, `attempts` — список ВСЕХ `Reply`
+    (1 или 2) для учёта расхода: неудачная первая попытка тоже стоила
+    денег, и `real_call_cost` должен просуммировать обе, а не только
+    финальную — иначе `--max-cost` молча недосчитывает потраченное.
+    """
+    reply = complete_fn(model, blocks, user_text, schema, effort, images=images)
+    try:
+        data = json.loads(reply.text)
+    except (ValueError, TypeError):
+        data = None
+    ok, violations = validate_fn(data) if data is not None else (
+        False, ['ответ не является JSON'])
+    if ok:
+        return reply, data, True, [], False, [reply]
+
+    retry_text = user_text + RETRY_PROMPT_TEMPLATE % '\n- '.join(violations)
+    reply2 = complete_fn(model, blocks, retry_text, schema, effort, images=images)
+    try:
+        data2 = json.loads(reply2.text)
+    except (ValueError, TypeError):
+        data2 = None
+    ok2, violations2 = validate_fn(data2) if data2 is not None else (
+        False, ['ответ не является JSON'])
+    return reply2, data2, ok2, violations2, True, [reply, reply2]
 
 
 # ---------------------------------------------------------------------------
@@ -585,21 +778,21 @@ def make_openai_complete_fn():
     """
     provider = providers.OpenAIProvider()
 
-    def _call_once(model, blocks, user_text, schema, effort):
+    def _call_once(model, blocks, user_text, schema, effort, images):
         if effort is None:
             return provider.complete(blocks, user_text, schema, model,
-                                     _setting_max_tokens())
+                                     _setting_max_tokens(), images=images)
         with override_settings(AI_REASONING_EFFORT=effort):
             return provider.complete(blocks, user_text, schema, model,
-                                     _setting_max_tokens())
+                                     _setting_max_tokens(), images=images)
 
-    def complete_fn(model, blocks, user_text, schema, effort):
+    def complete_fn(model, blocks, user_text, schema, effort, images=None):
         last_error = None
         for attempt in range(NETWORK_RETRIES):
             if attempt:
                 time.sleep(NETWORK_RETRY_BASE_SECONDS * (2 ** (attempt - 1)))
             try:
-                return _call_once(model, blocks, user_text, schema, effort)
+                return _call_once(model, blocks, user_text, schema, effort, images)
             except providers.ProviderError as error:
                 if error.kind not in RETRYABLE_PROVIDER_ERROR_KINDS:
                     raise
@@ -651,15 +844,19 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
             text1, tikz_stats = with_tikz_sources(text, problem.figures.all())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
         user1 = prompts_v2.call1_user_text(text1, shortlist_terms)
+        # Фаза 0.4: растровые картинки условия — В КАРТИНКУ вызова 1, а не
+        # текстом (GLM-5.3-Flash подтверждённо их читает). Только вызов 1 —
+        # во втором смысл картинки уже несут given/find первого.
+        images1 = images_for_call1(problem.figures.all())
         reply1 = complete_fn(variant['call1_model'], core1_blocks, user1,
-                             schema1, variant['call1_effort'])
+                             schema1, variant['call1_effort'], images=images1)
         spent += real_call_cost(variant['call1_model'], reply1)
         data1 = json.loads(reply1.text)
         ok1, violations1 = validate_call1(data1, with_concepts)
 
         row = {'problem_id': problem.id, 'call1': data1,
               'call1_violations': violations1, 'call1_usage': reply1,
-              'tikz': tikz_stats}
+              'tikz': tikz_stats, 'images_sent': len(images1)}
 
         if max_cost is not None and spent >= Decimal(str(max_cost)):
             rows.append(row)
@@ -695,6 +892,160 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
             on_progress(problem.id, spent)
 
     return rows, spent, stopped_early
+
+
+# ---------------------------------------------------------------------------
+# Фаза 1 (02.09.2026, подготовка боевого прогона на GLM-5.3-Flash): пул
+# воркеров. Z.AI ограничивает не RPM/TPM, а числом одновременных запросов
+# «в полёте» (§3.6 API_RUN_MASTER) — 50 для GLM-5.3-Flash, разгонная проба
+# выбирает рабочее число по факту. `run_variant` (последовательный) остаётся
+# как есть — он проще для тестов и достаточен для пилотов до 300 задач без
+# спешки; `run_variant_concurrent` — для разгонной пробы и боевого прогона.
+# ---------------------------------------------------------------------------
+
+def _process_one_problem(problem, variant, complete_fn, shortlists,
+                         with_tikz, core1_blocks, core2_blocks, schema1, schema2):
+    """Тело одной задачи (оба вызова) для `run_variant_concurrent` — БОЕВОЙ
+    путь (GLM), с одним повтором на нарушение схемы (§12 правило 4, Фаза 2).
+
+    `run_variant` (последовательный) — отдельный, более простой путь для
+    пилотов/сравнения веток на OpenAI со `strict` схемой, где повтор почти
+    не нужен; здесь дублирования логики нет специально: `run_variant`
+    проще для его собственных тестов, а не забытая копия этой функции.
+
+    Возвращает готовую `row`, включая `call1_ok`/`call2_ok` (прошла ли
+    схему хоть с повтором — задача-брак получает `False`) и `call1_retried`
+    /`call2_retried`. Расход и решение об остановке по `max_cost` — дело
+    вызывающего кода.
+    """
+    with_concepts = variant['concepts']
+    text = problem_full_text(problem.statement, problem.parts.all())
+    text = with_figure_note(text, problem.figures.count())
+    text1 = text
+    tikz_stats = {'replaced': 0, 'truncated': 0}
+    if with_tikz:
+        text1, tikz_stats = with_tikz_sources(text, problem.figures.all())
+    shortlist_terms = shortlists.get(problem.id) if with_concepts else None
+    user1 = prompts_v2.call1_user_text(text1, shortlist_terms)
+    images1 = images_for_call1(problem.figures.all())
+    reply1, data1, ok1, violations1, retried1, attempts1 = call_with_retry(
+        complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
+        variant['call1_effort'], images1,
+        lambda d: validate_call1_full(d, with_concepts))
+    row = {'problem_id': problem.id, 'call1': data1,
+          'call1_violations': violations1, 'call1_usage': reply1,
+          'call1_ok': ok1, 'call1_retried': retried1,
+          'call1_attempts': attempts1,
+          'tikz': tikz_stats, 'images_sent': len(images1)}
+
+    data1 = data1 or {}
+    try:
+        topic_primary_name = taxonomy.theme_name_from_id(
+            data1.get('topic_primary', ''))
+    except KeyError:
+        topic_primary_name = ''
+    user2 = prompts_v2.call2_user_text(
+        text, data1.get('given', ''), data1.get('find', ''),
+        problem.solution, problem.answer,
+        topic_primary_name=topic_primary_name,
+        task_nature=data1.get('task_nature', ''))
+    reply2, data2, ok2, violations2, retried2, attempts2 = call_with_retry(
+        complete_fn, variant['call2_model'], core2_blocks, user2, schema2,
+        variant['call2_effort'], None, validate_call2_full)
+    row['call2'] = data2
+    row['call2_violations'] = violations2
+    row['call2_usage'] = reply2
+    row['call2_ok'] = ok2
+    row['call2_retried'] = retried2
+    row['call2_attempts'] = attempts2
+    return row
+
+
+def run_variant_concurrent(sample_problems, variant, complete_fn, shortlists,
+                           workers, max_cost=None, on_progress=None,
+                           on_row=None, with_tikz=True, stop_event=None):
+    """Как `run_variant`, но до `workers` задач обрабатываются ОДНОВРЕМЕННО
+    (`ThreadPoolExecutor`) — Z.AI лимитирует одновременность, а не RPM,
+    поэтому throughput держит именно параллелизм (§3.6).
+
+    `max_cost` проверяется под локом ПЕРЕД тем, как задача берёт вызов 1 —
+    значит перебор потолка возможен максимум на те задачи, что УЖЕ летят
+    (до `workers` штук), не больше. Это тот же компромисс, что у любого
+    распределённого лимитера — точный стоп ровно на потолке потребовал бы
+    отменять уже отправленные HTTP-запросы, а платить за них всё равно
+    придётся.
+
+    `complete_fn` обязан быть потокобезопасным — `OpenAIProvider`/
+    `GLMProvider.complete()` создают свой HTTP-клиент на каждый вызов,
+    общего изменяемого состояния между вызовами нет.
+
+    Задача, упавшая исключением ПОСЛЕ исчерпания сетевых повторов внутри
+    `complete_fn` (не 429/обрыв — те уже отработаны там), НЕ роняет весь
+    пул — 300 оплаченных задач не должны теряться из-за одной. Ошибка
+    попадает в четвёртый элемент возврата `errors` — `[(problem_id,
+    exception), ...]` — вызывающий код решает, звать ли повтор.
+
+    `stop_event` (`threading.Event`, опционально) — Фаза 2, автостоп при
+    доле брака выше 3%: вызывающий код (обычно `on_row`) может дёрнуть
+    `.set()`, и НОВЫЕ задачи перестанут стартовать (уже летящие —
+    доработают). Тот же кооперативный компромисс, что и у `max_cost`.
+
+    Возвращает `(rows, spent, stopped_early, errors)`.
+    """
+    with_concepts = variant['concepts']
+    core1_blocks = [prompts_v2.call1_core(with_concepts=with_concepts)]
+    core2_blocks = [prompts_v2.call2_core()]
+    schema1 = prompts_v2.call1_schema(with_concepts=with_concepts)
+    schema2 = prompts_v2.CALL2_SCHEMA
+
+    lock = threading.Lock()
+    state = {'spent': Decimal('0'), 'stopped': False}
+    rows = []
+    errors = []
+
+    def worker(problem):
+        with lock:
+            if state['stopped']:
+                return
+            if max_cost is not None and state['spent'] >= Decimal(str(max_cost)):
+                state['stopped'] = True
+                return
+            if stop_event is not None and stop_event.is_set():
+                state['stopped'] = True
+                return
+
+        try:
+            row = _process_one_problem(
+                problem, variant, complete_fn, shortlists, with_tikz,
+                core1_blocks, core2_blocks, schema1, schema2)
+        except Exception as error:  # сеть/парсинг — не роняем весь пул
+            with lock:
+                errors.append((problem.id, error))
+            return
+
+        # Суммируем ВСЕ попытки (call_with_retry могла сделать по 2 на
+        # каждый вызов) — иначе неудачная первая попытка тратит деньги,
+        # но не учитывается в `spent`, и --max-cost недосчитывает расход.
+        cost = (
+            sum(real_call_cost(variant['call1_model'], r) for r in row['call1_attempts'])
+            + sum(real_call_cost(variant['call2_model'], r) for r in row['call2_attempts'])
+        )
+        with lock:
+            state['spent'] += cost
+            if max_cost is not None and state['spent'] >= Decimal(str(max_cost)):
+                state['stopped'] = True
+            rows.append(row)
+            if on_row:
+                on_row(row)
+            spent_now = state['spent']
+        if on_progress:
+            on_progress(problem.id, spent_now)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(worker, problem) for problem in sample_problems]
+        concurrent.futures.wait(futures)
+
+    return rows, state['spent'], state['stopped'], errors
 
 
 # ---------------------------------------------------------------------------
@@ -825,6 +1176,66 @@ def resumable_run_variant(sample_problems, variant, complete_fn, shortlists,
         todo, variant, complete_fn, shortlists, max_cost=max_cost,
         on_progress=on_progress, on_row=on_row)
     return rows, spent, stopped_early, skipped
+
+
+def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
+                                     shortlists, log_path, run_id,
+                                     prompt_version, workers, max_cost=None,
+                                     on_progress=None, stop_event=None,
+                                     extra_on_row=None):
+    """`resumable_run_variant` + `run_variant_concurrent` — журнал (Фаза 3)
+    и резюмируемость (Фаза 4) вместе с пулом воркеров (Фаза 1). Боевая
+    команда прогона использует именно эту функцию — `on_row` здесь
+    ОБЯЗАН быть под локом: без него параллельные `append_raw_log` из
+    разных потоков могут перемешать строки JSONL.
+
+    `extra_on_row(row)`, если задан, зовётся ПОСЛЕ записи в журнал (тот же
+    лок) — боевая команда вешает сюда автостоп при доле брака выше 3%
+    (Фаза 2): журнал уже видел эту задачу, отменять нечего.
+
+    Возвращает `(rows, spent, stopped_early, skipped, errors)`.
+    """
+    existing = read_raw_log(log_path)
+    done = _done_problem_ids(existing, prompt_version, variant)
+    todo = [p for p in sample_problems if p.id not in done]
+    skipped = len(sample_problems) - len(todo)
+
+    log_lock = threading.Lock()
+
+    def on_row(row):
+        with log_lock:
+            # `call1_attempts`/`call2_attempts` — 1 или 2 записи (Фаза 2:
+            # неудачная первая попытка тоже стоила денег и тоже уходит в
+            # журнал, иначе «run_raw.jsonl — страховка от повторной
+            # оплаты» держит слово только для успешных с первого раза
+            # задач). Последняя попытка — под именем 'call1'/'call2',
+            # как и раньше (совместимость с `_done_problem_ids`/отчётом);
+            # более ранние — под 'call1_retryN', отчётом не читаются, но
+            # доступны для разбора.
+            attempts1 = row.get('call1_attempts') or [row['call1_usage']]
+            for i, reply in enumerate(attempts1):
+                is_last = i == len(attempts1) - 1
+                append_raw_log(
+                    log_path, run_id, prompt_version, variant['call1_model'],
+                    row['problem_id'], 'call1' if is_last else 'call1_retry%d' % (i + 1),
+                    variant['call1_effort'], reply,
+                    row['call1'] if is_last else _safe_json_loads(reply.text))
+            if 'call2' in row:
+                attempts2 = row.get('call2_attempts') or [row['call2_usage']]
+                for i, reply in enumerate(attempts2):
+                    is_last = i == len(attempts2) - 1
+                    append_raw_log(
+                        log_path, run_id, prompt_version, variant['call2_model'],
+                        row['problem_id'], 'call2' if is_last else 'call2_retry%d' % (i + 1),
+                        variant['call2_effort'], reply,
+                        row['call2'] if is_last else _safe_json_loads(reply.text))
+            if extra_on_row:
+                extra_on_row(row)
+
+    rows, spent, stopped_early, errors = run_variant_concurrent(
+        todo, variant, complete_fn, shortlists, workers, max_cost=max_cost,
+        on_progress=on_progress, on_row=on_row, stop_event=stop_event)
+    return rows, spent, stopped_early, skipped, errors
 
 
 # ---------------------------------------------------------------------------
@@ -1019,6 +1430,11 @@ class Command(BaseCommand):
             report_lines.append(
                 '=== %s: расхождение вызов1/вызов2 по «это задача» — '
                 '%d/%d (%.1f%%) ===' % (key, divergent, pairs, pct))
+            gs = graphical_solution_breakdown(rows, problems_by_id)
+            report_lines.append(
+                '=== %s: «Графическое решение» после объединения по ИЛИ — '
+                'итого %d (модель %d, код %d, совпало %d) ===' % (
+                    key, gs['total_graphical'], gs['model'], gs['code'], gs['both']))
             for row in rows:
                 report_lines.append(json.dumps(row, ensure_ascii=False, default=str))
 
