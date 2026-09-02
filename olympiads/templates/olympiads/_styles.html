@@ -156,7 +156,7 @@
   margin: 36px 0 0; font-size: 14px; color: var(--text2);
 }
 .ol-divider::after {
-  content: ""; flex: 1; height: 1px; background: var(--line);
+  content: ""; flex: 1; height: var(--line); background: var(--border);
 }
 
 .ol-card[hidden] { display: none; }
@@ -216,7 +216,8 @@
 .ol-card-next-none, .ol-card-foot { color: var(--text2); }
 .ol-card-next .ol-status { margin-top: 0; flex-basis: 100%; }
 .ol-card-foot {
-  border-top: 1px solid var(--line); padding-top: 8px; font-size: 12px;
+  border-top: var(--line) solid var(--border-soft); padding-top: 8px; font-size: 12px;
+  padding-right: 92px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -237,7 +238,7 @@
 
 .ol-facts {
   display: flex; flex-wrap: wrap; gap: 8px 26px;
-  margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line);
+  margin-top: 18px; padding-top: 14px; border-top: var(--line) solid var(--border);
 }
 .ol-facts dt { font-size: 12px; color: var(--text2); }
 .ol-facts dd { font-size: 14px; font-weight: 600; margin-top: 2px; }
@@ -472,7 +473,7 @@
 
 /* ── Справочный хвост страницы ──────────────────────── */
 /* Скромнее остальных секций намеренно: это не содержание страницы. */
-.ol-sources { border-top: 1px solid var(--line); padding-top: 18px; }
+.ol-sources { border-top: var(--line) solid var(--border); padding-top: 18px; }
 .ol-sources-title { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
 .ol-sources-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; }
 .ol-sources-list a { font-size: 13px; color: var(--accent-ink); }
@@ -521,8 +522,13 @@
 
 /* ── Галочка выбора и липкая полоса ─────────────────── */
 .ol-card { position: relative; }
+/* ⚠️ ГАЛОЧКА В НИЖНЕМ УГЛУ, А НЕ В ВЕРХНЕМ. В верхнем она наезжала на
+   название: полные названия здесь длинные («Олимпиада школьников СПбГУ по
+   экономике»), и в трёх колонках заголовок уходил под неё. Внизу рядом
+   короткая строка со счётчиками, места хватает — под неё оставлен отступ
+   справа у .ol-card-foot. */
 .ol-pick {
-  position: absolute; top: 8px; right: 8px; z-index: 2;
+  position: absolute; bottom: 10px; right: 10px; z-index: 2;
   display: flex; align-items: center; gap: 5px;
   font-size: 11px; color: var(--text3); cursor: pointer;
   background: var(--surface-2); border: 1px solid var(--border-soft);
