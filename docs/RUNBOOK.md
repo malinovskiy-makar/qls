@@ -268,7 +268,15 @@ docker compose exec -T web python manage.py build_game_pool
 docker compose up -d ws
 docker compose ps ws                       # healthy
 
-# 8. nginx: проверить конфигурацию и перечитать её БЕЗ перезапуска.
+# 8. nginx — ⚠️ КОНФИГУРАЦИЯ НЕ ПОДТЯГИВАЕТСЯ САМА ИЗ КЛОНА, копируем явно
+#    (та же ловушка, что в SERVER.md, «Обновить сайт до свежего кода»).
+#    В этой ветке файл поменялся (добавлен блок location /ws/ — иначе
+#    дуэли уходят к gunicorn, который про сокеты не знает), и без этого
+#    шага изменение до сервера не доедет, сколько ни катай web.
+cp /srv/weconomics/app/deploy/nginx/available/django.conf \
+    /srv/weconomics/nginx/available/django.conf
+cp /srv/weconomics/nginx/available/django.conf \
+    /srv/weconomics/nginx/conf.d/weconomics.conf
 docker compose exec nginx nginx -t
 docker compose exec nginx nginx -s reload
 ```
