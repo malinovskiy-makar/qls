@@ -304,6 +304,45 @@ _DIGIT_RE = re.compile(r'\d')
 _GIVEN_PREFIX_RE = re.compile(r'^\s*дано\s*[:：]\s*', re.IGNORECASE)
 _FIND_PREFIX_RE = re.compile(r'^\s*найти\s*[:：]\s*', re.IGNORECASE)
 
+#: Фаза 1.3 (решение владельца 02.09.2026, четвёртая пересъёмка): правило
+#: §12.3 «без цифр» для `given`/`find` остаётся ЖЁСТКИМ — это структурный
+#: отпечаток задачи, ради него всё и затевалось. Меняется только СООБЩЕНИЕ
+#: повтора: раньше модель получала общий запрет («given содержит цифру») и
+#: не понимала, за что её ругают. Теперь сообщение цитирует нарушивший
+#: кусок и показывает, чем его заменить.
+_CLAUSE_BOUNDARY_RE = re.compile(r'[;,.!?\n]')
+
+DIGIT_FIELD_VIOLATION = (
+    'В поле %s встречается «%s». Числовые значения запрещены.\n'
+    'Опиши структуру словами: «линейная функция спроса».\n'
+    'Перепиши только given и find, остальные поля не меняй.'
+)
+
+
+def digit_fragment(text, max_len=60):
+    """Кусок текста вокруг ПЕРВОЙ цифры — то, что цитируется модели в
+    сообщении повтора. Границы куска — знаки конца предложения/запятая/
+    перевод строки: «Дана линейная функция спроса P = 100 − 2Q, найдите
+    равновесие» даёт «Дана линейная функция спроса P = 100 − 2Q», а не всю
+    строку и не голую цифру, по которой не понять, что переписывать.
+
+    Кусок длиннее `max_len` обрезается ОКНОМ ВОКРУГ цифры, а не с начала:
+    цифра обязана остаться видна, иначе цитата бессмысленна."""
+    match = _DIGIT_RE.search(text or '')
+    if not match:
+        return ''
+    pos = match.start()
+    left = 0
+    for boundary in _CLAUSE_BOUNDARY_RE.finditer(text, 0, pos):
+        left = boundary.end()
+    right_match = _CLAUSE_BOUNDARY_RE.search(text, pos)
+    right = right_match.start() if right_match else len(text)
+    fragment = text[left:right].strip()
+    if len(fragment) > max_len:
+        start = max(left, pos - max_len // 2)
+        fragment = text[start:start + max_len].strip()
+    return fragment
+
 
 def strip_given_find_prefixes(data):
     """Срезает «Дано:»/«Найти:» из `data['given']`/`data['find']` на
@@ -318,7 +357,16 @@ def strip_given_find_prefixes(data):
     return data
 
 
-def validate_call1(data, with_concepts=True):
+def validate_call1(data, with_concepts=True, shortlist_terms=None):
+    """ЖЁСТКИЕ нарушения — те, что портят банк, если пропустить (Фаза 1
+    задания сессии 02.09.2026, вторая пересъёмка): триггерят повтор внутри
+    `call_with_retry`. Мягкие — см. `soft_violations_call1` ниже, отдельно
+    от этой функции и НЕ влияют на `ok`.
+
+    `shortlist_terms`, если задан (боевой путь GLM — список для КОНКРЕТНОЙ
+    задачи), проверяет «понятие вне шорт-листа» — иначе (тесты с
+    плейсхолдерами вида `econ_concepts: ['a','b','c']`) эта проверка
+    пропускается, как и раньше делал вызывающий код с enum таксономии."""
     if not isinstance(data, dict):
         return (False, ['ответ вызова 1 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
@@ -329,25 +377,61 @@ def validate_call1(data, with_concepts=True):
         violations.append('tags вне диапазона 1..5 (%d)' % len(tags))
     if with_concepts:
         concepts = data.get('econ_concepts') or []
-        # Пустой список — законное исключение при `не_задача` (Фаза 4.5):
-        # промпт разрешает 0 понятий именно в этом случае, счётчик не имеет
-        # права ругаться на него как на промах мимо диапазона 3..6.
-        if not (len(concepts) == 0 and data.get('task_nature') == 'не_задача'):
-            if not 3 <= len(concepts) <= 6:
-                violations.append(
-                    'econ_concepts вне диапазона 3..6 (%d)' % len(concepts))
+        # Верхняя граница остаётся жёсткой — только нижняя (Фаза 1, 02.09)
+        # ушла в мягкие: починка шорт-листа сделала его честнее и уже, и на
+        # части задач физически не набрать три понятия — не наша ошибка.
+        if len(concepts) > 6:
+            violations.append('econ_concepts длиннее 6 (%d)' % len(concepts))
         if len(data.get('concepts_offlist') or []) > 2:
             violations.append('concepts_offlist длиннее 2')
+        # ⚠️ Пустой список — как отсутствие: `shortlist_for()` в бою
+        # никогда не отдаёт пустой список (добор ядром до MIN_SHORTLIST),
+        # `[]` встречается только в тестах как «не о том тесте» плейсхолдер
+        # — не должен читаться как «ничего не разрешено».
+        shortlist_set = set(shortlist_terms) if shortlist_terms else None
         for i, concept in enumerate(concepts):
-            if _DIGIT_RE.search(concept or ''):
+            # ⚠️ Не-строка сюда доходит (модель без строгой схемы может
+            # вернуть число) и раньше роняла проверку целиком —
+            # `_DIGIT_RE.search(42)` это TypeError, а не нарушение. Тип
+            # ловит `check_against_schema` жёстко и по своей части, здесь
+            # же проверяются только текстовые правила.
+            if not isinstance(concept, str):
+                continue
+            if _DIGIT_RE.search(concept):
                 violations.append('econ_concepts[%d] содержит цифру' % i)
+            # §12 правило 5 / §4.6 API_RUN_MASTER: «P», «π» и подобные
+            # однобуквенные обозначения неоднозначны без контекста.
+            if len(concept) <= 1:
+                violations.append(
+                    'econ_concepts[%d] однобуквенное обозначение' % i)
+            if shortlist_set is not None and concept not in shortlist_set:
+                violations.append('econ_concepts[%d] вне шорт-листа задачи' % i)
     if len(data.get('features_1') or []) > 6:
         violations.append('features_1 длиннее 6')
-    if _DIGIT_RE.search(data.get('given') or ''):
-        violations.append('given содержит цифру')
-    if _DIGIT_RE.search(data.get('find') or ''):
-        violations.append('find содержит цифру')
+    for field in ('given', 'find'):
+        value = data.get(field) or ''
+        if _DIGIT_RE.search(value):
+            violations.append(
+                DIGIT_FIELD_VIOLATION % (field, digit_fragment(value)))
     return (not violations, violations)
+
+
+def soft_violations_call1(data, with_concepts=True):
+    """МЯГКИЕ нарушения вызова 1 (Фаза 1, 02.09.2026, вторая пересъёмка) —
+    не портят банк, повтор не делают. Пишутся в журнал (`soft_violations`
+    в `run_parsed.jsonl` — см. `glm_enrich_run.parsed_row`), не влияют на
+    `ok`/автостоп."""
+    if not isinstance(data, dict):
+        return []
+    violations = []
+    if with_concepts:
+        concepts = data.get('econ_concepts') or []
+        if not (len(concepts) == 0 and data.get('task_nature') == 'не_задача'):
+            if len(concepts) < 3:
+                violations.append('econ_concepts меньше 3 (%d)' % len(concepts))
+    if not (data.get('topics_secondary') or []):
+        violations.append('topics_secondary пусто')
+    return violations
 
 
 # ---------------------------------------------------------------------------
@@ -487,19 +571,24 @@ _TITLE_CANDIDATE_LATEX_RE = re.compile(r'[$\\]')
 
 
 def validate_call2(data):
+    """ЖЁСТКИЕ нарушения вызова 2 — см. докстринг `validate_call1`. Нижняя
+    граница `search_queries` и длина/число слов `title_candidate` ушли в
+    `soft_violations_call2` (Фаза 1, 02.09.2026, вторая пересъёмка):
+    заголовки не пишутся в базу автоматически (свой стоп-гейт §5.8), а
+    пять точных запросов лучше восьми с натяжкой."""
     if not isinstance(data, dict):
         return (False, ['ответ вызова 2 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
     queries = data.get('search_queries') or []
-    # Фаза B.3 (боевой прогон 02.09): было РОВНО 8, теперь 5..8 — восьмой
-    # запрос у части задач оказывался явным добиванием до счёта, к задаче
-    # не относящимся («уравнение Слуцкого MRS равна отношению цен» у #32,
-    # где о Слуцком в условии ни слова). Лучше пять точных, чем восемь с
-    # натяжкой.
-    if not 5 <= len(queries) <= 8:
-        violations.append('search_queries вне диапазона 5..8 (%d)' % len(queries))
+    # Верхняя граница остаётся жёсткой — нижняя (было 5..8 целиком) ушла в
+    # мягкие, см. `soft_violations_call2`.
+    if len(queries) > 8:
+        violations.append('search_queries длиннее 8 (%d)' % len(queries))
     for i, query in enumerate(queries):
-        if _DIGIT_RE.search(query or ''):
+        # Не-строка — нарушение ТИПА (его ловит `check_against_schema`), а
+        # не «запрос с цифрой»; раньше `_DIGIT_RE.search(42)` роняло всю
+        # проверку исключением.
+        if isinstance(query, str) and _DIGIT_RE.search(query):
             violations.append('search_queries[%d] содержит цифру' % i)
     hints = data.get('hints')
     if hints is not None and not 3 <= len(hints) <= 5:
@@ -510,16 +599,13 @@ def validate_call2(data):
 
     # `title_candidate` (§5.8, Фаза 4.1/6.4) — границы не выражаются
     # схемой (maxLength не пробовали на этой schema, чтобы не рисковать
-    # `strict` перед смок-тестом), проверяем в Python.
+    # `strict` перед смок-тестом), проверяем в Python. Длина/число слов —
+    # мягкие (см. `soft_violations_call2`); пустота/регистр/точка/цифра/
+    # LaTeX остаются жёсткими.
     title = data.get('title_candidate') or ''
     if not title:
         violations.append('title_candidate пуст')
     else:
-        if len(title) > 40:
-            violations.append('title_candidate длиннее 40 символов (%d)' % len(title))
-        word_count = len(title.split())
-        if not 1 <= word_count <= 4:
-            violations.append('title_candidate не 1..4 слова (%d)' % word_count)
         if not title[:1].isupper():
             violations.append('title_candidate не с заглавной буквы')
         if title.endswith('.'):
@@ -530,6 +616,76 @@ def validate_call2(data):
             violations.append('title_candidate содержит $ или \\')
 
     return (not violations, violations)
+
+
+def drop_digit_search_queries(data):
+    """Фаза 1.2 (решение владельца 02.09.2026, четвёртая пересъёмка):
+    запрос с цифрой ВЫБРАСЫВАЕТСЯ из массива, а не роняет весь вызов.
+
+    Причина структурная. Проверка «нет цифр» применялась ко ВСЕМУ массиву
+    целиком, поэтому один плохой запрос из восьми убивал вызов, где семь
+    были в порядке — восьмикратный усилитель отказов на ровном месте, и
+    самая большая доля нарушений чек-поинта (71 случай из 142 задач).
+    Само правило §12.3 не ослаблено: цифра в поисковом запросе по-прежнему
+    недопустима, меняется только реакция — выбросить один запрос, а не
+    платить за повторный вызов.
+
+    Правит `data['search_queries']` НА МЕСТЕ, возвращает список
+    выброшенных запросов ТЕКСТОМ (идёт в журнал полем `dropped_queries`).
+    Не-строки не трогаются — их поймает проверка типа по схеме, это
+    жёсткое нарушение, а не «запрос с цифрой».
+
+    Осталось меньше 5 — это `soft_violations_call2` («search_queries
+    меньше 5»), то есть мягкое нарушение без повтора; отдельной проверки
+    здесь не нужно.
+    """
+    if not isinstance(data, dict):
+        return []
+    queries = data.get('search_queries')
+    if not isinstance(queries, list):
+        return []
+    kept = []
+    dropped = []
+    for query in queries:
+        if isinstance(query, str) and _DIGIT_RE.search(query):
+            dropped.append(query)
+        else:
+            kept.append(query)
+    if dropped:
+        data['search_queries'] = kept
+    return dropped
+
+
+def make_query_sanitizer():
+    """`(sanitize_fn, state)` для `call_with_retry`: `sanitize_fn(data)`
+    выбрасывает запросы с цифрой ещё ДО проверки, `state['dropped']` —
+    что выброшено из ПОСЛЕДНЕЙ попытки (повтор перезаписывает, а не
+    копит: в журнал идёт то, что выброшено из финального ответа)."""
+    state = {'dropped': []}
+
+    def sanitize(data):
+        state['dropped'] = drop_digit_search_queries(data)
+
+    return sanitize, state
+
+
+def soft_violations_call2(data):
+    """МЯГКИЕ нарушения вызова 2 (Фаза 1, 02.09.2026, вторая пересъёмка) —
+    см. докстринг `soft_violations_call1`."""
+    if not isinstance(data, dict):
+        return []
+    violations = []
+    queries = data.get('search_queries') or []
+    if len(queries) < 5:
+        violations.append('search_queries меньше 5 (%d)' % len(queries))
+    title = data.get('title_candidate') or ''
+    if title:
+        if len(title) > 40:
+            violations.append('title_candidate длиннее 40 символов (%d)' % len(title))
+        word_count = len(title.split())
+        if not 1 <= word_count <= 4:
+            violations.append('title_candidate не 1..4 слова (%d)' % word_count)
+    return violations
 
 
 # ---------------------------------------------------------------------------
@@ -570,6 +726,19 @@ def _check_schema_value(label, value, spec):
         return violations
     if 'enum' in spec and value not in spec['enum']:
         violations.append('%s: значение %r вне enum' % (label, value))
+    # `difficulty` (1..5) — единственное числовое поле схемы с границами;
+    # JSON Schema `minimum`/`maximum` не проверялись здесь вовсе (Фаза 1,
+    # 02.09.2026, вторая пересъёмка) — раньше их держал только тип
+    # integer/null, диапазон не проверялся никем.
+    if (isinstance(value, (int, float)) and not isinstance(value, bool)):
+        minimum = spec.get('minimum')
+        maximum = spec.get('maximum')
+        if minimum is not None and value < minimum:
+            violations.append('%s: значение %r меньше минимума %r'
+                              % (label, value, minimum))
+        if maximum is not None and value > maximum:
+            violations.append('%s: значение %r больше максимума %r'
+                              % (label, value, maximum))
     if isinstance(value, list):
         items_spec = spec.get('items')
         if items_spec:
@@ -603,12 +772,14 @@ def check_against_schema(data, schema):
     return violations
 
 
-def validate_call1_full(data, with_concepts=True):
+def validate_call1_full(data, with_concepts=True, shortlist_terms=None):
     """`validate_call1` + `check_against_schema` вместе — боевой путь
-    (GLM), где enum/тип поставщик не проверяет вовсе."""
+    (GLM), где enum/тип поставщик не проверяет вовсе. Только ЖЁСТКИЕ
+    нарушения — мягкие считаются отдельно, см. `soft_violations_call1`."""
     schema_violations = check_against_schema(
         data, prompts_v2.call1_schema(with_concepts=with_concepts))
-    ok, violations = validate_call1(data, with_concepts=with_concepts)
+    ok, violations = validate_call1(data, with_concepts=with_concepts,
+                                    shortlist_terms=shortlist_terms)
     all_violations = schema_violations + violations
     return (not all_violations, all_violations)
 
@@ -648,12 +819,18 @@ RETRY_PROMPT_TEMPLATE = (
 
 
 def call_with_retry(complete_fn, model, blocks, user_text, schema, effort,
-                    images, validate_fn):
+                    images, validate_fn, sanitize_fn=None):
     """Один вызов; если `validate_fn(data)` вернула нарушения (включая
     «это вообще не JSON») — ровно ОДИН повторный вызов с явным списком
     нарушений в промпте. Не помогло — возвращается `ok=False` с
     нарушениями второй попытки, дальше решает вызывающий код (очередь
     брака, не результат).
+
+    `sanitize_fn(data)`, если задан, правит разобранный ответ НА МЕСТЕ
+    ПЕРЕД проверкой — там, где нарушение чинится выбрасыванием части
+    ответа, а не повторным вызовом (Фаза 1.2: запрос с цифрой, см.
+    `drop_digit_search_queries`). Зовётся на КАЖДОЙ попытке: иначе повтор
+    проверялся бы по другим правилам, чем первая попытка.
 
     Возвращает `(reply, data, ok, violations, retried, attempts)` —
     `reply`/`data` от ПОСЛЕДНЕЙ попытки, `attempts` — список ВСЕХ `Reply`
@@ -661,24 +838,24 @@ def call_with_retry(complete_fn, model, blocks, user_text, schema, effort,
     денег, и `real_call_cost` должен просуммировать обе, а не только
     финальную — иначе `--max-cost` молча недосчитывает потраченное.
     """
+    def parse_and_check(reply):
+        try:
+            data = json.loads(reply.text)
+        except (ValueError, TypeError):
+            return None, False, ['ответ не является JSON']
+        if sanitize_fn is not None:
+            sanitize_fn(data)
+        ok, violations = validate_fn(data)
+        return data, ok, violations
+
     reply = complete_fn(model, blocks, user_text, schema, effort, images=images)
-    try:
-        data = json.loads(reply.text)
-    except (ValueError, TypeError):
-        data = None
-    ok, violations = validate_fn(data) if data is not None else (
-        False, ['ответ не является JSON'])
+    data, ok, violations = parse_and_check(reply)
     if ok:
         return reply, data, True, [], False, [reply]
 
     retry_text = user_text + RETRY_PROMPT_TEMPLATE % '\n- '.join(violations)
     reply2 = complete_fn(model, blocks, retry_text, schema, effort, images=images)
-    try:
-        data2 = json.loads(reply2.text)
-    except (ValueError, TypeError):
-        data2 = None
-    ok2, violations2 = validate_fn(data2) if data2 is not None else (
-        False, ['ответ не является JSON'])
+    data2, ok2, violations2 = parse_and_check(reply2)
     return reply2, data2, ok2, violations2, True, [reply, reply2]
 
 
@@ -957,12 +1134,13 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
     reply1, data1, ok1, violations1, retried1, attempts1 = call_with_retry(
         complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
         variant['call1_effort'], images1,
-        lambda d: validate_call1_full(d, with_concepts))
+        lambda d: validate_call1_full(d, with_concepts, shortlist_terms=shortlist_terms))
     strip_given_find_prefixes(data1)
     row = {'problem_id': problem.id, 'call1': data1,
           'call1_violations': violations1, 'call1_usage': reply1,
           'call1_ok': ok1, 'call1_retried': retried1,
           'call1_attempts': attempts1,
+          'call1_soft_violations': soft_violations_call1(data1, with_concepts),
           'tikz': tikz_stats, 'images_sent': len(images1)}
 
     data1 = data1 or {}
@@ -976,15 +1154,21 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
         problem.solution, problem.answer,
         topic_primary_name=topic_primary_name,
         task_nature=data1.get('task_nature', ''))
+    # Фаза 1.2: запрос с цифрой выбрасывается ДО проверки — вызов из-за
+    # него не повторяется (см. `drop_digit_search_queries`).
+    sanitize2, dropped2 = make_query_sanitizer()
     reply2, data2, ok2, violations2, retried2, attempts2 = call_with_retry(
         complete_fn, variant['call2_model'], core2_blocks, user2, schema2,
-        variant['call2_effort'], None, validate_call2_full)
+        variant['call2_effort'], None, validate_call2_full,
+        sanitize_fn=sanitize2)
     row['call2'] = data2
     row['call2_violations'] = violations2
     row['call2_usage'] = reply2
     row['call2_ok'] = ok2
     row['call2_retried'] = retried2
     row['call2_attempts'] = attempts2
+    row['call2_soft_violations'] = soft_violations_call2(data2)
+    row['dropped_queries'] = dropped2['dropped']
     return row
 
 
@@ -1239,14 +1423,23 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
             # как и раньше (совместимость с `_done_problem_ids`/отчётом);
             # более ранние — под 'call1_retryN', отчётом не читаются, но
             # доступны для разбора.
+            #
+            # ⚠️ В журнал идёт РАЗБОР `reply.text`, а не `row['call1']`/
+            # `row['call2']` — то есть ответ модели ДО нашей постобработки
+            # (Фаза 1.2, 02.09.2026, четвёртая пересъёмка). Раньше
+            # финальная попытка писалась уже обработанной, и с появлением
+            # `drop_digit_search_queries` журнал перестал бы быть «сырым»:
+            # восстановление метрик из него не увидело бы НИ ОДНОГО
+            # выброшенного запроса, потому что выбросили их до записи.
+            # Постобработку повторяет читающий код (`_rows_from_log`), и
+            # тогда восстановление — чистая функция журнала.
             attempts1 = row.get('call1_attempts') or [row['call1_usage']]
             for i, reply in enumerate(attempts1):
                 is_last = i == len(attempts1) - 1
                 append_raw_log(
                     log_path, run_id, prompt_version, variant['call1_model'],
                     row['problem_id'], 'call1' if is_last else 'call1_retry%d' % (i + 1),
-                    variant['call1_effort'], reply,
-                    row['call1'] if is_last else _safe_json_loads(reply.text))
+                    variant['call1_effort'], reply, _safe_json_loads(reply.text))
             if 'call2' in row:
                 attempts2 = row.get('call2_attempts') or [row['call2_usage']]
                 for i, reply in enumerate(attempts2):
@@ -1254,8 +1447,7 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
                     append_raw_log(
                         log_path, run_id, prompt_version, variant['call2_model'],
                         row['problem_id'], 'call2' if is_last else 'call2_retry%d' % (i + 1),
-                        variant['call2_effort'], reply,
-                        row['call2'] if is_last else _safe_json_loads(reply.text))
+                        variant['call2_effort'], reply, _safe_json_loads(reply.text))
             if extra_on_row:
                 extra_on_row(row)
 

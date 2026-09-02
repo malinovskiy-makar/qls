@@ -75,3 +75,23 @@ class GlmReviewBuildTests(TestCase):
                     out=str(self.out_path))
         text = self.out_path.read_text(encoding='utf-8')
         self.assertIn('БРАК', text)
+
+    def test_prioritize_visual_гарантирует_картинки_в_первых_n(self):
+        # Фаза 3.4 задания сессии 02.09 (третья пересъёмка): «первые N по
+        # файлу» не гарантирует визуальный пласт — картинки в выборке
+        # распределены неравномерно, ровно тот баг, что уже чинили в
+        # Фазе 2 для порядка обработки. Одним файлом (без --supplement),
+        # где картиночные задачи стоят ПОСЛЕДНИМИ по файлу.
+        with open(self.main_path, 'w', encoding='utf-8') as fh:
+            for p in self.main_problems:
+                fh.write(json.dumps(_parsed_row(p.id)) + '\n')
+            for p in self.image_problems:
+                fh.write(json.dumps(_parsed_row(p.id)) + '\n')
+
+        call_command('glm_review_build', main=str(self.main_path), main_count=4,
+                    prioritize_visual=True, min_raster=3, out=str(self.out_path))
+        text = self.out_path.read_text(encoding='utf-8')
+        self.assertEqual(text.count('data:image/png;base64,'), 3)
+        self.assertEqual(text.count('class="card has-raster"'), 3)
+        for p in self.image_problems:
+            self.assertIn('Задача #%d' % p.id, text)

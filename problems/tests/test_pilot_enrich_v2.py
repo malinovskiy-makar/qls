@@ -169,7 +169,8 @@ class ValidateCall1Tests(TestCase):
     def _base(self, **overrides):
         data = {
             'topic_primary': 'X', 'topics_secondary': [], 'tags': ['a'],
-            'given': 'Дано', 'find': 'Найти', 'econ_concepts': ['a', 'b', 'c'],
+            'given': 'Дано', 'find': 'Найти',
+            'econ_concepts': ['альфа', 'бета', 'гамма'],
             'concepts_offlist': [], 'task_nature': 'расчётная',
             'features_1': [], 'topic_confidence': 'высокая',
         }
@@ -189,15 +190,54 @@ class ValidateCall1Tests(TestCase):
         ok, violations = cmd.validate_call1(self._base(tags=[]))
         self.assertFalse(ok)
 
-    def test_мало_понятий(self):
-        ok, violations = cmd.validate_call1(self._base(econ_concepts=['a']))
-        self.assertFalse(ok)
-        self.assertTrue(any('econ_concepts' in v for v in violations))
+    def test_мало_понятий_теперь_не_жёсткое(self):
+        # Фаза 1 задания сессии 02.09 (вторая пересъёмка): econ_concepts
+        # < 3 больше не портит банк — прямое следствие починки шорт-листа
+        # (стал честнее и уже), повтор за это больше не платим.
+        ok, violations = cmd.validate_call1(self._base(econ_concepts=['альфа']))
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call1(self._base(econ_concepts=['альфа']))
+        self.assertTrue(any('econ_concepts' in v for v in soft))
 
     def test_много_дополнительных_тем(self):
         ok, violations = cmd.validate_call1(
             self._base(topics_secondary=['A', 'B', 'C']))
         self.assertFalse(ok)
+
+    def test_семь_понятий_всё_ещё_жёсткое(self):
+        ok, violations = cmd.validate_call1(
+            self._base(econ_concepts=['a1', 'b1', 'c1', 'd1', 'e1', 'f1', 'g1']))
+        self.assertFalse(ok)
+        self.assertTrue(any('econ_concepts' in v for v in violations))
+
+    def test_однобуквенное_обозначение_econ_concepts_жёсткое(self):
+        # §12 правило 5 / §4.6 API_RUN_MASTER: «P», «π» и подобные
+        # неоднозначны без контекста — запрещены даже если модель взяла их
+        # дословно из шорт-листа.
+        ok, violations = cmd.validate_call1(
+            self._base(econ_concepts=['альфа', 'P', 'гамма']))
+        self.assertFalse(ok)
+        self.assertTrue(any('однобуквенное' in v for v in violations))
+
+    def test_понятие_вне_шорт_листа_жёсткое(self):
+        ok, violations = cmd.validate_call1(
+            self._base(econ_concepts=['альфа', 'бета', 'не_из_списка']),
+            shortlist_terms=['альфа', 'бета', 'гамма'])
+        self.assertFalse(ok)
+        self.assertTrue(any('вне шорт-листа' in v for v in violations))
+
+    def test_понятие_из_шорт_листа_проходит(self):
+        ok, violations = cmd.validate_call1(
+            self._base(econ_concepts=['альфа', 'бета', 'гамма']),
+            shortlist_terms=['альфа', 'бета', 'гамма', 'дельта'])
+        self.assertTrue(ok, violations)
+
+    def test_пустой_шорт_лист_не_проверяется(self):
+        # `shortlist_for()` в бою никогда не отдаёт [] (добор ядром до
+        # MIN_SHORTLIST) — [] в вызове читается как «не задан», не как
+        # «ничего не разрешено».
+        ok, violations = cmd.validate_call1(self._base(), shortlist_terms=[])
+        self.assertTrue(ok, violations)
 
     def test_без_понятий_econ_concepts_не_проверяется(self):
         data = self._base()
@@ -214,12 +254,27 @@ class ValidateCall1Tests(TestCase):
             self._base(task_nature='не_задача', econ_concepts=[],
                        concepts_offlist=[]))
         self.assertTrue(ok, violations)
+        self.assertEqual(
+            cmd.soft_violations_call1(
+                self._base(task_nature='не_задача', econ_concepts=[],
+                           concepts_offlist=[])),
+            ['topics_secondary пусто'])
 
-    def test_пустые_econ_concepts_всё_ещё_нарушение_для_обычной_задачи(self):
+    def test_пустые_econ_concepts_теперь_только_мягкое_для_обычной_задачи(self):
         ok, violations = cmd.validate_call1(
             self._base(task_nature='расчётная', econ_concepts=[]))
-        self.assertFalse(ok)
-        self.assertTrue(any('econ_concepts' in v for v in violations))
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call1(
+            self._base(task_nature='расчётная', econ_concepts=[]))
+        self.assertTrue(any('econ_concepts' in v for v in soft))
+
+    def test_topics_secondary_пусто_мягкое(self):
+        soft = cmd.soft_violations_call1(self._base(topics_secondary=[]))
+        self.assertIn('topics_secondary пусто', soft)
+
+    def test_topics_secondary_непусто_без_мягкого(self):
+        soft = cmd.soft_violations_call1(self._base(topics_secondary=['5']))
+        self.assertNotIn('topics_secondary пусто', soft)
 
     def test_шесть_признаков_это_максимум(self):
         ok, _ = cmd.validate_call1(self._base(features_1=list(prompts_v2.FEATURES_1)))
@@ -273,10 +328,13 @@ class ValidateCall2Tests(TestCase):
         ok, violations = cmd.validate_call2(self._base())
         self.assertTrue(ok, violations)
 
-    def test_запросов_меньше_пяти_нарушение(self):
+    def test_запросов_меньше_пяти_теперь_мягкое(self):
+        # Фаза 1 задания сессии 02.09 (вторая пересъёмка): пять точных
+        # запросов лучше восьми с натяжкой — за это больше не повторяем.
         ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 4))
-        self.assertFalse(ok)
-        self.assertTrue(any('search_queries' in v for v in violations))
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call2(self._base(search_queries=['q'] * 4))
+        self.assertTrue(any('search_queries' in v for v in soft))
 
     def test_запросов_больше_восьми_нарушение(self):
         ok, violations = cmd.validate_call2(self._base(search_queries=['q'] * 9))
@@ -315,17 +373,29 @@ class ValidateCall2Tests(TestCase):
         self.assertFalse(ok)
         self.assertTrue(any('пуст' in v for v in violations))
 
-    def test_title_candidate_длиннее_40(self):
-        ok, violations = cmd.validate_call2(
-            self._base(title_candidate='Очень ' * 10 + 'длинное имя'))
-        self.assertFalse(ok)
-        self.assertTrue(any('40' in v for v in violations))
+    def test_title_candidate_длиннее_40_теперь_мягкое(self):
+        long_title = 'Очень ' * 10 + 'длинное имя'
+        ok, violations = cmd.validate_call2(self._base(title_candidate=long_title))
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call2(self._base(title_candidate=long_title))
+        self.assertTrue(any('40' in v for v in soft))
 
-    def test_title_candidate_больше_4_слов(self):
-        ok, violations = cmd.validate_call2(
-            self._base(title_candidate='Раз два три четыре пять'))
-        self.assertFalse(ok)
-        self.assertTrue(any('1..4 слова' in v for v in violations))
+    def test_title_candidate_больше_4_слов_теперь_мягкое(self):
+        title = 'Раз два три четыре пять'
+        ok, violations = cmd.validate_call2(self._base(title_candidate=title))
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call2(self._base(title_candidate=title))
+        self.assertTrue(any('1..4 слова' in v for v in soft))
+
+    def test_soft_violations_call2_пустой_title_без_мягкого(self):
+        # Пустой заголовок остаётся ЖЁСТКИМ нарушением (title_candidate
+        # пуст) — мягкая проверка длины/числа слов не должна дублировать
+        # его отдельной записью про несуществующий текст.
+        soft = cmd.soft_violations_call2(self._base(title_candidate=''))
+        self.assertEqual(soft, [])
+
+    def test_soft_violations_call2_валидный_без_мягких(self):
+        self.assertEqual(cmd.soft_violations_call2(self._base()), [])
 
     def test_title_candidate_со_строчной_буквы(self):
         ok, violations = cmd.validate_call2(
@@ -376,6 +446,135 @@ class ValidateCall2Tests(TestCase):
         ok, violations = cmd.validate_call2(
             self._base(plot='Монополист продаёт товар нескольким группам'))
         self.assertTrue(ok, violations)
+
+
+class DropDigitSearchQueriesTests(TestCase):
+    """Фаза 1.2 (решение владельца 02.09.2026, четвёртая пересъёмка):
+    запрос с цифрой ВЫБРАСЫВАЕТСЯ из массива, а не роняет весь вызов.
+
+    Правило §12.3 «без цифр» при этом не ослаблено: цифра в поисковом
+    запросе по-прежнему недопустима — меняется реакция, не правило."""
+
+    def _call2(self, queries):
+        return {
+            'search_queries': list(queries), 'text_quality': 'чистая',
+            'text_quality_note': '', 'problem_type': 'открытый_ответ',
+            'difficulty': 3, 'difficulty_note': '',
+            'answer_consistency': 'согласован', 'plot': None, 'hints': None,
+            'title_candidate': 'Рынок кофе',
+        }
+
+    def test_восемь_запросов_два_с_цифрами_остаётся_шесть_и_вызов_проходит(self):
+        """Зубастость задания дословно: массив из восьми, где два с
+        цифрами — на выходе шесть и вызов прошёл."""
+        data = self._call2(['чистый запрос %d' % i for i in range(6)])
+        data['search_queries'] = ['спрос и предложение', 'эластичность спроса',
+                                  'налог на производителя', 'потолок цены',
+                                  'излишек потребителя', 'равновесие рынка',
+                                  'цена 100 рублей', 'спрос при Q = 20']
+        dropped = cmd.drop_digit_search_queries(data)
+        self.assertEqual(len(dropped), 2)
+        self.assertEqual(len(data['search_queries']), 6)
+        ok, violations = cmd.validate_call2_full(data)
+        self.assertTrue(ok, violations)
+        self.assertEqual(cmd.soft_violations_call2(data), [])
+
+    def test_шесть_запросов_четыре_с_цифрами_остаётся_два_мягкое_без_повтора(self):
+        """Зубастость задания дословно: массив из шести, где четыре с
+        цифрами — на выходе два, мягкое нарушение, повтора нет."""
+        data = self._call2(['спрос и предложение', 'эластичность спроса',
+                            'цена 100 рублей', 'выпуск 20 единиц',
+                            'налог 5 процентов', 'доход 1000 рублей'])
+        dropped = cmd.drop_digit_search_queries(data)
+        self.assertEqual(len(dropped), 4)
+        self.assertEqual(len(data['search_queries']), 2)
+        # мягкое: повтора не будет — validate_call2_full молчит.
+        ok, violations = cmd.validate_call2_full(data)
+        self.assertTrue(ok, violations)
+        soft = cmd.soft_violations_call2(data)
+        self.assertTrue(any('search_queries' in v for v in soft), soft)
+
+    def test_выброшенные_запросы_возвращаются_текстом(self):
+        data = self._call2(['спрос', 'предложение', 'цена 100 рублей'])
+        dropped = cmd.drop_digit_search_queries(data)
+        self.assertEqual(dropped, ['цена 100 рублей'])
+
+    def test_массив_без_цифр_не_трогается(self):
+        queries = ['спрос', 'предложение', 'равновесие', 'налог', 'субсидия']
+        data = self._call2(queries)
+        self.assertEqual(cmd.drop_digit_search_queries(data), [])
+        self.assertEqual(data['search_queries'], queries)
+
+    def test_не_словарь_и_не_список_не_ломают(self):
+        self.assertEqual(cmd.drop_digit_search_queries(None), [])
+        self.assertEqual(cmd.drop_digit_search_queries('строка'), [])
+        self.assertEqual(cmd.drop_digit_search_queries({'search_queries': None}), [])
+
+    def test_не_строки_остаются_и_ловятся_схемой(self):
+        """Число вместо запроса — это НЕ «запрос с цифрой», а нарушение
+        типа: его обязана поймать схема жёстко, а не проглотить выброс."""
+        data = self._call2(['спрос', 'предложение', 'равновесие', 'налог', 42])
+        self.assertEqual(cmd.drop_digit_search_queries(data), [])
+        ok, violations = cmd.validate_call2_full(data)
+        self.assertFalse(ok)
+        self.assertTrue(any('search_queries[4]' in v for v in violations), violations)
+
+    def test_санитайзер_помнит_последнюю_попытку_а_не_копит(self):
+        sanitize, state = cmd.make_query_sanitizer()
+        sanitize(self._call2(['спрос', 'цена 100 рублей']))
+        self.assertEqual(len(state['dropped']), 1)
+        sanitize(self._call2(['спрос', 'предложение']))
+        self.assertEqual(state['dropped'], [])
+
+
+class DigitFragmentMessageTests(TestCase):
+    """Фаза 1.3: сообщение повтора по `given`/`find` цитирует нарушивший
+    кусок и говорит, чем его заменить. Правило остаётся жёстким."""
+
+    def _base(self, **overrides):
+        theme_id = taxonomy.theme_ids()[0]
+        tag_id = taxonomy.tag_ids()[0]
+        data = {
+            'topic_primary': theme_id, 'topics_secondary': [], 'tags': [tag_id],
+            'given': 'Линейная функция спроса', 'find': 'Точку равновесия',
+            'econ_concepts': ['спрос', 'предложение', 'равновесие'],
+            'concepts_offlist': [], 'task_nature': 'расчётная',
+            'features_1': [], 'topic_confidence': 'высокая',
+        }
+        data.update(overrides)
+        return data
+
+    def test_кусок_вокруг_цифры_а_не_вся_строка(self):
+        fragment = cmd.digit_fragment(
+            'Дана линейная функция спроса P = 100 − 2Q, найдите равновесие')
+        self.assertIn('100', fragment)
+        self.assertNotIn('найдите равновесие', fragment)
+
+    def test_длинный_кусок_обрезается_окном_вокруг_цифры(self):
+        text = 'слово ' * 40 + 'P = 100' + ' слово' * 40
+        fragment = cmd.digit_fragment(text)
+        self.assertLessEqual(len(fragment), 60)
+        self.assertIn('100', fragment)
+
+    def test_без_цифр_куска_нет(self):
+        self.assertEqual(cmd.digit_fragment('линейная функция спроса'), '')
+
+    def test_сообщение_повтора_цитирует_фрагмент_и_говорит_что_делать(self):
+        ok, violations = cmd.validate_call1(
+            self._base(given='Дана функция спроса P = 100 − 2Q'))
+        self.assertFalse(ok)
+        message = ' | '.join(violations)
+        self.assertIn('В поле given встречается', message)
+        self.assertIn('100', message)
+        self.assertIn('Числовые значения запрещены', message)
+        self.assertIn('линейная функция спроса', message)
+        self.assertIn('Перепиши только given и find', message)
+
+    def test_правило_осталось_жёстким(self):
+        """Формулировка сообщения смягчилась, само правило — нет:
+        `ok` по-прежнему False, значит будет повтор."""
+        ok, _ = cmd.validate_call1(self._base(find='Найти Q при P = 5'))
+        self.assertFalse(ok)
 
 
 class CheckAgainstSchemaTests(TestCase):
@@ -431,6 +630,40 @@ class CheckAgainstSchemaTests(TestCase):
         violations = cmd.check_against_schema(
             None, prompts_v2.call1_schema(with_concepts=True))
         self.assertTrue(violations)
+
+    def _valid_call2(self):
+        return {
+            'search_queries': ['a', 'b', 'c', 'd', 'e'],
+            'text_quality': 'чистая', 'text_quality_note': '',
+            'problem_type': 'открытый_ответ', 'difficulty': 3,
+            'difficulty_note': '', 'answer_consistency': 'согласован',
+            'plot': None, 'hints': None, 'title_candidate': 'Рынок кофе',
+        }
+
+    def test_difficulty_в_границах_1_5_проходит(self):
+        violations = cmd.check_against_schema(self._valid_call2(), prompts_v2.CALL2_SCHEMA)
+        self.assertEqual(violations, [])
+
+    def test_difficulty_ноль_вне_границ(self):
+        # Фаза 1 задания сессии 02.09 (вторая пересъёмка): schema уже
+        # объявляла minimum/maximum, но `_check_schema_value` их не
+        # проверял — тип integer/null пропускал 0 и 6 молча.
+        data = self._valid_call2()
+        data['difficulty'] = 0
+        violations = cmd.check_against_schema(data, prompts_v2.CALL2_SCHEMA)
+        self.assertTrue(any('difficulty' in v and 'минимума' in v for v in violations))
+
+    def test_difficulty_шесть_вне_границ(self):
+        data = self._valid_call2()
+        data['difficulty'] = 6
+        violations = cmd.check_against_schema(data, prompts_v2.CALL2_SCHEMA)
+        self.assertTrue(any('difficulty' in v and 'максимума' in v for v in violations))
+
+    def test_difficulty_null_допустим_для_не_задачи(self):
+        data = self._valid_call2()
+        data['difficulty'] = None
+        violations = cmd.check_against_schema(data, prompts_v2.CALL2_SCHEMA)
+        self.assertEqual(violations, [])
 
 
 class Call2UserTextContextTests(TestCase):
@@ -584,7 +817,8 @@ CALL1_OK_JSON = (
     # толку тесты, которые проверяют СОВСЕМ ДРУГОЕ (параллельность, дедуп,
     # учёт расхода), а не содержимое ответа.
     '{"topic_primary": "1", "topics_secondary": [], "tags": ["1.1"], '
-    '"given": "Дано", "find": "Найти", "econ_concepts": ["a","b","c"], '
+    '"given": "Дано", "find": "Найти", '
+    '"econ_concepts": ["альфа","бета","гамма"], '
     '"concepts_offlist": [], "task_nature": "расчётная", "features_1": [], '
     '"topic_confidence": "высокая"}'
 )

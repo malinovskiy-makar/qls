@@ -30,8 +30,10 @@
 Запуск (реальные деньги, `--max-cost` обязателен):
     manage.py glm_enrich_run --limit 300 --max-cost 3.0 --workers 50
 """
+import hashlib
 import json
 import random
+import re
 import statistics
 import threading
 import time
@@ -45,9 +47,12 @@ from django.test import override_settings
 from problems.ai import providers
 from problems.enrich import prompts_v2, taxonomy, text as enrich_text
 from problems.enrich.shortlist import shortlist_for
-from problems.enrich.text import looks_like_tikz, problem_full_text
+from problems.enrich.text import (images_for_call1, looks_like_tikz,
+                                  problem_full_text, with_figure_note,
+                                  with_tikz_sources)
 from problems.management.commands import pilot_enrich_v2 as pilot
-from problems.models import Problem, ProblemFigure, SourceReference
+from problems.models import (Problem, ProblemFigure, ProblemPart,
+                             SourceReference)
 
 GLM_MODEL = 'glm-5.3-flash'
 GLM_PRICES_PROMO = (0.075, 0.015, 0.25)  # скидка 50% до 24:00 09.09.2026 (UTC+8)
@@ -56,13 +61,26 @@ GLM_PRICES_PROMO = (0.075, 0.015, 0.25)  # скидка 50% до 24:00 09.09.202
 # всех уровнях, 50 — разрешённый максимум Z.AI для GLM-5.3-Flash (§3.6).
 WORKERS_DEFAULT = 50
 
-# Фаза B задания сессии 02.09: 3% было взято ДО того, как мы увидели
-# реальное поведение GLM без строгой схемы — на боевом чек-поинте доля
-# повтора была 85,5%, а итоговый брак (после повтора) — 13%. 3% упёрся бы
-# в стоп даже на хорошем результате. Пороговое значение — уже ПОСЛЕ фиксов
-# Фазы A/B (шорт-лист, given/find без цифр, примеры «было→стало»).
-FIRST_PASS_FAIL_STOP_PCT = 10.0
-FIRST_PASS_FAIL_MIN_SAMPLE = 20  # не судить о доле брака по первым 2-3 задачам
+# ⚠️ РЕШЕНИЕ ВЛАДЕЛЬЦА 02.09.2026 (четвёртая пересъёмка): автостоп считает
+# ФИНАЛЬНЫЙ БРАК — долю задач, которые ПОСЛЕ повтора всё равно ушли в брак.
+# Прежний показатель («доля задач, потребовавших повтора») качество не
+# измеряет: он одинаково срабатывает и когда модель выдаёт мусор, и когда
+# модель на трудной задаче ошибается один раз, а со второго попадает — нас
+# интересует только первое. Доля повторов — это про ДЕНЬГИ, а деньги
+# огорожены `--max-cost`: считаем и печатаем, но прогон по ней не
+# останавливаем.
+FINAL_DEFECT_STOP_PCT = 5.0
+# ⚠️ 200, А НЕ 20. Порог 5% сам по себе не меняется (это прямой запрет
+# задания), но решение о ПРЕВЫШЕНИИ порога нельзя принимать по двадцати
+# задачам: при пороге 5% две неудачи подряд из двадцати читаются как 10%
+# и останавливают прогон на шуме. Замер по уже оплаченному журналу
+# (142 задачи чек-поинта, пересчёт по правилам этой сессии) даёт брак
+# 2,1% — при такой доле скользящая проверка с min_sample=20 ложно
+# срабатывала бы примерно на каждом десятом прогоне. На 200 задачах
+# честный брак 8% виден почти наверняка (в среднем 16 против порога 10),
+# а ложное срабатывание при 2,1% — меньше процента; цена такой задержки
+# на боевом прогоне — около $0,30 из $70.
+FINAL_DEFECT_MIN_SAMPLE = 200
 CHECKPOINT_EVERY = 2000
 
 REPORT_DIR = Path('reports/enrich_pilot')
@@ -238,7 +256,19 @@ def stratified_checkpoint_sample(limit=300, seed=CHECKPOINT_SEED):
         report.append('  %s: %d' % (name, n))
     report.append('итого в выборке: %d (лимит %d)' % (len(chosen), limit))
 
-    return sorted(chosen), report
+    # Фаза 2 задания сессии 02.09.2026 (третья пересъёмка): ДВЕ попытки
+    # подряд остановились автостопом на 69/300 без единой картинки/TikZ в
+    # обработанных — `sorted(chosen)` в конце ставил визуальный пласт (id
+    # ≈ 57000-63000, решение владельца про Фазу C) в хвост 300-списка, а
+    # `ThreadPoolExecutor` в `run_variant_concurrent` разбирает очередь
+    # СТРОГО в порядке `sample_problems` (`pool.submit` в цикле по списку)
+    # — воркеры физически не успевали дойти до конца до срабатывания
+    # порога. Перемешиваем ТЕМ ЖЕ `rng` (тот же `seed` — порядок
+    # детерминирован и переживает резюмирование по манифесту), чтобы любой
+    # начальный кусок выборки был представительным по визуальному пласту.
+    rng.shuffle(chosen)
+
+    return chosen, report
 
 
 def make_glm_complete_fn():
@@ -269,17 +299,31 @@ def make_glm_complete_fn():
 
 
 # ---------------------------------------------------------------------------
-# Фаза 2: автостоп при доле брака (retry) выше 3% — считается по СКОЛЬЗЯЩЕМУ
-# счётчику задач, обработанных С НАЧАЛА ЭТОГО ЗАПУСКА (не считая пропущенных
-# резюмированием — те уже прошли проверку в прошлый раз).
+# Автостоп — по ФИНАЛЬНОМУ БРАКУ (решение владельца 02.09.2026, см. выше).
+# Считается по СКОЛЬЗЯЩЕМУ счётчику задач, обработанных С НАЧАЛА ЭТОГО
+# ЗАПУСКА (не считая пропущенных резюмированием — те уже прошли проверку в
+# прошлый раз). Доля повторов и доля мягких нарушений считаются тем же
+# счётчиком, но остановкой НЕ являются — только печатаются.
 # ---------------------------------------------------------------------------
 
-class FirstPassFailureTracker(object):
-    def __init__(self, min_sample=FIRST_PASS_FAIL_MIN_SAMPLE,
-                stop_pct=FIRST_PASS_FAIL_STOP_PCT):
+class RunQualityTracker(object):
+    """Три доли на одном счётчике:
+
+    - `defect_pct()` — задачи, у которых ПОСЛЕ повтора остались жёсткие
+      нарушения. Единственное, по чему прогон останавливается.
+    - `retry_pct()` — задачи, потребовавшие повтора (жёсткие нарушения на
+      первой попытке). Это про деньги, а не про качество.
+    - `soft_pct()` — задачи хотя бы с одним мягким нарушением. Повтора за
+      них не было вовсе.
+    """
+
+    def __init__(self, min_sample=FINAL_DEFECT_MIN_SAMPLE,
+                stop_pct=FINAL_DEFECT_STOP_PCT):
         self.lock = threading.Lock()
         self.total = 0
+        self.defects = 0
         self.retried = 0
+        self.soft = 0
         self.min_sample = min_sample
         self.stop_pct = stop_pct
         self.breached = False
@@ -287,16 +331,30 @@ class FirstPassFailureTracker(object):
     def record(self, row):
         with self.lock:
             self.total += 1
+            if not (row.get('call1_ok') and row.get('call2_ok')):
+                self.defects += 1
             if row.get('call1_retried') or row.get('call2_retried'):
                 self.retried += 1
+            if (row.get('call1_soft_violations')
+                    or row.get('call2_soft_violations')):
+                self.soft += 1
             if self.total >= self.min_sample:
-                pct = self.retried / self.total * 100
-                if pct > self.stop_pct:
+                if self.defects / self.total * 100 > self.stop_pct:
                     self.breached = True
 
-    def pct(self):
+    def pcts(self):
+        """Все три доли ОДНИМ снимком под локом — иначе числа в одной
+        печатной строке относились бы к разным моментам прогона.
+        Возвращает `(брак%, повторы%, мягкие%)`."""
         with self.lock:
-            return (self.retried / self.total * 100) if self.total else 0.0
+            if not self.total:
+                return 0.0, 0.0, 0.0
+            return (self.defects / self.total * 100,
+                    self.retried / self.total * 100,
+                    self.soft / self.total * 100)
+
+    def defect_pct(self):
+        return self.pcts()[0]
 
 
 # ---------------------------------------------------------------------------
@@ -305,12 +363,20 @@ class FirstPassFailureTracker(object):
 
 def parsed_row(row, problem):
     """Одна строка `run_parsed.jsonl` — все разобранные поля обоих
-    вызовов в готовом для слияния виде, что прошло проверку, брак ли."""
+    вызовов в готовом для слияния виде, что прошло проверку, брак ли.
+
+    `defect`/`call*_ok`/`call*_retried` считаются ТОЛЬКО по жёстким
+    нарушениям (Фаза 1 задания сессии 02.09.2026, вторая пересъёмка) —
+    `soft_violations` ниже не портят банк и повтор не вызывают, но
+    печатаются для отчёта владельцу (`run_metrics.json`, раздел
+    `soft_violations`)."""
     call1 = row.get('call1') or {}
     call2 = row.get('call2') or {}
     is_defect = not (row.get('call1_ok') and row.get('call2_ok'))
     merged_graphical, graphical_source = enrich_text.merge_graphical_solution(
         call1.get('features_1'), problem)
+    soft = list(row.get('call1_soft_violations') or []) + \
+        list(row.get('call2_soft_violations') or [])
     return {
         'problem_id': row['problem_id'],
         'defect': is_defect,
@@ -320,6 +386,11 @@ def parsed_row(row, problem):
         'call2_ok': row.get('call2_ok'),
         'call2_retried': row.get('call2_retried'),
         'call2_violations': row.get('call2_violations'),
+        'soft_violations': soft,
+        # Фаза 1.2: запросы с цифрой, выброшенные из массива вместо повтора
+        # всего вызова — ТЕКСТОМ каждого, чтобы владелец видел, что именно
+        # модель писала и почему это выброшено.
+        'dropped_queries': row.get('dropped_queries') or [],
         'topic_primary': call1.get('topic_primary'),
         'topics_secondary': call1.get('topics_secondary'),
         'tags': call1.get('tags'),
@@ -363,7 +434,51 @@ def write_parsed_log(path, rows, problems_by_id):
 # Фаза 3.3: run_metrics.json — сводка.
 # ---------------------------------------------------------------------------
 
-def build_metrics(rows, problems_by_id, usage_totals):
+def _count_problems_with_raster(parsed, problems_by_id):
+    """Сколько задач выборки ИМЕЮТ растровую картинку условия — по базе,
+    независимо от того, дошла ли она до вызова 1."""
+    from problems.enrich.text import RASTER_CALL1_SOURCE_FIELDS
+    count = 0
+    for row in parsed:
+        problem = problems_by_id.get(row['problem_id'])
+        if problem is None:
+            continue
+        if any(f.source_field in RASTER_CALL1_SOURCE_FIELDS
+               and f.image_data and not looks_like_tikz(f.tikz_source or '')
+               for f in problem.figures.all()):
+            count += 1
+    return count
+
+
+def _count_problems_with_tikz(parsed, problems_by_id):
+    """`(всего задач с настоящим TikZ, из них с TikZ У УСЛОВИЯ)`.
+
+    ⚠️ Разделять обязательно. §3.4 API_RUN_MASTER: решение НЕ подаётся в
+    вызов 1 — значит чертёж, привязанный к РЕШЕНИЮ (`source_field
+    ='solution'`), в вызов 1 уходить не имеет права, и его отсутствие там
+    это работающее правило, а не потеря. Сравнивать с «подставлено» можно
+    только второе число: замер чек-поинта 02.09.2026 дал 4 задачи с TikZ,
+    из них 2 у условия — и ровно 2 подстановки. Обе задачи с TikZ у
+    решения ловятся кодовой половиной «Графического решения»
+    (`merge_graphical_solution`), для этого она и заведена."""
+    from problems.enrich.text import RASTER_CALL1_SOURCE_FIELDS
+    total = 0
+    in_statement = 0
+    for row in parsed:
+        problem = problems_by_id.get(row['problem_id'])
+        if problem is None:
+            continue
+        tikz_figures = [f for f in problem.figures.all()
+                        if looks_like_tikz(f.tikz_source or '')]
+        if not tikz_figures:
+            continue
+        total += 1
+        if any(f.source_field in RASTER_CALL1_SOURCE_FIELDS for f in tikz_figures):
+            in_statement += 1
+    return total, in_statement
+
+
+def build_metrics(rows, problems_by_id, usage_totals, sweep=None):
     parsed = [parsed_row(row, problems_by_id[row['problem_id']])
              for row in rows if row['problem_id'] in problems_by_id]
     n = len(parsed)
@@ -382,12 +497,49 @@ def build_metrics(rows, problems_by_id, usage_totals):
     # чтения владельцем на контрольной точке).
     queries_counts = Counter(len(p['search_queries'] or []) for p in ok)
 
+    # Фаза 1 задания сессии 02.09.2026 (вторая пересъёмка): мягкие
+    # нарушения не портят банк и не считаются в defect/retried выше, но
+    # печатаются отдельным разделом — «принять как есть, записать в
+    # журнал» дословно требует владелец. Причина нормализуется без
+    # хвостового «(N)», чтобы «econ_concepts меньше 3 (1)» и «(2)»
+    # схлопывались в одну строку счётчика.
+    soft_reason_re = re.compile(r'\s*\(\d+\)$')
+    soft_by_reason = Counter()
+    rows_with_soft = 0
+    for p in parsed:
+        reasons = {soft_reason_re.sub('', v) for v in (p.get('soft_violations') or [])}
+        if reasons:
+            rows_with_soft += 1
+        soft_by_reason.update(reasons)
+
+    # Фаза 1.2: сколько поисковых запросов выброшено (вместо повтора всего
+    # вызова) и у скольких задач после выброса осталось меньше пяти.
+    dropped_total = sum(len(p.get('dropped_queries') or []) for p in parsed)
+    rows_with_dropped = sum(1 for p in parsed if p.get('dropped_queries'))
+    rows_under_five = sum(
+        1 for p in parsed
+        if p.get('search_queries') is not None and len(p['search_queries']) < 5)
+
+    # Фаза 1.1: доля повторов — метрика ДЕНЕГ, не качества. Печатается и
+    # пишется в журнал, но остановкой прогона не является (решение
+    # владельца 02.09.2026): для остановки есть `defect_pct` выше.
+    retried_rows = sum(1 for p in parsed
+                       if p['call1_retried'] or p['call2_retried'])
+    tikz_total, tikz_in_statement = _count_problems_with_tikz(parsed, problems_by_id)
+
     return {
         'total_processed': n,
         'defects': len(defects),
         'defect_pct': (len(defects) / n * 100) if n else 0.0,
+        'retried_rows': retried_rows,
+        'retried_pct': (retried_rows / n * 100) if n else 0.0,
         'retried_call1': sum(1 for p in parsed if p['call1_retried']),
         'retried_call2': sum(1 for p in parsed if p['call2_retried']),
+        'dropped_queries_total': dropped_total,
+        'rows_with_dropped_queries': rows_with_dropped,
+        'rows_with_dropped_queries_pct': (
+            rows_with_dropped / n * 100) if n else 0.0,
+        'rows_under_5_queries': rows_under_five,
         'topic_primary_distribution': dist('topic_primary'),
         'problem_type_distribution': dist('problem_type'),
         'difficulty_distribution': dist('difficulty'),
@@ -399,6 +551,19 @@ def build_metrics(rows, problems_by_id, usage_totals):
         'images_sent_total': sum(p['images_sent'] for p in parsed),
         'tikz_replaced_total': sum((p['tikz'] or {}).get('replaced', 0) for p in parsed),
         'tikz_truncated_total': sum((p['tikz'] or {}).get('truncated', 0) for p in parsed),
+        # ⚠️ Числа ЗАДАЧ, а не картинок. Инвариант владельца звучит как
+        # «задач с растром / отправлено с изображением — числа равны»:
+        # `images_sent_total` (70 картинок) на него не отвечает, потому что
+        # у одной задачи картинок бывает несколько. Знаменатель берётся из
+        # БАЗЫ (есть растровая картинка условия), числитель — из журнала
+        # (картинка реально ушла в вызов 1); расхождение означает, что
+        # `images_for_call1` что-то отбросил (битые байты, конверсия).
+        'problems_with_raster': _count_problems_with_raster(parsed, problems_by_id),
+        'problems_image_sent': sum(1 for p in parsed if p['images_sent']),
+        'problems_with_tikz': tikz_total,
+        'problems_with_tikz_in_statement': tikz_in_statement,
+        'problems_tikz_replaced': sum(
+            1 for p in parsed if (p['tikz'] or {}).get('replaced')),
         'graphical_solution': {
             'model': graphical.get('model', 0), 'code': graphical.get('code', 0),
             'both': graphical.get('both', 0), 'none': graphical.get('none', 0),
@@ -407,8 +572,64 @@ def build_metrics(rows, problems_by_id, usage_totals):
         'search_queries_count_distribution': dict(queries_counts),
         'search_queries_exactly_8_pct': (
             queries_counts.get(8, 0) / len(ok) * 100 if ok else 0.0),
+        'soft_violations': {
+            'rows_with_soft': rows_with_soft,
+            'rows_with_soft_pct': (rows_with_soft / n * 100) if n else 0.0,
+            'by_reason': dict(soft_by_reason),
+            'by_reason_pct': {reason: (count / n * 100 if n else 0.0)
+                             for reason, count in soft_by_reason.items()},
+        },
         'usage_totals': usage_totals,
+        # §12 правило 2 / §11 «Свип-детектор»: расхождения в защищённых
+        # полях (statement/answer/solution/ProblemPart.statement) между
+        # снимком ДО прогона и снимком ПОСЛЕ. Прогон в базу не пишет
+        # вовсе, поэтому ожидание — ровно 0; ненулевое число означает,
+        # что нарушено P0, а не «немного разошлось».
+        'sweep_detector': sweep if sweep is not None else {
+            'checked': 0, 'changed': 0, 'changed_ids': []},
     }
+
+
+def protected_fields_digest(problem_ids):
+    """Отпечаток ЗАЩИЩЁННЫХ полей (`statement`, `answer`, `solution`,
+    `ProblemPart.statement`) — `{id задачи: md5}`. Снимается ДО прогона и
+    ПОСЛЕ, разница и есть свип-детектор §12 правило 2.
+
+    ⚠️ Именно ХЕШ, а не сами тексты: на боевом прогоне это 41 тысяча задач,
+    и держать два полных снимка текстов в памяти незачем. Чтение идёт
+    `values_list` + `iterator()` — построчно, без загрузки объектов
+    `Problem` целиком.
+    """
+    wanted = set(problem_ids)
+    digests = {}
+    for pid, statement, answer, solution in (
+            Problem.objects.filter(id__in=list(wanted))
+            .values_list('id', 'statement', 'answer', 'solution')
+            .iterator()):
+        h = hashlib.md5()
+        for value in (statement, answer, solution):
+            h.update((value or '').encode('utf-8'))
+            h.update(b'\x00')
+        digests[pid] = h
+    for pid, part_id, part_statement in (
+            ProblemPart.objects.filter(problem_id__in=list(wanted))
+            .order_by('problem_id', 'id')
+            .values_list('problem_id', 'id', 'statement')
+            .iterator()):
+        h = digests.get(pid)
+        if h is not None:
+            h.update(('%d:%s' % (part_id, part_statement or '')).encode('utf-8'))
+            h.update(b'\x00')
+    return {pid: h.hexdigest() for pid, h in digests.items()}
+
+
+def sweep_report(before, after):
+    """`{'checked': N, 'changed': N, 'changed_ids': [...]}` по двум
+    отпечаткам `protected_fields_digest`. Ожидание — `changed == 0`."""
+    changed = sorted(pid for pid, digest in before.items()
+                     if after.get(pid) != digest)
+    return {'checked': len(before), 'changed': len(changed),
+            'changed_ids': changed[:50]}
 
 
 def usage_totals_from_rows(rows):
@@ -521,11 +742,16 @@ class Command(BaseCommand):
         prompt_version = pilot.prompt_fingerprint(GLM_VARIANT['concepts'])
         complete_fn = make_glm_complete_fn()
 
-        tracker = FirstPassFailureTracker()
+        tracker = RunQualityTracker()
         stop_event = threading.Event()
         processed_count = {'n': 0}
         count_lock = threading.Lock()
         start_time = time.monotonic()
+
+        # Свип-детектор (§12 правило 2): отпечаток защищённых полей ДО
+        # прогона. Прогон в базу не пишет вовсе — ожидание ровно 0
+        # расхождений, и это надо ПОКАЗАТЬ числом, а не утверждать.
+        sweep_before = protected_fields_digest(problem_ids)
 
         def on_progress(problem_id, spent):
             with count_lock:
@@ -536,10 +762,13 @@ class Command(BaseCommand):
                 rate = n / elapsed * 60 if elapsed else 0.0
                 remaining = len(problems) - n
                 eta_min = remaining / rate if rate else float('inf')
+                defect_pct, retry_pct, soft_pct = tracker.pcts()
                 self.stdout.write(
-                    '  [%d/%d] брак %.1f%%, потрачено $%.4f, %.1f задач/мин, '
+                    '  [%d/%d] брак %.1f%% (порог %.0f%%), повторы %.1f%%, '
+                    'мягкие %.1f%%, потрачено $%.4f, %.1f задач/мин, '
                     'прогноз оставшегося: %.0f мин'
-                    % (n, len(problems), tracker.pct(), spent, rate, eta_min))
+                    % (n, len(problems), defect_pct, tracker.stop_pct,
+                       retry_pct, soft_pct, spent, rate, eta_min))
 
         def extra_on_row(row):
             tracker.record(row)
@@ -577,18 +806,31 @@ class Command(BaseCommand):
                                   'повторов) — не попали ни в результат, ни в брак, '
                                   'нужен отдельный разбор: %s'
                                   % (len(errors), [pid for pid, _ in errors][:20]))
+            defect_pct, retry_pct, soft_pct = tracker.pcts()
+            self.stdout.write(
+                'в этом запуске: брак %.1f%%, повторы %.1f%%, мягкие %.1f%% '
+                '(остановка — только по браку, порог %.1f%%)'
+                % (defect_pct, retry_pct, soft_pct, tracker.stop_pct))
             if tracker.breached:
                 self.stdout.write('')
-                self.stdout.write('🔴 СТОП: доля задач, потребовавших повтор, — %.1f%% '
-                                  '(порог %.0f%%). Прогон остановлен сам, дальше решает '
-                                  'владелец.' % (tracker.pct(), FIRST_PASS_FAIL_STOP_PCT))
+                # ⚠️ Порог печатается ИЗ ТРЕКЕРА, а не зашитой константой:
+                # трекер можно построить с другим порогом, и сообщение
+                # обязано называть тот, по которому он реально сработал.
+                self.stdout.write(
+                    '🔴 СТОП: финальный брак (после повтора) — %.1f%% '
+                    '(порог %.1f%%). Прогон остановлен сам, дальше решает '
+                    'владелец.' % (defect_pct, tracker.stop_pct))
 
             # --- Фаза 3.2/3.3 -------------------------------------------
+            sweep = sweep_report(sweep_before,
+                                 protected_fields_digest(problem_ids))
             all_entries = pilot.read_raw_log(str(RAW_LOG_PATH))
-            all_rows = self._rows_from_log(all_entries, problem_ids, GLM_VARIANT, prompt_version)
+            all_rows = self._rows_from_log(all_entries, problem_ids, GLM_VARIANT,
+                                           prompt_version, shortlists, problems_by_id)
             write_parsed_log(parsed_out, all_rows, problems_by_id)
             usage_totals = usage_totals_from_rows(all_rows)
-            metrics = build_metrics(all_rows, problems_by_id, usage_totals)
+            metrics = build_metrics(all_rows, problems_by_id, usage_totals,
+                                    sweep=sweep)
 
         metrics_out.parent.mkdir(parents=True, exist_ok=True)
         with open(metrics_out, 'w', encoding='utf-8') as fh:
@@ -599,6 +841,36 @@ class Command(BaseCommand):
         self.stdout.write('всего в журнале для этой выборки: %d, брак: %d (%.1f%%)'
                           % (metrics['total_processed'], metrics['defects'],
                              metrics['defect_pct']))
+        self.stdout.write('повторов (метрика ДЕНЕГ, не остановка): %d задач (%.1f%%)'
+                          % (metrics['retried_rows'], metrics['retried_pct']))
+        self.stdout.write('поисковых запросов выброшено (цифра в запросе): %d '
+                          'у %d задач (%.1f%%); осталось меньше 5 запросов: %d'
+                          % (metrics['dropped_queries_total'],
+                             metrics['rows_with_dropped_queries'],
+                             metrics['rows_with_dropped_queries_pct'],
+                             metrics['rows_under_5_queries']))
+        self.stdout.write('свип-детектор (защищённые поля): проверено %d, '
+                          'расхождений %d%s'
+                          % (metrics['sweep_detector']['checked'],
+                             metrics['sweep_detector']['changed'],
+                             (' — id: %s' % metrics['sweep_detector']['changed_ids'])
+                             if metrics['sweep_detector']['changed'] else ''))
+        self.stdout.write('задач с растром / отправлено с изображением: %d / %d '
+                          '(картинок всего %d)'
+                          % (metrics['problems_with_raster'],
+                             metrics['problems_image_sent'],
+                             metrics['images_sent_total']))
+        self.stdout.write('задач с настоящим TikZ: %d, из них чертёж У УСЛОВИЯ: '
+                          '%d, получили чертёж в вызове 1: %d (у решения '
+                          'чертёж не подаётся — §3.4)'
+                          % (metrics['problems_with_tikz'],
+                             metrics['problems_with_tikz_in_statement'],
+                             metrics['problems_tikz_replaced']))
+        self.stdout.write('мягкие нарушения (не брак, повтор не делался): %d задач (%.1f%%), '
+                          'по причинам: %s'
+                          % (metrics['soft_violations']['rows_with_soft'],
+                             metrics['soft_violations']['rows_with_soft_pct'],
+                             metrics['soft_violations']['by_reason']))
         self.stdout.write('«Графическое решение»: модель %d, код %d, совпало %d, итого %d'
                           % (metrics['graphical_solution']['model'],
                              metrics['graphical_solution']['code'],
@@ -612,7 +884,8 @@ class Command(BaseCommand):
                           % usage_totals['cost_usd'])
         self.stdout.write('журналы: %s, %s' % (RAW_LOG_PATH, parsed_out))
 
-    def _rows_from_log(self, entries, problem_ids, variant, prompt_version):
+    def _rows_from_log(self, entries, problem_ids, variant, prompt_version,
+                       shortlists, problems_by_id):
         """Восстанавливает `rows`-подобные словари из `run_raw.jsonl` для
         ВСЕЙ запрошенной выборки (не только обработанных в этом запуске —
         нужно для метрик после резюмирования, где часть задач могла быть
@@ -623,7 +896,17 @@ class Command(BaseCommand):
         недосчитает деньги, потраченные на неудачную первую попытку.
         `ok`/`retried` считаются `validate_call1_full`/`validate_call2_full`
         по ФИНАЛЬНОЙ попытке — тем же способом, каким это решалось вживую.
-        """
+
+        ⚠️ `images_sent`/`tikz` — журнал (`run_raw.jsonl`) их НЕ хранит
+        (только `raw_response`/`usage`), а `_process_one_problem` считал их
+        живьём. Баг живого чек-поинта 02.09.2026 (третья пересъёмка):
+        `row.setdefault('images_sent', 0)` тут раньше означало «журнал
+        молчит — считаем, что картинок не было», и `run_metrics.json` врал
+        нулём даже когда картинки реально ушли в вызов 1 (проверено на 142
+        обработанных: 19 задач/29 картинок по факту при заявленных 0).
+        Обе величины — ЧИСТАЯ функция текста/`ProblemFigure` задачи, без
+        обращения к API, поэтому пересчитываются здесь заново, без
+        повторной оплаты."""
         by_pid = {}
         for entry in entries:
             if entry.get('prompt_version') != prompt_version:
@@ -656,12 +939,39 @@ class Command(BaseCommand):
         for pid, row in by_pid.items():
             if pid not in wanted or 'call1' not in row:
                 continue
+            # `shortlist_terms` — тот же список, что видела модель в
+            # промпте (детерминированная функция текста задачи, Фаза 1,
+            # 02.09.2026), нужен для «понятие вне шорт-листа»: без него
+            # эта жёсткая проверка молча не переигралась бы при
+            # восстановлении метрик из журнала.
+            shortlist_terms = shortlists.get(pid) if variant['concepts'] else None
+            # Постобработка ТА ЖЕ, что живьём (`_process_one_problem`), и в
+            # том же порядке: журнал хранит сырой ответ модели, а не
+            # результат разбора, поэтому «выбросить запрос с цифрой» и
+            # «срезать приставку Дано:/Найти:» обязан повторить читающий
+            # код — иначе метрики, восстановленные из журнала, разошлись
+            # бы с тем, что решалось вживую.
+            pilot.strip_given_find_prefixes(row.get('call1'))
+            row['dropped_queries'] = pilot.drop_digit_search_queries(
+                row.get('call2'))
             row['call1_ok'], _ = pilot.validate_call1_full(
-                row.get('call1'), variant['concepts'])
+                row.get('call1'), variant['concepts'], shortlist_terms=shortlist_terms)
             row['call1_retried'] = len(row['call1_attempts']) > 1
             row['call2_ok'], _ = pilot.validate_call2_full(row.get('call2'))
             row['call2_retried'] = len(row['call2_attempts']) > 1
-            row.setdefault('images_sent', 0)
-            row.setdefault('tikz', {'replaced': 0, 'truncated': 0})
+            row['call1_soft_violations'] = pilot.soft_violations_call1(
+                row.get('call1'), variant['concepts'])
+            row['call2_soft_violations'] = pilot.soft_violations_call2(row.get('call2'))
+            problem = problems_by_id.get(pid)
+            if problem is not None:
+                text = with_figure_note(
+                    problem_full_text(problem.statement, problem.parts.all()),
+                    problem.figures.count())
+                _, tikz_stats = with_tikz_sources(text, problem.figures.all())
+                row['images_sent'] = len(images_for_call1(problem.figures.all()))
+                row['tikz'] = tikz_stats
+            else:
+                row.setdefault('images_sent', 0)
+                row.setdefault('tikz', {'replaced': 0, 'truncated': 0})
             rows.append(row)
         return rows

@@ -3,7 +3,9 @@
 целиком с подставным провайдером — реальная сеть проверяется живым
 прогоном, не тестом; здесь проверяем, что конвейер (журнал → parsed →
 metrics) не падает и даёт ожидаемую форму."""
+import io
 import json
+import re
 import tempfile
 from decimal import Decimal
 from pathlib import Path
@@ -18,13 +20,33 @@ from problems.management.commands import glm_enrich_run as run_cmd
 from problems.models import Problem, ProblemFigure, Source, SourceReference
 
 
-def _valid_call1_json(theme_idx=0):
+_SHORTLIST_RE = re.compile(
+    r'ШОРТ-ЛИСТ ПОНЯТИЙ ДЛЯ econ_concepts.*?:\n(.*?)\n\nЗАДАЧА', re.DOTALL)
+
+
+def _shortlist_from_user_text(user_text):
+    """Достаёт шорт-лист из готового текста промпта (`call1_user_text`) —
+    так фиктивный ответ модели в тестах отвечает econ_concepts, которые
+    ДЕЙСТВИТЕЛЬНО из шорт-листа ЭТОЙ задачи (Фаза 1 задания сессии 02.09,
+    вторая пересъёмка: «понятие вне шорт-листа» стало жёсткой проверкой в
+    `_process_one_problem` — фиксированные плейсхолдеры вроде
+    `['спрос','предложение','равновесие']` больше не гарантированно
+    проходят её для произвольного текста задачи)."""
+    m = _SHORTLIST_RE.search(user_text or '')
+    if not m:
+        return []
+    return [t for t in m.group(1).split('; ') if t]
+
+
+def _valid_call1_json(user_text, theme_idx=0):
     theme_id = taxonomy.theme_ids()[theme_idx]
     tag_id = taxonomy.tag_ids()[theme_idx]
+    shortlist = _shortlist_from_user_text(user_text)
+    concepts = shortlist[:3]
     return json.dumps({
         'topic_primary': theme_id, 'topics_secondary': [], 'tags': [tag_id],
         'given': 'Линейная функция спроса', 'find': 'Точку равновесия',
-        'econ_concepts': ['спрос', 'предложение', 'равновесие'],
+        'econ_concepts': concepts,
         'concepts_offlist': [], 'task_nature': 'расчётная',
         'features_1': [], 'topic_confidence': 'высокая',
     }, ensure_ascii=False)
@@ -43,6 +65,15 @@ VALID_CALL2_JSON = json.dumps({
 }, ensure_ascii=False)
 
 INVALID_CALL1_JSON = '{"topic_primary": "999", "given": "P=10"}'
+
+
+def _real_png(size=(20, 20)):
+    """Настоящий декодируемый PNG — `prepare_raster_image` открывает байты
+    через Pillow, суррогатный заголовок картинку не проходит."""
+    from PIL import Image
+    buf = io.BytesIO()
+    Image.new('RGB', size, color=(200, 50, 50)).save(buf, format='PNG')
+    return buf.getvalue()
 
 
 class _FakeReply:
@@ -84,7 +115,7 @@ class GlmEnrichRunSmokeTests(TestCase):
     def test_полный_прогон_без_брака_создаёт_три_файла(self):
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
             is_call1 = 'topic_primary' in schema.get('properties', {})
-            return _FakeReply(_valid_call1_json() if is_call1 else VALID_CALL2_JSON)
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
 
         with self._patch_paths(), \
                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
@@ -130,7 +161,7 @@ class GlmEnrichRunSmokeTests(TestCase):
     def test_резюмирование_не_платит_дважды(self):
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
             is_call1 = 'topic_primary' in schema.get('properties', {})
-            return _FakeReply(_valid_call1_json() if is_call1 else VALID_CALL2_JSON)
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
 
         with self._patch_paths(), \
                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
@@ -142,7 +173,7 @@ class GlmEnrichRunSmokeTests(TestCase):
         def counting_complete(model, blocks, user_text, schema, effort, images=None):
             calls.append(model)
             is_call1 = 'topic_primary' in schema.get('properties', {})
-            return _FakeReply(_valid_call1_json() if is_call1 else VALID_CALL2_JSON)
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
 
         with self._patch_paths(), \
                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=counting_complete):
@@ -157,7 +188,7 @@ class GlmEnrichRunSmokeTests(TestCase):
         «первые 300» — только свой --parsed-out/--metrics-out."""
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
             is_call1 = 'topic_primary' in schema.get('properties', {})
-            return _FakeReply(_valid_call1_json() if is_call1 else VALID_CALL2_JSON)
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
 
         chosen_ids = [self.problems[1].id, self.problems[3].id]
         supplement_parsed = self.tmp_dir / 'supplement_parsed.jsonl'
@@ -177,6 +208,132 @@ class GlmEnrichRunSmokeTests(TestCase):
                  supplement_parsed.read_text(encoding='utf-8').strip().splitlines()]
         self.assertEqual(sorted(p['problem_id'] for p in parsed), sorted(chosen_ids))
 
+    def test_images_sent_считается_по_реальным_figures_а_не_нулём(self):
+        # Баг живого чек-поинта 02.09.2026 (третья пересъёмка): журнал
+        # (`run_raw.jsonl`) не хранит `images_sent`/`tikz`, и
+        # `_rows_from_log` раньше молча ставил 0 при ЛЮБОМ резюмировании —
+        # `run_metrics.json` врал нулём, даже когда картинки реально ушли
+        # в вызов 1 (проверено на боевом прогоне: 19 задач/29 картинок по
+        # факту при заявленных 0).
+        figured_problem = self.problems[0]
+        ProblemFigure.objects.create(
+            problem=figured_problem, tikz_hash='raster1', source_field='statement',
+            content_type='image/png', image_data=_real_png())
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=3, run_id='images-run')
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['images_sent_total'], 1)
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        figured_row = next(p for p in parsed if p['problem_id'] == figured_problem.id)
+        self.assertEqual(figured_row['images_sent'], 1)
+
+    def test_запрос_с_цифрой_выбрасывается_и_не_вызывает_повтора(self):
+        """Фаза 1.2 сквозняком: восемь запросов, два с цифрами — вызов 2
+        проходит с первого раза (повтора нет, денег за него не платим),
+        в журнале остаётся шесть запросов и текст обоих выброшенных."""
+        call2 = json.loads(VALID_CALL2_JSON)
+        call2['search_queries'] = [
+            'спрос и предложение', 'эластичность спроса',
+            'налог на производителя', 'потолок цены',
+            'излишек потребителя', 'равновесие рынка',
+            'цена 100 рублей', 'выпуск при Q = 20']
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1
+                              else json.dumps(call2, ensure_ascii=False))
+
+        with self._patch_paths(),                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=3, run_id='test-drop-1')
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        self.assertTrue(parsed)
+        for row in parsed:
+            self.assertFalse(row['defect'], row['call2_violations'])
+            self.assertFalse(row['call2_retried'])
+            self.assertEqual(len(row['search_queries']), 6)
+            self.assertEqual(sorted(row['dropped_queries']),
+                             ['выпуск при Q = 20', 'цена 100 рублей'])
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['dropped_queries_total'], 2 * len(self.problems))
+        self.assertEqual(metrics['rows_with_dropped_queries'], len(self.problems))
+        self.assertEqual(metrics['rows_under_5_queries'], 0)
+        self.assertEqual(metrics['sweep_detector']['changed'], 0)
+
+    def test_после_выброса_меньше_пяти_запросов_мягкое_без_повтора(self):
+        """Шесть запросов, четыре с цифрами — остаётся два: мягкое
+        нарушение, повтора нет, браком не считается."""
+        call2 = json.loads(VALID_CALL2_JSON)
+        call2['search_queries'] = [
+            'спрос и предложение', 'эластичность спроса',
+            'цена 100 рублей', 'выпуск 20 единиц',
+            'налог 5 процентов', 'доход 1000 рублей']
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1
+                              else json.dumps(call2, ensure_ascii=False))
+
+        with self._patch_paths(),                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=3, run_id='test-drop-2')
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        for row in parsed:
+            self.assertFalse(row['defect'], row['call2_violations'])
+            self.assertFalse(row['call2_retried'])
+            self.assertEqual(len(row['search_queries']), 2)
+            self.assertTrue(any('search_queries' in v
+                                for v in row['soft_violations']),
+                            row['soft_violations'])
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['rows_under_5_queries'], len(self.problems))
+        self.assertEqual(metrics['defects'], 0)
+
+    def test_журнал_хранит_сырой_ответ_а_не_постобработанный(self):
+        """`run_raw.jsonl` — СЫРОЙ ответ модели: выброшенные запросы обязаны
+        остаться в нём, иначе восстановление метрик из журнала не увидит
+        ни одного выброса и соврёт нулём (тот же класс бага, что уже был с
+        `images_sent`)."""
+        call2 = json.loads(VALID_CALL2_JSON)
+        call2['search_queries'] = ['спрос', 'предложение', 'равновесие',
+                                   'налог', 'субсидия', 'цена 100 рублей']
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1
+                              else json.dumps(call2, ensure_ascii=False))
+
+        with self._patch_paths(),                 mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=3, run_id='test-drop-3')
+
+        raw = [json.loads(line) for line in
+              self.raw_path.read_text(encoding='utf-8').strip().splitlines()]
+        call2_entries = [e for e in raw if e['call'] == 'call2']
+        self.assertTrue(call2_entries)
+        for entry in call2_entries:
+            self.assertIn('цена 100 рублей',
+                          entry['raw_response']['search_queries'])
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['dropped_queries_total'], len(self.problems))
+
     def test_фикстуры_рендерера_исключены_из_выборки(self):
         fixture_source = Source.objects.create(name=run_cmd.SERVICE_FIXTURE_SOURCE)
         fixture_problem = Problem.objects.create(statement='Служебная фикстура.')
@@ -185,6 +342,102 @@ class GlmEnrichRunSmokeTests(TestCase):
         ids = list(run_cmd.battle_queryset().values_list('id', flat=True))
         self.assertNotIn(fixture_problem.id, ids)
         self.assertTrue(all(p.id in ids for p in self.problems))
+
+
+class RunQualityTrackerTests(TestCase):
+    """Фаза 1.1 (решение владельца 02.09.2026, четвёртая пересъёмка):
+    автостоп считает ФИНАЛЬНЫЙ БРАК, а не долю задач, потребовавших
+    повтора. Доля повторов — это про деньги, они огорожены `--max-cost`."""
+
+    def _row(self, defect=False, retried=False, soft=False):
+        return {
+            'call1_ok': not defect, 'call2_ok': True,
+            'call1_retried': retried, 'call2_retried': False,
+            'call1_soft_violations': ['мягкое'] if soft else [],
+            'call2_soft_violations': [],
+        }
+
+    def _feed(self, tracker, total, defects, retries, softs=0):
+        for i in range(total):
+            tracker.record(self._row(defect=i < defects, retried=i < retries,
+                                     soft=i < softs))
+
+    def test_много_повторов_мало_брака_не_останавливает(self):
+        """Зубастость задания: 20% повторов и 2% брака — не останавливается."""
+        tracker = run_cmd.RunQualityTracker()
+        self._feed(tracker, total=200, defects=4, retries=40)
+        self.assertFalse(tracker.breached)
+        defect_pct, retry_pct, _ = tracker.pcts()
+        self.assertAlmostEqual(defect_pct, 2.0)
+        self.assertAlmostEqual(retry_pct, 20.0)
+
+    def test_мало_повторов_много_брака_останавливает(self):
+        """Зубастость задания: 4% повторов и 8% брака — останавливается."""
+        tracker = run_cmd.RunQualityTracker()
+        self._feed(tracker, total=200, defects=16, retries=8)
+        self.assertTrue(tracker.breached)
+        defect_pct, retry_pct, _ = tracker.pcts()
+        self.assertAlmostEqual(defect_pct, 8.0)
+        self.assertAlmostEqual(retry_pct, 4.0)
+
+    def test_порог_ровно_пять_процентов_не_превышен(self):
+        """Порог — «больше 5%», а не «5% и больше»."""
+        tracker = run_cmd.RunQualityTracker()
+        self._feed(tracker, total=200, defects=10, retries=0)
+        self.assertFalse(tracker.breached)
+
+    def test_малая_выборка_не_судится(self):
+        """Двадцать задач — не приговор: при пороге 5% две неудачи подряд
+        читаются как 10% и остановили бы прогон на шуме."""
+        tracker = run_cmd.RunQualityTracker()
+        self._feed(tracker, total=20, defects=20, retries=20)
+        self.assertFalse(tracker.breached)
+
+    def test_мягкие_нарушения_считаются_но_не_останавливают(self):
+        tracker = run_cmd.RunQualityTracker()
+        self._feed(tracker, total=200, defects=0, retries=0, softs=180)
+        self.assertFalse(tracker.breached)
+        _, _, soft_pct = tracker.pcts()
+        self.assertAlmostEqual(soft_pct, 90.0)
+
+    def test_порог_по_умолчанию_пять(self):
+        self.assertEqual(run_cmd.FINAL_DEFECT_STOP_PCT, 5.0)
+        self.assertEqual(run_cmd.RunQualityTracker().stop_pct, 5.0)
+
+
+class SweepDetectorTests(TestCase):
+    """§12 правило 2: расхождение в защищённых полях — это нарушение P0,
+    а не «немного разошлось». Прогон в базу не пишет вовсе."""
+
+    def setUp(self):
+        self.problem = Problem.objects.create(
+            statement='Условие про рынок.', answer='42', solution='Решение.')
+
+    def test_без_правок_ноль_расхождений(self):
+        before = run_cmd.protected_fields_digest([self.problem.id])
+        after = run_cmd.protected_fields_digest([self.problem.id])
+        report = run_cmd.sweep_report(before, after)
+        self.assertEqual(report['changed'], 0)
+        self.assertEqual(report['checked'], 1)
+
+    def test_правка_условия_видна(self):
+        before = run_cmd.protected_fields_digest([self.problem.id])
+        Problem.objects.filter(id=self.problem.id).update(
+            statement='Условие про рынок, но другое.')
+        report = run_cmd.sweep_report(
+            before, run_cmd.protected_fields_digest([self.problem.id]))
+        self.assertEqual(report['changed'], 1)
+        self.assertEqual(report['changed_ids'], [self.problem.id])
+
+    def test_правка_подпункта_видна(self):
+        from problems.models import ProblemPart
+        part = ProblemPart.objects.create(
+            problem=self.problem, label='а', statement='Первый подпункт.')
+        before = run_cmd.protected_fields_digest([self.problem.id])
+        ProblemPart.objects.filter(id=part.id).update(statement='Другой текст.')
+        report = run_cmd.sweep_report(
+            before, run_cmd.protected_fields_digest([self.problem.id]))
+        self.assertEqual(report['changed'], 1)
 
 
 class StratifiedCheckpointSampleTests(TestCase):
@@ -312,7 +565,7 @@ class GlmEnrichRunPricesRegressionTests(TestCase):
 
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
             is_call1 = 'topic_primary' in schema.get('properties', {})
-            return _FakeReply(_valid_call1_json() if is_call1 else VALID_CALL2_JSON)
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
 
         with mock.patch.multiple(
                 run_cmd, RAW_LOG_PATH=self.raw_path, PARSED_LOG_PATH=self.parsed_path,
