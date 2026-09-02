@@ -100,16 +100,17 @@ class NoBrokenPluralizeLeftTests(SimpleTestCase):
 
         from django.conf import settings
 
+        from problems.tests.tree import project_files
+
+        # ⚠️ Обход общим обходчиком: он не заходит в чужие рабочие копии
+        # внутри репозитория. Прежний список исключений знал только про
+        # `venv`, `node_modules`, `.git` и `reports` — worktree в
+        # `.claude/worktrees/` проходил насквозь, и шаблон соседней ветки
+        # приписался бы этому проекту. Подробности — `problems/tests/tree.py`.
         pattern = re.compile(r'pluralize:"[^"]*,[^"]*,')
         found = []
-        for root, dirs, files in os.walk(settings.BASE_DIR):
-            dirs[:] = [d for d in dirs
-                       if d not in ('venv', 'node_modules', '.git', 'reports')]
-            for name in files:
-                if not name.endswith('.html'):
-                    continue
-                path = os.path.join(root, name)
-                with open(path, encoding='utf-8') as handle:
-                    if pattern.search(handle.read()):
-                        found.append(os.path.relpath(path, settings.BASE_DIR))
+        for path in project_files(settings.BASE_DIR, '.html', ('reports',)):
+            with open(path, encoding='utf-8') as handle:
+                if pattern.search(handle.read()):
+                    found.append(os.path.relpath(path, settings.BASE_DIR))
         self.assertEqual(found, [], 'pluralize с тремя формами возвращает пустоту')

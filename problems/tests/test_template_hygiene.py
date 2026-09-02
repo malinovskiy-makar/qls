@@ -19,20 +19,16 @@ import re
 from django.conf import settings
 from django.test import TestCase
 
-# Куда не ходим: чужой код и сгенерированные отчёты.
-SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
-              os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep)
+from problems.tests.tree import project_files
+
+# Что эта проверка не считает своим предметом: сгенерированное и привозное.
+# Чужие рабочие копии, venv и кэши инструментов отсекает общий обходчик —
+# здесь перечисляется только то, что специфично для этой проверки.
+SKIP_NAMES = ('reports', 'backups', 'materials', 'staticfiles')
 
 
 def template_files():
-    for root, dirs, files in os.walk(settings.BASE_DIR):
-        if any(part in root + os.sep for part in SKIP_PARTS):
-            dirs[:] = []
-            continue
-        for name in files:
-            if name.endswith('.html'):
-                yield os.path.join(root, name)
+    return project_files(settings.BASE_DIR, '.html', SKIP_NAMES)
 
 
 class DjangoCommentTests(TestCase):

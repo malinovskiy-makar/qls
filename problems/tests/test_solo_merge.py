@@ -21,6 +21,7 @@ from django.urls import reverse
 from problems.models import StudentGroup
 from problems.models_platform import TutorNote
 from problems.tests.factories import make_user
+from problems.tests.tree import project_files
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -197,25 +198,22 @@ class OneMarkupTests(TestCase):
     def test_no_second_note_form_in_templates(self):
         """Поле заметки объявлено ровно в одном файле проекта.
 
-        ⚠️ `materials/` исключена той же логикой, что и `venv`/`node_modules`:
-        это исходники для импорта и посторонние рабочие копии (например,
-        клон репозитория для сравнения веток), не код проекта — их
-        HTML-файлы не обязаны подчиняться правилу «одна разметка».
-        22.08 упало здесь именно из-за такой копии: materials/
-        gitignore-ится, но не удаляется при переключении веток, и
-        `os.walk` без исключения находил в ней второй `_tutor_note.html`.
+        ⚠️ `materials/` исключена как исходники для импорта: их HTML-файлы
+        не обязаны подчиняться правилу «одна разметка».
+
+        ⚠️ ПОСТОРОННИЕ РАБОЧИЕ КОПИИ ОТСЕКАЕТ ОБЩИЙ ОБХОДЧИК, И ЭТО УЖЕ
+        ВТОРОЙ ЗАХОД. 22.08 проверка упала из-за клона репозитория в
+        `materials/`, и тогда хватило исключить `materials`. 02.09 упала
+        снова — на этот раз копия лежала в `.claude/worktrees/`, куда
+        прежний список не смотрел. Перечислять места, где может оказаться
+        чужая копия, бесполезно: их находят по признаку «внутри есть свой
+        `.git`». Подробности — `problems/tests/tree.py`.
         """
-        found = []
-        for folder, _dirs, files in os.walk(ROOT):
-            if any(part in folder for part in
-                   ('venv', 'node_modules', '.git', 'materials')):
-                continue
-            for name in files:
-                if not name.endswith('.html'):
-                    continue
-                path = os.path.join(folder, name)
-                if 'name="note"' in read(path):
-                    found.append(os.path.relpath(path, ROOT))
+        found = [
+            os.path.relpath(path, ROOT)
+            for path in project_files(ROOT, '.html', ('materials',))
+            if 'name="note"' in read(path)
+        ]
         self.assertEqual(found, [os.path.join('teacher', 'templates',
                                               'teacher', '_tutor_note.html')])
 
