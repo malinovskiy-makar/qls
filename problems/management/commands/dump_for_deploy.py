@@ -48,7 +48,22 @@ TIER4_MISC = [
     'problems.ProblemVersion', 'problems.Hint', 'problems.Rubric',
     'problems.RubricCriterion', 'problems.StudentSkillProgress',
     'problems.Collection', 'problems.ExportRecord', 'problems.ImportSession',
-    'problems.Lesson', 'problems.Assignment', 'problems.Submission',
+    'problems.Lesson', 'problems.Assignment',
+    # ⚠️ ПОРЯДОК ЗДЕСЬ ЗНАЧИМ, И ЭТИ ТРИ СТРОКИ ПОЯВИЛИСЬ НЕ ЗРЯ.
+    # Заливка в ЧИСТУЮ PostgreSQL падала: `Submission.problem_item` ссылается
+    # на `AssignmentItem`, а его в выгрузке не было вовсе:
+    #   IntegrityError: Key (problem_item_id)=(18) is not present in table
+    #   "problems_assignmentitem"
+    # На SQLite это не воспроизводится (внешние ключи там не проверяются так
+    # строго), а на проде строки уже лежали — поэтому дыра прожила незамеченной
+    # до первой репетиции на чистой базе (сессия «Wecon Rush», фаза 8).
+    # `AssignmentItem` тянет за собой `CustomProblem` и его варианты, иначе
+    # дыра просто переезжает на шаг дальше. Замкнутость графа держит тест
+    # problems/tests/test_deploy_dump.py.
+    'problems.CustomProblem', 'problems.CustomProblemOption',
+    'problems.SavedFolder', 'problems.SavedGraph',
+    'problems.AssignmentItem',
+    'problems.Submission',
     'problems.TeacherFeedback', 'problems.StudentTopicProgress',
     'problems.CalendarEvent',
 ]

@@ -103,11 +103,56 @@ class MpcMultiplierArchetype(Archetype):
                     u'склонность к потреблению равна {}. Инвестиции и налоги '
                     u'автономны. {}').format(p['mpc'], policy(p))
 
+        def full_crisis(p, s):
+            return (u'После спада экономика страны Икс работает не на полную '
+                    u'мощность, поэтому выпуск определяется спросом. '
+                    u'Предельная склонность к потреблению равна {}, '
+                    u'инвестиции и налоги автономны. {}').format(
+                        p['mpc'], policy(p))
+
+        def full_region(p, s):
+            return (u'Область считает, что даст её экономике оживление '
+                    u'бюджетных расходов. Модель кейнсианская: предельная '
+                    u'склонность к потреблению {}, инвестиции и налоги '
+                    u'автономны. {}').format(p['mpc'], policy(p))
+
+        def full_memo(p, s):
+            return (u'Министерство экономики готовит записку о влиянии '
+                    u'бюджета на выпуск. Экономика закрытая, предельная '
+                    u'склонность к потреблению {}, инвестиции и налоги '
+                    u'автономны. {}').format(p['mpc'], policy(p))
+
+        def full_class(p, s):
+            return (u'На занятии разбирают кейнсианский крест. Экономика '
+                    u'закрытая, предельная склонность к потреблению равна {}, '
+                    u'инвестиции и налоги автономны. {}').format(
+                        p['mpc'], policy(p))
+
         def short(p, s):
             return (u'Кейнсианский крест: MPC = {}. {}').format(
                 p['mpc'], policy(p))
 
-        return [Wrapper('country', full, short)]
+        def short_crisis(p, s):
+            return (u'После спада, выпуск по спросу. MPC = {}. {}').format(
+                p['mpc'], policy(p))
+
+        def short_region(p, s):
+            return (u'Область, кейнсианская модель: MPC = {}. {}').format(
+                p['mpc'], policy(p))
+
+        def short_memo(p, s):
+            return (u'Записка министерства: MPC = {}. {}').format(
+                p['mpc'], policy(p))
+
+        def short_class(p, s):
+            return (u'Разбор на занятии: MPC = {}. {}').format(
+                p['mpc'], policy(p))
+
+        return [Wrapper('country', full, short),
+                Wrapper('crisis', full_crisis, short_crisis),
+                Wrapper('region', full_region, short_region),
+                Wrapper('memo', full_memo, short_memo),
+                Wrapper('class', full_class, short_class)]
 
     def solution(self, params, solved, asked):
         mpc = params['mpc']

@@ -149,7 +149,79 @@ class PpfJointArchetype(Archetype):
                         p['mxa'], gx[1], p['mya'], gy[1],
                         p['mxb'], gx[1], p['myb'], gy[1])
 
-        return [Wrapper('countries', full, short)]
+        def full_neighbours(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'У соседних стран Альфа и Бета общая граница и разное '
+                    u'хозяйство. Обе производят {} и {}, КПВ каждой линейна. '
+                    u'Альфа может выпустить максимум {} ед. {} либо {} ед. '
+                    u'{}, а Бета {} ед. {} либо {} ед. {}. Соседи решили '
+                    u'производить сообща.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_islands(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Островные государства Альфа и Бета живут своим '
+                    u'хозяйством и производят {} и {}; КПВ каждой линейна. '
+                    u'Альфа выпускает максимум {} ед. {} либо {} ед. {}, '
+                    u'а Бета {} ед. {} либо {} ед. {}. Они наладили паром и '
+                    u'считают, что смогут произвести вместе.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_union(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Страны Альфа и Бета обсуждают союз без пошлин. Обе '
+                    u'производят {} и {}, КПВ каждой линейна: Альфа может '
+                    u'выпустить максимум {} ед. {} либо {} ед. {}, а Бета '
+                    u'{} ед. {} либо {} ед. {}. Переговорщики считают '
+                    u'совместные возможности.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def full_class(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'На олимпиадном разборе строят суммарную КПВ двух стран. '
+                    u'Альфа и Бета производят {} и {}, КПВ каждой линейна: '
+                    u'Альфа даёт максимум {} ед. {} либо {} ед. {}, Бета '
+                    u'{} ед. {} либо {} ед. {}. Производство объединяют и '
+                    u'распределяют эффективно.').format(
+                        gx[0], gy[0], p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_neighbours(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Соседи, КПВ линейны. Альфа: {} ед. {} либо {} ед. {}; '
+                    u'Бета: {} ед. {} либо {} ед. {}. Производят сообща.'
+                    ).format(p['mxa'], gx[1], p['mya'], gy[1],
+                             p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_islands(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Два острова, КПВ линейны. Альфа: {} ед. {} либо {} ед. '
+                    u'{}; Бета: {} ед. {} либо {} ед. {}. Производят сообща.'
+                    ).format(p['mxa'], gx[1], p['mya'], gy[1],
+                             p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_union(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Союз без пошлин, КПВ линейны. Альфа: {} ед. {} либо '
+                    u'{} ед. {}; Бета: {} ед. {} либо {} ед. {}.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        def short_class(p, s):
+            gx, gy = _ppf.PPF_GOODS[p['gx']], _ppf.PPF_GOODS[p['gy']]
+            return (u'Разбор: КПВ линейны. Альфа: {} ед. {} либо {} ед. {}; '
+                    u'Бета: {} ед. {} либо {} ед. {}. Сообща.').format(
+                        p['mxa'], gx[1], p['mya'], gy[1],
+                        p['mxb'], gx[1], p['myb'], gy[1])
+
+        return [Wrapper('countries', full, short),
+                Wrapper('neighbours', full_neighbours, short_neighbours),
+                Wrapper('islands', full_islands, short_islands),
+                Wrapper('union', full_union, short_union),
+                Wrapper('class', full_class, short_class)]
 
     def solution(self, params, solved, asked):
         low, high = _low_high(params)

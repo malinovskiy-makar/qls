@@ -1068,3 +1068,60 @@ class GeneratedPoolHasNoEmDashTests(TestCase):
                     bad.append((q.generator_key, text[:120]))
         self.assertEqual(bad[:5], [], u'тире в базе: {} вопросов'.format(
             len(bad)))
+
+
+# Пять архетипов, у которых была ОДНА обёртка на 300 вопросов. Замер
+# повторяемости 2026-09-02: сюжет узнавался с третьего вопроса.
+REWORKED_WRAPPERS = ['price_index', 'mpc_multiplier',
+                     'perfect_price_discrimination', 'ppf_joint',
+                     'comparative_advantage']
+MIN_WRAPPERS = 5
+
+
+class StoryWrapperTests(SimpleTestCase):
+    u"""Сюжетных обёрток достаточно, и они разные.
+
+    ⚠️ Проверяем не число в коде, а РЕЗУЛЬТАТ: обёртки обязаны реально
+    выпадать и давать разный текст. Пять функций, возвращающих одно и то
+    же, числом обёрток не считаются.
+    """
+
+    def test_reworked_archetypes_have_enough_wrappers(self):
+        for key in REWORKED_WRAPPERS:
+            n = len(ARCHETYPES[key].wrappers())
+            self.assertGreaterEqual(
+                n, MIN_WRAPPERS,
+                u'{}: обёрток {}, а сюжет узнаётся с третьего вопроса'
+                .format(key, n))
+
+    def test_every_wrapper_actually_comes_up(self):
+        u"""Все обёртки выпадают: заведённая, но недостижимая не считается."""
+        for key in REWORKED_WRAPPERS:
+            arch = ARCHETYPES[key]
+            expected = {w.key for w in arch.wrappers()}
+            rng = random.Random(7)
+            seen = set()
+            for i in range(240):
+                q = gbase.generate_question(
+                    arch, rng, ('numeric', 'single', 'boolean')[i % 3])
+                seen.add(q['params'].get('_wrapper'))
+            self.assertEqual(
+                seen, expected,
+                u'{}: выпали {}, а заведены {}'.format(key, seen, expected))
+
+    def test_wrappers_give_different_text(self):
+        u"""Разные обёртки — разный рассказ, а не переставленные слова."""
+        for key in REWORKED_WRAPPERS:
+            arch = ARCHETYPES[key]
+            rng = random.Random(11)
+            params = arch.sample(rng)
+            solved = arch.solve(params)
+            texts = [w.full(params, solved) for w in arch.wrappers()]
+            self.assertEqual(
+                len(set(texts)), len(texts),
+                u'{}: две обёртки дают одинаковый текст'.format(key))
+            # И начинаются они по-разному: одинаковая завязка узнаётся
+            # так же, как одинаковый текст.
+            heads = {t[:30] for t in texts}
+            self.assertEqual(len(heads), len(texts),
+                             u'{}: у обёрток одинаковая завязка'.format(key))
