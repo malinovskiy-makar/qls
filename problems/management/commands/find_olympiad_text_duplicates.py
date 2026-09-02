@@ -77,8 +77,14 @@ REPORTS_DIR = 'reports/olympiad_link'
 REVIEW_QUEUE = 'text_dedup_review_queue.csv'
 ANCHOR_CONFLICTS = 'anchor_metadata_conflicts.csv'
 GRADE_MERGES = 'anchor_grade_merges.csv'
+WEAK_NUMERIC = 'text_dedup_weak_numeric.csv'
 PREVIEW_HTML = 'text_dedup_preview.html'
 APPLIED_JOURNAL = 'text_dedup_applied.json'
+
+# Сколько различных чисел в условии считаем «числовой отпечаток есть».
+# Ниже этого числовая проверка почти ничего не доказывает — см.
+# `_numeric_is_weak`.
+WEAK_NUMERIC_LIMIT = 4
 
 # Поля метаданных олимпиады, переносимые из якорной строки БУКВАЛЬНО.
 # source_site и record_id тоже копируются: они описывают, ОТКУДА взялись
@@ -295,6 +301,27 @@ class Command(BaseCommand):
             got = extract_numeric_tokens(self.raw_text[pid])
             self.numeric_cache[pid] = got
         return got
+
+    def _numeric_is_weak(self, pid):
+        """Числовая проверка для этой задачи почти ничего не доказывает.
+
+        ⚠️ ЧИСЛОВОЙ ГЕЙТ ЗАЩИЩАЕТ ОТ ПОДМЕНЫ ДАННЫХ, НО НЕ ОТ ПОДМЕНЫ СЛОВА.
+        У теста с вариантами ответа все числа условия служебные — это номера
+        вариантов, и они одинаковы у любых двух тестов. Проверенный случай:
+        `#57821` «Which of the following is an example of a FIELD
+        experiment?» и `#59582` «…of a NATURAL experiment?» — сходство
+        0,9865, числа совпали, задачи разные с разными ответами.
+
+        Признак не блокирует запись сам по себе: решение, придержать такие
+        пары или нет, принимает владелец на стоп-гейте. Дело команды —
+        назвать их числом и выписать списком, а не спрятать.
+        """
+        tokens = self.numeric(pid)
+        if not tokens:
+            return True
+        if len(tokens) > WEAK_NUMERIC_LIMIT:
+            return False
+        return all(token.isdigit() and 1 <= int(token) <= 9 for token in tokens)
 
     def _long_enough(self, pid):
         """Предохранитель коротких текстов.
@@ -580,7 +607,8 @@ class Command(BaseCommand):
         queue_sample = rng.sample(self.queue_rows, min(10, len(self.queue_rows)))
 
         pieces = ["""<meta charset="utf-8"><title>Текстовые копии олимпиадных задач</title>
-<style>body{font:15px/1.55 system-ui,sans-serif;margin:24px;max-width:1400px}
+<style>body{font:15px/1.55 system-ui,sans-serif;margin:24px;max-width:1400px;
+background:#fff;color:#111}
 h1{font-size:22px}h2{font-size:17px;margin-top:32px;border-bottom:2px solid #ccc;padding-bottom:4px}
 table{border-collapse:collapse;width:100%;margin:10px 0 26px}
 td,th{border:1px solid #ccc;padding:9px 11px;vertical-align:top;width:50%}
@@ -661,6 +689,37 @@ th{background:#f2f2f2;text-align:left}
           f'{self._planned_row_count(k["decided"])}')
 
         w('')
+        w('НА ЧТО ОПИРАЕТСЯ ЧИСЛОВАЯ ПРОВЕРКА')
+        weak = [m for m in k['decided'] if self._numeric_is_weak(m.candidate_id)]
+        buckets = Counter()
+        for m in k['decided']:
+            count = len(self.numeric(m.candidate_id))
+            buckets['0 чисел' if not count else
+                    '1–4 числа' if count <= WEAK_NUMERIC_LIMIT else
+                    '5–9 чисел' if count <= 9 else '10 и больше'] += 1
+        for name in ('0 чисел', '1–4 числа', '5–9 чисел', '10 и больше'):
+            w(f'   {buckets[name]:6d}  {name} в условии кандидата')
+        w(f'   {len(weak):6d}  пар с ДЫРЯВЫМ числовым отпечатком '
+          f'(чисел нет или это 1–{WEAK_NUMERIC_LIMIT} однозначных)')
+        if weak:
+            w('   ⚠️  У таких пар числа не доказывают ничего: у теста с '
+              'вариантами')
+            w('       ответа они служебные. Список — в файле ниже, решение '
+              'за владельцем.')
+        self._write_csv(WEAK_NUMERIC, [{
+            'candidate_id': m.candidate_id, 'anchor_id': m.anchor_id,
+            'method': m.method,
+            'fuzzy': '' if m.fuzzy is None else f'{m.fuzzy:.4f}',
+            'cosine': '' if m.cosine is None else f'{m.cosine:.4f}',
+            'numbers': ' '.join(sorted(self.numeric(m.candidate_id).elements())),
+            'olympiad': self._describe(self.refs_by_anchor[m.anchor_id]),
+            'candidate_text_300': self.raw_text[m.candidate_id][:300],
+            'anchor_text_300': self.raw_text[m.anchor_id][:300],
+        } for m in weak], [
+            'candidate_id', 'anchor_id', 'method', 'fuzzy', 'cosine',
+            'numbers', 'olympiad', 'candidate_text_300', 'anchor_text_300'])
+
+        w('')
         w('РАЗБИВКА КАНДИДАТОВ ПО ИСТОЧНИКУ')
         by_source = Counter()
         seen_with_source = set()
@@ -693,7 +752,7 @@ th{background:#f2f2f2;text-align:left}
 
         w('')
         w('ОТЧЁТЫ')
-        for name in (REVIEW_QUEUE, ANCHOR_CONFLICTS, GRADE_MERGES):
+        for name in (REVIEW_QUEUE, ANCHOR_CONFLICTS, GRADE_MERGES, WEAK_NUMERIC):
             w(f'   {os.path.join(self.reports_dir, name)}')
         w(f'   {self.preview_path}   ← открыть двойным кликом')
 
