@@ -456,9 +456,24 @@ def extract_numeric(problem):
 class Command(BaseCommand):
     help = 'Пересобирает игровой пул Econ Rush (кэш GameQuestion) из тестов.'
 
+    def add_arguments(self, parser):
+        parser.add_argument(
+            '--dry-run', action='store_true',
+            help='ничего не писать: только посчитать и показать отчёт')
+
     def handle(self, *args, **options):
+        dry = options.get('dry_run')
         canonical_set = set(CANONICAL)
         qs = (Problem.objects
+              # ⚠️ БРАК, НАЙДЕННЫЙ ЧЕЛОВЕКОМ, В ИГРУ НЕ ИДЁТ. `human_review`
+              # ставится по вердиктам ревьюера (см. human_review_mark);
+              # это сильнее любого автоматического детектора качества.
+              .exclude(human_review='defect')
+              # ⚠️ `hidden_pending_review` НЕ ТРЕБУЕМ. Правило пула игры —
+              # «опубликовано и без брака», как у конструктора домашки, а
+              # НЕ правило каталога «только проверенное человеком». Иначе
+              # 562 задачи Сборника АА и весь SolveHub не попали бы в игру
+              # никогда: их просто ещё не смотрели глазами.
               .filter(status='published', needs_quality_review=False,
                       problem_type__in=GAME_TYPES)
               .prefetch_related('parts', 'topics', 'tags',
@@ -574,17 +589,23 @@ class Command(BaseCommand):
                 tall_formula.append((gq.problem_id, gq.question[:60]))
             built.append(gq)
 
-        with transaction.atomic():
-            # Сгенерированные вопросы (is_generated=True) — отдельный слой
-            # кэша, ими управляют generate_game_questions/purge_generated;
-            # пересборка пула из тестов их НЕ трогает.
-            deleted, _ = GameQuestion.objects.filter(
-                is_generated=False).delete()
-            GameQuestion.objects.bulk_create(built, batch_size=500)
-
-        self.stdout.write(self.style.SUCCESS(
-            f'Пул пересобран: {len(built)} вопросов (было {deleted}), '
-            f'схлопнуто повторов: {duplicate_in_pool}.'))
+        if dry:
+            deleted = GameQuestion.objects.filter(is_generated=False).count()
+            self.stdout.write(self.style.WARNING(
+                f'СУХОЙ ПРОГОН, база не тронута. Собралось бы {len(built)} '
+                f'вопросов (сейчас {deleted}), схлопнуто повторов: '
+                f'{duplicate_in_pool}.'))
+        else:
+            with transaction.atomic():
+                # Сгенерированные вопросы (is_generated=True) — отдельный
+                # слой кэша, ими управляют generate_game_questions и
+                # purge_generated; пересборка пула из тестов их НЕ трогает.
+                deleted, _ = GameQuestion.objects.filter(
+                    is_generated=False).delete()
+                GameQuestion.objects.bulk_create(built, batch_size=500)
+            self.stdout.write(self.style.SUCCESS(
+                f'Пул пересобран: {len(built)} вопросов (было {deleted}), '
+                f'схлопнуто повторов: {duplicate_in_pool}.'))
         by_type = {}
         for g in built:
             key = (g.question_type, g.lang)

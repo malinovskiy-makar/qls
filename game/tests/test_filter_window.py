@@ -316,3 +316,38 @@ class FilterWindowMarkupTests(TestCase):
         self.assertIn('Тренировочный забег: выбрана сложность', self.src)
         self.assertIn("'Без фильтров: ×'", self.src)
         self.assertIn("'С фильтрами: множителя ×'", self.src)
+
+
+class PoolGateTests(TestCase):
+    u"""Шлюз пула: что попадает в игру, а что нет (фаза 8.2).
+
+    ⚠️ Правило пула игры — «опубликовано и без брака», а НЕ правило каталога
+    «только проверенное человеком». Требуй пул `hidden_pending_review=False`,
+    и источники, которых ещё не смотрели глазами, не попали бы в игру
+    никогда: у одного только Сборника АА таких 562 задачи.
+    """
+
+    def test_defect_marked_by_a_human_never_enters_the_pool(self):
+        u"""Брак, найденный человеком, сильнее любого автодетектора."""
+        import io
+        src = io.open('game/management/commands/build_game_pool.py',
+                      encoding='utf-8').read()
+        self.assertIn(".exclude(human_review='defect')", src)
+
+    def test_pool_does_not_require_the_catalogue_gate(self):
+        import io
+        src = io.open('game/management/commands/build_game_pool.py',
+                      encoding='utf-8').read()
+        self.assertNotIn('hidden_pending_review=False', src)
+
+    def test_dry_run_writes_nothing(self):
+        u"""Сухой прогон обязан быть безвредным: им смотрят на пересборку
+        ДО того, как решают её делать."""
+        from io import StringIO
+        from django.core.management import call_command
+        before = list(GameQuestion.objects.values_list('id', flat=True))
+        out = StringIO()
+        call_command('build_game_pool', '--dry-run', stdout=out)
+        after = list(GameQuestion.objects.values_list('id', flat=True))
+        self.assertEqual(before, after, 'сухой прогон тронул базу')
+        self.assertIn('СУХОЙ ПРОГОН', out.getvalue())
