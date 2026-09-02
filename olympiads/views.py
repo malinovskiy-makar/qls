@@ -1,3 +1,67 @@
-from django.shortcuts import render
+"""Экраны раздела «Олимпиады».
 
-# Create your views here.
+Раздел публичный и вход не требует — как каталог. Ничего не пишет: все
+четыре функции только читают.
+"""
+from django.shortcuts import get_object_or_404, render
+
+from .models import Olympiad, current_academic_year
+
+
+def _has_placeholder(objects):
+    """Есть ли на странице хоть один объект с выдуманными данными.
+
+    От этого зависит плашка сверху. Плашка обязательна: без неё кто-нибудь
+    примет заглушку за факт и пропустит регистрацию.
+    """
+    return any(getattr(obj, 'is_placeholder', False) for obj in objects)
+
+
+def olympiad_list(request):
+    """Главный экран раздела: лента ближайших дат, фильтры, карточки."""
+    olympiads = list(
+        Olympiad.objects.filter(is_published=True)
+        .prefetch_related('levels', 'events', 'variants')
+    )
+    main = sorted(
+        [o for o in olympiads if o.display_group == Olympiad.DisplayGroup.MAIN],
+        key=lambda o: o.sort_key(),
+    )
+    related = sorted(
+        [o for o in olympiads
+         if o.display_group == Olympiad.DisplayGroup.RELATED],
+        key=lambda o: o.sort_key(),
+    )
+    return render(request, 'olympiads/list.html', {
+        'main': main,
+        'related': related,
+        'has_placeholder': _has_placeholder(olympiads),
+    })
+
+
+def olympiad_detail(request, slug):
+    """Страница одной олимпиады."""
+    olympiad = get_object_or_404(
+        Olympiad.objects.prefetch_related('levels', 'events', 'stages'),
+        slug=slug,
+    )
+    return render(request, 'olympiads/detail.html', {
+        'olympiad': olympiad,
+        'has_placeholder': _has_placeholder([olympiad]),
+    })
+
+
+def calendar(request):
+    """Собственный календарь раздела — учебный год с сентября по август."""
+    return render(request, 'olympiads/calendar.html', {
+        'academic_year': current_academic_year(),
+        'has_placeholder': Olympiad.objects.filter(
+            is_placeholder=True, is_published=True).exists(),
+    })
+
+
+def compare(request):
+    """Сравнение до трёх олимпиад: `?slugs=vseros,mosh,vp`."""
+    return render(request, 'olympiads/compare.html', {
+        'has_placeholder': False,
+    })

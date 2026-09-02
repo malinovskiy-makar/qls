@@ -1,0 +1,8 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% block title %}{{ olympiad.name_short }}{% endblock %}
+{% block olymp_content %}
+<div class="ol-head">
+  <h1 class="ol-title">{{ olympiad.name_full }}</h1>
+  <p class="ol-sub">{{ olympiad.organizer }}</p>
+</div>
+{% endblock %}

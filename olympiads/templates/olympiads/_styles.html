@@ -1,0 +1,36 @@
+{% comment %}
+Стили раздела «Олимпиады» — ВСЕ и ЕДИНСТВЕННЫЕ.
+Ни строчки CSS в других шаблонах раздела: так переделка внешнего вида
+не трогает разметку, а разметка не тащит за собой переделку вида.
+
+Своих цветов здесь нет ни одного — только переменные из _tokens.html;
+это проверяет тест olympiads/tests/test_no_hex_colors.py.
+{% endcomment %}
+/* ── Плашка демо-данных ─────────────────────────────── */
+.ol-demo {
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+
+/* ── Общая рамка раздела ────────────────────────────── */
+.ol-head { margin-bottom: 28px; }
+.ol-title { font-size: 30px; font-weight: 700; line-height: var(--lh-tight); }
+.ol-sub {
+  font-size: 15px; color: var(--text2); margin-top: 8px;
+  max-width: var(--w-read);
+}
+.ol-section { margin-top: 36px; }
+.ol-section-title { font-size: 19px; font-weight: 700; margin-bottom: 12px; }
+.ol-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 18px 20px;
+  font-size: 14px;
+  color: var(--text2);
+}
