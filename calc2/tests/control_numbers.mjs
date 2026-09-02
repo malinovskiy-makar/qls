@@ -1197,6 +1197,71 @@ cmp('кнопок «?» с плашкой найдено', r.n > 6, true, 0);
 cmp('ни одна не осталась «только по щелчку»', r.bad, 0, 0);
 cmp('меток data-pop-trigger не осталось', r.attr, 0, 0);
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · ОКНО РАСШИРЯЕТСЯ, НО НЕ СЖИМАЕТСЯ.
+   ⚠️ Стережём ПРАВИЛО: «конец кривой внутри окна» и «окно не уменьшилось».
+   Точные границы (600, 1000) не закрепляются: они зависят от округления
+   padMax, а правило — нет.
+   ================================================================ */
+const GROW = `
+  var setA = function (a) {
+    var p = STATE.params && STATE.params.a;
+    if (!p) return 'буквы a нет';
+    p.value = a;
+    redrawKeepingWindow();
+    return null;
+  };
+`;
+head('Сессия 01.09 (3) · масштаб расширяется под конец кривой');
+r = await run(MKT + GROW + `setDS('sd', '100-a*Q', 'Q'); redrawAll();
+  return { q: CONFIG.Qmax, p: CONFIG.Pmax, a: (STATE.params.a || {}).value,
+           eqQ: STATE.eq.Q, eqP: STATE.eq.P };`);
+cmp('a = 1: окно по Q не тронуто', r.q, 100, 1e-6);
+cmp('a = 1: окно по P не тронуто', r.p, 100, 1e-6);
+cmp('a = 1: равновесие', r.eqQ, 50, 1e-3);
+
+r = await run(MKT + GROW + `setDS('sd', '100-a*Q', 'Q'); redrawAll();
+  var e = setA(0.2); if (e) return { err: e }; return { ok: 1 };`);
+await page.waitForTimeout(900);
+r = await run(`return { q: CONFIG.Qmax, p: CONFIG.Pmax, eqQ: STATE.eq.Q, eqP: STATE.eq.P,
+  zero: (function () { var d = STATE.D; return d ? curveZeroQ(d, 4096) : null; })() };`);
+cmp('a = 0,2: спрос встречает ось Q при', r.zero, 500, 0.5);
+cmp('a = 0,2: конец кривой внутри окна', r.q >= 500, true, 0);
+cmp('a = 0,2: равновесие Q не сдвинулось', r.eqQ, 83.3333, 1e-3);
+cmp('a = 0,2: равновесие P не сдвинулось', r.eqP, 83.3333, 1e-3);
+cmp('a = 0,2: по P окно не раздувалось', r.p, 100, 1e-6);
+const grownQ = r.q;
+
+r = await run(GROW + `var e = setA(5); if (e) return { err: e }; return { ok: 1 };`);
+await page.waitForTimeout(900);
+r = await run(`return { q: CONFIG.Qmax, zero: curveZeroQ(STATE.D, 4096) };`);
+cmp('a = 5: конец кривой снова близко', r.zero, 20, 0.5);
+cmp('a = 5: окно НЕ сжалось', r.q >= grownQ - 1e-6, true, 0);
+
+head('Сессия 01.09 (3) · выбор человека главнее авто-расширения');
+r = await run(MKT + GROW + `setDS('sd', '100-a*Q', 'Q'); redrawAll();
+  setRanges(140, 140); STATE.zoomLock = true;
+  var e = setA(0.2); if (e) return { err: e }; return { ok: 1 };`);
+await page.waitForTimeout(900);
+r = await run(`return { q: CONFIG.Qmax, p: CONFIG.Pmax, lock: STATE.zoomLock ? 1 : 0 };`);
+cmp('окно человека не тронуто по Q', r.q, 140, 1e-6);
+cmp('окно человека не тронуто по P', r.p, 140, 1e-6);
+cmp('замок на месте', r.lock, 1, 0);
+r = await run(`resetZoom();`);
+await page.waitForTimeout(300);
+r = await run(`return { q: CONFIG.Qmax, lock: STATE.zoomLock ? 1 : 0 };`);
+cmp('«Вернуть исходный вид» снимает замок', r.lock, 0, 0);
+cmp('и показывает конец кривой целиком', r.q >= 500, true, 0);
+
+head('Сессия 01.09 (3) · составной спрос: конец потерь виден');
+r = await run(MKT + `setDS('mono-kink', '100-Q', '20');
+  STATE.d3D1 = '100 - Q'; STATE.d3D2 = '60 - Q'; STATE.d3MC = '20'; redrawAll();
+  return { qc: (STATE.kinked || {}).Qc, q0: CONFIG.Qmax };`);
+await page.waitForTimeout(900);
+r = await run(`return { qc: (STATE.kinked || {}).Qc, q: CONFIG.Qmax };`);
+cmp('конкурентный выпуск', r.qc, 120, 1e-3);
+cmp('окно достало до конца потерь', r.q >= 120, true, 0);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();

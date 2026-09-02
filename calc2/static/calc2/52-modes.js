@@ -138,7 +138,10 @@ function animateRanges(targetQmax, targetPmax) {
 // либо выставить мгновенно. Вызывается ВМЕСТО прямого setRanges в recompute КТВ.
 function applyTradeRanges(targetQmax, targetPmax) {
   if (_rangeAnimating) return;                 // внутри кадра анимации границами управляет цикл
-  if (_paramOnlyRedraw) { _wantRangeAnim = false; return; }   // окно идёт за формулой, не за буквой
+  _sceneRangedFrame = true;                    // окном этого кадра распоряжается сцена
+  /* Окно идёт за формулой, а не за буквой (20.08) — но РАСШИРЯЕТСЯ и за буквой
+     тоже (01.09): сжатия нет, поэтому рычаг по-прежнему двигает кривую. */
+  if (_paramOnlyRedraw) { _wantRangeAnim = false; growRanges(targetQmax, targetPmax); return; }
   /* П54. Масштаб, выбранный человеком, главнее авто-подгонки — ровно как в
      applyAutoRanges. Без этой проверки сцены торговли возвращали свой вид на
      первой же перерисовке, и колесо на них не работало совсем. */
@@ -200,7 +203,12 @@ function curveAxisBounds() {
   let mx = 0, my = 0, any = false;
   let targets = [];
   try { targets = (typeof snapTargets === 'function') ? snapTargets() : []; } catch (e) { targets = []; }
-  const hi = Math.max(10, (CONFIG.Qmax - CONFIG.Qmin) * 3);
+  /* ⚠️ ОТРЕЗОК ПОИСКА — СВОЙСТВО МОДЕЛИ, А НЕ КАДРА (ADR 0020). Стояло «втрое
+     шире текущего окна», и перехват, лежащий дальше, просто не находился: у
+     D = 100 − 0,2·Q ось Q встречается при 500, а окно до ста давало предел 300.
+     Оттого и «Вернуть исходный вид» не умел показать такую кривую целиком. */
+  const hi = Math.max(10, (CONFIG.Qmax - CONFIG.Qmin) * 3,
+                      (typeof modelSpanQ === 'function') ? modelSpanQ() : 0);
   targets.forEach(t => {
     if (typeof t.f !== 'function') return;
     const y0 = t.f(0);
@@ -269,7 +277,9 @@ function redrawKeepingWindow() {
 
 function applyAutoRanges(qmax, pmax) {
   if (_rangeAnimating) return;
-  if (_paramOnlyRedraw) { _wantRangeAnim = false; return; }
+  _sceneRangedFrame = true;                    // окном этого кадра распоряжается сцена
+  // Та же оговорка, что и у applyTradeRanges: не сжимаем, но раздвигаем.
+  if (_paramOnlyRedraw) { _wantRangeAnim = false; growRanges(qmax, pmax); return; }
   // Пользователь покрутил колесо — его масштаб главнее авто-подгонки, иначе
   // сцена возвращала бы свой вид на первой же перерисовке. Снимается сменой
   // сцены или двойным щелчком по графику (resetZoom).
@@ -455,6 +465,72 @@ function panByPixels(dxPx, dyPx, panel) {
    после возврата так и оставалась за краем. Сцены с собственной авто-подгонкой
    работают как прежде: у них подгонка отработает на первой же перерисовке,
    как только снят замок. */
+/* ЧЕГО МОДЕЛЬ ХОЧЕТ ОТ ОКНА — одна точка правды на двоих.
+   Порядок Н20 · Н21: сначала перехваты кривых с осями, затем проверка, влезли
+   ли точки, вершины и посчитанные площади, и только если нет — отдаляемся.
+   Жёсткие числа остаются запасным вариантом, когда кривых ещё нет вовсе.
+   Этим пользуются ДВОЕ: кнопка «Вернуть исходный вид» (она ставит ровно эти
+   границы) и авто-расширение окна (оно берёт из них только больший край). */
+function wantedRanges() {
+  const fallbackQ = (STATE.mode === 'costs') ? 10 : 100;
+  const fallbackP = (STATE.mode === 'costs') ? 50 : 100;
+  const c = curveAxisBounds();
+  const baseQ = (c && c.qmax > fallbackQ) ? padMax(c.qmax) : fallbackQ;
+  const baseP = (c && c.pmax > fallbackP) ? padMax(c.pmax) : fallbackP;
+  const b = boundsOfDrawn(baseQ, baseP);
+  return { qmax: b ? b.qmax : baseQ, pmax: b ? b.pmax : baseP };
+}
+
+/* ⚠️ ОКНО РАСШИРЯЕТСЯ, НО НЕ СЖИМАЕТСЯ (решение владельца 01.09).
+
+   Это УТОЧНЕНИЕ правила от 20.08, а не его отмена. Тогда авто-подгонку выключили
+   для букв-параметров по верной причине: если окно подгонять под кривую ВСЕГДА,
+   прямая «100 − a·x» при a = 1 и при a = 10 займёт одни и те же пиксели, и
+   рычаг будет выглядеть бесполезным (см. разбор у redrawKeepingWindow).
+   Сжатия здесь и нет: окно только раздвигается, и только тогда, когда конец
+   кривой или ключевая точка вышли за край. Кривая снова помещается с запасом —
+   окно остаётся как было, и кривая просто становится меньше внутри него.
+   Так рычаг по-прежнему видимо двигает кривую, и ничего не пропадает.
+
+   ⚠️ ВЫБОР ЧЕЛОВЕКА ГЛАВНЕЕ. Покрутил колесом — окно стало ЕГО (STATE.zoomLock),
+   и авто-расширение отступает; вернуть исходный вид можно кнопкой. Второго
+   признака для этого не заводим.
+
+   ⚠️ РАСШИРЕНИЕ ПЛАВНОЕ И С ЗАДЕРЖКОЙ — той же анимацией и тем же дебаунсом,
+   что у КТВ (scheduleRangeAnim): при протяжке ползунка экран не дёргается на
+   каждый кадр, оси доезжают, когда рука притормозит.
+
+   ⚠️ В «Математике» правило не действует: там окно полноплановое и своё
+   (MATH_PRESETS), а первая четверть — не её правило. */
+/* Раздвинуть окно до названных границ — и только раздвинуть. Плавно и с
+   дебаунсом; при выключенной анимации в системе — сразу. */
+function growRanges(qmax, pmax) {
+  if (STATE.zoomLock) return;             // окно человека — его
+  const q = Math.max(CONFIG.Qmax, qmax), p = Math.max(CONFIG.Pmax, pmax);
+  if (q <= CONFIG.Qmax + 1e-6 && p <= CONFIG.Pmax + 1e-6) return;   // всё помещается
+  if (prefersReducedMotion()) setRanges(q, p);
+  else scheduleRangeAnim(q, p);
+}
+
+/* ⚠️ ЕСТЬ СЦЕНЫ, КОТОРЫЕ ВПИСЫВАЮТ СВОЁ ОКНО САМИ (КПВ, КТВ, труд, фирма,
+   потребитель, макро) — они зовут applyAutoRanges/applyTradeRanges и знают
+   свои границы лучше общего подбора. Такой кадр общий проход пропускает:
+   иначе два хозяина тянули бы окно каждый в свою сторону, и протяжка ручки
+   МРОТ уводила бы поле (поймано calc2_math, жест «б2»). Расширение у этих
+   сцен делает сама applyAutoRanges — из своей же цели. */
+let _sceneRangedFrame = false;
+
+function growWindowToModel() {
+  const sceneTook = _sceneRangedFrame;
+  _sceneRangedFrame = false;
+  if (sceneTook) return;
+  if (_rangeAnimating) return;            // кадром анимации распоряжается сама анимация
+  if (STATE.mode === 'math') return;
+  if (STATE.zoomLock) return;
+  const w = wantedRanges();
+  growRanges(w.qmax, w.pmax);
+}
+
 function resetZoom() {
   STATE.zoomLock = false;
   STATE.viewDirty = false;
@@ -472,21 +548,11 @@ function resetZoom() {
       setMathWindow(x0, x1, y0, y1);
     }
   } else {
-    /* Н20, Н21. Порядок ровно такой: сначала перехваты кривых с осями, затем
-       проверка, влезли ли точки и площади, и только если нет — отдаляемся.
-       Жёсткие числа (издержки 10 на 50, остальное 100 на 100) остались лишь
-       как запасной вариант, когда кривых ещё нет вовсе. */
-    const fallbackQ = (STATE.mode === 'costs') ? 10 : 100;
-    const fallbackP = (STATE.mode === 'costs') ? 50 : 100;
-    /* Привычный масштаб сцены остаётся, пока кривые в него помещаются: у
-       стандартного спроса перехваты ровно на краях окна, и раздвигать его
-       незачем. Раздвигаем только тогда, когда перехват ВЫШЕ края, то есть
-       кривая иначе не поместилась бы. */
-    const c = curveAxisBounds();
-    const baseQ = (c && c.qmax > fallbackQ) ? padMax(c.qmax) : fallbackQ;
-    const baseP = (c && c.pmax > fallbackP) ? padMax(c.pmax) : fallbackP;
-    const b = boundsOfDrawn(baseQ, baseP);
-    setRanges(b ? b.qmax : baseQ, b ? b.pmax : baseP);
+    /* Порядок Н20 · Н21 живёт в wantedRanges — там же, откуда его берёт
+       авто-расширение окна. Возврат ставит эти границы РОВНО, то есть умеет и
+       сжать: человек попросил вернуть исходный вид. */
+    const w = wantedRanges();
+    setRanges(w.qmax, w.pmax);
   }
   syncViewFields();
   redrawAll();

@@ -61,6 +61,11 @@ function redrawAll() {
      же причине, что и разметка обозначений: сцены дописывают разбор позже, и
      проход, стоящий раньше, мерил бы не всю врезку. */
   if (typeof fitPanelMath === 'function') fitPanelMath();
+  /* И самым последним — авто-расширение окна: оно смотрит на то, что сцена уже
+     нарисовала и посчитала. Сжать окно оно не может, поэтому решение 20.08
+     («окно идёт за формулой, а не за буквой») остаётся в силе: рычаг
+     по-прежнему видимо двигает кривую внутри выбранного окна. */
+  if (typeof growWindowToModel === 'function') growWindowToModel();
 }
 
 function redrawScene() {
@@ -3629,6 +3634,19 @@ function snapTargetsAll() {
   // Торговля: КПВ страны плюс линия торговых возможностей, если она построена.
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     tradeSnapTargets(out);
+    return out;
+  }
+  /* СОСТАВНОЙ СПРОС. Спрос здесь ЛОМАНЫЙ и лежит в STATE.kinked, а не в
+     STATE.curves — та же болезнь, что была у дискриминации 3-й степени выше:
+     список молча проваливался в общую ветку и отдавал кривые ГЛАВНОЙ сцены
+     монополии, которых на этом холсте нет вовсе. Отсюда и то, что окно не
+     знало, докуда сцена дотянулась: конец потерь при выпуске 120 приходилось
+     открывать руками. */
+  if (STATE.mode === 'market' && STATE.market === 'monopoly'
+      && STATE.monoMode === 'kinked' && STATE.kinked && typeof STATE.kinked.Dfn === 'function') {
+    const k = STATE.kinked;
+    out.push({ name: 'D', f: (q) => k.Dfn(q), color: COL.D });
+    if (k.mcCurve) out.push({ name: 'MC', f: (q) => evalCurve(k.mcCurve, q), color: COL.S });
     return out;
   }
   if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
