@@ -29,5 +29,7 @@ urlpatterns = [
          name='session_start_mistakes'),
     path('api/question/', views.api_question, name='question'),
     path('api/answer/', views.api_answer, name='answer'),
+    # Живые счётчики окна фильтров: сколько вопросов даст каждый режим.
+    path('api/pool_counts/', views.api_pool_counts, name='pool_counts'),
     path('api/session/finish/', views.api_session_finish, name='session_finish'),
 ]

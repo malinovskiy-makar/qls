@@ -44,7 +44,7 @@ from . import sources as game_sources
 from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
-from . import config, scoring, stats as stats_mod
+from . import config, filters as game_filters, scoring, stats as stats_mod
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
@@ -133,9 +133,16 @@ def _mode_enabled(mode):
 
 
 def empty_filter():
-    """Фильтр «ничего не выбрано» = играем всем пулом режима."""
-    return {'topics': [], 'sources': [],
-            'dmin': config.DIFFICULTY_MIN, 'dmax': config.DIFFICULTY_MAX}
+    """Фильтр «ничего не выбрано» = играем всем пулом режима.
+
+    ⚠️ СЛОЖНОСТЬ — МНОЖЕСТВО, А НЕ ОТРЕЗОК. Ползунок «от…до» умел выбрать
+    только непрерывный диапазон: «1★ и 5★, без середины» им не задать, а
+    именно так и хотят готовиться (лёгкие на разгон, сложные на разбор).
+    Пустой список значит «любая» — так фильтр не превращается в запрет.
+    Старые `dmin`/`dmax` из ссылок по-прежнему понимаются (см. parse_filter).
+    """
+    return {'topics': [], 'tags': [], 'sources': [], 'stars': [],
+            'features': [], 'character': ''}
 
 
 def parse_filter(request):
@@ -159,17 +166,45 @@ def parse_filter(request):
     sources = [s.strip() for s in request.GET.getlist('sources') if s.strip()]
     f['sources'] = [s for s in dict.fromkeys(sources) if s in GROUP_KEYS]
 
-    def _level(name, default):
-        try:
-            v = int(request.GET.get(name, default))
-        except (TypeError, ValueError):
-            return default
-        return min(max(v, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+    tags = []
+    for raw in request.GET.getlist('tags'):
+        raw = (raw or '').strip()
+        if raw.isdigit() and int(raw) not in tags:
+            tags.append(int(raw))
+    f['tags'] = tags
 
-    f['dmin'] = _level('dmin', config.DIFFICULTY_MIN)
-    f['dmax'] = _level('dmax', config.DIFFICULTY_MAX)
-    if f['dmin'] > f['dmax']:            # ползунок перевернули — не спорим
-        f['dmin'], f['dmax'] = f['dmax'], f['dmin']
+    # Звёзды: любое подмножество из пяти (`stars=1&stars=3`).
+    stars = set()
+    for raw in request.GET.getlist('stars'):
+        raw = (raw or '').strip()
+        if raw.isdigit() and config.DIFFICULTY_MIN <= int(raw) <= config.DIFFICULTY_MAX:
+            stars.add(int(raw))
+    # ⚠️ СТАРЫЕ `dmin`/`dmax` ПОНИМАЕМ И ПРЕВРАЩАЕМ В МНОЖЕСТВО. Ссылками с
+    # ними могли уже поделиться, а «работа над ошибками» наследует фильтр
+    # прошлого забега — сломать их значит молча сменить человеку выбор.
+    if not stars and ('dmin' in request.GET or 'dmax' in request.GET):
+        def _level(name, default):
+            try:
+                v = int(request.GET.get(name, default))
+            except (TypeError, ValueError):
+                return default
+            return min(max(v, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+        lo = _level('dmin', config.DIFFICULTY_MIN)
+        hi = _level('dmax', config.DIFFICULTY_MAX)
+        if lo > hi:                      # ползунок перевернули — не спорим
+            lo, hi = hi, lo
+        stars = set(range(lo, hi + 1))
+    # Выбраны все пять — это то же самое, что не выбрано ничего.
+    if len(stars) == config.DIFFICULTY_MAX - config.DIFFICULTY_MIN + 1:
+        stars = set()
+    f['stars'] = sorted(stars)
+
+    # Группы-заготовки: разбираем, но пока их варианты пусты (см. filters.py).
+    f['features'] = [x for x in dict.fromkeys(
+        v.strip() for v in request.GET.getlist('features') if v.strip())
+        if x in dict(game_filters.FEATURES)]
+    ch = (request.GET.get('character') or '').strip()
+    f['character'] = ch if ch in dict(game_filters.CHARACTERS) else ''
     return f
 
 
@@ -180,28 +215,63 @@ def is_empty_filter(f):
     SCOPE_MULTIPLIER. Адрес подделывается, состояние забега — нет.
     """
     f = normalize_filter(f)
-    return (not f['topics'] and not f['sources']
-            and f['dmin'] == config.DIFFICULTY_MIN
-            and f['dmax'] == config.DIFFICULTY_MAX)
+    return not any((f['topics'], f['tags'], f['sources'], f['stars'],
+                    f['features'], f['character']))
+
+
+def is_difficulty_filtered(f):
+    """Выбирал ли игрок себе сложность.
+
+    ⚠️ ЭТО ДЕЛАЕТ ЗАБЕГ ТРЕНИРОВОЧНЫМ (решение владельца по симуляции).
+    Подобрать сложность можно — так готовятся, — но обгонять кого-то в
+    таблице на подобранном пуле нельзя: симуляция показала, что «только 5★»
+    даёт более высокий удачный забег, чем честный (см. ADR 0055).
+    Темы, теги и источники зачётности НЕ лишают: они меняют, ЧТО решаешь,
+    а не КАК ТРУДНО.
+    """
+    return bool(normalize_filter(f)['stars'])
 
 
 def normalize_filter(f):
-    """Фильтр из состояния забега → в нормальную форму (на случай старого
-    состояния в сессии, где его ещё не было)."""
+    """Фильтр из состояния забега → в нормальную форму.
+
+    ⚠️ Состояние могло лечь в сессию ДО этой правки — там были `dmin`/`dmax`
+    вместо `stars`. Переводим молча: у человека посреди сессии не должен
+    сброситься выбор.
+    """
     base = empty_filter()
     if isinstance(f, dict):
         base.update({k: f[k] for k in base if k in f})
+        if not base['stars'] and ('dmin' in f or 'dmax' in f):
+            lo = int(f.get('dmin') or config.DIFFICULTY_MIN)
+            hi = int(f.get('dmax') or config.DIFFICULTY_MAX)
+            lo = min(max(lo, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+            hi = min(max(hi, config.DIFFICULTY_MIN), config.DIFFICULTY_MAX)
+            if lo > hi:
+                lo, hi = hi, lo
+            span = set(range(lo, hi + 1))
+            if len(span) < config.DIFFICULTY_MAX - config.DIFFICULTY_MIN + 1:
+                base['stars'] = sorted(span)
+    base['stars'] = sorted({int(x) for x in (base['stars'] or [])
+                            if str(x).isdigit()
+                            or isinstance(x, int)})
+    base['tags'] = [int(x) for x in (base['tags'] or [])
+                    if str(x).lstrip('-').isdigit()]
     return base
 
 
-def _filter_matches(f, topics, source_group, difficulty):
-    """Подходит ли вопрос под фильтр. Пустой список тем/источников значит
+def _filter_matches(f, topics, source_group, difficulty, tag_ids=()):
+    """Подходит ли вопрос под фильтр. Пустой список любого измерения значит
     «любые» — так фильтр не превращается в запрет."""
     if f['topics'] and not (set(topics or []) & set(f['topics'])):
         return False
+    if f['tags'] and not (set(tag_ids or []) & set(f['tags'])):
+        return False
     if f['sources'] and (source_group or 'other') not in f['sources']:
         return False
-    return f['dmin'] <= difficulty <= f['dmax']
+    if f['stars'] and difficulty not in f['stars']:
+        return False
+    return True
 
 
 def _candidate_rows(state):
@@ -220,16 +290,82 @@ def _candidate_rows(state):
     bank_map, arch_map = stats_mod.difficulty_overrides()
     rows = _pool_qs().filter(question_type=qtype).values_list(
         'id', 'topics', 'source_group', 'difficulty',
-        'problem_id', 'part_id', 'generator_key')
+        'problem_id', 'part_id', 'generator_key', 'tag_ids')
     out = []
-    for pk, topics, group, difficulty, problem_id, part_id, gen_key in rows:
+    for (pk, topics, group, difficulty, problem_id, part_id, gen_key,
+         tag_ids) in rows:
         if problem_id is not None:
             difficulty = bank_map.get((problem_id, part_id), difficulty)
         elif gen_key:
             difficulty = arch_map.get(gen_key, difficulty)
-        if _filter_matches(f, topics, group, difficulty):
+        if _filter_matches(f, topics, group, difficulty, tag_ids):
             out.append((pk, difficulty, topics or []))
     return out
+
+
+def pool_counts_for(f):
+    u"""Сколько вопросов доступно каждому режиму под фильтром `f`.
+
+    ⚠️ СЧИТАЕТСЯ ТОЙ ЖЕ ФУНКЦИЕЙ, ЧТО ВЫБИРАЕТ ВОПРОСЫ (`_candidate_rows`).
+    Отдельный запрос «сколько подходит» разошёлся бы с выдачей при первой
+    же правке фильтра, и экран обещал бы игроку не то, что даёт сервер.
+    """
+    out = {}
+    for key in config.MODES:
+        out[key] = len(_candidate_rows({'mode': key, 'filter': f}))
+    return out
+
+
+def pool_tags(f=None):
+    u"""Теги, у которых В ПУЛЕ есть хотя бы один вопрос.
+
+    Показывать тег, по которому ничего не найдётся, — значит обещать выбор,
+    которого нет. Считаем по всему пулу (без учёта режима): игрок выбирает
+    теги до выбора режима.
+    """
+    from problems.models import Tag
+    used = set()
+    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
+        used.update(tag_ids or [])
+    if not used:
+        return []
+    rows = Tag.objects.filter(id__in=used).values_list('id', 'name')
+    counts = {}
+    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
+        for t in (tag_ids or []):
+            counts[t] = counts.get(t, 0) + 1
+    return sorted(
+        ({'id': pk, 'name': name, 'count': counts.get(pk, 0)}
+         for pk, name in rows),
+        key=lambda r: (-r['count'], r['name']))
+
+
+def topic_counts():
+    u"""Сколько вопросов в пуле по каждой теме — число рядом с темой в окне."""
+    counts = {}
+    for topics in _pool_qs().values_list('topics', flat=True):
+        for name in (topics or []):
+            counts[name] = counts.get(name, 0) + 1
+    return counts
+
+
+@require_GET
+def api_pool_counts(request):
+    u"""Живые счётчики окна фильтров: «Пуля N · Блиц N · Рапид N · Классика N».
+
+    Клиент зовёт с дебаунсом: считать на каждое нажатие галочки незачем.
+    """
+    f = parse_filter(request)
+    counts = pool_counts_for(f)
+    return JsonResponse({
+        'counts': counts,
+        'total': sum(counts.values()),
+        # Режим, у которого под фильтром меньше этого числа, играть нельзя:
+        # забег из трёх вопросов — не забег.
+        'min_playable': config.MIN_PLAYABLE,
+        'unfiltered': is_empty_filter(f),
+        'ranked': not is_difficulty_filtered(f),
+    })
 
 
 def escalation_slice(rows, streak):
@@ -287,6 +423,7 @@ def _game_page_context(request):
     счётчик, который считается по пулу, — пустой ли пул РЕЖИМА: режим без
     единого вопроса на экране не показывается вовсе (играть в него нечем).
     """
+    _tc = topic_counts()
     # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
     type_counts = {}
     for qtype in _pool_qs().values_list('question_type', flat=True):
@@ -297,11 +434,21 @@ def _game_page_context(request):
     return {
         'auto_set': None,
         'auto_set_json': 'null',
-        # Темы — все 21 каноническая, сгруппированы по колонкам панели.
-        'topic_groups': [{'key': key, 'title': title, 'topics': names}
-                         for key, title, names in config.TOPIC_GROUPS],
+        # Темы — все канонические, разделами окна фильтров, СО СВОИМИ
+        # числами: сколько вопросов пула лежит по каждой. Считает сервер —
+        # шаблону нечем складывать словарь с ключом-строкой.
+        'topic_groups': [
+            {'key': key, 'title': title,
+             'topics': [{'name': n, 'count': _tc.get(n, 0)} for n in names]}
+            for key, title, names in config.TOPIC_GROUPS],
         'source_groups': [{'key': key, 'title': title}
                           for key, title in game_sources.GROUPS],
+        # Теги пула с числами и счётчики тем — для окна фильтров.
+        'pool_tags': pool_tags(),
+        # Группы-заготовки: показываются, ТОЛЬКО если у них есть варианты.
+        # Серый переключатель, который не нажимается, хуже его отсутствия.
+        'feature_options': game_filters.feature_options(),
+        'character_options': game_filters.character_options(),
         # «Вопросов из реальных олимпиад» — считаем ТОЛЬКО вопросы банка:
         # сгенерированные тренировочные из олимпиад не приходили, и врать
         # в цифре на первом экране нельзя.
@@ -334,6 +481,9 @@ def _game_page_context(request):
             # «скоро», поэтому знание о готовности приходит с сервера.
             'has_daily': HAS_DAILY,
             'has_duel': HAS_DUEL,
+            'min_playable': config.MIN_PLAYABLE,
+            'pool_tags': pool_tags(),
+            'topic_counts': topic_counts(),
         }),
     }
 
@@ -1381,23 +1531,31 @@ def duel_page(request, code):
 
 
 def _filter_query(f):
+    f = normalize_filter(f)
     parts = ['&topics=' + quote(t) for t in f['topics']]
+    parts += ['&tags=%d' % t for t in f['tags']]
     parts += ['&sources=' + quote(s) for s in f['sources']]
-    parts.append('&dmin=%d&dmax=%d' % (f['dmin'], f['dmax']))
+    parts += ['&stars=%d' % d for d in f['stars']]
     return ''.join(parts)
 
 
 def _filter_text(f):
-    """Фильтр словами — соперник должен понимать, во что его зовут."""
+    """Фильтр словами — соперник должен понимать, во что его зовут.
+
+    ⚠️ Нормализуем на входе: в базе лежат снимки фильтров дуэлей и наборов,
+    сделанные ДО перехода на множество звёзд (там `dmin`/`dmax`). Упасть на
+    чужой старой дуэли — худший из возможных ответов.
+    """
+    f = normalize_filter(f)
     topics = ', '.join(f['topics']) if f['topics'] else 'все темы'
     if f['sources']:
         sources = ', '.join(game_sources.group_title(s) for s in f['sources'])
     else:
         sources = 'все источники'
-    if f['dmin'] == config.DIFFICULTY_MIN and f['dmax'] == config.DIFFICULTY_MAX:
+    if not f['stars']:
         diff = 'любая сложность'
     else:
-        diff = 'сложность %d–%d' % (f['dmin'], f['dmax'])
+        diff = 'сложность ' + ', '.join('%d★' % d for d in f['stars'])
     return '%s · %s · %s' % (topics, sources, diff)
 
 

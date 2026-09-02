@@ -59,15 +59,34 @@ class FilterParsingTests(TestCase):
         f = self._f({'topic': 'Эластичность'})
         self.assertEqual(f['topics'], ['Эластичность'])
 
+    def test_legacy_range_becomes_a_set_of_stars(self):
+        """Ползунок «от…до» заменён множеством звёзд (фаза 4), но старые
+        ссылки понимаются: отрезок превращается в множество."""
+        f = self._f({'dmin': '2', 'dmax': '4'})
+        self.assertEqual(f['stars'], [2, 3, 4])
+
     def test_difficulty_is_clamped_and_ordered(self):
         f = self._f({'dmin': '9', 'dmax': '-3'})
-        # 9→5, −3→1, потом перевёрнутый диапазон разворачивается
-        self.assertEqual((f['dmin'], f['dmax']), (1, 5))
+        # 9→5, −3→1, перевёрнутый диапазон разворачивается, а полный
+        # диапазон — это то же самое, что «не выбрано ничего».
+        self.assertEqual(f['stars'], [])
 
     def test_garbage_difficulty_falls_back_to_full_range(self):
         f = self._f({'dmin': 'ой', 'dmax': ''})
-        self.assertEqual((f['dmin'], f['dmax']),
-                         (config.DIFFICULTY_MIN, config.DIFFICULTY_MAX))
+        self.assertEqual(f['stars'], [])
+
+    def test_stars_take_any_subset(self):
+        """Главное, чего не умел ползунок: «1★ и 5★, без середины»."""
+        f = self._f({'stars': ['1', '5']})
+        self.assertEqual(f['stars'], [1, 5])
+
+    def test_all_five_stars_mean_no_filter(self):
+        f = self._f({'stars': ['1', '2', '3', '4', '5']})
+        self.assertEqual(f['stars'], [])
+
+    def test_garbage_stars_are_dropped_silently(self):
+        f = self._f({'stars': ['0', '7', 'ой', '3']})
+        self.assertEqual(f['stars'], [3])
 
 
 class FilterNarrowsServingTests(TestCase):

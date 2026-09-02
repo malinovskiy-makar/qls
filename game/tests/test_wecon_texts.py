@@ -229,8 +229,11 @@ class GeneratedNoteTests(TestCase):
         self.src = read(PAGE)
 
     def test_chip_is_gone_and_note_took_its_place(self):
+        # ⚠️ Ищем ПЛАШКУ, а не слово: «тренировочный забег» — это отдельная
+        # и законная надпись про зачётность (фаза 4), и проверка на слово
+        # запрещала бы её заодно.
         self.assertNotIn('gen-chip', self.src)
-        self.assertNotIn('Тренировочный', self.src)
+        self.assertNotIn('>Тренировочный<', self.src)
         self.assertIn('>Вопрос сгенерирован ИИ</p>', self.src)
 
     def test_note_is_small_and_quiet_under_the_card(self):

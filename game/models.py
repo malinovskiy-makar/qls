@@ -121,6 +121,12 @@ class GameQuestion(models.Model):
                                             blank=True, db_index=True)
     source_group = models.CharField('Группа источников', max_length=16,
                                     blank=True, default='', db_index=True)
+    # Теги задачи-источника, денормализованные списком id (как topics —
+    # названиями). ⚠️ Списком, а не M2M: выбор вопроса читает пул одним
+    # плоским values_list, и join на теги дал бы дубли строк у задачи с
+    # тремя тегами — то есть такая задача выпадала бы чаще прочих.
+    # Заполняется при пересборке пула (build_game_pool).
+    tag_ids = models.JSONField('ID тегов', default=list, blank=True)
 
     # --- Параметрические генераторы (game/generators/) ---
     # Сгенерированные вопросы живут в том же кэше, но: build_game_pool их

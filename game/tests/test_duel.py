@@ -200,10 +200,19 @@ class DuelPageTests(TestCase):
     def test_filter_text_is_human_readable(self):
         from game.views import _filter_text
         text = _filter_text({'topics': ['Эластичность'], 'sources': ['vsosh'],
-                             'dmin': 2, 'dmax': 4})
+                             'stars': [2, 3, 4]})
         self.assertIn('Эластичность', text)
         self.assertIn('ВсОШ', text)
-        self.assertIn('сложность 2–4', text)
-        text2 = _filter_text({'topics': [], 'sources': [], 'dmin': 1, 'dmax': 5})
+        self.assertIn('2★', text)
+        text2 = _filter_text({'topics': [], 'sources': [], 'stars': []})
         self.assertIn('все темы', text2)
         self.assertIn('любая сложность', text2)
+
+    def test_filter_text_survives_an_old_snapshot(self):
+        """⚠️ В базе лежат дуэли и наборы, созданные ДО множества звёзд —
+        со снимком `dmin`/`dmax`. Упасть на чужой старой дуэли нельзя."""
+        from game.views import _filter_text
+        text = _filter_text({'topics': ['Эластичность'], 'sources': [],
+                             'dmin': 2, 'dmax': 4})
+        self.assertIn('Эластичность', text)
+        self.assertIn('2★', text)

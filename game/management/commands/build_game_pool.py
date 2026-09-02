@@ -461,7 +461,8 @@ class Command(BaseCommand):
         qs = (Problem.objects
               .filter(status='published', needs_quality_review=False,
                       problem_type__in=GAME_TYPES)
-              .prefetch_related('parts', 'topics', 'source_references__source'))
+              .prefetch_related('parts', 'topics', 'tags',
+                                'source_references__source'))
 
         total = qs.count()
         self.stdout.write(f'Тестов-кандидатов: {total}')
@@ -544,6 +545,11 @@ class Command(BaseCommand):
                 unit=unit if qtype == 'numeric' else '',
                 source_id=source_id,
                 source_group=source_group,
+                # ⚠️ Теги — СПИСКОМ id, как темы списком названий. Не M2M:
+                # выбор вопроса читает пул одним плоским values_list, и join
+                # на теги дал бы дубли строк у задачи с тремя тегами — она
+                # выпадала бы игроку втрое чаще прочих.
+                tag_ids=sorted(t.id for t in p.tags.all()),
             )
 
             # Схлопывание повторов на сборке пула (контент-таблицы Problem/

@@ -4,9 +4,10 @@
   в одном шаблоне, переключаются JS-машиной состояний.
 
   Дизайн — «Сцена»: токены сайта из _tokens.html, свой слой --rush-* маппится
-  на глобальные. Осознанное локальное исключение из правила «сигналы священны»:
-  полоса времени меняет цвет малиновый → амбер (<15 с) → красный (<7 с) —
-  это семантика таймера, а не декоративное заимствование сигнальных цветов.
+  на глобальные. Всё красное на экране ведёт ОДНО число `--alarm`: последние
+  10 % запаса режима или последняя жизнь (DESIGN.md 5.2). Прежних ступеней
+  «амбер < 15 с, красный < 7 с» больше нет — они были одинаковыми для Пули и
+  Классики, у которых запас отличается вдесятеро.
 
   Десктоп первичен: игра полностью управляется клавиатурой (1–4 — ответ,
   пробел — пропуск, Enter — играть/ещё раз). Мобильная версия — адаптив
@@ -317,102 +318,217 @@ a:focus-visible, button:focus-visible {
   border-bottom: 1.5px solid var(--rush-border);
 }
 
-/* ── Строка настройки и панель фильтров ───────────────────────────
-   Фильтры показываются ПОЛНОСТЬЮ, без счётчиков и без гашения пустых
-   сочетаний: задач по каждой теме и источнику мы считаем неограниченно
-   много (указание Макара). Иначе экран рассказывал бы о сегодняшнем
-   состоянии банка вместо того, чтобы предлагать выбор. */
-.setup-bar {
-  margin-top: 20px;
+/* ── Фильтры тренажёра ────────────────────────────────────────────
+   ⚠️ ЧИПОВ ТЕМ НА ГЛАВНОМ ЭКРАНЕ НЕТ. Двадцать чипов вверху занимали
+   первый экран целиком и уводили внимание с карточек режимов — а режим
+   выбирают в девяти случаях из десяти, фильтр в одном. Теперь под
+   карточками одна кнопка, а весь выбор живёт в окне.
+
+   ⚠️ СЧЁТЧИКИ ЖИВЫЕ, И ЭТО СМЕНА ПРАВИЛА. Раньше фильтр работал так,
+   будто задач по каждой теме неограниченно, — иначе экран рассказывал бы
+   о состоянии банка. Но с фильтром по тегу «неограниченно» перестало быть
+   правдой: тегов 344, и по многим в пуле единицы. Молчащий фильтр,
+   который даёт пустой забег, хуже честного числа. */
+.filter-bar {
+  margin-top: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   flex-wrap: wrap;
 }
-.setup-summary { font-size: 13px; color: var(--text2); }
-.setup-btn {
-  font: inherit; font-size: 13px; font-weight: 600;
-  padding: 6px 14px;
-  border-radius: 20px;
+.filter-open {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 22px;
+  border-radius: 11px;
   border: 1px solid var(--rush-border);
   background: var(--rush-surface);
-  color: var(--text2);
+  color: var(--text);
   cursor: pointer;
+  transition: border-color .12s, color .12s, font-size .12s, font-weight .12s;
 }
-.setup-btn:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.setup-btn[aria-expanded="true"] {
-  background: var(--rush-accent); border-color: var(--rush-accent); color: #fff;
+/* При наведении текст чуть жирнее и крупнее — просьба владельца. */
+.filter-open:hover {
+  border-color: var(--rush-accent);
+  color: var(--rush-accent);
+  font-size: 16px;
+  font-weight: 700;
 }
-.setup-panel {
-  margin-top: 14px;
-  padding: 18px;
+.filter-open:focus-visible { outline: 2px solid var(--rush-accent);
+                             outline-offset: 2px; }
+.filter-reset {
+  font: inherit; font-size: 13px;
+  background: none; border: none; padding: 4px 6px;
+  color: var(--text3); cursor: pointer; text-decoration: underline;
+}
+.filter-reset:hover { color: var(--rush-bad); }
+.filter-reset[hidden] { display: none; }
+
+/* Выбранное — чипами с крестиком: снять по одному, не открывая окно. */
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.filter-chips:empty { display: none; }
+.fchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 13px;
+  padding: 5px 8px 5px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--rush-accent);
+  background: var(--rush-accent-tint);
+  color: var(--rush-accent);
+}
+.fchip button {
+  font: inherit; line-height: 1;
+  border: none; background: none; padding: 0 2px;
+  color: inherit; cursor: pointer; font-size: 15px;
+}
+.fchip button:hover { color: var(--rush-bad); }
+
+/* Пометка зачётности рядом с фильтрами: игрок обязан знать ДО забега,
+   поедет ли результат на доску. */
+.filter-note { margin-top: 8px; font-size: 13px; color: var(--text3); }
+.filter-note.unranked { color: var(--rush-bad); }
+
+/* ── Окно «Все фильтры» ──────────────────────────────────────────── */
+.fmodal[hidden] { display: none; }
+.fmodal {
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, .45);
+}
+.fmodal-card {
+  background: var(--surface);
   border: 1px solid var(--rush-border);
   border-radius: 16px;
-  background: var(--rush-surface);
+  box-shadow: var(--shadow-pop);
+  width: 100%;
+  max-width: 880px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
   text-align: left;
 }
-.setup-panel-head {
+.fmodal-head {
   display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--rush-border);
 }
-.setup-panel-head b { font-size: 15px; }
-.setup-close {
-  font: inherit; font-size: 15px; line-height: 1;
-  background: none; border: none; color: var(--text3); cursor: pointer;
-  padding: 4px 6px;
+.fmodal-head b { font-size: 17px; }
+.fmodal-close {
+  font: inherit; font-size: 18px; line-height: 1;
+  width: 32px; height: 32px; border-radius: 8px;
+  border: none; background: none; color: var(--text3); cursor: pointer;
 }
-.setup-block { margin-bottom: 16px; }
-.setup-block-head {
-  display: flex; align-items: center; justify-content: space-between;
-  gap: 10px; flex-wrap: wrap; margin-bottom: 8px;
-}
-.setup-block h3 {
-  font-size: 12px; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; color: var(--text3);
-}
-.preset-row { display: flex; gap: 6px; flex-wrap: wrap; }
-.preset {
-  font: inherit; font-size: 11.5px;
-  padding: 3px 10px;
-  border-radius: 14px;
-  border: 1px solid var(--rush-border);
-  background: transparent; color: var(--text2); cursor: pointer;
-}
-.preset:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.topic-cols {
+.fmodal-close:hover { color: var(--text); font-weight: 700; }
+.fmodal-body {
+  padding: 16px 20px;
+  overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 14px;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px 26px;
 }
+@media (max-width: 760px) {
+  .fmodal-body { grid-template-columns: 1fr; }
+}
+.fgroup h3 {
+  font-size: 14px; font-weight: 700; margin-bottom: 8px;
+  text-transform: uppercase; letter-spacing: .04em; color: var(--text2);
+}
+.fgroup-wide { grid-column: 1 / -1; }
+.topic-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
+@media (max-width: 760px) { .topic-cols { grid-template-columns: 1fr; } }
 .topic-col h4 {
-  font-size: 12px; font-weight: 700; color: var(--text2);
-  margin-bottom: 5px;
+  font-size: 13px; font-weight: 700; color: var(--text3);
+  margin-bottom: 4px;
 }
 .check {
   display: flex; align-items: flex-start; gap: 7px;
-  font-size: 12.5px; color: var(--text2);
-  padding: 3px 0; cursor: pointer;
+  font-size: 14px; line-height: 1.35; cursor: pointer; padding: 2px 0;
 }
-.check input { margin-top: 2px; accent-color: var(--rush-accent); cursor: pointer; }
-.source-row { display: flex; flex-wrap: wrap; gap: 6px 18px; }
-.diff-row {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--text2);
+.check input { margin-top: 3px; accent-color: var(--rush-accent); cursor: pointer; }
+.check .cnt { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.source-row { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+.preset-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+.preset {
+  font: inherit; font-size: 13px;
+  padding: 4px 11px; border-radius: 20px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text2); cursor: pointer;
 }
-.diff-row label { display: flex; align-items: center; gap: 8px; }
-.diff-slider { accent-color: var(--rush-accent); width: 130px; }
-.diff-out {
-  font-weight: 700; color: var(--rush-accent);
+.preset:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+
+/* Звёзды-переключатели: ЛЮБОЕ подмножество из пяти, а не отрезок. */
+.stars-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.star-btn {
+  font: inherit; font-size: 15px; font-weight: 700;
+  min-width: 52px; padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text2); cursor: pointer;
   font-variant-numeric: tabular-nums;
 }
-.setup-foot { display: flex; justify-content: flex-end; }
-.setup-apply {
-  font: inherit; font-size: 13px; font-weight: 600;
-  padding: 8px 20px; border-radius: 10px;
-  border: 1px solid var(--btn-bg);
-  background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
+.star-btn:hover { border-color: var(--rush-accent); }
+.star-btn[aria-pressed="true"] {
+  background: var(--rush-accent);
+  border-color: var(--rush-accent);
+  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы */
 }
+.star-hint { margin-top: 6px; font-size: 13px; color: var(--text3); }
+
+/* Теги: поиск + выбранные наверху. Их 344 — списком без поиска не жить. */
+.tag-search {
+  font: inherit; font-size: 14px;
+  width: 100%; padding: 8px 10px; margin-bottom: 8px;
+  border: 1px solid var(--rush-border); border-radius: 9px;
+  background: var(--rush-surface); color: var(--text);
+}
+.tag-search:focus { outline: 2px solid var(--rush-accent); outline-offset: 1px; }
+.tag-list {
+  max-height: 190px; overflow-y: auto;
+  border: 1px solid var(--rush-border); border-radius: 9px;
+  padding: 6px 10px;
+}
+.tag-empty { font-size: 13px; color: var(--text3); padding: 6px 0; }
+
+.fmodal-foot {
+  border-top: 1px solid var(--rush-border);
+  padding: 14px 20px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap;
+}
+.fcounts { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.fcounts b { color: var(--rush-accent); }
+.fcounts .low { color: var(--rush-bad); }
+.fmodal-actions { display: flex; gap: 10px; }
+.fmodal-actions button {
+  font: inherit; font-size: 15px; height: 42px; padding: 0 22px;
+  border-radius: 10px; cursor: pointer;
+}
+.fapply { border: none; background: var(--btn-bg); color: var(--on-btn); font-weight: 600; }
+.fapply:hover { background: var(--btn-bg-hover); }
+.fclear {
+  border: 1px solid var(--rush-border); background: var(--rush-surface);
+  color: var(--text2);
+}
+.fclear:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+
+/* Число доступных вопросов на карточке режима + выключенная карточка. */
+.mode-avail { margin-top: 4px; font-size: 13px; color: var(--text3);
+              font-variant-numeric: tabular-nums; }
+.mode-card.is-off { opacity: .55; cursor: not-allowed; }
+.mode-card.is-off:hover { border-color: var(--rush-border); box-shadow: none; }
+.mode-avail.low { color: var(--rush-bad); }
 
 .btn-board {
   font: inherit; font-size: 14px; font-weight: 600;
@@ -527,19 +643,15 @@ a:focus-visible, button:focus-visible {
   color: var(--rush-accent);
 }
 
-/* Узкий экран: панель фильтров становится шторкой снизу */
+/* Узкий экран: окно фильтров садится шторкой снизу — так до кнопок
+   «Применить» дотягивается большой палец, а не мизинец. */
 @media (max-width: 720px) {
-  .topic-cols { grid-template-columns: 1fr; }
-  .setup-panel {
-    position: fixed;
-    left: 0; right: 0; bottom: 0;
-    z-index: 60;
-    margin: 0;
-    max-height: 82vh;
-    overflow-y: auto;
+  .fmodal { padding: 0; align-items: flex-end; }
+  .fmodal-card {
+    max-width: none;
+    max-height: 88vh;
     border-radius: 18px 18px 0 0;
     border-bottom: none;
-    box-shadow: 0 -8px 30px rgba(0,0,0,.24);
   }
 }
 
@@ -1654,64 +1766,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
            результатов. Скрыта, пока сказать нечего. -->
       <p class="start-notice" id="start-notice" hidden></p>
 
-      <!-- Строка настройки: сводка выбора + кнопка раскрытия панели -->
-      <div class="setup-bar">
-        <span class="setup-summary" id="setup-summary">Все темы · Все источники · Любая сложность</span>
-        <button class="setup-btn" id="setup-toggle" aria-expanded="false"
-                aria-controls="setup-panel">Настроить</button>
+      <!-- Фильтры: одна кнопка под карточками, весь выбор — в окне -->
+      <div class="filter-bar">
+        <button class="filter-open" id="filter-open">Добавить фильтры</button>
+        <button class="filter-reset" id="filter-reset" hidden>Сбросить всё</button>
       </div>
-
-      <div class="setup-panel" id="setup-panel" hidden>
-        <div class="setup-panel-head">
-          <b>Настройки забега</b>
-          <button class="setup-close" id="setup-close" aria-label="Закрыть">✕</button>
-        </div>
-
-        <section class="setup-block">
-          <div class="setup-block-head">
-            <h3>Темы</h3>
-            <div class="preset-row">
-              <button class="preset" data-preset="all">все</button>
-              <button class="preset" data-preset="micro">микро</button>
-              <button class="preset" data-preset="macro">макро</button>
-              <button class="preset" data-preset="none">снять всё</button>
-            </div>
-          </div>
-          <div class="topic-cols">
-            {% for g in topic_groups %}
-            <div class="topic-col" data-group="{{ g.key }}">
-              <h4>{{ g.title }}</h4>
-              {% for t in g.topics %}
-              <label class="check"><input type="checkbox" class="f-topic" value="{{ t }}"><span>{{ t }}</span></label>
-              {% endfor %}
-            </div>
-            {% endfor %}
-          </div>
-        </section>
-
-        <section class="setup-block">
-          <div class="setup-block-head"><h3>Источники</h3></div>
-          <div class="source-row">
-            {% for s in source_groups %}
-            <label class="check"><input type="checkbox" class="f-source" value="{{ s.key }}"><span>{{ s.title }}</span></label>
-            {% endfor %}
-          </div>
-        </section>
-
-        <section class="setup-block">
-          <div class="setup-block-head"><h3>Сложность</h3></div>
-          <div class="diff-row">
-            <label>от <input type="range" id="f-dmin" class="diff-slider" min="1" max="5" step="1" value="1"></label>
-            <output class="diff-out" id="diff-out">1–5</output>
-            <label>до <input type="range" id="f-dmax" class="diff-slider" min="1" max="5" step="1" value="5"></label>
-          </div>
-        </section>
-
-        <div class="setup-foot">
-          <button class="setup-apply" id="setup-apply">Готово</button>
-        </div>
-      </div>
-
+      <div class="filter-chips" id="filter-chips"></div>
+      <p class="filter-note" id="filter-note"></p>
 
       <!-- Нижний ряд входов -->
       <div class="entry-row" id="entry-row">
@@ -1950,6 +2011,123 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
 {% include '_icons.html' %}
 <div class="vignette" id="vignette"></div>
+<!-- ОКНО «ВСЕ ФИЛЬТРЫ».
+     Разложено как в умном каталоге: слева то, что задаёт КОРПУС (тема,
+     источник), справа — то, что его сужает (тег, сложность). Группы
+     «Особенности» и «Характер задачи» рисуются, ТОЛЬКО если у них есть
+     варианты: серый переключатель, который не нажимается, хуже его
+     отсутствия. Сегодня полей в базе нет, и групп на экране нет. -->
+<div class="fmodal" id="fmodal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="fmodal-title">
+  <div class="fmodal-card">
+    <div class="fmodal-head">
+      <b id="fmodal-title">Все фильтры</b>
+      <button type="button" class="fmodal-close" id="fmodal-close"
+              aria-label="Закрыть">✕</button>
+    </div>
+
+    <div class="fmodal-body">
+      <section class="fgroup fgroup-wide">
+        <h3>Тема</h3>
+        <div class="preset-row">
+          <button type="button" class="preset" data-preset="all">все</button>
+          <button type="button" class="preset" data-preset="micro">микро</button>
+          <button type="button" class="preset" data-preset="macro">макро</button>
+          <button type="button" class="preset" data-preset="none">снять всё</button>
+        </div>
+        <div class="topic-cols">
+          {% for g in topic_groups %}
+          <div class="topic-col" data-group="{{ g.key }}">
+            <h4>{{ g.title }}</h4>
+            {% for t in g.topics %}
+            <label class="check">
+              <input type="checkbox" class="f-topic" value="{{ t.name }}">
+              <span>{{ t.name }} <span class="cnt">{{ t.count }}</span></span>
+            </label>
+            {% endfor %}
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if pool_tags %}
+      <section class="fgroup">
+        <h3>Тег</h3>
+        <input type="search" class="tag-search" id="tag-search"
+               placeholder="Поиск по названию" autocomplete="off"
+               aria-label="Поиск тега">
+        <div class="tag-list" id="tag-list"></div>
+      </section>
+      {% endif %}
+
+      <section class="fgroup">
+        <h3>Сложность</h3>
+        <div class="stars-row" id="stars-row">
+          <button type="button" class="star-btn f-star" data-star="1"
+                  aria-pressed="false">1★</button>
+          <button type="button" class="star-btn f-star" data-star="2"
+                  aria-pressed="false">2★</button>
+          <button type="button" class="star-btn f-star" data-star="3"
+                  aria-pressed="false">3★</button>
+          <button type="button" class="star-btn f-star" data-star="4"
+                  aria-pressed="false">4★</button>
+          <button type="button" class="star-btn f-star" data-star="5"
+                  aria-pressed="false">5★</button>
+        </div>
+        <p class="star-hint">Пусто значит «любая». Забег с
+          выбранной сложностью тренировочный: в таблицу он не идёт.</p>
+
+        <h3 style="margin-top:16px">Источник</h3>
+        <div class="source-row">
+          {% for src in source_groups %}
+          <label class="check">
+            <input type="checkbox" class="f-source" value="{{ src.key }}">
+            <span>{{ src.title }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
+
+      {% if feature_options %}
+      <section class="fgroup">
+        <h3>Особенности</h3>
+        <div class="source-row">
+          {% for opt in feature_options %}
+          <label class="check">
+            <input type="checkbox" class="f-feature" value="{{ opt.key }}">
+            <span>{{ opt.title }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+
+      {% if character_options %}
+      <section class="fgroup">
+        <h3>Характер задачи</h3>
+        <div class="source-row">
+          {% for opt in character_options %}
+          <label class="check">
+            <input type="radio" name="f-character" class="f-character"
+                   value="{{ opt.key }}">
+            <span>{{ opt.title }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
+    </div>
+
+    <div class="fmodal-foot">
+      <span class="fcounts" id="fcounts">Считаем…</span>
+      <div class="fmodal-actions">
+        <button type="button" class="fclear" id="fmodal-clear">Сбросить</button>
+        <button type="button" class="fapply" id="fmodal-apply">Применить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="quit-modal" id="quit-modal" hidden role="dialog" aria-modal="true"
      aria-labelledby="quit-text">
   <div class="quit-card">
@@ -2256,6 +2434,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       // показывается ВОВСЕ: карточка «скоро» обещала бы игроку то, чего
       // сейчас нет, — а играть в неё всё равно нельзя.
       if (!m || !CFG.pool_counts[key]) return;
+      // ⚠️ `poolCounts` — счётчики ПОД ТЕКУЩИМ ФИЛЬТРОМ (их обновляет
+      // refreshCounts). `CFG.pool_counts` — весь пул режима: по нему
+      // решается, показывать ли карточку вообще.
+      var avail = (poolCounts && poolCounts[key] != null)
+        ? poolCounts[key] : CFG.pool_counts[key];
+      var playable = avail >= (CFG.min_playable || 10);
       var meta = MODE_META[key] || { icon: '', kind: '', mock: 'radio' };
       var card = document.createElement('button');
       card.className = 'mode-card';
@@ -2287,6 +2471,20 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       bs[2].innerHTML = new Array(m.lives + 1).join(ICONS.heart_fill || '');
       card.appendChild(terms);
 
+      // Сколько вопросов доступно под фильтром — и почему нельзя играть.
+      var av = document.createElement('div');
+      av.className = 'mode-avail' + (playable ? '' : ' low');
+      av.textContent = playable
+        ? avail.toLocaleString('ru-RU') + ' '
+          + plural(avail, ['вопрос', 'вопроса', 'вопросов']) + ' под фильтром'
+        : 'Под фильтром ' + avail + ': мало для забега (нужно от '
+          + (CFG.min_playable || 10) + ')';
+      card.appendChild(av);
+      if (!playable) {
+        card.classList.add('is-off');
+        card.disabled = true;
+      }
+
       var bestEl = document.createElement('div');
       bestEl.className = 'mode-best';
       var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
@@ -2304,7 +2502,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   /* Режимы, реально показанные на экране, — по ним ходят клавиши 1–5. */
   function visibleModes() {
     return MODE_ORDER.filter(function (k) {
-      return CFG.modes[k] && CFG.pool_counts[k];
+      if (!CFG.modes[k] || !CFG.pool_counts[k]) return false;
+      var avail = (poolCounts && poolCounts[k] != null)
+        ? poolCounts[k] : CFG.pool_counts[k];
+      return avail >= (CFG.min_playable || 10);
     });
   }
 
@@ -2323,23 +2524,54 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      ошибками (её фильтр сервер берёт из журнала прошлого забега).
      Счётчиков у тем и источников нет намеренно: фильтр обещает выбор,
      а не отчёт о сегодняшнем состоянии банка. */
+  /* ═══ ФИЛЬТРЫ ТРЕНАЖЁРА ═══════════════════════════════════════════════
+     Состояние живёт в ОДНОМ месте (`filter`) и оттуда расходится в три:
+     адрес, localStorage и элементы окна. Обратной дороги нет: элементы
+     читаются только в момент правки, и разъехаться им негде.
+
+     ⚠️ СЛОЖНОСТЬ — МНОЖЕСТВО ЗВЁЗД, а не отрезок «от…до». Ползунок не умел
+     «1★ и 5★ без середины», а готовятся именно так. */
   function emptyFilter() {
-    return { topics: [], sources: [],
-             dmin: CFG.difficulty_min, dmax: CFG.difficulty_max };
+    return { topics: [], tags: [], sources: [], stars: [],
+             features: [], character: '' };
   }
 
   function loadFilter() {
     var f = emptyFilter();
-    try {
-      var raw = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null');
-      if (raw && typeof raw === 'object') {
-        if (Array.isArray(raw.topics)) f.topics = raw.topics;
-        if (Array.isArray(raw.sources)) f.sources = raw.sources;
-        if (raw.dmin >= CFG.difficulty_min) f.dmin = raw.dmin;
-        if (raw.dmax <= CFG.difficulty_max) f.dmax = raw.dmax;
+    /* Адрес важнее памяти: ссылкой поделились именно с этим выбором. */
+    var q = new URLSearchParams(location.search);
+    var fromUrl = q.has('topics') || q.has('tags') || q.has('stars')
+                  || q.has('sources') || q.has('topic')
+                  || q.has('dmin') || q.has('dmax');
+    if (fromUrl) {
+      f.topics = q.getAll('topics').filter(Boolean);
+      var legacyTopic = q.get('topic');
+      if (legacyTopic) f.topics.push(legacyTopic);
+      f.tags = q.getAll('tags').map(Number).filter(function (n) { return n > 0; });
+      f.sources = q.getAll('sources').filter(Boolean);
+      f.stars = q.getAll('stars').map(Number)
+        .filter(function (n) { return n >= 1 && n <= 5; });
+      /* Старая ссылка с ползунком: отрезок превращаем в множество. */
+      if (!f.stars.length && (q.has('dmin') || q.has('dmax'))) {
+        var lo = Math.max(1, Math.min(5, parseInt(q.get('dmin') || '1', 10) || 1));
+        var hi = Math.max(1, Math.min(5, parseInt(q.get('dmax') || '5', 10) || 5));
+        if (lo > hi) { var t = lo; lo = hi; hi = t; }
+        for (var d = lo; d <= hi; d++) f.stars.push(d);
       }
-    } catch (e) { /* мусор в ключе не должен ронять экран */ }
-    if (f.dmin > f.dmax) { var t = f.dmin; f.dmin = f.dmax; f.dmax = t; }
+    } else {
+      try {
+        var raw = JSON.parse(localStorage.getItem(FILTER_KEY) || 'null');
+        if (raw && typeof raw === 'object') {
+          if (Array.isArray(raw.topics)) f.topics = raw.topics;
+          if (Array.isArray(raw.tags)) f.tags = raw.tags.map(Number);
+          if (Array.isArray(raw.sources)) f.sources = raw.sources;
+          if (Array.isArray(raw.stars)) f.stars = raw.stars.map(Number);
+        }
+      } catch (e) { /* мусор в ключе не должен ронять экран */ }
+    }
+    /* Выбраны все пять — то же самое, что не выбрано ничего. */
+    if (f.stars.length === 5) f.stars = [];
+    f.stars.sort(function (a, b) { return a - b; });
     return f;
   }
 
@@ -2350,38 +2582,162 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function filterQuery() {
     var parts = [];
-    filter.topics.forEach(function (t) {
-      parts.push('topics=' + encodeURIComponent(t));
-    });
-    filter.sources.forEach(function (s) {
-      parts.push('sources=' + encodeURIComponent(s));
-    });
-    parts.push('dmin=' + filter.dmin, 'dmax=' + filter.dmax);
+    filter.topics.forEach(function (t) { parts.push('topics=' + encodeURIComponent(t)); });
+    filter.tags.forEach(function (t) { parts.push('tags=' + t); });
+    filter.sources.forEach(function (x) { parts.push('sources=' + encodeURIComponent(x)); });
+    filter.stars.forEach(function (d) { parts.push('stars=' + d); });
     return parts.join('&');
   }
 
-  function filterSummary() {
-    var t = filter.topics.length
-      ? (filter.topics.length === 1 ? filter.topics[0]
-         : filter.topics.length + ' '
-           + plural(filter.topics.length, ['тема', 'темы', 'тем']))
-      : 'Все темы';
-    var srcTitles = {};
-    (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
-    var s = filter.sources.length
-      ? (filter.sources.length === 1 ? srcTitles[filter.sources[0]]
-         : filter.sources.length + ' '
-           + plural(filter.sources.length,
-                    ['источник', 'источника', 'источников']))
-      : 'Все источники';
-    var d = (filter.dmin === CFG.difficulty_min && filter.dmax === CFG.difficulty_max)
-      ? 'Любая сложность'
-      : 'Сложность ' + filter.dmin + '–' + filter.dmax;
-    return t + ' · ' + s + ' · ' + d;
+  function isUnfiltered() {
+    return !filter.topics.length && !filter.tags.length
+        && !filter.sources.length && !filter.stars.length
+        && !filter.features.length && !filter.character;
   }
 
-  function paintFilterSummary() {
-    $('setup-summary').textContent = filterSummary();
+  /* ⚠️ ФИЛЬТР ПО СЛОЖНОСТИ ДЕЛАЕТ ЗАБЕГ ТРЕНИРОВОЧНЫМ. Тот же ответ даёт
+     сервер (views.is_difficulty_filtered) — здесь только надпись. */
+  function isRanked() { return !filter.stars.length; }
+
+  /* Адрес обновляем БЕЗ перезагрузки: ссылкой на свой выбор делятся. */
+  function syncUrl() {
+    var q = filterQuery();
+    var url = location.pathname + (q ? '?' + q : '');
+    try { history.replaceState(null, '', url); } catch (e) {}
+  }
+
+  var tagNames = {};
+  (CFG.pool_tags || []).forEach(function (t) { tagNames[t.id] = t.name; });
+  var srcTitles = {};
+  (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
+
+  /* Чипы выбранного: снять по одному, не открывая окно. */
+  function paintChips() {
+    var box = $('filter-chips');
+    box.innerHTML = '';
+    var rows = [];
+    filter.topics.forEach(function (t) { rows.push(['topics', t, t]); });
+    filter.tags.forEach(function (t) {
+      rows.push(['tags', t, tagNames[t] || ('тег ' + t)]);
+    });
+    filter.sources.forEach(function (x) {
+      rows.push(['sources', x, srcTitles[x] || x]);
+    });
+    filter.stars.forEach(function (d) { rows.push(['stars', d, d + '★']); });
+    rows.forEach(function (r) {
+      var chip = document.createElement('span');
+      chip.className = 'fchip';
+      var label = document.createElement('span');
+      label.textContent = r[2];
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.textContent = '×';
+      x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
+      x.addEventListener('click', function () {
+        filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
+        applyFilter();
+      });
+      chip.appendChild(label);
+      chip.appendChild(x);
+      box.appendChild(chip);
+    });
+    $('filter-open').textContent = rows.length ? 'Изменить фильтры'
+                                              : 'Добавить фильтры';
+    $('filter-reset').hidden = !rows.length;
+    var note = $('filter-note');
+    if (!isRanked()) {
+      note.textContent = 'Тренировочный забег: выбрана сложность, в таблицу не идёт';
+      note.className = 'filter-note unranked';
+    } else if (isUnfiltered()) {
+      note.textContent = 'Без фильтров: ×' + multText(CFG.scope_multiplier)
+                       + ' к очкам';
+      note.className = 'filter-note';
+    } else {
+      note.textContent = 'С фильтрами: множителя ×'
+                       + multText(CFG.scope_multiplier) + ' не будет';
+      note.className = 'filter-note';
+    }
+  }
+
+  /* Живые счётчики: сколько вопросов даст каждый режим под этим выбором. */
+  var countsTimer = null;
+  var poolCounts = CFG.pool_counts || {};
+  function refreshCounts(then) {
+    clearTimeout(countsTimer);
+    countsTimer = setTimeout(function () {
+      api('/game/api/pool_counts/?' + filterQuery()).then(function (d) {
+        poolCounts = d.counts || {};
+        var box = $('fcounts');
+        if (box) {
+          box.innerHTML = MODE_ORDER.filter(function (k) {
+              // Режим, которого нет на экране (выключен флагом или пуст
+              // целиком), в счётчиках не перечисляем: «График 0» обещал бы
+              // то, чего игрок не видит.
+              return CFG.modes[k] && CFG.pool_counts[k];
+            })
+            .map(function (k) {
+              var n = poolCounts[k] || 0;
+              var cls = n < (CFG.min_playable || 10) ? ' class="low"' : '';
+              return CFG.modes[k].title + ' <b' + cls + '>' + n + '</b>';
+            }).join(' · ');
+        }
+        renderModeCards();
+        if (then) then();
+      }).catch(function () { /* счётчик не критичен для игры */ });
+    }, 250);
+  }
+
+  function applyFilter() {
+    if (filter.stars.length === 5) filter.stars = [];
+    saveFilter();
+    syncUrl();
+    paintChips();
+    syncFilterControls();
+    refreshCounts();
+  }
+
+  /* ── Окно ─────────────────────────────────────────────────────────── */
+  function renderTagList() {
+    var box = $('tag-list');
+    // Группы тегов может не быть вовсе: пока пул не пересобран, тегов у
+    // вопросов нет, и группа не рисуется (то же правило, что у
+    // «Особенностей»).
+    if (!box) return;
+    var needle = ($('tag-search').value || '').trim().toLowerCase();
+    var all = CFG.pool_tags || [];
+    var chosen = all.filter(function (t) { return filter.tags.indexOf(t.id) >= 0; });
+    var rest = all.filter(function (t) {
+      return filter.tags.indexOf(t.id) < 0
+          && (!needle || t.name.toLowerCase().indexOf(needle) >= 0);
+    });
+    box.innerHTML = '';
+    // Выбранные — всегда сверху и всегда видны, даже мимо поиска: иначе
+    // снять выбранный тег можно было бы только вспомнив его название.
+    chosen.concat(rest.slice(0, 200)).forEach(function (t) {
+      var lab = document.createElement('label');
+      lab.className = 'check';
+      var cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.className = 'f-tag';
+      cb.value = String(t.id);
+      cb.checked = filter.tags.indexOf(t.id) >= 0;
+      var sp = document.createElement('span');
+      sp.innerHTML = '';
+      sp.appendChild(document.createTextNode(t.name + ' '));
+      var cnt = document.createElement('span');
+      cnt.className = 'cnt';
+      cnt.textContent = t.count;
+      sp.appendChild(cnt);
+      lab.appendChild(cb);
+      lab.appendChild(sp);
+      box.appendChild(lab);
+    });
+    if (!box.children.length) {
+      var em = document.createElement('div');
+      em.className = 'tag-empty';
+      em.textContent = needle ? 'Ничего не нашлось' : 'В пуле пока нет тегов';
+      box.appendChild(em);
+    }
   }
 
   function syncFilterControls() {
@@ -2391,10 +2747,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     document.querySelectorAll('.f-source').forEach(function (cb) {
       cb.checked = filter.sources.indexOf(cb.value) >= 0;
     });
-    $('f-dmin').value = filter.dmin;
-    $('f-dmax').value = filter.dmax;
-    $('diff-out').textContent = filter.dmin + '–' + filter.dmax;
-    paintFilterSummary();
+    document.querySelectorAll('.f-star').forEach(function (b) {
+      b.setAttribute('aria-pressed',
+        filter.stars.indexOf(Number(b.dataset.star)) >= 0 ? 'true' : 'false');
+    });
+    if (!$('fmodal').hidden) renderTagList();
   }
 
   function readFilterControls() {
@@ -2404,47 +2761,89 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     filter.sources = [].slice.call(document.querySelectorAll('.f-source'))
       .filter(function (cb) { return cb.checked; })
       .map(function (cb) { return cb.value; });
-    var lo = parseInt($('f-dmin').value, 10);
-    var hi = parseInt($('f-dmax').value, 10);
-    filter.dmin = Math.min(lo, hi);
-    filter.dmax = Math.max(lo, hi);
-    saveFilter();
-    syncFilterControls();
+    filter.tags = [].slice.call(document.querySelectorAll('.f-tag'))
+      .filter(function (cb) { return cb.checked; })
+      .map(function (cb) { return Number(cb.value); })
+      .concat(filter.tags.filter(function (id) {
+        // Тег, скрытый поиском, выбор не теряет.
+        return !document.querySelector('.f-tag[value="' + id + '"]');
+      }));
+    filter.tags = filter.tags.filter(function (v, i, a) { return a.indexOf(v) === i; });
+    applyFilter();
   }
 
-  function openSetup(open) {
-    $('setup-panel').hidden = !open;
-    $('setup-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
-    if (open) syncFilterControls();
+  function openFilters(open) {
+    $('fmodal').hidden = !open;
+    if (open) {
+      syncFilterControls();
+      renderTagList();
+      refreshCounts();
+      $('fmodal-close').focus();
+    } else {
+      $('filter-open').focus();
+    }
   }
 
-  $('setup-toggle').addEventListener('click', function () {
-    openSetup($('setup-panel').hidden);
+  $('filter-open').addEventListener('click', function () { openFilters(true); });
+  $('fmodal-close').addEventListener('click', function () { openFilters(false); });
+  $('fmodal-apply').addEventListener('click', function () { openFilters(false); });
+  $('filter-reset').addEventListener('click', function () {
+    filter = emptyFilter();
+    applyFilter();
   });
-  $('setup-close').addEventListener('click', function () { openSetup(false); });
-  $('setup-apply').addEventListener('click', function () { openSetup(false); });
-  $('setup-panel').addEventListener('change', readFilterControls);
-  $('setup-panel').addEventListener('input', function (e) {
-    if (e.target.classList.contains('diff-slider')) readFilterControls();
+  $('fmodal-clear').addEventListener('click', function () {
+    filter = emptyFilter();
+    applyFilter();
+    renderTagList();
   });
-  $('setup-panel').addEventListener('click', function (e) {
-    var btn = e.target.closest('.preset');
-    if (!btn) return;
-    var preset = btn.dataset.preset;
+  if ($('tag-search')) $('tag-search').addEventListener('input', renderTagList);
+  $('fmodal').addEventListener('change', function (e) {
+    if (e.target.classList.contains('f-topic')
+        || e.target.classList.contains('f-source')
+        || e.target.classList.contains('f-tag')) {
+      readFilterControls();
+    }
+  });
+  $('fmodal').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); openFilters(false); }
+  });
+  $('fmodal').addEventListener('click', function (e) {
+    var star = e.target.closest('.f-star');
+    if (star) {
+      var d = Number(star.dataset.star);
+      var i = filter.stars.indexOf(d);
+      if (i >= 0) { filter.stars.splice(i, 1); } else { filter.stars.push(d); }
+      filter.stars.sort(function (a, b) { return a - b; });
+      applyFilter();
+      return;
+    }
+    var preset = e.target.closest('.preset');
+    if (!preset) return;
+    var kind = preset.dataset.preset;
     var groups = CFG.topic_groups || [];
     var wanted = [];
-    if (preset === 'all') {
-      groups.forEach(function (g) { wanted = wanted.concat(g.topics); });
-    } else if (preset === 'micro' || preset === 'macro') {
+    if (kind === 'all') {
       groups.forEach(function (g) {
-        if (g.key === preset) wanted = wanted.concat(g.topics);
+        wanted = wanted.concat(g.topics.map(function (t) { return t.name || t; }));
+      });
+    } else if (kind === 'micro') {
+      groups.forEach(function (g) {
+        if (g.key === 'micro') {
+          wanted = wanted.concat(g.topics.map(function (t) { return t.name || t; }));
+        }
+      });
+    } else if (kind === 'macro') {
+      groups.forEach(function (g) {
+        if (g.key === 'macro' || g.key === 'world') {
+          wanted = wanted.concat(g.topics.map(function (t) { return t.name || t; }));
+        }
       });
     }
-    filter.topics = wanted;   // 'none' оставляет пустой список = все темы
-    saveFilter();
-    syncFilterControls();
+    filter.topics = wanted;
+    applyFilter();
   });
-  syncFilterControls();
+
 
   /* Забег — обычный или целевой («работа над ошибками»): отличается
      только эндпоинтом старта, дальше всё то же самое. Темы и пропорцию
@@ -4277,7 +4676,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      как в любом забеге. */
   (function initAutoSet() {
     if (!AUTO_SET) return;
-    ['mode-grid', 'setup-bar', 'setup-panel', 'entry-row',
+    ['mode-grid', 'filter-bar', 'filter-chips', 'filter-note', 'entry-row',
      'records-box'].forEach(function (id) {
       var el = $(id);
       if (el) el.hidden = true;
