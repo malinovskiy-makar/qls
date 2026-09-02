@@ -1322,6 +1322,13 @@ body.figfull .vignette.alarm { opacity: .42; }
   font-variant-numeric: tabular-nums;
 }
 .metric > span { font-size: 13px; color: var(--text3); }
+.acc-note {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text3);
+}
+.acc-note[hidden] { display: none; }
 .metric-main b.final-score {
   font-size: 38px;
   letter-spacing: -1.5px;
@@ -1835,6 +1842,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <div class="metric metric-main">
           <small>Итоговый счёт</small>
           <b class="final-score" id="final-score">0</b>
+          <span class="acc-note" id="acc-note" hidden></span>
           <span class="record-badge" id="record-badge"><span class="qi-slot"></span> личный рекорд</span>
         </div>
         <div class="metric">
@@ -2034,8 +2042,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (over) over.innerHTML = ICONS.heart || '';
   })();
 
-  /* Рекорды — отдельно на режим; старый общий ключ считаем рекордом блица */
-  function bestKey(m) { return 'econ_rush_best_' + m; }
+  /* Рекорды — отдельно на режим.
+     ⚠️ КЛЮЧ НОВЫЙ (…_v2_…), и это не косметика. Экономика поменялась
+     целиком: в версии 1 очки были «100 × комбо», в версии 2 они зависят от
+     сложности, скорости и точности. Смешать два рекорда в одном ключе
+     значило бы сравнивать килограммы с километрами — старый рекорд
+     навсегда остался бы непобиваемым или, наоборот, мусорным.
+     Старые ключи не трогаем: они просто перестают читаться. */
+  function bestKey(m) { return 'econrush_best_v2_' + m; }
 
   /* История забегов — для графика «сравнение с прошлыми играми». Раньше
      в localStorage жил только рекорд, истории не было совсем. Храним
@@ -2606,7 +2620,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('hud-score').textContent = score.toLocaleString('ru-RU');
     var mult = comboMult(streak);
     var combo = $('hud-combo');
-    combo.innerHTML = (ICONS.flame || '') + ' ×' + mult;
+    combo.innerHTML = (ICONS.flame || '') + ' ×' + multText(mult);
     combo.classList.toggle('hot', mult > 1);
     combo.classList.toggle('show', mult > 1);
     var fill = $('time-fill');
@@ -2670,11 +2684,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   function comboMult(s) {
-    var steps = CFG.combo_steps; // [[9,4],[6,3],[3,2]]
+    var steps = CFG.combo_steps; // v2: [[12,2],[9,1.75],[6,1.5],[3,1.25]]
     for (var i = 0; i < steps.length; i++) {
       if (s >= steps[i][0]) return steps[i][1];
     }
     return 1;
+  }
+
+  /* Множители в v2 ДРОБНЫЕ. Печатать их как есть нельзя: «×1.25» —
+     чужая для русского текста точка, а «×1,50» — лишний ноль. */
+  function multText(m) {
+    return (Math.round(m * 100) / 100).toLocaleString('ru-RU');
   }
 
   /* ---------- ВОПРОСЫ ---------- */
@@ -2968,7 +2988,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     card.classList.add('flash-bad');
     // solution приходит только у сгенерированных вопросов (после ответа) —
     // «Разобрать ошибки» показывает его вместо ссылки в каталог.
-    misses.push({ q: q, solution: (d && d.solution) || null,
+    // ⚠️ `problem_id` берём из ОТВЕТА, а не из вопроса: в вопросе его
+    // больше нет (по нему задача открывалась в каталоге вместе с ответом
+    // ещё до того, как игрок ответил).
+    misses.push({ q: q, problemId: (d && d.problem_id) || null,
+                  solution: (d && d.solution) || null,
                   figure: (d && d.figure) || null,
                   // эталонный чертёж режима «График»: разбор показывает
                   // «как было в решении» и «как правильно» рядом
@@ -3193,7 +3217,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var prev = comboMult(streak - 1);
     if (mult > prev) {
       var t = $('combo-toast');
-      t.textContent = 'Комбо ×' + mult + '!';
+      t.textContent = 'Комбо ×' + multText(mult) + '!';
       t.classList.remove('on');
       void t.offsetWidth;
       t.classList.add('on');
@@ -3386,6 +3410,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('st-lives-sub').textContent = lost
       ? lost + ' ' + plural(lost, ['потеряна', 'потеряно', 'потеряно'])
       : 'целы';
+
+    /* ⚠️ ТОЧНОСТЬ СНИЖАЕТ ИТОГ, и игрок обязан видеть, где потерял. В HUD
+       во время забега идут СЫРЫЕ очки (сумма за ответы), а на этом экране
+       стоит ИТОГ. Без этой строки разница выглядела бы как ошибка счёта. */
+    var accNote = $('acc-note');
+    if (accNote) {
+      var raw = s.raw_score != null ? s.raw_score : s.score;
+      var mult = s.accuracy_mult != null ? s.accuracy_mult : 1;
+      if (mult >= 1 || raw === s.score) {
+        accNote.textContent = 'Точность ' + s.accuracy + ' %: итог без потерь';
+      } else {
+        accNote.textContent = 'Очки ' + raw.toLocaleString('ru-RU')
+          + ' · ×' + multText(mult) + ' за точность ' + s.accuracy + ' % → итог '
+          + s.score.toLocaleString('ru-RU');
+      }
+      accNote.hidden = false;
+    }
 
     /* рекорд — посчитан в endRun (см. там про «событие, а не состояние») */
     $('record-badge').classList.toggle('on', isRecord);
@@ -3588,7 +3629,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         li.appendChild(sol);
       } else {
         var a = document.createElement('a');
-        a.href = '/catalog/' + m.q.problem_id + '/';
+        a.href = '/catalog/' + m.problemId + '/';
         a.textContent = 'Открыть задачу →';
         a.target = '_blank';
         li.appendChild(a);

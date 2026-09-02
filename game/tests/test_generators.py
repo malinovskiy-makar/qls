@@ -580,7 +580,11 @@ class ServingTests(TestCase):
             q = resp.json()['question']
             self.assertEqual(q['id'], gq.pk)
             self.assertTrue(q['generated'])
-            self.assertIsNone(q['problem_id'])
+            # ⚠️ Анти-чит v2: `problem_id` не приходит в вопросе ВООБЩЕ.
+            # По нему задача открывалась в каталоге вместе с ответом — то
+            # есть подсмотреть можно было ДО ответа. Теперь он есть только
+            # в ответе api_answer, когда отвечать уже поздно.
+            self.assertNotIn('problem_id', q)
             self.assertEqual(q.get('unit'), u'ден. ед.')
             # анти-чит: ни ответа, ни решения в payload вопроса
             payload_text = str(q)

@@ -101,11 +101,15 @@ class LastLifeTests(TestCase):
         return self.client.get(reverse('game:question')).json()['question']['id']
 
     def test_multiplier_applies_only_on_the_last_life(self):
+        """⚠️ Переведён на экономику v2. Абсолютные числа здесь больше не
+        сверяются — их сторожит game/tests/test_scoring.py по контрольным
+        значениям задания. Здесь проверяется ОТНОШЕНИЕ: тот же вопрос на
+        последней жизни стоит ровно в LAST_LIFE_MULTIPLIER раз дороже."""
         d = self.client.get(reverse('game:session_start'),
                             {'mode': 'blitz'}).json()
         qid = d['question']['id']
         first = self._answer(qid, 0)          # 3 жизни — множителя нет
-        self.assertEqual(first['points'], config.BASE_POINTS)
+        self.assertGreater(first['points'], 0)
 
         # две ошибки → осталась одна жизнь
         for _ in range(2):
@@ -114,8 +118,10 @@ class LastLifeTests(TestCase):
         qid = self._next()
         last = self._answer(qid, 0)
         self.assertEqual(last['lives'], 1)
-        self.assertEqual(last['points'],
-                         config.BASE_POINTS * config.LAST_LIFE_MULTIPLIER)
+        # Серия после двух ошибок снова 1, вопросы одинаковые, время ответа
+        # в тесте пренебрежимо мало у обоих — остаётся только множитель.
+        self.assertAlmostEqual(last['points'] / first['points'],
+                               config.LAST_LIFE_MULTIPLIER, places=2)
 
     def test_client_gets_the_multiplier_from_config(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
@@ -125,33 +131,40 @@ class LastLifeTests(TestCase):
 
 
 class PointsByDifficultyTests(TestCase):
-    """Задел под очки по сложности: механизм есть, поведение не меняется."""
+    """Очки по сложности ВКЛЮЧЕНЫ (экономика v2).
 
-    def test_values_are_neutral_today(self):
-        self.assertEqual(set(config.POINTS_BY_DIFFICULTY.values()),
-                         {config.BASE_POINTS})
+    Раньше здесь был задел с нейтральными значениями: таблица существовала,
+    но все пятеро стоили одинаково. Задача «включить очки по сложности
+    после накопления статистики» закрыта — таблица боевая.
+    """
 
-    def test_every_level_has_a_value(self):
-        for level in range(config.DIFFICULTY_MIN, config.DIFFICULTY_MAX + 1):
-            self.assertIn(level, config.POINTS_BY_DIFFICULTY)
+    def test_every_level_has_its_own_price(self):
+        vals = [config.BASE_BY_DIFFICULTY[d]
+                for d in range(config.DIFFICULTY_MIN, config.DIFFICULTY_MAX + 1)]
+        self.assertEqual(len(set(vals)), 5, 'сложности стоят одинаково')
+        self.assertEqual(vals, sorted(vals), 'дороже должно быть сложнее')
 
     def test_scoring_goes_through_the_table(self):
-        """Начисление читает таблицу — иначе включить её потом можно будет
-        только переписыванием api_answer."""
+        """Начисление читает таблицу, а не константу."""
         make_q(difficulty=5)
         d = self.client.get(reverse('game:session_start'),
                             {'mode': 'blitz'}).json()
-        with self.settings():
-            config.POINTS_BY_DIFFICULTY[5] = 250
-            try:
-                body = self.client.post(
-                    reverse('game:answer'),
-                    json.dumps({'question_id': d['question']['id'],
-                                'choice': 0}),
-                    content_type='application/json').json()
-                self.assertEqual(body['points'], 250)
-            finally:
-                config.POINTS_BY_DIFFICULTY[5] = config.BASE_POINTS
+        body = self.client.post(
+            reverse('game:answer'),
+            json.dumps({'question_id': d['question']['id'], 'choice': 0}),
+            content_type='application/json').json()
+        # 5★ отвечен мгновенно и без фильтров: база 250, бонус за скорость
+        # и ×1,3 за отсутствие фильтров — итог заведомо больше базы 3★.
+        self.assertGreater(body['points'], config.BASE_BY_DIFFICULTY[3])
+
+    def test_client_gets_the_table_not_a_single_number(self):
+        """Подсказки на экране обязаны знать реальные цены сложностей."""
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        cfg = json.loads(html.split('var CFG = ', 1)[1].split(';\n', 1)[0])
+        self.assertEqual({int(k): v for k, v in
+                          cfg['base_by_difficulty'].items()},
+                         config.BASE_BY_DIFFICULTY)
+        self.assertEqual(cfg['economy_version'], config.ECONOMY_VERSION)
 
 
 class SoundModuleTests(TestCase):

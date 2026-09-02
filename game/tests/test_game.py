@@ -248,8 +248,22 @@ class ExtractQuestionTests(TestCase):
 
 class ComboTests(TestCase):
     def test_combo_multiplier_steps(self):
-        self.assertEqual([combo_multiplier(s) for s in (0, 1, 2, 3, 5, 6, 8, 9, 20)],
-                         [1, 1, 1, 2, 2, 3, 3, 4, 4])
+        """Экономика v2: ступени положе (×1,25 … ×2 вместо ×2 … ×4).
+
+        При ×4 одна удачная серия перевешивала весь остальной забег, и
+        набирать её выгоднее было на лёгких вопросах, чем честно играть.
+        """
+        got = [combo_multiplier(s)
+               for s in (0, 1, 2, 3, 5, 6, 8, 9, 11, 12, 20)]
+        self.assertEqual(
+            got, [1.0, 1.0, 1.0, 1.25, 1.25, 1.5, 1.5, 1.75, 1.75, 2.0, 2.0])
+
+    def test_multiplier_never_drops_as_the_streak_grows(self):
+        prev = 0
+        for s in range(0, 30):
+            cur = combo_multiplier(s)
+            self.assertGreaterEqual(cur, prev)
+            prev = cur
 
 
 class GameApiTests(TestCase):
@@ -296,7 +310,10 @@ class GameApiTests(TestCase):
         d = r.json()
         self.assertTrue(d['correct'])
         self.assertEqual(d['correct_index'], 0)
-        self.assertEqual(d['time_delta'], 5)   # блиц (режим по умолчанию)
+        # ⚠️ Экономика v2: прибавка идёт СО СКИДКОЙ за лёгкость. Вопрос
+        # теста 2★, у 2★ доля 0,5: блиц +5 с → 5 × 0,5 = 2,5 → 3 с.
+        # Без скидки выгодно было бы отфильтровать пул до одних лёгких.
+        self.assertEqual(d['time_delta'], 3)   # блиц, 2★
         # следующий вопрос — неверный ответ
         q2 = self.client.get('/game/api/question/').json()['question']
         d2 = self.client.post('/game/api/answer/',
@@ -445,8 +462,11 @@ class LivesTests(TestCase):
     def test_skip_touches_nothing(self):
         """Пропуск: жизни целы, время цело, комбо цело."""
         qid = self.start()['question']['id']
-        for _ in range(3):          # набираем серию 3 → множитель ×2
-            self.answer(qid, 0)
+        first_points = None
+        for _ in range(3):          # набираем серию 3 → ступень ×1,25
+            got = self.answer(qid, 0).json()
+            if first_points is None:
+                first_points = got['points']    # серия 1, множителя нет
             qid = self.next_id()
         d = self.client.post(
             '/game/api/answer/', json.dumps({'question_id': qid, 'choice': None}),
@@ -458,7 +478,12 @@ class LivesTests(TestCase):
         # и следующий верный идёт уже по множителю ×2 (серия продолжилась)
         d2 = self.answer(self.next_id(), 0).json()
         self.assertEqual(d2['streak'], 4)
-        self.assertEqual(d2['points'], 200)
+        # ⚠️ Сверяем ОТНОШЕНИЕ, а не абсолютное число: в v2 очки зависят от
+        # времени ответа, а оно на медленной машине другое. Точные числа
+        # экономики сторожит game/tests/test_scoring.py по значениям из
+        # задания владельца. Здесь важно одно: серия пережила пропуск и
+        # следующий верный пошёл уже по ступени ×1,25.
+        self.assertAlmostEqual(d2['points'] / first_points, 1.25, places=2)
 
     def test_wrong_breaks_combo(self):
         qid = self.start()['question']['id']
@@ -470,7 +495,13 @@ class LivesTests(TestCase):
         self.assertEqual(d['best_streak'], 3)  # лучшая серия помнится
 
     def test_score_counted_by_server_with_multiplier(self):
-        """Очки считает сервер: 100 × множитель серии."""
+        """Очки считает СЕРВЕР, и ступень серии на них видна.
+
+        ⚠️ Экономика v2: абсолютные числа зависят от времени ответа, и на
+        медленной машине они другие. Поэтому здесь сверяются ступени
+        (отношения) и накопление, а точные значения — в test_scoring.py по
+        контрольным числам задания.
+        """
         qid = self.start()['question']['id']
         points, score = [], 0
         for _ in range(4):
@@ -478,9 +509,11 @@ class LivesTests(TestCase):
             points.append(d['points'])
             score = d['score']
             qid = self.next_id()
-        # серии 1,2 → ×1; серии 3,4 → ×2
-        self.assertEqual(points, [100, 100, 200, 200])
-        self.assertEqual(score, 600)
+        # серии 1 и 2 — множителя нет; серии 3 и 4 — ступень ×1,25
+        self.assertEqual(points[0], points[1])
+        self.assertEqual(points[2], points[3])
+        self.assertAlmostEqual(points[2] / points[0], 1.25, places=2)
+        self.assertEqual(score, sum(points))
 
     def test_lives_remain_while_run_continues(self):
         """Две ошибки — забег жив: конец только по жизням в ноль."""
@@ -628,7 +661,7 @@ class SummaryTests(TestCase):
     def test_max_combo_is_multiplier_of_best_streak(self):
         s = build_summary(fake_state([log_row()], best_streak=7))
         self.assertEqual(s['best_streak'], 7)
-        self.assertEqual(s['max_multiplier'], 3)   # серия 6..8 → ×3
+        self.assertEqual(s['max_multiplier'], 1.5)  # v2: серия 6..8 → ×1,5
 
     def test_curves_follow_question_order(self):
         s = build_summary(fake_state([
@@ -1008,7 +1041,9 @@ class ResultPageTests(TestCase):
         # ссылка АБСОЛЮТНАЯ — иначе в мессенджере не откроется
         self.assertTrue(d['share']['url'].startswith('http://'))
         self.assertIn('/game/r/' + r.code + '/', d['share']['url'])
-        self.assertEqual(r.score, 100)
+        # v2: счёт зависит от сложности, скорости и точности — сверяем
+        # не константу, а то, что в базу лёг ИТОГ сводки.
+        self.assertGreater(r.score, 0)
         self.assertEqual((r.correct_count, r.total_count), (1, 1))
         self.assertEqual(r.topic_breakdown[0]['topic'], 'Эластичность')
 
@@ -1035,7 +1070,8 @@ class ResultPageTests(TestCase):
                     'twitter:card']:
             self.assertIn(tag, html)
         self.assertIn('summary_large_image', html)
-        self.assertIn('100 очков в Wecon Rush', html)   # счёт в тексте превью
+        summary = d['summary']
+        self.assertIn('%d очков в Wecon Rush' % summary['score'], html)
         # og:url и og:image — абсолютные
         m = re.search(r'property="og:url" content="([^"]+)"', html)
         self.assertTrue(m.group(1).startswith('http://'))
@@ -1440,7 +1476,9 @@ class MultiAnswerTests(TestCase):
     def test_full_match_correct_any_order(self):
         d = self.start_and_answer({'choices': [2, 0]}).json()
         self.assertTrue(d['correct'])
-        self.assertEqual(d['time_delta'], MODES['rapid']['time_correct'])
+        # v2: 2★ дают половину прибавки — рапид +15 с → 8 с (7,5 вверх).
+        self.assertEqual(d['time_delta'],
+                         round(MODES['rapid']['time_correct'] * 0.5))
         self.assertEqual(d['correct_indices'], [0, 2])
 
     def test_partial_subset_wrong(self):
@@ -1481,7 +1519,9 @@ class NumericAnswerTests(TestCase):
         for given in ('0,1', '0.1', '1/10'):
             d = self.start_and_answer('0.1', given).json()
             self.assertTrue(d['correct'], given)
-            self.assertEqual(d['time_delta'], MODES['classic']['time_correct'])
+            # v2: 2★ дают половину прибавки — классика +30 с → 15 с.
+            self.assertEqual(d['time_delta'],
+                             round(MODES['classic']['time_correct'] * 0.5))
             self.assertEqual(d['correct_value'], '0.1')
 
     def test_inexact_decimal_wrong(self):

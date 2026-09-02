@@ -22,6 +22,7 @@
 import datetime
 import json
 import random
+import time
 from fractions import Fraction
 from urllib.parse import quote
 
@@ -43,7 +44,7 @@ from . import sources as game_sources
 from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
-from . import config, stats as stats_mod
+from . import config, scoring, stats as stats_mod
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
@@ -170,6 +171,18 @@ def parse_filter(request):
     if f['dmin'] > f['dmax']:            # ползунок перевернули — не спорим
         f['dmin'], f['dmax'] = f['dmax'], f['dmin']
     return f
+
+
+def is_empty_filter(f):
+    """Забег БЕЗ ЕДИНОГО фильтра — по всем измерениям сразу.
+
+    ⚠️ Именно это, а не «фильтр не передали в адресе», даёт множитель
+    SCOPE_MULTIPLIER. Адрес подделывается, состояние забега — нет.
+    """
+    f = normalize_filter(f)
+    return (not f['topics'] and not f['sources']
+            and f['dmin'] == config.DIFFICULTY_MIN
+            and f['dmax'] == config.DIFFICULTY_MAX)
 
 
 def normalize_filter(f):
@@ -300,8 +313,14 @@ def _game_page_context(request):
             'modes': {key: _mode_payload(key) for key in config.MODES},
             'default_mode': config.DEFAULT_MODE,
             'pool_counts': pool_counts,
-            'base_points': config.BASE_POINTS,
+            'economy_version': config.ECONOMY_VERSION,
+            'base_by_difficulty': config.BASE_BY_DIFFICULTY,
             'combo_steps': config.COMBO_STEPS,
+            'scope_multiplier': config.SCOPE_MULTIPLIER,
+            'speed_bonus_max': config.SPEED_BONUS_MAX,
+            'accuracy_full_at': config.ACCURACY_FULL_AT,
+            'accuracy_floor_at': config.ACCURACY_FLOOR_AT,
+            'accuracy_min_mult': config.ACCURACY_MIN_MULT,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
             'last_life_multiplier': config.LAST_LIFE_MULTIPLIER,
             'difficulty_min': config.DIFFICULTY_MIN,
@@ -331,8 +350,11 @@ def _question_payload(gq, number):
         'question': gq.question,
         'options': gq.options,
         'topics': gq.topics,
-        'problem_id': gq.problem_id,     # None у сгенерированных
-        'generated': gq.is_generated,    # чип «Тренировочный» на карточке
+        # ⚠️ `problem_id` СЮДА НЕ ВХОДИТ. По нему задача открывается в
+        # каталоге вместе с ответом и решением — то есть ответ можно было
+        # посмотреть ДО того, как ответишь. Ссылку «в каталог» клиент
+        # собирает из ответа api_answer, когда отвечать уже поздно.
+        'generated': gq.is_generated,    # строка «Вопрос сгенерирован ИИ»
     }
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
@@ -403,6 +425,8 @@ def _remember_seen(request, state, gq):
     state.setdefault('first_seen', {})[str(gq.id)] = gq.id not in counted
 
     state['seen'].append(gq.id)
+    # Момент выдачи — серверными часами. Отсюда считается время ответа.
+    state.setdefault('issued_at', {})[str(gq.id)] = time.time()
     seen_map = request.session.get(SEEN_KEY) or {}
     mode_seen = list(seen_map.get(mode, [])) + [gq.id]
     seen_map[mode] = mode_seen[-SEEN_LIMIT:]
@@ -462,6 +486,14 @@ def _new_state(mode, topic, run_filter=None):
         # Ставится при выдаче (см. _remember_seen), читается при ответе:
         # в статистику вопроса идут ТОЛЬКО первые встречи.
         'first_seen': {},
+        # ⚠️ {id вопроса: момент выдачи}. Время ответа считает СЕРВЕР, а не
+        # клиент: клиентское `elapsed_ms` приходит из браузера игрока и в
+        # очки входить не может — его подделывает любой, кто откроет консоль.
+        # Клиентское остаётся только для показа в статистике.
+        'issued_at': {},
+        # Сколько секунд забег уже получил прибавкой за верные ответы.
+        # Нужно для потолка: без него Классика становится бесконечной.
+        'bonus_total': 0,
         # Журнал забега: по записи на КАЖДЫЙ сыгранный вопрос, в порядке
         # игры. Из него целиком считается сводка (см. build_summary) —
         # отдельных счётчиков «сколько ошибок в теме» не заводим, иначе
@@ -672,11 +704,20 @@ def build_summary(state):
         buckets.append({'title': title, 'count': n})
 
     best_streak = state.get('best_streak', 0)
+    # ⚠️ ТРИ РАЗНЫХ ЧИСЛА, И ПУТАТЬ ИХ НЕЛЬЗЯ. `raw_score` — то, что игрок
+    # видел в HUD во время забега (сумма очков за ответы). `accuracy_mult` —
+    # множитель за точность. `score` — ИТОГ, он и идёт в рекорд и в таблицу.
+    raw = state.get('score', 0)
+    acc_mult = scoring.accuracy_multiplier(correct, wrong)
+    final = scoring.final_score(raw, correct, wrong)
     return {
         'mode': state['mode'],
         'mode_title': config.MODES[state['mode']]['title'],
         'topic': state.get('topic'),
-        'score': state.get('score', 0),
+        'economy_version': config.ECONOMY_VERSION,
+        'raw_score': raw,
+        'accuracy_mult': round(acc_mult, 3),
+        'score': final,
         'correct': correct,
         'wrong': wrong,
         'skipped': skipped,
@@ -741,24 +782,37 @@ def api_answer(request):
     is_skip, correct = checked
 
     mode_cfg = config.MODES[state['mode']]
+    mode_key = state['mode']
     points = 0
+    # Эффективная сложность: измеренная, если попыток набралось, иначе
+    # хранимая. Пишем в журнал ОБЕ — по хранимой строится разбор, по
+    # эффективной начислены очки, и они могут расходиться.
+    diff_eff = stats_mod.effective_difficulty(gq)
+    # ⚠️ Время ответа — СЕРВЕРНОЕ. Отсутствие метки (старая сессия, ответ
+    # на вопрос из прошлого забега) трактуем как «долго»: бонуса нет.
+    issued = (state.get('issued_at') or {}).get(str(qid))
+    elapsed_server = (time.time() - issued) if issued else None
+    # ⚠️ Забег без ЕДИНОГО фильтра получает ×1,3. Проверяем по состоянию, а
+    # не по адресу старта: адрес можно подделать, состояние — нет.
+    unfiltered = is_empty_filter(state.get('filter'))
+    lives_before = state['lives']
     if is_skip:
         # Пропуск безопасен: жизнь цела, комбо цело, время не трогаем.
         result = 'skip'
         delta = mode_cfg['time_skip']
     elif correct:
         result = 'correct'
-        delta = mode_cfg['time_correct']
         state['streak'] += 1
         state['best_streak'] = max(state['best_streak'], state['streak'])
-        # Очки: база по сложности вопроса (сегодня везде одинаковая — это
-        # задел, см. config.POINTS_BY_DIFFICULTY) × множитель комбо ×
-        # множитель последней жизни. Считает СЕРВЕР, клиент только рисует.
-        base = config.points_for(stats_mod.effective_difficulty(gq))
-        points = base * config.combo_multiplier(state['streak'])
-        if state['lives'] == 1:
-            points *= config.LAST_LIFE_MULTIPLIER
+        # Очки считает СЕРВЕР по game/scoring.py, клиент только рисует.
+        points = scoring.question_points(
+            mode_key, diff_eff, gq.question, elapsed_server,
+            state['streak'], lives_before, unfiltered)
         state['score'] += points
+        # Прибавка времени — со скидкой за лёгкость и с потолком на забег.
+        delta = scoring.time_bonus(mode_key, diff_eff,
+                                   state.get('bonus_total', 0))
+        state['bonus_total'] = state.get('bonus_total', 0) + delta
     else:
         # Ошибка: минус жизнь и комбо в ноль. Время НЕ трогаем —
         # наказание одно, а не два.
@@ -766,6 +820,8 @@ def api_answer(request):
         delta = mode_cfg['time_wrong']
         state['streak'] = 0
         state['lives'] = max(0, state['lives'] - 1)
+    state['wrong_count'] = state.get('wrong_count', 0) + (1 if result == 'wrong' else 0)
+    state['skip_count'] = state.get('skip_count', 0) + (1 if result == 'skip' else 0)
 
     state['answered'][str(qid)] = result
     number = state['seen'].index(qid) + 1   # номер вопроса в забеге
@@ -781,9 +837,17 @@ def api_answer(request):
         'number': number,
         'topics': gq.topics or [],
         'difficulty': gq.difficulty,
+        # Сложность, по которой НАЧИСЛЕНЫ очки. Может отличаться от
+        # хранимой: измеренная перебивает её при STATS_MIN_ATTEMPTS попыток.
+        'difficulty_effective': diff_eff,
         'question_type': gq.question_type,
         'outcome': result,
+        # Клиентское время — ТОЛЬКО для показа в статистике; в очки идёт
+        # серверное (elapsed_server_ms).
         'elapsed_ms': elapsed_ms,
+        'elapsed_server_ms': (int(elapsed_server * 1000)
+                              if elapsed_server is not None else None),
+        'points': points,
         'running_score': state['score'],
         'running_combo': state['streak'],
         'lives_after': state['lives'],
@@ -812,6 +876,9 @@ def api_answer(request):
         'best_streak': state['best_streak'],
         'lives': state['lives'],
     }
+    # Ссылка «в каталог» собирается клиентом ОТСЮДА: в payload вопроса
+    # `problem_id` нет намеренно (по нему открывалась задача с ответом).
+    payload['problem_id'] = gq.problem_id      # None у сгенерированных
     if state['ended'] == 'lives':
         payload['game_over'] = {'reason': 'lives', 'question_number': number}
     # Правда о правильном ответе — только теперь, когда вопрос сыгран.
@@ -1639,7 +1706,7 @@ def result_page(request, code):
         'page_url': page_url,
         'game_url': request.build_absolute_uri(reverse('game:page')),
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': f'{result.score} очков в Wecon Rush — обгонишь?',
+        'og_title': f'{result.score} очков в Wecon Rush – обгонишь?',
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),
