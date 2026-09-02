@@ -97,4 +97,65 @@
   </p>
 </section>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Этапы олимпиады</h2>
+  {% if stages %}
+  <div class="ol-tablewrap">
+    <table class="ol-table">
+      <thead>
+        <tr>
+          <th>Этап</th><th>Время</th><th>Максимум баллов</th>
+          <th>Тестовая часть</th><th>Популярно</th><th>Место проведения</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stage in stages %}
+        <tr>
+          <td>{{ stage.name }}</td>
+          <td>{% if stage.duration_minutes %}{{ stage.duration_minutes }} мин{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>{% if stage.max_score %}{{ stage.max_score }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>{% if stage.has_test_part is None %}<span class="ol-mute">—</span>{% elif stage.has_test_part %}Есть{% else %}Нет{% endif %}</td>
+          <td>
+            {% if stage.top_topic %}
+              {% if stage.topic_histogram %}
+              <span class="ol-pop">
+                <button type="button" class="ol-pop-btn">{{ stage.top_topic }}</button>
+                <span class="ol-pop-box" role="tooltip">
+                  <span class="ol-pop-title">Из чего состоит этап</span>
+                  {% for row in stage.topic_histogram %}
+                  <span class="ol-bar">
+                    <span class="ol-bar-name">{{ row.topic }}</span>
+                    <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {% widthratio row.share 1 100 %}%;"></span></span>
+                    <span class="ol-bar-num">{% widthratio row.share 1 100 %}%</span>
+                  </span>
+                  {% endfor %}
+                </span>
+              </span>
+              {% else %}{{ stage.top_topic }}{% endif %}
+            {% else %}
+              <span class="ol-mute">после разметки</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if stage.cities_overflow %}
+            <span class="ol-pop">
+              <button type="button" class="ol-pop-btn">{{ stage.cities_label }}</button>
+              <span class="ol-pop-box" role="tooltip">
+                <span class="ol-pop-title">Все площадки</span>
+                {% for city in stage.cities_overflow %}<span class="ol-pop-city">{{ city }}</span>{% endfor %}
+              </span>
+            </span>
+            {% elif stage.cities_label %}{{ stage.cities_label }}
+            {% else %}<span class="ol-mute">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="ol-empty">Устройство этапов пока не описано.</p>
+  {% endif %}
+</section>
+
 {% endblock %}

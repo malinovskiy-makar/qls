@@ -315,3 +315,44 @@
   font-size: 13px;
   max-width: var(--w-read);
 }
+
+/* ── Подсказка-бокс ─────────────────────────────────── */
+/* ⚠️ ЕДИНСТВЕННОЕ МЕСТО РАЗДЕЛА, ГДЕ ТЕНЬ РАЗРЕШЕНА. Этот бокс
+   физически висит НАД страницей, и без тени непонятно, что он не часть
+   таблицы. У поверхностей в покое и под курсором тени по-прежнему нет. */
+.ol-pop { position: relative; display: inline-block; }
+.ol-pop-btn {
+  font: inherit; font-size: 14px; cursor: help;
+  background: none; border: 0; padding: 0; text-align: left;
+  color: var(--text);
+  border-bottom: var(--line) dashed var(--border);
+}
+.ol-pop-box {
+  display: none; position: absolute; z-index: 50;
+  left: 0; top: calc(100% + 6px); min-width: 240px; max-width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 12px 14px;
+  font-size: 12px;
+}
+.ol-pop:hover .ol-pop-box,
+.ol-pop:focus-within .ol-pop-box { display: block; }
+.ol-pop-title {
+  display: block; font-weight: 600; color: var(--text2);
+  margin-bottom: 8px;
+}
+.ol-pop-city { display: block; padding: 2px 0; }
+
+.ol-bar {
+  display: grid; grid-template-columns: 1fr 90px 34px;
+  align-items: center; gap: 8px; padding: 3px 0;
+}
+.ol-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-bar-track {
+  height: 8px; border-radius: var(--r-pill);
+  background: var(--surface-2); overflow: hidden;
+}
+.ol-bar-fill { display: block; height: 100%; background: var(--accent); }
+.ol-bar-num { text-align: right; color: var(--text2); }
