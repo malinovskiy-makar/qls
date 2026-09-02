@@ -281,9 +281,14 @@ def reading_length(text):
     return len(GOOD_ARRAY_RE.sub('[таблица]', text))
 
 
-def clean_question(problem, max_len=MAX_QUESTION_LEN):
-    """Чистит текст условия. Возвращает (question, причина_брака)."""
-    question = strip_label_debris(clean_text(problem.statement))
+def clean_question(problem, max_len=MAX_QUESTION_LEN, text=None):
+    """Чистит текст условия. Возвращает (question, причина_брака).
+
+    `text` подменяет problem.statement: у источников со встроенным блоком
+    «Варианты ответа:» вопросом служит только его голова, без вариантов.
+    """
+    source_text = problem.statement if text is None else text
+    question = strip_label_debris(clean_text(source_text))
     question = normalize_formulas(question)
     if len(question) < MIN_QUESTION_LEN:
         return None, 'условие слишком короткое'
@@ -309,11 +314,11 @@ def _has_glued_label(text):
     return bool(GLUED_LABEL_RE.search(text))
 
 
-def clean_options(parts):
-    """Чистит варианты ответа из подпунктов. Возвращает (options, причина).
+def clean_options(texts):
+    """Чистит варианты ответа. Возвращает (options, причина).
     Огрызки меток срезаем только у вопроса: у вариантов ответа ведущая цифра
     часто настоящее число («-$1400», «0.75%») — срезать метку там нельзя."""
-    options = [normalize_formulas(clean_text(p.statement)) for p in parts]
+    options = [normalize_formulas(clean_text(t)) for t in texts]
     if any(not o for o in options):
         return None, 'пустой вариант'
     if any(_has_glued_label(o) for o in options):
@@ -325,18 +330,86 @@ def clean_options(parts):
     return options, None
 
 
+# ── Варианты, вшитые в текст условия ────────────────────────────────────────
+# Так лежит SolveHub: подпунктов ProblemPart у него нет ни у одного теста
+# (2724 из 2729), а варианты стоят прямо в statement блоком «Варианты
+# ответа:», и Problem.answer называет правильный номером строки («3. дохода»).
+# Разбор сверен с сырой выгрузкой источника 2026-09-02: 2724 из 2729 совпали
+# и по составу вариантов, и по правильному ответу, ноль конфликтов; остальные
+# 5 потеряли блок вариантов ещё на импорте. Без этого разбора весь SolveHub
+# отсеивался с причиной «вариантов не 2–6», сколько бы типов ему ни проставили.
+INLINE_MARKER = 'Варианты ответа:'
+INLINE_OPTION_RE = re.compile(r'^\s*(\d{1,2})\.\s+(.*)$')
+
+
+def inline_choice(problem):
+    """Вопрос, варианты и позиции правильных из встроенного блока.
+
+    Возвращает (вопрос, options, positions) либо (None, None, None).
+    Нумерация обязана идти 1, 2, 3 подряд: дыра значит, что за варианты
+    принято что-то другое, и тогда честнее отказаться, чем угадывать.
+    """
+    statement = problem.statement or ''
+    if INLINE_MARKER not in statement:
+        return None, None, None
+    head, _, tail = statement.partition(INLINE_MARKER)
+    options = []
+    expected = 1
+    for line in tail.splitlines():
+        if not line.strip():
+            continue
+        matched = INLINE_OPTION_RE.match(line)
+        if not matched:
+            if options:            # перенос длинного варианта
+                options[-1] += ' ' + line.strip()
+                continue
+            return None, None, None
+        if int(matched.group(1)) != expected:
+            return None, None, None
+        options.append(matched.group(2).strip())
+        expected += 1
+    if not (MIN_OPTIONS <= len(options) <= MAX_OPTIONS):
+        return None, None, None
+
+    positions = []
+    for line in (problem.answer or '').splitlines():
+        matched = INLINE_OPTION_RE.match(line)
+        if matched:
+            index = int(matched.group(1)) - 1
+            if 0 <= index < len(options):
+                positions.append(index)
+    return head.strip(), options, sorted(set(positions))
+
+
+def choice_material(problem):
+    """Сырьё для вопроса с вариантами: подпункты либо встроенный блок.
+
+    Возвращает (голова_условия, тексты_вариантов, метки, позиции_правильных).
+    Голова None значит «вопрос это весь statement» (путь подпунктов),
+    позиции None значат «правильный определяется по меткам подпунктов».
+    """
+    parts = list(problem.parts.all())  # ordering = ['order', 'label']
+    if MIN_OPTIONS <= len(parts) <= MAX_OPTIONS:
+        return (None, [p.statement for p in parts],
+                [normalize_label(p.label) for p in parts], None)
+    head, options, positions = inline_choice(problem)
+    if options is None:
+        return None, None, None, None
+    return head, options, [str(i + 1) for i in range(len(options))], positions
+
+
 def extract_question(problem):
     # single: возвращает (question, options, correct_index, reason_отказа).
     # Любое сомнение → (None, None, None, 'причина').
-    parts = list(problem.parts.all())  # ordering = ['order', 'label']
-    if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
+    head, texts, labels, positions = choice_material(problem)
+    if texts is None:
         return None, None, None, 'вариантов не 2–6'
 
-    question, reason = clean_question(problem)
+    question, reason = clean_question(problem, text=head)
     if reason:
         return None, None, None, reason
 
-    options, reason = clean_options(parts)
+    options, reason = clean_options(texts)
     if reason:
         return None, None, None, reason
 
@@ -344,9 +417,15 @@ def extract_question(problem):
     if reason:
         return None, None, None, reason
 
+    if positions is not None:
+        # Путь встроенного блока: правильный назван номером строки в ответе.
+        if len(positions) != 1:
+            return None, None, None, 'правильный ответ не определён'
+        return question, options, positions[0], None
+
     # Правильный ответ: два независимых сигнала, при конфликте — брак.
+    parts = list(problem.parts.all())
     ans = normalize_label(problem.answer)
-    labels = [normalize_label(p.label) for p in parts]
     marks = [normalize_label(p.answer) == 'верно' for p in parts]
 
     idx_by_label = labels.index(ans) if ans and ans in labels else None
@@ -374,6 +453,20 @@ def extract_boolean(problem):
     независимо от порядка подпунктов в задаче."""
     parts = list(problem.parts.all())
     stmts = [normalize_label(p.statement) for p in parts]
+    if not parts:
+        # Данетка без подпунктов: утверждение это всё условие, а «Верно» или
+        # «Неверно» стоит прямо в Problem.answer. Так лежат 531 данетка
+        # SolveHub; с подпунктами их не сравнить, потому что подпунктов нет.
+        plain = normalize_label(problem.answer)
+        if plain not in ('верно', 'неверно'):
+            return None, None, BOOLEAN_FALLBACK
+        question, reason = clean_question(problem)
+        if reason:
+            return None, None, reason
+        reason = content_reason(question)
+        if reason:
+            return None, None, reason
+        return question, (0 if plain == 'верно' else 1), None
     if sorted(stmts) != ['верно', 'неверно']:
         return None, None, BOOLEAN_FALLBACK
 
@@ -401,23 +494,28 @@ def extract_multi(problem):
     """multi: возвращает (question, options, correct_indices, reason_отказа).
     Правильные — буквы из Problem.answer (строка вида «аб», «а, в»);
     любая буква без пары среди меток или ноль правильных = брак, не гадаем."""
-    parts = list(problem.parts.all())
-    if not (MIN_OPTIONS <= len(parts) <= MAX_OPTIONS):
+    head, texts, labels, positions = choice_material(problem)
+    if texts is None:
         return None, None, None, 'вариантов не 2–6'
 
-    question, reason = clean_question(problem)
+    question, reason = clean_question(problem, text=head)
     if reason:
         return None, None, None, reason
-    options, reason = clean_options(parts)
+    options, reason = clean_options(texts)
     if reason:
         return None, None, None, reason
     reason = content_reason(question + ' ' + ' '.join(options))
     if reason:
         return None, None, None, reason
 
-    labels = [normalize_label(p.label) for p in parts]
     if len(set(labels)) != len(labels):
         return None, None, None, 'метки дублируются'
+
+    if positions is not None:
+        # Путь встроенного блока: правильные названы номерами строк в ответе.
+        if not positions:
+            return None, None, None, 'правильный ответ не определён'
+        return question, options, positions, None
 
     letters = [ch for ch in normalize_label(problem.answer)
                if ch not in ANSWER_SEPARATORS]
