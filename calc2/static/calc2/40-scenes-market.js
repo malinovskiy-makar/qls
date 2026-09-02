@@ -338,7 +338,7 @@ function recompute() {
       let dwl = null;
       if (Qc != null) {                            // потери — площадь между D и MC от Qm до Qc
         const lo = Math.min(Qm, Qc), hi = Math.max(Qm, Qc);
-        dwl = areaBetween(q => evalCurve(STATE.D, q) - mcAt(q), lo, hi);
+        dwl = areaBetween(q => evalCurve(STATE.D, q) - mcFloor(mcAt(q)), lo, hi);
       }
       let profit = null;                           // прибыль (TR − TC) — только если задана ATC
       const ATC = curveByRole('atc');
@@ -346,8 +346,8 @@ function recompute() {
       // Области монополии (Задача 1) — все численным интегрированием от 0 до Qm.
       // Под спросом до Qm три слоя без перекрытия: VC (под MC), PS (MC..Pm), CS (Pm..D).
       const csM = integrate(q => evalCurve(STATE.D, q) - Pm, 0, Qm);  // ∫ (D − Pm) dQ — излишек потребителя
-      const vcM = integrate(q => mcAt(q), 0, Qm);                     // ∫ MC dQ — переменные издержки (VC(0)=0)
-      const psM = integrate(q => Pm - mcAt(q), 0, Qm);               // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
+      const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qm);           // ∫ max(0, MC) dQ — переменные издержки (VC(0)=0)
+      const psM = integrate(q => Pm - mcFloor(mcAt(q)), 0, Qm);      // ∫ (Pm − MC) dQ = TR − VC — излишек производителя
       STATE.mono = { Qm, Pm, mcAtQm, Qc, Pc, dwl, profit, csM, vcM, psM };
     }
   }
@@ -394,7 +394,7 @@ function recompute() {
          прибыли кусок из четвёртой четверти (для D = 100 − Q и MC = Q − 30 это
          ровно 450 при верной прибыли 3775). Нижняя граница — max(0, MC), та же,
          что у ЗАЛИВКИ в drawDiscr1: число и картинка обязаны совпадать. */
-      const profit = integrate(q => evalCurve(STATE.D, q) - Math.max(0, mcAt(q)), 0, Qcomp);
+      const profit = integrate(q => evalCurve(STATE.D, q) - mcFloor(mcAt(q)), 0, Qcomp);
       STATE.discr1 = { Qcomp, profit };   // CS=0, DWL=0
     }
   }

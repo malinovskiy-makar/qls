@@ -30,6 +30,26 @@ function mcAt(q) {
   return NaN;
 }
 
+/* ⚠️ НИЖНЯЯ ГРАНИЦА ЛЮБОЙ ПЛОЩАДИ ПОД ПРЕДЕЛЬНЫМИ ИЗДЕРЖКАМИ — ОДИН ПОМОЩНИК
+   НА ВСЕ СЮЖЕТЫ МОНОПОЛИИ.
+
+   Отрицательных предельных издержек не бывает: произвести единицу нельзя
+   дешевле, чем даром. Кривая MC вида Q − 20 уходит под ось Q, и площадь под
+   ней без обрезки ГАСИЛА САМА СЕБЯ: у D = 100 − Q переменные издержки
+   монополиста выходили ровно ноль (кусок под осью в точности съедал кусок над
+   ней), а вычтенный из выручки минус утекал в излишек производителя. Признак
+   болезни простой: PS + VC обязаны давать выручку TR, и без обрезки не давали.
+
+   Зовут его ЧИСЛА и ЗАЛИВКИ одинаково: поправить одно без другого значит
+   развести картинку с числом, а это хуже исходной ошибки (ADR 0057).
+
+   ⚠️ ОПТИМУМ ЭТОТ ПОМОЩНИК НЕ ТРОГАЕТ. Выпуск по-прежнему ищется на НАСТОЯЩЕЙ
+   кривой (MR = MC, D = MC, перебор кандидатов при потолке): решение
+   монополиста принимается по его собственным издержкам, а первая четверть —
+   правило ИЗМЕРЕНИЯ площади. Ровно так это уже сделано у дискриминации
+   1-й степени: Qcomp ищется по mcAt, а прибыль меряется от нуля. */
+function mcFloor(v) { return (v > 0) ? v : 0; }
+
 // Предельный доход MR(Q) = d(TR)/dQ, где TR = P(Q)·Q = D(Q)·Q.
 // Центральная разность точна для линейного спроса (даёт MR = a − 2bQ).
 function marginalRevenue(D, q) {
@@ -51,11 +71,11 @@ function drawMonopolyAreas() {
   if (m.Qm > 0) {
     const s1 = samp(0, m.Qm);
     if (STATE.showMonoVC) {   // VC — под кривой MC (от оси P=0 до MC). Нейтральный серо-голубой.
-      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d))));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
     }
     if (STATE.showMonoPS) {   // PS (TR − VC) — между MC (низ) и ценой Pm (верх). Красный, как PS конкуренции.
-      const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(m.Pm));
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(m.Pm));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
@@ -69,7 +89,7 @@ function drawMonopolyAreas() {
     const lo = Math.min(m.Qm, m.Qc), hi = Math.max(m.Qm, m.Qc);
     if (hi > lo) {
       const s2 = samp(lo, hi);
-      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(STATE.D, d)));
+      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(STATE.D, d)));
       g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
     }
   }
@@ -210,6 +230,11 @@ function monopolyCeiling(Pc) {
   }
   // Относительная прибыль R(Q) = ∫ (MR_eff − MC) dQ; MR_eff горизонтальна (=Pc) до Q̂, далее обычный MR.
   // Разрыв в Q̂ учитываем, разбивая интеграл.
+  /* ⚠️ ЗДЕСЬ mcFloor НЕ ЗОВЁТСЯ, И ЭТО НАРОЧНО. Rel — не показываемая площадь,
+     а ВЫБОР монополиста: он решает по своим настоящим издержкам. Первая
+     четверть — правило ИЗМЕРЕНИЯ площади, а не правило принятия решения; то же
+     разделение стоит у дискриминации 1-й степени (выпуск ищется по mcAt,
+     прибыль меряется от нуля) и у корня MR = MC в обычной монополии. */
   const Rel = (Q) => {
     const a = Math.min(Q, Qhat);
     let r = integrate(q => Pc - mcAt(q), 0, a);
@@ -232,12 +257,12 @@ function monopolyCeiling(Pc) {
   let dwl = null;
   if (Qc != null) {                              // потери — площадь между D и MC от Qstar до Qc
     const lo = Math.min(Qstar, Qc), hi = Math.max(Qstar, Qc);
-    dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi);
+    dwl = areaBetween(q => evalCurve(D, q) - mcFloor(mcAt(q)), lo, hi);
   }
   // Области CS/VC/PS до нового выпуска при новой цене (для табло и заливок).
   const csM = integrate(q => evalCurve(D, q) - price, 0, Qstar);
-  const vcM = integrate(q => mcAt(q), 0, Qstar);
-  const psM = integrate(q => price - mcAt(q), 0, Qstar);
+  const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qstar);
+  const psM = integrate(q => price - mcFloor(mcAt(q)), 0, Qstar);
   return { binding: true, Qstar, price, Qhat, shortage, Pc, dwl, csM, vcM, psM };
 }
 
@@ -250,13 +275,13 @@ function drawMonoCeilingAreas() {
   const Qs = mc.Qstar, P = mc.price;
   if (Qs > 1e-6) {
     const s1 = samp(0, Qs);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(P)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
     if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
   }
   if (m.Qc != null) {                            // DWL — между D и MC от Qstar до Qc
     const lo = Math.min(Qs, m.Qc), hi = Math.max(Qs, m.Qc);
-    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
   }
 }
 
@@ -350,11 +375,11 @@ function monopolyTax(shift) {
      и в излишек производителя НЕ входят, это перевод, а не излишек.
      Отсюда тождество CS + PS + сбор + DWL = весь общественный излишек
      (при субсидии расход вычитается). */
-  const vcM = integrate(q => mcAt(q), 0, Qt);
-  const psM = integrate(q => Pt - mcEff(q), 0, Qt);
+  const vcM = integrate(q => mcFloor(mcAt(q)), 0, Qt);
+  const psM = integrate(q => Pt - mcFloor(mcEff(q)), 0, Qt);
   // DWL — против эффективного выпуска (D = СОЦИАЛЬНАЯ MC, без ставки): вмешательство его увеличивает.
   let dwl = null;
-  if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi); }
+  if (m.Qc != null) { const lo = Math.min(Qt, m.Qc), hi = Math.max(Qt, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcFloor(mcAt(q)), lo, hi); }
   return { isTax, shift, rate, Qt, Pt, budget, csM, vcM, psM, dwl, mcAtQt: mcAt(Qt) };
 }
 
@@ -368,10 +393,10 @@ function monopolyFloor(Pf) {
   if (Q == null || !(Q >= 0)) return { binding: false, Pf, Q: m.Qm, price: m.Pm };
   const price = Pf;
   const csM = integrate(q => evalCurve(D, q) - price, 0, Q);
-  const vcM = integrate(q => mcAt(q), 0, Q);
-  const psM = integrate(q => price - mcAt(q), 0, Q);
+  const vcM = integrate(q => mcFloor(mcAt(q)), 0, Q);
+  const psM = integrate(q => price - mcFloor(mcAt(q)), 0, Q);
   let dwl = null;
-  if (m.Qc != null) { const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi); }
+  if (m.Qc != null) { const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc); dwl = areaBetween(q => evalCurve(D, q) - mcFloor(mcAt(q)), lo, hi); }
   return { binding: true, Pf, Q, price, csM, vcM, psM, dwl };
 }
 
@@ -416,14 +441,14 @@ function monopolyQuota(Qk) {
   const price = evalCurve(D, Q);          // максимальная цена, по которой берут Qk
   if (isNaN(price)) return null;
   const csM = integrate(q => evalCurve(D, q) - price, 0, Q);
-  const vcM = integrate(q => mcAt(q), 0, Q);
-  const psM = integrate(q => price - mcAt(q), 0, Q);
+  const vcM = integrate(q => mcFloor(mcAt(q)), 0, Q);
+  const psM = integrate(q => price - mcFloor(mcAt(q)), 0, Q);
   /* Потери считаются против ЭФФЕКТИВНОГО выпуска (D = MC), как и у остальных
      видов вмешательства в монополии: квота уводит выпуск дальше от него. */
   let dwl = null;
   if (m.Qc != null) {
     const lo = Math.min(Q, m.Qc), hi = Math.max(Q, m.Qc);
-    dwl = areaBetween(q => evalCurve(D, q) - mcAt(q), lo, hi);
+    dwl = areaBetween(q => evalCurve(D, q) - mcFloor(mcAt(q)), lo, hi);
   }
   return { binding: true, Qk, Q, price, csM, vcM, psM, dwl };
 }
@@ -436,15 +461,15 @@ function drawMonoQuotaAreas() {
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   if (qt.Q > 1e-6) {
     const s1 = samp(0, qt.Q);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(qt.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(qt.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
     if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(qt.price)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
   }
   if (m.Qc != null) {
     const lo = Math.min(qt.Q, m.Qc), hi = Math.max(qt.Q, m.Qc);
     if (hi > lo) {
       const s2 = samp(lo, hi);
-      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d)));
+      const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d)));
       g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
     }
   }
@@ -504,7 +529,7 @@ function naturalATC(q) {
   const eps = Math.max(1e-9, q * 1e-6);          // страховка: MC в самом нуле может быть NaN
   const m0 = mcAt(eps);
   if (isNaN(m0)) return NaN;
-  const vc = integrate(mcAt, eps, q, 400) + m0 * eps;
+  const vc = integrate(x => mcFloor(mcAt(x)), eps, q, 400) + mcFloor(m0) * eps;
   return isNaN(vc) ? NaN : (STATE.natFC + vc) / q;
 }
 
@@ -673,12 +698,12 @@ function drawMonoTaxAreas() {
     const s1 = samp(0, t.Qt);
     // VC — под СОЦИАЛЬНОЙ MC: издержки ресурсов настоящие, ставка их не меняет.
     if (STATE.showMonoVC) {
-      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d)));
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d))));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
     }
     // PS — между фактической границей (MC ± ставка) и ценой монополиста.
     if (STATE.showMonoPS) {
-      const a = d3.area().x(d => sx(d)).y0(d => sy(mcEff(d))).y1(sy(t.Pt));
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcEff(d)))).y1(sy(t.Pt));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
     }
     if (STATE.showMonoCS) {   // CS — между ценой Pt (низ) и спросом (верх)
@@ -686,13 +711,13 @@ function drawMonoTaxAreas() {
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
     }
     // Деньги бюджета — полоса между MC и MC±ставка на [0,Qt]; её площадь = ставка·Qt = бюджет.
-    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(mcEff(d)));
+    const a2 = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(mcFloor(mcEff(d))));
     g.append('path').datum(s1).attr('d', a2).attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
   }
   // DWL — между D и социальной MC от Qt до конкурентного Qc.
   if (m.Qc != null) {
     const lo = Math.min(t.Qt, m.Qc), hi = Math.max(t.Qt, m.Qc);
-    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
+    if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); }
   }
 }
 
@@ -740,11 +765,11 @@ function drawMonoFloorAreas() {
   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
   if (fl.Q > 1e-6) {
     const s1 = samp(0, fl.Q);
-    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcAt(d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
-    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(sy(fl.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
+    if (STATE.showMonoVC) { const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d)))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'); }
+    if (STATE.showMonoPS) { const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(fl.price)); g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'); }
     if (STATE.showMonoCS) { const a = d3.area().x(d => sx(d)).y0(sy(fl.price)).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'); }
   }
-  if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcAt(d))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); } }
+  if (m.Qc != null) { const lo = Math.min(fl.Q, m.Qc), hi = Math.max(fl.Q, m.Qc); if (hi > lo) { const s2 = samp(lo, hi); const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d))); g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'); } }
 }
 
 // Точки при связывающем поле: призрак M₀(Qm,Pm) + новый M(Q, Pf).
@@ -935,7 +960,7 @@ function drawDiscr1() {
      ограничение стоит у ЧИСЛА прибыли в recompute — поправить одно без
      другого значит развести картинку с числом. */
   const samp = []; for (let i = 0; i <= 120; i++) samp.push(d1.Qcomp * i / 120);
-  const a = d3.area().x(d => sx(d)).y0(d => sy(Math.max(0, mcAt(d)))).y1(d => sy(evalCurve(D, d)));
+  const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(D, d)));
   g.append('path').datum(samp).attr('d', a).attr('fill', COL.tax).attr('opacity', 0.20).attr('data-legend', 'Излишек фирмы: весь излишек рынка');
   // Точка Qcomp на спросе + проекции.
   const ox = sx(0), oy = sy(0), Pq = evalCurve(D, d1.Qcomp);
@@ -1312,6 +1337,8 @@ function recomputeKinked() {
   const cands = [];
   segs.forEach(s => { const r = findRootIn(q => marginalRevenue(s.D, q) - mc(q), s.q0, s.q1); if (r != null) cands.push({ Q: r, kind: 'MR=MC' }); });
   kinks.forEach(qk => cands.push({ Q: qk, kind: 'излом' }));
+  // ⚠️ Выбор оптимума идёт по НАСТОЯЩЕЙ MC (см. Rel в monopolyCeiling):
+  // обрезка нулём — правило измерения площади, а не принятия решения.
   const prof = (Q) => { const p = Dfn(Q); return isNaN(p) ? -Infinity : p * Q - integrate(mc, 0, Q); };
   cands.forEach(c => c.profit = prof(c.Q));
   if (!cands.length) { STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: false }; return; }
@@ -1329,10 +1356,10 @@ function recomputeKinked() {
      что у излишков суммарных кривых (quadBreaks). Второго механизма не
      заводим. */
   const csM = integrateBroken(q => Dfn(q) - Pstar, 0, Qstar, kinks);
-  const vcM = integrate(mc, 0, Qstar);
-  const psM = integrate(q => Pstar - mc(q), 0, Qstar);
+  const vcM = integrate(q => mcFloor(mc(q)), 0, Qstar);
+  const psM = integrate(q => Pstar - mcFloor(mc(q)), 0, Qstar);
   const dwl = (Qc != null && Qc > Qstar)
-    ? integrateBroken(q => Dfn(q) - mc(q), Qstar, Qc, kinks) : null;
+    ? integrateBroken(q => Dfn(q) - mcFloor(mc(q)), Qstar, Qc, kinks) : null;
   STATE.kinked = { segs, kinks, Dfn, mcCurve: km, found: true, Qstar, Pstar,
                    profit: best.profit, winKind: best.kind, cands,
                    Qc, csM, vcM, psM, dwl };
@@ -1362,11 +1389,11 @@ function drawKinkedFull() {
   if (k.found && k.Qstar > 1e-6) {
     const s1 = sampK(0, k.Qstar);
     if (STATE.showMonoVC) {
-      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcK(d)));
+      const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcK(d))));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
     }
     if (STATE.showMonoPS) {
-      const a = d3.area().x(d => sx(d)).y0(d => sy(mcK(d))).y1(sy(k.Pstar));
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcK(d)))).y1(sy(k.Pstar));
       g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
     }
     if (STATE.showMonoCS) {
@@ -1375,7 +1402,7 @@ function drawKinkedFull() {
     }
     if (k.Qc != null && k.Qc > k.Qstar + 1e-9) {
       const s2 = sampK(k.Qstar, k.Qc);
-      const a = d3.area().x(d => sx(d)).y0(d => sy(mcK(d))).y1(d => sy(k.Dfn(d)));
+      const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcK(d)))).y1(d => sy(k.Dfn(d)));
       g.append('path').datum(s2).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
     }
   }

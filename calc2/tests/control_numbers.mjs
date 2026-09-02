@@ -831,6 +831,86 @@ cmp('карточки «Автаркия» больше нет', r.card, 0, 0);
 cmp('слов «Два треугольника потерь» на странице нет', r.old, 0, 0);
 cmp('галочка называется «Потери общества»', /Потери общества/.test(r.now), true, 0);
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · ОБРЕЗКА НУЛЁМ — ВЕЗДЕ, А НЕ В ОДНОМ МЕСТЕ.
+   Долг ADR 0057 закрыт: обычная монополия, потолок, пол, квота, ставка,
+   составной спрос и естественная монополия берут нижнюю границу площади
+   у одного помощника mcFloor. Признак болезни — PS + VC ≠ TR.
+   ================================================================ */
+head('Сессия 01.09 (3) · обрезка нулём: обычная монополия');
+r = await run(MKT + AREA + `setDS('mono', '100-Q', 'Q-20');
+  STATE.showMonoVC = true; STATE.showMonoPS = true; STATE.showMonoCS = true; redrawAll();
+  var m = STATE.mono || {};
+  return { Q: m.Qm, P: m.Pm, vc: m.vcM, ps: m.psM, cs: m.csM, dwl: m.dwl,
+           tr: m.Qm * m.Pm, aVC: areaOf(VCA), aPS: areaOf(PSA), aDWL: areaOf(DWLA) };`);
+cmp('MC = Q − 20: выпуск', r.Q, 40, 1e-3);
+cmp('MC = Q − 20: цена', r.P, 60, 1e-3);
+cmp('MC = Q − 20: VC (было 0)', r.vc, 200, 1e-2);
+cmp('MC = Q − 20: PS (было 2400)', r.ps, 2200, 1e-2);
+cmp('MC = Q − 20: DWL не сдвинулся', r.dwl, 400, 1e-2);
+cmp('MC = Q − 20: PS + VC = TR', r.ps + r.vc, 2400, 1e-2);
+cmp('MC = Q − 20: выручка TR', r.tr, 2400, 1e-2);
+cmp('нарисован VC', r.aVC, 200, 0.5);
+cmp('нарисован PS', r.aPS, 2200, 0.5);
+cmp('нарисован DWL', r.aDWL, 400, 0.5);
+
+r = await run(MKT + `setDS('mono', '100-Q', 'Q'); redrawAll();
+  var m = STATE.mono || {};
+  return { Q: m.Qm, P: m.Pm, vc: m.vcM, ps: m.psM };`);
+cmp('контроль MC = Q: выпуск не сдвинулся', r.Q, 33.3333, 1e-3);
+cmp('контроль MC = Q: цена не сдвинулась', r.P, 66.6667, 1e-3);
+cmp('контроль MC = Q: VC не сдвинулся', r.vc, 555.5556, 1e-2);
+cmp('контроль MC = Q: PS не сдвинулся', r.ps, 1666.6667, 1e-2);
+
+head('Сессия 01.09 (3) · обрезка нулём: вмешательство, квота, пол, потолок');
+/* ⚠️ Числа названы поимённо, а не проверены неравенством «VC > 0». У пола 80 и
+   квоты 20 выпуск равен 20, предельные издержки Q − 20 на всём этом отрезке
+   НЕ ПОЛОЖИТЕЛЬНЫ, и ноль там — верный ответ, а не болезнь. Отличает верный
+   ноль от больного как раз обрезка: без неё те же случаи дают VC = −200.
+   ⚠️ Тождество PS + VC = TR у СТАВКИ не выполняется, и это не ошибка: между
+   MC и MC ± ставка лежат деньги бюджета, они в излишек не входят (ADR 0057). */
+for (const [tag, setup, key, wQ, wP, wVC, wPS] of [
+  ['потолок 50', `setType('ceiling'); setPReg(50);`, 'monoCeil', 50, 50, 450, 2050],
+  ['пол 80',     `setType('floor'); setPReg(80);`,   'monoFloor', 20, 80, 0, 1600],
+  ['квота 20',   `setType('quota'); setQuota(20);`,  'monoQuota', 20, 80, 0, 1600]]) {
+  r = await run(MKT + `setDS('mono', '100-Q', 'Q-20'); ${setup} redrawAll();
+    var t = STATE.${key} || {};
+    var Q = (t.Qstar != null ? t.Qstar : t.Q), P = t.price;
+    return { Q: Q, P: P, vc: t.vcM, ps: t.psM, tr: Q * P };`);
+  cmp(tag + ': выпуск', r.Q, wQ, 1e-3);
+  cmp(tag + ': цена', r.P, wP, 1e-3);
+  cmp(tag + ': VC', r.vc, wVC, 1e-2);
+  cmp(tag + ': PS', r.ps, wPS, 1e-2);
+  cmp(tag + ': PS + VC = TR', r.ps + r.vc - r.tr, 0, 1e-2);
+}
+for (const [tag, setup, wQ, wP, wVC] of [
+  ['налог 10',    `setType('tax'); setTaxForm('unit'); setTax(10);`,     36.6667, 63.3333, 138.8889],
+  ['субсидия 10', `setType('subsidy'); setTaxForm('unit'); setTax(10);`, 43.3333, 56.6667, 272.2222]]) {
+  r = await run(MKT + `setDS('mono', '100-Q', 'Q-20'); ${setup} redrawAll();
+    var t = STATE.monoTax || {};
+    return { Q: t.Qt, P: t.Pt, vc: t.vcM, ps: t.psM };`);
+  cmp(tag + ': выпуск', r.Q, wQ, 1e-3);
+  cmp(tag + ': цена', r.P, wP, 1e-3);
+  cmp(tag + ': VC под социальной MC', r.vc, wVC, 1e-2);
+  cmp(tag + ': PS не отрицателен', r.ps > 0, true, 0);
+}
+r = await run(MKT + AREA + `setDS('mono-kink', '100-Q', 'Q-20');
+  STATE.d3D1 = '100 - Q'; STATE.d3D2 = '60 - Q'; STATE.d3MC = 'Q-20';
+  STATE.showMonoVC = true; STATE.showMonoPS = true; redrawAll();
+  var k = STATE.kinked || {};
+  return { found: k.found ? 1 : 0, vc: k.vcM, ps: k.psM, tr: k.Qstar * k.Pstar,
+           aVC: areaOf(VCA), aPS: areaOf(PSA) };`);
+cmp('составной спрос: сюжет посчитан', r.found, 1, 0);
+cmp('составной спрос: VC не съел сам себя', r.vc > 1e-6, true, 0);
+cmp('составной спрос: PS + VC = TR', r.vc + r.ps - r.tr, 0, 1e-2);
+cmp('составной спрос: нарисованный VC совпал с числом', r.aVC - r.vc, 0, 0.5);
+cmp('составной спрос: нарисованный PS совпал с числом', r.aPS - r.ps, 0, 0.5);
+
+r = await run(MKT + `setDS('mono-nat', '100-Q', 'Q-20'); STATE.natFC = 100; redrawAll();
+  return { atc40: naturalATC(40), vcOnly: naturalATC(40) * 40 - 100 };`);
+cmp('естественная монополия: ATC(40) считается', isFinite(r.atc40), true, 0);
+cmp('естественная монополия: VC(40) обрезан нулём', r.vcOnly, 200, 0.5);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
