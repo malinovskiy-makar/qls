@@ -445,6 +445,9 @@ def _game_page_context(request):
                           for key, title in game_sources.GROUPS],
         # Теги пула с числами и счётчики тем — для окна фильтров.
         'pool_tags': pool_tags(),
+        # Квота зачётных забегов на сегодня — вошедшему. Аноним её не видит:
+        # у него зачётных забегов не бывает вовсе.
+        'ranked_quota': _quota_line(request),
         # Группы-заготовки: показываются, ТОЛЬКО если у них есть варианты.
         # Серый переключатель, который не нажимается, хуже его отсутствия.
         'feature_options': game_filters.feature_options(),
@@ -641,6 +644,9 @@ def _new_state(mode, topic, run_filter=None):
         # очки входить не может — его подделывает любой, кто откроет консоль.
         # Клиентское остаётся только для показа в статистике.
         'issued_at': {},
+        # Момент старта СЕРВЕРНЫМИ часами. Из него считается длительность
+        # забега — по ней ловится «забег на паузе» (см. _rank_run).
+        'started_at': time.time(),
         # Сколько секунд забег уже получил прибавкой за верные ответы.
         # Нужно для потолка: без него Классика становится бесконечной.
         'bonus_total': 0,
@@ -797,6 +803,14 @@ TIME_BUCKETS = [
 DIFFICULTY_GROUPS = [('easy', 'Лёгкие', (1, 2)),
                      ('medium', 'Средние', (3,)),
                      ('hard', 'Сложные', (4, 5))]
+
+
+# ⚠️ ПОЛЯ, КОТОРЫЕ ДОБАВЛЯЕТ УЖЕ `api_session_finish`, А НЕ `build_summary`.
+# Сводка — чистая функция журнала и о зачётности знать не может: та решается
+# при сохранении результата. Список нужен, чтобы тест «клиент не читает
+# несуществующего поля» видел обе половины сводки, а не одну.
+FINISH_EXTRA_FIELDS = ('ranked', 'unranked_reason', 'unranked_text',
+                       'ranked_today', 'ranked_per_day')
 
 
 def build_summary(state):
@@ -1697,6 +1711,19 @@ def api_session_finish(request):
     summary = build_summary(state)
     share = _save_result(request, state, summary)
     _log_learning_events(request, state)
+    # ⚠️ Зачётность добавляем ПОСЛЕ сохранения и ЧИТАЕМ ИЗ БАЗЫ: решает её
+    # `_save_result`, и пересчёт здесь завёл бы второй ответ на один вопрос.
+    # Имена полей перечислены в FINISH_EXTRA_FIELDS — по этому же списку
+    # тест сверяет, что клиент не читает у сводки несуществующего.
+    code = state.get('result_code')
+    saved = GameResult.objects.filter(code=code).first() if code else None
+    summary['ranked'] = bool(saved and saved.ranked)
+    summary['unranked_reason'] = saved.unranked_reason if saved else ''
+    summary['unranked_text'] = config.UNRANKED_TEXT.get(
+        summary['unranked_reason'], '')
+    if saved is not None and saved.ranked and saved.user_id:
+        summary['ranked_today'] = _ranked_today(saved.user, saved.mode)
+        summary['ranked_per_day'] = config.RANKED_RUNS_PER_DAY
     return JsonResponse({'summary': summary, 'share': share})
 
 
@@ -1774,6 +1801,82 @@ def _end_reason(state, claimed):
     return 'time'
 
 
+def _quota_line(request):
+    u"""Строка «Зачётных забегов сегодня: 7 из 10» — или пусто анониму.
+
+    Считается по режиму по умолчанию: на стартовом экране режим ещё не
+    выбран, а показывать четыре строки ради одной цифры незачем.
+    """
+    if not request.user.is_authenticated:
+        return ''
+    used = _ranked_today(request.user, config.DEFAULT_MODE)
+    return 'Зачётных забегов сегодня: %d из %d' % (
+        min(used, config.RANKED_RUNS_PER_DAY), config.RANKED_RUNS_PER_DAY)
+
+
+def _moscow_day(when=None):
+    u"""Календарный день по Москве.
+
+    ⚠️ Квота считается по МОСКОВСКИМ суткам, а не по UTC. Сервер живёт в
+    Москве, игроки тоже; по UTC «сегодня» кончалось бы в три часа ночи, и
+    человек, играющий вечером, получал бы два дневных лимита подряд.
+    """
+    from zoneinfo import ZoneInfo
+    when = when or timezone.now()
+    return when.astimezone(ZoneInfo('Europe/Moscow')).date()
+
+
+def _ranked_today(user, mode):
+    u"""Сколько ЗАЧЁТНЫХ забегов режима человек уже сыграл сегодня.
+
+    Считаем по самим результатам — отдельной таблицы счётчиков не заводим:
+    она немедленно разошлась бы с фактом при любой правке или откате.
+    """
+    from zoneinfo import ZoneInfo
+    msk = ZoneInfo('Europe/Moscow')
+    today = _moscow_day()
+    start = datetime.datetime.combine(today, datetime.time.min, tzinfo=msk)
+    end = start + datetime.timedelta(days=1)
+    return GameResult.objects.filter(
+        user=user, mode=mode, ranked=True,
+        created_at__gte=start, created_at__lt=end).count()
+
+
+def _rank_run(request, state, summary, wall_ms):
+    u"""Идёт ли забег в таблицу, и если нет — почему.
+
+    ⚠️ РЕШАЕТСЯ ОДИН РАЗ, ПРИ СОХРАНЕНИИ. Причина пишется полем, а не
+    вычисляется на лету: иначе смена правил задним числом переписывала бы
+    чужие рекорды.
+
+    Порядок проверок — из `config.UNRANKED_REASONS`, сверху вниз: игроку
+    показывается ПЕРВАЯ сработавшая, самая понятная.
+    """
+    user = request.user if request.user.is_authenticated else None
+    if user is None:
+        return False, 'anonymous'
+    if state.get('mistakes_run'):
+        return False, 'mistakes_run'
+    if state.get('set_code'):
+        return False, 'set_run'
+    if is_difficulty_filtered(state.get('filter')):
+        return False, 'difficulty_filter'
+    if summary['correct'] < config.RANKED_MIN_CORRECT:
+        return False, 'too_few_correct'
+    # ⚠️ ПОТОЛОК ДЛИТЕЛЬНОСТИ. Забег не может идти дольше, чем запас режима
+    # плюс вся возможная прибавка за верные ответы, плюс минута на сетевые
+    # задержки. Больше — значит вкладку держали на паузе или подкручивали
+    # клиентский таймер: очки-то считает сервер, а вот времени на подумать
+    # так можно взять сколько угодно.
+    limit_ms = int((config.MODES[state['mode']]['duration']
+                    * (1 + config.TIME_BONUS_CAP_FACTOR) + 60) * 1000)
+    if wall_ms is not None and wall_ms > limit_ms:
+        return False, 'time_overrun'
+    if _ranked_today(user, state['mode']) >= config.RANKED_RUNS_PER_DAY:
+        return False, 'quota_exceeded'
+    return True, ''
+
+
 def _save_result(request, state, summary):
     """Сохранить результат забега и отдать ссылку на публичную страницу.
 
@@ -1791,6 +1894,17 @@ def _save_result(request, state, summary):
     gset = None
     if state.get('set_code'):
         gset = GameSet.objects.filter(code=state['set_code']).first()
+
+    # ⚠️ Средним считаем СЕРВЕРНОЕ время верных ответов. Клиентское приходит
+    # из браузера игрока и в доску «Скорость» не пускается — её выиграл бы
+    # тот, кто первым откроет консоль.
+    server_ms = [r['elapsed_server_ms'] for r in (state.get('log') or [])
+                 if r['outcome'] == 'correct' and r.get('elapsed_server_ms')]
+    avg_correct_ms = int(sum(server_ms) / len(server_ms)) if server_ms else None
+    started = state.get('started_at')
+    wall_ms = int((time.time() - started) * 1000) if started else None
+    ranked, unranked_reason = _rank_run(request, state, summary, wall_ms)
+
     if result is None:
         for _ in range(5):   # коллизия кода почти невероятна, но не 500
             try:
@@ -1798,8 +1912,19 @@ def _save_result(request, state, summary):
                     code=make_result_code(),
                     mode=state['mode'],
                     score=summary['score'],
+                    raw_score=summary.get('raw_score', summary['score']),
+                    accuracy_mult=summary.get('accuracy_mult', 1.0),
+                    economy_version=config.ECONOMY_VERSION,
                     correct_count=summary['correct'],
                     total_count=summary['total'],
+                    wrong_count=summary['wrong'],
+                    skip_count=summary['skipped'],
+                    avg_correct_ms=avg_correct_ms,
+                    wall_ms=wall_ms,
+                    filters=normalize_filter(state.get('filter')),
+                    is_unfiltered=is_empty_filter(state.get('filter')),
+                    ranked=ranked,
+                    unranked_reason=unranked_reason,
                     max_combo=summary['max_multiplier'],
                     ended_reason=summary['ended_reason'],
                     topic_breakdown=summary['topic_rows'],

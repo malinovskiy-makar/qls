@@ -87,7 +87,11 @@ class PageJsTests(TestCase):
         state = {'mode': 'blitz', 'topic': None, 'seen': [], 'answered': {},
                  'lives': 3, 'score': 0, 'streak': 0, 'best_streak': 0,
                  'ended': None, 'log': []}
+        # Сводка собирается в ДВА приёма: `build_summary` (чистая функция
+        # журнала) и `api_session_finish`, который дописывает зачётность —
+        # её сводка знать не может, она решается при сохранении результата.
         served = set(views.build_summary(state).keys())
+        served |= set(views.FINISH_EXTRA_FIELDS)
         # поля, которые клиент берёт у сводки: s.<имя>
         read = set(re.findall(r'\bs\.([a-z_]+)\b', self.js))
         # offline — поле запасной сводки клиента, сервер его не шлёт

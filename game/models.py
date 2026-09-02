@@ -270,7 +270,11 @@ class GameResult(models.Model):
     score = models.PositiveIntegerField('Счёт', default=0)
     correct_count = models.PositiveSmallIntegerField('Верных', default=0)
     total_count = models.PositiveSmallIntegerField('Попыток', default=0)
-    max_combo = models.PositiveSmallIntegerField('Макс. множитель', default=1)
+    # ⚠️ ВЕЩЕСТВЕННОЕ, И ЭТО НЕ ПЕДАНТИЗМ. В экономике v2 множители комбо
+    # дробные (×1,25 / 1,5 / 1,75 / 2). В целом поле 1,25 молча становилось
+    # единицей, и на карточке шеринга серия из четырёх выглядела как её
+    # отсутствие.
+    max_combo = models.FloatField('Макс. множитель', default=1.0)
     ended_reason = models.CharField('Чем кончился', max_length=8, default='time')
     # [{topic, correct, wrong, skip, total, accuracy}, ...]
     topic_breakdown = models.JSONField('Разбивка по темам', default=list, blank=True)
@@ -287,10 +291,53 @@ class GameResult(models.Model):
                                          default=list, blank=True)
     created_at = models.DateTimeField('Сыгран', auto_now_add=True)
 
+    # ── Экономика и зачётность (сессия «Wecon Rush», фаза 5) ────────────
+    #
+    # ⚠️ ВЕРСИЯ ЭКОНОМИКИ ХРАНИТСЯ У КАЖДОГО ЗАБЕГА. Забеги версий 1 и 2
+    # лежат в одной таблице, но складывать их в один рекорд нельзя: это
+    # разные шкалы. Старым строкам ставится 1 миграцией данных.
+    economy_version = models.SmallIntegerField('Версия экономики', default=1)
+    # Сырые очки (сумма за ответы) и итог после множителя точности. `score`
+    # выше — ИТОГ; здесь то, что игрок видел в HUD, и сам множитель.
+    raw_score = models.PositiveIntegerField('Сырые очки', default=0)
+    accuracy_mult = models.FloatField('Множитель точности', default=1.0)
+    wrong_count = models.PositiveIntegerField('Неверных', default=0)
+    skip_count = models.PositiveIntegerField('Пропусков', default=0)
+    # Среднее время верного ответа по СЕРВЕРНЫМ часам и длительность забега.
+    # Клиентское время в доску «Скорость» не пускаем: оно из браузера игрока.
+    avg_correct_ms = models.PositiveIntegerField('Среднее время верного, мс',
+                                                 null=True, blank=True)
+    wall_ms = models.PositiveIntegerField('Длительность забега, мс',
+                                          null=True, blank=True)
+    # Снимок фильтра забега — чтобы через месяц было видно, на каком пуле
+    # поставлен рекорд.
+    filters = models.JSONField('Фильтр забега', default=dict, blank=True)
+    is_unfiltered = models.BooleanField('Без единого фильтра', default=False,
+                                        db_index=True)
+    # ⚠️ ЗАЧЁТНОСТЬ РЕШАЕТСЯ ОДИН РАЗ, ПРИ СОХРАНЕНИИ, И ХРАНИТСЯ ПОЛЕМ.
+    # Считать её на лету по другим полям значило бы, что смена правил
+    # задним числом переписывает чужие рекорды.
+    ranked = models.BooleanField('Идёт в таблицу', default=False,
+                                 db_index=True)
+    unranked_reason = models.CharField('Почему не в таблице', max_length=24,
+                                       blank=True, default='')
+
     class Meta:
         verbose_name = 'Результат забега'
         verbose_name_plural = 'Результаты забегов'
         ordering = ['-created_at']
+        indexes = [
+            # Три доски лидерборда и «мои забеги». Без индексов каждая
+            # вкладка таблицы читала бы всю таблицу результатов.
+            models.Index(fields=['mode', 'ranked', '-score'],
+                         name='gres_mode_ranked_score'),
+            models.Index(fields=['mode', 'ranked', '-correct_count'],
+                         name='gres_mode_ranked_corr'),
+            models.Index(fields=['mode', 'ranked', 'avg_correct_ms'],
+                         name='gres_mode_ranked_avg'),
+            models.Index(fields=['user', 'mode', '-created_at'],
+                         name='gres_user_mode_time'),
+        ]
 
     def __str__(self):
         return f'{self.code}: {self.score} очков ({self.mode})'

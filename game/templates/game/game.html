@@ -1773,6 +1773,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       </div>
       <div class="filter-chips" id="filter-chips"></div>
       <p class="filter-note" id="filter-note"></p>
+      {% if ranked_quota %}<p class="filter-note">{{ ranked_quota }}</p>{% endif %}
 
       <!-- Нижний ряд входов -->
       <div class="entry-row" id="entry-row">
@@ -1904,6 +1905,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <small>Итоговый счёт</small>
           <b class="final-score" id="final-score">0</b>
           <span class="acc-note" id="acc-note" hidden></span>
+          <span class="acc-note" id="ranked-note" hidden></span>
           <span class="record-badge" id="record-badge"><span class="qi-slot"></span> личный рекорд</span>
         </div>
         <div class="metric">
@@ -3825,6 +3827,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           + s.score.toLocaleString('ru-RU');
       }
       accNote.hidden = false;
+    }
+
+    /* ⚠️ ПОЧЕМУ ЗАБЕГ НЕ В ТАБЛИЦЕ — ОДНОЙ СТРОКОЙ. «Просто не поехал»
+       читается как поломка; человек обязан узнать причину и понять, что
+       делать иначе. Текст причины приходит с сервера: список причин там
+       один (config.UNRANKED_REASONS), второй здесь разошёлся бы. */
+    var rn = $('ranked-note');
+    if (rn) {
+      if (s.ranked) {
+        rn.textContent = 'Забег в таблице'
+          + (s.ranked_today != null
+             ? ' · зачётных сегодня ' + s.ranked_today + ' из ' + s.ranked_per_day
+             : '');
+        rn.hidden = false;
+      } else if (s.unranked_text) {
+        rn.textContent = 'Не в таблице: ' + s.unranked_text;
+        rn.hidden = false;
+      } else {
+        rn.hidden = true;
+      }
     }
 
     /* рекорд — посчитан в endRun (см. там про «событие, а не состояние») */
