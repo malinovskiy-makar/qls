@@ -188,6 +188,7 @@ cache_similar                     # залить «похожие» в M2M — �
 quality_gate --apply / --revert   # шлюз качества, обратимый
 find_duplicates --threshold 0.95  # заполнить DuplicateCandidate
 lockdown_dev_accounts [--apply]   # погасить дев-аккаунты
+seed_olympiads_demo --yes [--wipe] # демо-данные раздела олимпиад (без --yes только план)
 human_review_mark [--apply/--revert]     # approved/defect по вердиктам ReviewVerdict
 pending_review_gate [--apply/--revert]   # скрыть непроверенное из каталога
 build_topic_map [--check]                # справочник карты /catalog/map/ (базу НЕ трогает)
@@ -265,10 +266,16 @@ preview_story_wrappers                        # превью сюжетных о
 | `game` | Wecon Rush — тренажёр на скорость, включая WebSocket дуэли ([docs/GAME.md](docs/GAME.md)) |
 | `calc2` | Графический калькулятор — единственный |
 | `calendar_stub` | Календарь занятий |
+| `olympiads` | Справочник олимпиад: даты туров, льготы вузов, комплекты |
 
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
-её в `problems/models*.py`, а не у себя. Исключение — `game.GameQuestion`:
-игровой пул намеренно отделён от банка, чтобы удаление задачи не ломало журнал.
+её в `problems/models*.py`, а не у себя. Исключений **два**, оба записаны:
+`game.GameQuestion` — игровой пул намеренно отделён от банка, чтобы удаление
+задачи не ломало журнал; `olympiads.*` — справочник ВНЕШНИХ фактов (приказы,
+правила приёма, проходные баллы) сущностями банка задач не является и на
+`Problem` не ссылается вовсе, [ADR 0063](docs/adr/0063-olympiads-own-models.md).
+⚠️ Третьего исключения быть не должно: появится — правило пора переписывать,
+а не пристраивать к нему ещё одну оговорку.
 
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·
