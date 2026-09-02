@@ -1317,6 +1317,59 @@ class DuplicateCandidate(models.Model):
         return f'#{self.problem_a_id} ↔ #{self.problem_b_id} ({self.similarity:.3f})'
 
 
+class OlympiadRef(models.Model):
+    """Привязка задачи банка к конкретному туру реальной олимпиады,
+    найденная сопоставлением по прямой ссылке (SourceReference.url) с
+    внешним индексом SolveHub/ILE. Ничего не меняет в Problem/SourceReference —
+    чисто дополнительная информация, источник на сайте не переключает.
+
+    Одна Problem может встречаться в НЕСКОЛЬКИХ турах одной или разных
+    олимпиад (задачу могли переиздать) — поэтому problem не unique сама
+    по себе, unique пара (problem, event_id).
+    """
+
+    problem = models.ForeignKey(
+        Problem, on_delete=models.CASCADE,
+        related_name='olympiad_refs', verbose_name='Задача')
+
+    source_site = models.CharField(
+        'Откуда взято сопоставление', max_length=20,
+        choices=[('solvehub', 'SolveHub'), ('ile', 'ILE / iloveeconomics.ru')])
+
+    olympiad_slug = models.CharField('Слаг олимпиады', max_length=50)
+    olympiad_name = models.CharField('Название олимпиады', max_length=300, blank=True)
+    academic_year = models.CharField('Учебный год', max_length=20, blank=True)
+    year = models.PositiveIntegerField('Год тура', null=True, blank=True)
+    stage = models.CharField('Этап', max_length=50, blank=True)
+    grade = models.CharField('Класс', max_length=50, blank=True)
+    variant = models.CharField('Вариант', max_length=100, blank=True)
+    number = models.CharField('Номер в туре', max_length=50, blank=True)
+
+    event_id = models.CharField('ID тура в источнике', max_length=200)
+    record_id = models.CharField('ID записи в источнике', max_length=300)
+
+    match_method = models.CharField(
+        'Метод сопоставления', max_length=30,
+        choices=[('url_exact', 'Точное совпадение ссылки')],
+        default='url_exact')
+    match_score = models.FloatField('Уверенность сопоставления', default=1.0)
+    official_url = models.URLField('Ссылка-источник сопоставления', max_length=500, blank=True)
+
+    raw_meta = models.JSONField('Прочие поля из экспорта', null=True, blank=True)
+
+    reviewed_by_human = models.BooleanField('Проверено человеком', default=False)
+    created_at = models.DateTimeField('Найдено', auto_now_add=True)
+
+    class Meta:
+        unique_together = ('problem', 'event_id')
+        ordering = ['olympiad_slug', 'year', 'stage']
+        verbose_name = 'Привязка к олимпиаде'
+        verbose_name_plural = 'Привязки к олимпиадам'
+
+    def __str__(self):
+        return f'#{self.problem_id} → {self.olympiad_slug} {self.year} {self.stage}'
+
+
 # ===========================================================================
 # Этап Е — Группы учеников
 # ===========================================================================
