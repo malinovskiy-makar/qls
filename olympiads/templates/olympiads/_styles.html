@@ -279,15 +279,26 @@
 /* ── Таблицы раздела ────────────────────────────────── */
 /* Обёртка со своей прокруткой и затенением края: страница целиком
    горизонтально ехать не должна, а таблица льгот в 960 не влезает. */
+/* ⚠️ ЗАТЕНЕНИЕ КРАЯ ГАСНЕТ САМО, БЕЗ СКРИПТА. Два слоя-заглушки цветом
+   поверхности прокручиваются ВМЕСТЕ с содержимым (local), два слоя тени
+   стоят на месте (scroll). Доехали до края — заглушка накрывает тень, и
+   она пропадает. Висящая всё время тень читалась бы как украшение и
+   перестала бы что-либо сообщать.
+   Ни одного шестнадцатеричного цвета: прозрачность задана через rgba. */
 .ol-tablewrap {
   overflow-x: auto;
   border: 1px solid var(--border);
   border-radius: var(--r-panel);
-  background: var(--surface);
-  -webkit-mask-image: linear-gradient(to right, var(--fade-edge) 0, #000 14px,
-                      #000 calc(100% - 14px), var(--fade-edge) 100%);
-          mask-image: linear-gradient(to right, var(--fade-edge) 0, #000 14px,
-                      #000 calc(100% - 14px), var(--fade-edge) 100%);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(to right, var(--surface), rgba(0, 0, 0, 0)),
+    linear-gradient(to left,  var(--surface), rgba(0, 0, 0, 0)),
+    linear-gradient(to right, var(--fade-edge), rgba(0, 0, 0, 0)),
+    linear-gradient(to left,  var(--fade-edge), rgba(0, 0, 0, 0));
+  background-position: left center, right center, left center, right center;
+  background-size: 26px 100%, 26px 100%, 18px 100%, 18px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
 }
 .ol-table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .ol-table th, .ol-table td {
