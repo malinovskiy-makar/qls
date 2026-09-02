@@ -63,10 +63,8 @@ def olympiad_detail(request, slug):
     )
     # Блок региональных организаторов есть только у ВсОШ: школьный и
     # муниципальный этапы назначает субъект, и только у неё это так.
-    regions = (
-        list(RegionalCoordinator.objects.all())
-        if olympiad.kind == Olympiad.Kind.VSOSH else []
-    )
+    show_regions = olympiad.kind == Olympiad.Kind.VSOSH
+    regions = list(RegionalCoordinator.objects.all()) if show_regions else []
     score_rows, score_years = services.pass_score_rows(olympiad)
     year = current_academic_year()
     events = list(
@@ -88,6 +86,7 @@ def olympiad_detail(request, slug):
         'variant_grades': sorted({v.grade for v in variants if v.grade}),
         'variant_years': sorted({v.year for v in variants}, reverse=True),
         'regions': regions,
+        'show_regions': show_regions,
         # Год берётся из данных, а не зашивается в шаблон: правила приёма
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,

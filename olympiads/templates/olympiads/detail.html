@@ -348,13 +348,16 @@
   {% endif %}
 </section>
 
-{% if regions %}
+{% if show_regions %}
 <section class="ol-section">
   <details class="ol-regions">
     <summary class="ol-regions-sum">Региональные организаторы — {{ regions|length }} регионов</summary>
     <p class="ol-note">Точные даты школьного и муниципального этапов, площадки
       и проходные баллы устанавливает ваш регион. Уточняйте их у регионального
       организатора.</p>
+    {% if not regions %}
+    <p class="ol-empty">Список организаторов ещё не заведён.</p>
+    {% endif %}
     <ul class="ol-regions-list">
       {% for region in regions %}
       <li class="ol-region{% if not region.url %} ol-region--nourl{% endif %}">
