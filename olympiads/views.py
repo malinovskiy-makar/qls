@@ -52,6 +52,10 @@ def olympiad_detail(request, slug):
         slug=slug,
     )
     stages = list(olympiad.stages.all())
+    benefits = list(
+        olympiad.benefits.select_related('program')
+        .order_by('-admission_year', 'program__order')
+    )
     year = current_academic_year()
     events = list(
         olympiad.events.filter(academic_year=year)
@@ -64,6 +68,10 @@ def olympiad_detail(request, slug):
         'events': events,
         'academic_year': year,
         'stats': services.problem_stats(olympiad),
+        'benefits': benefits,
+        # Год берётся из данных, а не зашивается в шаблон: правила приёма
+        # пересматриваются каждый год, и подпись обязана ехать за ними.
+        'benefit_year': benefits[0].admission_year if benefits else None,
         'has_placeholder': _has_placeholder([olympiad]),
     })
 

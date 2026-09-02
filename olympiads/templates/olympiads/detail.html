@@ -201,4 +201,56 @@
   </div>
 </section>
 
+<section class="ol-section">
+  <h2 class="ol-section-title">Льготы олимпиады</h2>
+  {% if benefits %}
+  <p class="ol-year">Льготы по правилам приёма {{ benefit_year }} года</p>
+  <div class="ol-tablewrap">
+    <table class="ol-table ol-table--benefits">
+      <thead>
+        <tr>
+          <th>Программа</th><th>Что даёт</th><th>Подтверждение ЕГЭ</th>
+          <th>Классы</th><th>Правила приёма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for benefit in benefits %}
+        <tr{% if benefit.benefit_type == 'none' %} class="ol-row--none"{% endif %}>
+          <td>
+            <span class="ol-uni">
+              {% if benefit.program.university_logo %}
+              <img class="ol-unilogo" src="{{ benefit.program.university_logo.url }}" alt="" width="28" height="28">
+              {% else %}
+              <span class="ol-unilogo ol-unilogo--empty" aria-hidden="true">{{ benefit.program.abbr }}</span>
+              {% endif %}
+              <span>
+                <span class="ol-uni-name">{{ benefit.program.university_name }}</span>
+                <span class="ol-uni-prog">{{ benefit.program.program_name }}</span>
+              </span>
+            </span>
+          </td>
+          <td>{{ benefit.gives_label }}</td>
+          <td>{{ benefit.confirm_label }}</td>
+          <td>{% if benefit.grades_note %}{{ benefit.grades_note }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>
+            {% if benefit.program.admission_rules_url %}
+            <a href="{{ benefit.program.admission_rules_url }}" target="_blank" rel="noopener">Смотреть</a>
+            {% else %}<span class="ol-mute">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="ol-note">
+    Льготы устанавливает каждый вуз самостоятельно и пересматривает ежегодно.
+    Уровень олимпиады в перечне тоже меняется каждый год. Перед подачей
+    документов сверяйтесь с правилами приёма конкретного вуза.
+  </p>
+  {% else %}
+  <p class="ol-empty">Данных о льготах пока нет. Мы собираем их по правилам
+    приёма вузов; правила на следующий год публикуются до 1 ноября.</p>
+  {% endif %}
+</section>
+
 {% endblock %}

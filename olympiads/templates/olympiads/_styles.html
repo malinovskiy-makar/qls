@@ -372,3 +372,28 @@
 .ol-panel-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
 .ol-panel-note { font-size: 13px; color: var(--text2); }
 .ol-panel .ol-bar { grid-template-columns: 74px 1fr 38px; font-size: 12px; }
+
+/* ── Таблица льгот ──────────────────────────────────── */
+.ol-year { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+.ol-table--benefits td { font-size: 13px; }
+.ol-uni { display: flex; gap: 8px; align-items: flex-start; }
+.ol-unilogo {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: var(--r-sm); object-fit: contain;
+}
+.ol-unilogo--empty {
+  background: var(--surface-2); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+.ol-uni-name { display: block; font-weight: 600; }
+.ol-uni-prog { display: block; color: var(--text2); }
+/* Строка «льготы нет» приглушается целиком, чтобы взгляд не спотыкался
+   о неё при просмотре сверху вниз. */
+.ol-row--none td { color: var(--text3); }
+.ol-row--none .ol-uni-name { font-weight: 500; }
+.ol-table a { color: var(--accent-ink); }
+.ol-note {
+  margin-top: 12px; font-size: 13px; color: var(--text2);
+  max-width: var(--w-read);
+}
