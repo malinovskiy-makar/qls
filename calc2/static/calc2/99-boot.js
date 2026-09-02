@@ -67,7 +67,7 @@ function init() {
      бинарными, по смыслу нет, и трогать их нельзя. */
   [
     ['ac-mode',        'ac-curve',    'ac-poly',        'Под кривой',       'Между точками'],
-    ['mm-mode',        'mm-min',      'mm-max',         'Наименьшую',       'Наибольшую'],
+    ['mm-mode',        'mm-min',      'mm-max',         'min',              'max'],
     [null,             'ki-indiv',    'ki-piece',       'Инд. спросы',      'Кусочный'],
     [null,             'tsb-seller',  'tsb-buyer',      'Продавец',         'Покупатель'],
     [null,             'plv-tc',      'plv-mc',         'Суммарные TC',     'Предельные MC'],

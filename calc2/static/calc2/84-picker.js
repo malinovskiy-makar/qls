@@ -248,8 +248,12 @@ const SCENE_ROUTE = {
      закрыты по-прежнему — там на холсте уже есть модель, и первый шаг очевиден. */
   /* Своего openSection у маршрута больше нет: карточка «Ввод функций» раскрыта
      во ВСЕХ сценах, и открывает её pickScene одинаково для всех. */
+  /* Сцена открывается С ГОТОВОЙ ФУНКЦИЕЙ (решение владельца 01.09): пустой
+     экран нечего покрутить, и первое, что видел человек, — чистый холст.
+     Парабола x² − 4 выбрана нарочно: у неё видны оба нуля и вершина, то есть
+     сразу заполнены «Ключевые значения». */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); renderGraphRows(); } },
+                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows(); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },

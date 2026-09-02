@@ -28,7 +28,7 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'cons-px1-row',                                                      // потребитель: новая цена Px₁
   'lr-price-field', 'pl-q-field',                                      // фирма: цена P / выпуск двух заводов
   'ma-dg-field', 'ma-fx-fixed-field',                                  // макро: дефицит ΔG / фикс. курс
-  'mathx0-field'];                                                     // математика: точка касания x₀
+  'mathx0-field', 'math-secant-row'];   // математика: точка касания x₀ и секущая
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 /* ⚠️ ОРГАНЫ УПРАВЛЕНИЯ ВМЕШАТЕЛЬСТВОМ ОСТАЮТСЯ В СВОЕЙ КАРТОЧКЕ.
@@ -58,9 +58,11 @@ const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
    содержимое одной карточки. */
 const PULT_STAY_HOME = new Set([
   'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',
-  /* Точка касания живёт в своей карточке рядом с формулой и переезжать в ленту
-     не должна — а общий компонент регулятора ей нужен ровно тот же. */
-  'mathx0-field',
+  /* ⚠️ ТОЧКА КАСАНИЯ x₀ ОТСЮДА УБРАНА (решение владельца 01.09). Она домоседом
+     не является: это живой регулятор сцены, и место ему там же, где ползункам
+     сдвига кривых в «Спросе и предложении» — в аналитике справа. Слева
+     остаётся ввод функции. Домоседы — только содержимое карточки
+     «Вмешательство государства», у которой свой порядок каскада. */
 ]);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -124,12 +126,13 @@ function pultRegulatorIds() {
     if (STATE.laborStruct !== 'union' && STATE.laborMinOn) ids.push('labmin-field');
     return ids;
   }
-  /* Математика: в сюжете про касательную живой регулятор один — точка x₀.
-     В ленту он не переезжает (см. PULT_STAY_HOME), но общий компонент
-     получает: правило владельца «числовых полей рядом с ползунками не бывает»
-     действует во всех сценах, а не только в рыночных. */
+  /* Математика: в сюжете про касательную живых регуляторов два — точка x₀ и
+     секущая через две точки. Оба переезжают в аналитику (01.09) и получают
+     общий компонент: правило «числовых полей рядом с ползунками не бывает»
+     действует во всех сценах, а не только в рыночных. Секущая едет ОДНИМ
+     узлом вместе со своим ползунком Δx: врозь они бессмысленны. */
   if (STATE.mode === 'math') {
-    return (STATE.mathSub === 'tangent') ? ['mathx0-field'] : [];
+    return (STATE.mathSub === 'tangent') ? ['mathx0-field', 'math-secant-row'] : [];
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
@@ -629,7 +632,9 @@ function syncPultRegulators(activeIds) {
    и пишутся прямо в атрибуты min/max/step ползунка, то есть остаются ровно тем,
    чем и были. Сама сцена об этом ничего не знает. */
 function upgradeRegulator(field) {
-  if (!field || field._regUpgraded) return;
+  // Узел может быть КОНТЕЙНЕРОМ переносимой группы (см. #math-secant-row):
+  // ползунок внутри есть, но он не его, и подпись у него чужая.
+  if (!field || field._regUpgraded || field.dataset.noRegulator === '1') return;
   const sl = field.querySelector('input[type=range]');
   if (!sl) return;
   field._regUpgraded = true;
@@ -1597,6 +1602,8 @@ function wireControls() {
     if (f) f.style.display = secChk.checked ? '' : 'none';
     redrawAll();
   });
+  // Ползунок Δx лежит ВНУТРИ переносимой группы, поэтому его показ и скрытие
+  // ленту не трогают: перенесён контейнер, а не два узла по отдельности.
   const dxs = document.getElementById('mathdx-slider');
   if (dxs) dxs.addEventListener('input', () => {
     STATE.mathDx = parseFloat(dxs.value);

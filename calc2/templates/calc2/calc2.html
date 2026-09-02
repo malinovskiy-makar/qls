@@ -1767,11 +1767,18 @@
             <input type="number" id="mathx0-input" step="any" value="1" aria-label="Точное значение x₀">
           </div>
         </div>
-        <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
-        <div class="field" id="mathdx-field" style="display:none;">
-          <label>Шаг Δx = <b id="mathdx-val">1</b></label>
-          <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
-          <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
+        <!-- Галочка и её ползунок переезжают в аналитику ОДНИМ узлом (01.09):
+             ползунок Δx появляется вместе с галочкой, и разлучать их нельзя.
+             data-no-regulator говорит upgradeRegulator, что это КОНТЕЙНЕР, а не
+             регулятор: иначе он забрал бы вложенный ползунок Δx и подписал бы
+             его чужой подписью галочки. -->
+        <div id="math-secant-row" data-no-regulator="1">
+          <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
+          <div class="field" id="mathdx-field" style="display:none;">
+            <label>Шаг Δx = <b id="mathdx-val">1</b></label>
+            <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
+            <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
+          </div>
         </div>
         <div class="field">
           <label>Цвета кривых</label>
@@ -1834,12 +1841,14 @@
            их заполняют. -->
       <div id="math-pane-minmax" style="display:none;">
         <div class="field">
-          <label>Что ищем</label>
+          <label>Какую функцию ищем</label>
           <!-- Н73: показывается тумблером (segToToggle). Кнопки остаются
-               источником правды: к ним привязана обвязка сюжета. -->
+               источником правды: к ним привязана обвязка сюжета.
+               01.09: подпись и варианты названы так же, как сама сцена
+               («Функции min и max»), а не описательно. -->
           <div class="seg" id="mm-mode">
-            <button class="seg-btn active" id="mm-min">Наименьшую</button>
-            <button class="seg-btn" id="mm-max">Наибольшую</button>
+            <button class="seg-btn active" id="mm-min">min</button>
+            <button class="seg-btn" id="mm-max">max</button>
           </div>
         </div>
         <div class="field pw-count-field">
@@ -1928,7 +1937,7 @@
       <div class="fold-body open" id="marks-body">
         <div class="hint-row">
           <span class="hint-lead">Зачем ставить точки</span>
-          <button class="hint-btn" type="button" data-pop="hp-marks" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-marks">
           <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
@@ -1956,7 +1965,7 @@
       <div class="fold-body" id="areascalc-body">
         <div class="hint-row">
           <span class="hint-lead">Что здесь считается</span>
-          <button class="hint-btn" type="button" data-pop="hp-areascalc" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-areascalc">
           <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>

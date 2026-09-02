@@ -1119,6 +1119,84 @@ cmp('пол 101: CS', r.cs, 0, 1e-9);
 cmp('пол 101: PS', r.ps, 0, 1e-9);
 cmp('пол 101: потери общества', r.dwl, 2500, 1e-3);
 
+/* ================================================================
+   СЕССИЯ 01.09 (3) · РАЗДЕЛ «МАТЕМАТИКА».
+   ================================================================ */
+head('Сессия 01.09 (3) · производная: регуляторы переехали в аналитику');
+r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
+  var inSide = function (id, panel) {
+    var e = document.getElementById(id);
+    return e && e.closest(panel) ? 1 : 0;
+  };
+  var sec = document.getElementById('chk-secant');
+  sec.checked = true; sec.dispatchEvent(new Event('change', { bubbles: true }));
+  return { x0right: inSide('mathx0-field', '#params-panel'),
+           x0left: inSide('mathx0-field', '#tools-panel'),
+           secRight: inSide('math-secant-row', '#params-panel'),
+           dxRight: inSide('mathdx-field', '#params-panel'),
+           dxShown: (document.getElementById('mathdx-field').style.display !== 'none') ? 1 : 0,
+           inputLeft: inSide('inp-mathf', '#tools-panel'),
+           numHidden: document.getElementById('mathx0-input').classList.contains('reg-num-hidden') ? 1 : 0,
+           eq: !!document.querySelector('#mathx0-field .reg-eq') };`);
+cmp('ползунок x₀ в правой панели', r.x0right, 1, 0);
+cmp('его в левой больше нет', r.x0left, 0, 0);
+cmp('секущая тоже справа', r.secRight, 1, 0);
+cmp('её ползунок Δx уехал вместе с ней', r.dxRight, 1, 0);
+cmp('и показался вместе с галочкой', r.dxShown, 1, 0);
+cmp('ввод функции остался слева', r.inputLeft, 1, 0);
+cmp('x₀ получил общий компонент регулятора', r.eq, true, 0);
+cmp('своё числовое поле спрятано', r.numHidden, 1, 0);
+r = await run(`var sec = document.getElementById('chk-secant');
+  sec.checked = false; sec.dispatchEvent(new Event('change', { bubbles: true }));
+  return { dxShown: (document.getElementById('mathdx-field').style.display !== 'none') ? 1 : 0 };`);
+cmp('снятая галочка снова прячет Δx', r.dxShown, 0, 0);
+
+head('Сессия 01.09 (3) · «Построение графиков» открывается с функцией');
+r = await run(`resetSceneMemory(); pickScene('m-graph'); redrawAll();
+  var c = (STATE.curves || [])[0] || {};
+  var box = document.getElementById('sb-body');
+  return { n: (STATE.curves || []).length, expr: c.expr,
+           at0: c.compiled ? evalCurve(c, 0) : null,
+           at2: c.compiled ? evalCurve(c, 2) : null,
+           panel: box ? (box.textContent || '').length : 0 };`);
+cmp('кривая одна', r.n, 1, 0);
+cmp('это x^2-4', r.expr, 'x^2-4', 0);
+cmp('значение в нуле', r.at0, -4, 1e-9);
+cmp('значение в двойке', r.at2, 0, 1e-9);
+cmp('ключевые значения не пусты', r.panel > 10, true, 0);
+
+head('Сессия 01.09 (3) · «Функции min и max» и подсказки по наведению');
+r = await run(`resetSceneMemory(); pickScene('m-minmax'); redrawAll();
+  var lab = document.querySelector('#math-pane-minmax .field label');
+  var t = document.getElementById('mm-mode');
+  var txt = t ? (t.textContent || '').replace(/\\s+/g, ' ').trim() : '';
+  var host = t ? t.parentElement : null;
+  var all = host ? (host.textContent || '').replace(/\\s+/g, ' ') : '';
+  return { lab: lab ? lab.textContent.trim() : '', txt: txt,
+           noOld: /Наименьшую|Наибольшую/.test(all) ? 0 : 1 };`);
+cmp('подпись переключателя', r.lab, 'Какую функцию ищем', 0);
+cmp('прежних слов не осталось', r.noOld, 1, 0);
+cmp('варианты названы min и max', /min/.test(r.txt) && /max/.test(r.txt), true, 0);
+
+/* ⚠️ Стережём ПРАВИЛО «подсказка открывается по наведению», а не список
+   кнопок: атрибута data-pop-trigger больше нет, и наведение обязано работать
+   у КАЖДОЙ кнопки «?» с плашкой — иначе следующую снова забудут. */
+r = await run(`var bad = [], n = 0;
+  document.querySelectorAll('.hint-btn[data-pop]').forEach(function (b) {
+    var pop = document.getElementById(b.getAttribute('data-pop'));
+    if (!pop) return;
+    n++;
+    pop.classList.remove('open');
+    b.dispatchEvent(new PointerEvent('pointerenter', { bubbles: true }));
+    if (!pop.classList.contains('open')) bad.push(b.getAttribute('data-pop'));
+    b.dispatchEvent(new PointerEvent('pointerleave', { bubbles: true }));
+  });
+  return { n: n, bad: bad.length, who: bad.join(','),
+           attr: document.querySelectorAll('[data-pop-trigger]').length };`);
+cmp('кнопок «?» с плашкой найдено', r.n > 6, true, 0);
+cmp('ни одна не осталась «только по щелчку»', r.bad, 0, 0);
+cmp('меток data-pop-trigger не осталось', r.attr, 0, 0);
+
 console.log('\nОшибок страницы: ' + errs.length + (errs.length ? ' | ' + errs.slice(0, 3).join(' | ') : ''));
 console.log(bad ? ('ПРОВАЛОВ: ' + bad + ' из ' + total) : ('ВСЕ ' + total + ' КОНТРОЛЬНЫХ ЧИСЕЛ СОШЛИСЬ'));
 await browser.close();
