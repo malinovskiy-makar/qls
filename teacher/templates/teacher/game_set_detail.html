@@ -108,7 +108,7 @@
         <td class="num">{{ q.wrong }}</td>
         <td class="num">{{ q.skip }}</td>
         <td class="num {% if q.percent is not None and q.percent < 50 %}sd-hard{% endif %}">
-          {% if q.percent is not None %}{{ q.percent }}%{% else %}—{% endif %}
+          {% if q.percent is not None %}{{ q.percent }}%{% else %}–{% endif %}
         </td>
       </tr>
     {% empty %}
@@ -118,7 +118,7 @@
   </table>
 </div>
 <p class="sd-note">
-  Доля верных считается ВНУТРИ этого набора — по забегам тех, кто его играл.
+  Доля верных считается ВНУТРИ этого набора, по забегам тех, кто его играл.
   Пропуск в долю не входит: он не ответ.
 </p>
 {% endblock %}

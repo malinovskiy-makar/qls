@@ -137,7 +137,7 @@
   <div>
     <h1 class="page-title">{{ assignment.name }}</h1>
     <div class="page-sub">
-      Так задание выглядит целиком — ещё до того, как кто-то начал решать.
+      Так задание выглядит целиком, ещё до того, как кто-то начал решать.
     </div>
   </div>
   {% comment %}
@@ -173,7 +173,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   <a href="{% url 'teacher:assignment_export' group.pk assignment.pk %}?for=teacher">.tex с ответами</a>
 </div>
 <div class="k-hint" style="margin:-8px 0 18px">
-  В окне печати снимите галочку «Колонтитулы» — иначе браузер допишет
+  В окне печати снимите галочку «Колонтитулы», иначе браузер допишет
   сверху и снизу свой адрес.
 </div>
 
@@ -190,7 +190,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
   <div class="summary-cell">
     <div class="summary-label">Дедлайн</div>
     <div class="summary-value">
-      {% if stats.deadline %}{{ stats.deadline|date:"d.m H:i" }}{% else %}—{% endif %}
+      {% if stats.deadline %}{{ stats.deadline|date:"d.m H:i" }}{% else %}–{% endif %}
     </div>
   </div>
   <div class="summary-cell">
@@ -215,7 +215,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 <div class="k-state k-state--warn" style="margin-bottom: 16px;">
   <span class="k-state__icon">!</span>
   <span class="k-state__note">
-    Баллы заперты — работу уже сдавали. Оценки выставлены по этой шкале, и
+    Баллы заперты, работу уже сдавали. Оценки выставлены по этой шкале, и
     менять максимум задним числом значило бы переписать их всем.
   </span>
 </div>
@@ -224,11 +224,11 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 {% if assignment.is_exam %}
 <div class="note" style="margin-bottom: 20px;">
   {% if assignment.exam_mode == 'window' %}
-    Окно: {{ assignment.starts_at|date:"d.m.Y H:i"|default:"—" }} —
-    {{ assignment.ends_at|date:"d.m.Y H:i"|default:"—" }}. Пишут все одновременно.
+    Окно: {{ assignment.starts_at|date:"d.m.Y H:i"|default:"–" }} –
+    {{ assignment.ends_at|date:"d.m.Y H:i"|default:"–" }}. Пишут все одновременно.
   {% else %}
-    Сдать до {{ assignment.deadline_at|date:"d.m.Y H:i"|default:"—" }},
-    на выполнение {{ assignment.duration_minutes|default:"—" }} минут
+    Сдать до {{ assignment.deadline_at|date:"d.m.Y H:i"|default:"–" }},
+    на выполнение {{ assignment.duration_minutes|default:"–" }} минут
     с момента старта. Время истечения считает сервер.
   {% endif %}
 </div>
@@ -359,7 +359,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
 
       <div class="check-body">
         <p class="check-why">
-          Ответ взят из каталога. Советуем проверить его до выдачи работы —
+          Ответ взят из каталога. Советуем проверить его до выдачи работы:
           <span class="check-hint" tabindex="0"
                 title="Правка здесь меняет только эту работу. Каталог остаётся как был.">почему</span>.
         </p>
@@ -374,7 +374,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
                  data-key="{{ arow.key }}"
                  data-catalog="{{ arow.from_catalog }}"
                  value="{{ arow.approved|default:arow.from_catalog }}"
-                 placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет — впишите свой{% endif %}">
+                 placeholder="{% if arow.from_catalog %}{{ arow.from_catalog }}{% else %}ответа в каталоге нет, впишите свой{% endif %}">
           {% comment %}
           Подпись «в каталоге» — только когда каталог говорит НЕ ТО, что
           стоит в поле. Совпадает — сравнивать нечего, и подпись была бы
@@ -433,12 +433,12 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
       Эталонное решение
       {% if row.item.has_solution %}
         ({% if row.item.solution_source == 'catalog' %}из каталога{% else %}своё{% endif %})
-      {% else %}— не задано{% endif %}
+      {% else %}не задано{% endif %}
     </summary>
     <div class="fold-body">
       {% if row.item.has_solution and row.item.solution_source == 'catalog' %}
       <div class="row-meta" style="margin-bottom:8px;">
-        Решение подгружено из каталога. Можно заменить своим — напишите
+        Решение подгружено из каталога. Можно заменить своим: напишите
         его ниже, оно станет главнее.
       </div>
       {% endif %}
@@ -446,7 +446,7 @@ Chromium на 200–400 МБ при 512 МБ на всё приложение (�
                 style="width:100%;font:inherit;font-size:14px;padding:8px 10px;
                        border-radius:var(--r);border:0.5px solid var(--border);
                        background:var(--surface);color:var(--text);"
-                placeholder="Своё решение (пусто — берётся решение каталога)">{{ row.item.solution_override }}</textarea>
+                placeholder="Своё решение (пусто: берётся решение каталога)">{{ row.item.solution_override }}</textarea>
       {% if row.item.has_solution and row.item.solution_source == 'catalog' %}
       <div style="margin-top:8px;padding:10px 12px;background:var(--surface);
                   border-radius:var(--r);font-size:14px;line-height:1.7;">

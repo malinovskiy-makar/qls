@@ -90,7 +90,7 @@ ai_error, steps, kind, group_id.
           <input class="k-num" type="number" name="min_difficulty"
                  min="1" max="5" value="{{ form.min_difficulty }}"
                  aria-label="сложность от">
-          <span class="k-quiet">—</span>
+          <span class="k-quiet">–</span>
           <input class="k-num" type="number" name="max_difficulty"
                  min="1" max="5" value="{{ form.max_difficulty }}"
                  aria-label="сложность до">
@@ -116,7 +116,7 @@ ai_error, steps, kind, group_id.
     написано в коде — а интерфейс раньше обещал фильтр, которого нет.
     {% endcomment %}
     <div class="k-hint">
-      Сложность — это предпочтение, а не жёсткий отбор: задачи вне диапазона
+      Сложность это предпочтение, а не жёсткий отбор: задачи вне диапазона
       встанут ниже, но могут попасть.
     </div>
 
@@ -134,7 +134,7 @@ ai_error, steps, kind, group_id.
       <span class="k-state__body">
         <span class="k-state__title">{{ ai_error.text }}</span>
         <span class="k-state__note">Соберите работу вручную:
-          <a href="{{ steps.pick }}">Искать самому</a> — ручной поиск по каталогу.
+          <a href="{{ steps.pick }}">Искать самому</a>: ручной поиск по каталогу.
         </span>
       </span>
     </div>
@@ -160,8 +160,8 @@ ai_error, steps, kind, group_id.
   <aside class="gen-side">
     <div class="gen-card gen-sum">
       <div class="gen-cap">Что получится</div>
-      <div class="gen-sum__line" id="sum-count">—</div>
-      <div class="gen-sum__line k-quiet" id="sum-hard">—</div>
+      <div class="gen-sum__line" id="sum-count">–</div>
+      <div class="gen-sum__line k-quiet" id="sum-hard">–</div>
       <div class="k-hint">Задачи выберете на следующем шаге.</div>
     </div>
   </aside>

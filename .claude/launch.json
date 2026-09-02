@@ -123,6 +123,18 @@
         "--noreload"
       ],
       "port": 8421
+    },
+    {
+      "name": "dev-figure",
+      "runtimeExecutable": "venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8011",
+        "--noreload",
+        "--settings=config.settings_figure"
+      ],
+      "port": 8011
     }
   ]
 }

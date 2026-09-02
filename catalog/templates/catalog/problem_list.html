@@ -707,7 +707,7 @@
     {% if is_zero_state %}
     <!-- ── Нулевое состояние: атлас 21 канонической темы ── -->
     <h1 class="atlas-head">Каталог задач</h1>
-    <p class="atlas-sub">Выберите тему — или воспользуйтесь поиском и фильтрами слева</p>
+    <p class="atlas-sub">Выберите тему или воспользуйтесь поиском и фильтрами слева</p>
     <div class="atlas-grid">
       {% for t in atlas %}
       <a class="atlas-tile" href="?{% set_param request 'topic' t.id %}">
@@ -780,12 +780,12 @@
         <tbody>
           {% for card in cards %}
           <tr>
-            <td class="col-diff" data-type="num">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% else %}—{% endif %}</td>
+            <td class="col-diff" data-type="num">{% if card.problem.difficulty %}{% for i in card.difficulty_stars %}★{% endfor %}{% else %}–{% endif %}</td>
             <td class="col-title"><a class="t-title" href="/catalog/problem/{{ card.problem.pk }}/">{% if card.problem.title %}{{ card.problem.title }}{% else %}Задача #{{ card.problem.pk }}{% endif %}</a></td>
-            <td class="col-topic">{% if card.topics %}{{ card.topics.0.name }}{% else %}—{% endif %}</td>
-            <td class="col-type">{{ card.problem.problem_type|default:'—' }}</td>
-            <td class="col-src">{{ card.source|default:'—' }}</td>
-            <td class="col-sol" data-type="num">{% if card.has_solution %}<span class="yes">✓</span>{% else %}—{% endif %}</td>
+            <td class="col-topic">{% if card.topics %}{{ card.topics.0.name }}{% else %}–{% endif %}</td>
+            <td class="col-type">{{ card.problem.problem_type|default:'–' }}</td>
+            <td class="col-src">{{ card.source|default:'–' }}</td>
+            <td class="col-sol" data-type="num">{% if card.has_solution %}<span class="yes">✓</span>{% else %}–{% endif %}</td>
             <td class="col-act" data-type="num"><button class="ca-btn ca-preview" onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button></td>
           </tr>
           {% endfor %}

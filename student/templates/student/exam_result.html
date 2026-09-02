@@ -1,6 +1,6 @@
 {% extends "student/base.html" %}
 
-{% block title %}{{ assignment.name }} — результат{% endblock %}
+{% block title %}{{ assignment.name }} · результат{% endblock %}
 
 {% block extra_style %}
 {% include "student/_work_style.html" %}
@@ -41,21 +41,21 @@
     <div class="res-score">{{ summary.scored }} / {{ summary.graded_max }}</div>
     <div class="res-cap">баллов по проверенным задачам</div>
   {% else %}
-    <div class="res-score">—</div>
+    <div class="res-score">–</div>
     <div class="res-cap">преподаватель откроет результат после проверки</div>
   {% endif %}
 
   <div class="res-meta">
     <span>сдано {{ attempt.submitted_at|date:"d.m.Y, H:i" }}</span>
     {% if spent_minutes is not None %}<span>затрачено {{ spent_minutes }} мин</span>{% endif %}
-    {% if attempt.is_auto_submitted %}<span>сдана автоматически — время вышло</span>{% endif %}
+    {% if attempt.is_auto_submitted %}<span>сдана автоматически, время вышло</span>{% endif %}
     {% if group_average is not None %}<span>средний балл группы: {{ group_average }}</span>{% endif %}
   </div>
 
   {% if summary.pending %}
   <div class="res-warn">
     Это <b>предварительный результат</b>: задач, которые проверяет
-    преподаватель, — {{ summary.pending }}. Итоговый балл появится после
+    преподаватель, столько: {{ summary.pending }}. Итоговый балл появится после
     проверки.
   </div>
   {% endif %}

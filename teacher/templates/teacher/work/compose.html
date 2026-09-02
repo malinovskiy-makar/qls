@@ -122,7 +122,7 @@
 законный сценарий ради подсказки.
 {% endcomment %}
 <div class="k-state k-state--warn wk-big" id="wk-big" hidden>
-  Работа получается очень большой — <b id="wk-big-n">0</b> позиций.
+  Работа получается очень большой: <b id="wk-big-n">0</b> позиций.
   Ученику её, скорее всего, не осилить за один раз.
 </div>
 
@@ -134,7 +134,7 @@
 
 <div class="wk-empty" id="wk-none" hidden>
   <b>В работе пока ничего нет</b>
-  Вернитесь к выбору и добавьте задачи — из каталога, подбором по описанию
+  Вернитесь к выбору и добавьте задачи из каталога, подбором по описанию
   или написав свою.
   <div><a class="k-btn k-btn--main k-btn--sm" href="{{ steps.pick }}">Вернуться к выбору</a></div>
 </div>
@@ -179,7 +179,7 @@
   </div>
 </div>
 
-{% include "teacher/work/_bar.html" with next_url=steps.give next_label="Дальше — выдача →" back_url=steps.pick back_label="← Добавить ещё" %}
+{% include "teacher/work/_bar.html" with next_url=steps.give next_label="Дальше выдача →" back_url=steps.pick back_label="← Добавить ещё" %}
 </div>
 
 {% comment %}Разметка позиции одна — скрипт клонирует её же.{% endcomment %}

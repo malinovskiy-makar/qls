@@ -492,6 +492,21 @@ def _game_page_context(request):
     return {
         'auto_set': None,
         'auto_set_json': 'null',
+        # ⚠️ КАРТОЧКА ССЫЛКИ НУЖНА И СТАРТОВОМУ ЭКРАНУ, а не только странице
+        # результата. Ссылкой на сам тренажёр делятся чаще, чем ссылкой на
+        # чужой забег, и без og:image мессенджер показывал голый адрес.
+        # Картинка одна и та же (game/static/game/og_default.png), рисует её
+        # `make_og_image`.
+        'og_image': request.build_absolute_uri(static('game/og_default.png')),
+        'og_title': 'Wecon Rush · игра на скорость по экономике',
+        'og_description': ('Три жизни, четыре режима, вопросы из реальных '
+                           'олимпиад. Сколько наберёшь?'),
+        'page_url': request.build_absolute_uri(),
+        # Панель прослушивания звука — служебная: только staff и только по
+        # явному ?sound_check=1. Обычному игроку блока нет в разметке вовсе.
+        'sound_check': (request.GET.get('sound_check') == '1'
+                        and request.user.is_authenticated
+                        and request.user.is_staff),
         # Темы — все канонические, разделами окна фильтров, СО СВОИМИ
         # числами: сколько вопросов пула лежит по каждой. Считает сервер —
         # шаблону нечем складывать словарь с ключом-строкой.
@@ -2127,8 +2142,24 @@ def stats_page(request):
 
     Вопросы без набранных попыток внизу списка: у них ещё нечего смотреть.
     """
-    tab = 'arch' if request.GET.get('tab') == 'arch' else 'pool'
+    raw_tab = request.GET.get('tab')
+    tab = raw_tab if raw_tab in ('arch', 'econ') else 'pool'
     min_attempts = config.STATS_MIN_ATTEMPTS
+
+    if tab == 'econ':
+        # Прибор для тюнинга экономики. Считает ТА ЖЕ функция, что и
+        # команда game_economy_report: второй расчёт того же самого
+        # разошёлся бы с первым при первой правке.
+        from game.economy_report import report as economy_report
+        data = economy_report(min_attempts)
+        for row in data['by_difficulty']:
+            row['base'] = config.BASE_BY_DIFFICULTY.get(row['star'])
+        return render(request, 'game/stats.html', {
+            'tab': tab, 'econ': data, 'rows': [], 'arch_rows': [],
+            'min_attempts': min_attempts,
+            'broken_pct': round(100 * config.STATS_BROKEN_BELOW),
+            'trivial_pct': round(100 * config.STATS_TRIVIAL_ABOVE),
+        })
 
     if tab == 'arch':
         rows = []
@@ -2164,7 +2195,7 @@ def stats_page(request):
             'id': gq.id,
             'text': gq.question[:140],
             'type': gq.get_question_type_display(),
-            'topics': ', '.join(gq.topics or []) or '—',
+            'topics': ', '.join(gq.topics or []) or '–',
             'shown': st.shown if st else 0,
             'attempts': attempts,
             'percent': percent,

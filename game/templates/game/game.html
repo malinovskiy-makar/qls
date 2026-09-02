@@ -18,6 +18,21 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Wecon Rush – игра на скорость по экономике</title>
+  <meta name="description" content="{{ og_description }}">
+
+  {# Карточка ссылки: та же картинка, что у страницы результата. #}
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Weconomics">
+  <meta property="og:title" content="{{ og_title }}">
+  <meta property="og:description" content="{{ og_description }}">
+  <meta property="og:url" content="{{ page_url }}">
+  <meta property="og:image" content="{{ og_image }}">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="{{ og_title }}">
+  <meta name="twitter:description" content="{{ og_description }}">
+  <meta name="twitter:image" content="{{ og_image }}">
 
   {% include '_tokens.html' %}
 
@@ -761,6 +776,24 @@ a:focus-visible, button:focus-visible {
 .set-play[disabled] { opacity: .5; cursor: default; }
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
+
+/* ── Панель прослушивания звука (staff, ?sound_check=1) ─────────────
+   Служебный блок: намеренно неброский, без фирменных акцентов. Он не
+   часть экрана игрока и не должен на него претендовать. */
+.sound-check {
+  max-width: 1280px; margin: 28px auto 0; padding: 14px 16px;
+  border: 1px dashed var(--border); border-radius: 10px;
+  color: var(--text2); font-size: 14px;
+}
+.sound-check b { display: block; margin-bottom: 8px; color: var(--text); }
+.sound-check__row { display: flex; flex-wrap: wrap; gap: 8px; }
+.sound-check__row button {
+  font: inherit; padding: 6px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); cursor: pointer;
+}
+.sound-check__row button:hover { border-color: var(--text3); }
+.sound-check__note { display: block; margin-top: 8px; color: var(--text3); }
 /* Плашка «этот забег по набору» на экране результатов */
 .fin-chip-set {
   border-color: var(--rush-accent);
@@ -1978,6 +2011,28 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </div>
       </div>
     </div>
+
+    {% if sound_check %}
+    {# ── Панель прослушивания звука ─────────────────────────────────────
+       Служебная: только staff и только по ?sound_check=1. Нужна для приёмки
+       НА СЛУХ — иначе, чтобы услышать «жизнь», надо трижды ошибиться, а
+       чтобы услышать «рекорд», сначала его поставить.
+       Кнопки зовут ровно те же функции, что и игра (window.rushSound), а не
+       свои копии: панель, играющая другой звук, бесполезна. #}
+    <div class="sound-check" id="sound-check">
+      <b>Прослушать звуки</b>
+      <div class="sound-check__row">
+        <button type="button" data-sound="correct">верно</button>
+        <button type="button" data-sound="wrong">неверно</button>
+        <button type="button" data-sound="lifeLost">жизнь</button>
+        <button type="button" data-sound="record">рекорд</button>
+        <button type="button" data-hb="70">сердцебиение 70</button>
+        <button type="button" data-hb="130">сердцебиение 130</button>
+        <button type="button" data-hb="stop">стоп</button>
+      </div>
+      <span class="sound-check__note" id="sound-check-note"></span>
+    </div>
+    {% endif %}
   </section>
 
   <!-- ЭКРАН 2: ИГРА -->
@@ -5189,6 +5244,34 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       }
     }
   });
+
+  // ── Панель прослушивания (только staff, только ?sound_check=1) ────────
+  // Блока в разметке нет вовсе, когда панель не запрошена, поэтому здесь
+  // достаточно проверки на его существование.
+  (function () {
+    var panel = document.getElementById('sound-check');
+    if (!panel) return;
+    var note = document.getElementById('sound-check-note');
+    panel.addEventListener('click', function (e) {
+      var b = e.target.closest('button');
+      if (!b) return;
+      var snd = window.rushSound;
+      if (!snd) { note.textContent = 'звук не загрузился'; return; }
+      if (!snd.isOn()) snd.toggle();
+      var hb = b.getAttribute('data-hb');
+      if (hb) {
+        if (hb === 'stop') { snd.heartbeat.stop(); note.textContent = 'стоп'; }
+        else { snd.heartbeat.start(parseInt(hb, 10));
+               note.textContent = hb + ' ударов в минуту'; }
+        return;
+      }
+      var name = b.getAttribute('data-sound');
+      // «верно» звучит с множителем комбо — берём средний, чтобы слышать
+      // не крайний случай.
+      if (name === 'correct') { snd.correct(1.5); } else { snd[name](); }
+      note.textContent = b.textContent;
+    });
+  })();
 
 })();
 </script>

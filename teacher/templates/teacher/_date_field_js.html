@@ -224,11 +224,11 @@
   function outOfBounds(date, bounds) {
     if (!date || !bounds) { return ''; }
     if (bounds.min && date < bounds.min) {
-      return 'Эта дата уже прошла. Самое раннее — сегодня, '
+      return 'Эта дата уже прошла. Самое раннее это сегодня, '
              + human(bounds.min) + '.';
     }
     if (bounds.max && date > bounds.max) {
-      return 'Слишком далеко. Самое позднее — ' + human(bounds.max) + '.';
+      return 'Слишком далеко. Самое позднее это ' + human(bounds.max) + '.';
     }
     return '';
   }

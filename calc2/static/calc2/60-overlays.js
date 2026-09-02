@@ -1889,7 +1889,7 @@ function renderVertList() {
 
     const t = document.createElement('span');
     t.className = 'vert-co';
-    t.setAttribute('data-tip', 'Двойной щелчок — поправить координаты');
+    t.setAttribute('data-tip', 'Двойной щелчок поправит координаты');
     const paint = () => {
       t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
     };

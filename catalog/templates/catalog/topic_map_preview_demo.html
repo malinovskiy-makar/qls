@@ -11,7 +11,7 @@
 останавливается, когда блок уехал за край.
 {% endcomment %}
 
-{% block title %}Предпросмотр карты — стенд{% endblock %}
+{% block title %}Предпросмотр карты · стенд{% endblock %}
 
 {% block extra_style %}
 /* Стенд, а не экран продукта: своих классов у него нет, три правила под
@@ -27,7 +27,7 @@
 {% block content %}
 <link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
 
-<h1 class="demo-h">Предпросмотр карты — стенд</h1>
+<h1 class="demo-h">Предпросмотр карты · стенд</h1>
 <p class="demo-p">
   Служебная страница. Проверяются: отсутствие подписей, медленное вращение,
   безразличие к курсору, клик в любом месте, остановка вне экрана и при
@@ -40,13 +40,13 @@
    data-tmap-preview
    data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
    href="{% url 'catalog:topic_map' %}"
-   aria-label="Интерактивная карта тем и тегов — открыть">
+   aria-label="Интерактивная карта тем и тегов, открыть">
   <span class="tmap-preview-cap"><b>Карта тем и тегов</b> · 29 тем, 343 тега</span>
 </a>
 
 <div style="height: 130vh"></div>
 
-<h2 class="demo-h2">Второй блок — ниже первого экрана</h2>
+<h2 class="demo-h2">Второй блок, ниже первого экрана</h2>
 <p class="demo-p">
   До прокрутки сюда данные не запрашиваются вовсе: у блока свой наблюдатель
   видимости.
@@ -56,7 +56,7 @@
    data-tmap-preview
    data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
    href="{% url 'catalog:topic_map' %}"
-   aria-label="Интерактивная карта тем и тегов — открыть"></a>
+   aria-label="Интерактивная карта тем и тегов, открыть"></a>
 
 <div style="height: 40vh"></div>
 {% endblock %}

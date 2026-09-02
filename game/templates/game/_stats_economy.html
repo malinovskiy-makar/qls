@@ -1,0 +1,141 @@
+{% comment %}
+Раздел «Экономика v2» служебной страницы /game/stats/.
+
+⚠️ ЭТО ПРИБОР, А НЕ ПАНЕЛЬ УПРАВЛЕНИЯ. Ни одно число экономики отсюда не
+правится: их правит человек в game/config.py и только по замеру. Здесь
+показано, что мерить.
+
+Сводку считает game/economy_report.py::report — та же функция, что и у
+команды `game_economy_report`. Второй расчёт того же самого разошёлся бы с
+первым при первой правке.
+{% endcomment %}
+<p class="st-legend">
+  <span>Забегов экономики v2: <b>{{ econ.total_runs }}</b></span>
+  <span>Из них незачётных: <b>{{ econ.unranked }}</b></span>
+  <span>Порог попыток для долей: <b>{{ econ.min_attempts }}</b></span>
+</p>
+
+{% if not econ.total_runs %}
+<p class="st-legend" style="margin-top:12px">
+  Живых забегов на новой шкале ещё нет. Мерить нечего, и подкручивать числа
+  до появления забегов нельзя: это ровно то «на глаз», от которого
+  отказались на порогах «Штриха».
+</p>
+{% endif %}
+
+<h2 class="st-h2">По режимам</h2>
+<div class="st-table-box">
+  <table class="st">
+    <thead>
+      <tr>
+        <th>Режим</th><th class="num">Забегов</th>
+        <th class="num">Итог p50</th><th class="num">p90</th>
+        <th class="num">Максимум</th>
+        <th class="num">Точность p50</th>
+        <th class="num">Множитель &lt; 1</th>
+        <th class="num">Прибавка множителей</th>
+        <th class="num">Сек. на верный</th>
+        <th class="num">THINK_S</th>
+      </tr>
+    </thead>
+    <tbody>
+    {% for m in econ.by_mode %}
+      <tr>
+        <td>{{ m.title }}</td>
+        <td class="num">{{ m.runs }}</td>
+        <td class="num">{% if m.score_p50 is not None %}{{ m.score_p50 }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num">{% if m.score_p90 is not None %}{{ m.score_p90 }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num">{% if m.score_max is not None %}{{ m.score_max }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num pct">{% if m.accuracy_p50 is not None %}{{ m.accuracy_p50 }} %{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num pct">{% if m.penalized_share is not None %}{{ m.penalized_share }} %{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num pct">{% if m.mult_gain is not None %}{{ m.mult_gain }} %{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num">{% if m.avg_correct_s is not None %}{{ m.avg_correct_s }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num">{{ m.think_s }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="st-legend" style="margin-top:12px">
+  «Множитель &lt; 1» это доля забегов, где точность СНИЗИЛА итог: главный
+  тормоз угадывания, и по нему видно, срабатывает ли он вообще.
+  «Прибавка множителей» показывает, насколько итог выше сырых очков.
+  Последние две колонки стоят рядом нарочно: если замер и константа
+  <code>THINK_S</code> разъехались, бонус за скорость раздаёт не то.
+</p>
+
+<h2 class="st-h2">Почему забеги не идут в таблицу</h2>
+<div class="st-table-box">
+  <table class="st">
+    <thead><tr><th>Причина</th><th class="num">Забегов</th></tr></thead>
+    <tbody>
+    {% for r in econ.reasons %}
+      <tr><td>{{ r.text }}</td><td class="num">{{ r.n }}</td></tr>
+    {% empty %}
+      <tr><td colspan="2" class="st-empty">Незачётных забегов нет.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<h2 class="st-h2">Доля верных по эффективной сложности</h2>
+<div class="st-table-box">
+  <table class="st">
+    <thead>
+      <tr><th class="num">Звёзд</th><th class="num">Ответов</th>
+          <th class="num">Верных</th><th class="num">BASE</th></tr>
+    </thead>
+    <tbody>
+    {% for d in econ.by_difficulty %}
+      <tr>
+        <td class="num">{{ d.star }}★</td>
+        <td class="num">{{ d.total }}</td>
+        <td class="num pct">{% if d.share is not None %}{{ d.share }} %{% else %}<span class="st-dash">–</span>{% endif %}</td>
+        <td class="num">{{ d.base }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+<p class="st-legend" style="margin-top:12px">
+  Пустая строка 5★ значит, что верхняя ступень шкалы пока недостижима: в
+  банке вопросов на пять звёзд нет, и появиться они могут только измеренной
+  сложностью или сгенерированными.
+</p>
+
+<h2 class="st-h2">Кандидаты на чистку пула</h2>
+<p class="st-legend">
+  <span style="color:var(--error)">почти никто не решает: доля &lt; {{ broken_pct }} %</span>
+  <span>решают почти все: доля &gt; {{ trivial_pct }} %</span>
+</p>
+<div class="st-table-box">
+  <table class="st">
+    <thead>
+      <tr><th class="num">% верных</th><th class="num">Попыток</th>
+          <th>Вопрос</th><th class="num">Задача</th></tr>
+    </thead>
+    <tbody>
+    {% for r in econ.hard %}
+      <tr class="broken">
+        <td class="num pct">{{ r.share }} %</td>
+        <td class="num">{{ r.attempts }}</td>
+        <td>{{ r.text }}</td>
+        <td class="num">{% if r.problem_id %}#{{ r.problem_id }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% for r in econ.trivial %}
+      <tr class="trivial">
+        <td class="num pct">{{ r.share }} %</td>
+        <td class="num">{{ r.attempts }}</td>
+        <td>{{ r.text }}</td>
+        <td class="num">{% if r.problem_id %}#{{ r.problem_id }}{% else %}<span class="st-dash">–</span>{% endif %}</td>
+      </tr>
+    {% endfor %}
+    {% if not econ.hard and not econ.trivial %}
+      <tr><td colspan="4" class="st-empty">
+        Вопросов с набранной статистикой на краях распределения нет.
+      </td></tr>
+    {% endif %}
+    </tbody>
+  </table>
+</div>

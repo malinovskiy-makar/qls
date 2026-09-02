@@ -5,12 +5,11 @@ u"""Типографика: длинного тире в тексте сайта
 не используем. Максимум короткое «–» (U+2013), и только там, где оно
 действительно нужно.
 
-⚠️ ЭТОТ ТЕСТ СТОРОЖИТ УЖЕ ВЫЧИЩЕННУЮ ОБЛАСТЬ, А НЕ ВЕСЬ САЙТ. Область
-перечислена в `CLEAN` и держится на нуле. Остальное — записанный долг:
-числа в `DEBT` не выдумка, а замер, и они обязаны только УМЕНЬШАТЬСЯ.
-Поставить сюда «весь сайт» и оставить тест красным значило бы завести
-красный тест, к которому все привыкнут, — а он должен быть либо зелёным,
-либо поводом остановиться.
+⚠️ РАНЬШЕ ЭТОТ ТЕСТ СТОРОЖИЛ ДОЛГ, ТЕПЕРЬ НОЛЬ. В нём был список
+`DEBT` с замеренными числами по каталогам и правило «только уменьшаться»:
+так область доводилась до конца по частям, чтобы не заводить красный тест,
+к которому все привыкнут. 2026-09-02 долг закрыт целиком (271 знак в 70
+файлах), и правило стало простым: НОЛЬ ПО ВСЕМУ САЙТУ.
 
 Комментарии не в счёт: их пользователь не видит. Что именно вырезается —
 в `scripts/check_em_dash.py`.
@@ -25,27 +24,8 @@ from django.test import SimpleTestCase
 
 SCANNER = os.path.join('scripts', 'check_em_dash.py')
 
-# Область, доведённая до нуля. Сюда можно только добавлять.
-CLEAN = [
-    'game',
-    'templates',
-    os.path.join('problems', 'templates', 'platform', 'stats.html'),
-]
 
-# ⚠️ ЗАМЕР, А НЕ ОЦЕНКА (2026-09-02, сессия «Wecon Rush», фаза 9).
-# Верхняя граница долга по каталогам. Число обязано только уменьшаться:
-# выросло — значит кто-то принёс новое длинное тире в текст сайта.
-DEBT = {
-    'teacher': 141,
-    'student': 33,
-    'problems': 35,
-    'catalog': 27,
-    'calc2': 21,
-    'calendar_stub': 14,
-}
-
-
-def scan(paths):
+def scan(paths=()):
     res = subprocess.run(
         [sys.executable, SCANNER, '--json'] + list(paths),
         cwd=str(settings.BASE_DIR), capture_output=True, text=True,
@@ -56,28 +36,14 @@ def scan(paths):
 
 class EmDashTests(SimpleTestCase):
 
-    def test_clean_area_stays_at_zero(self):
-        data = scan(CLEAN)
+    def test_the_whole_site_stays_at_zero(self):
+        u"""Ноль во всех каталогах, чей текст видит пользователь."""
+        data = scan()
         self.assertEqual(
             data['total'], 0,
-            'В вычищенной области снова появилось длинное тире:\n'
+            u'В тексте сайта снова появилось длинное тире:\n'
             + '\n'.join('  %s: %d' % (f['file'], f['count'])
                         for f in data['files']))
-
-    def test_debt_only_shrinks(self):
-        u"""Долг по остальным каталогам не растёт.
-
-        Тест не требует нуля — он требует, чтобы стало не хуже. Так область
-        доводится до конца по частям, а не одним неподъёмным заходом.
-        """
-        grew = []
-        for app, was in sorted(DEBT.items()):
-            now = scan([app])['total']
-            if now > was:
-                grew.append('%s: было %d, стало %d' % (app, was, now))
-        self.assertEqual(grew, [],
-                         'Длинное тире вернулось в текст сайта:\n  '
-                         + '\n  '.join(grew))
 
     def test_scanner_ignores_comments(self):
         u"""Комментарий пользователь не видит — считать его нечестно."""
@@ -101,3 +67,19 @@ class EmDashTests(SimpleTestCase):
         self.assertIn('example.com', out)
         self.assertIn('а — б', out)
         self.assertNotIn('тире — тут', out)
+
+    def test_comment_keeps_the_line_numbering(self):
+        u"""Вырезанный комментарий не должен сдвигать номера строк.
+
+        Раньше многострочный комментарий вырезался целиком, и всё, что
+        стояло ПОСЛЕ него, сканер показывал на чужих строках. Счётчик от
+        этого не страдал, поэтому баг жил незамеченным — и по выводу
+        сканера правились не те места.
+        """
+        sys.path.insert(0, os.path.join(str(settings.BASE_DIR), 'scripts'))
+        from check_em_dash import strip_comments
+        src = '<p>раз</p>\n{% comment %}\nдва\nтри\n{% endcomment %}\n<p>а — б</p>'
+        out = strip_comments(src, '.html')
+        self.assertEqual(len(out.split('\n')), len(src.split('\n')))
+        lines = [i + 1 for i, ln in enumerate(out.split('\n')) if '—' in ln]
+        self.assertEqual(lines, [6])

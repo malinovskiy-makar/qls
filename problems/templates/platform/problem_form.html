@@ -389,7 +389,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
             </div>
             <div class="k-hint">
               Числа сравниваются точно (через дроби, не через плавающую
-              точку). Допуск 0 — совпадение до последнего знака.
+              точку). Допуск 0 значит совпадение до последнего знака.
             </div>
           </div>
 
@@ -451,8 +451,8 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
             <button type="button" class="k-btn k-btn--plain k-btn--sm"
                     id="add-part-btn">+ Пункт</button>
             <span class="k-hint" id="parts-weight-hint" style="margin:0"
-                  {% if not parts %}hidden{% endif %}>Вес — доля балла задачи.
-              Пусто у всех — баллы делятся поровну.</span>
+                  {% if not parts %}hidden{% endif %}>Вес это доля балла задачи.
+              Пусто у всех: баллы делятся поровну.</span>
           </div>
         </div>
 
@@ -475,7 +475,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
             <button type="button" class="k-btn k-btn--plain k-btn--sm"
                     id="add-option-btn">+ Добавить вариант</button>
             <div class="k-hint">
-              Галочка слева — правильный вариант. Множественный выбор
+              Галочка слева отмечает правильный вариант. Множественный выбор
               засчитывается по правилу «всё или ничего».
             </div>
           </div>
@@ -784,7 +784,7 @@ dialog.modal::backdrop { background: rgba(0,0,0,.4); }
 
   function renderPreview() {
     previewBody.innerHTML = asHtml(statement.value)
-      || '<span class="row-meta">Здесь появится задача — так, как её увидит '
+      || '<span class="row-meta">Здесь появится задача так, как её увидит '
        + 'ученик. Пишите условие слева: формулы, пункты и варианты ответа '
        + 'появляются тут сразу.</span>';
 

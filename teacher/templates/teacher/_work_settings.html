@@ -78,7 +78,7 @@
     <label class="k-label" for="id_name">Название</label>
     <input class="k-input" type="text" id="id_name" name="name" required
            value="{{ form.name|default:'' }}"
-           placeholder="{% if is_exam %}Например: Контрольная — эластичность{% else %}Например: Домашка 5 — КПВ{% endif %}">
+           placeholder="{% if is_exam %}Например: Контрольная по эластичности{% else %}Например: Домашка 5 по КПВ{% endif %}">
   </div>
 
   {% if is_exam %}
@@ -104,7 +104,7 @@
                {% if form.kind == 'limit' %}checked{% endif %}>
         <span>
           <span class="ws-when__t">Срок с лимитом</span>
-          <span class="ws-when__d">Сдать до срока, на решение — заданное
+          <span class="ws-when__d">Сдать до срока, на решение даётся заданное
             число минут с момента старта.</span>
         </span>
       </label>
@@ -135,7 +135,7 @@
              id="id_duration" name="duration"
              value="{{ form.duration|default:'60' }}">
       <div class="k-hint">От {{ min_duration }} до {{ max_duration }} минут.
-        Если до крайнего срока останется меньше — время урежется, и ученика
+        Если до крайнего срока останется меньше, время урежется, и ученика
         предупредят ДО старта.</div>
     </div>
   </div>
@@ -155,7 +155,7 @@
   <div class="ws-field{% if not show_points_rule %} ws-field--last{% endif %}">
     <label class="k-label" for="id_deadline">Срок сдачи</label>
     {% include "teacher/_date_field.html" with field_name='deadline' field_id='id_deadline' field_value=form.deadline default_time='23:59' field_what='срок сдачи' %}
-    <div class="k-hint">Можно не задавать — тогда срока нет.</div>
+    <div class="k-hint">Можно не задавать, тогда срока нет.</div>
   </div>
   {% endif %}
 
@@ -186,7 +186,7 @@
       </label>
     </div>
     <div class="k-hint">По сложности: задача стоит столько баллов, какова её
-      сложность (1–5), тест — один. Баллы, которые вы правили руками в
+      сложность (1–5), а тест один. Баллы, которые вы правили руками в
       составе, правило не меняет.</div>
   </div>
   {% endif %}
@@ -247,7 +247,7 @@
       <span>{{ g.name }}
         <span class="k-chip-kind">{{ g.kind_label }}</span>
         {% if not g.is_individual %}<span class="k-quiet">· {{ g.students.count|count_ru:"ученик,ученика,учеников" }}</span>{% endif %}
-        {% if not g.students.count %}<span class="k-quiet ws-empty">— выдавать некому, добавьте учеников</span>{% endif %}
+        {% if not g.students.count %}<span class="k-quiet ws-empty">выдавать некому, добавьте учеников</span>{% endif %}
       </span>
     </label>
     {% endfor %}

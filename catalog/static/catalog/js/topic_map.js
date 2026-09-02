@@ -926,7 +926,7 @@ function wrapLabel(text, maxChars, maxLines) {
     if (used < String(text).replace(/\s+/g, ' ').length) {
       var last = lines[maxLines - 1];
       while (last.length > 3 && last.length > maxChars - 1) last = last.slice(0, -1);
-      lines[maxLines - 1] = last.replace(/[\s,;:—-]+$/, '') + '…';
+      lines[maxLines - 1] = last.replace(/[\s,;:\u2014-]+$/, '') + '…';
     }
   }
   return lines;
@@ -935,7 +935,7 @@ function wrapLabel(text, maxChars, maxLines) {
 function cutLabel(text, maxChars) {
   text = String(text);
   if (text.length <= maxChars) return text;
-  return text.slice(0, maxChars - 1).replace(/[\s,;:—-]+$/, '') + '…';
+  return text.slice(0, maxChars - 1).replace(/[\s,;:\u2014-]+$/, '') + '…';
 }
 
 /* Подложка под подписью: прямоугольник цвета холста.
@@ -2406,7 +2406,7 @@ function renderHover(n) {
     if (n.d) html += '<div class="tmap-def">' + esc(n.d) + '</div>';
     html += n.c
       ? '<div class="tmap-num"><b>' + fmtNum(n.c) + '</b> задач по тегам темы</div>'
-      : '<div class="tmap-num tmap-num--none">— счётчиков у тегов темы нет</div>';
+      : '<div class="tmap-num tmap-num--none">счётчиков у тегов темы нет</div>';
   } else {
     var parent = byId['t' + n.n];
     html += '<span class="tmap-kind">тег темы ' + n.n + '</span>';
@@ -2416,7 +2416,7 @@ function renderHover(n) {
     }
     /* Канон 2.3: отсутствие числа — прочерк и причина, а не пустое место. */
     html += n.c === null || n.c === undefined
-      ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет, тег размечается вручную</span></div>'
+      ? '<div class="tmap-num tmap-num--none">– <span>счётчика нет, тег размечается вручную</span></div>'
       : '<div class="tmap-num"><b>' + fmtNum(n.c) + '</b> задач</div>';
 
     var near = nearOf[n.id] || [];
@@ -2465,7 +2465,7 @@ function renderRoute(r) {
     if (th) html += '<div class="tmap-parent"><span>' + esc(th.l) + '</span></div>';
   }
   html += (far.c === null || far.c === undefined)
-    ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет</span></div>'
+    ? '<div class="tmap-num tmap-num--none">– <span>счётчика нет</span></div>'
     : '<div class="tmap-num"><b>' + fmtNum(far.c) + '</b> задач</div>';
 
   if (isCross && r.why) {
@@ -2600,7 +2600,7 @@ var TOUR = [
     t: 'Встаньте на тег',
     p: 'Наведите курсор на любой мелкий узел. Справа появится его тема, число ' +
        'задач и смежные теги из других тем.',
-    hint: 'Мелкий узел — это тег',
+    hint: 'Мелкий узел это тег',
     at: function () { return wrap; },
     want: function (kind, node) { return kind === 'node' && node.k === 'tag'; }
   },

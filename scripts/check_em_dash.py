@@ -37,15 +37,27 @@ SKIP_PARTS = ('docs', 'reports', 'scripts', '.claude', 'node_modules',
 SKIP_FILES = {os.path.join('templates', '_tokens.html')}
 
 
+def _blank(match):
+    """Комментарий → столько же ПЕРЕВОДОВ СТРОК, сколько в нём было.
+
+    ⚠️ Не пустая строка. Раньше многострочный комментарий вырезался
+    целиком, и все номера строк ПОСЛЕ него уезжали вверх: сканер честно
+    считал 271 знак, но показывал их на чужих строках, и по его выводу
+    правились не те места. Счётчик от этого не страдал, поэтому баг жил
+    незамеченным.
+    """
+    return '\n' * match.group(0).count('\n')
+
+
 def strip_comments(text, ext):
     """Убрать из текста всё, чего пользователь не увидит."""
     if ext == '.html':
-        text = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '',
+        text = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', _blank,
                       text, flags=re.S)
-        text = re.sub(r'\{#.*?#\}', '', text, flags=re.S)
-        text = re.sub(r'<!--.*?-->', '', text, flags=re.S)
+        text = re.sub(r'\{#.*?#\}', _blank, text, flags=re.S)
+        text = re.sub(r'<!--.*?-->', _blank, text, flags=re.S)
     if ext in ('.html', '.js', '.css'):
-        text = re.sub(r'/\*.*?\*/', '', text, flags=re.S)
+        text = re.sub(r'/\*.*?\*/', _blank, text, flags=re.S)
         text = '\n'.join(_strip_line_comment(ln) for ln in text.split('\n'))
     if ext == '.py':
         text = '\n'.join(_strip_py_comment(ln) for ln in text.split('\n'))

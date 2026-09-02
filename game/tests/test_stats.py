@@ -13,7 +13,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from game import config
-from game.models import ArchetypeStat, BankQuestionStat, GameQuestion
+from game.models import (ArchetypeStat, BankQuestionStat, GameQuestion,
+                         GameResult)
 from game import stats as stats_mod
 from problems.models import Problem, ProblemPart
 
@@ -345,3 +346,104 @@ class CatalogSurfaceTests(TestCase):
         r = self.client.get(self.url)
         self.assertContains(r, 'В игре решают верно')
         self.assertContains(r, '100%')
+
+
+class EconomyReportTests(TestCase):
+    u"""Прибор для тюнинга экономики v2: команда и вкладка /game/stats/.
+
+    ⚠️ Считает ОДНА функция на оба места. Тест это и закрепляет: разошлись
+    бы они — на экране и в терминале стояли бы разные числа, и тюнить
+    пришлось бы наугад.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.staff = User.objects.create_user('econ_staff', password='x',
+                                              is_staff=True)
+        self.plain = User.objects.create_user('econ_plain', password='x')
+        # Тридцать забегов с известными числами: 20 Блиц, 10 Классика.
+        for i in range(20):
+            GameResult.objects.create(
+                code='B%06d' % i, user=self.staff, mode='blitz',
+                economy_version=2, score=100 * (i + 1),
+                raw_score=80 * (i + 1), accuracy_mult=0.8 if i < 5 else 1.0,
+                correct_count=10, wrong_count=2, skip_count=1,
+                total_count=13, avg_correct_ms=4000 + i * 100,
+                is_unfiltered=(i % 2 == 0), ranked=(i >= 3),
+                unranked_reason='' if i >= 3 else 'too_few_correct',
+                difficulty_breakdown=[{'key': '3', 'total': 10,
+                                       'correct': 7}])
+        for i in range(10):
+            GameResult.objects.create(
+                code='C%06d' % i, user=self.staff, mode='classic',
+                economy_version=2, score=50 * (i + 1),
+                raw_score=50 * (i + 1), accuracy_mult=1.0,
+                correct_count=5, wrong_count=0, skip_count=0, total_count=5,
+                avg_correct_ms=30000, ranked=True,
+                difficulty_breakdown=[{'key': '5', 'total': 5,
+                                       'correct': 1}])
+        # Забег СТАРОЙ шкалы: в сводку попасть не должен.
+        GameResult.objects.create(code='OLD00001', mode='blitz',
+                                  economy_version=1, score=99999)
+
+    def test_only_v2_runs_are_counted(self):
+        from game.economy_report import report
+        data = report()
+        self.assertEqual(data['total_runs'], 30)
+
+    def test_percentiles_and_shares_are_measured(self):
+        from game.economy_report import report
+        data = report()
+        blitz = next(m for m in data['by_mode'] if m['key'] == 'blitz')
+        self.assertEqual(blitz['runs'], 20)
+        self.assertEqual(blitz['score_max'], 2000)
+        self.assertEqual(blitz['score_p50'], 1000)
+        # У пяти забегов из двадцати точность снизила итог.
+        self.assertEqual(blitz['penalized_share'], 25)
+        # Половина забегов без единого фильтра.
+        self.assertEqual(blitz['unfiltered_share'], 50)
+        # Точность 10 верных из 12 попыток (пропуск не в счёт).
+        self.assertEqual(blitz['accuracy_p50'], 83)
+        self.assertEqual(blitz['avg_correct_s'], 4.9)
+
+    def test_unranked_reasons_are_counted(self):
+        from game.economy_report import report
+        data = report()
+        self.assertEqual(data['unranked'], 3)
+        reason = next(r for r in data['reasons']
+                      if r['key'] == 'too_few_correct')
+        self.assertEqual(reason['n'], 3)
+
+    def test_five_stars_show_up_when_measured(self):
+        u"""Шкала до 250 очков имеет смысл только если 5★ вообще бывают."""
+        from game.economy_report import report
+        data = report()
+        five = next(d for d in data['by_difficulty'] if d['star'] == 5)
+        self.assertEqual(five['total'], 50)
+        self.assertEqual(five['share'], 20)
+        three = next(d for d in data['by_difficulty'] if d['star'] == 3)
+        self.assertEqual(three['total'], 200)
+        self.assertEqual(three['share'], 70)
+
+    def test_tab_is_staff_only(self):
+        self.client.force_login(self.plain)
+        resp = self.client.get('/game/stats/?tab=econ')
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_tab_shows_the_same_numbers_as_the_command(self):
+        from io import StringIO
+        from django.core.management import call_command
+        from game.economy_report import report
+        data = report()
+        self.client.force_login(self.staff)
+        html = self.client.get('/game/stats/?tab=econ').content.decode()
+        self.assertIn(u'Экономика v2', html)
+        self.assertIn(str(data['total_runs']), html)
+        blitz = next(m for m in data['by_mode'] if m['key'] == 'blitz')
+        self.assertIn(str(blitz['score_max']), html)
+
+        out = StringIO()
+        call_command('game_economy_report', stdout=out)
+        text = out.getvalue()
+        self.assertIn(str(data['total_runs']), text)
+        self.assertIn(str(blitz['score_max']), text)

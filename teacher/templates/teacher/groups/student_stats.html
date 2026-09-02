@@ -1,6 +1,6 @@
 {% extends "teacher/base.html" %}
 
-{% block title %}{{ student.get_full_name|default:student.username }} — статистика{% endblock %}
+{% block title %}{{ student.get_full_name|default:student.username }} · статистика{% endblock %}
 
 {% block extra_style %}
 {% include "platform/_stats_style.html" %}
@@ -36,7 +36,7 @@
   </div>
   <div class="metric">
     <div class="cap">доля верных</div>
-    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}—{% endif %}</div>
+    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}–{% endif %}</div>
   </div>
   <div class="metric">
     <div class="cap">время</div><div class="big">{{ overview.minutes }} мин</div>

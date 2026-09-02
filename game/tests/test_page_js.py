@@ -20,6 +20,7 @@ import tempfile
 import unittest
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 
 TEMPLATE = os.path.join(
@@ -248,3 +249,55 @@ class FigureModuleTests(TestCase):
         block = re.search(r'var FIG_ROLES = \{(.*?)\};', src, re.S).group(1)
         known = set(re.findall(r'(\w+)\s*:', block))
         self.assertEqual(sorted(set(_figure.ROLES) - known), [])
+
+
+class SoundCheckPanelTests(TestCase):
+    u"""Панель прослушивания звука: служебная, только staff и только по флагу.
+
+    Нужна для приёмки НА СЛУХ: иначе, чтобы услышать «жизнь», надо трижды
+    ошибиться, а чтобы услышать «рекорд» — сначала его поставить.
+    """
+
+    def setUp(self):
+        User = get_user_model()
+        self.staff = User.objects.create_user('st', password='x',
+                                              is_staff=True)
+        self.plain = User.objects.create_user('pl', password='x')
+
+    def test_absent_without_the_flag(self):
+        self.client.force_login(self.staff)
+        html = self.client.get('/game/').content.decode()
+        self.assertNotIn('id="sound-check"', html)
+        self.assertNotIn('data-sound=', html)
+
+    def test_absent_for_anonymous_even_with_the_flag(self):
+        html = self.client.get('/game/?sound_check=1').content.decode()
+        self.assertNotIn('id="sound-check"', html)
+        self.assertNotIn('data-sound=', html)
+
+    def test_absent_for_a_plain_user_with_the_flag(self):
+        u"""Флаг в адресе не даёт прав: панель служебная."""
+        self.client.force_login(self.plain)
+        html = self.client.get('/game/?sound_check=1').content.decode()
+        self.assertNotIn('id="sound-check"', html)
+        self.assertNotIn('data-sound=', html)
+
+    def test_present_for_staff_with_the_flag(self):
+        self.client.force_login(self.staff)
+        html = self.client.get('/game/?sound_check=1').content.decode()
+        self.assertIn('id="sound-check"', html)
+        for name in ('correct', 'wrong', 'lifeLost', 'record'):
+            self.assertIn('data-sound="%s"' % name, html)
+        for bpm in ('70', '130', 'stop'):
+            self.assertIn('data-hb="%s"' % bpm, html)
+
+
+class StartScreenShareCardTests(TestCase):
+    u"""Карточка ссылки есть и у стартового экрана, не только у результата."""
+
+    def test_open_graph_tags_are_present(self):
+        html = self.client.get('/game/').content.decode()
+        self.assertIn('property="og:image"', html)
+        self.assertIn('game/og_default.png', html)
+        self.assertIn('Wecon Rush', html)
+        self.assertIn('property="og:image:width" content="1200"', html)

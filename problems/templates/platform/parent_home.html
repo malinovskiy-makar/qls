@@ -24,7 +24,7 @@
     </div>
     <div class="row" style="margin-top:4px;">
       <span>доля верных</span>
-      <b>{% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}—{% endif %}</b>
+      <b>{% if row.accuracy is not None %}{{ row.accuracy }}%{% else %}–{% endif %}</b>
     </div>
     <div class="row" style="margin-top:4px;">
       <span>время</span><b>{{ row.minutes }} мин</b>
@@ -35,7 +35,7 @@
 {% else %}
 <div class="empty-note">
   К вашему аккаунту пока не привязан ни один ученик.<br>
-  Связь создаёт преподаватель — попросите его добавить вас.
+  Связь создаёт преподаватель: попросите его добавить вас.
 </div>
 {% endif %}
 {% endblock %}
