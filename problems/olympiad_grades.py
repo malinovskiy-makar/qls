@@ -89,11 +89,81 @@ def merge_grades_by_event(refs) -> dict:
     Принимает любой итерируемый набор строк — очередь одной задачи,
     выборку по нескольким задачам роли не играет, группировка идёт по
     ключу тура.
+
+    ⚠️ Группы собираются по СОГЛАСИЮ ключей, а не по их равенству: строка
+    ILE с пустым этапом и строка SolveHub с `final` описывают один тур и
+    обязаны слиться. Сборка жадная, в один проход — при 1–4 строках на
+    задачу порядок на результат не влияет.
+
+    В ключе результата этап — тот, который кто-то назвал; если промолчали
+    все, остаётся пустым.
     """
-    collected = {}
+    groups = []                       # [ {ключи}, {классы} ]
     for ref in refs:
-        collected.setdefault(event_key(ref), set()).update(parse_grades(ref.grade))
-    return {key: format_grades(nums) for key, nums in collected.items()}
+        key, grades = event_key(ref), parse_grades(ref.grade)
+        for keys, collected in groups:
+            if any(keys_agree(key, known) for known in keys):
+                keys.add(key)
+                collected |= grades
+                break
+        else:
+            groups.append(({key}, set(grades)))
+
+    result = {}
+    for keys, collected in groups:
+        slug = sorted(k[0] for k in keys)[0]
+        year = sorted((k[1] for k in keys), key=lambda y: (y is None, y))[0]
+        stage = ', '.join(sorted({k[2] for k in keys if k[2]}))
+        result[(slug, year, stage)] = format_grades(collected)
+    return result
+
+
+def stages_agree(left, right) -> bool:
+    """Спорят ли два этапа между собой.
+
+    ⚠️ ПУСТОЙ ЭТАП — ЭТО «НЕ УКАЗАНО», А НЕ «ДРУГОЙ ЭТАП». ILE этап не
+    записывает вовсе (795 строк из 2 930 с пустым `stage`), SolveHub
+    записывает. Замер по банку: все 10 пар якорей, совпавших побайтово по
+    тексту и разошедшихся по «этапу», оказались ровно этим случаем —
+    `final` против пустого при совпадающих олимпиаде, годе и классе.
+    Настоящих расхождений по этапу не нашлось ни одного.
+
+    Молчание источника не может противоречить чужому свидетельству.
+    """
+    return not left or not right or left == right
+
+
+def keys_agree(left, right) -> bool:
+    """Один ли это тур: олимпиада и год строго, этап — с учётом молчания."""
+    return (left[0] == right[0] and left[1] == right[1]
+            and stages_agree(left[2], right[2]))
+
+
+def keys_conflict(left_keys, right_keys) -> bool:
+    """Спорят ли два НАБОРА туров.
+
+    Спора нет, когда каждый тур, названный одной стороной, находит себе
+    согласного среди туров другой — и наоборот. Односторонней проверки
+    мало: она объявила бы согласными наборы, где одна сторона знает про
+    лишнюю олимпиаду.
+    """
+    def covers(one, other):
+        return all(any(keys_agree(k, o) for o in other) for k in one)
+
+    return not (covers(left_keys, right_keys) and covers(right_keys, left_keys))
+
+
+def keys_self_consistent(keys) -> bool:
+    """Описывают ли строки ОДНОЙ задачи один и тот же тур.
+
+    Проверяется попарно, а не через `keys_conflict` набора с самим собой:
+    любой ключ согласен сам с собой, и такая проверка всегда молчала бы.
+    Попарность важна и по существу — согласие не транзитивно: пустой этап
+    согласен и с `final`, и с `school`, а те между собой спорят.
+    """
+    keys = list(keys)
+    return all(keys_agree(a, b)
+               for i, a in enumerate(keys) for b in keys[i + 1:])
 
 
 def classify_refs(refs) -> str:
@@ -108,7 +178,8 @@ def classify_refs(refs) -> str:
     refs = list(refs)
     if len(refs) < 2:
         return 'single'
-    if len({event_key(r) for r in refs}) > 1:
+    keys = {event_key(r) for r in refs}
+    if not keys_self_consistent(keys):
         return 'conflict'
     if len({frozenset(parse_grades(r.grade)) for r in refs}) > 1:
         return 'grade_only'
