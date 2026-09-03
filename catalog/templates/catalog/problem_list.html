@@ -229,7 +229,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
       {% endfor %}
       <div class="ct-ask-field">
         <textarea name="q" rows="3" id="ct-q"
-                  placeholder="Опишите задачу словами — точные формулировки совпадать не обязаны">{{ query }}</textarea>
+                  placeholder="Опишите задачу словами: точные формулировки совпадать не обязаны">{{ query }}</textarea>
       </div>
       <div class="ct-ask-hint">Ищем по смыслу: «монополист с линейным спросом
         и постоянными издержками» найдётся, даже если этих слов в условии нет</div>
@@ -312,7 +312,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
   <div class="ct-note">По запросу и фильтрам вместе
     {% if total == 0 %}не нашлось ничего{% else %}нашлось {{ total }}
     {{ total|plural_ru:"задача,задачи,задач" }}{% endif %}.
-    Попробуйте снять фильтр «{{ relief.label }}» — без него подходящих
+    Попробуйте снять фильтр «{{ relief.label }}»: без него подходящих
     {{ relief.count }}.</div>
   {% endif %}
 
