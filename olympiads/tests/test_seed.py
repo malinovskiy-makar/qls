@@ -1,4 +1,7 @@
 """Команда демонстрационных данных: числа обязаны сойтись ровно."""
+import json
+import pathlib
+
 from io import StringIO
 
 from django.core.management import call_command
@@ -90,10 +93,29 @@ class SeedInventsNoNumbersTests(TestCase):
         call_command('seed_olympiads_demo', yes=True, verbosity=0)
         self.assertEqual(OlympiadStage.objects.exclude(max_score=None).count(), 0)
 
-    def test_seed_marks_variants_as_placeholder(self):
-        """Числа комплектов сеялка всё ещё ставит — но помечает их демо."""
+    def test_seed_writes_no_variant_numbers(self):
+        """И у КОМПЛЕКТОВ числа больше не выдумываются — они просто пустые.
+
+        Раньше сеялка ставила «6 заданий, 240 минут, 100 баллов» и «5
+        заданий, 235 минут», механически повторённые для всех лет, и
+        прикрывалась пометкой «демо». Настоящие числа из шапок файлов
+        заданий не совпали НИ С ОДНИМ из них: у тура заключительного
+        этапа 4 задания, 48 баллов и 210 минут, у регионального — 18,
+        100 и 180. Пометка не делает выдуманное число безвредным: экран
+        всё равно показывал его цифрами. [ADR 0067]
+        """
         call_command('seed_olympiads_demo', yes=True, verbosity=0)
         self.assertGreater(OlympiadVariant.objects.count(), 0)
+        bad = OlympiadVariant.objects.exclude(
+            problem_count=None, duration_minutes=None, max_score=None)
+        self.assertEqual(
+            list(bad.values_list('year', 'problem_count',
+                                 'duration_minutes', 'max_score')),
+            [], 'сеялка снова выдумывает числа комплекта')
+
+    def test_seed_marks_variants_as_placeholder(self):
+        """Заготовка без чисел обязана быть помечена — это её и означает."""
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
         self.assertEqual(
             OlympiadVariant.objects.filter(is_placeholder=False).count(), 0)
 
@@ -140,3 +162,60 @@ class SeedInventsNoUrlsTests(TestCase):
             if 'example.' in (program.admission_rules_url or ''):
                 bad.append((program.university_short, 'admission_rules_url'))
         self.assertEqual(bad, [], 'сеялка снова выдумывает адреса')
+
+
+class PlaceholderMeansNumbersAreThereTests(TestCase):
+    """⚠️ СНЯТАЯ ПОМЕТКА — ЭТО ОБЕЩАНИЕ, И ОНО ПРОВЕРЯЕМОЕ.
+
+    `is_placeholder=False` означает не «запись хорошая», а ровно одно: все
+    три числа комплекта взяты из официального файла заданий. Кнопка
+    «Решать на время» смотрит на `duration_minutes` и включается молча —
+    комплект с пустой длительностью и снятой пометкой выглядел бы готовым,
+    а таймер получил бы пустоту.
+
+    Обратное неверно НАМЕРЕННО: помеченным может быть и комплект с пустыми
+    числами — файла заданий того тура на сайте ЦПМК просто нет. Это
+    законное состояние, а не брак.
+
+    Проверяем и правило (на объектах), и сам файл данных: правило без файла
+    осталось бы зелёным на любой чепухе, которую мы поставляем.
+    """
+
+    def _broken(self, variants):
+        return [(v.ref_event_id, v.problem_count, v.duration_minutes,
+                 v.max_score)
+                for v in variants
+                if not v.is_placeholder
+                and not (v.problem_count and v.duration_minutes
+                         and v.max_score)]
+
+    def test_rule_catches_unmarked_variant_without_numbers(self):
+        olympiad = Olympiad.objects.create(
+            slug='vs', name_full='Тестовая', name_short='ТЕСТ',
+            organizer='Никто')
+        good = OlympiadVariant(olympiad=olympiad, year=2026, grade=11,
+                               problem_count=4, duration_minutes=210,
+                               max_score=48, is_placeholder=False,
+                               ref_event_id='good')
+        bad = OlympiadVariant(olympiad=olympiad, year=2025, grade=11,
+                              is_placeholder=False, ref_event_id='bad')
+        self.assertEqual(self._broken([good]), [])
+        self.assertEqual(self._broken([bad]), [('bad', None, None, None)])
+
+    def test_shipped_variants_file_keeps_the_promise(self):
+        """Тот же инвариант — на данных, которые мы реально поставляем."""
+        path = pathlib.Path('data/olympiads/out/variants.jsonl')
+        rows = [json.loads(line)
+                for line in path.read_text(encoding='utf-8').splitlines()
+                if line.strip()]
+        self.assertGreater(len(rows), 0, 'файл комплектов пуст')
+        broken = [r for r in rows if not r.get('is_placeholder')
+                  and not (r.get('problem_count') and r.get('duration_minutes')
+                           and r.get('max_score'))]
+        self.assertEqual(
+            broken, [],
+            'в variants.jsonl снята пометка, а числа не все: '
+            'кнопка «Решать на время» включится на пустой длительности')
+        ready = [r for r in rows if not r.get('is_placeholder')]
+        self.assertGreater(len(ready), 0,
+                           'ни одного готового комплекта — тренировать не на чем')

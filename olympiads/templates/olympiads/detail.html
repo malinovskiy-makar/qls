@@ -289,10 +289,17 @@
 <section class="ol-section" id="ol-variants">
   <h2 class="ol-section-title">Варианты прошлых лет</h2>
   {% if has_placeholder_variants %}
+  {% comment %}
+    Плашка изменилась вместе с данными: выдуманных чисел в базе больше нет,
+    их убрали из сеялки. Осталась честная нехватка — комплекты, файл заданий
+    по которым не нашёлся. Обещать «настоящие собираются» тоже перестали:
+    архива заключительного этапа 2021/22 на сайте ЦПМК просто нет.
+  {% endcomment %}
   <p class="ol-warn">
-    Числа заданий, времени и баллов у части комплектов <strong>демонстрационные</strong>:
-    они пришли из наполнения примерами, а не с сайта олимпиады. Настоящие собираются.
-    Такие строки помечены словом «демо», и оригинал по ним не открывается.
+    У части комплектов <strong>чисел нет</strong>: файл заданий того тура на
+    официальном сайте не выложен, а придумывать число минут нельзя — по нему
+    школьник ставит себе таймер. Такие строки помечены словами «чисел нет»,
+    и решать их на время не получится.
   </p>
   {% endif %}
   {% if variants %}
@@ -329,13 +336,17 @@
         data-year="{{ variant.year }}">
       <span class="ol-variant-year">{{ variant.year }}</span>
       <span class="ol-variant-main">
-        <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}</span>
+        {% comment %}
+          Тур называем явно: числа ниже — про ОДИН тур, и у двухтуровых
+          этапов без этой подписи страница выдавала бы их за весь этап.
+        {% endcomment %}
+        <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}{% if variant.variant_label %} · {{ variant.variant_label }}{% endif %}</span>
         <span class="ol-variant-meta">
-          {% if variant.is_placeholder %}<span class="ol-demo" title="Числа демонстрационные, настоящие ещё не собраны">демо</span> · {% endif %}
-          {% if variant.problem_count %}{{ variant.problem_count }} заданий{% endif %}
-          {% if variant.duration_minutes %} · {{ variant.duration_minutes }} мин{% endif %}
-          {% if variant.max_score %} · максимум {{ variant.max_score }}{% endif %}
-          · {% if variant.has_solutions %}есть разборы{% else %}разборов нет{% endif %}
+          {% if variant.is_placeholder %}<span class="ol-demo" title="Задания этого тура ещё не разобраны: числа не найдены в официальном источнике">чисел нет</span> · {% endif %}
+          {% if variant.problems_label %}{{ variant.problems_label }} · {% endif %}
+          {% if variant.duration_minutes %}{{ variant.duration_minutes }} мин · {% endif %}
+          {% if variant.max_score %}максимум {{ variant.max_score }} · {% endif %}
+          {% if variant.has_solutions %}есть разборы{% else %}разборов нет{% endif %}
         </span>
       </span>
       <span class="ol-variant-acts">

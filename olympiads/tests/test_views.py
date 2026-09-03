@@ -162,13 +162,17 @@ class VariantButtonsTests(TestCase):
 
 
 class PlaceholderVariantTests(TestCase):
-    """Демонстрационный комплект обязан называть себя вслух.
+    """Комплект без чисел обязан называть себя вслух.
 
-    ⚠️ ЗАЧЕМ ЭТО СТОРОЖИТЬ. У двенадцати комплектов из наполнения примерами
-    числа заданий, минут и баллов выдуманы и повторены механически для всех
-    лет, а адреса вроде `vos.olimpiada.ru/2026/final/11` выглядят настоящими,
-    но страниц по ним нет. По числу минут школьник ставит себе таймер
-    тренировки — молчащая заглушка здесь дороже пустого поля.
+    ⚠️ ЗАЧЕМ ЭТО СТОРОЖИТЬ И ЧТО ИЗМЕНИЛОСЬ. Сначала пометка значила
+    «числа выдуманы наполнением примерами»: стояли 6 заданий, 240 минут и
+    100 баллов, повторённые механически для всех лет. Настоящие числа
+    пришли из шапок файлов заданий и не совпали ни с одним из них, а
+    выдумку убрали из сеялки — теперь пометка значит «чисел НЕТ, файла
+    заданий того тура на сайте ЦПМК не выложено». Слово на экране
+    поменялось вместе со смыслом: было «демо», стало «чисел нет».
+    По числу минут школьник ставит себе таймер тренировки, и молчание
+    здесь дороже пустого поля. [ADR 0067]
     """
 
     def setUp(self):
@@ -178,12 +182,25 @@ class PlaceholderVariantTests(TestCase):
     def test_placeholder_variant_says_so_on_screen(self):
         OlympiadVariant.objects.create(
             olympiad=self.olympiad, year=2026, grade=11,
-            problem_count=6, duration_minutes=240, max_score=100,
+            problem_count=None, duration_minutes=None, max_score=None,
             is_placeholder=True)
         text = visible_text(self.client.get(
             reverse('olympiads:detail', args=['vseros'])))
-        self.assertIn('демо', text)
-        self.assertIn('демонстрационные', text)
+        self.assertIn('чисел нет', text)
+
+    def test_template_comments_do_not_leak_to_the_page(self):
+        """⚠️ `{# #}` в Django ОДНОСТРОЧНЫЙ — многострочный уезжает на экран.
+
+        Ровно так и случилось: пояснение к плашке из двух строк отрисовалось
+        школьнику текстом вместе с фигурными скобками. Проверка дешёвая, а
+        глазами такое замечается только случайно.
+        """
+        OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11, is_placeholder=True)
+        text = visible_text(self.client.get(
+            reverse('olympiads:detail', args=['vseros'])))
+        self.assertNotIn('{#', text)
+        self.assertNotIn('{%', text)
 
     def test_real_variant_shows_no_warning(self):
         """Плашки нет там, где выдумок нет: иначе она перестанет значить."""

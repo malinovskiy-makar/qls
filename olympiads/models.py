@@ -844,6 +844,27 @@ class OlympiadVariant(models.Model):
     def grade_label(self):
         return '{} класс'.format(self.grade) if self.grade else 'все классы'
 
+    @property
+    def problems_label(self):
+        """«4 задания», «18 заданий», «21 задание» — или пусто.
+
+        Число заданий у комплекта бывает любым (4 у тура заключительного,
+        18 у регионального, 20 у теста 2022 года), а `pluralize` умеет две
+        формы вместо трёх нужных русскому. Одна строка здесь честнее
+        «4 заданий» на экране.
+        """
+        n = self.problem_count
+        if not n:
+            return ''
+        tail, hundred = n % 10, n % 100
+        if tail == 1 and hundred != 11:
+            word = 'задание'
+        elif tail in (2, 3, 4) and hundred not in (12, 13, 14):
+            word = 'задания'
+        else:
+            word = 'заданий'
+        return '{} {}'.format(n, word)
+
 
 class RegionalCoordinator(models.Model):
     """Региональный организатор ВсОШ.
