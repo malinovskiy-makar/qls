@@ -248,22 +248,42 @@ class RegionOrderTests(TestCase):
                                                sort_order=order)
 
     def test_sort_order_wins_over_alphabet(self):
-        names = list(RegionalCoordinator.objects
+        """Сначала группа 0, потом группа 1 — независимо от алфавита.
+
+        ⚠️ ПРОВЕРЯЕМ ГРУППЫ, А НЕ ТОЧНЫЙ ПОРЯДОК ЧЕТЫРЁХ СТРОК. Первая
+        версия теста сверяла список целиком и зеленела на SQLite, но
+        краснела на PostgreSQL: тестовая база создаётся с локалью
+        `en_US.UTF-8`, и порядок кириллицы в ней другой, чем у рабочей
+        базы с локалью `C` («Херсонская» встала перед «Донецкой»).
+        Сортировка русских строк — свойство СУБД, а не наше правило;
+        наше правило здесь одно: sort_order сильнее алфавита.
+        """
+        rows = list(RegionalCoordinator.objects.all())
+        self.assertEqual([r.sort_order for r in rows], [0, 0, 1, 1],
+                         'группа с sort_order=1 обязана идти последней')
+        self.assertEqual(
+            {r.region_name for r in rows[:2]},
+            {'Алтайский край', 'Ямало-Ненецкий автономный округ'})
+        self.assertEqual(
+            {r.region_name for r in rows[2:]},
+            {'Донецкая Народная Республика', 'Херсонская область'})
+
+    def test_alphabet_orders_within_one_group(self):
+        """Внутри группы — по алфавиту. Пара «А…» и «Я…» одинакова в любой
+        локали, поэтому проверку не сносит сортировкой СУБД."""
+        names = list(RegionalCoordinator.objects.filter(sort_order=0)
                      .values_list('region_name', flat=True))
-        self.assertEqual(names, [
-            'Алтайский край',
-            'Ямало-Ненецкий автономный округ',
-            'Донецкая Народная Республика',
-            'Херсонская область',
-        ])
+        self.assertEqual(names, ['Алтайский край',
+                                 'Ямало-Ненецкий автономный округ'])
 
     def test_screen_shows_regions_in_that_order(self):
         text = visible_text(self.client.get(
             reverse('olympiads:detail', args=['vseros'])))
-        self.assertLess(text.index('Алтайский край'),
-                        text.index('Донецкая Народная Республика'))
-        self.assertLess(text.index('Ямало-Ненецкий автономный округ'),
-                        text.index('Донецкая Народная Республика'))
+        last_of_group0 = max(text.index('Алтайский край'),
+                             text.index('Ямало-Ненецкий автономный округ'))
+        first_of_group1 = min(text.index('Донецкая Народная Республика'),
+                              text.index('Херсонская область'))
+        self.assertLess(last_of_group0, first_of_group1)
 
 
 class BenefitWhoGetsTests(TestCase):
