@@ -30,7 +30,9 @@
 <section class="ol-task">
   <div class="ol-task-head">
     <span class="ol-task-num">{{ row.number }}</span>
-    {% if row.pending %}
+    {% if not row.answered %}
+      <span class="ol-verdict ol-verdict--wait">без ответа</span>
+    {% elif row.pending %}
       <span class="ol-verdict ol-verdict--wait">проверяет человек</span>
     {% elif row.score and row.score >= row.max_score %}
       <span class="ol-verdict ol-verdict--ok">верно</span>

@@ -480,13 +480,20 @@ def attempt_result(attempt):
                 'given': (draft.answer_draft if draft else '') or '',
                 'correct': part_correct_answer(item, part),
             })
+        solution_given = (whole.solution_draft if whole else '') or ''
         rows.append({
             'number': number,
             'item': item,
             'problem': problem,
             'parts': parts,
             'has_parts': len(parts) > 1 or parts[0]['part'] is not None,
-            'solution_given': (whole.solution_draft if whole else '') or '',
+            # ⚠️ «НЕ ОТВЕЧАЛ» И «ОШИБСЯ» — РАЗНЫЕ ВЕЩИ. Машина ставит ноль и
+            # за пустоту тоже (`part_grading.BLANK_COMMENT`), и разбор
+            # честно писал «неверно» у задачи, которую человек не открывал.
+            # Для тренировки это прямая неправда: он не ошибся, он не дошёл.
+            'answered': any(p['given'].strip() for p in parts)
+            or bool(solution_given.strip()),
+            'solution_given': solution_given,
             'solution_text': item.solution_text,
             'score': float(stored.score) if stored and stored.score is not None
             else None,
