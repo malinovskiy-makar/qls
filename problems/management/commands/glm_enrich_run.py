@@ -456,6 +456,9 @@ def parsed_row(row, problem):
         'title_candidate': call2.get('title_candidate'),
         'images_sent': row.get('images_sent', 0),
         'tikz': row.get('tikz'),
+        'solution_sent': row.get('solution_sent', False),
+        'solution_tokens': row.get('solution_tokens', 0),
+        'solution_truncated': row.get('solution_truncated', False),
         # ⚠️ Три признака визуального пласта пишутся В СТРОКУ, а не
         # считаются потом по базе: на боевом прогоне метрики собираются
         # кусками по 2000 задач, и держать 41 тысячу объектов `Problem` с
@@ -494,10 +497,13 @@ def build_metrics(parsed, usage_totals, sweep=None):
     самой строке (`has_raster`, `has_tikz`, ...), и метрики боевого
     прогона собираются кусками, не держа корпус в памяти.
 
-    ⚠️ TikZ считается ДВУМЯ числами. §3.4 API_RUN_MASTER: решение не
-    подаётся в вызов 1 — значит чертёж, привязанный к РЕШЕНИЮ, туда
-    уходить не имеет права, и его отсутствие это работающее правило, а не
-    потеря. Сравнивать с «подставлено» можно только «TikZ у условия»:
+    ⚠️ TikZ считается ДВУМЯ числами. Текст решения с Фазы 1 (2026-09-04,
+    реверс §3.4 API_RUN_MASTER) подаётся в вызов 1, но чертёж, привязанный
+    к РЕШЕНИЮ (`ProblemFigure.source_field='solution'`), туда по-прежнему
+    не уходит — `with_tikz_sources` подставляет исходник только там, где в
+    ТЕКСТЕ есть маркер `[[FIGURE:...]]`, а он живёт у условия, не у
+    решения. Его отсутствие — работающее правило, а не потеря. Сравнивать
+    с «подставлено» можно только «TikZ у условия»:
     замер чек-поинта 02.09.2026 дал 4 задачи с TikZ, из них 2 у условия —
     и ровно 2 подстановки. Задачи с TikZ у решения ловятся кодовой
     половиной «Графического решения» (`merge_graphical_solution`)."""
@@ -572,6 +578,16 @@ def build_metrics(parsed, usage_totals, sweep=None):
         'images_sent_total': sum(p['images_sent'] for p in parsed),
         'tikz_replaced_total': sum((p['tikz'] or {}).get('replaced', 0) for p in parsed),
         'tikz_truncated_total': sum((p['tikz'] or {}).get('truncated', 0) for p in parsed),
+        # Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER): сколько задач
+        # реально получили решение в вызове 1, и сколько из них обрезано
+        # по потолку 800 токенов — печатается в контрольной строке отчёта.
+        'solution_sent_total': sum(1 for p in parsed if p.get('solution_sent')),
+        'solution_truncated_total': sum(
+            1 for p in parsed if p.get('solution_truncated')),
+        'solution_tokens_mean': (
+            statistics.mean([p['solution_tokens'] for p in parsed
+                            if p.get('solution_sent')])
+            if any(p.get('solution_sent') for p in parsed) else 0),
         # ⚠️ Числа ЗАДАЧ, а не картинок. Инвариант владельца звучит как
         # «задач с растром / отправлено с изображением — числа равны»:
         # `images_sent_total` (70 картинок) на него не отвечает, потому что
@@ -958,11 +974,17 @@ class Command(BaseCommand):
                              metrics['problems_image_sent'],
                              metrics['images_sent_total']))
         self.stdout.write('задач с настоящим TikZ: %d, из них чертёж У УСЛОВИЯ: '
-                          '%d, получили чертёж в вызове 1: %d (у решения '
-                          'чертёж не подаётся — §3.4)'
+                          '%d, получили чертёж в вызове 1: %d (картинка '
+                          'решения по-прежнему не подаётся, только текст)'
                           % (metrics['problems_with_tikz'],
                              metrics['problems_with_tikz_in_statement'],
                              metrics['problems_tikz_replaced']))
+        self.stdout.write('решение в вызове 1 (Фаза 1, реверс §3.4): у %d задач, '
+                          'обрезано по потолку 800 токенов у %d, средний размер '
+                          'блока %.0f токенов'
+                          % (metrics['solution_sent_total'],
+                             metrics['solution_truncated_total'],
+                             metrics['solution_tokens_mean']))
         self.stdout.write('мягкие нарушения (не брак, повтор не делался): %d задач (%.1f%%), '
                           'по причинам: %s'
                           % (metrics['soft_violations']['rows_with_soft'],
@@ -1215,8 +1237,16 @@ class Command(BaseCommand):
                 _, tikz_stats = with_tikz_sources(text, problem.figures.all())
                 row['images_sent'] = len(images_for_call1(problem.figures.all()))
                 row['tikz'] = tikz_stats
+                _, solution_stats = enrich_text.solution_hint_for_call1(
+                    problem.solution)
+                row['solution_sent'] = solution_stats['sent']
+                row['solution_tokens'] = solution_stats['tokens']
+                row['solution_truncated'] = solution_stats['truncated']
             else:
                 row.setdefault('images_sent', 0)
                 row.setdefault('tikz', {'replaced': 0, 'truncated': 0})
+                row.setdefault('solution_sent', False)
+                row.setdefault('solution_tokens', 0)
+                row.setdefault('solution_truncated', False)
             rows.append(row)
         return rows

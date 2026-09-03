@@ -333,6 +333,43 @@ class GlmEnrichRunSmokeTests(TestCase):
         figured_row = next(p for p in parsed if p['problem_id'] == figured_problem.id)
         self.assertEqual(figured_row['images_sent'], 1)
 
+    def test_решение_уходит_в_вызов_1_и_считается_в_журнале(self):
+        """Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER): задача с
+        решением получает блок решения в вызове 1, задача без решения —
+        нет. Журнал и метрики обязаны знать, у скольких это сработало."""
+        with_solution = self.problems[0]
+        with_solution.solution = 'Из условия равновесия находим оптимум монополиста.'
+        with_solution.save()
+        without_solution = self.problems[1]
+
+        call1_user_texts = []
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            if is_call1:
+                call1_user_texts.append(user_text)
+                return _FakeReply(_valid_call1_json(user_text))
+            return _FakeReply(VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=1, run_id='test-solution-1')
+
+        self.assertTrue(any('оптимум монополиста' in t for t in call1_user_texts))
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        row_with = next(p for p in parsed if p['problem_id'] == with_solution.id)
+        row_without = next(p for p in parsed if p['problem_id'] == without_solution.id)
+        self.assertTrue(row_with['solution_sent'])
+        self.assertGreater(row_with['solution_tokens'], 0)
+        self.assertFalse(row_without['solution_sent'])
+        self.assertEqual(row_without['solution_tokens'], 0)
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['solution_sent_total'], 1)
+
     def test_запрос_с_цифрой_выбрасывается_и_не_вызывает_повтора(self):
         """Фаза 1.2 сквозняком: восемь запросов, два с цифрами — вызов 2
         проходит с первого раза (повтора нет, денег за него не платим),

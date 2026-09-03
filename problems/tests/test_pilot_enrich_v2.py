@@ -2051,6 +2051,110 @@ class TikzSourceInPayloadTests(TestCase):
         self.assertFalse(enrich_text.looks_like_tikz(''))
 
 
+class SolutionHintForCall1Tests(TestCase):
+    """Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER): решение подаётся в
+    вызов 1 как подсказка об аппарате — только для задач, у которых оно
+    есть, с потолком и обязательной защитной формулировкой рядом."""
+
+    def test_нет_решения_блок_не_строится(self):
+        block, stats = enrich_text.solution_hint_for_call1('')
+        self.assertIsNone(block)
+        self.assertEqual(stats, {'sent': False, 'tokens': 0, 'truncated': False})
+
+    def test_короткое_решение_подаётся_целиком_с_защитной_формулировкой(self):
+        block, stats = enrich_text.solution_hint_for_call1(
+            'Из условия равновесия P=MC находим оптимальный объём выпуска.')
+        self.assertTrue(stats['sent'])
+        self.assertFalse(stats['truncated'])
+        self.assertGreater(stats['tokens'], 0)
+        self.assertIn('оптимальный объём выпуска', block)
+        # защитная формулировка (Фаза 1.2) обязана стоять РЯДОМ с решением,
+        # а не только в ядре — модель читает их вместе.
+        self.assertIn('только как подсказка', block.lower())
+        self.assertIn('given', block)
+        self.assertIn('find', block)
+        self.assertIn('РЕШЕНИЕ', block)
+
+    def test_длинное_решение_обрезается_по_потолку_800(self):
+        long_solution = 'Шаг решения номер такой-то. ' * 400
+        self.assertGreater(enrich_text.count_tokens(long_solution), 800)
+
+        block, stats = enrich_text.solution_hint_for_call1(long_solution)
+
+        self.assertTrue(stats['truncated'])
+        self.assertIn('ОБРЕЗАНО', block)
+
+    def test_короткое_решение_не_обрезается(self):
+        block, stats = enrich_text.solution_hint_for_call1('Ответ: Q=10.')
+        self.assertFalse(stats['truncated'])
+        self.assertNotIn('ОБРЕЗАНО', block)
+
+
+class Call1UserTextSolutionBlockTests(TestCase):
+    """`call1_user_text` дописывает блок решения в конец, не трогая старый
+    формат (регулярка `_SHORTLIST_RE` теста `test_glm_enrich_run` завязана
+    на то, что сразу после шорт-листа идёт `\n\nЗАДАЧА`)."""
+
+    def test_без_решения_текст_не_меняется(self):
+        with_block = prompts_v2.call1_user_text('Текст задачи.', ['спрос'])
+        without_block = prompts_v2.call1_user_text(
+            'Текст задачи.', ['спрос'], solution_block=None)
+        self.assertEqual(with_block, without_block)
+
+    def test_блок_решения_дописывается_в_конец(self):
+        block = 'РЕШЕНИЕ КАК ПОДСКАЗКА (только как подсказка)'
+        out = prompts_v2.call1_user_text(
+            'Текст задачи.', ['спрос', 'предложение'], solution_block=block)
+        self.assertTrue(out.endswith(block))
+        self.assertIn('\n\nЗАДАЧА (условие с подпунктами, без сокращений):'
+                      '\nТекст задачи.\n\n' + block, out)
+
+    def test_шорт_лист_остаётся_вычленяемым_регуляркой(self):
+        shortlist_re = re.compile(
+            r'ШОРТ-ЛИСТ ПОНЯТИЙ ДЛЯ econ_concepts.*?:\n(.*?)\n\nЗАДАЧА', re.DOTALL)
+        out = prompts_v2.call1_user_text(
+            'Текст задачи.', ['спрос', 'предложение'],
+            solution_block='РЕШЕНИЕ-блок')
+        m = shortlist_re.search(out)
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), 'спрос; предложение')
+
+
+class SolutionLeakGuardTests(TestCase):
+    """Фаза 1.2: величина, выведенная в решении, не имеет права попасть в
+    `given`/`find` — общий запрет цифр в этих полях (§12.3) уже ловит это
+    структурно, тест закрепляет именно этот сценарий, а не запрет вообще."""
+
+    def _base(self, given='Обобщённое дано без цифр', find='Обобщённая цель'):
+        return {
+            'topic_primary': taxonomy.theme_ids()[0], 'topics_secondary': [],
+            'tags': [taxonomy.tag_ids()[0]], 'given': given, 'find': find,
+            'econ_concepts': ['спрос', 'предложение', 'равновесие'],
+            'concepts_offlist': [],
+            'task_nature': 'расчётная', 'features_1': [],
+            'topic_confidence': 'высокая',
+        }
+
+    def test_число_из_решения_утёкшее_в_given_ловится(self):
+        # Решение содержит Q=19,3 — в условии этого числа нет вовсе.
+        data = self._base(given='Равновесный объём Q=19,3 при линейном спросе')
+        ok, violations = cmd.validate_call1(data)
+        self.assertFalse(ok)
+        self.assertTrue(any('given' in v for v in violations))
+
+    def test_число_из_решения_утёкшее_в_find_ловится(self):
+        data = self._base(find='Найти, что цена равна 81,3')
+        ok, violations = cmd.validate_call1(data)
+        self.assertFalse(ok)
+        self.assertTrue(any('find' in v for v in violations))
+
+    def test_given_find_без_цифр_проходят(self):
+        data = self._base()
+        ok, violations = cmd.validate_call1(data)
+        self.assertTrue(ok)
+        self.assertEqual(violations, [])
+
+
 class TikzInCall1OnlyTests(TestCase):
     """§3.5: чертёж уходит ТОЛЬКО в вызов 1. В вызове 2 смысл чертежа уже
     несут `given`/`find`, платить за LaTeX второй раз незачем."""

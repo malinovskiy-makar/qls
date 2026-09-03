@@ -477,14 +477,23 @@ def call1_core(with_concepts=True):
     return head + '\n'.join(lines) + '\n' + tail
 
 
-def call1_user_text(problem_text, shortlist_terms=None):
+def call1_user_text(problem_text, shortlist_terms=None, solution_block=None):
+    """`solution_block` — Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER):
+    строка из `problems.enrich.text.solution_hint_for_call1`, `None` — у
+    задачи решения нет. Дописывается ПОСЛЕДНИМ блоком, чтобы не трогать
+    формат «шорт-лист → задача», на который завязана регулярка теста
+    `test_glm_enrich_run._SHORTLIST_RE`."""
     if shortlist_terms is None:
-        return 'ЗАДАЧА (условие с подпунктами, без сокращений):\n%s' % problem_text
-    return (
-        'ШОРТ-ЛИСТ ПОНЯТИЙ ДЛЯ econ_concepts (выбирай только отсюда, поле '
-        'concepts_offlist — исключение, не правило):\n%s\n\n'
-        'ЗАДАЧА (условие с подпунктами, без сокращений):\n%s'
-    ) % ('; '.join(shortlist_terms), problem_text)
+        out = 'ЗАДАЧА (условие с подпунктами, без сокращений):\n%s' % problem_text
+    else:
+        out = (
+            'ШОРТ-ЛИСТ ПОНЯТИЙ ДЛЯ econ_concepts (выбирай только отсюда, поле '
+            'concepts_offlist — исключение, не правило):\n%s\n\n'
+            'ЗАДАЧА (условие с подпунктами, без сокращений):\n%s'
+        ) % ('; '.join(shortlist_terms), problem_text)
+    if solution_block:
+        out += '\n\n' + solution_block
+    return out
 
 
 # ---------------------------------------------------------------------------

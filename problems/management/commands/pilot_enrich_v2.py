@@ -1054,7 +1054,12 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
         if with_tikz:
             text1, tikz_stats = with_tikz_sources(text, problem.figures.all())
         shortlist_terms = shortlists.get(problem.id) if with_concepts else None
-        user1 = prompts_v2.call1_user_text(text1, shortlist_terms)
+        # Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER): решение — только
+        # как подсказка об аппарате, только если оно есть, с потолком.
+        solution_block, solution_stats = enrich_text.solution_hint_for_call1(
+            problem.solution)
+        user1 = prompts_v2.call1_user_text(
+            text1, shortlist_terms, solution_block=solution_block)
         # Фаза 0.4: растровые картинки условия — В КАРТИНКУ вызова 1, а не
         # текстом (GLM-5.3-Flash подтверждённо их читает). Только вызов 1 —
         # во втором смысл картинки уже несут given/find первого.
@@ -1067,7 +1072,10 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
 
         row = {'problem_id': problem.id, 'call1': data1,
               'call1_violations': violations1, 'call1_usage': reply1,
-              'tikz': tikz_stats, 'images_sent': len(images1)}
+              'tikz': tikz_stats, 'images_sent': len(images1),
+              'solution_sent': solution_stats['sent'],
+              'solution_tokens': solution_stats['tokens'],
+              'solution_truncated': solution_stats['truncated']}
 
         if max_cost is not None and spent >= Decimal(str(max_cost)):
             rows.append(row)
@@ -1147,7 +1155,12 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
     if with_tikz:
         text1, tikz_stats = with_tikz_sources(text, problem.figures.all())
     shortlist_terms = shortlists.get(problem.id) if with_concepts else None
-    user1 = prompts_v2.call1_user_text(text1, shortlist_terms)
+    # Фаза 1 (2026-09-04, реверс §3.4 API_RUN_MASTER): решение — только как
+    # подсказка об аппарате, только если оно есть, с потолком 800 токенов.
+    solution_block, solution_stats = enrich_text.solution_hint_for_call1(
+        problem.solution)
+    user1 = prompts_v2.call1_user_text(
+        text1, shortlist_terms, solution_block=solution_block)
     images1 = images_for_call1(problem.figures.all())
     reply1, data1, ok1, violations1, retried1, attempts1 = call_with_retry(
         complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
@@ -1159,7 +1172,10 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
           'call1_ok': ok1, 'call1_retried': retried1,
           'call1_attempts': attempts1,
           'call1_soft_violations': soft_violations_call1(data1, with_concepts),
-          'tikz': tikz_stats, 'images_sent': len(images1)}
+          'tikz': tikz_stats, 'images_sent': len(images1),
+          'solution_sent': solution_stats['sent'],
+          'solution_tokens': solution_stats['tokens'],
+          'solution_truncated': solution_stats['truncated']}
 
     if call1_only:
         return row
