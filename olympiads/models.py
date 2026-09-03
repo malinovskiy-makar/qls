@@ -825,11 +825,16 @@ class RegionalCoordinator(models.Model):
         'Ссылка проверена', null=True, blank=True)
     contact_note = models.TextField('Контакты', blank=True)
     is_verified = models.BooleanField('Проверено', default=False)
+    # ⚠️ Порядок задаётся ЧИСЛОМ, а не признаком «новый регион». Список
+    # алфавитный, и владелец захотел видеть четыре субъекта, которых не
+    # было в исходном файле, в конце. Признак «новый» через год перестанет
+    # быть правдой, а число останется просто порядком.
+    sort_order = models.PositiveSmallIntegerField('Порядок', default=0)
 
     class Meta:
         verbose_name = 'Региональный организатор'
         verbose_name_plural = 'Региональные организаторы'
-        ordering = ['region_name']
+        ordering = ['sort_order', 'region_name']
 
     def __str__(self):
         return self.region_name

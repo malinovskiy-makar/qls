@@ -208,3 +208,41 @@ class PlaceholderVariantTests(TestCase):
         html = self.client.get(
             reverse('olympiads:detail', args=['vseros'])).content.decode()
         self.assertNotIn('href="https://vos.olimpiada.ru/2026/final/11"', html)
+
+
+class RegionOrderTests(TestCase):
+    """Порядок регионов в списке: сначала sort_order, потом алфавит.
+
+    ⚠️ ЗАЧЕМ ЧИСЛО, А НЕ ПРИЗНАК «НОВЫЙ РЕГИОН». Владелец захотел видеть
+    четыре субъекта, которых не было в исходном файле, в конце списка.
+    Признак «новый» через год перестанет быть правдой, а число останется
+    просто порядком — и его можно будет поменять, не трогая код.
+    """
+
+    def setUp(self):
+        self.olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
+                                      is_published=True)
+        for name, order in (('Ямало-Ненецкий автономный округ', 0),
+                            ('Алтайский край', 0),
+                            ('Херсонская область', 1),
+                            ('Донецкая Народная Республика', 1)):
+            RegionalCoordinator.objects.create(region_name=name,
+                                               sort_order=order)
+
+    def test_sort_order_wins_over_alphabet(self):
+        names = list(RegionalCoordinator.objects
+                     .values_list('region_name', flat=True))
+        self.assertEqual(names, [
+            'Алтайский край',
+            'Ямало-Ненецкий автономный округ',
+            'Донецкая Народная Республика',
+            'Херсонская область',
+        ])
+
+    def test_screen_shows_regions_in_that_order(self):
+        text = visible_text(self.client.get(
+            reverse('olympiads:detail', args=['vseros'])))
+        self.assertLess(text.index('Алтайский край'),
+                        text.index('Донецкая Народная Республика'))
+        self.assertLess(text.index('Ямало-Ненецкий автономный округ'),
+                        text.index('Донецкая Народная Республика'))
