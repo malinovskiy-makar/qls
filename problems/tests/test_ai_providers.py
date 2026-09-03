@@ -471,28 +471,34 @@ class _FakeGLMChoice(object):
 
 class _FakeGLMUsage(object):
     def __init__(self, prompt_tokens=1000, completion_tokens=300,
-                cached_tokens=0):
+                cached_tokens=0, reasoning_tokens=0):
         self.prompt_tokens = prompt_tokens
         self.completion_tokens = completion_tokens
         self.prompt_tokens_details = types.SimpleNamespace(
             cached_tokens=cached_tokens)
+        # Имя поля подтверждено ЖИВЫМ вызовом Z.AI (Фаза 6, 2026-09-04):
+        # `completion_tokens_details.reasoning_tokens`, НЕ
+        # `output_tokens_details` (та схема — только у OpenAI Responses API).
+        self.completion_tokens_details = types.SimpleNamespace(
+            reasoning_tokens=reasoning_tokens)
 
 
 class _FakeGLMResponse(object):
-    def __init__(self, text='{"a": "ok"}'):
+    def __init__(self, text='{"a": "ok"}', reasoning_tokens=0):
         self.choices = [_FakeGLMChoice(text)]
-        self.usage = _FakeGLMUsage()
+        self.usage = _FakeGLMUsage(reasoning_tokens=reasoning_tokens)
 
 
 class _FakeGLMCompletions(object):
     """Запоминает `extra_body` каждого вызова `chat.completions.create`."""
 
-    def __init__(self):
+    def __init__(self, response=None):
         self.calls = []
+        self._response = response or _FakeGLMResponse()
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        return _FakeGLMResponse()
+        return self._response
 
 
 class _FakeGLMChat(object):
@@ -545,3 +551,31 @@ class GLMReasoningEffortTests(TestCase):
 
     def test_thinking_всегда_enabled(self):
         self.assertEqual(self._run('high')['thinking'], {'type': 'enabled'})
+
+
+class GLMReasoningTokensTests(TestCase):
+    """Фаза 6 (2026-09-04): смок-тест боевого прогона на 'high' обязан
+    ДОКАЗАТЬ токенами, что рассуждение реально включилось — а `_reply_from`
+    GLM молча отдавал 0 всегда, ни разу не прочитав поле usage, где Z.AI
+    реально кладёт рассуждение. Живой вызов (Фаза 6, id=1..57149) показал:
+    `completion_tokens_details.reasoning_tokens`, а не `output_tokens_details`
+    (та схема — только у OpenAI Responses API, см. `OpenAIProvider._reply_from`)."""
+
+    def _reply(self, reasoning_tokens):
+        completions = _FakeGLMCompletions(
+            response=_FakeGLMResponse(reasoning_tokens=reasoning_tokens))
+        module = _fake_openai_module(None)
+        module.OpenAI = lambda **kwargs: _FakeGLMClient(completions)
+        with mock.patch.dict(sys.modules, {'openai': module}), \
+                mock.patch.dict('os.environ', {'GLM_API_KEY': 'test-key'}), \
+                override_settings(AI_REASONING_EFFORT='high'):
+            return providers.GLMProvider().complete(
+                ['ядро'], 'текст', SCHEMA, 'glm-5.3-flash', 500)
+
+    def test_reasoning_tokens_читается_из_ответа(self):
+        reply = self._reply(reasoning_tokens=41)
+        self.assertEqual(reply.reasoning_tokens, 41)
+
+    def test_reasoning_tokens_ноль_если_модель_не_рассуждала(self):
+        reply = self._reply(reasoning_tokens=0)
+        self.assertEqual(reply.reasoning_tokens, 0)

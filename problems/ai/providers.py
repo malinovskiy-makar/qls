@@ -541,13 +541,25 @@ class GLMProvider(BaseProvider):
         """Разбор ответа: `prompt_tokens_details.cached_tokens` — то же
         разведение «свежий вход / кэш», что у OpenAI (см. докстринг
         `OpenAIProvider`) — Z.AI считает `prompt_tokens` ПОЛНЫМ входом,
-        кэш сидит внутри него."""
+        кэш сидит внутри него.
+
+        ⚠️ `reasoning_tokens` — БАГ ДО Фазы 6 (2026-09-04): это поле
+        никогда не читалось вовсе, и `Reply.reasoning_tokens` тихо был 0 на
+        КАЖДОМ вызове GLM, независимо от реального уровня рассуждения —
+        смок-тест Фазы 6 (задачи 1/13/57130/57144/57149, `effort='high'`)
+        первым это заметил. Схема поля у Z.AI СВОЯ: `completion_tokens_
+        details.reasoning_tokens`, а не `output_tokens_details`, как у
+        OpenAI Responses API (см. `OpenAIProvider._reply_from`) — проверено
+        живым вызовом `chat.completions.create`."""
         usage = getattr(response, 'usage', None)
         total_input = _num(usage, 'prompt_tokens')
         output = _num(usage, 'completion_tokens')
 
         details = getattr(usage, 'prompt_tokens_details', None)
         cache_read = _num(details, 'cached_tokens')
+
+        out_details = getattr(usage, 'completion_tokens_details', None)
+        reasoning = _num(out_details, 'reasoning_tokens')
 
         text = ''
         choices = getattr(response, 'choices', None) or []
@@ -560,6 +572,7 @@ class GLMProvider(BaseProvider):
             input_tokens=max(total_input - cache_read, 0),
             output_tokens=output,
             cache_read_tokens=cache_read,
+            reasoning_tokens=reasoning,
         )
 
 
