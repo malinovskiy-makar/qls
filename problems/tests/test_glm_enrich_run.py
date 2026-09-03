@@ -726,12 +726,16 @@ class RunQualityTrackerTests(TestCase):
     автостоп считает ФИНАЛЬНЫЙ БРАК, а не долю задач, потребовавших
     повтора. Доля повторов — это про деньги, они огорожены `--max-cost`."""
 
-    def _row(self, defect=False, retried=False, soft=False):
+    def _row(self, defect=False, retried=False, soft=False,
+            find='Точку рыночного равновесия', answer='некоторый ответ',
+            solution_sent=False, hints=None):
         return {
             'call1_ok': not defect, 'call2_ok': True,
             'call1_retried': retried, 'call2_retried': False,
             'call1_soft_violations': ['мягкое'] if soft else [],
             'call2_soft_violations': [],
+            'call1': {'find': find}, 'call2': {'hints': hints},
+            'answer': answer, 'solution_sent': solution_sent,
         }
 
     def _feed(self, tracker, total, defects, retries, softs=0):
@@ -780,6 +784,86 @@ class RunQualityTrackerTests(TestCase):
     def test_порог_по_умолчанию_пять(self):
         self.assertEqual(run_cmd.FINAL_DEFECT_STOP_PCT, 5.0)
         self.assertEqual(run_cmd.RunQualityTracker().stop_pct, 5.0)
+
+
+class FindLeaksSolutionTests(TestCase):
+    """Фаза 5 (2026-09-04): прямой детектор риска Фазы 1.2 — величина,
+    выведенная в решении, не имеет права появиться в `find`."""
+
+    def test_цифра_в_find_ловится_даже_без_ответа(self):
+        self.assertTrue(run_cmd.find_leaks_solution('Цена P=10', ''))
+
+    def test_четырёхграмма_с_ответом_ловится(self):
+        find = 'Равновесная цена равна половине суммы издержек фирмы'
+        answer = 'Равновесная цена равна половине суммы издержек'
+        self.assertTrue(run_cmd.find_leaks_solution(find, answer))
+
+    def test_без_цифр_и_без_совпадений_чисто(self):
+        find = 'Точку рыночного равновесия'
+        answer = 'Цена 10, объём 5'
+        self.assertFalse(run_cmd.find_leaks_solution(find, answer))
+
+    def test_короткие_строки_не_роняют_и_не_ложно_срабатывают(self):
+        self.assertFalse(run_cmd.find_leaks_solution('Найти цену', 'Ответ'))
+        self.assertFalse(run_cmd.find_leaks_solution('', ''))
+        self.assertFalse(run_cmd.find_leaks_solution(None, None))
+
+
+class GuardSentinelTests(TestCase):
+    """Фаза 5 (2026-09-04): два новых сторожа поверх финального брака —
+    те же правила (скользящий счёт, минимальная выборка 200, порог 5%,
+    останавливает любой из трёх)."""
+
+    def _row(self, find_leak=False, solution_sent=False, empty_hints=False):
+        row = {
+            'call1_ok': True, 'call2_ok': True,
+            'call1_retried': False, 'call2_retried': False,
+            'call1_soft_violations': [], 'call2_soft_violations': [],
+        }
+        if find_leak:
+            row['call1'] = {'find': 'Цена P=10'}
+            row['answer'] = ''
+        else:
+            row['call1'] = {'find': 'Точку равновесия'}
+            row['answer'] = 'некоторый ответ'
+        row['solution_sent'] = solution_sent
+        row['call2'] = {'hints': None if empty_hints else ['раз', 'два', 'три']}
+        return row
+
+    def test_утечка_в_find_выше_порога_останавливает(self):
+        tracker = run_cmd.RunQualityTracker()
+        for i in range(200):
+            tracker.record(self._row(find_leak=i < 20))  # 10%
+        self.assertTrue(tracker.breached)
+        self.assertIn('find', tracker.breach_reason)
+
+    def test_утечка_в_find_ниже_порога_не_останавливает(self):
+        tracker = run_cmd.RunQualityTracker()
+        for i in range(200):
+            tracker.record(self._row(find_leak=i < 5))  # 2.5%
+        self.assertFalse(tracker.breached)
+
+    def test_пустые_подсказки_у_задач_с_решением_выше_порога_останавливает(self):
+        tracker = run_cmd.RunQualityTracker()
+        # 200 задач С решением — знаменатель именно по ним, а не по total.
+        for i in range(200):
+            tracker.record(self._row(solution_sent=True, empty_hints=i < 20))  # 10%
+        self.assertTrue(tracker.breached)
+        self.assertIn('подсказ', tracker.breach_reason)
+
+    def test_пустые_подсказки_ниже_порога_не_останавливает(self):
+        tracker = run_cmd.RunQualityTracker()
+        for i in range(200):
+            tracker.record(self._row(solution_sent=True, empty_hints=i < 5))  # 2.5%
+        self.assertFalse(tracker.breached)
+
+    def test_задачи_без_решения_не_считаются_в_знаменатель_подсказок(self):
+        """200 задач БЕЗ решения (сторож про подсказки тут неприменим) —
+        не должно ложно сработать из-за путаницы знаменателя."""
+        tracker = run_cmd.RunQualityTracker()
+        for _ in range(200):
+            tracker.record(self._row(solution_sent=False, empty_hints=True))
+        self.assertFalse(tracker.breached)
 
 
 class SweepDetectorTests(TestCase):

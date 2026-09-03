@@ -82,7 +82,47 @@ FINAL_DEFECT_STOP_PCT = 5.0
 # а ложное срабатывание при 2,1% — меньше процента; цена такой задержки
 # на боевом прогоне — около $0,30 из $70.
 FINAL_DEFECT_MIN_SAMPLE = 200
+
+# ⚠️ Фаза 5 (2026-09-04): два сторожа поверх финального брака — прямые
+# детекторы риска Фазы 1 (решение в вызове 1 может утечь в find, а блок
+# решения может не доехать до модели). Тот же порог 5% и та же
+# минимальная выборка 200 — не поднимать, чтобы «прошло» (прямой запрет
+# задания). Проверяются НЕПРЕРЫВНО по накопленному счёту (как и
+# финальный брак выше), а не по последним N задачам буквально — «скользящее
+# окно» здесь означает «пересчитывается на каждой строке», а не «забывает
+# старые данные»; так же устроен уже существующий сторож брака.
+FIND_LEAK_STOP_PCT = 5.0
+EMPTY_HINTS_STOP_PCT = 5.0
 CHECKPOINT_EVERY = 2000
+
+_WORD_RE = re.compile(r'[a-zA-Zа-яА-ЯёЁ0-9]+')
+_HAS_DIGIT_RE = re.compile(r'\d')
+
+
+def _fourgrams(text):
+    words = _WORD_RE.findall((text or '').lower())
+    if len(words) < 4:
+        return set()
+    return {tuple(words[i:i + 4]) for i in range(len(words) - 3)}
+
+
+def find_leaks_solution(find_text, answer_text):
+    """Фаза 5 (сторож «утечка решения в find»): True, если `find`
+    содержит цифру ИЛИ пересекается с `answer` четырёхграммой (общее
+    4-словное окно) — прямой детектор того, ради чего затевалась Фаза 1.2:
+    величина, выведенная в решении, не имеет права попасть в `find`.
+
+    Цифра в `find` уже ловится жёстко как нарушение схемы (§12.3,
+    `pilot_enrich_v2.validate_call1`) и должна была вызвать повтор раньше
+    — эта проверка ловит и её тоже, на случай если строка попала в отчёт
+    в обход (рескью Фазы 4.2, ручной разбор старого журнала). Четырёхграмма
+    с `answer` — единственная РЕАЛЬНО новая проверка: текстовый пересказ
+    ответа без единой цифры цифровым запретом не ловится вовсе."""
+    if _HAS_DIGIT_RE.search(find_text or ''):
+        return True
+    if not answer_text:
+        return False
+    return bool(_fourgrams(find_text) & _fourgrams(answer_text))
 
 REPORT_DIR = Path('reports/enrich_pilot')
 RAW_LOG_PATH = REPORT_DIR / 'run_raw.jsonl'
@@ -342,26 +382,37 @@ def make_glm_complete_fn():
 # ---------------------------------------------------------------------------
 
 class RunQualityTracker(object):
-    """Три доли на одном счётчике:
+    """Три доли на одном счётчике, плюс два сторожа Фазы 5:
 
     - `defect_pct()` — задачи, у которых ПОСЛЕ повтора остались жёсткие
-      нарушения. Единственное, по чему прогон останавливается.
+      нарушения. Останавливает прогон.
     - `retry_pct()` — задачи, потребовавшие повтора (жёсткие нарушения на
       первой попытке). Это про деньги, а не про качество.
     - `soft_pct()` — задачи хотя бы с одним мягким нарушением. Повтора за
       них не было вовсе.
+    - утечка решения в `find` (`find_leaks_solution`) — тоже останавливает.
+    - пустые подсказки у задач с решением — тоже останавливает; знаменатель
+      здесь — задачи С РЕШЕНИЕМ, а не все обработанные (см. `record`).
     """
 
     def __init__(self, min_sample=FINAL_DEFECT_MIN_SAMPLE,
-                stop_pct=FINAL_DEFECT_STOP_PCT, call1_only=False):
+                stop_pct=FINAL_DEFECT_STOP_PCT, call1_only=False,
+                find_leak_stop_pct=FIND_LEAK_STOP_PCT,
+                empty_hints_stop_pct=EMPTY_HINTS_STOP_PCT):
         self.lock = threading.Lock()
         self.total = 0
         self.defects = 0
         self.retried = 0
         self.soft = 0
+        self.find_leaks = 0
+        self.solution_tasks = 0
+        self.empty_hints_with_solution = 0
         self.min_sample = min_sample
         self.stop_pct = stop_pct
+        self.find_leak_stop_pct = find_leak_stop_pct
+        self.empty_hints_stop_pct = empty_hints_stop_pct
         self.breached = False
+        self.breach_reason = None
         # ⚠️ В режиме `--call1-only` вызова 2 не было вовсе, и `call2_ok`
         # у строки ОТСУТСТВУЕТ. Без этого флага `not (call1_ok and
         # call2_ok)` считал бы браком КАЖДУЮ задачу (None — ложь),
@@ -385,9 +436,42 @@ class RunQualityTracker(object):
                 or row.get('call2_soft_violations'))
             if soft:
                 self.soft += 1
+
+            call1 = row.get('call1') or {}
+            if find_leaks_solution(call1.get('find'), row.get('answer')):
+                self.find_leaks += 1
+
+            # Пустые подсказки — сторож ИМЕЕТ СМЫСЛ только у задач с
+            # решением (без решения `hints` легитимно `null`), и в режиме
+            # `--call1-only` вызов 2 не делался вовсе — считать нечего.
+            if row.get('solution_sent') and not self.call1_only:
+                self.solution_tasks += 1
+                call2 = row.get('call2') or {}
+                if not call2.get('hints'):
+                    self.empty_hints_with_solution += 1
+
             if self.total >= self.min_sample:
                 if self.defects / self.total * 100 > self.stop_pct:
                     self.breached = True
+                    self.breach_reason = self.breach_reason or (
+                        'финальный брак %.1f%% (порог %.1f%%)'
+                        % (self.defects / self.total * 100, self.stop_pct))
+                if self.find_leaks / self.total * 100 > self.find_leak_stop_pct:
+                    self.breached = True
+                    self.breach_reason = self.breach_reason or (
+                        'утечка решения в find %.1f%% (порог %.1f%%)'
+                        % (self.find_leaks / self.total * 100,
+                           self.find_leak_stop_pct))
+            if self.solution_tasks >= self.min_sample:
+                if (self.empty_hints_with_solution / self.solution_tasks * 100
+                        > self.empty_hints_stop_pct):
+                    self.breached = True
+                    self.breach_reason = self.breach_reason or (
+                        'пустые подсказки у задач с решением %.1f%% '
+                        '(порог %.1f%%)'
+                        % (self.empty_hints_with_solution
+                           / self.solution_tasks * 100,
+                           self.empty_hints_stop_pct))
 
     def pcts(self):
         """Все три доли ОДНИМ снимком под локом — иначе числа в одной
@@ -1075,17 +1159,18 @@ class Command(BaseCommand):
             defect_pct, retry_pct, soft_pct = tracker.pcts()
             self.stdout.write(
                 'в этом запуске: брак %.1f%%, повторы %.1f%%, мягкие %.1f%% '
-                '(остановка — только по браку, порог %.1f%%)'
+                '(остановка — брак/утечка в find/пустые подсказки, порог '
+                'каждого %.1f%%)'
                 % (defect_pct, retry_pct, soft_pct, tracker.stop_pct))
             if tracker.breached:
                 self.stdout.write('')
-                # ⚠️ Порог печатается ИЗ ТРЕКЕРА, а не зашитой константой:
-                # трекер можно построить с другим порогом, и сообщение
-                # обязано называть тот, по которому он реально сработал.
+                # ⚠️ Причина печатается ИЗ ТРЕКЕРА (`breach_reason`), а не
+                # зашита текстом «финальный брак»: сработать мог любой из
+                # трёх сторожей Фазы 5, и сообщение обязано называть
+                # ИМЕННО того, кто остановил прогон.
                 self.stdout.write(
-                    '🔴 СТОП: финальный брак (после повтора) — %.1f%% '
-                    '(порог %.1f%%). Прогон остановлен сам, дальше решает '
-                    'владелец.' % (defect_pct, tracker.stop_pct))
+                    '🔴 СТОП: %s. Прогон остановлен сам, дальше решает '
+                    'владелец.' % tracker.breach_reason)
 
             # --- Фаза 3.2/3.3 -------------------------------------------
             sweep = sweep_report(sweep_before,

@@ -1175,7 +1175,12 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
           'tikz': tikz_stats, 'images_sent': len(images1),
           'solution_sent': solution_stats['sent'],
           'solution_tokens': solution_stats['tokens'],
-          'solution_truncated': solution_stats['truncated']}
+          'solution_truncated': solution_stats['truncated'],
+          # Фаза 5 (сторож «утечка решения в find»): не персональные данные,
+          # уже уходит модели вторым вызовом — только ДЕРЖИТСЯ В ПАМЯТИ на
+          # время прогона, в run_raw.jsonl не пишется (append_raw_log берёт
+          # свои явные аргументы, не весь `row`).
+          'answer': problem.answer}
 
     if call1_only:
         return row
