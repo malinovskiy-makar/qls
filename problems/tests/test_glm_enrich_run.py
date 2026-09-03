@@ -266,6 +266,50 @@ class GlmEnrichRunSmokeTests(TestCase):
         metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
         self.assertEqual(metrics['defects'], len(self.problems))
 
+    def test_подстраховка_старым_журналом_сквозняком(self):
+        """Фаза 4.2 (2026-09-04) целиком через реальную команду: все
+        задачи бракуются (INVALID_CALL1_JSON не проходит проверку даже
+        после повтора), но старый журнал знает про часть из них — те
+        выходят из прогона рескьюнутыми, а не пустыми."""
+        rescuable = self.problems[:2]
+        old_parsed_path = self.tmp_dir / 'run_parsed.jsonl'
+        with open(old_parsed_path, 'w', encoding='utf-8') as fh:
+            for p in rescuable:
+                fh.write(json.dumps(_old_run1_row(p.id), ensure_ascii=False))
+                fh.write('\n')
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(INVALID_CALL1_JSON if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=3, run_id='test-fallback-1',
+                        fallback_parsed=str(old_parsed_path))
+
+        parsed = [json.loads(line) for line in
+                 self.parsed_path.read_text(encoding='utf-8').strip().splitlines()]
+        by_id = {p['problem_id']: p for p in parsed}
+
+        for p in rescuable:
+            row = by_id[p.id]
+            self.assertIn('call1', row['fallback_from_run1'])
+            self.assertEqual(row['topic_primary'], '1')
+            self.assertEqual(row['given'], 'Старое дано')
+            self.assertEqual(row['missing_required_fields'], [])
+
+        not_rescuable = [p for p in self.problems if p not in rescuable]
+        for p in not_rescuable:
+            row = by_id[p.id]
+            self.assertEqual(row['fallback_from_run1'], [])
+            self.assertTrue(row['missing_required_fields'])
+
+        metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
+        self.assertEqual(metrics['fallback_from_run1']['rows_call1'], 2)
+        self.assertEqual(metrics['rows_with_missing_fields'],
+                         len(not_rescuable))
+
     def test_резюмирование_не_платит_дважды(self):
         def fake_complete(model, blocks, user_text, schema, effort, images=None):
             is_call1 = 'topic_primary' in schema.get('properties', {})
@@ -382,6 +426,30 @@ class GlmEnrichRunSmokeTests(TestCase):
         metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
         self.assertEqual(metrics['solution_sent_total'], 1)
 
+    def test_raw_out_редиректит_журнал_и_не_трогает_путь_по_умолчанию(self):
+        """Фаза 4.3 (2026-09-04): у второго прогона нет права писать в
+        `run_raw.jsonl` первого — тот журнал неприкосновенен ($21,57
+        оплаченной работы). `--parsed-out`/`--metrics-out` такой флаг уже
+        имели, а сырой журнал молча писался по ХАРДКОДНОМУ пути — эта
+        дыра и чинится."""
+        custom_raw = self.tmp_dir / 'run2_raw.jsonl'
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=len(self.problems),
+                        max_cost=100.0, workers=2, run_id='test-rawout-1',
+                        raw_out=str(custom_raw))
+
+        self.assertTrue(custom_raw.exists())
+        self.assertFalse(self.raw_path.exists())
+
+        raw_lines = custom_raw.read_text(encoding='utf-8').strip().splitlines()
+        self.assertEqual(len(raw_lines), len(self.problems) * 2)
+
     def test_запрос_с_цифрой_выбрасывается_и_не_вызывает_повтора(self):
         """Фаза 1.2 сквозняком: восемь запросов, два с цифрами — вызов 2
         проходит с первого раза (повтора нет, денег за него не платим),
@@ -487,6 +555,170 @@ class GlmEnrichRunSmokeTests(TestCase):
         ids = list(run_cmd.battle_queryset().values_list('id', flat=True))
         self.assertNotIn(fixture_problem.id, ids)
         self.assertTrue(all(p.id in ids for p in self.problems))
+
+    def test_content_status_не_ok_исключён_из_выборки(self):
+        """Фаза 4.1 (2026-09-04): битый текст в прогон не идёт — обогащение
+        битого текста даёт битые поля. `battle_queryset()` раньше по
+        `content_status` не фильтровала вовсе (найдено прошлой сессией,
+        не починено — чиним здесь)."""
+        needs_fix = Problem.objects.create(
+            statement='Требует доработки.', content_status='needs_fix')
+        junk = Problem.objects.create(statement='Мусор.', content_status='junk')
+
+        ids = list(run_cmd.battle_queryset().values_list('id', flat=True))
+
+        self.assertNotIn(needs_fix.id, ids)
+        self.assertNotIn(junk.id, ids)
+        self.assertTrue(all(p.id in ids for p in self.problems))
+
+
+def _old_run1_row(problem_id, **overrides):
+    """Строка старого журнала (`run_parsed.jsonl` первого прогона) —
+    то, во что рассчитывает попасть подстраховка Фазы 4.2."""
+    base = {
+        'problem_id': problem_id,
+        'topic_primary': '1', 'topics_secondary': [], 'tags': ['1.1'],
+        'given': 'Старое дано', 'find': 'Старое найти',
+        'econ_concepts': ['спрос', 'предложение', 'равновесие'],
+        'concepts_offlist': [], 'task_nature': 'расчётная', 'features_1': [],
+        'topic_confidence': 'высокая',
+        'search_queries': ['старый запрос ' + w for w in
+                          ('один', 'два', 'три', 'четыре', 'пять')],
+        'plot': 'Старый сюжет.', 'hints': ['раз', 'два', 'три'],
+        'text_quality': 'чистая', 'text_quality_note': '',
+        'problem_type': 'открытый_ответ', 'difficulty': 3,
+        'difficulty_note': 'старое', 'answer_consistency': 'согласован',
+        'title_candidate': 'Старый заголовок',
+    }
+    base.update(overrides)
+    return base
+
+
+class ParsedRowFallbackTests(TestCase):
+    """Фаза 4.2 (2026-09-04): второй прогон не может сделать банк хуже —
+    задача, не прошедшая проверки даже после повтора, берёт поля
+    провалившегося вызова из журнала ПЕРВОГО прогона, а не остаётся с
+    пустыми/битыми полями."""
+
+    def setUp(self):
+        self.problem = Problem.objects.create(
+            statement='Задача про рынок.', solution='Из равновесия P=MC.')
+
+    def _row(self, call1_ok=True, call2_ok=True, call1=None, call2=None):
+        return {
+            'problem_id': self.problem.id,
+            'call1': call1 or {'topic_primary': '2', 'topics_secondary': [],
+                               'tags': ['2.1'], 'given': 'Новое дано',
+                               'find': 'Новое найти', 'econ_concepts': [],
+                               'concepts_offlist': [], 'task_nature': 'расчётная',
+                               'features_1': [], 'topic_confidence': 'высокая'},
+            'call1_ok': call1_ok, 'call1_retried': False,
+            'call1_violations': [], 'call1_soft_violations': [],
+            'call2': call2 or {'search_queries': ['a', 'b'], 'plot': None,
+                               'hints': None, 'text_quality': 'чистая',
+                               'text_quality_note': '', 'problem_type': 'открытый_ответ',
+                               'difficulty': 2, 'difficulty_note': '',
+                               'answer_consistency': 'согласован',
+                               'title_candidate': 'Новый заголовок'},
+            'call2_ok': call2_ok, 'call2_retried': False,
+            'call2_violations': [], 'call2_soft_violations': [],
+            'images_sent': 0, 'tikz': {'replaced': 0, 'truncated': 0},
+            'solution_sent': True, 'solution_tokens': 42,
+            'solution_truncated': False,
+        }
+
+    def test_call1_брак_без_подстраховки_остаётся_как_было(self):
+        row = self._row(call1_ok=False)
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=None)
+        self.assertEqual(parsed['topic_primary'], '2')  # своё, не подменено
+        self.assertEqual(parsed['fallback_from_run1'], [])
+
+    def test_call1_брак_с_подстраховкой_берёт_поля_из_старого_журнала(self):
+        row = self._row(call1_ok=False)
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['topic_primary'], '1')
+        self.assertEqual(parsed['tags'], ['1.1'])
+        self.assertEqual(parsed['given'], 'Старое дано')
+        self.assertEqual(parsed['find'], 'Старое найти')
+        self.assertIn('call1', parsed['fallback_from_run1'])
+        # вызов 2 был ok — его подстраховка не касается
+        self.assertEqual(parsed['title_candidate'], 'Новый заголовок')
+        self.assertNotIn('call2', parsed['fallback_from_run1'])
+
+    def test_call2_брак_с_подстраховкой_берёт_поля_из_старого_журнала(self):
+        row = self._row(call2_ok=False)
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['title_candidate'], 'Старый заголовок')
+        self.assertEqual(parsed['difficulty'], 3)
+        self.assertEqual(parsed['hints'], ['раз', 'два', 'три'])
+        self.assertIn('call2', parsed['fallback_from_run1'])
+        self.assertEqual(parsed['topic_primary'], '2')  # вызов 1 был ok
+        self.assertNotIn('call1', parsed['fallback_from_run1'])
+
+    def test_оба_брака_подставляют_оба_набора_полей(self):
+        row = self._row(call1_ok=False, call2_ok=False)
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['fallback_from_run1'], ['call1', 'call2'])
+        self.assertEqual(parsed['topic_primary'], '1')
+        self.assertEqual(parsed['title_candidate'], 'Старый заголовок')
+        self.assertEqual(parsed['missing_required_fields'], [])
+
+    def test_ok_строка_подстраховку_игнорирует(self):
+        row = self._row(call1_ok=True, call2_ok=True)
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['fallback_from_run1'], [])
+        self.assertEqual(parsed['topic_primary'], '2')
+
+    def test_брак_без_подстраховки_в_журнале_виден_в_missing_required_fields(self):
+        """Задачи, которых НЕТ в старом журнале (например, добавленной уже
+        после первого прогона), рескью не получают — список пропавших
+        полей делает эту брешь видимой владельцу поимённо, а не молча."""
+        row = self._row(call1_ok=False, call2=None)
+        row['call1'] = {}  # ничего не разобралось
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index={})
+        self.assertIn('topic_primary', parsed['missing_required_fields'])
+        self.assertEqual(parsed['fallback_from_run1'], [])
+
+    def test_не_задача_не_считается_недостающими_given_find(self):
+        row = self._row(call1_ok=True, call2_ok=True,
+                        call1={'topic_primary': '29', 'topics_secondary': [],
+                              'tags': ['29.5'], 'given': '', 'find': '',
+                              'econ_concepts': [], 'concepts_offlist': [],
+                              'task_nature': 'не_задача', 'features_1': [],
+                              'topic_confidence': 'низкая'},
+                        call2={'search_queries': ['a', 'b'], 'plot': None,
+                              'hints': None, 'text_quality': 'не_задача',
+                              'text_quality_note': '', 'problem_type': 'не_задача',
+                              'difficulty': None, 'difficulty_note': '',
+                              'answer_consistency': 'решение_отсутствует_проверить_нечем',
+                              'title_candidate': 'Обрывок'})
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=None)
+        self.assertEqual(parsed['missing_required_fields'], [])
+
+    def test_решение_есть_но_plot_hints_пусты_считается_недостающим(self):
+        row = self._row(call1_ok=True, call2_ok=True,
+                        call2={'search_queries': ['a', 'b'], 'plot': None,
+                              'hints': None, 'text_quality': 'чистая',
+                              'text_quality_note': '', 'problem_type': 'открытый_ответ',
+                              'difficulty': 2, 'difficulty_note': '',
+                              'answer_consistency': 'согласован',
+                              'title_candidate': 'Заголовок'})
+        # solution_sent=True в _row по умолчанию — решение реально подавалось
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=None)
+        self.assertIn('plot', parsed['missing_required_fields'])
+        self.assertIn('hints', parsed['missing_required_fields'])
 
 
 class RunQualityTrackerTests(TestCase):

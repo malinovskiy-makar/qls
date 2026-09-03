@@ -112,14 +112,21 @@ GLM_VARIANT = {
 
 
 def battle_queryset():
-    """Все задачи, кроме пяти служебных фикстур рендерера (Фаза 4),
+    """Все ГОДНЫЕ задачи, кроме пяти служебных фикстур рендерера (Фаза 4),
     упорядоченные по id — детерминированный полный корпус боевого прогона.
     Проверка `--ids` идёт по нему; сама выборка контрольной точки — Фаза C,
     см. `stratified_checkpoint_sample()` ниже (id 1-300 по возрастанию
     оказались целиком легаси без единой картинки — решение владельца
-    02.09.2026 заменило «первые N» на стратифицированную выборку)."""
+    02.09.2026 заменило «первые N» на стратифицированную выборку).
+
+    ⚠️ Фаза 4.1 (2026-09-04): `content_status != 'ok'` исключается —
+    прошлая сессия скрыла 3 836 задач с битым текстом (`needs_fix`/`junk`)
+    и НАЗВАЛА, что этот фильтр здесь отсутствовал, но не чинила. Обогащение
+    битого текста даёт битые поля; такие задачи обогащаются отдельным
+    маленьким проходом после починки текста, не этим прогоном."""
     return (Problem.objects
            .exclude(source_references__source__name=SERVICE_FIXTURE_SOURCE)
+           .filter(content_status=Problem.ContentStatus.OK)
            .distinct().order_by('id'))
 
 
@@ -401,7 +408,64 @@ class RunQualityTracker(object):
 # Фаза 3.2: run_parsed.jsonl — по строке на задачу.
 # ---------------------------------------------------------------------------
 
-def parsed_row(row, problem):
+#: Фаза 4.2 (2026-09-04): группы полей, которые подстраховка целиком
+#: заменяет старыми значениями — по ОДНОМУ вызову за раз, не построчно
+#: (вызов 1 и вызов 2 проверяются и подстраховываются независимо).
+CALL1_MERGE_FIELDS = (
+    'topic_primary', 'topics_secondary', 'tags', 'given', 'find',
+    'econ_concepts', 'concepts_offlist', 'task_nature', 'features_1',
+    'topic_confidence',
+)
+CALL2_MERGE_FIELDS = (
+    'search_queries', 'plot', 'hints', 'text_quality', 'text_quality_note',
+    'problem_type', 'difficulty', 'difficulty_note', 'answer_consistency',
+    'title_candidate',
+)
+
+
+def _missing_required_fields(result):
+    """Поля, которые НЕ ИМЕЮТ ПРАВА быть пустыми ни при каких легитимных
+    обстоятельствах этой конкретной задачи (Фаза 4.2, 2026-09-04) —
+    легитимные исключения учтены явно, а не как общий список «может быть
+    пустым»:
+      - `given`/`find`/`difficulty` легитимно пусты у `не_задача`
+        (`task_nature` ИЛИ `problem_type` — тексту вызова 1 могло не
+        повезти определить характер, а вызову 2 повезло, и наоборот);
+      - `plot`/`hints` легитимно `null`, если решения не было вовсе
+        (`solution_sent` — чистый факт из этой же строки, БД не нужна),
+        ИЛИ если задача сама по себе `не_задача` (см. выше);
+      - `topics_secondary`/`features_1`/`concepts_offlist` НЕ входят
+        сюда вовсе — 0 элементов для них легитимно всегда, это не брак.
+
+    Пустой список — «всё на месте». Непустой — ровно то, ради чего
+    существует инвариант «доля задач с пустым полем — ноль»."""
+    missing = []
+    for field in ('topic_primary', 'task_nature', 'problem_type',
+                  'text_quality', 'answer_consistency', 'title_candidate'):
+        if not result.get(field):
+            missing.append(field)
+    if not result.get('tags'):
+        missing.append('tags')
+    if not result.get('search_queries'):
+        missing.append('search_queries')
+    is_not_a_problem = (result.get('task_nature') == 'не_задача'
+                        or result.get('problem_type') == 'не_задача')
+    if not is_not_a_problem:
+        if not result.get('given'):
+            missing.append('given')
+        if not result.get('find'):
+            missing.append('find')
+        if result.get('difficulty') is None:
+            missing.append('difficulty')
+    if result.get('solution_sent') and not is_not_a_problem:
+        if not result.get('plot'):
+            missing.append('plot')
+        if not result.get('hints'):
+            missing.append('hints')
+    return missing
+
+
+def parsed_row(row, problem, fallback_index=None):
     """Одна строка `run_parsed.jsonl` — все разобранные поля обоих
     вызовов в готовом для слияния виде, что прошло проверку, брак ли.
 
@@ -413,8 +477,6 @@ def parsed_row(row, problem):
     call1 = row.get('call1') or {}
     call2 = row.get('call2') or {}
     is_defect = not (row.get('call1_ok') and row.get('call2_ok'))
-    merged_graphical, graphical_source = enrich_text.merge_graphical_solution(
-        call1.get('features_1'), problem)
     soft = list(row.get('call1_soft_violations') or []) + \
         list(row.get('call2_soft_violations') or [])
     figures = list(problem.figures.all())
@@ -425,7 +487,7 @@ def parsed_row(row, problem):
     has_tikz = bool(tikz_figures)
     has_tikz_statement = any(
         f.source_field in RASTER_CALL1_SOURCE_FIELDS for f in tikz_figures)
-    return {
+    result = {
         'problem_id': row['problem_id'],
         'defect': is_defect,
         'call1_ok': row.get('call1_ok'),
@@ -449,8 +511,6 @@ def parsed_row(row, problem):
         'task_nature': call1.get('task_nature'),
         'features_1': call1.get('features_1'),
         'topic_confidence': call1.get('topic_confidence'),
-        'graphical_solution': merged_graphical,
-        'graphical_solution_source': graphical_source,
         'search_queries': call2.get('search_queries'),
         'plot': call2.get('plot'),
         'hints': call2.get('hints'),
@@ -477,6 +537,35 @@ def parsed_row(row, problem):
         'has_tikz_in_statement': has_tikz_statement,
     }
 
+    # Фаза 4.2 (2026-09-04): «второй прогон не может сделать хуже» — вызов,
+    # не прошедший проверку ДАЖЕ ПОСЛЕ ПОВТОРА, берёт свои поля из журнала
+    # ПЕРВОГО прогона целиком (не построчно — вызов 1 и вызов 2 независимо).
+    # Не трогает `ok`-вызовы: удачный ответ этого прогона всегда новее и
+    # актуальнее старого журнала.
+    fallback_index = fallback_index or {}
+    old = fallback_index.get(row['problem_id'])
+    fallback_from_run1 = []
+    if not row.get('call1_ok') and old is not None:
+        for field in CALL1_MERGE_FIELDS:
+            result[field] = old.get(field)
+        fallback_from_run1.append('call1')
+    if not row.get('call2_ok') and old is not None:
+        for field in CALL2_MERGE_FIELDS:
+            result[field] = old.get(field)
+        fallback_from_run1.append('call2')
+    result['fallback_from_run1'] = fallback_from_run1
+
+    # `graphical_solution` считается ПОСЛЕ подстраховки — если вызов 1
+    # рескьюнут, `features_1` теперь из старого журнала, и код-признак
+    # обязан слиться именно с ним, а не с забракованным свежим ответом.
+    merged_graphical, graphical_source = enrich_text.merge_graphical_solution(
+        result.get('features_1'), problem)
+    result['graphical_solution'] = merged_graphical
+    result['graphical_solution_source'] = graphical_source
+
+    result['missing_required_fields'] = _missing_required_fields(result)
+    return result
+
 
 def write_parsed_rows(path, parsed, append=False):
     """Дописывает готовые строки `parsed_row` в JSONL. `append=False` —
@@ -489,9 +578,28 @@ def write_parsed_rows(path, parsed, append=False):
             fh.write('\n')
 
 
-def parsed_rows_for(rows, problems_by_id):
-    return [parsed_row(row, problems_by_id[row['problem_id']])
+def parsed_rows_for(rows, problems_by_id, fallback_index=None):
+    return [parsed_row(row, problems_by_id[row['problem_id']],
+                       fallback_index=fallback_index)
             for row in rows if row['problem_id'] in problems_by_id]
+
+
+def load_fallback_index(path):
+    """`{problem_id: старая_строка_run_parsed.jsonl}` — Фаза 4.2
+    (2026-09-04): источник подстраховки. Пусто, если файла нет (обычный
+    самый первый прогон — рескьюить неоткуда, это ожидаемо, не ошибка)."""
+    path = Path(path)
+    if not path.exists():
+        return {}
+    index = {}
+    with open(path, encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            entry = json.loads(line)
+            index[entry['problem_id']] = entry
+    return index
 
 
 # ---------------------------------------------------------------------------
@@ -631,6 +739,23 @@ def build_metrics(parsed, usage_totals, sweep=None):
         # что нарушено P0, а не «немного разошлось».
         'sweep_detector': sweep if sweep is not None else {
             'checked': 0, 'changed': 0, 'changed_ids': []},
+        # Фаза 4.2 (2026-09-04): подстраховка старым журналом — «второй
+        # прогон не может сделать хуже». `by_field` считает КОНКРЕТНЫЕ поля
+        # (не только «call1»/«call2»), чтобы видеть, что именно унаследовано.
+        'fallback_from_run1': {
+            'rows_call1': sum(1 for p in parsed
+                             if 'call1' in (p.get('fallback_from_run1') or [])),
+            'rows_call2': sum(1 for p in parsed
+                             if 'call2' in (p.get('fallback_from_run1') or [])),
+        },
+        # Инвариант владельца: доля задач с хоть одним пустым обязательным
+        # полем — ноль. Список id — поимённо, не только число: пробитый
+        # инвариант обязан быть виден и разбираем, а не потонуть в проценте.
+        'rows_with_missing_fields': sum(
+            1 for p in parsed if p.get('missing_required_fields')),
+        'rows_with_missing_fields_ids': sorted(
+            p['problem_id'] for p in parsed if p.get('missing_required_fields')
+        )[:50],
     }
 
 
@@ -736,6 +861,13 @@ class Command(BaseCommand):
                  'чек-поинт «первые 300» (решение владельца 02.09.2026: '
                  'два честных прогона, не подмена выборки).')
         parser.add_argument(
+            '--raw-out', type=str, default=None,
+            help='Переопределить путь run_raw.jsonl (по умолчанию — '
+                 'официальный файл ПЕРВОГО прогона, НЕПРИКОСНОВЕННЫЙ). '
+                 'Второй/повторный прогон обязан задавать свой путь '
+                 '(например run2_raw.jsonl) — иначе новый прогон допишет '
+                 'сырые ответы в чужой, уже оплаченный журнал.')
+        parser.add_argument(
             '--parsed-out', type=str, default=None,
             help='Переопределить путь run_parsed.jsonl (по умолчанию — '
                  'официальный файл Фазы 3.2). Использовать для донабора, '
@@ -743,6 +875,14 @@ class Command(BaseCommand):
         parser.add_argument(
             '--metrics-out', type=str, default=None,
             help='Переопределить путь run_metrics.json — как --parsed-out.')
+        parser.add_argument(
+            '--fallback-parsed', type=str, default=None,
+            help='Путь к СТАРОМУ run_parsed.jsonl (Фаза 4.2) — задача, не '
+                 'прошедшая проверку даже после повтора, берёт свои поля '
+                 'оттуда, а не остаётся пустой. По умолчанию — официальный '
+                 'файл первого прогона (PARSED_LOG_PATH); нет файла — '
+                 'подстраховки нет, это ожидаемо для самого первого '
+                 'прогона корпуса.')
         parser.add_argument(
             '--chunk', type=int, default=CHUNK_SIZE_DEFAULT,
             help='Сколько задач держать в памяти одновременно. Корпус '
@@ -752,8 +892,11 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         run_id = options['run_id'] or ('glm-enrich-%d' % int(time.time()))
         limit = options['limit']
+        raw_path = Path(options['raw_out']) if options['raw_out'] else RAW_LOG_PATH
         parsed_out = Path(options['parsed_out']) if options['parsed_out'] else PARSED_LOG_PATH
         metrics_out = Path(options['metrics_out']) if options['metrics_out'] else METRICS_PATH
+        fallback_parsed_path = (Path(options['fallback_parsed'])
+                               if options['fallback_parsed'] else PARSED_LOG_PATH)
 
         if options['ids']:
             requested = [int(x) for x in options['ids'].split(',') if x.strip()]
@@ -860,7 +1003,7 @@ class Command(BaseCommand):
         # каждый кусок: на 41 тысяче задач в нём 80+ тысяч строк, и
         # двадцать перечитываний стоили бы дороже самого прогона.
         done_ids = pilot.done_problem_ids_from_log(
-            str(RAW_LOG_PATH), prompt_version, GLM_VARIANT,
+            str(raw_path), prompt_version, GLM_VARIANT,
             call1_only=call1_only)
         todo_ids = [pid for pid in problem_ids if pid not in done_ids]
         todo_total = len(todo_ids)
@@ -895,7 +1038,7 @@ class Command(BaseCommand):
                     rows, chunk_spent, chunk_stopped, _s, chunk_errors = (
                         pilot.resumable_run_variant_concurrent(
                             problems, GLM_VARIANT, complete_fn, shortlists,
-                            str(RAW_LOG_PATH), run_id, prompt_version,
+                            str(raw_path), run_id, prompt_version,
                             options['workers'], max_cost=remaining_budget,
                             on_progress=on_progress, stop_event=stop_event,
                             extra_on_row=extra_on_row, done_ids=set(),
@@ -915,8 +1058,8 @@ class Command(BaseCommand):
                 self.stdout.write('')
                 self.stdout.write('⚠️ ОСТАНОВЛЕНО ПО Ctrl+C. Журнал %s уже содержит '
                                   'всё оплаченное — повторный запуск с тем же '
-                                  '--run-id продолжит с места остановки, платить '
-                                  'заново не придётся.' % RAW_LOG_PATH)
+                                  '--run-id (и тем же --raw-out) продолжит с места '
+                                  'остановки, платить заново не придётся.' % raw_path)
                 return
 
             self.stdout.write('')
@@ -947,9 +1090,17 @@ class Command(BaseCommand):
             # --- Фаза 3.2/3.3 -------------------------------------------
             sweep = sweep_report(sweep_before,
                                  protected_fields_digest(problem_ids))
+            # Фаза 4.2: читается ОДИН раз, не на каждый кусок (те же
+            # соображения, что у `done_ids` — 41 тысяча строк не перечитать
+            # двадцать раз подряд бесплатно).
+            fallback_index = load_fallback_index(fallback_parsed_path)
+            if fallback_index:
+                self.stdout.write(
+                    'подстраховка старым журналом: %s (%d задач доступно '
+                    'для рескью)' % (fallback_parsed_path, len(fallback_index)))
             parsed_all, usage_totals = self._collect_parsed(
                 problem_ids, chunk_size, prompt_version, parsed_out,
-                call1_only=call1_only)
+                raw_path, call1_only=call1_only, fallback_index=fallback_index)
             metrics = build_metrics(parsed_all, usage_totals, sweep=sweep)
 
         metrics_out.parent.mkdir(parents=True, exist_ok=True)
@@ -992,6 +1143,15 @@ class Command(BaseCommand):
                           % (metrics['solution_sent_total'],
                              metrics['solution_truncated_total'],
                              metrics['solution_tokens_mean']))
+        self.stdout.write('подстраховка старым журналом (Фаза 4.2): вызов 1 '
+                          'рескьюнут у %d задач, вызов 2 — у %d'
+                          % (metrics['fallback_from_run1']['rows_call1'],
+                             metrics['fallback_from_run1']['rows_call2']))
+        self.stdout.write('доля задач с пустым обязательным полем (инвариант, '
+                          'ожидание 0): %d%s'
+                          % (metrics['rows_with_missing_fields'],
+                             (' — id: %s' % metrics['rows_with_missing_fields_ids'])
+                             if metrics['rows_with_missing_fields'] else ''))
         self.stdout.write('мягкие нарушения (не брак, повтор не делался): %d задач (%.1f%%), '
                           'по причинам: %s'
                           % (metrics['soft_violations']['rows_with_soft'],
@@ -1008,7 +1168,7 @@ class Command(BaseCommand):
                              metrics['search_queries_exactly_8_pct']))
         self.stdout.write('расход по журналу (все попытки): $%s'
                           % usage_totals['cost_usd'])
-        self.stdout.write('журналы: %s, %s' % (RAW_LOG_PATH, parsed_out))
+        self.stdout.write('журналы: %s, %s' % (raw_path, parsed_out))
 
     # --- работа кусками -------------------------------------------------
 
@@ -1052,12 +1212,18 @@ class Command(BaseCommand):
         return [by_id[pid] for pid in chunk_ids if pid in by_id], by_id
 
     def _collect_parsed(self, problem_ids, chunk_size, prompt_version,
-                        parsed_out, call1_only=False):
+                        parsed_out, raw_path, call1_only=False,
+                        fallback_index=None):
         """Строки `run_parsed.jsonl` и суммарный расход — КУСКАМИ.
 
         Журнал перечитывается потоком на каждый кусок (`iter_raw_log`), но
         в памяти остаются только маленькие разобранные строки: держать
-        одновременно 80 тысяч сырых ответов И корпус с картинками нельзя."""
+        одновременно 80 тысяч сырых ответов И корпус с картинками нельзя.
+
+        `fallback_index` (Фаза 4.2) — `{problem_id: строка_старого_run_
+        parsed.jsonl}`, читается ОДИН раз вызывающим кодом (`handle()`),
+        не на каждый кусок — те же соображения памяти/времени, что и у
+        `done_ids`."""
         parsed_all = []
         usage_totals = {'input_tokens': 0, 'cache_read_tokens': 0,
                         'cache_write_tokens': 0, 'output_tokens': 0,
@@ -1068,7 +1234,7 @@ class Command(BaseCommand):
         for start in range(0, len(problem_ids), chunk_size):
             chunk_ids = problem_ids[start:start + chunk_size]
             wanted = set(chunk_ids)
-            entries = [e for e in pilot.iter_raw_log(str(RAW_LOG_PATH))
+            entries = [e for e in pilot.iter_raw_log(str(raw_path))
                        if e.get('problem_id') in wanted]
             # Задачи, которых в журнале НЕТ (прогон остановился раньше),
             # незачем ни грузить, ни считать им шорт-лист: строки в
@@ -1093,7 +1259,8 @@ class Command(BaseCommand):
                         'output_tokens', 'reasoning_tokens'):
                 usage_totals[key] += chunk_usage[key]
             cost += Decimal(chunk_usage['cost_usd'])
-            parsed_chunk = parsed_rows_for(rows, by_id)
+            parsed_chunk = parsed_rows_for(rows, by_id,
+                                          fallback_index=fallback_index)
             # ⚠️ `append` считается по УЖЕ ЗАПИСАННОМУ, а не по номеру
             # куска: первый кусок может целиком отсутствовать в журнале
             # (прогон остановился раньше), и тогда `append=start > 0`
