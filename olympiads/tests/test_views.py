@@ -159,3 +159,52 @@ class VariantButtonsTests(TestCase):
         self.assertIn('Время тура неизвестно', text)
         self.assertIn('Решать без таймера', text)
         self.assertEqual(variant.duration_minutes, None)
+
+
+class PlaceholderVariantTests(TestCase):
+    """Демонстрационный комплект обязан называть себя вслух.
+
+    ⚠️ ЗАЧЕМ ЭТО СТОРОЖИТЬ. У двенадцати комплектов из наполнения примерами
+    числа заданий, минут и баллов выдуманы и повторены механически для всех
+    лет, а адреса вроде `vos.olimpiada.ru/2026/final/11` выглядят настоящими,
+    но страниц по ним нет. По числу минут школьник ставит себе таймер
+    тренировки — молчащая заглушка здесь дороже пустого поля.
+    """
+
+    def setUp(self):
+        self.olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
+                                      is_published=True)
+
+    def test_placeholder_variant_says_so_on_screen(self):
+        OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11,
+            problem_count=6, duration_minutes=240, max_score=100,
+            is_placeholder=True)
+        text = visible_text(self.client.get(
+            reverse('olympiads:detail', args=['vseros'])))
+        self.assertIn('демо', text)
+        self.assertIn('демонстрационные', text)
+
+    def test_real_variant_shows_no_warning(self):
+        """Плашки нет там, где выдумок нет: иначе она перестанет значить."""
+        OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11,
+            problem_count=6, duration_minutes=240, max_score=100)
+        text = visible_text(self.client.get(
+            reverse('olympiads:detail', args=['vseros'])))
+        self.assertNotIn('демонстрационные', text)
+
+    def test_placeholder_original_link_is_dead_even_with_url(self):
+        """Адрес есть, но выдуман — кнопка обязана быть неактивной.
+
+        Проверка стоит в модели, а не в шаблоне: шаблон обойдёт новый экран.
+        """
+        variant = OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11,
+            original_url='https://vos.olimpiada.ru/2026/final/11',
+            original_source=OlympiadVariant.OriginalSource.OFFICIAL,
+            is_placeholder=True)
+        self.assertFalse(variant.has_original)
+        html = self.client.get(
+            reverse('olympiads:detail', args=['vseros'])).content.decode()
+        self.assertNotIn('href="https://vos.olimpiada.ru/2026/final/11"', html)

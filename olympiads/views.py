@@ -97,6 +97,9 @@ def olympiad_detail(request, slug):
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,
         'has_placeholder': _has_placeholder([olympiad]),
+        # Отдельно от общей плашки страницы: комплект может быть
+        # демонстрационным у совершенно настоящей олимпиады.
+        'has_placeholder_variants': _has_placeholder(variants),
     })
 
 

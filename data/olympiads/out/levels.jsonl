@@ -14,3 +14,4 @@
 {"slug": "pleh", "academic_year": "2026/27", "level": null, "order_number": null, "approval_status": "draft", "source": "proekt-2026-27"}
 {"slug": "vseros", "academic_year": "2025/26", "level": null, "order_number": null, "approval_status": "approved", "source": "fz273"}
 {"slug": "vseros", "academic_year": "2026/27", "level": null, "order_number": null, "approval_status": "approved", "source": "fz273"}
+{"slug": "vernadsky", "academic_year": "2025/26", "level": 1, "order_number": 4, "approval_status": "approved", "source": "rsr-main"}

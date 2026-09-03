@@ -512,6 +512,11 @@ class Command(BaseCommand):
                     max_score=score, has_solutions=has_solutions,
                     original_url=url, original_source=origin,
                     ref_event_id='vseros-{}-{}-{}'.format(year, code, grade),
+                    # ⚠️ Числа и адреса здесь ВЫДУМАНЫ и повторены для всех
+                    # лет механически. Пометка обязательна: без неё экран
+                    # выдаёт их за настоящие, а по числу минут школьник
+                    # ставит себе таймер тренировки.
+                    is_placeholder=True,
                 ),
             )
 

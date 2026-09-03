@@ -285,6 +285,13 @@
 
 <section class="ol-section" id="ol-variants">
   <h2 class="ol-section-title">Варианты прошлых лет</h2>
+  {% if has_placeholder_variants %}
+  <p class="ol-warn">
+    Числа заданий, времени и баллов у части комплектов <strong>демонстрационные</strong>:
+    они пришли из наполнения примерами, а не с сайта олимпиады. Настоящие собираются.
+    Такие строки помечены словом «демо», и оригинал по ним не открывается.
+  </p>
+  {% endif %}
   {% if variants %}
   <div class="ol-vfilters">
     {% if variant_stages %}
@@ -321,6 +328,7 @@
       <span class="ol-variant-main">
         <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}</span>
         <span class="ol-variant-meta">
+          {% if variant.is_placeholder %}<span class="ol-demo" title="Числа демонстрационные, настоящие ещё не собраны">демо</span> · {% endif %}
           {% if variant.problem_count %}{{ variant.problem_count }} заданий{% endif %}
           {% if variant.duration_minutes %} · {{ variant.duration_minutes }} мин{% endif %}
           {% if variant.max_score %} · максимум {{ variant.max_score }}{% endif %}
@@ -347,7 +355,8 @@
         {% if variant.has_original %}
         <a class="ol-btn ol-btn--sm ol-btn--second" href="{{ variant.original_url }}" target="_blank" rel="noopener">Открыть оригинал</a>
         {% else %}
-        <span class="ol-btn ol-btn--sm ol-btn--second ol-btn--off" aria-disabled="true" title="Оригинал пока не найден">Открыть оригинал</span>
+        <span class="ol-btn ol-btn--sm ol-btn--second ol-btn--off" aria-disabled="true"
+              title="{% if variant.is_placeholder %}Адрес демонстрационный, страницы по нему нет{% else %}Оригинал пока не найден{% endif %}">Открыть оригинал</span>
         {% endif %}
       </span>
     </li>

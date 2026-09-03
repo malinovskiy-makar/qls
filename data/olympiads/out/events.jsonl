@@ -5,3 +5,11 @@
 {"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "mun", "date_status": "awaiting", "approx_text": "даты муниципального этапа устанавливает каждый субъект", "source": "vos"}
 {"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "reg", "date_status": "awaiting", "approx_text": "график регионального этапа издаёт Минпросвещения; на сезон 2026/27 приказ не издан", "source": "vos"}
 {"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "final", "date_status": "awaiting", "approx_text": "заключительный этап обычно в марте–апреле; график не издан", "source": "vos"}
+{"slug": "vernadsky", "academic_year": "2025/26", "kind": "registration_open", "date_start": "2025-11-19", "date_status": "confirmed", "source": "vernadsky-2025-26"}
+{"slug": "vernadsky", "academic_year": "2025/26", "kind": "registration_close", "date_start": "2026-02-08", "date_status": "confirmed", "source": "vernadsky-2025-26"}
+{"slug": "vernadsky", "academic_year": "2025/26", "kind": "stage", "stage_code": "qual", "date_start": "2026-03-01", "date_status": "confirmed", "source": "vernadsky-2025-26"}
+{"slug": "vernadsky", "academic_year": "2025/26", "kind": "stage", "stage_code": "final", "date_start": "2026-04-11", "date_status": "confirmed", "source": "vernadsky-2025-26"}
+{"slug": "vernadsky", "academic_year": "2026/27", "kind": "registration_open", "date_status": "approx_last_year", "source": "vernadsky-2025-26", "approx_text": "в прошлом сезоне открылась 19 ноября; расписание 2026/27 ожидается в октябре"}
+{"slug": "vernadsky", "academic_year": "2026/27", "kind": "registration_close", "date_status": "approx_last_year", "source": "vernadsky-2025-26", "approx_text": "в прошлом сезоне закрылась 8 февраля"}
+{"slug": "vernadsky", "academic_year": "2026/27", "kind": "stage", "stage_code": "qual", "date_status": "approx_last_year", "source": "vernadsky-2025-26", "approx_text": "в прошлом сезоне отборочный был 1 марта"}
+{"slug": "vernadsky", "academic_year": "2026/27", "kind": "stage", "stage_code": "final", "date_status": "approx_last_year", "source": "vernadsky-2025-26", "approx_text": "в прошлом сезоне финал был 11 апреля"}

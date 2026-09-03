@@ -774,6 +774,13 @@ class OlympiadVariant(models.Model):
         'ID тура в банке', max_length=200, blank=True,
         help_text='Соответствует problems.OlympiadRef.event_id',
     )
+    # ⚠️ ДЕМОНСТРАЦИОННЫЙ КОМПЛЕКТ. Числа заданий, минут и баллов у него
+    # выдуманы `seed_olympiads_demo` и повторены механически для всех лет.
+    # Пока настоящие не собраны, экран обязан говорить об этом вслух:
+    # по этим числам школьник ставит себе таймер, а кнопка «Открыть
+    # оригинал» вела бы на несуществующую страницу.
+    is_placeholder = models.BooleanField(
+        'Демонстрационные данные', default=False)
     source = models.ForeignKey(
         FactSource, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='variants', verbose_name='Источник',
@@ -789,6 +796,11 @@ class OlympiadVariant(models.Model):
 
     @property
     def has_original(self):
+        # У демонстрационного комплекта адрес тоже выдуман: `vos.olimpiada.ru/2026/final/11`
+        # выглядит настоящим, но страницы по нему нет. Поэтому проверка
+        # стоит здесь, а не в шаблоне: шаблон обойдёт новый экран.
+        if self.is_placeholder:
+            return False
         return bool(self.original_url) and self.original_source != self.OriginalSource.NONE
 
     @property
