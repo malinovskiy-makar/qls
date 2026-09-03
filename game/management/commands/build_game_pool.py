@@ -40,7 +40,7 @@ ProblemPart.answer. Если оба сигнала есть и расходят�
 import re
 
 from django.core.management.base import BaseCommand
-from django.db import transaction
+from django.db import models, transaction
 
 from problems.models import Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
@@ -54,6 +54,68 @@ GAME_TYPES = {
     'тест: все верные': 'multi',
     'тест: числовой ответ': 'numeric',
 }
+
+# ---------------------------------------------------------------------------
+# Фаза 7 (задание сессии 2026-09-04): таксономия v2 — соответствие таблицы
+# §7.2. Игра умеет 4 типа; сопоставление/несколько_подвопросов/не_задача не
+# допускаются вовсе: сопоставление даёт ответ НАБОРОМ ПАР (для проверки
+# одиночным выбором не годится), несколько_подвопросов и не_задача — не тот
+# формат вовсе. открытый_ответ — единственный, кто дополнительно фильтруется
+# по длине ответа (см. TAXONOMY_V2_ADMISSION ниже): это смесь «короткий
+# числовой ответ» и «докажи с обоснованием», сюда годится только первое.
+TAXONOMY_V2_GAME_TYPES = {
+    'единственный_выбор': 'single',
+    'верно_неверно': 'boolean',
+    'множественный_выбор': 'multi',
+    'открытый_ответ': 'numeric',
+}
+GAME_TYPES.update(TAXONOMY_V2_GAME_TYPES)
+
+#: §7.3: открытый_ответ — брать только «короткий ответ», не «докажи с
+#: обоснованием» (аудит прошлой сессии: 16,4% короче этого порога).
+OPEN_ANSWER_MAX_LEN = 30
+
+
+def effective_problem_type(problem):
+    """§7.4: боевое поле `problem_type`, если заполнено, иначе кандидатное
+    `problem_type_candidate`.
+
+    ⚠️ На 2026-09-04 `problem_type_candidate` В СХЕМЕ ЕЩЁ НЕ СУЩЕСТВУЕТ —
+    переливка кандидатных полей в боевые (`problem_type`) отдельным шагом с
+    одобрением владельца, после боевого прогона. `getattr(..., '')` не
+    роняет код до тех пор: не найдя поля, тихо отдаёт пустую строку — ту же,
+    что и сегодня. Как только поле появится миграцией, ЭТА ЖЕ строка
+    начнёт его подхватывать без доработки — переносить код не придётся."""
+    return problem.problem_type or getattr(problem, 'problem_type_candidate', '') or ''
+
+
+def taxonomy_v2_admission_reason(problem, effective_type):
+    """§7.3: жёсткие условия допуска — ТОЛЬКО для задач, чей эффективный
+    `problem_type` пришёл из таксономии v2 (`TAXONOMY_V2_GAME_TYPES`), а не
+    из старого словаря «тест: …». Старый словарь уже проверен своим
+    кросс-сигналом label/mark при импорте (см. `extract_question` и
+    соседей) — второй гейт ему не нужен и мог бы только выбросить рабочие
+    вопросы задним числом.
+
+    Возвращает `None` — задача допущена; иначе строку причины отказа (в
+    ту же копилку `rejected`, что и остальные причины `handle()`).
+
+    ⚠️ `answer_consistency` — поле обогащения, ТОЖЕ ещё не перелито в
+    модель на 2026-09-04 (см. `effective_problem_type`). `getattr(...,
+    None)` без значения означает «неизвестно, согласован ли ответ» —
+    БЕЗОПАСНЫЙ дефолт здесь «не допускаем», а не «пропускаем гейт молча»:
+    ответ, идущий в автопроверку игрока, обязан быть ДОКАЗАННО согласован,
+    а не предположительно."""
+    if problem.content_status != Problem.ContentStatus.OK:
+        return 'content_status не ok'
+    answer = (problem.answer or '').strip()
+    if not answer:
+        return 'ответ пуст'
+    if getattr(problem, 'answer_consistency', None) != 'согласован':
+        return 'ответ не согласован с решением (answer_consistency)'
+    if effective_type == 'открытый_ответ' and len(answer) >= OPEN_ANSWER_MAX_LEN:
+        return 'открытый ответ длиннее %d символов' % OPEN_ANSWER_MAX_LEN
+    return None
 
 # Лимит поля GameQuestion.correct_value (CharField max_length=50).
 MAX_NUMERIC_ANSWER_LEN = 50
@@ -242,12 +304,18 @@ def detect_lang(text):
     return 'ru' if cyr >= lat else 'en'
 
 
-def heuristic_difficulty(problem, question):
+def heuristic_difficulty(problem, question, qtype=None):
     """Сложность 1–5. В базе difficulty почти не размечен (None у большинства),
-    поэтому честная эвристика: верно/неверно проще, длинные условия сложнее."""
+    поэтому честная эвристика: верно/неверно проще, длинные условия сложнее.
+
+    `qtype` — ИГРОВОЙ тип (после возможного фолбэка boolean→single), а не
+    сырой `problem.problem_type`: Фаза 7 добавила второй словарь исходных
+    значений (таксономия v2), проверять по сырой строке значило бы промазать
+    мимо новых «верно_неверно» — `qtype` не зависит от того, каким словарём
+    задача классифицирована."""
     if problem.difficulty and 1 <= problem.difficulty <= 5:
         return problem.difficulty
-    if problem.problem_type == 'тест: верно/неверно':
+    if qtype == 'boolean':
         return 2
     if len(question) < 120:
         return 2
@@ -457,10 +525,18 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         canonical_set = set(CANONICAL)
+        # §7.4: боевое поле ИЛИ кандидатное — кандидатного (`problem_type_
+        # candidate`) на 2026-09-04 ещё нет в схеме (см. `effective_problem_
+        # type`), поэтому условие добавляется, только если поле реально
+        # существует — `filter(несуществующее_поле=...)` уронил бы команду
+        # `FieldError` уже сегодня, а не «просто ничего не нашёл бы».
+        type_filter = models.Q(problem_type__in=GAME_TYPES)
+        if hasattr(Problem, 'problem_type_candidate'):
+            type_filter |= models.Q(problem_type_candidate__in=GAME_TYPES)
         qs = (Problem.objects
               .filter(status='published', needs_quality_review=False,
-                      content_status=Problem.ContentStatus.OK,
-                      problem_type__in=GAME_TYPES)
+                      content_status=Problem.ContentStatus.OK)
+              .filter(type_filter)
               .prefetch_related('parts', 'topics', 'source_references'))
 
         total = qs.count()
@@ -477,7 +553,16 @@ class Command(BaseCommand):
             rejected[reason] = rejected.get(reason, 0) + 1
 
         for p in qs:
-            qtype = GAME_TYPES[p.problem_type]
+            eff_type = effective_problem_type(p)
+            if eff_type in TAXONOMY_V2_GAME_TYPES:
+                # §7.3: гейт ТОЛЬКО для таксономии v2 — старый словарь
+                # «тест: …» этот гейт не проходит вовсе (answer_consistency
+                # у него не считался) и не должен вдруг перестать работать.
+                admission_reason = taxonomy_v2_admission_reason(p, eff_type)
+                if admission_reason:
+                    reject(admission_reason)
+                    continue
+            qtype = GAME_TYPES[eff_type]
             correct_index = None
             correct_indices = None
             correct_value = ''
@@ -526,7 +611,7 @@ class Command(BaseCommand):
                 correct_index=correct_index,
                 correct_indices=correct_indices,
                 correct_value=correct_value,
-                difficulty=heuristic_difficulty(p, question),
+                difficulty=heuristic_difficulty(p, question, qtype),
                 topics=topic_names,
                 lang=detect_lang(question),
                 stage=stage,

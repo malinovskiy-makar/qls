@@ -5,13 +5,16 @@
 import json
 import re
 from fractions import Fraction
+from unittest import mock
 
 from django.test import TestCase, Client
 
 from problems.models import Problem, ProblemPart, Source, SourceReference
 from game.models import GameQuestion, GameResult, make_result_code
 from game.management.commands.build_game_pool import (
-    extract_question, extract_boolean, extract_multi, extract_numeric)
+    extract_question, extract_boolean, extract_multi, extract_numeric,
+    effective_problem_type, taxonomy_v2_admission_reason, GAME_TYPES,
+    TAXONOMY_V2_GAME_TYPES, OPEN_ANSWER_MAX_LEN)
 from game.config import combo_multiplier, MODES
 from game.views import (parse_exact_number, build_summary, allocate_quotas,
                         mistakes_by_topic, build_mistakes_run)
@@ -1198,6 +1201,158 @@ class ExtractNumericTests(TestCase):
     def test_overlong_answer_rejected(self):
         p = make_numeric_problem(answer='1' * 51)
         self.assertEqual(extract_numeric(p)[2], 'числовой ответ длиннее 50')
+
+
+class TaxonomyV2GameTypesMappingTests(TestCase):
+    """Фаза 7.2 (задание сессии 2026-09-04): соответствие таксономии v2
+    игровым типам — таблица из задания. Игра умеет 4 типа; три значения
+    таксономии не допускаются вовсе."""
+
+    def test_четыре_значения_отображены(self):
+        self.assertEqual(TAXONOMY_V2_GAME_TYPES, {
+            'единственный_выбор': 'single',
+            'верно_неверно': 'boolean',
+            'множественный_выбор': 'multi',
+            'открытый_ответ': 'numeric',
+        })
+
+    def test_все_четыре_в_общем_словаре_GAME_TYPES(self):
+        for value, qtype in TAXONOMY_V2_GAME_TYPES.items():
+            self.assertEqual(GAME_TYPES[value], qtype)
+
+    def test_недопущенные_значения_отсутствуют(self):
+        for value in ('сопоставление', 'несколько_подвопросов', 'не_задача'):
+            self.assertNotIn(value, GAME_TYPES)
+
+
+class EffectiveProblemTypeTests(TestCase):
+    """Фаза 7.4: боевое поле `problem_type`, если заполнено, иначе
+    кандидатное `problem_type_candidate` — которого на 2026-09-04 ЕЩЁ НЕТ
+    в схеме (см. докстринг `effective_problem_type`)."""
+
+    def test_боевое_поле_в_приоритете(self):
+        p = make_test_problem(problem_type='единственный_выбор')
+        self.assertEqual(effective_problem_type(p), 'единственный_выбор')
+
+    def test_пустое_боевое_без_кандидатного_поля_даёт_пустую_строку(self):
+        p = make_test_problem(problem_type='')
+        self.assertEqual(effective_problem_type(p), '')
+
+    def test_кандидатное_поле_подхватывается_если_есть_атрибут(self):
+        """Поля в схеме нет — но код читает его через `getattr`, а не
+        напрямую, и Python не запрещает поставить атрибут вручную (это ==
+        поведению после будущей миграции, не требует её для проверки)."""
+        p = make_test_problem(problem_type='')
+        p.problem_type_candidate = 'верно_неверно'
+        self.assertEqual(effective_problem_type(p), 'верно_неверно')
+
+
+class TaxonomyV2AdmissionTests(TestCase):
+    """Фаза 7.3: жёсткие условия допуска для задач таксономии v2. Все
+    четыре условия обязаны выполниться разом — тест на каждое отдельно."""
+
+    def _problem(self, content_status=None, answer_consistency='согласован',
+                **overrides):
+        defaults = dict(problem_type='единственный_выбор', answer='42')
+        defaults.update(overrides)
+        p = make_test_problem(**defaults)
+        p.content_status = content_status or Problem.ContentStatus.OK
+        p.answer_consistency = answer_consistency
+        return p
+
+    def test_content_status_не_ok_отклоняется(self):
+        p = self._problem(content_status='needs_fix')
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertEqual(reason, 'content_status не ok')
+
+    def test_пустой_ответ_отклоняется(self):
+        p = self._problem(answer='')
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertEqual(reason, 'ответ пуст')
+
+    def test_answer_consistency_отсутствует_отклоняется_безопасно(self):
+        """Поле не перелито в модель — `getattr` без значения обязан
+        читаться как «неизвестно, значит НЕ допускаем», а не как
+        пропущенный гейт."""
+        p = self._problem()
+        del p.answer_consistency  # имитирует «поля не существует вовсе»
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
+
+    def test_answer_consistency_не_согласован_отклоняется(self):
+        p = self._problem(answer_consistency='ответ_не_совпадает_с_решением')
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
+
+    def test_короткий_открытый_ответ_проходит(self):
+        p = self._problem(problem_type='открытый_ответ', answer='12')
+        reason = taxonomy_v2_admission_reason(p, 'открытый_ответ')
+        self.assertIsNone(reason)
+
+    def test_длинный_открытый_ответ_отклоняется(self):
+        p = self._problem(problem_type='открытый_ответ', answer='1' * OPEN_ANSWER_MAX_LEN)
+        reason = taxonomy_v2_admission_reason(p, 'открытый_ответ')
+        self.assertEqual(reason, 'открытый ответ длиннее %d символов' % OPEN_ANSWER_MAX_LEN)
+
+    def test_единственный_выбор_с_любой_длиной_ответа_не_ограничен_по_длине(self):
+        """Лимит длины — только для открытый_ответ, не для остальных трёх."""
+        p = self._problem(problem_type='единственный_выбор', answer='A' * 50)
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertIsNone(reason)
+
+    def test_все_условия_разом_проходит(self):
+        p = self._problem()
+        self.assertIsNone(taxonomy_v2_admission_reason(p, 'единственный_выбор'))
+
+
+class TaxonomyV2PoolIntegrationTests(TestCase):
+    """Фаза 7: сквозняком через реальную команду — задача, классифицированная
+    ТАКСОНОМИЕЙ V2, попадает в пул наравне со старым словарём «тест: …», и
+    старый словарь при этом не ломается (регрессия — главный риск смены
+    словаря типов)."""
+
+    def _run(self):
+        from django.core.management import call_command
+        from io import StringIO
+        call_command('build_game_pool', stdout=StringIO())
+
+    def test_единственный_выбор_попадает_в_пул_как_single(self):
+        """`answer_consistency` не пережил бы `.save()` (поля нет в схеме,
+        см. `test_без_answer_consistency_не_попадает_в_пул`) — гейт
+        подменяется подставным, чтобы проверить именно ПРОВОДКУ типа
+        (единственный_выбор → single), а не сам гейт (он уже проверен
+        отдельно юнит-тестами `TaxonomyV2AdmissionTests`)."""
+        p = make_test_problem(problem_type='единственный_выбор', answer='A')
+        with mock.patch(
+                'game.management.commands.build_game_pool'
+                '.taxonomy_v2_admission_reason', return_value=None):
+            self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.question_type, 'single')
+
+    def test_без_answer_consistency_не_попадает_в_пул(self):
+        """Поле не перелито в модель НИ У КОГО в реальной базе — сохранение
+        через .save() не пишет динамический атрибут, ORM просто не знает
+        о нём, так что реальная запись всегда идёт по ветке «не допущена»
+        сегодня. Это и есть ожидаемое поведение до переливки полей."""
+        p = make_test_problem(problem_type='единственный_выбор', answer='A')
+        self._run()
+        self.assertFalse(GameQuestion.objects.filter(problem=p).exists())
+
+    def test_старый_словарь_не_ломается_новым_гейтом(self):
+        """Регрессия: «тест: …» никогда не имел answer_consistency и не
+        должен вдруг начать его требовать."""
+        p = make_test_problem(problem_type='тест: один ответ', answer='A')
+        self._run()
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.question_type, 'single')
+
+    def test_сопоставление_не_попадает_в_пул_вовсе(self):
+        """Не в GAME_TYPES вовсе — отсеивается уже на уровне queryset, до
+        гейта Фазы 7.3."""
+        p = make_test_problem(problem_type='сопоставление', answer='A')
+        self._run()
+        self.assertFalse(GameQuestion.objects.filter(problem=p).exists())
 
 
 class BuildPoolMetadataTests(TestCase):
