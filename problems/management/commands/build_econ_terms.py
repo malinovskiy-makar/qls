@@ -12,6 +12,15 @@ r"""Собирает data/econ_terms.json из markdown-словаря терм�
 молча, когда придёт новая версия словаря. Если бы мы правили сам markdown,
 следующая присланная версия тихо откатила бы починку.
 
+Ручные добавки владельца (синонимы к существующим терминам, новые понятия)
+живут ОТДЕЛЬНО — в `econ_terms_manual.md`, той же схемой записи. Он читается
+ПОСЛЕ основного источника и сливается: запись с уже существующим каноническим
+именем дописывает свои синонимы к найденному термину, запись с новым именем
+добавляется как новый термин целиком. Это тот же принцип, что и у
+KNOWN_FIXES (правки — в отдельном месте, не в аудируемом исходнике), только
+для синонимов и целых терминов, а не только для обозначений. Решение
+владельца от 2026-09-03 — см. Notion «Решения».
+
 Запуск:
     venv313/Scripts/python.exe manage.py build_econ_terms
     venv313/Scripts/python.exe manage.py build_econ_terms --check   # не писать, только сверить
@@ -24,6 +33,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 SOURCE_NAME = 'econ_terms_source.md'
+MANUAL_NAME = 'econ_terms_manual.md'
 OUTPUT_NAME = 'econ_terms.json'
 
 # Заголовки разделов словаря.
@@ -161,18 +171,59 @@ class Command(BaseCommand):
         terms = self._parse_terms(lines)
         self._apply_known_fixes(terms)
         index_rows = self._parse_reverse_index(lines)
-        notation_index = self._build_notation_index(terms, index_rows)
         declared = self._parse_declared_counts(text)
+
+        # ⚠️ СВЕРКА ИДЁТ ДО РУЧНЫХ ДОБАВОК И ТОЛЬКО ПО ИСТОЧНИКУ. Числа в
+        # шапке словаря — это то, что заявляет о себе econ_terms_source.md,
+        # а не итог после надстройки; сравнивать их с числами ПОСЛЕ слияния
+        # значило бы, что любая ручная добавка красит сверку в РАСХОЖДЕНИЕ.
+        source_counts = {
+            'terms': len(terms),
+            'ru_aliases': sum(len(t['synonyms']) for t in terms),
+            'english': sum(len(t['english']) for t in terms),
+            'notations': sum(len(t['notations']) for t in terms),
+        }
+        fixes_added = sum(len(v) for v in KNOWN_FIXES.values())
+        expected_delta = {'notations': fixes_added}
+        problems_found = []
+        for key, value in declared.items():
+            delta = expected_delta.get(key, 0)
+            actual = source_counts.get(key)
+            if actual == value + delta:
+                mark = 'ok' if not delta else 'ok (+%d наших починок)' % delta
+            else:
+                mark = 'РАСХОЖДЕНИЕ'
+                problems_found.append(key)
+            self.stdout.write('  заявлено %-12s %-6s (разобрано %s) %s'
+                              % (key, value, actual, mark))
+
+        if problems_found:
+            raise CommandError(
+                'Разобранное не сходится с заявленным по: %s. Это значит, что '
+                'парсер не понял часть записей словаря — молча недоразобранный '
+                'словарь выглядел бы как рабочий.' % ', '.join(problems_found))
+
+        manual_path = data_dir / MANUAL_NAME
+        manual_stats = {'existing_extended': 0, 'synonyms_added': 0, 'new_terms': 0}
+        if manual_path.exists():
+            manual_lines = manual_path.read_text(encoding='utf-8').splitlines()
+            manual_terms = self._parse_terms(manual_lines)
+            manual_stats = self._merge_manual(terms, manual_terms)
+
+        notation_index = self._build_notation_index(terms, index_rows)
 
         payload = {
             'meta': {
                 'source_file': SOURCE_NAME,
                 'source_lines': len(lines),
+                'manual_file': MANUAL_NAME if manual_path.exists() else None,
                 'schema': (
                     'канонический термин -> синонимы -> English -> обозначения '
                     '-> словоформы -> источники -> раздел'
                 ),
                 'declared_counts': declared,
+                'source_counts': source_counts,
+                'manual_additions': manual_stats,
                 'actual_counts': {
                     'terms': len(terms),
                     'ru_aliases': sum(len(t['synonyms']) for t in terms),
@@ -193,32 +244,11 @@ class Command(BaseCommand):
         counts = payload['meta']['actual_counts']
         for key, value in counts.items():
             self.stdout.write('  %-20s %s' % (key, value))
-
-        # ⚠️ СВЕРКА УЧИТЫВАЕТ НАШИ ЖЕ ПОЧИНКИ, ИНАЧЕ ОНА БЕСПОЛЕЗНА.
-        # KNOWN_FIXES добавляют обозначения, которых в источнике нет, —
-        # значит разобранное число обозначений ЗАКОНОМЕРНО больше
-        # заявленного ровно на их количество. Без этой поправки сверка
-        # вечно показывала бы расхождение, к нему привыкли бы, и она
-        # перестала бы ловить настоящую поломку парсера.
-        fixes_added = sum(len(v) for v in KNOWN_FIXES.values())
-        expected_delta = {'notations': fixes_added}
-        problems_found = []
-        for key, value in declared.items():
-            delta = expected_delta.get(key, 0)
-            actual = counts.get(key)
-            if actual == value + delta:
-                mark = 'ok' if not delta else 'ok (+%d наших починок)' % delta
-            else:
-                mark = 'РАСХОЖДЕНИЕ'
-                problems_found.append(key)
-            self.stdout.write('  заявлено %-12s %-6s (разобрано %s) %s'
-                              % (key, value, actual, mark))
-
-        if problems_found:
-            raise CommandError(
-                'Разобранное не сходится с заявленным по: %s. Это значит, что '
-                'парсер не понял часть записей словаря — молча недоразобранный '
-                'словарь выглядел бы как рабочий.' % ', '.join(problems_found))
+        self.stdout.write(
+            '  ручные добавки: %d новых терминов (+%d их собственных '
+            'синонимов), %d синонимов дописано к %d существующим терминам'
+            % (manual_stats['new_terms'], manual_stats['new_term_synonyms'],
+               manual_stats['synonyms_added'], manual_stats['existing_extended']))
 
         if options['check']:
             self.stdout.write(self.style.WARNING('--check: файл не записан'))
@@ -312,6 +342,89 @@ class Command(BaseCommand):
             for notation in extra:
                 if notation not in target['notations']:
                     target['notations'].append(notation)
+
+    def _merge_manual(self, terms, manual_terms):
+        """Сливает `econ_terms_manual.md` в уже разобранные `terms` (мутирует
+        список на месте). Запись с известным каноническим именем дописывает
+        свои синонимы к найденной записи; с неизвестным — становится новым
+        термином целиком, кроме случая «нет словоформ и цель не найдена»,
+        который сам по себе означает опечатку в целевом имени (см. правило
+        Фазы 2 задания — не выдумывать замену, а падать явно).
+
+        Коллизия — синоним, который уже принадлежит ДРУГОМУ термину, —
+        останавливает запись целиком: ничего не должно уйти в JSON частично
+        слитым, иначе следующий `--check` не отличит применённую правку от
+        неприменённой.
+        """
+        by_canonical = {t['canonical']: t for t in terms}
+
+        def all_phrases(t):
+            phrases = {t['canonical']}
+            phrases.update(t['synonyms'])
+            phrases.update(t['word_forms'].values())
+            phrases.update(t['english'])
+            return {p.strip().lower() for p in phrases if (p or '').strip()}
+
+        phrase_owner = {}
+        for t in terms:
+            for phrase in all_phrases(t):
+                phrase_owner.setdefault(phrase, t['canonical'])
+
+        stats = {'existing_extended': 0, 'synonyms_added': 0, 'new_terms': 0,
+                 'new_term_synonyms': 0}
+        conflicts = []
+
+        for entry in manual_terms:
+            canonical = entry['canonical']
+            target = by_canonical.get(canonical)
+
+            if target is None and not entry['word_forms']:
+                raise CommandError(
+                    'econ_terms_manual.md: запись «%s» не несёт словоформ и не '
+                    'совпадает ни с одним каноническим термином — похоже на '
+                    'опечатку в целевом имени синонима, а не на новый термин. '
+                    'Ничего не записано.' % canonical)
+
+            if target is None:
+                for phrase in all_phrases(entry):
+                    owner = phrase_owner.get(phrase)
+                    if owner and owner != canonical:
+                        conflicts.append((phrase, canonical, owner))
+                terms.append(entry)
+                by_canonical[canonical] = entry
+                for phrase in all_phrases(entry):
+                    phrase_owner.setdefault(phrase, canonical)
+                stats['new_terms'] += 1
+                stats['new_term_synonyms'] += len(entry['synonyms'])
+                continue
+
+            added_any = False
+            for syn in entry['synonyms']:
+                syn_l = syn.strip().lower()
+                if not syn_l:
+                    continue
+                owner = phrase_owner.get(syn_l)
+                if owner and owner != canonical:
+                    conflicts.append((syn, canonical, owner))
+                    continue
+                if syn in target['synonyms']:
+                    continue
+                target['synonyms'].append(syn)
+                phrase_owner.setdefault(syn_l, canonical)
+                stats['synonyms_added'] += 1
+                added_any = True
+            if added_any:
+                stats['existing_extended'] += 1
+
+        if conflicts:
+            detail = '; '.join(
+                '«%s» -> %s, уже занято термином «%s»' % c for c in conflicts)
+            raise CommandError(
+                'econ_terms_manual.md: %d коллизий синонимов — %s. Правка '
+                'отклонена целиком, ничего не записано.'
+                % (len(conflicts), detail))
+
+        return stats
 
     def _parse_reverse_index(self, lines):
         """Таблица обратного индекса в конце словаря."""
