@@ -18,6 +18,7 @@
 import hashlib
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 
 from django.core.management.base import BaseCommand
@@ -48,10 +49,22 @@ DEPENDENTS = (
 
 
 def fetch(url):
-    """(тело, код) или (None, код/None). Исключений наружу не выпускает."""
+    """(тело, код) или (None, код/None). Исключений наружу не выпускает.
+
+    ⚠️ СХЕМУ ПРОВЕРЯЕМ ДО ОТКРЫТИЯ. `urlopen` честно исполняет `file:` и
+    другие схемы, а адрес источника — это ДАННЫЕ: их вводит человек в
+    админке, и опечатка (или чужая правка) превратила бы сторожа в
+    читалку локальных файлов. Нашёл bandit (B310), и находка настоящая.
+    """
+    scheme = urllib.parse.urlparse(url).scheme.lower()
+    if scheme not in ('http', 'https'):
+        return None, None
+
     request = urllib.request.Request(url, headers={'User-Agent': USER_AGENT})
     try:
-        with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+        # noqa: S310 — схема уже сужена до http/https выше.
+        with urllib.request.urlopen(request,  # nosec B310
+                                    timeout=TIMEOUT) as response:
             return response.read(), response.getcode()
     except urllib.error.HTTPError as error:
         return None, error.code

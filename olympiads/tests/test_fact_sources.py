@@ -71,6 +71,18 @@ class CheckFactSourcesTests(TestCase):
         self.assertEqual(self.source.http_status, 503)
         self.assertEqual(FactUpdateProposal.objects.count(), 0)
 
+    def test_non_http_source_is_not_opened(self):
+        """⚠️ Адрес источника — данные. `file:` сторож открывать не должен.
+
+        Находка bandit B310, и она настоящая: адреса вводит человек в
+        админке, а `urlopen` честно исполнил бы `file:///etc/passwd`.
+        """
+        from olympiads.management.commands.check_fact_sources import fetch
+
+        body, status = fetch('file:///etc/passwd')
+        self.assertIsNone(body)
+        self.assertIsNone(status)
+
     def test_dry_run_writes_nothing(self):
         with patch(MODULE + '.fetch', return_value=(OTHER, 200)):
             call_command('check_fact_sources', dry_run=True, delay=0,
