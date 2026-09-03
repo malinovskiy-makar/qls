@@ -1,0 +1,396 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% block title %}{{ olympiad.name_short }}{% endblock %}
+{% block olymp_content %}
+
+<nav class="ol-crumbs" aria-label="Хлебные крошки">
+  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
+  <span aria-hidden="true">→</span>
+  <span>{{ olympiad.name_short }}</span>
+</nav>
+
+<header class="ol-hero" style="view-transition-name: ol-card-{{ olympiad.slug }};">
+  <div class="ol-hero-top">
+    {% if olympiad.logo %}
+    <img class="ol-logo ol-logo--big" src="{{ olympiad.logo.url }}" alt="" width="64" height="64">
+    {% else %}
+    <span class="ol-logo ol-logo--big ol-logo--empty" aria-hidden="true">{{ olympiad.abbr }}</span>
+    {% endif %}
+    <div>
+      <h1 class="ol-title">{{ olympiad.name_full }}</h1>
+      <p class="ol-sub">{{ olympiad.organizer }}</p>
+    </div>
+  </div>
+
+  <dl class="ol-facts">
+    {% if olympiad.grades_label %}<div><dt>Классы</dt><dd>{{ olympiad.grades_label }}</dd></div>{% endif %}
+    <div><dt>Этапов</dt><dd>{{ stages|length }}</dd></div>
+    {% if olympiad.format_label %}<div><dt>Формат</dt><dd>{{ olympiad.format_label }}</dd></div>{% endif %}
+    <div><dt>Регистрация</dt><dd>{{ olympiad.registration_label }}</dd></div>
+    {% if olympiad.cities_summary %}<div><dt>Города</dt><dd>{{ olympiad.cities_summary }}</dd></div>{% endif %}
+    <div><dt>Задач у нас</dt><dd>{{ olympiad.problem_count }}</dd></div>
+  </dl>
+
+  <div class="ol-actions">
+    {% if olympiad.official_url %}
+    <a class="ol-btn" href="{{ olympiad.official_url }}" target="_blank" rel="noopener">Официальный сайт</a>
+    {% endif %}
+    {% if olympiad.registration_url %}
+    <a class="ol-btn ol-btn--second" href="{{ olympiad.registration_url }}" target="_blank" rel="noopener">Регистрация на олимпиаду</a>
+    {% else %}
+    <span class="ol-btn ol-btn--second ol-btn--off" aria-disabled="true">Регистрация ещё не открыта</span>
+    {% endif %}
+  </div>
+</header>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Описание</h2>
+  {% if olympiad.description %}
+  <div class="ol-desc">{{ olympiad.description }}</div>
+  {% else %}
+  <p class="ol-empty">Описание готовится.</p>
+  {% endif %}
+</section>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Ключевые даты</h2>
+  {% if events %}
+  <div class="ol-tablewrap">
+    <table class="ol-table">
+      <thead>
+        <tr><th>Этап</th><th>Когда</th><th>Статус</th><th>Как попасть</th></tr>
+      </thead>
+      <tbody>
+        {% for event in events %}
+        <tr>
+          <td>{% if event.stage %}{{ event.stage.name }}{% else %}{{ event.get_kind_display }}{% endif %}</td>
+          <td>{{ event.display_date }}</td>
+          <td>
+            <span class="ol-status ol-status--{{ event.date_status }}">
+              <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
+            </span>
+            {% if event.source %}
+            <span class="ol-checked">
+              {% if event.source.verified_at %}Проверено {{ event.source.verified_at|date:"j E Y" }}{% endif %}
+              <a href="{{ event.source.url }}" target="_blank" rel="noopener">источник</a>
+            </span>
+            {% endif %}
+          </td>
+          <td>{% if event.stage.how_to_qualify %}{{ event.stage.how_to_qualify }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="ol-empty">Даты сезона пока не объявлены.</p>
+  {% endif %}
+
+  <p class="ol-warn">
+    {% if olympiad.kind == 'vsosh' %}
+    Даты школьного и муниципального этапов устанавливает каждый регион и
+    муниципалитет отдельно, поэтому они различаются по стране. Точные числа
+    для своего региона уточняйте у регионального организатора — список ниже
+    на этой странице.
+    {% else %}
+    Даты могут измениться, проверяйте на официальном сайте.
+    {% endif %}
+  </p>
+</section>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Этапы олимпиады</h2>
+  {% if stages %}
+  <div class="ol-tablewrap">
+    <table class="ol-table">
+      <thead>
+        <tr>
+          <th>Этап</th><th>Время</th><th>Максимум баллов</th>
+          <th>Тестовая часть</th><th>Популярно</th><th>Место проведения</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for stage in stages %}
+        <tr>
+          <td>{{ stage.name }}</td>
+          <td>{% if stage.duration_minutes %}{{ stage.duration_minutes }} мин{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>{% if stage.max_score %}{{ stage.max_score }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>{% if stage.has_test_part is None %}<span class="ol-mute">—</span>{% elif stage.has_test_part %}Есть{% else %}Нет{% endif %}</td>
+          <td>
+            {% if stage.top_topic %}
+              {% if stage.topic_histogram %}
+              <span class="ol-pop">
+                <button type="button" class="ol-pop-btn">{{ stage.top_topic }}</button>
+                <span class="ol-pop-box" role="tooltip">
+                  <span class="ol-pop-title">Из чего состоит этап</span>
+                  {% for row in stage.topic_histogram %}
+                  <span class="ol-bar">
+                    <span class="ol-bar-name">{{ row.topic }}</span>
+                    <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {% widthratio row.share 1 100 %}%;"></span></span>
+                    <span class="ol-bar-num">{% widthratio row.share 1 100 %}%</span>
+                  </span>
+                  {% endfor %}
+                </span>
+              </span>
+              {% else %}{{ stage.top_topic }}{% endif %}
+            {% else %}
+              <span class="ol-mute">после разметки</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if stage.cities_overflow %}
+            <span class="ol-pop">
+              <button type="button" class="ol-pop-btn">{{ stage.cities_label }}</button>
+              <span class="ol-pop-box" role="tooltip">
+                <span class="ol-pop-title">Все площадки</span>
+                {% for city in stage.cities_overflow %}<span class="ol-pop-city">{{ city }}</span>{% endfor %}
+              </span>
+            </span>
+            {% elif stage.cities_label %}{{ stage.cities_label }}
+            {% else %}<span class="ol-mute">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="ol-empty">Устройство этапов пока не описано.</p>
+  {% endif %}
+</section>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Что за задачи</h2>
+  <div class="ol-panels">
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Сложность</h3>
+      {% if stats %}
+        {% for row in stats.difficulty %}
+        <span class="ol-bar">
+          <span class="ol-bar-name">{{ row.level }} из 5</span>
+          <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {{ row.pct }}%;"></span></span>
+          <span class="ol-bar-num">{{ row.pct }}%</span>
+        </span>
+        {% endfor %}
+        {% if stats.unknown_difficulty %}
+        <p class="ol-panel-note">Без оценки сложности: {{ stats.unknown_difficulty }}.</p>
+        {% endif %}
+      {% else %}
+        <p class="ol-panel-note">Задания пока не размечены.</p>
+      {% endif %}
+    </div>
+
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Форматы заданий</h3>
+      {% if stats %}
+        {% for row in stats.formats %}
+        <span class="ol-bar">
+          <span class="ol-bar-name">{{ row.name }}</span>
+          <span class="ol-bar-track"><span class="ol-bar-fill" style="width: {{ row.pct }}%;"></span></span>
+          <span class="ol-bar-num">{{ row.pct }}%</span>
+        </span>
+        {% endfor %}
+      {% else %}
+        <p class="ol-panel-note">Задания пока не размечены.</p>
+      {% endif %}
+    </div>
+
+    <div class="ol-panel">
+      <h3 class="ol-panel-title">Частые темы</h3>
+      <p class="ol-panel-note">Появится, когда закончится разметка банка по темам.</p>
+    </div>
+  </div>
+</section>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Льготы олимпиады</h2>
+  {% if benefits %}
+  <p class="ol-year">Льготы по правилам приёма {{ benefit_year }} года</p>
+  <div class="ol-tablewrap">
+    <table class="ol-table ol-table--benefits">
+      <thead>
+        <tr>
+          <th>Программа</th><th>Что даёт</th><th>Подтверждение ЕГЭ</th>
+          <th>Классы</th><th>Правила приёма</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for benefit in benefits %}
+        <tr{% if benefit.benefit_type == 'none' %} class="ol-row--none"{% endif %}>
+          <td>
+            <span class="ol-uni">
+              {% if benefit.program.university_logo %}
+              <img class="ol-unilogo" src="{{ benefit.program.university_logo.url }}" alt="" width="28" height="28">
+              {% else %}
+              <span class="ol-unilogo ol-unilogo--empty" aria-hidden="true">{{ benefit.program.abbr }}</span>
+              {% endif %}
+              <span>
+                <span class="ol-uni-name">{{ benefit.program.university_name }}</span>
+                <span class="ol-uni-prog">{{ benefit.program.program_name }}</span>
+              </span>
+            </span>
+          </td>
+          <td>{{ benefit.gives_label }}</td>
+          <td>{{ benefit.confirm_label }}</td>
+          <td>{% if benefit.grades_note %}{{ benefit.grades_note }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
+          <td>
+            {% if benefit.program.admission_rules_url %}
+            <a href="{{ benefit.program.admission_rules_url }}" target="_blank" rel="noopener">Смотреть</a>
+            {% else %}<span class="ol-mute">—</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="ol-note">
+    Льготы устанавливает каждый вуз самостоятельно и пересматривает ежегодно.
+    Уровень олимпиады в перечне тоже меняется каждый год. Перед подачей
+    документов сверяйтесь с правилами приёма конкретного вуза.
+  </p>
+  {% else %}
+  <p class="ol-empty">Данных о льготах пока нет. Мы собираем их по правилам
+    приёма вузов; правила на следующий год публикуются до 1 ноября.</p>
+  {% endif %}
+</section>
+
+<section class="ol-section">
+  <h2 class="ol-section-title">Анализ проходных баллов</h2>
+  {% if score_rows %}
+  <div class="ol-scores">
+    {% for row in score_rows %}
+    <div class="ol-score-grade">
+      <h3 class="ol-panel-title">{{ row.grade }} класс</h3>
+      {% for cell in row.cells %}
+      <span class="ol-bar ol-bar--score">
+        <span class="ol-bar-name">{{ cell.year }}</span>
+        <span class="ol-bar-track">
+          {% if not cell.missing %}<span class="ol-bar-fill" style="width: {{ cell.pct }}%;"></span>{% endif %}
+        </span>
+        <span class="ol-bar-num">
+          {% if cell.missing %}<span class="ol-mute">нет данных</span>
+          {% else %}{{ cell.value }}{% if cell.max_value %} из {{ cell.max_value }}{% endif %}{% endif %}
+        </span>
+      </span>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  <p class="ol-note">Проходные баллы на муниципальный и региональный этапы
+    устанавливает каждый регион отдельно, единого числа по стране не
+    существует.</p>
+  {% else %}
+  <p class="ol-empty">Данные о проходных баллах пока не собраны.</p>
+  {% endif %}
+</section>
+
+<section class="ol-section" id="ol-variants">
+  <h2 class="ol-section-title">Варианты прошлых лет</h2>
+  {% if variants %}
+  <div class="ol-vfilters">
+    {% if variant_stages %}
+    <div class="ol-vrow" data-kind="stage">
+      <span class="ol-vrow-label">Этапы</span>
+      {% for stage in variant_stages %}
+      <button type="button" class="ol-chip" data-value="{{ stage.code }}" aria-pressed="false">{{ stage.name }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+    {% if variant_grades %}
+    <div class="ol-vrow" data-kind="grade">
+      <span class="ol-vrow-label">Классы</span>
+      {% for grade in variant_grades %}
+      <button type="button" class="ol-chip" data-value="{{ grade }}" aria-pressed="false">{{ grade }}</button>
+      {% endfor %}
+    </div>
+    {% endif %}
+    <div class="ol-vrow" data-kind="year">
+      <span class="ol-vrow-label">Годы</span>
+      {% for year in variant_years %}
+      <button type="button" class="ol-chip" data-value="{{ year }}" aria-pressed="false">{{ year }}</button>
+      {% endfor %}
+    </div>
+  </div>
+
+  <ul class="ol-vlist" id="ol-vlist">
+    {% for variant in variants %}
+    <li class="ol-variant"
+        data-stage="{{ variant.stage.code|default:'' }}"
+        data-grade="{{ variant.grade|default:'' }}"
+        data-year="{{ variant.year }}">
+      <span class="ol-variant-year">{{ variant.year }}</span>
+      <span class="ol-variant-main">
+        <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}</span>
+        <span class="ol-variant-meta">
+          {% if variant.problem_count %}{{ variant.problem_count }} заданий{% endif %}
+          {% if variant.duration_minutes %} · {{ variant.duration_minutes }} мин{% endif %}
+          {% if variant.max_score %} · максимум {{ variant.max_score }}{% endif %}
+          · {% if variant.has_solutions %}есть разборы{% else %}разборов нет{% endif %}
+        </span>
+      </span>
+      <span class="ol-variant-acts">
+        <a class="ol-btn ol-btn--sm" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}?timer=1">Решать на время</a>
+        <a class="ol-btn ol-btn--sm ol-btn--second" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}">Решать без таймера</a>
+        {% if variant.has_original %}
+        <a class="ol-btn ol-btn--sm ol-btn--second" href="{{ variant.original_url }}" target="_blank" rel="noopener">Открыть оригинал</a>
+        {% else %}
+        <span class="ol-btn ol-btn--sm ol-btn--second ol-btn--off" aria-disabled="true" title="Оригинал пока не найден">Открыть оригинал</span>
+        {% endif %}
+      </span>
+    </li>
+    {% endfor %}
+  </ul>
+  <p class="ol-nores" id="ol-vnores" hidden>
+    Под эти условия ничего не подошло.
+    <button type="button" class="ol-reset" id="ol-vreset">Сбросить фильтры</button>
+  </p>
+  {% else %}
+  <p class="ol-empty">Задания прошлых лет пока не собраны.</p>
+  {% endif %}
+</section>
+
+{% if show_regions %}
+<section class="ol-section">
+  <details class="ol-regions">
+    <summary class="ol-regions-sum">Региональные организаторы — {{ regions|length }} регионов</summary>
+    <p class="ol-note">Точные даты школьного и муниципального этапов, площадки
+      и проходные баллы устанавливает ваш регион. Уточняйте их у регионального
+      организатора.</p>
+    {% if not regions %}
+    <p class="ol-empty">Список организаторов ещё не заведён.</p>
+    {% endif %}
+    <ul class="ol-regions-list">
+      {% for region in regions %}
+      <li class="ol-region{% if not region.url %} ol-region--nourl{% endif %}">
+        <span class="ol-region-mark" aria-hidden="true"></span>
+        <span>
+          {% if region.url %}
+          <a href="{{ region.url }}" target="_blank" rel="noopener">{{ region.region_name }}</a>
+          {% else %}
+          {{ region.region_name }}
+          <span class="ol-region-soon">ссылка уточняется</span>
+          {% endif %}
+        </span>
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+
+<section class="ol-section ol-sources">
+  <h2 class="ol-sources-title">Официальные источники</h2>
+  {% if olympiad.official_url or olympiad.archive_url or olympiad.registration_url or olympiad.source %}
+  <ul class="ol-sources-list">
+    {% if olympiad.official_url %}<li><a href="{{ olympiad.official_url }}" target="_blank" rel="noopener">Официальный сайт</a></li>{% endif %}
+    {% if olympiad.archive_url %}<li><a href="{{ olympiad.archive_url }}" target="_blank" rel="noopener">Архив заданий</a></li>{% endif %}
+    {% if olympiad.registration_url %}<li><a href="{{ olympiad.registration_url }}" target="_blank" rel="noopener">Страница регистрации</a></li>{% endif %}
+    {% if olympiad.source %}<li><a href="{{ olympiad.source.url }}" target="_blank" rel="noopener">{{ olympiad.source.title|default:"Документ-источник" }}</a></li>{% endif %}
+  </ul>
+  {% else %}
+  <p class="ol-sources-empty">Ссылки на официальные документы пока не собраны.</p>
+  {% endif %}
+</section>
+
+{% endblock %}
+
+{% block extra_js %}{% include 'olympiads/_variants_js.html' %}{% endblock %}

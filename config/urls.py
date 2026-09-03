@@ -78,6 +78,8 @@ urlpatterns = [
     path('calendar/', include('calendar_stub.urls')),
     # Игра Econ Rush (публичная, без логина).
     path('game/', include('game.urls')),
+    # Справочник олимпиад: даты туров, льготы вузов, комплекты заданий.
+    path('olympiads/', include('olympiads.urls')),
 ]
 
 # В режиме разработки показываем загруженные файлы (картинки, PDF).
