@@ -117,3 +117,26 @@ class SeedWritesNoOriginalUrlTests(TestCase):
         call_command('seed_olympiads_demo', yes=True, verbosity=0)
         self.assertEqual(
             OlympiadVariant.objects.exclude(original_source='none').count(), 0)
+
+
+class SeedInventsNoUrlsTests(TestCase):
+    """⚠️ Наполнение примерами не имеет права выдумывать адреса.
+
+    Прежде сеялка ставила карточкам official_url вида
+    `https://example.org/<слаг>/`, а программам вузов —
+    `https://example.org/admission/<номер>/`. На экране это были рабочие
+    на вид кнопки «Официальный сайт» и «Смотреть», ведущие в никуда.
+    Пустое поле экран переживает, а школьник по такой кнопке уходит.
+    """
+
+    def test_no_fabricated_urls_anywhere(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        bad = []
+        for obj in Olympiad.objects.all():
+            for field in ('official_url', 'archive_url', 'registration_url'):
+                if 'example.' in (getattr(obj, field) or ''):
+                    bad.append((obj.slug, field))
+        for program in UniversityProgram.objects.all():
+            if 'example.' in (program.admission_rules_url or ''):
+                bad.append((program.university_short, 'admission_rules_url'))
+        self.assertEqual(bad, [], 'сеялка снова выдумывает адреса')

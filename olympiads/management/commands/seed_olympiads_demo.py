@@ -385,10 +385,13 @@ class Command(BaseCommand):
                     is_team=is_team, has_online_qualifier=on_qual,
                     has_online_final=on_final,
                     description=DESCRIPTIONS.get(slug, ''),
-                    official_url='https://example.org/{}/'.format(slug),
-                    registration_url=(
-                        'https://example.org/{}/reg/'.format(slug)
-                        if slug in ('mosh', 'vp', 'dano') else ''),
+                    # ⚠️ АДРЕСОВ НЕ ВЫДУМЫВАЕМ. Прежде сюда шли
+                    # https://example.org/<слаг>/ — и на карточке это была
+                    # кнопка «Официальный сайт», ведущая в никуда. Пустое
+                    # поле экран переживает, а школьник по такой кнопке
+                    # уходит и не возвращается. Настоящие адреса приходят
+                    # импортом из olympiads.jsonl.
+                    official_url='', registration_url='',
                     language='Английский' if slug == 'ieo' else '',
                     is_placeholder=True, is_published=True,
                 ),
@@ -475,9 +478,10 @@ class Command(BaseCommand):
                 university_short=uni_short, program_name=program_name,
                 defaults=dict(university_name=uni_name, city=city,
                               order=order,
-                              admission_rules_url=(
-                                  'https://example.org/admission/{}/'.format(
-                                      order))),
+                              # ⚠️ Тот же случай: выдуманный адрес правил
+                              # приёма в таблице льгот выглядел рабочей
+                              # ссылкой «Смотреть».
+                              admission_rules_url=''),
             )
             programs.append(program)
 
