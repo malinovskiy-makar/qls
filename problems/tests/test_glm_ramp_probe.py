@@ -110,7 +110,7 @@ class RunOneLevelTests(TestCase):
                      '"features_1": [], "topic_confidence": "высокая"}')
         call2_json = ('{"search_queries": ["a","b","c","d","e","f","g","h"], '
                      '"text_quality": "чистая", "text_quality_note": "", '
-                     '"problem_type": "открытый_ответ", "difficulty": 2, '
+                     '"problem_type": "тест: короткий ответ", "difficulty": 2, '
                      '"difficulty_note": "просто", '
                      '"answer_consistency": "решение_отсутствует_проверить_нечем", '
                      '"plot": null, "hints": null, '

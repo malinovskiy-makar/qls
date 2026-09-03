@@ -37,7 +37,7 @@ def _row(problem_id, **overrides):
                            'кривая предложения'],
         'plot': None, 'hints': None,
         'text_quality': 'чистая', 'text_quality_note': '',
-        'problem_type': 'открытый_ответ',
+        'problem_type': 'тест: короткий ответ',
         'difficulty': 3, 'difficulty_note': '',
         'answer_consistency': 'согласован',
         'title_candidate': 'Рынок кофе',
@@ -204,6 +204,17 @@ class EnrichFullAcceptTests(TestCase):
         rows = [dict(r, title_candidate='Рынок кофе') for r in self.rows]
         result, _ = self._run(rows=rows)
         self.assertEqual(result['phase2']['titles']['max_repeat'], len(rows))
+
+    def test_single_freetext_маппится_на_короткий_ответ(self):
+        """Правка владельца 2026-09-04 (§5.5): `открытый_ответ` разведён
+        обратно на два значения. `single_freetext` перешёл из
+        `CHECK_TYPE_AMBIGUOUS` в `CHECK_TYPE_MAP` — SolveHub сам определяет
+        его как короткий ответ без обоснования, соответствие 1:1."""
+        from problems.management.commands.enrich_full_accept import Command
+        self.assertEqual(Command.CHECK_TYPE_MAP['single_freetext'],
+                         'тест: короткий ответ')
+        self.assertNotIn('single_freetext', Command.CHECK_TYPE_AMBIGUOUS)
+        self.assertIn('uncheckable', Command.CHECK_TYPE_AMBIGUOUS)
 
     def test_check_type_без_solvehub_source_reference_даёт_ноль(self):
         """Ни одна тестовая задача не привязана к источнику SolveHub —

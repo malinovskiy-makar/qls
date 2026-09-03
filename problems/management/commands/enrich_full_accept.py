@@ -467,16 +467,25 @@ class Command(BaseCommand):
 
     #: `problems/enrich/prompts_v2.py` — соответствие check_type SolveHub
     #: нашему `problem_type` (дословно из комментария там же).
+    #:
+    #: ⚠️ Правка владельца 2026-09-04 (§5.5): `открытый_ответ` разведён
+    #: обратно на «тест: короткий ответ» / «задача с развёрнутым ответом».
+    #: `single_freetext` перешёл сюда ИЗ CHECK_TYPE_AMBIGUOUS — SolveHub сам
+    #: определяет его как «список принимаемых написаний» (короткий ответ без
+    #: обоснования), соответствие однозначное 1:1, а не «оба варианта
+    #: возможны», как было при склеенном значении.
     CHECK_TYPE_MAP = {
         'single_choice': 'единственный_выбор',
         'multiple_choice': 'множественный_выбор',
         'true_false': 'верно_неверно',
         'matching_list': 'сопоставление',
+        'single_freetext': 'тест: короткий ответ',
     }
-    #: Неоднозначные check_type — решает модель, в сверку не идут
-    #: (`single_freetext`/`uncheckable` -> оба могут стать `открытый_ответ`,
-    #: но однозначного соответствия 1:1 нет — см. комментарий в prompts_v2.py).
-    CHECK_TYPE_AMBIGUOUS = {'single_freetext', 'uncheckable', 'multiple_questions'}
+    #: Неоднозначные check_type — решает модель, в сверку не идут.
+    #: `uncheckable` значит «ответа в источнике нет вовсе» — это свойство
+    #: ДАННЫХ источника, а не тип задачи: текст может оказаться и коротким
+    #: ответом, и развёрнутым, и вовсе не задачей — соответствия 1:1 нет.
+    CHECK_TYPE_AMBIGUOUS = {'uncheckable', 'multiple_questions'}
 
     def _check_type_crosswalk(self, ok_rows):
         """Сверка `problem_type` с `check_type` SolveHub там, где он

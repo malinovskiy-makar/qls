@@ -50,7 +50,7 @@ def _row(problem_id, **overrides):
                            'кривая предложения'],
         'plot': None, 'hints': None,
         'text_quality': 'чистая', 'text_quality_note': '',
-        'problem_type': 'открытый_ответ',
+        'problem_type': 'тест: короткий ответ',
         'difficulty': 3, 'difficulty_note': '',
         'answer_consistency': 'согласован',
         'title_candidate': 'Рынок кофе',

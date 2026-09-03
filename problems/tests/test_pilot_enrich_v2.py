@@ -330,7 +330,7 @@ class ValidateCall2Tests(TestCase):
     def _base(self, **overrides):
         data = {
             'search_queries': ['q'] * 8, 'text_quality': 'чистая',
-            'text_quality_note': '', 'problem_type': 'открытый_ответ',
+            'text_quality_note': '', 'problem_type': 'тест: короткий ответ',
             'difficulty': 3, 'difficulty_note': '',
             'answer_consistency': 'согласован', 'plot': None, 'hints': None,
             'title_candidate': 'Рынок кофе',
@@ -472,7 +472,7 @@ class DropDigitSearchQueriesTests(TestCase):
     def _call2(self, queries):
         return {
             'search_queries': list(queries), 'text_quality': 'чистая',
-            'text_quality_note': '', 'problem_type': 'открытый_ответ',
+            'text_quality_note': '', 'problem_type': 'тест: короткий ответ',
             'difficulty': 3, 'difficulty_note': '',
             'answer_consistency': 'согласован', 'plot': None, 'hints': None,
             'title_candidate': 'Рынок кофе',
@@ -649,7 +649,7 @@ class CheckAgainstSchemaTests(TestCase):
         return {
             'search_queries': ['a', 'b', 'c', 'd', 'e'],
             'text_quality': 'чистая', 'text_quality_note': '',
-            'problem_type': 'открытый_ответ', 'difficulty': 3,
+            'problem_type': 'тест: короткий ответ', 'difficulty': 3,
             'difficulty_note': '', 'answer_consistency': 'согласован',
             'plot': None, 'hints': None, 'title_candidate': 'Рынок кофе',
         }
@@ -770,7 +770,7 @@ class TaskNatureDivergenceTests(TestCase):
     def test_совпадение_не_расхождение(self):
         rows = [
             {'call1': {'task_nature': 'расчётная'},
-             'call2': {'problem_type': 'открытый_ответ'}},
+             'call2': {'problem_type': 'тест: короткий ответ'}},
             {'call1': {'task_nature': 'не_задача'},
              'call2': {'problem_type': 'не_задача'}},
         ]
@@ -781,11 +781,11 @@ class TaskNatureDivergenceTests(TestCase):
     def test_расхождение_считается(self):
         rows = [
             {'call1': {'task_nature': 'не_задача'},
-             'call2': {'problem_type': 'открытый_ответ'}},
+             'call2': {'problem_type': 'тест: короткий ответ'}},
             {'call1': {'task_nature': 'расчётная'},
              'call2': {'problem_type': 'не_задача'}},
             {'call1': {'task_nature': 'расчётная'},
-             'call2': {'problem_type': 'открытый_ответ'}},
+             'call2': {'problem_type': 'тест: короткий ответ'}},
         ]
         divergent, total, pct = cmd.task_nature_divergence(rows)
         self.assertEqual((divergent, total), (2, 3))
@@ -839,7 +839,7 @@ CALL1_OK_JSON = (
 CALL2_OK_JSON = (
     '{"search_queries": ["a","b","c","d","e","f","g","h"], '
     '"text_quality": "чистая", "text_quality_note": "", '
-    '"problem_type": "открытый_ответ", "difficulty": 2, '
+    '"problem_type": "тест: короткий ответ", "difficulty": 2, '
     '"difficulty_note": "", "answer_consistency": "согласован", '
     '"plot": null, "hints": null, "title_candidate": "Рынок кофе"}'
 )

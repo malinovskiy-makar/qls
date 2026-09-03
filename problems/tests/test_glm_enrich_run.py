@@ -59,7 +59,7 @@ VALID_CALL2_JSON = json.dumps({
                        ('один', 'два', 'три', 'четыре', 'пять', 'шесть',
                         'семь', 'восемь')],
     'text_quality': 'чистая', 'text_quality_note': '',
-    'problem_type': 'открытый_ответ', 'difficulty': 2,
+    'problem_type': 'тест: короткий ответ', 'difficulty': 2,
     'difficulty_note': 'просто', 'answer_consistency': 'согласован',
     'plot': None, 'hints': None, 'title_candidate': 'Рынок кофе',
 }, ensure_ascii=False)
@@ -621,7 +621,7 @@ def _old_run1_row(problem_id, **overrides):
                           ('один', 'два', 'три', 'четыре', 'пять')],
         'plot': 'Старый сюжет.', 'hints': ['раз', 'два', 'три'],
         'text_quality': 'чистая', 'text_quality_note': '',
-        'problem_type': 'открытый_ответ', 'difficulty': 3,
+        'problem_type': 'тест: короткий ответ', 'difficulty': 3,
         'difficulty_note': 'старое', 'answer_consistency': 'согласован',
         'title_candidate': 'Старый заголовок',
     }
@@ -651,7 +651,7 @@ class ParsedRowFallbackTests(TestCase):
             'call1_violations': [], 'call1_soft_violations': [],
             'call2': call2 or {'search_queries': ['a', 'b'], 'plot': None,
                                'hints': None, 'text_quality': 'чистая',
-                               'text_quality_note': '', 'problem_type': 'открытый_ответ',
+                               'text_quality_note': '', 'problem_type': 'тест: короткий ответ',
                                'difficulty': 2, 'difficulty_note': '',
                                'answer_consistency': 'согласован',
                                'title_candidate': 'Новый заголовок'},
@@ -746,7 +746,7 @@ class ParsedRowFallbackTests(TestCase):
         row = self._row(call1_ok=True, call2_ok=True,
                         call2={'search_queries': ['a', 'b'], 'plot': None,
                               'hints': None, 'text_quality': 'чистая',
-                              'text_quality_note': '', 'problem_type': 'открытый_ответ',
+                              'text_quality_note': '', 'problem_type': 'тест: короткий ответ',
                               'difficulty': 2, 'difficulty_note': '',
                               'answer_consistency': 'согласован',
                               'title_candidate': 'Заголовок'})

@@ -14,7 +14,7 @@ from game.models import GameQuestion, GameResult, make_result_code
 from game.management.commands.build_game_pool import (
     extract_question, extract_boolean, extract_multi, extract_numeric,
     effective_problem_type, taxonomy_v2_admission_reason, GAME_TYPES,
-    TAXONOMY_V2_GAME_TYPES, OPEN_ANSWER_MAX_LEN)
+    TAXONOMY_V2_GAME_TYPES)
 from game.config import combo_multiplier, MODES
 from game.views import (parse_exact_number, build_summary, allocate_quotas,
                         mistakes_by_topic, build_mistakes_run)
@@ -1209,11 +1209,13 @@ class TaxonomyV2GameTypesMappingTests(TestCase):
     таксономии не допускаются вовсе."""
 
     def test_четыре_значения_отображены(self):
+        """§5.5 (правка владельца 2026-09-04): `открытый_ответ` разведён
+        обратно на два значения — в игру идёт только «короткий ответ»."""
         self.assertEqual(TAXONOMY_V2_GAME_TYPES, {
             'единственный_выбор': 'single',
             'верно_неверно': 'boolean',
             'множественный_выбор': 'multi',
-            'открытый_ответ': 'numeric',
+            'тест: короткий ответ': 'numeric',
         })
 
     def test_все_четыре_в_общем_словаре_GAME_TYPES(self):
@@ -1221,7 +1223,8 @@ class TaxonomyV2GameTypesMappingTests(TestCase):
             self.assertEqual(GAME_TYPES[value], qtype)
 
     def test_недопущенные_значения_отсутствуют(self):
-        for value in ('сопоставление', 'несколько_подвопросов', 'не_задача'):
+        for value in ('сопоставление', 'несколько_подвопросов', 'не_задача',
+                      'задача с развёрнутым ответом'):
             self.assertNotIn(value, GAME_TYPES)
 
 
@@ -1284,18 +1287,20 @@ class TaxonomyV2AdmissionTests(TestCase):
         reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
         self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
 
-    def test_короткий_открытый_ответ_проходит(self):
-        p = self._problem(problem_type='открытый_ответ', answer='12')
-        reason = taxonomy_v2_admission_reason(p, 'открытый_ответ')
+    def test_короткий_ответ_проходит(self):
+        p = self._problem(problem_type='тест: короткий ответ', answer='12')
+        reason = taxonomy_v2_admission_reason(p, 'тест: короткий ответ')
         self.assertIsNone(reason)
 
-    def test_длинный_открытый_ответ_отклоняется(self):
-        p = self._problem(problem_type='открытый_ответ', answer='1' * OPEN_ANSWER_MAX_LEN)
-        reason = taxonomy_v2_admission_reason(p, 'открытый_ответ')
-        self.assertEqual(reason, 'открытый ответ длиннее %d символов' % OPEN_ANSWER_MAX_LEN)
+    def test_короткий_ответ_любой_длины_проходит_гейт_длины_убран(self):
+        """Правка владельца 2026-09-04: длина ответа была костылём ВМЕСТО
+        типа — раз тип теперь сам говорит «короткий ответ без обоснования»,
+        отдельного лимита символов не нужно вовсе."""
+        p = self._problem(problem_type='тест: короткий ответ', answer='1' * 50)
+        reason = taxonomy_v2_admission_reason(p, 'тест: короткий ответ')
+        self.assertIsNone(reason)
 
-    def test_единственный_выбор_с_любой_длиной_ответа_не_ограничен_по_длине(self):
-        """Лимит длины — только для открытый_ответ, не для остальных трёх."""
+    def test_ни_один_тип_не_ограничен_по_длине_ответа(self):
         p = self._problem(problem_type='единственный_выбор', answer='A' * 50)
         reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
         self.assertIsNone(reason)
