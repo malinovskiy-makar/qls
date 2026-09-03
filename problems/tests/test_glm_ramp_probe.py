@@ -105,7 +105,8 @@ class RunOneLevelTests(TestCase):
         # иначе check_against_schema() в боевом пути даёт лишний повтор
         # и attempts_total считает не то, что ожидает тест.
         call1_json = ('{"topic_primary": "1", "topics_secondary": [], "tags": ["1.1"], '
-                     '"given": "Дано", "find": "Найти", "econ_concepts": ["a","b","c"], '
+                     '"given": "Дано", "find": "Найти", '
+                     '"econ_concepts": ["спрос","предложение","равновесие"], '
                      '"concepts_offlist": [], "task_nature": "расчётная", '
                      '"features_1": [], "topic_confidence": "высокая"}')
         call2_json = ('{"search_queries": ["a","b","c","d","e","f","g","h"], '
