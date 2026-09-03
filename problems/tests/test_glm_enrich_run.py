@@ -674,3 +674,156 @@ class GlmEnrichRunPricesRegressionTests(TestCase):
         metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
         self.assertEqual(metrics['total_processed'], len(self.problems))
         self.assertGreater(Decimal(metrics['usage_totals']['cost_usd']), 0)
+
+
+class Call1OnlyTests(TestCase):
+    """Режим `--call1-only` (задание сессии 03.09.2026, фаза 2.7).
+
+    Перегон корпуса переделывает ТОЛЬКО вызов 1: темы, дополнительные темы,
+    теги, понятия, «дано», «найти», характер задачи, особенности. Заголовок,
+    сложность, тип задачи, подсказки и сюжет живут в вызове 2 — их не
+    меняли, и платить за них второй раз незачем (около трети сметы).
+
+    Проверяется главное: ровно один вызов на задачу и НИ ОДНО поле вызова 2
+    не потеряно — они переносятся из старого журнала побайтно.
+    """
+
+    def setUp(self):
+        self.tmp_dir = Path(tempfile.mkdtemp())
+        self.problems = [
+            Problem.objects.create(statement='Задача %d про рынок и спрос.' % i)
+            for i in range(3)
+        ]
+        self.raw_path = self.tmp_dir / 'run_raw.jsonl'
+        self.parsed_path = self.tmp_dir / 'run_parsed.jsonl'
+        self.metrics_path = self.tmp_dir / 'run_metrics.json'
+        self.manifest_path = self.tmp_dir / 'run300_sample_ids.json'
+        self.battle_manifest_path = self.tmp_dir / 'run_full_sample_ids.json'
+        self.no_call2_path = self.tmp_dir / 'no_call2.json'
+
+    def _patch_paths(self):
+        return mock.patch.multiple(
+            run_cmd,
+            RAW_LOG_PATH=self.raw_path,
+            PARSED_LOG_PATH=self.parsed_path,
+            METRICS_PATH=self.metrics_path,
+            SAMPLE_MANIFEST_PATH=self.manifest_path,
+            BATTLE_MANIFEST_PATH=self.battle_manifest_path,
+            NO_CALL2_PATH=self.no_call2_path,
+        )
+
+    def _counting_complete_fn(self, calls):
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            calls.append('call1' if is_call1 else 'call2')
+            return _FakeReply(_valid_call1_json(user_text) if is_call1
+                              else VALID_CALL2_JSON)
+        return fake_complete
+
+    def _run(self, calls, call1_only=False, run_id='r1'):
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn',
+                                  return_value=self._counting_complete_fn(calls)):
+            call_command('glm_enrich_run', ids=','.join(
+                str(p.id) for p in self.problems), max_cost=100.0,
+                workers=1, chunk=3, run_id=run_id, call1_only=call1_only)
+        return [json.loads(line) for line
+                in self.parsed_path.read_text(encoding='utf-8').splitlines()
+                if line.strip()]
+
+    def _old_run(self, calls):
+        """Полный прогон СТАРОЙ версией промпта — то, что уже оплачено."""
+        with mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                               return_value='pv-old'):
+            return self._run(calls, call1_only=False, run_id='r-old')
+
+    def test_ровно_один_вызов_на_задачу(self):
+        self._old_run([])
+        calls = []
+        with mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                               return_value='pv-new'):
+            self._run(calls, call1_only=True, run_id='r-new')
+        self.assertEqual(
+            calls, ['call1'] * len(self.problems),
+            'в режиме --call1-only вызов 2 не должен выполняться вовсе')
+
+    def test_поля_вызова_2_совпадают_со_старым_журналом(self):
+        old_rows = {r['problem_id']: r for r in self._old_run([])}
+        with mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                               return_value='pv-new'):
+            new_rows = {r['problem_id']: r
+                        for r in self._run([], call1_only=True, run_id='r-new')}
+
+        self.assertEqual(set(new_rows), set(old_rows))
+        call2_fields = ('search_queries', 'plot', 'hints', 'text_quality',
+                        'text_quality_note', 'problem_type', 'difficulty',
+                        'difficulty_note', 'answer_consistency',
+                        'title_candidate', 'call2_ok', 'call2_retried',
+                        'dropped_queries')
+        for pid, new in new_rows.items():
+            for field in call2_fields:
+                self.assertEqual(
+                    new.get(field), old_rows[pid].get(field),
+                    'поле вызова 2 «%s» задачи #%s разошлось со старым '
+                    'журналом' % (field, pid))
+
+    def test_поля_вызова_1_переписаны_а_не_взяты_из_старого(self):
+        """Обратная половина: вызов 1 обязан быть НОВЫМ. Иначе перенос
+        превратился бы в «ничего не делаем»."""
+        self._old_run([])
+        theme_ids = taxonomy.theme_ids()
+
+        def other_call1(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            if not is_call1:
+                raise AssertionError('вызов 2 не должен выполняться')
+            return _FakeReply(_valid_call1_json(user_text, theme_idx=1))
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn',
+                                  return_value=other_call1), \
+                mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                                  return_value='pv-new'):
+            call_command('glm_enrich_run', ids=','.join(
+                str(p.id) for p in self.problems), max_cost=100.0,
+                workers=1, chunk=3, run_id='r-new', call1_only=True)
+        rows = [json.loads(line) for line
+                in self.parsed_path.read_text(encoding='utf-8').splitlines()
+                if line.strip()]
+        self.assertTrue(rows)
+        for row in rows:
+            self.assertEqual(row['topic_primary'], theme_ids[1])
+
+    def test_возобновление_не_платит_за_уже_сделанное(self):
+        self._old_run([])
+        with mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                               return_value='pv-new'):
+            self._run([], call1_only=True, run_id='r-new')
+            calls2 = []
+            self._run(calls2, call1_only=True, run_id='r-new-2')
+        self.assertEqual(
+            calls2, [],
+            'повторный запуск --call1-only обязан пропустить уже сделанный '
+            'вызов 1 — иначе резюмирование платило бы заново при каждом '
+            'перезапуске')
+
+    def test_задачи_без_старого_вызова_2_попадают_в_список(self):
+        """Старого вызова 2 нет вовсе — владелец обязан получить поимённый
+        список, а не обнаружить пустой заголовок через месяц."""
+        with mock.patch.object(run_cmd.pilot, 'prompt_fingerprint',
+                               return_value='pv-new'):
+            self._run([], call1_only=True, run_id='r-new')
+        payload = json.loads(self.no_call2_path.read_text(encoding='utf-8'))
+        self.assertEqual(payload['count'], len(self.problems))
+        self.assertEqual(sorted(payload['ids']),
+                         sorted(p.id for p in self.problems))
+
+    def test_автостоп_не_считает_браком_отсутствие_вызова_2(self):
+        """Мина режима: `call2_ok` у строки отсутствует, и проверка
+        `not (call1_ok and call2_ok)` посчитала бы браком КАЖДУЮ задачу —
+        автостоп убил бы перегон корпуса на ровном месте."""
+        tracker = run_cmd.RunQualityTracker(min_sample=1, call1_only=True)
+        tracker.record({'call1_ok': True, 'call1_retried': False})
+        defect_pct, _retry, _soft = tracker.pcts()
+        self.assertEqual(defect_pct, 0.0)
+        self.assertFalse(tracker.breached)

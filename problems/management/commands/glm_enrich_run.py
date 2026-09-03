@@ -88,6 +88,10 @@ REPORT_DIR = Path('reports/enrich_pilot')
 RAW_LOG_PATH = REPORT_DIR / 'run_raw.jsonl'
 PARSED_LOG_PATH = REPORT_DIR / 'run_parsed.jsonl'
 METRICS_PATH = REPORT_DIR / 'run_metrics.json'
+# Задачи, у которых в старом журнале нет вызова 2 (режим --call1-only):
+# поимённый список, а не число — их поля заголовка/сложности/типа/подсказок
+# останутся пустыми и требуют отдельного прогона.
+NO_CALL2_PATH = REPORT_DIR / 'run_call1_only_no_call2.json'
 REVIEW_HTML_PATH = REPORT_DIR / 'run300_review.html'
 
 SERVICE_FIXTURE_SOURCE = 'Служебное: фикстуры рендерера (не публиковать)'
@@ -335,7 +339,7 @@ class RunQualityTracker(object):
     """
 
     def __init__(self, min_sample=FINAL_DEFECT_MIN_SAMPLE,
-                stop_pct=FINAL_DEFECT_STOP_PCT):
+                stop_pct=FINAL_DEFECT_STOP_PCT, call1_only=False):
         self.lock = threading.Lock()
         self.total = 0
         self.defects = 0
@@ -344,16 +348,28 @@ class RunQualityTracker(object):
         self.min_sample = min_sample
         self.stop_pct = stop_pct
         self.breached = False
+        # ⚠️ В режиме `--call1-only` вызова 2 не было вовсе, и `call2_ok`
+        # у строки ОТСУТСТВУЕТ. Без этого флага `not (call1_ok and
+        # call2_ok)` считал бы браком КАЖДУЮ задачу (None — ложь),
+        # автостоп сработал бы на 200-й и убил перегон корпуса на ровном
+        # месте. Судим по тому, что реально делали.
+        self.call1_only = call1_only
 
     def record(self, row):
         with self.lock:
             self.total += 1
-            if not (row.get('call1_ok') and row.get('call2_ok')):
+            ok = row.get('call1_ok') if self.call1_only else (
+                row.get('call1_ok') and row.get('call2_ok'))
+            if not ok:
                 self.defects += 1
-            if row.get('call1_retried') or row.get('call2_retried'):
+            retried = row.get('call1_retried') if self.call1_only else (
+                row.get('call1_retried') or row.get('call2_retried'))
+            if retried:
                 self.retried += 1
-            if (row.get('call1_soft_violations')
-                    or row.get('call2_soft_violations')):
+            soft = row.get('call1_soft_violations') if self.call1_only else (
+                row.get('call1_soft_violations')
+                or row.get('call2_soft_violations'))
+            if soft:
                 self.soft += 1
             if self.total >= self.min_sample:
                 if self.defects / self.total * 100 > self.stop_pct:
@@ -682,6 +698,14 @@ class Command(BaseCommand):
         parser.add_argument('--workers', type=int, default=WORKERS_DEFAULT)
         parser.add_argument('--run-id', type=str, default=None)
         parser.add_argument(
+            '--call1-only', action='store_true',
+            help='Переделывать ТОЛЬКО вызов 1 (темы, доп. темы, теги, '
+                 'понятия, «дано», «найти», характер задачи, особенности). '
+                 'Вызов 2 не выполняется вовсе, его поля (заголовок, '
+                 'сложность, тип задачи, подсказки, сюжет) переносятся в '
+                 'результат из старого журнала без изменений. Экономит '
+                 'около трети сметы перегона.')
+        parser.add_argument(
             '--ids', type=str, default=None,
             help='Через запятую — конкретные id вместо первых --limit из '
                  'battle_queryset(). Например, донабор с картинками для '
@@ -759,8 +783,13 @@ class Command(BaseCommand):
 
         prompt_version = pilot.prompt_fingerprint(GLM_VARIANT['concepts'])
         complete_fn = make_glm_complete_fn()
+        call1_only = options['call1_only']
+        if call1_only:
+            self.stdout.write(
+                'режим --call1-only: ровно ОДИН вызов на задачу; поля вызова '
+                '2 переносятся из старого журнала без изменений')
 
-        tracker = RunQualityTracker()
+        tracker = RunQualityTracker(call1_only=call1_only)
         stop_event = threading.Event()
         processed_count = {'n': 0}
         count_lock = threading.Lock()
@@ -808,7 +837,8 @@ class Command(BaseCommand):
         # каждый кусок: на 41 тысяче задач в нём 80+ тысяч строк, и
         # двадцать перечитываний стоили бы дороже самого прогона.
         done_ids = pilot.done_problem_ids_from_log(
-            str(RAW_LOG_PATH), prompt_version, GLM_VARIANT)
+            str(RAW_LOG_PATH), prompt_version, GLM_VARIANT,
+            call1_only=call1_only)
         todo_ids = [pid for pid in problem_ids if pid not in done_ids]
         todo_total = len(todo_ids)
         skipped = total_ids - todo_total
@@ -845,7 +875,8 @@ class Command(BaseCommand):
                             str(RAW_LOG_PATH), run_id, prompt_version,
                             options['workers'], max_cost=remaining_budget,
                             on_progress=on_progress, stop_event=stop_event,
-                            extra_on_row=extra_on_row, done_ids=set()))
+                            extra_on_row=extra_on_row, done_ids=set(),
+                            call1_only=call1_only))
                     spent += chunk_spent
                     spent_done['v'] = spent
                     processed_now += len(rows)
@@ -894,7 +925,8 @@ class Command(BaseCommand):
             sweep = sweep_report(sweep_before,
                                  protected_fields_digest(problem_ids))
             parsed_all, usage_totals = self._collect_parsed(
-                problem_ids, chunk_size, prompt_version, parsed_out)
+                problem_ids, chunk_size, prompt_version, parsed_out,
+                call1_only=call1_only)
             metrics = build_metrics(parsed_all, usage_totals, sweep=sweep)
 
         metrics_out.parent.mkdir(parents=True, exist_ok=True)
@@ -991,7 +1023,7 @@ class Command(BaseCommand):
         return [by_id[pid] for pid in chunk_ids if pid in by_id], by_id
 
     def _collect_parsed(self, problem_ids, chunk_size, prompt_version,
-                        parsed_out):
+                        parsed_out, call1_only=False):
         """Строки `run_parsed.jsonl` и суммарный расход — КУСКАМИ.
 
         Журнал перечитывается потоком на каждый кусок (`iter_raw_log`), но
@@ -1003,6 +1035,7 @@ class Command(BaseCommand):
                         'reasoning_tokens': 0, 'cost_usd': '0'}
         cost = Decimal('0')
         written = False
+        no_call2 = []
         for start in range(0, len(problem_ids), chunk_size):
             chunk_ids = problem_ids[start:start + chunk_size]
             wanted = set(chunk_ids)
@@ -1021,7 +1054,11 @@ class Command(BaseCommand):
                 p.id: shortlist_for(problem_full_text(p.statement, p.parts.all()))
                 for p in problems}
             rows = self._rows_from_log(entries, chunk_ids, GLM_VARIANT,
-                                       prompt_version, shortlists, by_id)
+                                       prompt_version, shortlists, by_id,
+                                       call1_only=call1_only)
+            if call1_only:
+                no_call2.extend(r['problem_id'] for r in rows
+                                if not r.get('call2_carried'))
             chunk_usage = usage_totals_from_rows(rows)
             for key in ('input_tokens', 'cache_read_tokens', 'cache_write_tokens',
                         'output_tokens', 'reasoning_tokens'):
@@ -1039,10 +1076,22 @@ class Command(BaseCommand):
         if not written:  # в журнале нет ни одной задачи выборки
             write_parsed_rows(parsed_out, [])
         usage_totals['cost_usd'] = str(cost)
+        if no_call2:
+            # Поимённо, а не числом: у этих задач заголовок, сложность, тип
+            # и подсказки останутся пустыми, и это надо чинить отдельным
+            # прогоном вызова 2, а не обнаружить через месяц в каталоге.
+            NO_CALL2_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(NO_CALL2_PATH, 'w', encoding='utf-8') as fh:
+                json.dump({'count': len(no_call2), 'ids': sorted(no_call2)},
+                          fh, ensure_ascii=False, indent=2)
+            self.stdout.write(
+                '⚠️ у %d задач в старом журнале НЕТ вызова 2 — поля '
+                'заголовка/сложности/типа/подсказок останутся пустыми. '
+                'Список: %s' % (len(no_call2), NO_CALL2_PATH))
         return parsed_all, usage_totals
 
     def _rows_from_log(self, entries, problem_ids, variant, prompt_version,
-                       shortlists, problems_by_id):
+                       shortlists, problems_by_id, call1_only=False):
         """Восстанавливает `rows`-подобные словари из `run_raw.jsonl` для
         ВСЕЙ запрошенной выборки (не только обработанных в этом запуске —
         нужно для метрик после резюмирования, где часть задач могла быть
@@ -1063,19 +1112,38 @@ class Command(BaseCommand):
         обработанных: 19 задач/29 картинок по факту при заявленных 0).
         Обе величины — ЧИСТАЯ функция текста/`ProblemFigure` задачи, без
         обращения к API, поэтому пересчитываются здесь заново, без
-        повторной оплаты."""
+        повторной оплаты.
+
+        ⚠️ `call1_only=True` — ПЕРЕНОС ПОЛЕЙ ВЫЗОВА 2 ИЗ СТАРОГО ЖУРНАЛА.
+        Перегон корпуса переделывает только вызов 1, поэтому записи вызова 2
+        с НОВОЙ версией промпта в журнале не появятся никогда. Брать их
+        нужно из записей СТАРОЙ версии — иначе `run_parsed.jsonl` вышел бы
+        с пустыми заголовком, сложностью, типом задачи и подсказками, то
+        есть перегон стёр бы уже оплаченную работу.
+
+        Правило: вызов 1 берётся ТОЛЬКО со своей (новой) версией промпта,
+        вызов 2 — с ЛЮБОЙ. Журнал дописывается в конец, поэтому при
+        нескольких старых версиях побеждает последняя, то есть самая
+        свежая.
+
+        Деньги при этом НЕ смешиваются: попытки вызова 2 из чужого прогона
+        уходят в `call2_carried_attempts` и в расход этого запуска не
+        попадают — иначе цена перегона включала бы то, за что мы уже
+        заплатили в прошлый раз. `call2_retried` при этом сохраняется:
+        повтор был, просто оплачен раньше."""
         by_pid = {}
         for entry in entries:
-            if entry.get('prompt_version') != prompt_version:
-                continue
             call = entry['call']
             base_call = call.split('_retry')[0]
             if base_call not in ('call1', 'call2'):
                 continue
+            same_version = entry.get('prompt_version') == prompt_version
+            if not same_version and not (call1_only and base_call == 'call2'):
+                continue
             row = by_pid.setdefault(
                 entry['problem_id'],
                 {'problem_id': entry['problem_id'], 'call1_attempts': [],
-                'call2_attempts': []})
+                'call2_attempts': [], 'call2_carried_attempts': []})
             usage = entry['usage']
 
             class _U(object):
@@ -1086,10 +1154,20 @@ class Command(BaseCommand):
             u.cache_write_tokens = usage.get('cache_write_tokens', 0)
             u.cache_read_tokens = usage['cache_read_tokens']
             u.reasoning_tokens = usage.get('reasoning_tokens', 0)
-            row['%s_attempts' % base_call].append(u)
+            carried = call1_only and base_call == 'call2'
+            if carried:
+                # Новая версия промпта могла бы дописать сюда свои записи
+                # только по ошибке — но если такое случилось, они всё равно
+                # НЕ оплачены этим запуском (вызов 2 не делался вовсе), так
+                # что место у них одно.
+                row['call2_carried_attempts'].append(u)
+                row['call2_carried_from'] = entry.get('prompt_version')
+            else:
+                row['%s_attempts' % base_call].append(u)
             if call == base_call:  # финальная попытка (без суффикса _retryN)
                 row[base_call] = entry['raw_response']
-                row['%s_usage' % base_call] = u
+                if not carried:
+                    row['%s_usage' % base_call] = u
 
         rows = []
         wanted = set(problem_ids)
@@ -1115,7 +1193,17 @@ class Command(BaseCommand):
                 row.get('call1'), variant['concepts'], shortlist_terms=shortlist_terms)
             row['call1_retried'] = len(row['call1_attempts']) > 1
             row['call2_ok'], _ = pilot.validate_call2_full(row.get('call2'))
-            row['call2_retried'] = len(row['call2_attempts']) > 1
+            # Повтор вызова 2 в режиме переноса был в ПРОШЛОМ прогоне и
+            # оплачен там же — факт сохраняем, деньги не пересчитываем.
+            row['call2_retried'] = len(
+                row['call2_carried_attempts'] if call1_only
+                else row['call2_attempts']) > 1
+            if call1_only:
+                # Задачи, у которых старого вызова 2 нет вовсе: их поля
+                # заголовка/сложности/типа останутся пустыми, и владелец
+                # обязан видеть поимённый список, а не узнать об этом из
+                # пустой колонки через месяц.
+                row['call2_carried'] = 'call2' in row
             row['call1_soft_violations'] = pilot.soft_violations_call1(
                 row.get('call1'), variant['concepts'])
             row['call2_soft_violations'] = pilot.soft_violations_call2(row.get('call2'))

@@ -181,8 +181,14 @@ class ValidateCall1Tests(TestCase):
         ok, violations = cmd.validate_call1(self._base())
         self.assertTrue(ok, violations)
 
+    def test_восемь_тегов_проходит(self):
+        # Граница расширена 03.09.2026: теги выписываются по КАЖДОЙ
+        # названной теме, а не только по главной, — 1–8 вместо 1–5.
+        ok, violations = cmd.validate_call1(self._base(tags=['a'] * 8))
+        self.assertTrue(ok, violations)
+
     def test_слишком_много_тегов(self):
-        ok, violations = cmd.validate_call1(self._base(tags=['a'] * 6))
+        ok, violations = cmd.validate_call1(self._base(tags=['a'] * 9))
         self.assertFalse(ok)
         self.assertTrue(any('tags' in v for v in violations))
 
@@ -199,10 +205,18 @@ class ValidateCall1Tests(TestCase):
         soft = cmd.soft_violations_call1(self._base(econ_concepts=['альфа']))
         self.assertTrue(any('econ_concepts' in v for v in soft))
 
+    def test_четыре_дополнительные_темы_проходят(self):
+        # Граница расширена 03.09.2026: многотемье в олимпиадной экономике —
+        # норма, поэтому 0–4 вместо 0–2.
+        ok, violations = cmd.validate_call1(
+            self._base(topics_secondary=['A', 'B', 'C', 'D']))
+        self.assertTrue(ok, violations)
+
     def test_много_дополнительных_тем(self):
         ok, violations = cmd.validate_call1(
-            self._base(topics_secondary=['A', 'B', 'C']))
+            self._base(topics_secondary=['A', 'B', 'C', 'D', 'E']))
         self.assertFalse(ok)
+        self.assertTrue(any('topics_secondary' in v for v in violations))
 
     def test_семь_понятий_всё_ещё_жёсткое(self):
         ok, violations = cmd.validate_call1(
@@ -1718,6 +1732,47 @@ class ResumableRunTests(TestCase):
             self.log_path, run_id='r2', prompt_version='pv-new')
         self.assertEqual(len(calls2), len(self.problems) * 2)
         self.assertEqual(skipped2, 0)
+
+    # -----------------------------------------------------------------
+    # Мина перегона корпуса (задание сессии 03.09.2026, фаза −1). Журнал
+    # резюмирования ключуется версией промпта. Если версию не поднять при
+    # изменённом ядре, перегон решит, что корпус уже обработан, и не
+    # сделает НИ ОДНОГО вызова — молча, без ошибки, с кодом возврата 0.
+    #
+    # Версия — не ручной номер (его легко забыть увеличить), а sha256-
+    # отпечаток ТЕКСТА обоих ядер: она поднимается сама. Два теста ниже
+    # закрывают обе половины: отпечаток реагирует на правку ядра, и на
+    # новом отпечатке старый журнал не считается сделанным.
+    # -----------------------------------------------------------------
+
+    def test_отпечаток_промпта_меняется_при_правке_ядра(self):
+        before = cmd.prompt_fingerprint(True)
+        with mock.patch.object(prompts_v2, 'call1_core',
+                               return_value='другое ядро вызова 1'):
+            after = cmd.prompt_fingerprint(True)
+        self.assertNotEqual(
+            before, after,
+            'отпечаток обязан меняться при изменении текста ядра — иначе '
+            'перегон корпуса примет старый журнал за готовый результат')
+
+    def test_новая_версия_промпта_не_видит_старый_журнал_готовым(self):
+        """`done_problem_ids_from_log` на журнале, записанном СТАРОЙ версией
+        промпта, при новой версии обязан вернуть пустое множество."""
+        variant = cmd.VARIANTS['base']
+        complete_fn, _calls = self._counting_complete_fn()
+        cmd.resumable_run_variant(
+            self.problems, variant, complete_fn, self.shortlists,
+            self.log_path, run_id='r1', prompt_version='pv-old')
+
+        done_old = cmd.done_problem_ids_from_log(
+            self.log_path, 'pv-old', variant)
+        self.assertEqual(done_old, {p.id for p in self.problems},
+                         'на своей же версии журнал обязан читаться готовым '
+                         '— иначе тест ниже ничего не доказывает')
+
+        done_new = cmd.done_problem_ids_from_log(
+            self.log_path, 'pv-new', variant)
+        self.assertEqual(done_new, set())
 
 
 # ---------------------------------------------------------------------------

@@ -370,11 +370,19 @@ def validate_call1(data, with_concepts=True, shortlist_terms=None):
     if not isinstance(data, dict):
         return (False, ['ответ вызова 1 — не JSON-объект (%s)' % type(data).__name__])
     violations = []
-    if len(data.get('topics_secondary') or []) > 2:
-        violations.append('topics_secondary длиннее 2')
+    # Границы расширены 03.09.2026 решением владельца перед перегоном
+    # корпуса: многотемье в олимпиадной экономике — норма, а не исключение,
+    # поэтому дополнительных тем стало 0–4 вместо 0–2, а теги теперь
+    # выписываются по КАЖДОЙ названной теме, а не только по главной, — 1–8
+    # вместо 1–5. Верхняя граница остаётся ЖЁСТКОЙ (повтор): список тем и
+    # тегов закрытый, и выход за границу означает, что модель перестала
+    # следовать таксономии, а не что она нашла лишний оттенок смысла.
+    if len(data.get('topics_secondary') or []) > 4:
+        violations.append('topics_secondary длиннее 4 (%d)'
+                          % len(data.get('topics_secondary') or []))
     tags = data.get('tags') or []
-    if not 1 <= len(tags) <= 5:
-        violations.append('tags вне диапазона 1..5 (%d)' % len(tags))
+    if not 1 <= len(tags) <= 8:
+        violations.append('tags вне диапазона 1..8 (%d)' % len(tags))
     if with_concepts:
         concepts = data.get('econ_concepts') or []
         # Верхняя граница остаётся жёсткой — только нижняя (Фаза 1, 02.09)
@@ -1107,7 +1115,8 @@ def run_variant(sample_problems, variant, complete_fn, shortlists,
 # ---------------------------------------------------------------------------
 
 def _process_one_problem(problem, variant, complete_fn, shortlists,
-                         with_tikz, core1_blocks, core2_blocks, schema1, schema2):
+                         with_tikz, core1_blocks, core2_blocks, schema1,
+                         schema2, call1_only=False):
     """Тело одной задачи (оба вызова) для `run_variant_concurrent` — БОЕВОЙ
     путь (GLM), с одним повтором на нарушение схемы (§12 правило 4, Фаза 2).
 
@@ -1120,6 +1129,15 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
     схему хоть с повтором — задача-брак получает `False`) и `call1_retried`
     /`call2_retried`. Расход и решение об остановке по `max_cost` — дело
     вызывающего кода.
+
+    `call1_only=True` — вызов 2 НЕ ДЕЛАЕТСЯ ВОВСЕ (перегон корпуса
+    03.09.2026): менялись только поля вызова 1 (темы, доп. темы, теги,
+    понятия, «дано», «найти», характер задачи, особенности), а заголовок,
+    сложность, тип задачи, подсказки и сюжет вызова 2 не трогали — платить
+    за них второй раз незачем, это около трети сметы. В `row` тогда нет
+    ключа `call2` вовсе, и журнал его не пишет (`resumable_run_variant*`
+    проверяет `if 'call2' in row`); поля вызова 2 подставляет читающий код
+    из СТАРОГО журнала — см. `glm_enrich_run._rows_from_log`.
     """
     with_concepts = variant['concepts']
     text = problem_full_text(problem.statement, problem.parts.all())
@@ -1142,6 +1160,9 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
           'call1_attempts': attempts1,
           'call1_soft_violations': soft_violations_call1(data1, with_concepts),
           'tikz': tikz_stats, 'images_sent': len(images1)}
+
+    if call1_only:
+        return row
 
     data1 = data1 or {}
     try:
@@ -1174,7 +1195,8 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
 
 def run_variant_concurrent(sample_problems, variant, complete_fn, shortlists,
                            workers, max_cost=None, on_progress=None,
-                           on_row=None, with_tikz=True, stop_event=None):
+                           on_row=None, with_tikz=True, stop_event=None,
+                           call1_only=False):
     """Как `run_variant`, но до `workers` задач обрабатываются ОДНОВРЕМЕННО
     (`ThreadPoolExecutor`) — Z.AI лимитирует одновременность, а не RPM,
     поэтому throughput держит именно параллелизм (§3.6).
@@ -1228,7 +1250,8 @@ def run_variant_concurrent(sample_problems, variant, complete_fn, shortlists,
         try:
             row = _process_one_problem(
                 problem, variant, complete_fn, shortlists, with_tikz,
-                core1_blocks, core2_blocks, schema1, schema2)
+                core1_blocks, core2_blocks, schema1, schema2,
+                call1_only=call1_only)
         except Exception as error:  # сеть/парсинг — не роняем весь пул
             with lock:
                 errors.append((problem.id, error))
@@ -1239,7 +1262,8 @@ def run_variant_concurrent(sample_problems, variant, complete_fn, shortlists,
         # но не учитывается в `spent`, и --max-cost недосчитывает расход.
         cost = (
             sum(real_call_cost(variant['call1_model'], r) for r in row['call1_attempts'])
-            + sum(real_call_cost(variant['call2_model'], r) for r in row['call2_attempts'])
+            + sum(real_call_cost(variant['call2_model'], r)
+                  for r in row.get('call2_attempts') or [])
         )
         with lock:
             state['spent'] += cost
@@ -1333,10 +1357,12 @@ def read_raw_log(path):
     return list(iter_raw_log(path))
 
 
-def done_problem_ids_from_log(path, prompt_version, variant):
+def done_problem_ids_from_log(path, prompt_version, variant,
+                              call1_only=False):
     """`_done_problem_ids`, но потоком по файлу — без списка всех записей
     в памяти (см. предупреждение в `iter_raw_log`)."""
-    return _done_problem_ids(iter_raw_log(path), prompt_version, variant)
+    return _done_problem_ids(iter_raw_log(path), prompt_version, variant,
+                             call1_only=call1_only)
 
 
 # ---------------------------------------------------------------------------
@@ -1349,7 +1375,7 @@ def done_problem_ids_from_log(path, prompt_version, variant):
 # не умеет, а такое падение — редкий пограничный случай, не типичный сбой.
 # ---------------------------------------------------------------------------
 
-def _done_problem_ids(log_entries, prompt_version, variant):
+def _done_problem_ids(log_entries, prompt_version, variant, call1_only=False):
     """⚠️ МОДЕЛЬ + EFFORT, НЕ ТОЛЬКО МОДЕЛЬ (баг Фазы 5, боевой пилот
     01.09.2026). `base` и `terra-low` зовут ОДНИ И ТЕ ЖЕ модели — их
     различает только `call1_effort` ('none' vs 'low'). Проверка по одной
@@ -1369,6 +1395,11 @@ def _done_problem_ids(log_entries, prompt_version, variant):
                 and entry['model'] == variant['call2_model']
                 and entry.get('effort') == variant['call2_effort']):
             have_call2.add(entry['problem_id'])
+    # `call1_only` — вызова 2 в этом прогоне нет вовсе, и требовать его
+    # наличия значило бы никогда ничего не считать готовым: резюмирование
+    # платило бы за уже сделанный вызов 1 при каждом перезапуске.
+    if call1_only:
+        return have_call1
     return have_call1 & have_call2
 
 
@@ -1408,7 +1439,8 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
                                      shortlists, log_path, run_id,
                                      prompt_version, workers, max_cost=None,
                                      on_progress=None, stop_event=None,
-                                     extra_on_row=None, done_ids=None):
+                                     extra_on_row=None, done_ids=None,
+                                     call1_only=False):
     """`resumable_run_variant` + `run_variant_concurrent` — журнал (Фаза 3)
     и резюмируемость (Фаза 4) вместе с пулом воркеров (Фаза 1). Боевая
     команда прогона использует именно эту функцию — `on_row` здесь
@@ -1427,7 +1459,7 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
     """
     if done_ids is None:
         done_ids = _done_problem_ids(iter_raw_log(log_path), prompt_version,
-                                     variant)
+                                     variant, call1_only=call1_only)
     todo = [p for p in sample_problems if p.id not in done_ids]
     skipped = len(sample_problems) - len(todo)
 
@@ -1473,7 +1505,8 @@ def resumable_run_variant_concurrent(sample_problems, variant, complete_fn,
 
     rows, spent, stopped_early, errors = run_variant_concurrent(
         todo, variant, complete_fn, shortlists, workers, max_cost=max_cost,
-        on_progress=on_progress, on_row=on_row, stop_event=stop_event)
+        on_progress=on_progress, on_row=on_row, stop_event=stop_event,
+        call1_only=call1_only)
     return rows, spent, stopped_early, skipped, errors
 
 

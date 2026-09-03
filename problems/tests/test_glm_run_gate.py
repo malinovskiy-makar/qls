@@ -143,10 +143,13 @@ class GlmRunGateTests(TestCase):
         self.assertEqual(result['verdict'], 'РАЗРЕШЁН')
         self.assertEqual(self._tripped(result), [])
 
-    def test_шестнадцать_инвариантов_печатаются_всегда(self):
+    def test_семнадцать_инвариантов_печатаются_всегда(self):
+        # 17-й добавлен 03.09.2026 — 95-й процентиль длины `given`. Он
+        # справочный (вилки нет): потолок длины снят решением владельца, и
+        # осмысленной верхней границы у хвоста без потолка не существует.
         result = self._run()
-        self.assertEqual(len(result['invariants']), 16)
-        self.assertEqual(result['invariants_total'], 16)
+        self.assertEqual(len(result['invariants']), 17)
+        self.assertEqual(result['invariants_total'], 17)
         for inv in result['invariants']:
             self.assertTrue(inv['threshold'])
             self.assertTrue(inv['fact'])

@@ -136,6 +136,20 @@ def human_topic_match(rows):
     return matched, compared, pct
 
 
+def _percentile(values, pct):
+    """Процентиль методом «ближайший ранг» — без интерполяции.
+
+    Длина строки — целое число символов, и промежуточное значение между
+    двумя соседними наблюдениями здесь ничего не значит: 95-й процентиль
+    обязан быть длиной РЕАЛЬНОГО `given`, а не средним двух соседних.
+    """
+    if not values:
+        return 0
+    ordered = sorted(values)
+    rank = math.ceil(pct / 100.0 * len(ordered))
+    return ordered[max(rank, 1) - 1]
+
+
 def query_similarity_median(rows):
     """Медиана по задачам от медианы попарной схожести её запросов.
 
@@ -210,6 +224,7 @@ def build_invariants(rows, metrics):
 
     given_lens = [len(r['given']) for r in ok_rows if r.get('given')]
     given_median = statistics.median(given_lens) if given_lens else 0
+    given_p95 = _percentile(given_lens, 95)
     sim_median = query_similarity_median(ok_rows)
 
     concept_counter = Counter(c for r in ok_rows
@@ -251,7 +266,13 @@ def build_invariants(rows, metrics):
          '0', '%d' % digits_in_protected_fields(ok_rows),
          digits_in_protected_fields(ok_rows) == 0),
         ('Текстовые поля', 'Медианная длина given',
-         '40-120 символов', '%d' % given_median, 40 <= given_median <= 120),
+         '40-220 символов', '%d' % given_median, 40 <= given_median <= 220),
+        # 95-й процентиль вилки НЕ имеет — он печатается как справка. Потолок
+        # длины `given` снят решением владельца 03.09.2026 (у большой
+        # составной задачи «дано» законно длинное), а без потолка осмысленной
+        # верхней границы у хвоста нет: она была бы выдумана, а не измерена.
+        ('Текстовые поля', '95-й процентиль длины given',
+         'справочно', '%d' % given_p95, True),
         ('Текстовые поля', 'Медианная попарная схожесть запросов одной задачи',
          '< 0,85', '%.3f' % sim_median, sim_median < 0.85),
 
