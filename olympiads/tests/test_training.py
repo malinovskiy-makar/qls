@@ -149,18 +149,30 @@ class DraftRaceTests(TestCase):
         self.variant = make_variant()
         self.problem = make_problem(1)
 
-    def test_second_save_updates_instead_of_crashing(self):
-        """Второе сохранение того же поля обязано ОБНОВИТЬ, а не упасть.
+    def test_lost_race_falls_back_to_update(self):
+        """Проигравший гонку обязан ОБНОВИТЬ запись, а не отдать пятисотку.
 
-        ⚠️ Без лечения в `save_draft` второй INSERT ломается об уникальность
-        и решающий получает 500 на сохранении своей работы. Повторяем
-        запись через прямой `create`, а потом сохраняем ещё раз: если
-        лечение убрать, `update_or_create` сломается ровно так же.
+        ⚠️ ПОЧЕМУ ГОНКУ ПРИХОДИТСЯ ПОДДЕЛЫВАТЬ. В один поток
+        `update_or_create` всегда находит запись и спокойно её обновляет —
+        то есть тест, просто сохраняющий дважды, зелен и БЕЗ лечения, и
+        ничего не сторожит (проверено внесением дефекта). Настоящая гонка
+        выглядит иначе: два запроса делают SELECT одновременно, оба видят
+        «записи нет», второй INSERT ломается об уникальность. Подделываем
+        ровно это — поднимаем `IntegrityError` из `update_or_create` при
+        уже существующей строке — и требуем, чтобы значение всё равно
+        доехало.
         """
+        from unittest.mock import patch
+
+        from django.db import IntegrityError
+
         attempt = engine.start_attempt(self.variant, None, 'sess', False)
         TrainingDraft.objects.create(attempt=attempt, problem=self.problem,
                                      part=None, answer_draft='первый')
-        engine.save_draft(attempt, self.problem, answer='второй')
+
+        with patch.object(TrainingDraft.objects, 'update_or_create',
+                          side_effect=IntegrityError('гонка')):
+            engine.save_draft(attempt, self.problem, answer='второй')
 
         drafts = TrainingDraft.objects.filter(attempt=attempt,
                                               problem=self.problem)
