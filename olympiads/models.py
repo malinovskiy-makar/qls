@@ -19,6 +19,7 @@
 """
 from datetime import date
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -860,3 +861,171 @@ class FactUpdateProposal(models.Model):
     def __str__(self):
         return '{}.{} #{} · {}'.format(
             self.target_app, self.target_model, self.target_pk, self.field_name)
+
+
+# ===========================================================================
+# Тренировочный режим: прорешать комплект прямо на сайте
+# ===========================================================================
+#
+# ⚠️ ПОЧЕМУ ЭТИ МОДЕЛИ ЗДЕСЬ, А ПРОВЕРКА — В `problems`. Проверка ответа
+# одна на всю платформу (`student.views.grade_submission`), и второй её
+# копии быть не должно: разойдясь, две копии дали бы один и тот же ответ
+# верным в тренировке и неверным в контрольной. Поэтому тренировка ЗОВЁТ
+# проверку, а хранит у себя только то, чего в `problems` нет: кто решал
+# (в том числе гость), с таймером или без, и что вышло.
+#
+# Решение (`problems.Submission`) при проверке создаётся и тут же
+# ОТКАТЫВАЕТСЯ — см. [ADR 0066]. От тренировавшегося в `problems` не
+# остаётся ни одной записи, поэтому тренировка не попадает ни в опыт, ни в
+# статистику, ни в кабинет репетитора.
+
+
+class TrainingAttempt(models.Model):
+    """Попытка прорешать комплект. Гостю вход не нужен.
+
+    ⚠️ ИМЕНА ПОЛЕЙ ВРЕМЕНИ СОВПАДАЮТ С `problems.ExamAttempt` НАМЕРЕННО:
+    `started_at`, `expires_at`, `submitted_at`, `is_auto_submitted`.
+    Благодаря этому `exam_engine.seconds_remaining` и `can_accept`
+    работают с тренировочной попыткой без единой правки — время считает
+    тот же проверенный код, что и на контрольной, включая защиту
+    «остаток не больше выданного» от переведённых назад часов.
+    """
+
+    variant = models.ForeignKey(
+        'olympiads.OlympiadVariant', on_delete=models.CASCADE,
+        related_name='attempts', verbose_name='Комплект',
+    )
+    # ⚠️ Пусто = ГОСТЬ. Решать может любой, вход не требуется; результат
+    # гостя нигде не привязывается к человеку и живёт до уборки (7 дней).
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='olympiad_attempts',
+        verbose_name='Пользователь',
+    )
+    # Ключ сессии — единственный адрес попытки гостя. Без него гость терял
+    # бы ответы при обновлении страницы.
+    session_key = models.CharField(
+        'Ключ сессии', max_length=40, blank=True, db_index=True)
+    with_timer = models.BooleanField('На время', default=True)
+
+    started_at = models.DateTimeField('Начата', auto_now_add=True)
+    # Пусто = без таймера. `seconds_remaining` вернёт None, и это уже
+    # обработано и в движке, и на экране.
+    expires_at = models.DateTimeField('Истекает', null=True, blank=True)
+    submitted_at = models.DateTimeField('Сдана', null=True, blank=True)
+    is_auto_submitted = models.BooleanField('Сдана автоматически',
+                                            default=False)
+
+    score = models.DecimalField('Балл', max_digits=8, decimal_places=2,
+                                null=True, blank=True)
+    max_score = models.DecimalField('Максимум', max_digits=8,
+                                    decimal_places=2, null=True, blank=True)
+    # Сколько задач машина проверить не смогла — их смотрит человек.
+    pending_count = models.PositiveSmallIntegerField('Ждут проверки',
+                                                     default=0)
+
+    class Meta:
+        verbose_name = 'Попытка тренировки'
+        verbose_name_plural = 'Попытки тренировок'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['variant', 'user']),
+            models.Index(fields=['variant', 'session_key']),
+        ]
+
+    def __str__(self):
+        who = self.user or 'гость'
+        return '{} — {}'.format(who, self.variant)
+
+    @property
+    def is_guest(self):
+        """Решает гость — результат нигде не сохранится за человеком."""
+        return self.user_id is None
+
+    @property
+    def is_submitted(self):
+        return self.submitted_at is not None
+
+
+class TrainingDraft(models.Model):
+    """Черновик ответа в тренировке. Повторяет `problems.AnswerDraft`.
+
+    Задачи комплекта берутся из банка, своих задач репетитора здесь не
+    бывает — поэтому ссылка на пункт одна, `custom_part` не нужен.
+    """
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE,
+        related_name='drafts', verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_drafts', verbose_name='Задача')
+    answer_draft = models.TextField('Черновик ответа', blank=True)
+    solution_draft = models.TextField('Черновик решения', blank=True)
+    # ⚠️ NULL = «задача целиком»: так выглядит и задача без пунктов, и общее
+    # поле «Моё решение». То же соглашение, что у `AnswerDraft`.
+    part = models.ForeignKey(
+        'problems.ProblemPart', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='olympiad_training_drafts',
+        verbose_name='Пункт')
+    updated_at = models.DateTimeField('Сохранён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Черновик тренировки'
+        verbose_name_plural = 'Черновики тренировок'
+        constraints = [
+            # ⚠️ ДВА ограничения, а не одно: в SQL два NULL НЕ равны друг
+            # другу, поэтому UNIQUE(attempt, problem, part) не запретил бы
+            # два черновика «задачи целиком». Ровно как у `AnswerDraft`.
+            models.UniqueConstraint(
+                fields=['attempt', 'problem', 'part'],
+                condition=models.Q(part__isnull=False),
+                name='uniq_training_draft_part'),
+            models.UniqueConstraint(
+                fields=['attempt', 'problem'],
+                condition=models.Q(part__isnull=True),
+                name='uniq_training_draft_whole'),
+        ]
+
+    def __str__(self):
+        return 'Черновик #{} задачи {}'.format(self.attempt_id,
+                                               self.problem_id)
+
+
+class TrainingItemResult(models.Model):
+    """Итог по одной задаче попытки — снимок, сделанный при сдаче.
+
+    ⚠️ ЗАЧЕМ СНИМОК, А НЕ ПЕРЕСЧЁТ ПРИ КАЖДОМ ОТКРЫТИИ. Проверка идёт
+    через одноразовое решение, которое откатывается ([ADR 0066]); считать
+    его заново на каждый показ экрана значило бы гонять транзакцию на
+    каждое обновление страницы. Балл поставлен один раз — в момент сдачи.
+    """
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE,
+        related_name='results', verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_results', verbose_name='Задача')
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+    score = models.DecimalField('Балл', max_digits=8, decimal_places=2,
+                                null=True, blank=True)
+    max_score = models.DecimalField('Максимум', max_digits=8,
+                                    decimal_places=2, default=1)
+    # Машина проверить не смогла: эталон не утверждён или задача открытая.
+    # Это НЕ «ноль» — показывать ноль там, где никто не смотрел, нечестно.
+    is_pending = models.BooleanField('Ждёт проверки', default=False)
+    comment = models.TextField('Что сказала проверка', blank=True)
+
+    class Meta:
+        verbose_name = 'Итог по задаче'
+        verbose_name_plural = 'Итоги по задачам'
+        ordering = ['order', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['attempt', 'problem'],
+                                    name='uniq_training_result'),
+        ]
+
+    def __str__(self):
+        return '#{} задача {}: {}'.format(self.attempt_id, self.problem_id,
+                                          self.score)
