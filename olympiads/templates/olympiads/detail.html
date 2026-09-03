@@ -229,7 +229,10 @@
               </span>
             </span>
           </td>
-          <td>{{ benefit.gives_label }}</td>
+          <td>
+            {{ benefit.gives_label }}
+            {% if benefit.who_label %}<span class="ol-whogets">{{ benefit.who_label }}</span>{% endif %}
+          </td>
           <td>{{ benefit.confirm_label }}</td>
           <td>{% if benefit.grades_note %}{{ benefit.grades_note }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
           <td>

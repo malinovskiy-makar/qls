@@ -30,9 +30,12 @@ class ImportTestCase(TestCase):
             encoding='utf-8')
 
     def base(self):
+        # ⚠️ `note` здесь ОБЯЗАТЕЛЕН: льгота без дословной цитаты в
+        # источнике не создаётся, и образец без неё ломал бы половину
+        # тестов по причине, к их предмету не относящейся.
         self.write('sources.jsonl', [dict(
             key='s1', url='https://example.test/a', title='Источник',
-            doc_type='order')])
+            doc_type='order', note='Дословно: «льгота даётся победителям».')])
         self.write('olympiads.jsonl', [dict(
             slug='vs', name_full='Тестовая', name_short='ТЕСТ',
             organizer='Никто', kind='vsosh', source='s1')])
@@ -77,6 +80,31 @@ class BenefitSourceTests(ImportTestCase):
         self.write('benefits.jsonl', [dict(
             slug='vs', program='ВУЗ', admission_year=2026,
             benefit_type='bvi')])
+        with self.assertRaises(CommandError):
+            call_command('import_olympiads_data', yes=True, verbosity=0)
+        self.assertEqual(OlympiadBenefit.objects.count(), 0)
+
+    def test_benefit_with_sourceless_quote_is_refused(self):
+        """Ссылки мало — нужна дословная цитата.
+
+        ⚠️ ЗАЧЕМ. Ссылка на правила приёма доказывает только то, что
+        правила существуют. Проверить по ней запись человек не может:
+        страница длинная и меняется каждый год. Цитата в `note` — это то,
+        что он сверит глазами за минуту. Сессия 2 сохранила 48 льгот со
+        ссылкой и БЕЗ цитаты, и часть из них оказалась просто неверной.
+        """
+        self.write('sources.jsonl', [dict(
+            key='s1', url='https://example.test/a', title='Источник',
+            doc_type='order')])                        # note пуст
+        self.write('olympiads.jsonl', [dict(
+            slug='vs', name_full='Тестовая', name_short='ТЕСТ',
+            organizer='Никто', kind='vsosh', source='s1')])
+        self.write('programs.jsonl', [dict(
+            university_name='Вуз', university_short='ВУЗ',
+            program_name='Экономика', order=1)])
+        self.write('benefits.jsonl', [dict(
+            slug='vs', program='ВУЗ', admission_year=2026,
+            benefit_type='bvi', source='s1')])
         with self.assertRaises(CommandError):
             call_command('import_olympiads_data', yes=True, verbosity=0)
         self.assertEqual(OlympiadBenefit.objects.count(), 0)

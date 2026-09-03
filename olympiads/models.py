@@ -642,6 +642,17 @@ class OlympiadBenefit(models.Model):
     required_level = models.PositiveSmallIntegerField(
         'Требуемый уровень', null=True, blank=True)
     grades_note = models.CharField('Классы', max_length=100, blank=True)
+    # ⚠️ БЕЗ ЭТОГО ПОЛЯ ТАБЛИЦА ВРЁТ ПРИЗЁРУ. У части олимпиад льгота
+    # положена ТОЛЬКО победителю: у ФЭН ВШЭ так устроена МОШ по экономике
+    # — БВИ победителям, призёрам только сто баллов. Одна запись на пару
+    # «олимпиада + программа» не может промолчать об этом различии, иначе
+    # призёр прочитает «без экзаменов» и не станет готовиться к ЕГЭ.
+    class WhoGets(models.TextChoices):
+        WINNERS = 'winners', 'Только победителям'
+        BOTH = 'both', 'Победителям и призёрам'
+
+    who_gets = models.CharField(
+        'Кому положено', max_length=20, choices=WhoGets.choices, blank=True)
     source = models.ForeignKey(
         FactSource, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='benefits', verbose_name='Источник',
@@ -666,6 +677,20 @@ class OlympiadBenefit(models.Model):
             subject = self.score_100_subject or 'профильному предмету'
             return '100 баллов по предмету «{}»'.format(subject)
         return 'Льготы нет'
+
+    @property
+    def who_label(self):
+        """«Только победителям» — приписка к колонке «Что даёт».
+
+        Пусто у льготы, которой нет, и там, где источник различия не делает.
+        """
+        if self.benefit_type == self.BenefitType.NONE:
+            return ''
+        if self.who_gets == self.WhoGets.WINNERS:
+            return 'только победителям'
+        if self.who_gets == self.WhoGets.BOTH:
+            return 'победителям и призёрам'
+        return ''
 
     @property
     def confirm_label(self):

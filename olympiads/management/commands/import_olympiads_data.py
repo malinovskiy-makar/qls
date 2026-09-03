@@ -233,6 +233,15 @@ class Command(BaseCommand):
                 raise CommandError(
                     'Льгота без источника: {} / {}'.format(
                         row.get('slug'), row.get('program')))
+            if not source.note.strip():
+                # ⚠️ И ССЫЛКИ МАЛО — НУЖНА ДОСЛОВНАЯ ЦИТАТА. Ссылка на
+                # правила приёма доказывает только то, что правила есть.
+                # Проверить запись по ней человек не сможет: страница
+                # длинная и меняется каждый год. Цитата в note — это то,
+                # что он сверит глазами за минуту.
+                raise CommandError(
+                    'Льгота без цитаты в источнике: {} / {} (источник {})'
+                    .format(row.get('slug'), row.get('program'), source.url))
             OlympiadBenefit.objects.update_or_create(
                 olympiad=Olympiad.objects.get(slug=row['slug']),
                 program=UniversityProgram.objects.get(
@@ -245,6 +254,7 @@ class Command(BaseCommand):
                     confirm_min_score=row.get('confirm_min_score'),
                     required_level=row.get('required_level'),
                     grades_note=row.get('grades_note', ''),
+                    who_gets=row.get('who_gets', ''),
                     source=source))
             made += 1
         return made

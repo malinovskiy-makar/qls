@@ -246,3 +246,41 @@ class RegionOrderTests(TestCase):
                         text.index('Донецкая Народная Республика'))
         self.assertLess(text.index('Ямало-Ненецкий автономный округ'),
                         text.index('Донецкая Народная Республика'))
+
+
+class BenefitWhoGetsTests(TestCase):
+    """«Только победителям» обязано быть видно в таблице льгот.
+
+    ⚠️ ЗАЧЕМ. У части олимпиад БВИ положен ТОЛЬКО победителю: у программы
+    «Экономика» ФЭН ВШЭ так устроена Московская олимпиада — победителю
+    без экзаменов, призёру только сто баллов. Одна запись на пару
+    «олимпиада + программа» обязана назвать это различие, иначе призёр
+    прочитает «без вступительных испытаний» и не станет готовиться к ЕГЭ.
+    """
+
+    def setUp(self):
+        from olympiads.models import OlympiadBenefit, UniversityProgram
+        self.olympiad = make_olympiad('mosh', is_published=True)
+        program = UniversityProgram.objects.create(
+            university_name='НИУ ВШЭ', university_short='ФЭН ВШЭ',
+            program_name='Экономика', order=1)
+        OlympiadBenefit.objects.create(
+            olympiad=self.olympiad, program=program, admission_year=2026,
+            benefit_type=OlympiadBenefit.BenefitType.BVI,
+            confirm_subject='математика', confirm_min_score=75,
+            grades_note='11 класс',
+            who_gets=OlympiadBenefit.WhoGets.WINNERS)
+
+    def test_only_winners_is_shown(self):
+        text = visible_text(self.client.get(
+            reverse('olympiads:detail', args=['mosh'])))
+        self.assertIn('только победителям', text)
+        self.assertIn('математика, не ниже 75', text)
+
+    def test_no_benefit_row_says_nothing_about_who(self):
+        """У строки «льготы нет» приписки о победителях быть не должно."""
+        from olympiads.models import OlympiadBenefit
+        benefit = OlympiadBenefit.objects.get()
+        benefit.benefit_type = OlympiadBenefit.BenefitType.NONE
+        benefit.save()
+        self.assertEqual(benefit.who_label, '')
