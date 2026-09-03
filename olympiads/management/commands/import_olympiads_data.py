@@ -157,11 +157,16 @@ class Command(BaseCommand):
 
     def _load_stages(self, rows):
         for row in rows:
+            defaults = {k: v for k, v in row.items()
+                        if k not in ('slug', 'code', 'source')}
+            # ⚠️ Источник нужен и здесь: длительность и максимум баллов —
+            # такие же факты, как дата тура. По числу минут школьник
+            # ставит себе таймер тренировки.
+            if 'source' in row:
+                defaults['source'] = self._source(row['source'])
             OlympiadStage.objects.update_or_create(
                 olympiad=Olympiad.objects.get(slug=row['slug']),
-                code=row['code'],
-                defaults={k: v for k, v in row.items()
-                          if k not in ('slug', 'code')})
+                code=row['code'], defaults=defaults)
         return len(rows)
 
     def _load_events(self, rows):

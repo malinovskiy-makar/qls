@@ -5,7 +5,8 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from olympiads.models import (
-    Olympiad, OlympiadBenefit, OlympiadEvent, OlympiadScore, OlympiadVariant,
+    Olympiad, OlympiadBenefit, OlympiadEvent, OlympiadScore, OlympiadStage,
+    OlympiadVariant,
     RegionalCoordinator, UniversityProgram,
 )
 
@@ -65,3 +66,33 @@ class SeedTests(TestCase):
         call_command('seed_olympiads_demo', '--yes', '--wipe', stdout=StringIO())
         self.assertEqual(Olympiad.objects.count(), 21)
         self.assertEqual(OlympiadEvent.objects.count(), 10)
+
+
+class SeedInventsNoNumbersTests(TestCase):
+    """⚠️ Наполнение примерами НЕ ИМЕЕТ ПРАВА выдумывать числа этапов.
+
+    Длительность и максимум баллов устанавливает предметно-методическая
+    комиссия и публикует в требованиях к этапу. Прежде сеялка ставила
+    сюда 235 и 240 минут — на экране они выглядели ровно как настоящие и
+    прожили две сессии. Настоящая длительность регионального этапа по
+    экономике — 180 минут: расхождение почти час, а по этому числу
+    школьник ставит себе таймер тренировки.
+    """
+
+    def test_seed_writes_no_stage_durations(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        bad = OlympiadStage.objects.exclude(duration_minutes=None)
+        self.assertEqual(
+            list(bad.values_list('olympiad__slug', 'code', 'duration_minutes')),
+            [], 'сеялка снова выдумывает длительность этапа')
+
+    def test_seed_writes_no_stage_max_score(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        self.assertEqual(OlympiadStage.objects.exclude(max_score=None).count(), 0)
+
+    def test_seed_marks_variants_as_placeholder(self):
+        """Числа комплектов сеялка всё ещё ставит — но помечает их демо."""
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        self.assertGreater(OlympiadVariant.objects.count(), 0)
+        self.assertEqual(
+            OlympiadVariant.objects.filter(is_placeholder=False).count(), 0)

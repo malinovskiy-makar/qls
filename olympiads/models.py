@@ -427,6 +427,15 @@ class OlympiadStage(models.Model):
         'Распределение тем', default=list, blank=True,
         help_text='[{"topic": "...", "share": 0.18}] — заполнит прогон обогащения',
     )
+    # ⚠️ ИСТОЧНИК НУЖЕН ИМЕННО ЗДЕСЬ, а не только у дат и льгот.
+    # Длительность и максимум баллов — такие же факты: по числу минут
+    # школьник ставит себе таймер тренировки. Наполнение примерами
+    # проставляло сюда выдуманные 235 и 240 минут, и отличить их от
+    # настоящих было нечем — источник и есть это отличие.
+    source = models.ForeignKey(
+        FactSource, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stages', verbose_name='Источник',
+    )
 
     class Meta:
         verbose_name = 'Этап олимпиады'
