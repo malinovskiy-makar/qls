@@ -1,0 +1,7 @@
+{"slug": "vp", "academic_year": "2026/27", "kind": "registration_open", "date_start": "2026-08-20", "date_status": "confirmed", "source": "vp-eco"}
+{"slug": "vp", "academic_year": "2026/27", "kind": "registration_close", "date_start": "2026-09-21", "date_status": "confirmed", "source": "vp-eco"}
+{"slug": "vp", "academic_year": "2026/27", "kind": "stage", "stage_code": "qual", "date_status": "awaiting", "approx_text": "отборочный тур обычно в ноябре, точные даты не объявлены", "source": "vp-eco"}
+{"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "sch", "date_status": "awaiting", "approx_text": "даты школьного этапа устанавливает каждый субъект своим приказом", "source": "vos"}
+{"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "mun", "date_status": "awaiting", "approx_text": "даты муниципального этапа устанавливает каждый субъект", "source": "vos"}
+{"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "reg", "date_status": "awaiting", "approx_text": "график регионального этапа издаёт Минпросвещения; на сезон 2026/27 приказ не издан", "source": "vos"}
+{"slug": "vseros", "academic_year": "2026/27", "kind": "stage", "stage_code": "final", "date_status": "awaiting", "approx_text": "заключительный этап обычно в марте–апреле; график не издан", "source": "vos"}

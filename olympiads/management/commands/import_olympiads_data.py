@@ -81,7 +81,12 @@ class Command(BaseCommand):
                     name, human, count))
             return
 
+        # ⚠️ КЛЮЧИ ИСТОЧНИКОВ ПОДГРУЖАЕМ ВСЕГДА, даже при `--only`.
+        # Факты ссылаются на источник коротким ключом («hse-olimp»), а не
+        # адресом; без этой строки `--only benefits.jsonl` падал с
+        # «Льгота без источника» на данных, где источник есть.
         self.sources = {}
+        self._preload_source_keys()
         stats = {}
         with transaction.atomic():
             for name, human, _ in plan:
@@ -93,6 +98,14 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Залито.'))
 
     # -- источники ---------------------------------------------------------
+    def _preload_source_keys(self):
+        """Ключ из sources.jsonl → уже сохранённый `FactSource`."""
+        for row in read('sources.jsonl'):
+            key = row.get('key') or row['url']
+            source = FactSource.objects.filter(url=row['url']).first()
+            if source is not None:
+                self.sources[key] = source
+
     def _source(self, key):
         """Источник по ключу. Пусто — значит факт без источника, и это ошибка."""
         if not key:
@@ -200,11 +213,13 @@ class Command(BaseCommand):
 
     def _load_programs(self, rows):
         for row in rows:
+            # ⚠️ Ключ — ТОЛЬКО короткое имя. По нему же льгота находит
+            # программу; составной ключ давал две записи с одинаковым
+            # коротким именем и `MultipleObjectsReturned` при заливке льгот.
             UniversityProgram.objects.update_or_create(
                 university_short=row['university_short'],
-                program_name=row['program_name'],
                 defaults={k: v for k, v in row.items()
-                          if k not in ('university_short', 'program_name')})
+                          if k != 'university_short'})
         return len(rows)
 
     def _load_benefits(self, rows):

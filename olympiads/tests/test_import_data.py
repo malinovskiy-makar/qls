@@ -116,6 +116,21 @@ class IdempotencyTests(ImportTestCase):
         call_command('import_olympiads_data', yes=True, verbosity=0)
         self.assertFalse(Olympiad.objects.get(slug='vs').is_placeholder)
 
+    def test_only_one_file_still_resolves_source_keys(self):
+        """⚠️ Найдено при заливке: `--only` терял ключи источников.
+
+        Факты ссылаются на источник коротким ключом («hse-olimp»), а не
+        адресом. Ключи брались из того же прогона, и заливка одного файла
+        падала с «Льгота без источника» на данных, где источник есть.
+        """
+        self.base()
+        call_command('import_olympiads_data', yes=True, only='sources.jsonl',
+                     verbosity=0)
+        call_command('import_olympiads_data', yes=True,
+                     only='olympiads.jsonl', verbosity=0)
+        self.assertEqual(Olympiad.objects.get(slug='vs').source.url,
+                         'https://example.test/a')
+
     def test_dry_plan_writes_nothing(self):
         self.base()
         call_command('import_olympiads_data', verbosity=0)

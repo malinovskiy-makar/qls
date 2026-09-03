@@ -1,0 +1,28 @@
+{"slug": "vseros", "code": "sch", "name": "Школьный этап", "order": 1, "format": "offline", "cities": [], "how_to_qualify": "Прийти в свою школу в назначенный день — участвовать может любой желающий. Дату назначает субъект своим приказом, единой даты по стране нет."}
+{"slug": "vseros", "code": "mun", "name": "Муниципальный этап", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл школьного этапа. Дату назначает субъект."}
+{"slug": "vseros", "code": "reg", "name": "Региональный этап", "order": 3, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл муниципального этапа. График регионального этапа издаёт Минпросвещения приказом; на сезон 2026/27 приказ не издан."}
+{"slug": "vseros", "code": "final", "name": "Заключительный этап", "order": 4, "format": "offline", "cities": [], "how_to_qualify": "Набрать всероссийский проходной балл на региональном этапе или отобраться по квоте для региона"}
+{"slug": "vp", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "vp", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "mosh", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "mosh", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "spbgu", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "spbgu", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "pleh", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "pleh", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "ranepa", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "ranepa", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "mis", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "mis", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "sb", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "sb", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "lom", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "lom", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "nes", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "nes", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "dano", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "dano", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "volnc", "code": "qual", "name": "Отборочный тур", "order": 1, "format": "online", "cities": [], "how_to_qualify": "Зарегистрироваться на сайте олимпиады и решить отборочный тур."}
+{"slug": "volnc", "code": "final", "name": "Заключительный тур", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Набрать проходной балл отборочного тура."}
+{"slug": "ieo", "code": "qual", "name": "Национальный отбор", "order": 1, "format": "mixed", "cities": [], "how_to_qualify": "Попасть в сборную страны по результатам ВсОШ и сборов."}
+{"slug": "ieo", "code": "final", "name": "Международный финал", "order": 2, "format": "offline", "cities": [], "how_to_qualify": "Войти в состав национальной сборной."}
