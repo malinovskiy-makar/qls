@@ -96,3 +96,24 @@ class SeedInventsNoNumbersTests(TestCase):
         self.assertGreater(OlympiadVariant.objects.count(), 0)
         self.assertEqual(
             OlympiadVariant.objects.filter(is_placeholder=False).count(), 0)
+
+
+class SeedWritesNoOriginalUrlTests(TestCase):
+    """⚠️ Наполнение примерами не имеет права выдумывать адрес оригинала.
+
+    Прежде сеялка ставила ссылки вида `vos.olimpiada.ru/2026/final/11` с
+    пометкой «официальный источник». Выглядели настоящими, страниц по ним
+    не было. Настоящие архивы заданий ВсОШ по экономике лежат на
+    vso.edsoo.ru и приходят импортом.
+    """
+
+    def test_seed_leaves_original_url_empty(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        bad = OlympiadVariant.objects.exclude(original_url='')
+        self.assertEqual(list(bad.values_list('year', 'original_url')), [],
+                         'сеялка снова выдумывает адрес оригинала')
+
+    def test_seed_marks_original_source_as_none(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        self.assertEqual(
+            OlympiadVariant.objects.exclude(original_source='none').count(), 0)

@@ -194,20 +194,38 @@ class PlaceholderVariantTests(TestCase):
             reverse('olympiads:detail', args=['vseros'])))
         self.assertNotIn('демонстрационные', text)
 
-    def test_placeholder_original_link_is_dead_even_with_url(self):
-        """Адрес есть, но выдуман — кнопка обязана быть неактивной.
+    def test_placeholder_may_still_have_a_real_original(self):
+        """Демонстрационные ЧИСЛА и настоящая ссылка — разные вещи.
 
-        Проверка стоит в модели, а не в шаблоне: шаблон обойдёт новый экран.
+        ⚠️ ЭТОТ ТЕСТ ПОМЕНЯЛ СМЫСЛ, И ВОТ ПОЧЕМУ. Сначала он сторожил
+        правило «у демонстрационного комплекта оригинала нет»: сеялка
+        писала выдуманные адреса вида vos.olimpiada.ru/2026/final/11, и
+        гасить их было нужно. Потом нашлись НАСТОЯЩИЕ архивы заданий
+        ЦПМК на vso.edsoo.ru — по годам, с разборами. Числа заданий у
+        комплекта остаются демонстрационными (к нему привязано 5 задач
+        банка, а в настоящем туре 18), но ссылка при этом честная, и
+        гасить рабочую кнопку из-за выдуманного числа минут неправильно.
+        Выдумку убрали там, где её писали — в сеялке; это сторожит
+        SeedWritesNoOriginalUrlTests.
         """
         variant = OlympiadVariant.objects.create(
             olympiad=self.olympiad, year=2026, grade=11,
-            original_url='https://vos.olimpiada.ru/2026/final/11',
+            original_url='https://vso.edsoo.ru/public.php/dav/files/x/?accept=zip',
             original_source=OlympiadVariant.OriginalSource.OFFICIAL,
+            is_placeholder=True)
+        self.assertTrue(variant.has_original)
+
+    def test_variant_without_source_offers_no_original(self):
+        """Источника нет — кнопка неактивна, даже если адрес в поле есть."""
+        variant = OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2025, grade=11,
+            original_url='https://example.test/x',
+            original_source=OlympiadVariant.OriginalSource.NONE,
             is_placeholder=True)
         self.assertFalse(variant.has_original)
         html = self.client.get(
             reverse('olympiads:detail', args=['vseros'])).content.decode()
-        self.assertNotIn('href="https://vos.olimpiada.ru/2026/final/11"', html)
+        self.assertNotIn('href="https://example.test/x"', html)
 
 
 class RegionOrderTests(TestCase):

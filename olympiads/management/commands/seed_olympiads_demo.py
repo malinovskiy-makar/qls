@@ -260,16 +260,20 @@ SCORES = [
 
 # Комплекты заданий ВсОШ: год, этап, класс, заданий, минут, максимум,
 # разборы, ссылка на оригинал, откуда
+# ⚠️ АДРЕСОВ ОРИГИНАЛОВ ЗДЕСЬ НЕТ. Прежде стояли ссылки вида
+# vos.olimpiada.ru/2026/final/11 — выглядели настоящими, но страниц по
+# ним нет. Настоящие архивы заданий ВсОШ лежат на vso.edsoo.ru и
+# приходят импортом из data/olympiads/out/variants.jsonl.
 VARIANTS = [
-    (2026, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2026/final/11', 'official'),
-    (2026, 'final', 10, 6, 240, 100, True, 'https://vos.olimpiada.ru/2026/final/10', 'official'),
-    (2026, 'reg', 11, 5, 235, 100, True, 'https://vos.olimpiada.ru/2026/reg/11', 'official'),
+    (2026, 'final', 11, 6, 240, 100, True, '', 'none'),
+    (2026, 'final', 10, 6, 240, 100, True, '', 'none'),
+    (2026, 'reg', 11, 5, 235, 100, True, '', 'none'),
     (2026, 'reg', 9, 5, 235, 100, False, '', 'none'),
-    (2025, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2025/final/11', 'official'),
+    (2025, 'final', 11, 6, 240, 100, True, '', 'none'),
     (2025, 'reg', 10, 5, 235, 100, False, '', 'none'),
-    (2024, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2024/final/11', 'official'),
+    (2024, 'final', 11, 6, 240, 100, True, '', 'none'),
     (2024, 'reg', 11, 5, 235, 100, False, '', 'none'),
-    (2023, 'final', 10, 6, 240, 100, False, 'https://vos.olimpiada.ru/2023/final/10', 'official'),
+    (2023, 'final', 10, 6, 240, 100, False, '', 'none'),
     (2023, 'mun', 9, 4, 180, 100, False, '', 'none'),
     (2022, 'final', 11, 6, 240, 100, False, '', 'none'),
     (2022, 'reg', 11, 5, 235, 100, False, '', 'none'),
@@ -521,7 +525,11 @@ class Command(BaseCommand):
                 defaults=dict(
                     problem_count=count, duration_minutes=minutes,
                     max_score=score, has_solutions=has_solutions,
-                    original_url=url, original_source=origin,
+                    # ⚠️ АДРЕС НЕ ПИШЕМ. Ссылки вида
+                    # vos.olimpiada.ru/2026/final/11 выглядели настоящими,
+                    # но страниц по ним нет. Настоящие архивы заданий
+                    # приходят импортом из variants.jsonl.
+                    original_url='', original_source='none',
                     ref_event_id='vseros-{}-{}-{}'.format(year, code, grade),
                     # ⚠️ Числа и адреса здесь ВЫДУМАНЫ и повторены для всех
                     # лет механически. Пометка обязательна: без неё экран
