@@ -328,8 +328,22 @@
         </span>
       </span>
       <span class="ol-variant-acts">
-        <a class="ol-btn ol-btn--sm" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}?timer=1">Решать на время</a>
-        <a class="ol-btn ol-btn--sm ol-btn--second" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}">Решать без таймера</a>
+        {% if not variant.is_trainable %}
+        <span class="ol-btn ol-btn--sm ol-btn--off" aria-disabled="true" title="Задачи этого тура ещё не привязаны к банку">Задания ещё не привязаны</span>
+        {% else %}
+          {% if variant.duration_minutes %}
+          <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
+            {% csrf_token %}<input type="hidden" name="timer" value="1">
+            <button type="submit" class="ol-btn ol-btn--sm">Решать на время</button>
+          </form>
+          {% else %}
+          <span class="ol-btn ol-btn--sm ol-btn--off" aria-disabled="true" title="Длительность тура не найдена">Время тура неизвестно</span>
+          {% endif %}
+          <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
+            {% csrf_token %}<input type="hidden" name="timer" value="0">
+            <button type="submit" class="ol-btn ol-btn--sm ol-btn--second">Решать без таймера</button>
+          </form>
+        {% endif %}
         {% if variant.has_original %}
         <a class="ol-btn ol-btn--sm ol-btn--second" href="{{ variant.original_url }}" target="_blank" rel="noopener">Открыть оригинал</a>
         {% else %}

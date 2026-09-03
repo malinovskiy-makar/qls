@@ -1,0 +1,93 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% comment %}
+Разбор. Показываем ВСЁ: свой ответ, правильный ответ и полное решение.
+Скрытых частей здесь нет — это тренировка, а не контрольная.
+{% endcomment %}
+{% block title %}Разбор · {{ olympiad.name_short }} {{ variant.year }}{% endblock %}
+{% block olymp_content %}
+<nav class="ol-crumbs" aria-label="Хлебные крошки">
+  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
+  <span aria-hidden="true">→</span>
+  <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a>
+  <span aria-hidden="true">→</span>
+  <span>Разбор {{ variant.year }}</span>
+</nav>
+
+<h1 class="ol-title">Разбор</h1>
+<div class="ol-score">
+  <span class="ol-score-big">{{ scored|floatformat:"-2" }}</span>
+  <span class="ol-sub">из {{ max_score|floatformat:"-2" }} баллов</span>
+  {% if attempt.is_auto_submitted %}<span class="ol-verdict ol-verdict--wait">время вышло, сдано автоматически</span>{% endif %}
+</div>
+{% if pending %}
+<p class="ol-mute">
+  Задач, где машина не проверяет ответ: {{ pending }}. Правильный ответ и
+  разбор по ним всё равно ниже — сверьтесь сами.
+</p>
+{% endif %}
+
+{% for row in rows %}
+<section class="ol-task">
+  <div class="ol-task-head">
+    <span class="ol-task-num">{{ row.number }}</span>
+    {% if row.pending %}
+      <span class="ol-verdict ol-verdict--wait">проверяет человек</span>
+    {% elif row.score and row.score >= row.max_score %}
+      <span class="ol-verdict ol-verdict--ok">верно</span>
+    {% elif row.score %}
+      <span class="ol-verdict ol-verdict--ok">частично</span>
+    {% else %}
+      <span class="ol-verdict ol-verdict--no">неверно</span>
+    {% endif %}
+    <span class="ol-task-pts">
+      {% if row.pending %}— {% else %}{{ row.score|floatformat:"-2" }} {% endif %}из {{ row.max_score|floatformat:"-2" }} б.
+    </span>
+  </div>
+  <div class="ol-task-body">{{ row.problem.statement }}</div>
+
+  <div class="ol-answers">
+    {% for part in row.parts %}
+    <div class="ol-answer-row">
+      {% if part.label %}<span class="ol-answer-lab">{{ part.label }}</span>{% endif %}
+      <span class="ol-answer-mine">
+        вы ответили: {% if part.given %}{{ part.given }}{% else %}<span class="ol-mute">ничего</span>{% endif %}
+      </span>
+      {% if part.correct %}
+      <span class="ol-answer-right">правильно: {{ part.correct }}</span>
+      {% else %}
+      <span class="ol-mute">эталон не задан</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+
+  {% if row.solution_given %}
+  <div class="ol-solution">
+    <div class="ol-solution-title">Ваше решение</div>{{ row.solution_given }}
+  </div>
+  {% endif %}
+  {% if row.solution_text %}
+  <div class="ol-solution">
+    <div class="ol-solution-title">Разбор</div>{{ row.solution_text }}
+  </div>
+  {% else %}
+  <p class="ol-mute">Разбора этой задачи в банке пока нет.</p>
+  {% endif %}
+</section>
+{% endfor %}
+
+<div class="ol-actions">
+  <a class="ol-btn" href="{% url 'olympiads:training_intro' olympiad.slug variant.pk %}">Прорешать ещё раз</a>
+  <a class="ol-btn ol-btn--second" href="{% url 'olympiads:detail' olympiad.slug %}">К олимпиаде</a>
+</div>
+
+{% if is_guest %}
+{# Плашка только гостю: вошедшему его попытка уже сохранена. #}
+<div class="ol-guest" role="note">
+  <strong>Результат не сохранён.</strong>
+  Вы решали без входа, поэтому эта попытка нигде за вами не числится и через
+  неделю будет удалена.
+  <a href="/login/">Зарегистрируйтесь</a>, чтобы история попыток сохранялась.
+</div>
+{% endif %}
+{% endblock %}

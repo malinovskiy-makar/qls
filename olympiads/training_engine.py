@@ -88,6 +88,23 @@ def variant_problems(variant):
     return problems
 
 
+def linked_event_ids(variants):
+    """Множество `ref_event_id`, у которых в банке ЕСТЬ задачи. Один запрос.
+
+    ⚠️ Нужен именно так, а не вызовом `variant_items` на каждый комплект:
+    та функция создаёт постоянное «задание», и страница олимпиады заводила
+    бы работы для всех комплектов сразу, включая те, что никто не откроет.
+    """
+    from problems.models import OlympiadRef
+
+    wanted = {(v.ref_event_id or '').strip() for v in variants}
+    wanted.discard('')
+    if not wanted:
+        return set()
+    return set(OlympiadRef.objects.filter(event_id__in=wanted)
+               .values_list('event_id', flat=True).distinct())
+
+
 def service_user():
     """Служебный «ученик», на которого оформляется одноразовое решение.
 
