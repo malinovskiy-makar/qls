@@ -138,6 +138,7 @@ def _build_index():
             status=Problem.Status.PUBLISHED,
             needs_quality_review=False,
             hidden_pending_review=False,
+            content_status=Problem.ContentStatus.OK,
             embedding__isnull=False,
         )
         .only('id', 'embedding', 'problem_type')

@@ -459,6 +459,7 @@ class Command(BaseCommand):
         canonical_set = set(CANONICAL)
         qs = (Problem.objects
               .filter(status='published', needs_quality_review=False,
+                      content_status=Problem.ContentStatus.OK,
                       problem_type__in=GAME_TYPES)
               .prefetch_related('parts', 'topics', 'source_references'))
 

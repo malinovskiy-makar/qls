@@ -71,10 +71,14 @@ def generate_latex(collection, show_answers: bool = False,
                    show_solutions: bool = False) -> str:
     """Генерирует полный .tex файл для подборки."""
     # Задачи в порядке из problem_order; качественный шлюз — мимо экспорта
+    from problems.models import Problem
+
     order_map = {pid: i for i, pid in enumerate(collection.problem_order)}
     problems  = sorted(
-        collection.problems.filter(needs_quality_review=False,
-                                   hidden_pending_review=False)
+        collection.problems.filter(
+            needs_quality_review=False,
+            hidden_pending_review=False,
+            content_status=Problem.ContentStatus.OK)
         .prefetch_related('parts'),
         key=lambda p: order_map.get(p.pk, 9999),
     )
