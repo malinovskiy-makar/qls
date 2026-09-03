@@ -108,10 +108,47 @@ class PriceIndexArchetype(Archetype):
             return (u'Статистики города N считают индекс цен по фиксированной '
                     u'потребительской корзине: {}').format(basket(p))
 
+        def full_family(p, s):
+            return (u'Семья ведёт домашнюю бухгалтерию и каждый месяц '
+                    u'покупает один и тот же набор: {} Набор не меняется '
+                    u'намеренно: иначе непонятно, подорожала жизнь или '
+                    u'просто стали покупать другое.').format(basket(p))
+
+        def full_canteen(p, s):
+            return (u'Школьная столовая закупает продукты по неизменной '
+                    u'раскладке: {} Директор считает, на сколько подорожал '
+                    u'обед, чтобы объяснить это родителям.').format(basket(p))
+
+        def full_pension(p, s):
+            return (u'Пенсионный фонд считает, на сколько поднять выплаты. '
+                    u'В расчёт берут неизменную корзину: {} Индексация '
+                    u'привязана к её подорожанию.').format(basket(p))
+
+        def full_plant(p, s):
+            return (u'Снабженец завода закупает материалы одним и тем же '
+                    u'списком: {} Ему нужно понять, насколько выросла '
+                    u'стоимость закупки.').format(basket(p))
+
         def short(p, s):
             return u'Корзина: {}'.format(basket(p))
 
-        return [Wrapper('basket', full, short)]
+        def short_family(p, s):
+            return u'Домашняя корзина: {}'.format(basket(p))
+
+        def short_canteen(p, s):
+            return u'Закупка столовой: {}'.format(basket(p))
+
+        def short_pension(p, s):
+            return u'Корзина для индексации: {}'.format(basket(p))
+
+        def short_plant(p, s):
+            return u'Список снабженца: {}'.format(basket(p))
+
+        return [Wrapper('basket', full, short),
+                Wrapper('family', full_family, short_family),
+                Wrapper('canteen', full_canteen, short_canteen),
+                Wrapper('pension', full_pension, short_pension),
+                Wrapper('plant', full_plant, short_plant)]
 
     def solution(self, params, solved, asked):
         steps = [

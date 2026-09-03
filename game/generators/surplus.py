@@ -94,8 +94,8 @@ class SurplusArchetype(Archetype):
         ]
         if asked.key in ('cs', 'total'):
             steps.append(
-                (u'Цена спроса при $Q = 0$: ${}$; излишек потребителей — '
-                 u'треугольник: $CS = \\frac{{1}}{{2}}({} - {}) \\cdot {} '
+                (u'Цена спроса при $Q = 0$: ${}$; излишек потребителей '
+                 u'образует треугольник: $CS = \\frac{{1}}{{2}}({} - {}) \\cdot {} '
                  u'= {}$ ден. ед.').format(
                      fmt_num(a / b, latex=True), fmt_num(a / b, latex=True),
                      fmt_num(p, latex=True), fmt_num(q, latex=True),

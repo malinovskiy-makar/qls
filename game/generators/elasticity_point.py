@@ -127,7 +127,7 @@ class ElasticityPointArchetype(Archetype):
         if asked.key == 'e_class':
             e = solved['e_abs']
             cmp_word = u'больше' if e > 1 else (u'меньше' if e < 1 else u'равен')
-            steps.append(u'Модуль эластичности {} 1 — {}.'.format(
+            steps.append(u'Модуль эластичности {} 1, значит {}.'.format(
                 cmp_word, solved['e_class']))
         return steps
 

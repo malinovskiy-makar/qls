@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ревью задач — офлайн-пакет</title>
+<title>Ревью задач · офлайн-пакет</title>
 <!--
   Оболочка ручного ревью внешнего вида задач. Открывается двойным кликом
   (file://) в Chrome, интернет не нужен. Список задач и категории вердиктов
@@ -127,25 +127,25 @@
 <aside id="panel" hidden>
   <div>
     <h1 id="bundle-title">Ревью задач</h1>
-    <div class="muted" id="progress-text">—</div>
+    <div class="muted" id="progress-text">–</div>
     <div id="progress-bar" style="margin-top:6px"><div id="progress-fill"></div></div>
   </div>
 
   <div id="banner"></div>
 
   <div id="meta">
-    <div class="muted" id="meta-pos">—</div>
-    <div class="title" id="meta-title">—</div>
+    <div class="muted" id="meta-pos">–</div>
+    <div class="title" id="meta-title">–</div>
     <div class="muted" id="meta-source"></div>
   </div>
 
   <div id="current-verdict">Вердикта пока нет</div>
 
   <div id="buttons"></div>
-  <div id="confirm-row">Отмечено дефектов: <b id="confirm-count">0</b> — нажмите <b>Enter</b>, чтобы подтвердить и перейти дальше</div>
+  <div id="confirm-row">Отмечено дефектов: <b id="confirm-count">0</b>. Нажмите <b>Enter</b>, чтобы подтвердить и перейти дальше</div>
 
   <div>
-    <div class="row-label">Комментарий ко всей задаче (обязателен для «Прочее»; Enter — сохранить и дальше)</div>
+    <div class="row-label">Комментарий ко всей задаче (обязателен для «Прочее»; Enter сохраняет и ведёт дальше)</div>
     <textarea id="comment" placeholder="Что именно не так…"></textarea>
   </div>
 
@@ -171,15 +171,15 @@
   </label>
 
   <button class="big-btn" id="btn-download">Скачать вердикты (JSON)</button>
-  <div class="muted" id="download-hint" style="text-align:center">—</div>
+  <div class="muted" id="download-hint" style="text-align:center">–</div>
   <button class="ghost-btn" id="btn-import">Импорт вердиктов (продолжить с другого компьютера)</button>
   <input type="file" id="import-file" accept=".json,application/json" hidden>
 
   <details class="help" open>
     <summary>Клавиши</summary>
     <table style="margin-top:6px">
-      <tr><td><b>1</b></td><td>«Идеально» — вердикт сразу, переход дальше</td></tr>
-      <tr><td><b>0</b></td><td>«Гагно» — в мусор целиком, переход дальше</td></tr>
+      <tr><td><b>1</b></td><td>«Идеально»: вердикт сразу, переход дальше</td></tr>
+      <tr><td><b>0</b></td><td>«Гагно»: в мусор целиком, переход дальше</td></tr>
       <tr><td><b>2–9</b></td><td>отметить дефект (можно несколько), повторное нажатие снимает</td></tr>
       <tr><td><b>Enter</b></td><td>подтвердить отмеченные дефекты и перейти дальше</td></tr>
       <tr><td><b>← →</b></td><td>листать без вердикта</td></tr>
@@ -260,7 +260,7 @@
       b.style.display = 'block';
       b.innerHTML = '<b>Внимание: браузер не сохраняет вердикты между запусками.</b> ' +
         'Всё живёт только в памяти этой вкладки. НЕ закрывайте её, ' +
-        'а «Скачать вердикты (JSON)» нажимайте как можно чаще — это единственная защита от потери.';
+        'а «Скачать вердикты (JSON)» нажимайте как можно чаще: это единственная защита от потери.';
     } else {
       b.style.display = 'none';
     }
@@ -282,7 +282,7 @@
     b.className = 'vbtn ' + c.kind;
     b.setAttribute('data-key', c.key);
     b.innerHTML = '<span class="key">' + esc(c.hotkey) + '</span><span class="lbl">' +
-                  esc(c.label) + (c.hint ? ' <span class="hint">— ' + esc(c.hint) + '</span>' : '') +
+                  esc(c.label) + (c.hint ? ' <span class="hint">· ' + esc(c.hint) + '</span>' : '') +
                   '</span><span class="cnt" data-cnt="' + c.key + '"></span>';
     b.addEventListener('click', function () { pick(c); });
     $('buttons').appendChild(b);
@@ -322,7 +322,7 @@
     if (chosen.length) {
       var names = chosen.map(function (k) { return byKey[k] ? byKey[k].label : k; });
       cv.textContent = 'Вердикт: ' + names.join(' + ') +
-                       (v.comment ? ' — «' + v.comment + '»' : '');
+                       (v.comment ? ' · «' + v.comment + '»' : '');
       cv.className = 'has ' + (byKey[chosen[0]] ? byKey[chosen[0]].kind : '');
       commentEl.value = v.comment || '';
     } else {
@@ -388,9 +388,9 @@
   function confirmAndGo() {
     var p = problems[state.idx];
     var chosen = catsOf(p.id);
-    if (!chosen.length) { flash('Сначала отметьте категорию — клавиши 1–9 или 0'); return; }
+    if (!chosen.length) { flash('Сначала отметьте категорию: клавиши 1–9 или 0'); return; }
     if (chosen.indexOf('other') !== -1 && !commentEl.value.trim()) {
-      flash('«Прочее» — допишите комментарий и нажмите Enter');
+      flash('«Прочее»: допишите комментарий и нажмите Enter');
       commentEl.focus();
       return;
     }
@@ -421,7 +421,7 @@
     for (var i = 0; i < problems.length; i++) {
       if (!state.verdicts[problems[i].id]) return go(i);
     }
-    flash('Все задачи проверены — ура!');
+    flash('Все задачи проверены, ура!');
   }
 
   // ── Выгрузка / импорт ──

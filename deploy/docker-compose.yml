@@ -119,6 +119,46 @@ services:
       # Первый старт долгий: миграции с нуля плюс сборка статики.
       start_period: 120s
 
+  # ⚠️ СЕРВИС `ws` — ТОЛЬКО WEBSOCKET, И МИГРАЦИЙ ОН НЕ НАКАТЫВАЕТ.
+  # Образ тот же, что у web, но команда своя: daphne вместо gunicorn и
+  # СВОЙ entrypoint без `migrate`. Это прямое следствие запрета «второй
+  # контейнер web поднимать нельзя»: два процесса, накатывающих миграции
+  # без блокировки, развалят схему. Здесь миграций нет вовсе, поэтому
+  # процесс безопасен рядом с web.
+  #
+  # ⚠️ Порт наружу НЕ публикуется: `/ws/` проксирует nginx по внутренней
+  # сети, как и обычный HTTP.
+  #
+  # ⚠️ Живость проверяется СВОЕЙ ручкой /ws/health/: она не ходит ни в
+  # Django, ни в базу и отвечает на вопрос «жив ли ASGI-процесс». gunicorn
+  # может отвечать, а daphne лежать, и без отдельной проверки это заметил
+  # бы только игрок посреди дуэли.
+  ws:
+    image: weconomics-web:latest
+    container_name: weco-ws
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ. Наружу ходит только nginx.
+    env_file:
+      - /srv/weconomics/.env
+    entrypoint: ["/app/deploy/entrypoint-ws.sh"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      # Статику и миграции готовит web; ws стартует после него, чтобы не
+      # обслуживать сокеты на несогласованной схеме.
+      web:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/ws/health/ | grep -q 'ws ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
   # ⚠️ СЕРВИС КОДИРОВАНИЯ ЗАПРОСОВ (С4). ПОРТ НАРУЖУ НЕ ПУБЛИКУЕТСЯ.
   # Секции `ports` здесь нет и быть не должно: эндпоинт /encode работает
   # без авторизации, и опубликованный порт раздавал бы кому угодно нашу

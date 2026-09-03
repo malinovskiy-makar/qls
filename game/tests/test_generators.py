@@ -13,15 +13,17 @@ import json
 import random
 import re
 from fractions import Fraction
+from unittest import mock
 
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase
 
+from game import config as game_config
 from game.generators import base as gbase
 from game.generators.base import fmt_num, is_nice, LIMIT_FULL, LIMIT_SHORT
 from game.generators.registry import ARCHETYPES
 from game.models import GameQuestion
-from game.views import parse_exact_number
+from game.views import parse_exact_number, SESSION_KEY
 
 N_SAMPLES = 500          # сэмплов на архетип (распределяются по трём типам)
 MIN_INT_SHARE = 0.6      # доля целых ответов среди numeric (правило ≥80%
@@ -538,14 +540,16 @@ class StorageTests(TestCase):
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         n_eq = GameQuestion.objects.filter(
             is_generated=True, generator_key='equilibrium').count()
-        self.assertEqual(n_eq, 6)  # 2 вопроса × 3 типа
+        # 2 вопроса × 4 типа: у equilibrium есть чертёж, значит к трём
+        # обычным типам добавляется figure_choice (режим «График»).
+        self.assertEqual(n_eq, 8)
         self.assertTrue(GameQuestion.objects.filter(pk=baseline).exists())
 
         # повторный запуск того же ключа не плодит дубли
         call_command('generate_game_questions', '--per-archetype', '2',
                      '--confirm', '--only', 'equilibrium', verbosity=0)
         self.assertEqual(GameQuestion.objects.filter(
-            is_generated=True, generator_key='equilibrium').count(), 6)
+            is_generated=True, generator_key='equilibrium').count(), 8)
 
         call_command('purge_generated', verbosity=0)
         self.assertEqual(
@@ -562,8 +566,13 @@ class ServingTests(TestCase):
         make_generated_question()
         with self.settings(GAME_GENERATED_ENABLED=False):
             resp = self._start_session()
-            # других numeric в пуле нет → пул пуст
-            self.assertEqual(resp.status_code, 503)
+            # других numeric в пуле нет → пул режима пуст целиком, значит
+            # забег не начинается вовсе (Задача 3), а не стартует и сразу
+            # хоронит себя причиной pool_empty.
+            self.assertEqual(resp.status_code, 200)
+            body = resp.json()
+            self.assertFalse(body['ok'])
+            self.assertIsNone(self.client.session.get(SESSION_KEY))
 
     def test_flag_on_serves_generated_with_anticheat(self):
         gq = make_generated_question()
@@ -573,7 +582,11 @@ class ServingTests(TestCase):
             q = resp.json()['question']
             self.assertEqual(q['id'], gq.pk)
             self.assertTrue(q['generated'])
-            self.assertIsNone(q['problem_id'])
+            # ⚠️ Анти-чит v2: `problem_id` не приходит в вопросе ВООБЩЕ.
+            # По нему задача открывалась в каталоге вместе с ответом — то
+            # есть подсмотреть можно было ДО ответа. Теперь он есть только
+            # в ответе api_answer, когда отвечать уже поздно.
+            self.assertNotIn('problem_id', q)
             self.assertEqual(q.get('unit'), u'ден. ед.')
             # анти-чит: ни ответа, ни решения в payload вопроса
             payload_text = str(q)
@@ -666,21 +679,25 @@ class FlagHoldsEverywhereTests(TestCase):
         self.assertEqual(
             GameQuestion.objects.filter(id__in=served, is_generated=True).count(), 0)
 
-    def test_flag_off_hides_topic_chip_of_generated_only_topic(self):
-        """Тема, которая держится только на сгенерированных, чипом не встаёт.
+    def test_flag_off_keeps_generated_out_of_the_start_screen_counts(self):
+        """Счётчик пула на стартовом экране не считает сгенерированные.
 
-        Иначе игрок ткнул бы в чип и получил пустой забег (503)."""
-        # MIN_TOPIC_POOL=30 — берём с запасом, тема канонична
+        Чипов тем на экране больше нет (панель фильтров показывает все 21
+        тему без счётчиков — указание Макара), но счётчик режимов остался
+        и ходит через тот же _pool_qs. Утечка здесь показала бы игроку
+        вопросы, которых при выключенном флаге не существует."""
         self.make_gen(35, topic=self.TOPIC)
 
-        def has_chip():
+        def blitz_count():
             html = self.client.get('/game/').content.decode('utf-8')
-            return 'data-topic="{}"'.format(self.TOPIC) in html
+            m = re.search(r'"pool_counts": \{[^}]*"blitz": (\d+)', html)
+            return int(m.group(1))
 
         with self.settings(GAME_GENERATED_ENABLED=False):
-            self.assertFalse(has_chip())
+            off = blitz_count()
         with self.settings(GAME_GENERATED_ENABLED=True):
-            self.assertTrue(has_chip())
+            on = blitz_count()
+        self.assertEqual(on - off, 35)
 
     def test_flag_off_mistakes_run_pulls_no_generated(self):
         """Работа над ошибками — курированная очередь, отдельная поверхность.
@@ -724,6 +741,50 @@ class FlagHoldsEverywhereTests(TestCase):
                 content_type='application/json')
         self.assertEqual(r.status_code, 404)
         self.assertNotIn('solution', r.json())
+
+    def test_generated_share_max_has_no_effect_while_flag_is_off(self):
+        """При выключенном GAME_GENERATED_ENABLED значение GENERATED_SHARE_MAX
+        не имеет значения вовсе — потолок доли действует внутри
+        `_cap_generated` над кандидатами, УЖЕ прошедшими через `_pool_qs`,
+        а тот при выключенном флаге исключает сгенерированные раньше, чем
+        до потолка вообще доходит очередь (game/views.py, `_pool_qs` и
+        `_cap_generated`).
+
+        Сессия «Wecon Rush — подготовка к выкатке» (02.09): на проде флаг
+        выключен решением владельца, а `GENERATED_SHARE_MAX` в
+        конфигурации остаётся ненулевым — тест доказывает, что это
+        безопасно, а не просто «по факту сегодня не течёт»."""
+        self.make_base(3)
+        self.make_gen(40)
+
+        def play_a_whole_run():
+            with self.settings(GAME_GENERATED_ENABLED=False):
+                r = self.client.get('/game/api/session/start/?mode=blitz').json()
+                served = [r['question']['id']]
+                while True:
+                    nxt = self.client.get('/game/api/question/').json()
+                    if 'question' not in nxt:
+                        break
+                    served.append(nxt['question']['id'])
+                self.client.post('/game/api/session/finish/',
+                                 json.dumps({'reason': 'time'}),
+                                 content_type='application/json')
+            return served
+
+        # GENERATED_SHARE_MAX — константа модуля game/config.py, а не
+        # Django-настройка: override_settings() её не тронет, патчим сам
+        # атрибут модуля (views.py держит ссылку на модуль и читает
+        # config.GENERATED_SHARE_MAX динамически при каждом вызове).
+        with mock.patch.object(game_config, 'GENERATED_SHARE_MAX', 1.0):
+            served_unlimited = play_a_whole_run()          # потолка фактически нет
+        with mock.patch.object(game_config, 'GENERATED_SHARE_MAX', 0.0):
+            served_zero = play_a_whole_run()                # потолок «вообще ноль»
+
+        self.assertEqual(set(served_unlimited), set(served_zero))
+        self.assertEqual(
+            GameQuestion.objects.filter(
+                id__in=served_unlimited + served_zero, is_generated=True
+            ).count(), 0)
 
 
 # Архетипы, переработанные под ЭТАЛОН качества (решение в Notion, 2026-07-16:
@@ -917,3 +978,196 @@ class FigureServingTests(TestCase):
                 data='{"question_id": %d, "value": "5"}' % gq.pk,
                 content_type='application/json')
             self.assertNotIn('figure', resp.json())
+
+
+
+# ---------------------------------------------------------------------------
+# Гигиена текста генераторов (сессия «Wecon Rush — закрытие», фаза 1)
+# ---------------------------------------------------------------------------
+
+# Архетипы с качественными (kind='class') вопросами: у них есть порядок
+# вариантов, который можно забыть перетасовать.
+CLASS_ARCHETYPES = ['comparative_advantage', 'ppf_single', 'elasticity_point',
+                    'elasticity_arc']
+
+DASH = u'\u2014'      # длинное тире, запрещённое в текстах сайта
+
+
+def asked_kind(arch, params):
+    """kind того Asked, который выпал этому вопросу ('value' или 'class')."""
+    for a in arch.asked_values(params):
+        if a.key == params['_asked']:
+            return a.kind
+    return None
+
+
+class GeneratorTextHygieneTests(SimpleTestCase):
+    u"""Дефекты, найденные замером по базе (reports/game/generated_audit.html).
+
+    Проверки идут по СВЕЖЕ СГЕНЕРИРОВАННОМУ тексту, а не по строкам файлов:
+    длинное тире жило в БАЗЕ, а сканер по каталогу game честно показывал
+    ноль. Файловый сканер такой дефект не видит по устройству.
+    """
+
+    def sample(self, key, qtype, n, seed=20260902):
+        arch = ARCHETYPES[key]
+        rng = random.Random(seed)
+        for _ in range(n):
+            yield arch, gbase.generate_question(arch, rng, qtype)
+
+    def test_class_options_are_shuffled(self):
+        u"""Порядок вариантов качественного вопроса тасуется.
+
+        Без тасовки правильный ответ стоит там, куда его поставило
+        объявление class_options, и запоминается позицией, а не смыслом."""
+        for key in CLASS_ARCHETYPES:
+            orders = set()
+            for arch, q in self.sample(key, 'single', 200):
+                if asked_kind(arch, q['params']) != 'class':
+                    continue
+                orders.add(tuple(q['options']))
+            self.assertTrue(orders, u'{}: качественных вопросов не выпало'
+                                    .format(key))
+            self.assertGreater(
+                len(orders), 1,
+                u'{}: порядок вариантов всегда один и тот же: {}'.format(
+                    key, orders))
+
+    def test_no_em_dash_in_anything_the_player_sees(self):
+        u"""Ни в условии, ни в вариантах, ни в решении нет «—»."""
+        for key in sorted(ARCHETYPES):
+            for qtype in ('numeric', 'single', 'boolean'):
+                for _, q in self.sample(key, qtype, 40):
+                    texts = [q['statement'], q['solution_text']]
+                    texts += [o for o in q['options']
+                              if isinstance(o, str)]
+                    for text in texts:
+                        self.assertNotIn(
+                            DASH, text,
+                            u'{}/{}: длинное тире в «{}»'.format(
+                                key, qtype, text[:140]))
+
+    def test_equilibrium_speaks_one_currency(self):
+        u"""Условие равновесия и его вопрос — про одни и те же деньги.
+
+        Замер по базе: 45 вопросов говорили «$P$ — в ден. ед.», а спрашивали
+        «(в руб.)». Сжатую форму собирал общий помощник Блока А."""
+        for _, q in self.sample('equilibrium', 'single', 200):
+            self.assertNotIn(u'ден. ед.', q['statement'], q['statement'])
+        for _, q in self.sample('equilibrium', 'boolean', 200):
+            self.assertNotIn(u'ден. ед.', q['statement'], q['statement'])
+
+    def test_equilibrium_quantity_unit_matches_the_story(self):
+        u"""Кофе меряют в кг: и в условии, и у поля ввода."""
+        for _, q in self.sample('equilibrium', 'single', 200):
+            if u'кофе' in q['statement']:
+                self.assertIn(u'$Q$ в кг', q['statement'], q['statement'])
+                self.assertNotIn(u'$Q$ в шт.', q['statement'], q['statement'])
+
+    def test_ppf_single_answer_unit_matches_the_story(self):
+        u"""Урожай меряют центнерами, значит и единица ответа центнеры."""
+        seen = 0
+        for _, q in self.sample('ppf_single', 'numeric', 300):
+            if u'центнер' not in q['statement']:
+                continue
+            seen += 1
+            self.assertFalse(
+                q['unit'].startswith(u'ед. '),
+                u'условие в центнерах, а ответ в «{}»'.format(q['unit']))
+        self.assertGreater(seen, 0, u'сюжет с центнерами не выпал ни разу')
+
+    def test_comparative_advantage_uses_the_right_case(self):
+        u"""«по мёда» — не по-русски: преимущество бывает В ПРОИЗВОДСТВЕ."""
+        from game.generators import _ppf
+        bad = re.compile(u'\\bпо (%s)\\b' % u'|'.join(
+            g[1] for g in _ppf.PPF_GOODS))
+        for _, q in self.sample('comparative_advantage', 'single', 200):
+            text = q['statement'] + u'\n' + q['solution_text']
+            self.assertIsNone(bad.search(text), text)
+
+
+class GeneratedPoolHasNoEmDashTests(TestCase):
+    u"""Ноль длинных тире у сгенерированных вопросов — ПО БАЗЕ, не по файлам.
+
+    ⚠️ Именно по базе. Сканер scripts/check_em_dash.py читает каталог game и
+    честно показывает ноль, а игрок при этом видел 4 979 вопросов с
+    запрещённым знаком: тире приезжало из строк генератора в БАЗУ. Файловый
+    сканер такой дефект не увидит по устройству, поэтому проверка здесь
+    сначала НАПОЛНЯЕТ пул, а потом читает его.
+    """
+
+    def test_pool_built_by_both_generators_is_clean(self):
+        call_command('generate_game_questions', '--per-archetype', '3',
+                     '--confirm', verbosity=0)
+        call_command('generate_figure_questions', '--per-scenario', '3',
+                     '--confirm', verbosity=0)
+
+        rows = list(GameQuestion.objects.filter(is_generated=True))
+        self.assertGreater(len(rows), 100, u'пул не наполнился')
+
+        bad = []
+        for q in rows:
+            texts = [q.question or '', q.gen_solution or '']
+            texts += [o for o in (q.options or []) if isinstance(o, str)]
+            for text in texts:
+                if DASH in text:
+                    bad.append((q.generator_key, text[:120]))
+        self.assertEqual(bad[:5], [], u'тире в базе: {} вопросов'.format(
+            len(bad)))
+
+
+# Пять архетипов, у которых была ОДНА обёртка на 300 вопросов. Замер
+# повторяемости 2026-09-02: сюжет узнавался с третьего вопроса.
+REWORKED_WRAPPERS = ['price_index', 'mpc_multiplier',
+                     'perfect_price_discrimination', 'ppf_joint',
+                     'comparative_advantage']
+MIN_WRAPPERS = 5
+
+
+class StoryWrapperTests(SimpleTestCase):
+    u"""Сюжетных обёрток достаточно, и они разные.
+
+    ⚠️ Проверяем не число в коде, а РЕЗУЛЬТАТ: обёртки обязаны реально
+    выпадать и давать разный текст. Пять функций, возвращающих одно и то
+    же, числом обёрток не считаются.
+    """
+
+    def test_reworked_archetypes_have_enough_wrappers(self):
+        for key in REWORKED_WRAPPERS:
+            n = len(ARCHETYPES[key].wrappers())
+            self.assertGreaterEqual(
+                n, MIN_WRAPPERS,
+                u'{}: обёрток {}, а сюжет узнаётся с третьего вопроса'
+                .format(key, n))
+
+    def test_every_wrapper_actually_comes_up(self):
+        u"""Все обёртки выпадают: заведённая, но недостижимая не считается."""
+        for key in REWORKED_WRAPPERS:
+            arch = ARCHETYPES[key]
+            expected = {w.key for w in arch.wrappers()}
+            rng = random.Random(7)
+            seen = set()
+            for i in range(240):
+                q = gbase.generate_question(
+                    arch, rng, ('numeric', 'single', 'boolean')[i % 3])
+                seen.add(q['params'].get('_wrapper'))
+            self.assertEqual(
+                seen, expected,
+                u'{}: выпали {}, а заведены {}'.format(key, seen, expected))
+
+    def test_wrappers_give_different_text(self):
+        u"""Разные обёртки — разный рассказ, а не переставленные слова."""
+        for key in REWORKED_WRAPPERS:
+            arch = ARCHETYPES[key]
+            rng = random.Random(11)
+            params = arch.sample(rng)
+            solved = arch.solve(params)
+            texts = [w.full(params, solved) for w in arch.wrappers()]
+            self.assertEqual(
+                len(set(texts)), len(texts),
+                u'{}: две обёртки дают одинаковый текст'.format(key))
+            # И начинаются они по-разному: одинаковая завязка узнаётся
+            # так же, как одинаковый текст.
+            heads = {t[:30] for t in texts}
+            self.assertEqual(len(heads), len(texts),
+                             u'{}: у обёрток одинаковая завязка'.format(key))

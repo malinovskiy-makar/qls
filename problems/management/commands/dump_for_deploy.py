@@ -43,12 +43,58 @@ TIER1 = [
     'problems.StudentGroup', 'problems.Job', 'problems.TheoryPage',
 ]
 
+# ---------------------------------------------------------------------------
+# --bank-only: только банк задач (решение владельца 2026-09-02, 152-ФЗ).
+#
+# НЕ входят: User и профили, StudentGroup/Lesson/Assignment/AssignmentItem,
+# Submission/TeacherFeedback/StudentTopicProgress/StudentSkillProgress,
+# CalendarEvent, ProblemComment и вся геймификация — работы и активность
+# учеников/преподавателя. Также не входят Job/Template/ExportRecord/
+# ImportSession/DuplicateCandidate/AutoTopicAssignment/ReviewVerdict/
+# AnswerSecondOpinion/ProblemVersion/TheoryPage/Collection — служебные или
+# аудиторские таблицы, которые каталогу и игре не нужны для показа сайта
+# (проверено grep'ом: ни одна не читается вне problems/admin.py и команд).
+# Также не входит FileAsset: картинки задач сегодня живут в ProblemFigure
+# (chertyozhi/tikz, hex-хеш в тексте задачи), а не в FileAsset.files — этой
+# M2M ни каталог, ни игра не читают.
+BANK_ONLY = [
+    'problems.Topic', 'problems.Subtopic', 'problems.Tag',
+    'problems.Source', 'problems.Skill', 'problems.MistakeTag',
+]
+
+# Поля Problem, которые --bank-only обязан вырезать: обе ссылаются на
+# модели, не входящие в дамп (User, FileAsset), и остались бы висячими
+# ссылками при заливке в чистую PostgreSQL.
+BANK_ONLY_PROBLEM_STRIP = ['embedding', 'similar_problems', 'owner', 'files']
+
+# Мелкие модели, зависящие от Problem/ProblemPart — грузятся одним файлом
+# после TIER 2/3, как TIER4_MISC у полного дампа. ProblemFigure — это и есть
+# «чертежи/tikz» из задания: сгенерированные картинки, на которые в тексте
+# задачи ссылается маркер [[FIGURE:<hash>]] (problems/models.py, ADR 0031).
+BANK_ONLY_MISC = ['problems.Hint', 'problems.ProblemFigure']
+
+
 # Мелкие модели, зависящие от Problem/User (грузятся после Problem одним файлом)
 TIER4_MISC = [
     'problems.ProblemVersion', 'problems.Hint', 'problems.Rubric',
     'problems.RubricCriterion', 'problems.StudentSkillProgress',
     'problems.Collection', 'problems.ExportRecord', 'problems.ImportSession',
-    'problems.Lesson', 'problems.Assignment', 'problems.Submission',
+    'problems.Lesson', 'problems.Assignment',
+    # ⚠️ ПОРЯДОК ЗДЕСЬ ЗНАЧИМ, И ЭТИ ТРИ СТРОКИ ПОЯВИЛИСЬ НЕ ЗРЯ.
+    # Заливка в ЧИСТУЮ PostgreSQL падала: `Submission.problem_item` ссылается
+    # на `AssignmentItem`, а его в выгрузке не было вовсе:
+    #   IntegrityError: Key (problem_item_id)=(18) is not present in table
+    #   "problems_assignmentitem"
+    # На SQLite это не воспроизводится (внешние ключи там не проверяются так
+    # строго), а на проде строки уже лежали — поэтому дыра прожила незамеченной
+    # до первой репетиции на чистой базе (сессия «Wecon Rush», фаза 8).
+    # `AssignmentItem` тянет за собой `CustomProblem` и его варианты, иначе
+    # дыра просто переезжает на шаг дальше. Замкнутость графа держит тест
+    # problems/tests/test_deploy_dump.py.
+    'problems.CustomProblem', 'problems.CustomProblemOption',
+    'problems.SavedFolder', 'problems.SavedGraph',
+    'problems.AssignmentItem',
+    'problems.Submission',
     'problems.TeacherFeedback', 'problems.StudentTopicProgress',
     'problems.CalendarEvent',
 ]
@@ -83,6 +129,11 @@ class Command(BaseCommand):
     def add_arguments(self, parser):
         parser.add_argument('--outdir', type=str, default='deploy_fixtures')
         parser.add_argument('--chunk', type=int, default=5000)
+        parser.add_argument(
+            '--bank-only', action='store_true',
+            help='Только банк задач: без пользователей, работ учеников, '
+                 'назначений и служебных таблиц — см. BANK_ONLY* в этом файле.',
+        )
 
     def write_file(self, outdir, name, objects):
         path = os.path.join(outdir, name)
@@ -111,6 +162,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         outdir = options['outdir']
         chunk = options['chunk']
+        bank_only = options['bank_only']
         os.makedirs(outdir, exist_ok=True)
 
         # Чистим старые файлы
@@ -118,35 +170,52 @@ class Command(BaseCommand):
             if fn.endswith('.json'):
                 os.remove(os.path.join(outdir, fn))
 
-        self.stdout.write('TIER 1 — справочники:')
+        tier1 = BANK_ONLY if bank_only else TIER1
+        misc = BANK_ONLY_MISC if bank_only else TIER4_MISC
+        problem_strip = list(BANK_ONLY_PROBLEM_STRIP) if bank_only \
+            else ['embedding', 'similar_problems']
+
+        label = ' (--bank-only)' if bank_only else ''
+        self.stdout.write(f'TIER 1 — справочники{label}:')
         ref_objects = []
-        for label in TIER1:
+        for m_label in tier1:
             try:
-                model = apps.get_model(*label.split('.'))
+                model = apps.get_model(*m_label.split('.'))
             except LookupError:
                 continue
             ref_objects.extend(serialize_qs(model.objects.all()))
         self.write_file(outdir, '10_reference.json', ref_objects)
 
-        self.stdout.write('TIER 2 — Problem (без embedding, без similar_problems):')
+        self.stdout.write(f'TIER 2 — Problem (вырезаны: {", ".join(problem_strip)}):')
         self.dump_model_chunked(
             outdir, '20_problem', 'problems.Problem', chunk,
-            strip=['embedding', 'similar_problems'],
+            strip=problem_strip,
         )
 
         self.stdout.write('TIER 3 — SourceReference / ProblemPart:')
         self.dump_model_chunked(outdir, '30_sourceref', 'problems.SourceReference', chunk)
         self.dump_model_chunked(outdir, '31_part', 'problems.ProblemPart', chunk)
 
-        self.stdout.write('TIER 4 — мелкие связанные модели:')
+        self.stdout.write(f'TIER 4 — мелкие связанные модели{label}:')
         misc_objects = []
-        for label in TIER4_MISC:
+        for m_label in misc:
             try:
-                model = apps.get_model(*label.split('.'))
+                model = apps.get_model(*m_label.split('.'))
             except LookupError:
                 continue
             misc_objects.extend(serialize_qs(model.objects.all()))
         self.write_file(outdir, '40_misc.json', misc_objects)
+
+        if bank_only:
+            # DuplicateCandidate/AutoTopicAssignment/similar_problems —
+            # аудиторские/производные данные, не нужны каталогу и игре и
+            # пересобираются на месте (cache_similar и т.п.). Обе ссылаются
+            # на модели вне --bank-only графа, дампить их здесь нельзя.
+            files = sorted(f for f in os.listdir(outdir) if f.endswith('.json'))
+            self.stdout.write(self.style.SUCCESS(
+                f'\n--bank-only готово: {len(files)} файлов в {outdir}/'
+            ))
+            return
 
         self.stdout.write('TIER 4b — DuplicateCandidate / AutoTopicAssignment:')
         self.dump_model_chunked(outdir, '50_dupcand', 'problems.DuplicateCandidate', chunk)

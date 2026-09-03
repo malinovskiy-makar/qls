@@ -1,0 +1,27 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% block title %}Скоро · {{ olympiad.name_short }}{% endblock %}
+{% block olymp_content %}
+<nav class="ol-crumbs" aria-label="Хлебные крошки">
+  <a href="{% url 'olympiads:list' %}">Олимпиады</a>
+  <span aria-hidden="true">→</span>
+  <a href="{% url 'olympiads:detail' olympiad.slug %}">{{ olympiad.name_short }}</a>
+  <span aria-hidden="true">→</span>
+  <span>Комплект {{ variant.year }}</span>
+</nav>
+
+<h1 class="ol-title">Скоро</h1>
+<p class="ol-sub">
+  Комплект {{ variant.year }} года{% if variant.stage %}, {{ variant.stage.name|lower }}{% endif %},
+  {{ variant.grade_label }}{% if with_timer %} — режим на время{% else %} — режим без таймера{% endif %}.
+</p>
+
+<p class="ol-empty">
+  Решение комплекта прямо на сайте ещё не подключено. Режим контрольной уже
+  работает, но собирает задачи только из назначенной работы — чтобы он умел
+  собрать набор по комплекту олимпиады, его надо доработать отдельно.
+  {% if variant.has_original %}
+  Пока задания можно посмотреть в оригинале:
+  <a href="{{ variant.original_url }}" target="_blank" rel="noopener">открыть источник</a>.
+  {% endif %}
+</p>
+{% endblock %}

@@ -1179,7 +1179,7 @@ function buildMathfield(inp) {
       if (bad) {
         inp.dataset.texUnknown = bad;
         if (typeof fieldProblem === 'function')
-          fieldProblem(inp, 'Не понимаю команду ' + bad + ' — калькулятор её не считает');
+          fieldProblem(inp, 'Не понимаю команду ' + bad + ': калькулятор её не считает');
         return;
       }
       delete inp.dataset.texUnknown;

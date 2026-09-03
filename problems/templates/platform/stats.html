@@ -83,7 +83,7 @@
     блоке одна крупная величина, три остальные равновесны между собой.
     {% endcomment %}
     <div class="big">{{ w.done }}<span class="of">/ {{ w.goal }}</span></div>
-    <div class="cap">верных за неделю{% include '_hint.html' with hint='Сколько задач и тестов вы решили верно с понедельника. Ответы в Econ Rush сюда не идут: цель — про разбор задач, а не про скорость узнавания. В «Лучшем дне» игра, наоборот, считается — это рекорд, а не цель.' %}</div>
+    <div class="cap">верных за неделю{% include '_hint.html' with hint='Сколько задач и тестов вы решили верно с понедельника. Ответы в Wecon Rush сюда не идут: цель тут про разбор задач, а не про скорость узнавания. В «Лучшем дне» игра, наоборот, считается: это рекорд, а не цель.' %}</div>
     <div class="hero-bar hero-bar--thin"><i style="width:{{ w.percent }}%"></i></div>
     <button type="button" class="goal-edit" id="goal-edit">изменить</button>
     <form method="post" action="{% url 'set_weekly_goal' %}" id="goal-form" hidden
@@ -147,7 +147,7 @@
 {# ── Карта тем: САМЫЙ ПОЛЕЗНЫЙ БЛОК ───────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Карта тем — что делать дальше{% include '_hint.html' with hint='Метка ставится по числам этой же карточки: меньше 5 попыток — «мало данных»; дальше по доле верных: 85–100% — «мастер», 60–84% — «разобрался», ниже 60% — «стоит подтянуть».' %}</div>
+    <div class="panel-title">Карта тем: что делать дальше{% include '_hint.html' with hint='Метка ставится по числам этой же карточки: меньше 5 попыток значит «мало данных»; дальше по доле верных: 85–100% это «мастер», 60–84% «разобрался», ниже 60% «стоит подтянуть».' %}</div>
     <div class="panel-hint">Нажмите на тему, чтобы открыть её задачи в каталоге</div>
   </div>
   {% if data.topics %}
@@ -178,7 +178,7 @@
   </div>
   {% else %}
   <div class="empty-note">Ещё нет решённых задач с темой. Реши несколько
-    из каталога — карта заполнится сама.</div>
+    из каталога, и карта заполнится сама.</div>
   {% endif %}
 </div>
 
@@ -211,7 +211,7 @@
     {% if data.difficulty.total %}
       <div class="chart-box"><canvas id="chart-difficulty"></canvas></div>
     {% else %}
-      <div class="empty-note">Решённых задач пока мало — карта сложности
+      <div class="empty-note">Решённых задач пока мало, карта сложности
         заполнится сама.</div>
     {% endif %}
   </div>
@@ -233,14 +233,14 @@
     {% if data.level_history %}
       <div class="chart-box"><canvas id="chart-level"></canvas></div>
     {% else %}
-      <div class="empty-note">Реши первую задачу — линия начнёт расти.</div>
+      <div class="empty-note">Реши первую задачу, и линия начнёт расти.</div>
     {% endif %}
   </div>
 
   <div class="panel">
     <div class="panel-head">
       <div class="panel-title">Где решаешь</div>
-      <div class="panel-hint">насыщенный — верно, приглушённый — мимо</div>
+      <div class="panel-hint">насыщенный: верно, приглушённый: мимо</div>
     </div>
     <div class="chart-box"><canvas id="chart-sources"></canvas></div>
   </div>
@@ -251,7 +251,7 @@
 {# ── Достижения ────────────────────────────────────────────────────── #}
 <div class="panel">
   <div class="panel-head">
-    <div class="panel-title">Достижения — {{ achievements_earned }} из {{ achievements|length }}</div>
+    <div class="panel-title">Достижения: {{ achievements_earned }} из {{ achievements|length }}</div>
     <div class="achv-filter" id="achv-filter">
       <button type="button" class="is-active" data-cat="all">Все</button>
       <button type="button" data-cat="depth">Глубина</button>
@@ -289,7 +289,7 @@
     {% for record in records %}
     <div class="record">
       <div class="big">{{ record.value|floatformat:0 }}</div>
-      <div class="cap">{{ record.get_kind_display }}{% if record.kind == 'most_productive_day' %}{% include '_hint.html' with hint='Лучшим считается день, когда решено больше всего задач и тестов — по всему сайту: домашки, контрольные, каталог и игра.' %}{% endif %}</div>
+      <div class="cap">{{ record.get_kind_display }}{% if record.kind == 'most_productive_day' %}{% include '_hint.html' with hint='Лучшим считается день, когда решено больше всего задач и тестов по всему сайту: домашки, контрольные, каталог и игра.' %}{% endif %}</div>
       {% if record.when %}
       <div class="when">{{ record.when|date:"j E Y" }}</div>
       {% endif %}
@@ -360,7 +360,7 @@
     {% endcomment %}
     <div class="panel-title">{% include "_rush_logo.html" with extra="rush-logo--sm" %}<span class="game-badge">игра</span></div>
     <div class="panel-hint">Считается отдельно от учёбы: скорость узнавания и
-      решение задачи — разные вещи</div>
+      решение задачи это разные вещи</div>
   </div>
   {% if data.game.has_data %}
   <div class="record-grid">
@@ -413,7 +413,7 @@
   </div>
   {% endif %}
   {% else %}
-  <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent-ink)">Попробовать Econ Rush</a></div>
+  <div class="empty-note">Ты ещё не играл. <a href="/game/" style="color:var(--accent-ink)">Попробовать Wecon Rush</a></div>
   {% endif %}
 </div>
 </div>{# конец группы «игра» #}

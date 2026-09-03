@@ -334,7 +334,7 @@ function renderCurveList() {
     if (curve.kind === 'sum') {
       autoLine = document.createElement('div');
       autoLine.className = 'crow-auto';
-      autoLine.textContent = 'считается по группам — правке не подлежит';
+      autoLine.textContent = 'считается по группам, правке не подлежит';
       autoLine.setAttribute('data-tip', curve.expr
         ? ('Сейчас это ' + tipExpr(curve.expr))
         : 'Ни одна группа ещё не задана');

@@ -1,0 +1,14 @@
+{% comment %}
+Полоса чипов-фильтров. Кнопки «Все классы» здесь НЕТ намеренно: снятые
+чипы и есть «все», а лишняя кнопка только заставляет думать, чем она
+отличается от снятия остальных.
+{% endcomment %}
+<div class="ol-filters" id="ol-filters" role="group" aria-label="Фильтры олимпиад">
+  {% for code, label in tag_labels %}
+  <button type="button" class="ol-chip" data-tag="{{ code }}" aria-pressed="false">{{ label }}</button>
+  {% endfor %}
+</div>
+<p class="ol-nores" id="ol-nores" hidden>
+  Под эти условия ничего не подошло.
+  <button type="button" class="ol-reset" id="ol-reset">Сбросить фильтры</button>
+</p>

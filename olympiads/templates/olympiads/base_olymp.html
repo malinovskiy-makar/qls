@@ -1,0 +1,18 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+Общий каркас раздела олимпиад. Стили — ТОЛЬКО в партиале _styles.html:
+ни одной строчки CSS в шаблонах раздела, чтобы переделка внешнего вида
+не трогала разметку.
+{% endcomment %}
+
+{% block extra_style %}{% include 'olympiads/_styles.html' %}{% endblock %}
+
+{% block content %}
+  {% if has_placeholder %}
+  <div class="ol-demo" role="note">
+    <strong>Демонстрационные данные.</strong>
+    Раздел наполняется, цифры и даты ненастоящие.
+  </div>
+  {% endif %}
+  {% block olymp_content %}{% endblock %}
+{% endblock %}

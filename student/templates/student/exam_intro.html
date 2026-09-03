@@ -33,7 +33,7 @@
 
   <ul class="exam-facts">
     <li><span class="k">Тип</span>
-      <span>{% if assignment.exam_mode == 'window' %}окно — все пишут одновременно{% else %}дедлайн с лимитом времени{% endif %}</span></li>
+      <span>{% if assignment.exam_mode == 'window' %}окно, все пишут одновременно{% else %}дедлайн с лимитом времени{% endif %}</span></li>
     <li><span class="k">Время</span><span>{{ schedule }}</span></li>
     <li><span class="k">Задач</span><span>{{ items_count }}</span></li>
     {% if deadline %}
@@ -56,7 +56,7 @@
     </div>
     {% endif %}
     <div class="exam-warn">
-      ⏱ После старта таймер остановить нельзя — он идёт на сервере и не
+      ⏱ После старта таймер остановить нельзя: он идёт на сервере и не
       зависит от вашего устройства. Ответы сохраняются сами, но время идёт,
       даже если закрыть вкладку.
     </div>
@@ -66,7 +66,7 @@
         <button type="submit" class="btn-submit">Начать</button>
         {% if minutes is not None %}
         <span style="font-size:14px;color:var(--text2);">
-          на решение — {{ minutes }} мин
+          на решение {{ minutes }} мин
         </span>
         {% endif %}
       </div>

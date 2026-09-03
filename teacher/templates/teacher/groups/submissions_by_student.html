@@ -11,7 +11,7 @@
 выбор запоминается между заходами.
 {% endcomment %}
 
-{% block title %}{{ assignment.name }} — решения{% endblock %}
+{% block title %}{{ assignment.name }} · решения{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
@@ -82,7 +82,7 @@
 занимала верх экрана каждый раз, хотя читается один раз в жизни.
 {% endcomment %}
 <div class="k-hint" style="margin-bottom:16px">
-  Тесты и утверждённые задачи оценены автоматически — вам остаются
+  Тесты и утверждённые задачи оценены автоматически, вам остаются
   открытые задачи.
 </div>
 
@@ -126,7 +126,7 @@
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.scored_max }}</span></span>
       {% else %}
-      <span class="k-score__value k-score__value--none">—</span>
+      <span class="k-score__value k-score__value--none">–</span>
       {% endif %}
       <span class="k-score__cap">Итоговый балл</span>
     </span>
@@ -143,7 +143,7 @@
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.machine_could }}</span></span>
       {% else %}
-      <span class="k-score__value k-score__value--none">—</span>
+      <span class="k-score__value k-score__value--none">–</span>
       {% endif %}
       <span class="k-score__cap">Результат автопроверки{% include '_hint.html' with hint='Знаменатель меньше итогового: машина считает только тесты и задачи с утверждённым числовым эталоном. Открытые задачи оценивает преподаватель, и их баллы в это число не входят.' %}</span>
     </span>

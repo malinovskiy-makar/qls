@@ -119,7 +119,7 @@
                    value="{{ part.given }}">
           </div>
           {% endfor %}
-          <div class="field-hint">Кратко — число или короткая фраза. Числовой
+          <div class="field-hint">Кратко: число или короткая фраза. Числовой
             ответ проверяется автоматически.</div>
         {% endif %}
 
@@ -132,7 +132,7 @@
         <label for="{{ row.file_name }}" style="margin-top:16px;">Прикрепить файл</label>
         <input class="answer-file" type="file" id="{{ row.file_name }}"
                name="{{ row.file_name }}" accept=".jpg,.jpeg,.png,.pdf">
-        <div class="field-hint">Фото или PDF — если решение удобнее написать на бумаге.</div>
+        <div class="field-hint">Фото или PDF, если решение удобнее написать на бумаге.</div>
       </div>
     {% endif %}
 

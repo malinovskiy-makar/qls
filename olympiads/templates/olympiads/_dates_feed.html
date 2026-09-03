@@ -1,0 +1,37 @@
+{% comment %}
+Лента «Ближайшие даты». Три состояния, и все три — рабочие:
+подтверждённые даты, только ориентиры, пусто вовсе.
+{% endcomment %}
+<section class="ol-feed" aria-labelledby="ol-feed-title">
+  <div class="ol-feed-head">
+    <h2 class="ol-feed-title" id="ol-feed-title">Ближайшие даты</h2>
+    <a class="ol-feed-link" href="{% url 'olympiads:calendar' %}">Открыть полный календарь</a>
+  </div>
+
+  {% if feed_events %}
+    {% if not feed_has_confirmed %}
+    <p class="ol-feed-note">Точные даты ещё не объявлены.</p>
+    {% endif %}
+    <ul class="ol-feed-grid">
+      {% for event in feed_events %}
+      <li class="ol-ev{% if not event.is_confirmed %} ol-ev--dim{% endif %}">
+        {% if event.is_confirmed %}
+        <div class="ol-ev-day">{{ event.day_number }}</div>
+        <div class="ol-ev-month">{{ event.month_word }} {{ event.date_start.year }}</div>
+        {% else %}
+        <div class="ol-ev-approx">{{ event.display_date }}</div>
+        {% endif %}
+        <div class="ol-ev-olymp">{{ event.olympiad.name_short }}</div>
+        <div class="ol-ev-what">{{ event.get_kind_display }}</div>
+        <span class="ol-chip-type">{{ event.chip_label }}</span>
+        <div class="ol-status ol-status--{{ event.date_status }}">
+          <span class="ol-dot" aria-hidden="true"></span>{{ event.status_word }}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="ol-feed-empty">Даты на этот сезон пока не опубликованы.
+      Как только выйдут приказы — появятся здесь.</p>
+  {% endif %}
+</section>

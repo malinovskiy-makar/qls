@@ -65,15 +65,23 @@ class CategoriesTests(TestCase):
         self.assertGreater(abs(keys.index(perfect) - keys.index(trash)), 1)
 
     def test_exactly_two_exclusive_kinds_and_eight_defects(self):
-        # Дефектных категорий стало восемь: 2026-08-19 к семи прежним добавлена
-        # `fixed_wrong` («Починил не то») для пакетов разбора уже починенных
-        # задач. Она отвечает на вопрос «что не так с ПРАВКОЙ», а не «что не
-        # так с задачей», поэтому заведена отдельно от `other`.
+        # Дефектных категорий стало ДЕВЯТЬ.
+        # 2026-08-19: к семи прежним добавлена `fixed_wrong` («Починил не
+        # то») для пакетов разбора уже починенных задач — она отвечает на
+        # вопрос «что не так с ПРАВКОЙ», а не «что не так с задачей».
+        # 2026-09-02: добавлена `wrong_answer` («Неверный ответ») для
+        # разбора расхождений слепой перепроверки ответов моделью. По тому
+        # же доводу отдельно от `other`: «other» отвечает на вопрос «что не
+        # так с ВИДОМ задачи», а эта — «в банке лежит неверный КЛЮЧ». Слив
+        # их, мы потеряли бы счёт неверных ответов, а это единственный
+        # дефект, который портит игру молча: задача выглядит безупречно, и
+        # игрок теряет жизнь за верный ответ.
         exclusive = [c for c in REVIEW_CATEGORIES if c['kind'] in EXCLUSIVE_KINDS]
         defects = [c for c in REVIEW_CATEGORIES if c['kind'] == 'defect']
         self.assertEqual(sorted(c['key'] for c in exclusive), ['perfect', 'trash'])
-        self.assertEqual(len(defects), 8)
+        self.assertEqual(len(defects), 9)
         self.assertIn('fixed_wrong', [c['key'] for c in defects])
+        self.assertIn('wrong_answer', [c['key'] for c in defects])
 
     def test_hotkeys_are_unique(self):
         hot = [c['hotkey'] for c in REVIEW_CATEGORIES]

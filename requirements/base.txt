@@ -7,32 +7,78 @@
 asgiref==3.12.1
     # via
     #   -r requirements/base.in
+    #   channels
+    #   channels-redis
+    #   daphne
     #   django
+attrs==26.1.0
+    # via
+    #   service-identity
+    #   twisted
+autobahn==26.7.1
+    # via daphne
+automat==25.4.16
+    # via twisted
+cbor2==6.1.4
+    # via autobahn
 cffi==2.1.1
-    # via cryptography
+    # via
+    #   autobahn
+    #   cryptography
+channels==4.3.2
+    # via
+    #   -r requirements/base.in
+    #   channels-redis
+channels-redis==4.3.0
+    # via -r requirements/base.in
 charset-normalizer==3.5.1
     # via pdfminer-six
+constantly==23.10.4
+    # via twisted
 cryptography==50.0.0
-    # via pdfminer-six
+    # via
+    #   autobahn
+    #   pdfminer-six
+    #   pyopenssl
+    #   service-identity
+daphne==4.2.3
+    # via -r requirements/base.in
 dj-database-url==3.1.2
     # via -r requirements/base.in
 django==5.2.17
     # via
     #   -r requirements/base.in
+    #   channels
     #   dj-database-url
     #   django-redis
 django-redis==7.0.0
     # via -r requirements/base.in
 gunicorn==26.1.0
     # via -r requirements/base.in
+hyperlink==21.0.0
+    # via
+    #   autobahn
+    #   twisted
+idna==3.19
+    # via
+    #   hyperlink
+    #   twisted
+incremental==24.11.0
+    # via twisted
 markdown-it-py==4.2.0
     # via -r requirements/base.in
 mdurl==0.1.2
     # via markdown-it-py
+msgpack==1.2.2
+    # via
+    #   autobahn
+    #   channels-redis
 nh3==0.3.7
     # via -r requirements/base.in
 numpy==2.5.2
     # via -r requirements/base.in
+packaging==26.3
+    # via incremental
 pdfminer-six==20260107
     # via -r requirements/base.in
 pillow==12.3.0
@@ -45,19 +91,34 @@ pycparser==3.0
     # via cffi
 pymupdf==1.26.7
     # via -r requirements/base.in
+pyopenssl==26.4.0
+    # via twisted
 pypandoc==1.17
     # via -r requirements/base.in
 redis==8.1.0
     # via
     #   -r requirements/base.in
+    #   channels-redis
     #   django-redis
+service-identity==26.1.0
+    # via twisted
 sqlparse==0.6.0
     # via
     #   -r requirements/base.in
     #   django
+twisted[tls]==26.4.0
+    # via daphne
+txaio==26.6.1
+    # via autobahn
+typing-extensions==4.16.0
+    # via twisted
 tzdata==2026.3
     # via
     #   django
     #   psycopg
+ujson==5.13.0
+    # via autobahn
 whitenoise==6.12.0
     # via -r requirements/base.in
+zope-interface==8.6
+    # via twisted

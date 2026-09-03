@@ -18,7 +18,7 @@
 стратегию». Карточка на связывание списка с темой заведена в Notion.
 {% endcomment %}
 
-{% block title %}Проверка — {{ submission.student.get_full_name|default:submission.student.username }}{% endblock %}
+{% block title %}Проверка · {{ submission.student.get_full_name|default:submission.student.username }}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .rv-head { display: flex; align-items: flex-start; justify-content: space-between;
@@ -275,7 +275,7 @@
       <span class="k-state__icon">!</span>
       <div class="k-state__body">
         <div class="k-state__title">Ноль поставлен автоматически</div>
-        <div class="k-state__note">Ответа не было. Если это ошибка — поставьте
+        <div class="k-state__note">Ответа не было. Если это ошибка, поставьте
           балл ниже и сохраните.</div>
       </div>
     </div>
@@ -372,7 +372,7 @@
     которого его пишут осторожнее, чем надо.
     {% endcomment %}
     <label class="k-label" style="margin-top:16px">Комментарий к задаче
-      <span class="k-quiet" style="text-transform:none;letter-spacing:0;font-weight:400">— увидит только {{ submission.student.first_name|default:submission.student.get_full_name|default:submission.student.username }}</span>
+      <span class="k-quiet" style="text-transform:none;letter-spacing:0;font-weight:400">увидит только {{ submission.student.first_name|default:submission.student.get_full_name|default:submission.student.username }}</span>
     </label>
     <textarea name="comment" class="k-area" rows="3"
               placeholder="Что не так и как надо">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>

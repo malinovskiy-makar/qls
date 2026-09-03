@@ -240,6 +240,14 @@
   {% if problem.problem_type %}
   <span class="problem-source">{{ problem.problem_type }}</span>
   {% endif %}
+  {% comment %}Живая статистика из игры Wecon Rush. Показывается только когда попыток
+     набралось достаточно (порог в game/config.py) — иначе процент был бы
+     шумом. Задача не попала в игровой пул, значит строки просто нет.{% endcomment %}
+  {% if game_stat %}
+  <span class="problem-source" title="Доля верных ответов среди первых встреч игроков с этим вопросом">
+    В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)
+  </span>
+  {% endif %}
 </div>
 
 {% if topics %}

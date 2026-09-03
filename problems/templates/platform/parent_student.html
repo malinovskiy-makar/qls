@@ -34,7 +34,7 @@
   </div>
   <div class="metric">
     <div class="cap">доля верных</div>
-    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}—{% endif %}</div>
+    <div class="big">{% if overview.accuracy is not None %}{{ overview.accuracy }}%{% else %}–{% endif %}</div>
     <div class="chg {{ overview.change.accuracy.direction }}">
       {% if overview.change.accuracy %}{% if overview.change.accuracy.direction == 'up' %}↑{% elif overview.change.accuracy.direction == 'down' %}↓{% endif %}
       {{ overview.change.accuracy.abs_diff }} п.п.{% endif %}
@@ -48,7 +48,7 @@
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">Занимается ли регулярно</div>
-    <div class="panel-hint">Каждый квадрат — день; чем ярче, тем больше решено</div>
+    <div class="panel-hint">Каждый квадрат это день; чем ярче, тем больше решено</div>
   </div>
   {% include "platform/_heatmap.html" with calendar=calendar %}
 </div>
@@ -58,7 +58,7 @@
   <div class="panel-head">
     <div class="panel-title">Что получается, а что нет</div>
     <div class="panel-hint">Показываем только темы, где ребёнок решил хотя бы
-      {{ ranking.min_attempts }} задач — иначе это не вывод, а случайность</div>
+      {{ ranking.min_attempts }} задач, иначе это не вывод, а случайность</div>
   </div>
   <div style="display:grid;gap:18px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));">
     <div>

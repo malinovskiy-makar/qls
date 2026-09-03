@@ -1,0 +1,54 @@
+<script>
+/* Выбор до трёх олимпиад для сравнения. Липкая полоса внизу появляется
+   с первой галочкой и уходит, когда снята последняя. */
+(function () {
+  var LIMIT = 3;
+  var bar = document.getElementById('ol-picked');
+  if (!bar) { return; }
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.ol-pick-box'));
+  var counter = document.getElementById('ol-picked-count');
+  var go = document.getElementById('ol-picked-go');
+  var hint = document.getElementById('ol-picked-hint');
+  var base = go.getAttribute('href');
+  var hintTimer = null;
+
+  function chosen() {
+    return boxes.filter(function (b) { return b.checked; })
+                .map(function (b) { return b.value; });
+  }
+
+  function showHint() {
+    hint.hidden = false;
+    if (hintTimer) { window.clearTimeout(hintTimer); }
+    hintTimer = window.setTimeout(function () { hint.hidden = true; }, 3000);
+  }
+
+  function paint() {
+    var picked = chosen();
+    bar.hidden = picked.length === 0;
+    counter.textContent = 'Выбрано ' + picked.length + '.';
+    go.setAttribute('href', base + '?slugs=' + picked.join(','));
+    /* Четвёртую галочку не ставим вовсе: подсказать «нельзя» честнее,
+       чем принять выбор и молча его обрезать. */
+    boxes.forEach(function (b) {
+      b.disabled = !b.checked && picked.length >= LIMIT;
+    });
+  }
+
+  boxes.forEach(function (box) {
+    box.addEventListener('change', function () {
+      if (box.checked && chosen().length > LIMIT) {
+        box.checked = false;
+        showHint();
+      }
+      paint();
+    });
+    box.addEventListener('click', function (event) {
+      if (box.disabled) { showHint(); }
+      event.stopPropagation();
+    });
+  });
+
+  paint();
+})();
+</script>

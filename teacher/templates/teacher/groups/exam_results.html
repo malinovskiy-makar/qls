@@ -1,6 +1,6 @@
 {% extends "teacher/base.html" %}
 
-{% block title %}{{ exam.name }} — результаты{% endblock %}
+{% block title %}{{ exam.name }} · результаты{% endblock %}
 
 {% block extra_style %}
 {% include "platform/_stats_style.html" %}
@@ -34,7 +34,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
 <div class="panel">
   <div class="panel-head">
     <div class="panel-title">Ученик × задача</div>
-    <div class="panel-hint">Нижняя строка — процент верных ПО ЗАДАЧЕ: сразу
+    <div class="panel-hint">Нижняя строка это процент верных ПО ЗАДАЧЕ: сразу
       видно, что провалили все</div>
   </div>
   <div class="stats-table-wrap">
@@ -61,7 +61,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
               <span class="cell-{{ cell.state }}"
                     title="{{ cell.answer|default:'нет ответа' }}">
                 {% if cell.state == 'correct' %}✓{% elif cell.state == 'wrong' %}✗
-                {% elif cell.state == 'pending' %}?{% else %}—{% endif %}
+                {% elif cell.state == 'pending' %}?{% else %}–{% endif %}
               </span>
             </td>
             {% endfor %}
@@ -81,7 +81,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
           {% for column in footer %}
           <td class="cell">
             <span class="{% if column.percent is None %}cell-none{% elif column.percent < 50 %}cell-wrong{% elif column.percent < 75 %}cell-pending{% else %}cell-correct{% endif %}">
-              {% if column.percent is not None %}{{ column.percent }}%{% else %}—{% endif %}
+              {% if column.percent is not None %}{{ column.percent }}%{% else %}–{% endif %}
             </span>
           </td>
           {% endfor %}
@@ -98,7 +98,7 @@ tr.footer-row td { border-top: 1px solid var(--border); font-weight: 700; }
     {% for item in items %}
     <li>
       <span><b>{{ forloop.counter }}.</b> {{ item.statement|truncatechars:150 }}</span>
-      <span class="muted">ответ: {{ item.correct_answer|default:"—" }}</span>
+      <span class="muted">ответ: {{ item.correct_answer|default:"–" }}</span>
     </li>
     {% endfor %}
   </ul>

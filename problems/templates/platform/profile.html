@@ -106,7 +106,7 @@
     <div class="form-field">
       <label>Пароль</label>
       <div class="readonly">
-        не показывается —
+        не показывается,
         <a href="{% url 'password_change' %}" style="color:var(--accent);">сменить пароль</a>
       </div>
     </div>
@@ -164,7 +164,7 @@
           {{ item.problem_title|truncatechars:70 }}
           <span class="saved-off">снята с публикации</span>
         {% endif %}
-        {% if item.note %}<span class="row-meta"> — {{ item.note }}</span>{% endif %}
+        {% if item.note %}<span class="row-meta"> · {{ item.note }}</span>{% endif %}
       </span>
       <span class="saved-actions">
         <select class="move-folder">
@@ -190,7 +190,7 @@
 <div class="empty-state">
   <p><strong>Статистика</strong></p>
   <p>Появится в следующем обновлении.</p>
-  <p class="row-meta">Учебные события уже собираются — когда экраны появятся,
+  <p class="row-meta">Учебные события уже собираются: когда экраны появятся,
      им будет что показать за прошедшее время.</p>
 </div>
 {% endif %}

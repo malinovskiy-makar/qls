@@ -4,6 +4,9 @@ from . import (
     views, views_exams, views_generate, views_groups, views_problems,
     views_stats, views_work,
 )
+# Игровые наборы Wecon Rush живут отдельным модулем: конструктор набора и
+# доска результатов — это панель преподавателя, а не сама игра.
+from . import game_sets
 
 app_name = 'teacher'
 
@@ -125,4 +128,12 @@ urlpatterns = [
          name='assignment_detail'),
     path('submission/<int:pk>/review/', views.legacy_review_submission,
          name='review_submission'),
+
+    # ---- Игровые наборы Wecon Rush (конструктор + доска) ------------------
+    path('game-sets/', game_sets.game_sets_list, name='game_sets'),
+    path('game-sets/new/', game_sets.game_set_create, name='game_set_create'),
+    path('game-sets/<str:code>/', game_sets.game_set_detail,
+         name='game_set_detail'),
+    path('api/game-set/fill/', game_sets.api_game_set_fill,
+         name='api_game_set_fill'),
 ]

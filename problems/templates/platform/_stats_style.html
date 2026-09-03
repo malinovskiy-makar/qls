@@ -222,12 +222,15 @@
 .act-legend { display: flex; align-items: center; gap: 6px; font-size: 13px;
               color: var(--text2); margin-top: 10px; flex-wrap: wrap; }
 .act-sw { width: 12px; height: 12px; border-radius: 3px; display: block; }
-/* ── Логотип Econ Rush в строке заголовка ──────────────────────────────
+/* ── Логотип Wecon Rush в строке заголовка ──────────────────────────────
    Разметка знака общая со страницей игры (`templates/_rush_logo.html`),
    там он во весь экран, здесь — строка. Наклон и цвет «RUSH» те же. */
 .rush-logo { display: inline-block; font-weight: 800; letter-spacing: -.5px;
              user-select: none; }
 .rush-logo--sm { font-size: 18px; line-height: 1; }
+.rush-logo .w-mark { height: .7em; width: calc(.7em * 1.3756);
+                     display: inline-block; vertical-align: baseline;
+                     color: var(--accent-ink); }
 .rush-logo .bolt { margin: 0 .08em; }
 .rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
 .rush-logo .rush { color: var(--accent-ink); display: inline-block;

@@ -14,7 +14,7 @@
 ширины. Настройки уехали на «Выдачу», ширина досталась списку задач.
 {% endcomment %}
 
-{% block title %}Что кладём — новая работа{% endblock %}
+{% block title %}Что кладём · новая работа{% endblock %}
 
 {% block extra_style %}
 {% include "teacher/_ask_style.html" %}
@@ -127,7 +127,7 @@
       {% endcomment %}
       <div class="wk-count">{% if has_query %}Нашлось <b>{{ total|spaceint }}</b>
         {{ total|plural_ru:"задача,задачи,задач" }}{% else %}В каталоге
-        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }} —
+        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }}:
         задайте фильтры или листайте{% endif %}</div>
 
       {% for card in cards %}
@@ -172,7 +172,7 @@
   <div class="wk-empty">
     <b>Умный поиск сейчас недоступен</b>
     {{ reason }}
-    Задачи можно набрать руками — соседняя вкладка «Искать самому».
+    Задачи можно набрать руками: соседняя вкладка «Искать самому».
   </div>
   {% endif %}
 </div>
@@ -183,7 +183,7 @@
   {% empty %}
   <div class="wk-empty">
     <b>Вы ещё не написали ни одной своей задачи</b>
-    Своя задача — это условие, пункты и эталонные ответы, написанные вами.
+    Своя задача это условие, пункты и эталонные ответы, написанные вами.
     Она остаётся здесь и годится для любой следующей работы.
     <div><a href="{{ own_new_url }}" class="k-btn k-btn--main k-btn--sm">Написать свою</a></div>
   </div>
@@ -196,7 +196,7 @@
   {% empty %}
   <div class="wk-empty">
     <b>Отложенных задач нет</b>
-    Откладывайте их из каталога — кнопка «Сохранить» есть на странице любой
+    Откладывайте их из каталога: кнопка «Сохранить» есть на странице любой
     задачи. Отложенные это закладки КАТАЛОГА; свои задачи лежат на соседней
     вкладке.
     <div><a href="{% url 'catalog:problem_list' %}" class="k-btn k-btn--plain k-btn--sm">Открыть каталог</a></div>
@@ -205,7 +205,7 @@
 </div>
 </div>
 
-{% include "teacher/work/_bar.html" with next_url=steps.compose next_label="Дальше — состав →" quick_url=steps.give %}
+{% include "teacher/work/_bar.html" with next_url=steps.compose next_label="Дальше состав →" quick_url=steps.give %}
 </div>
 {% endblock %}
 
