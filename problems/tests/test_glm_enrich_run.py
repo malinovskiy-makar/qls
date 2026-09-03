@@ -154,6 +154,41 @@ class GlmEnrichRunSmokeTests(TestCase):
         metrics = json.loads(self.metrics_path.read_text(encoding='utf-8'))
         self.assertEqual(metrics['total_processed'], len(self.problems))
 
+    def test_battle_manifest_редиректит_и_не_трогает_манифест_первого_прогона(self):
+        """⚠️ Найдено владельцем перед запуском: `_battle_sample` берёт
+        существующий манифест КАК ЕСТЬ, даже если с тех пор изменился
+        `battle_queryset()` (например добавился фильтр content_status).
+        У второго прогона манифест первого (`run_full_sample_ids.json`)
+        уже существует и содержит needs_fix/junk-задачи, отфильтрованные
+        ТОЛЬКО в свежем battle_queryset() — без своего пути второй прогон
+        унаследовал бы устаревший список молча."""
+        needs_fix = Problem.objects.create(
+            statement='Битая задача.', content_status='needs_fix')
+        stale_ids = [p.id for p in self.problems] + [needs_fix.id]
+        with open(self.battle_manifest_path, 'w', encoding='utf-8') as fh:
+            json.dump({'seed': 1, 'limit': 50000, 'ids': stale_ids}, fh)
+        before = self.battle_manifest_path.read_text(encoding='utf-8')
+
+        custom_battle_manifest = self.tmp_dir / 'run2_full_sample_ids.json'
+
+        def fake_complete(model, blocks, user_text, schema, effort, images=None):
+            is_call1 = 'topic_primary' in schema.get('properties', {})
+            return _FakeReply(_valid_call1_json(user_text) if is_call1 else VALID_CALL2_JSON)
+
+        with self._patch_paths(), \
+                mock.patch.object(run_cmd, 'make_glm_complete_fn', return_value=fake_complete):
+            call_command('glm_enrich_run', limit=50000, max_cost=100.0,
+                        workers=3, chunk=2, run_id='test-battle-manifest-1',
+                        battle_manifest=str(custom_battle_manifest))
+
+        # старый манифест первого прогона не тронут
+        self.assertEqual(self.battle_manifest_path.read_text(encoding='utf-8'), before)
+
+        new_battle = json.loads(custom_battle_manifest.read_text(encoding='utf-8'))
+        self.assertEqual(sorted(new_battle['ids']),
+                         sorted(p.id for p in self.problems))
+        self.assertNotIn(needs_fix.id, new_battle['ids'])
+
     def test_куски_не_теряют_и_не_дублируют_задачи(self):
         """Прогон кусками по 2 задачи обязан дать ровно тот же журнал, что
         и одним куском: ни потерь, ни дублей строк в run_parsed.jsonl."""

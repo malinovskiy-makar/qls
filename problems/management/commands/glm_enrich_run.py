@@ -968,6 +968,17 @@ class Command(BaseCommand):
                  'подстраховки нет, это ожидаемо для самого первого '
                  'прогона корпуса.')
         parser.add_argument(
+            '--battle-manifest', type=str, default=None,
+            help='Переопределить путь БОЕВОГО манифеста выборки '
+                 '(BATTLE_MANIFEST_PATH) — `--limit` больше '
+                 'CHECKPOINT_LIMIT. ⚠️ Найдено владельцем перед вторым '
+                 'прогоном: `_battle_sample` читает существующий манифест '
+                 'КАК ЕСТЬ, не сверяя его с текущим `battle_queryset()` — '
+                 'манифест первого прогона содержит задачи, которые новый '
+                 'фильтр content_status уже исключает. Второй/повторный '
+                 'прогон ОБЯЗАН задавать свой путь, иначе унаследует '
+                 'устаревший список молча.')
+        parser.add_argument(
             '--chunk', type=int, default=CHUNK_SIZE_DEFAULT,
             help='Сколько задач держать в памяти одновременно. Корпус '
                  'целиком не помещается: 41 тысяча задач это 338 МБ одних '
@@ -981,6 +992,8 @@ class Command(BaseCommand):
         metrics_out = Path(options['metrics_out']) if options['metrics_out'] else METRICS_PATH
         fallback_parsed_path = (Path(options['fallback_parsed'])
                                if options['fallback_parsed'] else PARSED_LOG_PATH)
+        battle_manifest_path = (Path(options['battle_manifest'])
+                               if options['battle_manifest'] else BATTLE_MANIFEST_PATH)
 
         if options['ids']:
             requested = [int(x) for x in options['ids'].split(',') if x.strip()]
@@ -996,7 +1009,7 @@ class Command(BaseCommand):
             # НЕЛЬЗЯ: он содержит ровно те 300 задач, и `--limit 50000`
             # молча прогнал бы их же по второму разу вместо корпуса.
             # Своя выборка — свой манифест, чек-поинт не затирается.
-            problem_ids = self._battle_sample(limit)
+            problem_ids = self._battle_sample(limit, battle_manifest_path)
         elif SAMPLE_MANIFEST_PATH.exists():
             # Фаза C: список id сохраняется в файл ДО первого обращения к
             # API — повторный запуск (резюмирование после обрыва, добавка
@@ -1257,7 +1270,7 @@ class Command(BaseCommand):
 
     # --- работа кусками -------------------------------------------------
 
-    def _battle_sample(self, limit):
+    def _battle_sample(self, limit, battle_manifest_path=BATTLE_MANIFEST_PATH):
         """Весь корпус `battle_queryset()`, перемешанный тем же зерном, что
         и контрольная точка, и урезанный до `limit`.
 
@@ -1266,27 +1279,34 @@ class Command(BaseCommand):
         возрастанию любой начальный кусок прогона непредставителен —
         автостоп судил бы о качестве корпуса по одному источнику. Порядок
         детерминирован зерном и сохраняется в свой манифест, поэтому
-        возобновление берёт ту же выборку в том же порядке."""
-        if BATTLE_MANIFEST_PATH.exists():
-            with open(BATTLE_MANIFEST_PATH, encoding='utf-8') as fh:
+        возобновление берёт ту же выборку в том же порядке.
+
+        ⚠️ Манифест читается КАК ЕСТЬ, если существует — НЕ сверяется с
+        текущим `battle_queryset()` заново (найдено владельцем перед вторым
+        прогоном: манифест первого прогона содержит задачи, которые
+        добавленный позже фильтр `content_status` уже исключает). Второй
+        прогон обязан передать СВОЙ `battle_manifest_path` (флаг
+        `--battle-manifest`), а не переиспользовать чужой файл молча."""
+        if battle_manifest_path.exists():
+            with open(battle_manifest_path, encoding='utf-8') as fh:
                 manifest = json.load(fh)
             self.stdout.write('=== БОЕВАЯ ВЫБОРКА: манифест уже существует, '
                               'беру его (%s, seed=%s, задач %d) ==='
-                              % (BATTLE_MANIFEST_PATH, manifest.get('seed'),
+                              % (battle_manifest_path, manifest.get('seed'),
                                  len(manifest['ids'])))
             return manifest['ids']
         ids = list(battle_queryset().values_list('id', flat=True))
         random.Random(CHECKPOINT_SEED).shuffle(ids)
         if limit < len(ids):
             ids = ids[:limit]
-        BATTLE_MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(BATTLE_MANIFEST_PATH, 'w', encoding='utf-8') as fh:
+        battle_manifest_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(battle_manifest_path, 'w', encoding='utf-8') as fh:
             json.dump({'seed': CHECKPOINT_SEED, 'limit': limit, 'ids': ids},
                      fh, ensure_ascii=False)
         self.stdout.write('=== БОЕВАЯ ВЫБОРКА: весь корпус кроме служебных '
                           'фикстур, %d задач, перемешан зерном %d ==='
                           % (len(ids), CHECKPOINT_SEED))
-        self.stdout.write('манифест сохранён: %s' % BATTLE_MANIFEST_PATH)
+        self.stdout.write('манифест сохранён: %s' % battle_manifest_path)
         return ids
 
     def _load_problems(self, chunk_ids):
