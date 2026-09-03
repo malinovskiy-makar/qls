@@ -88,6 +88,18 @@ class _FakeReply:
 
 
 @override_settings(AI_PRICES={run_cmd.GLM_MODEL: run_cmd.GLM_PRICES_PROMO})
+class GlmVariantReasoningEffortTests(TestCase):
+    """Фаза 2 (2026-09-04): уровень рассуждения — 'high', а не 'low', для
+    ОБОИХ вызовов. 'medium' не выбран сознательно: реальный API Z.AI для
+    GLM-5.3-Flash принимает только reasoning_effort ∈ {low, high, max} —
+    решение владельца при разборе этого ограничения (задание сессии,
+    Фаза 2)."""
+
+    def test_оба_вызова_на_high(self):
+        self.assertEqual(run_cmd.GLM_VARIANT['call1_effort'], 'high')
+        self.assertEqual(run_cmd.GLM_VARIANT['call2_effort'], 'high')
+
+
 class GlmEnrichRunSmokeTests(TestCase):
 
     def setUp(self):

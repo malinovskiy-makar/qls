@@ -457,3 +457,91 @@ class GLMImageInputTests(TestCase):
         self.assertEqual(
             self.provider._user_content('текст', [('image/png', b'')]),
             'текст')
+
+
+class _FakeGLMMessage(object):
+    def __init__(self, content):
+        self.content = content
+
+
+class _FakeGLMChoice(object):
+    def __init__(self, content):
+        self.message = _FakeGLMMessage(content)
+
+
+class _FakeGLMUsage(object):
+    def __init__(self, prompt_tokens=1000, completion_tokens=300,
+                cached_tokens=0):
+        self.prompt_tokens = prompt_tokens
+        self.completion_tokens = completion_tokens
+        self.prompt_tokens_details = types.SimpleNamespace(
+            cached_tokens=cached_tokens)
+
+
+class _FakeGLMResponse(object):
+    def __init__(self, text='{"a": "ok"}'):
+        self.choices = [_FakeGLMChoice(text)]
+        self.usage = _FakeGLMUsage()
+
+
+class _FakeGLMCompletions(object):
+    """Запоминает `extra_body` каждого вызова `chat.completions.create`."""
+
+    def __init__(self):
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        return _FakeGLMResponse()
+
+
+class _FakeGLMChat(object):
+    def __init__(self, completions):
+        self.completions = completions
+
+
+class _FakeGLMClient(object):
+    def __init__(self, completions):
+        self.chat = _FakeGLMChat(completions)
+
+
+class GLMReasoningEffortTests(TestCase):
+    """Фаза 2 (2026-09-04): параметр называется `reasoning_effort` и
+    передаётся в `extra_body` вызова `chat.completions.create` — НЕ
+    `reasoning.effort`, как у OpenAI (см. докстринг `GLMProvider`).
+
+    Z.AI принимает для GLM-5.3-Flash только low/high/max (подтверждено
+    документацией Z.AI и текстом самой ошибки API, дословно процитированной
+    в докстринге `complete()`) — 'medium' и всё остальное тихо подменяется
+    на 'low' кодом ниже. Это ЗАКРЕПЛЕНО тестом, а не задумано как надёжная
+    защита: Фаза 2 сессии 2026-09-04 обошла это, поставив 'high'."""
+
+    def _run(self, effort):
+        completions = _FakeGLMCompletions()
+        module = _fake_openai_module(None)
+        module.OpenAI = lambda **kwargs: _FakeGLMClient(completions)
+        with mock.patch.dict(sys.modules, {'openai': module}), \
+                mock.patch.dict('os.environ', {'GLM_API_KEY': 'test-key'}), \
+                override_settings(AI_REASONING_EFFORT=effort):
+            providers.GLMProvider().complete(['ядро'], 'текст', SCHEMA,
+                                             'glm-5.3-flash', 500)
+        return completions.calls[0]['extra_body']
+
+    def test_high_доезжает_как_есть(self):
+        self.assertEqual(self._run('high')['reasoning_effort'], 'high')
+
+    def test_max_доезжает_как_есть(self):
+        self.assertEqual(self._run('max')['reasoning_effort'], 'max')
+
+    def test_low_доезжает_как_есть(self):
+        self.assertEqual(self._run('low')['reasoning_effort'], 'low')
+
+    def test_medium_молча_подменяется_на_low(self):
+        """Задокументированное ограничение, не открытие этого теста:
+        GLM-5.3-Flash не принимает 'medium' вовсе — вызывающий код обязан
+        выбирать ТОЛЬКО low/high/max (см. `GLM_VARIANT` в
+        `glm_enrich_run.py`, Фаза 2)."""
+        self.assertEqual(self._run('medium')['reasoning_effort'], 'low')
+
+    def test_thinking_всегда_enabled(self):
+        self.assertEqual(self._run('high')['thinking'], {'type': 'enabled'})

@@ -96,10 +96,17 @@ REVIEW_HTML_PATH = REPORT_DIR / 'run300_review.html'
 
 SERVICE_FIXTURE_SOURCE = 'Служебное: фикстуры рендерера (не публиковать)'
 
+#: Фаза 2 (2026-09-04): 'high', а не 'medium' — реальный API Z.AI для
+#: GLM-5.3-Flash принимает только `reasoning_effort` ∈ {low, high, max}
+#: (подтверждено документацией Z.AI и ошибкой самого API — см. докстринг
+#: `GLMProvider.complete`), «средний» уровень физически не существует.
+#: 'low' первого прогона был минимумом доступного, не выбором по вкусу;
+#: 'high' — решение владельца при разборе этого ограничения (следующий
+#: шаг вверх, а не 'max' — дороже без замера пользы).
 GLM_VARIANT = {
-    'label': 'glm-5.3-flash (низкий уровень рассуждения — минимум доступного, см. GLMProvider)',
-    'call1_model': GLM_MODEL, 'call1_effort': 'low',
-    'call2_model': GLM_MODEL, 'call2_effort': 'low',
+    'label': 'glm-5.3-flash (высокий уровень рассуждения — medium недоступен API, см. GLMProvider)',
+    'call1_model': GLM_MODEL, 'call1_effort': 'high',
+    'call2_model': GLM_MODEL, 'call2_effort': 'high',
     'concepts': True,
 }
 
