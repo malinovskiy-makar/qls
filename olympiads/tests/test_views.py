@@ -119,15 +119,43 @@ class CompareTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class VariantSolveStubTests(TestCase):
+class VariantButtonsTests(TestCase):
+    """Кнопки блока комплектов. Заглушку «Скоро» сменила тренировка.
 
-    def test_stub_page_answers_and_does_not_touch_exam_mode(self):
-        olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
-                                 is_published=True)
-        variant = OlympiadVariant.objects.create(
-            olympiad=olympiad, year=2026, grade=11, duration_minutes=240)
+    ⚠️ Прежний тест этого класса сторожил заглушку и был удалён вместе с
+    ней — не «поправлен, чтобы позеленел»: экран, который он проверял,
+    больше не существует. Сторожим то, что пришло ему на смену.
+    """
+
+    def setUp(self):
+        self.olympiad = make_olympiad('vseros', kind=Olympiad.Kind.VSOSH,
+                                      is_published=True)
+
+    def test_variant_without_linked_problems_offers_no_training(self):
+        """Комплект без задач в банке не зовёт решать — и говорит почему."""
+        OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11,
+            duration_minutes=240)
         response = self.client.get(
-            reverse('olympiads:variant_solve', args=['vseros', variant.pk])
-            + '?timer=1')
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('Скоро', visible_text(response))
+            reverse('olympiads:detail', args=['vseros']))
+        text = visible_text(response)
+        self.assertIn('Задания ещё не привязаны', text)
+        self.assertNotIn('Решать на время', text)
+
+    def test_variant_without_duration_cannot_be_timed(self):
+        """Длительность тура неизвестна — «на время» неактивно."""
+        variant = OlympiadVariant.objects.create(
+            olympiad=self.olympiad, year=2026, grade=11,
+            duration_minutes=None, ref_event_id='ev')
+        Problem_ = __import__('problems.models', fromlist=['x'])
+        problem = Problem_.Problem.objects.create(
+            title='з', statement='у', answer='1')
+        Problem_.OlympiadRef.objects.create(
+            problem=problem, event_id='ev', source_site='solvehub',
+            olympiad_slug='vseros', number='1', record_id='r1')
+        response = self.client.get(
+            reverse('olympiads:detail', args=['vseros']))
+        text = visible_text(response)
+        self.assertIn('Время тура неизвестно', text)
+        self.assertIn('Решать без таймера', text)
+        self.assertEqual(variant.duration_minutes, None)
