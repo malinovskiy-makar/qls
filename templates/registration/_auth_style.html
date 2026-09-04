@@ -192,7 +192,18 @@ a:focus-visible, button:focus-visible {
   background: var(--surface-2);
   transition: border-color .12s, background .12s;
 }
-.role-tiles input { position: absolute; opacity: 0; pointer-events: none; }
+/* ⚠️ ПЕРЕКЛЮЧАТЕЛЬ ПРЯЧЕТСЯ РАЗМЕРОМ, А НЕ ТОЛЬКО ПРОЗРАЧНОСТЬЮ.
+   `position: absolute` без `top/left` внутри НЕпозиционированного родителя
+   отсчитывается от далёкого предка, и переключатель занимал всю ширину
+   страницы: обход Фазы 8 показал документ 1740 px при окне 1440. Родителю
+   нужен `position: relative`, а самому полю — нулевой размер.
+   `display: none` не годится: с ним поле выпадает из порядка обхода
+   клавиатурой, а выбирать уровень с клавиатуры надо. */
+.role-tiles label { position: relative; }
+.role-tiles input {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px; opacity: 0; margin: 0;
+}
 .role-tiles label:hover { border-color: var(--accent-ring); }
 .role-tiles input:checked + span { color: var(--accent-ink); font-weight: 600; }
 .role-tiles label:has(input:checked) {

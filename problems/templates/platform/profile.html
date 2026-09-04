@@ -111,7 +111,18 @@
   font-weight: 400;
   margin-bottom: 0;
 }
-.pf-level input { position: absolute; opacity: 0; pointer-events: none; }
+/* ⚠️ ПЕРЕКЛЮЧАТЕЛЬ ПРЯЧЕТСЯ РАЗМЕРОМ, А НЕ ТОЛЬКО ПРОЗРАЧНОСТЬЮ.
+   `position: absolute` без `top/left` внутри НЕпозиционированного родителя
+   отсчитывается от далёкого предка, и переключатель занимал всю ширину
+   страницы: обход Фазы 8 показал документ 1740 px при окне 1440. Родителю
+   нужен `position: relative`, а самому полю — нулевой размер.
+   `display: none` не годится: с ним поле выпадает из порядка обхода
+   клавиатурой, а выбирать уровень с клавиатуры надо. */
+.pf-level { position: relative; }
+.pf-level input {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px; opacity: 0; margin: 0;
+}
 .pf-level b { display: block; font-size: 14px; font-weight: 600; }
 .pf-level span { display: block; font-size: 13px; color: var(--text2);
                  margin-top: 2px; line-height: 1.4; }
