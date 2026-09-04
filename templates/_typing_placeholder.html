@@ -1,0 +1,164 @@
+{% comment %}
+БЕГУЩАЯ ПОДСКАЗКА В ПОЛЕ ПОИСКА — ОДНА РЕАЛИЗАЦИЯ НА ГЛАВНУЮ И КАТАЛОГ.
+
+Фразы печатаются по кругу: печатаются, держатся, стираются. Смысл — показать
+живому человеку, ЧТО сюда вообще можно спросить: «поиск по условиям задач»
+об этом не говорил ничего. Решение владельца 04.09.2026: каталог получает
+тот же механизм, что главная, со своими одиннадцатью фразами.
+
+Ждёт:
+    el_id     — id поля (input или textarea);
+    phrases   — список словарей {text, muse?} из catalog/placeholder_phrases.py;
+    stop_text — что остаётся в поле, когда человек остановил печать
+                (необязательно; по умолчанию поле остаётся пустым).
+
+⚠️ ФРАЗЫ ЕДУТ JSON-ОМ (фильтр `script_json`), А НЕ ПОДСТАВЛЯЮТСЯ В КОД. Так их
+нельзя написать дважды (главная и каталог берут одну константу), и текст
+никогда не становится частью скрипта.
+
+⚠️ ЭТО ПОДСКАЗКА, А НЕ ЗНАЧЕНИЕ ПОЛЯ. Пишем только в `placeholder`, и пишем
+присваиванием строки — то есть текстом, разметка сюда не попадает в
+принципе. `value` скрипт не трогает вовсе.
+
+⚠️ ПЕРВОЕ ЖЕ ДЕЙСТВИЕ ЧЕЛОВЕКА ГАСИТ АНИМАЦИЮ НАВСЕГДА. Слушаем нажатие
+мыши, клавишу, вставку и ввод. Событие `focus` НЕ слушаем намеренно: у
+поля главной стоит `autofocus`, и фокус приходит сам при загрузке —
+анимация умирала бы, не начавшись, а «человек кликнул» — это `pointerdown`.
+
+⚠️ НЕВИДИМАЯ ВКЛАДКА НИЧЕГО НЕ ПЕЧАТАЕТ. По `visibilitychange` таймер
+снимается и заводится обратно: иначе она крутила бы процессор в фоне,
+где её всё равно никто не видит.
+
+При «уменьшить движение» скрипт не делает вообще ничего: в разметке хозяина
+уже лежит первая фраза, она и остаётся статичной подсказкой.
+{% endcomment %}
+{% load catalog_filters %}
+<script type="application/json" id="{{ el_id }}-phrases">{{ phrases|script_json }}</script>
+<script>
+(function () {
+  'use strict';
+
+  var el = document.getElementById('{{ el_id|escapejs }}');
+  var data = document.getElementById('{{ el_id|escapejs }}-phrases');
+  if (!el || !data) return;
+  if (window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+
+  var PHRASES = JSON.parse(data.textContent);
+  if (!PHRASES.length) return;
+  var STOP_TEXT = '{{ stop_text|default:""|escapejs }}';
+
+  /* Соседи по ЙЦУКЕН: промах пальцем попадает на соседнюю клавишу, а не на
+     случайную букву — случайная читалась бы как сбой, а не как опечатка. */
+  var SLIPS = {
+    'а': 'в', 'в': 'а', 'о': 'л', 'л': 'о', 'и': 'т', 'т': 'и',
+    'е': 'к', 'к': 'е', 'с': 'ч', 'ч': 'с', 'н': 'г', 'г': 'н',
+    'р': 'п', 'п': 'р', 'д': 'л', 'ы': 'в', 'я': 'ч', 'у': 'ц',
+    'м': 'и', 'з': 'х'
+  };
+
+  var TYPE = 58, JIT = 34;           // печать: 58 ± 17 мс на символ
+  var ERASE = 22;                    // стирание заметно быстрее печати
+  var ERASE_MUSE = 14;               // после многоточия — стереть рывком
+  var HOLD = 1700, HOLD_MUSE = 650;  // пауза на законченной фразе — дольше
+  var GAP = 380, DOT = 240;
+  /* Опечатка одна на фразу и далеко не в каждой: чаще она читалась бы как
+     поломка, а не как живая рука. */
+  var SLIP_P = 0.11;
+
+  var timer = null, stopped = false, paused = false, resume = null, phrase = 0;
+
+  function schedule(fn, ms) {
+    if (stopped) return;
+    resume = fn;
+    if (paused) return;             // невидимая вкладка: ждём возвращения
+    timer = setTimeout(function () { timer = null; fn(); }, ms);
+  }
+
+  function stop() {
+    if (stopped) return;
+    stopped = true;
+    if (timer) { clearTimeout(timer); timer = null; }
+    resume = null;
+    el.placeholder = STOP_TEXT;     // статичная подсказка или пустое поле
+    ['pointerdown', 'keydown', 'paste', 'input'].forEach(function (ev) {
+      el.removeEventListener(ev, stop);
+    });
+    document.removeEventListener('visibilitychange', onVisibility);
+  }
+
+  function onVisibility() {
+    if (document.hidden) {
+      paused = true;
+      if (timer) { clearTimeout(timer); timer = null; }
+    } else if (paused) {
+      paused = false;
+      var next = resume;
+      if (next) schedule(next, GAP);
+    }
+  }
+
+  function typePhrase() {
+    var item = PHRASES[phrase];
+    var full = item.text;
+    var i = 0, slipUsed = false;
+
+    function step() {
+      if (i >= full.length) return afterTyped(item, full);
+      var ch = full.charAt(i);
+      var wrong = SLIPS[ch.toLowerCase()];
+      if (!slipUsed && wrong && i > 2 && Math.random() < SLIP_P) {
+        slipUsed = true;
+        el.placeholder = full.slice(0, i) + wrong;
+        schedule(function () {                 // заметил
+          el.placeholder = full.slice(0, i);   // забой на символ назад
+          schedule(function () {
+            el.placeholder = full.slice(0, ++i);
+            schedule(step, TYPE);
+          }, 100);
+        }, 200);
+        return;
+      }
+      el.placeholder = full.slice(0, ++i);
+      schedule(step, TYPE - JIT / 2 + Math.random() * JIT);
+    }
+    step();
+  }
+
+  function afterTyped(item, full) {
+    if (!item.muse) return schedule(function () { erase(full, ERASE); }, HOLD);
+    /* Три точки по одной: многоточие целиком выскакивало бы разом и читалось
+       как часть запроса, а не как заминка. */
+    var dots = 0;
+    (function dot() {
+      if (dots++ >= 3) {
+        return schedule(function () { erase(full + '...', ERASE_MUSE); },
+                        HOLD_MUSE);
+      }
+      el.placeholder = full + '...'.slice(0, dots);
+      schedule(dot, DOT);
+    })();
+  }
+
+  function erase(full, speed) {
+    var i = full.length;
+    (function back() {
+      if (i <= 0) {
+        phrase = (phrase + 1) % PHRASES.length;
+        return schedule(typePhrase, GAP);
+      }
+      el.placeholder = full.slice(0, --i);
+      schedule(back, speed + Math.random() * 10);
+    })();
+  }
+
+  ['pointerdown', 'keydown', 'paste', 'input'].forEach(function (ev) {
+    el.addEventListener(ev, stop);
+  });
+  document.addEventListener('visibilitychange', onVisibility);
+
+  /* Первая фраза уже стоит в разметке хозяина: даём её прочитать, потом
+     стираем и уходим в круг. Иначе экран встречал бы пустым полем. */
+  schedule(function () { erase(PHRASES[0].text, ERASE); }, HOLD);
+})();
+</script>

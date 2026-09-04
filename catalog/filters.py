@@ -478,6 +478,85 @@ def _has_data(base):
     }
 
 
+# ── Чипы полосы выбранного ───────────────────────────────────────────────
+
+def difficulty_label(levels):
+    """«★ 4–5»: соседние ступени схлопнуты в диапазон, разрывы — запятой.
+
+    Одна ступень — «★ 4». Функция готова к списку ступеней (множественный
+    выбор сложности, этап 2), хотя сегодня активна одна.
+    """
+    levels = sorted({int(x) for x in levels})
+    ranges = []
+    start = prev = None
+    for level in levels:
+        if start is None:
+            start = prev = level
+        elif level == prev + 1:
+            prev = level
+        else:
+            ranges.append((start, prev))
+            start = prev = level
+    if start is not None:
+        ranges.append((start, prev))
+    return '★ ' + ', '.join(str(a) if a == b else '%d–%d' % (a, b)
+                             for a, b in ranges)
+
+
+def _chips(carry, active, topics, tags, sources):
+    """Полоса под полем: ТОЛЬКО выбранное, по чипу на значение.
+
+    Порядок — как в мокапе владельца 04.09.2026: темы, теги, сложность,
+    вид, характер, решение, особенности, источник. У каждого чипа адрес,
+    который снимает ровно его: крестик работает и без JavaScript.
+
+    ⚠️ ЧИП ТЕМЫ НЕСЁТ РАЗДЕЛ КАРТЫ (`section`) — им красится чип, чтобы
+    полоса, 3D-карта и страница задачи говорили одним цветом.
+    """
+    from .topic_blocks import section_of
+
+    chips = []
+    for group in topics:
+        for option in group['options']:
+            if option['active']:
+                chips.append({'kind': 'topic', 'value': option['value'],
+                              'label': option['label'],
+                              'section': section_of(option['label']),
+                              'remove_url': query(carry, active, topic='')})
+    for option in tags['chosen']:
+        rest = [t for t in active['tags'] if t != option['value']]
+        chips.append({'kind': 'tag', 'value': option['value'],
+                      'label': option['label'],
+                      'remove_url': query(carry, active, tags=rest)})
+    if active['difficulty']:
+        chips.append({'kind': 'difficulty', 'value': active['difficulty'],
+                      'label': difficulty_label([active['difficulty']]),
+                      'remove_url': query(carry, active, difficulty='')})
+    if active['kind']:
+        label = 'Развёрнутая задача' if active['kind'] == 'open' else 'Тест'
+        if active['test_type']:
+            label = 'Тест · ' + dict(TEST_TYPES)[active['test_type']]
+        chips.append({'kind': 'kind', 'value': active['kind'], 'label': label,
+                      'remove_url': query(carry, active, kind='', test_type='')})
+    if active['character'] in dict(CHARACTERS):
+        chips.append({'kind': 'character', 'value': active['character'],
+                      'label': dict(CHARACTERS)[active['character']],
+                      'remove_url': query(carry, active, character='')})
+    if active['has_solution']:
+        chips.append({'kind': 'solution', 'value': '1', 'label': 'С решением ✓',
+                      'remove_url': query(carry, active, has_solution=False)})
+    if active['feature'] in dict(FEATURES):
+        chips.append({'kind': 'feature', 'value': active['feature'],
+                      'label': dict(FEATURES)[active['feature']],
+                      'remove_url': query(carry, active, feature='')})
+    for option in sources:
+        if option['active']:
+            chips.append({'kind': 'source', 'value': option['value'],
+                          'label': option['label'],
+                          'remove_url': query(carry, active, source='')})
+    return chips
+
+
 # ── Сборка контекста для шаблона ─────────────────────────────────────────
 
 def build(base, active, *, mode='strip', action='', hidden=(), carry=None,
@@ -598,6 +677,8 @@ def build(base, active, *, mode='strip', action='', hidden=(), carry=None,
         'modal_left': pick(MODAL_LEFT),
         'modal_right': pick(MODAL_RIGHT),
         'chosen': [g for g in shown if g['value']],
+        # Полоса под полем каталога: только выбранное (этап 1 редизайна).
+        'chips': _chips(carry, active, topics, tags, sources),
         'has_any': not is_empty(active),
         'carry': carry,
         # ⚠️ АКТИВНЫЕ ФИЛЬТРЫ СКРЫТЫМИ ПОЛЯМИ — ДЛЯ ЛЮБОЙ GET-ФОРМЫ НА

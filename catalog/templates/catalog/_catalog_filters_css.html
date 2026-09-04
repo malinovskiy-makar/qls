@@ -1,0 +1,62 @@
+{% comment %}
+СТИЛИ ПОЛОСЫ ВЫБРАННОГО И ОКНА «ВСЕ ФИЛЬТРЫ» КАТАЛОГА — перенос из мокапа
+владельца `catalog_search_filters_mockup.html` (04.09.2026), цвета только
+через токены `templates/_tokens.html`.
+
+Это стили КАТАЛОГА. Конструктор домашки остаётся на прежней разметке
+фильтров (`_filters.html` + `_filters_css.html`) до отдельного решения:
+https://app.notion.com/p/3d1b11c92bc18148888ed95df85ab4d4
+
+Этап 1 — полоса: кнопка «Все фильтры», чипы выбранного, «Сбросить».
+Окно с живым обновлением (`.ct-all*`, `.fl-*`) добавляет этап 3.
+
+Движение: `prefers-reduced-motion` глушится общим правилом на `*` в
+`catalog/base.html`, отдельные исключения здесь не нужны.
+{% endcomment %}
+/* ── Полоса под полем: ОДНА кнопка «Все фильтры» + только выбранное ── */
+.ct-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+            margin-top: 12px; min-height: 36px; }
+.btn-all { display: inline-flex; align-items: center; gap: 8px;
+           background: var(--surface); color: var(--text);
+           border: 1px solid transparent; border-radius: var(--r-pill);
+           padding: 8px 14px 8px 12px; font: 600 14px/1 var(--font-ui);
+           cursor: pointer; }
+.btn-all:hover { border-color: var(--brand-amber); }
+.btn-all svg { width: 16px; height: 16px; }
+/* Бейдж с числом выбранных значений: при нуле его нет в разметке вовсе. */
+.btn-all .n { background: var(--btn-bg); color: var(--on-btn);
+              border-radius: var(--r-pill); min-width: 20px; height: 20px;
+              padding: 0 6px; font-size: 12px; display: inline-flex;
+              align-items: center; justify-content: center; }
+.chip { display: inline-flex; align-items: center; gap: 6px;
+        background: var(--surface); color: var(--text);
+        border-radius: var(--r-pill); padding: 6px 8px 6px 12px;
+        font-size: 13.5px; line-height: 1.2; border: 1px solid transparent;
+        animation: chipIn .14s ease-out; max-width: 100%; }
+.chip b { font-weight: 600; }
+@keyframes chipIn { from { opacity: 0; transform: scale(.92); } }
+.chip-x { border: 0; background: transparent; color: inherit; opacity: .6;
+          width: 20px; height: 20px; border-radius: var(--r-pill);
+          cursor: pointer; font-size: 12px; display: inline-flex;
+          align-items: center; justify-content: center; padding: 0;
+          text-decoration: none; }
+.chip-x:hover { opacity: 1; background: var(--chip-bg); }
+/* Чип темы окрашен цветом своего раздела карты — общий язык с 3D-картой. */
+.chip--g { background: color-mix(in srgb, var(--gc) 16%, var(--surface));
+           border-color: color-mix(in srgb, var(--gc) 45%, transparent); }
+.chip--g::before { content: ''; width: 8px; height: 8px; border-radius: 50%;
+                   background: var(--gc); flex: none; }
+.chip--tag::before { content: '#'; color: var(--text3); font-weight: 600; }
+.chip--sol { color: var(--green); }
+.chip--stars { color: var(--amber); }
+/* «N тем ▾» — схлопнутый чип, раскрывается скриптом (этап 3). */
+.chip--more { cursor: pointer; border-color: var(--border); padding-right: 12px; }
+.chip--more:hover { border-color: var(--brand-amber); }
+.chip--more .caret { width: 0; height: 0; border: 4px solid transparent;
+                     border-top-color: currentColor; margin-top: 4px; }
+.chip--more.is-open .caret { transform: rotate(180deg); margin-top: -4px; }
+.strip-reset { margin-left: auto; font: 500 13px/1 var(--font-ui);
+               color: var(--text); background: none; border: 0;
+               cursor: pointer; text-decoration: underline;
+               text-underline-offset: 3px; opacity: .85; padding: 6px 4px; }
+.strip-reset:hover { opacity: 1; }

@@ -14,6 +14,13 @@ from django.views.decorators.http import require_POST
 from problems.jsonsafe import dumps_for_script
 
 from . import filters
+from .placeholder_phrases import (
+    CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
+)
+from .preview import (
+    PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
+)
+from .topic_blocks import section_of
 from problems.models import (
     Collection, Problem, ProblemFigure, Source, Topic,
 )
@@ -125,6 +132,8 @@ def home(request):
         #   'topics_count':    Topic.objects.filter(name__in=CANONICAL).count(),
         'olympiads_count': LANDING_OLYMPIADS,
         'topics_count':    LANDING_TOPICS,
+        # Бегущая подсказка поля — общий партиал, фразы из одной константы.
+        'home_phrases':    HOME_PHRASES,
     }
     return render(request, 'catalog/home.html', context)
 
@@ -147,18 +156,24 @@ def random_problem(request):
 def _card(problem, score=None):
     """Одна карточка выдачи.
 
-    ⚠️ НОМЕР ЗАДАЧИ НЕ ПЕРВЫЙ СЛЕВА (решение владельца). Он нужен, чтобы на
-    задачу сослаться, но глаз должен цепляться за тему и условие: слева
-    тема, теги, сложность и флаг решения, номер — мелким и приглушённым
-    справа.
+    ⚠️ НОМЕРА ЗАДАЧИ В КАРТОЧКЕ НЕТ (решение владельца 04.09.2026): он
+    остаётся только в адресе. Глаз цепляется за тему и условие: цветной
+    чип темы, звёзды при заданной сложности, формат теста, флаг решения.
+
+    ⚠️ ПРАВИЛО НУЛЯ: каждое поле карточки берётся из данных задачи, и чего
+    нет в данных — того нет и в разметке. Заголовок показывается, только
+    если это название, а не обрезок условия (`looks_like_statement_cut`).
     """
-    raw = _strip_latex(problem.statement)
     refs = list(problem.source_references.all())
     d = problem.difficulty or 0
+    title = (problem.title or '').strip()
+    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
     return {
         'problem':          problem,
-        'preview':          raw[:180] + ('…' if len(raw) > 180 else ''),
-        'topics':           [t for t in problem.topics.all()
+        'preview':          cut_words(preview_text(problem.statement), PREVIEW_CHARS),
+        # Тема несёт раздел карты — им красится чип (`--map-g-*`).
+        'topics':           [{'name': t.name, 'section': section_of(t.name)}
+                             for t in problem.topics.all()
                              if t.name in CANONICAL][:2],
         'difficulty':       d,
         'difficulty_stars': range(d),
@@ -167,13 +182,22 @@ def _card(problem, score=None):
                             and not problem.solution_needs_review,
         'source':           refs[0].source.name if refs else '',
         'grade':            refs[0].grade if refs else '',
-        'is_test':          (problem.problem_type or '')
-                            .lower().startswith('тест'),
-        # Близость показывается ТОЛЬКО в таблице и только при смысловом
-        # поиске: в строках и галерее ей места нет, а числа «кухни» наружу
-        # не идут — колонка называется словом, не долей.
+        'is_test':          is_test,
+        # «тест · один верный»: формат из `problem_type`, если он известен
+        # списку `TEST_TYPES`; иначе просто «тест».
+        'kind_label':       _kind_label(problem.problem_type) if is_test else '',
+        'show_title':       bool(title) and not looks_like_statement_cut(
+                                title, problem.statement),
+        # Число близости наружу НЕ ИДЁТ (просьба владельца): в карточке
+        # оно лежит только для тестов и отладки.
         'score':            score,
     }
+
+
+def _kind_label(problem_type):
+    """Подпись формата теста в карточке."""
+    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    return 'тест · ' + label if label else 'тест'
 
 
 def _teacher_assignments(request):
@@ -289,8 +313,10 @@ def problem_list(request):
     active = filters.parse(request.GET)
     query = active['q']
 
+    # ⚠️ ТАБЛИЧНОГО ВИДА БОЛЬШЕ НЕТ (решение владельца 04.09.2026): старые
+    # адреса с `?view=table` открываются строками, а не ошибкой.
     view_mode = (request.GET.get('view') or 'rows').strip()
-    if view_mode not in ('rows', 'table', 'gallery'):
+    if view_mode not in ('rows', 'gallery'):
         view_mode = 'rows'
 
     # ⚠️ ЧИСТО ЧИСЛОВОЙ ЗАПРОС — ЭТО НОМЕР ЗАДАЧИ, А НЕ ОПИСАНИЕ. У числа
@@ -389,8 +415,14 @@ def problem_list(request):
         'step':           PAGE_STEP,
         'relief':         relief,
         'view_urls':      {mode: filters.query(dict(carry, view=mode), active)
-                           for mode in ('rows', 'table', 'gallery')},
+                           for mode in ('rows', 'gallery')},
         'teacher_assignments_json': _teacher_assignments(request),
+        # Бегущая подсказка поля: фразы и текст после остановки — из
+        # одной константы, партиал общий с главной.
+        'catalog_phrases':   CATALOG_PHRASES,
+        'catalog_stop_text': CATALOG_STOP_TEXT,
+        # Подпись блока карты — из данных карты, не литералом.
+        'map_stats':         _map_stats(),
     }
     return render(request, 'catalog/problem_list.html', context)
 
@@ -765,6 +797,25 @@ def _topic_map_payload():
         _TOPIC_MAP_CACHE['etag'] = '"%s"' % hashlib.sha256(
             text.encode('utf-8')).hexdigest()[:32]
     return _TOPIC_MAP_CACHE['text'], _TOPIC_MAP_CACHE['etag']
+
+
+def _map_stats():
+    """Сколько тем и тегов на карте — для подписи блока карты в каталоге.
+
+    ⚠️ СЧИТАЕТСЯ ИЗ ДАННЫХ КАРТЫ, А НЕ ПИШЕТСЯ ЛИТЕРАЛОМ (правило нуля,
+    решение владельца 04.09.2026): подпись «29 тем, 343 тега» жила в
+    шаблоне руками и разошлась бы с картой при первой правке справочника.
+    Читается через тот же кэш, что отдаёт JSON карты; пересчёт — только
+    когда сменился ETag файла.
+    """
+    text, etag = _topic_map_payload()
+    if _TOPIC_MAP_CACHE.get('stats_etag') != etag:
+        nodes = json.loads(text).get('nodes', [])
+        themes = sum(1 for n in nodes if n.get('k') == 'theme')
+        _TOPIC_MAP_CACHE['stats'] = {'themes': themes,
+                                     'tags': len(nodes) - themes}
+        _TOPIC_MAP_CACHE['stats_etag'] = etag
+    return _TOPIC_MAP_CACHE['stats']
 
 
 def topic_map(request):

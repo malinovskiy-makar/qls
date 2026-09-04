@@ -220,13 +220,15 @@
 
   <form class="home-search" action="/catalog/" method="get">
     {% comment %}
-      ⚠️ Плейсхолдер печатается сам (см. блок extra_js). В разметке лежит
-      ПЕРВЫЙ запрос целиком: он же остаётся статичным при «уменьшить
-      движение» и он же виден, если скрипт не отработал.
+      ⚠️ Плейсхолдер печатается сам — общим партиалом
+      `_typing_placeholder.html` (блок extra_js), фразы — в
+      `catalog/placeholder_phrases.py`. В разметке лежит ПЕРВЫЙ запрос
+      целиком: он же остаётся статичным при «уменьшить движение» и он же
+      виден, если скрипт не отработал.
       ⚠️ Многострочный {# … #} здесь НЕ РАБОТАЕТ: он однострочный, и всё
       его содержимое вываливается на экран текстом. Проверено снимком.
     {% endcomment %}
-    <input type="text" name="q" id="home-q" placeholder="Спрос и предложение" autofocus
+    <input type="text" name="q" id="home-q" placeholder="{{ home_phrases.0.text }}" autofocus
            autocomplete="off">
     <button type="submit">Найти</button>
   </form>
@@ -297,161 +299,9 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-/* ── ПОДСКАЗКА В ПОЛЕ ПОИСКА ПЕЧАТАЕТСЯ САМА ────────────────────────────
-   Шесть запросов по кругу: печатаются, держатся, стираются. Смысл — показать
-   живому человеку, ЧТО сюда вообще можно спросить: «поиск по условиям задач»
-   об этом не говорил ничего.
-
-   ⚠️ ЭТО ПОДСКАЗКА, А НЕ ЗНАЧЕНИЕ ПОЛЯ. Пишем только в `placeholder`, и
-   пишем присваиванием строки — то есть текстом, разметка сюда не попадает
-   в принципе. Ни один набранный человеком символ с анимацией не смешается:
-   `value` скрипт не трогает вовсе.
-
-   ⚠️ ПЕРВОЕ ЖЕ ДЕЙСТВИЕ ЧЕЛОВЕКА ГАСИТ АНИМАЦИЮ НАВСЕГДА. Слушаем нажатие
-   мыши, клавишу, вставку и ввод. Событие `focus` НЕ слушаем намеренно: у
-   поля стоит `autofocus`, и фокус приходит сам при загрузке — анимация
-   умирала бы, не начавшись, а «человек кликнул» — это `pointerdown`.
-
-   ⚠️ НЕВИДИМАЯ ВКЛАДКА НИЧЕГО НЕ ПЕЧАТАЕТ. По `visibilitychange` таймер
-   снимается и заводится обратно: иначе она крутила бы процессор в фоне,
-   где её всё равно никто не видит.
-
-   При «уменьшить движение» скрипт не делает вообще ничего: в разметке уже
-   лежит первый запрос, он и остаётся статичной подсказкой. */
-(function () {
-  'use strict';
-
-  var el = document.getElementById('home-q');
-  if (!el) return;
-
-  if (window.matchMedia &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-
-  /* Пятый запрос обрывается на «Э» намеренно: человек задумался, как пишется
-     «Эджворта», поставил многоточие и стёр. Это единственная шутка на экране,
-     и она же показывает, что подсказка живая, а не зациклённая строка. */
-  var PHRASES = [
-    { text: 'Спрос и предложение' },
-    { text: 'Сюжет монополист на внешнем рынке' },
-    { text: 'Сложение КПВ практика' },
-    { text: 'Задачи на адвалорный налог' },
-    { text: 'Ящик Э', muse: true },
-    { text: 'Тесты на финансы' }
-  ];
-
-  /* Соседи по ЙЦУКЕН: промах пальцем попадает на соседнюю клавишу, а не на
-     случайную букву — случайная читалась бы как сбой, а не как опечатка. */
-  var SLIPS = {
-    'а': 'в', 'в': 'а', 'о': 'л', 'л': 'о', 'и': 'т', 'т': 'и',
-    'е': 'к', 'к': 'е', 'с': 'ч', 'ч': 'с', 'н': 'г', 'г': 'н',
-    'р': 'п', 'п': 'р', 'д': 'л', 'ы': 'в', 'я': 'ч', 'у': 'ц'
-  };
-
-  var TYPE = 62, TYPE_JITTER = 34;   // печать: 62 ± 17 мс на символ
-  var ERASE = 26;                    // стирание заметно быстрее печати
-  var ERASE_MUSE = 16;               // после многоточия — стереть рывком
-  var HOLD = 1600, HOLD_MUSE = 700;  // пауза на законченной фразе — дольше
-  var GAP = 340, DOT = 260;
-
-  var timer = null, stopped = false, paused = false, resume = null;
-
-  function schedule(fn, ms) {
-    if (stopped) return;
-    resume = fn;
-    if (paused) return;             // невидимая вкладка: ждём возвращения
-    timer = setTimeout(function () { timer = null; fn(); }, ms);
-  }
-
-  function stop() {
-    if (stopped) return;
-    stopped = true;
-    if (timer) { clearTimeout(timer); timer = null; }
-    resume = null;
-    el.placeholder = '';            // подсказка уходит, поле остаётся пустым
-    ['pointerdown', 'keydown', 'paste', 'input'].forEach(function (ev) {
-      el.removeEventListener(ev, stop);
-    });
-    document.removeEventListener('visibilitychange', onVisibility);
-  }
-
-  function onVisibility() {
-    if (document.hidden) {
-      paused = true;
-      if (timer) { clearTimeout(timer); timer = null; }
-    } else if (paused) {
-      paused = false;
-      var next = resume;
-      if (next) schedule(next, GAP);
-    }
-  }
-
-  var phrase = 0;
-
-  function typePhrase() {
-    var item = PHRASES[phrase];
-    var full = item.text;
-    var i = 0, slipUsed = false;
-
-    function step() {
-      if (i >= full.length) return afterTyped(item, full);
-      var ch = full.charAt(i);
-      var wrong = SLIPS[ch.toLowerCase()];
-      /* Опечатка одна на фразу и далеко не в каждой: чаще она читалась бы
-         как поломка, а не как живая рука. */
-      if (!slipUsed && wrong && i > 2 && Math.random() < 0.06) {
-        slipUsed = true;
-        el.placeholder = full.slice(0, i) + wrong;
-        schedule(function () {                 // заметил
-          el.placeholder = full.slice(0, i);   // забой на символ назад
-          schedule(function () {
-            el.placeholder = full.slice(0, ++i);
-            schedule(step, TYPE);
-          }, 110);
-        }, 210);
-        return;
-      }
-      el.placeholder = full.slice(0, ++i);
-      schedule(step, TYPE - TYPE_JITTER / 2 + Math.random() * TYPE_JITTER);
-    }
-    step();
-  }
-
-  function afterTyped(item, full) {
-    if (!item.muse) return schedule(function () { erase(full, ERASE); }, HOLD);
-    /* Три точки по одной: многоточие целиком выскакивало бы разом и читалось
-       как часть запроса, а не как заминка. */
-    var dots = 0, base = full;
-    (function dot() {
-      if (dots++ >= 3) {
-        return schedule(function () { erase(base + '...', ERASE_MUSE); },
-                        HOLD_MUSE);
-      }
-      el.placeholder = base + '...'.slice(0, dots);
-      schedule(dot, DOT);
-    })();
-  }
-
-  function erase(full, speed) {
-    var i = full.length;
-    (function back() {
-      if (i <= 0) {
-        phrase = (phrase + 1) % PHRASES.length;
-        return schedule(typePhrase, GAP);
-      }
-      el.placeholder = full.slice(0, --i);
-      schedule(back, speed + Math.random() * 10);
-    })();
-  }
-
-  ['pointerdown', 'keydown', 'paste', 'input'].forEach(function (ev) {
-    el.addEventListener(ev, stop);
-  });
-  document.addEventListener('visibilitychange', onVisibility);
-
-  /* Первый запрос уже стоит в разметке: даём его прочитать, потом стираем
-     и уходим в круг. Иначе экран встречал бы пустым полем. */
-  schedule(function () { erase(PHRASES[0].text, ERASE); }, HOLD);
-})();
-</script>
+{% comment %}
+Бегущая подсказка — ОДНА реализация на главную и каталог
+(`templates/_typing_placeholder.html`); здесь только подключение.
+{% endcomment %}
+{% include "_typing_placeholder.html" with el_id="home-q" phrases=home_phrases %}
 {% endblock %}

@@ -89,24 +89,39 @@ document.addEventListener('click', function (e) {
   });
 })();
 
-/* ── Честное «ищу» ────────────────────────────────────────────────────
+/* ── Поле запроса: текст, крестик, стрелка, честное «ищу» ────────────
+   Крестик и стрелка живут ВНУТРИ поля (решение владельца 04.09.2026):
+   крестик виден только при тексте, стрелка при тексте становится
+   янтарной — за это отвечает класс has-text на форме. Enter отправляет,
+   Shift+Enter переносит строку: поле многострочное, но человек ждёт от
+   поиска поведения поиска.
+
    Первый смысловой запрос идёт около семи секунд: модель грузится
-   лениво. Пока поиск жил отдельной страницей, это была плата за вход
-   именно на неё; теперь каталог — главный вход. Молчащий экран в эти
-   секунды выглядит зависшим, поэтому кнопка честно говорит, что ищет. */
+   лениво. Молчащий экран в эти секунды выглядит зависшим, поэтому на
+   время запроса подсказка о способе сменяется на «Ищу…» (класс is-busy). */
 (function () {
   var form = document.getElementById('ct-ask-form');
-  var busy = document.getElementById('ct-busy');
   var field = document.getElementById('ct-q');
-  if (!form || !busy || !field) return;
-  form.addEventListener('submit', function () {
-    if (field.value.trim()) busy.hidden = false;
-  });
-  /* Ctrl/⌘+Enter отправляет: поле многострочное, и Enter в нём — перевод
-     строки, а не отправка. */
+  if (!form || !field) return;
+  var clear = document.getElementById('ask-clear');
+
+  function sync() {
+    form.classList.toggle('has-text', field.value.trim().length > 0);
+    /* Поле растёт под текст, но не ниже трёх строк. */
+    field.style.height = 'auto';
+    field.style.height = Math.max(96, field.scrollHeight) + 'px';
+  }
+  field.addEventListener('input', sync);
   field.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) form.requestSubmit();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
   });
+  if (clear) clear.addEventListener('click', function () {
+    field.value = ''; sync(); field.focus();
+  });
+  form.addEventListener('submit', function () {
+    if (field.value.trim()) form.classList.add('is-busy');
+  });
+  sync();
 })();
 
 
