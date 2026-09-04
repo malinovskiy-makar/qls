@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
 
-from . import attempts, filters
+from . import attempts, chat, filters
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
 )
@@ -728,10 +728,47 @@ def api_attempt(request):
         return JsonResponse({'error': exc.kind, 'message': message, 'attempt_id': attempt.pk})
 
     html = render_to_string('catalog/_attempt_result.html',
-                            {'attempt': attempt, 'chk': _attempt_view(attempt, can_chat=False)},
+                            {'attempt': attempt, 'chk': _attempt_view(attempt, can_chat=True)},
                             request=request)
     return JsonResponse({'attempt_id': attempt.pk, 'status': attempt.status, 'html': html,
                          'remaining': ai.remaining_today(request.user)})
+
+
+@require_POST
+def api_chat(request):
+    """Одна реплика помощника по задаче (этап 5, ADR 0072). Только вход.
+
+    История приходит от клиента и не хранится; лимит общий с проверкой.
+    `AiUnavailable` — человеческое сообщение в чате, а не ошибка сервера.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login', 'reply': 'Войдите, чтобы спросить помощника.'},
+                            status=403)
+    data = _json_body(request)
+    try:
+        problem = _visible_problem(int(data.get('problem_id') or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'problem', 'reply': 'Задача не указана.'}, status=400)
+    message = str(data.get('message') or '').strip()
+    if not message:
+        return JsonResponse({'error': 'empty', 'reply': 'Напишите вопрос.'}, status=400)
+    if len(message) > chat.MESSAGE_MAX:
+        return JsonResponse({'error': 'long', 'reply': 'Слишком длинный вопрос: сократите его.'},
+                            status=400)
+    if not ai.is_available():
+        return JsonResponse({'error': 'no_key', 'reply': ai.unavailable_reason()})
+    if ai.remaining_today(request.user) <= 0:
+        return JsonResponse({'error': 'limit', 'reply': LIMIT_TEXT % ai.daily_limit()})
+    last_attempt = (CatalogAttempt.objects
+                    .filter(user=request.user, problem=problem)
+                    .order_by('-created_at').first())
+    try:
+        reply = chat.answer(problem, message, data.get('history'), request.user,
+                            last_attempt=last_attempt)
+    except ai.AiUnavailable as exc:
+        message_text = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
+        return JsonResponse({'error': exc.kind, 'reply': message_text})
+    return JsonResponse({'reply': reply, 'remaining': ai.remaining_today(request.user)})
 
 
 def problem_detail(request, pk):
@@ -781,6 +818,7 @@ def problem_detail(request, pk):
     pd_config = {'problemId': problem.pk}
     if ai_available:
         pd_config['attemptUrl'] = reverse('catalog:api_attempt')
+        pd_config['chatUrl'] = reverse('catalog:api_chat')
 
     from urllib.parse import urlencode
     context = {
@@ -788,7 +826,7 @@ def problem_detail(request, pk):
         'ai_available': ai_available,
         'remaining':    remaining,
         'last_attempt': last_attempt,
-        'last_chk':     _attempt_view(last_attempt) if last_attempt else None,
+        'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
         'pd_config':    pd_config,
         'parts':        parts,
         'is_test':      (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX),

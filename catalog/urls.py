@@ -21,6 +21,8 @@ urlpatterns = [
     path('api/filter-state/',                   views.api_filter_state,   name='api_filter_state'),
     # Попытка решения на странице задачи → проверка ИИ (только вход, ADR 0071).
     path('api/attempt/',                        views.api_attempt,        name='api_attempt'),
+    # Чат по задаче — одна реплика, история на клиенте (ADR 0072).
+    path('api/chat/',                           views.api_chat,           name='api_chat'),
 
     # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
     # 01.09.2026): он слился с каталогом, поиск там один и всегда по

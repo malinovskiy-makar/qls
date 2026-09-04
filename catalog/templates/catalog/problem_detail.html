@@ -388,6 +388,12 @@
 </article>
 
 <aside class="pd-side">
+  {% comment %}
+  Карточка чата — только при доступной модели (правило нуля: без ключа её
+  нет вовсе). Три подсказки-вопроса — тексты интерфейса, одни на любую
+  задачу. Анониму вместо поля — ссылка на вход: чат только для вошедших.
+  {% endcomment %}
+  {% if ai_available %}
   <section class="ai" aria-label="Чат с ИИ по этой задаче">
     <div class="ai-head">
       <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg></span>
@@ -395,14 +401,29 @@
     </div>
     <div class="ai-body" id="ai-body">
       <p class="ai-intro">Объясню термин, проверю идею, подскажу, куда смотреть. Готовое решение не выдам: задача остаётся вашей.</p>
+      {% if user.is_authenticated %}
+      <div class="ai-sug" id="ai-sug">
+        <button type="button" data-q="Объясни условие проще">Объясни условие проще</button>
+        <button type="button" data-q="С чего начать?">С чего начать?</button>
+        <button type="button" data-q="Проверь мою идею">Проверь мою идею</button>
+      </div>
+      {% endif %}
     </div>
     <div class="ai-foot">
+      {% if user.is_authenticated %}
       <div class="ai-in" id="ai-in">
         <textarea id="ai-text" rows="1" placeholder="Напишите вопрос по задаче…" aria-label="Вопрос ИИ"></textarea>
+        <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg>
+        </button>
       </div>
+      {% else %}
+      <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
+      {% endif %}
       <p class="ai-note">ИИ видит условие и ваше решение. Данные профиля ему не передаются.</p>
     </div>
   </section>
+  {% endif %}
 </aside>
 </div>
 {% endblock %}

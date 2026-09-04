@@ -158,9 +158,11 @@ class ProblemPageTests(TestCase):
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertNotIn('toggleHwDropdown', html)
 
-    def test_ai_card_is_layout_only(self):
-        html = self.client.get(_url(self.p_named)).content.decode()
+    def test_ai_card_needs_an_available_model(self):
+        # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.
+        with self.settings(AI_PROVIDER='anthropic'):
+            self.assertNotIn('<h2>Спросить ИИ</h2>', self.client.get(_url(self.p_named)).content.decode())
+        with self.settings(AI_PROVIDER='fake'):
+            html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<h2>Спросить ИИ</h2>', html)
-        self.assertIn('id="ai-text"', html)
         self.assertIn('Данные профиля ему не передаются', html)
-        self.assertNotIn('id="ai-send"', html)
