@@ -178,12 +178,12 @@ TIME_BONUS_CAP_FACTOR = 1.0
 UNRANKED_REASONS = [
     ('anonymous', 'вы не вошли в аккаунт'),
     ('mistakes_run', 'это работа над ошибками'),
-    ('set_run', 'это забег по набору'),
+    ('set_run', 'это раунд по набору'),
     ('difficulty_filter', 'выбрана сложность'),
     ('too_few_correct', 'слишком мало верных ответов'),
-    ('time_overrun', 'забег шёл дольше, чем возможно'),
-    ('quota_exceeded', 'зачётные забеги на сегодня кончились'),
-    ('legacy', 'забег на старой шкале очков'),
+    ('time_overrun', 'раунд шёл дольше, чем возможно'),
+    ('quota_exceeded', 'зачётные раунды на сегодня кончились'),
+    ('legacy', 'раунд на старой шкале очков'),
 ]
 UNRANKED_TEXT = dict(UNRANKED_REASONS)
 

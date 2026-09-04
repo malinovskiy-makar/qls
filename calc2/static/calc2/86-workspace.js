@@ -450,8 +450,6 @@ function wireScene() {
   if (pTog) pTog.addEventListener('click', () => setParamsOpen(params.classList.contains('collapsed')));
 
   // Тема.
-  const dTheme = document.getElementById('dock-theme');
-  if (dTheme) dTheme.addEventListener('click', () => toggleCalcTheme());
 
   /* Сохранения графиков в базу нет, и кнопки-заглушки в полосе тоже больше
      нет (п. 68): она занимала второе место и умела только сказать «появится

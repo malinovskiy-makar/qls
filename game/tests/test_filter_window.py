@@ -312,8 +312,8 @@ class FilterWindowMarkupTests(TestCase):
                       self.src)
 
     def test_ranked_note_is_shown_before_the_run(self):
-        u"""Игрок обязан знать ДО забега, поедет ли результат на доску."""
-        self.assertIn('Тренировочный забег: выбрана сложность', self.src)
+        u"""Игрок обязан знать ДО раунда, поедет ли результат на доску."""
+        self.assertIn('Тренировочный раунд: выбрана сложность', self.src)
         self.assertIn("'Без фильтров: ×'", self.src)
         self.assertIn("'С фильтрами: множителя ×'", self.src)
 

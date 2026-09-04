@@ -2010,7 +2010,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <section class="lb-card" id="lb-card">
           <div class="lb-head">
             Лидерборд
-            {% include '_hint.html' with hint='Как сравниваются разные забеги. У каждого вопроса есть сложность от 1 до 5 звёзд, и она уточняется по ответам всех игроков. Очки за верный ответ растут со сложностью (от 20 за одну звезду до 250 за пять), за скорость ответа и за серию верных подряд. Забег без фильтров получает ×1,3, точность ниже 85 % уменьшает итог, а забег с фильтром по сложности – тренировочный и в таблицу не попадает. Поэтому в таблице сравнивается умение, а не удачная выборка вопросов.' %}
+            {% include '_hint.html' with hint='Как сравниваются разные раунды. У каждого вопроса есть сложность от 1 до 5 звёзд, и она уточняется по ответам всех игроков. Очки за верный ответ растут со сложностью (от 20 за одну звезду до 250 за пять), за скорость ответа и за серию верных подряд. Раунд без фильтров получает ×1,3, точность ниже 85 % уменьшает итог, а раунд с фильтром по сложности – тренировочный и в таблицу не попадает. Поэтому в таблице сравнивается умение, а не удачная выборка вопросов.' %}
           </div>
           <div class="lb-tabs" id="lb-modes" role="tablist"></div>
           <div>
@@ -2119,7 +2119,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   <!-- ЭКРАН 2: ИГРА -->
   <section id="screen-play" class="screen">
     <div class="scene">
-      <button class="quit-x" id="btn-quit" title="Выйти из забега" aria-label="Выйти из забега">✕</button>
+      <button class="quit-x" id="btn-quit" title="Выйти из раунда" aria-label="Выйти из раунда">✕</button>
       <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
       {% comment %} ── Дуэль: полоса соперника ────────────────────────────────
@@ -2240,7 +2240,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <!-- 3. Работа над ошибками — главное действие экрана -->
       <section class="fin-mistakes" id="fin-mistakes" hidden>
         <h3>Работа над ошибками</h3>
-        <p class="fm-lead" id="fm-lead">Соберём забег по темам, где вы ошиблись</p>
+        <p class="fm-lead" id="fm-lead">Соберём раунд по темам, где вы ошиблись</p>
         <div class="fm-bar" id="fm-bar"></div>
         <ul class="fm-legend" id="fm-legend"></ul>
         <button class="fm-go" id="btn-mistakes">Начать работу над ошибками</button>
@@ -2269,7 +2269,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
                 aria-controls="det-body">Подробная статистика</button>
         <div class="det-body" id="det-body" hidden>
           <div class="chart-card">
-            <h4>Динамика забега</h4>
+            <h4>Динамика раунда</h4>
             <div class="chart-box" id="chart-curve"></div>
             <p class="chart-key">
               <i class="k k-score"></i> счёт
@@ -2389,7 +2389,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <button type="button" class="star-btn f-star" data-star="5"
                   aria-pressed="false">5★</button>
         </div>
-        <p class="star-hint">Пусто значит «любая». Забег с
+        <p class="star-hint">Пусто значит «любая». Раунд с
           выбранной сложностью тренировочный: в таблицу он не идёт.</p>
 
         <h3 style="margin-top:16px">Источник</h3>
@@ -2456,7 +2456,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 <div class="gameover-overlay" id="gameover-overlay" hidden>
   <div class="go-card">
     <div class="go-hearts"><span class="qi-slot"></span></div>
-    <h2>Забег окончен</h2>
+    <h2>Раунд окончен</h2>
     <p id="go-sub">Жизни кончились</p>
   </div>
 </div>
@@ -2792,7 +2792,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       av.textContent = playable
         ? avail.toLocaleString('ru-RU') + ' '
           + plural(avail, ['вопрос', 'вопроса', 'вопросов']) + ' под фильтром'
-        : 'Под фильтром ' + avail + ': мало для забега (нужно от '
+        : 'Под фильтром ' + avail + ': мало для раунда (нужно от '
           + (CFG.min_playable || 10) + ')';
       card.appendChild(av);
       if (!playable) {
@@ -2961,7 +2961,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('filter-reset').hidden = !rows.length;
     var note = $('filter-note');
     if (!isRanked()) {
-      note.textContent = 'Тренировочный забег: выбрана сложность, в таблицу не идёт';
+      note.textContent = 'Тренировочный раунд: выбрана сложность, в таблицу не идёт';
       note.className = 'filter-note unranked';
     } else if (isUnfiltered()) {
       note.textContent = 'Без фильтров: ×' + multText(CFG.scope_multiplier)
@@ -3473,7 +3473,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (!d.rows || !d.rows.length) {
       var em = document.createElement('p');
       em.className = 'lb-empty';
-      em.textContent = 'Пока никого. Сыграйте зачётный забег.';
+      em.textContent = 'Пока никого. Сыграйте зачётный раунд.';
       box.appendChild(em);
     } else {
       d.rows.forEach(function (r) { box.appendChild(lbRowNode(r)); });
@@ -3579,11 +3579,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           box.appendChild(em);
           return;
         }
-        box.appendChild(msRow('Забегов', st.runs.toLocaleString('ru-RU')));
+        box.appendChild(msRow('Раундов', st.runs.toLocaleString('ru-RU')));
         box.appendChild(msRow('Лучший счёт',
           st.best_score.toLocaleString('ru-RU')
           + (st.best_score_at ? ' · ' + lbDate(st.best_score_at) : '')));
-        box.appendChild(msRow('Больше всего верных за забег',
+        box.appendChild(msRow('Больше всего верных за раунд',
                               st.best_correct.toLocaleString('ru-RU')));
         box.appendChild(msRow('Средняя точность', st.accuracy + ' %'));
         box.appendChild(msRow('Среднее время верного',
@@ -4305,7 +4305,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      фильтром) и set_done (курированный список пройден): клиент знает про
      конец вопросов, но не знает, какой это был забег. */
   function titleText(s) {
-    if (s.ended_reason === 'lives') return 'Забег окончен';
+    if (s.ended_reason === 'lives') return 'Раунд окончен';
     if (s.ended_reason === 'set_done') return 'Пройдено!';
     if (s.ended_reason === 'pool_empty') return 'Вопросы кончились';
     return 'Время вышло!';
@@ -4359,7 +4359,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var rn = $('ranked-note');
     if (rn) {
       if (s.ranked) {
-        rn.textContent = 'Забег в таблице'
+        rn.textContent = 'Раунд в таблице'
           + (s.ranked_today != null
              ? ' · зачётных сегодня ' + s.ranked_today + ' из ' + s.ranked_per_day
              : '');
@@ -4421,7 +4421,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      по которой сервер соберёт целевой забег — по сырому числу ошибок. */
   function paintMistakes(rows) {
     var totalWrong = rows.reduce(function (a, t) { return a + t.wrong; }, 0);
-    $('fm-lead').textContent = 'Соберём забег из ' + MISTAKES_RUN_SIZE
+    $('fm-lead').textContent = 'Соберём раунд из ' + MISTAKES_RUN_SIZE
       + ' вопросов по темам, где вы ошиблись: ' + totalWrong + ' '
       + plural(totalWrong, ['ошибка', 'ошибки', 'ошибок']) + ' в '
       + rows.length + ' ' + plural(rows.length, ['теме', 'темах', 'темах']);
@@ -4683,7 +4683,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (scores.length < 2) {
       ctx.fillStyle = CARD.dim;
       ctx.font = cardFont(600, 24);
-      ctx.fillText('слишком короткий забег для кривой', x + 26, y + h / 2);
+      ctx.fillText('слишком короткий раунд для кривой', x + 26, y + h / 2);
       return;
     }
     var pad = 22;
@@ -4964,7 +4964,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var box = $('chart-curve');
     var scores = s.score_curve || [];
     if (scores.length < 2) {
-      chartEmpty(box, 'Забег слишком короткий для графика');
+      chartEmpty(box, 'Раунд слишком короткий для графика');
       return;
     }
     var W = 400, H = 130, P = 8;
@@ -5096,7 +5096,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var rows = loadHistory().filter(function (r) { return r.mode === mode; });
     rows = rows.slice(-HISTORY_SHOWN);
     if (rows.length < 2) {
-      chartEmpty(box, 'Это ваш первый забег в этом режиме. Будет с чем сравнить');
+      chartEmpty(box, 'Это ваш первый раунд в этом режиме. Будет с чем сравнить');
       return;
     }
     var W = 400, H = 130, P = 8, BOT = 18;
@@ -5209,7 +5209,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (!any) {
       var hint = document.createElement('div');
       hint.className = 'rec-row';
-      hint.textContent = 'Рекордов пока нет. Сыграйте первый забег.';
+      hint.textContent = 'Рекордов пока нет. Сыграйте первый раунд.';
       box.appendChild(hint);
     }
     box.hidden = false;

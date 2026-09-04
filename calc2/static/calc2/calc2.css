@@ -1262,8 +1262,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    вместе с кнопкой возврата занимали 332 пикселя над первой карточкой: при
    высоте окна 392 карточка была видна на пятую часть, а инструкция про выбор
    раздела показывалась уже ПОСЛЕ того, как раздел открыт. */
-#scene-picker.block-open .picker-head { display: none; }
-#scene-picker.block-open .picker-inner { padding-top: 20px; }
+/* ⚠️ ШАПКА ВЫБОРА СЦЕНЫ ВИДНА ВСЕГДА (04.09.2026, п. 9 разбора владельца).
+   Раньше правило `#scene-picker.block-open .picker-head { display: none }`
+   прятало её при открытом блоке — в том числе при ВОЗВРАТЕ из сцены, и
+   человек видел список моделей без единой строки о том, где он. Прятать
+   её было незачем: с уходом кикера «Графики в экономике» шапка стала
+   короткой. Правило снято вместе с классом `block-open` (комментарии
+   А41/А68 в 84-picker.js). */
 .picker-eyebrow {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
@@ -1272,10 +1277,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .picker-eyebrow::before {
   content: ""; width: 18px; height: 2px; border-radius: var(--r-pill); background: var(--accent);
 }
-.picker-title { font-size: 22px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+/* Та же пара, что у каталога, олимпиад и статистики: 30px/600. */
+.picker-title { font-size: 30px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 /* Н3: подзаголовок укладывается ровно в две строки. При 56ch «экономике!»
    уезжало одно на третью; 68ch хватает, чтобы фраза легла надвое. */
-.picker-sub { font-size: 15px; color: var(--text2); margin-top: 6px; max-width: 68ch; line-height: 1.5; }
+.picker-sub { font-size: 16px; color: var(--text2); margin-top: 8px; max-width: 68ch; line-height: 1.5; }
 
 /* ── П2. Главный экран: десять больших карточек блоков по две в ряд ────
    Щелчок по карточке убирает остальные и на их месте показывает модели этого
@@ -1430,7 +1436,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 @media (max-width: 640px) {
   .picker-inner { padding: 28px 16px 48px; }
-  .picker-title { font-size: 22px; }
+  .picker-title { font-size: 24px; }
   .picker-grid { grid-template-columns: 1fr; }
 }
 
@@ -1469,7 +1475,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border-right: 1px solid var(--border);
 }
 .dock-sep { width: 24px; height: 1px; background: var(--border); margin: 6px 0; }
-.dock-spacer { flex: 1; }
 .dock-btn {
   width: 40px; height: 40px; border: 1px solid transparent; border-radius: var(--r);
   background: transparent; color: var(--text2); display: grid; place-items: center;

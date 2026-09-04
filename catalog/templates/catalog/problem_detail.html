@@ -342,9 +342,10 @@
   <div class="similar-list">
     {% for s in similar %}
     <a class="similar-card" href="{% url 'catalog:problem_detail' s.problem.pk %}">
-      <div class="similar-card-title">
-        {% if s.problem.title %}{{ s.problem.title }}{% else %}Задача #{{ s.problem.pk }}{% endif %}
-      </div>
+      {# Заголовок готовит вью (`similar_title`): пустой — начало условия,
+         обрывок формулы — обрезан по незакрытому доллару. Формулы внутри
+         остаются: их отрисует KaTeX вместе со всей страницей. #}
+      <div class="similar-card-title">{{ s.title_display }}</div>
       <div class="similar-card-meta">
         {% if s.problem.difficulty %}
         <span class="similar-stars">

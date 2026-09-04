@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графики в экономике</title>
+  <title>Графики · Weconomics</title>
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).
@@ -13,8 +13,8 @@
      Теперь общее приходит отсюда, а calc2.css ниже переопределяет ровно
      то, что у рисующей поверхности своё: цвета кривых, структурные цвета
      холста, глушее фоновая оболочка, тени и слои.
-     Порядок важен: свой bootstrap темы у калькулятора стоит НИЖЕ и сильнее —
-     он, в отличие от общего, умеет ещё и системную тему.
+     Тему ставит ОДИН скрипт — из этого же партиала: своего bootstrap у
+     калькулятора больше нет (см. комментарий ниже).
   {% endcomment %}
   {% include '_tokens.html' %}
 
@@ -51,17 +51,14 @@
   <script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"
           onload="if (typeof onMathliveReady === 'function') onMathliveReady();"></script>
 
-  <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
-  <script>
-    (function () {
-      try {
-        var saved = localStorage.getItem('theme');
-        var dark = saved ? saved === 'dark'
-                         : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-      } catch (e) {}
-    })();
-  </script>
+  <!-- ⚠️ СВОЕГО BOOTSTRAP ТЕМЫ У КАЛЬКУЛЯТОРА БОЛЬШЕ НЕТ (04.09.2026, п. 9).
+       Он стоял ниже общего и делал ЛИШНЕЕ: при отсутствии сохранённого
+       выбора спрашивал системную тему и явно ставил data-theme="light".
+       На остальном сайте светлая тема — это ОТСУТСТВИЕ атрибута, и
+       `_tokens.html` системную не спрашивает вовсе. Отсюда и «тема
+       скачет»: калькулятор в системной тьме открывался тёмным, а любая
+       соседняя страница — светлой. Теперь тему на всём сайте ставит один
+       скрипт из `_tokens.html`, который подключён выше. -->
 
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
@@ -75,8 +72,7 @@
 <div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
   <div class="picker-inner">
     <header class="picker-head">
-      <div class="picker-eyebrow">Графики в экономике</div>
-      <h1 class="picker-title" id="picker-title">С чего начнём?</h1>
+      <h1 class="picker-title" id="picker-title">Это графики.</h1>
       <!-- п. 66. Слов ровно два и они не меняются нигде: БЛОК — это группа
            моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. «Раздел»,
            «сценарий» и «сцена» из интерфейса убраны: четыре слова на две
@@ -744,10 +740,6 @@
     </button>
     <button class="dock-btn" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать график">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
-    </button>
-    <div class="dock-spacer"></div>
-    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая или тёмная тема" aria-label="Переключить светлую или тёмную тему">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
     </button>
   </nav>
 

@@ -1,7 +1,7 @@
 {% extends "platform/base.html" %}
 {% load static ru %}
 
-{% block title %}Моя статистика{% endblock %}
+{% block title %}Статистика{% endblock %}
 
 {% block extra_style %}
 {% include "platform/_stats_style.html" %}
@@ -10,8 +10,9 @@
 {% block content %}
 <div class="stats-head">
   <div>
-    <h1 class="stats-title">Моя статистика</h1>
-    <div class="stats-sub">Что получается, что просело и что делать дальше.</div>
+    <h1 class="stats-title">Это ваша статистика.</h1>
+    <div class="stats-sub">Анализируйте свои сильные и слабые стороны,
+      отслеживайте прогресс и решайте, в чем развиваться в первую очередь.</div>
   </div>
   <div class="period-bar" id="period-bar">
     {% for key, label in periods %}

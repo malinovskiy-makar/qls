@@ -114,11 +114,18 @@
 .home-search button:hover { background: var(--brand-amber-hover); }
 
 /* ── Статистика ─────────────────────────────────────── */
+/* ⚠️ СЕТКА, А НЕ FLEX. У flex с общим отступом блоки разной ширины, и
+   середина СРЕДНЕГО блока не совпадает с серединой страницы: «29» стояло
+   заметно левее центра. Три равные колонки ставят её ровно по центру. */
 .home-stats {
   margin-top: clamp(18px, 3.2vh, 44px);
-  display: flex;
-  gap: 56px;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  text-align: center;
 }
+/* Знак «+» мельче числа и прижат к верху: масса числа не уезжает вправо. */
+.stat-plus { font-size: .6em; vertical-align: top; margin-left: 1px; }
 .stat-num {
   font-size: 30px;
   font-weight: 700;
@@ -205,7 +212,7 @@
 }
 @media (max-width: 640px) {
   .home-cards { grid-template-columns: 1fr; }
-  .home-stats { gap: 32px; }
+
   .home-title { font-size: 34px; }
 }
 {% endblock %}
@@ -231,18 +238,23 @@
     <button type="submit">Найти</button>
   </form>
 
+  {% comment %}
+    Порядок задан владельцем 04.09: задач в базе → тем → олимпиад.
+    Знак «+» вынесен отдельным мелким span: в общей строке он утяжелял
+    число справа, и «25+» переставало стоять по центру своей колонки.
+  {% endcomment %}
   <div class="home-stats">
     <div class="stat">
       <div class="stat-num">{{ problems_count }}</div>
       <div class="stat-label">задач в базе</div>
     </div>
     <div class="stat">
-      <div class="stat-num">{{ olympiads_count }}</div>
-      <div class="stat-label">олимпиад</div>
-    </div>
-    <div class="stat">
       <div class="stat-num">{{ topics_count }}</div>
       <div class="stat-label">тем</div>
+    </div>
+    <div class="stat">
+      <div class="stat-num">{{ olympiads_count }}<span class="stat-plus">+</span></div>
+      <div class="stat-label">олимпиад</div>
     </div>
   </div>
 

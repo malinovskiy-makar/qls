@@ -1,7 +1,7 @@
 {% extends "student/base.html" %}
 {% load score %}
 
-{% block title %}Мои работы{% endblock %}
+{% block title %}Занятия{% endblock %}
 
 {% block extra_style %}
 .page-title {
@@ -128,7 +128,7 @@
 {% endblock %}
 
 {% block content %}
-<h1 class="page-title">Мои работы</h1>
+<h1 class="page-title">Занятия</h1>
 
 {% if not active and not submitted and not completed and not has_exams %}
 <div class="empty-state">

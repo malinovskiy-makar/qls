@@ -299,3 +299,79 @@ class EmDashTests(TestCase):
         for line in read('game/views.py').split('\n'):
             if 'JsonResponse' in line or "'error':" in line:
                 self.assertNotIn('—', line, line)
+
+
+class RoundNotRaceTests(TestCase):
+    u"""1.15 Слова «забег» человек на экране не видит — только «раунд».
+
+    Решение владельца 04.09.2026: в Wecon Rush «забег» заменён на «раунд»
+    во ВСЕХ строках, которые доходят до человека. Комментарии кода, имена
+    переменных и docs/GAME.md намеренно оставлены как были — это не экран.
+
+    Поэтому проверка идёт по ОТРЕНДЕРЕННОЙ странице с вырезанными
+    комментариями: она ловит и разметку, и строки внутри инлайн-скрипта,
+    которые попадают в DOM, и aria-label с data-tip.
+    """
+
+    RX = re.compile('забег', re.IGNORECASE)
+
+    def _visible(self, html):
+        u"""Текст страницы без того, чего человек не видит."""
+        html = re.sub(r'<!--.*?-->', '', html, flags=re.S)
+        html = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '', html, flags=re.S)
+        html = re.sub(r'\{#.*?#\}', '', html, flags=re.S)
+        html = re.sub(r'/\*.*?\*/', '', html, flags=re.S)
+        return '\n'.join(self._strip_line_comment(ln)
+                         for ln in html.split('\n'))
+
+    @staticmethod
+    def _strip_line_comment(line):
+        u"""Отрезать хвостовой `//`-комментарий, не тронув адреса и строки.
+
+        Осторожно: «//» бывает внутри адреса (`https://`) и внутри строкового
+        литерала. Режем только там, где перед «//» стоит пробел, кавычки до
+        него закрыты и это не двоеточие из адреса. Правило намеренно
+        осторожное: пропустить лишний комментарий безопаснее, чем спрятать
+        настоящую строку с экрана.
+        """
+        for m in re.finditer('//', line):
+            j = m.start()
+            before = line[:j]
+            if before.strip() and not before.endswith((' ', '\t')):
+                continue
+            if before.count("'") % 2 or before.count('"') % 2:
+                continue
+            if before.rstrip().endswith(':'):
+                continue
+            return before
+        return line
+
+    def _check(self, url, who):
+        response = self.client.get(url)
+        self.assertIn(response.status_code, (200, 302), '%s: %s' % (who, url))
+        if response.status_code != 200:
+            return
+        found = self.RX.findall(self._visible(response.content.decode('utf-8')))
+        self.assertEqual(
+            found, [],
+            u'%s видит слово «забег» на %s: %d раз. Решение владельца — '
+            u'«раунд».' % (who, url, len(found)),
+        )
+
+    def test_guest_sees_no_race_word(self):
+        for url in ('/game/', '/game/daily/'):
+            self._check(url, u'гость')
+
+    def test_logged_in_sees_no_race_word(self):
+        from problems.models import User
+        User.objects.create_user(username='round_probe', password='x' * 12,
+                                 role='student')
+        self.client.login(username='round_probe', password='x' * 12)
+        for url in ('/game/', '/game/daily/', '/game/stats/'):
+            self._check(url, u'вошедший')
+
+    def test_unranked_reasons_say_round(self):
+        u"""Причины «почему раунд не в таблице» человек читает на экране."""
+        from game.config import UNRANKED_TEXT
+        for key, text in UNRANKED_TEXT.items():
+            self.assertNotIn('забег', text.lower(), '%s: %s' % (key, text))
