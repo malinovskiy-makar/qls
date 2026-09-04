@@ -1,5 +1,5 @@
 {% extends "student/base.html" %}
-{% load score %}
+{% load score %}{% load ru %}
 
 {% block title %}Занятия{% endblock %}
 
@@ -18,6 +18,49 @@
   margin: 28px 0 12px;
 }
 .section-label:first-child { margin-top: 0; }
+
+/* ── Мои группы и репетиторы (04.09.2026, ADR 0074) ─────────────────── */
+.sg-block { margin-bottom: 26px; }
+.sg-head {
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 10px;
+}
+.sg-head .section-label { margin: 0; }
+.sg-join { display: flex; gap: 6px; }
+.sg-join input {
+  font: inherit; font-size: 14px; padding: 7px 11px; width: 190px;
+  letter-spacing: .06em;
+  border-radius: var(--r); border: .5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.sg-join input::placeholder { letter-spacing: normal; }
+.sg-join button {
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 7px 15px;
+  border-radius: var(--r); border: none;
+  background: var(--btn-bg); color: var(--on-btn);
+  cursor: pointer; white-space: nowrap;
+}
+.sg-join button:hover { background: var(--btn-bg-hover); }
+.sg-cards {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+.sg-card {
+  background: var(--surface); border: .5px solid var(--border);
+  border-radius: var(--r-card, 10px); padding: 13px 15px;
+}
+.sg-name { font-size: 14px; font-weight: 600; color: var(--text); }
+.sg-meta { font-size: 13px; color: var(--text2); margin-top: 3px; }
+.sg-empty {
+  background: var(--surface); border: .5px dashed var(--border);
+  border-radius: var(--r-card, 10px); padding: 16px;
+  font-size: 14px; color: var(--text2); line-height: 1.5;
+}
+@media (max-width: 560px) {
+  .sg-head { flex-direction: column; align-items: stretch; }
+  .sg-join input { width: 100%; }
+}
 .hw-card {
   background: var(--surface);
   border: 1px solid var(--border);
@@ -129,6 +172,45 @@
 
 {% block content %}
 <h1 class="page-title">Занятия</h1>
+
+{% comment %}
+Блок групп и репетиторов — ПЕРВЫМ. Ученик приходит сюда за двумя вещами:
+«что задали» и «к кому я хожу»; второе раньше не показывалось нигде.
+{% endcomment %}
+<div class="sg-block">
+  <div class="sg-head">
+    <h2 class="section-label">Мои группы и репетиторы</h2>
+    <form class="sg-join" method="post" action="{% url 'student:join_group' %}">
+      {% csrf_token %}
+      <input type="text" name="code" maxlength="20" autocomplete="off"
+             placeholder="Код приглашения" aria-label="Код приглашения">
+      <button type="submit">Вступить</button>
+    </form>
+  </div>
+
+  {% if groups %}
+  <div class="sg-cards">
+    {% for group in groups %}
+    <div class="sg-card">
+      <div class="sg-name">{{ group.name }}</div>
+      <div class="sg-meta">
+        {{ group.teacher.get_full_name|default:group.teacher.username }}
+        · {{ group.get_kind_display }}
+        · {{ group.works|count_ru:"работа,работы,работ" }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {% comment %}Канон 3.13: пустое состояние говорит, что делать дальше.{% endcomment %}
+  <div class="sg-empty">
+    Пока вы ни в одной группе. Введите код от репетитора — он продиктует его
+    на занятии.
+  </div>
+  {% endif %}
+</div>
+
+<div class="section-label">Мои работы</div>
 
 {% if not active and not submitted and not completed and not has_exams %}
 <div class="empty-state">

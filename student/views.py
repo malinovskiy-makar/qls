@@ -310,6 +310,14 @@ def dashboard(request):
         else:
             active.append(item)
 
+    # Занятия, в которых человек состоит. Одним запросом с автором и
+    # счётчиком работ: иначе на каждую карточку уходило бы по два запроса.
+    from django.db.models import Count
+    groups = (request.user.enrolled_groups
+              .select_related('teacher')
+              .annotate(works=Count('assignments', distinct=True))
+              .order_by('name'))
+
     return render(request, 'student/dashboard.html', {
         'active': active,
         'submitted': submitted_list,
@@ -318,8 +326,55 @@ def dashboard(request):
         'exams_upcoming': exams_upcoming,
         'exams_done': exams_done,
         'has_exams': bool(exams_open or exams_upcoming or exams_done),
+        'groups': groups,
         'now': now,
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Вступление в занятие по коду (04.09.2026, ADR 0074)
+# ═══════════════════════════════════════════════════════════════════════
+
+JOIN_SCOPE = 'join'
+
+
+@student_required
+@require_POST
+def join_group(request):
+    """Вступить в занятие по коду приглашения.
+
+    ⚠️ ОШИБКА НЕ ГОВОРИТ, СУЩЕСТВУЕТ ЛИ КОД. «Такого кода нет» — один и тот
+    же ответ и на выдуманный код, и на чужой существующий: иначе перебором
+    можно было бы собирать список живых занятий.
+
+    ⚠️ ЧАСТОТА ОГРАНИЧЕНА. Пространство кодов 32^8 ≈ 1,1·10^12, и перебор
+    вслепую бессмыслен даже без ограничения; но десять промахов подряд —
+    это уже не опечатка, и дальше включается та же лестница задержек, что у
+    входа (`problems/ratelimit.py`).
+    """
+    from problems import ratelimit
+    from problems.models import StudentGroup
+
+    wait = ratelimit.check(JOIN_SCOPE, request, request.user.pk)
+    if wait:
+        messages.error(
+            request,
+            'Слишком много попыток. Попробуйте через %d с.' % wait)
+        return redirect('student:dashboard')
+
+    code = StudentGroup.normalize_invite_code(request.POST.get('code'))
+    group = StudentGroup.objects.filter(invite_code=code).first() if code else None
+
+    if group is None:
+        ratelimit.register_failure(JOIN_SCOPE, request, request.user.pk)
+        messages.error(request, 'Такого кода нет. Проверьте написание.')
+    elif group.students.filter(pk=request.user.pk).exists():
+        messages.info(request, 'Вы уже в этом занятии.')
+    else:
+        group.students.add(request.user)
+        ratelimit.register_success(JOIN_SCOPE, request, request.user.pk)
+        messages.success(request, 'Готово: вы в занятии «%s».' % group.name)
+    return redirect('student:dashboard')
 
 
 def exam_schedule_label(assignment):

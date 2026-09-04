@@ -1,4 +1,6 @@
 {% load ru %}
+{% include '_confirm.html' %}
+{% include 'teacher/groups/_invite_js.html' %}
 {% comment %}
 Содержимое вкладки «Обзор» — то, что раньше было отдельной страницей
 статистики группы.
@@ -12,6 +14,58 @@
 Теперь это вкладка по умолчанию, а «Ученики» удалена: таблица учеников
 здесь одна и полная.
 {% endcomment %}
+{% comment %}
+Приглашение и состав — первым блоком вкладки «Обзор»: это то, с чего
+занятие начинается, и то, за чем репетитор сюда заходит чаще всего.
+{% endcomment %}
+<div class="card" style="margin-bottom:18px;">
+  <h2 class="section-title">Приглашение</h2>
+  <div class="gd-invite">
+    <code class="gd-code">{{ group.invite_code }}</code>
+    <button type="button" class="gd-copy" data-copy="{{ group.invite_code }}">Скопировать</button>
+    <form method="post" action="{% url 'teacher:group_invite_regenerate' group.pk %}"
+          data-confirm="Старый код перестанет работать сразу же. Тем, кто ещё не вступил, придётся дать новый."
+          data-confirm-ok="Выдать новый код">
+      {% csrf_token %}
+      <button type="submit" class="gd-copy">Новый код</button>
+    </form>
+  </div>
+  <div class="gd-hint">Ученик вводит его на своём экране «Занятия».</div>
+  {% comment %}
+  ⚠️ ПРЕДУПРЕЖДЕНИЕ СТОИТ РЯДОМ С КНОПКОЙ, А НЕ В ПОДСКАЗКЕ (канон 2.8):
+  последствие необратимо, и узнать о нём надо ДО нажатия.
+  {% endcomment %}
+  <div class="gd-warn">
+    Новый код отменяет старый. Уже вступившие остаются в занятии.
+  </div>
+</div>
+
+<div class="card" style="margin-bottom:18px;">
+  <h2 class="section-title">Состав</h2>
+  {% if group.students.all %}
+  <div class="gd-roster">
+    {% for student in group.students.all %}
+    <div class="gd-row">
+      <div class="gd-row-name">
+        {{ student.get_full_name|default:student.username }}
+        <div class="gd-row-sub">{{ student.username }}</div>
+      </div>
+      <form method="post"
+            action="{% url 'teacher:group_student_remove' group.pk student.pk %}"
+            data-confirm="Ученик перестанет получать новые работы. Уже выданные работы и их проверка останутся на месте."
+            data-confirm-ok="Отчислить">
+        {% csrf_token %}
+        <button type="submit" class="gd-copy">Отчислить</button>
+      </form>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  {# Канон 3.13: пустое состояние говорит, что делать. #}
+  <p class="gd-hint">Пока никого. Продиктуйте код — ученик введёт его у себя.</p>
+  {% endif %}
+</div>
+
 <div class="period-bar" style="margin-bottom:18px;">
   {% for key, label in periods %}
   <a href="?tab=overview&period={{ key }}" style="text-decoration:none;">

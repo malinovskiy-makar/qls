@@ -1377,6 +1377,21 @@ class OlympiadRef(models.Model):
 # Этап Е — Группы учеников
 # ===========================================================================
 
+# Алфавит кода приглашения: 24 буквы (без I и O) и 8 цифр (без 0 и 1) —
+# ровно 32 знака. Убраны две пары, которые путают на слух и на доске:
+# «ноль или О» и «единица или И». Прочие похожие пары (2/Z, 5/S, 8/B)
+# оставлены намеренно: каждая убранная пара сокращает пространство кодов, а
+# на письме эти три различаются надёжно.
+INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+
+def make_invite_code():
+    """Код вида XXXX-XXXX. `secrets`, а не `random`: код — это доступ."""
+    import secrets
+    body = ''.join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+    return '%s-%s' % (body[:4], body[4:])
+
+
 class StudentGroup(models.Model):
     """Занятие: группа или один на один.
 
@@ -1397,6 +1412,42 @@ class StudentGroup(models.Model):
     class Kind(models.TextChoices):
         GROUP = 'group', 'Группа'
         INDIVIDUAL = 'individual', 'Индивидуально'
+
+    def save(self, *args, **kwargs):
+        """Код выдаётся при создании и дальше не меняется сам собой."""
+        if not self.invite_code:
+            self.invite_code = self._free_invite_code()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def _free_invite_code(cls):
+        """Свободный код. Совпадение почти невозможно, но не невозможно."""
+        for _ in range(20):
+            code = make_invite_code()
+            if not cls.objects.filter(invite_code=code).exists():
+                return code
+        # Двадцать совпадений подряд при 32^8 — это не совпадение, а поломка
+        # генератора. Падать здесь честнее, чем выдать чужой код.
+        raise RuntimeError('не удалось подобрать свободный код приглашения')
+
+    def regenerate_invite_code(self):
+        """Новый код. Старый перестаёт работать сразу же."""
+        self.invite_code = self._free_invite_code()
+        self.save(update_fields=['invite_code'])
+        return self.invite_code
+
+    @staticmethod
+    def normalize_invite_code(raw):
+        """Приводит введённое к виду XXXX-XXXX.
+
+        Человек диктует код голосом, а вводит как получится: строчными, без
+        дефиса, с пробелами. Всё это — тот же код.
+        """
+        cleaned = ''.join(ch for ch in (raw or '').upper()
+                          if ch in INVITE_ALPHABET)
+        if len(cleaned) != 8:
+            return ''
+        return '%s-%s' % (cleaned[:4], cleaned[4:])
 
     kind = models.CharField('Тип занятия', max_length=16,
                             choices=Kind.choices, default=Kind.GROUP,
@@ -1419,6 +1470,17 @@ class StudentGroup(models.Model):
         limit_choices_to={'role': 'student'},
         verbose_name='Ученики',
     )
+    # ⚠️ КОД ПРИГЛАШЕНИЯ — ЕДИНСТВЕННЫЙ СПОСОБ ПОПАСТЬ В ЗАНЯТИЕ (04.09.2026,
+    # ADR 0074). Прежде репетитор выбирал ученика из выпадающего списка ВСЕХ
+    # учеников базы — то есть видел чужих учеников поимённо. Код диктуется
+    # голосом на занятии и не показывает никого.
+    #
+    # Алфавит без пар, которые путают вслух: нет 0 и O, нет 1 и I
+    # (см. INVITE_ALPHABET выше). 32^8 ≈ 1,1·10^12 сочетаний.
+    invite_code = models.CharField(
+        'Код приглашения', max_length=9, unique=True, db_index=True,
+        help_text='Формат XXXX-XXXX. Ученик вводит его на экране «Занятия».')
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создана')
 
     # Внутригрупповой рейтинг — ПО ВЫБОРУ РЕПЕТИТОРА и по умолчанию выключен.

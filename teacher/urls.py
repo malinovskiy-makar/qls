@@ -22,6 +22,12 @@ urlpatterns = [
     path('groups/', views_groups.groups_list, name='groups'),
     path('groups/create/', views_groups.group_create, name='group_create'),
     path('groups/<int:pk>/', views_groups.group_detail, name='group_detail'),
+    # Код приглашения и состав занятия (ADR 0074).
+    path('groups/<int:pk>/edit/', views_groups.group_edit, name='group_edit'),
+    path('groups/<int:pk>/invite/regenerate/',
+         views_groups.group_invite_regenerate, name='group_invite_regenerate'),
+    path('groups/<int:pk>/students/<int:sid>/remove/',
+         views_groups.group_student_remove, name='group_student_remove'),
     path('groups/<int:group_id>/assignments/<int:assignment_id>/',
          views_groups.group_assignment_detail, name='group_assignment'),
     path('groups/<int:group_id>/assignments/<int:assignment_id>/submissions/',

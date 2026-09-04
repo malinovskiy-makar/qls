@@ -273,46 +273,37 @@ def group_create(request):
     названия остаётся, но обязательным не становится: заставлять
     придумывать имя занятию с одним человеком незачем.
     """
-    from problems.models import StudentGroup, User
+    from problems.models import StudentGroup
 
     kind = request.GET.get('kind') or request.POST.get('kind') or 'group'
     if kind not in dict(StudentGroup.Kind.choices):
         kind = 'group'
     individual = kind == StudentGroup.Kind.INDIVIDUAL
 
-    # Кого можно взять на индивидуальное занятие: ученики этого репетитора
-    # плюс те, кто пока ни в одном его занятии не состоит.
-    students = User.objects.filter(role='student').order_by(
-        'last_name', 'first_name', 'username')
+    # ⚠️ ВЫПАДАЮЩЕГО СПИСКА ВСЕХ УЧЕНИКОВ БАЗЫ БОЛЬШЕ НЕТ (04.09.2026,
+    # ADR 0074). Он показывал репетитору чужих учеников поимённо — то есть
+    # был утечкой, а не удобством, и вдобавок не масштабировался: к бете в
+    # базе тысячи имён. Ученик приходит сам, по коду приглашения.
 
     if request.method == 'POST':
         name = (request.POST.get('name') or '').strip()
-        student = None
-        if individual:
-            student = students.filter(pk=request.POST.get('student')).first()
-            if student is None:
-                messages.error(request, 'Выберите ученика.')
-                return render(request, 'teacher/groups/create.html',
-                              {'kind': kind, 'individual': individual,
-                               'students': students})
-            name = name or (student.get_full_name() or student.username)
         if not name:
-            messages.error(request, 'Название группы не может быть пустым.')
+            messages.error(
+                request,
+                'Назовите занятие — например, именем ученика.' if individual
+                else 'Название группы не может быть пустым.')
         else:
             group = StudentGroup.objects.create(
                 name=name, teacher=request.user, kind=kind,
                 description=(request.POST.get('description') or '').strip())
-            if student is not None:
-                group.students.add(student)
             messages.success(
                 request,
-                'Ученик «%s» добавлен.' % group.name if individual
-                else 'Группа «%s» создана.' % group.name)
+                'Занятие создано. Продиктуйте ученику код %s — он введёт его '
+                'у себя на экране «Занятия».' % group.invite_code)
             return redirect('teacher:group_detail', pk=group.pk)
 
     return render(request, 'teacher/groups/create.html',
-                  {'kind': kind, 'individual': individual,
-                   'students': students})
+                  {'kind': kind, 'individual': individual})
 
 
 # ---------------------------------------------------------------------------
@@ -1478,3 +1469,62 @@ def api_grade_submission(request):
         'wrong': summary['wrong'],
         'tasks': len(summary['rows']),
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Код приглашения и состав занятия (04.09.2026, ADR 0074)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ ВЕЗДЕ `own_group_or_404`, А НЕ `get_object_or_404` ПО НОМЕРУ. Чужое
+# занятие для репетитора не «запрещено», его для него не существует — и
+# номер чужого занятия не должен подтверждаться сообщением об ошибке.
+
+@tutor_required
+@require_POST
+def group_invite_regenerate(request, pk):
+    """Новый код приглашения. Старый перестаёт работать сразу же."""
+    group = own_group_or_404(request.user, pk)
+    group.regenerate_invite_code()
+    messages.success(
+        request,
+        'Новый код: %s. Старый больше не работает — раздайте новый.'
+        % group.invite_code)
+    return redirect('teacher:group_detail', pk=group.pk)
+
+
+@tutor_required
+@require_POST
+def group_student_remove(request, pk, sid):
+    """Отчислить ученика из занятия.
+
+    ⚠️ ИЗ `Assignment.students` НЕ УБИРАЕМ, И ЭТО НЕ ЗАБЫВЧИВОСТЬ. Уже
+    выданные работы остаются за учеником: его ответы, оценки и разбор —
+    это его история, а не собственность занятия. Отчисление означает
+    «новых работ не получает», а не «сделанного не было».
+    """
+    from problems.models import User
+
+    group = own_group_or_404(request.user, pk)
+    student = get_object_or_404(User, pk=sid)
+    group.students.remove(student)
+    messages.success(
+        request,
+        'Ученик отчислен. Выданные работы и их проверка остались на месте.')
+    return redirect('teacher:group_detail', pk=group.pk)
+
+
+@tutor_required
+def group_edit(request, pk):
+    """Правка названия и описания занятия."""
+    group = own_group_or_404(request.user, pk)
+    if request.method == 'POST':
+        name = (request.POST.get('name') or '').strip()
+        if not name:
+            messages.error(request, 'Название не может быть пустым.')
+        else:
+            group.name = name[:200]
+            group.description = (request.POST.get('description') or '').strip()
+            group.save(update_fields=['name', 'description'])
+            messages.success(request, 'Сохранено.')
+            return redirect('teacher:group_detail', pk=group.pk)
+    return render(request, 'teacher/groups/edit.html', {'group': group})

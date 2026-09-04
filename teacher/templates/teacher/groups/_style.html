@@ -192,3 +192,55 @@ details.fold .fold-body {
   .cards-grid { grid-template-columns: 1fr; }
   .card, .problem-block { padding: 16px; }
 }
+
+/* ── Код приглашения (04.09.2026, ADR 0074) ─────────────────────────── */
+.gc-invite {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-top: 10px; padding-top: 10px;
+  border-top: .5px solid var(--border-soft);
+}
+.gc-invite-label {
+  font-size: 11px; font-weight: 600; letter-spacing: .5px;
+  text-transform: uppercase; color: var(--text3);
+}
+.gc-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 14px; font-weight: 600; letter-spacing: .06em;
+  color: var(--text);
+  background: var(--surface-2);
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 3px 9px;
+}
+.gc-copy, .gd-copy {
+  font: inherit; font-size: 12px;
+  color: var(--text2);
+  background: none;
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: background var(--t), color var(--t);
+}
+.gc-copy:hover, .gd-copy:hover { background: var(--chip-bg); color: var(--text); }
+.gc-copy.is-done, .gd-copy.is-done { color: var(--accent-ink); border-color: var(--accent-ring); }
+
+/* Блок «Приглашение» на странице занятия: код крупно. */
+.gd-invite { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gd-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 26px; font-weight: 700; letter-spacing: .1em;
+  color: var(--text);
+}
+.gd-warn { font-size: 13px; color: var(--text2); margin-top: 8px; line-height: 1.5; }
+.gd-hint { font-size: 13px; color: var(--text2); margin-top: 6px; }
+
+/* Состав занятия */
+.gd-roster { display: flex; flex-direction: column; }
+.gd-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 9px 0; border-bottom: .5px solid var(--border-soft); font-size: 14px;
+}
+.gd-row:last-child { border-bottom: none; }
+.gd-row-name { flex: 1; min-width: 0; }
+.gd-row-sub { font-size: 12px; color: var(--text3); }

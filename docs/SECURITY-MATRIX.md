@@ -160,6 +160,10 @@
 | `/teacher/groups/` | `teacher:groups` | `tutor_required` | — | ✅ | [teacher/views_groups.py:177](../teacher/views_groups.py) |
 | `/teacher/groups/create/` | `teacher:group_create` | `tutor_required` | 5× POST | ✅ | [teacher/views_groups.py:263](../teacher/views_groups.py) |
 | `/teacher/groups/<int:pk>/` | `teacher:group_detail` | `tutor_required` | `pk`, 3× GET | ✅ `own_group_or_404` | [teacher/views_groups.py:328](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/edit/` | `teacher:group_edit` | `tutor_required` | `pk`, POST: название, описание | ✅ `own_group_or_404` → 404 на чужое | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/invite/regenerate/` | `teacher:group_invite_regenerate` | `tutor_required` + POST | `pk` | ✅ `own_group_or_404` | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/students/<int:sid>/remove/` | `teacher:group_student_remove` | `tutor_required` + POST | `pk`, `sid` | ✅ `own_group_or_404`; `sid` ищется ТОЛЬКО внутри своего занятия | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/student/join/` | `student:join_group` | `student_required` + POST | POST: код | ✅ вступает всегда `request.user` | [student/views.py](../student/views.py) |
 | `/teacher/groups/<gid>/assignments/<aid>/` | `teacher:group_assignment` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:613](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/assignments/<aid>/submissions/` | `teacher:group_submissions` | `tutor_required` | 2× pk, 3× GET | ✅ | [teacher/views_groups.py:1010](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/submissions/<sid>/` | `teacher:group_review_submission` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:1103](../teacher/views_groups.py) |

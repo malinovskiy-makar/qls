@@ -6,6 +6,8 @@ app_name = 'student'
 
 urlpatterns = [
     path('', views.dashboard, name='dashboard'),
+    # Вступление в занятие по коду приглашения (ADR 0074).
+    path('join/', views.join_group, name='join_group'),
     path('assignment/<int:pk>/', views.assignment_detail, name='assignment_detail'),
     path('assignment/<int:pk>/submit/', views.submit_assignment, name='submit_assignment'),
     path('submission/<int:pk>/', views.submission_detail, name='submission_detail'),
