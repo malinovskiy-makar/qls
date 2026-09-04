@@ -57,6 +57,7 @@
 .pp--feat svg { width: 13px; height: 13px; }
 .pp--src { background: transparent; color: var(--text3); border-color: var(--border); font-weight: 400; }
 .pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+.pd-stat { margin: -8px 0 16px; font-size: 13px; color: var(--text3); }
 
 /* ── Условие: своя поверхность, подпункты внутри, вплотную ─────────── */
 .stm { background: var(--surface-info); border-radius: 14px; padding: 22px 26px 8px; margin: 0 0 18px;
@@ -209,6 +210,15 @@
     </div>
     {% endif %}
   </div>
+  {% endif %}
+
+  {% comment %}
+  Живая статистика из игры Wecon Rush — только когда попыток набралось
+  достаточно (порог в game/config.py), иначе процент был бы шумом. Задача не
+  попала в игровой пул — строки просто нет. Этап 7 переносит её в блок теста.
+  {% endcomment %}
+  {% if game_stat %}
+  <p class="pd-stat" title="Доля верных ответов среди первых встреч игроков с этим вопросом">В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)</p>
   {% endif %}
 
   <section class="stm" aria-label="Условие">
