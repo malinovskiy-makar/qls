@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
 
-from . import filters
+from . import attempts, filters
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
 )
@@ -22,8 +22,9 @@ from .preview import (
     PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
 )
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
+from problems.ai import core as ai
 from problems.models import (
-    Collection, Problem, ProblemFigure, Source, Topic,
+    CatalogAttempt, Collection, Problem, ProblemFigure, Source, Topic,
 )
 from problems.management.commands.apply_topic_mapping import CANONICAL
 
@@ -645,6 +646,94 @@ def _similar_cards(problem):
     return cards
 
 
+NEEDS_HUMAN_TEXT = ('Модель не ставит балл: ход решения нестандартный. Можно '
+                    'исправить и отправить снова или открыть решение.')
+LIMIT_TEXT = 'Лимит проверок на сегодня исчерпан: завтра снова %d'
+
+
+def _attempt_view(attempt, can_chat=False):
+    """Что нужно партиалу `_attempt_result.html` сверх самой попытки."""
+    if attempt.status == 'error':
+        return {'css': 'wait', 'word': 'Проверка не удалась', 'sub': attempt.summary,
+                'bars': 0, 'confidence_word': '', 'ask': '', 'can_chat': can_chat}
+    css = {'ok': 'ok', 'partial': 'part', 'wrong': 'bad'}.get(attempt.verdict, 'wait')
+    word = {'ok': 'Верно', 'partial': 'Частично верно', 'wrong': 'Неверно'}.get(
+        attempt.verdict, 'Балл не поставлен')
+    sub = NEEDS_HUMAN_TEXT if attempt.status == 'needs_human' else attempt.summary
+    bars = {'high': 3, 'medium': 2, 'low': 1}.get(attempt.confidence, 1)
+    confidence_word = {'high': 'высокая', 'medium': 'средняя', 'low': 'низкая'}.get(
+        attempt.confidence, 'низкая')
+    ask = ''
+    if attempt.first_error_step:
+        title = next((s.get('title', '') for s in attempt.steps
+                      if s.get('n') == attempt.first_error_step), '')
+        ask = 'Объясни, почему в шаге %d ошибка%s' % (
+            attempt.first_error_step, (': ' + title) if title else '')
+    return {'css': css, 'word': word, 'sub': sub, 'bars': bars,
+            'confidence_word': confidence_word, 'ask': ask, 'can_chat': can_chat}
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return {}
+
+
+def _visible_problem(pk):
+    return get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
+                             needs_quality_review=False, hidden_pending_review=False)
+
+
+@require_POST
+def api_attempt(request):
+    """Отправить решение на проверку ИИ (этап 5, ADR 0071).
+
+    Только для вошедших: анониму страница показывает ссылку на вход вместо
+    кнопки. Проверка идёт синхронно; `AiUnavailable` — это 200 с человеческим
+    сообщением, а не ошибка сервера: ключа нет, лимит, таймаут — всё это
+    штатные состояния, о которых ученику надо сказать словами.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login',
+                             'message': 'Войдите, чтобы отправить решение на проверку.'},
+                            status=403)
+    data = _json_body(request)
+    try:
+        problem = _visible_problem(int(data.get('problem_id') or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'problem', 'message': 'Задача не указана.'}, status=400)
+    text = (data.get('text') or '').strip()
+    if not text:
+        return JsonResponse({'error': 'empty',
+                             'message': 'Напишите решение, прежде чем отправлять.'}, status=400)
+    if len(text) > 20000:
+        return JsonResponse({'error': 'long',
+                             'message': 'Слишком длинный текст: сократите решение.'}, status=400)
+    if not ai.is_available():
+        return JsonResponse({'error': 'no_key', 'message': ai.unavailable_reason()})
+    if ai.remaining_today(request.user) <= 0:
+        return JsonResponse({'error': 'limit', 'message': LIMIT_TEXT % ai.daily_limit()})
+
+    attempt = CatalogAttempt.objects.create(
+        user=request.user, problem=problem, text=text,
+        solution_viewed_before=bool(data.get('solution_viewed_before')))
+    try:
+        attempts.check_attempt(attempt, request.user)
+    except ai.AiUnavailable as exc:
+        attempt.status = CatalogAttempt.Status.ERROR
+        attempt.summary = str(exc)[:300]
+        attempt.save(update_fields=['status', 'summary'])
+        message = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
+        return JsonResponse({'error': exc.kind, 'message': message, 'attempt_id': attempt.pk})
+
+    html = render_to_string('catalog/_attempt_result.html',
+                            {'attempt': attempt, 'chk': _attempt_view(attempt, can_chat=False)},
+                            request=request)
+    return JsonResponse({'attempt_id': attempt.pk, 'status': attempt.status, 'html': html,
+                         'remaining': ai.remaining_today(request.user)})
+
+
 def problem_detail(request, pk):
     """Страница задачи (редизайн 04.09.2026, мокап `problem_page_mockup.html`).
 
@@ -679,9 +768,28 @@ def problem_detail(request, pk):
         saved = SavedProblem.objects.filter(owner=request.user, catalog_problem=problem,
                                             is_deleted=False).exists()
 
+    # Проверка ИИ: кнопка и строка лимита — только при доступной модели и
+    # только для вошедших (правило нуля: без ключа их нет вовсе).
+    ai_available = ai.is_available()
+    remaining = ai.remaining_today(request.user) if ai_available and request.user.is_authenticated else 0
+    last_attempt = None
+    if ai_available and request.user.is_authenticated:
+        last_attempt = (CatalogAttempt.objects
+                        .filter(user=request.user, problem=problem)
+                        .exclude(status=CatalogAttempt.Status.ERROR)
+                        .order_by('-created_at').first())
+    pd_config = {'problemId': problem.pk}
+    if ai_available:
+        pd_config['attemptUrl'] = reverse('catalog:api_attempt')
+
     from urllib.parse import urlencode
     context = {
         'problem':      problem,
+        'ai_available': ai_available,
+        'remaining':    remaining,
+        'last_attempt': last_attempt,
+        'last_chk':     _attempt_view(last_attempt) if last_attempt else None,
+        'pd_config':    pd_config,
         'parts':        parts,
         'is_test':      (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX),
         'heading':      heading,
