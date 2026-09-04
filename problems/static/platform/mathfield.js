@@ -19,6 +19,17 @@
 (function () {
   'use strict';
 
+  // Шрифты и звуки MathLive. Адрес папки приходит из шаблона
+  // (window.MATHLIVE_DIR, см. _mathfield.html): писать /static/ руками
+  // нельзя — на бою у файлов имена с хешем. Звуки клавиш выключены.
+  try {
+    var MFE = window.MathfieldElement;
+    if (MFE) {
+      MFE.fontsDirectory = (window.MATHLIVE_DIR || '') + '/fonts';
+      MFE.soundsDirectory = null;
+    }
+  } catch (e) {}
+
   // Кнопки быстрой вставки. Ориентир — набор IEO (дроби, степени, индексы,
   // корни, скобки, сравнения, греческие), плюс то, без чего не обойтись
   // в экономике: процент, стрелки сдвига кривых, Q_d / Q_s / P_e.

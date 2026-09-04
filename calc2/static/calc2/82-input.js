@@ -535,9 +535,10 @@ function onMathliveReady() {
   if (!MF) return;
   window.MathfieldElement = MF;
   MATHLIVE_READY = true;
-  const V = '0.110.0';
   try {
-    MF.fontsDirectory = 'https://cdn.jsdelivr.net/npm/mathlive@' + V + '/fonts';
+    // Адрес папки шрифтов приходит из шаблона (window.MATHLIVE_DIR): здесь
+    // нельзя писать /static/ руками — на бою имена файлов с хешем.
+    MF.fontsDirectory = (window.MATHLIVE_DIR || '') + '/fonts';
     MF.soundsDirectory = null;   // щелчки клавиш здесь только мешают
   } catch (e) {}
   // Своя клавиатура рисуется в панели, встроенная всплывать не должна.

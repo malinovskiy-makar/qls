@@ -1,11 +1,10 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Календарь · Weconomics</title>
 {% include '_tokens.html' %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font-ui);
@@ -422,8 +421,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/ru.global.min.js"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/index.global.min.js' %}"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/locales/ru.global.js' %}"></script>
 <script>
 // ---------- Данные из Django ----------
 const USER_ROLE    = '{{ user_role }}';

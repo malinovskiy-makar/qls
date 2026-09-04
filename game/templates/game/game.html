@@ -37,9 +37,9 @@
   {% include '_tokens.html' %}
 
   <!-- KaTeX (как в каталоге) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"></script>
+  <script defer src="{% static 'vendor/katex-0.16.9/contrib/auto-render.min.js' %}"></script>
 
   <style>
 /* ── База страницы (в духе catalog/base.html) ─────────────────── */

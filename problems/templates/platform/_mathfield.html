@@ -5,16 +5,21 @@
 раздел SESSION_PROGRESS). В ветке
 feat/calc2-shipu MathLive не используется вовсе (проверено git grep), поэтому
 взята последняя стабильная и записана здесь. Сборки нет — так же, как D3 и
-Math.js в calc2, подключаем с CDN одним <script src>. Файлы calc2 не тронуты.
+Math.js в calc2, подключаем одним <script src> из static/vendor/: внешних CDN
+у сайта нет с 04.09.2026.
 
 Использование: у textarea поставить атрибут data-mathfield, затем один раз
 на странице подключить этот партиал.
 {% endcomment %}
 {% load static %}
 
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive-static.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"></script>
+<link rel="stylesheet" href="{% static 'vendor/mathlive-0.110.0/mathlive-static.css' %}">
+<script>
+  /* Папка шрифтов MathLive — тем же способом, что в калькуляторе. */
+  window.MATHLIVE_DIR =
+    "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
+</script>
+<script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"></script>
 <script defer src="{% static 'platform/mathfield.js' %}"></script>
 
 <style>

@@ -23,6 +23,11 @@
   (собраны `pip-compile` на 3.13). Корневые `requirements.txt` и
   `requirements-local.txt` — указатели на них.
 - Драйвер PostgreSQL — см. раздел «Локальная СУБД» ниже.
+- **Библиотеки браузера лежат в репозитории — `static/vendor/`.** KaTeX,
+  MathLive, D3, Math.js, Chart.js, FullCalendar, html2canvas; внешних CDN у
+  сайта нет с 04.09.2026 ([ADR 0070](adr/0070-vendor-browser-libraries.md)).
+  Что и откуда взято — `static/vendor/README.md`; сторож — тест
+  `config/tests/test_no_external_cdn.py`.
 - Виртуальное окружение — `venv313/`. Рядом сохранены `venv/` (3.9) и
   `venv312/` (мост) до подтверждения владельцем.
 

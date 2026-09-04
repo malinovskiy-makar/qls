@@ -420,7 +420,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chartjs-4.4.1/chart.umd.min.js' %}"></script>
 <script id="stats-data" type="application/json">{{ chart_json|safe }}</script>
 <script src="{% static 'platform/stats.js' %}"></script>
 {% endblock %}

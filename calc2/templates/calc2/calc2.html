@@ -18,29 +18,37 @@
   {% endcomment %}
   {% include '_tokens.html' %}
 
-  <!-- ── Внешние библиотеки (CDN, без сборки) ──────────────────────────
+  <!-- ── Внешние библиотеки (вложены в репозиторий, без сборки) ─────────
        D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
        Math.js    — «мозг»: разбор и вычисление любых формул, численные методы.
-       Подключаются точно так же, как Desmos в старом калькуляторе. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+       Лежат в static/vendor/: внешних CDN у сайта нет с 04.09.2026, иначе
+       при перебоях с чужой сетью калькулятор открывается мёртвым. -->
+  <script src="{% static 'vendor/d3-7.9.0/d3.min.js' %}"></script>
+  <script src="{% static 'vendor/mathjs-12.4.3/math.min.js' %}"></script>
 
   <!-- KaTeX — ровно тот же способ подключения, что в каталоге задач
-       (catalog/base.html): та же версия 0.16.9 с того же CDN. Вторая
-       библиотека формул не нужна. Здесь достаточно katex.render, поэтому
-       auto-render не тянем: он ищет $…$ по всей странице, а нам нужно
-       отрендерить одно поле. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+       (catalog/base.html): та же версия 0.16.9 из той же папки vendor.
+       Вторая библиотека формул не нужна. Здесь достаточно katex.render,
+       поэтому auto-render не тянем: он ищет $…$ по всей странице, а нам
+       нужно отрендерить одно поле. -->
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"
           onload="if (typeof onKatexReady === 'function') onKatexReady();"></script>
 
   <!-- MathLive — редактор формул. Даёт то, чего не даёт обычное поле ввода:
        напечатал дробь, крышку или подчёркивание — и сразу видишь дробь,
        степень и индекс, а не сырые символы. Если библиотека не загрузилась,
        поля остаются обычными текстовыми (см. upgradeFormulaField). -->
-  <script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"
-          integrity="sha384-5IN6K0kiaz8MufrTGBvPCP3oDeMjmwe+DDTvuyQLNv6gc634FpKbQfllonjHJPmy"
-          crossorigin="anonymous"
+  <script>
+    /* Папка шрифтов MathLive. Берём адрес РЕАЛЬНОГО файла и отрезаем имя:
+       сослаться тегом static на КАТАЛОГ нельзя вовсе —
+       ManifestStaticFilesStorage ищет в манифесте файл, а не папку.
+       (Тег static в комментарии не пишем: Django разбирает шаблон раньше
+       браузера, и «пустой» тег роняет страницу с 500.) */
+    window.MATHLIVE_DIR =
+      "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
+  </script>
+  <script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"
           onload="if (typeof onMathliveReady === 'function') onMathliveReady();"></script>
 
   <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
