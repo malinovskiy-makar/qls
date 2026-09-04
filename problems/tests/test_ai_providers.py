@@ -304,6 +304,16 @@ class FailureTests(_OpenAIMixin, TestCase):
         self.assertNotIn('SSLError', str(exception))
         self.assertIn('вручную', str(exception))
 
+    def test_original_сохраняет_сырое_исключение(self):
+        """Фаза 1 (04.09.2026, разбор run2-corpus-20260904): журналу
+        отказов нужен `status_code`/`body` оригинального исключения —
+        `ProviderError.args[0]` их не несёт (см. тест выше)."""
+        error = FakeAPIStatusError('bad request', status_code=400)
+
+        exception = self._complete_with_error(error)
+
+        self.assertIs(exception.original, error)
+
 
 class AvailabilityTests(TestCase):
     """Пакета нет или ключа нет — выключаемся, а не падаем."""
