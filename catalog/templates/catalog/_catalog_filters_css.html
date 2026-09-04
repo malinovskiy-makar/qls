@@ -7,8 +7,9 @@
 фильтров (`_filters.html` + `_filters_css.html`) до отдельного решения:
 https://app.notion.com/p/3d1b11c92bc18148888ed95df85ab4d4
 
-Этап 1 — полоса: кнопка «Все фильтры», чипы выбранного, «Сбросить».
-Окно с живым обновлением (`.ct-all*`, `.fl-*`) добавляет этап 3.
+Полоса: кнопка «Все фильтры», чипы выбранного, «Сбросить».
+Окно «Все фильтры»: `.ct-all*` — рамка окна, `.fl-*` — блоки и варианты
+(плитки с рисованной галочкой, сегменты, пилюли, переключатель, теги).
 
 Движение: `prefers-reduced-motion` глушится общим правилом на `*` в
 `catalog/base.html`, отдельные исключения здесь не нужны.
@@ -60,3 +61,139 @@ https://app.notion.com/p/3d1b11c92bc18148888ed95df85ab4d4
                cursor: pointer; text-decoration: underline;
                text-underline-offset: 3px; opacity: .85; padding: 6px 4px; }
 .strip-reset:hover { opacity: 1; }
+
+/* ── Окно «Все фильтры» ─────────────────────────────────────────────── */
+.ct-all { border: 0; padding: 0; background: transparent;
+          width: min(1000px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
+          margin: auto; }
+/* Затемнение — как у прежнего окна каталога. */
+.ct-all::backdrop { background: rgba(20,18,14,.45); }
+.ct-all-box { background: var(--surface); border-radius: 16px;
+              border: 1.5px solid var(--brand-amber); overflow: hidden;
+              display: flex; flex-direction: column; max-height: calc(100vh - 40px); }
+.ct-all-head { display: flex; align-items: center; gap: 16px; padding: 14px 20px;
+               border-bottom: 1px solid var(--border-soft); flex: none; }
+.ct-all-head h2 { margin: 0; font-size: 19px; }
+.ct-all-found { font-size: 14px; color: var(--text2); }
+.ct-all-found b { color: var(--text); font-variant-numeric: tabular-nums; transition: color var(--t); }
+.ct-all-found b.is-bump { color: var(--accent-ink); }
+.ct-all-close { margin-left: auto; }
+/* Тихая строка об ошибке сети: состояние не теряется, список просто не обновился. */
+.ct-all-err { margin: 0; padding: 8px 20px; font-size: 13px; color: var(--error);
+              background: var(--error-tint); border-bottom: 1px solid var(--border-soft); }
+.ct-all-err[hidden] { display: none; }
+.ct-all-cols { display: grid; grid-template-columns: 11fr 9fr; overflow: auto;
+               flex: 1 1 auto; min-height: 0; }
+.ct-all-col { padding: 16px 20px 8px; min-width: 0; }
+.ct-all-col + .ct-all-col { border-left: 1px solid var(--border-soft); }
+.ct-all-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+               padding: 12px 20px; border-top: 1px solid var(--border-soft);
+               background: var(--surface-2); flex: none; }
+.ct-all-foot .ct-btn--go b { font-variant-numeric: tabular-nums; }
+
+/* Блок фильтра: имя + «снять» */
+.fl-block { margin: 0 0 20px; }
+.fl-block-head { display: flex; align-items: baseline; justify-content: space-between;
+                 gap: 10px; margin: 0 0 8px; }
+.fl-block-name { font-size: 15px; font-weight: 600; color: var(--text); }
+.fl-block-sel { font-size: 13px; color: var(--text3); margin-left: 8px; font-weight: 400; }
+.fl-block-clear { font-size: 13px; color: var(--accent-ink); background: none; border: 0;
+                  cursor: pointer; text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+.fl-block-clear[hidden] { display: none; }
+
+/* Блоки тем: пять раскрывающихся разделов. Раскрытие анимировано через
+   grid-template-rows 0fr→1fr (плавно и без измерения высоты скриптом). */
+.fl-acc { border-top: 1px solid var(--border-soft); }
+.fl-acc:first-child { border-top: 0; }
+.fl-acc-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 6px 9px 4px;
+               background: none; border: 0; cursor: pointer; text-align: left;
+               font: 600 14.5px/1.3 var(--font-ui); color: var(--text); border-radius: 8px; }
+.fl-acc-head:hover { background: var(--surface-2); }
+.fl-acc-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gc); flex: none; }
+.fl-acc-name { flex: 1 1 auto; }
+.fl-acc-n { font-weight: 400; font-size: 13px; color: var(--text3);
+            font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fl-acc-sel { font-size: 12px; font-weight: 600; background: var(--accent); color: var(--act-ink-solid);
+              border-radius: var(--r-pill); padding: 1px 7px; }
+.fl-acc-sel:empty { display: none; }
+.fl-acc-caret { width: 16px; height: 16px; transition: transform var(--t-slow); color: var(--text3); flex: none; }
+.fl-acc.is-open .fl-acc-caret { transform: rotate(180deg); }
+.fl-acc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.fl-acc.is-open .fl-acc-body { grid-template-rows: 1fr; }
+.fl-acc-inner { overflow: hidden; }
+.fl-tiles { list-style: none; margin: 0; padding: 2px 0 10px 22px; display: flex; flex-direction: column; gap: 1px; }
+/* Плитка-галочка: рисованный чекбокс, не браузерный (правило 6 канона). */
+.fl-tile { display: flex; align-items: center; gap: 10px; width: 100%; padding: 6px 8px; border-radius: 8px;
+           border: 1px solid transparent; background: none; cursor: pointer; text-align: left;
+           font: 400 14px/1.35 var(--font-ui); color: var(--text); transition: background var(--t); }
+.fl-tile:hover { background: var(--surface-2); }
+.fl-tile-box { width: 16px; height: 16px; border-radius: 5px; border: 1.5px solid var(--border); flex: none;
+               display: inline-flex; align-items: center; justify-content: center; background: var(--surface);
+               transition: background var(--t), border-color var(--t); }
+.fl-tile-box svg { width: 11px; height: 11px; opacity: 0; color: var(--act-ink-solid); }
+.fl-tile[aria-pressed="true"] { background: var(--accent-tint); }
+.fl-tile[aria-pressed="true"] .fl-tile-box { background: var(--accent); border-color: var(--accent); }
+.fl-tile[aria-pressed="true"] .fl-tile-box svg { opacity: 1; }
+.fl-tile-l { flex: 1 1 auto; }
+.fl-tile-n { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+/* Ноль под ТЕКУЩИМИ фильтрами — приглушён, но остаётся: видно, что снять. */
+.fl-tile.is-zero, .fl-pill.is-zero, .fl-seg button.is-zero { color: var(--text3); }
+
+/* Сегмент из взаимоисключающих вариантов (характер, задача/тест) */
+.fl-seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; max-width: 100%; }
+.fl-seg button { border: 0; background: transparent; padding: 7px 12px; border-radius: 8px;
+                 font: 500 14px/1.2 var(--font-ui); color: var(--text2); cursor: pointer; display: inline-flex; gap: 8px;
+                 align-items: center; transition: background var(--t), color var(--t); }
+.fl-seg button .fl-tile-n { font-size: 12px; }
+.fl-seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px var(--border); }
+/* Форматы теста появляются ПОД выбором «Тест» */
+.fl-sub { display: none; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-left: 12px;
+          border-left: 2px solid var(--accent-ring); }
+.fl-sub.is-on { display: flex; }
+
+/* Пилюля (форматы теста, сложность, особенности, теги) */
+.fl-pills { display: flex; flex-wrap: wrap; gap: 6px; }
+.fl-pill { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--border); border-radius: var(--r-pill);
+           background: var(--surface); color: var(--text); padding: 6px 11px; font: 500 13.5px/1.2 var(--font-ui); cursor: pointer;
+           transition: background var(--t), color var(--t), border-color var(--t); }
+.fl-pill:hover { border-color: var(--accent); }
+.fl-pill .fl-tile-n { font-size: 12px; }
+.fl-pill[aria-pressed="true"] { background: var(--accent); color: var(--on-btn); border-color: var(--accent); }
+.fl-pill[aria-pressed="true"] .fl-tile-n { color: var(--on-btn); opacity: .85; }
+.fl-pill .st { color: var(--amber); letter-spacing: .5px; font-size: 12px; }
+.fl-pill[aria-pressed="true"] .st { color: var(--on-btn); }
+
+/* Переключатель «Только с решением» */
+.fl-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; position: relative; }
+.fl-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.fl-switch-track { width: 36px; height: 20px; border-radius: var(--r-pill); background: var(--border); position: relative;
+                   transition: background .15s; flex: none; }
+.fl-switch-track::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+                          background: var(--surface); transition: transform .15s; box-shadow: 0 1px 2px var(--border); }
+.fl-switch input:checked + .fl-switch-track { background: var(--accent); }
+.fl-switch input:checked + .fl-switch-track::after { transform: translateX(16px); }
+.fl-switch input:focus-visible + .fl-switch-track { box-shadow: 0 0 0 3px var(--focus-ring); }
+.fl-switch .fl-tile-n { font-size: 12px; }
+
+/* Теги: поле + группы по выбранным темам */
+.fl-tag-input { width: 100%; font: 400 14px/1.4 var(--font-ui); padding: 9px 11px; border-radius: 9px;
+                color: var(--text); border: 1px solid var(--border); background: var(--surface); }
+.fl-tag-input::placeholder { color: var(--text3); }
+.fl-tag-input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.fl-tag-empty { font-size: 13px; color: var(--text3); margin: 10px 0 0; line-height: 1.45; }
+.fl-tag-empty[hidden] { display: none; }
+.fl-tag-group { margin-top: 12px; animation: chipIn .14s ease-out; }
+.fl-tag-group-h { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; color: var(--text2); margin: 0 0 6px; }
+.fl-tag-group-h .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gc); flex: none; }
+.fl-tag-group-h .more { margin-left: auto; font-weight: 400; color: var(--text3); }
+.fl-tag-group .fl-pills { padding-left: 16px; }
+
+/* Источник: список без поиска, прокручивается внутри своей высоты */
+.fl-list { max-height: 214px; overflow: auto; border: 1px solid var(--border-soft); border-radius: 10px; padding: 4px;
+           scrollbar-width: thin; }
+.fl-list .fl-tiles { padding: 0; }
+
+@media (max-width: 760px) {
+  .ct-all-cols { grid-template-columns: 1fr; }
+  .ct-all-col + .ct-all-col { border-left: 0; border-top: 1px solid var(--border-soft); }
+}

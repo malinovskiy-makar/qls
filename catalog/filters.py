@@ -37,7 +37,9 @@ from collections import Counter
 from django.db.models import Count, Q, TextField
 from django.db.models.functions import Cast
 
-from .topic_blocks import BLOCKS, block_of, is_known, order_in_block, section_of
+from .topic_blocks import (
+    BLOCK_SECTION, BLOCKS, block_of, is_known, order_in_block, section_of,
+)
 
 # ── «Задача или тест»: выбор из двух, у теста — форматы ПОД ним ─────────
 #
@@ -426,7 +428,8 @@ def _topic_options(base, active, corpus):
                            str(t.id) in active['topics'],
                            section=section_of(t.name)) for t in rows]
         groups.append({
-            'key': key, 'label': label, 'options': options,
+            'key': key, 'label': label, 'section': BLOCK_SECTION[key],
+            'options': options,
             'topics': len(options),
             'count': sum(o['count'] for o in options),
             'selected': sum(1 for o in options if o['active']),

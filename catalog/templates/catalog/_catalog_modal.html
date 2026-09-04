@@ -1,0 +1,41 @@
+{% load ru catalog_filters %}{% comment %}
+ОКНО «ВСЕ ФИЛЬТРЫ» КАТАЛОГА — по мокапу владельца 04.09.2026.
+
+⚠️ ОКНО НЕ ЗАКРЫВАЕТСЯ ПОСЛЕ КЛИКА (решение владельца): каждый выбор идёт
+запросом к `api_filter_state`, список и счётчик за окном обновляются, адрес
+в строке браузера тоже, а окно остаётся открытым для следующего выбора.
+Логика — `catalog/static/catalog/js/catalog_filters.js`; здесь только
+стартовое состояние, которое нарисовал сервер.
+
+Настоящий <dialog> с showModal(): ловушка фокуса, Escape и возврат фокуса
+на «Все фильтры» приходят от браузера. Клик по затемнению закрывает.
+Слева — то, что задаёт корпус (`filters.modal_left`), справа — то, что его
+сужает (`filters.modal_right`); порядок задан модулем.
+{% endcomment %}
+<dialog class="ct-all" id="ct-all" aria-labelledby="ct-all-title">
+  <div class="ct-all-box">
+    <div class="ct-all-head">
+      <h2 id="ct-all-title">Все фильтры</h2>
+      <span class="ct-all-found" aria-live="polite">Найдено <b id="found-n">{{ filtered_total|spaceint }}</b></span>
+      <button class="ct-btn ct-btn--quiet ct-all-close" type="button" id="all-close">Закрыть</button>
+    </div>
+    <p class="ct-all-err" id="ct-all-err" role="status" hidden>Не удалось обновить список, попробуйте ещё раз</p>
+    <div class="ct-all-cols">
+      <div class="ct-all-col">
+        {% for g in filters.modal_left %}{% include "catalog/_catalog_modal_block.html" with g=g %}{% endfor %}
+      </div>
+      <div class="ct-all-col">
+        {% for g in filters.modal_right %}{% include "catalog/_catalog_modal_block.html" with g=g %}{% endfor %}
+      </div>
+    </div>
+    <div class="ct-all-foot">
+      <a class="ct-btn ct-btn--quiet" id="all-reset" href="{{ filters.reset_url }}" data-clear="all">Сбросить всё</a>
+      <button class="ct-btn ct-btn--go" type="button" id="all-show">Показать <b id="show-n">{{ filtered_total|spaceint }}</b> <span id="show-w">{{ filtered_total|plural_ru:"задачу,задачи,задач" }}</span></button>
+    </div>
+  </div>
+</dialog>
+{% comment %}
+Стартовое состояние для скрипта: активные значения списками, вид и адреса
+эндпоинтов. JSON через `script_json` — кириллица как есть, `<>&` экранированы.
+{% endcomment %}
+<script type="application/json" id="ct-filter-state">{{ filter_state|script_json|safe }}</script>

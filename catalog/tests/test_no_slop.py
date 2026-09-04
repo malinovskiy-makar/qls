@@ -115,6 +115,19 @@ class EmptyCatalogTests(TestCase):
         self.assertNotIn('ct-card', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
 
 
+class EmptyCatalogWindowTests(TestCase):
+    """Пустая база: окно «Все фильтры» без единой группы и без чисел, кроме 0."""
+
+    def test_window_has_no_groups_and_no_numbers(self):
+        html = self.client.get('/catalog/').content.decode()
+        start = html.index('<dialog class="ct-all"')
+        dialog = html[start:html.index('</dialog>', start)]
+        self.assertNotIn('data-fl=', dialog)
+        self.assertNotIn('data-count=', dialog)
+        self.assertEqual(numbers_in(visible_text(dialog)) - {'0'}, set())
+        self.assertIn('Найдено 0', visible_text(dialog))
+
+
 class EmptyCatalogApiTests(TestCase):
     """Пустая база: эндпоинт живого состояния отдаёт нули и пустые группы."""
 

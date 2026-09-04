@@ -12,8 +12,8 @@
 решения в Notion-штабе): поле — единственный герой карточки поиска,
 подсказка о способе, крестик и стрелка живут ВНУТРИ поля; карта справа
 ровно в высоту поля; под полем — «Все фильтры» и только выбранные чипы;
-в карточках нет номера и нет табличного вида. Окно «Все фильтры» пока
-прежнее (`_filters.html` в режиме панели) — его переносит этап 3.
+в карточках нет номера и нет табличного вида; окно «Все фильтры» обновляет
+выдачу живьём и не закрывается (`_catalog_modal.html` + `catalog_filters.js`).
 
 ⚠️ РОЛИ ЦВЕТА (решение владельца и дизайнера, 31.08–01.09.2026):
     поиск и фильтры        → --surface-tool (бирюза бренда);
@@ -120,35 +120,16 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 .ct-map:hover .ct-map-cap { color: var(--accent-ink); }
 
 {% include "catalog/_catalog_filters_css.html" %}
-{% comment %}
-Прежние стили общего компонента фильтров ещё нужны окну «Все фильтры»
-(режим панели). Этап 3 заменит окно и снимет это подключение.
-{% endcomment %}
-{% include "catalog/_filters_css.html" %}
 
+/* gap — потому что inline-flex съедает пробелы между вложенными узлами:
+   «Показать <b>97</b> задач» слипалось в «Показать97задач». */
 .ct-btn { font: 600 14px/1 var(--font-ui); padding: 10px 18px;
           border-radius: 9px; border: 1px solid transparent; cursor: pointer;
-          text-decoration: none; display: inline-flex; align-items: center; }
+          text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .ct-btn--go { background: var(--brand-amber); color: var(--brand-amber-ink); }
 .ct-btn--go:hover { background: var(--brand-amber-hover); }
 .ct-btn--quiet { background: var(--surface); color: var(--text);
                  border-color: var(--border); }
-
-.ct-all { border: 0; padding: 0; background: transparent; max-width: 900px;
-          width: calc(100vw - 32px); margin: auto; }
-.ct-all::backdrop { background: rgba(20,18,14,.45); }
-.ct-all-box { background: var(--surface); border-radius: 16px;
-              border: 1.5px solid var(--brand-amber); overflow: hidden; }
-.ct-all-head { display: flex; justify-content: space-between;
-               align-items: center; padding: 16px 20px;
-               border-bottom: 1px solid var(--border-soft); }
-.ct-all-head h2 { margin: 0; font-size: 19px; }
-.ct-all-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
-               padding: 18px 20px; max-height: 66vh; overflow: auto; }
-.ct-all-foot { display: flex; justify-content: space-between;
-               align-items: center; gap: 12px; padding: 14px 20px;
-               border-top: 1px solid var(--border-soft);
-               background: var(--surface-2); }
 
 /* ── Блок найденных задач ────────────────────────────────────────── */
 .ct-results { background: var(--surface-info); border: 1.5px solid var(--brand-amber);
@@ -226,6 +207,12 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 {% endcomment %}
 <link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
 <script defer src="{% static 'catalog/js/topic_map_preview.js' %}"></script>
+{% comment %}
+Живое обновление окна «Все фильтры»: состояние в скрипте и в адресе,
+числа и список — от `api_filter_state`. Без скрипта страница остаётся
+рабочей: форма поиска и чипы полосы серверные.
+{% endcomment %}
+<script defer src="{% static 'catalog/js/catalog_filters.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -299,9 +286,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
       Все фильтры{% if filters.selected_count %} <span class="n">{{ filters.selected_count }}</span>{% endif %}
     </button>
     <span id="ct-chips" style="display:contents">{% include "catalog/_catalog_chips.html" %}</span>
-    {% if filters.chips %}
-    <a class="strip-reset" href="{{ filters.reset_url }}">Сбросить</a>
-    {% endif %}
+    <a class="strip-reset" id="strip-reset" href="{{ filters.reset_url }}" data-clear="all"{% if not filters.chips %} hidden{% endif %}>Сбросить</a>
   </div>
 </section>
 
@@ -318,29 +303,11 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 {% include "catalog/_catalog_results.html" %}
 
 {% comment %}
-⚠️ ОКНО «ВСЕ ФИЛЬТРЫ» ОТКРЫВАЕТСЯ НАД ВЫДАЧЕЙ, А НЕ ПОД НЕЙ (прямое
-замечание владельца: под задачами это нелогично). Настоящий <dialog>
-с showModal даёт ловушку фокуса, Escape и возврат фокуса даром.
-Разметка окна — прежняя, общий компонент в режиме панели; живое
-обновление и новую разметку приносит этап 3.
+Окно «Все фильтры» — настоящий <dialog> над выдачей, живое обновление
+списка без закрытия окна: разметка в `_catalog_modal.html`, логика в
+`catalog_filters.js`, стили в `_catalog_filters_css.html`.
 {% endcomment %}
-<dialog class="ct-all" id="ct-all" aria-labelledby="ct-all-title">
-  <form method="dialog" class="ct-all-box">
-    <div class="ct-all-head">
-      <h2 id="ct-all-title">Все фильтры</h2>
-      <button class="ct-btn ct-btn--quiet" value="close">Закрыть</button>
-    </div>
-    <div class="ct-all-cols">
-      <div>{% include "catalog/_filters.html" with groups=filters.modal_left mode="panel" %}</div>
-      <div>{% include "catalog/_filters.html" with groups=filters.modal_right mode="panel" %}</div>
-    </div>
-    <div class="ct-all-foot">
-      <a class="ct-btn ct-btn--quiet" href="{{ filters.reset_url }}">Сбросить всё</a>
-      <button class="ct-btn ct-btn--go" value="close">Показать {{ filtered_total|spaceint }}
-        {{ filtered_total|plural_ru:"задачу,задачи,задач" }}</button>
-    </div>
-  </form>
-</dialog>
+{% include "catalog/_catalog_modal.html" %}
 
 {% include "catalog/_problem_modal.html" %}
 {% endblock %}

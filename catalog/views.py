@@ -422,6 +422,15 @@ def _catalog_context(request, missing_id=''):
         'catalog_stop_text': CATALOG_STOP_TEXT,
         # Подпись блока карты — из данных карты, не литералом.
         'map_stats':         _map_stats(),
+        # Стартовое состояние для скрипта окна «Все фильтры»: активные
+        # значения (уже списками) и адреса эндпоинтов — по имени, не строкой.
+        'filter_state': {
+            'active': active,
+            'view': view_mode,
+            'urls': {'state': reverse('catalog:api_filter_state'),
+                     'tags': reverse('catalog:api_tags'),
+                     'page': reverse('catalog:problem_list')},
+        },
     }
 
 

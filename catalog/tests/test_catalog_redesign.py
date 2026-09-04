@@ -141,7 +141,8 @@ class StripTests(TestCase):
         html = self.client.get(CATALOG_URL).content.decode()
         self.assertIn('id="ct-all-open"', html)
         self.assertNotIn('data-chip=', html)
-        self.assertNotIn('class="strip-reset"', html)
+        # «Сбросить» есть в разметке для скрипта, но скрыта, пока нечего снимать.
+        self.assertIn('data-clear="all" hidden>Сбросить</a>', html)
         self.assertNotIn('<span class="n">', html)
         # Старые пять чипов-групп каталог больше не подключает.
         self.assertNotIn('class="fl-chip', html)
@@ -158,7 +159,8 @@ class StripTests(TestCase):
         self.assertEqual(labels, ['Монополия и ценовая дискриминация', '★ 4',
                                   'Тест · один верный', 'С решением ✓', 'Сборник'])
         self.assertIn('<span class="n">5</span>', html)
-        self.assertIn('class="strip-reset"', html)
+        self.assertIn('class="strip-reset" id="strip-reset" href=', html)
+        self.assertNotIn('data-clear="all" hidden>', html)
         # Чип темы окрашен разделом карты: монополия — «фирма».
         self.assertIn('class="chip chip--g" style="--gc: var(--map-g-firm)"', html)
         self.assertEqual(len(resp.context['cards']), 1)

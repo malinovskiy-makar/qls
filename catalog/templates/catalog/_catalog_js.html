@@ -1,94 +1,15 @@
 {% comment %}
 СКРИПТ ЭКРАНА КАТАЛОГА.
 
-Первая половина — новая: окно «Все фильтры», подсказки тегов, честное
-«ищу» на первом запросе. Вторая — БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего
-`problem_list.html`: модальное окно задачи и кнопка «+ В домашку».
-Это работающие возможности каталога, слияние экранов их не касалось.
+Первая половина — поле запроса (крестик, стрелка, честное «ищу»). Вторая —
+БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего `problem_list.html`: модальное окно
+задачи и кнопка «+ В домашку». Окно «Все фильтры» живёт отдельным файлом
+`catalog/static/catalog/js/catalog_filters.js`.
 
-⚠️ ФИЛЬТРЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА. Каждый вариант — обычная ссылка с
-готовым адресом; скрипт добавляет удобство (окно, подсказки), но не
-является условием того, что каталогом можно пользоваться.
+⚠️ ПОИСК И ЧИПЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА: форма и крестики чипов —
+серверные. Скрипт добавляет удобство, а не условие пользования каталогом.
 {% endcomment %}
 <script>
-/* ── Окно «Все фильтры» ───────────────────────────────────────────────
-   Настоящий <dialog> с showModal(): ловушка фокуса, Escape и возврат
-   фокуса приходят от браузера, а не пишутся руками. Окно встаёт НАД
-   выдачей — под задачами ему не место (замечание владельца). */
-(function () {
-  var dlg = document.getElementById('ct-all');
-  var open = document.getElementById('ct-all-open');
-  if (!dlg || !open) return;
-  open.addEventListener('click', function () {
-    if (typeof dlg.showModal === 'function') dlg.showModal();
-    else dlg.setAttribute('open', '');       /* старый браузер: без затемнения */
-  });
-})();
-
-/* ── Чипы полосы: открытый закрывается щелчком мимо ───────────────── */
-document.addEventListener('click', function (e) {
-  document.querySelectorAll('details.fl-chip[open]').forEach(function (d) {
-    if (!d.contains(e.target)) d.removeAttribute('open');
-  });
-});
-
-/* ── Подсказки тегов ──────────────────────────────────────────────────
-   Тегов 552, списком их не показать. Подсказки идут с двух символов;
-   выбранный тег уходит в адрес обычной ссылкой, как и все остальные
-   фильтры, — состояние экрана всегда честно лежит в URL.
-
-   ⚠️ ИМЯ ТЕГА КЛАДЁТСЯ ЧЕРЕЗ textContent. Таблица тегов засорена
-   импортом (ссылки, обрывки комментариев), и это чужой текст: собирать
-   из него разметку нельзя ни при каких обстоятельствах. */
-(function () {
-  document.querySelectorAll('[data-tag-box]').forEach(function (box) {
-    var input = box.querySelector('[data-tag-input]');
-    var list = box.querySelector('[data-tag-sug]');
-    if (!input || !list) return;
-    var timer = null;
-
-    function urlWithTag(id) {
-      var params = new URLSearchParams(location.search);
-      params.delete('show');            /* новый фильтр — снова первые 20 */
-      params.append('tag', id);
-      return location.pathname + '?' + params.toString();
-    }
-
-    function render(tags) {
-      list.textContent = '';
-      if (!tags.length) { list.hidden = true; return; }
-      tags.forEach(function (t) {
-        var li = document.createElement('li');
-        var a = document.createElement('a');
-        a.className = 'fl-opt';
-        a.href = urlWithTag(t.id);
-        var name = document.createElement('span');
-        name.className = 'fl-opt-l';
-        name.textContent = t.name;
-        var n = document.createElement('span');
-        n.className = 'fl-opt-n';
-        n.textContent = t.count;
-        a.appendChild(name); a.appendChild(n); li.appendChild(a);
-        list.appendChild(li);
-      });
-      list.hidden = false;
-    }
-
-    input.addEventListener('input', function () {
-      var needle = input.value.trim();
-      window.clearTimeout(timer);
-      if (needle.length < 2) { list.textContent = ''; list.hidden = true; return; }
-      timer = window.setTimeout(function () {
-        fetch(input.dataset.tagUrl + '?q=' + encodeURIComponent(needle),
-              { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-          .then(function (r) { return r.json(); })
-          .then(function (d) { render(d.tags || []); })
-          .catch(function () { list.hidden = true; });
-      }, 200);
-    });
-  });
-})();
-
 /* ── Поле запроса: текст, крестик, стрелка, честное «ищу» ────────────
    Крестик и стрелка живут ВНУТРИ поля (решение владельца 04.09.2026):
    крестик виден только при тексте, стрелка при тексте становится
