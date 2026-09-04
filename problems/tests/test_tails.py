@@ -162,8 +162,9 @@ class GameMissLinkTests(TestCase):
         # каталога живут в общем компоненте (`catalog/filters.py`), и
         # второй копии их состояния рядом не заводится. Требование то же:
         # каталог обязан ПРОЧИТАТЬ параметр темы, а не просто открыться.
-        self.assertEqual(response.context['filters']['active']['topic'],
-                         str(topic.pk))
+        # Темы с 04.09.2026 — список (множественный выбор в каталоге).
+        self.assertEqual(response.context['filters']['active']['topics'],
+                         [str(topic.pk)])
 
 
 class DemoGameTopicsTests(TestCase):

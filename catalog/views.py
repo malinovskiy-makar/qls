@@ -20,7 +20,7 @@ from .placeholder_phrases import (
 from .preview import (
     PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
 )
-from .topic_blocks import section_of
+from .topic_blocks import is_known, section_of
 from problems.models import (
     Collection, Problem, ProblemFigure, Source, Topic,
 )
@@ -174,7 +174,7 @@ def _card(problem, score=None):
         # Тема несёт раздел карты — им красится чип (`--map-g-*`).
         'topics':           [{'name': t.name, 'section': section_of(t.name)}
                              for t in problem.topics.all()
-                             if t.name in CANONICAL][:2],
+                             if is_known(t.name)][:2],
         'difficulty':       d,
         'difficulty_stars': range(d),
         'difficulty_empty': range(5 - d),
@@ -281,8 +281,8 @@ def _relief(base, active, candidate_ids):
     """
     best = None
     for key in ('topic', 'tag', 'difficulty', 'kind', 'source',
-                'has_solution'):
-        value = active['tags'] if key == 'tag' else active[key]
+                'has_solution', 'character', 'feature'):
+        value = active[filters.ACTIVE_KEY[key]]
         if not value:
             continue
         loose = filters.apply(base, active, skip=(key,))
@@ -290,7 +290,8 @@ def _relief(base, active, candidate_ids):
             loose = loose.filter(pk__in=candidate_ids)
         n = loose.distinct().count()
         if best is None or n > best[1]:
-            best = (filters.RELIEF_LABEL[key], n)
+            n_values = len(value) if isinstance(value, list) else 1
+            best = (filters.relief_label(key, n_values), n)
     if best is None or best[1] < 1:
         return None
     return {'label': best[0], 'count': best[1]}
@@ -391,11 +392,9 @@ def problem_list(request):
 
     cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
 
-    # Подпись второго числа счётчика: «из 294 по теме „Монополия“».
-    scope = ''
-    for group in fctx['chosen']:
-        scope = filters.SCOPE_LABEL[group['key']] % group['value_label']
-        break
+    # Подпись второго числа счётчика: «из 294 по теме „Монополия“» —
+    # собирает общий модуль, у него же формы для нескольких значений.
+    scope = fctx['scope']
 
     context = {
         'filters':        fctx,

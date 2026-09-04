@@ -234,6 +234,25 @@ class Problem(models.Model):
         'Сложность (метка источника)', max_length=20, blank=True,
         help_text='Например: *, **, ***')
 
+    # ── Характер и особенности — ПОЛЯ ЗАРАНЕЕ (правило нуля, решение владельца
+    #    04.09.2026, https://app.notion.com/p/3d1b11c92bc181f2a58fca64235ef298).
+    #    Разметку загружает владелец командой `import_problem_attributes`;
+    #    пока поля пусты, фильтры и облачка их не показывают и включатся сами,
+    #    когда данные появятся — без новой сессии. Существующие поля задачи
+    #    команда не трогает (ADR 0005).
+    class Character(models.TextChoices):
+        NONE = '', 'не размечено'
+        QUAL = 'qual', 'Качественная'
+        QUANT = 'quant', 'Количественная'
+
+    character = models.CharField(
+        'Характер задачи', max_length=8, choices=Character.choices,
+        default='', blank=True, db_index=True)
+    # Список ключей особенностей из `catalog.filters.FEATURES`
+    # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
+    # собственной сущности, и правило «модели только в problems» не задето.
+    features = models.JSONField('Особенности', default=list, blank=True)
+
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
 

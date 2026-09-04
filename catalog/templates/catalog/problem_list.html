@@ -296,7 +296,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
         <path d="M2 4h8M12 4h2M2 12h2M6 12h8M2 8h5M9 8h5"/><circle cx="10" cy="4" r="1.6" fill="var(--surface)"/><circle cx="4" cy="12" r="1.6" fill="var(--surface)"/><circle cx="7" cy="8" r="1.6" fill="var(--surface)"/>
       </svg>
-      Все фильтры{% if filters.chips %} <span class="n">{{ filters.chips|length }}</span>{% endif %}
+      Все фильтры{% if filters.selected_count %} <span class="n">{{ filters.selected_count }}</span>{% endif %}
     </button>
     <span id="ct-chips" style="display:contents">{% include "catalog/_catalog_chips.html" %}</span>
     {% if filters.chips %}
