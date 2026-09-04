@@ -769,10 +769,14 @@ class PanelTreeTests(SimpleTestCase):
         """Свёрнуто по умолчанию: пять строк вместо двадцати девяти.
 
         Именно из-за этого в покое не нужна и полоса прокрутки.
+
+        ⚠️ СЧИТАЕМ ВНУТРИ ДЕРЕВА, А НЕ ПО ВСЕЙ СТРАНИЦЕ. С 04.09.2026
+        `aria-expanded` есть и у кнопки ☰ в шапке — она тоже «свёрнута», но к
+        дереву разделов отношения не имеет.
         """
-        html = self._page()
-        self.assertEqual(html.count('aria-expanded="false"'), 5 + 29)
-        self.assertNotIn('aria-expanded="true"', html)
+        tree = self._page().split('class="tmap-tree"', 1)[-1]
+        self.assertEqual(tree.count('aria-expanded="false"'), 5 + 29)
+        self.assertNotIn('aria-expanded="true"', tree)
 
     def test_section_headers_are_painted_with_their_colour(self):
         """Заголовок раздела — легенда, а не украшение.

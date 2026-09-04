@@ -96,6 +96,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.context_processors.site_meta',
             ],
             'loaders': [
                 'django.template.loaders.filesystem.Loader',
@@ -276,8 +277,16 @@ SEMANTIC_SEARCH_MIN_SCORE = float(
 
 # Этап В1 — Кабинет ученика: URL для входа и редирект по умолчанию.
 LOGIN_URL = '/login/'
+# Метка версии в правом углу шапки. Поднимает владелец руками: числа
+# считает человек, а не сборка — на бете важно, что версию назвали, а не то,
+# что она вычислилась.
+SITE_VERSION = 'beta 0.0'
+
 LOGIN_REDIRECT_URL = '/student/'  # переопределяется в RoleBasedLoginView
-LOGOUT_REDIRECT_URL = '/login/'
+# ⚠️ ПОСЛЕ ВЫХОДА — НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
+# нажал «Выйти» — значит, он закончил, а не собирается войти снова. Главная
+# открыта гостям и показывает, куда пойти дальше.
+LOGOUT_REDIRECT_URL = '/'
 
 # Econ Rush: сгенерированные вопросы (game/generators/) участвуют в выдаче.
 # На проде выключено в settings_production.py, пока преподаватель не проверил

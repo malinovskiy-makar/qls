@@ -91,3 +91,14 @@ class RoleBasedLoginView(LoginView):
         if user.role == 'teacher':
             return '/teacher/'
         return '/admin/'
+
+
+# ⚠️ ВРЕМЕННАЯ ЗАГЛУШКА, ЖИВЁТ ОДНУ ФАЗУ. Шапка (Фаза 3) уже показывает
+# гостю ссылку «Создать аккаунт», а настоящая форма приходит в Фазе 4:
+# без маршрута шапка падала бы на `{% url 'register' %}` ещё до того, как
+# форму успели написать. Заменяется целиком, а не дописывается.
+def register_stub(request):
+    """Регистрация — «скоро». Настоящая форма появится в Фазе 4."""
+    from django.http import HttpResponse
+    return HttpResponse('Регистрация скоро появится.', status=200,
+                        content_type='text/plain; charset=utf-8')

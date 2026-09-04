@@ -12,6 +12,7 @@ from catalog import views as catalog_views
 from problems import views_parent, views_platform, views_stats
 from config.csp_report import csp_report
 from config.health import health, healthz
+from problems import views_auth
 from problems.views_auth import RoleBasedLoginView
 
 urlpatterns = [
@@ -31,7 +32,16 @@ urlpatterns = [
     path('health/', health, name='health'),
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
-    path('logout/', LogoutView.as_view(next_page='/login/'), name='logout'),
+    # Регистрация: пока заглушка, настоящая форма — в следующей фазе.
+    path('register/', views_auth.register_stub, name='register'),
+    # ⚠️ ВЫХОД ВЕДЁТ НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
+    # нажал «Выйти» — он закончил, а не собирается войти снова. Главная
+    # открыта гостям. Метод только POST: так решил Django 5, и шапка шлёт
+    # форму (прежняя GET-ссылка отдавала 405 — это и была «ошибка выхода»).
+    path('logout/', LogoutView.as_view(next_page='/'), name='logout'),
+    # Учебник — заглушка «Скоро»: раздел пишется, но пункт в шапке нужен уже
+    # на бете, иначе о нём не узнают.
+    path('textbook/', catalog_views.textbook, name='textbook'),
     # Смена пароля — штатными формами Django. Свою форму не пишем: пароль
     # не должен проходить через наш код ни в каком виде.
     path('password/change/', auth_views.PasswordChangeView.as_view(

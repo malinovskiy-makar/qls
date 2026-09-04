@@ -5,6 +5,11 @@
 {% block title %}Результат: {{ problem.title|default:"Задача" }}{% endblock %}
 
 {% block extra_style %}
+/* ⚠️ ПОЛОСА УЖЕ ОБЫЧНОЙ: 860 вместо 960 (канон 1.9). Основное содержание
+   здесь — длинный текст с формулами, и на 960 строка становится слишком
+   длинной для чтения. Сужаем страницу, а не переопределяем базовый шаблон:
+   узкая полоса — свойство ЭТОГО экрана, а не кабинета целиком. */
+.page-wrap { max-width: var(--w-read); }
 .back-link {
   font-size: 14px; color: var(--text2); text-decoration: none;
   display: inline-flex; align-items: center; gap: 4px; margin-bottom: 20px;
