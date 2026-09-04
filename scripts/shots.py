@@ -29,8 +29,16 @@ ROOT = Path(__file__).resolve().parent.parent
 
 # Логин отдельного бота, заведённого в локальной копии базы. Пароли
 # боевых аккаунтов сюда не попадают и попасть не могут: база локальная.
+#
+# ⚠️ ПАРОЛЬ ЗАДАЁТ `scripts/ensure_probe_users.py`, И ОН ЖЕ ЕГО СБРАСЫВАЕТ.
+# Здесь стояло `shotbot-local-2026`, и после появления той команды вход
+# перестал проходить — а скрипт ловил ошибку и снимал ДАЛЬШЕ, гостем,
+# сообщив об этом одной строкой в потоке вывода. Снимки «кабинета»
+# оказывались снимками страницы входа. Пароль берём оттуда же, а неудачный
+# вход теперь останавливает прогон (см. ниже).
 USER = "shot_bot"
-PASSWORD = "shotbot-local-2026"
+USER_TEACHER = "shot_bot_teacher"
+PASSWORD = "probebot-local-2026"
 
 # Страницы: имя → путь. {pid} подставляется id живой задачи.
 PAGES = {
@@ -56,7 +64,23 @@ PAGES = {
     "catalogq": "/catalog/?q=%D0%BC%D0%BE%D0%BD%D0%BE%D0%BF%D0%BE%D0%BB%D0%B8%D1%81%D1%82+%D0%BC%D0%B0%D0%BA%D1%81%D0%B8%D0%BC%D0%B8%D0%B7%D0%B8%D1%80%D1%83%D0%B5%D1%82+%D0%BF%D1%80%D0%B8%D0%B1%D1%8B%D0%BB%D1%8C",
     "catalogall": "/catalog/",
     "catalogtable": "/catalog/?view=table&q=%D1%8D%D0%BB%D0%B0%D1%81%D1%82%D0%B8%D1%87%D0%BD%D0%BE%D1%81%D1%82%D1%8C+%D1%81%D0%BF%D1%80%D0%BE%D1%81%D0%B0",
+    # --- появилось к бете, 04.09.2026 -------------------------------------
+    "register": "/register/",
+    "profile": "/profile/",
+    # Вкладка «Безопасность» профиля — там смена пароля. Своя страница, а не
+    # состояние: вкладку выбирает адрес.
+    "profile_security": "/profile/?tab=security",
+    "textbook": "/textbook/",
+    # Кабинет ученика: над списком работ теперь блок занятий с кодом.
+    "student_lessons": "/student/",
+    "olympiads": "/olympiads/",
+    # Экраны учителя снимаются с `--role teacher`.
+    "teacher_groups": "/teacher/groups/",
 }
+
+# Страницы, которые открываются только учителем. Снимать их учеником
+# бессмысленно: придёт 403 или редирект, а на снимке будет чужой экран.
+TEACHER_ONLY = {"teacher_groups", "work", "workai", "styleguide"}
 
 # Страницы, которые снимаются БЕЗ входа (иначе редиректит на кабинет).
 ANONYMOUS = {"login"}
@@ -131,6 +155,8 @@ def main() -> int:
     ap.add_argument("--height", type=int, default=1000)
     ap.add_argument("--full", action="store_true", help="снимать страницу целиком")
     ap.add_argument("--anon", action="store_true", help="снимать гостем, без входа")
+    ap.add_argument("--role", default="student", choices=("student", "teacher"),
+                    help="под кем входить: student (по умолчанию) или teacher")
     args = ap.parse_args()
 
     pid = args.pid or "63321"
@@ -154,22 +180,29 @@ def main() -> int:
         # Вход один раз на весь прогон.
         if args.anon:
             print("снимаем гостем: вход пропущен")
-        try:
-            if args.anon:
-                raise RuntimeError("--anon")
+        if not args.anon:
+            who = USER_TEACHER if args.role == "teacher" else USER
             page.goto(f"{BASE}/login/", wait_until="networkidle")
-            page.fill("input[name=username]", USER)
+            page.fill("input[name=username]", who)
             page.fill("input[name=password]", PASSWORD)
             page.click("button[type=submit], input[type=submit]")
             page.wait_for_load_state("networkidle")
-            print(f"вход: {page.url}")
-        except Exception as exc:  # форма могла смениться — снимем анонимно
-            if not args.anon:
-                print(f"ВХОД НЕ УДАЛСЯ: {exc}")
+            # ⚠️ НЕУДАЧНЫЙ ВХОД ОСТАНАВЛИВАЕТ ПРОГОН. Раньше здесь стоял
+            # `except`, и после провала скрипт снимал гостем: получались
+            # десятки снимков страницы входа с подписями «профиль»,
+            # «статистика», «группа». Молчащая проба хуже отсутствующей.
+            if "/login" in page.url:
+                raise SystemExit(
+                    f"ВХОД НЕ ПРОШЁЛ ролью {who}. Заведите ботов:\n"
+                    f"    venv313/Scripts/python.exe scripts/ensure_probe_users.py")
+            print(f"вход ролью {args.role}: {page.url}")
 
         for name in wanted:
             if name not in PAGES:
                 print(f"пропуск: неизвестная страница {name}")
+                continue
+            if name in TEACHER_ONLY and args.role != "teacher":
+                print(f"пропуск: {name} — только для --role teacher")
                 continue
             url = BASE + PAGES[name].format(pid=pid)
             for theme in ("light", "dark"):
