@@ -756,6 +756,89 @@ class ParsedRowFallbackTests(TestCase):
         self.assertIn('hints', parsed['missing_required_fields'])
 
 
+class NormalizeLegacyProblemTypeTests(TestCase):
+    """Фаза 4 (04.09.2026, разбор run2-corpus-20260904): 11 строк с
+    отменённым коммитом 2104203 значением `problem_type = 'открытый_
+    ответ'` — пришли через подстраховку старым журналом (Фаза 4.2), не из
+    свежего ответа GLM. `single_freetext` — категория ТЕСТА на SolveHub, а
+    не признак «ответ короткий»."""
+
+    def test_обычное_значение_не_трогается(self):
+        value, was_legacy = run_cmd.normalize_legacy_problem_type(
+            'тест: короткий ответ', check_type=None)
+        self.assertEqual(value, 'тест: короткий ответ')
+        self.assertFalse(was_legacy)
+
+    def test_single_freetext_даёт_короткий_ответ(self):
+        value, was_legacy = run_cmd.normalize_legacy_problem_type(
+            run_cmd.LEGACY_OPEN_ANSWER_VALUE, check_type='single_freetext')
+        self.assertEqual(value, 'тест: короткий ответ')
+        self.assertTrue(was_legacy)
+
+    def test_check_type_отсутствует_даёт_развёрнутый_ответ(self):
+        value, was_legacy = run_cmd.normalize_legacy_problem_type(
+            run_cmd.LEGACY_OPEN_ANSWER_VALUE, check_type=None)
+        self.assertEqual(value, 'задача с развёрнутым ответом')
+        self.assertTrue(was_legacy)
+
+    def test_check_type_неоднозначный_даёт_развёрнутый_ответ(self):
+        """`uncheckable`/`multiple_questions` — свойство ДАННЫХ источника
+        (ответа нет / несколько вопросов), не тип задачи; соответствия 1:1
+        нет, поэтому уходит в тот же безопасный дефолт, что и отсутствие
+        check_type (два реальных случая из 11 найденных строк)."""
+        for check_type in ('uncheckable', 'multiple_questions'):
+            value, was_legacy = run_cmd.normalize_legacy_problem_type(
+                run_cmd.LEGACY_OPEN_ANSWER_VALUE, check_type=check_type)
+            self.assertEqual(value, 'задача с развёрнутым ответом')
+            self.assertTrue(was_legacy)
+
+
+class ParsedRowLegacyProblemTypeTests(TestCase):
+    """Как `ParsedRowFallbackTests`, но конкретно про легаси-значение,
+    попавшее в строку через подстраховку (Фаза 4.2) — обычным путём
+    (свежий ответ GLM) оно попасть не может: `prompts_v2.PROBLEM_TYPE`
+    его не содержит, схема отклоняет как жёсткое нарушение."""
+
+    def setUp(self):
+        self.problem = Problem.objects.create(statement='Задача про рынок.')
+
+    def _row_with_bad_call2(self):
+        row = ParsedRowFallbackTests._row(self, call2_ok=False)
+        return row
+
+    def test_легаси_значение_из_подстраховки_нормализуется_с_check_type(self):
+        row = self._row_with_bad_call2()
+        fallback = {self.problem.id: _old_run1_row(
+            self.problem.id, problem_type=run_cmd.LEGACY_OPEN_ANSWER_VALUE)}
+
+        parsed = run_cmd.parsed_row(
+            row, self.problem, fallback_index=fallback,
+            check_type_index={self.problem.id: 'single_freetext'})
+
+        self.assertEqual(parsed['problem_type'], 'тест: короткий ответ')
+        self.assertIn('problem_type_legacy_value', parsed['soft_violations'])
+
+    def test_легаси_значение_без_check_type_index_даёт_развёрнутый_ответ(self):
+        row = self._row_with_bad_call2()
+        fallback = {self.problem.id: _old_run1_row(
+            self.problem.id, problem_type=run_cmd.LEGACY_OPEN_ANSWER_VALUE)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback,
+                                    check_type_index=None)
+
+        self.assertEqual(parsed['problem_type'], 'задача с развёрнутым ответом')
+        self.assertIn('problem_type_legacy_value', parsed['soft_violations'])
+
+    def test_обычное_значение_из_подстраховки_не_помечается_легаси(self):
+        row = self._row_with_bad_call2()
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}  # 'тест: короткий ответ'
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['problem_type'], 'тест: короткий ответ')
+        self.assertNotIn('problem_type_legacy_value', parsed['soft_violations'])
+
+
 class PayloadShapeTests(TestCase):
     """Форма ответа модели (2026-09-04, разбор падения боевого прогона
     `run2-corpus-20260904`).
@@ -878,11 +961,12 @@ class PayloadShapeTests(TestCase):
         real = run_cmd.parsed_row
         calls = {'n': 0}
 
-        def explode(row, problem, fallback_index=None):
+        def explode(row, problem, fallback_index=None, check_type_index=None):
             calls['n'] += 1
             if calls['n'] == 1:
                 raise RuntimeError('внезапно')
-            return real(row, problem, fallback_index=fallback_index)
+            return real(row, problem, fallback_index=fallback_index,
+                       check_type_index=check_type_index)
 
         with mock.patch.object(run_cmd, 'parsed_row', explode):
             parsed = run_cmd.parsed_rows_for(rows, by_id)

@@ -617,7 +617,81 @@ def _missing_required_fields(result):
     return missing
 
 
-def parsed_row(row, problem, fallback_index=None):
+# ---------------------------------------------------------------------------
+# Фаза 4 (04.09.2026, разбор run2-corpus-20260904): 11 строк с отменённым
+# значением `problem_type = 'открытый_ответ'`. Коммит 2104203 (§5.5)
+# развёл его обратно на «тест: короткий ответ»/«задача с развёрнутым
+# ответом» — `prompts_v2.PROBLEM_TYPE` его больше не содержит, и схема
+# отклоняет как жёсткое нарушение. Но подстраховка старым журналом (Фаза
+# 4.2, `CALL2_MERGE_FIELDS`) может принести `problem_type` из ДОРЕФОРМЕННОГО
+# прогона в обход схемы — все 11 обнаруженных строк были именно такими
+# (`source in ('mixed', 'run1_fallback')`), а не свежим ответом GLM.
+# ---------------------------------------------------------------------------
+
+LEGACY_OPEN_ANSWER_VALUE = 'открытый_ответ'
+
+
+def normalize_legacy_problem_type(problem_type, check_type):
+    """`(значение, была_ли_строка_легаси)`.
+
+    `check_type == 'single_freetext'` — категория ТЕСТА на SolveHub
+    (список принимаемых написаний, без обоснования) → «тест: короткий
+    ответ», соответствие однозначное. Во всех остальных случаях, включая
+    отсутствующий `check_type` (задача не из SolveHub, или check_type
+    неоднозначен/неизвестен) → «задача с развёрнутым ответом»: обычная
+    задача с развёрнутым решением туда не заходит, даже если её ответ —
+    одно число, а «короткий ответ» — это категория ТЕСТА на SolveHub, а
+    не признак «ответ короткий»."""
+    if problem_type != LEGACY_OPEN_ANSWER_VALUE:
+        return problem_type, False
+    if check_type == 'single_freetext':
+        return 'тест: короткий ответ', True
+    return 'задача с развёрнутым ответом', True
+
+
+def load_solvehub_check_type_index(problem_ids=None):
+    """`{problem_id: check_type}` для задач источника SolveHub —
+    `normalize_legacy_problem_type` без него не различит `single_freetext`
+    от прочих значений. Raw JSON лежит ВНЕ репозитория (`data_root()/
+    solvehub/problems/*.json`) — то же место, что читает `import_solvehub`
+    и `enrich_full_accept._check_type_crosswalk` (тот же приём, здесь не
+    статистика, а настоящая правка значения).
+
+    Пусто, если каталога нет (сервер/CI без внешних данных): вызывающий
+    код деградирует к «check_type отсутствует», а это по правилу выше и
+    так «задача с развёрнутым ответом» — безопасный дефолт, не молчаливая
+    потеря."""
+    from problems.corpus_converter.ingest import data_root
+    from problems.management.commands.import_solvehub import SOURCE_NAME
+
+    problems_dir = Path(data_root()) / 'solvehub' / 'problems'
+    if not problems_dir.is_dir():
+        return {}
+
+    wanted = set(problem_ids) if problem_ids is not None else None
+    ext_to_pid = {}
+    for pid, source_name, ext_id in SourceReference.objects.values_list(
+            'problem_id', 'source__name', 'problem_number').iterator():
+        if source_name != SOURCE_NAME or not ext_id:
+            continue
+        if wanted is not None and pid not in wanted:
+            continue
+        ext_to_pid[ext_id] = pid
+
+    index = {}
+    for json_path in problems_dir.glob('*.json'):
+        pid = ext_to_pid.get(json_path.stem)
+        if pid is None:
+            continue
+        try:
+            raw = json.loads(json_path.read_text(encoding='utf-8'))
+        except (OSError, ValueError):
+            continue
+        index[pid] = raw.get('check_type')
+    return index
+
+
+def parsed_row(row, problem, fallback_index=None, check_type_index=None):
     """Одна строка `run_parsed.jsonl` — все разобранные поля обоих
     вызовов в готовом для слияния виде, что прошло проверку, брак ли.
 
@@ -722,6 +796,16 @@ def parsed_row(row, problem, fallback_index=None):
         'run2' if not fallback_from_run1
         else 'run1_fallback' if len(fallback_from_run1) == 2 else 'mixed')
 
+    # Фаза 4: нормализация ПОСЛЕ подстраховки — именно оттуда, а не из
+    # свежего ответа, приходит легаси-значение (см. докстринг
+    # `normalize_legacy_problem_type`).
+    normalized_type, was_legacy = normalize_legacy_problem_type(
+        result.get('problem_type'),
+        (check_type_index or {}).get(row['problem_id']))
+    result['problem_type'] = normalized_type
+    if was_legacy:
+        result['soft_violations'].append('problem_type_legacy_value')
+
     # `graphical_solution` считается ПОСЛЕ подстраховки — если вызов 1
     # рескьюнут, `features_1` теперь из старого журнала, и код-признак
     # обязан слиться именно с ним, а не с забракованным свежим ответом.
@@ -778,7 +862,8 @@ def crash_row(problem_id, exc):
     }
 
 
-def parsed_rows_for(rows, problems_by_id, fallback_index=None):
+def parsed_rows_for(rows, problems_by_id, fallback_index=None,
+                    check_type_index=None):
     """⚠️ НЕ ВЫБРАСЫВАЕТ ИСКЛЮЧЕНИЙ НИ ПРИ КАКОЙ ФОРМЕ ВХОДА.
 
     04.09.2026 боевой прогон `run2-corpus-20260904` отработал все 37 035
@@ -794,7 +879,8 @@ def parsed_rows_for(rows, problems_by_id, fallback_index=None):
             continue
         try:
             out.append(parsed_row(row, problems_by_id[pid],
-                                  fallback_index=fallback_index))
+                                  fallback_index=fallback_index,
+                                  check_type_index=check_type_index))
         except Exception as exc:  # noqa: BLE001 — намеренно широко, см. докстринг
             out.append(crash_row(pid, exc))
     return out
@@ -1531,9 +1617,15 @@ class Command(BaseCommand):
                 self.stdout.write(
                     'подстраховка старым журналом: %s (%d задач доступно '
                     'для рескью)' % (fallback_parsed_path, len(fallback_index)))
+            # Фаза 4: check_type SolveHub для нормализации легаси
+            # problem_type — читается один раз (см. докстринг
+            # `load_solvehub_check_type_index`), пусто и без предупреждения,
+            # если внешние данные недоступны (безопасный дефолт).
+            check_type_index = load_solvehub_check_type_index(problem_ids)
             parsed_all, usage_totals = self._collect_parsed(
                 problem_ids, chunk_size, prompt_version, parsed_out,
-                raw_path, call1_only=call1_only, fallback_index=fallback_index)
+                raw_path, call1_only=call1_only, fallback_index=fallback_index,
+                check_type_index=check_type_index)
             # Фаза 1, пункт 5: раздел errors_summary — сколько отказов и по
             # каким кодам/классам, отдельно от подсчёта строк ответа выше.
             # В режиме пересборки журнал отказов не пишется (провайдер не
@@ -1667,7 +1759,7 @@ class Command(BaseCommand):
 
     def _collect_parsed(self, problem_ids, chunk_size, prompt_version,
                         parsed_out, raw_path, call1_only=False,
-                        fallback_index=None):
+                        fallback_index=None, check_type_index=None):
         """Строки `run_parsed.jsonl` и суммарный расход — КУСКАМИ.
 
         Журнал перечитывается потоком на каждый кусок (`iter_raw_log`), но
@@ -1677,7 +1769,9 @@ class Command(BaseCommand):
         `fallback_index` (Фаза 4.2) — `{problem_id: строка_старого_run_
         parsed.jsonl}`, читается ОДИН раз вызывающим кодом (`handle()`),
         не на каждый кусок — те же соображения памяти/времени, что и у
-        `done_ids`."""
+        `done_ids`. `check_type_index` (Фаза 4) — та же логика: `{problem_id:
+        check_type}` для нормализации легаси `problem_type`, читается один
+        раз."""
         parsed_all = []
         usage_totals = {'input_tokens': 0, 'cache_read_tokens': 0,
                         'cache_write_tokens': 0, 'output_tokens': 0,
@@ -1714,7 +1808,8 @@ class Command(BaseCommand):
                 usage_totals[key] += chunk_usage[key]
             cost += Decimal(chunk_usage['cost_usd'])
             parsed_chunk = parsed_rows_for(rows, by_id,
-                                          fallback_index=fallback_index)
+                                          fallback_index=fallback_index,
+                                          check_type_index=check_type_index)
             # ⚠️ `append` считается по УЖЕ ЗАПИСАННОМУ, а не по номеру
             # куска: первый кусок может целиком отсутствовать в журнале
             # (прогон остановился раньше), и тогда `append=start > 0`
