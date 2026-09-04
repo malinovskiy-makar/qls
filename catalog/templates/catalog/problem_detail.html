@@ -112,6 +112,16 @@
   background: var(--surface-2); border-radius: 10px; padding: 8px 8px 8px 12px; margin-top: 10px; }
 .sv-confirm.is-on { display: flex; }
 
+/* ── Подсказки уровнями ─────────────────────────────────────────────── */
+.hints { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hints:empty { display: none; }
+.hint { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-tint); border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14.5px; line-height: 1.55; animation: chipIn .18s ease-out; }
+.hint .k { flex: none; font-weight: 700; color: var(--accent-ink); font-size: 12.5px; padding-top: 2px; white-space: nowrap; }
+.hint .ai { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.btn .n { font-weight: 500; color: var(--text3); }
+#hint-done[hidden] { display: none; }
+
 /* ── Решение и ответ (раскрытие) ────────────────────────────────────── */
 .sol { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
 .sol.is-on { display: block; animation: chipIn .18s ease-out; }
@@ -321,6 +331,9 @@
         {% endif %}
       {% endif %}
       <span class="grow"></span>
+      {% if hint_total %}
+      <button class="btn btn--quiet" type="button" id="hint-btn">💡 Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
+      {% endif %}
       {% if sol.has_any %}
       <button class="btn btn--quiet" type="button" id="sol-btn">
         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
@@ -329,6 +342,10 @@
       {% endif %}
     </div>
     <p class="sv-limit" id="sv-note" hidden></p>
+    {% if hint_total %}
+    <p class="sv-limit" id="hint-done" hidden>Это была последняя подсказка</p>
+    <div class="hints" id="hints" aria-live="polite"></div>
+    {% endif %}
     {% if sol.has_any %}
     <div class="sv-confirm" id="sol-confirm">
       Открыть решение до отправки? Тогда проверка этой попытки не пойдёт в вашу статистику.

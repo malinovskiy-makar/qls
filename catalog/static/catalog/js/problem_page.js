@@ -68,6 +68,65 @@
     if (ask && chat) { chat.send(ask.dataset.ask); }
   });
 
+  /* ── Подсказки уровнями: по одной, счётчик «сколько осталось» ─────── */
+  function renderMath(el) {
+    if (typeof maskEscapedDollars === 'function') { maskEscapedDollars(el); }
+    if (typeof renderMathInElement !== 'undefined') {
+      renderMathInElement(el, { delimiters: [
+        { left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false },
+        { left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }
+      ], throwOnError: false, trust: false });
+    }
+    if (typeof fixCurrencyDollars === 'function') { fixCurrencyDollars(el); }
+  }
+  var hintBtn = $('hint-btn'), hints = $('hints');
+  if (hintBtn && hints && cfg.hintUrl && cfg.hintTotal) {
+    var hintN = 0, hintBusy = false;
+    hintBtn.addEventListener('click', function () {
+      if (hintBusy || hintN >= cfg.hintTotal) { return; }
+      hintBusy = true;
+      fetch(cfg.hintUrl + (hintN + 1) + '/', { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
+        .then(function (d) {
+          hintN = d.n;
+          var card = document.createElement('div');
+          card.className = 'hint';
+          var k = document.createElement('span');
+          k.className = 'k';
+          k.textContent = 'Подсказка ' + d.n + (d.part ? ' · пункт ' + d.part + ')' : '');
+          var body = document.createElement('div');
+          var text = document.createElement('div');
+          text.textContent = d.text;
+          body.appendChild(text);
+          if (d.ai && !d.reviewed) {
+            var note = document.createElement('div');
+            note.className = 'ai';
+            note.textContent = 'сгенерировано ИИ, не проверено человеком';
+            body.appendChild(note);
+          }
+          card.appendChild(k);
+          card.appendChild(body);
+          hints.appendChild(card);
+          renderMath(text);
+          if (hintN < d.total) {
+            hintBtn.innerHTML = '';
+            hintBtn.appendChild(document.createTextNode('💡 Ещё подсказка '));
+            var n = document.createElement('span');
+            n.className = 'n';
+            n.id = 'hint-n';
+            n.textContent = (hintN + 1) + ' из ' + d.total;
+            hintBtn.appendChild(n);
+          } else {
+            hintBtn.hidden = true;
+            var done = $('hint-done');
+            if (done) { done.hidden = false; }
+          }
+        })
+        .catch(function () { say('Не удалось получить подсказку, попробуйте ещё раз.'); })
+        .then(function () { hintBusy = false; });
+    });
+  }
+
   /* ── Чат по задаче ─────────────────────────────────────────────────── */
   var chat = null;
   var aiIn = $('ai-in'), aiText = $('ai-text'), aiBody = $('ai-body'), aiSend = $('ai-send');

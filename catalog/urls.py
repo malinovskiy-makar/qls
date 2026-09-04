@@ -23,6 +23,8 @@ urlpatterns = [
     path('api/attempt/',                        views.api_attempt,        name='api_attempt'),
     # Чат по задаче — одна реплика, история на клиенте (ADR 0072).
     path('api/chat/',                           views.api_chat,           name='api_chat'),
+    # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
+    path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
 
     # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
     # 01.09.2026): он слился с каталогом, поиск там один и всегда по

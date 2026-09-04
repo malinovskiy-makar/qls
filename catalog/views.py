@@ -5,7 +5,7 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
 from django.urls import reverse
@@ -771,6 +771,33 @@ def api_chat(request):
     return JsonResponse({'reply': reply, 'remaining': ai.remaining_today(request.user)})
 
 
+def _ordered_hints(problem):
+    """Подсказки задачи по уровням: сначала общие, потом к подпунктам."""
+    hints = list(problem.hints.select_related('part').order_by('order', 'pk'))
+    general = [h for h in hints if h.part_id is None]
+    by_part = [h for h in hints if h.part_id is not None]
+    by_part.sort(key=lambda h: (h.part.order, h.part.label, h.order, h.pk))
+    return general + by_part
+
+
+def api_hint(request, problem_id, n):
+    """Подсказка номер `n` (с единицы) к видимой задаче; за пределом — 404.
+
+    Подсказки — часть задачи, как решение: доступны без входа. Порядок —
+    поле `order`; подсказки к подпунктам идут после общих с пометкой пункта.
+    """
+    problem = _visible_problem(problem_id)
+    hints = _ordered_hints(problem)
+    if n < 1 or n > len(hints):
+        raise Http404('такой подсказки нет')
+    hint = hints[n - 1]
+    return JsonResponse({
+        'n': n, 'total': len(hints), 'text': hint.text,
+        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
+        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
+    })
+
+
 def problem_detail(request, pk):
     """Страница задачи (редизайн 04.09.2026, мокап `problem_page_mockup.html`).
 
@@ -815,7 +842,11 @@ def problem_detail(request, pk):
                         .filter(user=request.user, problem=problem)
                         .exclude(status=CatalogAttempt.Status.ERROR)
                         .order_by('-created_at').first())
+    hint_total = len(_ordered_hints(problem))
     pd_config = {'problemId': problem.pk}
+    if hint_total:
+        pd_config['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
+        pd_config['hintTotal'] = hint_total
     if ai_available:
         pd_config['attemptUrl'] = reverse('catalog:api_attempt')
         pd_config['chatUrl'] = reverse('catalog:api_chat')
@@ -824,6 +855,7 @@ def problem_detail(request, pk):
     context = {
         'problem':      problem,
         'ai_available': ai_available,
+        'hint_total':   hint_total,
         'remaining':    remaining,
         'last_attempt': last_attempt,
         'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
