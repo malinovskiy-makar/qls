@@ -72,10 +72,14 @@ class ImportProblemAttributesTests(TestCase):
         self.p1.refresh_from_db()
         self.assertEqual((self.p1.character, self.p1.features), ('', []))
 
-    def test_second_dry_run_is_zero(self):
-        path = self._file(self._rows())
-        self._run(path, apply=True)
-        out = self._run(path)
+    def test_second_dry_run_is_zero_even_with_keys_reordered(self):
+        self._run(self._file(self._rows()), apply=True)
+        # Тот же смысл другими словами: ключи в другом порядке, с повтором —
+        # изменений быть не должно, иначе каждый прогон «менял» бы всё заново.
+        out = self._run(self._file([
+            {'id': self.p1.pk, 'character': 'quant', 'features': ['graph']},
+            {'id': self.p2.pk, 'features': ['graph', 'table', 'table']},
+        ]))
         self.assertIn('Изменится: 0', out)
         self.assertIn('без изменений: 2', out)
 

@@ -81,7 +81,13 @@ class FilterStateApiTests(_Fixture):
     def test_view_mode_and_query_ride_along(self):
         data = self._get({'view': 'gallery', 'topic': self.mon.pk})
         self.assertIn('view=gallery', data['url'])
+        self.assertIn('topic=%d' % self.mon.pk, data['url'])
         self.assertIn('class="ct-gallery"', data['results_html'])
+        # С запросом список зависит от поиска (в тестах он идёт по словам),
+        # поэтому здесь проверяется только адрес: запрос и фильтр остаются.
+        with_query = self._get({'view': 'gallery', 'topic': self.mon.pk, 'q': 'спрос'})
+        self.assertIn('q=', with_query['url'])
+        self.assertIn('topic=%d' % self.mon.pk, with_query['url'])
 
     def test_endpoint_renders_the_same_results_partial_as_the_page(self):
         params = {'topic': self.mon.pk}
