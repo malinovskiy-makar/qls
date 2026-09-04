@@ -641,6 +641,12 @@ class Hint(models.Model):
                              related_name='hints', verbose_name='Подпункт')
     order = models.PositiveIntegerField('Порядок', default=1)
     text = models.TextField('Текст подсказки')
+    # ── Кто написал подсказку (этап 6 редизайна, 04.09.2026). Существующие
+    #    подсказки — рукописные: миграция данных 0053 ставит им reviewed=True.
+    #    Подсказка «сгенерировано ИИ, не проверено человеком» так и подписана
+    #    на странице задачи.
+    generated_by_ai = models.BooleanField('Сгенерирована ИИ', default=False)
+    reviewed = models.BooleanField('Проверена человеком', default=False)
 
     class Meta:
         verbose_name = 'Подсказка'
