@@ -21,7 +21,7 @@ from .placeholder_phrases import (
 from .preview import (
     PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
 )
-from .topic_blocks import is_known, section_of
+from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.models import (
     Collection, Problem, ProblemFigure, Source, Topic,
 )
@@ -526,7 +526,134 @@ def smart_search(request):
 
 
 # ── Страница задачи ─────────────────────────────────────────────────────────
+_TAG_SECTIONS = {}
+
+
+def _tag_section(tag_name, fallback):
+    """Раздел карты для тега: по названию из `topic_map.json`, иначе — раздел
+    первой темы задачи. Теги базы с темами не связаны, а карта знает, под
+    какой темой стоит тег таксономии; совпало по названию — красим им."""
+    if not _TAG_SECTIONS:
+        text, _etag = _topic_map_payload()
+        for node in json.loads(text).get('nodes', []):
+            if node.get('k') == 'tag':
+                _TAG_SECTIONS[normalize_topic(node.get('l', ''))] = node.get('g', 'tools')
+    return _TAG_SECTIONS.get(normalize_topic(tag_name), fallback)
+
+
+def _catalog_link(**changes):
+    """Адрес каталога с одним фильтром — через общий модуль, не склейкой строк."""
+    return reverse('catalog:problem_list') + filters.query({}, filters.parse({}), **changes)
+
+
+def _kind_cloud_label(problem_type):
+    if not (problem_type or '').lower().startswith(filters.TEST_PREFIX):
+        return 'Развёрнутая задача'
+    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    return 'Тест · ' + label if label else 'Тест'
+
+
+def _clouds(problem, topics, tags, sources):
+    """Два ряда облачек-ссылок в каталог. Каждое — только при данных
+    (правило нуля); пустой ряд не рисуется."""
+    first_section = section_of(topics[0].name) if topics else 'tools'
+    row1 = [{'kind': 'topic', 'label': t.name, 'section': section_of(t.name),
+             'url': _catalog_link(topics=[str(t.pk)])} for t in topics]
+    row1 += [{'kind': 'tag', 'label': tag.name,
+              'section': _tag_section(tag.name, first_section),
+              'url': _catalog_link(tags=[str(tag.pk)])} for tag in tags]
+
+    row2 = []
+    d = problem.difficulty or 0
+    if d:
+        row2.append({'kind': 'diff', 'stars': '★' * d + '☆' * (5 - d),
+                     'label': 'сложность %d' % d,
+                     'url': _catalog_link(difficulties=[str(d)])})
+    if problem.character in dict(filters.CHARACTERS):
+        row2.append({'kind': 'char', 'label': dict(filters.CHARACTERS)[problem.character],
+                     'url': _catalog_link(character=problem.character)})
+    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
+    kind_changes = {'kind': 'test' if is_test else 'open'}
+    if is_test and problem.problem_type in dict(filters.TEST_TYPES):
+        kind_changes['test_type'] = problem.problem_type
+    row2.append({'kind': 'kind', 'label': _kind_cloud_label(problem.problem_type),
+                 'url': _catalog_link(**kind_changes)})
+    for key in problem.features or ():
+        if key in dict(filters.FEATURES):
+            row2.append({'kind': 'feat', 'label': dict(filters.FEATURES)[key],
+                         'url': _catalog_link(features=[key])})
+    if sources:
+        row2.append({'kind': 'sep'})
+        for ref in sources:
+            row2.append({'kind': 'src', 'label': ref.source.name,
+                         'url': _catalog_link(sources=[str(ref.source_id)])})
+    return row1, row2
+
+
+def _norm_answer(text):
+    return re.sub(r'[\s$,.;:]+', '', (text or '').casefold())
+
+
+def _solution_block(problem, parts):
+    """Ответ и решение — раздельно, по правилам владельца (04.09.2026).
+
+    `problem.answer` → «Ответ:» в шапке; `problem.solution` → тело. Решение
+    короче 30 знаков или совпадающее с ответом — это ответ, а не решение
+    (случай «Вмешательство — 5», где в решении лежит «1800»).
+    `solution_needs_review` по-прежнему прячет решение (и решения пунктов).
+    Нет ни того ни другого — кнопки «Показать решение» нет.
+    """
+    answer = (problem.answer or '').strip()
+    solution = '' if problem.solution_needs_review else (problem.solution or '').strip()
+    if solution and (len(solution) < 30 or _norm_answer(solution) == _norm_answer(answer)):
+        if not answer:
+            answer = solution
+        solution = ''
+    part_rows = []
+    for part in parts:
+        part_solution = '' if problem.solution_needs_review else (part.solution or '').strip()
+        if part.answer or part_solution:
+            part_rows.append({'label': part.label, 'answer': part.answer,
+                              'solution': part_solution})
+    return {'answer': answer, 'solution': solution, 'parts': part_rows,
+            'has_any': bool(answer or solution or part_rows)}
+
+
+def _similar_cards(problem):
+    """Похожие — из кэша M2M, без задач за шлюзами, до четырёх (сетка 2×2)."""
+    rows = (problem.similar_problems
+            .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                    hidden_pending_review=False)
+            .prefetch_related('topics')[:4])
+    cards = []
+    for s in rows:
+        topics = [t for t in s.topics.all() if is_known(t.name)][:1]
+        title = (s.title or '').strip()
+        text = preview_text(s.statement)
+        d = s.difficulty or 0
+        cards.append({
+            'problem': s,
+            'topic': ({'name': topics[0].name, 'section': section_of(topics[0].name)}
+                      if topics else None),
+            'title': title if title and not looks_like_statement_cut(title, s.statement)
+                     else cut_words(text, 120),
+            'preview': cut_words(text, 160),
+            'difficulty': d,
+            'stars': ('★' * d + '☆' * (5 - d)) if d else '',
+            'has_solution': bool(s.solution) and not s.solution_needs_review,
+        })
+    return cards
+
+
 def problem_detail(request, pk):
+    """Страница задачи (редизайн 04.09.2026, мокап `problem_page_mockup.html`).
+
+    Полоса 1120 px с постоянной карточкой справа (ADR 0070). Заголовок —
+    только если это название, а не обрезок условия; номер задачи нигде,
+    кроме адреса. Облачка свойств ведут в каталог с этим фильтром. Всё на
+    экране — из данных: нет тегов — нет ряда, нет сложности — нет звёзд,
+    нет решения и ответа — нет кнопки (правило нуля).
+    """
     problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
                                 needs_quality_review=False,
                                 hidden_pending_review=False)
@@ -537,39 +664,39 @@ def problem_detail(request, pk):
     log_problem_event('catalog', 'opened', request.user, problem,
                       request=request)
 
-    difficulty = problem.difficulty or 0
+    topics = [t for t in problem.topics.all() if is_known(t.name)]
+    tags = list(problem.tags.all())
+    sources = list(problem.source_references.select_related('source').all())
+    parts = list(problem.parts.all())
+    title = (problem.title or '').strip()
+    show_title = bool(title) and not looks_like_statement_cut(title, problem.statement)
+    heading = title if show_title else ('Задача: ' + topics[0].name if topics else 'Задача')
+    row1, row2 = _clouds(problem, topics, tags, sources)
 
-    # Похожие задачи из кеша (топ-5), без задач за качественным шлюзом
-    similar_qs = (
-        problem.similar_problems
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                hidden_pending_review=False)
-        .prefetch_related('topics')[:5]
-    )
-    similar = []
-    for s in similar_qs:
-        d = s.difficulty or 0
-        similar.append({
-            'problem':          s,
-            'topics':           list(s.topics.all())[:2],
-            'difficulty_stars': range(d),
-            'difficulty_empty': range(5 - d),
-        })
+    saved = False
+    if request.user.is_authenticated:
+        from problems.models_platform import SavedProblem
+        saved = SavedProblem.objects.filter(owner=request.user, catalog_problem=problem,
+                                            is_deleted=False).exists()
 
+    from urllib.parse import urlencode
     context = {
-        'problem':          problem,
-        'parts':            problem.parts.all(),
-        'has_part_answers': problem.parts.filter(answer__gt='').exists(),
-        'topics':           problem.topics.all(),
-        'tags':             problem.tags.all(),
-        'sources':          problem.source_references.select_related('source').all(),
-        'difficulty_stars': range(difficulty),
-        'difficulty_empty': range(5 - difficulty),
-        'similar':          similar,
-        # Как эту задачу решают в игре. None, если она в игровой пул не
-        # попала либо попыток ещё мало (порог — game.config.STATS_MIN_ATTEMPTS):
-        # процент на пяти ответах врёт, честнее не показывать ничего.
-        'game_stat':        _game_stat(problem.pk),
+        'problem':      problem,
+        'parts':        parts,
+        'is_test':      (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX),
+        'heading':      heading,
+        'show_title':   show_title,
+        'clouds_1':     row1,
+        'clouds_2':     row2,
+        'sol':          _solution_block(problem, parts),
+        'similar':      _similar_cards(problem),
+        # «Все похожие» — поиск по смыслу с началом условия этой задачи.
+        'similar_url':  reverse('catalog:problem_list') + '?' + urlencode(
+            {'q': problem.statement[:200]}),
+        'saved':        saved,
+        'teacher_assignments_json': _teacher_assignments(request),
+        # Как эту задачу решают в игре — понадобится тесту (этап 7).
+        'game_stat':    _game_stat(problem.pk),
     }
     return render(request, 'catalog/problem_detail.html', context)
 

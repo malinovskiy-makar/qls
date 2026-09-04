@@ -58,9 +58,6 @@
 
 </script>
 <script>
-// ── Домашки учителя (JSON из view) ───────────────
-const TEACHER_ASSIGNMENTS = {{ teacher_assignments_json|safe }};
-
 // ── Модальное окно ────────────────────────────────
 function openCatalogModal(pid, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -191,92 +188,5 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeCatalogModalDirect();
 });
 
-// ── Dropdown "+ В домашку" для учителей ──────────
-let openDropdownPid = null;
-
-function closeAllDropdowns() {
-  if (openDropdownPid !== null) {
-    const dd = document.getElementById('hw-dd-' + openDropdownPid);
-    if (dd) dd.classList.remove('open');
-    openDropdownPid = null;
-  }
-}
-
-function toggleHwDropdown(pid, e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-
-  if (openDropdownPid === pid) {
-    closeAllDropdowns();
-    return;
-  }
-  closeAllDropdowns();
-
-  const dd = document.getElementById('hw-dd-' + pid);
-  if (!dd) return;
-
-  // ⚠️ Собираем узлами: название работы печатает человек, и через
-  // innerHTML оно становилось разметкой.
-  dd.textContent = '';
-  const head = document.createElement('div');
-  head.className = 'ca-dd-head';
-  head.textContent = 'Добавить в:';
-  dd.appendChild(head);
-
-  TEACHER_ASSIGNMENTS.forEach(a => {
-    const btn = document.createElement('button');
-    btn.className = 'ca-dd-item';
-    btn.textContent = a.name;
-    btn.addEventListener('click', ev => {
-      addToAssignment(a.id, pid, btn);
-      ev.stopPropagation();
-    });
-    dd.appendChild(btn);
-  });
-
-  const link = document.createElement('a');
-  link.className = 'ca-dd-item new-hw';
-  link.href = '/teacher/assignment/create/?preselect=' + pid;
-  link.textContent = '+ Новая домашка';
-  link.addEventListener('click', ev => ev.stopPropagation());
-  dd.appendChild(link);
-
-  dd.classList.add('open');
-  openDropdownPid = pid;
-}
-
-function addToAssignment(assignmentId, problemId, btn) {
-  const csrfToken = '{{ csrf_token }}';
-  fetch(`/teacher/api/assignment/${assignmentId}/add_problem/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrfToken,
-    },
-    body: JSON.stringify({ problem_id: problemId }),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.ok) {
-      btn.textContent = '✓ Добавлено';
-      btn.classList.add('done');
-      const hwBtn = document.getElementById('hw-btn-' + problemId);
-      if (hwBtn) {
-        hwBtn.textContent = '✓ Добавлено';
-        hwBtn.classList.add('added');
-      }
-      setTimeout(closeAllDropdowns, 600);
-    }
-  })
-  .catch(() => {});
-}
-
-// Закрываем dropdown при клике вне
-document.addEventListener('click', e => {
-  if (openDropdownPid !== null) {
-    const wrap = document.getElementById('hw-wrap-' + openDropdownPid);
-    if (wrap && !wrap.contains(e.target)) {
-      closeAllDropdowns();
-    }
-  }
-});
 </script>
+{% include "catalog/_hw_dropdown_js.html" %}

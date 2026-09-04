@@ -101,8 +101,11 @@ class ProblemDetailTests(TestCase):
         self.assertEqual(resp.status_code, 404)
 
     def test_part_label_single_paren_and_intro(self):
-        """H3 этап 4: метка «а)» не превращается в «а))»; над списком
-        подпунктов — метка-разделитель."""
+        """H3 этап 4: метка «а)» не превращается в «а))».
+
+        Подписи «Подпункты» больше нет (редизайн 04.09.2026: подпункты живут
+        внутри карточки условия списком `.parts`) — сторожим сам список.
+        """
         from problems.models import ProblemPart
         p = make_problem('Условие с подпунктами.')
         ProblemPart.objects.create(problem=p, label='а)',
@@ -115,7 +118,7 @@ class ProblemDetailTests(TestCase):
         self.assertNotIn('а))', html)              # нет двойной скобки
         self.assertIn('>а)<', html)                # «а)» отрисовано
         self.assertIn('>б)<', html)                # голая «б» → «б)»
-        self.assertIn('parts-intro', html)         # метка-разделитель
+        self.assertIn('<ol class="parts">', html)  # подпункты внутри условия
 
     def test_similar_block_excludes_hidden(self):
         """Блок «Похожие» не содержит зафлагованных задач даже из кэша."""

@@ -128,6 +128,21 @@ class EmptyCatalogWindowTests(TestCase):
         self.assertIn('Найдено 0', visible_text(dialog))
 
 
+class MinimalProblemPageTests(TestCase):
+    """Задача с одним условием: ни чисел, ни рядов облачек, ни кнопок."""
+
+    def test_page_has_no_numbers_rows_or_buttons(self):
+        from problems.tests.factories import make_problem
+        problem = make_problem('Только условие, больше ничего.')
+        resp = self.client.get('/catalog/problem/%d/' % problem.pk)
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
+        self.assertEqual(numbers_in(visible_text(html)) - {'0'}, set())
+        for absent in ('pp--tag', 'pp--diff', 'pp--src', 'pp-sep', 'pp--topic',
+                       'id="sol-btn"', 'id="save-btn"', 'class="sim"', '№'):
+            self.assertNotIn(absent, html.split('<main')[1])
+
+
 class EmptyCatalogApiTests(TestCase):
     """Пустая база: эндпоинт живого состояния отдаёт нули и пустые группы."""
 

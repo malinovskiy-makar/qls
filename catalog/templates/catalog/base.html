@@ -122,7 +122,11 @@ button:focus-visible {
 
 {% include '_nav.html' %}
 
-<main class="page-wrap">
+{% comment %}
+Класс полосы — блок: страница задачи шире общей полосы (ADR 0070, `pd-wrap`),
+остальные экраны блок не трогают и живут на 860.
+{% endcomment %}
+<main class="{% block main_class %}page-wrap{% endblock %}">
   {% block content %}{% endblock %}
 </main>
 
