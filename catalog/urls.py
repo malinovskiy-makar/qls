@@ -26,6 +26,9 @@ urlpatterns = [
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
     path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
+    # Тест как игра (этап 7): всё-или-ничего, попытки в сессии.
+    path('api/test-check/<int:problem_id>/',    views.api_test_check,     name='api_test_check'),
+    path('api/test-reveal/<int:problem_id>/',   views.api_test_reveal,    name='api_test_reveal'),
 
     # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
     # 01.09.2026): он слился с каталогом, поиск там один и всегда по

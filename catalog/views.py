@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
 
-from . import attachments, attempts, chat, filters
+from . import attachments, attempts, chat, filters, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
 )
@@ -142,13 +142,18 @@ def home(request):
 
 # ── Случайная опубликованная задача ─────────────────────────────────────────
 def random_problem(request):
-    problem = (
-        Problem.objects
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                hidden_pending_review=False)
-        .order_by('?')
-        .first()
-    )
+    """Случайная видимая задача; понимает фильтры каталога и `exclude=<id>`.
+
+    «Ещё тест по этой теме» на странице теста (этап 7) ведёт сюда с
+    `type=test&topic=<id>&exclude=<текущая>`: те же параметры, что у
+    каталога, разбирает `filters.parse`.
+    """
+    active = filters.parse(request.GET)
+    qs = filters.apply(filters.base_queryset('catalog'), active)
+    exclude = (request.GET.get('exclude') or '').strip()
+    if exclude.isdigit():
+        qs = qs.exclude(pk=int(exclude))
+    problem = qs.order_by('?').first()
     if problem is None:
         return redirect('catalog:problem_list')
     return redirect('catalog:problem_detail', pk=problem.pk)
@@ -685,6 +690,63 @@ def _visible_problem(pk):
                              needs_quality_review=False, hidden_pending_review=False)
 
 
+def _test_game_or_400(problem_id):
+    problem = _visible_problem(problem_id)
+    game = testplay.game_of(problem)
+    if game is None:
+        return problem, None, JsonResponse(
+            {'error': 'no_game', 'message': 'У этого теста нет вариантов для проверки.'},
+            status=400)
+    return problem, game, None
+
+
+@require_POST
+def api_test_check(request, problem_id):
+    """Проверка отмеченных вариантов теста: всё или ничего (этап 7.2).
+
+    Гость допускается: попытки считаются в сессии. Ответ —
+    `{correct, attempt}`; при неверном ответе начиная с третьей попытки
+    (после двух неудач) добавляется `correct_count`: сколько верных, но не
+    какие. Верный ответ сбрасывает счётчик, у вошедшего он записывается
+    попыткой `CatalogAttempt` с итогом «тест: решено с N-й попытки».
+    """
+    problem, game, error = _test_game_or_400(problem_id)
+    if error:
+        return error
+    data = _json_body(request)
+    raw = data.get('labels') if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw:
+        return JsonResponse({'error': 'empty', 'message': 'Отметьте хотя бы один вариант.'},
+                            status=400)
+    known = {opt['label'] for opt in game['options']}
+    given = {testplay.answer_check.normalize_label(str(x)) for x in raw}
+    if not given or not given <= known:
+        return JsonResponse({'error': 'labels', 'message': 'Такого варианта нет.'}, status=400)
+    attempt = testplay.record_attempt(request.session, problem.pk)
+    correct = testplay.check(game, given)
+    out = {'correct': correct, 'attempt': attempt}
+    if correct:
+        testplay.reset_attempts(request.session, problem.pk)
+        if request.user.is_authenticated:
+            CatalogAttempt.objects.create(
+                user=request.user, problem=problem, text='',
+                status=CatalogAttempt.Status.CHECKED, verdict=CatalogAttempt.Verdict.OK,
+                steps=[], summary=testplay.solved_summary(attempt))
+    elif attempt + 1 >= testplay.COUNT_FROM_ATTEMPT:
+        out['correct_count'] = len(game['correct'])
+    return JsonResponse(out)
+
+
+@require_POST
+def api_test_reveal(request, problem_id):
+    """Показать ответ: верные метки; счётчик попыток сбрасывается."""
+    problem, game, error = _test_game_or_400(problem_id)
+    if error:
+        return error
+    testplay.reset_attempts(request.session, problem.pk)
+    return JsonResponse({'correct_labels': sorted(game['correct'])})
+
+
 @require_POST
 def api_attempt_file(request):
     """Фото или файл к будущей попытке (этап 6.2). Только вход.
@@ -883,7 +945,16 @@ def problem_detail(request, pk):
                         .exclude(status=CatalogAttempt.Status.ERROR)
                         .order_by('-created_at').first())
     hint_total = len(_ordered_hints(problem))
+    game = testplay.game_of(problem, parts)
+    test = _test_context(problem, game, topics) if game else None
     pd_config = {'problemId': problem.pk}
+    if test:
+        pd_config['test'] = {
+            'checkUrl':  reverse('catalog:api_test_check', args=[problem.pk]),
+            'revealUrl': reverse('catalog:api_test_reveal', args=[problem.pk]),
+            'multi':     game['multi'],
+            'labels':    [opt['label'] for opt in game['options']],
+        }
     if hint_total:
         pd_config['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
         pd_config['hintTotal'] = hint_total
@@ -900,6 +971,7 @@ def problem_detail(request, pk):
         'problem':      problem,
         'ai_available': ai_available,
         'hint_total':   hint_total,
+        'test':         test,
         'remaining':    remaining,
         'last_attempt': last_attempt,
         'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
@@ -921,6 +993,30 @@ def problem_detail(request, pk):
         'game_stat':    _game_stat(problem.pk),
     }
     return render(request, 'catalog/problem_detail.html', context)
+
+
+def _test_context(problem, game, topics):
+    """Блок игры теста для шаблона (этап 7.3): варианты, правило, ссылки.
+
+    «Ещё тест по этой теме» — только если по первой теме задачи есть другой
+    видимый тест; «Почему так» — только при решении (правило нуля).
+    """
+    more_url = ''
+    if topics:
+        active = filters.parse({'type': 'test', 'topic': str(topics[0].pk)})
+        others = (filters.apply(filters.base_queryset('catalog'), active)
+                  .exclude(pk=problem.pk).exists())
+        if others:
+            more_url = reverse('catalog:random_problem') + '?' + urlencode(
+                {'type': 'test', 'topic': topics[0].pk, 'exclude': problem.pk})
+    return {
+        'multi':    game['multi'],
+        'rule':     game['rule'],
+        'options':  game['options'],
+        'more_url': more_url,
+        'expl':     (problem.solution or '').strip(),
+        'stat':     _game_stat(problem.pk),
+    }
 
 
 def _game_stat(problem_id):
