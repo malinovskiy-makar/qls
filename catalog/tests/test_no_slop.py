@@ -143,6 +143,23 @@ class MinimalProblemPageTests(TestCase):
             self.assertNotIn(absent, html.split('<main')[1])
 
 
+class NoAiKeyProblemPageTests(TestCase):
+    """Без ключа ИИ: ни кнопки проверки, ни строки лимита, ни карточки чата."""
+
+    def test_page_without_key_has_no_ai_controls(self):
+        from problems.tests.factories import make_problem, make_user
+        problem = make_problem('Условие без ИИ.', solution='Решение длиннее тридцати знаков для теста.')
+        self.client.force_login(make_user('без_ключа'))
+        with self.settings(AI_PROVIDER='anthropic'):
+            resp = self.client.get('/catalog/problem/%d/' % problem.pk)
+        self.assertEqual(resp.status_code, 200)
+        html = resp.content.decode()
+        for absent in ('id="sv-submit"', 'id="sv-remaining"', 'осталось сегодня',
+                       'Спросить ИИ', 'id="ai-text"', 'id="chk-busy"', 'attemptUrl', 'chatUrl'):
+            self.assertNotIn(absent, html)
+        self.assertEqual(numbers_in(visible_text(html)) - {'0'}, set())
+
+
 class EmptyCatalogApiTests(TestCase):
     """Пустая база: эндпоинт живого состояния отдаёт нули и пустые группы."""
 
