@@ -143,6 +143,32 @@ class MinimalProblemPageTests(TestCase):
             self.assertNotIn(absent, html.split('<main')[1])
 
 
+class NoHintsNoFilesTests(TestCase):
+    """Этап 6: подсказки и файлы — только при данных и только при входе.
+
+    Без подсказок нет ни кнопки, ни надписи «последняя подсказка», ни адреса
+    в конфиге страницы; без входа нет кнопки «Фото или файл» и адреса
+    загрузки, даже когда модель доступна.
+    """
+
+    def test_problem_without_hints_has_no_hint_ui(self):
+        from problems.tests.factories import make_problem
+        problem = make_problem('Только условие, без подсказок.')
+        html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode()
+        for absent in ('id="hint-btn"', 'id="hint-done"', 'id="hints"', 'hintUrl', 'hintTotal',
+                       'Это была последняя подсказка'):
+            self.assertNotIn(absent, html)
+
+    def test_guest_gets_no_file_button_even_with_a_model(self):
+        from django.test import override_settings
+        from problems.tests.factories import make_problem
+        problem = make_problem('Условие для гостя.')
+        with override_settings(AI_PROVIDER='fake'):
+            html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode()
+        for absent in ('id="att-add"', 'id="att-input"', 'fileUrl', 'maxFiles', 'Фото или файл'):
+            self.assertNotIn(absent, html)
+
+
 class NoAiKeyProblemPageTests(TestCase):
     """Без ключа ИИ: ни кнопки проверки, ни строки лимита, ни карточки чата."""
 

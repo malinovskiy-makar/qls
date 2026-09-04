@@ -890,8 +890,10 @@ def problem_detail(request, pk):
     if ai_available:
         pd_config['attemptUrl'] = reverse('catalog:api_attempt')
         pd_config['chatUrl'] = reverse('catalog:api_chat')
-        pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
-        pd_config['maxFiles'] = attachments.MAX_FILES
+        if request.user.is_authenticated:
+            # Файлы принимаются только от вошедших: гостю адрес не нужен.
+            pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
+            pd_config['maxFiles'] = attachments.MAX_FILES
 
     from urllib.parse import urlencode
     context = {
