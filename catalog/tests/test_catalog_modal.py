@@ -12,6 +12,7 @@ from django.contrib.staticfiles import finders
 from django.test import SimpleTestCase, TestCase
 
 from catalog import filters
+from problems.models import Tag
 from problems.tests.factories import (
     link_source, make_problem, make_source, make_topic,
 )
@@ -30,12 +31,15 @@ class ModalMarkupTests(TestCase):
                               problem_type='тест: один ответ', solution='Р.')
         cls.p2 = make_problem('ВВП.', topic=cls.gdp, difficulty=2)
         link_source(cls.p1, cls.src)
+        cls.tag = Tag.objects.create(name='Курно', slug='kurno')
+        cls.p1.tags.add(cls.tag)
 
     def test_dialog_is_built_from_the_shared_module(self):
         html = self.client.get(CATALOG_URL).content.decode()
         self.assertIn('<dialog class="ct-all" id="ct-all"', html)
         groups = re.findall(r'data-fl="(\w+)"', html)
-        self.assertEqual(groups, ['topic', 'kind', 'has_solution', 'difficulty', 'source'])
+        self.assertEqual(groups, ['topic', 'kind', 'has_solution', 'tag', 'difficulty', 'source'])
+        self.assertIn('<input class="fl-tag-input" type="search" id="tag-input"', html)
         self.assertEqual(re.findall(r'data-acc="(\w+)"', html), ['micro', 'macro'])
         # Тема — плитка-кнопка с aria-pressed и числом под своим ключом.
         self.assertIn('data-topic="%d" data-section="firm" aria-pressed="false"' % self.mon.pk, html)
@@ -53,7 +57,6 @@ class ModalMarkupTests(TestCase):
         # Групп без данных нет вовсе.
         self.assertNotIn('data-fl="character"', html)
         self.assertNotIn('data-fl="feature"', html)
-        self.assertNotIn('data-fl="tag"', html)
 
     def test_selected_state_is_drawn_by_the_server(self):
         html = self.client.get(CATALOG_URL, {
@@ -100,10 +103,15 @@ class ScriptContractTests(SimpleTestCase):
 
     def test_script_targets_every_control_of_the_window(self):
         src = Path(finders.find('catalog/js/catalog_filters.js')).read_text(encoding='utf-8')
+        # Делегированный обработчик клика обязан слушать КАЖДЫЙ элемент окна и
+        # полосы — проверяется сам селектор, а не наличие строки где-то в файле.
+        selector = re.search(r"closest\('([^']+)'\)", src[src.index("addEventListener('click'"):]).group(1)
         for hook in ('[data-topic]', '[data-tag]', '[data-diff]', '[data-src]',
                      '[data-feat]', '[data-kind]', '[data-ttype]', '[data-char]',
-                     'sol-switch', '[data-clear]', '[data-remove]', '[data-expand]',
-                     'AbortController', 'history.replaceState', 'showModal'):
+                     '[data-clear]', '[data-remove]', '[data-expand]', '[data-acc-toggle]'):
+            self.assertIn(hook, selector.split(','))
+        for hook in ("getElementById('sol-switch')", 'AbortController',
+                     'history.replaceState', 'showModal', "'?topic='"):
             self.assertIn(hook, src)
         for promise in ('появится', 'позже', 'скоро', 'demo', 'TODO'):
             self.assertNotIn(promise, src)

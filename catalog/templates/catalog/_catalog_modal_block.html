@@ -53,7 +53,7 @@
       {% for o in g.tags.chosen %}<button class="fl-pill" type="button" data-tag="{{ o.value }}" aria-pressed="true">{{ o.label }}</button>{% endfor %}
     </div></div>
     {% endif %}
-    <p class="fl-tag-empty" id="tag-empty"{% if g.tags.listed %} hidden{% endif %}>Выберите тему слева — здесь появятся её теги. Или начните вводить название тега.</p>
+    <p class="fl-tag-empty" id="tag-empty"{% if g.tags.listed %} hidden{% endif %}>Выберите тему слева: здесь появятся её теги. Или начните вводить название тега.</p>
   </div>
 
 {% elif g.type == 'kind' %}

@@ -313,7 +313,7 @@
       empty.className = 'fl-tag-empty';
       empty.id = 'tag-empty';
       if (!topics.length && !needle) {
-        empty.textContent = 'Выберите тему слева — здесь появятся её теги. Или начните вводить название тега.';
+        empty.textContent = 'Выберите тему слева: здесь появятся её теги. Или начните вводить название тега.';
         root.appendChild(empty);
       } else if (!groups.length) {
         empty.textContent = 'Ничего не нашлось: попробуйте другое слово.';
