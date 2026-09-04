@@ -1,5 +1,4 @@
 from django import template
-from django.utils.safestring import mark_safe
 
 from problems.figures import render_figures as _render_figures
 from problems.jsonsafe import dumps_for_script
@@ -122,6 +121,8 @@ def script_json(value):
     Штатный `json_script` пишет не-ASCII как `\\uXXXX`: страница переставала
     содержать русские фразы буквально, и проверка «HTML содержит фразу» их
     не находила. `dumps_for_script` держит кириллицу и экранирует только
-    `<`, `>`, `&` — выйти из тега таким значением нельзя, поэтому `safe`.
+    `<`, `>`, `&` — выйти из тега таким значением нельзя. Выводить через
+    `|safe` в шаблоне (как и остальные вызовы `dumps_for_script`), иначе
+    автоэкранирование превратит кавычки JSON в `&quot;`.
     """
-    return mark_safe(dumps_for_script(value))
+    return dumps_for_script(value)

@@ -549,10 +549,19 @@ def _chips(carry, active, topics, tags, sources):
         chips.append({'kind': 'feature', 'value': active['feature'],
                       'label': dict(FEATURES)[active['feature']],
                       'remove_url': query(carry, active, feature='')})
-    for option in sources:
-        if option['active']:
-            chips.append({'kind': 'source', 'value': option['value'],
-                          'label': option['label'],
+    if active['source']:
+        label = next((o['label'] for o in sources if o['active']), '')
+        if not label:
+            # ⚠️ ИСТОЧНИК ВЫБРАН, НО ПОД ОСТАЛЬНЫМИ ФИЛЬТРАМИ У НЕГО НОЛЬ
+            # ЗАДАЧ: в список вариантов он не попал (там только счётные),
+            # а чип обязан быть — иначе фильтр нечем снять, и бейдж на
+            # «Все фильтры» врёт числом. Поймано глазами 04.09.2026.
+            from problems.models import Source
+            label = (Source.objects.filter(pk=active['source'])
+                     .values_list('name', flat=True).first() or '')
+        if label:
+            chips.append({'kind': 'source', 'value': active['source'],
+                          'label': label,
                           'remove_url': query(carry, active, source='')})
     return chips
 

@@ -33,7 +33,7 @@
 уже лежит первая фраза, она и остаётся статичной подсказкой.
 {% endcomment %}
 {% load catalog_filters %}
-<script type="application/json" id="{{ el_id }}-phrases">{{ phrases|script_json }}</script>
+<script type="application/json" id="{{ el_id }}-phrases">{{ phrases|script_json|safe }}</script>
 <script>
 (function () {
   'use strict';

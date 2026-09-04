@@ -88,7 +88,7 @@ class SearchFieldTests(TestCase):
         html = self.client.get(CATALOG_URL).content.decode()
         for needle in ('<form class="ask"', 'id="ct-q"', 'class="ask-hint"',
                        'class="ask-busy"', 'id="ask-clear"', 'id="ask-go"',
-                       'Ищем по смыслу — точные слова не нужны'):
+                       'Ищем по смыслу: точные слова не нужны'):
             self.assertIn(needle, html)
         # Отдельных кнопок «Найти» и «Очистить» больше нет.
         self.assertNotIn('>Найти<', html)
@@ -172,6 +172,15 @@ class StripTests(TestCase):
         self.assertIn('difficulty=4', by_kind['topic'])
         self.assertNotIn('difficulty=', by_kind['difficulty'])
         self.assertIn('topic=%d' % self.mon.pk, by_kind['difficulty'])
+
+    def test_active_source_keeps_its_chip_even_at_zero_count(self):
+        """Источник выбран, под остальными фильтрами у него ноль — чип есть."""
+        html = self.client.get(CATALOG_URL, {'source': self.source.pk,
+                                             'difficulty': 2}).content.decode()
+        self.assertEqual(re.findall(r'data-chip="(\w+)"', html),
+                         ['difficulty', 'source'])
+        self.assertIn('data-chip="source">Сборник<a', html)
+        self.assertIn('<span class="n">2</span>', html)
 
     def test_chips_are_a_key_of_the_shared_filters_module(self):
         active = filters.parse({'topic': str(self.mon.pk), 'has_solution': '1'})

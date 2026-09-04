@@ -106,10 +106,20 @@ document.addEventListener('click', function (e) {
   var clear = document.getElementById('ask-clear');
 
   function sync() {
-    form.classList.toggle('has-text', field.value.trim().length > 0);
-    /* Поле растёт под текст, но не ниже трёх строк. */
-    field.style.height = 'auto';
-    field.style.height = Math.max(96, field.scrollHeight) + 'px';
+    var text = field.value.trim();
+    form.classList.toggle('has-text', text.length > 0);
+    /* Поле растёт под ВВЕДЁННЫЙ текст и не ниже трёх строк; без текста
+       высота возвращается к трём строкам из CSS.
+       ⚠️ scrollHeight ПУСТОГО поля считает и перенесённый placeholder:
+       на узком окне подсказка ложится в полсотни строк, и поле раздувалось
+       на весь экран. Меряем только при тексте и при снятом flex — иначе
+       замер берёт высоту, до которой поле уже растянул ряд. */
+    field.style.height = '';
+    if (!text) return;
+    field.style.flex = '0 0 auto';
+    var height = Math.max(96, field.scrollHeight);
+    field.style.flex = '';
+    field.style.height = height + 'px';
   }
   field.addEventListener('input', sync);
   field.addEventListener('keydown', function (e) {
