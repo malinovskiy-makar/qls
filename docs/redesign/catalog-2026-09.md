@@ -104,7 +104,7 @@
 
 | Что | Число | Откуда |
 |---|---|---|
-| Коммитов на ветке после `origin/main` | 32 (этапы 1–3: 8; этап 4: 3; этап 5: 6; этап 6: 5; этап 7: 5 + финал) | `git log origin/main..feat/catalog-redesign` |
+| Коммитов на ветке после `origin/main` | **26** (этапы 1–3: 8; этап 4: 3; этап 5: 6; этап 6: 4; этап 7: 4 + финал) | `git log origin/main..feat/catalog-redesign` |
 | Тестов, шаг A | 3 875 → **3 999** (+124 за сессии 1–2), шаг B 8 | `scripts/run_tests.py` |
 | Красных вне этой работы | 1 — `calc2…test_calc2_control_numbers`, красный и на чистом `origin/main` | worktree 04.09 |
 | Миграции | `problems` 0050 (`character`, `features`), 0051 (`CatalogAttempt`), 0052 (`Hint.generated_by_ai`, `reviewed`), 0053 (данные: старые подсказки = проверены) | `showmigrations problems` |
