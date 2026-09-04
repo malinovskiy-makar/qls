@@ -25,6 +25,56 @@
     }).then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }); });
   }
 
+  /* ── Фото или файл: грузится сразу, к попытке привязывается при отправке ── */
+  var pendingFiles = [];
+  var attInput = $('att-input'), attAdd = $('att-add'), attBox = $('sv-attach');
+  function renderFiles() {
+    if (!attBox) { return; }
+    Array.prototype.forEach.call(attBox.querySelectorAll('.att'), function (el) { el.remove(); });
+    pendingFiles.forEach(function (f) {
+      var chip = document.createElement('span');
+      chip.className = 'att';
+      var thumb = document.createElement('span');
+      thumb.className = 'thumb';
+      thumb.textContent = f.kind === 'application/pdf' ? 'PDF' : 'IMG';
+      chip.appendChild(thumb);
+      chip.appendChild(document.createTextNode(f.name));
+      var x = document.createElement('button');
+      x.type = 'button';
+      x.className = 'x';
+      x.setAttribute('aria-label', 'Убрать файл');
+      x.textContent = '×';
+      x.addEventListener('click', function () {
+        pendingFiles = pendingFiles.filter(function (g) { return g.id !== f.id; });
+        renderFiles();
+      });
+      chip.appendChild(x);
+      attBox.insertBefore(chip, attAdd);
+    });
+    if (attAdd) { attAdd.disabled = pendingFiles.length >= (cfg.maxFiles || 3); }
+  }
+  if (attInput && attAdd && cfg.fileUrl) {
+    attAdd.addEventListener('click', function () { attInput.click(); });
+    attInput.addEventListener('change', function () {
+      var file = attInput.files && attInput.files[0];
+      attInput.value = '';
+      if (!file) { return; }
+      var form = new FormData();
+      form.append('file', file);
+      form.append('pending', pendingFiles.map(function (f) { return f.id; }).join(','));
+      attAdd.disabled = true;
+      fetch(cfg.fileUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }, body: form })
+        .then(function (r) { return r.json().then(function (d) { d._status = r.status; return d; }); })
+        .then(function (d) {
+          if (d.error) { say(d.message || 'Файл не принят.'); return; }
+          say('');
+          pendingFiles.push({ id: d.id, name: d.name, kind: d.kind });
+        })
+        .catch(function () { say('Не удалось загрузить файл, попробуйте ещё раз.'); })
+        .then(renderFiles);
+    });
+  }
+
   /* ── Проверка решения ──────────────────────────────────────────────── */
   var submit = $('sv-submit'), field = $('sv-text'), busy = $('chk-busy'),
       holder = $('chk-holder'), remaining = $('sv-remaining'), note = $('sv-note');
@@ -37,16 +87,19 @@
     submit.dataset.label = submit.textContent.trim();
     submit.addEventListener('click', function () {
       var text = field.value.trim();
-      if (!text) { field.focus(); return; }
+      if (!text && !pendingFiles.length) { field.focus(); return; }
       say('');
       setBusy(true);
       post(cfg.attemptUrl, { problem_id: cfg.problemId, text: text,
+                             file_ids: pendingFiles.map(function (f) { return f.id; }),
                              solution_viewed_before: !!window.solutionViewedBefore })
         .then(function (d) {
           setBusy(false);
           if (d.error) { say(d.message || 'Проверка не удалась, попробуйте ещё раз.'); return; }
           holder.innerHTML = d.html;
           window.attemptSubmitted = true;
+          pendingFiles = [];
+          renderFiles();
           if (remaining && d.remaining !== undefined) { remaining.textContent = d.remaining; }
           setBusy(false);
           var chk = $('chk');

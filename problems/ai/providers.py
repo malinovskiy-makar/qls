@@ -81,7 +81,7 @@ class BaseProvider(object):
         raise NotImplementedError
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None):
+                 timeout=None, images=None):
         raise NotImplementedError
 
 
@@ -124,7 +124,7 @@ class AnthropicProvider(BaseProvider):
         return ''
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None):
+                 timeout=None, images=None):
         """⚠️ КЭШИРУЕТСЯ ТОЛЬКО ПЕРВЫЙ БЛОК — неизменное ядро.
 
         Пометка стоит на нём, потому что скидка даётся на ПРЕФИКС запроса:
@@ -141,13 +141,24 @@ class AnthropicProvider(BaseProvider):
                 block['cache_control'] = {'type': 'ephemeral'}
             system.append(block)
 
+        # Файлы (фото решения, PDF) — блоками ПЕРЕД текстом; текст один.
+        content = user_text
+        if images:
+            content = []
+            for image in images:
+                kind = 'document' if image['media_type'] == 'application/pdf' else 'image'
+                content.append({'type': kind, 'source': {
+                    'type': 'base64', 'media_type': image['media_type'],
+                    'data': image['data']}})
+            content.append({'type': 'text', 'text': user_text})
+
         client = anthropic.Anthropic(api_key=self.api_key())
         try:
             response = client.messages.create(
                 model=model,
                 max_tokens=max_tokens,
                 system=system,
-                messages=[{'role': 'user', 'content': user_text}],
+                messages=[{'role': 'user', 'content': content}],
                 output_config={'format': {'type': 'json_schema',
                                           'schema': schema}},
                 timeout=timeout,
@@ -213,7 +224,7 @@ class FakeProvider(BaseProvider):
         return ''
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
-                 timeout=None):
+                 timeout=None, images=None):
         from django.conf import settings
 
         reply = getattr(settings, 'AI_FAKE_REPLY', None)

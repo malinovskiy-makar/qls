@@ -14,7 +14,7 @@ from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
 
-from . import attempts, chat, filters
+from . import attachments, attempts, chat, filters
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
 )
@@ -24,7 +24,7 @@ from .preview import (
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
 from problems.models import (
-    CatalogAttempt, Collection, Problem, ProblemFigure, Source, Topic,
+    CatalogAttempt, Collection, FileAsset, Problem, ProblemFigure, Source, Topic,
 )
 from problems.management.commands.apply_topic_mapping import CANONICAL
 
@@ -686,6 +686,30 @@ def _visible_problem(pk):
 
 
 @require_POST
+def api_attempt_file(request):
+    """Фото или файл к будущей попытке (этап 6.2). Только вход.
+
+    Один файл на запрос: jpg/png/webp/pdf до 10 МБ, не больше трёх на
+    попытку (`pending` — id уже загруженных). Хранится `FileAsset` вида
+    «работа ученика», к попытке привязывается при отправке решения.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login', 'message': 'Войдите, чтобы прикрепить файл.'},
+                            status=403)
+    pending = [x for x in (request.POST.get('pending') or '').split(',') if x.strip().isdigit()]
+    if len(pending) >= attachments.MAX_FILES:
+        return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY}, status=400)
+    uploaded = request.FILES.get('file')
+    media_type, error = attachments.validate_upload(uploaded)
+    if error:
+        return JsonResponse({'error': 'file', 'message': error}, status=400)
+    asset = FileAsset.objects.create(file=uploaded, kind=FileAsset.Kind.STUDENT_WORK,
+                                     caption=(uploaded.name or '')[:300],
+                                     uploaded_by=request.user)
+    return JsonResponse({'id': asset.pk, 'name': asset.caption, 'kind': media_type})
+
+
+@require_POST
 def api_attempt(request):
     """Отправить решение на проверку ИИ (этап 5, ADR 0071).
 
@@ -704,9 +728,19 @@ def api_attempt(request):
     except (TypeError, ValueError):
         return JsonResponse({'error': 'problem', 'message': 'Задача не указана.'}, status=400)
     text = (data.get('text') or '').strip()
-    if not text:
+    raw_ids = data.get('file_ids') or []
+    if not isinstance(raw_ids, list) or len(raw_ids) > attachments.MAX_FILES:
+        return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY}, status=400)
+    file_ids = [int(x) for x in raw_ids if str(x).isdigit()]
+    files = list(FileAsset.objects.filter(pk__in=file_ids, uploaded_by=request.user,
+                                          kind=FileAsset.Kind.STUDENT_WORK)) if file_ids else []
+    if len(files) != len(set(file_ids)):
+        return JsonResponse({'error': 'file', 'message': 'Файл не найден: прикрепите его заново.'},
+                            status=400)
+    if not text and not files:
         return JsonResponse({'error': 'empty',
-                             'message': 'Напишите решение, прежде чем отправлять.'}, status=400)
+                             'message': 'Напишите решение или приложите фото, прежде чем отправлять.'},
+                            status=400)
     if len(text) > 20000:
         return JsonResponse({'error': 'long',
                              'message': 'Слишком длинный текст: сократите решение.'}, status=400)
@@ -718,7 +752,13 @@ def api_attempt(request):
     attempt = CatalogAttempt.objects.create(
         user=request.user, problem=problem, text=text,
         solution_viewed_before=bool(data.get('solution_viewed_before')))
+    if files:
+        attempt.files.set(files)
     try:
+        if files:
+            # Сначала текст с фото, потом проверка по тексту и распознанному.
+            attachments.recognise_attempt(attempt, request.user)
+            attempt.save(update_fields=['ocr_text'])
         attempts.check_attempt(attempt, request.user)
     except ai.AiUnavailable as exc:
         attempt.status = CatalogAttempt.Status.ERROR
@@ -850,6 +890,8 @@ def problem_detail(request, pk):
     if ai_available:
         pd_config['attemptUrl'] = reverse('catalog:api_attempt')
         pd_config['chatUrl'] = reverse('catalog:api_chat')
+        pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
+        pd_config['maxFiles'] = attachments.MAX_FILES
 
     from urllib.parse import urlencode
     context = {

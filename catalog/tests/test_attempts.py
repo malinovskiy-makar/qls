@@ -120,7 +120,8 @@ class CheckAttemptTests(TestCase):
         calls = {}
         original = providers.FakeProvider.complete
 
-        def spy(self_, system_blocks, user_text, schema, model, max_tokens, timeout=None):
+        def spy(self_, system_blocks, user_text, schema, model, max_tokens, timeout=None,
+                images=None):
             calls['timeout'] = timeout
             return original(self_, system_blocks, user_text, schema, model, max_tokens, timeout=timeout)
 

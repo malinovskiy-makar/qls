@@ -134,7 +134,7 @@ def _cache_key(profile, model, user_text):
 
 
 def run(profile, user_text, schema, user, max_tokens=None,
-        cache_seconds=None, check_limit=True, timeout=None):
+        cache_seconds=None, check_limit=True, timeout=None, images=None):
     """Выполнить задачу `profile` и вернуть разобранную структуру.
 
     `user_text` — ВСЁ переменное: описание, параметры, подсказки из банка.
@@ -144,6 +144,11 @@ def run(profile, user_text, schema, user, max_tokens=None,
     `timeout` — потолок одного вызова в секундах (по умолчанию
     `AI_TIMEOUT_SECONDS`): превышение — `AiUnavailable('other')` с
     человеческим текстом, а не вечное ожидание.
+
+    `images` — список `{media_type, data}` (base64) для распознавания
+    текста с фото: файл уходит поставщику блоком рядом с текстом. Кэш
+    ответов ключ по картинке не считает — вызывающий кладёт хеш файла в
+    `user_text` (`catalog/attachments.py`).
     """
     provider = _provider()
     if not provider.is_available():
@@ -172,7 +177,7 @@ def run(profile, user_text, schema, user, max_tokens=None,
         reply = provider.complete(
             blocks, user_text, schema, model,
             max_tokens or _setting('AI_MAX_TOKENS', DEFAULT_MAX_TOKENS),
-            timeout=timeout or timeout_seconds())
+            timeout=timeout or timeout_seconds(), images=images or None)
     except providers.ProviderError as error:
         _log(user, profile, provider.name, model, None,
              time.monotonic() - started, ok=False, note=str(error)[:290])
