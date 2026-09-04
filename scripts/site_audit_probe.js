@@ -30,6 +30,11 @@ const BOTS = {
 const PAGES = [
   ['/', ['guest', 'student', 'teacher']],
   ['/catalog/', ['guest', 'student', 'teacher']],
+  /* ⚠️ СТРАНИЦА ЗАДАЧИ БЫЛА ПРОПУЩЕНА в первом обходе Фазы 8, и дефект на
+     ней нашёлся только снимками: на 380 px документ 437 px. Это самая
+     посещаемая страница каталога — пропускать её нельзя. Номер задачи
+     подставляется живой, ссылкой с самого каталога (см. ниже). */
+  ['/catalog/problem/', ['guest', 'student']],
   ['/catalog/map/', ['guest', 'student']],
   ['/textbook/', ['guest', 'student']],
   ['/olympiads/', ['guest', 'student']],
@@ -71,14 +76,32 @@ async function login(page, role) {
 (async () => {
   const browser = await chromium.launch();
 
+  /* Живой номер задачи для `/catalog/problem/`: берём ссылкой с каталога,
+     а не зашиваем числом — на чужой базе зашитый номер даст 404, и проба
+     доложит «страница цела», проверив страницу ошибки. */
+  let problemUrl = null;
+  {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(BASE + '/catalog/', { waitUntil: 'load' });
+    problemUrl = await page.evaluate(() => {
+      const a = document.querySelector('a[href^="/catalog/problem/"]');
+      return a && a.getAttribute('href');
+    });
+    await ctx.close();
+    if (!problemUrl) console.log('ВНИМАНИЕ: на каталоге не нашлось ни одной задачи');
+  }
+
   for (const role of ['guest', 'student', 'teacher']) {
     const ctx = await browser.newContext();
     const page = await ctx.newPage();
     await page.setViewportSize({ width: 1440, height: 900 });
     if (role !== 'guest') await login(page, role);
 
-    for (const [url, roles] of PAGES) {
+    for (const [rawUrl, roles] of PAGES) {
       if (!roles.includes(role)) continue;
+      const url = rawUrl === '/catalog/problem/' ? problemUrl : rawUrl;
+      if (!url) continue;
       for (const theme of THEMES) {
         for (const width of WIDTHS) {
           const consoleErrors = [];

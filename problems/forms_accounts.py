@@ -89,7 +89,7 @@ class ProfileForm(forms.ModelForm):
     username = forms.CharField(label='Логин', max_length=150)
     email = forms.EmailField(
         label='Почта', required=False,
-        help_text='Необязательно, не подтверждается — только для связи.')
+        help_text='Необязательно, не подтверждается, нужно только для связи.')
 
     class Meta:
         model = UserProfile
