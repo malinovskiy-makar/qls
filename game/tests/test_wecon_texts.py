@@ -66,20 +66,39 @@ class LogoMarkTests(TestCase):
 
 
 class NavigationTests(TestCase):
-    u"""1.2 Пункт навигации называется «Тренажёр»."""
+    u"""1.2 Пункт навигации называется «Тренажёр».
 
-    def test_nav_says_trenazhor_everywhere(self):
-        src = read(NAV)
-        self.assertEqual(src.count('>Тренажёр</a>'), 4)
-        self.assertNotIn('>Игра</a>', src)
+    ⚠️ ПРОВЕРКА ПЕРЕЕХАЛА С ШАБЛОНА НА ОТРИСОВАННУЮ СТРАНИЦУ (04.09.2026).
+    Прежде `_nav.html` держал четыре копии ряда ссылок, и тест считал в нём
+    четыре литерала «Тренажёр» и восемь условий подсветки. Копий больше нет:
+    состав меню собирает `config/context_processors.py::site_meta`, а
+    разметка — один цикл. Считать литералы стало нечего, и это к лучшему:
+    важно, что видит человек, а не сколько раз слово написано в файле.
+    """
 
-    def test_active_underline_still_keyed_on_game_path(self):
-        u"""Переименование не должно было тронуть подсветку активного пункта."""
-        self.assertEqual(read(NAV).count("'/game/' in request.path"), 8)
+    def _nav_labels(self, html):
+        u"""Подписи пунктов шапки в порядке слева направо."""
+        block = html.split('<div class="nav-links">', 1)[-1].split('</div>', 1)[0]
+        return re.findall(r'class="nav-link[^"]*"[^>]*>([^<]+)</a>', block)
 
     def test_rendered_page_shows_the_new_name(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        self.assertIn('>Тренажёр</a>', html)
+        labels = self._nav_labels(html)
+        self.assertEqual(labels.count('Тренажёр'), 1, labels)
+        self.assertNotIn('Игра', labels)
+
+    def test_textbook_stands_right_after_catalog(self):
+        u"""Порядок задан владельцем: «Учебник» сразу за «Каталогом»."""
+        labels = self._nav_labels(
+            self.client.get(reverse('game:page')).content.decode('utf-8'))
+        self.assertEqual(labels.count('Учебник'), 1, labels)
+        self.assertEqual(labels[labels.index('Каталог') + 1], 'Учебник', labels)
+
+    def test_active_item_is_marked_on_the_game_page(self):
+        u"""«Где я сейчас» осталось на месте после переезда логики в питон."""
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
+        self.assertEqual(set(active), {'Тренажёр'}, active)
 
 
 class StartScreenTextTests(TestCase):
