@@ -68,11 +68,21 @@ class ProviderError(Exception):
     доступ» и «сервис не ответил» — это разные советы. Код ошибки
     (401/429/500) остаётся в журнале сервера и на экран не выходит: он
     ничего не говорит тому, кто собирает домашку.
-    """
 
-    def __init__(self, message, kind='other'):
+    ⚠️ `original` — СЫРОЕ исключение поставщика (`openai.APIStatusError` и
+    т.п.), НЕ печатается на экран репетитору (см. выше), но нужно журналу
+    отказов боевого прогона (`pilot_enrich_v2.append_error_log`): именно в
+    нём живут `status_code`/`body`/код провайдера. Разбор `run2-corpus-
+    20260904` (04.09.2026) полтора часа отказов `400 code 1210` не смог
+    разобрать ИМЕННО потому, что `ProviderError` терял их бесследно —
+    `_fail()` заворачивал их в человеческий текст и выбрасывал оригинал.
+    `None` — когда `ProviderError` создан напрямую, не через `_fail()`
+    (например `FakeProvider`)."""
+
+    def __init__(self, message, kind='other', original=None):
         super(ProviderError, self).__init__(message)
         self.kind = kind
+        self.original = original
 
 
 class BaseProvider(object):
@@ -103,9 +113,14 @@ class BaseProvider(object):
         в журнале оставался тот же текст, что видел репетитор. Локально
         это стоило часа поисков — падала `urllib3` v2 на LibreSSL, а лог
         сообщал «Сервис разбора запроса недоступен».
+
+        `original=error` — та же причина, что уходит и в `log_cause`, но
+        сохранённая НА объекте, а не только в логгере: журналу отказов
+        боевого прогона (Фаза 1, 04.09.2026) нужен `status_code`/`body`
+        оригинального исключения, а не человеческий текст `text`.
         """
         log_cause(error)
-        return ProviderError(text, kind=kind)
+        return ProviderError(text, kind=kind, original=error)
 
 class AnthropicProvider(BaseProvider):
     name = 'anthropic'

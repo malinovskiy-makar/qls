@@ -49,6 +49,8 @@ import sqlite3
 import tempfile
 import threading
 import time
+from collections import Counter
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -977,7 +979,7 @@ NETWORK_RETRY_BASE_SECONDS = 2  # 2, 4, 8, 16 — растёт на каждой
 RETRYABLE_PROVIDER_ERROR_KINDS = ('other', 'limit')
 
 
-def make_openai_complete_fn():
+def make_openai_complete_fn(error_log_path=None, run_id=None, prompt_version=None):
     """Обёртка над `OpenAIProvider.complete` для боевого `--apply`.
 
     ⚠️ ОБХОД `core.run()` — см. докстринг модуля целиком.
@@ -986,6 +988,11 @@ def make_openai_complete_fn():
     владельца постоянно включён VPN, и `luna-luna` упала на 86-й задаче из
     3000 запланированных именно на таймауте. `kind='no_key'` (ключ не
     настроен) НЕ повторяется — ждать тут нечего, отказ постоянный.
+
+    `error_log_path` (Фаза 1, 04.09.2026) — если задан, каждая неудачная
+    попытка пишет строку в журнал отказов ДО того, как решить, повторять
+    ли (см. `append_error_log`); `None` — поведение прежнее, без журнала
+    (пилоты/тесты, где журнал отказов не нужен).
     """
     provider = providers.OpenAIProvider()
 
@@ -1005,6 +1012,11 @@ def make_openai_complete_fn():
             try:
                 return _call_once(model, blocks, user_text, schema, effort, images)
             except providers.ProviderError as error:
+                will_retry = (error.kind in RETRYABLE_PROVIDER_ERROR_KINDS
+                             and attempt < NETWORK_RETRIES - 1)
+                if error_log_path is not None:
+                    append_error_log(error_log_path, run_id, prompt_version,
+                                     attempt + 1, error, will_retry)
                 if error.kind not in RETRYABLE_PROVIDER_ERROR_KINDS:
                     raise
                 last_error = error
@@ -1162,10 +1174,13 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
     user1 = prompts_v2.call1_user_text(
         text1, shortlist_terms, solution_block=solution_block)
     images1 = images_for_call1(problem.figures.all())
-    reply1, data1, ok1, violations1, retried1, attempts1 = call_with_retry(
-        complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
-        variant['call1_effort'], images1,
-        lambda d: validate_call1_full(d, with_concepts, shortlist_terms=shortlist_terms))
+    with call_error_context(problem_id=problem.id, call='call1',
+                            prompt_chars=len(user1), has_image=bool(images1),
+                            solution_sent=solution_stats['sent']):
+        reply1, data1, ok1, violations1, retried1, attempts1 = call_with_retry(
+            complete_fn, variant['call1_model'], core1_blocks, user1, schema1,
+            variant['call1_effort'], images1,
+            lambda d: validate_call1_full(d, with_concepts, shortlist_terms=shortlist_terms))
     strip_given_find_prefixes(data1)
     row = {'problem_id': problem.id, 'call1': data1,
           'call1_violations': violations1, 'call1_usage': reply1,
@@ -1199,10 +1214,13 @@ def _process_one_problem(problem, variant, complete_fn, shortlists,
     # Фаза 1.2: запрос с цифрой выбрасывается ДО проверки — вызов из-за
     # него не повторяется (см. `drop_digit_search_queries`).
     sanitize2, dropped2 = make_query_sanitizer()
-    reply2, data2, ok2, violations2, retried2, attempts2 = call_with_retry(
-        complete_fn, variant['call2_model'], core2_blocks, user2, schema2,
-        variant['call2_effort'], None, validate_call2_full,
-        sanitize_fn=sanitize2)
+    with call_error_context(problem_id=problem.id, call='call2',
+                            prompt_chars=len(user2), has_image=False,
+                            solution_sent=bool(problem.solution)):
+        reply2, data2, ok2, violations2, retried2, attempts2 = call_with_retry(
+            complete_fn, variant['call2_model'], core2_blocks, user2, schema2,
+            variant['call2_effort'], None, validate_call2_full,
+            sanitize_fn=sanitize2)
     row['call2'] = data2
     row['call2_violations'] = violations2
     row['call2_usage'] = reply2
@@ -1352,6 +1370,173 @@ def append_raw_log(path, run_id, prompt_version, model, problem_id,
         fh.write(json.dumps(entry, ensure_ascii=False))
         fh.write('\n')
     return entry
+
+
+# ---------------------------------------------------------------------------
+# Фаза 1 (04.09.2026, разбор run2-corpus-20260904): журнал ОТКАЗОВ.
+# `append_raw_log` выше зовётся из `on_row`, то есть ТОЛЬКО после успеха —
+# запрос, отбитый сервером, бросает исключение и до записи не доходит.
+# Итог прошлого прогона: полтора часа отказов `400 code 1210` (09:45-11:15)
+# не оставили НИ ОДНОЙ строки нигде, и разделить жертв сети от жертв 1210
+# стало невозможно (RUN2_POSTMORTEM.md, раздел 5). Теперь любая неудачная
+# попытка — даже та, что через секунду закроется повтором — оставляет
+# строку JSONL.
+# ---------------------------------------------------------------------------
+
+_call_error_context = threading.local()
+
+
+class call_error_context(object):
+    """Контекст одного вызова (`problem_id`, `call`, размер запроса,
+    картинка, решение) для журнала отказов — тред-локально, а НЕ новый
+    параметр `complete_fn`.
+
+    `complete_fn(model, blocks, user_text, schema, effort, images=None)` —
+    открытый контракт: десятки `fake_complete` в тестах подделывают его
+    ровно этой сигнатурой, и любой новый обязательный/передаваемый на
+    каждый вызов параметр уронил бы их все `TypeError`. Контекст
+    выставляется СНАРУЖИ, вокруг `call_with_retry` в `_process_one_problem`
+    (которая и так знает про задачу и про то, call1 сейчас или call2), и
+    читается ВНУТРИ настоящей боевой обёртки (`make_glm_complete_fn`/
+    `make_openai_complete_fn`) на каждой неудачной попытке — подставные
+    `complete_fn` тестов его никогда не читают и не обязаны знать о нём.
+    """
+
+    def __init__(self, **fields):
+        self.fields = fields
+        self._prev = None
+
+    def __enter__(self):
+        self._prev = getattr(_call_error_context, 'value', None)
+        _call_error_context.value = self.fields
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _call_error_context.value = self._prev
+        return False
+
+
+def _current_call_error_context():
+    return getattr(_call_error_context, 'value', None) or {}
+
+
+def classify_provider_error(error):
+    """`(error_class, http_status, api_code, message)` из `ProviderError`.
+
+    Достаём из `error.original` — сырое исключение поставщика, сохранённое
+    `BaseProvider._fail()` (см. `problems/ai/providers.py`), а не из самого
+    `error`: `ProviderError.args[0]` — уже человеческий текст без кода и
+    статуса (такой и была дыра, из-за которой `1210` не разобрать). Всё
+    best-effort в `try`: поставщик может прислать что угодно, разбор
+    отказа не имеет права сам стать отказом.
+    """
+    original = getattr(error, 'original', None)
+    source = original if original is not None else error
+    error_class = type(source).__name__
+
+    http_status = None
+    api_code = None
+    try:
+        http_status = getattr(original, 'status_code', None)
+    except Exception:  # noqa: BLE001 — разбор чужого исключения не должен падать
+        pass
+    try:
+        body = getattr(original, 'body', None)
+        if isinstance(body, dict):
+            inner = body.get('error')
+            if isinstance(inner, dict):
+                api_code = inner.get('code')
+        if api_code is None:
+            api_code = getattr(original, 'code', None)
+    except Exception:  # noqa: BLE001 — см. выше
+        pass
+
+    message = str(source)[:500]
+    return error_class, http_status, api_code, message
+
+
+def append_error_log(path, run_id, prompt_version, attempt, error, will_retry):
+    """Одна строка журнала отказов на одну неудачную попытку вызова.
+
+    Контекст задачи (`problem_id`, `call`, `prompt_chars`, `has_image`,
+    `solution_sent`) берётся из `call_error_context` — сам `complete_fn`
+    не знает, какую задачу обрабатывает.
+
+    ⚠️ Запись САМА НЕ ИМЕЕТ ПРАВА уронить прогон — иначе кривой байт в
+    сообщении об ошибке стоил бы всех уже оплаченных вызовов пачки. Любое
+    исключение здесь проглатывается с одной строкой в консоль (требование
+    Фазы 1, пункт 3)."""
+    ctx = _current_call_error_context()
+    error_class, http_status, api_code, message = classify_provider_error(error)
+    entry = {
+        'ts': datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3],
+        'run_id': run_id,
+        'prompt_version': prompt_version,
+        'problem_id': ctx.get('problem_id'),
+        'call': ctx.get('call'),
+        'attempt': attempt,
+        'error_class': error_class,
+        'http_status': http_status,
+        'api_code': api_code,
+        'message': message,
+        'prompt_chars': ctx.get('prompt_chars'),
+        'has_image': ctx.get('has_image'),
+        'solution_sent': ctx.get('solution_sent'),
+        'will_retry': will_retry,
+    }
+    try:
+        error_path = Path(path)
+        error_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(error_path, 'a', encoding='utf-8') as fh:
+            fh.write(json.dumps(entry, ensure_ascii=False))
+            fh.write('\n')
+    except Exception as exc:  # noqa: BLE001 — запись журнала не роняет прогон
+        print('⚠️ журнал отказов: не удалось записать строку (%s: %s)'
+             % (type(exc).__name__, exc))
+    return entry
+
+
+def iter_error_log(path):
+    """Строки журнала отказов по одной, генератором — как `iter_raw_log`."""
+    path = Path(path)
+    if not path.exists():
+        return
+    with open(path, encoding='utf-8') as fh:
+        for line in fh:
+            line = line.strip()
+            if line:
+                yield json.loads(line)
+
+
+def summarize_errors_log(path):
+    """Свод по журналу отказов для `errors_summary` в `build_metrics`:
+    сколько неудачных ПОПЫТОК всего, разбивка по классу исключения и по
+    коду поставщика, сколько РАЗНЫХ задач потеряно окончательно.
+
+    «Потеряна окончательно» — задача, у которой есть хотя бы одна запись
+    с `will_retry=False`: это последняя попытка вызова, дальше исключение
+    уходит наверх без повтора. Задача, чей единственный отказ закрылся
+    повтором (`will_retry=True` на всех строках), в `problems_lost` не
+    попадает — она есть в результате."""
+    by_class = Counter()
+    by_code = Counter()
+    total = 0
+    lost_ids = set()
+    for entry in iter_error_log(path):
+        total += 1
+        by_class[entry.get('error_class') or 'неизвестно'] += 1
+        code = entry.get('api_code')
+        if code is not None:
+            by_code[str(code)] += 1
+        if not entry.get('will_retry') and entry.get('problem_id') is not None:
+            lost_ids.add(entry['problem_id'])
+    return {
+        'total_failed_attempts': total,
+        'by_error_class': dict(by_class),
+        'by_api_code': dict(by_code),
+        'problems_lost': len(lost_ids),
+        'problems_lost_ids': sorted(lost_ids)[:50],
+    }
 
 
 def iter_raw_log(path):

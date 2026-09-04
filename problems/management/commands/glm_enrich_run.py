@@ -38,6 +38,7 @@ import statistics
 import threading
 import time
 from collections import Counter
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 
@@ -346,10 +347,16 @@ def stratified_checkpoint_sample(limit=300, seed=CHECKPOINT_SEED):
     return chosen, report
 
 
-def make_glm_complete_fn():
+def make_glm_complete_fn(error_log_path=None, run_id=None, prompt_version=None):
     """Как `pilot.make_openai_complete_fn`, но для GLM — сетевые повторы
     (429/обрыв) те же, что и у боевого OpenAI-пути (Фаза 5, боевой пилот
-    01.09.2026: обрыв на VPN — штатное событие, не падение)."""
+    01.09.2026: обрыв на VPN — штатное событие, не падение).
+
+    `error_log_path` (Фаза 1, 04.09.2026, разбор `run2-corpus-20260904`) —
+    если задан, каждая неудачная попытка пишет строку в журнал отказов ДО
+    решения о повторе (`pilot.append_error_log`); без него — прежнее
+    поведение (пересборка `--rebuild-from-raw` провайдера не создаёт
+    вовсе, сюда не попадает)."""
     provider = providers.GLMProvider()
 
     def _call_once(model, blocks, user_text, schema, effort, images):
@@ -365,6 +372,11 @@ def make_glm_complete_fn():
             try:
                 return _call_once(model, blocks, user_text, schema, effort, images)
             except providers.ProviderError as error:
+                will_retry = (error.kind in pilot.RETRYABLE_PROVIDER_ERROR_KINDS
+                             and attempt < pilot.NETWORK_RETRIES - 1)
+                if error_log_path is not None:
+                    pilot.append_error_log(error_log_path, run_id, prompt_version,
+                                           attempt + 1, error, will_retry)
                 if error.kind not in pilot.RETRYABLE_PROVIDER_ERROR_KINDS:
                     raise
                 last_error = error
@@ -834,11 +846,15 @@ def _payload_anomalies(parsed):
     }
 
 
-def build_metrics(parsed, usage_totals, sweep=None):
+def build_metrics(parsed, usage_totals, sweep=None, errors_summary=None):
     """Сводка по УЖЕ РАЗОБРАННЫМ строкам (`parsed_row`). База здесь не
     нужна вовсе — всё, что раньше пересчитывалось по `Problem`, лежит в
     самой строке (`has_raster`, `has_tikz`, ...), и метрики боевого
     прогона собираются кусками, не держа корпус в памяти.
+
+    `errors_summary` (Фаза 1, пункт 5) — свод `pilot.summarize_errors_log`
+    по журналу отказов; `None` (нет журнала — например, режим пересборки)
+    даёт нулевой раздел, а не отсутствующий ключ.
 
     ⚠️ TikZ считается ДВУМЯ числами. Текст решения с Фазы 1 (2026-09-04,
     реверс §3.4 API_RUN_MASTER) подаётся в вызов 1, но чертёж, привязанный
@@ -994,6 +1010,10 @@ def build_metrics(parsed, usage_totals, sweep=None):
         'rows_with_missing_fields_ids': sorted(
             p['problem_id'] for p in parsed if p.get('missing_required_fields')
         )[:50],
+        'errors_summary': errors_summary if errors_summary is not None else {
+            'total_failed_attempts': 0, 'by_error_class': {}, 'by_api_code': {},
+            'problems_lost': 0, 'problems_lost_ids': [],
+        },
     }
 
 
@@ -1068,6 +1088,49 @@ def usage_totals_from_rows(rows):
 
 
 # ---------------------------------------------------------------------------
+# Фаза 2 (04.09.2026, разбор run2-corpus-20260904): лог консоли на диск.
+# Многочасовой прогон печатал контрольные строки ТОЛЬКО в терминал — лог
+# консоли на диск не сохранялся вовсе (поиск по `*.log`/`*.txt`/`*.md` в
+# обеих копиях репозитория пуст, RUN2_POSTMORTEM.md, раздел 5), и полтора
+# часа отказов `400 code 1210` не оставили следа НИГДЕ, не только в
+# журнале запросов.
+# ---------------------------------------------------------------------------
+
+class _TeeConsoleWriter(object):
+    """Дублирует `.write()` в файл с меткой времени, оставляя вывод в
+    терминале как было. Подменяет `self.stdout._out`/`self.stderr._out`
+    (см. `django.core.management.base.OutputWrapper.write` — она сама
+    зовёт `self._out.write(...)`), а не оборачивает `self.stdout.write`
+    целиком: так все ~40 существующих `self.stdout.write(...)` в этом
+    файле остаются нетронутыми.
+
+    Файл открывается на ДОЗАПИСЬ ('a') — перезапуск после обрыва не стирает
+    предыдущий лог (Фаза 4: резюмирование — штатный сценарий)."""
+
+    def __init__(self, stream, log_path):
+        self._stream = stream
+        self._log_path = Path(log_path)
+        self._log_path.parent.mkdir(parents=True, exist_ok=True)
+        self._fh = open(self._log_path, 'a', encoding='utf-8')
+
+    def write(self, text):
+        self._stream.write(text)
+        if text and text != '\n':
+            ts = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+            self._fh.write('[%s] %s' % (ts, text))
+        else:
+            self._fh.write(text)
+
+    def flush(self):
+        if hasattr(self._stream, 'flush'):
+            self._stream.flush()
+        self._fh.flush()
+
+    def isatty(self):
+        return hasattr(self._stream, 'isatty') and self._stream.isatty()
+
+
+# ---------------------------------------------------------------------------
 # Команда
 # ---------------------------------------------------------------------------
 
@@ -1127,6 +1190,25 @@ class Command(BaseCommand):
             '--metrics-out', type=str, default=None,
             help='Переопределить путь run_metrics.json — как --parsed-out.')
         parser.add_argument(
+            '--errors-out', type=str, default=None,
+            help='Переопределить путь журнала отказов (Фаза 1, '
+                 '04.09.2026) — по умолчанию reports/enrich_pilot/'
+                 '<run_id>_errors.jsonl. Одна строка JSONL на каждую '
+                 'неудачную попытку вызова, включая закрывшиеся повтором.')
+        parser.add_argument(
+            '--unrecovered-out', type=str, default=None,
+            help='Переопределить путь списка невосстановленных id (Фаза 1, '
+                 'пункт 4) — по умолчанию reports/enrich_pilot/'
+                 '<run_id>_unrecovered_ids.txt. Считается СВЕРКОЙ манифеста '
+                 'с журналом запросов после прогона, а не счётчиком errors '
+                 'по ходу — тот в прошлом прогоне недосчитал 20 задач.')
+        parser.add_argument(
+            '--console-log', type=str, default=None,
+            help='Переопределить путь лога консоли (Фаза 2, 04.09.2026) — '
+                 'по умолчанию reports/enrich_pilot/<run_id>_console.log. '
+                 'Дублирует весь вывод команды в файл с метками времени, '
+                 'дозаписью; в терминале вывод остаётся как был.')
+        parser.add_argument(
             '--fallback-parsed', type=str, default=None,
             help='Путь к СТАРОМУ run_parsed.jsonl (Фаза 4.2) — задача, не '
                  'прошедшая проверку даже после повтора, берёт свои поля '
@@ -1158,10 +1240,31 @@ class Command(BaseCommand):
                 '--max-cost обязателен: без потолка расхода боевой прогон '
                 'не запускается. (Не нужен только с --rebuild-from-raw.)')
         run_id = options['run_id'] or ('glm-enrich-%d' % int(time.time()))
+
         limit = options['limit']
         raw_path = Path(options['raw_out']) if options['raw_out'] else RAW_LOG_PATH
         parsed_out = Path(options['parsed_out']) if options['parsed_out'] else PARSED_LOG_PATH
         metrics_out = Path(options['metrics_out']) if options['metrics_out'] else METRICS_PATH
+        # ⚠️ По умолчанию — рядом с `raw_path` (`raw_path.parent`), НЕ
+        # константа `REPORT_DIR` напрямую: тесты подменяют `RAW_LOG_PATH`
+        # на путь во временном каталоге (`_patch_paths()`), а `REPORT_DIR`
+        # не патчат — прямая ссылка на него писала бы журнал отказов и лог
+        # консоли в НАСТОЯЩИЙ `reports/enrich_pilot/` при каждом тестовом
+        # прогоне. Тот же путь, что и `--raw-out`, держит артефакты одного
+        # прогона вместе, даже когда `--raw-out` переопределён.
+        errors_out = (Path(options['errors_out']) if options['errors_out']
+                     else raw_path.parent / ('%s_errors.jsonl' % run_id))
+        unrecovered_out = (Path(options['unrecovered_out']) if options['unrecovered_out']
+                          else raw_path.parent / ('%s_unrecovered_ids.txt' % run_id))
+
+        # Фаза 2: лог консоли на диск — ставится РАНЬШЕ первой строки
+        # вывода, иначе первые контрольные строки (выборка, смета) в файл
+        # не попадут.
+        console_log_path = (Path(options['console_log']) if options['console_log']
+                            else raw_path.parent / ('%s_console.log' % run_id))
+        self.stdout._out = _TeeConsoleWriter(self.stdout._out, console_log_path)
+        self.stderr._out = _TeeConsoleWriter(self.stderr._out, console_log_path)
+
         fallback_parsed_path = (Path(options['fallback_parsed'])
                                if options['fallback_parsed'] else PARSED_LOG_PATH)
         battle_manifest_path = (Path(options['battle_manifest'])
@@ -1227,7 +1330,9 @@ class Command(BaseCommand):
         # ⚠️ Провайдер создаётся ТОЛЬКО для настоящего прогона: в режиме
         # пересборки его нет вовсе, и случайное обращение к API упадёт на
         # `None`, а не уйдёт в сеть за деньги.
-        complete_fn = None if rebuild else make_glm_complete_fn()
+        complete_fn = None if rebuild else make_glm_complete_fn(
+            error_log_path=str(errors_out), run_id=run_id,
+            prompt_version=prompt_version)
         call1_only = options['call1_only']
         if call1_only:
             self.stdout.write(
@@ -1351,6 +1456,7 @@ class Command(BaseCommand):
                 return
 
             self.stdout.write('')
+            unrecovered_ids = []
             if rebuild:
                 self.stdout.write(
                     'обращений к API: 0, потрачено: $0.0000 — пересборка '
@@ -1360,11 +1466,42 @@ class Command(BaseCommand):
                                   % (processed_now, skipped))
                 self.stdout.write('потрачено: $%.4f%s' % (
                     spent, ' (остановлено потолком)' if stopped else ''))
-            if errors:
-                self.stdout.write('⚠️ %d задач упали без восстановления (после сетевых '
-                                  'повторов) — не попали ни в результат, ни в брак, '
-                                  'нужен отдельный разбор: %s'
-                                  % (len(errors), [pid for pid, _ in errors][:20]))
+                # ⚠️ Фаза 1, пункт 4 (04.09.2026, разбор run2-corpus-20260904):
+                # «невосстановленные» считаются СВЕРКОЙ манифеста с журналом
+                # запросов ПОСЛЕ прогона — не счётчиком `errors`,
+                # накопленным по ходу. Прошлый прогон отработал полностью,
+                # но `errors` недосчитал 20 задач: `worker()` в
+                # `run_variant_concurrent` возвращается молча, если пул уже
+                # остановлен (`state['stopped']`), и такая задача не
+                # попадает НИ в `rows`, НИ в `errors`. Журнал `raw_path` —
+                # источник истины: `on_row` пишет туда КАЖДУЮ задачу,
+                # получившую полный результат, и только её.
+                final_done_ids = pilot.done_problem_ids_from_log(
+                    str(raw_path), prompt_version, GLM_VARIANT,
+                    call1_only=call1_only)
+                unrecovered_ids = sorted(set(problem_ids) - final_done_ids)
+                self.stdout.write(
+                    'манифест = обработано + пропущено + невосстановленные: '
+                    '%d = %d + %d + %d'
+                    % (total_ids, processed_now, skipped, len(unrecovered_ids)))
+                if unrecovered_ids:
+                    unrecovered_out.parent.mkdir(parents=True, exist_ok=True)
+                    with open(unrecovered_out, 'w', encoding='utf-8') as fh:
+                        fh.write('# Невосстановленные задачи прогона %s.\n' % run_id)
+                        fh.write(
+                            '# Манифест %d = обработано %d + пропущено %d + '
+                            'невосстановленные %d.\n'
+                            % (total_ids, processed_now, skipped, len(unrecovered_ids)))
+                        for pid in unrecovered_ids:
+                            fh.write('%d\n' % pid)
+                    self.stdout.write(
+                        '⚠️ %d задач без результата в журнале — список '
+                        'поимённо: %s' % (len(unrecovered_ids), unrecovered_out))
+                if errors:
+                    self.stdout.write(
+                        '(из них через явное исключение хода прогона: %d — '
+                        'см. журнал отказов %s для разбора по коду/классу)'
+                        % (len(errors), errors_out))
             if not rebuild:
                 defect_pct, retry_pct, soft_pct = tracker.pcts()
                 self.stdout.write(
@@ -1397,7 +1534,14 @@ class Command(BaseCommand):
             parsed_all, usage_totals = self._collect_parsed(
                 problem_ids, chunk_size, prompt_version, parsed_out,
                 raw_path, call1_only=call1_only, fallback_index=fallback_index)
-            metrics = build_metrics(parsed_all, usage_totals, sweep=sweep)
+            # Фаза 1, пункт 5: раздел errors_summary — сколько отказов и по
+            # каким кодам/классам, отдельно от подсчёта строк ответа выше.
+            # В режиме пересборки журнал отказов не пишется (провайдер не
+            # создаётся) — раздел остаётся нулевым по построению.
+            errors_summary = (None if rebuild
+                             else pilot.summarize_errors_log(str(errors_out)))
+            metrics = build_metrics(parsed_all, usage_totals, sweep=sweep,
+                                   errors_summary=errors_summary)
 
         metrics_out.parent.mkdir(parents=True, exist_ok=True)
         with open(metrics_out, 'w', encoding='utf-8') as fh:
@@ -1464,7 +1608,14 @@ class Command(BaseCommand):
                              metrics['search_queries_exactly_8_pct']))
         self.stdout.write('расход по журналу (все попытки): $%s'
                           % usage_totals['cost_usd'])
-        self.stdout.write('журналы: %s, %s' % (raw_path, parsed_out))
+        errs = metrics['errors_summary']
+        self.stdout.write(
+            'отказов API (все попытки, включая закрывшиеся повтором): %d, '
+            'классы: %s, коды поставщика: %s, задач потеряно окончательно: %d%s'
+            % (errs['total_failed_attempts'], errs['by_error_class'],
+               errs['by_api_code'], errs['problems_lost'],
+               (' — id: %s' % errs['problems_lost_ids']) if errs['problems_lost'] else ''))
+        self.stdout.write('журналы: %s, %s, отказы: %s' % (raw_path, parsed_out, errors_out))
 
     # --- работа кусками -------------------------------------------------
 
