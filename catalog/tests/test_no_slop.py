@@ -115,6 +115,20 @@ class EmptyCatalogTests(TestCase):
         self.assertNotIn('ct-card', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
 
 
+class EmptyCatalogApiTests(TestCase):
+    """Пустая база: эндпоинт живого состояния отдаёт нули и пустые группы."""
+
+    def test_filter_state_is_all_zero(self):
+        resp = self.client.get('/catalog/api/filter-state/')
+        self.assertEqual(resp.status_code, 200)
+        data = json.loads(resp.content)
+        self.assertEqual((data['total'], data['selected_count']), (0, 0))
+        for key, value in data['counts'].items():
+            self.assertEqual(value, 0 if key == 'has_solution' else {}, key)
+        self.assertEqual(data['chips_html'].strip(), '')
+        self.assertEqual(numbers_in(visible_text(data['results_html'])) - {'0'}, set())
+
+
 class MapCaptionFollowsDataTests(TestCase):
     def test_caption_changes_with_the_map_file(self):
         nodes = [{'k': 'theme'}] * 2 + [{'k': 'tag'}] * 7

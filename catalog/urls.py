@@ -16,6 +16,9 @@ urlpatterns = [
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
     # Подсказки тегов для поля фильтра: тегов 552, списком их не показать.
     path('api/tags/',                           views.api_tags,           name='api_tags'),
+    # Живое состояние фильтров: числа по вариантам, чипы и список одним
+    # ответом — окно «Все фильтры» обновляет выдачу, не закрываясь.
+    path('api/filter-state/',                   views.api_filter_state,   name='api_filter_state'),
 
     # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
     # 01.09.2026): он слился с каталогом, поиск там один и всегда по

@@ -7,6 +7,7 @@ from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
@@ -297,19 +298,36 @@ def _relief(base, active, candidate_ids):
     return {'label': best[0], 'count': best[1]}
 
 
-def problem_list(request):
-    """Умный каталог: один экран, один поиск, восемь фильтров.
+def _numeric_query(query):
+    """Чисто числовой запрос — это НОМЕР задачи, а не описание.
 
-    ⚠️ ЭКРАН ОБЪЕДИНЁН С «УМНЫМ ПОИСКОМ» (решение владельца 01.09.2026).
-    `/catalog/smart-search/` ведёт сюда постоянным редиректом, пункт
-    «Умный поиск» ушёл из шапки: два входа в один банк заставляли человека
-    выбирать способ ДО того, как он сформулировал, что ищет.
+    У числа нет смысла, который можно с чем-то сравнить: смысловой поиск на
+    «1065» вернёт мусор. Возвращает `(id найденной задачи, ненайденный
+    номер)`. Видимость проверяется та же, что у самой страницы задачи,
+    иначе ответ «есть/нет» стал бы оглавлением скрытого.
+    """
+    if not (query.isdigit() and len(query) <= 9):
+        return None, ''
+    found_id = (Problem.objects
+                .filter(pk=int(query), status=Problem.Status.PUBLISHED,
+                        needs_quality_review=False,
+                        hidden_pending_review=False)
+                .values_list('pk', flat=True).first())
+    return found_id, ('' if found_id else query)
+
+
+def _catalog_context(request, missing_id=''):
+    """Контекст каталога — ОДИН на страницу и на эндпоинт живого состояния.
+
+    ⚠️ СТРАНИЦА И `api_filter_state` СОБИРАЮТСЯ ОДНИМ КОДОМ И РИСУЮТ ОДНИ
+    ПАРТИАЛЫ (`_catalog_results.html`, `_catalog_chips.html`). Иначе список
+    под окном фильтров и список после перезагрузки разошлись бы при первой
+    же правке одного из них (решение владельца 04.09.2026: фильтры
+    обновляют выдачу живьём, окно не закрывается).
 
     ⚠️ ПРИ ПУСТОМ ЗАПРОСЕ СМЫСЛОВОЙ ПОИСК НЕ ТРОГАЕТСЯ ВООБЩЕ. Модель
-    грузится лениво, первый раз около семи секунд. Пока поиск жил
-    отдельной страницей, это была плата за вход именно на неё; теперь
-    каталог — главный вход, и секунды достались бы каждому, кто просто
-    зашёл посмотреть банк.
+    грузится лениво, первый раз около семи секунд. Каталог — главный вход,
+    и секунды достались бы каждому, кто просто зашёл посмотреть банк.
     """
     active = filters.parse(request.GET)
     query = active['q']
@@ -319,22 +337,6 @@ def problem_list(request):
     view_mode = (request.GET.get('view') or 'rows').strip()
     if view_mode not in ('rows', 'gallery'):
         view_mode = 'rows'
-
-    # ⚠️ ЧИСТО ЧИСЛОВОЙ ЗАПРОС — ЭТО НОМЕР ЗАДАЧИ, А НЕ ОПИСАНИЕ. У числа
-    # нет смысла, который можно с чем-то сравнить: смысловой поиск на
-    # «1065» вернёт мусор. Ведём прямо на задачу; нет такой — говорим.
-    # Видимость проверяется та же, что у самой страницы задачи, иначе
-    # ответ «есть/нет» стал бы оглавлением скрытого.
-    missing_id = ''
-    if query.isdigit() and len(query) <= 9:
-        found_id = (Problem.objects
-                    .filter(pk=int(query), status=Problem.Status.PUBLISHED,
-                            needs_quality_review=False,
-                            hidden_pending_review=False)
-                    .values_list('pk', flat=True).first())
-        if found_id:
-            return redirect('catalog:problem_detail', pk=found_id)
-        missing_id = query
 
     base = filters.base_queryset('catalog')
     carry = {}
@@ -392,11 +394,7 @@ def problem_list(request):
 
     cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
 
-    # Подпись второго числа счётчика: «из 294 по теме „Монополия“» —
-    # собирает общий модуль, у него же формы для нескольких значений.
-    scope = fctx['scope']
-
-    context = {
+    return {
         'filters':        fctx,
         'cards':          cards,
         'view_mode':      view_mode,
@@ -407,7 +405,9 @@ def problem_list(request):
         'total':          total,
         'capped':         capped,
         'filtered_total': filtered_total,
-        'scope':          scope,
+        # Подпись второго числа счётчика: «из 294 по теме „Монополия“» —
+        # собирает общий модуль, у него же формы для нескольких значений.
+        'scope':          fctx['scope'],
         'shown':          len(cards),
         'has_more':       has_more,
         'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
@@ -423,7 +423,80 @@ def problem_list(request):
         # Подпись блока карты — из данных карты, не литералом.
         'map_stats':         _map_stats(),
     }
-    return render(request, 'catalog/problem_list.html', context)
+
+
+def problem_list(request):
+    """Умный каталог: один экран, один поиск, восемь фильтров.
+
+    ⚠️ ЭКРАН ОБЪЕДИНЁН С «УМНЫМ ПОИСКОМ» (решение владельца 01.09.2026).
+    `/catalog/smart-search/` ведёт сюда постоянным редиректом, пункт
+    «Умный поиск» ушёл из шапки: два входа в один банк заставляли человека
+    выбирать способ ДО того, как он сформулировал, что ищет.
+
+    Сборка контекста живёт в `_catalog_context`: её же зовёт эндпоинт
+    живого состояния фильтров, и страница отличается от него только
+    редиректом по номеру задачи.
+    """
+    query = (request.GET.get('q') or '').strip()
+    found_id, missing_id = _numeric_query(query)
+    if found_id:
+        return redirect('catalog:problem_detail', pk=found_id)
+    return render(request, 'catalog/problem_list.html',
+                  _catalog_context(request, missing_id))
+
+
+def _filter_counts(fctx):
+    """Числа по вариантам — словарь для скрипта живого обновления.
+
+    Ключи — группы фильтра, значения — «значение варианта → число задач
+    под остальными фильтрами». Берётся из уже собранных вариантов, второй
+    раз ничего не считается.
+    """
+    by_key = {g['key']: g for g in fctx['groups']}
+    counts = {'topic': {}, 'tag': {}, 'difficulty': {}, 'kind': {},
+              'test_type': {}, 'source': {}, 'has_solution': 0,
+              'character': {}, 'feature': {}}
+    if 'topic' in by_key:
+        for block in by_key['topic']['groups']:
+            for option in block['options']:
+                counts['topic'][option['value']] = option['count']
+    if 'tag' in by_key:
+        for option in by_key['tag']['tags']['listed']:
+            counts['tag'][option['value']] = option['count']
+    for key in ('difficulty', 'source', 'character', 'feature'):
+        if key in by_key:
+            for option in by_key[key]['options']:
+                counts[key][option['value']] = option['count']
+    if 'kind' in by_key:
+        for option in by_key['kind']['options']:
+            counts['kind'][option['value']] = option['count']
+        for option in by_key['kind']['test_types']:
+            counts['test_type'][option['value']] = option['count']
+    if 'has_solution' in by_key:
+        counts['has_solution'] = by_key['has_solution']['option']['count']
+    return counts
+
+
+def api_filter_state(request):
+    """Живое состояние каталога под текущими параметрами. GET, публично.
+
+    Параметры те же, что у страницы (включая `q` и `view`). Ответ — числа
+    по вариантам, готовые куски разметки (чипы и список) и адрес, который
+    страница поставит в строку браузера. Разметку рисуют те же партиалы,
+    что и страница, — из того же контекста.
+    """
+    context = _catalog_context(request)
+    fctx = context['filters']
+    return JsonResponse({
+        'total': context['total'],
+        'counts': _filter_counts(fctx),
+        'selected_count': fctx['selected_count'],
+        'chips_html': render_to_string('catalog/_catalog_chips.html',
+                                       context, request=request),
+        'results_html': render_to_string('catalog/_catalog_results.html',
+                                         context, request=request),
+        'url': fctx['total_url'],
+    })
 
 
 def smart_search(request):
@@ -903,13 +976,26 @@ def api_tags(request):
     """
     from problems.models import Tag
 
-    needle = (request.GET.get('q') or '').strip()
-    if len(needle) < 2:
-        return JsonResponse({'tags': []})
-
     visible = Q(problems__status=Problem.Status.PUBLISHED,
                 problems__needs_quality_review=False,
                 problems__hidden_pending_review=False)
+
+    # Режим «теги темы» (`?topic=<id>`): все теги видимых задач этой темы
+    # с числами, по убыванию, без нулей и без ограничения длины — окно
+    # фильтров показывает их группой под заголовком темы.
+    topic_id = (request.GET.get('topic') or '').strip()
+    if topic_id.isdigit():
+        of_topic = visible & Q(problems__topics__id=int(topic_id))
+        rows = (Tag.objects
+                .annotate(n=Count('problems', filter=of_topic, distinct=True))
+                .filter(n__gt=0)
+                .order_by('-n', 'name'))
+        return JsonResponse({'tags': [{'id': t.pk, 'name': t.name, 'count': t.n}
+                                      for t in rows]})
+
+    needle = (request.GET.get('q') or '').strip()
+    if len(needle) < 2:
+        return JsonResponse({'tags': []})
     rows = (Tag.objects
             .filter(name__icontains=needle)
             .annotate(n=Count('problems', filter=visible, distinct=True))
