@@ -90,6 +90,20 @@ def _menu(request):
     return items
 
 
+def _avatar_url(user):
+    """Адрес аватара или пусто. Метка `?v=` — чтобы кэш не держал старое.
+
+    ⚠️ Профиль читается ЧЕРЕЗ getattr с запасным значением: у части старых
+    аккаунтов профиля может не быть вовсе, и шапка из-за этого падать не
+    должна.
+    """
+    profile = getattr(user, 'profile', None)
+    if profile is None or not getattr(profile, 'avatar', None):
+        return ''
+    stamp = int(profile.updated_at.timestamp()) if profile.updated_at else 0
+    return '/profile/avatar/%d/?v=%d' % (user.pk, stamp)
+
+
 def site_meta(request):
     """Версия сайта, меню шапки и плашка пользователя."""
     user = getattr(request, 'user', None)
@@ -99,4 +113,5 @@ def site_meta(request):
         'nav_items': _menu(request),
         'nav_user_initials': _initials(user) if authed else '',
         'nav_user_name': (user.get_full_name() or user.get_username()) if authed else '',
+        'nav_avatar_url': _avatar_url(user) if authed else '',
     }

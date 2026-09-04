@@ -61,6 +61,28 @@ class UserProfile(models.Model):
         STUDENT = 'student', 'Ученик'
         PARENT = 'parent', 'Родитель'
 
+    class Level(models.TextChoices):
+        """Уровень подготовки. Спрашиваем у ученика ОДИН раз, в профиле.
+
+        Названия и описания — слова владельца (04.09.2026). Это данные в
+        одном месте: переименовать можно, не трогая ни один экран.
+        """
+        NOVICE = 'novice', 'Новичок'
+        BASIC = 'basic', 'Базовый'
+        REGION = 'region', 'Региональный'
+        FINAL = 'final', 'Всеросник'
+
+    # Описание уровня — рядом с самим уровнем, чтобы не разъехалось.
+    LEVEL_HINTS = {
+        'novice': 'Только начинаю, экономику почти не изучал',
+        'basic': 'Знаю основные модели, решаю задачи школьного и '
+                 'муниципального этапов',
+        'region': 'Участвовал в региональном этапе ВсОШ или в отборах '
+                  'перечневых олимпиад',
+        'final': 'Выходил на заключительный этап ВсОШ или призёр перечневых '
+                 'олимпиад первого уровня',
+    }
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
         related_name='profile', verbose_name='Пользователь',
@@ -89,6 +111,18 @@ class UserProfile(models.Model):
     # желанию: лишние персональные данные ребёнка — лишний риск по 152-ФЗ.
     phone = models.CharField('Телефон', max_length=32, blank=True,
                              help_text='Необязательно.')
+
+    level = models.CharField(
+        'Уровень подготовки', max_length=16, blank=True,
+        choices=Level.choices,
+        help_text='Необязательно. Нужен, чтобы подбирать задачи по силам.')
+
+    # ⚠️ ПЕРВОЕ ПОЛЕ С ФАЙЛОМ В ПРОЕКТЕ. Что кладётся — решает НЕ загрузчик:
+    # форма пересжимает картинку Pillow в JPEG 256×256 и сама задаёт имя
+    # `avatars/<id>.jpg`. Имя из запроса не участвует нигде — иначе это был
+    # бы обход каталога. Отдаётся файл только своей же вьюхой (`avatar`),
+    # напрямую из `/media/` nginx его не покажет: см. docs/SECURITY.md.
+    avatar = models.ImageField('Аватар', upload_to='avatars/', blank=True)
 
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Изменён', auto_now=True)

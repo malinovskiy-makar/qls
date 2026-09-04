@@ -1,0 +1,213 @@
+{% comment %}
+Оформление экранов входа и регистрации — ОДНО на оба.
+
+Обе страницы самостоятельные: `base` они не наследуют, потому что шапки у
+них нет вовсе (человек ещё не вошёл, и меню ему показывать нечего).
+Раньше это значило вторую копию стилей; теперь копия одна.
+{% endcomment %}
+<style>
+/* Цветовые токены — в общем партиале _tokens.html (свет + тьма). */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  /* ⚠️ ЦВЕТ ТЕКСТА ОБЯЗАТЕЛЕН, А НЕ «И ТАК ЧЁРНЫЙ». Страница самостоятельная
+     и base не наследует; без этой строки заголовок берёт чёрный по умолчанию
+     от браузера. В светлой теме это сходит за --text, а в тёмной остаётся
+     ЧЁРНЫМ на тёмной карточке: «Войти» давал 1,99 при норме 3,0 и не читался
+     вовсе. Нашлось замером по экрану — по токенам такой пары нет. */
+  color: var(--text);
+  background: var(--bg);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+.login-card {
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: var(--r-panel, 12px);
+  padding: 40px;
+  width: 380px;
+  max-width: 100%;
+}
+.login-logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 32px;
+}
+/* ⚠️ ЗНАК — ОБЩИЙ ПАРТИАЛ, А НЕ `logo-medium.svg` (04.09.2026).
+   В том файле буквы залиты #2b2b29 намертво, и на тёмной карточке слово
+   «econoics» просто пропадало: видна была одна бирюзовая W. Найдено на
+   снимке тёмной темы. В `_wordmark.html` буквы нарисованы `currentColor`,
+   поэтому знак живёт в обеих темах одной разметкой.
+   Ширина 170 px — меньше половины карточки: знак не спорит с заголовком. */
+.login-logo-lockup { width: 170px; height: auto; display: block;
+                     color: var(--text); }
+h1 {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.login-sub {
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 28px;
+}
+label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+input[type=text],
+input[type=password],
+input[type=email] {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 9px 12px;
+  font-size: 14px;
+  color: var(--text);
+  /* ⚠️ ФОН ПОЛЯ ЗАДАН ЯВНО (04.09.2026). Без него браузер рисует поле
+     БЕЛЫМ в любой теме: в тёмной получалось белое поле со светлым текстом
+     — то есть текст в поле не читался. Токен `--surface-2` тот же, что у
+     полей на остальном сайте. */
+  background: var(--surface-2);
+  outline: none;
+  transition: border-color .12s;
+}
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--focus-ring);
+}
+/* Клавиатурный фокус-ринг + reduced-motion (страница standalone, base не наследуется) */
+a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: .001ms !important; }
+}
+.form-group { margin-bottom: 16px; }
+.field-hint { font-size: 12px; color: var(--text3); margin-top: 5px; }
+.field-error {
+  font-size: 13px; color: var(--error); margin-top: 5px;
+}
+.error-list {
+  background: var(--error-tint);
+  border: 1px solid var(--error-border);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--error);
+}
+.btn-login {
+  display: block;
+  width: 100%;
+  background: var(--btn-bg);
+  color: var(--on-btn);
+  border: none;
+  border-radius: var(--r);
+  padding: 11px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .12s;
+  margin-top: 8px;
+}
+.btn-login:hover { background: var(--btn-bg-hover); }
+.back-link {
+  display: block;
+  text-align: center;
+  margin-top: 20px;
+  font-size: 14px;
+  color: var(--text2);
+  text-decoration: none;
+}
+.back-link:hover { color: var(--accent-ink); }
+
+/* Строки под формой: «нет аккаунта», «забыли пароль». */
+.auth-foot {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: .5px solid var(--border-soft);
+  font-size: 14px;
+  color: var(--text2);
+  line-height: 1.7;
+}
+.auth-foot a { color: var(--accent-ink); text-decoration: none; }
+.auth-foot a:hover { text-decoration: underline; }
+
+/* Переключатель темы и метка версии — в правом верхнем углу СТРАНИЦЫ:
+   шапки здесь нет, а тема и версия нужны и до входа. */
+.auth-corner {
+  position: fixed;
+  top: 16px; right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 10;
+}
+.auth-icon-btn {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 14px;
+  color: var(--text2);
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+.auth-icon-btn:hover { color: var(--text); }
+.auth-version {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text3);
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+
+/* Выбор роли при регистрации — плитки, а не выпадающий список (канон 3.10):
+   вариантов два, и оба надо видеть сразу. */
+.role-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.role-tiles label {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 10px;
+  text-align: center;
+  cursor: pointer;
+  background: var(--surface-2);
+  transition: border-color .12s, background .12s;
+}
+.role-tiles input { position: absolute; opacity: 0; pointer-events: none; }
+.role-tiles label:hover { border-color: var(--accent-ring); }
+.role-tiles input:checked + span { color: var(--accent-ink); font-weight: 600; }
+.role-tiles label:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.consent {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--text2);
+  line-height: 1.45;
+  cursor: pointer;
+}
+.consent input { margin-top: 2px; flex-shrink: 0; }
+.consent span { font-weight: 400; }
+</style>

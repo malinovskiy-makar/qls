@@ -1,0 +1,17 @@
+{% comment %}
+Полоса вкладок профиля — ОДНА на четыре экрана.
+
+Подключают: `platform/profile.html` (три своих вкладки) и
+`platform/stats.html` — статистика живёт по своему адресу `/profile/stats/`
+и переезжать не должна (у неё свои расчёты и свой кэш), но человеку она
+обязана выглядеть четвёртой вкладкой профиля, а не отдельной страницей.
+
+Активную вкладку называет вызывающий: `{% include 'platform/_profile_tabs.html'
+with active='data' %}`. Значения: data · security · stats · saved.
+{% endcomment %}
+<nav class="tabs">
+  <a href="/profile/?tab=data"     class="{% if active == 'data' %}active{% endif %}">Профиль</a>
+  <a href="/profile/?tab=security" class="{% if active == 'security' %}active{% endif %}">Безопасность</a>
+  <a href="/profile/stats/"        class="{% if active == 'stats' %}active{% endif %}">Статистика</a>
+  <a href="/profile/?tab=saved"    class="{% if active == 'saved' %}active{% endif %}">Сохранённое</a>
+</nav>

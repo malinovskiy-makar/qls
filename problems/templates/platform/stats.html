@@ -8,6 +8,14 @@
 {% endblock %}
 
 {% block content %}
+{% comment %}
+Статистика — четвёртая вкладка профиля. Экран остаётся по своему адресу
+(`/profile/stats/`): у него свои расчёты и свой кэш, переезжать ему незачем.
+Полоса вкладок нужна, чтобы человек видел её частью профиля, а не отдельной
+страницей, на которую он попал случайно.
+{% endcomment %}
+{% include 'platform/_profile_tabs.html' with active='stats' %}
+
 <div class="stats-head">
   <div>
     <h1 class="stats-title">Это ваша статистика.</h1>

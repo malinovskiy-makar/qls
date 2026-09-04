@@ -7,6 +7,7 @@ from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.views import LogoutView
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 from catalog import views as catalog_views
 from problems import views_parent, views_platform, views_stats
@@ -32,8 +33,7 @@ urlpatterns = [
     path('health/', health, name='health'),
     # Логин / логаут.
     path('login/', RoleBasedLoginView.as_view(), name='login'),
-    # Регистрация: пока заглушка, настоящая форма — в следующей фазе.
-    path('register/', views_auth.register_stub, name='register'),
+    path('register/', views_auth.RegisterView.as_view(), name='register'),
     # ⚠️ ВЫХОД ВЕДЁТ НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
     # нажал «Выйти» — он закончил, а не собирается войти снова. Главная
     # открыта гостям. Метод только POST: так решил Django 5, и шапка шлёт
@@ -42,15 +42,22 @@ urlpatterns = [
     # Учебник — заглушка «Скоро»: раздел пишется, но пункт в шапке нужен уже
     # на бете, иначе о нём не узнают.
     path('textbook/', catalog_views.textbook, name='textbook'),
-    # Смена пароля — штатными формами Django. Свою форму не пишем: пароль
-    # не должен проходить через наш код ни в каком виде.
-    path('password/change/', auth_views.PasswordChangeView.as_view(
-        success_url='/password/change/done/'), name='password_change'),
-    path('password/change/done/', auth_views.PasswordChangeDoneView.as_view(),
-         name='password_change_done'),
+    # ⚠️ СМЕНА ПАРОЛЯ ЖИВЁТ ВО ВКЛАДКЕ «БЕЗОПАСНОСТЬ» ПРОФИЛЯ (04.09.2026,
+    # ADR 0073) и спрашивает только новый пароль дважды. Отдельные страницы
+    # `password/change/` и `.../done/` остаются РЕДИРЕКТАМИ ради закладок и
+    # чужих ссылок: адрес, который был, отвечать не перестал.
+    # Формы Django по-прежнему делают всю работу — своей формы пароля у нас
+    # нет и быть не должно.
+    path('password/change/', views_platform.password_change,
+         name='password_change'),
+    path('password/change/done/', RedirectView.as_view(
+        url='/profile/?tab=security', permanent=False),
+        name='password_change_done'),
 
     # Платформа: профиль, сохранённое, папки.
     path('profile/', views_platform.profile, name='profile'),
+    # Аватар: путь к файлу — из поля модели, из запроса только номер.
+    path('profile/avatar/<int:user_id>/', views_platform.avatar, name='avatar'),
     # Статистика ученика — с геймификацией. Старая страница «Прогресс»
     # ПОГЛОЩЕНА этой: /student/progress/ ведёт сюда редиректом.
     path('profile/stats/', views_stats.student_stats, name='student_stats'),

@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-08-19
+> **Обновлён:** 2026-09-04 (регистрация, профиль, аватар)
 > **Статус:** актуален
 
 # Карта маршрутов и границ доступа
@@ -69,7 +69,9 @@
 |---|---|---|---|---|---|
 | `/` | `home` | — | — | — | [catalog/views.py:62](../catalog/views.py) |
 | `/login/` | `login` | — | POST: логин/пароль | — | [problems/views_auth.py:8](../problems/views_auth.py) |
-| `/logout/` | `logout` | — | — | — | Django |
+| `/register/` | `register` | — (вошедшего уводит в профиль) | POST: логин, пароль ×2, роль, согласие | — | [problems/views_auth.py](../problems/views_auth.py) `RegisterView` |
+| `/logout/` | `logout` | — | **только POST** (GET → 405) | — | Django |
+| `/textbook/` | `textbook` | — | — | — | [catalog/views.py](../catalog/views.py) `textbook` |
 | `/catalog/` | `catalog:problem_list` | — | 10× GET (фильтры, поиск, страница) | — | [catalog/views.py:85](../catalog/views.py) |
 | `/catalog/random/` | `catalog:random_problem` | — | — | — | [catalog/views.py:72](../catalog/views.py) |
 | `/catalog/problem/<int:pk>/` | `catalog:problem_detail` | — | `pk` | — | [catalog/views.py:249](../catalog/views.py) |
@@ -251,7 +253,8 @@ TypeError: Field 'id' expected a number but got
 
 | Путь | Имя | Роль | Клиент | Владелец | Файл |
 |---|---|---|---|---|---|
-| `/profile/` | `profile` | `login_required` | 7× POST/GET | ✅ | [problems/views_platform.py:26](../problems/views_platform.py) |
+| `/profile/` | `profile` | `login_required` | POST `action` ∈ {data, password, avatar, avatar_remove}, GET `tab`/`sub` | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `profile` |
+| `/profile/avatar/<int:user_id>/` | `avatar` | `login_required` | `user_id` (целое) | ⚠️ ПО ЗАМЫСЛУ ЧУЖОЙ: аватар виден любому вошедшему | [problems/views_platform.py](../problems/views_platform.py) `avatar` |
 | `/profile/stats/` | `student_stats` | `login_required` | — | ✅ | [problems/views_stats.py:31](../problems/views_stats.py) |
 | `/profile/stats/data/` | `student_stats_json` | `login_required` | — | ✅ | [problems/views_stats.py:38](../problems/views_stats.py) |
 | `/profile/stats/goal/` | `set_weekly_goal` | `login_required` + POST | POST | ✅ | [problems/views_stats.py:45](../problems/views_stats.py) |
@@ -263,8 +266,31 @@ TypeError: Field 'id' expected a number but got
 | `/api/saved/move/` | `api_saved_move` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:154](../problems/views_platform.py) |
 | `/api/saved/delete/` | `api_saved_delete` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:177](../problems/views_platform.py) |
 | `/api/graphs/save/` | `api_graph_save` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:193](../problems/views_platform.py) |
-| `/password/change/` | `password_change` | `login_required` | POST | ✅ Django | Django |
-| `/password/change/done/` | `password_change_done` | `login_required` | — | — | Django |
+| `/password/change/` | `password_change` | `login_required` | POST: новый пароль ×2 (`old_password` игнорируется) | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `password_change` |
+| `/password/change/done/` | `password_change_done` | — | — | — | редирект на `/profile/?tab=security` |
+
+### ⚠️ Аватар: единственный маршрут, где объект НЕ сужен по владельцу
+
+`/profile/avatar/<id>/` отдаёт файл ЧУЖОГО пользователя любому вошедшему —
+и это осознанно, а не пропущенный фильтр. Аватар показывается в шапке, в
+списке учеников группы и на доске набора: сузить его до владельца значило
+бы, что лицо не видно нигде, кроме собственного профиля.
+
+Что удерживает это в границах:
+
+| Что могло бы пойти не так | Почему не идёт |
+|---|---|
+| путь из запроса → чтение чужого файла | из запроса приходит ТОЛЬКО целое число; путь берётся из поля модели |
+| загрузка исполняемого файла | форма пересжимает картинку Pillow и сохраняет СВОЙ JPEG; имя из запроса не используется вовсе |
+| «пиксельная бомба» (мелкий файл, огромный размер) | размеры проверяются ДО обработки: потолок 4000×4000 и 3 МБ |
+| геометка в EXIF | пересохранение метаданные стирает |
+| гость смотрит лица детей | `login_required`, отрицательный тест `test_guest_is_refused` |
+| общий кэш держит чужое лицо | `Cache-Control: private` |
+
+Закрыто тестами `problems/tests/test_accounts.py::AvatarTests` (12 штук, из
+них четыре — отрицательные) и сторожем
+`test_media_route.py::NoOtherFileServingViewTests`, где этот файл вписан в
+список разрешённых **вместе с причиной**.
 
 ⚠️ **Роль на маршрутах `/parent/` не проверяется.** Стоит только
 `login_required`. Экран честен: кто не родитель — увидит пустой список, потому
