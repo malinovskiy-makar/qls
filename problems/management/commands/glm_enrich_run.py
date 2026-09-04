@@ -702,6 +702,13 @@ def parsed_row(row, problem, fallback_index=None):
             result[field] = old.get(field)
         fallback_from_run1.append('call2')
     result['fallback_from_run1'] = fallback_from_run1
+    # Откуда в строке данные — одним словом, чтобы «сколько задач реально
+    # обогащены вторым прогоном» считалось без разбора списков. Второй
+    # прогон шёл на effort high, с чтением решения и подсказками 3-5;
+    # строка, закрытая подстраховкой, ничего этого не содержит.
+    result['source'] = (
+        'run2' if not fallback_from_run1
+        else 'run1_fallback' if len(fallback_from_run1) == 2 else 'mixed')
 
     # `graphical_solution` считается ПОСЛЕ подстраховки — если вызов 1
     # рескьюнут, `features_1` теперь из старого журнала, и код-признак
@@ -752,6 +759,8 @@ def crash_row(problem_id, exc):
         'images_sent': 0, 'tikz': None, 'solution_sent': False,
         'solution_tokens': 0, 'solution_truncated': False,
         'has_raster': False, 'has_tikz': False, 'has_tikz_in_statement': False,
+        # Не 'run2': данных этого прогона в строке тоже нет.
+        'source': PARSE_CRASH,
         'fallback_from_run1': [], 'graphical_solution': None,
         'graphical_solution_source': 'none', 'missing_required_fields': [],
     }
@@ -966,6 +975,11 @@ def build_metrics(parsed, usage_totals, sweep=None):
                              if 'call1' in (p.get('fallback_from_run1') or [])),
             'rows_call2': sum(1 for p in parsed
                              if 'call2' in (p.get('fallback_from_run1') or [])),
+            # Одним словом на строку: 'run2' — обе половины свежие,
+            # 'run1_fallback' — обе из старого журнала, 'mixed' — одна из
+            # двух. Без этого «сколько задач реально обогащены вторым
+            # прогоном» пришлось бы каждый раз считать разбором списков.
+            'by_source': dict(Counter(p.get('source') for p in parsed)),
         },
         # Форма ответа модели (2026-09-04): не объект, объект в массиве из
         # одного элемента, непредвиденное падение разбора. Поимённо, как и
@@ -1066,7 +1080,20 @@ class Command(BaseCommand):
                                  '(stratified_checkpoint_sample) — НЕ '
                                  '«первые N по id». ФАЗА 5 ЭТОЙ СЕССИИ: '
                                  'обязательно 300.')
-        parser.add_argument('--max-cost', type=float, required=True)
+        parser.add_argument(
+            '--max-cost', type=float, default=None,
+            help='Потолок расхода, обязателен для настоящего прогона. Не '
+                 'требуется с --rebuild-from-raw: там не тратится ничего.')
+        parser.add_argument(
+            '--rebuild-from-raw', action='store_true',
+            help='ОФЛАЙН-ПЕРЕСБОРКА: ни одного обращения к API. Берёт '
+                 'готовые ответы из --raw-out и прогоняет их через ту же '
+                 'логику разбора и подсчёта метрик, минуя провайдера '
+                 '(провайдер не создаётся вовсе). Заведено 04.09.2026 '
+                 'после падения `run2-corpus-20260904`: прогон отработал '
+                 'все запросы и заплатил $31,46, а сборка результата легла '
+                 'на одной кривой форме ответа — пересобрать оплаченное '
+                 'было нечем, кроме как повторив прогон за деньги.')
         parser.add_argument('--workers', type=int, default=WORKERS_DEFAULT)
         parser.add_argument('--run-id', type=str, default=None)
         parser.add_argument(
@@ -1125,6 +1152,11 @@ class Command(BaseCommand):
                  'только байтов изображений плюс тексты и подпункты.')
 
     def handle(self, *args, **options):
+        rebuild = options['rebuild_from_raw']
+        if not rebuild and options['max_cost'] is None:
+            raise CommandError(
+                '--max-cost обязателен: без потолка расхода боевой прогон '
+                'не запускается. (Не нужен только с --rebuild-from-raw.)')
         run_id = options['run_id'] or ('glm-enrich-%d' % int(time.time()))
         limit = options['limit']
         raw_path = Path(options['raw_out']) if options['raw_out'] else RAW_LOG_PATH
@@ -1179,13 +1211,23 @@ class Command(BaseCommand):
         total_ids = len(problem_ids)
         chunk_size = options['chunk']
 
-        self.stdout.write('=== БОЕВОЙ ПРОГОН GLM-5.3-Flash: %d задач, run_id=%s ==='
-                          % (total_ids, run_id))
-        self.stdout.write('workers=%d, max-cost=$%.4f, кусок=%d задач' % (
-            options['workers'], options['max_cost'], chunk_size))
+        if rebuild:
+            self.stdout.write(
+                '=== ОФЛАЙН-ПЕРЕСБОРКА: %d задач, run_id=%s ===' % (total_ids, run_id))
+            self.stdout.write(
+                'обращений к API — НИ ОДНОГО, провайдер не создаётся. '
+                'Источник ответов: %s, кусок=%d задач' % (raw_path, chunk_size))
+        else:
+            self.stdout.write('=== БОЕВОЙ ПРОГОН GLM-5.3-Flash: %d задач, run_id=%s ==='
+                              % (total_ids, run_id))
+            self.stdout.write('workers=%d, max-cost=$%.4f, кусок=%d задач' % (
+                options['workers'], options['max_cost'], chunk_size))
 
         prompt_version = pilot.prompt_fingerprint(GLM_VARIANT['concepts'])
-        complete_fn = make_glm_complete_fn()
+        # ⚠️ Провайдер создаётся ТОЛЬКО для настоящего прогона: в режиме
+        # пересборки его нет вовсе, и случайное обращение к API упадёт на
+        # `None`, а не уйдёт в сеть за деньги.
+        complete_fn = None if rebuild else make_glm_complete_fn()
         call1_only = options['call1_only']
         if call1_only:
             self.stdout.write(
@@ -1201,7 +1243,10 @@ class Command(BaseCommand):
         # Свип-детектор (§12 правило 2): отпечаток защищённых полей ДО
         # прогона. Прогон в базу не пишет вовсе — ожидание ровно 0
         # расхождений, и это надо ПОКАЗАТЬ числом, а не утверждать.
-        sweep_before = protected_fields_digest(problem_ids)
+        # В режиме пересборки снимать нечего: прогон не идёт, база не
+        # трогается, и два снимка по 37 тысячам задач стоили бы минут
+        # чтения ради заведомого нуля.
+        sweep_before = None if rebuild else protected_fields_digest(problem_ids)
 
         # ⚠️ Расход завершённых кусков. `on_progress` получает от
         # `run_variant_concurrent` расход ТЕКУЩЕГО КУСКА (его `state['spent']`
@@ -1239,14 +1284,20 @@ class Command(BaseCommand):
         # ⚠️ Журнал читается ОДИН раз, потоком (`iter_raw_log`), а не на
         # каждый кусок: на 41 тысяче задач в нём 80+ тысяч строк, и
         # двадцать перечитываний стоили бы дороже самого прогона.
-        done_ids = pilot.done_problem_ids_from_log(
-            str(raw_path), prompt_version, GLM_VARIANT,
-            call1_only=call1_only)
-        todo_ids = [pid for pid in problem_ids if pid not in done_ids]
-        todo_total = len(todo_ids)
-        skipped = total_ids - todo_total
-        self.stdout.write('уже в журнале (платить заново не нужно): %d, '
-                          'к обработке: %d' % (skipped, todo_total))
+        if rebuild:
+            # Пересборка не обрабатывает НИ ОДНОЙ задачи заново: цикл
+            # запросов ниже просто не выполняется (`todo_total = 0`), а
+            # результат собирается из журнала в разделе «Фаза 3.2/3.3».
+            todo_ids, todo_total, skipped = [], 0, total_ids
+        else:
+            done_ids = pilot.done_problem_ids_from_log(
+                str(raw_path), prompt_version, GLM_VARIANT,
+                call1_only=call1_only)
+            todo_ids = [pid for pid in problem_ids if pid not in done_ids]
+            todo_total = len(todo_ids)
+            skipped = total_ids - todo_total
+            self.stdout.write('уже в журнале (платить заново не нужно): %d, '
+                              'к обработке: %d' % (skipped, todo_total))
 
         spent = Decimal('0')
         stopped = False
@@ -1300,21 +1351,27 @@ class Command(BaseCommand):
                 return
 
             self.stdout.write('')
-            self.stdout.write('обработано сейчас: %d, пропущено (уже в журнале): %d'
-                              % (processed_now, skipped))
-            self.stdout.write('потрачено: $%.4f%s' % (
-                spent, ' (остановлено потолком)' if stopped else ''))
+            if rebuild:
+                self.stdout.write(
+                    'обращений к API: 0, потрачено: $0.0000 — пересборка '
+                    'из уже оплаченного журнала')
+            else:
+                self.stdout.write('обработано сейчас: %d, пропущено (уже в журнале): %d'
+                                  % (processed_now, skipped))
+                self.stdout.write('потрачено: $%.4f%s' % (
+                    spent, ' (остановлено потолком)' if stopped else ''))
             if errors:
                 self.stdout.write('⚠️ %d задач упали без восстановления (после сетевых '
                                   'повторов) — не попали ни в результат, ни в брак, '
                                   'нужен отдельный разбор: %s'
                                   % (len(errors), [pid for pid, _ in errors][:20]))
-            defect_pct, retry_pct, soft_pct = tracker.pcts()
-            self.stdout.write(
-                'в этом запуске: брак %.1f%%, повторы %.1f%%, мягкие %.1f%% '
-                '(остановка — брак/утечка в find/пустые подсказки, порог '
-                'каждого %.1f%%)'
-                % (defect_pct, retry_pct, soft_pct, tracker.stop_pct))
+            if not rebuild:
+                defect_pct, retry_pct, soft_pct = tracker.pcts()
+                self.stdout.write(
+                    'в этом запуске: брак %.1f%%, повторы %.1f%%, мягкие %.1f%% '
+                    '(остановка — брак/утечка в find/пустые подсказки, порог '
+                    'каждого %.1f%%)'
+                    % (defect_pct, retry_pct, soft_pct, tracker.stop_pct))
             if tracker.breached:
                 self.stdout.write('')
                 # ⚠️ Причина печатается ИЗ ТРЕКЕРА (`breach_reason`), а не
@@ -1326,8 +1383,9 @@ class Command(BaseCommand):
                     'владелец.' % tracker.breach_reason)
 
             # --- Фаза 3.2/3.3 -------------------------------------------
-            sweep = sweep_report(sweep_before,
-                                 protected_fields_digest(problem_ids))
+            sweep = (None if sweep_before is None
+                     else sweep_report(sweep_before,
+                                       protected_fields_digest(problem_ids)))
             # Фаза 4.2: читается ОДИН раз, не на каждый кусок (те же
             # соображения, что у `done_ids` — 41 тысяча строк не перечитать
             # двадцать раз подряд бесплатно).
@@ -1653,10 +1711,17 @@ class Command(BaseCommand):
             pilot.strip_given_find_prefixes(row.get('call1'))
             row['dropped_queries'] = pilot.drop_digit_search_queries(
                 row.get('call2'))
-            row['call1_ok'], _ = pilot.validate_call1_full(
+            # ⚠️ Тексты нарушений СОХРАНЯЮТСЯ, а не выбрасываются в `_`
+            # (04.09.2026): живой путь кладёт их в `call*_violations`, а
+            # восстановление из журнала клало пустой список — и в
+            # `run_parsed.jsonl` у бракованных задач причина брака была
+            # пустой. Разбирать «почему 94 задачи ушли в брак» было не по
+            # чему, хотя сам ответ модели лежит на диске.
+            row['call1_ok'], row['call1_violations'] = pilot.validate_call1_full(
                 row.get('call1'), variant['concepts'], shortlist_terms=shortlist_terms)
             row['call1_retried'] = len(row['call1_attempts']) > 1
-            row['call2_ok'], _ = pilot.validate_call2_full(row.get('call2'))
+            row['call2_ok'], row['call2_violations'] = pilot.validate_call2_full(
+                row.get('call2'))
             # Повтор вызова 2 в режиме переноса был в ПРОШЛОМ прогоне и
             # оплачен там же — факт сохраняем, деньги не пересчитываем.
             row['call2_retried'] = len(
