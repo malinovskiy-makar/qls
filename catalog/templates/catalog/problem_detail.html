@@ -392,8 +392,15 @@
     {% endif %}
   </section>
 
+  {% if ai_available or hint_total or sol.has_any %}
+  {% comment %}
+  Карточка «Решение» живёт по правилу нуля: поле ввода только при
+  доступной модели (иначе писать некуда), подсказки только при подсказках,
+  кнопка решения только при решении или ответе. Нет ничего — нет карточки.
+  {% endcomment %}
   <section class="sv" id="sv" aria-label="Решение">
     <div class="sv-head"><h2>Решение</h2>{% if parts and not is_test %}<small>одно на всю задачу, подпункты внутри</small>{% endif %}</div>
+    {% if ai_available %}
     <div class="sv-field">
       <textarea id="sv-text" placeholder="Запишите ход решения и ответы по пунктам. Можно кратко: главное, идея каждого шага.{% if ai_available and user.is_authenticated %} Или приложите фото тетради.{% endif %}"></textarea>
       {% if ai_available and user.is_authenticated %}
@@ -411,6 +418,7 @@
       </div>
       {% endif %}
     </div>
+    {% endif %}
     <div class="sv-row">
       {% if ai_available %}
         {% if user.is_authenticated %}
@@ -463,6 +471,7 @@
     </div>
     {% endif %}
   </section>
+  {% endif %}
   {% endif %}
 
   {% if ai_available and user.is_authenticated and not test %}

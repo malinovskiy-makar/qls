@@ -139,7 +139,8 @@ class MinimalProblemPageTests(TestCase):
         html = resp.content.decode()
         self.assertEqual(numbers_in(visible_text(html)) - {'0'}, set())
         for absent in ('pp--tag', 'pp--diff', 'pp--src', 'pp-sep', 'pp--topic',
-                       'id="sol-btn"', 'id="save-btn"', 'class="sim"', '№'):
+                       'id="sol-btn"', 'id="save-btn"', 'class="sim"', '№',
+                       'id="sv"', 'id="sv-text"', 'class="sv-row"'):
             self.assertNotIn(absent, html.split('<main')[1])
 
 
