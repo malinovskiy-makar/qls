@@ -507,6 +507,62 @@ CALL2_MERGE_FIELDS = (
 )
 
 
+# ---------------------------------------------------------------------------
+# Форма полезной нагрузки ответа модели (2026-09-04, разбор падения
+# `run2-corpus-20260904`).
+#
+# Схемы у Z.AI нет вовсе, формат держит только наш код, и модель изредка
+# отвечает не объектом: из 37 035 задач боевого прогона шесть финальных
+# ответов вызова 2 пришли МАССИВОМ из нескольких кусков (огрызок объекта,
+# потом голые списки, потом полный объект). `parsed_row` звал у него
+# `.get(...)`, ловил `AttributeError` и ронял сборку результата ЦЕЛИКОМ —
+# 37 тысяч оплаченных ответов не собрались из-за шести строк.
+#
+# Правило простое и без угадывания: словарь — работаем; массив ровно из
+# одного словаря — разворачиваем (модель обернула объект) и помечаем
+# МЯГКИМ нарушением; что угодно ещё — ответ этого вызова невалиден,
+# ЖЁСТКОЕ нарушение и обычная ветка брака/подстраховки. Складывать куски
+# многоэлементного массива в один объект мы не пробуем: последний элемент
+# часто выглядит полным, но «часто» — это и есть угадывание.
+# ---------------------------------------------------------------------------
+
+PAYLOAD_WRAPPED_IN_LIST = 'payload_wrapped_in_list'
+PAYLOAD_NOT_OBJECT = 'payload_not_object'
+PARSE_CRASH = 'parse_crash'
+
+
+def normalize_payload(payload):
+    """`(словарь_или_None, мягкие_нарушения, жёсткие_нарушения)`.
+
+    `None` (JSON вообще не разобрался, `_safe_json_loads`) — тоже «не
+    объект»: валидаторы и раньше считали такой вызов неудачным, метка
+    лишь называет причину вслух. Поведение от неё не меняется, меняется
+    читаемость отчёта. Функция идемпотентна на словарях, поэтому её
+    безопасно звать дважды (журнал + `parsed_row`)."""
+    if isinstance(payload, dict):
+        return payload, [], []
+    if (isinstance(payload, list) and len(payload) == 1
+            and isinstance(payload[0], dict)):
+        return payload[0], [PAYLOAD_WRAPPED_IN_LIST], []
+    return None, [], [PAYLOAD_NOT_OBJECT]
+
+
+def _normalized_call(row, name):
+    """Полезная нагрузка вызова `name` строки `row` плюс пометки формы.
+
+    Пометки могли быть проставлены раньше — `_rows_from_log` нормализует
+    ответ ДО валидаторов, иначе развёрнутый из массива объект всё равно
+    считался бы браком. Здесь они только подхватываются, а нормализация
+    повторяется для строк живого прогона, где её ещё не было."""
+    payload, soft, hard = normalize_payload(row.get(name))
+    for stored, collected in ((row.get('%s_payload_soft' % name), soft),
+                              (row.get('%s_payload_hard' % name), hard)):
+        for mark in stored or []:
+            if mark not in collected:
+                collected.append(mark)
+    return payload, soft, hard
+
+
 def _missing_required_fields(result):
     """Поля, которые НЕ ИМЕЮТ ПРАВА быть пустыми ни при каких легитимных
     обстоятельствах этой конкретной задачи (Фаза 4.2, 2026-09-04) —
@@ -558,11 +614,19 @@ def parsed_row(row, problem, fallback_index=None):
     `soft_violations` ниже не портят банк и повтор не вызывают, но
     печатаются для отчёта владельцу (`run_metrics.json`, раздел
     `soft_violations`)."""
-    call1 = row.get('call1') or {}
-    call2 = row.get('call2') or {}
-    is_defect = not (row.get('call1_ok') and row.get('call2_ok'))
+    call1, call1_soft, call1_hard = _normalized_call(row, 'call1')
+    call2, call2_soft, call2_hard = _normalized_call(row, 'call2')
+    call1 = call1 or {}
+    call2 = call2 or {}
+    # Ответ не той формы — это брак вызова, даже если валидаторы почему-то
+    # сказали «ok»: работать с ним всё равно нечем, и строка обязана уйти
+    # по той же ветке подстраховки, что и сломанный JSON.
+    call1_ok = bool(row.get('call1_ok')) and not call1_hard
+    call2_ok = bool(row.get('call2_ok')) and not call2_hard
+    is_defect = not (call1_ok and call2_ok)
     soft = list(row.get('call1_soft_violations') or []) + \
-        list(row.get('call2_soft_violations') or [])
+        list(row.get('call2_soft_violations') or []) + \
+        call1_soft + call2_soft
     figures = list(problem.figures.all())
     tikz_figures = [f for f in figures if looks_like_tikz(f.tikz_source or '')]
     has_raster = any(
@@ -574,12 +638,12 @@ def parsed_row(row, problem, fallback_index=None):
     result = {
         'problem_id': row['problem_id'],
         'defect': is_defect,
-        'call1_ok': row.get('call1_ok'),
+        'call1_ok': call1_ok,
         'call1_retried': row.get('call1_retried'),
-        'call1_violations': row.get('call1_violations'),
-        'call2_ok': row.get('call2_ok'),
+        'call1_violations': list(row.get('call1_violations') or []) + call1_hard,
+        'call2_ok': call2_ok,
         'call2_retried': row.get('call2_retried'),
-        'call2_violations': row.get('call2_violations'),
+        'call2_violations': list(row.get('call2_violations') or []) + call2_hard,
         'soft_violations': soft,
         # Фаза 1.2: запросы с цифрой, выброшенные из массива вместо повтора
         # всего вызова — ТЕКСТОМ каждого, чтобы владелец видел, что именно
@@ -629,11 +693,11 @@ def parsed_row(row, problem, fallback_index=None):
     fallback_index = fallback_index or {}
     old = fallback_index.get(row['problem_id'])
     fallback_from_run1 = []
-    if not row.get('call1_ok') and old is not None:
+    if not call1_ok and old is not None:
         for field in CALL1_MERGE_FIELDS:
             result[field] = old.get(field)
         fallback_from_run1.append('call1')
-    if not row.get('call2_ok') and old is not None:
+    if not call2_ok and old is not None:
         for field in CALL2_MERGE_FIELDS:
             result[field] = old.get(field)
         fallback_from_run1.append('call2')
@@ -662,10 +726,57 @@ def write_parsed_rows(path, parsed, append=False):
             fh.write('\n')
 
 
+def crash_row(problem_id, exc):
+    """Строка-заглушка вместо задачи, на которой разбор упал непредвиденно.
+
+    Смысл в том, чтобы сборка НЕ теряла задачу молча и не падала целиком:
+    строка есть, она помечена браком, причина названа текстом исключения.
+    Поля заполнены безопасными пустыми значениями — `build_metrics` ходит
+    по ним без `.get`, и отсутствие ключа уронило бы уже метрики."""
+    return {
+        'problem_id': problem_id,
+        'defect': True,
+        'call1_ok': False, 'call1_retried': False,
+        'call1_violations': ['%s: %s' % (PARSE_CRASH, exc)],
+        'call2_ok': False, 'call2_retried': False,
+        'call2_violations': ['%s: %s' % (PARSE_CRASH, exc)],
+        'parse_crash': '%s: %s' % (type(exc).__name__, exc),
+        'soft_violations': [], 'dropped_queries': [],
+        'topic_primary': None, 'topics_secondary': None, 'tags': None,
+        'given': None, 'find': None, 'econ_concepts': None,
+        'concepts_offlist': None, 'task_nature': None, 'features_1': None,
+        'topic_confidence': None, 'search_queries': None, 'plot': None,
+        'hints': None, 'text_quality': None, 'text_quality_note': None,
+        'problem_type': None, 'difficulty': None, 'difficulty_note': None,
+        'answer_consistency': None, 'title_candidate': None,
+        'images_sent': 0, 'tikz': None, 'solution_sent': False,
+        'solution_tokens': 0, 'solution_truncated': False,
+        'has_raster': False, 'has_tikz': False, 'has_tikz_in_statement': False,
+        'fallback_from_run1': [], 'graphical_solution': None,
+        'graphical_solution_source': 'none', 'missing_required_fields': [],
+    }
+
+
 def parsed_rows_for(rows, problems_by_id, fallback_index=None):
-    return [parsed_row(row, problems_by_id[row['problem_id']],
-                       fallback_index=fallback_index)
-            for row in rows if row['problem_id'] in problems_by_id]
+    """⚠️ НЕ ВЫБРАСЫВАЕТ ИСКЛЮЧЕНИЙ НИ ПРИ КАКОЙ ФОРМЕ ВХОДА.
+
+    04.09.2026 боевой прогон `run2-corpus-20260904` отработал все 37 035
+    задач, заплатил $31,46 — и сборка результата легла на первой же задаче
+    с ответом-массивом (`AttributeError: 'list' object has no attribute
+    'get'`). Одна кривая строка не имеет права стоить всего прогона:
+    непредвиденная ошибка на задаче записывается браком `parse_crash`, и
+    сборка идёт дальше."""
+    out = []
+    for row in rows:
+        pid = row.get('problem_id')
+        if pid not in problems_by_id:
+            continue
+        try:
+            out.append(parsed_row(row, problems_by_id[pid],
+                                  fallback_index=fallback_index))
+        except Exception as exc:  # noqa: BLE001 — намеренно широко, см. докстринг
+            out.append(crash_row(pid, exc))
+    return out
 
 
 def load_fallback_index(path):
@@ -689,6 +800,30 @@ def load_fallback_index(path):
 # ---------------------------------------------------------------------------
 # Фаза 3.3: run_metrics.json — сводка.
 # ---------------------------------------------------------------------------
+
+def _payload_anomalies(parsed):
+    """Сколько строк и какие именно пострадали от формы ответа модели."""
+    def ids(pred):
+        return sorted(p['problem_id'] for p in parsed if pred(p))
+
+    def in_hard(p, mark):
+        return any(mark in v for v in
+                   (list(p.get('call1_violations') or [])
+                    + list(p.get('call2_violations') or [])))
+
+    wrapped = ids(lambda p: PAYLOAD_WRAPPED_IN_LIST
+                  in (p.get('soft_violations') or []))
+    not_object = ids(lambda p: in_hard(p, PAYLOAD_NOT_OBJECT))
+    crashed = ids(lambda p: p.get('parse_crash'))
+    return {
+        PAYLOAD_WRAPPED_IN_LIST: len(wrapped),
+        '%s_ids' % PAYLOAD_WRAPPED_IN_LIST: wrapped[:50],
+        PAYLOAD_NOT_OBJECT: len(not_object),
+        '%s_ids' % PAYLOAD_NOT_OBJECT: not_object[:50],
+        PARSE_CRASH: len(crashed),
+        '%s_ids' % PARSE_CRASH: crashed[:50],
+    }
+
 
 def build_metrics(parsed, usage_totals, sweep=None):
     """Сводка по УЖЕ РАЗОБРАННЫМ строкам (`parsed_row`). База здесь не
@@ -832,6 +967,11 @@ def build_metrics(parsed, usage_totals, sweep=None):
             'rows_call2': sum(1 for p in parsed
                              if 'call2' in (p.get('fallback_from_run1') or [])),
         },
+        # Форма ответа модели (2026-09-04): не объект, объект в массиве из
+        # одного элемента, непредвиденное падение разбора. Поимённо, как и
+        # `rows_with_missing_fields_ids` ниже: это не «шум в процентах», а
+        # список задач, с которыми надо что-то делать.
+        'payload_anomalies': _payload_anomalies(parsed),
         # Инвариант владельца: доля задач с хоть одним пустым обязательным
         # полем — ноль. Список id — поимённо, не только число: пробитый
         # инвариант обязан быть виден и разбираем, а не потонуть в проценте.
@@ -1389,6 +1529,21 @@ class Command(BaseCommand):
                 '⚠️ у %d задач в старом журнале НЕТ вызова 2 — поля '
                 'заголовка/сложности/типа/подсказок останутся пустыми. '
                 'Список: %s' % (len(no_call2), NO_CALL2_PATH))
+        # Форма ответа модели — сводка сразу, а не только в JSON метрик:
+        # падение сборки 04.09.2026 началось именно отсюда, и следующий
+        # раз это должно быть видно в консоли, а не найдено потом.
+        anomalies = _payload_anomalies(parsed_all)
+        if any(anomalies[k] for k in (PAYLOAD_WRAPPED_IN_LIST,
+                                      PAYLOAD_NOT_OBJECT, PARSE_CRASH)):
+            self.stdout.write(
+                '⚠️ форма ответа модели: объект в массиве (развёрнут) — %d, '
+                'не объект (брак) — %d, разбор упал — %d'
+                % (anomalies[PAYLOAD_WRAPPED_IN_LIST],
+                   anomalies[PAYLOAD_NOT_OBJECT], anomalies[PARSE_CRASH]))
+            if anomalies[PARSE_CRASH]:
+                self.stdout.write(
+                    '   упавшие при разборе id: %s'
+                    % anomalies['%s_ids' % PARSE_CRASH])
         return parsed_all, usage_totals
 
     def _rows_from_log(self, entries, problem_ids, variant, prompt_version,
@@ -1466,7 +1621,15 @@ class Command(BaseCommand):
             else:
                 row['%s_attempts' % base_call].append(u)
             if call == base_call:  # финальная попытка (без суффикса _retryN)
-                row[base_call] = entry['raw_response']
+                # ⚠️ Форма ответа приводится ЗДЕСЬ, до валидаторов: объект,
+                # обёрнутый моделью в массив из одного элемента, иначе не
+                # прошёл бы проверку схемы и ушёл бы в брак, хотя внутри
+                # он целый. Пометки формы едут в строке и попадают в
+                # нарушения через `parsed_row`.
+                payload, soft, hard = normalize_payload(entry['raw_response'])
+                row[base_call] = payload
+                row['%s_payload_soft' % base_call] = soft
+                row['%s_payload_hard' % base_call] = hard
                 if not carried:
                     row['%s_usage' % base_call] = u
 

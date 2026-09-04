@@ -756,6 +756,162 @@ class ParsedRowFallbackTests(TestCase):
         self.assertIn('hints', parsed['missing_required_fields'])
 
 
+class PayloadShapeTests(TestCase):
+    """Форма ответа модели (2026-09-04, разбор падения боевого прогона
+    `run2-corpus-20260904`).
+
+    Прогон отработал 37 035 задач и заплатил $31,46, после чего сборка
+    результата легла целиком на `AttributeError: 'list' object has no
+    attribute 'get'` — шесть финальных ответов вызова 2 пришли массивом
+    из нескольких кусков вместо объекта. Проверяется ровно два свойства:
+    объект в массиве из одного элемента разворачивается, а любая другая
+    форма даёт БРАК и не роняет сборку."""
+
+    def setUp(self):
+        self.problem = Problem.objects.create(
+            statement='Задача про рынок.', solution='Из равновесия P=MC.')
+
+    def _call2(self):
+        return {'search_queries': ['a', 'b'], 'plot': None, 'hints': None,
+                'text_quality': 'чистая', 'text_quality_note': '',
+                'problem_type': 'тест: короткий ответ', 'difficulty': 2,
+                'difficulty_note': '', 'answer_consistency': 'согласован',
+                'title_candidate': 'Новый заголовок'}
+
+    def _row(self, call2, call2_ok=True, problem_id=None):
+        return {
+            'problem_id': problem_id or self.problem.id,
+            'call1': {'topic_primary': '2', 'topics_secondary': [],
+                      'tags': ['2.1'], 'given': 'Дано', 'find': 'Найти',
+                      'econ_concepts': [], 'concepts_offlist': [],
+                      'task_nature': 'расчётная', 'features_1': [],
+                      'topic_confidence': 'высокая'},
+            'call1_ok': True, 'call1_retried': False,
+            'call1_violations': [], 'call1_soft_violations': [],
+            'call2': call2,
+            'call2_ok': call2_ok, 'call2_retried': False,
+            'call2_violations': [], 'call2_soft_violations': [],
+            'images_sent': 0, 'tikz': {'replaced': 0, 'truncated': 0},
+            'solution_sent': True, 'solution_tokens': 42,
+            'solution_truncated': False,
+        }
+
+    def test_словарь_собирается_как_обычно(self):
+        parsed = run_cmd.parsed_row(self._row(self._call2()), self.problem)
+
+        self.assertEqual(parsed['search_queries'], ['a', 'b'])
+        self.assertEqual(parsed['title_candidate'], 'Новый заголовок')
+        self.assertTrue(parsed['call2_ok'])
+        self.assertFalse(parsed['defect'])
+        self.assertNotIn(run_cmd.PAYLOAD_WRAPPED_IN_LIST,
+                         parsed['soft_violations'])
+
+    def test_один_словарь_в_массиве_разворачивается(self):
+        parsed = run_cmd.parsed_row(self._row([self._call2()]), self.problem)
+
+        self.assertEqual(parsed['search_queries'], ['a', 'b'])
+        self.assertEqual(parsed['title_candidate'], 'Новый заголовок')
+        self.assertIn(run_cmd.PAYLOAD_WRAPPED_IN_LIST,
+                      parsed['soft_violations'])
+        # мягкое нарушение банк не портит: вызов остаётся годным
+        self.assertTrue(parsed['call2_ok'])
+        self.assertFalse(parsed['defect'])
+
+    def test_несколько_элементов_в_массиве_это_брак_без_исключения(self):
+        row = self._row([{'search_queries': ['a']}, self._call2()])
+
+        parsed = run_cmd.parsed_row(row, self.problem)
+
+        self.assertFalse(parsed['call2_ok'])
+        self.assertTrue(parsed['defect'])
+        self.assertIn(run_cmd.PAYLOAD_NOT_OBJECT, parsed['call2_violations'])
+        # не угадываем «последний элемент похож на целый»
+        self.assertIsNone(parsed['search_queries'])
+
+    def test_строка_вместо_объекта_это_брак_без_исключения(self):
+        parsed = run_cmd.parsed_row(self._row('просто текст'), self.problem)
+
+        self.assertFalse(parsed['call2_ok'])
+        self.assertTrue(parsed['defect'])
+        self.assertIn(run_cmd.PAYLOAD_NOT_OBJECT, parsed['call2_violations'])
+
+    def test_none_вместо_объекта_это_брак_без_исключения(self):
+        parsed = run_cmd.parsed_row(self._row(None), self.problem)
+
+        self.assertFalse(parsed['call2_ok'])
+        self.assertTrue(parsed['defect'])
+        self.assertIn(run_cmd.PAYLOAD_NOT_OBJECT, parsed['call2_violations'])
+
+    def test_кривая_форма_уходит_по_ветке_подстраховки_run1(self):
+        row = self._row([{'search_queries': ['a']}, self._call2()])
+        fallback = {self.problem.id: _old_run1_row(self.problem.id)}
+
+        parsed = run_cmd.parsed_row(row, self.problem, fallback_index=fallback)
+
+        self.assertEqual(parsed['title_candidate'], 'Старый заголовок')
+        self.assertIn('call2', parsed['fallback_from_run1'])
+
+    def test_батч_из_пяти_со_второй_кривой_отдаёт_пять_строк(self):
+        problems = [self.problem] + [
+            Problem.objects.create(statement='Задача %d.' % i,
+                                   solution='Решение %d.' % i)
+            for i in range(4)]
+        by_id = {p.id: p for p in problems}
+        payloads = [self._call2(), [{'a': 1}, {'b': 2}], self._call2(),
+                    self._call2(), self._call2()]
+        rows = [self._row(payload, problem_id=p.id)
+                for p, payload in zip(problems, payloads)]
+
+        parsed = run_cmd.parsed_rows_for(rows, by_id)
+
+        self.assertEqual(len(parsed), 5)
+        self.assertEqual(sum(1 for p in parsed if p['defect']), 1)
+        self.assertEqual(sum(1 for p in parsed if not p['defect']), 4)
+
+    def test_непредвиденная_ошибка_не_роняет_батч_а_становится_браком(self):
+        """Даже если разбор упадёт по причине, которой мы не предусмотрели,
+        сборка обязана продолжиться: 37 тысяч оплаченных ответов не могут
+        стоить одной кривой строки."""
+        rows = [self._row(self._call2()),
+                self._row(self._call2(), problem_id=self.problem.id)]
+        by_id = {self.problem.id: self.problem}
+        real = run_cmd.parsed_row
+        calls = {'n': 0}
+
+        def explode(row, problem, fallback_index=None):
+            calls['n'] += 1
+            if calls['n'] == 1:
+                raise RuntimeError('внезапно')
+            return real(row, problem, fallback_index=fallback_index)
+
+        with mock.patch.object(run_cmd, 'parsed_row', explode):
+            parsed = run_cmd.parsed_rows_for(rows, by_id)
+
+        self.assertEqual(len(parsed), 2)
+        self.assertTrue(parsed[0]['defect'])
+        self.assertIn('внезапно', parsed[0]['parse_crash'])
+        self.assertFalse(parsed[1]['defect'])
+
+    def test_метрики_считают_форму_ответа_отдельными_счётчиками(self):
+        other = Problem.objects.create(statement='Вторая.', solution='Р.')
+        third = Problem.objects.create(statement='Третья.', solution='Р.')
+        by_id = {self.problem.id: self.problem, other.id: other,
+                 third.id: third}
+        rows = [self._row([self._call2()]),
+                self._row([{'a': 1}, {'b': 2}], problem_id=other.id),
+                self._row(self._call2(), problem_id=third.id)]
+
+        parsed = run_cmd.parsed_rows_for(rows, by_id)
+        metrics = run_cmd.build_metrics(parsed, {'cost_usd': '0'})
+        anomalies = metrics['payload_anomalies']
+
+        self.assertEqual(anomalies[run_cmd.PAYLOAD_WRAPPED_IN_LIST], 1)
+        self.assertEqual(anomalies[run_cmd.PAYLOAD_NOT_OBJECT], 1)
+        self.assertEqual(anomalies[run_cmd.PARSE_CRASH], 0)
+        self.assertEqual(anomalies['%s_ids' % run_cmd.PAYLOAD_NOT_OBJECT],
+                         [other.id])
+
+
 class RunQualityTrackerTests(TestCase):
     """Фаза 1.1 (решение владельца 02.09.2026, четвёртая пересъёмка):
     автостоп считает ФИНАЛЬНЫЙ БРАК, а не долю задач, потребовавших
