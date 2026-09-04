@@ -60,6 +60,12 @@
        соседняя страница — светлой. Теперь тему на всём сайте ставит один
        скрипт из `_tokens.html`, который подключён выше. -->
 
+  {% comment %}
+  Общая клавиатура формул: одна на калькулятор и домашки (ADR 0075).
+  Стиль — до `calc2.css`, чтобы калькулятор при желании мог что-то
+  переопределить, а не наоборот.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
@@ -2479,6 +2485,12 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
 <script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
 <script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
+{% comment %}
+⚠️ ОБЩАЯ КЛАВИАТУРА — ПЕРЕД `82-input.js`. Тот зовёт `window.MathKbd.build`
+при сборке панели ввода; порядок номерных файлов calc2 (00-…99-) при этом не
+нарушается: общий модуль стоит вне их нумерации.
+{% endcomment %}
+<script src="{% static 'mathkbd/mathkbd.js' %}"></script>
 <script src="{% calc2_static 'calc2/82-input.js' %}"></script>
 <script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
 <script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>

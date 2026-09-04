@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-09-04. HEAD: `79803ab`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-09-04. HEAD: `b198fb9`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -343,8 +343,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 219 | 13.3 | python |
-| `calc2/templates/calc2/calc2.html` | 2489 | 204.8 | шаблон |
-| `calc2/static/calc2/calc2.css` | 2390 | 172.8 | CSS |
+| `calc2/templates/calc2/calc2.html` | 2501 | 205.6 | шаблон |
+| `calc2/static/calc2/calc2.css` | 2343 | 170.9 | CSS |
 | `calc2/static/calc2/00-config.js` | 539 | 46.5 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 74.6 | JS |
 | `calc2/static/calc2/20-plane.js` | 708 | 50.0 | JS |
@@ -361,14 +361,14 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/60-overlays.js` | 4215 | 264.6 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2428 | 156.5 | JS |
 | `calc2/static/calc2/80-ui.js` | 526 | 33.8 | JS |
-| `calc2/static/calc2/82-input.js` | 2031 | 118.9 | JS |
+| `calc2/static/calc2/82-input.js` | 1917 | 113.5 | JS |
 | `calc2/static/calc2/84-picker.js` | 564 | 41.9 | JS |
 | `calc2/static/calc2/86-workspace.js` | 1845 | 119.0 | JS |
 | `calc2/static/calc2/88-params.js` | 1826 | 122.9 | JS |
 | `calc2/static/calc2/90-explain.js` | 381 | 63.5 | JS |
 | `calc2/static/calc2/99-boot.js` | 92 | 7.5 | JS |
 
-**Итого: 26 файлов, 34624 строк, 2405.1 КБ.**
+**Итого: 26 файлов, 34475 строк, 2398.7 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1304,23 +1304,27 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 1091 — `texSafeText`
 - строка 1095 — `buildMathfield`
 - строка 1247 — `insertIntoField`
-- строка 1318 — `mkbdKey`
-- строка 1345 — `buildKeyboard`
-- строка 1405 — `closeAllKeyboardsExcept`
-- строка 1426 — `scheduleParamsSync`
-- строка 1432 — `registerFormulaField`
-- строка 1449 — `fieldActive`
-- строка 1458 — `liveFormulaTexts`
-- строка 1485 — `equipFormulaField`
-- строка 1522 — `equipAllFormulaFields`
-- строка 1526 — `attachFormulaHelp`
-- строка 1716 — `makeEditableValue`
-- строка 1821 — `makeToggle`
-- строка 1863 — `segToToggle`
-- строка 1895 — `closeAllSelectMenus`
-- строка 1899 — `upgradeSelect`
-- строка 2000 — `upgradeTextField`
-- строка 2023 — `upgradeTextFieldsIn`
+- строка 1266 — `keyboardAdapter`
+- строка 1268 — `insert`
+- строка 1269 — `deleteBack`
+- строка 1274 — `clear`
+- строка 1278 — `piecewise`
+- строка 1286 — `buildKeyboard`
+- строка 1291 — `closeAllKeyboardsExcept`
+- строка 1312 — `scheduleParamsSync`
+- строка 1318 — `registerFormulaField`
+- строка 1335 — `fieldActive`
+- строка 1344 — `liveFormulaTexts`
+- строка 1371 — `equipFormulaField`
+- строка 1408 — `equipAllFormulaFields`
+- строка 1412 — `attachFormulaHelp`
+- строка 1602 — `makeEditableValue`
+- строка 1707 — `makeToggle`
+- строка 1749 — `segToToggle`
+- строка 1781 — `closeAllSelectMenus`
+- строка 1785 — `upgradeSelect`
+- строка 1886 — `upgradeTextField`
+- строка 1909 — `upgradeTextFieldsIn`
 
 #### `calc2/static/calc2/84-picker.js`
 
@@ -1455,6 +1459,6 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 13 — `lockNumberFields`
 - строка 42 — `init`
 
-**Итого функций в индексе: 1017.**
+**Итого функций в индексе: 1021.**
 
 <!-- AUTO:END -->

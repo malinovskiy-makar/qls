@@ -1255,150 +1255,36 @@ function insertIntoField(inp, tex, txt, back) {
   insertIntoFormula(inp, txt != null ? txt : tex, back || 0);
 }
 
-/* ── Раскладка клавиатуры ─────────────────────────────────────────────
-   Каждая клавиша: [подпись, вставка в набранном виде, вставка текстом,
-   насколько отвести курсор назад в обычном поле].
-   #@ — то, что выделено (или предыдущий кусок), #? — пустое место. */
-const MKBD_BASE = [
-  [['7', '7'], ['8', '8'], ['9', '9'], ['(', '(', '(', 0], [')', ')', ')', 0]],
-  [['4', '4'], ['5', '5'], ['6', '6'], ['×', '\\cdot ', '*'], ['÷', '\\frac{#@}{#?}', '/']],
-  [['1', '1'], ['2', '2'], ['3', '3'], ['−', '-', '-'], ['+', '+', '+']],
-  [['0', '0'], [',', '.', '.'], ['=', '=', '='], ['x²', '#@^2', '^2'], ['xⁿ', '#@^{#?}', '^(', 1]],
-  /* П21. Один язык оформления в ряду. Было вперемешку: «×» и «÷» знаками,
-     «дробь» и «стереть» словами, «⌫» иконкой. Знак действия рисуется знаком,
-     а команда над полем называется словом — «дробь» это то же самое, что «÷»,
-     и второй кнопки для неё не нужно. */
-  [['xₙ', '#@_{#?}', '_'], ['√', '\\sqrt{#?}', 'sqrt()', 1], ['|x|', '\\left|#?\\right|', 'abs()', 1],
-   ['⌫', 'DEL'], ['✕', 'CLEAR']],
-];
-const MKBD_FUNCS = [
-  ['Корни и модуль', [
-    ['√', '\\sqrt{#?}', 'sqrt()', 1],
-    ['ⁿ√', '\\sqrt[#?]{#@}', 'nthRoot(, )', 4],
-    ['|x|', '\\left|#?\\right|', 'abs()', 1],
-  ]],
-  ['Степень и логарифм', [
-    ['xⁿ', '#@^{#?}', '^(', 1],
-    ['eˣ', '\\exponentialE^{#?}', 'exp()', 1],
-    ['ln', '\\ln\\left(#?\\right)', 'log()', 1],
-    ['log', '\\log_{#?}\\left(#?\\right)', 'log(, )', 4],
-  ]],
-  ['Тригонометрия', [
-    ['sin', '\\sin\\left(#?\\right)', 'sin()', 1],
-    ['cos', '\\cos\\left(#?\\right)', 'cos()', 1],
-    ['tan', '\\tan\\left(#?\\right)', 'tan()', 1],
-  ]],
-  ['Сравнения', [
-    ['<', '<', '<'], ['>', '>', '>'],
-    ['≤', '\\le ', '<='], ['≥', '\\ge ', '>='], ['≠', '\\ne ', '!='],
-  ]],
-  ['Выбор', [
-    ['min', '\\min\\left(#?,#?\\right)', 'min(, )', 3],
-    ['max', '\\max\\left(#?,#?\\right)', 'max(, )', 3],
-    ['если', '#?>#? ? #? : #?', ' ? : ', 3],
-  ]],
-];
-const MKBD_LETTERS = [
-  ['Латинские буквы', 'abcdefghijklmnopqrstuvwxyz'.split('').map(ch => [ch, ch, ch])],
-  ['Заглавные', 'ABCDEFGHIKLMNPQRSTVWXYZ'.split('').map(ch => [ch, ch, ch])],
-  ['Греческие', [
-    ['α', '\\alpha ', 'alpha'], ['β', '\\beta ', 'beta'], ['γ', '\\gamma ', 'gamma'],
-    ['δ', '\\delta ', 'delta'], ['ε', '\\epsilon ', 'epsilon'], ['θ', '\\theta ', 'theta'],
-    ['λ', '\\lambda ', 'lambda'], ['μ', '\\mu ', 'mu'], ['π', '\\pi ', 'pi'],
-    ['ρ', '\\rho ', 'rho'], ['σ', '\\sigma ', 'sigma'], ['τ', '\\tau ', 'tau'],
-    ['φ', '\\phi ', 'phi'], ['ω', '\\omega ', 'omega'], ['Δ', '\\Delta ', 'Delta'],
-    ['Σ', '\\Sigma ', 'Sigma'],
-  ]],
-  ['Знаки', [
-    ['∞', '\\infty ', 'Infinity'], ['%', '\\%', '%'],
-    ['≈', '\\approx ', '=='],
-  ]],
-];
+/* ── Клавиатура формул ────────────────────────────────────────────────
+   ⚠️ РАСКЛАДКА ЖИВЁТ В ОБЩЕМ МОДУЛЕ `static/mathkbd/mathkbd.js` (04.09.2026,
+   ADR 0075). Здесь была её единственная копия; вторая, другого набора и
+   другого вида, стояла в домашках. Теперь обе клавиатуры — одна и та же, а
+   калькулятор остаётся ЭТАЛОНОМ: раскладка перенесена дословно.
 
-function mkbdKey(k, inp) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = 'mk';
-  b.textContent = k[0];
-  /* Знак без слова обязан называть себя доступному чтению: нативной подсказки
-     на сайте нет (правило 18 части 4), а «⌫» и «✕» на слух не читаются. */
-  if (k[1] === 'DEL') b.setAttribute('aria-label', 'Стереть символ');
-  if (k[1] === 'CLEAR') b.setAttribute('aria-label', 'Очистить поле');
-  if (k[0].length > 2) b.classList.add('fn');
-  b.addEventListener('mousedown', (e) => e.preventDefault());   // не терять фокус поля
-  b.addEventListener('click', () => {
-    if (k[1] === 'DEL') {
-      if (inp._mf) inp._mf.executeCommand('deleteBackward');
-      else { inp.value = inp.value.slice(0, -1); inp.dispatchEvent(new Event('input', { bubbles: true })); }
-      return;
-    }
-    if (k[1] === 'CLEAR') {
+   Клавиатура не знает, куда пишет: между ней и полем стоит адаптер. Здесь
+   он собирается из уже существующих функций калькулятора. */
+function keyboardAdapter(inp, box) {
+  return {
+    insert: function (tex, txt, back) { insertIntoField(inp, tex, txt, back); },
+    deleteBack: function () {
+      if (inp._mf) { inp._mf.executeCommand('deleteBackward'); return; }
+      inp.value = inp.value.slice(0, -1);
+      inp.dispatchEvent(new Event('input', { bubbles: true }));
+    },
+    clear: function () {
       if (inp._mf) inp._mf.value = '';
       setFieldValue(inp, '');
-      return;
-    }
-    insertIntoField(inp, k[1], k[2], k[3]);
-  });
-  return b;
+    },
+    piecewise: function () {
+      box.classList.remove('open');
+      openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
+    },
+  };
 }
 
 // Собрать клавиатуру под конкретным полем. Три раздела, открыт один.
 function buildKeyboard(box, inp) {
-  box.innerHTML = '';
-  const tabs = document.createElement('div'); tabs.className = 'mkbd-tabs';
-  const panes = [];
-  const SECTIONS = [
-    ['123', (pane) => {
-      MKBD_BASE.forEach(row => {
-        const r = document.createElement('div'); r.className = 'mkbd-row';
-        row.forEach(k => r.appendChild(mkbdKey(k, inp)));
-        pane.appendChild(r);
-      });
-    }],
-    ['Функции', (pane) => {
-      MKBD_FUNCS.forEach(([label, keys]) => {
-        const l = document.createElement('div'); l.className = 'mkbd-lab'; l.textContent = label;
-        const g = document.createElement('div'); g.className = 'mkbd-grid';
-        keys.forEach(k => g.appendChild(mkbdKey(k, inp)));
-        pane.append(l, g);
-      });
-    }],
-    ['Буквы', (pane) => {
-      MKBD_LETTERS.forEach(([label, keys]) => {
-        const l = document.createElement('div'); l.className = 'mkbd-lab'; l.textContent = label;
-        const g = document.createElement('div'); g.className = 'mkbd-grid';
-        keys.forEach(k => g.appendChild(mkbdKey(k, inp)));
-        pane.append(l, g);
-      });
-    }],
-  ];
-  SECTIONS.forEach(([name, fill], idx) => {
-    const t = document.createElement('button');
-    t.type = 'button'; t.className = 'mkbd-tab' + (idx === 0 ? ' active' : '');
-    t.textContent = name;
-    const pane = document.createElement('div');
-    pane.className = 'mkbd-pane' + (idx === 0 ? ' active' : '');
-    fill(pane);
-    t.addEventListener('click', () => {
-      tabs.querySelectorAll('.mkbd-tab').forEach(x => x.classList.remove('active'));
-      panes.forEach(x => x.classList.remove('active'));
-      t.classList.add('active'); pane.classList.add('active');
-    });
-    tabs.appendChild(t); panes.push(pane);
-  });
-  box.appendChild(tabs);
-  panes.forEach(p => box.appendChild(p));
-
-  /* Внизу — только вход в конструктор кусочной функции. Раздел «Примеры формул»
-     убран: он повторял раздел «Функции», а вернуться из него обратно к
-     клавиатуре было нечем. */
-  const foot = document.createElement('div'); foot.className = 'mkbd-foot';
-  const pw = document.createElement('button'); pw.type = 'button'; pw.textContent = 'Кусочная функция';
-  pw.addEventListener('click', () => {
-    box.classList.remove('open');
-    openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
-  });
-  foot.appendChild(pw);
-  box.appendChild(foot);
+  window.MathKbd.build(box, keyboardAdapter(inp, box));
 }
 
 // Закрыть все открытые клавиатуры, кроме той, что в переданном слоте.

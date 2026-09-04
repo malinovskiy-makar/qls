@@ -20,6 +20,19 @@ Math.js в calc2, подключаем одним <script src> из static/vendo
     "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
 </script>
 <script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"></script>
+{% comment %}
+⚠️ ОБЩАЯ КЛАВИАТУРА ФОРМУЛ — ОДНА НА САЙТ (04.09.2026, ADR 0075). Здесь
+раньше были свои четыре ряда быстрых кнопок и кнопка «⌨ Клавиатура»
+(встроенная клавиатура MathLive) — другой набор знаков и другой вид, чем в
+калькуляторе. Эталоном взята клавиатура калькулятора; оба экрана берут её
+из `static/mathkbd/`.
+
+Порядок важен: `mathkbd.js` должен быть загружен до `mathfield.js`, который
+зовёт `window.MathKbd.build`. Оба `defer` — выполнятся в порядке
+подключения.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
+<script defer src="{% static 'mathkbd/mathkbd.js' %}"></script>
 <script defer src="{% static 'platform/mathfield.js' %}"></script>
 
 <style>
@@ -36,12 +49,12 @@ Math.js в calc2, подключаем одним <script src> из static/vendo
   color: var(--text2); margin-bottom: 6px;
 }
 .mf-panel { margin-top: 8px; }
-.mf-toggle, .mf-insert, .mf-kbd {
+.mf-toggle, .mf-insert {
   border: 0.5px solid var(--border); border-radius: var(--r);
   background: transparent; color: var(--text); font: inherit; font-size: 13px;
   padding: 5px 12px; cursor: pointer;
 }
-.mf-toggle:hover, .mf-insert:hover, .mf-kbd:hover { background: var(--panel); }
+.mf-toggle:hover, .mf-insert:hover { background: var(--panel); }
 .mf-body {
   margin-top: 10px; padding: 12px; border: 0.5px solid var(--border);
   border-radius: var(--r); background: var(--surface-2);
@@ -54,17 +67,6 @@ Math.js в calc2, подключаем одним <script src> из static/vendo
 .mf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
           margin-top: 10px; }
 .mf-hint { font-size: 13px; color: var(--text2); }
-.mf-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-            margin-top: 10px; }
-.mf-group-name { font-size: 13px; color: var(--text2); min-width: 74px; }
-.mf-key {
-  min-width: 34px; padding: 4px 8px; font: inherit; font-size: 14px;
-  border: 0.5px solid var(--border); border-radius: var(--r);
-  background: var(--surface); color: var(--text); cursor: pointer;
-}
-.mf-key:hover { background: var(--panel); }
-@media (max-width: 560px) {
-  .mf-group-name { min-width: 100%; }
-  .mf-key { min-width: 40px; padding: 6px 10px; }
-}
+/* Стили своих быстрых кнопок (.mf-group / .mf-key) удалены вместе с самими
+   кнопками: их место заняла общая клавиатура из `static/mathkbd/`. */
 </style>

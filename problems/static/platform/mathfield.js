@@ -30,50 +30,11 @@
     }
   } catch (e) {}
 
-  // Кнопки быстрой вставки. Ориентир — набор IEO (дроби, степени, индексы,
-  // корни, скобки, сравнения, греческие), плюс то, без чего не обойтись
-  // в экономике: процент, стрелки сдвига кривых, Q_d / Q_s / P_e.
-  var QUICK = [
-    { group: 'Основное', items: [
-      { label: '×', latex: '\\times' },
-      { label: '÷', latex: '\\div' },
-      { label: '±', latex: '\\pm' },
-      { label: '%', latex: '\\%' },
-      { label: 'a/b', latex: '\\frac{#0}{#?}' },
-      { label: 'x²', latex: '#0^{#?}' },
-      { label: 'xₙ', latex: '#0_{#?}' },
-      { label: '√', latex: '\\sqrt{#0}' },
-      { label: '( )', latex: '\\left(#0\\right)' },
-    ]},
-    { group: 'Сравнения', items: [
-      { label: '≤', latex: '\\le' },
-      { label: '≥', latex: '\\ge' },
-      { label: '≠', latex: '\\ne' },
-      { label: '≈', latex: '\\approx' },
-      { label: '→', latex: '\\to' },
-      { label: '↑', latex: '\\uparrow' },
-      { label: '↓', latex: '\\downarrow' },
-    ]},
-    { group: 'Экономика', items: [
-      { label: 'Q_d', latex: 'Q_d' },
-      { label: 'Q_s', latex: 'Q_s' },
-      { label: 'P_e', latex: 'P_e' },
-      { label: 'Q_e', latex: 'Q_e' },
-      { label: 'TR', latex: 'TR' },
-      { label: 'MC', latex: 'MC' },
-      { label: 'MR', latex: 'MR' },
-      { label: 'E_p', latex: 'E_p' },
-      { label: 'Δ', latex: '\\Delta' },
-    ]},
-    { group: 'Греческие', items: [
-      { label: 'α', latex: '\\alpha' },
-      { label: 'β', latex: '\\beta' },
-      { label: 'π', latex: '\\pi' },
-      { label: 'σ', latex: '\\sigma' },
-      { label: 'λ', latex: '\\lambda' },
-      { label: 'μ', latex: '\\mu' },
-    ]},
-  ];
+  /* ⚠️ ЗДЕСЬ ЛЕЖАЛИ СВОИ «КНОПКИ БЫСТРОЙ ВСТАВКИ» — четыре ряда своего
+     набора. Удалены 04.09.2026 (ADR 0075): это и была вторая клавиатура,
+     о которой говорил владелец. Раскладка теперь одна на весь сайт и живёт
+     в `static/mathkbd/mathkbd.js`; эталоном взята клавиатура калькулятора.
+     Восстанавливать набор здесь нельзя — вернётся ровно та же болезнь. */
 
   function el(tag, className, text) {
     var node = document.createElement(tag);
@@ -129,6 +90,43 @@
       });
     }
     if (typeof fixCurrencyDollars === 'function') { fixCurrencyDollars(node); }
+  }
+
+  /* Адаптер общей клавиатуры для поля MathLive.
+   *
+   * ⚠️ КЛАВИАТУРА НЕ ЗНАЕТ ПРО MathLive, а MathLive не знает про клавиатуру.
+   * В калькуляторе тот же самый модуль пишет в обычное поле ввода через
+   * `insertIntoField`; здесь — командой `insert` в `<math-field>`. Разницу
+   * держит адаптер, и только он.
+   */
+  function mathfieldAdapter(field) {
+    return {
+      insert: function (tex) {
+        field.executeCommand(['insert', tex]);
+        field.focus();
+      },
+      deleteBack: function () {
+        field.executeCommand('deleteBackward');
+        field.focus();
+      },
+      clear: function () {
+        field.value = '';
+        field.focus();
+      },
+      /* ⚠️ «Кусочная функция» здесь — ЗАГОТОВКА, а не конструктор.
+         В калькуляторе за этой кнопкой стоит отдельное окно с полями
+         условий: там формула идёт в движок и должна быть разобрана. В
+         домашке формула идёт В ТЕКСТ ответа, и разбирать её некому —
+         достаточно вставить каркас `cases`, который KaTeX нарисует и в
+         `$…$`, и в `$$…$$`. */
+      piecewise: function () {
+        field.executeCommand([
+          'insert',
+          '\\begin{cases} #? & #? \\\\ #? & #? \\end{cases}',
+        ]);
+        field.focus();
+      },
+    };
   }
 
   window.attachMathfield = function (textarea) {
@@ -201,40 +199,30 @@
     var row = el('div', 'mf-row');
     var insert = el('button', 'mf-insert', 'Вставить в текст');
     insert.type = 'button';
-    var keyboard = el('button', 'mf-kbd', '⌨ Клавиатура');
-    keyboard.type = 'button';
     var hint = el('span', 'mf-hint',
       'Формула вставится как $…$ на место курсора.');
     row.appendChild(insert);
-    row.appendChild(keyboard);
     row.appendChild(hint);
     body.appendChild(row);
 
-    QUICK.forEach(function (block) {
-      var group = el('div', 'mf-group');
-      group.appendChild(el('span', 'mf-group-name', block.group));
-      block.items.forEach(function (item) {
-        var button = el('button', 'mf-key', item.label);
-        button.type = 'button';
-        button.addEventListener('click', function () {
-          field.executeCommand(['insert', item.latex]);
-          field.focus();
-        });
-        group.appendChild(button);
-      });
-      body.appendChild(group);
-    });
+    /* ⚠️ ЗДЕСЬ БЫЛИ ЧЕТЫРЕ РЯДА СВОИХ БЫСТРЫХ КНОПОК И КНОПКА «⌨ Клавиатура»
+       (встроенная клавиатура MathLive). Обе убраны 04.09.2026 (ADR 0075):
+       это и была «другая клавиатура» из разбора владельца — другой набор
+       знаков и другой вид, чем в калькуляторе. Теперь на обоих экранах одна
+       и та же клавиатура из `static/mathkbd/mathkbd.js`.
+
+       `math-virtual-keyboard-policy="manual"` у поля ОСТАЁТСЯ: без него
+       встроенная клавиатура MathLive всплывала бы сама при фокусе и спорила
+       бы с нашей. */
+    var keyboardBox = el('div', 'mkbd open');
+    body.appendChild(keyboardBox);
+    if (window.MathKbd) {
+      window.MathKbd.build(keyboardBox, mathfieldAdapter(field));
+    }
 
     toggle.addEventListener('click', function () {
       body.hidden = !body.hidden;
       if (!body.hidden) { field.focus(); }
-    });
-
-    keyboard.addEventListener('click', function () {
-      if (window.mathVirtualKeyboard) {
-        window.mathVirtualKeyboard.visible =
-          !window.mathVirtualKeyboard.visible;
-      }
     });
 
     insert.addEventListener('click', function () {

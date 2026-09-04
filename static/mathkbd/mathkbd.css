@@ -1,0 +1,84 @@
+/* Клавиатура формул — ОДНА на весь сайт (04.09.2026, ADR 0075).
+ *
+ * Стили перенесены из `calc2/static/calc2/calc2.css` без изменения вида:
+ * эталоном назначена клавиатура калькулятора, и «заодно поправить» её здесь
+ * было бы подменой задачи. Изменены ровно две вещи, и обе — ради того, чтобы
+ * файл жил вне калькулятора:
+ *
+ *   1. `var(--ease)` → `ease`: `--ease` объявлен в `calc2.css`, а на странице
+ *      домашки его нет, и переход просто не работал бы;
+ *   2. анимация `fpop` (тоже из `calc2.css`) заменена на общий токен
+ *      длительности `--t-slow` и простое появление.
+ *
+ * Все цвета — токены сайта из `templates/_tokens.html`. Своих значений здесь
+ * нет ни одного: клавиатура следует теме страницы, на которой стоит.
+ */
+
+/* ── Клавиатура ───────────────────────────────────────────────────────
+   Три раздела, раскрывается ОДИН за раз на всю ширину панели. */
+.mkbd {
+  display: none; margin-top: 8px; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+}
+.mkbd.open { display: block; }
+@media (prefers-reduced-motion: no-preference) {
+  .mkbd.open { animation: mkbd-pop var(--t-slow, .2s) ease; }
+}
+@keyframes mkbd-pop {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: none; }
+}
+.mkbd-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.mkbd-tab {
+  flex: 1; padding: 6px 4px; font: inherit; font-size: 12px; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); color: var(--text2);
+  cursor: pointer;
+  transition: background .12s ease, color .12s ease, border-color .12s ease;
+}
+.mkbd-tab:hover { color: var(--text); }
+.mkbd-tab.active { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
+.mkbd-pane { display: none; }
+.mkbd-pane.active { display: block; }
+.mkbd-row { display: flex; gap: 4px; }
+.mkbd-row + .mkbd-row { margin-top: 4px; }
+.mkbd-grid { display: flex; flex-wrap: wrap; gap: 4px; }
+.mkbd-lab {
+  font-size: 11px; font-weight: 600; color: var(--text3);
+  margin: 8px 0 4px; letter-spacing: .03em;
+}
+.mkbd-lab:first-child { margin-top: 0; }
+.mk {
+  flex: 1 1 auto; min-width: 30px; min-height: 32px; padding: 3px 6px;
+  display: grid; place-items: center; font: inherit; font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+  cursor: pointer;
+  transition: background .1s ease, border-color .1s ease, transform .08s ease;
+}
+.mk:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
+.mk:active { transform: scale(.94); }
+.mk.wide { flex: 2 1 auto; }
+.mk.op { font-weight: 600; }
+.mk.fn { font-size: 12px; }
+.mkbd-grid .mk { flex: 0 0 auto; min-width: 32px; }
+.mkbd-foot {
+  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+.mkbd-foot button {
+  flex: 1; padding: 6px; font: inherit; font-size: 11px; font-weight: 600;
+  color: var(--text2);
+  background: transparent; border: 1px dashed var(--border); border-radius: var(--r);
+  cursor: pointer;
+  transition: color .12s ease, border-color .12s ease;
+}
+.mkbd-foot button:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ⚠️ БУКВЫ РИСУЮТСЯ KaTeX, И ИМ НУЖЕН РАЗМЕР (п. 23 разбора владельца).
+   Внутри клавиши KaTeX ставит свой `font-size: 1.21em`, и латинская «a»
+   выходила заметно крупнее соседней цифры. Возвращаем к размеру клавиши.
+   Курсив здесь НЕ задаётся: наклон рисует сам KaTeX, как в TeX. */
+.mk .katex { font-size: 1em; line-height: 1; }
+.mk .katex-display { margin: 0; }
