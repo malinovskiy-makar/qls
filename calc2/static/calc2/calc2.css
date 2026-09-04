@@ -610,6 +610,15 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .f-kbd svg { width: 17px; height: 17px; }
 .f-kbd:hover, .f-kbd[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 
+/* ⚠️ ЗАПАС СНИЗУ ПОД КРУЖОК TELEGRAM (04.09.2026, ADR 0076). Кружок стоит
+   в правом нижнем углу окна: 40 px плюс 16 px отступа. На узком экране
+   карточки блоков доходят до самого низа, и последняя пряталась под ним —
+   замер `elementFromPoint` на 380 px показывал под кружком живую `.bcard`.
+   Двигаем СОДЕРЖИМОЕ, а не кружок: кружок нужен на всех экранах одинаково. */
+@media (max-width: 900px) {
+  #scene-picker .picker-inner { padding-bottom: 72px; }
+}
+
 /* ── Клавиатура ───────────────────────────────────────────────────────
    ⚠️ СТИЛИ ПЕРЕЕХАЛИ В `static/mathkbd/mathkbd.css` (04.09.2026, ADR 0075).
    Клавиатура теперь одна на весь сайт, и её оформление обязано жить рядом с

@@ -251,6 +251,17 @@ nav.site-nav {
   </div>
 
   <div class="nav-right">
+    {% comment %}
+    Кнопка обратной связи стоит ПЕРЕД меткой версии: жалоба важнее номера,
+    и на узком экране от неё остаётся значок, а метка уезжает в панель ☰.
+    {% endcomment %}
+    <button type="button" class="fb-btn" aria-label="Проблема или предложение">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+      </svg>
+      <span class="fb-btn-text">Проблема или предложение</span>
+    </button>
     <span class="nav-version">{{ site_version }}</span>
     {% include '_theme_toggle.html' %}
     {% if user.is_authenticated %}
@@ -285,6 +296,13 @@ nav.site-nav {
       {% endfor %}
     </div>
     <span class="nav-version">{{ site_version }}</span>
+    <button type="button" class="fb-btn" aria-label="Проблема или предложение">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+      </svg>
+      <span class="fb-btn-text">Проблема или предложение</span>
+    </button>
   </div>
 </nav>
 <script>

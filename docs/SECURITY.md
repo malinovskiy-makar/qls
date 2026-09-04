@@ -385,8 +385,16 @@ Python, а всё, что ниже WARNING, пропадало молча. На�
 что её кто-то отсекает, а потому что отвечать некому. `WHITENOISE_ROOT` не
 задан, поэтому WhiteNoise отдаёт только `STATIC_ROOT`.
 
-⚠️ **С 04.09.2026 в проекте ОДНО представление, отдающее файл** —
-`/profile/avatar/<id>/` ([`problems/views_platform.py`](../problems/views_platform.py)).
+⚠️ **С 04.09.2026 в проекте ДВА представления, отдающих файл**, и оба
+разобраны поимённо:
+
+1. `/profile/avatar/<id>/` ([`problems/views_platform.py`](../problems/views_platform.py))
+   — аватар, виден любому ВОШЕДШЕМУ;
+2. `/admin/problems/feedback/<pk>/screenshot/`
+   ([`problems/admin_platform.py`](../problems/admin_platform.py)) — снимок
+   экрана из обратной связи, виден только **staff**. Живёт внутри админки, а
+   не отдельным маршрутом: `admin_site.admin_view` сам требует staff и
+   держит проверку в одном месте с остальной админкой.
 Прежняя формулировка «представлений с `FileResponse` в проекте нет»
 устарела, и сторож `test_media_route.py::NoOtherFileServingViewTests`
 теперь держит **список разрешённых с причиной**, а не пустоту: любое НОВОЕ
@@ -415,9 +423,10 @@ Django (`deploy/docker-compose.yml`, том `media`). Реальная загр�
 единой проверки прав — сессией С2-хвостов закрыто (`location /media/`
 теперь безусловно 404, тем же приёмом, что и `/healthz/`).
 
-Пять полей моделей принимают загрузку (`FileAsset.file`,
+Шесть полей моделей принимают загрузку (`FileAsset.file`,
 `Problem.solution_file`, `Job.output_file`, `ImportSession.source_file`,
-`UserProfile.avatar`), и у пятого отдача есть — разобранная выше;
+`UserProfile.avatar`, `Feedback.screenshot`), и у двух последних отдача
+есть — разобранная выше;
 но публичной отдачи для них **сознательно нет ни на одном слое** — это не
 недоделка, а осознанная отсрочка до отдельной сессии **SEC-06**: лимиты
 размера, проверка magic-байтов/MIME (не доверять расширению и

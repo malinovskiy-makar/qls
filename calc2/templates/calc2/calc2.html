@@ -2497,5 +2497,17 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/88-params.js' %}"></script>
 <script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+
+⚠️ НА КАЛЬКУЛЯТОРЕ КРУЖОК TELEGRAM МОГ БЫ ЗАКРЫТЬ ОРГАНЫ УПРАВЛЕНИЯ: правый
+нижний угол занят панелью. Проверено снимком — панель выше кружка; если
+когда-нибудь опустится, панель сдвигается отступом снизу, а кружок остаётся.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

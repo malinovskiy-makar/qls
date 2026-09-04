@@ -10,6 +10,19 @@
 </head>
 <body>
 <div class="auth-corner">
+  {% comment %}
+  Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
+  вход, а пожаловаться ему больше нечем. Класс `--onpage` — потому что фон
+  тут светлый, а не графитовая полоса шапки.
+  {% endcomment %}
+  <button type="button" class="fb-btn fb-btn--onpage"
+          aria-label="Проблема или предложение">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+    </svg>
+    <span class="fb-btn-text">Проблема или предложение</span>
+  </button>
   <span class="auth-version">{{ site_version }}</span>
   {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
 </div>
@@ -79,5 +92,13 @@
 
   <a class="back-link" href="/">← На главную</a>
 </div>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

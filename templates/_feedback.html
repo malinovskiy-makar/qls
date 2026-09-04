@@ -1,0 +1,378 @@
+{% comment %}
+«Проблема или предложение» — кнопка, окно и отправка (ADR 0076).
+
+Подключается там же, где `_nav.html`, плюс на экранах входа и регистрации:
+именно у не вошедшего чаще всего и ломается вход, а пожаловаться ему нечем.
+
+⚠️ СНИМОК ЭКРАНА СНИМАЕТСЯ ДО ОТКРЫТИЯ ОКНА. Иначе на снимке было бы само
+окно поверх страницы, а не то, на что человек жалуется.
+
+⚠️ СНИМОК — ПРИЯТНОЕ ДОПОЛНЕНИЕ, А НЕ УСЛОВИЕ. `html2canvas` на тяжёлой
+странице может думать секунды или упасть вовсе; на это стоит таймаут в 4
+секунды, после которого окно открывается без снимка. Держать человека ради
+картинки нельзя.
+{% endcomment %}
+{% load static %}
+<style>
+/* Кнопка в шапке. На узком экране остаётся один значок. */
+.fb-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 13px;
+  color: rgba(255, 255, 255, .6);
+  background: none;
+  border: 0.5px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r);
+  padding: 5px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.fb-btn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.fb-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
+.fb-btn.is-busy { opacity: .7; cursor: progress; }
+@media (max-width: 900px) {
+  .fb-btn .fb-btn-text { display: none; }
+  .fb-btn { padding: 5px 7px; }
+}
+/* В панели ☰ кнопка со словами — там места хватает. */
+.nav-panel .fb-btn .fb-btn-text { display: inline; }
+
+/* На экранах входа кнопка стоит на светлом фоне, а не на графите. */
+.fb-btn--onpage {
+  color: var(--text2);
+  background: var(--surface);
+  border-color: var(--border);
+}
+.fb-btn--onpage:hover { color: var(--text); background: var(--surface-2); }
+
+/* ── Окно ──────────────────────────────────────────────────────────── */
+.fb-back {
+  position: fixed; inset: 0; z-index: 420;
+  background: rgba(8, 11, 18, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.fb-box {
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: var(--r-panel, 12px);
+  box-shadow: var(--shadow-pop);
+  padding: 22px 24px;
+  width: 460px; max-width: 100%;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.fb-head { display: flex; align-items: flex-start; gap: 12px; }
+.fb-title { font-size: 17px; font-weight: 600; color: var(--text); flex: 1; }
+.fb-x {
+  font: inherit; font-size: 18px; line-height: 1;
+  color: var(--text3); background: none; border: none; cursor: pointer;
+  padding: 0 2px;
+}
+.fb-x:hover { color: var(--text); }
+.fb-sub { font-size: 13px; color: var(--text2); margin-top: 4px; }
+.fb-kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+.fb-kind {
+  border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 14px 10px; cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.fb-kind:hover { border-color: var(--accent-ring); }
+.fb-kind.is-on { border-color: var(--accent); background: var(--accent-tint); color: var(--accent-ink); }
+.fb-list { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+.fb-opt {
+  display: flex; align-items: flex-start; gap: 9px;
+  font-size: 14px; color: var(--text); line-height: 1.4; cursor: pointer;
+}
+.fb-opt input { margin-top: 2px; flex-shrink: 0; }
+.fb-field { margin-top: 12px; }
+.fb-field label { display: block; font-size: 13px; color: var(--text2); margin-bottom: 5px; }
+.fb-field textarea {
+  width: 100%; min-height: 72px; resize: vertical;
+  font: inherit; font-size: 14px; padding: 9px 11px;
+  border-radius: var(--r); border: .5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.fb-err { font-size: 13px; color: var(--error); margin-top: 10px; }
+.fb-err a { color: var(--accent-ink); }
+.fb-ok { font-size: 14px; color: var(--text); margin-top: 16px; }
+.fb-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.fb-send {
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 8px 18px; border-radius: var(--r); border: none;
+  background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
+}
+.fb-send:hover { background: var(--btn-bg-hover); }
+.fb-send:disabled { opacity: .5; cursor: default; }
+.fb-shot { font-size: 12px; color: var(--text3); margin-top: 10px; }
+
+/* ── Кружок Telegram ───────────────────────────────────────────────── */
+/* z-index 150: ниже шапки (200) и ниже любых окон (400+). */
+.tg-fab {
+  position: fixed; right: 16px; bottom: 16px; z-index: 150;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: var(--r-pill);
+  color: var(--accent-ink);
+  box-shadow: var(--shadow-pop);
+  transition: transform .12s, border-color .12s;
+}
+.tg-fab:hover { transform: translateY(-2px); border-color: var(--accent-ring); }
+.tg-fab svg { width: 19px; height: 19px; }
+
+/* Печать: ни кнопки, ни кружка на листе. */
+@media print {
+  .fb-btn, .tg-fab, .fb-back { display: none !important; }
+}
+</style>
+
+<a class="tg-fab" href="https://t.me/weconomics_ru?direct"
+   target="_blank" rel="noopener"
+   aria-label="Написать нам в Telegram" title="Написать нам">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+       stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M21 4 3 11l6 2.5L21 4Z"/><path d="M21 4l-8 16-2.5-6.5L21 4Z"/>
+  </svg>
+</a>
+
+{% comment %}
+⚠️ ЭТА ПУСТАЯ ФОРМА НУЖНА РАДИ CSRF, И БЕЗ НЕЁ ОБРАТНАЯ СВЯЗЬ МОЛЧА НЕ
+РАБОТАЛА БЫ НА ПОЛОВИНЕ САЙТА. Django ставит куку `csrftoken`, только если
+на странице кто-то попросил токен. На страницах без единой формы — лендинг,
+«Учебник», олимпиады, каталог у гостя — просить его было некому, и отправка
+падала с 403 «CSRF cookie not set». Найдено пробой на `/textbook/`.
+
+Тег `{% templatetag openblock %} csrf_token {% templatetag closeblock %}`
+и ставит куку, и даёт запасной путь: если кука почему-то недоступна, скрипт
+берёт значение из этого поля.
+{% endcomment %}
+<form hidden aria-hidden="true">{% csrf_token %}</form>
+
+{{ feedback_data|json_script:"fb-options" }}
+<script>
+(function () {
+  /* Данные приходят одним словарём через `json_script`: он экранирует
+     `<`, `>` и `&` сам, поэтому `mark_safe` в питоне не нужен. */
+  var DATA = {};
+  try {
+    DATA = JSON.parse(document.getElementById('fb-options').textContent || '{}');
+  } catch (e) { DATA = {}; }
+  var OPTIONS = DATA.options || {};
+  var PAGE_KEY = DATA.page || 'other';
+
+  var open = null;
+
+  function csrf() {
+    var m = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
+    if (m) return decodeURIComponent(m[2]);
+    var f = document.querySelector('input[name=csrfmiddlewaretoken]');
+    return f ? f.value : '';
+  }
+
+  function close() {
+    if (!open) return;
+    var back = open.back, focus = open.focus;
+    open = null;
+    back.remove();
+    if (focus && focus.focus) focus.focus();
+  }
+
+  /** Снимок экрана. Никогда не задерживает человека дольше 4 секунд. */
+  function grabShot() {
+    return new Promise(function (resolve) {
+      if (typeof html2canvas !== 'function') { resolve(null); return; }
+      var done = false;
+      var timer = setTimeout(function () {
+        if (!done) { done = true; resolve(null); }
+      }, 4000);
+      try {
+        html2canvas(document.documentElement, {
+          scale: 1, useCORS: false, logging: false,
+          windowWidth: document.documentElement.clientWidth,
+          windowHeight: document.documentElement.clientHeight,
+        }).then(function (canvas) {
+          if (done) return;
+          var wide = canvas.width > 1600;
+          var target = canvas;
+          if (wide) {
+            target = document.createElement('canvas');
+            target.width = 1600;
+            target.height = Math.round(canvas.height * 1600 / canvas.width);
+            target.getContext('2d').drawImage(canvas, 0, 0, target.width, target.height);
+          }
+          target.toBlob(function (blob) {
+            if (done) return;
+            done = true; clearTimeout(timer); resolve(blob);
+          }, 'image/jpeg', 0.8);
+        }, function () {
+          if (!done) { done = true; clearTimeout(timer); resolve(null); }
+        });
+      } catch (e) {
+        if (!done) { done = true; clearTimeout(timer); resolve(null); }
+      }
+    });
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function build(shot) {
+    var back = el('div', 'fb-back');
+    back.setAttribute('role', 'dialog');
+    back.setAttribute('aria-modal', 'true');
+    var box = el('div', 'fb-box');
+
+    var head = el('div', 'fb-head');
+    var title = el('div', 'fb-title', 'Проблема или предложение');
+    var x = el('button', 'fb-x', '✕');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Закрыть');
+    head.appendChild(title); head.appendChild(x);
+    box.appendChild(head);
+    box.appendChild(el('div', 'fb-sub', 'Мы читаем всё. Пишите как есть.'));
+
+    /* Шаг 1: что это. */
+    var kinds = el('div', 'fb-kinds');
+    var chosenKind = null;
+    var problemBtn = el('button', 'fb-kind', 'Проблема');
+    var ideaBtn = el('button', 'fb-kind', 'Предложение');
+    problemBtn.type = ideaBtn.type = 'button';
+    kinds.appendChild(problemBtn); kinds.appendChild(ideaBtn);
+    box.appendChild(kinds);
+
+    /* Шаг 2: подробности — появляется после выбора. */
+    var step2 = el('div');
+    box.appendChild(step2);
+
+    var err = el('div', 'fb-err');
+    err.hidden = true;
+    box.appendChild(err);
+
+    var row = el('div', 'fb-row');
+    var send = el('button', 'fb-send', 'Отправить');
+    send.type = 'button';
+    send.disabled = true;
+    row.appendChild(send);
+    box.appendChild(row);
+
+    if (shot) box.appendChild(el('div', 'fb-shot', 'Снимок экрана приложен.'));
+
+    function renderStep2(kind) {
+      step2.innerHTML = '';
+      err.hidden = true;
+      if (kind === 'problem') {
+        var list = el('div', 'fb-list');
+        var items = OPTIONS[PAGE_KEY] || OPTIONS.other || [];
+        items.forEach(function (text) {
+          var label = el('label', 'fb-opt');
+          var input = document.createElement('input');
+          input.type = 'checkbox'; input.value = text; input.className = 'fb-choice';
+          label.appendChild(input);
+          label.appendChild(el('span', null, text));
+          list.appendChild(label);
+        });
+        step2.appendChild(list);
+      }
+      var field = el('div', 'fb-field');
+      field.appendChild(el('label', null, kind === 'idea'
+        ? 'Что предлагаете' : 'Другое — своими словами'));
+      var area = document.createElement('textarea');
+      area.className = 'fb-other';
+      field.appendChild(area);
+      step2.appendChild(field);
+
+      var extra = el('div', 'fb-field');
+      extra.appendChild(el('label', null, 'Комментарий (необязательно)'));
+      var comment = document.createElement('textarea');
+      comment.className = 'fb-comment';
+      extra.appendChild(comment);
+      step2.appendChild(extra);
+      send.disabled = false;
+    }
+
+    problemBtn.addEventListener('click', function () {
+      chosenKind = 'problem';
+      problemBtn.classList.add('is-on'); ideaBtn.classList.remove('is-on');
+      renderStep2('problem');
+    });
+    ideaBtn.addEventListener('click', function () {
+      chosenKind = 'idea';
+      ideaBtn.classList.add('is-on'); problemBtn.classList.remove('is-on');
+      renderStep2('idea');
+    });
+    x.addEventListener('click', close);
+    back.addEventListener('click', function (e) { if (e.target === back) close(); });
+
+    send.addEventListener('click', function () {
+      if (!chosenKind) { return; }
+      var data = new FormData();
+      data.append('kind', chosenKind);
+      data.append('url', location.pathname + location.search);
+      data.append('viewport', window.innerWidth + '×' + window.innerHeight);
+      data.append('theme', document.documentElement.getAttribute('data-theme') || 'light');
+      box.querySelectorAll('.fb-choice:checked').forEach(function (c) {
+        data.append('choices', c.value);
+      });
+      var other = box.querySelector('.fb-other');
+      var comment = box.querySelector('.fb-comment');
+      data.append('other_text', other ? other.value : '');
+      data.append('comment', comment ? comment.value : '');
+      if (shot) data.append('screenshot', shot, 'shot.jpg');
+
+      send.disabled = true;
+      fetch('/api/feedback/', {
+        method: 'POST', body: data, credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrf() },
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (answer) {
+          if (answer && answer.ok) {
+            box.innerHTML = '';
+            box.appendChild(el('div', 'fb-title', 'Спасибо, получили.'));
+            box.appendChild(el('div', 'fb-ok', 'Мы читаем всё.'));
+            setTimeout(close, 2000);
+          } else {
+            send.disabled = false;
+            err.hidden = false;
+            err.textContent = (answer && answer.error)
+              || 'Не отправилось. Попробуйте ещё раз или напишите в Telegram.';
+          }
+        })
+        .catch(function () {
+          send.disabled = false;
+          err.hidden = false;
+          err.innerHTML = 'Не отправилось. Попробуйте ещё раз или '
+            + '<a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">напишите в Telegram</a>.';
+        });
+    });
+
+    back.appendChild(box);
+    document.body.appendChild(back);
+    open = { back: back, focus: document.activeElement };
+    problemBtn.focus();
+  }
+
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.fb-btn');
+    if (!button) return;
+    event.preventDefault();
+    var label = button.querySelector('.fb-btn-text');
+    var was = label ? label.textContent : null;
+    button.classList.add('is-busy');
+    if (label) label.textContent = 'Снимаем экран…';
+    grabShot().then(function (shot) {
+      button.classList.remove('is-busy');
+      if (label && was !== null) label.textContent = was;
+      build(shot);
+    });
+  });
+})();
+</script>

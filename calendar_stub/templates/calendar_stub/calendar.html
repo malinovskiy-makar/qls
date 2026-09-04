@@ -893,5 +893,13 @@ function formatDt(dt) {
   });
 }
 </script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

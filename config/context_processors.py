@@ -12,6 +12,8 @@
 """
 from django.conf import settings
 
+from problems.feedback_options import FEEDBACK_OPTIONS, page_key_for
+
 
 def _match(request, *, namespace=None, url_name=None, url_name_has=None,
            path_has=None, path_prefix=None):
@@ -114,4 +116,18 @@ def site_meta(request):
         'nav_user_initials': _initials(user) if authed else '',
         'nav_user_name': (user.get_full_name() or user.get_username()) if authed else '',
         'nav_avatar_url': _avatar_url(user) if authed else '',
+        # ⚠️ СПИСОК ВАРИАНТОВ ОТДАЁТ СЕРВЕР, КЛИЕНТ ЕГО НЕ ДУБЛИРУЕТ: иначе
+        # к первой правке формулировок было бы два списка — один в питоне
+        # (по нему разбирают жалобы) и один в разметке (его читает человек).
+        #
+        # ⚠️ ОДНИМ СЛОВАРЁМ И ЧЕРЕЗ `json_script`, А НЕ `mark_safe`. Первая
+        # версия склеивала JSON строкой и помечала его безопасным — и это
+        # честная находка bandit (B703/B308): `mark_safe` над строкой,
+        # собранной в питоне, придётся пересматривать при каждой правке
+        # источника. `json_script` экранирует `<`, `>` и `&` сам, а ключ
+        # экрана уезжает внутрь того же словаря — значит и тег нужен один.
+        'feedback_data': {
+            'page': page_key_for(request.path),
+            'options': FEEDBACK_OPTIONS,
+        },
     }

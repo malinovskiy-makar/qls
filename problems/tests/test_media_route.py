@@ -133,6 +133,11 @@ class NoOtherFileServingViewTests(TestCase):
             'целое число; файл — наш собственный JPEG, пересжатый Pillow и '
             'названный нами (avatars/<id>.jpg); отдаётся только вошедшим; '
             'Content-Type задан жёстко. Разбор — Фаза 4 сессии 04.09.2026.',
+        'problems/admin_platform.py':
+            'снимок экрана из обратной связи: живёт ВНУТРИ админки через '
+            'ModelAdmin.get_urls и admin_site.admin_view — тот сам требует '
+            'staff; путь из поля модели, из адреса только номер записи; '
+            'файл пересжат Pillow в JPEG. Разбор — Фаза 7 сессии 04.09.2026.',
     }
 
     def test_no_file_serving_helpers_in_views(self):

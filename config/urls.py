@@ -58,6 +58,8 @@ urlpatterns = [
     path('profile/', views_platform.profile, name='profile'),
     # Аватар: путь к файлу — из поля модели, из запроса только номер.
     path('profile/avatar/<int:user_id>/', views_platform.avatar, name='avatar'),
+    # Обратная связь беты: гостю можно, CSRF обязателен (ADR 0076).
+    path('api/feedback/', views_platform.api_feedback, name='api_feedback'),
     # Статистика ученика — с геймификацией. Старая страница «Прогресс»
     # ПОГЛОЩЕНА этой: /student/progress/ ведёт сюда редиректом.
     path('profile/stats/', views_stats.student_stats, name='student_stats'),

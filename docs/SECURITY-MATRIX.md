@@ -164,6 +164,8 @@
 | `/teacher/groups/<int:pk>/invite/regenerate/` | `teacher:group_invite_regenerate` | `tutor_required` + POST | `pk` | ✅ `own_group_or_404` | [teacher/views_groups.py](../teacher/views_groups.py) |
 | `/teacher/groups/<int:pk>/students/<int:sid>/remove/` | `teacher:group_student_remove` | `tutor_required` + POST | `pk`, `sid` | ✅ `own_group_or_404`; `sid` ищется ТОЛЬКО внутри своего занятия | [teacher/views_groups.py](../teacher/views_groups.py) |
 | `/student/join/` | `student:join_group` | `student_required` + POST | POST: код | ✅ вступает всегда `request.user` | [student/views.py](../student/views.py) |
+| `/api/feedback/` | `api_feedback` | **никакой (гостю можно)** + POST + CSRF | POST: вид, адрес, варианты, тексты, файл ≤ 2,5 МБ | — записи ничьи | [problems/views_platform.py](../problems/views_platform.py) `api_feedback` |
+| `/admin/problems/feedback/<pk>/screenshot/` | `problems_feedback_screenshot` | **staff** (`admin_site.admin_view`) | `pk` | ⚠️ ЧУЖОЙ ПО ЗАМЫСЛУ: разбирает жалобы администратор | [problems/admin_platform.py](../problems/admin_platform.py) `FeedbackAdmin` |
 | `/teacher/groups/<gid>/assignments/<aid>/` | `teacher:group_assignment` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:613](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/assignments/<aid>/submissions/` | `teacher:group_submissions` | `tutor_required` | 2× pk, 3× GET | ✅ | [teacher/views_groups.py:1010](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/submissions/<sid>/` | `teacher:group_review_submission` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:1103](../teacher/views_groups.py) |
@@ -272,6 +274,29 @@ TypeError: Field 'id' expected a number but got
 | `/api/graphs/save/` | `api_graph_save` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:193](../problems/views_platform.py) |
 | `/password/change/` | `password_change` | `login_required` | POST: новый пароль ×2 (`old_password` игнорируется) | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `password_change` |
 | `/password/change/done/` | `password_change_done` | — | — | — | редирект на `/profile/?tab=security` |
+
+### ⚠️ Обратная связь: единственный маршрут БЕЗ проверки входа
+
+`/api/feedback/` принимает запись от кого угодно, включая гостя, — и это
+решение, а не пропуск. Половина беты это люди, которые ещё не завели
+аккаунт; именно у них ломается вход, и требовать логин, чтобы пожаловаться
+на форму входа, значит не узнать о поломке.
+
+Что удерживает это в границах:
+
+| Что могло бы пойти не так | Почему не идёт |
+|---|---|
+| чужая страница шлёт записи от имени наших посетителей | CSRF обязателен; `csrf_exempt` здесь нет и не будет |
+| заваливание базы записями | ограничение частоты: 10 записей в час с адреса, дальше 429 |
+| `page_key` из запроса ломает группировку | ключ считает СЕРВЕР по адресу; поле от клиента не читается вовсе |
+| произвольные строки в поле «варианты» | принимаются только варианты ЭТОГО экрана, остальные молча отбрасываются |
+| загрузка чего угодно под видом снимка | Pillow: целостность → размеры в пикселях → пересжатие в JPEG; путь и имя наши |
+| «пиксельная бомба» | потолок 4000×4000 проверяется ДО обработки |
+| снимок теряет саму жалобу | битый или слишком большой снимок НЕ отменяет запись — текст ценнее картинки |
+
+⚠️ **Снимок экрана видит только staff** и только из админки:
+`admin_site.admin_view` сам требует staff и держит проверку в одном месте с
+остальной админкой. Закрыто отрицательными тестами (обычный вошедший и гость).
 
 ### ⚠️ Аватар: единственный маршрут, где объект НЕ сужен по владельцу
 
