@@ -336,15 +336,32 @@ class ExportBundleTests(TestCase):
             snap = (out_dir / 'snapshots' / f'{self.visible.id}.html').read_text(encoding='utf-8')
             self.assertIn('review-snapshot-overrides', snap)
             self.assertNotIn('cdn.jsdelivr.net', snap)
-            self.assertIn('../assets/vendor/katex/katex.min.css', snap)
+            # ⚠️ ПРОВЕРЯЕТСЯ СВОЙСТВО, А НЕ КОНКРЕТНЫЙ ПУТЬ. Здесь стояло
+            # `../assets/vendor/katex/katex.min.css` — путь появлялся оттого,
+            # что боевой шаблон грузил KaTeX с CDN, а экспорт подменял адрес
+            # на свою вендорную копию. С 04.09.2026 KaTeX лежит в
+            # `static/vendor/` (ADR 0070), подменять нечего, и файл едет в
+            # пакет обычным путём для статики. Пакет от этого офлайн быть не
+            # перестал, а тест на старый путь краснел бы после каждого
+            # переезда библиотеки.
+            katex_css = re.findall(r'href="(\.\./[^"]*katex[^"]*\.css)"', snap)
+            self.assertTrue(
+                katex_css, 'в снимке нет относительной ссылки на CSS KaTeX')
+            for rel in katex_css:
+                self.assertTrue(
+                    ((out_dir / 'snapshots' / rel).resolve()).exists(),
+                    'снимок ссылается на %s, а файла в пакете нет' % rel)
             self.assertIn('Приравниваем', snap)          # решение в снимке
             self.assertIn('Найдите $P^*$', snap)         # подпункт в снимке
             self.assertNotIn('href="/static/', snap)
             self.assertNotIn('src="/static/', snap)
 
-            # вендор KaTeX скопирован вместе со шрифтами
-            self.assertTrue((out_dir / 'assets/vendor/katex/katex.min.js').exists())
-            self.assertTrue(list((out_dir / 'assets/vendor/katex/fonts').glob('*.woff2')))
+            # KaTeX скопирован вместе со шрифтами — без шрифтов формулы в
+            # офлайн-пакете рисуются запасной гарнитурой, то есть неверно.
+            self.assertTrue(list(out_dir.glob('assets/**/katex*.js')),
+                            'в пакете нет katex*.js')
+            self.assertTrue(list(out_dir.glob('assets/**/fonts/*.woff2')),
+                            'в пакете нет шрифтов KaTeX')
 
             # зафлагованной задачи в пакете нет
             self.assertFalse((out_dir / 'snapshots' / f'{self.flagged.id}.html').exists())

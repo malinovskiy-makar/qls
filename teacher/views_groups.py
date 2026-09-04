@@ -273,29 +273,59 @@ def group_create(request):
     названия остаётся, но обязательным не становится: заставлять
     придумывать имя занятию с одним человеком незачем.
     """
-    from problems.models import StudentGroup
+    from problems.models import StudentGroup, User
 
     kind = request.GET.get('kind') or request.POST.get('kind') or 'group'
     if kind not in dict(StudentGroup.Kind.choices):
         kind = 'group'
     individual = kind == StudentGroup.Kind.INDIVIDUAL
 
-    # ⚠️ ВЫПАДАЮЩЕГО СПИСКА ВСЕХ УЧЕНИКОВ БАЗЫ БОЛЬШЕ НЕТ (04.09.2026,
-    # ADR 0074). Он показывал репетитору чужих учеников поимённо — то есть
-    # был утечкой, а не удобством, и вдобавок не масштабировался: к бете в
-    # базе тысячи имён. Ученик приходит сам, по коду приглашения.
+    # ⚠️ СПИСКА ВСЕХ УЧЕНИКОВ БАЗЫ БОЛЬШЕ НЕТ (04.09.2026, ADR 0074). Он
+    # показывал репетитору ЧУЖИХ учеников поимённо — то есть был утечкой, а
+    # не удобством, и вдобавок не масштабировался: к бете в базе тысячи имён.
+    #
+    # Но само поле «ученик» у ИНДИВИДУАЛЬНОГО занятия осталось: без него
+    # нельзя завести занятие с человеком, который уже учится у этого
+    # репетитора, а название по умолчанию неоткуда взять. В списке теперь
+    # только СВОИ ученики — те, кто уже состоит в занятиях этого репетитора.
+    # Новый человек приходит по коду приглашения, а не выбирается из базы.
+    students = ()
+    if individual:
+        students = (User.objects
+                    .filter(role='student', enrolled_groups__teacher=request.user)
+                    .distinct()
+                    .order_by('last_name', 'first_name', 'username'))
 
     if request.method == 'POST':
         name = (request.POST.get('name') or '').strip()
-        if not name:
-            messages.error(
-                request,
-                'Назовите занятие — например, именем ученика.' if individual
-                else 'Название группы не может быть пустым.')
+        student = None
+        problem = ''
+
+        if individual:
+            # ⚠️ Ученик обязателен: индивидуальное занятие без человека — это
+            # группа из нуля людей, и отличить их потом будет нечем.
+            raw = (request.POST.get('student') or '').strip()
+            student = (User.objects.filter(pk=raw, role='student').first()
+                       if raw.isdigit() else None)
+            if student is None:
+                problem = 'Выберите ученика.'
+            elif not name:
+                # Название по умолчанию — имя ученика: придумывать имя
+                # занятию с одним человеком незачем.
+                name = student.get_full_name().strip() or student.username
+
+        if not problem and not name:
+            problem = ('Назовите занятие — например, именем ученика.'
+                       if individual else 'Название группы не может быть пустым.')
+
+        if problem:
+            messages.error(request, problem)
         else:
             group = StudentGroup.objects.create(
                 name=name, teacher=request.user, kind=kind,
                 description=(request.POST.get('description') or '').strip())
+            if student is not None:
+                group.students.add(student)
             messages.success(
                 request,
                 'Занятие создано. Продиктуйте ученику код %s — он введёт его '
@@ -303,7 +333,7 @@ def group_create(request):
             return redirect('teacher:group_detail', pk=group.pk)
 
     return render(request, 'teacher/groups/create.html',
-                  {'kind': kind, 'individual': individual})
+                  {'kind': kind, 'individual': individual, 'students': students})
 
 
 # ---------------------------------------------------------------------------

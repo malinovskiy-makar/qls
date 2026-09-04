@@ -32,17 +32,37 @@
 
     {% if individual %}
     {% comment %}
-    ⚠️ УЧЕНИК ЗДЕСЬ НЕ ВЫБИРАЕТСЯ (04.09.2026, ADR 0074). Прежде тут стоял
-    выпадающий список ВСЕХ учеников базы: репетитор видел чужих учеников
-    поимённо, а к бете таких имён тысячи. Ученик приходит сам — по коду,
-    который появится сразу после создания занятия.
+    ⚠️ В СПИСКЕ ТОЛЬКО СВОИ УЧЕНИКИ (04.09.2026, ADR 0074). Прежде тут стоял
+    выпадающий список ВСЕХ учеников базы: репетитор видел чужих поимённо, а к
+    бете таких имён тысячи. Само поле осталось: без него нельзя завести
+    занятие с человеком, который уже учится у этого репетитора. Новый человек
+    приходит по коду приглашения, а не выбирается из базы.
     {% endcomment %}
     <div class="form-field">
-      <label for="id_name">Название занятия</label>
-      <input type="text" class="k-input" id="id_name" name="name" required maxlength="100"
-             placeholder="Например: имя ученика">
+      <label for="id_student">Ученик</label>
+      <span class="k-select-wrap">
+        <select class="k-select" id="id_student" name="student" required>
+          <option value="">выберите ученика</option>
+          {% for student in students %}
+          <option value="{{ student.pk }}">{{ student.get_full_name|default:student.username }}</option>
+          {% endfor %}
+        </select>
+      </span>
+      {% if not students %}
+      {% comment %}Канон 3.13: пустое состояние говорит, что делать дальше.{% endcomment %}
       <div class="k-hint">
-        После создания вы получите код приглашения — продиктуйте его ученику.
+        Пока у вас нет ни одного ученика. Заведите группу, продиктуйте код
+        приглашения, а индивидуальное занятие создайте, когда человек войдёт.
+      </div>
+      {% endif %}
+    </div>
+    <div class="form-field">
+      <label for="id_name">Название занятия (необязательно)</label>
+      <input type="text" class="k-input" id="id_name" name="name" maxlength="100"
+             placeholder="По умолчанию берётся имя ученика">
+      <div class="k-hint">
+        Пригодится, если у вас два занятия с одним человеком. После создания
+        вы получите код приглашения: продиктуйте его ученику.
       </div>
     </div>
     {% else %}

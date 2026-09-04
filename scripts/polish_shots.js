@@ -42,6 +42,10 @@ const PAGES = {
   profile: '/profile/',
   textbook: '/textbook/',
   register: '/register/',
+  /* Вкладка «Безопасность» — там смена пароля; вкладку выбирает адрес,
+     поэтому это отдельная страница, а не состояние одной. */
+  profile_security: '/profile/?tab=security',
+  teacher_groups: '/teacher/groups/',
 };
 
 const WIDTHS = [[1440, 900], [1024, 800], [380, 780]];

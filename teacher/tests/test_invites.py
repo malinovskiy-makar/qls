@@ -148,20 +148,39 @@ class TeacherScreenTests(TestCase):
         self.group.refresh_from_db()
         self.assertEqual(self.group.name, 'Моя группа')
 
-    def test_create_individual_without_choosing_a_student(self):
-        """⚠️ ВЫПАДАЮЩЕГО СПИСКА ВСЕХ УЧЕНИКОВ БАЗЫ БОЛЬШЕ НЕТ."""
+    def test_individual_lists_only_my_own_students(self):
+        """⚠️ В СПИСКЕ УЧЕНИКОВ — ТОЛЬКО СВОИ, НЕ ВСЯ БАЗА.
+
+        Утечкой был не сам выбор ученика, а СОСТАВ списка: там стояли все
+        ученики базы поимённо, включая чужих. Поле осталось (без него нельзя
+        завести занятие с тем, кто уже учится у этого репетитора), а список
+        сузился до своих.
+
+        ⚠️ Первая версия этого теста требовала, чтобы поля не было ВОВСЕ, —
+        и тем самым закрепляла случайно снесённую возможность владельца.
+        Её ловили три теста в `problems/tests/test_individual.py`, которые
+        старше и описывают настоящее поведение. Прав оказался старый тест.
+        """
+        alien_tutor = tutor('inv_alien_tu')
+        alien = student('inv_alien_st')
+        alien_group = StudentGroup.objects.create(name='Чужая',
+                                                  teacher=alien_tutor)
+        alien_group.students.add(alien)
+
         self.client.force_login(self.teacher)
         html = self.client.get(
             '/teacher/groups/create/?kind=individual').content.decode('utf-8')
-        self.assertNotIn('name="student"', html)
-        self.assertNotIn('inv_pupil', html)
 
-        response = self.client.post('/teacher/groups/create/',
-                                    {'kind': 'individual', 'name': 'Пётр'})
-        self.assertEqual(response.status_code, 302)
-        created = StudentGroup.objects.get(name='Пётр')
-        self.assertTrue(created.invite_code)
-        self.assertEqual(created.students.count(), 0)
+        self.assertIn('name="student"', html)          # поле на месте
+        self.assertIn('inv_pupil', html)               # свой ученик виден
+        self.assertNotIn('inv_alien_st', html)         # чужой — нет
+
+    def test_individual_without_a_student_is_not_created(self):
+        """Индивидуальное занятие без человека — это группа из нуля людей."""
+        self.client.force_login(self.teacher)
+        self.client.post('/teacher/groups/create/',
+                         {'kind': 'individual', 'name': 'Пётр'})
+        self.assertFalse(StudentGroup.objects.filter(name='Пётр').exists())
 
 
 class TeacherBoundaryTests(TestCase):

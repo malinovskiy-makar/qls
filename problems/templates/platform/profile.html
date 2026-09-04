@@ -164,7 +164,7 @@
 получить выдуманные данные.
 {% endcomment %}
 <div class="note note--welcome">
-  Заполните имя, класс и уровень — так статистика будет точнее.
+  Заполните имя, класс и уровень: так статистика будет точнее.
 </div>
 {% endif %}
 {% if saved_ok %}<div class="note note--ok">Сохранено.</div>{% endif %}
@@ -194,7 +194,14 @@
         {% csrf_token %}
         <input type="hidden" name="action" value="avatar">
         <label class="btn-quiet pf-ava-pick">
-          Загрузить<input type="file" name="avatar" accept="image/*"
+          {% comment %}Список расширений, а не `image/*`. Причина не в
+          придирчивости: звёздочка после косой черты читается как открытие
+          комментария в стилях, и сторож `test_no_comment_left_open` считал
+          весь блок стилей незакрытым. Плюс так же поступают остальные формы
+          загрузки в проекте. Настоящую проверку делает сервер: `accept` —
+          только подсказка окну выбора файла.{% endcomment %}
+          Загрузить<input type="file" name="avatar"
+                          accept=".jpg,.jpeg,.png,.webp,.gif,.bmp"
                           onchange="this.form.submit()">
         </label>
       </form>
@@ -233,7 +240,7 @@
       <div class="form-field">
         <label for="{{ form.email.id_for_label }}">Почта</label>
         {{ form.email }}
-        <div class="pf-hint">Необязательно, не подтверждается — только для связи.</div>
+        <div class="pf-hint">Необязательно, не подтверждается, нужно только для связи.</div>
         {% for e in form.email.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
       </div>
     </div>
@@ -299,7 +306,7 @@
   {% endcomment %}
   <h2 class="pf-h2">Сменить пароль</h2>
   <p class="pf-hint pf-hint--block">
-    Старый пароль не нужен — достаточно ввести новый дважды. После смены
+    Старый пароль не нужен: достаточно ввести новый дважды. После смены
     все остальные входы в этот аккаунт завершатся.
   </p>
   <form method="post">

@@ -140,9 +140,14 @@
 }
 </style>
 
+{% comment %}⚠️ БЕЗ `title`. Канон, правило 8: нативная подсказка браузера на
+сайте не используется, и потолка у этого долга нет, любое нарушение красное
+(`test_design_canon`). Здесь `title` был лишним вдвойне: имя элемента для
+доступности уже даёт `aria-label`, а зрячему человеку значок Telegram
+понятен сам. Пойман полным прогоном, шаг B.{% endcomment %}
 <a class="tg-fab" href="https://t.me/weconomics_ru?direct"
    target="_blank" rel="noopener"
-   aria-label="Написать нам в Telegram" title="Написать нам">
+   aria-label="Написать нам в Telegram">
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
     <path d="M21 4 3 11l6 2.5L21 4Z"/><path d="M21 4l-8 16-2.5-6.5L21 4Z"/>
@@ -293,7 +298,7 @@
       }
       var field = el('div', 'fb-field');
       field.appendChild(el('label', null, kind === 'idea'
-        ? 'Что предлагаете' : 'Другое — своими словами'));
+        ? 'Что предлагаете' : 'Другое, своими словами'));
       var area = document.createElement('textarea');
       area.className = 'fb-other';
       field.appendChild(area);
