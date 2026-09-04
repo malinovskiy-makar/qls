@@ -70,13 +70,72 @@
 .stm .part:first-child { border-top: 0; }
 .stm .part b { color: var(--accent-ink); font-weight: 700; min-width: 22px; }
 .stm .part .math-content { padding-bottom: 0; }
-/* Варианты теста — статичные плитки (играбельными их делает этап 7). */
-.opt-list { list-style: none; margin: 8px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
-.opt { display: flex; gap: 12px; align-items: flex-start; background: var(--surface-2); border: 1.5px solid transparent;
-  border-radius: 12px; padding: 10px 12px; font-size: 15.5px; line-height: 1.5; }
+/* ── Тест: играбельные варианты и разбор (этап 7, мокап E) ───────────
+   Выбранный вариант получает сплошной акцент (правило 8: акцент у
+   выбранного из равноправных). Разбор — четыре состояния из
+   student/_option_review.html: ✓ выбрал и верно, ✗ выбрал зря,
+   ○ надо было выбрать, · нейтрально. Зелёный и красный в законных
+   значениях. ── */
+.stm--q { padding-bottom: 22px; }
+.stm--q .math-content { padding-bottom: 0; font-size: 18px; font-weight: 600; line-height: 1.45; }
+.tq { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin: 0 0 18px; }
+.tq.is-shake { animation: shake .45s ease; }
+@keyframes shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .tq.is-shake { animation: none; } }
+.tq-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.tq-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.tq-rule { font-size: 13.5px; color: var(--text2); }
+.tq-try { margin-left: auto; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tq-stat { font-size: 12.5px; color: var(--text3); margin: -6px 0 12px; }
+.tq-stat b { color: var(--text2); font-weight: 600; }
+.opt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: var(--surface-2);
+  border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  font: 400 15.5px/1.5 var(--font-ui); color: var(--text); transition: border-color var(--t), background var(--t), transform var(--t); }
+.opt:hover { border-color: var(--accent-ring); }
+.opt:active { transform: scale(.995); }
+.opt:disabled { cursor: default; }
+.opt:disabled:hover { border-color: transparent; }
 .opt-l { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex;
-  align-items: center; justify-content: center; font-weight: 700; font-size: 14px; color: var(--text2); }
+  align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--text2); background: var(--surface);
+  transition: background var(--t), border-color var(--t), color var(--t); margin-top: -1px; }
 .opt-t { flex: 1 1 auto; }
+.opt-t .math-content { padding: 0; }
+.opt-note { flex: none; align-self: center; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap; display: none; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.opt[aria-pressed="true"] .opt-l { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); }
+.opt.is-hit { border-color: var(--green); background: var(--green-tint); }
+.opt.is-hit .opt-l { background: var(--green); border-color: var(--green); color: var(--act-ink-solid); }
+.opt.is-hit .opt-note { display: inline; color: var(--green); }
+.opt.is-wrong { border-color: var(--error); background: var(--error-tint); }
+.opt.is-wrong .opt-l { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.opt.is-wrong .opt-note { display: inline; color: var(--error); }
+.opt.is-missed { border-color: var(--amber); border-style: dashed; background: var(--amber-tint); }
+.opt.is-missed .opt-l { border-color: var(--amber); color: var(--amber-ink); background: transparent; }
+.opt.is-missed .opt-note { display: inline; color: var(--amber-ink); }
+.opt.is-skip { opacity: .72; }
+.opt.is-skip .opt-l { color: var(--text3); }
+@media (max-width: 560px) { .opt { flex-wrap: wrap; } .opt-note { width: 100%; padding-left: 40px; } }
+.tq-msg { display: none; align-items: center; gap: 10px; border-radius: 12px; padding: 11px 14px; margin-top: 12px;
+  font-size: 14.5px; border-left: 3px solid; animation: chipIn .18s ease-out; }
+.tq-msg.is-on { display: flex; }
+.tq-msg svg { width: 18px; height: 18px; flex: none; }
+.tq-msg--wrong { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.tq-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.tq-msg--show { background: var(--amber-tint); color: var(--amber-ink); border-color: var(--amber); }
+.tq-msg b { font-weight: 700; }
+.tq-msg .cnt { margin-left: auto; font-size: 13px; opacity: .9; }
+.tq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tq-row .grow { flex: 1 1 auto; }
+.tq-why { font-size: 13px; color: var(--text3); }
+.tq-kbd { font-size: 12px; color: var(--text3); }
+.tq-kbd kbd { font: 600 11px/1 var(--font-ui); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; background: var(--surface); color: var(--text2); }
+.tq-expl { display: none; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tq-expl.is-on { display: block; animation: chipIn .18s ease-out; }
+.tq-expl .h { padding: 10px 14px; background: var(--surface-2); font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border-soft); }
+.tq-expl .b { padding: 10px 14px; font-size: 14.5px; line-height: 1.55; color: var(--text2); }
+.tq-expl .b .math-content { padding: 0; }
 
 /* Таблицы из markdown-рендерера (content_format='markdown'): заголовок
    отличается весом и цветом, разделители только горизонтальные. */
@@ -305,22 +364,31 @@
   достаточно (порог в game/config.py), иначе процент был бы шумом. Задача не
   попала в игровой пул — строки просто нет. Этап 7 переносит её в блок теста.
   {% endcomment %}
-  {% if game_stat %}
+  {% if game_stat and not test %}
   <p class="pd-stat" title="Доля верных ответов среди первых встреч игроков с этим вопросом">В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)</p>
   {% endif %}
 
+  {% if test %}
+  {% comment %}
+  Играбельный тест: вопрос в карточке условия, варианты — плитками в блоке
+  игры ниже. Карточки свободного решения и кнопки «Показать решение» нет:
+  ответ открывает «Показать ответ», решение живёт в «Почему так».
+  {% endcomment %}
+  <section class="stm stm--q" aria-label="Условие">
+    <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
+  </section>
+  {% include "catalog/_problem_test.html" %}
+  {% else %}
   <section class="stm" aria-label="Условие">
     <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
     {% if parts %}
-      {% if is_test %}
-      <ol class="opt-list" aria-label="Варианты">
-        {% for part in parts %}<li class="opt"><span class="opt-l">{{ part.label|partlabel|cut:")" }}</span><span class="opt-t math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span></li>{% endfor %}
-      </ol>
-      {% else %}
+      {% comment %}
+      Подпункты; у теста без игры (нет вариантов или верные метки вне
+      вариантов) — тоже подпунктами: он показывается как обычная задача.
+      {% endcomment %}
       <ol class="parts">
         {% for part in parts %}<li class="part"><b>{{ part.label|partlabel }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span></li>{% endfor %}
       </ol>
-      {% endif %}
     {% endif %}
   </section>
 
@@ -395,8 +463,9 @@
     </div>
     {% endif %}
   </section>
+  {% endif %}
 
-  {% if ai_available and user.is_authenticated %}
+  {% if ai_available and user.is_authenticated and not test %}
   {% comment %}
   Идёт проверка: спиннер и полоса, «обычно 10–20 секунд». Результат
   приходит готовой разметкой (`_attempt_result.html`) — тем же партиалом,

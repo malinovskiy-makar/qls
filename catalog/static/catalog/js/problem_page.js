@@ -180,6 +180,131 @@
     });
   }
 
+  /* ── Тест как игра (этап 7): выбор, проверка всё-или-ничего, разбор ── */
+  var tq = $('tq'), tcfg = cfg.test;
+  if (tq && tcfg && tcfg.checkUrl) {
+    var opts = Array.prototype.slice.call(tq.querySelectorAll('.opt'));
+    var sel = [], mode = 'play', attempt = 1, correct = null, count = null, tqBusy = false;
+    var msgWrong = $('msg-wrong'), msgOk = $('msg-ok'), msgShow = $('msg-show'), cnt = $('msg-cnt');
+    var rowPlay = $('row-play'), rowDone = $('row-done'), expl = $('expl'), tryEl = $('tq-try');
+    var checkBtn = $('check-btn'), why = $('check-why'), revealBtn = $('reveal-btn');
+    var againBtn = $('again-btn'), askWhy = $('ask-why'), okSub = $('ok-sub'), showLabels = $('show-labels');
+    var whyText = why ? why.textContent : '';
+    function plural(n, forms) {
+      var a = n % 10, b = n % 100;
+      return forms[(a === 1 && b !== 11) ? 0 : (a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 1 : 2];
+    }
+    function nth(n) { return (n === 2 ? 'со ' : 'с ') + n + '-й попытки'; }
+    function isDone() { return mode === 'solved' || mode === 'revealed'; }
+    function renderTest() {
+      var done = isDone();
+      opts.forEach(function (o) {
+        var l = o.getAttribute('data-l'), on = sel.indexOf(l) >= 0;
+        o.setAttribute('aria-pressed', on ? 'true' : 'false');
+        o.classList.remove('is-hit', 'is-wrong', 'is-missed', 'is-skip');
+        o.disabled = done;
+        var note = o.querySelector('.opt-note');
+        if (note) { note.textContent = ''; }
+        if (done && correct) {
+          var right = correct.indexOf(l) >= 0;
+          if (on && right) { o.classList.add('is-hit'); note.textContent = 'вы выбрали · верно'; }
+          else if (on) { o.classList.add('is-wrong'); note.textContent = 'вы выбрали · неверно'; }
+          else if (right) { o.classList.add('is-missed'); note.textContent = 'надо было выбрать'; }
+          else { o.classList.add('is-skip'); }
+        }
+      });
+      msgWrong.classList.toggle('is-on', mode === 'wrong');
+      msgOk.classList.toggle('is-on', mode === 'solved');
+      msgShow.classList.toggle('is-on', mode === 'revealed');
+      rowPlay.hidden = done;
+      rowDone.hidden = !done;
+      if (expl) { expl.classList.toggle('is-on', done); }
+      checkBtn.disabled = !sel.length || tqBusy;
+      why.hidden = !!sel.length;
+      if (mode === 'solved') {
+        tryEl.textContent = 'Решено ' + nth(attempt);
+      } else if (mode === 'revealed') {
+        var made = attempt - 1;
+        tryEl.textContent = made ? 'Ответ показан после ' + made + ' ' + plural(made, ['попытки', 'попыток', 'попыток']) : 'Ответ показан';
+      } else {
+        tryEl.textContent = 'Попытка ' + attempt;
+      }
+      cnt.hidden = !(mode === 'wrong' && count !== null);
+      if (!cnt.hidden) { cnt.textContent = 'верных вариантов: ' + count; }
+      if (askWhy) { askWhy.setAttribute('data-ask', correct ? 'Объясни, почему в этом тесте верно именно: ' + correct.join(', ') : ''); }
+    }
+    function toggleOpt(l) {
+      if (isDone() || tqBusy) { return; }
+      var i = sel.indexOf(l);
+      if (!tcfg.multi) { sel = i >= 0 ? [] : [l]; }
+      else if (i >= 0) { sel.splice(i, 1); }
+      else { sel.push(l); }
+      if (mode === 'wrong') { mode = 'play'; }
+      why.textContent = whyText;
+      renderTest();
+    }
+    function shake() {
+      tq.classList.remove('is-shake');
+      void tq.offsetWidth;
+      tq.classList.add('is-shake');
+    }
+    function checkTest() {
+      if (!sel.length || isDone() || tqBusy) { return; }
+      tqBusy = true;
+      renderTest();
+      post(tcfg.checkUrl, { labels: sel.slice() })
+        .then(function (d) {
+          if (d.error) { why.textContent = d.message || 'Не удалось проверить, попробуйте ещё раз.'; why.hidden = false; return; }
+          attempt = d.attempt;
+          if (d.correct) {
+            mode = 'solved';
+            correct = sel.slice();
+            okSub.textContent = attempt === 1 ? 'С первой попытки.' : nth(attempt).charAt(0).toUpperCase() + nth(attempt).slice(1) + ', и это тоже считается.';
+          } else {
+            mode = 'wrong';
+            attempt = d.attempt + 1;
+            count = (d.correct_count === undefined || d.correct_count === null) ? null : d.correct_count;
+            shake();
+          }
+        })
+        .catch(function () { why.textContent = 'Не удалось проверить, попробуйте ещё раз.'; why.hidden = false; })
+        .then(function () { tqBusy = false; renderTest(); });
+    }
+    function revealTest() {
+      if (isDone() || tqBusy) { return; }
+      tqBusy = true;
+      post(tcfg.revealUrl, {})
+        .then(function (d) {
+          if (!d.correct_labels) { return; }
+          correct = d.correct_labels.slice();
+          mode = 'revealed';
+          showLabels.textContent = correct.join(', ');
+        })
+        .catch(function () {})
+        .then(function () { tqBusy = false; renderTest(); });
+    }
+    function againTest() {
+      sel = []; attempt = 1; mode = 'play'; correct = null; count = null;
+      why.textContent = whyText;
+      renderTest();
+    }
+    opts.forEach(function (o) { o.addEventListener('click', function () { toggleOpt(o.getAttribute('data-l')); }); });
+    checkBtn.addEventListener('click', checkTest);
+    revealBtn.addEventListener('click', revealTest);
+    againBtn.addEventListener('click', againTest);
+    /* Клавиатура: 1–9 и буквы меток выбирают, Enter проверяет; в полях ввода молчим. */
+    document.addEventListener('keydown', function (e) {
+      var t = e.target;
+      if (t && (t.tagName === 'TEXTAREA' || t.tagName === 'INPUT' || t.isContentEditable)) { return; }
+      if (e.altKey || e.ctrlKey || e.metaKey) { return; }
+      var key = (e.key || '').toLowerCase();
+      var idx = /^[1-9]$/.test(key) ? parseInt(key, 10) - 1 : tcfg.labels.indexOf(key);
+      if (idx >= 0 && idx < opts.length) { toggleOpt(opts[idx].getAttribute('data-l')); e.preventDefault(); return; }
+      if (e.key === 'Enter' && !rowPlay.hidden) { checkTest(); e.preventDefault(); }
+    });
+    renderTest();
+  }
+
   /* ── Чат по задаче ─────────────────────────────────────────────────── */
   var chat = null;
   var aiIn = $('ai-in'), aiText = $('ai-text'), aiBody = $('ai-body'), aiSend = $('ai-send');

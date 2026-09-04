@@ -169,6 +169,36 @@ class NoHintsNoFilesTests(TestCase):
             self.assertNotIn(absent, html)
 
 
+class TestPageZeroTests(TestCase):
+    """Этап 7: у теста на экране только то, что есть в данных.
+
+    Без решения нет «Почему так», без игровой статистики нет строки игры,
+    без другого теста по теме нет кнопки «Ещё тест», без модели и входа нет
+    «Спросить ИИ, почему так»; тест без вариантов — обычная задача.
+    """
+
+    def test_bare_test_shows_nothing_extra(self):
+        from problems.models import ProblemPart
+        from problems.tests.factories import make_problem
+        problem = make_problem('Выберите верное.', problem_type='тест: один ответ', answer='а')
+        for i, label in enumerate('аб', start=1):
+            ProblemPart.objects.create(problem=problem, label=label, statement='Вариант ' + label, order=i)
+        html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode()
+        main = html.split('<main')[1]
+        self.assertIn('id="tq"', main)
+        for absent in ('Почему так', 'id="expl"', 'tq-stat', 'решают верно', 'Ещё тест по этой теме',
+                       'Спросить ИИ, почему так', 'id="hint-btn"', 'id="sol-btn"', 'id="sv"'):
+            self.assertNotIn(absent, main)
+
+    def test_test_without_options_has_no_game(self):
+        from problems.tests.factories import make_problem
+        problem = make_problem('Сколько?', problem_type='тест: числовой ответ', answer='7')
+        html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode()
+        main = html.split('<main')[1]
+        for absent in ('id="tq"', 'Проверить', 'Показать ответ', 'aria-pressed', 'checkUrl'):
+            self.assertNotIn(absent, main)
+
+
 class NoAiKeyProblemPageTests(TestCase):
     """Без ключа ИИ: ни кнопки проверки, ни строки лимита, ни карточки чата."""
 

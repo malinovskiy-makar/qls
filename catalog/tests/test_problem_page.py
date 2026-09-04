@@ -117,13 +117,14 @@ class ProblemPageTests(TestCase):
         self.assertIn('<b>а)</b>', html)
         self.assertIn('одно на всю задачу, подпункты внутри', html)
 
-    def test_test_options_are_static_tiles_for_now(self):
+    def test_test_options_are_playable_tiles(self):
+        """Этап 7: варианты теста — кнопки игры, а не статичные плитки."""
         html = self.client.get(_url(self.p_test)).content.decode()
-        self.assertEqual(html.count('<li class="opt">'), 3)
+        self.assertEqual(html.count('aria-pressed="false"'), 3)
         self.assertIn('<span class="opt-l">а</span>', html)
-        self.assertNotIn('aria-pressed', html)
-        self.assertNotIn('Показать ответ', html)
-        self.assertIn('Ответ: <b class="math-content">б</b>', html)
+        self.assertEqual(html.count('Показать ответ'), 1)
+        self.assertNotIn('id="sol-btn"', html)
+        self.assertNotIn('Ответ: <b class="math-content">б</b>', html)
 
     def test_similar_cards_and_link(self):
         others = [make_problem('Похожая %d.' % i, topic=self.mon, difficulty=3) for i in range(4)]
