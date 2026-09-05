@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап · Тест в каталоге (E) · Weconomics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   МОКАП «Тест в каталоге: игра и разбор» (часть E) — 04.09.2026
+   Для Claude Code: ниже два слоя.
+   1) ТОКЕНЫ — копия значений из templates/_tokens.html (свет + тьма).
+      В проекте этот блок НЕ копировать: он уже подключён первым в <head>.
+   2) КОМПОНЕНТЫ — новые классы .pd-*, .pp*, .stm*, .sv-*, .chk*, .hint*, .sol*, .sim*, .ai-*.
+      Их переносить как есть; цвета только через var(--…).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ТОКЕНЫ (копия _tokens.html, светлая тема) ──────────────────── */
+:root {
+  --accent: #00797a; --accent-ink: #006c6d; --accent-deep: #016769;
+  --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+  --accent-rgb: 0, 121, 122; --act-ink: #2d2d2d; --act-ink-solid: #ffffff;
+  --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+  --surface-tool: #81b5b4; --surface-info: #f2e8bd;
+  --border: rgba(45,45,45,.14); --border-soft: rgba(45,45,45,.08);
+  --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+  --brand-amber: #d6a525; --brand-amber-ink: #1d1a16; --brand-amber-hover: #e3b03a;
+  --btn-bg: #2e2b27; --btn-bg-hover: #3d3933; --on-btn: #ffffff; --nav-bg: #3c3531;
+  --chip-bg: rgba(45,45,45,.07); --chip-text: #5c5346;
+  --amber: #96500c; --amber-tint: rgba(150,80,12,.11); --amber-border: rgba(150,80,12,.34); --amber-ink: #723c09;
+  --green: #186e3c; --green-tint: rgba(24,110,60,.09); --green-border: rgba(24,110,60,.30); --green-ink: #186e3c;
+  --error: #b93526; --error-tint: rgba(185,53,38,.09); --error-border: rgba(185,53,38,.28); --on-error: #ffffff;
+  --pending: #43566f; --pending-tint: rgba(67,86,111,.09);
+  --focus: #7d7466; --focus-ring: rgba(125,116,102,.22);
+  --map-g-base: #A94223; --map-g-market: #704C10; --map-g-firm: #576114;
+  --map-g-state: #1C5F25; --map-g-macro: #6847C2; --map-g-fin: #8C3180; --map-g-tools: #B53054;
+  --r-sm: 4px; --r: 6px; --r-card: 10px; --r-panel: 12px; --r-pill: 999px;
+  --t: .12s; --t-slow: .2s; --w-page: 960px; --w-read: 860px;
+  --font-ui: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fs-hero: 32px; --fs-h1: 24px; --fs-h2: 19px; --fs-body: 16px; --fs-ui: 14.5px; --fs-meta: 13px;
+  --lh-tight: 1.25; --lh-body: 1.6; --lh-ui: 1.45;
+  --shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+  --bg-pattern-alpha: .10;
+}
+[data-theme="dark"] {
+  --accent: #81b5b4; --accent-ink: #81b5b4; --accent-deep: #9bc6c5;
+  --accent-tint: rgba(129,181,180,.16); --accent-ring: rgba(129,181,180,.40);
+  --accent-rgb: 129, 181, 180; --act-ink: #f2ecd9; --act-ink-solid: #1d1a16;
+  --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+  --surface-tool: #2d504f; --surface-info: #504a2d;
+  --border: rgba(255,255,255,.13); --border-soft: rgba(255,255,255,.07);
+  --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+  --btn-bg: #c4bba9; --btn-bg-hover: #d0c7b5; --on-btn: #23211d;
+  --focus: #8a8172; --focus-ring: rgba(138,129,114,.26);
+  --chip-bg: rgba(255,255,255,.08); --chip-text: #c8c2b0;
+  --amber: #efa273; --amber-tint: rgba(239,162,115,.15); --amber-border: rgba(239,162,115,.34); --amber-ink: #f9eae1;
+  --green: #3fc77f; --green-ink: #bfecd4; --green-tint: rgba(63,199,127,.15); --green-border: rgba(63,199,127,.32);
+  --error: #ff8a8a; --error-ink: #ffd2d2; --error-tint: rgba(255,138,138,.15); --error-border: rgba(255,138,138,.30); --on-error: #1d1a16;
+  --map-g-base: #DA6B49; --map-g-market: #D6931F; --map-g-firm: #8C9D20;
+  --map-g-state: #36BA48; --map-g-macro: #9A85D6; --map-g-fin: #D27FC7; --map-g-tools: #D66684;
+  --bg-pattern-alpha: .15;
+}
+
+/* ── База страницы (приближение к catalog/base.html, в проект не копировать) ── */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--fs-body)/var(--lh-body) var(--font-ui);
+       -webkit-font-smoothing: antialiased; min-height: 100vh; position: relative; }
+body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: var(--bg-pattern-alpha);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='260' viewBox='0 0 320 260'><path d='M20 40 l30 110 l35 -80 l35 80 l30 -110' fill='none' stroke='%237fae7c' stroke-width='26' stroke-linecap='round' stroke-linejoin='round'/><path d='M180 150 l24 84 l28 -60 l28 60 l24 -84' fill='none' stroke='%23c9b45a' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 320px 260px; }
+.site-nav { position: relative; z-index: 1; background: var(--nav-bg); height: 56px; display: flex;
+  align-items: center; padding: 0 28px; gap: 26px; font-size: 15.5px; }
+.site-nav .logo { width: 34px; height: 34px; border-radius: 50%; background: #81b5b4; color: #1d1a16;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+.site-nav a { color: #c9c1ae; text-decoration: none; line-height: 56px; }
+.site-nav a.is-on { color: #fff; box-shadow: inset 0 -2px 0 #81b5b4; }
+.site-nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; color: #c9c1ae; }
+.site-nav .right span { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.page-wrap { position: relative; z-index: 1; max-width: var(--w-read); margin: 0 auto; padding: 44px 20px 80px; }
+.ct-head { margin: 0 0 22px; }
+.ct-head h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: -.01em; line-height: 1.2; }
+.ct-head p { margin: 0; color: var(--text2); font-size: 16px; line-height: 1.5; max-width: 46em; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button { font-family: inherit; }
+
+/* ── Панель мокапа (НЕ часть дизайна, в проект не копировать) ────────── */
+.mk-bar { position: fixed; left: 14px; bottom: 14px; z-index: 60; background: #1d1a16; color: #f2ecd9;
+  border-radius: 10px; padding: 8px 10px; font: 500 12px/1.3 var(--font-ui); display: flex; gap: 6px;
+  align-items: center; box-shadow: var(--shadow-pop); flex-wrap: wrap; max-width: 250px; }
+.mk-bar em { font-style: normal; opacity: .7; margin-right: 2px; width: 100%; }
+.mk-bar em:first-child { width: auto; }
+.mk-bar button { font: inherit; background: #3c3531; color: #f2ecd9; border: 0; border-radius: 6px;
+  padding: 5px 8px; cursor: pointer; }
+.mk-bar button.is-on { background: #81b5b4; color: #1d1a16; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   2. КОМПОНЕНТЫ — переносить в проект
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Каркас: страница задачи шире общей полосы 860 — под карточку чата ── */
+.pd-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 36px 20px 80px; }
+.pd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 32px; align-items: start; }
+.pd-side { position: sticky; top: 72px; }
+@media (max-width: 980px) { .pd-grid { grid-template-columns: 1fr; } .pd-side { position: static; } }
+
+/* ── Заголовок и действия ────────────────────────────────────────────── */
+.pd-title { font-size: 28px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; margin: 0 0 10px; }
+.pd-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+.pd-act { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 var(--font-ui);
+  padding: 7px 11px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--surface);
+  color: var(--text2); cursor: pointer; transition: border-color var(--t), color var(--t); }
+.pd-act:hover { color: var(--text); border-color: var(--accent); }
+.pd-act svg { width: 14px; height: 14px; }
+.pd-act.is-on { color: var(--amber-ink); border-color: var(--amber-border); background: var(--amber-tint); }
+.pd-act--copied { color: var(--green); border-color: var(--green-border); }
+
+/* ── Облачка свойств: два ряда, каждое — ссылка в каталог с этим фильтром.
+   Цвет — второй носитель смысла рядом со словом/глифом (правило 1.1.3). ── */
+.pp-rows { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; }
+.pp-row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.pp { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r-pill); padding: 5px 11px;
+  font: 500 13px/1.25 var(--font-ui); color: var(--text); text-decoration: none; border: 1px solid transparent;
+  background: var(--surface); transition: border-color var(--t), transform var(--t); max-width: 100%; }
+.pp:hover { border-color: var(--accent); }
+.pp:active { transform: scale(.98); }
+.pp--topic { background: color-mix(in srgb, var(--gc) 16%, var(--surface)); border-color: color-mix(in srgb, var(--gc) 45%, transparent); font-weight: 600; }
+.pp--topic::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gc); flex: none; }
+.pp--tag { border-color: color-mix(in srgb, var(--gc) 40%, transparent); color: var(--text); }
+.pp--tag::before { content: '#'; color: color-mix(in srgb, var(--gc) 80%, var(--text)); font-weight: 700; }
+.pp--diff { background: var(--amber-tint); border-color: var(--amber-border); color: var(--amber-ink); }
+.pp--diff .st { letter-spacing: .5px; color: var(--amber); }
+.pp--char { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent-ring); }
+.pp--kind { background: var(--chip-bg); color: var(--chip-text); }
+.pp--feat { background: var(--pending-tint); color: var(--pending); border-color: transparent; }
+.pp--feat svg { width: 13px; height: 13px; }
+.pp--src { background: transparent; color: var(--text3); border-color: var(--border); font-weight: 400; }
+.pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+/* ── Условие: своя поверхность, подпункты внутри, вплотную ─────────── */
+.stm { background: var(--surface-info); border-radius: 14px; padding: 22px 26px 8px; margin: 0 0 18px;
+  font-size: 17px; line-height: 1.7; }
+.stm p { margin: 0 0 .7em; }
+.stm i, .stm var { font-style: italic; font-family: 'Times New Roman', 'STIX Two Text', serif; font-size: 1.08em; }
+.stm .parts { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid rgba(45,45,45,.10); }
+[data-theme="dark"] .stm .parts { border-top-color: rgba(255,255,255,.10); }
+.stm .part { display: flex; gap: 12px; padding: 12px 0; border-top: 1px dashed rgba(45,45,45,.12); }
+.stm .part:first-child { border-top: 0; }
+[data-theme="dark"] .stm .part { border-top-color: rgba(255,255,255,.10); }
+.stm .part b { color: var(--accent-ink); font-weight: 700; min-width: 22px; }
+.stm-figure { margin: 10px 0 14px; background: var(--surface); border-radius: 10px; padding: 12px; text-align: center; font-size: 13px; color: var(--text3); }
+
+/* ── Карточка «Решение»: ввод + действия ────────────────────────────── */
+.sv { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 14px; margin: 0 0 18px; }
+.sv-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+.sv-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sv-head small { color: var(--text3); font-size: 13px; }
+.sv-field { border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); transition: border-color var(--t), box-shadow var(--t); }
+.sv-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); background: var(--surface); }
+.sv-field textarea { width: 100%; border: 0; background: transparent; resize: none; display: block; min-height: 118px;
+  padding: 12px 14px; font: 400 15.5px/1.55 var(--font-ui); color: var(--text); outline: none; }
+.sv-field textarea::placeholder { color: var(--text3); }
+.sv-attach { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px 14px; flex-wrap: wrap; }
+.att { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); padding: 5px 8px 5px 5px; font-size: 13px; color: var(--text2); animation: chipIn .14s ease-out; }
+.att .thumb { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, var(--surface-2), var(--surface-info)); display: inline-flex; align-items: center; justify-content: center; color: var(--text3); }
+.att .thumb svg { width: 15px; height: 15px; }
+.att .x { border: 0; background: none; color: var(--text3); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; }
+.att .x:hover { color: var(--text); }
+@keyframes chipIn { from { opacity: 0; transform: scale(.94); } }
+.att-add { display: inline-flex; align-items: center; gap: 7px; font: 500 13px/1 var(--font-ui); color: var(--text2);
+  background: none; border: 1px dashed var(--border); border-radius: 10px; padding: 9px 11px; cursor: pointer; }
+.att-add:hover { color: var(--text); border-color: var(--accent); border-style: solid; }
+.att-add svg { width: 15px; height: 15px; }
+.sv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.sv-row .grow { flex: 1 1 auto; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--font-ui); padding: 11px 16px;
+  border-radius: 9px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: background var(--t), border-color var(--t), color var(--t); }
+.btn svg { width: 15px; height: 15px; }
+/* Главная кнопка экрана одна и она графитовая (правила 7–8 канона). */
+.btn--main { background: var(--btn-bg); color: var(--on-btn); }
+.btn--main:hover { background: var(--btn-bg-hover); }
+.btn--main:disabled { opacity: .5; cursor: default; }
+.btn--quiet { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn--quiet:hover { border-color: var(--accent); }
+.btn--quiet:disabled { color: var(--text3); border-color: var(--border-soft); cursor: default; }
+.btn--quiet:disabled:hover { border-color: var(--border-soft); }
+.btn .n { font-weight: 500; color: var(--text3); }
+.sv-limit { font-size: 12.5px; color: var(--text3); }
+.sv-limit b { font-weight: 600; color: var(--text2); }
+/* мягкое подтверждение перед показом решения — не модалка, а замена кнопки */
+.sv-confirm { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--text2);
+  background: var(--surface-2); border-radius: 10px; padding: 8px 8px 8px 12px; margin-top: 10px; }
+.sv-confirm.is-on { display: flex; }
+.btn--sm { padding: 7px 11px; font-size: 13px; }
+
+/* ── Подсказки уровнями ─────────────────────────────────────────────── */
+.hints { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hint { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-tint); border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14.5px; line-height: 1.55; animation: chipIn .18s ease-out; }
+.hint .k { flex: none; font-weight: 700; color: var(--accent-ink); font-size: 12.5px; padding-top: 2px; white-space: nowrap; }
+.hint .ai { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* ── Решение и ответ (раскрытие) ────────────────────────────────────── */
+.sol { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.sol.is-on { display: block; animation: chipIn .18s ease-out; }
+.sol-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border-soft); }
+.sol-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.sol-ans { margin-left: auto; font-size: 14px; color: var(--text2); }
+.sol-ans b { color: var(--text); font-variant-numeric: tabular-nums; }
+.sol-body { padding: 14px 16px 6px; font-size: 15px; line-height: 1.65; }
+.sol-body ol { margin: 0; padding-left: 22px; }
+.sol-body li { margin: 0 0 8px; }
+.sol-body i { font-style: italic; font-family: 'Times New Roman', serif; font-size: 1.06em; }
+
+/* ── Результат проверки ИИ ───────────────────────────────────────────
+   Состояние показывается полосой слева, значком и словом — панель не
+   заливается (правило 9). Балл — tabular-nums (правило 12). Итог модели
+   помечен как предварительный (2.13). ── */
+.chk { display: none; border: 1px solid var(--border); border-left-width: 4px; border-radius: 12px; background: var(--surface);
+  margin: 0 0 18px; overflow: hidden; }
+.chk.is-on { display: block; animation: chipIn .2s ease-out; }
+.chk--ok { border-left-color: var(--green); } .chk--part { border-left-color: var(--amber); }
+.chk--bad { border-left-color: var(--error); } .chk--wait { border-left-color: var(--pending); }
+.chk-head { display: flex; align-items: center; gap: 16px; padding: 16px 18px 12px; }
+.chk-score { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.chk-score small { font-size: 15px; font-weight: 500; color: var(--text3); }
+.chk-verdict { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.chk--ok .chk-verdict { color: var(--green); } .chk--part .chk-verdict { color: var(--amber-ink); }
+.chk--bad .chk-verdict { color: var(--error); } .chk--wait .chk-verdict { color: var(--pending); }
+.chk-verdict svg { width: 18px; height: 18px; }
+.chk-sub { font-size: 13.5px; color: var(--text2); margin-top: 2px; }
+.chk-steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-soft); }
+.chk-step { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 10px 18px; border-top: 1px solid var(--border-soft); font-size: 14.5px; line-height: 1.5; }
+.chk-step:first-child { border-top: 0; }
+.chk-mark { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; margin-top: 1px; }
+.chk-mark.ok { background: var(--green-tint); color: var(--green); }
+.chk-mark.bad { background: var(--error-tint); color: var(--error); }
+.chk-mark.part { background: var(--amber-tint); color: var(--amber-ink); }
+.chk-mark.na { background: var(--chip-bg); color: var(--text3); }
+.chk-step-t { font-weight: 600; }
+.chk-step-c { color: var(--text2); }
+.chk-step.is-first { background: var(--error-tint); }
+.chk-flag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--error); margin-left: 8px; letter-spacing: .02em; }
+.chk-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 18px 14px; border-top: 1px solid var(--border-soft); background: var(--surface-2); }
+.chk-conf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.chk-conf .bars { display: inline-flex; gap: 2px; }
+.chk-conf .bars i { width: 14px; height: 6px; border-radius: 2px; background: var(--border); }
+.chk-conf .bars i.on { background: var(--accent); }
+.chk-note { font-size: 12.5px; color: var(--text3); flex: 1 1 100%; display: flex; gap: 6px; align-items: flex-start; }
+.chk-note svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.chk-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.chk-ocr { padding: 0 18px 12px; }
+.chk-ocr details { font-size: 13px; color: var(--text2); }
+.chk-ocr summary { cursor: pointer; color: var(--accent-ink); }
+.chk-ocr blockquote { margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--border); font-size: 13.5px; line-height: 1.5; }
+/* Идёт проверка */
+.chk-busy { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.chk-busy .line { display: flex; gap: 10px; align-items: center; font-size: 14.5px; }
+.chk-busy .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: askSpin .8s linear infinite; }
+@keyframes askSpin { to { transform: rotate(360deg); } }
+.chk-busy .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.chk-busy .bar i { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 3px; animation: barRun 1.6s ease-in-out infinite; }
+@keyframes barRun { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+.chk-busy small { color: var(--text3); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .chk-busy .bar i, .chk-busy .spin { animation: none; } }
+
+/* ── Похожие задачи ─────────────────────────────────────────────────── */
+.sim { margin-top: 30px; }
+.sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.sim-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sim-head a { font-size: 13px; color: var(--accent-ink); }
+.sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .sim-grid { grid-template-columns: 1fr; } }
+.sim-card { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 12px 14px; text-decoration: none; color: var(--text); transition: border-color var(--t); }
+.sim-card:hover { border-color: var(--accent); }
+.sim-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tchip { font-size: 12px; border-radius: var(--r-pill); padding: 3px 9px 3px 7px; display: inline-flex; gap: 6px; align-items: center;
+  background: color-mix(in srgb, var(--gc) 14%, var(--surface)); color: var(--text); }
+.tchip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--gc); }
+.sim-title { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.sim-prev { font-size: 13px; color: var(--text2); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sim-meta { display: flex; gap: 8px; font-size: 12px; margin-top: auto; }
+.ct-stars { color: var(--amber); letter-spacing: .5px; } .ct-sol { color: var(--green); } .ct-kind { color: var(--text3); }
+
+/* ── Карточка ИИ-чата (справа, всегда видна) ────────────────────────── */
+.ai { background: var(--surface); border: 1.5px solid var(--accent-ring); border-radius: 16px; display: flex; flex-direction: column;
+  max-height: calc(100vh - 96px); overflow: hidden; }
+.ai-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border-soft); }
+.ai-head .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--act-ink-solid); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ai-head .ic svg { width: 16px; height: 16px; }
+.ai-head h2 { margin: 0; font-size: 15.5px; font-weight: 600; }
+.ai-head small { display: block; font-size: 12px; color: var(--text3); }
+.ai-body { padding: 14px 16px; overflow: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; }
+.ai-intro { font-size: 13.5px; color: var(--text2); line-height: 1.5; margin: 0; }
+.ai-sug { display: flex; flex-direction: column; gap: 6px; }
+.ai-sug button { text-align: left; font: 500 13px/1.35 var(--font-ui); color: var(--text); background: var(--surface-2); border: 1px solid transparent;
+  border-radius: 10px; padding: 8px 11px; cursor: pointer; }
+.ai-sug button:hover { border-color: var(--accent); }
+.ai-msg { max-width: 92%; font-size: 14px; line-height: 1.5; padding: 9px 12px; border-radius: 12px; animation: chipIn .16s ease-out; }
+.ai-msg--me { align-self: flex-end; background: var(--btn-bg); color: var(--on-btn); border-bottom-right-radius: 4px; }
+.ai-msg--ai { align-self: flex-start; background: var(--accent-tint); border-bottom-left-radius: 4px; }
+.ai-msg--ai .typing { display: inline-flex; gap: 3px; } .ai-msg--ai .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+.ai-msg--ai .typing i:nth-child(2) { animation-delay: .2s; } .ai-msg--ai .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.ai-foot { padding: 10px 12px 12px; border-top: 1px solid var(--border-soft); }
+.ai-in { display: flex; align-items: flex-end; gap: 6px; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 6px 6px 12px; transition: border-color var(--t), box-shadow var(--t); }
+.ai-in:focus-within { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-ring); }
+.ai-in textarea { flex: 1 1 auto; border: 0; background: transparent; resize: none; font: 400 14px/1.45 var(--font-ui); color: var(--text); outline: none; min-height: 24px; max-height: 120px; padding: 6px 0; }
+.ai-in textarea::placeholder { color: var(--text3); }
+.ai-send { width: 32px; height: 32px; border-radius: var(--r-pill); border: 0; background: var(--surface); color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: background var(--t), color var(--t); }
+.ai-send svg { width: 16px; height: 16px; }
+.ai-in.has-text .ai-send { background: var(--accent); color: var(--act-ink-solid); }
+.ai-note { font-size: 11.5px; color: var(--text3); margin: 8px 2px 0; line-height: 1.4; }
+
+/* ── E. Тест: играбельные варианты и разбор ─────────────────────────
+   Выбранный вариант получает сплошной акцент (правило 8: акцент —
+   у выбранного из равноправных). Разбор — четыре состояния из
+   student/_option_review.html: ✓ выбрал и верно, ✗ выбрал зря,
+   ○ надо было выбрать, · нейтрально. Цвета в законных значениях. ── */
+.sr-only { position: absolute; left: -9999px; }
+.stm--q { padding-bottom: 22px; }
+.stm--q .q { font-size: 19px; font-weight: 600; line-height: 1.45; margin: 0; }
+.tq { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin: 0 0 18px; }
+.tq.is-shake { animation: shake .45s ease; }
+@keyframes shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .tq.is-shake { animation: none; } }
+.tq-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.tq-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.tq-rule { font-size: 13.5px; color: var(--text2); }
+.tq-try { margin-left: auto; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tq-stat { font-size: 12.5px; color: var(--text3); margin: -6px 0 12px; }
+.tq-stat b { color: var(--text2); font-weight: 600; }
+.opt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: var(--surface-2);
+  border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  font: 400 15.5px/1.5 var(--font-ui); color: var(--text); transition: border-color var(--t), background var(--t), transform var(--t); }
+.opt:hover { border-color: var(--accent-ring); }
+.opt:active { transform: scale(.995); }
+.opt:disabled { cursor: default; }
+.opt:disabled:hover { border-color: transparent; }
+.opt-l { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex;
+  align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--text2); background: var(--surface);
+  transition: background var(--t), border-color var(--t), color var(--t); margin-top: -1px; }
+.opt-t { flex: 1 1 auto; }
+.opt-note { flex: none; align-self: center; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap; display: none; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.opt[aria-pressed="true"] .opt-l { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); }
+/* разбор */
+.opt.is-hit { border-color: var(--green); background: var(--green-tint); }
+.opt.is-hit .opt-l { background: var(--green); border-color: var(--green); color: var(--act-ink-solid); }
+.opt.is-hit .opt-note { display: inline; color: var(--green); }
+.opt.is-wrong { border-color: var(--error); background: var(--error-tint); }
+.opt.is-wrong .opt-l { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.opt.is-wrong .opt-note { display: inline; color: var(--error); }
+.opt.is-missed { border-color: var(--amber); border-style: dashed; background: var(--amber-tint); }
+.opt.is-missed .opt-l { border-color: var(--amber); color: var(--amber-ink); background: transparent; }
+.opt.is-missed .opt-note { display: inline; color: var(--amber-ink); }
+.opt.is-skip { opacity: .72; }
+.opt.is-skip .opt-l { color: var(--text3); }
+@media (max-width: 560px) { .opt { flex-wrap: wrap; } .opt-note { width: 100%; padding-left: 40px; } }
+/* сообщение под вариантами */
+.tq-msg { display: none; align-items: center; gap: 10px; border-radius: 12px; padding: 11px 14px; margin-top: 12px;
+  font-size: 14.5px; border-left: 3px solid; animation: chipIn .18s ease-out; }
+.tq-msg.is-on { display: flex; }
+.tq-msg svg { width: 18px; height: 18px; flex: none; }
+.tq-msg--wrong { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.tq-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.tq-msg--show { background: var(--amber-tint); color: var(--amber-ink); border-color: var(--amber); }
+.tq-msg b { font-weight: 700; }
+.tq-msg .cnt { margin-left: auto; font-size: 13px; opacity: .9; }
+.tq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tq-row .grow { flex: 1 1 auto; }
+.tq-why { font-size: 13px; color: var(--text3); }
+.tq-kbd { font-size: 12px; color: var(--text3); }
+.tq-kbd kbd { font: 600 11px/1 var(--font-ui); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; background: var(--surface); color: var(--text2); }
+/* объяснение после разбора */
+.tq-expl { display: none; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tq-expl.is-on { display: block; animation: chipIn .18s ease-out; }
+.tq-expl .h { padding: 10px 14px; background: var(--surface-2); font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border-soft); }
+.tq-expl ul { margin: 0; padding: 10px 14px 10px 30px; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.tq-expl li { margin: 0 0 6px; }
+.tq-expl li b { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+<!-- Панель мокапа: НЕ часть дизайна -->
+<div class="mk-bar" aria-label="Панель мокапа">
+  <em>мокап</em>
+  <button type="button" id="mk-theme">Тёмная тема</button>
+  <em>состояние:</em>
+  <button type="button" data-st="play" class="is-on">до</button>
+  <button type="button" data-st="wrong">неверно</button>
+  <button type="button" data-st="solved">верно</button>
+  <button type="button" data-st="revealed">ответ показан</button>
+</div>
+
+<nav class="site-nav" aria-label="Шапка сайта (имитация)">
+  <span class="logo">W</span>
+  <a href="#">Домашки</a>
+  <a href="#" class="is-on">Каталог</a>
+  <a href="#">Олимпиады</a>
+  <a href="#">Календарь</a>
+  <a href="#">Графики</a>
+  <a href="#">Тренажёр</a>
+  <div class="right"><span>Пётр Иванов</span><span>Выйти</span></div>
+</nav>
+
+<main class="pd-wrap">
+<div class="pd-grid">
+<article class="pd-main">
+  <!-- У этого теста нет настоящего названия («Выберите верные при прочих рав-» —
+       обрезок условия), поэтому крупного заголовка НЕТ: страница начинается
+       с действий и облачек, а вопрос стоит в карточке условия. -->
+  <h1 class="sr-only">Тест: монополия и ценовая дискриминация</h1>
+  <div class="pd-acts">
+    <button class="pd-act" type="button" id="save-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>
+      <span id="save-label">Сохранить</span>
+    </button>
+    <button class="pd-act" type="button" id="copy-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1"/></svg>
+      <span id="copy-label">Скопировать ссылку</span>
+    </button>
+  </div>
+
+  <div class="pp-rows" aria-label="Свойства задачи">
+    <div class="pp-row">
+      <a class="pp pp--topic" href="#" style="--gc: var(--map-g-firm)">Монополия и ценовая дискриминация</a>
+      <a class="pp pp--tag" href="#" style="--gc: var(--map-g-firm)">ценовая дискриминация первой степени</a>
+      <a class="pp pp--tag" href="#" style="--gc: var(--map-g-firm)">второй степени и нелинейные тарифы</a>
+      <a class="pp pp--tag" href="#" style="--gc: var(--map-g-firm)">третьей степени по сегментам</a>
+    </div>
+    <div class="pp-row">
+      <a class="pp pp--kind" href="#">Тест · выбор всех верных</a>
+      <a class="pp pp--char" href="#">Качественная</a>
+      <span class="pp-sep" aria-hidden="true"></span>
+      <a class="pp pp--src" href="#">Сборник тестов АА</a>
+    </div>
+  </div>
+
+  <section class="stm stm--q" aria-label="Условие">
+    <p class="q">Выберите верные при прочих равных условиях утверждения:</p>
+  </section>
+
+  <!-- ══ Игра ═══════════════════════════════════════════════════════════ -->
+  <section class="tq" id="tq" aria-label="Варианты ответа">
+    <div class="tq-head">
+      <h2>Варианты</h2>
+      <span class="tq-rule" id="tq-rule">верных может быть несколько — отметьте все</span>
+      <span class="tq-try" id="tq-try">Попытка 1</span>
+    </div>
+    <p class="tq-stat">В Wecon Rush этот вопрос решают верно <b>64 %</b> игроков</p>
+    <ul class="opt-list" id="opts">
+      <li><button class="opt" type="button" data-l="а" aria-pressed="false"><span class="opt-l">а</span><span class="opt-t">При появлении возможности осуществлять ценовую дискриминацию прибыль фирмы не может снизиться</span><span class="opt-note"></span></button></li>
+      <li><button class="opt" type="button" data-l="б" aria-pressed="false"><span class="opt-l">б</span><span class="opt-t">Для проведения ценовой дискриминации фирме не обязательно уметь заранее отличать один тип потребителей от другого</span><span class="opt-note"></span></button></li>
+      <li><button class="opt" type="button" data-l="в" aria-pressed="false"><span class="opt-l">в</span><span class="opt-t">Ценовая дискриминация законодательно запрещена в большинстве стран, поэтому практически не встречается в реальной жизни</span><span class="opt-note"></span></button></li>
+      <li><button class="opt" type="button" data-l="г" aria-pressed="false"><span class="opt-l">г</span><span class="opt-t">Потребители никогда не могут выиграть от введения ценовой дискриминации по сравнению с политикой единой цены</span><span class="opt-note"></span></button></li>
+    </ul>
+
+    <div class="tq-msg tq-msg--wrong" id="msg-wrong">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+      <span><b>Не то.</b> Попробуйте ещё раз — какой-то вариант лишний или чего-то не хватает.</span>
+      <span class="cnt" id="msg-cnt" hidden></span>
+    </div>
+    <div class="tq-msg tq-msg--ok" id="msg-ok">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2 2 4-4.5"/></svg>
+      <span><b>Верно!</b> <span id="ok-sub">С первой попытки.</span></span>
+    </div>
+    <div class="tq-msg tq-msg--show" id="msg-show">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v4M8 5v.5"/></svg>
+      <span><b>Правильный ответ: а, б.</b> Ниже видно, что вы отметили и что надо было.</span>
+    </div>
+
+    <div class="tq-row" id="row-play">
+      <button class="btn btn--main" type="button" id="check-btn" disabled>Проверить</button>
+      <span class="tq-why" id="check-why">отметьте хотя бы один вариант</span>
+      <span class="grow"></span>
+      <span class="tq-kbd"><kbd>1</kbd>–<kbd>4</kbd> выбрать · <kbd>Enter</kbd> проверить</span>
+      <button class="btn btn--quiet" type="button" id="reveal-btn">Показать ответ</button>
+    </div>
+    <div class="tq-row" id="row-done" hidden>
+      <a class="btn btn--main" href="#">Ещё тест по этой теме</a>
+      <button class="btn btn--quiet" type="button" data-ask="Объясни, почему в этом тесте верны именно а и б">Спросить ИИ, почему так</button>
+      <span class="grow"></span>
+      <button class="btn btn--quiet btn--sm" type="button" id="again-btn">Пройти заново</button>
+    </div>
+
+    <div class="tq-expl" id="expl">
+      <div class="h">Почему так</div>
+      <ul>
+        <li><b>а — верно.</b> Возможность дискриминировать — это дополнительная опция: фирма всегда может от неё отказаться и назначить единую цену, так что прибыль не упадёт.</li>
+        <li><b>б — верно.</b> Дискриминация второй степени работает через самоотбор: фирма предлагает меню (объёмы, тарифы), и покупатели сами раскрывают свой тип.</li>
+        <li><b>в — неверно.</b> Скидки студентам, тарифы по объёму, цены выходного дня — дискриминация вокруг нас и в большинстве стран законна.</li>
+        <li><b>г — неверно.</b> При дискриминации третьей степени группа с эластичным спросом получает цену ниже единой — она выигрывает.</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="sim">
+    <div class="sim-head"><h2>Ещё тесты по теме</h2><a href="#">Все тесты по теме в каталоге</a></div>
+    <div class="sim-grid">
+      <a class="sim-card" href="#">
+        <div class="sim-line"><span class="tchip" style="--gc: var(--map-g-firm)">Монополия и ценовая дискриминация</span></div>
+        <div class="sim-title">Условия дискриминации третьей степени</div>
+        <div class="sim-prev">Выберите одно верное утверждение о том, какой группе монополист назначит более низкую цену.</div>
+        <div class="sim-meta"><span class="ct-kind">тест · один верный</span></div>
+      </a>
+      <a class="sim-card" href="#">
+        <div class="sim-line"><span class="tchip" style="--gc: var(--map-g-firm)">Монополия и ценовая дискриминация</span></div>
+        <div class="sim-title">Двухчастный тариф: верно или неверно</div>
+        <div class="sim-prev">Абонентская плата при двухчастном тарифе равна излишку потребителя при цене, равной предельным издержкам.</div>
+        <div class="sim-meta"><span class="ct-kind">тест · верно/неверно</span></div>
+      </a>
+    </div>
+  </section>
+</article>
+
+<aside class="pd-side">
+  <section class="ai" aria-label="Чат с ИИ по этой задаче">
+    <div class="ai-head">
+      <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg></span>
+      <div><h2>Спросить ИИ</h2><small>помощник по этому тесту</small></div>
+    </div>
+    <div class="ai-body" id="ai-body">
+      <p class="ai-intro">Объясню термин или уточню формулировку. Какой вариант верный — не скажу, пока вы не ответите сами.</p>
+      <div class="ai-sug" id="ai-sug">
+        <button type="button" data-q="Чем отличаются три степени ценовой дискриминации?">Три степени дискриминации — в чём разница?</button>
+        <button type="button" data-q="Что значит «при прочих равных условиях» в тесте?">Что значит «при прочих равных»?</button>
+        <button type="button" data-q="Приведи пример ценовой дискриминации из жизни">Пример из жизни</button>
+      </div>
+    </div>
+    <div class="ai-foot">
+      <div class="ai-in" id="ai-in">
+        <textarea id="ai-text" rows="1" placeholder="Напишите вопрос…" aria-label="Вопрос ИИ"></textarea>
+        <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg>
+        </button>
+      </div>
+      <p class="ai-note">ИИ видит условие и ваши попытки. Данные профиля ему не передаются.</p>
+    </div>
+  </section>
+</aside>
+</div>
+</main>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   ПОВЕДЕНИЕ. В проекте множество верных меток даёт
+   problems.answer_check.catalog_test_correct_labels(problem); правило
+   «всё или ничего» — check_option_answer. Попытки не ограничены; неверная
+   попытка не раскрывает, какие варианты лишние (решение владельца 04.09).
+   ═══════════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const CORRECT = new Set(['а', 'б']);
+const MULTI = true;                    /* «один верный» / «верно-неверно» — та же плитка, но выбор одиночный */
+let sel = new Set(), attempt = 1, mode = 'play';
+const opts = [...document.querySelectorAll('.opt')];
+
+function render() {
+  opts.forEach(o => {
+    const l = o.dataset.l, on = sel.has(l);
+    o.setAttribute('aria-pressed', String(on));
+    o.classList.remove('is-hit', 'is-wrong', 'is-missed', 'is-skip');
+    o.disabled = mode === 'solved' || mode === 'revealed';
+    const note = o.querySelector('.opt-note');
+    note.textContent = '';
+    if (mode === 'solved' || mode === 'revealed') {
+      const right = CORRECT.has(l);
+      if (on && right) { o.classList.add('is-hit'); note.textContent = 'вы выбрали · верно'; }
+      else if (on && !right) { o.classList.add('is-wrong'); note.textContent = 'вы выбрали · неверно'; }
+      else if (!on && right) { o.classList.add('is-missed'); note.textContent = 'надо было выбрать'; }
+      else { o.classList.add('is-skip'); }
+    }
+  });
+  $('msg-wrong').classList.toggle('is-on', mode === 'wrong');
+  $('msg-ok').classList.toggle('is-on', mode === 'solved');
+  $('msg-show').classList.toggle('is-on', mode === 'revealed');
+  $('row-play').hidden = mode === 'solved' || mode === 'revealed';
+  $('row-done').hidden = !(mode === 'solved' || mode === 'revealed');
+  $('expl').classList.toggle('is-on', mode === 'solved' || mode === 'revealed');
+  $('check-btn').disabled = sel.size === 0;
+  $('check-why').hidden = sel.size !== 0;
+  $('tq-try').textContent = mode === 'solved' ? `Решено с ${attempt}-й попытки` : mode === 'revealed' ? `Ответ показан после ${attempt - 1} ${plural(attempt - 1, ['попытки','попыток','попыток'])}` : `Попытка ${attempt}`;
+  /* после второй неудачи — подсказка о числе верных: не говорит, какие именно */
+  const cnt = $('msg-cnt'); cnt.hidden = !(mode === 'wrong' && attempt >= 3);
+  if (!cnt.hidden) cnt.textContent = `верных вариантов: ${CORRECT.size}`;
+  document.querySelectorAll('[data-st]').forEach(b => b.classList.toggle('is-on', b.dataset.st === mode));
+}
+function plural(n, f) { const a = n % 10, b = n % 100; return f[(a === 1 && b !== 11) ? 0 : (a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 1 : 2]; }
+function toggle(l) {
+  if (mode === 'solved' || mode === 'revealed') return;
+  if (!MULTI) sel = sel.has(l) ? new Set() : new Set([l]);
+  else sel.has(l) ? sel.delete(l) : sel.add(l);
+  if (mode === 'wrong') mode = 'play';
+  render();
+}
+function check() {
+  if (!sel.size || mode === 'solved' || mode === 'revealed') return;
+  const ok = sel.size === CORRECT.size && [...sel].every(l => CORRECT.has(l));
+  if (ok) { mode = 'solved'; $('ok-sub').textContent = attempt === 1 ? 'С первой попытки.' : `С ${attempt}-й попытки — и это тоже считается.`; }
+  else { mode = 'wrong'; attempt++; const tq = $('tq'); tq.classList.remove('is-shake'); void tq.offsetWidth; tq.classList.add('is-shake'); }
+  render();
+}
+function reveal() { mode = 'revealed'; render(); }
+function again() { sel = new Set(); attempt = 1; mode = 'play'; render(); }
+
+opts.forEach(o => o.addEventListener('click', () => toggle(o.dataset.l)));
+$('check-btn').addEventListener('click', check);
+$('reveal-btn').addEventListener('click', reveal);
+$('again-btn').addEventListener('click', again);
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  const map = { '1': 'а', '2': 'б', '3': 'в', '4': 'г', 'а': 'а', 'б': 'б', 'в': 'в', 'г': 'г' };
+  if (map[e.key]) { toggle(map[e.key]); e.preventDefault(); }
+  if (e.key === 'Enter') { check(); e.preventDefault(); }
+});
+
+/* сохранить / ссылка */
+let saved = false;
+$('save-btn').addEventListener('click', () => { saved = !saved; $('save-btn').classList.toggle('is-on', saved); $('save-label').textContent = saved ? 'Сохранено' : 'Сохранить'; });
+$('copy-btn').addEventListener('click', () => { const b = $('copy-btn'); b.classList.add('pd-act--copied'); $('copy-label').textContent = 'Ссылка скопирована'; setTimeout(() => { b.classList.remove('pd-act--copied'); $('copy-label').textContent = 'Скопировать ссылку'; }, 1600); });
+
+/* чат — как на странице задачи */
+const aiIn = $('ai-in'), aiText = $('ai-text'), aiBody = $('ai-body');
+function syncAi() { aiIn.classList.toggle('has-text', aiText.value.trim().length > 0); aiText.style.height = 'auto'; aiText.style.height = Math.min(120, aiText.scrollHeight) + 'px'; }
+aiText.addEventListener('input', syncAi);
+aiText.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendAi(); } });
+$('ai-send').addEventListener('click', sendAi);
+document.querySelectorAll('[data-q]').forEach(b => b.addEventListener('click', () => { aiText.value = b.dataset.q; syncAi(); aiText.focus(); }));
+document.querySelectorAll('[data-ask]').forEach(b => b.addEventListener('click', () => { aiText.value = b.dataset.ask; syncAi(); sendAi(); }));
+const REPLIES = [
+  'Первая степень — каждому своя цена, равная его готовности платить. Вторая — меню тарифов, покупатели выбирают сами. Третья — разные цены разным группам, которые фирма умеет различать. Какая из них не требует заранее знать тип покупателя?',
+  '«При прочих равных» значит: меняется только то, о чём спрашивают, остальное — спрос, издержки, число фирм — как было. Это защита от ответов «а если ещё и издержки упадут».',
+  'Студенческие билеты в кино, тарифы «больше берёшь — дешевле», цены на билеты по времени суток. Заметьте: ни одно из этого не запрещено.',
+];
+let replyN = 0;
+function sendAi() {
+  const text = aiText.value.trim(); if (!text) return;
+  const sug = $('ai-sug'); if (sug) sug.remove();
+  const me = document.createElement('div'); me.className = 'ai-msg ai-msg--me'; me.textContent = text; aiBody.appendChild(me);
+  aiText.value = ''; syncAi();
+  const ai = document.createElement('div'); ai.className = 'ai-msg ai-msg--ai'; ai.innerHTML = '<span class="typing"><i></i><i></i><i></i></span>'; aiBody.appendChild(ai);
+  aiBody.scrollTop = aiBody.scrollHeight;
+  setTimeout(() => { ai.textContent = REPLIES[replyN++ % REPLIES.length]; aiBody.scrollTop = aiBody.scrollHeight; }, 1300);
+}
+
+/* панель мокапа */
+$('mk-theme').addEventListener('click', e => {
+  const dark = document.documentElement.getAttribute('data-theme') !== 'dark';
+  document.documentElement.setAttribute('data-theme', dark ? 'dark' : '');
+  e.target.textContent = dark ? 'Светлая тема' : 'Тёмная тема';
+});
+document.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => {
+  const st = b.dataset.st;
+  if (st === 'play') { again(); return; }
+  if (st === 'wrong') { sel = new Set(['а', 'в']); attempt = 2; mode = 'wrong'; render(); return; }
+  if (st === 'solved') { sel = new Set(['а', 'б']); attempt = 2; mode = 'solved'; $('ok-sub').textContent = 'Со 2-й попытки — и это тоже считается.'; render(); return; }
+  if (st === 'revealed') { sel = new Set(['а', 'в']); attempt = 3; mode = 'revealed'; render(); return; }
+}));
+render(); syncAi();
+</script>
+</body>
+</html>
