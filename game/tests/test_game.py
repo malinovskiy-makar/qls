@@ -1273,17 +1273,34 @@ class TaxonomyV2AdmissionTests(TestCase):
         reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
         self.assertEqual(reason, 'ответ пуст')
 
-    def test_answer_consistency_отсутствует_отклоняется_безопасно(self):
-        """Поле не перелито в модель — `getattr` без значения обязан
-        читаться как «неизвестно, значит НЕ допускаем», а не как
-        пропущенный гейт."""
-        p = self._problem()
-        del p.answer_consistency  # имитирует «поля не существует вовсе»
+    def test_answer_consistency_нечем_проверить_допускается(self):
+        """Правка владельца 2026-09-06: гейт СМЯГЧЁН — «решение отсутствует,
+        проверить нечем» это не признак неверного ответа (у большинства
+        коротких тестов решения в источнике попросту нет), а честное
+        «неизвестно». Отклоняем только прямое противоречие или подозрение
+        на утечку решения, см. `ANSWER_CONSISTENCY_REJECT`. Строгий вариант
+        (отклонять и «нечем проверить») пропускал только 21-22% каждого
+        v2-типа — замер в отчёте сессии 2026-09-06."""
+        p = self._problem(answer_consistency='решение_отсутствует_проверить_нечем')
         reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
-        self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
+        self.assertIsNone(reason)
+
+    def test_answer_consistency_пустая_допускается(self):
+        """Поле теперь есть в схеме (миграция `problems` 0051), но у задач
+        вне прогона обогащения оно пусто — это тоже не прямое противоречие,
+        мягкий гейт пропускает."""
+        p = self._problem(answer_consistency='')
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertIsNone(reason)
 
     def test_answer_consistency_не_согласован_отклоняется(self):
         p = self._problem(answer_consistency='ответ_не_совпадает_с_решением')
+        reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
+        self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
+
+    def test_answer_consistency_подозрение_на_утечку_отклоняется(self):
+        p = self._problem(
+            answer_consistency='подозрение_на_утечку_решения_в_условии')
         reason = taxonomy_v2_admission_reason(p, 'единственный_выбор')
         self.assertEqual(reason, 'ответ не согласован с решением (answer_consistency)')
 
@@ -1335,14 +1352,18 @@ class TaxonomyV2PoolIntegrationTests(TestCase):
         gq = GameQuestion.objects.get(problem=p)
         self.assertEqual(gq.question_type, 'single')
 
-    def test_без_answer_consistency_не_попадает_в_пул(self):
-        """Поле не перелито в модель НИ У КОГО в реальной базе — сохранение
-        через .save() не пишет динамический атрибут, ORM просто не знает
-        о нём, так что реальная запись всегда идёт по ветке «не допущена»
-        сегодня. Это и есть ожидаемое поведение до переливки полей."""
+    def test_answer_consistency_пустая_попадает_в_пул(self):
+        """Поле перелито в модель 2026-09-06 (миграция `problems` 0051), но
+        у задач вне прогона обогащения остаётся пустым (`''` по умолчанию) —
+        мягкий гейт (правка владельца 2026-09-06) это ДОПУСКАЕТ, пустая
+        строка не входит в `ANSWER_CONSISTENCY_REJECT`. Раньше (строгий
+        гейт, до 0051) такая задача была бы отклонена — поведение сознательно
+        изменено, см. `test_answer_consistency_пустая_допускается` в
+        `TaxonomyV2AdmissionTests`."""
         p = make_test_problem(problem_type='единственный_выбор', answer='A')
         self._run()
-        self.assertFalse(GameQuestion.objects.filter(problem=p).exists())
+        gq = GameQuestion.objects.get(problem=p)
+        self.assertEqual(gq.question_type, 'single')
 
     def test_старый_словарь_не_ломается_новым_гейтом(self):
         """Регрессия: «тест: …» никогда не имел answer_consistency и не

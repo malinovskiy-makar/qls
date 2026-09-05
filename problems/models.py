@@ -267,6 +267,26 @@ class Problem(models.Model):
         'Сложность (метка источника)', max_length=20, blank=True,
         help_text='Например: *, **, ***')
 
+    class AnswerConsistency(models.TextChoices):
+        """Согласован ли `answer` с `solution` — из обогащения v2, вызов 2
+        (`problems/enrich/prompts_v2.py::ANSWER_CONSISTENCY`). Заполняется
+        ТОЛЬКО моделью, не оценка качества задачи человеком. Питает гейт
+        допуска в Econ Rush (`game/management/commands/build_game_pool.py`).
+        """
+        AGREES = 'согласован', 'Ответ согласован с решением'
+        MISMATCH = 'ответ_не_совпадает_с_решением', 'Ответ не совпадает с решением'
+        NO_SOLUTION = 'решение_отсутствует_проверить_нечем', 'Решения нет — проверить нечем'
+        ANSWER_EMPTY = 'ответ_пуст_решение_есть', 'Ответ пуст, решение есть'
+        LEAK_SUSPECTED = ('подозрение_на_утечку_решения_в_условии',
+                          'Подозрение на утечку решения в условие')
+
+    answer_consistency = models.CharField(
+        'Согласованность ответа (обогащение)',
+        max_length=64, choices=AnswerConsistency.choices, blank=True,
+        help_text='Из обогащения v2, вызов 2. Пусто — задача вне прогона '
+                  'обогащения.',
+    )
+
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
 
