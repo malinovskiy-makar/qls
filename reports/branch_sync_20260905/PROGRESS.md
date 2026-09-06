@@ -544,4 +544,38 @@ merge-коммита. Тег `sync-20260905` создан на вершине.
   не трогает, риск только при загрузке картинок.
 
 ⛔ **Стоп-гейт 2.** Карта и план отката показаны. Вопрос владельцу: план
-отката прочитан, дамп будем снимать — да?
+отката прочитан, дамп будем снимать — да? Ответ: **да, снимаем дамп.**
+
+### Фаза B2, шаг 1. Свежий дамп и факты «до» (владелец, сервер)
+
+**Ожидания записаны ДО выдачи команды владельцу:**
+
+| Что | Ожидание |
+|---|---|
+| HEAD на сервере (до pull) | `6b840611` (старый прод, не обновлялся с 21.08–03.09) |
+| `git status --short` в `/srv/weconomics/app` | пусто |
+| Файл дампа | новый, с сегодняшним временем (06.09.2026), в `/srv/weconomics/backups/` |
+| `docker compose ps` | четыре службы `Up ... (healthy)`: `postgres`, `redis`, `web`, `nginx` (`ws`/`search` — если подняты, тоже healthy) |
+| Миграций `[ ]` (неприменённых) | пусто — прод стоял ровно на своей версии |
+| `problems_problem` (N_p) | ориентир ~505 (smoke-набор по SERVER.md) |
+| пользователей (N_u) | ориентир 3 (`weco_admin`, `demo_teacher`, `demo_student` по SERVER.md) |
+| `olympiads.Olympiad` | ориентир 0 (раздел ещё не заводился на проде) |
+
+Расхождение с любым пунктом — стоп, не подгонять объяснение под факт.
+
+**Команды владельцу** (SSH-ключ и пользователь — из `docs/SERVER.md`):
+
+```bash
+ssh -i $env:USERPROFILE\.ssh\id_ed25519_weconomics makar@135.106.181.151
+cd /srv/weconomics/app && git rev-parse --short=8 HEAD && git status --short
+sudo /srv/weconomics/app/deploy/backup.sh
+sudo sh -c 'ls -lt /srv/weconomics/backups/*.dump.gz | head -2'
+cd /srv/weconomics/app/deploy && docker compose ps
+docker compose exec web python manage.py showmigrations problems olympiads | grep -c "\[X\]"
+docker compose exec web python manage.py showmigrations problems olympiads | grep "\[ \]"
+docker compose exec web python manage.py shell -c "from problems.models import Problem; from django.contrib.auth import get_user_model; print('problems', Problem.objects.count(), 'users', get_user_model().objects.count())"
+docker compose exec web python manage.py shell -c "from olympiads.models import Olympiad; print('olympiads', Olympiad.objects.count())"
+```
+
+Пришлите весь вывод целиком — сверю с ожиданием построчно, без дампа с
+сегодняшней датой на B2 шаг 2 не пойдём.
