@@ -1,0 +1,152 @@
+{% comment %}
+Окно подтверждения в стиле проекта — на замену `window.confirm()`.
+
+⚠️ ПОЧЕМУ НЕ `confirm()`. Родное окно браузера не берёт ни тему сайта, ни
+шрифт, ни слова кнопок: на тёмной теме оно белое, а кнопки называются «ОК» и
+«Отмена» независимо от того, что произойдёт. Канон 2.8 требует, чтобы
+необратимое действие называлось своим именем ПРЯМО на кнопке — «Отчислить»,
+«Выдать новый код», а не «ОК».
+
+Как пользоваться. На форме, отправку которой надо подтвердить:
+
+    <form method="post" action="…"
+          data-confirm="Что именно случится и что при этом уцелеет."
+          data-confirm-ok="Отчислить">
+
+`data-confirm-ok` — надпись на подтверждающей кнопке; без неё будет
+«Продолжить». Заголовок берётся из `data-confirm-title`, по умолчанию
+«Подтвердите действие».
+
+⚠️ БЕЗ СКРИПТА ФОРМА ОТПРАВЛЯЕТСЯ КАК ОБЫЧНАЯ. Подтверждение — прослойка
+поверх рабочей формы, а не условие её работы: отключённый JavaScript не
+должен превращать кнопку в мёртвую.
+{% endcomment %}
+<style>
+.cfm-back {
+  position: fixed; inset: 0; z-index: 400;
+  background: rgba(8, 11, 18, .55);
+  display: flex; align-items: center; justify-content: center;
+  padding: 20px;
+}
+.cfm-box {
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: var(--r-panel, 12px);
+  box-shadow: var(--shadow-pop);
+  padding: 22px 24px;
+  width: 420px; max-width: 100%;
+}
+.cfm-title { font-size: 17px; font-weight: 600; color: var(--text); }
+.cfm-text {
+  font-size: 14px; color: var(--text2); line-height: 1.5; margin-top: 8px;
+}
+.cfm-row {
+  display: flex; justify-content: flex-end; gap: 8px;
+  margin-top: 20px; flex-wrap: wrap;
+}
+.cfm-btn {
+  font: inherit; font-size: 14px; font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--r);
+  border: .5px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  cursor: pointer;
+}
+.cfm-btn:hover { background: var(--chip-bg); }
+/* ⚠️ ПОДТВЕРЖДАЮЩАЯ КНОПКА НЕ КРАСНАЯ. Красный на платформе закреплён за
+   ВЕРДИКТОМ задачи («неверно»), а не за «это важное действие». */
+.cfm-btn--go {
+  background: var(--btn-bg); color: var(--on-btn); border-color: transparent;
+}
+.cfm-btn--go:hover { background: var(--btn-bg-hover); }
+</style>
+<script>
+(function () {
+  var open = null;
+
+  function close() {
+    if (!open) return;
+    var back = open.back, focus = open.focus;
+    open = null;
+    back.remove();
+    if (focus && focus.focus) focus.focus();
+  }
+
+  function ask(form) {
+    var back = document.createElement('div');
+    back.className = 'cfm-back';
+    back.setAttribute('role', 'dialog');
+    back.setAttribute('aria-modal', 'true');
+
+    var box = document.createElement('div');
+    box.className = 'cfm-box';
+
+    var title = document.createElement('div');
+    title.className = 'cfm-title';
+    title.textContent = form.dataset.confirmTitle || 'Подтвердите действие';
+
+    var text = document.createElement('div');
+    text.className = 'cfm-text';
+    text.textContent = form.dataset.confirm || '';
+
+    var row = document.createElement('div');
+    row.className = 'cfm-row';
+
+    var cancel = document.createElement('button');
+    cancel.type = 'button';
+    cancel.className = 'cfm-btn';
+    cancel.textContent = 'Отмена';
+
+    var go = document.createElement('button');
+    go.type = 'button';
+    go.className = 'cfm-btn cfm-btn--go';
+    go.textContent = form.dataset.confirmOk || 'Продолжить';
+
+    row.appendChild(cancel);
+    row.appendChild(go);
+    box.appendChild(title);
+    box.appendChild(text);
+    box.appendChild(row);
+    back.appendChild(box);
+    document.body.appendChild(back);
+
+    open = { back: back, focus: document.activeElement, form: form };
+    go.focus();
+
+    cancel.addEventListener('click', close);
+    go.addEventListener('click', function () {
+      var f = open.form;
+      close();
+      f.dataset.confirmed = '1';
+      /* requestSubmit сохраняет имя нажатой кнопки и валидацию формы. */
+      if (f.requestSubmit) { f.requestSubmit(); } else { f.submit(); }
+    });
+    back.addEventListener('click', function (event) {
+      if (event.target === back) close();
+    });
+  }
+
+  document.addEventListener('keydown', function (event) {
+    if (event.key === 'Escape') close();
+    /* Ловушка фокуса: Tab внутри окна не выпускает наружу. */
+    if (event.key === 'Tab' && open) {
+      var focusable = open.back.querySelectorAll('button');
+      var first = focusable[0], last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault(); first.focus();
+      }
+    }
+  });
+
+  document.addEventListener('submit', function (event) {
+    var form = event.target;
+    if (!form.dataset || !form.dataset.confirm) return;
+    if (form.dataset.confirmed === '1') { form.dataset.confirmed = ''; return; }
+    event.preventDefault();
+    ask(form);
+  }, true);
+})();
+</script>

@@ -280,24 +280,46 @@ def group_create(request):
         kind = 'group'
     individual = kind == StudentGroup.Kind.INDIVIDUAL
 
-    # Кого можно взять на индивидуальное занятие: ученики этого репетитора
-    # плюс те, кто пока ни в одном его занятии не состоит.
-    students = User.objects.filter(role='student').order_by(
-        'last_name', 'first_name', 'username')
+    # ⚠️ СПИСКА ВСЕХ УЧЕНИКОВ БАЗЫ БОЛЬШЕ НЕТ (04.09.2026, ADR 0074). Он
+    # показывал репетитору ЧУЖИХ учеников поимённо — то есть был утечкой, а
+    # не удобством, и вдобавок не масштабировался: к бете в базе тысячи имён.
+    #
+    # Но само поле «ученик» у ИНДИВИДУАЛЬНОГО занятия осталось: без него
+    # нельзя завести занятие с человеком, который уже учится у этого
+    # репетитора, а название по умолчанию неоткуда взять. В списке теперь
+    # только СВОИ ученики — те, кто уже состоит в занятиях этого репетитора.
+    # Новый человек приходит по коду приглашения, а не выбирается из базы.
+    students = ()
+    if individual:
+        students = (User.objects
+                    .filter(role='student', enrolled_groups__teacher=request.user)
+                    .distinct()
+                    .order_by('last_name', 'first_name', 'username'))
 
     if request.method == 'POST':
         name = (request.POST.get('name') or '').strip()
         student = None
+        problem = ''
+
         if individual:
-            student = students.filter(pk=request.POST.get('student')).first()
+            # ⚠️ Ученик обязателен: индивидуальное занятие без человека — это
+            # группа из нуля людей, и отличить их потом будет нечем.
+            raw = (request.POST.get('student') or '').strip()
+            student = (User.objects.filter(pk=raw, role='student').first()
+                       if raw.isdigit() else None)
             if student is None:
-                messages.error(request, 'Выберите ученика.')
-                return render(request, 'teacher/groups/create.html',
-                              {'kind': kind, 'individual': individual,
-                               'students': students})
-            name = name or (student.get_full_name() or student.username)
-        if not name:
-            messages.error(request, 'Название группы не может быть пустым.')
+                problem = 'Выберите ученика.'
+            elif not name:
+                # Название по умолчанию — имя ученика: придумывать имя
+                # занятию с одним человеком незачем.
+                name = student.get_full_name().strip() or student.username
+
+        if not problem and not name:
+            problem = ('Назовите занятие — например, именем ученика.'
+                       if individual else 'Название группы не может быть пустым.')
+
+        if problem:
+            messages.error(request, problem)
         else:
             group = StudentGroup.objects.create(
                 name=name, teacher=request.user, kind=kind,
@@ -306,13 +328,12 @@ def group_create(request):
                 group.students.add(student)
             messages.success(
                 request,
-                'Ученик «%s» добавлен.' % group.name if individual
-                else 'Группа «%s» создана.' % group.name)
+                'Занятие создано. Продиктуйте ученику код %s — он введёт его '
+                'у себя на экране «Занятия».' % group.invite_code)
             return redirect('teacher:group_detail', pk=group.pk)
 
     return render(request, 'teacher/groups/create.html',
-                  {'kind': kind, 'individual': individual,
-                   'students': students})
+                  {'kind': kind, 'individual': individual, 'students': students})
 
 
 # ---------------------------------------------------------------------------
@@ -1478,3 +1499,62 @@ def api_grade_submission(request):
         'wrong': summary['wrong'],
         'tasks': len(summary['rows']),
     })
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Код приглашения и состав занятия (04.09.2026, ADR 0074)
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ ВЕЗДЕ `own_group_or_404`, А НЕ `get_object_or_404` ПО НОМЕРУ. Чужое
+# занятие для репетитора не «запрещено», его для него не существует — и
+# номер чужого занятия не должен подтверждаться сообщением об ошибке.
+
+@tutor_required
+@require_POST
+def group_invite_regenerate(request, pk):
+    """Новый код приглашения. Старый перестаёт работать сразу же."""
+    group = own_group_or_404(request.user, pk)
+    group.regenerate_invite_code()
+    messages.success(
+        request,
+        'Новый код: %s. Старый больше не работает — раздайте новый.'
+        % group.invite_code)
+    return redirect('teacher:group_detail', pk=group.pk)
+
+
+@tutor_required
+@require_POST
+def group_student_remove(request, pk, sid):
+    """Отчислить ученика из занятия.
+
+    ⚠️ ИЗ `Assignment.students` НЕ УБИРАЕМ, И ЭТО НЕ ЗАБЫВЧИВОСТЬ. Уже
+    выданные работы остаются за учеником: его ответы, оценки и разбор —
+    это его история, а не собственность занятия. Отчисление означает
+    «новых работ не получает», а не «сделанного не было».
+    """
+    from problems.models import User
+
+    group = own_group_or_404(request.user, pk)
+    student = get_object_or_404(User, pk=sid)
+    group.students.remove(student)
+    messages.success(
+        request,
+        'Ученик отчислен. Выданные работы и их проверка остались на месте.')
+    return redirect('teacher:group_detail', pk=group.pk)
+
+
+@tutor_required
+def group_edit(request, pk):
+    """Правка названия и описания занятия."""
+    group = own_group_or_404(request.user, pk)
+    if request.method == 'POST':
+        name = (request.POST.get('name') or '').strip()
+        if not name:
+            messages.error(request, 'Название не может быть пустым.')
+        else:
+            group.name = name[:200]
+            group.description = (request.POST.get('description') or '').strip()
+            group.save(update_fields=['name', 'description'])
+            messages.success(request, 'Сохранено.')
+            return redirect('teacher:group_detail', pk=group.pk)
+    return render(request, 'teacher/groups/edit.html', {'group': group})

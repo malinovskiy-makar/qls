@@ -23,10 +23,12 @@
    подключён единственно на экранах олимпиад. */
 .page-wrap { max-width: var(--w-page); }
 .ol-head { margin-bottom: 28px; }
-.ol-title { font-size: 30px; font-weight: 700; line-height: var(--lh-tight); }
+/* Та же пара, что у каталога и статистики: 30px/600 и 16px `--text2`. */
+.ol-title { font-size: 30px; font-weight: 600; line-height: var(--lh-tight);
+            letter-spacing: -.01em; }
 .ol-sub {
-  font-size: 15px; color: var(--text2); margin-top: 8px;
-  max-width: var(--w-read);
+  font-size: 16px; color: var(--text2); margin-top: 8px;
+  line-height: 1.5; max-width: var(--w-read);
 }
 .ol-section { margin-top: 36px; }
 .ol-section-title { font-size: 19px; font-weight: 700; margin-bottom: 12px; }

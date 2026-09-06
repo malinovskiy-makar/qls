@@ -209,13 +209,15 @@ class GraphIntegrityTests(SimpleTestCase):
     def test_seven_groups_and_none_of_them_carries_a_colour(self):
         """У раздела есть имя и состав; цвет — есть, но не здесь.
 
-        ⚠️ СЕМЬ ЦВЕТОВ ВЕРНУЛИСЬ (ADR 0053), А ПОЛЯ `cl`/`cd` — НЕТ, и это
+        ⚠️ ЦВЕТА РАЗДЕЛОВ ВЕРНУЛИСЬ (ADR 0053), А ПОЛЯ `cl`/`cd` — НЕТ, и это
         не мелочь. Цвет раздела — оформление, его место в CSS
         (`--map-g-*` в topic_map.css), где его меняет дизайн и сторожит
         замер контраста. Данные карты остаются данными: положи цвет в JSON
         — и он разъедется с темой сайта, потому что тем две, а поле одно.
         """
-        self.assertEqual(len(self.data['groups']), 7)
+        # Разделов ПЯТЬ с 04.09.2026 — те же блоки, что в фильтрах
+        # каталога и на радаре статистики (ADR 0071).
+        self.assertEqual(len(self.data['groups']), 5)
         for g in self.data['groups']:
             self.assertTrue(g['l'])
             self.assertTrue(g['themes'])
@@ -444,9 +446,9 @@ class SectionColourTests(SimpleTestCase):
         one, two = cls._lab(first), cls._lab(second)
         return round(sum((one[i] - two[i]) ** 2 for i in range(3)) ** 0.5, 1)
 
-    def test_all_seven_sections_have_a_colour_in_both_themes(self):
+    def test_all_five_sections_have_a_colour_in_both_themes(self):
         for theme in ('светлая', 'тёмная'):
-            self.assertEqual(len(self._colours(theme)), 7)
+            self.assertEqual(len(self._colours(theme)), 5)
 
     def test_every_section_colour_is_visible_on_the_canvas(self):
         """Порог 4,5:1 к фону холста — цвет отвечает на вопрос «где я»."""
@@ -752,31 +754,35 @@ class PanelTreeTests(SimpleTestCase):
         return self.html
 
     def test_tree_carries_all_three_levels(self):
-        """Семь разделов, 29 тем, 343 тега — весь справочник, а не выборка.
+        """Пять разделов, 29 тем, 343 тега — весь справочник, а не выборка.
 
         Дерево печатается на сервере целиком: 372 строки это около 30 КБ
         разметки, а собирать их на клиенте значило бы держать вторую копию
         справочника ради того же результата.
         """
         html = self._page()
-        self.assertEqual(html.count('class="tmap-sec-row"'), 7)
+        self.assertEqual(html.count('class="tmap-sec-row"'), 5)
         self.assertEqual(html.count('class="tmap-theme-row"'), 29)
         self.assertEqual(html.count('class="tmap-tag-row"'), 343)
 
     def test_tree_starts_collapsed(self):
-        """Свёрнуто по умолчанию: семь строк вместо двадцати девяти.
+        """Свёрнуто по умолчанию: пять строк вместо двадцати девяти.
 
         Именно из-за этого в покое не нужна и полоса прокрутки.
+
+        ⚠️ СЧИТАЕМ ВНУТРИ ДЕРЕВА, А НЕ ПО ВСЕЙ СТРАНИЦЕ. С 04.09.2026
+        `aria-expanded` есть и у кнопки ☰ в шапке — она тоже «свёрнута», но к
+        дереву разделов отношения не имеет.
         """
-        html = self._page()
-        self.assertEqual(html.count('aria-expanded="false"'), 7 + 29)
-        self.assertNotIn('aria-expanded="true"', html)
+        tree = self._page().split('class="tmap-tree"', 1)[-1]
+        self.assertEqual(tree.count('aria-expanded="false"'), 5 + 29)
+        self.assertNotIn('aria-expanded="true"', tree)
 
     def test_section_headers_are_painted_with_their_colour(self):
         """Заголовок раздела — легенда, а не украшение.
 
         ⚠️ КЛЮЧ РАЗДЕЛА ВСТРЕЧАЕТСЯ СО СВОЕЙ КРАСКОЙ РОВНО В ОДНОМ МЕСТЕ —
-        в этих семи правилах. Разметка про цвета не знает и печатает только
+        в этих пяти правилах. Разметка про цвета не знает и печатает только
         `data-sec`; разъедется — покраснеет здесь.
         """
         for key, _label, _nums in GROUPS:

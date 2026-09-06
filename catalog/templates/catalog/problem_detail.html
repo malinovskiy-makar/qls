@@ -4,6 +4,11 @@
 {% block title %}{% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}{% endblock %}
 
 {% block extra_style %}
+/* ⚠️ ПОЛОСА УЖЕ ОБЫЧНОЙ: 860 вместо 960 (канон 1.9). Основное содержание
+   здесь — длинный текст с формулами, и на 960 строка становится слишком
+   длинной для чтения. Сужаем страницу, а не переопределяем базовый шаблон:
+   узкая полоса — свойство ЭТОГО экрана, а не кабинета целиком. */
+.page-wrap { max-width: var(--w-read); }
 /* ── Страница задачи ──────────────────────────────── */
 .problem-meta {
   display: flex;
@@ -342,9 +347,13 @@
   <div class="similar-list">
     {% for s in similar %}
     <a class="similar-card" href="{% url 'catalog:problem_detail' s.problem.pk %}">
-      <div class="similar-card-title">
-        {% if s.problem.title %}{{ s.problem.title }}{% else %}Задача #{{ s.problem.pk }}{% endif %}
-      </div>
+      {% comment %}Заголовок готовит вью (`similar_title`): пустой заменяется
+      началом условия, обрывок формулы обрезается по незакрытому доллару.
+      Формулы внутри остаются: их отрисует KaTeX вместе со всей страницей.
+
+      ⚠️ Здесь тег комментария, а не многострочная решётка: вторая
+      печатается на экран как текст. Ловит `test_no_multiline_hash_comments`.{% endcomment %}
+      <div class="similar-card-title">{{ s.title_display }}</div>
       <div class="similar-card-meta">
         {% if s.problem.difficulty %}
         <span class="similar-stars">

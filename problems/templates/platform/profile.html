@@ -38,6 +38,112 @@
 .folder-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
                margin-bottom: 6px; }
 .folder-name { font-size: 14px; font-weight: 600; }
+
+/* ── Профиль: шапка, аватар, уровни ─────────────────────────────────── */
+.pf-card { max-width: 660px; }
+.pf-h2 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+.pf-hint { font-size: 12px; color: var(--text3); margin-top: 5px; }
+.pf-hint--block { margin: 0 0 16px; font-size: 13px; line-height: 1.5; }
+.pf-err { font-size: 13px; color: var(--error); margin-top: 5px; }
+
+/* Полоса фактов: три-четыре числа, посчитанные не здесь. */
+.pf-facts {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin-bottom: 16px;
+}
+.pf-fact {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 14px;
+  background: var(--surface); border: .5px solid var(--border);
+  border-radius: var(--r);
+  min-width: 108px;
+}
+.pf-fact b { font-size: 17px; font-weight: 600; color: var(--text); }
+.pf-fact span { font-size: 12px; color: var(--text2); }
+
+/* Аватар. Круг 96px — крупнее, чем в шапке: здесь его меняют. */
+.pf-ava-row {
+  display: flex; align-items: center; gap: 20px;
+  padding-bottom: 20px; margin-bottom: 20px;
+  border-bottom: .5px solid var(--border-soft);
+  flex-wrap: wrap;
+}
+.pf-ava {
+  width: 96px; height: 96px; flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+  font-size: 30px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.pf-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf-ava-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pf-ava-form { display: inline-flex; }
+/* Настоящий <input type=file> спрятан за подписью: браузерная кнопка
+   выглядит чужой на любом экране и не берёт цвета темы. */
+.pf-ava-pick { position: relative; overflow: hidden; cursor: pointer; }
+.pf-ava-pick input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.pf-ava-hint { flex-basis: 100%; font-size: 12px; color: var(--text3); }
+
+.btn-quiet {
+  font: inherit; font-size: 13px;
+  padding: 6px 12px;
+  color: var(--text);
+  background: var(--surface-2);
+  border: .5px solid var(--border);
+  border-radius: var(--r);
+  cursor: pointer;
+  display: inline-flex; align-items: center;
+}
+.btn-quiet:hover { background: var(--chip-bg); }
+
+/* Уровень подготовки — плитки с описанием (канон 3.10). */
+.pf-levels { display: grid; gap: 8px; }
+.pf-level {
+  display: block;
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 11px 14px;
+  cursor: pointer;
+  background: var(--surface-2);
+  transition: border-color .12s, background .12s;
+  font-weight: 400;
+  margin-bottom: 0;
+}
+/* ⚠️ ПЕРЕКЛЮЧАТЕЛЬ ПРЯЧЕТСЯ РАЗМЕРОМ, А НЕ ТОЛЬКО ПРОЗРАЧНОСТЬЮ.
+   `position: absolute` без `top/left` внутри НЕпозиционированного родителя
+   отсчитывается от далёкого предка, и переключатель занимал всю ширину
+   страницы: обход Фазы 8 показал документ 1740 px при окне 1440. Родителю
+   нужен `position: relative`, а самому полю — нулевой размер.
+   `display: none` не годится: с ним поле выпадает из порядка обхода
+   клавиатурой, а выбирать уровень с клавиатуры надо. */
+.pf-level { position: relative; }
+.pf-level input {
+  position: absolute; top: 0; left: 0;
+  width: 1px; height: 1px; opacity: 0; margin: 0;
+}
+.pf-level b { display: block; font-size: 14px; font-weight: 600; }
+.pf-level span { display: block; font-size: 13px; color: var(--text2);
+                 margin-top: 2px; line-height: 1.4; }
+.pf-level:hover { border-color: var(--accent-ring); }
+.pf-level:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+
+/* Плашки состояния над карточкой. */
+.note {
+  padding: 10px 14px; border-radius: var(--r);
+  font-size: 14px; margin-bottom: 16px;
+  border: .5px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+}
+.note--welcome { border-color: var(--accent-ring); background: var(--accent-tint);
+                 color: var(--text); }
+.note--ok { border-color: var(--accent-ring); color: var(--text); }
+
 @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } }
 {% endblock %}
 
@@ -49,69 +155,175 @@
   </div>
 </div>
 
-<nav class="tabs">
-  <a href="?tab=data"  class="{% if tab == 'data' %}active{% endif %}">Данные</a>
-  <a href="?tab=saved" class="{% if tab == 'saved' %}active{% endif %}">Сохранённое</a>
-  <a href="?tab=stats" class="{% if tab == 'stats' %}active{% endif %}">Статистика</a>
-</nav>
+{% include 'platform/_profile_tabs.html' with active=tab %}
+
+{% if welcome %}
+{% comment %}
+Мягкая плашка после регистрации. Не модальное окно и не обязательный шаг:
+человек только что вошёл, и заставлять его заполнять анкету — верный способ
+получить выдуманные данные.
+{% endcomment %}
+<div class="note note--welcome">
+  Заполните имя, класс и уровень: так статистика будет точнее.
+</div>
+{% endif %}
+{% if saved_ok %}<div class="note note--ok">Сохранено.</div>{% endif %}
+{% if password_changed %}<div class="note note--ok">Пароль изменён.</div>{% endif %}
 
 {% if tab == 'data' %}
-<div class="card" style="max-width: 620px;">
+{% comment %}
+Полоса фактов: три-четыре числа, посчитанные ОДИН раз в `problems.stats`.
+Своего счётчика решённых задач у профиля нет — второе число неизбежно
+разошлось бы с первым.
+{% endcomment %}
+<div class="pf-facts">
+  {% for label, value in facts %}
+  <div class="pf-fact"><b>{{ value }}</b><span>{{ label }}</span></div>
+  {% endfor %}
+</div>
+
+<div class="card pf-card">
+  <div class="pf-ava-row">
+    <div class="pf-ava">
+      {% if profile.avatar %}
+      <img src="{% url 'avatar' profile.user_id %}?v={{ profile.updated_at|date:'U' }}" alt="">
+      {% else %}{{ nav_user_initials }}{% endif %}
+    </div>
+    <div class="pf-ava-actions">
+      <form method="post" enctype="multipart/form-data" class="pf-ava-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="avatar">
+        <label class="btn-quiet pf-ava-pick">
+          {% comment %}Список расширений, а не `image/*`. Причина не в
+          придирчивости: звёздочка после косой черты читается как открытие
+          комментария в стилях, и сторож `test_no_comment_left_open` считал
+          весь блок стилей незакрытым. Плюс так же поступают остальные формы
+          загрузки в проекте. Настоящую проверку делает сервер: `accept` —
+          только подсказка окну выбора файла.{% endcomment %}
+          Загрузить<input type="file" name="avatar"
+                          accept=".jpg,.jpeg,.png,.webp,.gif,.bmp"
+                          onchange="this.form.submit()">
+        </label>
+      </form>
+      {% if profile.avatar %}
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="avatar_remove">
+        <button type="submit" class="btn-quiet">Убрать</button>
+      </form>
+      {% endif %}
+      <div class="pf-ava-hint">JPEG или PNG, до 3 МБ. Обрежем по центру.</div>
+      {% if avatar_error %}<div class="pf-err">{{ avatar_error }}</div>{% endif %}
+    </div>
+  </div>
+
   <form method="post">
     {% csrf_token %}
+    <input type="hidden" name="action" value="data">
     <div class="form-grid">
       <div class="form-field">
-        <label for="id_first_name">Имя</label>
-        <input type="text" id="id_first_name" name="first_name"
-               value="{{ profile.user.first_name }}" maxlength="150">
+        <label for="{{ form.first_name.id_for_label }}">Имя</label>
+        {{ form.first_name }}
+        {% for e in form.first_name.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
       </div>
       <div class="form-field">
-        <label for="id_last_name">Фамилия</label>
-        <input type="text" id="id_last_name" name="last_name"
-               value="{{ profile.user.last_name }}" maxlength="150">
+        <label for="{{ form.last_name.id_for_label }}">Фамилия</label>
+        {{ form.last_name }}
+        {% for e in form.last_name.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
       </div>
       <div class="form-field">
-        <label for="id_phone">Телефон</label>
-        <input type="tel" id="id_phone" name="phone"
-               value="{{ profile.phone }}" maxlength="32"
-               placeholder="необязательно">
+        <label for="{{ form.username.id_for_label }}">Логин</label>
+        {{ form.username }}
+        <div class="pf-hint">Им вы входите, и он же виден там, где нет имени.</div>
+        {% for e in form.username.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
       </div>
       <div class="form-field">
-        <label for="id_grade">Класс</label>
-        <select id="id_grade" name="grade">
-          <option value="">не указан</option>
-          {% for g in grades %}
-          <option value="{{ g }}" {% if profile.grade == g %}selected{% endif %}>{{ g }}</option>
-          {% endfor %}
-        </select>
-      </div>
-    </div>
-    <div class="form-field">
-      <label for="id_school">Школа</label>
-      <input type="text" id="id_school" name="school"
-             value="{{ profile.school }}" maxlength="200">
-    </div>
-
-    <div class="form-grid">
-      <div class="form-field">
-        <label>Почта</label>
-        <div class="readonly">{{ profile.user.email|default:"не указана" }}</div>
-      </div>
-      <div class="form-field">
-        <label>Роль</label>
-        <div class="readonly">{{ profile.get_role_display }}</div>
+        <label for="{{ form.email.id_for_label }}">Почта</label>
+        {{ form.email }}
+        <div class="pf-hint">Необязательно, не подтверждается, нужно только для связи.</div>
+        {% for e in form.email.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
       </div>
     </div>
 
-    <div class="form-field">
-      <label>Пароль</label>
-      <div class="readonly">
-        не показывается,
-        <a href="{% url 'password_change' %}" style="color:var(--accent);">сменить пароль</a>
+    {% if profile.is_tutor %}
+    {% comment %}
+    Преподавателю класс и уровень не показываем: они про ученика. Вместо
+    них — сколько у него учеников и групп.
+    {% endcomment %}
+    <div class="form-grid">
+      <div class="form-field">
+        <label for="{{ form.phone.id_for_label }}">Телефон</label>
+        {{ form.phone }}
+        <div class="pf-hint">Необязательно.</div>
+      </div>
+      <div class="form-field">
+        <label>Ученики</label>
+        <div class="readonly">Учеников: {{ tutor_students|default:0 }}, групп: {{ tutor_groups|default:0 }}</div>
       </div>
     </div>
+    {% else %}
+    <div class="form-grid">
+      <div class="form-field">
+        <label for="{{ form.grade.id_for_label }}">Класс</label>
+        {{ form.grade }}
+      </div>
+      <div class="form-field">
+        <label for="{{ form.school.id_for_label }}">Школа</label>
+        {{ form.school }}
+      </div>
+    </div>
+
+    {% comment %}
+    Уровень подготовки — плитками с описанием (канон 3.10): название без
+    описания («Базовый») человек трактует как хочет, и данные получаются
+    несравнимыми.
+    {% endcomment %}
+    <div class="form-field">
+      <label>Уровень подготовки</label>
+      <div class="pf-levels">
+        {% for value, label, hint in levels %}
+        <label class="pf-level">
+          <input type="radio" name="level" value="{{ value }}"
+                 {% if profile.level == value %}checked{% endif %}>
+          <b>{{ label }}</b>
+          <span>{{ hint }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
 
     <button type="submit" class="btn-primary">Сохранить</button>
+  </form>
+</div>
+
+{% elif tab == 'security' %}
+<div class="card pf-card">
+  {% comment %}
+  ⚠️ СТАРЫЙ ПАРОЛЬ НЕ СПРАШИВАЕТСЯ (решение владельца 04.09.2026, ADR 0073).
+  Форма — штатная `SetPasswordForm`: своей формы пароля у нас нет и быть не
+  должно. Смена пароля по-прежнему завершает ВСЕ ОСТАЛЬНЫЕ сессии.
+  {% endcomment %}
+  <h2 class="pf-h2">Сменить пароль</h2>
+  <p class="pf-hint pf-hint--block">
+    Старый пароль не нужен: достаточно ввести новый дважды. После смены
+    все остальные входы в этот аккаунт завершатся.
+  </p>
+  <form method="post">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="password">
+    <div class="form-field">
+      <label for="{{ password_form.new_password1.id_for_label }}">Новый пароль</label>
+      {{ password_form.new_password1 }}
+      {% for e in password_form.new_password1.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
+    </div>
+    <div class="form-field">
+      <label for="{{ password_form.new_password2.id_for_label }}">Новый пароль ещё раз</label>
+      {{ password_form.new_password2 }}
+      {% for e in password_form.new_password2.errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
+    </div>
+    {% for e in password_form.non_field_errors %}<div class="pf-err">{{ e }}</div>{% endfor %}
+    <button type="submit" class="btn-primary">Сменить пароль</button>
   </form>
 </div>
 

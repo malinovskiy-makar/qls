@@ -531,16 +531,9 @@ function roleColor(role) {
   return { demand: COL.D, supply: COL.S, mc: COL.MC, tc: COL.costVC, atc: COL.reg }[role] || null;
 }
 
-// Переключение темы (кнопка в доке). Тёмная — вечерняя работа/проектор,
-// светлая — класс/печать. Выбор запоминается в localStorage.
-function setCalcTheme(theme) {
-  const t = theme === 'dark' ? 'dark' : 'light';
-  document.documentElement.setAttribute('data-theme', t);
-  try { localStorage.setItem('theme', t); } catch (e) {}
-  if (typeof redrawAll === 'function') redrawAll();   // перечитает COL и перерисует SVG
-}
-function toggleCalcTheme() {
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  setCalcTheme(dark ? 'light' : 'dark');
-}
+// ⚠️ СВОИХ ФУНКЦИЙ ТЕМЫ У КАЛЬКУЛЯТОРА НЕТ (04.09.2026, п. 20). Кнопка в
+// доке дублировала кнопку в шапке сайта, а `setCalcTheme`/`toggleCalcTheme`
+// звались только из неё. Кнопка шапки уже зовёт `redrawAll()`, поэтому
+// графики перерисовываются сами. Печать ставит тему напрямую
+// (`86-workspace.js`, root.setAttribute) и в этих функциях не нуждалась.
 

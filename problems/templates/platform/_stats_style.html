@@ -5,8 +5,14 @@
 {% endcomment %}
 .stats-head { display: flex; align-items: flex-start; justify-content: space-between;
               gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
-.stats-title { font-size: 24px; font-weight: 700; }
-.stats-sub { font-size: 14px; color: var(--text2); margin-top: 4px; }
+/* ⚠️ ТЕ ЖЕ ЗНАЧЕНИЯ, ЧТО У КАТАЛОГА И ОЛИМПИАД (04.09.2026): 30px/600 и
+   16px `--text2`. Общего класса «заголовок экрана» намеренно НЕ заводим:
+   в `_kit.html` живёт набор кабинета, в `_tokens.html` — только токены, а
+   третьего общего места под один заголовок разводить не стоит. Три пары
+   остаются в своих файлах с одинаковыми числами. */
+.stats-title { font-size: 30px; font-weight: 600; letter-spacing: -.01em; }
+.stats-sub { font-size: 16px; color: var(--text2); margin-top: 8px;
+             line-height: 1.5; max-width: 46em; }
 
 /* ── Переключатель периода ──────────────────────────── */
 .period-bar { display: inline-flex; gap: 2px; background: var(--surface-2);

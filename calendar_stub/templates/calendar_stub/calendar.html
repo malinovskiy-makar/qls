@@ -1,11 +1,10 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Календарь · Weconomics</title>
 {% include '_tokens.html' %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font-ui);
@@ -48,9 +47,27 @@
     min-width: 160px;
     text-align: center;
   }
+  /* ⚠️ ЛЕГЕНДА ПЕРЕНОСИТСЯ. Без `flex-wrap` четыре подписи стояли в один
+     ряд и распирали документ: обход Фазы 8 показал на 380 px документ
+     698 px при окне 380, то есть вбок ехала вся страница (правило 1.9.1
+     канона). Это МИНИМАЛЬНАЯ починка узкого экрана; переоформление
+     календаря целиком — отдельная сессия, карточка в Notion. */
   .legend {
-    display: flex; align-items: center; gap: 14px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
     margin-left: auto; font-size: 13px; color: var(--text2);
+  }
+  /* ⚠️ НА УЗКОМ ЭКРАНЕ ПОЛОСА ПЕРЕНОСИТСЯ. `#cal-toolbar` — флекс-ряд с
+     жёсткой высотой 48px и без переноса: три кнопки, заголовок с
+     `min-width: 160px` и легенда не помещались, и вбок ехала вся страница
+     (замер: 698 px при окне 380). Это МИНИМАЛЬНАЯ починка правила 1.9.1,
+     а не переоформление календаря — оно отдельной сессией. */
+  @media (max-width: 560px) {
+    #cal-toolbar {
+      height: auto; flex-wrap: wrap; gap: 8px;
+      padding: 10px 14px;
+    }
+    #cal-title { min-width: 0; flex: 1 1 auto; text-align: left; }
+    .legend { margin-left: 0; gap: 10px; flex-basis: 100%; }
   }
   .legend-item { display: flex; align-items: center; gap: 5px; }
   .legend-dot {
@@ -422,8 +439,8 @@
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/ru.global.min.js"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/index.global.min.js' %}"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/locales/ru.global.js' %}"></script>
 <script>
 // ---------- Данные из Django ----------
 const USER_ROLE    = '{{ user_role }}';
@@ -894,5 +911,13 @@ function formatDt(dt) {
   });
 }
 </script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

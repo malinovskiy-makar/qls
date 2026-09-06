@@ -1324,14 +1324,14 @@ def api_session_start_mistakes(request):
     """
     last = request.session.get(LAST_KEY)
     if not last or not last.get('log'):
-        return JsonResponse({'error': 'Нет завершённого забега'}, status=400)
+        return JsonResponse({'error': 'Нет завершённого раунда'}, status=400)
     mode = last.get('mode')
     if mode not in config.MODES:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
 
     counts = mistakes_by_topic(last['log'])
     if not counts:
-        return JsonResponse({'error': 'В этом забеге не было ошибок'}, status=400)
+        return JsonResponse({'error': 'В этом раунде не было ошибок'}, status=400)
 
     # Фильтр наследуется от разбираемого забега: игрок выбрал источники и
     # сложность не для того, чтобы разбор ошибок молча вернул ему весь пул.
@@ -2033,7 +2033,7 @@ def _quota_line(request):
     if not request.user.is_authenticated:
         return ''
     used = _ranked_today(request.user, config.DEFAULT_MODE)
-    return 'Зачётных забегов сегодня: %d из %d' % (
+    return 'Зачётных раундов сегодня: %d из %d' % (
         min(used, config.RANKED_RUNS_PER_DAY), config.RANKED_RUNS_PER_DAY)
 
 

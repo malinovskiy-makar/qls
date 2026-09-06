@@ -10,15 +10,15 @@
 первым при первой правке.
 {% endcomment %}
 <p class="st-legend">
-  <span>Забегов экономики v2: <b>{{ econ.total_runs }}</b></span>
+  <span>Раундов экономики v2: <b>{{ econ.total_runs }}</b></span>
   <span>Из них незачётных: <b>{{ econ.unranked }}</b></span>
   <span>Порог попыток для долей: <b>{{ econ.min_attempts }}</b></span>
 </p>
 
 {% if not econ.total_runs %}
 <p class="st-legend" style="margin-top:12px">
-  Живых забегов на новой шкале ещё нет. Мерить нечего, и подкручивать числа
-  до появления забегов нельзя: это ровно то «на глаз», от которого
+  Живых раундов на новой шкале ещё нет. Мерить нечего, и подкручивать числа
+  до появления раундов нельзя: это ровно то «на глаз», от которого
   отказались на порогах «Штриха».
 </p>
 {% endif %}
@@ -28,7 +28,7 @@
   <table class="st">
     <thead>
       <tr>
-        <th>Режим</th><th class="num">Забегов</th>
+        <th>Режим</th><th class="num">Раундов</th>
         <th class="num">Итог p50</th><th class="num">p90</th>
         <th class="num">Максимум</th>
         <th class="num">Точность p50</th>
@@ -57,22 +57,22 @@
   </table>
 </div>
 <p class="st-legend" style="margin-top:12px">
-  «Множитель &lt; 1» это доля забегов, где точность СНИЗИЛА итог: главный
+  «Множитель &lt; 1» это доля раундов, где точность СНИЗИЛА итог: главный
   тормоз угадывания, и по нему видно, срабатывает ли он вообще.
   «Прибавка множителей» показывает, насколько итог выше сырых очков.
   Последние две колонки стоят рядом нарочно: если замер и константа
   <code>THINK_S</code> разъехались, бонус за скорость раздаёт не то.
 </p>
 
-<h2 class="st-h2">Почему забеги не идут в таблицу</h2>
+<h2 class="st-h2">Почему раунды не идут в таблицу</h2>
 <div class="st-table-box">
   <table class="st">
-    <thead><tr><th>Причина</th><th class="num">Забегов</th></tr></thead>
+    <thead><tr><th>Причина</th><th class="num">Раундов</th></tr></thead>
     <tbody>
     {% for r in econ.reasons %}
       <tr><td>{{ r.text }}</td><td class="num">{{ r.n }}</td></tr>
     {% empty %}
-      <tr><td colspan="2" class="st-empty">Незачётных забегов нет.</td></tr>
+      <tr><td colspan="2" class="st-empty">Незачётных раундов нет.</td></tr>
     {% endfor %}
     </tbody>
   </table>

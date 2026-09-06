@@ -147,12 +147,12 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 
     {% if curve_points %}
     <div class="curve">
-      <svg viewBox="0 0 300 60" role="img" aria-label="Рост счёта по ходу забега">
+      <svg viewBox="0 0 300 60" role="img" aria-label="Рост счёта по ходу раунда">
         <polyline points="{{ curve_points }}" fill="none" stroke="var(--accent)"
                   stroke-width="2" stroke-linejoin="round"
                   vector-effect="non-scaling-stroke"/>
       </svg>
-      <p>счёт по ходу забега</p>
+      <p>счёт по ходу раунда</p>
     </div>
     {% endif %}
 

@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-08-19
+> **Обновлён:** 2026-09-04 (регистрация, профиль, аватар)
 > **Статус:** актуален
 
 # Карта маршрутов и границ доступа
@@ -69,7 +69,9 @@
 |---|---|---|---|---|---|
 | `/` | `home` | — | — | — | [catalog/views.py:62](../catalog/views.py) |
 | `/login/` | `login` | — | POST: логин/пароль | — | [problems/views_auth.py:8](../problems/views_auth.py) |
-| `/logout/` | `logout` | — | — | — | Django |
+| `/register/` | `register` | — (вошедшего уводит в профиль) | POST: логин, пароль ×2, роль, согласие | — | [problems/views_auth.py](../problems/views_auth.py) `RegisterView` |
+| `/logout/` | `logout` | — | **только POST** (GET → 405) | — | Django |
+| `/textbook/` | `textbook` | — | — | — | [catalog/views.py](../catalog/views.py) `textbook` |
 | `/catalog/` | `catalog:problem_list` | — | 10× GET (фильтры, поиск, страница) | — | [catalog/views.py:85](../catalog/views.py) |
 | `/catalog/random/` | `catalog:random_problem` | — | — | — | [catalog/views.py:72](../catalog/views.py) |
 | `/catalog/problem/<int:pk>/` | `catalog:problem_detail` | — | `pk` | — | [catalog/views.py:249](../catalog/views.py) |
@@ -158,6 +160,12 @@
 | `/teacher/groups/` | `teacher:groups` | `tutor_required` | — | ✅ | [teacher/views_groups.py:177](../teacher/views_groups.py) |
 | `/teacher/groups/create/` | `teacher:group_create` | `tutor_required` | 5× POST | ✅ | [teacher/views_groups.py:263](../teacher/views_groups.py) |
 | `/teacher/groups/<int:pk>/` | `teacher:group_detail` | `tutor_required` | `pk`, 3× GET | ✅ `own_group_or_404` | [teacher/views_groups.py:328](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/edit/` | `teacher:group_edit` | `tutor_required` | `pk`, POST: название, описание | ✅ `own_group_or_404` → 404 на чужое | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/invite/regenerate/` | `teacher:group_invite_regenerate` | `tutor_required` + POST | `pk` | ✅ `own_group_or_404` | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/teacher/groups/<int:pk>/students/<int:sid>/remove/` | `teacher:group_student_remove` | `tutor_required` + POST | `pk`, `sid` | ✅ `own_group_or_404`; `sid` ищется ТОЛЬКО внутри своего занятия | [teacher/views_groups.py](../teacher/views_groups.py) |
+| `/student/join/` | `student:join_group` | `student_required` + POST | POST: код | ✅ вступает всегда `request.user` | [student/views.py](../student/views.py) |
+| `/api/feedback/` | `api_feedback` | **никакой (гостю можно)** + POST + CSRF | POST: вид, адрес, варианты, тексты, файл ≤ 2,5 МБ | — записи ничьи | [problems/views_platform.py](../problems/views_platform.py) `api_feedback` |
+| `/admin/problems/feedback/<pk>/screenshot/` | `problems_feedback_screenshot` | **staff** (`admin_site.admin_view`) | `pk` | ⚠️ ЧУЖОЙ ПО ЗАМЫСЛУ: разбирает жалобы администратор | [problems/admin_platform.py](../problems/admin_platform.py) `FeedbackAdmin` |
 | `/teacher/groups/<gid>/assignments/<aid>/` | `teacher:group_assignment` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:613](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/assignments/<aid>/submissions/` | `teacher:group_submissions` | `tutor_required` | 2× pk, 3× GET | ✅ | [teacher/views_groups.py:1010](../teacher/views_groups.py) |
 | `/teacher/groups/<gid>/submissions/<sid>/` | `teacher:group_review_submission` | `tutor_required` | 2× pk | ✅ | [teacher/views_groups.py:1103](../teacher/views_groups.py) |
@@ -251,7 +259,8 @@ TypeError: Field 'id' expected a number but got
 
 | Путь | Имя | Роль | Клиент | Владелец | Файл |
 |---|---|---|---|---|---|
-| `/profile/` | `profile` | `login_required` | 7× POST/GET | ✅ | [problems/views_platform.py:26](../problems/views_platform.py) |
+| `/profile/` | `profile` | `login_required` | POST `action` ∈ {data, password, avatar, avatar_remove}, GET `tab`/`sub` | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `profile` |
+| `/profile/avatar/<int:user_id>/` | `avatar` | `login_required` | `user_id` (целое) | ⚠️ ПО ЗАМЫСЛУ ЧУЖОЙ: аватар виден любому вошедшему | [problems/views_platform.py](../problems/views_platform.py) `avatar` |
 | `/profile/stats/` | `student_stats` | `login_required` | — | ✅ | [problems/views_stats.py:31](../problems/views_stats.py) |
 | `/profile/stats/data/` | `student_stats_json` | `login_required` | — | ✅ | [problems/views_stats.py:38](../problems/views_stats.py) |
 | `/profile/stats/goal/` | `set_weekly_goal` | `login_required` + POST | POST | ✅ | [problems/views_stats.py:45](../problems/views_stats.py) |
@@ -263,8 +272,54 @@ TypeError: Field 'id' expected a number but got
 | `/api/saved/move/` | `api_saved_move` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:154](../problems/views_platform.py) |
 | `/api/saved/delete/` | `api_saved_delete` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:177](../problems/views_platform.py) |
 | `/api/graphs/save/` | `api_graph_save` | `login_required` + POST | POST | ✅ | [problems/views_platform.py:193](../problems/views_platform.py) |
-| `/password/change/` | `password_change` | `login_required` | POST | ✅ Django | Django |
-| `/password/change/done/` | `password_change_done` | `login_required` | — | — | Django |
+| `/password/change/` | `password_change` | `login_required` | POST: новый пароль ×2 (`old_password` игнорируется) | ✅ всегда `request.user` | [problems/views_platform.py](../problems/views_platform.py) `password_change` |
+| `/password/change/done/` | `password_change_done` | — | — | — | редирект на `/profile/?tab=security` |
+
+### ⚠️ Обратная связь: единственный маршрут БЕЗ проверки входа
+
+`/api/feedback/` принимает запись от кого угодно, включая гостя, — и это
+решение, а не пропуск. Половина беты это люди, которые ещё не завели
+аккаунт; именно у них ломается вход, и требовать логин, чтобы пожаловаться
+на форму входа, значит не узнать о поломке.
+
+Что удерживает это в границах:
+
+| Что могло бы пойти не так | Почему не идёт |
+|---|---|
+| чужая страница шлёт записи от имени наших посетителей | CSRF обязателен; `csrf_exempt` здесь нет и не будет |
+| заваливание базы записями | ограничение частоты: 10 записей в час с адреса, дальше 429 |
+| `page_key` из запроса ломает группировку | ключ считает СЕРВЕР по адресу; поле от клиента не читается вовсе |
+| произвольные строки в поле «варианты» | принимаются только варианты ЭТОГО экрана, остальные молча отбрасываются |
+| загрузка чего угодно под видом снимка | Pillow: целостность → размеры в пикселях → пересжатие в JPEG; путь и имя наши |
+| «пиксельная бомба» | потолок 4000×4000 проверяется ДО обработки |
+| снимок теряет саму жалобу | битый или слишком большой снимок НЕ отменяет запись — текст ценнее картинки |
+
+⚠️ **Снимок экрана видит только staff** и только из админки:
+`admin_site.admin_view` сам требует staff и держит проверку в одном месте с
+остальной админкой. Закрыто отрицательными тестами (обычный вошедший и гость).
+
+### ⚠️ Аватар: единственный маршрут, где объект НЕ сужен по владельцу
+
+`/profile/avatar/<id>/` отдаёт файл ЧУЖОГО пользователя любому вошедшему —
+и это осознанно, а не пропущенный фильтр. Аватар показывается в шапке, в
+списке учеников группы и на доске набора: сузить его до владельца значило
+бы, что лицо не видно нигде, кроме собственного профиля.
+
+Что удерживает это в границах:
+
+| Что могло бы пойти не так | Почему не идёт |
+|---|---|
+| путь из запроса → чтение чужого файла | из запроса приходит ТОЛЬКО целое число; путь берётся из поля модели |
+| загрузка исполняемого файла | форма пересжимает картинку Pillow и сохраняет СВОЙ JPEG; имя из запроса не используется вовсе |
+| «пиксельная бомба» (мелкий файл, огромный размер) | размеры проверяются ДО обработки: потолок 4000×4000 и 3 МБ |
+| геометка в EXIF | пересохранение метаданные стирает |
+| гость смотрит лица детей | `login_required`, отрицательный тест `test_guest_is_refused` |
+| общий кэш держит чужое лицо | `Cache-Control: private` |
+
+Закрыто тестами `problems/tests/test_accounts.py::AvatarTests` (12 штук, из
+них четыре — отрицательные) и сторожем
+`test_media_route.py::NoOtherFileServingViewTests`, где этот файл вписан в
+список разрешённых **вместе с причиной**.
 
 ⚠️ **Роль на маршрутах `/parent/` не проверяется.** Стоит только
 `login_required`. Экран честен: кто не родитель — увидит пустой список, потому

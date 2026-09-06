@@ -66,20 +66,39 @@ class LogoMarkTests(TestCase):
 
 
 class NavigationTests(TestCase):
-    u"""1.2 Пункт навигации называется «Тренажёр»."""
+    u"""1.2 Пункт навигации называется «Тренажёр».
 
-    def test_nav_says_trenazhor_everywhere(self):
-        src = read(NAV)
-        self.assertEqual(src.count('>Тренажёр</a>'), 4)
-        self.assertNotIn('>Игра</a>', src)
+    ⚠️ ПРОВЕРКА ПЕРЕЕХАЛА С ШАБЛОНА НА ОТРИСОВАННУЮ СТРАНИЦУ (04.09.2026).
+    Прежде `_nav.html` держал четыре копии ряда ссылок, и тест считал в нём
+    четыре литерала «Тренажёр» и восемь условий подсветки. Копий больше нет:
+    состав меню собирает `config/context_processors.py::site_meta`, а
+    разметка — один цикл. Считать литералы стало нечего, и это к лучшему:
+    важно, что видит человек, а не сколько раз слово написано в файле.
+    """
 
-    def test_active_underline_still_keyed_on_game_path(self):
-        u"""Переименование не должно было тронуть подсветку активного пункта."""
-        self.assertEqual(read(NAV).count("'/game/' in request.path"), 8)
+    def _nav_labels(self, html):
+        u"""Подписи пунктов шапки в порядке слева направо."""
+        block = html.split('<div class="nav-links">', 1)[-1].split('</div>', 1)[0]
+        return re.findall(r'class="nav-link[^"]*"[^>]*>([^<]+)</a>', block)
 
     def test_rendered_page_shows_the_new_name(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        self.assertIn('>Тренажёр</a>', html)
+        labels = self._nav_labels(html)
+        self.assertEqual(labels.count('Тренажёр'), 1, labels)
+        self.assertNotIn('Игра', labels)
+
+    def test_textbook_stands_right_after_catalog(self):
+        u"""Порядок задан владельцем: «Учебник» сразу за «Каталогом»."""
+        labels = self._nav_labels(
+            self.client.get(reverse('game:page')).content.decode('utf-8'))
+        self.assertEqual(labels.count('Учебник'), 1, labels)
+        self.assertEqual(labels[labels.index('Каталог') + 1], 'Учебник', labels)
+
+    def test_active_item_is_marked_on_the_game_page(self):
+        u"""«Где я сейчас» осталось на месте после переезда логики в питон."""
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
+        self.assertEqual(set(active), {'Тренажёр'}, active)
 
 
 class StartScreenTextTests(TestCase):
@@ -299,3 +318,79 @@ class EmDashTests(TestCase):
         for line in read('game/views.py').split('\n'):
             if 'JsonResponse' in line or "'error':" in line:
                 self.assertNotIn('—', line, line)
+
+
+class RoundNotRaceTests(TestCase):
+    u"""1.15 Слова «забег» человек на экране не видит — только «раунд».
+
+    Решение владельца 04.09.2026: в Wecon Rush «забег» заменён на «раунд»
+    во ВСЕХ строках, которые доходят до человека. Комментарии кода, имена
+    переменных и docs/GAME.md намеренно оставлены как были — это не экран.
+
+    Поэтому проверка идёт по ОТРЕНДЕРЕННОЙ странице с вырезанными
+    комментариями: она ловит и разметку, и строки внутри инлайн-скрипта,
+    которые попадают в DOM, и aria-label с data-tip.
+    """
+
+    RX = re.compile('забег', re.IGNORECASE)
+
+    def _visible(self, html):
+        u"""Текст страницы без того, чего человек не видит."""
+        html = re.sub(r'<!--.*?-->', '', html, flags=re.S)
+        html = re.sub(r'\{%\s*comment\s*%\}.*?\{%\s*endcomment\s*%\}', '', html, flags=re.S)
+        html = re.sub(r'\{#.*?#\}', '', html, flags=re.S)
+        html = re.sub(r'/\*.*?\*/', '', html, flags=re.S)
+        return '\n'.join(self._strip_line_comment(ln)
+                         for ln in html.split('\n'))
+
+    @staticmethod
+    def _strip_line_comment(line):
+        u"""Отрезать хвостовой `//`-комментарий, не тронув адреса и строки.
+
+        Осторожно: «//» бывает внутри адреса (`https://`) и внутри строкового
+        литерала. Режем только там, где перед «//» стоит пробел, кавычки до
+        него закрыты и это не двоеточие из адреса. Правило намеренно
+        осторожное: пропустить лишний комментарий безопаснее, чем спрятать
+        настоящую строку с экрана.
+        """
+        for m in re.finditer('//', line):
+            j = m.start()
+            before = line[:j]
+            if before.strip() and not before.endswith((' ', '\t')):
+                continue
+            if before.count("'") % 2 or before.count('"') % 2:
+                continue
+            if before.rstrip().endswith(':'):
+                continue
+            return before
+        return line
+
+    def _check(self, url, who):
+        response = self.client.get(url)
+        self.assertIn(response.status_code, (200, 302), '%s: %s' % (who, url))
+        if response.status_code != 200:
+            return
+        found = self.RX.findall(self._visible(response.content.decode('utf-8')))
+        self.assertEqual(
+            found, [],
+            u'%s видит слово «забег» на %s: %d раз. Решение владельца — '
+            u'«раунд».' % (who, url, len(found)),
+        )
+
+    def test_guest_sees_no_race_word(self):
+        for url in ('/game/', '/game/daily/'):
+            self._check(url, u'гость')
+
+    def test_logged_in_sees_no_race_word(self):
+        from problems.models import User
+        User.objects.create_user(username='round_probe', password='x' * 12,
+                                 role='student')
+        self.client.login(username='round_probe', password='x' * 12)
+        for url in ('/game/', '/game/daily/', '/game/stats/'):
+            self._check(url, u'вошедший')
+
+    def test_unranked_reasons_say_round(self):
+        u"""Причины «почему раунд не в таблице» человек читает на экране."""
+        from game.config import UNRANKED_TEXT
+        for key, text in UNRANKED_TEXT.items():
+            self.assertNotIn('забег', text.lower(), '%s: %s' % (key, text))

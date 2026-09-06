@@ -1,32 +1,232 @@
+{% comment %}
+Шапка сайта — ОДИН ряд ссылок на все роли.
+
+⚠️ ДО 04.09.2026 ЗДЕСЬ БЫЛО ЧЕТЫРЕ КОПИИ ОДНОГО РЯДА (учитель / ученик /
+прочие / гость), и каждая ссылка несла инлайновый стиль с двумя условиями
+подсветки — 32 атрибута `style` на файл. Правка требовала повторить её
+четырежды, а расхождение ничем не ловилось. Теперь состав меню и признак
+«где я сейчас» считает `config/context_processors.py::site_meta`, а здесь
+один цикл и таблица стилей.
+
+⚠️ ПУНКТА «УМНЫЙ ПОИСК» В ШАПКЕ НЕТ (решение владельца 01.09.2026): экран
+слился с каталогом. Адрес `/catalog/smart-search/` жив редиректом ради
+закладок, но в навигацию не выведен.
+
+⚠️ ПУНКТА «СТАТИСТИКА» В ШАПКЕ УЧЕНИКА НЕТ (04.09.2026): статистика — одна
+из вкладок профиля, и держать её ещё и в шапке значило бы иметь два входа в
+одно место.
+{% endcomment %}
 <style>
 /* ⚠️ ОТСТУПЫ ШАПКИ — ПЕРЕМЕННЫМИ, И ЭТО НЕ УКРАШАТЕЛЬСТВО.
    Шапка — единственная строка на сайте, которая не переносится: логотип,
    до восьми ссылок и блок пользователя стоят в один ряд и своей шириной
    РАСПИРАЮТ ДОКУМЕНТ. Пока подписи были 13 px, ряд помещался до 740 px
-   ширины окна; на 14 px он перестал помещаться уже на 820, и появлялась
-   горизонтальная прокрутка ВСЕЙ страницы — замерено сравнением с копией
-   репозитория до правки.
-   Кегль возвращать нельзя (14 — пол интерфейса), поэтому на узких окнах
-   ужимаются отступы. Значения подобраны так, чтобы прежняя граница 740 px
-   восстановилась; ниже неё сайт не помещался и ДО этой сессии.
-   Переменными, а не media-запросом на сами ссылки: у ссылок стиль стоит
-   атрибутом, и правило из таблицы стилей его не перебьёт без !important. */
-nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14px; }
+   ширины окна; на 14 px он перестал помещаться уже на 820.
+   Ниже 820 px ряд уходит в панель под шапкой (кнопка ☰), поэтому распирать
+   документ ему больше нечем — но на промежуточных ширинах отступы всё ещё
+   ужимаются, чтобы панель включалась как можно позже. */
+nav.site-nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14px; }
 @media (max-width: 1060px) {
-  nav { --nav-pad: 8px; --nav-edge: 12px; --nav-logo-gap: 12px; --nav-btn-pad: 10px; }
+  nav.site-nav { --nav-pad: 8px; --nav-edge: 12px; --nav-logo-gap: 12px; --nav-btn-pad: 10px; }
 }
 @media (max-width: 900px) {
-  nav { --nav-pad: 5px; --nav-edge: 8px; --nav-logo-gap: 8px; --nav-btn-pad: 8px; }
+  nav.site-nav { --nav-pad: 5px; --nav-edge: 8px; --nav-logo-gap: 8px; --nav-btn-pad: 8px; }
+}
+
+nav.site-nav {
+  background: var(--nav-bg, #1a1f2e);
+  padding: 0 var(--nav-edge);
+  display: flex;
+  align-items: center;
+  height: 48px;
+  position: sticky;
+  top: 0;
+  z-index: 200;
+}
+.nav-logo { display: flex; align-items: center; flex-shrink: 0;
+            margin-right: var(--nav-logo-gap); text-decoration: none; }
+.nav-logo svg { display: block; }
+
+/* ⚠️ БЕЗ min-width: 0 И БЕЗ СЖАТИЯ. С `min-width: 0` ряд схлопывался до
+   нулевой ширины, а ссылки внутри с `nowrap` продолжали занимать место и
+   вылезали наружу — документ ехал вбок, а замер ширины самого ряда при этом
+   показывал ноль. Ряд либо помещается целиком, либо уходит в панель ☰. */
+.nav-links { display: flex; align-items: center; flex: 0 0 auto; }
+
+/* ⚠️ ПАНЕЛЬ УЗКОГО ЭКРАНА СПРЯТАНА ПО УМОЛЧАНИЮ, А НЕ ТОЛЬКО В МЕДИА-ЗАПРОСЕ.
+   Она держит ВТОРУЮ копию тех же ссылок. Пока правило `display: none` жило
+   только внутри `@media (max-width: 820px)`, на широких экранах панель была
+   обычным флекс-элементом шапки и раскладывала свою копию ряда: у ученика
+   документ занимал 1744 px при окне 1440. Симптом прятался за
+   `min-width: 0` — ряд схлопывался в ноль, а ссылки вылезали наружу. */
+.nav-panel { display: none; }
+
+/* ⚠️ АКТИВНЫЙ ПУНКТ — ПОДЧЁРКИВАНИЕ ПЛЮС ФОН (04.09.2026, ADR 0072).
+   Одного подчёркивания мало: на графитовой полосе тонкая линия внизу
+   читается хуже, чем кажется на макете. Одного фона тоже мало — он
+   теряется при смене темы. Вместе они держатся в обеих. */
+.nav-link {
+  font-size: 14px;
+  color: rgba(255, 255, 255, .6);
+  padding: 0 var(--nav-pad);
+  height: 48px;
+  display: flex;
+  align-items: center;
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid transparent;
+  transition: background var(--t), color var(--t);
+}
+.nav-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.nav-link.is-active {
+  color: #fff;
+  background: rgba(255, 255, 255, .12);
+  border-bottom-color: var(--accent);
+}
+
+.nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+
+/* Метка версии. Стоит в липкой шапке (z-index 200) — её не закрывает ни
+   кружок Telegram снизу, ни панели калькулятора: угол, который всегда виден. */
+.nav-version {
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, .55);
+  border: 0.5px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r);
+  padding: 3px 7px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Кнопки-иконки шапки (тема, ☰) и кнопка выхода — радиус по канону. */
+.nav-icon-btn {
+  font-size: 14px;
+  color: rgba(255, 255, 255, .6);
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: none;
+  border: 0.5px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  flex-shrink: 0;
+}
+.nav-icon-btn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* Плашка профиля: круг с инициалами (или аватар) и имя — одна ссылка. */
+.nav-user {
+  display: flex; align-items: center; gap: 8px;
+  text-decoration: none;
+  color: rgba(255, 255, 255, .7);
+  font-size: 14px;
+  padding: 3px 8px 3px 3px;
+  border-radius: var(--r-pill);
+  white-space: nowrap;
+  transition: background var(--t), color var(--t);
+}
+.nav-user:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+.nav-ava {
+  width: 32px; height: 32px;
+  flex-shrink: 0;
+  border-radius: var(--r-pill);
+  background: rgba(255, 255, 255, .16);
+  color: #fff;
+  font-size: 12px; font-weight: 600; letter-spacing: .02em;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden;
+}
+.nav-ava img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.nav-logout { display: flex; }
+.nav-logout button {
+  font: inherit;
+  font-size: 14px;
+  color: rgba(255, 255, 255, .6);
+  padding: 6px var(--nav-btn-pad);
+  background: none;
+  border: 0.5px solid rgba(255, 255, 255, .2);
+  border-radius: var(--r);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.nav-logout button:hover { color: #fff; background: rgba(255, 255, 255, .08); }
+
+/* Вход — брендовый янтарь; «Создать аккаунт» рядом тихой ссылкой.
+   Чернила --brand-amber-ink #1d1a16 на #d6a525 дают 7,65 (порог AAA),
+   сама плашка к шапке #3c3531 — 5,31. Цвет один на обе темы: янтарь
+   брендовый, а не тематический. */
+.nav-login {
+  font-size: 14px;
+  color: var(--brand-amber-ink);
+  padding: 6px 14px;
+  background: var(--brand-amber);
+  border-radius: var(--r);
+  text-decoration: none;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.nav-register {
+  font-size: 14px;
+  color: rgba(255, 255, 255, .6);
+  text-decoration: none;
+  padding: 0 4px;
+  white-space: nowrap;
+}
+.nav-register:hover { color: #fff; text-decoration: underline; }
+
+/* ── Узкий экран: ряд ссылок уезжает в панель под шапкой ──────────────
+   ⚠️ ЭТО ПРАВИЛО 1.9.1 КАНОНА: шапка обязана свернуться ДО того, как
+   страница поедет вбок. Замер до правки: на 380 px документ занимал
+   806 px и вбок ехала ВСЯ страница, а графитовая подложка обрывалась по
+   ширине окна. Порог 820 px взят потому, что на 14 px ряд перестаёт
+   помещаться именно там. */
+.nav-burger { display: none; }
+@media (max-width: 820px) {
+  .nav-burger { display: inline-flex; }
+  /* Прячем ряд и метку, которые стоят В САМОЙ ШАПКЕ; их копии в панели
+     живут по своим правилам ниже. Селекторы точные (`>` и `.nav-right`):
+     без них правило доставало и до панели, а метка внутри неё получала
+     `display: flex` и растягивалась на всю ширину. */
+  nav.site-nav > .nav-links { display: none; }
+  .nav-right .nav-version { display: none; }
+  .nav-panel {
+    position: absolute;
+    left: 0; right: 0;
+    top: 48px;
+    /* На единицу ниже шапки: панель уезжает ПОД неё, а не поверх. */
+    z-index: 199;
+    background: var(--nav-bg, #1a1f2e);
+    border-top: 0.5px solid rgba(255, 255, 255, .12);
+    padding: 8px var(--nav-edge) 12px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .28);
+  }
+  .nav-panel.is-open { display: block; }
+  .nav-panel .nav-links { display: flex; flex-direction: column; align-items: stretch; }
+  .nav-panel .nav-link {
+    height: 42px;
+    padding: 0 10px;
+    border-bottom: none;
+    border-left: 2px solid transparent;
+    border-radius: var(--r);
+  }
+  .nav-panel .nav-link.is-active { border-left-color: var(--accent); }
+  .nav-panel .nav-version { display: inline-block; margin: 8px 0 0 10px; }
+}
+
+/* ⚠️ ИМЯ В ПЛАШКЕ ПОКАЗЫВАЕТСЯ ТОЛЬКО НА ШИРОКОМ ЭКРАНЕ. Оно бывает
+   длинным («Преподаватель Пробный» — около 150 px) и именно оно решало,
+   поместится ли ряд: замер по ширинам показал, что учителю без этой правки
+   нужно 1156 px, а ученику 1012 — то есть на ноутбуке 1024 ряд учителя ехал
+   вбок. Круг с инициалами говорит то же самое и занимает 32 px. */
+@media (max-width: 1160px) {
+  .nav-user span:last-child { display: none; }
+  .nav-user { padding: 3px; }
 }
 </style>
-{% comment %}
-⚠️ ПУНКТА «УМНЫЙ ПОИСК» В ШАПКЕ БОЛЬШЕ НЕТ (решение владельца 01.09.2026).
-Экран слился с каталогом: поиск там один и всегда по смыслу, а два входа
-в один банк заставляли человека выбирать способ ДО того, как он
-сформулировал, что ищет. Адрес `/catalog/smart-search/` жив постоянным
-редиректом ради закладок — но в навигацию он больше не выведен.
-{% endcomment %}
-<nav style="background:var(--nav-bg,#1a1f2e);padding:0 var(--nav-edge);display:flex;align-items:center;height:48px;gap:0;position:sticky;top:0;z-index:200;">
+
+<nav class="site-nav">
   {% comment %}
   ⚠️ ОБВОДКИ У КРУГА В ШАПКЕ НЕТ, И ЭТО ЗАМЕР, А НЕ ВКУС. Присланный SVG
   рисует круг обводкой #333331; против шапки --nav-bg #3c3531 она даёт 1,05
@@ -36,86 +236,89 @@ nav { --nav-pad: 12px; --nav-edge: 20px; --nav-logo-gap: 20px; --nav-btn-pad: 14
   ⚠️ SVG вставлен СТРОКОЙ, а не через <img>: так он не даёт лишнего запроса,
   а размеры заданы атрибутами — иначе при загрузке страница дёрнется.
   {% endcomment %}
-  <a href="/" style="display:flex;align-items:center;flex-shrink:0;margin-right:var(--nav-logo-gap);text-decoration:none;" aria-label="Weconomics: на главную">
-    <svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" role="img" aria-hidden="true" focusable="false" style="display:block;">
+  <a href="/" class="nav-logo" aria-label="Weconomics: на главную">
+    <svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" role="img" aria-hidden="true" focusable="false">
       <circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"/>
       <path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"/>
     </svg>
   </a>
 
-  {% if user.is_authenticated %}
-    {% if user.role == 'teacher' %}
-      {% comment %}
-      ⚠️ Вкладка «Проверка» убрана целиком (сессия 9, фаза 3). Смысл у неё
-      был только для репетитора с несколькими группами, а всё то же видно
-      через открытие каждого занятия. Пункт «Группы» стал «Учениками»:
-      там теперь и группы, и индивидуальные занятия.
-      {% endcomment %}
-      <a href="{% url 'teacher:groups' %}" style="font-size:14px;color:{% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'group' in request.resolver_match.url_name|default:'' or 'student' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Ученики</a>
-      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
-      <a href="/olympiads/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'olympiads' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'olympiads' %}var(--accent){% else %}transparent{% endif %};">Олимпиады</a>
-      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
-      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Тренажёр</a>
-      {% if user.is_staff %}
-      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
-      {% endif %}
+  {# Один ряд на все роли: состав и подсветку считает site_meta. #}
+  <div class="nav-links">
+    {% for item in nav_items %}
+    <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
+    {% endfor %}
+  </div>
 
-    {% elif user.role == 'student' %}
-      <a href="/student/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'student' and request.resolver_match.url_name == 'dashboard' %}var(--accent){% else %}transparent{% endif %};">Домашки</a>
-      {# «Прогресс» поглощён экраном статистики — двух похожих разделов нет. #}
-      <a href="/profile/stats/" style="font-size:14px;color:{% if 'student_stats' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'student_stats' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Статистика</a>
-      <a href="/catalog/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'catalog' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'catalog' %}var(--accent){% else %}transparent{% endif %};">Каталог</a>
-      <a href="/olympiads/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'olympiads' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'olympiads' %}var(--accent){% else %}transparent{% endif %};">Олимпиады</a>
-      <a href="/calendar/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'calendar_stub' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'calendar_stub' %}var(--accent){% else %}transparent{% endif %};">Календарь</a>
-      <a href="/calc2/" style="font-size:14px;color:{% if 'calc2' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'calc2' in request.path %}var(--accent){% else %}transparent{% endif %};">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Тренажёр</a>
-
-    {% else %}
-      {% if user.profile.is_parent %}
-      <a href="{% url 'parent_home' %}" style="font-size:14px;color:{% if 'parent' in request.resolver_match.url_name|default:'' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if 'parent' in request.resolver_match.url_name|default:'' %}var(--accent){% else %}transparent{% endif %};">Мои дети</a>
-      {% endif %}
-      <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
-      <a href="/olympiads/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'olympiads' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'olympiads' %}var(--accent){% else %}transparent{% endif %};">Олимпиады</a>
-      <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
-      <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Тренажёр</a>
-      {% if user.is_staff %}
-      <a href="/admin/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Админка</a>
-      {% endif %}
-    {% endif %}
-
-  {% else %}
-    <a href="/catalog/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Каталог</a>
-    <a href="/olympiads/" style="font-size:14px;color:{% if request.resolver_match.namespace == 'olympiads' %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if request.resolver_match.namespace == 'olympiads' %}var(--accent){% else %}transparent{% endif %};">Олимпиады</a>
-    <a href="/calc2/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid transparent;">Графики</a>
-    <a href="/game/" style="font-size:14px;color:{% if '/game/' in request.path %}#fff{% else %}rgba(255,255,255,0.6){% endif %};padding:0 var(--nav-pad);height:48px;display:flex;align-items:center;text-decoration:none;border-bottom:2px solid {% if '/game/' in request.path %}var(--accent){% else %}transparent{% endif %};">Тренажёр</a>
-  {% endif %}
-
-  <div style="margin-left:auto;display:flex;align-items:center;gap:8px;">
-    <button id="theme-toggle" type="button" aria-label="Сменить тему" title="Светлая / тёмная тема"
-            style="font-size:14px;color:rgba(255,255,255,0.6);width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;background:none;border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;cursor:pointer;line-height:1;padding:0;flex-shrink:0;">☾</button>
+  <div class="nav-right">
+    {% comment %}
+    Кнопка обратной связи стоит ПЕРЕД меткой версии: жалоба важнее номера,
+    и на узком экране от неё остаётся значок, а метка уезжает в панель ☰.
+    {% endcomment %}
+    <button type="button" class="fb-btn" aria-label="Проблема или предложение">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+      </svg>
+      <span class="fb-btn-text">Проблема или предложение</span>
+    </button>
+    <span class="nav-version">{{ site_version }}</span>
+    {% include '_theme_toggle.html' %}
     {% if user.is_authenticated %}
-      <span style="font-size:14px;color:rgba(255,255,255,0.7);">{{ user.get_full_name|default:user.username }}</span>
-      <a href="/logout/" style="font-size:14px;color:rgba(255,255,255,0.6);padding:6px var(--nav-btn-pad);border:0.5px solid rgba(255,255,255,0.2);border-radius:8px;text-decoration:none;">Выйти</a>
+      <a class="nav-user" href="/profile/">
+        <span class="nav-ava">
+          {% if nav_avatar_url %}<img src="{{ nav_avatar_url }}" alt="">{% else %}{{ nav_user_initials }}{% endif %}
+        </span>
+        <span>{{ nav_user_name }}</span>
+      </a>
+      {% comment %}
+      ⚠️ ВЫХОД — POST, А НЕ ССЫЛКА. `LogoutView` в Django 5 принимает только
+      POST; прежняя ссылка отдавала 405, и «выйти» на сайте не работало.
+      GET на /logout/ так и остаётся 405 — это норма Django, а не дефект.
+      {% endcomment %}
+      <form class="nav-logout" method="post" action="/logout/">
+        {% csrf_token %}
+        <button type="submit">Выйти</button>
+      </form>
     {% else %}
-      {# Кнопка входа — брендовый янтарь, как в макете. Шапка публичная, и правило территории янтаря её разрешает. Чернила --brand-amber-ink #1d1a16 на #d6a525 дают 7,65 — порог AAA взят; сама плашка к шапке #3c3531 — 5,31. Цвет один на обе темы: янтарь брендовый, а не тематический. #}
-      <a href="/login/" style="font-size:14px;color:var(--brand-amber-ink);padding:6px 14px;background:var(--brand-amber);border-radius:8px;text-decoration:none;font-weight:600;">Войти</a>
+      <a class="nav-login" href="/login/">Войти</a>
+      <a class="nav-register" href="{% url 'register' %}">Создать аккаунт</a>
     {% endif %}
+    <button class="nav-icon-btn nav-burger" id="nav-burger" type="button"
+            aria-label="Меню" aria-expanded="false" aria-controls="nav-panel">☰</button>
+  </div>
+
+  {# Панель узкого экрана: тот же список, другой вид. #}
+  <div class="nav-panel" id="nav-panel">
+    <div class="nav-links">
+      {% for item in nav_items %}
+      <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
+      {% endfor %}
+    </div>
+    <span class="nav-version">{{ site_version }}</span>
+    <button type="button" class="fb-btn" aria-label="Проблема или предложение">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+      </svg>
+      <span class="fb-btn-text">Проблема или предложение</span>
+    </button>
   </div>
 </nav>
 <script>
 (function () {
-  var btn = document.getElementById('theme-toggle');
-  if (!btn) return;
-  function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
-  function paint() { btn.textContent = isDark() ? '☀' : '☾'; }
-  paint();
-  btn.addEventListener('click', function () {
-    var h = document.documentElement;
-    if (isDark()) { h.removeAttribute('data-theme'); try { localStorage.setItem('theme', 'light'); } catch (e) {} }
-    else { h.setAttribute('data-theme', 'dark'); try { localStorage.setItem('theme', 'dark'); } catch (e) {} }
-    paint();
-    if (typeof redrawAll === 'function') redrawAll();
+  var burger = document.getElementById('nav-burger');
+  var panel = document.getElementById('nav-panel');
+  if (!burger || !panel) return;
+  function close() { panel.classList.remove('is-open'); burger.setAttribute('aria-expanded', 'false'); }
+  burger.addEventListener('click', function (e) {
+    e.stopPropagation();
+    var open = panel.classList.toggle('is-open');
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
   });
+  document.addEventListener('click', function (e) {
+    if (panel.classList.contains('is-open') && !panel.contains(e.target)) close();
+  });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
 })();
 </script>

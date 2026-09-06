@@ -111,15 +111,34 @@ class MediaRouteIsGuardedByDebugFlagTests(TestCase):
 
 
 class NoOtherFileServingViewTests(TestCase):
-    """Никто не отдаёт файл по пути, пришедшему от клиента.
+    """Файлы отдаёт только то, что разобрано поимённо.
 
     Проверяется исходник всех приложений: `FileResponse`, `django.views.
     static.serve` и `open()` по значению из запроса. Тест ловит не
     сегодняшнюю дыру, а завтрашнюю — «сделаю просто скачивание файла».
+
+    ⚠️ СПИСОК РАЗРЕШЁННЫХ — НЕ ПОСЛАБЛЕНИЕ, А МЕСТО ДЛЯ РАЗБОРА. Каждый файл
+    в нём разобран отдельно, и рядом записано, ПОЧЕМУ он безопасен. Добавить
+    строку сюда = обязаться этот разбор провести; тест по-прежнему краснеет
+    на любом НОВОМ месте, отдающем файлы.
     """
 
     APPS = ('problems', 'catalog', 'teacher', 'student', 'game', 'calc2',
             'calendar_stub', 'config')
+
+    # путь → почему это безопасно
+    ALLOWED = {
+        'problems/views_platform.py':
+            'аватар: путь берётся из поля модели, из запроса приходит только '
+            'целое число; файл — наш собственный JPEG, пересжатый Pillow и '
+            'названный нами (avatars/<id>.jpg); отдаётся только вошедшим; '
+            'Content-Type задан жёстко. Разбор — Фаза 4 сессии 04.09.2026.',
+        'problems/admin_platform.py':
+            'снимок экрана из обратной связи: живёт ВНУТРИ админки через '
+            'ModelAdmin.get_urls и admin_site.admin_view — тот сам требует '
+            'staff; путь из поля модели, из адреса только номер записи; '
+            'файл пересжат Pillow в JPEG. Разбор — Фаза 7 сессии 04.09.2026.',
+    }
 
     def test_no_file_serving_helpers_in_views(self):
         offenders = []
@@ -130,17 +149,34 @@ class NoOtherFileServingViewTests(TestCase):
             for path in root.rglob('*.py'):
                 if 'test' in path.name or '/migrations/' in path.as_posix():
                     continue
+                rel = path.relative_to(settings.BASE_DIR).as_posix()
+                if rel in self.ALLOWED:
+                    continue
                 text = path.read_text(encoding='utf-8')
                 for needle in ('FileResponse', 'views.static.serve',
                                'from django.views.static import serve'):
                     if needle in text:
-                        offenders.append('%s: %s' % (
-                            path.relative_to(settings.BASE_DIR), needle))
+                        offenders.append('%s: %s' % (rel, needle))
         self.assertEqual(
             offenders, [],
             'Появился код, отдающий файлы. Это не запрещено, но требует '
             'разбора: путь обязан браться не из запроса, а из поля модели, '
-            'и доступ — сужением queryset. Найдено: %s' % offenders)
+            'и доступ — сужением queryset. Разобрали — впишите файл и '
+            'причину в ALLOWED. Найдено: %s' % offenders)
+
+    def test_allowed_list_is_not_stale(self):
+        """Разрешение без кода — забытая строка, а не разрешение.
+
+        Если файл из списка перестал отдавать файлы, строку надо убрать:
+        иначе завтра в нём появится новая раздача и пройдёт молча.
+        """
+        for rel, reason in self.ALLOWED.items():
+            path = Path(settings.BASE_DIR) / rel
+            self.assertTrue(path.exists(), rel)
+            text = path.read_text(encoding='utf-8')
+            self.assertIn('FileResponse', text,
+                          '%s больше не отдаёт файлы — уберите из ALLOWED' % rel)
+            self.assertTrue(reason.strip(), rel)
 
 
 class MediaIsNotServedByNginxTests(TestCase):

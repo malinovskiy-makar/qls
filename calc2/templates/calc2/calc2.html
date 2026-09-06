@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графики в экономике</title>
+  <title>Графики · Weconomics</title>
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).
@@ -13,48 +13,59 @@
      Теперь общее приходит отсюда, а calc2.css ниже переопределяет ровно
      то, что у рисующей поверхности своё: цвета кривых, структурные цвета
      холста, глушее фоновая оболочка, тени и слои.
-     Порядок важен: свой bootstrap темы у калькулятора стоит НИЖЕ и сильнее —
-     он, в отличие от общего, умеет ещё и системную тему.
+     Тему ставит ОДИН скрипт — из этого же партиала: своего bootstrap у
+     калькулятора больше нет (см. комментарий ниже).
   {% endcomment %}
   {% include '_tokens.html' %}
 
-  <!-- ── Внешние библиотеки (CDN, без сборки) ──────────────────────────
+  <!-- ── Внешние библиотеки (вложены в репозиторий, без сборки) ─────────
        D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
        Math.js    — «мозг»: разбор и вычисление любых формул, численные методы.
-       Подключаются точно так же, как Desmos в старом калькуляторе. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+       Лежат в static/vendor/: внешних CDN у сайта нет с 04.09.2026, иначе
+       при перебоях с чужой сетью калькулятор открывается мёртвым. -->
+  <script src="{% static 'vendor/d3-7.9.0/d3.min.js' %}"></script>
+  <script src="{% static 'vendor/mathjs-12.4.3/math.min.js' %}"></script>
 
   <!-- KaTeX — ровно тот же способ подключения, что в каталоге задач
-       (catalog/base.html): та же версия 0.16.9 с того же CDN. Вторая
-       библиотека формул не нужна. Здесь достаточно katex.render, поэтому
-       auto-render не тянем: он ищет $…$ по всей странице, а нам нужно
-       отрендерить одно поле. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+       (catalog/base.html): та же версия 0.16.9 из той же папки vendor.
+       Вторая библиотека формул не нужна. Здесь достаточно katex.render,
+       поэтому auto-render не тянем: он ищет $…$ по всей странице, а нам
+       нужно отрендерить одно поле. -->
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"
           onload="if (typeof onKatexReady === 'function') onKatexReady();"></script>
 
   <!-- MathLive — редактор формул. Даёт то, чего не даёт обычное поле ввода:
        напечатал дробь, крышку или подчёркивание — и сразу видишь дробь,
        степень и индекс, а не сырые символы. Если библиотека не загрузилась,
        поля остаются обычными текстовыми (см. upgradeFormulaField). -->
-  <script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"
-          integrity="sha384-5IN6K0kiaz8MufrTGBvPCP3oDeMjmwe+DDTvuyQLNv6gc634FpKbQfllonjHJPmy"
-          crossorigin="anonymous"
+  <script>
+    /* Папка шрифтов MathLive. Берём адрес РЕАЛЬНОГО файла и отрезаем имя:
+       сослаться тегом static на КАТАЛОГ нельзя вовсе —
+       ManifestStaticFilesStorage ищет в манифесте файл, а не папку.
+       (Тег static в комментарии не пишем: Django разбирает шаблон раньше
+       браузера, и «пустой» тег роняет страницу с 500.) */
+    window.MATHLIVE_DIR =
+      "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
+  </script>
+  <script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"
           onload="if (typeof onMathliveReady === 'function') onMathliveReady();"></script>
 
-  <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
-  <script>
-    (function () {
-      try {
-        var saved = localStorage.getItem('theme');
-        var dark = saved ? saved === 'dark'
-                         : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-      } catch (e) {}
-    })();
-  </script>
+  <!-- ⚠️ СВОЕГО BOOTSTRAP ТЕМЫ У КАЛЬКУЛЯТОРА БОЛЬШЕ НЕТ (04.09.2026, п. 9).
+       Он стоял ниже общего и делал ЛИШНЕЕ: при отсутствии сохранённого
+       выбора спрашивал системную тему и явно ставил data-theme="light".
+       На остальном сайте светлая тема — это ОТСУТСТВИЕ атрибута, и
+       `_tokens.html` системную не спрашивает вовсе. Отсюда и «тема
+       скачет»: калькулятор в системной тьме открывался тёмным, а любая
+       соседняя страница — светлой. Теперь тему на всём сайте ставит один
+       скрипт из `_tokens.html`, который подключён выше. -->
 
+  {% comment %}
+  Общая клавиатура формул: одна на калькулятор и домашки (ADR 0075).
+  Стиль — до `calc2.css`, чтобы калькулятор при желании мог что-то
+  переопределить, а не наоборот.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
@@ -67,8 +78,7 @@
 <div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
   <div class="picker-inner">
     <header class="picker-head">
-      <div class="picker-eyebrow">Графики в экономике</div>
-      <h1 class="picker-title" id="picker-title">С чего начнём?</h1>
+      <h1 class="picker-title" id="picker-title">Это графики.</h1>
       <!-- п. 66. Слов ровно два и они не меняются нигде: БЛОК — это группа
            моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. «Раздел»,
            «сценарий» и «сцена» из интерфейса убраны: четыре слова на две
@@ -736,10 +746,6 @@
     </button>
     <button class="dock-btn" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать график">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
-    </button>
-    <div class="dock-spacer"></div>
-    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая или тёмная тема" aria-label="Переключить светлую или тёмную тему">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
     </button>
   </nav>
 
@@ -2479,11 +2485,29 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
 <script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
 <script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
+{% comment %}
+⚠️ ОБЩАЯ КЛАВИАТУРА — ПЕРЕД `82-input.js`. Тот зовёт `window.MathKbd.build`
+при сборке панели ввода; порядок номерных файлов calc2 (00-…99-) при этом не
+нарушается: общий модуль стоит вне их нумерации.
+{% endcomment %}
+<script src="{% static 'mathkbd/mathkbd.js' %}"></script>
 <script src="{% calc2_static 'calc2/82-input.js' %}"></script>
 <script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
 <script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>
 <script src="{% calc2_static 'calc2/88-params.js' %}"></script>
 <script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+
+⚠️ НА КАЛЬКУЛЯТОРЕ КРУЖОК TELEGRAM МОГ БЫ ЗАКРЫТЬ ОРГАНЫ УПРАВЛЕНИЯ: правый
+нижний угол занят панелью. Проверено снимком — панель выше кружка; если
+когда-нибудь опустится, панель сдвигается отступом снизу, а кружок остаётся.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

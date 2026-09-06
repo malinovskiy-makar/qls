@@ -23,6 +23,11 @@
   (собраны `pip-compile` на 3.13). Корневые `requirements.txt` и
   `requirements-local.txt` — указатели на них.
 - Драйвер PostgreSQL — см. раздел «Локальная СУБД» ниже.
+- **Библиотеки браузера лежат в репозитории — `static/vendor/`.** KaTeX,
+  MathLive, D3, Math.js, Chart.js, FullCalendar, html2canvas; внешних CDN у
+  сайта нет с 04.09.2026 ([ADR 0070](adr/0070-vendor-browser-libraries.md)).
+  Что и откуда взято — `static/vendor/README.md`; сторож — тест
+  `config/tests/test_no_external_cdn.py`.
 - Виртуальное окружение — `venv313/`. Рядом сохранены `venv/` (3.9) и
   `venv312/` (мост) до подтверждения владельцем.
 
@@ -196,10 +201,12 @@ manage.py test --settings=config.settings_test_pg
 - **Педагогика:** `Skill`, `MistakeTag`, `Hint`, `Rubric`/`RubricCriterion`,
   `TheoryPage`, `StudentSkillProgress`, `StudentTopicProgress`.
 - **Цикл ученик↔учитель:** `Lesson`, `Assignment`, `Submission`,
-  `TeacherFeedback`, `StudentGroup`.
+  `TeacherFeedback`, `StudentGroup` (у группы с 04.09.2026 —
+  `invite_code`, см. ниже).
 - **Инфраструктура:** `Collection`, `Job`, `Template`, `ExportRecord`,
   `ImportSession`, `DuplicateCandidate` (инвариант `a.id < b.id`),
-  `AutoTopicAssignment`.
+  `AutoTopicAssignment`, `Feedback` (обратная связь беты,
+  [ADR 0076](adr/0076-feedback-to-database.md)).
 
 **Решение по M2M «задача ↔ навык/ошибка»:** объявлены ОДИН раз на стороне
 `Problem` (`related_name='problems'`), доступны с обеих сторон. Иначе Django
@@ -208,6 +215,72 @@ manage.py test --settings=config.settings_test_pg
 ⚠️ **`Lesson` держит три отдельных M2M к `Problem`** (основные / со звёздочкой /
 домашние) с разными `related_name`. Это три независимые таблицы, и так задумано:
 задача бывает основной на одном занятии и домашней на другом.
+
+---
+
+## Что появилось к бете (04.09.2026)
+
+Сессия «Полировка сайта к бета-тесту». Пять мест, которые нужно знать, чтобы
+не написать шестое такое же рядом.
+
+### `problems/sections.py` — пять блоков тем, одна точка правды
+
+Двадцать девять тем таксономии v2 сводятся к пяти блокам: **Микро, Макро,
+Финансы, Математика, Прочее**. Модуль отдаёт `SECTIONS` (порядок и подписи),
+`section_of(имя_темы)` и `grouped(...)`.
+
+⚠️ **Тема относится к блоку по ТОЧНОМУ имени, а не по куску слова.** Раньше
+группировка жила в трёх местах и в каждом по-своему; подписи на радаре
+статистики расходились с подписями в фильтрах каталога. Теперь ими пользуются
+`catalog/filters.py`, `game/filters.py`, `problems/stats.py` и
+`catalog/taxonomy_map.py` — новое место обязано ходить сюда же.
+[ADR 0071](adr/0071-five-sections-one-module.md).
+
+### `static/mathkbd/` — одна клавиатура формул на весь сайт
+
+Раскладка была в двух копиях: своя у калькулятора, своя у поля формул. Теперь
+модуль один (`MathKbd.build(box, adapter)`), эталон — раскладка калькулятора,
+а каждый потребитель приносит свой адаптер (`calc2/static/calc2/82-input.js`,
+`problems/static/platform/mathfield.js`).
+[ADR 0075](adr/0075-one-formula-keyboard.md).
+
+### Аккаунты: регистрация, профиль, аватар
+
+- `problems/views_auth.py::RegisterView` — регистрация по **логину и паролю**
+  с выбором роли; почты у платформы нет вовсе.
+- `problems/forms_accounts.py` — формы; аватар приводится к **256×256 JPEG**,
+  вход ограничен 3 МБ и стороной 4000 px (защита от «пиксельной бомбы»).
+- Смена пароля — **только новый дважды, без старого**:
+  [ADR 0073](adr/0073-password-change-without-old.md). Причина в том же ADR:
+  почты нет, восстанавливать некому.
+
+### Группы по коду приглашения
+
+`StudentGroup.invite_code` — восемь знаков вида `XXXX-XXXX` из алфавита без
+`0`, `O`, `1`, `I` (их путают, когда код диктуют голосом). Пространство
+`32⁸ ≈ 1,1·10¹²`.
+
+⚠️ **Ошибка не говорит, существует ли код:** «такого кода нет» — один и тот же
+ответ и на выдуманный, и на чужой существующий. Иначе перебором собирался бы
+список живых занятий. Частота ограничена областью `join`.
+[ADR 0074](adr/0074-join-group-by-invite-code.md).
+
+⚠️ Миграция `0051` — **в три шага** (добавить поле → заполнить → сделать
+уникальным). Шаг 1 идёт БЕЗ `db_index`: с индексом третий шаг падает на
+PostgreSQL с `relation ..._like already exists`, а на SQLite та же миграция
+проходит. Ловушка описана в [docs/TESTING.md](TESTING.md).
+
+### Обратная связь беты
+
+`Feedback` + `problems/feedback_options.py` + `templates/_feedback.html`.
+Кнопка в шапке на девяти экранах, снимок снимается на клиенте
+(`html2canvas`), запись уходит в базу и читается в админке. Ни бота, ни почты.
+
+⚠️ **Куку `csrftoken` Django ставит, только если кто-то на странице попросил
+токен.** На страницах без единой формы (лендинг, «Учебник», олимпиады) просить
+было некому, и отправка молча падала с 403. Лечится пустой формой с
+`{% csrf_token %}` в самом партиале.
+[ADR 0076](adr/0076-feedback-to-database.md).
 
 ---
 

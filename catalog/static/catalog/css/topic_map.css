@@ -10,9 +10,9 @@
  * Обычной полупрозрачной заливки достаточно.
  */
 
-/* ── Семь цветов разделов корпуса ──────────────────────────────────────
+/* ── Цвета разделов корпуса (их пять) ──────────────────────────────────
  *
- * Значений здесь НЕТ: роли `--map-g-base` … `--map-g-tools` объявлены в
+ * Значений здесь НЕТ: роли `--map-g-micro` … `--map-g-other` объявлены в
  * `templates/_tokens.html` рядом с `--map-node` и `--map-region`, где им и
  * место — там же лежат замеры контраста и обоснование. Карта их только
  * читает, из JavaScript, через getComputedStyle блока `.tmap`.
@@ -222,7 +222,7 @@
 
 /* Прокручиваемая часть панели: «Выбрано» и дерево разделов.
    ⚠️ ПОЛОСЫ ПРОКРУТКИ НЕ ВИДНО, ПОКА НА ПАНЕЛЬ НЕ НАВЕЛИСЬ. В свёрнутом
-   дереве семь строк, прокручивать нечего, а системная полоса в Windows
+   дереве пять строк, прокручивать нечего, а системная полоса в Windows
    всё равно занимала бы место и рисовала серую колонку вдоль всей панели —
    на узкой колонке в 290 px это заметная часть ширины. Прокрутка при этом
    работает всегда: убрана полоса, а не возможность. */
@@ -406,19 +406,17 @@
 .tmap-chip button:hover { color: var(--text); background: var(--chip-bg); }
 
 /* ── Дерево: разделы → темы → теги ─────────────────────────────────────
-   Всё свёрнуто по умолчанию: семь строк вместо двадцати девяти, и панель
+   Всё свёрнуто по умолчанию: пять строк вместо двадцати девяти, и панель
    помещается целиком, без прокрутки.
 
-   ⚠️ ЦВЕТ РАЗДЕЛА БЕРЁТСЯ ПО КЛЮЧУ, А НЕ ЗАДАЁТСЯ В РАЗМЕТКЕ. Семь правил
+   ⚠️ ЦВЕТ РАЗДЕЛА БЕРЁТСЯ ПО КЛЮЧУ, А НЕ ЗАДАЁТСЯ В РАЗМЕТКЕ. Пять правил
    ниже — единственное место, где ключ раздела встречается со своей краской;
    шаблон про цвета не знает вовсе и печатает только `data-sec`. */
-.tmap-tree-sec[data-sec="base"]   { --sec: var(--map-g-base); }
-.tmap-tree-sec[data-sec="market"] { --sec: var(--map-g-market); }
-.tmap-tree-sec[data-sec="firm"]   { --sec: var(--map-g-firm); }
-.tmap-tree-sec[data-sec="state"]  { --sec: var(--map-g-state); }
-.tmap-tree-sec[data-sec="macro"]  { --sec: var(--map-g-macro); }
-.tmap-tree-sec[data-sec="fin"]    { --sec: var(--map-g-fin); }
-.tmap-tree-sec[data-sec="tools"]  { --sec: var(--map-g-tools); }
+.tmap-tree-sec[data-sec="micro"] { --sec: var(--map-g-micro); }
+.tmap-tree-sec[data-sec="macro"] { --sec: var(--map-g-macro); }
+.tmap-tree-sec[data-sec="fin"]   { --sec: var(--map-g-fin); }
+.tmap-tree-sec[data-sec="math"]  { --sec: var(--map-g-math); }
+.tmap-tree-sec[data-sec="other"] { --sec: var(--map-g-other); }
 
 .tmap-tree-sec { margin-bottom: 2px; }
 .tmap-tree-sec:last-child { margin-bottom: 0; }

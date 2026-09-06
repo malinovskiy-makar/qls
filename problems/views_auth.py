@@ -27,9 +27,14 @@ Django, а не наша: `ModelBackend` при несуществующем и�
 хэш пароля вхолостую (`UserModel().set_password`), чтобы отклик занимал
 столько же. Закреплено тестом `problems/tests/test_auth_hardening.py`.
 """
+from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView  # noqa: F401
+from django.shortcuts import redirect
+from django.views.generic.edit import FormView
 
 from problems import ratelimit
+from problems.forms_accounts import RegisterForm
+from problems.models_platform import UserProfile
 
 # Имя счётчика. Своё у каждого входа в систему: когда появятся регистрация
 # и восстановление пароля, они возьмут свои имена и свои ступени.
@@ -91,3 +96,70 @@ class RoleBasedLoginView(LoginView):
         if user.role == 'teacher':
             return '/teacher/'
         return '/admin/'
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Регистрация
+# ═══════════════════════════════════════════════════════════════════════
+#
+# ⚠️ СВОЙ СЧЁТЧИК, А НЕ ОБЩИЙ СО ВХОДОМ. Регистрацию и вход ограничивают
+# разные вещи: у входа считается подбор пароля к КОНКРЕТНОМУ имени, здесь —
+# массовое создание аккаунтов с одного адреса. Общий счётчик означал бы,
+# что неудачные входы запирают регистрацию, и наоборот.
+#
+# ⚠️ СЧЁТ ИДЁТ ПО АДРЕСУ И ПО УСПЕХАМ, А НЕ ПО ПРОМАХАМ. У входа промах —
+# признак подбора; здесь промах это обычная опечатка в пароле, а вредна как
+# раз УДАЧНАЯ регистрация, повторённая двадцать раз.
+REGISTER_SCOPE = 'register'
+
+
+class RegisterView(FormView):
+    """Регистрация по логину и паролю. Роль выбирает сам человек.
+
+    Почты нет: подтверждать её нечем (решение владельца 04.09.2026).
+    «Забыли пароль» — через Telegram и админку, там же в шаблоне ссылка.
+    """
+
+    template_name = 'registration/register.html'
+    form_class = RegisterForm
+
+    def dispatch(self, request, *args, **kwargs):
+        # Вошедшему регистрироваться незачем — уводим в профиль.
+        if request.user.is_authenticated:
+            return redirect('profile')
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['locked_seconds'] = ratelimit.check(REGISTER_SCOPE,
+                                                    self.request, None)
+        return context
+
+    def post(self, request, *args, **kwargs):
+        wait = ratelimit.check(REGISTER_SCOPE, request, None)
+        if wait:
+            # 429, как на входе: форма даже не собирается связанной.
+            form = self.get_form_class()()
+            response = self.render_to_response(
+                self.get_context_data(form=form, locked_seconds=wait,
+                                      rate_limited=True))
+            response.status_code = 429
+            return response
+        return super().post(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        user = form.save()
+
+        # Профиль с выбранной ролью. `UserProfile.save()` сам подтянет
+        # старое поле `User.role` через существующее соответствие.
+        profile_role = form.cleaned_data['role']
+        UserProfile.objects.update_or_create(
+            user=user, defaults={'role': profile_role})
+
+        # Считаем УДАЧНУЮ регистрацию: см. комментарий у REGISTER_SCOPE.
+        ratelimit.note_failure(REGISTER_SCOPE + ':ip',
+                               ratelimit.client_ip(self.request),
+                               multiplier=1)
+
+        login(self.request, user)   # cycle_key Django делает сам
+        return redirect('/profile/?welcome=1')

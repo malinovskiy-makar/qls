@@ -1,0 +1,45 @@
+{% extends 'teacher/base.html' %}
+{% comment %}
+Правка занятия: название и описание. Больше здесь ничего не меняется —
+состав правится на обзоре, код приглашения там же.
+{% endcomment %}
+{% block title %}{{ group.name }} · правка{% endblock %}
+
+{% block extra_style %}{% include 'teacher/groups/_style.html' %}
+.ge-field { margin-bottom: 14px; }
+.ge-field label { display: block; font-size: 14px; font-weight: 500;
+                  margin-bottom: 6px; }
+.ge-field input, .ge-field textarea {
+  width: 100%; font: inherit; font-size: 14px; padding: 9px 12px;
+  border-radius: var(--r); border: .5px solid var(--border);
+  background: var(--surface-2); color: var(--text);
+}
+.ge-field textarea { min-height: 90px; resize: vertical; }
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <div>
+    <h1 class="page-title">Правка занятия</h1>
+    <div class="page-sub">{{ group.name }}</div>
+  </div>
+</div>
+
+<div class="card" style="max-width:620px">
+  <form method="post">
+    {% csrf_token %}
+    <div class="ge-field">
+      <label for="id_name">Название</label>
+      <input type="text" id="id_name" name="name" maxlength="200"
+             value="{{ group.name }}" required>
+    </div>
+    <div class="ge-field">
+      <label for="id_description">Описание</label>
+      <textarea id="id_description" name="description">{{ group.description }}</textarea>
+    </div>
+    <button type="submit" class="btn-primary">Сохранить</button>
+    <a href="{% url 'teacher:group_detail' group.pk %}"
+       style="margin-left:10px;font-size:14px;color:var(--text2);">Отмена</a>
+  </form>
+</div>
+{% endblock %}

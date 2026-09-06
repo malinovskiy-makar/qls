@@ -61,6 +61,28 @@ class UserProfile(models.Model):
         STUDENT = 'student', 'Ученик'
         PARENT = 'parent', 'Родитель'
 
+    class Level(models.TextChoices):
+        """Уровень подготовки. Спрашиваем у ученика ОДИН раз, в профиле.
+
+        Названия и описания — слова владельца (04.09.2026). Это данные в
+        одном месте: переименовать можно, не трогая ни один экран.
+        """
+        NOVICE = 'novice', 'Новичок'
+        BASIC = 'basic', 'Базовый'
+        REGION = 'region', 'Региональный'
+        FINAL = 'final', 'Всеросник'
+
+    # Описание уровня — рядом с самим уровнем, чтобы не разъехалось.
+    LEVEL_HINTS = {
+        'novice': 'Только начинаю, экономику почти не изучал',
+        'basic': 'Знаю основные модели, решаю задачи школьного и '
+                 'муниципального этапов',
+        'region': 'Участвовал в региональном этапе ВсОШ или в отборах '
+                  'перечневых олимпиад',
+        'final': 'Выходил на заключительный этап ВсОШ или призёр перечневых '
+                 'олимпиад первого уровня',
+    }
+
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
         related_name='profile', verbose_name='Пользователь',
@@ -89,6 +111,18 @@ class UserProfile(models.Model):
     # желанию: лишние персональные данные ребёнка — лишний риск по 152-ФЗ.
     phone = models.CharField('Телефон', max_length=32, blank=True,
                              help_text='Необязательно.')
+
+    level = models.CharField(
+        'Уровень подготовки', max_length=16, blank=True,
+        choices=Level.choices,
+        help_text='Необязательно. Нужен, чтобы подбирать задачи по силам.')
+
+    # ⚠️ ПЕРВОЕ ПОЛЕ С ФАЙЛОМ В ПРОЕКТЕ. Что кладётся — решает НЕ загрузчик:
+    # форма пересжимает картинку Pillow в JPEG 256×256 и сама задаёт имя
+    # `avatars/<id>.jpg`. Имя из запроса не участвует нигде — иначе это был
+    # бы обход каталога. Отдаётся файл только своей же вьюхой (`avatar`),
+    # напрямую из `/media/` nginx его не покажет: см. docs/SECURITY.md.
+    avatar = models.ImageField('Аватар', upload_to='avatars/', blank=True)
 
     created_at = models.DateTimeField('Создан', auto_now_add=True)
     updated_at = models.DateTimeField('Изменён', auto_now=True)
@@ -1502,3 +1536,74 @@ class TutorNote(models.Model):
 
     def __str__(self):
         return 'заметка %s об %s' % (self.tutor, self.student)
+
+
+# ===========================================================================
+# Обратная связь беты (04.09.2026, ADR 0076)
+# ===========================================================================
+
+class Feedback(models.Model):
+    """«Проблема или предложение» — то, что человек написал с экрана.
+
+    ⚠️ ПИШЕТСЯ В БАЗУ И ЧИТАЕТСЯ В АДМИНКЕ. Ни бота, ни почты (решение
+    владельца 04.09.2026): бот требует токена, дежурного и своей истории, а
+    почта — рассылки, которой у платформы нет. На бете важно НЕ ПОТЕРЯТЬ
+    сообщение, а не доставить его за секунду.
+
+    ⚠️ ГОСТЮ МОЖНО. Половина беты — люди, которые ещё не завели аккаунт, и
+    именно у них ломается вход. Требовать логин, чтобы пожаловаться на форму
+    входа, — верный способ не узнать о поломке.
+    """
+
+    class Kind(models.TextChoices):
+        PROBLEM = 'problem', 'Проблема'
+        IDEA = 'idea', 'Предложение'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='feedback',
+        verbose_name='Кто написал',
+        help_text='Пусто — писал гость.')
+    kind = models.CharField('Что это', max_length=16, choices=Kind.choices)
+
+    # Ключ экрана: по нему подбирается список вариантов и группируются
+    # жалобы. Строкой, а не выбором из списка: набор экранов меняется
+    # чаще, чем схема базы, и живёт в `problems/feedback_options.py`.
+    page_key = models.CharField('Экран', max_length=32, db_index=True)
+    url = models.CharField('Адрес', max_length=500, blank=True)
+
+    choices = models.JSONField('Выбранные варианты', default=list, blank=True)
+    other_text = models.TextField('Своими словами', blank=True)
+    comment = models.TextField('Комментарий', blank=True)
+
+    # ⚠️ ВТОРАЯ (И ПОСЛЕДНЯЯ) ФАЙЛОВАЯ ВЬЮХА ПРОЕКТА — за этим полем.
+    # Отдаётся только staff и только из админки; путь берётся из поля, а не
+    # из запроса. Разбор — docs/SECURITY.md, раздел «Пользовательские файлы».
+    screenshot = models.ImageField('Снимок экрана', upload_to='feedback/%Y/%m/',
+                                   blank=True)
+
+    viewport = models.CharField('Окно', max_length=32, blank=True)
+    theme = models.CharField('Тема', max_length=16, blank=True)
+    user_agent = models.CharField('Браузер', max_length=300, blank=True)
+
+    created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    handled = models.BooleanField('Разобрано', default=False, db_index=True)
+    note = models.TextField('Пометка для своих', blank=True)
+
+    class Meta:
+        verbose_name = 'Обратная связь'
+        verbose_name_plural = 'Обратная связь'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        who = self.user.username if self.user_id else 'гость'
+        return '%s · %s · %s' % (self.get_kind_display(), self.page_key, who)
+
+    @property
+    def short(self):
+        """Первая осмысленная строка — для списка в админке."""
+        if self.other_text.strip():
+            return self.other_text.strip()[:90]
+        if self.choices:
+            return '; '.join(str(c) for c in self.choices)[:90]
+        return self.comment.strip()[:90] or '—'

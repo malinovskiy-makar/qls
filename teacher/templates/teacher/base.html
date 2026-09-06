@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
@@ -9,9 +9,9 @@
   {% include '_favicon.html' %}
 
   <!-- KaTeX -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"></script>
+  <script defer src="{% static 'vendor/katex-0.16.9/contrib/auto-render.min.js' %}"
           onload="initKaTeX()"></script>
 
   <style>
@@ -181,5 +181,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% block extra_js %}{% endblock %}
 
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

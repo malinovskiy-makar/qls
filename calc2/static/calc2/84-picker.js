@@ -148,17 +148,15 @@ function closePicker() {
   redrawAll();   // график стал видимым — пересчитать размеры под холст
 }
 
-/* А41 · А68. Открыв блок, человек всё ещё видел шапку первого экрана: кикер
-   «ГРАФИКИ В ЭКОНОМИКЕ», заголовок «С чего начнём?» и инструкцию «Откройте
-   раздел и выберите модель» — уже ПОСЛЕ того, как раздел открыт. Вместе с
-   кнопкой возврата это занимало 332 пикселя над первой карточкой, и при
-   высоте окна 392 карточка была видна на пятую часть.
-
-   Метка на самом окне; шапку прячет стиль. Одно место на все переходы. */
-function setPickerBlockOpen(on) {
-  const p = document.getElementById('scene-picker');
-  if (p) p.classList.toggle('block-open', !!on);
-}
+/* А41 · А68 — ПРАВИЛО СНЯТО 04.09.2026 (п. 9 разбора владельца).
+   Прятать шапку при открытом блоке было нужно, пока она занимала 332
+   пикселя: кикер «ГРАФИКИ В ЭКОНОМИКЕ», заголовок «С чего начнём?» и
+   инструкция стояли НАД первой карточкой уже после того, как блок открыт.
+   Кикера больше нет, заголовок стал короткой строкой «Это графики.» —
+   прятать нечего, а прятался он в том числе при ВОЗВРАТЕ из сцены, и
+   человек видел список моделей без единой строки о том, где он.
+   Вместе с правилом убраны класс block-open и функция, которая его
+   ставила: ничего другого она не делала. */
 
 function openPicker() {
   const p = document.getElementById('scene-picker');
@@ -182,11 +180,9 @@ function openPicker() {
     group.classList.add('open');
     if (blocks) blocks.classList.add('hidden');
     if (back) back.classList.add('shown');
-    setPickerBlockOpen(true);
   } else {
     if (blocks) blocks.classList.remove('hidden');
     if (back) back.classList.remove('shown');
-    setPickerBlockOpen(false);
   }
   const first = group
     ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
@@ -453,7 +449,6 @@ function foldPickerGroups() {
     document.querySelectorAll('#scene-picker .picker-group').forEach(x => x.classList.remove('open'));
     blocks.classList.remove('hidden');
     back.classList.remove('shown');
-    setPickerBlockOpen(false);
     inner.scrollIntoView({ block: 'start' });
   };
   back.addEventListener('click', showBlocks);
@@ -502,7 +497,6 @@ function foldPickerGroups() {
       groups.forEach(x => x.classList.remove('open'));
       g.classList.add('open');
       back.classList.add('shown');
-      setPickerBlockOpen(true);
       inner.scrollIntoView({ block: 'start' });
     });
     blocks.appendChild(card);

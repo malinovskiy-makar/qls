@@ -1,17 +1,26 @@
 {% extends "platform/base.html" %}
 {% load static ru %}
 
-{% block title %}Моя статистика{% endblock %}
+{% block title %}Статистика{% endblock %}
 
 {% block extra_style %}
 {% include "platform/_stats_style.html" %}
 {% endblock %}
 
 {% block content %}
+{% comment %}
+Статистика — четвёртая вкладка профиля. Экран остаётся по своему адресу
+(`/profile/stats/`): у него свои расчёты и свой кэш, переезжать ему незачем.
+Полоса вкладок нужна, чтобы человек видел её частью профиля, а не отдельной
+страницей, на которую он попал случайно.
+{% endcomment %}
+{% include 'platform/_profile_tabs.html' with active='stats' %}
+
 <div class="stats-head">
   <div>
-    <h1 class="stats-title">Моя статистика</h1>
-    <div class="stats-sub">Что получается, что просело и что делать дальше.</div>
+    <h1 class="stats-title">Это ваша статистика.</h1>
+    <div class="stats-sub">Анализируйте свои сильные и слабые стороны,
+      отслеживайте прогресс и решайте, в чем развиваться в первую очередь.</div>
   </div>
   <div class="period-bar" id="period-bar">
     {% for key, label in periods %}
@@ -420,7 +429,7 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="{% static 'vendor/chartjs-4.4.1/chart.umd.min.js' %}"></script>
 <script id="stats-data" type="application/json">{{ chart_json|safe }}</script>
 <script src="{% static 'platform/stats.js' %}"></script>
 {% endblock %}
