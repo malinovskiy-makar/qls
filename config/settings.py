@@ -299,6 +299,12 @@ SITE_VERSION = 'beta 0.0'
 SITE_ENV = os.environ.get('SITE_ENV', 'prod').strip()
 SITE_BUILD = os.environ.get('GIT_SHA', '').strip()[:7]
 
+# Пароль двух тестовых аккаунтов площадки (`dev-teacher`, `dev-student`).
+# Задаётся ТОЛЬКО в `/srv/weconomics/dev/.env` на сервере и читается
+# командой `dev_scrub`. Пусто везде, кроме площадки: команда с пустым
+# значением отказывается работать, а не заводит аккаунт без пароля.
+DEV_ACCOUNTS_PASSWORD = os.environ.get('DEV_ACCOUNTS_PASSWORD', '').strip()
+
 LOGIN_REDIRECT_URL = '/student/'  # переопределяется в RoleBasedLoginView
 # ⚠️ ПОСЛЕ ВЫХОДА — НА ГЛАВНУЮ, А НЕ НА ФОРМУ ВХОДА (04.09.2026). Человек
 # нажал «Выйти» — значит, он закончил, а не собирается войти снова. Главная
