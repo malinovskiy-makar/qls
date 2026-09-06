@@ -413,3 +413,27 @@ provider` @ `772ac87` (пуш 06.09 02:07 МСК) и `wip/sol-vs-glm-scripts` @
 - `docs/TESTING.md`: команда `python -m unittest discover -s scripts/tests -t .` не описана (фаза 3).
 - Рабочая локальная база — SQLite, не PostgreSQL; формулировки про «31 тыс. задач в PostgreSQL» уточнить в фазе 11.
 - Фазы 12 (джоб `migrations`) и 13 (полный прогон на PostgreSQL) требуют Docker — статус см. фазу 9.
+
+## Сессия B: main → прод → чистка GitHub и Windows
+
+### Фаза −1. Сверка с реальностью
+
+✅ Все пункты сошлись с ожиданием, расхождений нет.
+
+| Проверка | Ожидание | Факт |
+|---|---|---|
+| `git status --short -uall` (без `??`) | пусто | пусто |
+| `git branch --show-current` | `integration/sync-20260905` | совпало |
+| `git rev-parse HEAD origin/integration/sync-20260905` | оба `7458d560…` | оба `7458d5608a0676512aebbd748ff9abf8f9bc6c3b` |
+| `git rev-parse main origin/main` | оба `6b8406110d9d7e24afb8e796e6e0dc10197eb143` | совпало |
+| `git merge-base --is-ancestor main HEAD` | ff-ok | ff-ok |
+| `git rev-list --count main..HEAD` | 164 | 164 |
+| `git stash list` | пусто | пусто |
+| `git worktree list` | 11 записей (B_PLAN §5а) + сама `qls` | 12 строк, состав совпал с B_PLAN §5а |
+| `git ls-remote --tags origin \| grep -c archive/\|backup/main-before-sync` | 8 | 8 |
+| `git ls-remote --heads origin \| wc -l` | 54 | 54 |
+| `qls-models` status / HEAD | пусто / `772ac87e…` | пусто / `772ac87e4de094c221970ce8f4f4af950696ba51` |
+
+**CI #115** — [run 34026895692](https://github.com/malinovskiy-makar/qls/actions/runs/34026895692), `headSha` `7458d5608a0676512aebbd748ff9abf8f9bc6c3b` = HEAD. Все пять джобов зелёные (Стиль/ruff, Миграции с нуля, Безопасность, Продакшен-настройки, Тесты на PostgreSQL 17). Числа шага A/B из джоба «Тесты на PostgreSQL 17»: **шаг A — 4413 тестов, OK (skipped=5), 447,9 с; шаг B — 8 тестов, OK (skipped=3), 208,0 с.** Отличается от локального прогона фазы 13 (4411/1 и 8/4) — расхождение в среде CI (два теста больше в сборе, другой набор пропусков), не красное, стопа не требует.
+
+Вопрос владельцу задан (приёмка на runserver) — ждём ответ «принято» перед началом B1.
