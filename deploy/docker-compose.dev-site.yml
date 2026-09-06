@@ -1,0 +1,164 @@
+# Площадка разработчиков dev.weconomics.ai.
+#
+# ⚠️ ЭТО ВТОРОЙ COMPOSE-ПРОЕКТ НА ТОМ ЖЕ СЕРВЕРЕ, И ЗАПУСКАЕТСЯ ОН НЕ ОТСЮДА.
+# Файл лежит в репозитории, но команды даются из ДЕВ-КЛОНА:
+#     cd /srv/weconomics/dev/app
+#     docker compose -f deploy/docker-compose.dev-site.yml up -d
+# Боевой клон (/srv/weconomics/app) этот файл не запускает никогда: у боя свой
+# docker-compose.yml, и путать их нельзя — у них разные .env и разные базы.
+#
+# ⚠️ ИМЯ ПРОЕКТА ЗАДАНО ЯВНО, ПО ТОЙ ЖЕ ПРИЧИНЕ, ЧТО И У БОЯ. Без ключа name
+# compose взял бы имя от каталога («deploy»), и оно совпало бы с тем, что взял
+# бы боевой проект: два разных набора служб под одним именем, общие тома,
+# «up -d» одного гасит контейнеры другого. Здесь имя ДРУГОЕ, чем у боя, —
+# это и есть граница между площадкой и боем.
+name: weconomics-dev
+
+# ⚠️ СЕТЬ ВНЕШНЯЯ И ОБЩАЯ С БОЕМ, И ЭТО НАМЕРЕННО.
+# Её создал боевой проект (там она называется `backend`, полное имя —
+# `weconomics_backend`). Общая сеть нужна ради ТРЁХ вещей:
+#   1. боевой nginx — единственная дверь наружу — должен видеть `web-dev`
+#      и `ws-dev` по имени, иначе площадке потребовался бы свой порт 443,
+#      а второго на сервере нет;
+#   2. PostgreSQL общий: у площадки СВОЯ БАЗА (`weconomics_dev`) в ТОМ ЖЕ
+#      контейнере. Второй Postgres на 8 ГБ — лишний гигабайт ни за что;
+#   3. `search` общий, и второй экземпляр ЗАПРЕЩЁН: модель весит 2,12 ГБ,
+#      вторая копия просто не поместится (запрет P0, docs/SERVER.md).
+#
+# `external: true` означает «сеть уже есть, создавать не надо». Если боевой
+# проект не поднят — площадка не стартует, и это правильное поведение:
+# без боевых postgres и nginx она всё равно нерабочая.
+networks:
+  backend:
+    external: true
+    name: weconomics_backend
+
+services:
+
+  # ⚠️ REDIS У ПЛОЩАДКИ СВОЙ, А НЕ ОБЩИЙ С БОЕМ. Это единственная служба,
+  # которую пришлось задублировать, и вот почему.
+  # Настройки раскладывают данные по НОМЕРАМ баз одного Redis: 0 — кэш,
+  # 1 — сессии, 3 — табло дуэлей (config/settings.py). Номера зашиты в код,
+  # а не в переменную, поэтому «дать площадке базы 4–6» нельзя без правки
+  # настроек — то есть без расхождения между площадкой и боем, ради устранения
+  # которого площадка и заводится.
+  # На общем Redis вышло бы: сессии площадки и боя в одной базе 1, а
+  # `cache.clear()` у Redis — это FLUSHDB, он вычищает базу ЦЕЛИКОМ. Один
+  # сброс кэша на площадке разлогинил бы живых людей на бою.
+  # Цена вопроса — около 10 МБ памяти. Дёшево.
+  redis-dev:
+    image: redis:7-alpine
+    container_name: weco-redis-dev
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ. Публикация портов в Docker обходит ufw: правило
+    # в ufw есть, а порт открыт всему интернету. Наружу ходит только nginx.
+    # Пароль подставляет оболочка ВНУТРИ контейнера из env_file — так же,
+    # как у боя: compose на хосте до /srv/weconomics/dev/.env не дотягивается.
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes"]
+    env_file:
+      - /srv/weconomics/dev/.env
+    volumes:
+      - redisdata_dev:/data
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # ⚠️ ЭТО НЕ «ВТОРОЙ КОНТЕЙНЕР web», ЗАПРЕЩЁННЫЙ ПРАВИЛОМ P0.
+  # Запрет касается второго процесса, накатывающего миграции В ОДНУ И ТУ ЖЕ
+  # БАЗУ: entrypoint мигрирует без блокировки, и два процесса развалили бы
+  # схему. Здесь база ДРУГАЯ — `weconomics_dev`, отдельная от боевой в том же
+  # контейнере PostgreSQL. Гонки нет: у каждой базы ровно один мигрирующий
+  # процесс. Правило остаётся в силе — второй web НА БОЕВОЙ БАЗЕ по-прежнему
+  # нельзя.
+  web-dev:
+    build:
+      # Контекст — корень ДЕВ-КЛОНА (файл лежит в его deploy/). Собирается
+      # ровно тот код, что вытянул автовыкаткой `dev_autodeploy.sh`.
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        # Хеш коммита вшивается в образ и показывается плашкой в шапке.
+        # Передаётся при сборке: --build-arg GIT_SHA=$(git rev-parse --short HEAD).
+        # Без аргумента приедет `unknown` — образ соберётся, плашка покажет
+        # окружение без хеша.
+        GIT_SHA: ${GIT_SHA:-unknown}
+    # ⚠️ ИМЯ ОБРАЗА ДРУГОЕ, ЧЕМ У БОЯ (`weconomics-web:latest`). Совпади они —
+    # сборка площадки перезаписала бы боевой образ, и следующий рестарт боевого
+    # контейнера поднял бы на бою код с main, никем не подтверждённый.
+    image: weconomics-web-dev:latest
+    container_name: weco-web-dev
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ. Наружу ходит только боевой nginx, он обращается
+    # к `web-dev` по имени в общей сети backend.
+    # ⚠️ СВОЙ .env, НЕ БОЕВОЙ. В нём другая DATABASE_URL (weconomics_dev),
+    # другой REDIS_URL (redis-dev), SITE_ENV=dev и свои ALLOWED_HOSTS.
+    # Путь абсолютный: файл живёт вне клона, клон можно снести и склонировать.
+    env_file:
+      - /srv/weconomics/dev/.env
+    volumes:
+      # Тома свои: боевые `static`/`media` трогать нельзя — collectstatic
+      # площадки перезаписал бы файлы, которые отдаёт боевой nginx.
+      - static_dev:/app/staticfiles
+      - media_dev:/app/media
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+      # ⚠️ postgres И search ЗДЕСЬ НЕ ПЕРЕЧИСЛЕНЫ, И ЭТО НЕ ЗАБЫТО.
+      # depends_on работает только внутри своего compose-проекта, а они живут
+      # в боевом. Ожидание базы делает сам entrypoint (deploy/entrypoint.sh:
+      # настоящее соединение, а не sleep) — он для того и написан.
+    networks:
+      - backend
+    healthcheck:
+      # ⚠️ ЗАГОЛОВОК Host ОБЯЗАТЕЛЕН И ОТЛИЧАЕТСЯ ОТ БОЕВОГО. Стучимся прямо
+      # в gunicorn, минуя nginx; у Django ALLOWED_HOSTS площадки содержит
+      # только dev.weconomics.ai, и с боевым Host проверка получила бы 400 —
+      # то есть краснела бы на полностью живом приложении.
+      test: ["CMD-SHELL", "curl -fsS -H 'Host: dev.weconomics.ai' http://127.0.0.1:8000/healthz/ | grep -q '\"ok\": true'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      # Первый старт долгий: миграции с нуля плюс сборка статики.
+      start_period: 120s
+
+  # ⚠️ У ws-dev СВОЙ ENTRYPOINT, И В НЁМ НЕТ МИГРАЦИЙ — как и у боевого `ws`.
+  # Образ тот же, что у web-dev; миграции в базу площадки накатывает ровно
+  # один процесс (web-dev), иначе схема развалится.
+  ws-dev:
+    image: weconomics-web-dev:latest
+    container_name: weco-ws-dev
+    restart: unless-stopped
+    # ports: НЕ ДОБАВЛЯТЬ.
+    env_file:
+      - /srv/weconomics/dev/.env
+    entrypoint: ["/app/deploy/entrypoint-ws.sh"]
+    depends_on:
+      redis-dev:
+        condition: service_healthy
+      # Статику и миграции готовит web-dev; ws-dev стартует после него, чтобы
+      # не обслуживать сокеты на несогласованной схеме.
+      web-dev:
+        condition: service_healthy
+    networks:
+      - backend
+    healthcheck:
+      # Своя ручка, не трогающая ни Django, ни базу: gunicorn может отвечать,
+      # а daphne лежать, и заметил бы это только игрок посреди дуэли.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8001/ws/health/ | grep -q 'ws ok'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  # ⚠️ ИМЕНА ТОМОВ ПОЛУЧАТ ПРЕФИКС ПРОЕКТА: weconomics-dev_static_dev и т.д.
+  # С боевыми weconomics_static они не пересекаются — ровно ради этого у
+  # проекта другое имя.
+  static_dev:
+  media_dev:
+  redisdata_dev:
