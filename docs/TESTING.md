@@ -480,6 +480,13 @@ venv313/Scripts/python.exe scripts/run_tests.py --scope-from-git main
 venv313/Scripts/python.exe scripts/run_tests.py --scope-from-git 4126d7d
 ```
 
+Тесты самого механизма (`scripts/tests/`) в набор `manage.py test` не входят —
+это не Django-приложение. Гоняются отдельно, обычным `unittest`:
+
+```bash
+venv313/Scripts/python.exe -m unittest discover -s scripts/tests -t .   # 50 тестов (06.09.2026)
+```
+
 Без аргумента — diff от последнего коммита (`git diff --name-only HEAD` +
 `git status --porcelain`, объединение). С аргументом — diff от указанной
 базы (`git diff --name-only <база>...HEAD`, тот же union с untracked).
