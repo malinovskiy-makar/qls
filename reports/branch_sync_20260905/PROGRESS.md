@@ -65,7 +65,7 @@
 | 13 Полный прогон PostgreSQL | ✅ | (этот коммит) | `scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads --settings=config.settings_test_pg --noinput` (`logs/13-full-run.txt`), `--parallel` не трогался. **Шаг A: Ran 4411 tests in 1090.9s — OK (skipped=1). Шаг B: Ran 8 tests in 270.6s — OK (skipped=4).** Код возврата 0. failures 0, errors 0. Причины пропусков при verbosity 1 не печатаются; по составу шага B — три `BitExactEncodingTests` (нет модели BGE-M3) и браузерная регрессия calc2 (node-раннер > 180 с). Известный красный calc2 (`calc2_math.mjs`, 40,375 px) в Django-прогон не попадает — он в пропуске раннера, доказан фазой 7 отдельно. Новых падений нет (тире починены до запуска). Числа вписаны в CLAUDE.md («Проверки перед сдачей») |
 | 16 Обход сайта (ночная фаза) | ✅ | (этот коммит) | Команда обхода из полировки — `scripts/site_audit_probe.js` (боты `shot_bot*` уже в базе, записей не понадобилось). `bash scripts/polish_server.sh 8901` → `node scripts/site_audit_probe.js 8901 logs/16-audit.json` (4 мин 34 с) → сервер погашен. **Страниц: 19 адресов × роли (гость/ученик/учитель по доступу) × 3 ширины × 2 темы; ошибок консоли и разбора скриптов 0; ответов 4xx/5xx на свои запросы 0; внутренних ссылок проверено 75, битых 0.** Находок 8 — все об одном: `/catalog/problem/63321/` на 380 px едет вбок (документ 484 px; за краем `ARTICLE.pd-main`, `DIV.pd-acts`, `DIV.pp-rows`, `DIV.pp-row`; гость и ученик, обе темы). Это страница редизайна (`.pd-wrap`) — визуальный дефект, ночью не чинился → карточка «Задачи» (Надо) + «Вопросы к утру». Дополнительно коды гостя по 22 адресам curl-ом (`logs/16-guest-codes.txt`): публичные 12 → 200 (в т. ч. `/olympiads/vseros/`, `/textbook/`, `/calendar/` — открыт гостю), закрытые 8 → 302 на `/login/?next=…`, `/admin/` → 302 на `/admin/login/`, несуществующий → 404; 5xx нет |
 | 17 План сессии B (только чтение) | ✅ | (этот коммит) | `reports/branch_sync_20260905/B_PLAN.md`: (а) 45 веток origin — предки integration (`logs/17-origin-branches.txt`), (б) пять хвостов — теги покрывают вершины на origin, (в) команды `git push origin --delete` по 10 в строку, (г) 29 локальных веток к `-d` + 5 к `-D` с причиной, (д) 11 worktree: 9 к сносу (3 с неучтённым — осмотр владельца), `qls-models` и `qls-olymp` остаются, (е) серверные команды из docs/SERVER.md с ожиданием хеша; ⚠️ nginx-конфиг менялся (`weconomics.ai` в `server_name`, коммит `2f7adb9`) — на сервере копируется руками через `nginx -t`. Ничего не выполнялось |
-| 14 Итог сессии | | | |
+| 14 Итог сессии | ✅ | (этот коммит — последний) | Инварианты: четыре `??`; `check` чист; `makemigrations --check` → No changes detected; `main..HEAD` = 156 до этого коммита (157 с ним); шесть веток — предки HEAD; дубли ADR только 0013–0015; stash пуст; `main` = `origin/main` = `6b840611`; `qls-models` `772ac87e` не тронута; ignored-tracked без разницы с main. Копии баз сессии (`logs/*.sqlite3`) удалены; `db.sqlite3.bak_pre_sync_20260906` (932 МБ) оставлена владельцу. Notion: карточка задачи дополнена строкой «A1–A3 сделаны 06.09…»; комментарий в «Два ADR 0050/0051» (статус не менял); запись в «Результаты» 06.09; карточки «Задачи»: maxItems (Готово), тире calc2 (Готово), import_olympiads finat (Надо), страница задачи 380 px (Надо); «Решения»: заглушка «Учебник» (06.09). Отчёт и утренний список — раздел «Итог сессии» ниже |
 | 15 Рабочая база `db.sqlite3` (разрешено заранее) | ✅ (шаг 5 пропущен, шаг 4 — демо) | — (база вне git) | **1.** На порту 8000 сидела цепочка `manage.py runserver` из `qls` (pid 20796→12816→27544→26876, автоперезагрузка) — сервер владельца; погашен `taskkill /T` (действие вне репозитория, по разрешению фазы 15). **2.** Копия `db.sqlite3.bak_pre_sync_20260906`, 932 548 608 байт = оригинал. **3.** `migrate --plan` (`logs/15-migrate-working-db.txt`) — ровно 10: olympiads 0002–0006, problems 0050_problem_character_features, 0051_catalog_attempt, 0052_hint_ai_flags, 0053_hint_reviewed_backfill, 0054_merge (0047 и beta-polish 0050–0052 уже стояли); `migrate` 28 с без ошибок; неприменённых 0. **4.** `import_olympiads_data` без `--yes` — план: 37 источников, 17 олимпиад, 50 уровней, 32 этапа, 15 дат, 9 баллов, 7 программ, 88 льгот, 89 регионов, 12 комплектов. `--yes` — **упал** в `_load_benefits`: `Olympiad.DoesNotExist` — `benefits.jsonl` ссылается на slug `finat` (Финуниверситет, коммит `0d8394f` сессии 2), которого нет в `olympiads.jsonl`; остальные файлы ссылаются только на существующие slug. Команда атомарна — все таблицы olympiads остались по нулям. По ночному правилу («раздел остался пустым») — `seed_olympiads_demo` план → `--yes`: 21 олимпиада (16 main + 5 related), 4 этапа/4 даты у vseros, 7 программ, 21 льгота, 14 баллов, 12 комплектов, 85 регионов, все 11 инвариантов сошлись, `is_placeholder=True` (`logs/15-seed-olympiads.txt`). Данные `data/olympiads/out` не правились — карточка «Задачи» (Надо) + «Вопросы к утру». **5.** `import_problem_attributes` — **пропущено: файла разметки нет** (ни `reports/problem_attributes/`, ни `*attr*.jsonl` в дереве; команда ждёт путь к JSONL аргументом; по коду пишет только `character` и `features` — P0 не нарушала бы) |
 
 ## Теги (фаза 0)
@@ -151,6 +151,52 @@ CI GitHub: #112 (КТ1) ✅ пять джобов · #113 (КТ2) ❌ тольк
 git status: четыре ??, журнал — правится
 Дальше: фаза 13 (полный прогон на PostgreSQL, фон) → 15 → 16 → 17 → 14
 ```
+
+## Итог сессии (фаза 14) — отчёт по шаблону
+
+```
+Итог — блоки A1–A3 + ночные фазы 13, 15, 16, 17
+HEAD integration/sync-20260905: коммит журнала фазы 14 (предыдущий — 3fb3cd08); коммитов над main: 157
+  (формула: 6 веток = 23+5+27+26+24+29 = 134 · 6 merge · 17 служебных: журнал ×9, миграция 0054 ×2,
+   карта calc2, схема attempts, ADR, документы, тире, числа прогона)
+Влито: feat/beta-polish-0904 13b3e1f · feat/scoped-test-runner 1690397 · origin/feat/olympiads-screens 128391e ·
+  origin/feat/catalog-redesign 36de913 · origin/feat/calc2-monoexport-one-chart aca9bd2 · feat/embeddings-c13-diagnostics 0729a47
+Конфликты и как решены: журналы — объединение / сторона с поздней датой; .gitignore — объединение;
+  catalog/filters.py — редизайн + TOPIC_GROUPS из sections; catalog/topic_blocks.py — тонкий слой над problems/sections.py
+  (пять блоков, пять цветов); catalog/views.py — редизайн + title_display через similar_title; problem_detail.html —
+  1120 без .page-wrap 860; prompts.py и test_template_hygiene.py — объединение без потерь
+Миграции: problems — один лист 0054_merge (зависимости 0052_feedback, 0053_hint_reviewed_backfill, 0047_problem_figure_raster),
+  файлы не перенумерованы; olympiads 0001–0006; с нуля на PostgreSQL 99 миграций; путь обновления и откат — на копии; локальная
+  db.sqlite3 мигрирована (10 новых)
+Тесты: полный прогон PostgreSQL — A 4411 OK (skipped 1), B 8 OK (skipped 4), код 0; известные красные: calc2_math.mjs
+  «Регулятор сцены» 40,375 px — тот же на чистом main (не регрессия); control_numbers 512/512
+Отклонения от задания: рабочая база SQLite, не PostgreSQL (поправка 3); logs/ вне git (поправка 5); Docker Desktop
+  перезапущен после удаления сокета; два кода-исправления после слияний (карта calc2, схема attempts) + тире из calc2;
+  import_olympiads_data не прошёл (finat) — раздел на демо; import_problem_attributes — файла нет
+Нужны решения владельца (утро): finat в olympiads.jsonl; страница задачи 380 px; /calendar/ гостю 200; удалить ли
+  db.sqlite3.bak после приёмки; integration после перемотки main
+Команды владельцу: git push origin integration/sync-20260905
+Дальше: утренний список ниже → сессия B по B_PLAN.md
+```
+
+### Утренний список владельца
+
+1. `git push origin integration/sync-20260905` → пять джобов CI на GitHub (локально все зелёные; #113 падал на
+   тире — починено).
+2. Проверить Actions: https://github.com/malinovskiy-makar/qls/actions — новый run на вершине ветки.
+3. `venv313\Scripts\python.exe manage.py runserver` (база уже мигрирована, олимпиады — демо) → чек-лист приёмки:
+   - `/` — шапка с пятью блоками и пунктом «Учебник», тёмная тема;
+   - `/catalog/` — поле поиска, множественный выбор, окно «Все фильтры»: **подписи блоков короткие («Микро», «Макро»,
+     «Финансы», «Математика», «Прочее»), точки блоков и чипы тем — пятью цветами блоков**; живой счётчик;
+   - `/catalog/problem/<id>/` — полоса 1120, карточка чата справа, похожие задачи без обрывков формул
+     (⚠️ на 380 px едет вбок — карточка Надо);
+   - `/catalog/map/`, `/olympiads/`, `/olympiads/vseros/` (демо-данные, is_placeholder);
+   - `/calc2/` — сцены «Монополист и внешний рынок» и «Международная торговля»;
+   - регистрация и профиль с аватаром, вход в группу по коду приглашения, клавиатура формул, виджет обратной связи,
+     `/textbook/` — «Скоро.».
+4. Ответы на «Вопросы к утру» (finat, 380 px, /calendar/).
+5. Сессия B по `reports/branch_sync_20260905/B_PLAN.md`: перемотка main → прод (nginx-конфиг руками) → теги и
+   wip/* на origin → удаление 46 веток origin, 34 локальных, 9 worktree.
 
 ## Поправки владельца
 
