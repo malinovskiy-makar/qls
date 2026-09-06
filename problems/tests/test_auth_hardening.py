@@ -283,3 +283,42 @@ class NoForeignAuthProvidersTests(TestCase):
             with self.subTest(name=name):
                 with self.assertRaises(NoReverseMatch):
                     reverse(name)
+
+
+class LoginRedirectsBackToNextTests(TestCase):
+    """После входа человек должен попасть туда, откуда его послали
+    логиниться, а не на дефолтный экран роли.
+
+    Найдено вручную (сессия 02.09): анонимный переход по ссылке дуэли
+    `/game/duel/new/?mode=blitz` уводит на `/login/?next=...`, но после
+    успешного входа `RoleBasedLoginView.get_success_url()` игнорировал
+    `next` целиком и вёл на `/student/`/`/teacher/`/`/admin/` — дуэль
+    так и не создавалась, без единой ошибки на экране."""
+
+    def setUp(self):
+        self.student = User.objects.create_user(
+            'realnyy_uchenik', password=GOOD_PASSWORD, role='student')
+
+    def test_next_wins_over_role_default(self):
+        target = '/game/duel/new/?mode=blitz'
+        resp = self.client.post(
+            '/login/?next=' + target,
+            {'username': 'realnyy_uchenik', 'password': GOOD_PASSWORD})
+        self.assertRedirects(resp, target, fetch_redirect_response=False)
+
+    def test_missing_next_still_falls_back_to_role_default(self):
+        """Без next — прежнее поведение: студента ведёт в кабинет."""
+        resp = self.client.post(
+            '/login/',
+            {'username': 'realnyy_uchenik', 'password': GOOD_PASSWORD})
+        self.assertRedirects(resp, '/student/', fetch_redirect_response=False)
+
+    def test_unsafe_next_is_rejected_not_followed(self):
+        """Открытый редирект на чужой домен — не через эту форму.
+
+        `next` на чужой хост обязан быть отброшен (как и в штатном
+        Django LoginView), а не использован буквально."""
+        resp = self.client.post(
+            '/login/?next=https://evil.example.com/phish',
+            {'username': 'realnyy_uchenik', 'password': GOOD_PASSWORD})
+        self.assertRedirects(resp, '/student/', fetch_redirect_response=False)

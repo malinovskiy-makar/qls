@@ -1,0 +1,192 @@
+{% comment %}
+СКРИПТ ЭКРАНА КАТАЛОГА.
+
+Первая половина — поле запроса (крестик, стрелка, честное «ищу»). Вторая —
+БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего `problem_list.html`: модальное окно
+задачи и кнопка «+ В домашку». Окно «Все фильтры» живёт отдельным файлом
+`catalog/static/catalog/js/catalog_filters.js`.
+
+⚠️ ПОИСК И ЧИПЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА: форма и крестики чипов —
+серверные. Скрипт добавляет удобство, а не условие пользования каталогом.
+{% endcomment %}
+<script>
+/* ── Поле запроса: текст, крестик, стрелка, честное «ищу» ────────────
+   Крестик и стрелка живут ВНУТРИ поля (решение владельца 04.09.2026):
+   крестик виден только при тексте, стрелка при тексте становится
+   янтарной — за это отвечает класс has-text на форме. Enter отправляет,
+   Shift+Enter переносит строку: поле многострочное, но человек ждёт от
+   поиска поведения поиска.
+
+   Первый смысловой запрос идёт около семи секунд: модель грузится
+   лениво. Молчащий экран в эти секунды выглядит зависшим, поэтому на
+   время запроса подсказка о способе сменяется на «Ищу…» (класс is-busy). */
+(function () {
+  var form = document.getElementById('ct-ask-form');
+  var field = document.getElementById('ct-q');
+  if (!form || !field) return;
+  var clear = document.getElementById('ask-clear');
+
+  function sync() {
+    var text = field.value.trim();
+    form.classList.toggle('has-text', text.length > 0);
+    /* Поле растёт под ВВЕДЁННЫЙ текст и не ниже трёх строк; без текста
+       высота возвращается к трём строкам из CSS.
+       ⚠️ scrollHeight ПУСТОГО поля считает и перенесённый placeholder:
+       на узком окне подсказка ложится в полсотни строк, и поле раздувалось
+       на весь экран. Меряем только при тексте и при снятом flex — иначе
+       замер берёт высоту, до которой поле уже растянул ряд. */
+    field.style.height = '';
+    if (!text) return;
+    field.style.flex = '0 0 auto';
+    var height = Math.max(96, field.scrollHeight);
+    field.style.flex = '';
+    field.style.height = height + 'px';
+  }
+  field.addEventListener('input', sync);
+  field.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
+  });
+  if (clear) clear.addEventListener('click', function () {
+    field.value = ''; sync(); field.focus();
+  });
+  form.addEventListener('submit', function () {
+    if (field.value.trim()) form.classList.add('is-busy');
+  });
+  sync();
+})();
+
+
+</script>
+<script>
+// ── Модальное окно ────────────────────────────────
+function openCatalogModal(pid, e) {
+  if (e) { e.preventDefault(); e.stopPropagation(); }
+  document.getElementById('c-modal-backdrop').classList.add('open');
+  document.getElementById('c-modal-title').textContent = '…';
+  document.getElementById('c-modal-meta').innerHTML = '';
+  document.getElementById('c-modal-source').textContent = '';
+  document.getElementById('c-modal-body').innerHTML = '<div class="c-modal-loading">Загрузка…</div>';
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + pid + '/';
+
+  fetch('/catalog/api/problem/' + pid + '/')
+    .then(r => r.json())
+    .then(data => {
+      if (data.error) {
+        document.getElementById('c-modal-body').textContent = 'Ошибка загрузки.';
+        return;
+      }
+      renderCatalogModal(data);
+    })
+    .catch(() => {
+      document.getElementById('c-modal-body').textContent = 'Ошибка сети.';
+    });
+}
+
+// ⚠️ ОКНО СОБИРАЕТСЯ УЗЛАМИ, А НЕ СТРОКОЙ HTML, И ЭТО НЕ СТИЛЬ.
+//
+// Раньше условие подставлялось в шаблонную строку разметки, и готовая
+// строка уезжала в innerHTML. Условие приходит из JSON каталога, то есть
+// прямо из банка: 31 690 задач приехали из внешних источников. Задача с
+// текстом-нагрузкой (битая картинка с обработчиком onerror) выполняла бы
+// чужой код в браузере
+// КАЖДОГО посетителя каталога — вход для этого не нужен, страница публичная.
+//
+// `textContent` кладёт строку как текст: браузер не разбирает её как
+// разметку. KaTeX это не мешает — он и так ходит по текстовым узлам, ровно
+// как на серверной странице задачи, где условие всегда выводилось
+// экранированным.
+//
+// Единственные строки, которые здесь по-прежнему становятся разметкой, —
+// наши собственные («решение ✓», скобка после метки пункта). Всё, что
+// пришло из данных, идёт через textContent.
+function chip(text, extraClass) {
+  const el = document.createElement('span');
+  el.className = 'c-modal-tag' + (extraClass ? ' ' + extraClass : '');
+  el.textContent = text;
+  return el;
+}
+
+function renderCatalogModal(data) {
+  document.getElementById('c-modal-title').textContent = data.title;
+  document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
+
+  const meta = document.getElementById('c-modal-meta');
+  meta.textContent = '';
+  if (data.difficulty_str) {
+    const d = document.createElement('span');
+    d.style.cssText = 'font-size:14px;color:var(--amber);';
+    d.textContent = data.difficulty_str;
+    meta.appendChild(d);
+  }
+  (data.topics || []).forEach(t => meta.appendChild(chip(t)));
+  if (data.problem_type) { meta.appendChild(chip(data.problem_type)); }
+  if (data.has_solution) { meta.appendChild(chip('решение ✓', 'sol')); }
+
+  if (data.sources && data.sources.length) {
+    document.getElementById('c-modal-source').textContent = data.sources.join(', ');
+  }
+
+  const body = document.getElementById('c-modal-body');
+  body.textContent = '';
+  const stmt = document.createElement('div');
+  stmt.textContent = data.statement || '';
+  body.appendChild(stmt);
+
+  if (data.parts && data.parts.length) {
+    data.parts.forEach(part => {
+      const wrap = document.createElement('div');
+      wrap.className = 'c-modal-part';
+
+      const label = document.createElement('div');
+      label.className = 'c-modal-part-label';
+      if (part.label) {
+        label.textContent = String(part.label).replace(/[).．。\s]+$/, '') + ')';
+      }
+      if (part.points) {
+        const pts = document.createElement('span');
+        pts.style.cssText = 'color:var(--text2);font-size:13px;';
+        pts.textContent = ' (' + part.points + ' б.)';
+        label.appendChild(pts);
+      }
+      wrap.appendChild(label);
+
+      const text = document.createElement('div');
+      text.textContent = part.text || '';
+      wrap.appendChild(text);
+
+      body.appendChild(wrap);
+    });
+  }
+
+  maskEscapedDollars(document.getElementById('c-modal-body'));
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(document.getElementById('c-modal-body'), {
+      delimiters: [
+        { left: '$$', right: '$$', display: true  },
+        { left: '$',  right: '$',  display: false },
+        { left: '\\[', right: '\\]', display: true  },
+        { left: '\\(', right: '\\)', display: false }
+      ],
+      throwOnError: false,
+      trust: false
+    });
+  }
+  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
+  fixCurrencyDollars(document.getElementById('c-modal-body'));
+}
+
+function closeCatalogModal(e) {
+  if (e.target === document.getElementById('c-modal-backdrop')) {
+    closeCatalogModalDirect();
+  }
+}
+function closeCatalogModalDirect() {
+  document.getElementById('c-modal-backdrop').classList.remove('open');
+  closeAllDropdowns();
+}
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeCatalogModalDirect();
+});
+
+</script>
+{% include "catalog/_hw_dropdown_js.html" %}

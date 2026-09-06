@@ -18,7 +18,7 @@
   <meta name="description" content="{{ og_description }}">
 
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="ЭкЗадачи">
+  <meta property="og:site_name" content="Weconomics">
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_description }}">
   <meta property="og:url" content="{{ page_url }}">
@@ -34,9 +34,9 @@
 
   <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: 16px; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -45,10 +45,10 @@ body {
 .wrap { max-width: 520px; margin: 0 auto; padding: 40px 16px 48px; }
 .brand {
   display: flex; align-items: center; gap: 8px;
-  font-size: 13px; font-weight: 700; color: var(--text3);
+  font-size: 14px; font-weight: 700; color: var(--text3);
   text-decoration: none; letter-spacing: .3px;
 }
-.brand b { color: var(--accent); }
+.brand b { color: var(--accent-ink); }
 .card {
   margin-top: 16px;
   background: var(--surface);
@@ -59,28 +59,28 @@ body {
 .chip {
   display: inline-block;
   padding: 3px 10px; border-radius: 999px;
-  background: var(--accent-tint); color: var(--accent);
-  font-size: 12.5px; font-weight: 700;
+  background: var(--accent-tint); color: var(--accent-ink);
+  font-size: 13px; font-weight: 700;
 }
-.date { margin-left: 6px; font-size: 12.5px; color: var(--text3); }
+.date { margin-left: 6px; font-size: 13px; color: var(--text3); }
 .score {
   margin: 12px 0 2px;
   font-size: 54px; font-weight: 800; letter-spacing: -2px;
   font-variant-numeric: tabular-nums; line-height: 1;
 }
-.score small { font-size: 15px; font-weight: 600; color: var(--text3); letter-spacing: 0; margin-left: 8px; }
+.score small { font-size: 16px; font-weight: 600; color: var(--text3); letter-spacing: 0; margin-left: 8px; }
 .facts { display: flex; gap: 22px; margin-top: 18px; }
 .fact b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fact span { font-size: 11.5px; color: var(--text3); }
+.fact span { font-size: 13px; color: var(--text3); }
 .curve { margin-top: 18px; }
 .curve svg { display: block; width: 100%; height: auto; }
-.curve p { margin-top: 4px; font-size: 11px; color: var(--text3); }
+.curve p { margin-top: 4px; font-size: 13px; color: var(--text3); }
 
 h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 .tp { list-style: none; display: flex; flex-direction: column; gap: 9px; }
 .tp-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
-.tp-name { font-size: 13px; font-weight: 600; }
-.tp-num { font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tp-name { font-size: 14px; font-weight: 600; }
+.tp-num { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
 .tp-bar {
   grid-column: 1 / -1;
   display: flex; height: 7px; border-radius: 999px; overflow: hidden;
@@ -95,7 +95,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
   display: block; margin-top: 26px;
   height: 54px; line-height: 54px;
   border-radius: 12px;
-  background: var(--accent); color: #fff;
+  background: var(--accent); color: var(--act-ink-solid);  /* белый даёт 2,28 в тёмной */
   font-size: 17px; font-weight: 700; text-align: center;
   text-decoration: none;
   transition: filter .12s, transform .1s;
@@ -105,15 +105,15 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 .share-row { display: flex; gap: 8px; margin-top: 10px; }
 .share-row button {
   flex: 1;
-  font: inherit; font-size: 13.5px; font-weight: 600;
+  font: inherit; font-size: 14px; font-weight: 600;
   height: 42px;
   border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface); color: var(--text2);
   cursor: pointer;
 }
-.share-row button:hover { border-color: var(--accent); color: var(--accent); }
-.foot { margin-top: 18px; font-size: 12px; color: var(--text3); text-align: center; }
-.foot a { color: var(--accent); }
+.share-row button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.foot { margin-top: 18px; font-size: 13px; color: var(--text3); text-align: center; }
+.foot a { color: var(--accent-ink); }
 @media (max-width: 480px) {
   .facts { gap: 14px; }
   .score { font-size: 44px; }
@@ -122,7 +122,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 </head>
 <body>
 <div class="wrap">
-  <a class="brand" href="{{ game_url }}"><b>Эк</b> ЭкЗадачи · Econ Rush</a>
+  <a class="brand" href="{{ game_url }}"><b>Weconomics</b> · Wecon Rush</a>
 
   <div class="card">
     <span class="chip">{{ mode_title }}</span>
@@ -140,19 +140,19 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
         <span>макс. комбо</span>
       </div>
       <div class="fact">
-        <b>{% if r.ended_reason == 'lives' %}0/3{% else %}—{% endif %}</b>
+        <b>{% if r.ended_reason == 'lives' %}0/3{% else %}–{% endif %}</b>
         <span>{% if r.ended_reason == 'lives' %}жизни кончились{% else %}время вышло{% endif %}</span>
       </div>
     </div>
 
     {% if curve_points %}
     <div class="curve">
-      <svg viewBox="0 0 300 60" role="img" aria-label="Рост счёта по ходу забега">
+      <svg viewBox="0 0 300 60" role="img" aria-label="Рост счёта по ходу раунда">
         <polyline points="{{ curve_points }}" fill="none" stroke="var(--accent)"
                   stroke-width="2" stroke-linejoin="round"
                   vector-effect="non-scaling-stroke"/>
       </svg>
-      <p>счёт по ходу забега</p>
+      <p>счёт по ходу раунда</p>
     </div>
     {% endif %}
 
@@ -180,7 +180,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
     </div>
   </div>
 
-  <p class="foot">Econ Rush — игра на скорость по олимпиадной экономике.
+  <p class="foot">Wecon Rush – игра на скорость по олимпиадной экономике.
     <a href="{{ game_url }}">Играть</a></p>
 </div>
 
@@ -195,7 +195,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 
   copy.addEventListener('click', function () {
     function done(ok) {
-      copy.textContent = ok ? 'Скопировано ✓' : 'Не вышло — скопируйте вручную';
+      copy.textContent = ok ? 'Скопировано ✓' : 'Не вышло, скопируйте вручную';
       setTimeout(function () { copy.textContent = 'Скопировать ссылку'; }, 2000);
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {

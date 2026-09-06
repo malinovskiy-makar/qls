@@ -1,34 +1,63 @@
-{% extends 'catalog/base.html' %}
+{% extends 'catalog/base.html' %}{% load static %}
 
-{% block title %}ЭкЗадачи{% endblock %}
+{% block title %}Weconomics{% endblock %}
 
 {% block extra_style %}
 /* ── Главная страница ───────────────────────────────── */
+
+/* ⚠️ ЭТОТ БЛОК СТИЛЕЙ ПРИХОДИТ ТОЛЬКО С ЛЕНДИНГА, поэтому правило для общей
+   обёртки здесь безопасно: на других страницах его просто нет.
+   Ширина 1160 вместо общих 860 — ради пяти карточек в один ряд. При 860
+   карточка выходила 150 px, и описание ломалось на шесть строк.
+   Отступы обёртки завязаны на высоту окна: на большом экране остаются
+   прежними, на ноутбучном ужимаются. Кегли при этом НЕ ТРОГАЮТСЯ —
+   экономим на воздухе, а не на тексте (владелец жаловался на мелкий шрифт,
+   и прошлая сессия специально поднимала размеры до 16/14/13). */
+.page-wrap {
+  max-width: 1160px;
+  padding-top: clamp(10px, 2.4vh, 40px);
+  padding-bottom: clamp(10px, 2.2vh, 80px);
+}
+
 .home-wrap {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding-top: 48px;
+  padding-top: clamp(2px, 1.6vh, 48px);
 }
 
-.home-title {
-  font-size: 44px;
-  font-weight: 800;
-  letter-spacing: -1px;
+/* ⚠️ ЗДЕСЬ «ЦАРСКИЙ» ЛОГОТИП, А НЕ НАЗВАНИЕ ШРИФТОМ. Лендинг — публичная
+   поверхность, и знак на ней должен быть тем самым, нарисованным, а не
+   набранным Montserrat. Ширина ограничена, высота производная: замок
+   горизонтально-вертикальный (845×451), и задавать обе стороны значит
+   растянуть его. */
+.home-logo {
+  /* ⚠️ ТРЕТЬЕ ОГРАНИЧЕНИЕ — ПО ВЫСОТЕ ОКНА, И ОНО ЗДЕСЬ ГЛАВНОЕ. Знак
+     горизонтально-вытянутый (845×451), то есть каждые 100 px ширины стоят
+     53 px высоты — на невысоком ноутбуке он один съедал треть экрана. На
+     мониторе 47vh больше 420 и не действует вовсе: там всё как было. */
+  width: min(420px, 76vw, 44vh);
+  height: auto;
+  display: block;
+  /* ⚠️ БУКВЫ «economics» ИДУТ ЗА ТЕМОЙ, И ЭТО НЕ ПРИДИРКА. В присланном
+     файле они залиты тёмным #2b2b29 — на кремовом это правильно, а на
+     тёмном фоне слово исчезает: на снимке тёмной темы от него оставался
+     призрак. Поэтому знак вставлен разметкой, а буквы красятся
+     currentColor. Росчерк W остаётся фирменной бирюзой в ОБЕИХ темах —
+     так и в макете 06, а он тёмный. */
   color: var(--text);
 }
-.home-title .accent { color: var(--accent); }
 
 .home-slogan {
-  margin-top: 10px;
+  margin-top: clamp(4px, 1.1vh, 10px);
   font-size: 16px;
   color: var(--text2);
 }
 
 /* ── Поиск ──────────────────────────────────────────── */
 .home-search {
-  margin-top: 36px;
+  margin-top: clamp(16px, 3.1vh, 36px);
   width: 100%;
   max-width: 560px;
   position: relative;
@@ -39,7 +68,7 @@
   width: 100%;
   height: 52px;
   padding: 0 116px 0 20px;
-  font-size: 15px;
+  font-size: 16px;
   font-family: inherit;
   border: 1.5px solid var(--border);
   border-radius: 26px;
@@ -62,21 +91,41 @@
   font-size: 14px;
   font-weight: 600;
   font-family: inherit;
-  color: var(--on-btn);
-  background: var(--btn-bg);
+  /* ⚠️ ЯНТАРНАЯ, А НЕ ГРАФИТОВАЯ — ИСКЛЮЧЕНИЕ, ВЫБРАННОЕ ПО ЗАМЕРУ.
+     Владелец просил кнопку ярче, а правило проекта требует от текста на
+     крупной сплошной кнопке порога AAA (7,0). Разбор пяти вариантов показал,
+     что «ярко» и AAA совместимы, просто не в тех парах, что пробовали:
+       бирюза #00797a + белый          5,23  — не проходит
+       янтарь #d6a525 + --text #2d2d2d 6,08  — не проходит
+       янтарь #d6a525 + #1d1a16        7,65  — проходит  ← взято
+       бирюза #005f60 + белый          7,48  — проходит, но в тёмной теме
+                                              к полю всего 1,93 и сливается
+     Порог не понижен и тест не тронут: он сторожит токены --btn-bg/--on-btn,
+     а здесь своя пара. Против поля кнопка даёт 2,19 в светлой и 6,39 в
+     тёмной. Территория янтаря лендинг разрешает — поверхность публичная,
+     и та же пара стоит на кнопке входа в шапке. */
+  color: var(--brand-amber-ink);
+  background: var(--brand-amber);
   border: none;
   border-radius: 20px;
   cursor: pointer;
   transition: background .15s;
 }
-.home-search button:hover { background: var(--btn-bg-hover); }
+.home-search button:hover { background: var(--brand-amber-hover); }
 
 /* ── Статистика ─────────────────────────────────────── */
+/* ⚠️ СЕТКА, А НЕ FLEX. У flex с общим отступом блоки разной ширины, и
+   середина СРЕДНЕГО блока не совпадает с серединой страницы: «29» стояло
+   заметно левее центра. Три равные колонки ставят её ровно по центру. */
 .home-stats {
-  margin-top: 44px;
-  display: flex;
-  gap: 56px;
+  margin-top: clamp(18px, 3.2vh, 44px);
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 32px;
+  text-align: center;
 }
+/* Знак «+» мельче числа и прижат к верху: масса числа не уезжает вправо. */
+.stat-plus { font-size: .6em; vertical-align: top; margin-left: 1px; }
 .stat-num {
   font-size: 30px;
   font-weight: 700;
@@ -84,26 +133,35 @@
 }
 .stat-label {
   margin-top: 2px;
-  font-size: 13px;
+  font-size: 14px;
   color: var(--text2);
 }
 
 /* ── Карточки ───────────────────────────────────────── */
+/* Пять разделов в один ряд. Ширина ряда — вся обёртка: при 720 px
+   карточка выходила 128 px и заголовок «Графический калькулятор» вставал
+   в три строки. */
 .home-cards {
-  margin-top: 48px;
+  margin-top: clamp(18px, 3.2vh, 48px);
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
   width: 100%;
-  max-width: 720px;
 }
 .home-card {
   display: block;
-  padding: 24px 18px;
-  border: 1.5px solid var(--border);
+  padding: clamp(13px, 2.2vh, 24px) 14px;
+  /* Рамка янтарём — как в макете 06. Лендинг публичный, и правило
+     территории брендовый янтарь здесь прямо разрешает. */
+  border: 1.5px solid var(--brand-amber);
   border-radius: 12px;
   text-decoration: none;
   color: var(--text);
+  /* ⚠️ ЗАЛИВКА СВЕТЛАЯ, ЦВЕТ ЖИВЁТ В КОНТУРЕ. Песочный --surface-info давал
+     к фону страницы 1,056 — карточка не отделялась от фона, и команда
+     дизайна назвала это кашей. Цвет карточки с содержимым --surface даёт
+     1,128 в светлой и 1,198 в тёмной при пороге 1,10: карточка читается
+     как отдельный предмет, а брендовый янтарь остаётся рамкой. */
   background: var(--surface);
   transition: border-color .15s, box-shadow .15s, transform .15s;
 }
@@ -120,7 +178,7 @@
   margin: 0 auto;
   border-radius: 12px;
   background: var(--accent-tint);
-  color: var(--accent);
+  color: var(--accent-ink);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -131,7 +189,7 @@
 .card-title {
   /* min-height + центрирование выравнивает старт описаний при 1- и 2-строчных заголовках */
   margin-top: 14px;
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 600;
   line-height: 1.25;
   min-height: 38px;
@@ -141,14 +199,20 @@
 }
 .card-desc {
   margin-top: 4px;
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--text2);
   line-height: 1.4;
 }
 
+/* Ниже 1040 px пять карточек в ряд становятся уже 180 px и описание
+   рассыпается — ряд ломается на 3 + 2. Оба целевых ноутбука (1440 и 1366)
+   до этого порога не доходят и держат один ряд. */
+@media (max-width: 1040px) {
+  .home-cards { grid-template-columns: repeat(3, 1fr); }
+}
 @media (max-width: 640px) {
   .home-cards { grid-template-columns: 1fr; }
-  .home-stats { gap: 32px; }
+
   .home-title { font-size: 34px; }
 }
 {% endblock %}
@@ -156,52 +220,100 @@
 {% block content %}
 <div class="home-wrap">
 
-  <h1 class="home-title">Эк<span class="accent">Задачи</span></h1>
-  <p class="home-slogan">Платформа задач по олимпиадной экономике</p>
+  <h1 style="margin:0">
+    {% include '_wordmark.html' %}
+  </h1>
+  <p class="home-slogan">Решай. Разбирайся. Побеждай.</p>
 
   <form class="home-search" action="/catalog/" method="get">
-    <input type="text" name="q" placeholder="Поиск по условиям задач…" autofocus>
+    {% comment %}
+      ⚠️ Плейсхолдер печатается сам — общим партиалом
+      `_typing_placeholder.html` (блок extra_js), фразы — в
+      `catalog/placeholder_phrases.py`. В разметке лежит ПЕРВЫЙ запрос
+      целиком: он же остаётся статичным при «уменьшить движение» и он же
+      виден, если скрипт не отработал.
+      ⚠️ Многострочный {# … #} здесь НЕ РАБОТАЕТ: он однострочный, и всё
+      его содержимое вываливается на экран текстом. Проверено снимком.
+    {% endcomment %}
+    <input type="text" name="q" id="home-q" placeholder="{{ home_phrases.0.text }}" autofocus
+           autocomplete="off">
     <button type="submit">Найти</button>
   </form>
 
+  {% comment %}
+    Порядок задан владельцем 04.09: задач в базе → тем → олимпиад.
+    Знак «+» вынесен отдельным мелким span: в общей строке он утяжелял
+    число справа, и «25+» переставало стоять по центру своей колонки.
+  {% endcomment %}
   <div class="home-stats">
     <div class="stat">
       <div class="stat-num">{{ problems_count }}</div>
       <div class="stat-label">задач в базе</div>
     </div>
     <div class="stat">
-      <div class="stat-num">{{ sources_count }}</div>
-      <div class="stat-label">источников</div>
-    </div>
-    <div class="stat">
       <div class="stat-num">{{ topics_count }}</div>
       <div class="stat-label">тем</div>
     </div>
+    <div class="stat">
+      <div class="stat-num">{{ olympiads_count }}<span class="stat-plus">+</span></div>
+      <div class="stat-label">олимпиад</div>
+    </div>
   </div>
 
+  {% comment %}
+    Пять разделов, порядок задан владельцем. Иконки — единый line-SVG 24×24,
+    fill none / stroke currentColor / ширина штриха 1,75 / скруглённые концы.
+    Три старые сохранены у своих карточек; две новые (секундомер и календарь)
+    нарисованы по той же метрике, а не взяты из чужого набора.
+    Маршруты сверены по urls.py: все пять существуют.
+    ⚠️ /calc2/ и /calendar/ требуют входа — гость с лендинга попадёт на
+    страницу входа. Это не поломка, но и не решение этой сессии.
+  {% endcomment %}
   <div class="home-cards">
     <a class="home-card" href="/catalog/">
       <div class="card-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 6.6C10.4 5.5 7.9 5 4 5v12.5c3.9 0 6.4.5 8 1.5 1.6-1 4.1-1.5 8-1.5V5c-3.9 0-6.4.5-8 1.6Z"/><path d="M12 6.6v12.4"/></svg>
       </div>
-      <div class="card-title">Каталог задач</div>
-      <div class="card-desc">Фильтры по теме, сложности и источнику, поиск по тексту</div>
+      <div class="card-title">Умный каталог задач</div>
+      <div class="card-desc">Поиск задач по темам и сложности с интерактивной картой</div>
     </a>
     <a class="home-card" href="/calc2/">
       <div class="card-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4v16h16"/><path d="M7.5 13.5 11 9l3 2 3.5-5"/></svg>
       </div>
       <div class="card-title">Графический калькулятор</div>
-      <div class="card-desc">Кривые спроса и предложения, благосостояние, экспорт</div>
+      <div class="card-desc">Стройте графики и разбирайте экономические модели</div>
+    </a>
+    <a class="home-card" href="/game/">
+      <div class="card-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 3h5"/><path d="M12 3v3"/><circle cx="12" cy="13.5" r="7.5"/><path d="M12 10v3.5l2.4 1.7"/></svg>
+      </div>
+      <div class="card-title">Тренажёр для тестов</div>
+      <div class="card-desc">Решайте в условиях ограниченного времени и бросьте вызов друзьям</div>
+    </a>
+    <a class="home-card" href="/calendar/">
+      <div class="card-icon">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="5" width="16" height="15" rx="3.5"/><path d="M8.5 3.2v3.4"/><path d="M15.5 3.2v3.4"/><path d="M4 9.8h16"/><circle cx="9" cy="14.2" r="1.15" fill="currentColor" stroke="none"/></svg>
+      </div>
+      <div class="card-title">Календарь олимпиадника</div>
+      <div class="card-desc">Следите за отборами, турами и важными дедлайнами</div>
     </a>
     <a class="home-card" href="{% url 'catalog:random_problem' %}">
       <div class="card-icon">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="3.5"/><circle cx="8.8" cy="8.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="15.2" r="1.15" fill="currentColor" stroke="none"/><circle cx="15.2" cy="8.8" r="1.15" fill="currentColor" stroke="none"/><circle cx="8.8" cy="15.2" r="1.15" fill="currentColor" stroke="none"/></svg>
       </div>
       <div class="card-title">Случайная задача</div>
-      <div class="card-desc">Открыть случайную опубликованную задачу из базы</div>
+      <div class="card-desc">Откройте случайную задачу и начните решать прямо сейчас</div>
     </a>
   </div>
 
 </div>
+{% endblock %}
+
+{% block extra_js %}
+{% comment %}
+Бегущая подсказка — ОДНА реализация на главную и каталог
+(`templates/_typing_placeholder.html`); здесь только подключение.
+{% endcomment %}
+{% include "_typing_placeholder.html" with el_id="home-q" phrases=home_phrases %}
 {% endblock %}

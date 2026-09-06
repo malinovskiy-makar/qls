@@ -142,12 +142,29 @@ class StudentFactsTests(TestCase):
         self.assertIn('<span class="cap">город</span>', html)
 
     def test_value_is_bigger_and_denser_than_the_label(self):
+        """⚠️ Проверяется ОТНОШЕНИЕ, а не два конкретных кегля.
+
+        Раньше здесь стояли литералы 14 px и 11 px. От поднятия пола шкалы
+        01.09.2026 метка стала 13 px, и тест покраснел — хотя свойство
+        «значение крупнее и плотнее метки» сохранилось (14 против 13 плюс
+        полужирное начертание против обычного).
+
+        ⚠️ Зазор сузился с 3 px до 1 px, и это осознанная цена поднятия пола:
+        подпись не может быть мельче 13. Иерархию теперь держит в основном
+        НАЧЕРТАНИЕ, поэтому проверка на него обязательна.
+        """
+        import re as _re
         style = render_to_string('platform/_stats_style.html')
         self.assertIn('.student-facts { display: flex', style)
-        self.assertIn('font-size: 14px', style.split('.student-facts')[1][:200])
+        значение = float(_re.search(r'\.student-facts \{[^}]*font-size:\s*([\d.]+)px',
+                                    style).group(1))
+        метка = float(_re.search(r'\.student-facts \.cap \{[^}]*font-size:\s*([\d.]+)px',
+                                 style).group(1))
+        self.assertGreater(значение, метка,
+                           'значение обязано быть крупнее метки: %s против %s'
+                           % (значение, метка))
+        self.assertGreaterEqual(метка, 13, 'пол подписи по канону — 13 px')
         self.assertIn('.student-facts .fact { font-weight: 600', style)
-        # Метка осталась мелкой: заметнее — не значит «всё крупное».
-        self.assertIn('.student-facts .cap { font-size: 11px', style)
 
     def test_separator_is_drawn_by_css(self):
         """Литеральной точки в разметке нет — иначе она висела бы у

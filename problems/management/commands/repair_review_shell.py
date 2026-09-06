@@ -208,7 +208,7 @@ def spread_pairs(screens):
 
 PAGE = r"""<!doctype html>
 <html lang="ru"><head><meta charset="utf-8">
-<title>Оценка починок — ЭкЗадачи</title>
+<title>Оценка починок — Weconomics</title>
 __KATEX__
 <style>
 :root{--ink:#1a1c22;--muted:#8a8f99;--line:#e2e4e9;--bg:#f6f7f9;--acc:#BE185D}

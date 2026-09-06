@@ -2,25 +2,26 @@
 База страниц платформы (профиль, редактор задач).
 Ту же шапку и токены, что у остальных публичных страниц, берём из
 _tokens.html и _nav.html — второй набор цветов заводить нельзя.
-{% endcomment %}<!DOCTYPE html>
+{% endcomment %}{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Платформа{% endblock %} — ЭкЗадачи</title>
+  <title>{% block title %}Платформа{% endblock %} · Weconomics</title>
 
   {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
 
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"></script>
+  <script defer src="{% static 'vendor/katex-0.16.9/contrib/auto-render.min.js' %}"
           onload="initKaTeX()"></script>
 
   <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: 16px; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   color: var(--text); background: var(--bg); min-height: 100vh;
 }
 .page-wrap { max-width: 960px; margin: 0 auto; padding: 32px 24px 80px; }
@@ -81,5 +82,13 @@ function initKaTeX() {
 {% include '_area_js.html' %}
 
 {% block extra_js %}{% endblock %}
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

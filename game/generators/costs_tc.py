@@ -141,17 +141,17 @@ class CostsTCArchetype(Archetype):
         def full(p, s):
             good = _market.GOODS[p['good']]
             return (u'Фирма производит {}. Её общие издержки описываются '
-                    u'функцией {}, где $Q$ — выпуск (в шт.), издержки — '
-                    u'в ден. ед.').format(good[1], tc_formula(p))
+                    u'функцией {}, где выпуск $Q$ задан в шт., '
+                    u'а издержки в ден. ед.').format(good[1], tc_formula(p))
 
         def full_plant(p, s):
             good = _market.GOODS[p['good']]
             return (u'Технологи завода, выпускающего {}, оценили функцию '
-                    u'общих издержек: {} ($Q$ — выпуск в шт., '
-                    u'издержки — в ден. ед.).').format(good[1], tc_formula(p))
+                    u'общих издержек: {} (выпуск $Q$ в шт., '
+                    u'издержки в ден. ед.).').format(good[1], tc_formula(p))
 
         def short(p, s):
-            return u'Издержки фирмы: {} ($Q$ — шт., издержки — ден. ед.).'.format(
+            return u'Издержки фирмы: {} ($Q$ в шт., издержки в ден. ед.).'.format(
                 tc_formula(p))
 
         return [Wrapper('firm', full, short),
@@ -161,8 +161,9 @@ class CostsTCArchetype(Archetype):
         f_cost, g, h = params['F'], params['g'], params['h']
         q0 = params['q0']
         if asked.key == 'fc':
-            return [u'Постоянные издержки — слагаемое TC, не зависящее от $Q$: '
-                    u'$FC = {}$ ден. ед.'.format(fmt_num(f_cost, latex=True))]
+            return [u'Постоянные издержки берём как слагаемое TC, не '
+                    u'зависящее от $Q$: $FC = {}$ ден. ед.'.format(
+                        fmt_num(f_cost, latex=True))]
         if asked.key == 'vc0':
             return [
                 u'Переменные издержки: $VC(Q) = TC(Q) - FC = {}Q + {}Q^2$.'.format(

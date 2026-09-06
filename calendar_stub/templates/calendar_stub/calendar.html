@@ -1,19 +1,22 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Календарь — ЭкЗадачи</title>
+<title>Календарь · Weconomics</title>
 {% include '_tokens.html' %}
-<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  body { font-family: var(--font-ui);
          background: var(--bg); color: var(--text);
          transition: background-color .2s ease, color .2s ease; }
 
   /* ---- Тулбар ---- */
-  #cal-toolbar {
+  #btn-add-event { margin-left: 10px; }
+  .cal-offline { padding: 24px; text-align: center; color: var(--text2);
+                 background: var(--surface); border-radius: 12px;
+                 border: 1px solid var(--border); line-height: 1.5; }
+#cal-toolbar {
     height: 48px;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
@@ -28,7 +31,7 @@
     border: 1px solid var(--border);
     border-radius: 7px;
     background: var(--surface);
-    font-size: 13px;
+    font-size: 14px;
     cursor: pointer;
     color: var(--text);
     display: flex; align-items: center;
@@ -39,14 +42,32 @@
   }
   #cal-toolbar .btn-primary:hover { background: var(--btn-bg-hover); border-color: var(--btn-bg-hover); }
   #cal-title {
-    font-size: 15px;
+    font-size: 16px;
     font-weight: 600;
     min-width: 160px;
     text-align: center;
   }
+  /* ⚠️ ЛЕГЕНДА ПЕРЕНОСИТСЯ. Без `flex-wrap` четыре подписи стояли в один
+     ряд и распирали документ: обход Фазы 8 показал на 380 px документ
+     698 px при окне 380, то есть вбок ехала вся страница (правило 1.9.1
+     канона). Это МИНИМАЛЬНАЯ починка узкого экрана; переоформление
+     календаря целиком — отдельная сессия, карточка в Notion. */
   .legend {
-    display: flex; align-items: center; gap: 14px;
-    margin-left: auto; font-size: 12px; color: var(--text2);
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+    margin-left: auto; font-size: 13px; color: var(--text2);
+  }
+  /* ⚠️ НА УЗКОМ ЭКРАНЕ ПОЛОСА ПЕРЕНОСИТСЯ. `#cal-toolbar` — флекс-ряд с
+     жёсткой высотой 48px и без переноса: три кнопки, заголовок с
+     `min-width: 160px` и легенда не помещались, и вбок ехала вся страница
+     (замер: 698 px при окне 380). Это МИНИМАЛЬНАЯ починка правила 1.9.1,
+     а не переоформление календаря — оно отдельной сессией. */
+  @media (max-width: 560px) {
+    #cal-toolbar {
+      height: auto; flex-wrap: wrap; gap: 8px;
+      padding: 10px 14px;
+    }
+    #cal-title { min-width: 0; flex: 1 1 auto; text-align: left; }
+    .legend { margin-left: 0; gap: 10px; flex-basis: 100%; }
   }
   .legend-item { display: flex; align-items: center; gap: 5px; }
   .legend-dot {
@@ -83,7 +104,7 @@
   .fc-event { cursor: pointer; }
   .fc-event-inner {
     padding: 1px 4px;
-    font-size: 11px;
+    font-size: 13px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -98,10 +119,10 @@
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
-    font-size: 11px !important;
+    font-size: 13px !important;
   }
   .fc-daygrid-event {
-    font-size: 11px !important;
+    font-size: 13px !important;
   }
 
   /* ---- Модальное окно ---- */
@@ -140,17 +161,17 @@
   .type-badge {
     display: inline-block;
     padding: 2px 10px; border-radius: 99px;
-    font-size: 11px; font-weight: 600; color: var(--on-btn);
+    font-size: 13px; font-weight: 600; color: var(--on-btn);
   }
 
   /* Строки деталей */
   .detail-row {
     display: flex; gap: 8px;
-    font-size: 13px; color: var(--text);
+    font-size: 14px; color: var(--text);
     margin-top: 10px;
   }
   .detail-row .label { color: var(--text2); min-width: 80px; }
-  .detail-row a { color: var(--accent); text-decoration: none; }
+  .detail-row a { color: var(--accent-ink); text-decoration: none; }
   .detail-row a:hover { text-decoration: underline; }
 
   /* Кнопки модала */
@@ -158,18 +179,18 @@
     margin-top: 18px;
     display: flex; gap: 8px; flex-wrap: wrap;
   }
-  .modal-actions .btn { height: 36px; font-size: 13px; }
+  .modal-actions .btn { height: 36px; font-size: 14px; }
 
   /* ---- Форма создания/редактирования ---- */
   .form-group { margin-bottom: 14px; }
   .form-group label {
-    display: block; font-size: 12px; font-weight: 600;
+    display: block; font-size: 13px; font-weight: 600;
     color: var(--text2); margin-bottom: 5px;
   }
   .form-group input, .form-group textarea, .form-group select {
     width: 100%; padding: 8px 10px;
     border: 1px solid var(--border); border-radius: 8px;
-    font-size: 13px; color: var(--text);
+    font-size: 14px; color: var(--text);
     background: var(--surface);
   }
   .form-group input:focus, .form-group textarea:focus, .form-group select:focus {
@@ -183,7 +204,7 @@
     padding: 5px 14px;
     border-radius: 99px;
     border: 1.5px solid var(--border);
-    background: var(--surface); font-size: 12px; cursor: pointer; color: var(--text2);
+    background: var(--surface); font-size: 13px; cursor: pointer; color: var(--text2);
     transition: all .15s;
   }
   .pill-btn.active {
@@ -201,7 +222,7 @@
   }
   .group-list label {
     display: flex; align-items: center; gap: 7px;
-    font-size: 13px; font-weight: 400; color: var(--text);
+    font-size: 14px; font-weight: 400; color: var(--text);
     padding: 3px 4px; cursor: pointer;
   }
   .group-list label:hover { background: var(--surface-2); border-radius: 5px; }
@@ -236,8 +257,15 @@
     </div>
   </div>
 
-  {% if user_role == 'teacher' or user_role == 'admin' %}
-  <button class="btn btn-primary" id="btn-add-event" style="margin-left:10px;">+ Добавить</button>
+  {% comment %}
+  ⚠️ УСЛОВИЕ ТО ЖЕ, ЧТО В API. Здесь стояло `user_role == 'teacher'`, то
+  есть проверка по СТАРОМУ полю `user.role`, а `event_create` пускает по
+  `is_tutor` — тот знает обе системы ролей. Репетитор из `UserProfile`
+  кнопки не видел, хотя сервер его пускает. У кого права нет — кнопки нет
+  вовсе, а не серая неактивная без объяснения.
+  {% endcomment %}
+  {% if can_create %}
+  <button class="btn btn-primary" id="btn-add-event">+ Добавить</button>
   {% endif %}
 </div>
 
@@ -326,7 +354,7 @@
             <div onclick="pickColor('#6b7280')" style="width:20px;height:20px;border-radius:50%;background:#6b7280;cursor:pointer;border:2px solid transparent" title="Серый"></div>
           </div>
         </div>
-        <div style="font-size:11px;color:var(--text3);margin-top:4px">По умолчанию: синий — занятие, оранжевый — домашка, зелёный — олимпиада</div>
+        <div style="font-size:13px;color:var(--text3);margin-top:4px">По умолчанию: синий у занятия, оранжевый у домашки, зелёный у олимпиады</div>
       </div>
 
       <!-- Название -->
@@ -368,7 +396,7 @@
         <label>Группы</label>
         <div class="group-list" id="group-checkboxes">
           <!-- Заполняется JS -->
-          <span style="font-size:12px;color:var(--text3);padding:4px;">Нет групп</span>
+          <span style="font-size:13px;color:var(--text3);padding:4px;">Нет групп</span>
         </div>
       </div>
 
@@ -382,7 +410,7 @@
       <div class="form-group" id="assignment-section" style="display:none;">
         <label for="edit-assignment">Связать с домашкой</label>
         <select id="edit-assignment">
-          <option value="">— не привязывать —</option>
+          <option value="">не привязывать</option>
           <!-- Заполняется JS -->
         </select>
       </div>
@@ -405,20 +433,40 @@
       <div class="modal-actions">
         <button class="btn btn-primary" id="edit-save-btn">Сохранить</button>
         <button class="btn" id="edit-cancel-btn">Отмена</button>
-        <span id="edit-error" style="font-size:12px;color:var(--error);align-self:center;"></span>
+        <span id="edit-error" style="font-size:13px;color:var(--error);align-self:center;"></span>
       </div>
     </div>
   </div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/locales/ru.global.min.js"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/index.global.min.js' %}"></script>
+<script src="{% static 'vendor/fullcalendar-6.1.11/locales/ru.global.js' %}"></script>
 <script>
 // ---------- Данные из Django ----------
 const USER_ROLE    = '{{ user_role }}';
 const GROUPS       = {{ groups_json|safe }};
 const ASSIGNMENTS  = {{ assignments_json|safe }};
-const CAN_EDIT     = (USER_ROLE === 'teacher' || USER_ROLE === 'admin');
+// ⚠️ ТОТ ЖЕ ПРИЗНАК, ЧТО У КНОПКИ И У API. Скрипт решал это сам по
+// `USER_ROLE`, то есть по старому полю роли, — третье место в файле,
+// знающее только одну систему ролей из двух.
+const CAN_EDIT     = {{ can_create|yesno:"true,false" }};
+
+// ---------- Ссылка из описания ----------
+// ⚠️ РАЗРЕШЁННЫЙ СПИСОК СХЕМ, А НЕ ЗАПРЕЩЁННЫЙ. Перечислять запрещённые
+// («не начинается с javascript:») бесполезно: есть `data:`, `vbscript:`,
+// пробелы и переводы строки внутри схемы, регистр. Разбираем адрес
+// настоящим разборщиком и пропускаем ровно две схемы.
+function safeLink(raw) {
+  if (!raw) return null;
+  let url;
+  try {
+    url = new URL(String(raw).trim(), window.location.origin);
+  } catch (e) {
+    return null;
+  }
+  return (url.protocol === 'http:' || url.protocol === 'https:')
+    ? url.href : null;
+}
 
 // ---------- CSRF ----------
 function getCsrf() {
@@ -426,11 +474,36 @@ function getCsrf() {
   return m ? m[1] : '';
 }
 
+// ---------- Кнопка добавления ----------
+// ⚠️ ОБРАБОТЧИК ВЕШАЕТСЯ ДО ПОСТРОЕНИЯ КАЛЕНДАРЯ, И ЭТО ПОЧИНКА, А НЕ
+// ПЕРЕСТАНОВКА РАДИ КРАСОТЫ. Он стоял ПОСЛЕ строки построения календаря,
+// а сама библиотека тянется с чужого CDN. Стоило CDN не доехать —
+// `FullCalendar` оказывался `undefined`, строка построения бросала
+// ReferenceError, и ВЕСЬ инлайн-скрипт умирал вместе с ней. Кнопка
+// «+ Добавить» при этом оставалась на экране и выглядела рабочей, а
+// нажатие не делало ничего: ни ошибки, ни сообщения. Это и есть
+// «добавлять события больше нельзя» (замер — reports/CALENDAR_AUDIT.md).
+const addBtn = document.getElementById('btn-add-event');
+if (addBtn) addBtn.addEventListener('click', () => openCreateModal(null));
+
 // ---------- FullCalendar ----------
 const calEl = document.getElementById('calendar');
 const calHeight = 'calc(100vh - 48px - 48px - 32px)';
 
-const cal = new FullCalendar.Calendar(calEl, {
+// ⚠️ ЧУЖАЯ БИБЛИОТЕКА МОЖЕТ НЕ ДОЕХАТЬ, И ЭТО НЕ ПОВОД УБИВАТЬ ЭКРАН.
+// Молчащий пустой прямоугольник неотличим от «сайт сломался»; честная
+// строка говорит, что произошло и что делать.
+if (typeof FullCalendar === 'undefined') {
+  const note = document.createElement('p');
+  note.className = 'cal-offline';
+  note.textContent = 'Сетка календаря не загрузилась: не доехала внешняя '
+    + 'библиотека. Проверьте соединение и обновите страницу. Добавление и '
+    + 'правка событий работают.';
+  calEl.appendChild(note);
+}
+
+const cal = (typeof FullCalendar === 'undefined') ? null
+  : new FullCalendar.Calendar(calEl, {
   locale: 'ru',
   initialView: 'dayGridMonth',
   headerToolbar: false,
@@ -462,15 +535,16 @@ const cal = new FullCalendar.Calendar(calEl, {
   },
 });
 
-cal.render();
-document.getElementById('cal-title').textContent = cal.view.title;
+if (cal) {
+  cal.render();
+  document.getElementById('cal-title').textContent = cal.view.title;
+}
 
-// Кнопки тулбара
-document.getElementById('btn-prev').addEventListener('click', () => { cal.prev(); });
-document.getElementById('btn-next').addEventListener('click', () => { cal.next(); });
-document.getElementById('btn-today').addEventListener('click', () => { cal.today(); });
-const addBtn = document.getElementById('btn-add-event');
-if (addBtn) addBtn.addEventListener('click', () => openCreateModal(null));
+// Кнопки тулбара. `if (cal)` внутри, а не снаружи: обработчик всегда на
+// месте, просто без сетки ему нечего листать.
+document.getElementById('btn-prev').addEventListener('click', () => { if (cal) cal.prev(); });
+document.getElementById('btn-next').addEventListener('click', () => { if (cal) cal.next(); });
+document.getElementById('btn-today').addEventListener('click', () => { if (cal) cal.today(); });
 
 // ---------- Состояние текущего события ----------
 let _currentEvent = null;
@@ -492,9 +566,9 @@ function openViewModal(fcEvent) {
   document.getElementById('view-title').textContent = ep.full_title;
 
   // Время
-  const startDt = fcEvent.start ? formatDt(fcEvent.start) : '—';
+  const startDt = fcEvent.start ? formatDt(fcEvent.start) : '–';
   const endDt   = fcEvent.end   ? formatDt(fcEvent.end)   : '';
-  document.getElementById('view-time-val').textContent = endDt ? `${startDt} — ${endDt}` : startDt;
+  document.getElementById('view-time-val').textContent = endDt ? `${startDt} – ${endDt}` : startDt;
 
   // Группы — берём из fcEvent (нет готового поля, скроем строку)
   const groupsRow = document.getElementById('view-groups-row');
@@ -505,8 +579,23 @@ function openViewModal(fcEvent) {
   const descVal = document.getElementById('view-desc-val');
   if (ep.description) {
     descRow.style.display = 'flex';
-    if (ep.description.startsWith('http')) {
-      descVal.innerHTML = `<a href="${ep.description}" target="_blank" rel="noopener">${ep.description}</a>`;
+    // ⚠️ ОПИСАНИЕ — ЧУЖОЙ ТЕКСТ, И РАЗМЕТКОЙ ОН НЕ СТАНОВИТСЯ НИКОГДА.
+    // Раньше ссылка склеивалась строкой и вставлялась в узел как
+    // разметка. Описание печатает репетитор, а событие с пометкой
+    // «общее» видно всему интернету: кавычка в описании выходила из
+    // атрибута и открывала обработчик. Теперь узел собирается руками,
+    // текст кладётся через textContent, а адрес проверяется по СХЕМЕ, а
+    // не по началу строки — «http…» с кавычкой внутри прежнюю проверку
+    // проходило.
+    descVal.textContent = '';
+    const href = safeLink(ep.description);
+    if (href) {
+      const a = document.createElement('a');
+      a.href = href;                       // уже проверенная схема
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.textContent = ep.description;      // ТЕКСТ, а не разметка
+      descVal.appendChild(a);
     } else {
       descVal.textContent = ep.description;
     }
@@ -565,7 +654,7 @@ document.getElementById('view-delete-btn').addEventListener('click', () => {
   const ep = _currentEvent.extendedProps;
   if (ep.is_recurring || ep.parent_event_id) {
     const choice = confirm(
-      'Удалить все повторения этого события?\n\nОК — удалить всю серию\nОтмена — только это событие'
+      'Удалить все повторения этого события?\n\nОК: удалить всю серию\nОтмена: только это событие'
     );
     deleteEvent(_currentEvent.id, choice);
   } else {
@@ -612,10 +701,19 @@ document.getElementById('event-color').addEventListener('input', () => {
 // Заполняем группы
 const gcBox = document.getElementById('group-checkboxes');
 if (GROUPS.length) {
-  gcBox.innerHTML = '';
+  gcBox.textContent = '';
   GROUPS.forEach(g => {
+    // ⚠️ НАЗВАНИЕ ГРУППЫ — ТОЖЕ ЧУЖОЙ ТЕКСТ. Раньше чекбокс вместе с
+    // именем склеивались строкой и вставлялись как разметка, а имена
+    // групп печатает репетитор. Администратор видит список ВСЕХ групп —
+    // то есть чужая строка доезжала до самого привилегированного зрителя.
     const lbl = document.createElement('label');
-    lbl.innerHTML = `<input type="checkbox" value="${g.id}" class="group-cb"> ${g.name}`;
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.value = g.id;
+    cb.className = 'group-cb';
+    lbl.appendChild(cb);
+    lbl.appendChild(document.createTextNode(' ' + g.name));
     gcBox.appendChild(lbl);
   });
 }
@@ -813,5 +911,13 @@ function formatDt(dt) {
   });
 }
 </script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

@@ -25,7 +25,7 @@
 .k-btn {
   display: inline-flex; align-items: center; justify-content: center;
   gap: 6px;
-  font: inherit; font-size: 13px; font-weight: 500; line-height: 1.2;
+  font: inherit; font-size: 14px; font-weight: 500; line-height: 1.2;
   padding: 8px 16px; border-radius: var(--r);
   border: 0.5px solid transparent; background: transparent; color: var(--text);
   text-decoration: none; cursor: pointer; white-space: nowrap;
@@ -74,12 +74,12 @@
                                      background: var(--surface-2); }
 .k-btn--quiet:active:not(:disabled) { transform: translateY(1px); }
 
-.k-btn--sm { font-size: 12px; padding: 5px 11px; }
+.k-btn--sm { font-size: 13px; padding: 5px 11px; }
 .k-btn--wide { width: 100%; }
 
 /* ── Поля ввода ─────────────────────────────────────────────────────── */
 .k-input, .k-area, .k-select {
-  font: inherit; font-size: 13px; color: var(--text);
+  font: inherit; font-size: 14px; color: var(--text);
   background: var(--surface-2);
   border: 0.5px solid var(--border); border-radius: var(--r);
   padding: 8px 10px; width: 100%;
@@ -184,8 +184,8 @@
 }
 .k-num--wide { width: 64px; min-width: 64px; }
 .k-num--long { width: 92px; min-width: 92px; }
-.k-unit { font-size: 13px; color: var(--text2); white-space: nowrap; }
-.k-num__why { display: block; width: 100%; font-size: 12px;
+.k-unit { font-size: 14px; color: var(--text2); white-space: nowrap; }
+.k-num__why { display: block; width: 100%; font-size: 13px;
               color: var(--error); margin-top: 2px; }
 .k-num__why[hidden] { display: none; }
 
@@ -196,18 +196,18 @@
 .k-select-wrap { position: relative; display: inline-block; width: 100%; }
 .k-select-wrap::after {
   content: '▾'; position: absolute; right: 10px; top: 50%;
-  transform: translateY(-50%); font-size: 11px; color: var(--text2);
+  transform: translateY(-50%); font-size: 13px; color: var(--text2);
   pointer-events: none;
 }
 
-.k-label { display: block; font-size: 12px; font-weight: 600;
+.k-label { display: block; font-size: 13px; font-weight: 600;
            color: var(--text2); margin-bottom: 5px; }
-.k-hint { font-size: 12px; color: var(--text3); line-height: 1.5;
+.k-hint { font-size: 13px; color: var(--text3); line-height: 1.5;
           margin-top: 5px; }
 
 /* Переключатель-галочка */
 .k-check { display: inline-flex; align-items: center; gap: 8px;
-           font-size: 13px; color: var(--text); cursor: pointer;
+           font-size: 14px; color: var(--text); cursor: pointer;
            user-select: none; }
 .k-check input[type="checkbox"] {
   appearance: none; -webkit-appearance: none;
@@ -296,13 +296,13 @@
   background: var(--surface-2); border: 0.5px solid var(--border);
   border-left: 3px solid var(--text3);
   border-radius: 0 var(--r) var(--r) 0;
-  padding: 12px 14px; font-size: 13px; line-height: 1.6; color: var(--text);
+  padding: 12px 14px; font-size: 14px; line-height: 1.6; color: var(--text);
 }
 .k-state__icon { flex-shrink: 0; width: 16px; text-align: center;
-                 font-size: 13px; line-height: 1.55; font-weight: 700; }
+                 font-size: 14px; line-height: 1.55; font-weight: 700; }
 .k-state__body { flex: 1; min-width: 0; }
 .k-state__title { font-weight: 600; margin-bottom: 2px; }
-.k-state__note { color: var(--text2); font-size: 12px; }
+.k-state__note { color: var(--text2); font-size: 13px; }
 .k-state--warn { border-left-color: var(--amber); }
 .k-state--warn .k-state__icon { color: var(--amber); }
 .k-state--ok   { border-left-color: var(--green); }
@@ -327,7 +327,7 @@
   outline: none; border-color: var(--focus);
   box-shadow: 0 0 0 3px var(--focus-ring); background: var(--surface);
 }
-.k-score__cap { font-size: 11px; color: var(--text3); }
+.k-score__cap { font-size: 13px; color: var(--text3); }
 /* ⚠️ «Балл не поставлен» — СЛОВАМИ, а не прочерком (обзор 13.08, п. 46).
    Прочерк на месте крупного числа, да ещё над подписью «из 2», читался как
    «ноль из двух». Кегль меньше числа намеренно: это отсутствие значения, и
@@ -388,7 +388,7 @@
    цветом такое не сообщают. */
 .k-mark.k-mark--next    { border-left-color: var(--accent); }
 
-.k-flag { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.k-flag { font-size: 13px; font-weight: 700; text-transform: uppercase;
           letter-spacing: .05em; padding: 3px 9px; border-radius: 999px;
           white-space: nowrap; }
 .k-flag.k-flag--correct { background: var(--green-tint); color: var(--green); }
@@ -406,7 +406,7 @@
   display: inline-flex; align-items: center; justify-content: center;
   width: 15px; height: 15px; flex-shrink: 0;
   border: 1px solid var(--border); border-radius: 50%;
-  font-size: 10px; font-weight: 700; line-height: 1;
+  font-size: 13px; font-weight: 700; line-height: 1;
   color: var(--text3); background: var(--surface-2);
   vertical-align: middle; margin-left: 5px;
 }
@@ -429,7 +429,7 @@
 .bh-kind { display: inline-flex; gap: 2px; padding: 2px;
            background: var(--surface-2); border: 1px solid var(--border);
            border-radius: 999px; }
-.bh-kind__opt { font-size: 12px; font-weight: 600; line-height: 1.2;
+.bh-kind__opt { font-size: 13px; font-weight: 600; line-height: 1.2;
                 color: var(--text2); text-decoration: none;
                 padding: 6px 15px; border-radius: 999px;
                 white-space: nowrap; transition: background .12s ease,
@@ -439,7 +439,7 @@
                       box-shadow: 0 1px 2px rgba(0,0,0,.07); }
 .bh-kind__opt:focus-visible { outline: 2px solid var(--focus);
                               outline-offset: 2px; }
-.bh-kind__note { font-size: 11px; color: var(--text3); margin-top: 5px; }
+.bh-kind__note { font-size: 13px; color: var(--text3); margin-top: 5px; }
 @media (max-width: 560px) {
   .bh-kindwrap { margin-left: 0; text-align: left; width: 100%; }
 }
@@ -448,7 +448,7 @@
    Тихая рамка без заливки: это уточнение, а не ярлык. Стоит в шапке
    занятия и в списках «кому выдать» — поэтому живёт здесь, а не в стилях
    одного экрана (тот же класс дефекта, что баг 7.6). */
-.k-chip-kind { display: inline-block; font-size: 11px; font-weight: 500;
+.k-chip-kind { display: inline-block; font-size: 13px; font-weight: 500;
                color: var(--text2); border: 1px solid var(--border);
                border-radius: 999px; padding: 2px 10px; white-space: nowrap;
                vertical-align: middle; }
@@ -482,7 +482,7 @@
   min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 999px; background: var(--error);
   color: var(--on-error); border: 0;
-  font-size: 11px; font-weight: 700; line-height: 1;
+  font-size: 13px; font-weight: 700; line-height: 1;
   font-variant-numeric: tabular-nums; vertical-align: middle;
   margin-left: 6px;
 }
@@ -498,7 +498,7 @@
   position: fixed; z-index: 900; max-width: 260px;
   padding: 8px 11px; border-radius: var(--r);
   border: 0.5px solid var(--border); background: var(--surface-2);
-  color: var(--text); font-size: 12px; line-height: 1.45;
+  color: var(--text); font-size: 13px; line-height: 1.45;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
   pointer-events: none; white-space: normal; text-align: left;
   font-weight: 400; letter-spacing: 0;
@@ -557,20 +557,20 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    имя и подпись слипаются в одну строку. */
 .k-tile__name { display: block; font-size: 14px; font-weight: 600;
                 margin-bottom: 3px; }
-.k-tile__note { display: block; font-size: 12px; color: var(--text2);
+.k-tile__note { display: block; font-size: 13px; color: var(--text2);
                 line-height: 1.45; }
 .k-tile--on {
   border-color: var(--accent); border-width: 1px;
   background: var(--accent-tint);
 }
-.k-tile--on .k-tile__name { color: var(--accent); }
+.k-tile--on .k-tile__name { color: var(--accent-ink); }
 .k-tile--on:hover { background: var(--accent-tint); border-color: var(--accent); }
 .k-tile input { position: absolute; opacity: 0; pointer-events: none; }
 
 /* ── Служебный разделитель: подпись + тонкая пунктирная линия ───────── */
 .k-sep { display: flex; align-items: center; gap: 10px;
          margin: 20px 0 12px; }
-.k-sep__cap { font-size: 12px; font-weight: 600; color: var(--text2);
+.k-sep__cap { font-size: 13px; font-weight: 600; color: var(--text2);
               white-space: nowrap; }
 .k-sep__line { flex: 1; border-top: 1px dashed var(--border);
                min-width: 20px; }
@@ -578,7 +578,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    разговор с учеником — разные дела, и тонкий пунктир с мелкой серой
    подписью оказался самым бледным элементом карточки. */
 .k-sep--loud { margin: 26px 0 14px; }
-.k-sep--loud .k-sep__cap { font-size: 13px; font-weight: 700;
+.k-sep--loud .k-sep__cap { font-size: 14px; font-weight: 700;
                            color: var(--text); }
 .k-sep--loud .k-sep__line { border-top-style: solid; }
 
@@ -593,7 +593,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
 .k-sep--head { margin: 26px 0 12px; }
 .k-sep--head .k-sep__cap { font-size: 14px; font-weight: 700;
                            color: var(--text); letter-spacing: .01em; }
-.k-sep--head .k-sep__of { font-size: 12px; color: var(--text3);
+.k-sep--head .k-sep__of { font-size: 13px; color: var(--text3);
                           white-space: nowrap; }
 .k-sep--head .k-sep__line { border-top-style: solid; }
 /* Первый заголовок списка не отбивается сверху: над ним и так шапка. */
@@ -654,7 +654,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    Цвет остался только у сложности и решения — там он сигнал; тип
    отличается формой, а не краской. */
 .k-kind { display: inline-block; min-width: 62px; text-align: center;
-          font-size: 11px; font-weight: 600; line-height: 18px;
+          font-size: 13px; font-weight: 600; line-height: 18px;
           padding: 0 8px; border-radius: 999px; white-space: nowrap;
           background: transparent; color: var(--text2);
           border: 1px solid var(--border); }
@@ -669,7 +669,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    Число пунктов чипом БЫТЬ ПЕРЕСТАЛО: это справка, а не сигнал, и место
    ей в обычном тексте (`.k-chip-note`). */
 .k-chip { display: inline-flex; align-items: center; gap: 4px;
-          font-size: 12px; font-weight: 500; line-height: 1.7;
+          font-size: 13px; font-weight: 500; line-height: 1.7;
           padding: 1px 9px; border-radius: 999px; white-space: nowrap;
           border: 1px solid transparent; }
 .k-chip.k-chip--type { background: transparent; border-color: var(--border);
@@ -680,7 +680,7 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
 .k-chip.k-chip--sol { background: var(--green-tint);
                       border-color: var(--green-border);
                       color: var(--green); }
-.k-chip-note { font-size: 12px; color: var(--text2); white-space: nowrap; }
+.k-chip-note { font-size: 13px; color: var(--text2); white-space: nowrap; }
 
 /* ── Раскрытие: одно слово и один знак на платформу (п. 1.3) ───────────
    Одно и то же действие называлось «Целиком» на шаге «Что кладём»,
@@ -702,11 +702,11 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
    Слова у «Эталонного решения», «Так тоже можно» и «Переписки по задаче»
    свои — они правда про разное. Общий только знак и цвет. */
 .k-disc { display: inline-flex; align-items: center; gap: 5px;
-          font: inherit; font-size: 13px; font-weight: 500;
-          color: var(--accent); background: none; border: 0;
+          font: inherit; font-size: 14px; font-weight: 500;
+          color: var(--accent-ink); background: none; border: 0;
           padding: 6px 0; cursor: pointer; }
 .k-disc:hover { color: var(--accent-deep); }
-.k-disc__tri { display: inline-block; font-size: 10px; line-height: 1;
+.k-disc__tri { display: inline-block; font-size: 13px; line-height: 1;
                transition: transform .14s; }
 .k-disc[aria-expanded="true"] .k-disc__tri { transform: rotate(90deg); }
 
@@ -719,8 +719,8 @@ thead th.is-sorted.is-desc::after { content: '\2193'; }
 details.fold > summary,
 .pf-fold > summary {
   display: flex; align-items: center; gap: 5px; list-style: none;
-  cursor: pointer; font-size: 13px; font-weight: 500;
-  color: var(--accent); padding: 6px 0;
+  cursor: pointer; font-size: 14px; font-weight: 500;
+  color: var(--accent-ink); padding: 6px 0;
 }
 .k-details > summary::-webkit-details-marker,
 .gen-examples > summary::-webkit-details-marker,
@@ -730,7 +730,7 @@ details.fold > summary::-webkit-details-marker,
 .gen-examples > summary::before,
 details.fold > summary::before,
 .pf-fold > summary::before {
-  content: '▸'; font-size: 10px; line-height: 1; display: inline-block;
+  content: '▸'; font-size: 13px; line-height: 1; display: inline-block;
   transition: transform .14s;
 }
 .k-details[open] > summary::before,
@@ -754,7 +754,7 @@ details.fold > summary:hover,
 }
 
 /* ── Мелочи, нужные во многих экранах ───────────────────────────────── */
-.k-quiet { font-size: 12px; color: var(--text3); }
+.k-quiet { font-size: 13px; color: var(--text3); }
 .k-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .k-stack { display: flex; flex-direction: column; gap: 10px; }
 
@@ -772,7 +772,7 @@ details.fold > summary:hover,
 .page-header { display: flex; align-items: center; gap: 16px;
                margin-bottom: 22px; flex-wrap: wrap; }
 .page-title { font-size: 20px; font-weight: 700; }
-.back-link { font-size: 13px; color: var(--text2); text-decoration: none; }
+.back-link { font-size: 14px; color: var(--text2); text-decoration: none; }
 .back-link:hover { color: var(--text); }
 
 /* ── Прокручиваемый блок: без полосы, с растворением у краёв ────────────
@@ -863,12 +863,12 @@ details.fold > summary:hover,
 
    Последнее звено («вы здесь») — обычный цвет текста, не приглушённый:
    владелец отдельно просил, чтобы оно не гасло в серый. */
-.crumbs { font-size: 13px; line-height: 1.7; margin-bottom: 14px;
+.crumbs { font-size: 14px; line-height: 1.7; margin-bottom: 14px;
           color: var(--text); }
-.crumbs a { color: var(--accent); text-decoration: none; }
+.crumbs a { color: var(--accent-ink); text-decoration: none; }
 .crumbs a:hover { text-decoration: underline; }
 .crumbs > * + *::before {
-  content: '→'; color: var(--accent); margin: 0 7px;
+  content: '→'; color: var(--accent-ink); margin: 0 7px;
   font-weight: 400; text-decoration: none; display: inline-block;
 }
 .crumbs__here { color: var(--text); }
@@ -905,7 +905,7 @@ details.fold > summary:hover,
 }
 .k-date.is-ready .k-date__pick:hover { color: var(--text); }
 .k-date__pick svg { width: 17px; height: 17px; }
-.k-date__err { font-size: 12px; color: var(--error); margin-top: 5px; }
+.k-date__err { font-size: 13px; color: var(--error); margin-top: 5px; }
 /* ⚠️ `display` из правила выше сильнее браузерного `[hidden]` — третий раз
    за проект. Без этой строки подсказка об ошибке висела бы всегда. */
 .k-date__err[hidden] { display: none; }
@@ -920,7 +920,7 @@ details.fold > summary:hover,
 .k-date.is-open .k-cal { display: block; }
 .k-cal__head { display: flex; align-items: center; gap: 6px;
                margin-bottom: 10px; }
-.k-cal__month { flex: 1; text-align: center; font-size: 13px;
+.k-cal__month { flex: 1; text-align: center; font-size: 14px;
                 font-weight: 700; color: var(--text); }
 .k-cal__nav { width: 28px; height: 28px; flex: none; padding: 0;
               background: none; border: 1px solid transparent;
@@ -929,11 +929,11 @@ details.fold > summary:hover,
 .k-cal__nav:hover { background: var(--surface-2); color: var(--text); }
 .k-cal__week, .k-cal__grid { display: grid; grid-template-columns: repeat(7, 1fr);
                              gap: 2px; }
-.k-cal__week span { text-align: center; font-size: 11px; color: var(--text3);
+.k-cal__week span { text-align: center; font-size: 13px; color: var(--text3);
                     padding-bottom: 4px; }
 .k-cal__day { height: 32px; padding: 0; border: 1px solid transparent;
               border-radius: 8px; background: none; color: var(--text);
-              font-size: 13px; cursor: pointer; }
+              font-size: 14px; cursor: pointer; }
 .k-cal__day:hover { background: var(--surface-2); }
 /* День не своего месяца остаётся нажимаемым: попасть на 1 сентября из
    августовской сетки — обычный способ выбрать дату. Он просто тише. */
@@ -944,7 +944,7 @@ details.fold > summary:hover,
                      text-decoration: line-through; }
 .k-cal__day.is-off:hover { background: none; }
 .k-cal__day.is-today { border-color: var(--border); font-weight: 700; }
-.k-cal__day.is-picked { background: var(--accent); color: #fff;
+.k-cal__day.is-picked { background: var(--accent); color: var(--act-ink-solid);
                         border-color: var(--accent); font-weight: 700; }
 .k-cal__foot { display: flex; align-items: center; justify-content: space-between;
                gap: 8px; margin-top: 10px; padding-top: 10px;
@@ -960,12 +960,12 @@ details.fold > summary:hover,
                background: none; color: var(--text); cursor: pointer;
                font: inherit; font-size: 34px; font-weight: 700;
                line-height: 1.1; font-variant-numeric: tabular-nums; }
-.k-time__num:hover { color: var(--accent); }
+.k-time__num:hover { color: var(--accent-ink); }
 .k-time__num:focus { outline: none; }
-.k-time__num.is-on { color: var(--accent); border-bottom-color: var(--accent); }
+.k-time__num.is-on { color: var(--accent-ink); border-bottom-color: var(--accent); }
 .k-time__colon { font-size: 30px; font-weight: 700; color: var(--text2);
                  line-height: 1.1; }
-.k-time__hint { font-size: 11px; color: var(--text3); text-align: center;
+.k-time__hint { font-size: 13px; color: var(--text3); text-align: center;
                 min-height: 15px; }
 /* У панели времени одна кнопка, и ей место справа. */
 .k-cal__foot--time { justify-content: flex-end; }
@@ -988,7 +988,7 @@ details.fold > summary:hover,
    Правила — в наборе, а не в стилях отбора: панель стоит и на конструкторе
    подборки, который `_picker_style.html` не подключает. */
 .ws-card { margin-bottom: 12px; }
-.ws-title { font-size: 12px; font-weight: 600; color: var(--text2);
+.ws-title { font-size: 13px; font-weight: 600; color: var(--text2);
             text-transform: uppercase; letter-spacing: .04em;
             margin-bottom: 12px; }
 .ws-cap { margin-bottom: 8px; }
@@ -1019,18 +1019,18 @@ details.fold > summary:hover,
                    border: 1px solid var(--border); border-radius: 10px;
                    padding: 10px 12px; background: var(--surface-2); }
 .ws-when > label.is-on { border-color: var(--accent); }
-.ws-when__t { font-size: 13px; font-weight: 600; display: block; }
-.ws-when__d { font-size: 12px; color: var(--text2); margin-top: 3px;
+.ws-when__t { font-size: 14px; font-weight: 600; display: block; }
+.ws-when__d { font-size: 13px; color: var(--text2); margin-top: 3px;
               display: block; line-height: 1.45; }
 
 .ws-groups { display: flex; flex-direction: column; gap: 8px;
              max-height: 210px; overflow-y: auto; }
 .ws-fixed { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
-            font-size: 13px; font-weight: 600; }
+            font-size: 14px; font-weight: 600; }
 .ws-why { margin: 10px 0 8px; }
 .ws-errors { background: var(--error-tint); border: 1px solid var(--error-border);
              color: var(--error); border-radius: var(--r); padding: 10px 14px;
-             font-size: 13px; margin-bottom: 12px; }
+             font-size: 14px; margin-bottom: 12px; }
 .ws-errors ul { margin: 0; padding-left: 18px; }
 
 /* ── Карточка фильтров ручного поиска ───────────────────────────────────
@@ -1057,13 +1057,13 @@ details.fold > summary:hover,
    Янтарь здесь в своём законном смысле — «ещё не готово». */
 .k-prelim { margin-top: 14px; background: var(--amber-tint);
             border: 1px solid var(--amber-border); border-radius: var(--r);
-            padding: 10px 14px; font-size: 13px; line-height: 1.6; }
+            padding: 10px 14px; font-size: 14px; line-height: 1.6; }
 
 /* ── Пометка «сохранено» у заметок об ученике ───────────────────────────
    Партиал `teacher/_tutor_note.html` стоит на карточке ученика и на обзоре
    индивидуального занятия, поэтому правило живёт здесь, а не в стилях
    одного экрана. Тот же класс дефекта, что у плашки выше. */
-.note-said { font-size: 12px; color: var(--text2); margin-left: 10px; }
+.note-said { font-size: 13px; color: var(--text2); margin-left: 10px; }
 .note-said[hidden] { display: none; }
 
 /* ── Строка-ссылка списка ───────────────────────────────────────────────
@@ -1082,17 +1082,17 @@ details.fold > summary:hover,
   gap: 12px; flex-wrap: wrap;
   background: var(--surface); border: 0.5px solid var(--border);
   border-radius: 10px; padding: 12px 16px;
-  text-decoration: none; color: var(--text); font-size: 13px;
+  text-decoration: none; color: var(--text); font-size: 14px;
   transition: background .12s ease, border-color .12s ease;
 }
 .row-link:hover { background: var(--surface-2); border-color: var(--text3); }
 .row-link:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .row-main { font-weight: 500; }
-.row-meta { font-size: 12px; color: var(--text2); }
+.row-meta { font-size: 13px; color: var(--text2); }
 .row-side { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
-.row-go { font-size: 12px; font-weight: 600; color: var(--text3);
+.row-go { font-size: 13px; font-weight: 600; color: var(--text3);
           white-space: nowrap; }
-.row-link:hover .row-go { color: var(--accent); }
+.row-link:hover .row-go { color: var(--accent-ink); }
 @media (max-width: 560px) {
   .row-link { flex-direction: column; align-items: flex-start; gap: 6px; }
 }
@@ -1106,7 +1106,7 @@ details.fold > summary:hover,
 /* Лента шагов. Пройденный шаг — ссылка, текущий выделен, будущие тихие. */
 .wk-rail { display: flex; align-items: center; flex-wrap: wrap; gap: 4px;
            list-style: none; margin: 0 0 18px; padding: 0; }
-.wk-rail__s { display: flex; align-items: center; font-size: 13px;
+.wk-rail__s { display: flex; align-items: center; font-size: 14px;
               color: var(--text3); }
 .wk-rail__s + .wk-rail__s::before { content: ""; width: 26px; height: 1px;
               background: var(--border); margin: 0 10px; }
@@ -1115,47 +1115,35 @@ details.fold > summary:hover,
 .wk-rail__s > a:hover { color: var(--text); }
 .wk-rail__n { display: grid; place-items: center; width: 22px; height: 22px;
               border-radius: 999px; border: 1px solid var(--border);
-              font-size: 11px; font-weight: 600; }
+              font-size: 13px; font-weight: 600; }
 .wk-rail__s.is-on { color: var(--text); font-weight: 600; }
 .wk-rail__s.is-on .wk-rail__n { background: var(--accent);
               border-color: var(--accent); color: #fff; }
 .wk-rail__s.is-done .wk-rail__n { background: var(--accent-tint);
-              border-color: var(--accent-tint); color: var(--accent); }
+              border-color: var(--accent-tint); color: var(--accent-ink); }
 
 /* Пять способов набора одной строкой. */
 .wk-tabs { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
-.wk-tab { display: block; font-size: 13px; padding: 8px 14px;
+.wk-tab { display: block; font-size: 14px; padding: 8px 14px;
           border-radius: 10px; border: 0.5px solid var(--border);
           background: var(--surface-2); color: var(--text2); cursor: pointer;
           text-align: left; text-decoration: none; }
 .wk-tab:hover { color: var(--text); border-color: var(--text3); }
-.wk-tab small { display: block; font-size: 11px; color: var(--text3);
+.wk-tab small { display: block; font-size: 13px; color: var(--text3);
                 font-weight: 400; }
 .wk-tab.is-on { border-color: var(--accent); background: var(--accent-tint);
                 color: var(--text); font-weight: 600; }
 .wk-tab.is-on small { color: var(--text2); }
 
-/* ── Отбор: поиск шире всего остального (п. 2.5) ───────────────────────
-   ⚠️ РЯД СТАЛ СЕТКОЙ, А НЕ ФЛЕКСОМ. Во флексе ширина поля поиска зависела
-   от того, сколько места осталось от трёх списков, и главное поле экрана
-   выходило самым узким. Сетка `2fr 1fr 1fr 1fr` задаёт то, что просил
-   владелец: поиск вдвое шире каждого списка, всегда. */
-.wk-filters { display: grid; gap: 8px; align-items: center;
-              grid-template-columns: 2fr 1fr 1fr 1fr; }
-.wk-filters .k-input { width: 100%; min-width: 0; }
-.wk-filters .k-select-wrap { width: 100%; min-width: 0; }
-.wk-filters .k-select { width: 100%; }
-/* Флажок, кнопки и счётчик — ОДНА строка под фильтрами. */
-.wk-frow { display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-           margin-top: 12px; }
-.wk-count { font-size: 13px; color: var(--text2); }
+/* ── Счётчик найденного над списком отбора ─────────────────────────────
+   ⚠️ РЯДА ФИЛЬТРОВ `.wk-filters` И СТРОКИ `.wk-frow` БОЛЬШЕ НЕТ. Отбор на
+   шаге «Что кладём» перешёл на ОБЩИЙ компонент фильтров каталога в режиме
+   «панель» (решение владельца 01.09.2026): вместо ряда из четырёх списков
+   над задачами слева стоит вертикальная панель. Правила ряда удалены, а не
+   оставлены «на всякий случай»: мёртвое правило неотличимо от живого и
+   продолжает сторожиться проверками, которые уже ничего не значат. */
+.wk-count { font-size: 14px; color: var(--text2); }
 .wk-count b { color: var(--text); }
-@media (max-width: 760px) {
-  .wk-filters { grid-template-columns: 1fr 1fr; }
-}
-@media (max-width: 480px) {
-  .wk-filters { grid-template-columns: 1fr; }
-}
 
 /* ⚠️ КОЛОНКА ПОТОКА ЗАДАНА ОДИН РАЗ (ревью 17.08, п. 4.4). Каждый шаг
    объявлял ширину сам: 1100 у отбора, 1000 у состава, 1100 у выдачи, а
@@ -1187,8 +1175,8 @@ details.fold > summary:hover,
    справку о пунктах на одной строке текста. */
 .wk-card__facts { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 5px;
                   align-items: baseline; }
-.wk-card__src { font-size: 11px; color: var(--text3); margin-top: 5px; }
-.wk-card__lead { font-size: 13px; color: var(--text2); margin-top: 6px;
+.wk-card__src { font-size: 13px; color: var(--text3); margin-top: 5px; }
+.wk-card__lead { font-size: 14px; color: var(--text2); margin-top: 6px;
                  display: -webkit-box; -webkit-line-clamp: 2;
                  -webkit-box-orient: vertical; overflow: hidden; }
 .wk-card__acts { display: flex; gap: 8px; align-items: center;
@@ -1208,19 +1196,19 @@ details.fold > summary:hover,
 .wk-full { flex: 1 0 100%; min-width: 0; margin-top: 10px; padding: 12px 14px;
            border-radius: var(--r);
            background: var(--surface-2); border: 0.5px solid var(--border);
-           font-size: 13px; line-height: 1.7; overflow-wrap: anywhere; }
+           font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .wk-full[hidden] { display: none; }
 .wk-full .wk-st { white-space: pre-line; }
 .wk-full .wk-part { margin-top: 8px; }
-.wk-full .wk-part b { color: var(--accent); }
-.wk-full .wk-ans { margin-top: 6px; font-size: 12px; color: var(--text2); }
+.wk-full .wk-part b { color: var(--accent-ink); }
+.wk-full .wk-ans { margin-top: 6px; font-size: 13px; color: var(--text2); }
 .wk-full .wk-ans b { color: var(--text); }
 .wk-full .wk-sol { margin-top: 10px; padding-top: 10px;
                    border-top: 1px solid var(--border-soft);
                    white-space: pre-line; }
 .wk-full ul.wk-opts { margin: 8px 0 0; padding-left: 18px; }
 .wk-full .wk-flags { margin-top: 10px; display: flex; gap: 8px;
-                     flex-wrap: wrap; font-size: 11px; color: var(--text3); }
+                     flex-wrap: wrap; font-size: 13px; color: var(--text3); }
 /* ⚠️ Широкое прокручивается ВНУТРИ СЕБЯ, и у формулы с таблицей это
    делается по-разному. Формула — блок, ей хватает `overflow-x`. Таблице
    не хватает: у бокса `display: table` вычисленный `overflow-x` остаётся
@@ -1247,11 +1235,11 @@ details.fold > summary:hover,
 .sheet-task__no { font-weight: 700; }
 /* Цена позиции — тихая и справа: она про устройство работы, а не про
    задачу. У печатного листка она стоит там же. */
-.sheet-task__pts { margin-left: auto; font-size: 12px; color: var(--text2);
+.sheet-task__pts { margin-left: auto; font-size: 13px; color: var(--text2);
                    white-space: nowrap; }
 .sheet-task__st { white-space: pre-line; line-height: 1.6; margin-top: 4px; }
 .sheet-task__part { margin-top: 8px; margin-left: 12px; }
-.sheet-task__part b { color: var(--accent); }
+.sheet-task__part b { color: var(--accent-ink); }
 .sheet-task__opt { margin-top: 4px; margin-left: 12px; }
 /* Место под ответ — пунктирная строка: это не поле ввода, а лист. */
 .sheet-task__field { margin-top: 8px; height: 34px; border-radius: var(--r);
@@ -1269,16 +1257,16 @@ details.fold > summary:hover,
           flex-wrap: wrap; margin-top: 18px; padding: 12px 16px;
           background: var(--surface); border: 0.5px solid var(--border);
           border-radius: 12px; box-shadow: 0 -2px 14px rgba(0,0,0,.06); }
-.wk-bar__sum { font-size: 13px; color: var(--text2); }
+.wk-bar__sum { font-size: 14px; color: var(--text2); }
 .wk-bar__sum b { color: var(--text); }
 .wk-bar__acts { display: flex; align-items: center; gap: 10px;
                 flex-wrap: wrap; }
-.wk-bar__why { font-size: 12px; color: var(--text3); }
+.wk-bar__why { font-size: 13px; color: var(--text3); }
 
 /* Пустое состояние вкладки или шага. */
 .wk-empty { border: 1px dashed var(--border); border-radius: 10px;
             padding: 30px 20px; text-align: center; color: var(--text2);
-            font-size: 13px; line-height: 1.7; }
+            font-size: 14px; line-height: 1.7; }
 .wk-empty b { display: block; color: var(--text); font-size: 14px;
               margin-bottom: 6px; }
 .wk-empty .k-btn { margin-top: 12px; }
@@ -1294,4 +1282,4 @@ details.fold > summary:hover,
    делает, читается как поломка. */
 .k-btn.is-off, .k-btn.is-off:hover { opacity: .45; cursor: default;
                                      pointer-events: none; }
-.k-select--sm { font-size: 12px; padding-top: 4px; padding-bottom: 4px; }
+.k-select--sm { font-size: 13px; padding-top: 4px; padding-bottom: 4px; }

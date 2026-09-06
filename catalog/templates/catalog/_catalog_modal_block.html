@@ -1,0 +1,103 @@
+{% load ru catalog_filters %}{% comment %}
+ОДНА ГРУППА ОКНА «ВСЕ ФИЛЬТРЫ». Ждёт `g` — группу из `catalog.filters.build`.
+
+⚠️ ВАРИАНТЫ — КНОПКИ С aria-pressed, А НЕ ССЫЛКИ (решение владельца
+04.09.2026: окно обновляет выдачу живьём и не закрывается). Состояние
+держит скрипт `catalog_filters.js` и адрес страницы; сервер рисует
+стартовое состояние и числа. Каждый вариант несёт `data-count="группа:значение"`
+— по нему скрипт обновляет число после каждого клика.
+
+Атрибут `data-fl` — тот же, что у панели конструктора: по нему тест
+«наборы экранов совпадают» снимает набор групп с обоих экранов.
+
+Правило нуля: сюда попадают только группы и варианты с данными в корпусе
+(отбор в `filters.py`); ноль под текущими фильтрами — класс `is-zero`.
+{% endcomment %}
+<div class="fl-block" data-fl="{{ g.key }}">
+  <div class="fl-block-head">
+    <span class="fl-block-name">{% if g.type == 'flag' %}Решение{% else %}{{ g.label }}{% endif %}{% if g.type == 'topic' or g.type == 'tag' %} <span class="fl-block-sel" data-block-sel="{{ g.key }}">{% if g.labels %}выбрано {{ g.labels|length }}{% endif %}</span>{% endif %}</span>
+    {% if g.type != 'flag' %}<button class="fl-block-clear" type="button" data-clear="{{ g.key }}"{% if not g.value %} hidden{% endif %}>снять</button>{% endif %}
+  </div>
+
+{% if g.type == 'topic' %}
+  <div id="topic-blocks">
+  {% for grp in g.groups %}
+    <div class="fl-acc{% if grp.open %} is-open{% endif %}" data-acc="{{ grp.key }}" style="--gc: var(--map-g-{{ grp.section }})">
+      <button class="fl-acc-head" type="button" aria-expanded="{{ grp.open|yesno:'true,false' }}" data-acc-toggle="{{ grp.key }}">
+        <span class="fl-acc-dot"></span>
+        <span class="fl-acc-name">{{ grp.label }}</span>
+        <span class="fl-acc-sel" data-acc-sel="{{ grp.key }}">{% if grp.selected %}{{ grp.selected }}{% endif %}</span>
+        <span class="fl-acc-n">{{ grp.topics }}&nbsp;{{ grp.topics|plural_ru:"тема,темы,тем" }} · <span data-count-sum="{{ grp.key }}">{{ grp.count|spaceint }}</span></span>
+        <svg class="fl-acc-caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg>
+      </button>
+      <div class="fl-acc-body"><div class="fl-acc-inner">
+        <ul class="fl-tiles">
+        {% for o in grp.options %}
+          <li><button class="fl-tile{% if o.zero %} is-zero{% endif %}" type="button" data-topic="{{ o.value }}" data-section="{{ o.section }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
+            <span class="fl-tile-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5"/></svg></span>
+            <span class="fl-tile-l">{{ o.label }}</span>
+            <span class="fl-tile-n" data-count="topic:{{ o.value }}">{{ o.count|spaceint }}</span></button></li>
+        {% endfor %}
+        </ul>
+      </div></div>
+    </div>
+  {% endfor %}
+  </div>
+
+{% elif g.type == 'tag' %}
+  <input class="fl-tag-input" type="search" id="tag-input" autocomplete="off"
+         placeholder="Олигополия по Курно, двухчастный тариф…" aria-label="Поиск тега">
+  <div id="tag-groups">
+    {% if g.tags.chosen %}
+    <div class="fl-tag-group"><div class="fl-tag-group-h">Выбранные теги</div><div class="fl-pills">
+      {% for o in g.tags.chosen %}<button class="fl-pill" type="button" data-tag="{{ o.value }}" aria-pressed="true">{{ o.label }}</button>{% endfor %}
+    </div></div>
+    {% endif %}
+    <p class="fl-tag-empty" id="tag-empty"{% if g.tags.listed %} hidden{% endif %}>Выберите тему слева: здесь появятся её теги. Или начните вводить название тега.</p>
+  </div>
+
+{% elif g.type == 'kind' %}
+  <div class="fl-seg" role="group" aria-label="{{ g.label }}">
+    {% for o in g.options %}<button type="button" data-kind="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}"{% if o.zero %} class="is-zero"{% endif %}>{{ o.label }} <span class="fl-tile-n" data-count="kind:{{ o.value }}">{{ o.count|spaceint }}</span></button>{% endfor %}
+  </div>
+  {% if g.test_types %}
+  <div class="fl-sub{% if g.value == 'test' %} is-on{% endif %}" id="test-types" aria-label="Формат теста">
+    {% for o in g.test_types %}<button class="fl-pill{% if o.zero %} is-zero{% endif %}" type="button" data-ttype="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">{{ o.label }} <span class="fl-tile-n" data-count="test_type:{{ o.value }}">{{ o.count|spaceint }}</span></button>{% endfor %}
+  </div>
+  {% endif %}
+
+{% elif g.type == 'flag' %}
+  <label class="fl-switch">
+    <input type="checkbox" id="sol-switch"{% if g.option.active %} checked{% endif %}>
+    <span class="fl-switch-track" aria-hidden="true"></span>
+    <span>Только задачи с решением <span class="fl-tile-n" data-count="has_solution">{{ g.option.count|spaceint }}</span></span>
+  </label>
+
+{% elif g.key == 'character' %}
+  <div class="fl-seg" role="group" aria-label="{{ g.label }}">
+    {% for o in g.options %}<button type="button" data-char="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}"{% if o.zero %} class="is-zero"{% endif %}>{{ o.label }} <span class="fl-tile-n" data-count="character:{{ o.value }}">{{ o.count|spaceint }}</span></button>{% endfor %}
+  </div>
+
+{% elif g.key == 'difficulty' %}
+  <div class="fl-pills" role="group" aria-label="{{ g.label }}">
+    {% for o in g.options %}<button class="fl-pill{% if o.zero %} is-zero{% endif %}" type="button" data-diff="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}"><span class="st">{{ o.label }}</span><span class="fl-tile-n" data-count="difficulty:{{ o.value }}">{{ o.count|spaceint }}</span></button>{% endfor %}
+  </div>
+
+{% elif g.key == 'feature' %}
+  <div class="fl-pills" role="group" aria-label="{{ g.label }}">
+    {% for o in g.options %}<button class="fl-pill{% if o.zero %} is-zero{% endif %}" type="button" data-feat="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">{{ o.label }} <span class="fl-tile-n" data-count="feature:{{ o.value }}">{{ o.count|spaceint }}</span></button>{% endfor %}
+  </div>
+
+{% elif g.key == 'source' %}
+  <div class="fl-list" id="source-list">
+    <ul class="fl-tiles">
+    {% for o in g.options %}
+      <li><button class="fl-tile{% if o.zero %} is-zero{% endif %}" type="button" data-src="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
+        <span class="fl-tile-box"><svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6.5l2.6 2.6L10 3.5"/></svg></span>
+        <span class="fl-tile-l">{{ o.label }}</span>
+        <span class="fl-tile-n" data-count="source:{{ o.value }}">{{ o.count|spaceint }}</span></button></li>
+    {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+</div>

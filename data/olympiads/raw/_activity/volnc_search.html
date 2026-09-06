@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="/js/jquery-1.7.min.js"></script>
+<script src="/Admin/js/jquery.form.js"></script>
+<!--<script type="text/javascript" src="https://www.google.com/jsapi"></script>-->
+<script src="/Admin/js/user_functions.js"></script>
+<!--<script>
+google.load("visualization", "1", {packages:["corechart"]});
+</script>-->
+<SCRIPT language=javascript> 
+	console.log(document);
+	var where = document.referrer; 
+if(where==0){
+console.log("Вы загрузились с пустой страницы")} else {console.log(""+where)} 
+</SCRIPT>
+<title>
+	Поиск</title>
+<meta name="description" content="">
+<meta name="keywords" content="">
+<meta property="og:image" content="_blank"/><meta property="og:url" content="https://olimpiada.ru/search/?q=%D0%92%D0%BE%D0%BB%D0%BE%D0%B3%D0%BE%D0%B4%D1%81%D0%BA%D0%B0%D1%8F%20%D0%BE%D0%BB%D0%B8%D0%BC%D0%BF%D0%B8%D0%B0%D0%B4%D0%B0%20%D1%8D%D0%BA%D0%BE%D0%BD%D0%BE%D0%BC%D0%B8%D0%BA%D0%B0"/>
+<!--<meta http-equiv="Cache-Control" content="no-cache">-->
+<script src="/js/functions.js?v=3"></script>
+<script src="/js/timeline.js"></script>
+<script src="/js/jquery.mask.js" type="text/javascript"></script>
+<!--<script data-require="angular.js@*" data-semver="1.3.1" src="//code.angularjs.org/1.3.1/angular.js"></script>
+<script src="/js/rounding.js"></script>-->
+<meta name='yandex-verification' content='ec050fa1596e3f46' />
+<meta name="google-site-verification" content="eYlELwJJDneJFZ2jSC_JQznWLEvsc7CHzGk37ZGMmi0" />
+<script type="text/javascript" src="/js/fancybox/jquery.mousewheel-3.0.6.pack.js"></script>
+<script type="text/javascript" src="/js/fancybox/jquery.fancybox.js?v=2.1.2"></script>
+<link rel="stylesheet" type="text/css" href="/js/fancybox/jquery.fancybox.css?v=2.1.2" media="screen" />
+<script type="text/javascript" src="/js/adriver.core.2.js"></script>
+<script type="text/javascript">(window.Image ? (new Image()) : document.createElement('img')).src = 'https://vk.com/rtrg?p=VK-RTRG-209803-1bqwS';</script>
+<script src='https://ajax.googleapis.com/ajax/libs/jqueryui/1.8.5/jquery-ui.min.js'></script>
+<!-- Global site tag (gtag.js) - Google Ads: Letovo -->
+<!--<script async src="https://www.googletagmanager.com/gtag/js?id=AW-833719990"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'AW-833719990');
+</script>-->
+<!--VK Letovo-->
+<script type="text/javascript">!function(){var t=document.createElement("script");t.type="text/javascript",t.async=!0,t.src="https://vk.com/js/api/openapi.js?160",t.onload=function(){VK.Retargeting.Init("VK-RTRG-318139-diPnU"),VK.Retargeting.Hit()},document.head.appendChild(t)}();</script><noscript><img src="https://vk.com/rtrg?p=VK-RTRG-318139-diPnU" style="position:fixed; left:-999px;" alt=""/></noscript>
+
+<!-- Facebook Pixel Code Letovo 
+<script>
+!function(f,b,e,v,n,t,s)
+{if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+n.queue=[];t=b.createElement(e);t.async=!0;
+t.src=v;s=b.getElementsByTagName(e)[0];
+s.parentNode.insertBefore(t,s)}(window, document,'script',
+'https://connect.facebook.net/en_US/fbevents.js');
+fbq('init', '271456613232418');
+fbq('track', 'PageView');
+</script>
+<noscript><img height="1" width="1" style="display:none"
+src="https://www.facebook.com/tr?id=271456613232418&ev=PageView&noscript=1"
+/></noscript>
+End Facebook Pixel Code -->
+
+<link media="all" href="/css/style.css" rel="stylesheet">
+<link media="all" href="/css/main.css" rel="stylesheet">
+<link media="all" href="/css/blocks.css" rel="stylesheet">
+
+
+<link media="all" href="/css/filter.css" rel="stylesheet">
+<link media="all" href="/css/benefits.css" rel="stylesheet">
+
+
+
+<link media="all" href="/css/search.css" rel="stylesheet"><link href='https://fonts.googleapis.com/css?family=Roboto:400,700,500,500italic,100,100italic,300,300italic,400italic,900,700italic,900italic&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+<link href='https://fonts.googleapis.com/css?family=Roboto+Condensed:400,300,300italic,400italic,700,700italic&subset=latin,cyrillic' rel='stylesheet' type='text/css'>
+<!--<script type="text/javascript" src="/Admin/editors/tinymce2/tinymce.min.js"></script>-->
+<!--<script src="/Admin/js/jquery-ui-1.8.24.custom.min.js" type="text/javascript"></script>-->
+<script type="text/javascript" src="/js/jquery.placeholder.min.js"></script>
+<!--<link rel="icon" href="/favicon.ico" type="image/x-icon">-->
+<link rel="icon" type="image/png" href="/files/imagecache/ca3cf72a09556e2b9870497e8594d3eb.png" />
+			<link rel="apple-touch-icon" sizes="57x57" href="/files/imagecache/1a8f0440c62429bccf9feb2a2872f61a.png">
+					<link rel="apple-touch-icon" sizes="114x114" href="/files/imagecache/48a738918acf2bd11846d2b7ee9d0038.png">
+					<link rel="apple-touch-icon" sizes="72x72" href="/files/imagecache/da8a6f019bafba7b8e81d8078f0a9226.png">
+					<link rel="apple-touch-icon" sizes="144x144" href="/files/imagecache/d49dda580721f83725b50f0f56d62c7b.png">
+					<link rel="apple-touch-icon" sizes="60x60" href="/files/imagecache/b72cea7198dd17d3d4a1bddf54ac8f45.png">
+					<link rel="apple-touch-icon" sizes="120x120" href="/files/imagecache/a19f981f448f7a8f53aae8f13daac4d5.png">
+					<link rel="apple-touch-icon" sizes="76x76" href="/files/imagecache/c9072d2560ec803a91a5a6d96840cea3.png">
+					<link rel="apple-touch-icon" sizes="152x152" href="/files/imagecache/704c2394815aa2fc3384032fe7a65d79.png">
+		<!--<meta name="viewport" content="width=device-width, initial-scale=1">-->
+<style type="text/css">
+	.rait_text, .pl_rating, .act_rating
+	{
+		display: none !important;
+	}
+
+	.with-image-article
+{
+	display: flex;
+	justify-content: center;
+	gap: 20px;
+}
+
+.with-image-article>a
+{
+	flex: none;
+	width: 30%;
+}
+
+.with-image-article>a img
+{
+	width: 100% !important;
+}
+
+.with-image-article .yellow_block
+{
+	margin: 0;
+}
+
+@media all and (max-width: 700px)
+{
+	.otbivka span.blue
+	{
+		font-size: 19px;
+		line-height: 23px;
+	}
+
+	.with-image-article
+	{
+		flex-direction: column-reverse;
+	}
+}
+</style></head><body><script type="text/javascript" >
+   (function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+   m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+   (window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+
+   ym(46311342, "init", {
+        clickmap:true,
+        trackLinks:true,
+        accurateTrackBounce:true,
+        webvisor:true
+   });
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/46311342" style="position:absolute; left:-9999px;" alt="" /></div></noscript><script type="text/javascript">
+(function (d, w, c) {
+    (w[c] = w[c] || []).push(function() {
+        try {
+            w.yaCounter22151252 = new Ya.Metrika({id:22151252,
+                    webvisor:true,
+                    clickmap:true,
+                    trackLinks:true,
+                    accurateTrackBounce:true});
+        } catch(e) { }
+    });
+
+    var n = d.getElementsByTagName("script")[0],
+        s = d.createElement("script"),
+        f = function () { n.parentNode.insertBefore(s, n); };
+    s.type = "text/javascript";
+    s.async = true;
+    s.src = (d.location.protocol == "https:" ? "https:" : "http:") + "//mc.yandex.ru/metrika/watch.js";
+
+    if (w.opera == "[object Opera]") {
+        d.addEventListener("DOMContentLoaded", f, false);
+    } else { f(); }
+})(document, window, "yandex_metrika_callbacks");
+</script>
+<noscript><div><img src="//mc.yandex.ru/watch/22151252" style="position:absolute; left:-9999px;" alt="" /></div></noscript><script type="text/javascript" >
+    (function (d, w, c) {
+        (w[c] = w[c] || []).push(function() {
+            try {
+                w.yaCounter18559432 = new Ya.Metrika({
+                    id:18559432,
+                    clickmap:true,
+                    trackLinks:true,
+                    accurateTrackBounce:true,
+                    webvisor:true
+                });
+            } catch(e) { }
+        });
+
+        var n = d.getElementsByTagName("script")[0],
+            s = d.createElement("script"),
+            f = function () { n.parentNode.insertBefore(s, n); };
+        s.type = "text/javascript";
+        s.async = true;
+        s.src = "https://mc.yandex.ru/metrika/watch.js";
+
+        if (w.opera == "[object Opera]") {
+            d.addEventListener("DOMContentLoaded", f, false);
+        } else { f(); }
+    })(document, window, "yandex_metrika_callbacks");
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/18559432" style="position:absolute; left:-9999px;" alt="" /></div></noscript><!--<script async src="https://www.googletagmanager.com/gtag/js?id=UA-61589710-3"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'UA-61589710-3');
+</script>--><script type="text/javascript">
+var _tmr = _tmr || [];
+_tmr.push({id: "2699290", type: "pageView", start: (new Date()).getTime()});
+(function (d, w, id) {
+  if (d.getElementById(id)) return;
+  var ts = d.createElement("script"); ts.type = "text/javascript"; ts.async = true; ts.id = id;
+  ts.src = (d.location.protocol == "https:" ? "https:" : "http:") + "//top-fwz1.mail.ru/js/code.js";
+  var f = function () {var s = d.getElementsByTagName("script")[0]; s.parentNode.insertBefore(ts, s);};
+  if (w.opera == "[object Opera]") { d.addEventListener("DOMContentLoaded", f, false); } else { f(); }
+})(document, window, "topmailru-code");
+</script><noscript><div style="position:absolute;left:-10000px;">
+<img src="//top-fwz1.mail.ru/counter?id=2699290;js=na" style="border:0;" height="1" width="1" alt="Рейтинг@Mail.ru" />
+</div></noscript><!--<span id="openstat1"></span>
+<script type="text/javascript">
+var openstat = { counter: 1, next: openstat };
+(function(d, t, p) {
+var j = d.createElement(t); j.async = true; j.type = "text/javascript";
+j.src = ("https:" == p ? "https:" : "http:") + "//openstat.net/cnt.js";
+var s = d.getElementsByTagName(t)[0]; s.parentNode.insertBefore(j, s);
+})(document, "script", document.location.protocol);
+</script>--><div class="all">
+
+<a name="start"></a>
+<div class="content">
+	<div class="main_menu page_search">
+		<a href="/" title="Олимпиада.ру" class="logo"><img src="/images/logo-simple.svg" class="fs" height="35"><img src="/favicon.png" class="ms"></a>
+		<div class="menu-line">
+			<a title="Олимпиады" href="/activities" class="menu">Олимпиады</a>
+			<a title="Новости" href="/news" class="menu">Новости</a>
+			<a title="Журнал" href="/articles" class="menu">Журнал</a>
+		</div>
+		<div class="search mbutton">
+			<a href="javascript:void(0)"><i class="icon-search"></i></a>
+			<form method="GET" id="search" action="/search">
+				<input type="text" name="q" autocomplete="off" placeholder="Олимпиада, статья, новость"/>
+				<a class="close icon-cros" href="javascript:void(0)" style="display: inline-block; "></a>
+				<div id="fast_search"></div>
+			</form>
+		</div>
+		<a class="favorites mbutton" href="/favorites"><i class="icon-favorites"></i></a>
+		<a class="morda mbutton" href="javascript:void(0)" onclick="autorization2($(this),0)">
+						<i class="icon-user"></i>
+					</a>
+		<div class="hregion">
+			<span class="r_name">
+				<span class="icon-map_point"></span>
+				Москва				
+			</span>
+			<div class="r_changer">
+				<input type="text" placeholder="Регион или город" value="Москва" onkeyup="findRegion($(this).val())"><span class="icon-map_point" style="float: right;"></span>
+				<div id="found_regions">
+					<div class="fr_content">
+					</div>
+					<!--<div class="poterialsa"><a class="ya_poterialsa" polig="0.05 0,1 0,0.95 1,0 1" href="javascript:setRegion(0)">Определить регион</a></div>-->
+				</div>
+			</div>
+		</div>
+		
+	</div>
+		<div style="display: block; height: 3px;"></div>
+	</div> 
+<div id="login_block" >
+</div><div class="content static_page">
+	<div class="big_search">
+	<form method="GET" action="/search" id="big_search">
+	<table style="width:100%">
+		<tr>
+			<td style="width:65px">
+				<span class="s_b_lupa">
+					<svg id="Layer_1" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px" viewBox="0 0 64 63" style="enable-background:new 0 0 64 63;" xml:space="preserve">
+						<path d="M63.5,56.2C63.5,56.2,63.5,56.2,63.5,56.2c-4.8-4.8-11.2-10.2-16.8-15c-2-1.7-4-3.4-5.6-4.8c2.9-4.3,4.4-9.4,4.4-14.6 C45.4,8.5,34.3,0.3,23.5,0C10.1-0.4,0.4,9.5,0,23.9c-0.2,6.3,2,12,6,16.1c4,4.1,9.5,6.3,15.5,6.3c0.1,0,0.1,0,0.2,0 c5.9,0,10.6-1.7,14.4-4.9c6,5.1,13.8,13.5,20.8,21c0.4,0.4,1,0.5,1.6,0.5c0.6,0,1.2-0.1,1.6-0.2l0.2,0c2-0.4,3.6-1.9,3.6-3.4 c0-0.1,0-0.2,0-0.4C64,58.1,64.2,56.9,63.5,56.2z M39.4,22.6c0,9.6-7.1,16.7-17,16.8c-5.1,0.1-9.2-1.3-12-4.2C7.6,32.4,6,28.1,6,23 c0-4.7,1.8-9.1,4.8-12c2.9-2.8,6.8-4.3,11.3-4.3c0.1,0,0.3,0,0.4,0C32.8,6.8,39.4,13.1,39.4,22.6z">
+					</svg>
+				</span>
+			</td>
+			<td>
+				<input type="text" autocomplete="off" value="Вологодская олимпиада экономика" placeholder="Олимпиада, статья, новость" name="q"/>
+			</td>
+			<td style="width:55px">
+				<a class="clear" href="javascript:void(0)" onclick="$('.big_search input[type=text]').val('')">
+					<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+						<path d="M22.31,24A1.79,1.79,0,0,0,24,22.11a1.84,1.84,0,0,0-.5-1.39L14.64,12l9-9A1.47,1.47,0,0,0,24,1.69,1.62,1.62,0,0,0,22.31,0,1.47,1.47,0,0,0,21,.4l-9,9L3.28.5A1.84,1.84,0,0,0,1.89,0,1.68,1.68,0,0,0,0,1.89,1.72,1.72,0,0,0,.6,3.09L9.46,12,.7,20.81A1.81,1.81,0,0,0,0,22.11,2,2,0,0,0,1.89,24a1.84,1.84,0,0,0,1.29-.6L12,14.54l8.86,8.86A1.81,1.81,0,0,0,22.31,24Z">
+					</svg>
+				</a>
+			</td>
+		</tr>
+	</table>
+</form>
+</div>
+		<ul class="results_counter">
+									<li>
+								<span>2 статьи</span>
+							</li>
+								</ul>
+		<div id="search_res">
+		<a class="new_link" href="/article/833"><span class="type_date blue">Подборка, 19 июня 2018</span>
+				Успехи России на международных олимпиадах в 2018 году</a><a class="new_link" href="/article/583"><span class="type_date blue">Обзор, 18 октября 2016</span>
+				Первый олимпиадный рейтинг регионов</a></div>
+<script type="text/javascript">
+	$('.static_page').removeClass('static_page');
+	function loadMore()
+	{
+		$.post('/include/moreSearch.php',{start:$('.olimpiada').length,q:'Вологодская олимпиада экономика'},function(data){
+				$('#search_res').append(data);
+				if($('.olimpiada').length==0)
+					$('#escho').hide();
+		});
+	}
+	$(document).ready(function(){
+		$('.big_search input[type=text]').focus(function(){
+			$('.big_search').css('border-bottom','1px solid #666');
+		});
+		$('.big_search input[type=text]').blur(function(){
+			$('.big_search').css('border-bottom','1px solid #e5e5e5');
+		});
+	});
+</script>	</div>
+<div class="content fcontent">	
+  <a href="javascript:void(0)" class="totop" onclick="$('body,html').animate({'scrollTop':'0'},500,'easeOutCirc');">→</a>
+<div class="footer">
+		<table>
+			<tbody>
+				<tr>
+					<td>
+            © Олимпиада.ру, 1996—2026<p style="margin: 3px 30px 0 0">Любое использование материалов возможно только с активной ссылкой на сайт.</p>
+<p style="margin: 3px 30px 0 0">Свидетельство о регистрации СМИ Эл № ФС77-50515 от 04 июля 2012г.</p>
+					</td>
+					<td style="width:159px"> 
+						<a href="/editors"><font>Редакция</font></a><br>
+						<a href="/faq"><font>FAQ</font></a><br>
+						<a href="/contacts"><font>Контакты</font></a><br>
+					</td>
+						
+          <td style="width:189px">
+            <!--<a href="/faq"><font>Как пользоваться сайтом</font></a>-->
+            <a href="/placement"><font>Правила размещения</font></a>
+            <a href="/license"><font>Пользовательское соглашение</font></a>
+            
+            
+          </td>
+					<td style="width:159px">
+						<a href="/about"><font>О сайте</font></a><br>
+						<a href="/projects"><font>Наши проекты</font></a>
+            			<a target="_blank" href="https://vk.com/olimpiada_ru"><font>ВКонтакте</font></a>
+						<!--<a href="/advertizing"><font>Реклама</font></a>-->
+            <!--<a href="/vacancy"><font>Вакансии</font></a><br>-->
+            <!--<a target="_blank" href="https://itunes.apple.com/ru/app/olimpiada.ru/id1184864287?mt=8" style="min-width:180px">
+              <svg id="Layer_1" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 12.84 24" style="width:13px;display: inline-block; margin-bottom: -5px;position: relative;" >
+                <defs><style>.cls-1{fill-rule:evenodd;}</style></defs><title>iphone</title>
+                <path class="cls-1" d="M10.27,0H2.56A2.66,2.66,0,0,0,0,2.75v18.5A2.66,2.66,0,0,0,2.56,24h7.71a2.66,2.66,0,0,0,2.56-2.75V2.75A2.66,2.66,0,0,0,10.27,0ZM1.5,4.5h9.84V18H1.5Zm9.84,16.75a1.17,1.17,0,0,1-1.06,1.25H2.56A1.17,1.17,0,0,1,1.5,21.25V19.5h9.84ZM1.5,3V2.75A1.17,1.17,0,0,1,2.56,1.5h7.71a1.17,1.17,0,0,1,1.06,1.25V3Z"/><circle cx="6.42" cy="20.97" r="1"/>
+              </svg>
+              <span class="icon-iphone"></span> <font>Приложение</font></a>-->
+              
+					</td>
+				  				</tr>
+                			</tbody>
+		</table>
+	</div>
+  
+
+
+<a name="finish"></a>
+</div>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape0" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0,1.0 0.9,0 1.0" />
+    </clipPath>
+  </defs>
+</svg>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape1" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0,1.0 1.0,0 0.9" />
+    </clipPath>
+  </defs>
+</svg>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape2" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0,1.0 0.9,0 1.0" />
+    </clipPath>
+  </defs>
+</svg>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape3" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0,1.0 1.0,0 0.9" />
+    </clipPath>
+  </defs>
+</svg>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape4" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0,1.0 0.9,0 1.0" />
+    </clipPath>
+  </defs>
+</svg>
+<div id="shadow">
+  <div id="popup">
+    <a href="javascript:void(0)" class="popup_closer"><svg xmlns="http://www.w3.org/2000/svg" style="width:24px;" viewBox="0 0 24 24"><title>search-cross</title><path d="M22.31,24A1.79,1.79,0,0,0,24,22.11a1.84,1.84,0,0,0-.5-1.39L14.64,12l9-9A1.47,1.47,0,0,0,24,1.69,1.62,1.62,0,0,0,22.31,0,1.47,1.47,0,0,0,21,.4l-9,9L3.28.5A1.84,1.84,0,0,0,1.89,0,1.68,1.68,0,0,0,0,1.89,1.72,1.72,0,0,0,.6,3.09L9.46,12,.7,20.81A1.81,1.81,0,0,0,0,22.11,2,2,0,0,0,1.89,24a1.84,1.84,0,0,0,1.29-.6L12,14.54l8.86,8.86A1.81,1.81,0,0,0,22.31,24Z"></path></svg></a>
+    <div id="popup_content"></div>
+  </div>
+</div>
+<svg width="0" height="0" style="display:none;">
+  <defs>
+    <clipPath id="clip-shape-popup" clipPathUnits="objectBoundingBox">
+      <polygon points="0 0,1.0 0.05,0.95 1.0,0.1 1.0" />
+    </clipPath>
+  </defs>
+</svg>
+<script type="text/javascript">
+  $.post('/include/autorization2.php',function(data){
+    $('#login_block').html(data);
+  });
+</script>
+<style type="text/css">
+  #shadow
+  {
+    display: none;
+    background: rgba(0,0,0,0.4);
+    position: fixed;
+    top:0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 5;
+  }
+  #popup
+  {
+    display: block;
+    position: fixed;
+    top:20%;
+    width: 400px;
+    left:50%;
+    padding:20px;
+    box-shadow: 0 0 4px 0 #000;
+    min-height: 150px;
+    margin-left:-200px;
+    background: #fff;
+    /*-webkit-clip-path: polygon(0% 0%, 100% 5%, 95% 100%, 10% 100%);
+    clip-path: url(#clip-shape-popup);*/
+  }
+
+  .popup_closer
+  {
+    display: block;
+    position: absolute;
+    right:20px;
+    top:20px;
+    font-size: 30px;
+    color:#000;
+    text-decoration: none;
+  }
+
+  .popup_closer:hover
+  {
+      color:#e11000;
+  }
+  @media all and (max-width: 700px)
+{
+  .otbivka span.blue
+  {
+    font-size: 19px;
+    line-height: 23px;
+  }
+
+  .with-image-article
+  {
+    flex-direction: column-reverse;
+  }
+
+  .with-image-article .yellow_block {
+    padding: 40px 20px 30px;
+  }
+}
+</style>
+<div id="svg-container" style="display: none;"></div>
+<script type="text/javascript">
+function easeOutCirc(x) {
+  return Math.sqrt(1 - Math.pow(x - 1, 2));
+}
+</script>
+
+</div></body></html>

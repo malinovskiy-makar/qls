@@ -5,16 +5,34 @@
 раздел SESSION_PROGRESS). В ветке
 feat/calc2-shipu MathLive не используется вовсе (проверено git grep), поэтому
 взята последняя стабильная и записана здесь. Сборки нет — так же, как D3 и
-Math.js в calc2, подключаем с CDN одним <script src>. Файлы calc2 не тронуты.
+Math.js в calc2, подключаем одним <script src> из static/vendor/: внешних CDN
+у сайта нет с 04.09.2026.
 
 Использование: у textarea поставить атрибут data-mathfield, затем один раз
 на странице подключить этот партиал.
 {% endcomment %}
 {% load static %}
 
-<link rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive-static.min.css">
-<script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"></script>
+<link rel="stylesheet" href="{% static 'vendor/mathlive-0.110.0/mathlive-static.css' %}">
+<script>
+  /* Папка шрифтов MathLive — тем же способом, что в калькуляторе. */
+  window.MATHLIVE_DIR =
+    "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
+</script>
+<script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"></script>
+{% comment %}
+⚠️ ОБЩАЯ КЛАВИАТУРА ФОРМУЛ — ОДНА НА САЙТ (04.09.2026, ADR 0075). Здесь
+раньше были свои четыре ряда быстрых кнопок и кнопка «⌨ Клавиатура»
+(встроенная клавиатура MathLive) — другой набор знаков и другой вид, чем в
+калькуляторе. Эталоном взята клавиатура калькулятора; оба экрана берут её
+из `static/mathkbd/`.
+
+Порядок важен: `mathkbd.js` должен быть загружен до `mathfield.js`, который
+зовёт `window.MathKbd.build`. Оба `defer` — выполнятся в порядке
+подключения.
+{% endcomment %}
+<link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
+<script defer src="{% static 'mathkbd/mathkbd.js' %}"></script>
 <script defer src="{% static 'platform/mathfield.js' %}"></script>
 
 <style>
@@ -26,17 +44,17 @@ Math.js в calc2, подключаем с CDN одним <script src>. Файл�
   white-space: pre-wrap;
 }
 .mf-preview::before {
-  content: 'Как это будет выглядеть'; display: block; font-size: 11px;
+  content: 'Как это будет выглядеть'; display: block; font-size: 13px;
   font-weight: 700; text-transform: uppercase; letter-spacing: .05em;
   color: var(--text2); margin-bottom: 6px;
 }
 .mf-panel { margin-top: 8px; }
-.mf-toggle, .mf-insert, .mf-kbd {
+.mf-toggle, .mf-insert {
   border: 0.5px solid var(--border); border-radius: var(--r);
-  background: transparent; color: var(--text); font: inherit; font-size: 12px;
+  background: transparent; color: var(--text); font: inherit; font-size: 13px;
   padding: 5px 12px; cursor: pointer;
 }
-.mf-toggle:hover, .mf-insert:hover, .mf-kbd:hover { background: var(--panel); }
+.mf-toggle:hover, .mf-insert:hover { background: var(--panel); }
 .mf-body {
   margin-top: 10px; padding: 12px; border: 0.5px solid var(--border);
   border-radius: var(--r); background: var(--surface-2);
@@ -48,18 +66,7 @@ Math.js в calc2, подключаем с CDN одним <script src>. Файл�
 }
 .mf-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
           margin-top: 10px; }
-.mf-hint { font-size: 12px; color: var(--text2); }
-.mf-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
-            margin-top: 10px; }
-.mf-group-name { font-size: 11px; color: var(--text2); min-width: 74px; }
-.mf-key {
-  min-width: 34px; padding: 4px 8px; font: inherit; font-size: 13px;
-  border: 0.5px solid var(--border); border-radius: var(--r);
-  background: var(--surface); color: var(--text); cursor: pointer;
-}
-.mf-key:hover { background: var(--panel); }
-@media (max-width: 560px) {
-  .mf-group-name { min-width: 100%; }
-  .mf-key { min-width: 40px; padding: 6px 10px; }
-}
+.mf-hint { font-size: 13px; color: var(--text2); }
+/* Стили своих быстрых кнопок (.mf-group / .mf-key) удалены вместе с самими
+   кнопками: их место заняла общая клавиатура из `static/mathkbd/`. */
 </style>

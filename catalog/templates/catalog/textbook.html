@@ -1,0 +1,50 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+«Учебник» — заглушка. Раздел ещё пишется, но пункт в шапке нужен уже на
+бете: иначе о нём никто не узнает, а первый вопрос беты — «а учебник будет?».
+
+⚠️ НА ЭКРАНЕ НЕТ НИЧЕГО, КРОМЕ ЗНАКА, СЛОВА И ОДНОЙ СТРОКИ. Ни кнопки
+«сообщить, когда выйдет», ни формы почты, ни списка будущих глав: обещать на
+заглушке нечего, а форма без работающей рассылки — обман. Решение владельца
+04.09.2026.
+{% endcomment %}
+
+{% block title %}Учебник{% endblock %}
+
+{% block extra_style %}
+.tb {
+  min-height: calc(100vh - 220px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 0;
+}
+.tb-logo { width: min(420px, 76vw); height: auto; color: var(--text); }
+.tb h1 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin: 28px 0 8px;
+}
+.tb p {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text2);
+  max-width: 46em;
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .tb h1 { font-size: 24px; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="tb">
+  {% include '_wordmark.html' with logo_class='tb-logo' %}
+  <h1>Скоро.</h1>
+  <p>Учебник по олимпиадной экономике: от первых моделей до задач
+     заключительного этапа. Мы уже пишем.</p>
+</div>
+{% endblock %}

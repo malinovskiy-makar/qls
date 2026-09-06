@@ -118,7 +118,7 @@ class MarkupTests(TestCase):
 
     def test_empty_row_names_both_ways_out(self):
         page = read('teacher', 'templates', 'teacher', 'generate.html')
-        self.assertIn('это бесплатно, к модели обращаться не нужно', page)
+        self.assertIn('бесплатно, к модели обращаться не нужно', page)
         self.assertIn('доберите задачу из каталога', page)
 
     def test_cost_and_model_left_the_screen(self):

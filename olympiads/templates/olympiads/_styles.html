@@ -1,0 +1,711 @@
+{% comment %}
+Стили раздела «Олимпиады» — ВСЕ и ЕДИНСТВЕННЫЕ.
+Ни строчки CSS в других шаблонах раздела: так переделка внешнего вида
+не трогает разметку, а разметка не тащит за собой переделку вида.
+
+Своих цветов здесь нет ни одного — только переменные из _tokens.html;
+это проверяет тест olympiads/tests/test_no_hex_colors.py.
+{% endcomment %}
+/* ── Плашка демо-данных ─────────────────────────────── */
+.ol-demo {
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--text);
+  margin-bottom: 24px;
+}
+
+/* ── Общая рамка раздела ────────────────────────────── */
+/* Раздел шире каталога: таблица льгот — семь колонок, и на 860 она не
+   помещается вовсе. Правило действует только здесь: партиал стилей
+   подключён единственно на экранах олимпиад. */
+.page-wrap { max-width: var(--w-page); }
+.ol-head { margin-bottom: 28px; }
+/* Та же пара, что у каталога и статистики: 30px/600 и 16px `--text2`. */
+.ol-title { font-size: 30px; font-weight: 600; line-height: var(--lh-tight);
+            letter-spacing: -.01em; }
+.ol-sub {
+  font-size: 16px; color: var(--text2); margin-top: 8px;
+  line-height: 1.5; max-width: var(--w-read);
+}
+.ol-section { margin-top: 36px; }
+.ol-section-title { font-size: 19px; font-weight: 700; margin-bottom: 12px; }
+.ol-empty {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 18px 20px;
+  font-size: 14px;
+  color: var(--text2);
+}
+
+/* ── Панель дат сверху главной ──────────────────────── */
+.ol-feed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 18px 20px 20px;
+}
+.ol-feed-head {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 12px; flex-wrap: wrap; margin-bottom: 14px;
+}
+.ol-feed-title { font-size: 17px; font-weight: 700; }
+.ol-feed-link { font-size: 14px; color: var(--accent-ink); text-decoration: none; }
+.ol-feed-link:hover { text-decoration: underline; }
+.ol-feed-note, .ol-feed-empty {
+  font-size: 14px; color: var(--text2); max-width: var(--w-read);
+}
+.ol-feed-note { margin-bottom: 12px; }
+
+.ol-feed-grid {
+  list-style: none; display: grid; gap: 10px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .ol-feed-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .ol-feed-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 420px) { .ol-feed-grid { grid-template-columns: 1fr; } }
+
+.ol-ev {
+  background: var(--surface-2);
+  border: 1px solid var(--border-soft);
+  border-radius: var(--r-card);
+  padding: 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+/* Неподтверждённое приглушается, но не прячется: школьнику важно знать,
+   что тур вообще будет, даже когда числа ещё нет. */
+.ol-ev--dim { opacity: .78; }
+.ol-ev-day { font-size: 28px; font-weight: 700; line-height: var(--lh-tight); }
+.ol-ev-month { font-size: 13px; color: var(--text2); }
+.ol-ev-approx { font-size: 15px; font-weight: 600; line-height: var(--lh-tight); }
+.ol-ev-olymp { font-size: 14px; font-weight: 600; margin-top: 6px; }
+.ol-ev-what { font-size: 13px; color: var(--text2); }
+
+.ol-chip-type {
+  align-self: flex-start; margin-top: 6px;
+  font-size: 12px; padding: 2px 8px;
+  background: var(--chip-bg); color: var(--chip-text);
+  border: 1px solid var(--border); border-radius: var(--r-pill);
+}
+
+/* ── Статус даты: точка плюс слово ──────────────────── */
+/* Новых цветов не заводим — все три состояния собраны из токенов. */
+.ol-status {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; margin-top: 8px;
+}
+.ol-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  flex-shrink: 0; box-sizing: border-box;
+}
+.ol-status--confirmed { color: var(--accent-ink); }
+.ol-status--confirmed .ol-dot { background: var(--accent); }
+.ol-status--approx_last_year { color: var(--text2); }
+/* Половина заливки — половина уверенности. */
+.ol-status--approx_last_year .ol-dot {
+  border: 1px solid currentColor;
+  background: linear-gradient(to right, currentColor 50%, transparent 50%);
+}
+.ol-status--awaiting { color: var(--pending); }
+.ol-status--awaiting .ol-dot {
+  border: 1px dashed currentColor;
+  background: none;
+}
+
+/* ── Полоса чипов-фильтров ──────────────────────────── */
+.ol-filters {
+  display: flex; flex-wrap: wrap; gap: 8px;
+  margin: 24px 0 4px;
+}
+.ol-chip {
+  font: inherit; font-size: 13px; cursor: pointer;
+  padding: 5px 12px; border-radius: var(--r-pill);
+  background: var(--chip-bg); color: var(--chip-text);
+  border: 1px solid var(--border);
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+.ol-chip:hover { border-color: var(--accent); }
+.ol-chip[aria-pressed="true"] {
+  background: var(--accent-tint);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ol-nores[hidden] { display: none; }
+.ol-nores {
+  margin-top: 18px; font-size: 14px; color: var(--text2);
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.ol-reset {
+  font: inherit; font-size: 13px; cursor: pointer;
+  padding: 5px 12px; border-radius: var(--r);
+  background: var(--btn-bg); color: var(--on-btn); border: 0;
+}
+.ol-reset:hover { background: var(--btn-bg-hover); }
+
+/* ── Сетка карточек ─────────────────────────────────── */
+.ol-grid {
+  list-style: none; display: grid; gap: 12px; margin-top: 18px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .ol-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 620px) { .ol-grid { grid-template-columns: 1fr; } }
+
+.ol-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 36px 0 0; font-size: 14px; color: var(--text2);
+}
+.ol-divider::after {
+  content: ""; flex: 1; height: var(--line); background: var(--border);
+}
+
+.ol-card[hidden] { display: none; }
+.ol-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  transition: transform var(--t), border-color var(--t), background var(--t);
+}
+/* ⚠️ ТЕНИ ПРИ НАВЕДЕНИИ НЕТ, И ЭТО КАНОН, А НЕ ЗАБЫВЧИВОСТЬ.
+   У поверхности в покое и под курсором тени нет: отличие дают рамка и
+   фон. Тень оставлена только всплывающей подсказке, которая физически
+   висит над страницей. */
+.ol-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+  background: var(--accent-tint);
+}
+.ol-card-link {
+  display: flex; flex-direction: column; gap: 8px; height: 100%;
+  padding: 14px; text-decoration: none; color: inherit;
+}
+.ol-card-top { display: flex; gap: 10px; align-items: flex-start; }
+.ol-logo {
+  width: 48px; height: 48px; flex-shrink: 0;
+  border-radius: var(--r-card); object-fit: contain;
+}
+.ol-logo--empty {
+  background: var(--surface-2); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; letter-spacing: .5px;
+}
+.ol-card-names { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.ol-card-name { font-size: 15px; font-weight: 600; line-height: var(--lh-tight); }
+.ol-card-org { font-size: 13px; color: var(--text2); }
+
+.ol-card-tags { list-style: none; display: flex; flex-wrap: wrap; gap: 4px; }
+.ol-tag {
+  font-size: 11px; padding: 2px 7px; border-radius: var(--r-pill);
+  background: var(--chip-bg); color: var(--text3);
+  border: 1px solid var(--border-soft);
+  transition: background var(--t), border-color var(--t), color var(--t);
+}
+/* Тег загорается, когда пользователь выбрал этот же чип наверху: видно,
+   ПОЧЕМУ карточка осталась в выдаче. */
+.ol-tag[data-on="1"] {
+  background: var(--accent-tint); border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+.ol-card-next {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
+  font-size: 13px; margin-top: auto; padding-top: 4px;
+}
+.ol-card-next-what { color: var(--text2); }
+.ol-card-next-when { font-weight: 600; }
+.ol-card-next-none, .ol-card-foot { color: var(--text2); }
+.ol-card-next .ol-status { margin-top: 0; flex-basis: 100%; }
+.ol-card-foot {
+  border-top: var(--line) solid var(--border-soft); padding-top: 8px; font-size: 12px;
+  padding-right: 92px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ol-card:hover { transform: none; }
+}
+
+/* ── Шапка страницы олимпиады ───────────────────────── */
+.ol-crumbs {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  font-size: 13px; color: var(--text2); margin-bottom: 14px;
+}
+.ol-crumbs a { color: var(--accent-ink); text-decoration: none; }
+.ol-crumbs a:hover { text-decoration: underline; }
+
+.ol-hero { margin-bottom: 8px; }
+.ol-hero-top { display: flex; gap: 14px; align-items: flex-start; }
+.ol-logo--big { width: 64px; height: 64px; font-size: 15px; }
+
+.ol-facts {
+  display: flex; flex-wrap: wrap; gap: 8px 26px;
+  margin-top: 18px; padding-top: 14px; border-top: var(--line) solid var(--border);
+}
+.ol-facts dt { font-size: 12px; color: var(--text2); }
+.ol-facts dd { font-size: 14px; font-weight: 600; margin-top: 2px; }
+
+.ol-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+/* Крупная сплошная кнопка — графитовая. Акцент оставлен мелочам:
+   ссылкам, активному чипу, полосе слева. */
+.ol-btn {
+  display: inline-flex; align-items: center;
+  font-size: 14px; font-weight: 600; text-decoration: none;
+  padding: 9px 16px; border-radius: var(--r);
+  background: var(--btn-bg); color: var(--on-btn); border: 1px solid transparent;
+  transition: background var(--t), border-color var(--t);
+}
+.ol-btn:hover { background: var(--btn-bg-hover); }
+.ol-btn--second {
+  background: var(--surface); color: var(--text);
+  border-color: var(--border);
+}
+.ol-btn--second:hover { background: var(--surface-2); border-color: var(--accent); }
+/* Заготовка видна и в пустом состоянии: кнопка не исчезает, а честно
+   говорит, что нажимать пока некуда. */
+.ol-btn--off {
+  color: var(--text3); cursor: default; opacity: .75;
+}
+.ol-btn--off:hover { background: var(--surface); border-color: var(--border); }
+
+/* ── Панель с рассказом об олимпиаде ────────────────── */
+.ol-desc {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: var(--stripe) solid var(--accent);
+  border-radius: var(--r-panel);
+  padding: 16px 18px;
+  font-size: 15px; line-height: var(--lh-body);
+  max-width: var(--w-read);
+}
+
+/* ── Таблицы раздела ────────────────────────────────── */
+/* Обёртка со своей прокруткой и затенением края: страница целиком
+   горизонтально ехать не должна, а таблица льгот в 960 не влезает. */
+/* ⚠️ ЗАТЕНЕНИЕ КРАЯ ГАСНЕТ САМО, БЕЗ СКРИПТА. Два слоя-заглушки цветом
+   поверхности прокручиваются ВМЕСТЕ с содержимым (local), два слоя тени
+   стоят на месте (scroll). Доехали до края — заглушка накрывает тень, и
+   она пропадает. Висящая всё время тень читалась бы как украшение и
+   перестала бы что-либо сообщать.
+   Ни одного шестнадцатеричного цвета: прозрачность задана через rgba. */
+.ol-tablewrap {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  background-color: var(--surface);
+  background-image:
+    linear-gradient(to right, var(--surface), rgba(0, 0, 0, 0)),
+    linear-gradient(to left,  var(--surface), rgba(0, 0, 0, 0)),
+    linear-gradient(to right, var(--fade-edge), rgba(0, 0, 0, 0)),
+    linear-gradient(to left,  var(--fade-edge), rgba(0, 0, 0, 0));
+  background-position: left center, right center, left center, right center;
+  background-size: 26px 100%, 26px 100%, 18px 100%, 18px 100%;
+  background-repeat: no-repeat;
+  background-attachment: local, local, scroll, scroll;
+}
+.ol-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.ol-table th, .ol-table td {
+  text-align: left; padding: 10px 14px; vertical-align: top;
+}
+.ol-table th {
+  font-size: 12px; font-weight: 600; color: var(--text2);
+  border-bottom: var(--line) solid var(--border);
+  white-space: nowrap;
+}
+.ol-table td { border-bottom: var(--line) solid var(--border-soft); }
+.ol-table tr:last-child td { border-bottom: 0; }
+.ol-table .ol-status { margin-top: 0; }
+.ol-checked { display: block; font-size: 11px; color: var(--text3); margin-top: 4px; }
+.ol-checked a { color: var(--accent-ink); }
+.ol-mute { color: var(--text3); }
+
+/* «Только победителям» под строкой льготы: у части олимпиад призёру
+   положено меньше, и молчать об этом нельзя. */
+.ol-whogets { display: block; font-size: 12px; color: var(--text2); margin-top: 2px; }
+
+/* Пометка «демо» у строки комплекта: числа рядом с ней выдуманы. */
+.ol-demo {
+  display: inline-block;
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
+  border-radius: 3px;
+  padding: 0 5px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+/* Предупреждение под таблицей — янтарь на информационной поверхности. */
+.ol-warn {
+  margin-top: 12px;
+  background: var(--surface-info);
+  border: 1px solid var(--brand-amber);
+  border-radius: var(--r);
+  padding: 10px 14px;
+  font-size: 13px;
+  max-width: var(--w-read);
+}
+
+/* ── Подсказка-бокс ─────────────────────────────────── */
+/* ⚠️ ЕДИНСТВЕННОЕ МЕСТО РАЗДЕЛА, ГДЕ ТЕНЬ РАЗРЕШЕНА. Этот бокс
+   физически висит НАД страницей, и без тени непонятно, что он не часть
+   таблицы. У поверхностей в покое и под курсором тени по-прежнему нет. */
+.ol-pop { position: relative; display: inline-block; }
+.ol-pop-btn {
+  font: inherit; font-size: 14px; cursor: help;
+  background: none; border: 0; padding: 0; text-align: left;
+  color: var(--text);
+  border-bottom: var(--line) dashed var(--border);
+}
+.ol-pop-box {
+  display: none; position: absolute; z-index: 50;
+  left: 0; top: calc(100% + 6px); min-width: 240px; max-width: 320px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 12px 14px;
+  font-size: 12px;
+}
+.ol-pop:hover .ol-pop-box,
+.ol-pop:focus-within .ol-pop-box { display: block; }
+.ol-pop-title {
+  display: block; font-weight: 600; color: var(--text2);
+  margin-bottom: 8px;
+}
+.ol-pop-city { display: block; padding: 2px 0; }
+
+.ol-bar {
+  display: grid; grid-template-columns: 1fr 90px 34px;
+  align-items: center; gap: 8px; padding: 3px 0;
+}
+.ol-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ol-bar-track {
+  height: 8px; border-radius: var(--r-pill);
+  background: var(--surface-2); overflow: hidden;
+}
+.ol-bar-fill { display: block; height: 100%; background: var(--accent); }
+.ol-bar-num { text-align: right; color: var(--text2); }
+
+/* ── Три панели разбора банка ───────────────────────── */
+.ol-panels {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 780px) { .ol-panels { grid-template-columns: 1fr; } }
+.ol-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 14px 16px;
+}
+.ol-panel-title { font-size: 13px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.ol-panel-note { font-size: 13px; color: var(--text2); }
+.ol-panel .ol-bar { grid-template-columns: 74px 1fr 38px; font-size: 12px; }
+
+/* ── Таблица льгот ──────────────────────────────────── */
+.ol-year { font-size: 13px; color: var(--text2); margin-bottom: 8px; }
+.ol-table--benefits td { font-size: 13px; }
+.ol-uni { display: flex; gap: 8px; align-items: flex-start; }
+.ol-unilogo {
+  width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: var(--r-sm); object-fit: contain;
+}
+.ol-unilogo--empty {
+  background: var(--surface-2); color: var(--text3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700;
+}
+.ol-uni-name { display: block; font-weight: 600; }
+.ol-uni-prog { display: block; color: var(--text2); }
+/* Строка без права приглушается целиком, чтобы взгляд не спотыкался
+   о неё при просмотре сверху вниз. */
+.ol-row--none td { color: var(--text3); }
+.ol-row--none .ol-uni-name { font-weight: 500; }
+.ol-table a { color: var(--accent-ink); }
+.ol-note {
+  margin-top: 12px; font-size: 13px; color: var(--text2);
+  max-width: var(--w-read);
+}
+
+/* ── Полоски баллов по годам ────────────────────────── */
+.ol-scores {
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+@media (max-width: 780px) { .ol-scores { grid-template-columns: 1fr; } }
+.ol-score-grade {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 14px 16px;
+}
+.ol-bar--score { grid-template-columns: 44px 1fr 84px; font-size: 12px; }
+
+/* ── Список комплектов и их чипы ────────────────────── */
+.ol-vfilters { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.ol-vrow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ol-vrow-label { font-size: 12px; color: var(--text2); width: 58px; flex-shrink: 0; }
+.ol-vlist { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ol-variant[hidden] { display: none; }
+.ol-variant {
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+}
+.ol-variant-year { font-size: 22px; font-weight: 700; width: 56px; flex-shrink: 0; }
+.ol-variant-main { flex: 1; min-width: 180px; }
+.ol-variant-what { display: block; font-size: 14px; font-weight: 600; }
+.ol-variant-meta { display: block; font-size: 12px; color: var(--text2); margin-top: 2px; }
+.ol-variant-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.ol-btn--sm { font-size: 13px; padding: 6px 12px; }
+
+/* ── Раскрывающийся список субъектов РФ ─────────────── */
+.ol-regions {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  padding: 12px 16px;
+}
+.ol-regions-sum { font-size: 15px; font-weight: 600; cursor: pointer; }
+.ol-regions-list {
+  list-style: none; columns: 3; column-gap: 24px; margin-top: 12px;
+}
+@media (max-width: 900px) { .ol-regions-list { columns: 2; } }
+@media (max-width: 620px) { .ol-regions-list { columns: 1; } }
+.ol-region {
+  display: flex; gap: 8px; align-items: flex-start;
+  break-inside: avoid; padding: 4px 0; font-size: 13px;
+}
+/* Место под эмблему региона занято заранее — по той же причине, что и
+   место под логотип на карточке. */
+.ol-region-mark {
+  width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px;
+  background: var(--surface-2); border-radius: var(--r-sm);
+}
+.ol-region a { color: var(--accent-ink); }
+.ol-region--nourl { color: var(--text3); }
+.ol-region-soon { display: block; font-size: 11px; color: var(--text3); }
+
+/* ── Справочный хвост страницы ──────────────────────── */
+/* Скромнее остальных секций намеренно: это не содержание страницы. */
+.ol-sources { border-top: var(--line) solid var(--border); padding-top: 18px; }
+.ol-sources-title { font-size: 14px; font-weight: 600; color: var(--text2); margin-bottom: 8px; }
+.ol-sources-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.ol-sources-list a { font-size: 13px; color: var(--accent-ink); }
+.ol-sources-empty { font-size: 13px; color: var(--text3); }
+
+/* ── Годовая сетка раздела ──────────────────────────── */
+.ol-calfilter {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 18px; font-size: 13px; color: var(--text2);
+}
+.ol-calfilter select {
+  font: inherit; font-size: 13px; padding: 6px 10px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: var(--r);
+}
+.ol-months {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+@media (max-width: 900px) { .ol-months { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .ol-months { grid-template-columns: 1fr; } }
+.ol-month {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  min-height: 96px;
+}
+/* Месяц без событий не исчезает: пустой сентябрь — тоже сведение. */
+.ol-month--empty { background: var(--surface-2); }
+.ol-month-name { font-size: 14px; font-weight: 700; margin-bottom: 8px; }
+.ol-month-name span { font-weight: 400; color: var(--text3); font-size: 12px; }
+.ol-month-none { font-size: 12px; color: var(--text3); }
+.ol-month-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.ol-cal-ev { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.ol-cal-when { font-weight: 600; }
+.ol-cal-olymp { color: var(--text2); }
+.ol-cal-ev .ol-chip-type { margin-top: 2px; }
+.ol-cal-ev .ol-status { margin-top: 2px; }
+.ol-cal-ev--flat {
+  flex-direction: row; align-items: center; flex-wrap: wrap; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-card); padding: 10px 12px; font-size: 13px;
+}
+.ol-cal-ev--flat .ol-status, .ol-cal-ev--flat .ol-chip-type { margin-top: 0; }
+
+/* ── Галочка выбора и липкая полоса ─────────────────── */
+.ol-card { position: relative; }
+/* ⚠️ ГАЛОЧКА В НИЖНЕМ УГЛУ, А НЕ В ВЕРХНЕМ. В верхнем она наезжала на
+   название: полные названия здесь длинные («Олимпиада школьников СПбГУ по
+   экономике»), и в трёх колонках заголовок уходил под неё. Внизу рядом
+   короткая строка со счётчиками, места хватает — под неё оставлен отступ
+   справа у .ol-card-foot. */
+.ol-pick {
+  position: absolute; bottom: 10px; right: 10px; z-index: 2;
+  display: flex; align-items: center; gap: 5px;
+  font-size: 11px; color: var(--text3); cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--r-pill); padding: 3px 8px 3px 6px;
+}
+.ol-pick:hover { border-color: var(--accent); color: var(--accent-ink); }
+.ol-pick-box { accent-color: var(--accent); margin: 0; }
+.ol-pick-box:disabled + span { opacity: .5; }
+
+.ol-picked[hidden] { display: none; }
+.ol-picked {
+  position: fixed; left: 50%; transform: translateX(-50%); bottom: 16px;
+  z-index: 120; display: flex; align-items: center; gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--r-panel);
+  box-shadow: var(--shadow-pop);
+  padding: 10px 14px; font-size: 13px;
+}
+.ol-picked-hint[hidden] { display: none; }
+.ol-picked-hint { color: var(--pending); }
+
+/* ── Таблица сравнения ──────────────────────────────── */
+.ol-table--compare th[scope="row"] {
+  font-weight: 600; color: var(--text); white-space: normal;
+  border-bottom: var(--line) solid var(--border-soft);
+}
+/* Совпало у всех — строка приглушена; различается — обычная яркость и
+   полоса слева. Читать надо различия, а не одинаковое. */
+.ol-row--same th, .ol-row--same td { color: var(--text3); }
+.ol-row--diff th[scope="row"] { border-left: var(--stripe-thin) solid var(--accent); }
+
+/* ── Переход между экранами ─────────────────────────── */
+/* Прогрессивное улучшение, а не зависимость: в Chrome и Safari карточка
+   разворачивается в страницу и сворачивается обратно, в Firefox страница
+   просто открывается, как раньше. Библиотек не подключаем.
+   Имя перехода уникально на странице — оно собрано из слага и стоит
+   атрибутом style прямо на карточке и на шапке страницы олимпиады. */
+@view-transition { navigation: auto; }
+
+  /* ── Тренировка: решение комплекта ────────────────────────────────
+     Ни одного шестнадцатеричного цвета — только токены из _tokens.html;
+     это сторожит тест `test_no_hex_colors`. */
+
+  /* Липкая шапка с таймером. Видна всегда: решающий на пятой задаче не
+     обязан помнить, сколько осталось. */
+  .ol-tbar {
+    position: sticky; top: 0; z-index: 60;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--r-panel); padding: 12px 18px; margin-bottom: 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+  .ol-tbar-cap { font-size: var(--fs-meta); color: var(--text2);
+                 text-transform: uppercase; letter-spacing: .06em; }
+  .ol-timer { font-size: 26px; font-weight: 800;
+              font-variant-numeric: tabular-nums; letter-spacing: .02em; }
+  .ol-timer.warn { color: var(--amber-ink); }
+  .ol-timer.danger { color: var(--error); }
+  .ol-qnav { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ol-qnav a {
+    width: 30px; height: 30px; display: flex; align-items: center;
+    justify-content: center; border-radius: var(--r-sm);
+    font-size: var(--fs-ui); text-decoration: none; color: var(--text2);
+    border: 1px solid var(--border); background: var(--surface-2);
+  }
+  .ol-qnav a.is-answered { border-color: var(--green-border);
+                           background: var(--green-tint); color: var(--green);
+                           font-weight: 700; }
+  .ol-qnav a:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .ol-tcount { font-size: var(--fs-meta); color: var(--text2);
+               margin-left: auto; }
+  .ol-tcount b { color: var(--text); font-weight: 700; }
+  .ol-tsave { font-size: var(--fs-meta); color: var(--text2); }
+  .ol-tsave.is-saving { color: var(--amber-ink); }
+  .ol-tsave.is-offline { color: var(--error); font-weight: 600; }
+
+  /* Карточка задачи */
+  .ol-task {
+    border: 1px solid var(--border); border-radius: var(--r-card);
+    background: var(--surface); padding: 18px 20px; margin-bottom: 16px;
+    scroll-margin-top: 90px;
+  }
+  .ol-task-head { display: flex; align-items: baseline; gap: 12px;
+                  flex-wrap: wrap; margin-bottom: 10px; }
+  .ol-task-num { font-weight: 800; font-size: var(--fs-h2); }
+  .ol-task-pts { font-size: var(--fs-meta); color: var(--text2);
+                 margin-left: auto; }
+  .ol-task-body { line-height: var(--lh-body); white-space: pre-wrap; }
+  .ol-task-part { margin-top: 12px; }
+  .ol-task-part-label { font-weight: 700; }
+  .ol-field { margin-top: 12px; }
+  .ol-field label { display: block; font-size: var(--fs-meta);
+                    color: var(--text2); margin-bottom: 5px; }
+  .ol-field input.answer-short, .ol-field textarea.answer-text {
+    width: 100%; box-sizing: border-box; padding: 9px 11px;
+    border: 1px solid var(--border); border-radius: var(--r-sm);
+    background: var(--bg); color: var(--text);
+    font: inherit; font-size: var(--fs-body);
+  }
+  .ol-field textarea.answer-text { min-height: 110px; resize: vertical; }
+  .ol-field input.answer-short:focus, .ol-field textarea.answer-text:focus {
+    outline: 2px solid var(--focus); outline-offset: 1px;
+    border-color: var(--accent);
+  }
+  .ol-opt { display: flex; align-items: flex-start; gap: 9px;
+            padding: 6px 0; line-height: var(--lh-ui); }
+  .ol-finish { margin-top: 26px; display: flex; align-items: center;
+               gap: 16px; flex-wrap: wrap; }
+
+  /* Разбор */
+  .ol-score { display: flex; align-items: baseline; gap: 12px;
+              flex-wrap: wrap; margin-bottom: 6px; }
+  .ol-score-big { font-size: var(--fs-hero); font-weight: 800;
+                  font-variant-numeric: tabular-nums; }
+  .ol-verdict { display: inline-block; padding: 2px 10px;
+                border-radius: var(--r-pill); font-size: var(--fs-meta);
+                font-weight: 700; border: 1px solid var(--border); }
+  .ol-verdict--ok { background: var(--green-tint); color: var(--green-ink);
+                    border-color: var(--green-border); }
+  .ol-verdict--no { background: var(--error-tint); color: var(--error-ink);
+                    border-color: var(--error-border); }
+  .ol-verdict--wait { background: var(--pending-tint); color: var(--text2);
+                      border-color: var(--pending-border); }
+  .ol-answers { margin: 12px 0 0; }
+  .ol-answer-row { display: flex; gap: 10px; flex-wrap: wrap;
+                   padding: 7px 0; border-top: 1px solid var(--border-soft); }
+  .ol-answer-lab { font-weight: 700; min-width: 2.2em; }
+  .ol-answer-mine { color: var(--text); }
+  .ol-answer-right { color: var(--green-ink); }
+  .ol-solution { margin-top: 12px; padding: 12px 14px;
+                 background: var(--surface-2); border-radius: var(--r-sm);
+                 line-height: var(--lh-body); white-space: pre-wrap; }
+  .ol-solution-title { font-size: var(--fs-meta); color: var(--text2);
+                       text-transform: uppercase; letter-spacing: .06em;
+                       margin-bottom: 6px; }
+
+  /* Плашка гостю: результат не сохранён. Цвета — токенами, как велит канон. */
+  .ol-guest {
+    margin-top: 26px; padding: 16px 18px;
+    background: var(--surface-info); border: 1px solid var(--brand-amber);
+    border-left-width: 4px; border-radius: var(--r-panel);
+    line-height: var(--lh-body);
+  }
+  .ol-guest strong { display: block; margin-bottom: 4px; }
+
+  @media (max-width: 560px) {
+    .ol-tbar { padding: 10px 14px; gap: 10px; }
+    .ol-timer { font-size: 22px; }
+    .ol-tcount { margin-left: 0; }
+    .ol-tsave { flex-basis: 100%; }
+    .ol-task { padding: 14px 15px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+  /* Человек попросил не двигать — не двигаем ничего: ни переход между
+     экранами, ни сдвиг карточки под курсором. */
+  @view-transition { navigation: none; }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) { animation: none !important; }
+  .ol-card, .ol-chip, .ol-btn, .ol-tag { transition: none !important; }
+}

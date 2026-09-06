@@ -1,0 +1,91 @@
+{% comment %}
+СТИЛИ ОБЩЕГО КОМПОНЕНТА ФИЛЬТРОВ — рядом с его разметкой, а не в одном
+из двух экранов. Пока они жили в `problem_list.html`, компонент на экране
+домашки приезжал БЕЗ вида: разметка общая, а вид случайно оказался
+принадлежностью каталога.
+
+Оба режима здесь: «полоса» (чипы с выпадающим окном, каталог) и «панель»
+(вертикальные блоки, шаг мастера домашки).
+{% endcomment %}
+.fl-chip { position: relative; }
+.fl-chip > summary {
+  list-style: none; cursor: pointer; display: inline-flex; gap: 8px;
+  align-items: center; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 7px 13px; font-size: 14px; white-space: nowrap;
+}
+.fl-chip > summary::-webkit-details-marker { display: none; }
+.fl-chip.is-on > summary { border-color: var(--brand-amber);
+                           border-width: 1.5px; padding: 6.5px 12.5px; }
+.fl-chip-caret { width: 0; height: 0; border: 4px solid transparent;
+                 border-top-color: var(--text2); margin-top: 3px; }
+.fl-chip[open] .fl-chip-caret { transform: rotate(180deg); margin-top: -3px; }
+.fl-chip-x { background: var(--surface); color: var(--text);
+             border: 1px solid var(--border); border-radius: 999px;
+             width: 28px; height: 28px; display: inline-flex;
+             align-items: center; justify-content: center;
+             text-decoration: none; font-size: 12px; margin-left: -6px; }
+.fl-pop { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0;
+          min-width: 280px; max-width: 380px; max-height: 60vh;
+          overflow: auto; background: var(--surface);
+          border: 1px solid var(--border); border-radius: 12px;
+          padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.14); }
+
+/* ── Варианты фильтра ────────────────────────────────────────────── */
+.fl-opts { list-style: none; margin: 0; padding: 0; }
+.fl-opts--wrap { display: flex; flex-wrap: wrap; gap: 6px; }
+.fl-opts--tall { max-height: 260px; overflow: auto; }
+.fl-opt { display: flex; gap: 10px; justify-content: space-between;
+          align-items: baseline; padding: 6px 9px; border-radius: 8px;
+          text-decoration: none; color: var(--text); font-size: 14px; }
+.fl-opt:hover { background: var(--surface-2); }
+/* ⚠️ ЧЕРНИЛА НА АКЦЕНТЕ — `--on-btn`, а не `--accent-on`: второй
+   держит 2,63 в светлой теме и 1,93 в тёмной при норме 4,5. */
+.fl-opt.is-on { background: var(--accent); color: var(--on-btn); }
+.fl-opt.is-on .fl-opt-n { color: var(--on-btn); opacity: .85; }
+.fl-opt-n { color: var(--text3); font-size: 13px; font-variant-numeric: tabular-nums; }
+.fl-opts--wrap .fl-opt { border: 1px solid var(--border); }
+.fl-group { border-top: 1px solid var(--border-soft); }
+.fl-group:first-child { border-top: 0; }
+/* ⚠️ ЗАГОЛОВОК РАЗДЕЛА ПЕРЕНОСИТСЯ ЦЕЛЫМИ ЧАСТЯМИ. В узкой панели (250 px
+   на экране домашки) «Мировая экономика» и «1 тема · 292» рвались каждое
+   по своим словам и наезжали друг на друга; `flex-wrap` роняет счётчик
+   на свою строку целиком. */
+.fl-group > summary { list-style: none; cursor: pointer; display: flex;
+    justify-content: space-between; gap: 2px 10px; padding: 8px 9px;
+    flex-wrap: wrap; font-size: 14px; font-weight: 600; color: var(--text); }
+.fl-group-name { flex: 1 1 auto; }
+.fl-group > summary::-webkit-details-marker { display: none; }
+.fl-group-n { font-weight: 400; font-size: 13px; color: var(--text3); }
+.fl-two { display: flex; gap: 10px; align-items: flex-start; }
+.fl-two .fl-opts { flex: 1 1 0; min-width: 0; }
+/* ⚠️ ВТОРОЙ СТОЛБЕЦ, А НЕ СПИСОК ВНИЗ: выбор формата теста — это
+   ПРОДОЛЖЕНИЕ выбора вбок (решение владельца). */
+.fl-opts--next { border-left: 1px solid var(--border); padding-left: 10px; }
+
+.fl-tag-input { width: 100%; font: 400 14px/1.4 var(--font-ui);
+                padding: 9px 11px; border-radius: 9px; color: var(--text);
+                border: 1px solid var(--border); background: var(--surface); }
+.fl-tag-sug { list-style: none; margin: 4px 0 0; padding: 4px;
+              border: 1px solid var(--border); border-radius: 9px;
+              background: var(--surface); max-height: 220px; overflow: auto; }
+.fl-tag-sug[hidden] { display: none; }
+.fl-tag-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 6px;
+                margin: 8px 0 0; padding: 0; }
+.fl-tag-chip { display: inline-flex; gap: 6px; align-items: center;
+               background: var(--accent); color: var(--on-btn);
+               border-radius: 999px; padding: 5px 11px; font-size: 13px;
+               text-decoration: none; }
+.fl-tag-of { font-size: 13px; color: var(--text3); margin: 10px 0 4px; }
+
+/* ── Блок и панель в окне «Все фильтры» ──────────────────────────── */
+.fl-block { margin: 0 0 16px; }
+.fl-block-head { display: flex; justify-content: space-between;
+                 align-items: baseline; margin: 0 0 6px; }
+.fl-block-name { font-size: 13px; font-weight: 700; letter-spacing: .04em;
+                 text-transform: uppercase; color: var(--text2); }
+.fl-block-clear { font-size: 13px; color: var(--accent-ink); }
+
+/* ⚠️ `margin: auto` ЗАДАЁТСЯ ЯВНО. Браузерное правило центрирования у
+   <dialog> завязано на `width: fit-content`; как только ширину назначили
+   своей, окно уезжает в левый верхний угол — что и было видно на снимке. */

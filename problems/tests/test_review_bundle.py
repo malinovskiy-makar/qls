@@ -65,15 +65,23 @@ class CategoriesTests(TestCase):
         self.assertGreater(abs(keys.index(perfect) - keys.index(trash)), 1)
 
     def test_exactly_two_exclusive_kinds_and_eight_defects(self):
-        # Дефектных категорий стало восемь: 2026-08-19 к семи прежним добавлена
-        # `fixed_wrong` («Починил не то») для пакетов разбора уже починенных
-        # задач. Она отвечает на вопрос «что не так с ПРАВКОЙ», а не «что не
-        # так с задачей», поэтому заведена отдельно от `other`.
+        # Дефектных категорий стало ДЕВЯТЬ.
+        # 2026-08-19: к семи прежним добавлена `fixed_wrong` («Починил не
+        # то») для пакетов разбора уже починенных задач — она отвечает на
+        # вопрос «что не так с ПРАВКОЙ», а не «что не так с задачей».
+        # 2026-09-02: добавлена `wrong_answer` («Неверный ответ») для
+        # разбора расхождений слепой перепроверки ответов моделью. По тому
+        # же доводу отдельно от `other`: «other» отвечает на вопрос «что не
+        # так с ВИДОМ задачи», а эта — «в банке лежит неверный КЛЮЧ». Слив
+        # их, мы потеряли бы счёт неверных ответов, а это единственный
+        # дефект, который портит игру молча: задача выглядит безупречно, и
+        # игрок теряет жизнь за верный ответ.
         exclusive = [c for c in REVIEW_CATEGORIES if c['kind'] in EXCLUSIVE_KINDS]
         defects = [c for c in REVIEW_CATEGORIES if c['kind'] == 'defect']
         self.assertEqual(sorted(c['key'] for c in exclusive), ['perfect', 'trash'])
-        self.assertEqual(len(defects), 8)
+        self.assertEqual(len(defects), 9)
         self.assertIn('fixed_wrong', [c['key'] for c in defects])
+        self.assertIn('wrong_answer', [c['key'] for c in defects])
 
     def test_hotkeys_are_unique(self):
         hot = [c['hotkey'] for c in REVIEW_CATEGORIES]
@@ -328,15 +336,32 @@ class ExportBundleTests(TestCase):
             snap = (out_dir / 'snapshots' / f'{self.visible.id}.html').read_text(encoding='utf-8')
             self.assertIn('review-snapshot-overrides', snap)
             self.assertNotIn('cdn.jsdelivr.net', snap)
-            self.assertIn('../assets/vendor/katex/katex.min.css', snap)
+            # ⚠️ ПРОВЕРЯЕТСЯ СВОЙСТВО, А НЕ КОНКРЕТНЫЙ ПУТЬ. Здесь стояло
+            # `../assets/vendor/katex/katex.min.css` — путь появлялся оттого,
+            # что боевой шаблон грузил KaTeX с CDN, а экспорт подменял адрес
+            # на свою вендорную копию. С 04.09.2026 KaTeX лежит в
+            # `static/vendor/` (ADR 0070), подменять нечего, и файл едет в
+            # пакет обычным путём для статики. Пакет от этого офлайн быть не
+            # перестал, а тест на старый путь краснел бы после каждого
+            # переезда библиотеки.
+            katex_css = re.findall(r'href="(\.\./[^"]*katex[^"]*\.css)"', snap)
+            self.assertTrue(
+                katex_css, 'в снимке нет относительной ссылки на CSS KaTeX')
+            for rel in katex_css:
+                self.assertTrue(
+                    ((out_dir / 'snapshots' / rel).resolve()).exists(),
+                    'снимок ссылается на %s, а файла в пакете нет' % rel)
             self.assertIn('Приравниваем', snap)          # решение в снимке
             self.assertIn('Найдите $P^*$', snap)         # подпункт в снимке
             self.assertNotIn('href="/static/', snap)
             self.assertNotIn('src="/static/', snap)
 
-            # вендор KaTeX скопирован вместе со шрифтами
-            self.assertTrue((out_dir / 'assets/vendor/katex/katex.min.js').exists())
-            self.assertTrue(list((out_dir / 'assets/vendor/katex/fonts').glob('*.woff2')))
+            # KaTeX скопирован вместе со шрифтами — без шрифтов формулы в
+            # офлайн-пакете рисуются запасной гарнитурой, то есть неверно.
+            self.assertTrue(list(out_dir.glob('assets/**/katex*.js')),
+                            'в пакете нет katex*.js')
+            self.assertTrue(list(out_dir.glob('assets/**/fonts/*.woff2')),
+                            'в пакете нет шрифтов KaTeX')
 
             # зафлагованной задачи в пакете нет
             self.assertFalse((out_dir / 'snapshots' / f'{self.flagged.id}.html').exists())

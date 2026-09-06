@@ -18,6 +18,8 @@
 from datetime import timedelta
 
 from django.core.cache import cache
+
+from .sections import SECTIONS, section_of
 from django.db.models import Avg, Count, Max, Min, Q, Sum
 from django.utils import timezone
 
@@ -39,21 +41,14 @@ PERIOD_DAYS = {'day': 1, 'week': 7, 'month': 30}
 # тему «сильной», одна невнимательность — «слабой».
 MIN_ATTEMPTS_FOR_RANKING = 5
 
-# Укрупнённые разделы для паутинки. По 21 канонической теме радар нечитаем —
-# подписи налезают друг на друга. Группировка по ключевым словам названия:
-# отдельного поля «раздел» у Topic нет, заводить его ради одного графика
-# значит просить преподавателя разметить 849 тем.
-SECTIONS = (
-    ('Микроэкономика', ('спрос', 'предложен', 'эластич', 'равновес',
-                        'излиш', 'налог', 'потолок', 'дефицит')),
-    ('Фирма и рынки', ('издерж', 'фирм', 'конкурен', 'монопол', 'олигопол',
-                       'прибыл', 'производ')),
-    ('Макроэкономика', ('ввп', 'инфляц', 'безработ', 'мультипликат',
-                        'совокуп', 'цикл', 'деньг', 'банк', 'бюджет')),
-    ('Международная', ('торгов', 'преимуществ', 'курс', 'валют', 'экспорт',
-                       'импорт', 'кпв')),
-    ('Прочее', ()),
-)
+# Укрупнённые разделы для паутинки берутся из общего модуля
+# `problems/sections.py` — те же пять блоков, что в фильтрах каталога, в
+# тренажёре и на карте тем.
+#
+# ⚠️ РАНЬШЕ ЗДЕСЬ БЫЛА СВОЯ ГРУППИРОВКА ПО КЛЮЧЕВЫМ СЛОВАМ названия, и
+# именно она давала «рандомные числа» на радаре: тема попадала в раздел по
+# куску слова («монопол», «налог»), а не по тому, чем она является. Своей
+# раскладки у статистики больше нет. ADR 0071.
 
 
 # ===========================================================================
@@ -486,29 +481,26 @@ def strongest_weakest(user, period='all', now=None, limit=RANKING_LIMIT,
 
 
 def section_radar(user, period='all', now=None, rows=None):
-    """Паутинка по укрупнённым разделам."""
+    """Паутинка по пяти блокам разделов.
+
+    Тема относится к блоку по ТОЧНОМУ названию (`sections.section_of`), а не
+    по куску слова: подписи на осях теперь совпадают с фильтрами каталога,
+    а числа под ними — с тем, что человек решал.
+    """
     rows = topic_breakdown(user, period, now) if rows is None else rows
-    buckets = {name: {'attempted': 0, 'solved': 0} for name, _ in SECTIONS}
+    buckets = {key: {'attempted': 0, 'solved': 0} for key, _ in SECTIONS}
     for row in rows:
-        bucket = buckets[_section_of(row['name'])]
+        bucket = buckets[section_of(row['name'])]
         bucket['attempted'] += row['attempted']
         bucket['solved'] += row['solved']
     return [
-        {'name': name,
-         'accuracy': (round(buckets[name]['solved'] * 100.0
-                            / buckets[name]['attempted'])
-                      if buckets[name]['attempted'] else 0),
-         'attempted': buckets[name]['attempted']}
-        for name, _ in SECTIONS
+        {'name': label,
+         'accuracy': (round(buckets[key]['solved'] * 100.0
+                            / buckets[key]['attempted'])
+                      if buckets[key]['attempted'] else 0),
+         'attempted': buckets[key]['attempted']}
+        for key, label in SECTIONS
     ]
-
-
-def _section_of(topic_name):
-    lowered = (topic_name or '').lower()
-    for name, keys in SECTIONS:
-        if any(key in lowered for key in keys):
-            return name
-    return SECTIONS[-1][0]
 
 
 # ===========================================================================

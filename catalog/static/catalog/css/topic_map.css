@@ -1,13 +1,27 @@
 /* Карта тем и тегов — /catalog/map/
  *
  * Все цвета берутся из токенов (`templates/_tokens.html`): собственных
- * значений здесь нет, карта следует теме сайта, а не задаёт свою.
- * Цвет узла один на всю карту — `--map-node`; всё подсвеченное рисуется
- * акцентом платформы `--accent` (ADR 0038).
+ * значений здесь нет, карта следует теме сайта, а не задаёт свою. Узлы
+ * красятся цветом своего раздела (`--map-g-*`), всё подсвеченное — акцентом
+ * платформы `--accent`.
  *
  * ⚠️ НИ ОДИН СЛОЙ НАД ХОЛСТОМ НЕ ИМЕЕТ backdrop-filter. Браузер размывает
  * подложку заново на каждом кадре, и карта падала с 60 кадров до 25.
  * Обычной полупрозрачной заливки достаточно.
+ */
+
+/* ── Цвета разделов корпуса (их пять) ──────────────────────────────────
+ *
+ * Значений здесь НЕТ: роли `--map-g-micro` … `--map-g-other` объявлены в
+ * `templates/_tokens.html` рядом с `--map-node` и `--map-region`, где им и
+ * место — там же лежат замеры контраста и обоснование. Карта их только
+ * читает, из JavaScript, через getComputedStyle блока `.tmap`.
+ *
+ * ⚠️ ОДИН ДЕНЬ ОНИ ПРОЖИЛИ ЗДЕСЬ, И ЭТО СТОИТ ПОМНИТЬ. 01.09.2026 общий
+ * файл токенов правила параллельная сессия по палитре, трогать его было
+ * нельзя, и цвета временно объявлялись в этом файле. Как только та работа
+ * влилась в main, значения переехали в токены: два места объявления одной
+ * роли неизбежно расходятся. См. ADR 0053.
  */
 
 .tmap {
@@ -173,22 +187,59 @@
   min-height: 0;
 }
 
-/* Блок «Под курсором»: высота задана и НЕ зависит от содержимого.
-   210 px хватает самому высокому виду (тег с описанием и списком смежных);
-   что не влезло — прокручивается внутри самого блока. */
+/* Высота блока задана и НЕ зависит от содержимого.
+   ⚠️ ИМЕННО ФИКСИРОВАННАЯ, И ЭТО НЕ ПРИДИРКА. Пусти высоту по содержимому —
+   и при наведении на строку темы в списке ниже блок менял бы высоту, список
+   уезжал бы из-под курсора, наведение слетало, блок возвращался: то самое
+   дрожание, ради которого высота и была зафиксирована.
+   ⚠️ 270 px — ЭТО ЗАМЕР, А НЕ КРУГЛОЕ ЧИСЛО. Видов у блока два, и высота
+   берётся по большему: легенда со знаками 267 px, самый высокий вид узла
+   (тег с описанием и списком смежных, t5.1) тоже 267 px. Прежние 210
+   обрезали обоих: легенду на двух последних строках, карточку тега — на
+   смежных.
+   Цена известна: в невысоком окне дереву разделов остаётся на два десятка
+   пикселей меньше, чем его свёрнутая высота, и оно чуть прокручивается.
+   Полосы при этом не видно (см. ниже), а о прокрутке говорит полоса
+   затухания у нижней кромки панели. */
 #tmap-hover-block {
   flex: none;
-  height: 210px;
+  height: 270px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  /* Полоса прокрутки — по тому же правилу, что и у дерева ниже: не видна,
+     пока не навелись. Блок фиксированной высоты, и системная полоса стояла
+     в нём постоянно, даже когда прокручивать нечего. */
+  scrollbar-width: none;
+  scrollbar-color: var(--border) transparent;
+}
+#tmap-hover-block::-webkit-scrollbar { width: 0; }
+#tmap-hover-block:hover { scrollbar-width: thin; }
+#tmap-hover-block:hover::-webkit-scrollbar { width: 6px; }
+#tmap-hover-block:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--r-pill);
 }
 
-/* Прокручиваемая часть панели: «Выбрано», «Темы», «Разделы». */
+/* Прокручиваемая часть панели: «Выбрано» и дерево разделов.
+   ⚠️ ПОЛОСЫ ПРОКРУТКИ НЕ ВИДНО, ПОКА НА ПАНЕЛЬ НЕ НАВЕЛИСЬ. В свёрнутом
+   дереве пять строк, прокручивать нечего, а системная полоса в Windows
+   всё равно занимала бы место и рисовала серую колонку вдоль всей панели —
+   на узкой колонке в 290 px это заметная часть ширины. Прокрутка при этом
+   работает всегда: убрана полоса, а не возможность. */
 .tmap-panel-scroll {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
+  scrollbar-width: none;
+  scrollbar-color: var(--border) transparent;
+}
+.tmap-panel-scroll::-webkit-scrollbar { width: 0; }
+.tmap-panel-scroll:hover { scrollbar-width: thin; }
+.tmap-panel-scroll:hover::-webkit-scrollbar { width: 6px; }
+.tmap-panel-scroll:hover::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--r-pill);
 }
 
 /* Полоса затухания у нижней кромки панели: намёк, что список продолжается.
@@ -354,23 +405,31 @@
 }
 .tmap-chip button:hover { color: var(--text); background: var(--chip-bg); }
 
-/* Навигатор «Темы» */
-.tmap-themes-group { margin-bottom: 12px; }
-.tmap-themes-group:last-child { margin-bottom: 0; }
-.tmap-themes-group-h {
-  font-size: 11px;
-  color: var(--text3);
-  margin-bottom: 4px;
-}
-.tmap-theme-row {
+/* ── Дерево: разделы → темы → теги ─────────────────────────────────────
+   Всё свёрнуто по умолчанию: пять строк вместо двадцати девяти, и панель
+   помещается целиком, без прокрутки.
+
+   ⚠️ ЦВЕТ РАЗДЕЛА БЕРЁТСЯ ПО КЛЮЧУ, А НЕ ЗАДАЁТСЯ В РАЗМЕТКЕ. Пять правил
+   ниже — единственное место, где ключ раздела встречается со своей краской;
+   шаблон про цвета не знает вовсе и печатает только `data-sec`. */
+.tmap-tree-sec[data-sec="micro"] { --sec: var(--map-g-micro); }
+.tmap-tree-sec[data-sec="macro"] { --sec: var(--map-g-macro); }
+.tmap-tree-sec[data-sec="fin"]   { --sec: var(--map-g-fin); }
+.tmap-tree-sec[data-sec="math"]  { --sec: var(--map-g-math); }
+.tmap-tree-sec[data-sec="other"] { --sec: var(--map-g-other); }
+
+.tmap-tree-sec { margin-bottom: 2px; }
+.tmap-tree-sec:last-child { margin-bottom: 0; }
+
+/* Общий вид строки дерева на всех трёх уровнях. */
+.tmap-sec-row,
+.tmap-theme-row,
+.tmap-tag-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 7px;
   width: 100%;
-  padding: 3px 6px;
   font: inherit;
-  font-size: 12.5px;
-  color: var(--text2);
   text-align: left;
   background: none;
   border: none;
@@ -378,8 +437,47 @@
   cursor: pointer;
   transition: background var(--t), color var(--t);
 }
+
+/* ⚠️ ЗАГОЛОВОК РАЗДЕЛА — САМАЯ ЗАМЕТНАЯ СТРОКА В ПАНЕЛИ, А НЕ САМАЯ БЛЕДНАЯ.
+   Раньше он был на ступень тише строк под собой и читался как отключённый
+   пункт. Теперь это кнопка, написанная цветом своего раздела: она же и
+   легенда к цветам на карте. */
+.tmap-sec-row {
+  padding: 6px 6px;
+  font-size: var(--fs-meta);
+  font-weight: 600;
+  color: var(--sec, var(--text));
+}
+.tmap-sec-row:hover { background: var(--chip-bg); }
+.tmap-sec-cnt {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Стрелка. Одна форма на оба уровня, поворачивается при раскрытии. */
+.tmap-arrow {
+  flex-shrink: 0;
+  width: 9px; height: 9px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform var(--t);
+  opacity: .8;
+}
+[aria-expanded="true"] > .tmap-arrow { transform: rotate(45deg); }
+
+.tmap-sec-body { padding-left: 8px; }
+.tmap-theme-row {
+  padding: 3px 6px;
+  font-size: 12.5px;
+  color: var(--text2);
+}
 .tmap-theme-row:hover,
 .tmap-theme-row.is-on { background: var(--chip-bg); color: var(--text); }
+.tmap-theme-row .tmap-arrow { width: 7px; height: 7px; opacity: .55; }
 .tmap-theme-n {
   flex-shrink: 0;
   width: 18px;
@@ -394,11 +492,43 @@
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.tmap-theme-cnt {
+.tmap-theme-cnt,
+.tmap-tag-cnt {
   flex-shrink: 0;
   font-size: 11px;
   color: var(--text3);
   font-variant-numeric: tabular-nums;
+}
+/* Канон 2.3: отсутствие числа — прочерк с причиной в подсказке. */
+.tmap-cnt--none { opacity: .7; }
+
+/* Теги: третий уровень. Отступ ставит вертикальная линия от темы — так
+   видно, чьи это теги, даже когда раскрыто несколько тем подряд. */
+.tmap-theme-body {
+  margin: 2px 0 4px 13px;
+  padding-left: 10px;
+  border-left: var(--line) solid var(--border-soft);
+}
+.tmap-tag-row {
+  padding: 2px 6px;
+  font-size: 12px;
+  color: var(--text2);
+  line-height: 1.35;
+}
+.tmap-tag-row:hover { background: var(--chip-bg); color: var(--text); }
+/* Выбрано (то же, что чип внизу) и «камера стоит здесь» — разные вещи и
+   разные отметки: первая заливкой, вторая тонкой чертой слева. */
+.tmap-tag-row.is-on { background: var(--accent-tint); color: var(--text); }
+.tmap-tag-row.is-at {
+  color: var(--text);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.tmap-tag-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* ── Нижняя полоса ───────────────────────────────────────────────────── */
@@ -415,11 +545,6 @@
   font-size: 13px;
   color: var(--text);
   font-variant-numeric: tabular-nums;
-}
-.tmap-note {
-  font-size: 11px;
-  color: var(--text3);
-  margin-top: 2px;
 }
 .tmap-foot-right {
   margin-left: auto;
@@ -474,11 +599,36 @@
 .tmap-btn:not(.tmap-btn--main):disabled:hover { background: var(--surface-2); }
 
 /* ── Обучение при первом заходе ──────────────────────────────────────── */
+/* ⚠️ СЛОЙ ТУРА НЕ ЛОВИТ КУРСОР. Пока тур только рассказывал, это было
+   неважно; теперь каждый шаг требует работы руками ПО КАРТЕ, и слой на всю
+   страницу перехватывал бы и перетаскивание, и колесо, и наведение.
+   Курсор ловит только сама карточка. */
 .tmap-tour {
   position: fixed;
   inset: 0;
   z-index: 200;
+  pointer-events: none;
 }
+.tmap-tour-card { pointer-events: auto; }
+
+/* Задание шага. Оно же место ответа: когда шаг взят, строка превращается
+   в «Получилось» и окрашивается акцентом. */
+.tmap-tour-ask {
+  margin-top: 12px;
+  padding: 7px 10px;
+  font-size: var(--fs-meta);
+  font-weight: 500;
+  color: var(--text2);
+  background: var(--surface-2);
+  border: var(--line) solid var(--border);
+  border-radius: var(--r);
+}
+.tmap-tour-card.is-done .tmap-tour-ask {
+  color: var(--on-btn);
+  background: var(--accent);
+  border-color: transparent;
+}
+.tmap-tour-dots i.is-past { background: var(--accent); opacity: .45; }
 /* Вырез-подсветка: прозрачный блок с огромной тенью наружу. Затемнение
    рисует сама тень — отдельного слоя над холстом нет. */
 .tmap-tour-hole {

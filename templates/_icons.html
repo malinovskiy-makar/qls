@@ -20,6 +20,26 @@
 {% endcomment %}
 <script>
 window.QLS_ICONS = {
+  // ── Восемь реакций дуэли ──────────────────────────────
+  // Закрытый список: свободный текст в дуэли означал бы чат
+  // без модерации между школьниками. Имена совпадают с белым
+  // списком сервера (game/consumers.py::EMOJI).
+  // Хорошая игра: рукопожатие.
+  duel_gg: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 12.5 5 9.5a2 2 0 0 1 2.8-2.8L10 8.9"/><path d="m16 11.5 3-3a2 2 0 0 0-2.8-2.8L14 7.9"/><path d="M9.5 10.5 12 13l2.5-2.5"/><path d="M6 13.5 9.5 17a3.5 3.5 0 0 0 5 0l3.5-3.5"/></svg>',
+  // Ого: восклицание в круге.
+  duel_wow: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5v5"/><circle cx="12" cy="16" r="1" fill="currentColor" stroke="none"/></svg>',
+  // Горячо: пламя (тот же силуэт, что у flame).
+  duel_fire: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3s4.5 3.6 4.5 8a4.5 4.5 0 0 1-9 0c0-1.4.5-2.6 1.2-3.5.3 1.1 1 1.9 1.8 1.9 1.2 0 1.6-1.4 1.5-6.4Z"/><path d="M12 21a6.5 6.5 0 0 0 6.5-6.5c0-1.2-.3-2.4-.8-3.5"/><path d="M12 21a6.5 6.5 0 0 1-6.5-6.5c0-1.2.3-2.4.8-3.5"/></svg>',
+  // Думаю: облако мысли.
+  duel_think: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7.5 14a4 4 0 0 1 .6-7.9A4.2 4.2 0 0 1 16 5.6a3.6 3.6 0 0 1 .8 7.1"/><path d="M7.5 14h9.3"/><circle cx="8" cy="18" r="1.3"/><circle cx="5" cy="20.5" r=".8"/></svg>',
+  // Промах: зигзаг вниз.
+  duel_oops: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h4l-2 4h5l-3 4h5l-2 4"/><path d="M17 5.5 20 8l-3 2.5"/></svg>',
+  // Быстро: двойная стрелка.
+  duel_fast: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 6 6 6-6 6"/><path d="m13 6 6 6-6 6"/></svg>',
+  // Близко: две сходящиеся черты.
+  duel_close: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12h6"/><path d="M14 12h6"/><path d="M10.5 8.5 12 12l-1.5 3.5"/><path d="M13.5 8.5 12 12l1.5 3.5"/></svg>',
+  // Удачи: клевер.
+  duel_gl: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 12c-2.5-2.5-2.5-5 0-6.5 2.5 1.5 2.5 4 0 6.5Z"/><path d="M12 12c2.5-2.5 5-2.5 6.5 0-1.5 2.5-4 2.5-6.5 0Z"/><path d="M12 12c2.5 2.5 2.5 5 0 6.5-2.5-1.5-2.5-4 0-6.5Z"/><path d="M12 12c-2.5 2.5-5 2.5-6.5 0 1.5-2.5 4-2.5 6.5 0Z"/></svg>',
   // Пуля — молния. Быстрый режим.
   bolt: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 3 5 13.5h5.5L11 21l8-10.5h-5.5L13 3Z"/></svg>',
   // Блиц — огонь. Он же серия дней и комбо.
@@ -30,8 +50,16 @@ window.QLS_ICONS = {
   keypad: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="M8 7.5h8"/><circle cx="8.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="12" r="1" fill="currentColor" stroke="none"/><circle cx="8.5" cy="16.5" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none"/><circle cx="15.5" cy="16.5" r="1" fill="currentColor" stroke="none"/></svg>',
   // Жизнь. Погашенная — та же иконка с прозрачностью (класс `is-lost`).
   heart: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.7C19 15.6 12 20 12 20Z"/></svg>',
+  // Жизнь с заливкой — запас в тренажёре. Тот же контур, что у `heart`,
+  // но залитый: три красных сердца читаются как запас, а не как
+  // три значка. Погашенная жизнь — ТА ЖЕ иконка с прозрачностью.
+  heart_fill: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none" aria-hidden="true"><path d="M12 20s-7-4.4-7-9.3A3.9 3.9 0 0 1 12 8a3.9 3.9 0 0 1 7 2.7C19 15.6 12 20 12 20Z"/></svg>',
   // Личный рекорд.
   trophy: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4.5v1A3.5 3.5 0 0 0 7 10.4"/><path d="M17 6h2.5v1a3.5 3.5 0 0 1-2.5 3.4"/><path d="M12 14v3"/><path d="M8.5 20h7"/><path d="M10 17h4l1 3H9l1-3Z"/></svg>',
+  // Звук включён: динамик с двумя волнами.
+  sound_on: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="M15 9.5a3.5 3.5 0 0 1 0 5"/><path d="M17.5 7a7 7 0 0 1 0 10"/></svg>',
+  // Звук выключен: тот же динамик, волны заменены крестом.
+  sound_off: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6.5 9H3v6h3.5L11 19V5Z"/><path d="m16 10 5 4"/><path d="m21 10-5 4"/></svg>',
   // Поиск — лупа. Нулевое состояние «ничего не нашлось».
   search: '<svg class="qi" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></svg>',
   // Подсказка — лампочка. Была эмодзи «лампочка».

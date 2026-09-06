@@ -1,24 +1,25 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Каталог задач{% endblock %} — Экономика</title>
+  <title>{% block title %}Каталог задач{% endblock %} · Экономика</title>
 
   {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
 
   <!-- KaTeX -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"></script>
+  <script defer src="{% static 'vendor/katex-0.16.9/contrib/auto-render.min.js' %}"
           onload="initKaTeX()"></script>
 
   <style>
 /* Цветовые токены — в общем партиале _tokens.html (свет + тьма). */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 15px; }
+html { font-size: 16px; }
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-ui);
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
@@ -44,7 +45,7 @@ body {
   width: 28px; height: 28px; border-radius: 7px;
   background: var(--accent);
   display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff;
+  font-size: 13px; font-weight: 700; color: #fff;
   letter-spacing: -.5px;
   text-decoration: none;
   flex-shrink: 0;
@@ -58,7 +59,7 @@ body {
 .header-nav a {
   color: rgba(255,255,255,.55);
   text-decoration: none;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
   padding: 6px 10px;
   border-radius: var(--r);
@@ -68,7 +69,7 @@ body {
 .header-nav a.active { color: #fff; }
 .header-spacer { flex: 1; }
 .header-auth {
-  font-size: 12px;
+  font-size: 13px;
   color: rgba(255,255,255,.35);
   padding: 5px 10px;
   border: 1px solid rgba(255,255,255,.15);
@@ -77,7 +78,10 @@ body {
 
 /* ── Основной контент ───────────────────────────────── */
 .page-wrap {
-  max-width: 860px;
+  /* 960 — обычная страница (канон 1.9). Токены --w-page/--w-read впервые
+     читаются с 04.09.2026; страницы чтения сужаются до 860 сами, в своём
+     блоке extra_style. */
+  max-width: var(--w-page);
   margin: 0 auto;
   padding: 40px 24px 80px;
 }
@@ -109,12 +113,23 @@ button:focus-visible {
 {% include "_table_align.html" %}
 {% block extra_style %}{% endblock %}
   </style>
+{% comment %}
+⚠️ БЛОК ДЛЯ <link> И ПРОЧЕГО, ЧТО ОБЯЗАНО СТОЯТЬ В <head> ЦЕЛИКОМ.
+`extra_style` лежит ВНУТРИ <style>: туда можно положить только правила,
+но не тег. Отдельным файлам стилей (например, предпросмотру карты тем)
+до этого блока места не было, и они уезжали в тело страницы.
+{% endcomment %}
+{% block extra_head %}{% endblock %}
 </head>
 <body>
 
 {% include '_nav.html' %}
 
-<main class="page-wrap">
+{% comment %}
+Класс полосы — блок: страница задачи шире общей полосы (ADR 0078, `pd-wrap`),
+остальные экраны блок не трогают и живут на 860.
+{% endcomment %}
+<main class="{% block main_class %}page-wrap{% endblock %}">
   {% block content %}{% endblock %}
 </main>
 
@@ -154,5 +169,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
 {% block extra_js %}{% endblock %}
 
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

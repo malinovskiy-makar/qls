@@ -1,0 +1,52 @@
+{% comment %}
+Кнопка «Скопировать» для кода приглашения — ОДНА на все экраны занятий.
+
+⚠️ БЕЗ `alert()`. Подтверждение — сменой подписи самой кнопки на полторы
+секунды: человек и так смотрит на неё, а модальное окно требует второго
+действия (закрыть) ради сообщения, которое ничего не решает.
+
+⚠️ ЗАПАСНОЙ ПУТЬ ОБЯЗАТЕЛЕН. `navigator.clipboard` доступен только на
+защищённом соединении; на `http://` его нет вовсе, и без запасного пути
+кнопка молча не работала бы у того, кто открыл сайт по старому адресу.
+{% endcomment %}
+<script>
+(function () {
+  function flash(button, text) {
+    var was = button.textContent;
+    button.textContent = text;
+    button.classList.add('is-done');
+    setTimeout(function () {
+      button.textContent = was;
+      button.classList.remove('is-done');
+    }, 1500);
+  }
+
+  function copyFallback(value) {
+    /* Старый способ: скрытое поле, выделение, execCommand. */
+    var field = document.createElement('textarea');
+    field.value = value;
+    field.setAttribute('readonly', '');
+    field.style.position = 'fixed';
+    field.style.opacity = '0';
+    document.body.appendChild(field);
+    field.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    document.body.removeChild(field);
+    return ok;
+  }
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('[data-copy]');
+    if (!button) return;
+    var value = button.getAttribute('data-copy');
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(value).then(
+        function () { flash(button, 'скопировано'); },
+        function () { flash(button, copyFallback(value) ? 'скопировано' : 'не вышло'); });
+    } else {
+      flash(button, copyFallback(value) ? 'скопировано' : 'не вышло');
+    }
+  });
+})();
+</script>

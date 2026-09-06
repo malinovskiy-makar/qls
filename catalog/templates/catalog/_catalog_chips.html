@@ -1,0 +1,17 @@
+{% comment %}
+ПОЛОСА ВЫБРАННОГО ПОД ПОЛЕМ ПОИСКА: только то, что выбрано, по чипу на
+значение. Ждёт `filters.chips` из `catalog/filters.py` — список словарей
+{kind, value, label, section?, remove_url}. Порядок задан там же.
+
+⚠️ КРЕСТИК — ССЫЛКА, А НЕ КНОПКА: снять фильтр можно и без JavaScript,
+адрес уже собран в питоне. Скрипт живого обновления (этап 3) перехватит
+клик по `data-remove`, но страница без него остаётся рабочей.
+
+Чип темы окрашен цветом своего раздела 3D-карты (`--map-g-*`) — общий язык
+с картой и страницей задачи (решение владельца 04.09.2026).
+
+Этот же партиал отрисовывает эндпоинт живого состояния (этап 2), поэтому
+здесь нет ничего, кроме самих чипов.
+{% endcomment %}
+{% for chip in filters.chips %}<span class="chip{% if chip.kind == 'topic' %} chip--g{% elif chip.kind == 'tag' %} chip--tag{% elif chip.kind == 'difficulty' %} chip--stars{% elif chip.kind == 'solution' %} chip--sol{% endif %}"{% if chip.section %} style="--gc: var(--map-g-{{ chip.section }})"{% endif %} data-chip="{{ chip.kind }}">{{ chip.label }}<a class="chip-x" href="{{ chip.remove_url }}" data-remove="{{ chip.kind }}:{{ chip.value }}" aria-label="Снять фильтр «{{ chip.label }}»">✕</a></span>
+{% endfor %}

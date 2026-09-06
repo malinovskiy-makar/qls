@@ -23,6 +23,7 @@
 Пункты задачи «а)/б)» — другое дело, там вопросов действительно несколько,
 и они считаются раздельно (`part_grading`).
 """
+import re
 from fractions import Fraction
 
 # Что считаем «десятичной запятой» и как чистим ввод.
@@ -100,10 +101,38 @@ def normalize_label(text):
     return str(text).lower().strip().rstrip('.').rstrip(')').strip()
 
 
-def _label_set(raw):
-    """«а, в» → {'а', 'в'}. Порядок отметок значения не имеет."""
-    return {normalize_label(chunk) for chunk in str(raw or '').split(',')
-            if normalize_label(chunk)}
+# Буквы, из которых состоят метки вариантов: слитная строка из них («абг»)
+# делится посимвольно. Слово с буквами вне алфавита («верно», «нет») —
+# одна метка, а не россыпь букв.
+LABEL_LETTERS = frozenset('абвгдежз' + 'abcdefgh')
+_LABEL_SPLIT = re.compile(r'[\s,;/.()]+')
+
+
+def label_set(raw, labels=None):
+    """Множество меток из ответа: «аб», «а, б», «а,б», «а б», «АБ» → {'а', 'б'}.
+
+    Пять форм записи одного ответа — одно множество. Строка из одних
+    букв-меток без разделителей делится посимвольно: так ответ хранят 244
+    видимых теста (например «аб» у задачи 5999), и раньше они проверялись
+    как одна метка «аб», которую нельзя выбрать. `labels` — известные метки
+    вариантов: если они есть, посимвольно делится только строка, целиком
+    составленная из них (ответ «да» при вариантах а–г остаётся словом).
+
+    Та же функция режет ответ в `game/management/commands/build_game_pool.py`
+    (этап 7.1 редизайна каталога): две копии разошлись бы на первом же
+    исправлении.
+    """
+    text = str(raw or '').lower().strip()
+    chunks = [normalize_label(chunk) for chunk in _LABEL_SPLIT.split(text)]
+    chunks = [chunk for chunk in chunks if chunk]
+    if len(chunks) == 1 and len(chunks[0]) > 1:
+        alphabet = {normalize_label(x) for x in labels} if labels is not None else LABEL_LETTERS
+        if set(chunks[0]) <= alphabet:
+            return set(chunks[0])
+    return set(chunks)
+
+
+_label_set = label_set   # прежнее имя: его знают старые тесты и вызовы
 
 
 def catalog_test_correct_labels(problem):
@@ -114,9 +143,10 @@ def catalog_test_correct_labels(problem):
     Разметка подпунктов главнее — она подробнее и именно её видит ученик;
     `answer` работает запасным, потому что размечены далеко не все задачи.
     """
-    labels = {normalize_label(part.label) for part in problem.parts.all()
+    parts = list(problem.parts.all())
+    labels = {normalize_label(part.label) for part in parts
               if normalize_label(part.answer) == 'верно'}
-    return labels or _label_set(problem.answer)
+    return labels or label_set(problem.answer, [part.label for part in parts])
 
 
 def check_catalog_test(problem, submitted_answer, multiple=None):
@@ -142,18 +172,19 @@ def check_catalog_test(problem, submitted_answer, multiple=None):
     if multiple is None:
         multiple = ptype != 'тест: один ответ' and problem.parts.exists()
 
+    known = [part.label for part in problem.parts.all()]
     if multiple:
         correct = catalog_test_correct_labels(problem)
         if not correct:
             return False, False
-        return True, correct == _label_set(given_raw)
+        return True, correct == label_set(given_raw, known)
 
-    if problem.parts.exists():
+    if known:
         # Один вариант из списка — сравниваем метки.
-        correct = _label_set(problem.answer)
+        correct = label_set(problem.answer, known)
         if not correct:
             return False, False
-        return True, correct == _label_set(given_raw)
+        return True, correct == label_set(given_raw, known)
 
     # Тест без вариантов (числовой ответ) — обычная проверка ответа.
     if not (problem.answer or '').strip():

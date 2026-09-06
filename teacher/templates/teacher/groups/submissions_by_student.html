@@ -11,7 +11,7 @@
 выбор запоминается между заходами.
 {% endcomment %}
 
-{% block title %}{{ assignment.name }} — решения{% endblock %}
+{% block title %}{{ assignment.name }} · решения{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .stu-card { display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
@@ -24,11 +24,11 @@
 «его больше нет» ищет по файлу и поймала бы объяснение.
 {% endcomment %}
 .stu-main { flex: 1; min-width: 180px; }
-.stu-name { font-size: 15px; font-weight: 600; margin-bottom: 3px; }
-.stu-meta { font-size: 12px; color: var(--text2); }
+.stu-name { font-size: 16px; font-weight: 600; margin-bottom: 3px; }
+.stu-meta { font-size: 13px; color: var(--text2); }
 /* Подпись, объясняющая выделение первой карточки. Акцентная и мелкая:
    это пояснение к полосе, а не ещё один показатель. */
-.stu-next { font-size: 12px; font-weight: 600; color: var(--accent);
+.stu-next { font-size: 13px; font-weight: 600; color: var(--accent-ink);
             margin-top: 2px; }
 
 /* Крупные числа карточки — класс набора `.k-score--pair` (сессия 7, фаза 4).
@@ -44,7 +44,7 @@
               flex-wrap: wrap; }
 /* Тихая ссылка «глазами ученика» рядом с главной кнопкой: это второй,
    необязательный переход, и весом он должен быть заметно меньше. */
-.stu-eyes { font-size: 12px; color: var(--text2); white-space: nowrap; }
+.stu-eyes { font-size: 13px; color: var(--text2); white-space: nowrap; }
 /* Прочерк вместо числа: тише самого числа, но того же кегля — иначе
    строка карточки съезжает по высоте. */
 .k-score__value--none { color: var(--text3); }
@@ -82,7 +82,7 @@
 занимала верх экрана каждый раз, хотя читается один раз в жизни.
 {% endcomment %}
 <div class="k-hint" style="margin-bottom:16px">
-  Тесты и утверждённые задачи оценены автоматически — вам остаются
+  Тесты и утверждённые задачи оценены автоматически, вам остаются
   открытые задачи.
 </div>
 
@@ -126,7 +126,7 @@
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.scored_max }}</span></span>
       {% else %}
-      <span class="k-score__value k-score__value--none">—</span>
+      <span class="k-score__value k-score__value--none">–</span>
       {% endif %}
       <span class="k-score__cap">Итоговый балл</span>
     </span>
@@ -143,7 +143,7 @@
         class="k-score__of">из</span><span
         class="k-score__max">{{ card.machine_could }}</span></span>
       {% else %}
-      <span class="k-score__value k-score__value--none">—</span>
+      <span class="k-score__value k-score__value--none">–</span>
       {% endif %}
       <span class="k-score__cap">Результат автопроверки{% include '_hint.html' with hint='Знаменатель меньше итогового: машина считает только тесты и задачи с утверждённым числовым эталоном. Открытые задачи оценивает преподаватель, и их баллы в это число не входят.' %}</span>
     </span>

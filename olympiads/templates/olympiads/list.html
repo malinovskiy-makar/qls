@@ -1,0 +1,34 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% block title %}Олимпиады по экономике{% endblock %}
+{% block olymp_content %}
+<div class="ol-head">
+  <h1 class="ol-title">Это олимпиады по экономике.</h1>
+  <p class="ol-sub">Узнайте все об олимпиадах и их льготах, следите за датами туров и решайте задания прошлых лет.</p>
+</div>
+
+{% include 'olympiads/_dates_feed.html' %}
+{% include 'olympiads/_filters.html' %}
+
+<div data-group="main">
+  <ul class="ol-grid" id="ol-grid-main">
+    {% for olympiad in main %}{% include 'olympiads/_card.html' %}{% endfor %}
+  </ul>
+</div>
+
+{% if related %}
+<div data-group="related">
+  <p class="ol-divider">Смежные направления</p>
+  <ul class="ol-grid" id="ol-grid-related">
+    {% for olympiad in related %}{% include 'olympiads/_card.html' %}{% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="ol-picked" id="ol-picked" hidden>
+  <span id="ol-picked-count">Выбрано 0.</span>
+  <a class="ol-btn ol-btn--sm" id="ol-picked-go" href="{% url 'olympiads:compare' %}">Сравнить</a>
+  <span class="ol-picked-hint" id="ol-picked-hint" hidden>Можно сравнить не больше трёх</span>
+</div>
+{% endblock %}
+
+{% block extra_js %}{% include 'olympiads/_filters_js.html' %}{% include 'olympiads/_compare_js.html' %}{% endblock %}

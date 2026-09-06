@@ -65,11 +65,33 @@ def themes():
 
 
 class ActivityCellContrastTests(TestCase):
-    """3.1 — цифра дня читается на всех четырёх уровнях заливки."""
+    """3.1 — цифра дня читается на всех четырёх уровнях заливки.
 
-    # Плотности заливки — те же числа, что в `_stats_style.html`.
-    LEVELS = ((1, 0.22), (2, 0.45), (3, 0.70), (4, 1.0))
+    ⚠️ ПЛОТНОСТИ БЕРУТСЯ ИЗ ТОКЕНОВ, А НЕ ПОВТОРЯЮТСЯ ЗДЕСЬ ЧИСЛАМИ
+    (31.08.2026). Раньше `LEVELS` держал копию `.22/.45/.70` из
+    `_stats_style.html`, и копия жила своей жизнью: поменяли бы шкалу в CSS —
+    тест мерил бы прежнюю и остался бы зелёным на сломанном экране. Теперь
+    источник один — `templates/_tokens.html`, по токену на уровень, и шкалы
+    у тем РАЗНЫЕ (акцент в темах разной светлоты).
+
+    Чтобы тест остался сторожем, а не просто перестал падать, он проверяет
+    ДВЕ вещи сразу: числа приходят из токенов (вернут .70 — контраст упадёт
+    и тест покраснеет) И `_stats_style.html` действительно берёт эти токены,
+    а не свои зашитые доли (`test_scale_lives_in_tokens_only`). Без второй
+    половины плотность можно было бы зашить обратно в CSS мимо токена, и
+    измерение опять поехало бы мимо экрана.
+    """
+
     AA = 4.5
+
+    def levels(self, theme_css):
+        """Плотности уровней 1–3 из токенов темы; четвёртый — сплошной."""
+        out = []
+        for level in (1, 2, 3):
+            raw = token(theme_css, 'act-a%d' % level)
+            self.assertIsNotNone(raw, 'нет токена --act-a%d' % level)
+            out.append((level, float(raw)))
+        return tuple(out) + ((4, 1.0),)
 
     def measure(self, theme_css):
         accent = token(theme_css, 'accent-rgb')
@@ -79,11 +101,51 @@ class ActivityCellContrastTests(TestCase):
         ink = hex_rgb(token(theme_css, 'act-ink'))
         ink_solid = hex_rgb(token(theme_css, 'act-ink-solid'))
         out = {}
-        for level, alpha in self.LEVELS:
+        for level, alpha in self.levels(theme_css):
             background = over(accent, surface, alpha)
             paint = ink_solid if level == 4 else ink
             out[level] = contrast(paint, background)
         return out
+
+    def test_scale_lives_in_tokens_only(self):
+        """Шкала объявлена в обеих темах, а CSS берёт её и ничего не зашивает."""
+        light, dark = themes()
+        for name, css in (('светлая', light), ('тёмная', dark)):
+            for level in (1, 2, 3):
+                raw = token(css, 'act-a%d' % level)
+                self.assertIsNotNone(raw, '%s: нет --act-a%d' % (name, level))
+                self.assertTrue(0 < float(raw) < 1,
+                                '%s: --act-a%d = %s' % (name, level, raw))
+        style = read(STATS_STYLE)
+        for level in (1, 2, 3):
+            rule = re.search(r'\.act-l%d\s*\{([^}]*)\}' % level, style)
+            self.assertIsNotNone(rule, 'нет правила .act-l%d' % level)
+            body = rule.group(1)
+            self.assertIn('var(--act-a%d)' % level, body,
+                          'уровень %d не берёт плотность из токена' % level)
+            self.assertIsNone(
+                re.search(r'rgba\([^)]*?,\s*[.\d]+\s*\)', body),
+                'уровень %d снова зашил плотность числом: %s' % (level, body.strip()))
+
+    def test_levels_are_distinguishable(self):
+        """Уровни должны РАЗЛИЧАТЬСЯ, а не только нести читаемый текст.
+
+        Пять ступеней одного цвета легко сделать читаемыми и при этом
+        неразличимыми: если соседние заливки отличаются на 1,02, теплокарта
+        перестаёт быть картой. Порог 1,15 — ниже него разницу на клетке
+        34×34 px глазом уже не поймать.
+        """
+        for name, css in (('светлая', themes()[0]), ('тёмная', themes()[1])):
+            accent = tuple(int(p) for p in token(css, 'accent-rgb').split(','))
+            surface = hex_rgb(token(css, 'surface'))
+            fills = [surface] + [over(accent, surface, alpha)
+                                 for _level, alpha in self.levels(css)]
+            for step in range(len(fills) - 1):
+                value = contrast(fills[step], fills[step + 1])
+                self.assertGreaterEqual(
+                    value, 1.15,
+                    '%s тема, ступень %d→%d: перепад заливки %s'
+                    % (name, step, step + 1, value))
 
     def test_light_theme_passes_aa(self):
         light, _ = themes()

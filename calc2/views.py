@@ -20,7 +20,6 @@ from pathlib import Path
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, HttpResponseBadRequest
-from django.utils.decorators import method_decorator
 from django.views.decorators.http import require_POST
 from django.views.generic import TemplateView
 
@@ -135,11 +134,24 @@ def compile_pdf_pdflatex(tex_content):
         return None, 'код возврата {}\n{}\n{}'.format(proc.returncode, out[-800:], err[-800:])
 
 
-@method_decorator(login_required, name='dispatch')
 class Calc2View(TemplateView):
     """Рендерит страницу нового графического калькулятора.
 
-    Требует входа в систему (@login_required).
+    ⚠️ СТРАНИЦА ПУБЛИЧНА ОСОЗНАННО (решение владельца 01.09.2026). С лендинга
+    на неё ведёт карточка «Графический калькулятор», и гость упирался в форму
+    входа: две карточки из пяти вели в тупик.
+
+    Открывать её безопасно, потому что калькулятор — инструмент БЕЗ ДАННЫХ.
+    В шаблоне нет ни одного обращения к `request.user`, вью ничего не читает
+    из базы и ничего в неё не пишет: все кривые считаются в браузере.
+
+    ⚠️ ЧТО ОСТАЁТСЯ ЗАКРЫТЫМ И ПОЧЕМУ:
+      · `export_pdf` ниже — `@login_required`. Он запускает pdflatex над
+        присланным клиентом файлом, то есть тратит процессор сервера по
+        чужой команде; аноним такого рычага не получает.
+      · `/api/graphs/save/` (problems/views_platform.py) — `@login_required`.
+        Там пишется в базу, и у записи есть владелец.
+    Сторожит `problems/tests/test_guest_access.py`.
     """
     template_name = 'calc2/calc2.html'
 

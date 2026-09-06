@@ -61,11 +61,21 @@ function redrawAll() {
      же причине, что и разметка обозначений: сцены дописывают разбор позже, и
      проход, стоящий раньше, мерил бы не всю врезку. */
   if (typeof fitPanelMath === 'function') fitPanelMath();
+  /* И самым последним — авто-расширение окна: оно смотрит на то, что сцена уже
+     нарисовала и посчитала. Сжать окно оно не может, поэтому решение 20.08
+     («окно идёт за формулой, а не за буквой») остаётся в силе: рычаг
+     по-прежнему видимо двигает кривую внутри выбранного окна. */
+  if (typeof growWindowToModel === 'function') growWindowToModel();
 }
 
 function redrawScene() {
   refreshColors();      // перечитать цвета из CSS-переменных (учитывает смену темы)
   clearResultPanels();  // очистить табло — активный режим заполнит свои блоки
+  /* ⚠️ РЕЕСТР ПАНЕЛЕЙ ЧИСТИТСЯ ПЕРВЫМ ДЕЛОМ, ДО ЛЮБОЙ ОТРИСОВКИ.
+     Панели прошлого кадра не имеют права дожить до нового: сцена сменилась,
+     а слой поверх неё считал бы по чужим шкалам. */
+  clearPanels();
+  resetDrawnKeyPoints();   // и пары нарисованных ключевых точек — тоже заново
   computeSize();
   makeScales();
   if (STATE.mode === 'costs') { redrawCosts(); return; }   // режим издержек (Задача 2)
@@ -130,9 +140,9 @@ function redrawScene() {
       drawCurves();              // спрос D и (если задана явно) кривая MC
       drawMonopoly();            // MR + (если MC выведена из TC) сама MC
       drawMonopolyPoints();      // точки M и MR=MC, проекции, конкурентный ориентир
-      if (STATE.intervType === 'ceiling' && STATE.pReg > 0) drawMonoCeilingLine();  // линия видна, но не связывает
-      else if (STATE.intervType === 'floor' && STATE.pReg > 0) drawMonoFloorLine(); // линия видна, но не связывает
-      else if (STATE.intervType === 'quota' && STATE.quota > 0) drawMonoQuotaLine();// вертикаль видна, но не связывает
+      if (STATE.intervType === 'ceiling' && STATE.pRegSet) drawMonoCeilingLine();  // линия видна, но не связывает
+      else if (STATE.intervType === 'floor' && STATE.pRegSet) drawMonoFloorLine(); // линия видна, но не связывает
+      else if (STATE.intervType === 'quota' && STATE.quotaSet) drawMonoQuotaLine();// вертикаль видна, но не связывает
     }
   } else if (STATE.scenario === 'externality') {
     // Внешний эффект (Задача 4): DWL + D/MPC + MSC + точки Qрын/Qопт (+ Пигу).
@@ -407,15 +417,22 @@ function graphRowInput(row, inp, del, name) {
    ОФОРМЛЕНИЕ (Фаза 1) — слой поверх любой сцены: заголовок и свои точки.
    --------------------------------------------------------------------- */
 
-// Канонические шкалы главного графика. Считаем свои копии, а не берём глобальные
-// sx/sy: сцены с двумя мини-графиками (дискриминация 3°, производство, два завода)
-// оставляют в sx/sy шкалу ПОСЛЕДНЕЙ панели, и точки уехали бы вместе с ней.
-function mainScales() {
+/* Шкалы ПАНЕЛИ. Без аргумента — панели под курсором, с аргументом — названной.
+
+   ⚠️ Здесь стояло построение шкал из CONFIG.Qmin/Qmax на всю ширину холста.
+   Сделано это было нарочно — чтобы не брать глобальные sx/sy, в которых у
+   многопанельных сцен остаётся шкала ПОСЛЕДНЕЙ панели. Лечение вышло хуже
+   болезни: слой перестал совпадать НИ С ОДНОЙ панелью (разбор — у registerPanel
+   в 20-plane.js). Ветки «в математике окно другое» здесь тоже больше нет:
+   панель раздела «Математика» регистрируется наравне со всеми.
+
+   Запасной путь оставлен на один случай: реестр пуст до самой первой
+   перерисовки, а спросить шкалы могут и раньше. */
+function mainScales(panelId) {
+  const p = (panelId != null) ? panelById(panelId) : activePanel();
+  if (p) return { mx: p.mx, my: p.my };
   const m = CONFIG.margin;
-  // В «Математике» окно другое — полный план вместо первой четверти.
   if (STATE.mode === 'math') return mathScales();
-  // Берём и нижние границы: после панорамирования начало окна уже не в нуле,
-  // и точки, посчитанные от нуля, разъезжались бы с кривыми.
   return {
     mx: d3.scaleLinear().domain([CONFIG.Qmin, CONFIG.Qmax]).range([m.left, W - m.right]),
     my: d3.scaleLinear().domain([CONFIG.Pmin, CONFIG.Pmax]).range([H - m.bottom, m.top]),
@@ -424,6 +441,10 @@ function mainScales() {
 
 function drawOverlays() {
   if (!svg || !svg.node()) return;
+  /* Сцена дорисована — объявляем на холсте её ключевые точки. Строго ЗДЕСЬ:
+     раньше сцены нет целиком, а пары ищутся по пунктиру, который сцена рисует
+     то до числа на оси, то после него. */
+  flushDrawnKeyPoints();
   invalidateKeyTargets();    // особые точки считаются заново под новую картинку
   /* ⚠️ ПЕРЕСЕЧЕНИЯ СЧИТАЮТСЯ ЗДЕСЬ, А НЕ ТАМ, ГДЕ ИХ РИСУЮТ.
 
@@ -433,7 +454,13 @@ function drawOverlays() {
      весь текущий. Сдвинули кривую: пересечение уже в другом месте, а вершина,
      стоящая в старом, всё ещё считает себя стоящей в пересечении. Общее
      состояние не может обновляться побочным действием отрисовки. */
-  STATE.crosses = crossPoints();
+  /* Пересечения считаются для ПАНЕЛИ ВЗВЕДЁННОЙ КРИВОЙ, а нет взведённой —
+     для панели под курсором. Рядом с ними кладётся её id: без него полка
+     отдала бы соседней панели чужие точки. */
+  const crossPanel = armedPanelId();
+  STATE.crossesPanel = String(crossPanel == null
+    ? (activePanel() ? activePanel().id : '') : crossPanel);
+  STATE.crosses = crossPoints(crossPanel);
   if (typeof resetLabelBoxes === 'function') resetLabelBoxes();   // подписи расставляются заново
   applyAreaColors();         // свои цвета заливок — одним проходом по data-legend
   drawAreaCalc();            // посчитанная площадь (Фаза 10)
@@ -1108,8 +1135,8 @@ function legendCorner(boxW, boxH) {
    в отрицательной части плана). Нижние границы режем по правилу первой
    четверти — тем же econLo, что и обрезка кривых: в экономической сцене
    пересечений и корней ниже нуля не бывает независимо от галочки. */
-function viewWindow() {
-  const { mx, my } = mainScales();
+function viewWindow(panelId) {
+  const { mx, my } = mainScales(panelId);
   const [dx0, dx1] = mx.domain(), [dy0, dy1] = my.domain();
   const [px0, px1] = mx.range();
   return {
@@ -1126,10 +1153,10 @@ function axisWords() {
   return ['ось Q', 'ось P'];
 }
 
-function crossPoints() {
-  const t = snapTargets();
+function crossPoints(panelId) {
+  const t = snapTargets(panelId);
   if (!t.length) return [];
-  const w = viewWindow();
+  const w = viewWindow(panelId);
   const lo0 = w.x0, hi = w.x1, yLo = w.y0, yHi = w.y1;
   if (!(hi > lo0) || !isFinite(hi - lo0)) return [];
   const lo = lo0 + (hi - lo0) * 1e-6;
@@ -1223,8 +1250,12 @@ function crossPoints() {
 
    Список кэшируется до следующей перерисовки: его дёргает движение мыши,
    а пересчёт по всем кривым стоит несколько тысяч вычислений. */
-let _keyPtsCache = null;
-function invalidateKeyTargets() { _keyPtsCache = null; }
+/* ⚠️ КЭШ КЛЮЧЕВЫХ ТОЧЕК — ПО ПАНЕЛЯМ, А НЕ ОДИН НА СЦЕНУ.
+   Панель под курсором меняется БЕЗ перерисовки (человек просто ведёт мышь),
+   а сбрасывается кэш только на перерисовке. Один общий кэш отдавал бы соседней
+   панели точки той, над которой курсор был раньше. */
+let _keyPtsCache = {};
+function invalidateKeyTargets() { _keyPtsCache = {}; }
 
 // Изломы кривой: там, где наклон меняется скачком (кусочная запись, min и max).
 function kinksOf(f, lo, hi) {
@@ -1275,10 +1306,13 @@ function kinksOf(f, lo, hi) {
   return out;
 }
 
-function keyTargets() {
-  if (_keyPtsCache) return _keyPtsCache;
+function keyTargets(panelId) {
+  const ap = activePanel();
+  const pid = (panelId != null) ? panelId : (ap ? ap.id : '');
+  const ck = String(pid);
+  if (_keyPtsCache[ck]) return _keyPtsCache[ck];
   const out = [];
-  const w = viewWindow();
+  const w = viewWindow(panelId);
   const dx = (w.x1 - w.x0) * 1e-3, dy = (w.y1 - w.y0) * 1e-3;
   /* Вид точки нужен отрисовке (П36–П38): излом рисуется по-особому, у
      остальных вид одинаковый. Перегибы сюда не попадают и не попадут:
@@ -1294,14 +1328,32 @@ function keyTargets() {
 
      Хозяин записывается ИМЕНЕМ, тем же, что печатает snapTargets: по имени же
      сверяет взведение, и второго способа отождествить кривую заводить нельзя. */
+  /* ⚠️ ДУБЛЬ СХЛОПЫВАЕТСЯ СО СЛИЯНИЕМ ХОЗЯЕВ, А НЕ МОЛЧА РОНЯЕТСЯ.
+     Одна и та же точка приходит сюда с разных сторон: равновесие E — и как
+     пересечение D и S, и как нарисованная сценой точка; излом суммарного
+     спроса в наборе владельца стоит ровно там же, где пересечение двух других
+     кривых. Прежний push просто выходил на дубле — и излом ТЕРЯЛ хозяина, то
+     есть переставал загораться при щелчке по своей кривой (замер: излом
+     рыночного спроса (40; 60) не загорался вовсе). Имя у точки остаётся
+     первое — оно содержательнее; хозяева складываются. */
   const push = (x, y, name, kind, owners) => {
     if (!isFinite(x) || !isFinite(y)) return;
     if (x < w.x0 - 1e-9 || x > w.x1 + 1e-9 || y < w.y0 - 1e-9 || y > w.y1 + 1e-9) return;
-    if (out.some(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy)) return;
-    out.push({ x, y, name, kind: kind || 'cross', owners: owners || [] });
+    const same = out.find(o => Math.abs(o.x - x) < dx && Math.abs(o.y - y) < dy);
+    if (same) {
+      (owners || []).forEach(nm => { if (!same.owners.includes(nm)) same.owners.push(nm); });
+      return same;
+    }
+    const rec = { x, y, name, kind: kind || 'cross', owners: (owners || []).slice() };
+    out.push(rec);
+    return rec;
   };
-  const curveNames = new Set(snapTargets().map(t => t.name));
-  (STATE.crosses && STATE.crosses.length ? STATE.crosses : crossPoints()).forEach(p => {
+  const curveNames = new Set(snapTargets(panelId).map(t => t.name));
+  /* Готовые пересечения берём с полки, только если их считали ДЛЯ ЭТОЙ ЖЕ
+     панели: у соседней они совсем другие. */
+  const ready = (STATE.crosses && STATE.crosses.length && STATE.crossesPanel === ck)
+    ? STATE.crosses : crossPoints(panelId);
+  ready.forEach(p => {
     // Второй участник бывает осью, а не кривой: ось в хозяева не идёт.
     const own = [p.a, p.b].filter(nm => curveNames.has(nm));
     push(p.x, p.y, /^ось /.test(p.b)
@@ -1312,12 +1364,44 @@ function keyTargets() {
      если кривая и так пересекает ось в нуле, это одна и та же точка, и имя у
      неё должно остаться содержательным, а не превратиться в «начало координат».
      Сам push отсеет повтор по координатам. */
+  /* ── (б) и (в): точки, которые НАРИСОВАЛА сама сцена, и их проекции ──
+     Читаем метки с холста (`data-key-point`), а не считаем правило второй раз:
+     сцена уже отрисована, и на ней стоит ровно то, что человек видит.
+     Хозяева — кривые, на которых точка лежит: равновесие принадлежит и спросу,
+     и предложению, и загорается при щелчке по любой из них. */
+  const drawn = [];
+  try {
+    svg.selectAll('[data-key-point]').each(function () {
+      const pl = this.getAttribute('data-kp-panel') || '';
+      if (pl && ck && pl !== ck) return;
+      const x = +this.getAttribute('data-kp-x'), y = +this.getAttribute('data-kp-y');
+      if (!isFinite(x) || !isFinite(y)) return;
+      drawn.push({ x, y, name: this.getAttribute('data-key-point') || 'отмеченная точка' });
+    });
+  } catch (e) { /* холста ещё нет — нарисованных точек тоже */ }
+  const targets = snapTargets(panelId);
+  const onCurves = (x, y) => targets.filter(t => {
+    let v; try { v = t.f(x); } catch (e) { return false; }
+    return isFinite(v) && Math.abs(v - y) <= Math.max(dy * 8, (w.y1 - w.y0) * 1e-3);
+  }).map(t => t.name);
+  const [xAxisNm, yAxisNm] = axisWords();
+  drawn.forEach(p => {
+    const own = onCurves(p.x, p.y);
+    push(p.x, p.y, p.name, 'drawn', own);
+    // Проекции на обе оси: для равновесия (50; 50) это (0; 50) и (50; 0).
+    /* Имя оси подставляется как есть: axisWords отдаёт «ось Q» / «ось P», и
+       «проекция E на ось P» уже по-русски. Здесь стояла замена строки на саму
+       себя — след от попытки склонять, доведённой до конца строчкой выше, где
+       у пересечения падеж действительно другой («пересечение с осью Q»). */
+    push(0, p.y, 'проекция ' + p.name + ' на ' + yAxisNm, 'drawn', own);
+    push(p.x, 0, 'проекция ' + p.name + ' на ' + xAxisNm, 'drawn', own);
+  });
   push(0, 0, 'начало координат', 'cross', []);
-  if (!(w.x1 > w.x0)) { _keyPtsCache = out; return out; }
+  if (!(w.x1 > w.x0)) { _keyPtsCache[ck] = out; return out; }
   const lo = w.x0 + (w.x1 - w.x0) * 1e-4, hi = w.x1;
   const h = (w.x1 - w.x0) * 1e-4;
   const h2 = Math.max(h * 20, (w.x1 - w.x0) * 1e-3);
-  snapTargets().forEach(t => {
+  snapTargets(panelId).forEach(t => {
     /* У постоянной кривой (горизонтальная MC, потолок цены, мировая цена)
        производная равна нулю ВЕЗДЕ, и экстремумом объявлялся каждый узел сетки:
        на холсте вдоль такой линии выстраивались сотни серых кружков.
@@ -1353,15 +1437,20 @@ function keyTargets() {
        высоте, то есть совсем другая точка. Замер 24.08 в сюжете сложения: излом
        рыночного предложения (20; 20) пропадал из списка, потому что рядом стояло
        пересечение двух групп в (20; 40). Один и тот же Q, разные точки. */
+    /* ⚠️ Излом, совпавший с уже найденной точкой, НЕ выбрасывается: он отдаёт
+       ей своего хозяина (см. push выше). Раньше здесь стоял выход, и излом
+       суммарного спроса пропадал из списка целиком — вместе с возможностью
+       зажечь его щелчком по самой суммарной кривой. */
     const nearX = (w.x1 - w.x0) * 0.02, nearY = (w.y1 - w.y0) * 0.02;
     kinksOf(t.f, lo, hi).forEach(x => {
       const y = t.f(x);
       if (!isFinite(y)) return;
-      if (out.some(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY)) return;
+      const near = out.find(o => Math.abs(o.x - x) < nearX && Math.abs(o.y - y) < nearY);
+      if (near) { if (!near.owners.includes(t.name)) near.owners.push(t.name); return; }
       push(x, y, 'излом ' + t.name, 'kink', [t.name]);
     });
   });
-  _keyPtsCache = out;
+  _keyPtsCache[ck] = out;
   return out;
 }
 
@@ -1393,11 +1482,15 @@ const KEY_HIT_PX = 11;
    аббревиатуры легенды оставлен: это не подсказка, а ИМЯ фигуры.            */
 
 function snapVertexAt(px, py) {
-  const { mx, my } = mainScales();
+  // Панель решает ПИКСЕЛЬ, а не курсор: щелчок мог прийти и с клавиатуры,
+  // и из прибора, а панель у него всё равно та, над которой он случился.
+  const pan = panelAt(px, py);
+  const pid = pan ? pan.id : null;
+  const { mx, my } = mainScales(pid);
   let best = null;
-  keyTargets().forEach(p => {
+  keyTargets(pid).forEach(p => {
     const d = Math.hypot(mx(p.x) - px, my(p.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: p.x, y: p.y, name: p.name, key: true, d };
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: p.x, y: p.y, name: p.name, key: true, d, panel: pid };
   });
   /* ⚠️ СВОИ ТОЧКИ — ТОЖЕ КАНДИДАТ НА ЗАХВАТ, НАРАВНЕ С КЛЮЧЕВЫМИ (замер
      владельца 21.08: промах 5 px давал вершину в 7+ px от своей точки — щелчок
@@ -1406,13 +1499,24 @@ function snapVertexAt(px, py) {
      пересечении, и тогда ловить её было нечем — засечь получалось только
      координатами до пикселя. Тот же радиус KEY_SNAP_PX, что и у ключевых
      точек: своя точка для вершины площади не менее важна. */
-  (STATE.marks || []).forEach(mk => {
+  // Своя точка — кандидат только в СВОЕЙ панели: в соседней её нет на экране.
+  (STATE.marks || []).filter(mk => markPanelId(mk) === pid).forEach(mk => {
     const d = Math.hypot(mx(mk.x) - px, my(mk.y) - py);
-    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d };
+    if (d <= KEY_SNAP_PX && (!best || d < best.d)) best = { x: mk.x, y: mk.y, name: mk.name || 'своя точка', key: true, d, panel: pid };
   });
   if (best) return best;
   const hit = snapPointAt(px, py);
-  return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross } : null;
+  return hit ? { x: hit.x, y: hit.y, name: hit.name, key: false, cross: hit.cross, panel: pid } : null;
+}
+
+/* Панель объекта слоя (точка, вершина, посчитанная площадь). Записи без поля
+   `panel` считаются принадлежащими панели по умолчанию: калькулятор ничего не
+   хранит между сессиями, но защита от undefined нужна — объект мог быть
+   заведён кодом, который про панели ещё не знает. */
+function markPanelId(o) {
+  if (o && o.panel) return o.panel;
+  const list = STATE.panels || [];
+  return list.some(p => p.id === 'main') ? 'main' : (list[0] ? list[0].id : null);
 }
 
 /* Ключевые точки на холсте (П36–П38).
@@ -1426,18 +1530,28 @@ function snapVertexAt(px, py) {
    Излом (П37) особый: у него сразу, без всякого щелчка, проводится пунктир к
    обеим осям и подписываются координаты НА ОСЯХ. У остальных точек так не
    делается: они серые, а координаты и «закрепка» появляются по щелчку. */
+/* Панель ВЗВЕДЁННОЙ кривой. Взводят кривую щелчком, а курсор потом уходит
+   куда угодно — привязывать её точки к панели под курсором было бы неверно.
+   Кривая без панели (а таких 38 сцен из 44) отдаёт null: там панель одна. */
+function armedPanelId() {
+  if (!STATE.armedCurve) return null;
+  const t = snapTargetsAll().filter(t => t.name === STATE.armedCurve)[0];
+  return (t && t.panel) || null;
+}
+
 function drawCrossPoints() {
   /* По умолчанию автоматических ключевых точек нет вовсе (решение владельца).
      Пока ни одна кривая не взведена, рисовать нечего — холст чистый.
      Своих точек и вершин площадей это не касается: их рисуют drawMarks и
      drawAreaVerts, и они видны всегда. */
   if (!STATE.armedCurve) return;
-  const pts = keyTargets().filter(keyPointLit);
+  const pid = armedPanelId();
+  const pts = keyTargets(pid).filter(keyPointLit);
   if (!pts.length) return;
-  const { mx, my } = mainScales();
+  const { mx, my } = mainScales(pid);
   const g = svg.append('g').attr('class', 'crosses');
   // Цвет взведённой кривой: загоревшаяся точка красится им, а не общим сланцем.
-  const armed = snapTargets().filter(t => t.name === STATE.armedCurve)[0];
+  const armed = snapTargetsAll().filter(t => t.name === STATE.armedCurve)[0];
   const litColor = (armed && armed.color) || COL.ink;
   // Пока набирают вершины или ставят свою точку, кружки ключевых точек не ловят
   // щелчок: иначе щелчок рядом с пересечением уходил в кружок и вершина не
@@ -1564,19 +1678,23 @@ function keyPointLit(p) {
    означали бы, что верхняя молча съедает щелчок по нижней. */
 function drawCurveHits() {
   if (STATE.markArm || STATE.vertArm) return;   // сейчас на холсте ставят точку
-  const targets = snapTargets();
+  /* Полосы нужны у ВСЕХ кривых сцены, а не только у панели под курсором:
+     щёлкнуть по кривой соседней панели человек вправе. Считает каждую полосу
+     её собственная панель. */
+  const targets = snapTargetsAll();
   if (!targets.length) return;
   const done = new Set();
   svg.selectAll('g.curves path[data-hit]').each(function () {
     const nm = this.getAttribute('data-hit-name');
     if (nm) done.add(nm);
   });
-  const { mx, my } = mainScales();
-  const [xLo, xHi] = mx.domain();
   const g = svg.append('g').attr('class', 'curve-hits').attr('clip-path', 'url(#plot-clip)');
-  const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
   targets.forEach(t => {
     if (done.has(t.name)) return;
+    const ts = mainScales(t.panel);
+    const mx = ts.mx, my = ts.my;
+    const [xLo, xHi] = mx.domain();
+    const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
     const pts = [];
     for (let i = 0; i <= 240; i++) {
       const x = xLo + (xHi - xLo) * i / 240;
@@ -1630,7 +1748,7 @@ function hoverLabel(g, dot, x, y, text, anchor, baseline) {
 function drawRoller() {
   const r = STATE.roller;
   if (!r) return;
-  const { mx, my } = mainScales();
+  const { mx, my } = mainScales(r.panel);
   const g = svg.append('g').attr('class', 'roller').style('pointer-events', 'none');
   const px = mx(r.x), py = my(r.y);
   // Проекции ведём до самой оси, а если ноль ушёл за край окна — до края.
@@ -1649,8 +1767,10 @@ function drawRoller() {
 
 // Кривая под курсором (в пикселях) — для прокатывания.
 function rollerTargetAt(px, py) {
-  const { mx, my } = mainScales();
-  const targets = snapTargets();
+  const pan = panelAt(px, py);
+  const pid = pan ? pan.id : null;
+  const { mx, my } = mainScales(pid);
+  const targets = snapTargets(pid);
   if (!targets.length) return null;
   const [xLo, xHi] = mx.domain();
   let best = null;
@@ -1664,7 +1784,9 @@ function rollerTargetAt(px, py) {
       if (!best || d < best.d) best = { d, t };
     }
   });
-  return (best && best.d <= ROLL_PX) ? best.t : null;
+  // Панель запоминаем у самой цели: точка покатится по шкалам своей панели.
+  return (best && best.d <= ROLL_PX)
+    ? Object.assign({}, best.t, { panel: best.t.panel || pid }) : null;
 }
 
 const ROLL_PX = 12;    // на каком расстоянии нажатие считается «по кривой»
@@ -1674,8 +1796,8 @@ const ROLL_PX = 12;    // на каком расстоянии нажатие с
    ближайший к запрошенному x, где функция считается и (в ЭКОНОМИЧЕСКИХ сценах)
    не уходит ниже оси; годной точки нет — null. Условие — isEconScene(), а не
    галочка: точка катается по кривой, а кривой ниже оси Q нет. */
-function rollerClampX(f, x) {
-  const { mx } = mainScales();
+function rollerClampX(f, x, panelId) {
+  const { mx } = mainScales(panelId);
   let [lo, hi] = mx.domain();
   if (isEconScene()) lo = Math.max(lo, 0);
   const ok = (t) => { const v = f(t); return isFinite(v) && (!isEconScene() || v >= -1e-9); };
@@ -1696,8 +1818,8 @@ function rollerClampX(f, x) {
 function rollerMove(px, clientX, clientY) {
   const r = STATE.roller;
   if (!r) return;
-  const { mx } = mainScales();
-  const x = rollerClampX(r.f, mx.invert(px));
+  const { mx } = mainScales(r.panel);
+  const x = rollerClampX(r.f, mx.invert(px), r.panel);
   if (x == null) return;
   const y = r.f(x);
   if (!isFinite(y)) return;
@@ -1859,12 +1981,23 @@ function leaveCanvasMode() {
   if (STATE.vertArm) armVerts(false);
 }
 
-function addAreaVert(x, y, name) {
+function addAreaVert(x, y, name, panel) {
   STATE.areaVerts = STATE.areaVerts || [];
-  STATE.areaVerts.push({ x, y, name: name || '' });
+  // Хозяйская панель вершины: в ней её поставили, по её шкалам и рисуем.
+  const pid = panel || (activePanel() ? activePanel().id : null);
+  STATE.areaVerts.push({ x, y, name: name || '', panel: pid });
   renderVertList();
   redrawAll();
 }
+
+/* ⚠️ ПЛОЩАДЬ НЕ ПЕРЕСЕКАЕТ ГРАНИЦУ ПАНЕЛИ.
+   Многоугольник собирается из вершин ОДНОЙ панели. Иначе получается фигура,
+   натянутая между графиком функции и графиком её производной, — у неё нет ни
+   смысла, ни числа: у панелей разные единицы по обеим осям. */
+function vertPanels() {
+  return Array.from(new Set((STATE.areaVerts || []).map(markPanelId)));
+}
+function vertsMixed() { return vertPanels().length > 1; }
 
 function clearAreaVerts() { STATE.areaVerts = []; renderVertList(); redrawAll(); }
 
@@ -1882,6 +2015,12 @@ function renderVertList() {
   if (btns) btns.style.display = list.length ? '' : 'none';
   syncCanvasMode();   // подпись кнопки «Отмечать вершины» идёт за состоянием
   box.innerHTML = '';
+  if (vertsMixed()) {
+    const warn = document.createElement('div');
+    warn.className = 'vert-mixed warn';
+    warn.textContent = 'Вершины стоят на разных графиках: площадь считается внутри одного.';
+    box.appendChild(warn);
+  }
   list.forEach((p, i) => {
     const row = document.createElement('div');
     row.className = 'vert-row';
@@ -1889,7 +2028,7 @@ function renderVertList() {
 
     const t = document.createElement('span');
     t.className = 'vert-co';
-    t.setAttribute('data-tip', 'Двойной щелчок — поправить координаты');
+    t.setAttribute('data-tip', 'Двойной щелчок поправит координаты');
     const paint = () => {
       t.textContent = (p.name ? p.name + ' ' : '') + '(' + fmt(p.x) + '; ' + fmt(p.y) + ')';
     };
@@ -1942,7 +2081,7 @@ function syncAreaCalcButton() {
   const btn = document.getElementById('ac-calc');
   if (!btn) return;
   const ready = (STATE.areaCalcMode === 'poly')
-    ? ((STATE.areaVerts || []).length >= 3)
+    ? ((STATE.areaVerts || []).length >= 3 && !vertsMixed())
     : !!areaPickedCurve();
   btn.disabled = !ready;
   btn.setAttribute('data-tip', ready ? '' : (STATE.areaCalcMode === 'poly'
@@ -2035,9 +2174,14 @@ function drawAreaVerts() {
   // Список перекладываем ПОСЛЕ проверки имён и только если что-то изменилось:
   // renderVertList не перерисовывает холст, поэтому петли здесь нет.
   if (freshenVertNames()) renderVertList();
-  const { mx, my } = mainScales();
+  /* Контур собирается ТОЛЬКО из вершин одной панели: у смешанного набора
+     фигуры нет, и рисовать её было бы враньём (см. vertsMixed). Кружки при
+     этом рисуются у всех вершин — каждый по шкалам своей панели. */
+  const { mx, my } = mainScales(markPanelId(list[0]));
   const g = svg.append('g').attr('class', 'area-verts').style('pointer-events', 'none');
-  if (list.length >= 3) {
+  if (vertsMixed()) {
+    // нечего соединять
+  } else if (list.length >= 3) {
     /* П43: контур показывает РОВНО ту фигуру, которая будет посчитана.
        Раньше пунктир соединял вершины в порядке щелчков, а площадь считалась
        по другому обходу — картинка и число расходились. */
@@ -2054,14 +2198,16 @@ function drawAreaVerts() {
   /* Вершины на графике (П42): при наведении явно выделяются, щелчок по уже
      выбранной снимает её, а зажатую можно перетащить — координата в списке
      меняется сама. Рядом с кривой вершина катится по ней, как и при постановке. */
-  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   list.forEach((p, i) => {
-    const dot = g.append('circle').attr('cx', mx(p.x)).attr('cy', my(p.y)).attr('r', 4.5)
+    const ps = mainScales(markPanelId(p));
+    const pmx = ps.mx, pmy = ps.my;
+    const [xLo, xHi] = pmx.domain(), [yLo, yHi] = pmy.domain();
+    const dot = g.append('circle').attr('cx', pmx(p.x)).attr('cy', pmy(p.y)).attr('r', 4.5)
       .attr('fill', COL.halo).attr('stroke', COL.reg).attr('stroke-width', 2)
       .style('pointer-events', 'all').style('cursor', 'grab');
     // Номер вершины стоит вплотную к своей точке: на 8 px вправо и вверх,
     // то есть в углу её же кружка радиусом 4,5.
-    haloText(g, mx(p.x) + 8, my(p.y) - 8, String(i + 1), 'start', 'auto');
+    haloText(g, pmx(p.x) + 8, pmy(p.y) - 8, String(i + 1), 'start', 'auto');
 
     dot.on('pointerenter', () => dot.attr('r', 6.5).attr('stroke-width', 3))
        .on('pointerleave', () => dot.attr('r', 4.5).attr('stroke-width', 2));
@@ -2072,9 +2218,11 @@ function drawAreaVerts() {
       .on('drag', (ev) => {
         moved = true;
         const hit = snapVertexAt(ev.x, ev.y);
-        p.x = hit ? hit.x : Math.max(xLo, Math.min(xHi, mx.invert(ev.x)));
-        p.y = hit ? hit.y : Math.max(yLo, Math.min(yHi, my.invert(ev.y)));
-        p.name = (hit && hit.key) ? hit.name : '';
+        // Вершина не переезжает в чужую панель протяжкой: хозяин у неё один.
+        const inOwn = hit && markPanelId(hit) === markPanelId(p);
+        p.x = inOwn ? hit.x : Math.max(xLo, Math.min(xHi, pmx.invert(ev.x)));
+        p.y = inOwn ? hit.y : Math.max(yLo, Math.min(yHi, pmy.invert(ev.y)));
+        p.name = (inOwn && hit.key) ? hit.name : '';
         renderVertList(); redrawAll();
       })
       .on('end', () => {
@@ -2089,8 +2237,8 @@ function drawAreaVerts() {
   });
 }
 
-function areaTargets() {
-  return snapTargets();
+function areaTargets(panelId) {
+  return snapTargets(panelId);
 }
 
 function calcAreaUnderCurve() {
@@ -2102,7 +2250,7 @@ function calcAreaUnderCurve() {
   const a = r.a, b = r.b;
   const val = integrate((x) => { const y = t.f(x); return isFinite(y) ? Math.max(0, y) : 0; }, a, b);
   if (!isFinite(val)) return { error: 'Не удалось посчитать: кривая не определена на этом отрезке.' };
-  return { kind: 'curve', value: val, a, b, name };
+  return { kind: 'curve', value: val, a, b, name, panel: activePanel() ? activePanel().id : null };
 }
 
 // Площадь замкнутого обхода по формуле шнурков.
@@ -2184,9 +2332,11 @@ function bestAreaRing(pts) {
 function calcAreaPolygon() {
   const pts = (STATE.areaVerts || []).slice();
   if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
+  if (vertsMixed()) return { error: 'Вершины стоят на разных графиках: площадь считается внутри одного.' };
   const r = bestAreaRing(pts);
   return { kind: 'poly', value: ringArea(r.ring), exact: r.exact,
            crosses: !r.exact && ringSelfCrosses(r.ring),
+           panel: markPanelId(pts[0]),
            ring: r.ring.map(p => [p.x, p.y]) };
 }
 
@@ -2228,12 +2378,13 @@ function clearAreaCalc() {
 function drawAreaCalc() {
   const list = STATE.areaCalcList || [];
   if (!list.length) { updateAreaCalcPanel(); return; }
-  const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'areacalc').attr('clip-path', 'url(#plot-clip)');
   list.forEach(r => {
+    // Площадь помнит свою панель: посчитана она в её шкалах, в них и рисуется.
+    const { mx, my } = mainScales(markPanelId(r));
     const color = r.color || COL.MR;
     if (r.kind === 'curve') {
-      const t = areaTargets().filter(x => x.name === r.name)[0];
+      const t = areaTargets(markPanelId(r)).filter(x => x.name === r.name)[0];
       if (!t) return;
       const N = 160, pts = [];
       for (let i = 0; i <= N; i++) pts.push(r.a + (r.b - r.a) * i / N);
@@ -3302,12 +3453,13 @@ function markCaption(mk) {
 
 function drawMarks() {
   if (!STATE.marks || !STATE.marks.length) return;
-  const { mx, my } = mainScales();
   const g = svg.append('g').attr('class', 'marks');
-  const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   STATE.marks.forEach(mk => {
     // Точка, у которой заполнено ещё не всё, на плоскости не появляется (П28).
     if (mk.pending || !isFinite(mk.x) || !isFinite(mk.y)) return;
+    const ms = mainScales(markPanelId(mk));
+    const mx = ms.mx, my = ms.my;
+    const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     if (mk.x < xLo || mk.x > xHi || mk.y < yLo || mk.y > yHi) return;
     const px = mx(mk.x), py = my(mk.y);
     const col = mk.color || COL.ink;
@@ -3335,10 +3487,12 @@ function drawMarks() {
            первой — в неё точка «падает» и стоит ровно в ней, а не скользит по
            одной из кривых мимо перекрестья. */
         const key = snapVertexAt(ev.x, ev.y);
-        if (key && key.key) { mk.snapTo = null; mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
+        // Магнит соседней панели точке не хозяин: она живёт в своей.
+        const own = (h) => h && markPanelId(h) === markPanelId(mk);
+        if (key && key.key && own(key)) { mk.snapTo = null; mk.x = key.x; mk.y = key.y; renderMarkList(); redrawAll(); return; }
         if (!mk.snapTo) {
           const hit = snapPointAt(ev.x, ev.y);
-          if (hit && !hit.cross) mk.snapTo = hit.name;
+          if (hit && !hit.cross && own(hit)) mk.snapTo = hit.name;
         }
         if (mk.snapTo === 'ось Y') {
           mk.x = 0;
@@ -3387,7 +3541,24 @@ const RELEASE_PX = 35;   // а на каком уже отрывается (П31
 
 // К чему можно прилипнуть в текущей сцене. Кривые берём готовыми функциями:
 // откуда они взялись, прилипанию знать не нужно.
-function snapTargets() {
+/* ⚠️ У КРИВОЙ ЕСТЬ ПАНЕЛЬ, И ПРИТЯГИВАТЬСЯ К НЕЙ МОЖНО ТОЛЬКО В НЕЙ.
+
+   `snapTargets()` отдаёт кривые ПАНЕЛИ ПОД КУРСОРОМ. Раньше список был один на
+   всю сцену, и в сюжете про производную мышь на НИЖНЕЙ панели липла к f(x),
+   которой там нет: обе панели спрашивали один и тот же список.
+
+   Поле `panel` ставится только там, где панелей в сцене больше одной. Кривая
+   БЕЗ этого поля принадлежит любой панели — так однопанельные сцены (а их 38
+   из 44) не приходится размечать поштучно, и правило у них не меняется. */
+function snapTargets(panelId) {
+  const all = snapTargetsAll();
+  const list = STATE.panels || [];
+  const id = (panelId != null) ? panelId : (activePanel() ? activePanel().id : null);
+  if (!id || !list.some(p => p.id === id)) return all;
+  return all.filter(t => !t.panel || t.panel === id);
+}
+
+function snapTargetsAll() {
   const out = [];
   if (STATE.mode === 'costs' && STATE.costsSub === 'costs' && STATE.costsReady) {
     if (STATE.showMC)  out.push({ name: 'MC',  f: costMC });
@@ -3399,7 +3570,36 @@ function snapTargets() {
   // Было условие на STATE.prodReady, которого в состоянии нет вовсе, поэтому
   // ветка не срабатывала никогда и в «Производственной функции» точка не каталась.
   if (STATE.mode === 'costs' && STATE.costsSub === 'production' && STATE.prodCompiled) {
-    out.push({ name: 'TP', f: prodEval });
+    // TP нарисован на ВЕРХНЕЙ панели: на нижней стоят MP и AP, и притягиваться
+    // там к общему продукту нечему.
+    out.push({ name: 'TP', f: prodEval, panel: 'prod-top' });
+    return out;
+  }
+  /* Дискриминация 3-й степени и «Монополист и внешний рынок»: кривые лежат в
+     STATE.discr3, а не в STATE.curves, поэтому раньше список молча
+     проваливался в общую ветку и отдавал спрос с издержками ГЛАВНОЙ сцены
+     монополии — кривые, которых на этом холсте нет вовсе.
+     ⚠️ Сцены здесь ДВЕ, и панелей у них разное число. У дискриминации два
+     разных рынка и два мини-графика, у внешнего рынка — один график на общий
+     выпуск (см. drawMonoExport), и обе его кривые живут в панели 'main'. */
+  if (STATE.mode === 'market' && STATE.market === 'monopoly'
+      && STATE.monoMode === 'discr3' && STATE.discr3) {
+    const d = STATE.discr3;
+    if (STATE.d3World) {
+      // Мировая цена — прямая линия холста, а не кривая, по которой катаются:
+      // её пересечения уже объявлены нарисованными точками сцены.
+      if (!d.found && !d.unbounded) return out;
+      out.push({ name: 'D внутри', f: (q) => evalCurve(d.c1, q), color: COL.D });
+      out.push({ name: 'MC', f: (q) => evalCurve(d.cm, q), color: COL.S });
+      return out;
+    }
+    if (d.found) {
+      out.push({ name: 'D₁', f: (q) => evalCurve(d.c1, q), color: COL.D, panel: 'mini-1' });
+      out.push({ name: 'D₂', f: (q) => evalCurve(d.c2, q), color: COL.D, panel: 'mini-2' });
+      out.push({ name: 'MC₁', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-1' });
+      out.push({ name: 'MC₂', f: (q) => evalCurve(d.cm, q), color: COL.S, panel: 'mini-2' });
+      return out;
+    }
     return out;
   }
   // Изокванта задана уровнем выпуска, а не формулой K = f(L): её точки считает
@@ -3445,6 +3645,19 @@ function snapTargets() {
   // Торговля: КПВ страны плюс линия торговых возможностей, если она построена.
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     tradeSnapTargets(out);
+    return out;
+  }
+  /* СОСТАВНОЙ СПРОС. Спрос здесь ЛОМАНЫЙ и лежит в STATE.kinked, а не в
+     STATE.curves — та же болезнь, что была у дискриминации 3-й степени выше:
+     список молча проваливался в общую ветку и отдавал кривые ГЛАВНОЙ сцены
+     монополии, которых на этом холсте нет вовсе. Отсюда и то, что окно не
+     знало, докуда сцена дотянулась: конец потерь при выпуске 120 приходилось
+     открывать руками. */
+  if (STATE.mode === 'market' && STATE.market === 'monopoly'
+      && STATE.monoMode === 'kinked' && STATE.kinked && typeof STATE.kinked.Dfn === 'function') {
+    const k = STATE.kinked;
+    out.push({ name: 'D', f: (q) => k.Dfn(q), color: COL.D });
+    if (k.mcCurve) out.push({ name: 'MC', f: (q) => evalCurve(k.mcCurve, q), color: COL.S });
     return out;
   }
   if (STATE.mode === 'math') { mathSnapTargets(out); return out; }
@@ -3538,6 +3751,19 @@ function ineqSnapTargets(out) {
 function mathSnapTargets(out) {
   const f = mathF();
   const sub = STATE.mathSub;
+  /* ⚠️ У СЮЖЕТА ПРО ПРОИЗВОДНУЮ ДВЕ ПАНЕЛИ, И ФУНКЦИИ У НИХ РАЗНЫЕ.
+     Раньше ветки здесь не было вовсе: сюжет проваливался в общий конец, и на
+     обе панели отдавалась одна f(x). На нижнем графике мышь притягивалась к
+     x², которой там нет, а к самой производной — не притягивалась ни к чему.
+     Производную берём ту же, что рисует сцена: численную dNum, второй
+     математики здесь заводить нельзя. */
+  if (sub === 'tangent') {
+    if (f) {
+      out.push({ name: 'f', f, color: COL.tanF, panel: 'deriv-top' });
+      out.push({ name: "f'", f: (x) => dNum(f, x), color: COL.tanD, panel: 'deriv-bottom' });
+    }
+    return;
+  }
   if (sub === 'minmax') {
     if (f) out.push({ name: mmLabel(0), f, color: mmColor(0) });
     for (let i = 1; i < mmSlots(); i++) {
@@ -3596,8 +3822,9 @@ function tradeSnapTargets(out) {
   }
   const b = STATE.tradeBData;
   if (b && b.ok) {
-    if (b.co1) out.push({ name: 'КПВ 1', f: (x) => interpY(b.co1.ppts, x) });
-    if (b.co2) out.push({ name: 'КПВ 2', f: (x) => interpY(b.co2.ppts, x) });
+    // Две страны — два поля со своими масштабами: каждая КПВ живёт в своём.
+    if (b.co1) out.push({ name: 'КПВ 1', f: (x) => interpY(b.co1.ppts, x), panel: 'trade-1' });
+    if (b.co2) out.push({ name: 'КПВ 2', f: (x) => interpY(b.co2.ppts, x), panel: 'trade-2' });
   }
 }
 
@@ -3608,7 +3835,8 @@ function tradeSnapTargets(out) {
    Поэтому оси считаем отдельно, и ось Y — вертикаль, для которой f(x) вообще
    не определена. */
 function axisSnapAt(px, py) {
-  const { mx, my } = mainScales();
+  const pan = panelAt(px, py);
+  const { mx, my } = mainScales(pan ? pan.id : null);
   const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
   const zx = (0 >= xLo && 0 <= xHi) ? mx(0) : null;
   const zy = (0 >= yLo && 0 <= yHi) ? my(0) : null;
@@ -3627,11 +3855,13 @@ function axisSnapAt(px, py) {
 // Расстояние в пикселях от курсора до линии, на которой сидит точка. Нужно
 // для сопротивления при отрыве: пока курсор ближе порога, точка не срывается.
 function snapDistPx(name, px, py) {
-  const { mx, my } = mainScales();
+  const pan = panelAt(px, py);
+  const pid = pan ? pan.id : null;
+  const { mx, my } = mainScales(pid);
   if (name === 'ось X') return Math.abs(py - my(0));
   if (name === 'ось Y') return Math.abs(px - mx(0));
   if (name === 'начало координат') return Math.hypot(px - mx(0), py - my(0));
-  const t = snapTargets().filter(t => t.name === name)[0];
+  const t = snapTargets(pid).filter(t => t.name === name)[0];
   if (!t) return Infinity;
   const [xLo, xHi] = mx.domain();
   let best = Infinity;
@@ -3646,8 +3876,10 @@ function snapDistPx(name, px, py) {
 }
 
 function snapPointAt(px, py) {
-  const { mx, my } = mainScales();
-  const targets = snapTargets();
+  const pan = panelAt(px, py);
+  const pid = pan ? pan.id : null;
+  const { mx, my } = mainScales(pid);
+  const targets = snapTargets(pid);
   const ax = axisSnapAt(px, py);
   if (!targets.length) return ax;
   const [xLo, xHi] = mx.domain();
@@ -3690,7 +3922,7 @@ function showSnapHint(hit) {
   const old = document.getElementById('snap-hint');
   if (!hit) { if (old) old.remove(); return; }
   if (old) old.remove();
-  const { mx, my } = mainScales();
+  const { mx, my } = mainScales(hit.panel);
   const g = svg.append('g').attr('id', 'snap-hint').style('pointer-events', 'none');
   const px = mx(hit.x), py = my(hit.y);
   const hot = !!(hit.key || hit.cross);
@@ -3942,18 +4174,20 @@ function restoreSceneSnapshot(key) {
   return true;
 }
 
-function addMarkAt(x, y, snapTo) {
+function addMarkAt(x, y, snapTo, panel) {
+  const pid = panel || (activePanel() ? activePanel().id : null);
   // Щелчок по графику в режиме «Указать на графике» достраивает уже заведённую
   // заготовку, а не плодит вторую точку (П28).
   const draft = pendingMark();
   if (draft) {
     draft.x = x; draft.y = y; draft.snapTo = snapTo || null;
+    draft.panel = pid;
     draft.pending = false;
     renderMarkList();
     redrawAll();
     return;
   }
-  STATE.marks.push(newMark(x, y, snapTo, 'graph'));
+  STATE.marks.push(newMark(x, y, snapTo, 'graph', pid));
   renderMarkList();
   redrawAll();
 }
@@ -4018,10 +4252,12 @@ function nextMarkColor() {
   return pal[(STATE.marks || []).length % pal.length];
 }
 
-function newMark(x, y, snapTo, mode) {
+function newMark(x, y, snapTo, mode, panel) {
   markCounter++;
   return {
     id: markCounter, x, y, text: 'Точка ' + markCounter,
+    // Хозяйская панель: в ней точку поставили, по её шкалам и рисуем.
+    panel: panel || (activePanel() ? activePanel().id : null),
     showCoords: true, showDash: true, color: nextMarkColor(),
     mode: mode || 'coords',      // как её создавали: тумблер после этого заперт
     pending: false,

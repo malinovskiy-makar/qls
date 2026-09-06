@@ -27,6 +27,14 @@ Django даёт каждому воркеру свою тестовую базу
     --keepdb        передаётся обоим шагам (см. docs/TESTING.md)
     --parallel N    сколько воркеров на шаге A (по умолчанию auto)
     --only-parallel / --only-serial   прогнать один шаг
+    --scope-from-git [BASE_REF]   быстрый круг сессии — только тесты
+                    приложений, задетых изменениями с BASE_REF (по
+                    умолчанию — с последнего коммита). ПОЛНЫЙ прогон
+                    (без этого флага) перед сдачей сессии остаётся
+                    обязательным — см. docs/TESTING.md, «Быстрый круг».
+    --summary       сводка + полный traceback упавших в терминал, весь
+                    verbosity=2 лог — в файл .test-logs/. Включается сам
+                    собой вместе с --scope-from-git; --no-summary гасит.
 Всё остальное уезжает в `manage.py test` обоих шагов как есть, например
 `--settings=config.settings_test_pg` или `--verbosity 2`.
 """
@@ -38,20 +46,88 @@ import time
 from pathlib import Path
 
 BASE = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(BASE))  # чтобы `import scripts.*` работал и при
+                                # прямом запуске `python scripts/run_tests.py`
+
+from scripts.output_summary import extract_failure_blocks, parse_summary  # noqa: E402
+from scripts.scope_from_git import build_reverse_import_index, changed_files, resolve_labels  # noqa: E402
+
 SERIAL_TAG = 'serial'
+_LAST_COMMIT = '__последний_коммит__'
 
 
-def _run(название, аргументы, окружение):
-    """Один шаг прогона. Возвращает (код возврата, секунды)."""
+def _run(название, аргументы, окружение, log_path=None):
+    """Один шаг прогона. Возвращает (код возврата, секунды).
+
+    log_path=None -> вывод идёт прямо на экран вживую (как раньше — владелец
+    должен видеть ход прогона, иначе получасовое молчание неотличимо от
+    зависшего процесса). log_path задан -> вывод пишется в файл, а на экран
+    после завершения шага идёт только сводка (см. _print_step_summary).
+    """
     команда = [sys.executable, 'manage.py', 'test'] + аргументы
-    print('\n' + '=' * 72)
-    print('%s: %s' % (название, ' '.join(команда[1:])))
-    print('=' * 72, flush=True)
+    заголовок = '\n' + '=' * 72 + '\n%s: %s\n' % (название, ' '.join(команда[1:])) + '=' * 72
+    print(заголовок, flush=True)
     начало = time.monotonic()
-    # Без capture_output: владелец должен видеть ход прогона вживую, иначе
-    # получасовое молчание неотличимо от зависшего процесса.
-    итог = subprocess.run(команда, cwd=str(BASE), env=окружение)
-    return итог.returncode, time.monotonic() - начало
+
+    if log_path is None:
+        итог = subprocess.run(команда, cwd=str(BASE), env=окружение)
+        return итог.returncode, time.monotonic() - начало
+
+    смещение = log_path.stat().st_size if log_path.exists() else 0
+    with open(log_path, 'a', encoding='utf-8') as лог:
+        лог.write(заголовок + '\n')
+        лог.flush()
+        итог = subprocess.run(команда, cwd=str(BASE), env=окружение,
+                               stdout=лог, stderr=subprocess.STDOUT)
+    секунды = time.monotonic() - начало
+    _print_step_summary(log_path, смещение)
+    return итог.returncode, секунды
+
+
+def _print_step_summary(log_path, смещение):
+    """Печатает сводку и ПОЛНЫЙ traceback упавших для среза лога с offset'а."""
+    with open(log_path, 'r', encoding='utf-8') as лог:
+        лог.seek(смещение)
+        текст = лог.read()
+
+    сводка = parse_summary(текст)
+    if сводка.ran is None:
+        print('  (сводка не найдена в выводе — смотри %s)' % log_path)
+        return
+
+    print('  Ran %d test(s) in %.1fs  —  %s'
+          % (сводка.ran, сводка.seconds,
+             'OK' if сводка.ok else 'FAILED (failures=%d, errors=%d)'
+             % (сводка.failures, сводка.errors)))
+    if сводка.skipped:
+        print('  skipped=%d' % сводка.skipped)
+
+    for блок in extract_failure_blocks(текст):
+        print('\n' + '-' * 72)
+        print(блок)
+    print('  полный лог (verbosity=2): %s' % log_path, flush=True)
+
+
+def _resolve_scope(base_ref_arg):
+    """--scope-from-git -> (labels: list[str] | None, full_run: bool, skip: bool)."""
+    base_ref = None if base_ref_arg == _LAST_COMMIT else base_ref_arg
+    пути = changed_files(base_ref=base_ref)
+    индекс = build_reverse_import_index()
+    итог = resolve_labels(пути, reverse_index=индекс)
+
+    print('--scope-from-git: изменённые пути (%d):' % len(пути))
+    for заметка in итог.notes:
+        print('  ' + заметка)
+
+    if итог.full_run:
+        print('--scope-from-git: широкий эффект -> полный набор без сужения')
+        return None, True, False
+    if not итог.labels:
+        print('--scope-from-git: тестового следствия нет — прогон пропущен')
+        return None, False, True
+    лейблы = sorted(итог.labels)
+    print('--scope-from-git: лейблы = %s' % ', '.join(лейблы))
+    return лейблы, False, False
 
 
 def main():
@@ -60,9 +136,27 @@ def main():
     разбор.add_argument('--keepdb', action='store_true')
     разбор.add_argument('--only-parallel', action='store_true')
     разбор.add_argument('--only-serial', action='store_true')
+    разбор.add_argument('--scope-from-git', nargs='?', const=_LAST_COMMIT, default=None,
+                         metavar='BASE_REF')
+    разбор.add_argument('--summary', action='store_true')
+    разбор.add_argument('--no-summary', action='store_true')
     свои, чужие = разбор.parse_known_args()
 
-    общие = list(чужие)
+    лейблы = None
+    if свои.scope_from_git is not None:
+        лейблы, полный, пропустить = _resolve_scope(свои.scope_from_git)
+        if пропустить:
+            return 0
+    else:
+        полный = False
+
+    сводка_режим = (свои.summary or (свои.scope_from_git is not None)) and not свои.no_summary
+    log_path = None
+    if сводка_режим:
+        log_path = BASE / '.test-logs' / ('run-%s.log' % time.strftime('%Y%m%d-%H%M%S'))
+        log_path.parent.mkdir(parents=True, exist_ok=True)
+
+    общие = list(чужие) + (лейблы or [])
     if свои.keepdb:
         общие.append('--keepdb')
 
@@ -79,7 +173,7 @@ def main():
             'ШАГ A — параллельный (всё, кроме serial)',
             общие + ['--parallel', свои.parallel,
                      '--exclude-tag', SERIAL_TAG],
-            env_a)
+            env_a, log_path)
         шаги.append(('A (параллельный)', код, секунды))
 
     if not свои.only_parallel:
@@ -88,7 +182,7 @@ def main():
         код, секунды = _run(
             'ШАГ B — последовательный (только serial)',
             общие + ['--tag', SERIAL_TAG],
-            окружение)
+            окружение, log_path)
         шаги.append(('B (последовательный)', код, секунды))
 
     print('\n' + '=' * 72)
@@ -105,6 +199,8 @@ def main():
     print('  всего %36.1f с  (%4.1f мин)' % (всего, всего / 60))
     print('  общий код возврата: %s%s'
           % (провал, '' if провал else '  — оба шага зелёные'))
+    if log_path is not None:
+        print('  полный лог (verbosity=2, оба шага): %s' % log_path)
     return провал
 
 

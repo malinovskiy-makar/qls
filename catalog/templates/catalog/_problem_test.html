@@ -1,0 +1,64 @@
+{% comment %}
+Тест как игра (этап 7 редизайна, мокап test_page_mockup.html, ADR 0082).
+Варианты — кнопки с aria-pressed; проверка — всё или ничего через
+/catalog/api/test-check/; попытки не ограничены, число верных сообщается
+после двух неудач. Разбор четырьмя состояниями плиток (is-hit, is-wrong,
+is-missed, is-skip) с подписями из student/_option_review.html.
+Правило нуля: строка игры только при game_stat, «Почему так» только при
+решении, «Ещё тест по этой теме» только если другой тест по теме есть,
+«Спросить ИИ, почему так» только при карточке чата (вход и модель).
+{% endcomment %}
+<section class="tq" id="tq" aria-label="Варианты ответа">
+  <div class="tq-head">
+    <h2>Варианты</h2>
+    <span class="tq-rule">{{ test.rule }}</span>
+    <span class="tq-try" id="tq-try">Попытка 1</span>
+  </div>
+  {% if test.stat %}
+  <p class="tq-stat" title="Доля верных ответов среди первых встреч игроков с этим вопросом">В Wecon Rush этот вопрос решают верно <b>{{ test.stat.percent }} %</b> игроков ({{ test.stat.attempts }} попыт.)</p>
+  {% endif %}
+  <ul class="opt-list" id="opts">
+    {% for opt in test.options %}<li><button class="opt" type="button" data-l="{{ opt.label }}" aria-pressed="false"><span class="opt-l">{{ opt.label }}</span><span class="opt-t math-content">{% include "catalog/_math_text.html" with text=opt.text %}</span><span class="opt-note"></span></button></li>{% endfor %}
+  </ul>
+
+  <div class="tq-msg tq-msg--wrong" id="msg-wrong" role="status">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5.5 5.5l5 5M10.5 5.5l-5 5"/></svg>
+    <span><b>Не то.</b> {% if test.multi %}Попробуйте ещё раз: какой-то вариант лишний или чего-то не хватает.{% else %}Попробуйте другой вариант.{% endif %}</span>
+    <span class="cnt" id="msg-cnt" hidden></span>
+  </div>
+  <div class="tq-msg tq-msg--ok" id="msg-ok" role="status">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2 2 4-4.5"/></svg>
+    <span><b>Верно!</b> <span id="ok-sub"></span></span>
+  </div>
+  <div class="tq-msg tq-msg--show" id="msg-show" role="status">
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 7v4M8 5v.5"/></svg>
+    <span><b>Правильный ответ: <span id="show-labels"></span>.</b> Ниже видно, что вы отметили и что надо было.</span>
+  </div>
+
+  <div class="tq-row" id="row-play">
+    <button class="btn btn--main" type="button" id="check-btn" disabled>Проверить</button>
+    <span class="tq-why" id="check-why">отметьте хотя бы один вариант</span>
+    <span class="grow"></span>
+    <span class="tq-kbd"><kbd>1</kbd>–<kbd>{{ test.options|length }}</kbd> выбрать · <kbd>Enter</kbd> проверить</span>
+    {% if hint_total %}
+    <button class="btn btn--quiet" type="button" id="hint-btn">💡 Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
+    {% endif %}
+    <button class="btn btn--quiet" type="button" id="reveal-btn">Показать ответ</button>
+  </div>
+  {% if hint_total %}
+  <p class="sv-limit" id="hint-done" hidden>Это была последняя подсказка</p>
+  <div class="hints" id="hints" aria-live="polite"></div>
+  {% endif %}
+  <div class="tq-row" id="row-done" hidden>
+    {% if test.more_url %}<a class="btn btn--main" href="{{ test.more_url }}">Ещё тест по этой теме</a>{% endif %}
+    {% if ai_available and user.is_authenticated %}<button class="btn btn--quiet" type="button" id="ask-why" data-ask="">Спросить ИИ, почему так</button>{% endif %}
+    <span class="grow"></span>
+    <button class="btn btn--quiet btn--sm" type="button" id="again-btn">Пройти заново</button>
+  </div>
+  {% if test.expl %}
+  <div class="tq-expl" id="expl">
+    <div class="h">Почему так</div>
+    <div class="b math-content">{% include "catalog/_math_text.html" with text=test.expl %}</div>
+  </div>
+  {% endif %}
+</section>

@@ -197,9 +197,16 @@ class CardValuesOnOneLineTests(TestCase):
 
 
 class CatalogDifficultyTests(TestCase):
-    """Столбец сложности каталога — тоже по центру."""
+    """Столбец сложности каталога — тоже по центру.
+
+    ⚠️ ТАБЛИЧНОГО ВИДА В КАТАЛОГЕ БОЛЬШЕ НЕТ (решение владельца 04.09.2026,
+    редизайн каталога, этап 1): столбца сложности нет, центрировать нечего.
+    Проверка осталась сторожем обратного хода: вернётся таблица — вместе с
+    ней обязано вернуться и правило центровки, и тогда эту проверку надо
+    вернуть к прежнему виду (`.ct-table .col-diff` → `text-align: center`).
+    """
 
     def test_difficulty_column_is_centred(self):
         page = read('catalog', 'templates', 'catalog', 'problem_list.html')
-        rule = page.split('.ptable .col-diff')[1].split('}')[0]
-        self.assertIn('text-align: center', rule)
+        self.assertNotIn('.ct-table', page,
+                         'таблица вернулась — верните проверку центровки')

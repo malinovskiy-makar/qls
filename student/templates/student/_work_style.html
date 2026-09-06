@@ -3,19 +3,19 @@
 Все цвета через токены `var(--…)`: хардкод hex ломает тёмную тему.
 {% endcomment %}
 .back-link {
-  font-size: 13px; color: var(--text2); text-decoration: none;
+  font-size: 14px; color: var(--text2); text-decoration: none;
   display: inline-flex; align-items: center; gap: 4px; margin-bottom: 20px;
 }
-.back-link:hover { color: var(--accent); }
+.back-link:hover { color: var(--accent-ink); }
 
 .hw-header { margin-bottom: 32px; }
 .hw-title { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
 .hw-meta-row {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-  font-size: 13px; color: var(--text2);
+  font-size: 14px; color: var(--text2);
 }
 .deadline-badge {
-  padding: 2px 8px; border-radius: 20px; font-size: 11px; font-weight: 600;
+  padding: 2px 8px; border-radius: 20px; font-size: 13px; font-weight: 600;
 }
 .deadline-red    { background: var(--error-tint); color: var(--error); }
 .deadline-yellow { background: var(--amber-tint); color: var(--text); }
@@ -40,26 +40,26 @@
 }
 /* Ширина номера фиксирована, чтобы чип типа у всех карточек стоял на
    одной вертикали и на двузначных номерах. */
-.problem-num { font-size: 13px; font-weight: 700; color: var(--text2);
+.problem-num { font-size: 14px; font-weight: 700; color: var(--text2);
                min-width: 22px; }
 .problem-title-text { font-size: 14px; font-weight: 600; flex: 1; min-width: 0; }
 .status-badge {
-  font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
+  font-size: 13px; font-weight: 700; padding: 3px 9px; border-radius: 20px;
   white-space: nowrap;
 }
 .status-not_started { background: var(--panel); color: var(--text2); border: 1px solid var(--border); }
 .status-in_progress { background: var(--amber-tint); color: var(--text); border: 1px solid var(--amber-border); }
-.status-submitted   { background: var(--accent-tint); color: var(--accent); border: 1px solid var(--accent); }
+.status-submitted   { background: var(--accent-tint); color: var(--accent-ink); border: 1px solid var(--accent); }
 .status-reviewed    { background: var(--green-tint); color: var(--green); border: 1px solid var(--green-border); }
 
 .problem-card-body { padding: 20px; }
-.problem-statement { font-size: 15px; line-height: 1.65; margin-bottom: 16px;
+.problem-statement { font-size: 16px; line-height: 1.65; margin-bottom: 16px;
                      overflow-wrap: anywhere; }
 .problem-parts { margin-bottom: 16px; }
 .part-item { display: flex; gap: 10px; margin-bottom: 8px; font-size: 14px;
              line-height: 1.6; }
-.part-label { font-weight: 700; color: var(--accent); flex-shrink: 0; width: 22px; }
-.pf-graph { margin: 10px 0 16px; padding: 10px 14px; font-size: 13px;
+.part-label { font-weight: 700; color: var(--accent-ink); flex-shrink: 0; width: 22px; }
+.pf-graph { margin: 10px 0 16px; padding: 10px 14px; font-size: 14px;
             background: var(--surface-2); border: 1px solid var(--border);
             border-radius: var(--r); color: var(--text2); }
 
@@ -67,10 +67,10 @@
 .answer-area { margin-top: 16px; padding-top: 16px;
                border-top: 1px solid var(--border); }
 .answer-area > label {
-  display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+  display: block; font-size: 13px; font-weight: 600; color: var(--text2);
   margin-bottom: 8px; text-transform: uppercase; letter-spacing: .05em;
 }
-.field-hint { font-size: 12px; color: var(--text2); margin-top: 6px; }
+.field-hint { font-size: 13px; color: var(--text2); margin-top: 6px; }
 textarea.answer-text, input.answer-short {
   background: var(--surface); color: var(--text); width: 100%;
   box-sizing: border-box; border: 1px solid var(--border);
@@ -80,7 +80,7 @@ textarea.answer-text, input.answer-short {
 }
 textarea.answer-text { resize: vertical; min-height: 90px; }
 textarea.answer-text:focus, input.answer-short:focus { border-color: var(--focus); }
-input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
+input.answer-file { font-size: 14px; color: var(--text2); max-width: 100%; }
 
 .choices-list { list-style: none; margin: 0; padding: 0; }
 .choices-list li { margin-bottom: 8px; }
@@ -96,17 +96,17 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 /* ── Подсказки ───────────────────────────────────── */
 .hint-btn {
   background: none; border: 1px solid var(--border); border-radius: var(--r);
-  padding: 6px 12px; font-size: 12px; color: var(--text2); cursor: pointer;
+  padding: 6px 12px; font-size: 13px; color: var(--text2); cursor: pointer;
   transition: border-color .12s, color .12s; margin-top: 12px;
 }
-.hint-btn:hover { border-color: var(--accent); color: var(--accent); }
+.hint-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
 .hint-box {
   margin-top: 10px; padding: 12px 14px; background: var(--amber-tint);
   border: 1px solid var(--amber-border); border-radius: var(--r);
-  font-size: 13px; line-height: 1.6;
+  font-size: 14px; line-height: 1.6;
 }
 .hint-box + .hint-box { margin-top: 6px; }
-.hint-label { font-size: 11px; font-weight: 700; color: var(--amber-ink);
+.hint-label { font-size: 13px; font-weight: 700; color: var(--amber-ink);
               margin-bottom: 4px; }
 
 /* ── Ответ по пунктам ────────────────────────────── */
@@ -126,16 +126,16 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 .part-result-wait { border-left-color: var(--amber); }
 .part-result-head { display: flex; align-items: baseline; gap: 10px;
                     flex-wrap: wrap; }
-.part-mark { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.part-mark { font-size: 13px; font-weight: 700; text-transform: uppercase;
              letter-spacing: .05em; }
 .part-result-ok   .part-mark { color: var(--green); }
 .part-result-bad  .part-mark { color: var(--error); }
 .part-result-wait .part-mark { color: var(--amber-ink); }
-.part-points { font-size: 12px; color: var(--text2); margin-left: auto; }
-.part-result-q { font-size: 13px; line-height: 1.6; margin-top: 4px;
+.part-points { font-size: 13px; color: var(--text2); margin-left: auto; }
+.part-result-q { font-size: 14px; line-height: 1.6; margin-top: 4px;
                  color: var(--text2); overflow-wrap: anywhere; }
 .part-result-answers { display: flex; gap: 16px; flex-wrap: wrap;
-                       font-size: 13px; margin-top: 6px; }
+                       font-size: 14px; margin-top: 6px; }
 .part-result-answers b { color: var(--text2); font-weight: 600; }
 
 /* ── Проверка: единый блок обратной связи ────────── */
@@ -163,17 +163,17 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 .fb-state--partial .fb-score { color: var(--amber-ink); }
 .fb-state--wrong   .fb-score { color: var(--error); }
 /* Вердикт словом — тот же, что в чипе шапки задачи. */
-.fb-verdict { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.fb-verdict { font-size: 13px; font-weight: 700; text-transform: uppercase;
               letter-spacing: .05em; }
 .fb-state--correct .fb-verdict { color: var(--green); }
 .fb-state--partial .fb-verdict { color: var(--amber-ink); }
 .fb-state--wrong   .fb-verdict { color: var(--error); }
 .fb-comment[hidden] { display: none; }
-.fb-source { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.fb-source { font-size: 13px; font-weight: 700; text-transform: uppercase;
              letter-spacing: .05em; color: var(--text2); }
 .fb-comment { font-size: 14px; line-height: 1.65; margin-top: 4px;
               overflow-wrap: anywhere; }
-.fb-mistakes-cap { font-size: 12px; font-weight: 700; color: var(--text2);
+.fb-mistakes-cap { font-size: 13px; font-weight: 700; color: var(--text2);
                    margin-top: 10px; margin-bottom: 6px; }
 
 /* ── Проверка (старый блок, ещё используется) ────── */
@@ -187,7 +187,7 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 .mistake-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .mistake-tag {
   background: var(--error-tint); border: 1px solid var(--error-border);
-  color: var(--error); border-radius: 20px; padding: 2px 9px; font-size: 12px;
+  color: var(--error); border-radius: 20px; padding: 2px 9px; font-size: 13px;
 }
 .submitted-answer {
   margin-top: 12px; padding: 12px 14px; background: var(--panel);
@@ -195,7 +195,7 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
   font-size: 14px; line-height: 1.6; overflow-wrap: anywhere;
 }
 .submitted-label {
-  font-size: 11px; font-weight: 700; color: var(--text2); margin-bottom: 4px;
+  font-size: 13px; font-weight: 700; color: var(--text2); margin-bottom: 4px;
   text-transform: uppercase; letter-spacing: .05em;
 }
 
@@ -204,20 +204,20 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
               gap: 16px; flex-wrap: wrap; }
 .btn-submit {
   background: var(--btn-bg); color: var(--on-btn); border: none;
-  border-radius: var(--r); padding: 12px 28px; font-size: 15px;
+  border-radius: var(--r); padding: 12px 28px; font-size: 16px;
   font-weight: 700; cursor: pointer; transition: background .12s;
 }
 .btn-submit:hover { background: var(--btn-bg-hover); }
 .results-link { font-size: 14px; color: var(--text2); text-decoration: none; }
-.results-link:hover { color: var(--accent); }
+.results-link:hover { color: var(--accent-ink); }
 
 /* ── Решалка и вопросы по задаче ─────────────────── */
 .pf-fold { margin-top: 12px; }
 /* ⚠️ Вид раскрывашки задаёт НАБОР (`_kit.html`, п. 1.3). */
 .pf-fold-body { margin-top: 8px; padding: 12px 14px; background: var(--surface-2);
-                border-radius: var(--r); font-size: 13px; line-height: 1.7;
+                border-radius: var(--r); font-size: 14px; line-height: 1.7;
                 overflow-wrap: anywhere; }
-.pf-locked { margin-top: 12px; font-size: 12px; color: var(--text2);
+.pf-locked { margin-top: 12px; font-size: 13px; color: var(--text2);
              background: var(--surface-2); border: 1px solid var(--border);
              border-radius: var(--r); padding: 8px 12px; }
 /* ── Переписка по задаче ─────────────────────────────────────────────
@@ -226,30 +226,30 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
    преподавателя «с листа». Приём различения ОДИН — подложка. */
 .pf-comments { margin-top: 22px; padding-top: 14px;
                border-top: 1px solid var(--border); }
-.pf-comments-cap { font-size: 13px; font-weight: 700; color: var(--text);
+.pf-comments-cap { font-size: 14px; font-weight: 700; color: var(--text);
                    margin-bottom: 10px; }
 .pf-comment-list { display: flex; flex-direction: column; gap: 10px; }
-.pf-comment { font-size: 13px; line-height: 1.6; padding: 9px 12px;
+.pf-comment { font-size: 14px; line-height: 1.6; padding: 9px 12px;
               border-radius: var(--r); }
 .pf-comment--student { background: var(--surface-2); }
-.pf-comment-head { font-size: 12px; color: var(--text3); margin-bottom: 3px;
+.pf-comment-head { font-size: 13px; color: var(--text3); margin-bottom: 3px;
                    display: flex; align-items: baseline; gap: 6px;
                    flex-wrap: wrap; }
-.pf-comment-author { color: var(--text); font-weight: 600; font-size: 13px; }
+.pf-comment-author { color: var(--text); font-weight: 600; font-size: 14px; }
 .pf-comment-when { color: var(--text3); }
 .pf-comment-text { color: var(--text); }
 /* Пометка видимости — исключение, а не украшение: её надо заметить. */
-.pf-comment-note { color: var(--amber-ink); font-weight: 600; font-size: 11px;
+.pf-comment-note { color: var(--amber-ink); font-weight: 600; font-size: 13px;
                    background: var(--amber-tint); border-radius: 999px;
                    padding: 1px 7px; }
-.pf-comment-empty { font-size: 12px; color: var(--text2); }
+.pf-comment-empty { font-size: 13px; color: var(--text2); }
 
 /* ⚠️ Раньше это была вложенная <form> внутри формы отправки домашки —
    браузер её выбрасывал, вместе со стилями и обработчиком. Теперь это
    обычный блок, поэтому правила ниже наконец применяются. */
 .pf-comment-form { margin-top: 12px; }
 .pf-comment-form label {
-  display: block; font-size: 12px; font-weight: 600; color: var(--text2);
+  display: block; font-size: 13px; font-weight: 600; color: var(--text2);
   margin-bottom: 6px; text-transform: uppercase; letter-spacing: .05em;
 }
 .pf-comment-form textarea {
@@ -263,11 +263,11 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
 .pf-comment-actions { display: flex; align-items: center; gap: 10px;
                       margin-top: 8px; flex-wrap: wrap; }
 .pf-btn { border: 1px solid var(--border); border-radius: var(--r);
-          padding: 7px 14px; font: inherit; font-size: 13px;
+          padding: 7px 14px; font: inherit; font-size: 14px;
           background: transparent; color: var(--text); cursor: pointer; }
 .pf-btn:hover { background: var(--panel); border-color: var(--accent);
-                color: var(--accent); }
-.pf-status { font-size: 12px; color: var(--text2); }
+                color: var(--accent-ink); }
+.pf-status { font-size: 13px; color: var(--text2); }
 
 /* ── Разбор вариантов ответа (Фаза 0.2) ──────────────────────
    Четыре исхода различаются рамкой, значком, фоном И подписью: одного
@@ -284,7 +284,7 @@ input.answer-file { font-size: 13px; color: var(--text2); max-width: 100%; }
             color: var(--text2); }
 .opt-body { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .opt-label { color: var(--text2); }
-.opt-note { flex: none; font-size: 11px; font-weight: 700;
+.opt-note { flex: none; font-size: 13px; font-weight: 700;
             text-transform: uppercase; letter-spacing: .04em;
             color: var(--text2); white-space: nowrap; align-self: center; }
 

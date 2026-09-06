@@ -18,23 +18,23 @@
 стратегию». Карточка на связывание списка с темой заведена в Notion.
 {% endcomment %}
 
-{% block title %}Проверка — {{ submission.student.get_full_name|default:submission.student.username }}{% endblock %}
+{% block title %}Проверка · {{ submission.student.get_full_name|default:submission.student.username }}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .rv-head { display: flex; align-items: flex-start; justify-content: space-between;
            gap: 16px; flex-wrap: wrap; margin-bottom: 20px; }
 .rv-who { font-size: 20px; font-weight: 600; }
-.rv-sub { font-size: 13px; color: var(--text2); margin-top: 3px; }
+.rv-sub { font-size: 14px; color: var(--text2); margin-top: 3px; }
 /* ⚠️ ПЕРЕХОДЫ ЖИВУТ ВМЕСТЕ (п. 3.2): стрелки, «задача N из M» и «глазами
    ученика» — один узел. Ссылка переехала сюда из ряда кнопок сохранения,
    поэтому узел стал двухэтажным на узком экране. */
 .rv-nav { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
           justify-content: flex-end; }
-.rv-pos { font-size: 13px; color: var(--text2); white-space: nowrap; }
+.rv-pos { font-size: 14px; color: var(--text2); white-space: nowrap; }
 .rv-arrow { display: inline-flex; align-items: center; justify-content: center;
             width: 32px; height: 32px; border-radius: var(--r);
             border: 0.5px solid var(--border); background: var(--surface);
-            color: var(--text); text-decoration: none; font-size: 15px; }
+            color: var(--text); text-decoration: none; font-size: 16px; }
 .rv-arrow:hover { background: var(--surface-2); }
 .rv-arrow.is-off { opacity: .35; pointer-events: none; }
 
@@ -60,12 +60,12 @@
 .rv-sect { padding: 12px 0; border-top: 1px solid var(--border-soft);
            min-width: 0; }
 .rv-sect:first-child { border-top: 0; padding-top: 0; }
-.rv-box-cap { font-size: 11px; font-weight: 600; letter-spacing: .5px;
+.rv-box-cap { font-size: 13px; font-weight: 600; letter-spacing: .5px;
               text-transform: uppercase; color: var(--text3);
               margin-bottom: 5px; }
 /* Крупно — потому что именно это и сравнивают. */
 .rv-value { font-size: 19px; line-height: 1.5; overflow-wrap: anywhere; }
-.rv-value.is-empty { color: var(--text3); font-size: 15px; font-style: italic; }
+.rv-value.is-empty { color: var(--text3); font-size: 16px; font-style: italic; }
 .rv-value.is-missing { color: var(--error); font-style: normal; }
 .rv-solution { font-size: 14px; line-height: 1.7; overflow-wrap: anywhere; }
 .rv-solution-text { white-space: pre-wrap; }
@@ -73,7 +73,7 @@
 .rv-part { border-top: 0.5px solid var(--border); padding-top: 14px;
            margin-top: 14px; }
 .rv-part:first-child { border-top: none; padding-top: 0; margin-top: 0; }
-.rv-part-q { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+.rv-part-q { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
 
 /* Балл ставится НАЖАТИЕМ: 21 оценка за работу — это 21 набранное число. */
 .rv-score { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -82,7 +82,7 @@
    как три отключённые кнопки. */
 .rv-seg { display: inline-flex; border: 1px solid var(--border);
           border-radius: var(--r); overflow: hidden; }
-.rv-preset { font: inherit; font-size: 15px; font-weight: 700;
+.rv-preset { font: inherit; font-size: 16px; font-weight: 700;
              min-width: 56px; padding: 9px 18px; cursor: pointer;
              border: 0; border-right: 1px solid var(--border);
              background: var(--surface); color: var(--text);
@@ -94,7 +94,7 @@
    одного из трёх; рядом стоят две настоящие графитовые кнопки, и три
    графитовых пятна в одном блоке читались как три равные кнопки. */
 .rv-preset.is-on { background: var(--accent); color: var(--on-btn); }
-.rv-own { display: flex; align-items: baseline; gap: 6px; font-size: 12px;
+.rv-own { display: flex; align-items: baseline; gap: 6px; font-size: 13px;
           color: var(--text2); }
 
 /* Картинка-решение показывается ЦЕЛИКОМ (фаза 14.2): решение под ссылкой
@@ -111,14 +111,14 @@
                  flex-wrap: wrap; margin-bottom: 16px;
                  padding-bottom: 14px;
                  border-bottom: 1px solid var(--border-soft); }
-.rv-grade-title { font-size: 15px; font-weight: 700; flex: 1; min-width: 0; }
+.rv-grade-title { font-size: 16px; font-weight: 700; flex: 1; min-width: 0; }
 
 .rv-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
               margin-top: 18px; }
 /* Переход на другой экран, а не действие с работой. Тот же вид, что у
    «глазами ученика» в сводке решений; `margin-left: auto` убран — теперь
    ссылка стоит в узле переходов, а не отодвигается от кнопок. */
-.rv-eyes { flex-basis: 100%; text-align: right; font-size: 13px;
+.rv-eyes { flex-basis: 100%; text-align: right; font-size: 14px;
            color: var(--text2); text-decoration: none; white-space: nowrap; }
 .rv-eyes:hover { color: var(--text); text-decoration: underline; }
 
@@ -275,7 +275,7 @@
       <span class="k-state__icon">!</span>
       <div class="k-state__body">
         <div class="k-state__title">Ноль поставлен автоматически</div>
-        <div class="k-state__note">Ответа не было. Если это ошибка — поставьте
+        <div class="k-state__note">Ответа не было. Если это ошибка, поставьте
           балл ниже и сохраните.</div>
       </div>
     </div>
@@ -372,7 +372,7 @@
     которого его пишут осторожнее, чем надо.
     {% endcomment %}
     <label class="k-label" style="margin-top:16px">Комментарий к задаче
-      <span class="k-quiet" style="text-transform:none;letter-spacing:0;font-weight:400">— увидит только {{ submission.student.first_name|default:submission.student.get_full_name|default:submission.student.username }}</span>
+      <span class="k-quiet" style="text-transform:none;letter-spacing:0;font-weight:400">увидит только {{ submission.student.first_name|default:submission.student.get_full_name|default:submission.student.username }}</span>
     </label>
     <textarea name="comment" class="k-area" rows="3"
               placeholder="Что не так и как надо">{% if existing_feedback %}{{ existing_feedback.comment }}{% endif %}</textarea>

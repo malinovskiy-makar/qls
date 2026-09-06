@@ -1,0 +1,130 @@
+{% load static %}<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Регистрация · Weconomics</title>
+  {% include '_tokens.html' %}
+  {% include '_favicon.html' %}
+  {% include 'registration/_auth_style.html' %}
+</head>
+<body>
+<div class="auth-corner">
+  {% comment %}
+  Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
+  вход, а пожаловаться ему больше нечем. Класс `--onpage` — потому что фон
+  тут светлый, а не графитовая полоса шапки.
+  {% endcomment %}
+  <button type="button" class="fb-btn fb-btn--onpage"
+          aria-label="Проблема или предложение">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+    </svg>
+    <span class="fb-btn-text">Проблема или предложение</span>
+  </button>
+  <span class="auth-version">{{ site_version }}</span>
+  {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
+</div>
+
+<div class="login-card">
+  <div class="login-logo">
+    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
+  </div>
+  <h1>Создать аккаунт</h1>
+  <p class="login-sub">Логин и пароль: больше ничего не нужно</p>
+
+  {% if rate_limited %}
+  <div class="error-list">
+    Слишком много регистраций с этого адреса. Попробуйте позже.
+  </div>
+  {% elif form.non_field_errors %}
+  <div class="error-list">{{ form.non_field_errors|join:' ' }}</div>
+  {% endif %}
+
+  <form method="post" novalidate>
+    {% csrf_token %}
+
+    <div class="form-group">
+      <label for="{{ form.username.id_for_label }}">Логин</label>
+      <input type="text" name="username" id="{{ form.username.id_for_label }}"
+             value="{{ form.username.value|default:'' }}"
+             autocomplete="username" autofocus>
+      <div class="field-hint">
+        Им вы входите, и он же виден на сайте, пока не заполнено имя.
+      </div>
+      {% for error in form.username.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.password1.id_for_label }}">Пароль</label>
+      <input type="password" name="password1" id="{{ form.password1.id_for_label }}"
+             autocomplete="new-password">
+      {% for error in form.password1.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label for="{{ form.password2.id_for_label }}">Пароль ещё раз</label>
+      <input type="password" name="password2" id="{{ form.password2.id_for_label }}"
+             autocomplete="new-password">
+      {% for error in form.password2.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    {% comment %}
+    Роль выбирается ОДИН раз и меняет права: ученик видит занятия, учитель —
+    группы. Плитками, а не списком: вариантов два, и оба надо видеть сразу.
+    {% endcomment %}
+    <div class="form-group">
+      <label>Кто вы</label>
+      <div class="role-tiles">
+        {% for value, label in form.fields.role.choices %}
+        <label>
+          <input type="radio" name="role" value="{{ value }}"
+                 {% if form.role.value == value %}checked{% elif not form.role.value and value == 'student' %}checked{% endif %}>
+          <span>{{ label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      {% for error in form.role.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <div class="form-group">
+      <label class="consent">
+        <input type="checkbox" name="consent"
+               {% if form.consent.value %}checked{% endif %}>
+        <span>Согласен на обработку персональных данных</span>
+      </label>
+      {% for error in form.consent.errors %}
+      <div class="field-error">{{ error }}</div>
+      {% endfor %}
+    </div>
+
+    <button type="submit" class="btn-login">Создать аккаунт</button>
+  </form>
+
+  <div class="auth-foot">
+    Уже есть аккаунт? <a href="{% url 'login' %}">Войти</a><br>
+    Забыли пароль?
+    <a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
+  </div>
+
+  <a class="back-link" href="/">← На главную</a>
+</div>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
+</body>
+</html>

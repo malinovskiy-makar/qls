@@ -14,8 +14,27 @@ urlpatterns = [
     path('figure/<int:pk>.svg',                 views.problem_figure_svg, name='problem_figure_svg'),
     # Публичный API для модального окна
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
+    # Подсказки тегов для поля фильтра: тегов 552, списком их не показать.
+    path('api/tags/',                           views.api_tags,           name='api_tags'),
+    # Живое состояние фильтров: числа по вариантам, чипы и список одним
+    # ответом — окно «Все фильтры» обновляет выдачу, не закрываясь.
+    path('api/filter-state/',                   views.api_filter_state,   name='api_filter_state'),
+    # Попытка решения на странице задачи → проверка ИИ (только вход, ADR 0079).
+    path('api/attempt/',                        views.api_attempt,        name='api_attempt'),
+    path('api/attempt-file/',                   views.api_attempt_file,   name='api_attempt_file'),
+    # Чат по задаче — одна реплика, история на клиенте (ADR 0080).
+    path('api/chat/',                           views.api_chat,           name='api_chat'),
+    # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
+    path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
+    # Тест как игра (этап 7): всё-или-ничего, попытки в сессии.
+    path('api/test-check/<int:problem_id>/',    views.api_test_check,     name='api_test_check'),
+    path('api/test-reveal/<int:problem_id>/',   views.api_test_reveal,    name='api_test_reveal'),
 
-    # Семантический поиск (Стадия 1, локальный прототип)
+    # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
+    # 01.09.2026): он слился с каталогом, поиск там один и всегда по
+    # смыслу. Адрес оставлен ПОСТОЯННЫМ редиректом — по нему ходят
+    # закладки и поисковые системы, а маршрут ещё зовут по имени
+    # `catalog:smart_search` старые ссылки в шаблонах и тестах.
     path('smart-search/',                         views.smart_search,       name='smart_search'),
 
     # Карта тем и тегов — трёхмерный граф корпуса.
@@ -23,6 +42,10 @@ urlpatterns = [
     # в переработанном поиске+каталоге (карточка идеи в Notion).
     path('map/',                                views.topic_map,          name='topic_map'),
     path('map/data.json',                       views.topic_map_data,     name='topic_map_data'),
+    # Стенд предпросмотра карты для чужого экрана. Не в навигации: он нужен
+    # приёмке встраиваемого режима, а не человеку в каталоге.
+    path('map/preview-demo/',                   views.topic_map_preview_demo,
+         name='topic_map_preview_demo'),
 
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),

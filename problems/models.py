@@ -287,6 +287,25 @@ class Problem(models.Model):
                   'обогащения.',
     )
 
+    # ── Характер и особенности — ПОЛЯ ЗАРАНЕЕ (правило нуля, решение владельца
+    #    04.09.2026, https://app.notion.com/p/3d1b11c92bc181f2a58fca64235ef298).
+    #    Разметку загружает владелец командой `import_problem_attributes`;
+    #    пока поля пусты, фильтры и облачка их не показывают и включатся сами,
+    #    когда данные появятся — без новой сессии. Существующие поля задачи
+    #    команда не трогает (ADR 0005).
+    class Character(models.TextChoices):
+        NONE = '', 'не размечено'
+        QUAL = 'qual', 'Качественная'
+        QUANT = 'quant', 'Количественная'
+
+    character = models.CharField(
+        'Характер задачи', max_length=8, choices=Character.choices,
+        default='', blank=True, db_index=True)
+    # Список ключей особенностей из `catalog.filters.FEATURES`
+    # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
+    # собственной сущности, и правило «модели только в problems» не задето.
+    features = models.JSONField('Особенности', default=list, blank=True)
+
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
 
@@ -728,6 +747,12 @@ class Hint(models.Model):
                              related_name='hints', verbose_name='Подпункт')
     order = models.PositiveIntegerField('Порядок', default=1)
     text = models.TextField('Текст подсказки')
+    # ── Кто написал подсказку (этап 6 редизайна, 04.09.2026). Существующие
+    #    подсказки — рукописные: миграция данных 0053 ставит им reviewed=True.
+    #    Подсказка «сгенерировано ИИ, не проверено человеком» так и подписана
+    #    на странице задачи.
+    generated_by_ai = models.BooleanField('Сгенерирована ИИ', default=False)
+    reviewed = models.BooleanField('Проверена человеком', default=False)
 
     class Meta:
         verbose_name = 'Подсказка'
@@ -1077,6 +1102,78 @@ class Submission(models.Model):
         return f'{self.student} / {self.assignment} / {self.problem}'
 
 
+class CatalogAttempt(models.Model):
+    """Попытка решения задачи каталога с проверкой ИИ (этап 5 редизайна, 04.09.2026).
+
+    Не путать с `Submission` — та про домашку репетитора: у неё есть работа,
+    пункт работы и проверка человеком. Здесь — свободная попытка на
+    странице задачи: ученик пишет решение, модель сверяет его с эталоном по
+    шагам (`catalog/attempts.py`, профиль `catalog_check`, ADR 0079), и
+    попытка живёт в статистике ученика. Пользователь обязателен: анониму
+    вместо кнопки показывается ссылка на вход.
+
+    `steps` — список `{n, title, verdict: ok|bad|part|na, comment}`;
+    `first_error_step` — номер первого ошибочного шага. `files` и
+    `ocr_text` — фото решения и распознанный с него текст (этап 6).
+    """
+
+    class Status(models.TextChoices):
+        CHECKED = 'checked', 'проверена'
+        NEEDS_HUMAN = 'needs_human', 'модель не ставит балл'
+        ERROR = 'error', 'проверка не удалась'
+
+    class Verdict(models.TextChoices):
+        NONE = '', 'нет'
+        OK = 'ok', 'верно'
+        PARTIAL = 'partial', 'частично верно'
+        WRONG = 'wrong', 'неверно'
+        NEEDS_HUMAN = 'needs_human', 'нужен человек'
+
+    class Confidence(models.TextChoices):
+        NONE = '', 'нет'
+        HIGH = 'high', 'высокая'
+        MEDIUM = 'medium', 'средняя'
+        LOW = 'low', 'низкая'
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name='catalog_attempts',
+                             verbose_name='Ученик')
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='catalog_attempts',
+                                verbose_name='Задача')
+    text = models.TextField('Текст решения', blank=True)
+    solution_viewed_before = models.BooleanField(
+        'Решение открыли до отправки', default=False)
+    status = models.CharField('Статус', max_length=16, choices=Status.choices,
+                              default=Status.ERROR)
+    verdict = models.CharField('Вердикт', max_length=16, choices=Verdict.choices,
+                               default=Verdict.NONE, blank=True)
+    score = models.PositiveSmallIntegerField('Балл', null=True, blank=True)
+    max_score = models.PositiveSmallIntegerField('Максимум', default=10)
+    steps = models.JSONField('Шаги', default=list, blank=True)
+    first_error_step = models.PositiveSmallIntegerField(
+        'Первый ошибочный шаг', null=True, blank=True)
+    confidence = models.CharField('Уверенность модели', max_length=8,
+                                  choices=Confidence.choices,
+                                  default=Confidence.NONE, blank=True)
+    summary = models.CharField('Итог одной строкой', max_length=300, blank=True)
+    ocr_text = models.TextField('Текст, распознанный с фото', blank=True)
+    files = models.ManyToManyField(FileAsset, blank=True,
+                                   related_name='catalog_attempts',
+                                   verbose_name='Файлы')
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Попытка в каталоге'
+        verbose_name_plural = 'Попытки в каталоге'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'problem', 'created_at'],
+                                name='catalog_attempt_user_prob_idx')]
+
+    def __str__(self):
+        return 'Попытка #%s: задача %s, %s' % (self.pk, self.problem_id, self.status)
+
+
 class TeacherFeedback(models.Model):
     """Проверка решения ученика преподавателем: балл, ошибки, комментарий."""
 
@@ -1423,9 +1520,80 @@ class DuplicateCandidate(models.Model):
         return f'#{self.problem_a_id} ↔ #{self.problem_b_id} ({self.similarity:.3f})'
 
 
+class OlympiadRef(models.Model):
+    """Привязка задачи банка к конкретному туру реальной олимпиады,
+    найденная сопоставлением по прямой ссылке (SourceReference.url) с
+    внешним индексом SolveHub/ILE. Ничего не меняет в Problem/SourceReference —
+    чисто дополнительная информация, источник на сайте не переключает.
+
+    Одна Problem может встречаться в НЕСКОЛЬКИХ турах одной или разных
+    олимпиад (задачу могли переиздать) — поэтому problem не unique сама
+    по себе, unique пара (problem, event_id).
+    """
+
+    problem = models.ForeignKey(
+        Problem, on_delete=models.CASCADE,
+        related_name='olympiad_refs', verbose_name='Задача')
+
+    source_site = models.CharField(
+        'Откуда взято сопоставление', max_length=20,
+        choices=[('solvehub', 'SolveHub'), ('ile', 'ILE / iloveeconomics.ru')])
+
+    olympiad_slug = models.CharField('Слаг олимпиады', max_length=50)
+    olympiad_name = models.CharField('Название олимпиады', max_length=300, blank=True)
+    academic_year = models.CharField('Учебный год', max_length=20, blank=True)
+    year = models.PositiveIntegerField('Год тура', null=True, blank=True)
+    stage = models.CharField('Этап', max_length=50, blank=True)
+    grade = models.CharField('Класс', max_length=50, blank=True)
+    variant = models.CharField('Вариант', max_length=100, blank=True)
+    number = models.CharField('Номер в туре', max_length=50, blank=True)
+
+    event_id = models.CharField('ID тура в источнике', max_length=200)
+    record_id = models.CharField('ID записи в источнике', max_length=300)
+
+    match_method = models.CharField(
+        'Метод сопоставления', max_length=30,
+        choices=[
+            ('url_exact', 'Точное совпадение ссылки'),
+            ('url_www_normalized', 'Совпадение после нормализации www/схемы'),
+        ],
+        default='url_exact')
+    match_score = models.FloatField('Уверенность сопоставления', default=1.0)
+    official_url = models.URLField('Ссылка-источник сопоставления', max_length=500, blank=True)
+
+    raw_meta = models.JSONField('Прочие поля из экспорта', null=True, blank=True)
+
+    reviewed_by_human = models.BooleanField('Проверено человеком', default=False)
+    created_at = models.DateTimeField('Найдено', auto_now_add=True)
+
+    class Meta:
+        unique_together = ('problem', 'event_id')
+        ordering = ['olympiad_slug', 'year', 'stage']
+        verbose_name = 'Привязка к олимпиаде'
+        verbose_name_plural = 'Привязки к олимпиадам'
+
+    def __str__(self):
+        return f'#{self.problem_id} → {self.olympiad_slug} {self.year} {self.stage}'
+
+
 # ===========================================================================
 # Этап Е — Группы учеников
 # ===========================================================================
+
+# Алфавит кода приглашения: 24 буквы (без I и O) и 8 цифр (без 0 и 1) —
+# ровно 32 знака. Убраны две пары, которые путают на слух и на доске:
+# «ноль или О» и «единица или И». Прочие похожие пары (2/Z, 5/S, 8/B)
+# оставлены намеренно: каждая убранная пара сокращает пространство кодов, а
+# на письме эти три различаются надёжно.
+INVITE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+
+
+def make_invite_code():
+    """Код вида XXXX-XXXX. `secrets`, а не `random`: код — это доступ."""
+    import secrets
+    body = ''.join(secrets.choice(INVITE_ALPHABET) for _ in range(8))
+    return '%s-%s' % (body[:4], body[4:])
+
 
 class StudentGroup(models.Model):
     """Занятие: группа или один на один.
@@ -1448,6 +1616,42 @@ class StudentGroup(models.Model):
         GROUP = 'group', 'Группа'
         INDIVIDUAL = 'individual', 'Индивидуально'
 
+    def save(self, *args, **kwargs):
+        """Код выдаётся при создании и дальше не меняется сам собой."""
+        if not self.invite_code:
+            self.invite_code = self._free_invite_code()
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def _free_invite_code(cls):
+        """Свободный код. Совпадение почти невозможно, но не невозможно."""
+        for _ in range(20):
+            code = make_invite_code()
+            if not cls.objects.filter(invite_code=code).exists():
+                return code
+        # Двадцать совпадений подряд при 32^8 — это не совпадение, а поломка
+        # генератора. Падать здесь честнее, чем выдать чужой код.
+        raise RuntimeError('не удалось подобрать свободный код приглашения')
+
+    def regenerate_invite_code(self):
+        """Новый код. Старый перестаёт работать сразу же."""
+        self.invite_code = self._free_invite_code()
+        self.save(update_fields=['invite_code'])
+        return self.invite_code
+
+    @staticmethod
+    def normalize_invite_code(raw):
+        """Приводит введённое к виду XXXX-XXXX.
+
+        Человек диктует код голосом, а вводит как получится: строчными, без
+        дефиса, с пробелами. Всё это — тот же код.
+        """
+        cleaned = ''.join(ch for ch in (raw or '').upper()
+                          if ch in INVITE_ALPHABET)
+        if len(cleaned) != 8:
+            return ''
+        return '%s-%s' % (cleaned[:4], cleaned[4:])
+
     kind = models.CharField('Тип занятия', max_length=16,
                             choices=Kind.choices, default=Kind.GROUP,
                             db_index=True)
@@ -1469,6 +1673,17 @@ class StudentGroup(models.Model):
         limit_choices_to={'role': 'student'},
         verbose_name='Ученики',
     )
+    # ⚠️ КОД ПРИГЛАШЕНИЯ — ЕДИНСТВЕННЫЙ СПОСОБ ПОПАСТЬ В ЗАНЯТИЕ (04.09.2026,
+    # ADR 0074). Прежде репетитор выбирал ученика из выпадающего списка ВСЕХ
+    # учеников базы — то есть видел чужих учеников поимённо. Код диктуется
+    # голосом на занятии и не показывает никого.
+    #
+    # Алфавит без пар, которые путают вслух: нет 0 и O, нет 1 и I
+    # (см. INVITE_ALPHABET выше). 32^8 ≈ 1,1·10^12 сочетаний.
+    invite_code = models.CharField(
+        'Код приглашения', max_length=9, unique=True, db_index=True,
+        help_text='Формат XXXX-XXXX. Ученик вводит его на экране «Занятия».')
+
     created_at = models.DateTimeField(auto_now_add=True, verbose_name='Создана')
 
     # Внутригрупповой рейтинг — ПО ВЫБОРУ РЕПЕТИТОРА и по умолчанию выключен.
@@ -1672,6 +1887,65 @@ class ReviewVerdict(models.Model):
 
     def __str__(self):
         return f'#{self.problem_id}: {self.get_category_display()} ({self.reviewer or "аноним"})'
+
+
+class AnswerSecondOpinion(models.Model):
+    """Ответ модели на тест, полученный ВСЛЕПУЮ — без ответа банка.
+
+    Зачем. Выборочная проверка 30 тестов SolveHub нашла два неверных ответа
+    (#62000 и #61009). Два из тридцати — это не «пара опечаток», это 6-7 %
+    выборки, и проверять весь корпус глазами нереально. Модель отвечает на
+    вопрос сама, ответы сравнивает КОД, и человек смотрит только расхождения.
+
+    ⚠️ В БАНКЕ ЭТА ТАБЛИЦА НИЧЕГО НЕ МЕНЯЕТ. Ни `answer`, ни `solution`, ни
+    `human_review` отсюда не переписываются: расхождение — повод показать
+    задачу человеку, а не повод молча переставить ответ. Правку вносит
+    ревьюер штатными командами вердиктов (запрет P0).
+
+    ⚠️ СТРОКА НА КАЖДЫЙ ПРОГОН, а не на задачу. Промпт и модель меняются, и
+    сравнивать надо прогон с прогоном, а не затирать историю. «Текущее»
+    мнение — последнее по `created_at` (см. `latest_for`).
+    """
+
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='second_opinions',
+                                verbose_name='Задача')
+    provider = models.CharField('Поставщик', max_length=32, default='anthropic')
+    model = models.CharField('Модель', max_length=64)
+    # Ответ модели и ответ банка — как ТЕКСТ, ровно в том виде, в каком их
+    # сравнивали. Нормализованные формы не храним: правило сравнения ещё
+    # будет меняться, а сырые ответы должны пережить его смену.
+    model_answer = models.TextField('Ответ модели', blank=True)
+    bank_answer = models.TextField('Ответ банка', blank=True)
+    agrees = models.BooleanField('Сошлось', db_index=True)
+    confidence = models.FloatField('Уверенность модели', default=0.0)
+    created_at = models.DateTimeField('Когда', default=timezone.now,
+                                      db_index=True)
+
+    # Разбор расхождения человеком. resolved=False у спорной задачи означает
+    # «ещё не смотрели» — именно такие сборщик пула держит вне игры.
+    resolved = models.BooleanField('Разобрано человеком', default=False,
+                                   db_index=True)
+    RESOLUTIONS = [
+        ('', 'не разобрано'),
+        ('bank_right', 'прав банк'),
+        ('model_right', 'права модель, задача в брак'),
+        ('unclear', 'вопрос сам по себе спорный'),
+    ]
+    resolution = models.CharField('Чем кончилось', max_length=16, blank=True,
+                                  default='', choices=RESOLUTIONS)
+
+    class Meta:
+        verbose_name = 'Второе мнение по ответу'
+        verbose_name_plural = 'Вторые мнения по ответам'
+        indexes = [
+            models.Index(fields=['problem', '-created_at'],
+                         name='idx_opinion_problem_time'),
+        ]
+
+    def __str__(self):
+        mark = 'сошлось' if self.agrees else 'РАСХОЖДЕНИЕ'
+        return f'#{self.problem_id}: {mark} ({self.model})'
 
 
 # ===========================================================================

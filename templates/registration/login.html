@@ -1,131 +1,44 @@
-<!DOCTYPE html>
+{% load static %}<!DOCTYPE html>
 <html lang="ru">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Вход — ЭкЗадачи</title>
+  <title>Вход · Weconomics</title>
   {% include '_tokens.html' %}
-  <style>
-/* Цветовые токены — в общем партиале _tokens.html (свет + тьма). */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: var(--bg);
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
-.login-card {
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: 12px;
-  padding: 40px;
-  width: 360px;
-}
-.login-logo {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 32px;
-}
-.login-logo-icon {
-  width: 36px; height: 36px; border-radius: 9px;
-  background: var(--accent);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 13px; font-weight: 700; color: #fff;
-}
-.login-logo-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--text);
-}
-.login-logo-name span { color: var(--accent); }
-h1 {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-.login-sub {
-  font-size: 13px;
-  color: var(--text2);
-  margin-bottom: 28px;
-}
-label {
-  display: block;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
-  margin-bottom: 6px;
-}
-input[type=text],
-input[type=password] {
-  width: 100%;
-  border: 1px solid var(--border);
-  border-radius: var(--r);
-  padding: 9px 12px;
-  font-size: 14px;
-  color: var(--text);
-  outline: none;
-  transition: border-color .12s;
-}
-input:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--focus-ring);
-}
-/* Клавиатурный фокус-ринг + reduced-motion (страница standalone, base не наследуется) */
-a:focus-visible, button:focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
-  border-radius: 4px;
-}
-@media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after { transition-duration: .001ms !important; }
-}
-.form-group { margin-bottom: 16px; }
-.error-list {
-  background: var(--error-tint);
-  border: 1px solid var(--error-border);
-  border-radius: var(--r);
-  padding: 10px 14px;
-  margin-bottom: 16px;
-  font-size: 13px;
-  color: var(--error);
-}
-.btn-login {
-  display: block;
-  width: 100%;
-  background: var(--btn-bg);
-  color: var(--on-btn);
-  border: none;
-  border-radius: var(--r);
-  padding: 11px;
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background .12s;
-  margin-top: 8px;
-}
-.btn-login:hover { background: var(--btn-bg-hover); }
-.back-link {
-  display: block;
-  text-align: center;
-  margin-top: 20px;
-  font-size: 13px;
-  color: var(--text2);
-  text-decoration: none;
-}
-.back-link:hover { color: var(--accent); }
-  </style>
+  {% include '_favicon.html' %}
+  {% include 'registration/_auth_style.html' %}
 </head>
 <body>
+<div class="auth-corner">
+  {% comment %}
+  Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
+  вход, а пожаловаться ему больше нечем. Класс `--onpage` — потому что фон
+  тут светлый, а не графитовая полоса шапки.
+  {% endcomment %}
+  <button type="button" class="fb-btn fb-btn--onpage"
+          aria-label="Проблема или предложение">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M21 12a8 8 0 0 1-8 8H7l-4 3v-5.5A8 8 0 0 1 11 4h2a8 8 0 0 1 8 8Z"/>
+    </svg>
+    <span class="fb-btn-text">Проблема или предложение</span>
+  </button>
+  <span class="auth-version">{{ site_version }}</span>
+  {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
+</div>
+
 <div class="login-card">
+  {% comment %}
+  ⚠️ ЗДЕСЬ ГОТОВЫЙ ЛОГО-ЗАМОК ЦЕЛИКОМ, А НЕ «ЗНАК ПЛЮС СЛОВО ШРИФТОМ».
+  Сравнили оба варианта на экране (reports/shots/…/login_variants.png).
+  Пара «круглый знак + слово, набранное Montserrat» даёт на карточке ДВЕ
+  разные буквы W: нарисованную в кружке и наборную рядом — глаз читает это
+  как два знака одного бренда, поставленные рядом по ошибке. Плюс тонкая
+  обводка круга на 36 px растворяется. Замок `logo-medium.svg` — один
+  объект, буква W в нём и есть фирменный росчерк.
+  {% endcomment %}
   <div class="login-logo">
-    <div class="login-logo-icon">Эк</div>
-    <div class="login-logo-name">Эк<span>Задачи</span></div>
+    {% include '_wordmark.html' with logo_class='login-logo-lockup' %}
   </div>
   <h1>Войти</h1>
   <p class="login-sub">Введите логин и пароль</p>
@@ -164,7 +77,28 @@ a:focus-visible, button:focus-visible {
     </div>
     <button type="submit" class="btn-login">Войти</button>
   </form>
+
+  {% comment %}
+  ⚠️ «ЗАБЫЛИ ПАРОЛЬ» ВЕДЁТ К ЖИВОМУ ЧЕЛОВЕКУ, А НЕ НА ПОЧТУ. Почты у нас
+  нет и подтверждать её нечем (решение владельца 04.09.2026): пароль
+  сбрасывает владелец через админку. Честная ссылка на переписку лучше
+  формы «введите почту», которая никому ничего не пришлёт.
+  {% endcomment %}
+  <div class="auth-foot">
+    Нет аккаунта? <a href="{% url 'register' %}">Создать аккаунт</a><br>
+    Забыли пароль?
+    <a href="https://t.me/weconomics_ru?direct" target="_blank" rel="noopener">Напишите нам в Telegram</a>
+  </div>
+
   <a class="back-link" href="/">← На главную</a>
 </div>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

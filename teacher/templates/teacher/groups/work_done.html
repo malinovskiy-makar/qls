@@ -11,19 +11,19 @@
 Главное на экране — итоговый балл.
 {% endcomment %}
 
-{% block title %}{% if unchecked %}Проверено частично{% else %}Работа проверена{% endif %} — {{ student.get_full_name|default:student.username }}{% endblock %}
+{% block title %}{% if unchecked %}Проверено частично{% else %}Работа проверена{% endif %} · {{ student.get_full_name|default:student.username }}{% endblock %}
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .done-total { text-align: center; padding: 26px 20px 22px; }
 .done-score { font-size: 46px; font-weight: 700; line-height: 1;
               font-variant-numeric: tabular-nums; }
-.done-cap { font-size: 13px; color: var(--text2); margin-top: 6px; }
+.done-cap { font-size: 14px; color: var(--text2); margin-top: 6px; }
 .done-list { margin-top: 16px; }
 /* Строка задачи — как в разборе глазами ученика: цветная полоса слева по
    состоянию, бейдж состояния, балл справа. Цвета и бейдж — из набора
    деталей (.k-mark--*, .k-flag--*), своих здесь нет. */
 .done-row { display: flex; align-items: center; justify-content: space-between;
-            gap: 12px; padding: 10px 14px; font-size: 13px;
+            gap: 12px; padding: 10px 14px; font-size: 14px;
             margin-bottom: 6px; border-radius: 0 var(--r) var(--r) 0;
             background: var(--surface-2); }
 .done-row:last-child { margin-bottom: 0; }
@@ -36,7 +36,7 @@
                   flex-shrink: 0; }
 .done-row-score { font-variant-numeric: tabular-nums; white-space: nowrap;
                   font-weight: 700; }
-.done-row-score small { font-size: 11px; font-weight: 600;
+.done-row-score small { font-size: 13px; font-weight: 600;
                         color: var(--text2); }
 @media (max-width: 560px) {
   .done-row { flex-wrap: wrap; }
@@ -118,7 +118,7 @@
       <span class="done-row-score">
         {% if row.score is not None %}{{ row.score|ball }}<small>
           / {{ row.max_points|ball }} б.</small>
-        {% else %}—{% endif %}
+        {% else %}–{% endif %}
       </span>
     </span>
   </div>

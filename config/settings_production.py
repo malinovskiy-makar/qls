@@ -182,6 +182,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.context_processors.site_meta',
             ],
             'loaders': [
                 ('django.template.loaders.cached.Loader', [
@@ -217,3 +218,6 @@ LOAD_EMBEDDINGS_MODEL = False
 # ─── Econ Rush: сгенерированные вопросы выключены до решения о выкатке ──────
 
 GAME_GENERATED_ENABLED = False
+
+# Режим «График» на проде выключен (см. settings.py).
+GAME_FIGURE_ENABLED = False

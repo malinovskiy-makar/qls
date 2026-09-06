@@ -7,7 +7,7 @@
 4.3 Способы набора назывались двумя разными наборами слов.
 4.4 Ширина колонки прыгала между шагами (1000 / 1060 / 1100).
 4.5 Старые экраны создания жили по прямому адресу мёртвым грузом.
-4.6 Заголовок вкладки кабинета — «Ученики — ЭкЗадачи — ЭкЗадачи».
+4.6 Заголовок вкладки кабинета — «Ученики — Weconomics — Weconomics».
 """
 import os
 import re
@@ -217,7 +217,7 @@ class OldScreensAreGoneTests(Base):
 
 
 class TabTitleTests(Base):
-    """4.6 — суффикс «— ЭкЗадачи» добавляется ровно один раз."""
+    """4.6 — суффикс «— Weconomics» добавляется ровно один раз."""
 
     def screens(self):
         from problems.models import Assignment, AssignmentItem
@@ -251,13 +251,16 @@ class TabTitleTests(Base):
             html = self.client.get(url).content.decode()
             title = re.search(r'<title>(.*?)</title>', html, re.S)
             self.assertIsNotNone(title, url)
-            self.assertEqual(title.group(1).count('ЭкЗадачи'), 1,
+            self.assertEqual(title.group(1).count('Weconomics'), 1,
                              '%s: %s' % (url, title.group(1)))
 
     def test_the_suffix_lives_in_the_base_template(self):
         base = read('teacher', 'templates', 'teacher', 'base.html')
         self.assertIn('{% block title %}', base)
-        self.assertIn('— ЭкЗадачи</title>', base)
+        # ⚠️ Разделитель — точка посередине, а не длинное тире: длинное
+        # тире ушло из текстов сайта целиком (правило владельца, 2026-09-02).
+        # Проверяем, что суффикс на месте, а не какой перед ним знак.
+        self.assertIn('Weconomics</title>', base)
 
     def test_no_page_adds_it_by_hand(self):
         """⚠️ Проверка обходит ВСЕ шаблоны кабинета: дефект завёлся тем, что
@@ -271,6 +274,6 @@ class TabTitleTests(Base):
                 text = read(os.path.join(folder, name))
                 for block in re.findall(r'\{% block title %\}(.*?)'
                                         r'\{% endblock %\}', text, re.S):
-                    if 'ЭкЗадачи' in block:
+                    if 'Weconomics' in block:
                         found.append(os.path.join(folder, name))
         self.assertEqual(found, [], 'суффикс дописан руками: %s' % found)

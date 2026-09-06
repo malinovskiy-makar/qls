@@ -19,6 +19,7 @@ from problems.assignment_rows import ordered_items
 from problems.models import (
     Assignment, AssignmentItem, ProblemPart, StudentGroup, Submission,
 )
+from problems.tests.color_utils import ratio, split_themes, token
 from problems.tests.factories import make_problem, make_user
 from problems.work_review import work_summary
 
@@ -32,25 +33,9 @@ def read(path):
         return handle.read()
 
 
-def hex_to_rgb(value):
-    value = value.lstrip('#')
-    return tuple(int(value[i:i + 2], 16) for i in (0, 2, 4))
-
-
-def luminance(rgb):
-    channels = []
-    for raw in rgb:
-        c = raw / 255
-        channels.append(c / 12.92 if c <= 0.03928
-                        else ((c + 0.055) / 1.055) ** 2.4)
-    r, g, b = channels
-    return 0.2126 * r + 0.7152 * g + 0.0722 * b
-
-
-def contrast(first, second):
-    a, b = sorted([luminance(hex_to_rgb(first)),
-                   luminance(hex_to_rgb(second))], reverse=True)
-    return (a + 0.05) / (b + 0.05)
+# ⚠️ Формула контраста — из `problems/tests/color_utils.py`, ОДНОЙ копией на
+# весь набор. Здесь лежала своя, ещё одна из восьми одинаковых.
+contrast = ratio
 
 
 class RailTests(TestCase):
@@ -148,18 +133,28 @@ class DarkButtonContrastTests(TestCase):
     развалит другое.
     """
 
+    AAA = 7.0          # порог контраста текста на кнопке
+    STANDS_OUT = 2.11  # перепад кнопки к поверхности, которую требует канон
+
+    def _token(self, theme, name):
+        light, dark = split_themes(read(TOKENS))
+        value = token(dark if theme == 'dark' else light, name)
+        self.assertIsNotNone(value, '%s: токен --%s не найден' % (theme, name))
+        return value
+
     def _dark_token(self, name):
-        tokens = read(TOKENS)
-        dark = tokens.split('[data-theme="dark"]', 1)[1]
-        match = re.search(r'--%s:\s*(#[0-9a-fA-F]{6})' % name, dark)
-        self.assertIsNotNone(match, 'токен --%s не найден' % name)
-        return match.group(1)
+        return self._token('dark', name)
 
     def test_main_button_text_stays_readable(self):
-        """Осветляя заливку, легко потерять текст. Порог AAA — 7:1."""
-        ratio = contrast(self._dark_token('btn-bg'), self._dark_token('on-btn'))
-        self.assertGreater(ratio, 7.0,
-                           'белый текст на кнопке даёт всего %.2f:1' % ratio)
+        """Осветляя заливку, легко потерять текст. Порог AAA — 7:1.
+
+        ⚠️ ЧЕРНИЛА БЕРУТСЯ ИЗ `--on-btn` СВОЕЙ ТЕМЫ, А НЕ СЧИТАЮТСЯ БЕЛЫМИ.
+        В тёмной теме кнопка стала светлой, и текст на ней тёмный; проверка,
+        зашившая белый, мерила бы не то, что на экране.
+        """
+        value = contrast(self._dark_token('btn-bg'), self._dark_token('on-btn'))
+        self.assertGreater(value, self.AAA,
+                           'текст на кнопке даёт всего %.2f:1' % value)
 
     def test_main_button_stands_out_from_the_panel(self):
         """Кнопка обязана отличаться от панели, на которой лежит."""
@@ -168,9 +163,27 @@ class DarkButtonContrastTests(TestCase):
         self.assertGreater(ratio, 1.9,
                            'кнопка сливается с панелью: %.2f:1' % ratio)
 
-    def test_light_theme_button_untouched(self):
-        light = read(TOKENS).split('[data-theme="dark"]', 1)[0]
-        self.assertIn('--btn-bg: #1e293b;', light)
+    def test_button_holds_its_properties_in_both_themes(self):
+        """Проверяется СВОЙСТВО кнопки, а не конкретный её цвет.
+
+        ⚠️ Раньше здесь стояло `assertIn('--btn-bg: #1e293b;', light)` — тест
+        держал наизусть один старый серо-синий. Смена палитры делает такую
+        проверку красной, ничего не сообщая о читаемости: цвет поменялся —
+        и что? Свойств у кнопки три, и они не зависят от палитры: кнопка
+        объявлена в обеих темах, текст на ней держит порог AAA, и сама
+        кнопка отличается от поверхности не меньше, чем требует канон.
+        """
+        for theme in ('light', 'dark'):
+            btn = self._token(theme, 'btn-bg')
+            ink = self._token(theme, 'on-btn')
+            surface = self._token(theme, 'surface')
+            self.assertGreaterEqual(
+                contrast(btn, ink), self.AAA,
+                '%s: текст на кнопке %.2f:1' % (theme, contrast(btn, ink)))
+            self.assertGreaterEqual(
+                contrast(btn, surface), self.STANDS_OUT,
+                '%s: кнопка не отличается от поверхности (%.2f:1)'
+                % (theme, contrast(btn, surface)))
 
 
 class SubmissionsButtonTests(TestCase):

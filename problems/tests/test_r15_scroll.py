@@ -103,7 +103,22 @@ class DarkEdgeTests(TestCase):
         colour, _alpha = self._edge(dark)
         self.assertEqual(colour, 'ffffff', colour)
 
-    def test_even_pure_black_would_be_weaker_than_light_theme(self):
+    def test_black_edge_at_the_same_density_would_be_weaker(self):
+        """Чёрный край в тёмной теме слабее — при РАВНОЙ плотности.
+
+        ⚠️ ПРЕЖНЯЯ ФОРМУЛИРОВКА СРАВНИВАЛА НЕСРАВНИМОЕ, И ЭТО ВСКРЫЛОСЬ ТОЛЬКО
+        СЕЙЧАС (31.08.2026, вечер). Она брала ЧИСТО ЧЁРНЫЙ, то есть плотность
+        1,0, и сравнивала его со светлым краем на его настоящей плотности
+        0,17. На глубокой карточке #242019 даже такая фора чёрному не
+        помогала (1,35 против 1,39), и перекос никого не беспокоил. На
+        карточке #3f3f3d он даёт 1,99 — и проверка покраснела, хотя решение
+        «край в тёмной теме светлый» осталось верным.
+
+        Сравниваем честно: чёрный край на ТОЙ ЖЕ плотности, что у настоящего
+        края тёмной темы. Тогда видно и то, ради чего писалась проверка:
+        чёрный (1,13) слабее светлого края светлой темы (1,39), а белый,
+        который стоит на самом деле (1,48), — не слабее.
+        """
         tokens = read('templates', '_tokens.html')
         light, dark = tokens.split('[data-theme="dark"]')
         light_surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})',
@@ -111,11 +126,18 @@ class DarkEdgeTests(TestCase):
         dark_surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})',
                                  dark).group(1)
         light_colour, light_alpha = self._edge(light)
+        dark_colour, dark_alpha = self._edge(dark)
         light_step = self._ratio(
             self._over(light_colour, light_alpha, light_surface),
             light_surface)
-        black_step = self._ratio('#000000', dark_surface)
-        self.assertLess(black_step, light_step)
+        black_step = self._ratio(
+            self._over('000000', dark_alpha, dark_surface), dark_surface)
+        real_step = self._ratio(
+            self._over(dark_colour, dark_alpha, dark_surface), dark_surface)
+        self.assertLess(black_step, light_step,
+                        'чёрный %.2f, светлая тема %.2f' % (black_step, light_step))
+        self.assertGreater(real_step, black_step,
+                           'настоящий край %.2f, чёрный %.2f' % (real_step, black_step))
 
     def test_dark_step_catches_up_with_light(self):
         tokens = read('templates', '_tokens.html')

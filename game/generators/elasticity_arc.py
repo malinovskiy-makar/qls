@@ -143,7 +143,7 @@ class ElasticityArcArchetype(Archetype):
         if asked.key != 'e_arc':
             steps.append(
                 u'Выручка: $R_1 = {} \\cdot {} = {}$, $R_2 = {} \\cdot {} = {}$ '
-                u'ден. ед. — выручка {}.'.format(
+                u'ден. ед., то есть выручка {}.'.format(
                     p1, q1, fmt_num(solved['r1'], latex=True),
                     p2, q2, fmt_num(solved['r2'], latex=True),
                     solved['rev_class']))

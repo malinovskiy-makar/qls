@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графики в экономике</title>
+  <title>Графики · Weconomics</title>
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).
@@ -13,48 +13,59 @@
      Теперь общее приходит отсюда, а calc2.css ниже переопределяет ровно
      то, что у рисующей поверхности своё: цвета кривых, структурные цвета
      холста, глушее фоновая оболочка, тени и слои.
-     Порядок важен: свой bootstrap темы у калькулятора стоит НИЖЕ и сильнее —
-     он, в отличие от общего, умеет ещё и системную тему.
+     Тему ставит ОДИН скрипт — из этого же партиала: своего bootstrap у
+     калькулятора больше нет (см. комментарий ниже).
   {% endcomment %}
   {% include '_tokens.html' %}
 
-  <!-- ── Внешние библиотеки (CDN, без сборки) ──────────────────────────
+  <!-- ── Внешние библиотеки (вложены в репозиторий, без сборки) ─────────
        D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
        Math.js    — «мозг»: разбор и вычисление любых формул, численные методы.
-       Подключаются точно так же, как Desmos в старом калькуляторе. -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/mathjs/12.4.3/math.min.js"></script>
+       Лежат в static/vendor/: внешних CDN у сайта нет с 04.09.2026, иначе
+       при перебоях с чужой сетью калькулятор открывается мёртвым. -->
+  <script src="{% static 'vendor/d3-7.9.0/d3.min.js' %}"></script>
+  <script src="{% static 'vendor/mathjs-12.4.3/math.min.js' %}"></script>
 
   <!-- KaTeX — ровно тот же способ подключения, что в каталоге задач
-       (catalog/base.html): та же версия 0.16.9 с того же CDN. Вторая
-       библиотека формул не нужна. Здесь достаточно katex.render, поэтому
-       auto-render не тянем: он ищет $…$ по всей странице, а нам нужно
-       отрендерить одно поле. -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+       (catalog/base.html): та же версия 0.16.9 из той же папки vendor.
+       Вторая библиотека формул не нужна. Здесь достаточно katex.render,
+       поэтому auto-render не тянем: он ищет $…$ по всей странице, а нам
+       нужно отрендерить одно поле. -->
+  <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
+  <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"
           onload="if (typeof onKatexReady === 'function') onKatexReady();"></script>
 
   <!-- MathLive — редактор формул. Даёт то, чего не даёт обычное поле ввода:
        напечатал дробь, крышку или подчёркивание — и сразу видишь дробь,
        степень и индекс, а не сырые символы. Если библиотека не загрузилась,
        поля остаются обычными текстовыми (см. upgradeFormulaField). -->
-  <script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.110.0/mathlive.min.js"
-          integrity="sha384-5IN6K0kiaz8MufrTGBvPCP3oDeMjmwe+DDTvuyQLNv6gc634FpKbQfllonjHJPmy"
-          crossorigin="anonymous"
+  <script>
+    /* Папка шрифтов MathLive. Берём адрес РЕАЛЬНОГО файла и отрезаем имя:
+       сослаться тегом static на КАТАЛОГ нельзя вовсе —
+       ManifestStaticFilesStorage ищет в манифесте файл, а не папку.
+       (Тег static в комментарии не пишем: Django разбирает шаблон раньше
+       браузера, и «пустой» тег роняет страницу с 500.) */
+    window.MATHLIVE_DIR =
+      "{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}".replace(/\/[^/]*$/, '');
+  </script>
+  <script defer src="{% static 'vendor/mathlive-0.110.0/mathlive.min.js' %}"
           onload="if (typeof onMathliveReady === 'function') onMathliveReady();"></script>
 
-  <!-- Тема: применяем сохранённый выбор (или системную) ДО отрисовки — без мигания. -->
-  <script>
-    (function () {
-      try {
-        var saved = localStorage.getItem('theme');
-        var dark = saved ? saved === 'dark'
-                         : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
-        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-      } catch (e) {}
-    })();
-  </script>
+  <!-- ⚠️ СВОЕГО BOOTSTRAP ТЕМЫ У КАЛЬКУЛЯТОРА БОЛЬШЕ НЕТ (04.09.2026, п. 9).
+       Он стоял ниже общего и делал ЛИШНЕЕ: при отсутствии сохранённого
+       выбора спрашивал системную тему и явно ставил data-theme="light".
+       На остальном сайте светлая тема — это ОТСУТСТВИЕ атрибута, и
+       `_tokens.html` системную не спрашивает вовсе. Отсюда и «тема
+       скачет»: калькулятор в системной тьме открывался тёмным, а любая
+       соседняя страница — светлой. Теперь тему на всём сайте ставит один
+       скрипт из `_tokens.html`, который подключён выше. -->
 
+  {% comment %}
+  Общая клавиатура формул: одна на калькулятор и домашки (ADR 0075).
+  Стиль — до `calc2.css`, чтобы калькулятор при желании мог что-то
+  переопределить, а не наоборот.
+  {% endcomment %}
+  <link rel="stylesheet" href="{% static 'mathkbd/mathkbd.css' %}">
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
@@ -64,11 +75,10 @@
      Карточки вызывают уже существующие пресеты движка (loadScene/setMode/
      setPpfSub). Мини-графики нарисованы цветами кривых через var(--curve-*),
      поэтому подхватывают тему. -->
-<div class="picker" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+<div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
   <div class="picker-inner">
     <header class="picker-head">
-      <div class="picker-eyebrow">Графики в экономике</div>
-      <h1 class="picker-title" id="picker-title">С чего начнём?</h1>
+      <h1 class="picker-title" id="picker-title">Это графики.</h1>
       <!-- п. 66. Слов ровно два и они не меняются нигде: БЛОК — это группа
            моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. «Раздел»,
            «сценарий» и «сцена» из интерфейса убраны: четыре слова на две
@@ -434,16 +444,12 @@
     <section class="picker-group" aria-label="Международная торговля">
       <div class="picker-group-label">Международная торговля</div>
       <div class="picker-grid">
-        <button class="scard soon" data-scene="autarky" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 45 H81" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <circle cx="81" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
-          <span class="scard-head"><span class="scard-name">Автаркия</span><span class="scard-soon">Скоро</span></span>
-          <span class="scard-desc">Закрытая экономика до открытия: внутренняя цена как точка отсчёта.</span>
-        </button>
+        <!-- Карточка «Автаркия» УДАЛЕНА 01.09 (решение владельца). Реализована она
+             не была никогда, а содержательно автаркия это ровно модель «Спрос и
+             предложение», которая уже есть; автаркическое равновесие как ориентир
+             показано внутри «Малой открытой экономики» бледным призраком.
+             Обещание «Скоро» стоило внимания ученика каждый раз, когда он сюда
+             заходил, и не отдавало ничего. -->
         <button class="scard" data-scene="smallopen">
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
             <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
@@ -452,7 +458,7 @@
             <path d="M18 60 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
             <rect x="52" y="57" width="56" height="6" fill="var(--curve-dwl)" opacity=".4"/></g></svg></span>
           <span class="scard-name">Малая открытая экономика</span>
-          <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, два треугольника потерь.</span>
+          <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, потери общества.</span>
         </button>
         <button class="scard soon" data-scene="bigopen" disabled>
           <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
@@ -737,10 +743,6 @@
     <button class="dock-btn" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать график">
       <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg>
     </button>
-    <div class="dock-spacer"></div>
-    <button class="dock-btn" id="dock-theme" type="button" data-tip="Светлая или тёмная тема" aria-label="Переключить светлую или тёмную тему">
-      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M20 14a8 8 0 1 1-9.5-9.8A6.5 6.5 0 0 0 20 14z"/></svg>
-    </button>
   </nav>
 
   <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ ────────────────────────────────── -->
@@ -952,8 +954,12 @@
                    style="width:64px;padding:5px 6px;border:.5px solid var(--border);border-radius:var(--r);">
           </div>
         </div>
-        <div class="field" id="open-quota-field" style="display:none;margin-top:8px;">
-          <label>Квота (объём импорта) = <b id="open-quota-val">20</b></label>
+        <!-- Смысл квоты задаёт НАПРАВЛЕНИЕ ТОРГОВЛИ: страна ввозит - квота
+             ограничивает ввоз, вывозит - вывоз. Подпись переписывает
+             syncOpenQuotaLabel на каждой перерисовке. -->
+        <div class="field" id="open-quota-field" style="display:none;margin-top:8px;"
+             data-reg-tip="Квота: сколько товара разрешено провезти через границу">
+          <label><span id="open-quota-name">Квота ввоза</span> = <b id="open-quota-val">20</b></label>
           <div style="display:flex;gap:6px;align-items:center;margin-top:4px;">
             <input type="range" id="open-quota-slider" min="0" max="100" step="1" value="20" style="flex:1;margin-top:0;">
             <input type="number" id="open-quota-input" min="0" step="0.1" value="20"
@@ -963,12 +969,14 @@
         <label class="chk" style="margin-top:8px;"><input type="checkbox" id="chk-open-money" checked>
           <span class="swatch" style="background:var(--curve-tax)"></span> Доход бюджета / рента квоты</label>
         <label class="chk"><input type="checkbox" id="chk-open-dwl" checked>
-          <span class="swatch" style="background:var(--curve-dwl)"></span> Два треугольника потерь</label>
+          <span class="swatch" style="background:var(--curve-dwl)"></span> Потери общества</label>
         <div class="hint">Страна мала: мировая цена от неё не зависит, поэтому Pw идёт горизонтальной линией
           (её можно тянуть мышью). Если при Pw объём спроса больше объёма предложения, страна
           <b>импортирует</b>, если меньше, <b>экспортирует</b>. Тариф поднимает внутреннюю цену до
-          Pw&nbsp;+&nbsp;t; квота ограничивает объём напрямую, а цена находится численно из условия
-          Qd(P)&nbsp;−&nbsp;Qs(P)&nbsp;=&nbsp;квота.</div>
+          Pw&nbsp;+&nbsp;t, но не выше автаркической: как только ввоз стал невыгоден, страна
+          закрывается сама. Квота ограничивает объём напрямую и идёт за направлением торговли
+          (ввозим&nbsp;– ограничивает ввоз, вывозим&nbsp;– вывоз), а цена находится численно из
+          условия «объём торговли&nbsp;=&nbsp;квота».</div>
         <div id="info-open" style="margin-top:6px;"></div>
       </div>
 
@@ -1391,17 +1399,16 @@
           <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
           <input type="range" id="ineq-alpha" min="1" max="6" step="0.1" value="2">
         </div>
-        <div class="field">
-          <label>α (точное значение)</label>
-          <input type="number" id="ineq-alpha-num" min="1" step="0.1" value="2">
-        </div>
+        <!-- Отдельного поля «α (точное значение)» здесь больше нет (решение
+             владельца 01.09): значение уже показано у самого ползунка, а
+             точное вводится щелчком по нему, как у всех регуляторов сцены. -->
         <div class="hint">Должно быть L(0)=0, L(1)=1, неубывающая и выпуклая.
           Примеры: <code>p^2</code>, <code>p^3</code>, <code>p^1.5</code>. Ползунок α задаёт
           именно семейство <code>p^α</code>; любую другую формулу можно вписать вручную в поле выше.</div>
       </div>
-      <!-- ЧК2: сравнение «было → стало». Галочка запоминает текущую кривую как «было». -->
-      <label class="chk" style="margin-top:10px;"><input type="checkbox" id="ineq-ghost">
-        <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
+      <!-- Галочки «Исходное состояние (было → стало)» здесь больше нет (решение
+           владельца 01.09): в этой модели сравнивать не с чем. Сравнение «до и
+           после» даёт «Перераспределение» ниже, и оно про настоящее действие. -->
       <!-- ЧК3: перераспределение. Берём текущее распределение как «до налогов»,
            применяем инструмент, рисуем «после» — Джини падает, кривая ближе к диагонали. -->
       <div style="margin-top:10px;">
@@ -1766,11 +1773,18 @@
             <input type="number" id="mathx0-input" step="any" value="1" aria-label="Точное значение x₀">
           </div>
         </div>
-        <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
-        <div class="field" id="mathdx-field" style="display:none;">
-          <label>Шаг Δx = <b id="mathdx-val">1</b></label>
-          <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
-          <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
+        <!-- Галочка и её ползунок переезжают в аналитику ОДНИМ узлом (01.09):
+             ползунок Δx появляется вместе с галочкой, и разлучать их нельзя.
+             data-no-regulator говорит upgradeRegulator, что это КОНТЕЙНЕР, а не
+             регулятор: иначе он забрал бы вложенный ползунок Δx и подписал бы
+             его чужой подписью галочки. -->
+        <div id="math-secant-row" data-no-regulator="1">
+          <label class="chk"><input type="checkbox" id="chk-secant"> Секущая через две точки</label>
+          <div class="field" id="mathdx-field" style="display:none;">
+            <label>Шаг Δx = <b id="mathdx-val">1</b></label>
+            <input type="range" id="mathdx-slider" min="0.001" max="5" step="0.001" value="1" style="width:100%;">
+            <div class="hint">Ведите ползунок влево: секущая ложится на касательную.</div>
+          </div>
         </div>
         <div class="field">
           <label>Цвета кривых</label>
@@ -1833,12 +1847,14 @@
            их заполняют. -->
       <div id="math-pane-minmax" style="display:none;">
         <div class="field">
-          <label>Что ищем</label>
+          <label>Какую функцию ищем</label>
           <!-- Н73: показывается тумблером (segToToggle). Кнопки остаются
-               источником правды: к ним привязана обвязка сюжета. -->
+               источником правды: к ним привязана обвязка сюжета.
+               01.09: подпись и варианты названы так же, как сама сцена
+               («Функции min и max»), а не описательно. -->
           <div class="seg" id="mm-mode">
-            <button class="seg-btn active" id="mm-min">Наименьшую</button>
-            <button class="seg-btn" id="mm-max">Наибольшую</button>
+            <button class="seg-btn active" id="mm-min">min</button>
+            <button class="seg-btn" id="mm-max">max</button>
           </div>
         </div>
         <div class="field pw-count-field">
@@ -1927,7 +1943,7 @@
       <div class="fold-body open" id="marks-body">
         <div class="hint-row">
           <span class="hint-lead">Зачем ставить точки</span>
-          <button class="hint-btn" type="button" data-pop="hp-marks" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-marks" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-marks">
           <p>Точка задаёт набор чисел: равновесие, оптимум, заданный объём. Ставится координатами
@@ -1955,7 +1971,7 @@
       <div class="fold-body" id="areascalc-body">
         <div class="hint-row">
           <span class="hint-lead">Что здесь считается</span>
-          <button class="hint-btn" type="button" data-pop="hp-areascalc" data-pop-trigger="hover" aria-label="Как этим пользоваться">?</button>
+          <button class="hint-btn" type="button" data-pop="hp-areascalc" aria-label="Как этим пользоваться">?</button>
         </div>
         <div class="hint-pop" id="hp-areascalc">
           <p>Площадь под кривой на отрезке считается интегралом: например, площадь под спросом до равновесия равна общей готовности платить.</p>
@@ -2288,15 +2304,19 @@
                    style="width:100%;margin-top:4px;">
             <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
           </div>
-          <div class="hint" id="quota-hint" style="display:none;">Квота ограничивает объём напрямую.
+          <div class="hint sb-note-src" id="quota-hint">Квота ограничивает объём напрямую.
             Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт
             любая цена от той, по которой продавцы готовы отдать этот объём, до той, по которой
             покупатели готовы его выбрать. Двигайте цену внутри коридора: излишки перетекают
             между сторонами, а их сумма и потери общества не меняются.</div>
-          <div class="hint" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
+          <!-- ⚠️ ТРИ ПОЯСНЕНИЯ ВМЕШАТЕЛЬСТВА ЖИВУТ В «ОБЪЯСНЕНИИ МОДЕЛИ», А НЕ ЗДЕСЬ
+               (решение владельца 01.09). В карточке они скрыты классом .sb-note-src
+               и служат ИСТОЧНИКОМ текста: собирает его intervHintHtml. Инлайновый
+               display им больше не ставится, иначе он победил бы класс. -->
+          <div class="hint sb-note-src" id="tax-hint">Потоварное вмешательство на стороне производителя: кривая S сдвигается
             на величину ставки: налог вверх, субсидия вниз. Клин между ценами покупателя
             и продавца можно тянуть мышью.</div>
-          <div class="hint" id="pc-hint" style="display:none;">Государство фиксирует цену. Потолок ниже равновесия даёт
+          <div class="hint sb-note-src" id="pc-hint">Государство фиксирует цену. Потолок ниже равновесия даёт
             дефицит (продаётся меньше), пол выше равновесия даёт избыток. Линию цены можно тянуть мышью.</div>
           <!-- «Было → стало» выключено по умолчанию: сцена сама гасит showGhost
                при входе (SCENE_DEFAULTS), и отметка в разметке эту правду
@@ -2479,11 +2499,29 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/60-overlays.js' %}"></script>
 <script src="{% calc2_static 'calc2/70-scenes-math.js' %}"></script>
 <script src="{% calc2_static 'calc2/80-ui.js' %}"></script>
+{% comment %}
+⚠️ ОБЩАЯ КЛАВИАТУРА — ПЕРЕД `82-input.js`. Тот зовёт `window.MathKbd.build`
+при сборке панели ввода; порядок номерных файлов calc2 (00-…99-) при этом не
+нарушается: общий модуль стоит вне их нумерации.
+{% endcomment %}
+<script src="{% static 'mathkbd/mathkbd.js' %}"></script>
 <script src="{% calc2_static 'calc2/82-input.js' %}"></script>
 <script src="{% calc2_static 'calc2/84-picker.js' %}"></script>
 <script src="{% calc2_static 'calc2/86-workspace.js' %}"></script>
 <script src="{% calc2_static 'calc2/88-params.js' %}"></script>
 <script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
+
+{% comment %}
+Обратная связь беты: кнопка «Проблема или предложение» в шапке, окно и
+кружок Telegram в правом нижнем углу (ADR 0076). html2canvas нужен только
+здесь — снимок экрана снимается на клиенте, в момент нажатия.
+
+⚠️ НА КАЛЬКУЛЯТОРЕ КРУЖОК TELEGRAM МОГ БЫ ЗАКРЫТЬ ОРГАНЫ УПРАВЛЕНИЯ: правый
+нижний угол занят панелью. Проверено снимком — панель выше кружка; если
+когда-нибудь опустится, панель сдвигается отступом снизу, а кружок остаётся.
+{% endcomment %}
+<script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_feedback.html' %}
 </body>
 </html>

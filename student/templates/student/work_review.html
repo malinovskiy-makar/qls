@@ -1,9 +1,14 @@
 {% extends "student/base.html" %}
 {% load score %}{% load catalog_filters %}
 
-{% block title %}{{ assignment.name }} — разбор{% endblock %}
+{% block title %}{{ assignment.name }} · разбор{% endblock %}
 
 {% block extra_style %}
+/* ⚠️ ПОЛОСА УЖЕ ОБЫЧНОЙ: 860 вместо 960 (канон 1.9). Основное содержание
+   здесь — длинный текст с формулами, и на 960 строка становится слишком
+   длинной для чтения. Сужаем страницу, а не переопределяем базовый шаблон:
+   узкая полоса — свойство ЭТОГО экрана, а не кабинета целиком. */
+.page-wrap { max-width: var(--w-read); }
 {% include "student/_work_style.html" %}
 
 /* ── Шапка: балл — самый крупный элемент экрана ──────────────
@@ -11,12 +16,12 @@
    своей работы, как бы аккуратно ни был свёрстан. */
 .wr-head { background: var(--surface); border: 1px solid var(--border);
            border-radius: 12px; padding: 24px 26px; margin-bottom: 22px; }
-.wr-kind { font-size: 11px; font-weight: 700; letter-spacing: .08em;
+.wr-kind { font-size: 13px; font-weight: 700; letter-spacing: .08em;
            text-transform: uppercase; color: var(--text2); }
 .wr-name { font-size: 20px; font-weight: 700; margin: 6px 0 18px; }
 .wr-score { font-size: 56px; font-weight: 800; line-height: 1;
             letter-spacing: -.02em; }
-.wr-cap { font-size: 13px; color: var(--text2); margin-top: 8px; }
+.wr-cap { font-size: 14px; color: var(--text2); margin-top: 8px; }
 {% comment %}
 Сколько баллов ещё на проверке — тихой строкой рядом с крупным баллом, а не
 вместо знаменателя: знаменатель у одной величины обязан быть один.
@@ -25,21 +30,21 @@
            letter-spacing: 0; color: var(--text2); margin-top: 6px; }
 .wr-rest[hidden] { display: none; }
 .wr-meta { display: flex; gap: 18px; flex-wrap: wrap; margin-top: 16px;
-           font-size: 13px; color: var(--text2); }
+           font-size: 14px; color: var(--text2); }
 .wr-note { margin-top: 18px; background: var(--green-tint);
            border: 1px solid var(--green-border); border-radius: var(--r);
            padding: 14px 16px; }
-.wr-note-cap { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.wr-note-cap { font-size: 13px; font-weight: 700; text-transform: uppercase;
                letter-spacing: .05em; color: var(--green); margin-bottom: 6px; }
 
 /* Табличка «вы смотрите чужой экран» — рецессивная поверхность, без
    акцентного цвета: это подпись к странице, а не действие на ней. */
 .wr-asstudent { background: var(--surface-2); border: 1px solid var(--border);
                 border-left: 4px solid var(--text2); border-radius: var(--r);
-                padding: 12px 16px; margin-bottom: 16px; font-size: 13px;
+                padding: 12px 16px; margin-bottom: 16px; font-size: 14px;
                 line-height: 1.6; color: var(--text2); }
 .wr-asstudent b { color: var(--text); }
-.wr-asstudent a { color: var(--accent); }
+.wr-asstudent a { color: var(--accent-ink); }
 
 /* ── Задача ─────────────────────────────────────────────── */
 .wr-item { background: var(--surface); border: 1px solid var(--border);
@@ -53,31 +58,31 @@
                      flex-wrap: wrap; }
 .wr-item > summary::-webkit-details-marker { display: none; }
 .wr-item > summary::before { content: '▸'; color: var(--text2);
-                             font-size: 12px; }
+                             font-size: 13px; }
 .wr-item[open] > summary::before { content: '▾'; }
 /* ⚠️ У НОМЕРА ФИКСИРОВАННАЯ ШИРИНА — иначе чип типа, стоящий следом,
    съезжает вправо на двузначных номерах, и «на одной вертикали» перестаёт
    быть правдой ровно с десятой задачи. */
-.wr-num { font-size: 13px; font-weight: 700; color: var(--text2);
+.wr-num { font-size: 14px; font-weight: 700; color: var(--text2);
           min-width: 22px; }
 .wr-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600;
             overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .wr-points { font-size: 16px; font-weight: 800; white-space: nowrap; }
-.wr-points small { font-size: 12px; font-weight: 600; color: var(--text2); }
+.wr-points small { font-size: 13px; font-weight: 600; color: var(--text2); }
 .wr-body { padding: 0 18px 18px; }
 .wr-block { margin-top: 16px; }
 /* ── Оценивание внутри разбора (репетитору, п. 14.4) ────────────────── */
 .gi-block { margin-top: 14px; padding-top: 12px;
             border-top: 2px solid var(--border); }
 .gi-head { display: flex; align-items: baseline; gap: 10px; }
-.gi-said { font-size: 12px; color: var(--green); }
+.gi-said { font-size: 13px; color: var(--green); }
 .gi-score { display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
             margin: 8px 0 10px; }
 .gi-preset.is-on { background: var(--btn-bg); color: var(--on-btn);
                    border-color: var(--btn-bg); }
 .gi-comment { width: 100%; }
 .gi-actions { margin-top: 8px; }
-.wr-block-cap { font-size: 11px; font-weight: 700; text-transform: uppercase;
+.wr-block-cap { font-size: 13px; font-weight: 700; text-transform: uppercase;
                 letter-spacing: .05em; color: var(--text2); margin-bottom: 6px; }
 .wr-mine { background: var(--panel); border: 1px solid var(--border);
            border-radius: var(--r); padding: 12px 14px; font-size: 14px;
@@ -88,12 +93,12 @@
    прямо разрешает акцент на активном). */
 .wr-diff { background: var(--surface); border: 1px solid var(--border);
            border-radius: 10px; padding: 14px 18px; margin-bottom: 16px; }
-.wr-diff-q { font-size: 13px; font-weight: 600; margin-bottom: 10px; }
+.wr-diff-q { font-size: 14px; font-weight: 600; margin-bottom: 10px; }
 .wr-diff-scale { display: flex; align-items: center; gap: 12px;
                  flex-wrap: wrap; }
-.wr-diff-end { font-size: 12px; color: var(--text3); white-space: nowrap; }
+.wr-diff-end { font-size: 13px; color: var(--text3); white-space: nowrap; }
 .wr-diff-marks { display: flex; gap: 4px; flex-wrap: wrap; }
-.wr-diff-mark { font: inherit; font-size: 13px; font-variant-numeric: tabular-nums;
+.wr-diff-mark { font: inherit; font-size: 14px; font-variant-numeric: tabular-nums;
                 width: 32px; height: 32px; cursor: pointer;
                 border: 1px solid var(--border); border-radius: var(--r);
                 background: var(--surface-2); color: var(--text2);
@@ -103,15 +108,15 @@
                               outline-offset: 2px; }
 .wr-diff-mark.is-on { background: var(--accent); border-color: var(--accent);
                       color: #fff; font-weight: 700; }
-.wr-diff-said { font-size: 12px; color: var(--text2); margin-top: 8px; }
+.wr-diff-said { font-size: 13px; color: var(--text2); margin-top: 8px; }
 .wr-diff-said[hidden] { display: none; }
 
 .wr-order { display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
-            margin-bottom: 16px; font-size: 13px; color: var(--text2); }
+            margin-bottom: 16px; font-size: 14px; color: var(--text2); }
 .wr-order button { border: 1px solid var(--border); border-radius: var(--r);
                    background: transparent; color: var(--text); font: inherit;
-                   font-size: 13px; padding: 5px 12px; cursor: pointer; }
-.wr-order button.is-on { border-color: var(--accent); color: var(--accent);
+                   font-size: 14px; padding: 5px 12px; cursor: pointer; }
+.wr-order button.is-on { border-color: var(--accent); color: var(--accent-ink);
                          background: var(--accent-tint); font-weight: 600; }
 @media (max-width: 560px) {
   .wr-head { padding: 18px; }
@@ -149,7 +154,7 @@
 <div class="wr-asstudent">
   <b>Вы смотрите работу глазами ученика.</b>
   {{ student.get_full_name|default:student.username }} видит эту страницу
-  ровно так же. Задачи свёрнуты — раскройте нужную, чтобы поставить балл
+  ровно так же. Задачи свёрнуты: раскройте нужную, чтобы поставить балл
   прямо здесь; сплошной поток проверки живёт на
   <a href="{{ back_url }}">{{ back_label|lower }}</a>.
 </div>
@@ -191,10 +196,10 @@
   <div class="wr-cap" data-wr-cap>по проверенным задачам</div>
   {% elif show_scores %}
   {# Проверено пока НИЧЕГО. «0 из 0» — не результат, а недоразумение. #}
-  <div class="wr-score">—</div>
+  <div class="wr-score">–</div>
   <div class="wr-cap">ещё ничего не проверено</div>
   {% else %}
-  <div class="wr-score">—</div>
+  <div class="wr-score">–</div>
   <div class="wr-cap">преподаватель откроет результат после проверки</div>
   {% endif %}
 
@@ -236,7 +241,7 @@
      data-chosen="{% if difficulty_vote %}{{ difficulty_vote.value }}{% endif %}">
   <div class="wr-diff-q">Насколько сложной была работа?</div>
   <div class="wr-diff-scale">
-    <span class="wr-diff-end">1 — легко</span>
+    <span class="wr-diff-end">1, легко</span>
     <span class="wr-diff-marks">
       {% for value in difficulty_range %}
       <button type="button" class="wr-diff-mark{% if difficulty_vote and difficulty_vote.value == value %} is-on{% endif %}"
@@ -244,7 +249,7 @@
               aria-label="сложность {{ value }} из 10">{{ value }}</button>
       {% endfor %}
     </span>
-    <span class="wr-diff-end">10 — очень сложно</span>
+    <span class="wr-diff-end">10, очень сложно</span>
   </div>
   <div class="wr-diff-said" id="wr-diff-said"
        {% if not difficulty_vote %}hidden{% endif %}>Спасибо, записали.</div>
@@ -301,7 +306,7 @@
     <span class="wr-points">
       {# Прочерк остался ровно там, где балла ещё НЕТ: задача не сдана или #}
       {# ждёт преподавателя. Пустая задача сданной работы получает честный 0. #}
-      <span data-wr-got>{% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}—{% endif %}</span><small> / {{ row.max_points|ball }} б.</small>
+      <span data-wr-got>{% if row.score is not None and show_scores or row.by_teacher %}{{ row.score|ball }}{% else %}–{% endif %}</span><small> / {{ row.max_points|ball }} б.</small>
     </span>
   </summary>
 
@@ -337,10 +342,10 @@
         {% endcomment %}
         {% include "student/_option_review.html" with option_rows=row.option_review %}
         {% if not row.answer_display %}
-        <div class="wr-mine" style="margin-top:8px;">— ничего не отмечено</div>
+        <div class="wr-mine" style="margin-top:8px;">ничего не отмечено</div>
         {% endif %}
       {% else %}
-        <div class="wr-mine">{% if row.answer_display %}{{ row.answer_display }}{% else %}— не отвечено{% endif %}</div>
+        <div class="wr-mine">{% if row.answer_display %}{{ row.answer_display }}{% else %}не отвечено{% endif %}</div>
         {% if row.item.correct_answer %}
         <div class="part-result-answers" style="margin-top:8px;">
           <span><b>верный ответ:</b> {{ row.item.correct_answer }}</span>
@@ -359,7 +364,7 @@
     {% if row.sub.solution_file %}
     <div class="wr-block">
       <a href="{{ row.sub.solution_file.url }}" target="_blank"
-         style="color:var(--accent);font-size:13px;"><span class="k-ico">{% include '_icon.html' with name='clip' %}</span> Прикреплённый файл</a>
+         style="color:var(--accent);font-size:14px;"><span class="k-ico">{% include '_icon.html' with name='clip' %}</span> Прикреплённый файл</a>
     </div>
     {% endif %}
 
@@ -527,7 +532,7 @@
       })
       .catch(function () {
         save.disabled = false;
-        said.textContent = 'не сохранилось — попробуйте ещё раз';
+        said.textContent = 'не сохранилось, попробуйте ещё раз';
         said.hidden = false;
       });
   });
@@ -578,7 +583,7 @@
         .catch(function () {
           button.classList.remove('is-on');
           said.hidden = false;
-          said.textContent = 'Не удалось сохранить — попробуйте ещё раз.';
+          said.textContent = 'Не удалось сохранить, попробуйте ещё раз.';
         });
     });
   });

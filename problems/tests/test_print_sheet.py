@@ -71,7 +71,7 @@ class PrintSheetTests(TestCase):
         """Страница не наследует базовый шаблон: меню на бумаге не нужно.
 
         Название сайта на листке ЕСТЬ — в собственном подвале (фаза 5.4), и
-        это не навигация. Раньше проверка искала само слово «ЭкЗадачи» и
+        это не навигация. Раньше проверка искала само слово «Weconomics» и
         поэтому запрещала подвал заодно с меню.
         """
         body = self.client.get(self._url()).content.decode()
@@ -79,14 +79,38 @@ class PrintSheetTests(TestCase):
         self.assertNotIn('header-nav', body)
         self.assertNotIn('site-header', body)
         # Название сайта встречается ровно один раз — в подвале.
-        self.assertEqual(body.count('ЭкЗадачи'), 1)
-        self.assertIn('<span><b>ЭкЗадачи</b>', body)
+        self.assertEqual(body.count('Weconomics'), 1)
+        self.assertIn('<span><b>Weconomics</b>', body)
 
     def test_katex_pipeline_matches_the_site(self):
         """Тот же конвейер, что в `catalog/base.html`, — иначе на бумаге
-        напечатается не то, что видно на экране."""
+        напечатается не то, что видно на экране.
+
+        ⚠️ Версия НЕ пишется здесь строкой. Раньше стояло `katex@0.16.9` —
+        кусок адреса CDN, и после переезда библиотек в репозиторий
+        (ADR 0070) тест покраснел, хотя конвейер как раз остался общим.
+        Теперь путь спрашивается у самого `catalog/base.html`: тест
+        сравнивает печать с сайтом, как и обещает его название, и переживёт
+        следующую смену версии.
+        """
+        import os
+        import re
+
+        from django.conf import settings
+
+        base = os.path.join(str(settings.BASE_DIR), 'catalog', 'templates',
+                            'catalog', 'base.html')
+        with open(base, encoding='utf-8') as handle:
+            site = handle.read()
+        katex_path = re.search(r"vendor/katex-[\d.]+/katex\.min\.js", site)
+        self.assertIsNotNone(
+            katex_path, 'в catalog/base.html не нашёлся путь к KaTeX')
+
         body = self.client.get(self._url()).content.decode()
-        self.assertIn('katex@0.16.9', body)
+        # В отрисованной странице путь уже с хешем ManifestStaticFiles,
+        # поэтому сверяем каталог версии, а не имя файла целиком.
+        version = katex_path.group(0).split('/')[1]      # katex-0.16.9
+        self.assertIn(version, body)
         self.assertIn('throwOnError: false', body)
         # $$ строго раньше $ — иначе auto-render режет $$…$$ на два пустых.
         self.assertLess(body.index("left: '$$'"), body.index("left: '$',"))
@@ -289,7 +313,7 @@ class PrintSheetPhase5Tests(TestCase):
         self._task(3)
         html = self.client.get(self._url()).content.decode()
         self.assertIn('class="foot"', html)
-        self.assertIn('ЭкЗадачи', html)
+        self.assertIn('Weconomics', html)
         # Адрес ГЛАВНОЙ, а не этого раздела.
         self.assertIn('http://testserver/', html)
         self.assertNotIn('http://testserver/teacher/', html)

@@ -115,12 +115,16 @@
   --canvas:   #ffffff;   /* фон графика                       */
 
   /* ── Интерфейс: только своё ──
-     --bg у калькулятора глуше страничного (#eceef2 против #f5f5f3): холст
-     белый, и оболочка вокруг него обязана быть заметно темнее, иначе рабочее
-     поле не читается как поле. --input-bg тоже своё. Остальное (текст трёх
-     ступеней, поверхности, границы) совпадало с платформой байт в байт
-     и приходит из _tokens.html. */
-  --bg:          #eceef2;   /* оболочка за холстом */
+     ⚠️ ОБОЛОЧКА БОЛЬШЕ НЕ СВОЯ, И ЭТО ЗАМЕР, А НЕ ВКУС. Прежний #eceef2 был
+     холодным серо-синим и остался от старой палитры: рядом с кремовой
+     страницей сайта раздел «Графики» читался как чужой экран. Правило
+     «оболочка заметно темнее холста» при этом никуда не делось — и общий
+     страничный #f4eed2 его держит ЛУЧШЕ прежнего: к белому холсту 1,166
+     против 1,162 у #eceef2 при пороге 1,15. Холст и цвета кривых не тронуты.
+     --input-bg остаётся своим: поле ввода белое, как холст.
+     Остальное (текст трёх ступеней, поверхности, границы) совпадало с
+     платформой байт в байт и приходит из _tokens.html. */
+  --bg:          #f4eed2;   /* оболочка за холстом — общая со страницей */
   --input-bg:    #ffffff;
   /* ⚠️ ВТОРОЙ КОПИИ ТОКЕНОВ ПЛАТФОРМЫ ЗДЕСЬ БОЛЬШЕ НЕТ (канон 5.1).
      Малиновый акцент, поверхности, текст, графитовые кнопки, фокус и сигналы
@@ -163,8 +167,14 @@
   --halo:     #10141c;
   --canvas:   #10141c;
 
-  /* Тёмная тема: своё только у оболочки и поля ввода — остальное общее. */
-  --bg:          #07090e;
+  /* Тёмная тема: своё только у поля ввода — остальное общее.
+     ⚠️ ОБОЛОЧКА ПЕРЕЕХАЛА НА СТРАНИЧНЫЙ #1d1a16, И ФИГУРА С ФОНОМ
+     ПОМЕНЯЛИСЬ МЕСТАМИ. Прежний #07090e был ТЕМНЕЕ холста #10141c (1,080);
+     общий тёплый графит СВЕТЛЕЕ его (1,064). Перепад тот же по величине,
+     но теперь холст читается как утопленное поле, а не как подсвеченное.
+     Холст не тронут: он остаётся своим у калькулятора, под него
+     откалиброваны цвета кривых. */
+  --bg:          #1d1a16;
   --input-bg:    #11151d;
   --pick: rgba(var(--accent-rgb), .40);
   --shadow-float: 0 0 0 1px rgba(255,255,255,.05), 0 10px 34px -10px rgba(0,0,0,.6);
@@ -196,9 +206,31 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body {
   height: 100%; overflow: hidden;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  font-size: 14px; color: var(--text); background: var(--bg);
+  /* Шрифт интерфейса — общий с сайтом (Montserrat из _tokens.html). Раздел
+     «Графики» был единственным экраном на системном шрифте и выпадал из
+     оформления. Рисующая поверхность на прежнем шрифте — см. ниже. */
+  font-family: var(--font-ui);
+  font-size: 14px; color: var(--text);
   -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility;
+}
+/* ⚠️ ФОН КРАСИТ ТОЛЬКО ТЕЛО, НЕ КОРЕНЬ — ИНАЧЕ ПАТТЕРНА НЕ ВИДНО.
+   Слой паттерна из _tokens.html лежит в `body::before/::after` при
+   `z-index: -1`, то есть ПОД содержимым тела. Пока фон стоял и на `html`,
+   и на `body`, фон тела рисовался поверх слоя и закрывал его собой. Сайт
+   красит только тело — здесь теперь так же. */
+body { background: var(--bg); }
+
+/* ⚠️ РИСУЮЩАЯ ПОВЕРХНОСТЬ ОСТАЁТСЯ НА ПРЕЖНЕМ ШРИФТЕ, И ЭТО НЕ ЗАБЫТЫЙ ХВОСТ.
+   Подписи осей, цифры делений и имена кривых живут внутри #chart и берут
+   шрифт по наследству. У Montserrat другая метрика, и смена шрифта сдвинула
+   бы разметку графика: поля холста считаются по ИЗМЕРЕННОЙ ширине подписей
+   (fitMargins в 20-plane.js).
+   Второй селектор — скрытая линейка `measureText`: она лежит рядом с #chart
+   отдельным svg и меряет ту же строку. Если шрифт линейки и холста разойдутся,
+   поля будут считаться по одному шрифту, а рисоваться другим. */
+#chart,
+#graph-wrap > svg[data-skip-export] {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 button { cursor: pointer; font: inherit; color: inherit; }
 input, select { font: inherit; }
@@ -578,58 +610,20 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 .f-kbd svg { width: 17px; height: 17px; }
 .f-kbd:hover, .f-kbd[aria-expanded="true"] { color: var(--accent); border-color: var(--accent); }
 
+/* ⚠️ ЗАПАС СНИЗУ ПОД КРУЖОК TELEGRAM (04.09.2026, ADR 0076). Кружок стоит
+   в правом нижнем углу окна: 40 px плюс 16 px отступа. На узком экране
+   карточки блоков доходят до самого низа, и последняя пряталась под ним —
+   замер `elementFromPoint` на 380 px показывал под кружком живую `.bcard`.
+   Двигаем СОДЕРЖИМОЕ, а не кружок: кружок нужен на всех экранах одинаково. */
+@media (max-width: 900px) {
+  #scene-picker .picker-inner { padding-bottom: 72px; }
+}
+
 /* ── Клавиатура ───────────────────────────────────────────────────────
-   Три раздела, раскрывается ОДИН за раз на всю ширину панели. */
-.mkbd {
-  display: none; margin-top: 8px; padding: 8px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
-  box-shadow: var(--shadow-pop);
-}
-.mkbd.open { display: block; }
-@media (prefers-reduced-motion: no-preference) {
-  .mkbd.open { animation: fpop .16s var(--ease); }
-}
-.mkbd-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-.mkbd-tab {
-  flex: 1; padding: 6px 4px; font-size: 12px; font-weight: 600;
-  border: 1px solid var(--border); border-radius: var(--r);
-  background: var(--surface-2); color: var(--text2);
-  transition: background .12s var(--ease), color .12s var(--ease), border-color .12s var(--ease);
-}
-.mkbd-tab:hover { color: var(--text); }
-.mkbd-tab.active { background: var(--accent-tint); border-color: var(--accent); color: var(--accent); }
-.mkbd-pane { display: none; }
-.mkbd-pane.active { display: block; }
-.mkbd-row { display: flex; gap: 4px; }
-.mkbd-row + .mkbd-row { margin-top: 4px; }
-.mkbd-grid { display: flex; flex-wrap: wrap; gap: 4px; }
-.mkbd-lab {
-  font-size: 11px; font-weight: 600; color: var(--text3);
-  margin: 8px 0 4px; letter-spacing: .03em;
-}
-.mkbd-lab:first-child { margin-top: 0; }
-.mk {
-  flex: 1 1 auto; min-width: 30px; min-height: 32px; padding: 3px 6px;
-  display: grid; place-items: center; font-size: 13px; color: var(--text);
-  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
-  transition: background .1s var(--ease), border-color .1s var(--ease), transform .08s var(--ease);
-}
-.mk:hover { background: var(--accent-tint); border-color: var(--accent-ring); }
-.mk:active { transform: scale(.94); }
-.mk.wide { flex: 2 1 auto; }
-.mk.op { font-weight: 600; }
-.mk.fn { font-size: 12px; }
-.mkbd-grid .mk { flex: 0 0 auto; min-width: 32px; }
-.mkbd-foot {
-  display: flex; gap: 6px; margin-top: 8px; padding-top: 8px;
-  border-top: 1px solid var(--border-soft);
-}
-.mkbd-foot button {
-  flex: 1; padding: 6px; font-size: 11px; font-weight: 600; color: var(--text2);
-  background: transparent; border: 1px dashed var(--border); border-radius: var(--r);
-  transition: color .12s var(--ease), border-color .12s var(--ease);
-}
-.mkbd-foot button:hover { color: var(--accent); border-color: var(--accent); }
+   ⚠️ СТИЛИ ПЕРЕЕХАЛИ В `static/mathkbd/mathkbd.css` (04.09.2026, ADR 0075).
+   Клавиатура теперь одна на весь сайт, и её оформление обязано жить рядом с
+   её разметкой, а не внутри калькулятора: иначе на странице домашки она
+   осталась бы без стилей. Файл подключается в `calc2.html` рядом с этим. */
 
 .f-pal-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .f-pal {
@@ -1230,8 +1224,13 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
    вместе с кнопкой возврата занимали 332 пикселя над первой карточкой: при
    высоте окна 392 карточка была видна на пятую часть, а инструкция про выбор
    раздела показывалась уже ПОСЛЕ того, как раздел открыт. */
-#scene-picker.block-open .picker-head { display: none; }
-#scene-picker.block-open .picker-inner { padding-top: 20px; }
+/* ⚠️ ШАПКА ВЫБОРА СЦЕНЫ ВИДНА ВСЕГДА (04.09.2026, п. 9 разбора владельца).
+   Раньше правило `#scene-picker.block-open .picker-head { display: none }`
+   прятало её при открытом блоке — в том числе при ВОЗВРАТЕ из сцены, и
+   человек видел список моделей без единой строки о том, где он. Прятать
+   её было незачем: с уходом кикера «Графики в экономике» шапка стала
+   короткой. Правило снято вместе с классом `block-open` (комментарии
+   А41/А68 в 84-picker.js). */
 .picker-eyebrow {
   display: inline-flex; align-items: center; gap: 7px;
   font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase;
@@ -1240,10 +1239,11 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .picker-eyebrow::before {
   content: ""; width: 18px; height: 2px; border-radius: var(--r-pill); background: var(--accent);
 }
-.picker-title { font-size: 22px; font-weight: 600; letter-spacing: -.02em; color: var(--text); }
+/* Та же пара, что у каталога, олимпиад и статистики: 30px/600. */
+.picker-title { font-size: 30px; font-weight: 600; letter-spacing: -.01em; color: var(--text); }
 /* Н3: подзаголовок укладывается ровно в две строки. При 56ch «экономике!»
    уезжало одно на третью; 68ch хватает, чтобы фраза легла надвое. */
-.picker-sub { font-size: 15px; color: var(--text2); margin-top: 6px; max-width: 68ch; line-height: 1.5; }
+.picker-sub { font-size: 16px; color: var(--text2); margin-top: 8px; max-width: 68ch; line-height: 1.5; }
 
 /* ── П2. Главный экран: десять больших карточек блоков по две в ряд ────
    Щелчок по карточке убирает остальные и на их месте показывает модели этого
@@ -1398,7 +1398,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 
 @media (max-width: 640px) {
   .picker-inner { padding: 28px 16px 48px; }
-  .picker-title { font-size: 22px; }
+  .picker-title { font-size: 24px; }
   .picker-grid { grid-template-columns: 1fr; }
 }
 
@@ -1437,7 +1437,6 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border-right: 1px solid var(--border);
 }
 .dock-sep { width: 24px; height: 1px; background: var(--border); margin: 6px 0; }
-.dock-spacer { flex: 1; }
 .dock-btn {
   width: 40px; height: 40px; border: 1px solid transparent; border-radius: var(--r);
   background: transparent; color: var(--text2); display: grid; place-items: center;

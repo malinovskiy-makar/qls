@@ -4,21 +4,29 @@
 Живёт в `problems`, а не в `teacher`/`student`: профиль есть у всех ролей,
 и класть его в кабинет одной из них значило бы закрыть его для остальных.
 """
+import io
 import json
 
+from django.utils import formats
+
+from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.contrib.auth.forms import SetPasswordForm
+from django.core.files.base import ContentFile
+from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 # Problem нужен и в профиле (пометка «снята с публикации»), и при
 # сохранении — поднимаем импорт на уровень модуля.
 from .models import Problem
+from .forms_accounts import AvatarForm, ProfileForm
 from .models_platform import (
     CustomProblem,
     SavedFolder,
     SavedGraph,
     SavedProblem,
+    UserProfile,
 )
 
 
@@ -26,36 +34,180 @@ from .models_platform import (
 # Фаза 15 — страница профиля
 # ---------------------------------------------------------------------------
 
+def _profile_facts(user, profile_obj):
+    """Полоса фактов над карточкой профиля: три-четыре числа, не больше.
+
+    ⚠️ СВОЕГО РАСЧЁТА ЗДЕСЬ НЕТ. Берём то, что уже посчитано и закэшировано
+    в `problems.stats.full_stats`; если оно почему-то недоступно, показываем
+    только дату регистрации. Заводить ради шапки профиля второй счётчик
+    решённых задач значило бы завести второе число, которое разойдётся с
+    первым.
+    """
+    facts = [('на сайте с', formats.date_format(user.date_joined, 'd.m.Y'))]
+    try:
+        from .stats import full_stats
+        data = full_stats(user, 'all') or {}
+        head = data.get('profile') or {}
+        overview = data.get('overview') or {}
+        solved = head.get('solved', overview.get('solved'))
+        if solved is not None:
+            facts.append(('решено задач', str(solved)))
+        streak = head.get('streak_days', head.get('streak'))
+        if streak is not None:
+            facts.append(('серия дней', str(streak)))
+        level = head.get('level')
+        if level is not None:
+            facts.append(('уровень', str(level)))
+    except Exception:      # noqa: BLE001
+        # Статистика — украшение шапки. Её отказ не должен ронять профиль,
+        # где человек, возможно, пришёл менять пароль.
+        pass
+    return facts
+
+
+@login_required(login_url='/login/')
+def password_change(request):
+    """Старый адрес смены пароля — рабочий, а не редирект.
+
+    ⚠️ ЭКРАН СМЕНЫ ПАРОЛЯ ЖИВЁТ ВО ВКЛАДКЕ «БЕЗОПАСНОСТЬ», но адрес
+    `/password/change/` остаётся РАБОЧИМ: на него ведут закладки, чужие
+    ссылки и, главное, существующая проверка
+    `test_auth_hardening::test_password_change_kills_other_sessions`.
+    Ломать её переездом экрана нельзя — она сторожит то, что смена пароля
+    закрывает ВСЕ ОСТАЛЬНЫЕ сессии, а это единственная компенсация за отказ
+    от старого пароля (ADR 0073).
+
+    ⚠️ Поле `old_password`, если его прислали, форма просто не заметит:
+    `SetPasswordForm` о нём не знает.
+    """
+    if request.method != 'POST':
+        return redirect('/profile/?tab=security')
+    form = SetPasswordForm(request.user, request.POST)
+    if not form.is_valid():
+        return render(request, 'platform/profile.html', {
+            'profile': UserProfile.objects.get_or_create(user=request.user)[0],
+            'form': ProfileForm(instance=request.user.profile),
+            'password_form': form,
+            'tab': 'security',
+            'subtab': 'problems',
+            'grades': range(5, 12),
+            'levels': [(value, label, UserProfile.LEVEL_HINTS.get(value, ''))
+                       for value, label in UserProfile.Level.choices],
+            'facts': _profile_facts(request.user, request.user.profile),
+            'avatar_error': '',
+        })
+    form.save()
+    update_session_auth_hash(request, request.user)
+    return redirect('/profile/?tab=security&changed=1')
+
+
+@login_required(login_url='/login/')
+def avatar(request, user_id):
+    """Отдаёт аватар. ПЕРВАЯ вьюха проекта, отдающая файл.
+
+    ⚠️ ЧТО ЗДЕСЬ СДЕЛАНО, ЧТОБЫ ЭТО НЕ БЫЛО ДЫРОЙ:
+
+    * путь к файлу берётся ИЗ ПОЛЯ МОДЕЛИ, а не из запроса. Из запроса
+      приходит только целое число — номер пользователя;
+    * отдаётся ровно один файл на пользователя, и он наш собственный: форма
+      пересжала картинку Pillow в JPEG и сама назвала её `avatars/<id>.jpg`;
+    * гостю нельзя вовсе (`login_required`): аватар — лицо ребёнка, и
+      выкладывать его в открытый доступ мы не будем;
+    * `Content-Type` задан жёстко, из файла не угадывается.
+
+    Почему аватар видит любой ВОШЕДШИЙ, а не только владелец: его показывает
+    шапка, доска набора, список учеников группы — то есть человек и так
+    видит лица тех, с кем занимается. Сужать до владельца значило бы, что
+    аватар не видно нигде, кроме собственного профиля.
+    """
+    profile_obj = get_object_or_404(UserProfile, user_id=user_id)
+    if not profile_obj.avatar:
+        raise Http404('Аватара нет')
+    try:
+        handle = profile_obj.avatar.open('rb')
+    except (FileNotFoundError, OSError):
+        # Файл потерялся (перенос, чистка media) — это не 500.
+        raise Http404('Аватара нет')
+    response = FileResponse(handle, content_type='image/jpeg')
+    # Приватно: общий кэш (nginx, прокси) держать чужое лицо не должен.
+    response['Cache-Control'] = 'private, max-age=86400'
+    return response
+
+
 @login_required(login_url='/login/')
 def profile(request):
-    profile_obj = request.user.profile
+    profile_obj, _ = UserProfile.objects.get_or_create(user=request.user)
     tab = request.GET.get('tab', 'data')
-    if tab not in ('data', 'saved', 'stats'):
+    # ⚠️ ВКЛАДКИ ЧЕТЫРЕ, И «СТАТИСТИКА» СРЕДИ НИХ — ССЫЛКА, А НЕ ВКЛАДКА:
+    # готовый экран `/profile/stats/` переезжать не должен, у него свои
+    # расчёты. Здесь она есть только для полосы вкладок.
+    if tab not in ('data', 'security', 'saved'):
         tab = 'data'
     subtab = request.GET.get('sub', 'problems')
     if subtab not in ('problems', 'graphs'):
         subtab = 'problems'
 
-    if request.method == 'POST' and tab == 'data':
-        # Почта и роль — только просмотр: почта это логин связи с человеком,
-        # роль меняет права. И то и другое меняется не самим пользователем.
-        request.user.first_name = (request.POST.get('first_name') or '').strip()
-        request.user.last_name = (request.POST.get('last_name') or '').strip()
-        request.user.save(update_fields=['first_name', 'last_name'])
+    form = ProfileForm(instance=profile_obj)
+    password_form = SetPasswordForm(request.user)
+    avatar_error = ''
 
-        profile_obj.phone = (request.POST.get('phone') or '').strip()
-        profile_obj.school = (request.POST.get('school') or '').strip()
-        grade = (request.POST.get('grade') or '').strip()
-        profile_obj.grade = int(grade) if grade.isdigit() else None
-        profile_obj.save()
-        return redirect('profile')
+    if request.method == 'POST':
+        action = request.POST.get('action') or 'data'
+        if action == 'data':
+            form = ProfileForm(request.POST, instance=profile_obj)
+            if form.is_valid():
+                form.save()
+                return redirect('/profile/?saved=1')
+        elif action == 'password':
+            # ⚠️ БЕЗ СТАРОГО ПАРОЛЯ — решение владельца 04.09.2026 (ADR 0073).
+            # Форма Django, своей проверки пароля у нас нет.
+            password_form = SetPasswordForm(request.user, request.POST)
+            if password_form.is_valid():
+                password_form.save()
+                # Иначе смена пароля выкинула бы и самого человека.
+                update_session_auth_hash(request, request.user)
+                return redirect('/profile/?tab=security&changed=1')
+            tab = 'security'
+        elif action == 'avatar':
+            avatar_form = AvatarForm(request.POST, request.FILES)
+            if avatar_form.is_valid():
+                # Имя файла НАШЕ, а не из запроса: `avatars/<id>.jpg`.
+                profile_obj.avatar.save(
+                    'avatars/%d.jpg' % request.user.pk,
+                    ContentFile(avatar_form.squared_jpeg().read()),
+                    save=True)
+                return redirect('/profile/?saved=1')
+            avatar_error = ' '.join(
+                avatar_form.errors.get('avatar', ['Не получилось загрузить.']))
+        elif action == 'avatar_remove':
+            if profile_obj.avatar:
+                profile_obj.avatar.delete(save=True)
+            return redirect('/profile/')
 
     context = {
         'profile': profile_obj,
+        'form': form,
+        'password_form': password_form,
+        'avatar_error': avatar_error,
         'tab': tab,
         'subtab': subtab,
         'grades': range(5, 12),
+        # Уровень отдаём тройками (значение, название, описание): фильтра
+        # «взять по ключу» в проекте нет, а заводить его ради одного экрана
+        # значит завести ещё одну общую вещь.
+        'levels': [(value, label, UserProfile.LEVEL_HINTS.get(value, ''))
+                   for value, label in UserProfile.Level.choices],
+        'welcome': request.GET.get('welcome') == '1',
+        'saved_ok': request.GET.get('saved') == '1',
+        'password_changed': request.GET.get('changed') == '1',
+        'facts': _profile_facts(request.user, profile_obj),
     }
+    if profile_obj.is_tutor:
+        from .models import User as UserModel
+        context['tutor_groups'] = request.user.teaching_groups.count()
+        context['tutor_students'] = (
+            UserModel.objects.filter(enrolled_groups__teacher=request.user)
+            .distinct().count())
 
     if tab == 'saved':
         kind = (SavedFolder.Kind.GRAPHS if subtab == 'graphs'
@@ -242,3 +394,122 @@ def api_graph_save(request):
         owner=request.user, name=name, scene=scene,
         preview=(data.get('preview') or '')[:500])
     return JsonResponse({'id': graph.pk, 'name': graph.name})
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Обратная связь беты (04.09.2026, ADR 0076)
+# ═══════════════════════════════════════════════════════════════════════
+
+FEEDBACK_SCOPE = 'feedback'
+FEEDBACK_MAX_SCREENSHOT = 2_500_000     # 2,5 МБ
+
+
+@require_POST
+def api_feedback(request):
+    """Принять «Проблема или предложение».
+
+    ⚠️ ГОСТЮ МОЖНО, И ЭТО НЕ НЕДОСМОТР. Половина беты — люди, которые ещё
+    не завели аккаунт; именно у них ломается вход. Требовать логин, чтобы
+    пожаловаться на форму входа, — способ не узнать о поломке.
+
+    ⚠️ CSRF ОБЯЗАТЕЛЕН (декоратора `csrf_exempt` здесь нет и не будет):
+    иначе чужая страница смогла бы слать нам записи от имени наших
+    посетителей.
+
+    ⚠️ СНИМОК ЭКРАНА — ПРИЯТНОЕ ДОПОЛНЕНИЕ, А НЕ УСЛОВИЕ. Битый, слишком
+    большой или отсутствующий снимок НЕ отменяет запись: текст жалобы
+    ценнее картинки, и терять его из-за картинки нельзя.
+    """
+    from problems import ratelimit
+    from problems.feedback_options import options_for, page_key_for
+    from problems.models_platform import Feedback
+
+    wait = ratelimit.check(FEEDBACK_SCOPE, request, None)
+    if wait:
+        return JsonResponse(
+            {'ok': False, 'error': 'Слишком часто. Попробуйте позже.'},
+            status=429)
+
+    kind = (request.POST.get('kind') or '').strip()
+    if kind not in dict(Feedback.Kind.choices):
+        return JsonResponse({'ok': False, 'error': 'Выберите, что это.'},
+                            status=400)
+
+    # ⚠️ ЭКРАН ОПРЕДЕЛЯЕТ СЕРВЕР ПО АДРЕСУ, А НЕ КЛИЕНТ СВОИМ ПОЛЕМ: иначе
+    # в `page_key` приехало бы что угодно и группировка жалоб развалилась.
+    url = (request.POST.get('url') or '')[:500]
+    page_key = page_key_for(url if url.startswith('/') else
+                            _path_of(url))
+
+    allowed = set(options_for(page_key))
+    chosen = [c for c in request.POST.getlist('choices') if c in allowed]
+    other_text = (request.POST.get('other_text') or '').strip()[:4000]
+    comment = (request.POST.get('comment') or '').strip()[:4000]
+
+    if kind == Feedback.Kind.PROBLEM and not chosen and not other_text:
+        return JsonResponse(
+            {'ok': False,
+             'error': 'Отметьте, что случилось, или опишите своими словами.'},
+            status=400)
+    if kind == Feedback.Kind.IDEA and not other_text:
+        return JsonResponse({'ok': False, 'error': 'Напишите предложение.'},
+                            status=400)
+
+    entry = Feedback(
+        user=request.user if request.user.is_authenticated else None,
+        kind=kind, page_key=page_key, url=url,
+        choices=chosen, other_text=other_text, comment=comment,
+        viewport=(request.POST.get('viewport') or '')[:32],
+        theme=(request.POST.get('theme') or '')[:16],
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:300],
+    )
+
+    shot = request.FILES.get('screenshot')
+    if shot is not None and shot.size <= FEEDBACK_MAX_SCREENSHOT:
+        blob = _feedback_screenshot(shot)
+        if blob is not None:
+            entry.screenshot.save('shot.jpg', ContentFile(blob), save=False)
+
+    entry.save()
+    ratelimit.note_failure(FEEDBACK_SCOPE + ':ip',
+                           ratelimit.client_ip(request), multiplier=2)
+    return JsonResponse({'ok': True, 'id': entry.pk})
+
+
+def _path_of(url):
+    """Путь из абсолютного адреса. Чужой домен нас не интересует."""
+    from urllib.parse import urlparse
+    try:
+        return urlparse(url).path or '/'
+    except ValueError:
+        return '/'
+
+
+def _feedback_screenshot(uploaded):
+    """Пересжать снимок в JPEG. Не картинка — вернуть None, не падать.
+
+    Та же осторожность, что у аватара: сначала целостность, потом размеры в
+    пикселях, и только потом обработка — иначе мелкий файл разворачивается в
+    памяти в сотню мегабайт.
+    """
+    from PIL import Image, UnidentifiedImageError
+
+    try:
+        probe = Image.open(uploaded)
+        probe.verify()
+        uploaded.seek(0)
+        image = Image.open(uploaded)
+        if image.width > 4000 or image.height > 4000:
+            return None
+        uploaded.seek(0)
+        image = Image.open(uploaded).convert('RGB')
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
+
+    if image.width > 1600:
+        height = max(1, round(image.height * 1600 / image.width))
+        image = image.resize((1600, height), Image.LANCZOS)
+
+    buffer = io.BytesIO()
+    image.save(buffer, format='JPEG', quality=80, optimize=True)
+    return buffer.getvalue()

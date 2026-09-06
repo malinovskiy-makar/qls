@@ -142,6 +142,148 @@ function makeScales() {
   const m = CONFIG.margin;
   sx = d3.scaleLinear().domain([CONFIG.Qmin, CONFIG.Qmax]).range([m.left, W - m.right]);
   sy = d3.scaleLinear().domain([CONFIG.Pmin, CONFIG.Pmax]).range([H - m.bottom, m.top]);
+  /* Обычная сцена — одна панель на весь холст, и её шкалы это и есть sx/sy.
+     Регистрируем прямо здесь: makeScales зовут все сцены без своей геометрии,
+     и держать список «кто должен зарегистрироваться» пришлось бы вручную. */
+  registerPanel('main', sx, sy, {
+    x0: m.left, y0: m.top, x1: W - m.right, y1: H - m.bottom,
+  });
+}
+
+/* ---------------------------------------------------------------------
+   РЕЕСТР ПАНЕЛЕЙ
+   --------------------------------------------------------------------- */
+/* ⚠️ СЛОЙ ПОВЕРХ СЦЕНЫ ЖИВЁТ В ПАНЕЛИ, А НЕ В ГЛОБАЛЬНЫХ ГРАНИЦАХ.
+
+   `mainScales()` строил свои шкалы из CONFIG.Qmin/Qmax на всю ширину холста.
+   Сделано это было нарочно — чтобы не брать глобальные sx/sy, в которых у
+   многопанельных сцен остаётся шкала ПОСЛЕДНЕЙ панели. Лечение вышло хуже
+   болезни: слой перестал совпадать НИ С ОДНОЙ панелью. В «Неравенстве
+   доходов» кривая Лоренца рисуется в квадрате 0…100, а вершины площадей и
+   ключевые точки считались по шкале на всю ширину — отклонение по X около
+   54 px, и оно росло при зуме. В сюжете про производную площадь натягивалась
+   полигоном между верхним и нижним графиком, а на нижнем мышь липла к f(x),
+   которой там нет.
+
+   Панель — это прямоугольный кусок холста со своими шкалами. Сцена объявляет
+   свои панели сама, сразу после того, как построила шкалы. Точка, вершина и
+   посчитанная площадь помнят, в какой панели их поставили, и рисуются по её
+   шкалам. Второго механизма «границы кадра» заводить нельзя. */
+/* Сцена, у которой геометрия своя, объявляет об этом ОДНОЙ строкой: сначала
+   гасит то, что успел зарегистрировать makeScales, потом заводит свои панели.
+   Без этого 'main' на весь холст остался бы рядом с квадратом Лоренца и с
+   панелями производной, и панель под курсором выбиралась бы наугад. */
+function clearPanels() { STATE.panels = []; }
+
+function registerPanel(id, mx, my, rect) {
+  const r = rect || {};
+  const p = {
+    id: String(id),
+    mx, my,
+    x0: Math.min(r.x0, r.x1), x1: Math.max(r.x0, r.x1),
+    y0: Math.min(r.y0, r.y1), y1: Math.max(r.y0, r.y1),
+  };
+  if (!Array.isArray(STATE.panels)) STATE.panels = [];
+  // Перерисовка в один кадр бывает вложенной (сцена зовёт makeScales дважды);
+  // панель с тем же id заменяем, а не копим дубли.
+  const i = STATE.panels.findIndex(o => o.id === p.id);
+  if (i >= 0) STATE.panels[i] = p; else STATE.panels.push(p);
+  return p;
+}
+
+// Расстояние от пикселя до прямоугольника панели (0 — внутри).
+function panelDist(p, px, py) {
+  const dx = Math.max(p.x0 - px, 0, px - p.x1);
+  const dy = Math.max(p.y0 - py, 0, py - p.y1);
+  return Math.hypot(dx, dy);
+}
+
+/* Панель под пикселем. Мимо всех прямоугольников — ближайшая: курсор в поле
+   холста (там же оси и подписи) обязан вести себя как курсор в панели, иначе
+   постановка точки у самой оси уходила бы в чужие шкалы. */
+function panelAt(px, py) {
+  const list = STATE.panels || [];
+  if (!list.length) return null;
+  let best = null, bd = Infinity;
+  list.forEach(p => {
+    const d = panelDist(p, px, py);
+    if (d < bd) { bd = d; best = p; }
+  });
+  return best;
+}
+
+// Панель под последней известной позицией курсора; курсора не было — первая.
+function activePanel() {
+  const list = STATE.panels || [];
+  if (!list.length) return null;
+  if (STATE.pointerPx == null || STATE.pointerPy == null) return list[0];
+  return panelAt(STATE.pointerPx, STATE.pointerPy) || list[0];
+}
+
+// Панель по id (для точек и вершин, помнящих свою). Нет такой — активная.
+function panelById(id) {
+  const list = STATE.panels || [];
+  if (!id) return activePanel();
+  return list.find(p => p.id === id) || activePanel();
+}
+
+/* ── ОКНО ПАНЕЛИ, ВЫБРАННОЕ ЧЕЛОВЕКОМ ─────────────────────────────────
+   Колесо и перетаскивание фона меняют окно ТОЙ панели, над которой курсор.
+   У панели со своими границами (мини-рынок, квадрат Лоренца) окно считает
+   сама сцена — по своим кривым. Как только человек покрутил колесо, окно
+   становится ЕГО, и сцена больше его не пересчитывает: то же правило, что у
+   `STATE.zoomLock` для главной панели.
+
+   ⚠️ Живёт это в STATE, а не в записи панели: записи пересобираются на каждой
+   перерисовке, а выбор человека обязан её пережить. */
+function panelWin(id, x0, x1, y0, y1) {
+  const st = STATE.panelWin || (STATE.panelWin = {});
+  return st[id] || { x0, x1, y0, y1 };
+}
+function resetPanelWins() { STATE.panelWin = {}; }
+
+/* Приблизить окно панели к точке (px, py). Возвращает false, если панели нет
+   или окно выродилось — тогда жест просто ничего не делает.
+   ⚠️ КВАДРАТ ЛОРЕНЦА ОСТАЁТСЯ КВАДРАТОМ: обе оси умножаются на ОДИН и тот же
+   множитель, поэтому равные размахи остаются равными сами собой. Оси там
+   несут проценты, и растянуть одну без другой значит соврать про смысл
+   картинки. */
+function panelZoomBy(id, factor, px, py) {
+  const p = (STATE.panels || []).find(q => q.id === id);
+  if (!p || !isFinite(factor) || factor <= 0) return false;
+  const [x0, x1] = p.mx.domain(), [y0, y1] = p.my.domain();
+  const w = Math.max(1, p.x1 - p.x0), h = Math.max(1, p.y1 - p.y0);
+  const tx = Math.min(1, Math.max(0, (px - p.x0) / w));
+  const ty = Math.min(1, Math.max(0, (py - p.y0) / h));
+  const xc = x0 + (x1 - x0) * tx, yc = y1 - (y1 - y0) * ty;
+  const nx0 = xc - (xc - x0) * factor, nx1 = xc + (x1 - xc) * factor;
+  const ny0 = yc - (yc - y0) * factor, ny1 = yc + (y1 - yc) * factor;
+  if (!((nx1 - nx0) > 1e-9) || !((ny1 - ny0) > 1e-9)) return false;
+  if (!isFinite(nx0) || !isFinite(nx1) || !isFinite(ny0) || !isFinite(ny1)) return false;
+  (STATE.panelWin || (STATE.panelWin = {}))[id] = { x0: nx0, x1: nx1, y0: ny0, y1: ny1 };
+  return true;
+}
+
+// Сдвинуть окно панели на столько единиц, на сколько уехал курсор.
+function panelPanBy(id, dxPx, dyPx) {
+  const p = (STATE.panels || []).find(q => q.id === id);
+  if (!p) return false;
+  const [x0, x1] = p.mx.domain(), [y0, y1] = p.my.domain();
+  const w = Math.max(1, p.x1 - p.x0), h = Math.max(1, p.y1 - p.y0);
+  const dx = (x1 - x0) * dxPx / w, dy = (y1 - y0) * dyPx / h;
+  (STATE.panelWin || (STATE.panelWin = {}))[id] =
+    { x0: x0 - dx, x1: x1 - dx, y0: y0 + dy, y1: y1 + dy };
+  return true;
+}
+
+/* Панель, окном которой распоряжается ЖЕСТ, а не сцена. У 'main' окном
+   по-прежнему распоряжаются CONFIG.Qmax/Pmax, у панелей производной — их
+   собственный, давно написанный механизм tanWin. Остальные ходят сюда. */
+function gesturePanelId(px, py) {
+  const p = panelAt(px, py);
+  if (!p || p.id === 'main') return null;
+  if (p.id === 'deriv-top' || p.id === 'deriv-bottom') return null;
+  return p.id;
 }
 
 /* ⚠️ ДВЕ РАЗНЫЕ ВЕЩИ, КОТОРЫЕ РАНЬШЕ БЫЛИ ОДНИМ ФЛАГОМ.
@@ -545,9 +687,150 @@ function coordAlreadyAt(px, horiz, text) {
   return found;
 }
 
+/* ---------------------------------------------------------------------
+   НАРИСОВАННЫЕ КЛЮЧЕВЫЕ ТОЧКИ
+   --------------------------------------------------------------------- */
+/* ⚠️ КЛЮЧЕВАЯ ТОЧКА — ЭТО ТО, ЧТО СЦЕНА НАРИСОВАЛА (решение владельца 01.09).
+
+   Равновесие E, оптимум монополиста M, Qопт и Qрын, точка на границе квоты —
+   всё это точки с пунктиром к обеим осям и числом на каждой оси. Раньше слой
+   поверх сцены о них не знал вовсе: он считал только пересечения кривых.
+
+   Список берётся У НАРИСОВАННОГО, а не у второй копии правила — тем же
+   приёмом, что `offQuadShownPoints()` читает `data-marginal-tail` с холста
+   ([ADR 0026]). Порядок вызовов это позволяет: `redrawScene()` рисует сцену
+   целиком, и только потом `drawOverlays()` спрашивает ключевые точки.
+
+   Помечать точки поштучно в тридцати с лишним местах не пришлось: число на
+   оси печатают ровно два помощника, `axisValueX` и `axisValueY`, и сцены
+   зовут их ПАРОЙ с одним и тем же различителем idx. Пара с обеими половинами
+   и есть нарисованная точка. Имя ей даёт `pointName` — та самая буква, что
+   стоит на холсте («E», «M»); её нет — имя собирается из различителя.
+
+   ⚠️ Записывать намерение ДО отрисовки нельзя: сцена, вышедшая раньше срока,
+   объявила бы точку, которой на экране нет. Поэтому запись идёт из самих
+   помощников, в тот момент, когда они печатают. */
+let _kpX = [], _kpY = [], _kpNames = [];
+function resetDrawnKeyPoints() { _kpX = []; _kpY = []; _kpNames = []; }
+
+// Панель, чьи шкалы сейчас лежат в глобальных sx/sy: их и печатают помощники.
+function panelOfGlobalScales() {
+  return (STATE.panels || []).find(p => p.mx === sx && p.my === sy) || null;
+}
+
+function kpNode(g) { return (g && g.node) ? g.node() : g; }
+
+/* Пункт (б) собирается ПОСЛЕ отрисовки сцены, в один проход. Раньше пары
+   искались по различителю `idx`, и это покрывало равновесие и оптимум
+   монополиста, но не налог (одно Q на две цены), не потолок (одна цена на два
+   Q) и не квоту. Пара ищется по ГЕОМЕТРИИ: угол (число на оси Q, число на оси
+   P) считается точкой ровно тогда, когда из него выходит ПУНКТИР — то самое,
+   по чему точку узнаёт и человек. Лишние углы (у монополии их два из четырёх)
+   пунктира не имеют и отсеиваются сами. */
+/* Пунктиры ищем по ВСЕМУ холсту, а не внутри одной группы: линию МРОТ и
+   числа при ней печатают разные группы, и точка занятости иначе терялась.
+   Сетку исключаем — её штрих не проекция точки, а фон.
+
+   ⚠️ СПИСОК СЧИТАЕТСЯ ОДИН РАЗ НА КАДР. Раньше запрос по всему SVG уходил
+   ВНУТРИ двойного цикла — на каждую пару «число на оси Q × число на оси P»,
+   то есть до девяти раз за кадр по одному и тому же холсту. */
+function collectDashes() {
+  const out = [];
+  try {
+    svg.selectAll('line[stroke-dasharray]').each(function () {
+      if ((this.getAttribute('class') || '').indexOf('grid') >= 0) return;
+      out.push([+this.getAttribute('x1'), +this.getAttribute('y1'),
+                +this.getAttribute('x2'), +this.getAttribute('y2')]);
+    });
+  } catch (e) { /* холста ещё нет — пунктиров тоже */ }
+  return out;
+}
+
+/* ⚠️ ПУНКТИР ЗАСЧИТЫВАЕТСЯ ТОЛЬКО СВОЕЙ ПАНЕЛИ. В двухпанельной сцене штрих
+   из соседней панели подтверждал бы угол в этой, стоило пикселям совпасть.
+   Допуск 6 px нужен потому, что пунктир к оси упирается ровно в границу
+   панели; расстояние между соседними панелями — десятки пикселей, так что
+   перепутать их этот допуск не даёт. */
+function dashEndsNear(dashes, px, py, rect) {
+  const T = 6;
+  const inside = (x, y) => !rect ||
+    (x >= rect.x0 - T && x <= rect.x1 + T && y >= rect.y0 - T && y <= rect.y1 + T);
+  for (let i = 0; i < dashes.length; i++) {
+    const d = dashes[i];
+    if (!inside(d[0], d[1]) || !inside(d[2], d[3])) continue;
+    if (Math.hypot(d[0] - px, d[1] - py) <= 2 || Math.hypot(d[2] - px, d[3] - py) <= 2) return true;
+  }
+  return false;
+}
+
+function flushDrawnKeyPoints() {
+  const fb = panelOfGlobalScales();
+  const fid = fb ? fb.id : '';
+  const dashes = collectDashes();
+  /* ⚠️ УГОЛ СОСТАВЛЯЕТСЯ ИЗ ЧИСЕЛ ОДНОЙ ПАНЕЛИ. Числа помнят, где их
+     напечатали; без панели — значит на общих осях, и хозяйку им отдаёт
+     panelOfGlobalScales, как и раньше. Так мини-рынки объявляют свои точки
+     наравне с общими осями, не заводя второго механизма. */
+  const groups = new Map();
+  const bag = (id) => { if (!groups.has(id)) groups.set(id, { x: [], y: [] }); return groups.get(id); };
+  _kpX.forEach(a => bag(a.panel || fid).x.push(a));
+  _kpY.forEach(b => bag(b.panel || fid).y.push(b));
+  groups.forEach((grp, pid) => {
+    const rect = (STATE.panels || []).find(p => p.id === pid) || null;
+    const seen = [];
+    grp.x.forEach(a => {
+      grp.y.forEach(b => {
+        if (!dashEndsNear(dashes, a.px, b.py, rect)) return;   // угол без пунктира — не точка
+        if (seen.some(s => Math.abs(s[0] - a.px) <= 2 && Math.abs(s[1] - b.py) <= 2)) return;
+        seen.push([a.px, b.py]);
+        // Имя точки — буква, которую сцена написала рядом; нет буквы — по различителю.
+        let nm = null, bd = 10;
+        _kpNames.forEach(n => {
+          const d = Math.hypot(n.px - a.px, n.py - b.py);
+          if (d <= bd) { bd = d; nm = n.sym; }
+        });
+        if (!nm) {
+          const qs = a.idx ? ('Q' + a.idx) : '', ps = b.idx ? ('P' + b.idx) : '';
+          nm = (qs && ps) ? ('точка ' + qs + ' и ' + ps)
+             : (qs || ps ? ('точка ' + (qs || ps)) : 'отмеченная точка');
+        }
+        d3.select(a.node).append('circle').attr('class', 'kp-mark')
+          .attr('cx', a.px).attr('cy', b.py).attr('r', 0)
+          .attr('fill', 'none').attr('pointer-events', 'none')
+          .attr('data-skip-export', '1')
+          .attr('data-key-point', nm)
+          .attr('data-kp-x', a.x).attr('data-kp-y', b.y)
+          .attr('data-kp-panel', pid);
+      });
+    });
+  });
+}
+
+/* Объявление «на этой оси, в этом пикселе, напечатано это число». Зовут его
+   ДВА печатника общих осей (axisValueX/axisValueY) и мини-рынок, который свои
+   числа печатает сам — по причинам, записанным у него в коде. Это один
+   механизм с параметром, а не второй рядом: список, поиск пар и правило
+   пунктира общие. Панель нужна потому, что у мини-рынка свои шкалы. */
+function noteAxisX(g, px, value, idx, panel) {
+  const v = coordValue(value);
+  if (v && isFinite(v.num)) _kpX.push({ node: kpNode(g), px, x: v.num, idx: String(idx || ''), panel: panel || '' });
+  return v;
+}
+function noteAxisY(g, py, value, idx, panel) {
+  const v = coordValue(value);
+  if (v && isFinite(v.num)) _kpY.push({ node: kpNode(g), py, y: v.num, idx: String(idx || ''), panel: panel || '' });
+  return v;
+}
+
+// Буква у точки — её настоящее имя на холсте («E», «M»).
+function kpName(g, px, py, sym) {
+  if (!sym || !isFinite(px) || !isFinite(py)) return;
+  _kpNames.push({ node: kpNode(g), px, py, sym: String(sym) });
+}
+
 function axisValueX(g, px, oy, value, idx) {
   if (!isFinite(px)) return null;
-  const v = coordValue(value);
+  const v = noteAxisX(g, px, value, idx);
   if (!v) return null;
   const span = Math.abs(sx.domain()[1] - sx.domain()[0]);
   const onTick = xTicks().some(t => Math.abs(sx(t) - px) < 7) ||
@@ -574,7 +857,7 @@ function axisValueX(g, px, oy, value, idx) {
    раза — по ней подпись «не влезала» там, где на самом деле влезает. */
 function axisValueY(g, ox, py, value, idx) {
   if (!isFinite(py)) return null;
-  const v = coordValue(value);
+  const v = noteAxisY(g, py, value, idx);
   if (!v) return null;
   const span = Math.abs(sy.domain()[1] - sy.domain()[0]);
   const onTick = yTicks().some(t => Math.abs(sy(t) - py) < 7) ||

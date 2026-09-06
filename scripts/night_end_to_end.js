@@ -141,7 +141,7 @@ async function login(page, user) {
   await page.goto(assignmentUrl.replace(/\/$/, '') + '/print/',
                   { waitUntil: 'networkidle' });
   text = await page.evaluate(() => document.body.innerText);
-  check('в листке есть свой подвал', text.includes('ЭкЗадачи'));
+  check('в листке есть свой подвал', text.includes('Weconomics'));
   check('в листке есть подписи частей', text.includes('Тестовая часть'));
   await shot(page, '07-print', 'Листок ученикам: подписи частей, место под решение по весу задачи, свой подвал.');
 

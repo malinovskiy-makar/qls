@@ -23,7 +23,20 @@ from game.generators.base import generate_batch
 from game.generators.registry import ARCHETYPES
 
 QUESTION_TYPES = ('numeric', 'single', 'boolean')
+# Режим «График» — четвёртый тип, но только у архетипов с чертежом:
+# без figure() четыре картинки взять неоткуда.
+FIGURE_TYPE = 'figure_choice'
 DEFAULT_SEED = 20260714
+
+
+def _probe_args(arch, rng):
+    """Пробный (params, solved, asked) — чтобы узнать, рисует ли архетип
+    чертёж. Дешевле, чем держать отдельный список «графических» ключей:
+    список разъехался бы с кодом при первой же переработке архетипа."""
+    params = arch.sample(rng)
+    solved = arch.solve(params)
+    asked = arch.asked_values(params)[0]
+    return params, solved, asked
 
 
 class Command(BaseCommand):
@@ -60,7 +73,13 @@ class Command(BaseCommand):
                 raise CommandError(
                     '{}: неканонические темы {}'.format(key, bad_topics))
             counts = {}
-            for qtype in QUESTION_TYPES:
+            # Четвёртый тип — только у архетипов с чертежом: без figure()
+            # четыре картинки взять неоткуда.
+            types = list(QUESTION_TYPES)
+            probe = arch.figure(*_probe_args(arch, rng))
+            if probe:
+                types.append(FIGURE_TYPE)
+            for qtype in types:
                 batch = generate_batch(arch, rng, qtype, per)
                 counts[qtype] = len(batch)
                 for q in batch:
@@ -87,10 +106,12 @@ class Command(BaseCommand):
             summary.append((key, counts))
             short = [c for c in counts.values() if c < per]
             mark = '' if not short else '  ⚠ меньше запрошенного'
+            fig_note = ('' if FIGURE_TYPE not in counts
+                        else ' · график {:>4}'.format(counts[FIGURE_TYPE]))
             self.stdout.write('  {:<24} numeric {:>4} · single {:>4} · '
-                              'boolean {:>4}{}'.format(
+                              'boolean {:>4}{}{}'.format(
                                   key, counts['numeric'], counts['single'],
-                                  counts['boolean'], mark))
+                                  counts['boolean'], fig_note, mark))
 
         total = len(rows)
         self.stdout.write('Итого сгенерировано: {} вопросов '

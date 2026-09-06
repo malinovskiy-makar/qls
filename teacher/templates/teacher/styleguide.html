@@ -9,11 +9,37 @@
 
 {% block extra_style %}{% include 'teacher/groups/_style.html' %}
 .sg-block { margin-bottom: 34px; }
-.sg-h { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
-.sg-d { font-size: 12px; color: var(--text2); margin-bottom: 12px;
+.sg-h { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+.sg-d { font-size: 13px; color: var(--text2); margin-bottom: 12px;
         line-height: 1.6; max-width: 640px; }
 .sg-demo { background: var(--bg); border: 0.5px solid var(--border);
            border-radius: 10px; padding: 18px; }
+/* ⚠️ ЭТИ РАЗДЕЛЫ ПОКАЗЫВАЮТ ПАНЕЛЬ ИНСТРУМЕНТА, А НЕ ПРОСТО ФОН.
+   Роль цвета: всё, что относится к вводу, поиску и отбору, красится
+   --surface-tool. Стайлгайд — полигон приёмки, и если роль не показана
+   здесь, её на экранах и не заметят: ровно так шесть новых токенов
+   прожили сутки объявленными и ни разу не применёнными.
+   ⚠️ На бирюзе живёт только основной текст (6,03); --text2 даёт 3,31,
+   поэтому подписи внутри демо обязаны лежать в светлых полях. */
+.sg-demo--tool { background: var(--surface-tool); border-color: var(--border); }
+/* Правило «на бирюзе только основной текст» применено ЗДЕСЬ, а не в самом
+   наборе: `.k-label`, `.k-hint` и `.k-score__cap` живут на всех экранах
+   платформы, и там второстепенный тон на месте. Переопределение прицельное —
+   действует только внутри бирюзовой панели.
+   Замер до правки: 3,31 у подписи поля, 2,80 у приписки «баллов», 3,90 у
+   пояснения под полем в тёмной теме. */
+.sg-demo--tool .k-label,
+.sg-demo--tool .k-hint,
+.sg-demo--tool .k-score__cap,
+.sg-demo--tool .k-check { color: var(--text); }
+/* Выключенная строка — тоже. WCAG 1.4.3 выключенные элементы от нормы
+   освобождает, и на обычном фоне приглушённый тон здесь уместен: --text3
+   даёт там 6,19, то есть «тише», но читаемо. На бирюзе тот же тон падает
+   до 2,80 — это уже не «тише», а «не видно». Признак выключенности несёт
+   сама галочка (серая, курсор not-allowed), поэтому подпись возвращается
+   к основному тону. Селектор повторяет `:has()` из набора, иначе не
+   перебьёт его по весу. */
+.sg-demo--tool .k-check--box:has(input:disabled) { color: var(--text); }
 .sg-grid { display: grid; gap: 14px;
            grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
 {% endblock %}
@@ -23,14 +49,14 @@
   <div>
     <h1 class="page-title">Набор деталей</h1>
     <p class="page-sub">Из этих элементов собраны экраны кабинета.
-      Переключите тему в шапке — всё должно остаться читаемым.</p>
+      Переключите тему в шапке: всё должно остаться читаемым.</p>
   </div>
 </div>
 
 <div class="sg-block">
   <div class="sg-h">Кнопки</div>
-  <div class="sg-d">Три веса. Главная — сплошная заливка, одна на экран.
-    Обычная — тонкая рамка. Тихая — только текст, для необязательных действий.</div>
+  <div class="sg-d">Три веса. У главной сплошная заливка, одна на экран.
+    У обычной тонкая рамка. У тихой только текст, для необязательных действий.</div>
   <div class="sg-demo k-row">
     <button class="k-btn k-btn--main" type="button">Сохранить и дальше</button>
     <button class="k-btn k-btn--plain" type="button">Проверять вручную</button>
@@ -45,7 +71,7 @@
   <div class="sg-d">Ни одного браузерного элемента по умолчанию: список и
     галочка нарисованы своими, иначе в тёмной теме просвечивает светлый
     системный виджет.</div>
-  <div class="sg-demo sg-grid">
+  <div class="sg-demo sg-demo--tool sg-grid">
     <div>
       <label class="k-label" for="sg1">Название работы</label>
       <input class="k-input" id="sg1" type="text" placeholder="Например: КПВ и альтернативные издержки">
@@ -113,7 +139,7 @@
       <div class="k-state__body">
         <div class="k-state__title">Проверять придётся вам, вручную</div>
         <div class="k-state__note">Ответ этой задачи взят из каталога и записан
-          фразой — машине сверять нечего.</div>
+          фразой, и машине сверять нечего.</div>
       </div>
     </div>
     <div class="k-state k-state--ok">
@@ -127,7 +153,7 @@
       <span class="k-state__icon">×</span>
       <div class="k-state__body">
         <div class="k-state__title">Ответа нет</div>
-        <div class="k-state__note">Но решение ученик написал — прочитайте.</div>
+        <div class="k-state__note">Но решение ученик написал, прочитайте.</div>
       </div>
     </div>
   </div>
@@ -137,7 +163,7 @@
   <div class="sg-h">Крупное числовое поле</div>
   <div class="sg-d">Максимальный балл за позицию. Цифра крупная, подпись мелкой:
     так балл и метка источника перестают сливаться в серую кашу.</div>
-  <div class="sg-demo k-row" style="gap:26px">
+  <div class="sg-demo sg-demo--tool k-row" style="gap:26px">
     <label class="k-score">
       <input type="number" value="10" min="0" max="100">
       <span class="k-score__cap">баллов</span>
@@ -155,7 +181,7 @@
 
 <div class="sg-block">
   <div class="sg-h">Ряд плиток-переключателей</div>
-  <div class="sg-d">Равноправные способы что-то сделать. Выбранная плитка —
+  <div class="sg-d">Равноправные способы что-то сделать. Выбранная плитка это
     единственное место, где акцент заливает поверхность.</div>
   <div class="sg-demo k-tiles">
     <span class="k-tile k-tile--on">
@@ -175,7 +201,7 @@
 
 <div class="sg-block">
   <div class="sg-h">Карточки</div>
-  <div class="sg-d">Обычная и «просит внимания» — вторая отличается только
+  <div class="sg-d">Обычная и «просит внимания»: вторая отличается только
     тонкой рамкой, без заливки.</div>
   <div class="sg-demo sg-grid">
     <div class="k-card">
@@ -192,7 +218,7 @@
 <div class="sg-block">
   <div class="sg-h">Служебный разделитель</div>
   <div class="sg-d">Подпись плюс пунктир. Разделяет части листка и части
-    карточки. Намеренно не жирный — это служебная линия, а не заголовок.</div>
+    карточки. Намеренно не жирный, ведь это служебная линия, а не заголовок.</div>
   <div class="sg-demo">
     <div class="k-sep"><span class="k-sep__cap">Тестовая часть</span>
       <span class="k-sep__line"></span></div>
@@ -206,12 +232,12 @@
 <div class="sg-block">
   <div class="sg-h">Знак вопроса с подсказкой</div>
   <div class="sg-d">Ставится там, где рядом стоят два числа и без пояснения
-    непонятно, чем они отличаются. Подсказка появляется сразу — при
+    непонятно, чем они отличаются. Подсказка появляется сразу: при
     наведении, при фокусе с клавиатуры и по нажатию на сенсорном экране.
-    Разметка — партиал <code>_hint.html</code>, рисование —
+    Разметку даёт партиал <code>_hint.html</code>, рисование
     <code>_hint_js.html</code>.</div>
   <div class="sg-demo">
-    <span>Доля верных{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</span>
+    <span>Доля верных{% include '_hint.html' with hint='Первое число считается по всем задачам, решённым на сайте. Второе только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</span>
     <span style="margin-left:28px;">Короткая подсказка{% include '_hint.html' with hint='Так выглядит подсказка в одну строку.' %}</span>
   </div>
 </div>

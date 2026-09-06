@@ -1,6 +1,7 @@
 from django import template
 
 from problems.figures import render_figures as _render_figures
+from problems.jsonsafe import dumps_for_script
 from problems.rendering import render_markdown as _render_markdown
 
 register = template.Library()
@@ -111,3 +112,17 @@ def render_figures_filter(html, problem):
     см. `problems/figures.py` и ADR 0031.
     """
     return _render_figures(html, problem)
+
+
+@register.filter(name='script_json')
+def script_json(value):
+    """JSON для тега `<script type="application/json">` — кириллица как есть.
+
+    Штатный `json_script` пишет не-ASCII как `\\uXXXX`: страница переставала
+    содержать русские фразы буквально, и проверка «HTML содержит фразу» их
+    не находила. `dumps_for_script` держит кириллицу и экранирует только
+    `<`, `>`, `&` — выйти из тега таким значением нельзя. Выводить через
+    `|safe` в шаблоне (как и остальные вызовы `dumps_for_script`), иначе
+    автоэкранирование превратит кавычки JSON в `&quot;`.
+    """
+    return dumps_for_script(value)

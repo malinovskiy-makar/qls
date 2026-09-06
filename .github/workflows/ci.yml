@@ -120,7 +120,7 @@ jobs:
       # средней и высокой важности ноль, код возврата 0.
       - name: bandit
         run: >-
-          bandit -r problems catalog teacher student game calc2 config -ll
+          bandit -r problems catalog teacher student game calc2 config olympiads -ll
 
       # ⚠️ Проверяем БОЕВОЙ лок, а не dev: уязвимость в линтере на сервер
       # не поедет, а уязвимость в Django поедет.
@@ -304,7 +304,7 @@ jobs:
       - name: Прогон (два шага)
         run: |
           python scripts/run_tests.py \
-            problems catalog teacher student calc2 game calendar_stub config \
+            problems catalog teacher student calc2 game calendar_stub config olympiads \
             --settings=config.settings_test_pg --verbosity 2
 
   # ---------------------------------------------------------------------

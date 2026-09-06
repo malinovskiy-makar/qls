@@ -1,0 +1,172 @@
+{% comment %}
+СТИЛИ ОБЩИХ ЧАСТЕЙ КАРТОЧКИ: кнопки «Условие» и «+ В домашку» с её
+выпадающим списком, и модальное окно с текстом задачи.
+
+⚠️ ВЫНЕСЕНО ИЗ `problem_list.html` ПРИ СЛИЯНИИ ЭКРАНОВ, А НЕ НАПИСАНО
+ЗАНОВО: это работающие возможности каталога, и слияние их не касалось.
+Отдельный файл — чтобы новый экран не тащил шестьсот строк стилей одним
+блоком и чтобы правка кнопки не значила правку всего каталога.
+{% endcomment %}
+/* ── Кнопки действий на карточке ─────────────────── */
+.card-action-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+}
+.ca-btn {
+  padding: 4px 11px;
+  border-radius: var(--r);
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background .12s, color .12s, border-color .12s;
+  line-height: 1.5;
+}
+.ca-preview {
+  border: .5px solid var(--border);
+  background: var(--surface);
+  color: var(--text2);
+}
+.ca-preview:hover { border-color: var(--accent); color: var(--accent-ink); }
+.ca-add {
+  border: .5px solid var(--accent);
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-weight: 500;
+}
+.ca-add:hover { background: var(--accent); color: var(--on-btn); }
+.ca-add.added { background: var(--green-tint); border-color: var(--green); color: var(--green); }
+
+/* Dropdown домашек */
+.ca-hw-wrap { position: relative; }
+.ca-dropdown {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  background: var(--surface);
+  border: .5px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.12);
+  min-width: 220px;
+  z-index: 200;
+  overflow: hidden;
+}
+.ca-dropdown.open { display: block; }
+.ca-dd-head {
+  padding: 8px 12px 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  border-bottom: .5px solid var(--border);
+}
+.ca-dd-item {
+  display: block;
+  width: 100%;
+  padding: 9px 12px;
+  border: none;
+  background: none;
+  text-align: left;
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+  transition: background .1s;
+  border-bottom: .5px solid var(--border-soft);
+}
+.ca-dd-item:last-child { border-bottom: none; }
+.ca-dd-item:hover { background: var(--surface-2); }
+.ca-dd-item.new-hw { color: var(--accent-ink); font-weight: 500; }
+.ca-dd-item.done   { color: var(--green); pointer-events: none; }
+
+/* ── Модальное окно ───────────────────────────────── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.45);
+  z-index: 1000;
+  align-items: center;
+  justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.c-modal {
+  background: var(--surface);
+  border-radius: 12px;
+  border: .5px solid var(--border);
+  width: 640px;
+  max-width: 96vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 8px 40px rgba(0,0,0,.18);
+}
+.c-modal-head {
+  padding: 18px 22px 14px;
+  border-bottom: .5px solid var(--border);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.c-modal-title {
+  flex: 1;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+.c-modal-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.c-modal-tag {
+  background: var(--chip-bg);
+  color: var(--chip-text);
+  border-radius: 20px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.c-modal-tag.sol { background: var(--green-tint); color: var(--green); }
+.c-modal-close {
+  border: none;
+  background: none;
+  font-size: 20px;
+  color: var(--text2);
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.c-modal-close:hover { color: var(--text); }
+.c-modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.c-modal-part { margin-top: 14px; }
+.c-modal-part-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text2);
+  text-transform: uppercase;
+  letter-spacing: .4px;
+  margin-bottom: 4px;
+}
+.c-modal-foot {
+  padding: 12px 22px;
+  border-top: .5px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.c-modal-source { font-size: 13px; color: var(--text2); flex: 1; }
+.c-modal-loading {
+  display: flex; align-items: center; justify-content: center;
+  height: 100px; color: var(--text2); font-size: 14px;
+}

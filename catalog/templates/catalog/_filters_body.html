@@ -1,0 +1,115 @@
+{% load ru catalog_filters %}{% comment %}
+ТЕЛО ОДНОЙ ГРУППЫ ФИЛЬТРОВ. Отдельный файл, потому что оно одинаково в
+обоих режимах: в ленте оно лежит внутри выпадающего окна чипа, в панели —
+прямо в блоке. Пока тело было написано дважды, ровно этим двум копиям и
+предстояло разойтись — то самое, ради чего компонент и делался.
+
+Ждёт: g — одна группа из `catalog.filters.build`.
+{% endcomment %}
+{% if g.type == 'topic' %}
+  {% comment %}
+  ⚠️ ТЕМЫ СОБРАНЫ В ШЕСТЬ РАЗДЕЛОВ. Двадцать три строки подряд читаются
+  как список без начала и конца; раздел говорит, сколько в нём тем и
+  задач, и раскрывается по клику. Раздел с выбранной темой открыт сразу —
+  иначе выбранное было бы спрятано от того, кто его выбрал.
+  {% endcomment %}
+  <div class="fl-groups">
+  {% for grp in g.groups %}
+    <details class="fl-group"{% if grp.open %} open{% endif %}>
+      <summary>
+        <span class="fl-group-name">{{ grp.label }}</span>
+        <span class="fl-group-n">{{ grp.topics }}&nbsp;{{ grp.topics|plural_ru:"тема,темы,тем" }} · {{ grp.count|spaceint }}</span>
+      </summary>
+      <ul class="fl-opts">
+      {% for o in grp.options %}
+        <li><a class="fl-opt{% if o.active %} is-on{% endif %}" href="{{ o.url }}">
+          <span class="fl-opt-l">{{ o.label }}</span>
+          <span class="fl-opt-n">{{ o.count|spaceint }}</span></a></li>
+      {% endfor %}
+      </ul>
+    </details>
+  {% endfor %}
+  </div>
+
+{% elif g.type == 'tag' %}
+  {% comment %}
+  ⚠️ ТЕГ — ПОЛЕ ВВОДА, А НЕ СПИСОК. Тегов 552 сегодня и 343 в таксономии
+  v2: списком их не показать никакими средствами. Подсказки приходят с
+  двух символов, выбранный тег падает чипом вниз, поле очищается и готово
+  к следующему. Список под полем — теги ВЫБРАННОЙ ТЕМЫ (медиана 11 на
+  тему, помещаются целиком).
+  {% endcomment %}
+  <div class="fl-tag" data-tag-box>
+    <input class="fl-tag-input" type="search" autocomplete="off"
+           data-tag-input data-tag-url="{% url 'catalog:api_tags' %}"
+           placeholder="Попробуйте вписать тег. Например, Олигополия по Курно"
+           aria-label="Поиск тега">
+    <ul class="fl-tag-sug" data-tag-sug hidden></ul>
+    {% if g.tags.chosen %}
+    <ul class="fl-tag-chips">
+      {% for o in g.tags.chosen %}
+      <li><a class="fl-tag-chip" href="{{ o.url }}">{{ o.label }}<span aria-hidden="true">✕</span>
+        <span class="sr-only">снять тег</span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if g.tags.listed %}
+    <div class="fl-tag-of">Теги выбранной темы</div>
+    <ul class="fl-opts fl-opts--wrap">
+      {% for o in g.tags.listed %}
+      <li><a class="fl-opt{% if o.active %} is-on{% endif %}" href="{{ o.url }}">
+        <span class="fl-opt-l">{{ o.label }}</span>
+        <span class="fl-opt-n">{{ o.count|spaceint }}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+{% elif g.type == 'kind' %}
+  {% comment %}
+  ⚠️ ВЫБОР ПРОДОЛЖАЕТСЯ ВБОК, А НЕ РАСКРЫВАЕТСЯ ВНИЗ (решение владельца).
+  Сначала «развёрнутая задача или тест»; выбрали тест — рядом СБОКУ встаёт
+  второй столбец с форматами. Тип, которого в банке нет, показан с нулём:
+  ноль говорит «такого формата пока не завезли», а молчание неотличимо от
+  сломанного фильтра.
+  {% endcomment %}
+  <div class="fl-two">
+    <ul class="fl-opts">
+      {% for o in g.options %}
+      <li><a class="fl-opt{% if o.active %} is-on{% endif %}" href="{{ o.url }}">
+        <span class="fl-opt-l">{{ o.label }}</span>
+        <span class="fl-opt-n">{{ o.count|spaceint }}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% if g.value == 'test' %}
+    <ul class="fl-opts fl-opts--next" aria-label="Формат теста">
+      {% for o in g.test_types %}
+      <li><a class="fl-opt{% if o.active %} is-on{% endif %}" href="{{ o.url }}">
+        <span class="fl-opt-l">{{ o.label }}</span>
+        <span class="fl-opt-n">{{ o.count|spaceint }}</span></a></li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+
+{% elif g.type == 'flag' %}
+  <ul class="fl-opts">
+    <li><a class="fl-opt{% if g.option.active %} is-on{% endif %}" href="{{ g.option.url }}">
+      <span class="fl-opt-l">{{ g.option.label }}</span>
+      <span class="fl-opt-n">{{ g.option.count|spaceint }}</span></a></li>
+  </ul>
+
+{% else %}
+  {% comment %}
+  Обычный список вариантов: сложность, источник, а позже — характер задачи
+  и особенности. Источник просили именно выпадающим выбором, а не полем
+  ввода как у тегов: их около двух десятков, они помещаются списком.
+  {% endcomment %}
+  <ul class="fl-opts{% if g.key == 'difficulty' %} fl-opts--wrap{% endif %}{% if g.key == 'source' %} fl-opts--tall{% endif %}">
+    {% for o in g.options %}
+    <li><a class="fl-opt{% if o.active %} is-on{% endif %}" href="{{ o.url }}">
+      <span class="fl-opt-l">{{ o.label }}</span>
+      <span class="fl-opt-n">{{ o.count|spaceint }}</span></a></li>
+    {% endfor %}
+  </ul>
+{% endif %}

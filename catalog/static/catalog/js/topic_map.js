@@ -46,18 +46,29 @@ function makeRandom(seed) {
 }
 
 /* ── Цвет ──────────────────────────────────────────────────────────────
-   ВСЕ 372 УЗЛА ОДНОГО ЦВЕТА — нейтрального `--map-node`. Тема отличается
-   от тега размером и непрозрачностью (1 против 0,72), а не оттенком; всё
-   подсвеченное рисуется акцентом платформы. Раньше здесь разводились семь
-   предметных цветов разделов оттенком и светлотой, с дотяжкой контраста
-   после разведения (ADR 0036); от этого отказались в ADR 0038 — цвет
-   пестрил и ничего не сообщал, потому что легенду никто не помнит.
+   У КАЖДОГО РАЗДЕЛА КОРПУСА СВОЙ ЦВЕТ, ИХ СЕМЬ. Тема и все её теги
+   красятся цветом своего раздела; тема отличается от тега размером и
+   непрозрачностью (1 против 0,72), а не оттенком. Всё подсвеченное
+   рисуется акцентом платформы — акцент поверх цвета раздела, а не вместо
+   него.
+
+   Это ВОЗВРАТ, а не новинка: цвета уже были (ADR 0036), их сняли в пользу
+   одного нейтрального `--map-node` (ADR 0038) с доводом «пестрит, а
+   легенду никто не помнит». Довод оказался неполным: без цвета коллеге не
+   за что зацепиться взглядом, карта читается как однородная сеть. Легенду
+   в этот раз держит правая панель — заголовок раздела написан своим
+   цветом, и подсказка всегда рядом с картой. См. ADR 0053.
+
+   Сами значения — CSS-переменные `--map-g-*` в topic_map.css (не в общих
+   токенах; почему — долг записан там же).
+
    ⚠️ ЛОВУШКА, ИЗ-ЗА КОТОРОЙ КАРТА ТЕРЯЛА КАДРЫ: строку цвета нельзя
    собирать на каждый узел каждый кадр — 372 разбора CSS-цвета за кадр
    стоят дороже всей остальной отрисовки. Поэтому цвет переводится в rgb
    ОДИН раз при чтении токенов, и заранее строится массив готовых строк
    'rgba(r,g,b,a)' по ступеням прозрачности; в кадре только индексация по
-   номеру ступени. */
+   номеру ступени. Несколько цветов не меняют этого правила: массивов
+   столько же, сколько разделов, а в кадре по-прежнему только индексация. */
 
 var ALPHA_STEPS = 15;              /* ступени прозрачности: 0 … 1 */
 
@@ -95,7 +106,10 @@ function shadeIndex(a) {
 var PAL = {};
 
 function readPalette() {
-  var cs = getComputedStyle(document.documentElement);
+  /* ⚠️ ЧИТАЕМ У БЛОКА КАРТЫ, А НЕ У КОРНЯ ДОКУМЕНТА. Цвета разделов
+     объявлены в скоупе `.tmap`, и с корня их не видно; общие токены сайта
+     блок наследует, поэтому одного чтения хватает на всё. */
+  var cs = getComputedStyle(root);
   var dark = document.documentElement.getAttribute('data-theme') === 'dark';
   var bgRaw = cs.getPropertyValue('--bg') || (dark ? '#10141c' : '#f5f5f3');
   var bg = hexToRgb(bgRaw);
@@ -128,26 +142,56 @@ function readPalette() {
      рёбрами (дефект Б). Прозрачность 0.88 задаётся здесь же. */
   PAL.plate = 'rgba(' + bg[0] + ',' + bg[1] + ',' + bg[2] + ',0.88)';
 
-  /* Один цвет на все узлы. Своих полей цвета у узла больше нет вовсе:
-     раньше каждый узел носил `shades` и `css` от цвета своего раздела,
-     теперь набор ступеней ровно один на карту — и второй, акцентный, для
-     всего подсвеченного. */
+  /* Нейтральный цвет остаётся запасным: им рисуется узел, чей раздел
+     почему-либо не нашёлся. Молча пропасть узел не должен. */
   PAL.node = hexToRgb(cs.getPropertyValue('--map-node') ||
                       (dark ? '#C8CEDA' : '#4A5260'));
   PAL.nodeShades = makeShades(PAL.node);
+
+  /* По набору ступеней на раздел; сколько разделов — говорит сам JSON, в
+     коде число не зашито. Ключ тот же, что в поле `g` у узла, поэтому в
+     кадре не нужен ни поиск, ни разбор цвета. */
+  PAL.groupShades = {};
+  PAL.groupCss = {};
+  for (var gi = 0; gi < groups.length; gi++) {
+    var gk = groups[gi].k;
+    var raw = cs.getPropertyValue('--map-g-' + gk);
+    var col = raw && raw.trim() ? hexToRgb(raw) : PAL.node;
+    PAL.groupShades[gk] = makeShades(col);
+    PAL.groupCss[gk] = 'rgb(' + col.join(',') + ')';
+  }
 
   /* Надписи-ориентиры по разделам — третий цвет карты, не узел и не
      подсветка (ADR 0046). Ступеней не нужно: прозрачность у них своя, и
      задаётся она globalAlpha сразу обоим проходам — обводке и заливке. */
   PAL.region = hexToRgb(cs.getPropertyValue('--map-region') ||
-                        (dark ? '#8FBEE0' : '#3E6C99'));
+                        (dark ? '#6794C1' : '#3E6C99'));
   PAL.regionCss = 'rgb(' + PAL.region.join(',') + ')';
+
+  /* Семейство шрифта — тем же путём, что и цвета: из токенов. */
+  PAL.font = (cs.getPropertyValue('--font-ui') || '').trim() ||
+             '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
 }
 
 /* ── Раскладка ───────────────────────────────────────────────────────── */
 
 var R_SPHERE = 470;          /* радиус сферы тем */
 var Y_SQUASH = 0.78;         /* сплющивание по вертикали */
+/* ⚠️ ПРОСТОРНЕЕ ДЕЛАЕТ НЕ РАЗМЕР ОБЛАКА, А ЕГО ФОРМА, и это замер, а не
+   рассуждение. Поднять все силы и длины разом бесполезно: обзор вписывает
+   облако в холст (computeFit), и равномерно раздутая раскладка вернётся на
+   экран ровно того же размера. Проверено — отталкивание +18 % вместе с
+   перекрёстной нитью +15 % не сдвинули ни одного числа: узлов ближе 6 px
+   друг к другу осталось 46 из 372, как и было.
+   Расходится ровно то, что растёт ОТНОСИТЕЛЬНО остального. Здесь это венец
+   тегов: он и есть длина связи тема→тег. Замер по числу узлов, у которых
+   сосед ближе 6 px (меньше — лучше):
+     46 + 5,5·n  (было)      46
+     55 + 6,6·n  (+20 %)     32   ← взято
+     58 + 7,0·n и пружина слабее  41
+     60 + 7,2·n  (+30 %)     48
+   Дальше +20 % венец начинает налезать на соседние темы, и теснота
+   возвращается уже между темами, а не внутри них. */
 var REP = 1450;              /* сила отталкивания */
 var REP_CUT2 = 640000;       /* дальше 800 не считаем */
 var K_TREE = 0.055;          /* пружина тема→тег */
@@ -159,8 +203,9 @@ var alpha = 1;
 var themeAffinity = [];      /* пары тем: {a, b, L, K, both} */
 
 function tagRadius(count) {
-  /* Венец тегов: у темы с 5 тегами ~74, с 18 — ~145. */
-  return 46 + 5.5 * count;
+  /* Венец тегов: у темы с 5 тегами ~88, с 18 — ~174. Он же длина связи
+     тема→тег, и он же главный рычаг тесноты — см. замер выше. */
+  return 55 + 6.6 * count;
 }
 
 function fibSphere(i, n, rnd) {
@@ -749,6 +794,17 @@ function pick(mx, my) {
    ЧАСТЬ 3. ОТРИСОВКА
    ═══════════════════════════════════════════════════════════════════════ */
 
+/* ── Импульс по ребру ────────────────────────────────────────────────
+   Когда тег выбирают в дереве, а не на холсте, связи с темой не видно: в
+   списке они стоят рядом, а на карте могут оказаться в разных концах
+   экрана. Импульс — точка, пробегающая по ребру от тега к его теме, —
+   показывает принадлежность движением, не занимая места.
+   ⚠️ ПРИ prefers-reduced-motion ИМПУЛЬСА НЕТ ВОВСЕ: он ничего не сообщает
+   сверх подсветки, которая остаётся. */
+var PULSE_MS = 620;          /* один пробег                             */
+var PULSE_TIMES = 3;         /* столько раз                             */
+var pulse = null;            /* {from, to, t0} либо null                */
+
 /* Состояние подсветки. */
 var picked = {};             /* id → true: выбранные теги и темы          */
 /* ⚠️ ACTIVE — ЭТО НЕ «УЗЕЛ ПОД КУРСОРОМ», А «УЗЕЛ, НА КОТОРОМ ТЫ СТОИШЬ».
@@ -764,9 +820,14 @@ var order = [];              /* порядок отрисовки по глуб�
 var lastThemeBoxes = [];     /* занятые места последнего кадра (для замеров) */
 var lastThemeFrom = 0;       /* с какого индекса в нём начинаются темы      */
 
+/* Толщина главной дороги «тег → его тема». Прочие подсвеченные связи
+   рисуются в 2,2 px; 3,8 отличается от них заметно и на глаз, и на
+   замере — полторы толщины, а не десятая доля. */
+var ROAD_HOME_WIDTH = 3.8;
+
 /* Базовая непрозрачность узла: тема в полную силу, тег вполсилы с
    небольшим запасом. Это второй после размера признак «тема или тег» —
-   цвет у них один и тот же. */
+   цвет у них общий, раздела. */
 var BASE_ALPHA_THEME = 1, BASE_ALPHA_TAG = 0.72;
 
 /* Приглушение: на белом фоне гасить надо СЛАБЕЕ, иначе карта исчезает. */
@@ -816,13 +877,21 @@ function rebuildHighlight() {
       litSet[n.id] = true;
       var parent = byId['t' + n.n];
       if (parent) {
-        litSet[parent.id] = true;
-        litEdges[edgeKey(parent.id, n.id)] = true;
+        /* ⚠️ СВОЯ ТЕМА — ВТОРОЙ УРОВЕНЬ, А НЕ ПЕРВЫЙ. Тег и его тема
+           отвечают на разные вопросы: тег это «вот что ты держишь», тема —
+           «вот чьё оно». Гори они одинаково, глазу не за что зацепиться, и
+           выбранный тег теряется рядом с крупным узлом темы. */
+        litNear[parent.id] = true;
+        /* ⚠️ ГЛАВНАЯ ДОРОГА ПОМЕЧАЕТСЯ ОТДЕЛЬНО (2, а не true). Связь тега
+           со СВОЕЙ темой отвечает на вопрос «откуда этот тег», и среди
+           десятка подсвеченных линий она обязана читаться первой. Одной
+           толщиной со смежными связями она в них терялась. */
+        litEdges[edgeKey(parent.id, n.id)] = 2;
       }
       /* Смежные теги — второй, тихий уровень. */
       (nearOf[n.id] || []).forEach(function (otherId) {
         litNear[otherId] = true;
-        litEdges[edgeKey(n.id, otherId)] = true;
+        litEdges[edgeKey(n.id, otherId)] = 1;
       });
     }
   });
@@ -858,7 +927,7 @@ function wrapLabel(text, maxChars, maxLines) {
     if (used < String(text).replace(/\s+/g, ' ').length) {
       var last = lines[maxLines - 1];
       while (last.length > 3 && last.length > maxChars - 1) last = last.slice(0, -1);
-      lines[maxLines - 1] = last.replace(/[\s,;:—-]+$/, '') + '…';
+      lines[maxLines - 1] = last.replace(/[\s,;:\u2014-]+$/, '') + '…';
     }
   }
   return lines;
@@ -867,7 +936,7 @@ function wrapLabel(text, maxChars, maxLines) {
 function cutLabel(text, maxChars) {
   text = String(text);
   if (text.length <= maxChars) return text;
-  return text.slice(0, maxChars - 1).replace(/[\s,;:—-]+$/, '') + '…';
+  return text.slice(0, maxChars - 1).replace(/[\s,;:\u2014-]+$/, '') + '…';
 }
 
 /* Подложка под подписью: прямоугольник цвета холста.
@@ -888,10 +957,15 @@ function plate(x, y, w, h) {
 
 /* Шрифт подписи. Разрядка (letterSpacing) нужна только надписям-
    ориентирам; там, где её нет, поле обязано сбрасываться в ноль — иначе
-   она протекает на следующую подпись и на замер ширины. */
+   она протекает на следующую подпись и на замер ширины.
+
+   ⚠️ СЕМЕЙСТВО БЕРЁТСЯ ИЗ ТОКЕНА `--font-ui`, А НЕ ЗАШИТО ЗДЕСЬ. Раньше в
+   этой строке стоял свой набор (-apple-system, Segoe UI), и подписи на
+   холсте единственные на всём сайте рисовались НЕ фирменным шрифтом. На
+   глаз это ловится плохо: системный гротеск похож на Montserrat ровно
+   настолько, чтобы разницу списали на сглаживание холста. */
 function setLabelFont(px, weight, spacing) {
-  ctx.font = (weight || 500) + ' ' + px +
-             'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  ctx.font = (weight || 500) + ' ' + px + 'px ' + PAL.font;
   ctx.letterSpacing = spacing ? (spacing * px).toFixed(2) + 'px' : '0px';
 }
 
@@ -957,7 +1031,7 @@ function layoutFocusLabels(theme) {
 
   function place(list, side) {
     list.sort(function (a, b) { return a.py - b.py; });
-    ctx.font = '500 ' + LABEL_TAG_PX + 'px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+    setLabelFont(LABEL_TAG_PX, 500, 0);
     var wMax = 0;
     var items = list.map(function (t) {
       var lines = wrapLabel(t.l, TAG_WRAP_CHARS, 2);
@@ -1002,13 +1076,24 @@ function layoutFocusLabels(theme) {
 /* ── Кадр ────────────────────────────────────────────────────────────── */
 
 /* ── Надписи-ориентиры по разделам ────────────────────────────────────
-   Семь названий разделов корпуса вместо двадцати девяти имён тем. Вид
+   Названия разделов корпуса (их пять) вместо двадцати девяти имён тем. Вид
    намеренно другой: прописные, разрядка, вполсилы — это ориентир, как
    название страны на карте, а не подпись объекта. */
 var GROUP_PX = 17;           /* кегль надписи раздела                   */
 var GROUP_SPACING = 0.07;    /* разрядка, доля кегля                    */
-var GROUP_ALPHA = 0.62;      /* в покое                                 */
+var GROUP_ALPHA = 0.62;      /* в покое, у САМОГО БЛИЖНЕГО раздела      */
 var GROUP_ALPHA_DIM = 0.28;  /* при любой подсветке — остаётся фоном    */
+/* ── Ориентир гаснет с глубиной ───────────────────────────────────────
+   ⚠️ РАНЬШЕ ВСЕ СЕМЬ НАДПИСЕЙ ГОРЕЛИ ОДИНАКОВО И ВСЕГДА, и это был дефект:
+   сцена поворачивается, скопления меняются местами, а подписи стоят как
+   вкопанные. Хуже того, надпись раздела, уехавшего ЗА граф, проецируется в
+   середину экрана поверх чужих узлов и врёт про то, что под ней.
+   Теперь у каждой надписи свой вес по глубине её скопления в ТЕКУЩЕЙ
+   ориентации: ближнее скопление подписано в полную силу, дальнее тает, а
+   то, что ушло за спину, не рисуется вовсе. При повороте набор ярких
+   надписей меняется сам — считать его отдельно не нужно. */
+var GROUP_DEPTH_FLOOR = 0.34;   /* во сколько раз тише самый дальний   */
+var GROUP_DEPTH_DROP = 0.16;    /* ниже этой доли не рисуем вовсе      */
 var GROUP_HALO = 3;          /* толщина обводки цветом холста, px       */
 /* Вблизи ориентир уже не нужен: человек смотрит на конкретные узлы.
    Гаснет не щелчком на пороге, а рампой, иначе дрожание масштаба около
@@ -1182,7 +1267,11 @@ function draw() {
     var a = byId[ln.s], b = byId[ln.t];
     if (a.pz < 0 || b.pz < 0) continue;
     var lit = litEdges && litEdges[edgeKey(a.id, b.id)];
-    if (lit) { roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id) }); continue; }
+    if (lit) {
+      roads.push({ a: a, b: b, k: ln.k, key: edgeKey(a.id, b.id),
+                   home: lit === 2 });
+      continue;
+    }
     var path;
     if (ln.k === 'cross') path = pCross;
     else path = ((a.pz + b.pz) / 2 < DIST) ? pNear : pFar;
@@ -1210,6 +1299,12 @@ function draw() {
     var rd = roads[i];
     ctx.strokeStyle = PAL.accentShades[shadeIndex(0.95 * hl)];
     ctx.lineWidth = 2.2;
+    /* Дорога тега к своей теме — толще и в полную силу: это ответ на
+       вопрос «откуда он», и он важнее прочих подсвеченных связей. */
+    if (rd.home) {
+      ctx.lineWidth = ROAD_HOME_WIDTH;
+      ctx.strokeStyle = PAL.accentShades[shadeIndex(hl)];
+    }
     if (rd.k === 'cross') {
       /* Пунктир остаётся пунктиром: он означает «связь по смыслу», а не
          «принадлежность теме», и менять его значение при наведении — врать
@@ -1247,6 +1342,25 @@ function draw() {
     ctx.fill();
   }
 
+  /* ── Импульс: бежит по ребру от тега к его теме ──────────────────── */
+  if (pulse && !reduceMotion) {
+    var age = (frameNow || performance.now()) - pulse.t0;
+    if (age > PULSE_MS * PULSE_TIMES) {
+      pulse = null;
+    } else if (pulse.from.pz > 0 && pulse.to.pz > 0) {
+      var k = (age % PULSE_MS) / PULSE_MS;
+      /* Ход не линейный: точка выходит быстро и подходит к теме мягко —
+         так читается направление, а не просто мигание. */
+      var ease = 1 - Math.pow(1 - k, 3);
+      var ux = pulse.from.px + (pulse.to.px - pulse.from.px) * ease;
+      var uy = pulse.from.py + (pulse.to.py - pulse.from.py) * ease;
+      ctx.fillStyle = PAL.accentShades[shadeIndex(1 - k * 0.55)];
+      ctx.beginPath();
+      ctx.arc(ux, uy, 4.5 - k * 1.5, 0, 6.283185307179586);
+      ctx.fill();
+    }
+  }
+
   /* ── Узлы: дальние раньше ближних ─────────────────────────────────── */
   order.sort(function (p, q) { return q.pz - p.pz; });
 
@@ -1275,10 +1389,11 @@ function draw() {
 
     /* Подсветка — всегда акцент, и наведение, и выбор, и найденное
        поиском: один цвет на все случаи, чтобы человек не гадал, что
-       означает второй. Акцент кладётся ПОВЕРХ обычного цвета с силой
-       подсветки: так он не переключается, а проступает и тает. */
+       означает второй. Акцент кладётся ПОВЕРХ цвета раздела с силой
+       подсветки: так он не переключается, а проступает и тает, и под ним
+       остаётся видно, какого раздела узел. */
     var hot = dim && (on || near);
-    ctx.fillStyle = PAL.nodeShades[shadeIndex(a2)];
+    ctx.fillStyle = (PAL.groupShades[n.g] || PAL.nodeShades)[shadeIndex(a2)];
     ctx.beginPath();
     ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
     ctx.fill();
@@ -1503,13 +1618,29 @@ function drawLabels(dim) {
   if (zoomFade > 1) zoomFade = 1; else if (zoomFade < 0) zoomFade = 0;
   var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade;
   if (!focusTheme) {
+    /* Сначала глубины всех разделов — доля считается от РАЗМАХА этого
+       кадра, а не от абсолютного pz: облако то ближе, то дальше, и
+       постоянный порог гасил бы то все надписи разом, то ни одной. */
+    var anchors = [], zMin = 1e9, zMax = -1e9;
+    for (i = 0; i < groups.length; i++) {
+      var a0 = groupAnchor(groups[i], { });
+      anchors.push(a0);
+      if (a0.pz < 0) continue;
+      if (a0.pz < zMin) zMin = a0.pz;
+      if (a0.pz > zMax) zMax = a0.pz;
+    }
+    var span = zMax - zMin;
     for (i = 0; i < groups.length; i++) {
       var g = groups[i];
-      var a = groupAnchor(g, gAnchor);
+      var a = anchors[i];
       if (a.pz < 0) continue;
+      /* 1 у самого ближнего скопления, 0 у самого дальнего. */
+      var front = span > 1 ? (zMax - a.pz) / span : 1;
+      if (front < GROUP_DEPTH_DROP) continue;      /* ушло за спину */
+      var depth = GROUP_DEPTH_FLOOR + (1 - GROUP_DEPTH_FLOOR) * front;
       want.push({ key: 'g:' + g.k, kind: 'group', text: g.l.toUpperCase(),
                   lines: null, node: null, ax: a.px, ay: a.py,
-                  talpha: groupAlpha, prio: 9, stick: false,
+                  talpha: groupAlpha * depth, prio: 9 - front, stick: false,
                   px: GROUP_PX, weight: 600, spacing: GROUP_SPACING,
                   maxAway: 1e9, plate: false,
                   guard: groupGuard(g, a.cx, a.cy) });
@@ -1903,6 +2034,7 @@ function frame(now) {
      раскладка пересчиталась и подписи вернулись после движения. */
   if (labelsBusy()) moved = true;
   else if (labelsCalm && now - labelLayoutAt > LAYOUT_MS) moved = true;
+  if (pulse) moved = true;
 
   if (moved || dirty) {
     dirty = false;
@@ -1956,6 +2088,7 @@ canvas.addEventListener('pointermove', function (e) {
     cam.pitch += dy * 0.005;
     cam.pitch = Math.max(-1.35, Math.min(1.35, cam.pitch));
     dragX = e.clientX; dragY = e.clientY;
+    tourNotice('drag', dragMoved);
     touchActivity(); wake();
     return;
   }
@@ -1980,7 +2113,7 @@ canvas.addEventListener('pointermove', function (e) {
        уменьшается, ни одно из двух условий не выполняется. */
     var toFar = Math.hypot(p[0] - r.b.px, p[1] - r.b.py);
     if (r.t > ROUTE_ARRIVE_T || toFar < ROUTE_ARRIVE_PX) {
-      setActive(r.b);
+      setActive(r.b, true);
     } else if (!route || route.key !== r.key) {
       route = r;
       renderRoute(r);
@@ -1997,13 +2130,16 @@ canvas.addEventListener('pointermove', function (e) {
   touchActivity();
 });
 
-/* Встать на узел: одна точка входа в режим хождения. */
-function setActive(n) {
+/* Встать на узел: одна точка входа в режим хождения.
+   `viaRoute` — пришли ли сюда, пройдя линию до конца: тур различает
+   «навёл курсор» и «дошёл по дороге», это разные умения. */
+function setActive(n, viaRoute) {
   active = n;
   route = null;
   focusTheme = (n && n.k === 'theme') ? n : null;
   rebuildHighlight();
   renderHover(n);
+  if (n) tourNotice(viaRoute ? 'walk' : 'node', n);
   wake();
 }
 
@@ -2012,28 +2148,26 @@ canvas.addEventListener('pointerup', function (e) {
   canvas.classList.remove('is-drag');
   if (dragMoved < 5) {
     var p = localPoint(e);
-    var got2 = pick(p[0], p[1]);
-    var hit = got2.node;
+    /* ⚠️ КЛИК ЦЕЛИТСЯ В УЗЕЛ, А НЕ В ЛИНИЮ, И ЭТО ОТДЕЛЬНОЕ ПРАВИЛО ОТ
+       НАВЕДЕНИЯ. У pick() старшинство настроено под ХОЖДЕНИЕ: стоишь на
+       узле — коридор его линии сильнее соседнего кружка (ADR 0047). Для
+       наведения это верно, для клика — нет: попасть в тег требовалось
+       пиксель в пиксель (кружок тега 3–5 px), промах на шесть пикселей
+       отдавал клик линии, а клик по линии брал ОБА её конца — то есть тег
+       вместе с его темой. Человек видел «кликнул по тегу, выбралась вся
+       тема», и это был не каприз выделения, а промах прицела.
+       Поэтому у клика свой прицел: hitTest с допуском 10 px. */
+    var hit = hitTest(p[0], p[1]);
     if (hit) {
-      togglePick(hit);
+      selectNode(hit);
     } else {
-      /* Клик посреди пути берёт ОБА конца маршрута — удобный способ взять
-         связанную пару целиком, не кликая по каждому узлу отдельно. */
-      var r2 = got2.route;
-      if (r2) {
-        var want = !(picked[r2.a.id] && picked[r2.b.id]);
-        if (want) {
-          picked[r2.a.id] = true;
-          picked[r2.b.id] = true;
-          lastPickedId = r2.b.id;
-        } else {
-          delete picked[r2.a.id];
-          delete picked[r2.b.id];
-          if (lastPickedId === r2.a.id || lastPickedId === r2.b.id) lastPickedId = null;
-        }
-        rebuildHighlight();
-        renderPicked();
-      }
+      /* Не попали ни в один узел — значит, клик пришёлся на линию.
+         ⚠️ БЕРЁМ ТОЛЬКО ДАЛЬНИЙ КОНЕЦ, А НЕ ОБА. Панель в этот момент
+         крупно показывает именно его («идём к …»), и выбраться должно то,
+         что человек читает. Прежний захват пары молча добавлял второй
+         узел, которого на экране никто не обещал. */
+      var r2 = pick(p[0], p[1]).route;
+      if (r2) selectNode(r2.b);
     }
   }
   touchActivity(); wake();
@@ -2049,7 +2183,11 @@ canvas.addEventListener('pointerleave', function () {
 canvas.addEventListener('dblclick', function (e) {
   var p = localPoint(e);
   var hit = hitTest(p[0], p[1]);
+  /* По узлу — подлёт к нему; по пустому месту — возврат к исходному виду.
+     Двойной клик по пустоте это привычный жест «покажи всё целиком», и
+     доходить до кнопки ⟲ в углу ради него не нужно. */
   if (hit) flyTo(hit, 2.1);
+  else resetView();
   touchActivity();
 });
 
@@ -2080,7 +2218,11 @@ function zoomAt(mx, my, factor) {
 canvas.addEventListener('wheel', function (e) {
   e.preventDefault();
   var p = localPoint(e);
+  var was = cam.zoomTarget;
   zoomAt(p[0], p[1], e.deltaY < 0 ? 1.12 : 0.893);
+  /* Сообщаем туру только о зуме, который ЧТО-ТО изменил: на упоре шкалы
+     колесо крутится, а масштаб стоит, и шаг засчитывать не за что. */
+  if (cam.zoomTarget !== was) tourNotice('zoom', cam.zoomTarget);
   touchActivity();
 }, { passive: false });
 
@@ -2104,10 +2246,17 @@ function flyTo(n, zoom) {
   wake();
 }
 
+/* Возврат к тому виду, с которого карта открылась.
+   ⚠️ ПОВОРОТ ВОЗВРАЩАЕТСЯ ТОЖЕ. Раньше здесь сбрасывались смещение,
+   масштаб и наклон, а yaw оставался где был — и «вернуть обзор» возвращало
+   не тот вид, с которого человек начал: карта успевает уехать сама, она
+   тихо вращается. Обзор — это ВЕСЬ ракурс целиком, иначе кнопка не
+   отвечает на вопрос «как было в начале». */
 function resetView() {
   cam.goalX = cam.goalY = cam.goalZ = null;
   cam.tx = cam.ty = cam.tz = 0;
   cam.zoomTarget = 1;
+  cam.yaw = START_YAW;
   cam.pitch = START_PITCH;
   if (reduceMotion) cam.zoom = 1;
   showZoom();
@@ -2131,7 +2280,16 @@ document.getElementById('tmap-zoom-fit').addEventListener('click', function () {
    для этого — не источник правды. */
 var lastPickedId = null;
 
-function togglePick(n) {
+/* ⚠️ ЕДИНСТВЕННАЯ ТОЧКА ВЫБОРА НА ВСЮ КАРТУ. Через неё идут и клик по
+   холсту, и строки правой панели, и обучение. Правило у неё одно и
+   короткое: ВЫБИРАЕТСЯ РОВНО ТОТ УЗЕЛ, КОТОРЫЙ ПЕРЕДАЛИ, — ни его тема,
+   ни его теги, ни второй конец линии. Всё остальное (подсветка соседей,
+   подсчёт задач) считается уже ОТ выбранного, а не подмешивается в него.
+
+   Заводить второй путь выбора мимо этой функции нельзя: каждый такой путь
+   заново решает, что значит «выбрать тег», и решает по-своему. */
+function selectNode(n) {
+  if (!n) return false;
   if (picked[n.id]) {
     delete picked[n.id];
     if (lastPickedId === n.id) lastPickedId = null;
@@ -2142,7 +2300,9 @@ function togglePick(n) {
   rebuildHighlight();
   renderPicked();
   if (!active) refreshHoverPanel();
+  if (picked[n.id]) tourNotice('pick', n);
   wake();
+  return !!picked[n.id];
 }
 
 function clearPick() {
@@ -2190,18 +2350,35 @@ function fmtNum(n) {
   return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 }
 
+/* ⚠️ ЭТО ЛЕГЕНДА, А НЕ «ПОД КУРСОРОМ», И ЗАГОЛОВОК БЛОКА МЕНЯЕТСЯ ВМЕСТЕ С
+   СОДЕРЖИМЫМ. Блок один, состояний два: пока ничего не наведено и не
+   выбрано, в нём объяснение знаков, и над ним обязано стоять «Как
+   пользоваться». Заголовок «Под курсором» над легендой сообщал неправду —
+   под курсором в этот момент ровно ничего.
+
+   Текст переписан короче и без длинных тире: пять строк, каждая про один
+   знак, глагол в начале там, где от человека ждут действия. */
 var HOWTO = '<ul class="tmap-howto">' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="currentColor" opacity=".7"/></svg>' +
-  '<span>Крупный узел — <b>тема</b>, их 29.</span></li>' +
+  '<span>Крупный узел это <b>тема</b>. Их 29.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="2.6" fill="currentColor" opacity=".7"/></svg>' +
-  '<span>Мелкий узел — <b>тег</b>, их 343.</span></li>' +
+  '<span>Мелкий узел это <b>тег</b>. Их 343.</span></li>' +
+  '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="7" cy="7" r="5.5" fill="currentColor" opacity=".28"/><circle cx="7" cy="7" r="2.6" fill="currentColor"/></svg>' +
+  '<span>Цвет узла это его <b>раздел</b>, они перечислены ниже.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" opacity=".7"/></svg>' +
-  '<span>Сплошная линия — дорога <b>тема → тег</b>.</span></li>' +
+  '<span>Сплошная линия ведёт от темы к её тегу.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><line x1="1" y1="7" x2="13" y2="7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="3 3" opacity=".7"/></svg>' +
-  '<span>Пунктир — смежные теги из разных тем, 82 пары.</span></li>' +
+  '<span>Пунктир связывает близкие теги разных тем. Таких пар 82.</span></li>' +
   '<li><svg width="14" height="14" viewBox="0 0 14 14"><circle cx="2.5" cy="11" r="2" fill="currentColor" opacity=".7"/><path d="M4 10 L12 3.5" stroke="currentColor" stroke-width="1.5" opacity=".7"/><circle cx="8" cy="6.5" r="2" fill="currentColor" opacity=".45"/></svg>' +
-  '<span><b>Встаньте на тег</b> — и от него можно уходить по линиям ' +
-  'к его теме и родственным тегам.</span></li></ul>';
+  '<span><b>Встаньте на тег</b> и уходите по линиям к его теме и ' +
+  'соседям.</span></li></ul>';
+
+/* Заголовок блока живёт вместе с его содержимым. */
+var hoverHead = document.getElementById('tmap-hover-head');
+
+function setHoverHead(text) {
+  if (hoverHead) hoverHead.textContent = text;
+}
 
 function renderHover(n) {
   if (!hoverBox) return;
@@ -2218,8 +2395,10 @@ function renderHover(n) {
     }
     if (last) { renderHover(last); return; }
     hoverBox.innerHTML = HOWTO;
+    setHoverHead('Как пользоваться');
     return;
   }
+  setHoverHead('Под курсором');
   var html = '';
   if (n.k === 'theme') {
     var cnt = (tagsOfTheme[n.n] || []).length;
@@ -2228,7 +2407,7 @@ function renderHover(n) {
     if (n.d) html += '<div class="tmap-def">' + esc(n.d) + '</div>';
     html += n.c
       ? '<div class="tmap-num"><b>' + fmtNum(n.c) + '</b> задач по тегам темы</div>'
-      : '<div class="tmap-num tmap-num--none">— счётчиков у тегов темы нет</div>';
+      : '<div class="tmap-num tmap-num--none">счётчиков у тегов темы нет</div>';
   } else {
     var parent = byId['t' + n.n];
     html += '<span class="tmap-kind">тег темы ' + n.n + '</span>';
@@ -2238,7 +2417,7 @@ function renderHover(n) {
     }
     /* Канон 2.3: отсутствие числа — прочерк и причина, а не пустое место. */
     html += n.c === null || n.c === undefined
-      ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет, тег размечается вручную</span></div>'
+      ? '<div class="tmap-num tmap-num--none">– <span>счётчика нет, тег размечается вручную</span></div>'
       : '<div class="tmap-num"><b>' + fmtNum(n.c) + '</b> задач</div>';
 
     var near = nearOf[n.id] || [];
@@ -2272,6 +2451,7 @@ function refreshHoverPanel() {
    нечего. */
 function renderRoute(r) {
   if (!hoverBox) return;
+  setHoverHead('Под курсором');
   var far = r.b;
   var isCross = r.link.k === 'cross';
   var html = '<span class="tmap-kind">' +
@@ -2286,7 +2466,7 @@ function renderRoute(r) {
     if (th) html += '<div class="tmap-parent"><span>' + esc(th.l) + '</span></div>';
   }
   html += (far.c === null || far.c === undefined)
-    ? '<div class="tmap-num tmap-num--none">— <span>счётчика нет</span></div>'
+    ? '<div class="tmap-num tmap-num--none">– <span>счётчика нет</span></div>'
     : '<div class="tmap-num"><b>' + fmtNum(far.c) + '</b> задач</div>';
 
   if (isCross && r.why) {
@@ -2323,15 +2503,28 @@ function renderPicked() {
     (tagsOfTheme[byId[id].n] || []).forEach(function (t) { all[t.id] = true; });
   });
   var keys = Object.keys(all);
+  /* ⚠️ СУММИРУЕМ ТОЛЬКО ТЕ ТЕГИ, У КОТОРЫХ СЧЁТЧИК ЗАДАН. Счётчик известен
+     не у всех: часть тегов размечается вручную и числа ещё не имеет.
+     Пока отсутствие числа считалось нулём, выбор из одних таких тегов давал
+     «примерно 0 задач» — а это читается как «ничего не нашлось», то есть
+     ровно противоположное правде («неизвестно»). */
+  var counted = keys.filter(function (id) {
+    var n = byId[id];
+    return n && n.c !== null && n.c !== undefined;
+  });
   var sum = 0;
-  keys.forEach(function (id) { sum += byId[id].c || 0; });
+  counted.forEach(function (id) { sum += byId[id].c; });
 
   var cEl = document.getElementById('tmap-count');
   if (cEl) {
-    cEl.textContent = keys.length
-      ? 'Выбрано: ' + keys.length + ' ' + plural(keys.length, 'тег', 'тега', 'тегов') +
-        ' · примерно ' + fmtNum(sum) + ' ' + plural(sum, 'задача', 'задачи', 'задач')
-      : 'Выбрано: 0 тегов';
+    var head = 'Выбрано: ' + keys.length + ' ' +
+               plural(keys.length, 'тег', 'тега', 'тегов');
+    cEl.textContent = !keys.length
+      ? 'Выбрано: 0 тегов'
+      : head + ' · ' + (counted.length
+          ? 'примерно ' + fmtNum(sum) + ' ' +
+            plural(sum, 'задача', 'задачи', 'задач')
+          : 'число задач пока неизвестно');
   }
   var apply = document.getElementById('tmap-apply');
   var why = document.getElementById('tmap-why');
@@ -2339,9 +2532,13 @@ function renderPicked() {
   /* Канон 2.7: причина выключенной кнопки стоит РЯДОМ, а не в подсказке. */
   if (why) why.hidden = keys.length > 0;
 
-  /* Подсветка строк навигатора «Темы». */
+  /* Отметка выбранного в дереве: и темы, и теги. Дерево — второй экран
+     того же состояния, и оно обязано показывать выбор так же, как чипы. */
   Array.prototype.forEach.call(document.querySelectorAll('.tmap-theme-row'), function (row) {
     row.classList.toggle('is-on', !!picked['t' + row.dataset.theme]);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.tmap-tag-row'), function (row) {
+    row.classList.toggle('is-on', !!picked[row.dataset.goTag]);
   });
 }
 
@@ -2358,115 +2555,115 @@ function plural(n, one, few, many) {
    ЧАСТЬ 5. ОБУЧЕНИЕ ПРИ ПЕРВОМ ЗАХОДЕ
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Версия в ключе нужна, чтобы при серьёзной переделке карты показать тур
-   заново, не трогая тех, кто его уже видел на прежней версии. */
-var TOUR_KEY = 'weconomics.map.tour.v1';
+/* ⚠️ ТУР НЕ РАССКАЗЫВАЕТ, А ЗАСТАВЛЯЕТ ПОПРОБОВАТЬ. Прежняя версия
+   показывала пять карточек и сама двигала камеру: человек досматривал её
+   как ролик и закрывал, ничего не научившись — руками он к карте так и не
+   прикоснулся. Теперь каждый шаг ждёт НАСТОЯЩЕГО действия и засчитывается
+   слушателем этого действия, а не кнопкой «дальше» и не таймером.
+
+   Пять шагов — пять разных механик: повернуть, приблизить, встать на узел,
+   уйти по линии, выбрать тег. Кнопки «дальше» у шага нет вовсе; есть
+   «пропустить шаг» — на случай мыши без колеса или сенсорного экрана — и
+   «пропустить» на весь тур.
+
+   Версия в ключе поднята до v2: логика шагов изменилась целиком, и те, кто
+   видел рассказ, должны один раз увидеть и практику. */
+var TOUR_KEY = 'weconomics.map.tour.v2';
 
 var tourBox = document.getElementById('tmap-tour');
 var tourHole = document.getElementById('tmap-tour-hole');
 var tourCard = document.getElementById('tmap-tour-card');
-var tourStep = 0, tourOn = false, tourDemo = [];
+var tourStep = 0, tourOn = false, tourDone = false;
 
-/* Тур не рассказывает, а ПОКАЗЫВАЕТ: каждый шаг сам управляет картой. */
+/* ⚠️ ШАГ ЗАСЧИТЫВАЕТСЯ СОБЫТИЕМ, А НЕ СОСТОЯНИЕМ. Проверять «стоит ли
+   курсор на теге» опросом нельзя: человек мог оказаться там случайно ещё
+   до того, как прочёл задание, и шаг засчитался бы сам. Поэтому места
+   взаимодействия сообщают туру, ЧТО ИМЕННО СЕЙЧАС ПРОИЗОШЛО, а шаг решает,
+   его ли это событие. */
 var TOUR = [
   {
-    t: 'Это весь корпус',
-    p: '29 тем и 343 тега — всё, из чего состоит банк задач. Крупные узлы это темы, ' +
-       'мелкие вокруг них — теги.',
+    t: 'Поверните корпус',
+    p: 'Возьмите карту мышью и потяните в сторону. Она объёмная: то, что ' +
+       'сейчас далеко, повернётся к вам.',
+    hint: 'Тяните мышью по холсту',
     at: function () { return wrap; },
-    zone: 'canvas-bottom',
-    go: function () { resetView(); }
+    want: function (kind, value) { return kind === 'drag' && value >= 60; }
   },
   {
-    t: 'Тяните мышью — карта поворачивается',
-    p: 'Колесо приближает и отдаляет, причём к той точке, где стоит курсор. ' +
-       'Кнопки в углу холста делают то же самое.',
+    t: 'Приблизьте',
+    p: 'Покрутите колесо. Масштаб идёт к точке под курсором, поэтому целиться ' +
+       'можно прямо в скопление, которое хочется рассмотреть.',
+    hint: 'Колесо мыши над холстом',
     at: function () { return wrap; },
-    zone: 'canvas-bottom',
-    go: function () {
-      if (reduceMotion) return;
-      var from = cam.yaw;
-      spinTo(from + 0.7, 700, function () { spinTo(from, 700); });
-    }
+    want: function (kind) { return kind === 'zoom'; }
   },
   {
-    t: 'Наведите на узел',
-    p: 'Справа появится тема, число задач и смежные теги из других тем. ' +
-       'Дорога от тега до его темы подсвечивается прямо на карте.',
-    at: function () { return document.getElementById('tmap-hover-block'); },
-    zone: 'canvas-left',
-    go: function () {
-      var t = findTag('Кривая Лаффера');
-      if (!t) return;
-      active = t; focusTheme = null;
-      rebuildHighlight(); renderHover(t);
-      flyTo(byId['t' + t.n], 1.6);
-    }
+    t: 'Встаньте на тег',
+    p: 'Наведите курсор на любой мелкий узел. Справа откроется его тема, число ' +
+       'задач и смежные теги из других тем.',
+    hint: 'Мелкий узел это тег',
+    at: function () { return wrap; },
+    want: function (kind, node) { return kind === 'node' && node.k === 'tag'; }
   },
   {
-    t: 'Клик выбирает тег',
-    p: 'Выбранный тег попадает в список справа, а внизу считается, сколько задач ' +
-       'он примерно даёт. Тегов можно набрать сколько угодно, даже из разных тем.',
-    at: function () { return document.getElementById('tmap-picked-block'); },
-    zone: 'canvas-left',
-    go: function () {
-      var a = findTag('Кривая Лаффера');
-      var b = findTag('Расчёт коэффициента Джини');
-      tourDemo = [];
-      [a, b].forEach(function (t) {
-        if (t && !picked[t.id]) { picked[t.id] = true; tourDemo.push(t.id); }
-      });
-      active = null;
-      rebuildHighlight(); renderPicked(); renderHover(null);
-    }
+    t: 'Уйдите по линии',
+    p: 'Не спеша ведите курсор от тега вдоль линии до её дальнего конца. Так по ' +
+       'карте и ходят: встают на узел и уходят по его дорогам.',
+    hint: 'Ведите курсор вдоль линии до конца',
+    at: function () { return wrap; },
+    want: function (kind) { return kind === 'walk'; }
   },
   {
-    t: 'Не нашли на карте — ищите',
-    p: 'Поиск в шапке подсвечивает совпавшие узлы. А список тем справа — второй, ' +
-       'надёжный способ: клик по строке наводит камеру на нужную тему.',
-    at: function () { return document.getElementById('tmap-q'); },
-    zone: 'under-search',
-    go: function () {}
+    t: 'Выберите тег',
+    p: 'Кликните по тегу. Он попадёт в список справа, а внизу посчитается, ' +
+       'сколько задач он примерно даёт. Тегов можно набрать сколько угодно.',
+    hint: 'Клик по мелкому узлу',
+    at: function () { return root; },
+    want: function (kind, node) { return kind === 'pick' && node.k === 'tag'; }
   }
 ];
 
-function findTag(part) {
-  var q = norm(part);
-  for (var i = 0; i < nodes.length; i++) {
-    if (nodes[i].k === 'tag' && nodes[i].nl.indexOf(q) >= 0) return nodes[i];
-  }
-  return null;
+/* Единственный вход для всех сообщений о действиях человека.
+   ⚠️ Зовётся ИЗ мест взаимодействия, а не наоборот: тур не вешает своих
+   слушателей на холст и не может перехватить или сломать обычную работу
+   карты. Выключен тур — вызов стоит ровно ничего. */
+function tourNotice(kind, value) {
+  if (!tourOn || tourDone) return;
+  var step = TOUR[tourStep];
+  if (!step.want(kind, value)) return;
+  tourPass();
 }
 
-/* Плавный поворот камеры для показа — только когда движение разрешено. */
-function spinTo(target, ms, done) {
-  var from = cam.yaw, t0 = performance.now();
-  (function tick() {
-    var k = Math.min(1, (performance.now() - t0) / ms);
-    cam.yaw = from + (target - from) * (k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2);
-    wake();
-    if (k < 1) requestAnimationFrame(tick);
-    else if (done) done();
-  })();
+/* Шаг взят. Показываем это отдельным состоянием и только потом идём
+   дальше: мгновенный перескок читается как сбой, а не как «получилось». */
+function tourPass() {
+  tourDone = true;
+  tourCard.classList.add('is-done');
+  var next = document.getElementById('tmap-tour-hint');
+  if (next) next.textContent = 'Получилось';
+  setTimeout(function () {
+    if (!tourOn) return;
+    if (tourStep === TOUR.length - 1) tourEnd();
+    else tourShow(tourStep + 1);
+  }, reduceMotion ? 200 : 620);
 }
 
 function tourShow(i) {
   tourStep = Math.max(0, Math.min(TOUR.length - 1, i));
+  tourDone = false;
+  tourCard.classList.remove('is-done');
   var s = TOUR[tourStep];
   document.getElementById('tmap-tour-step').textContent =
     'Шаг ' + (tourStep + 1) + ' из ' + TOUR.length;
   document.getElementById('tmap-tour-title').textContent = s.t;
   document.getElementById('tmap-tour-text').textContent = s.p;
-  /* «Начать», а не «Понятно, начать»: длинная надпись ломалась на две
-     строки и кнопка вырастала вдвое. Ширину держит ещё и white-space в
-     стилях — на случай другого шрифта. */
-  document.getElementById('tmap-tour-next').textContent =
-    tourStep === TOUR.length - 1 ? 'Начать' : 'Дальше';
+  var hint = document.getElementById('tmap-tour-hint');
+  if (hint) hint.textContent = s.hint;
   document.getElementById('tmap-tour-prev').disabled = tourStep === 0;
 
   var dots = document.getElementById('tmap-tour-dots');
   dots.innerHTML = TOUR.map(function (_, j) {
-    return '<i class="' + (j === tourStep ? 'is-on' : '') + '"></i>';
+    return '<i class="' + (j === tourStep ? 'is-on' : (j < tourStep ? 'is-past' : '')) + '"></i>';
   }).join('');
 
   var el = s.at && s.at();
@@ -2477,46 +2674,25 @@ function tourShow(i) {
     tourHole.style.width = (r.width + 12) + 'px';
     tourHole.style.height = (r.height + 12) + 'px';
   }
-  placeTourCard(s.zone);
-  if (s.go) s.go();
+  placeTourCard();
   wake();
 }
 
-/* ⚠️ ЗОНУ КАРТОЧКИ ЗАДАЁТ САМ ШАГ, А НЕ ГЕОМЕТРИЯ ПОДСВЕЧЕННОГО МЕСТА.
-   Прежнее правило «под подсвеченным элементом, а не влезает — над ним»
-   знает про край окна и не знает, что именно закрывает. Итог был виден
-   глазами: шаги «Наведите на узел» и «Не нашли на карте — ищите»
-   ложились ровно на правую панель, где и происходит показ, а шаги 1 и 4
-   залезали на шапку сайта с логотипом и меню.
-   Зон три, и все три оставляют открытым то, про что идёт рассказ:
-     canvas-bottom — про холст: слева внизу, ВЫШЕ кнопок масштаба, о
-                     которых говорит второй шаг;
-     canvas-left   — про правую панель: слева по центру холста, панель
-                     остаётся видна целиком;
-     under-search  — про поиск: под самим полем, прижата к его правому
-                     краю.
-   Нижняя граница шапки сайта берётся у блока карты, а не числом: высота
-   шапки задана стилями и может поменяться. */
-function placeTourCard(zone) {
+/* ⚠️ КАРТОЧКА СТОИТ В ПРАВОМ НИЖНЕМ УГЛУ ХОЛСТА, И ЭТО ЕДИНСТВЕННОЕ МЕСТО,
+   КОТОРОЕ НИЧЕМУ НЕ МЕШАЕТ. Прежде она вставала слева внизу и закрывала
+   угол графа — а теперь работать руками надо именно по графу. Слева внизу
+   кнопки масштаба (о них второй шаг), сверху шапка с поиском, справа за
+   краем холста панель, где показывается результат третьего и пятого шага.
+   Остаётся правый нижний угол САМОГО ХОЛСТА: панель он не закрывает,
+   потому что лежит левее её кромки. */
+function placeTourCard() {
   var cw = tourCard.offsetWidth || 340, ch = tourCard.offsetHeight || 190;
   var box = wrap.getBoundingClientRect();
-  var headBottom = root.getBoundingClientRect().top;
-  var left, top;
-
-  if (zone === 'under-search') {
-    var q = document.getElementById('tmap-q').getBoundingClientRect();
-    left = q.right - cw;
-    top = q.bottom + 12;
-  } else if (zone === 'canvas-left') {
-    left = box.left + 16;
-    top = box.top + (box.height - ch) / 2;
-  } else {
-    left = box.left + 16;
-    top = box.bottom - ch - 56;      /* 56px — над кнопками масштаба */
-  }
-
+  var left = box.right - cw - 16;
+  var top = box.bottom - ch - 16;
   left = Math.max(8, Math.min(window.innerWidth - cw - 8, left));
-  top = Math.max(headBottom + 8, Math.min(window.innerHeight - ch - 8, top));
+  top = Math.max(root.getBoundingClientRect().top + 8,
+                 Math.min(window.innerHeight - ch - 8, top));
   tourCard.style.left = left + 'px';
   tourCard.style.top = top + 'px';
 }
@@ -2526,18 +2702,20 @@ function tourStart() {
   tourBox.hidden = false;
   tourShow(0);
   document.addEventListener('keydown', tourKeys);
+  window.addEventListener('resize', placeTourCard);
 }
 
 function tourEnd() {
   tourOn = false;
+  tourDone = false;
   tourBox.hidden = true;
+  tourCard.classList.remove('is-done');
   document.removeEventListener('keydown', tourKeys);
-  /* Тур убирает за собой свой показательный выбор и возвращает обзор. */
-  tourDemo.forEach(function (id) { delete picked[id]; });
-  tourDemo = [];
-  active = null; focusTheme = null;
-  rebuildHighlight(); renderPicked(); renderHover(null);
-  resetView();
+  window.removeEventListener('resize', placeTourCard);
+  /* ⚠️ ЗА СОБОЙ ТУР БОЛЬШЕ НЕ УБИРАЕТ, И ЭТО НАРОЧНО. Раньше он сам делал
+     показательный выбор и сам его снимал. Теперь всё, что на карте, —
+     сделано руками человека: снимать его выбор и уводить камеру значило бы
+     стереть результат его же работы на глазах. */
   try { localStorage.setItem(TOUR_KEY, '1'); } catch (e) {}
   wake();
 }
@@ -2545,16 +2723,19 @@ function tourEnd() {
 function tourKeys(e) {
   if (!tourOn) return;
   if (e.key === 'Escape') { tourEnd(); e.preventDefault(); }
-  else if (e.key === 'ArrowRight') { tourNext(); e.preventDefault(); }
+  else if (e.key === 'ArrowRight') { tourSkipStep(); e.preventDefault(); }
   else if (e.key === 'ArrowLeft') { tourShow(tourStep - 1); e.preventDefault(); }
 }
 
-function tourNext() {
+/* Пропуск ОДНОГО шага: у человека может не быть колеса мыши или он на
+   сенсорном экране. Это выход из положения, а не обычный путь — потому и
+   написано «пропустить шаг», а не «дальше». */
+function tourSkipStep() {
   if (tourStep === TOUR.length - 1) tourEnd();
   else tourShow(tourStep + 1);
 }
 
-document.getElementById('tmap-tour-next').addEventListener('click', tourNext);
+document.getElementById('tmap-tour-next').addEventListener('click', tourSkipStep);
 document.getElementById('tmap-tour-prev').addEventListener('click', function () {
   tourShow(tourStep - 1);
 });
@@ -2581,14 +2762,16 @@ document.getElementById('tmap-reset').addEventListener('click', function () {
   clearPick(); touchActivity();
 });
 
-/* Кнопка «Показать задачи» пока никуда не ведёт.
-   TODO: логика И/ИЛИ и применение фильтра решаются вместе с переработкой
-   поиска и каталога — карточка идеи в Notion,
+/* Кнопка «Показать задачи» ведёт в каталог поиском по названиям выбранного
+   (04.09.2026): узлы карты — номера тем и тегов таксономии, а не
+   идентификаторы базы, поэтому в фильтр каталога они не переводятся.
+   Точный перевод в фильтр (логика И/ИЛИ) — карточка идеи в Notion,
    https://app.notion.com/p/3cbb11c92bc181629f4aff24af52d837 */
 document.getElementById('tmap-apply').addEventListener('click', function () {
-  var apply = document.getElementById('tmap-apply');
-  apply.textContent = 'Фильтр появится вместе с новым каталогом';
-  setTimeout(function () { apply.textContent = 'Показать задачи'; }, 2200);
+  var names = Object.keys(picked).filter(function (k) { return picked[k] && byId[k]; })
+    .map(function (k) { return byId[k].l; });
+  if (!names.length) return;
+  window.location.href = '/catalog/?q=' + encodeURIComponent(names.join(', '));
 });
 
 /* Чипы: крестик снимает выбор. */
@@ -2611,10 +2794,61 @@ hoverBox.addEventListener('click', function (e) {
   if (n) { flyTo(n, 2.1); touchActivity(); }
 });
 
-/* Навигатор «Темы»: наведение подсвечивает, клик наводит камеру и выделяет.
-   Это второй, надёжный способ найти тему, когда на карте её не видно. */
+/* ── Дерево «Разделы → Темы → Теги» ───────────────────────────────────
+   Второй, надёжный способ дойти до нужного места, когда на карте его не
+   видно. Свёрнуто по умолчанию: семь строк вместо двадцати девяти.
+
+   ⚠️ РАЗДЕЛЫ И ТЕМЫ РАСКРЫВАЮТСЯ, А НЕ ВЫБИРАЮТСЯ. Раньше клик по теме
+   разом и наводил камеру, и добавлял тему в выбранное — одна кнопка делала
+   два разных дела, и человек, открывавший список посмотреть состав, молча
+   получал 16 тегов в подборке. Раскрытие и выбор разведены: клик по
+   разделу и по теме раскрывает, выбор живёт на холсте, а клик по ТЕГУ
+   ведёт к нему камеру.
+   Наведение по-прежнему подсвечивает тему на карте: это подсказка, она
+   ничего не меняет. */
 var themesBox = document.getElementById('tmap-themes');
+
+/* Показать тег на карте: камера к нему, подсветка на него, импульс по
+   ребру к его теме. Тема при этом подсвечена мягче — см. rebuildHighlight. */
+function revealTag(n) {
+  if (!n) return;
+  flyTo(n, 2.1);
+  active = n;
+  focusTheme = null;
+  rebuildHighlight();
+  renderHover(n);
+  holdHighlight();
+  var parent = byId['t' + n.n];
+  pulse = parent ? { from: n, to: parent, t0: performance.now() } : null;
+  /* ⚠️ КЛАСС ЗДЕСЬ ДРУГОЙ, НЕ `is-on`. `is-on` означает «выбрано» и его
+     ставит renderPicked по `picked`; «камера стоит здесь» — другое
+     состояние, и делить с ним один класс значит, что один из двух будет
+     затирать другой при каждом обновлении. */
+  Array.prototype.forEach.call(themesBox.querySelectorAll('.tmap-tag-row'),
+    function (row) { row.classList.toggle('is-at', row.dataset.goTag === n.id); });
+  wake();
+}
+
 if (themesBox) {
+  themesBox.addEventListener('click', function (e) {
+    var open = e.target.closest('[data-open]');
+    if (open) {
+      var body = open.nextElementSibling;
+      var was = open.getAttribute('aria-expanded') === 'true';
+      open.setAttribute('aria-expanded', was ? 'false' : 'true');
+      if (body) body.hidden = was;
+      showPanelFade();
+      return;
+    }
+    var tagRow = e.target.closest('[data-go-tag]');
+    if (tagRow) {
+      revealTag(byId[tagRow.dataset.goTag]);
+      touchActivity();
+    }
+  });
+
+  /* Наведение на строку темы подсвечивает её на карте — но только если
+     человек не держит что-то своё: перебивать выбранное подсказкой нельзя. */
   themesBox.addEventListener('mouseover', function (e) {
     var row = e.target.closest('.tmap-theme-row');
     if (!row) return;
@@ -2629,15 +2863,6 @@ if (themesBox) {
       active = null; focusTheme = null;
       rebuildHighlight(); renderHover(null); wake();
     }
-  });
-  themesBox.addEventListener('click', function (e) {
-    var row = e.target.closest('.tmap-theme-row');
-    if (!row) return;
-    var n = byId['t' + row.dataset.theme];
-    if (!n) return;
-    flyTo(n, 2.1);
-    togglePick(n);
-    touchActivity();
   });
 }
 
@@ -2682,6 +2907,13 @@ if (window.ResizeObserver) {
 new MutationObserver(function () {
   readPalette(); wake();
 }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+/* ⚠️ ФИРМЕННЫЙ ШРИФТ ПРИЕЗЖАЕТ ПОЗЖЕ ПЕРВОГО КАДРА. Пока он грузится,
+   measureText меряет запасным, и раскладка подписей считается по чужим
+   ширинам. Дождавшись загрузки, пересчитываем: это один кадр, а не цикл. */
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(function () { labelSig = ''; wake(); });
+}
 
 window.matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change', function (e) {
   reduceMotion = e.matches;
@@ -2867,6 +3099,7 @@ window.TMAP = {
       var L = LB['g:' + groups[i].k];
       out.push({ key: groups[i].k, label: groups[i].l,
                  cx: a.cx, cy: a.cy, r: +(a.r || 0).toFixed(1),
+                 pz: +(a.pz || 0).toFixed(1),
                  anchorY: a.py,
                  x: L ? L.ax + L.ox : null, y: L ? L.ay + L.oy : null,
                  alpha: L ? +L.alpha.toFixed(3) : 0 });

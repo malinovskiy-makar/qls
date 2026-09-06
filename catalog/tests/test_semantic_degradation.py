@@ -112,7 +112,7 @@ class ModelIsNotImportedTests(_База):
         зелёный тест означал бы ровно обратное тому, что нужно.
         """
         попытки, ответ = self._без_попыток_импорта(
-            lambda: self.client.get(reverse('catalog:smart_search'),
+            lambda: self.client.get(reverse('catalog:problem_list'),
                                     {'q': 'эластичность спроса'}))
         self.assertEqual(ответ.status_code, 200)
         self.assertEqual(
@@ -159,39 +159,39 @@ class ModelIsNotImportedTests(_База):
 class DegradedPageTests(_База):
 
     def test_страница_отдаёт_200_и_плашку(self):
-        ответ = self.client.get(reverse('catalog:smart_search'),
+        ответ = self.client.get(reverse('catalog:problem_list'),
                                 {'q': 'эластичность спроса'})
         self.assertEqual(ответ.status_code, 200,
                          'Выключенный поиск обязан деградировать, а не падать')
         тело = ответ.content.decode()
-        self.assertIn('Умный поиск временно недоступен', тело)
-        self.assertIn('обычный поиск по словам', тело)
+        self.assertIn('Смысловой поиск сейчас недоступен', тело)
+        self.assertIn('Ищем по словам', тело)
 
     def test_в_плашке_нет_слова_ошибка_и_нет_совета_ставить_пакет(self):
         """Человеку не показывают ни «ошибку», ни `pip install`: он ничего
         не сделал не так, и чинить ему нечего."""
-        ответ = self.client.get(reverse('catalog:smart_search'),
+        ответ = self.client.get(reverse('catalog:problem_list'),
                                 {'q': 'эластичность спроса'})
         тело = ответ.content.decode()
         self.assertNotIn('pip install', тело)
         self.assertNotIn('Ошибка поиска', тело)
 
     def test_пустая_страница_без_запроса_тоже_200(self):
-        ответ = self.client.get(reverse('catalog:smart_search'))
+        ответ = self.client.get(reverse('catalog:problem_list'))
         self.assertEqual(ответ.status_code, 200)
 
     def test_лексический_поиск_действительно_находит(self):
         """Плашка без результатов — это не деградация, а отказ с извинением."""
-        ответ = self.client.get(reverse('catalog:smart_search'),
+        ответ = self.client.get(reverse('catalog:problem_list'),
                                 {'q': 'эластичность'})
         self.assertEqual(ответ.status_code, 200)
-        найденные = [r['problem'].pk for r in ответ.context['results']]
+        найденные = [c['problem'].pk for c in ответ.context['cards']]
         self.assertIn(self.нужная.pk, найденные,
                       'Поиск по словам не нашёл задачу со словом из запроса')
         self.assertNotIn(self.посторонняя.pk, найденные)
 
     def test_контекст_помечен_как_деградация(self):
-        ответ = self.client.get(reverse('catalog:smart_search'), {'q': 'спрос'})
+        ответ = self.client.get(reverse('catalog:problem_list'), {'q': 'спрос'})
         self.assertTrue(ответ.context['degraded'])
 
     def test_блок_похожих_задач_работает_без_модели(self):
@@ -225,9 +225,9 @@ class EnabledBehaviourUnchangedTests(_База):
         from catalog import semantic
 
         self.assertTrue(semantic.is_enabled())
-        ответ = self.client.get(reverse('catalog:smart_search'))
+        ответ = self.client.get(reverse('catalog:problem_list'))
         self.assertEqual(ответ.status_code, 200)
-        self.assertNotIn('Умный поиск временно недоступен',
+        self.assertNotIn('Смысловой поиск сейчас недоступен',
                          ответ.content.decode())
         self.assertFalse(ответ.context['degraded'])
 

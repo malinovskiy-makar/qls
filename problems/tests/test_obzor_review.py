@@ -13,6 +13,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from problems.models import StudentGroup
+from problems.tests.color_utils import flatten, ratio, split_themes, token
 from problems.tests.factories import make_problem, make_user
 from problems.work_review import score_presets
 
@@ -24,31 +25,9 @@ def read(*parts):
         return handle.read()
 
 
-# ── Счёт контраста. Держим ЗДЕСЬ, а не «на глаз»: цифра либо есть, либо нет.
-def _lum(value):
-    value = value.lstrip('#')
-    channels = [int(value[i:i + 2], 16) / 255 for i in (0, 2, 4)]
-    channels = [c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
-                for c in channels]
-    return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
-
-
-def ratio(one, two):
-    first, second = _lum(one), _lum(two)
-    top, bottom = max(first, second), min(first, second)
-    return (top + 0.05) / (bottom + 0.05)
-
-
-def over(colour, alpha, below):
-    """Полупрозрачный цвет поверх фона → сплошной.
-
-    ⚠️ В тёмной теме подложки заданы через `rgba`, и считать контраст по
-    самому `rgba` нельзя: пока он не лёг на поверхность, у него нет яркости.
-    """
-    top = [int(colour.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)]
-    base = [int(below.lstrip('#')[i:i + 2], 16) for i in (0, 2, 4)]
-    return '#%02x%02x%02x' % tuple(
-        round(top[i] * alpha + base[i] * (1 - alpha)) for i in range(3))
+# ⚠️ Счёт контраста живёт в `problems/tests/color_utils.py` — ОДНОЙ копией на
+# весь набор. Раньше формула стояла прямо здесь, и такие же копии лежали ещё
+# в семи файлах проверок: поправят одну — забудут остальные.
 
 
 def _markup_files():
@@ -191,13 +170,22 @@ class PendingColourTests(TestCase):
             self.assertIn('--pending-tint:', part)
 
     def test_contrast_passes_aa(self):
-        """Считаем прямо здесь: «проверено на глаз» не проверка."""
-        tokens = read('templates', '_tokens.html')
-        light = tokens.split('[data-theme="dark"]')[0]
-        colour = re.search(r'--pending:\s*(#[0-9a-fA-F]{6})', light).group(1)
-        tint = re.search(r'--pending-tint:\s*(#[0-9a-fA-F]{6})',
-                         light).group(1)
-        self.assertGreaterEqual(round(ratio(colour, tint), 2), 4.5)
+        """Считаем прямо здесь: «проверено на глаз» не проверка.
+
+        ⚠️ `--pending-tint` задан через `rgba(...)`, и это сделано НАМЕРЕННО:
+        подсветка обязана ложиться и на карточку, и на фон страницы, а
+        жёсткий hex привязан к одной подложке. Значит подложку надо сначала
+        сплющить на поверхность, и мерить уже сплошной цвет. Прежняя версия
+        доставала значение регуляркой `#[0-9a-fA-F]{6}`, на `rgba(...)`
+        получала None и падала до самой проверки контраста.
+        """
+        light, _dark = split_themes(read('templates', '_tokens.html'))
+        colour = token(light, 'pending')
+        surface = token(light, 'surface')
+        page = token(light, 'bg')
+        for below in (surface, page):
+            tint = flatten(token(light, 'pending-tint'), below)
+            self.assertGreaterEqual(round(ratio(colour, tint), 2), 4.5, below)
         self.assertGreaterEqual(round(ratio(colour, '#ffffff'), 2), 4.5)
 
     # ── Янтарь: текст на янтарной подложке (ревью 15.08, фаза 4) ─────────
@@ -212,30 +200,36 @@ class PendingColourTests(TestCase):
             self.assertIn('--amber-ink:', part)
 
     def test_amber_ink_passes_aa_in_light(self):
-        tokens = read('templates', '_tokens.html')
-        light = tokens.split('[data-theme="dark"]')[0]
-        ink = re.search(r'--amber-ink:\s*(#[0-9a-fA-F]{6})', light).group(1)
-        tint = re.search(r'--amber-tint:\s*(#[0-9a-fA-F]{6})', light).group(1)
-        dense = re.search(r'--amber-border:\s*(#[0-9a-fA-F]{6})',
-                          light).group(1)
-        surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})', light).group(1)
-        self.assertGreaterEqual(round(ratio(ink, tint), 2), 4.5)
-        self.assertGreaterEqual(round(ratio(ink, dense), 2), 4.5)
+        """Та же ловушка `rgba`, что и у «ждёт проверки», — см. соседний тест."""
+        light, _dark = split_themes(read('templates', '_tokens.html'))
+        ink = token(light, 'amber-ink')
+        surface = token(light, 'surface')
+        page = token(light, 'bg')
+        for below in (surface, page):
+            tint = flatten(token(light, 'amber-tint'), below)
+            dense = flatten(token(light, 'amber-border'), below)
+            self.assertGreaterEqual(round(ratio(ink, tint), 2), 4.5, below)
+            self.assertGreaterEqual(round(ratio(ink, dense), 2), 4.5, below)
         self.assertGreaterEqual(round(ratio(ink, surface), 2), 4.5)
 
     def test_amber_ink_passes_aa_in_dark(self):
-        """⚠️ В тёмной теме подложка ПРОЗРАЧНАЯ — считаем поверх поверхности."""
-        tokens = read('templates', '_tokens.html')
-        dark = tokens.split('[data-theme="dark"]')[1]
-        ink = re.search(r'--amber-ink:\s*(#[0-9a-fA-F]{6})', dark).group(1)
-        base = re.search(r'--amber:\s*(#[0-9a-fA-F]{6})', dark).group(1)
-        surface = re.search(r'--surface:\s*(#[0-9a-fA-F]{6})', dark).group(1)
-        page = re.search(r'--bg:\s*(#[0-9a-fA-F]{6})', dark).group(1)
+        """⚠️ В тёмной теме подложка ПРОЗРАЧНАЯ — считаем поверх поверхности.
+
+        Прозрачность берётся ИЗ САМОГО ТОКЕНА, а не подставляется числом
+        рядом: раньше здесь стояло `.35`, тогда как в палитре `--amber-border`
+        всегда был `.34`, — то есть проверка мерила подложку, которой на
+        экране нет.
+        """
+        _light, dark = split_themes(read('templates', '_tokens.html'))
+        ink = token(dark, 'amber-ink')
+        surface = token(dark, 'surface')
+        page = token(dark, 'bg')
         for below in (surface, page):
-            self.assertGreaterEqual(round(ratio(ink, over(base, .15, below)),
-                                          2), 4.5, below)
-            self.assertGreaterEqual(round(ratio(ink, over(base, .35, below)),
-                                          2), 4.5, below)
+            for name in ('amber-tint', 'amber-border'):
+                below_solid = flatten(token(dark, name), below)
+                self.assertGreaterEqual(
+                    round(ratio(ink, below_solid), 2), 4.5,
+                    '%s на %s' % (name, below))
 
     def test_old_pair_really_was_below_aa(self):
         """Проверка «зубастая»: прежняя пара порог НЕ проходит."""
@@ -254,9 +248,14 @@ class PendingColourTests(TestCase):
         self.assertEqual(bad, [], bad)
 
     def test_stars_keep_the_signal_colour(self):
-        """⚠️ Звёзды сложности — САМ СИГНАЛ, их цвет не трогали."""
+        """⚠️ Звёзды сложности — САМ СИГНАЛ, их цвет не трогали.
+
+        ⚠️ КЛАСС ПЕРЕИМЕНОВАН ПРИ СЛИЯНИИ ЭКРАНОВ: `.card-stars` старого
+        каталога стал `.ct-stars` объединённого. Требование не
+        менялось — звёзды остаются сигнальным янтарём.
+        """
         page = read('catalog', 'templates', 'catalog', 'problem_list.html')
-        stars = [l for l in page.split('\n') if '.card-stars' in l][0]
+        stars = [l for l in page.split('\n') if '.ct-stars' in l][0]
         self.assertIn('var(--amber)', stars)
         self.assertNotIn('amber-ink', stars)
 

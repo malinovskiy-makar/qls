@@ -1,0 +1,110 @@
+{% load ru catalog_filters %}{% comment %}
+БЛОК НАЙДЕННЫХ ЗАДАЧ — счётчик, переключатель вида, карточки, «показать ещё».
+Ждёт контекст `catalog.views._catalog_context`.
+
+⚠️ ЭТОТ ЖЕ ПАРТИАЛ ОТДАЁТ ЭНДПОИНТ ЖИВОГО СОСТОЯНИЯ (`api_filter_state`):
+окно «Все фильтры» подменяет `#ct-results` полученной разметкой. Поэтому
+всё, что относится к списку, живёт здесь, а не в странице — иначе список
+под окном и список после перезагрузки разошлись бы.
+{% endcomment %}
+<section class="ct-results" id="ct-results">
+  <div class="ct-count-row">
+    <div class="ct-count">
+      {% if searched %}
+        {% comment %}
+        ⚠️ «НЕ МЕНЬШЕ» — КОГДА СПИСОК УПЁРСЯ В ПОТОЛОК КАНДИДАТОВ. У поиска
+        по смыслу нет числа «сколько всего подходит»: есть «сколько мы
+        попросили и сколько из них прошло порог». Писать это число точным
+        значило бы врать точностью, которой у поиска нет.
+        {% endcomment %}
+        Похожих задач: {% if capped %}не меньше {% endif %}<b>{{ total|spaceint }}</b>
+        <small>· из {{ filtered_total|spaceint }} {{ filtered_total|plural_ru:"задачи,задач,задач" }}{% if scope %} {{ scope }}{% endif %}</small>
+      {% else %}
+        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }}{% if scope %}
+        <small>{{ scope }}</small>{% endif %}
+      {% endif %}
+    </div>
+    <nav class="ct-views" aria-label="Как показывать">
+      <a class="ct-view{% if view_mode == 'rows' %} is-on{% endif %}" href="{{ view_urls.rows }}">Строки</a>
+      <a class="ct-view{% if view_mode == 'gallery' %} is-on{% endif %}" href="{{ view_urls.gallery }}">Галерея</a>
+    </nav>
+  </div>
+
+  {% if relief %}
+  {% comment %}
+  СХЛОПНУВШАЯСЯ ВЫДАЧА. Запрос дал кандидатов, фильтры срезали их почти
+  до нуля. Экран обязан назвать причину и предложить, что снять: пустота
+  без объяснения читается как «в банке этого нет».
+  {% endcomment %}
+  <div class="ct-note">По запросу и фильтрам вместе
+    {% if total == 0 %}не нашлось ничего{% else %}нашлось {{ total }}
+    {{ total|plural_ru:"задача,задачи,задач" }}{% endif %}.
+    Попробуйте снять фильтр «{{ relief.label }}»: без него подходящих
+    {{ relief.count }}.</div>
+  {% endif %}
+
+  {% if cards %}
+    <div class="{% if view_mode == 'gallery' %}ct-gallery{% endif %}">
+      {% for card in cards %}
+      <a class="ct-card" href="{% url 'catalog:problem_detail' card.problem.pk %}">
+        {% comment %}
+        Строка признаков — только то, что есть у задачи: чип темы при теме,
+        звёзды при заданной сложности (пустых ☆☆☆☆☆ у задачи без сложности
+        нет), формат теста при тесте, галочка при проверенном решении.
+        Нет ничего — нет и строки.
+        {% endcomment %}
+        {% if card.topics or card.difficulty or card.is_test or card.has_solution %}
+        <div class="ct-line">
+          {% for t in card.topics %}<span class="tchip" style="--gc: var(--map-g-{{ t.section }})">{{ t.name }}</span>{% endfor %}
+          {% if card.difficulty %}<span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span>{% endif %}
+          {% if card.is_test %}<span class="ct-kind">{{ card.kind_label }}</span>{% endif %}
+          {% if card.has_solution %}<span class="ct-sol">решение ✓</span>{% endif %}
+        </div>
+        {% endif %}
+        {% comment %}
+        Заголовок показывается, только если это НАЗВАНИЕ, а не обрезок
+        условия: у части источников в заголовке лежат первые полсотни
+        знаков самого условия, и карточка повторяла бы себя дважды
+        (`catalog.preview.looks_like_statement_cut`).
+        {% endcomment %}
+        {% if card.show_title %}<div class="ct-card-title">{{ card.problem.title }}</div>{% endif %}
+        <p class="ct-card-preview">{{ card.preview }}</p>
+        <div class="ct-acts" onclick="event.stopPropagation();">
+          <button class="ca-btn ca-preview" type="button"
+                  onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button>
+          {% if user.is_authenticated and user.role == 'teacher' %}
+          <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
+            <button class="ca-btn ca-add" type="button" id="hw-btn-{{ card.problem.pk }}"
+                    onclick="toggleHwDropdown({{ card.problem.pk }}, event)">+ В домашку ▾</button>
+            <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
+          </div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% comment %}
+    ⚠️ «ПОКАЗАТЬ ЕЩЁ» ВМЕСТО СТРАНИЦ. Подпись под кнопкой меняется по
+    ситуации: без запроса это место в банке, с запросом — конец
+    ранжированного списка, и говорить о нём номером страницы нечестно.
+    Порог числом наружу не идёт.
+    {% endcomment %}
+    <div class="ct-more">
+      {% if has_more %}
+        <a class="ct-btn ct-btn--go" href="{{ more_url }}">Показать ещё {{ step }}</a>
+        <small>показано {{ shown }} из {{ total|spaceint }}</small>
+      {% else %}
+        <small>{% if searched %}больше похожих задач нет{% else %}показаны все {{ total|spaceint }}{% endif %}</small>
+      {% endif %}
+    </div>
+
+  {% else %}
+    <div class="ct-empty">
+      {% if searched %}По этому описанию похожих задач не нашлось.
+        Попробуйте другими словами или снимите фильтры.
+      {% else %}Под эти фильтры не подходит ни одна задача.{% endif %}
+      {% if filters.has_any %}<br><a href="{{ filters.reset_url }}">Сбросить фильтры</a>{% endif %}
+    </div>
+  {% endif %}
+</section>

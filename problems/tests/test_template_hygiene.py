@@ -20,10 +20,27 @@ from django.conf import settings
 from django.test import TestCase
 
 # Куда не ходим: чужой код и сгенерированные отчёты.
+# ⚠️ `.claude` исключена по той же причине, что `materials`: в
+# `.claude/worktrees/` лежат рабочие копии ДРУГИХ веток репозитория. Их
+# шаблоны — не шаблоны этой ветки, и судить их отсюда бессмысленно; без
+# исключения прогон краснеет от чужого кода и этим прячет своё.
+#
+# ⚠️ `.claude` — это рабочие папки git worktree и симлинки на соседние
+# каталоги данных. Внутри лежат ПОЛНЫЕ копии проекта другой ветки, и обход
+# без этого исключения судит чужие шаблоны как свои: 30.08 отсюда пришли 369
+# «нарушений» из одного katex-бандла в `.claude/worktrees/weconomics-data/`.
+# Причина та же, по которой исключены `materials` и `node_modules`, — просто
+# каталог появился позже, чем писался список.
+# ⚠️ `data/olympiads/raw/` исключена как ДАННЫЕ, а не код: там лежат
+# скачанные копии чужих сайтов — доказательства собранных фактов
+# раздела олимпиад. Судить их по нашим правилам разметки бессмысленно
+# по той же причине, что и `.claude/worktrees`. Практически: CSS-селектор
+# вида `{#rec463288649 ...}` на чужой странице выглядит как незакрытый
+# комментарий Django, а страница в windows-1251 роняет само чтение.
 SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
               os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep,
-              os.sep + '.claude' + os.sep + 'worktrees' + os.sep)
+              os.sep + 'staticfiles' + os.sep, os.sep + '.claude' + os.sep,
+              os.path.join('data', 'olympiads', 'raw') + os.sep)
 
 
 def template_files():

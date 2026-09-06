@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="/Admin/js/jquery-1.7.min.js"></script>
+<script src="/Admin/js/jquery.form.js"></script>
+<script type="text/javascript" src="https://www.google.com/jsapi"></script>
+<script src="/Admin/js/user_functions.js"></script>
+<script>
+google.load("visualization", "1", {packages:["corechart"]});
+</script>
+<title>Московская олимпиада школьников по экономике</title>
+<meta name="description" content="">
+<meta name="description" content="">
+<link media="all" href="/css/style.css" rel="stylesheet">
+<link media="all" href="/css/galery.css" rel="stylesheet">
+<script src="/js/jquery-1.7.min.js"></script>
+<script type="text/javascript" src="/js/fancybox/jquery.mousewheel-3.0.6.pack.js"></script>
+<script type="text/javascript" src="/js/fancybox/jquery.fancybox.js?v=2.1.2"></script>
+<link rel="stylesheet" type="text/css" href="/js/fancybox/jquery.fancybox.css?v=2.1.2" media="screen" />
+<style>
+	body
+	{
+		background: url('/files/settings/35/images.jpg') top center no-repeat;
+				background-size:100% 100%; font-family: Arial, Helvetica, sans-serif; font-size: 12px;color: #000000;	}
+	
+	.header
+	{
+		background:none;	}
+	
+	a
+	{
+		color: #444D52;	}
+	
+	.block, .mainblock
+	{
+		background:url('/include/transparent_bg.php?color=ffffff&alpha=52');border: 1px solid #ffffff;	}
+	
+	.menu a
+	{
+		padding-left:10px;
+		font-style: normal;color: #404040; font-family: Arial, Helvetica, sans-serif; font-size: 20px;text-decoration: none;	}
+	
+	.menu a:hover
+	{
+		text-decoration: underline;color: #1c6e85;	}
+</style>
+<link rel="icon" type="image/png" href="/files/imagecache/d624bba8b0318cffe7b6ee2037fe4a67.png" />
+			<link rel="apple-touch-icon" sizes="57x57" href="/files/imagecache/465820a35373096e43e45a91c037539c.png">
+					<link rel="apple-touch-icon" sizes="114x114" href="/files/imagecache/f9cd5378c97413b2ab1c6d65983a91d4.png">
+					<link rel="apple-touch-icon" sizes="72x72" href="/files/imagecache/53ba8f0d57bf5304ae799f52b0acc9dd.png">
+					<link rel="apple-touch-icon" sizes="144x144" href="/files/imagecache/797a22b37ca6791699fa956c0a934ee0.png">
+					<link rel="apple-touch-icon" sizes="60x60" href="/files/imagecache/fb74f30a9c5fdd8b5e2d06b837c956c6.png">
+					<link rel="apple-touch-icon" sizes="120x120" href="/files/imagecache/165daa8bfb7efd72e0d106aeba381a42.png">
+					<link rel="apple-touch-icon" sizes="76x76" href="/files/imagecache/01af3dd14c3a62dc3d46824716e911ea.png">
+					<link rel="apple-touch-icon" sizes="152x152" href="/files/imagecache/0741d4264a035c7a9468c92aae39fea1.png">
+		</head><body><table width="100%" style="text-decoration:none; max-width:100%" cellpadding="0" cellspacing="0">
+    	<tr class="header">
+        	<td align="center" style="text-decoration:none; max-width:100%" style="height:40px">
+            <a href="/" style="text-decoration:none; max-width:100%">
+<span class="logo" style=" font-family: 'Trebuchet MS', Arial, Helvetica, sans-serif; font-size: 45px; color:#011c1a; font-weight:bold;; width:100%; display: block" >
+<img src="/files/settings/45/header_for_web.png" style="dislay:block; max-width:100%" onload="if ($(this).innerWidth()>$('body').innerWidth()) $(this).css('width',$('body').innerWidth())"/></span></a>            </td>
+        </tr>
+        <tr>
+        	<td>
+                <table width="100%" cellpadding="5" cellspacing="0">
+                    <tr>
+                        <td width="220" valign="top">
+ 
+                        <div class="block">
+							
+							<!--<a href="http://vos.olimpiada.ru/"><img src="/images/vos_logo.png" style="margin-top:10px; margin-left:10px" width="230"/></a>
+							<hr color="#CCCCCC">
+							<a href="http://statgrad.mioo.ru/"><img src="/images/logonew1.jpg" style="margin-top:10px; margin-left:10px" width="100"/></a>
+							<a href="http://www.mioo.ru"><img src="/images/mioo.png" style="margin-top:10px; margin-left:10px"/></a>-->
+							
+
+
+<p class="menu"><a href="/news_left">Новости</a></p>
+
+														 <span class="headline" style="background:#3E6C62">Московская олимпиада</span>
+							 	
+								<div style="margin: 10px"><p><strong>Работы победителей и призёров заключительного этапа:</strong></p>
+<p><a href="https://reg.olimpiada.ru/files/moscow-olympiads-2016/prizewinner-scans/mosh-econ-2016/" target="_blank">2015-2016 учебный год</a></p>
+<p><a href="https://reg.olimpiada.ru/files/moscow-olympiads-2015/prizewinner-scans/mosh-econ-2015-both-days/" target="_blank">2014-2015 учебный год</a></p></div>
+														 <span class="headline" style="background:#3E6C62"><a style="color: #ffffff;" href="https://mosecon.olimpiada.ru/news/359" target="_blank">Регистрация</a></span>
+							 	
+								<div style="margin: 10px"></div>
+														 <span class="headline" style="background:#660e66">Расписание</span>
+							 	
+								<div style="margin: 10px"><p><span style="font-size: 12pt;">Даты дистанционного этапа:<br /></span><span style="font-size: 12pt;"><strong>10-18 декабря </strong></span><span style="font-size: 12pt;"><strong>2025 года</strong></span></p>
+<p><em><span style="font-size: 12pt;">Дата заключительного этапа:</span></em><br /><strong><span style="font-size: 12pt;"><span style="font-size: 10pt;">7 класс:</span><br /><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span style="font-size: 10pt;">25 января 2026 года</span><br /><span style="font-size: 10pt;">8-11 классы:</span><span style="font-size: 10pt;"><br /><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span><span class="mce-nbsp-wrap" contenteditable="false">&nbsp;</span>15 февраля 2026 года</span><br /></span><span style="font-size: 10pt;"><br />10:00 по московскому времени</span></strong></p></div>
+														 <span class="headline" style="background:#3E6C62">Контакты</span>
+							 	
+								<div style="margin: 10px"><p><span style="font-size: 10pt;">E-mail:&nbsp;<a href="mailto:mosecon@olimpiada.ru">mosecon@olimpiada.ru</a></span></p></div>
+														 <span class="headline" style="background:#3E6C62">Полезные документы</span>
+							 	
+								<div style="margin: 10px"><p><table>
+<tr><td><img src="/images/html.png" width="40"/></td>
+					<td><a href="http://publication.pravo.gov.ru/Document/View/0001202207220037">Приказ Министерства науки и высшего образования Российской Федерации от 22.06.2022 № 566
+"Об утверждении Порядка проведения олимпиад школьников"</td></tr><tr><td><img src="/images/html.png" width="40"/></td>
+					<td><a href="http://mos.olimpiada.ru/regulation">Положение о Московской олимпиаде школьников</td></tr><tr><td><img src="/images/pdf.png" width="40"/></td>
+					<td><a href="files/m_files/5/Регламент_2026.pdf">Регламент проведения Москвоской Олимпиады Школьников по экономике 2025-2026 гг. </td></tr></table></p>
+<p><span style="font-size: 10pt;">&nbsp;</span></p></div>
+								
+								<div style="margin: 10px"><p><a href="http://vos.olimpiada.ru/"><img src="/images/vos_logo.png" alt="" width="230" /><br /><br /></a><a href="http://mosolymp.olimpiada.ru/" target="_blank"><img src="/upload/images/mosh.jpg" alt="" width="185" height="77" /></a><a href="http://vos.olimpiada.ru/"><br /></a></p></div>
+							               
+                      
+                            <hr color="#CCCCCC"/>
+                            <a href="http://olimpiada.ru/" target="_blank"><img src="http://olimpiada.ru/upload/images/tipovie_saiti/inform_o_ru.png" style="margin-top:10px; margin-left:10px" width="180"/></a>
+							
+                        </div>
+                        </td>
+                        <td valign="top">
+                        	<div class="mainblock">
+                            <div style="margin:20px">
+                            <span class="headlineM">														</span>
+							<br>
+							<h1><span style="font-family: 'Times New Roman', serif; font-size: 24pt;"><span style="color: #000000;"><span style="font-family: Arial, serif;">Московская олимпиада школьников по экономике 2025-2026 года</span></span></span></h1>
+<p><span style="font-size: 14pt;">В этом сезоне московская олимпиада школьников по экономике проходит в два этапа: дистанционный этап для 5-11 классов и Заключительный этап для 7&ndash;11 классов.</span></p>
+<p><span style="font-size: 14pt; color: #ff0000;">Уважаемые участники!</span></p>
+<p><strong><span style="font-size: 18pt; color: #0007ff;">Поздравляем лауреатов МОШ по экономике 2025-2026 года!<br /></span></strong></p>
+<p><span style="font-size: 14pt;">Наши партнёры из компании "Яндекс" приглашают победителей и призёров заключительного этапа МОШ по экономике 2026 года за 9-11 классы на экскурсию в офис "Яндекса" в башне Нева в Москва-Сити.</span></p>
+<p><span style="color: #0007ff;"><strong><span style="font-size: 14pt;">Экскурсия состоится 24 июня 2026 года в 14:00</span></strong></span></p>
+<p><span style="text-decoration: underline;"><span style="font-size: 14pt;">В программе экскурсии:</span></span></p>
+<ul>
+<li><span style="font-size: 14pt;">Экскурсия по офису 14:00-15:00</span></li>
+<li><span style="font-size: 14pt;">Лекция 15:00-16:00</span></li>
+<li><span style="font-size: 14pt;">Презентация стажировок в "Яндексе" 16:00-16:30</span></li>
+</ul>
+<p><strong><span style="font-size: 14pt;"><span style="color: #ff0000;">Для участия в экскурсии необходима регистрация. При себе обязательно иметь паспорт.</span></span></strong></p>
+<p><span style="font-size: 14pt;"><strong>Ссылка на регистрацию <a href="https://forms.yandex.ru/surveys/13862546.c578d11f5c9dfd96b88bc598825a45db2feac925/">https://forms.yandex.ru/surveys/13862546.c578d11f5c9dfd96b88bc598825a45db2feac925/</a></strong></span></p>
+<p><strong><span style="font-size: 14pt;">Вопросы вы можете задать в комментариях к новостям в канале МОШ по экономике <a href="https://t.me/moshecon">https://t.me/moshecon</a></span></strong></p>							<p><span style="font-size: 12pt;"><span class="data_news"><b>17.06.2026</b> <a href="/news/368">Спецприз для победителей МОШ по экономике 9-11 классов: Экскурсия в офис Яндекса в башне Нева</a>
+		<br></span><br><span class="data_news"><b>19.05.2026</b> <a href="/news/367">Награждение победителей и призёров Заключительного этапа Московской олимпиады школьников по экономике 2025-2026 года</a>
+		<br></span><br><span class="data_news"><b>14.05.2026</b> <a href="/news/366">Экскурсия в компанию Б1 - приз для победителей МОШ по экономике за 9, 10 и 11 класс</a>
+		<br></span><br><span class="data_news"><b>14.03.2026</b> <a href="/news/365">Критерии определения победителей и призеров Заключительного этапа Московской олимпиады школьников по экономике 2025-2026 учебного года</a>
+		<br></span><br><span class="data_news"><b>07.03.2026</b> <a href="/news/364">Просмотр сканов работ и апелляция</a>
+		<br></span><br><span class="data_news"><b>07.03.2026</b> <a href="/news/363">Задания, решения и критерии проверки заданий Заключительного этапа МОШ по экономике 2026 года для учащихся 8-11 классов</a>
+		<br></span><br><span class="data_news"><b>16.02.2026</b> <a href="/news/362">Опубликованы работы Заключительного этапа МОШ по экономике 7 класса. Выложены задания и критерии оценивания. Открыта апелляция</a>
+		<br></span><br><span class="data_news"><b>15.02.2026</b> <a href="/news/361">Участникам точки "Центральный университет" (11 класс, Москва)</a>
+		<br></span><br><span class="data_news"><b>15.02.2026</b> <a href="/news/360">Размещение сопровождающих в точках проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>11.02.2026</b> <a href="/news/359">Организационная информация о проведении заключительного этапа МОШ по экономике для 8-11 классов 15 февраля 2026 года</a>
+		<br></span><br><span class="data_news"><b>03.02.2026</b> <a href="/news/356">Точки проведения МОШ по экономике в 2025-2026 году</a>
+		<br></span><br><span class="data_news"><b>22.01.2026</b> <a href="/news/357">Организационная информация о проведении заключительного этапа МОШ по экономике для 7 класса 25 января 2026 года</a>
+		<br></span><br><span class="data_news"><b>22.01.2026</b> <a href="/news/355">Встреча сопровождающих преподавателей и родителей с членами ЦПМК МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>22.01.2026</b> <a href="/news/354">Организационная информация о проведении заключительного этапа МОШ по экономике для 7 класса 25 января 2026 года</a>
+		<br></span><br><span class="data_news"><b>17.01.2026</b> <a href="/news/353">Открыта регистрация на заключительный этап МОШ по экономике для 7 класса 25.01.2026 года</a>
+		<br></span><br><span class="data_news"><b>13.01.2026</b> <a href="/news/352">Опубликованы списки приглашённых на Заключительный этап МОШ по экономике 2025-2026 года</a>
+		<br></span><br><span class="data_news"><b>29.12.2025</b> <a href="/news/351">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2025-2026 года"</a>
+		<br></span><br><span class="data_news"><b>25.12.2025</b> <a href="/news/350">Апелляция Дистанционного этапа МОШ по экономике </a>
+		<br></span><br><span class="data_news"><b>25.12.2025</b> <a href="/news/349">Задания и критерии проверки Дистанционного этапа</a>
+		<br></span><br><span class="data_news"><b>25.12.2025</b> <a href="/news/348">Публикация предварительных результатов Дистанционного этапа МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>15.12.2025</b> <a href="/news/347">Важная информация о дистанционном (отборочном) этапе МОШ по экономике 2025-2026 года</a>
+		<br></span><br><span class="data_news"><b>28.11.2025</b> <a href="/news/346">Регистрация на МОШ открыта!</a>
+		<br></span><br><span class="data_news"><b>03.09.2025</b> <a href="/news/344">Важная информация про экскурсии в экоцентр "Сборка" для победителей и призёров Дистанционного этапа Московской олимпиаде школьников по экономике 2024-2025 года</a>
+		<br></span><br><span class="data_news"><b>17.08.2025</b> <a href="/news/342">Перенос экскурсии в экоцентр "Сборка"</a>
+		<br></span><br><span class="data_news"><b>24.06.2025</b> <a href="/news/343">Приз - экскурсия в экоцентр "Сборка" для победителей и призёров Дистанционного этапа за 5 и 6 класс</a>
+		<br></span><br><span class="data_news"><b>24.06.2025</b> <a href="/news/341">Приз - экскурсия в экоцентр "Сборка" для победителей и призёров Дистанционного этапа за 5 и 6 класс</a>
+		<br></span><br><span class="data_news"><b>24.06.2025</b> <a href="/news/340">Специальный приз для победителей и призёров - учеников 9, 10 и 11 классов - экскурсия в Т-Банк и Центральный университет!</a>
+		<br></span><br><span class="data_news"><b>19.06.2025</b> <a href="/news/339">Фотографии с церемонии награждения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>19.06.2025</b> <a href="/news/338">Похвальные грамоты победителям и призёрам Дистанционного этапа 5 и 6 класса</a>
+		<br></span><br><span class="data_news"><b>30.05.2025</b> <a href="/news/337">Церемония награждения</a>
+		<br></span><br><span class="data_news"><b>28.05.2025</b> <a href="/news/335">Дополнительная информация о церемонии награждения победителей и призёров Заключительного этапа МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>23.05.2025</b> <a href="/news/334">Награждение победителей и призёров Заключительного этапа МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>11.04.2025</b> <a href="/news/333">Опубликован список победителей и призёров Московской олимпиады школьников по экономике 2024-2025 года</a>
+		<br></span><br><span class="data_news"><b>28.03.2025</b> <a href="/news/332">Критерии определения победителей и призеров Московской олимпиады школьников по экономике для учащихся 5–11 классов в 2024-2025 учебном году </a>
+		<br></span><br><span class="data_news"><b>21.03.2025</b> <a href="/news/330">Апелляция МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>21.03.2025</b> <a href="/news/329">Задания МОШ по экономике 2025 года и критерии проверки работ</a>
+		<br></span><br><span class="data_news"><b>01.03.2025</b> <a href="/news/328">Решение оргкомитета и методической комиссии МОШ по экономике о допустимости калькуляторов во время Заключительного этапа</a>
+		<br></span><br><span class="data_news"><b>28.02.2025</b> <a href="/news/327">О регистрации для участия в заключительном этапе МОШ по экономике в "Сириусе"</a>
+		<br></span><br><span class="data_news"><b>26.02.2025</b> <a href="/news/326">О распечатывании бланков участников</a>
+		<br></span><br><span class="data_news"><b>26.02.2025</b> <a href="/news/325">Организационная информация о проведении заключительного этапа МОШ по экономике 2025 года</a>
+		<br></span><br><span class="data_news"><b>25.02.2025</b> <a href="/news/324">Телеграм-канал МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>25.02.2025</b> <a href="/news/322">Регистрация на заключительный этап МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>19.02.2025</b> <a href="/news/321">Список приглашенных на заключительный этап МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>10.02.2025</b> <a href="/news/323">Точки проведения МОШ по экономике открыты в 12 регионах России!</a>
+		<br>Вы можете озмакомиться с информацией об адресах, способах проезда и условиях доступа в точки</span><br><span class="data_news"><b>07.01.2025</b> <a href="/news/320">Решение оргкомитета МОШ по экономике "О результатах дистанционного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2024-2025 года"</a>
+		<br></span><br><span class="data_news"><b>28.12.2024</b> <a href="/news/319">Предварительные итоги дистанционного этапа МОШ и проведение апелляции</a>
+		<br></span><br><span class="data_news"><b>23.12.2024</b> <a href="/news/318">Продление дистанционного отборочного этапа МОШ по экономике 2025 года</a>
+		<br></span><br><span class="data_news"><b>21.12.2024</b> <a href="/news/317">Продолжается регистрация и отборочный этап МОШ по экономике 2025 года!</a>
+		<br></span><br><span class="data_news"><b>02.12.2024</b> <a href="/news/316">Регистрация для участия в Московской олимпиаде школьников по экономике 2024-2025 года</a>
+		<br></span><br><span class="data_news"><b>13.09.2024</b> <a href="/news/315">Телеграм-канал МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>13.09.2024</b> <a href="/news/314">Предварительные даты МОШ по экономике 2024-2025</a>
+		<br></span><br><span class="data_news"><b>21.05.2024</b> <a href="/news/312">Церемония награждения победителей и призёров Заключительного этапа МОШ по экономике 2023-2024 года</a>
+		<br></span><br><span class="data_news"><b>10.04.2024</b> <a href="/news/311">Опубликован список победителей и призёров МОШ по экономике 2023-2024 года</a>
+		<br></span><br><span class="data_news"><b>05.04.2024</b> <a href="/news/331">Критерии определения победителей и призеров Московской олимпиады школьников по экономике для учащихся 5–11 классов в 2023/2024</a>
+		<br></span><br><span class="data_news"><b>05.04.2024</b> <a href="/news/310">Критерии определения победителей и призеров Московской олимпиады школьников по экономике для учащихся 5–11 классов в 2023/2024</a>
+		<br></span><br><span class="data_news"><b>27.03.2024</b> <a href="/news/309">Информация об очной апелляции МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>26.03.2024</b> <a href="/news/308">Результаты заочной апелляции и информация об очной апелляции МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>23.03.2024</b> <a href="/news/307">Апелляция МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>23.03.2024</b> <a href="/news/306">Опубликованы задания, решения и критерии проверки работ МОШ 2024 по экономике. Открыта апелляция</a>
+		<br></span><br><span class="data_news"><b>01.03.2024</b> <a href="/news/305">О регистрации в точки проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>01.03.2024</b> <a href="/news/304">Уточнение списка документов, необходимых для участия в Заключительном этапе МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>28.02.2024</b> <a href="/news/303">Организационная информация о проведении заключительного этапа МОШ по экономике 2024 года</a>
+		<br></span><br><span class="data_news"><b>25.02.2024</b> <a href="/news/301">Регистрация для участия в заключительно этапе МОШ по экономике 2023-2024 года</a>
+		<br>Особенности регистрации для разных категорий участников</span><br><span class="data_news"><b>25.02.2024</b> <a href="/news/298">Точки проведения МОШ по экономике открыты в 13 регионах России!</a>
+		<br>Вы можете озмакомиться с информацией об адресах, способах проезда и условиях доступа в точки</span><br><span class="data_news"><b>05.02.2024</b> <a href="/news/297">Выложен список участников МОШ по экономике, приглашенных к участию в Заключительном этапе МОШ 2023-2024 года</a>
+		<br></span><br><span class="data_news"><b>27.01.2024</b> <a href="/news/358">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2023-2024 года"</a>
+		<br></span><br><span class="data_news"><b>27.01.2024</b> <a href="/news/292">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2023-2024 года"</a>
+		<br></span><br><span class="data_news"><b>17.01.2024</b> <a href="/news/290">Важная информация для участников, использовавших резервную систему регистрации на отборочном этапе</a>
+		<br></span><br><span class="data_news"><b>16.01.2024</b> <a href="/news/289">Предварительные результаты отборочного этапа МОШ</a>
+		<br></span><br><span class="data_news"><b>21.12.2023</b> <a href="/news/288">Телеграм-канал МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>20.12.2023</b> <a href="/news/287">Продление сроков Отборочного этапа МОШ по экономике 2023-2024 года.</a>
+		<br></span><br><span class="data_news"><b>16.12.2023</b> <a href="/news/286">Резервная система регистрации для обучающихся в школах вне Москвы</a>
+		<br></span><br><span class="data_news"><b>05.12.2023</b> <a href="/news/300">Открыта регистрация для участия в МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>05.12.2023</b> <a href="/news/285">Открыта регистрация для участия в МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>02.04.2023</b> <a href="/news/281">Критерии определения победителей и призеров МОШ по экономике 2022-2023 года</a>
+		<br></span><br><span class="data_news"><b>28.03.2023</b> <a href="/news/280">Очная апелляция</a>
+		<br></span><br><span class="data_news"><b>24.03.2023</b> <a href="/news/279">Опубликованы сканы работ и результаты проверки. Открыта апелляция</a>
+		<br></span><br><span class="data_news"><b>23.03.2023</b> <a href="/news/278">Опубликованы задания, решения и критерии проверки работ МОШ 2023 по экономике</a>
+		<br></span><br><span class="data_news"><b>03.03.2023</b> <a href="/news/302">Организационная информация о проведении заключительного этапа МОШ по экономике 2023 года</a>
+		<br></span><br><span class="data_news"><b>03.03.2023</b> <a href="/news/277">Совместная точка проведения МОШ и Олимпиады "Курчатов" в Москве</a>
+		<br></span><br><span class="data_news"><b>03.03.2023</b> <a href="/news/276">Организационная информация о проведении заключительного этапа МОШ по экономике 2023 года</a>
+		<br></span><br><span class="data_news"><b>02.03.2023</b> <a href="/news/275">Дополнительная точка для учащихся, выполняющих задания 11 класса</a>
+		<br></span><br><span class="data_news"><b>02.03.2023</b> <a href="/news/274">Распечатывание бланков ответов</a>
+		<br></span><br><span class="data_news"><b>01.03.2023</b> <a href="/news/273">Регистрация в точки проведения МОШ в Москве и регионах</a>
+		<br></span><br><span class="data_news"><b>28.02.2023</b> <a href="/news/271">Регистрация и предполагаемые города проведения Заключительного этапа МОШ по экономике 4 марта 2023 года</a>
+		<br></span><br><span class="data_news"><b>19.02.2023</b> <a href="/news/270">Список приглашенных на заключительный этап МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>17.02.2023</b> <a href="/news/269">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2022-2023 года"</a>
+		<br></span><br><span class="data_news"><b>08.02.2023</b> <a href="/news/268">Предварительные результаты отборочного этапа МОШ и апелляция участников</a>
+		<br></span><br><span class="data_news"><b>27.01.2023</b> <a href="/news/267">Отборочный этап МОШ по экономике стартует 28 января 2023 года и продлится по 4 февраля 2023 года</a>
+		<br></span><br><span class="data_news"><b>26.01.2023</b> <a href="/news/266">Регистрация и старт отборочного этапа МОШ по экономике. </a>
+		<br></span><br><span class="data_news"><b>17.01.2023</b> <a href="/news/265">Открыта регистрация для участия в Московской олимпиаде школьников по экономике. Отборочный этап пройдет с 27 января по 2 февраля 2023 года.</a>
+		<br></span><br><span class="data_news"><b>26.11.2022</b> <a href="/news/264">Определены предварительные даты проведения МОШ по экономике 2022-2023 года</a>
+		<br></span><br><span class="data_news"><b>16.09.2022</b> <a href="/news/263">На сайте РСОШ опубликована информация о порядке получения электронных копий дипломов победителей (призеров) олимпиад, входящих в Перечень олимпиад школьников на 2021/22 учебный год.</a>
+		<br></span><br><span class="data_news"><b>29.04.2022</b> <a href="/news/262">Опубликован список победителей и призёров МОШ по экономике 2022 года</a>
+		<br></span><br><span class="data_news"><b>21.04.2022</b> <a href="/news/299">Опубликованы критерии определения победителей и призеров МОШ по экономике 2021-2022 года</a>
+		<br></span><br><span class="data_news"><b>21.04.2022</b> <a href="/news/283">Опубликованы критерии определения победителей и призеров МОШ по экономике 2021-2022 года</a>
+		<br></span><br><span class="data_news"><b>21.04.2022</b> <a href="/news/282">Опубликованы критерии определения победителей и призеров МОШ по экономике 2021-2022 года</a>
+		<br></span><br><span class="data_news"><b>21.04.2022</b> <a href="/news/261">Внесение участниками информации о СНИЛС и коректировка названия образовательного учреждения в ЕСР</a>
+		<br></span><br><span class="data_news"><b>21.04.2022</b> <a href="/news/260">Опубликованы критерии определения победителей и призеров МОШ по экономике 2021-2022 года</a>
+		<br></span><br><span class="data_news"><b>15.04.2022</b> <a href="/news/259">Особенности просмотра результатов проверки работ, проверяемых дистанционно</a>
+		<br></span><br><span class="data_news"><b>15.04.2022</b> <a href="/news/258">Обновлены файлы заданий и критериев проверки 11 класса</a>
+		<br></span><br><span class="data_news"><b>15.04.2022</b> <a href="/news/257">Опубликованы сканы работ и результаты проверки. Открыта апелляция</a>
+		<br></span><br><span class="data_news"><b>13.04.2022</b> <a href="/news/256">Опубликованы задания, решения и критерии проверки</a>
+		<br></span><br><span class="data_news"><b>05.03.2022</b> <a href="/news/255">Уточнена информация о точке МОШ в Санкт-Петербурге</a>
+		<br></span><br><span class="data_news"><b>03.03.2022</b> <a href="/news/254">Открыта точка в Кирове</a>
+		<br></span><br><span class="data_news"><b>02.03.2022</b> <a href="/news/253">Организационная информация о проведении заключительного этапа МОШ по экономике 2022 года</a>
+		<br></span><br><span class="data_news"><b>02.03.2022</b> <a href="/news/251">В систему "Статград" загружена информация об участниках, приглашенных на Заключительных этап.</a>
+		<br></span><br><span class="data_news"><b>02.03.2022</b> <a href="/news/250">Адреса точек проведения МОШ по экономике в Москве и регионах и особенности регистрации</a>
+		<br></span><br><span class="data_news"><b>01.03.2022</b> <a href="/news/249">Одновременное участие в МОШ по экономике и олимпиаде "Курчатов"</a>
+		<br></span><br><span class="data_news"><b>01.03.2022</b> <a href="/news/248">Список приглашенных на Заключительный этап 7 марта и предварительная информация о точках проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>25.02.2022</b> <a href="/news/247">О смене классе участия в Заключительном этапе МОШ по экономике на класс, соответстующий классу обучения</a>
+		<br></span><br><span class="data_news"><b>24.02.2022</b> <a href="/news/246">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2021-2022 года"</a>
+		<br></span><br><span class="data_news"><b>21.02.2022</b> <a href="/news/245">Изменение в ключах проверки и пересчёт баллов в заданиях 10 и 11 классов</a>
+		<br></span><br><span class="data_news"><b>17.02.2022</b> <a href="/news/244">Разбор заданий отборочного этапа для 8-11 классов</a>
+		<br></span><br><span class="data_news"><b>15.02.2022</b> <a href="/news/243">В личных кабинетах участников опубликованы предварительные результаты отборочного онлайн-этапа МОШ</a>
+		<br></span><br><span class="data_news"><b>14.02.2022</b> <a href="/news/242">Задания и решения дистанционного отборочного он-лайн этапа МОШ</a>
+		<br></span><br><span class="data_news"><b>24.06.2021</b> <a href="/news/239">Список победителей и призёров МОШ и ссылка на скачивание дипломов</a>
+		<br></span><br><span class="data_news"><b>12.05.2021</b> <a href="/news/238">Опубликованы критерии определения победителей и призеров МОШ по экономике 2020-2021 года</a>
+		<br></span><br><span class="data_news"><b>11.05.2021</b> <a href="/news/237">Просмотр работ и апелляция для участников, у которых на 11.00 10.05.2021 г. были проверены не все задачи</a>
+		<br></span><br><span class="data_news"><b>10.05.2021</b> <a href="/news/236">Публикация работ и апелляция для участников, в работах которых обнаружились непроверенные листы</a>
+		<br></span><br><span class="data_news"><b>09.05.2021</b> <a href="/news/235">Задания и критерии проверки МОШ по экономике 2021 года и информация об апелляции</a>
+		<br></span><br><span class="data_news"><b>09.04.2021</b> <a href="/news/234">Организационная информация о проведении заключительного этапа МОШ по экономике 2021 года</a>
+		<br></span><br><span class="data_news"><b>08.04.2021</b> <a href="/news/233">Адреса точек проведения МОШ по экономике в Москве и регионах и особенности регистрации</a>
+		<br></span><br><span class="data_news"><b>08.04.2021</b> <a href="/news/232">В ЕСР продолжается регистрация на Заключительный этап. Адреса точек опубликованы в ЕСР и вскоре появятся на сайте МОШ по экономике.</a>
+		<br></span><br><span class="data_news"><b>05.04.2021</b> <a href="/news/231">Точки проведения МОШ по экономике в регионах России и особенности проведения МОШ по экономике в Москве</a>
+		<br></span><br><span class="data_news"><b>29.03.2021</b> <a href="/news/230">О дате проведения Заключительного этапа МОШ по экономике и пересечении с МОШ по обществознанию</a>
+		<br></span><br><span class="data_news"><b>18.03.2021</b> <a href="/news/229">Список участников, приглашённых на Заключительный этап МОШ по экономике 2020-2021 года.</a>
+		<br></span><br><span class="data_news"><b>12.03.2021</b> <a href="/news/228">Решение оргкомитета МОШ по экономике "О результатах отборочного этапа и проведении Заключительного этапа Московской олимпиады школьников по экономике 2020-2021 года"</a>
+		<br></span><br><span class="data_news"><b>25.02.2021</b> <a href="/news/226">Предварительные результаты отборочного этапа МОШ по экономике - 2021</a>
+		<br></span><br><span class="data_news"><b>06.02.2021</b> <a href="/news/224">Отборочный этап МОШ по экономике - 2021 стартовал!</a>
+		<br></span><br><span class="data_news"><b>01.02.2021</b> <a href="/news/223">Регистрация и отборочный этап МОШ по экономике-2021</a>
+		<br></span><br><span class="data_news"><b>30.05.2020</b> <a href="/news/222">Опубликованы критерии определения победителей и призеров МОШ по экономике 2019-2020 года и списки победителей и призеров МОШ</a>
+		<br></span><br><span class="data_news"><b>26.05.2020</b> <a href="/news/221">Публикация работ участников, писавших МОШ по экономике в Москве совместно с Олимпиадой "Курчатов" </a>
+		<br></span><br><span class="data_news"><b>22.05.2020</b> <a href="/news/220">Вопросы жюри (апелляция)</a>
+		<br></span><br><span class="data_news"><b>21.05.2020</b> <a href="/news/219">Задания и решения заданий МОШ по экономике и критерии проверки. Замечания по проверке работ. </a>
+		<br></span><br><span class="data_news"><b>10.04.2020</b> <a href="/news/218">Бизнес образование для школьников: сегодня - бесплатно и онлайн. БЕРЁZKA – семейный бизнес-форум для подростков и родителей в онлайн формате</a>
+		<br></span><br><span class="data_news"><b>07.03.2020</b> <a href="/news/217">Участникам олимпиады школьников "Турнир имени М.В. Ломоносова" в Москве</a>
+		<br></span><br><span class="data_news"><b>06.03.2020</b> <a href="/news/216">Точка проведения МОШ в Москве по адресу Старослободская д.1 (ГБОУ Школа № 1282) открыта не будет</a>
+		<br></span><br><span class="data_news"><b>05.03.2020</b> <a href="/news/215">Информация об адресах точек проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>05.03.2020</b> <a href="/news/214">Организационная информация о проведении заключительного этапа МОШ по экономике 2020 года</a>
+		<br></span><br><span class="data_news"><b>05.03.2020</b> <a href="/news/213">Открыта регистрация на Заключительный этап</a>
+		<br></span><br><span class="data_news"><b>03.03.2020</b> <a href="/news/212">Список приглашенных на заключительный этап МОШ по экономике - 2020</a>
+		<br></span><br><span class="data_news"><b>02.03.2020</b> <a href="/news/211">Города, в которых будут открыты точки проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>01.03.2020</b> <a href="/news/210">Пороговые баллы для участия в Заключительном этапе МОШ по экономике 2020 года</a>
+		<br></span><br><span class="data_news"><b>27.02.2020</b> <a href="/news/209">Результаты заочного этапа и вопросы методической комиссии</a>
+		<br></span><br><span class="data_news"><b>14.01.2020</b> <a href="/news/208">Регистрация для участия в МОШ по экономике - 2020</a>
+		<br></span><br><span class="data_news"><b>26.06.2019</b> <a href="/news/207">Получение дипломов МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>15.05.2019</b> <a href="/news/206">Определены пороговые баллы призеров и победителей </a>
+		<br></span><br><span class="data_news"><b>05.04.2019</b> <a href="/news/205">Очная апелляция</a>
+		<br></span><br><span class="data_news"><b>04.04.2019</b> <a href="/news/203">Повторная публикация критериев 9-11 класса и обновление критериев 8 класса</a>
+		<br></span><br><span class="data_news"><b>04.04.2019</b> <a href="/news/202">Сроки заочной апелляции</a>
+		<br></span><br><span class="data_news"><b>04.04.2019</b> <a href="/news/200">Задания 5-11 классов, решения и критерии проверки 5-7 классов</a>
+		<br></span><br><span class="data_news"><b>03.04.2019</b> <a href="/news/198">Результаты проверки и апелляция</a>
+		<br></span><br><span class="data_news"><b>11.03.2019</b> <a href="/news/197">Где учиться экономике? Набор в математико-экономические классы школ - партнеров МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>09.03.2019</b> <a href="/news/196">Адреса точек проведения в Екатеринбурге и Чебоксарах</a>
+		<br></span><br><span class="data_news"><b>07.03.2019</b> <a href="/news/195">Точка проведения в Москве, совместная с олимпиадой "Курчатов"</a>
+		<br></span><br><span class="data_news"><b>07.03.2019</b> <a href="/news/194">Организационная информация о проведении заключительного этапа МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>06.03.2019</b> <a href="/news/193">Уточненный список регионов проведения МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>06.03.2019</b> <a href="/news/192">Регистрация на заключительный этап</a>
+		<br></span><br><span class="data_news"><b>06.03.2019</b> <a href="/news/191">Список приглашенных на заключительный этап</a>
+		<br></span><br><span class="data_news"><b>05.03.2019</b> <a href="/news/190">Определены баллы, необходимые для участия в заключительном этапе 2018-2019 учебного года</a>
+		<br></span><br><span class="data_news"><b>10.02.2019</b> <a href="/news/189">Площадки проведение заключительного этапа</a>
+		<br></span><br><span class="data_news"><b>07.02.2019</b> <a href="/news/188">Продление дистанционного этапа</a>
+		<br></span><br><span class="data_news"><b>20.01.2019</b> <a href="/news/186">Начало отборочного этапа</a>
+		<br></span><br><span class="data_news"><b>18.01.2019</b> <a href="/news/187">Сегодня вечером начинается отборочный этап МОШ </a>
+		<br></span><br><span class="data_news"><b>18.01.2019</b> <a href="/news/185">Сегодня вечером начинается отборочный этап МОШ </a>
+		<br></span><br><span class="data_news"><b>12.01.2019</b> <a href="/news/183">Осталось всего 5 дней до начала дистанционного этапа МОШ по экономике, не пропустите свой шанс!</a>
+		<br></span><br><span class="data_news"><b>30.12.2018</b> <a href="/news/182">Продолжается регистрация на дистанционный этап, не забудьте принять участие!</a>
+		<br></span><br><span class="data_news"><b>02.04.2018</b> <a href="/news/181">Определились пороговые баллы победителей и призеров МОШ-2018</a>
+		<br></span><br><span class="data_news"><b>30.03.2018</b> <a href="/news/180">Очная апелляция</a>
+		<br></span><br><span class="data_news"><b>27.03.2018</b> <a href="/news/179">Выложены решения задач и критерии проверки работ</a>
+		<br></span><br><span class="data_news"><b>25.03.2018</b> <a href="/news/178">Окончание проверки работ, публикация решений, результатов проверки и порядок апелляции</a>
+		<br></span><br><span class="data_news"><b>24.03.2018</b> <a href="/news/177">Набор в математико-экономические классы школ - партнеров МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>21.03.2018</b> <a href="/news/176">Вебинары с разбором заданий МОШ 22 марта</a>
+		<br></span><br><span class="data_news"><b>11.03.2018</b> <a href="/news/175">Задания заключительного этапа </a>
+		<br></span><br><span class="data_news"><b>09.03.2018</b> <a href="/news/174">Разбор заданий Московской олимпиады школьников по экономике</a>
+		<br></span><br><span class="data_news"><b>09.03.2018</b> <a href="/news/173">Точки проведения МОШ в Москве</a>
+		<br></span><br><span class="data_news"><b>07.03.2018</b> <a href="/news/172">Адреса проведения Московской олимпиады школьников по экономике в регионах Российской Федерации</a>
+		<br></span><br><span class="data_news"><b>05.03.2018</b> <a href="/news/171">Организационная информация о проведении заключительного этапа МОШ по экономике</a>
+		<br></span><br><span class="data_news"><b>02.03.2018</b> <a href="/news/168">Определился список региональных площадок МОШ</a>
+		<br></span><br><span class="data_news"><b>28.02.2018</b> <a href="/news/167">Списки приглашенных и регистрация на заключительный этап МОШ 2017-18 учебного года</a>
+		<br></span><br><span class="data_news"><b>26.02.2018</b> <a href="/news/164">Скорректированные проходные баллы и выложены ответы к заданиям дистанционного этапа 2017-18 учебного года</a>
+		<br></span><br><span class="data_news"><b>20.02.2018</b> <a href="/news/163">Дистанционный этап олимпиады заверешен</a>
+		<br></span><br><span class="data_news"><b>12.02.2018</b> <a href="/news/165">Информация о региональных площадках</a>
+		<br></span><br><span class="data_news"><b>10.02.2018</b> <a href="/news/162">Доступ к заданиям дистанционного этапа открыт</a>
+		<br></span><br><span class="data_news"><b>09.02.2018</b> <a href="/news/166">Изменения в Московской олимпиаде школьников по экономике </a>
+		<br></span><br><span class="data_news"><b>26.01.2018</b> <a href="/news/161">Открыта регистрация для участия в дистанционном этапе Московской Олимпиады Школьников по экономике 2018 года</a>
+		<br></span><br><span class="data_news"><b>19.01.2018</b> <a href="/news/160">Даты регистрации, дистанционного и заключительного этапов Московской олимпиады школьников по экономике </a>
+		<br>Даты регистрации, дистанционного и заключительного этапов Московской олимпиады школьников по экономике 201718 учебного года </span><br><span class="data_news"><b>05.06.2017</b> <a href="/news/158">Выдача дипломов заключительного этапа олимпиады</a>
+		<br></span><br><span class="data_news"><b>13.04.2017</b> <a href="/news/157">Итоги олимпиады 2016/17 учебного года</a>
+		<br></span><br><span class="data_news"><b>29.03.2017</b> <a href="/news/156">Информация об апелляции и результаты участников заключительного этапа</a>
+		<br></span><br><span class="data_news"><b>28.02.2017</b> <a href="/news/155">Доступны титульные листы и бланки в личных кабинетах. Списки приглашенных</a>
+		<br></span><br><span class="data_news"><b>27.02.2017</b> <a href="/news/154">Организационная информация для участников заключительного этапа</a>
+		<br></span><br><span class="data_news"><b>27.02.2017</b> <a href="/news/153">Итоги дистанционного этапа</a>
+		<br></span><br><span class="data_news"><b>13.02.2017</b> <a href="/news/152">Результаты дистанционного этапа и вопросы по автоматической проверке</a>
+		<br></span><br><span class="data_news"><b>27.01.2017</b> <a href="/news/151">Стартовал дистанционный этап</a>
+		<br></span><br><span class="data_news"><b>26.01.2017</b> <a href="/news/150">Перенесены даты дистанционного этапа</a>
+		<br></span><br><span class="data_news"><b>12.01.2017</b> <a href="/news/149">Регистрация и даты дистанционного этапа Московской олимпиады школьников по экономике</a>
+		<br></span><br><span class="data_news"><b>07.06.2016</b> <a href="/news/148">Выдача дипломов победителям и призерам олимпиады</a>
+		<br></span><br><span class="data_news"><b>22.03.2016</b> <a href="/news/147">Итоги Московской олимпиады школьников по экономике 2015/16 года</a>
+		<br>Определены границы победителей и призеров олимпиады.</span><br></span></p>                        	</div>
+                            </div>
+                        </td>
+                        <td width="220" valign="top">                        <div class="block">  
+									<a style="text-decoration:none;" href="http://vos.olimpiada.ru/">										<span class="headline" style="background:#3E6C62"><span style="text-decoration: underline;">Всероссийская олимпиада</span></span>
+									</a>	
+																			</div>
+						<div class="block">  
+																			<span class="headline" style="background:#074713">Материалы для подготовки</span>
+										
+																				<div style="margin: 10px;"><p><strong><a href="http://mosecon.olimpiada.ru/arch_tasks">Задания прошлых лет (МОШ)<br /></a><a href="http://info.olimpiada.ru/activity/86/tasks">Задания прошлых лет (ВОШ)</a><a href="http://mosecon.olimpiada.ru/arch_tasks"><br /></a></strong><strong><strong><a href="http://olimpiada.ru/intro/econ" target="_blank">Советы по подготовке<br /></a></strong></strong><strong><a href="/links">Полезные ссылки<br /></a></strong><strong><a href="/liter">Рекомендуемая литература</a></strong></p></div>
+																			</div>
+						<div class="block">  
+																			<span class="headline" style="background:#3E6C62">Другие олимпиады и конкурсы</span>
+										
+																				<div style="margin: 10px;"><p><a href="http://olymp.hse.ru/mmo" target="_blank">Олимпиада НИУ ВШЭ "Высшая проба"</a></p>
+<p><a href="http://openchampionship.ru/">МГУ. Открытый чемпионат школ по экономике</a><a href="http://www.olimpiada-kondratiev.ru/" target="_blank"><br /><br />Олимпиада имени Кондратьева<br /></a><a href="http://olymp.hse.ru/mmo" target="_blank"><br /></a><a href="http://www.ifru.ru/698/" target="_blank">Всероссийская олимпиада по финансовому рынку<br /></a><br /><a href="http://sibiriada.org/files/" target="_blank"><span style="color: #800080;">Межрегиональный экономический фестиваль школьников "Сибириада.Шаг в мечту"</span><br /><br /></a><a href="http://www.internet-konkurs.fa.ru/" target="_blank">Всероссийская олимпиада "Миссия выполнима.Твоё призвание -финансист"</a></p>
+<p><span style="text-decoration: underline; color: #333399;"><a href="http://ec-school.ru/">Московский &nbsp;открытый конкурс&laquo;Человек. Город.Финансы&raquo;&nbsp;</a></span><a href="https://reg.olimpiada.ru/login/"><br /></a></p></div>
+																			</div>
+						</td>                    </tr>
+                 </table>
+             </td>
+        </tr>
+    </table>
+	<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+(function (d, w, c) {
+    (w[c] = w[c] || []).push(function() {
+        try {
+            w.yaCounter18579499 = new Ya.Metrika({id:18579499,
+                    webvisor:true,
+                    clickmap:true,
+                    trackLinks:true,
+                    accurateTrackBounce:true});
+        } catch(e) { }
+    });
+
+    var n = d.getElementsByTagName("script")[0],
+        s = d.createElement("script"),
+        f = function () { n.parentNode.insertBefore(s, n); };
+    s.type = "text/javascript";
+    s.async = true;
+    s.src = (d.location.protocol == "https:" ? "https:" : "http:") + "//mc.yandex.ru/metrika/watch.js";
+
+    if (w.opera == "[object Opera]") {
+        d.addEventListener("DOMContentLoaded", f, false);
+    } else { f(); }
+})(document, window, "yandex_metrika_callbacks");
+</script>
+<noscript><div><img src="//mc.yandex.ru/watch/18579499" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+(function (d, w, c) {
+    (w[c] = w[c] || []).push(function() {
+        try {
+            w.yaCounter18559432 = new Ya.Metrika({id:18559432,
+                    webvisor:true,
+                    clickmap:true,
+                    trackLinks:true,
+                    accurateTrackBounce:true});
+        } catch(e) { }
+    });
+
+    var n = d.getElementsByTagName("script")[0],
+        s = d.createElement("script"),
+        f = function () { n.parentNode.insertBefore(s, n); };
+    s.type = "text/javascript";
+    s.async = true;
+    s.src = (d.location.protocol == "https:" ? "https:" : "http:") + "//mc.yandex.ru/metrika/watch.js";
+
+    if (w.opera == "[object Opera]") {
+        d.addEventListener("DOMContentLoaded", f, false);
+    } else { f(); }
+})(document, window, "yandex_metrika_callbacks");
+</script>
+<noscript><div><img src="//mc.yandex.ru/watch/18559432" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter --></body></html>

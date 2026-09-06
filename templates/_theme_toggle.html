@@ -1,0 +1,34 @@
+{% comment %}
+Переключатель светлой и тёмной темы — ОДНА реализация на весь сайт.
+
+Подключают: `_nav.html` (шапка) и экраны входа/регистрации, у которых шапки
+нет вовсе. До 04.09.2026 переключателей было два: этот и свой в доке
+калькулятора (`#dock-theme`), причём второй умел «системную тему» и потому
+расходился с первым — отсюда «тема скачет». Второй удалён.
+
+Тему на странице ставит скрипт из `_tokens.html` ДО отрисовки. Здесь только
+кнопка и её обработчик: тёмная — атрибут `data-theme="dark"`, светлая — ЕГО
+ОТСУТСТВИЕ. Атрибута `light` не существует нигде на сайте.
+
+Класс кнопки задаёт вызывающий: в шапке она белая на графите
+(`.nav-icon-btn`), на странице входа — по теме (`.auth-icon-btn`).
+{% endcomment %}
+<button id="theme-toggle" type="button" class="{{ theme_btn_class|default:'nav-icon-btn' }}"
+        aria-label="Сменить тему" title="Светлая / тёмная тема">☾</button>
+<script>
+(function () {
+  var btn = document.getElementById('theme-toggle');
+  if (!btn) return;
+  function isDark() { return document.documentElement.getAttribute('data-theme') === 'dark'; }
+  function paint() { btn.textContent = isDark() ? '☀' : '☾'; }
+  paint();
+  btn.addEventListener('click', function () {
+    var h = document.documentElement;
+    if (isDark()) { h.removeAttribute('data-theme'); try { localStorage.setItem('theme', 'light'); } catch (e) {} }
+    else { h.setAttribute('data-theme', 'dark'); try { localStorage.setItem('theme', 'dark'); } catch (e) {} }
+    paint();
+    /* Калькулятор перечитывает цвета из токенов и перерисовывает SVG. */
+    if (typeof redrawAll === 'function') redrawAll();
+  });
+})();
+</script>

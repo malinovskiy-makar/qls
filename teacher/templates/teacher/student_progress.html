@@ -20,7 +20,7 @@
 
 .page-header { display: flex; align-items: flex-start; gap: 16px;
                flex-wrap: wrap; margin-bottom: 24px; }
-.back-link { font-size: 13px; color: var(--text2); text-decoration: none;
+.back-link { font-size: 14px; color: var(--text2); text-decoration: none;
              white-space: nowrap; padding-top: 6px; }
 .back-link:hover { color: var(--text); }
 .student-name { font-size: 22px; font-weight: 700; }
@@ -95,22 +95,22 @@
 {% endcomment %}
 <div class="cards3">
   <div class="card3">
-    <div class="card3-cap">Процент верно решённых задач{% include '_hint.html' with hint='Первое число — по всем задачам, решённым на сайте. Второе — только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-cap">Процент верно решённых задач{% include '_hint.html' with hint='Первое число считается по всем задачам, решённым на сайте. Второе только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</div>
     <div class="card3-value">
       <span class="k-pair">
-        {% if open_pair.all is not None %}{{ open_pair.all }}%{% else %}—{% endif %}
+        {% if open_pair.all is not None %}{{ open_pair.all }}%{% else %}–{% endif %}
         <span class="k-pair__slash">/</span>
-        <span class="k-pair__mine">{% if open_pair.mine is not None %}{{ open_pair.mine }}%{% else %}—{% endif %}</span>
+        <span class="k-pair__mine">{% if open_pair.mine is not None %}{{ open_pair.mine }}%{% else %}–{% endif %}</span>
       </span>
     </div>
   </div>
   <div class="card3">
-    <div class="card3-cap">Процент верно решённых тестов{% include '_hint.html' with hint='Первое число — по всем тестам, решённым на сайте. Второе — только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</div>
+    <div class="card3-cap">Процент верно решённых тестов{% include '_hint.html' with hint='Первое число считается по всем тестам, решённым на сайте. Второе только по домашкам и контрольным этого репетитора. Игра не входит ни в одно из них.' %}</div>
     <div class="card3-value">
       <span class="k-pair">
-        {% if test_pair.all is not None %}{{ test_pair.all }}%{% else %}—{% endif %}
+        {% if test_pair.all is not None %}{{ test_pair.all }}%{% else %}–{% endif %}
         <span class="k-pair__slash">/</span>
-        <span class="k-pair__mine">{% if test_pair.mine is not None %}{{ test_pair.mine }}%{% else %}—{% endif %}</span>
+        <span class="k-pair__mine">{% if test_pair.mine is not None %}{{ test_pair.mine }}%{% else %}–{% endif %}</span>
       </span>
     </div>
   </div>

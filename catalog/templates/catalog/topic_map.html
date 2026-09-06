@@ -25,9 +25,16 @@
 
   <header class="tmap-head">
     <div class="tmap-head-title">
-      <h1>Карта тем и тегов</h1>
+      {% comment %}
+        Витрина страницы. Прежний подзаголовок был инструкцией («наведитесь
+        на тег и уходите от него по линиям») — она уместна в обучении, а не
+        в шапке: человек читает её раньше, чем понял, зачем ему карта.
+        Здесь говорим, ЧТО это и что на ней видно.
+      {% endcomment %}
+      <h1>Интерактивная карта задач</h1>
+      {# 343 оканчивается на 3, значит «тега», а не «тегов». #}
       <p class="tmap-sub">{{ theme_count }} тем&nbsp;· {{ tag_count }} тега&nbsp;·
-        наведитесь на тег и уходите от него по линиям</p>
+        связи между разделами корпуса</p>
     </div>
 
     <div class="tmap-search">
@@ -67,7 +74,7 @@
         возвращался — и всё повторялось. Это и было дрожание.
       {% endcomment %}
       <section class="tmap-block" id="tmap-hover-block">
-        <h2 class="tmap-block-h">Под курсором</h2>
+        <h2 class="tmap-block-h" id="tmap-hover-head">Как пользоваться</h2>
         <div id="tmap-hover"><!-- заполняется картой --></div>
       </section>
 
@@ -82,24 +89,68 @@
         <div class="tmap-chips" id="tmap-chips"></div>
       </section>
 
+      {% comment %}
+        ⚠️ ЗАГОЛОВОК РАЗДЕЛА НАПИСАН ЕГО ЦВЕТОМ, И ЭТО НЕ УКРАШЕНИЕ, А
+        ЛЕГЕНДА. Семь цветов узлов вернулись (ADR 0053); прошлый раз от них
+        отказались с доводом «легенду никто не помнит». Легенда, которую надо
+        вспоминать, и правда не работает — поэтому отдельного блока-легенды
+        здесь нет, а цвет назван прямо на органе управления: раздел написан
+        своей краской, и темы раздела лежат под ним. Соответствие не
+        запоминают, его видят, пока пользуются списком.
+
+        Раньше эти заголовки были бледнее самих строк и читались как
+        отключённые. Теперь это кнопки: стрелка, имя цветом раздела, число
+        тем.
+      {% endcomment %}
       <section class="tmap-block">
-        <h2 class="tmap-block-h">Темы</h2>
-        <div class="tmap-themes" id="tmap-themes">
+        <h2 class="tmap-block-h">Разделы корпуса</h2>
+        <div class="tmap-tree" id="tmap-themes">
           {% for s in sections %}
-            <div class="tmap-themes-group">
-              {% comment %}
-                Заголовок раздела — метка без точки: у раздела больше нет
-                своего цвета (ADR 0038), он только структурирует список.
-              {% endcomment %}
-              <div class="tmap-themes-group-h">{{ s.label }}</div>
-              {% for t in s.themes %}
-                <button type="button" class="tmap-theme-row"
-                        data-theme="{{ t.n }}" data-g="{{ s.key }}">
-                  <span class="tmap-theme-n">{{ t.n }}</span>
-                  <span class="tmap-theme-name">{{ t.title }}</span>
-                  <span class="tmap-theme-cnt">{{ t.tags }}</span>
-                </button>
-              {% endfor %}
+            <div class="tmap-tree-sec" data-sec="{{ s.key }}">
+              <button type="button" class="tmap-sec-row" data-open="sec"
+                      aria-expanded="false">
+                <span class="tmap-arrow" aria-hidden="true"></span>
+                <span class="tmap-sec-name">{{ s.label }}</span>
+                <span class="tmap-sec-cnt">{{ s.themes|length }}</span>
+              </button>
+              <div class="tmap-sec-body" hidden>
+                {% for t in s.themes %}
+                  <div class="tmap-tree-theme">
+                    <button type="button" class="tmap-theme-row" data-open="theme"
+                            data-theme="{{ t.n }}" aria-expanded="false">
+                      <span class="tmap-arrow" aria-hidden="true"></span>
+                      <span class="tmap-theme-n">{{ t.n }}</span>
+                      <span class="tmap-theme-name">{{ t.title }}</span>
+                      {% comment %}
+                        Число у темы — сумма по её тегам, а тег может стоять
+                        у той же задачи не один: это оценка объёма темы, а не
+                        поголовье задач. Подсказка говорит это прямо, чтобы
+                        голое число не читалось как точный итог.
+                      {% endcomment %}
+                      {% if t.count %}
+                        <span class="tmap-theme-cnt"
+                              title="{{ t.count }} задач по тегам темы">{{ t.count }}</span>
+                      {% else %}
+                        <span class="tmap-theme-cnt tmap-cnt--none"
+                              title="счётчик задач у тегов темы не задан">–</span>
+                      {% endif %}
+                    </button>
+                    <div class="tmap-theme-body" hidden>
+                      {% for g in t.tags %}
+                        <button type="button" class="tmap-tag-row" data-go-tag="{{ g.id }}">
+                          <span class="tmap-tag-name">{{ g.label }}</span>
+                          {% if g.count %}
+                            <span class="tmap-tag-cnt">{{ g.count }}</span>
+                          {% else %}
+                            <span class="tmap-tag-cnt tmap-cnt--none"
+                                  title="счётчика нет, тег размечается вручную">–</span>
+                          {% endif %}
+                        </button>
+                      {% endfor %}
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
             </div>
           {% endfor %}
         </div>
@@ -122,12 +173,14 @@
     <div class="tmap-foot-left">
       <div class="tmap-count" id="tmap-count">Выбрано: 0 тегов</div>
       {% comment %}
-        Канон 2.3: неполное число сопровождается оговоркой. Счётчик задач
-        известен не у всех тегов, и молчаливое «примерно M» читалось бы как
-        точный итог по корпусу.
+        ⚠️ ОГОВОРКА ПРО НЕПОЛНОТУ ЧИСЕЛ НЕ ИСЧЕЗЛА, А ПЕРЕЕХАЛА В САМ
+        СЧЁТЧИК. Здесь стояла строка «Оценка снизу: счётчик задан у N тегов
+        из M» — служебная бухгалтерия, которую человек читает всегда, а
+        относится она к случаю, который может его и не касаться. Теперь
+        неполнота проговаривается ровно там и тогда, где она есть:
+        «примерно» при частичных числах и «число задач пока неизвестно»,
+        когда у выбранных тегов счётчика нет вовсе (канон 2.3).
       {% endcomment %}
-      <div class="tmap-note">Оценка снизу: счётчик задан
-        у {{ counted_tags }} тегов из {{ tag_count }}</div>
     </div>
     <div class="tmap-foot-right">
       <span class="tmap-why" id="tmap-why">Выберите хотя бы один тег</span>
@@ -151,11 +204,20 @@
       <div class="tmap-tour-step" id="tmap-tour-step">Шаг 1 из 5</div>
       <h2 id="tmap-tour-title">Это весь корпус</h2>
       <p id="tmap-tour-text">…</p>
+      {% comment %}
+        ⚠️ КНОПКИ «ДАЛЬШЕ» ЗДЕСЬ НЕТ, И ЭТО ГЛАВНОЕ В ЭТОМ БЛОКЕ. Шаг
+        засчитывается настоящим действием на карте, а не нажатием: пока
+        человек не повернул, не приблизил, не встал на тег, не прошёл по
+        линии и не выбрал — тур стоит. Строка подсказки говорит, что делать,
+        и она же превращается в «Получилось», когда шаг взят.
+        «Пропустить шаг» — выход для мыши без колеса и сенсорного экрана.
+      {% endcomment %}
+      <div class="tmap-tour-ask" id="tmap-tour-hint">…</div>
       <div class="tmap-tour-foot">
         <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-skip">Пропустить</button>
         <span class="tmap-tour-dots" id="tmap-tour-dots"></span>
         <button type="button" class="tmap-btn" id="tmap-tour-prev">←</button>
-        <button type="button" class="tmap-btn tmap-btn--main" id="tmap-tour-next">Дальше</button>
+        <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-next">Пропустить шаг</button>
       </div>
     </div>
   </div>

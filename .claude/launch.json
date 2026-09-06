@@ -104,7 +104,7 @@
     },
     {
       "name": "gate-revert",
-      "runtimeExecutable": "C:\\Users\\shipu\\qls\\venv313\\Scripts\\python.exe",
+      "runtimeExecutable": "C:/Users/shipu/qls/venv313/Scripts/python.exe",
       "runtimeArgs": [
         "manage.py",
         "runserver",
@@ -115,7 +115,7 @@
     },
     {
       "name": "reports-static",
-      "runtimeExecutable": "C:\\Users\\shipu\\qls\\venv313\\Scripts\\python.exe",
+      "runtimeExecutable": "C:/Users/shipu/qls/venv313/Scripts/python.exe",
       "runtimeArgs": [
         "-m",
         "http.server",
@@ -131,10 +131,44 @@
       "runtimeArgs": [
         "manage.py",
         "runserver",
-        "8414",
+        "8412",
         "--noreload"
       ],
-      "port": 8414
+      "port": 8412
+    },
+    {
+      "name": "tmap-v2",
+      "runtimeExecutable": "C:/Users/shipu/qls/venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8421",
+        "--noreload"
+      ],
+      "port": 8421
+    },
+    {
+      "name": "dev-figure",
+      "runtimeExecutable": "venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8011",
+        "--noreload",
+        "--settings=config.settings_figure"
+      ],
+      "port": 8011
+    },
+    {
+      "name": "olympiads",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv313/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8433",
+        "--noreload"
+      ],
+      "port": 8433
     }
   ]
 }

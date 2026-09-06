@@ -19,8 +19,8 @@
   padding: 16px 18px;
   text-align: center;
 }
-.stat-num { font-size: 28px; font-weight: 800; color: var(--accent); }
-.stat-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+.stat-num { font-size: 28px; font-weight: 800; color: var(--accent-ink); }
+.stat-label { font-size: 13px; color: var(--text2); margin-top: 4px; }
 
 /* ── Секция ──────────────────────────────────────── */
 .section-title {
@@ -51,8 +51,14 @@
   transition: width .4s ease;
 }
 .progress-val {
-  font-size: 13px; font-weight: 700; color: var(--accent);
-  width: 36px; text-align: right; flex-shrink: 0;
+  font-size: 14px; font-weight: 700; color: var(--accent-ink);
+  /* ⚠️ 44, А НЕ 36. «100%» полужирным набором просит 40 px, и на полном
+     освоении темы значение вылезало на полосу слева. Дефект был
+     пограничным и до этой сессии (на 13 px просило 37 при тех же 36), а
+     поднятие кегля до пола интерфейса его довершило. Замерено шириной
+     текста в браузере, а не на глаз. Полоса рядом тянущаяся, поэтому
+     восемь пикселей забираются у неё и раскладка не едет. */
+  width: 44px; text-align: right; flex-shrink: 0;
 }
 
 /* ── Ошибки ──────────────────────────────────────── */
@@ -68,7 +74,7 @@
   font-size: 14px;
 }
 .mistake-count {
-  font-size: 12px; font-weight: 700;
+  font-size: 13px; font-weight: 700;
   background: var(--error-tint); color: var(--error);
   border-radius: 20px; padding: 2px 9px;
 }
@@ -99,7 +105,7 @@
   transition: width .4s ease;
 }
 .topic-level {
-  font-size: 13px; font-weight: 700;
+  font-size: 14px; font-weight: 700;
   width: 44px; text-align: right; flex-shrink: 0;
 }
 
