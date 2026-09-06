@@ -272,6 +272,44 @@ CI (по пункту 4): run #112 (`183f632`, КТ1) — успешно, пят
    и учителя). Возможно, так и задумано — проверить на приёмке.
 
 
+### 06.09, перед сессией B — фаза B0: CI красный (текст владельца целиком)
+
+> Перед сессией B — фаза B0: CI красный, разобраться и починить. Первое действие: записать этот текст целиком в `reports/branch_sync_20260905/PROGRESS.md`, раздел «Поправки владельца» (как делали с ночным режимом). B1 не начинать, пока CI по интеграционной ветке не зелёный.
+>
+> **Что известно (владелец скачал логи трёх красных прогонов Actions, разбор сделан)**
+>
+> 1. **`integration/sync-20260905` @ `03ebe57`, run #114** (https://github.com/malinovskiy-makar/qls/actions/runs/34024626960): четыре быстрых джоба зелёные (ruff 33 с, bandit/pip-audit 49 с, миграции с нуля 54 с, продакшен-настройки 22 с). «Тесты на PostgreSQL 17»: шаг A — `Ran 4413 tests`, `FAILED (failures=1, skipped=5)`; шаг B — 8 тестов OK, calc2-регрессия 238/238. Единственный провал:
+>
+>    FAIL: test_table_does_not_force_full_width (problems.tests.test_rendering.TableCssTests.test_table_does_not_force_full_width)
+>    AssertionError: Regex matched: 'width: 100%' matches 'width\\s*:\\s*100%' in ' display: block; max-width: 100%; overflow-x: auto; '
+>
+>    Причина (проверить, а не верить на слово): утренний коммит `4b22940` («Страница задачи: на узком экране не едет вбок») добавил в `catalog/templates/catalog/problem_detail.html` строку 74 — `.math-content table { display: block; max-width: 100%; overflow-x: auto; }`. Это ВТОРОЕ правило для того же селектора, и стоит оно раньше исходного на строке 149 — `.math-content table { border-collapse: collapse; margin: .75em 0; }`. Тест (`problems/tests/test_rendering.py`, строки 333–337) берёт ПЕРВОЕ правило `.math-content table {…}` и проверяет `assertNotRegex(m.group(1), r'width\s*:\s*100%')` — у регулярки нет левой границы, и она ловит `max-width: 100%`. Дефекта два: (а) регулярка проверяет не то, что обещает докстринг «не растягивать таблицу без нужды» — `max-width` как раз НЕ растягивает, а ограничивает; (б) два правила на один селектор в одном файле. Полный прогон фазы 13 был ДО этого коммита; после правки CSS запускался только замер ширины, тесты шаблона — нет. Вот почему локально «A 4 411 OK», а CI красный.
+>
+> 2. **`feat/taxonomy-v2-openai-provider` @ `772ac87`** (прогон 06.09 02:07 МСК — пуш владельца) и **`wip/sol-vs-glm-scripts` @ `169bd39`** (закладка стэша из A1): красные 6 тестов контраста (`test_readable.ActivityCellContrastTests` ×2, `test_small_fixes.DarkButtonContrastTests` ×2, `test_obzor_review.PendingColourTests` ×2 — ERROR) плюс `test_design_canon.CanonBrowserChecks.test_canon` в шаге B; на wip ещё `test_glm_ramp_probe.RunOneLevelTests.test_метрики_считаются_из_прогона` (12 != 8). Обе ветки стоят на `a6f9283` «Новая цветовая палитра» и не содержат 134 коммита main — в том числе правки токенов (`templates/_tokens.html`: `--act-a1..3`, `--surface`) и обновлённые тесты контраста. К интеграционной ветке отношения не имеет. **НЕ чинить, в этих ветках ничего не трогать:** wip — закладка; taxonomy-v2 получит main при подготовке к слиянию, тогда и перепроверить. Только запись в журнал и Notion (B0.5–B0.6).
+>
+> **Шаги**
+>
+> **B0.1. Воспроизвести локально на PostgreSQL** (docker-compose.dev.yml поднят, Docker не гасить):
+> venv313\Scripts\python.exe manage.py test problems.tests.test_rendering --settings=config.settings_test_pg
+> Ожидание: ровно один провал, тот же самый. Провала нет или он другой — стоп, отчёт по шаблону.
+>
+> **B0.2. Правка — минимальная, ничего сверх этого:**
+> - `problems/tests/test_rendering.py`, строка 337: `r'width\s*:\s*100%'` → `r'(?<![-\w])width\s*:\s*100%'`. Голый `width: 100%` по-прежнему запрещён; `max-width` / `min-width` регулярку не задевают. В докстринг тест-метода добавить одну фразу: «`max-width: 100%` допустим — он не растягивает, а ограничивает».
+> - `catalog/templates/catalog/problem_detail.html`: два правила `.math-content table` слить в одно на строке 149 — `.math-content table { border-collapse: collapse; margin: .75em 0; display: block; max-width: 100%; overflow-x: auto; }`; строку 74 убрать. Комментарий ⚠️ про 380 px и строку 73 (`.math-content .katex-display`) оставить как есть. Поведение CSS не менять: `max-width: 100%` оставить — он страхует от `<table width=…>` в старых условиях.
+>
+> **B0.3. Зубастость.** Сначала закоммитить B0.2 (сообщение: «test_rendering: регулярка width:100% ловила max-width; два правила .math-content table слиты в одно»). Затем временно вписать в это правило `width: 100%;` → тот же прогон → должен покраснеть именно `test_table_does_not_force_full_width`; убрать → зелёный. Временную правку не коммитить, `git status --short` пуст.
+>
+> **B0.4. Соседи**, все с `--settings=config.settings_test_pg`: `problems.tests.test_rendering catalog.tests config.tests.test_nav`. Все зелёные, числа в журнал. Плюс замер ширины документа тем же приёмом, что в фазе 18 (`site_audit_probe.js`): 380 / 768 / 1280 — ширина документа равна окну; числа в журнал.
+>
+> **B0.5. Журнал** `PROGRESS.md`, раздел «B0. CI #114»: причина, правка, хеш коммита, результаты зубастости и соседей, числа замера. Отдельный абзац про два других красных прогона (taxonomy-v2 и wip) с формулировкой «не относится к интеграции; перепроверить после слияния main в taxonomy-v2». Одной строкой в `docs/TESTING.md`, где описан быстрый круг: «после правки шаблона гонять тесты шаблона (`problems.tests.test_rendering`, `catalog.tests`, `config.tests.test_nav`), а не только замер». Этот коммит — отдельный.
+>
+> **B0.6. Notion.** Карточка в «Задачи» уже есть: «CI красный на integration/sync-20260905: test_rendering ловит max-width как width: 100%», ID `3d3b11c9-2bc1-8141-aaaa-f544d2f83be3`. После зелёных соседей — статус «Готово», в «Заметки» дописать хеш коммита. Про taxonomy-v2: поискать в «Задачи» карточку о подготовке `feat/taxonomy-v2-openai-provider` к слиянию; есть — дописать строку «CI на 772ac87 красный: 6 тестов контраста + test_canon, старая база a6f9283; перепроверить после merge main»; нет — новая карточка, статус «Надо», направление «Техническое». Ничего в Notion не удалять.
+>
+> **B0.7. Команда владельцу:** `git push origin integration/sync-20260905`. Затем ждать CI #115 (https://github.com/malinovskiy-makar/qls/actions, читать без входа): все пять джобов зелёные, числа шага A/B в журнал. Пока CI не зелёный — B1 не начинать. Отчёт по шаблону: что сделано / результат с цифрами / чего не смог / что записано в Notion.
+>
+> Модель: та же сессия (Sonnet). Effort: High.
+
+
 ## Для будущего слияния taxonomy-v2
 
 - Её `0047_problem_figure_raster` — тот же файл, что в c13 (байт в байт по
