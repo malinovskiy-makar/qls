@@ -362,16 +362,9 @@ class Command(BaseCommand):
         self._report()
 
     def _wipe(self):
-        FactUpdateProposal.objects.all().delete()
-        OlympiadBenefit.objects.all().delete()
-        OlympiadScore.objects.all().delete()
-        OlympiadVariant.objects.all().delete()
-        OlympiadEvent.objects.all().delete()
-        OlympiadStage.objects.all().delete()
-        OlympiadLevelYear.objects.all().delete()
-        Olympiad.objects.all().delete()
-        UniversityProgram.objects.all().delete()
-        RegionalCoordinator.objects.all().delete()
+        # Список удаления один на обе команды — `import_olympiads_data.wipe_section`.
+        from olympiads.management.commands.import_olympiads_data import wipe_section
+        wipe_section()
         self.stdout.write('Прежние записи раздела удалены.')
 
     def _seed(self):

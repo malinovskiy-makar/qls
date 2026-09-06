@@ -164,3 +164,45 @@ class IdempotencyTests(ImportTestCase):
         call_command('import_olympiads_data', verbosity=0)
         self.assertEqual(Olympiad.objects.count(), 0)
         self.assertEqual(UniversityProgram.objects.count(), 0)
+
+
+class MissingOlympiadTests(ImportTestCase):
+    """Льгота настоящей олимпиады, которой ещё нет в olympiads.jsonl
+    (06.09.2026: «Финатлон» в перечне Финуниверситета), не роняет заливку и
+    не выдумывается: строка пропускается, а в отчёте команды о ней написано."""
+
+    def _benefits(self):
+        self.write('programs.jsonl', [dict(
+            university_short='ФУ', university_name='Финансовый университет',
+            program_name='Экономика', city='Москва', order=1)])
+        self.write('benefits.jsonl', [
+            dict(slug='vs', program='ФУ', admission_year=2026, benefit_type='bvi',
+                 required_level=3, source='s1'),
+            dict(slug='finat', program='ФУ', admission_year=2026, benefit_type='bvi',
+                 required_level=3, source='s1'),
+        ])
+
+    def test_benefit_of_unknown_olympiad_is_skipped_with_a_warning(self):
+        from io import StringIO
+        self.base()
+        self._benefits()
+        out = StringIO()
+        call_command('import_olympiads_data', yes=True, stdout=out)
+        self.assertEqual(OlympiadBenefit.objects.count(), 1)
+        self.assertEqual(OlympiadBenefit.objects.get().olympiad.slug, 'vs')
+        self.assertIn('ПРОПУЩЕНО', out.getvalue())
+        self.assertIn('finat', out.getvalue())
+
+
+class WipeTests(ImportTestCase):
+    """`--wipe` сносит записи раздела (демо-данные) перед заливкой настоящих,
+    источники остаются; список удаления — общий с seed_olympiads_demo."""
+
+    def test_wipe_removes_demo_rows_before_import(self):
+        call_command('seed_olympiads_demo', yes=True, verbosity=0)
+        self.assertTrue(Olympiad.objects.filter(is_placeholder=True).exists())
+        self.base()
+        call_command('import_olympiads_data', yes=True, wipe=True, verbosity=0)
+        self.assertEqual(list(Olympiad.objects.values_list('slug', flat=True)), ['vs'])
+        self.assertFalse(Olympiad.objects.filter(is_placeholder=True).exists())
+        self.assertTrue(FactSource.objects.filter(url='https://example.test/a').exists())

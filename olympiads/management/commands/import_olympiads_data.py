@@ -26,6 +26,28 @@ from olympiads.models import (FactSource, Olympiad, OlympiadBenefit,
 
 OUT_DIR = pathlib.Path('data/olympiads/out')
 
+
+def wipe_section():
+    """Снести записи раздела перед заливкой — ОДИН список на обе команды.
+
+    Им пользуются `seed_olympiads_demo --wipe` и `import_olympiads_data
+    --wipe`: демо и настоящие факты в одной базе не смешиваются, а порядок
+    удаления (от зависимых к главным) записан в одном месте. Источники
+    (`FactSource`) не трогаем: у них свой ключ (адрес), и `update_or_create`
+    заливки их обновит.
+    """
+    from olympiads.models import FactUpdateProposal
+    FactUpdateProposal.objects.all().delete()
+    OlympiadBenefit.objects.all().delete()
+    OlympiadScore.objects.all().delete()
+    OlympiadVariant.objects.all().delete()
+    OlympiadEvent.objects.all().delete()
+    OlympiadStage.objects.all().delete()
+    OlympiadLevelYear.objects.all().delete()
+    Olympiad.objects.all().delete()
+    UniversityProgram.objects.all().delete()
+    RegionalCoordinator.objects.all().delete()
+
 # Файл → как называется в отчёте. Порядок ВАЖЕН: олимпиады раньше всего,
 # что на них ссылается.
 FILES = [
@@ -63,6 +85,10 @@ class Command(BaseCommand):
                             help='Действительно записать в базу.')
         parser.add_argument('--only', default='',
                             help='Только один файл, например levels.jsonl')
+        parser.add_argument('--wipe', action='store_true',
+                            help='Сначала снести записи раздела (например, '
+                                 'демо-данные seed_olympiads_demo); '
+                                 'источники остаются.')
 
     def handle(self, *args, **options):
         only = options['only']
@@ -86,15 +112,21 @@ class Command(BaseCommand):
         # адресом; без этой строки `--only benefits.jsonl` падал с
         # «Льгота без источника» на данных, где источник есть.
         self.sources = {}
+        self.skipped = []
         self._preload_source_keys()
         stats = {}
         with transaction.atomic():
+            if options['wipe']:
+                wipe_section()
+                self.stdout.write('Записи раздела снесены (--wipe).')
             for name, human, _ in plan:
                 handler = getattr(self, '_load_' + name.split('.')[0])
                 stats[human] = handler(read(name))
 
         for human, made in stats.items():
             self.stdout.write('  {:<28} {}'.format(human, made))
+        for line in self.skipped:
+            self.stdout.write(self.style.WARNING('  ПРОПУЩЕНО: ' + line))
         self.stdout.write(self.style.SUCCESS('Залито.'))
 
     # -- источники ---------------------------------------------------------
@@ -247,8 +279,18 @@ class Command(BaseCommand):
                 raise CommandError(
                     'Льгота без цитаты в источнике: {} / {} (источник {})'
                     .format(row.get('slug'), row.get('program'), source.url))
+            olympiad = Olympiad.objects.filter(slug=row['slug']).first()
+            if olympiad is None:
+                # ⚠️ Льгота настоящая, а олимпиады в olympiads.jsonl ещё нет
+                # (06.09.2026: «Финатлон» в перечне Финуниверситета). Такую
+                # строку не выдумываем и не роняем заливку целиком — пропускаем
+                # с предупреждением, чтобы её было видно в отчёте команды.
+                self.skipped.append(
+                    'льгота {} / {}: олимпиады «{}» нет в olympiads.jsonl'
+                    .format(row.get('slug'), row.get('program'), row['slug']))
+                continue
             OlympiadBenefit.objects.update_or_create(
-                olympiad=Olympiad.objects.get(slug=row['slug']),
+                olympiad=olympiad,
                 program=UniversityProgram.objects.get(
                     university_short=row['program']),
                 admission_year=row['admission_year'],
