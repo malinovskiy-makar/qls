@@ -938,4 +938,47 @@ B3 (удаление веток на GitHub), только после того �
 
 Вопрос про `qls-olymp`: ветка `feat/olympiad-text-dedup` уже есть на
 GitHub (осталась в семёрке B3) — оставить папку (ветка ещё в работе) или
-снести worktree сейчас?
+снести worktree сейчас? Ответ: **оставить, ветка ещё в работе.**
+
+### 4.2. Локальные ветки
+
+41 локальная ветка. Исключены из проверки: `main`,
+`integration/sync-20260905`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, три `wip/*` — 34 к проверке.
+`git merge-base --is-ancestor <b> main` для каждой: **29 предков + 5
+непредков**, ровно как в B_PLAN §5б, список идентичен. Пять непредков
+проверены отдельно — все безопасны:
+
+| Ветка | Чем покрыта |
+|---|---|
+| `backup/search-eval-c14-before-rebase` | тег `archive/backup-search-eval-c14-before-rebase` (хеш совпал) |
+| `chore/corpus-consolidation-20260822` | тег `archive/chore-corpus-consolidation-20260822` (хеш совпал) |
+| `feat/import-new-sources` | тег `archive/feat-import-new-sources` (хеш совпал) |
+| `feat/boevoi-render-legacy` | целиком внутри `feat/taxonomy-v2-openai-provider` |
+| `feat/publish-readiness-legacy-new-sources` | целиком внутри `feat/taxonomy-v2-openai-provider` |
+
+`integration/sync-20260905` (локальная) — тоже предок `main`, тег
+`sync-20260905` есть на её вершине через `main` — можно `-d`.
+
+⛔ **Стоп-гейт 7.** К удалению:
+- `git branch -d` (29, предки `main`): audit-a1-a71, backup-before-merge,
+  blok-konkurencia-firma, chore/parallel-tests,
+  claude/import-new-sources-edbc26, design/landing-bg,
+  docs/effort-and-simplicity-rules, feat/beta-polish-0904,
+  feat/calc2-andrei, feat/calc2-shipu, feat/corpus-converter-pilot,
+  feat/corpus-converter-render, feat/corpus-converter-scaleup,
+  feat/embeddings-c13-diagnostics, feat/markdown-renderer,
+  feat/merge-anich-review, feat/prod-deploy, feat/prod-django,
+  feat/prod-server, feat/redis-cache-sessions, feat/scoped-test-runner,
+  feat/search-eval-c14, feat/smart-catalog, feat/topic-map,
+  feat/topic-map-v2, feat/wecon-rush, fix/bandit-search-client-nosec,
+  fix/palette-tests, integration/canonical-base
+- `git branch -D` (5, не предки, но покрыты — см. таблицу выше):
+  backup/search-eval-c14-before-rebase,
+  chore/corpus-consolidation-20260822, feat/import-new-sources,
+  feat/boevoi-render-legacy, feat/publish-readiness-legacy-new-sources
+- `git branch -d integration/sync-20260905` (предок main, тег есть) —
+  отдельной строкой, как в задании
+
+Остаются: `main`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, три `wip/*` = 6 веток. Жду «да».
