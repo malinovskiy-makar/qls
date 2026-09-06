@@ -63,8 +63,10 @@
 | 12 Четыре быстрых джоба CI | ✅ | — | Локально, поимённо как в ci.yml (`logs/12-*.txt`): **lint** `ruff check .` → All checks passed (rc 0); **security** `bandit -r … olympiads -ll` → No issues identified (Medium 0, High 0), `pip-audit -r requirements/base.txt` → No known vulnerabilities found; **migrations** на СВЕЖЕЙ PG-базе `qls_ci_migrations_20260906` (qls_dev не пуста) → 99 миграций, `makemigrations --check` No changes detected, база удалена; **deploy-check** с переменными джоба из ci.yml → `System check identified no issues (1 silenced)`, rc 0. **CI GitHub**: run #112 (`183f632`, КТ1) — success, все пять джобов; run #113 (`800f322`, КТ2) — **failure**: упал только джоб «Тесты на PostgreSQL 17», шаг «Прогон (два шага)»; остальные четыре зелёные. Падение принесли слияния A2 (calc2/c13) или правки после них — воспроизводится фазой 13 локально на PostgreSQL |
 | КТ3 (без остановки) | ✅ | `2ac4c123` документы, `91c4c1d7` тире | Отчёт по шаблону — раздел «КТ3 (без остановки)» ниже. Перед фазой 13 разобрано падение CI #113: `test_typography.EmDashTests` — четыре длинных тире из ветки calc2 (`60-overlays.js` ×2 — подсказка площади, `calc2.html` ×2 — пояснение квоты); ветка отделилась до уборки тире на main. Тем же приёмом (тире → двоеточие, в паре «ввозим/вывозим» — короткое тире); `test_typography` 4 OK; `panels_probe.mjs` проверяет подстроку «разных графиках» — цела. Карточка Notion «Задачи» — Готово |
 | 13 Полный прогон PostgreSQL | ✅ | (этот коммит) | `scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads --settings=config.settings_test_pg --noinput` (`logs/13-full-run.txt`), `--parallel` не трогался. **Шаг A: Ran 4411 tests in 1090.9s — OK (skipped=1). Шаг B: Ran 8 tests in 270.6s — OK (skipped=4).** Код возврата 0. failures 0, errors 0. Причины пропусков при verbosity 1 не печатаются; по составу шага B — три `BitExactEncodingTests` (нет модели BGE-M3) и браузерная регрессия calc2 (node-раннер > 180 с). Известный красный calc2 (`calc2_math.mjs`, 40,375 px) в Django-прогон не попадает — он в пропуске раннера, доказан фазой 7 отдельно. Новых падений нет (тире починены до запуска). Числа вписаны в CLAUDE.md («Проверки перед сдачей») |
+| 16 Обход сайта (ночная фаза) | ⏳ | | `scripts/site_audit_probe.js` (полировка, фаза 8): `bash scripts/polish_server.sh 8901` → `node scripts/site_audit_probe.js 8901 logs/16-audit.json` — идёт |
+| 17 План сессии B (только чтение) | ✅ | (этот коммит) | `reports/branch_sync_20260905/B_PLAN.md`: (а) 45 веток origin — предки integration (`logs/17-origin-branches.txt`), (б) пять хвостов — теги покрывают вершины на origin, (в) команды `git push origin --delete` по 10 в строку, (г) 29 локальных веток к `-d` + 5 к `-D` с причиной, (д) 11 worktree: 9 к сносу (3 с неучтённым — осмотр владельца), `qls-models` и `qls-olymp` остаются, (е) серверные команды из docs/SERVER.md с ожиданием хеша; ⚠️ nginx-конфиг менялся (`weconomics.ai` в `server_name`, коммит `2f7adb9`) — на сервере копируется руками через `nginx -t`. Ничего не выполнялось |
 | 14 Итог сессии | | | |
-| 15 Стоп-гейт: рабочая база | | | |
+| 15 Рабочая база `db.sqlite3` (разрешено заранее) | ✅ (шаг 5 пропущен, шаг 4 — демо) | — (база вне git) | **1.** На порту 8000 сидела цепочка `manage.py runserver` из `qls` (pid 20796→12816→27544→26876, автоперезагрузка) — сервер владельца; погашен `taskkill /T` (действие вне репозитория, по разрешению фазы 15). **2.** Копия `db.sqlite3.bak_pre_sync_20260906`, 932 548 608 байт = оригинал. **3.** `migrate --plan` (`logs/15-migrate-working-db.txt`) — ровно 10: olympiads 0002–0006, problems 0050_problem_character_features, 0051_catalog_attempt, 0052_hint_ai_flags, 0053_hint_reviewed_backfill, 0054_merge (0047 и beta-polish 0050–0052 уже стояли); `migrate` 28 с без ошибок; неприменённых 0. **4.** `import_olympiads_data` без `--yes` — план: 37 источников, 17 олимпиад, 50 уровней, 32 этапа, 15 дат, 9 баллов, 7 программ, 88 льгот, 89 регионов, 12 комплектов. `--yes` — **упал** в `_load_benefits`: `Olympiad.DoesNotExist` — `benefits.jsonl` ссылается на slug `finat` (Финуниверситет, коммит `0d8394f` сессии 2), которого нет в `olympiads.jsonl`; остальные файлы ссылаются только на существующие slug. Команда атомарна — все таблицы olympiads остались по нулям. По ночному правилу («раздел остался пустым») — `seed_olympiads_demo` план → `--yes`: 21 олимпиада (16 main + 5 related), 4 этапа/4 даты у vseros, 7 программ, 21 льгота, 14 баллов, 12 комплектов, 85 регионов, все 11 инвариантов сошлись, `is_placeholder=True` (`logs/15-seed-olympiads.txt`). Данные `data/olympiads/out` не правились — карточка «Задачи» (Надо) + «Вопросы к утру». **5.** `import_problem_attributes` — **пропущено: файла разметки нет** (ни `reports/problem_attributes/`, ни `*attr*.jsonl` в дереве; команда ждёт путь к JSONL аргументом; по коду пишет только `character` и `features` — P0 не нарушала бы) |
 
 ## Теги (фаза 0)
 
@@ -206,7 +208,15 @@ CI (по пункту 4): run #112 (`183f632`, КТ1) — успешно, пят
 
 ## Вопросы к утру
 
-(заполняется ночью; пусто = вопросов нет)
+1. **`import_olympiads_data` падает на `benefits.jsonl`**: льготы olympiad `finat`
+   без записи олимпиады в `olympiads.jsonl` (см. фазу 15, карточка «Задачи» —
+   Надо). Раздел `/olympiads/` на локальной базе сейчас на демо-данных
+   (`seed_olympiads_demo`, `is_placeholder=True`). Решение владельца: добавить
+   `finat` в `olympiads.jsonl` или убрать её льготы, затем `seed … --wipe` и
+   повторный импорт. Данные не трогал.
+2. Разметки признаков задач (`import_problem_attributes`) нет — облачка
+   характера/особенностей и две группы фильтров не появятся (правило нуля,
+   не поломка). Ждёт файла владельца.
 
 
 ## Для будущего слияния taxonomy-v2
