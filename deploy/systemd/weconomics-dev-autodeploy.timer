@@ -1,0 +1,17 @@
+[Unit]
+Description=Проверять main для площадки dev каждые 5 минут
+
+[Timer]
+# Не сразу после загрузки: дать docker поднять боевые контейнеры и сеть
+# weconomics_backend, без которой площадка не стартует.
+OnBootSec=2min
+OnUnitActiveSec=5min
+# Разброс, чтобы опрос GitHub не приходился ровно на круглые минуты вместе
+# с чужими таймерами.
+RandomizedDelaySec=30
+# ⚠️ Persistent нужен на случай перезагрузки сервера: без него пропущенный
+# запуск теряется, и площадка стоит на старом коде до следующего тика.
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -19,3 +19,9 @@ Dockerfile text eol=lf
 .dockerignore text eol=lf
 deploy/**/*.yml text eol=lf
 deploy/**/*.conf text eol=lf
+
+# ⚠️ Юниты systemd читает Linux — по той же причине, что и *.sh выше.
+# systemd на строку с CRLF не ругается внятно: он берёт `` частью ЗНАЧЕНИЯ,
+# и `ExecStart=/…/dev_autodeploy.sh` не находит файл. Отказ выглядит как
+# «нет такого файла» при файле на месте.
+deploy/systemd/* text eol=lf
