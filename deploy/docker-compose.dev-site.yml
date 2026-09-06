@@ -54,7 +54,15 @@ services:
     # в ufw есть, а порт открыт всему интернету. Наружу ходит только nginx.
     # Пароль подставляет оболочка ВНУТРИ контейнера из env_file — так же,
     # как у боя: compose на хосте до /srv/weconomics/dev/.env не дотягивается.
-    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes"]
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --maxmemory 96mb --maxmemory-policy allkeys-lru --appendonly yes"]
+    # ⚠️ ДВА ПРЕДЕЛА, И ОНИ О РАЗНОМ. `--maxmemory 96mb` — это предел САМИХ
+    # ДАННЫХ: дойдя до него, Redis начинает вытеснять старые ключи (политика
+    # allkeys-lru) и продолжает работать. `mem_limit: 128m` — жёсткий предел
+    # ПРОЦЕССА со стороны ядра: превысив его, контейнер убивается OOM-killer-ом.
+    # Внутренний предел ниже внешнего намеренно, с запасом на служебную память
+    # самого Redis: так вытеснение срабатывает РАНЬШЕ, чем ядро убивает
+    # контейнер. Совпади они — Redis площадки падал бы вместо вытеснения.
+    mem_limit: 128m
     env_file:
       - /srv/weconomics/dev/.env
     volumes:
@@ -93,6 +101,16 @@ services:
     image: weconomics-web-dev:latest
     container_name: weco-web-dev
     restart: unless-stopped
+    # ⚠️ ПЛОЩАДКА НЕ ИМЕЕТ ПРАВА УРОНИТЬ БОЙ ПАМЯТЬЮ. Она живёт на ТОМ ЖЕ
+    # сервере с 8 ГБ, где рядом работают боевые gunicorn (4 воркера), Postgres,
+    # Redis и сервис поиска с моделью на 2,12 ГБ. Без предела утечка или
+    # тяжёлый запрос на площадке съели бы память, и OOM-killer ядра выбрал бы
+    # жертву САМ — а выбирает он самый прожорливый процесс, то есть скорее
+    # всего боевой `search` или боевой `web`. То есть баг на площадке ронял бы
+    # настоящий сайт.
+    # 900 МБ — два воркера gunicorn (замер боя: 86 МБ на воркер) с большим
+    # запасом на миграции и collectstatic при старте.
+    mem_limit: 900m
     # ports: НЕ ДОБАВЛЯТЬ. Наружу ходит только боевой nginx, он обращается
     # к `web-dev` по имени в общей сети backend.
     # ⚠️ СВОЙ .env, НЕ БОЕВОЙ. В нём другая DATABASE_URL (weconomics_dev),
@@ -133,6 +151,8 @@ services:
     image: weconomics-web-dev:latest
     container_name: weco-ws-dev
     restart: unless-stopped
+    # daphne — один процесс без воркеров, ему хватает с запасом.
+    mem_limit: 300m
     # ports: НЕ ДОБАВЛЯТЬ.
     env_file:
       - /srv/weconomics/dev/.env

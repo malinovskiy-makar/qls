@@ -39,17 +39,42 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from problems.models import (
-    Assignment, Collection, ExportRecord, Lesson, Problem, User,
+    Assignment, Collection, ExportRecord, Lesson, Problem, StudentGroup, User,
 )
+from problems.models_gamification import ParentLink
 from problems.models_platform import Feedback, UserProfile
 
-# Логины и роли двух тестовых аккаунтов площадки. Ролей у проекта две
-# системы: `User.role` решает состав шапки, `UserProfile.role` — устройство
-# кабинета. Заводим обе, иначе кабинет у «учителя» окажется пустым.
+# ── Четыре тестовых аккаунта площадки ───────────────────────────────────────
+#
+# ⚠️ ПЯТОЙ РОЛИ — ГОСТЯ — АККАУНТА НЕ НУЖНО И БЫТЬ НЕ ДОЛЖНО. Гость на сайте
+# это в точности разлогиненный браузер: каталог, задача, тренажёр открыты без
+# входа. Проверяется окном инкогнито, а не логином «dev-guest» — такой логин
+# был бы уже вошедшим пользователем с пустыми правами, то есть проверял бы не
+# то, что нужно.
+#
+# ⚠️ РОЛИ ЗАДАЮТСЯ ЧЕРЕЗ UserProfile, А НЕ ЧЕРЕЗ User.role, И ЭТО НЕ ВКУСОВЩИНА.
+# Ровно так делает настоящая регистрация (problems/views_auth.py::form_valid):
+# создаётся User, затем UserProfile с выбранной ролью, а старое поле
+# `User.role` подтягивает сам `UserProfile.sync_user_role()` по таблице
+# PROFILE_ROLE_TO_USER_ROLE (tutor→teacher, student→student, parent→viewer).
+# Проставь мы `User.role` руками — получили бы ВТОРОЙ способ заводить роли,
+# который однажды разойдётся с первым.
+#
+# Роль профиля → роль пользователя, и что на этом аккаунте смотреть:
+#   dev-student  student → student   кабинет ученика, каталог, домашки
+#   dev-teacher  tutor   → teacher   панель преподавателя, группы, работы
+#   dev-parent   parent  → viewer    экран «Мои дети»
+#   dev-admin    tutor   → (не трогается, см. ниже)  /admin/
 АККАУНТЫ = (
-    ('dev-teacher', User.Role.TEACHER, UserProfile.Role.TUTOR, 'Дев', 'Учитель'),
-    ('dev-student', User.Role.STUDENT, UserProfile.Role.STUDENT, 'Дев', 'Ученик'),
+    # логин, роль профиля, имя, фамилия
+    ('dev-student', UserProfile.Role.STUDENT, 'Дев', 'Ученик'),
+    ('dev-teacher', UserProfile.Role.TUTOR, 'Дев', 'Учитель'),
+    ('dev-parent', UserProfile.Role.PARENT, 'Дев', 'Родитель'),
 )
+
+# Название группы, в которой dev-student состоит у dev-teacher. Без неё
+# половина экранов преподавателя пуста: группа — точка входа к ученику.
+ГРУППА = 'dev-группа'
 
 # Личное, что НЕ уходит каскадом за пользователем (ссылка на автора —
 # `SET_NULL`). Сносим явно. Порядок значения не имеет: связи между ними
@@ -135,15 +160,54 @@ class Command(BaseCommand):
             #    прогресс, записи игры и тренировок олимпиад.
             людей_снесено = User.objects.all().delete()[0]
 
-            # 3. Два тестовых аккаунта.
-            for логин, роль, роль_профиля, имя, фамилия in АККАУНТЫ:
+            # 3. Четыре тестовых аккаунта и связи между ними.
+            #    ⚠️ Заводим ТЕМ ЖЕ способом, что настоящая регистрация:
+            #    create_user + UserProfile с ролью. `User.role` подтянет
+            #    `UserProfile.sync_user_role()` — руками его не трогаем.
+            заведённые = {}
+            for логин, роль_профиля, имя, фамилия in АККАУНТЫ:
                 человек = User.objects.create_user(
                     username=логин, email='%s@example.invalid' % логин,
-                    first_name=имя, last_name=фамилия, role=роль)
+                    first_name=имя, last_name=фамилия)
                 человек.set_password(пароль)
                 человек.save()
                 UserProfile.objects.update_or_create(
                     user=человек, defaults={'role': роль_профиля})
+                человек.refresh_from_db()
+                заведённые[логин] = человек
+
+            # ⚠️ АДМИНИСТРАТОР ЗАВОДИТСЯ ОТДЕЛЬНО, И ВОТ ПОЧЕМУ.
+            # `UserProfile.sync_user_role()` НАМЕРЕННО не трогает роль
+            # суперпользователя («у него роль служебная»), поэтому через общий
+            # цикл роль ему бы не проставилась вовсе и осталась бы значением
+            # по умолчанию — `student`. Шапка тогда показывала бы админу меню
+            # ученика. Ставим `User.role` явно — это единственное место, где
+            # так можно, и причина записана здесь.
+            админ = User.objects.create_superuser(
+                username='dev-admin', email='dev-admin@example.invalid',
+                password=пароль)
+            админ.first_name, админ.last_name = 'Дев', 'Админ'
+            админ.role = User.Role.TEACHER
+            админ.save()
+            UserProfile.objects.update_or_create(
+                user=админ, defaults={'role': UserProfile.Role.TUTOR})
+            заведённые['dev-admin'] = админ
+
+            # Группа: без неё половина экранов преподавателя пуста, а ученик
+            # не виден учителю вовсе. Код приглашения проставляет сама модель
+            # (StudentGroup.save), своего генератора здесь нет.
+            группа = StudentGroup.objects.create(
+                name=ГРУППА, teacher=заведённые['dev-teacher'])
+            группа.students.add(заведённые['dev-student'])
+
+            # Связь родитель → ребёнок. Отдельная модель, а не поле профиля:
+            # у родителя бывает несколько детей и наоборот. `created_by` —
+            # кто выдал доступ к учебным данным ребёнка; в жизни это
+            # репетитор, здесь тоже.
+            ParentLink.objects.create(
+                parent=заведённые['dev-parent'],
+                student=заведённые['dev-student'],
+                created_by=заведённые['dev-teacher'])
 
             # ── Инвариант: банк не пострадал ─────────────────────────────
             задач_после = Problem.objects.count()
@@ -169,6 +233,10 @@ class Command(BaseCommand):
                           % (олимпиад_после, олимпиад_до))
         self.stdout.write('  пользователей:  %d — %s'
                           % (User.objects.count(),
-                             ', '.join(a[0] for a in АККАУНТЫ)))
+                             ', '.join(sorted(заведённые))))
+        self.stdout.write('  группа «%s»: %s → %s'
+                          % (ГРУППА, 'dev-teacher', 'dev-student'))
+        self.stdout.write('  родитель: dev-parent → dev-student')
+        self.stdout.write('  гость: аккаунт не нужен — это окно инкогнито')
         self.stdout.write(self.style.SUCCESS(
             'Готово. Пароль обоих аккаунтов — из DEV_ACCOUNTS_PASSWORD.'))

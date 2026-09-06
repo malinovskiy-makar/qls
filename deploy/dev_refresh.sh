@@ -12,12 +12,13 @@
 # Что делает по шагам:
 #   1. берёт САМЫЙ СВЕЖИЙ боевой дамп из /srv/weconomics/backups;
 #   2. гасит web-dev и ws-dev (нельзя удалять базу под работающим Django);
-#   3. пересоздаёт базу weconomics_dev — БОЕВУЮ НЕ ТРОГАЕТ;
+#   3. пересоздаёт базу площадки (имя берётся из её .env и обязано
+#      оканчиваться на _dev) — БОЕВУЮ НЕ ТРОГАЕТ;
 #   4. заливает дамп;
 #   5. поднимает web-dev — его entrypoint накатывает миграции (у площадки
 #      они могут быть новее боевых: код с main, данные с боя);
-#   6. `manage.py dev_scrub --yes` — вычищает всех людей, заводит два
-#      тестовых аккаунта;
+#   6. `manage.py dev_scrub --yes` — вычищает всех людей, заводит четыре
+#      тестовых аккаунта (ученик, учитель, родитель, админ) со связями;
 #   7. `manage.py fix_sequences --apply` — счётчики после заливки с явными id;
 #   8. печатает числа.
 #
@@ -34,9 +35,35 @@ COMPOSE_FILE=deploy/docker-compose.dev-site.yml
 PROD_COMPOSE_DIR=/srv/weconomics/app/deploy
 PROD_ENV=/srv/weconomics/.env
 BACKUP_DIR=/srv/weconomics/backups
-DEV_DB=weconomics_dev
 
 cd "$APP_DIR"
+
+# ── ПРЕДОХРАНИТЕЛЬ: работаем только с базой площадки ─────────────────────────
+#
+# ⚠️ ЭТА ПРОВЕРКА СТОИТ ПЕРЕД ВСЕМ ОСТАЛЬНЫМ И ВЫХОДИТ НЕМЕДЛЕННО.
+# Скрипт задуман для дев-клона, но лежит в репозитории — значит его точная
+# копия есть и в БОЕВОМ клоне /srv/weconomics/app/deploy/. Запусти его оттуда
+# (или из дев-клона, но с испорченным .env) — и он начал бы пересобирать и
+# перезапускать службы на БОЕВОЙ базе. Одна ошибочная строка в подсказке
+# командной строки, одна привычка «сделать то же, но здесь».
+#
+# Имя базы — последний кусок DATABASE_URL после «/». Оно обязано оканчиваться
+# на `_dev`. Боевая база называется `weconomics`, площадка — `weconomics_dev`:
+# проверка отличает их надёжно и не требует знать имя заранее.
+DEV_ENV=/srv/weconomics/dev/.env
+[ -f "$DEV_ENV" ] || { echo "Нет ${DEV_ENV} — это не сервер площадки." >&2; exit 1; }
+
+# Читаем ТЕКСТОМ, а не через `. .env`: исполнение файла с паролями означало бы,
+# что значение вида a(b)c роняет скрипт синтаксической ошибкой (эта ловушка
+# уже стоила проекта одного упавшего бэкапа — docs/SERVER.md).
+DEV_DB_NAME=$(sed -n 's/^DATABASE_URL=//p' "$DEV_ENV" | head -1 | sed 's/?.*//; s#.*/##')
+case "$DEV_DB_NAME" in
+    *_dev) : ;;
+    '')    echo "В ${DEV_ENV} не найден DATABASE_URL." >&2; exit 1 ;;
+    *)     echo "ОТКАЗ: база в DATABASE_URL называется «${DEV_DB_NAME}», а не *_dev." >&2
+           echo "Похоже, это боевая база. Скрипт площадки её не трогает." >&2
+           exit 1 ;;
+esac
 
 # ── Что возьмём ──────────────────────────────────────────────────────────────
 # ⚠️ Каталог копий закрыт от makar (700, владелец root), поэтому шаблон `*`
@@ -51,10 +78,11 @@ PGDB=$(sudo sed -n 's/^POSTGRES_DB=//p' "$PROD_ENV" | head -1)
 
 echo "Дамп:            $LAST ($(sudo stat -c %y "$LAST" | cut -d. -f1))"
 echo "Размер:          $(sudo du -h "$LAST" | cut -f1)"
-echo "База площадки:   ${DEV_DB}  ← будет УДАЛЕНА И СОЗДАНА ЗАНОВО"
+echo "База площадки:   ${DEV_DB_NAME}  ← будет УДАЛЕНА И СОЗДАНА ЗАНОВО"
 echo "Боевая база:     ${PGDB}    ← НЕ ТРОГАЕТСЯ (только читается имя пользователя)"
-echo "После заливки:   dev_scrub --yes (все люди удаляются, заводятся"
-echo "                 dev-teacher и dev-student), затем fix_sequences --apply"
+echo "После заливки:   dev_scrub --yes (все люди удаляются, заводятся четыре"
+echo "                 аккаунта: dev-student, dev-teacher, dev-parent, dev-admin),"
+echo "                 затем fix_sequences --apply"
 
 # ── Стоп-гейт ────────────────────────────────────────────────────────────────
 if [ "${1:-}" != "--yes" ]; then
@@ -67,20 +95,20 @@ echo
 echo "── 1/6 гасим службы площадки ──"
 docker compose -f "$COMPOSE_FILE" stop web-dev ws-dev
 
-echo "── 2/6 пересоздаём базу ${DEV_DB} ──"
+echo "── 2/6 пересоздаём базу ${DEV_DB_NAME} ──"
 cd "$PROD_COMPOSE_DIR"
 # ⚠️ Подключаемся к БОЕВОЙ базе только как к «точке входа» psql: удалить базу,
 # сидя в ней самой, нельзя. Ни одной команды, меняющей боевые данные, здесь нет.
 docker compose exec -T postgres psql -U "$PGUSER" -d "$PGDB" \
-    -c "DROP DATABASE IF EXISTS ${DEV_DB};"
+    -c "DROP DATABASE IF EXISTS ${DEV_DB_NAME};"
 docker compose exec -T postgres psql -U "$PGUSER" -d "$PGDB" \
-    -c "CREATE DATABASE ${DEV_DB} OWNER ${PGUSER};"
+    -c "CREATE DATABASE ${DEV_DB_NAME} OWNER ${PGUSER};"
 
 echo "── 3/6 заливаем дамп (это долго) ──"
 # --no-owner/--no-privileges: владелец и права в дампе боевые, а на площадке
 # они не нужны и только сыпали бы ошибками.
 sudo gunzip -c "$LAST" | docker compose exec -T postgres \
-    pg_restore -U "$PGUSER" -d "$DEV_DB" --no-owner --no-privileges
+    pg_restore -U "$PGUSER" -d "$DEV_DB_NAME" --no-owner --no-privileges
 
 echo "── 4/6 поднимаем web-dev (entrypoint накатит миграции) ──"
 cd "$APP_DIR"
