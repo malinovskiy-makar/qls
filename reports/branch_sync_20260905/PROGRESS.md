@@ -884,4 +884,42 @@ B3 (удаление веток на GitHub), только после того �
 **3.3.** `origin/integration/sync-20260905` = `7458d560` — предок
 `origin/main` (`c370602` на момент проверки), тегом `sync-20260905`
 покрыта (`^{}` = `a93e67b`, тоже предок main). Удалить ветку на GitHub
-сейчас?
+сейчас? Ответ: **да** (владелец выполнил сам,
+`git push origin --delete integration/sync-20260905` → `[deleted]`).
+`git ls-remote --heads origin | wc -l` = **7**. Фаза B3 закрыта.
+
+## Фаза B4. Windows — worktree и локальные ветки
+
+### 4.1. Worktree
+
+`git worktree list` — 12 записей, состав идентичен B_PLAN §5а. Три папки с
+неучтённым осмотрены (не тронуты):
+- `qls-gate-revert/tatus` (703 байта) — обрывок `git log`, похоже на
+  случайный редирект оборванной команды, не текст-документ. Мусор.
+- `qls-search-eval/session_c14_transcript_20260829.md` (52 407 байт) —
+  расшифровка сессии, настоящий текст, не мусор.
+- `qls_palette/_incoming/` (55 файлов, ~9 МБ: шрифты Montserrat, лого и
+  фоны SVG/PNG) — настоящие дизайн-материалы, не мусор.
+
+Предложение по умолчанию (ничего не стирается): перенести все три в
+`C:\Users\shipu\qls_untracked_20260906\<имя папки>\` с сохранением
+структуры, затем снести все 9 «мёртвых» worktree (оставить `qls-models` и
+`qls-olymp`).
+
+⛔ **Стоп-гейт 6.** Таблица:
+
+| Папка | Ветка | Неучтённое | Действие |
+|---|---|---|---|
+| `qls/.claude/worktrees/import-new-sources-edbc26` | `feat/import-new-sources` | чисто | `worktree remove` |
+| `qls-gate-revert` | `feat/boevoi-render-legacy` | `tatus` (мусор) | перенести → `qls_untracked_20260906/qls-gate-revert/`, затем `remove` |
+| `qls-render` | `feat/corpus-converter-render` | чисто | `worktree remove` |
+| `qls-scoped-tests` | `feat/scoped-test-runner` | чисто | `worktree remove` |
+| `qls-search-eval` | `wip/search-eval-c14-leftovers` | расшифровка сессии (52 КБ) | перенести → `qls_untracked_20260906/qls-search-eval/`, затем `remove` (ветка остаётся) |
+| `qls-sol` | `wip/sol-vs-glm-scripts` | чисто | `worktree remove` (ветка остаётся) |
+| `qls-topicmap` | `feat/topic-map-v2` | чисто | `worktree remove` |
+| `qls_map` | `feat/topic-map` | чисто | `worktree remove` |
+| `qls_palette` | `feat/smart-catalog` | `_incoming/` (дизайн-материалы, 55 файлов) | перенести → `qls_untracked_20260906/qls_palette/`, затем `remove` |
+| `qls-models` | `feat/taxonomy-v2-openai-provider` | чисто | **оставить** — живая работа |
+| `qls-olymp` | `feat/olympiad-text-dedup` | чисто | оставить (ветка ещё в работе) |
+
+Ждём «да».
