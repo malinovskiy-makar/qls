@@ -981,4 +981,25 @@ GitHub (осталась в семёрке B3) — оставить папку (
   отдельной строкой, как в задании
 
 Остаются: `main`, `feat/taxonomy-v2-openai-provider`,
-`feat/olympiad-text-dedup`, три `wip/*` = 6 веток. Жду «да».
+`feat/olympiad-text-dedup`, три `wip/*` = 6 веток. Жду «да». Ответ: **да.**
+
+Удалено тремя партиями по 9–10: 29 через `-d`, 5 через `-D`
+(`backup/search-eval-c14-before-rebase`,
+`chore/corpus-consolidation-20260822`, `feat/import-new-sources`,
+`feat/boevoi-render-legacy`, `feat/publish-readiness-legacy-new-sources`),
+`integration/sync-20260905` — через `-d`. Ошибок нет. `git branch -vv` →
+**6 веток**: `main`, `feat/olympiad-text-dedup`,
+`feat/taxonomy-v2-openai-provider`, три `wip/*`. Ровно по ожиданию (плана
+«7, если integration осталась» — она удалена, значит 6).
+
+### 4.3. Финал
+
+`git fetch origin --prune` → `git branch -r` = 8 строк, из них
+`origin/HEAD -> origin/main` — символическая ссылка, не ветка; реальных
+веток **7**, совпадает с `ls-remote --heads`. `git count-objects -vH`:
+7720 объектов, 119 МиБ, 15 pack-файлов, garbage 0 — `gc` не запускался, как
+и предписано. `qls-models` не тронута: `772ac87e`, status пуст.
+`qls`: `git status --short` — ровно четыре исходных `??`
+(`.txt`, `Claude outputs/`, `claude/`, `session_c15_transcript_20260830.md`).
+
+**Фаза B4 закрыта.**
