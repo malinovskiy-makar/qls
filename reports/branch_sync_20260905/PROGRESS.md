@@ -922,4 +922,20 @@ B3 (удаление веток на GitHub), только после того �
 | `qls-models` | `feat/taxonomy-v2-openai-provider` | чисто | **оставить** — живая работа |
 | `qls-olymp` | `feat/olympiad-text-dedup` | чисто | оставить (ветка ещё в работе) |
 
-Ждём «да».
+Ждём «да». Ответ: **да.**
+
+Три файла перенесены (не удалены) в `C:\Users\shipu\qls_untracked_20260906\`
+с сохранением имени папки-источника: `qls-gate-revert/tatus`,
+`qls-search-eval/session_c14_transcript_20260829.md`,
+`qls_palette/_incoming/` (52 файла). После переноса все три worktree стали
+чистыми (`git status --short` — пусто). Снесены `git worktree remove` (без
+`--force`, т.к. уже чистые) все 9: призрак
+`import-new-sources-edbc26`, `qls-render`, `qls-scoped-tests`, `qls-sol`,
+`qls-topicmap`, `qls_map`, `qls-gate-revert`, `qls-search-eval`,
+`qls_palette`; `git worktree prune`. Итог `git worktree list` — **3
+записи**: `qls` (main), `qls-models` (`772ac87`, taxonomy-v2, не тронута),
+`qls-olymp` (`c6e5af7`, olympiad-text-dedup). Ровно по ожиданию.
+
+Вопрос про `qls-olymp`: ветка `feat/olympiad-text-dedup` уже есть на
+GitHub (осталась в семёрке B3) — оставить папку (ветка ещё в работе) или
+снести worktree сейчас?
