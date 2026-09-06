@@ -8,6 +8,13 @@
 слился с каталогом. Два входа в один банк заставляли человека выбирать
 способ ДО того, как он сформулировал, что ищет.
 
+Редизайн 04.09.2026 (мокап владельца `catalog_search_filters_mockup.html`,
+решения в Notion-штабе): поле — единственный герой карточки поиска,
+подсказка о способе, крестик и стрелка живут ВНУТРИ поля; карта справа
+ровно в высоту поля; под полем — «Все фильтры» и только выбранные чипы;
+в карточках нет номера и нет табличного вида; окно «Все фильтры» обновляет
+выдачу живьём и не закрывается (`_catalog_modal.html` + `catalog_filters.js`).
+
 ⚠️ РОЛИ ЦВЕТА (решение владельца и дизайнера, 31.08–01.09.2026):
     поиск и фильтры        → --surface-tool (бирюза бренда);
     блок найденных задач   → --surface-info + рамка --brand-amber;
@@ -26,6 +33,12 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 860 — это `.page-wrap` из `catalog/base.html`, по нему живут страница
 задачи и остальные экраны каталога, поэтому переопределения здесь больше
 нет вовсе: своё число не изобретается, берётся общее.
+
+⚠️ ПРАВИЛО НУЛЯ (решение владельца 04.09.2026): всё на экране — из данных
+или не показывается. В шаблоне нет ни одного числа, имени или списка
+литералом: подпись карты считается из данных карты, звёзды стоят только
+при заданной сложности, чип темы — только при теме, заголовок — только
+если он не обрезок условия. Сторожит `catalog/tests/test_no_slop.py`.
 {% endcomment %}
 
 {% block title %}Умный каталог{% endblock %}
@@ -38,73 +51,86 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 .ct-head p { margin: 0; color: var(--text2); font-size: 16px;
              line-height: 1.5; max-width: 46em; }
 
-/* ── Панель инструмента: поиск, карта, фильтры ───────────────────── */
+/* ── Панель инструмента: поле, карта, полоса выбранного ──────────── */
 .ct-tool { background: var(--surface-tool); border-radius: 16px;
-           padding: 18px; margin: 0 0 22px; color: var(--text); }
-.ct-tool-top { display: flex; gap: 16px; align-items: stretch; }
-.ct-ask { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+           padding: 16px; margin: 0 0 22px; color: var(--text); }
+.ct-tool-top { display: flex; gap: 14px; align-items: stretch; }
 
-/* Поле поиска — ГЛАВНЫЙ ОБЪЕКТ ЭКРАНА. Владелец: «пока будто просто
-   какое-то поле, нужно больше эмфасиса что он умный». Отсюда высота под
-   несколько строк описания, крупный кегль ввода и подсказка, которая
-   объясняет СПОСОБ, а не повторяет слово «поиск». */
-.ct-ask-field { position: relative; background: var(--surface);
-                border: 1.5px solid var(--brand-amber); border-radius: 12px;
-                padding: 10px 12px 8px; }
-.ct-ask-field textarea {
-  width: 100%; border: 0; background: transparent; resize: vertical;
-  font: 500 19px/1.45 var(--font-ui); color: var(--text);
-  min-height: 84px; outline: none; display: block;
-}
-.ct-ask-field textarea::placeholder { color: var(--text3); font-weight: 400;
-                                      font-size: 17px; }
-/* ⚠️ ПОДСКАЗКА ЛЕЖИТ В СВЕТЛОМ ПОЛЕ, А НЕ ПРЯМО НА БИРЮЗЕ. Первый вариант
-   писал её цветом --text3 по --surface-tool: замер дал 2,45 при норме 4,5.
-   Правило панели («на бирюзе только основной текст») ловится именно так —
-   глазами и замером, а не намерением. */
-.ct-ask-hint { font-size: 13px; color: var(--text2); margin: 6px 0 0;
-               background: var(--surface); border-radius: 8px;
-               padding: 7px 11px; line-height: 1.45; }
-.ct-ask-row { display: flex; gap: 8px; align-items: center;
-              margin-top: 10px; flex-wrap: wrap; }
-/* ⚠️ ОБЕ КНОПКИ ОДНОГО РАЗМЕРА (замечание владельца): «Найти» была
-   заметно крупнее «Очистить», и ряд читался кривым. */
+/* Поле — ГЛАВНЫЙ ОБЪЕКТ ЭКРАНА. Одна светлая карточка, внутри которой
+   живут и подсказка о способе, и кнопки. Никаких отдельных плашек
+   снаружи: по образцу полей ИИ-запроса, знакомых человеку. */
+.ask { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column;
+       background: var(--surface); border-radius: 14px;
+       border: 1.5px solid transparent; position: relative;
+       transition: border-color var(--t), box-shadow var(--t); }
+.ask:focus-within { border-color: var(--brand-amber);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand-amber) 22%, transparent); }
+.ask textarea { flex: 1 1 auto; width: 100%; border: 0; background: transparent;
+  resize: none; font: 500 18px/1.45 var(--font-ui); color: var(--text);
+  padding: 14px 16px 4px; min-height: 96px; outline: none; display: block; }
+.ask textarea::placeholder { color: var(--text3); font-weight: 400; }
+.ask-foot { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px 16px; }
+/* Подсказка о способе — внутри поля, слева внизу: объясняет СПОСОБ, а не
+   повторяет слово «поиск». Цвет --text2 на --surface держит норму. */
+.ask-hint { display: inline-flex; align-items: center; gap: 7px; font-size: 13px;
+            color: var(--text2); margin-right: auto; min-width: 0; }
+.ask-hint svg { width: 14px; height: 14px; color: var(--accent-ink); flex: none; }
+/* ⚠️ ПЕРВЫЙ ЗАПРОС ИДЁТ ДОЛГО (модель грузится лениво, около семи секунд),
+   и молчащий экран в эти секунды выглядит зависшим: на время запроса
+   подсказка о способе сменяется на «Ищу…». */
+.ask-busy { display: none; align-items: center; gap: 7px; font-size: 13px;
+            color: var(--text2); margin-right: auto; }
+.ask.is-busy .ask-hint { display: none; }
+.ask.is-busy .ask-busy { display: inline-flex; }
+.ask-busy i { width: 12px; height: 12px; border-radius: 50%;
+              border: 2px solid var(--accent-ring); border-top-color: var(--accent);
+              animation: askSpin .8s linear infinite; }
+@keyframes askSpin { to { transform: rotate(360deg); } }
+/* Очистить — маленький крестик, появляется только когда есть текст. */
+.ask-clear { border: 0; background: transparent; color: var(--text3);
+             width: 32px; height: 32px; border-radius: var(--r-pill);
+             cursor: pointer; font-size: 18px; line-height: 1; display: none;
+             align-items: center; justify-content: center; }
+.ask.has-text .ask-clear { display: inline-flex; }
+.ask-clear:hover { background: var(--surface-2); color: var(--text); }
+/* «Найти» — круглая кнопка-стрелка внутри поля. Пустое поле: тихая;
+   есть текст: янтарная (цвет действия панели поиска, решение 31.08). */
+.ask-go { width: 38px; height: 38px; border-radius: var(--r-pill); border: 0;
+          background: var(--surface-2); color: var(--text3); cursor: pointer;
+          display: inline-flex; align-items: center; justify-content: center;
+          transition: background var(--t), color var(--t), transform var(--t);
+          flex: none; }
+.ask-go svg { width: 18px; height: 18px; }
+.ask.has-text .ask-go { background: var(--brand-amber); color: var(--brand-amber-ink); }
+.ask.has-text .ask-go:hover { background: var(--brand-amber-hover); }
+.ask.has-text .ask-go:active { transform: scale(.94); }
+.ask-kbd { font-size: 11.5px; color: var(--text3); margin-right: 4px; display: none; }
+.ask.has-text .ask-kbd { display: inline; }
+
+/* Карта — ВХОД В КОРПУС, а не сужение выдачи: стоит справа от поля,
+   РОВНО в его высоту (align-items: stretch у ряда), и второстепенна.
+   Рисует её встраиваемый режим `topic_map_preview.js`; размер блока
+   задаёт хозяин, холст подгоняется сам. */
+.ct-map { flex: 0 0 236px; border-radius: 14px; border: 0;
+          background: var(--surface); }
+.ct-map-cap { position: absolute; left: 10px; bottom: 8px; z-index: 1;
+              font-size: 12px; color: var(--text2); white-space: nowrap;
+              background: color-mix(in srgb, var(--surface) 82%, transparent);
+              padding: 3px 9px; border-radius: var(--r-pill); pointer-events: none; }
+.ct-map-cap b { font-weight: 600; color: var(--text); }
+.ct-map:hover .ct-map-cap { color: var(--accent-ink); }
+
+{% include "catalog/_catalog_filters_css.html" %}
+
+/* gap — потому что inline-flex съедает пробелы между вложенными узлами:
+   «Показать <b>97</b> задач» слипалось в «Показать97задач». */
 .ct-btn { font: 600 14px/1 var(--font-ui); padding: 10px 18px;
           border-radius: 9px; border: 1px solid transparent; cursor: pointer;
-          text-decoration: none; display: inline-flex; align-items: center; }
+          text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
 .ct-btn--go { background: var(--brand-amber); color: var(--brand-amber-ink); }
 .ct-btn--go:hover { background: var(--brand-amber-hover); }
 .ct-btn--quiet { background: var(--surface); color: var(--text);
                  border-color: var(--border); }
-.ct-busy { font-size: 13px; color: var(--text); background: var(--surface);
-           padding: 6px 10px; border-radius: 8px; }
-.ct-busy[hidden] { display: none; }
-
-/* Блок карты — ВХОД В КОРПУС, а не сужение выдачи, поэтому он стоит
-   рядом с полем поиска, а не в ряду фильтров. */
-.ct-map { flex: 0 0 300px; display: flex; }
-.ct-map .tmap-preview { width: 100%; }
-
-/* ── Полоса фильтров ─────────────────────────────────────────────── */
-.ct-strip { display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
-            margin-top: 14px; }
-{% include "catalog/_filters_css.html" %}
-
-.ct-all { border: 0; padding: 0; background: transparent; max-width: 900px;
-          width: calc(100vw - 32px); margin: auto; }
-.ct-all::backdrop { background: rgba(20,18,14,.45); }
-.ct-all-box { background: var(--surface); border-radius: 16px;
-              border: 1.5px solid var(--brand-amber); overflow: hidden; }
-.ct-all-head { display: flex; justify-content: space-between;
-               align-items: center; padding: 16px 20px;
-               border-bottom: 1px solid var(--border-soft); }
-.ct-all-head h2 { margin: 0; font-size: 19px; }
-.ct-all-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
-               padding: 18px 20px; max-height: 66vh; overflow: auto; }
-.ct-all-foot { display: flex; justify-content: space-between;
-               align-items: center; gap: 12px; padding: 14px 20px;
-               border-top: 1px solid var(--border-soft);
-               background: var(--surface-2); }
 
 /* ── Блок найденных задач ────────────────────────────────────────── */
 .ct-results { background: var(--surface-info); border: 1.5px solid var(--brand-amber);
@@ -112,7 +138,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 .ct-count-row { display: flex; justify-content: space-between; gap: 14px;
                 align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
 .ct-count { font-size: 15px; color: var(--text); }
-.ct-count b { font-size: 17px; }
+.ct-count b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .ct-count small { color: var(--text2); font-size: 14px; }
 .ct-views { display: flex; gap: 4px; background: var(--surface);
             border-radius: 9px; padding: 3px; }
@@ -127,21 +153,22 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
            border-left: 3px solid var(--brand-amber); }
 .ct-note a { color: var(--accent-ink); }
 
-/* Карточка задачи — на --surface, а не на песочной плашке. */
-.ct-card { display: flex; gap: 14px; background: var(--surface);
+/* Карточка задачи — на --surface, а не на песочной плашке. Без номера
+   (решение владельца 04.09.2026: номер остаётся только в адресе) и без
+   колонки справа — глаз цепляется за тему и условие. */
+.ct-card { display: block; background: var(--surface);
            border: 1px solid var(--border-soft); border-radius: 12px;
            padding: 13px 15px; margin: 0 0 8px; text-decoration: none;
            color: var(--text); }
 .ct-card:hover { border-color: var(--accent); }
-.ct-card-main { flex: 1 1 auto; min-width: 0; }
-/* ⚠️ НОМЕР ЗАДАЧИ — МЕЛКИЙ И СПРАВА (решение владельца). Он нужен, чтобы
-   сослаться, но глаз должен цепляться за тему и условие. */
-.ct-card-id { flex: 0 0 auto; font-size: 12px; color: var(--text3);
-              font-variant-numeric: tabular-nums; align-self: flex-start; }
 .ct-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
-           margin: 0 0 5px; }
-.ct-topic { font-size: 12px; background: var(--surface-2); color: var(--text2);
-            border-radius: 999px; padding: 3px 9px; }
+           margin: 0 0 6px; }
+/* Чип темы окрашен цветом своего раздела карты — общий язык с 3D-картой. */
+.tchip { font-size: 12px; border-radius: var(--r-pill); padding: 3px 9px 3px 7px;
+         display: inline-flex; gap: 6px; align-items: center; color: var(--text);
+         background: color-mix(in srgb, var(--gc) 14%, var(--surface)); }
+.tchip::before { content: ''; width: 7px; height: 7px; border-radius: 50%;
+                 background: var(--gc); }
 .ct-stars { color: var(--amber); font-size: 12px; letter-spacing: .5px; }
 .ct-sol { font-size: 12px; color: var(--green); }
 .ct-kind { font-size: 12px; color: var(--text3); }
@@ -150,28 +177,10 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
                    margin: 0; }
 .ct-acts { display: flex; gap: 6px; margin-top: 9px; }
 
+/* Галерея — та же карточка, сеткой. Заголовок в ней тот же один раз. */
 .ct-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
               gap: 10px; }
-.ct-gallery .ct-card { flex-direction: column; }
-
-.ct-table { width: 100%; border-collapse: collapse; background: var(--surface);
-            border-radius: 12px; overflow: hidden; font-size: 14px; }
-.ct-table th, .ct-table td { padding: 9px 11px; text-align: left;
-            border-bottom: 1px solid var(--border-soft); vertical-align: top; }
-.ct-table th { font-size: 12px; text-transform: uppercase; letter-spacing: .04em;
-            color: var(--text2); background: var(--surface-2); }
-/* ⚠️ СТОЛБЕЦ СЛОЖНОСТИ — ПО ЦЕНТРУ, И ЭТО ТРЕБОВАНИЕ ПРОШЛОГО РЕВЮ (r15,
-   «столбец сложности каталога — тоже по центру»). Новая таблица сперва
-   прижала его вправо заодно с номером, и проверка это поймала. */
-.ct-table .col-diff { text-align: center; }
-.ct-table td.num, .ct-table th.num { text-align: right;
-            font-variant-numeric: tabular-nums; color: var(--text3);
-            white-space: nowrap; }
-/* Ссылка в таблице — обычный текст строки, а не синее подчёркивание
-   браузера: подчёркнутая синева в песочной таблице читается как чужой
-   элемент, а вся строка и так ведёт на задачу. */
-.ct-table a { color: var(--text); text-decoration: none; }
-.ct-table tr:hover a { color: var(--accent-ink); text-decoration: underline; }
+.ct-gallery .ct-card { margin: 0; }
 
 .ct-more { text-align: center; margin: 16px 0 0; }
 .ct-more small { display: block; margin-top: 7px; font-size: 13px;
@@ -181,7 +190,7 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 
 @media (max-width: 760px) {
   .ct-tool-top { flex-direction: column; }
-  .ct-map { flex-basis: auto; height: 170px; }
+  .ct-map { flex-basis: auto; height: 150px; }
   .ct-all-cols { grid-template-columns: 1fr; }
 }
 
@@ -199,6 +208,12 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 {% endcomment %}
 <link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
 <script defer src="{% static 'catalog/js/topic_map_preview.js' %}"></script>
+{% comment %}
+Живое обновление окна «Все фильтры»: состояние в скрипте и в адресе,
+числа и список — от `api_filter_state`. Без скрипта страница остаётся
+рабочей: форма поиска и чипы полосы серверные.
+{% endcomment %}
+<script defer src="{% static 'catalog/js/catalog_filters.js' %}"></script>
 {% endblock %}
 
 {% block content %}
@@ -211,62 +226,68 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 
 <section class="ct-tool">
   <div class="ct-tool-top">
-    <form class="ct-ask" method="get" action="{% url 'catalog:problem_list' %}"
+    <form class="ask" method="get" action="{% url 'catalog:problem_list' %}"
           id="ct-ask-form">
       {% comment %}
       ⚠️ ПОЛЕ — МНОГОСТРОЧНОЕ НАРОЧНО. Поиск ждёт ОПИСАНИЕ задачи, а не
-      слово; однострочная щель просит слово одним своим видом.
+      слово; однострочная щель просит слово одним своим видом. Enter
+      отправляет, Shift+Enter переносит строку (скрипт в _catalog_js.html).
       ⚠️ ЧИСЕЛ БЛИЗОСТИ И СЛОВА «эмбеддинги» В ИНТЕРФЕЙСЕ НЕТ — прямая
       просьба владельца: это наша кухня, наружу она не идёт.
-      {% endcomment %}
-      {% comment %}
-      ⚠️ АКТИВНЫЕ ФИЛЬТРЫ ЕДУТ СКРЫТЫМИ ПОЛЯМИ. Варианты фильтров — ссылки,
-      а поиск — форма: без этих полей нажатие «Найти» молча снимало бы всё
+      ⚠️ АКТИВНЫЕ ФИЛЬТРЫ ЕДУТ СКРЫТЫМИ ПОЛЯМИ. Чипы полосы — ссылки,
+      а поиск — форма: без этих полей отправка молча снимала бы всё
       выбранное, и человек получал бы поиск по всему банку вместо поиска
       внутри своей темы.
+      ⚠️ В placeholder лежит ПЕРВАЯ фраза бегущей подсказки: она же
+      остаётся статичной при «уменьшить движение» и без скрипта.
       {% endcomment %}
       {% for name, value in filters.hidden_fields %}
       <input type="hidden" name="{{ name }}" value="{{ value }}">
       {% endfor %}
-      <div class="ct-ask-field">
-        <textarea name="q" rows="3" id="ct-q"
-                  placeholder="Опишите задачу словами: точные формулировки совпадать не обязаны">{{ query }}</textarea>
-      </div>
-      <div class="ct-ask-hint">Ищем по смыслу: «монополист с линейным спросом
-        и постоянными издержками» найдётся, даже если этих слов в условии нет</div>
-      <div class="ct-ask-row">
-        <button class="ct-btn ct-btn--go" type="submit">Найти</button>
-        <a class="ct-btn ct-btn--quiet" href="{% url 'catalog:problem_list' %}">Очистить</a>
-        {% comment %}
-        ⚠️ ПЕРВЫЙ ЗАПРОС ИДЁТ ДОЛГО (модель грузится лениво, около семи
-        секунд), и молчащий экран в эти секунды выглядит зависшим.
-        {% endcomment %}
-        <span class="ct-busy" id="ct-busy" hidden>Ищу…</span>
+      <textarea id="ct-q" name="q" rows="3" aria-label="Опишите задачу"
+                placeholder="{{ catalog_phrases.0.text }}">{{ query }}</textarea>
+      <div class="ask-foot">
+        <span class="ask-hint">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/>
+          </svg>
+          Ищем по смыслу: точные слова не нужны
+        </span>
+        <span class="ask-busy" aria-live="polite"><i></i>Ищу похожие задачи…</span>
+        <span class="ask-kbd">Enter – найти</span>
+        <button class="ask-clear" type="button" id="ask-clear" aria-label="Очистить запрос">×</button>
+        <button class="ask-go" type="submit" id="ask-go" aria-label="Найти">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/>
+          </svg>
+        </button>
       </div>
     </form>
 
     {% comment %}
-    Встраиваемый режим карты (`topic_map_preview.js`) подключается ровно
-    так, как написано в шапке самого файла. Скрипт сам находит контейнер,
-    ждёт простоя и появления блока на экране и только тогда идёт за
-    данными — дописывать здесь нечего.
+    Встраиваемый режим карты (`topic_map_preview.js`): скрипт сам находит
+    контейнер по `data-tmap-preview`, ждёт простоя и появления блока на
+    экране и только тогда идёт за данными. Подпись — из данных карты
+    (`map_stats` во вьюхе), а не литералом: правило нуля.
     {% endcomment %}
-    <div class="ct-map">
-      <a class="tmap-preview" data-tmap-preview
-         data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
-         href="{% url 'catalog:topic_map' %}"
-         aria-label="Интерактивная карта тем и тегов">
-        <span class="tmap-preview-cap"><b>Карта тем и тегов</b> · 29 тем, 343 тега</span>
-      </a>
-    </div>
+    <a class="tmap-preview ct-map" data-tmap-preview
+       data-tmap-preview-data="{% url 'catalog:topic_map_data' %}"
+       href="{% url 'catalog:topic_map' %}"
+       aria-label="Интерактивная карта тем и тегов">
+      <span class="ct-map-cap"><b>Карта тем</b> · {{ map_stats.themes|spaceint }}&nbsp;{{ map_stats.themes|plural_ru:"тема,темы,тем" }}, {{ map_stats.tags|spaceint }}&nbsp;{{ map_stats.tags|plural_ru:"тег,тега,тегов" }}</span>
+    </a>
   </div>
 
-  <div class="ct-strip">
-    {% include "catalog/_filters.html" with groups=filters.strip mode="strip" %}
-    <button class="ct-btn ct-btn--quiet" type="button" id="ct-all-open">Все фильтры</button>
-    {% if filters.has_any %}
-    <a class="ct-btn ct-btn--quiet" href="{{ filters.reset_url }}">Сбросить</a>
-    {% endif %}
+  <div class="ct-strip" id="ct-strip" aria-label="Выбранные фильтры">
+    <button class="btn-all" type="button" id="ct-all-open"
+            aria-haspopup="dialog" aria-controls="ct-all">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+        <path d="M2 4h8M12 4h2M2 12h2M6 12h8M2 8h5M9 8h5"/><circle cx="10" cy="4" r="1.6" fill="var(--surface)"/><circle cx="4" cy="12" r="1.6" fill="var(--surface)"/><circle cx="7" cy="8" r="1.6" fill="var(--surface)"/>
+      </svg>
+      Все фильтры{% if filters.selected_count %} <span class="n">{{ filters.selected_count }}</span>{% endif %}
+    </button>
+    <span id="ct-chips" style="display:contents">{% include "catalog/_catalog_chips.html" %}</span>
+    <a class="strip-reset" id="strip-reset" href="{{ filters.reset_url }}" data-clear="all"{% if not filters.chips %} hidden{% endif %}>Сбросить</a>
   </div>
 </section>
 
@@ -280,150 +301,19 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
   Возможно, она ещё не прошла проверку или номер набран с опечаткой.</div>
 {% endif %}
 
-<section class="ct-results">
-  <div class="ct-count-row">
-    <div class="ct-count">
-      {% if searched %}
-        {% comment %}
-        ⚠️ «НЕ МЕНЬШЕ» — КОГДА СПИСОК УПЁРСЯ В ПОТОЛОК КАНДИДАТОВ. У поиска
-        по смыслу нет числа «сколько всего подходит»: есть «сколько мы
-        попросили и сколько из них прошло порог». Писать это число точным
-        значило бы врать точностью, которой у поиска нет.
-        {% endcomment %}
-        Похожих задач: {% if capped %}не меньше {% endif %}<b>{{ total|spaceint }}</b>
-        <small>· из {{ filtered_total|spaceint }} {{ filtered_total|plural_ru:"задачи,задач,задач" }}{% if scope %} {{ scope }}{% endif %}</small>
-      {% else %}
-        <b>{{ total|spaceint }}</b> {{ total|plural_ru:"задача,задачи,задач" }}{% if scope %}
-        <small>{{ scope }}</small>{% endif %}
-      {% endif %}
-    </div>
-    <nav class="ct-views" aria-label="Как показывать">
-      <a class="ct-view{% if view_mode == 'rows' %} is-on{% endif %}" href="{{ view_urls.rows }}">Строки</a>
-      <a class="ct-view{% if view_mode == 'table' %} is-on{% endif %}" href="{{ view_urls.table }}">Таблица</a>
-      <a class="ct-view{% if view_mode == 'gallery' %} is-on{% endif %}" href="{{ view_urls.gallery }}">Галерея</a>
-    </nav>
-  </div>
-
-  {% if relief %}
-  {% comment %}
-  СХЛОПНУВШАЯСЯ ВЫДАЧА. Запрос дал кандидатов, фильтры срезали их почти
-  до нуля. Экран обязан назвать причину и предложить, что снять: пустота
-  без объяснения читается как «в банке этого нет».
-  {% endcomment %}
-  <div class="ct-note">По запросу и фильтрам вместе
-    {% if total == 0 %}не нашлось ничего{% else %}нашлось {{ total }}
-    {{ total|plural_ru:"задача,задачи,задач" }}{% endif %}.
-    Попробуйте снять фильтр «{{ relief.label }}»: без него подходящих
-    {{ relief.count }}.</div>
-  {% endif %}
-
-  {% if cards %}
-    {% if view_mode == 'table' %}
-    <table class="ct-table">
-      <thead><tr>
-        <th>Тема</th><th>Условие</th><th class="col-diff">Сложность</th>
-        {% if searched and not degraded %}<th>Похоже</th>{% endif %}
-        <th class="num">№</th>
-      </tr></thead>
-      <tbody>
-      {% for card in cards %}
-      <tr>
-        <td>{% for t in card.topics %}{{ t.name }}{% if not forloop.last %}, {% endif %}{% endfor %}</td>
-        <td><a href="{% url 'catalog:problem_detail' card.problem.pk %}">{{ card.preview|truncatechars:110 }}</a></td>
-        <td class="col-diff"><span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span></td>
-        {% comment %}
-        ⚠️ КОЛОНКА НАЗЫВАЕТСЯ СЛОВОМ, А НЕ ДОЛЕЙ. Число близости наружу не
-        идёт (просьба владельца) — показываем ступень словами.
-        {% endcomment %}
-        {% if searched and not degraded %}<td>{% if card.score >= 0.75 %}очень{% elif card.score >= 0.6 %}заметно{% else %}немного{% endif %}</td>{% endif %}
-        <td class="num">{{ card.problem.pk }}</td>
-      </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-
-    {% else %}
-    <div class="{% if view_mode == 'gallery' %}ct-gallery{% endif %}">
-      {% for card in cards %}
-      <a class="ct-card" href="{% url 'catalog:problem_detail' card.problem.pk %}">
-        <div class="ct-card-main">
-          <div class="ct-line">
-            {% for t in card.topics %}<span class="ct-topic">{{ t.name }}</span>{% endfor %}
-            {% if card.difficulty %}<span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span>{% endif %}
-            {% if card.is_test %}<span class="ct-kind">тест</span>{% endif %}
-            {% if card.has_solution %}<span class="ct-sol">решение ✓</span>{% endif %}
-          </div>
-          {% if card.problem.title %}<div class="ct-card-title">{{ card.problem.title }}</div>{% endif %}
-          <p class="ct-card-preview">{{ card.preview }}</p>
-          <div class="ct-acts" onclick="event.stopPropagation();">
-            <button class="ca-btn ca-preview" type="button"
-                    onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button>
-            {% if user.is_authenticated and user.role == 'teacher' %}
-            <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
-              <button class="ca-btn ca-add" type="button" id="hw-btn-{{ card.problem.pk }}"
-                      onclick="toggleHwDropdown({{ card.problem.pk }}, event)">+ В домашку ▾</button>
-              <div class="ca-dropdown" id="hw-dd-{{ card.problem.pk }}"></div>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-        <span class="ct-card-id">№&nbsp;{{ card.problem.pk }}</span>
-      </a>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% comment %}
-    ⚠️ «ПОКАЗАТЬ ЕЩЁ» ВМЕСТО СТРАНИЦ. Подпись под кнопкой меняется по
-    ситуации: без запроса это место в банке, с запросом — конец
-    ранжированного списка, и говорить о нём номером страницы нечестно.
-    Порог числом наружу не идёт.
-    {% endcomment %}
-    <div class="ct-more">
-      {% if has_more %}
-        <a class="ct-btn ct-btn--go" href="{{ more_url }}">Показать ещё {{ step }}</a>
-        <small>показано {{ shown }} из {{ total|spaceint }}</small>
-      {% else %}
-        <small>{% if searched %}больше похожих задач нет{% else %}показаны все {{ total|spaceint }}{% endif %}</small>
-      {% endif %}
-    </div>
-
-  {% else %}
-    <div class="ct-empty">
-      {% if searched %}По этому описанию похожих задач не нашлось.
-        Попробуйте другими словами или снимите фильтры.
-      {% else %}Под эти фильтры не подходит ни одна задача.{% endif %}
-      {% if filters.has_any %}<br><a href="{{ filters.reset_url }}">Сбросить фильтры</a>{% endif %}
-    </div>
-  {% endif %}
-</section>
+{% include "catalog/_catalog_results.html" %}
 
 {% comment %}
-⚠️ ОКНО «ВСЕ ФИЛЬТРЫ» ОТКРЫВАЕТСЯ НАД ВЫДАЧЕЙ, А НЕ ПОД НЕЙ (прямое
-замечание владельца: под задачами это нелогично). Настоящий <dialog>
-с showModal даёт ловушку фокуса, Escape и возврат фокуса даром.
+Окно «Все фильтры» — настоящий <dialog> над выдачей, живое обновление
+списка без закрытия окна: разметка в `_catalog_modal.html`, логика в
+`catalog_filters.js`, стили в `_catalog_filters_css.html`.
 {% endcomment %}
-<dialog class="ct-all" id="ct-all" aria-labelledby="ct-all-title">
-  <form method="dialog" class="ct-all-box">
-    <div class="ct-all-head">
-      <h2 id="ct-all-title">Все фильтры</h2>
-      <button class="ct-btn ct-btn--quiet" value="close">Закрыть</button>
-    </div>
-    <div class="ct-all-cols">
-      <div>{% include "catalog/_filters.html" with groups=filters.modal_left mode="panel" %}</div>
-      <div>{% include "catalog/_filters.html" with groups=filters.modal_right mode="panel" %}</div>
-    </div>
-    <div class="ct-all-foot">
-      <a class="ct-btn ct-btn--quiet" href="{{ filters.reset_url }}">Сбросить всё</a>
-      <button class="ct-btn ct-btn--go" value="close">Показать {{ filtered_total|spaceint }}
-        {{ filtered_total|plural_ru:"задачу,задачи,задач" }}</button>
-    </div>
-  </form>
-</dialog>
+{% include "catalog/_catalog_modal.html" %}
 
 {% include "catalog/_problem_modal.html" %}
 {% endblock %}
 
 {% block extra_js %}
 {% include "catalog/_catalog_js.html" %}
+{% include "_typing_placeholder.html" with el_id="ct-q" phrases=catalog_phrases stop_text=catalog_stop_text %}
 {% endblock %}

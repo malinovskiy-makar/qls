@@ -234,6 +234,25 @@ class Problem(models.Model):
         'Сложность (метка источника)', max_length=20, blank=True,
         help_text='Например: *, **, ***')
 
+    # ── Характер и особенности — ПОЛЯ ЗАРАНЕЕ (правило нуля, решение владельца
+    #    04.09.2026, https://app.notion.com/p/3d1b11c92bc181f2a58fca64235ef298).
+    #    Разметку загружает владелец командой `import_problem_attributes`;
+    #    пока поля пусты, фильтры и облачка их не показывают и включатся сами,
+    #    когда данные появятся — без новой сессии. Существующие поля задачи
+    #    команда не трогает (ADR 0005).
+    class Character(models.TextChoices):
+        NONE = '', 'не размечено'
+        QUAL = 'qual', 'Качественная'
+        QUANT = 'quant', 'Количественная'
+
+    character = models.CharField(
+        'Характер задачи', max_length=8, choices=Character.choices,
+        default='', blank=True, db_index=True)
+    # Список ключей особенностей из `catalog.filters.FEATURES`
+    # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
+    # собственной сущности, и правило «модели только в problems» не задето.
+    features = models.JSONField('Особенности', default=list, blank=True)
+
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
 
@@ -622,6 +641,12 @@ class Hint(models.Model):
                              related_name='hints', verbose_name='Подпункт')
     order = models.PositiveIntegerField('Порядок', default=1)
     text = models.TextField('Текст подсказки')
+    # ── Кто написал подсказку (этап 6 редизайна, 04.09.2026). Существующие
+    #    подсказки — рукописные: миграция данных 0053 ставит им reviewed=True.
+    #    Подсказка «сгенерировано ИИ, не проверено человеком» так и подписана
+    #    на странице задачи.
+    generated_by_ai = models.BooleanField('Сгенерирована ИИ', default=False)
+    reviewed = models.BooleanField('Проверена человеком', default=False)
 
     class Meta:
         verbose_name = 'Подсказка'
@@ -969,6 +994,78 @@ class Submission(models.Model):
 
     def __str__(self):
         return f'{self.student} / {self.assignment} / {self.problem}'
+
+
+class CatalogAttempt(models.Model):
+    """Попытка решения задачи каталога с проверкой ИИ (этап 5 редизайна, 04.09.2026).
+
+    Не путать с `Submission` — та про домашку репетитора: у неё есть работа,
+    пункт работы и проверка человеком. Здесь — свободная попытка на
+    странице задачи: ученик пишет решение, модель сверяет его с эталоном по
+    шагам (`catalog/attempts.py`, профиль `catalog_check`, ADR 0071), и
+    попытка живёт в статистике ученика. Пользователь обязателен: анониму
+    вместо кнопки показывается ссылка на вход.
+
+    `steps` — список `{n, title, verdict: ok|bad|part|na, comment}`;
+    `first_error_step` — номер первого ошибочного шага. `files` и
+    `ocr_text` — фото решения и распознанный с него текст (этап 6).
+    """
+
+    class Status(models.TextChoices):
+        CHECKED = 'checked', 'проверена'
+        NEEDS_HUMAN = 'needs_human', 'модель не ставит балл'
+        ERROR = 'error', 'проверка не удалась'
+
+    class Verdict(models.TextChoices):
+        NONE = '', 'нет'
+        OK = 'ok', 'верно'
+        PARTIAL = 'partial', 'частично верно'
+        WRONG = 'wrong', 'неверно'
+        NEEDS_HUMAN = 'needs_human', 'нужен человек'
+
+    class Confidence(models.TextChoices):
+        NONE = '', 'нет'
+        HIGH = 'high', 'высокая'
+        MEDIUM = 'medium', 'средняя'
+        LOW = 'low', 'низкая'
+
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+                             related_name='catalog_attempts',
+                             verbose_name='Ученик')
+    problem = models.ForeignKey(Problem, on_delete=models.CASCADE,
+                                related_name='catalog_attempts',
+                                verbose_name='Задача')
+    text = models.TextField('Текст решения', blank=True)
+    solution_viewed_before = models.BooleanField(
+        'Решение открыли до отправки', default=False)
+    status = models.CharField('Статус', max_length=16, choices=Status.choices,
+                              default=Status.ERROR)
+    verdict = models.CharField('Вердикт', max_length=16, choices=Verdict.choices,
+                               default=Verdict.NONE, blank=True)
+    score = models.PositiveSmallIntegerField('Балл', null=True, blank=True)
+    max_score = models.PositiveSmallIntegerField('Максимум', default=10)
+    steps = models.JSONField('Шаги', default=list, blank=True)
+    first_error_step = models.PositiveSmallIntegerField(
+        'Первый ошибочный шаг', null=True, blank=True)
+    confidence = models.CharField('Уверенность модели', max_length=8,
+                                  choices=Confidence.choices,
+                                  default=Confidence.NONE, blank=True)
+    summary = models.CharField('Итог одной строкой', max_length=300, blank=True)
+    ocr_text = models.TextField('Текст, распознанный с фото', blank=True)
+    files = models.ManyToManyField(FileAsset, blank=True,
+                                   related_name='catalog_attempts',
+                                   verbose_name='Файлы')
+    created_at = models.DateTimeField('Создана', auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Попытка в каталоге'
+        verbose_name_plural = 'Попытки в каталоге'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['user', 'problem', 'created_at'],
+                                name='catalog_attempt_user_prob_idx')]
+
+    def __str__(self):
+        return 'Попытка #%s: задача %s, %s' % (self.pk, self.problem_id, self.status)
 
 
 class TeacherFeedback(models.Model):

@@ -1,0 +1,10 @@
+Creating test database for alias 'default'...
+......................................................................................WARNING 2026-09-06 03:25:59,590 catalog.topic_blocks: тема «Ценовая политика» не описана в problems/sections.py — ушла в «Прочее»
+...
+----------------------------------------------------------------------
+Ran 89 tests in 60.109s
+
+OK
+Destroying test database for alias 'default'...
+Found 89 test(s).
+System check identified no issues (0 silenced).

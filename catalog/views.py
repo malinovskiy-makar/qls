@@ -5,17 +5,26 @@ import re
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
 from django.db.models import Count, F, Q
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from problems.jsonsafe import dumps_for_script
 
-from . import filters
+from . import attachments, attempts, chat, filters, testplay
+from .placeholder_phrases import (
+    CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
+)
+from .preview import (
+    PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
+)
+from .topic_blocks import is_known, normalize as normalize_topic, section_of
+from problems.ai import core as ai
 from problems.models import (
-    Collection, Problem, ProblemFigure, Source, Topic,
+    CatalogAttempt, Collection, FileAsset, Problem, ProblemFigure, Source, Topic,
 )
 from problems.management.commands.apply_topic_mapping import CANONICAL
 
@@ -189,19 +198,26 @@ def home(request):
         #   'topics_count':    Topic.objects.filter(name__in=CANONICAL).count(),
         'olympiads_count': LANDING_OLYMPIADS,
         'topics_count':    LANDING_TOPICS,
+        # Бегущая подсказка поля — общий партиал, фразы из одной константы.
+        'home_phrases':    HOME_PHRASES,
     }
     return render(request, 'catalog/home.html', context)
 
 
 # ── Случайная опубликованная задача ─────────────────────────────────────────
 def random_problem(request):
-    problem = (
-        Problem.objects
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                hidden_pending_review=False)
-        .order_by('?')
-        .first()
-    )
+    """Случайная видимая задача; понимает фильтры каталога и `exclude=<id>`.
+
+    «Ещё тест по этой теме» на странице теста (этап 7) ведёт сюда с
+    `type=test&topic=<id>&exclude=<текущая>`: те же параметры, что у
+    каталога, разбирает `filters.parse`.
+    """
+    active = filters.parse(request.GET)
+    qs = filters.apply(filters.base_queryset('catalog'), active)
+    exclude = (request.GET.get('exclude') or '').strip()
+    if exclude.isdigit():
+        qs = qs.exclude(pk=int(exclude))
+    problem = qs.order_by('?').first()
     if problem is None:
         return redirect('catalog:problem_list')
     return redirect('catalog:problem_detail', pk=problem.pk)
@@ -211,19 +227,25 @@ def random_problem(request):
 def _card(problem, score=None):
     """Одна карточка выдачи.
 
-    ⚠️ НОМЕР ЗАДАЧИ НЕ ПЕРВЫЙ СЛЕВА (решение владельца). Он нужен, чтобы на
-    задачу сослаться, но глаз должен цепляться за тему и условие: слева
-    тема, теги, сложность и флаг решения, номер — мелким и приглушённым
-    справа.
+    ⚠️ НОМЕРА ЗАДАЧИ В КАРТОЧКЕ НЕТ (решение владельца 04.09.2026): он
+    остаётся только в адресе. Глаз цепляется за тему и условие: цветной
+    чип темы, звёзды при заданной сложности, формат теста, флаг решения.
+
+    ⚠️ ПРАВИЛО НУЛЯ: каждое поле карточки берётся из данных задачи, и чего
+    нет в данных — того нет и в разметке. Заголовок показывается, только
+    если это название, а не обрезок условия (`looks_like_statement_cut`).
     """
-    raw = _strip_latex(problem.statement)
     refs = list(problem.source_references.all())
     d = problem.difficulty or 0
+    title = (problem.title or '').strip()
+    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
     return {
         'problem':          problem,
-        'preview':          raw[:180] + ('…' if len(raw) > 180 else ''),
-        'topics':           [t for t in problem.topics.all()
-                             if t.name in CANONICAL][:2],
+        'preview':          cut_words(preview_text(problem.statement), PREVIEW_CHARS),
+        # Тема несёт раздел карты — им красится чип (`--map-g-*`).
+        'topics':           [{'name': t.name, 'section': section_of(t.name)}
+                             for t in problem.topics.all()
+                             if is_known(t.name)][:2],
         'difficulty':       d,
         'difficulty_stars': range(d),
         'difficulty_empty': range(5 - d),
@@ -231,13 +253,22 @@ def _card(problem, score=None):
                             and not problem.solution_needs_review,
         'source':           refs[0].source.name if refs else '',
         'grade':            refs[0].grade if refs else '',
-        'is_test':          (problem.problem_type or '')
-                            .lower().startswith('тест'),
-        # Близость показывается ТОЛЬКО в таблице и только при смысловом
-        # поиске: в строках и галерее ей места нет, а числа «кухни» наружу
-        # не идут — колонка называется словом, не долей.
+        'is_test':          is_test,
+        # «тест · один верный»: формат из `problem_type`, если он известен
+        # списку `TEST_TYPES`; иначе просто «тест».
+        'kind_label':       _kind_label(problem.problem_type) if is_test else '',
+        'show_title':       bool(title) and not looks_like_statement_cut(
+                                title, problem.statement),
+        # Число близости наружу НЕ ИДЁТ (просьба владельца): в карточке
+        # оно лежит только для тестов и отладки.
         'score':            score,
     }
+
+
+def _kind_label(problem_type):
+    """Подпись формата теста в карточке."""
+    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    return 'тест · ' + label if label else 'тест'
 
 
 def _teacher_assignments(request):
@@ -321,8 +352,8 @@ def _relief(base, active, candidate_ids):
     """
     best = None
     for key in ('topic', 'tag', 'difficulty', 'kind', 'source',
-                'has_solution'):
-        value = active['tags'] if key == 'tag' else active[key]
+                'has_solution', 'character', 'feature'):
+        value = active[filters.ACTIVE_KEY[key]]
         if not value:
             continue
         loose = filters.apply(base, active, skip=(key,))
@@ -330,48 +361,52 @@ def _relief(base, active, candidate_ids):
             loose = loose.filter(pk__in=candidate_ids)
         n = loose.distinct().count()
         if best is None or n > best[1]:
-            best = (filters.RELIEF_LABEL[key], n)
+            n_values = len(value) if isinstance(value, list) else 1
+            best = (filters.relief_label(key, n_values), n)
     if best is None or best[1] < 1:
         return None
     return {'label': best[0], 'count': best[1]}
 
 
-def problem_list(request):
-    """Умный каталог: один экран, один поиск, восемь фильтров.
+def _numeric_query(query):
+    """Чисто числовой запрос — это НОМЕР задачи, а не описание.
 
-    ⚠️ ЭКРАН ОБЪЕДИНЁН С «УМНЫМ ПОИСКОМ» (решение владельца 01.09.2026).
-    `/catalog/smart-search/` ведёт сюда постоянным редиректом, пункт
-    «Умный поиск» ушёл из шапки: два входа в один банк заставляли человека
-    выбирать способ ДО того, как он сформулировал, что ищет.
+    У числа нет смысла, который можно с чем-то сравнить: смысловой поиск на
+    «1065» вернёт мусор. Возвращает `(id найденной задачи, ненайденный
+    номер)`. Видимость проверяется та же, что у самой страницы задачи,
+    иначе ответ «есть/нет» стал бы оглавлением скрытого.
+    """
+    if not (query.isdigit() and len(query) <= 9):
+        return None, ''
+    found_id = (Problem.objects
+                .filter(pk=int(query), status=Problem.Status.PUBLISHED,
+                        needs_quality_review=False,
+                        hidden_pending_review=False)
+                .values_list('pk', flat=True).first())
+    return found_id, ('' if found_id else query)
+
+
+def _catalog_context(request, missing_id=''):
+    """Контекст каталога — ОДИН на страницу и на эндпоинт живого состояния.
+
+    ⚠️ СТРАНИЦА И `api_filter_state` СОБИРАЮТСЯ ОДНИМ КОДОМ И РИСУЮТ ОДНИ
+    ПАРТИАЛЫ (`_catalog_results.html`, `_catalog_chips.html`). Иначе список
+    под окном фильтров и список после перезагрузки разошлись бы при первой
+    же правке одного из них (решение владельца 04.09.2026: фильтры
+    обновляют выдачу живьём, окно не закрывается).
 
     ⚠️ ПРИ ПУСТОМ ЗАПРОСЕ СМЫСЛОВОЙ ПОИСК НЕ ТРОГАЕТСЯ ВООБЩЕ. Модель
-    грузится лениво, первый раз около семи секунд. Пока поиск жил
-    отдельной страницей, это была плата за вход именно на неё; теперь
-    каталог — главный вход, и секунды достались бы каждому, кто просто
-    зашёл посмотреть банк.
+    грузится лениво, первый раз около семи секунд. Каталог — главный вход,
+    и секунды достались бы каждому, кто просто зашёл посмотреть банк.
     """
     active = filters.parse(request.GET)
     query = active['q']
 
+    # ⚠️ ТАБЛИЧНОГО ВИДА БОЛЬШЕ НЕТ (решение владельца 04.09.2026): старые
+    # адреса с `?view=table` открываются строками, а не ошибкой.
     view_mode = (request.GET.get('view') or 'rows').strip()
-    if view_mode not in ('rows', 'table', 'gallery'):
+    if view_mode not in ('rows', 'gallery'):
         view_mode = 'rows'
-
-    # ⚠️ ЧИСТО ЧИСЛОВОЙ ЗАПРОС — ЭТО НОМЕР ЗАДАЧИ, А НЕ ОПИСАНИЕ. У числа
-    # нет смысла, который можно с чем-то сравнить: смысловой поиск на
-    # «1065» вернёт мусор. Ведём прямо на задачу; нет такой — говорим.
-    # Видимость проверяется та же, что у самой страницы задачи, иначе
-    # ответ «есть/нет» стал бы оглавлением скрытого.
-    missing_id = ''
-    if query.isdigit() and len(query) <= 9:
-        found_id = (Problem.objects
-                    .filter(pk=int(query), status=Problem.Status.PUBLISHED,
-                            needs_quality_review=False,
-                            hidden_pending_review=False)
-                    .values_list('pk', flat=True).first())
-        if found_id:
-            return redirect('catalog:problem_detail', pk=found_id)
-        missing_id = query
 
     base = filters.base_queryset('catalog')
     carry = {}
@@ -429,13 +464,7 @@ def problem_list(request):
 
     cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
 
-    # Подпись второго числа счётчика: «из 294 по теме „Монополия“».
-    scope = ''
-    for group in fctx['chosen']:
-        scope = filters.SCOPE_LABEL[group['key']] % group['value_label']
-        break
-
-    context = {
+    return {
         'filters':        fctx,
         'cards':          cards,
         'view_mode':      view_mode,
@@ -446,17 +475,107 @@ def problem_list(request):
         'total':          total,
         'capped':         capped,
         'filtered_total': filtered_total,
-        'scope':          scope,
+        # Подпись второго числа счётчика: «из 294 по теме „Монополия“» —
+        # собирает общий модуль, у него же формы для нескольких значений.
+        'scope':          fctx['scope'],
         'shown':          len(cards),
         'has_more':       has_more,
         'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
         'step':           PAGE_STEP,
         'relief':         relief,
         'view_urls':      {mode: filters.query(dict(carry, view=mode), active)
-                           for mode in ('rows', 'table', 'gallery')},
+                           for mode in ('rows', 'gallery')},
         'teacher_assignments_json': _teacher_assignments(request),
+        # Бегущая подсказка поля: фразы и текст после остановки — из
+        # одной константы, партиал общий с главной.
+        'catalog_phrases':   CATALOG_PHRASES,
+        'catalog_stop_text': CATALOG_STOP_TEXT,
+        # Подпись блока карты — из данных карты, не литералом.
+        'map_stats':         _map_stats(),
+        # Стартовое состояние для скрипта окна «Все фильтры»: активные
+        # значения (уже списками) и адреса эндпоинтов — по имени, не строкой.
+        'filter_state': {
+            'active': active,
+            'view': view_mode,
+            'urls': {'state': reverse('catalog:api_filter_state'),
+                     'tags': reverse('catalog:api_tags'),
+                     'page': reverse('catalog:problem_list')},
+        },
     }
-    return render(request, 'catalog/problem_list.html', context)
+
+
+def problem_list(request):
+    """Умный каталог: один экран, один поиск, восемь фильтров.
+
+    ⚠️ ЭКРАН ОБЪЕДИНЁН С «УМНЫМ ПОИСКОМ» (решение владельца 01.09.2026).
+    `/catalog/smart-search/` ведёт сюда постоянным редиректом, пункт
+    «Умный поиск» ушёл из шапки: два входа в один банк заставляли человека
+    выбирать способ ДО того, как он сформулировал, что ищет.
+
+    Сборка контекста живёт в `_catalog_context`: её же зовёт эндпоинт
+    живого состояния фильтров, и страница отличается от него только
+    редиректом по номеру задачи.
+    """
+    query = (request.GET.get('q') or '').strip()
+    found_id, missing_id = _numeric_query(query)
+    if found_id:
+        return redirect('catalog:problem_detail', pk=found_id)
+    return render(request, 'catalog/problem_list.html',
+                  _catalog_context(request, missing_id))
+
+
+def _filter_counts(fctx):
+    """Числа по вариантам — словарь для скрипта живого обновления.
+
+    Ключи — группы фильтра, значения — «значение варианта → число задач
+    под остальными фильтрами». Берётся из уже собранных вариантов, второй
+    раз ничего не считается.
+    """
+    by_key = {g['key']: g for g in fctx['groups']}
+    counts = {'topic': {}, 'tag': {}, 'difficulty': {}, 'kind': {},
+              'test_type': {}, 'source': {}, 'has_solution': 0,
+              'character': {}, 'feature': {}}
+    if 'topic' in by_key:
+        for block in by_key['topic']['groups']:
+            for option in block['options']:
+                counts['topic'][option['value']] = option['count']
+    if 'tag' in by_key:
+        for option in by_key['tag']['tags']['listed']:
+            counts['tag'][option['value']] = option['count']
+    for key in ('difficulty', 'source', 'character', 'feature'):
+        if key in by_key:
+            for option in by_key[key]['options']:
+                counts[key][option['value']] = option['count']
+    if 'kind' in by_key:
+        for option in by_key['kind']['options']:
+            counts['kind'][option['value']] = option['count']
+        for option in by_key['kind']['test_types']:
+            counts['test_type'][option['value']] = option['count']
+    if 'has_solution' in by_key:
+        counts['has_solution'] = by_key['has_solution']['option']['count']
+    return counts
+
+
+def api_filter_state(request):
+    """Живое состояние каталога под текущими параметрами. GET, публично.
+
+    Параметры те же, что у страницы (включая `q` и `view`). Ответ — числа
+    по вариантам, готовые куски разметки (чипы и список) и адрес, который
+    страница поставит в строку браузера. Разметку рисуют те же партиалы,
+    что и страница, — из того же контекста.
+    """
+    context = _catalog_context(request)
+    fctx = context['filters']
+    return JsonResponse({
+        'total': context['total'],
+        'counts': _filter_counts(fctx),
+        'selected_count': fctx['selected_count'],
+        'chips_html': render_to_string('catalog/_catalog_chips.html',
+                                       context, request=request),
+        'results_html': render_to_string('catalog/_catalog_results.html',
+                                         context, request=request),
+        'url': fctx['total_url'],
+    })
 
 
 def smart_search(request):
@@ -477,7 +596,388 @@ def smart_search(request):
 
 
 # ── Страница задачи ─────────────────────────────────────────────────────────
+_TAG_SECTIONS = {}
+
+
+def _tag_section(tag_name, fallback):
+    """Раздел карты для тега: по названию из `topic_map.json`, иначе — раздел
+    первой темы задачи. Теги базы с темами не связаны, а карта знает, под
+    какой темой стоит тег таксономии; совпало по названию — красим им."""
+    if not _TAG_SECTIONS:
+        text, _etag = _topic_map_payload()
+        for node in json.loads(text).get('nodes', []):
+            if node.get('k') == 'tag':
+                _TAG_SECTIONS[normalize_topic(node.get('l', ''))] = node.get('g', 'other')
+    return _TAG_SECTIONS.get(normalize_topic(tag_name), fallback)
+
+
+def _catalog_link(**changes):
+    """Адрес каталога с одним фильтром — через общий модуль, не склейкой строк."""
+    return reverse('catalog:problem_list') + filters.query({}, filters.parse({}), **changes)
+
+
+def _kind_cloud_label(problem_type):
+    if not (problem_type or '').lower().startswith(filters.TEST_PREFIX):
+        return 'Развёрнутая задача'
+    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    return 'Тест · ' + label if label else 'Тест'
+
+
+def _clouds(problem, topics, tags, sources):
+    """Два ряда облачек-ссылок в каталог. Каждое — только при данных
+    (правило нуля); пустой ряд не рисуется."""
+    first_section = section_of(topics[0].name) if topics else 'other'
+    row1 = [{'kind': 'topic', 'label': t.name, 'section': section_of(t.name),
+             'url': _catalog_link(topics=[str(t.pk)])} for t in topics]
+    row1 += [{'kind': 'tag', 'label': tag.name,
+              'section': _tag_section(tag.name, first_section),
+              'url': _catalog_link(tags=[str(tag.pk)])} for tag in tags]
+
+    row2 = []
+    d = problem.difficulty or 0
+    if d:
+        row2.append({'kind': 'diff', 'stars': '★' * d + '☆' * (5 - d),
+                     'label': 'сложность %d' % d,
+                     'url': _catalog_link(difficulties=[str(d)])})
+    if problem.character in dict(filters.CHARACTERS):
+        row2.append({'kind': 'char', 'label': dict(filters.CHARACTERS)[problem.character],
+                     'url': _catalog_link(character=problem.character)})
+    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
+    kind_changes = {'kind': 'test' if is_test else 'open'}
+    if is_test and problem.problem_type in dict(filters.TEST_TYPES):
+        kind_changes['test_type'] = problem.problem_type
+    row2.append({'kind': 'kind', 'label': _kind_cloud_label(problem.problem_type),
+                 'url': _catalog_link(**kind_changes)})
+    for key in problem.features or ():
+        if key in dict(filters.FEATURES):
+            row2.append({'kind': 'feat', 'label': dict(filters.FEATURES)[key],
+                         'url': _catalog_link(features=[key])})
+    if sources:
+        row2.append({'kind': 'sep'})
+        for ref in sources:
+            row2.append({'kind': 'src', 'label': ref.source.name,
+                         'url': _catalog_link(sources=[str(ref.source_id)])})
+    return row1, row2
+
+
+def _norm_answer(text):
+    return re.sub(r'[\s$,.;:]+', '', (text or '').casefold())
+
+
+def _solution_block(problem, parts):
+    """Ответ и решение — раздельно, по правилам владельца (04.09.2026).
+
+    `problem.answer` → «Ответ:» в шапке; `problem.solution` → тело. Решение
+    короче 30 знаков или совпадающее с ответом — это ответ, а не решение
+    (случай «Вмешательство — 5», где в решении лежит «1800»).
+    `solution_needs_review` по-прежнему прячет решение (и решения пунктов).
+    Нет ни того ни другого — кнопки «Показать решение» нет.
+    """
+    answer = (problem.answer or '').strip()
+    solution = '' if problem.solution_needs_review else (problem.solution or '').strip()
+    if solution and (len(solution) < 30 or _norm_answer(solution) == _norm_answer(answer)):
+        if not answer:
+            answer = solution
+        solution = ''
+    part_rows = []
+    for part in parts:
+        part_solution = '' if problem.solution_needs_review else (part.solution or '').strip()
+        if part.answer or part_solution:
+            part_rows.append({'label': part.label, 'answer': part.answer,
+                              'solution': part_solution})
+    return {'answer': answer, 'solution': solution, 'parts': part_rows,
+            'has_any': bool(answer or solution or part_rows)}
+
+
+def _similar_cards(problem):
+    """Похожие — из кэша M2M, без задач за шлюзами, до четырёх (сетка 2×2)."""
+    rows = (problem.similar_problems
+            .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                    hidden_pending_review=False)
+            .prefetch_related('topics')[:4])
+    cards = []
+    for s in rows:
+        topics = [t for t in s.topics.all() if is_known(t.name)][:1]
+        title = (s.title or '').strip()
+        text = preview_text(s.statement)
+        d = s.difficulty or 0
+        cards.append({
+            'problem': s,
+            'topic': ({'name': topics[0].name, 'section': section_of(topics[0].name)}
+                      if topics else None),
+            # Заголовок карточки: настоящий заголовок — через `similar_title`
+            # (полировка к бете: обрывок формулы срезается по незакрытому
+            # доллару, валюта «$3» остаётся); заголовок-обрезок условия или
+            # его отсутствие — начало условия без разметки.
+            'title_display': (similar_title(s)
+                              if title and not looks_like_statement_cut(title, s.statement)
+                              else cut_words(text, 120)),
+            'preview': cut_words(text, 160),
+            'difficulty': d,
+            'stars': ('★' * d + '☆' * (5 - d)) if d else '',
+            'has_solution': bool(s.solution) and not s.solution_needs_review,
+        })
+    return cards
+
+
+NEEDS_HUMAN_TEXT = ('Модель не ставит балл: ход решения нестандартный. Можно '
+                    'исправить и отправить снова или открыть решение.')
+LIMIT_TEXT = 'Лимит проверок на сегодня исчерпан: завтра снова %d'
+
+
+def _attempt_view(attempt, can_chat=False):
+    """Что нужно партиалу `_attempt_result.html` сверх самой попытки."""
+    if attempt.status == 'error':
+        return {'css': 'wait', 'word': 'Проверка не удалась', 'sub': attempt.summary,
+                'bars': 0, 'confidence_word': '', 'ask': '', 'can_chat': can_chat}
+    css = {'ok': 'ok', 'partial': 'part', 'wrong': 'bad'}.get(attempt.verdict, 'wait')
+    word = {'ok': 'Верно', 'partial': 'Частично верно', 'wrong': 'Неверно'}.get(
+        attempt.verdict, 'Балл не поставлен')
+    sub = NEEDS_HUMAN_TEXT if attempt.status == 'needs_human' else attempt.summary
+    bars = {'high': 3, 'medium': 2, 'low': 1}.get(attempt.confidence, 1)
+    confidence_word = {'high': 'высокая', 'medium': 'средняя', 'low': 'низкая'}.get(
+        attempt.confidence, 'низкая')
+    ask = ''
+    if attempt.first_error_step:
+        title = next((s.get('title', '') for s in attempt.steps
+                      if s.get('n') == attempt.first_error_step), '')
+        ask = 'Объясни, почему в шаге %d ошибка%s' % (
+            attempt.first_error_step, (': ' + title) if title else '')
+    return {'css': css, 'word': word, 'sub': sub, 'bars': bars,
+            'confidence_word': confidence_word, 'ask': ask, 'can_chat': can_chat}
+
+
+def _json_body(request):
+    try:
+        return json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        return {}
+
+
+def _visible_problem(pk):
+    return get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
+                             needs_quality_review=False, hidden_pending_review=False)
+
+
+def _test_game_or_400(problem_id):
+    problem = _visible_problem(problem_id)
+    game = testplay.game_of(problem)
+    if game is None:
+        return problem, None, JsonResponse(
+            {'error': 'no_game', 'message': 'У этого теста нет вариантов для проверки.'},
+            status=400)
+    return problem, game, None
+
+
+@require_POST
+def api_test_check(request, problem_id):
+    """Проверка отмеченных вариантов теста: всё или ничего (этап 7.2).
+
+    Гость допускается: попытки считаются в сессии. Ответ —
+    `{correct, attempt}`; при неверном ответе начиная с третьей попытки
+    (после двух неудач) добавляется `correct_count`: сколько верных, но не
+    какие. Верный ответ сбрасывает счётчик, у вошедшего он записывается
+    попыткой `CatalogAttempt` с итогом «тест: решено с N-й попытки».
+    """
+    problem, game, error = _test_game_or_400(problem_id)
+    if error:
+        return error
+    data = _json_body(request)
+    raw = data.get('labels') if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw:
+        return JsonResponse({'error': 'empty', 'message': 'Отметьте хотя бы один вариант.'},
+                            status=400)
+    known = {opt['label'] for opt in game['options']}
+    given = {testplay.answer_check.normalize_label(str(x)) for x in raw}
+    if not given or not given <= known:
+        return JsonResponse({'error': 'labels', 'message': 'Такого варианта нет.'}, status=400)
+    attempt = testplay.record_attempt(request.session, problem.pk)
+    correct = testplay.check(game, given)
+    out = {'correct': correct, 'attempt': attempt}
+    if correct:
+        testplay.reset_attempts(request.session, problem.pk)
+        if request.user.is_authenticated:
+            CatalogAttempt.objects.create(
+                user=request.user, problem=problem, text='',
+                status=CatalogAttempt.Status.CHECKED, verdict=CatalogAttempt.Verdict.OK,
+                steps=[], summary=testplay.solved_summary(attempt))
+    elif attempt + 1 >= testplay.COUNT_FROM_ATTEMPT:
+        out['correct_count'] = len(game['correct'])
+    return JsonResponse(out)
+
+
+@require_POST
+def api_test_reveal(request, problem_id):
+    """Показать ответ: верные метки; счётчик попыток сбрасывается."""
+    problem, game, error = _test_game_or_400(problem_id)
+    if error:
+        return error
+    testplay.reset_attempts(request.session, problem.pk)
+    return JsonResponse({'correct_labels': sorted(game['correct'])})
+
+
+@require_POST
+def api_attempt_file(request):
+    """Фото или файл к будущей попытке (этап 6.2). Только вход.
+
+    Один файл на запрос: jpg/png/webp/pdf до 10 МБ, не больше трёх на
+    попытку (`pending` — id уже загруженных). Хранится `FileAsset` вида
+    «работа ученика», к попытке привязывается при отправке решения.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login', 'message': 'Войдите, чтобы прикрепить файл.'},
+                            status=403)
+    pending = [x for x in (request.POST.get('pending') or '').split(',') if x.strip().isdigit()]
+    if len(pending) >= attachments.MAX_FILES:
+        return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY}, status=400)
+    uploaded = request.FILES.get('file')
+    media_type, error = attachments.validate_upload(uploaded)
+    if error:
+        return JsonResponse({'error': 'file', 'message': error}, status=400)
+    asset = FileAsset.objects.create(file=uploaded, kind=FileAsset.Kind.STUDENT_WORK,
+                                     caption=(uploaded.name or '')[:300],
+                                     uploaded_by=request.user)
+    return JsonResponse({'id': asset.pk, 'name': asset.caption, 'kind': media_type})
+
+
+@require_POST
+def api_attempt(request):
+    """Отправить решение на проверку ИИ (этап 5, ADR 0071).
+
+    Только для вошедших: анониму страница показывает ссылку на вход вместо
+    кнопки. Проверка идёт синхронно; `AiUnavailable` — это 200 с человеческим
+    сообщением, а не ошибка сервера: ключа нет, лимит, таймаут — всё это
+    штатные состояния, о которых ученику надо сказать словами.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login',
+                             'message': 'Войдите, чтобы отправить решение на проверку.'},
+                            status=403)
+    data = _json_body(request)
+    try:
+        problem = _visible_problem(int(data.get('problem_id') or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'problem', 'message': 'Задача не указана.'}, status=400)
+    text = (data.get('text') or '').strip()
+    raw_ids = data.get('file_ids') or []
+    if not isinstance(raw_ids, list) or len(raw_ids) > attachments.MAX_FILES:
+        return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY}, status=400)
+    file_ids = [int(x) for x in raw_ids if str(x).isdigit()]
+    files = list(FileAsset.objects.filter(pk__in=file_ids, uploaded_by=request.user,
+                                          kind=FileAsset.Kind.STUDENT_WORK)) if file_ids else []
+    if len(files) != len(set(file_ids)):
+        return JsonResponse({'error': 'file', 'message': 'Файл не найден: прикрепите его заново.'},
+                            status=400)
+    if not text and not files:
+        return JsonResponse({'error': 'empty',
+                             'message': 'Напишите решение или приложите фото, прежде чем отправлять.'},
+                            status=400)
+    if len(text) > 20000:
+        return JsonResponse({'error': 'long',
+                             'message': 'Слишком длинный текст: сократите решение.'}, status=400)
+    if not ai.is_available():
+        return JsonResponse({'error': 'no_key', 'message': ai.unavailable_reason()})
+    if ai.remaining_today(request.user) <= 0:
+        return JsonResponse({'error': 'limit', 'message': LIMIT_TEXT % ai.daily_limit()})
+
+    attempt = CatalogAttempt.objects.create(
+        user=request.user, problem=problem, text=text,
+        solution_viewed_before=bool(data.get('solution_viewed_before')))
+    if files:
+        attempt.files.set(files)
+    try:
+        if files:
+            # Сначала текст с фото, потом проверка по тексту и распознанному.
+            attachments.recognise_attempt(attempt, request.user)
+            attempt.save(update_fields=['ocr_text'])
+        attempts.check_attempt(attempt, request.user)
+    except ai.AiUnavailable as exc:
+        attempt.status = CatalogAttempt.Status.ERROR
+        attempt.summary = str(exc)[:300]
+        attempt.save(update_fields=['status', 'summary'])
+        message = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
+        return JsonResponse({'error': exc.kind, 'message': message, 'attempt_id': attempt.pk})
+
+    html = render_to_string('catalog/_attempt_result.html',
+                            {'attempt': attempt, 'chk': _attempt_view(attempt, can_chat=True)},
+                            request=request)
+    return JsonResponse({'attempt_id': attempt.pk, 'status': attempt.status, 'html': html,
+                         'remaining': ai.remaining_today(request.user)})
+
+
+@require_POST
+def api_chat(request):
+    """Одна реплика помощника по задаче (этап 5, ADR 0072). Только вход.
+
+    История приходит от клиента и не хранится; лимит общий с проверкой.
+    `AiUnavailable` — человеческое сообщение в чате, а не ошибка сервера.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login', 'reply': 'Войдите, чтобы спросить помощника.'},
+                            status=403)
+    data = _json_body(request)
+    try:
+        problem = _visible_problem(int(data.get('problem_id') or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'problem', 'reply': 'Задача не указана.'}, status=400)
+    message = str(data.get('message') or '').strip()
+    if not message:
+        return JsonResponse({'error': 'empty', 'reply': 'Напишите вопрос.'}, status=400)
+    if len(message) > chat.MESSAGE_MAX:
+        return JsonResponse({'error': 'long', 'reply': 'Слишком длинный вопрос: сократите его.'},
+                            status=400)
+    if not ai.is_available():
+        return JsonResponse({'error': 'no_key', 'reply': ai.unavailable_reason()})
+    if ai.remaining_today(request.user) <= 0:
+        return JsonResponse({'error': 'limit', 'reply': LIMIT_TEXT % ai.daily_limit()})
+    last_attempt = (CatalogAttempt.objects
+                    .filter(user=request.user, problem=problem)
+                    .order_by('-created_at').first())
+    try:
+        reply = chat.answer(problem, message, data.get('history'), request.user,
+                            last_attempt=last_attempt)
+    except ai.AiUnavailable as exc:
+        message_text = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
+        return JsonResponse({'error': exc.kind, 'reply': message_text})
+    return JsonResponse({'reply': reply, 'remaining': ai.remaining_today(request.user)})
+
+
+def _ordered_hints(problem):
+    """Подсказки задачи по уровням: сначала общие, потом к подпунктам."""
+    hints = list(problem.hints.select_related('part').order_by('order', 'pk'))
+    general = [h for h in hints if h.part_id is None]
+    by_part = [h for h in hints if h.part_id is not None]
+    by_part.sort(key=lambda h: (h.part.order, h.part.label, h.order, h.pk))
+    return general + by_part
+
+
+def api_hint(request, problem_id, n):
+    """Подсказка номер `n` (с единицы) к видимой задаче; за пределом — 404.
+
+    Подсказки — часть задачи, как решение: доступны без входа. Порядок —
+    поле `order`; подсказки к подпунктам идут после общих с пометкой пункта.
+    """
+    problem = _visible_problem(problem_id)
+    hints = _ordered_hints(problem)
+    if n < 1 or n > len(hints):
+        raise Http404('такой подсказки нет')
+    hint = hints[n - 1]
+    return JsonResponse({
+        'n': n, 'total': len(hints), 'text': hint.text,
+        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
+        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
+    })
+
+
 def problem_detail(request, pk):
+    """Страница задачи (редизайн 04.09.2026, мокап `problem_page_mockup.html`).
+
+    Полоса 1120 px с постоянной карточкой справа (ADR 0070). Заголовок —
+    только если это название, а не обрезок условия; номер задачи нигде,
+    кроме адреса. Облачка свойств ведут в каталог с этим фильтром. Всё на
+    экране — из данных: нет тегов — нет ряда, нет сложности — нет звёзд,
+    нет решения и ответа — нет кнопки (правило нуля).
+    """
     problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
                                 needs_quality_review=False,
                                 hidden_pending_review=False)
@@ -488,42 +988,104 @@ def problem_detail(request, pk):
     log_problem_event('catalog', 'opened', request.user, problem,
                       request=request)
 
-    difficulty = problem.difficulty or 0
+    topics = [t for t in problem.topics.all() if is_known(t.name)]
+    tags = list(problem.tags.all())
+    sources = list(problem.source_references.select_related('source').all())
+    parts = list(problem.parts.all())
+    title = (problem.title or '').strip()
+    show_title = bool(title) and not looks_like_statement_cut(title, problem.statement)
+    heading = title if show_title else ('Задача: ' + topics[0].name if topics else 'Задача')
+    row1, row2 = _clouds(problem, topics, tags, sources)
 
-    # Похожие задачи из кеша (топ-5), без задач за качественным шлюзом
-    similar_qs = (
-        problem.similar_problems
-        .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                hidden_pending_review=False)
-        .prefetch_related('topics')[:5]
-    )
-    similar = []
-    for s in similar_qs:
-        d = s.difficulty or 0
-        similar.append({
-            'problem':          s,
-            'title_display':    similar_title(s),
-            'topics':           list(s.topics.all())[:2],
-            'difficulty_stars': range(d),
-            'difficulty_empty': range(5 - d),
-        })
+    saved = False
+    if request.user.is_authenticated:
+        from problems.models_platform import SavedProblem
+        saved = SavedProblem.objects.filter(owner=request.user, catalog_problem=problem,
+                                            is_deleted=False).exists()
 
+    # Проверка ИИ: кнопка и строка лимита — только при доступной модели и
+    # только для вошедших (правило нуля: без ключа их нет вовсе).
+    ai_available = ai.is_available()
+    remaining = ai.remaining_today(request.user) if ai_available and request.user.is_authenticated else 0
+    last_attempt = None
+    if ai_available and request.user.is_authenticated:
+        last_attempt = (CatalogAttempt.objects
+                        .filter(user=request.user, problem=problem)
+                        .exclude(status=CatalogAttempt.Status.ERROR)
+                        .order_by('-created_at').first())
+    hint_total = len(_ordered_hints(problem))
+    game = testplay.game_of(problem, parts)
+    test = _test_context(problem, game, topics) if game else None
+    pd_config = {'problemId': problem.pk}
+    if test:
+        pd_config['test'] = {
+            'checkUrl':  reverse('catalog:api_test_check', args=[problem.pk]),
+            'revealUrl': reverse('catalog:api_test_reveal', args=[problem.pk]),
+            'multi':     game['multi'],
+            'labels':    [opt['label'] for opt in game['options']],
+        }
+    if hint_total:
+        pd_config['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
+        pd_config['hintTotal'] = hint_total
+    if ai_available:
+        pd_config['attemptUrl'] = reverse('catalog:api_attempt')
+        pd_config['chatUrl'] = reverse('catalog:api_chat')
+        if request.user.is_authenticated:
+            # Файлы принимаются только от вошедших: гостю адрес не нужен.
+            pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
+            pd_config['maxFiles'] = attachments.MAX_FILES
+
+    from urllib.parse import urlencode
     context = {
-        'problem':          problem,
-        'parts':            problem.parts.all(),
-        'has_part_answers': problem.parts.filter(answer__gt='').exists(),
-        'topics':           problem.topics.all(),
-        'tags':             problem.tags.all(),
-        'sources':          problem.source_references.select_related('source').all(),
-        'difficulty_stars': range(difficulty),
-        'difficulty_empty': range(5 - difficulty),
-        'similar':          similar,
-        # Как эту задачу решают в игре. None, если она в игровой пул не
-        # попала либо попыток ещё мало (порог — game.config.STATS_MIN_ATTEMPTS):
-        # процент на пяти ответах врёт, честнее не показывать ничего.
-        'game_stat':        _game_stat(problem.pk),
+        'problem':      problem,
+        'ai_available': ai_available,
+        'hint_total':   hint_total,
+        'test':         test,
+        'remaining':    remaining,
+        'last_attempt': last_attempt,
+        'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
+        'pd_config':    pd_config,
+        'parts':        parts,
+        'is_test':      (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX),
+        'heading':      heading,
+        'show_title':   show_title,
+        'clouds_1':     row1,
+        'clouds_2':     row2,
+        'sol':          _solution_block(problem, parts),
+        'similar':      _similar_cards(problem),
+        # «Все похожие» — поиск по смыслу с началом условия этой задачи.
+        'similar_url':  reverse('catalog:problem_list') + '?' + urlencode(
+            {'q': problem.statement[:200]}),
+        'saved':        saved,
+        'teacher_assignments_json': _teacher_assignments(request),
+        # Как эту задачу решают в игре — понадобится тесту (этап 7).
+        'game_stat':    _game_stat(problem.pk),
     }
     return render(request, 'catalog/problem_detail.html', context)
+
+
+def _test_context(problem, game, topics):
+    """Блок игры теста для шаблона (этап 7.3): варианты, правило, ссылки.
+
+    «Ещё тест по этой теме» — только если по первой теме задачи есть другой
+    видимый тест; «Почему так» — только при решении (правило нуля).
+    """
+    more_url = ''
+    if topics:
+        active = filters.parse({'type': 'test', 'topic': str(topics[0].pk)})
+        others = (filters.apply(filters.base_queryset('catalog'), active)
+                  .exclude(pk=problem.pk).exists())
+        if others:
+            more_url = reverse('catalog:random_problem') + '?' + urlencode(
+                {'type': 'test', 'topic': topics[0].pk, 'exclude': problem.pk})
+    return {
+        'multi':    game['multi'],
+        'rule':     game['rule'],
+        'options':  game['options'],
+        'more_url': more_url,
+        'expl':     (problem.solution or '').strip(),
+        'stat':     _game_stat(problem.pk),
+    }
 
 
 def _game_stat(problem_id):
@@ -832,6 +1394,25 @@ def _topic_map_payload():
     return _TOPIC_MAP_CACHE['text'], _TOPIC_MAP_CACHE['etag']
 
 
+def _map_stats():
+    """Сколько тем и тегов на карте — для подписи блока карты в каталоге.
+
+    ⚠️ СЧИТАЕТСЯ ИЗ ДАННЫХ КАРТЫ, А НЕ ПИШЕТСЯ ЛИТЕРАЛОМ (правило нуля,
+    решение владельца 04.09.2026): подпись «29 тем, 343 тега» жила в
+    шаблоне руками и разошлась бы с картой при первой правке справочника.
+    Читается через тот же кэш, что отдаёт JSON карты; пересчёт — только
+    когда сменился ETag файла.
+    """
+    text, etag = _topic_map_payload()
+    if _TOPIC_MAP_CACHE.get('stats_etag') != etag:
+        nodes = json.loads(text).get('nodes', [])
+        themes = sum(1 for n in nodes if n.get('k') == 'theme')
+        _TOPIC_MAP_CACHE['stats'] = {'themes': themes,
+                                     'tags': len(nodes) - themes}
+        _TOPIC_MAP_CACHE['stats_etag'] = etag
+    return _TOPIC_MAP_CACHE['stats']
+
+
 def topic_map(request):
     """Страница карты. Разметка — самостоятельный блок: позже он переедет
     во всплывающее окно переработанного поиска без переделки."""
@@ -918,13 +1499,26 @@ def api_tags(request):
     """
     from problems.models import Tag
 
-    needle = (request.GET.get('q') or '').strip()
-    if len(needle) < 2:
-        return JsonResponse({'tags': []})
-
     visible = Q(problems__status=Problem.Status.PUBLISHED,
                 problems__needs_quality_review=False,
                 problems__hidden_pending_review=False)
+
+    # Режим «теги темы» (`?topic=<id>`): все теги видимых задач этой темы
+    # с числами, по убыванию, без нулей и без ограничения длины — окно
+    # фильтров показывает их группой под заголовком темы.
+    topic_id = (request.GET.get('topic') or '').strip()
+    if topic_id.isdigit():
+        of_topic = visible & Q(problems__topics__id=int(topic_id))
+        rows = (Tag.objects
+                .annotate(n=Count('problems', filter=of_topic, distinct=True))
+                .filter(n__gt=0)
+                .order_by('-n', 'name'))
+        return JsonResponse({'tags': [{'id': t.pk, 'name': t.name, 'count': t.n}
+                                      for t in rows]})
+
+    needle = (request.GET.get('q') or '').strip()
+    if len(needle) < 2:
+        return JsonResponse({'tags': []})
     rows = (Tag.objects
             .filter(name__icontains=needle)
             .annotate(n=Count('problems', filter=visible, distinct=True))

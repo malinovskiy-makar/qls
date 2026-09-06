@@ -1,434 +1,640 @@
 {% extends "catalog/base.html" %}
 {% load catalog_filters %}
+{% comment %}
+СТРАНИЦА ЗАДАЧИ — редизайн 04.09.2026 по мокапу владельца
+`problem_page_mockup.html` и решениям Notion. Полоса 1120 px и постоянная
+карточка ИИ справа — ADR 0070. Номер задачи нигде, кроме адреса. Заголовок —
+только если это название, а не обрезок условия (`catalog.preview`).
 
-{% block title %}{% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}{% endblock %}
+⚠️ ПРАВИЛО НУЛЯ: каждое облачко, ряд, звёзды, кнопка — только при данных;
+нет решения и ответа — нет «Показать решение». Сторож — `test_no_slop.py`.
+
+Этап 4 промпта: каркас, облачка, условие, решение/ответ, похожие, карточка
+чата вёрсткой. Отправка на проверку, подсказки и фото приходят этапами 5–6.
+{% endcomment %}
+
+{% block title %}{{ heading }}{% endblock %}
+{% block main_class %}pd-wrap{% endblock %}
 
 {% block extra_style %}
-/* ⚠️ ПОЛОСА УЖЕ ОБЫЧНОЙ: 860 вместо 960 (канон 1.9). Основное содержание
-   здесь — длинный текст с формулами, и на 960 строка становится слишком
-   длинной для чтения. Сужаем страницу, а не переопределяем базовый шаблон:
-   узкая полоса — свойство ЭТОГО экрана, а не кабинета целиком. */
-.page-wrap { max-width: var(--w-read); }
-/* ── Страница задачи ──────────────────────────────── */
-.problem-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 20px;
-  font-size: 14px;
-  color: var(--text2);
-}
-.problem-stars { color: var(--amber); letter-spacing: 1px; font-size: 14px; }
-.problem-source {
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  border: .5px solid var(--border);
-  border-radius: 20px;
-  padding: 3px 10px;
-}
-.problem-tags { display: flex; flex-wrap: wrap; gap: 6px; }
-.tag-pill {
-  background: var(--chip-bg);
-  color: var(--chip-text);
-  border-radius: 20px;
-  padding: 3px 10px;
-  font-size: 13px;
-  font-weight: 500;
-}
+/* ── Каркас: своя полоса под карточку справа (ADR 0070) ─────────────── */
+.pd-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 36px 20px 80px; }
+.pd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 32px; align-items: start; }
+.pd-side { position: sticky; top: 72px; }
+@media (max-width: 980px) { .pd-grid { grid-template-columns: 1fr; } .pd-side { position: static; } }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+           clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
-.problem-title {
-  font-size: 22px;
-  font-weight: 700;
-  line-height: 1.3;
-  margin-bottom: 16px;
-}
+/* ── Заголовок и действия ────────────────────────────────────────────── */
+.pd-title { font-size: 28px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; margin: 0 0 10px; }
+.pd-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+.pd-act { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 var(--font-ui);
+  padding: 7px 11px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--surface);
+  color: var(--text2); cursor: pointer; transition: border-color var(--t), color var(--t); }
+.pd-act:hover { color: var(--text); border-color: var(--accent); }
+.pd-act svg { width: 14px; height: 14px; }
+.pd-act.is-on { color: var(--amber-ink); border-color: var(--amber-border); background: var(--amber-tint); }
+.pd-act--copied { color: var(--green); border-color: var(--green-border); }
 
-/* ── Блок с текстом (KaTeX рендерится внутри) ──── */
-.math-content {
-  font-size: 16px;
-  line-height: 1.7;
-  color: var(--text);
-}
-.math-content p { margin-bottom: .75em; }
-.math-content .katex-display { margin: 1em 0; }
+/* ── Облачка свойств: два ряда, каждое — ссылка в каталог с этим фильтром.
+   Цвет — второй носитель смысла рядом со словом (правило 1.1.3). ── */
+.pp-rows { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; }
+.pp-row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.pp { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r-pill); padding: 5px 11px;
+  font: 500 13px/1.25 var(--font-ui); color: var(--text); text-decoration: none; border: 1px solid transparent;
+  background: var(--surface); transition: border-color var(--t), transform var(--t); max-width: 100%; }
+.pp:hover { border-color: var(--accent); }
+.pp:active { transform: scale(.98); }
+.pp--topic { background: color-mix(in srgb, var(--gc) 16%, var(--surface)); border-color: color-mix(in srgb, var(--gc) 45%, transparent); font-weight: 600; }
+.pp--topic::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gc); flex: none; }
+.pp--tag { border-color: color-mix(in srgb, var(--gc) 40%, transparent); }
+.pp--tag::before { content: '#'; color: color-mix(in srgb, var(--gc) 80%, var(--text)); font-weight: 700; }
+.pp--diff { background: var(--amber-tint); border-color: var(--amber-border); color: var(--amber-ink); }
+.pp--diff .st { letter-spacing: .5px; color: var(--amber); }
+.pp--char { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent-ring); }
+.pp--kind { background: var(--chip-bg); color: var(--chip-text); }
+.pp--feat { background: var(--pending-tint); color: var(--pending); border-color: transparent; }
+.pp--feat svg { width: 13px; height: 13px; }
+.pp--src { background: transparent; color: var(--text3); border-color: var(--border); font-weight: 400; }
+.pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+.pd-stat { margin: -8px 0 16px; font-size: 13px; color: var(--text3); }
 
-/* Таблицы из markdown-рендерера (content_format='markdown', см.
-   problems/rendering.py). Стиль — тот же язык, что у .stats-table и
-   .wk-table (platform/_stats_style.html): заголовок отличается весом
-   и цветом, а не заливкой; разделители только горизонтальные. Без
-   `width: 100%` — таблица условия задачи обычно на 2–3 колонки и не
-   должна растягиваться на всю ширину блока без нужды. */
-.math-content table {
-  border-collapse: collapse;
-  margin: .75em 0;
-}
-.math-content th, .math-content td {
-  padding: 8px 14px;
-  text-align: left;
-  border-bottom: 1px solid var(--border-soft);
-}
-.math-content th {
-  font-weight: 600;
-  color: var(--text2);
-  border-bottom: 1px solid var(--border);
-}
+/* ── Условие: своя поверхность, подпункты внутри, вплотную ─────────── */
+.stm { background: var(--surface-info); border-radius: 14px; padding: 22px 26px 8px; margin: 0 0 18px;
+  font-size: 17px; line-height: 1.7; }
+.stm .math-content p { margin: 0 0 .7em; }
+.stm .math-content { padding-bottom: 14px; }
+.stm .katex-display { margin: 1em 0; }
+.stm .parts { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--border-soft); }
+.stm .part { display: flex; gap: 12px; padding: 12px 0; border-top: 1px dashed var(--border); }
+.stm .part:first-child { border-top: 0; }
+.stm .part b { color: var(--accent-ink); font-weight: 700; min-width: 22px; }
+.stm .part .math-content { padding-bottom: 0; }
+/* ── Тест: играбельные варианты и разбор (этап 7, мокап E) ───────────
+   Выбранный вариант получает сплошной акцент (правило 8: акцент у
+   выбранного из равноправных). Разбор — четыре состояния из
+   student/_option_review.html: ✓ выбрал и верно, ✗ выбрал зря,
+   ○ надо было выбрать, · нейтрально. Зелёный и красный в законных
+   значениях. ── */
+.stm--q { padding-bottom: 22px; }
+.stm--q .math-content { padding-bottom: 0; font-size: 18px; font-weight: 600; line-height: 1.45; }
+.tq { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin: 0 0 18px; }
+.tq.is-shake { animation: shake .45s ease; }
+@keyframes shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .tq.is-shake { animation: none; } }
+.tq-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.tq-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.tq-rule { font-size: 13.5px; color: var(--text2); }
+.tq-try { margin-left: auto; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tq-stat { font-size: 12.5px; color: var(--text3); margin: -6px 0 12px; }
+.tq-stat b { color: var(--text2); font-weight: 600; }
+.opt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: var(--surface-2);
+  border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  font: 400 15.5px/1.5 var(--font-ui); color: var(--text); transition: border-color var(--t), background var(--t), transform var(--t); }
+.opt:hover { border-color: var(--accent-ring); }
+.opt:active { transform: scale(.995); }
+.opt:disabled { cursor: default; }
+.opt:disabled:hover { border-color: transparent; }
+.opt-l { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex;
+  align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--text2); background: var(--surface);
+  transition: background var(--t), border-color var(--t), color var(--t); margin-top: -1px; }
+.opt-t { flex: 1 1 auto; }
+.opt-t .math-content { padding: 0; }
+.opt-note { flex: none; align-self: center; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap; display: none; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.opt[aria-pressed="true"] .opt-l { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); }
+.opt.is-hit { border-color: var(--green); background: var(--green-tint); }
+.opt.is-hit .opt-l { background: var(--green); border-color: var(--green); color: var(--act-ink-solid); }
+.opt.is-hit .opt-note { display: inline; color: var(--green); }
+.opt.is-wrong { border-color: var(--error); background: var(--error-tint); }
+.opt.is-wrong .opt-l { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.opt.is-wrong .opt-note { display: inline; color: var(--error); }
+.opt.is-missed { border-color: var(--amber); border-style: dashed; background: var(--amber-tint); }
+.opt.is-missed .opt-l { border-color: var(--amber); color: var(--amber-ink); background: transparent; }
+.opt.is-missed .opt-note { display: inline; color: var(--amber-ink); }
+.opt.is-skip { opacity: .72; }
+.opt.is-skip .opt-l { color: var(--text3); }
+@media (max-width: 560px) { .opt { flex-wrap: wrap; } .opt-note { width: 100%; padding-left: 40px; } }
+.tq-msg { display: none; align-items: center; gap: 10px; border-radius: 12px; padding: 11px 14px; margin-top: 12px;
+  font-size: 14.5px; border-left: 3px solid; animation: chipIn .18s ease-out; }
+.tq-msg.is-on { display: flex; }
+.tq-msg svg { width: 18px; height: 18px; flex: none; }
+.tq-msg--wrong { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.tq-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.tq-msg--show { background: var(--amber-tint); color: var(--amber-ink); border-color: var(--amber); }
+.tq-msg b { font-weight: 700; }
+.tq-msg .cnt { margin-left: auto; font-size: 13px; opacity: .9; }
+.tq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tq-row .grow { flex: 1 1 auto; }
+.tq-why { font-size: 13px; color: var(--text3); }
+.tq-kbd { font-size: 12px; color: var(--text3); }
+.tq-kbd kbd { font: 600 11px/1 var(--font-ui); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; background: var(--surface); color: var(--text2); }
+.tq-expl { display: none; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tq-expl.is-on { display: block; animation: chipIn .18s ease-out; }
+.tq-expl .h { padding: 10px 14px; background: var(--surface-2); font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border-soft); }
+.tq-expl .b { padding: 10px 14px; font-size: 14.5px; line-height: 1.55; color: var(--text2); }
+.tq-expl .b .math-content { padding: 0; }
+
+/* Таблицы из markdown-рендерера (content_format='markdown'): заголовок
+   отличается весом и цветом, разделители только горизонтальные. */
+.math-content table { border-collapse: collapse; margin: .75em 0; }
+.math-content th, .math-content td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); }
+.math-content th { font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); }
 .math-content tbody tr:last-child td { border-bottom: none; }
 
-.problem-statement {
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 24px;
-  margin-bottom: 24px;
-}
+/* ── Карточка «Решение»: ввод + действия ────────────────────────────── */
+.sv { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 14px; margin: 0 0 18px; }
+.sv-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+.sv-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sv-head small { color: var(--text3); font-size: 13px; }
+.sv-field { border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); transition: border-color var(--t), box-shadow var(--t); }
+.sv-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); background: var(--surface); }
+.sv-field textarea { width: 100%; border: 0; background: transparent; resize: none; display: block; min-height: 118px;
+  padding: 12px 14px; font: 400 15.5px/1.55 var(--font-ui); color: var(--text); outline: none; }
+.sv-field textarea::placeholder { color: var(--text3); }
+.sv-attach { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px 14px; flex-wrap: wrap; }
+.att { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); padding: 5px 8px 5px 5px; font-size: 13px; color: var(--text2); animation: chipIn .14s ease-out; }
+.att .thumb { width: 28px; height: 28px; border-radius: 6px; background: var(--surface-2); display: inline-flex; align-items: center; justify-content: center; color: var(--text3); font-size: 11px; font-weight: 700; }
+.att .x { border: 0; background: none; color: var(--text3); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; }
+.att .x:hover { color: var(--text); }
+.att-add { display: inline-flex; align-items: center; gap: 7px; font: 500 13px/1 var(--font-ui); color: var(--text2);
+  background: none; border: 1px dashed var(--border); border-radius: 10px; padding: 9px 11px; cursor: pointer; }
+.att-add:hover { color: var(--text); border-color: var(--accent); border-style: solid; }
+.att-add:disabled { opacity: .5; cursor: default; }
+.att-add svg { width: 15px; height: 15px; }
+.sv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.sv-row .grow { flex: 1 1 auto; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--font-ui); padding: 11px 16px;
+  border-radius: 9px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: background var(--t), border-color var(--t), color var(--t); }
+.btn svg { width: 15px; height: 15px; }
+/* Главная кнопка экрана одна и она графитовая (правила 7–8 канона). */
+.btn--main { background: var(--btn-bg); color: var(--on-btn); }
+.btn--main:hover { background: var(--btn-bg-hover); }
+.btn--quiet { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn--quiet:hover { border-color: var(--accent); }
+.btn--quiet:disabled { color: var(--text3); border-color: var(--border-soft); cursor: default; }
+.btn--sm { padding: 7px 11px; font-size: 13px; }
+/* Мягкое подтверждение перед показом решения — не модалка, а замена кнопки. */
+.sv-confirm { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--text2);
+  background: var(--surface-2); border-radius: 10px; padding: 8px 8px 8px 12px; margin-top: 10px; }
+.sv-confirm.is-on { display: flex; }
 
-/* ── Подпункты ───────────────────────────────────── */
-.parts-intro {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .5px;
-  color: var(--text2);
-  margin: 4px 0 10px;
-}
-.parts-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  margin-bottom: 24px;
-}
-.part-item {
-  border: .5px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  /* Плотная подложка под тинтом — см. объяснение у .fchip в каталоге:
-     сквозь прозрачный тинт просвечивал фоновый паттерн и съедал контраст. */
-  background-color: var(--bg);
-  background-image: linear-gradient(var(--accent-tint), var(--accent-tint));
-}
-.part-header {
-  display: flex;
-  align-items: baseline;
-  gap: 10px;
-  padding: 13px 18px;
-  background: transparent;
-}
-.part-label {
-  font-weight: 700;
-  color: var(--accent-ink);
-  font-size: 14px;
-  min-width: 20px;
-}
-.part-statement.math-content { flex: 1; }
+/* ── Подсказки уровнями ─────────────────────────────────────────────── */
+.hints { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hints:empty { display: none; }
+.hint { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-tint); border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14.5px; line-height: 1.55; animation: chipIn .18s ease-out; }
+.hint .k { flex: none; font-weight: 700; color: var(--accent-ink); font-size: 12.5px; padding-top: 2px; white-space: nowrap; }
+.hint .ai { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.btn .n { font-weight: 500; color: var(--text3); }
+#hint-done[hidden] { display: none; }
 
-/* ── Кнопки «Показать» ───────────────────────────── */
-.reveal-section { margin-bottom: 16px; }
-.part-reveal-section { padding: 0 18px 14px; }
-.reveal-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 16px;
-  border: .5px solid var(--border);
-  background: var(--surface);
-  border-radius: var(--r);
-  font-size: 14px;
-  font-weight: 500;
-  color: var(--text2);
-  cursor: pointer;
-  transition: background .12s, color .12s, border-color .12s;
-}
-.reveal-btn:hover { background: var(--surface-2); color: var(--text); border-color: var(--border); }
-.reveal-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
-.reveal-content {
-  display: none;
-  margin-top: 12px;
-  padding: 16px 20px;
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: 10px;
-}
-.reveal-content.visible { display: block; }
-.reveal-label {
-  font-size: 13px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: .6px;
-  color: var(--text2);
-  margin-bottom: 8px;
-}
+/* ── Решение и ответ (раскрытие) ────────────────────────────────────── */
+.sol { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.sol.is-on { display: block; animation: chipIn .18s ease-out; }
+@keyframes chipIn { from { opacity: 0; transform: scale(.98); } }
+.sol-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border-soft); }
+.sol-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.sol-ans { margin-left: auto; font-size: 14px; color: var(--text2); }
+.sol-ans b { color: var(--text); font-variant-numeric: tabular-nums; }
+.sol-body { padding: 14px 16px 6px; font-size: 15px; line-height: 1.65; }
+.sol-body .math-content p { margin: 0 0 8px; }
+.sol-body .parts { list-style: none; margin: 0; padding: 0; }
+.sol-body .part { display: flex; gap: 10px; padding: 6px 0; border-top: 1px dashed var(--border); }
+.sol-body .part:first-child { border-top: 0; }
+.sol-body .part b { color: var(--accent-ink); min-width: 22px; }
 
-/* ── Блок «Похожие задачи» ───────────────────────── */
-.similar-block {
-  margin-top: 40px;
-  padding-top: 24px;
-  border-top: .5px solid var(--border);
-}
-.similar-block h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin-bottom: 14px;
-}
-.similar-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.similar-card {
-  display: block;
-  padding: 12px 16px;
-  background: var(--surface);
-  border: .5px solid var(--border);
-  border-radius: var(--r);
-  text-decoration: none;
-  color: var(--text);
-  transition: border-color .12s, background .12s;
-}
-.similar-card:hover {
-  border-color: var(--accent);
-  background: var(--accent-tint);
-}
-.similar-card-title {
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 5px;
-  color: var(--text);
-  line-height: 1.4;
-}
-.similar-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-.similar-stars { color: var(--amber); font-size: 13px; letter-spacing: 1px; }
-.similar-topic {
-  font-size: 13px;
-  color: var(--chip-text);
-  background: var(--chip-bg);
-  border-radius: 20px;
-  padding: 2px 8px;
-  font-weight: 500;
-}
+/* ── Результат проверки ИИ: полоса слева, значок и слово; панель не
+   заливается (правило 9); балл табличными цифрами; итог предварительный. ── */
+.sv-limit { font-size: 12.5px; color: var(--text3); margin: 0; }
+.sv-limit b { font-weight: 600; color: var(--text2); }
+#sv-note { margin-top: 8px; color: var(--amber-ink); }
+#sv-note[hidden] { display: none; }
+.btn--main:disabled { opacity: .5; cursor: default; }
+.chk { display: none; border: 1px solid var(--border); border-left-width: 4px; border-radius: 12px; background: var(--surface);
+  margin: 0 0 18px; overflow: hidden; }
+.chk.is-on { display: block; animation: chipIn .2s ease-out; }
+.chk[hidden] { display: none; }
+.chk--ok { border-left-color: var(--green); } .chk--part { border-left-color: var(--amber); }
+.chk--bad { border-left-color: var(--error); } .chk--wait { border-left-color: var(--pending); }
+.chk-head { display: flex; align-items: center; gap: 16px; padding: 16px 18px 12px; }
+.chk-score { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.chk-score small { font-size: 15px; font-weight: 500; color: var(--text3); }
+.chk-verdict { font-weight: 600; font-size: 16px; }
+.chk--ok .chk-verdict { color: var(--green); } .chk--part .chk-verdict { color: var(--amber-ink); }
+.chk--bad .chk-verdict { color: var(--error); } .chk--wait .chk-verdict { color: var(--pending); }
+.chk-sub { font-size: 13.5px; color: var(--text2); margin-top: 2px; }
+.chk-steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-soft); }
+.chk-step { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 10px 18px; border-top: 1px solid var(--border-soft); font-size: 14.5px; line-height: 1.5; }
+.chk-step:first-child { border-top: 0; }
+.chk-mark { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; margin-top: 1px; }
+.chk-mark.ok { background: var(--green-tint); color: var(--green); }
+.chk-mark.bad { background: var(--error-tint); color: var(--error); }
+.chk-mark.part { background: var(--amber-tint); color: var(--amber-ink); }
+.chk-mark.na { background: var(--chip-bg); color: var(--text3); }
+.chk-step-t { font-weight: 600; }
+.chk-step-c { color: var(--text2); }
+.chk-step.is-first { background: var(--error-tint); }
+.chk-flag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--error); margin-left: 8px; letter-spacing: .02em; }
+.chk-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 18px 14px; border-top: 1px solid var(--border-soft); background: var(--surface-2); }
+.chk-conf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.chk-conf .bars { display: inline-flex; gap: 2px; }
+.chk-conf .bars i { width: 14px; height: 6px; border-radius: 2px; background: var(--border); }
+.chk-conf .bars i.on { background: var(--accent); }
+.chk-note { font-size: 12.5px; color: var(--text3); flex: 1 1 100%; }
+.chk-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.chk-ocr { padding: 0 18px 12px; }
+.chk-ocr details { font-size: 13px; color: var(--text2); }
+.chk-ocr summary { cursor: pointer; color: var(--accent-ink); }
+.chk-ocr blockquote { margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--border); font-size: 13.5px; line-height: 1.5; }
+.chk-busy { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.chk-busy .line { display: flex; gap: 10px; align-items: center; font-size: 14.5px; }
+.chk-busy .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: askSpin .8s linear infinite; }
+@keyframes askSpin { to { transform: rotate(360deg); } }
+.chk-busy .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.chk-busy .bar i { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 3px; animation: barRun 1.6s ease-in-out infinite; }
+@keyframes barRun { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+.chk-busy small { color: var(--text3); font-size: 13px; }
+
+/* ── Чат: пузыри, «печатает», подсказки-вопросы, кнопка отправки ── */
+.ai-sug { display: flex; flex-direction: column; gap: 6px; }
+.ai-sug button { text-align: left; font: 500 13px/1.35 var(--font-ui); color: var(--text); background: var(--surface-2); border: 1px solid transparent;
+  border-radius: 10px; padding: 8px 11px; cursor: pointer; }
+.ai-sug button:hover { border-color: var(--accent); }
+.ai-msg { max-width: 92%; font-size: 14px; line-height: 1.5; padding: 9px 12px; border-radius: 12px; animation: chipIn .16s ease-out; white-space: pre-wrap; }
+.ai-msg--me { align-self: flex-end; background: var(--btn-bg); color: var(--on-btn); border-bottom-right-radius: 4px; }
+.ai-msg--ai { align-self: flex-start; background: var(--accent-tint); border-bottom-left-radius: 4px; }
+.ai-msg--ai .typing { display: inline-flex; gap: 3px; } .ai-msg--ai .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+.ai-msg--ai .typing i:nth-child(2) { animation-delay: .2s; } .ai-msg--ai .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.ai-send { width: 32px; height: 32px; border-radius: var(--r-pill); border: 0; background: var(--surface); color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: background var(--t), color var(--t); }
+.ai-send svg { width: 16px; height: 16px; }
+.ai-in.has-text .ai-send { background: var(--accent); color: var(--act-ink-solid); }
+
+/* ── Похожие задачи ─────────────────────────────────────────────────── */
+.sim { margin-top: 30px; }
+.sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.sim-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sim-head a { font-size: 13px; color: var(--accent-ink); }
+.sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .sim-grid { grid-template-columns: 1fr; } }
+.sim-card { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 12px 14px; text-decoration: none; color: var(--text); transition: border-color var(--t); }
+.sim-card:hover { border-color: var(--accent); }
+.sim-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tchip { font-size: 12px; border-radius: var(--r-pill); padding: 3px 9px 3px 7px; display: inline-flex; gap: 6px; align-items: center;
+  background: color-mix(in srgb, var(--gc) 14%, var(--surface)); color: var(--text); }
+.tchip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--gc); }
+.sim-title { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.sim-prev { font-size: 13px; color: var(--text2); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sim-meta { display: flex; gap: 8px; font-size: 12px; margin-top: auto; }
+.ct-stars { color: var(--amber); letter-spacing: .5px; } .ct-sol { color: var(--green); } .ct-kind { color: var(--text3); }
+
+/* ── Карточка ИИ-чата (справа, всегда видна) ────────────────────────── */
+.ai { background: var(--surface); border: 1.5px solid var(--accent-ring); border-radius: 16px; display: flex; flex-direction: column;
+  max-height: calc(100vh - 96px); overflow: hidden; }
+.ai-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border-soft); }
+.ai-head .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--act-ink-solid); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ai-head .ic svg { width: 16px; height: 16px; }
+.ai-head h2 { margin: 0; font-size: 15.5px; font-weight: 600; }
+.ai-head small { display: block; font-size: 12px; color: var(--text3); }
+.ai-body { padding: 14px 16px; overflow: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; }
+.ai-intro { font-size: 13.5px; color: var(--text2); line-height: 1.5; margin: 0; }
+.ai-foot { padding: 10px 12px 12px; border-top: 1px solid var(--border-soft); }
+.ai-in { display: flex; align-items: flex-end; gap: 6px; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 6px 6px 12px; transition: border-color var(--t), box-shadow var(--t); }
+.ai-in:focus-within { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-ring); }
+.ai-in textarea { flex: 1 1 auto; border: 0; background: transparent; resize: none; font: 400 14px/1.45 var(--font-ui); color: var(--text); outline: none; min-height: 24px; max-height: 120px; padding: 6px 0; }
+.ai-in textarea::placeholder { color: var(--text3); }
+.ai-note { font-size: 11.5px; color: var(--text3); margin: 8px 2px 0; line-height: 1.4; }
+
+{% include "catalog/_catalog_actions_css.html" %}
 {% endblock %}
 
 {% block content %}
-<!-- Заголовок и мета -->
-<h1 class="problem-title">
-  {% if problem.title %}{{ problem.title }}{% else %}Задача #{{ problem.pk }}{% endif %}
-</h1>
+<div class="pd-grid">
+<article class="pd-main">
 
-{% if user.is_authenticated %}
-{% comment %}
-Кнопка «Сохранить к себе» — маленькая и ненавязчивая, работает без
-перезагрузки. Акцентом её делать нельзя: это мелочь на странице задачи.
-{% endcomment %}
-<button type="button" id="save-problem-btn" data-problem="{{ problem.pk }}"
-        style="border:0.5px solid var(--border);border-radius:var(--r);
-               background:transparent;color:var(--text2);font:inherit;
-               font-size:13px;padding:4px 10px;cursor:pointer;
-               margin-bottom:12px;">
-  <span id="save-problem-label">☆ Сохранить</span>
-</button>
-{% endif %}
+  {% comment %}
+  Заголовок показывается, только если это НАЗВАНИЕ; обрезок условия уходит в
+  скрытый h1 «Задача: <первая тема>» — страница начинается с действий.
+  {% endcomment %}
+  {% if show_title %}<h1 class="pd-title">{{ problem.title }}</h1>{% else %}<h1 class="sr-only">{{ heading }}</h1>{% endif %}
 
-<div class="problem-meta">
-  {% if problem.difficulty %}
-  <span class="problem-stars" title="Сложность {{ problem.difficulty }} из 5">
-    {% for i in difficulty_stars %}★{% endfor %}{% for i in difficulty_empty %}☆{% endfor %}
-  </span>
-  {% endif %}
-  {% for ref in sources %}
-  <span class="problem-source">{{ ref.source.name }}</span>
-  {% endfor %}
-  {% if problem.problem_type %}
-  <span class="problem-source">{{ problem.problem_type }}</span>
-  {% endif %}
-  {% comment %}Живая статистика из игры Wecon Rush. Показывается только когда попыток
-     набралось достаточно (порог в game/config.py) — иначе процент был бы
-     шумом. Задача не попала в игровой пул, значит строки просто нет.{% endcomment %}
-  {% if game_stat %}
-  <span class="problem-source" title="Доля верных ответов среди первых встреч игроков с этим вопросом">
-    В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)
-  </span>
-  {% endif %}
-</div>
-
-{% if topics %}
-<div class="problem-tags" style="margin-bottom: 24px;">
-  {% for topic in topics %}
-  <span class="tag-pill">{{ topic.name }}</span>
-  {% endfor %}
-  {% for tag in tags %}
-  <span class="tag-pill" style="background:var(--chip-bg); color:var(--chip-text);">{{ tag.name }}</span>
-  {% endfor %}
-</div>
-{% endif %}
-
-<!-- Условие задачи -->
-<div class="problem-statement">
-  <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.statement|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.statement|linebreaksbr }}{% endif %}</div>
-</div>
-
-<!-- Подпункты -->
-{% if parts %}
-{% if problem.problem_type == 'тест: один ответ' or problem.problem_type == 'тест: все верные' or problem.problem_type == 'тест: верно/неверно' %}
-<div class="parts-intro">Варианты ответов</div>
-{% else %}
-<div class="parts-intro">Подпункты</div>
-{% endif %}
-<div class="parts-list">
-  {% for part in parts %}
-  <div class="part-item">
-    <div class="part-header">
-      <span class="part-label">{{ part.label|partlabel }}</span>
-      {% if part.statement %}
-      <div class="part-statement math-content">{% if problem.content_format == 'markdown' %}{{ part.statement|render_markdown|render_figures:problem|safe }}{% else %}{{ part.statement|linebreaksbr }}{% endif %}</div>
-      {% endif %}
-    </div>
-    {% if part.answer %}
-    <div class="part-reveal-section">
-      <button class="reveal-btn" onclick="toggleReveal('part-answer-{{ part.pk }}', this)">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-          <circle cx="8" cy="8" r="6.5"/>
-          <path d="M8 7v4M8 5.5v.5"/>
-        </svg>
-        Показать ответ
-      </button>
-      <div id="part-answer-{{ part.pk }}" class="reveal-content">
-        <div class="reveal-label">Ответ</div>
-        <div class="math-content">{% if problem.content_format == 'markdown' %}{{ part.answer|render_markdown|render_figures:problem|safe }}{% else %}{{ part.answer|linebreaksbr }}{% endif %}</div>
-      </div>
+  <div class="pd-acts">
+    {% if user.is_authenticated %}
+    <button class="pd-act{% if saved %} is-on{% endif %}" type="button" id="save-btn" data-problem="{{ problem.pk }}"
+            data-url="{% url 'api_save_problem' %}">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg>
+      <span id="save-label">{% if saved %}Сохранено{% else %}Сохранить{% endif %}</span>
+    </button>
+    {% endif %}
+    <button class="pd-act" type="button" id="copy-btn">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1"/></svg>
+      <span id="copy-label">Скопировать ссылку</span>
+    </button>
+    {% if user.is_authenticated and user.role == 'teacher' %}
+    <div class="ca-hw-wrap" id="hw-wrap-{{ problem.pk }}">
+      <button class="pd-act" type="button" id="hw-btn-{{ problem.pk }}"
+              onclick="toggleHwDropdown({{ problem.pk }}, event)">+ В домашку ▾</button>
+      <div class="ca-dropdown" id="hw-dd-{{ problem.pk }}"></div>
     </div>
     {% endif %}
   </div>
-  {% endfor %}
-</div>
-{% endif %}
 
-<!-- Кнопка «Показать ответ» — только если нет per-part ответов -->
-{% if problem.answer and not has_part_answers %}
-<div class="reveal-section">
-  <button class="reveal-btn" onclick="toggleReveal('answer-block', this)">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <circle cx="8" cy="8" r="6.5"/>
-      <path d="M8 7v4M8 5.5v.5"/>
-    </svg>
-    Показать ответ
-  </button>
-  <div id="answer-block" class="reveal-content">
-    <div class="reveal-label">Ответ</div>
-    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.answer|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.answer|linebreaksbr }}{% endif %}</div>
+  {% if clouds_1 or clouds_2 %}
+  <div class="pp-rows" aria-label="Свойства задачи">
+    {% if clouds_1 %}
+    <div class="pp-row">
+      {% for c in clouds_1 %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endfor %}
+    </div>
+    {% endif %}
+    {% if clouds_2 %}
+    <div class="pp-row">
+      {% for c in clouds_2 %}{% if c.kind == 'sep' %}<span class="pp-sep" aria-hidden="true"></span>{% else %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}">{% if c.stars %}<span class="st">{{ c.stars }}</span> {% endif %}{% if c.kind == 'feat' %}<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 13V3M2 13h12M4 10l3-4 3 2 3-5"/></svg>{% endif %}{{ c.label }}</a>{% endif %}{% endfor %}
+    </div>
+    {% endif %}
   </div>
-</div>
-{% endif %}
+  {% endif %}
 
-<!-- Кнопка «Показать решение» (скрыта, если решение помечено шлюзом) -->
-{% if problem.solution and not problem.solution_needs_review %}
-<div class="reveal-section">
-  <button class="reveal-btn" onclick="toggleReveal('solution-block', this)">
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
-      <path d="M2 4h12M2 8h8M2 12h10"/>
-    </svg>
-    Показать решение
-  </button>
-  <div id="solution-block" class="reveal-content">
-    <div class="reveal-label">Решение</div>
-    <div class="math-content">{% if problem.content_format == 'markdown' %}{{ problem.solution|render_markdown|render_figures:problem|safe }}{% else %}{{ problem.solution|linebreaksbr }}{% endif %}</div>
-  </div>
-</div>
-{% endif %}
+  {% comment %}
+  Живая статистика из игры Wecon Rush — только когда попыток набралось
+  достаточно (порог в game/config.py), иначе процент был бы шумом. Задача не
+  попала в игровой пул — строки просто нет. Этап 7 переносит её в блок теста.
+  {% endcomment %}
+  {% if game_stat and not test %}
+  <p class="pd-stat" title="Доля верных ответов среди первых встреч игроков с этим вопросом">В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)</p>
+  {% endif %}
 
-<!-- Похожие задачи -->
-{% if similar %}
-<div class="similar-block">
-  <h2>Похожие задачи</h2>
-  <div class="similar-list">
-    {% for s in similar %}
-    <a class="similar-card" href="{% url 'catalog:problem_detail' s.problem.pk %}">
-      {% comment %}Заголовок готовит вью (`similar_title`): пустой заменяется
-      началом условия, обрывок формулы обрезается по незакрытому доллару.
-      Формулы внутри остаются: их отрисует KaTeX вместе со всей страницей.
+  {% if test %}
+  {% comment %}
+  Играбельный тест: вопрос в карточке условия, варианты — плитками в блоке
+  игры ниже. Карточки свободного решения и кнопки «Показать решение» нет:
+  ответ открывает «Показать ответ», решение живёт в «Почему так».
+  {% endcomment %}
+  <section class="stm stm--q" aria-label="Условие">
+    <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
+  </section>
+  {% include "catalog/_problem_test.html" %}
+  {% else %}
+  <section class="stm" aria-label="Условие">
+    <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
+    {% if parts %}
+      {% comment %}
+      Подпункты; у теста без игры (нет вариантов или верные метки вне
+      вариантов) — тоже подпунктами: он показывается как обычная задача.
+      {% endcomment %}
+      <ol class="parts">
+        {% for part in parts %}<li class="part"><b>{{ part.label|partlabel }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span></li>{% endfor %}
+      </ol>
+    {% endif %}
+  </section>
 
-      ⚠️ Здесь тег комментария, а не многострочная решётка: вторая
-      печатается на экран как текст. Ловит `test_no_multiline_hash_comments`.{% endcomment %}
-      <div class="similar-card-title">{{ s.title_display }}</div>
-      <div class="similar-card-meta">
-        {% if s.problem.difficulty %}
-        <span class="similar-stars">
-          {% for i in s.difficulty_stars %}★{% endfor %}{% for i in s.difficulty_empty %}☆{% endfor %}
-        </span>
-        {% endif %}
-        {% for topic in s.topics %}
-        <span class="similar-topic">{{ topic.name }}</span>
-        {% endfor %}
+  {% if ai_available or hint_total or sol.has_any %}
+  {% comment %}
+  Карточка «Решение» живёт по правилу нуля: поле ввода только при
+  доступной модели (иначе писать некуда), подсказки только при подсказках,
+  кнопка решения только при решении или ответе. Нет ничего — нет карточки.
+  {% endcomment %}
+  <section class="sv" id="sv" aria-label="Решение">
+    <div class="sv-head"><h2>Решение</h2>{% if parts and not is_test %}<small>одно на всю задачу, подпункты внутри</small>{% endif %}</div>
+    {% if ai_available %}
+    <div class="sv-field">
+      <textarea id="sv-text" placeholder="Запишите ход решения и ответы по пунктам. Можно кратко: главное, идея каждого шага.{% if ai_available and user.is_authenticated %} Или приложите фото тетради.{% endif %}"></textarea>
+      {% if ai_available and user.is_authenticated %}
+      {% comment %}
+      Фото или файл к попытке: jpg/png/webp/pdf до 10 МБ, не больше трёх.
+      Загружается сразу, к попытке привязывается при отправке; текст с фото
+      распознаёт модель и проверка идёт по тексту и распознанному.
+      {% endcomment %}
+      <div class="sv-attach" id="sv-attach">
+        <input type="file" id="att-input" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
+        <button class="att-add" type="button" id="att-add">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 7.5l-5.6 5.6a3.5 3.5 0 0 1-5-5L9 2a2.3 2.3 0 0 1 3.3 3.3L6.6 11a1.1 1.1 0 0 1-1.6-1.6L10 4.5"/></svg>
+          Фото или файл
+        </button>
       </div>
-    </a>
-    {% endfor %}
-  </div>
+      {% endif %}
+    </div>
+    {% endif %}
+    <div class="sv-row">
+      {% if ai_available %}
+        {% if user.is_authenticated %}
+        <button class="btn btn--main" type="button" id="sv-submit">
+          <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 8.5l3.5 3.5 7.5-8"/></svg>
+          Отправить на проверку
+        </button>
+        <span class="sv-limit">проверяет ИИ · осталось сегодня <b id="sv-remaining">{{ remaining }}</b></span>
+        {% else %}
+        <a class="btn btn--main" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы отправить на проверку</a>
+        {% endif %}
+      {% endif %}
+      <span class="grow"></span>
+      {% if hint_total %}
+      <button class="btn btn--quiet" type="button" id="hint-btn">💡 Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
+      {% endif %}
+      {% if sol.has_any %}
+      <button class="btn btn--quiet" type="button" id="sol-btn">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h10"/></svg>
+        Показать решение
+      </button>
+      {% endif %}
+    </div>
+    <p class="sv-limit" id="sv-note" hidden></p>
+    {% if hint_total %}
+    <p class="sv-limit" id="hint-done" hidden>Это была последняя подсказка</p>
+    <div class="hints" id="hints" aria-live="polite"></div>
+    {% endif %}
+    {% if sol.has_any %}
+    <div class="sv-confirm" id="sol-confirm">
+      Открыть решение до отправки? Тогда проверка этой попытки не пойдёт в вашу статистику.
+      <button class="btn btn--main btn--sm" type="button" id="sol-yes">Открыть</button>
+      <button class="btn btn--quiet btn--sm" type="button" id="sol-no">Ещё подумаю</button>
+    </div>
+    <div class="sol" id="sol">
+      <div class="sol-head">
+        <h3>{% if sol.solution %}Решение{% else %}Ответ{% endif %}</h3>
+        {% if sol.answer %}<span class="sol-ans">Ответ: <b class="math-content">{% include "catalog/_math_text.html" with text=sol.answer %}</b></span>{% endif %}
+      </div>
+      {% if sol.solution or sol.parts %}
+      <div class="sol-body">
+        {% if sol.solution %}<div class="math-content">{% include "catalog/_math_text.html" with text=sol.solution %}</div>{% endif %}
+        {% if sol.parts %}
+        <ol class="parts">
+          {% for row in sol.parts %}<li class="part"><b>{{ row.label|partlabel }}</b><span class="math-content">{% if row.answer %}<span>Ответ: {% include "catalog/_math_text.html" with text=row.answer %}</span>{% endif %}{% if row.solution %}{% if row.answer %}<br>{% endif %}{% include "catalog/_math_text.html" with text=row.solution %}{% endif %}</span></li>{% endfor %}
+        </ol>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+  {% endif %}
+  {% endif %}
+
+  {% if ai_available and user.is_authenticated and not test %}
+  {% comment %}
+  Идёт проверка: спиннер и полоса, «обычно 10–20 секунд». Результат
+  приходит готовой разметкой (`_attempt_result.html`) — тем же партиалом,
+  которым показана последняя попытка при загрузке.
+  {% endcomment %}
+  <section class="chk chk--wait is-on" id="chk-busy" aria-live="polite" hidden>
+    <div class="chk-busy">
+      <div class="line"><span class="spin" aria-hidden="true"></span>Проверяю решение: обычно 10–20 секунд</div>
+      <div class="bar" aria-hidden="true"><i></i></div>
+      <small>Сверяю с эталоном по шагам. Можно пока перечитать условие.</small>
+    </div>
+  </section>
+  <div id="chk-holder">{% if last_attempt %}{% include "catalog/_attempt_result.html" with attempt=last_attempt chk=last_chk %}{% endif %}</div>
+  {% endif %}
+
+  {% if similar %}
+  <section class="sim" id="sim" aria-label="Похожие задачи">
+    <div class="sim-head"><h2>Похожие задачи</h2><a href="{{ similar_url }}">Все похожие в каталоге</a></div>
+    <div class="sim-grid">
+      {% for s in similar %}
+      <a class="sim-card" href="{% url 'catalog:problem_detail' s.problem.pk %}">
+        {% if s.topic %}<div class="sim-line"><span class="tchip" style="--gc: var(--map-g-{{ s.topic.section }})">{{ s.topic.name }}</span></div>{% endif %}
+        {% comment %}Заголовок готовит вью (`similar_title` внутри `_similar_cards`):
+        пустой или обрезок условия заменяется началом условия, обрывок формулы
+        обрезается по незакрытому доллару. Формулы внутри остаются: их отрисует
+        KaTeX вместе со всей страницей. Здесь тег комментария, а не многострочная
+        решётка — вторая печатается на экран как текст (ловит
+        `test_no_multiline_hash_comments`).{% endcomment %}
+        <div class="sim-title">{{ s.title_display }}</div>
+        <div class="sim-prev">{{ s.preview }}</div>
+        <div class="sim-meta">{% if s.stars %}<span class="ct-stars">{{ s.stars }}</span>{% endif %}{% if s.has_solution %}<span class="ct-sol">решение ✓</span>{% else %}<span class="ct-kind">без решения</span>{% endif %}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</article>
+
+<aside class="pd-side">
+  {% comment %}
+  Карточка чата — только при доступной модели (правило нуля: без ключа её
+  нет вовсе). Три подсказки-вопроса — тексты интерфейса, одни на любую
+  задачу. Анониму вместо поля — ссылка на вход: чат только для вошедших.
+  {% endcomment %}
+  {% if ai_available %}
+  <section class="ai" aria-label="Чат с ИИ по этой задаче">
+    <div class="ai-head">
+      <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg></span>
+      <div><h2>Спросить ИИ</h2><small>помощник по этой задаче</small></div>
+    </div>
+    <div class="ai-body" id="ai-body">
+      <p class="ai-intro">Объясню термин, проверю идею, подскажу, куда смотреть. Готовое решение не выдам: задача остаётся вашей.</p>
+      {% if user.is_authenticated %}
+      <div class="ai-sug" id="ai-sug">
+        <button type="button" data-q="Объясни условие проще">Объясни условие проще</button>
+        <button type="button" data-q="С чего начать?">С чего начать?</button>
+        <button type="button" data-q="Проверь мою идею">Проверь мою идею</button>
+      </div>
+      {% endif %}
+    </div>
+    <div class="ai-foot">
+      {% if user.is_authenticated %}
+      <div class="ai-in" id="ai-in">
+        <textarea id="ai-text" rows="1" placeholder="Напишите вопрос по задаче…" aria-label="Вопрос ИИ"></textarea>
+        <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">
+          <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg>
+        </button>
+      </div>
+      {% else %}
+      <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
+      {% endif %}
+      <p class="ai-note">ИИ видит условие и ваше решение. Данные профиля ему не передаются.</p>
+    </div>
+  </section>
+  {% endif %}
+</aside>
 </div>
-{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+{% load static %}
+{% comment %}
+Скрипт проверки и чата ищет свои узлы и конфиг; без ключа ИИ на странице нет
+ни кнопки, ни адресов эндпоинтов — скрипт молчит.
+{% endcomment %}
+<script type="application/json" id="pd-config">{{ pd_config|script_json|safe }}</script>
+<script defer src="{% static 'catalog/js/problem_page.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function toggleReveal(id, btn) {
-  var block = document.getElementById(id);
-  var isVisible = block.classList.toggle('visible');
-  var svg = btn.querySelector('svg');
-  if (isVisible) {
-    btn.style.color = 'var(--accent)';
-    btn.style.borderColor = 'var(--accent)';
-    // Перерендерить KaTeX внутри только что раскрытого блока
-    maskEscapedDollars(block);
-    if (typeof renderMathInElement !== 'undefined') {
-      renderMathInElement(block, {
-        delimiters: [
-          // ВАЖНО: $$ раньше $ (см. base.html)
-          { left: '$$',   right: '$$',   display: true  },
-          { left: '$',    right: '$',    display: false },
-          { left: '\\[',  right: '\\]',  display: true  },
-          { left: '\\(',  right: '\\)',  display: false }
-        ],
-        throwOnError: false,
-        trust: false
-      });
-    }
-    // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
-    fixCurrencyDollars(block);
-  } else {
-    btn.style.color = '';
-    btn.style.borderColor = '';
-  }
-}
-</script>
-
-{% if user.is_authenticated %}
-<script>
-// Сохранить задачу к себе. Переключатель: повторное нажатие убирает.
 (function () {
-  var btn = document.getElementById('save-problem-btn');
-  if (!btn) { return; }
-  var label = document.getElementById('save-problem-label');
-  var csrf = document.cookie.match(/csrftoken=([^;]+)/);
-  btn.addEventListener('click', function () {
-    btn.disabled = true;
-    fetch("{% url 'api_save_problem' %}", {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json',
-                 'X-CSRFToken': csrf ? csrf[1] : '' },
-      body: JSON.stringify({ catalog_problem_id: btn.dataset.problem })
-    })
-      .then(function (r) { return r.json(); })
-      .then(function (d) {
-        label.textContent = d.saved ? '★ Сохранено' : '☆ Сохранить';
+  'use strict';
+  var $ = function (id) { return document.getElementById(id); };
+
+  /* ── Сохранить: существующий api_save_problem, переключатель ────────── */
+  var save = $('save-btn');
+  if (save) {
+    var csrf = document.cookie.match(/csrftoken=([^;]+)/);
+    save.addEventListener('click', function () {
+      save.disabled = true;
+      fetch(save.dataset.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf ? csrf[1] : '' },
+        body: JSON.stringify({ catalog_problem_id: save.dataset.problem })
       })
-      .catch(function () { label.textContent = 'Не получилось'; })
-      .then(function () { btn.disabled = false; });
-  });
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          save.classList.toggle('is-on', !!d.saved);
+          $('save-label').textContent = d.saved ? 'Сохранено' : 'Сохранить';
+        })
+        .catch(function () { $('save-label').textContent = 'Не получилось'; })
+        .then(function () { save.disabled = false; });
+    });
+  }
+
+  /* ── Скопировать ссылку: подпись на 1,6 с ───────────────────────────── */
+  var copy = $('copy-btn');
+  if (copy) {
+    copy.addEventListener('click', function () {
+      var done = function () {
+        copy.classList.add('pd-act--copied');
+        $('copy-label').textContent = 'Ссылка скопирована';
+        setTimeout(function () { copy.classList.remove('pd-act--copied'); $('copy-label').textContent = 'Скопировать ссылку'; }, 1600);
+      };
+      if (navigator.clipboard) { navigator.clipboard.writeText(location.href).then(done, done); } else { done(); }
+    });
+  }
+
+  /* ── Показать решение: до отправки — мягкое подтверждение ───────────── */
+  var solBtn = $('sol-btn'), sol = $('sol'), confirmBox = $('sol-confirm');
+  if (solBtn && sol) {
+    /* Флаг «решение открыли до отправки» читает проверка попытки (этап 5). */
+    window.solutionViewedBefore = false;
+    var submitted = false;
+    var reveal = function () {
+      sol.classList.add('is-on');
+      solBtn.disabled = true;
+      solBtn.textContent = 'Решение открыто';
+      if (confirmBox) { confirmBox.classList.remove('is-on'); }
+      if (!submitted) { window.solutionViewedBefore = true; }
+      /* Формулы в раскрытом блоке — тем же конвейером, что у страницы:
+         маскировка «\$» до KaTeX, «$$» раньше «$», чистка эскейпов после. */
+      var block = sol;
+      if (typeof maskEscapedDollars === 'function') { maskEscapedDollars(block); }
+      if (typeof renderMathInElement !== 'undefined') {
+        renderMathInElement(block, { delimiters: [
+          { left: '$$', right: '$$', display: true }, { left: '$', right: '$', display: false },
+          { left: '\\[', right: '\\]', display: true }, { left: '\\(', right: '\\)', display: false }
+        ], throwOnError: false, trust: false });
+      }
+      if (typeof fixCurrencyDollars === 'function') { fixCurrencyDollars(block); }
+    };
+    solBtn.addEventListener('click', function () {
+      if (submitted || !confirmBox) { reveal(); } else { confirmBox.classList.add('is-on'); }
+    });
+    if ($('sol-yes')) { $('sol-yes').addEventListener('click', reveal); }
+    if ($('sol-no')) { $('sol-no').addEventListener('click', function () { confirmBox.classList.remove('is-on'); }); }
+  }
 })();
 </script>
-{% endif %}
-
+{% if user.is_authenticated and user.role == 'teacher' %}{% include "catalog/_hw_dropdown_js.html" %}{% endif %}
 {% endblock %}

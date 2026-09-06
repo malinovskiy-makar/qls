@@ -31,6 +31,8 @@ CACHE_WRITE_MULTIPLIER = Decimal('1.25')
 CACHE_READ_MULTIPLIER = Decimal('0.1')
 
 DEFAULT_DAILY_LIMIT = 30
+# Потолок одного вызова, секунд. Вечный спиннер хуже любой ошибки (ADR 0071).
+DEFAULT_TIMEOUT_SECONDS = 25
 DEFAULT_CACHE_SECONDS = 900
 DEFAULT_MAX_TOKENS = 2000
 
@@ -110,6 +112,17 @@ def daily_limit():
     return _setting('AI_GENERATOR_DAILY_LIMIT', DEFAULT_DAILY_LIMIT)
 
 
+def remaining_today(user):
+    """Сколько обращений осталось сегодня — для строки «осталось сегодня N»."""
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return 0
+    return max(0, daily_limit() - used_today(user))
+
+
+def timeout_seconds():
+    return _setting('AI_TIMEOUT_SECONDS', DEFAULT_TIMEOUT_SECONDS)
+
+
 def _cache_key(profile, model, user_text):
     """Ключ НАШЕГО кэша ответов — не путать с кэшем префикса у поставщика.
 
@@ -121,12 +134,21 @@ def _cache_key(profile, model, user_text):
 
 
 def run(profile, user_text, schema, user, max_tokens=None,
-        cache_seconds=None, check_limit=True):
+        cache_seconds=None, check_limit=True, timeout=None, images=None):
     """Выполнить задачу `profile` и вернуть разобранную структуру.
 
     `user_text` — ВСЁ переменное: описание, параметры, подсказки из банка.
     В системную часть ничего переменного не попадает никогда (см.
     `prompts.py`), иначе кэш префикса перестаёт срабатывать.
+
+    `timeout` — потолок одного вызова в секундах (по умолчанию
+    `AI_TIMEOUT_SECONDS`): превышение — `AiUnavailable('other')` с
+    человеческим текстом, а не вечное ожидание.
+
+    `images` — список `{media_type, data}` (base64) для распознавания
+    текста с фото: файл уходит поставщику блоком рядом с текстом. Кэш
+    ответов ключ по картинке не считает — вызывающий кладёт хеш файла в
+    `user_text` (`catalog/attachments.py`).
     """
     provider = _provider()
     if not provider.is_available():
@@ -154,7 +176,8 @@ def run(profile, user_text, schema, user, max_tokens=None,
     try:
         reply = provider.complete(
             blocks, user_text, schema, model,
-            max_tokens or _setting('AI_MAX_TOKENS', DEFAULT_MAX_TOKENS))
+            max_tokens or _setting('AI_MAX_TOKENS', DEFAULT_MAX_TOKENS),
+            timeout=timeout or timeout_seconds(), images=images or None)
     except providers.ProviderError as error:
         _log(user, profile, provider.name, model, None,
              time.monotonic() - started, ok=False, note=str(error)[:290])

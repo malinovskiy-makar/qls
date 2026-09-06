@@ -16,6 +16,19 @@ urlpatterns = [
     path('api/problem/<int:pk>/',               views.catalog_api_problem, name='api_problem'),
     # Подсказки тегов для поля фильтра: тегов 552, списком их не показать.
     path('api/tags/',                           views.api_tags,           name='api_tags'),
+    # Живое состояние фильтров: числа по вариантам, чипы и список одним
+    # ответом — окно «Все фильтры» обновляет выдачу, не закрываясь.
+    path('api/filter-state/',                   views.api_filter_state,   name='api_filter_state'),
+    # Попытка решения на странице задачи → проверка ИИ (только вход, ADR 0071).
+    path('api/attempt/',                        views.api_attempt,        name='api_attempt'),
+    path('api/attempt-file/',                   views.api_attempt_file,   name='api_attempt_file'),
+    # Чат по задаче — одна реплика, история на клиенте (ADR 0072).
+    path('api/chat/',                           views.api_chat,           name='api_chat'),
+    # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
+    path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
+    # Тест как игра (этап 7): всё-или-ничего, попытки в сессии.
+    path('api/test-check/<int:problem_id>/',    views.api_test_check,     name='api_test_check'),
+    path('api/test-reveal/<int:problem_id>/',   views.api_test_reveal,    name='api_test_reveal'),
 
     # ⚠️ ОТДЕЛЬНОГО ЭКРАНА УМНОГО ПОИСКА БОЛЬШЕ НЕТ (решение владельца
     # 01.09.2026): он слился с каталогом, поиск там один и всегда по

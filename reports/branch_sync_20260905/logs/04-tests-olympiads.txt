@@ -1,0 +1,194 @@
+Creating test database for alias 'default'...
+...............................Found 117 test(s).
+System check identified no issues (0 silenced).
+  ИЗМЕНИЛСЯ   200 https://example.test/perechen (+1 предложений)
+
+Источников: 1. Без изменений: 0. Изменилось: 1. Недоступно: 0. Предложений: 1.
+  ИЗМЕНИЛСЯ   200 https://example.test/perechen (+1 предложений)
+
+Источников: 1. Без изменений: 0. Изменилось: 1. Недоступно: 0. Предложений: 1.
+  ИЗМЕНИЛСЯ   200 https://example.test/perechen (+1 предложений)
+
+Источников: 1. Без изменений: 0. Изменилось: 1. Недоступно: 0. Предложений: 1.
+Это был --dry-run: в базу не записано ничего.
+  ИЗМЕНИЛСЯ   200 https://example.test/perechen (+1 предложений)
+
+Источников: 1. Без изменений: 0. Изменилось: 1. Недоступно: 0. Предложений: 1.
+  ИЗМЕНИЛСЯ   200 https://example.test/perechen (+0 предложений)
+
+Источников: 1. Без изменений: 0. Изменилось: 1. Недоступно: 0. Предложений: 0.
+
+Источников: 1. Без изменений: 1. Изменилось: 0. Недоступно: 0. Предложений: 0.
+  НЕДОСТУПЕН 503 https://example.test/perechen
+
+Источников: 1. Без изменений: 0. Изменилось: 0. Недоступно: 1. Предложений: 0.
+  источники                    1
+  олимпиады                    1
+  уровни                       0
+  этапы                        0
+  даты                         0
+  проходные баллы              0
+  программы вузов              1
+  льготы                       1
+  региональные организаторы    0
+  комплекты                    0
+Залито.
+  источники                    1
+  олимпиады                    1
+  уровни                       0
+  этапы                        0
+  даты                         1
+  проходные баллы              0
+  программы вузов              0
+  льготы                       0
+  региональные организаторы    0
+  комплекты                    0
+Залито.
+ПЛАН (ничего не записано, нужен --yes):
+  sources.jsonl              источники                    1 записей
+  olympiads.jsonl            олимпиады                    1 записей
+  levels.jsonl               уровни                       0 записей
+  stages.jsonl               этапы                        0 записей
+  events.jsonl               даты                         0 записей
+  scores.jsonl               проходные баллы              0 записей
+  programs.jsonl             программы вузов              0 записей
+  benefits.jsonl             льготы                       0 записей
+  regions.jsonl              региональные организаторы    0 записей
+  variants.jsonl             комплекты                    0 записей
+  источники                    1
+  олимпиады                    1
+  уровни                       0
+  этапы                        0
+  даты                         0
+  проходные баллы              0
+  программы вузов              0
+  льготы                       0
+  региональные организаторы    0
+  комплекты                    0
+Залито.
+  источники                    1
+Залито.
+  олимпиады                    1
+Залито.
+  источники                    1
+  олимпиады                    1
+  уровни                       1
+  этапы                        0
+  даты                         0
+  проходные баллы              0
+  программы вузов              0
+  льготы                       0
+  региональные организаторы    0
+  комплекты                    0
+Залито.
+  источники                    1
+  олимпиады                    1
+  уровни                       1
+  этапы                        0
+  даты                         0
+  проходные баллы              0
+  программы вузов              0
+  льготы                       0
+  региональные организаторы    0
+  комплекты                    0
+Залито.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+......................................................................................
+----------------------------------------------------------------------
+Ran 117 tests in 30.995s
+
+OK
+Destroying test database for alias 'default'...
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+ЧИСЛОВЫЕ ИНВАРИАНТЫ:
+  OK  Olympiad всего                   ждали 21, получили 21
+  OK  Olympiad display_group='main'    ждали 16, получили 16
+  OK  Olympiad display_group='related' ждали 5, получили 5
+  OK  OlympiadStage у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros           ждали 4, получили 4
+  OK  OlympiadEvent у vseros с датой   ждали 0, получили 0
+  OK  UniversityProgram                ждали 7, получили 7
+  OK  OlympiadBenefit                  ждали 21, получили 21
+  OK  OlympiadScore                    ждали 14, получили 14
+  OK  OlympiadVariant                  ждали 12, получили 12
+  OK  RegionalCoordinator              ждали 85, получили 85
+Все инварианты сошлись. Данные демонстрационные, is_placeholder=True у всех олимпиад.
+Удалило бы гостевых попыток старше 7 дней: 1. Ничего не тронуто.
+Удалено гостевых попыток старше 7 дней: 0.
+Удалено гостевых попыток старше 7 дней: 1.

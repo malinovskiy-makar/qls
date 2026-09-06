@@ -2599,7 +2599,7 @@ var TOUR = [
   },
   {
     t: 'Встаньте на тег',
-    p: 'Наведите курсор на любой мелкий узел. Справа появится его тема, число ' +
+    p: 'Наведите курсор на любой мелкий узел. Справа откроется его тема, число ' +
        'задач и смежные теги из других тем.',
     hint: 'Мелкий узел это тег',
     at: function () { return wrap; },
@@ -2762,14 +2762,16 @@ document.getElementById('tmap-reset').addEventListener('click', function () {
   clearPick(); touchActivity();
 });
 
-/* Кнопка «Показать задачи» пока никуда не ведёт.
-   TODO: логика И/ИЛИ и применение фильтра решаются вместе с переработкой
-   поиска и каталога — карточка идеи в Notion,
+/* Кнопка «Показать задачи» ведёт в каталог поиском по названиям выбранного
+   (04.09.2026): узлы карты — номера тем и тегов таксономии, а не
+   идентификаторы базы, поэтому в фильтр каталога они не переводятся.
+   Точный перевод в фильтр (логика И/ИЛИ) — карточка идеи в Notion,
    https://app.notion.com/p/3cbb11c92bc181629f4aff24af52d837 */
 document.getElementById('tmap-apply').addEventListener('click', function () {
-  var apply = document.getElementById('tmap-apply');
-  apply.textContent = 'Фильтр появится вместе с новым каталогом';
-  setTimeout(function () { apply.textContent = 'Показать задачи'; }, 2200);
+  var names = Object.keys(picked).filter(function (k) { return picked[k] && byId[k]; })
+    .map(function (k) { return byId[k].l; });
+  if (!names.length) return;
+  window.location.href = '/catalog/?q=' + encodeURIComponent(names.join(', '));
 });
 
 /* Чипы: крестик снимает выбор. */

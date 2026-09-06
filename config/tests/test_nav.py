@@ -239,7 +239,12 @@ class TextbookTests(TestCase):
 
 
 class ContentWidthTests(TestCase):
-    """П10: 960 везде, 860 только на страницах чтения."""
+    """П10: 960 везде, 860 только на страницах чтения.
+
+    Страницы задачи в списке чтения НЕТ: у неё своя полоса 1120 с карточкой
+    чата справа — ADR 0070 и решение владельца 05.09.2026 («1120 для
+    страницы задачи — исключение из „960/860“»).
+    """
 
     def test_tokens_are_actually_read(self):
         import io
@@ -251,8 +256,7 @@ class ContentWidthTests(TestCase):
 
     def test_reading_pages_narrow_themselves(self):
         import io
-        for path in ('catalog/templates/catalog/problem_detail.html',
-                     'student/templates/student/assignment_detail.html',
+        for path in ('student/templates/student/assignment_detail.html',
                      'student/templates/student/work_review.html',
                      'student/templates/student/submission_detail.html',
                      'student/templates/student/exam_take.html'):

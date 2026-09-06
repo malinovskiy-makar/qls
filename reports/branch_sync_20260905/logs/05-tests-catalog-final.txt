@@ -1,0 +1,696 @@
+Creating test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+Found 442 test(s).
+Operations to perform:
+  Synchronize unmigrated apps: calendar_stub, channels, messages, staticfiles, teacher
+  Apply all migrations: admin, auth, contenttypes, game, olympiads, problems, sessions
+Synchronizing apps without migrations:
+  Creating tables...
+    Running deferred SQL...
+Running migrations:
+  Applying contenttypes.0001_initial... OK
+  Applying contenttypes.0002_remove_content_type_name... OK
+  Applying auth.0001_initial... OK
+  Applying auth.0002_alter_permission_name_max_length... OK
+  Applying auth.0003_alter_user_email_max_length... OK
+  Applying auth.0004_alter_user_username_opts... OK
+  Applying auth.0005_alter_user_last_login_null... OK
+  Applying auth.0006_require_contenttypes_0002... OK
+  Applying auth.0007_alter_validators_add_error_messages... OK
+  Applying auth.0008_alter_user_username_max_length... OK
+  Applying auth.0009_alter_user_last_name_max_length... OK
+  Applying auth.0010_alter_group_name_max_length... OK
+  Applying auth.0011_update_proxy_permissions... OK
+  Applying auth.0012_alter_user_first_name_max_length... OK
+  Applying problems.0001_initial... OK
+  Applying admin.0001_initial... OK
+  Applying admin.0002_logentry_remove_auto_add... OK
+  Applying admin.0003_logentry_add_action_flag_choices... OK
+  Applying problems.0002_mistaketag_rubric_skill_theorypage_rubriccriterion_and_more... OK
+  Applying problems.0003_assignment_submission_teacherfeedback_lesson_and_more... OK
+  Applying problems.0004_template_job_importsession_exportrecord_collection... OK
+  Applying problems.0005_content_hash... OK
+  Applying problems.0006_embedding_field... OK
+  Applying problems.0007_duplicate_candidate... OK
+  Applying problems.0008_desmosgraph... OK
+  Applying problems.0009_duplicate_of_field... OK
+  Applying problems.0010_similar_problems... OK
+  Applying problems.0011_collection_extended... OK
+  Applying problems.0012_student_group... OK
+  Applying problems.0013_calendar_event... OK
+  Applying problems.0014_calendarevent_color... OK
+  Applying problems.0015_problem_needs_quality_review... OK
+  Applying problems.0016_problem_solution_needs_review_and_more... OK
+  Applying problems.0017_autotopicassignment... OK
+  Applying problems.0018_batch1_ai_fields... OK
+  Applying problems.0019_add_solution_ai_extracted... OK
+  Applying problems.0020_sourcereference_year... OK
+  Applying game.0001_initial... OK
+  Applying game.0002_gamequestion_correct_indices_and_more... OK
+  Applying game.0003_gamequestion_unit... OK
+  Applying game.0004_gamequestion_gen_params_gamequestion_gen_solution_and_more... OK
+  Applying game.0005_gameresult... OK
+  Applying game.0006_gamequestion_figure... OK
+  Applying game.0007_archetypestat_bankquestionstat_and_more... OK
+  Applying game.0008_gamequestion_source... OK
+  Applying game.0009_gameset... OK
+  Applying game.0010_gameresult_question_outcomes... OK
+  Applying game.0011_figure_choice_type... OK
+  Applying game.0012_figure_audit... OK
+  Applying game.0013_gamequestion_tag_ids... OK
+  Applying game.0014_game_result_ranked... OK
+  Applying game.0015_ended_reason_length... OK
+  Applying problems.0021_reviewverdict_and_more... OK
+  Applying problems.0022_reviewverdict_bundle_multicategory... OK
+  Applying problems.0023_answerdraft_assignmentitem_customproblem_and_more... OK
+  Applying problems.0024_studentgroup_description... OK
+  Applying problems.0025_assignmentitem_graph... OK
+  Applying problems.0026_stats_gamification_exams... OK
+  Applying problems.0027_partanswer_remove_answerdraft_uniq_answer_draft_and_more... OK
+  Applying problems.0028_workfeedback_workfeedback_uniq_work_feedback... OK
+  Applying problems.0029_aiusagelog... OK
+  Applying problems.0030_assignment_item_answer_override... OK
+  Applying problems.0031_ai_usage_cache_tokens... OK
+  Applying problems.0032_assignment_item_points_backfill... OK
+  Applying problems.0033_partanswer_auto_zero... OK
+  Applying problems.0034_assignment_manual_order... OK
+  Applying problems.0035_comment_visibility_self... OK
+  Applying problems.0036_work_difficulty... OK
+  Applying problems.0037_student_card... OK
+  Applying problems.0038_custom_problem_parts... OK
+  Applying problems.0039_group_kind... OK
+  Applying problems.0040_human_review_gate... OK
+  Applying problems.0041_review_fixed_wrong... OK
+  Applying problems.0042_review_quotes... OK
+  Applying problems.0040_delete_desmosgraph... OK
+  Applying problems.0043_merge_0040_delete_desmosgraph_0042_review_quotes... OK
+  Applying problems.0044_embedding_versioning... OK
+  Applying problems.0045_problem_content_format... OK
+  Applying problems.0046_problem_figure... OK
+  Applying problems.0047_olympiadref... OK
+  Applying problems.0048_alter_olympiadref_match_method... OK
+  Applying problems.0047_answer_second_opinion... OK
+  Applying problems.0049_merge_20260902_2058... OK
+  Applying olympiads.0001_initial... OK
+  Applying olympiads.0002_trainingattempt_trainingdraft_trainingitemresult_and_more... OK
+  Applying olympiads.0003_olympiadvariant_is_placeholder... OK
+  Applying olympiads.0004_alter_regionalcoordinator_options_and_more... OK
+  Applying olympiads.0005_olympiadbenefit_who_gets... OK
+  Applying olympiads.0006_olympiadstage_source... OK
+  Applying problems.0050_problem_character_features... OK
+  Applying problems.0051_catalog_attempt... OK
+  Applying problems.0052_hint_ai_flags... OK
+  Applying problems.0053_hint_reviewed_backfill... OK
+  Applying problems.0050_userprofile_avatar_userprofile_level... OK
+  Applying problems.0051_studentgroup_invite_code... OK
+  Applying problems.0052_feedback... OK
+  Applying problems.0054_merge_0052_feedback_0053_hint_reviewed_backfill... OK
+  Applying sessions.0001_initial...test_anonymous_sees_login_link_and_gets_403 (catalog.tests.test_attempt_api.AttemptApiTests.test_anonymous_sees_login_link_and_gets_403) ... ok
+test_checked_attempt_renders_partial_with_first_error (catalog.tests.test_attempt_api.AttemptApiTests.test_checked_attempt_renders_partial_with_first_error) ... ok
+test_empty_text_is_400 (catalog.tests.test_attempt_api.AttemptApiTests.test_empty_text_is_400) ... ok
+test_limit_gives_a_human_message_not_500 (catalog.tests.test_attempt_api.AttemptApiTests.test_limit_gives_a_human_message_not_500) ... ok
+test_needs_human_has_no_score_and_no_teacher_button (catalog.tests.test_attempt_api.AttemptApiTests.test_needs_human_has_no_score_and_no_teacher_button) ... ok
+test_off_schema_reply_is_an_error_attempt_with_a_message (catalog.tests.test_attempt_api.AttemptApiTests.test_off_schema_reply_is_an_error_attempt_with_a_message) ... ok
+test_without_key_there_is_no_button_no_limit_line_no_config (catalog.tests.test_attempt_api.AttemptApiTests.test_without_key_there_is_no_button_no_limit_line_no_config) ... ok
+test_anonymous_upload_is_403 (catalog.tests.test_attempt_files.AttemptFileTests.test_anonymous_upload_is_403) ... ok
+test_attempt_with_a_photo_is_recognised_and_checked (catalog.tests.test_attempt_files.AttemptFileTests.test_attempt_with_a_photo_is_recognised_and_checked) ... ok
+test_fourth_file_is_400 (catalog.tests.test_attempt_files.AttemptFileTests.test_fourth_file_is_400) ... ok
+test_page_offers_the_button_only_with_model_and_login (catalog.tests.test_attempt_files.AttemptFileTests.test_page_offers_the_button_only_with_model_and_login) ... ok
+test_someone_elses_file_is_rejected_and_text_or_file_required (catalog.tests.test_attempt_files.AttemptFileTests.test_someone_elses_file_is_rejected_and_text_or_file_required) ... ok
+test_too_big_is_400 (catalog.tests.test_attempt_files.AttemptFileTests.test_too_big_is_400) ... ok
+test_wrong_type_is_400_with_a_human_text (catalog.tests.test_attempt_files.AttemptFileTests.test_wrong_type_is_400_with_a_human_text) ... ok
+test_first_error_step_must_exist_among_steps (catalog.tests.test_attempts.CheckAttemptTests.test_first_error_step_must_exist_among_steps) ... ok
+test_needs_human_drops_the_score (catalog.tests.test_attempts.CheckAttemptTests.test_needs_human_drops_the_score) ... ok
+test_not_json_is_ai_unavailable (catalog.tests.test_attempts.CheckAttemptTests.test_not_json_is_ai_unavailable) ... WARNING 2026-09-06 03:28:12,795 problems.ai.core: Модель вернула не JSON (профиль catalog_check)
+ok
+test_prompt_carries_the_problem_but_no_profile_fields (catalog.tests.test_attempts.CheckAttemptTests.test_prompt_carries_the_problem_but_no_profile_fields) ... ok
+test_reply_off_schema_marks_error_not_crash (catalog.tests.test_attempts.CheckAttemptTests.test_reply_off_schema_marks_error_not_crash) ... ok
+test_timeout_reaches_the_provider_and_remaining_counts (catalog.tests.test_attempts.CheckAttemptTests.test_timeout_reaches_the_provider_and_remaining_counts) ... ok
+test_valid_reply_fills_the_attempt (catalog.tests.test_attempts.CheckAttemptTests.test_valid_reply_fills_the_attempt) ... ok
+test_without_reference_confidence_is_capped (catalog.tests.test_attempts.CheckAttemptTests.test_without_reference_confidence_is_capped) ... ok
+test_api_404_for_flagged (catalog.tests.test_catalog.CatalogApiTests.test_api_404_for_flagged) ... ok
+test_api_returns_problem_json (catalog.tests.test_catalog.CatalogApiTests.test_api_returns_problem_json) ... ok
+test_counter_respects_quality_gate_and_status (catalog.tests.test_catalog.CatalogListTests.test_counter_respects_quality_gate_and_status)
+Счётчик каталога не учитывает зафлагованные и черновики. ... ok
+test_filter_by_difficulty_and_solution (catalog.tests.test_catalog.CatalogListTests.test_filter_by_difficulty_and_solution) ... ok
+test_filter_by_source (catalog.tests.test_catalog.CatalogListTests.test_filter_by_source) ... ok
+test_filter_by_topic (catalog.tests.test_catalog.CatalogListTests.test_filter_by_topic) ... ok
+test_list_returns_200_and_shows_published (catalog.tests.test_catalog.CatalogListTests.test_list_returns_200_and_shows_published) ... ok
+test_search_query (catalog.tests.test_catalog.CatalogListTests.test_search_query) ... WARNING 2026-09-06 03:28:30,264 catalog.views: search service unavailable: нет связи с сервисом: [Errno 11001] getaddrinfo failed — идём по словам
+ok
+test_page_contains_dollar_masking_fix_v3 (catalog.tests.test_catalog.CurrencyEscapeFrontendTests.test_page_contains_dollar_masking_fix_v3)
+Сессия H3: «\$» маскируется ДО KaTeX приватным символом, иначе ... ok
+test_page_contains_escaped_data_and_fix_v2_script (catalog.tests.test_catalog.CurrencyEscapeFrontendTests.test_page_contains_escaped_data_and_fix_v2_script) ... ok
+test_home_opens (catalog.tests.test_catalog.HomePageTests.test_home_opens) ... ok
+test_draft_problem_returns_404 (catalog.tests.test_catalog.ProblemDetailTests.test_draft_problem_returns_404) ... ok
+test_flagged_problem_returns_404 (catalog.tests.test_catalog.ProblemDetailTests.test_flagged_problem_returns_404) ... ok
+test_part_label_single_paren_and_intro (catalog.tests.test_catalog.ProblemDetailTests.test_part_label_single_paren_and_intro)
+H3 этап 4: метка «а)» не превращается в «а))». ... ok
+test_published_problem_page_opens (catalog.tests.test_catalog.ProblemDetailTests.test_published_problem_page_opens) ... ok
+test_similar_block_excludes_hidden (catalog.tests.test_catalog.ProblemDetailTests.test_similar_block_excludes_hidden)
+Блок «Похожие» не содержит зафлагованных задач даже из кэша. ... ok
+test_solution_linebreaks_rendered_and_escaped (catalog.tests.test_catalog.ProblemDetailTests.test_solution_linebreaks_rendered_and_escaped)
+Абзацы решения превращаются в <br>, а не остаются одной строкой. ... ok
+test_random_redirects_to_visible_problem (catalog.tests.test_catalog.RandomProblemTests.test_random_redirects_to_visible_problem) ... ok
+test_random_without_problems_redirects_to_list (catalog.tests.test_catalog.RandomProblemTests.test_random_without_problems_redirects_to_list) ... ok
+test_dialog_is_built_from_the_shared_module (catalog.tests.test_catalog_modal.ModalMarkupTests.test_dialog_is_built_from_the_shared_module) ... ok
+test_old_window_markup_is_gone_and_problem_modal_stays (catalog.tests.test_catalog_modal.ModalMarkupTests.test_old_window_markup_is_gone_and_problem_modal_stays) ... ok
+test_selected_state_is_drawn_by_the_server (catalog.tests.test_catalog_modal.ModalMarkupTests.test_selected_state_is_drawn_by_the_server) ... ok
+test_gallery_is_the_same_card_without_duplicate_title (catalog.tests.test_catalog_redesign.CardTests.test_gallery_is_the_same_card_without_duplicate_title) ... ok
+test_no_number_and_no_table_anywhere (catalog.tests.test_catalog_redesign.CardTests.test_no_number_and_no_table_anywhere) ... ok
+test_preview_keeps_formula_text_without_orphans (catalog.tests.test_catalog_redesign.CardTests.test_preview_keeps_formula_text_without_orphans) ... ok
+test_stars_only_when_difficulty_is_set (catalog.tests.test_catalog_redesign.CardTests.test_stars_only_when_difficulty_is_set) ... ok
+test_table_address_falls_back_to_rows (catalog.tests.test_catalog_redesign.CardTests.test_table_address_falls_back_to_rows) ... ok
+test_test_format_label (catalog.tests.test_catalog_redesign.CardTests.test_test_format_label) ... ok
+test_title_shown_only_when_it_is_a_name (catalog.tests.test_catalog_redesign.CardTests.test_title_shown_only_when_it_is_a_name) ... ok
+test_topic_chip_only_when_there_is_a_topic (catalog.tests.test_catalog_redesign.CardTests.test_topic_chip_only_when_there_is_a_topic) ... ok
+test_caption_follows_map_data (catalog.tests.test_catalog_redesign.MapCaptionTests.test_caption_follows_map_data) ... ok
+test_caption_matches_the_real_map_file (catalog.tests.test_catalog_redesign.MapCaptionTests.test_caption_matches_the_real_map_file) ... ok
+test_no_literal_caption_left_in_template (catalog.tests.test_catalog_redesign.MapCaptionTests.test_no_literal_caption_left_in_template) ... ok
+test_active_filters_ride_inside_the_form (catalog.tests.test_catalog_redesign.SearchFieldTests.test_active_filters_ride_inside_the_form) ... ok
+test_field_is_the_hero_with_buttons_inside (catalog.tests.test_catalog_redesign.SearchFieldTests.test_field_is_the_hero_with_buttons_inside) ... ok
+test_active_source_keeps_its_chip_even_at_zero_count (catalog.tests.test_catalog_redesign.StripTests.test_active_source_keeps_its_chip_even_at_zero_count)
+Источник выбран, под остальными фильтрами у него ноль — чип есть. ... ok
+test_chip_cross_removes_only_its_own_filter (catalog.tests.test_catalog_redesign.StripTests.test_chip_cross_removes_only_its_own_filter) ... ok
+test_chips_are_a_key_of_the_shared_filters_module (catalog.tests.test_catalog_redesign.StripTests.test_chips_are_a_key_of_the_shared_filters_module) ... ok
+test_difficulty_label_collapses_ranges (catalog.tests.test_catalog_redesign.StripTests.test_difficulty_label_collapses_ranges) ... ok
+test_nothing_selected_means_no_chips_badge_or_reset (catalog.tests.test_catalog_redesign.StripTests.test_nothing_selected_means_no_chips_badge_or_reset) ... ok
+test_selected_filters_become_chips_in_owner_order (catalog.tests.test_catalog_redesign.StripTests.test_selected_filters_become_chips_in_owner_order) ... ok
+test_catalog_page_carries_all_eleven_phrases (catalog.tests.test_catalog_redesign.TypingPlaceholderTests.test_catalog_page_carries_all_eleven_phrases) ... ok
+test_exactly_one_typing_implementation_in_the_repository (catalog.tests.test_catalog_redesign.TypingPlaceholderTests.test_exactly_one_typing_implementation_in_the_repository)
+grep SLIPS по шаблонам и статике даёт ровно один файл — партиал. ... ok
+test_home_page_carries_the_same_six_phrases (catalog.tests.test_catalog_redesign.TypingPlaceholderTests.test_home_page_carries_the_same_six_phrases) ... ok
+test_anonymous_gets_403_and_a_login_link_instead_of_the_field (catalog.tests.test_chat_api.ChatApiTests.test_anonymous_gets_403_and_a_login_link_instead_of_the_field) ... ok
+test_history_is_trimmed_and_reply_is_capped (catalog.tests.test_chat_api.ChatApiTests.test_history_is_trimmed_and_reply_is_capped) ... ok
+test_homework_mode_for_open_assignment_by_list_and_by_group (catalog.tests.test_chat_api.ChatApiTests.test_homework_mode_for_open_assignment_by_list_and_by_group) ... ok
+test_homework_mode_via_group_and_not_after_deadline (catalog.tests.test_chat_api.ChatApiTests.test_homework_mode_via_group_and_not_after_deadline) ... ok
+test_last_attempt_and_its_result_reach_the_helper (catalog.tests.test_chat_api.ChatApiTests.test_last_attempt_and_its_result_reach_the_helper) ... ok
+test_limit_is_shared_with_the_check_and_is_a_human_reply (catalog.tests.test_chat_api.ChatApiTests.test_limit_is_shared_with_the_check_and_is_a_human_reply) ... ok
+test_logged_in_page_has_field_send_button_and_three_suggestions (catalog.tests.test_chat_api.ChatApiTests.test_logged_in_page_has_field_send_button_and_three_suggestions) ... ok
+test_reply_comes_back_and_prompt_has_no_profile_fields (catalog.tests.test_chat_api.ChatApiTests.test_reply_comes_back_and_prompt_has_no_profile_fields) ... ok
+test_without_key_page_has_no_chat_card (catalog.tests.test_chat_api.ChatApiTests.test_without_key_page_has_no_chat_card) ... ok
+test_add_remove_problem (catalog.tests.test_collections.CollectionConstructorTests.test_add_remove_problem) ... ok
+test_collection_page_opens (catalog.tests.test_collections.CollectionConstructorTests.test_collection_page_opens) ... ok
+test_create_collection_redirects_to_token_page (catalog.tests.test_collections.CollectionConstructorTests.test_create_collection_redirects_to_token_page) ... ok
+test_flagged_problem_hidden_in_collection_panel (catalog.tests.test_collections.CollectionConstructorTests.test_flagged_problem_hidden_in_collection_panel)
+Зафлагованная задача, попавшая в подборку, не видна на странице. ... ok
+test_reorder (catalog.tests.test_collections.CollectionConstructorTests.test_reorder) ... ok
+test_export_page_opens (catalog.tests.test_collections.CollectionExportTests.test_export_page_opens) ... ok
+test_generate_latex_no_exception (catalog.tests.test_collections.CollectionExportTests.test_generate_latex_no_exception) ... ok
+test_pdf_download_responds (catalog.tests.test_collections.CollectionExportTests.test_pdf_download_responds)
+POST на PDF: либо настоящий PDF, либо fallback .tex — без исключений. ... ok
+test_tex_download_contains_problem (catalog.tests.test_collections.CollectionExportTests.test_tex_download_contains_problem) ... ok
+test_q_mode_is_unchanged (catalog.tests.test_filter_state_api.ApiTagsByTopicTests.test_q_mode_is_unchanged) ... ok
+test_topic_mode_lists_only_that_topics_tags_without_zeros (catalog.tests.test_filter_state_api.ApiTagsByTopicTests.test_topic_mode_lists_only_that_topics_tags_without_zeros) ... ok
+test_counts_cover_the_corpus_and_follow_the_other_filters (catalog.tests.test_filter_state_api.FilterStateApiTests.test_counts_cover_the_corpus_and_follow_the_other_filters) ... ok
+test_endpoint_renders_the_same_results_partial_as_the_page (catalog.tests.test_filter_state_api.FilterStateApiTests.test_endpoint_renders_the_same_results_partial_as_the_page) ... ok
+test_keys_and_total_match_the_page (catalog.tests.test_filter_state_api.FilterStateApiTests.test_keys_and_total_match_the_page) ... ok
+test_two_topics_are_a_union (catalog.tests.test_filter_state_api.FilterStateApiTests.test_two_topics_are_a_union) ... ok
+test_view_mode_and_query_ride_along (catalog.tests.test_filter_state_api.FilterStateApiTests.test_view_mode_and_query_ride_along) ... WARNING 2026-09-06 03:29:25,258 catalog.views: search service unavailable: нет связи с сервисом: [Errno 11001] getaddrinfo failed — идём по словам
+ok
+test_filtering_by_character_and_features (catalog.tests.test_filters_multi.CharacterAndFeaturesTests.test_filtering_by_character_and_features) ... ok
+test_groups_appear_only_with_data (catalog.tests.test_filters_multi.CharacterAndFeaturesTests.test_groups_appear_only_with_data) ... ok
+test_kind_and_test_types_follow_the_corpus (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_kind_and_test_types_follow_the_corpus) ... ok
+test_modal_layout_is_the_owners (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_modal_layout_is_the_owners) ... ok
+test_scope_names_several_topics (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_scope_names_several_topics) ... ok
+test_topics_sit_in_owner_blocks_in_owner_order (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_topics_sit_in_owner_blocks_in_owner_order) ... ok
+test_two_difficulties_add_up_and_groups_intersect (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_two_difficulties_add_up_and_groups_intersect) ... ok
+test_two_topics_are_a_union (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_two_topics_are_a_union) ... ok
+test_unknown_topic_names_are_not_filter_options (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_unknown_topic_names_are_not_filter_options) ... ok
+test_zero_in_corpus_is_not_an_option_zero_under_filters_stays (catalog.tests.test_filters_multi.MultiSelectQueryTests.test_zero_in_corpus_is_not_an_option_zero_under_filters_stays) ... ok
+test_button_only_when_there_are_hints (catalog.tests.test_hints.HintApiTests.test_button_only_when_there_are_hints) ... ok
+test_hidden_problem_gives_404 (catalog.tests.test_hints.HintApiTests.test_hidden_problem_gives_404) ... ok
+test_three_hints_come_in_order_then_404 (catalog.tests.test_hints.HintApiTests.test_three_hints_come_in_order_then_404) ... ok
+test_apply_creates_exactly_n_in_order_and_button_appears (catalog.tests.test_hints.ImportHintsCommandTests.test_apply_creates_exactly_n_in_order_and_button_appears) ... ok
+test_backfill_marks_existing_hints_reviewed (catalog.tests.test_hints.ImportHintsCommandTests.test_backfill_marks_existing_hints_reviewed) ... ok
+test_bad_lines_and_unknown_ids_are_reported_others_apply (catalog.tests.test_hints.ImportHintsCommandTests.test_bad_lines_and_unknown_ids_are_reported_others_apply) ... ok
+test_dry_run_creates_nothing (catalog.tests.test_hints.ImportHintsCommandTests.test_dry_run_creates_nothing) ... ok
+test_replace_swaps_hints_and_writes_a_snapshot (catalog.tests.test_hints.ImportHintsCommandTests.test_replace_swaps_hints_and_writes_a_snapshot) ... ok
+test_second_run_without_replace_does_not_duplicate (catalog.tests.test_hints.ImportHintsCommandTests.test_second_run_without_replace_does_not_duplicate) ... ok
+test_filter_state_is_all_zero (catalog.tests.test_no_slop.EmptyCatalogApiTests.test_filter_state_is_all_zero) ... ok
+test_catalog_page_has_no_numbers (catalog.tests.test_no_slop.EmptyCatalogTests.test_catalog_page_has_no_numbers) ... ok
+test_catalog_page_shows_no_selection_ui (catalog.tests.test_no_slop.EmptyCatalogTests.test_catalog_page_shows_no_selection_ui) ... ok
+test_window_has_no_groups_and_no_numbers (catalog.tests.test_no_slop.EmptyCatalogWindowTests.test_window_has_no_groups_and_no_numbers) ... ok
+test_caption_changes_with_the_map_file (catalog.tests.test_no_slop.MapCaptionFollowsDataTests.test_caption_changes_with_the_map_file) ... ok
+test_page_has_no_numbers_rows_or_buttons (catalog.tests.test_no_slop.MinimalProblemPageTests.test_page_has_no_numbers_rows_or_buttons) ... ok
+test_page_without_key_has_no_ai_controls (catalog.tests.test_no_slop.NoAiKeyProblemPageTests.test_page_without_key_has_no_ai_controls) ... ok
+test_guest_gets_no_file_button_even_with_a_model (catalog.tests.test_no_slop.NoHintsNoFilesTests.test_guest_gets_no_file_button_even_with_a_model) ... ok
+test_problem_without_hints_has_no_hint_ui (catalog.tests.test_no_slop.NoHintsNoFilesTests.test_problem_without_hints_has_no_hint_ui) ... ok
+test_bare_test_shows_nothing_extra (catalog.tests.test_no_slop.TestPageZeroTests.test_bare_test_shows_nothing_extra) ... ok
+test_test_without_options_has_no_game (catalog.tests.test_no_slop.TestPageZeroTests.test_test_without_options_has_no_game) ... ok
+test_ai_card_needs_an_available_model (catalog.tests.test_problem_page.ProblemPageTests.test_ai_card_needs_an_available_model) ... ok
+test_answer_and_solution_are_separate (catalog.tests.test_problem_page.ProblemPageTests.test_answer_and_solution_are_separate) ... ok
+test_clouds_link_to_the_catalog_with_that_filter (catalog.tests.test_problem_page.ProblemPageTests.test_clouds_link_to_the_catalog_with_that_filter) ... ok
+test_empty_properties_render_nothing (catalog.tests.test_problem_page.ProblemPageTests.test_empty_properties_render_nothing) ... ok
+test_every_shape_renders (catalog.tests.test_problem_page.ProblemPageTests.test_every_shape_renders) ... ok
+test_named_title_is_shown_and_cut_title_is_hidden (catalog.tests.test_problem_page.ProblemPageTests.test_named_title_is_shown_and_cut_title_is_hidden) ... ok
+test_number_appears_nowhere_but_the_address (catalog.tests.test_problem_page.ProblemPageTests.test_number_appears_nowhere_but_the_address) ... ok
+test_page_uses_its_own_wide_column (catalog.tests.test_problem_page.ProblemPageTests.test_page_uses_its_own_wide_column) ... ok
+test_parts_live_inside_the_statement (catalog.tests.test_problem_page.ProblemPageTests.test_parts_live_inside_the_statement) ... ok
+test_save_button_only_for_logged_in_and_reflects_state (catalog.tests.test_problem_page.ProblemPageTests.test_save_button_only_for_logged_in_and_reflects_state) ... ok
+test_similar_cards_and_link (catalog.tests.test_problem_page.ProblemPageTests.test_similar_cards_and_link) ... ok
+test_solution_needs_soft_confirmation_before_reveal (catalog.tests.test_problem_page.ProblemPageTests.test_solution_needs_soft_confirmation_before_reveal) ... ok
+test_teacher_gets_homework_button (catalog.tests.test_problem_page.ProblemPageTests.test_teacher_gets_homework_button) ... ok
+test_test_options_are_playable_tiles (catalog.tests.test_problem_page.ProblemPageTests.test_test_options_are_playable_tiles)
+Этап 7: варианты теста — кнопки игры, а не статичные плитки. ... ok
+test_ask_why_button_needs_model_and_login (catalog.tests.test_problem_test_page.TestPageTests.test_ask_why_button_needs_model_and_login) ... ok
+test_hint_button_lives_in_the_play_row (catalog.tests.test_problem_test_page.TestPageTests.test_hint_button_lives_in_the_play_row) ... ok
+test_more_test_link_only_with_another_test_by_topic (catalog.tests.test_problem_test_page.TestPageTests.test_more_test_link_only_with_another_test_by_topic) ... ok
+test_playable_test_has_tiles_rule_and_one_reveal_button (catalog.tests.test_problem_test_page.TestPageTests.test_playable_test_has_tiles_rule_and_one_reveal_button) ... ok
+test_single_choice_rule_and_config (catalog.tests.test_problem_test_page.TestPageTests.test_single_choice_rule_and_config) ... ok
+test_stat_line_only_with_game_stat (catalog.tests.test_problem_test_page.TestPageTests.test_stat_line_only_with_game_stat) ... ok
+test_test_without_game_is_an_ordinary_problem (catalog.tests.test_problem_test_page.TestPageTests.test_test_without_game_is_an_ordinary_problem) ... ok
+test_django_не_лезет_за_моделью_когда_сервиса_нет (catalog.tests.test_search_service.DegradationWithoutServiceTests.test_django_не_лезет_за_моделью_когда_сервиса_нет)
+Соблазн «сервис лёг — посчитаем сами» вернул бы мину №1. ... WARNING 2026-09-06 03:29:47,982 catalog.views: search service unavailable: нет связи с сервисом: timed out — идём по словам
+ok
+test_в_журнал_идёт_типизированное_событие_без_traceback (catalog.tests.test_search_service.DegradationWithoutServiceTests.test_в_журнал_идёт_типизированное_событие_без_traceback)
+⚠️ Полная трассировка на КАЖДЫЙ запрос топит журнал. ... ok
+test_лексический_поиск_продолжает_находить (catalog.tests.test_search_service.DegradationWithoutServiceTests.test_лексический_поиск_продолжает_находить)
+Деградация — это «ищем хуже», а не «не ищем вовсе». ... WARNING 2026-09-06 03:29:49,140 catalog.hybrid: search service unavailable: нет связи с сервисом: timed out — идём по словам
+ok
+test_страница_деградирует_а_не_показывает_ошибку (catalog.tests.test_search_service.DegradationWithoutServiceTests.test_страница_деградирует_а_не_показывает_ошибку)
+⚠️ КОДА 200 НЕДОСТАТОЧНО, И ЭТО ГЛАВНЫЙ УРОК ЭТОГО ФАЙЛА. ... WARNING 2026-09-06 03:29:49,711 catalog.views: search service unavailable: нет связи с сервисом: timed out — идём по словам
+ok
+test_страница_поиска_отвечает_200_без_сервиса (catalog.tests.test_search_service.DegradationWithoutServiceTests.test_страница_поиска_отвечает_200_без_сервиса) ... WARNING 2026-09-06 03:29:50,345 catalog.views: search service unavailable: нет связи с сервисом: timed out — идём по словам
+ok
+test_блок_похожих_задач_работает_без_модели (catalog.tests.test_semantic_degradation.DegradedPageTests.test_блок_похожих_задач_работает_без_модели)
+«Похожие» живут кэшем M2M, модель им не нужна вовсе. ... ok
+test_в_плашке_нет_слова_ошибка_и_нет_совета_ставить_пакет (catalog.tests.test_semantic_degradation.DegradedPageTests.test_в_плашке_нет_слова_ошибка_и_нет_совета_ставить_пакет)
+Человеку не показывают ни «ошибку», ни `pip install`: он ничего ... ok
+test_контекст_помечен_как_деградация (catalog.tests.test_semantic_degradation.DegradedPageTests.test_контекст_помечен_как_деградация) ... ok
+test_лексический_поиск_действительно_находит (catalog.tests.test_semantic_degradation.DegradedPageTests.test_лексический_поиск_действительно_находит)
+Плашка без результатов — это не деградация, а отказ с извинением. ... ok
+test_пустая_страница_без_запроса_тоже_200 (catalog.tests.test_semantic_degradation.DegradedPageTests.test_пустая_страница_без_запроса_тоже_200) ... ok
+test_страница_отдаёт_200_и_плашку (catalog.tests.test_semantic_degradation.DegradedPageTests.test_страница_отдаёт_200_и_плашку) ... ok
+test_get_model_возбуждает_понятное_исключение (catalog.tests.test_semantic_degradation.EnabledBehaviourUnchangedTests.test_get_model_возбуждает_понятное_исключение) ... ok
+test_по_умолчанию_флаг_включён (catalog.tests.test_semantic_degradation.EnabledBehaviourUnchangedTests.test_по_умолчанию_флаг_включён) ... ok
+test_при_включённом_флаге_плашки_нет (catalog.tests.test_semantic_degradation.EnabledBehaviourUnchangedTests.test_при_включённом_флаге_плашки_нет) ... ok
+test_dense_search_отдаёт_пусто_без_исключения (catalog.tests.test_semantic_degradation.ModelIsNotImportedTests.test_dense_search_отдаёт_пусто_без_исключения) ... ok
+test_get_model_не_пытается_импортировать_модель (catalog.tests.test_semantic_degradation.ModelIsNotImportedTests.test_get_model_не_пытается_импортировать_модель)
+Третья дверь — прямой вызов. Проверка обязана стоять ДО импорта. ... ok
+test_гибридный_поиск_не_пытается_импортировать_модель (catalog.tests.test_semantic_degradation.ModelIsNotImportedTests.test_гибридный_поиск_не_пытается_импортировать_модель)
+Вторая дверь к той же модели: подбор домашки ходит через hybrid. ... ok
+test_страница_поиска_не_пытается_импортировать_модель (catalog.tests.test_semantic_degradation.ModelIsNotImportedTests.test_страница_поиска_не_пытается_импортировать_модель)
+⚠️ САМАЯ ВАЖНАЯ ПРОВЕРКА ФАЙЛА. ... ok
+test_page_keeps_whole_formula_and_drops_the_stub (catalog.tests.test_similar_titles.SimilarBlockRenderTests.test_page_keeps_whole_formula_and_drops_the_stub) ... ok
+test_currency_is_kept (catalog.tests.test_similar_titles.SimilarTitleTests.test_currency_is_kept)
+⚠️ ГЛАВНАЯ ПРОВЕРКА: валюту не режем. ... ok
+test_empty_title_falls_back_to_statement (catalog.tests.test_similar_titles.SimilarTitleTests.test_empty_title_falls_back_to_statement) ... ok
+test_escaped_dollar_is_not_a_delimiter (catalog.tests.test_similar_titles.SimilarTitleTests.test_escaped_dollar_is_not_a_delimiter)
+«\$» — валюта в разметке источника, разделителем не считается. ... ok
+test_plain_title_untouched (catalog.tests.test_similar_titles.SimilarTitleTests.test_plain_title_untouched) ... ok
+test_short_statement_gets_no_ellipsis (catalog.tests.test_similar_titles.SimilarTitleTests.test_short_statement_gets_no_ellipsis) ... ok
+test_truncated_formula_is_cut_off (catalog.tests.test_similar_titles.SimilarTitleTests.test_truncated_formula_is_cut_off)
+Обрывок формулы срезается вместе с одиноким долларом. ... ok
+test_whole_formula_survives (catalog.tests.test_similar_titles.SimilarTitleTests.test_whole_formula_survives)
+Целая формула остаётся целиком — её отрисует KaTeX. ... ok
+test_без_запроса_число_одно (catalog.tests.test_smart_catalog.CounterTests.test_без_запроса_число_одно) ... ok
+test_при_запросе_чисел_два (catalog.tests.test_smart_catalog.CounterTests.test_при_запросе_чисел_два)
+«Похожих задач: 18 · из 294 по теме „Монополия“». ... ok
+test_на_экране_нет_нашей_кухни (catalog.tests.test_smart_catalog.DegradationTests.test_на_экране_нет_нашей_кухни) ... ok
+test_страница_отвечает_200_и_находит_словами (catalog.tests.test_smart_catalog.DegradationTests.test_страница_отвечает_200_и_находит_словами) ... ok
+test_а_размеченное_показывается (catalog.tests.test_smart_catalog.EmptyFilterIsHiddenTests.test_а_размеченное_показывается)
+Обратная сторона: иначе проверка выше зеленела бы на пустом экране. ... ok
+test_неразмеченное_поле_не_показывается (catalog.tests.test_smart_catalog.EmptyFilterIsHiddenTests.test_неразмеченное_поле_не_показывается)
+«Характер задачи» и «особенности» в базе не размечены вовсе. ... ok
+test_фильтр_исчезает_вместе_с_данными (catalog.tests.test_smart_catalog.EmptyFilterIsHiddenTests.test_фильтр_исчезает_вместе_с_данными)
+Убрали источники у всех задач — группа «Источник» ушла. ... ok
+test_без_запроса_поиск_не_вызывается_вовсе (catalog.tests.test_smart_catalog.EmptyQueryCostsNothingTests.test_без_запроса_поиск_не_вызывается_вовсе) ... ok
+test_с_запросом_поиск_всё_таки_вызывается (catalog.tests.test_smart_catalog.EmptyQueryCostsNothingTests.test_с_запросом_поиск_всё_таки_вызывается)
+Обратная сторона: иначе проверка выше зеленела бы на сломанном. ... ok
+test_с_фильтром_но_без_запроса_поиск_тоже_не_вызывается (catalog.tests.test_smart_catalog.EmptyQueryCostsNothingTests.test_с_фильтром_но_без_запроса_поиск_тоже_не_вызывается)
+Фильтр — это не запрос. Выбор темы не повод будить модель. ... ok
+test_несуществующий_номер_объясняется_словами (catalog.tests.test_smart_catalog.NumericQueryTests.test_несуществующий_номер_объясняется_словами) ... ok
+test_скрытая_задача_не_подтверждается_номером (catalog.tests.test_smart_catalog.NumericQueryTests.test_скрытая_задача_не_подтверждается_номером)
+⚠️ Ответ «есть такой номер» не должен быть оглавлением скрытого. ... ok
+test_число_ведёт_прямо_на_задачу (catalog.tests.test_smart_catalog.NumericQueryTests.test_число_ведёт_прямо_на_задачу) ... ok
+test_число_не_идёт_в_смысловой_поиск (catalog.tests.test_smart_catalog.NumericQueryTests.test_число_не_идёт_в_смысловой_поиск)
+У числа нет смысла, который можно с чем-то сравнить. ... ok
+test_запрос_переносится_вместе_с_человеком (catalog.tests.test_smart_catalog.OldSearchAddressTests.test_запрос_переносится_вместе_с_человеком)
+Пришедший по своей же старой ссылке обязан увидеть результат. ... ok
+test_редирект_постоянный_и_ведёт_в_каталог (catalog.tests.test_smart_catalog.OldSearchAddressTests.test_редирект_постоянный_и_ведёт_в_каталог) ... ok
+test_набор_не_пустой (catalog.tests.test_smart_catalog.SameFilterSetTests.test_набор_не_пустой)
+Иначе сравнение выше сошлось бы на двух пустых множествах. ... ok
+test_наборы_совпадают (catalog.tests.test_smart_catalog.SameFilterSetTests.test_наборы_совпадают) ... ok
+test_page_context_has_more_url_only_with_another_test (catalog.tests.test_testplay.MoreTestsByTopicTests.test_page_context_has_more_url_only_with_another_test) ... ok
+test_random_accepts_filters_and_exclude (catalog.tests.test_testplay.MoreTestsByTopicTests.test_random_accepts_filters_and_exclude) ... ok
+test_random_without_match_goes_to_the_catalog (catalog.tests.test_testplay.MoreTestsByTopicTests.test_random_without_match_goes_to_the_catalog) ... ok
+test_bad_requests (catalog.tests.test_testplay.TestCheckApiTests.test_bad_requests) ... ok
+test_correct_set_in_any_order (catalog.tests.test_testplay.TestCheckApiTests.test_correct_set_in_any_order) ... ok
+test_count_of_correct_comes_from_the_third_attempt (catalog.tests.test_testplay.TestCheckApiTests.test_count_of_correct_comes_from_the_third_attempt) ... ok
+test_guest_success_is_not_recorded (catalog.tests.test_testplay.TestCheckApiTests.test_guest_success_is_not_recorded) ... ok
+test_partial_and_extra_are_wrong (catalog.tests.test_testplay.TestCheckApiTests.test_partial_and_extra_are_wrong) ... ok
+test_reveal_gives_labels_and_resets (catalog.tests.test_testplay.TestCheckApiTests.test_reveal_gives_labels_and_resets) ... ok
+test_success_resets_the_counter_and_is_recorded_for_users (catalog.tests.test_testplay.TestCheckApiTests.test_success_resets_the_counter_and_is_recorded_for_users) ... ok
+test_marked_parts_win (catalog.tests.test_testplay.TestGameModelTests.test_marked_parts_win) ... ok
+test_multi_choice_from_glued_answer (catalog.tests.test_testplay.TestGameModelTests.test_multi_choice_from_glued_answer) ... ok
+test_no_game_without_options_or_with_labels_outside (catalog.tests.test_testplay.TestGameModelTests.test_no_game_without_options_or_with_labels_outside) ... ok
+test_single_choice_and_true_false_are_single (catalog.tests.test_testplay.TestGameModelTests.test_single_choice_and_true_false_are_single) ... ok
+test_comment_tags_are_balanced (problems.tests.test_template_hygiene.DjangoCommentTests.test_comment_tags_are_balanced)
+Незакрытый `{% comment %}` съедает остаток страницы молча. ... ok
+test_no_multiline_hash_comments (problems.tests.test_template_hygiene.DjangoCommentTests.test_no_multiline_hash_comments)
+`{# … #}` через перенос строки печатается на экран как текст. ... ok
+test_alien_group_is_refused_too (problems.tests.test_r15_pair.ForeignGroupParamTests.test_alien_group_is_refused_too) ... ok
+test_direct_address_gives_our_own_page (problems.tests.test_r15_pair.ForeignGroupParamTests.test_direct_address_gives_our_own_page)
+Наша страница, а не служебная страница Django. ... ok
+test_exam_constructor_of_a_missing_group (problems.tests.test_r15_pair.ForeignGroupParamTests.test_exam_constructor_of_a_missing_group)
+Тот самый адрес из разбора владельца. ... ok
+test_missing_group_is_refused_with_a_way_back (problems.tests.test_r15_pair.ForeignGroupParamTests.test_missing_group_is_refused_with_a_way_back) ... ok
+test_no_group_at_all_is_legal (problems.tests.test_r15_pair.ForeignGroupParamTests.test_no_group_at_all_is_legal)
+Работу создают и без занятия — пустой параметр не ошибка. ... ok
+test_non_numeric_group_still_does_not_crash (problems.tests.test_r15_pair.ForeignGroupParamTests.test_non_numeric_group_still_does_not_crash)
+⚠️ `?group=abc` когда-то отвечал пятисоткой — правило остаётся. ... ok
+test_own_group_still_works (problems.tests.test_r15_pair.ForeignGroupParamTests.test_own_group_still_works) ... ok
+test_refusal_explains_itself (problems.tests.test_r15_pair.ForeignGroupParamTests.test_refusal_explains_itself) ... ok
+test_both_have_the_same_three_tabs (problems.tests.test_r15_pair.GroupAndSoloPairTests.test_both_have_the_same_three_tabs) ... ok
+test_both_tabs_open (problems.tests.test_r15_pair.GroupAndSoloPairTests.test_both_tabs_open) ... ok
+test_creation_paths_exist_for_both (problems.tests.test_r15_pair.GroupAndSoloPairTests.test_creation_paths_exist_for_both) ... ok
+test_exam_constructor_exists_for_both (problems.tests.test_r15_pair.GroupAndSoloPairTests.test_exam_constructor_exists_for_both)
+⚠️ Конструктор контрольной жил внутри занятия и удалён: вид ... ok
+test_solo_screen_drops_the_group_only_blocks (problems.tests.test_r15_pair.GroupAndSoloPairTests.test_solo_screen_drops_the_group_only_blocks)
+Законное различие: теплокарты и таблицы учеников у одного нет. ... ok
+test_card_is_a_column_with_the_value_at_the_bottom (problems.tests.test_r15_align.CardValuesOnOneLineTests.test_card_is_a_column_with_the_value_at_the_bottom) ... ok
+test_narrow_screen_grid_is_not_touched (problems.tests.test_r15_align.CardValuesOnOneLineTests.test_narrow_screen_grid_is_not_touched)
+На 380 карточки идут столбцом — прижимать там нечего. ... ok
+test_difficulty_column_is_centred (problems.tests.test_r15_align.CatalogDifficultyTests.test_difficulty_column_is_centred) ... ok
+test_students_table_marks_its_numbers (problems.tests.test_r15_align.LiveAlignmentTests.test_students_table_marks_its_numbers) ... ok
+test_text_columns_are_left_alone (problems.tests.test_r15_align.LiveAlignmentTests.test_text_columns_are_left_alone)
+Имя ученика и название работы остаются текстом слева. ... ok
+test_work_history_marks_its_numbers (problems.tests.test_r15_align.LiveAlignmentTests.test_work_history_marks_its_numbers) ... ok
+test_every_marked_table_has_marked_headers (problems.tests.test_r15_align.MarkedCellsTests.test_every_marked_table_has_marked_headers)
+Ячейка с типом без заголовка с типом — столбец без оси. ... ok
+test_numeric_cells_are_marked (problems.tests.test_r15_align.MarkedCellsTests.test_numeric_cells_are_marked) ... ok
+test_header_sits_on_one_line (problems.tests.test_r15_align.RuleIsCommonTests.test_header_sits_on_one_line) ... ok
+test_kit_owns_column_alignment (problems.tests.test_r15_align.RuleIsCommonTests.test_kit_owns_column_alignment) ... ok
+test_no_inline_text_align_left_in_cabinet_tables (problems.tests.test_r15_align.RuleIsCommonTests.test_no_inline_text_align_left_in_cabinet_tables)
+Выравнивание живёт в правилах, а не в атрибуте `style`. ... ok
+test_numbers_are_tabular (problems.tests.test_r15_align.RuleIsCommonTests.test_numbers_are_tabular)
+⚠️ Ищем ПРАВИЛО, а не первое вхождение селектора. ... ok
+test_per_table_rule_does_not_outweigh_the_kit (problems.tests.test_r15_align.RuleIsCommonTests.test_per_table_rule_does_not_outweigh_the_kit)
+⚠️ `table.stats-table th` весил столько же и, стоя ниже, побеждал. ... ok
+test_check_accepts_any_form_and_order (problems.tests.test_label_set.GluedAnswerProblemTests.test_check_accepts_any_form_and_order) ... ok
+test_correct_labels_are_split (problems.tests.test_label_set.GluedAnswerProblemTests.test_correct_labels_are_split) ... ok
+test_game_pool_uses_the_same_split (problems.tests.test_label_set.GluedAnswerProblemTests.test_game_pool_uses_the_same_split) ... ok
+test_marked_parts_win_over_the_answer_string (problems.tests.test_label_set.GluedAnswerProblemTests.test_marked_parts_win_over_the_answer_string) ... ok
+test_five_forms_are_the_same_set (problems.tests.test_label_set.LabelSetTests.test_five_forms_are_the_same_set) ... ok
+test_known_labels_decide_what_is_glued (problems.tests.test_label_set.LabelSetTests.test_known_labels_decide_what_is_glued) ... ok
+test_other_separators_and_debris (problems.tests.test_label_set.LabelSetTests.test_other_separators_and_debris) ... ok
+test_word_is_one_label_not_letters (problems.tests.test_label_set.LabelSetTests.test_word_is_one_label_not_letters) ... ok
+test_page_says_it_once (problems.tests.test_tails.CalmCardTests.test_page_says_it_once) ... ok
+test_template_has_no_second_phrase (problems.tests.test_tails.CalmCardTests.test_template_has_no_second_phrase) ... ok
+test_file_is_deleted (problems.tests.test_tails.DeadTemplateTests.test_file_is_deleted) ... ok
+test_group_stats_address_still_redirects (problems.tests.test_tails.DeadTemplateTests.test_group_stats_address_still_redirects)
+Адрес не умер: он и раньше был редиректом на обзор. ... ok
+test_nothing_renders_it (problems.tests.test_tails.DeadTemplateTests.test_nothing_renders_it) ... ok
+test_backfill_fills_blank_game_events (problems.tests.test_tails.DemoGameTopicsTests.test_backfill_fills_blank_game_events) ... ok
+test_misses_block_needs_a_topic (problems.tests.test_tails.DemoGameTopicsTests.test_misses_block_needs_a_topic)
+Без темы строка промахов бесполезна — целиться в «Без темы» нечем. ... ok
+test_catalog_really_reads_the_topic_parameter (problems.tests.test_tails.GameMissLinkTests.test_catalog_really_reads_the_topic_parameter)
+Обещание должно исполняться каталогом, а не только выглядеть. ... ok
+test_link_goes_to_the_catalog_with_the_topic (problems.tests.test_tails.GameMissLinkTests.test_link_goes_to_the_catalog_with_the_topic) ... ok
+test_no_link_into_the_game_as_a_whole (problems.tests.test_tails.GameMissLinkTests.test_no_link_into_the_game_as_a_whole) ... ok
+test_cells_are_left_aligned (problems.tests.test_tails.HeroAlignmentTests.test_cells_are_left_aligned) ... ok
+test_ceiling_matches_the_limit (problems.tests.test_tails.MatrixLabelTests.test_ceiling_matches_the_limit)
+Высота шапки посчитана по замеру ~7,6 px на символ. ... ok
+test_ellipsis_only_when_something_was_cut (problems.tests.test_tails.MatrixLabelTests.test_ellipsis_only_when_something_was_cut) ... ok
+test_limit_fits_twenty_plus_characters (problems.tests.test_tails.MatrixLabelTests.test_limit_fits_twenty_plus_characters) ... ok
+test_no_two_canonical_topics_collapse_into_one_label (problems.tests.test_tails.MatrixLabelTests.test_no_two_canonical_topics_collapse_into_one_label) ... ok
+test_two_longest_theories_differ (problems.tests.test_tails.MatrixLabelTests.test_two_longest_theories_differ)
+Пример владельца: две «Теории» обязаны читаться по-разному. ... ok
+test_address_of_my_problems_still_works (problems.tests.test_tails.MyProblemsButtonTests.test_address_of_my_problems_still_works) ... ok
+test_button_is_gone_from_the_students_screen (problems.tests.test_tails.MyProblemsButtonTests.test_button_is_gone_from_the_students_screen) ... ok
+test_tab_inside_the_work_flow_survives (problems.tests.test_tails.MyProblemsButtonTests.test_tab_inside_the_work_flow_survives) ... ok
+test_two_ways_to_start_a_lesson_are_still_there (problems.tests.test_tails.MyProblemsButtonTests.test_two_ways_to_start_a_lesson_are_still_there) ... ok
+test_apply_changes_exactly_the_listed_problems_and_only_two_fields (problems.tests.test_import_problem_attributes.ImportProblemAttributesTests.test_apply_changes_exactly_the_listed_problems_and_only_two_fields) ... ok
+test_bad_line_fails_alone_others_apply (problems.tests.test_import_problem_attributes.ImportProblemAttributesTests.test_bad_line_fails_alone_others_apply) ... ok
+test_dry_run_changes_nothing (problems.tests.test_import_problem_attributes.ImportProblemAttributesTests.test_dry_run_changes_nothing) ... ok
+test_groups_and_filter_light_up_after_import (problems.tests.test_import_problem_attributes.ImportProblemAttributesTests.test_groups_and_filter_light_up_after_import) ... ok
+test_second_dry_run_is_zero_even_with_keys_reordered (problems.tests.test_import_problem_attributes.ImportProblemAttributesTests.test_second_dry_run_is_zero_even_with_keys_reordered) ... ok
+test_active_style_has_both_underline_and_background (config.tests.test_nav.ActiveItemTests.test_active_style_has_both_underline_and_background)
+Одного подчёркивания мало на графите, одного фона — при смене темы. ... ok
+test_only_the_current_item_is_active (config.tests.test_nav.ActiveItemTests.test_only_the_current_item_is_active) ... ok
+test_reading_pages_narrow_themselves (config.tests.test_nav.ContentWidthTests.test_reading_pages_narrow_themselves) ... ok
+test_tokens_are_actually_read (config.tests.test_nav.ContentWidthTests.test_tokens_are_actually_read) ... ok
+test_get_is_405_and_that_is_normal (config.tests.test_nav.LogoutTests.test_get_is_405_and_that_is_normal)
+Так решил Django 5. Чинить нечего — чинить надо было ссылку. ... ok
+test_header_form_is_post_with_csrf (config.tests.test_nav.LogoutTests.test_header_form_is_post_with_csrf) ... ok
+test_header_shows_guest_buttons_after_logout (config.tests.test_nav.LogoutTests.test_header_shows_guest_buttons_after_logout) ... ok
+test_post_logs_out_and_goes_home (config.tests.test_nav.LogoutTests.test_post_logs_out_and_goes_home) ... ok
+test_every_item_appears_once (config.tests.test_nav.MenuByRoleTests.test_every_item_appears_once) ... ok
+test_guest (config.tests.test_nav.MenuByRoleTests.test_guest) ... ok
+test_staff_gets_admin_item (config.tests.test_nav.MenuByRoleTests.test_staff_gets_admin_item) ... ok
+test_student_has_lessons_and_no_stats (config.tests.test_nav.MenuByRoleTests.test_student_has_lessons_and_no_stats) ... ok
+test_teacher (config.tests.test_nav.MenuByRoleTests.test_teacher) ... ok
+test_textbook_stands_right_after_catalog_for_every_role (config.tests.test_nav.MenuByRoleTests.test_textbook_stands_right_after_catalog_for_every_role)
+Порядок задан владельцем и одинаков у всех ролей. ... ok
+test_almost_no_inline_styles (config.tests.test_nav.NavMarkupTests.test_almost_no_inline_styles)
+Было 32 атрибута `style`, договорились не больше трёх. ... ok
+test_no_four_copies_of_the_row (config.tests.test_nav.NavMarkupTests.test_no_four_copies_of_the_row)
+Ряд ссылок в разметке ровно один цикл на шапку и один на панель. ... ok
+test_initials_fall_back_to_username (config.tests.test_nav.ProfileChipTests.test_initials_fall_back_to_username) ... ok
+test_initials_from_first_and_last_name (config.tests.test_nav.ProfileChipTests.test_initials_from_first_and_last_name) ... ok
+test_no_forms_or_buttons_on_the_stub (config.tests.test_nav.TextbookTests.test_no_forms_or_buttons_on_the_stub)
+Обещать на заглушке нечего: ни формы почты, ни кнопки. ... ok
+test_page_opens_for_guest (config.tests.test_nav.TextbookTests.test_page_opens_for_guest) ... ok
+test_version_comes_from_settings (config.tests.test_nav.VersionBadgeTests.test_version_comes_from_settings) ... ok
+test_version_on_every_template (config.tests.test_nav.VersionBadgeTests.test_version_on_every_template) ... ok
+test_fifty_served_questions_all_match (game.tests.test_filter_window.FilterReallyFiltersTests.test_fifty_served_questions_all_match) ... ok
+test_chips_have_a_cross_and_reset (game.tests.test_filter_window.FilterWindowMarkupTests.test_chips_have_a_cross_and_reset) ... ok
+test_counter_line_skips_modes_that_are_not_on_screen (game.tests.test_filter_window.FilterWindowMarkupTests.test_counter_line_skips_modes_that_are_not_on_screen)
+«График 0» при выключенном флаге обещал бы режим, которого на ... ok
+test_empty_groups_are_not_rendered_at_all (game.tests.test_filter_window.FilterWindowMarkupTests.test_empty_groups_are_not_rendered_at_all)
+Серый переключатель, который не нажимается, хуже его отсутствия. ... ok
+test_live_counters_are_debounced (game.tests.test_filter_window.FilterWindowMarkupTests.test_live_counters_are_debounced) ... ok
+test_modal_has_every_group (game.tests.test_filter_window.FilterWindowMarkupTests.test_modal_has_every_group) ... ok
+test_mode_card_shows_the_available_count (game.tests.test_filter_window.FilterWindowMarkupTests.test_mode_card_shows_the_available_count) ... ok
+test_one_button_instead (game.tests.test_filter_window.FilterWindowMarkupTests.test_one_button_instead) ... ok
+test_ranked_note_is_shown_before_the_run (game.tests.test_filter_window.FilterWindowMarkupTests.test_ranked_note_is_shown_before_the_run)
+Игрок обязан знать ДО раунда, поедет ли результат на доску. ... ok
+test_stars_are_five_toggles_not_a_slider (game.tests.test_filter_window.FilterWindowMarkupTests.test_stars_are_five_toggles_not_a_slider) ... ok
+test_state_lives_in_the_url_and_storage (game.tests.test_filter_window.FilterWindowMarkupTests.test_state_lives_in_the_url_and_storage) ... ok
+test_tag_group_appears_once_there_are_tags (game.tests.test_filter_window.FilterWindowMarkupTests.test_tag_group_appears_once_there_are_tags) ... ok
+test_tag_group_hides_while_the_pool_has_no_tags (game.tests.test_filter_window.FilterWindowMarkupTests.test_tag_group_hides_while_the_pool_has_no_tags)
+То же правило, что у «Особенностей»: группа без вариантов не ... ok
+test_tag_search_and_selected_on_top (game.tests.test_filter_window.FilterWindowMarkupTests.test_tag_search_and_selected_on_top) ... ok
+test_topic_chips_are_gone_from_the_start_screen (game.tests.test_filter_window.FilterWindowMarkupTests.test_topic_chips_are_gone_from_the_start_screen)
+Двадцать чипов занимали первый экран целиком и уводили внимание ... ok
+test_counts_match_the_candidates_actually_served (game.tests.test_filter_window.PoolCountsApiTests.test_counts_match_the_candidates_actually_served)
+⚠️ Счётчик обязан считать ТОЙ ЖЕ функцией, что выбирает вопросы. ... ok
+test_counts_report_ranked_and_unfiltered (game.tests.test_filter_window.PoolCountsApiTests.test_counts_report_ranked_and_unfiltered) ... ok
+test_min_playable_is_sent (game.tests.test_filter_window.PoolCountsApiTests.test_min_playable_is_sent) ... ok
+test_defect_marked_by_a_human_never_enters_the_pool (game.tests.test_filter_window.PoolGateTests.test_defect_marked_by_a_human_never_enters_the_pool)
+Брак, найденный человеком, сильнее любого автодетектора. ... ok
+test_dry_run_writes_nothing (game.tests.test_filter_window.PoolGateTests.test_dry_run_writes_nothing)
+Сухой прогон обязан быть безвредным: им смотрят на пересборку ... ok
+test_pool_does_not_require_the_catalogue_gate (game.tests.test_filter_window.PoolGateTests.test_pool_does_not_require_the_catalogue_gate) ... ok
+test_difficulty_filter_makes_the_run_unranked (game.tests.test_filter_window.RankedRulesTests.test_difficulty_filter_makes_the_run_unranked) ... ok
+test_topics_and_tags_do_not_touch_ranked (game.tests.test_filter_window.RankedRulesTests.test_topics_and_tags_do_not_touch_ranked)
+Они меняют, ЧТО решаешь, а не КАК ТРУДНО. ... ok
+test_unfiltered_needs_every_dimension_empty (game.tests.test_filter_window.RankedRulesTests.test_unfiltered_needs_every_dimension_empty) ... ok
+test_empty_means_all (game.tests.test_filter_window.StarsFilterTests.test_empty_means_all) ... ok
+test_gap_subset_is_possible (game.tests.test_filter_window.StarsFilterTests.test_gap_subset_is_possible)
+То, чего ползунок «от…до» не умел в принципе. ... ok
+test_single_star (game.tests.test_filter_window.StarsFilterTests.test_single_star) ... ok
+test_no_tag_filter_keeps_everything (game.tests.test_filter_window.TagFilterTests.test_no_tag_filter_keeps_everything) ... ok
+test_pool_tags_only_lists_tags_that_have_questions (game.tests.test_filter_window.TagFilterTests.test_pool_tags_only_lists_tags_that_have_questions)
+Тег, по которому ничего не найдётся, обещал бы выбор, которого ... ok
+test_several_tags_mean_any_of_them (game.tests.test_filter_window.TagFilterTests.test_several_tags_mean_any_of_them)
+Список тегов — «любой из», а не «все сразу»: пересечение почти ... ok
+test_tag_filter_narrows_the_pool (game.tests.test_filter_window.TagFilterTests.test_tag_filter_narrows_the_pool) ... ok
+test_script_parameter_names_match_filters_param (catalog.tests.test_catalog_modal.ScriptContractTests.test_script_parameter_names_match_filters_param) ... ok
+test_script_targets_every_control_of_the_window (catalog.tests.test_catalog_modal.ScriptContractTests.test_script_targets_every_control_of_the_window) ... ok
+test_cut_words_never_splits_a_number (catalog.tests.test_catalog_redesign.PreviewTextTests.test_cut_words_never_splits_a_number) ... ok
+test_formulas_become_text (catalog.tests.test_catalog_redesign.PreviewTextTests.test_formulas_become_text) ... ok
+test_literal_dollar_survives (catalog.tests.test_catalog_redesign.PreviewTextTests.test_literal_dollar_survives) ... ok
+test_long_formula_becomes_ellipsis_without_orphans (catalog.tests.test_catalog_redesign.PreviewTextTests.test_long_formula_becomes_ellipsis_without_orphans) ... ok
+test_looks_like_statement_cut (catalog.tests.test_catalog_redesign.PreviewTextTests.test_looks_like_statement_cut) ... ok
+test_block_order_is_the_owners (catalog.tests.test_catalog_redesign.TopicBlocksTests.test_block_order_is_the_owners) ... ok
+test_every_listed_name_lands_in_its_block (catalog.tests.test_catalog_redesign.TopicBlocksTests.test_every_listed_name_lands_in_its_block) ... ok
+test_names_are_matched_loosely (catalog.tests.test_catalog_redesign.TopicBlocksTests.test_names_are_matched_loosely) ... WARNING 2026-09-06 03:32:07,294 catalog.topic_blocks: тема «Ценовая политика» не описана в problems/sections.py — ушла в «Прочее»
+ok
+test_sections_match_the_map_file (catalog.tests.test_catalog_redesign.TopicBlocksTests.test_sections_match_the_map_file) ... ok
+test_legacy_single_address_and_plain_dict (catalog.tests.test_filters_multi.ParseTests.test_legacy_single_address_and_plain_dict) ... ok
+test_lists_come_from_repeated_params (catalog.tests.test_filters_multi.ParseTests.test_lists_come_from_repeated_params) ... ok
+test_query_round_trip (catalog.tests.test_filters_multi.ParseTests.test_query_round_trip) ... ok
+test_scope_and_relief_labels_for_several_values (catalog.tests.test_filters_multi.ParseTests.test_scope_and_relief_labels_for_several_values) ... ok
+test_selected_count_and_emptiness (catalog.tests.test_filters_multi.ParseTests.test_selected_count_and_emptiness) ... ok
+test_no_forbidden_words (catalog.tests.test_no_slop.NoPromisesInTemplatesTests.test_no_forbidden_words) ... ok
+test_healthz_не_требует_модели (catalog.tests.test_search_service.BitExactEncodingTests.test_healthz_не_требует_модели)
+Проверка живости обязана отвечать до загрузки модели. ... ok
+test_вектор_через_http_побитово_равен_прямому (catalog.tests.test_search_service.BitExactEncodingTests.test_вектор_через_http_побитово_равен_прямому) ... ok
+test_сервис_настроен_на_ту_же_модель_и_размерность (catalog.tests.test_search_service.BitExactEncodingTests.test_сервис_настроен_на_ту_же_модель_и_размерность) ... ok
+test_у_сервиса_search_нет_опубликованных_портов (catalog.tests.test_search_service.ComposeIsolationTests.test_у_сервиса_search_нет_опубликованных_портов) ... ok
+test_healthy_отвечает_false_на_недопустимую_схему_без_сети (catalog.tests.test_search_service.InvalidSchemeTests.test_healthy_отвечает_false_на_недопустимую_схему_без_сети) ... ok
+test_недопустимая_схема_даёт_ошибку_до_сети (catalog.tests.test_search_service.InvalidSchemeTests.test_недопустимая_схема_даёт_ошибку_до_сети) ... ok
+test_второй_одинаковый_запрос_берётся_из_кэша (catalog.tests.test_search_service.QueryVectorCacheTests.test_второй_одинаковый_запрос_берётся_из_кэша) ... ok
+test_другой_текст_идёт_в_сервис (catalog.tests.test_search_service.QueryVectorCacheTests.test_другой_текст_идёт_в_сервис)
+Обратная сторона: кэш не должен склеивать разные запросы. ... ok
+test_ключ_кэша_содержит_сборку_модели (catalog.tests.test_search_service.QueryVectorCacheTests.test_ключ_кэша_содержит_сборку_модели)
+Иначе после смены модели раздавались бы старые векторы. ... ok
+test_healthy_отвечает_false_а_не_падает (catalog.tests.test_search_service.ServiceUnavailableTests.test_healthy_отвечает_false_а_не_падает) ... ok
+test_отказ_соединения_даёт_типизированное_исключение (catalog.tests.test_search_service.ServiceUnavailableTests.test_отказ_соединения_даёт_типизированное_исключение) ... ok
+test_accepts_valid_pair (catalog.tests.test_topic_map.BuildGuardsTests.test_accepts_valid_pair) ... ok
+test_link_explanation_is_parsed_and_stored (catalog.tests.test_topic_map.BuildGuardsTests.test_link_explanation_is_parsed_and_stored) ... ok
+test_link_without_explanation_still_parses (catalog.tests.test_topic_map.BuildGuardsTests.test_link_without_explanation_still_parses)
+Разбор пояснения не требует: обязательность — дело отдельного ... ok
+test_rejects_duplicate_link (catalog.tests.test_topic_map.BuildGuardsTests.test_rejects_duplicate_link) ... ok
+test_rejects_link_inside_one_theme (catalog.tests.test_topic_map.BuildGuardsTests.test_rejects_link_inside_one_theme) ... ok
+test_rejects_link_to_missing_tag (catalog.tests.test_topic_map.BuildGuardsTests.test_rejects_link_to_missing_tag) ... ok
+test_rejects_theme_outside_groups (catalog.tests.test_topic_map.BuildGuardsTests.test_rejects_theme_outside_groups)
+Тема, не попавшая ни в один раздел корпуса, не должна пройти молча: ... ok
+test_json_file_exists_and_parses (catalog.tests.test_topic_map.BuiltJsonTests.test_json_file_exists_and_parses) ... ok
+test_json_matches_a_fresh_build (catalog.tests.test_topic_map.BuiltJsonTests.test_json_matches_a_fresh_build)
+Если разошлись — дерево правили, а команду не гоняли. ... ok
+test_json_stays_small_enough_to_ship (catalog.tests.test_topic_map.BuiltJsonTests.test_json_stays_small_enough_to_ship) ... ok
+test_all_link_endpoints_exist (catalog.tests.test_topic_map.GraphIntegrityTests.test_all_link_endpoints_exist) ... ok
+test_cross_link_list_parses_to_eighty_two_pairs (catalog.tests.test_topic_map.GraphIntegrityTests.test_cross_link_list_parses_to_eighty_two_pairs) ... ok
+test_cross_links_have_no_duplicates (catalog.tests.test_topic_map.GraphIntegrityTests.test_cross_links_have_no_duplicates) ... ok
+test_cross_links_join_different_themes (catalog.tests.test_topic_map.GraphIntegrityTests.test_cross_links_join_different_themes) ... ok
+test_every_cross_link_carries_an_explanation (catalog.tests.test_topic_map.GraphIntegrityTests.test_every_cross_link_carries_an_explanation)
+У каждой из 82 связей есть пояснение, и оно осмысленной длины. ... ok
+test_every_tag_has_exactly_one_parent_theme (catalog.tests.test_topic_map.GraphIntegrityTests.test_every_tag_has_exactly_one_parent_theme) ... ok
+test_every_theme_belongs_to_exactly_one_group (catalog.tests.test_topic_map.GraphIntegrityTests.test_every_theme_belongs_to_exactly_one_group) ... ok
+test_group_of_tag_matches_group_of_its_theme (catalog.tests.test_topic_map.GraphIntegrityTests.test_group_of_tag_matches_group_of_its_theme) ... ok
+test_node_and_link_counts (catalog.tests.test_topic_map.GraphIntegrityTests.test_node_and_link_counts) ... ok
+test_node_ids_are_unique (catalog.tests.test_topic_map.GraphIntegrityTests.test_node_ids_are_unique) ... ok
+test_seven_groups_and_none_of_them_carries_a_colour (catalog.tests.test_topic_map.GraphIntegrityTests.test_seven_groups_and_none_of_them_carries_a_colour)
+У раздела есть имя и состав; цвет — есть, но не здесь. ... ok
+test_every_step_waits_for_a_real_action (catalog.tests.test_topic_map.InteractiveTourTests.test_every_step_waits_for_a_real_action)
+Пять шагов — пять условий `want`, и ни одного «показать самому». ... ok
+test_steps_are_counted_by_events_not_by_a_button (catalog.tests.test_topic_map.InteractiveTourTests.test_steps_are_counted_by_events_not_by_a_button)
+Кнопки «Дальше» нет; шаг двигают сообщения из мест взаимодействия. ... ok
+test_tour_card_stands_in_the_free_corner (catalog.tests.test_topic_map.InteractiveTourTests.test_tour_card_stands_in_the_free_corner)
+Карточка больше не закрывает нижний левый угол графа. ... ok
+test_tour_overlay_does_not_swallow_the_cursor (catalog.tests.test_topic_map.InteractiveTourTests.test_tour_overlay_does_not_swallow_the_cursor)
+Слой тура не ловит курсор — иначе работать по карте нельзя. ... ok
+test_tour_version_is_bumped_so_returning_people_see_it_once (catalog.tests.test_topic_map.InteractiveTourTests.test_tour_version_is_bumped_so_returning_people_see_it_once)
+Логика шагов изменилась целиком — значит и ключ другой. ... ok
+test_canvas_labels_use_the_site_font (catalog.tests.test_topic_map.LayoutLabelsAndFontTests.test_canvas_labels_use_the_site_font)
+Подписи на холсте пишутся тем же шрифтом, что весь сайт. ... ok
+test_region_label_reads_as_one_colour_in_both_themes (catalog.tests.test_topic_map.LayoutLabelsAndFontTests.test_region_label_reads_as_one_colour_in_both_themes)
+Ориентир в двух темах — один цвет, а не два похожих. ... ok
+test_region_labels_depend_on_the_current_turn (catalog.tests.test_topic_map.LayoutLabelsAndFontTests.test_region_labels_depend_on_the_current_turn)
+Набор надписей-ориентиров пересчитывается по глубине скопления. ... ok
+test_tag_crown_stays_roomy (catalog.tests.test_topic_map.LayoutLabelsAndFontTests.test_tag_crown_stays_roomy)
+Венец тегов — главный рычаг тесноты, и он замерен. ... ok
+test_hover_block_hides_its_scrollbar (catalog.tests.test_topic_map.MapTextsTests.test_hover_block_hides_its_scrollbar)
+У блока фиксированная высота, и системная полоса стояла в нём ... ok
+test_legend_is_titled_as_a_legend (catalog.tests.test_topic_map.MapTextsTests.test_legend_is_titled_as_a_legend)
+Над легендой стоит «Как пользоваться», а не «Под курсором». ... ok
+test_legend_text_has_no_long_dashes (catalog.tests.test_topic_map.MapTextsTests.test_legend_text_has_no_long_dashes)
+Длинных тире в легенде нет: пять коротких фраз читаются быстрее ... ok
+test_page_says_what_it_is_not_what_to_do (catalog.tests.test_topic_map.MapTextsTests.test_page_says_what_it_is_not_what_to_do)
+Витрина страницы отвечает «что это», а не «как этим пользоваться». ... ok
+test_theme_descriptions_are_short_and_uniform (catalog.tests.test_topic_map.MapTextsTests.test_theme_descriptions_are_short_and_uniform)
+Единый шаблон: одна фраза о сути. ... ok
+test_theme_descriptions_carry_no_editorial_notes (catalog.tests.test_topic_map.MapTextsTests.test_theme_descriptions_carry_no_editorial_notes)
+Описания тем — текст для человека, а не заметки редактора. ... ok
+test_node_and_accent_stand_out_in_both_themes (catalog.tests.test_topic_map.NodeColourContrastTests.test_node_and_accent_stand_out_in_both_themes) ... ok
+test_only_one_node_colour_is_declared (catalog.tests.test_topic_map.NodeColourContrastTests.test_only_one_node_colour_is_declared)
+Старых имён `--g-base` … `--g-tools` в токенах нет. ... ok
+test_region_colour_differs_from_node_and_accent (catalog.tests.test_topic_map.NodeColourContrastTests.test_region_colour_differs_from_node_and_accent)
+Третий цвет — именно третий, а не переименованный первый. ... ok
+test_region_label_colour_is_readable_in_both_themes (catalog.tests.test_topic_map.NodeColourContrastTests.test_region_label_colour_is_readable_in_both_themes)
+Надписи-ориентиры по разделам читаются на холсте. ... ok
+test_clicking_a_tag_goes_to_the_tag_and_shows_where_it_belongs (catalog.tests.test_topic_map.PanelTreeTests.test_clicking_a_tag_goes_to_the_tag_and_shows_where_it_belongs)
+Клик по тегу ведёт камеру к ТЕГУ, а не к его теме. ... ok
+test_expanding_and_selecting_are_different_actions (catalog.tests.test_topic_map.PanelTreeTests.test_expanding_and_selecting_are_different_actions)
+Клик по теме раскрывает, а не выбирает. ... ok
+test_pulse_stops_when_motion_is_switched_off (catalog.tests.test_topic_map.PanelTreeTests.test_pulse_stops_when_motion_is_switched_off)
+Импульс — украшение поверх подсветки, и при отключённом движении ... ok
+test_scrollbar_is_hidden_until_the_panel_is_hovered (catalog.tests.test_topic_map.PanelTreeTests.test_scrollbar_is_hidden_until_the_panel_is_hovered)
+Полосы прокрутки не видно, пока на панель не навелись. ... ok
+test_section_headers_are_painted_with_their_colour (catalog.tests.test_topic_map.PanelTreeTests.test_section_headers_are_painted_with_their_colour)
+Заголовок раздела — легенда, а не украшение. ... ok
+test_tree_carries_all_three_levels (catalog.tests.test_topic_map.PanelTreeTests.test_tree_carries_all_three_levels)
+Пять разделов, 29 тем, 343 тега — весь справочник, а не выборка. ... ok
+test_tree_starts_collapsed (catalog.tests.test_topic_map.PanelTreeTests.test_tree_starts_collapsed)
+Свёрнуто по умолчанию: пять строк вместо двадцати девяти. ... ok
+test_counter_forms (catalog.tests.test_topic_map.ParserUnitTests.test_counter_forms) ... ok
+test_demo_blocks_lead_to_the_full_map (catalog.tests.test_topic_map.PreviewModeTests.test_demo_blocks_lead_to_the_full_map)
+Клик по блоку ведёт на полную карту — адрес берётся из маршрута, ... ok
+test_demo_page_shows_two_preview_blocks (catalog.tests.test_topic_map.PreviewModeTests.test_demo_page_shows_two_preview_blocks)
+Стенд приёмки: один блок виден сразу, второй лежит ниже экрана. ... ok
+test_preview_draws_no_labels_at_all (catalog.tests.test_topic_map.PreviewModeTests.test_preview_draws_no_labels_at_all)
+Ни одной подписи: только узлы и связи. ... ok
+test_preview_exposes_the_mount_point (catalog.tests.test_topic_map.PreviewModeTests.test_preview_exposes_the_mount_point)
+Точка подключения — то, ради чего режим и делался. ... ok
+test_preview_listens_to_no_pointer_events (catalog.tests.test_topic_map.PreviewModeTests.test_preview_listens_to_no_pointer_events)
+Курсор на карту не влияет — и это держится устройством. ... ok
+test_preview_stays_far_lighter_than_the_full_engine (catalog.tests.test_topic_map.PreviewModeTests.test_preview_stays_far_lighter_than_the_full_engine)
+Вес — весь смысл отдельного файла. ... ok
+test_preview_stops_off_screen_and_without_motion (catalog.tests.test_topic_map.PreviewModeTests.test_preview_stops_off_screen_and_without_motion)
+Вне экрана и при prefers-reduced-motion кадры не просто одинаковые, ... ok
+test_preview_styles_live_in_their_own_file (catalog.tests.test_topic_map.PreviewModeTests.test_preview_styles_live_in_their_own_file)
+Стили предпросмотра отдельно от стилей полной карты: экрану-хозяину ... ok
+test_preview_waits_for_the_host_screen (catalog.tests.test_topic_map.PreviewModeTests.test_preview_waits_for_the_host_screen)
+Данные тянутся после отрисовки экрана-хозяина, а не вместе с ним. ... ok
+test_all_five_sections_have_a_colour_in_both_themes (catalog.tests.test_topic_map.SectionColourTests.test_all_five_sections_have_a_colour_in_both_themes) ... ok
+test_both_map_modes_actually_read_the_section_colours (catalog.tests.test_topic_map.SectionColourTests.test_both_map_modes_actually_read_the_section_colours)
+Объявленный, но никем не читаемый цвет — не введённый цвет. ... ok
+test_every_section_colour_is_visible_on_the_canvas (catalog.tests.test_topic_map.SectionColourTests.test_every_section_colour_is_visible_on_the_canvas)
+Порог 4,5:1 к фону холста — цвет отвечает на вопрос «где я». ... ok
+test_sections_are_not_the_accent_and_not_the_region_label (catalog.tests.test_topic_map.SectionColourTests.test_sections_are_not_the_accent_and_not_the_region_label)
+Цвет раздела не притворяется ни подсветкой, ни ориентиром. ... ok
+test_sections_do_not_blend_into_each_other (catalog.tests.test_topic_map.SectionColourTests.test_sections_do_not_blend_into_each_other)
+Семь красок должны читаться как семь, а не как «примерно две». ... ok
+test_tag_shade_of_every_section_still_stands_out (catalog.tests.test_topic_map.SectionColourTests.test_tag_shade_of_every_section_still_stands_out)
+Тег — тот же цвет вполсилы. Он не обязан быть текстом, но обязан ... ok
+test_click_aims_at_a_node_not_at_a_line (catalog.tests.test_topic_map.SelectionAndViewTests.test_click_aims_at_a_node_not_at_a_line)
+У клика свой прицел, шире чем у наведения. ... ok
+test_click_never_takes_both_ends_of_a_line (catalog.tests.test_topic_map.SelectionAndViewTests.test_click_never_takes_both_ends_of_a_line)
+Клик выбирает РОВНО ОДИН узел. ... ok
+test_home_road_is_visibly_thicker_than_the_others (catalog.tests.test_topic_map.SelectionAndViewTests.test_home_road_is_visibly_thicker_than_the_others)
+Дорога тега к СВОЕЙ теме толще прочих подсвеченных связей. ... ok
+test_lower_bound_note_is_gone_from_the_screen (catalog.tests.test_topic_map.SelectionAndViewTests.test_lower_bound_note_is_gone_from_the_screen)
+Строки «Оценка снизу: счётчик задан у N тегов из M» нет нигде. ... ok
+test_missing_counter_is_called_unknown_not_zero (catalog.tests.test_topic_map.SelectionAndViewTests.test_missing_counter_is_called_unknown_not_zero)
+«Примерно 0 задач» читается как «ничего не нашлось». ... ok
+test_reset_returns_the_whole_view_including_the_turn (catalog.tests.test_topic_map.SelectionAndViewTests.test_reset_returns_the_whole_view_including_the_turn)
+«Вернуть обзор» возвращает и поворот. ... ok
+test_selection_has_exactly_one_entry_point (catalog.tests.test_topic_map.SelectionAndViewTests.test_selection_has_exactly_one_entry_point)
+Выбор идёт через `selectNode`, и второго пути нет. ... ok
+test_counter_present_on_one_hundred_eighty_tags (catalog.tests.test_topic_map.TreeInvariantsTests.test_counter_present_on_one_hundred_eighty_tags) ... ok
+test_every_theme_has_definition (catalog.tests.test_topic_map.TreeInvariantsTests.test_every_theme_has_definition) ... ok
+test_label_never_keeps_trailing_counter (catalog.tests.test_topic_map.TreeInvariantsTests.test_label_never_keeps_trailing_counter)
+Счётчик вырезан из названия, а не оставлен в тексте подписи. ... ok
+test_named_themes_keep_their_size (catalog.tests.test_topic_map.TreeInvariantsTests.test_named_themes_keep_their_size) ... ok
+test_section_cut_does_not_stop_at_theme_five (catalog.tests.test_topic_map.TreeInvariantsTests.test_section_cut_does_not_stop_at_theme_five)
+Раздел режется по началу строки, а не подстрокой «## 5.». ... ok
+test_slash_means_two_patterns_summed (catalog.tests.test_topic_map.TreeInvariantsTests.test_slash_means_two_patterns_summed) ... ok
+test_sum_of_counters (catalog.tests.test_topic_map.TreeInvariantsTests.test_sum_of_counters)
+Сумма счётчиков — 37 264. ... ok
+test_tag_numbers_are_consecutive_inside_theme (catalog.tests.test_topic_map.TreeInvariantsTests.test_tag_numbers_are_consecutive_inside_theme) ... ok
+test_tags_per_theme_spread (catalog.tests.test_topic_map.TreeInvariantsTests.test_tags_per_theme_spread) ... ok
+test_theme_numbers_are_one_to_twenty_nine (catalog.tests.test_topic_map.TreeInvariantsTests.test_theme_numbers_are_one_to_twenty_nine) ... ok
+test_thousands_separator_is_not_a_second_number (catalog.tests.test_topic_map.TreeInvariantsTests.test_thousands_separator_is_not_a_second_number) ... ok
+test_three_hundred_forty_three_tags (catalog.tests.test_topic_map.TreeInvariantsTests.test_three_hundred_forty_three_tags) ... ok
+test_twenty_nine_themes (catalog.tests.test_topic_map.TreeInvariantsTests.test_twenty_nine_themes) ... ok
+test_every_canonical_topic_is_placed (problems.tests.test_sections.CanonicalCoverageTests.test_every_canonical_topic_is_placed) ... ok
+test_every_section_used (problems.tests.test_sections.CanonicalCoverageTests.test_every_section_used) ... ok
+test_exactly_23_keys (problems.tests.test_sections.CanonicalCoverageTests.test_exactly_23_keys) ... ok
+test_no_stray_keys (problems.tests.test_sections.CanonicalCoverageTests.test_no_stray_keys) ... ok
+test_empty_input (problems.tests.test_sections.GroupedTests.test_empty_input) ... ok
+test_empty_sections_are_dropped (problems.tests.test_sections.GroupedTests.test_empty_sections_are_dropped) ... ok
+test_order_and_content (problems.tests.test_sections.GroupedTests.test_order_and_content) ... ok
+test_known_canonical_names (problems.tests.test_sections.SectionOfTests.test_known_canonical_names) ... ok
+test_known_v2_names (problems.tests.test_sections.SectionOfTests.test_known_v2_names) ... ok
+test_substring_does_not_decide (problems.tests.test_sections.SectionOfTests.test_substring_does_not_decide)
+Раньше «монопол» в названии утаскивало тему в чужой блок. ... ok
+test_unknown_name_falls_to_other (problems.tests.test_sections.SectionOfTests.test_unknown_name_falls_to_other) ... ok
+test_whitespace_is_forgiven (problems.tests.test_sections.SectionOfTests.test_whitespace_is_forgiven) ... ok
+test_five_sections_in_agreed_order (problems.tests.test_sections.SectionsShapeTests.test_five_sections_in_agreed_order) ... ok
+test_all_29_numbers_covered (problems.tests.test_sections.V2CoverageTests.test_all_29_numbers_covered) ... ok
+test_borders_match_owner_decision (problems.tests.test_sections.V2CoverageTests.test_borders_match_owner_decision)
+Границы блоков — решение владельца 04.09, а не догадка. ... ok
+test_every_number_has_a_known_section (problems.tests.test_sections.V2CoverageTests.test_every_number_has_a_known_section) ... ok
+test_names_cover_all_29 (problems.tests.test_sections.V2CoverageTests.test_names_cover_all_29) ... ok
+
+----------------------------------------------------------------------
+Ran 442 tests in 343.874s
+
+OK
+Destroying test database for alias 'default' ('file:memorydb_default?mode=memory&cache=shared')...
+ OK
+System check identified no issues (0 silenced).
+  история пропущена: в банке мало задач с темами
+exit=0

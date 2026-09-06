@@ -1,0 +1,50 @@
+{% load catalog_filters %}{% comment %}
+РЕЗУЛЬТАТ ПРОВЕРКИ ПОПЫТКИ — ОДИН РЕНДЕРЕР. Его отдаёт эндпоинт
+`api_attempt` после проверки, и он же показывает последнюю попытку
+пользователя при загрузке страницы. Ждёт `attempt` (CatalogAttempt) и
+подготовленные во вьюхе `chk` (css, слово вердикта, уверенность).
+
+Состояние показывается полосой слева, значком и словом, панель не
+заливается (правило 9 канона); балл — табличными цифрами; итог модели
+помечен как предварительный (2.13). Для `needs_human` балла нет и нет
+«отправить преподавателю» — такой проверки пока не существует.
+{% endcomment %}
+<section class="chk chk--{{ chk.css }} is-on" id="chk" data-attempt="{{ attempt.pk }}" aria-label="Результат проверки">
+  <div class="chk-head">
+    <div class="chk-score">{% if attempt.score is not None %}{{ attempt.score }}<small> / {{ attempt.max_score }}</small>{% else %}–{% endif %}</div>
+    <div>
+      <div class="chk-verdict">{{ chk.word }}</div>
+      {% if chk.sub %}<div class="chk-sub">{{ chk.sub }}</div>{% endif %}
+    </div>
+  </div>
+  {% if attempt.steps %}
+  <ol class="chk-steps">
+    {% for step in attempt.steps %}
+    <li class="chk-step{% if step.n == attempt.first_error_step %} is-first{% endif %}">
+      <span class="chk-mark {{ step.verdict }}">{% if step.verdict == 'ok' %}✓{% elif step.verdict == 'bad' %}✗{% elif step.verdict == 'part' %}?{% else %}·{% endif %}</span>
+      <div>
+        <div class="chk-step-t">{{ step.title }}{% if step.n == attempt.first_error_step %}<span class="chk-flag">ПЕРВАЯ ОШИБКА</span>{% endif %}</div>
+        {% if step.comment %}<div class="chk-step-c">{{ step.comment }}</div>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+  {% if attempt.ocr_text %}
+  <div class="chk-ocr">
+    <details><summary>Проверено по тексту, распознанному с фото: показать, как мы его прочитали</summary>
+      <blockquote>{{ attempt.ocr_text|linebreaksbr }}</blockquote>
+      Если что-то распознано неверно, поправьте текст решения и отправьте снова.</details>
+  </div>
+  {% endif %}
+  <div class="chk-foot">
+    {% if attempt.status != 'error' %}
+    <span class="chk-conf">Уверенность модели <span class="bars"><i class="on"></i><i{% if chk.bars > 1 %} class="on"{% endif %}></i><i{% if chk.bars > 2 %} class="on"{% endif %}></i></span> {{ chk.confidence_word }}</span>
+    {% endif %}
+    <div class="chk-acts">
+      {% if chk.ask and chk.can_chat %}<button class="btn btn--quiet btn--sm" type="button" data-ask="{{ chk.ask }}">Спросить про ошибку</button>{% endif %}
+      <button class="btn btn--main btn--sm" type="button" data-retry>Исправить и отправить снова</button>
+    </div>
+    <span class="chk-note">Предварительная оценка ИИ: может ошибаться.</span>
+  </div>
+</section>

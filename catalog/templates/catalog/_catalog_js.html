@@ -1,120 +1,63 @@
 {% comment %}
 СКРИПТ ЭКРАНА КАТАЛОГА.
 
-Первая половина — новая: окно «Все фильтры», подсказки тегов, честное
-«ищу» на первом запросе. Вторая — БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего
-`problem_list.html`: модальное окно задачи и кнопка «+ В домашку».
-Это работающие возможности каталога, слияние экранов их не касалось.
+Первая половина — поле запроса (крестик, стрелка, честное «ищу»). Вторая —
+БЕЗ ИЗМЕНЕНИЙ перенесена из прежнего `problem_list.html`: модальное окно
+задачи и кнопка «+ В домашку». Окно «Все фильтры» живёт отдельным файлом
+`catalog/static/catalog/js/catalog_filters.js`.
 
-⚠️ ФИЛЬТРЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА. Каждый вариант — обычная ссылка с
-готовым адресом; скрипт добавляет удобство (окно, подсказки), но не
-является условием того, что каталогом можно пользоваться.
+⚠️ ПОИСК И ЧИПЫ РАБОТАЮТ БЕЗ ЭТОГО ФАЙЛА: форма и крестики чипов —
+серверные. Скрипт добавляет удобство, а не условие пользования каталогом.
 {% endcomment %}
 <script>
-/* ── Окно «Все фильтры» ───────────────────────────────────────────────
-   Настоящий <dialog> с showModal(): ловушка фокуса, Escape и возврат
-   фокуса приходят от браузера, а не пишутся руками. Окно встаёт НАД
-   выдачей — под задачами ему не место (замечание владельца). */
-(function () {
-  var dlg = document.getElementById('ct-all');
-  var open = document.getElementById('ct-all-open');
-  if (!dlg || !open) return;
-  open.addEventListener('click', function () {
-    if (typeof dlg.showModal === 'function') dlg.showModal();
-    else dlg.setAttribute('open', '');       /* старый браузер: без затемнения */
-  });
-})();
+/* ── Поле запроса: текст, крестик, стрелка, честное «ищу» ────────────
+   Крестик и стрелка живут ВНУТРИ поля (решение владельца 04.09.2026):
+   крестик виден только при тексте, стрелка при тексте становится
+   янтарной — за это отвечает класс has-text на форме. Enter отправляет,
+   Shift+Enter переносит строку: поле многострочное, но человек ждёт от
+   поиска поведения поиска.
 
-/* ── Чипы полосы: открытый закрывается щелчком мимо ───────────────── */
-document.addEventListener('click', function (e) {
-  document.querySelectorAll('details.fl-chip[open]').forEach(function (d) {
-    if (!d.contains(e.target)) d.removeAttribute('open');
-  });
-});
-
-/* ── Подсказки тегов ──────────────────────────────────────────────────
-   Тегов 552, списком их не показать. Подсказки идут с двух символов;
-   выбранный тег уходит в адрес обычной ссылкой, как и все остальные
-   фильтры, — состояние экрана всегда честно лежит в URL.
-
-   ⚠️ ИМЯ ТЕГА КЛАДЁТСЯ ЧЕРЕЗ textContent. Таблица тегов засорена
-   импортом (ссылки, обрывки комментариев), и это чужой текст: собирать
-   из него разметку нельзя ни при каких обстоятельствах. */
-(function () {
-  document.querySelectorAll('[data-tag-box]').forEach(function (box) {
-    var input = box.querySelector('[data-tag-input]');
-    var list = box.querySelector('[data-tag-sug]');
-    if (!input || !list) return;
-    var timer = null;
-
-    function urlWithTag(id) {
-      var params = new URLSearchParams(location.search);
-      params.delete('show');            /* новый фильтр — снова первые 20 */
-      params.append('tag', id);
-      return location.pathname + '?' + params.toString();
-    }
-
-    function render(tags) {
-      list.textContent = '';
-      if (!tags.length) { list.hidden = true; return; }
-      tags.forEach(function (t) {
-        var li = document.createElement('li');
-        var a = document.createElement('a');
-        a.className = 'fl-opt';
-        a.href = urlWithTag(t.id);
-        var name = document.createElement('span');
-        name.className = 'fl-opt-l';
-        name.textContent = t.name;
-        var n = document.createElement('span');
-        n.className = 'fl-opt-n';
-        n.textContent = t.count;
-        a.appendChild(name); a.appendChild(n); li.appendChild(a);
-        list.appendChild(li);
-      });
-      list.hidden = false;
-    }
-
-    input.addEventListener('input', function () {
-      var needle = input.value.trim();
-      window.clearTimeout(timer);
-      if (needle.length < 2) { list.textContent = ''; list.hidden = true; return; }
-      timer = window.setTimeout(function () {
-        fetch(input.dataset.tagUrl + '?q=' + encodeURIComponent(needle),
-              { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-          .then(function (r) { return r.json(); })
-          .then(function (d) { render(d.tags || []); })
-          .catch(function () { list.hidden = true; });
-      }, 200);
-    });
-  });
-})();
-
-/* ── Честное «ищу» ────────────────────────────────────────────────────
    Первый смысловой запрос идёт около семи секунд: модель грузится
-   лениво. Пока поиск жил отдельной страницей, это была плата за вход
-   именно на неё; теперь каталог — главный вход. Молчащий экран в эти
-   секунды выглядит зависшим, поэтому кнопка честно говорит, что ищет. */
+   лениво. Молчащий экран в эти секунды выглядит зависшим, поэтому на
+   время запроса подсказка о способе сменяется на «Ищу…» (класс is-busy). */
 (function () {
   var form = document.getElementById('ct-ask-form');
-  var busy = document.getElementById('ct-busy');
   var field = document.getElementById('ct-q');
-  if (!form || !busy || !field) return;
-  form.addEventListener('submit', function () {
-    if (field.value.trim()) busy.hidden = false;
-  });
-  /* Ctrl/⌘+Enter отправляет: поле многострочное, и Enter в нём — перевод
-     строки, а не отправка. */
+  if (!form || !field) return;
+  var clear = document.getElementById('ask-clear');
+
+  function sync() {
+    var text = field.value.trim();
+    form.classList.toggle('has-text', text.length > 0);
+    /* Поле растёт под ВВЕДЁННЫЙ текст и не ниже трёх строк; без текста
+       высота возвращается к трём строкам из CSS.
+       ⚠️ scrollHeight ПУСТОГО поля считает и перенесённый placeholder:
+       на узком окне подсказка ложится в полсотни строк, и поле раздувалось
+       на весь экран. Меряем только при тексте и при снятом flex — иначе
+       замер берёт высоту, до которой поле уже растянул ряд. */
+    field.style.height = '';
+    if (!text) return;
+    field.style.flex = '0 0 auto';
+    var height = Math.max(96, field.scrollHeight);
+    field.style.flex = '';
+    field.style.height = height + 'px';
+  }
+  field.addEventListener('input', sync);
   field.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) form.requestSubmit();
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); }
   });
+  if (clear) clear.addEventListener('click', function () {
+    field.value = ''; sync(); field.focus();
+  });
+  form.addEventListener('submit', function () {
+    if (field.value.trim()) form.classList.add('is-busy');
+  });
+  sync();
 })();
 
 
 </script>
 <script>
-// ── Домашки учителя (JSON из view) ───────────────
-const TEACHER_ASSIGNMENTS = {{ teacher_assignments_json|safe }};
-
 // ── Модальное окно ────────────────────────────────
 function openCatalogModal(pid, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
@@ -245,92 +188,5 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') closeCatalogModalDirect();
 });
 
-// ── Dropdown "+ В домашку" для учителей ──────────
-let openDropdownPid = null;
-
-function closeAllDropdowns() {
-  if (openDropdownPid !== null) {
-    const dd = document.getElementById('hw-dd-' + openDropdownPid);
-    if (dd) dd.classList.remove('open');
-    openDropdownPid = null;
-  }
-}
-
-function toggleHwDropdown(pid, e) {
-  if (e) { e.preventDefault(); e.stopPropagation(); }
-
-  if (openDropdownPid === pid) {
-    closeAllDropdowns();
-    return;
-  }
-  closeAllDropdowns();
-
-  const dd = document.getElementById('hw-dd-' + pid);
-  if (!dd) return;
-
-  // ⚠️ Собираем узлами: название работы печатает человек, и через
-  // innerHTML оно становилось разметкой.
-  dd.textContent = '';
-  const head = document.createElement('div');
-  head.className = 'ca-dd-head';
-  head.textContent = 'Добавить в:';
-  dd.appendChild(head);
-
-  TEACHER_ASSIGNMENTS.forEach(a => {
-    const btn = document.createElement('button');
-    btn.className = 'ca-dd-item';
-    btn.textContent = a.name;
-    btn.addEventListener('click', ev => {
-      addToAssignment(a.id, pid, btn);
-      ev.stopPropagation();
-    });
-    dd.appendChild(btn);
-  });
-
-  const link = document.createElement('a');
-  link.className = 'ca-dd-item new-hw';
-  link.href = '/teacher/assignment/create/?preselect=' + pid;
-  link.textContent = '+ Новая домашка';
-  link.addEventListener('click', ev => ev.stopPropagation());
-  dd.appendChild(link);
-
-  dd.classList.add('open');
-  openDropdownPid = pid;
-}
-
-function addToAssignment(assignmentId, problemId, btn) {
-  const csrfToken = '{{ csrf_token }}';
-  fetch(`/teacher/api/assignment/${assignmentId}/add_problem/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'X-CSRFToken': csrfToken,
-    },
-    body: JSON.stringify({ problem_id: problemId }),
-  })
-  .then(r => r.json())
-  .then(data => {
-    if (data.ok) {
-      btn.textContent = '✓ Добавлено';
-      btn.classList.add('done');
-      const hwBtn = document.getElementById('hw-btn-' + problemId);
-      if (hwBtn) {
-        hwBtn.textContent = '✓ Добавлено';
-        hwBtn.classList.add('added');
-      }
-      setTimeout(closeAllDropdowns, 600);
-    }
-  })
-  .catch(() => {});
-}
-
-// Закрываем dropdown при клике вне
-document.addEventListener('click', e => {
-  if (openDropdownPid !== null) {
-    const wrap = document.getElementById('hw-wrap-' + openDropdownPid);
-    if (wrap && !wrap.contains(e.target)) {
-      closeAllDropdowns();
-    }
-  }
-});
 </script>
+{% include "catalog/_hw_dropdown_js.html" %}

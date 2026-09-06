@@ -1,0 +1,6 @@
+{% load catalog_filters %}{% comment %}
+ТЕКСТ ЗАДАЧИ С ФОРМУЛАМИ — одно место для условия, подпунктов, ответа и решения.
+Ждёт `text` и `problem` (формат текста берётся у задачи: PLAIN — автоэскейп +
+переносы, MARKDOWN — узкий рендерер `problems/rendering.py`). KaTeX ходит по
+тексту сам (`catalog/base.html`), `$$` раньше `$`.
+{% endcomment %}{% if problem.content_format == 'markdown' %}{{ text|render_markdown|render_figures:problem|safe }}{% else %}{{ text|linebreaksbr }}{% endif %}

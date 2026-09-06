@@ -44,6 +44,7 @@ import re
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from problems import answer_check
 from problems.models import AnswerSecondOpinion, Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from game.sources import group_of
@@ -507,9 +508,6 @@ def extract_boolean(problem):
     return question, (0 if correct_stmt == 'верно' else 1), None
 
 
-ANSWER_SEPARATORS = set(' ,;.()')
-
-
 def extract_multi(problem):
     """multi: возвращает (question, options, correct_indices, reason_отказа).
     Правильные — буквы из Problem.answer (строка вида «аб», «а, в»);
@@ -537,8 +535,12 @@ def extract_multi(problem):
             return None, None, None, 'правильный ответ не определён'
         return question, options, positions, None
 
-    letters = [ch for ch in normalize_label(problem.answer)
-               if ch not in ANSWER_SEPARATORS]
+    # Ответ режет та же функция, что и проверка в каталоге (этап 7.1
+    # редизайна, 04.09.2026): «аб», «а, б», «а б» — одно множество. Метки
+    # здесь уже сведены к кириллице, поэтому латинские двойники в ответе
+    # переводим ДО разбора: иначе «aб» с латинской «a» не разрежется.
+    answer = str(problem.answer or '').lower().translate(LATIN_LOOKALIKES)
+    letters = answer_check.label_set(answer, labels)
     if not letters:
         return None, None, None, 'правильный ответ не определён'
     indices = set()
