@@ -485,3 +485,63 @@ merge-коммита. Тег `sync-20260905` создан на вершине.
 | `git ls-remote --tags origin sync-20260905` | `46a73c307996f33fa34d5f5c3bb1a7e5dc6a4311` (объект тега) |
 | `git diff --stat 7458d560 main` | только `reports/branch_sync_20260905/PROGRESS.md`, +46 |
 | CI #116 на `main` (run `34029085274`) | запущен, результат — при появлении, ждать не обязательно |
+
+### Фаза B2, шаг 0. Карта выкатки и план отката (Claude Code, до сервера)
+
+**Что придёт на сервер одним `git pull`** — коммитов от `6b840611` (текущий
+прод) до `main` (`6b0315b9` на момент записи, дальше — журнальные коммиты).
+Кода это не касается: `git diff --stat 7458d560 main` (см. выше) — только
+`reports/branch_sync_20260905/PROGRESS.md`, вне `.dockerignore` не попадает.
+
+**Миграции — ровно 14 файлов** (`git diff --stat 6b840611 main -- problems/migrations olympiads/migrations`,
+проверено командой, не по памяти):
+
+- `olympiads`: 0002_trainingattempt_trainingdraft_trainingitemresult_and_more,
+  0003_olympiadvariant_is_placeholder, 0004_alter_regionalcoordinator_options_and_more,
+  0005_olympiadbenefit_who_gets, 0006_olympiadstage_source (5 файлов)
+- `problems`: 0047_problem_figure_raster, 0050_problem_character_features,
+  0050_userprofile_avatar_userprofile_level, 0051_catalog_attempt,
+  0051_studentgroup_invite_code, 0052_feedback, 0052_hint_ai_flags,
+  0053_hint_reviewed_backfill, 0054_merge_0052_feedback_0053_hint_reviewed_backfill
+  (9 файлов)
+
+Все обратимы по схеме (проверено на копии в фазе 9 сессии A). Две `RunPython`:
+`0051_studentgroup_invite_code` (`fill_codes`, откат `noop`) и
+`0053_hint_reviewed_backfill` (`mark_reviewed`, откат `noop`) — откат схемы
+идёт, данные RunPython назад не возвращаются. `entrypoint.sh` (строки 82, 89)
+накатывает `migrate --noinput` и `collectstatic --noinput` сам при старте
+контейнера `web` — руками ничего катить не нужно. nginx: `deploy/nginx/available/django.conf`
+уже несёт `weconomics.ai`/`www.weconomics.ai` в `server_name` (проверка diff-ом
+на сервере всё равно обязательна — B2 шаг 3). Данные: заливка олимпиад по
+`--yes` на шаге 6 (finat чинится пропуском с предупреждением, не блокирует).
+`import_problem_attributes` — пропуск, файла разметки нет.
+
+Имена служб в `deploy/docker-compose.yml` подтверждены: `postgres`, `redis`,
+`web`, `ws`, `search`, `nginx`, `certbot` (плюс тома и сеть `backend`) —
+совпадает с ожиданием SERVER.md.
+
+**План отката** (записан ДО выкатки):
+
+- **А. Заглушка.** Сайт сломан, чинить некогда —
+  `cp /srv/weconomics/nginx/available/stub.conf /srv/weconomics/nginx/conf.d/weconomics.conf && docker compose exec nginx nginx -s reload`
+  (раздел «Откат» SERVER.md, команда проверена дважды на живом сайте
+  21.08). Данные и `web` целы, nginx просто перестаёт проксировать.
+- **Б. Откат кода = откат базы.** Старый код не переживёт новые NOT NULL
+  колонки без дефолта на уровне базы (`userprofile.avatar`/`level`,
+  `problemfigure.content_type` и т. п.) — регистрация и другие вставки
+  упадут. Порядок: `docker compose stop web` → переименовать боевую базу
+  (не удалять) → создать пустую → восстановить свежий дамп шага 1
+  (`pg_restore --no-owner --no-privileges`, раздел «Как восстановиться»
+  SERVER.md, но поверх боевой, не во временную) → `git reset --hard 6b8406110d9d7e24afb8e796e6e0dc10197eb143`
+  в клоне → `docker compose build web && docker compose up -d web` →
+  `manage.py fix_sequences` (сперва показать, затем `--apply`) → проверки
+  шага 2. Записи пользователей между выкаткой и откатом теряются — сказать
+  владельцу прямо, если до этого дойдёт.
+- **В. Частичный откат без отката базы** (данные после выкатки уже ценны):
+  на новом коде — `manage.py migrate problems 0049_merge_20260902_2058` и
+  `manage.py migrate olympiads 0001_initial`, затем А или Б. Колонки
+  `0047_problem_figure_raster` не потомок 0049 — остаются, старый код их
+  не трогает, риск только при загрузке картинок.
+
+⛔ **Стоп-гейт 2.** Карта и план отката показаны. Вопрос владельцу: план
+отката прочитан, дамп будем снимать — да?
