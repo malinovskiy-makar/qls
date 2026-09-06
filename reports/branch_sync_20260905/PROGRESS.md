@@ -310,6 +310,62 @@ CI (по пункту 4): run #112 (`183f632`, КТ1) — успешно, пят
 > Модель: та же сессия (Sonnet). Effort: High.
 
 
+## B0. CI красный на run #114 — test_rendering ловил max-width как width:100%
+
+**Причина (подтверждено, не только по описанию владельца).** Утренний коммит
+`4b22940` («Страница задачи: на узком экране не едет вбок») добавил в
+`catalog/templates/catalog/problem_detail.html` ВТОРОЕ правило для селектора
+`.math-content table` (строка 74) — оно стояло раньше исходного правила на
+строке 149. Тест `problems/tests/test_rendering.py::TableCssTests::
+test_table_does_not_force_full_width` берёт через `re.search` ПЕРВОЕ
+совпадение и проверяет `assertNotRegex(…, r'width\s*:\s*100%')` — регулярка
+без левой границы ловит `max-width: 100%` из нового правила. Дефекта два:
+регулярка не различает `width` и `max-width` (а `max-width` как раз не
+растягивает, что и требует тест), и в файле было два правила на один
+селектор. Полный прогон фазы 13 прошёл ДО коммита `4b22940`; после него
+гонялся только замер ширины браузером (тест шаблона не входил в тот список).
+
+**B0.1 Воспроизведено** локально на PostgreSQL
+(`--settings=config.settings_test_pg`): ровно один провал, тот же самый
+(`logs/b0-repro-before.txt`).
+
+**B0.2 Правка.** `problems/tests/test_rendering.py`: регулярка
+`r'width\s*:\s*100%'` → `r'(?<![-\w])width\s*:\s*100%'` (голый `width:
+100%` по-прежнему запрещён, `max-width`/`min-width` регулярку не задевают),
+докстринг дополнен фразой про `max-width`. `problem_detail.html`: два
+правила `.math-content table` слиты в одно на месте исходного (строка 149:
+`border-collapse`, `margin`, `display: block`, `max-width: 100%`,
+`overflow-x: auto`); дублирующая строка 74 убрана; поведение CSS не
+изменилось. Коммит `1dfd956e`.
+
+**B0.3 Зубастость.** После коммита правки временно вписано `width: 100%;` в
+слитое правило → прогон покраснел именно `test_table_does_not_force_full_
+width` (`FAILED (failures=1)`); правка убрана без коммита, `git status
+--short` пуст (кроме четырёх неучтённых с корня).
+
+**B0.4 Соседи** (`--settings=config.settings_test_pg`):
+`problems.tests.test_rendering catalog.tests config.tests.test_nav` →
+**372 OK** за 242 с (`logs/b0-neighbors.txt`). Замер ширины тем же приёмом,
+что фаза 18 (`/catalog/problem/63321/`, `documentElement.scrollWidth`):
+**380/768/1280 — ширина документа равна окну** на всех трёх
+(`logs/b0-width-measure.txt`); элементы «за краем» на 380 px — тот же
+невидимый MathML-слой KaTeX, что и в фазе 18, не документ.
+
+**Не относится к интеграции (не чинить).** CI-логи, скачанные владельцем,
+показывают красные прогоны ещё на двух ветках: `feat/taxonomy-v2-openai-
+provider` @ `772ac87` (пуш 06.09 02:07 МСК) и `wip/sol-vs-glm-scripts` @
+`169bd39` — обе стоят на `a6f9283` «Новая цветовая палитра» и не содержат
+134 коммита `main`, включая правки токенов (`templates/_tokens.html`:
+`--act-a1..3`, `--surface`) и обновлённые тесты контраста. Красные: шесть
+тестов контраста (`test_readable.ActivityCellContrastTests` ×2,
+`test_small_fixes.DarkButtonContrastTests` ×2,
+`test_obzor_review.PendingColourTests` ×2 — ERROR) и
+`test_design_canon.CanonBrowserChecks.test_canon`; на `wip` дополнительно
+`test_glm_ramp_probe.RunOneLevelTests.test_метрики_считаются_из_прогона`
+(12 != 8). **Перепроверить после слияния `main` в `taxonomy-v2`** — этой
+сессии не касается: `wip/sol-vs-glm-scripts` — закладка стэша A1,
+`taxonomy-v2` — живая работа, обе ветки не трогались.
+
 ## Для будущего слияния taxonomy-v2
 
 - Её `0047_problem_figure_raster` — тот же файл, что в c13 (байт в байт по
