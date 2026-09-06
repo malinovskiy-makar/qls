@@ -131,7 +131,7 @@ ssh -T git@github.com     # «Hi malinovskiy-makar/qls! You've successfully auth
 | `redis` | redis:7-alpine | **нет** | кэш, сессии, счётчики частоты |
 | `web` | `weconomics-web:latest` (собирается на месте) | **нет** | Django под gunicorn |
 | `ws` | тот же `weconomics-web:latest` | **нет** | WebSocket дуэли под daphne |
-| `search` | `weconomics-search:latest` | **нет** | кодирование поисковых запросов |
+| `search` | `weconomics-search:latest` | **нет** | кодирование поисковых запросов. ⚠️ **На 07.09.2026 НЕ РАЗВЁРНУТ:** контейнера нет вовсе, он ни разу не создавался (`docker compose ps -a` показывает пять служб, не шесть). Сайту это безразлично — `SEMANTIC_SEARCH_ENABLED=0`, поиск идёт по словам. Разворачивать вместе с включением флага |
 | `nginx` | nginx:1.27-alpine | 80, 443 | единственная дверь снаружи |
 | `certbot` | certbot/certbot | — | выпуск и продление сертификата |
 
@@ -488,6 +488,22 @@ sudo fail2ban-client status sshd     # кого забанили
 Let's Encrypt, на четыре имени (`weconomics.site`, `www.weconomics.site`,
 `weconomics.ai`, `www.weconomics.ai`).
 
+⚠️ **У аккаунта Let's Encrypt НЕ ЗАДАНА ПОЧТА** (`Email contact: none`,
+проверено 07.09.2026 командой `docker compose run --rm certbot show_account`).
+Следствий два, и оба надо знать.
+
+Первое: в командах выпуска сертификата **не передавать `--email`** — его
+значения не существует. Аккаунт уже зарегистрирован, certbot переиспользует
+его молча; добавляйте `--non-interactive`, чтобы он не попытался спросить
+почту и не повис в `tmux` без видимой причины.
+
+Второе, важнее: **Let's Encrypt не пришлёт предупреждение об истечении.**
+Обычно письмо приходит за 20 и за 7 дней до срока — это последняя сеть
+безопасности на случай, если сломается таймер продления. Её у нас нет, и
+продление сторожит только сам таймер. Проверять глазами:
+`systemctl list-timers weconomics-certbot.timer`. Завести почту — решение
+владельца, карточка в Notion.
+
 ```bash
 cd /srv/weconomics/app/deploy
 docker compose run --rm certbot certificates     # что есть и до какого числа
@@ -820,7 +836,7 @@ PostgreSQL вставка строк с готовыми `id` не двигае�
 | Служба | Площадки | Почему |
 |---|---|---|
 | PostgreSQL | **общий контейнер, своя база** `weconomics_dev` | второй Postgres на 8 ГБ — лишний гигабайт ни за что |
-| `search` | **общий**, когда работает | модель весит 2,12 ГБ, второй экземпляр запрещён (P0). ⚠️ На 07.09.2026 на бою не запущен — площадке безразлично: `SEMANTIC_SEARCH_ENABLED=0` у обоих |
+| `search` | **общий**, когда появится | модель весит 2,12 ГБ, второй экземпляр запрещён (P0). ⚠️ На 07.09.2026 на бою НЕ РАЗВЁРНУТ вовсе — площадке безразлично: `SEMANTIC_SEARCH_ENABLED=0` у обоих, в сервис никто не ходит |
 | nginx | **общий** | порт 443 на сервере один |
 | Redis | **свой** (`redis-dev`) | номера баз (0 кэш, 1 сессии, 3 дуэли) зашиты в настройки; на общем Redis `cache.clear()` площадки — это `FLUSHDB`, и он разлогинил бы живых людей на бою |
 | `web` / `ws` | **свои** (`web-dev`, `ws-dev`) | своя база, свой код, свои 2 воркера |
@@ -922,6 +938,35 @@ tmux new -s refresh                                   # операция дол�
 боевом `.env` этой переменной нет вовсе (значение по умолчанию — `prod`).
 Это его единственный предохранитель, и он же — причина, по которой
 `SITE_ENV` вообще существует.
+
+### Сертификат площадки
+
+Выпускается один раз, дальше продлевается тем же таймером, что и боевой.
+
+```bash
+# 1. временный блок порта 80 (без него certbot не сможет пройти проверку,
+#    а сразу добавить блок 443 нельзя: nginx не поднимется без сертификата
+#    и уронит БОЙ — они в одном контейнере)
+sudo cp /srv/weconomics/dev/app/deploy/nginx/available/dev-bootstrap.conf         /srv/weconomics/nginx/conf.d/dev-bootstrap.conf
+cd /srv/weconomics/app/deploy
+docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload
+
+# 2. проверка, что блок работает: ожидается 404 от nginx, НЕ 444 и НЕ 301
+curl -sI http://dev.weconomics.ai/.well-known/acme-challenge/test | head -1
+
+# 3. сам сертификат
+docker compose run --rm certbot certonly --webroot -w /var/www/certbot   -d dev.weconomics.ai --keep-until-expiring --agree-tos --no-eff-email   --non-interactive
+sudo ls /srv/weconomics/certbot/conf/live/dev.weconomics.ai/   # fullchain.pem privkey.pem
+```
+
+⚠️ **`--email` НЕ ПЕРЕДАЁТСЯ, и это не забывчивость.** У аккаунта Let's
+Encrypt почты нет вовсе (см. раздел «Сертификат» выше). Аккаунт уже
+зарегистрирован, certbot переиспользует его молча; `--non-interactive`
+не даёт ему попытаться спросить почту и повиснуть в `tmux`.
+
+⚠️ **Проверять только с `--dry-run`.** У Let's Encrypt лимит примерно пять
+неудачных попыток в час на домен, и его легко исчерпать отладкой, закрыв
+себе выдачу.
 
 ### Сменить пароль на вход
 
