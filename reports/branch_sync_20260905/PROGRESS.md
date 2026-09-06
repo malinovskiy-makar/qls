@@ -781,3 +781,50 @@ Python подтверждено `site_meta` в списке; `config.tests.test_
 отдельный стоп-гейт перед записью. План (`import_olympiads_data` без флага)
 — **точно по ожиданию**: источники 37, олимпиады 17, уровни 50, этапы 32,
 даты 15, баллы 9, программы 7, льготы 88, регионы 89, комплекты 12.
+
+⛔ Стоп-гейт 4 — «да», запись.
+
+### Внеочередной инцидент 2: `DataError` на PostgreSQL при `--yes`
+
+Реальная запись (`import_olympiads_data --yes`) упала:
+`django.db.utils.DataError: value too long for type character varying(300)`,
+в `_load_olympiads` (`olympiads/management/commands/import_olympiads_data.py:173`).
+Проверка `Olympiad.objects.count()` сразу после — **0**, частичной записи не
+осталось (команда атомарна).
+
+**Разбор.** Полный трейсбек по кусочкам (терминал резал вывод) указал на
+файл и строку. Сверка всех девяти файлов `data/olympiads/out/*.jsonl`
+против `max_length` соответствующих полей моделей (`olympiads/models.py`,
+скрипт-разовый, интроспекция через Django) нашла ровно ОДНО превышение:
+`olympiads.jsonl`, slug `vernadsky`, поле `organizer` — **441 символ** при
+`CharField(max_length=300)`. Значение — не мусор, а список девяти вузов
+консорциума («Бурятский государственный университет…», далее по списку).
+**Почему не поймано раньше:** тот же файл и код успешно отработали в
+сессии A (фаза 18) на **SQLite** — SQLite не проверяет длину `varchar`
+физически, PostgreSQL проверяет. Ровно случай из предупреждения CLAUDE.md
+«зелёный прогон на SQLite — не доказательство, прод на PostgreSQL».
+
+**Фикс** (коммит `d00ba04`, применён навык `weco-migration-safety`):
+`Olympiad.organizer` — `CharField(max_length=300)` → `TextField` (без лимита,
+как уже сделано для `description`), миграция `0007_alter_olympiad_organizer`.
+Чек-лист:
+- граф цел, `0007` — единственный лист (`showmigrations olympiads`);
+- `makemigrations --check --dry-run` → No changes detected;
+- накат с нуля на свежей PostgreSQL (`qls_zero_migtest_b3`, докер
+  `qls_postgres_dev`) — все 68 миграций (включая новую) без ошибок;
+- обратимость: `migrate olympiads 0006` → `0007` туда-обратно на пустой
+  таблице — ОК; отдельно отмечено — на данных с `organizer` длиннее 300
+  откат назад технически невозможен (сузить `text` в `varchar(300)`
+  нельзя), это ожидаемо для операции расширения поля, не дефект;
+- `manage.py test olympiads --settings=config.settings_test_pg` → **95 OK**
+  (совпадает с сессией A);
+- **полный `import_olympiads_data --yes` на чистой PostgreSQL** (отдельная
+  тестовая база `qls_import_test_b3`) — прошёл целиком: источники 37,
+  олимпиады 17, уровни 50, этапы 32, даты 15, баллы 9, программы 7,
+  **льготы 87** (+ `ПРОПУЩЕНО: льгота finat / Финуниверситет: олимпиады
+  «finat» нет в olympiads.jsonl`), регионы 89, комплекты 12 — «Залито.»;
+  `vernadsky.organizer` — 441 символ, цел; `Olympiad.objects.count()` = 17,
+  `is_placeholder=True` = 0. Тестовые базы удалены.
+
+Дальше: пуш `d00ba04`, `git pull` + пересборка `web` на проде (тот же
+цикл), и только потом повтор `import_olympiads_data --yes` на самом проде.
