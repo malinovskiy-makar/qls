@@ -45,10 +45,10 @@
 | −1 Сверка с реальностью | ✅ | — | два расхождения → стоп → владелец ответил (поправки 1, 2) |
 | 0 Теги | ✅ | — | 8 тегов, все хеши совпали с ожиданием |
 | 0б Хвосты wip/* | ✅ | см. раздел «Хвосты» | stash применился чисто, `git stash list` пуст |
-| 1 Ветка integration и журнал | ✅ | (этот коммит) | `integration/sync-20260905` от `main` |
-| 2 Слияние beta-polish | ⏳ | | |
-| 3 Слияние scoped-test-runner | | | |
-| 4 Слияние olympiads-screens | | | |
+| 1 Ветка integration и журнал | ✅ | `c34fa9c6` | `integration/sync-20260905` от `main`. Отклонение: `reports/*` игнорируется — добавлено исключение `!reports/branch_sync_20260905/` в `.gitignore` по принятому в репозитории паттерну |
+| 2 Слияние beta-polish | ✅ | `062e7abf` | Конфликт только в `.gitignore` — самодельный (моё исключение против блока beta-polish в конце файла), объединение. `git diff --stat feat/beta-polish-0904 HEAD` — только `.gitignore` (+4) и `reports/branch_sync_20260905/`. `main..HEAD` = 25 ✅. `check` чист. `git ls-files -ci --exclude-standard` = 105 — столько же на `main` и на beta-polish (старые папки `reports/calc2-*`, `reports/vsosh_*`), не наше; инвариант читаем как «не больше 105» |
+| 3 Слияние scoped-test-runner | ✅ | `3de777d0` | без конфликтов; `check` чист; `python -m unittest discover -s scripts/tests -t .` → **50 OK** (команда — из докстрингов `scripts/tests/*.py`; в `docs/TESTING.md` она не описана — отметить в фазе 11) |
+| 4 Слияние olympiads-screens | ⏳ | | |
 | 5 Слияние catalog-redesign + 0054_merge | | | |
 | КТ1 | | | |
 | 6 Сверка перед A2 | | | |
