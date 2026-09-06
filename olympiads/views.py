@@ -6,7 +6,7 @@
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 
-from . import services
+from . import services, training_engine
 from .models import (TAG_LABELS, Olympiad, RegionalCoordinator,
                      current_academic_year)
 
@@ -61,6 +61,12 @@ def olympiad_detail(request, slug):
         olympiad.variants.select_related('stage')
         .order_by('-year', 'stage__order', 'grade')
     )
+    # Кнопки «Решать» живут только у комплектов, задачи которых есть в банке.
+    # Спрашиваем ОДНИМ запросом: заводить «задание» на каждый комплект ради
+    # проверки кнопки — значит создавать работы, которые никто не откроет.
+    linked = training_engine.linked_event_ids(variants)
+    for variant in variants:
+        variant.is_trainable = (variant.ref_event_id or '').strip() in linked
     # Блок региональных организаторов есть только у ВсОШ: школьный и
     # муниципальный этапы назначает субъект, и только у неё это так.
     show_regions = olympiad.kind == Olympiad.Kind.VSOSH
@@ -91,6 +97,9 @@ def olympiad_detail(request, slug):
         # пересматриваются каждый год, и подпись обязана ехать за ними.
         'benefit_year': benefits[0].admission_year if benefits else None,
         'has_placeholder': _has_placeholder([olympiad]),
+        # Отдельно от общей плашки страницы: комплект может быть
+        # демонстрационным у совершенно настоящей олимпиады.
+        'has_placeholder_variants': _has_placeholder(variants),
     })
 
 
@@ -145,28 +154,4 @@ def compare(request):
         'trimmed': trimmed,
         'limit': services.COMPARE_LIMIT,
         'has_placeholder': _has_placeholder(olympiads),
-    })
-
-
-def variant_solve(request, slug, pk):
-    """Заглушка «Скоро» для кнопок решения комплекта.
-
-    ⚠️ РЕЖИМ КОНТРОЛЬНОЙ НЕ ПЕРЕДЕЛАН НАМЕРЕННО. `student/views_exam.py`
-    рассчитан на НАЗНАЧЕННУЮ работу: `_exam_or_404` ищет
-    `Assignment(kind=EXAM, students=request.user)`, набор задач собирает
-    `problems.assignment_rows.build_rows(assignment, user)` из
-    `assignment.items`, а лимит времени считает
-    `exam_engine.available_minutes(assignment, now)` по расписанию
-    работы. Собрать набор по внешнему признаку (комплекту олимпиады) он
-    не умеет, и ломать работающий режим ради кнопки нельзя.
-
-    Что нужно доработать — подробно в отчёте сессии.
-    """
-    olympiad = get_object_or_404(Olympiad, slug=slug)
-    variant = get_object_or_404(olympiad.variants.select_related('stage'), pk=pk)
-    return render(request, 'olympiads/variant_soon.html', {
-        'olympiad': olympiad,
-        'variant': variant,
-        'with_timer': request.GET.get('timer') == '1',
-        'has_placeholder': _has_placeholder([olympiad]),
     })

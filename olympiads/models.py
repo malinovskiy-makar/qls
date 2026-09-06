@@ -19,6 +19,7 @@
 """
 from datetime import date
 
+from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
@@ -426,6 +427,15 @@ class OlympiadStage(models.Model):
         'Распределение тем', default=list, blank=True,
         help_text='[{"topic": "...", "share": 0.18}] — заполнит прогон обогащения',
     )
+    # ⚠️ ИСТОЧНИК НУЖЕН ИМЕННО ЗДЕСЬ, а не только у дат и льгот.
+    # Длительность и максимум баллов — такие же факты: по числу минут
+    # школьник ставит себе таймер тренировки. Наполнение примерами
+    # проставляло сюда выдуманные 235 и 240 минут, и отличить их от
+    # настоящих было нечем — источник и есть это отличие.
+    source = models.ForeignKey(
+        FactSource, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='stages', verbose_name='Источник',
+    )
 
     class Meta:
         verbose_name = 'Этап олимпиады'
@@ -641,6 +651,17 @@ class OlympiadBenefit(models.Model):
     required_level = models.PositiveSmallIntegerField(
         'Требуемый уровень', null=True, blank=True)
     grades_note = models.CharField('Классы', max_length=100, blank=True)
+    # ⚠️ БЕЗ ЭТОГО ПОЛЯ ТАБЛИЦА ВРЁТ ПРИЗЁРУ. У части олимпиад льгота
+    # положена ТОЛЬКО победителю: у ФЭН ВШЭ так устроена МОШ по экономике
+    # — БВИ победителям, призёрам только сто баллов. Одна запись на пару
+    # «олимпиада + программа» не может промолчать об этом различии, иначе
+    # призёр прочитает «без экзаменов» и не станет готовиться к ЕГЭ.
+    class WhoGets(models.TextChoices):
+        WINNERS = 'winners', 'Только победителям'
+        BOTH = 'both', 'Победителям и призёрам'
+
+    who_gets = models.CharField(
+        'Кому положено', max_length=20, choices=WhoGets.choices, blank=True)
     source = models.ForeignKey(
         FactSource, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='benefits', verbose_name='Источник',
@@ -665,6 +686,20 @@ class OlympiadBenefit(models.Model):
             subject = self.score_100_subject or 'профильному предмету'
             return '100 баллов по предмету «{}»'.format(subject)
         return 'Льготы нет'
+
+    @property
+    def who_label(self):
+        """«Только победителям» — приписка к колонке «Что даёт».
+
+        Пусто у льготы, которой нет, и там, где источник различия не делает.
+        """
+        if self.benefit_type == self.BenefitType.NONE:
+            return ''
+        if self.who_gets == self.WhoGets.WINNERS:
+            return 'только победителям'
+        if self.who_gets == self.WhoGets.BOTH:
+            return 'победителям и призёрам'
+        return ''
 
     @property
     def confirm_label(self):
@@ -773,6 +808,13 @@ class OlympiadVariant(models.Model):
         'ID тура в банке', max_length=200, blank=True,
         help_text='Соответствует problems.OlympiadRef.event_id',
     )
+    # ⚠️ ДЕМОНСТРАЦИОННЫЙ КОМПЛЕКТ. Числа заданий, минут и баллов у него
+    # выдуманы `seed_olympiads_demo` и повторены механически для всех лет.
+    # Пока настоящие не собраны, экран обязан говорить об этом вслух:
+    # по этим числам школьник ставит себе таймер, а кнопка «Открыть
+    # оригинал» вела бы на несуществующую страницу.
+    is_placeholder = models.BooleanField(
+        'Демонстрационные данные', default=False)
     source = models.ForeignKey(
         FactSource, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='variants', verbose_name='Источник',
@@ -788,11 +830,40 @@ class OlympiadVariant(models.Model):
 
     @property
     def has_original(self):
+        # ⚠️ ЗАЩИТА ПЕРЕЕХАЛА В ИСТОЧНИК ДАННЫХ. Сначала проверка стояла
+        # здесь: «у демонстрационного комплекта оригинала нет». Но у
+        # комплекта с демонстрационными ЧИСЛАМИ ссылка на официальный
+        # архив заданий может быть настоящей — это разные вещи, и гасить
+        # рабочую кнопку из-за выдуманного числа минут неправильно.
+        # Поэтому выдуманные адреса убраны там, где их писали
+        # (`seed_olympiads_demo` теперь ставит original_source='none' и
+        # пустой адрес), а здесь снова простая проверка.
         return bool(self.original_url) and self.original_source != self.OriginalSource.NONE
 
     @property
     def grade_label(self):
         return '{} класс'.format(self.grade) if self.grade else 'все классы'
+
+    @property
+    def problems_label(self):
+        """«4 задания», «18 заданий», «21 задание» — или пусто.
+
+        Число заданий у комплекта бывает любым (4 у тура заключительного,
+        18 у регионального, 20 у теста 2022 года), а `pluralize` умеет две
+        формы вместо трёх нужных русскому. Одна строка здесь честнее
+        «4 заданий» на экране.
+        """
+        n = self.problem_count
+        if not n:
+            return ''
+        tail, hundred = n % 10, n % 100
+        if tail == 1 and hundred != 11:
+            word = 'задание'
+        elif tail in (2, 3, 4) and hundred not in (12, 13, 14):
+            word = 'задания'
+        else:
+            word = 'заданий'
+        return '{} {}'.format(n, word)
 
 
 class RegionalCoordinator(models.Model):
@@ -812,11 +883,16 @@ class RegionalCoordinator(models.Model):
         'Ссылка проверена', null=True, blank=True)
     contact_note = models.TextField('Контакты', blank=True)
     is_verified = models.BooleanField('Проверено', default=False)
+    # ⚠️ Порядок задаётся ЧИСЛОМ, а не признаком «новый регион». Список
+    # алфавитный, и владелец захотел видеть четыре субъекта, которых не
+    # было в исходном файле, в конце. Признак «новый» через год перестанет
+    # быть правдой, а число останется просто порядком.
+    sort_order = models.PositiveSmallIntegerField('Порядок', default=0)
 
     class Meta:
         verbose_name = 'Региональный организатор'
         verbose_name_plural = 'Региональные организаторы'
-        ordering = ['region_name']
+        ordering = ['sort_order', 'region_name']
 
     def __str__(self):
         return self.region_name
@@ -860,3 +936,171 @@ class FactUpdateProposal(models.Model):
     def __str__(self):
         return '{}.{} #{} · {}'.format(
             self.target_app, self.target_model, self.target_pk, self.field_name)
+
+
+# ===========================================================================
+# Тренировочный режим: прорешать комплект прямо на сайте
+# ===========================================================================
+#
+# ⚠️ ПОЧЕМУ ЭТИ МОДЕЛИ ЗДЕСЬ, А ПРОВЕРКА — В `problems`. Проверка ответа
+# одна на всю платформу (`student.views.grade_submission`), и второй её
+# копии быть не должно: разойдясь, две копии дали бы один и тот же ответ
+# верным в тренировке и неверным в контрольной. Поэтому тренировка ЗОВЁТ
+# проверку, а хранит у себя только то, чего в `problems` нет: кто решал
+# (в том числе гость), с таймером или без, и что вышло.
+#
+# Решение (`problems.Submission`) при проверке создаётся и тут же
+# ОТКАТЫВАЕТСЯ — см. [ADR 0066]. От тренировавшегося в `problems` не
+# остаётся ни одной записи, поэтому тренировка не попадает ни в опыт, ни в
+# статистику, ни в кабинет репетитора.
+
+
+class TrainingAttempt(models.Model):
+    """Попытка прорешать комплект. Гостю вход не нужен.
+
+    ⚠️ ИМЕНА ПОЛЕЙ ВРЕМЕНИ СОВПАДАЮТ С `problems.ExamAttempt` НАМЕРЕННО:
+    `started_at`, `expires_at`, `submitted_at`, `is_auto_submitted`.
+    Благодаря этому `exam_engine.seconds_remaining` и `can_accept`
+    работают с тренировочной попыткой без единой правки — время считает
+    тот же проверенный код, что и на контрольной, включая защиту
+    «остаток не больше выданного» от переведённых назад часов.
+    """
+
+    variant = models.ForeignKey(
+        'olympiads.OlympiadVariant', on_delete=models.CASCADE,
+        related_name='attempts', verbose_name='Комплект',
+    )
+    # ⚠️ Пусто = ГОСТЬ. Решать может любой, вход не требуется; результат
+    # гостя нигде не привязывается к человеку и живёт до уборки (7 дней).
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        null=True, blank=True, related_name='olympiad_attempts',
+        verbose_name='Пользователь',
+    )
+    # Ключ сессии — единственный адрес попытки гостя. Без него гость терял
+    # бы ответы при обновлении страницы.
+    session_key = models.CharField(
+        'Ключ сессии', max_length=40, blank=True, db_index=True)
+    with_timer = models.BooleanField('На время', default=True)
+
+    started_at = models.DateTimeField('Начата', auto_now_add=True)
+    # Пусто = без таймера. `seconds_remaining` вернёт None, и это уже
+    # обработано и в движке, и на экране.
+    expires_at = models.DateTimeField('Истекает', null=True, blank=True)
+    submitted_at = models.DateTimeField('Сдана', null=True, blank=True)
+    is_auto_submitted = models.BooleanField('Сдана автоматически',
+                                            default=False)
+
+    score = models.DecimalField('Балл', max_digits=8, decimal_places=2,
+                                null=True, blank=True)
+    max_score = models.DecimalField('Максимум', max_digits=8,
+                                    decimal_places=2, null=True, blank=True)
+    # Сколько задач машина проверить не смогла — их смотрит человек.
+    pending_count = models.PositiveSmallIntegerField('Ждут проверки',
+                                                     default=0)
+
+    class Meta:
+        verbose_name = 'Попытка тренировки'
+        verbose_name_plural = 'Попытки тренировок'
+        ordering = ['-started_at']
+        indexes = [
+            models.Index(fields=['variant', 'user']),
+            models.Index(fields=['variant', 'session_key']),
+        ]
+
+    def __str__(self):
+        who = self.user or 'гость'
+        return '{} — {}'.format(who, self.variant)
+
+    @property
+    def is_guest(self):
+        """Решает гость — результат нигде не сохранится за человеком."""
+        return self.user_id is None
+
+    @property
+    def is_submitted(self):
+        return self.submitted_at is not None
+
+
+class TrainingDraft(models.Model):
+    """Черновик ответа в тренировке. Повторяет `problems.AnswerDraft`.
+
+    Задачи комплекта берутся из банка, своих задач репетитора здесь не
+    бывает — поэтому ссылка на пункт одна, `custom_part` не нужен.
+    """
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE,
+        related_name='drafts', verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_drafts', verbose_name='Задача')
+    answer_draft = models.TextField('Черновик ответа', blank=True)
+    solution_draft = models.TextField('Черновик решения', blank=True)
+    # ⚠️ NULL = «задача целиком»: так выглядит и задача без пунктов, и общее
+    # поле «Моё решение». То же соглашение, что у `AnswerDraft`.
+    part = models.ForeignKey(
+        'problems.ProblemPart', on_delete=models.CASCADE,
+        null=True, blank=True, related_name='olympiad_training_drafts',
+        verbose_name='Пункт')
+    updated_at = models.DateTimeField('Сохранён', auto_now=True)
+
+    class Meta:
+        verbose_name = 'Черновик тренировки'
+        verbose_name_plural = 'Черновики тренировок'
+        constraints = [
+            # ⚠️ ДВА ограничения, а не одно: в SQL два NULL НЕ равны друг
+            # другу, поэтому UNIQUE(attempt, problem, part) не запретил бы
+            # два черновика «задачи целиком». Ровно как у `AnswerDraft`.
+            models.UniqueConstraint(
+                fields=['attempt', 'problem', 'part'],
+                condition=models.Q(part__isnull=False),
+                name='uniq_training_draft_part'),
+            models.UniqueConstraint(
+                fields=['attempt', 'problem'],
+                condition=models.Q(part__isnull=True),
+                name='uniq_training_draft_whole'),
+        ]
+
+    def __str__(self):
+        return 'Черновик #{} задачи {}'.format(self.attempt_id,
+                                               self.problem_id)
+
+
+class TrainingItemResult(models.Model):
+    """Итог по одной задаче попытки — снимок, сделанный при сдаче.
+
+    ⚠️ ЗАЧЕМ СНИМОК, А НЕ ПЕРЕСЧЁТ ПРИ КАЖДОМ ОТКРЫТИИ. Проверка идёт
+    через одноразовое решение, которое откатывается ([ADR 0066]); считать
+    его заново на каждый показ экрана значило бы гонять транзакцию на
+    каждое обновление страницы. Балл поставлен один раз — в момент сдачи.
+    """
+
+    attempt = models.ForeignKey(
+        TrainingAttempt, on_delete=models.CASCADE,
+        related_name='results', verbose_name='Попытка')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='olympiad_training_results', verbose_name='Задача')
+    order = models.PositiveSmallIntegerField('Порядок', default=0)
+    score = models.DecimalField('Балл', max_digits=8, decimal_places=2,
+                                null=True, blank=True)
+    max_score = models.DecimalField('Максимум', max_digits=8,
+                                    decimal_places=2, default=1)
+    # Машина проверить не смогла: эталон не утверждён или задача открытая.
+    # Это НЕ «ноль» — показывать ноль там, где никто не смотрел, нечестно.
+    is_pending = models.BooleanField('Ждёт проверки', default=False)
+    comment = models.TextField('Что сказала проверка', blank=True)
+
+    class Meta:
+        verbose_name = 'Итог по задаче'
+        verbose_name_plural = 'Итоги по задачам'
+        ordering = ['order', 'id']
+        constraints = [
+            models.UniqueConstraint(fields=['attempt', 'problem'],
+                                    name='uniq_training_result'),
+        ]
+
+    def __str__(self):
+        return '#{} задача {}: {}'.format(self.attempt_id, self.problem_id,
+                                          self.score)

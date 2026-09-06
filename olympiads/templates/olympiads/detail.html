@@ -229,7 +229,10 @@
               </span>
             </span>
           </td>
-          <td>{{ benefit.gives_label }}</td>
+          <td>
+            {{ benefit.gives_label }}
+            {% if benefit.who_label %}<span class="ol-whogets">{{ benefit.who_label }}</span>{% endif %}
+          </td>
           <td>{{ benefit.confirm_label }}</td>
           <td>{% if benefit.grades_note %}{{ benefit.grades_note }}{% else %}<span class="ol-mute">—</span>{% endif %}</td>
           <td>
@@ -285,6 +288,20 @@
 
 <section class="ol-section" id="ol-variants">
   <h2 class="ol-section-title">Варианты прошлых лет</h2>
+  {% if has_placeholder_variants %}
+  {% comment %}
+    Плашка изменилась вместе с данными: выдуманных чисел в базе больше нет,
+    их убрали из сеялки. Осталась честная нехватка — комплекты, файл заданий
+    по которым не нашёлся. Обещать «настоящие собираются» тоже перестали:
+    архива заключительного этапа 2021/22 на сайте ЦПМК просто нет.
+  {% endcomment %}
+  <p class="ol-warn">
+    У части комплектов <strong>чисел нет</strong>: файл заданий того тура на
+    официальном сайте не выложен, а придумывать число минут нельзя — по нему
+    школьник ставит себе таймер. Такие строки помечены словами «чисел нет»,
+    и решать их на время не получится.
+  </p>
+  {% endif %}
   {% if variants %}
   <div class="ol-vfilters">
     {% if variant_stages %}
@@ -319,21 +336,41 @@
         data-year="{{ variant.year }}">
       <span class="ol-variant-year">{{ variant.year }}</span>
       <span class="ol-variant-main">
-        <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}</span>
+        {% comment %}
+          Тур называем явно: числа ниже — про ОДИН тур, и у двухтуровых
+          этапов без этой подписи страница выдавала бы их за весь этап.
+        {% endcomment %}
+        <span class="ol-variant-what">{% if variant.stage %}{{ variant.stage.name }}{% endif %} · {{ variant.grade_label }}{% if variant.variant_label %} · {{ variant.variant_label }}{% endif %}</span>
         <span class="ol-variant-meta">
-          {% if variant.problem_count %}{{ variant.problem_count }} заданий{% endif %}
-          {% if variant.duration_minutes %} · {{ variant.duration_minutes }} мин{% endif %}
-          {% if variant.max_score %} · максимум {{ variant.max_score }}{% endif %}
-          · {% if variant.has_solutions %}есть разборы{% else %}разборов нет{% endif %}
+          {% if variant.is_placeholder %}<span class="ol-demo" title="Задания этого тура ещё не разобраны: числа не найдены в официальном источнике">чисел нет</span> · {% endif %}
+          {% if variant.problems_label %}{{ variant.problems_label }} · {% endif %}
+          {% if variant.duration_minutes %}{{ variant.duration_minutes }} мин · {% endif %}
+          {% if variant.max_score %}максимум {{ variant.max_score }} · {% endif %}
+          {% if variant.has_solutions %}есть разборы{% else %}разборов нет{% endif %}
         </span>
       </span>
       <span class="ol-variant-acts">
-        <a class="ol-btn ol-btn--sm" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}?timer=1">Решать на время</a>
-        <a class="ol-btn ol-btn--sm ol-btn--second" href="{% url 'olympiads:variant_solve' olympiad.slug variant.pk %}">Решать без таймера</a>
+        {% if not variant.is_trainable %}
+        <span class="ol-btn ol-btn--sm ol-btn--off" aria-disabled="true" title="Задачи этого тура ещё не привязаны к банку">Задания ещё не привязаны</span>
+        {% else %}
+          {% if variant.duration_minutes %}
+          <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
+            {% csrf_token %}<input type="hidden" name="timer" value="1">
+            <button type="submit" class="ol-btn ol-btn--sm">Решать на время</button>
+          </form>
+          {% else %}
+          <span class="ol-btn ol-btn--sm ol-btn--off" aria-disabled="true" title="Длительность тура не найдена">Время тура неизвестно</span>
+          {% endif %}
+          <form method="post" action="{% url 'olympiads:training_start' olympiad.slug variant.pk %}">
+            {% csrf_token %}<input type="hidden" name="timer" value="0">
+            <button type="submit" class="ol-btn ol-btn--sm ol-btn--second">Решать без таймера</button>
+          </form>
+        {% endif %}
         {% if variant.has_original %}
         <a class="ol-btn ol-btn--sm ol-btn--second" href="{{ variant.original_url }}" target="_blank" rel="noopener">Открыть оригинал</a>
         {% else %}
-        <span class="ol-btn ol-btn--sm ol-btn--second ol-btn--off" aria-disabled="true" title="Оригинал пока не найден">Открыть оригинал</span>
+        <span class="ol-btn ol-btn--sm ol-btn--second ol-btn--off" aria-disabled="true"
+              title="{% if variant.is_placeholder %}Адрес демонстрационный, страницы по нему нет{% else %}Оригинал пока не найден{% endif %}">Открыть оригинал</span>
         {% endif %}
       </span>
     </li>

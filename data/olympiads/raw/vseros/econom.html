@@ -1,0 +1,789 @@
+<!DOCTYPE html>
+<html>
+<head>
+<script src="/js/jquery-3.7.1.min.js"></script>
+<script src="/Admin/js/user_functions.js"></script>
+
+					<title>Предмет</title>
+					<meta name="description" content="">
+					<meta name="keywords" content=""><link rel="icon" type="image/png" href="/files/imagecache/c05e85be5ba290adc69499c355fb4093.webp" /><link rel="apple-touch-icon" sizes="57x57" href="/files/imagecache/1a8f0440c62429bccf9feb2a2872f61a.webp"><link rel="apple-touch-icon" sizes="114x114" href="/files/imagecache/48a738918acf2bd11846d2b7ee9d0038.webp"><link rel="apple-touch-icon" sizes="72x72" href="/files/imagecache/da8a6f019bafba7b8e81d8078f0a9226.webp"><link rel="apple-touch-icon" sizes="144x144" href="/files/imagecache/d49dda580721f83725b50f0f56d62c7b.webp"><link rel="apple-touch-icon" sizes="60x60" href="/files/imagecache/b72cea7198dd17d3d4a1bddf54ac8f45.webp"><link rel="apple-touch-icon" sizes="120x120" href="/files/imagecache/a19f981f448f7a8f53aae8f13daac4d5.webp"><link rel="apple-touch-icon" sizes="76x76" href="/files/imagecache/c9072d2560ec803a91a5a6d96840cea3.webp"><link rel="apple-touch-icon" sizes="152x152" href="/files/imagecache/704c2394815aa2fc3384032fe7a65d79.webp"><meta charset="UTF-8">
+<link media="all" href="/css/style.css?date=20260903121856" rel="stylesheet">
+<link rel="stylesheet" type="text/css" href="/css/fonts/aneliza/aneliza.css"/>
+<link rel="stylesheet" type="text/css" href="/js/fancybox/jquery.fancybox.css">
+<link rel="stylesheet" type="text/css" href="/js/jquery.slider.new.css?date=20260903121856">
+<!--<link rel="stylesheet" href="https://i.icomoon.io/public/ce1f1167f4/VOSMoscow/style.css">-->
+<script type="text/javascript" src="/js/functions.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/filter_manager.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/search_suggest.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/jquery.news.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/jquery.slider.new.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/jquery.schedule.js?date=20260903121856"></script>
+<script type="text/javascript" src="/js/fancybox/jquery.fancybox.min.js"></script>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+	.scrollable-table
+	{
+		display: block;
+		max-width: 100%;
+		overflow-x: auto;
+	}
+</style>
+
+</head><body><div class="header-content">
+	<div class="maxcontent">
+		 <header>
+	<div class="logo-block">
+		<a href="/" class="logo"><img src="/images/logo.svg"/></a>
+		<div class="separate-line"></div>
+		<span>Центр педагогического мастерства</span>
+	</div>
+	<div class="header-menu">
+		<div class="menu-list">
+			<div class="ms m-closer">
+				<a href="javascript:void(0)"><i class="icon-cros"></i></a>
+			</div>
+			<div class="ms sub-list">
+				<a href="javascript:void(0)">Предметы</a>
+				<div class="subjects">
+												<a href="/subject/engl">Английский язык</a>
+														<a href="/subject/astr">Астрономия</a>
+														<a href="/subject/biol">Биология</a>
+														<a href="/subject/geog">География</a>
+														<a href="/subject/secr">Инф. безопасность<span class="s-note">в рамках предмета «Информатика»</span></a>
+														<a href="/subject/ai">Иск. интеллект<span class="s-note">в рамках предмета «Информатика»</span></a>
+														<a href="/subject/amxk">Искусство (МХК)</a>
+														<a href="/subject/span">Испанский язык</a>
+														<a href="/subject/hist">История</a>
+														<a href="/subject/ital">Итальянский язык</a>
+														<a href="/subject/kddit">КДДиТ<span class="s-note">в рамках предмета «Труд»</span></a>
+														<a href="/subject/chin">Китайский язык</a>
+														<a href="/subject/litr">Литература</a>
+														<a href="/subject/math">Математика</a>
+														<a href="/subject/germ">Немецкий язык</a>
+														<a href="/subject/bshd">ОБЗР</a>
+														<a href="/subject/soci">Обществознание</a>
+														<a href="/subject/law">Право</a>
+														<a href="/subject/prog">Программирование<span class="s-note">в рамках предмета «Информатика»</span></a>
+														<a href="/subject/robo">Робототехника<span class="s-note">в рамках предмета «Информатика»</span></a>
+														<a href="/subject/russ">Русский язык</a>
+														<a href="/subject/ttitt">ТТиТТ<span class="s-note">в рамках предмета «Труд»</span></a>
+														<a href="/subject/phys">Физика</a>
+														<a href="/subject/pcul">Физическая культура</a>
+														<a href="/subject/fren">Французский язык</a>
+														<a href="/subject/chem">Химия</a>
+														<a href="/subject/ekol">Экология</a>
+														<a href="/subject/econ">Экономика</a>
+											</div>
+			</div>
+			<a href="/news">Новости</a>
+			<a href="/tasks">Задания</a>
+			<div class="multilevel school-a">
+				<a href="javascript:void(0)">Школам</a>
+				<div class="submenu">
+										<a href="/2026/invite">Пригласительный этап</a>
+					<a href="/2026/school">Школьный этап</a>
+					<a href="/2025/okrug">Муниципальный этап</a>
+					<a href="/2026/region">Региональный этап</a>
+				</div>
+			</div>
+			<div class="multilevel">
+				<a href="javascript:void(0)">Команда Москвы</a>
+				<div class="submenu">
+										<a href="/team/year/2026">Заключительный этап</a>
+					<a href="/2026/world">Международные олимпиады</a>
+				</div>
+			</div>
+			<a href="/contacts">Контакты</a>
+			
+		</div>
+		<div class="header-buttons">
+			<div class="search-block "><!--has-results-->
+				<form class="search-input" action="/search" method="GET">
+					<input type="search" placeholder="Поиск..." name="q"/>
+					<a href="javascript:void(0)" onclick="$('header').removeClass('search-mode')"><i class="icon-cros"></i></a>
+				</form>
+				<a href="javascript:void(0)" class="search-button"><i class="icon-search"></i></a>
+				<div class="search-results">
+					<a href="#"><span class="type">страница</span><span class="res-label">Олимпиада по биологии</span></a>
+					<a href="#"><span class="type">задания</span><span class="res-label">Биология, Школьный этап, 2024/2025 уч. год</span></a>
+					<a href="#"><span class="type">новость</span><span class="res-label">Результаты пригласительного этапа по биологии</span></a>
+				</div>
+			</div>
+			<a class="subjects-button" href="#"><i class="icon-menu"></i><span>Предметы</span></a>
+		</div>	
+	</div>
+</header>
+<div class="subjects-fs-list">
+				<a href="/subject/engl" class="">Английский язык</a>
+						<a href="/subject/astr" class="">Астрономия</a>
+						<a href="/subject/biol" class="">Биология</a>
+						<a href="/subject/geog" class="">География</a>
+						<a href="/subject/secr" class="">Инф. безопасность<span class="s-note">в рамках предмета «Информатика»</span></a>
+						<a href="/subject/ai" class="">Иск. интеллект<span class="s-note">в рамках предмета «Информатика»</span></a>
+						<a href="/subject/amxk" class="">Искусство (МХК)</a>
+						<a href="/subject/span" class="">Испанский язык</a>
+						<a href="/subject/hist" class="">История</a>
+						<a href="/subject/ital" class="">Итальянский язык</a>
+						<a href="/subject/kddit" class="">КДДиТ<span class="s-note">в рамках предмета «Труд»</span></a>
+						<a href="/subject/chin" class="">Китайский язык</a>
+						<a href="/subject/litr" class="">Литература</a>
+						<a href="/subject/math" class="">Математика</a>
+						<a href="/subject/germ" class="">Немецкий язык</a>
+						<a href="/subject/bshd" class="">ОБЗР</a>
+						<a href="/subject/soci" class="">Обществознание</a>
+						<a href="/subject/law" class="">Право</a>
+						<a href="/subject/prog" class="">Программирование<span class="s-note">в рамках предмета «Информатика»</span></a>
+						<a href="/subject/robo" class="">Робототехника<span class="s-note">в рамках предмета «Информатика»</span></a>
+						<a href="/subject/russ" class="">Русский язык</a>
+						<a href="/subject/ttitt" class="">ТТиТТ<span class="s-note">в рамках предмета «Труд»</span></a>
+						<a href="/subject/phys" class="">Физика</a>
+						<a href="/subject/pcul" class="">Физическая культура</a>
+						<a href="/subject/fren" class="">Французский язык</a>
+						<a href="/subject/chem" class="">Химия</a>
+						<a href="/subject/ekol" class="">Экология</a>
+						<a href="/subject/econ" class="">Экономика</a>
+			</div>	</div>
+</div>
+<div class="maxcontent">
+<div class="subject-headline-div">
+	<div>
+		<div class="title-with-image">
+			<h1><img src="/images/biology.svg"></h1>
+		</div>
+		<div class="profile"></div>
+	</div>
+	<div class="bread-crumbs flex">
+		<a href="/">Главная</a>
+		<i class="icon-dot-star"></i>
+		<a href="javascript:void(0)">Предметы</a>
+		<i class="icon-dot-star"></i>
+		<span></span>
+	</div>
+</div>
+<div class="subject-top-block">
+	<div class="stb-left-block">
+		<div class="stb-current radius">
+			<div class="title flex">
+				<i class="icon-bell"></i>
+				<span class="tf-pre">Сейчас</span>
+			</div>
+			<span class="tf-text">...</span>
+		</div>
+		<div class="stb-text-block radius"></div>
+	</div>
+	<div class="stb-image radius"></div>
+</div>
+<div class="content-with-menu">
+	<div class="main-content-block">
+		<div class="olimp-block" data="why">
+			<span class="title">Зачем участвовать?</span>
+			<div class="why-participate-slider">
+			  <div class="slider-container">
+			    <div class="why-participate">
+			      
+			    </div>
+			  </div>
+			  
+			</div>
+			
+		</div>
+		<div class="olimp-block ob-grafik" data="grafik">
+			
+		</div>
+		<div class="olimp-block" data="news">
+			<span class="title">Последние новости</span>
+			<div class="news-list">
+				
+			</div>
+			<a href="/news?subject=" class="more news-more">Читать все новости</a>
+		</div>
+		<div data="team">
+		<div class="how-to-get-into radius">
+			<span class="title">Как попасть в сборную Москвы?</span>
+			<span class="desc">Попасть в сборную Москвы на всероссийской олимпиаде может каждый столичный школьник: занятия проходят по всем 24 направлениям соревнования, а программы учитывают разный уровень знаний участников. Учеба в сборной — это углубленное изучение любимого предмета под руководством опытных педагогов и работа в кругу единомышленников. Предстоит непростой, но увлекательный путь, на котором мы всегда будем болеть за тебя! Узнать подробнее об отборе в сборные можно на сайте ЦПМ.</span>
+			<a href="https://цпм.рф/" class="button more">На сайт ЦПМ</a>
+		</div>		</div>
+		<div class="olimp-block" data="tasks">
+			<span class="title">Задания прошлых лет</span>
+			<div class="full-tasks-div">
+				<div class="form-container">
+			        <div class="row">
+			        <div class="select-group">
+			            <label for="year">Год</label>
+			            <div class="custom-select" id="year-select">
+			                <div class="select-header" id="year-header">Выберите год</div>
+			                <div class="select-options" id="year-options">
+			                </div>
+			            </div>
+			        </div>
+			        
+			        <div class="select-group">
+			            <label for="stage">Этап</label>
+			            <div class="custom-select" id="stage-select">
+			                <div class="select-header" id="stage-header">Выберите этапы</div>
+			                <div class="select-options" id="stage-options">
+			                	<div class="option" data-value="all">Все этапы</div>
+			                				                			<div class="option" data-value="1">Пригласительный этап</div>
+			                			
+			                						                			<div class="option" data-value="2">Школьный этап</div>
+			                			
+			                						                			<div class="option" data-value="3">Муниципальный этап</div>
+			                			
+			                						                			<div class="option" data-value="4">Региональный этап</div>
+			                			
+			                						                			<div class="option" data-value="5">Заключительный этап</div>
+			                			
+			                			   
+			                </div>
+			                <div class="selected-items" id="selected-stages"></div>
+			            </div>
+			        </div>
+			    	</div>
+			        <!--<div class="clear-filter">
+			        	<a href="javascript:void(0)">Сбросить <i class="icon-cros"></i></a>
+			        </div>-->
+			    </div>
+				<div class="tasks-blocks-list">
+					
+				</div>
+			</div>
+		</div>
+		<div class="olimp-block" data="itog">
+			<span class="title">Итоги олимпиады в этом году</span>
+			<div class="results-list">
+				
+			</div>
+			<a href="/results" data="results" class="more">Архив за прошлые годы</a>
+		</div>
+		<div class="olimp-block" data="other">
+			<span class="title">Другие олимпиады</span>
+			<div class="olimp-list-slider">
+				
+			</div>
+
+		</div>
+	</div>
+	<!--
+	<div class="slider-container">
+					<div class="other-olympiads-list">
+						
+					</div>
+				</div>
+				
+				<div class="slider-dots"></div>
+				
+				<button class="slider-arrow left"><i class="icon-s-arrow-left"></i></button>
+				<button class="slider-arrow right"><i class="icon-s-arrow-right"></i></button>-->
+	<div class="right-menu-div">
+		<div class="right-menu">
+			<a href="javascript:void(0)" data="why">Зачем участвовать?</a>
+			<a href="javascript:void(0)" data="grafik">График олимпиады</a>
+			<a href="javascript:void(0)" data="news">Последние новости</a>
+			<a href="javascript:void(0)" data="team">Попасть в сборную</a>
+			<a href="javascript:void(0)" data="tasks">Задания</a>
+			<a href="javascript:void(0)" data="itog">Итоги этого года</a>
+			<a href="javascript:void(0)" data="other">Другие олимпиады</a>
+		</div>
+	</div>
+</div>
+<script>
+	var curYear='0';
+	var curStages='all';
+	var tasks;
+	var itog;
+	var other;
+	$.post('/api/getSubject',{profile:'econom'},function(data) {
+		var res=JSON.parse(data);
+		console.log(res);
+		var head=$('.subject-headline-div');
+		head.find('.title-with-image h1').html(res.subject.name+'<img src="/images/biology.svg">');
+		head.find('.bread-crumbs span').html(res.subject.name);
+		$('.tf-pre').html(res.current.pre);
+		$('.tf-text').html(res.current.text);
+		if(res.subject.note!='')
+		{
+			head.find('.profile').html(res.subject.note)
+		}
+		else
+		{
+			 head.find('.profile').remove();
+		}
+		$('.more[data=results]').attr('href','/results?subject='+res.profile.psevdo);
+		$('.subject-top-block .stb-text-block').html(res.profile.descr);
+		$('.stb-image').css('background-image',`url('/files/m_profiles/${res.profile.id}/${res.profile.photo}')`);
+		for(var i=0; i<res.why.length; i++)
+		{
+			if(i<3)
+			{
+				$('.why-participate').append(`
+					<div class="slide">
+				        <img src="/images/wp${(i+1)}.svg"/>
+				        <span class="title">${res.why[i].title}</span>
+				        <span class="description">${res.why[i].text}</span>
+				      </div>
+				`);
+			}
+		}
+		//initSlider($('.why-participate-slider'));
+		
+		$('.ob-grafik').olympSchedule(res.stages);
+		//$('.ob-grafik').html(generateOlimpBlockHTML(res));
+		//setTimeout(function(){initOlimpBlockHandlers(res)}, 10);
+		$.post('/api/news_list',{subject:res.profile.id, start:0, cnt: 4},function(data){
+			var res1=JSON.parse(data);
+	    	$('.news-list').newsRenderer(res1.data, true);
+	    	$('.news-more').attr('href',`/news?subject=${res.profile.id}`);
+		});
+		tasks=res.tasks;
+		itog=res.itog;
+		other=res.other;
+		var years={};
+		for(var i=0; i<tasks.length; i++)
+		{
+			years[tasks[i].yid]=tasks[i].yname;
+		}
+
+		// Сортируем ключи по значению (по учебным годам)
+		var sortedKeys = Object.keys(years).sort(function(a, b) {
+		    var yearA = parseInt(years[a].split('/')[0]);
+		    var yearB = parseInt(years[b].split('/')[0]);
+		    return yearB - yearA;
+		});
+
+		// Создаем новый объект с отсортированными ключами
+		var sortedYears = {};
+		for(var i = 0; i < sortedKeys.length; i++) {
+		    sortedYears[sortedKeys[i]] = years[sortedKeys[i]];
+		}
+		$('#year-options').empty();
+		//$('#year-options').append(`<div class="option" data-value="all">Все годы</div>`);
+		console.log(sortedYears);
+		console.log(sortedKeys);
+		const keys = sortedKeys;//Object.keys(years);
+		curYear=keys[0];
+		for(var i=0; i<keys.length; i++)
+		{
+			$('#year-options').append(`<div class="option" data-value="${keys[i]}">${sortedYears[keys[i]]} уч. год</div>`);
+		}
+		initSelect('year', function(data){
+			if(data!='all')
+			{
+				curYear=data;
+				$('#stage-options>div').hide();
+				$('#stage-options>div').addClass('disabled').removeClass('enabled');
+				$('#stage-options>div[data-value=all]').show();
+						$('#stage-options>div[data-value=all]').removeClass('disabled').addClass('enabled');
+				for(var i=0; i<tasks.length; i++)
+				{
+
+					if(((tasks[i].yid==curYear)))
+					{
+						$('#stage-options>div[data-value='+tasks[i].sid+']').show();
+						$('#stage-options>div[data-value='+tasks[i].sid+']').removeClass('disabled').addClass('enabled');
+					}
+				}
+				console.log(curYear);
+			}
+			else
+			{
+				curYear='-1';
+			}
+			drawTasks();
+			if(!$('#stage-options>div[data-value='+curStages+']').hasClass('disabled'))
+			{
+				$('#stage-options>div[data-value='+curStages+']').trigger('click');
+			} else {
+				$('#stage-options>div.enabled').eq(0).trigger('click');
+			}
+		});
+		initSelect('stage', function(data){
+			console.log(data);
+			curStages=data; drawTasks();
+
+		});
+		$('#year-options>div').eq(0).trigger('click');
+		$('#stage-options>div').eq(0).trigger('click');
+		//drawTasks();
+		drawItog();
+		initMenu();
+		drawOther();
+		//initSlider($('.olimp-list-slider'));
+		$('.olimp-list-slider').simpleSlider({
+                    visibleSlides: getSlidesPerView(), // Для узкого контейнера показываем 2 слайда
+                    //items: els,
+                    loop: true,
+                    autoplay: false, // Автоплей только для первого
+                    autoplayInterval: 3000,
+                    speed: 500,
+                    onSlideChange: function(idx, $slide) {
+                        console.log(`Слайдер ${idx + 1}: слайд ${idx + 1}`);
+                    }
+                });
+		$('.why-participate').simpleSlider({
+                    visibleSlides: getSlidesPerView(), // Для узкого контейнера показываем 2 слайда
+                    //items: els,
+                    loop: true,
+                    autoplay: false, // Автоплей только для первого
+                    autoplayInterval: 3000,
+                    speed: 500,
+                    onSlideChange: function(idx, $slide) {
+                        console.log(`Слайдер ${idx + 1}: слайд ${idx + 1}`);
+                    }
+                });
+		$(window).trigger('scroll');
+	});
+
+	function drawTasks()
+	{
+		$('.tasks-blocks-list').empty();
+		console.log(curYear+' '+curStages);
+		for(var i=0; i<tasks.length; i++)
+		{
+			if(((tasks[i].yid==curYear)||('-1'==curYear))&&(curStages==tasks[i].sid || curStages=='all'))
+			{
+				$('.tasks-blocks-list').append(`<div class="tasks-block">
+						<span class="title">${tasks[i].sname}</span>
+						
+							${tasks[i].tasks}
+						
+					</div>`);
+			}
+		}
+	}
+
+	function drawItog()
+	{
+		$('.results-list').empty();
+		for(var i=0; i<itog.length; i++)
+		{
+			$('.results-list').append(`<div class="results-stage radius">
+					<span class="title">${itog[i].stage}</span>
+					<div class="year-list">
+						${itog[i].itog}
+					</div>
+				</div>`);
+		}
+		$('.results-list .year-list>div').each(function(){
+			$(this).closest('.year-list').html($(this).html());
+		});
+	}
+
+	function drawOther()
+	{
+		$('.olimp-list-slider').empty();
+		if(other.length==0)
+		{
+			$('.olimp-block[data=other]').hide();
+			$('.right-menu a[data=other]').hide();
+		}
+		for(i=0; i<other.length; i++)
+		{
+			$('.olimp-list-slider').append(`<a href="${other[i].link}" target="_blank" class="other-olimp-block slide">
+							<div class="logo-block">
+								<img src="${other[i].logo}"/>
+								<!--<div class="arrow"><i class="icon-arrow"></i></div>-->
+							</div>
+							<span>${other[i].name}</span>
+						</a>`);
+		}
+
+	}
+	function initMenu(){
+	$(document).ready(function() {
+    // Функция для активации пункта меню и прокрутки к блоку
+    function activateMenuItem(targetData) {
+        // Убираем класс selected у всех ссылок
+        $('.right-menu a').removeClass('selected');
+        // Добавляем класс selected к выбранной ссылке
+        $('.right-menu a[data="' + targetData + '"]').addClass('selected');
+        
+        // Прокручиваем к соответствующему блоку
+        var targetBlock = $('div[data="' + targetData + '"]');
+        if (targetBlock.length) {
+            $('html, body').animate({
+                scrollTop: targetBlock.offset().top - 50 // Отступ сверху для лучшего вида
+            }, 800);
+        }
+    }
+    
+    // Обработчик клика по пунктам меню
+    $('.right-menu a').on('click', function(e) {
+        e.preventDefault();
+        var targetData = $(this).attr('data');
+        activateMenuItem(targetData);
+    });
+    
+    // Обработчик прокрутки страницы для автоматического выделения текущего блока
+    $(window).on('scroll', function() {
+        var scrollPosition = $(window).scrollTop() + 100; // Небольшой отступ
+        
+        // Находим все блоки с атрибутом data
+        var dataBlocks = $('div[data]');
+        var currentBlock = null;
+        
+        // Определяем, какой блок сейчас в области видимости
+        dataBlocks.each(function() {
+            var block = $(this);
+            var blockTop = block.offset().top;
+            var blockBottom = blockTop + block.outerHeight();
+            
+            if (scrollPosition >= blockTop && scrollPosition < blockBottom) {
+                currentBlock = block;
+                return false; // Прерываем цикл при нахождении первого подходящего блока
+            }
+        });
+        
+        // Если нашли текущий блок, активируем соответствующий пункт меню
+        if (currentBlock) {
+            var currentData = currentBlock.attr('data');
+            $('.right-menu a').removeClass('selected');
+            $('.right-menu a[data="' + currentData + '"]').addClass('selected');
+        }
+    });
+    
+    // Дополнительно: плавная прокрутка при загрузке страницы с хэшем
+    if (window.location.hash) {
+        var hash = window.location.hash.substring(1);
+        setTimeout(function() {
+            activateMenuItem(hash);
+        }, 100);
+    }
+});
+}
+
+function getSlidesPerView() {
+        var width = $(window).width();
+        console.log(width);
+        if (width < 768) return 1;
+        if (width < 992) return 2;
+        return 3;
+    }
+
+/*function initSlider(el) {
+	//if($(window).width()>720) return;
+	
+    var $slider = el;
+    var $slides = $slider.find('.slide');
+    var $dotsContainer = $slider.find('.slider-dots');
+    var totalSlides = $slides.length;
+    var currentIndex = 0;
+    var slidesPerView = getSlidesPerView();
+    var autoPlayInterval = null;
+    var hgt=$slides.eq(0).outerHeight();
+    console.log('init Slider');
+    for(var i=0; i<$slides.length; i++)
+    {
+    	if($slides.eq(i).outerHeight>hgt)
+    		hgt=$slides.eq(i).outerHeight;
+    }
+    console.log(hgt);
+    if(!$(window).width()>720)
+    {
+    $slider.css({'position':'relative', 'height': hgt});
+    $slider.find('.slider-container').css('height','100%');
+
+    $slides.css({'position':'absolute', 'height': hgt, 'top':0, 'left':0,'width':$slider.find('.slider-container').outerWidth()});
+	}
+    // Если слайдов меньше или равно количеству видимых — скрываем стрелки и точки
+    if (totalSlides <= slidesPerView) {
+        $slider.find('.slider-arrow').remove();
+        $dotsContainer.hide();
+        return;
+    }
+    
+    // Создаем точки
+    var totalDots = Math.ceil(totalSlides / slidesPerView);
+    $dotsContainer.empty();
+    for (var i = 0; i < totalDots; i++) {
+        var dot = $('<span class="dot"></span>');
+        if (i === 0) dot.addClass('active');
+        dot.data('index', i);
+        $dotsContainer.append(dot);
+    }
+    
+    // Показываем только нужное количество слайдов
+    function showSlides(index) {
+        var start = index * slidesPerView;
+        var end = start + slidesPerView;
+        
+        $slides.addClass('hidden').removeClass('visible');
+        $slides.slice(start, end).addClass('visible').removeClass('hidden');
+        
+        // Обновляем точки
+        $dotsContainer.find('.dot').removeClass('active');
+        $dotsContainer.find('.dot').eq(index).addClass('active');
+        
+        currentIndex = index;
+    }
+    
+    // Переключение на следующий/предыдущий
+    function nextSlide() {
+        var totalDotsCount = $dotsContainer.find('.dot').length;
+        var nextIndex = (currentIndex + 1) % totalDotsCount;
+        showSlides(nextIndex);
+    }
+    
+    function prevSlide() {
+        var totalDotsCount = $dotsContainer.find('.dot').length;
+        var prevIndex = (currentIndex - 1 + totalDotsCount) % totalDotsCount;
+        showSlides(prevIndex);
+    }
+    
+    // Обработчики для стрелок
+    $slider.find('.slider-arrow.left').off('click').on('click', function(e) {
+        e.preventDefault();
+        prevSlide();
+        resetAutoPlay();
+    });
+    
+    $slider.find('.slider-arrow.right').off('click').on('click', function(e) {
+        e.preventDefault();
+        nextSlide();
+        resetAutoPlay();
+    });
+    
+    // Обработчики для точек
+    $dotsContainer.find('.dot').off('click').on('click', function() {
+        var index = $(this).data('index');
+        showSlides(index);
+        resetAutoPlay();
+    });
+    
+    // Автоплей (опционально)
+    function startAutoPlay() {
+        if (autoPlayInterval) clearInterval(autoPlayInterval);
+        autoPlayInterval = setInterval(nextSlide, 5000);
+    }
+    
+    function resetAutoPlay() {
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            startAutoPlay();
+        }
+    }
+    
+    // При наведении на слайдер — останавливаем автоплей
+    $slider.on('mouseenter', function() {
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+    });
+    
+    $slider.on('mouseleave', function() {
+        startAutoPlay();
+    });
+    
+    // Функция для определения количества видимых слайдов
+    function getSlidesPerView() {
+        var width = $(window).width();
+        if (width < 768) return 1;
+        if (width < 992) return 2;
+        return 3;
+    }
+    
+    // Пересчет при изменении размера окна
+    var resizeTimeout;
+    $(window).on('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            slidesPerView = getSlidesPerView();
+            var newTotalDots = Math.ceil(totalSlides / slidesPerView);
+            
+            // Обновляем точки
+            $dotsContainer.empty();
+            for (var i = 0; i < newTotalDots; i++) {
+                var dot = $('<span class="dot"></span>');
+                if (i === 0) dot.addClass('active');
+                dot.data('index', i);
+                $dotsContainer.append(dot);
+            }
+            
+            // Показываем слайды с текущим индексом, но с новым slidesPerView
+            // Корректируем индекс, чтобы не выйти за границы
+            if (currentIndex >= newTotalDots) {
+                currentIndex = newTotalDots - 1;
+            }
+            showSlides(currentIndex);
+            
+            // Обновляем обработчики для новых точек
+            $dotsContainer.find('.dot').off('click').on('click', function() {
+                var index = $(this).data('index');
+                showSlides(index);
+                resetAutoPlay();
+            });
+            
+            // Если слайдов меньше или равно видимым — скрываем элементы управления
+            if (totalSlides <= slidesPerView) {
+                $slider.find('.slider-arrow').hide();
+                $dotsContainer.hide();
+            } else {
+                $slider.find('.slider-arrow').show();
+                $dotsContainer.show();
+            }
+        }, 200);
+    });
+    
+    // Показываем первые слайды
+    showSlides(0);
+    
+    // Запускаем автоплей
+    startAutoPlay();
+}*/
+</script></div>
+<footer>
+	<div class="maxcontent">
+		<div class="footer-top">
+			<div class="logo-block">
+				<a href="/" class="logo"><img src="/images/logo_white.svg"/></a>
+				<div class="separate-line"></div>
+				<span>Центр педагогического мастерства</span>
+			</div>
+			<div class="header-menu">
+				<div class="menu-list">
+					<!--<div>
+						<a href="/tasks">Задания прошлых лет</a>
+						<a href="/news">Новости</a>
+						<a href="/contacts">Контакты</a>
+					</div>-->
+					<div>
+						<!--<a href="#" class="selected">Школам</a>-->
+						<a href="/official">Правовая информация</a>
+						<a href="/docs">Документы</a>
+					</div>
+				</div>
+				<!--<a class="subjects-button" href="#"><i class="icon-menu"></i><span>Предметы</span></a>-->
+			</div>
+		</div>
+		<div class="partners">
+			<span>Партнеры<br>и организаторы</span>
+			<div class="partner-div">
+				<img style="max-width: 206px;" src="/images/mosobr.svg"/>
+			</div>
+			<a href="https://цпм.рф/" target="_blank" class="partner-div">
+				<img style="max-width: 146px;" src="/images/cpm.png"/>
+			</a>
+			<a href="https://olimpiada.ru/" target="_blank" class="partner-div">
+				<img style="max-width: 206px;" src="/images/olimpiada.png"/>
+			</a>
+		</div>
+		<div class="footer-bottom">
+			<span class="copyright">© Всероссийская олимпиада школьников в Москве 2026</span>
+		</div>
+	</div>
+</footer>
+<a class="upper"><i class="icon-arrow-up"></i></a><div class="shadow"></div>
+<!-- Yandex.Metrika counter -->
+<script type="text/javascript">
+    (function(m,e,t,r,i,k,a){
+        m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+        m[i].l=1*new Date();
+        for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+    })(window, document,'script','https://mc.yandex.ru/metrika/tag.js', 'ym');
+
+    ym(17524870, 'init', {clickmap:true, referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});
+</script>
+<noscript><div><img src="https://mc.yandex.ru/watch/17524870" style="position:absolute; left:-9999px;" alt="" /></div></noscript>
+<!-- /Yandex.Metrika counter -->
+</body></html>

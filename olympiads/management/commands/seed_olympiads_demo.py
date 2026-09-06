@@ -126,18 +126,24 @@ DESCRIPTIONS = {
 }
 
 # ── Этапы ВсОШ: образец подробного заполнения ──────────────────────────
-# код, имя, порядок, формат, минут, максимум, тестовая часть, как попасть, города
+# код, имя, порядок, формат, как попасть, города
+# ⚠️ БЕЗ ДЛИТЕЛЬНОСТИ И МАКСИМУМА БАЛЛОВ. Их устанавливает предметно-
+# методическая комиссия и публикует в требованиях к этапу; наполнение
+# примерами их не знает. Прежде тут стояли выдуманные 235 и 240 минут —
+# на экране они выглядели ровно как настоящие и прожили две сессии.
+# Настоящие приходят импортом из data/olympiads/out/stages.jsonl,
+# вместе со ссылкой на документ.
 VSEROS_STAGES = [
-    ('sch', 'Школьный этап', 1, 'offline', 120, 100, True,
+    ('sch', 'Школьный этап', 1, 'offline',
      'Прийти в свою школу в назначенный день — отбора нет, участвовать '
      'может любой школьник подходящего класса.', []),
-    ('mun', 'Муниципальный этап', 2, 'offline', 180, 100, True,
+    ('mun', 'Муниципальный этап', 2, 'offline',
      'Набрать проходной балл школьного этапа, который устанавливает '
      'ваш муниципалитет.', []),
-    ('reg', 'Региональный этап', 3, 'offline', 235, 100, False,
+    ('reg', 'Региональный этап', 3, 'offline',
      'Набрать проходной балл муниципального этапа своего региона либо '
      'быть призёром или победителем регионального этапа прошлого года.', []),
-    ('final', 'Заключительный этап', 4, 'offline', 240, 100, False,
+    ('final', 'Заключительный этап', 4, 'offline',
      'Набрать всероссийский проходной балл на региональном этапе или '
      'отобраться по квоте для региона.',
      ['Москва', 'Санкт-Петербург', 'Казань', 'Тюмень', 'Сочи']),
@@ -155,58 +161,55 @@ VSEROS_EVENTS = [
 
 # ── Скелетные этапы остальных олимпиад ─────────────────────────────────
 SKELETON_STAGES = {
-    'mosh': [('qual', 'Отборочный тур', 1, 'online', 180, 100, True,
+    'mosh': [('qual', 'Отборочный тур', 1, 'online',
               'Зарегистрироваться на сайте и решить отборочный тур онлайн.',
               []),
-             ('final', 'Заключительный тур', 2, 'offline', 235, 100, False,
+             ('final', 'Заключительный тур', 2, 'offline',
               'Набрать проходной балл отборочного тура.',
               ['Москва', 'Санкт-Петербург', 'Екатеринбург', 'Новосибирск'])],
-    'vp': [('qual', 'Отборочный тур', 1, 'online', 200, 100, True,
+    'vp': [('qual', 'Отборочный тур', 1, 'online',
             'Зарегистрироваться и решить отборочный тур онлайн.', []),
-           ('final', 'Заключительный тур', 2, 'offline', 240, 100, False,
+           ('final', 'Заключительный тур', 2, 'offline',
             'Набрать проходной балл отборочного тура.',
             ['Москва', 'Санкт-Петербург', 'Нижний Новгород', 'Пермь'])],
-    'spbgu': [('qual', 'Отборочный тур', 1, 'online', 180, 100, True, '', []),
-              ('final', 'Заключительный тур', 2, 'offline', 240, 100, False,
+    'spbgu': [('qual', 'Отборочный тур', 1, 'online', '', []),
+              ('final', 'Заключительный тур', 2, 'offline',
                '', ['Санкт-Петербург'])],
-    'lom': [('qual', 'Отборочный тур', 1, 'online', 180, 100, True, '', []),
-            ('final', 'Заключительный тур', 2, 'offline', 240, 100, False,
+    'lom': [('qual', 'Отборочный тур', 1, 'online', '', []),
+            ('final', 'Заключительный тур', 2, 'offline',
              '', ['Москва'])],
-    'pleh': [('qual', 'Отборочный тур', 1, 'online', 150, 100, True, '', []),
-             ('final', 'Заключительный тур', 2, 'offline', 180, 100, False,
+    'pleh': [('qual', 'Отборочный тур', 1, 'online', '', []),
+             ('final', 'Заключительный тур', 2, 'offline',
               '', ['Москва'])],
-    'kondrat': [('final', 'Заключительный тур', 1, 'offline', 180, 100,
-                 False, '', ['Москва'])],
-    'ranepa': [('qual', 'Отборочный тур', 1, 'online', 150, 100, True, '', []),
-               ('final', 'Заключительный тур', 2, 'offline', 200, 100, False,
+    'kondrat': [('final', 'Заключительный тур', 1, 'offline', '', ['Москва'])],
+    'ranepa': [('qual', 'Отборочный тур', 1, 'online', '', []),
+               ('final', 'Заключительный тур', 2, 'offline',
                 '', ['Москва'])],
-    'mis': [('qual', 'Отборочный тур', 1, 'online', 150, 100, True, '', []),
-            ('final', 'Заключительный тур', 2, 'offline', 200, 100, False,
+    'mis': [('qual', 'Отборочный тур', 1, 'online', '', []),
+            ('final', 'Заключительный тур', 2, 'offline',
              '', ['Москва'])],
-    'sb': [('qual', 'Отборочный тур', 1, 'online', 120, 100, True, '', []),
-           ('final', 'Заключительный тур', 2, 'offline', 180, 100, False,
+    'sb': [('qual', 'Отборочный тур', 1, 'online', '', []),
+           ('final', 'Заключительный тур', 2, 'offline',
             '', ['Кемерово'])],
-    'nes': [('qual', 'Отборочный тур', 1, 'online', 180, 100, False, '', [])],
-    'ieo': [('qual', 'National selection', 1, 'online', 180, 100, True,
+    'nes': [('qual', 'Отборочный тур', 1, 'online', '', [])],
+    'ieo': [('qual', 'National selection', 1, 'online',
              '', []),
-            ('final', 'International final', 2, 'offline', 240, 100, False,
+            ('final', 'International final', 2, 'offline',
              '', ['Не объявлен'])],
-    'dano': [('qual', 'Отборочный тур', 1, 'online', 240, 100, False, '', []),
-             ('final', 'Финал', 2, 'mixed', 300, 100, False, '', ['Москва'])],
-    'och': [('final', 'Чемпионат', 1, 'online', 120, 100, True, '', [])],
-    'kolokolnikov': [('final', 'Заключительный тур', 1, 'offline', 180, 100,
-                      False, '', ['Тюмень'])],
-    'volnc': [('qual', 'Отборочный тур', 1, 'online', 120, 100, True, '', []),
-              ('final', 'Заключительный тур', 2, 'online', 180, 100, False,
+    'dano': [('qual', 'Отборочный тур', 1, 'online', '', []),
+             ('final', 'Финал', 2, 'mixed', '', ['Москва'])],
+    'och': [('final', 'Чемпионат', 1, 'online', '', [])],
+    'kolokolnikov': [('final', 'Заключительный тур', 1, 'offline', '', ['Тюмень'])],
+    'volnc': [('qual', 'Отборочный тур', 1, 'online', '', []),
+              ('final', 'Заключительный тур', 2, 'online',
                '', [])],
-    'vp-ob': [('qual', 'Отборочный тур', 1, 'online', 180, 100, True, '', [])],
-    'vp-fingram': [('qual', 'Отборочный тур', 1, 'online', 180, 100, True,
+    'vp-ob': [('qual', 'Отборочный тур', 1, 'online', '', [])],
+    'vp-fingram': [('qual', 'Отборочный тур', 1, 'online',
                     '', [])],
-    'finat': [('qual', 'Отборочный тур', 1, 'online', 120, 100, True, '', [])],
-    'skol': [('final', 'Кейс-чемпионат', 1, 'mixed', 300, 100, False, '',
+    'finat': [('qual', 'Отборочный тур', 1, 'online', '', [])],
+    'skol': [('final', 'Кейс-чемпионат', 1, 'mixed', '',
               ['Москва'])],
-    'icef-evening-school': [('final', 'Итоговое испытание', 1, 'offline',
-                             120, 100, True, '', ['Москва'])],
+    'icef-evening-school': [('final', 'Итоговое испытание', 1, 'offline', '', ['Москва'])],
 }
 
 # ── События с подтверждёнными датами: МОШ и Высшая проба ───────────────
@@ -255,21 +258,29 @@ SCORES = [
     (2026, 9, 58), (2026, 10, 65), (2026, 11, 74),
 ]
 
-# Комплекты заданий ВсОШ: год, этап, класс, заданий, минут, максимум,
-# разборы, ссылка на оригинал, откуда
+# Комплекты заданий ВсОШ: год, этап, класс, разборы.
+# ⚠️ НИ ЧИСЕЛ, НИ АДРЕСОВ ЗДЕСЬ НЕТ — это КАРКАС, а не данные.
+# Сначала отсюда убрали выдуманные адреса (вида vos.olimpiada.ru/2026/final/11:
+# выглядели рабочими, страниц по ним нет), теперь — выдуманные числа: стояли
+# «6 заданий, 240 минут, 100 баллов» и «5 заданий, 235 минут», повторённые для
+# всех лет механически. Настоящие числа берутся из шапок файлов заданий на
+# vso.edsoo.ru и приходят импортом из data/olympiads/out/variants.jsonl —
+# у заключительного этапа это 4 задания, 48 баллов, 210 минут НА ТУР, у
+# регионального 18 заданий, 100 баллов, 180 минут. Ни одно из выдуманных
+# чисел не совпало с настоящим. [ADR 0067]
 VARIANTS = [
-    (2026, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2026/final/11', 'official'),
-    (2026, 'final', 10, 6, 240, 100, True, 'https://vos.olimpiada.ru/2026/final/10', 'official'),
-    (2026, 'reg', 11, 5, 235, 100, True, 'https://vos.olimpiada.ru/2026/reg/11', 'official'),
-    (2026, 'reg', 9, 5, 235, 100, False, '', 'none'),
-    (2025, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2025/final/11', 'official'),
-    (2025, 'reg', 10, 5, 235, 100, False, '', 'none'),
-    (2024, 'final', 11, 6, 240, 100, True, 'https://vos.olimpiada.ru/2024/final/11', 'official'),
-    (2024, 'reg', 11, 5, 235, 100, False, '', 'none'),
-    (2023, 'final', 10, 6, 240, 100, False, 'https://vos.olimpiada.ru/2023/final/10', 'official'),
-    (2023, 'mun', 9, 4, 180, 100, False, '', 'none'),
-    (2022, 'final', 11, 6, 240, 100, False, '', 'none'),
-    (2022, 'reg', 11, 5, 235, 100, False, '', 'none'),
+    (2026, 'final', 11, True),
+    (2026, 'final', 10, True),
+    (2026, 'reg', 11, True),
+    (2026, 'reg', 9, False),
+    (2025, 'final', 11, True),
+    (2025, 'reg', 10, False),
+    (2024, 'final', 11, True),
+    (2024, 'reg', 11, False),
+    (2023, 'final', 10, False),
+    (2023, 'mun', 9, False),
+    (2022, 'final', 11, False),
+    (2022, 'reg', 11, False),
 ]
 
 REGIONS = [
@@ -378,10 +389,13 @@ class Command(BaseCommand):
                     is_team=is_team, has_online_qualifier=on_qual,
                     has_online_final=on_final,
                     description=DESCRIPTIONS.get(slug, ''),
-                    official_url='https://example.org/{}/'.format(slug),
-                    registration_url=(
-                        'https://example.org/{}/reg/'.format(slug)
-                        if slug in ('mosh', 'vp', 'dano') else ''),
+                    # ⚠️ АДРЕСОВ НЕ ВЫДУМЫВАЕМ. Прежде сюда шли
+                    # https://example.org/<слаг>/ — и на карточке это была
+                    # кнопка «Официальный сайт», ведущая в никуда. Пустое
+                    # поле экран переживает, а школьник по такой кнопке
+                    # уходит и не возвращается. Настоящие адреса приходят
+                    # импортом из olympiads.jsonl.
+                    official_url='', registration_url='',
                     language='Английский' if slug == 'ieo' else '',
                     is_placeholder=True, is_published=True,
                 ),
@@ -404,29 +418,37 @@ class Command(BaseCommand):
 
         # ── Этапы ──────────────────────────────────────────────────────
         stages = {}
-        for (code, name, order, fmt, minutes, score, test_part,
-             qualify, cities) in VSEROS_STAGES:
+        for code, name, order, fmt, qualify, cities in VSEROS_STAGES:
             stage, _ = OlympiadStage.objects.update_or_create(
                 olympiad=olympiads['vseros'], code=code,
                 defaults=dict(
                     name=name, order=order, format=fmt,
-                    duration_minutes=minutes, max_score=score,
-                    has_test_part=test_part, how_to_qualify=qualify,
-                    cities=cities,
+                    # ⚠️ ЧИСЛА СЮДА НЕ ПИШЕМ. Наполнение примерами знает
+                    # устройство этапов, но не знает длительности и
+                    # максимума баллов: их устанавливает предметно-
+                    # методическая комиссия и публикует в требованиях.
+                    # Выдуманные 235 и 240 минут прожили две сессии, и
+                    # отличить их от настоящих на экране было нечем.
+                    # Настоящие приходят импортом, вместе с источником.
+                    how_to_qualify=qualify, cities=cities,
                 ),
             )
             stages[('vseros', code)] = stage
 
         for slug, rows in SKELETON_STAGES.items():
-            for (code, name, order, fmt, minutes, score, test_part,
-                 qualify, cities) in rows:
+            for code, name, order, fmt, qualify, cities in rows:
                 stage, _ = OlympiadStage.objects.update_or_create(
                     olympiad=olympiads[slug], code=code,
                     defaults=dict(
                         name=name, order=order, format=fmt,
-                        duration_minutes=minutes, max_score=score,
-                        has_test_part=test_part, how_to_qualify=qualify,
-                        cities=cities,
+                        # ⚠️ ЧИСЛА СЮДА НЕ ПИШЕМ. Наполнение примерами знает
+                        # устройство этапов, но не знает длительности и
+                        # максимума баллов: их устанавливает предметно-
+                        # методическая комиссия и публикует в требованиях.
+                        # Выдуманные 235 и 240 минут прожили две сессии, и
+                        # отличить их от настоящих на экране было нечем.
+                        # Настоящие приходят импортом, вместе с источником.
+                        how_to_qualify=qualify, cities=cities,
                     ),
                 )
                 stages[(slug, code)] = stage
@@ -460,9 +482,10 @@ class Command(BaseCommand):
                 university_short=uni_short, program_name=program_name,
                 defaults=dict(university_name=uni_name, city=city,
                               order=order,
-                              admission_rules_url=(
-                                  'https://example.org/admission/{}/'.format(
-                                      order))),
+                              # ⚠️ Тот же случай: выдуманный адрес правил
+                              # приёма в таблице льгот выглядел рабочей
+                              # ссылкой «Смотреть».
+                              admission_rules_url=''),
             )
             programs.append(program)
 
@@ -501,17 +524,25 @@ class Command(BaseCommand):
                 defaults=dict(value=value, max_value=100, scope='federal'),
             )
 
-        for (year, code, grade, count, minutes, score, has_solutions,
-             url, origin) in VARIANTS:
+        for year, code, grade, has_solutions in VARIANTS:
             OlympiadVariant.objects.update_or_create(
                 olympiad=olympiads['vseros'],
                 stage=stages[('vseros', code)],
                 year=year, grade=grade,
                 defaults=dict(
-                    problem_count=count, duration_minutes=minutes,
-                    max_score=score, has_solutions=has_solutions,
-                    original_url=url, original_source=origin,
+                    # ⚠️ ЧИСЛА И АДРЕС НЕ ПИШЕМ — ни настоящих, ни похожих
+                    # на настоящие. Заготовка создаёт только каркас записи;
+                    # заданий, минут и баллов у неё нет, пока импорт не
+                    # принесёт их из шапки файла заданий. Пустое поле
+                    # честнее правдоподобного числа: по минутам школьник
+                    # ставит себе таймер тренировки. [ADR 0067]
+                    problem_count=None, duration_minutes=None, max_score=None,
+                    has_solutions=has_solutions,
+                    original_url='', original_source='none',
                     ref_event_id='vseros-{}-{}-{}'.format(year, code, grade),
+                    # Пометка снимается импортом, когда все три числа
+                    # заполнены настоящими; это сторожит тест.
+                    is_placeholder=True,
                 ),
             )
 

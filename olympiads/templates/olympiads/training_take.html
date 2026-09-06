@@ -1,0 +1,108 @@
+{% extends 'olympiads/base_olymp.html' %}
+{% load static %}
+{% comment %}
+Сам процесс решения.
+
+⚠️ РАЗМЕТКА ПОДЧИНЕНА `platform/exam.js`, А НЕ НАОБОРОТ. Скрипты контрольной
+переиспользованы БЕЗ КОПИРОВАНИЯ: они привязаны к адресам (через window.EXAM)
+и к именам узлов — `#exam-form`, `#item-<pk>`, `#timer`, `#qnav`,
+`#save-state`, `#answered-count`, `#finish-btn`, `input.answer-short`,
+`textarea.answer-text`. Менять эти имена нельзя, не поправив exam.js.
+{% endcomment %}
+{% block title %}Решаю · {{ olympiad.name_short }} {{ variant.year }}{% endblock %}
+{% block olymp_content %}
+<div class="ol-tbar">
+  {% if attempt.with_timer %}
+  <div>
+    <div class="ol-tbar-cap">осталось</div>
+    <div class="ol-timer" id="timer" data-seconds="{{ seconds_left|default_if_none:'' }}">–:–</div>
+  </div>
+  {% else %}
+  {# Без таймера часы не показываются ВОВСЕ, а не показываются пустыми. #}
+  <div><div class="ol-tbar-cap">режим</div><div class="ol-tbar-cap">без таймера</div></div>
+  <span id="timer" data-seconds="" hidden></span>
+  {% endif %}
+  <div class="ol-qnav" id="qnav">
+    {% for row in rows %}
+    <a href="#item-{{ row.item.pk }}" data-item="{{ row.item.pk }}"
+       class="{% if row.answered %}is-answered{% endif %}">{{ row.number }}</a>
+    {% endfor %}
+  </div>
+  <div class="ol-tcount">отвечено <b id="answered-count">{{ answered_count }}</b> из {{ rows|length }}</div>
+  <span class="ol-tsave" id="save-state">все ответы сохраняются сами</span>
+</div>
+
+<h1 class="ol-title">{{ olympiad.name_short }} · {{ variant.year }}</h1>
+<p class="ol-sub">{% if variant.stage %}{{ variant.stage.name }} · {% endif %}{{ variant.grade_label }}</p>
+
+<form method="post" id="exam-form"
+      action="{% url 'olympiads:training_finish' olympiad.slug variant.pk %}">
+  {% csrf_token %}
+  {% for row in rows %}
+  <section class="ol-task" id="item-{{ row.item.pk }}">
+    <div class="ol-task-head">
+      <span class="ol-task-num">{{ row.number }}</span>
+      <span class="ol-task-pts">{{ row.points|floatformat:"-2" }} б.</span>
+    </div>
+    <div class="ol-task-body">{{ row.problem.statement }}</div>
+
+    {% if row.kind == 'radio' or row.kind == 'checkbox' %}
+      <div class="ol-field">
+        <label>Выберите ответ</label>
+        {% for option in row.options %}
+        <label class="ol-opt">
+          <input type="{{ row.kind }}" name="{{ row.parts.0.name }}"
+                 value="{{ option.value }}"
+                 {% if option.value in row.chosen %}checked{% endif %}>
+          <span>{{ option.label }}</span>
+        </label>
+        {% endfor %}
+      </div>
+    {% else %}
+      {% for part in row.parts %}
+      <div class="ol-field">
+        {% if part.part %}
+        <div class="ol-task-part">
+          <span class="ol-task-part-label">{{ part.label }}</span>
+          {{ part.statement }}
+        </div>
+        {% endif %}
+        <label for="{{ part.name }}">Ответ{% if part.part %} на {{ part.label }}{% endif %}</label>
+        <input class="answer-short" type="text" id="{{ part.name }}"
+               name="{{ part.name }}" value="{{ part.value }}"
+               {% if part.part %}data-part="{{ part.part.pk }}"{% endif %}
+               autocomplete="off">
+      </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="ol-field">
+      <label for="{{ row.solution_name }}">Моё решение (необязательно)</label>
+      <textarea class="answer-text" id="{{ row.solution_name }}"
+                name="{{ row.solution_name }}">{{ row.solution_value }}</textarea>
+    </div>
+  </section>
+  {% empty %}
+  <p class="ol-empty">В этом комплекте нет задач.</p>
+  {% endfor %}
+
+  <div class="ol-finish">
+    <button type="button" class="ol-btn" id="finish-btn">Завершить</button>
+    <span class="ol-mute">После завершения покажем правильные ответы и разборы.</span>
+  </div>
+</form>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+window.EXAM = {
+  autosaveUrl: "{% url 'olympiads:training_autosave' olympiad.slug variant.pk %}",
+  timeUrl: "{% url 'olympiads:training_time' olympiad.slug variant.pk %}",
+  itemIds: [{% for row in rows %}{{ row.item.pk }}{% if not forloop.last %},{% endif %}{% endfor %}],
+  totalItems: {{ rows|length }}
+};
+</script>
+<script src="{% static 'platform/exam_timer.js' %}"></script>
+<script src="{% static 'platform/work_form.js' %}"></script>
+<script src="{% static 'platform/exam.js' %}"></script>
+{% endblock %}
