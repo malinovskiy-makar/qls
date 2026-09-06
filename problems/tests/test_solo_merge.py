@@ -207,6 +207,9 @@ class OneMarkupTests(TestCase):
         """
         found = []
         for folder, _dirs, files in os.walk(ROOT):
+            # `.claude` — воркtree и симлинки на соседние каталоги: там
+            # лежат полные копии проекта другой ветки. Тот же довод, что у
+            # `materials` в шапке метода, только каталог появился позже.
             if any(part in folder for part in
                    ('venv', 'node_modules', '.git', 'materials', '.claude')):
                 continue

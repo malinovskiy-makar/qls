@@ -1,6 +1,6 @@
 {
- "note": "Снимок content_format ДО шлюза новых источников — путь отката. ВОССТАНОВЛЕН: первый файл затёр прогон тестов, писавших в боевую папку отчётов (починено, см. ReportDirIsolationTests). Восстановление точное: до шлюза ВСЕ задачи трёх новых источников стояли на plain (импорт ставит только plain), а render_new_sources markdown никогда не снимает — значит множество изменённых равно множеству новых задач, стоящих на markdown сейчас.",
- "count": 9066,
+ "note": "Снимок content_format ДО шлюза новых источников — путь отката. ВОССТАНОВЛЕН: первый файл затёр прогон тестов, писавших в боевую папку отчётов (починено, см. ReportDirIsolationTests). Восстановление точное: до шлюза ВСЕ задачи трёх новых источников стояли на plain (импорт ставит только plain), а render_new_sources markdown никогда не снимает — значит множество изменённых равно множеству новых задач, стоящих на markdown сейчас. ОБЪЕДИНЁН 29.08: к снимку первого прогона шлюза (9066 задач) добавлены 102 задачи второго прогона — файл должен оставаться ПОЛНЫМ путём отката, а команда перезаписывает его каждым --apply.",
+ "count": 9168,
  "problems": [
   {
    "id": 53715,
@@ -44,6 +44,18 @@
   },
   {
    "id": 53725,
+   "content_format": "plain"
+  },
+  {
+   "id": 53730,
+   "content_format": "plain"
+  },
+  {
+   "id": 53731,
+   "content_format": "plain"
+  },
+  {
+   "id": 53732,
    "content_format": "plain"
   },
   {
@@ -427,6 +439,10 @@
    "content_format": "plain"
   },
   {
+   "id": 53833,
+   "content_format": "plain"
+  },
+  {
    "id": 53834,
    "content_format": "plain"
   },
@@ -499,6 +515,10 @@
    "content_format": "plain"
   },
   {
+   "id": 53854,
+   "content_format": "plain"
+  },
+  {
    "id": 53855,
    "content_format": "plain"
   },
@@ -532,6 +552,10 @@
   },
   {
    "id": 53863,
+   "content_format": "plain"
+  },
+  {
+   "id": 53864,
    "content_format": "plain"
   },
   {
@@ -699,6 +723,10 @@
    "content_format": "plain"
   },
   {
+   "id": 53909,
+   "content_format": "plain"
+  },
+  {
    "id": 53910,
    "content_format": "plain"
   },
@@ -732,6 +760,14 @@
   },
   {
    "id": 53918,
+   "content_format": "plain"
+  },
+  {
+   "id": 53919,
+   "content_format": "plain"
+  },
+  {
+   "id": 53920,
    "content_format": "plain"
   },
   {
@@ -927,6 +963,10 @@
    "content_format": "plain"
   },
   {
+   "id": 53987,
+   "content_format": "plain"
+  },
+  {
    "id": 53989,
    "content_format": "plain"
   },
@@ -1095,6 +1135,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54039,
+   "content_format": "plain"
+  },
+  {
    "id": 54041,
    "content_format": "plain"
   },
@@ -1192,6 +1236,10 @@
   },
   {
    "id": 54072,
+   "content_format": "plain"
+  },
+  {
+   "id": 54073,
    "content_format": "plain"
   },
   {
@@ -1387,6 +1435,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54137,
+   "content_format": "plain"
+  },
+  {
    "id": 54138,
    "content_format": "plain"
   },
@@ -1532,6 +1584,10 @@
   },
   {
    "id": 54178,
+   "content_format": "plain"
+  },
+  {
+   "id": 54179,
    "content_format": "plain"
   },
   {
@@ -1943,6 +1999,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54308,
+   "content_format": "plain"
+  },
+  {
    "id": 54309,
    "content_format": "plain"
   },
@@ -2207,6 +2267,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54413,
+   "content_format": "plain"
+  },
+  {
    "id": 54414,
    "content_format": "plain"
   },
@@ -2267,6 +2331,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54433,
+   "content_format": "plain"
+  },
+  {
    "id": 54434,
    "content_format": "plain"
   },
@@ -2280,6 +2348,10 @@
   },
   {
    "id": 54437,
+   "content_format": "plain"
+  },
+  {
+   "id": 54440,
    "content_format": "plain"
   },
   {
@@ -2312,6 +2384,10 @@
   },
   {
    "id": 54450,
+   "content_format": "plain"
+  },
+  {
+   "id": 54452,
    "content_format": "plain"
   },
   {
@@ -2351,6 +2427,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54462,
+   "content_format": "plain"
+  },
+  {
    "id": 54463,
    "content_format": "plain"
   },
@@ -2376,6 +2456,10 @@
   },
   {
    "id": 54469,
+   "content_format": "plain"
+  },
+  {
+   "id": 54470,
    "content_format": "plain"
   },
   {
@@ -2415,6 +2499,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54480,
+   "content_format": "plain"
+  },
+  {
    "id": 54481,
    "content_format": "plain"
   },
@@ -2424,6 +2512,10 @@
   },
   {
    "id": 54484,
+   "content_format": "plain"
+  },
+  {
+   "id": 54485,
    "content_format": "plain"
   },
   {
@@ -2927,6 +3019,10 @@
    "content_format": "plain"
   },
   {
+   "id": 54621,
+   "content_format": "plain"
+  },
+  {
    "id": 54622,
    "content_format": "plain"
   },
@@ -3004,6 +3100,10 @@
   },
   {
    "id": 54644,
+   "content_format": "plain"
+  },
+  {
+   "id": 54645,
    "content_format": "plain"
   },
   {
@@ -4335,6 +4435,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55016,
+   "content_format": "plain"
+  },
+  {
    "id": 55017,
    "content_format": "plain"
   },
@@ -4420,6 +4524,10 @@
   },
   {
    "id": 55039,
+   "content_format": "plain"
+  },
+  {
+   "id": 55040,
    "content_format": "plain"
   },
   {
@@ -4831,11 +4939,19 @@
    "content_format": "plain"
   },
   {
+   "id": 55156,
+   "content_format": "plain"
+  },
+  {
    "id": 55157,
    "content_format": "plain"
   },
   {
    "id": 55158,
+   "content_format": "plain"
+  },
+  {
+   "id": 55159,
    "content_format": "plain"
   },
   {
@@ -4923,7 +5039,15 @@
    "content_format": "plain"
   },
   {
+   "id": 55181,
+   "content_format": "plain"
+  },
+  {
    "id": 55183,
+   "content_format": "plain"
+  },
+  {
+   "id": 55185,
    "content_format": "plain"
   },
   {
@@ -5163,7 +5287,43 @@
    "content_format": "plain"
   },
   {
+   "id": 55251,
+   "content_format": "plain"
+  },
+  {
+   "id": 55252,
+   "content_format": "plain"
+  },
+  {
    "id": 55253,
+   "content_format": "plain"
+  },
+  {
+   "id": 55254,
+   "content_format": "plain"
+  },
+  {
+   "id": 55255,
+   "content_format": "plain"
+  },
+  {
+   "id": 55256,
+   "content_format": "plain"
+  },
+  {
+   "id": 55257,
+   "content_format": "plain"
+  },
+  {
+   "id": 55258,
+   "content_format": "plain"
+  },
+  {
+   "id": 55259,
+   "content_format": "plain"
+  },
+  {
+   "id": 55260,
    "content_format": "plain"
   },
   {
@@ -5171,7 +5331,23 @@
    "content_format": "plain"
   },
   {
+   "id": 55262,
+   "content_format": "plain"
+  },
+  {
+   "id": 55263,
+   "content_format": "plain"
+  },
+  {
    "id": 55264,
+   "content_format": "plain"
+  },
+  {
+   "id": 55265,
+   "content_format": "plain"
+  },
+  {
+   "id": 55266,
    "content_format": "plain"
   },
   {
@@ -5179,7 +5355,23 @@
    "content_format": "plain"
   },
   {
+   "id": 55268,
+   "content_format": "plain"
+  },
+  {
+   "id": 55270,
+   "content_format": "plain"
+  },
+  {
    "id": 55271,
+   "content_format": "plain"
+  },
+  {
+   "id": 55272,
+   "content_format": "plain"
+  },
+  {
+   "id": 55273,
    "content_format": "plain"
   },
   {
@@ -5295,7 +5487,19 @@
    "content_format": "plain"
   },
   {
+   "id": 55302,
+   "content_format": "plain"
+  },
+  {
    "id": 55303,
+   "content_format": "plain"
+  },
+  {
+   "id": 55304,
+   "content_format": "plain"
+  },
+  {
+   "id": 55305,
    "content_format": "plain"
   },
   {
@@ -5303,7 +5507,43 @@
    "content_format": "plain"
   },
   {
+   "id": 55307,
+   "content_format": "plain"
+  },
+  {
+   "id": 55308,
+   "content_format": "plain"
+  },
+  {
+   "id": 55309,
+   "content_format": "plain"
+  },
+  {
+   "id": 55310,
+   "content_format": "plain"
+  },
+  {
+   "id": 55311,
+   "content_format": "plain"
+  },
+  {
+   "id": 55312,
+   "content_format": "plain"
+  },
+  {
+   "id": 55313,
+   "content_format": "plain"
+  },
+  {
    "id": 55314,
+   "content_format": "plain"
+  },
+  {
+   "id": 55315,
+   "content_format": "plain"
+  },
+  {
+   "id": 55316,
    "content_format": "plain"
   },
   {
@@ -5311,11 +5551,35 @@
    "content_format": "plain"
   },
   {
+   "id": 55318,
+   "content_format": "plain"
+  },
+  {
+   "id": 55319,
+   "content_format": "plain"
+  },
+  {
    "id": 55320,
    "content_format": "plain"
   },
   {
+   "id": 55321,
+   "content_format": "plain"
+  },
+  {
+   "id": 55323,
+   "content_format": "plain"
+  },
+  {
    "id": 55324,
+   "content_format": "plain"
+  },
+  {
+   "id": 55325,
+   "content_format": "plain"
+  },
+  {
+   "id": 55326,
    "content_format": "plain"
   },
   {
@@ -5475,6 +5739,14 @@
    "content_format": "plain"
   },
   {
+   "id": 55368,
+   "content_format": "plain"
+  },
+  {
+   "id": 55369,
+   "content_format": "plain"
+  },
+  {
    "id": 55372,
    "content_format": "plain"
   },
@@ -5619,6 +5891,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55409,
+   "content_format": "plain"
+  },
+  {
    "id": 55410,
    "content_format": "plain"
   },
@@ -5652,6 +5928,10 @@
   },
   {
    "id": 55418,
+   "content_format": "plain"
+  },
+  {
+   "id": 55419,
    "content_format": "plain"
   },
   {
@@ -5736,6 +6016,10 @@
   },
   {
    "id": 55441,
+   "content_format": "plain"
+  },
+  {
+   "id": 55443,
    "content_format": "plain"
   },
   {
@@ -5863,11 +6147,19 @@
    "content_format": "plain"
   },
   {
+   "id": 55475,
+   "content_format": "plain"
+  },
+  {
    "id": 55476,
    "content_format": "plain"
   },
   {
    "id": 55478,
+   "content_format": "plain"
+  },
+  {
+   "id": 55480,
    "content_format": "plain"
   },
   {
@@ -6775,6 +7067,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55732,
+   "content_format": "plain"
+  },
+  {
    "id": 55733,
    "content_format": "plain"
   },
@@ -6915,6 +7211,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55779,
+   "content_format": "plain"
+  },
+  {
    "id": 55780,
    "content_format": "plain"
   },
@@ -6932,6 +7232,10 @@
   },
   {
    "id": 55786,
+   "content_format": "plain"
+  },
+  {
+   "id": 55787,
    "content_format": "plain"
   },
   {
@@ -7031,6 +7335,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55815,
+   "content_format": "plain"
+  },
+  {
    "id": 55816,
    "content_format": "plain"
   },
@@ -7044,6 +7352,10 @@
   },
   {
    "id": 55821,
+   "content_format": "plain"
+  },
+  {
+   "id": 55822,
    "content_format": "plain"
   },
   {
@@ -7196,6 +7508,10 @@
   },
   {
    "id": 55873,
+   "content_format": "plain"
+  },
+  {
+   "id": 55874,
    "content_format": "plain"
   },
   {
@@ -7388,6 +7704,10 @@
   },
   {
    "id": 55931,
+   "content_format": "plain"
+  },
+  {
+   "id": 55932,
    "content_format": "plain"
   },
   {
@@ -7603,6 +7923,10 @@
    "content_format": "plain"
   },
   {
+   "id": 55988,
+   "content_format": "plain"
+  },
+  {
    "id": 55989,
    "content_format": "plain"
   },
@@ -7687,7 +8011,19 @@
    "content_format": "plain"
   },
   {
+   "id": 56010,
+   "content_format": "plain"
+  },
+  {
    "id": 56011,
+   "content_format": "plain"
+  },
+  {
+   "id": 56012,
+   "content_format": "plain"
+  },
+  {
+   "id": 56013,
    "content_format": "plain"
   },
   {
@@ -7728,6 +8064,10 @@
   },
   {
    "id": 56023,
+   "content_format": "plain"
+  },
+  {
+   "id": 56024,
    "content_format": "plain"
   },
   {
@@ -8260,6 +8600,42 @@
   },
   {
    "id": 56166,
+   "content_format": "plain"
+  },
+  {
+   "id": 56167,
+   "content_format": "plain"
+  },
+  {
+   "id": 56170,
+   "content_format": "plain"
+  },
+  {
+   "id": 56171,
+   "content_format": "plain"
+  },
+  {
+   "id": 56172,
+   "content_format": "plain"
+  },
+  {
+   "id": 56173,
+   "content_format": "plain"
+  },
+  {
+   "id": 56174,
+   "content_format": "plain"
+  },
+  {
+   "id": 56175,
+   "content_format": "plain"
+  },
+  {
+   "id": 56176,
+   "content_format": "plain"
+  },
+  {
+   "id": 56177,
    "content_format": "plain"
   },
   {
@@ -9212,6 +9588,10 @@
   },
   {
    "id": 56430,
+   "content_format": "plain"
+  },
+  {
+   "id": 56431,
    "content_format": "plain"
   },
   {
@@ -13568,6 +13948,10 @@
   },
   {
    "id": 57558,
+   "content_format": "plain"
+  },
+  {
+   "id": 57559,
    "content_format": "plain"
   },
   {
@@ -30511,6 +30895,10 @@
    "content_format": "plain"
   },
   {
+   "id": 61848,
+   "content_format": "plain"
+  },
+  {
    "id": 61849,
    "content_format": "plain"
   },
@@ -33695,6 +34083,10 @@
    "content_format": "plain"
   },
   {
+   "id": 62653,
+   "content_format": "plain"
+  },
+  {
    "id": 62654,
    "content_format": "plain"
   },
@@ -36055,6 +36447,10 @@
    "content_format": "plain"
   },
   {
+   "id": 63261,
+   "content_format": "plain"
+  },
+  {
    "id": 63262,
    "content_format": "plain"
   },
@@ -36159,6 +36555,10 @@
    "content_format": "plain"
   },
   {
+   "id": 63288,
+   "content_format": "plain"
+  },
+  {
    "id": 63289,
    "content_format": "plain"
   },
@@ -36175,6 +36575,10 @@
    "content_format": "plain"
   },
   {
+   "id": 63294,
+   "content_format": "plain"
+  },
+  {
    "id": 63295,
    "content_format": "plain"
   },
@@ -36184,6 +36588,10 @@
   },
   {
    "id": 63298,
+   "content_format": "plain"
+  },
+  {
+   "id": 63299,
    "content_format": "plain"
   },
   {
