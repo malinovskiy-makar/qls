@@ -28,6 +28,12 @@ CONFIDENCES = ('high', 'medium', 'low')
 SUMMARY_MAX = 300
 
 # Балл — перечень 0..10, а не min/max: structured outputs границ не форсируют.
+# ⚠️ У массива `steps` НЕТ `maxItems`: structured output Anthropic отвечает
+# 400 ещё до генерации на любой `maxItems` и на `minItems` кроме 0/1 (так
+# 28.08 упал пилот набора B — `build_eval_set_b.py`; сторожит
+# `problems/tests/test_eval_set_b.py`). «Не больше восьми» держат профиль
+# промпта и `validate()` (`steps[:MAX_STEPS]`). Найдено при синхронизации
+# веток 06.09.2026.
 CHECK_SCHEMA = {
     'type': 'object',
     'additionalProperties': False,
@@ -37,7 +43,7 @@ CHECK_SCHEMA = {
         'score': {'type': 'integer', 'enum': list(range(MAX_SCORE + 1))},
         'verdict': {'type': 'string', 'enum': list(VERDICTS)},
         'steps': {
-            'type': 'array', 'maxItems': MAX_STEPS,
+            'type': 'array',
             'items': {
                 'type': 'object', 'additionalProperties': False,
                 'required': ['n', 'title', 'verdict', 'comment'],
