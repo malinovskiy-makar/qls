@@ -245,11 +245,7 @@ class NoPromisesInTemplatesTests(SimpleTestCase):
 
     TEMPLATES = ('catalog/templates/catalog', 'templates/_typing_placeholder.html')
 
-    # Заглушка «Учебник» (`/textbook/`) — сознательное исключение: решение
-    # владельца 04.09.2026 («Полировка к бете») оставило на экране ровно знак,
-    # слово «Скоро.» и одну строку, без формы и кнопки; это сторожит
-    # `config.tests.test_nav`. Правило «без обещаний» писалось для экранов
-    # каталога и страницы задачи, а не для этой заглушки.
+    # Заглушка раздела и есть обещание раздела: исключение сознательное — решение владельца 04.09 и 06.09.2026 (сторожит `config.tests.test_nav`).
     EXEMPT = ('textbook.html',)
 
     def _files(self):
