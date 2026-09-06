@@ -765,6 +765,12 @@ function redrawProduction() {
   const lx = d3.scaleLinear().domain([0, Lmax]).range([left, right]);
   const t1 = d3.scaleLinear().domain([0, tpMax]).range([yTop0, top]);
   const t2 = d3.scaleLinear().domain([0, mpMax]).range([yBot0, yTop0 + gap]);
+  /* Две панели со своими вертикалями: сверху TP (до тысяч), снизу MP и AP.
+     Реестр чистим здесь — fitLeftForLabels выше мог позвать makeScales, и
+     'main' на весь холст осталась бы рядом с настоящими панелями. */
+  clearPanels();
+  registerPanel('prod-top', lx, t1, { x0: left, y0: top, x1: right, y1: yTop0 });
+  registerPanel('prod-bottom', lx, t2, { x0: left, y0: yTop0 + gap, x1: right, y1: yBot0 });
   const panel = (scale, y0, title) => {
     const g = svg.append('g');
     drawGrid(lx, scale, g);          // у панели свои шкалы — сетку считаем по ним

@@ -14,12 +14,20 @@ function loadScene(name) {
   // суммарные кривые пересобирались бы там, где групп уже нет.
   STATE.sumOn = false; STATE.sumN = { D: 2, S: 2 };
   STATE.tax = 0; STATE.pReg = 0;
+  // Ноль — это значение; «не задано» держат отдельные признаки, и они гаснут.
+  STATE.pRegSet = false; STATE.quotaSet = false; STATE.openPwSet = false;
   // Вид ставки тоже сбрасываем: иначе адвалорная «протекает» из прошлой сцены
   // (та же болезнь, что была у типа вмешательства). Карточка «Процентные
   // налоги» включает адвалорную сама, уже после loadScene.
   // Каскад вмешательства возвращается к началу: потоварный вид, продавец.
   // Иначе НДС, акциз или «платит покупатель» протекают из прошлой сцены.
   STATE.taxForm = 'unit'; STATE.subKind = 'unit'; STATE.taxSide = 'seller';
+  /* Сюжет «второй сегмент — это мировой рынок» тоже протекал: его ставит только
+     «Монополист и внешний рынок», а снять было некому, и «Дискриминация 3-й
+     степени», открытая следом, доставалась с подписями про Pw. Пока обе сцены
+     рисовали по два мини-графика, это было видно лишь в словах; теперь у них
+     разная КОМПОНОВКА (один график против двух), и молчать об этом нельзя. */
+  STATE.d3World = false;
   STATE.quota = 0; STATE.quotaPos = 0.5; STATE.qt = null;
   ['quota-slider', 'quota-input'].forEach(id => { const e = document.getElementById(id); if (e) e.value = 0; });
   const qv = document.getElementById('quota-val'); if (qv) qv.textContent = '0';
@@ -242,8 +250,12 @@ const SCENE_ROUTE = {
      закрыты по-прежнему — там на холсте уже есть модель, и первый шаг очевиден. */
   /* Своего openSection у маршрута больше нет: карточка «Ввод функций» раскрыта
      во ВСЕХ сценах, и открывает её pickScene одинаково для всех. */
+  /* Сцена открывается С ГОТОВОЙ ФУНКЦИЕЙ (решение владельца 01.09): пустой
+     экран нечего покрутить, и первое, что видел человек, — чистый холст.
+     Парабола x² − 4 выбрана нарочно: у неё видны оба нуля и вершина, то есть
+     сразу заполнены «Ключевые значения». */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); renderGraphRows(); } },
+                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows(); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },
@@ -528,6 +540,7 @@ function pickScene(key) {
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
   resetDecor();           // П20: новая модель начинается с чистого состояния
   STATE.zoomLock = false; // и своего масштаба, а не унаследованного от колеса
+  if (typeof resetPanelWins === 'function') resetPanelWins();   // и окон её панелей
   /* ⚠️ ВХОД В ЛЮБУЮ МОДЕЛЬ ОБНУЛЯЕТ КРИВЫЕ (п. 11).
      Девятнадцать маршрутов из сорока одного зовут loadScene, и он чистит
      STATE.curves сам. Остальные двадцать два (вся «Математика», КПВ, торговля,

@@ -28,7 +28,7 @@ const PULT_MOVABLE = ['mono-submode',                                          /
   'cons-px1-row',                                                      // потребитель: новая цена Px₁
   'lr-price-field', 'pl-q-field',                                      // фирма: цена P / выпуск двух заводов
   'ma-dg-field', 'ma-fx-fixed-field',                                  // макро: дефицит ΔG / фикс. курс
-  'mathx0-field'];                                                     // математика: точка касания x₀
+  'mathx0-field', 'math-secant-row'];   // математика: точка касания x₀ и секущая
 const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
 
 /* ⚠️ ОРГАНЫ УПРАВЛЕНИЯ ВМЕШАТЕЛЬСТВОМ ОСТАЮТСЯ В СВОЕЙ КАРТОЧКЕ.
@@ -58,9 +58,11 @@ const PULT_MOVABLE_SET = new Set(PULT_MOVABLE);
    содержимое одной карточки. */
 const PULT_STAY_HOME = new Set([
   'taxside-row', 'tax-field', 'pc-field', 'quota-field', 'quota-price-field',
-  /* Точка касания живёт в своей карточке рядом с формулой и переезжать в ленту
-     не должна — а общий компонент регулятора ей нужен ровно тот же. */
-  'mathx0-field',
+  /* ⚠️ ТОЧКА КАСАНИЯ x₀ ОТСЮДА УБРАНА (решение владельца 01.09). Она домоседом
+     не является: это живой регулятор сцены, и место ему там же, где ползункам
+     сдвига кривых в «Спросе и предложении» — в аналитике справа. Слева
+     остаётся ввод функции. Домоседы — только содержимое карточки
+     «Вмешательство государства», у которой свой порядок каскада. */
 ]);
 
 // Какие экранные регуляторы должны жить в пульте ПРЯМО СЕЙЧАС (по состоянию).
@@ -124,12 +126,13 @@ function pultRegulatorIds() {
     if (STATE.laborStruct !== 'union' && STATE.laborMinOn) ids.push('labmin-field');
     return ids;
   }
-  /* Математика: в сюжете про касательную живой регулятор один — точка x₀.
-     В ленту он не переезжает (см. PULT_STAY_HOME), но общий компонент
-     получает: правило владельца «числовых полей рядом с ползунками не бывает»
-     действует во всех сценах, а не только в рыночных. */
+  /* Математика: в сюжете про касательную живых регуляторов два — точка x₀ и
+     секущая через две точки. Оба переезжают в аналитику (01.09) и получают
+     общий компонент: правило «числовых полей рядом с ползунками не бывает»
+     действует во всех сценах, а не только в рыночных. Секущая едет ОДНИМ
+     узлом вместе со своим ползунком Δx: врозь они бессмысленны. */
   if (STATE.mode === 'math') {
-    return (STATE.mathSub === 'tangent') ? ['mathx0-field'] : [];
+    return (STATE.mathSub === 'tangent') ? ['mathx0-field', 'math-secant-row'] : [];
   }
   if (STATE.mode === 'ppf' && STATE.ppfSub === 'trade') {
     return [STATE.tradeScenario === 'B' ? 'tb-price-field' : 'ppft-price-field'];
@@ -273,15 +276,21 @@ function texifyName(name) {
 function editEqValue(lab, name, current, apply) {
   if (lab.querySelector('input')) return;
   lab.innerHTML = '';
-  const head = document.createElement('span');
-  head.className = 'param-eq-head';
-  if (typeof katex !== 'undefined') {
-    if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
-  } else head.textContent = name + ' =';
   const inp = document.createElement('input');
   inp.type = 'number'; inp.step = 'any'; inp.value = current;
   inp.className = 'param-eq-input';
-  lab.append(head, inp);
+  /* Приписка «имя =» нужна там, где правят строку «a = 1». У чипа сцены имя
+     стоит СЛЕВА отдельной подписью, а правят число справа: голова там встала
+     бы вторым именем в той же строке. Пустое имя — просто поле. */
+  if (name) {
+    const head = document.createElement('span');
+    head.className = 'param-eq-head';
+    if (typeof katex !== 'undefined') {
+      if (!katexInto(head, texifyName(name) + ' =')) head.textContent = name + ' =';
+    } else head.textContent = name + ' =';
+    lab.appendChild(head);
+  }
+  lab.appendChild(inp);
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
@@ -623,7 +632,9 @@ function syncPultRegulators(activeIds) {
    и пишутся прямо в атрибуты min/max/step ползунка, то есть остаются ровно тем,
    чем и были. Сама сцена об этом ничего не знает. */
 function upgradeRegulator(field) {
-  if (!field || field._regUpgraded) return;
+  // Узел может быть КОНТЕЙНЕРОМ переносимой группы (см. #math-secant-row):
+  // ползунок внутри есть, но он не его, и подпись у него чужая.
+  if (!field || field._regUpgraded || field.dataset.noRegulator === '1') return;
   const sl = field.querySelector('input[type=range]');
   if (!sl) return;
   field._regUpgraded = true;
@@ -751,6 +762,7 @@ function upgradeRegulator(field) {
       if (v < +sl.min || v > +sl.max) {
         const b = centerBandOn({ min: +sl.min, max: +sl.max }, v);
         sl.min = b.min; sl.max = b.max;
+        sl.dataset.boundsByHand = '1';   // границы переставил человек — модель их больше не двигает
       }
       sl.value = v;
       sl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -762,6 +774,7 @@ function upgradeRegulator(field) {
     (key) => sl[key],
     (key, v) => {
       sl[key] = v;
+      sl.dataset.boundsByHand = '1';     // границы переставил человек — модель их больше не двигает
       if (+sl.max <= +sl.min) sl.max = +sl.min + 1;
       if (num) { if (key === 'min') num.min = sl.min; if (key === 'max') num.max = sl.max; if (key === 'step') num.step = sl.step; }
       const cur = Math.max(+sl.min, Math.min(+sl.max, +sl.value));
@@ -789,6 +802,10 @@ function shortRegulatorName(id, raw) {
      рублей — ровно та запись в деньгах, которой у процентной формы быть не
      должно. Берём ту же букву, что и панель: одна точка правды. */
   if (id === 'tax-field') return rateLetter();
+  /* У квоты смысл тоже не постоянный: он задан НАПРАВЛЕНИЕМ ТОРГОВЛИ, а оно
+     меняется одним движением мировой цены. Поэтому имени в готовом списке нет
+     — его каждый раз спрашивают у модели, как и букву ставки. */
+  if (id === 'open-quota-field' && typeof openQuotaName === 'function') return openQuotaName();
   if (REGULATOR_SHORT[id]) return REGULATOR_SHORT[id];
   const s = String(raw || '').trim();
   if (!s) return 'Значение';
@@ -841,14 +858,33 @@ function ppfSetSum(which, maxX, maxY) {
 }
 
 // Один сцен-слайдер (метка + число сверху, range снизу). onInput(value) применяет состояние.
-function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr) {
-  const { chip, val } = makePchip(label, fmt(value), null);
+/* `show` — как печатать значение (у силы неравенства это проценты). Нужен
+   потому, что число теперь пишется в ДВУХ местах: при движении ползунка и
+   после точного ввода, и оба обязаны печатать одинаково. */
+function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr, show) {
+  const { chip, lab, val } = makePchip(label, fmt(value), null);
+  const print = show || fmt;
   const sl = document.createElement('input');
   sl.type = 'range'; sl.min = min; sl.max = max; sl.step = step;
   sl.value = Math.round(value); sl.style.accentColor = color || cssVar('--accent');
   if (idAttr) { sl.id = idAttr; val.id = idAttr + '-val'; }
-  sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = fmt(v); onInput(v); });
+  val.textContent = print(value);
+  sl.addEventListener('input', () => { const v = parseFloat(sl.value); val.textContent = print(v); onInput(v); });
+  /* ⚠️ ЩЕЛЧОК ПО ЧИСЛУ ОТКРЫВАЕТ ТОЧНЫЙ ВВОД — как у буквы-параметра и у
+     регуляторов сцены. Раньше «125%» рядом с ползунком не нажималось вовсе, и
+     точное значение силы неравенства задать было нечем (замечание владельца
+     01.09). Механизм тот же самый, editEqValue, второго не заводим. */
+  val.classList.add('pchip-editable');
+  val.setAttribute('data-tip', 'Щёлкните, чтобы ввести точное значение');
+  val.addEventListener('click', () => {
+    editEqValue(val, '', parseFloat(sl.value), (v) => {
+      v = Math.max(min, Math.min(max, isFinite(v) ? v : parseFloat(sl.value)));
+      sl.value = v;
+      sl.dispatchEvent(new Event('input', { bubbles: true }));   // один путь: печать значения и onInput
+    });
+  });
   chip.appendChild(sl); box.appendChild(chip);
+  return { chip, lab, val, sl };
 }
 
 // Пересобрать сцен-слайдеры под текущую сцену.
@@ -930,9 +966,13 @@ function ineqMasterDetach() {         // ручная правка профил�
 function buildIneqMasterChip(box) {
   const detached = !!STATE.ineqMasterDetached;
   const pct = detached ? 100 : Math.round((STATE.ineqMasterS != null ? STATE.ineqMasterS : 1) * 100);
-  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v), 'ineq-master-slider');
+  addPultXChip(box, 'Сила неравенства', pct, COL.D, 0, 200, 1, v => ineqMasterApply(v),
+               'ineq-master-slider', v => fmt(v) + '%');
   const val = document.getElementById('ineq-master-slider-val');
-  if (val) val.textContent = detached ? 'Своё' : (pct + '%');
+  // Отвязанный мастер процентов не показывает: профиль правили руками, и доля
+  // от прежней базы к нему уже не относится. Щелчок по слову всё равно
+  // открывает точный ввод — он-то мастера обратно и привяжет.
+  if (val && detached) val.textContent = 'Своё';
 }
 
 function showPult(on) {
@@ -1249,8 +1289,7 @@ function wireControls() {
         STATE[key + 'Expr'] = (inp.value || '').trim();
         recompileSocial(); redrawAll();
       };
-      inp.addEventListener('change', apply);
-      inp.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+      onFormulaInput(inp, apply);   // input + change + Enter, см. 82-input.js
     }
   });
   const extPigou = document.getElementById('ext-pigou');
@@ -1359,8 +1398,7 @@ function wireControls() {
   const isoInp = document.getElementById('inp-iso');
   if (isoInp) {
     const applyIso = () => { STATE.isoExpr = (isoInp.value || '').trim(); redrawAll(); };
-    isoInp.addEventListener('change', applyIso);
-    isoInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyIso(); });
+    onFormulaInput(isoInp, applyIso);
   }
   attachFormulaHelp('fh-iso', 'fp-iso', 'inp-iso', 'ISO');
   [['iso-w', 'isoW'], ['iso-r', 'isoR'], ['iso-c', 'isoC']].forEach(([id, key]) => {
@@ -1564,6 +1602,8 @@ function wireControls() {
     if (f) f.style.display = secChk.checked ? '' : 'none';
     redrawAll();
   });
+  // Ползунок Δx лежит ВНУТРИ переносимой группы, поэтому его показ и скрытие
+  // ленту не трогают: перенесён контейнер, а не два узла по отдельности.
   const dxs = document.getElementById('mathdx-slider');
   if (dxs) dxs.addEventListener('input', () => {
     STATE.mathDx = parseFloat(dxs.value);
@@ -1636,8 +1676,11 @@ function wireControls() {
   const chartEl = document.getElementById('chart');
   if (chartEl) chartEl.addEventListener('click', (ev) => {
     if (!STATE.markArm) return;
-    const { mx, my } = mainScales();
+    // Панель решает МЕСТО ЩЕЛЧКА: в многопанельной сцене это не одно и то же.
     const [px, py] = d3.pointer(ev, chartEl);
+    const pan = panelAt(px, py);
+    const pid = pan ? pan.id : null;
+    const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     armMark(false);
     showSnapHint(null);
@@ -1651,7 +1694,7 @@ function wireControls() {
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
     // К пересечению и к особой точке не привязываем: скольжение по одной из
     // кривых увело бы точку из перекрестья, а смысл отметки именно в нём.
-    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null);
+    addMarkAt(x, y, (hit && !hit.cross && !hit.key) ? hit.name : null, pid);
   });
   // Набор вершин площади: щелчок ставит вершину и режим не снимается —
   // вершин надо хотя бы три, и каждый раз жать кнопку было бы издевательством.
@@ -1659,14 +1702,16 @@ function wireControls() {
     if (!STATE.vertArm || STATE.markArm) return;
     // Только что сняли вершину щелчком по ней — этот щелчок уже отработан (П42).
     if (STATE._vertClickEaten) { STATE._vertClickEaten = false; return; }
-    const { mx, my } = mainScales();
     const [px, py] = d3.pointer(ev, chartEl);
+    const pan = panelAt(px, py);
+    const pid = pan ? pan.id : null;
+    const { mx, my } = mainScales(pid);
     const [xLo, xHi] = mx.domain(), [yLo, yHi] = my.domain();
     const hit = snapVertexAt(px, py);
     const x = hit ? hit.x : mx.invert(px);
     const y = hit ? hit.y : my.invert(py);
     if (x < xLo || x > xHi || y < yLo || y > yHi) return;   // щелчок мимо поля
-    addAreaVert(x, y, hit && hit.key ? hit.name : '');
+    addAreaVert(x, y, hit && hit.key ? hit.name : '', pid);
   });
   // «Убрать последнюю» убрана по П42: у каждой вершины в списке свой крестик.
   // «Убрать все вершины» подключается в wireAreaCalc вместе с остальной секцией.
@@ -1729,15 +1774,10 @@ function wireControls() {
   // Задача 3: ползунок и поле α для семейства L(p)=p^α.
   const ineqAlpha = document.getElementById('ineq-alpha');
   if (ineqAlpha) ineqAlpha.addEventListener('input', () => setIneqAlpha(ineqAlpha.value));
-  const ineqAlphaNum = document.getElementById('ineq-alpha-num');
-  if (ineqAlphaNum) ineqAlphaNum.addEventListener('change', () => setIneqAlpha(ineqAlphaNum.value));
-  // ЧК2: галочка «Исходное состояние» — снимок текущей кривой как «было».
-  const ineqGhostChk = document.getElementById('ineq-ghost');
-  if (ineqGhostChk) ineqGhostChk.addEventListener('change', () => {
-    STATE.showIneqGhost = ineqGhostChk.checked;
-    if (ineqGhostChk.checked) ineqSnapshot(); else STATE.ineqGhost = null;
-    redrawAll();
-  });
+  /* Отдельного числового поля α и галочки «Исходное состояние» в этой сцене
+     больше нет (01.09). Точное значение α вводится щелчком по самому ползунку
+     (общий компонент регулятора), а сравнивать кривую Лоренца не с чем: для
+     «до и после» есть «Перераспределение». */
   // ЧК3: перераспределение — галочка, инструмент, ползунки τ и T.
   const ineqRedistChk = document.getElementById('ineq-redist');
   if (ineqRedistChk) ineqRedistChk.addEventListener('change', () => {
@@ -1775,8 +1815,11 @@ function wireControls() {
       _wantRangeAnim = true;
       redrawAll();
     };
-    e.addEventListener('change', apply);
-    if (!isNum) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+    /* Числовое поле оставляем на `change`: там дребезг только мешал бы —
+       набранное «12» на полпути читалось бы как «1». Поле ФОРМУЛЫ слышит
+       набранное, иначе оно глухо к мосту MathLive. */
+    if (isNum) e.addEventListener('change', apply);
+    else onFormulaInput(e, apply);
   };
   macroField('ma-lras', 'adas', 'lras', true);
   macroField('ma-sras', 'adas', 'sras', false);
