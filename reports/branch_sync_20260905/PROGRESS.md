@@ -845,3 +845,31 @@ nginx не трогали (уже совпадал), навигация почи
 исправленные ПРЯМО в ходе B2, не относятся к плану сессии A. Дальше — фаза
 B3 (удаление веток на GitHub), только после того как `origin/main`
 содержит интеграцию (да, содержит) и прод выкачен (да, выкачен).
+
+## Фаза B3. GitHub — удаление веток, вошедших в `main`
+
+**3.1 Страховка.** `git ls-remote --tags origin` — 8 архивных/backup тегов
+(все ожидаемые: `backup/main-before-sync-20260905`,
+`archive/feat-calc2-map-21aug`, `archive/feat-calc2-mono-surpluses`,
+`archive/feat-calc2-panels-and-keypoints`,
+`archive/feat-calc2-trade-and-ui`, `archive/feat-import-new-sources`,
+`archive/chore-corpus-consolidation-20260822`,
+`archive/backup-search-eval-c14-before-rebase`) плюс `sync-20260905`.
+`git ls-remote --heads` — `feat/olympiad-text-dedup` и все четыре `wip/*`
+на месте. Всё, что нужно для страховки, есть — продолжаю.
+
+**3.2 Пересчёт на живом дереве** (после `git fetch origin --prune --tags`):
+54 ветки на origin, из проверки исключены `main`,
+`integration/sync-20260905`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, четыре `wip/*` — 46 к проверке. Результат
+(`git merge-base --is-ancestor origin/<b> origin/main` для каждой):
+**45 предков + 1 непредок** (`feat/calc2-map-21aug`) — совпадает с B_PLAN
+§4а/4б один в один, включая полный список. `feat/calc2-map-21aug` покрыта
+тегом: `git rev-parse origin/feat/calc2-map-21aug archive/feat-calc2-map-21aug^{}`
+— оба `766c68ee`.
+
+⛔ **Стоп-гейт 5.** Таблица: 45 предков `main` (полный список — B_PLAN.md
+§4а, сверен заново и идентичен) + 1 покрыта тегом (`feat/calc2-map-21aug`)
+= **46 к удалению**. Остаются 8: `main`, `integration/sync-20260905`,
+`feat/taxonomy-v2-openai-provider`, `feat/olympiad-text-dedup`, четыре
+`wip/*`. Жду «да» (можно «да, кроме …»).
