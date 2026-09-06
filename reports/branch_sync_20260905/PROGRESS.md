@@ -872,4 +872,16 @@ B3 (удаление веток на GitHub), только после того �
 §4а, сверен заново и идентичен) + 1 покрыта тегом (`feat/calc2-map-21aug`)
 = **46 к удалению**. Остаются 8: `main`, `integration/sync-20260905`,
 `feat/taxonomy-v2-openai-provider`, `feat/olympiad-text-dedup`, четыре
-`wip/*`. Жду «да» (можно «да, кроме …»).
+`wip/*`. Жду «да» (можно «да, кроме …»). Ответ: **да.**
+
+Владелец выполнил пять команд `git push origin --delete` (по 10–6 веток в
+строку) — все 46 удалены (`[deleted]` по каждой, ошибок нет). После
+`git fetch origin --prune`: `git ls-remote --heads origin | wc -l` = **8**,
+ровно ожидаемый список (`main`, `integration/sync-20260905`,
+`feat/taxonomy-v2-openai-provider`, `feat/olympiad-text-dedup`, четыре
+`wip/*`).
+
+**3.3.** `origin/integration/sync-20260905` = `7458d560` — предок
+`origin/main` (`c370602` на момент проверки), тегом `sync-20260905`
+покрыта (`^{}` = `a93e67b`, тоже предок main). Удалить ветку на GitHub
+сейчас?
