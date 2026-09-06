@@ -112,6 +112,14 @@ def site_meta(request):
     authed = bool(user and user.is_authenticated)
     return {
         'site_version': settings.SITE_VERSION,
+        # ⚠️ ОКРУЖЕНИЕ И СБОРКА ЕДУТ В КАЖДЫЙ ШАБЛОН, НО РИСУЮТСЯ ТОЛЬКО НА
+        # ПЛОЩАДКЕ. `site_env` равно 'dev' исключительно на dev.weconomics.ai
+        # (переменная SITE_ENV в её .env); на бою здесь 'prod', и шапка не
+        # показывает ничего — разметка боя от этой правки не меняется.
+        # Зачем вообще: площадка выглядит как бой во всём, кроме адреса, и без
+        # плашки разбор бага легко пойдёт не по тому сайту.
+        'site_env': settings.SITE_ENV,
+        'site_build': settings.SITE_BUILD,
         'nav_items': _menu(request),
         'nav_user_initials': _initials(user) if authed else '',
         'nav_user_name': (user.get_full_name() or user.get_username()) if authed else '',
