@@ -20,8 +20,13 @@
 /* ── Каркас: своя полоса под карточку справа (ADR 0078) ─────────────── */
 .pd-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 36px 20px 80px; }
 .pd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 32px; align-items: start; }
+/* ⚠️ min-width: 0 у детей сетки — иначе на узком экране колонка растёт до
+   min-content самой широкой формулы и страница едет вбок (обход 06.09.2026:
+   380 px → документ 484 px). Широкая формула прокручивается внутри себя,
+   как таблица в канон 1.9.1, а не двигает страницу. */
+.pd-main, .pd-side { min-width: 0; }
 .pd-side { position: sticky; top: 72px; }
-@media (max-width: 980px) { .pd-grid { grid-template-columns: 1fr; } .pd-side { position: static; } }
+@media (max-width: 980px) { .pd-grid { grid-template-columns: minmax(0, 1fr); } .pd-side { position: static; } }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
            clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
@@ -65,6 +70,8 @@
 .stm .math-content p { margin: 0 0 .7em; }
 .stm .math-content { padding-bottom: 14px; }
 .stm .katex-display { margin: 1em 0; }
+.math-content .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0 4px; }
+.math-content table { display: block; max-width: 100%; overflow-x: auto; }
 .stm .parts { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--border-soft); }
 .stm .part { display: flex; gap: 12px; padding: 12px 0; border-top: 1px dashed var(--border); }
 .stm .part:first-child { border-top: 0; }
