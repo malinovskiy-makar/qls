@@ -24,7 +24,12 @@ DEFAULT_PROVIDER = 'anthropic'
 DEFAULT_MODEL = 'claude-haiku-4-5'
 # Цена за миллион токенов: (вход, выход). Держим таблицей, а не числами в
 # расчёте: тариф меняется, и меняться он должен в одном месте.
-DEFAULT_PRICES = {'claude-haiku-4-5': (1.0, 5.0)}
+# Тарифы на 30.08.2026, Sonnet 5 — до 31.08.2026 включительно (с 01.09.2026
+# дорожает до $3/$15).
+DEFAULT_PRICES = {
+    'claude-haiku-4-5': (1.0, 5.0),
+    'claude-sonnet-5': (2.0, 10.0),
+}
 # Записанный в кэш токен стоит на четверть дороже обычного, прочитанный из
 # кэша — десятую часть. Отсюда и вся выгода.
 CACHE_WRITE_MULTIPLIER = Decimal('1.25')
@@ -121,12 +126,16 @@ def _cache_key(profile, model, user_text):
 
 
 def run(profile, user_text, schema, user, max_tokens=None,
-        cache_seconds=None, check_limit=True):
+        cache_seconds=None, check_limit=True, model=None):
     """Выполнить задачу `profile` и вернуть разобранную структуру.
 
     `user_text` — ВСЁ переменное: описание, параметры, подсказки из банка.
     В системную часть ничего переменного не попадает никогда (см.
     `prompts.py`), иначе кэш префикса перестаёт срабатывать.
+
+    `model` — необязательное переопределение модели для ЭТОГО обращения
+    (например, сравнение вариантов из management-команды). По умолчанию —
+    настройка `AI_MODEL` / `DEFAULT_MODEL`, как и раньше.
     """
     provider = _provider()
     if not provider.is_available():
@@ -136,7 +145,7 @@ def run(profile, user_text, schema, user, max_tokens=None,
     if not user_text:
         raise AiUnavailable('Пустой запрос — разбирать нечего.')
 
-    model = _setting('AI_MODEL', DEFAULT_MODEL)
+    model = model or _setting('AI_MODEL', DEFAULT_MODEL)
     key = _cache_key(profile, model, user_text)
     hit = cache.get(key)
     if hit is not None:

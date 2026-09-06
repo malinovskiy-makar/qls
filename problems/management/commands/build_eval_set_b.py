@@ -131,6 +131,11 @@ class Command(BaseCommand):
                             help='БОЕВОЙ прогон: обращается к модели и тратит '
                                  'деньги. Без него — только смета.')
         parser.add_argument(
+            '--model', default=None,
+            help='Модель генерации (по умолчанию — DEFAULT_MODEL из '
+                 'problems/ai/core.py). Должна быть в таблице цен '
+                 'DEFAULT_PRICES там же — иначе ошибка ДО обращения к API.')
+        parser.add_argument(
             '--max-cost', type=float, default=None,
             help='Жёсткий потолок расхода в долларах. Считается по '
                  'ФАКТИЧЕСКИМ токенам из ответов, а не по смете: смета — '
@@ -140,13 +145,27 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         from catalog.semantic import index_queryset
+        from problems.ai.core import DEFAULT_MODEL, DEFAULT_PRICES
+
+        # ⚠️ ПРОВЕРКА МОДЕЛИ — ДО ЛЮБОГО ОБРАЩЕНИЯ К API, и до самой сметы:
+        # смета для неизвестной модели молча посчитала бы её по цене модели
+        # по умолчанию (DEFAULT_PRICES.get с фоллбэком) — владелец увидел бы
+        # неверную вилку и не узнал бы, что модель на самом деле не найдена.
+        модель = options['model'] or DEFAULT_MODEL
+        if модель not in DEFAULT_PRICES:
+            raise CommandError(
+                f'Неизвестная модель: {модель!r}. Цена задана только для: '
+                f'{", ".join(sorted(DEFAULT_PRICES))}. Добавьте тариф в '
+                f'DEFAULT_PRICES (problems/ai/core.py), прежде чем '
+                f'обращаться к API с этой моделью.')
+        options['model'] = модель
 
         задачи = self._выборка(index_queryset(options['scope']),
                                options['limit'], options['seed'])
         if not задачи:
             raise CommandError('В выборке нет ни одной задачи.')
 
-        смета = self._смета(задачи)
+        смета = self._смета(задачи, модель)
         self._показать_смету(задачи, смета, options)
 
         if not options['apply']:
@@ -189,19 +208,19 @@ class Command(BaseCommand):
                     return отобранные
         return отобранные
 
-    def _смета(self, задачи):
+    def _смета(self, задачи, модель):
         """Вилка стоимости: нижняя граница по замеру, верхняя — с запасом.
 
         Считается по трём частям входа отдельно, потому что стоят они разное:
         ядро кэшируется (0,1 тарифа на чтение), профиль и условие идут полной
         ценой каждое обращение.
         """
-        from problems.ai.core import DEFAULT_MODEL, DEFAULT_PRICES
+        from problems.ai.core import DEFAULT_PRICES
         from problems.ai.prompts import system_blocks
 
         ядро, профиль = system_blocks(ПРОФИЛЬ)[0], system_blocks(ПРОФИЛЬ)[1]
         n = len(задачи)
-        цена_вход, цена_выход = DEFAULT_PRICES.get(DEFAULT_MODEL, (1.0, 5.0))
+        цена_вход, цена_выход = DEFAULT_PRICES[модель]
 
         def посчитать(симв_на_токен):
             ядро_т = len(ядро) / симв_на_токен
@@ -222,7 +241,7 @@ class Command(BaseCommand):
 
         низ = посчитать(СИМВОЛОВ_НА_ТОКЕН_ЗАМЕР)
         верх = посчитать(СИМВОЛОВ_НА_ТОКЕН_ЗАМЕР / ЗАПАС_ТОКЕНИЗАТОРА)
-        return {'модель': DEFAULT_MODEL, 'низ': низ, 'верх': верх}
+        return {'модель': модель, 'низ': низ, 'верх': верх}
 
     def _показать_смету(self, задачи, смета, options):
         низ, верх = смета['низ'], смета['верх']
@@ -267,7 +286,7 @@ class Command(BaseCommand):
                 # Наружу уходит ТОЛЬКО текст задачи: полей профиля
                 # пользователя в запросе нет ни одного.
                 итог = core.run(ПРОФИЛЬ, текст, СХЕМА, user=None,
-                                check_limit=False)
+                                check_limit=False, model=options['model'])
             except Exception as ошибка:
                 ошибок = self._отказ(pid, ошибка, ошибок, н)
                 continue

@@ -296,3 +296,71 @@ class ДлинаОтветаNabораBTests(TestCase):
         self.assertEqual(данные['count'], 9)
         self.assertIn('Ошибок при генерации: 0 из 3',
                       ' '.join(данные['warnings']))
+
+
+# ── Флаг --model: смета и проброс модели ──────────────────────────────────
+#
+# С15+: команда была жёстко зашита на claude-haiku-4-5 — ни выбрать другую
+# модель, ни сравнить цену было нельзя. Тесты ниже проверяют ТОЛЬКО таблицу
+# цен и проброс параметра — расчёт сметы (переведённый в доллары по цене за
+# токен) не переписывается.
+
+class ФлагМодельTests(SimpleTestCase):
+
+    def test_смета_дороже_ровно_вдвое_для_sonnet_5(self):
+        """Sonnet 5 вдвое дороже Haiku 4.5 и на входе, и на выходе — смета
+        обязана показать РОВНО двукратную разницу на одинаковой выборке."""
+        from problems.management.commands.build_eval_set_b import Command
+
+        задачи = [(1, 'А' * 300), (2, 'Б' * 300), (3, 'В' * 300)]
+        cmd = Command()
+        смета_haiku = cmd._смета(задачи, 'claude-haiku-4-5')
+        смета_sonnet = cmd._смета(задачи, 'claude-sonnet-5')
+
+        self.assertAlmostEqual(
+            смета_sonnet['низ']['доллары'] / смета_haiku['низ']['доллары'],
+            2.0, places=9)
+        self.assertAlmostEqual(
+            смета_sonnet['верх']['доллары'] / смета_haiku['верх']['доллары'],
+            2.0, places=9)
+
+    def test_неизвестная_модель_явная_ошибка_до_обращения_к_api(self):
+        """Неизвестное имя — понятная ошибка ДО API, а не молчаливый
+        фоллбэк на модель по умолчанию и не 500 после обращения."""
+        with tempfile.TemporaryDirectory() as d:
+            путь = str(Path(d) / 'eval_set_b.json')
+            with self.assertRaises(CommandError) as поймано:
+                call_command('build_eval_set_b', limit=3, out=путь,
+                             model='gpt-4-turbo', verbosity=0)
+        self.assertIn('gpt-4-turbo', str(поймано.exception))
+        self.assertFalse(Path(путь).exists())
+
+@override_settings(AI_PROVIDER='fake', AI_FAKE_REPLY=ОТВЕТ)
+class ПробросМоделиВПрогонTests(TestCase):
+    """--model обязан дойти до настоящего вызова, а не только до сметы.
+
+    `core.run` вызывается с `user=None` (см. build_eval_set_b.py) — `_log`
+    в этом случае НЕ пишет `AiUsageLog` (ранний `return` в core.py), поэтому
+    проверить проброс через журнал расхода нельзя. Проверяем сам вызов.
+    """
+
+    def test_model_пробрасывается_в_вызов_core_run(self):
+        from unittest import mock
+
+        from problems.ai import core
+
+        for н in range(3):
+            p = make_problem(statement=f'Задача номер {н}. ' + 'Текст. ' * 40)
+            Problem.objects.filter(pk=p.pk).update(
+                status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                hidden_pending_review=False, embedding=b'\x00' * 4096)
+        with tempfile.TemporaryDirectory() as d:
+            путь = str(Path(d) / 'eval_set_b.json')
+            with mock.patch(
+                    'problems.management.commands.build_eval_set_b.core.run',
+                    wraps=core.run) as поддельный:
+                call_command('build_eval_set_b', limit=3, out=путь,
+                             apply=True, model='claude-sonnet-5', verbosity=0)
+        self.assertTrue(поддельный.call_args_list)
+        for вызов in поддельный.call_args_list:
+            self.assertEqual(вызов.kwargs.get('model'), 'claude-sonnet-5')
