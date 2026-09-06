@@ -2018,7 +2018,7 @@ function renderVertList() {
   if (vertsMixed()) {
     const warn = document.createElement('div');
     warn.className = 'vert-mixed warn';
-    warn.textContent = 'Вершины стоят на разных графиках — площадь считается внутри одного.';
+    warn.textContent = 'Вершины стоят на разных графиках: площадь считается внутри одного.';
     box.appendChild(warn);
   }
   list.forEach((p, i) => {
@@ -2332,7 +2332,7 @@ function bestAreaRing(pts) {
 function calcAreaPolygon() {
   const pts = (STATE.areaVerts || []).slice();
   if (pts.length < 3) return { error: 'Нужно хотя бы три вершины: щёлкните по графику ещё раз.' };
-  if (vertsMixed()) return { error: 'Вершины стоят на разных графиках — площадь считается внутри одного.' };
+  if (vertsMixed()) return { error: 'Вершины стоят на разных графиках: площадь считается внутри одного.' };
   const r = bestAreaRing(pts);
   return { kind: 'poly', value: ringArea(r.ring), exact: r.exact,
            crosses: !r.exact && ringSelfCrosses(r.ring),
