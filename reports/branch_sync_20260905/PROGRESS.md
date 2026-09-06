@@ -691,3 +691,20 @@ smoke-наборе» (правка документов делается в B5, 
 CI #115 (см. разбор выше — разница с `7458d560` только в `PROGRESS.md`).
 Дальше работаем от `798dc148`, без `tmux` (шаги короткие), команды по одной,
 вывод — текстом, не скриншотом.
+
+**Шаг 2 — выкатка, результат: ✅ зелёный по всем пунктам.**
+
+| Проверка | Ожидание | Факт |
+|---|---|---|
+| `git status --short` после `pull` | только `deploy_fixtures_approved.tar.gz` (не мешает) | совпало |
+| `docker compose build web` | без ошибок | `Image weconomics-web:latest Built` |
+| `docker compose up -d web` | `web` healthy | healthy через 40 с |
+| Логи `web`, `Applying\|Traceback\|Error` | 14 строк `OK`, 0 ошибок | ровно 14 строк `Applying … OK`, `Traceback`/`Error` — 0 (⚠️ с `--tail=200` строки не попали в срез — вытеснены выводом `collectstatic`; без `--tail` нашлись) |
+| Миграций `[ ]` | пусто | пусто |
+| Миграций `[X]` | 66 | 66 |
+| `makemigrations --check` | No changes detected | No changes detected |
+| `problems_problem` / users | 5095 / 3 | 5095 / 3 |
+| `weconomics.site` / `.ai` | оба 200 | оба `HTTP/2 200` |
+
+Прод обновлён: `main` = `798dc148`, 14 миграций накатились без ошибок, данные
+не сдвинулись. Дальше — шаг 3 (nginx, сверка diff-ом).
