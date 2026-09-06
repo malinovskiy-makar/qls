@@ -1124,7 +1124,10 @@ def protected_fields_digest(problem_ids):
                 Problem.objects.filter(id__in=batch)
                 .values_list('id', 'statement', 'answer', 'solution')
                 .iterator()):
-            h = hashlib.md5()
+            # MD5 здесь — ОТПЕЧАТОК ТЕКСТА для сравнения «изменилось ли»,
+            # а не защита: `usedforsecurity=False` говорит это и людям,
+            # и bandit (иначе B324 красит джоб «Безопасность»).
+            h = hashlib.md5(usedforsecurity=False)
             for value in (statement, answer, solution):
                 h.update((value or '').encode('utf-8'))
                 h.update(b'\x00')

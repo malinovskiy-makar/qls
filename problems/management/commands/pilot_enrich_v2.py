@@ -1764,12 +1764,14 @@ def rehearse_db_write(db_path, updates):
         for problem_id, candidate, source in updates:
             cur.execute(
                 'UPDATE %s SET title_candidate=?, title_source=? '
-                'WHERE id=?' % table, (candidate, source, problem_id))
+                'WHERE id=?' % table,  # nosec B608 — имя таблицы из _meta
+                (candidate, source, problem_id))
             if cur.rowcount:
                 applied += 1
         conn.commit()
         cur.execute(
-            "SELECT COUNT(*) FROM %s WHERE title_candidate != ''" % table)
+            "SELECT COUNT(*) FROM %s WHERE title_candidate != ''"  # nosec B608
+            % table)
         nonempty = cur.fetchone()[0]
     finally:
         conn.close()
