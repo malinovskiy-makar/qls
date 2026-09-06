@@ -164,7 +164,7 @@ class AnthropicProvider(BaseProvider):
                 timeout=timeout,
             )
         except anthropic.APITimeoutError as error:
-            # Потолок времени (ADR 0071): ученику — что делать, а не «сеть».
+            # Потолок времени (ADR 0079): ученику — что делать, а не «сеть».
             # Ветка стоит ПЕРЕД APIConnectionError: таймаут — его подкласс.
             raise self._fail(
                 error,

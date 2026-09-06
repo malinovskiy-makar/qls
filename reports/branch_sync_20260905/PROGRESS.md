@@ -58,7 +58,7 @@
 | КТ2 | ✅ | журнал — этот коммит | `main..HEAD` = 148 = 89 (КТ1) + 1 поправки + 24 calc2 + 1 merge + 1 карта + 29 c13 + 1 merge + 1 схема + 1 склейка; merge-коммитов 9 (6 веток + 3 внутри веток); шесть веток — предки HEAD; четыре `??`; stash пуст; `check` чист; `makemigrations --check` → No changes detected; листовой узел problems один; три `wip/*` на месте; `qls-search-eval` чист (кроме расшифровки), `qls-sol` чист; ignored-tracked без разницы с main; `qls-models` `772ac87e` не изменилась; `main` `6b840611`. ⛔ Стоп до «продолжай» |
 
 **Фаза 9, шаг 4 (PostgreSQL):** ✅ после удаления старого сокета Docker Desktop поднялся за 52 с, `docker compose -f docker-compose.dev.yml up -d postgres redis` — оба healthy. База `qls_dev` из `settings_test_pg` НЕ пуста (104 таблицы, контейнер живёт с 01.09) — поэтому создана свежая `qls_zero_20260905` и Django направлен на неё через `DATABASE_URL` (settings_test_pg его читает). `migrate --noinput --settings=config.settings_test_pg` — **99 миграций за 16 с**, по приложениям те же, что на SQLite (admin 3, auth 12, contenttypes 2, game 15, olympiads 6, problems 60, sessions 1), неприменённых 0, таблиц 110; `makemigrations --check --dry-run --settings=config.settings_test_pg` → **No changes detected**. Свидетельство — `logs/09-zero-postgres.txt`. База `qls_zero_20260905` удалена (артефакт сессии). Docker Desktop оставлен работающим — нужен фазам 12 и 13.
-| 10 Номера ADR | | | |
+| 10 Номера ADR | ✅ | (этот коммит) | 13 `git mv` ровно по таблице (все файлы были на месте, 0077–0089 свободны); в шапку каждого — строка «Нумерация: перенумерован из …», заголовок `# ADR 00XX` заменён. Ссылки путями: слаг однозначен — заменены по всему дереву (8 файлов); текст ссылок `[ADR N](…M-slug.md)` приведён к номеру пути (несовпадений 0). Голые упоминания (162) разобраны по контексту: 22 файла правлены (calc2-код и docs → 0083–0088; редизайн каталога в `catalog/*`, `problems/ai/*`, `problems/models.py:1031`, `config/tests/test_nav.py`, `DESIGN.md` §1.9, `docs/redesign/catalog-2026-09.md`, запись редизайна в архиве → 0078–0082); упоминания beta-polish (0070 vendor, 0071 sections, 0072 nav, 0073 password, 0074 invite), main (0054 semantic, 0055–0057 game, 0036 topic-map, 0017 calc2-math) — не тронуты. Инварианты: дубли номеров — только 0013–0015; старых слагов 0 (`git grep`); каждый путь `docs/adr/NNNN-*.md` существует, КРОМЕ (было битым до сессии): `0034-legacy-stores-converted-text.md` из `0089-canonical-database-copy.md` (c13) — файла нет ни в одной влитой ветке (живёт в taxonomy-v2, см. «Для будущего слияния»); четыре строки в `reports/site_polish_20260904/PROGRESS.md:118–121` — исторический перечень чужих номеров, не ссылки. Попутно починена опечатка слага в `0071-five-sections-one-module.md` (→ `0053-topic-map-seven-section-colours.md`). Тесты `test_template_hygiene + config` → 62 OK, skipped 4. Следующий свободный номер — **0090** |
 | 11 CLAUDE.md и документы | | | |
 | 12 Четыре быстрых джоба CI | | | |
 | КТ3 | | | |
@@ -196,7 +196,8 @@ CI (по пункту 4): run #112 (`183f632`, КТ1) — успешно, пят
   слиянии taxonomy-v2 конфликта по нему быть не должно, но нужна ещё одна
   склеивающая миграция problems.
 - ADR: перенумеровать её 0059–0062 и 0067–0069 (номера заняты после фазы 10).
-  Следующий свободный номер после этой сессии — заполняется в фазе 10.
+  **Следующий свободный номер после этой сессии — 0090.**
+- Её `0034-legacy-stores-converted-text.md`: на него ссылается `docs/adr/0089-canonical-database-copy.md` (c13) — после слияния taxonomy-v2 ссылка станет живой (если 0034 не перенумеруют).
 
 ## Для A3
 
@@ -207,17 +208,17 @@ CI (по пункту 4): run #112 (`183f632`, КТ1) — успешно, пят
 | 0013 | `0013-calc2-static-version-tag.md`, `0013-x-frame-options-owner.md` — старые, не трогать |
 | 0014 | `0014-calc2-kink-as-regular-keypoint.md`, `0014-referrer-policy-and-nosniff-owner.md` — старые, не трогать |
 | 0015 | `0015-calc2-single-input-card.md`, `0015-search-service-fp32.md` — старые, не трогать |
-| 0017 | `0017-calc2-math-independent-of-viewport.md` (main), `0017-scoped-test-runner-boundaries.md` → 0077 |
-| 0036 | `0036-topic-map-subject-colour-layer.md` (main), `0036-canonical-database-copy.md` → 0089 |
-| 0054 | `0054-semantic-threshold-is-a-setting.md` (main), `0054-calc2-overlay-lives-in-a-panel.md` → 0083 |
-| 0055 | `0055-game-economy-v2.md` (main), `0055-calc2-key-point-is-what-the-scene-drew.md` → 0084 |
-| 0056 | `0056-game-leaderboard-personal-records.md` (main), `0056-calc2-zero-is-a-value-hidden-curve-is-absent.md` → 0085 |
-| 0057 | `0057-game-realtime-duel-architecture.md` (main), `0057-calc2-monopoly-surpluses-in-first-quadrant.md` → 0086 |
-| 0070 | `0070-vendor-browser-libraries.md` (beta-polish), `0070-problem-page-wider-than-reading-column.md` → 0078 |
-| 0071 | `0071-five-sections-one-module.md` (beta-polish), `0071-catalog-attempt-check-is-synchronous.md` → 0079 |
-| 0072 | `0072-active-nav-item-underline-and-fill.md` (beta-polish), `0072-problem-chat-is-stateless.md` → 0080 |
-| 0073 | `0073-password-change-without-old.md` (beta-polish), `0073-photo-is-recognised-before-the-check.md` → 0081 |
-| 0074 | `0074-join-group-by-invite-code.md` (beta-polish), `0074-catalog-test-unlimited-attempts.md` → 0082 |
+| 0017 | `0017-calc2-math-independent-of-viewport.md` (main), `0077-scoped-test-runner-boundaries.md` → 0077 |
+| 0036 | `0036-topic-map-subject-colour-layer.md` (main), `0089-canonical-database-copy.md` → 0089 |
+| 0054 | `0054-semantic-threshold-is-a-setting.md` (main), `0083-calc2-overlay-lives-in-a-panel.md` → 0083 |
+| 0055 | `0055-game-economy-v2.md` (main), `0084-calc2-key-point-is-what-the-scene-drew.md` → 0084 |
+| 0056 | `0056-game-leaderboard-personal-records.md` (main), `0085-calc2-zero-is-a-value-hidden-curve-is-absent.md` → 0085 |
+| 0057 | `0057-game-realtime-duel-architecture.md` (main), `0086-calc2-monopoly-surpluses-in-first-quadrant.md` → 0086 |
+| 0070 | `0070-vendor-browser-libraries.md` (beta-polish), `0078-problem-page-wider-than-reading-column.md` → 0078 |
+| 0071 | `0071-five-sections-one-module.md` (beta-polish), `0079-catalog-attempt-check-is-synchronous.md` → 0079 |
+| 0072 | `0072-active-nav-item-underline-and-fill.md` (beta-polish), `0080-problem-chat-is-stateless.md` → 0080 |
+| 0073 | `0073-password-change-without-old.md` (beta-polish), `0081-photo-is-recognised-before-the-check.md` → 0081 |
+| 0074 | `0074-join-group-by-invite-code.md` (beta-polish), `0082-catalog-test-unlimited-attempts.md` → 0082 |
 
 0058–0059 (calc2) дублей не имеют, но уезжают вместе с блоком → 0087, 0088.
 Совпадает с таблицей фазы 10 один в один: лишних и недостающих файлов нет.

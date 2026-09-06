@@ -31,7 +31,7 @@ CACHE_WRITE_MULTIPLIER = Decimal('1.25')
 CACHE_READ_MULTIPLIER = Decimal('0.1')
 
 DEFAULT_DAILY_LIMIT = 30
-# Потолок одного вызова, секунд. Вечный спиннер хуже любой ошибки (ADR 0071).
+# Потолок одного вызова, секунд. Вечный спиннер хуже любой ошибки (ADR 0079).
 DEFAULT_TIMEOUT_SECONDS = 25
 DEFAULT_CACHE_SECONDS = 900
 DEFAULT_MAX_TOKENS = 2000

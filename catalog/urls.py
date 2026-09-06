@@ -19,10 +19,10 @@ urlpatterns = [
     # Живое состояние фильтров: числа по вариантам, чипы и список одним
     # ответом — окно «Все фильтры» обновляет выдачу, не закрываясь.
     path('api/filter-state/',                   views.api_filter_state,   name='api_filter_state'),
-    # Попытка решения на странице задачи → проверка ИИ (только вход, ADR 0071).
+    # Попытка решения на странице задачи → проверка ИИ (только вход, ADR 0079).
     path('api/attempt/',                        views.api_attempt,        name='api_attempt'),
     path('api/attempt-file/',                   views.api_attempt_file,   name='api_attempt_file'),
-    # Чат по задаче — одна реплика, история на клиенте (ADR 0072).
+    # Чат по задаче — одна реплика, история на клиенте (ADR 0080).
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
     path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),

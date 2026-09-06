@@ -3,7 +3,7 @@
 {% comment %}
 СТРАНИЦА ЗАДАЧИ — редизайн 04.09.2026 по мокапу владельца
 `problem_page_mockup.html` и решениям Notion. Полоса 1120 px и постоянная
-карточка ИИ справа — ADR 0070. Номер задачи нигде, кроме адреса. Заголовок —
+карточка ИИ справа — ADR 0078. Номер задачи нигде, кроме адреса. Заголовок —
 только если это название, а не обрезок условия (`catalog.preview`).
 
 ⚠️ ПРАВИЛО НУЛЯ: каждое облачко, ряд, звёзды, кнопка — только при данных;
@@ -17,7 +17,7 @@
 {% block main_class %}pd-wrap{% endblock %}
 
 {% block extra_style %}
-/* ── Каркас: своя полоса под карточку справа (ADR 0070) ─────────────── */
+/* ── Каркас: своя полоса под карточку справа (ADR 0078) ─────────────── */
 .pd-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 36px 20px 80px; }
 .pd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 32px; align-items: start; }
 .pd-side { position: sticky; top: 72px; }

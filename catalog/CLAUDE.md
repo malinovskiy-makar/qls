@@ -110,7 +110,7 @@ BGE-M3 НЕ калибрована по длине запроса: одно сл
 - **Длинного тире «—» в тексте нет** (правило сайта, `scripts/check_em_dash.py`):
   мокапы владельца тире содержат — при переносе менять на «–» или двоеточие.
 - **Страница задачи** (`problem_detail.html`, редизайн 04.09.2026): полоса 1120 px
-  с постоянной карточкой ИИ справа — ADR 0070, блок `main_class` в `base.html`
+  с постоянной карточкой ИИ справа — ADR 0078, блок `main_class` в `base.html`
   (остальные экраны на 860). Заголовок — только для названия; обрезок условия
   (`preview.looks_like_statement_cut`) уходит в скрытый `h1` «Задача: <тема>».
   Номер задачи нигде, кроме адреса. Облачка свойств — ссылки в каталог через
@@ -129,8 +129,8 @@ BGE-M3 НЕ калибрована по длине запроса: одно сл
   файл, jpg/png/webp/pdf до 10 МБ, три на попытку; `catalog/attachments.py`
   проверяет расширение, сигнатуру PDF и открывает картинку Pillow); попытка
   принимает `file_ids` СВОИХ файлов, текст с фото распознаётся до проверки
-  ([ADR 0073](../docs/adr/0073-photo-is-recognised-before-the-check.md)).
-- **Тест как игра** (этап 7, 04.09.2026, [ADR 0074](../docs/adr/0074-catalog-test-unlimited-attempts.md)).
+  ([ADR 0081](../docs/adr/0081-photo-is-recognised-before-the-check.md)).
+- **Тест как игра** (этап 7, 04.09.2026, [ADR 0082](../docs/adr/0082-catalog-test-unlimited-attempts.md)).
   Модель игры — `catalog/testplay.py`: варианты из подпунктов, верные метки
   — `answer_check.catalog_test_correct_labels`, правило «всё или ничего» —
   `check_option_answer`. `POST /catalog/api/test-check/<id>/` принимает
