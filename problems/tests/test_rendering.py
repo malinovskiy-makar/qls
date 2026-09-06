@@ -331,10 +331,13 @@ class TableCssTests(SimpleTestCase):
             'заголовок таблицы ничем не отличим от обычной ячейки: %r' % rule)
 
     def test_table_does_not_force_full_width(self):
-        """Требование владельца: не растягивать таблицу без нужды."""
+        """Требование владельца: не растягивать таблицу без нужды.
+
+        `max-width: 100%` допустим — он не растягивает, а ограничивает.
+        """
         m = re.search(r'\.math-content table\s*\{([^}]*)\}', self.source)
         self.assertIsNotNone(m, 'нет правила .math-content table')
-        self.assertNotRegex(m.group(1), r'width\s*:\s*100%')
+        self.assertNotRegex(m.group(1), r'(?<![-\w])width\s*:\s*100%')
 
     def test_table_colors_use_design_tokens_not_hardcoded_hex(self):
         """catalog/CLAUDE.md: хардкод hex ломает тёмную тему — цвета только

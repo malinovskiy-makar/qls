@@ -71,7 +71,6 @@
 .stm .math-content { padding-bottom: 14px; }
 .stm .katex-display { margin: 1em 0; }
 .math-content .katex-display { overflow-x: auto; overflow-y: hidden; padding: 2px 0 4px; }
-.math-content table { display: block; max-width: 100%; overflow-x: auto; }
 .stm .parts { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid var(--border-soft); }
 .stm .part { display: flex; gap: 12px; padding: 12px 0; border-top: 1px dashed var(--border); }
 .stm .part:first-child { border-top: 0; }
@@ -146,7 +145,7 @@
 
 /* Таблицы из markdown-рендерера (content_format='markdown'): заголовок
    отличается весом и цветом, разделители только горизонтальные. */
-.math-content table { border-collapse: collapse; margin: .75em 0; }
+.math-content table { border-collapse: collapse; margin: .75em 0; display: block; max-width: 100%; overflow-x: auto; }
 .math-content th, .math-content td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); }
 .math-content th { font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); }
 .math-content tbody tr:last-child td { border-bottom: none; }
