@@ -5,9 +5,13 @@ from django.db import migrations
 
 class Migration(migrations.Migration):
 
+    # Третий лист — 0047_problem_figure_raster (ветка embeddings-c13 растёт
+    # из 0046, минуя 0047–0049 main). Зависимость дописана при синхронизации
+    # веток 06.09.2026, пока 0054 никем не применена (skill weco-migration-safety, путь 2а).
     dependencies = [
         ('problems', '0052_feedback'),
         ('problems', '0053_hint_reviewed_backfill'),
+        ('problems', '0047_problem_figure_raster'),
     ]
 
     operations = [
