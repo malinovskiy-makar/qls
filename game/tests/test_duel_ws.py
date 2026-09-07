@@ -16,12 +16,12 @@ from channels.layers import get_channel_layer
 from channels.testing import HttpCommunicator, WebsocketCommunicator
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
-from django.test import TransactionTestCase, override_settings
+from django.test import TestCase, TransactionTestCase, override_settings
 
 from channels.routing import URLRouter
 
 from config.asgi import application
-from game import consumers, routing as game_routing, state as run_state
+from game import config, consumers, routing as game_routing, state as run_state
 
 # ⚠️ СОКЕТ ПОДНИМАЕТСЯ БЕЗ ORIGIN-ПРОВЕРКИ И БЕЗ AuthMiddlewareStack, и это
 # намеренно: у WebsocketCommunicator нет ни заголовка Origin, ни куки
@@ -198,7 +198,98 @@ class DuelSocketTests(TransactionTestCase):
         self.assertEqual(payload['score'], 420)
         self.assertEqual(payload['correct'], 2)
         self.assertEqual(payload['lives'], 2)
+        # ⚠️ Восстановленное табло несёт ТЕ ЖЕ поля, что живое событие:
+        # иначе после обрыва соперник видел бы другую игру.
+        self.assertEqual(payload['wrong'], 1)
+        self.assertEqual(payload['number'], 3)
+        self.assertIsNotNone(payload['at'])
+        self.assertIn('seconds_left', payload)
         await first.disconnect()
+
+
+class ScoreEventFieldsTests(TestCase):
+    u"""Табло несёт время, номер вопроса и комбо, и время считает СЕРВЕР.
+
+    ⚠️ ЧТО БЫЛО. Поле `seconds_left` в протоколе существовало, но
+    `_duel_broadcast` его не заполнял — приходил `null` всегда. Владелец
+    просил видеть на табло ещё и время.
+
+    ⚠️ КЛИЕНТСКИЙ ТАЙМЕР В СОБЫТИЕ НЕ ПУСКАЕТСЯ. Он приходит из браузера
+    игрока и подделывается из консоли: на табло соперника это означало бы
+    «у него ещё минута», когда у него секунда.
+    """
+
+    def state(self, spent=0.0, **extra):
+        import time as _time
+        base = {
+            'mode': 'blitz',
+            'started_at': _time.time() - spent,
+            'bonus_total': 0,
+            'score': 250,
+            'lives': 2,
+            'streak': 3,
+            'log': [{'outcome': 'correct'}, {'outcome': 'correct'},
+                    {'outcome': 'wrong'}, {'outcome': 'skip'}],
+        }
+        base.update(extra)
+        return base
+
+    def user(self):
+        User = get_user_model()
+        return User.objects.create_user('ev_%d' % _next_id(), password='x')
+
+    def test_the_event_carries_every_new_field(self):
+        event = consumers.duel_score_event(self.state(), self.user())
+        for field in ('score', 'correct', 'wrong', 'skipped', 'lives',
+                      'seconds_left', 'at', 'number', 'combo'):
+            self.assertIn(field, event, field)
+
+    def test_counts_use_the_same_formulas_as_the_summary(self):
+        u"""Вторых счётчиков не заводим: два счётчика одного разъезжаются."""
+        event = consumers.duel_score_event(self.state(), self.user())
+        self.assertEqual(event['correct'], 2)
+        self.assertEqual(event['wrong'], 1)
+        self.assertEqual(event['skipped'], 1)
+
+    def test_number_is_the_length_of_the_log(self):
+        event = consumers.duel_score_event(self.state(), self.user())
+        self.assertEqual(event['number'], 4)
+
+    def test_combo_comes_from_config_not_from_a_literal(self):
+        event = consumers.duel_score_event(self.state(streak=3), self.user())
+        self.assertEqual(event['combo'], config.combo_multiplier(3))
+
+    def test_seconds_left_shrinks_as_the_run_goes_on(self):
+        u"""Числовой инвариант: второе значение строго меньше первого."""
+        early = consumers.seconds_left_for(self.state(spent=1))
+        late = consumers.seconds_left_for(self.state(spent=40))
+        self.assertIsNotNone(early)
+        self.assertLess(late, early)
+
+    def test_seconds_left_is_never_negative(self):
+        u"""Забег на паузе досчитал бы до минуса, а минус на табло — мусор."""
+        self.assertEqual(consumers.seconds_left_for(self.state(spent=99999)), 0)
+
+    def test_the_time_bonus_counts_towards_the_remainder(self):
+        u"""Прибавка за верные ответы — часть запаса, а не отдельная жизнь."""
+        plain = consumers.seconds_left_for(self.state(spent=10))
+        with_bonus = consumers.seconds_left_for(
+            self.state(spent=10, bonus_total=30))
+        self.assertEqual(with_bonus - plain, 30)
+
+    def test_a_run_without_a_start_mark_says_nothing_instead_of_zero(self):
+        u"""None честнее нуля: ноль на табло читается как «время вышло»."""
+        self.assertIsNone(consumers.seconds_left_for(self.state(started_at=0)))
+        self.assertIsNone(
+            consumers.seconds_left_for(self.state(mode='нет-такого')))
+
+
+_counter = [0]
+
+
+def _next_id():
+    _counter[0] += 1
+    return _counter[0]
 
 
 @override_settings(CHANNEL_LAYERS=IN_MEMORY)
