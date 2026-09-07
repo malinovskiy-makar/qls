@@ -84,6 +84,15 @@ from problems.models import (EconConcept, Hint, OlympiadRef, Problem,
 
 PARSED_PATH = Path('reports/enrich_pilot/run2_parsed.jsonl')
 RUN1_PARSED_PATH = Path('reports/enrich_pilot/run_parsed.jsonl')
+
+#: Чем метится `enrichment_source` у задач из основного журнала. Значение по
+#: умолчанию сохраняет прежнее поведение байт в байт; переопределяется
+#: флагом `--source-tag` (07.09.2026, журнал третьего прогона).
+DEFAULT_SOURCE_TAG = 'run2'
+
+#: Метка задач, подмешанных из журнала ПЕРВОГО прогона (`--parsed-run1`).
+#: От `--source-tag` не зависит: они и правда оттуда.
+RUN1_SOURCE_TAG = 'run1'
 # Задачи этих статусов раскладку не получают: дубль схлопнут, скрытое убрано
 # руками — ни то ни другое ученику не показывается ни при каких фильтрах.
 INACTIVE_STATUSES = ('duplicate', 'hidden')
@@ -152,6 +161,17 @@ class Command(BaseCommand):
         parser.add_argument(
             '--no-run1', action='store_true',
             help='Не подмешивать данные первого прогона.')
+        parser.add_argument(
+            '--source-tag', type=str, default=DEFAULT_SOURCE_TAG,
+            help='Чем метить `enrichment_source` у задач из ОСНОВНОГО журнала '
+                 '(по умолчанию «%s» — поведение прежнее). ⚠️ Метка '
+                 'вычислялась жёстко из двух вариантов, run1/run2: журнал '
+                 'третьего прогона она пометила бы как run2, и в банке '
+                 'осталась бы неправда — поле утверждало бы, что данные из '
+                 'второго прогона. Прослеживаемость после этого не '
+                 'восстановить ничем. Задачи, подмешанные из журнала первого '
+                 'прогона (--parsed-run1), метятся «run1» независимо от '
+                 'этого флага: они и правда оттуда.' % DEFAULT_SOURCE_TAG)
 
     # ------------------------------------------------------------------
 
@@ -163,6 +183,7 @@ class Command(BaseCommand):
         self.sample_size = options['sample_size']
         self.run1_path = Path(options['parsed_run1'])
         self.use_run1 = not options['no_run1']
+        self.source_tag = options['source_tag']
 
         rows = self.load_rows()
         ok_rows = [r for r in rows if not r.get('defect')]
@@ -979,7 +1000,8 @@ class Command(BaseCommand):
                     if character and problem.character != character:
                         problem.character = character
                         changed = True
-                    source_tag = 'run1' if row.get('_run1') else 'run2'
+                    source_tag = (RUN1_SOURCE_TAG if row.get('_run1')
+                                  else self.source_tag)
                     if problem.enrichment_source != source_tag:
                         problem.enrichment_source = source_tag
                         changed = True
@@ -1109,8 +1131,23 @@ class Command(BaseCommand):
         Пишется связь `ProblemFeature`, и ТОЛЬКО ПОТОМ из неё пересчитывается
         витрина `Problem.features` — одной функцией `features.catalog_view()`.
         Обратный порядок означал бы второй источник правды.
+
+        ⚠️ **Прогон отвечает только за задачи СВОЕГО журнала** (починено
+        07.09.2026). Кодовая половина считается по всем активным задачам —
+        таблица в условии есть или её нет, от состава прогона это не зависит.
+        А модельная у задачи ВНЕ журнала берётся из того, что уже стоит в
+        базе: прогон её не видел и сказать о ней нечего.
+
+        Пока журнал был полным (боевой run2 на 37 тысячах), разницы не было:
+        в журнале была почти каждая задача, и `.get(pid, set())` почти всегда
+        попадал. Допрогон подал журнал на 1 740 задач — и прежний код снял
+        модельные особенности у всех остальных: 18 771 связь `source='model'`
+        превратилась в 1 019, задач с особенностями стало 21 518 вместо
+        27 517. Стережёт `problems/tests/test_merge_features_scope.py`.
         """
         feature_by_key = layout.ensure_features()
+        key_by_fid = {f.id: k for k, f in feature_by_key.items()}
+        in_journal = {row['problem_id'] for row in all_rows}
         model_keys_by_id = {}
         for row in all_rows:
             keys = [k for k in (row.get('features_1') or []) if k in feat.MODEL_KEYS]
@@ -1125,8 +1162,15 @@ class Command(BaseCommand):
         to_create, to_update, view_updates = [], [], []
         drop_ids = []
         for pid, code_keys in self.iter_code_features():
-            wanted = layout.merge_feature_sources(
-                model_keys_by_id.get(pid, set()), code_keys)
+            if pid in in_journal:
+                model_keys = model_keys_by_id.get(pid, set())
+            else:
+                # Задачи в журнале нет — модельную половину оставляем как есть.
+                model_keys = {
+                    key_by_fid[fid] for fid, src in existing.get(pid, {}).items()
+                    if src in (feat.BY_MODEL, feat.BY_BOTH) and fid in key_by_fid
+                }
+            wanted = layout.merge_feature_sources(model_keys, code_keys)
             have = existing.get(pid, {})
             wanted_by_fid = {feature_by_key[k].id: src for k, src in wanted.items()}
             for fid, src in wanted_by_fid.items():

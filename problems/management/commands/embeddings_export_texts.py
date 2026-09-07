@@ -72,9 +72,15 @@ def export_queryset(scope):
 
 
 def run1_leftovers():
-    """Сколько задач ещё сидит на данных слабого первого прогона."""
-    return (Problem.objects.filter(enrichment_source='run1')
-            .exclude(content_status='junk').count())
+    """id задач, всё ещё сидящих на данных слабого первого прогона.
+
+    Список, а не число: когда их единицы, человеку нужно видеть, кто именно,
+    — иначе гейт превращается в тупик. У задач-`junk` метка `run1` остаётся
+    законно, они в манифест допрогона не входили.
+    """
+    return sorted(Problem.objects.filter(enrichment_source='run1')
+                  .exclude(content_status='junk')
+                  .values_list('id', flat=True))
 
 
 class Command(BaseCommand):
@@ -123,10 +129,15 @@ class Command(BaseCommand):
                 'ГЕЙТ ДОПРОГОНА: %d задач всё ещё на данных слабого первого '
                 'прогона (enrichment_source = run1, content_status <> junk). '
                 'Векторы обязаны считаться по банку ПОСЛЕ допрогона, иначе '
-                'аренда оплатит устаревшие поля. Сначала фазы 1-2 '
-                '(glm_enrich_run --ids-file … --include-nonok, затем '
-                'merge_enrichment_v2 --apply). Разрез enrichment_source: %s'
-                % (осталось, разрез))
+                'аренда оплатит устаревшие поля. Сначала фазы 1-2: '
+                'glm_enrich_run --ids-file … --include-nonok, затем '
+                'merge_enrichment_v2 --apply --source-tag run3.\n'
+                '   id: %s\n'
+                '   разрез enrichment_source: %s\n'
+                'Если это единичные задачи, на которых прогон застрял по '
+                'известной причине, — посмотрите их поимённо и запускайте с '
+                '--allow-run1-leftovers, назвав причину в отчёте.'
+                % (len(осталось), осталось[:50], разрез))
 
         out = Path(options['out'])
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -146,7 +157,8 @@ class Command(BaseCommand):
             'scope': options['scope'],
             'rows': всего,
             'enrichment_source': разрез,
-            'run1_leftovers': осталось,
+            'run1_leftovers': len(осталось),
+            'run1_leftover_ids': осталось[:200],
             'exported_at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
         }
 

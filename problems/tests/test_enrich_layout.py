@@ -245,3 +245,44 @@ class Run1BranchTests(TestCase):
         self._write(self.run2, [{'problem_id': self.in_both.id, 'given': ''}])
         self._run()
         self.assertEqual(self.in_both.given, 'было в базе')
+
+
+class SourceTagTests(Run1BranchTests):
+    """`--source-tag` (07.09.2026, журнал ТРЕТЬЕГО прогона).
+
+    ⚠️ Метка вычислялась жёстко из двух вариантов: `'run1' if row['_run1']
+    else 'run2'`. Журнал третьего прогона она пометила бы как `run2`, и в
+    банке осталась бы неправда — поле утверждало бы, что данные из второго
+    прогона. Прослеживаемость после этого не восстановить ничем: запрос
+    «кто ещё на слабых данных» перестаёт работать навсегда.
+    """
+
+    def _run(self, **kwargs):
+        call_command('merge_enrichment_v2', '--apply',
+                     parsed=str(self.run2), parsed_run1=str(self.run1),
+                     out=str(self.tmp / 'out.json'),
+                     sample_html=str(self.tmp / 'sample.html'), verbosity=0,
+                     **kwargs)
+        self.in_both.refresh_from_db()
+        self.only_run1.refresh_from_db()
+
+    def test_по_умолчанию_метка_прежняя(self):
+        self._run()
+        self.assertEqual(self.in_both.enrichment_source, 'run2')
+
+    def test_флаг_метит_основной_журнал(self):
+        self._run(source_tag='run3')
+        self.assertEqual(self.in_both.enrichment_source, 'run3')
+
+    def test_подмешанные_из_run1_метятся_run1_независимо_от_флага(self):
+        """Флаг именует ОСНОВНОЙ журнал. Задачи, взятые из `--parsed-run1`,
+        и правда оттуда — переименовать их значило бы соврать во второй раз."""
+        self._run(source_tag='run3')
+        self.assertEqual(self.only_run1.enrichment_source, 'run1')
+
+    def test_умолчание_совпадает_с_константой(self):
+        from problems.management.commands.merge_enrichment_v2 import (
+            DEFAULT_SOURCE_TAG, RUN1_SOURCE_TAG,
+        )
+        self.assertEqual(DEFAULT_SOURCE_TAG, 'run2')
+        self.assertEqual(RUN1_SOURCE_TAG, 'run1')
