@@ -301,3 +301,85 @@ class StartScreenShareCardTests(TestCase):
         self.assertIn('game/og_default.png', html)
         self.assertIn('Wecon Rush', html)
         self.assertIn('property="og:image:width" content="1200"', html)
+
+
+class NoBrowserBlueTests(TestCase):
+    u"""Ни одной ссылки и ни одного поля без своего цвета (08.09.2026).
+
+    ⚠️ ЧТО БЫЛО. `game.html` — самостоятельный шаблон, а не наследник
+    базового, и правил для `<a>` на нём не было вовсе: две ссылки в строке
+    под режимами («Вызов дня», «Дуэль с другом») браузер красил системным
+    синим. Рядом `#code-input` и `#duel-link` не имели `:focus`, и Safari
+    обводил их своей синей рамкой. Владелец назвал это «странными синими
+    кнопками» — кнопок там нет вовсе.
+    """
+
+    # Селектор поля → селектор, под которым живёт правило фокуса. Список
+    # ведётся руками намеренно: новое поле обязано попасть сюда вместе с
+    # правилом, а не тихо приехать с браузерным синим.
+    INPUT_RULES = {
+        '.code-form input': '.code-form input:focus',
+        '.duel-lobby input': '.duel-lobby input:focus',
+        '.num-input': '.num-input:focus',
+        '.tag-search': '.tag-search:focus',
+        '.fmodal input': '.fmodal input:focus-visible',
+    }
+
+    def setUp(self):
+        self.src = page_source()
+
+    def test_links_inside_the_game_have_their_own_colour(self):
+        self.assertIn(':where(.rush-wrap a) { color: var(--rush-accent)',
+                      self.src)
+        self.assertIn(':where(.rush-wrap a:hover)', self.src)
+
+    def test_the_link_rule_does_not_repaint_links_that_have_a_colour(self):
+        u"""⚠️ Обёртка :where() обязательна — она и есть смысл правила.
+
+        Без неё `.rush-wrap a` весит (0,1,1) и перебивает `.set-back`,
+        `.btn-board`, `.btn-copy` (0,1,0): четыре ссылки со своим осмысленным
+        цветом перекрасились бы заодно. Нужен ЗАПАСНОЙ цвет, а не общий.
+        """
+        self.assertNotIn('\n.rush-wrap a {', self.src)
+        for rule in ('.set-back { color: var(--text3); }',
+                     '.btn-board:hover { border-color: var(--rush-accent)',
+                     '.btn-copy:hover { border-color: var(--rush-accent)'):
+            self.assertIn(rule, self.src)
+
+    def test_the_code_field_has_a_focus_rule(self):
+        self.assertIn('.code-form input:focus', self.src)
+        block = self.src.split('.code-form input:focus,', 1)[1]
+        block = block.split('}', 1)[0]
+        self.assertIn('var(--rush-accent)', block)
+
+    def test_every_input_selector_has_a_focus_rule(self):
+        u"""Числовой инвариант фазы: полей без правила фокуса — ноль.
+
+        Собираем классы всех `<input` разметки, сводим к селектору, под
+        которым поле стилизуется, и сверяем со списком правил `:focus`.
+        Расхождение печатается поимённо: «каких не хватает» важнее, чем
+        «сколько».
+        """
+        # Классы всех полей ввода в разметке.
+        classes = set()
+        ids = set()
+        for tag in re.findall(r'<input\b[^>]*>', self.src):
+            for cls in re.findall(r'class="([^"]+)"', tag):
+                classes.update(cls.split())
+            ids.update(re.findall(r'id="([^"]+)"', tag))
+
+        # Каждое поле обязано попасть под один из известных селекторов.
+        known = {'f-topic', 'f-source', 'f-feature', 'f-character',
+                 'tag-search', 'num-input'}
+        unknown = classes - known
+        self.assertEqual(unknown, set(),
+                         'поля с неизвестным классом: %s' % sorted(unknown))
+
+        known_ids = {'code-input', 'duel-link', 'num-input', 'tag-search'}
+        self.assertEqual(ids - known_ids, set(),
+                         'поля с неизвестным id: %s' % sorted(ids - known_ids))
+
+        missing = [sel for sel, rule in self.INPUT_RULES.items()
+                   if rule not in self.src]
+        self.assertEqual(missing, [],
+                         'нет правила фокуса у: %s' % missing)

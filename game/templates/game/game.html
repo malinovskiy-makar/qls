@@ -77,6 +77,42 @@ a:focus-visible, button:focus-visible {
   outline-offset: 2px;
 }
 
+/* ⚠️ ССЫЛКИ ВНУТРИ ИГРЫ КРАСИМ ЯВНО. Страница игры — самостоятельный
+   шаблон, а не наследник базового: правил для <a> на ней не было вовсе, и
+   браузер красил их системным синим. Он не из палитры и на графите
+   выглядит чужим — владелец принял это за «странные синие кнопки».
+   ⚠️ ПРАВИЛО ЗАВЁРНУТО В :where() РАДИ НУЛЕВОЙ ВЕСОМОСТИ. Без обёртки
+   `.rush-wrap a` (0,1,1) перебил бы `.set-back`, `.btn-board` и `.btn-copy`
+   (0,1,0) — четыре ссылки, у которых свой цвет есть и он осмысленный,
+   перекрасились бы заодно. Здесь нужен ИМЕННО запасной цвет: он берёт
+   только те ссылки, которым цвет не назначен нигде. */
+:where(.rush-wrap a) { color: var(--rush-accent); text-decoration: none; }
+:where(.rush-wrap a:hover) { text-decoration: underline; }
+
+/* ⚠️ ПОЛЯ ВВОДА — СВОЙ ФОКУС, ИНАЧЕ ЕГО РИСУЕТ БРАУЗЕР. У `#code-input` и
+   `#duel-link` правила `:focus` не было, и Safari обводил их своей синей
+   рамкой. Цвет тот же, что у остальных полей страницы (`.num-input`,
+   `.tag-search`), — нового не заводим. */
+.code-form input:focus,
+.code-form input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 1px;
+  border-color: var(--rush-accent);
+}
+.duel-lobby input:focus,
+.duel-lobby input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 1px;
+  border-color: var(--rush-accent);
+}
+/* Флажки и переключатели окна фильтров: их рисует система, и системная
+   обводка тоже синяя. Модальное окно лежит ВНЕ `.rush-wrap`, поэтому
+   селектор свой. */
+.fmodal input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 2px;
+}
+
 .rush-wrap {
   max-width: 880px;
   margin: 0 auto;
