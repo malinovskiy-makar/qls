@@ -99,8 +99,8 @@ a:focus-visible, button:focus-visible {
   outline-offset: 1px;
   border-color: var(--rush-accent);
 }
-.duel-lobby input:focus,
-.duel-lobby input:focus-visible {
+.duel-lobby__row input:focus,
+.duel-lobby__row input:focus-visible {
   outline: 2px solid var(--rush-accent);
   outline-offset: 1px;
   border-color: var(--rush-accent);
@@ -574,6 +574,51 @@ a:focus-visible, button:focus-visible {
 }
 .fclear:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 
+/* ── Окно «Бросить вызов» ────────────────────────────────────────────
+   ⚠️ УСТРОЕНО КАК ОКНО ФИЛЬТРОВ И ЖИВЁТ РЯДОМ С НИМ: тот же класс
+   `.fmodal`, тот же способ показа, та же клавиша Esc, тот же возврат
+   фокуса. Своего механизма окон в игре не заводим — второй разъехался бы
+   с первым при первой правке.
+   ⚠️ В РАЗМЕТКЕ СТОИТ ПЕРЕД `#fmodal`: у обоих z-index 60, и окно
+   фильтров, открытое ПОВЕРХ вызова, обязано быть сверху. Решает порядок
+   в документе. */
+/* Шаг — одна колонка: сетка `.fmodal-body` в две колонки нужна
+   только списку фильтров. */
+.dm-step { display: block; }
+.dm-step[hidden] { display: none; }
+.dm-lead { margin: 0 0 14px; font-size: 14.5px; line-height: 1.5;
+           color: var(--text2); }
+.dm-modes { display: grid; gap: 10px; margin-bottom: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.dm-mode {
+  font: inherit; text-align: left; cursor: pointer;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text);
+}
+.dm-mode:hover { border-color: var(--rush-accent); }
+.dm-mode[aria-pressed="true"] {
+  border-color: var(--rush-accent);
+  box-shadow: 0 0 0 1px var(--rush-accent) inset;
+}
+.dm-mode b { display: block; font-size: 15px; font-weight: 600; }
+.dm-mode small { display: block; margin-top: 4px; font-size: 12.5px;
+                 color: var(--text3); font-variant-numeric: tabular-nums; }
+.dm-mode small.low { color: var(--rush-bad); }
+.dm-summary { margin: 12px 0 0; font-size: 13.5px; color: var(--text2); }
+.dm-state { margin: 10px 0 0; font-size: 14px; color: var(--text2);
+            display: flex; align-items: center; gap: 8px; }
+.dm-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--rush-accent);
+  animation: dmPulse 1.4s ease-in-out infinite;
+}
+.dm-state.is-here .dm-dot { animation: none; }
+@keyframes dmPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dm-dot { animation: none; } }
+.dm-count { margin: 0; font-size: 13.5px; color: var(--text2);
+            font-variant-numeric: tabular-nums; }
+
 /* Число доступных вопросов на карточке режима + выключенная карточка. */
 .mode-avail { margin-top: 4px; font-size: 13px; color: var(--text3);
               font-variant-numeric: tabular-nums; }
@@ -870,7 +915,10 @@ a:focus-visible, button:focus-visible {
 .duel-lobby p { margin: 0 0 10px; color: var(--rush-dim); font-size: 14px; }
 .duel-lobby__row { display: flex; gap: 8px; flex-wrap: wrap;
   align-items: center; }
-.duel-lobby input {
+/* ⚠️ Селектор по СТРОКЕ, а не по лобби: та же строка со ссылкой стоит в
+   окне «Бросить вызов», которое лежит вне `.duel-lobby`. Один вид у одного
+   и того же поля — второе правило разъехалось бы с первым. */
+.duel-lobby__row input {
   flex: 1 1 260px; font: inherit; padding: 8px 10px;
   border: 1px solid var(--rush-line); border-radius: 9px;
   background: var(--rush-bg); color: var(--rush-text);
@@ -2364,6 +2412,58 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      «Особенности» и «Характер задачи» рисуются, ТОЛЬКО если у них есть
      варианты: серый переключатель, который не нажимается, хуже его
      отсутствия. Сегодня полей в базе нет, и групп на экране нет. -->
+<!-- ⚠️ ОКНО «БРОСИТЬ ВЫЗОВ» (08.09.2026, решение владельца). Раньше
+     кнопка вела прямо на /game/duel/new/, вьюха молча собирала набор из
+     десяти вопросов и уводила автора играть с `?auto=1`. Автор не видел ни
+     выбора режима, ни ссылки-приглашения; соперник приходил позже, и в
+     одном забеге они практически никогда не пересекались — из-за этого
+     живого табло не видел никто. Два шага: собрать вызов и позвать. -->
+<div class="fmodal" id="dmodal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="dmodal-title">
+  <div class="fmodal-card">
+    <div class="fmodal-head">
+      <b id="dmodal-title">Бросить вызов</b>
+      <button type="button" class="fmodal-close" id="dmodal-close"
+              aria-label="Закрыть">&times;</button>
+    </div>
+
+    <!-- ШАГ 1: собрать вызов -->
+    <div class="fmodal-body dm-step" id="dm-step1">
+      <p class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам
+        в том же порядке. Раунд не ограничен числом вопросов: играете, пока
+        есть время и жизни. Вопросов до игры не видит никто: ни он, ни вы.</p>
+      <div class="dm-modes" id="dm-modes"></div>
+      <div class="filter-bar">
+        <button class="filter-open" id="dm-filters">Добавить фильтры</button>
+      </div>
+      <div class="filter-chips" id="dm-chips"></div>
+      <p class="dm-count" id="dm-count"></p>
+      <p class="start-notice" id="dm-error" hidden></p>
+    </div>
+
+    <!-- ШАГ 2: позвать соперника -->
+    <div class="fmodal-body dm-step" id="dm-step2" hidden>
+      <p class="dm-lead">Пришлите сопернику ссылку. Пока его нет, играть
+        можно: он догонит и увидит ваш счёт на своей полосе.</p>
+      <div class="duel-lobby__row">
+        <input type="text" id="dm-link" readonly aria-label="Ссылка вызова">
+        <button class="set-play" id="dm-copy" type="button">Скопировать</button>
+      </div>
+      <p class="dm-summary" id="dm-summary"></p>
+      <p class="dm-state" id="dm-state"><span class="dm-dot"></span><span
+         id="dm-state-text">Ждём соперника</span></p>
+    </div>
+
+    <div class="fmodal-foot">
+      <span class="fcounts" id="dm-foot-note"></span>
+      <div class="fmodal-actions">
+        <button type="button" class="fapply" id="dm-create">Создать вызов</button>
+        <button type="button" class="fapply" id="dm-play" hidden>Играть сейчас</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="fmodal" id="fmodal" hidden role="dialog" aria-modal="true"
      aria-labelledby="fmodal-title">
   <div class="fmodal-card">
@@ -2684,6 +2784,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (opts.method === 'POST') {
       opts.headers = { 'Content-Type': 'application/json',
                        'X-CSRFToken': getCookie('csrftoken') };
+    } else {
+      // ⚠️ Метка «это fetch, а не адресная строка». Нужна ровно одной
+      // вьюхе — `duel_new`: окну вызова она отвечает строкой ошибки, а
+      // человеку, набравшему /game/duel/new/ руками, — страницей
+      // `duel_empty.html`. Получатели разные, ответ тоже.
+      opts.headers = { 'X-Requested-With': 'XMLHttpRequest' };
     }
     return fetch(url, opts).then(function (r) { return r.json(); });
   }
@@ -2958,10 +3064,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var srcTitles = {};
   (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
 
-  /* Чипы выбранного: снять по одному, не открывая окно. */
+  /* Чипы выбранного: снять по одному, не открывая окно.
+     ⚠️ Рисуются в ДВА места — на стартовый экран и в окно «Бросить вызов».
+     Именно рисуются, а не копируются готовой разметкой: у крестика живой
+     обработчик, и копия через innerHTML осталась бы мёртвой. Список выбора
+     при этом ОДИН (`filter`), второго набора фильтров у дуэли нет. */
+  function chipBoxes() {
+    return [$('filter-chips'), document.getElementById('dm-chips')]
+      .filter(Boolean);
+  }
+
   function paintChips() {
-    var box = $('filter-chips');
-    box.innerHTML = '';
     var rows = [];
     filter.topics.forEach(function (t) { rows.push(['topics', t, t]); });
     filter.tags.forEach(function (t) {
@@ -2971,25 +3084,30 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       rows.push(['sources', x, srcTitles[x] || x]);
     });
     filter.stars.forEach(function (d) { rows.push(['stars', d, d + '★']); });
-    rows.forEach(function (r) {
-      var chip = document.createElement('span');
-      chip.className = 'fchip';
-      var label = document.createElement('span');
-      label.textContent = r[2];
-      var x = document.createElement('button');
-      x.type = 'button';
-      x.textContent = '×';
-      x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
-      x.addEventListener('click', function () {
-        filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
-        applyFilter();
+    chipBoxes().forEach(function (box) {
+      box.innerHTML = '';
+      rows.forEach(function (r) {
+        var chip = document.createElement('span');
+        chip.className = 'fchip';
+        var label = document.createElement('span');
+        label.textContent = r[2];
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
+        x.addEventListener('click', function () {
+          filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
+          applyFilter();
+        });
+        chip.appendChild(label);
+        chip.appendChild(x);
+        box.appendChild(chip);
       });
-      chip.appendChild(label);
-      chip.appendChild(x);
-      box.appendChild(chip);
     });
-    $('filter-open').textContent = rows.length ? 'Изменить фильтры'
-                                              : 'Добавить фильтры';
+    ['filter-open', 'dm-filters'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.textContent = rows.length ? 'Изменить фильтры' : 'Добавить фильтры';
+    });
     $('filter-reset').hidden = !rows.length;
     var note = $('filter-note');
     if (!isRanked()) {
@@ -3029,6 +3147,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             }).join(' · ');
         }
         renderModeCards();
+        // Счётчики обновились: окно «Бросить вызов» рисует по ним свои
+        // карточки. Событием, а не прямым вызовом, — оно объявлено ниже
+        // по файлу и своего запроса к серверу не делает.
+        try { window.dispatchEvent(new CustomEvent('rush:counts')); }
+        catch (e) { /* старый браузер: карточки обновятся при открытии */ }
         if (then) then();
       }).catch(function () { /* счётчик не критичен для игры */ });
     }, 250);
@@ -3119,19 +3242,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     applyFilter();
   }
 
-  function openFilters(open) {
+  /* Кто открыл окно фильтров — тому и вернём фокус. Окно зовут из двух
+     мест: со стартового экрана и из окна «Бросить вызов». */
+  var filtersOpener = null;
+
+  function openFilters(open, opener) {
     $('fmodal').hidden = !open;
     if (open) {
+      filtersOpener = opener || $('filter-open');
       syncFilterControls();
       renderTagList();
       refreshCounts();
       $('fmodal-close').focus();
     } else {
-      $('filter-open').focus();
+      (filtersOpener || $('filter-open')).focus();
     }
   }
 
-  $('filter-open').addEventListener('click', function () { openFilters(true); });
+  $('filter-open').addEventListener('click', function () {
+    openFilters(true, this);
+  });
   $('fmodal-close').addEventListener('click', function () { openFilters(false); });
   $('fmodal-apply').addEventListener('click', function () { openFilters(false); });
   $('filter-reset').addEventListener('click', function () {
@@ -4942,12 +5072,191 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       location.href = '/game/daily/';
     });
   }
-  if (CFG.has_duel) {
-    $('entry-duel').addEventListener('click', function () {
-      location.href = '/game/duel/new/?mode=' + encodeURIComponent(mode)
-        + '&' + filterQuery();
+  /* ---------- ОКНО «БРОСИТЬ ВЫЗОВ» ----------
+     ⚠️ ДВА ШАГА, А НЕ ПЕРЕХОД СРАЗУ В ИГРУ (08.09.2026). Раньше кнопка
+     делала `location.href = '/game/duel/new/?…'`, вьюха молча собирала
+     набор из десяти вопросов и возвращала редирект с `?auto=1` — забег
+     запускался немедленно. Автор не видел ни выбора режима, ни ссылки;
+     соперник приходил позже, и в одном забеге они практически никогда не
+     пересекались. Живого табло из-за этого не видел никто.
+
+     ⚠️ ВТОРОГО НАБОРА ФИЛЬТРОВ И ВТОРОГО «ТЕКУЩЕГО РЕЖИМА» ЗДЕСЬ НЕТ.
+     Окно правит тот же `filter` и тот же `mode`, что стартовый экран:
+     выбор в одном месте виден в другом, и разъезжаться нечему. */
+  (function duelWindow() {
+    var box = document.getElementById('dmodal');
+    if (!box || !CFG.has_duel) return;
+
+    var created = null;      // ответ duel_new: код, ссылки, сводка
+    var sock = null;
+    var opener = null;
+
+    function open(on) {
+      box.hidden = !on;
+      if (on) {
+        opener = document.activeElement;
+        step(1);
+        refreshCounts();
+        paintModes();
+        paintChips();
+        $('dmodal-close').focus();
+      } else {
+        if (opener && opener.focus) opener.focus();
+      }
+    }
+
+    function step(n) {
+      $('dm-step1').hidden = n !== 1;
+      $('dm-step2').hidden = n !== 2;
+      $('dm-create').hidden = n !== 1;
+      $('dm-play').hidden = n !== 2;
+    }
+
+    /* Карточки режимов окна. Число под каждой — сколько вопросов даёт
+       режим ПОД ТЕКУЩИМ ФИЛЬТРОМ; берётся из уже посчитанного
+       `poolCounts` (api_pool_counts), своего запроса не заводим. */
+    function paintModes() {
+      var grid = $('dm-modes');
+      grid.innerHTML = '';
+      MODE_ORDER.forEach(function (key) {
+        var m = CFG.modes[key];
+        if (!m || !CFG.pool_counts[key]) return;
+        var avail = (poolCounts && poolCounts[key] != null)
+          ? poolCounts[key] : CFG.pool_counts[key];
+        var low = avail < (CFG.min_playable || 10);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dm-mode';
+        b.dataset.mode = key;
+        b.setAttribute('aria-pressed', key === mode ? 'true' : 'false');
+        var name = document.createElement('b');
+        name.textContent = m.title;
+        var sub = document.createElement('small');
+        if (low) sub.className = 'low';
+        sub.textContent = avail + ' '
+          + plural(avail, ['вопрос', 'вопроса', 'вопросов']);
+        b.appendChild(name);
+        b.appendChild(sub);
+        b.addEventListener('click', function () {
+          mode = key;
+          renderModeCards();     // подсветка на стартовом экране — та же
+          paintModes();
+          paintCount();
+        });
+        grid.appendChild(b);
+      });
+      paintCount();
+    }
+
+    function paintCount() {
+      var avail = (poolCounts && poolCounts[mode] != null)
+        ? poolCounts[mode] : (CFG.pool_counts[mode] || 0);
+      $('dm-count').textContent = avail + ' '
+        + plural(avail, ['вопрос подходит', 'вопроса подходят',
+                         'вопросов подходит'])
+        + ' · играете, пока есть время и жизни';
+    }
+
+    function fail(text) {
+      var note = $('dm-error');
+      note.hidden = !text;
+      note.textContent = text || '';
+    }
+
+    /* Создать вызов. Ответ — JSON: вьюха больше не редиректит в игру. */
+    $('dm-create').addEventListener('click', function () {
+      var btn = this;
+      fail('');
+      btn.disabled = true;
+      api('/game/duel/new/?mode=' + encodeURIComponent(mode)
+          + '&' + filterQuery())
+        .then(function (d) {
+          btn.disabled = false;
+          if (!d || !d.ok) {
+            fail((d && d.error) || 'Не удалось создать вызов');
+            return;
+          }
+          created = d;
+          $('dm-link').value = d.duel_url;
+          $('dm-summary').textContent = 'Режим «' + d.mode_title
+            + '» · без лимита вопросов · ' + d.filter_text
+            + ' · код ' + d.code;
+          step(2);
+          $('dm-copy').focus();
+          listen(d.code);
+        }, function () {
+          btn.disabled = false;
+          fail('Не удалось создать вызов');
+        });
     });
-  }
+
+    $('dm-copy').addEventListener('click', function () {
+      var btn = this;
+      var input = $('dm-link');
+      input.select();
+      try {
+        navigator.clipboard.writeText(input.value);
+        btn.textContent = 'Скопировано';
+        setTimeout(function () { btn.textContent = 'Скопировать'; }, 1500);
+      } catch (e) { /* старый браузер: текст уже выделен */ }
+    });
+
+    $('dm-play').addEventListener('click', function () {
+      if (created) location.href = created.play_url;
+    });
+
+    /* Соперник открыл ссылку — узнаём об этом по сокету дуэли. Тот же
+       консьюмер, что рисует табло во время забега: своего канала не
+       заводим. Не подключился — строка так и останется «Ждём соперника»,
+       и это честно: врать «он на месте» нельзя. */
+    function listen(code) {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      try {
+        sock = new WebSocket(proto + location.host + '/ws/duel/' + code + '/');
+      } catch (e) { return; }
+      sock.addEventListener('message', function (e) {
+        var m;
+        try { m = JSON.parse(e.data); } catch (err) { return; }
+        if (m.type === 'presence' && m.action === 'join') { here(); }
+        else if (m.type === 'start') { here(); countdown(m.in || 3); }
+      });
+    }
+
+    function here() {
+      $('dm-state').classList.add('is-here');
+      $('dm-state-text').textContent = 'Соперник на месте';
+    }
+
+    function countdown(n) {
+      $('dm-state-text').textContent = n > 0 ? String(n) : 'Поехали';
+      if (n > 0) { setTimeout(function () { countdown(n - 1); }, 1000); return; }
+      if (created) location.href = created.play_url;
+    }
+
+    $('entry-duel').addEventListener('click', function () { open(true); });
+    $('dmodal-close').addEventListener('click', function () { open(false); });
+    $('dm-filters').addEventListener('click', function () {
+      openFilters(true, this);
+    });
+    box.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); open(false); }
+    });
+
+    // Ссылка «Дуэль с другом» в строке под режимами открывает то же окно.
+    var link = document.querySelector('a[href="/game/duel/new/"]');
+    if (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        open(true);
+      });
+    }
+
+    // Счётчики окна фильтров обновились — обновим и карточки вызова.
+    window.addEventListener('rush:counts', function () {
+      if (!box.hidden) paintModes();
+    });
+  })();
 
   /* Код набора: нечувствителен к регистру и пробелам — его переписывают
      руками с доски или из чата. */
@@ -5000,8 +5309,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-kind').textContent = AUTO_SET.kind === 'daily' ? 'Вызов дня'
       : AUTO_SET.kind === 'duel' ? 'Дуэль' : 'Набор';
     $('set-title').textContent = AUTO_SET.title;
+    // ⚠️ У ДУЭЛИ ЧИСЛА ВОПРОСОВ НЕТ. `size` — запас очереди (150), а не
+    // длина раунда: раунд кончается по времени и жизням. Показать «150
+    // вопр.» значило бы пообещать то, чего игрок никогда не увидит.
     $('set-meta').textContent = 'Режим «' + AUTO_SET.mode_title + '» · '
-      + AUTO_SET.size + ' вопр. · код ' + AUTO_SET.code;
+      + (AUTO_SET.kind === 'duel'
+          ? 'без лимита вопросов'
+          : AUTO_SET.size + ' вопр.')
+      + ' · код ' + AUTO_SET.code;
     $('set-board-link').href = AUTO_SET.board_url;
     if (!AUTO_SET.allowed) {
       var btn = $('set-play');
@@ -5014,8 +5329,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-play').addEventListener('click', function () {
       startRun({ setCode: AUTO_SET.code });
     });
-    // Автор дуэли уходит играть сразу: вопросов он не видел и увидеть
-    // не должен, показывать ему заставку не с чем.
+    // ⚠️ У ДУЭЛИ `autostart` ВСЕГДА false — так решает сервер (set_page).
+    // Автор дуэли приходит сюда из окна вызова и видит лобби со ссылкой;
+    // раньше забег начинался немедленно, и лобби никто не видел.
     if (AUTO_SET.autostart) startRun({ setCode: AUTO_SET.code });
   })();
 

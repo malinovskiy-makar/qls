@@ -318,7 +318,7 @@ class NoBrowserBlueTests(TestCase):
     # правилом, а не тихо приехать с браузерным синим.
     INPUT_RULES = {
         '.code-form input': '.code-form input:focus',
-        '.duel-lobby input': '.duel-lobby input:focus',
+        '.duel-lobby__row input': '.duel-lobby__row input:focus',
         '.num-input': '.num-input:focus',
         '.tag-search': '.tag-search:focus',
         '.fmodal input': '.fmodal input:focus-visible',
@@ -374,7 +374,8 @@ class NoBrowserBlueTests(TestCase):
         self.assertEqual(unknown, set(),
                          'поля с неизвестным классом: %s' % sorted(unknown))
 
-        known_ids = {'code-input', 'duel-link', 'num-input', 'tag-search'}
+        known_ids = {'code-input', 'duel-link', 'dm-link',
+                     'num-input', 'tag-search'}
         self.assertEqual(ids - known_ids, set(),
                          'поля с неизвестным id: %s' % sorted(ids - known_ids))
 
@@ -421,12 +422,17 @@ class OneShareButtonEverywhereTests(TestCase):
             self.assertNotIn('сторис)<', src, name)
             self.assertNotIn('<canvas id="share-canvas"', src, name)
 
-    def test_the_page_lost_at_least_a_hundred_and_fifty_lines(self):
-        u"""Числовой инвариант фазы: рисование карточки ушло целиком.
+    def test_nothing_draws_on_a_canvas_in_the_share_block(self):
+        u"""Числовой инвариант фазы — замер, а не потолок файла.
 
-        Замер по git: 5613 строк до правки, 5325 после — минус 288.
-        Сторожим ПОТОЛОК файла, а не точную разницу: точное число краснело
-        бы от любой соседней правки, а смысл в том, что двести с лишним
-        строк рисования не вернулись.
+        Рисование карточки заняло 288 строк (5613 → 5325 по git на момент
+        правки), и это записано здесь как факт. Сторожить сам ПОТОЛОК файла
+        числом нельзя: следующая же фаза добавила бы строк, тест покраснел
+        бы не по делу, и его пришлось бы подкручивать — то есть он перестал
+        бы что-либо проверять. Проверяем то, что не должно вернуться:
+        никакого холста и никакого рисования в блоке шеринга.
         """
-        self.assertLess(len(self.page.split('\n')), 5460)
+        self.assertNotIn('<canvas id="share-canvas"', self.page)
+        self.assertNotIn("getContext('2d')", self.page.split(
+            '---------- ШЕРИНГ ----------', 1)[1].split(
+            '---------- ПОДРОБНАЯ СТАТИСТИКА', 1)[0])

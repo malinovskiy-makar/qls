@@ -1499,10 +1499,20 @@ def set_page(request, code):
         'why': why,
         'board_url': reverse('game:set_board', args=[gset.code]),
     }
-    # ?auto=1 — начать сразу, без карточки-заставки: так уходит играть
-    # автор дуэли, который вопросов ещё не видел (и не должен увидеть).
+    # ?auto=1 — начать сразу, без карточки-заставки. Механизм остаётся у
+    # наборов другого рода (вызов дня, учительские): там его смысл в том,
+    # чтобы не показывать лишний экран перед известным заданием.
+    #
+    # ⚠️ У ДУЭЛИ АВТОСТАРТА НЕТ, И ЭТО ЗАПРЕТ, А НЕ УМОЛЧАНИЕ (08.09.2026).
+    # Раньше `duel_new` уводила автора сюда с `?auto=1`, забег начинался
+    # немедленно, и автор не видел ни лобби, ни ссылки-приглашения. Соперник
+    # приходил позже — в одном забеге они практически никогда не
+    # пересекались, и живого табло не видел никто. Условие стоит здесь, а не
+    # только в `duel_new`: иначе адрес с `?auto=1`, набранный руками или
+    # оставшийся в чьей-то закладке, вернул бы прежнее поведение.
     ctx['auto_set']['autostart'] = (request.GET.get('auto') == '1'
-                                    and allowed)
+                                    and allowed
+                                    and gset.kind != 'duel')
     # Ссылка-приглашение для лобби дуэли. Ведёт на страницу дуэли, а не на
     # забег: соперник должен сначала увидеть, во что его зовут.
     ctx['duel_url'] = request.build_absolute_uri(
@@ -1620,10 +1630,23 @@ def my_result_for(request, gset):
     return gset.results.filter(code=code).first() if code else None
 
 
+def _wants_json(request):
+    u"""Запрос пришёл из окна вызова (fetch), а не из адресной строки.
+
+    Нужно ровно для одного: на пустой пул отвечать по-разному. Окну нужна
+    строка ошибки, а человеку, набравшему адрес руками, — страница
+    `duel_empty.html`. Одно и то же условие в двух видах — не дубль:
+    получатели разные.
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    return 'application/json' in (request.headers.get('Accept') or '')
+
+
 @require_GET
 @login_required
 def duel_new(request):
-    """Создать дуэль и СРАЗУ уйти играть. ТОЛЬКО ДЛЯ ВОШЕДШИХ.
+    """Создать дуэль и вернуть ссылку-приглашение. ТОЛЬКО ДЛЯ ВОШЕДШИХ.
 
     ⚠️ ВХОД ОБЯЗАТЕЛЕН, И ЭТО НЕ ФОРМАЛЬНОСТЬ. Дуэль — это сравнение двух
     людей по имени; у анонима имени нет, и на доске он был бы «кто-то».
@@ -1634,6 +1657,14 @@ def duel_new(request):
     вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую первым, наравне
     с соперником. Поэтому экрана «вот твой набор, поехали» не существует —
     ни одна вьюха не отдаёт список вопросов до того, как игрок их сыграл.
+
+    ⚠️ В ИГРУ БОЛЬШЕ НЕ РЕДИРЕКТИТ (08.09.2026, решение владельца). Раньше
+    вьюха уводила автора на `/game/s/<код>/?auto=1`, а `auto=1` запускает
+    забег сразу: автор не видел ни лобби, ни ссылки-приглашения, соперник
+    приходил позже, и в одном забеге они практически никогда не
+    пересекались — из-за этого живого табло не видел никто. Теперь ответ —
+    JSON, а ссылку показывает окно «Бросить вызов»: автор зовёт соперника
+    и ждёт, а играть уходит сам, когда решит.
     """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
@@ -1643,6 +1674,11 @@ def duel_new(request):
     ids = [pk for pk, _d, _t, _g in _candidate_rows(probe)]
     if not ids:
         # Под фильтром пусто — не создаём пустую дуэль, а честно говорим.
+        if _wants_json(request):
+            return JsonResponse({
+                'ok': False,
+                'error': 'Под этим фильтром вопросов нет: дуэль не из '
+                         'чего собрать.'})
         return render(request, 'game/duel_empty.html', {
             'mode_title': config.MODES[mode]['title']}, status=200)
     random.shuffle(ids)
@@ -1659,9 +1695,26 @@ def duel_new(request):
         code=make_result_code(), mode=mode, kind='duel',
         title=title,
         author=request.user if request.user.is_authenticated else None,
-        question_ids=ids[:config.DUEL_SIZE],
+        # ⚠️ Это ЗАПАС ОЧЕРЕДИ, а не длина раунда: раунд кончается по
+        # времени и жизням. Вопросов под фильтром меньше запаса — берём
+        # сколько есть, и тогда `set_done` теоретически возможен. Это
+        # честно: обещать бесконечную очередь на сорока вопросах нельзя.
+        question_ids=ids[:config.DUEL_QUEUE_LIMIT],
         filter_snapshot=run_filter, attempts_allowed=1)
-    return redirect(reverse('game:set_page', args=[gset.code]) + '?auto=1')
+    return JsonResponse({
+        'ok': True,
+        'code': gset.code,
+        # ⚠️ БЕЗ `?auto=1`. Автор идёт в игру сам, из окна вызова, и лобби
+        # со ссылкой успевает показаться. Автостарт остаётся у наборов
+        # другого рода (вызов дня, учительские) — там его смысл другой.
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'duel_url': request.build_absolute_uri(
+            reverse('game:duel', args=[gset.code])),
+        'mode': mode,
+        'mode_title': config.MODES[mode]['title'],
+        'filter_text': _filter_text(run_filter),
+        'size': gset.size,
+    })
 
 
 @require_safe

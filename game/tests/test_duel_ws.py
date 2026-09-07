@@ -264,15 +264,25 @@ class RematchTests(TransactionTestCase):
         self.user = User.objects.create_user('rem', password='x')
         self.qs = [make_question() for _ in range(15)]
 
+    def _code(self, response):
+        u"""Код созданной дуэли из ответа.
+
+        ⚠️ Ответ — JSON, а не редирект (08.09.2026): `duel_new` больше не
+        уводит автора в игру, он идёт туда сам из окна вызова.
+        """
+        import json as _json
+        data = _json.loads(response.content.decode('utf-8'))
+        self.assertTrue(data['ok'], data)
+        return data['code']
+
     def test_rematch_makes_a_new_set_with_a_clear_title(self):
         self.client.force_login(self.user)
-        first = self.client.get('/game/duel/new/?mode=blitz')
-        code = first.url.split('/s/')[1].split('/')[0]
+        code = self._code(self.client.get('/game/duel/new/?mode=blitz'))
         old = GameSet.objects.get(code=code)
         self.assertTrue(old.title.startswith('Дуэль'))
 
-        second = self.client.get('/game/duel/new/?mode=blitz&rematch=' + code)
-        new_code = second.url.split('/s/')[1].split('/')[0]
+        new_code = self._code(
+            self.client.get('/game/duel/new/?mode=blitz&rematch=' + code))
         self.assertNotEqual(new_code, code)
         fresh = GameSet.objects.get(code=new_code)
         self.assertTrue(fresh.title.startswith('Реванш'),
@@ -283,7 +293,7 @@ class RematchTests(TransactionTestCase):
     def test_unknown_rematch_code_is_ignored(self):
         u"""Чужой или протухший код не роняет создание дуэли."""
         self.client.force_login(self.user)
-        resp = self.client.get('/game/duel/new/?mode=blitz&rematch=NOSUCH99')
-        code = resp.url.split('/s/')[1].split('/')[0]
+        code = self._code(
+            self.client.get('/game/duel/new/?mode=blitz&rematch=NOSUCH99'))
         self.assertTrue(GameSet.objects.get(code=code).title
                         .startswith('Дуэль'))
