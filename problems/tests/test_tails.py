@@ -17,6 +17,7 @@ from django.urls import reverse
 
 from problems.models import StudentGroup
 from problems.tests.factories import make_user
+from problems.tests.tree import project_files
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -222,19 +223,16 @@ class DeadTemplateTests(TestCase):
         # ловит СЕБЯ САМУ — тот же класс дефекта, что «имя класса в
         # комментарии CSS», только в питоне.
         needle = 'teacher/groups/' + 'stats' + '.html'
+        # ⚠️ Обход идёт общим обходчиком: он не заходит в чужие рабочие
+        # копии внутри репозитория. Прежний список исключений про них не
+        # знал, и проверка нашла бы удалённый шаблон живым — в дереве
+        # соседней ветки. Подробности — `problems/tests/tree.py`.
         hits = []
-        for folder, _dirs, files in os.walk(ROOT):
-            if any(part in folder for part in ('venv', 'node_modules',
-                                               '.git', 'reports')):
+        for path in project_files(ROOT, ('.py', '.html'), ('reports',)):
+            if os.path.abspath(path) == os.path.abspath(__file__):
                 continue
-            for name in files:
-                if not name.endswith(('.py', '.html')):
-                    continue
-                path = os.path.join(folder, name)
-                if os.path.abspath(path) == os.path.abspath(__file__):
-                    continue
-                if needle in read(path):
-                    hits.append(os.path.relpath(path, ROOT))
+            if needle in read(path):
+                hits.append(os.path.relpath(path, ROOT))
         self.assertEqual(hits, [])
 
     def test_group_stats_address_still_redirects(self):

@@ -19,38 +19,31 @@ import re
 from django.conf import settings
 from django.test import TestCase
 
-# Куда не ходим: чужой код и сгенерированные отчёты.
-# ⚠️ `.claude` исключена по той же причине, что `materials`: в
-# `.claude/worktrees/` лежат рабочие копии ДРУГИХ веток репозитория. Их
-# шаблоны — не шаблоны этой ветки, и судить их отсюда бессмысленно; без
-# исключения прогон краснеет от чужого кода и этим прячет своё.
-#
-# ⚠️ `.claude` — это рабочие папки git worktree и симлинки на соседние
-# каталоги данных. Внутри лежат ПОЛНЫЕ копии проекта другой ветки, и обход
-# без этого исключения судит чужие шаблоны как свои: 30.08 отсюда пришли 369
-# «нарушений» из одного katex-бандла в `.claude/worktrees/weconomics-data/`.
-# Причина та же, по которой исключены `materials` и `node_modules`, — просто
-# каталог появился позже, чем писался список.
+from problems.tests.tree import project_files
+
+# Что эта проверка не считает своим предметом: сгенерированное и привозное.
+# Чужие рабочие копии, venv и кэши инструментов отсекает общий обходчик
+# (`problems/tests/tree.py`) — он узнаёт их по имени и по своему `.git`
+# внутри, поэтому `.claude/worktrees` перечислять здесь больше не нужно.
+# Здесь остаётся только то, что специфично для этой проверки.
+SKIP_NAMES = ('reports', 'backups', 'materials', 'staticfiles')
+
 # ⚠️ `data/olympiads/raw/` исключена как ДАННЫЕ, а не код: там лежат
-# скачанные копии чужих сайтов — доказательства собранных фактов
-# раздела олимпиад. Судить их по нашим правилам разметки бессмысленно
-# по той же причине, что и `.claude/worktrees`. Практически: CSS-селектор
-# вида `{#rec463288649 ...}` на чужой странице выглядит как незакрытый
+# скачанные копии чужих сайтов — доказательства собранных фактов раздела
+# олимпиад. Судить их по нашим правилам разметки бессмысленно по той же
+# причине, что и чужую рабочую копию. Практически: CSS-селектор вида
+# `{#rec463288649 ...}` на чужой странице выглядит как незакрытый
 # комментарий Django, а страница в windows-1251 роняет само чтение.
-SKIP_PARTS = ('venv', 'node_modules', os.sep + 'reports' + os.sep,
-              os.sep + 'backups' + os.sep, os.sep + 'materials' + os.sep,
-              os.sep + 'staticfiles' + os.sep, os.sep + '.claude' + os.sep,
-              os.path.join('data', 'olympiads', 'raw') + os.sep)
+# Отсекается путём, а не именем: каталогов с именем `raw` в дереве может
+# быть много, и запрещать их все эта проверка не вправе.
+OLYMPIAD_RAW = os.path.join('data', 'olympiads', 'raw') + os.sep
 
 
 def template_files():
-    for root, dirs, files in os.walk(settings.BASE_DIR):
-        if any(part in root + os.sep for part in SKIP_PARTS):
-            dirs[:] = []
+    for path in project_files(settings.BASE_DIR, '.html', SKIP_NAMES):
+        if OLYMPIAD_RAW in path:
             continue
-        for name in files:
-            if name.endswith('.html'):
-                yield os.path.join(root, name)
+        yield path
 
 
 class DjangoCommentTests(TestCase):
