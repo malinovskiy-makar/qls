@@ -148,12 +148,7 @@
 {% endblock %}
 
 {% block content %}
-<div class="page-header">
-  <div>
-    <h1 class="page-title">Профиль</h1>
-    <div class="page-sub">{{ profile.display_name }} · {{ profile.get_role_display }}</div>
-  </div>
-</div>
+{% include 'platform/_profile_header.html' %}
 
 {% include 'platform/_profile_tabs.html' with active=tab %}
 
