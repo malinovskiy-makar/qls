@@ -76,7 +76,9 @@ from django.utils import timezone
 from problems.enrich import features as feat
 from problems.enrich import layout, taxonomy
 from problems.enrich.title_rules import classify_and_pick_source
-from problems.models import (EconConcept, Feature, Hint, OlympiadRef, Problem,
+from problems.management.commands.glm_enrich_run import (
+    load_solvehub_check_type_index, normalize_legacy_problem_type)
+from problems.models import (EconConcept, Hint, OlympiadRef, Problem,
                              ProblemFeature, ProblemPart, Tag, Topic)
 
 PARSED_PATH = Path('reports/enrich_pilot/run2_parsed.jsonl')
@@ -174,7 +176,9 @@ class Command(BaseCommand):
         # Их пометили `needs_fix` ПО ДАННЫМ ПЕРВОГО прогона и потому не взяли
         # во второй — замкнутый круг, который разрывает допрогон. До него
         # данные первого прогона всё же лучше пустоты, но помечены как run1.
-        self.run1_rows = self.load_run1_rows(jsonl_ids) if self.use_run1 else []
+        covered_by_run2 = {r['problem_id'] for r in ok_rows}
+        self.run1_rows = (self.load_run1_rows(covered_by_run2)
+                          if self.use_run1 else [])
         if self.run1_rows:
             self.stdout.write(
                 'из первого прогона (активные вне run2): %d задач'
@@ -230,12 +234,19 @@ class Command(BaseCommand):
                     rows.append(json.loads(line))
         return rows
 
-    def load_run1_rows(self, run2_ids):
-        """Строки первого прогона для АКТИВНЫХ задач, которых нет во втором.
+    def load_run1_rows(self, run2_ok_ids):
+        """Строки первого прогона для АКТИВНЫХ задач без годных данных run2.
 
         Данные run1 слабее (без чтения решений, другой уровень рассуждения),
         поэтому они никогда не перекрывают run2: множества не пересекаются по
-        построению — из журнала берутся только id, отсутствующие в `run2_ids`.
+        построению — берутся только id, для которых во втором прогоне НЕТ
+        годной строки.
+
+        ⚠️ «Годной», а не «никакой». Задача, забракованная во втором прогоне
+        (`defect: true`), данных из него не получила вовсе — и если бы мы
+        считали её покрытой, она осталась бы с легаси-типом навсегда. Именно
+        так #7468 сохранила «тест: один ответ» и сорвала инвариант «ноль
+        значений вне восьми» на первой записи 07.09.2026.
         """
         if not self.run1_path.exists():
             self.stdout.write(self.style.WARNING(
@@ -245,7 +256,7 @@ class Command(BaseCommand):
         active_ids = set(Problem.objects
                          .exclude(status__in=INACTIVE_STATUSES)
                          .values_list('id', flat=True))
-        wanted = active_ids - run2_ids
+        wanted = active_ids - run2_ok_ids
         rows = []
         with open(self.run1_path, encoding='utf-8') as fh:
             for line in fh:
@@ -375,6 +386,13 @@ class Command(BaseCommand):
         samples = defaultdict(list)
         self.invalid_value_ids = defaultdict(list)   # поле -> [(id, значение)]
         self.concept_lookup = layout.concept_lookup(layout.load_terms())
+        # ⚠️ Журнал ПЕРВОГО прогона несёт отменённое значение
+        # `problem_type='открытый_ответ'` (557 активных задач на 07.09.2026).
+        # Схема v2 его не содержит, и без нормализации эти задачи остались бы
+        # вовсе без типа — то есть вне каталога и вне инварианта «ноль
+        # активных без problem_type». Правило разведения — то же, что у
+        # прогона (`glm_enrich_run.normalize_legacy_problem_type`, §5.5).
+        self.check_types = load_solvehub_check_type_index()
 
         all_rows = list(ok_rows) + [dict(r, _run1=True) for r in run1_rows]
         ids = [r['problem_id'] for r in all_rows]
@@ -406,12 +424,10 @@ class Command(BaseCommand):
                 self._plan_concepts(problem, row, counters)
                 self._plan_features_model(problem, row, counters['features_модель'])
                 self._plan_content_status(problem, row, counters['content_status'])
-                if row.get('_run1'):
-                    # Ветка run1: только новые поля. Темы, теги, заголовок,
-                    # подсказки, тип и сложность у слабого прогона не берём —
-                    # правило «run1 не перекрывает run2» относится и к тому,
-                    # чего во втором прогоне для этой задачи просто нет.
-                    continue
+                # ⚠️ Ветка run1 проходит ВСЕ планировщики. «run1 не перекрывает
+                # run2» значит «не пишет поверх данных второго прогона», а не
+                # «не пишет вовсе»: у этих задач данных run2 нет ни одного, и
+                # без темы с типом они выпали бы из инвариантов и из каталога.
                 self._plan_topics(problem, row, counters['topics'], skipped, samples)
                 self._plan_tags(problem, row, counters['tags'], skipped, samples)
                 self._plan_title(problem, row, counters['title'], samples,
@@ -560,8 +576,17 @@ class Command(BaseCommand):
         if random.random() < 0.003:
             samples['hints'].append((problem.id, len(hints), hints[0][:120]))
 
-    def _plan_problem_type(self, problem, row, counter, skipped, samples):
+    def _problem_type_candidate(self, problem, row):
+        """Кандидат на `problem_type` с разведением легаси-значения."""
         candidate = row.get('problem_type')
+        candidate, was_legacy = normalize_legacy_problem_type(
+            candidate, self.check_types.get(problem.id))
+        return candidate, was_legacy
+
+    def _plan_problem_type(self, problem, row, counter, skipped, samples):
+        candidate, was_legacy = self._problem_type_candidate(problem, row)
+        if was_legacy:
+            counter['легаси_открытый_ответ_разведён'] += 1
         if not candidate:
             counter['кандидат_пуст'] += 1
             return
@@ -612,13 +637,18 @@ class Command(BaseCommand):
     # Кодовые особенности — по ВСЕМ активным задачам
     # ------------------------------------------------------------------
 
-    def iter_code_features(self):
-        """(id задачи, множество кодовых особенностей) по всем активным.
+    def iter_code_features(self, only_active=False):
+        """(id задачи, множество кодовых особенностей).
 
         Считается по данным банка, а не по составу прогона: обогащалась
         задача или нет, наличие таблицы в её условии от этого не зависит.
+        По умолчанию идёт по ВСЕЙ базе — дубль, которого завтра «раздублируют»,
+        иначе остался бы без особенностей молча. `only_active` нужен отчёту:
+        порог показа в каталоге считается от активных задач.
         """
-        active = Problem.objects.exclude(status__in=INACTIVE_STATUSES)
+        active = Problem.objects.all()
+        if only_active:
+            active = active.exclude(status__in=INACTIVE_STATUSES)
         figure_ids = set(
             Problem.objects.filter(figures__isnull=False)
             .values_list('id', flat=True))
@@ -641,7 +671,7 @@ class Command(BaseCommand):
     def plan_code_features(self):
         counter = Counter()
         total = 0
-        for _pid, keys in self.iter_code_features():
+        for _pid, keys in self.iter_code_features(only_active=True):
             total += 1
             for key in keys:
                 counter[key] += 1
@@ -948,13 +978,6 @@ class Command(BaseCommand):
                         changed = True
                     problem.enrichment_at = timezone.now()
 
-                    if row.get('_run1'):
-                        # Слабый прогон боевые тему/тег/заголовок/тип не трогает.
-                        if changed:
-                            to_save.append(problem)
-                            written['задач_изменено'] += 1
-                        continue
-
                     topic_ids = [str(t) for t in
                                 [row.get('topic_primary')] + list(row.get('topics_secondary') or [])
                                 if t and str(t) in taxonomy.theme_ids()]
@@ -984,7 +1007,7 @@ class Command(BaseCommand):
                             new_hints.append(Hint(problem=problem, order=i, text=text))
                         written['hints_задач'] += 1
 
-                    ptype = row.get('problem_type')
+                    ptype, _legacy = self._problem_type_candidate(problem, row)
                     if ptype in VALID_PROBLEM_TYPES:
                         problem.problem_type = ptype
                         changed = True

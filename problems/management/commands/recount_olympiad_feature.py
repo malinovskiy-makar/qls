@@ -42,10 +42,15 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         feature = ensure_features()[KEY]
 
+        # ⚠️ СВЯЗЬ СТАВИТСЯ ПО ВСЕЙ БАЗЕ, А ПОРОГ СЧИТАЕТСЯ ПО АКТИВНЫМ.
+        # Особенность — факт задачи, статус к ней отношения не имеет; если
+        # ставить её только активным, а `merge_enrichment_v2` — всем, две
+        # команды начнут качели: одна ставит, другая снимает.
         active_ids = set(Problem.objects.exclude(status__in=INACTIVE_STATUSES)
                          .values_list('id', flat=True))
         linked_ids = set(OlympiadRef.objects.values_list('problem_id', flat=True))
-        want_ids = active_ids & linked_ids
+        all_ids = set(Problem.objects.values_list('id', flat=True))
+        want_ids = all_ids & linked_ids
         have_ids = set(ProblemFeature.objects
                        .filter(feature=feature)
                        .values_list('problem_id', flat=True))
@@ -53,10 +58,11 @@ class Command(BaseCommand):
         to_add = want_ids - have_ids
         to_drop = have_ids - want_ids
 
-        share = (len(want_ids) / len(active_ids)) if active_ids else 0.0
+        active_linked = active_ids & linked_ids
+        share = (len(active_linked) / len(active_ids)) if active_ids else 0.0
         self.stdout.write('активных задач: %d' % len(active_ids))
-        self.stdout.write('с привязкой к олимпиаде: %d (%.2f %%)'
-                          % (len(want_ids), share * 100))
+        self.stdout.write('с привязкой к олимпиаде: %d, из них активных %d (%.2f %%)'
+                          % (len(want_ids), len(active_linked), share * 100))
         self.stdout.write('поставить: %d, снять: %d' % (len(to_add), len(to_drop)))
         if share < feat.MIN_CATALOG_COVERAGE:
             self.stdout.write(
