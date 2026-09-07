@@ -25,16 +25,66 @@ class SpecsShapeTests(TestCase):
     def test_блоков_ровно_девятнадцать(self):
         self.assertEqual(len(BLOCKS), 19)
 
-    def test_боевая_спецификация_v2_это_шестнадцать_блоков(self):
-        self.assertEqual(len(SPECS['v2'].blocks), 16)
-        for выпавший in ('blurb', 'plot', 'skills'):
+    def test_боевая_спецификация_v2_это_семнадцать_блоков(self):
+        self.assertEqual(len(SPECS['v2'].blocks), 17)
+        for выпавший in ('plot', 'skills'):
             self.assertNotIn(выпавший, SPECS['v2'].blocks)
 
     def test_порядок_v2_зафиксирован_владельцем_07_09(self):
         self.assertEqual(SPECS['v2'].blocks, (
-            'topics', 'tags', 'concepts', 'queries', 'find', 'given',
+            'topics', 'tags', 'concepts', 'blurb', 'queries', 'find', 'given',
             'solution', 'statement', 'parts', 'hints', 'features', 'kind',
             'olympiad', 'difficulty_note', 'difficulty', 'title'))
+
+    def test_blurb_стоит_четвёртым_а_не_просто_где_то(self):
+        """Место взято из `API_RUN_MASTER` §9: сразу после понятий. Простое
+        «блок присутствует» пропустило бы его в хвосте, а позиция в отпечатке
+        значима — ради неё заведена пара `v2` ↔ `v2_meta_first`."""
+        self.assertEqual(SPECS['v2'].blocks[3], 'blurb')
+        self.assertEqual(SPECS['v2'].budgets['blurb'], 400)
+
+    def test_no_blurb_отличается_от_v2_ровно_одним_блоком(self):
+        """Сравнение списков, а не чтение кода: абляция обязана снимать один
+        блок и не трогать ни порядок остальных, ни бюджеты."""
+        v2, без = SPECS['v2'], SPECS['v2_no_blurb']
+        self.assertEqual(set(v2.blocks) - set(без.blocks), {'blurb'})
+        self.assertEqual(без.blocks,
+                         tuple(b for b in v2.blocks if b != 'blurb'))
+        self.assertEqual(v2.budgets, без.budgets)
+        self.assertEqual(v2.options, без.options)
+
+    def test_варианты_наследуют_состав_v2_а_не_свой_старый_список(self):
+        """Проверяется явно, а не «на глаз»: у каждого варианта, кроме `v1`,
+        `v2_core` и `v2_lean` (у них состав СВОЙ и заявлен отдельно), набор
+        блоков обязан быть подмножеством `v2` — плюс повтор пятёрки упора у
+        `v2_focus_repeat`. Если завтра в `v2` добавят блок, а вариант о нём
+        не узнает, тест это увидит."""
+        свои = {'v1', 'v2_core', 'v2_lean'}
+        for имя, spec in SPECS.items():
+            if имя in свои:
+                continue
+            with self.subTest(вариант=имя):
+                self.assertLessEqual(set(spec.blocks), set(SPECS['v2'].blocks))
+        for имя in ('v2_500', 'v2_3000', 'v2_nolimit', 'v2_focus',
+                    'v2_meta_first', 'v2_masked_numbers', 'v2_no_offlist',
+                    'v2_no_code_features'):
+            with self.subTest(вариант=имя):
+                self.assertEqual(sorted(SPECS[имя].blocks),
+                                 sorted(SPECS['v2'].blocks))
+
+    def test_v2_lean_состав_и_порядок(self):
+        """Средняя длина между `v1` и `v2`: восемь блоков, ни решения, ни
+        подсказок, ни запросов, ни `ai_blurb`, ни хвостовых метаданных."""
+        lean = SPECS['v2_lean']
+        self.assertEqual(lean.blocks, ('title', 'topics', 'tags', 'concepts',
+                                       'find', 'given', 'statement', 'parts'))
+        for выпавший in ('solution', 'hints', 'queries', 'blurb', 'features',
+                         'kind', 'olympiad', 'difficulty_note', 'difficulty'):
+            self.assertNotIn(выпавший, lean.blocks)
+        self.assertEqual(lean.budgets['statement'], 400)
+        self.assertEqual(lean.budgets['parts'], 400)
+        self.assertEqual(lean.budgets['find'], 400)
+        self.assertEqual(lean.budgets['given'], 500)
 
     def test_ответ_не_входит_ни_в_один_вариант(self):
         """Медианная длина ответа в банке — 2 символа, то есть это число.
@@ -45,8 +95,8 @@ class SpecsShapeTests(TestCase):
         версии = [s.version for s in SPECS.values()]
         self.assertEqual(len(set(версии)), len(версии))
 
-    def test_вариантов_семнадцать(self):
-        self.assertEqual(len(SPECS), 17)
+    def test_вариантов_восемнадцать(self):
+        self.assertEqual(len(SPECS), 18)
 
     def test_meta_first_отличается_от_v2_только_порядком(self):
         """Пара `v2` ↔ `v2_meta_first` — единственная проверка порядка: если
@@ -293,13 +343,28 @@ class V2BlocksTests(TestCase):
         self.assertIn('Решение: Приравниваем', self.текст())
         self.assertNotIn('Решение:', self.текст('v2_no_solution'))
 
-    def test_сюжет_и_blurb_в_v2_не_входят(self):
+    def test_сюжет_в_v2_не_входит_а_blurb_входит(self):
         текст = self.текст()
         self.assertNotIn('Сюжет:', текст)
-        self.assertNotIn('Краткая суть', текст)
+        self.assertIn('Краткая суть.', текст)
 
-    def test_v2_plus_blurb_возвращает_blurb_четвёртым(self):
-        self.assertIn('Краткая суть.', self.текст('v2_plus_blurb'))
+    def test_blurb_стоит_между_понятиями_и_запросами(self):
+        текст = self.текст()
+        self.assertLess(текст.index('Понятия:'), текст.index('Краткая суть.'))
+        self.assertLess(текст.index('Краткая суть.'), текст.index('Запросы:'))
+
+    def test_v2_no_blurb_снимает_blurb(self):
+        self.assertNotIn('Краткая суть', self.текст('v2_no_blurb'))
+
+    def test_v2_lean_короче_v2_и_без_решения(self):
+        lean, полный = self.текст('v2_lean'), self.текст()
+        self.assertLess(len(lean), len(полный))
+        self.assertNotIn('Решение:', lean)
+        self.assertNotIn('Подсказки:', lean)
+        self.assertNotIn('Запросы:', lean)
+        self.assertNotIn('Краткая суть', lean)
+        self.assertIn('Заголовок: Пекарня Ивана.', lean)
+        self.assertIn('Найти:', lean)
 
     def test_обезличивание_чисел_только_в_отпечатке(self):
         текст = self.текст('v2_masked_numbers')

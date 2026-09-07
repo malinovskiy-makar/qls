@@ -1,18 +1,43 @@
 {
-  "session": "formula_v2",
+  "session": "titles_lean",
   "branch": "feat/embedding-formula-v2",
   "base_commit": "326c939",
-  "db": "C:\Users\shipu\qls\db.sqlite3",
-  "backup_phase0": "C:\Users\shipu\weconomics-data\backups\db_formula_v2_phase0_20260907.sqlite3",
-  "backup_phase0_checked": {"integrity_check": "ok", "problems": 41307, "size": 1291358208},
+  "db": "C:\\Users\\shipu\\qls\\db.sqlite3",
+  "backup_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_formula_v2_phase0_20260907.sqlite3",
+  "backup_phase0_checked": {
+    "integrity_check": "ok",
+    "problems": 41307,
+    "size": 1291358208
+  },
   "backup_phase0_used_for_rollback": true,
   "phases": {
-    "0": {"status": "done"},
-    "1": {"status": "done", "processed": 1740, "unrecovered": 0, "spent_usd": 1.9163},
-    "2": {"status": "done", "merged": 1733, "promoted_to_ok": 559, "published_of_them": 452},
-    "3": {"status": "done", "specs": 17, "blocks": 19, "v1_byte_exact_on": 2500},
-    "4": {"status": "done"},
-    "5": {"status": "done"}
+    "0": {
+      "status": "done"
+    },
+    "1": {
+      "status": "done",
+      "processed": 1740,
+      "unrecovered": 0,
+      "spent_usd": 1.9163
+    },
+    "2": {
+      "status": "done",
+      "merged": 1733,
+      "promoted_to_ok": 559,
+      "published_of_them": 452
+    },
+    "3": {
+      "status": "done",
+      "specs": 17,
+      "blocks": 19,
+      "v1_byte_exact_on": 2500
+    },
+    "4": {
+      "status": "done"
+    },
+    "5": {
+      "status": "done"
+    }
   },
   "manifest_size": 1740,
   "active_spec": "v1",
@@ -21,9 +46,17 @@
   "build_check_passed": false,
   "catalog_visible_before": 13968,
   "catalog_visible_after": 14082,
-  "run1_leftovers_remaining": [55678],
+  "run1_leftovers_remaining": [
+    55678
+  ],
   "snapshots_for_revert": [
     "reports/formula_v2/content_status_promote_backup.json",
     "reports/formula_v2/content_status_promote_tail_backup.json"
-  ]
+  ],
+  "backup_titles_lean_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_20260907_titles_lean_phase0.sqlite3",
+  "backup_titles_lean_phase0_checked": {
+    "integrity_check": "ok",
+    "problems": 41307,
+    "size": 1291358208
+  }
 }
