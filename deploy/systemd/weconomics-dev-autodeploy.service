@@ -1,0 +1,19 @@
+[Unit]
+Description=Автовыкатка площадки dev.weconomics.ai (main после зелёного CI)
+After=docker.service
+Requires=docker.service
+
+[Service]
+# ⚠️ Type=oneshot, И ЭТО НЕ МЕЛОЧЬ. Сборка образа занимает минуты, а таймер
+# срабатывает раз в пять минут. У oneshot systemd НЕ ЗАПУСТИТ второй
+# экземпляр поверх работающего первого: две одновременные сборки одного
+# образа и два `up -d` подряд — это гонка на ровном месте.
+Type=oneshot
+# Скрипту нужен docker, git и запись в /srv/weconomics/dev. Всё это есть
+# у makar (он в группе docker), root не требуется — и не даётся.
+User=makar
+WorkingDirectory=/srv/weconomics/dev/app
+ExecStart=/srv/weconomics/dev/app/deploy/dev_autodeploy.sh
+# Сборка с нуля плюс ожидание healthy укладываются в 15 минут с запасом.
+# Без предела зависший docker build держал бы юнит бесконечно.
+TimeoutStartSec=900
