@@ -37,6 +37,16 @@
     },
     "5": {
       "status": "done"
+    },
+    "titles_lean": {
+      "phase_-1": "done",
+      "phase_0": "done",
+      "phase_1": "done",
+      "phase_2": "done",
+      "phase_3": "done",
+      "phase_4": "done",
+      "phase_5": "done",
+      "phase_6": "done"
     }
   },
   "manifest_size": 1740,
@@ -58,5 +68,21 @@
     "integrity_check": "ok",
     "problems": 41307,
     "size": 1291358208
-  }
+  },
+  "specs": 18,
+  "v2_blocks": 17,
+  "title_buckets": {
+    "A": 12473,
+    "B": 318,
+    "C": 9498,
+    "C-оставляем": 12439,
+    "D-совпадает": 5192,
+    "D-кандидат негоден": 1387
+  },
+  "titles_replaced": 22289,
+  "titles_snapshot": "reports\\formula_v2\\title_apply_backup.json",
+  "field_name_values_cleared": 882,
+  "field_name_values_snapshot": "reports\\formula_v2\\field_name_values_backup.json",
+  "title_candidate_nonempty": 40425,
+  "protected_fingerprint_matches_phase0_backup": "89c339ef23eae9c2b39e29c793c54cee"
 }

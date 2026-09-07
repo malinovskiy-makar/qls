@@ -100,16 +100,38 @@ class BucketTests(TestCase):
                    title_candidate='Дуополия Курно', title_source='kept')
         self.assertEqual(tr.bucket(p), 'B')
 
-    def test_C_длинный_kept(self):
-        p = задача(title='Очень длинный авторский заголовок про монополию и цены',
+    @unittest.skipIf(pymorphy3 is None, 'pymorphy3 не установлен')
+    def test_C_длинный_без_термина(self):
+        p = задача(title='Очень длинное название без единого делового слова тут',
                    title_candidate='Монополия и цена', title_source='kept')
         self.assertEqual(tr.bucket(p), 'C')
+
+    @unittest.skipIf(pymorphy3 is None, 'pymorphy3 не установлен')
+    def test_C_оставляем_длинный_но_с_термином(self):
+        """Решение владельца 07.09: длина сама по себе заменой не является.
+        «Кешбэк как инструмент ценовой дискриминации» — 43 символа, но это
+        осмысленный авторский заголовок, а не обрубок."""
+        p = задача(title='Кешбэк как инструмент ценовой дискриминации',
+                   title_candidate='Кешбэк и самоотбор', title_source='kept')
+        self.assertGreater(len(p.title), tr.TITLE_LIMIT)
+        self.assertEqual(tr.bucket(p), 'C-оставляем')
 
     @unittest.skipIf(pymorphy3 is None, 'pymorphy3 не установлен')
     def test_C_короткий_без_термина(self):
         p = задача(title='Подсолнух - 2', title_candidate='Опцион и погода',
                    title_source='kept')
         self.assertEqual(tr.bucket(p), 'C')
+
+    @unittest.skipIf(pymorphy3 is None, 'pymorphy3 не установлен')
+    def test_длина_на_корзину_C_больше_не_влияет(self):
+        """Прямая проверка снятого условия: два заголовка с одним и тем же
+        термином, разной длины, обязаны попасть в одну корзину."""
+        короткий = задача(title='Ценовая дискриминация',
+                          title_candidate='Кешбэк и самоотбор', title_source='kept')
+        длинный = задача(title='Кешбэк как инструмент ценовой дискриминации',
+                         title_candidate='Кешбэк и самоотбор', title_source='kept')
+        self.assertEqual(tr.bucket(короткий), tr.bucket(длинный))
+        self.assertEqual(tr.bucket(длинный), 'C-оставляем')
 
     @unittest.skipIf(pymorphy3 is None, 'pymorphy3 не установлен')
     def test_C_оставляем_короткий_с_термином(self):
