@@ -504,6 +504,19 @@ class Problem(models.Model):
 
     # Этап 5б — дедупликация. Если задача является возможным дублём другой,
     # здесь хранится ссылка на «оригинал». Устанавливается командой process_duplicates.
+    # --- Разметка групп копий (ночная сессия 08.09, фаза 5) -------------
+    # ⚠️ Только ПОМЕТКИ. Ни одна задача не скрывается и не удаляется:
+    # владелец решает схлопывание сам, глядя на отчёт DUPLICATES.md.
+    dup_group = models.CharField(
+        'Группа копий', max_length=40, blank=True, db_index=True,
+        help_text='Идентификатор группы одинаковых по тексту задач')
+    dup_is_best = models.BooleanField(
+        'Фаворит группы копий', default=False,
+        help_text='Лучшая версия внутри dup_group по правилам ранжирования')
+    dup_best_rule = models.PositiveSmallIntegerField(
+        'Каким признаком выиграл', null=True, blank=True,
+        help_text='Номер первого различающего признака 1-9; 9 — выбор шаткий')
+
     duplicate_of = models.ForeignKey(
         'self',
         on_delete=models.SET_NULL,
