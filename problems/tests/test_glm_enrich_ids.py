@@ -190,3 +190,47 @@ class IdsNonOkEndToEndTests(TestCase):
         ids, _вывод = self._run('nonok-file', include_nonok=True,
                                 ids_file=str(path))
         self.assertEqual(sorted(ids), sorted([self.ok.id, self.needs_fix.id]))
+
+
+class EmptyHintsStopPctTests(TestCase):
+    """`--empty-hints-stop-pct` (решение владельца 07.09.2026).
+
+    ⚠️ Порог поднимают ТОЛЬКО с замером на руках. Здесь проверяется ровно
+    то, что делает флаг: значение по умолчанию не меняется, а заданное
+    доезжает до сторожа. Замер, оправдавший подъём для допрогона, —
+    `reports/formula_v2/DECISIONS.md`, Р-05.
+    """
+
+    def test_по_умолчанию_порог_прежний(self):
+        трекер = run_cmd.RunQualityTracker()
+        self.assertEqual(трекер.empty_hints_stop_pct,
+                         run_cmd.EMPTY_HINTS_STOP_PCT)
+        self.assertEqual(run_cmd.EMPTY_HINTS_STOP_PCT, 5.0)
+
+    def test_сторож_срабатывает_на_прежнем_пороге(self):
+        трекер = run_cmd.RunQualityTracker(min_sample=1)
+        for _ in range(9):
+            трекер.record({'call1_ok': True, 'call2_ok': True,
+                           'solution_sent': True, 'call2': {'hints': ['раз']}})
+        трекер.record({'call1_ok': True, 'call2_ok': True,
+                       'solution_sent': True, 'call2': {'hints': None}})
+        self.assertTrue(трекер.breached)          # 10 % > 5 %
+        self.assertIn('пустые подсказки', трекер.breach_reason)
+
+    def test_поднятый_порог_доезжает_до_сторожа(self):
+        трекер = run_cmd.RunQualityTracker(min_sample=1, empty_hints_stop_pct=15.0)
+        for _ in range(9):
+            трекер.record({'call1_ok': True, 'call2_ok': True,
+                           'solution_sent': True, 'call2': {'hints': ['раз']}})
+        трекер.record({'call1_ok': True, 'call2_ok': True,
+                       'solution_sent': True, 'call2': {'hints': None}})
+        self.assertFalse(трекер.breached)         # 10 % < 15 %
+
+    def test_флаг_не_трогает_остальные_сторожа(self):
+        """Поднят ровно один порог. Брак и утечка решения в `find`
+        останавливают прогон как прежде — иначе флаг тихо снял бы защиту,
+        о которой не просили."""
+        трекер = run_cmd.RunQualityTracker(min_sample=1, empty_hints_stop_pct=99.0)
+        трекер.record({'call1_ok': False, 'call2_ok': False})
+        self.assertTrue(трекер.breached)
+        self.assertNotIn('пустые подсказки', трекер.breach_reason)

@@ -24,9 +24,10 @@ from django.utils import timezone
 
 from problems.models import Problem
 from problems.embedding_config import (
-    EMBEDDING_MODEL_NAME, EMBEDDING_DIM, CANONICAL_TAG_NAMES,
+    ACTIVE_SPEC, EMBEDDING_MODEL_NAME, EMBEDDING_DIM, CANONICAL_TAG_NAMES,
     EMBEDDING_FORMULA_VERSION, EMBEDDING_MODEL_BUILD,
 )
+from problems.embedding_formula import PREFETCH, build_text
 
 # Псевдоним для обратной совместимости: night_embeddings.py импортирует MODEL_NAME отсюда.
 MODEL_NAME = EMBEDDING_MODEL_NAME
@@ -66,57 +67,26 @@ def _select_device(preferred: str) -> str:
 
 
 def problem_to_text(problem: Problem) -> str:
-    """Строит текст для эмбеддинга.
+    """Текст отпечатка по АКТИВНОЙ спецификации формулы.
 
-    Порядок блоков:
-      1. title (если есть)
-      2. statement[:500]
-      3. подпункты ProblemPart.statement (до 500 символов суммарно)
-      4. «Темы: …» — канонические темы, исключая техническую тему «Тест»
-      5. «Навыки: …» — навыки задачи
-      6. ai_blurb[:400] — краткая суть (Дано/Найти или резюме)
-      7. «Теги: …» — только канонические теги из CANONICAL_TAG_NAMES
+    Реализация с 07.09.2026 одна — `problems.embedding_formula.build_text`;
+    здесь остаётся тонкая обёртка, потому что имя `problem_to_text`
+    вызывается из полутора десятков мест. Что именно собирается, решает
+    `ACTIVE_SPEC` (сегодня — `v1`, и переключается она одной строкой в
+    `embedding_config` после того, как замер назовёт победителя).
 
-    Решение и ответ в отпечаток НЕ входят.
-    ⚠️ Требует prefetch_related('parts', 'topics', 'skills', 'tags') при батч-запросе.
+    Сегодняшняя `v1`: title + statement[:500] + подпункты (500 суммарно) +
+    «Темы» + «Навыки» + ai_blurb[:400] + «Теги» по старому списку
+    `CANONICAL_TAG_NAMES`. Решение и ответ в отпечаток не входят.
+
+    ⚠️ Совпадение `build_text(p, SPECS['v1'])` с прежней реализацией —
+    СИМВОЛ В СИМВОЛ, и это держит тест
+    `problems/tests/test_embedding_formula.py::V1ByteForByteTests`. Без него
+    сравнение v1 против v2 было бы сравнением v2 с новой опечаткой.
+
+    ⚠️ Требует `prefetch_related(*PREFETCH)` при батч-запросе.
     """
-    parts = []
-    if problem.title:
-        parts.append(problem.title + '.')
-    parts.append(problem.statement[:500])
-
-    # Подпункты
-    subparts = list(problem.parts.all())  # Meta.ordering = ['order', 'label']
-    if subparts:
-        subtext = ' '.join(sp.statement for sp in subparts if sp.statement)
-        if subtext:
-            parts.append(subtext[:500])
-
-    # Темы (исключаем «Тест» — техническая метка импорта, не смысловая)
-    topic_names = [t.name for t in problem.topics.all() if t.name != 'Тест']
-    if topic_names:
-        parts.append('Темы: ' + ', '.join(topic_names) + '.')
-
-    # Навыки
-    skill_names = [s.name for s in problem.skills.all()]
-    if skill_names:
-        parts.append('Навыки: ' + ', '.join(skill_names) + '.')
-
-    # Краткая суть из Батча 1 (ai_blurb — внутреннее поле, в интерфейсе не показывается)
-    blurb = (problem.ai_blurb or '').strip()
-    if blurb:
-        parts.append(blurb[:400])
-
-    # Канонические теги (только из CANONICAL_TAG_NAMES — без мусорных «Homework», «тут» и пр.)
-    # Сравнение по точному имени: регистр в базе совпадает с каноном (проверено на данных).
-    canonical_tags = sorted(
-        t.name for t in problem.tags.all()
-        if t.name in CANONICAL_TAG_NAMES
-    )
-    if canonical_tags:
-        parts.append('Теги: ' + ', '.join(canonical_tags) + '.')
-
-    return ' '.join(parts)
+    return build_text(problem, ACTIVE_SPEC)
 
 
 def embedding_source_hash(text: str) -> str:
@@ -189,10 +159,13 @@ class Command(BaseCommand):
             ids = [
                 p.id for p in (
                     Problem.objects
-                    .only('id', 'title', 'statement', 'ai_blurb',
-                          'embedding_version', 'embedding_model_build',
-                          'embedding_source_hash')
-                    .prefetch_related('parts', 'topics', 'skills', 'tags')
+                    # ⚠️ `defer('embedding')`, а НЕ `only(...)` со списком
+                    # полей: список пришлось бы держать в согласии с составом
+                    # активной спецификации формулы, и при переключении на v2
+                    # забытое поле обернулось бы тихим N+1 на 41 тысяче задач.
+                    # Отложить надо ровно один тяжёлый блоб — 4 КБ на задачу.
+                    .defer('embedding')
+                    .prefetch_related(*PREFETCH)
                     .iterator(chunk_size=BATCH_SIZE)
                 )
                 if is_stale(p, problem_to_text(p))
@@ -234,7 +207,7 @@ class Command(BaseCommand):
                 Problem.objects
                 .filter(id__in=batch_ids)
                 .only('id', 'title', 'statement', 'ai_blurb')
-                .prefetch_related('parts', 'topics', 'skills', 'tags')
+                .prefetch_related(*PREFETCH)
             )
 
             texts = [problem_to_text(p) for p in problems]

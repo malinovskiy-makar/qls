@@ -229,6 +229,10 @@ batch2_errors.txt
 shots/
 tools/*.mjs
 tools/*.py
+# ⚠️ Исключение: этот файл ЕДЕТ на арендованную видеокарту и на него
+# ссылается reports/formula_v2/RUNBOOK_GPU.md. Одноразовым скриптом он не
+# является — потерять его значит потерять аренду.
+!tools/gpu_encode.py
 
 # OCR кэши
 materials/attachments/kylchik_ocr_cache.txt

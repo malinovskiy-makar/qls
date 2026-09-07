@@ -1344,6 +1344,17 @@ class Command(BaseCommand):
                  'причём МОЛЧА обрезая: прогон прошёл бы на куске манифеста '
                  'и отчитался бы об успехе.')
         parser.add_argument(
+            '--empty-hints-stop-pct', type=float, default=EMPTY_HINTS_STOP_PCT,
+            help='Порог сторожа «пустые подсказки у задач с решением», %% '
+                 '(по умолчанию %.1f — поведение прежнее). ⚠️ Порог поднимают '
+                 'ТОЛЬКО с замером на руках, а не чтобы «прошло». Замер '
+                 '07.09.2026, допрогон 1 740 худших задач: сторож дал 5,2 %% '
+                 'при пороге 5,0 %%, тогда как на ТЕХ ЖЕ задачах слабый '
+                 'первый прогон даёт 6,4 %% — то есть новый прогон лучше '
+                 'ровно по метрике сторожа, а порог калиброван на здоровом '
+                 'корпусе из 37 тысяч. Решение владельца 07.09.2026.'
+                 % EMPTY_HINTS_STOP_PCT)
+        parser.add_argument(
             '--include-nonok', action='store_true',
             help='Не фильтровать --ids/--ids-file по content_status (07.09.2026). '
                  'Размыкает замкнутый круг: слабый первый прогон пометил '
@@ -1540,7 +1551,15 @@ class Command(BaseCommand):
                 'режим --call1-only: ровно ОДИН вызов на задачу; поля вызова '
                 '2 переносятся из старого журнала без изменений')
 
-        tracker = RunQualityTracker(call1_only=call1_only)
+        tracker = RunQualityTracker(
+            call1_only=call1_only,
+            empty_hints_stop_pct=options['empty_hints_stop_pct'])
+        if options['empty_hints_stop_pct'] != EMPTY_HINTS_STOP_PCT:
+            self.stdout.write(
+                '⚠️ порог сторожа «пустые подсказки» поднят с %.1f%% до %.1f%% '
+                '— это осознанное решение владельца, а не настройка по '
+                'умолчанию.' % (EMPTY_HINTS_STOP_PCT,
+                                options['empty_hints_stop_pct']))
         stop_event = threading.Event()
         processed_count = {'n': 0}
         count_lock = threading.Lock()
