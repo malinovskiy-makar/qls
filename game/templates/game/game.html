@@ -3164,6 +3164,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      только эндпоинтом старта, дальше всё то же самое. Темы и пропорцию
      целевого считает сервер по журналу прошлого забега. */
   function startRun(opts) {
+    // След прошлого забега: игра живёт в ОДНОЙ странице на три экрана,
+    // и не снятый класс пережил бы возврат на старт.
+    clearAlarm();
     var mistakes = !!(opts && opts.mistakes);
     var setCode = opts && opts.setCode;
     var url = setCode
@@ -3314,6 +3317,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     } else if (on) {
       beatApi('set', alarmBpm(timeLeft, MODE.duration));
     }
+  }
+
+  /* ⚠️ ТРЕВОГУ СНИМАЕТ ОТДЕЛЬНАЯ ФУНКЦИЯ, И ЗОВЁТ ЕЁ КОНЕЦ ЗАБЕГА.
+     paintAlarm() живёт внутри игрового цикла: после show('finished') его
+     больше никто не зовёт, и класс `alarm` оставался на #vignette — а он
+     лежит fixed во весь экран. Красная кайма переживала экран результатов
+     и возвращалась на стартовый. Видно было только когда забег кончался в
+     красной зоне (последние 10 % запаса или последняя жизнь): иначе
+     последний paintAlarm() успевал снять класс сам. Отсюда «после
+     некоторых партий». */
+  function clearAlarm() {
+    var v = $('vignette');
+    if (v) v.classList.remove('alarm', 'beat', 'on');
+    document.documentElement.style.setProperty('--alarm', '0');
+    alarmOn = false;
+    beatApi('stop');
   }
 
   /* Пульс картинки — по удару сердца, а не по своему таймеру. Событие
@@ -4190,6 +4209,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function quitRun() {
     closeQuit();
     cancelAnimationFrame(rafId);
+    // ⚠️ Тревога снимается ЗДЕСЬ, а не в openQuit: пока окно подтверждения
+    // открыто, забег продолжается за ним, и гасить кайму рано — следующий
+    // же кадр вернул бы её обратно. Бросают забег именно тут.
+    clearAlarm();
     show('start');
     renderModeCards();
   }
@@ -4223,7 +4246,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     show('finished');
     // Экран результатов и перерисовка графиков звука не издают: он
     // сопровождает забег, а не отчёт о нём. Одно исключение — рекорд.
-    beatApi('stop');
+    // Вместе со звуком гасится и красная кайма — она пережила бы экран.
+    clearAlarm();
     rush('over');
 
     // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,

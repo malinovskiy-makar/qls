@@ -183,3 +183,77 @@ class AlarmPaintTests(TestCase):
         u"""Ключ хранения звука — тот же, что был на ветке: переименование
         игры не должно сбрасывать выбор игроков."""
         self.assertIn("var KEY = 'econ_rush_sound';", read(SOUND))
+
+
+def body_of(src, header):
+    u"""Тело функции или блока от `header` до парной закрывающей скобки.
+
+    Нужно именно тело, а не «где-то в файле»: вызов `clearAlarm()` рядом с
+    `endRun`, но не внутри него, дефект не чинит.
+    """
+    start = src.index(header) + len(header)   # header кончается на `{`
+    depth = 1
+    i = start
+    while depth:
+        ch = src[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+        i += 1
+    return src[start:i]
+
+
+class AlarmIsClearedOnRunEndTests(SimpleTestCase):
+    u"""Красная кайма не переживает забег (08.09.2026).
+
+    ⚠️ ЧТО БЫЛО. Класс `alarm` вешает на `#vignette` только `paintAlarm()`,
+    а её зовёт игровой цикл. После `show('finished')` цикл кончается, и
+    снять класс становится некому — а `#vignette` лежит `fixed; inset: 0`
+    поверх всего. Кайма переживала экран результата и возвращалась на
+    стартовый: игра живёт в одной странице на три экрана.
+
+    Дефект был виден не всегда: если забег кончался, когда времени было
+    много, последний `paintAlarm()` успевал снять класс сам. Красным он
+    оставался, только когда забег кончался В КРАСНОЙ ЗОНЕ — последние 10 %
+    запаса режима или последняя жизнь. Отсюда «после некоторых партий».
+    """
+
+    def setUp(self):
+        self.src = read(PAGE)
+
+    def test_clear_alarm_is_defined_once_and_actually_clears(self):
+        self.assertEqual(self.src.count('function clearAlarm('), 1)
+        body = body_of(self.src, 'function clearAlarm() {')
+        self.assertIn("classList.remove('alarm'", body)
+        self.assertIn('--alarm', body)
+        self.assertIn('alarmOn = false;', body)
+        self.assertIn("beatApi('stop')", body)
+
+    def test_end_of_run_clears_it(self):
+        body = body_of(self.src, 'function endRun(reason) {')
+        self.assertIn('clearAlarm(', body)
+        # ⚠️ Прежний голый `beatApi('stop')` из endRun убран: он теперь
+        # внутри clearAlarm. Два места, гасящие звук, разъедутся.
+        self.assertNotIn("beatApi('stop')", body)
+
+    def test_quitting_mid_run_clears_it(self):
+        u"""Кнопка выхода `btn-quit`.
+
+        ⚠️ Вызов стоит в `quitRun`, а не в `openQuit`: `btn-quit` только
+        открывает окно подтверждения, а забег за ним ПРОДОЛЖАЕТСЯ, и снятая
+        там кайма вернулась бы следующим же кадром. Бросают забег в
+        `quitRun` — туда вызов и поставлен.
+        """
+        self.assertIn("$('btn-quit').addEventListener('click', openQuit);",
+                      self.src)
+        self.assertIn('clearAlarm(', body_of(self.src, 'function quitRun() {'))
+
+    def test_a_new_run_starts_clean(self):
+        self.assertIn('clearAlarm(', body_of(self.src, 'function startRun(opts) {'))
+
+    def test_three_call_sites_at_least(self):
+        u"""Числовой инвариант: определение одно, вызовов не меньше трёх."""
+        self.assertEqual(self.src.count('function clearAlarm('), 1)
+        calls = self.src.count('clearAlarm(') - 1   # минус само определение
+        self.assertGreaterEqual(calls, 3, calls)
