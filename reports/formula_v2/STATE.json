@@ -1,0 +1,18 @@
+{
+  "session": "formula_v2",
+  "branch": "feat/embedding-formula-v2",
+  "base_commit": "326c939",
+  "db": "C:\Users\shipu\qls\db.sqlite3",
+  "backup_phase0": "C:\Users\shipu\weconomics-data\backups\db_formula_v2_phase0_20260907.sqlite3",
+  "backup_phase0_checked": {"integrity_check": "ok", "problems": 41307, "size": 1291358208},
+  "phases": {
+    "0": {"status": "done", "note": "ветка, сверка, бэкап"},
+    "1": {"status": "pending"},
+    "2": {"status": "pending"},
+    "3": {"status": "pending"},
+    "4": {"status": "pending"},
+    "5": {"status": "pending"}
+  },
+  "manifest_size": 1740,
+  "build_check_passed": false
+}

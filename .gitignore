@@ -432,3 +432,13 @@ reports/enrich_pilot/*
 # сравнения, и в репозитории ему не место.
 !reports/enrich_pilot/raster_inventory.md
 !reports/enrich_pilot/model_choice_summary.md
+
+# Сессия «формула v2» (07.09.2026). reports/* исключён выше — возвращаем
+# только отчёты и манифест допрогона: манифест нужен фазе 2.2 (после мержа
+# исходный запрос `enrichment_source='run1'` его уже не воспроизведёт) и
+# ранбуку аренды, а весит 12 КБ. Журналы прогона и векторы — не в git.
+!reports/formula_v2/
+reports/formula_v2/*
+!reports/formula_v2/*.md
+!reports/formula_v2/STATE.json
+!reports/formula_v2/manifest_run3.txt
