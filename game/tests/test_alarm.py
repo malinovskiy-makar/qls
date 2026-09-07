@@ -28,6 +28,25 @@ def read(path):
     return io.open(path, encoding='utf-8').read()
 
 
+def body_of(src, header):
+    u"""Тело функции или блока от `header` до парной закрывающей скобки.
+
+    Нужно именно тело, а не «где-то в файле»: вызов `clearAlarm()` рядом с
+    `endRun`, но не внутри него, дефект не чинит.
+    """
+    start = src.index(header) + len(header)   # header кончается на `{`
+    depth = 1
+    i = start
+    while depth:
+        ch = src[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+        i += 1
+    return src[start:i]
+
+
 class AlarmArithmeticTest(SimpleTestCase):
     u"""Три контрольные точки задания плюс границы окна и темп."""
 
@@ -115,6 +134,85 @@ class SoundModuleTests(SimpleTestCase):
         self.assertIn('master.gain.value = 0.18;', read(SOUND))
 
 
+class SoundSurvivesSleepAndDeviceChangeTests(SimpleTestCase):
+    u"""Звук перестаёт пропадать (08.09.2026).
+
+    ⚠️ ПРИЧИНА ОДНОЙ НЕ НАЗЫВАЕТСЯ. Владелец видел пропажу звука на
+    Windows; воспроизвести её на разборе не удалось, и утверждать «дело
+    было в этом» нечестно. Известны ТРИ механизма, и все три лечатся одним
+    приёмом — самовосстановлением контекста:
+
+    1. Chrome на Windows усыпляет AudioContext при уходе со вкладки, и
+       state становится `suspended`.
+    2. resume() звала только tone(), а сердцебиение (thump) — нет: после
+       сна пульс молчал, хотя ноты играли.
+    3. Смена устройства вывода (воткнули наушники) оставляет контекст в
+       состоянии `running`, но звука в нём больше нет; лечится только
+       пересозданием.
+
+    Проверяется наличие всех трёх лечений: закрытый контекст, спящий
+    контекст, неподвижные часы.
+    """
+
+    def setUp(self):
+        self.src = read(SOUND)
+
+    def test_wake_exists_and_resumes(self):
+        self.assertIn('function wake() {', self.src)
+        body = body_of(self.src, 'function wake() {')
+        self.assertIn("c.state !== 'running'", body)
+        self.assertIn('c.resume()', body)
+
+    def test_tone_thump_and_heartbeat_all_wake_first(self):
+        u"""Механизм 2: раньше будила только tone(), и пульс молчал."""
+        for header in ('function tone(opts) {',
+                       'function thump(t0, vol) {'):
+            self.assertIn('wake()', body_of(self.src, header), header)
+        # heartbeat.start — метод объекта, не функция
+        start = self.src.split('start: function (bpm) {', 1)[1]
+        start = start.split('},', 1)[0]
+        self.assertIn('wake()', start)
+        self.assertNotIn('audio();', start)
+
+    def test_closed_context_is_recreated(self):
+        u"""Механизм 1 (крайний случай): закрытый контекст — не живой объект."""
+        body = body_of(self.src, 'function audio() {')
+        self.assertIn("ctx.state === 'closed'", body)
+        self.assertIn('ctx = null; master = null;', body)
+
+    def test_a_stopped_clock_counts_as_a_dead_context(self):
+        u"""Механизм 3: running, а currentTime стоит — контекст мёртв."""
+        body = body_of(self.src, 'function watchClock(replay) {')
+        self.assertIn('c.currentTime !== was', body)
+        self.assertIn("c.state !== 'running'", body)
+        self.assertIn('respawn()', body)
+
+    def test_the_retry_happens_exactly_once(self):
+        u"""⚠️ Бесконечная цепочка пересозданий хуже тишины."""
+        body = body_of(self.src, 'function watchClock(replay) {')
+        self.assertIn('if (clock.retried) return;', body)
+        self.assertIn('clock.retried = true;', body)
+        # И снимается, как только часы пошли: вторая смена наушников за
+        # сессию тоже должна лечиться.
+        self.assertIn('clock.retried = false;', body)
+
+    def test_respawn_reschedules_the_heartbeat(self):
+        u"""Часы нового контекста идут с нуля — иначе пульс замолчал бы."""
+        body = body_of(self.src, 'function respawn() {')
+        self.assertIn('hb.next = hbNow() + 0.05;', body)
+
+    def test_returning_to_the_tab_wakes_the_sound(self):
+        self.assertIn("addEventListener('visibilitychange'", self.src)
+        self.assertEqual(self.src.count("'visibilitychange'"), 1)
+
+    def test_nothing_here_can_break_the_game(self):
+        u"""Весь новый код — под try/catch, как beatApi и rush() на странице."""
+        for header in ('function wake() {',
+                       'function respawn() {',
+                       'function watchClock(replay) {'):
+            self.assertIn('try {', body_of(self.src, header), header)
+
+
 class AlarmPaintTests(TestCase):
     u"""2.1, 2.3 Виньетка, таймер и полоса."""
 
@@ -183,25 +281,6 @@ class AlarmPaintTests(TestCase):
         u"""Ключ хранения звука — тот же, что был на ветке: переименование
         игры не должно сбрасывать выбор игроков."""
         self.assertIn("var KEY = 'econ_rush_sound';", read(SOUND))
-
-
-def body_of(src, header):
-    u"""Тело функции или блока от `header` до парной закрывающей скобки.
-
-    Нужно именно тело, а не «где-то в файле»: вызов `clearAlarm()` рядом с
-    `endRun`, но не внутри него, дефект не чинит.
-    """
-    start = src.index(header) + len(header)   # header кончается на `{`
-    depth = 1
-    i = start
-    while depth:
-        ch = src[i]
-        if ch == '{':
-            depth += 1
-        elif ch == '}':
-            depth -= 1
-        i += 1
-    return src[start:i]
 
 
 class AlarmIsClearedOnRunEndTests(SimpleTestCase):

@@ -32,7 +32,22 @@
     // пульсируют виньетка и полоса времени, а они нужны и без звука.
   }
 
+  /* ⚠️ КОНТЕКСТ САМОВОССТАНАВЛИВАЕТСЯ, И ЭТО НЕ ПЕРЕСТРАХОВКА.
+     Chrome на Windows усыпляет AudioContext при уходе со вкладки, а при
+     смене устройства вывода оставляет его в состоянии running, но звука в
+     нём уже нет. Ни то ни другое клиенту не сообщается — звук просто
+     пропадает до перезагрузки страницы. Отсюда три правила ниже:
+     закрытый контекст пересоздаём, спящий будим перед каждым звуком,
+     остановившиеся часы (currentTime не движется) считаем мёртвым
+     контекстом и тоже пересоздаём.
+
+     ⚠️ Точную причину пропажи звука без воспроизведения не назвать — все
+     три механизма известны по симптомам, а не по замеру. Лечатся они
+     одним приёмом, поэтому чиним все три сразу. */
   function audio() {
+    // Закрытый контекст остаётся объектом и молча не играет: `if (ctx)`
+    // без этой проверки возвращал бы труп до конца сессии.
+    if (ctx && ctx.state === 'closed') { ctx = null; master = null; }
     if (ctx) return ctx;
     var Ctx = window.AudioContext || window.webkitAudioContext;
     if (!Ctx) return null;
@@ -41,16 +56,66 @@
       master = ctx.createGain();
       master.gain.value = 0.18;   // тихо: игра не должна пугать
       master.connect(ctx.destination);
-    } catch (e) { ctx = null; }
+    } catch (e) { ctx = null; master = null; }
     return ctx;
+  }
+
+  /* Разбудить контекст перед звуком. Зовётся первой строкой в tone(),
+     thump() и heartbeat.start(): раньше resume() был только в tone(), и
+     после сна вкладки ноты играли, а пульс молчал. */
+  function wake() {
+    var c = audio();
+    if (!c) return null;
+    try {
+      if (c.state !== 'running' && c.resume) c.resume();
+    } catch (e) { /* звук не критичен */ }
+    return c;
+  }
+
+  /* Сторож часов: контекст в состоянии running, а currentTime не движется —
+     значит, он мёртв (типично после смены устройства вывода). Пересоздаём
+     и повторяем звук РОВНО ОДИН РАЗ: бесконечная цепочка пересозданий хуже
+     тишины. Флаг снимается, как только часы снова пошли, — иначе вторая
+     смена наушников за сессию осталась бы без лечения. */
+  var clock = { timer: null, retried: false };
+  var CLOCK_WAIT = 250;   // мс: столько ждём движения currentTime
+
+  function respawn() {
+    try { if (ctx && ctx.close) ctx.close(); } catch (e) {}
+    ctx = null; master = null;
+    var c = audio();
+    // ⚠️ Часы нового контекста идут с нуля, а hb.next назначен по старым:
+    // назначенные удары оказались бы в далёком будущем, и сердцебиение
+    // замолчало бы навсегда. Переназначаем от новых часов.
+    if (c && hb.on) hb.next = hbNow() + 0.05;
+    return c;
+  }
+
+  function watchClock(replay) {
+    if (clock.timer) return;          // один сторож за раз
+    var c = ctx;
+    if (!c) return;
+    var was = c.currentTime;
+    clock.timer = setTimeout(function () {
+      clock.timer = null;
+      try {
+        if (ctx !== c) return;              // контекст уже сменился
+        if (c.state !== 'running') return;  // спит — это лечит wake()
+        if (c.currentTime !== was) { clock.retried = false; return; }
+        if (clock.retried) return;          // вторая неудача подряд — молчим
+        clock.retried = true;
+        respawn();
+        if (replay) replay();
+      } catch (e) { /* звук не критичен */ }
+    }, CLOCK_WAIT);
   }
 
   /* Одна нота: тип волны, частота, длительность, громкость, скольжение. */
   function tone(opts) {
     if (!enabled()) return;
-    var c = audio();
-    if (!c) return;
-    if (c.state === 'suspended' && c.resume) c.resume();
+    var c = wake();
+    if (!c || !master) return;
+    watchClock(function () { tone(opts); });
     var osc = c.createOscillator();
     var gain = c.createGain();
     var t0 = c.currentTime + (opts.delay || 0);
@@ -99,8 +164,13 @@
   /* Один «туп»: синус 55 → 40 Гц с быстрым спадом. Низко и коротко —
      это удар, а не нота. */
   function thump(t0, vol) {
-    var c = ctx;
+    // ⚠️ Здесь тоже wake(), а не голый ctx: resume() стоял только в tone(),
+    // и после сна вкладки ноты играли, а пульс молчал.
+    var c = wake();
     if (!c || !master) return;
+    // Повтора у удара нет: он назначен на точный момент, который уже
+    // прошёл бы. Планировщик и так заглядывает вперёд каждые 25 мс.
+    watchClock(null);
     var osc = c.createOscillator();
     var gain = c.createGain();
     osc.type = 'sine';
@@ -149,7 +219,7 @@
        молча» на полсекунды. */
     start: function (bpm) {
       if (hb.on) { heartbeat.set(bpm); return; }
-      audio();                       // может вернуть null — это нормально
+      wake();                        // может вернуть null — это нормально
       hb.on = true;
       hb.bpm = bpm || 70;
       hb.next = hbNow() + 0.05;
@@ -225,6 +295,17 @@
 
     heartbeat: heartbeat
   };
+
+  /* Возврат на вкладку. Chrome на Windows усыпляет контекст, пока вкладка
+     в фоне, и без этого звук молчал бы до следующей перезагрузки страницы.
+     Слушатель вешается ОДИН раз при загрузке модуля. */
+  try {
+    document.addEventListener('visibilitychange', function () {
+      if (!document.hidden) {
+        try { wake(); } catch (e) { /* звук не критичен */ }
+      }
+    });
+  } catch (e) { /* нет document — модуль всё равно должен собраться */ }
 
   window.rushSound = api;
 })();
