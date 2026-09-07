@@ -47,6 +47,14 @@
       "phase_4": "done",
       "phase_5": "done",
       "phase_6": "done"
+    },
+    "titles_final": {
+      "phase_-1": "done",
+      "phase_0": "done",
+      "phase_1": "done",
+      "phase_2": "done",
+      "phase_3": "стоп-гейт — ждём владельца",
+      "phase_5": "done"
     }
   },
   "manifest_size": 1740,
@@ -84,5 +92,21 @@
   "field_name_values_cleared": 882,
   "field_name_values_snapshot": "reports\\formula_v2\\field_name_values_backup.json",
   "title_candidate_nonempty": 40425,
-  "protected_fingerprint_matches_phase0_backup": "89c339ef23eae9c2b39e29c793c54cee"
+  "protected_fingerprint_matches_phase0_backup": "89c339ef23eae9c2b39e29c793c54cee",
+  "backup_titles_final_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_20260907_titles_final_phase0.sqlite3",
+  "backup_titles_final_phase0_checked": {
+    "integrity_check": "ok",
+    "problems": 41307,
+    "size": 1291358208,
+    "md5_id_title": "801cb7d50399503a3cf0fb437016372a"
+  },
+  "titles_reverted_by_owner": true,
+  "title_buckets_final": {
+    "обрубки": 13111,
+    "технические номера": 3273,
+    "не трогаем": 18344,
+    "уже равен кандидату": 5192,
+    "кандидат негоден": 1387
+  },
+  "titles_to_replace_final": 16384
 }
