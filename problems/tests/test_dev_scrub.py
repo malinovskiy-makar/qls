@@ -21,6 +21,7 @@ from problems.models import (
     Assignment, CatalogAttempt, Problem, StudentGroup, User,
 )
 from problems.models_gamification import ParentLink
+from game.models import GameResult, GameSet
 from problems.models_platform import LearningEvent, UserProfile
 
 
@@ -41,6 +42,31 @@ def _данные():
     группа = StudentGroup.objects.create(name='Группа', teacher=учитель)
     группа.students.add(ученик, ещё)
     Assignment.objects.create(name='Домашка', author=учитель)
+
+    # ⚠️ АНОНИМНАЯ АКТИВНОСТЬ — БЕЗ ПОЛЬЗОВАТЕЛЯ, И ЭТО ГЛАВНОЕ В ФИКСТУРЕ.
+    # 07.09.2026 первая заливка площадки оставила 48 272 события: у
+    # `LearningEvent.user` стоит null=True (тренажёр работает без входа), и
+    # удаление людей такие строки не трогает. Прежняя фикстура этого не
+    # ловила — в ней ВСЯ активность была привязана к ученику.
+    LearningEvent.objects.create(
+        user=None, session_key='anon-session-key',
+        source=LearningEvent.Source.GAME,
+        event_type=LearningEvent.EventType.SOLVED)
+    набор = GameSet.objects.create(code='devscrub1', mode='classic',
+                                   author=учитель)
+    # `GameResult.user` — SET_NULL: строка переживает удаление владельца и
+    # остаётся в таблице рекордов без единого признака, чья она.
+    GameResult.objects.create(code='res-user', game_set=набор, user=ученик,
+                              mode='classic', score=10)
+    GameResult.objects.create(code='res-anon', game_set=набор, user=None,
+                              mode='classic', score=20)
+    # ⚠️ Результат БЕЗ НАБОРА И БЕЗ ЧЕЛОВЕКА. У `game_set` стоит CASCADE, но
+    # `null=True`: удаление наборов такую строку не уносит, а удаление людей
+    # — тем более. Без неё проверка проходила бы «по неправильной причине»:
+    # результаты исчезали бы каскадом за наборами, и забудь мы GameResult в
+    # списке, никто бы этого не заметил.
+    GameResult.objects.create(code='res-orphan', game_set=None, user=None,
+                              mode='classic', score=30)
     return задача
 
 
@@ -163,6 +189,8 @@ class DevScrubWorkTests(TestCase):
     def test_личное_вычищено(self):
         self.assertEqual(CatalogAttempt.objects.count(), 0)
         self.assertEqual(LearningEvent.objects.count(), 0)
+        self.assertEqual(GameResult.objects.count(), 0)
+        self.assertEqual(GameSet.objects.count(), 0)
         # Осталась ровно одна группа — та, что завела сама команда.
         self.assertEqual(StudentGroup.objects.count(), 1)
         # Домашка переживает удаление автора (`author` = SET_NULL), поэтому
@@ -187,3 +215,19 @@ class DevScrubWorkTests(TestCase):
         self.assertEqual(
             sorted(User.objects.values_list('username', flat=True)),
             ['dev-admin', 'dev-parent', 'dev-student', 'dev-teacher'])
+
+    def test_анонимная_активность_тоже_вычищена(self):
+        """Активность без пользователя удаление людей НЕ уносит.
+
+        ⚠️ Проверка заведена по настоящей поломке. Первая заливка площадки
+        07.09.2026 оставила 48 272 события: тренажёр и каталог работают без
+        входа, такие строки хранят только ключ сессии, и каскад за
+        пользователем до них не доходит. Это ровно та персональная
+        активность, которой на площадке с общим паролем быть не должно.
+        """
+        self.assertFalse(
+            LearningEvent.objects.filter(user__isnull=True).exists(),
+            'на площадке остались анонимные события с ключами сессий')
+        self.assertFalse(
+            GameResult.objects.filter(user__isnull=True).exists(),
+            'на площадке остались результаты забегов без владельца')
