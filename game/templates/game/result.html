@@ -174,9 +174,10 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
     {% endif %}
 
     <a class="cta" href="{{ game_url }}">Сыграть тоже</a>
+    <!-- ⚠️ ОДНА КНОПКА (08.09.2026, решение владельца): была пара
+         «Скопировать ссылку» / «Поделиться». -->
     <div class="share-row">
-      <button type="button" id="btn-copy" data-url="{{ page_url }}">Скопировать ссылку</button>
-      <button type="button" id="btn-share" hidden>Поделиться</button>
+      <button type="button" id="btn-share" data-url="{{ page_url }}">Поделиться</button>
     </div>
   </div>
 
@@ -185,35 +186,34 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 </div>
 
 <script>
-/* Только кнопки шеринга: сама сводка отрисована сервером и без JS цела. */
+/* Только кнопка шеринга: сама сводка отрисована сервером и без JS цела.
+   Один путь на все браузеры: есть системное окно — отдаём ему, нет —
+   кладём ссылку в буфер, нет и буфера — prompt. Та же лестница, что на
+   экране результата в игре: два разных поведения одной кнопки разъехались
+   бы при первой правке. */
 (function () {
   'use strict';
-  var copy = document.getElementById('btn-copy');
   var share = document.getElementById('btn-share');
-  var url = copy.dataset.url;
+  var url = share.dataset.url;
   var title = document.title;
 
-  copy.addEventListener('click', function () {
-    function done(ok) {
-      copy.textContent = ok ? 'Скопировано ✓' : 'Не вышло, скопируйте вручную';
-      setTimeout(function () { copy.textContent = 'Скопировать ссылку'; }, 2000);
+  share.addEventListener('click', function () {
+    if (navigator.share) {
+      navigator.share({ title: title, text: title, url: url })
+        .catch(function () { /* игрок передумал — это не ошибка */ });
+      return;
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(url).then(function () { done(true); },
-                                              function () { prompt('Ссылка:', url); });
+      navigator.clipboard.writeText(url).then(
+        function () {
+          share.textContent = 'Ссылка скопирована ✓';
+          setTimeout(function () { share.textContent = 'Поделиться'; }, 2000);
+        },
+        function () { prompt('Ссылка:', url); });
     } else {
       prompt('Ссылка:', url);
     }
   });
-
-  // Нативное «Поделиться» есть не везде — показываем кнопку только там, где есть.
-  if (navigator.share) {
-    share.hidden = false;
-    share.addEventListener('click', function () {
-      navigator.share({ title: title, text: title, url: url })
-        .catch(function () { /* игрок передумал — это не ошибка */ });
-    });
-  }
 })();
 </script>
 </body>

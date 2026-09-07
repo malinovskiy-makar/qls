@@ -225,39 +225,41 @@ class SoundModuleTests(TestCase):
         self.assertNotIn('rush(', charts.group(1))
 
 
-class ShareCardTests(TestCase):
-    """Карточка результата: два размера, тёмная, пустая полоса под ссылку."""
+class ShareCardIsGoneTests(TestCase):
+    u"""Карточки результата на canvas больше нет (08.09.2026).
+
+    ⚠️ ЧТО БЫЛО. Класс `ShareCardTests` сторожил рисование карточки: два
+    размера (1200×630 и 1080×1350 под сторис), ожидание шрифтов, тёмный фон
+    независимо от темы сайта, пустую полосу под будущий домен, кривую счёта
+    и ленту рекорда. Решением владельца 08.09.2026 всё это удалено вместе с
+    тремя кнопками из четырёх: остаётся одна кнопка «Поделиться», ведущая
+    на публичную страницу результата.
+
+    Проверки не выброшены, а ПЕРЕВЁРНУТЫ: карточка не имеет права вернуться
+    незамеченной, а вместе с ней — три захардкоженных цвета, которые были
+    осознанным исключением из правила «каждый цвет через var(--…)».
+    """
 
     def setUp(self):
         with open(TEMPLATE, encoding='utf-8') as f:
             self.page = f.read()
 
-    def test_two_sizes_are_declared(self):
-        self.assertIn("wide:  { w: 1200, h: 630 }", self.page)
-        self.assertIn("story: { w: 1080, h: 1350 }", self.page)
+    def test_nothing_of_the_card_is_left(self):
+        for gone in ('drawShareCard', 'drawCurve', 'drawHearts', 'drawDonut',
+                     'drawRecordRibbon', 'cardFont', 'withFonts',
+                     'CARD_SIZES', 'CARD_LAYOUT', 'document.fonts.ready',
+                     'НОВЫЙ РЕКОРД', 'linkBand'):
+            self.assertNotIn(gone, self.page, gone)
 
-    def test_card_waits_for_fonts(self):
-        """На системном шрифте карточка выйдет разной на разных
-        устройствах — ждём document.fonts.ready до отрисовки."""
-        self.assertIn('document.fonts.ready', self.page)
-        self.assertRegex(self.page, r'withFonts\(function \(\) \{\s*\n\s*drawShareCard')
+    def test_the_hardcoded_card_palette_left_with_it(self):
+        u"""Набор CARD жил как осознанное исключение из канона: canvas не
+        читает CSS-переменные, а картинка уезжала наружу. Картинки нет —
+        исключению не место.
 
-    def test_link_band_is_reserved_and_empty(self):
-        """Домена нет; 127.0.0.1 на карточке недопустим. Полоса
-        зарезервирована фиксированной высотой и пока пустая."""
-        m = re.search(r'function drawShareCard\(kind\) \{(.*?)\n  \}\n',
-                      self.page, re.S)
-        self.assertIsNotNone(m)
-        body = m.group(1)
-        self.assertIn('linkBand', body)
-        self.assertNotIn('shareInfo', body)     # URL на карточку не попадает
-
-    def test_card_is_always_dark(self):
-        self.assertIn("bg: '#0d0d12'", self.page)
-
-    def test_curve_is_the_main_element(self):
-        self.assertIn('function drawCurve', self.page)
-        self.assertIn('combo_curve', self.page)
-
-    def test_record_ribbon_exists(self):
-        self.assertIn('НОВЫЙ РЕКОРД', self.page)
+        ⚠️ Проверяется САМ НАБОР и его собственные цвета, а не любой хекс в
+        файле: рядом живёт конфетти со своей палитрой, и оно к карточке
+        отношения не имеет. Тест, который цеплял бы и его, краснел бы на
+        ровном месте."""
+        self.assertNotIn('var CARD = {', self.page)
+        for colour in ("'#0d0d12'", "'#161b25'", "'#4a4a55'", "'#96969f'"):
+            self.assertNotIn(colour, self.page, colour)

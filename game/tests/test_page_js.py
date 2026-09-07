@@ -110,39 +110,38 @@ class PageJsTests(TestCase):
                 dead.append(name)
         self.assertEqual(sorted(dead), [])
 
-    def test_image_share_sends_only_the_file(self):
-        """Кнопка «Поделиться картинкой» отдаёт в share ТОЛЬКО файл.
+    def test_sharing_is_one_button_with_one_path(self):
+        """⚠️ ОДНА КНОПКА (08.09.2026, решение владельца).
 
-        Если рядом с files положить text/url, системное окно «Поделиться»
-        на десктопе берёт текст и ВЫБРАСЫВАЕТ картинку — кнопка начинает
-        делиться подписью вместо карточки. Ровно этот баг ловили в браузере
-        2026-07-16: уходило {files, text, url}. Ссылка не теряется — она
-        нарисована на самой карточке и живёт на соседних кнопках."""
-        calls = re.findall(r'navigator\.share\(\{(.*?)\}\)', self.js, re.S)
-        with_files = [c for c in calls if 'files' in c]
-        self.assertEqual(len(with_files), 1,
-                         'ожидался ровно один share с файлом')
-        self.assertNotIn('text:', with_files[0])
-        self.assertNotIn('url:', with_files[0])
+        Было четыре: «картинкой», «сторис», «скопировать ссылку» и
+        системное «Поделиться». Вместе с ними удалено рисование карточки на
+        canvas — всё, что было на картинке, есть на публичной странице
+        результата, и она к тому же живая. Прежний тест сторожил ловушку
+        Web Share «files рядом с text/url» — файлов больше нет вовсе, и
+        сторожить нечего.
+        """
+        for gone in ('btn-share-img', 'btn-share-story', 'btn-share-link',
+                     'btn-share-native', 'share-canvas', 'drawShareCard',
+                     'shareCard', 'downloadCard', 'CARD_SIZES', 'CARD_LAYOUT',
+                     'cardFont', 'withFonts', 'drawCurve', 'drawHearts',
+                     'drawDonut', 'drawRecordRibbon'):
+            self.assertNotIn(gone, self.src, gone)
 
-    def test_image_button_falls_back_to_download_not_text(self):
-        """Запасной путь кнопки-картинки — скачивание PNG, никогда не текст.
+        self.assertEqual(self.src.count('id="btn-share"'), 1)
+        # Ни одного share с файлом не осталось: файлов нет.
+        self.assertNotIn('files:', self.js)
 
-        Нажали «картинкой» — получите картинку: текст и ссылка живут на
-        своих кнопках."""
-        # обе кнопки карточки (широкая и вертикальная) ходят через один
-        # shareCard — запасной путь у них общий
-        m = re.search(r'function shareCard\(btn, kind, label\) \{(.*?)\n  \}\n',
-                      self.js, re.S)
-        self.assertIsNotNone(m, 'shareCard не найден')
+    def test_the_one_button_walks_three_steps_down(self):
+        """Системное окно → буфер → prompt. Ссылку скопировать можно всегда."""
+        m = re.search(
+            r"\$\('btn-share'\)\.addEventListener\('click', function \(\) \{(.*?)\n  \}\);",
+            self.js, re.S)
+        self.assertIsNotNone(m, 'обработчик btn-share не найден')
         handler = m.group(1)
-        self.assertIn('downloadCard', handler)
-        self.assertNotIn('shareText', handler)
-        for btn in ('btn-share-img', 'btn-share-story'):
-            self.assertRegex(
-                self.js,
-                r"\$\('%s'\)\.addEventListener\('click', function \(\) \{\s*"
-                r"shareCard\(" % btn)
+        self.assertIn('navigator.share', handler)
+        self.assertIn('shareText()', handler)
+        self.assertIn('navigator.clipboard', handler)
+        self.assertIn('prompt(', handler)
 
     def test_filter_state_is_persisted_and_sent(self):
         """Фильтр живёт в localStorage и уезжает на сервер — иначе выбор
@@ -383,3 +382,51 @@ class NoBrowserBlueTests(TestCase):
                    if rule not in self.src]
         self.assertEqual(missing, [],
                          'нет правила фокуса у: %s' % missing)
+
+
+class OneShareButtonEverywhereTests(TestCase):
+    u"""Кнопка шеринга ровно одна — и в игре, и на публичной странице.
+
+    Решение владельца 08.09.2026: остаётся одна кнопка «Поделиться»,
+    ведущая на публичную страницу результата `/game/r/<код>/`. Рисование
+    карточки на canvas удалено.
+
+    ⚠️ Проверяются ОБА шаблона одним тестом: пара «Скопировать ссылку» /
+    «Поделиться» на `result.html` — та же кнопка в другом месте, и оставь
+    её там — у одного действия стало бы два разных поведения.
+    """
+
+    RESULT = os.path.join(settings.BASE_DIR, 'game', 'templates', 'game',
+                          'result.html')
+
+    def setUp(self):
+        self.page = page_source()
+        with open(self.RESULT, encoding='utf-8') as f:
+            self.result = f.read()
+
+    def test_exactly_one_share_button_in_each_template(self):
+        for name, src in (('game.html', self.page),
+                          ('result.html', self.result)):
+            buttons = re.findall(r'<button[^>]*id="btn-share[^"]*"', src)
+            self.assertEqual(len(buttons), 1, '%s: %s' % (name, buttons))
+            self.assertNotIn('id="btn-copy"', src, name)
+
+    def test_no_card_words_and_no_canvas(self):
+        for name, src in (('game.html', self.page),
+                          ('result.html', self.result)):
+            # ⚠️ Слово «картинкой» ищем как ПОДПИСЬ КНОПКИ, а не в тексте:
+            # в комментариях страницы «объясняется картинкой» встречается
+            # трижды и к шерингу отношения не имеет.
+            self.assertNotIn('>Поделиться картинкой<', src, name)
+            self.assertNotIn('сторис)<', src, name)
+            self.assertNotIn('<canvas id="share-canvas"', src, name)
+
+    def test_the_page_lost_at_least_a_hundred_and_fifty_lines(self):
+        u"""Числовой инвариант фазы: рисование карточки ушло целиком.
+
+        Замер по git: 5613 строк до правки, 5325 после — минус 288.
+        Сторожим ПОТОЛОК файла, а не точную разницу: точное число краснело
+        бы от любой соседней правки, а смысл в том, что двести с лишним
+        строк рисования не вернулись.
+        """
+        self.assertLess(len(self.page.split('\n')), 5460)

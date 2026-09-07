@@ -1854,7 +1854,6 @@ body.figfull .vignette.alarm { opacity: .42; }
 }
 .share-row button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .share-row button[hidden] { display: none; }
-#share-canvas { display: none; }
 
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
@@ -2328,21 +2327,18 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </div>
       </section>
 
-      <!-- 6. Шеринг: ссылка на публичную страницу + карточка-картинка -->
+      <!-- 6. Шеринг: ОДНА кнопка на публичную страницу результата.
+           ⚠️ Было четыре (картинкой, сторис, скопировать ссылку, системное
+           «Поделиться») — решение владельца 08.09.2026 оставило одну.
+           Рисование карточки на canvas удалено целиком: всё, что было на
+           картинке, лежит на странице /game/r/<код>/, и она к тому же
+           живая. -->
       <section class="fin-share" id="fin-share" hidden>
         <h3>Поделиться результатом</h3>
         <p class="share-lead" id="share-lead"></p>
         <div class="share-row">
-          <button type="button" id="btn-share-img">Поделиться картинкой</button>
-          <button type="button" id="btn-share-story">Вертикальная (сторис)</button>
-          <button type="button" id="btn-share-link">Скопировать ссылку</button>
-          <button type="button" id="btn-share-native" hidden>Поделиться</button>
+          <button type="button" id="btn-share">Поделиться</button>
         </div>
-        <!-- холст карточки: рисуем в браузере (кириллицу отрисует он сам),
-             на экране не показываем — он нужен только чтобы отдать PNG.
-             Размер ставится перед отрисовкой: 1200×630 широкая, 1080×1350
-             вертикальная под сторис. -->
-        <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
       </section>
 
       <!-- 7. Действия -->
@@ -4644,10 +4640,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   /* ---------- ШЕРИНГ ----------
-     Делимся ссылкой на публичную страницу результата (её абсолютный URL
-     считает сервер: относительный в мессенджере не откроется) и картинкой,
-     которую рисует сам браузер — кириллицу он отрисует без наших забот
-     о шрифтах, а серверу не придётся держать рендер картинок. */
+     Делимся ссылкой на публичную страницу результата: её абсолютный URL
+     считает сервер — относительный в мессенджере не откроется. */
   function shareText() {
     var s = summary;
     return 'Wecon Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
@@ -4663,251 +4657,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     board.hidden = !setInfo;
     if (setInfo) board.href = setInfo.board_url;
     var box = $('fin-share');
-    // Нет ссылки (сеть подвела) — блока нет: делиться нечем.
+    // Нет ссылки (сеть подвела) — блока нет: делиться нечем. Больше блок
+    // ничего не решает: кнопка одна, и путь у неё один.
     box.hidden = !(shareInfo && shareInfo.url);
     if (box.hidden) return;
     $('share-lead').textContent = 'Ссылка открывается у всех, без регистрации';
-    $('btn-share-native').hidden = !navigator.share;
-  }
-
-  /* ---------- КАРТОЧКА РЕЗУЛЬТАТА ----------
-     Рисует canvas в браузере: кириллицу он отрисует сам, серверу рендер
-     картинок не нужен.
-
-     Два размера: 1200×630 (широкая, как превью ссылки) и 1080×1350
-     (вертикальная под сторис).
-
-     ⚠️ Карточка ВСЕГДА ТЁМНАЯ, независимо от темы сайта: её смотрят в
-     ленте мессенджера, и мы обязаны точно знать, как она выглядит у
-     чужого человека. Отсюда же захардкоженные цвета — осознанное
-     исключение из правила «каждый цвет через var(--…)»: canvas не читает
-     CSS-переменные, а картинка уезжает наружу.
-
-     Главный элемент — КРИВАЯ СЧЁТА со ступеньками комбо во всю ширину:
-     у каждого забега своя форма, ради этого её и показывают.
-
-     ⚠️ Внизу ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ фиксированной высоты,
-     сейчас ПУСТАЯ: домена ещё нет, а `127.0.0.1` на карточке — позор.
-     Появится домен — впишем строку, и вёрстка не сдвинется ни на пиксель. */
-  var CARD_SIZES = {
-    wide:  { w: 1200, h: 630 },
-    story: { w: 1080, h: 1350 }
-  };
-  var CARD = {
-    bg: '#0d0d12', panel: '#161b25', accent: '#FF4D94',
-    ink: '#ffffff', soft: '#96969f', dim: '#4a4a55',
-    ok: '#3fc77f', combo: '#f5a623'
-  };
-  /* Один вшитый шрифт вместо системного: на системном карточка выйдет
-     разной на разных устройствах, а местами с кривой кириллицей.
-     Файл кладётся в game/static/game/fonts/ — пока его нет, честно
-     работаем на системном стеке (и это видно в отчёте, а не молча). */
-  var CARD_FONT = 'RushCard';
-  var CARD_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  var cardFontReady = false;
-
-  function cardFont(weight, size) {
-    var family = cardFontReady ? ('"' + CARD_FONT + '", ' + CARD_FALLBACK)
-                               : CARD_FALLBACK;
-    return weight + ' ' + size + 'px ' + family;
-  }
-
-  /* Ждём готовности шрифтов ДО отрисовки: иначе первый кадр уйдёт
-     системным шрифтом, а игрок увидит другую картинку, чем ожидал. */
-  function withFonts(done) {
-    if (!document.fonts || !document.fonts.ready) { done(); return; }
-    document.fonts.ready.then(function () {
-      try { cardFontReady = document.fonts.check('16px "' + CARD_FONT + '"'); }
-      catch (e) { cardFontReady = false; }
-      done();
-    }, done);
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  /* Кривая счёта со ступеньками комбо — главный элемент карточки. */
-  function drawCurve(ctx, s, x, y, w, h) {
-    var scores = s.score_curve || [];
-    var combo = s.combo_curve || [];
-    ctx.fillStyle = CARD.panel;
-    roundRect(ctx, x, y, w, h, 18);
-    ctx.fill();
-    if (scores.length < 2) {
-      ctx.fillStyle = CARD.dim;
-      ctx.font = cardFont(600, 24);
-      ctx.fillText('слишком короткий раунд для кривой', x + 26, y + h / 2);
-      return;
-    }
-    var pad = 22;
-    var maxScore = Math.max.apply(null, scores) || 1;
-    var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
-    var px = function (i) { return x + pad + i * (w - 2 * pad) / (scores.length - 1); };
-    var py = function (v) { return y + h - pad - (v / maxScore) * (h - 2 * pad); };
-
-    // ступеньки комбо — СТУПЕНЧАТОЙ линией внизу поля. Блоками они
-    // сливались с розовой заливкой в грязно-коричневый; ступенька же
-    // читается как ступенька и не спорит с кривой счёта.
-    if (combo.length) {
-      var cy = function (v) {
-        return y + h - pad - (v / maxCombo) * (h - 2 * pad) * 0.34;
-      };
-      ctx.beginPath();
-      combo.forEach(function (c, i) {
-        if (i === 0) { ctx.moveTo(px(i), cy(c)); }
-        else { ctx.lineTo(px(i), cy(combo[i - 1])); ctx.lineTo(px(i), cy(c)); }
-      });
-      ctx.strokeStyle = 'rgba(245,166,35,.75)';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-    }
-
-    // заливка под кривой
-    ctx.beginPath();
-    ctx.moveTo(px(0), y + h - pad);
-    scores.forEach(function (v, i) { ctx.lineTo(px(i), py(v)); });
-    ctx.lineTo(px(scores.length - 1), y + h - pad);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,77,148,.16)';
-    ctx.fill();
-
-    // сама кривая
-    ctx.beginPath();
-    scores.forEach(function (v, i) {
-      if (i === 0) { ctx.moveTo(px(i), py(v)); } else { ctx.lineTo(px(i), py(v)); }
-    });
-    ctx.strokeStyle = CARD.accent;
-    ctx.lineWidth = 4;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-  }
-
-  /* Ряд сердец: погашенные — контуром. */
-  function drawHearts(ctx, left, max, x, y, size) {
-    ctx.font = cardFont(400, size);
-    for (var i = 0; i < max; i++) {
-      var lost = i >= left;
-      ctx.fillStyle = lost ? CARD.dim : '#ff5470';
-      ctx.fillText(lost ? '♡' : '♥', x + i * (size * 0.95), y);
-    }
-  }
-
-  /* Кольцо сложностей в углу — маленькое, справочное. */
-  function drawDonut(ctx, s, cx, cy, r) {
-    var rows = (s.difficulty || []).filter(function (g) { return g.total > 0; });
-    var total = rows.reduce(function (a, g) { return a + g.total; }, 0);
-    if (!total) return;
-    var colors = { easy: CARD.ok, medium: CARD.soft, hard: CARD.combo };
-    var a0 = -Math.PI / 2;
-    rows.forEach(function (g) {
-      var a1 = a0 + (g.total / total) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1);
-      ctx.strokeStyle = colors[g.key] || CARD.soft;
-      ctx.lineWidth = r * 0.42;
-      ctx.stroke();
-      a0 = a1;
-    });
-  }
-
-  /* Лента «НОВЫЙ РЕКОРД» по диагонали. */
-  function drawRecordRibbon(ctx, W) {
-    ctx.save();
-    ctx.translate(W - 130, 96);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = CARD.accent;
-    ctx.fillRect(-170, -22, 340, 44);
-    ctx.fillStyle = '#fff';
-    ctx.font = cardFont(800, 24);
-    ctx.textAlign = 'center';
-    ctx.fillText('НОВЫЙ РЕКОРД', 0, 8);
-    ctx.restore();
-    ctx.textAlign = 'left';
-  }
-
-  /* Раскладка задана ЯВНЫМИ координатами на каждый размер, а не цепочкой
-     «предыдущий + отступ»: цепочка молча выезжала за нижнюю полосу, и
-     сердца с кольцом сложностей просто не влезали в кадр. */
-  var CARD_LAYOUT = {
-    wide: { pad: 64, linkBand: 96, mark: 88, mode: 134,
-            curveY: 164, curveH: 196, score: 470, scoreSize: 118,
-            metrics: 508, heartsY: 470, heartSize: 38,
-            donutX: 106, donutY: 440, donutR: 38 },
-    story: { pad: 72, linkBand: 120, mark: 124, mode: 182,
-             curveY: 220, curveH: 470, score: 850, scoreSize: 138,
-             metrics: 908, heartsY: 1040, heartSize: 50,
-             donutX: 124, donutY: 1010, donutR: 50 }
-  };
-
-  function drawShareCard(kind) {
-    var story = kind === 'story';
-    var size = CARD_SIZES[story ? 'story' : 'wide'];
-    var L = CARD_LAYOUT[story ? 'story' : 'wide'];
-    var cv = $('share-canvas');
-    cv.width = size.w;
-    cv.height = size.h;
-    var ctx = cv.getContext('2d');
-    var W = cv.width, H = cv.height, s = summary;
-
-    ctx.fillStyle = CARD.bg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = CARD.accent;
-    ctx.fillRect(0, 0, 12, H);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(600, story ? 30 : 26);
-    ctx.fillText('Weconomics · Wecon Rush', L.pad, L.mark);
-    ctx.fillStyle = CARD.ink;
-    ctx.font = cardFont(700, story ? 38 : 32);
-    ctx.fillText('Режим «' + s.mode_title + '»', L.pad, L.mode);
-
-    // кривая счёта — главный элемент, во всю ширину
-    drawCurve(ctx, s, L.pad, L.curveY, W - L.pad * 2, L.curveH);
-
-    // крупный счёт
-    ctx.fillStyle = CARD.ink;
-    ctx.font = cardFont(800, L.scoreSize);
-    var scoreText = s.score.toLocaleString('ru-RU');
-    ctx.fillText(scoreText, L.pad, L.score);
-    var scoreW = ctx.measureText(scoreText).width;
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(600, story ? 32 : 28);
-    ctx.fillText('очков', L.pad + scoreW + 16, L.score);
-
-    // метрики строкой
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(500, story ? 30 : 26);
-    ctx.fillText('точность ' + s.accuracy + '%  ·  комбо ×' + s.max_multiplier
-                 + '  ·  вопросов ' + (s.total + s.skipped),
-                 L.pad, L.metrics);
-
-    // сердца — справа (на широкой в одной строке со счётом, на
-    // вертикальной под ним), кольцо сложностей в углу
-    var heartsW = s.lives_max * L.heartSize * 0.95;
-    drawHearts(ctx, s.lives_left, s.lives_max,
-               W - L.pad - L.donutX - heartsW - 24, L.heartsY, L.heartSize);
-    drawDonut(ctx, s, W - L.pad - L.donutR, L.donutY, L.donutR);
-
-    if (isRecord) drawRecordRibbon(ctx, W);
-
-    // ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ — пустая. Домен у сайта уже
-    // есть, но локально адрес забега — это 127.0.0.1, а такой адрес на
-    // картинке недопустим. Возврат ссылки — отдельное решение владельца.
-    ctx.fillStyle = CARD.panel;
-    ctx.fillRect(0, H - L.linkBand, W, L.linkBand);
-    ctx.fillStyle = CARD.accent;
-    ctx.font = cardFont(800, story ? 40 : 34);
-    ctx.fillText('Обгонишь?', L.pad, H - L.linkBand / 2 + (story ? 14 : 12));
   }
 
   function toast(btn, text, back) {
@@ -4915,76 +4669,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     setTimeout(function () { btn.textContent = back; }, 2000);
   }
 
-  /* Скачивание карточки — единственный запасной путь кнопки «Поделиться
-     картинкой». В текст не уходим НИКОГДА: нажали «картинкой» — получите
-     картинку. Текст и ссылка живут на соседних кнопках. */
-  function downloadCard(blob, btn, label) {
-    var a = document.createElement('a');
-    var href = URL.createObjectURL(blob);
-    a.href = href;
-    a.download = 'econ-rush.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(href);
-    toast(btn, 'Картинка скачана ✓', label || 'Поделиться картинкой');
-  }
+  /* ⚠️ ОДНА КНОПКА, ОДИН ПУТЬ (08.09.2026, решение владельца). Было
+     четыре: «картинкой», «сторис», «скопировать ссылку» и системное
+     «Поделиться». Рисование карточки на canvas удалено вместе с ними —
+     всё, что было на картинке, есть на публичной странице результата, и
+     она к тому же живая.
 
-  /* Общий обработчик обеих кнопок карточки: отличается только размером.
-     ⚠️ Ловушка Web Share (чинили 2026-07-16): в navigator.share рядом с
-     files НЕЛЬЗЯ класть text/url — системное окно берёт текст и
-     ВЫБРАСЫВАЕТ картинку. Отдаём только {files, title}. */
-  function shareCard(btn, kind, label) {
-    withFonts(function () {
-      drawShareCard(kind);
-      $('share-canvas').toBlob(function (blob) {
-      if (!blob) { toast(btn, 'Не вышло', label); return; }
-      var file = null;
-      try { file = new File([blob], 'econ-rush.png', { type: 'image/png' }); }
-      catch (e) { /* старый браузер без конструктора File — уйдём в скачивание */ }
-      if (!(file && navigator.canShare && navigator.canShare({ files: [file] }))) {
-        downloadCard(blob, btn, label);   // системного «Поделиться» с файлом нет
-        return;
-      }
-      /* ⚠️ Отдаём ТОЛЬКО файл — ни text, ни url. Положишь их рядом с files —
-         системное окно «Поделиться» на десктопе берёт текст и ВЫБРАСЫВАЕТ
-         картинку: именно так кнопка «поделиться картинкой» уходила текстовой
-         подписью. Проверено в браузере: было {files, text, url} → уезжал текст. */
-      navigator.share({ files: [file], title: 'Wecon Rush' })
-        .catch(function (e) {
-          // Игрок передумал (AbortError) — не ошибка, ничего не делаем.
-          // Любой другой отказ значит, что систему файл не взяла — скачиваем.
-          if (e && e.name === 'AbortError') return;
-          downloadCard(blob, btn, label);
-        });
-      }, 'image/png');
-    });
-  }
-
-  $('btn-share-img').addEventListener('click', function () {
-    shareCard(this, 'wide', 'Поделиться картинкой');
-  });
-  $('btn-share-story').addEventListener('click', function () {
-    shareCard(this, 'story', 'Вертикальная (сторис)');
-  });
-
-  $('btn-share-link').addEventListener('click', function () {
+     Есть системное окно — отдаём ему заголовок, текст и ссылку. Нет —
+     кладём ссылку в буфер и говорим об этом подписью на две секунды.
+     Нет и буфера (старый браузер, не защищённое соединение) — prompt со
+     ссылкой: скопировать вручную всегда можно. */
+  $('btn-share').addEventListener('click', function () {
     var btn = this;
     var url = shareInfo && shareInfo.url;
     if (!url) return;
+    if (navigator.share) {
+      navigator.share({ title: 'Wecon Rush', text: shareText(), url: url })
+        .catch(function () { /* игрок передумал — не ошибка */ });
+      return;
+    }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
-        function () { toast(btn, 'Ссылка скопирована ✓', 'Скопировать ссылку'); },
+        function () { toast(btn, 'Ссылка скопирована ✓', 'Поделиться'); },
         function () { prompt('Скопируйте ссылку:', url); });
     } else {
       prompt('Скопируйте ссылку:', url);
     }
-  });
-
-  $('btn-share-native').addEventListener('click', function () {
-    if (!navigator.share || !shareInfo) return;
-    navigator.share({ title: 'Wecon Rush', text: shareText(), url: shareInfo.url })
-      .catch(function () { /* игрок передумал — не ошибка */ });
   });
 
   /* ---------- ПОДРОБНАЯ СТАТИСТИКА: графики ----------
