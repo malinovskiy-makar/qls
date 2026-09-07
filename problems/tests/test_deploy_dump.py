@@ -177,3 +177,106 @@ class BankOnlyNoPersonLinkedFieldTests(SimpleTestCase):
             u'(ученика/преподавателя/пользователя) — заливка вынесет его '
             u'данные на прод в обход решения владельца о банке-и-только-'
             u'банке:\n  ' + '\n  '.join(offenders))
+
+
+# ---------------------------------------------------------------------------
+# Усиление 07.09.2026: списка моделей мало
+# ---------------------------------------------------------------------------
+#
+# Проверка «каждый FK ведёт в выгруженную модель» ловит только ГРОМКУЮ беду —
+# падение заливки на внешнем ключе. Но есть беда ТИХАЯ: связь может пропасть
+# из дампа без единой ошибки. Сериализатор Django пишет M2M внутрь объекта,
+# только если through-таблица создана автоматически
+# (django/core/serializers/python.py: `if field.remote_field.through._meta.auto_created`).
+# У M2M со СВОЕЙ through-моделью (`Problem.features_rel` через
+# `ProblemFeature` с полем `source`) связи не попадут никуда, если саму
+# through-модель не выгрузить отдельно. На чистой базе это выглядит не как
+# ошибка, а как пустой фильтр в каталоге.
+#
+# Ровно так 44 992 связи задача↔особенность и жили вне дампа с момента
+# слияния обогащения v2, пока это не нашли на репетиции заливки.
+
+
+def _m2m_through_holes(dumped):
+    u"""Возвращает M2M-поля выгруженных моделей, чья through-модель в дамп
+    не попала (значит, связи потеряются молча)."""
+    problem_model = apps.get_model('problems', 'Problem')
+    stripped = {problem_model: set(dfd.BANK_ONLY_PROBLEM_STRIP)}
+    holes = []
+    for model in sorted(dumped, key=lambda m: m.__name__):
+        skip = stripped.get(model, set())
+        for field in model._meta.get_fields():
+            if not getattr(field, 'concrete', False):
+                continue
+            if not getattr(field, 'many_to_many', False):
+                continue
+            if field.name in skip:
+                continue
+            through = field.remote_field.through
+            if through._meta.auto_created:
+                continue          # связи уедут внутри самого объекта
+            if through in dumped:
+                continue          # through выгружается отдельной моделью
+            holes.append('%s.%s (through %s)'
+                         % (model.__name__, field.name, through.__name__))
+    return holes
+
+
+def _misc_order_problems(labels):
+    u"""Список `labels` пишется в ОДИН файл и грузится подряд, поэтому
+    ссылающаяся модель не может стоять раньше той, на кого она ссылается.
+    Проверка общая — не список пар руками, а обход настоящих FK."""
+    order = {}
+    models = []
+    for i, label in enumerate(labels):
+        try:
+            model = apps.get_model(*label.split('.'))
+        except LookupError:
+            continue
+        order[model] = i
+        models.append(model)
+    wrong = []
+    for model in models:
+        for field in model._meta.get_fields():
+            if not getattr(field, 'concrete', False):
+                continue
+            if not (getattr(field, 'many_to_one', False)
+                    or getattr(field, 'one_to_one', False)):
+                continue
+            target = field.related_model
+            if target is None or target is model:
+                continue
+            if target not in order:
+                continue          # грузится более ранним файлом — не наше дело
+            if order[target] > order[model]:
+                wrong.append('%s обязан идти РАНЬШЕ %s (ссылка .%s)'
+                             % (target.__name__, model.__name__, field.name))
+    return wrong
+
+
+class M2MThroughIsDumpedTests(SimpleTestCase):
+
+    def test_full_dump_keeps_links_of_m2m_with_own_through_model(self):
+        holes = _m2m_through_holes(dumped_models())
+        self.assertEqual(
+            holes, [],
+            u'У M2M со своей through-моделью связи в дамп не попадут: '
+            u'сериализатор их не пишет, а сама through-модель не выгружается. '
+            u'Ошибки не будет — связи просто исчезнут:\n  '
+            + '\n  '.join(holes))
+
+    def test_bank_only_keeps_links_of_m2m_with_own_through_model(self):
+        holes = _m2m_through_holes(bank_only_dumped_models())
+        self.assertEqual(
+            holes, [],
+            u'То же для --bank-only:\n  ' + '\n  '.join(holes))
+
+
+class MiscFileOrderTests(SimpleTestCase):
+    u"""Общая проверка порядка внутри одного файла 40_misc.json —
+    в дополнение к списку пар, записанному вручную выше."""
+
+    def test_misc_lists_are_ordered_by_dependency(self):
+        wrong = (_misc_order_problems(dfd.TIER4_MISC)
+                 + _misc_order_problems(dfd.BANK_ONLY_MISC))
+        self.assertEqual(wrong, [], '\n  '.join(wrong))

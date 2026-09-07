@@ -7,6 +7,7 @@
 уходить ни одного обращения к API, а верхние границы массивов (1–5 тегов,
 ровно 8 запросов...) проверяются в Python, а не схемой.
 """
+import ast
 import io
 import json
 import re
@@ -1544,6 +1545,60 @@ _REMOVED_FEATURE_SCAN_ROOTS = (
 )
 
 
+# ⚠️ СКАНИРУЕМ КОД, А НЕ ТЕКСТ ФАЙЛА, И ЭТО ПРИНЦИПИАЛЬНО.
+# Прежняя версия искала подстроку во всём файле целиком и ловила сама себя:
+# `problems/enrich/features.py` в первом же абзаце ОБЪЯСНЯЕТ, что «Реальные
+# данные» и «Нестандартный поворот» убраны, — и сторож краснел на фразе,
+# которая как раз подтверждает, что особенностей нет. Сторож при этом не
+# ослаблен: убранная особенность может жить в коде только как строковый
+# литерал (элемент FEATURES_1, значение enum, ключ словаря) или как имя
+# (переменная, поле, функция), и проверяются именно они. Пояснительная проза —
+# комментарии и docstring — кодом не является и в проверку не входит.
+
+
+def _identifiers(tree):
+    """Все имена, объявленные или использованные в модуле."""
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Name):
+            yield node.id
+        elif isinstance(node, ast.Attribute):
+            yield node.attr
+        elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef,
+                               ast.ClassDef)):
+            yield node.name
+        elif isinstance(node, ast.arg):
+            yield node.arg
+        elif isinstance(node, ast.keyword) and node.arg:
+            yield node.arg
+
+
+def _code_strings(tree):
+    """Строковые литералы модуля, КРОМЕ docstring'ов."""
+    docstrings = set()
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.Module, ast.ClassDef, ast.FunctionDef,
+                                 ast.AsyncFunctionDef)):
+            continue
+        first = node.body[0] if node.body else None
+        if (isinstance(first, ast.Expr)
+                and isinstance(first.value, ast.Constant)
+                and isinstance(first.value.value, str)):
+            docstrings.add(id(first.value))
+    for node in ast.walk(tree):
+        if (isinstance(node, ast.Constant)
+                and isinstance(node.value, str)
+                and id(node) not in docstrings):
+            yield node.value
+
+
+def _removed_feature_hits_in_source(source):
+    """Следы убранных особенностей в ЗНАЧЕНИЯХ и ИМЕНАХ исходника."""
+    tree = ast.parse(source)
+    haystack = list(_code_strings(tree)) + list(_identifiers(tree))
+    return sorted({needle for needle in _REMOVED_FEATURE_NEEDLES
+                   for chunk in haystack if needle in chunk})
+
+
 def _scan_removed_feature_hits():
     hits = []
     for root in _REMOVED_FEATURE_SCAN_ROOTS:
@@ -1551,16 +1606,42 @@ def _scan_removed_feature_hits():
             p for p in root.rglob('*.py') if '__pycache__' not in p.parts)
         for path in paths:
             source = path.read_text(encoding='utf-8')
-            for needle in _REMOVED_FEATURE_NEEDLES:
-                if needle in source:
-                    hits.append((str(path), needle))
+            for needle in _removed_feature_hits_in_source(source):
+                hits.append((str(path), needle))
     return hits
 
 
 class RemovedFeaturesTests(TestCase):
-    """Зубастость: временно верни 'реальные_данные' в FEATURES_1 — этот
-    тест обязан покраснеть (проверено вручную, не автоматизировано здесь,
-    т.к. правит исходник на диске)."""
+    """Зубастость сторожа проверяется здесь же, а не «вручную»:
+    `test_сторож_краснеет_на_возвращённой_особенности` подсовывает сканеру
+    исходник с вернувшейся особенностью и требует, чтобы он её нашёл."""
+
+    def test_сторож_краснеет_на_возвращённой_особенности(self):
+        """Убранная особенность в КОДЕ обязана находиться — во всех видах,
+        какими она может вернуться."""
+        для_каждого = [
+            "FEATURES_1 = ('реальные_данные', 'параметры')",
+            "SCHEMA = {'enum': ['нестандартный_поворот']}",
+            "LABELS = {'реальные_данные': 'Реальные данные'}",
+            "реальные_данные = True",
+            "def нестандартный_поворот(x):\n    return x",
+        ]
+        for source in для_каждого:
+            with self.subTest(source=source):
+                self.assertNotEqual(
+                    [], _removed_feature_hits_in_source(source),
+                    'сторож проспал возвращённую особенность')
+
+    def test_сторож_не_краснеет_на_пояснительной_прозе(self):
+        """Комментарий и docstring, объясняющие, что особенности убраны, —
+        это не возвращение особенности. Именно на них сторож ловил сам себя."""
+        source = (
+            '"""«Реальные данные» и «Нестандартный поворот» убраны '
+            'владельцем 01.09.2026."""\n'
+            '# реальные_данные и нестандартный_поворот больше не считаются\n'
+            "FEATURES_1 = ('параметры',)\n"
+        )
+        self.assertEqual([], _removed_feature_hits_in_source(source))
 
     def test_убранные_особенности_нигде_не_встречаются_в_коде(self):
         hits = _scan_removed_feature_hits()
