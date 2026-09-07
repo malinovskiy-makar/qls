@@ -84,7 +84,7 @@ def match_concepts(raw_values, lookup):
 # ---------------------------------------------------------------------------
 
 def code_features(statement, part_texts, has_figure, parts_count,
-                  has_rubric, has_olympiad_ref):
+                  has_rubric, has_olympiad_ref, has_solution_figure=False):
     """Ключи кодовых особенностей одной задачи.
 
     Считается по данным банка и НЕ зависит от того, обогащалась задача или
@@ -111,6 +111,13 @@ def code_features(statement, part_texts, has_figure, parts_count,
         keys.add('есть_разбалловка')
     if has_olympiad_ref:
         keys.add('с_реальной_олимпиады')
+    # ⚠️ «Графическое решение» спрашивается у модели, но у кода есть ПРЯМОЕ
+    # доказательство — картинка, привязанная к решению. Модель её не видит
+    # вовсе (в вызов 1 картинка решения не подаётся), поэтому итог —
+    # объединение по ИЛИ, а пересечение помечается `both`
+    # (решение владельца 02.09.2026, `text.merge_graphical_solution`).
+    if has_solution_figure:
+        keys.add('графическое_решение')
     return keys
 
 

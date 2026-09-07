@@ -116,6 +116,23 @@ class CodeFeatureTests(TestCase):
                          layout.code_features('Монополист выбирает выпуск',
                                               [], False, 0, False, False))
 
+    def test_графическое_решение_ставится_и_кодом(self):
+        """Картинка у РЕШЕНИЯ — прямое доказательство особенности, которую
+        модель поставить не может: в вызов 1 картинка решения не подаётся
+        (решение владельца 02.09.2026, объединение по ИЛИ)."""
+        self.assertIn('графическое_решение',
+                      layout.code_features('Условие', [], False, 0, False, False,
+                                           has_solution_figure=True))
+        self.assertNotIn('графическое_решение',
+                         layout.code_features('Условие', [], False, 0, False, False))
+
+    def test_модель_и_код_на_графическом_решении_дают_both(self):
+        from problems.enrich import features as feat
+        code = layout.code_features('Условие', [], False, 0, False, False,
+                                    has_solution_figure=True)
+        merged = layout.merge_feature_sources({'графическое_решение'}, code)
+        self.assertEqual(merged['графическое_решение'], feat.BY_BOTH)
+
     def test_олимпиада_только_по_привязке(self):
         """⚠️ Признак выводится из `OlympiadRef`, а не из источника: у
         агрегаторов источник врёт (HANDOFF_OLYMPIADS §2.4)."""

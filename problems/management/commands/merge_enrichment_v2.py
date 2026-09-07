@@ -79,7 +79,8 @@ from problems.enrich.title_rules import classify_and_pick_source
 from problems.management.commands.glm_enrich_run import (
     load_solvehub_check_type_index, normalize_legacy_problem_type)
 from problems.models import (EconConcept, Hint, OlympiadRef, Problem,
-                             ProblemFeature, ProblemPart, Tag, Topic)
+                             ProblemFeature, ProblemFigure, ProblemPart, Tag,
+                             Topic)
 
 PARSED_PATH = Path('reports/enrich_pilot/run2_parsed.jsonl')
 RUN1_PARSED_PATH = Path('reports/enrich_pilot/run_parsed.jsonl')
@@ -656,6 +657,11 @@ class Command(BaseCommand):
             Problem.objects.filter(rubrics__isnull=False)
             .values_list('id', flat=True))
         olympiad_ids = set(OlympiadRef.objects.values_list('problem_id', flat=True))
+        # Картинка, привязанная к РЕШЕНИЮ, — код-доказательство особенности
+        # «Графическое решение»: модель её не видит вовсе.
+        solution_figure_ids = set(
+            ProblemFigure.objects.filter(source_field='solution')
+            .values_list('problem_id', flat=True))
         parts = defaultdict(list)
         for pid, text in ProblemPart.objects.values_list('problem_id', 'statement'):
             parts[pid].append(text)
@@ -666,7 +672,8 @@ class Command(BaseCommand):
                 has_figure=pid in figure_ids,
                 parts_count=len(parts.get(pid) or []),
                 has_rubric=pid in rubric_ids,
-                has_olympiad_ref=pid in olympiad_ids)
+                has_olympiad_ref=pid in olympiad_ids,
+                has_solution_figure=pid in solution_figure_ids)
 
     def plan_code_features(self):
         counter = Counter()
