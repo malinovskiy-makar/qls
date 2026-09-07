@@ -30,6 +30,13 @@ class FieldNameGuardTests(TestCase):
         for поле in FIELDS:
             self.assertEqual(broken_ids(поле), [])
 
+    def test_сторож_смотрит_на_все_четыре_поля(self):
+        """Список полей закреплён отдельно, а не только перебирается ниже:
+        тест, который сам ходит по `FIELDS`, при сужении списка стал бы
+        пустым и остался зелёным — то есть перестал быть тестом."""
+        self.assertEqual(set(FIELDS), {'title_candidate', 'title_source',
+                                       'enrichment_source', 'text_quality'})
+
     def test_сторож_ловит_имя_поля_в_каждом_из_четырёх_полей(self):
         """Тест обязан краснеть, пока баг в базе. Проверяется по одному полю
         за раз: сторож, который смотрит только на `title_candidate`, пропустил
