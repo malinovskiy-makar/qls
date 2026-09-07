@@ -208,17 +208,37 @@ def run(profile, user_text, schema, user, max_tokens=None,
 
 
 def _cost(model, reply):
-    """Деньги за обращение с учётом кэша префикса."""
+    """Деньги за обращение с учётом кэша префикса.
+
+    ⚠️ ЭТО ОЦЕНКА, А НЕ СЧЁТ. Считается по нашей таблице цен и нашему
+    пониманию того, что поставщик тарифицирует. Сверить с реальным
+    списанием обязательно на пилоте: расхождение здесь означает, что
+    смета всего прогона обогащения посчитана неверно.
+
+    Цена в таблице — кортеж из ТРЁХ чисел (вход, кэш, выход) за миллион
+    токенов. Кортеж из ДВУХ (вход, выход) продолжает работать: цена кэша
+    выводится из цены входа старым множителем. Для `claude-haiku-4-5`
+    обе записи дают одно и то же число — (1.0, 5.0) и (1.0, 0.1, 5.0)
+    совпадают, потому что 1.0 × 0.1 = 0.1.
+
+    Токены рассуждения отдельно НЕ прибавляются: они уже сидят внутри
+    `output_tokens` (см. Reply в providers.py) и посчитались бы дважды.
+    """
     prices = _setting('AI_PRICES', DEFAULT_PRICES)
-    price_in, price_out = prices.get(model, DEFAULT_PRICES[DEFAULT_MODEL])
+    row = prices.get(model, DEFAULT_PRICES[DEFAULT_MODEL])
+    if len(row) == 3:
+        price_in, price_cache, price_out = row
+        price_cache = Decimal(str(price_cache))
+    else:
+        price_in, price_out = row
+        price_cache = Decimal(str(price_in)) * CACHE_READ_MULTIPLIER
     price_in = Decimal(str(price_in))
     price_out = Decimal(str(price_out))
     total = (Decimal(reply.input_tokens) * price_in
              + Decimal(reply.output_tokens) * price_out
              + Decimal(reply.cache_write_tokens) * price_in
              * CACHE_WRITE_MULTIPLIER
-             + Decimal(reply.cache_read_tokens) * price_in
-             * CACHE_READ_MULTIPLIER)
+             + Decimal(reply.cache_read_tokens) * price_cache)
     return (total / Decimal(10 ** 6)).quantize(Decimal('0.000001'))
 
 
@@ -239,6 +259,7 @@ def _log(user, profile, provider_name, model, reply, seconds, ok=True,
         'output_tokens': reply.output_tokens,
         'cache_write_tokens': reply.cache_write_tokens,
         'cache_read_tokens': reply.cache_read_tokens,
+        'reasoning_tokens': getattr(reply, 'reasoning_tokens', 0),
         'cost_usd': float(cost),
         'model': model,
         'provider': provider_name,
@@ -255,6 +276,7 @@ def _log(user, profile, provider_name, model, reply, seconds, ok=True,
             output_tokens=reply.output_tokens,
             cache_write_tokens=reply.cache_write_tokens,
             cache_read_tokens=reply.cache_read_tokens,
+            reasoning_tokens=getattr(reply, 'reasoning_tokens', 0),
             provider=provider_name, seconds=round(seconds, 2),
             cost_usd=cost, ok=ok, note=note)
     except Exception:

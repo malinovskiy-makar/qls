@@ -14,14 +14,23 @@
 
 --apply сначала снимает все флаги, затем ставит заново по свежему аудиту —
 повторный запуск идемпотентен.
+
+⚠️ `--sources 14,13,3,16` ограничивает прогон источниками. Это НЕ удобство,
+а предохранитель. Без ограничения `--apply` СНАЧАЛА СНИМАЕТ флаг со ВСЕХ
+задач банка и только потом ставит заново по свежему аудиту. Если прогон
+задуман точечным («разобрались с четырьмя источниками, применяем»), то без
+`--sources` он молча раскроет брак во всех остальных: снял со всех, поставил
+только тем, кого посчитал. С `--sources` и снятие, и установка, и
+`solution_needs_review` идут ТОЛЬКО внутри области; чужие флаги не двигаются
+ни в какую сторону. То же ограничение действует и на `--revert`.
 """
 
 import os
 from collections import defaultdict
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
-from problems.models import Problem, Source
+from problems.models import Problem, Source, SourceReference
 from problems.management.commands.audit_render_quality import audit_problem
 
 REPORT_DIR = 'reports/quality_audit'
@@ -42,13 +51,89 @@ class Command(BaseCommand):
         parser.add_argument('--apply', action='store_true')
         parser.add_argument('--revert', action='store_true')
         parser.add_argument('--list', action='store_true', dest='list_flagged')
+        parser.add_argument(
+            '--sources', default='',
+            help='ограничить прогон источниками (id через запятую). '
+                 'Задачи ДРУГИХ источников не проверяются и их флаги не '
+                 'меняются — ни снятием, ни установкой.')
+
+    @staticmethod
+    def _scope(raw):
+        """`--sources 14,13` → множество id задач этих источников.
+
+        Возвращает `None`, если ограничения нет: это отличается от пустого
+        множества, у которого смысл «ни одной задачи»."""
+        raw = (raw or '').strip()
+        if not raw:
+            return None
+        try:
+            source_ids = [int(part) for part in raw.split(',') if part.strip()]
+        except ValueError:
+            raise CommandError('--sources: ожидаются id через запятую, '
+                               'получено %r' % raw)
+        if not source_ids:
+            raise CommandError('--sources: пустой список')
+        known = set(Source.objects.filter(id__in=source_ids)
+                    .values_list('id', flat=True))
+        missing = sorted(set(source_ids) - known)
+        if missing:
+            raise CommandError('--sources: нет таких источников: %s'
+                               % ', '.join(map(str, missing)))
+        return set(
+            SourceReference.objects.filter(source_id__in=source_ids)
+            .values_list('problem_id', flat=True))
+
+    @staticmethod
+    def _scoped(queryset, scope_ids):
+        """Сузить выборку до области, если она задана."""
+        return queryset if scope_ids is None else queryset.filter(id__in=scope_ids)
+
+    @staticmethod
+    def _false_positives():
+        r"""Задачи, которые детектор считает браком, а человек — нет.
+
+        Формат файла тот же, что у остальных списков: `id<TAB>причина`,
+        строки с `#` пропускаются.
+
+        Зачем отдельный список, а не правка детектора. Живой случай —
+        `unpaired_dollar` на суммах в долларах: «Правительство заплатило
+        $2 в виде трансфертов» (#26724), «привязка к доллару: $35 могли
+        быть обменены на унцию» (#29691). Непарный `$` здесь ДЕНЬГИ, а не
+        обрывок формулы, и на экране всё в порядке — закрывающего `$` нет,
+        поэтому KaTeX не превращает фразу в математику.
+
+        Сузить сам детектор («`$` перед цифрой — валюта») было бы
+        соблазнительно, но замер по ВСЕМУ банку говорит не делать этого
+        мимоходом: нечётный `$` у 163 задач, под правило «валюта» попали
+        бы 46, и **41 из них — в источниках вне текущей работы**. Менять
+        приговор сорока одной чужой карточке заодно нельзя; это отдельное
+        решение с отдельным просмотром. Поимённый список — честная
+        середина: он чинит ровно то, что человек посмотрел, и оставляет
+        детектор в покое.
+        """
+        path = os.path.join(REPORT_DIR, 'gate_false_positive_ids.txt')
+        if not os.path.exists(path):
+            return set()
+        ids = set()
+        with open(path, encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if line and not line.startswith('#'):
+                    ids.add(int(line.split('\t')[0]))
+        return ids
 
     def handle(self, *args, **options):
+        scope_ids = self._scope(options['sources'])
+        if scope_ids is not None:
+            self.stdout.write(
+                'Область ограничена: %d задач из источников %s.'
+                % (len(scope_ids), options['sources']))
+
         if options['revert']:
-            n = Problem.objects.filter(needs_quality_review=True) \
-                               .update(needs_quality_review=False)
-            n2 = Problem.objects.filter(solution_needs_review=True) \
-                                .update(solution_needs_review=False)
+            n = self._scoped(Problem.objects.filter(needs_quality_review=True),
+                             scope_ids).update(needs_quality_review=False)
+            n2 = self._scoped(Problem.objects.filter(solution_needs_review=True),
+                              scope_ids).update(solution_needs_review=False)
             self.stdout.write(self.style.SUCCESS(
                 f'Флаги сняты: {n} задач (+ solution_needs_review: {n2}).'))
             return
@@ -78,8 +163,8 @@ class Command(BaseCommand):
         src_total = defaultdict(int)            # sid -> всего задач
         candidates = defaultdict(list)          # sid -> [(id, types, fragment)]
         solution_review_ids = []
-        qs = Problem.objects.all().order_by('id') \
-                    .prefetch_related('parts', 'source_references')
+        qs = self._scoped(Problem.objects.all(), scope_ids).order_by('id') \
+                 .prefetch_related('parts', 'source_references')
         done = 0
         for problem in qs.iterator(chunk_size=300):
             done += 1
@@ -166,7 +251,15 @@ class Command(BaseCommand):
                       # вопросы без условия (G14) — оба уже через 5%-предохранитель
                       # внутри detect_missing_refs.
                       'missing_figure_ids.txt',
-                      'no_premise_ids.txt'):
+                      'no_premise_ids.txt',
+                      # сессия 2026-08-30: 19 кодов читаемости из аудита
+                      # 3 000 карточек — потерянные рисунки, неполные
+                      # карточки, сырой служебный синтаксис, утечка
+                      # решения в условие. Список пишет
+                      # `manage.py corpus_render_codes` (только P0 и P1:
+                      # P2 — косметика, и TABLE/OVER-M из неё уже сняты
+                      # правкой шаблона). Регенерация — той же командой.
+                      'render_codes_ids.txt'):
             path = os.path.join(REPORT_DIR, fname)
             if not os.path.exists(path):
                 continue
@@ -223,17 +316,36 @@ class Command(BaseCommand):
                 if ln and not ln.startswith('#'):
                     solution_review_ids.append(int(ln.split('\t')[0]))
 
+        # ── подтверждённые человеком ложные срабатывания ──
+        false_positives = self._false_positives()
+        if false_positives:
+            before = len(set(flag_ids) | set(detector_ids))
+            flag_ids = [i for i in flag_ids if i not in false_positives]
+            detector_ids = [i for i in detector_ids if i not in false_positives]
+            solution_review_ids = [i for i in solution_review_ids
+                                   if i not in false_positives]
+            after = len(set(flag_ids) | set(detector_ids))
+            report_lines.append(
+                '- снято по списку ложных срабатываний: %d' % (before - after))
+            self.stdout.write(
+                'ложные срабатывания (проверены человеком): не флагуем %d'
+                % (before - after))
+
         # ── применяем: сброс + установка ──
-        Problem.objects.filter(needs_quality_review=True) \
-                       .update(needs_quality_review=False)
-        Problem.objects.filter(id__in=flag_ids + detector_ids) \
-                       .update(needs_quality_review=True)
-        Problem.objects.filter(solution_needs_review=True) \
-                       .update(solution_needs_review=False)
+        # ⚠️ При `--sources` И СБРОС, И УСТАНОВКА идут только внутри области.
+        # Сброс опаснее установки: без ограничения он снял бы флаг со ВСЕХ
+        # задач банка, а поставил бы обратно только по свежему аудиту —
+        # то есть «точечный» прогон молча раскрыл бы чужой брак.
+        self._scoped(Problem.objects.filter(needs_quality_review=True),
+                     scope_ids).update(needs_quality_review=False)
+        self._scoped(Problem.objects.filter(id__in=flag_ids + detector_ids),
+                     scope_ids).update(needs_quality_review=True)
+        self._scoped(Problem.objects.filter(solution_needs_review=True),
+                     scope_ids).update(solution_needs_review=False)
         # кнопку решения прячем только там, где решение вообще есть
-        n_solrev = Problem.objects.filter(id__in=solution_review_ids) \
-                                  .exclude(solution='') \
-                                  .update(solution_needs_review=True)
+        n_solrev = self._scoped(
+            Problem.objects.filter(id__in=solution_review_ids), scope_ids
+        ).exclude(solution='').update(solution_needs_review=True)
         report_lines.append(f'- solution_needs_review (кнопка решения скрыта): '
                             f'{n_solrev}')
 

@@ -1,5 +1,6 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-09-07 (сессия D1: площадка dev.weconomics.ai — Claude Code)
+> **Обновлён:** 2026-09-08 (ночная сессия: обогащение v2 слито в main,
+> раскладка в боевой банк — Claude Code)
 > **Статус:** актуален
 
 # CLAUDE.md — точка входа
@@ -206,6 +207,8 @@ calc2_map                         # пересобрать docs/calc2/CALC2_MAP.
 search_eval                       # измеритель поиска на эталонных наборах A/B/C (docs/EMBEDDINGS.md)
 human_review_mark [--apply/--revert]     # approved/defect по вердиктам ReviewVerdict
 pending_review_gate [--apply/--revert]   # скрыть непроверенное из каталога
+content_cleanup [--apply --allow-delete] # состояние текста: мусор удалить,
+                                         # битое скрыть (--revert обратимо)
 build_topic_map [--check]                # справочник карты /catalog/map/ (базу НЕ трогает)
 assign_topics_from_source --source solvehub   # темы из разметки источника
 assign_topics_by_model --dry-run              # темы моделью: смета и Batch API
@@ -393,10 +396,18 @@ Claude Code)** · [Notion-штаб](https://app.notion.com/p/39ab11c92bc181f7bbe
 `Problem.human_review` (`approved` / `defect` / пусто), `Problem.hidden_pending_review`
 (булево), категория `fixed_wrong`, `ReviewVerdict.quotes`.
 
-Три РАЗНЫХ механизма скрытия, не путать: `status='hidden'` — убрано руками;
-`needs_quality_review` — скрыто как ПЛОХОЕ (детекторы качества); `hidden_pending_review`
-— скрыто, потому что человек ЕЩЁ НЕ СМОТРЕЛ (это не оценка качества). Счётчик
-каталога после применения шлюза: **18 865 → 5 090** видимых.
+**ЧЕТЫРЕ РАЗНЫХ механизма скрытия, не путать:** `status='hidden'` — убрано
+руками; `needs_quality_review` — скрыто как ПЛОХОЕ (детекторы качества);
+`hidden_pending_review` — скрыто, потому что человек ЕЩЁ НЕ СМОТРЕЛ (это не
+оценка качества); `content_status` — скрыто, потому что ТЕКСТ битый и его
+надо доработать ([ADR 0092](docs/adr/0092-content-status-separate-from-hidden.md),
+заведено 03.09.2026). Счётчик каталога после применения шлюза:
+**18 865 → 5 090** видимых.
+
+⚠️ Общей функции «видимая задача» в проекте нет — четвёрка признаков
+повторяется по месту в 16 запросах. Пятый признак заводить нельзя, пока
+четыре не сведены в одну функцию. Подробности и числа чистки —
+[docs/DATA.md](docs/DATA.md).
 
 Правило старшинства: **брак сильнее идеального** — одобрить сломанное хуже,
 чем задержать хорошее. Исключение — **`SUPERSEDES`**: повторное ревью (например,
@@ -406,6 +417,8 @@ Claude Code)** · [Notion-штаб](https://app.notion.com/p/39ab11c92bc181f7bbe
 ```bash
 human_review_mark [--apply|--revert]     # approved/defect по вердиктам ReviewVerdict
 pending_review_gate [--apply|--revert]   # скрыть непроверенное (обратимо)
+content_cleanup [--apply --allow-delete] # состояние текста задачи (обратимо,
+                                         # кроме удаления — см. выгрузку)
 publication_holes_check                  # только читает — дыры в одобренных
 defect_review_export                     # пакет разбора дефектов для ревьюера
 import_review_verdicts <file>            # понимает форматы вердиктов v1–v3

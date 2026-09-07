@@ -41,6 +41,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_GET, require_POST, require_safe
 
 from problems.jsonsafe import dumps_for_script
+from problems.models import Problem
 from problems.management.commands.apply_topic_mapping import CANONICAL
 from . import sources as game_sources
 from .sources import GROUP_KEYS
@@ -126,6 +127,13 @@ def _pool_qs():
         qs = qs.exclude(question_type=FIGURE_AUDIT)
     if not getattr(settings, 'GAME_GENERATED_ENABLED', False):
         qs = qs.filter(Q(is_generated=False) | Q(question_type=FIGURE_AUDIT))
+    # Состояние текста задачи-источника (чистка корпуса 03.09.2026). Пул —
+    # КЭШ: он пересобирается командой build_game_pool, и между пересборками
+    # содержит вопросы по задачам, чей текст с тех пор признали битым.
+    # Фильтр стоит и здесь, и на сборке: у сгенерированных вопросов задачи
+    # нет вовсе (problem is NULL), и их exclude не задевает.
+    qs = qs.exclude(problem__content_status__in=(
+        Problem.ContentStatus.NEEDS_FIX, Problem.ContentStatus.JUNK))
     return qs
 
 

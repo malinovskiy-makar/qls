@@ -36,7 +36,17 @@
 разметку рисует общий `work/_sheet_js.html`, и её видят два экрана.
 Здесь остаётся только бумага, на которой лист лежит.
 {% endcomment %}
-.wk-paper :is(table, .katex-display) { overflow-x: auto; }
+{% comment %}
+⚠️ Формуле и таблице нужны РАЗНЫЕ правила, и общее `:is(...)` для таблицы
+не делает ничего: у бокса `display: table` вычисленный `overflow-x`
+остаётся `visible` (проверено в браузере 30.08). Таблицу переводим в
+блок — внутренняя раскладка сохраняется, браузер строит анонимный
+табличный бокс. Так же исправлено в `_kit.html` у `.wk-full` и
+`.sheet-task`.
+{% endcomment %}
+.wk-paper .katex-display { overflow-x: auto; overflow-y: hidden; }
+.wk-paper table { display: block; width: fit-content; max-width: 100%;
+                  overflow-x: auto; }
 .wk-note { font-size: 13px; color: var(--text3); margin-top: 10px; }
 @media (max-width: 900px) {
   .wk-give { grid-template-columns: minmax(0,1fr); }

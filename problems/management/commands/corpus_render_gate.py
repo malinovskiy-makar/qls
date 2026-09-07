@@ -15,29 +15,33 @@ READ-ONLY от начала до конца: ни один `Problem`/`ProblemPar
   источников. Даёт PASS/FAIL по новому шлюзу и явную разницу: сколько
   из старых PASS стали FAIL.
 
-⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE` выставляется здесь осознанно:
-синхронный playwright поднимает event loop, после чего Django
-запрещает ORM. Доступ к базе тут только на чтение и в один поток —
-ровно случай, для которого этот флаг и существует.
+⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE` выставляется на время работы с
+`KatexPreflight` (см. `async_unsafe_for_playwright` в
+katex_preflight.py) осознанно: синхронный playwright поднимает event
+loop, после чего Django запрещает ORM. Доступ к базе тут только на
+чтение и в один поток — ровно случай, для которого этот флаг и
+существует. Ставить его на уровне модуля НЕЛЬЗЯ: Django импортирует
+модули команд при автопоиске, и флаг утекал бы в процесс от одного
+факта импорта.
 """
 import json
 import os
 import time
 
-os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', '1')
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
-from django.conf import settings  # noqa: E402
-from django.core.management.base import BaseCommand, CommandError  # noqa: E402
-
-from problems.corpus_converter.core import may_render_as_markdown  # noqa: E402
-from problems.corpus_converter.katex_preflight import KatexPreflight  # noqa: E402
-from problems.corpus_converter.preflight_gate import (  # noqa: E402
+from problems.corpus_converter.core import may_render_as_markdown
+from problems.corpus_converter.katex_preflight import (
+    KatexPreflight, async_unsafe_for_playwright,
+)
+from problems.corpus_converter.preflight_gate import (
     build_blocks, convert_problem_v2, render_preflight_v2,
 )
-from problems.corpus_converter.reshalki_dollar_exclusions import (  # noqa: E402
+from problems.corpus_converter.reshalki_dollar_exclusions import (
     FORCED_EXCLUDE_RESHALKI_DOLLAR_SPLIT,
 )
-from problems.models import Problem, ProblemFigure, ProblemPart  # noqa: E402
+from problems.models import Problem, ProblemFigure, ProblemPart
 
 SOURCES = {
     'archive3': (14, 'Overleaf Archive 3 (ОШ/ЛШ Олмат)'),
@@ -143,7 +147,7 @@ class Command(BaseCommand):
         parts_before = ProblemPart.objects.count()
         started = time.time()
 
-        with KatexPreflight() as checker:
+        with async_unsafe_for_playwright(), KatexPreflight() as checker:
             if options['fixtures']:
                 self._run_fixtures(checker)
             else:

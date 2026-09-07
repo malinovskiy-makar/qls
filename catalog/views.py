@@ -186,6 +186,7 @@ def home(request):
         status=Problem.Status.PUBLISHED,
         needs_quality_review=False,
         hidden_pending_review=False,
+        content_status=Problem.ContentStatus.OK,
     )
     context = {
         # Живое число — оно и верное, и проверяемое ссылкой «Каталог задач».
@@ -381,7 +382,8 @@ def _numeric_query(query):
     found_id = (Problem.objects
                 .filter(pk=int(query), status=Problem.Status.PUBLISHED,
                         needs_quality_review=False,
-                        hidden_pending_review=False)
+                        hidden_pending_review=False,
+                        content_status=Problem.ContentStatus.OK)
                 .values_list('pk', flat=True).first())
     return found_id, ('' if found_id else query)
 
@@ -693,7 +695,8 @@ def _similar_cards(problem):
     """Похожие — из кэша M2M, без задач за шлюзами, до четырёх (сетка 2×2)."""
     rows = (problem.similar_problems
             .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                    hidden_pending_review=False)
+                    hidden_pending_review=False,
+                    content_status=Problem.ContentStatus.OK)
             .prefetch_related('topics')[:4])
     cards = []
     for s in rows:
@@ -756,7 +759,8 @@ def _json_body(request):
 
 def _visible_problem(pk):
     return get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
-                             needs_quality_review=False, hidden_pending_review=False)
+                             needs_quality_review=False, hidden_pending_review=False,
+                             content_status=Problem.ContentStatus.OK)
 
 
 def _test_game_or_400(problem_id):
@@ -980,7 +984,7 @@ def problem_detail(request, pk):
     """
     problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
                                 needs_quality_review=False,
-                                hidden_pending_review=False)
+                                hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
 
     # Учебное событие: задачу открыли. Запись неблокирующая — см.
     # problems/event_log.py (её падение не должно ронять страницу).
@@ -1126,7 +1130,7 @@ def collection_detail(request, token):
     # Каталог с теми же фильтрами что в problem_list (+ оба шлюза)
     qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
                                 needs_quality_review=False,
-                                hidden_pending_review=False)
+                                hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
     f_q      = request.GET.get('q', '').strip()
     f_topic  = request.GET.get('topic', '').strip()
     f_diff   = request.GET.get('difficulty', '').strip()
@@ -1151,7 +1155,7 @@ def collection_detail(request, token):
     order_map = {pid: i for i, pid in enumerate(collection.problem_order)}
     coll_problems = sorted(
         collection.problems.filter(needs_quality_review=False,
-                                   hidden_pending_review=False)
+                                   hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
         .prefetch_related('topics'),
         key=lambda p: order_map.get(p.pk, 9999),
     )
@@ -1259,7 +1263,7 @@ def collection_export(request, token):
     order_map = {pid: i for i, pid in enumerate(collection.problem_order)}
     problems  = sorted(
         collection.problems.filter(needs_quality_review=False,
-                                   hidden_pending_review=False)
+                                   hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
         .prefetch_related('topics'),
         key=lambda p: order_map.get(p.pk, 9999),
     )
@@ -1316,7 +1320,7 @@ def catalog_api_problem(request, pk):
             .prefetch_related('topics', 'parts', 'source_references__source')
             .get(pk=pk, status=Problem.Status.PUBLISHED,
                  needs_quality_review=False,
-                 hidden_pending_review=False)
+                 hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
         )
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
@@ -1516,7 +1520,8 @@ def api_tags(request):
 
     visible = Q(problems__status=Problem.Status.PUBLISHED,
                 problems__needs_quality_review=False,
-                problems__hidden_pending_review=False)
+                problems__hidden_pending_review=False,
+                problems__content_status=Problem.ContentStatus.OK)
 
     # Режим «теги темы» (`?topic=<id>`): все теги видимых задач этой темы
     # с числами, по убыванию, без нулей и без ограничения длины — окно

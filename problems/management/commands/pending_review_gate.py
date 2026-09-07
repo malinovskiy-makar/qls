@@ -30,7 +30,7 @@ import os
 from django.core.management.base import BaseCommand, CommandError
 from django.db.models import Q
 
-from problems.models import Problem
+from problems.models import Problem, Source, SourceReference
 
 OUT_DIR = os.path.join('reports', 'publication_check')
 HIDDEN_LIST = os.path.join(OUT_DIR, 'hidden_pending_ids.txt')
@@ -55,6 +55,73 @@ class Command(BaseCommand):
                             help='записать в базу')
         parser.add_argument('--revert', action='store_true',
                             help='снять признак у всех задач')
+        parser.add_argument(
+            '--sources', default='',
+            help='ограничить откат источниками (id через запятую). Задачи '
+                 'других источников не трогаются вовсе.')
+        parser.add_argument(
+            '--exclude-ids-file', default='',
+            help='файл с id, которые НЕ раскрывать (формат id<TAB>причина). '
+                 'Для карточек, про которые решение ещё не принято.')
+        parser.add_argument(
+            '--only-publishable', action='store_true',
+            help='снимать признак только у published без флага брака — '
+                 'то есть ровно у тех, кто от этого станет виден.')
+
+    @staticmethod
+    def _limit(queryset, opts, say):
+        r"""Сузить откат до источников и вычесть явно исключённые id.
+
+        ⚠️ Без `--sources` откат снимает признак у ВСЕХ задач банка. Это
+        и задумано как «шлюз ручного ревью выключили целиком», но для
+        частичной раскатки — «разобрали три источника, открываем их» —
+        это слишком широко: заодно открылись бы все прочие, которых
+        человек не смотрел.
+
+        `--exclude-ids-file` нужен для карточек, про которые решение ещё
+        НЕ принято (например, сомнительные после разбора заглушек).
+        Оставить их скрытыми дешевле, чем показать непонятное."""
+        raw = (opts.get('sources') or '').strip()
+        if raw:
+            try:
+                source_ids = [int(p) for p in raw.split(',') if p.strip()]
+            except ValueError:
+                raise CommandError('--sources: ожидаются id через запятую')
+            known = set(Source.objects.filter(id__in=source_ids)
+                        .values_list('id', flat=True))
+            missing = sorted(set(source_ids) - known)
+            if missing:
+                raise CommandError('--sources: нет таких источников: %s'
+                                   % ', '.join(map(str, missing)))
+            scope = SourceReference.objects.filter(
+                source_id__in=source_ids).values_list('problem_id', flat=True)
+            queryset = queryset.filter(id__in=scope)
+            say('Область ограничена источниками: {}'.format(raw))
+
+        if opts.get('only_publishable'):
+            # ⚠️ Черновику признак снимать НЕЛЬЗЯ. Докстринг команды говорит
+            # прямо: признак стоит и у черновиков затем, чтобы публикация
+            # задачи потом не вернула её в каталог непроверенной. Снять его
+            # сейчас — значит объявить просмотренным то, что никто не видел,
+            # и открыть дыру на будущее.
+            queryset = queryset.filter(status=Problem.Status.PUBLISHED,
+                                       needs_quality_review=False)
+            say('Только те, кто от снятия станет виден '
+                '(published без флага брака)')
+
+        path = (opts.get('exclude_ids_file') or '').strip()
+        if path:
+            if not os.path.isfile(path):
+                raise CommandError('нет файла исключений: %s' % path)
+            excluded = set()
+            with open(path, encoding='utf-8') as fh:
+                for line in fh:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        excluded.add(int(line.split('\t')[0]))
+            queryset = queryset.exclude(id__in=excluded)
+            say('Исключено по списку: {}'.format(len(excluded)))
+        return queryset
 
     def handle(self, *args, **opts):
         say = self.stdout.write
@@ -64,16 +131,22 @@ class Command(BaseCommand):
         published = Q(status=Problem.Status.PUBLISHED)
 
         if opts['revert']:
-            n = Problem.objects.filter(hidden_pending_review=True).count()
+            qs = Problem.objects.filter(hidden_pending_review=True)
+            qs = self._limit(qs, opts, say)
+            n = qs.count()
             if not opts['apply']:
                 say('ОТКАТ (проба): снял бы признак у {} задач. '
                     'Повторите с --apply.'.format(n))
                 return
-            Problem.objects.filter(hidden_pending_review=True).update(
-                hidden_pending_review=False)
+            ids = list(qs.values_list('id', flat=True))
+            Problem.objects.filter(id__in=ids).update(hidden_pending_review=False)
             say('ОТКАТ: признак снят у {} задач.'.format(n))
             say('⚠️ Задачи, спрятанные шлюзом качества или руками, остались '
                 'спрятанными — их причина другая.')
+            visible = Problem.objects.filter(
+                published, needs_quality_review=False,
+                hidden_pending_review=False).count()
+            say('В каталоге теперь видно: {}'.format(visible))
             return
 
         # ── счёт до ────────────────────────────────────────────────────

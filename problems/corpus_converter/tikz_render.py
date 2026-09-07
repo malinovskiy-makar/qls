@@ -63,10 +63,13 @@ _TEX_TEMPLATE = r"""\documentclass[border=2pt]{standalone}
 \usepackage[utf8]{inputenc}
 \usepackage[T2A]{fontenc}
 \usepackage[russian]{babel}
+\usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{tikz}
 \usepackage{pgfplots}
 \pgfplotsset{compat=1.18}
 \usetikzlibrary{arrows,arrows.meta,positioning,patterns}
+%(preamble)s
 \begin{document}
 %(body)s
 \end{document}
@@ -270,11 +273,19 @@ def toolchain_available():
                for n in ('latex', 'dvisvgm'))
 
 
-def compile_tikz_to_svg(tikz_source, timeout=COMPILE_TIMEOUT_SEC):
+def compile_tikz_to_svg(tikz_source, timeout=COMPILE_TIMEOUT_SEC,
+                        preamble=''):
     """TikZ-блок → санитизированный SVG. Бросает `TikzCompileError`.
 
     Каждая компиляция — в собственном временном каталоге, который
-    удаляется целиком, что бы ни случилось."""
+    удаляется целиком, что бы ни случилось.
+
+    `preamble` — объявления из ИСХОДНОГО проекта (\\tikzset,
+    \\newcommand, \\definecolor). Без них падает всё, что
+    опирается на домашние стили автора: живые отказы — `style=style1`
+    и `\\circled{1}`. Песочница от этого не меняется:
+    `-no-shell-escape` и `-disable-installer` остаются, а преамбула —
+    такой же текст из архива, как и сам блок."""
     if not toolchain_available():
         raise TikzCompileError('latex/dvisvgm не найдены — компиляция невозможна')
 
@@ -282,7 +293,8 @@ def compile_tikz_to_svg(tikz_source, timeout=COMPILE_TIMEOUT_SEC):
     try:
         tex_path = os.path.join(workdir, 'figure.tex')
         with open(tex_path, 'w', encoding='utf-8') as f:
-            f.write(_TEX_TEMPLATE % {'body': tikz_source})
+            f.write(_TEX_TEMPLATE % {'body': tikz_source,
+                                     'preamble': preamble or ''})
 
         try:
             proc = subprocess.run(

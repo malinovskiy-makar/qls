@@ -586,7 +586,8 @@ def _any_problems(rows, limit, kind=None):
     levels = {row['difficulty'] for row in rows if row.get('difficulty')}
     queryset = Problem.objects.filter(status=Problem.Status.PUBLISHED,
                                       needs_quality_review=False,
-                                      hidden_pending_review=False)
+                                      hidden_pending_review=False,
+        content_status=Problem.ContentStatus.OK)
     if kind == 'test':
         queryset = queryset.filter(problem_type__istartswith='тест')
     else:

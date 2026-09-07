@@ -116,9 +116,9 @@ CSP: script-src-elem заблокировал бы https://cdnjs.cloudflare.com/
 
 ```
 docs/adr/0065-olympiads-own-models.md      (main)
-docs/adr/0067-content-status-separate-from-hidden.md
-docs/adr/0068-rerun-call1-only-carry-call2.md
-docs/adr/0069-solution-in-call1-and-glm-effort-high.md   ← занят
+docs/adr/0092-content-status-separate-from-hidden.md
+docs/adr/0093-rerun-call1-only-carry-call2.md
+docs/adr/0094-solution-in-call1-and-glm-effort-high.md   ← занят
 ```
 
 `0069` уже занят на чужой ветке. По правилу промпта («возьми max + 1 по ВСЕМ

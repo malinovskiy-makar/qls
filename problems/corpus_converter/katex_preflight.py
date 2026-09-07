@@ -46,14 +46,18 @@ Node-скрипты рядом (`scripts/katex_render_check.js`) для этог
 
 ⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE`. Синхронный API playwright поднимает
 event loop, и Django после этого запрещает обращения к ORM
-(`SynchronousOnlyOperation`). Вызывающая сторона обязана выставить
-`DJANGO_ALLOW_ASYNC_UNSAFE=1` — здесь это безопасно и ровно для того
-и предназначено: доступ к базе ТОЛЬКО на чтение, один поток, никаких
-async-драйверов. Ставится не здесь, а в вызывающей команде, явно и
-с комментарием — чтобы модуль не трогал глобальное состояние молча.
+(`SynchronousOnlyOperation`). Вызывающая сторона обязана обернуть
+работу с `KatexPreflight` в `async_unsafe_for_playwright()` (ниже) —
+это безопасно и ровно для того и предназначено: доступ к базе ТОЛЬКО
+на чтение, один поток, никаких async-драйверов. Ставить переменную
+на уровне модуля или без восстановления НЕЛЬЗЯ: Django импортирует
+модули команд при автопоиске, и переменная утекала бы в процесс от
+одного факта импорта, роняя `test_check_deploy_is_clean` (`async.E001`)
+в этом же процессе — уже случалось, см. `problems/management/commands/CLAUDE.md`.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import os
 import re
@@ -82,6 +86,44 @@ RAW_TEX_MARKERS = (
 #: слеша, а боевой `fixCurrencyDollars` превращает их в обычные символы.
 _LEFTOVER_TEX_CMD_RE = re.compile(r'\\[A-Za-z]{2,}')
 
+# ---------------------------------------------------------------------------
+# Разметка LaTeX БЕЗ имени команды — общая слепая зона шлюза
+# ---------------------------------------------------------------------------
+#
+# `_LEFTOVER_TEX_CMD_RE` ищет `\слово`, KaTeX судит только формулы. Между
+# ними проваливалось целое семейство разметки, у которой имени команды
+# НЕТ вовсе: `[htpb]` (296 задач), `\\` (174), `~` (187). Каждый раз это
+# находили свипом по корпусу, а не шлюзом — то есть шлюз молча выдавал
+# PASS карточке с мусором на экране. Проверки ниже закрывают дыру.
+#
+# ⚠️ Каждый шаблон сужен по ЖИВЫМ ложным срабатываниям, найденным на
+# корпусе; на каждое стоит отдельный тест. Ошибка в эту сторону дорога:
+# шлюз решает, годится ли карточка к показу, и лишний отказ прячет
+# хорошую задачу.
+
+#: `\\` — принудительный перенос строки. Код `SLASH` реестра.
+_LEFTOVER_BACKSLASH_RE = re.compile(r'\\\\|\\(?![A-Za-z$%&_#{}])')
+
+#: `[htpb]` и родня — необязательный аргумент float-окружения. Только
+#: буквы размещения и только в этом наборе: `[AB]` (отрезок), `[0,1]`
+#: (интервал) и `[2]` (сноска) сюда не попадают.
+_FLOAT_OPTION_RE = re.compile(r'(?<![\w\]])\[[hHtbp!]{1,5}\](?![\w(])')
+
+#: `~` — неразрывный пробел. `~~` не трогаем: это чужая разметка.
+_TILDE_RE = re.compile(r'(?<!~)~(?!~)')
+
+#: Лигатуры и кавычки LaTeX. Строка-разделитель markdown-таблицы
+#: (`| --- | --- |`) исключается ОТДЕЛЬНО, построчно: там `---` —
+#: обязательный синтаксис, без него markdown-it не узнает таблицу.
+_LIGATURE_RE = re.compile(r"(?<![-\s])--(?![-\s])|(?<=\s)---(?=\s)|``|(?<!\w)''")
+
+#: Спецификация колонок `tabular`, доехавшая до экрана: `{|l|c|r|}`,
+#: `{@{}l@{}}`. Обратного слеша в ней нет, поэтому `R-CMD` слеп.
+_COLUMN_SPEC_RE = re.compile(r'\{@\{\}[^{}]*\}|\{\|?[lcrp](?:\|?[lcrp]){1,9}\|?\}')
+
+#: Строка-разделитель markdown-таблицы — законная разметка, не дефект.
+_TABLE_DELIMITER_ROW_RE = re.compile(r'^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$')
+
 #: Строго документированный allowlist для `unicodeTextInMathMode`.
 #: ПУСТ намеренно. Аудит (раздел 3) показал: русский текст в math mode —
 #: это 397 формул в 183 карточках, где `если T≤300` визуально слипается
@@ -89,6 +131,9 @@ _LEFTOVER_TEX_CMD_RE = re.compile(r'\\[A-Za-z]{2,}')
 #: а не разрешение. Заводить сюда символы можно только с обоснованием,
 #: почему конкретно ЭТОТ символ читается верно без `\text{}`.
 UNICODE_TEXT_ALLOWLIST: frozenset[str] = frozenset()
+
+
+from problems.corpus_converter.width_probe import MEASURE_WIDTHS_JS  # noqa: E402
 
 
 def _read_asset(*parts):
@@ -107,10 +152,16 @@ window.__preflight = function (html) {
   box.innerHTML = html;
 
   var DOLLAR_SENTINEL = '';
+  // Пара `\\` (перенос строки) пропускается наравне с `\$`: иначе в
+  // `\\$` второй слеш вместе с `$` читается как экранированный доллар,
+  // формула не закрывается и съедает текст до следующего `$`.
+  // Зеркало _find_close из problems/rendering.py и findClose из
+  // templates/_katex_dollars.html — три реализации обязаны совпадать,
+  // иначе замер перестаёт быть замером боевого показа.
   function findClose(s, from, close) {
     var i = from;
     while (i < s.length) {
-      if (s.charAt(i) === '\\' && s.charAt(i + 1) === '$') { i += 2; continue; }
+      if (s.charAt(i) === '\\' && (s.charAt(i + 1) === '$' || s.charAt(i + 1) === '\\')) { i += 2; continue; }
       if (s.substr(i, close.length) === close) return i;
       i++;
     }
@@ -196,14 +247,35 @@ window.__preflight = function (html) {
 """
 
 
+@contextlib.contextmanager
+def async_unsafe_for_playwright():
+    """Ставит `DJANGO_ALLOW_ASYNC_UNSAFE` на время блока, возвращает
+    окружение ровно как было при выходе (даже при исключении)."""
+    previous = os.environ.get('DJANGO_ALLOW_ASYNC_UNSAFE')
+    os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = '1'
+    try:
+        yield
+    finally:
+        if previous is None:
+            os.environ.pop('DJANGO_ALLOW_ASYNC_UNSAFE', None)
+        else:
+            os.environ['DJANGO_ALLOW_ASYNC_UNSAFE'] = previous
+
+
 def build_sandbox_html():
-    """HTML песочницы: вендорный KaTeX 0.16.9 + измеритель."""
+    """HTML песочницы: вендорный KaTeX 0.16.9 + измеритель.
+
+    Рядом с проверкой разбора живёт измеритель ширины (коды `OVER` и
+    `OVER-M` аудита). Тот же браузер и та же версия KaTeX намеренно:
+    ширина формулы зависит от шрифта, и мерить её в другой песочнице
+    значило бы мерить не то, что видит ученик."""
     css = _read_asset('katex.min.css')
     js = _read_asset('katex.min.js')
     return (
         '<!DOCTYPE html><html><head><meta charset="utf-8">'
         f'<style>{css}</style><script>{js}</script>'
         f'<script>{_MEASURE_JS}</script>'
+        f'<script>{MEASURE_WIDTHS_JS}</script>'
         '</head><body><div id="box"></div></body></html>'
     )
 
@@ -250,6 +322,12 @@ class KatexPreflight:
     def check(self, html):
         """Один HTML-фрагмент → отчёт preflight (см. `summarize`)."""
         return self._page.evaluate('(h) => window.__preflight(h)', html)
+
+    def widths_many(self, htmls):
+        """Список HTML → список списков измеренных ширин формул (px)."""
+        return self._page.evaluate(
+            '(items) => items.map(h => window.__widths(h))', htmls,
+        )
 
     def check_many(self, htmls):
         """Список HTML → список отчётов, одним заходом в браузер.
@@ -324,6 +402,14 @@ def summarize(report):
         details.append('уцелевшие TeX-команды в видимом тексте: '
                        + ', '.join(leftover_commands[:8]))
 
+    # Ссылка на картинку — свой код и свой маршрут: не правка конвертера,
+    # а поиск файла в выгрузке. Раньше тонула в общем `R-CMD` вместе с
+    # `\textwidth`, и 298 задач Школково полгода читались как «сырой
+    # LaTeX» вместо «нет картинки».
+    if '\\includegraphics' in visible or '![' in visible:
+        codes.append('MISS')
+        details.append('ссылка на картинку, для которой нет файла')
+
     raw_found = sorted({m for m in RAW_TEX_MARKERS if m in visible})
     if raw_found:
         code = 'PLOT' if any(
@@ -332,7 +418,39 @@ def summarize(report):
         codes.append(code)
         details.append('сырой LaTeX в видимом тексте: ' + ', '.join(raw_found[:8]))
 
+    _add_nameless_markup_codes(visible, codes, details)
     return (not codes), codes, details
+
+
+def _add_nameless_markup_codes(visible, codes, details):
+    """Коды для разметки БЕЗ имени команды (см. шаблоны выше).
+
+    Строки-разделители markdown-таблиц выбрасываются ПОСТРОЧНО, а не
+    одной заменой по всему тексту: `---` в такой строке — обязательный
+    синтаксис, и правило «дефис-дефис = лигатура» её задело бы."""
+    prose = '\n'.join(
+        line for line in visible.split('\n')
+        if not _TABLE_DELIMITER_ROW_RE.match(line.strip())
+    )
+
+    if _LEFTOVER_BACKSLASH_RE.search(prose):
+        codes.append('SLASH')
+        details.append('служебный обратный слеш в видимом тексте')
+
+    md_hits = []
+    if _FLOAT_OPTION_RE.search(prose):
+        md_hits.append('опция float-окружения ([htpb])')
+    if _TILDE_RE.search(prose):
+        md_hits.append('неразрывный пробел (~)')
+    if _LIGATURE_RE.search(prose):
+        md_hits.append('лигатура/кавычки LaTeX (--, ``…\'\')')
+    if md_hits:
+        codes.append('MD')
+        details.append('сырая разметка в видимом тексте: ' + ', '.join(md_hits))
+
+    if _COLUMN_SPEC_RE.search(prose):
+        codes.append('RTAB')
+        details.append('спецификация колонок tabular в видимом тексте')
 
 
 def _all_allowed(tex):

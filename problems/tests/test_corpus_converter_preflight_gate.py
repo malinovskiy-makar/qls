@@ -121,6 +121,93 @@ class RawTexGateTests(SimpleTestCase):
         self.assertTrue(verdict.ok, verdict.details)
 
 
+class NamelessMarkupGateTests(SimpleTestCase):
+    r"""Разметка LaTeX БЕЗ имени команды — общая слепая зона шлюза.
+
+    `R-CMD` ищет `\слово`, KaTeX судит только формулы. Между ними
+    проваливалось целое семейство: `[htpb]` (296 задач), `\\` (174),
+    `~` (187). Каждый раз это находили свипом по корпусу, а не шлюзом,
+    — то есть шлюз молча выдавал PASS карточке с мусором на экране.
+    Эти проверки закрывают дыру: коды из общего реестра аудита.
+    """
+
+    def test_double_backslash_blocks(self):
+        blocks = [('Условие', 'src', 'группы покупателей.\\\\ Группа A')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('SLASH', verdict.codes)
+
+    def test_float_placement_option_blocks(self):
+        """`[htpb]` — то, что шлюз не ловил и на чём всё началось."""
+        blocks = [('Условие', 'src', '[htpb] Рисунок 1 показывает')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('MD', verdict.codes)
+
+    def test_tilde_blocks(self):
+        blocks = [('Условие', 'src', 'цена~100 рублей за штуку')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('MD', verdict.codes)
+
+    def test_latex_ligatures_block(self):
+        blocks = [('Условие', 'src', "Косатка --- крупное ``хищное'' животное")]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('MD', verdict.codes)
+
+    def test_column_spec_blocks(self):
+        """Спецификация колонок видна ученику — своя карточка в Notion."""
+        blocks = [('Условие', 'src', 'таблица {|l|c|r|} ниже')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('RTAB', verdict.codes)
+
+    def test_missing_figure_reference_gets_own_code(self):
+        r"""Ссылка на картинку без файла — `MISS`, а не общий `R-CMD`.
+
+        Своя причина и свой маршрут: не правка конвертера, а поиск
+        файла в выгрузке."""
+        blocks = [('Условие', 'src',
+                   r'график \includegraphics[width=0.3\linewidth]{ela.png}')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertFalse(verdict.ok)
+        self.assertIn('MISS', verdict.codes)
+
+    # --- ложные срабатывания: каждое проверено на живом корпусе ---
+
+    def test_percent_after_number_is_not_a_comment(self):
+        """«ставка 25 %» — процент, а не TeX-комментарий (584 задачи)."""
+        blocks = [('Условие', 'src', 'налог по ставке 25 % и ещё 10 % сверху')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
+    def test_ampersand_in_company_name_is_not_a_table(self):
+        """«Ernst & Young», «Wolf & Pigs» — живые #63137, #62358."""
+        blocks = [('Условие', 'src', 'согласно Ernst & Young рынок растёт')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
+    def test_markdown_table_delimiter_row_is_not_column_spec(self):
+        """`| --- | --- |` — обязательный синтаксис markdown-таблицы."""
+        blocks = [('Условие', 'src',
+                   '| Год | Цена |\n| --- | --- |\n| 2024 | 10 |')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
+    def test_interval_notation_is_not_a_float_option(self):
+        """`[0,1]`, `[AB]` — обычная запись, не опция окружения."""
+        blocks = [('Условие', 'src', 'точка на отрезке [AB] и x из [0,1]')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
+    def test_dash_between_words_is_not_a_ligature(self):
+        """Настоящее тире «—» и дефис в слове трогать не за что."""
+        blocks = [('Условие', 'src', 'Косатка — крупное хищное; северо-запад')]
+        verdict = render_preflight_v2(blocks, StubChecker())
+        self.assertTrue(verdict.ok, verdict.details)
+
+
 class PipelineTests(SimpleTestCase):
     """Конвейер v2 не ломает контракт стадии 1 и идемпотентен."""
 

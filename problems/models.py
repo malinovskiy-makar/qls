@@ -64,6 +64,8 @@ class Topic(models.Model):
                             unique=True, blank=True)
     description = models.TextField('Описание', blank=True)
     order = models.PositiveIntegerField('Порядок', default=0)
+    is_canonical = models.BooleanField('Каноническая тема таксономии', default=False,
+                                       db_index=True)
 
     class Meta:
         verbose_name = 'Тема'
@@ -95,9 +97,18 @@ class Subtopic(models.Model):
 class Tag(models.Model):
     """Свободная метка (тег), которую можно повесить на любую задачу."""
 
+    KIND_CHOICES = [
+        ('canonical', 'Канонический тег таксономии'),
+        ('author',    'Имя составителя задачи'),
+        ('legacy',    'Наследие импорта, не используется'),
+        ('junk',      'Мусор: URL, обрывок комментария'),
+    ]
+
     name = models.CharField('Название', max_length=100, unique=True)
     slug = models.SlugField('Короткий код', max_length=120, unique=True,
                             blank=True)
+    kind = models.CharField('Вид тега', max_length=16, choices=KIND_CHOICES,
+                            default='legacy', db_index=True)
 
     class Meta:
         verbose_name = 'Тег'
@@ -106,6 +117,56 @@ class Tag(models.Model):
 
     def __str__(self):
         return self.name
+
+
+# ---------------------------------------------------------------------------
+# Особенности и понятия — справочники обогащения v2
+# ---------------------------------------------------------------------------
+
+class Feature(models.Model):
+    """Особенность задачи — ФОРМА, а не содержание («задачи с графиком» темой
+    не становятся, docs/TAXONOMY.md §5).
+
+    Справочник ровно на двенадцать строк, канон и правило витрины —
+    `problems/enrich/features.py`. Наполняется миграцией данных, руками
+    строки сюда не добавляются: список закрыт решением владельца.
+    """
+
+    key = models.CharField('Ключ', max_length=48, unique=True)
+    label = models.CharField('Подпись', max_length=80)
+    counted_by = models.CharField(
+        'Кто считает', max_length=8,
+        choices=[('model', 'Модель'), ('code', 'Код')], db_index=True)
+    order = models.PositiveSmallIntegerField('Порядок показа', default=0)
+
+    class Meta:
+        verbose_name = 'Особенность задачи'
+        verbose_name_plural = 'Особенности задач'
+        ordering = ['order', 'key']
+
+    def __str__(self):
+        return self.label
+
+
+class EconConcept(models.Model):
+    """Экономическое понятие из словаря `data/econ_terms.json`.
+
+    ⚠️ ЭТО НЕ ТЕГ. Тег интерфейсный, его видит ученик, их ~344. Понятие
+    лексическое, из словаря на 1 886 терминов, ученику не показывается и
+    нужно для точности поиска (docs/TAXONOMY.md §5). Пересечение множеств
+    нормально и дублированием не является.
+    """
+
+    canonical = models.CharField('Каноническая форма', max_length=200, unique=True)
+    section = models.CharField('Раздел словаря', max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = 'Экономическое понятие'
+        verbose_name_plural = 'Экономические понятия'
+        ordering = ['canonical']
+
+    def __str__(self):
+        return self.canonical
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +277,28 @@ class Problem(models.Model):
 
     title = models.CharField('Заголовок', max_length=300, blank=True,
                              help_text='Необязательно. Краткое имя задачи.')
+
+    class TitleSource(models.TextChoices):
+        """Откуда взялся `title_candidate` — для стоп-гейта перед тем, как
+        решать, переписывать ли им `title` (Фаза 4.1, Б5). Решение о
+        перезаписи в этой сессии НЕ принимается, поле только заполняется
+        моделью и размечается кодом по `problems/enrich/title_rules.py`.
+        """
+        MODEL_EMPTY = 'model-empty', 'Модель: старый заголовок пуст/заглушка'
+        MODEL_BROKEN = 'model-broken', 'Модель: старый заголовок сломан'
+        MODEL_FIRSTLINE = 'model-firstline', 'Модель: старый заголовок — эхо начала условия'
+        KEPT = 'kept', 'Старый заголовок оставлен как есть'
+
+    #: Заголовок-кандидат от модели (вызов 2, §5.8) — НЕ показывается
+    #: ученику напрямую, пока владелец не решит применить поверх `title`.
+    title_candidate = models.CharField('Заголовок-кандидат', max_length=60,
+                                       blank=True)
+    #: Категория текущего `title` на момент, когда кандидат был предложен —
+    #: см. `problems/enrich/title_rules.py::classify_current_title`.
+    title_source = models.CharField('Источник заголовка-кандидата',
+                                     max_length=20,
+                                     choices=TitleSource.choices, blank=True)
+
     statement = models.TextField(
         'Условие',
         help_text='Основной текст задачи. Можно использовать LaTeX-формулы.',
@@ -233,6 +316,26 @@ class Problem(models.Model):
     difficulty_native = models.CharField(
         'Сложность (метка источника)', max_length=20, blank=True,
         help_text='Например: *, **, ***')
+
+    class AnswerConsistency(models.TextChoices):
+        """Согласован ли `answer` с `solution` — из обогащения v2, вызов 2
+        (`problems/enrich/prompts_v2.py::ANSWER_CONSISTENCY`). Заполняется
+        ТОЛЬКО моделью, не оценка качества задачи человеком. Питает гейт
+        допуска в Econ Rush (`game/management/commands/build_game_pool.py`).
+        """
+        AGREES = 'согласован', 'Ответ согласован с решением'
+        MISMATCH = 'ответ_не_совпадает_с_решением', 'Ответ не совпадает с решением'
+        NO_SOLUTION = 'решение_отсутствует_проверить_нечем', 'Решения нет — проверить нечем'
+        ANSWER_EMPTY = 'ответ_пуст_решение_есть', 'Ответ пуст, решение есть'
+        LEAK_SUSPECTED = ('подозрение_на_утечку_решения_в_условии',
+                          'Подозрение на утечку решения в условие')
+
+    answer_consistency = models.CharField(
+        'Согласованность ответа (обогащение)',
+        max_length=64, choices=AnswerConsistency.choices, blank=True,
+        help_text='Из обогащения v2, вызов 2. Пусто — задача вне прогона '
+                  'обогащения.',
+    )
 
     # ── Характер и особенности — ПОЛЯ ЗАРАНЕЕ (правило нуля, решение владельца
     #    04.09.2026, https://app.notion.com/p/3d1b11c92bc181f2a58fca64235ef298).
@@ -252,6 +355,81 @@ class Problem(models.Model):
     # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
     # собственной сущности, и правило «модели только в problems» не задето.
     features = models.JSONField('Особенности', default=list, blank=True)
+
+    # ── Обогащение v2: раскладка журнала прогона (07.09.2026) ──────────────
+    #
+    # ⚠️ ВИТРИНА И ИСТОЧНИК ПРАВДЫ — РАЗНЫЕ ВЕЩИ. `features` выше держит три
+    # ключа фильтра каталога и ПЕРЕСЧИТЫВАЕТСЯ из связи `features_rel`
+    # функцией `problems.enrich.features.catalog_view()`. Двенадцать
+    # настоящих особенностей живут в связи, там же видно, кто каждую
+    # поставил — модель, код или оба. `character` точно так же производен
+    # от `task_nature` (`features.character_for()`).
+
+    features_rel = models.ManyToManyField(
+        Feature, through='ProblemFeature', related_name='problems',
+        verbose_name='Особенности (связь)', blank=True)
+
+    econ_concepts = models.ManyToManyField(
+        EconConcept, related_name='problems', blank=True,
+        verbose_name='Экономические понятия')
+
+    class TaskNature(models.TextChoices):
+        CALC = 'расчётная', 'Расчётная'
+        THEORY = 'теоретическая', 'Теоретическая'
+        QUAL = 'качественная', 'Качественная'
+        NOT_A_TASK = 'не_задача', 'Не задача'
+
+    class TextQuality(models.TextChoices):
+        CLEAN = 'чистая', 'Текст чистый'
+        MINOR = 'мелкие_дефекты', 'Мелкие дефекты'
+        MAJOR = 'серьёзные_дефекты', 'Серьёзные дефекты'
+        NOT_A_TASK = 'не_задача', 'Не задача'
+
+    class TopicConfidence(models.TextChoices):
+        HIGH = 'высокая', 'Высокая'
+        MEDIUM = 'средняя', 'Средняя'
+        LOW = 'низкая', 'Низкая'
+
+    class EnrichmentSource(models.TextChoices):
+        RUN1 = 'run1', 'Первый прогон (слабый, ждёт допрогона)'
+        RUN2 = 'run2', 'Второй прогон (эталон)'
+        RUN2B = 'run2b', 'Допрогон вторым промптом'
+
+    task_nature = models.CharField(
+        'Характер задачи (обогащение)', max_length=16,
+        choices=TaskNature.choices, blank=True, db_index=True)
+    text_quality = models.CharField(
+        'Качество текста (обогащение)', max_length=20,
+        choices=TextQuality.choices, blank=True, db_index=True)
+    topic_confidence = models.CharField(
+        'Уверенность в теме', max_length=10,
+        choices=TopicConfidence.choices, blank=True, db_index=True)
+
+    given = models.TextField('Дано', blank=True)
+    find = models.TextField('Найти', blank=True)
+    plot = models.TextField(
+        'Сюжет', blank=True,
+        help_text='Заполняется только у задач с решением: без решения модель '
+                  'видит не механизм, а пересказ условия.')
+    difficulty_note = models.TextField('Обоснование сложности', blank=True)
+    text_quality_note = models.TextField('Что не так с текстом', blank=True)
+
+    # ⚠️ Поисковые запросы держим В БАЗЕ, а не в журнале прогона: их читает
+    # пересчёт эмбеддингов формулы v2, а он идёт на сервере, где каталога
+    # `reports/` нет вовсе (docs/EMBEDDINGS.md §5).
+    search_queries = models.JSONField(
+        'Поисковые запросы', default=list, blank=True)
+    # Диагностика для пополнения словаря терминов. Ученику не показывается,
+    # справочника у неё по определению нет — это как раз то, чего в словаре
+    # ещё не хватает.
+    concepts_offlist = models.JSONField(
+        'Понятия вне словаря', default=list, blank=True)
+
+    enrichment_source = models.CharField(
+        'Откуда раскладка', max_length=8,
+        choices=EnrichmentSource.choices, blank=True, db_index=True)
+    enrichment_at = models.DateTimeField(
+        'Когда разложено', null=True, blank=True)
 
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
@@ -371,6 +549,33 @@ class Problem(models.Model):
         help_text='Что сказал человек, посмотревший снимок страницы задачи',
     )
 
+    # --- Состояние ТЕКСТА задачи (чистка корпуса 03.09.2026) ---------
+    # ЧЕТВЁРТЫЙ независимый признак. Отвечает на вопрос «пригоден ли текст к
+    # показу», а не «хорошая ли это задача» и не «смотрел ли человек».
+    #
+    # ⚠️ ЭТО НЕ `status='hidden'`. Тот уже занят двумя своими смыслами —
+    # служебные фикстуры и снятое с публикации руками. Смешать причины
+    # значит через месяц не суметь ответить, почему задача скрыта, и не
+    # суметь вернуть её обратно, ничего не сломав: снятие `hidden` подняло
+    # бы заодно и битые тексты, и фикстуры.
+    #
+    # `needs_fix` ставится за дефект ОТОБРАЖЕНИЯ (битая формула, утраченная
+    # картинка, обрывок текста, склеенные задачи), но НЕ за опечатку:
+    # опечатка смысла не мешает и прятать задачу из-за неё — потеря без
+    # выгоды. `junk` — помечено к удалению, ученику не видно.
+    class ContentStatus(models.TextChoices):
+        OK = 'ok', 'Текст в порядке'
+        NEEDS_FIX = 'needs_fix', 'Текст требует доработки'
+        JUNK = 'junk', 'Помечено к удалению'
+
+    content_status = models.CharField(
+        'Состояние текста',
+        max_length=16, choices=ContentStatus.choices,
+        default=ContentStatus.OK, db_index=True,
+        help_text='Пригоден ли текст к показу ученику (не оценка качества '
+                  'задачи и не результат ревью человеком)',
+    )
+
     # Скрытие «до проверки». Отдельный признак, а НЕ status/needs_quality_review:
     # он отвечает на вопрос «человек ещё не смотрел», а не «задача плохая».
     # Ставится и снимается командой pending_review_gate (--apply / --revert),
@@ -474,6 +679,39 @@ class ProblemPart(models.Model):
 
     def __str__(self):
         return f'{self.problem} — пункт ({self.label})'
+
+
+class ProblemFeature(models.Model):
+    """Одна особенность у одной задачи — с пометкой, КТО её поставил.
+
+    `source` отличает три случая, которые иначе слились бы в один: особенность
+    от модели, особенность от кода и та, где обе стороны сошлись. Без этого
+    поля нельзя ни перепроверить модель кодом, ни пересчитать кодовую половину,
+    не задев модельную (решение владельца 02.09.2026 про «Графическое
+    решение», где итог — объединение по ИЛИ).
+    """
+
+    problem = models.ForeignKey(
+        Problem, on_delete=models.CASCADE, related_name='feature_links',
+        verbose_name='Задача')
+    feature = models.ForeignKey(
+        Feature, on_delete=models.CASCADE, related_name='problem_links',
+        verbose_name='Особенность')
+    source = models.CharField(
+        'Кто поставил', max_length=8,
+        choices=[('model', 'Модель'), ('code', 'Код'),
+                 ('both', 'Модель и код')], db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'feature'],
+                                    name='uniq_problem_feature'),
+        ]
+        verbose_name = 'Особенность задачи'
+        verbose_name_plural = 'Особенности задач'
+
+    def __str__(self):
+        return f'#{self.problem_id} · {self.feature_id} ({self.source})'
 
 
 class ProblemFigure(models.Model):

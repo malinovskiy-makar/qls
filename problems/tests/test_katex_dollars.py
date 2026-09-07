@@ -115,6 +115,27 @@ class MaskOutsideMathTests(unittest.TestCase):
         got, = self.run_cases([src])
         self.assertEqual(got, src)
 
+    def test_row_break_before_closing_dollar_closes_math(self):
+        r"""«\\» перед закрывающим «$» — перенос строки, а не экран доллара.
+
+        Слеш экранирует ВТОРОЙ СЛЕШ; «$» после пары — обычный
+        разделитель. Пока пара «\\» не пропускалась, формула не
+        закрывалась и съедала прозу до следующего «$» — доллар в этой
+        прозе тогда НЕ маскировался, потому что считался частью формулы.
+        Проверяем именно по маскировке: доллар прозы обязан стать
+        приватным символом (25 задач, живые #62556, #62939).
+
+        ⚠️ Зеркало `_find_close` из problems/rendering.py и `findClose`
+        из katex_preflight._MEASURE_JS."""
+        got, = self.run_cases([r'$a = 1 \\$ цена 5\$ конец'])
+        self.assertEqual(got, r'$a = 1 \\$ цена 5' + SENTINEL + ' конец')
+
+    def test_row_break_does_not_eat_paren_delimiter(self):
+        r"""«\\» перед «\)» не должен съесть сам разделитель."""
+        src = r'\(a = 1 \\\) и 5\$'
+        got, = self.run_cases([src])
+        self.assertEqual(got, r'\(a = 1 \\\) и 5' + SENTINEL)
+
 
 class PartialIsSinglePointTests(TestCase):
     """Конвейер долларов написан ОДИН раз и подключается включением."""

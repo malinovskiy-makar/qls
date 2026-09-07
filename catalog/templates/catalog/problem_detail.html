@@ -146,6 +146,13 @@
 /* Таблицы из markdown-рендерера (content_format='markdown'): заголовок
    отличается весом и цветом, разделители только горизонтальные. */
 .math-content table { border-collapse: collapse; margin: .75em 0; display: block; max-width: 100%; overflow-x: auto; }
+
+/* Картинки задачи (`[[FIGURE:…]]` → `<img>` после санитайзера,
+   `problems/figures.py`). Правила появились вместе с картинками: их
+   737 у легаси-источников, и среди них есть скриншоты в 2 000 px —
+   без `max-width` они ломают вёрстку, а не просто выглядят крупно. */
+.math-content .problem-figure { display: block; max-width: 100%; height: auto;
+  margin: 12px 0; }
 .math-content th, .math-content td { padding: 8px 14px; text-align: left; border-bottom: 1px solid var(--border-soft); }
 .math-content th { font-weight: 600; color: var(--text2); border-bottom: 1px solid var(--border); }
 .math-content tbody tr:last-child td { border-bottom: none; }

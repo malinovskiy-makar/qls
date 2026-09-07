@@ -139,6 +139,10 @@ def index_queryset(scope='prod'):
             status=Problem.Status.PUBLISHED,
             needs_quality_review=False,
             hidden_pending_review=False,
+            # Четвёртый признак невидимости (ADR про content_status): текст
+            # задачи признан битым. В индекс такие пускать нельзя — поиск
+            # приведёт человека на страницу, которой каталог не покажет.
+            content_status=Problem.ContentStatus.OK,
         )
     return qs
 

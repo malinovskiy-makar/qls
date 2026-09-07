@@ -338,3 +338,97 @@ data/olympiads/raw/shime/
 !reports/import_new_sources/report_20260829.md
 !reports/import_new_sources/reconvert_backup.json
 !reports/import_new_sources/rubrics_backup.json
+# Сессия 30.08 живёт в своей подпапке, чтобы боевые прогоны не затирали
+# снимки предыдущей сессии (её бэкапы — единственный путь назад к
+# состоянию до 29.08). Правило выше исключает саму подпапку, поэтому её
+# нужно вернуть отдельной строкой: git не может вернуть файл, у которого
+# исключён родительский каталог.
+!reports/import_new_sources/s20260830/
+reports/import_new_sources/s20260830/*
+!reports/import_new_sources/s20260830/report_20260830.md
+!reports/import_new_sources/s20260830/reconvert_backup.json
+!reports/import_new_sources/s20260830/snapshot_before.json
+!reports/import_new_sources/s20260830/snapshot_after.json
+# ⚠️ Бэкап ПЕРВОГО боевого прогона под своим именем: каждый следующий
+# --apply перезаписывает reconvert_backup.json, и без этой копии путь
+# отката к тексту до 30.08 исчез бы.
+!reports/import_new_sources/s20260830/reconvert_backup_pass1.json
+!reports/import_new_sources/s20260830/changed_ids_for_embeddings.json
+!reports/import_new_sources/s20260830/manual_review_queue.md
+!reports/import_new_sources/s20260830/gate_fail_flags.json
+# Копия базы (432 МБ) и HTML-предпросмотры остаются игнорируемыми:
+# первая слишком велика для репозитория, вторые пересобираются командой.
+
+# Фаза 3 легаси-картинок. Как и у соседних отчётов: папка закрыта, из неё
+# пускаются только обратимый журнал и очередь ручного разбора. Предпросмотр
+# (11 МБ картинок в base64) — артефакт для глаз, в истории ему не место.
+!reports/corpus_legacy_figures/
+reports/corpus_legacy_figures/*
+!reports/corpus_legacy_figures/texts_backup.json
+!reports/corpus_legacy_figures/unresolved.json
+!reports/corpus_legacy_figures/stats.json
+!reports/corpus_legacy_figures/plan.json
+
+# Диагностика 19 кодов читаемости: список id по кодам — это результат
+# замера, он нужен следующим фазам и должен быть в истории.
+!reports/corpus_render_codes/
+reports/corpus_render_codes/*
+!reports/corpus_render_codes/codes.json
+
+# ИСКЛЮЧЕНИЕ (2026-08-30): сессия «готовность к показу» — слияние двух веток
+# (легаси-рендер и три новых источника) в одну каноническую базу. Тот же
+# принцип, что у import_new_sources выше: в git едет только то, без чего
+# нельзя ни откатить, ни перепроверить, ни понять, на чём сессия встала.
+#   PHASES.md            — файл-метка: какие фазы сделаны. Следующая сессия
+#     читает его первым и не повторяет уже сделанное;
+#   report.md            — итог сессии для владельца;
+#   gate_backup.json     — снимок id/status/needs_quality_review ВСЕХ задач
+#     до quality_gate. Единственное доказательство «вне шести источников не
+#     изменилось ничего» и путь отката;
+#   miss_decisions.json  — вердикты по ложным MISS («ученик рисует сам»):
+#     решение по каждой карточке, иначе разбор не воспроизвести.
+# Предпросмотры (*.html) и машинные срезы (*_audit.json) остаются
+# игнорируемыми: пересобираются командой, а весят много.
+!reports/publish_readiness/
+reports/publish_readiness/*
+!reports/publish_readiness/PHASES.md
+!reports/publish_readiness/report.md
+!reports/publish_readiness/gate_backup.json
+!reports/publish_readiness/miss_decisions.json
+#   publish_ready_backup.json — путь отката для 9 418 задач,
+#     переведённых из draft в published. Без него откат невозможен.
+!reports/publish_readiness/publish_ready_backup.json
+#   stub_cleanup_backup.json — путь отката для карточек-заглушек,
+#     спрятанных статусом hidden. Без него не вернуть.
+!reports/publish_readiness/stub_cleanup_backup.json
+#   borderline_hold_ids.txt — сомнительные, которые НЕ выпущены
+#     из-под шлюза ручного ревью. Без него не воспроизвести,
+#     кого и почему придержали.
+!reports/publish_readiness/borderline_hold_ids.txt
+
+# Список ложных срабатываний шлюза, проверенных человеком. В git,
+# потому что это РЕШЕНИЕ, а не машинный вывод: без него следующий
+# прогон quality_gate снова спрячет карточки, которые человек одобрил.
+!reports/quality_audit/
+reports/quality_audit/*
+!reports/quality_audit/gate_false_positive_ids.txt
+
+# Сухой прогон load_taxonomy. В git, потому что это ВНИМАНИЕ ВЛАДЕЛЬЦА,
+# а не машинный вывод: 114 имён составителей и 52 мусорные строки он
+# просмотрел глазами и утвердил разметку. Без файла следующая сессия
+# не сможет отличить проверенное от заново угаданного.
+!reports/taxonomy_v2/
+reports/taxonomy_v2/*
+!reports/taxonomy_v2/load_taxonomy_dry_run.txt
+
+# Формулировки промпта пилота v2 — дословный текст, который владелец читает
+# перед стоп-гейтом (фаза 2.1, замер Б4). Не машинный вывод.
+!reports/enrich_pilot/
+reports/enrich_pilot/*
+!reports/enrich_pilot/prompt_wordings_v2.md
+# Разбор визуального пласта и сводка по выбору модели (сессия 02.09.2026).
+# Только .md: HTML и JSON — рабочие артефакты прогонов, они пересобираются
+# командой. ⚠️ blind_models_key.json НЕ ДОБАВЛЯТЬ НИКОГДА — это ключ слепого
+# сравнения, и в репозитории ему не место.
+!reports/enrich_pilot/raster_inventory.md
+!reports/enrich_pilot/model_choice_summary.md

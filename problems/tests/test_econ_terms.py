@@ -29,24 +29,41 @@ AMBIGUOUS_SYMBOLS = ('P', 'S', 'C', 'AC', 'AP', 'AR', 'π')
 class DictionaryShapeTests(SimpleTestCase):
     """Форма словаря: числа, схема записи, разделы."""
 
-    def test_числа_сходятся_с_заявленными_в_источнике(self):
-        """Разобранное обязано совпасть с тем, что словарь пишет о себе сам.
+    def test_числа_источника_сходятся_с_заявленными_в_нём(self):
+        """Разобранный ИСТОЧНИК обязан совпасть с тем, что он пишет о себе
+        сам — до ручных добавок (`econ_terms_manual.md`), у которых
+        собственных заявленных чисел нет и быть не может.
 
         Молчаливо недоразобранный словарь выглядел бы как рабочий: поиск
         просто не находил бы часть терминов, и никто бы не понял почему.
         """
-        counts = econ_terms.counts()
-        declared = econ_terms.load()['meta']['declared_counts']
-        fixes = sum(len(v) for v in
-                    econ_terms.load()['meta']['known_fixes_applied'].values())
-        self.assertEqual(counts['terms'], declared['terms'])
-        self.assertEqual(counts['ru_aliases'], declared['ru_aliases'])
-        self.assertEqual(counts['english'], declared['english'])
+        meta = econ_terms.load()['meta']
+        source = meta['source_counts']
+        declared = meta['declared_counts']
+        fixes = sum(len(v) for v in meta['known_fixes_applied'].values())
+        self.assertEqual(source['terms'], declared['terms'])
+        self.assertEqual(source['ru_aliases'], declared['ru_aliases'])
+        self.assertEqual(source['english'], declared['english'])
         # Обозначений на наши починки больше — см. KNOWN_FIXES в команде сборки.
-        self.assertEqual(counts['notations'], declared['notations'] + fixes)
+        self.assertEqual(source['notations'], declared['notations'] + fixes)
 
-    def test_тридцать_два_раздела(self):
-        self.assertEqual(counts_sections(), 32)
+    def test_итоговые_числа_учитывают_ручные_добавки(self):
+        """Ручная надстройка (задание владельца, 2026-09-03) сливается ПОСЛЕ
+        сверки источника — итог обязан быть суммой источника и добавок,
+        иначе слияние тихо теряет или задваивает записи."""
+        meta = econ_terms.load()['meta']
+        counts = meta['actual_counts']
+        manual = meta['manual_additions']
+        self.assertEqual(counts['terms'],
+                         meta['source_counts']['terms'] + manual['new_terms'])
+        self.assertEqual(counts['ru_aliases'],
+                         meta['source_counts']['ru_aliases']
+                         + manual['synonyms_added']
+                         + manual['new_term_synonyms'])
+
+    def test_разделов_на_один_больше_источника_из_за_ручной_надстройки(self):
+        # 32 раздела у источника + 1 «Новые понятия» из econ_terms_manual.md.
+        self.assertEqual(counts_sections(), 33)
 
     def test_у_каждого_термина_есть_раздел(self):
         without = [t['canonical'] for t in econ_terms.terms() if not t['section']]

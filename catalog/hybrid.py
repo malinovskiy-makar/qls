@@ -93,7 +93,8 @@ def lexical_search(query, limit, content_kind='problems'):
 
     queryset = Problem.objects.filter(status=Problem.Status.PUBLISHED,
                                       needs_quality_review=False,
-                                      hidden_pending_review=False)
+                                      hidden_pending_review=False,
+        content_status=Problem.ContentStatus.OK)
     if content_kind == 'problems':
         queryset = queryset.exclude(problem_type__istartswith='тест')
     elif content_kind == 'tests':

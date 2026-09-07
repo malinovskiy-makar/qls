@@ -27,7 +27,9 @@ from django.conf import settings
 from django.test import SimpleTestCase
 from django.utils.html import escape
 
-from problems.rendering import render_markdown, _sanitize_html
+from problems.rendering import (
+    render_markdown, _sanitize_html, _protect_math_and_currency,
+)
 
 PROBLEM_DETAIL_TEMPLATE = (
     Path(settings.BASE_DIR) / 'catalog' / 'templates' / 'catalog'
@@ -109,6 +111,32 @@ class MathProtectionTests(SimpleTestCase):
         self.assertIn(esc('$P_D$'), out)
         self.assertNotIn('<em>', out)
         self.assertNotIn('<strong>', out)
+
+    def test_row_break_before_closing_dollar_closes_span(self):
+        r"""`\\` перед закрывающим `$` — перенос строки, а не экран доллара.
+
+        Поиск закрытия пропускал `\$` как «экранированный доллар», но в
+        `\\$` обратный слеш экранирует ВТОРОЙ СЛЕШ, а `$` после него —
+        обычный разделитель. Формула не закрывалась и «съедала» текст до
+        следующего `$`; KaTeX отвечал `Can't use function '$' in math
+        mode` (25 задач трёх новых источников, живые #62556, #62939).
+
+        Замер по всей базе: расхождение ровно у 25 задач, все — новые
+        источники, легаси не задет ни одной."""
+        _text, protected = _protect_math_and_currency(
+            r'$a = 1 \\$ и текст $b = 2$')
+        self.assertEqual(protected, [r'$a = 1 \\$', '$b = 2$'])
+
+    def test_escaped_dollar_inside_math_still_not_a_delimiter(self):
+        r"""Обратная сторона: одиночный `\$` внутри формулы — законный
+        символ доллара, и закрытием формулы он быть не должен."""
+        _text, protected = _protect_math_and_currency(r'цена $x = \$5 + y$ рублей')
+        self.assertEqual(protected, [r'$x = \$5 + y$'])
+
+    def test_row_break_before_closing_paren_delimiter(self):
+        r"""`\\` перед `\)` не должен съесть сам разделитель `\)`."""
+        _text, protected = _protect_math_and_currency(r'формула \(a = 1 \\\) конец')
+        self.assertEqual(protected, [r'\(a = 1 \\\)'])
 
     def test_display_math_with_cases_survives(self):
         formula = r'$$\begin{cases}x + y = 1 \\ x - y = 0\end{cases}$$'
@@ -333,11 +361,18 @@ class TableCssTests(SimpleTestCase):
     def test_table_does_not_force_full_width(self):
         """Требование владельца: не растягивать таблицу без нужды.
 
-        `max-width: 100%` допустим — он не растягивает, а ограничивает.
-        """
+        Ловятся `width` и `min-width` — оба растягивают. `max-width` НЕ
+        ловится: он ровно наоборот, ОГРАНИЧИВАЕТ ширину.
+
+        ⚠️ Различать их обязательно. Прежняя проверка искала подстроку
+        `width: 100%` и потому срабатывала на `max-width: 100%`. 30.08 на
+        этом покраснела правка, которая требование как раз усилила:
+        `width: fit-content` — таблица ровно по содержимому, а
+        `max-width: 100%` не даёт ей вылезти из колонки."""
         m = re.search(r'\.math-content table\s*\{([^}]*)\}', self.source)
         self.assertIsNotNone(m, 'нет правила .math-content table')
-        self.assertNotRegex(m.group(1), r'(?<![-\w])width\s*:\s*100%')
+        self.assertNotRegex(m.group(1),
+                            r'(?<![-\w])(?:min-)?width\s*:\s*100%')
 
     def test_table_colors_use_design_tokens_not_hardcoded_hex(self):
         """catalog/CLAUDE.md: хардкод hex ломает тёмную тему — цвета только

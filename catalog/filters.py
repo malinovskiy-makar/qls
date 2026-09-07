@@ -301,8 +301,12 @@ def base_queryset(gate='catalog'):
     """
     from problems.models import Problem
 
+    # ⚠️ Четвёртый признак невидимости — состояние ТЕКСТА задачи
+    # (ADR про content_status): битый текст скрыт независимо от того,
+    # смотрел ли его человек и что сказал детектор качества.
     qs = Problem.objects.filter(status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False)
+                                needs_quality_review=False,
+                                content_status=Problem.ContentStatus.OK)
     if gate == 'catalog':
         qs = qs.filter(hidden_pending_review=False)
     return qs

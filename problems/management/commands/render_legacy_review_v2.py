@@ -13,26 +13,33 @@ READ-ONLY. Отличия от прежней `render_legacy_review_html`:
 
 Прежний файл `boevoi_render_review.html` не перезаписывается — он нужен
 для сравнения «до/после» с аудитом. Новый: `boevoi_render_review_v2.html`.
+
+⚠️ `DJANGO_ALLOW_ASYNC_UNSAFE` выставляется на время работы с
+`KatexPreflight` (см. `async_unsafe_for_playwright` в
+katex_preflight.py): синхронный playwright поднимает event loop,
+после чего Django запрещает ORM. Ставить его на уровне модуля
+НЕЛЬЗЯ: Django импортирует модули команд при автопоиске, и флаг
+утекал бы в процесс от одного факта импорта.
 """
 import os
 import random
 
-os.environ.setdefault('DJANGO_ALLOW_ASYNC_UNSAFE', '1')
+from django.conf import settings
+from django.core.management.base import BaseCommand, CommandError
 
-from django.conf import settings  # noqa: E402
-from django.core.management.base import BaseCommand, CommandError  # noqa: E402
-
-from problems.corpus_converter.katex_preflight import KatexPreflight  # noqa: E402
-from problems.corpus_converter.preflight_gate import (  # noqa: E402
+from problems.corpus_converter.katex_preflight import (
+    KatexPreflight, async_unsafe_for_playwright,
+)
+from problems.corpus_converter.preflight_gate import (
     build_blocks, convert_problem_v2, render_preflight_v2,
 )
-from problems.management.commands.corpus_render_gate import (  # noqa: E402
+from problems.management.commands.corpus_render_gate import (
     SOURCES, _candidate_qs,
 )
-from problems.management.commands.corpus_review_html import (  # noqa: E402
-    _HTML_HEAD, _HTML_FOOT_TEMPLATE, _esc, _render_sample_card,
+from problems.management.commands.corpus_review_html import (
+    _HTML_FOOT_TEMPLATE, _esc, _render_sample_card, html_head,
 )
-from problems.models import Problem, ProblemPart  # noqa: E402
+from problems.models import Problem, ProblemPart
 
 SAMPLE_SIZE = 50
 BLOCKED_SHOWN = 25
@@ -87,7 +94,7 @@ class Command(BaseCommand):
         sections, summary_rows = [], []
         totals = {'pass': 0, 'fail': 0, 'shown': 0, 'cases': 0}
 
-        with KatexPreflight() as checker:
+        with async_unsafe_for_playwright(), KatexPreflight() as checker:
             for slug, (source_id, name) in SOURCES.items():
                 passed, blocked = [], []
                 for problem in _candidate_qs(slug, source_id).prefetch_related(
@@ -146,7 +153,7 @@ class Command(BaseCommand):
 
                 self.stdout.write(f'  {name}: PASS {len(passed)}, блок {len(blocked)}')
 
-        html = [_HTML_HEAD,
+        html = [html_head(),
                 '<h1>Боевой рендер — визуальная проверка по НОВОМУ шлюзу (v2)</h1>',
                 '<div class="subtitle">PASS определяет render_preflight_v2 — '
                 'настоящий KaTeX 0.16.9 (throwOnError=true, trust=false), а не '
