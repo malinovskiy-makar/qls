@@ -120,6 +120,56 @@ class Tag(models.Model):
 
 
 # ---------------------------------------------------------------------------
+# Особенности и понятия — справочники обогащения v2
+# ---------------------------------------------------------------------------
+
+class Feature(models.Model):
+    """Особенность задачи — ФОРМА, а не содержание («задачи с графиком» темой
+    не становятся, docs/TAXONOMY.md §5).
+
+    Справочник ровно на двенадцать строк, канон и правило витрины —
+    `problems/enrich/features.py`. Наполняется миграцией данных, руками
+    строки сюда не добавляются: список закрыт решением владельца.
+    """
+
+    key = models.CharField('Ключ', max_length=48, unique=True)
+    label = models.CharField('Подпись', max_length=80)
+    counted_by = models.CharField(
+        'Кто считает', max_length=8,
+        choices=[('model', 'Модель'), ('code', 'Код')], db_index=True)
+    order = models.PositiveSmallIntegerField('Порядок показа', default=0)
+
+    class Meta:
+        verbose_name = 'Особенность задачи'
+        verbose_name_plural = 'Особенности задач'
+        ordering = ['order', 'key']
+
+    def __str__(self):
+        return self.label
+
+
+class EconConcept(models.Model):
+    """Экономическое понятие из словаря `data/econ_terms.json`.
+
+    ⚠️ ЭТО НЕ ТЕГ. Тег интерфейсный, его видит ученик, их ~344. Понятие
+    лексическое, из словаря на 1 886 терминов, ученику не показывается и
+    нужно для точности поиска (docs/TAXONOMY.md §5). Пересечение множеств
+    нормально и дублированием не является.
+    """
+
+    canonical = models.CharField('Каноническая форма', max_length=200, unique=True)
+    section = models.CharField('Раздел словаря', max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = 'Экономическое понятие'
+        verbose_name_plural = 'Экономические понятия'
+        ordering = ['canonical']
+
+    def __str__(self):
+        return self.canonical
+
+
+# ---------------------------------------------------------------------------
 # Источники
 # ---------------------------------------------------------------------------
 
@@ -305,6 +355,81 @@ class Problem(models.Model):
     # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
     # собственной сущности, и правило «модели только в problems» не задето.
     features = models.JSONField('Особенности', default=list, blank=True)
+
+    # ── Обогащение v2: раскладка журнала прогона (07.09.2026) ──────────────
+    #
+    # ⚠️ ВИТРИНА И ИСТОЧНИК ПРАВДЫ — РАЗНЫЕ ВЕЩИ. `features` выше держит три
+    # ключа фильтра каталога и ПЕРЕСЧИТЫВАЕТСЯ из связи `features_rel`
+    # функцией `problems.enrich.features.catalog_view()`. Двенадцать
+    # настоящих особенностей живут в связи, там же видно, кто каждую
+    # поставил — модель, код или оба. `character` точно так же производен
+    # от `task_nature` (`features.character_for()`).
+
+    features_rel = models.ManyToManyField(
+        Feature, through='ProblemFeature', related_name='problems',
+        verbose_name='Особенности (связь)', blank=True)
+
+    econ_concepts = models.ManyToManyField(
+        EconConcept, related_name='problems', blank=True,
+        verbose_name='Экономические понятия')
+
+    class TaskNature(models.TextChoices):
+        CALC = 'расчётная', 'Расчётная'
+        THEORY = 'теоретическая', 'Теоретическая'
+        QUAL = 'качественная', 'Качественная'
+        NOT_A_TASK = 'не_задача', 'Не задача'
+
+    class TextQuality(models.TextChoices):
+        CLEAN = 'чистая', 'Текст чистый'
+        MINOR = 'мелкие_дефекты', 'Мелкие дефекты'
+        MAJOR = 'серьёзные_дефекты', 'Серьёзные дефекты'
+        NOT_A_TASK = 'не_задача', 'Не задача'
+
+    class TopicConfidence(models.TextChoices):
+        HIGH = 'высокая', 'Высокая'
+        MEDIUM = 'средняя', 'Средняя'
+        LOW = 'низкая', 'Низкая'
+
+    class EnrichmentSource(models.TextChoices):
+        RUN1 = 'run1', 'Первый прогон (слабый, ждёт допрогона)'
+        RUN2 = 'run2', 'Второй прогон (эталон)'
+        RUN2B = 'run2b', 'Допрогон вторым промптом'
+
+    task_nature = models.CharField(
+        'Характер задачи (обогащение)', max_length=16,
+        choices=TaskNature.choices, blank=True, db_index=True)
+    text_quality = models.CharField(
+        'Качество текста (обогащение)', max_length=20,
+        choices=TextQuality.choices, blank=True, db_index=True)
+    topic_confidence = models.CharField(
+        'Уверенность в теме', max_length=10,
+        choices=TopicConfidence.choices, blank=True, db_index=True)
+
+    given = models.TextField('Дано', blank=True)
+    find = models.TextField('Найти', blank=True)
+    plot = models.TextField(
+        'Сюжет', blank=True,
+        help_text='Заполняется только у задач с решением: без решения модель '
+                  'видит не механизм, а пересказ условия.')
+    difficulty_note = models.TextField('Обоснование сложности', blank=True)
+    text_quality_note = models.TextField('Что не так с текстом', blank=True)
+
+    # ⚠️ Поисковые запросы держим В БАЗЕ, а не в журнале прогона: их читает
+    # пересчёт эмбеддингов формулы v2, а он идёт на сервере, где каталога
+    # `reports/` нет вовсе (docs/EMBEDDINGS.md §5).
+    search_queries = models.JSONField(
+        'Поисковые запросы', default=list, blank=True)
+    # Диагностика для пополнения словаря терминов. Ученику не показывается,
+    # справочника у неё по определению нет — это как раз то, чего в словаре
+    # ещё не хватает.
+    concepts_offlist = models.JSONField(
+        'Понятия вне словаря', default=list, blank=True)
+
+    enrichment_source = models.CharField(
+        'Откуда раскладка', max_length=8,
+        choices=EnrichmentSource.choices, blank=True, db_index=True)
+    enrichment_at = models.DateTimeField(
+        'Когда разложено', null=True, blank=True)
 
     class HumanReview(models.TextChoices):
         """Что сказал ЧЕЛОВЕК, посмотревший снимок страницы задачи.
@@ -554,6 +679,39 @@ class ProblemPart(models.Model):
 
     def __str__(self):
         return f'{self.problem} — пункт ({self.label})'
+
+
+class ProblemFeature(models.Model):
+    """Одна особенность у одной задачи — с пометкой, КТО её поставил.
+
+    `source` отличает три случая, которые иначе слились бы в один: особенность
+    от модели, особенность от кода и та, где обе стороны сошлись. Без этого
+    поля нельзя ни перепроверить модель кодом, ни пересчитать кодовую половину,
+    не задев модельную (решение владельца 02.09.2026 про «Графическое
+    решение», где итог — объединение по ИЛИ).
+    """
+
+    problem = models.ForeignKey(
+        Problem, on_delete=models.CASCADE, related_name='feature_links',
+        verbose_name='Задача')
+    feature = models.ForeignKey(
+        Feature, on_delete=models.CASCADE, related_name='problem_links',
+        verbose_name='Особенность')
+    source = models.CharField(
+        'Кто поставил', max_length=8,
+        choices=[('model', 'Модель'), ('code', 'Код'),
+                 ('both', 'Модель и код')], db_index=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['problem', 'feature'],
+                                    name='uniq_problem_feature'),
+        ]
+        verbose_name = 'Особенность задачи'
+        verbose_name_plural = 'Особенности задач'
+
+    def __str__(self):
+        return f'#{self.problem_id} · {self.feature_id} ({self.source})'
 
 
 class ProblemFigure(models.Model):

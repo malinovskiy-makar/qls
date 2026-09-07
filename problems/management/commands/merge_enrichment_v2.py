@@ -35,6 +35,29 @@
      подсказки (идемпотентность повторного прогона).
   7. `answer_consistency` — новое поле (0051), пишем всегда, где есть кандидат.
 
+Сессия 2026-09-07 добавила остальные поля журнала (миграция 0056):
+
+  8. Особенности — связь `ProblemFeature` (двенадцать штук, канон в
+     `problems/enrich/features.py`), у каждой видно, кто поставил. Витрина
+     каталога `Problem.features` из трёх ключей ПЕРЕСЧИТЫВАЕТСЯ из связи
+     единственной функцией `features.catalog_view()`, своего факта не хранит.
+     Шесть кодовых особенностей считаются по ВСЕМ активным задачам, а не по
+     составу прогона: код не зависит от того, обогащалась задача или нет.
+  9. `econ_concepts` — связь со справочником `EconConcept`, наполняемым из
+     `data/econ_terms.json`. Понятия вне словаря складываются в
+     `concepts_offlist` как диагностика и ученику не показываются.
+ 10. Тексты (`given`, `find`, `plot`, `difficulty_note`, `text_quality_note`),
+     короткие значения (`task_nature`, `text_quality`, `topic_confidence`) и
+     `search_queries` кладутся в одноимённые поля. Пустой кандидат непустое
+     боевое не затирает, значение вне справочника — не пишется, задача уходит
+     в список на разбор.
+ 11. `content_status` пересуживается по `text_quality`/`problem_type`, но
+     ТОЛЬКО в сторону ухудшения: `content_cleanup` сильнее модели.
+ 12. `character` производен от `task_nature` (`features.character_for()`).
+ 13. Активные задачи, которых во втором прогоне нет вовсе, берут данные
+     ПЕРВОГО прогона с пометкой `enrichment_source='run1'` — их видно и можно
+     допрогнать. Данные run1 никогда не перекрывают данные run2.
+
 Запуск:
     manage.py merge_enrichment_v2                 # --dry-run по умолчанию
     manage.py merge_enrichment_v2 --apply         # боевая запись, одна транзакция
@@ -48,11 +71,19 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from django.utils.text import slugify
 
-from problems.enrich import taxonomy
+from django.utils import timezone
+
+from problems.enrich import features as feat
+from problems.enrich import layout, taxonomy
 from problems.enrich.title_rules import classify_and_pick_source
-from problems.models import Hint, Problem, Tag, Topic
+from problems.models import (EconConcept, Feature, Hint, OlympiadRef, Problem,
+                             ProblemFeature, ProblemPart, Tag, Topic)
 
 PARSED_PATH = Path('reports/enrich_pilot/run2_parsed.jsonl')
+RUN1_PARSED_PATH = Path('reports/enrich_pilot/run_parsed.jsonl')
+# Задачи этих статусов раскладку не получают: дубль схлопнут, скрытое убрано
+# руками — ни то ни другое ученику не показывается ни при каких фильтрах.
+INACTIVE_STATUSES = ('duplicate', 'hidden')
 REPORT_DIR = Path('reports/enrich_pilot')
 BACKUP_CSV_PATH = Path(
     r'C:\Users\shipu\weconomics-data\backups\old_markup_20260906_before_v2_merge.csv')
@@ -111,6 +142,13 @@ class Command(BaseCommand):
         parser.add_argument('--out', type=str,
                             default=str(REPORT_DIR / 'merge_v2_dry_run.json'))
         parser.add_argument('--sample-size', type=int, default=20)
+        parser.add_argument(
+            '--parsed-run1', type=str, default=str(RUN1_PARSED_PATH),
+            help='Журнал ПЕРВОГО прогона: из него берутся активные задачи, '
+                 'которых во втором прогоне нет вовсе.')
+        parser.add_argument(
+            '--no-run1', action='store_true',
+            help='Не подмешивать данные первого прогона.')
 
     # ------------------------------------------------------------------
 
@@ -120,6 +158,8 @@ class Command(BaseCommand):
         self.sample_html_path = Path(options['sample_html'])
         self.out_path = Path(options['out'])
         self.sample_size = options['sample_size']
+        self.run1_path = Path(options['parsed_run1'])
+        self.use_run1 = not options['no_run1']
 
         rows = self.load_rows()
         ok_rows = [r for r in rows if not r.get('defect')]
@@ -129,6 +169,16 @@ class Command(BaseCommand):
 
         jsonl_ids = {r['problem_id'] for r in rows}
         legacy_only_ids, legacy_old_values = self.find_legacy_only(jsonl_ids)
+
+        # Ветка run1: активные задачи, которых во втором прогоне нет вовсе.
+        # Их пометили `needs_fix` ПО ДАННЫМ ПЕРВОГО прогона и потому не взяли
+        # во второй — замкнутый круг, который разрывает допрогон. До него
+        # данные первого прогона всё же лучше пустоты, но помечены как run1.
+        self.run1_rows = self.load_run1_rows(jsonl_ids) if self.use_run1 else []
+        if self.run1_rows:
+            self.stdout.write(
+                'из первого прогона (активные вне run2): %d задач'
+                % len(self.run1_rows))
 
         taxonomy_plan = self.plan_taxonomy_objects()
         self.stdout.write('')
@@ -143,7 +193,9 @@ class Command(BaseCommand):
             self.stdout.write('  переиспользуемые имена тем (13 ожидается): %s'
                               % taxonomy_plan['topics_reused_names'])
 
-        counters, samples, skipped, title_overwrite_rows = self.build_plan(ok_rows)
+        counters, samples, skipped, title_overwrite_rows = self.build_plan(
+            ok_rows, self.run1_rows)
+        code_plan = self.plan_code_features()
         legacy_plan = self.build_legacy_plan(legacy_only_ids, legacy_old_values)
         difficulty_crosstab = self.build_difficulty_crosstab(ok_rows)
         contamination = self.report_topic_contamination(
@@ -151,6 +203,7 @@ class Command(BaseCommand):
 
         self.report(counters, skipped, legacy_plan, len(ok_rows), difficulty_crosstab,
                    contamination)
+        self.report_layout(counters, skipped, code_plan)
         self.write_sample_html(samples)
         self.write_json_report(counters, skipped, legacy_plan, taxonomy_plan,
                                difficulty_crosstab, contamination)
@@ -175,6 +228,36 @@ class Command(BaseCommand):
                 line = line.strip()
                 if line:
                     rows.append(json.loads(line))
+        return rows
+
+    def load_run1_rows(self, run2_ids):
+        """Строки первого прогона для АКТИВНЫХ задач, которых нет во втором.
+
+        Данные run1 слабее (без чтения решений, другой уровень рассуждения),
+        поэтому они никогда не перекрывают run2: множества не пересекаются по
+        построению — из журнала берутся только id, отсутствующие в `run2_ids`.
+        """
+        if not self.run1_path.exists():
+            self.stdout.write(self.style.WARNING(
+                'журнала первого прогона нет: %s — ветка run1 пропущена'
+                % self.run1_path))
+            return []
+        active_ids = set(Problem.objects
+                         .exclude(status__in=INACTIVE_STATUSES)
+                         .values_list('id', flat=True))
+        wanted = active_ids - run2_ids
+        rows = []
+        with open(self.run1_path, encoding='utf-8') as fh:
+            for line in fh:
+                line = line.strip()
+                if not line:
+                    continue
+                row = json.loads(line)
+                pid = row.get('problem_id')
+                if pid is None or int(pid) not in wanted or row.get('defect'):
+                    continue
+                row['problem_id'] = int(pid)
+                rows.append(row)
         return rows
 
     def find_legacy_only(self, jsonl_ids):
@@ -274,17 +357,28 @@ class Command(BaseCommand):
     # Сухой прогон — план по каждому полю
     # ------------------------------------------------------------------
 
-    def build_plan(self, ok_rows):
+    def build_plan(self, ok_rows, run1_rows=()):
         counters = {
             'topics': Counter(), 'tags': Counter(), 'title': Counter(),
             'hints': Counter(), 'problem_type': Counter(), 'difficulty': Counter(),
             'answer_consistency': Counter(),
+            # раскладка 07.09.2026
+            'given': Counter(), 'find': Counter(), 'plot': Counter(),
+            'difficulty_note': Counter(), 'text_quality_note': Counter(),
+            'task_nature': Counter(), 'text_quality': Counter(),
+            'topic_confidence': Counter(), 'search_queries': Counter(),
+            'econ_concepts': Counter(), 'concepts_offlist': Counter(),
+            'features_модель': Counter(), 'content_status': Counter(),
+            'источник': Counter(),
         }
         skipped = Counter()
         samples = defaultdict(list)
+        self.invalid_value_ids = defaultdict(list)   # поле -> [(id, значение)]
+        self.concept_lookup = layout.concept_lookup(layout.load_terms())
 
-        ids = [r['problem_id'] for r in ok_rows]
-        rows_by_id = {r['problem_id']: r for r in ok_rows}
+        all_rows = list(ok_rows) + [dict(r, _run1=True) for r in run1_rows]
+        ids = [r['problem_id'] for r in all_rows]
+        rows_by_id = {r['problem_id']: r for r in all_rows}
 
         title_overwrite_rows = []  # (id, old_title, category) — для CSV-бэкапа
 
@@ -292,7 +386,10 @@ class Command(BaseCommand):
             problems = {p.id: p for p in Problem.objects.filter(id__in=chunk_ids)
                        .prefetch_related('topics', 'tags')
                        .only('id', 'title', 'statement', 'problem_type',
-                            'difficulty', 'difficulty_native')}
+                            'difficulty', 'difficulty_native', 'content_status',
+                            'given', 'find', 'plot', 'difficulty_note',
+                            'text_quality_note', 'task_nature', 'text_quality',
+                            'topic_confidence', 'search_queries')}
             hint_counts = Counter(Hint.objects.filter(problem_id__in=chunk_ids)
                                   .values_list('problem_id', flat=True))
 
@@ -303,6 +400,18 @@ class Command(BaseCommand):
                     skipped['id_не_найден_в_базе'] += 1
                     continue
 
+                counters['источник'][
+                    'run1' if row.get('_run1') else 'run2'] += 1
+                self._plan_scalars(problem, row, counters, skipped)
+                self._plan_concepts(problem, row, counters)
+                self._plan_features_model(problem, row, counters['features_модель'])
+                self._plan_content_status(problem, row, counters['content_status'])
+                if row.get('_run1'):
+                    # Ветка run1: только новые поля. Темы, теги, заголовок,
+                    # подсказки, тип и сложность у слабого прогона не берём —
+                    # правило «run1 не перекрывает run2» относится и к тому,
+                    # чего во втором прогоне для этой задачи просто нет.
+                    continue
                 self._plan_topics(problem, row, counters['topics'], skipped, samples)
                 self._plan_tags(problem, row, counters['tags'], skipped, samples)
                 self._plan_title(problem, row, counters['title'], samples,
@@ -316,6 +425,64 @@ class Command(BaseCommand):
                                               counters['answer_consistency'], samples)
 
         return counters, samples, skipped, title_overwrite_rows
+
+    # ── раскладка 07.09.2026 ─────────────────────────────────────────
+
+    def _plan_scalars(self, problem, row, counters, skipped):
+        """Тексты, короткие значения из справочников и `search_queries`."""
+        values, invalid = layout.row_scalar_fields(row)
+        for field, value in invalid.items():
+            skipped['%s_невалидное_значение' % field] += 1
+            self.invalid_value_ids[field].append((problem.id, value))
+        for field in ('given', 'find', 'plot', 'difficulty_note',
+                      'text_quality_note', 'task_nature', 'text_quality',
+                      'topic_confidence', 'search_queries'):
+            counter = counters[field]
+            if field not in values:
+                counter['кандидат_пуст'] += 1
+                continue
+            old = getattr(problem, field)
+            if old == values[field]:
+                counter['совпало_со_старым'] += 1
+            elif old:
+                counter['заменено'] += 1
+            else:
+                counter['заполнено_впервые'] += 1
+
+    def _plan_concepts(self, problem, row, counters):
+        found, missing = layout.match_concepts(
+            row.get('econ_concepts'), self.concept_lookup)
+        if found:
+            counters['econ_concepts']['задач_с_понятиями'] += 1
+            counters['econ_concepts']['связей_всего'] += len(found)
+        else:
+            counters['econ_concepts']['кандидат_пуст'] += 1
+        # Понятие, которого нет в словаре, — не ошибка модели, а дыра в
+        # словаре: складываем в диагностику, ученику не показываем.
+        offlist = list(missing) + list(row.get('concepts_offlist') or [])
+        if offlist:
+            counters['concepts_offlist']['задач'] += 1
+            counters['concepts_offlist']['терминов_всего'] += len(offlist)
+
+    def _plan_features_model(self, problem, row, counter):
+        keys = [k for k in (row.get('features_1') or []) if k in feat.MODEL_KEYS]
+        bad = [k for k in (row.get('features_1') or []) if k not in feat.MODEL_KEYS]
+        if bad:
+            counter['невалидная_особенность'] += len(bad)
+            self.invalid_value_ids['features_1'].append((problem.id, ','.join(bad)))
+        if keys:
+            counter['задач_с_особенностью'] += 1
+            counter['связей_всего'] += len(keys)
+        else:
+            counter['кандидат_пуст'] += 1
+
+    def _plan_content_status(self, problem, row, counter):
+        new_value = layout.content_status_for(
+            problem.content_status, row.get('text_quality'), row.get('problem_type'))
+        if new_value == problem.content_status:
+            counter['без_изменений'] += 1
+        else:
+            counter['%s -> %s' % (problem.content_status, new_value)] += 1
 
     def _plan_topics(self, problem, row, counter, skipped, samples):
         old_names = sorted(t.name for t in problem.topics.all())
@@ -440,6 +607,46 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------
     # 297 (+2) вне прогона обогащения — кроссвок problem_type
     # ------------------------------------------------------------------
+
+    # ------------------------------------------------------------------
+    # Кодовые особенности — по ВСЕМ активным задачам
+    # ------------------------------------------------------------------
+
+    def iter_code_features(self):
+        """(id задачи, множество кодовых особенностей) по всем активным.
+
+        Считается по данным банка, а не по составу прогона: обогащалась
+        задача или нет, наличие таблицы в её условии от этого не зависит.
+        """
+        active = Problem.objects.exclude(status__in=INACTIVE_STATUSES)
+        figure_ids = set(
+            Problem.objects.filter(figures__isnull=False)
+            .values_list('id', flat=True))
+        rubric_ids = set(
+            Problem.objects.filter(rubrics__isnull=False)
+            .values_list('id', flat=True))
+        olympiad_ids = set(OlympiadRef.objects.values_list('problem_id', flat=True))
+        parts = defaultdict(list)
+        for pid, text in ProblemPart.objects.values_list('problem_id', 'statement'):
+            parts[pid].append(text)
+        for pid, statement in active.values_list('id', 'statement').iterator(
+                chunk_size=2000):
+            yield pid, layout.code_features(
+                statement, parts.get(pid) or [],
+                has_figure=pid in figure_ids,
+                parts_count=len(parts.get(pid) or []),
+                has_rubric=pid in rubric_ids,
+                has_olympiad_ref=pid in olympiad_ids)
+
+    def plan_code_features(self):
+        counter = Counter()
+        total = 0
+        for _pid, keys in self.iter_code_features():
+            total += 1
+            for key in keys:
+                counter[key] += 1
+        counter['_активных'] = total
+        return counter
 
     def build_legacy_plan(self, legacy_only_ids, legacy_old_values):
         translated = Counter()
@@ -613,6 +820,51 @@ class Command(BaseCommand):
                                   % (name, nums['всего_привязано'],
                                      nums['вне_охвата_обогащения']))
 
+    def report_layout(self, counters, skipped, code_plan):
+        """Отчёт по полям, добавленным раскладкой 07.09.2026."""
+        self.stdout.write('')
+        self.stdout.write('=== Раскладка остальных полей журнала ===')
+        self.stdout.write('источник строк: %s'
+                          % dict(counters['источник']))
+        for field in ('given', 'find', 'plot', 'difficulty_note',
+                      'text_quality_note', 'task_nature', 'text_quality',
+                      'topic_confidence', 'search_queries'):
+            self.stdout.write('  --- %s ---' % field)
+            for name, value in counters[field].most_common():
+                self.stdout.write('    %-34s %6d' % (name, value))
+        self.stdout.write('  --- econ_concepts ---')
+        for name, value in counters['econ_concepts'].most_common():
+            self.stdout.write('    %-34s %6d' % (name, value))
+        self.stdout.write('  --- concepts_offlist (диагностика) ---')
+        for name, value in counters['concepts_offlist'].most_common():
+            self.stdout.write('    %-34s %6d' % (name, value))
+        self.stdout.write('  --- особенности от модели ---')
+        for name, value in counters['features_модель'].most_common():
+            self.stdout.write('    %-34s %6d' % (name, value))
+        self.stdout.write('  --- content_status (только ухудшение) ---')
+        for name, value in counters['content_status'].most_common():
+            self.stdout.write('    %-34s %6d' % (name, value))
+
+        total = code_plan.get('_активных', 0)
+        self.stdout.write('')
+        self.stdout.write('=== Особенности от кода (все %d активных задач) ==='
+                          % total)
+        for key in feat.CODE_KEYS:
+            n = code_plan.get(key, 0)
+            share = (100.0 * n / total) if total else 0.0
+            gate = ''
+            if key in feat.COVERAGE_GATED and share < feat.MIN_CATALOG_COVERAGE * 100:
+                gate = '  ← в фильтре каталога СКРЫТА (порог %.0f %%)' % (
+                    feat.MIN_CATALOG_COVERAGE * 100)
+            self.stdout.write('  %-34s %6d  (%.2f %%)%s' % (key, n, share, gate))
+
+        if self.invalid_value_ids:
+            self.stdout.write('')
+            self.stdout.write('=== Значения вне справочника — задачи на разбор ===')
+            for field, pairs in sorted(self.invalid_value_ids.items()):
+                self.stdout.write('  %s: %d задач, первые пять: %s'
+                                  % (field, len(pairs), pairs[:5]))
+
     def write_json_report(self, counters, skipped, legacy_plan, taxonomy_plan,
                           difficulty_crosstab, contamination):
         out = {
@@ -656,9 +908,11 @@ class Command(BaseCommand):
     def apply_all(self, ok_rows, legacy_only_ids, legacy_old_values, taxonomy_plan):
         with transaction.atomic():
             topic_by_id, tag_by_id = self.ensure_taxonomy_objects()
+            concept_by_name = self.ensure_concepts()
 
-            ids = [r['problem_id'] for r in ok_rows]
-            rows_by_id = {r['problem_id']: r for r in ok_rows}
+            all_rows = list(ok_rows) + [dict(r, _run1=True) for r in self.run1_rows]
+            ids = [r['problem_id'] for r in all_rows]
+            rows_by_id = {r['problem_id']: r for r in all_rows}
             written = Counter()
 
             for chunk_ids in chunks(ids):
@@ -674,6 +928,32 @@ class Command(BaseCommand):
                     if problem is None:
                         continue
                     changed = False
+
+                    changed = self._apply_scalars(problem, row, written) or changed
+                    self._apply_concepts(problem, row, concept_by_name, written)
+                    new_status = layout.content_status_for(
+                        problem.content_status, row.get('text_quality'),
+                        row.get('problem_type'))
+                    if new_status != problem.content_status:
+                        problem.content_status = new_status
+                        written['content_status_ухудшен'] += 1
+                        changed = True
+                    character = feat.character_for(row.get('task_nature'))
+                    if character and problem.character != character:
+                        problem.character = character
+                        changed = True
+                    source_tag = 'run1' if row.get('_run1') else 'run2'
+                    if problem.enrichment_source != source_tag:
+                        problem.enrichment_source = source_tag
+                        changed = True
+                    problem.enrichment_at = timezone.now()
+
+                    if row.get('_run1'):
+                        # Слабый прогон боевые тему/тег/заголовок/тип не трогает.
+                        if changed:
+                            to_save.append(problem)
+                            written['задач_изменено'] += 1
+                        continue
 
                     topic_ids = [str(t) for t in
                                 [row.get('topic_primary')] + list(row.get('topics_secondary') or [])
@@ -728,7 +1008,12 @@ class Command(BaseCommand):
                 Problem.objects.bulk_update(
                     to_save,
                     ['title', 'title_candidate', 'title_source', 'problem_type',
-                     'difficulty', 'answer_consistency'])
+                     'difficulty', 'answer_consistency',
+                     'given', 'find', 'plot', 'difficulty_note',
+                     'text_quality_note', 'task_nature', 'text_quality',
+                     'topic_confidence', 'search_queries', 'concepts_offlist',
+                     'content_status', 'character',
+                     'enrichment_source', 'enrichment_at'])
                 if new_hints:
                     Hint.objects.bulk_create(new_hints)
                     written['подсказок_строк'] += len(new_hints)
@@ -749,7 +1034,108 @@ class Command(BaseCommand):
                               % (written['hints_задач'], written['подсказок_строк']))
             self.stdout.write('задач переведено кроссвоком (вне прогона): %d' % legacy_translated)
 
+            self.apply_features(all_rows, written)
             self.print_invariants()
+
+    # ------------------------------------------------------------------
+    # Применение раскладки 07.09.2026
+    # ------------------------------------------------------------------
+
+    def ensure_concepts(self):
+        """Справочник понятий из `data/econ_terms.json`. Идемпотентно."""
+        terms = layout.load_terms()
+        existing = dict(EconConcept.objects.values_list('canonical', 'id'))
+        new_rows = [EconConcept(canonical=name, section=section)
+                    for name, section in terms.items() if name not in existing]
+        if new_rows:
+            EconConcept.objects.bulk_create(new_rows, batch_size=500)
+            self.stdout.write('понятий заведено в справочник: %d' % len(new_rows))
+        return {c.canonical: c for c in EconConcept.objects.all()}
+
+    def _apply_scalars(self, problem, row, written):
+        values, _invalid = layout.row_scalar_fields(row)
+        changed = False
+        for field, value in values.items():
+            if getattr(problem, field) != value:
+                setattr(problem, field, value)
+                written['поле_%s' % field] += 1
+                changed = True
+        return changed
+
+    def _apply_concepts(self, problem, row, concept_by_name, written):
+        found, missing = layout.match_concepts(
+            row.get('econ_concepts'), self.concept_lookup)
+        if found:
+            problem.econ_concepts.set([concept_by_name[n] for n in found])
+            written['понятий_связей'] += len(found)
+        offlist = list(dict.fromkeys(
+            list(missing) + list(row.get('concepts_offlist') or [])))
+        if offlist and problem.concepts_offlist != offlist:
+            problem.concepts_offlist = offlist
+
+    def apply_features(self, all_rows, written):
+        """Особенности: модельные из журналов, кодовые по всем активным.
+
+        Пишется связь `ProblemFeature`, и ТОЛЬКО ПОТОМ из неё пересчитывается
+        витрина `Problem.features` — одной функцией `features.catalog_view()`.
+        Обратный порядок означал бы второй источник правды.
+        """
+        feature_by_key = layout.ensure_features()
+        model_keys_by_id = {}
+        for row in all_rows:
+            keys = [k for k in (row.get('features_1') or []) if k in feat.MODEL_KEYS]
+            if keys:
+                model_keys_by_id[row['problem_id']] = set(keys)
+
+        existing = defaultdict(dict)
+        for pid, fid, src in ProblemFeature.objects.values_list(
+                'problem_id', 'feature_id', 'source'):
+            existing[pid][fid] = src
+
+        to_create, to_update, view_updates = [], [], []
+        drop_ids = []
+        for pid, code_keys in self.iter_code_features():
+            wanted = layout.merge_feature_sources(
+                model_keys_by_id.get(pid, set()), code_keys)
+            have = existing.get(pid, {})
+            wanted_by_fid = {feature_by_key[k].id: src for k, src in wanted.items()}
+            for fid, src in wanted_by_fid.items():
+                if fid not in have:
+                    to_create.append(ProblemFeature(
+                        problem_id=pid, feature_id=fid, source=src))
+                elif have[fid] != src:
+                    to_update.append((pid, fid, src))
+            drop_ids += [(pid, fid) for fid in have if fid not in wanted_by_fid]
+            view_updates.append((pid, feat.catalog_view(wanted)))
+
+        if to_create:
+            ProblemFeature.objects.bulk_create(to_create, batch_size=1000)
+        for pid, fid, src in to_update:
+            ProblemFeature.objects.filter(problem_id=pid, feature_id=fid).update(source=src)
+        for chunk in chunks([pid for pid, _fid in drop_ids]):
+            pairs = {(p, f) for p, f in drop_ids if p in set(chunk)}
+            for pid, fid in pairs:
+                ProblemFeature.objects.filter(problem_id=pid, feature_id=fid).delete()
+
+        # витрина каталога — из связи, пакетами
+        by_id = {pid: view for pid, view in view_updates}
+        for chunk_ids in chunks(list(by_id)):
+            objs = list(Problem.objects.filter(id__in=chunk_ids).only('id', 'features'))
+            dirty = []
+            for obj in objs:
+                view = sorted(by_id[obj.id])
+                if sorted(obj.features or []) != view:
+                    obj.features = view
+                    dirty.append(obj)
+            if dirty:
+                Problem.objects.bulk_update(dirty, ['features'])
+                written['витрина_обновлена'] += len(dirty)
+
+        written['особенностей_связей_создано'] += len(to_create)
+        written['особенностей_связей_снято'] += len(drop_ids)
+        self.stdout.write(
+            'особенности: связей создано %d, снято %d, витрина обновлена у %d задач'
+            % (len(to_create), len(drop_ids), written['витрина_обновлена']))
 
     def print_invariants(self):
         self.stdout.write('')
