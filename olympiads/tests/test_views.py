@@ -1,7 +1,7 @@
 """Экраны раздела: главное — они обязаны жить и на пустых данных."""
 import re
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from olympiads.models import (Olympiad, OlympiadVariant,
@@ -23,6 +23,10 @@ def visible_text(response):
     return re.sub(r'\s+', ' ', re.sub(r'<[^>]+>', ' ', html))
 
 
+# ⚠️ РАЗДЕЛ ЗАКРЫТ ЗАГЛУШКОЙ «СКОРО» (флаг OLYMPIADS_PUBLIC, 08.09.2026).
+# Классы ниже проверяют СОДЕРЖИМОЕ экранов, а не гейт, — поэтому раздел им
+# открывают явно. Сам гейт сторожит OlympiadsAreClosedTests.
+@override_settings(OLYMPIADS_PUBLIC=True)
 class EmptyStateTests(TestCase):
 
     def test_list_works_with_zero_olympiads(self):
@@ -55,6 +59,7 @@ class EmptyStateTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class RegionsBlockTests(TestCase):
     """Блок регионов — только у ВсОШ: школьный и муниципальный этапы
     назначает субъект, и только у неё это так."""
@@ -76,6 +81,7 @@ class RegionsBlockTests(TestCase):
         self.assertNotIn('Региональные организаторы', visible_text(response))
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class RoutingTests(TestCase):
 
     def test_calendar_is_not_caught_as_a_slug(self):
@@ -96,6 +102,7 @@ class RoutingTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class CompareTests(TestCase):
 
     def setUp(self):
@@ -119,6 +126,7 @@ class CompareTests(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class VariantButtonsTests(TestCase):
     """Кнопки блока комплектов. Заглушку «Скоро» сменила тренировка.
 
@@ -161,6 +169,7 @@ class VariantButtonsTests(TestCase):
         self.assertEqual(variant.duration_minutes, None)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class PlaceholderVariantTests(TestCase):
     """Комплект без чисел обязан называть себя вслух.
 
@@ -245,6 +254,7 @@ class PlaceholderVariantTests(TestCase):
         self.assertNotIn('href="https://example.test/x"', html)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class RegionOrderTests(TestCase):
     """Порядок регионов в списке: сначала sort_order, потом алфавит.
 
@@ -303,6 +313,7 @@ class RegionOrderTests(TestCase):
         self.assertLess(last_of_group0, first_of_group1)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class BenefitWhoGetsTests(TestCase):
     """«Только победителям» обязано быть видно в таблице льгот.
 
@@ -339,3 +350,87 @@ class BenefitWhoGetsTests(TestCase):
         benefit.benefit_type = OlympiadBenefit.BenefitType.NONE
         benefit.save()
         self.assertEqual(benefit.who_label, '')
+
+
+class OlympiadsAreClosedTests(TestCase):
+    """⚠️ РАЗДЕЛ ЗАКРЫТ ЗАГЛУШКОЙ «СКОРО» — гейт, а не содержимое экранов.
+
+    Решение владельца 08.09.2026: раздел собран целиком, но публике его
+    показывать рано. Флаг `OLYMPIADS_PUBLIC` по умолчанию выключен, персонал
+    ходит внутрь и без него.
+
+    Проверка стоит в КАЖДОЙ вьюхе, а не в middleware: у тренировки семь
+    адресов, и один забытый пускал бы внутрь закрытого раздела. Поэтому тут
+    проверяются и основные четыре адреса, и тренировочный.
+    """
+
+    MAIN = ('/olympiads/', '/olympiads/vseros/',
+            '/olympiads/calendar/', '/olympiads/compare/')
+
+    def setUp(self):
+        make_olympiad('vseros', is_published=True, kind=Olympiad.Kind.VSOSH)
+
+    def _make_user(self, username, **kwargs):
+        from problems.models import User
+        return User.objects.create_user(
+            username=username, password='olymp-gate-2026', **kwargs)
+
+    def test_guest_sees_the_stub_on_every_main_address(self):
+        """Числовой инвариант фазы: «Скоро.» вернулось 4 из 4."""
+        seen = 0
+        for url in self.MAIN:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            if 'Скоро.' in visible_text(response):
+                seen += 1
+        self.assertEqual(seen, 4)
+
+    def test_plain_student_sees_the_stub_too(self):
+        """Вошедший — не значит «свой»: заглушку снимает только персонал."""
+        self.client.force_login(self._make_user('olymp_st', role='student'))
+        for url in self.MAIN:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200, url)
+            self.assertIn('Скоро.', visible_text(response), url)
+
+    def test_the_stub_promises_nothing(self):
+        """Ни формы, ни кнопки, ни поля — обещать на заглушке нечего."""
+        html = self.client.get('/olympiads/').content.decode('utf-8')
+        body = html.split('<div class="ol-soon">', 1)[1].split('</div>', 1)[0]
+        for tag in ('<form', '<button', '<input'):
+            self.assertNotIn(tag, body, tag)
+
+    def test_training_addresses_are_closed_as_well(self):
+        """Пятый адрес: тренировка. Заглушка стоит ДО поиска комплекта.
+
+        Комплекта с таким номером нет вовсе — и это часть проверки: гейт
+        обязан сработать раньше, чем `_variant_or_404`. Иначе закрытый
+        раздел отвечал бы 404 и выдавал, какие комплекты существуют.
+        """
+        response = self.client.get(
+            reverse('olympiads:training_intro', args=['vseros', 999]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('Скоро.', visible_text(response))
+
+    def test_five_anonymous_addresses_out_of_five(self):
+        """Числовой инвариант фазы целиком: 5 из 5."""
+        urls = self.MAIN + (
+            reverse('olympiads:training_intro', args=['vseros', 999]),)
+        closed = [u for u in urls
+                  if 'Скоро.' in visible_text(self.client.get(u))]
+        self.assertEqual(len(closed), 5, closed)
+
+    def test_staff_walks_straight_in(self):
+        """Персонал видит настоящий раздел и без флага."""
+        self.client.force_login(
+            self._make_user('olymp_ad', role='teacher', is_staff=True))
+        text = visible_text(self.client.get('/olympiads/'))
+        self.assertNotIn('Скоро.', text)
+        self.assertIn('Это олимпиады по экономике.', text)
+
+    @override_settings(OLYMPIADS_PUBLIC=True)
+    def test_the_flag_opens_the_section_for_everyone(self):
+        """Поднятый флаг — единственное, что нужно для публичного запуска."""
+        text = visible_text(self.client.get('/olympiads/'))
+        self.assertNotIn('Скоро.', text)
+        self.assertIn('Это олимпиады по экономике.', text)

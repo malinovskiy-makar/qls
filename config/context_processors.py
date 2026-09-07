@@ -57,6 +57,10 @@ def _menu(request):
     Порядок задан владельцем 04.09.2026: «Учебник» стоит сразу после
     «Каталога». Пункт «Статистика» из шапки ученика убран — статистика
     живёт в профиле.
+
+    ⚠️ «Календарь» из шапки убран 08.09.2026 (решение владельца). Убрана
+    ТОЛЬКО ссылка: маршрут `/calendar/` и приложение `calendar_stub` живы,
+    страница открывается по прямому адресу.
     """
     user = getattr(request, 'user', None)
     items = []
@@ -78,13 +82,8 @@ def _menu(request):
     add('/catalog/', 'Каталог', namespace='catalog')
     add('/textbook/', 'Учебник', url_name='textbook')
     add('/olympiads/', 'Олимпиады', namespace='olympiads')
-
-    # Календарь занятий — только тем, у кого эти занятия есть.
-    if role in ('teacher', 'student'):
-        add('/calendar/', 'Календарь', namespace='calendar_stub')
-
     add('/calc2/', 'Графики', path_has='calc2')
-    add('/game/', 'Тренажёр', path_has='/game/')
+    add('/game/', 'Wecon Rush', path_has='/game/')
 
     if authed and user.is_staff:
         add('/admin/', 'Админка', path_prefix='/admin/')

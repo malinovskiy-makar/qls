@@ -61,10 +61,16 @@ nav.site-nav {
    `min-width: 0` — ряд схлопывался в ноль, а ссылки вылезали наружу. */
 .nav-panel { display: none; }
 
-/* ⚠️ АКТИВНЫЙ ПУНКТ — ПОДЧЁРКИВАНИЕ ПЛЮС ФОН (04.09.2026, ADR 0072).
-   Одного подчёркивания мало: на графитовой полосе тонкая линия внизу
-   читается хуже, чем кажется на макете. Одного фона тоже мало — он
-   теряется при смене темы. Вместе они держатся в обеих. */
+/* ⚠️ АКТИВНЫЙ ПУНКТ — ЦВЕТ ПОДПИСИ И ЛИНИЯ ПОД СЛОВОМ (08.09.2026).
+   Отменяет решение от 04.09 (ADR 0072) «подчёркивание плюс фон»: заливка
+   красила прямоугольник во всю высоту полосы, и активный пункт отличался
+   от пункта под курсором только плотностью серого — .12 против .08.
+   Линия рисуется псевдоэлементом по ширине слова: отступы кнопки
+   (--nav-pad) в неё не входят, поэтому она короче самой кнопки.
+   ⚠️ Цвет берётся из --nav-accent, а НЕ из --accent: шапка не меняется по
+   темам, а --accent меняется, и в светлой теме он даёт на графите 2,30 при
+   пороге 4,5 — подпись была бы нечитаемой. Значение и замер — в
+   `_tokens.html`. */
 .nav-link {
   font-size: 14px;
   color: rgba(255, 255, 255, .6);
@@ -74,14 +80,25 @@ nav.site-nav {
   align-items: center;
   text-decoration: none;
   white-space: nowrap;
+  /* Прозрачная граница держит высоту строки — линию рисует ::after. */
   border-bottom: 2px solid transparent;
   transition: background var(--t), color var(--t);
+  position: relative;
 }
-.nav-link:hover { color: #fff; background: rgba(255, 255, 255, .08); }
-.nav-link.is-active {
-  color: #fff;
-  background: rgba(255, 255, 255, .12);
-  border-bottom-color: var(--accent);
+.nav-link::after {
+  content: '';
+  position: absolute;
+  left: var(--nav-pad); right: var(--nav-pad); bottom: 9px;
+  height: 2px; border-radius: 2px;
+  background: transparent;
+  transition: background var(--t), box-shadow var(--t);
+}
+.nav-link:hover { color: #fff; }
+.nav-link:hover::after { background: rgba(255, 255, 255, .22); }
+.nav-link.is-active { color: var(--nav-accent); font-weight: 600; }
+.nav-link.is-active::after {
+  background: var(--nav-accent);
+  box-shadow: 0 0 10px 1px var(--nav-accent-glow);
 }
 
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
@@ -211,7 +228,13 @@ nav.site-nav {
     border-left: 2px solid transparent;
     border-radius: var(--r);
   }
-  .nav-panel .nav-link.is-active { border-left-color: var(--accent); }
+  /* В вертикальном ряду линия под словом не нужна — активный пункт
+     панели держит риску слева, ей же дописан цвет подписи. */
+  .nav-panel .nav-link::after { display: none; }
+  .nav-panel .nav-link.is-active {
+    border-left-color: var(--nav-accent);
+    color: var(--nav-accent);
+  }
   .nav-panel .nav-version { display: inline-block; margin: 8px 0 0 10px; }
 }
 

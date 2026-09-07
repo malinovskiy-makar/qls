@@ -3,12 +3,31 @@
 Раздел публичный и вход не требует — как каталог. Ничего не пишет: все
 четыре функции только читают.
 """
+from django.conf import settings
 from django.db.models import F
 from django.shortcuts import get_object_or_404, render
 
 from . import services, training_engine
 from .models import (TAG_LABELS, Olympiad, RegionalCoordinator,
                      current_academic_year)
+
+
+def soon_page(request):
+    u"""Заглушка раздела или None, если пускать можно.
+
+    ⚠️ ПРОВЕРКА В КАЖДОЙ ВЬЮХЕ, А НЕ В MIDDLEWARE. Middleware ловил бы
+    адреса строкой пути, а у тренировки их семь, и один забытый пускал бы
+    внутрь закрытого раздела. Здесь забыть нельзя: без вызова вьюха просто
+    не соберётся по образцу соседних.
+
+    Ответ — 200, а не 403 и не 404: это не ошибка, а состояние раздела.
+    """
+    if settings.OLYMPIADS_PUBLIC:
+        return None
+    user = getattr(request, 'user', None)
+    if user is not None and user.is_authenticated and user.is_staff:
+        return None
+    return render(request, 'olympiads/soon.html')
 
 
 def _has_placeholder(objects):
@@ -22,6 +41,9 @@ def _has_placeholder(objects):
 
 def olympiad_list(request):
     """Главный экран раздела: лента ближайших дат, фильтры, карточки."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     olympiads = list(
         Olympiad.objects.filter(is_published=True)
         .prefetch_related('levels', 'events', 'variants')
@@ -48,6 +70,9 @@ def olympiad_list(request):
 
 def olympiad_detail(request, slug):
     """Страница одной олимпиады."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     olympiad = get_object_or_404(
         Olympiad.objects.prefetch_related('levels', 'events', 'stages'),
         slug=slug,
@@ -110,6 +135,9 @@ def calendar(request):
     календарь про занятия репетитора, этот про туры. Заготовка связки —
     `services.events_for_external_calendar()`.
     """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     year = current_academic_year()
     chosen = (request.GET.get('olympiad') or '').strip()
     olympiads = list(
@@ -137,6 +165,9 @@ def compare(request):
     падаем: ссылку могли прислать из чата, и ошибка вместо экрана здесь
     хуже, чем усечение.
     """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     raw = [s for s in (request.GET.get('slugs') or '').split(',') if s.strip()]
     wanted = [s.strip() for s in raw]
     trimmed = len(wanted) > services.COMPARE_LIMIT

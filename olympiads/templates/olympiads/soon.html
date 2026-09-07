@@ -1,0 +1,53 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+«Олимпиады» — заглушка «Скоро». Раздел собран целиком, но показывать его
+публике рано (решение владельца 08.09.2026). Персонал видит настоящие экраны.
+
+⚠️ НА ЭКРАНЕ НЕТ НИЧЕГО, КРОМЕ ЗНАКА, СЛОВА И ОДНОЙ СТРОКИ — как в
+«Учебнике»: ни кнопки, ни формы почты, ни списка будущих разделов. Обещать
+на заглушке нечего, а форма без работающей рассылки — обман.
+
+⚠️ КЛАСС СВОЙ (`.ol-soon`), А НЕ ЧУЖОЙ `.tb` ИЗ «УЧЕБНИКА». Стили
+скопированы намеренно: два раздела с общим классом разъедутся при первой же
+правке одного из них, и правивший об этом не узнает.
+{% endcomment %}
+
+{% block title %}Олимпиады{% endblock %}
+
+{% block extra_style %}
+.ol-soon {
+  min-height: calc(100vh - 220px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 48px 0;
+}
+.ol-soon-logo { width: min(420px, 76vw); height: auto; color: var(--text); }
+.ol-soon h1 {
+  font-size: 30px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  margin: 28px 0 8px;
+}
+.ol-soon p {
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--text2);
+  max-width: 46em;
+  margin: 0;
+}
+@media (max-width: 560px) {
+  .ol-soon h1 { font-size: 24px; }
+}
+{% endblock %}
+
+{% block content %}
+<div class="ol-soon">
+  {% include '_wordmark.html' with logo_class='ol-soon-logo' %}
+  <h1>Скоро.</h1>
+  <p>Олимпиады по экономике: календарь этапов, состав заданий, разборы и
+     тренировки. Уже собираем.</p>
+</div>
+{% endblock %}

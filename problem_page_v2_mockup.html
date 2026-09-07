@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап · Страница задачи v2: четыре вида ответа, контекст, статус · Weconomics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   МОКАП «Страница задачи v2: карточка «Ответ» по данным задачи, контекстная полоса, статус ученика» — 06.09.2026
+   Для Claude Code: ниже два слоя.
+   1) ТОКЕНЫ — копия значений из templates/_tokens.html (свет + тьма).
+      В проекте этот блок НЕ копировать: он уже подключён первым в <head>.
+   2) КОМПОНЕНТЫ — .ctx (контекст), .pst (статус ученика), .ans* (карточка «Ответ»), .nf* (поля числом), .drop (файл), остальное — из принятых мокапов страницы задачи и теста.
+      Их переносить как есть; цвета только через var(--…).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ТОКЕНЫ (копия _tokens.html, светлая тема) ──────────────────── */
+:root {
+  --accent: #00797a; --accent-ink: #006c6d; --accent-deep: #016769;
+  --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+  --accent-rgb: 0, 121, 122; --act-ink: #2d2d2d; --act-ink-solid: #ffffff;
+  --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+  --surface-tool: #81b5b4; --surface-info: #f2e8bd;
+  --border: rgba(45,45,45,.14); --border-soft: rgba(45,45,45,.08);
+  --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+  --brand-amber: #d6a525; --brand-amber-ink: #1d1a16; --brand-amber-hover: #e3b03a;
+  --btn-bg: #2e2b27; --btn-bg-hover: #3d3933; --on-btn: #ffffff; --nav-bg: #3c3531;
+  --chip-bg: rgba(45,45,45,.07); --chip-text: #5c5346;
+  --amber: #96500c; --amber-tint: rgba(150,80,12,.11); --amber-border: rgba(150,80,12,.34); --amber-ink: #723c09;
+  --green: #186e3c; --green-tint: rgba(24,110,60,.09); --green-border: rgba(24,110,60,.30); --green-ink: #186e3c;
+  --error: #b93526; --error-tint: rgba(185,53,38,.09); --error-border: rgba(185,53,38,.28); --on-error: #ffffff;
+  --pending: #43566f; --pending-tint: rgba(67,86,111,.09);
+  --focus: #7d7466; --focus-ring: rgba(125,116,102,.22);
+  --map-g-base: #A94223; --map-g-market: #704C10; --map-g-firm: #576114;
+  --map-g-state: #1C5F25; --map-g-macro: #6847C2; --map-g-fin: #8C3180; --map-g-tools: #B53054;
+  /* пять цветов блоков (решение 05.09: один источник problems/sections.py; пары — из замеренных семи) */
+  --blk-micro: #A94223; --blk-macro: #6847C2; --blk-fin: #8C3180; --blk-math: #1C5F25; --blk-other: #704C10;
+  --r-sm: 4px; --r: 6px; --r-card: 10px; --r-panel: 12px; --r-pill: 999px;
+  --t: .12s; --t-slow: .2s; --w-page: 960px; --w-read: 860px;
+  --font-ui: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fs-hero: 32px; --fs-h1: 24px; --fs-h2: 19px; --fs-body: 16px; --fs-ui: 14.5px; --fs-meta: 13px;
+  --lh-tight: 1.25; --lh-body: 1.6; --lh-ui: 1.45;
+  --shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+  --bg-pattern-alpha: .10;
+}
+[data-theme="dark"] {
+  --accent: #81b5b4; --accent-ink: #81b5b4; --accent-deep: #9bc6c5;
+  --accent-tint: rgba(129,181,180,.16); --accent-ring: rgba(129,181,180,.40);
+  --accent-rgb: 129, 181, 180; --act-ink: #f2ecd9; --act-ink-solid: #1d1a16;
+  --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+  --surface-tool: #2d504f; --surface-info: #504a2d;
+  --border: rgba(255,255,255,.13); --border-soft: rgba(255,255,255,.07);
+  --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+  --btn-bg: #c4bba9; --btn-bg-hover: #d0c7b5; --on-btn: #23211d;
+  --focus: #8a8172; --focus-ring: rgba(138,129,114,.26);
+  --chip-bg: rgba(255,255,255,.08); --chip-text: #c8c2b0;
+  --amber: #efa273; --amber-tint: rgba(239,162,115,.15); --amber-border: rgba(239,162,115,.34); --amber-ink: #f9eae1;
+  --green: #3fc77f; --green-ink: #bfecd4; --green-tint: rgba(63,199,127,.15); --green-border: rgba(63,199,127,.32);
+  --error: #ff8a8a; --error-ink: #ffd2d2; --error-tint: rgba(255,138,138,.15); --error-border: rgba(255,138,138,.30); --on-error: #1d1a16;
+  --map-g-base: #DA6B49; --map-g-market: #D6931F; --map-g-firm: #8C9D20;
+  --map-g-state: #36BA48; --map-g-macro: #9A85D6; --map-g-fin: #D27FC7; --map-g-tools: #D66684;
+  --blk-micro: #DA6B49; --blk-macro: #9A85D6; --blk-fin: #D27FC7; --blk-math: #36BA48; --blk-other: #D6931F;
+  --bg-pattern-alpha: .15;
+}
+
+/* ── База страницы (приближение к catalog/base.html, в проект не копировать) ── */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--fs-body)/var(--lh-body) var(--font-ui);
+       -webkit-font-smoothing: antialiased; min-height: 100vh; position: relative; }
+body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: var(--bg-pattern-alpha);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='260' viewBox='0 0 320 260'><path d='M20 40 l30 110 l35 -80 l35 80 l30 -110' fill='none' stroke='%237fae7c' stroke-width='26' stroke-linecap='round' stroke-linejoin='round'/><path d='M180 150 l24 84 l28 -60 l28 60 l24 -84' fill='none' stroke='%23c9b45a' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 320px 260px; }
+.site-nav { position: relative; z-index: 1; background: var(--nav-bg); height: 56px; display: flex;
+  align-items: center; padding: 0 28px; gap: 26px; font-size: 15.5px; }
+.site-nav .logo { width: 34px; height: 34px; border-radius: 50%; background: #81b5b4; color: #1d1a16;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+.site-nav a { color: #c9c1ae; text-decoration: none; line-height: 56px; }
+.site-nav a.is-on { color: #fff; box-shadow: inset 0 -2px 0 #81b5b4; }
+.site-nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; color: #c9c1ae; }
+.site-nav .right span { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.page-wrap { position: relative; z-index: 1; max-width: var(--w-page); margin: 0 auto; padding: 28px 20px 80px; }
+.ct-head { margin: 0 0 22px; }
+.ct-head h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: -.01em; line-height: 1.2; }
+.ct-head p { margin: 0; color: var(--text2); font-size: 16px; line-height: 1.5; max-width: 46em; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button { font-family: inherit; }
+
+/* ── Каркас: страница задачи шире общей полосы 860 — под карточку чата ── */
+.pd-wrap { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: 36px 20px 80px; }
+.pd-grid { display: grid; grid-template-columns: minmax(0, 1fr) 328px; gap: 32px; align-items: start; }
+.pd-side { position: sticky; top: 72px; }
+@media (max-width: 980px) { .pd-grid { grid-template-columns: 1fr; } .pd-side { position: static; } }
+
+/* ── Заголовок и действия ────────────────────────────────────────────── */
+.pd-title { font-size: 28px; font-weight: 700; line-height: 1.25; letter-spacing: -.01em; margin: 0 0 10px; }
+.pd-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+.pd-act { display: inline-flex; align-items: center; gap: 6px; font: 500 13px/1 var(--font-ui);
+  padding: 7px 11px; border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--surface);
+  color: var(--text2); cursor: pointer; transition: border-color var(--t), color var(--t); }
+.pd-act:hover { color: var(--text); border-color: var(--accent); }
+.pd-act svg { width: 14px; height: 14px; }
+.pd-act.is-on { color: var(--amber-ink); border-color: var(--amber-border); background: var(--amber-tint); }
+.pd-act--copied { color: var(--green); border-color: var(--green-border); }
+
+/* ── Облачка свойств: два ряда, каждое — ссылка в каталог с этим фильтром.
+   Цвет — второй носитель смысла рядом со словом/глифом (правило 1.1.3). ── */
+.pp-rows { display: flex; flex-direction: column; gap: 8px; margin: 0 0 20px; }
+.pp-row { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+.pp { display: inline-flex; align-items: center; gap: 6px; border-radius: var(--r-pill); padding: 5px 11px;
+  font: 500 13px/1.25 var(--font-ui); color: var(--text); text-decoration: none; border: 1px solid transparent;
+  background: var(--surface); transition: border-color var(--t), transform var(--t); max-width: 100%; }
+.pp:hover { border-color: var(--accent); }
+.pp:active { transform: scale(.98); }
+.pp--topic { background: color-mix(in srgb, var(--gc) 16%, var(--surface)); border-color: color-mix(in srgb, var(--gc) 45%, transparent); font-weight: 600; }
+.pp--topic::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gc); flex: none; }
+.pp--tag { border-color: color-mix(in srgb, var(--gc) 40%, transparent); color: var(--text); }
+.pp--tag::before { content: '#'; color: color-mix(in srgb, var(--gc) 80%, var(--text)); font-weight: 700; }
+.pp--diff { background: var(--amber-tint); border-color: var(--amber-border); color: var(--amber-ink); }
+.pp--diff .st { letter-spacing: .5px; color: var(--amber); }
+.pp--char { background: var(--accent-tint); color: var(--accent-ink); border-color: var(--accent-ring); }
+.pp--kind { background: var(--chip-bg); color: var(--chip-text); }
+.pp--feat { background: var(--pending-tint); color: var(--pending); border-color: transparent; }
+.pp--feat svg { width: 13px; height: 13px; }
+.pp--src { background: transparent; color: var(--text3); border-color: var(--border); font-weight: 400; }
+.pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
+
+/* ── Условие: своя поверхность, подпункты внутри, вплотную ─────────── */
+.stm { background: var(--surface-info); border-radius: 14px; padding: 22px 26px 8px; margin: 0 0 18px;
+  font-size: 17px; line-height: 1.7; }
+.stm p { margin: 0 0 .7em; }
+.stm i, .stm var { font-style: italic; font-family: 'Times New Roman', 'STIX Two Text', serif; font-size: 1.08em; }
+.stm .parts { list-style: none; margin: 4px 0 0; padding: 0; border-top: 1px solid rgba(45,45,45,.10); }
+[data-theme="dark"] .stm .parts { border-top-color: rgba(255,255,255,.10); }
+.stm .part { display: flex; gap: 12px; padding: 12px 0; border-top: 1px dashed rgba(45,45,45,.12); }
+.stm .part:first-child { border-top: 0; }
+[data-theme="dark"] .stm .part { border-top-color: rgba(255,255,255,.10); }
+.stm .part b { color: var(--accent-ink); font-weight: 700; min-width: 22px; }
+.stm-figure { margin: 10px 0 14px; background: var(--surface); border-radius: 10px; padding: 12px; text-align: center; font-size: 13px; color: var(--text3); }
+
+/* ── Карточка «Решение»: ввод + действия ────────────────────────────── */
+.sv { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 14px; margin: 0 0 18px; }
+.sv-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; }
+.sv-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sv-head small { color: var(--text3); font-size: 13px; }
+.sv-field { border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); transition: border-color var(--t), box-shadow var(--t); }
+.sv-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); background: var(--surface); }
+.sv-field textarea { width: 100%; border: 0; background: transparent; resize: none; display: block; min-height: 118px;
+  padding: 12px 14px; font: 400 15.5px/1.55 var(--font-ui); color: var(--text); outline: none; }
+.sv-field textarea::placeholder { color: var(--text3); }
+.sv-attach { display: flex; align-items: center; gap: 8px; padding: 6px 10px 10px 14px; flex-wrap: wrap; }
+.att { display: inline-flex; align-items: center; gap: 8px; border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface); padding: 5px 8px 5px 5px; font-size: 13px; color: var(--text2); animation: chipIn .14s ease-out; }
+.att .thumb { width: 28px; height: 28px; border-radius: 6px; background: linear-gradient(135deg, var(--surface-2), var(--surface-info)); display: inline-flex; align-items: center; justify-content: center; color: var(--text3); }
+.att .thumb svg { width: 15px; height: 15px; }
+.att .x { border: 0; background: none; color: var(--text3); cursor: pointer; font-size: 14px; line-height: 1; padding: 2px 4px; }
+.att .x:hover { color: var(--text); }
+@keyframes chipIn { from { opacity: 0; transform: scale(.94); } }
+.att-add { display: inline-flex; align-items: center; gap: 7px; font: 500 13px/1 var(--font-ui); color: var(--text2);
+  background: none; border: 1px dashed var(--border); border-radius: 10px; padding: 9px 11px; cursor: pointer; }
+.att-add:hover { color: var(--text); border-color: var(--accent); border-style: solid; }
+.att-add svg { width: 15px; height: 15px; }
+.sv-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.sv-row .grow { flex: 1 1 auto; }
+.btn { display: inline-flex; align-items: center; gap: 8px; font: 600 14px/1 var(--font-ui); padding: 11px 16px;
+  border-radius: 9px; border: 1px solid transparent; cursor: pointer; text-decoration: none; transition: background var(--t), border-color var(--t), color var(--t); }
+.btn svg { width: 15px; height: 15px; }
+/* Главная кнопка экрана одна и она графитовая (правила 7–8 канона). */
+.btn--main { background: var(--btn-bg); color: var(--on-btn); }
+.btn--main:hover { background: var(--btn-bg-hover); }
+.btn--main:disabled { opacity: .5; cursor: default; }
+.btn--quiet { background: var(--surface); color: var(--text); border-color: var(--border); }
+.btn--quiet:hover { border-color: var(--accent); }
+.btn--quiet:disabled { color: var(--text3); border-color: var(--border-soft); cursor: default; }
+.btn--quiet:disabled:hover { border-color: var(--border-soft); }
+.btn .n { font-weight: 500; color: var(--text3); }
+.sv-limit { font-size: 12.5px; color: var(--text3); }
+.sv-limit b { font-weight: 600; color: var(--text2); }
+/* мягкое подтверждение перед показом решения — не модалка, а замена кнопки */
+.sv-confirm { display: none; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13.5px; color: var(--text2);
+  background: var(--surface-2); border-radius: 10px; padding: 8px 8px 8px 12px; margin-top: 10px; }
+.sv-confirm.is-on { display: flex; }
+.btn--sm { padding: 7px 11px; font-size: 13px; }
+
+/* ── Подсказки уровнями ─────────────────────────────────────────────── */
+.hints { display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
+.hint { display: flex; gap: 12px; align-items: flex-start; background: var(--accent-tint); border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0; padding: 10px 14px; font-size: 14.5px; line-height: 1.55; animation: chipIn .18s ease-out; }
+.hint .k { flex: none; font-weight: 700; color: var(--accent-ink); font-size: 12.5px; padding-top: 2px; white-space: nowrap; }
+.hint .ai { font-size: 12px; color: var(--text3); margin-top: 4px; }
+
+/* ── Решение и ответ (раскрытие) ────────────────────────────────────── */
+.sol { display: none; margin-top: 14px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.sol.is-on { display: block; animation: chipIn .18s ease-out; }
+.sol-head { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--surface-2); border-bottom: 1px solid var(--border-soft); }
+.sol-head h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.sol-ans { margin-left: auto; font-size: 14px; color: var(--text2); }
+.sol-ans b { color: var(--text); font-variant-numeric: tabular-nums; }
+.sol-body { padding: 14px 16px 6px; font-size: 15px; line-height: 1.65; }
+.sol-body ol { margin: 0; padding-left: 22px; }
+.sol-body li { margin: 0 0 8px; }
+.sol-body i { font-style: italic; font-family: 'Times New Roman', serif; font-size: 1.06em; }
+
+/* ── Результат проверки ИИ ───────────────────────────────────────────
+   Состояние показывается полосой слева, значком и словом — панель не
+   заливается (правило 9). Балл — tabular-nums (правило 12). Итог модели
+   помечен как предварительный (2.13). ── */
+.chk { display: none; border: 1px solid var(--border); border-left-width: 4px; border-radius: 12px; background: var(--surface);
+  margin: 0 0 18px; overflow: hidden; }
+.chk.is-on { display: block; animation: chipIn .2s ease-out; }
+.chk--ok { border-left-color: var(--green); } .chk--part { border-left-color: var(--amber); }
+.chk--bad { border-left-color: var(--error); } .chk--wait { border-left-color: var(--pending); }
+.chk-head { display: flex; align-items: center; gap: 16px; padding: 16px 18px 12px; }
+.chk-score { font-size: 30px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+.chk-score small { font-size: 15px; font-weight: 500; color: var(--text3); }
+.chk-verdict { font-weight: 600; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.chk--ok .chk-verdict { color: var(--green); } .chk--part .chk-verdict { color: var(--amber-ink); }
+.chk--bad .chk-verdict { color: var(--error); } .chk--wait .chk-verdict { color: var(--pending); }
+.chk-verdict svg { width: 18px; height: 18px; }
+.chk-sub { font-size: 13.5px; color: var(--text2); margin-top: 2px; }
+.chk-steps { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-soft); }
+.chk-step { display: grid; grid-template-columns: 24px 1fr; gap: 12px; padding: 10px 18px; border-top: 1px solid var(--border-soft); font-size: 14.5px; line-height: 1.5; }
+.chk-step:first-child { border-top: 0; }
+.chk-mark { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; margin-top: 1px; }
+.chk-mark.ok { background: var(--green-tint); color: var(--green); }
+.chk-mark.bad { background: var(--error-tint); color: var(--error); }
+.chk-mark.part { background: var(--amber-tint); color: var(--amber-ink); }
+.chk-mark.na { background: var(--chip-bg); color: var(--text3); }
+.chk-step-t { font-weight: 600; }
+.chk-step-c { color: var(--text2); }
+.chk-step.is-first { background: var(--error-tint); }
+.chk-flag { display: inline-block; font-size: 11.5px; font-weight: 700; color: var(--error); margin-left: 8px; letter-spacing: .02em; }
+.chk-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; padding: 12px 18px 14px; border-top: 1px solid var(--border-soft); background: var(--surface-2); }
+.chk-conf { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); }
+.chk-conf .bars { display: inline-flex; gap: 2px; }
+.chk-conf .bars i { width: 14px; height: 6px; border-radius: 2px; background: var(--border); }
+.chk-conf .bars i.on { background: var(--accent); }
+.chk-note { font-size: 12.5px; color: var(--text3); flex: 1 1 100%; display: flex; gap: 6px; align-items: flex-start; }
+.chk-note svg { width: 14px; height: 14px; flex: none; margin-top: 2px; }
+.chk-acts { display: flex; gap: 8px; flex-wrap: wrap; margin-left: auto; }
+.chk-ocr { padding: 0 18px 12px; }
+.chk-ocr details { font-size: 13px; color: var(--text2); }
+.chk-ocr summary { cursor: pointer; color: var(--accent-ink); }
+.chk-ocr blockquote { margin: 8px 0 0; padding: 8px 12px; border-left: 2px solid var(--border); font-size: 13.5px; line-height: 1.5; }
+/* Идёт проверка */
+.chk-busy { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.chk-busy .line { display: flex; gap: 10px; align-items: center; font-size: 14.5px; }
+.chk-busy .spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: askSpin .8s linear infinite; }
+@keyframes askSpin { to { transform: rotate(360deg); } }
+.chk-busy .bar { height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.chk-busy .bar i { display: block; height: 100%; width: 40%; background: var(--accent); border-radius: 3px; animation: barRun 1.6s ease-in-out infinite; }
+@keyframes barRun { 0% { transform: translateX(-100%); } 100% { transform: translateX(260%); } }
+.chk-busy small { color: var(--text3); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .chk-busy .bar i, .chk-busy .spin { animation: none; } }
+
+/* ── Похожие задачи ─────────────────────────────────────────────────── */
+.sim { margin-top: 30px; }
+.sim-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.sim-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.sim-head a { font-size: 13px; color: var(--accent-ink); }
+.sim-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .sim-grid { grid-template-columns: 1fr; } }
+.sim-card { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 12px 14px; text-decoration: none; color: var(--text); transition: border-color var(--t); }
+.sim-card:hover { border-color: var(--accent); }
+.sim-line { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tchip { font-size: 12px; border-radius: var(--r-pill); padding: 3px 9px 3px 7px; display: inline-flex; gap: 6px; align-items: center;
+  background: color-mix(in srgb, var(--gc) 14%, var(--surface)); color: var(--text); }
+.tchip::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--gc); }
+.sim-title { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.sim-prev { font-size: 13px; color: var(--text2); line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.sim-meta { display: flex; gap: 8px; font-size: 12px; margin-top: auto; }
+.ct-stars { color: var(--amber); letter-spacing: .5px; } .ct-sol { color: var(--green); } .ct-kind { color: var(--text3); }
+
+/* ── Карточка ИИ-чата (справа, всегда видна) ────────────────────────── */
+.ai { background: var(--surface); border: 1.5px solid var(--accent-ring); border-radius: 16px; display: flex; flex-direction: column;
+  max-height: calc(100vh - 96px); overflow: hidden; }
+.ai-head { display: flex; align-items: center; gap: 10px; padding: 14px 16px 12px; border-bottom: 1px solid var(--border-soft); }
+.ai-head .ic { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--act-ink-solid); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.ai-head .ic svg { width: 16px; height: 16px; }
+.ai-head h2 { margin: 0; font-size: 15.5px; font-weight: 600; }
+.ai-head small { display: block; font-size: 12px; color: var(--text3); }
+.ai-body { padding: 14px 16px; overflow: auto; flex: 1 1 auto; display: flex; flex-direction: column; gap: 10px; }
+.ai-intro { font-size: 13.5px; color: var(--text2); line-height: 1.5; margin: 0; }
+.ai-sug { display: flex; flex-direction: column; gap: 6px; }
+.ai-sug button { text-align: left; font: 500 13px/1.35 var(--font-ui); color: var(--text); background: var(--surface-2); border: 1px solid transparent;
+  border-radius: 10px; padding: 8px 11px; cursor: pointer; }
+.ai-sug button:hover { border-color: var(--accent); }
+.ai-msg { max-width: 92%; font-size: 14px; line-height: 1.5; padding: 9px 12px; border-radius: 12px; animation: chipIn .16s ease-out; }
+.ai-msg--me { align-self: flex-end; background: var(--btn-bg); color: var(--on-btn); border-bottom-right-radius: 4px; }
+.ai-msg--ai { align-self: flex-start; background: var(--accent-tint); border-bottom-left-radius: 4px; }
+.ai-msg--ai .typing { display: inline-flex; gap: 3px; } .ai-msg--ai .typing i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: blink 1s infinite; }
+.ai-msg--ai .typing i:nth-child(2) { animation-delay: .2s; } .ai-msg--ai .typing i:nth-child(3) { animation-delay: .4s; }
+@keyframes blink { 0%, 80%, 100% { opacity: .25; } 40% { opacity: 1; } }
+.ai-foot { padding: 10px 12px 12px; border-top: 1px solid var(--border-soft); }
+.ai-in { display: flex; align-items: flex-end; gap: 6px; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 6px 6px 12px; transition: border-color var(--t), box-shadow var(--t); }
+.ai-in:focus-within { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-ring); }
+.ai-in textarea { flex: 1 1 auto; border: 0; background: transparent; resize: none; font: 400 14px/1.45 var(--font-ui); color: var(--text); outline: none; min-height: 24px; max-height: 120px; padding: 6px 0; }
+.ai-in textarea::placeholder { color: var(--text3); }
+.ai-send { width: 32px; height: 32px; border-radius: var(--r-pill); border: 0; background: var(--surface); color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: background var(--t), color var(--t); }
+.ai-send svg { width: 16px; height: 16px; }
+.ai-in.has-text .ai-send { background: var(--accent); color: var(--act-ink-solid); }
+.ai-note { font-size: 11.5px; color: var(--text3); margin: 8px 2px 0; line-height: 1.4; }
+/* ── E. Тест: играбельные варианты и разбор ─────────────────────────
+   Выбранный вариант получает сплошной акцент (правило 8: акцент —
+   у выбранного из равноправных). Разбор — четыре состояния из
+   student/_option_review.html: ✓ выбрал и верно, ✗ выбрал зря,
+   ○ надо было выбрать, · нейтрально. Цвета в законных значениях. ── */
+.sr-only { position: absolute; left: -9999px; }
+.stm--q { padding-bottom: 22px; }
+.stm--q .q { font-size: 19px; font-weight: 600; line-height: 1.45; margin: 0; }
+.tq { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px; margin: 0 0 18px; }
+.tq.is-shake { animation: shake .45s ease; }
+@keyframes shake { 10%, 90% { transform: translateX(-2px); } 20%, 80% { transform: translateX(3px); } 30%, 50%, 70% { transform: translateX(-4px); } 40%, 60% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .tq.is-shake { animation: none; } }
+.tq-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.tq-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.tq-rule { font-size: 13.5px; color: var(--text2); }
+.tq-try { margin-left: auto; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tq-stat { font-size: 12.5px; color: var(--text3); margin: -6px 0 12px; }
+.tq-stat b { color: var(--text2); font-weight: 600; }
+.opt-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.opt { display: flex; gap: 12px; align-items: flex-start; width: 100%; text-align: left; background: var(--surface-2);
+  border: 1.5px solid transparent; border-radius: 12px; padding: 12px 14px; cursor: pointer;
+  font: 400 15.5px/1.5 var(--font-ui); color: var(--text); transition: border-color var(--t), background var(--t), transform var(--t); }
+.opt:hover { border-color: var(--accent-ring); }
+.opt:active { transform: scale(.995); }
+.opt:disabled { cursor: default; }
+.opt:disabled:hover { border-color: transparent; }
+.opt-l { flex: none; width: 28px; height: 28px; border-radius: 50%; border: 1.5px solid var(--border); display: inline-flex;
+  align-items: center; justify-content: center; font-weight: 700; font-size: 13px; color: var(--text2); background: var(--surface);
+  transition: background var(--t), border-color var(--t), color var(--t); margin-top: -1px; }
+.opt-t { flex: 1 1 auto; }
+.opt-note { flex: none; align-self: center; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  white-space: nowrap; display: none; }
+.opt[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); }
+.opt[aria-pressed="true"] .opt-l { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); }
+/* разбор */
+.opt.is-hit { border-color: var(--green); background: var(--green-tint); }
+.opt.is-hit .opt-l { background: var(--green); border-color: var(--green); color: var(--act-ink-solid); }
+.opt.is-hit .opt-note { display: inline; color: var(--green); }
+.opt.is-wrong { border-color: var(--error); background: var(--error-tint); }
+.opt.is-wrong .opt-l { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.opt.is-wrong .opt-note { display: inline; color: var(--error); }
+.opt.is-missed { border-color: var(--amber); border-style: dashed; background: var(--amber-tint); }
+.opt.is-missed .opt-l { border-color: var(--amber); color: var(--amber-ink); background: transparent; }
+.opt.is-missed .opt-note { display: inline; color: var(--amber-ink); }
+.opt.is-skip { opacity: .72; }
+.opt.is-skip .opt-l { color: var(--text3); }
+@media (max-width: 560px) { .opt { flex-wrap: wrap; } .opt-note { width: 100%; padding-left: 40px; } }
+/* сообщение под вариантами */
+.tq-msg { display: none; align-items: center; gap: 10px; border-radius: 12px; padding: 11px 14px; margin-top: 12px;
+  font-size: 14.5px; border-left: 3px solid; animation: chipIn .18s ease-out; }
+.tq-msg.is-on { display: flex; }
+.tq-msg svg { width: 18px; height: 18px; flex: none; }
+.tq-msg--wrong { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.tq-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.tq-msg--show { background: var(--amber-tint); color: var(--amber-ink); border-color: var(--amber); }
+.tq-msg b { font-weight: 700; }
+.tq-msg .cnt { margin-left: auto; font-size: 13px; opacity: .9; }
+.tq-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.tq-row .grow { flex: 1 1 auto; }
+.tq-why { font-size: 13px; color: var(--text3); }
+.tq-kbd { font-size: 12px; color: var(--text3); }
+.tq-kbd kbd { font: 600 11px/1 var(--font-ui); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; background: var(--surface); color: var(--text2); }
+/* объяснение после разбора */
+.tq-expl { display: none; margin-top: 12px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+.tq-expl.is-on { display: block; animation: chipIn .18s ease-out; }
+.tq-expl .h { padding: 10px 14px; background: var(--surface-2); font-size: 14px; font-weight: 600; border-bottom: 1px solid var(--border-soft); }
+.tq-expl ul { margin: 0; padding: 10px 14px 10px 30px; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.tq-expl li { margin: 0 0 6px; }
+.tq-expl li b { color: var(--text); font-weight: 600; }
+
+/* ── Панель мокапа (НЕ часть дизайна) ─────────────────────────────── */
+.mk-bar { position: fixed; left: 14px; bottom: 14px; z-index: 60; background: #1d1a16; color: #f2ecd9; border-radius: 10px; padding: 8px 10px;
+  font: 500 12px/1.3 var(--font-ui); display: flex; gap: 6px; align-items: center; box-shadow: var(--shadow-pop); flex-wrap: wrap; max-width: 360px; }
+.mk-bar em { font-style: normal; opacity: .7; }
+.mk-bar .brk { flex-basis: 100%; height: 0; }
+.mk-bar button { font: inherit; background: #3c3531; color: #f2ecd9; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; }
+.mk-bar button.is-on { background: #81b5b4; color: #1d1a16; }
+.hidden { display: none !important; }
+
+/* ── Контекстная полоса: откуда пришли (дорожка / сессия / поиск) ───── */
+.ctx { display: flex; align-items: center; gap: 12px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; padding: 8px 10px 8px 14px; margin: 0 0 16px; font-size: 13px; }
+.ctx .k { font-weight: 700; color: var(--text3); font-size: 11.5px; letter-spacing: .02em; }
+.ctx .t { font-weight: 600; }
+.ctx .p { color: var(--text2); font-variant-numeric: tabular-nums; }
+.ctx .bar { flex: 1 1 120px; max-width: 220px; height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.ctx .bar i { display: block; height: 100%; width: 50%; background: var(--gc, var(--accent)); border-radius: 3px; }
+.ctx .nav { margin-left: auto; display: flex; gap: 6px; }
+.ctx a.back { margin-left: auto; color: var(--accent-ink); text-decoration: none; font-weight: 500; }
+/* ── Статус ученика под названием ─────────────────────────────────── */
+.pst { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); margin: -4px 0 10px; }
+.pst .lv { width: 16px; height: 16px; }
+.pst b { color: var(--text); font-weight: 600; }
+.lv circle { fill: none; stroke-width: 1.6; }
+.lv--none circle { stroke: var(--border); }
+.lv--work circle { stroke: var(--amber); } .lv--work path { fill: var(--amber); }
+.lv--sure circle { stroke: var(--green); fill: var(--green); } .lv--sure path { stroke: var(--act-ink-solid); fill: none; stroke-width: 2; }
+.pod-badge { display: inline-flex; align-items: center; gap: 6px; font: 700 12px/1 var(--font-ui); color: var(--brand-amber-ink); background: var(--brand-amber); border-radius: var(--r-pill); padding: 5px 10px; }
+
+/* ── Карточка «Ответ» ──────────────────────────────────────────────── */
+.ans { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 18px 14px; margin: 0 0 18px; }
+.ans-head { display: flex; align-items: baseline; gap: 12px; margin: 0 0 12px; flex-wrap: wrap; }
+.ans-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
+.ans-head small { color: var(--text3); font-size: 13px; }
+.ans-head .tries { margin-left: auto; font-size: 12.5px; color: var(--text3); font-variant-numeric: tabular-nums; }
+/* Поля числом — ОДНА группа с общей рамкой, внутри строка на пункт.
+   Enter в поле проверяет только этот пункт, кнопка «Проверить» — все
+   заполненные. Верный пункт замораживается, неверный остаётся для правки. */
+.nf-group { border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); overflow: hidden; }
+.nf { display: grid; grid-template-columns: 30px minmax(0, 1fr) 176px 30px; gap: 12px; align-items: center; padding: 10px 12px 10px 14px; border-top: 1px solid var(--border-soft); }
+.nf:first-child { border-top: 0; }
+.nf .l { font-weight: 700; color: var(--accent-ink); font-size: 15px; }
+.nf .q { font-size: 14px; color: var(--text); line-height: 1.35; }
+.nf.is-ok .q { color: var(--text2); }
+.num { width: 100%; font: 600 16px/1 var(--font-ui); padding: 9px 12px; border-radius: 9px; border: 1.5px solid var(--border); background: var(--surface); color: var(--text); outline: none; font-variant-numeric: tabular-nums; transition: border-color var(--t), box-shadow var(--t), background var(--t); }
+.num::placeholder { color: var(--text3); font-weight: 400; font-size: 14px; }
+.num:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.num.is-ok { border-color: var(--green); background: var(--green-tint); }
+.num.is-bad { border-color: var(--error); background: var(--error-tint); animation: shake .4s ease; }
+.num:disabled { color: var(--text2); }
+.nf .m { width: 24px; height: 24px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.nf .m svg { width: 14px; height: 14px; }
+.nf .m.ok { background: var(--green-tint); color: var(--green); } .nf .m.bad { background: var(--error-tint); color: var(--error); }
+.nf--single { grid-template-columns: minmax(0, 1fr) 176px 30px; }
+.nf-kbd { font-size: 12px; color: var(--text3); margin-top: 8px; }
+.nf-kbd kbd { font: 600 11px/1 var(--font-ui); border: 1px solid var(--border); border-radius: 4px; padding: 2px 5px; background: var(--surface); color: var(--text2); }
+/* строка формулой / словом */
+.str { display: flex; gap: 8px; align-items: center; }
+.str input { flex: 1 1 auto; font: 500 15px/1 var(--font-ui); padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; }
+.str input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface); }
+.str input.is-ok { border-color: var(--green); background: var(--green-tint); } .str input.is-bad { border-color: var(--error); background: var(--error-tint); }
+/* загрузка файла — главное действие, когда числа нет */
+.drop { display: flex; align-items: center; gap: 14px; border: 1.5px dashed var(--border); border-radius: 12px; padding: 14px 16px; cursor: pointer; background: var(--surface-2); text-align: left; width: 100%; font: inherit; color: var(--text); }
+.drop:hover { border-color: var(--accent); border-style: solid; background: var(--surface); }
+.drop .ic { width: 40px; height: 40px; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; flex: none; }
+.drop .ic svg { width: 20px; height: 20px; }
+.drop b { display: block; font-weight: 600; font-size: 14.5px; margin-bottom: 2px; }
+.drop span { font-size: 13px; color: var(--text2); }
+.ans-or { display: flex; align-items: center; gap: 10px; font-size: 12px; color: var(--text3); margin: 10px 0; }
+.ans-or::before, .ans-or::after { content: ''; flex: 1 1 auto; height: 1px; background: var(--border-soft); }
+.ans-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+.ans-row .grow { flex: 1 1 auto; }
+.ans-msg { display: none; align-items: center; gap: 8px; font-size: 14px; border-radius: 10px; padding: 9px 12px; border-left: 3px solid; margin-top: 12px; }
+.ans-msg.is-on { display: flex; animation: chipIn .18s ease-out; }
+.ans-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.ans-msg--bad { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.ans-msg b { font-weight: 700; }
+.ans-msg .cnt { margin-left: auto; font-size: 13px; opacity: .9; }
+.ans-busy { display: none; align-items: center; gap: 8px; font-size: 13.5px; color: var(--text2); margin-top: 12px; }
+.ans-busy.is-on { display: inline-flex; }
+.ans-busy i { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--accent-ring); border-top-color: var(--accent); animation: askSpin .8s linear infinite; }
+.ans-done { display: none; align-items: center; gap: 10px; margin-top: 12px; padding: 12px 14px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); font-size: 13.5px; color: var(--text2); }
+.ans-done.is-on { display: flex; }
+.need { display: flex; align-items: center; gap: 12px; background: var(--accent-tint); border-radius: 12px; padding: 12px 14px; font-size: 14px; }
+.need a { margin-left: auto; white-space: nowrap; }
+.ans .att-list { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.stm.is-folded { display: none; }
+/* Плашка «ИИ-чат — скоро» (решение владельца 07.09; исключение из правила нуля) */
+.ai-soon { background: var(--surface); border: 1.5px dashed var(--accent-ring); border-radius: 16px; padding: 22px 18px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.ai-soon .ic { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); display: inline-flex; align-items: center; justify-content: center; }
+.ai-soon .ic svg { width: 22px; height: 22px; }
+.ai-soon h2 { margin: 0; font-size: 15.5px; font-weight: 600; }
+.ai-soon .soon { display: inline-flex; font: 700 11.5px/1 var(--font-ui); letter-spacing: .04em; color: var(--brand-amber-ink); background: var(--brand-amber); border-radius: var(--r-pill); padding: 5px 9px; }
+.ai-soon p { margin: 0; font-size: 13px; color: var(--text2); line-height: 1.5; max-width: 26em; }
+.ico { width: 15px; height: 15px; flex: none; }
+</style>
+</head>
+<body class="role-student">
+<div class="mk-bar" aria-label="Панель мокапа">
+  <em>мокап · числа статистики — демонстрационные</em><span class="brk"></span>
+  <button type="button" id="mk-theme">Тёмная тема</button>
+  <em>вид:</em><button type="button" data-kind="num" class="is-on">число</button><button type="button" data-kind="file">файл</button><button type="button" data-kind="qual">кач</button><button type="button" data-kind="test">тест</button>
+  <span class="brk"></span>
+  <em>откуда:</em><button type="button" data-ctx="none" class="is-on">сама</button><button type="button" data-ctx="track">дорожка</button><button type="button" data-ctx="search">поиск</button>
+  <em>роль:</em><button type="button" data-role="guest">гость</button><button type="button" data-role="student" class="is-on">ученик</button>
+  <span class="brk"></span>
+  <em>состояние:</em><button type="button" data-st="reset" class="is-on">до</button><button type="button" data-st="human">нужен человек</button><button type="button" data-st="opened">решение открыто</button>
+</div>
+
+<nav class="site-nav" aria-label="Шапка сайта (имитация)">
+  <span class="logo">W</span>
+  <a href="#">Домашки</a><a href="#" class="is-on">Каталог</a><a href="#">Олимпиады</a><a href="#">Календарь</a><a href="#">Графики</a><a href="#">Тренажёр</a>
+  <div class="right"><span id="nav-user">Пётр Иванов</span><span>Выйти</span></div>
+</nav>
+
+<main class="pd-wrap">
+<div id="ctx"></div>
+<div class="pd-grid">
+<article class="pd-main">
+  <div id="head"></div>
+  <div id="stm"></div>
+  <div id="ans"></div>
+  <div id="after"></div>
+  <section class="sim" id="sim"></section>
+</article>
+<aside class="pd-side" id="side"></aside>
+</div>
+</main>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   ЛОГИКА. Вид карточки «Ответ» определяют данные задачи: тест → есть число
+   в ответах → качественная → файл. Проверка числом мгновенная и бесплатная;
+   строка (формула/слово) и текст — один вызов ИИ; файл — распознавание и
+   сверка по шагам. Подсказки и решение — только по запросу. Первая попытка
+   каждого поля идёт в уровень темы. Гость: число и тест; файл/текст — вход.
+   ═══════════════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const KINDS = {
+  num: { title: 'Вмешательство — 5', topic: 'Монополия и ценовая дискриминация', tags: ['обратная индукция', 'последовательные игры', 'потоварный налог'], stars: 4, sol: true, src: 'МатЭк — Overleaf архивы (2021–2025)', kind: 'Развёрнутая задача', char: 'Количественная',
+    stm: 'На школьной ярмарке популярностью пользуются ягодки: спрос на них задаётся как <i>Q<sub>d</sub></i> = 120 − <i>P</i>, а предложение <i>Q<sub>s</sub></i> = 2<i>P</i>. Два школьных хулигана Арслан и Егор решили заработать денег: сначала Арслан собирает потоварный налог по ставке <i>t</i><sub>1</sub> с производителей, после чего, зная <i>t</i><sub>1</sub>, Егор собирает налог по ставке <i>t</i><sub>2</sub>. Каждый из мальчиков стремится максимизировать собранные им деньги.',
+    parts: [['а', 'Какую ставку выберет Арслан?', 60], ['б', 'Какую ставку выберет Егор?', 30], ['в', 'Чему равны суммарные налоговые сборы?', 1800]],
+    status: { lv: 'work', text: '<b>Пробовали дважды</b>, последний раз вчера' }, hints: 4 },
+  file: { title: null, topic: 'Монополия и ценовая дискриминация', tags: ['линейный спрос', 'монополия'], stars: 0, sol: true, src: 'МатЭк — Overleaf архивы (2021–2025)', kind: 'Развёрнутая задача', char: 'Количественная',
+    stm: 'Известно, что монополист получает максимальную выручку в точке <i>P</i> = 20, <i>Q</i> = 40. Найдите функцию спроса при предположении, что она линейна.', parts: [], status: null, hints: 2, answerIsFormula: true },
+  qual: { title: 'Вася где-то прочитал', topic: 'Монополия и ценовая дискриминация', tags: ['потоварный налог', 'переложение налога'], stars: 0, sol: true, src: 'ILE / iloveeconomics.ru', kind: 'Развёрнутая задача', char: 'Качественная',
+    stm: 'Вася Пупкин только начинает изучать микроэкономику и где-то прочитал, что при введении потоварного налога монополист перекладывает на потребителей лишь часть налога, поэтому цена товара возрастает менее чем на налоговую ставку. Согласны ли вы с этим утверждением? Если да, докажите его. Если нет, приведите контрпример. Решайте задачу в самых общих предпосылках.', parts: [], status: null, hints: 0 },
+  test: { title: null, topic: 'Монополия и ценовая дискриминация', tags: ['ценовая дискриминация первой степени', 'второй степени и нелинейные тарифы', 'третьей степени по сегментам'], stars: 0, sol: false, src: 'Сборник тестов АА', kind: 'Тест · выбор всех верных', char: 'Качественная',
+    stm: 'Выберите верные при прочих равных условиях утверждения:', parts: [], status: null, hints: 0 },
+};
+let kind = 'num', ctx = 'none', role = 'student', solved = false, opened = false;
+const isUser = () => role !== 'guest';
+const LV = k => `<svg class="lv lv--${k}" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6"/>${k === 'work' ? '<path d="M8 3a5 5 0 0 1 0 10z"/>' : k === 'sure' ? '<path d="M5 8.3l2 2 4-4.5"/>' : ''}</svg>`;
+
+/* ── Контекстная полоса ────────────────────────────────────────────── */
+function renderCtx() {
+  const el = $('ctx');
+  if (ctx === 'track') el.innerHTML = `<div class="ctx" style="--gc: var(--blk-micro)"><span class="k">ДОРОЖКА</span><span class="t">Монополия: от простого к сложному</span><span class="p">6 из 12</span><span class="bar"><i></i></span><span class="nav"><button class="btn btn--quiet btn--sm" type="button">Назад</button><button class="btn btn--quiet btn--sm" type="button" id="ctx-next">Дальше</button></span></div>`;
+  else if (ctx === 'search') el.innerHTML = `<div class="ctx"><span class="k">ПОИСК</span><span class="t" style="font-weight:500;color:var(--text2)">«монополист с линейным спросом»</span><a class="back" href="#">К результатам</a></div>`;
+  else el.innerHTML = '';
+}
+
+/* ── Шапка: название или без него, статус ученика, действия, облачка ── */
+function renderHead() {
+  const k = KINDS[kind];
+  const title = k.title ? `<h1 class="pd-title">${k.title}</h1>` : `<h1 class="sr-only">Задача: ${k.topic}</h1>`;
+  let status = '';
+  if (isUser()) {
+    if (opened) status = `<div class="pst"><svg class="lv" viewBox="0 0 16 16" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" fill="none" stroke="var(--text3)" stroke-width="1.6"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="var(--text3)" stroke-width="1.3" stroke-linecap="round"/></svg><span><b>Решение открыто</b> сегодня — попытка в уровень не идёт</span></div>`;
+    else if (solved) status = `<div class="pst">${LV('sure')}<span><b>Решено сегодня</b> · ${firstTry ? 'с первой попытки' : `${tries === 2 ? 'со' : 'с'} ${tries || 2}-й попытки`}</span></div>`;
+    else if (k.status) status = `<div class="pst">${LV(k.status.lv)}<span>${k.status.text}</span></div>`;
+  }
+  const pod = kind === 'num' ? '<span class="pod-badge">Задача дня · 6 сентября</span>' : '';
+  $('head').innerHTML = `${title}${status}
+  <div class="pd-acts">${pod}<button class="pd-act" type="button" id="save-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.8l1.9 3.9 4.3.6-3.1 3 .7 4.3L8 11.6l-3.8 2 .7-4.3-3.1-3 4.3-.6z"/></svg><span id="save-label">Сохранить</span></button>
+    <button class="pd-act" type="button" id="copy-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1"/></svg><span id="copy-label">Скопировать ссылку</span></button></div>
+  <div class="pp-rows"><div class="pp-row"><a class="pp pp--topic" href="#" style="--gc: var(--blk-micro)">${k.topic}</a>${k.tags.map(t => `<a class="pp pp--tag" href="#" style="--gc: var(--blk-micro)">${t}</a>`).join('')}</div>
+    <div class="pp-row">${k.stars ? `<a class="pp pp--diff" href="#"><span class="st">${'★'.repeat(k.stars)}${'☆'.repeat(5 - k.stars)}</span> сложность ${k.stars}</a>` : ''}<a class="pp pp--char" href="#">${k.char}</a><a class="pp pp--kind" href="#">${k.kind}</a><span class="pp-sep" aria-hidden="true"></span><a class="pp pp--src" href="#">${k.src}</a></div></div>`;
+  let saved = false; $('save-btn').addEventListener('click', () => { saved = !saved; $('save-btn').classList.toggle('is-on', saved); $('save-label').textContent = saved ? 'Сохранено' : 'Сохранить'; });
+  $('copy-btn').addEventListener('click', () => { $('copy-btn').classList.add('pd-act--copied'); $('copy-label').textContent = 'Ссылка скопирована'; setTimeout(() => { $('copy-btn').classList.remove('pd-act--copied'); $('copy-label').textContent = 'Скопировать ссылку'; }, 1600); });
+}
+function renderStm() {
+  const k = KINDS[kind];
+  if (kind === 'test') { $('stm').innerHTML = `<section class="stm stm--q" aria-label="Условие"><p class="q">${k.stm}</p></section>`; return; }
+  const parts = k.parts.length ? `<ol class="parts">${k.parts.map(p => `<li class="part"><b>${p[0]})</b><span>${p[1]}</span></li>`).join('')}</ol>` : '';
+  $('stm').innerHTML = `<section class="stm" aria-label="Условие"><p>${k.stm}</p>${parts}</section>`;
+}
+
+/* ── Карточка «Ответ» — четыре вида ─────────────────────────────────── */
+let firstTry = true, tries = 0;
+function actionsRow(extra) {
+  const k = KINDS[kind];
+  const hint = k.hints ? `<button class="btn btn--quiet" type="button" id="hint-btn"><svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.5h4M6.5 11.5h3M8 1.5a4.5 4.5 0 0 0-2.6 8.2c.4.3.6.7.6 1.1v.7h4v-.7c0-.4.2-.8.6-1.1A4.5 4.5 0 0 0 8 1.5z"/></svg>Подсказка <span class="n">1 из ${k.hints}</span></button>` : '';
+  const sol = k.sol ? `<button class="btn btn--quiet" type="button" id="sol-btn"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2 4h12M2 8h8M2 12h10"/></svg>Показать решение</button>` : '';
+  return `<div class="ans-row">${extra || ''}<span class="grow"></span>${hint}${sol}</div>
+    <div class="sv-confirm" id="sol-confirm">Открыть решение до ответа? Тогда эта попытка не пойдёт в уровень темы.<button class="btn btn--main btn--sm" type="button" id="sol-yes">Открыть</button><button class="btn btn--quiet btn--sm" type="button" id="sol-no">Ещё подумаю</button></div>
+    <div class="hints" id="hints"></div>`;
+}
+const needLogin = what => `<div class="need"><span>${what} — нужен аккаунт. Число и тесты проверяются без него.</span><a class="btn btn--main btn--sm" href="#">Войти и вернуться сюда</a></div>`;
+function renderAns() {
+  const k = KINDS[kind]; let html = '';
+  if (kind === 'num') {
+    html = `<section class="ans" id="ans-card"><div class="ans-head"><h2>Ответ</h2><small>числом, по каждому пункту</small><span class="tries" id="tries"></span></div>
+      <div class="nf-group">${k.parts.map((p, i) => `<div class="nf" data-row="${i}"><span class="l">${p[0]})</span><span class="q">${p[1]}</span><input class="num" data-i="${i}" data-a="${p[2]}" inputmode="decimal" placeholder="число" aria-label="Ответ ${p[0]}"><span class="m" data-m="${i}"></span></div>`).join('')}</div>
+      <div class="nf-kbd"><kbd>Enter</kbd> в поле — проверить этот пункт · кнопка — все заполненные</div>
+      <div class="ans-msg ans-msg--ok" id="msg-ok"></div><div class="ans-msg ans-msg--bad" id="msg-bad"></div>
+      ${actionsRow('<button class="btn btn--main" type="button" id="check-btn">Проверить</button><span class="sv-limit" id="check-why">заполните хотя бы одно поле</span>')}</section>`;
+  } else if (kind === 'file') {
+    const main = isUser() ? `<button class="drop" type="button" id="drop"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 7.5l-5.6 5.6a3.5 3.5 0 0 1-5-5L9 2a2.3 2.3 0 0 1 3.3 3.3L6.6 11a1.1 1.1 0 0 1-1.6-1.6L10 4.5"/></svg></span><span><b>Загрузить решение — PDF или фото тетради</b><span>ИИ распознает текст, сверит с эталоном по шагам и найдёт первую ошибку · до 3 файлов, 10 МБ</span></span></button>` : needLogin('Проверка решения по файлу');
+    html = `<section class="ans" id="ans-card"><div class="ans-head"><h2>Ответ</h2><small>у этой задачи ответ — формула, поэтому главное — ход решения</small></div>${main}
+      <div class="att-list" id="att-list"></div>
+      <div class="ans-or">или ответ формулой</div>
+      <div class="str"><input id="str" placeholder="например, P = a − bQ с числами" aria-label="Ответ формулой или словом"><button class="btn btn--quiet" type="button" id="str-btn">Проверить</button></div>
+      <span class="sv-limit" style="display:block;margin-top:6px">строку сверяет ИИ с эталонным ответом — одна короткая проверка</span>
+      <div class="ans-msg ans-msg--ok" id="msg-ok"></div><div class="ans-msg ans-msg--bad" id="msg-bad"></div>
+      <span class="ans-busy" id="busy"><i></i><span id="busy-t">Проверяю…</span></span>
+      ${actionsRow(isUser() ? '<button class="btn btn--main" type="button" id="file-check" hidden>Проверить решение</button>' : '')}</section>`;
+  } else if (kind === 'qual') {
+    const main = isUser() ? `<div class="sv-field"><textarea id="qual-text" placeholder="Ваш ответ и обоснование. Если не согласны — приведите контрпример."></textarea><div class="sv-attach"><button class="att-add" type="button" id="qual-att"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 7.5l-5.6 5.6a3.5 3.5 0 0 1-5-5L9 2a2.3 2.3 0 0 1 3.3 3.3L6.6 11a1.1 1.1 0 0 1-1.6-1.6L10 4.5"/></svg>Фото или файл</button></div></div>` : needLogin('Проверка ответа ИИ');
+    html = `<section class="ans" id="ans-card"><div class="ans-head"><h2>Ответ</h2><small>качественная задача: текст и обоснование, проверяет ИИ</small></div>${main}
+      <span class="ans-busy" id="busy"><i></i><span id="busy-t">Проверяю — обычно 10–20 секунд</span></span>
+      ${actionsRow(isUser() ? '<button class="btn btn--main" type="button" id="qual-check">Отправить на проверку</button><span class="sv-limit">проверяет ИИ · осталось сегодня <b>8</b></span>' : '')}</section>`;
+  } else {
+    html = `<section class="tq" id="tq" aria-label="Варианты ответа"><div class="tq-head"><h2>Варианты</h2><span class="tq-rule">верных может быть несколько — отметьте все</span><span class="tq-try" id="tq-try">Попытка 1</span></div>
+      <p class="tq-stat">В Wecon Rush этот вопрос решают верно <b>64 %</b> игроков</p>
+      <ul class="opt-list">${[['а','При появлении возможности осуществлять ценовую дискриминацию прибыль фирмы не может снизиться'],['б','Для проведения ценовой дискриминации фирме не обязательно уметь заранее отличать один тип потребителей от другого'],['в','Ценовая дискриминация законодательно запрещена в большинстве стран, поэтому практически не встречается в реальной жизни'],['г','Потребители никогда не могут выиграть от введения ценовой дискриминации по сравнению с политикой единой цены']].map(o => `<li><button class="opt" type="button" data-l="${o[0]}" aria-pressed="false"><span class="opt-l">${o[0]}</span><span class="opt-t">${o[1]}</span><span class="opt-note"></span></button></li>`).join('')}</ul>
+      <div class="tq-msg tq-msg--wrong" id="msg-wrong"><span><b>Не то.</b> Попробуйте ещё раз — какой-то вариант лишний или чего-то не хватает.</span><span class="cnt" id="msg-cnt" hidden></span></div>
+      <div class="tq-msg tq-msg--ok" id="msg-ok-t"><span><b>Верно!</b> <span id="ok-sub">С первой попытки.</span></span></div>
+      <div class="tq-msg tq-msg--show" id="msg-show"><span><b>Правильный ответ: а, б.</b> Ниже видно, что вы отметили и что надо было.</span></div>
+      <div class="tq-row" id="row-play"><button class="btn btn--main" type="button" id="check-btn" disabled>Проверить</button><span class="tq-why" id="check-why">отметьте хотя бы один вариант</span><span class="grow"></span><button class="btn btn--quiet" type="button" id="reveal-btn">Показать ответ</button></div>
+      <div class="tq-row" id="row-done" hidden><span class="grow"></span><button class="btn btn--quiet btn--sm" type="button" id="again-btn">Пройти заново</button></div></section>`;
+  }
+  $('ans').innerHTML = html; $('after').innerHTML = ''; bindAns();
+}
+
+/* ── Поведение ─────────────────────────────────────────────────────── */
+function doneBlock(text) { return `<div class="ans-done is-on"><span>${text}</span><span class="grow"></span>${ctx === 'track' ? '<button class="btn btn--main btn--sm" type="button">Дальше: 7 из 12</button>' : '<a class="btn btn--main btn--sm" href="#">Следующая по теме</a>'}</div>`; }
+function bindCommon() {
+  const k = KINDS[kind];
+  const hb = $('hint-btn'); let hn = 0;
+  if (hb) hb.addEventListener('click', () => { if (hn >= k.hints) return; const d = document.createElement('div'); d.className = 'hint'; d.innerHTML = `<span class="k">Подсказка ${hn + 1}</span><div>${['Оба налога ложатся на продавцов: запишите предложение с учётом суммарной ставки.', 'Найдите равновесный объём как функцию от суммарной ставки.', 'Егор ходит вторым: найдите его лучший ответ на ставку Арслана.', 'Арслан знает реакцию Егора — подставьте её в свои сборы.'][hn % 4]}</div>`; $('hints').appendChild(d); hn++;
+    if (hn < k.hints) hb.innerHTML = `<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.5h4M6.5 11.5h3M8 1.5a4.5 4.5 0 0 0-2.6 8.2c.4.3.6.7.6 1.1v.7h4v-.7c0-.4.2-.8.6-1.1A4.5 4.5 0 0 0 8 1.5z"/></svg>Ещё подсказка <span class="n">${hn + 1} из ${k.hints}</span>`; else { hb.disabled = true; hb.innerHTML = '<svg class="ico" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 13.5h4M6.5 11.5h3M8 1.5a4.5 4.5 0 0 0-2.6 8.2c.4.3.6.7.6 1.1v.7h4v-.7c0-.4.2-.8.6-1.1A4.5 4.5 0 0 0 8 1.5z"/></svg>Подсказки кончились'; } });
+  const sb = $('sol-btn');
+  if (sb) { sb.addEventListener('click', () => { if (solved) reveal(); else $('sol-confirm').classList.add('is-on'); }); $('sol-yes').addEventListener('click', () => { opened = true; reveal(); }); $('sol-no').addEventListener('click', () => $('sol-confirm').classList.remove('is-on')); }
+}
+function reveal() {
+  $('sol-confirm') && $('sol-confirm').classList.remove('is-on');
+  $('after').innerHTML = `<div class="sol is-on"><div class="sol-head"><h3>Решение</h3><span class="sol-ans">Ответ: <b>${kind === 'num' ? 't₁ = 60, t₂ = 30; сборы 1 800' : kind === 'file' ? 'P = 40 − 0,5Q' : 'не согласны: при постоянных MC и вогнутом спросе цена может вырасти больше, чем на t'}</b></span></div><div class="sol-body"><ol><li>Оба налога ложатся на продавцов, предложение с учётом суммарной ставки <i>T</i>: <i>Q<sub>s</sub></i> = 2(<i>P</i> − <i>T</i>).</li><li>Равновесие: <i>Q</i> = 80 − 2<i>T</i>/3.</li><li>Егор ходит вторым: <i>t</i><sub>2</sub> = 60 − <i>t</i><sub>1</sub>/2.</li><li>Арслан учитывает реакцию: максимум при <i>t</i><sub>1</sub> = 60; тогда <i>t</i><sub>2</sub> = 30, <i>Q</i> = 20, сборы 1 200 + 600 = 1 800.</li></ol></div></div>`;
+  if (opened && !solved) { document.querySelectorAll('#ans-card .num, #ans-card input, #ans-card textarea').forEach(x => x.disabled = true); const cb = $('check-btn') || $('qual-check') || $('str-btn'); if (cb) cb.disabled = true; $('sol-btn').disabled = true; renderHead(); }
+}
+function bindAns() {
+  bindCommon();
+  if (kind === 'num') {
+    const inputs = [...document.querySelectorAll('#ans-card .num')], btn = $('check-btn');
+    const sync = () => { const any = inputs.some(i => !i.disabled && i.value.trim()); btn.disabled = !any; $('check-why').hidden = any; };
+    inputs.forEach(i => { i.addEventListener('input', () => { i.classList.remove('is-bad'); sync(); }); i.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); check(+i.dataset.i); } }); });
+    sync();
+    const OKI = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>', BADI = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg>';
+    /* only — проверить один пункт (Enter), иначе — все заполненные */
+    function check(only) {
+      const targets = inputs.filter(i => !i.disabled && i.value.trim() && (only == null || +i.dataset.i === only));
+      if (!targets.length) return;
+      tries++;
+      targets.forEach(i => { const v = parseFloat(i.value.replace(/\s/g, '').replace(',', '.').replace(/[^\d.\-]/g, '')); if (isNaN(v)) return;
+        const a = +i.dataset.a, m = document.querySelector(`[data-m="${i.dataset.i}"]`), row = i.closest('.nf'); i.classList.remove('is-ok', 'is-bad'); void i.offsetWidth;
+        if (Math.abs(v - a) <= a * 0.005) { i.classList.add('is-ok'); i.disabled = true; row.classList.add('is-ok'); m.className = 'm ok'; m.innerHTML = OKI; } else { i.classList.add('is-bad'); m.className = 'm bad'; m.innerHTML = BADI; } });
+      if (tries > 1) firstTry = false;
+      const okN = inputs.filter(i => i.disabled).length, badN = inputs.filter(i => i.classList.contains('is-bad')).length;
+      $('tries').textContent = `попытка ${tries}`;
+      if (okN === inputs.length) { solved = true; $('msg-bad').classList.remove('is-on'); $('msg-ok').innerHTML = `<span><b>Верно!</b> Все ${inputs.length} пункта сошлись — ${firstTry ? 'с первой попытки, идёт в уровень темы' : `${tries === 2 ? 'со' : 'с'} ${tries}-й попытки, засчитано как решено`}.</span>`; $('msg-ok').classList.add('is-on'); btn.disabled = true; $('check-why').hidden = true;
+        $('after').innerHTML = doneBlock(isUser() ? 'Уровень по теме: в работе → <b>уверенно</b> ещё через 2 верных первых попытки.' : 'Так работает у 5 090 задач. С аккаунтом ответы копятся в уровень по теме.'); renderHead(); }
+      else { $('msg-ok').classList.remove('is-on'); if (badN) { $('msg-bad').innerHTML = `<span><b>${okN ? 'Частично.' : 'Не сходится.'}</b> ${okN ? `Верных пунктов ${okN} из ${inputs.length}, остальные можно исправить.` : 'Проверьте вычисления и попробуйте ещё.'}</span><span class="cnt">попытка ${tries}</span>`; $('msg-bad').classList.add('is-on'); } else { $('msg-bad').classList.remove('is-on'); } sync(); const nxt = inputs.find(i => !i.disabled); if (nxt) nxt.focus(); }
+    }
+    btn.addEventListener('click', () => check(null));
+  }
+  if (kind === 'file') {
+    const drop = $('drop'), fc = $('file-check');
+    if (drop) drop.addEventListener('click', () => { $('att-list').innerHTML = `<span class="att"><span class="thumb"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="2" y="3" width="12" height="10" rx="1.5"/><path d="M2 11l3.5-3.5 3 3 2-2L14 12"/><circle cx="10.5" cy="6" r="1.1"/></svg></span>тетрадь_стр2.jpg<button class="x" type="button" aria-label="Убрать">×</button></span>`; fc.hidden = false; $('att-list').querySelector('.x').addEventListener('click', () => { $('att-list').innerHTML = ''; fc.hidden = true; }); });
+    if (fc) fc.addEventListener('click', () => { fc.disabled = true; $('busy-t').textContent = 'Распознаю фото и сверяю с эталоном — обычно 10–20 секунд'; $('busy').classList.add('is-on'); setTimeout(() => { $('busy').classList.remove('is-on'); showFileResult('part'); }, 1800); });
+    const sb = $('str-btn'), si = $('str');
+    const strCheck = () => { const v = si.value.replace(/\s/g, '').replace(',', '.').toLowerCase(); if (!v) { si.focus(); return; } $('busy-t').textContent = 'Сверяю формулу с эталонным ответом…'; $('busy').classList.add('is-on'); sb.disabled = true;
+      setTimeout(() => { $('busy').classList.remove('is-on'); sb.disabled = false; const ok = (v.includes('40') && (v.includes('0.5') || v.includes('1/2'))) || (v.includes('80') && v.includes('2p')); si.classList.remove('is-ok', 'is-bad'); si.classList.add(ok ? 'is-ok' : 'is-bad');
+        if (ok) { solved = true; $('msg-bad').classList.remove('is-on'); $('msg-ok').innerHTML = '<span><b>Верно!</b> Функция совпадает с эталоном: <i>P</i> = 40 − 0,5<i>Q</i>.</span>'; $('msg-ok').classList.add('is-on'); si.disabled = true; sb.disabled = true; $('after').innerHTML = doneBlock('Хотите разбор хода — загрузите решение, ИИ сверит по шагам.'); renderHead(); }
+        else { $('msg-ok').classList.remove('is-on'); $('msg-bad').innerHTML = '<span><b>Не совпадает.</b> Проверьте: спрос линейный, максимум выручки там, где MR = 0.</span>'; $('msg-bad').classList.add('is-on'); } }, 1200); };
+    sb.addEventListener('click', strCheck); si.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); strCheck(); } });
+  }
+  if (kind === 'qual') {
+    const qc = $('qual-check'); if (qc) qc.addEventListener('click', () => { const t = $('qual-text'); if (!t.value.trim()) { t.focus(); return; } qc.disabled = true; $('busy').classList.add('is-on'); setTimeout(() => { $('busy').classList.remove('is-on'); showQualResult(); }, 1800); });
+    const qa = $('qual-att'); if (qa) qa.addEventListener('click', () => { qa.insertAdjacentHTML('beforebegin', '<span class="att"><span class="thumb"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" aria-hidden="true"><path d="M4 1.5h5l3 3v10H4z"/><path d="M9 1.5v3h3M6 8h4M6 10.5h4"/></svg></span>ответ.pdf<button class="x" type="button" aria-label="Убрать">×</button></span>'); });
+  }
+  if (kind === 'test') bindTest();
+}
+function showFileResult(mode) {
+  const part = `<section class="chk chk--part is-on" aria-label="Результат проверки"><div class="chk-head"><div class="chk-score">6<small> / 10</small></div><div><div class="chk-verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 5v3.5M8 11v.5"/></svg>Частично верно</div><div class="chk-sub">Первая ошибка — в шаге 2: точка максимума выручки найдена, но условие MR = 0 записано с ошибкой знака</div></div></div>
+    <ol class="chk-steps"><li class="chk-step"><span class="chk-mark ok">✓</span><div><div class="chk-step-t">Линейный спрос записан в общем виде <i>P</i> = <i>a</i> − <i>bQ</i></div></div></li><li class="chk-step is-first"><span class="chk-mark bad">✗</span><div><div class="chk-step-t">Условие максимума выручки<span class="chk-flag">ПЕРВАЯ ОШИБКА</span></div><div class="chk-step-c">Записано MR = <i>a</i> + 2<i>bQ</i>; должно быть <i>a</i> − 2<i>bQ</i> = 0 при <i>Q</i> = 40.</div></div></li><li class="chk-step"><span class="chk-mark bad">✗</span><div><div class="chk-step-t">Итоговая функция</div><div class="chk-step-c">Следствие шага 2, отдельно не снижается.</div></div></li></ol>
+    <div class="chk-ocr"><details><summary>Проверено по тексту, распознанному с фото — показать, как мы его прочитали</summary><blockquote>P = a − bQ; TR = aQ − bQ²; MR = a + 2bQ = 0 → …</blockquote>Если распознано неверно — поправьте и отправьте снова.</details></div>
+    <div class="chk-foot"><span class="chk-conf">Уверенность модели <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i></span> высокая</span><div class="chk-acts"><button class="btn btn--quiet btn--sm" type="button">Спросить про ошибку</button><button class="btn btn--main btn--sm" type="button" id="retry">Исправить и отправить снова</button></div><span class="chk-note">Предварительная оценка ИИ: может ошибаться.</span></div></section>`;
+  const human = `<section class="chk chk--wait is-on" aria-label="Результат проверки"><div class="chk-head"><div class="chk-score">–</div><div><div class="chk-verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M8 4.5V8l2.5 1.5"/></svg>Модель не ставит балл</div><div class="chk-sub">Ход решения нестандартный и с эталоном по существу не совпадает — уверенность низкая</div></div></div>
+    <div class="chk-foot"><span class="chk-conf">Уверенность модели <span class="bars"><i class="on"></i><i></i><i></i></span> низкая</span><div class="chk-acts"><button class="btn btn--quiet btn--sm" type="button">Спросить ИИ</button><button class="btn btn--main btn--sm" type="button" id="retry">Отправить снова</button></div><span class="chk-note">Попытка сохранена. Можно исправить и отправить снова или открыть решение.</span></div></section>`;
+  $('after').innerHTML = mode === 'human' ? human : part; const r = $('retry'); if (r) r.addEventListener('click', () => { renderAns(); });
+}
+function showQualResult() {
+  $('after').innerHTML = `<section class="chk chk--ok is-on"><div class="chk-head"><div class="chk-score">9<small> / 10</small></div><div><div class="chk-verdict"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6.5"/><path d="M5 8.3l2 2 4-4.5"/></svg>Верно</div><div class="chk-sub">Не согласились и привели контрпример с постоянными предельными издержками — это и есть ключ</div></div></div>
+    <ol class="chk-steps"><li class="chk-step"><span class="chk-mark ok">✓</span><div><div class="chk-step-t">Позиция: утверждение неверно в общем случае</div></div></li><li class="chk-step"><span class="chk-mark ok">✓</span><div><div class="chk-step-t">Контрпример</div><div class="chk-step-c">Постоянные MC и спрос вида <i>P</i> = <i>a</i>/<i>Q</i><sup>ε</sup>: цена растёт больше, чем на <i>t</i>.</div></div></li><li class="chk-step"><span class="chk-mark part">~</span><div><div class="chk-step-t">Обоснование</div><div class="chk-step-c">Условие «вогнутость спроса» упомянуто, но не объяснено, почему оно меняет знак — минус балл.</div></div></li></ol>
+    <div class="chk-foot"><span class="chk-conf">Уверенность модели <span class="bars"><i class="on"></i><i class="on"></i><i class="on"></i></span> высокая</span><div class="chk-acts"><button class="btn btn--quiet btn--sm" type="button">Спросить, что дописать</button>${ctx === 'track' ? '<button class="btn btn--main btn--sm" type="button">Дальше: 7 из 12</button>' : '<a class="btn btn--main btn--sm" href="#">Следующая по теме</a>'}</div><span class="chk-note">Предварительная оценка ИИ: может ошибаться.</span></div></section>`;
+  solved = true; renderHead();
+}
+/* тест — из принятого мокапа, коротко */
+function bindTest() {
+  const CORRECT = new Set(['а', 'б']); let sel = new Set(), attempt = 1, mode = 'play'; const opts = [...document.querySelectorAll('.opt')];
+  const plural = (n, f) => { const a = n % 10, b = n % 100; return f[(a === 1 && b !== 11) ? 0 : (a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 1 : 2]; };
+  function render() { opts.forEach(o => { const l = o.dataset.l, on = sel.has(l); o.setAttribute('aria-pressed', String(on)); o.classList.remove('is-hit', 'is-wrong', 'is-missed', 'is-skip'); o.disabled = mode === 'solved' || mode === 'revealed'; const note = o.querySelector('.opt-note'); note.textContent = '';
+      if (mode === 'solved' || mode === 'revealed') { const r = CORRECT.has(l); if (on && r) { o.classList.add('is-hit'); note.textContent = 'вы выбрали · верно'; } else if (on) { o.classList.add('is-wrong'); note.textContent = 'вы выбрали · неверно'; } else if (r) { o.classList.add('is-missed'); note.textContent = 'надо было выбрать'; } else o.classList.add('is-skip'); } });
+    $('msg-wrong').classList.toggle('is-on', mode === 'wrong'); $('msg-ok-t').classList.toggle('is-on', mode === 'solved'); $('msg-show').classList.toggle('is-on', mode === 'revealed');
+    $('row-play').hidden = mode === 'solved' || mode === 'revealed'; $('row-done').hidden = !(mode === 'solved' || mode === 'revealed');
+    $('check-btn').disabled = sel.size === 0; $('check-why').hidden = sel.size !== 0;
+    $('tq-try').textContent = mode === 'solved' ? `Решено ${attempt === 1 ? 'с первой попытки' : (attempt === 2 ? 'со' : 'с') + ' ' + attempt + '-й попытки'}` : mode === 'revealed' ? `Ответ показан после ${attempt - 1} ${plural(attempt - 1, ['попытки', 'попыток', 'попыток'])}` : `Попытка ${attempt}`;
+    const cnt = $('msg-cnt'); cnt.hidden = !(mode === 'wrong' && attempt >= 3); if (!cnt.hidden) cnt.textContent = 'верных вариантов: 2';
+    if (mode === 'solved') { solved = true; firstTry = attempt === 1; $('after').innerHTML = doneBlock(firstTry ? 'С первой попытки — идёт в уровень темы.' : 'Засчитано как решено; в уровень — первая попытка.'); renderHead(); } }
+  opts.forEach(o => o.addEventListener('click', () => { if (mode === 'solved' || mode === 'revealed') return; sel.has(o.dataset.l) ? sel.delete(o.dataset.l) : sel.add(o.dataset.l); if (mode === 'wrong') mode = 'play'; render(); }));
+  $('check-btn').addEventListener('click', () => { if (!sel.size) return; const ok = sel.size === CORRECT.size && [...sel].every(l => CORRECT.has(l)); if (ok) { mode = 'solved'; $('ok-sub').textContent = attempt === 1 ? 'С первой попытки.' : `${attempt === 2 ? 'Со' : 'С'} ${attempt}-й попытки — и это тоже считается.`; } else { mode = 'wrong'; attempt++; const tq = $('tq'); tq.classList.remove('is-shake'); void tq.offsetWidth; tq.classList.add('is-shake'); } render(); });
+  $('reveal-btn').addEventListener('click', () => { mode = 'revealed'; opened = true; render(); renderHead(); });
+  $('again-btn').addEventListener('click', () => { sel = new Set(); attempt = 1; mode = 'play'; solved = false; opened = false; $('after').innerHTML = ''; render(); renderHead(); });
+  render();
+}
+
+/* ── Похожие и чат ─────────────────────────────────────────────────── */
+function renderSide() {
+  $('sim').innerHTML = `<div class="sim-head"><h2>${kind === 'test' ? 'Ещё тесты по теме' : 'Похожие задачи'}</h2><a href="#">Все в каталоге</a></div><div class="sim-grid">
+    <a class="sim-card" href="#"><div class="sim-line"><span class="tchip" style="--gc: var(--blk-micro)">Вмешательство государства</span></div><div class="sim-title">Вмешательство — 1</div><div class="sim-prev">Государство вводит потоварный налог на производителей. Как распределится налоговое бремя?</div><div class="sim-meta"><span class="ct-stars">★★★☆☆</span><span class="ct-sol">решение ✓</span><span class="ct-kind">ответ числом</span></div></a>
+    <a class="sim-card" href="#"><div class="sim-line"><span class="tchip" style="--gc: var(--blk-micro)">Олигополия и теория игр</span></div><div class="sim-title">Штакельберг: лидер и последователь</div><div class="sim-prev">Две фирмы выбирают выпуск последовательно. Найдите равновесие и сравните с Курно.</div><div class="sim-meta"><span class="ct-stars">★★★★☆</span><span class="ct-sol">решение ✓</span><span class="ct-kind">ответ числом</span></div></a></div>`;
+  $('side').innerHTML = `<section class="ai-soon" aria-label="ИИ-чат по задаче"><span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg></span><h2>ИИ-чат по задаче</h2><span class="soon">СКОРО</span><p>Здесь можно будет спросить про условие, проверить идею и получить подсказку к следующему шагу — без готового решения.</p></section>`;
+}
+
+/* ── Переключатели ─────────────────────────────────────────────────── */
+function renderAll() { solved = false; opened = false; firstTry = true; tries = 0; renderCtx(); renderHead(); renderStm(); renderAns(); renderSide(); }
+document.querySelectorAll('[data-kind]').forEach(b => b.addEventListener('click', () => { kind = b.dataset.kind; document.querySelectorAll('[data-kind]').forEach(x => x.classList.toggle('is-on', x === b)); renderAll(); resetStBtns(); }));
+document.querySelectorAll('[data-ctx]').forEach(b => b.addEventListener('click', () => { ctx = b.dataset.ctx; document.querySelectorAll('[data-ctx]').forEach(x => x.classList.toggle('is-on', x === b)); renderCtx(); }));
+document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => { role = b.dataset.role; document.body.className = 'role-' + role; $('nav-user').textContent = role === 'guest' ? 'Войти' : 'Пётр Иванов'; document.querySelectorAll('[data-role]').forEach(x => x.classList.toggle('is-on', x === b)); renderAll(); resetStBtns(); }));
+function resetStBtns() { document.querySelectorAll('[data-st]').forEach(x => x.classList.toggle('is-on', x.dataset.st === 'reset')); }
+document.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => { document.querySelectorAll('[data-st]').forEach(x => x.classList.toggle('is-on', x === b));
+  if (b.dataset.st === 'reset') { renderAll(); return; }
+  if (b.dataset.st === 'human') { if (kind === 'num' || kind === 'test') { kind = 'file'; document.querySelectorAll('[data-kind]').forEach(x => x.classList.toggle('is-on', x.dataset.kind === 'file')); renderAll(); } showFileResult('human'); return; }
+  if (b.dataset.st === 'opened') { if (kind === 'test') { $('reveal-btn').click(); return; } opened = true; reveal(); } }));
+$('mk-theme').addEventListener('click', e => { const dark = document.documentElement.getAttribute('data-theme') !== 'dark'; document.documentElement.setAttribute('data-theme', dark ? 'dark' : ''); e.target.textContent = dark ? 'Светлая тема' : 'Тёмная тема'; });
+renderAll();
+</script>
+</body>
+</html>

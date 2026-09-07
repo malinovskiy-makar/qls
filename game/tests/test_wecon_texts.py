@@ -66,11 +66,11 @@ class LogoMarkTests(TestCase):
 
 
 class NavigationTests(TestCase):
-    u"""1.2 Пункт навигации называется «Тренажёр».
+    u"""1.2 Пункт навигации называется «Wecon Rush».
 
     ⚠️ ПРОВЕРКА ПЕРЕЕХАЛА С ШАБЛОНА НА ОТРИСОВАННУЮ СТРАНИЦУ (04.09.2026).
     Прежде `_nav.html` держал четыре копии ряда ссылок, и тест считал в нём
-    четыре литерала «Тренажёр» и восемь условий подсветки. Копий больше нет:
+    четыре литерала подписи и восемь условий подсветки. Копий больше нет:
     состав меню собирает `config/context_processors.py::site_meta`, а
     разметка — один цикл. Считать литералы стало нечего, и это к лучшему:
     важно, что видит человек, а не сколько раз слово написано в файле.
@@ -84,8 +84,9 @@ class NavigationTests(TestCase):
     def test_rendered_page_shows_the_new_name(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         labels = self._nav_labels(html)
-        self.assertEqual(labels.count('Тренажёр'), 1, labels)
+        self.assertEqual(labels.count('Wecon Rush'), 1, labels)
         self.assertNotIn('Игра', labels)
+        self.assertNotIn('Тренажёр', labels)
 
     def test_textbook_stands_right_after_catalog(self):
         u"""Порядок задан владельцем: «Учебник» сразу за «Каталогом»."""
@@ -98,7 +99,7 @@ class NavigationTests(TestCase):
         u"""«Где я сейчас» осталось на месте после переезда логики в питон."""
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
-        self.assertEqual(set(active), {'Тренажёр'}, active)
+        self.assertEqual(set(active), {'Wecon Rush'}, active)
 
 
 class StartScreenTextTests(TestCase):
