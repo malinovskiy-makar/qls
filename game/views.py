@@ -422,6 +422,32 @@ def api_my_stats(request):
 
 
 @require_GET
+def api_my_history(request):
+    u"""История забегов игрока в режиме. ВИДНА ТОЛЬКО ЕМУ САМОМУ.
+
+    ⚠️ ПОЛЬЗОВАТЕЛЬ БЕРЁТСЯ ИЗ `request.user` И БОЛЬШЕ НИОТКУДА. Параметра
+    «чей» здесь нет и не будет — то же правило, что у `api_my_stats`: он
+    немедленно превратил бы личную историю в публичную по перебору номеров.
+
+    ⚠️ ИСТОРИЯ ПЕРЕЕХАЛА С localStorage НА СЕРВЕР (08.09.2026). Прежний
+    ключ `econ_rush_history` жил в браузере: рекорды и история терялись при
+    смене браузера, а два источника истории разъехались бы при первом же
+    расхождении. Источник теперь один — `GameResult`.
+
+    ⚠️ АНОНИМУ ОТВЕЧАЕМ 403, А НЕ РЕДИРЕКТОМ НА ВХОД. Эндпоинт зовёт
+    fetch, и редирект вернул бы ему HTML страницы входа: клиент получил бы
+    200 и мусор вместо JSON. Экран в этом случае показывает графики без
+    сравнения, а не выдуманные числа.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Только для вошедших'}, status=403)
+    mode = request.GET.get('mode') or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        mode = config.DEFAULT_MODE
+    return JsonResponse(lb.run_history(request.user, mode))
+
+
+@require_GET
 def api_pool_counts(request):
     u"""Живые счётчики окна фильтров: «Пуля N · Блиц N · Рапид N · Классика N».
 

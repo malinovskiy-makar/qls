@@ -523,3 +523,87 @@ class ScoreboardTests(TestCase):
         body = m.group(1)
         self.assertIn('m.lives', body)
         self.assertNotRegex(body, r'i < 3;')
+
+
+class NineChartsTests(TestCase):
+    u"""Экран результата: девять графиков, блок раскрыт сразу (08.09.2026).
+
+    Владелец: «раньше было больше статистики после игры, надо вернуть, там
+    было много классной». Кнопка-раскрывашка убрана: то, что спрятано за
+    кнопкой, для половины игроков не существует.
+    """
+
+    def setUp(self):
+        self.src = page_source()
+        self.js = inline_js(self.src)
+
+    def test_there_are_exactly_nine_chart_cards(self):
+        u"""Числовой инвариант фазы: карточек-графиков ровно девять."""
+        self.assertEqual(self.src.count('<div class="chart-card">'), 9)
+
+    def test_the_toggle_is_gone_with_its_state(self):
+        for gone in ('det-toggle', 'chartsBuilt', 'aria-expanded="false"'):
+            self.assertNotIn(gone, self.src, gone)
+        self.assertNotIn('<div class="det-body" id="det-body" hidden>', self.src)
+
+    def test_charts_are_built_when_the_screen_is_painted(self):
+        m = re.search(r'function buildCharts\(\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'buildCharts не найден')
+        body = m.group(1)
+        for fn in ('chartCurve', 'chartTime', 'chartDifficulty', 'chartTape',
+                   'chartPoints', 'chartGroups', 'buildCompareCharts'):
+            self.assertIn(fn + '(', body, fn)
+        # buildCompareCharts несёт три графика, зависящих от истории.
+        m2 = re.search(r'function buildCompareCharts\(\) \{(.*?)\n  \}',
+                       self.js, re.S)
+        for fn in ('chartHistory', 'chartTimes', 'chartUsual'):
+            self.assertIn(fn + '(', m2.group(1), fn)
+
+    def test_local_storage_history_is_gone_entirely(self):
+        u"""⚠️ Два источника истории разъедутся при первом расхождении."""
+        for gone in ('econ_rush_history', 'saveRunToHistory', 'loadHistory',
+                     'HISTORY_KEY', 'HISTORY_SHOWN'):
+            self.assertNotIn(gone, self.src, gone)
+        self.assertIn("api('/game/api/me/history/", self.js)
+
+    def test_the_topic_layout_is_not_copied_a_second_time(self):
+        u"""⚠️ ADR 0071: второй раскладки тем не заводить.
+
+        «Микро и макро» берёт разделы из `CFG.topic_groups`, а она приезжает
+        из `problems/sections.py` через `game/filters.py::TOPIC_GROUPS`.
+        Список тем, написанный в шаблоне руками, разошёлся бы с каталогом.
+        """
+        m = re.search(r'function chartGroups\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'chartGroups не найден')
+        body = m.group(1)
+        self.assertIn('CFG.topic_groups', body)
+        # Ни одного названия раздела и ни одной темы литералом.
+        for literal in ('Микроэкономика', 'Макроэкономика', "'micro'",
+                        "'macro'", 'Эластичность'):
+            self.assertNotIn(literal, body, literal)
+
+    def test_missing_history_never_becomes_an_invented_number(self):
+        u"""Нет среднего — нет пунктира и нет сравнения. Ноль тут ложь."""
+        m = re.search(r'function chartTimes\(s\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIn('if (avg) {', m.group(1))
+        m2 = re.search(r'function chartUsual\(s\) \{(.*?)\n  \}', self.js, re.S)
+        body = m2.group(1)
+        self.assertIn('if (!avg) {', body)
+        self.assertIn('сравнивать пока не с чем', body)
+        self.assertIn('Войдите, чтобы сравнивать', body)
+
+    def test_charts_are_still_hand_drawn_svg(self):
+        u"""Библиотеку не подключаем: тему перекрашивает CSS, а не JS.
+
+        ⚠️ Ищем ПОДКЛЮЧЁННЫЕ файлы, а не имена библиотек подстрокой: слово
+        «echarts» живёт внутри `buildCompareCharts`, и наивная проверка
+        краснела бы на собственной функции.
+        """
+        self.assertIn('var SVG_NS', self.js)
+        srcs = re.findall(r'<script[^>]*src="([^"]+)"', self.src)
+        for url in srcs:
+            low = url.lower()
+            for lib in ('chart.js', 'd3', 'plotly', 'echarts', 'highcharts'):
+                self.assertNotIn(lib, low, url)
+        # Цвета графиков идут токенами — иначе смена темы их не перекрасит.
+        self.assertIn("'var(--rush-accent)'", self.js)

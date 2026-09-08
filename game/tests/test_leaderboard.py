@@ -280,3 +280,91 @@ class ApiShapeTests(TestCase):
     def test_first_tab_comes_with_the_page_so_it_does_not_blink(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         self.assertIn('"leaderboard"', html)
+
+
+class MyHistoryBoundaryTests(TestCase):
+    u"""История забегов: только про себя, и она с СЕРВЕРА (08.09.2026).
+
+    ⚠️ ПОЧЕМУ ПЕРЕЕХАЛА. Прежняя история жила в localStorage браузера:
+    терялась при смене браузера, а два источника истории разъехались бы при
+    первом же расхождении. Источник теперь один — `GameResult`.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.a = User.objects.create_user(username='hist_a', password='p12345')
+        self.b = User.objects.create_user(username='hist_b', password='p12345')
+
+    def url(self):
+        return reverse('game:my_history')
+
+    def test_anonymous_gets_403_not_a_redirect(self):
+        u"""⚠️ Эндпоинт зовёт fetch: редирект вернул бы ему HTML входа."""
+        r = self.client.get(self.url())
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r['Content-Type'].split(';')[0], 'application/json')
+
+    def test_no_parameter_can_ask_for_someone_elses_history(self):
+        u"""Параметра «чей» нет и не будет: перебор номеров сделал бы личную
+        историю публичной. То же правило, что у `api_my_stats`."""
+        run(self.a, score=999, correct=30)
+        run(self.b, score=11, correct=1)
+        self.client.force_login(self.b)
+        for probe in ({'user': self.a.id}, {'user_id': self.a.id},
+                      {'username': 'hist_a'}, {'me': self.a.id}):
+            d = self.client.get(self.url(), probe).json()
+            self.assertEqual([r['score'] for r in d['runs']], [11],
+                             'параметр %r пробил границу' % probe)
+
+    def test_an_empty_history_is_empty_not_zeroed(self):
+        u"""⚠️ Нуля забегов не бывает «в среднем»: `avg` тут None, не ноль.
+
+        Иначе экран нарисовал бы сравнение с выдуманным средним.
+        """
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertEqual(d['runs'], [])
+        self.assertIsNone(d['avg'])
+        self.assertEqual(d['total'], 0)
+
+    def test_runs_come_oldest_first_and_are_capped(self):
+        u"""На графике время идёт слева направо, и хвост ограничен."""
+        from game import leaderboard as lb
+        for i in range(lb.HISTORY_LIMIT + 5):
+            run(self.a, score=i, correct=1)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertEqual(len(d['runs']), lb.HISTORY_LIMIT)
+        scores = [r['score'] for r in d['runs']]
+        self.assertEqual(scores, sorted(scores), 'порядок не по возрастанию')
+        self.assertEqual(scores[-1], lb.HISTORY_LIMIT + 4)   # последний забег
+        self.assertEqual(d['total'], lb.HISTORY_LIMIT + 5)
+
+    def test_the_average_is_over_all_runs_not_just_the_listed_ones(self):
+        u"""⚠️ «Как я играю обычно» и «как шли последние раунды» — разные
+        вопросы. Считать среднее по двадцати значило бы менять смысл слова
+        «обычно» вместе с длиной списка."""
+        from game import leaderboard as lb
+        for _ in range(lb.HISTORY_LIMIT):
+            run(self.a, score=100, correct=10)
+        run(self.a, score=0, correct=0, wrong=10, avg_ms=None)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        total = lb.HISTORY_LIMIT + 1
+        self.assertEqual(d['total'], total)
+        self.assertEqual(d['avg']['score'],
+                         round(100 * lb.HISTORY_LIMIT / total))
+
+    def test_history_is_per_mode(self):
+        run(self.a, mode='blitz', score=500, correct=20)
+        run(self.a, mode='bullet', score=70, correct=4)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url(), {'mode': 'bullet'}).json()
+        self.assertEqual([r['score'] for r in d['runs']], [70])
+
+    def test_a_missing_speed_never_becomes_a_zero(self):
+        u"""«В среднем ноль миллисекунд» — не факт, а отсутствие факта."""
+        run(self.a, score=100, correct=5, avg_ms=None)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertIsNone(d['avg']['avg_correct_ms'])

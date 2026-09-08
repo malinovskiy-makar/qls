@@ -1891,21 +1891,11 @@ body.figfull .vignette.alarm { opacity: .42; }
 .k-bad { background: var(--rush-bad); }
 .k-skip { background: var(--text3); opacity: .45; }
 
-/* Подробная статистика — свёрнута, графики строятся при раскрытии */
-.det-toggle {
-  font: inherit; font-size: 14px; font-weight: 600;
-  width: 100%;
-  height: 44px; padding: 0 16px;
-  text-align: left;
-  border: 1px solid var(--rush-border); border-radius: 10px;
-  background: var(--rush-surface); color: var(--text2);
-  cursor: pointer;
-}
-.det-toggle::after { content: ' ▾'; float: right; color: var(--text3); }
-.det-toggle[aria-expanded="true"]::after { content: ' ▴'; }
-.det-toggle:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+/* Подробная статистика — РАСКРЫТА СРАЗУ (08.09.2026). Кнопки-раскрывашки
+   больше нет: то, что спрятано за кнопкой, для половины игроков не
+   существует, а владелец просил статистику вернуть, а не спрятать. */
 .det-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.det-body[hidden] { display: none; }
+@media (max-width: 720px) { .det-body { grid-template-columns: 1fr; } }
 .chart-card {
   background: var(--rush-surface);
   border: 1px solid var(--rush-border);
@@ -1919,6 +1909,25 @@ body.figfull .vignette.alarm { opacity: .42; }
    при масштабировании — vector-effect в самих линиях. */
 .chart-box svg { display: block; width: 100%; height: auto; }
 .chart-empty { font-size: 13px; color: var(--text3); padding: 18px 0; text-align: center; }
+
+/* «Микро и макро» и «Против себя обычного» рисуются списком, а не SVG:
+   там два-три ряда, и полоса из <i> честнее прямоугольника в холсте —
+   она сама переносится и сама берёт цвет темы. */
+.group-bars, .usual-rows { list-style: none; display: flex;
+                           flex-direction: column; gap: 10px; }
+.group-bars li, .usual-rows li { display: flex; align-items: center;
+                                 gap: 10px; font-size: 13px; }
+.gb-name { flex: 0 0 88px; color: var(--text2); }
+.gb-bar { flex: 1 1 auto; height: 8px; border-radius: 4px;
+          background: var(--rush-border); overflow: hidden; }
+.gb-bar i { display: block; height: 100%; background: var(--rush-accent); }
+.gb-num { flex: 0 0 auto; color: var(--text3);
+          font-variant-numeric: tabular-nums; }
+.usual-val { flex: 1 1 auto; color: var(--text2);
+             font-variant-numeric: tabular-nums; }
+.usual-mark { flex: 0 0 auto; font-weight: 600; color: var(--text3); }
+.usual-mark.up { color: var(--rush-ok); }
+.usual-mark.down { color: var(--rush-bad); }
 .chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
 .chart-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 8px; }
 .chart-key .k:first-child { margin-left: 0; }
@@ -2423,13 +2432,15 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </p>
       </section>
 
-      <!-- 5. Подробная статистика (графики — Фаза 5) -->
+      <!-- 5. Подробная статистика — ДЕВЯТЬ ГРАФИКОВ, БЛОК РАСКРЫТ СРАЗУ.
+           ⚠️ Кнопка-раскрывашка убрана (08.09.2026): владелец сказал, что
+           раньше статистики после игры было больше и она была нужна. То,
+           что спрятано за кнопкой, для половины игроков не существует. -->
       <section class="fin-details">
-        <button class="det-toggle" id="det-toggle" aria-expanded="false"
-                aria-controls="det-body">Подробная статистика</button>
-        <div class="det-body" id="det-body" hidden>
+        <h3>Подробная статистика</h3>
+        <div class="det-body" id="det-body">
           <div class="chart-card">
-            <h4>Динамика раунда</h4>
+            <h4>Ход раунда</h4>
             <div class="chart-box" id="chart-curve"></div>
             <p class="chart-key">
               <i class="k k-score"></i> счёт
@@ -2438,16 +2449,42 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             </p>
           </div>
           <div class="chart-card">
-            <h4>Время на ответ</h4>
+            <h4>Сколько думали</h4>
             <div class="chart-box" id="chart-time"></div>
           </div>
           <div class="chart-card">
-            <h4>Распределение сложностей</h4>
+            <h4>Держите ли сложное</h4>
             <div class="chart-box chart-donut" id="chart-diff"></div>
           </div>
           <div class="chart-card">
-            <h4>Сравнение с прошлыми играми</h4>
+            <h4>Последние раунды</h4>
             <div class="chart-box" id="chart-history"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Лента ответов</h4>
+            <div class="chart-box" id="chart-tape"></div>
+            <p class="chart-key">
+              <i class="k k-ok"></i> верно
+              <i class="k k-bad"></i> мимо
+              <i class="k k-skip"></i> пропуск
+              <span class="chart-x">выше клетка: дольше думали</span>
+            </p>
+          </div>
+          <div class="chart-card">
+            <h4>Время на ответ</h4>
+            <div class="chart-box" id="chart-times"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Где набрано</h4>
+            <div class="chart-box" id="chart-points"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Микро и макро</h4>
+            <div class="chart-box" id="chart-groups"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Против себя обычного</h4>
+            <div class="chart-box" id="chart-usual"></div>
           </div>
         </div>
       </section>
@@ -2753,31 +2790,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      Старые ключи не трогаем: они просто перестают читаться. */
   function bestKey(m) { return 'econrush_best_v2_' + m; }
 
-  /* История забегов — для графика «сравнение с прошлыми играми». Раньше
-     в localStorage жил только рекорд, истории не было совсем. Храним
-     локально и только своё: серверного лидерборда у игры нет. */
-  var HISTORY_KEY = 'econ_rush_history';
-  var HISTORY_LIMIT = 30;   // сколько забегов помним
-  var HISTORY_SHOWN = 12;   // сколько показываем на графике
+  /* ⚠️ ИСТОРИЯ ЗАБЕГОВ ЖИВЁТ НА СЕРВЕРЕ (08.09.2026). Прежняя пара
+     «прочитать/дописать» и её ключ в localStorage удалены целиком:
+     история в браузере терялась при смене браузера, а два источника
+     истории разъехались бы при первом же расхождении. Источник теперь
+     один — `GameResult`, эндпоинт `/game/api/me/history/`. Имена и ключ
+     здесь намеренно не названы: тест сторожит их отсутствие в файле
+     буквально, и упоминание в комментарии его же и обмануло бы.
 
-  function loadHistory() {
-    try {
-      var raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-      return Array.isArray(raw) ? raw : [];
-    } catch (e) { return []; }   // мусор в ключе не должен ронять экран
-  }
-
-  function saveRunToHistory(s) {
-    // Целевой забег и забег по набору в историю не идут: десять вопросов
-    // по темам ошибок (или фиксированный список набора) — не тот же забег,
-    // сравнивать его с полным нечестно.
-    if (mistakesRun || setRun || !s) return;
-    var h = loadHistory();
-    h.push({ mode: mode, score: s.score, accuracy: s.accuracy, at: Date.now() });
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-HISTORY_LIMIT)));
-    } catch (e) { /* приватный режим браузера — история не критична */ }
-  }
+     Аноним получает 403 и видит графики без сравнения. Выдуманных чисел
+     вместо истории на экране нет. */
+  var runHistory = null;        // {runs: [...], avg: {...}} или null
   (function migrateOldBest() {
     var old = localStorage.getItem('econrush_best');
     if (old && !localStorage.getItem(bestKey('blitz'))) {
@@ -2830,7 +2853,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var setRun = null;            // {code, kind, title, size} забега по набору
-  var chartsBuilt = false;      // графики подробной статистики уже построены?
   var shareInfo = null;         // {code, url} публичной страницы результата
   var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
@@ -4701,8 +4723,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // результатов не имеет права пропасть.
     summary = localSummary();
     function done() {
-      saveRunToHistory(summary);
       paintFinal();
+      // История нужна трём графикам из девяти. Тянем ПОСЛЕ отрисовки: экран
+      // результата не имеет права ждать этот запрос, а три графика
+      // дорисуются, когда ответ придёт. Аноним получит 403 — и увидит те же
+      // графики без сравнения, а не выдуманные числа.
+      fetchHistory(function () { buildCompareCharts(); });
     }
     api('/game/api/session/finish/', {
       method: 'POST',
@@ -4868,11 +4894,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
     paintShare(s);
 
-    /* подробная статистика — заново свёрнута, графики построятся при
-       раскрытии уже по НОВОЙ сводке */
-    chartsBuilt = false;
-    $('det-body').hidden = true;
-    $('det-toggle').setAttribute('aria-expanded', 'false');
+    // Подробная статистика раскрыта сразу: графики строятся при отрисовке
+    // экрана результата, а не при нажатии на кнопку, которой больше нет.
+    buildCharts();
   }
 
   /* Блок работы над ошибками: полоса пропорции + легенда. Пропорция та же,
@@ -5265,8 +5289,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      «Классики» несравним — разные запасы времени). Текущий — акцентом. */
   function chartHistory(s) {
     var box = $('chart-history');
-    var rows = loadHistory().filter(function (r) { return r.mode === mode; });
-    rows = rows.slice(-HISTORY_SHOWN);
+    if (!CFG.is_authenticated) {
+      chartEmpty(box, 'Войдите, чтобы видеть свои прошлые раунды');
+      return;
+    }
+    var rows = (runHistory && runHistory.runs) || [];
     if (rows.length < 2) {
       chartEmpty(box, 'Это ваш первый раунд в этом режиме. Будет с чем сравнить');
       return;
@@ -5294,22 +5321,244 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
   }
 
+  /* ---------- ИСТОРИЯ ИГРОКА (СЕРВЕР) ----------
+     Тремя графиками из девяти («Последние раунды», «Время на ответ»,
+     «Против себя обычного») раунд сравнивается с прошлыми. История лежит
+     в `GameResult`, а не в localStorage: два источника истории разъехались
+     бы, а браузеров у человека несколько. */
+  function fetchHistory(then) {
+    if (!CFG.is_authenticated) { runHistory = null; if (then) then(); return; }
+    api('/game/api/me/history/?mode=' + encodeURIComponent(mode))
+      .then(function (d) {
+        runHistory = (d && d.runs) ? d : null;
+        if (then) then();
+      }, function () {
+        // Сеть подвела — сравнения не будет, а экран останется целым.
+        runHistory = null;
+        if (then) then();
+      });
+  }
+
+  /* 5. Лента ответов: клетка на вопрос, цвет — исход, высота — время. */
+  function chartTape(s) {
+    var box = $('chart-tape');
+    var seq = s.outcome_seq || [];
+    var times = s.time_seq || [];
+    if (!seq.length) { chartEmpty(box, 'Ни одного ответа в раунде'); return; }
+    var W = 400, H = 92, P = 8;
+    var svg = chartFrame(box, W, H);
+    var maxT = Math.max.apply(null, times.concat([1])) || 1;
+    var slot = (W - 2 * P) / seq.length;
+    var fill = { correct: 'var(--rush-ok)', wrong: 'var(--rush-bad)',
+                 skip: 'var(--text3)' };
+    seq.forEach(function (o, i) {
+      var t = times[i] || 0;
+      var bh = 10 + (t / maxT) * (H - P * 2 - 12);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.12, y: H - P - bh,
+        width: Math.max(slot * 0.76, 2), height: bh, rx: 2,
+        fill: fill[o] || 'var(--text3)', opacity: o === 'skip' ? .45 : .9
+      }));
+    });
+  }
+
+  /* 6. Время на ответ по вопросам. Ошибки красным, пунктиром — личное
+     среднее время верного ответа в этом режиме (с сервера). */
+  function chartTimes(s) {
+    var box = $('chart-times');
+    var times = s.time_seq || [];
+    var seq = s.outcome_seq || [];
+    if (!times.length) { chartEmpty(box, 'Нет данных о времени ответов'); return; }
+    var W = 400, H = 130, P = 8, BOT = 14;
+    var svg = chartFrame(box, W, H);
+    var avg = runHistory && runHistory.avg && runHistory.avg.avg_correct_ms;
+    var maxT = Math.max.apply(null, times.concat([avg || 0, 1])) || 1;
+    var slot = (W - 2 * P) / times.length;
+    var y = function (ms) { return H - BOT - (ms / maxT) * (H - P - BOT); };
+    times.forEach(function (t, i) {
+      var top = y(t);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.15, y: top,
+        width: Math.max(slot * 0.7, 2), height: Math.max(H - BOT - top, 2), rx: 2,
+        fill: seq[i] === 'wrong' ? 'var(--rush-bad)' : 'var(--rush-accent)',
+        opacity: seq[i] === 'skip' ? .3 : .85
+      }));
+    });
+    // ⚠️ Пунктира НЕТ, если среднего нет: линия по нулю говорила бы, что
+    // игрок обычно отвечает мгновенно. Отсутствие факта — не ноль.
+    if (avg) {
+      svg.appendChild(svgEl('line', {
+        x1: P, y1: y(avg), x2: W - P, y2: y(avg),
+        stroke: 'var(--text3)', 'stroke-width': 1,
+        'stroke-dasharray': '4 3', 'vector-effect': 'non-scaling-stroke'
+      }));
+      var lbl = svgEl('text', { x: W - P, y: y(avg) - 4, 'text-anchor': 'end',
+                                class: 'chart-lbl' });
+      lbl.textContent = 'обычно ' + (avg / 1000).toFixed(1).replace('.', ',') + ' с';
+      svg.appendChild(lbl);
+    }
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+  }
+
+  /* 7. Где набрано: очки за каждый вопрос. */
+  function chartPoints(s) {
+    var box = $('chart-points');
+    var pts = s.points_seq || [];
+    var total = pts.reduce(function (a, b) { return a + b; }, 0);
+    if (!total) { chartEmpty(box, 'Очков в этом раунде не набрано'); return; }
+    var W = 400, H = 130, P = 8, BOT = 14;
+    var svg = chartFrame(box, W, H);
+    var max = Math.max.apply(null, pts.concat([1])) || 1;
+    var slot = (W - 2 * P) / pts.length;
+    pts.forEach(function (v, i) {
+      var bh = (v / max) * (H - P - BOT);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.15, y: H - BOT - bh,
+        width: Math.max(slot * 0.7, 2), height: Math.max(bh, v ? 2 : 0), rx: 2,
+        fill: 'var(--rush-accent)', opacity: v ? .85 : .15
+      }));
+    });
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+  }
+
+  /* 8. Микро и макро: те же ответы, свёрнутые в два раздела.
+     ⚠️ РАСКЛАДКА ТЕМ БЕРЁТСЯ ИЗ CFG.topic_groups, а она приезжает из
+     `problems/sections.py` через `game/filters.py::TOPIC_GROUPS`. ВТОРОЙ
+     копии раскладки не заводить — прямой запрет ADR 0071. */
+  function chartGroups(s) {
+    var box = $('chart-groups');
+    var groups = CFG.topic_groups || [];
+    var rows = s.topic_rows || [];
+    if (!groups.length || !rows.length) {
+      chartEmpty(box, 'Тем в раунде не набралось');
+      return;
+    }
+    var byTopic = {};
+    groups.forEach(function (g) {
+      (g.topics || []).forEach(function (t) { byTopic[t] = g.key; });
+    });
+    var acc = {};
+    groups.forEach(function (g) { acc[g.key] = { correct: 0, wrong: 0 }; });
+    var seen = false;
+    rows.forEach(function (r) {
+      var key = byTopic[r.topic];
+      if (!key || !acc[key]) return;      // «Без темы» ни в один раздел не идёт
+      acc[key].correct += r.correct;
+      acc[key].wrong += r.wrong;
+      seen = true;
+    });
+    if (!seen) { chartEmpty(box, 'Темы раунда не попали ни в один раздел'); return; }
+
+    box.innerHTML = '';
+    var list = document.createElement('ul');
+    list.className = 'group-bars';
+    groups.forEach(function (g) {
+      var cell = acc[g.key];
+      var tries = cell.correct + cell.wrong;
+      var li = document.createElement('li');
+      var name = document.createElement('span');
+      name.className = 'gb-name';
+      name.textContent = g.title;
+      var bar = document.createElement('span');
+      bar.className = 'gb-bar';
+      var fill = document.createElement('i');
+      fill.style.width = (tries ? 100 * cell.correct / tries : 0) + '%';
+      bar.appendChild(fill);
+      var num = document.createElement('span');
+      num.className = 'gb-num';
+      num.textContent = tries
+        ? cell.correct + '/' + tries + ' (' + Math.round(100 * cell.correct / tries) + '%)'
+        : 'не было';
+      li.appendChild(name);
+      li.appendChild(bar);
+      li.appendChild(num);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+  }
+
+  /* 9. Против себя обычного: счёт, точность и время этого раунда против
+     личного среднего в этом режиме. Средних нет — сравнивать не с чем, и
+     выдуманного среднего мы не рисуем. */
+  function chartUsual(s) {
+    var box = $('chart-usual');
+    if (!CFG.is_authenticated) {
+      chartEmpty(box, 'Войдите, чтобы сравнивать раунд со своим обычным');
+      return;
+    }
+    var avg = runHistory && runHistory.avg;
+    if (!avg) {
+      chartEmpty(box, 'Первый раунд в этом режиме: сравнивать пока не с чем');
+      return;
+    }
+    var myMs = 0, n = 0;
+    (s.time_seq || []).forEach(function (t, i) {
+      if ((s.outcome_seq || [])[i] === 'correct' && t) { myMs += t; n++; }
+    });
+    myMs = n ? Math.round(myMs / n) : null;
+
+    var rows = [
+      ['Счёт', s.score, avg.score, false],
+      ['Точность', s.accuracy, avg.accuracy, false],
+      // ⚠️ У времени «меньше» значит «лучше»: направление сравнения своё.
+      ['Время верного', myMs, avg.avg_correct_ms, true]
+    ];
+    box.innerHTML = '';
+    var list = document.createElement('ul');
+    list.className = 'usual-rows';
+    rows.forEach(function (r) {
+      var now = r[1], usual = r[2], lowerIsBetter = r[3];
+      if (now == null || usual == null) return;
+      var li = document.createElement('li');
+      var name = document.createElement('span');
+      name.className = 'gb-name';
+      name.textContent = r[0];
+      var val = document.createElement('span');
+      val.className = 'usual-val';
+      var fmt = function (v) {
+        return r[0] === 'Время верного'
+          ? (v / 1000).toFixed(1).replace('.', ',') + ' с'
+          : (r[0] === 'Точность' ? v + '%' : v.toLocaleString('ru-RU'));
+      };
+      val.textContent = fmt(now) + ' против ' + fmt(usual);
+      var mark = document.createElement('span');
+      var better = lowerIsBetter ? now < usual : now > usual;
+      var same = now === usual;
+      mark.className = 'usual-mark ' + (same ? '' : better ? 'up' : 'down');
+      mark.textContent = same ? 'как обычно' : better ? 'лучше' : 'хуже';
+      li.appendChild(name);
+      li.appendChild(val);
+      li.appendChild(mark);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+  }
+
+  /* Три графика из девяти зависят от истории с сервера: перерисовываем их
+     отдельно, когда ответ придёт. Остальные шесть уже нарисованы. */
+  function buildCompareCharts() {
+    if (!summary) return;
+    chartHistory(summary);
+    chartTimes(summary);
+    chartUsual(summary);
+  }
+
   function buildCharts() {
     if (!summary) return;
     chartCurve(summary);
     chartTime(summary);
     chartDifficulty(summary);
-    chartHistory(summary);
+    chartTape(summary);
+    chartPoints(summary);
+    chartGroups(summary);
+    buildCompareCharts();
   }
-
-  $('det-toggle').addEventListener('click', function () {
-    var body = $('det-body');
-    var open = body.hidden;
-    body.hidden = !open;
-    this.setAttribute('aria-expanded', open ? 'true' : 'false');
-    // графики строим лениво — при первом раскрытии в этом забеге
-    if (open && !chartsBuilt) { buildCharts(); chartsBuilt = true; }
-  });
 
   $('btn-review').addEventListener('click', function () {
     var list = $('miss-list');

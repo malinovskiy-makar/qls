@@ -277,7 +277,12 @@ class FinalScreenTests(TestCase):
             self.assertNotIn(dead, self.src, dead)
 
     def test_comparison_chart_stays_but_its_caption_is_gone(self):
-        self.assertIn('Сравнение с прошлыми играми', self.src)
+        u"""⚠️ Подпись переименована 08.09.2026: «Сравнение с прошлыми
+        играми» → «Последние раунды». Сам график остался — проверяем его
+        по КОРОБКЕ, а не по названию: название владелец меняет, коробка
+        держит смысл."""
+        self.assertIn('id="chart-history"', self.src)
+        self.assertIn('Последние раунды', self.src)
         self.assertNotIn('правый столбец этот забег', self.src)
 
 

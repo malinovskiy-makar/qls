@@ -220,6 +220,60 @@ def best_run(user, mode):
     }
 
 
+# Сколько последних забегов показывает график «Последние раунды».
+# ⚠️ Число живёт ЗДЕСЬ, а не в клиенте: клиент рисует то, что дали.
+HISTORY_LIMIT = 20
+
+
+def run_history(user, mode):
+    u"""Последние забеги игрока в режиме плюс его средние по режиму.
+
+    ⚠️ ТОЛЬКО ПРО СЕБЯ. Параметра «чей» нет и не будет: он немедленно
+    превратил бы личную историю в публичную по перебору номеров — то же
+    правило, что у `personal_stats`.
+
+    ⚠️ СРЕДНИЕ СЧИТАЮТСЯ ПО ВСЕМ ЗАБЕГАМ РЕЖИМА, а список — по последним
+    двадцати. Это разные вопросы: «как я играю обычно» и «как шли последние
+    раунды». Считать среднее по двадцати значило бы менять смысл слова
+    «обычно» вместе с длиной списка.
+
+    Пустая история — это `runs: []` и `avg: None`, а не нули: нуля забегов
+    не бывает «в среднем», и рисовать по нему сравнение нечестно.
+    """
+    runs = GameResult.objects.filter(user=user, mode=mode,
+                                     economy_version=config.ECONOMY_VERSION)
+    total = runs.count()
+    if not total:
+        return {'mode': mode, 'runs': [], 'avg': None, 'total': 0}
+
+    recent = list(runs.order_by('-created_at')[:HISTORY_LIMIT])
+    recent.reverse()          # на графике время идёт слева направо
+    rows = [{
+        'score': r.score,
+        'accuracy': r.accuracy,
+        'avg_correct_ms': r.avg_correct_ms,
+        'created_at': r.created_at.isoformat(timespec='seconds'),
+    } for r in recent]
+
+    scores = list(runs.values_list('score', flat=True))
+    correct_sum = sum(runs.values_list('correct_count', flat=True))
+    attempts = sum(r.correct_count + r.wrong_count for r in runs)
+    speeds = [r.avg_correct_ms for r in runs if r.avg_correct_ms]
+    return {
+        'mode': mode,
+        'runs': rows,
+        'total': total,
+        'avg': {
+            'score': round(sum(scores) / total),
+            'accuracy': round(100 * correct_sum / attempts) if attempts else 0,
+            # None, а не ноль: «в среднем ноль миллисекунд» — не факт, а
+            # отсутствие факта, и пунктир по нему лёг бы по нулю.
+            'avg_correct_ms': (int(sum(speeds) / len(speeds))
+                               if speeds else None),
+        },
+    }
+
+
 def duel_stats(user):
     u"""Сводка по дуэлям игрока. Новых таблиц не заводим.
 
