@@ -53,8 +53,11 @@
       "phase_0": "done",
       "phase_1": "done",
       "phase_2": "done",
-      "phase_3": "стоп-гейт — ждём владельца",
-      "phase_5": "done"
+      "phase_3": "done (три стоп-гейта)",
+      "phase_4": "done",
+      "phase_5": "done",
+      "phase_6": "done",
+      "phase_7": "done"
     }
   },
   "manifest_size": 1740,
@@ -102,11 +105,34 @@
   },
   "titles_reverted_by_owner": true,
   "title_buckets_final": {
-    "обрубки": 13111,
-    "технические номера": 3273,
-    "не трогаем": 18344,
+    "обрубки": 10961,
+    "технические номера": 3275,
+    "не трогаем": 20492,
     "уже равен кандидату": 5192,
     "кандидат негоден": 1387
   },
-  "titles_to_replace_final": 16384
+  "titles_to_replace_final": 14236,
+  "titles_replaced_final": 14236,
+  "titles_snapshot_final": "reports/formula_v2/title_apply_backup_final.json",
+  "titles_snapshot_previous_KEEP": "reports/formula_v2/title_apply_backup.json (22 289, старый критерий — НЕ применять)",
+  "published_title_over_40": {
+    "до": 13236,
+    "после": 7406
+  },
+  "protected_fingerprint_final": "314a18b1ab20e61ab4e95ec67ea8a3ef",
+  "md5_id_title": {
+    "до замены": "801cb7d50399503a3cf0fb437016372a",
+    "после замены": "f7ab41ca99630fce4ee82cec414d3f24"
+  },
+  "firstline_unresolved": {
+    "файл": "reports/formula_v2/firstline_unresolved.json",
+    "всего": 2229,
+    "опубликованных": 884
+  },
+  "empty_statements": {
+    "файл": "reports/formula_v2/empty_statements.json",
+    "всего": 151,
+    "совсем пустых": 29
+  },
+  "mutations_red": "16 из 16"
 }
