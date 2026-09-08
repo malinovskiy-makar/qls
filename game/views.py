@@ -411,6 +411,19 @@ def api_my_stats(request):
     mode = request.GET.get('mode') or config.DEFAULT_MODE
     if mode not in config.MODES:
         mode = config.DEFAULT_MODE
+    # ⚠️ ПАНЕЛЬ «МОИ РЕКОРДЫ» ЖИВЁТ ЗДЕСЬ, А НЕ В СВОЁМ ЭНДПОИНТЕ
+    # (08.09.2026). Это ровно «личная статистика, только про себя», и
+    # граница у неё та же самая — она уже описана в этой вьюхе и закрыта
+    # тестами `MyStatsBoundaryTests`. Второй эндпоинт означал бы второе
+    # место, где ту же границу надо не забыть удержать. (Отдельный
+    # `api_my_history` существует по другой причине: он про ОДИН режим и
+    # про порядок последних забегов — его зовёт экран результата.)
+    #
+    # `panel_mode` может быть 'all': панель умеет показывать все режимы
+    # сразу, а `stats` — нет, счёт Пули и Классики несравним.
+    panel_mode = request.GET.get('panel_mode') or mode
+    if panel_mode != 'all' and panel_mode not in config.MODES:
+        panel_mode = mode
     return JsonResponse({
         'mode': mode,
         'stats': lb.personal_stats(request.user, mode),
@@ -418,6 +431,7 @@ def api_my_stats(request):
         # вторая таблица разъехалась бы с фактом при первом же удалении
         # забега руками (тот же довод, что у лидерборда, ADR 0056).
         'duels': lb.duel_stats(request.user),
+        'panel': lb.records_panel(request.user, panel_mode),
     })
 
 

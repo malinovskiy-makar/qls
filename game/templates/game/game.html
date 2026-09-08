@@ -814,7 +814,7 @@ a:focus-visible, button:focus-visible {
 .code-form button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .records-box {
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--rush-border);
   border-radius: 12px;
   background: var(--rush-surface);
@@ -826,6 +826,45 @@ a:focus-visible, button:focus-visible {
   padding: 3px 0; color: var(--text2);
 }
 .records-box .rec-row b { color: var(--rush-accent); font-variant-numeric: tabular-nums; }
+
+/* ── Панель «Мои рекорды» (08.09.2026) ──────────────────────────────
+   Было четыре строки из localStorage, стало развёрнутое место на
+   серверных данных. Все числа — из `GameResult`, новых таблиц нет. */
+.rec-modes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rec-modes button {
+  font: inherit; font-size: 13px; padding: 5px 11px; cursor: pointer;
+  border: 1px solid var(--rush-border); border-radius: 999px;
+  background: transparent; color: var(--text2);
+}
+.rec-modes button:hover { border-color: var(--rush-accent); }
+.rec-modes button[aria-pressed="true"] {
+  border-color: var(--rush-accent); color: var(--rush-accent); font-weight: 600;
+}
+.rec-metrics {
+  display: grid; gap: 10px; margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+.rec-metric { padding: 10px 12px; border-radius: 10px;
+              background: var(--rush-bg); }
+.rec-metric small { display: block; font-size: 12px; color: var(--text3); }
+.rec-metric b { display: block; font-size: 19px; font-weight: 700;
+                font-variant-numeric: tabular-nums; }
+.rec-metric i { font-style: normal; font-size: 12px; color: var(--text3); }
+.rec-block { margin-top: 14px; }
+.rec-block h4 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rec-table th, .rec-table td { text-align: left; padding: 4px 8px 4px 0;
+                               color: var(--text2); }
+.rec-table th { color: var(--text3); font-weight: 500; }
+.rec-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rec-note { font-size: 13px; color: var(--text3); }
+/* Активность за 30 дней: клетка на день, плотность по числу раундов. */
+.rec-days { display: flex; gap: 3px; flex-wrap: wrap; }
+.rec-days i { width: 12px; height: 12px; border-radius: 3px;
+              background: var(--rush-border); }
+.rec-days i.a1 { background: var(--rush-accent); opacity: .35; }
+.rec-days i.a2 { background: var(--rush-accent); opacity: .65; }
+.rec-days i.a3 { background: var(--rush-accent); }
 
 /* ── Карточка забега по набору ──────────────────────────────────── */
 .set-intro {
@@ -2198,7 +2237,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <b>Бросить вызов</b><small>дуэль по ссылке</small>
         </button>
         <button class="entry" id="entry-records">
-          <b>Мои рекорды</b><small>по режимам, локально</small>
+          <b>Мои рекорды</b><small>по режимам, темам и дуэлям</small>
         </button>
       </div>
 
@@ -5788,31 +5827,239 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     location.href = '/game/s/' + encodeURIComponent(code) + '/';
   });
 
+  /* ---------- ПАНЕЛЬ «МОИ РЕКОРДЫ» ----------
+     ⚠️ ДАННЫЕ С СЕРВЕРА, А НЕ ИЗ localStorage (08.09.2026, решение
+     владельца). Было четыре строки с рекордами по режимам, прочитанные из
+     браузера; рекорды при этом терялись при смене браузера. Всё, что здесь
+     есть, считается из `GameResult` — новых таблиц не заводится.
+
+     Ключ `econrush_best_v2_*` в localStorage остаётся: он больше не
+     источник правды (его пишет и читает только плашка «новый рекорд» по
+     ходу забега), а удалять ключи у живых игроков в эту сессию не входит.
+
+     ⚠️ АНОНИМУ НЕ РИСУЕМ НИ ОДНОГО ЧИСЛА. Ему нечего показывать, и
+     выдуманное число-заглушка хуже честной строки. */
+  var recMode = 'all';
+  var recLoading = false;
+
+  function recEl(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  function recMs(ms) {
+    return ms == null ? '–' : (ms / 1000).toFixed(1).replace('.', ',') + ' с';
+  }
+
+  function paintRecords(d) {
+    var box = $('records-box');
+    box.innerHTML = '';
+
+    // Переключатель режимов: «Все режимы» плюс те, что есть на экране.
+    var tabs = recEl('div', 'rec-modes');
+    [['all', 'Все режимы']].concat(visibleModes().map(function (k) {
+      return [k, CFG.modes[k].title];
+    })).forEach(function (pair) {
+      var b = recEl('button', null, pair[1]);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', pair[0] === recMode ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        recMode = pair[0];
+        loadRecords();
+      });
+      tabs.appendChild(b);
+    });
+    box.appendChild(tabs);
+
+    var p = d && d.panel;
+    if (!p || !p.runs) {
+      box.appendChild(recEl('p', 'rec-note',
+        'Раундов в этом режиме ещё не было. Сыграйте первый.'));
+      return;
+    }
+
+    // ── Четыре метрики ──
+    var grid = recEl('div', 'rec-metrics');
+    function metric(label, value, note) {
+      var cell = recEl('div', 'rec-metric');
+      cell.appendChild(recEl('small', null, label));
+      cell.appendChild(recEl('b', null, value));
+      if (note) cell.appendChild(recEl('i', null, note));
+      grid.appendChild(cell);
+    }
+    metric('Раундов', p.runs.toLocaleString('ru-RU'),
+           'зачётных ' + p.ranked_runs);
+    metric('Лучший счёт', p.best_score.toLocaleString('ru-RU'),
+           formatDate(p.best_score_at) + ' · ' + p.best_score_mode);
+    metric('Средняя точность', p.accuracy + '%');
+    metric('Верный ответ', recMs(p.avg_correct_ms), 'в среднем');
+    box.appendChild(grid);
+
+    // ── Место в таблице и разрыв до соседа сверху ──
+    if (p.place) {
+      var note = p.place.place + ' место из ' + p.place.total_players
+        + ' · ' + p.place.value.toLocaleString('ru-RU') + ' очков';
+      // ⚠️ Разрыва нет у первого места: догонять некого, и ноль здесь
+      // прочитался бы как «догнал».
+      note += p.place.gap == null
+        ? ' · выше никого'
+        : ' · до соседа сверху ' + p.place.gap.toLocaleString('ru-RU');
+      box.appendChild(recEl('p', 'rec-note', note));
+    }
+
+    recTimeline(box, p.timeline);
+    recModeTable(box, p.mode_rows);
+    recTopics(box, p.topic_rows);
+    recActivity(box, p.activity);
+    recDuels(box, p.duels);
+    recDifficulty(box, p.difficulty_rows);
+  }
+
+  function recBlock(box, title) {
+    var wrap = recEl('div', 'rec-block');
+    wrap.appendChild(recEl('h4', null, title));
+    box.appendChild(wrap);
+    return wrap;
+  }
+
+  /* График всех раундов: точка на раунд, линия личного рекорда на тот день.
+     Линия — нарастающий максимум: видно, КОГДА игрок себя обошёл. */
+  function recTimeline(box, rows) {
+    if (!rows || rows.length < 2) return;
+    var wrap = recBlock(box, 'Все раунды');
+    var holder = recEl('div', 'chart-box');
+    wrap.appendChild(holder);
+    var W = 400, H = 120, P = 8;
+    var svg = chartFrame(holder, W, H);
+    var max = Math.max.apply(null, rows.map(function (r) { return r.best; })) || 1;
+    var x = function (i) { return P + i * (W - 2 * P) / (rows.length - 1); };
+    var y = function (v) { return H - P - (v / max) * (H - 2 * P); };
+    svg.appendChild(svgEl('polyline', {
+      points: rows.map(function (r, i) { return x(i) + ',' + y(r.best); }).join(' '),
+      fill: 'none', stroke: 'var(--rush-accent)', 'stroke-width': 2,
+      'vector-effect': 'non-scaling-stroke'
+    }));
+    rows.forEach(function (r, i) {
+      svg.appendChild(svgEl('circle', {
+        cx: x(i), cy: y(r.score), r: 2.5,
+        fill: 'var(--text3)', opacity: .7
+      }));
+    });
+  }
+
+  function recModeTable(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Рекорды по режимам');
+    var table = recEl('table', 'rec-table');
+    var head = recEl('tr');
+    ['Режим', 'Счёт', 'Комбо', 'Точность'].forEach(function (t, i) {
+      var th = recEl('th', i ? 'num' : null, t);
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    rows.forEach(function (r) {
+      var tr = recEl('tr');
+      tr.appendChild(recEl('td', null, r.title));
+      tr.appendChild(recEl('td', 'num', r.score.toLocaleString('ru-RU')));
+      tr.appendChild(recEl('td', 'num', '×' + multText(r.combo)));
+      tr.appendChild(recEl('td', 'num', r.accuracy + '%'));
+      table.appendChild(tr);
+    });
+    wrap.appendChild(table);
+  }
+
+  function recTopics(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Точность по темам за всё время');
+    var list = recEl('ul', 'group-bars');
+    rows.slice(0, 8).forEach(function (r) {
+      var li = recEl('li');
+      li.appendChild(recEl('span', 'gb-name', r.topic));
+      var bar = recEl('span', 'gb-bar');
+      var fill = recEl('i');
+      fill.style.width = r.accuracy + '%';
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      li.appendChild(recEl('span', 'gb-num',
+        r.correct + '/' + r.total + ' (' + r.accuracy + '%)'));
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+  }
+
+  function recActivity(box, days) {
+    if (!days || !days.length) return;
+    var wrap = recBlock(box, 'Активность за 30 дней');
+    var strip = recEl('div', 'rec-days');
+    days.forEach(function (d) {
+      var cell = recEl('i', d.count >= 5 ? 'a3' : d.count >= 2 ? 'a2'
+                                                : d.count ? 'a1' : null);
+      cell.title = d.date + ': ' + d.count;
+      strip.appendChild(cell);
+    });
+    wrap.appendChild(strip);
+  }
+
+  function recDuels(box, duels) {
+    if (!duels || !duels.played) return;
+    var wrap = recBlock(box, 'Дуэли');
+    var text = 'побед ' + duels.wins + ' · поражений ' + duels.losses
+      + ' · ничьих ' + duels.draws;
+    // ⚠️ Процент может быть null: дуэли, где соперник не пришёл, в
+    // знаменатель не идут, и делить бывает не на что. Ноль тут соврал бы.
+    if (duels.win_percent != null) text += ' · ' + duels.win_percent + '%';
+    if (duels.top_rival) text += ' · чаще всего с ' + duels.top_rival;
+    wrap.appendChild(recEl('p', 'rec-note', text));
+  }
+
+  function recDifficulty(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Доля верных по сложности');
+    var list = recEl('ul', 'group-bars');
+    rows.forEach(function (r) {
+      var li = recEl('li');
+      li.appendChild(recEl('span', 'gb-name', r.title));
+      var bar = recEl('span', 'gb-bar');
+      var fill = recEl('i');
+      fill.style.width = r.accuracy + '%';
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      li.appendChild(recEl('span', 'gb-num',
+        r.correct + '/' + r.total + ' (' + r.accuracy + '%)'));
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+  }
+
+  function loadRecords() {
+    var box = $('records-box');
+    if (!CFG.is_authenticated) {
+      box.innerHTML = '';
+      box.appendChild(recEl('p', 'rec-note',
+        'Войдите, чтобы рекорды сохранялись и считались по всем устройствам.'));
+      box.hidden = false;
+      return;
+    }
+    if (recLoading) return;
+    recLoading = true;
+    box.hidden = false;
+    if (!box.innerHTML) box.appendChild(recEl('p', 'rec-note', 'Считаем…'));
+    api('/game/api/me/stats/?panel_mode=' + encodeURIComponent(recMode))
+      .then(function (d) { recLoading = false; paintRecords(d); },
+            function () {
+              recLoading = false;
+              box.innerHTML = '';
+              box.appendChild(recEl('p', 'rec-note',
+                'Не получилось загрузить рекорды. Попробуйте позже.'));
+            });
+  }
+
   $('entry-records').addEventListener('click', function () {
     var box = $('records-box');
     if (!box.hidden) { box.hidden = true; return; }
-    box.innerHTML = '';
-    var any = false;
-    visibleModes().forEach(function (key) {
-      var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
-      var row = document.createElement('div');
-      row.className = 'rec-row';
-      var name = document.createElement('span');
-      name.textContent = CFG.modes[key].title;
-      var val = document.createElement('b');
-      val.textContent = best > 0 ? best.toLocaleString('ru-RU') : '–';
-      if (best > 0) any = true;
-      row.appendChild(name);
-      row.appendChild(val);
-      box.appendChild(row);
-    });
-    if (!any) {
-      var hint = document.createElement('div');
-      hint.className = 'rec-row';
-      hint.textContent = 'Рекордов пока нет. Сыграйте первый раунд.';
-      box.appendChild(hint);
-    }
-    box.hidden = false;
+    loadRecords();
   });
 
   /* ---------- ЗАБЕГ ПО НАБОРУ ----------

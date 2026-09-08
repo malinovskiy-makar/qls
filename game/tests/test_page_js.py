@@ -607,3 +607,50 @@ class NineChartsTests(TestCase):
                 self.assertNotIn(lib, low, url)
         # Цвета графиков идут токенами — иначе смена темы их не перекрасит.
         self.assertIn("'var(--rush-accent)'", self.js)
+
+
+class RecordsPanelClientTests(TestCase):
+    u"""Панель «Мои рекорды» на клиенте: серверные данные, не localStorage."""
+
+    def setUp(self):
+        self.src = page_source()
+        self.js = inline_js(self.src)
+
+    def test_the_panel_asks_the_server(self):
+        self.assertIn("api('/game/api/me/stats/?panel_mode=", self.js)
+        m = re.search(r'function paintRecords\(d\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'paintRecords не найден')
+        self.assertNotIn('localStorage', m.group(1))
+
+    def test_an_anonymous_player_is_told_the_truth_not_shown_zeroes(self):
+        m = re.search(r'function loadRecords\(\) \{(.*?)\n  \}', self.js, re.S)
+        branch = m.group(1).split('if (!CFG.is_authenticated) {', 1)[1]
+        branch = branch.split('return;', 1)[0]
+        self.assertIn('Войдите, чтобы рекорды сохранялись', branch)
+        self.assertNotRegex(branch, r'\d')
+
+    def test_no_runs_means_words_not_numbers(self):
+        m = re.search(r'function paintRecords\(d\) \{(.*?)\n  \}', self.js, re.S)
+        branch = m.group(1).split('if (!p || !p.runs) {', 1)[1]
+        branch = branch.split('return;', 1)[0]
+        self.assertIn('Сыграйте первый', branch)
+        self.assertNotRegex(branch, r'\d')
+
+    def test_the_old_four_line_box_is_gone(self):
+        u"""Прежняя панель читала рекорды режимов прямо из localStorage."""
+        m = re.search(r"\$\('entry-records'\)\.addEventListener"
+                      r"\('click', function \(\) \{(.*?)\n  \}\);",
+                      self.js, re.S)
+        self.assertIsNotNone(m, 'обработчик entry-records не найден')
+        self.assertNotIn('bestKey', m.group(1))
+        self.assertIn('loadRecords()', m.group(1))
+        self.assertNotIn('по режимам, локально', self.src)
+
+    def test_the_local_best_key_is_left_alone(self):
+        u"""⚠️ Ключ `econrush_best_v2_*` НЕ удаляется.
+
+        Он больше не источник правды — его читает только плашка «новый
+        рекорд» по ходу забега, — но удаление ключей у живых игроков в эту
+        сессию не входило и вреда ключ не делает.
+        """
+        self.assertIn("'econrush_best_v2_'", self.js)
