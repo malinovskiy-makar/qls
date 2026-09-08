@@ -81,18 +81,40 @@ class CandidateUsableTests(TestCase):
 
 
 class TruncationTests(TestCase):
-    """Корзина «обрубки» — три правила, каждое отдельно."""
+    """Правило 2 — обрубок ДЛИННЕЕ 40 символов."""
 
-    def test_заголовок_дословно_начинает_условие(self):
-        self.assertTrue(tr.starts_statement(
-            'Фирма-монополист производит два товара и…', УСЛОВИЕ))
+    ДЛИННЫЙ = 'Фирма-монополист производит два товара и…'   # 41 символ
 
-    def test_короткое_совпадение_обрубком_не_считается(self):
-        """«Фирма» и «Фирма-монополист производит…» — не обрубок, а название."""
-        self.assertFalse(tr.starts_statement('Фирма', УСЛОВИЕ))
+    def test_длинный_заголовок_дословно_начинает_условие(self):
+        self.assertGreater(len(self.ДЛИННЫЙ), tr.TITLE_LIMIT)
+        self.assertTrue(tr.is_long_truncation(self.ДЛИННЫЙ, УСЛОВИЕ))
+
+    def test_порог_сорока_символов_обязателен(self):
+        """Сторож ответа владельца на вопрос 3. Короткий заголовок, дословно
+        начинающий условие, — это авторская кличка, продублированная шапкой
+        («Национальное достояние», «ШтаКельНо»), а не обрубок. Замерено: таких
+        коротких не-firstline заголовков 817 опубликованных.
+        """
+        кличка = 'Дуополия Курно'
+        условие = 'Дуополия Курно. Две фирмы делят рынок и выбирают выпуск.'
+        self.assertTrue(tr.starts_statement(кличка, условие))
+        self.assertLessEqual(len(кличка), tr.TITLE_LIMIT)
+        self.assertFalse(tr.is_long_truncation(кличка, условие))
+
+    def test_ведущее_число_у_условия_срезается(self):
+        """Сторож починки ложного отрицания: импорт оставляет в начале условия
+        номер задачи или год, заголовок его не содержит. id 6308 и id 41249 —
+        обе названы владельцем поимённо."""
+        заголовок = 'Конкурентная фирма, максимизирующая прибыль, реализует'
+        self.assertGreater(len(заголовок), tr.TITLE_LIMIT)
+        условие = ('2009 Конкурентная фирма, максимизирующая прибыль, '
+                   'реализует продукцию по 20 долл.')
+        self.assertEqual(tr.statement_key(условие)[:12], 'конкурентная')
+        self.assertTrue(tr.is_long_truncation(заголовок, условие))
 
     def test_свой_заголовок_условие_не_начинает(self):
-        self.assertFalse(tr.starts_statement('Дуополия Курно', УСЛОВИЕ))
+        self.assertFalse(tr.is_long_truncation(
+            'Совершенно осмысленное название задачи про дуополию', УСЛОВИЕ))
 
     def test_обрыв_на_чёрточке(self):
         for хвост in ('явля-', 'явля–', 'явля—', 'явля- '):
@@ -105,18 +127,9 @@ class TruncationTests(TestCase):
         self.assertFalse(tr.ends_with_dash('Подсолнух - 2'))
         self.assertFalse(tr.ends_with_dash('Обзор мер регулирования -- 1'))
 
-    def test_первые_сорок_символов_совпали_а_хвост_разошёлся(self):
-        заголовок = 'Фирма-монополист производит два товара и ХВОСТ ЧУЖОЙ'
-        self.assertGreater(len(заголовок), tr.TITLE_LIMIT)
-        self.assertFalse(tr.starts_statement(заголовок, УСЛОВИЕ))
-        self.assertTrue(tr.head_matches_statement(заголовок, УСЛОВИЕ))
-
-    def test_правило_сорока_символов_на_короткий_заголовок_не_действует(self):
-        """Иначе короткое название «Фирма» стало бы обрубком по префиксу."""
-        self.assertFalse(tr.head_matches_statement('Фирма-монополист', УСЛОВИЕ))
-
     def test_пустое_условие_обрубком_не_делает(self):
-        self.assertFalse(tr.is_truncation('Какой-то заголовок задачи', ''))
+        self.assertFalse(tr.is_long_truncation(
+            'Какой-то заголовок задачи подлиннее сорока символов', ''))
 
 
 class TechnicalNumberTests(TestCase):
@@ -155,9 +168,28 @@ class BucketTests(TestCase):
                    title_source='model-firstline')
         self.assertEqual(tr.bucket(p), 'обрубки')
 
+    def test_правило_1_метка_происхождения_без_других_правил(self):
+        """Самая новая часть критерия: короткий осколок, который не ловят ни
+        правило 2 (длиннее 40), ни правило 3 (номер). Ловит только метка."""
+        for осколок in ('a', 'b, c, d', 'КПВ', 'Банк', '[рисунок]'):
+            with self.subTest(заголовок=осколок):
+                p = задача(title=осколок, title_candidate='Дуополия Курно',
+                           title_source='model-firstline')
+                self.assertFalse(tr.is_long_truncation(p.title, p.statement))
+                self.assertFalse(tr.is_technical_number(p.title))
+                self.assertEqual(tr.bucket(p), 'первая строка')
+
+    def test_такой_же_осколок_но_не_firstline_остаётся(self):
+        """Зеркало предыдущего: без метки происхождения тот же заголовок —
+        авторская кличка, и её владелец велел беречь."""
+        p = задача(title='Банк', title_candidate='Дуополия Курно',
+                   title_source='kept')
+        self.assertEqual(tr.bucket(p), 'не трогаем')
+
     def test_обрубок_среди_kept(self):
         p = задача(title='Фирма-монополист производит два товара и…',
                    title_candidate='Дуополия Курно', title_source='kept')
+        self.assertGreater(len(p.title), tr.TITLE_LIMIT)
         self.assertEqual(tr.bucket(p), 'обрубки')
 
     def test_технический_номер(self):
@@ -209,6 +241,13 @@ class BucketTests(TestCase):
         p = задача(title='Монополия', title_candidate='title_candidate',
                    title_source='title_source')
         self.assertEqual(tr.bucket(p), 'кандидат негоден')
+
+    def test_корзины_отчёта_не_меняют_состав_замены(self):
+        """Порядок правил в `bucket()` влияет только на то, в какой корзине
+        задача покажется в отчёте. Замена — объединение трёх правил."""
+        p = задача(title='Тест 23', title_candidate='Повышение акциза',
+                   title_source='model-firstline')
+        self.assertIn(tr.bucket(p), tr.REPLACED)
 
     def test_обрубок_проверяется_раньше_номера(self):
         """«Задача 5. Фирма-монополист производит…» — и номер, и обрубок.
