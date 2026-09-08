@@ -186,22 +186,23 @@ class BucketTests(TestCase):
                    title_source='model-firstline')
         self.assertEqual(tr.bucket(p), 'обрубки')
 
-    def test_правило_1_метка_происхождения_без_других_правил(self):
-        """Самая новая часть критерия: короткий осколок, который не ловят ни
-        правило 2 (длиннее 40), ни правило 3 (номер). Ловит только метка."""
-        for осколок in ('a', 'b, c, d', 'КПВ', 'Банк', '[рисунок]'):
-            with self.subTest(заголовок=осколок):
-                p = задача(title=осколок, title_candidate='Дуополия Курно',
-                           title_source='model-firstline')
-                self.assertFalse(tr.is_truncation(p.title, p.statement))
-                self.assertFalse(tr.is_technical_number(p.title))
-                self.assertEqual(tr.bucket(p), 'первая строка')
+    def test_метка_происхождения_в_критерии_не_участвует(self):
+        """Сторож снятого правила (решение владельца 08.09). `title_source`
+        сама по себе замены не вызывает: это метка ПРОГОНА, а не автора, и
+        подтвердить её нечем. Короткий заголовок остаётся при любой метке."""
+        self.assertFalse(hasattr(tr, 'is_first_line_title'))
+        self.assertNotIn('первая строка', tr.BUCKETS)
+        for метка in ('model-firstline', 'kept', 'model-empty'):
+            with self.subTest(title_source=метка):
+                p = задача(title='Банк', title_candidate='Дуополия Курно',
+                           title_source=метка)
+                self.assertEqual(tr.bucket(p), 'не трогаем')
 
-    def test_такой_же_осколок_но_не_firstline_остаётся(self):
-        """Зеркало предыдущего: без метки происхождения тот же заголовок —
-        авторская кличка, и её владелец велел беречь."""
-        p = задача(title='Банк', title_candidate='Дуополия Курно',
-                   title_source='kept')
+    def test_осколок_без_подтверждения_текстом_остаётся(self):
+        """Цена решения, названная числом: 2 229 задач вроде «ВП-2020» и
+        «b, c, d» остаются на месте. Список — firstline_unresolved.json."""
+        p = задача(title='ВП-2020', title_candidate='Дуополия Курно',
+                   title_source='model-firstline')
         self.assertEqual(tr.bucket(p), 'не трогаем')
 
     def test_обрубок_среди_kept(self):
@@ -262,7 +263,7 @@ class BucketTests(TestCase):
 
     def test_корзины_отчёта_не_меняют_состав_замены(self):
         """Порядок правил в `bucket()` влияет только на то, в какой корзине
-        задача покажется в отчёте. Замена — объединение трёх правил."""
+        задача покажется в отчёте. Замена — объединение двух правил."""
         p = задача(title='Тест 23', title_candidate='Повышение акциза',
                    title_source='model-firstline')
         self.assertIn(tr.bucket(p), tr.REPLACED)
