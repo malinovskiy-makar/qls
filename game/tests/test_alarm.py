@@ -11,6 +11,7 @@ game.html и считает ими, а не копией — копия разъ
 кодом при первой правке порога.
 """
 import io
+import re
 import os
 import shutil
 import subprocess
@@ -26,6 +27,18 @@ SOUND = 'game/static/game/sound.js'
 
 def read(path):
     return io.open(path, encoding='utf-8').read()
+
+
+def no_comments(text):
+    u"""Текст без комментариев JS.
+
+    ⚠️ БЕЗ ЭТОГО ПРОВЕРКИ ОБМАНЫВАЕТ СОБСТВЕННЫЙ КОММЕНТАРИЙ. Поймано на
+    фазе 14: убрали вызов `wake()` из `thump()`, а тест остался зелёным —
+    строку `wake()` он нашёл в комментарии над убранным вызовом. Тест,
+    который не краснеет, — это не тест.
+    """
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    return re.sub(r'//[^\n]*', ' ', text)
 
 
 def body_of(src, header):
@@ -159,37 +172,44 @@ class SoundSurvivesSleepAndDeviceChangeTests(SimpleTestCase):
 
     def test_wake_exists_and_resumes(self):
         self.assertIn('function wake() {', self.src)
-        body = body_of(self.src, 'function wake() {')
+        body = no_comments(body_of(self.src, 'function wake() {'))
         self.assertIn("c.state !== 'running'", body)
         self.assertIn('c.resume()', body)
 
     def test_tone_thump_and_heartbeat_all_wake_first(self):
-        u"""Механизм 2: раньше будила только tone(), и пульс молчал."""
+        u"""Механизм 2: раньше будила только tone(), и пульс молчал.
+
+        ⚠️ Комментарии вырезаются: рядом с вызовом стоит объяснение, в
+        котором тоже написано `wake()`, и без чистки проверка находила бы
+        его вместо вызова (поймано мутацией на фазе 14).
+        """
         for header in ('function tone(opts) {',
                        'function thump(t0, vol) {'):
-            self.assertIn('wake()', body_of(self.src, header), header)
+            body = no_comments(body_of(self.src, header))
+            self.assertIn('= wake();', body, header)
+            self.assertNotIn('var c = ctx;', body, header)
         # heartbeat.start — метод объекта, не функция
-        start = self.src.split('start: function (bpm) {', 1)[1]
-        start = start.split('},', 1)[0]
-        self.assertIn('wake()', start)
+        start = no_comments(self.src.split('start: function (bpm) {', 1)[1]
+                            .split('},', 1)[0])
+        self.assertIn('wake();', start)
         self.assertNotIn('audio();', start)
 
     def test_closed_context_is_recreated(self):
         u"""Механизм 1 (крайний случай): закрытый контекст — не живой объект."""
-        body = body_of(self.src, 'function audio() {')
+        body = no_comments(body_of(self.src, 'function audio() {'))
         self.assertIn("ctx.state === 'closed'", body)
         self.assertIn('ctx = null; master = null;', body)
 
     def test_a_stopped_clock_counts_as_a_dead_context(self):
         u"""Механизм 3: running, а currentTime стоит — контекст мёртв."""
-        body = body_of(self.src, 'function watchClock(replay) {')
+        body = no_comments(body_of(self.src, 'function watchClock(replay) {'))
         self.assertIn('c.currentTime !== was', body)
         self.assertIn("c.state !== 'running'", body)
         self.assertIn('respawn()', body)
 
     def test_the_retry_happens_exactly_once(self):
         u"""⚠️ Бесконечная цепочка пересозданий хуже тишины."""
-        body = body_of(self.src, 'function watchClock(replay) {')
+        body = no_comments(body_of(self.src, 'function watchClock(replay) {'))
         self.assertIn('if (clock.retried) return;', body)
         self.assertIn('clock.retried = true;', body)
         # И снимается, как только часы пошли: вторая смена наушников за
@@ -198,7 +218,7 @@ class SoundSurvivesSleepAndDeviceChangeTests(SimpleTestCase):
 
     def test_respawn_reschedules_the_heartbeat(self):
         u"""Часы нового контекста идут с нуля — иначе пульс замолчал бы."""
-        body = body_of(self.src, 'function respawn() {')
+        body = no_comments(body_of(self.src, 'function respawn() {'))
         self.assertIn('hb.next = hbNow() + 0.05;', body)
 
     def test_returning_to_the_tab_wakes_the_sound(self):
@@ -302,15 +322,18 @@ class AlarmIsClearedOnRunEndTests(SimpleTestCase):
         self.src = read(PAGE)
 
     def test_clear_alarm_is_defined_once_and_actually_clears(self):
+        # ⚠️ Комментарии вырезаются везде в этом классе: рядом с вызовами
+        # стоят объяснения, и без чистки проверка могла бы найти имя
+        # функции в тексте про неё, а не сам вызов.
         self.assertEqual(self.src.count('function clearAlarm('), 1)
-        body = body_of(self.src, 'function clearAlarm() {')
+        body = no_comments(body_of(self.src, 'function clearAlarm() {'))
         self.assertIn("classList.remove('alarm'", body)
         self.assertIn('--alarm', body)
         self.assertIn('alarmOn = false;', body)
         self.assertIn("beatApi('stop')", body)
 
     def test_end_of_run_clears_it(self):
-        body = body_of(self.src, 'function endRun(reason) {')
+        body = no_comments(body_of(self.src, 'function endRun(reason) {'))
         self.assertIn('clearAlarm(', body)
         # ⚠️ Прежний голый `beatApi('stop')` из endRun убран: он теперь
         # внутри clearAlarm. Два места, гасящие звук, разъедутся.
@@ -326,10 +349,10 @@ class AlarmIsClearedOnRunEndTests(SimpleTestCase):
         """
         self.assertIn("$('btn-quit').addEventListener('click', openQuit);",
                       self.src)
-        self.assertIn('clearAlarm(', body_of(self.src, 'function quitRun() {'))
+        self.assertIn('clearAlarm(', no_comments(body_of(self.src, 'function quitRun() {')))
 
     def test_a_new_run_starts_clean(self):
-        self.assertIn('clearAlarm(', body_of(self.src, 'function startRun(opts) {'))
+        self.assertIn('clearAlarm(', no_comments(body_of(self.src, 'function startRun(opts) {')))
 
     def test_three_call_sites_at_least(self):
         u"""Числовой инвариант: определение одно, вызовов не меньше трёх."""

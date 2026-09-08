@@ -244,6 +244,25 @@ class ScoreEventFieldsTests(TestCase):
                       'seconds_left', 'at', 'number', 'combo'):
             self.assertIn(field, event, field)
 
+    def test_seconds_left_is_actually_filled_in(self):
+        u"""⚠️ ЭТО И БЫЛ ДЕФЕКТ: поле в протоколе есть, а приходит null.
+
+        Проверять НАЛИЧИЕ ключа мало — он и раньше был на месте. Событие
+        обязано нести ЧИСЛО: `duel_score_event` считает остаток сама, а не
+        ждёт его аргументом от вызывающего. Первая версия этого теста
+        смотрела только на ключ и не покраснела, когда расчёт убрали.
+        """
+        event = consumers.duel_score_event(self.state(spent=5), self.user())
+        self.assertIsInstance(event['seconds_left'], int)
+        self.assertGreater(event['seconds_left'], 0)
+        self.assertIsInstance(event['at'], float)
+
+    def test_an_explicit_value_still_wins(self):
+        u"""Готовому результату остаток известен (ноль) — его и берём."""
+        event = consumers.duel_score_event(self.state(), self.user(),
+                                           seconds_left=0)
+        self.assertEqual(event['seconds_left'], 0)
+
     def test_counts_use_the_same_formulas_as_the_summary(self):
         u"""Вторых счётчиков не заводим: два счётчика одного разъезжаются."""
         event = consumers.duel_score_event(self.state(), self.user())
