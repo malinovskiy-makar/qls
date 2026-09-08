@@ -436,3 +436,90 @@ class OneShareButtonEverywhereTests(TestCase):
         self.assertNotIn("getContext('2d')", self.page.split(
             '---------- ШЕРИНГ ----------', 1)[1].split(
             '---------- ПОДРОБНАЯ СТАТИСТИКА', 1)[0])
+
+
+class ScoreboardTests(TestCase):
+    u"""Табло: вы, разрыв, вторая сторона (08.09.2026).
+
+    ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ. Прежняя `.duel-bar` показывала одну
+    строку про соперника и ни одного своего числа: сравнивать было не с
+    чем. Теперь слева всегда «вы», посередине разрыв, справа в дуэли
+    соперник, в обычном забеге личный рекорд. Второго вида табло нет.
+    """
+
+    def setUp(self):
+        self.src = page_source()
+        self.js = inline_js(self.src)
+
+    def test_the_old_one_line_bar_is_gone(self):
+        u"""⚠️ Ищем СЕЛЕКТОРЫ и id, а не слово: комментарий у новой вёрстки
+        объясняет, что и почему заменило `.duel-bar`, и проверка по слову
+        краснела бы на объяснении."""
+        for gone in ('.duel-bar {', 'class="duel-bar', '.duel-bar__',
+                     'id="duel-score"', 'id="duel-correct"',
+                     'id="duel-lives"', 'id="duel-state"', 'id="duel-who"'):
+            self.assertNotIn(gone, self.src, gone)
+
+    def test_one_markup_serves_both_cases(self):
+        u"""Блок `.vs` в разметке ровно один: второго вида табло нет."""
+        self.assertEqual(self.src.count('<div class="vs" id="vs"'), 1)
+        self.assertIn('function isDuelRun()', self.js)
+        # Обе ветки правой карточки ходят через один и тот же блок.
+        self.assertIn('if (isDuelRun()) { paintRival(); } else { paintBest(); }',
+                      self.js)
+
+    def test_the_rival_clock_keeps_running_between_events(self):
+        u"""⚠️ Событие приходит только на ОТВЕТ соперника.
+
+        Думает он полминуты — все его числа стоят, а время течёт. Клиент
+        обязан продолжать отсчёт сам: запомнить `seconds_left` и серверную
+        метку `at`, дальше вычитать разницу СВОИХ часов. Присвоения
+        пришедшего значения мало — это и проверяем.
+        """
+        m = re.search(r'function rivalSeconds\(\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'rivalSeconds не найден')
+        body = m.group(1)
+        self.assertIn('Date.now() - vsRivalAt', body)
+        self.assertIn('vsRival.seconds_left - gone', body)
+        # Метку ставит приход события, а не отрисовка.
+        self.assertIn('vsRivalAt = Date.now();', self.js)
+        # Рисует игровой цикл: время идёт кадрами, а не событиями.
+        self.assertRegex(self.js, r'paintAlarm\(\);\s*\n(?:\s*//[^\n]*\n)*\s*paintVs\(\);')
+
+    def test_a_finished_or_absent_rival_stops_the_clock(self):
+        u"""Досчитывать финишировавшего до нуля значит показывать неправду."""
+        self.assertIn('vsRivalDone = true;', self.js)
+        self.assertIn('if (vsRivalDone) return 0;', self.js)
+
+    def test_without_a_record_the_right_card_has_no_number(self):
+        u"""Первый раунд в режиме: выдуманного числа-заглушки быть не должно."""
+        m = re.search(r'function paintBest\(\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'paintBest не найден')
+        branch = m.group(1).split('if (!vsBest) {', 1)[1].split('return;', 1)[0]
+        self.assertIn("$('vs-them-score').textContent = '';", branch)
+        self.assertIn('Первый раунд в этом режиме', branch)
+        self.assertIn('Войдите, чтобы рекорды сохранялись', branch)
+        # Ни одной цифры в ветке «рекорда нет».
+        self.assertNotRegex(branch, r'\d')
+
+    def test_the_gap_disappears_when_there_is_nothing_to_compare(self):
+        m = re.search(r'function paintGap\(\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m)
+        body = m.group(1)
+        self.assertIn('if (other == null) { gap.hidden = true; return; }', body)
+        self.assertIn('вы ведёте', body)
+        self.assertIn('отстаёте', body)
+
+    def test_the_record_comes_from_the_server_not_from_local_storage(self):
+        u"""Рекорды не должны теряться при смене браузера."""
+        self.assertIn('vsBest = d.best || null;', self.js)
+        m = re.search(r'function paintBest\(\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertNotIn('localStorage', m.group(1))
+
+    def test_lives_are_still_drawn_from_config(self):
+        u"""Тест механики не обойдён новой вёрсткой: запас жизней из CFG."""
+        m = re.search(r'function livesHtml\(n\) \{(.*?)\n  \}', self.js, re.S)
+        self.assertIsNotNone(m, 'livesHtml не найден')
+        body = m.group(1)
+        self.assertIn('m.lives', body)
+        self.assertNotRegex(body, r'i < 3;')

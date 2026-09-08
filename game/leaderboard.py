@@ -193,6 +193,33 @@ def personal_stats(user, mode):
     }
 
 
+def best_run(user, mode):
+    u"""Личный рекорд игрока в режиме или None, если рекорда ещё нет.
+
+    ⚠️ ТОЧНОСТЬ БЕРЁТСЯ У САМОГО РЕКОРДНОГО ЗАБЕГА, а не средняя за всё
+    время (её считает `personal_stats`). Табло сравнивает текущий раунд с
+    ОДНИМ конкретным забегом, и подмешивать туда среднее значило бы
+    показывать рядом два числа из разных вселенных.
+
+    None означает ровно одно: забегов в этом режиме не было. Экран в этом
+    случае говорит словами, а не рисует ноль: выдуманное число-заглушка на
+    табло хуже честного «первый раунд».
+    """
+    run = (GameResult.objects
+           .filter(user=user, mode=mode,
+                   economy_version=config.ECONOMY_VERSION)
+           .order_by('-score', 'created_at').first())
+    if run is None:
+        return None
+    attempts = run.correct_count + run.wrong_count
+    return {
+        'score': run.score,
+        'correct': run.correct_count,
+        'accuracy': round(100 * run.correct_count / attempts) if attempts else 0,
+        'created_at': run.created_at.isoformat(timespec='seconds'),
+    }
+
+
 def duel_stats(user):
     u"""Сводка по дуэлям игрока. Новых таблиц не заводим.
 

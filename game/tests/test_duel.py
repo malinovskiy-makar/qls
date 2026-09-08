@@ -420,3 +420,94 @@ class DuelLoginBoundaryTests(TestCase):
         self.assertFalse(r.ranked)
         self.assertEqual(r.unranked_reason, 'set_run')
         self.assertEqual(r.user, rival)
+
+
+class ScoreboardIsOneMarkupTests(TestCase):
+    u"""Табло `.vs` — одно и то же на дуэли и на обычном забеге.
+
+    Решение владельца 08.09.2026: второго вида табло не заводим. Проверяется
+    по РАЗМЕТКЕ обеих страниц: если когда-нибудь заведут вторую, страницы
+    разойдутся, и этот тест это увидит.
+    """
+
+    def setUp(self):
+        make_q(20)
+        self.me = User.objects.create_user(username='vs_user', password='p12345')
+        self.client.force_login(self.me)
+
+    def _vs_block(self, html):
+        self.assertIn('<div class="vs" id="vs"', html)
+        return html.split('<div class="vs" id="vs"', 1)[1].split(
+            '<div class="duel-emoji"', 1)[0]
+
+    def test_the_same_block_serves_both_run_kinds(self):
+        plain = self.client.get(reverse('game:page')).content.decode('utf-8')
+
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        gset = GameSet.objects.get(kind='duel')
+        duel = self.client.get(
+            reverse('game:set_page', args=[gset.code])).content.decode('utf-8')
+
+        self.assertEqual(self._vs_block(plain), self._vs_block(duel))
+
+    def test_the_left_side_is_always_you(self):
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        block = self._vs_block(html)
+        self.assertIn('id="vs-my-score"', block)
+        self.assertIn('id="vs-my-correct"', block)
+        self.assertIn('id="vs-my-acc"', block)
+        self.assertIn('id="vs-my-combo"', block)
+        self.assertIn('id="vs-my-time"', block)
+        self.assertIn('id="vs-my-tape"', block)
+
+    def test_the_gap_column_stands_between_the_two_cards(self):
+        block = self._vs_block(
+            self.client.get(reverse('game:page')).content.decode('utf-8'))
+        self.assertLess(block.index('id="vs-me"'), block.index('id="vs-gap"'))
+        self.assertLess(block.index('id="vs-gap"'), block.index('id="vs-them"'))
+
+
+class PersonalBestComesWithTheStartTests(TestCase):
+    u"""Правая карточка обычного забега — личный рекорд, и он с СЕРВЕРА.
+
+    ⚠️ ВЫБОР ИСТОЧНИКА. Рекорд отдаёт `api_session_start` полем `best`, а не
+    отдельный запрос к `api_my_stats`: правая карточка нужна ровно в момент
+    старта забега, и вторым запросом она подъезжала бы после первого
+    вопроса. Плюс `api_my_stats` — про всю панель рекордов, и вешать на неё
+    открытие раунда значит связать раунд с запросом, который не про раунд.
+    """
+
+    def setUp(self):
+        make_q(20)
+        self.me = User.objects.create_user(username='best_user',
+                                           password='p12345')
+
+    def test_no_runs_means_no_record_and_no_invented_number(self):
+        self.client.force_login(self.me)
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        self.assertIsNone(json.loads(r.content.decode('utf-8'))['best'])
+
+    def test_an_anonymous_player_gets_no_record_either(self):
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        self.assertIsNone(json.loads(r.content.decode('utf-8'))['best'])
+
+    def test_the_record_run_reports_its_own_accuracy(self):
+        u"""Точность — у самого рекордного забега, не средняя за всё время."""
+        from game import config as game_config
+        GameResult.objects.create(
+            user=self.me, mode='blitz', score=900, correct_count=9,
+            wrong_count=1, total_count=10,
+            economy_version=game_config.ECONOMY_VERSION)
+        GameResult.objects.create(
+            user=self.me, mode='blitz', score=100, correct_count=1,
+            wrong_count=9, total_count=10,
+            economy_version=game_config.ECONOMY_VERSION)
+
+        self.client.force_login(self.me)
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        best = json.loads(r.content.decode('utf-8'))['best']
+        self.assertEqual(best['score'], 900)
+        self.assertEqual(best['correct'], 9)
+        # 9 из 10 попыток рекордного забега, а не (9+1)/20 по обоим.
+        self.assertEqual(best['accuracy'], 90)
+        self.assertTrue(best['created_at'])

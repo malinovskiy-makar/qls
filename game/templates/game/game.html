@@ -858,23 +858,74 @@ a:focus-visible, button:focus-visible {
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
 
-/* ── Дуэль в реальном времени ──────────────────────────────────────
-   Полоса соперника стоит РЯДОМ со своим HUD, а не под ним: сравнение
-   работает только когда оба числа видны одним движением глаз.
-   Блока нет в разметке вовсе, когда забег не дуэльный. */
-.duel-bar {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  margin: 0 0 12px; padding: 10px 14px;
-  border: 1px solid var(--rush-line); border-radius: 12px;
-  background: var(--rush-surface); font-size: 14px;
+/* ── Табло: вы, разрыв, вторая сторона ─────────────────────────────
+   ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
+   всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд в
+   этом режиме. Второго вида табло не заводим: два разъехались бы, а
+   сравнение с собой и сравнение с соперником — одно и то же движение
+   глаз.
+   Прежняя `.duel-bar` (одна строка «соперник · очки · верных · жизни»)
+   заменена целиком: своих чисел она не показывала вовсе, сравнивать было
+   не с чем. */
+.vs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0 0 12px;
 }
-.duel-bar__who { font-weight: 600; }
-.duel-bar__num { font-variant-numeric: tabular-nums; font-weight: 700; }
-.duel-bar__lives { display: inline-flex; gap: 3px; }
-.duel-bar__lives .qi { width: 15px; height: 15px; }
-.duel-bar__lives .is-lost { opacity: .22; }
-.duel-bar--off { opacity: .55; }
-.duel-bar__state { margin-left: auto; color: var(--rush-dim); }
+.vs[hidden] { display: none; }
+.vs-side {
+  padding: 10px 14px;
+  border: 1px solid var(--rush-line); border-radius: 12px;
+  background: var(--rush-surface);
+  min-width: 0;
+}
+.vs-side--off { opacity: .55; }
+.vs-who { font-size: 12.5px; color: var(--rush-dim); text-transform: uppercase;
+          letter-spacing: .06em; }
+.vs-score { font-size: 30px; font-weight: 700; line-height: 1.1;
+            font-variant-numeric: tabular-nums; }
+.vs-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px;
+          font-size: 13px; color: var(--rush-dim); }
+.vs-row b { color: var(--rush-text); font-weight: 600;
+            font-variant-numeric: tabular-nums; }
+.vs-lives { display: inline-flex; gap: 3px; margin-top: 6px; }
+.vs-lives .qi { width: 15px; height: 15px; }
+.vs-lives .is-lost { opacity: .22; }
+.vs-state { margin-top: 6px; font-size: 13px; color: var(--rush-dim); }
+.vs-empty { margin: 6px 0 0; font-size: 13px; color: var(--rush-dim);
+            line-height: 1.4; }
+
+/* Лента последних десяти ответов: клетка на вопрос. */
+.vs-tape { display: flex; gap: 3px; margin-top: 8px; }
+.vs-tape i {
+  width: 12px; height: 6px; border-radius: 2px;
+  background: var(--rush-line);
+}
+.vs-tape i.ok { background: var(--rush-ok); }
+.vs-tape i.bad { background: var(--rush-bad); }
+.vs-tape i.skip { background: var(--rush-dim); opacity: .5; }
+.vs-tape i.now { background: var(--rush-accent); }
+
+/* Разрыв посередине: число крупно, под ним словами кто ведёт. */
+.vs-gap {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px;
+  min-width: 84px; padding: 0 6px; text-align: center;
+}
+.vs-gap[hidden] { display: none; }
+.vs-gap-num { font-size: 20px; font-weight: 700;
+              font-variant-numeric: tabular-nums; }
+.vs-gap-num.ahead { color: var(--rush-ok); }
+.vs-gap-num.behind { color: var(--rush-bad); }
+.vs-gap-note { font-size: 12px; color: var(--rush-dim); }
+
+@media (max-width: 620px) {
+  /* Узкий экран: карточки друг под другом, разрыв между ними. */
+  .vs { grid-template-columns: 1fr; }
+  .vs-score { font-size: 24px; }
+}
 
 /* Восемь реакций. Значки свои (templates/_icons.html), не эмодзи: эмодзи
    рисует операционная система, они всегда цветные и мимо палитры. */
@@ -2205,15 +2256,41 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <button class="quit-x" id="btn-quit" title="Выйти из раунда" aria-label="Выйти из раунда">✕</button>
       <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
-      {% comment %} ── Дуэль: полоса соперника ────────────────────────────────
-           Блока нет вовсе, когда забег не дуэльный: рисовать пустую
-           полосу «соперника нет» на обычном забеге незачем. {% endcomment %}
-      <div class="duel-bar duel-bar--off" id="duel-bar" hidden>
-        <span class="duel-bar__who" id="duel-who">соперник</span>
-        <span>очки <b class="duel-bar__num" id="duel-score">0</b></span>
-        <span>верных <b class="duel-bar__num" id="duel-correct">0</b></span>
-        <span class="duel-bar__lives" id="duel-lives"></span>
-        <span class="duel-bar__state" id="duel-state">ждём соперника</span>
+      {% comment %} ── Табло: вы, разрыв, вторая сторона ──────────────────
+           ОДНА вёрстка на дуэль и на обычный забег. Справа в дуэли
+           соперник, в обычном забеге личный рекорд игрока в этом режиме.
+           Скрыто, пока сравнивать не с чем. {% endcomment %}
+      <div class="vs" id="vs" hidden>
+        <div class="vs-side" id="vs-me">
+          <div class="vs-who">вы</div>
+          <div class="vs-score" id="vs-my-score">0</div>
+          <div class="vs-row">
+            <span>верных <b id="vs-my-correct">0</b></span>
+            <span>точность <b id="vs-my-acc">&ndash;</b></span>
+            <span>комбо <b id="vs-my-combo">&times;1</b></span>
+            <span>время <b id="vs-my-time">&ndash;</b></span>
+          </div>
+          <div class="vs-tape" id="vs-my-tape" aria-hidden="true"></div>
+        </div>
+
+        <div class="vs-gap" id="vs-gap" hidden>
+          <div class="vs-gap-num" id="vs-gap-num">0</div>
+          <div class="vs-gap-note" id="vs-gap-note"></div>
+        </div>
+
+        <div class="vs-side vs-side--off" id="vs-them">
+          <div class="vs-who" id="vs-them-who">соперник</div>
+          <div class="vs-score" id="vs-them-score">0</div>
+          <div class="vs-row" id="vs-them-row">
+            <span>верных <b id="vs-them-correct">0</b></span>
+            <span>точность <b id="vs-them-acc">&ndash;</b></span>
+            <span>комбо <b id="vs-them-combo">&times;1</b></span>
+            <span>время <b id="vs-them-time">&ndash;</b></span>
+          </div>
+          <div class="vs-lives" id="vs-them-lives"></div>
+          <div class="vs-state" id="vs-them-state">ждём соперника</div>
+          <p class="vs-empty" id="vs-them-empty" hidden></p>
+        </div>
       </div>
       <div class="duel-emoji" id="duel-emoji" hidden></div>
       <div class="hud">
@@ -2739,6 +2816,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var questionShownAt = 0;      // когда показали карточку (для elapsed_ms)
   var summary = null;           // сводка забега с сервера (экран результатов)
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
+
+  /* ── ТАБЛО ────────────────────────────────────────────────────────────
+     ⚠️ `myTape` — ПОСЛЕДОВАТЕЛЬНОСТЬ ИСХОДОВ, а не ещё один счётчик.
+     Счётчики верных, ошибок и пропусков остаются прежние; отсюда берётся
+     только порядок, и только он — иначе это был бы второй счёт того же
+     самого, а такие в этом проекте уже разъезжались. */
+  var myTape = [];              // 'correct' | 'wrong' | 'skip', по порядку
+  var vsBest = null;            // личный рекорд режима (обычный забег)
+  var vsRival = null;           // последнее событие соперника (дуэль)
+  var vsRivalAt = 0;            // когда оно пришло по ЧАСАМ БРАУЗЕРА
+  var vsRivalDone = false;      // соперник финишировал: время замерло
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var setRun = null;            // {code, kind, title, size} забега по набору
@@ -3354,6 +3442,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
         skippedCount = 0; isRecord = false; bestNow = 0;
+        myTape = [];
+        // Рекорд приходит вместе со стартом (сервер, не localStorage).
+        // У набора его нет: там справа соперник, а не своя история.
+        vsBest = d.best || null;
+        vsRival = null; vsRivalAt = 0; vsRivalDone = false;
+        setupVs();
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
         shareInfo = null;
         $('gameover-overlay').hidden = true;
@@ -3525,7 +3619,182 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сколько бы времени ни осталось: она перестаёт быть про время и
     // становится про опасность.
     paintAlarm();
+    // ⚠️ Табло перерисовывается ЗДЕСЬ, в игровом цикле, а не по приходу
+    // события: событие соперника приходит только на его ответ, а время у
+    // него идёт всё это время. Один водитель отрисовки — один и тот же
+    // кадр у HUD и у табло.
+    paintVs();
     tickSoundMaybe();
+  }
+
+  /* ---------- ТАБЛО: ВЫ, РАЗРЫВ, ВТОРАЯ СТОРОНА ----------
+     ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
+     всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд
+     игрока в этом режиме. Второго вида табло не заводим.
+
+     ⚠️ ВРЕМЯ СОПЕРНИКА ИДЁТ ЛОКАЛЬНО МЕЖДУ СОБЫТИЯМИ. Событие табло
+     приходит только на его ОТВЕТ: думает он полминуты — все его числа
+     стоят, а время у него на самом деле течёт. Поэтому клиент запоминает
+     `seconds_left` и серверную метку `at` из последнего события и дальше
+     вычитает разницу СВОИХ часов. Разницу серверных и клиентских часов не
+     выравниваем: нас интересует шаг, а не абсолют, и лишняя арифметика тут
+     только добавила бы способов ошибиться. */
+
+  function isDuelRun() { return !!(setRun && setRun.kind === 'duel'); }
+
+  function setupVs() {
+    var box = $('vs');
+    if (!box) return;
+    // Табло показывается всегда, когда есть с чем сравнивать: в дуэли это
+    // соперник, в обычном забеге личный рекорд. Первый раунд в режиме —
+    // сравнивать не с чем, но карточка остаётся: она говорит словами.
+    box.hidden = false;
+    $('vs-them-who').textContent = isDuelRun() ? 'соперник' : 'ваш рекорд';
+    paintVs();
+  }
+
+  function tapeHtml(seq) {
+    var last = seq.slice(-10);
+    var out = '';
+    for (var i = 0; i < last.length; i++) {
+      var cls = last[i] === 'correct' ? 'ok'
+              : last[i] === 'wrong' ? 'bad' : 'skip';
+      out += '<i class="' + cls + '"></i>';
+    }
+    // Текущий вопрос — отдельной клеткой: видно, что лента живая.
+    if (state === 'playing' && last.length < 10) out += '<i class="now"></i>';
+    return out;
+  }
+
+  function accText(right, tries) {
+    return tries ? Math.round(100 * right / tries) + '%' : '–';
+  }
+
+  function timeText(seconds) {
+    if (seconds == null) return '–';
+    var s = Math.max(0, Math.round(seconds));
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  /* Сколько времени у соперника ПРЯМО СЕЙЧАС. */
+  function rivalSeconds() {
+    if (!vsRival || vsRival.seconds_left == null) return null;
+    if (vsRivalDone) return 0;
+    var gone = (Date.now() - vsRivalAt) / 1000;
+    return Math.max(0, vsRival.seconds_left - gone);
+  }
+
+  function paintVs() {
+    var box = $('vs');
+    if (!box || box.hidden) return;
+
+    // ── Слева всегда вы ──
+    $('vs-my-score').textContent = score.toLocaleString('ru-RU');
+    $('vs-my-correct').textContent = correctCount;
+    $('vs-my-acc').textContent = accText(correctCount, answered);
+    $('vs-my-combo').textContent = '×' + multText(comboMult(streak));
+    $('vs-my-time').textContent = state === 'playing'
+      ? timeText(timeLeft) : '–';
+    $('vs-my-tape').innerHTML = tapeHtml(myTape);
+
+    if (isDuelRun()) { paintRival(); } else { paintBest(); }
+    paintGap();
+  }
+
+  function paintRival() {
+    var side = $('vs-them');
+    var empty = $('vs-them-empty');
+    var row = $('vs-them-row');
+    var lives = $('vs-them-lives');
+    if (!vsRival) {
+      // Соперника ещё нет: чисел не выдумываем, говорим словами.
+      side.classList.add('vs-side--off');
+      $('vs-them-score').textContent = '0';
+      row.hidden = true;
+      lives.hidden = true;
+      empty.hidden = false;
+      empty.textContent = 'Соперник ещё не начал. Играйте: он догонит и '
+        + 'увидит ваш счёт на своей полосе.';
+      return;
+    }
+    side.classList.remove('vs-side--off');
+    row.hidden = false;
+    lives.hidden = false;
+    empty.hidden = true;
+    $('vs-them-who').textContent = vsRival.username || 'соперник';
+    $('vs-them-score').textContent = (vsRival.score || 0).toLocaleString('ru-RU');
+    $('vs-them-correct').textContent = vsRival.correct || 0;
+    $('vs-them-acc').textContent = accText(
+      vsRival.correct || 0, (vsRival.correct || 0) + (vsRival.wrong || 0));
+    $('vs-them-combo').textContent = '×' + multText(vsRival.combo || 1);
+    $('vs-them-combo').parentNode.hidden = false;
+    $('vs-them-time').textContent = timeText(rivalSeconds());
+    lives.innerHTML = livesHtml(vsRival.lives || 0);
+  }
+
+  function paintBest() {
+    var side = $('vs-them');
+    var empty = $('vs-them-empty');
+    var row = $('vs-them-row');
+    var lives = $('vs-them-lives');
+    lives.hidden = true;
+    $('vs-them-state').textContent = '';
+    if (!vsBest) {
+      /* ⚠️ ПЕРВЫЙ РАУНД В РЕЖИМЕ: РЕКОРДА ЕЩЁ НЕТ. Ноль или прочерк
+         читались бы как «рекорд равен нулю», а выдуманного числа-заглушки
+         на экране быть не должно. Говорим словами. Аноним видит то же
+         самое: рекорды у него не хранятся. */
+      side.classList.add('vs-side--off');
+      $('vs-them-score').textContent = '';
+      row.hidden = true;
+      empty.hidden = false;
+      empty.textContent = CFG.is_authenticated
+        ? 'Первый раунд в этом режиме: он и станет рекордом.'
+        : 'Войдите, чтобы рекорды сохранялись.';
+      return;
+    }
+    side.classList.remove('vs-side--off');
+    row.hidden = false;
+    empty.hidden = true;
+    $('vs-them-score').textContent = vsBest.score.toLocaleString('ru-RU');
+    $('vs-them-correct').textContent = vsBest.correct;
+    $('vs-them-acc').textContent = vsBest.accuracy + '%';
+    // ⚠️ У рекорда комбо не храним, поэтому ячейка прячется — и ЯВНО
+    // возвращается в дуэли: одна страница живёт через несколько забегов
+    // подряд, и спрятанное здесь осталось бы спрятанным там.
+    $('vs-them-combo').parentNode.hidden = true;
+    $('vs-them-time').textContent = formatDate(vsBest.created_at) || '–';
+  }
+
+  /* Разрыв посередине. Сравнивать не с чем — колонки нет вовсе. */
+  function paintGap() {
+    var gap = $('vs-gap');
+    var other = isDuelRun()
+      ? (vsRival ? vsRival.score || 0 : null)
+      : (vsBest ? vsBest.score : null);
+    if (other == null) { gap.hidden = true; return; }
+    gap.hidden = false;
+    var diff = score - other;
+    var num = $('vs-gap-num');
+    num.textContent = (diff > 0 ? '+' : '') + diff.toLocaleString('ru-RU');
+    num.classList.toggle('ahead', diff > 0);
+    num.classList.toggle('behind', diff < 0);
+    $('vs-gap-note').textContent = diff > 0 ? 'вы ведёте'
+                                 : diff < 0 ? 'отстаёте' : 'вровень';
+  }
+
+  /* Жизни второй стороны. ⚠️ Запас НЕ выдумываем: он приходит из config.py
+     вместе с режимом (CFG). Тройка числом здесь означала бы второй источник
+     правды о механике. */
+  function livesHtml(n) {
+    var m = (MODE || CFG.modes[CFG.default_mode] || {});
+    var max = m.lives || n;
+    var out = '';
+    for (var i = 0; i < max; i++) {
+      out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
+        + (ICONS.heart || '') + '</span>';
+    }
+    return out;
   }
 
   /* Последняя жизнь: один и тот же вопрос задают три места (сердца,
@@ -4076,11 +4345,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function registerCorrect() {
     answered++; correctCount++;
+    myTape.push('correct');
     rush('correct', comboMult(streak));
   }
 
   function registerWrong(q, d) {
     answered++;
+    myTape.push('wrong');
     // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
     // Потеря жизни — ОТДЕЛЬНОЕ событие со своим звуком: игрок обязан
     // слышать разницу между «ошибся» и «сгорело сердце».
@@ -4247,6 +4518,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
       skippedCount++;
+      myTape.push('skip');
       // пропуск бесплатный — дельту показываем, только если она есть
       if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
@@ -5455,7 +5727,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var isDuel = AUTO_SET && AUTO_SET.kind === 'duel';
     if (!isDuel) return;
 
-    var bar = $('duel-bar');
+    var side = $('vs-them');
     var panel = $('duel-emoji');
     var lobby = $('duel-lobby');
     var countdown = $('duel-countdown');
@@ -5494,28 +5766,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (button) button.blur();
     }
 
-    function livesHtml(n) {
-      // ⚠️ Запас жизней НЕ ВЫДУМЫВАЕМ. Он приходит из config.py вместе с
-      // режимом: «три» здесь числом означало бы второй источник правды о
-      // механике, и он разошёлся бы с сервером при первой же правке.
-      var mode = CFG.modes[AUTO_SET.mode] || {};
-      var max = mode.lives || n;
-      var out = '';
-      for (var i = 0; i < max; i++) {
-        out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
-          + (window.QLS_ICONS ? window.QLS_ICONS.heart : '') + '</span>';
-      }
-      return out;
-    }
-
+    /* ⚠️ СОБЫТИЕ ТОЛЬКО ЗАПОМИНАЕТСЯ, РИСУЕТ ИГРОВОЙ ЦИКЛ. Событие
+       приходит на ответ соперника; между ответами его время всё равно
+       идёт, и отсчёт продолжает `paintVs()` от метки `at`. Рисовать здесь
+       значило бы заморозить время соперника до его следующего ответа —
+       ровно тот дефект, ради которого метка и заведена. */
     function showScore(row) {
-      bar.hidden = false;
-      bar.classList.remove('duel-bar--off');
-      $('duel-who').textContent = row.username || 'соперник';
-      $('duel-score').textContent = row.score;
-      $('duel-correct').textContent = row.correct;
-      $('duel-lives').innerHTML = livesHtml(row.lives);
-      $('duel-state').textContent = '';
+      vsRival = row;
+      vsRivalAt = Date.now();
+      $('vs-them-state').textContent = '';
+      paintVs();
     }
 
     function flyer(name, who) {
@@ -5548,7 +5808,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       } catch (e) { return; }
 
       sock.addEventListener('open', function () {
-        bar.hidden = false;
         panel.hidden = false;
         // «Привет» просит табло: после обрыва счёт соперника надо
         // восстановить, а не ждать его следующего ответа.
@@ -5561,19 +5820,25 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         else if (m.type === 'emoji') { flyer(m.name, m.username); }
         else if (m.type === 'start') { tick(m.in || 3); }
         else if (m.type === 'finished') {
+          // Забег соперника кончился: время замирает, а не продолжает
+          // течь локально. Иначе табло досчитало бы финишировавшего до нуля.
+          vsRivalDone = true;
           showScore(m);
-          $('duel-state').textContent = 'финишировал';
+          $('vs-them-state').textContent = 'финишировал';
         } else if (m.type === 'presence') {
           if (m.action === 'leave') {
-            bar.classList.add('duel-bar--off');
-            $('duel-state').textContent = 'соперник отключился';
+            // Ушёл — карточка гаснет вместе с отсчётом: показывать живое
+            // время того, кого нет, значит врать.
+            vsRivalDone = true;
+            side.classList.add('vs-side--off');
+            $('vs-them-state').textContent = 'соперник отключился';
           }
         }
       });
       sock.addEventListener('close', function () {
         // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться.
-        bar.classList.add('duel-bar--off');
-        $('duel-state').textContent = 'связь потеряна';
+        side.classList.add('vs-side--off');
+        $('vs-them-state').textContent = 'связь потеряна';
         setTimeout(connect, 4000);
       });
     }
