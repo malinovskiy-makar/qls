@@ -774,3 +774,298 @@ Python подтверждено `site_meta` в списке; `config.tests.test_
 базе с `seed_olympiads_demo` (демо-олимпиады, включая `vseros`), а на прод
 `seed_olympiads_demo` запрещён. Не дефект, не 5xx — перепроверить `/olympiads/vseros/`
 после шага 6 (заливка реальных данных), там ожидание снова 200.
+
+### Фаза B2, шаг 6. Данные олимпиад
+
+Раздел на проде пуст (`olympiads.Olympiad = 0`, шаг 1) — по правилу нужен
+отдельный стоп-гейт перед записью. План (`import_olympiads_data` без флага)
+— **точно по ожиданию**: источники 37, олимпиады 17, уровни 50, этапы 32,
+даты 15, баллы 9, программы 7, льготы 88, регионы 89, комплекты 12.
+
+⛔ Стоп-гейт 4 — «да», запись.
+
+### Внеочередной инцидент 2: `DataError` на PostgreSQL при `--yes`
+
+Реальная запись (`import_olympiads_data --yes`) упала:
+`django.db.utils.DataError: value too long for type character varying(300)`,
+в `_load_olympiads` (`olympiads/management/commands/import_olympiads_data.py:173`).
+Проверка `Olympiad.objects.count()` сразу после — **0**, частичной записи не
+осталось (команда атомарна).
+
+**Разбор.** Полный трейсбек по кусочкам (терминал резал вывод) указал на
+файл и строку. Сверка всех девяти файлов `data/olympiads/out/*.jsonl`
+против `max_length` соответствующих полей моделей (`olympiads/models.py`,
+скрипт-разовый, интроспекция через Django) нашла ровно ОДНО превышение:
+`olympiads.jsonl`, slug `vernadsky`, поле `organizer` — **441 символ** при
+`CharField(max_length=300)`. Значение — не мусор, а список девяти вузов
+консорциума («Бурятский государственный университет…», далее по списку).
+**Почему не поймано раньше:** тот же файл и код успешно отработали в
+сессии A (фаза 18) на **SQLite** — SQLite не проверяет длину `varchar`
+физически, PostgreSQL проверяет. Ровно случай из предупреждения CLAUDE.md
+«зелёный прогон на SQLite — не доказательство, прод на PostgreSQL».
+
+**Фикс** (коммит `d00ba04`, применён навык `weco-migration-safety`):
+`Olympiad.organizer` — `CharField(max_length=300)` → `TextField` (без лимита,
+как уже сделано для `description`), миграция `0007_alter_olympiad_organizer`.
+Чек-лист:
+- граф цел, `0007` — единственный лист (`showmigrations olympiads`);
+- `makemigrations --check --dry-run` → No changes detected;
+- накат с нуля на свежей PostgreSQL (`qls_zero_migtest_b3`, докер
+  `qls_postgres_dev`) — все 68 миграций (включая новую) без ошибок;
+- обратимость: `migrate olympiads 0006` → `0007` туда-обратно на пустой
+  таблице — ОК; отдельно отмечено — на данных с `organizer` длиннее 300
+  откат назад технически невозможен (сузить `text` в `varchar(300)`
+  нельзя), это ожидаемо для операции расширения поля, не дефект;
+- `manage.py test olympiads --settings=config.settings_test_pg` → **95 OK**
+  (совпадает с сессией A);
+- **полный `import_olympiads_data --yes` на чистой PostgreSQL** (отдельная
+  тестовая база `qls_import_test_b3`) — прошёл целиком: источники 37,
+  олимпиады 17, уровни 50, этапы 32, даты 15, баллы 9, программы 7,
+  **льготы 87** (+ `ПРОПУЩЕНО: льгота finat / Финуниверситет: олимпиады
+  «finat» нет в olympiads.jsonl`), регионы 89, комплекты 12 — «Залито.»;
+  `vernadsky.organizer` — 441 символ, цел; `Olympiad.objects.count()` = 17,
+  `is_placeholder=True` = 0. Тестовые базы удалены.
+
+Дальше: пуш `d00ba04`, `git pull` + пересборка `web` на проде (тот же
+цикл), и только потом повтор `import_olympiads_data --yes` на самом проде.
+
+**Прод: выкачен `f30aa088` (+ journal-коммит), миграция 0007 применена без
+ошибок, `import_olympiads_data --yes` прошёл целиком на боевой базе.**
+Результат — точно по ожиданию: источники 37, олимпиады 17, уровни 50,
+этапы 32, даты 15, баллы 9, программы 7, льготы 87 (+ пропуск finat),
+регионы 89, комплекты 12. Проверено: `Olympiad.objects.count()` = 17,
+`is_placeholder=True` = 0; `/olympiads/vseros/` → 200 (было 404 до заливки,
+объяснение из шага 4 подтвердилось). Открыл `/olympiads/vernadsky/` через
+браузер напрямую — карточка организатора («Консорциум вузов: … девять
+вузов…») отображается полностью, вёрстка не едет.
+
+**Шаг 6 закрыт.** Фаза B2 закончена: код на проде, 14+1 миграций применены,
+nginx не трогали (уже совпадал), навигация починена (инцидент 1), олимпиады
+залиты (инцидент 2 починен). Оба инцидента — новые баги, найденные и
+исправленные ПРЯМО в ходе B2, не относятся к плану сессии A. Дальше — фаза
+B3 (удаление веток на GitHub), только после того как `origin/main`
+содержит интеграцию (да, содержит) и прод выкачен (да, выкачен).
+
+## Фаза B3. GitHub — удаление веток, вошедших в `main`
+
+**3.1 Страховка.** `git ls-remote --tags origin` — 8 архивных/backup тегов
+(все ожидаемые: `backup/main-before-sync-20260905`,
+`archive/feat-calc2-map-21aug`, `archive/feat-calc2-mono-surpluses`,
+`archive/feat-calc2-panels-and-keypoints`,
+`archive/feat-calc2-trade-and-ui`, `archive/feat-import-new-sources`,
+`archive/chore-corpus-consolidation-20260822`,
+`archive/backup-search-eval-c14-before-rebase`) плюс `sync-20260905`.
+`git ls-remote --heads` — `feat/olympiad-text-dedup` и все четыре `wip/*`
+на месте. Всё, что нужно для страховки, есть — продолжаю.
+
+**3.2 Пересчёт на живом дереве** (после `git fetch origin --prune --tags`):
+54 ветки на origin, из проверки исключены `main`,
+`integration/sync-20260905`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, четыре `wip/*` — 46 к проверке. Результат
+(`git merge-base --is-ancestor origin/<b> origin/main` для каждой):
+**45 предков + 1 непредок** (`feat/calc2-map-21aug`) — совпадает с B_PLAN
+§4а/4б один в один, включая полный список. `feat/calc2-map-21aug` покрыта
+тегом: `git rev-parse origin/feat/calc2-map-21aug archive/feat-calc2-map-21aug^{}`
+— оба `766c68ee`.
+
+⛔ **Стоп-гейт 5.** Таблица: 45 предков `main` (полный список — B_PLAN.md
+§4а, сверен заново и идентичен) + 1 покрыта тегом (`feat/calc2-map-21aug`)
+= **46 к удалению**. Остаются 8: `main`, `integration/sync-20260905`,
+`feat/taxonomy-v2-openai-provider`, `feat/olympiad-text-dedup`, четыре
+`wip/*`. Жду «да» (можно «да, кроме …»). Ответ: **да.**
+
+Владелец выполнил пять команд `git push origin --delete` (по 10–6 веток в
+строку) — все 46 удалены (`[deleted]` по каждой, ошибок нет). После
+`git fetch origin --prune`: `git ls-remote --heads origin | wc -l` = **8**,
+ровно ожидаемый список (`main`, `integration/sync-20260905`,
+`feat/taxonomy-v2-openai-provider`, `feat/olympiad-text-dedup`, четыре
+`wip/*`).
+
+**3.3.** `origin/integration/sync-20260905` = `7458d560` — предок
+`origin/main` (`c370602` на момент проверки), тегом `sync-20260905`
+покрыта (`^{}` = `a93e67b`, тоже предок main). Удалить ветку на GitHub
+сейчас? Ответ: **да** (владелец выполнил сам,
+`git push origin --delete integration/sync-20260905` → `[deleted]`).
+`git ls-remote --heads origin | wc -l` = **7**. Фаза B3 закрыта.
+
+## Фаза B4. Windows — worktree и локальные ветки
+
+### 4.1. Worktree
+
+`git worktree list` — 12 записей, состав идентичен B_PLAN §5а. Три папки с
+неучтённым осмотрены (не тронуты):
+- `qls-gate-revert/tatus` (703 байта) — обрывок `git log`, похоже на
+  случайный редирект оборванной команды, не текст-документ. Мусор.
+- `qls-search-eval/session_c14_transcript_20260829.md` (52 407 байт) —
+  расшифровка сессии, настоящий текст, не мусор.
+- `qls_palette/_incoming/` (55 файлов, ~9 МБ: шрифты Montserrat, лого и
+  фоны SVG/PNG) — настоящие дизайн-материалы, не мусор.
+
+Предложение по умолчанию (ничего не стирается): перенести все три в
+`C:\Users\shipu\qls_untracked_20260906\<имя папки>\` с сохранением
+структуры, затем снести все 9 «мёртвых» worktree (оставить `qls-models` и
+`qls-olymp`).
+
+⛔ **Стоп-гейт 6.** Таблица:
+
+| Папка | Ветка | Неучтённое | Действие |
+|---|---|---|---|
+| `qls/.claude/worktrees/import-new-sources-edbc26` | `feat/import-new-sources` | чисто | `worktree remove` |
+| `qls-gate-revert` | `feat/boevoi-render-legacy` | `tatus` (мусор) | перенести → `qls_untracked_20260906/qls-gate-revert/`, затем `remove` |
+| `qls-render` | `feat/corpus-converter-render` | чисто | `worktree remove` |
+| `qls-scoped-tests` | `feat/scoped-test-runner` | чисто | `worktree remove` |
+| `qls-search-eval` | `wip/search-eval-c14-leftovers` | расшифровка сессии (52 КБ) | перенести → `qls_untracked_20260906/qls-search-eval/`, затем `remove` (ветка остаётся) |
+| `qls-sol` | `wip/sol-vs-glm-scripts` | чисто | `worktree remove` (ветка остаётся) |
+| `qls-topicmap` | `feat/topic-map-v2` | чисто | `worktree remove` |
+| `qls_map` | `feat/topic-map` | чисто | `worktree remove` |
+| `qls_palette` | `feat/smart-catalog` | `_incoming/` (дизайн-материалы, 55 файлов) | перенести → `qls_untracked_20260906/qls_palette/`, затем `remove` |
+| `qls-models` | `feat/taxonomy-v2-openai-provider` | чисто | **оставить** — живая работа |
+| `qls-olymp` | `feat/olympiad-text-dedup` | чисто | оставить (ветка ещё в работе) |
+
+Ждём «да». Ответ: **да.**
+
+Три файла перенесены (не удалены) в `C:\Users\shipu\qls_untracked_20260906\`
+с сохранением имени папки-источника: `qls-gate-revert/tatus`,
+`qls-search-eval/session_c14_transcript_20260829.md`,
+`qls_palette/_incoming/` (52 файла). После переноса все три worktree стали
+чистыми (`git status --short` — пусто). Снесены `git worktree remove` (без
+`--force`, т.к. уже чистые) все 9: призрак
+`import-new-sources-edbc26`, `qls-render`, `qls-scoped-tests`, `qls-sol`,
+`qls-topicmap`, `qls_map`, `qls-gate-revert`, `qls-search-eval`,
+`qls_palette`; `git worktree prune`. Итог `git worktree list` — **3
+записи**: `qls` (main), `qls-models` (`772ac87`, taxonomy-v2, не тронута),
+`qls-olymp` (`c6e5af7`, olympiad-text-dedup). Ровно по ожиданию.
+
+Вопрос про `qls-olymp`: ветка `feat/olympiad-text-dedup` уже есть на
+GitHub (осталась в семёрке B3) — оставить папку (ветка ещё в работе) или
+снести worktree сейчас? Ответ: **оставить, ветка ещё в работе.**
+
+### 4.2. Локальные ветки
+
+41 локальная ветка. Исключены из проверки: `main`,
+`integration/sync-20260905`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, три `wip/*` — 34 к проверке.
+`git merge-base --is-ancestor <b> main` для каждой: **29 предков + 5
+непредков**, ровно как в B_PLAN §5б, список идентичен. Пять непредков
+проверены отдельно — все безопасны:
+
+| Ветка | Чем покрыта |
+|---|---|
+| `backup/search-eval-c14-before-rebase` | тег `archive/backup-search-eval-c14-before-rebase` (хеш совпал) |
+| `chore/corpus-consolidation-20260822` | тег `archive/chore-corpus-consolidation-20260822` (хеш совпал) |
+| `feat/import-new-sources` | тег `archive/feat-import-new-sources` (хеш совпал) |
+| `feat/boevoi-render-legacy` | целиком внутри `feat/taxonomy-v2-openai-provider` |
+| `feat/publish-readiness-legacy-new-sources` | целиком внутри `feat/taxonomy-v2-openai-provider` |
+
+`integration/sync-20260905` (локальная) — тоже предок `main`, тег
+`sync-20260905` есть на её вершине через `main` — можно `-d`.
+
+⛔ **Стоп-гейт 7.** К удалению:
+- `git branch -d` (29, предки `main`): audit-a1-a71, backup-before-merge,
+  blok-konkurencia-firma, chore/parallel-tests,
+  claude/import-new-sources-edbc26, design/landing-bg,
+  docs/effort-and-simplicity-rules, feat/beta-polish-0904,
+  feat/calc2-andrei, feat/calc2-shipu, feat/corpus-converter-pilot,
+  feat/corpus-converter-render, feat/corpus-converter-scaleup,
+  feat/embeddings-c13-diagnostics, feat/markdown-renderer,
+  feat/merge-anich-review, feat/prod-deploy, feat/prod-django,
+  feat/prod-server, feat/redis-cache-sessions, feat/scoped-test-runner,
+  feat/search-eval-c14, feat/smart-catalog, feat/topic-map,
+  feat/topic-map-v2, feat/wecon-rush, fix/bandit-search-client-nosec,
+  fix/palette-tests, integration/canonical-base
+- `git branch -D` (5, не предки, но покрыты — см. таблицу выше):
+  backup/search-eval-c14-before-rebase,
+  chore/corpus-consolidation-20260822, feat/import-new-sources,
+  feat/boevoi-render-legacy, feat/publish-readiness-legacy-new-sources
+- `git branch -d integration/sync-20260905` (предок main, тег есть) —
+  отдельной строкой, как в задании
+
+Остаются: `main`, `feat/taxonomy-v2-openai-provider`,
+`feat/olympiad-text-dedup`, три `wip/*` = 6 веток. Жду «да». Ответ: **да.**
+
+Удалено тремя партиями по 9–10: 29 через `-d`, 5 через `-D`
+(`backup/search-eval-c14-before-rebase`,
+`chore/corpus-consolidation-20260822`, `feat/import-new-sources`,
+`feat/boevoi-render-legacy`, `feat/publish-readiness-legacy-new-sources`),
+`integration/sync-20260905` — через `-d`. Ошибок нет. `git branch -vv` →
+**6 веток**: `main`, `feat/olympiad-text-dedup`,
+`feat/taxonomy-v2-openai-provider`, три `wip/*`. Ровно по ожиданию (плана
+«7, если integration осталась» — она удалена, значит 6).
+
+### 4.3. Финал
+
+`git fetch origin --prune` → `git branch -r` = 8 строк, из них
+`origin/HEAD -> origin/main` — символическая ссылка, не ветка; реальных
+веток **7**, совпадает с `ls-remote --heads`. `git count-objects -vH`:
+7720 объектов, 119 МиБ, 15 pack-файлов, garbage 0 — `gc` не запускался, как
+и предписано. `qls-models` не тронута: `772ac87e`, status пуст.
+`qls`: `git status --short` — ровно четыре исходных `??`
+(`.txt`, `Claude outputs/`, `claude/`, `session_c15_transcript_20260830.md`).
+
+**Фаза B4 закрыта.**
+
+## Фаза B5. Инварианты, Notion, хвосты
+
+**Инварианты:**
+- `git rev-parse sync-20260905^{}` = `a93e67b`; `git rev-list --count main..sync-20260905` = 0.
+- `git rev-list sync-20260905..main --oneline` — 25 коммитов: 23 журнала
+  сессии B плюс **два настоящих кодовых коммита** (не только журнал, как
+  предполагало задание) — `b75123b` (site_meta) и `d00ba04` (organizer
+  TextField) — оба найдены и исправлены в ходе самой фазы B2, оба уже
+  выкачены на прод и запушены в `main`.
+- Пуш финальных коммитов: `git push origin main` — `c370602..4da841f`,
+  `origin/main` = локальный `main` = `4da841f`.
+- Прод: HEAD = `f30aa088` (журнальные коммиты после него в образ не
+  попадают, `reports/` в `.dockerignore`), `[ ]` = 0, задач 5095,
+  пользователей 3, олимпиад 17 — без изменений с конца B2.
+- GitHub: веток **7**, тегов `archive/`+`backup/main-before-sync` **8**,
+  `sync-20260905` есть. Локально: веток **6**, worktree **3**
+  (`qls`, `qls-models`, `qls-olymp`). `qls-models` не тронута: `772ac87e`,
+  status пуст. `qls` status — только четыре исходных `??`.
+
+**Notion:** карточка операции (`3d2b11c9-2bc1-81b6-ace8-cd0cb5c44c71`) →
+«Готово», итоговая заметка дописана. Обе карточки багов (site_meta,
+organizer) уже «Готово» (созданы в ходе B2). Карточка
+«Подготовить taxonomy-v2 к слиянию» дописана: пересчёт ADR с 0090, красные
+тесты контраста должны уйти сами при слиянии (проверить, не предполагать),
+конвертер разметки — отдельно, `0047_problem_figure_raster` совпадает
+байт-в-байт. Ничего не удалено.
+
+**Хвосты:**
+- Последний пуш `main` сделан (`4da841f`) — прод по-прежнему на `f30aa088`
+  по коду (разница только в `reports/`), перевыкатывать не нужно.
+- `db.sqlite3.bak_pre_sync_20260906` (932 548 608 байт = 889 МиБ) —
+  вопрос владельцу: приёмка пройдена, удалить копию сейчас или оставить?
+  Ответ: **оставить пока.** Не тронуто.
+- Напоминание для Mac при следующем включении:
+  `cd ~/Downloads/qls_platform && git fetch --prune && git pull --ff-only`.
+
+### Отчёт по шаблону — сессия B целиком
+
+```
+Сессия B — main → прод → чистка GitHub и Windows, 06–07.09.2026
+Сделано: B1 (main перемотан на sync-20260905, тег поставлен) → B2 (прод
+  выкачен, 15 миграций, олимпиады залиты, НАЙДЕНЫ И ПОЧИНЕНЫ два новых бага:
+  пустая навигация — site_meta не в settings_production.py; DataError на
+  PostgreSQL — Olympiad.organizer CharField(300) тесен для консорциума
+  «Вернадский», 441 символ, стал TextField) → B3 (47 веток удалено на
+  GitHub: 46 влитых + integration/sync-20260905) → B4 (35 локальных веток,
+  9 worktree; три файла с неучтённым содержимым НЕ удалены, перенесены в
+  C:\Users\shipu\qls_untracked_20260906\) → B5 (инварианты сошлись, Notion
+  обновлён)
+Числа: main = origin/main = 4da841f (код = f30aa088, журнал поверх);
+  прод = f30aa088, 505→5095 задач не изменились, пользователей 3, олимпиад
+  17 (льгот 87 + 1 пропуск finat); GitHub веток 7 (было 54), тегов 9;
+  локально веток 6 (было 41), worktree 3 (было 12)
+Чего не смог/отклонения: дважды забыл попросить пуш после локальных
+  коммитов журнала — до пересборки контейнера успевал заметить сам, прод не
+  пострадал; сообщения с командами для сервера дважды путались с tmux —
+  разобрано без потерь данных
+Что в Notion: карточка операции → Готово; две новые карточки багов → Готово;
+  карточка taxonomy-v2 дополнена; запись в «Результаты» 07.09.2026
+Открытые вопросы владельцу: удалить ли db.sqlite3.bak_pre_sync_20260906
+  (889 МиБ)
+Что дальше: слияние main в taxonomy-v2 (перенумерация ADR с 0090, проверить
+  тесты контраста), конвертер разметки характера/особенностей задач,
+  олимпиада «Финатлон» в olympiads.jsonl, второй круг обогащения
+```

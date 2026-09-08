@@ -113,7 +113,9 @@ class Olympiad(models.Model):
     slug = models.SlugField('Слаг', unique=True)
     name_full = models.CharField('Полное название', max_length=300)
     name_short = models.CharField('Короткое название', max_length=50)
-    organizer = models.CharField('Организатор', max_length=300)
+    # ⚠️ TextField, не CharField: у консорциумов вузов список организаторов
+    # уходит за 300 символов (Вернадский — 441, девять вузов одной строкой).
+    organizer = models.TextField('Организатор')
     official_url = models.URLField(
         'Официальный сайт', max_length=500, blank=True)
     archive_url = models.URLField('Архив заданий', max_length=500, blank=True)

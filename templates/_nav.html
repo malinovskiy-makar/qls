@@ -345,3 +345,41 @@ nav.site-nav {
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
 })();
 </script>
+
+{% comment %}
+⚠️ ПЛАШКА ОКРУЖЕНИЯ. Рисуется ТОЛЬКО на площадке разработчиков
+`dev.weconomics.ai` (там в .env стоит SITE_ENV=dev). На бою `site_env`
+равно 'prod', условие ложно, и в разметку не уходит ни байта — ни полосы,
+ни блока стилей.
+
+Зачем она: площадка работает на ТЕХ ЖЕ боевых настройках, что и бой, и
+выглядит как бой во всём, кроме адреса в строке браузера. Без плашки разбор
+бага легко пойдёт не по тому сайту, а правка «на боевом» окажется правкой на
+площадке. Хеш сборки рядом отвечает на второй вопрос — «а свежий ли тут код».
+
+⚠️ Стоит ПОД шапкой, а не над ней: шапка `sticky`, и полоса над ней уехала
+бы вверх при прокрутке — то есть исчезала бы ровно тогда, когда человек
+углубился в страницу и вопрос «где я» уже актуален. Здесь она прокручивается
+вместе со страницей и видна на её верху.
+
+Цвета — токенами (`_tokens.html`), янтарные: это предупреждение, а не ошибка.
+{% endcomment %}
+{% if site_env == 'dev' %}
+<style>
+.site-env-strip {
+  background: var(--amber-tint);
+  border-bottom: 1px solid var(--amber-border);
+  color: var(--amber-ink);
+  font-size: 12px;
+  line-height: 1;
+  padding: 6px var(--nav-edge, 20px);
+  text-align: center;
+  letter-spacing: .02em;
+}
+.site-env-strip b { font-weight: 600; }
+.site-env-strip code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+</style>
+<div class="site-env-strip">
+  <b>dev</b>{% if site_build %} · <code>{{ site_build }}</code>{% endif %} · рабочая версия, не бой
+</div>
+{% endif %}
