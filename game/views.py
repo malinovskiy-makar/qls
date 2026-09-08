@@ -1063,6 +1063,12 @@ def build_summary(state):
         # кривые для графиков: значение по номеру вопроса
         'score_curve': [r['running_score'] for r in log],
         'combo_curve': [r['running_combo'] for r in log],
+        # Лента раунда: по записи на вопрос, в порядке игры. Экран рисует из
+        # неё и ленту исходов, и график времени, и график очков — три графика
+        # из одного места, а не три счётчика одного и того же.
+        'outcome_seq': [r['outcome'] for r in log],
+        'time_seq': [r.get('elapsed_ms') or 0 for r in log],
+        'points_seq': [r.get('points') or 0 for r in log],
         'played_at': timezone.now().isoformat(timespec='seconds'),
     }
 
