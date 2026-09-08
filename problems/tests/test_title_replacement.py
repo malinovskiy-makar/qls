@@ -87,7 +87,7 @@ class TruncationTests(TestCase):
 
     def test_длинный_заголовок_дословно_начинает_условие(self):
         self.assertGreater(len(self.ДЛИННЫЙ), tr.TITLE_LIMIT)
-        self.assertTrue(tr.is_long_truncation(self.ДЛИННЫЙ, УСЛОВИЕ))
+        self.assertTrue(tr.is_truncation(self.ДЛИННЫЙ, УСЛОВИЕ))
 
     def test_порог_сорока_символов_обязателен(self):
         """Сторож ответа владельца на вопрос 3. Короткий заголовок, дословно
@@ -99,9 +99,9 @@ class TruncationTests(TestCase):
         условие = 'Дуополия Курно. Две фирмы делят рынок и выбирают выпуск.'
         self.assertTrue(tr.starts_statement(кличка, условие))
         self.assertLessEqual(len(кличка), tr.TITLE_LIMIT)
-        self.assertFalse(tr.is_long_truncation(кличка, условие))
+        self.assertFalse(tr.is_truncation(кличка, условие))
 
-    def test_ведущее_число_у_условия_срезается(self):
+    def test_ведущее_число_срезается_у_условия(self):
         """Сторож починки ложного отрицания: импорт оставляет в начале условия
         номер задачи или год, заголовок его не содержит. id 6308 и id 41249 —
         обе названы владельцем поимённо."""
@@ -109,11 +109,11 @@ class TruncationTests(TestCase):
         self.assertGreater(len(заголовок), tr.TITLE_LIMIT)
         условие = ('2009 Конкурентная фирма, максимизирующая прибыль, '
                    'реализует продукцию по 20 долл.')
-        self.assertEqual(tr.statement_key(условие)[:12], 'конкурентная')
-        self.assertTrue(tr.is_long_truncation(заголовок, условие))
+        self.assertEqual(tr.compare_key(условие)[:12], 'конкурентная')
+        self.assertTrue(tr.is_truncation(заголовок, условие))
 
     def test_свой_заголовок_условие_не_начинает(self):
-        self.assertFalse(tr.is_long_truncation(
+        self.assertFalse(tr.is_truncation(
             'Совершенно осмысленное название задачи про дуополию', УСЛОВИЕ))
 
     def test_обрыв_на_чёрточке(self):
@@ -128,8 +128,26 @@ class TruncationTests(TestCase):
         self.assertFalse(tr.ends_with_dash('Обзор мер регулирования -- 1'))
 
     def test_пустое_условие_обрубком_не_делает(self):
-        self.assertFalse(tr.is_long_truncation(
+        self.assertFalse(tr.is_truncation(
             'Какой-то заголовок задачи подлиннее сорока символов', ''))
+
+    def test_у_чёрточки_порога_длины_НЕТ(self):
+        """Решение владельца 08.09 на замере: из 116 коротких не-firstline
+        заголовков с чёрточкой на конце исключений нет ни одного. Собственный
+        пример владельца — 38 символов, то есть под порогом не ловился бы."""
+        короткий = 'Активами Центрального банка (ЦБ) явля-'
+        self.assertLessEqual(len(короткий), tr.TITLE_LIMIT)
+        self.assertTrue(tr.is_truncation(короткий, 'Активами ЦБ являются…'))
+        self.assertTrue(tr.is_truncation('Рассмотрим инди-', 'что угодно'))
+
+    def test_ведущее_число_срезается_с_ОБЕИХ_сторон(self):
+        """Односторонний вариант ломался там, где номер есть и в заголовке."""
+        заголовок = '[1] Страны А и Б производят клубничный смузи и десерт'
+        условие = ('[1] Страны А и Б производят клубничный смузи и десерт, '
+                   'используя клубнику.')
+        self.assertGreater(len(заголовок), tr.TITLE_LIMIT)
+        self.assertEqual(tr.compare_key(заголовок)[:6], 'страны')
+        self.assertTrue(tr.is_truncation(заголовок, условие))
 
 
 class TechnicalNumberTests(TestCase):
@@ -175,7 +193,7 @@ class BucketTests(TestCase):
             with self.subTest(заголовок=осколок):
                 p = задача(title=осколок, title_candidate='Дуополия Курно',
                            title_source='model-firstline')
-                self.assertFalse(tr.is_long_truncation(p.title, p.statement))
+                self.assertFalse(tr.is_truncation(p.title, p.statement))
                 self.assertFalse(tr.is_technical_number(p.title))
                 self.assertEqual(tr.bucket(p), 'первая строка')
 
