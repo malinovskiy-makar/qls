@@ -271,11 +271,18 @@ class ScoreEventFieldsTests(TestCase):
         self.assertEqual(consumers.seconds_left_for(self.state(spent=99999)), 0)
 
     def test_the_time_bonus_counts_towards_the_remainder(self):
-        u"""Прибавка за верные ответы — часть запаса, а не отдельная жизнь."""
+        u"""Прибавка за верные ответы — часть запаса, а не отдельная жизнь.
+
+        ⚠️ Сравниваем С ДОПУСКОМ В СЕКУНДУ, и это не поблажка. Между двумя
+        вызовами проходит реальное время, а результат обрезается до целого:
+        ровное «30» краснело бы примерно в половине прогонов, и тест
+        пришлось бы отключить. Проверяется то, что и требуется, — прибавка
+        целиком попадает в остаток.
+        """
         plain = consumers.seconds_left_for(self.state(spent=10))
         with_bonus = consumers.seconds_left_for(
             self.state(spent=10, bonus_total=30))
-        self.assertEqual(with_bonus - plain, 30)
+        self.assertAlmostEqual(with_bonus - plain, 30, delta=1)
 
     def test_a_run_without_a_start_mark_says_nothing_instead_of_zero(self):
         u"""None честнее нуля: ноль на табло читается как «время вышло»."""
