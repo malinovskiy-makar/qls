@@ -290,11 +290,12 @@ CANONICAL_TAG_NAMES = frozenset({
 from problems.embedding_formula import SPECS  # noqa: E402
 
 # Переключено 09.09.2026 по решению владельца (карточка Notion «Формула
-# отпечатка: ввозим v2_meta_first одним вектором, падение набора A принято
-# сознательно») — офлайн-замер 16 вариантов на 4×RTX 4090 назвал победителя.
+# отпечатка: переходим на v2_focus_repeat») — лидер ручной разметки 336
+# карточек (precision@10 = 0,650 против 0,600 у v2_meta_first); ДИ разницы
+# накрывает ноль, выбор — лучший из статистически неразличимого кластера.
 # Смена делает устаревшими все 41 307 векторов разом до ввоза файла
-# reports/formula_v2/vec_v2_meta_first (ФАЗА 4 ранбука сессии).
-ACTIVE_SPEC_NAME = 'v2_meta_first'
+# reports/formula_v2/vec_v2_focus_repeat (ФАЗА 3 ранбука сессии).
+ACTIVE_SPEC_NAME = 'v2_focus_repeat'
 ACTIVE_SPEC = SPECS[ACTIVE_SPEC_NAME]
 
 EMBEDDING_FORMULA_VERSION = ACTIVE_SPEC.version

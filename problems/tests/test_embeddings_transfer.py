@@ -26,7 +26,10 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import TestCase
 
-from problems.embedding_config import EMBEDDING_DIM, EMBEDDING_MODEL_BUILD
+from problems.embedding_config import (
+    ACTIVE_SPEC_NAME, EMBEDDING_DIM, EMBEDDING_FORMULA_VERSION,
+    EMBEDDING_MODEL_BUILD,
+)
 from problems.embedding_provenance import protected_fingerprint
 from problems.management.commands import embeddings_import_vectors as imp
 from problems.management.commands.embeddings_check_build import compare_versions
@@ -432,6 +435,24 @@ class SearchEvalVectorsTests(ЭкспортИмпортTestCase):
         with self.assertRaises(CommandError) as ctx:
             self._замер(vectors=prefix, query_vectors=str(q_prefix))
         self.assertIn('ОДНИМ билдом', str(ctx.exception))
+
+
+class ActiveSpecVersionTests(ЭкспортИмпортTestCase):
+    """Сессия перехода на v2_focus_repeat (09.09.2026): активная
+    спецификация — версия 95, и ввоз проставляет её всем задачам."""
+
+    def test_активная_спецификация_версии_95(self):
+        self.assertEqual(ACTIVE_SPEC_NAME, 'v2_focus_repeat')
+        self.assertEqual(EMBEDDING_FORMULA_VERSION, 95)
+
+    def test_ввоз_проставляет_версию_95_у_всех(self):
+        шапка, строки, _ = self.экспорт(spec=ACTIVE_SPEC_NAME)
+        prefix, _m = self.привезти(шапка, строки)
+        self.сверка_пройдена(spec=ACTIVE_SPEC_NAME)
+        self.импорт(prefix, apply=True)
+        versions = set(Problem.objects.exclude(embedding=None)
+                       .values_list('embedding_version', flat=True))
+        self.assertEqual(versions, {95})
 
 
 class ImportModuleTests(TestCase):

@@ -260,8 +260,9 @@ def _card(problem, score=None):
         'kind_label':       _kind_label(problem.problem_type) if is_test else '',
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
-        # Число близости наружу НЕ ИДЁТ (просьба владельца): в карточке
-        # оно лежит только для тестов и отладки.
+        # Число близости показывается ТОЛЬКО при поиске (решение владельца
+        # 09.09.2026) — при пустом запросе сортировка идёт по id, близости
+        # нет вовсе, и `score` здесь всегда None.
         'score':            score,
     }
 

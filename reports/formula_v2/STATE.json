@@ -171,10 +171,13 @@
    "НЕ ЗАКОММИЧЕНО — владелец коммит не запрашивал, коммит и текст команды — в конце сессии"
   ],
   "phase3_dry_run_approved_by_owner": {
-   "к_записи": 41307, "пропущено": 0, "не_найдено": 0
+   "к_записи": 41307,
+   "пропущено": 0,
+   "не_найдено": 0
   },
   "phase4_apply_done": {
-   "записано": 41307, "свип_детектор_расхождений": 0
+   "записано": 41307,
+   "свип_детектор_расхождений": 0
   },
   "invariants_status": {
    "1_protected_fingerprint": "MATCH — 88ec6893a22ea2a665ab2c75a185a0e2 (statement/solution/answer/content_format/human_review/title), бэкап фазы0 vs текущая db.sqlite3, сверено напрямую sqlite3 в обход Django",
@@ -186,8 +189,8 @@
   }
  },
  "build_check": {
-  "spec": "v2_meta_first",
-  "version": 96,
+  "spec": "v2_focus_repeat",
+  "version": 95,
   "rows_checked": 200,
   "min_cosine": 0.9999999,
   "median_cosine": 1.0,
@@ -199,7 +202,7 @@
    "tokenizers": "0.22.2",
    "python": "3.13.15"
   },
-  "input_sha256": "2e8282177e1d647b2a01db8d1de45105c519225f9b2cfd74719c5438f669796e",
-  "checked_at": "2026-09-09T11:18:24+00:00"
+  "input_sha256": "4cf820054a58b9eaa7277a902dc9f1072b12cf3decdb856cb59c8489d5f74fba",
+  "checked_at": "2026-09-09T18:06:05+00:00"
  }
 }
