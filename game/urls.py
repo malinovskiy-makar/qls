@@ -35,5 +35,7 @@ urlpatterns = [
     path('api/leaderboard/', views.api_leaderboard, name='leaderboard'),
     # Личная статистика: только своя, аноним сюда не проходит.
     path('api/me/stats/', views.api_my_stats, name='my_stats'),
+    # История забегов игрока: только про себя, параметра «чей» нет.
+    path('api/me/history/', views.api_my_history, name='my_history'),
     path('api/session/finish/', views.api_session_finish, name='session_finish'),
 ]

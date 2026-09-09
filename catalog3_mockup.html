@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мокап · Каталог: поиск, задача дня, дерево тем, дорожки · Weconomics</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════════
+   МОКАП «Каталог 3: поиск + задача дня + дерево тем + дорожки + строки» — 06.09.2026
+   Для Claude Code: ниже два слоя.
+   1) ТОКЕНЫ — копия значений из templates/_tokens.html (свет + тьма).
+      В проекте этот блок НЕ копировать: он уже подключён первым в <head>.
+   2) КОМПОНЕНТЫ — .cat-grid, .rail/.tree, .pod (задача дня), .cont (продолжить), .trk (дорожки), .th (шапка темы), .tb (панель списка), .pr (строка 72 px). Поле .ask, чипы — из принятого мокапа A+B.
+      Их переносить как есть; цвета только через var(--…).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── 1. ТОКЕНЫ (копия _tokens.html, светлая тема) ──────────────────── */
+:root {
+  --accent: #00797a; --accent-ink: #006c6d; --accent-deep: #016769;
+  --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+  --accent-rgb: 0, 121, 122; --act-ink: #2d2d2d; --act-ink-solid: #ffffff;
+  --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+  --surface-tool: #81b5b4; --surface-info: #f2e8bd;
+  --border: rgba(45,45,45,.14); --border-soft: rgba(45,45,45,.08);
+  --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+  --brand-amber: #d6a525; --brand-amber-ink: #1d1a16; --brand-amber-hover: #e3b03a;
+  --btn-bg: #2e2b27; --btn-bg-hover: #3d3933; --on-btn: #ffffff; --nav-bg: #3c3531;
+  --chip-bg: rgba(45,45,45,.07); --chip-text: #5c5346;
+  --amber: #96500c; --amber-tint: rgba(150,80,12,.11); --amber-border: rgba(150,80,12,.34); --amber-ink: #723c09;
+  --green: #186e3c; --green-tint: rgba(24,110,60,.09); --green-border: rgba(24,110,60,.30); --green-ink: #186e3c;
+  --error: #b93526; --error-tint: rgba(185,53,38,.09); --error-border: rgba(185,53,38,.28); --on-error: #ffffff;
+  --pending: #43566f; --pending-tint: rgba(67,86,111,.09);
+  --focus: #7d7466; --focus-ring: rgba(125,116,102,.22);
+  --map-g-base: #A94223; --map-g-market: #704C10; --map-g-firm: #576114;
+  --map-g-state: #1C5F25; --map-g-macro: #6847C2; --map-g-fin: #8C3180; --map-g-tools: #B53054;
+  /* пять цветов блоков (решение 05.09: один источник problems/sections.py; пары — из замеренных семи) */
+  --blk-micro: #A94223; --blk-macro: #6847C2; --blk-fin: #8C3180; --blk-math: #1C5F25; --blk-other: #704C10;
+  --r-sm: 4px; --r: 6px; --r-card: 10px; --r-panel: 12px; --r-pill: 999px;
+  --t: .12s; --t-slow: .2s; --w-page: 960px; --w-read: 860px;
+  --font-ui: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --fs-hero: 32px; --fs-h1: 24px; --fs-h2: 19px; --fs-body: 16px; --fs-ui: 14.5px; --fs-meta: 13px;
+  --lh-tight: 1.25; --lh-body: 1.6; --lh-ui: 1.45;
+  --shadow-pop: 0 6px 20px rgba(0,0,0,.14);
+  --bg-pattern-alpha: .10;
+}
+[data-theme="dark"] {
+  --accent: #81b5b4; --accent-ink: #81b5b4; --accent-deep: #9bc6c5;
+  --accent-tint: rgba(129,181,180,.16); --accent-ring: rgba(129,181,180,.40);
+  --accent-rgb: 129, 181, 180; --act-ink: #f2ecd9; --act-ink-solid: #1d1a16;
+  --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+  --surface-tool: #2d504f; --surface-info: #504a2d;
+  --border: rgba(255,255,255,.13); --border-soft: rgba(255,255,255,.07);
+  --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+  --btn-bg: #c4bba9; --btn-bg-hover: #d0c7b5; --on-btn: #23211d;
+  --focus: #8a8172; --focus-ring: rgba(138,129,114,.26);
+  --chip-bg: rgba(255,255,255,.08); --chip-text: #c8c2b0;
+  --amber: #efa273; --amber-tint: rgba(239,162,115,.15); --amber-border: rgba(239,162,115,.34); --amber-ink: #f9eae1;
+  --green: #3fc77f; --green-ink: #bfecd4; --green-tint: rgba(63,199,127,.15); --green-border: rgba(63,199,127,.32);
+  --error: #ff8a8a; --error-ink: #ffd2d2; --error-tint: rgba(255,138,138,.15); --error-border: rgba(255,138,138,.30); --on-error: #1d1a16;
+  --map-g-base: #DA6B49; --map-g-market: #D6931F; --map-g-firm: #8C9D20;
+  --map-g-state: #36BA48; --map-g-macro: #9A85D6; --map-g-fin: #D27FC7; --map-g-tools: #D66684;
+  --blk-micro: #DA6B49; --blk-macro: #9A85D6; --blk-fin: #D27FC7; --blk-math: #36BA48; --blk-other: #D6931F;
+  --bg-pattern-alpha: .15;
+}
+
+/* ── База страницы (приближение к catalog/base.html, в проект не копировать) ── */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--fs-body)/var(--lh-body) var(--font-ui);
+       -webkit-font-smoothing: antialiased; min-height: 100vh; position: relative; }
+body::before { content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  opacity: var(--bg-pattern-alpha);
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='260' viewBox='0 0 320 260'><path d='M20 40 l30 110 l35 -80 l35 80 l30 -110' fill='none' stroke='%237fae7c' stroke-width='26' stroke-linecap='round' stroke-linejoin='round'/><path d='M180 150 l24 84 l28 -60 l28 60 l24 -84' fill='none' stroke='%23c9b45a' stroke-width='22' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-size: 320px 260px; }
+.site-nav { position: relative; z-index: 1; background: var(--nav-bg); height: 56px; display: flex;
+  align-items: center; padding: 0 28px; gap: 26px; font-size: 15.5px; }
+.site-nav .logo { width: 34px; height: 34px; border-radius: 50%; background: #81b5b4; color: #1d1a16;
+  display: inline-flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+.site-nav a { color: #c9c1ae; text-decoration: none; line-height: 56px; }
+.site-nav a.is-on { color: #fff; box-shadow: inset 0 -2px 0 #81b5b4; }
+.site-nav .right { margin-left: auto; display: flex; gap: 10px; align-items: center; color: #c9c1ae; }
+.site-nav .right span { border: 1px solid rgba(255,255,255,.18); border-radius: 999px; padding: 6px 12px; font-size: 14px; }
+.page-wrap { position: relative; z-index: 1; max-width: var(--w-page); margin: 0 auto; padding: 28px 20px 80px; }
+.ct-head { margin: 0 0 22px; }
+.ct-head h1 { font-size: 30px; margin: 0 0 8px; letter-spacing: -.01em; line-height: 1.2; }
+.ct-head p { margin: 0; color: var(--text2); font-size: 16px; line-height: 1.5; max-width: 46em; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button { font-family: inherit; }
+
+/* ── Панель мокапа (НЕ часть дизайна) ─────────────────────────────── */
+.mk-bar { position: fixed; left: 14px; bottom: 14px; z-index: 60; background: #1d1a16; color: #f2ecd9; border-radius: 10px; padding: 8px 10px;
+  font: 500 12px/1.3 var(--font-ui); display: flex; gap: 6px; align-items: center; box-shadow: var(--shadow-pop); flex-wrap: wrap; max-width: 330px; }
+.mk-bar em { font-style: normal; opacity: .7; }
+.mk-bar .brk { flex-basis: 100%; height: 0; }
+.mk-bar button { font: inherit; background: #3c3531; color: #f2ecd9; border: 0; border-radius: 6px; padding: 5px 8px; cursor: pointer; }
+.mk-bar button.is-on { background: #81b5b4; color: #1d1a16; }
+.hidden { display: none !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   2. КОМПОНЕНТЫ
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Поиск — герой на всю ширину (из принятого A+B, без карты справа) ── */
+.ct-tool { display: flex; margin: 0; }
+.ask { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; background: var(--surface); border-radius: 14px;
+  border: 1.5px solid var(--border); transition: border-color var(--t), box-shadow var(--t); }
+.ask:focus-within { border-color: var(--brand-amber); box-shadow: 0 0 0 4px rgba(214,165,37,.22); }
+.ask textarea { flex: 1 1 auto; width: 100%; border: 0; background: transparent; resize: none; font: 500 17px/1.45 var(--font-ui); color: var(--text);
+  padding: 13px 16px 4px; min-height: 84px; outline: none; display: block; }
+.ask textarea::placeholder { color: var(--text3); font-weight: 400; }
+.ask-foot { display: flex; align-items: center; gap: 6px; padding: 0 8px 8px 16px; }
+.ask-hint { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; color: var(--text2); margin-right: auto; }
+.ask-hint svg { width: 14px; height: 14px; color: var(--accent-ink); }
+.ask-clear { border: 0; background: transparent; color: var(--text3); width: 32px; height: 32px; border-radius: var(--r-pill); cursor: pointer; font-size: 18px; display: none; align-items: center; justify-content: center; }
+.ask.has-text .ask-clear { display: inline-flex; }
+.ask-go { width: 38px; height: 38px; border-radius: var(--r-pill); border: 0; background: var(--surface-2); color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: background var(--t), color var(--t); }
+.ask-go svg { width: 18px; height: 18px; }
+.ask.has-text .ask-go { background: var(--brand-amber); color: var(--brand-amber-ink); }
+.btn-all { display: inline-flex; align-items: center; gap: 8px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: var(--r-pill);
+  padding: 9px 14px 9px 12px; font: 600 13.5px/1 var(--font-ui); cursor: pointer; flex: none; }
+.btn-all:hover { border-color: var(--brand-amber); }
+.btn-all svg { width: 16px; height: 16px; }
+.btn-all .n { background: var(--btn-bg); color: var(--on-btn); border-radius: var(--r-pill); min-width: 20px; height: 20px; padding: 0 6px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; }
+.btn-all .n:empty { display: none; }
+.ct-strip { display: contents; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--surface); color: var(--text); border-radius: var(--r-pill); padding: 6px 8px 6px 12px; font-size: 13.5px; border: 1px solid var(--border); }
+.chip-x { border: 0; background: transparent; color: inherit; opacity: .6; width: 20px; height: 20px; border-radius: var(--r-pill); cursor: pointer; font-size: 12px; display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+.chip--g { background: color-mix(in srgb, var(--gc) 16%, var(--surface)); border-color: color-mix(in srgb, var(--gc) 45%, transparent); }
+.chip--g::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--gc); }
+
+/* ── Две колонки: слева «Темы», справа содержимое ────────────────────── */
+.cat-grid { display: grid; grid-template-columns: 264px minmax(0, 1fr); gap: 28px; align-items: start; margin-top: 18px; }
+@media (max-width: 860px) { .cat-grid { grid-template-columns: 1fr; } .rail { order: 2; } }
+.rail { position: sticky; top: 72px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Карта тем — шапка колонки «Темы»: та же навигация в другом виде */
+.rail-map { display: block; position: relative; height: 140px; border-radius: 14px; overflow: hidden; background: var(--surface); border: 1px solid var(--border-soft); text-decoration: none; color: var(--text); perspective: 480px; }
+.rail-map svg { position: absolute; inset: 0; width: 100%; height: 100%; transform-origin: 50% 50%; animation: tmapSpin 28s linear infinite; }
+@keyframes tmapSpin { from { transform: rotateY(0deg) rotateX(12deg); } to { transform: rotateY(360deg) rotateX(12deg); } }
+@media (prefers-reduced-motion: reduce) { .rail-map svg { animation: none; } }
+.rail-map .cap { position: absolute; left: 10px; bottom: 8px; font-size: 12px; color: var(--text2); background: color-mix(in srgb, var(--surface) 82%, transparent); padding: 3px 9px; border-radius: var(--r-pill); }
+.rail-map .cap b { font-weight: 600; color: var(--text); }
+
+/* Дерево: пять блоков → темы. У вошедшего у темы — уровень (глиф + цвет). */
+.tree { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px; padding: 6px; }
+.tree-h { display: flex; align-items: baseline; justify-content: space-between; padding: 8px 10px 6px; }
+.tree-h b { font-size: 14px; }
+.tree-h a { font-size: 12px; color: var(--accent-ink); text-decoration: none; }
+.tb-block { border-top: 1px solid var(--border-soft); }
+.tb-block:first-of-type { border-top: 0; }
+.tb-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 6px; background: none; border: 0; cursor: pointer; text-align: left;
+  font: 600 13.5px/1.3 var(--font-ui); color: var(--text); border-radius: 8px; }
+.tb-head:hover { background: var(--surface-2); }
+.tb-head .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--gc); flex: none; }
+.tb-head .nm { flex: 1 1 auto; }
+.tb-head .n { font-weight: 400; font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tb-head .caret { width: 14px; height: 14px; color: var(--text3); transition: transform var(--t-slow); flex: none; }
+.tb-block.is-open .tb-head .caret { transform: rotate(180deg); }
+.tb-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.tb-block.is-open .tb-body { grid-template-rows: 1fr; }
+.tb-inner { overflow: hidden; }
+.tnode { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 8px 6px 10px; border: 0; background: none; cursor: pointer; text-align: left;
+  font: 400 13px/1.3 var(--font-ui); color: var(--text); border-radius: 8px; }
+.tnode:hover { background: var(--surface-2); }
+.tnode.is-on { background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.tnode .lv { width: 14px; height: 14px; flex: none; }
+.tnode .nm { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tnode .n { font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+/* уровни: не начата · в работе · слабо · уверенно — глиф + цвет, никогда только цвет */
+.lv circle { fill: none; stroke-width: 1.6; }
+.lv--none circle { stroke: var(--border); }
+.lv--work circle { stroke: var(--amber); } .lv--work path { fill: var(--amber); }
+.lv--weak circle { stroke: var(--error); } .lv--weak path { fill: var(--error); }
+.lv--sure circle { stroke: var(--green); fill: var(--green); } .lv--sure path { stroke: var(--act-ink-solid); fill: none; stroke-width: 2; }
+.tree-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; padding: 10px 12px 8px; font-size: 12px; color: var(--text3); border-top: 1px solid var(--border-soft); }
+.tree-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.tree-legend .lv { width: 12px; height: 12px; }
+.rail-random { display: inline-flex; align-items: center; gap: 8px; font: 500 13px/1 var(--font-ui); color: var(--text2); background: none; border: 1px dashed var(--border); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
+.rail-random:hover { color: var(--text); border-color: var(--accent); border-style: solid; }
+
+/* ── Секции основной колонки ─────────────────────────────────────────── */
+.sec { margin: 0 0 26px; }
+.sec-h { display: flex; align-items: baseline; gap: 10px; margin: 0 0 10px; }
+.sec-h h2 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -.01em; }
+.sec-h .sub { font-size: 13px; color: var(--text2); }
+.sec-h a { margin-left: auto; font-size: 13px; color: var(--accent-ink); text-decoration: none; }
+
+/* Ряд под полем: «Все фильтры» + выбранные чипы слева, «Задача дня» справа.
+   Кнопка задачи дня видна на любом экране — к задаче всегда можно вернуться. */
+.ct-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 10px 0 18px; }
+.ct-bar .grow { flex: 1 1 auto; }
+.btn-pod { display: inline-flex; align-items: center; gap: 8px; font: 600 13.5px/1 var(--font-ui); color: var(--brand-amber-ink); background: var(--brand-amber); border: 0; border-radius: var(--r-pill); padding: 9px 14px 9px 12px; cursor: pointer; }
+.btn-pod:hover { background: var(--brand-amber-hover); }
+.btn-pod svg { width: 15px; height: 15px; }
+.btn-pod .d { font-weight: 500; opacity: .85; }
+[data-theme="dark"] .btn-pod { color: #1d1a16; }
+
+/* Задача дня — компактная карточка: условие, поле ответа числом, ссылка на файл */
+.pod { background: var(--surface); border: 1.5px solid var(--brand-amber); border-radius: 14px; padding: 14px 16px 12px; }
+.pod-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 8px; }
+.pod-badge { display: inline-flex; align-items: center; gap: 6px; font: 700 12px/1 var(--font-ui); color: var(--brand-amber-ink); background: var(--brand-amber); border-radius: var(--r-pill); padding: 5px 10px; }
+.pod-head .meta { font-size: 12.5px; color: var(--text2); margin-left: auto; }
+.pod-head .meta b { color: var(--text); font-variant-numeric: tabular-nums; }
+.pod-head .hide { font-size: 12.5px; color: var(--text3); background: none; border: 0; cursor: pointer; padding: 2px 4px; }
+.pod-stm { font-size: 15px; line-height: 1.55; margin: 0 0 10px; }
+.pod-stm i { font-style: italic; font-family: 'Times New Roman', serif; color: var(--text); }
+.pod-stm b { font-weight: 600; }
+.pod-ans { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.num { width: 170px; font: 600 16px/1 var(--font-ui); padding: 10px 12px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text); outline: none; font-variant-numeric: tabular-nums; }
+.num:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); background: var(--surface); }
+.num.is-ok { border-color: var(--green); background: var(--green-tint); }
+.num.is-bad { border-color: var(--error); background: var(--error-tint); animation: shake .4s ease; }
+@keyframes shake { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+.pod-file { display: inline-flex; align-items: center; gap: 7px; font: 500 13px/1 var(--font-ui); color: var(--text2); background: none; border: 1px dashed var(--border); border-radius: 10px; padding: 9px 11px; cursor: pointer; }
+.pod-file:hover { border-color: var(--accent); border-style: solid; color: var(--text); }
+.pod-file svg { width: 15px; height: 15px; color: var(--accent-ink); }
+.pod-msg { display: none; align-items: center; gap: 8px; font-size: 13.5px; border-radius: 10px; padding: 8px 11px; border-left: 3px solid; margin-top: 10px; }
+.pod-msg.is-on { display: flex; animation: fadeIn .2s ease-out; }
+.pod-msg--ok { background: var(--green-tint); color: var(--green); border-color: var(--green); }
+.pod-msg--bad { background: var(--error-tint); color: var(--error); border-color: var(--error); }
+.pod-msg b { font-weight: 700; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } }
+.pod-foot { display: flex; align-items: center; gap: 12px; margin-top: 10px; font-size: 12.5px; color: var(--text3); flex-wrap: wrap; }
+.pod-foot .grow { flex: 1 1 auto; }
+.pod-foot .streak { color: var(--amber-ink); font-weight: 600; }
+#pod-slot:not(:empty) { margin: 0 0 22px; }
+/* Продолжить — три-четыре последние задачи со статусом попытки */
+.cont { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.cont-card { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; padding: 11px 13px; text-decoration: none; color: var(--text); transition: border-color var(--t); }
+.cont-card:hover { border-color: var(--accent); }
+.cont-card .t { font-weight: 600; font-size: 14px; line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.st { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; border-radius: var(--r-pill); padding: 2px 8px; align-self: flex-start; }
+.st--part { background: var(--amber-tint); color: var(--amber-ink); } .st--ok { background: var(--green-tint); color: var(--green); }
+.st--open { background: var(--chip-bg); color: var(--chip-text); } .st--hint { background: var(--accent-tint); color: var(--accent-ink); }
+.cont-card .when { font-size: 12px; color: var(--text3); margin-top: auto; }
+
+/* Дорожки — по этапу олимпиады и по теме от простого к сложному */
+.trk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 640px) { .trk-grid { grid-template-columns: 1fr; } }
+.trk { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: 12px; padding: 12px 14px; text-decoration: none; color: var(--text); position: relative; overflow: hidden; transition: border-color var(--t); }
+.trk:hover { border-color: var(--accent); }
+.trk::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--gc, var(--accent)); }
+.trk .k { font-size: 11.5px; font-weight: 700; color: var(--text3); letter-spacing: .02em; }
+.trk .t { font-weight: 600; font-size: 14.5px; line-height: 1.35; }
+.trk .m { font-size: 12.5px; color: var(--text2); }
+.trk .bar { height: 5px; border-radius: 3px; background: var(--surface-2); overflow: hidden; margin-top: 4px; }
+.trk .bar i { display: block; height: 100%; background: var(--gc, var(--accent)); border-radius: 3px; }
+.trk .row2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.trk .row2 .p { font-size: 12px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.trk .go { font: 600 12.5px/1 var(--font-ui); color: var(--accent-ink); background: var(--accent-tint); border-radius: var(--r-pill); padding: 6px 10px; }
+
+/* Шапка темы (после клика в дереве) */
+.th { background: var(--surface); border: 1px solid var(--border-soft); border-radius: 14px; padding: 16px 18px 14px; position: relative; overflow: hidden; margin: 0 0 12px; }
+.th::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 5px; background: var(--gc); }
+.th-top { display: flex; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.th h1 { margin: 0 0 4px; font-size: 22px; line-height: 1.25; letter-spacing: -.01em; }
+.th .meta { font-size: 13px; color: var(--text2); }
+.th .lvl { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--text2); margin-top: 6px; }
+.th .lvl .lv { width: 16px; height: 16px; }
+.th .lvl b { color: var(--text); }
+.th-acts { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+.th-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.tag { font-size: 12.5px; border-radius: var(--r-pill); padding: 4px 10px; border: 1px solid var(--border); color: var(--text2); background: var(--surface); text-decoration: none; }
+.tag:hover { border-color: var(--accent); color: var(--text); }
+.tag.more { border-style: dashed; }
+
+/* Панель списка: статус, сортировка, счётчик */
+.tb { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.seg { display: inline-flex; background: var(--surface-2); border-radius: 10px; padding: 3px; gap: 2px; }
+.seg button { border: 0; background: transparent; padding: 6px 11px; border-radius: 8px; font: 500 13px/1.2 var(--font-ui); color: var(--text2); cursor: pointer; display: inline-flex; gap: 6px; align-items: center; }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: 0 1px 2px rgba(0,0,0,.10); }
+.seg button .n { font-size: 11.5px; color: var(--text3); }
+.tb .cnt { font-size: 14px; } .tb .cnt b { font-variant-numeric: tabular-nums; }
+.tb .sort { margin-left: auto; font-size: 13px; color: var(--text2); }
+.tb .sort b { color: var(--text); font-weight: 600; }
+
+/* Строка задачи 72 px: статус · заголовок или начало условия · превью · справа свойства */
+.rows { display: flex; flex-direction: column; gap: 6px; }
+.pr { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 12px; align-items: center; min-height: 72px; background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 10px 14px 10px 12px; text-decoration: none; color: var(--text); position: relative; transition: border-color var(--t); }
+.pr:hover { border-color: var(--accent); }
+.pr .lv { width: 20px; height: 20px; }
+.pr-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.pr-t { font-weight: 600; font-size: 14.5px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-t.is-stm { font-weight: 500; }
+.pr-p { font-size: 13px; color: var(--text2); line-height: 1.4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pr-p i { font-style: italic; font-family: 'Times New Roman', serif; color: var(--text); }
+.pr-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 12px; }
+.pr-side .l2 { display: flex; gap: 8px; align-items: center; color: var(--text3); }
+.ct-stars { color: var(--amber); letter-spacing: .5px; } .ct-sol { color: var(--green); } .ct-kind { color: var(--text3); }
+.pr-tools { position: absolute; right: 12px; bottom: -1px; display: none; gap: 6px; transform: translateY(50%); }
+.pr:hover .pr-tools { display: flex; }
+body:not(.role-teacher) .pr-tools { display: none !important; }
+.tool { font: 500 12px/1 var(--font-ui); padding: 5px 9px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.res-more { text-align: center; margin: 16px 0 0; }
+.ct-btn--go { background: var(--brand-amber); color: var(--brand-amber-ink); border-color: transparent; }
+.ct-btn--go:hover { background: var(--brand-amber-hover); }
+.res-more small { display: block; margin-top: 7px; font-size: 13px; color: var(--text2); }
+</style>
+</head>
+<body class="role-student">
+<div class="mk-bar" aria-label="Панель мокапа">
+  <em>мокап · числа статистики, дорожек и уровней — демонстрационные</em><span class="brk"></span>
+  <button type="button" id="mk-theme">Тёмная тема</button>
+  <em>роль:</em><button type="button" data-role="guest">гость</button><button type="button" data-role="student" class="is-on">ученик</button><button type="button" data-role="teacher">преподаватель</button>
+  <span class="brk"></span>
+  <em>экран:</em><button type="button" data-view="entry" class="is-on">вход</button><button type="button" data-view="topic">тема</button><button type="button" data-view="search">поиск</button>
+</div>
+
+<nav class="site-nav" aria-label="Шапка сайта (имитация)">
+  <span class="logo">W</span>
+  <a href="#">Домашки</a><a href="#" class="is-on">Каталог</a><a href="#">Олимпиады</a><a href="#">Календарь</a><a href="#">Графики</a><a href="#">Тренажёр</a>
+  <div class="right"><span id="nav-user">Пётр Иванов</span><span>Выйти</span></div>
+</nav>
+
+<main class="page-wrap">
+  <div class="ct-tool">
+    <form class="ask" id="ask" action="#" onsubmit="return false">
+      <textarea id="ct-q" rows="2" placeholder="задачи на ценовую дискриминацию 3 степени с двумя группами" aria-label="Опишите задачу"></textarea>
+      <div class="ask-foot">
+        <span class="ask-hint"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/></svg>Ищем по смыслу: точные слова не нужны</span>
+        <button class="ask-clear" type="button" id="ask-clear" aria-label="Очистить">×</button>
+        <button class="ask-go" type="submit" id="ask-go" aria-label="Найти"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg></button>
+      </div>
+    </form>
+  </div>
+  <div class="ct-bar">
+    <button class="btn-all" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 4h8M12 4h2M2 12h2M6 12h8M2 8h5M9 8h5"/><circle cx="10" cy="4" r="1.6" fill="var(--surface)"/><circle cx="4" cy="12" r="1.6" fill="var(--surface)"/><circle cx="7" cy="8" r="1.6" fill="var(--surface)"/></svg>Все фильтры <span class="n" id="btn-all-n"></span></button>
+    <div class="ct-strip" id="strip"></div>
+    <span class="grow"></span>
+    <button class="btn-pod" type="button" id="btn-pod"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/></svg>Задача дня <span class="d">· 6 сентября</span></button>
+  </div>
+
+  <div class="cat-grid">
+    <aside class="rail" aria-label="Темы">
+      <a class="rail-map" href="#" aria-label="Карта тем и тегов"><svg viewBox="0 0 264 140" id="mk-map" aria-hidden="true"></svg><span class="cap"><b>Карта тем</b> · 29 тем, 343 тега</span></a>
+      <div class="tree" id="tree"></div>
+      <button class="rail-random" type="button"><svg style="width:16px;height:16px" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="2" width="12" height="12" rx="2.5"/><circle cx="5.5" cy="5.5" r=".9" fill="currentColor"/><circle cx="10.5" cy="5.5" r=".9" fill="currentColor"/><circle cx="8" cy="8" r=".9" fill="currentColor"/><circle cx="5.5" cy="10.5" r=".9" fill="currentColor"/><circle cx="10.5" cy="10.5" r=".9" fill="currentColor"/></svg>Случайная задача, которую вы не решали</button>
+    </aside>
+
+    <section class="main" id="main">
+      <div id="pod-slot"></div>
+      <div id="v-entry"></div>
+      <div id="v-topic" class="hidden"></div>
+      <div id="v-search" class="hidden"></div>
+    </section>
+  </div>
+</main>
+<script>
+/* ═══════════════════════════════════════════════════════════════════════
+   ДАННЫЕ МОКАПА. 29 тем — из catalog/data/topic_map.json (числа задач
+   уменьшены до масштаба видимого каталога). Задачи — настоящие, из базы.
+   Уровни, дорожки, «решили N», «сегодня» — демонстрационные.
+   ═══════════════════════════════════════════════════════════════════════ */
+const T = [[1,'Введение в экономику','micro',38],[2,'Альтернативные издержки и КПВ','micro',313],[3,'Спрос, предложение и равновесие','micro',341],[4,'Эластичность','micro',218],[5,'Теория потребителя и полезность','micro',310],[6,'Производство и издержки фирмы','micro',1190],[7,'Совершенная конкуренция','micro',196],[8,'Монополия и ценовая дискриминация','micro',196],[9,'Олигополия и теория игр','micro',228],[10,'Вмешательство государства','micro',221],[11,'Внешние эффекты и общественные блага','micro',54],[12,'Асимметрия информации и риск','micro',49],[13,'Рынок труда и факторы производства','micro',86],[14,'Неравенство доходов','micro',102],[15,'Международная торговля','micro',70],
+[16,'Открытая экономика и валютный рынок','macro',49],[17,'ВВП и национальные счета','macro',97],[18,'Инфляция и индексы цен','macro',85],[19,'Безработица и занятость','macro',44],[20,'AD–AS и IS–LM','macro',61],[21,'Фискальная политика','macro',53],[22,'Монетарная политика и банки','macro',68],[23,'Экономический рост и циклы','macro',39],
+[24,'Проценты, вклады и кредиты','fin',88],[25,'Инвестиции и ценные бумаги','fin',37],[27,'Данные, статистика и причинность','math',29],[28,'Математический аппарат','math',12],[26,'Поведенческая экономика','other',0],[29,'Другое','other',0]];
+const BLK = [['micro','Микроэкономика'],['macro','Макроэкономика'],['fin','Финансы'],['math','Математика и данные'],['other','Прочее']];
+/* уровень ученика по теме — демо: none / work / weak / sure */
+const LEVEL = { 8: 'sure', 9: 'work', 4: 'weak', 3: 'work', 10: 'work', 2: 'sure', 24: 'work' };
+const LEVEL_T = { none: 'не начата', work: 'в работе', weak: 'слабо', sure: 'уверенно' };
+const P = {
+  vm5:   { t: 'Вмешательство — 5', tp: 8, stars: 4, sol: true, st: 'part', num: true, prev: 'На школьной ярмарке популярностью пользуются ягодки: спрос на них задаётся как Qd = 120 − P, а предложение Qs = 2P. Два школьных хулигана Арслан и Егор решили заработать денег…', solved: 214 },
+  firm:  { t: null, tp: 8, st: 'none', num: true, prev: 'Фирма монополистка работает на рынке товара Y. Спрос на Y предъявляют две группы потребителей: бедные и очень бедные. Их функции спроса имеют вид Pd = 120 − 2Q и Pd = 60 − 0,5Q.', solved: 88 },
+  groups:{ t: null, tp: 8, st: 'none', num: true, prev: 'Спрос на продукцию монополиста предъявляют две группы покупателей, спрос первой группы q¹ = 200 − 4p, спрос второй группы q² = 160 − 2p. Функция издержек TC(Q) = Q² + 50.', solved: 61 },
+  spy:   { t: 'Шпионим за шпионом (бета/гамма/эпсилон)', tp: 9, sol: true, st: 'open', prev: 'Фирма «Агент 007» с издержками TC_A = Q² + 20Q и фирма «Джеймс Бонд» с TC_B = 2Q² + 10Q являются олигополистами на рынке фильмов про шпионов…', solved: 140 },
+  mono:  { t: null, tp: 8, st: 'ok', num: false, prev: 'Известно, что монополист получает максимальную выручку в точке P = 20, Q = 40. Найдите функцию спроса при предположении, что она линейна.', solved: 402 },
+  t5999: { t: null, tp: 8, kind: 'тест · все верные', st: 'ok', prev: 'Выберите верные при прочих равных условиях утверждения: при появлении возможности осуществлять ценовую дискриминацию прибыль фирмы не может снизиться…', solved: 512 },
+  kpv:   { t: 'Простой тестик по КПВ (бета? гамма?)', tp: 2, sol: true, st: 'hint', prev: 'Огородник Вася хочет запастись дачными овощами на долгую зиму. Он умеет выращивать картофель и морковь на поле площадью 20 гектаров…', solved: 96 },
+  perf:  { t: 'Совершенно конкурентный монополист', tp: 8, kind: 'тест · один верный', sol: true, st: 'none', prev: 'Выберите только один правильный ответ. В какой из ситуаций в равновесии верно, что P = MC, если все фирмы являются монополистами?', solved: 233 },
+  town:  { t: null, tp: 8, st: 'none', num: true, prev: 'В уездный город Р приехала монополистка, которая планирует работать на рынке товара X. У монополистки нет собственного производства…', solved: 45 },
+  mand:  { t: null, tp: 8, st: 'part', num: true, prev: 'ООО «М» является монополистом на рынке мандаринов, а спрос на этом рынке предъявляют студенты. К сожалению, студенты никак не могут влиять на цену мандаринов…', solved: 77 },
+};
+const TP = Object.fromEntries(T.map(x => [x[0], { n: x[0], name: x[1], blk: x[2], c: x[3] }]));
+const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '\u00a0');
+const plural = (n, f) => { const a = n % 10, b = n % 100; return f[(a === 1 && b !== 11) ? 0 : (a >= 2 && a <= 4 && (b < 10 || b >= 20)) ? 1 : 2]; };
+let role = 'student', view = 'entry', topicN = 8, statusF = 'all';
+const isUser = () => role !== 'guest';
+
+/* уровень / статус — глиф + цвет */
+function lv(kind, cls) {
+  const inner = kind === 'work' ? '<path d="M8 3a5 5 0 0 1 0 10z"/>' : kind === 'weak' ? '<path d="M8 3a5 5 0 1 1 0 10z"/>' : kind === 'sure' ? '<path d="M5 8.3l2 2 4-4.5"/>' : '';
+  return `<svg class="lv lv--${kind}${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-label="${LEVEL_T[kind]}"><circle cx="8" cy="8" r="6"/>${inner}</svg>`;
+}
+const ST_LV = { none: 'none', part: 'work', ok: 'sure', open: 'none', hint: 'work' };
+const ST_T = { none: 'не трогали', part: 'пробовали', ok: 'решено', open: 'решение открыто', hint: 'с подсказкой' };
+function stGlyph(st) {
+  if (st === 'open') return `<svg class="lv lv--none" viewBox="0 0 16 16" aria-label="решение открыто"><rect x="2.5" y="2.5" width="11" height="11" rx="2.5" fill="none" stroke="var(--text3)" stroke-width="1.6"/><path d="M5 6h6M5 8.5h6M5 11h4" stroke="var(--text3)" stroke-width="1.3" stroke-linecap="round"/></svg>`;
+  return lv(ST_LV[st]);
+}
+
+/* ── Дерево тем ─────────────────────────────────────────────────────── */
+function renderTree() {
+  const root = document.getElementById('tree');
+  let html = `<div class="tree-h"><b>Темы</b><a href="#">все теги</a></div>`;
+  for (const [key, label] of BLK) {
+    const ts = T.filter(x => x[2] === key && x[3] > 0);
+    if (!ts.length) continue;                                   /* блок без задач не рендерится */
+    const total = ts.reduce((s, x) => s + x[3], 0), open = ts.some(x => x[0] === topicN) || (view === 'entry' && key === 'micro');
+    const started = isUser() ? ts.filter(x => LEVEL[x[0]]).length : 0;
+    html += `<div class="tb-block${open ? ' is-open' : ''}" style="--gc: var(--blk-${key})">
+      <button class="tb-head" type="button" data-blk="${key}" aria-expanded="${open}"><span class="dot"></span><span class="nm">${label}</span><span class="n">${isUser() && started ? started + ' из ' : ''}${ts.length}</span>
+        <svg class="caret" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><path d="M4 6l4 4 4-4"/></svg></button>
+      <div class="tb-body"><div class="tb-inner">${ts.map(x => `<button class="tnode${x[0] === topicN && view === 'topic' ? ' is-on' : ''}" type="button" data-topic="${x[0]}">${isUser() ? lv(LEVEL[x[0]] || 'none') : ''}<span class="nm">${esc(x[1])}</span><span class="n">${fmt(x[3])}</span></button>`).join('')}</div></div></div>`;
+  }
+  if (isUser()) html += `<div class="tree-legend"><span>${lv('none')} не начата</span><span>${lv('work')} в работе</span><span>${lv('weak')} слабо</span><span>${lv('sure')} уверенно</span></div>`;
+  root.innerHTML = html;
+}
+
+/* ── Вход ───────────────────────────────────────────────────────────── */
+function podHTML(closable) {
+  return `<div class="pod" id="pod">
+    <div class="pod-head"><span class="pod-badge">Задача дня</span><span style="font-size:12.5px;color:var(--text2)">6 сентября</span><span class="tchip" style="--gc: var(--blk-micro)">Монополия и ценовая дискриминация</span><span class="meta">решили сегодня <b>48</b> · с первой попытки <b>71 %</b></span>${closable ? '<button class="hide" type="button" id="pod-hide">скрыть</button>' : ''}</div>
+    <p class="pod-stm"><b>Вмешательство — 5.</b> На школьной ярмарке популярностью пользуются ягодки: спрос на них задаётся как <i>Q<sub>d</sub></i> = 120 − <i>P</i>, а предложение <i>Q<sub>s</sub></i> = 2<i>P</i>. Два школьных хулигана Арслан и Егор решили заработать денег: сначала Арслан собирает потоварный налог по ставке <i>t</i><sub>1</sub> с производителей, после чего, зная <i>t</i><sub>1</sub>, Егор собирает налог по ставке <i>t</i><sub>2</sub>. Каждый максимизирует собранные им деньги. Напишите в ответ суммарные налоговые сборы.</p>
+    <div class="pod-ans"><input class="num" id="pod-num" inputmode="decimal" placeholder="ответ числом" aria-label="Ответ числом"><button class="btn btn--main" type="button" id="pod-go">Проверить</button>
+      <button class="pod-file" type="button"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13.5 7.5l-5.6 5.6a3.5 3.5 0 0 1-5-5L9 2a2.3 2.3 0 0 1 3.3 3.3L6.6 11a1.1 1.1 0 0 1-1.6-1.6L10 4.5"/></svg>${isUser() ? 'Загрузить решение — ИИ разберёт по шагам' : 'Загрузить решение (PDF, фото) — нужен аккаунт'}</button></div>
+    <div class="pod-msg pod-msg--bad" id="pod-bad"><span><b>Не сходится.</b> Попытка <span id="pod-try">2</span> — попробуйте ещё.</span></div>
+    <div class="pod-msg pod-msg--ok" id="pod-ok"><span><b>Верно!</b> <span id="pod-ok-sub">С первой попытки.</span></span></div>
+    <div class="pod-foot">${isUser() ? '<span class="streak"><svg style="width:14px;height:14px;vertical-align:-2px;margin-right:4px" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M8 14.5c-2.8 0-4.5-1.9-4.5-4.4 0-2 1.3-3.3 2.2-4.6.3 1 .8 1.6 1.4 2 .3-2.3 1-4.3 3-5.9-.3 2 .5 3.2 1.4 4.4.9 1.1 1.5 2.2 1.5 3.9 0 2.6-2 4.6-5 4.6z"/></svg>3 дня подряд</span><span>следующая — через 8 ч</span>' : '<span>число и тесты проверяются без аккаунта</span><span>следующая — через 8 ч</span>'}<span class="grow"></span><a href="#" class="tag">открыть страницу задачи</a></div>
+  </div>`;
+}
+/* задача дня живёт в слоте над содержимым: на входе — всегда, на других экранах — по кнопке */
+function renderPodSlot(force) {
+  const slot = document.getElementById('pod-slot');
+  if (view === 'entry' || force) { slot.innerHTML = podHTML(view !== 'entry'); bindPod(); const h = document.getElementById('pod-hide'); if (h) h.addEventListener('click', () => { slot.innerHTML = ''; }); }
+  else slot.innerHTML = '';
+}
+function contHTML() {
+  if (!isUser()) return '';
+  const items = [['vm5', 'st--part', 'частично · 5 из 10', 'вчера'], ['spy', 'st--open', 'решение открыто', 'вчера'], ['kpv', 'st--hint', 'подсказка 2 из 3', 'в среду'], ['mand', 'st--part', 'частично · 3 из 10', 'на прошлой неделе']];
+  return `<section class="sec"><div class="sec-h"><h2>Продолжить</h2><span class="sub">то, что вы не дорешали</span><a href="#">Все попытки</a></div><div class="cont">${items.map(([id, cls, txt, when]) => { const pr = P[id]; return `<a class="cont-card" href="#"><span class="tchip" style="--gc: var(--blk-${TP[pr.tp].blk})">${esc(TP[pr.tp].name)}</span><span class="t">${esc(pr.t || pr.prev.slice(0, 80) + '…')}</span><span class="st ${cls}">${txt}</span><span class="when">${when}</span></a>`; }).join('')}</div></section>`;
+}
+function tracksHTML() {
+  const ol = [['Региональный этап ВсОШ 2025 · 10–11 класс', '6 задач · 240 минут · с таймером', 'macro', 2, 6], ['Муниципальный этап ВсОШ 2024 · 9 класс', '5 задач и 20 тестов · 180 минут', 'micro', 0, 25], ['Высшая проба 2025 · отборочный этап', '30 тестов · 90 минут', 'fin', 0, 30]];
+  const tp = [['Монополия и ценовая дискриминация', '12 задач с разбором · от ★★ до ★★★★★', 'micro', 5, 12], ['Эластичность', '9 задач с разбором · от простого к сложному', 'micro', 1, 9], ['Проценты, вклады и кредиты', '10 задач · считаем без ошибок', 'fin', 3, 10]];
+  const card = (k, [t, m, g, done, total]) => `<a class="trk" href="#" style="--gc: var(--blk-${g})"><span class="k">${k}</span><span class="t">${t}</span><span class="m">${m}</span>${isUser() && done ? `<span class="bar"><i style="width:${Math.round(done / total * 100)}%"></i></span><span class="row2"><span class="p">${done} из ${total}</span><span class="go">Продолжить</span></span>` : `<span class="row2"><span class="p"></span><span class="go">Начать</span></span>`}</a>`;
+  return `<section class="sec"><div class="sec-h"><h2>Дорожки</h2><span class="sub">по этапам олимпиад и по темам от простого к сложному</span><a href="#">Все 41</a></div><div class="trk-grid">${ol.map(x => card('ОЛИМПИАДА', x)).join('')}${tp.map(x => card('ТЕМА', x)).join('')}</div></section>`;
+}
+function todayHTML() {
+  return `<section class="sec"><div class="sec-h"><h2>Сегодня решают</h2><span class="sub">по попыткам и Wecon Rush за сутки</span></div><div class="rows">${['t5999', 'mono', 'perf', 'firm'].map(id => rowHTML(id, true)).join('')}</div></section>`;
+}
+function renderEntry() { document.getElementById('v-entry').innerHTML = contHTML() + tracksHTML() + todayHTML(); }
+
+/* ── Строка задачи 72 px ───────────────────────────────────────────── */
+function rowHTML(id, withTopic) {
+  const pr = P[id], t = TP[pr.tp];
+  const title = pr.t ? `<div class="pr-t">${esc(pr.t)}</div>` : `<div class="pr-t is-stm">${esc(pr.prev.slice(0, 90))}…</div>`;
+  const side = [];
+  if (withTopic) side.push(`<span class="tchip" style="--gc: var(--blk-${t.blk})">${esc(t.name)}</span>`);
+  const l2 = [];
+  l2.push(`<span class="ct-kind">${pr.kind ? pr.kind : (pr.num ? 'ответ числом' : 'проверка ИИ')}</span>`);
+  if (pr.stars) l2.push(`<span class="ct-stars">${'★'.repeat(pr.stars)}${'☆'.repeat(5 - pr.stars)}</span>`); else l2.push(`<span>решили ${fmt(pr.solved)}</span>`);
+  if (pr.sol) l2.push(`<span class="ct-sol">решение ✓</span>`);
+  side.push(`<span class="l2">${l2.join('')}</span>`);
+  return `<a class="pr" href="#">${isUser() ? stGlyph(pr.st) : '<span></span>'}<div class="pr-body">${title}<div class="pr-p">${esc(pr.prev)}</div></div><div class="pr-side">${side.join('')}</div><div class="pr-tools"><button class="tool" type="button"><svg style="width:13px;height:13px;vertical-align:-2px;margin-right:4px" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" aria-hidden="true"><path d="M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="2"/></svg>Условие</button><button class="tool" type="button">+ В домашку</button></div></a>`;
+}
+
+/* ── Тема ───────────────────────────────────────────────────────────── */
+function renderTopic() {
+  const t = TP[topicN], level = isUser() ? (LEVEL[topicN] || 'none') : null;
+  const tags = ['ценовая дискриминация третьей степени', 'двухчастный тариф', 'оптимум монополиста: MR = MC', 'потери от монополии', 'естественная монополия', 'дискриминация первой степени', 'регулирование монополии', 'индекс Лернера'];
+  const ids = ['mono', 'perf', 'vm5', 'firm', 'groups', 't5999', 'town', 'mand'];
+  const counts = { all: 97, none: 71, part: 9, ok: 14, open: 3 };
+  const filt = ids.filter(id => statusF === 'all' || (statusF === 'part' ? ['part', 'hint'].includes(P[id].st) : P[id].st === statusF));
+  document.getElementById('v-topic').innerHTML = `
+  <div class="th" style="--gc: var(--blk-${t.blk})"><div class="th-top"><div><h1>${esc(t.name)}</h1><div class="meta">${fmt(t.c)} задач · 41 с разбором · 18 тегов · Микроэкономика</div>
+    ${level ? `<div class="lvl">${lv(level)}<span>Ваш уровень: <b>${LEVEL_T[level]}</b> · решено 14 из 97 · верно 82 %</span></div>` : ''}</div>
+</div>
+    <div class="th-acts"><button class="btn btn--main" type="button">Начать: 5 задач подряд</button><button class="btn btn--quiet" type="button">Случайная нерешённая</button></div>
+    <div class="th-tags">${tags.map(x => `<a class="tag" href="#">${x}</a>`).join('')}<a class="tag more" href="#">ещё 10</a></div></div>
+  <div class="tb">${isUser() ? `<div class="seg" role="group"><button type="button" data-st="all" aria-pressed="${statusF === 'all'}">Все <span class="n">${counts.all}</span></button><button type="button" data-st="none" aria-pressed="${statusF === 'none'}">Не решал <span class="n">${counts.none}</span></button><button type="button" data-st="part" aria-pressed="${statusF === 'part'}">Пробовал <span class="n">${counts.part}</span></button><button type="button" data-st="ok" aria-pressed="${statusF === 'ok'}">Решено <span class="n">${counts.ok}</span></button></div>` : `<span class="cnt"><b>97</b> задач</span>`}
+    <span class="sort">порядок: <b>от простого к сложному</b></span></div>
+  <div class="rows">${filt.map(id => rowHTML(id, false)).join('')}</div>
+  <div class="res-more"><a class="btn ct-btn--go" href="#">Показать ещё 20</a><small>показано ${filt.length} из ${counts[statusF === 'part' ? 'part' : statusF] ?? counts.all}</small></div>`;
+}
+
+/* ── Поиск ──────────────────────────────────────────────────────────── */
+function renderSearch() {
+  document.getElementById('strip').innerHTML = `<span class="chip chip--g" style="--gc: var(--blk-micro)">Монополия и ценовая дискриминация<button class="chip-x" type="button" aria-label="Снять фильтр">✕</button></span>`;
+  document.getElementById('btn-all-n').textContent = '1';
+  document.getElementById('v-search').innerHTML = `<div class="tb"><span class="cnt">Похожих задач: не меньше <b>40</b> <span style="color:var(--text2)">· из 97 по теме</span></span><span class="sort">порядок: <b>по близости к запросу</b></span></div>
+    <div class="rows">${['vm5', 'firm', 'groups', 'mono', 'perf', 'town', 'spy', 'mand'].map(id => rowHTML(id, true)).join('')}</div><div class="res-more"><a class="btn ct-btn--go" href="#">Показать ещё 20</a><small>показано 8 из 97</small></div>`;
+}
+
+/* ── Переключение экранов ──────────────────────────────────────────── */
+const q = document.getElementById('ct-q'), ask = document.getElementById('ask');
+function setView(v) {
+  view = v;
+  ['entry', 'topic', 'search'].forEach(k => document.getElementById('v-' + k).classList.toggle('hidden', k !== v));
+  if (v !== 'search') { document.getElementById('strip').innerHTML = ''; document.getElementById('btn-all-n').textContent = ''; if (v === 'entry') q.value = ''; }
+  renderEntry(); renderTopic(); if (v === 'search') { if (!q.value.trim()) q.value = 'монополист с линейным спросом'; renderSearch(); }
+  renderPodSlot(false);
+  renderTree(); syncAsk();
+  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('is-on', b.dataset.view === v));
+  window.scrollTo({ top: 0 });
+}
+function setRole(r) { role = r; document.body.className = 'role-' + r; document.getElementById('nav-user').textContent = r === 'guest' ? 'Войти' : r === 'teacher' ? 'Марина Петрова' : 'Пётр Иванов'; setView(view);
+  document.querySelectorAll('[data-role]').forEach(b => b.classList.toggle('is-on', b.dataset.role === r)); }
+document.addEventListener('click', e => {
+  const tn = e.target.closest('[data-topic]'); if (tn) { topicN = +tn.dataset.topic; statusF = 'all'; setView('topic'); return; }
+  const bh = e.target.closest('[data-blk]'); if (bh) { const b = bh.closest('.tb-block'); b.classList.toggle('is-open'); bh.setAttribute('aria-expanded', b.classList.contains('is-open')); return; }
+  const st = e.target.closest('[data-st]'); if (st) { statusF = st.dataset.st; renderTopic(); return; }
+  const x = e.target.closest('.chip-x'); if (x) { setView('entry'); }
+});
+document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => setView(b.dataset.view)));
+document.getElementById('btn-pod').addEventListener('click', () => { renderPodSlot(true); document.getElementById('pod').scrollIntoView({ block: 'start', behavior: 'smooth' }); });
+document.querySelectorAll('[data-role]').forEach(b => b.addEventListener('click', () => setRole(b.dataset.role)));
+document.getElementById('mk-theme').addEventListener('click', e => { const dark = document.documentElement.getAttribute('data-theme') !== 'dark'; document.documentElement.setAttribute('data-theme', dark ? 'dark' : ''); e.target.textContent = dark ? 'Светлая тема' : 'Тёмная тема'; });
+
+/* поле поиска */
+function syncAsk() { ask.classList.toggle('has-text', q.value.trim().length > 0); }
+q.addEventListener('input', syncAsk);
+q.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (q.value.trim()) setView('search'); } });
+document.getElementById('ask-clear').addEventListener('click', () => { q.value = ''; syncAsk(); setView('entry'); q.focus(); });
+document.getElementById('ask-go').addEventListener('click', () => { if (q.value.trim()) setView('search'); });
+
+/* задача дня: проверка числом (демо: правильный ответ 1800, допуск 0,5 %) */
+function bindPod() {
+  const go = document.getElementById('pod-go'); if (!go) return;
+  let tries = 0;
+  const num = document.getElementById('pod-num'), ok = document.getElementById('pod-ok'), bad = document.getElementById('pod-bad');
+  const check = () => {
+    const v = parseFloat(num.value.replace(/\s/g, '').replace(',', '.')); if (isNaN(v)) { num.focus(); return; }
+    tries++; num.classList.remove('is-ok', 'is-bad'); void num.offsetWidth;
+    if (Math.abs(v - 1800) <= 1800 * 0.005) { num.classList.add('is-ok'); bad.classList.remove('is-on'); ok.classList.add('is-on'); document.getElementById('pod-ok-sub').textContent = tries === 1 ? 'С первой попытки — это идёт в уровень темы.' : `С ${tries}-й попытки — засчитано как «решено».`; go.disabled = true; num.disabled = true; }
+    else { num.classList.add('is-bad'); ok.classList.remove('is-on'); bad.classList.add('is-on'); document.getElementById('pod-try').textContent = String(tries + 1); num.select(); }
+  };
+  go.addEventListener('click', check);
+  num.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
+}
+/* карта (имитация) */
+(function () { const svg = document.getElementById('mk-map'); const G = ['micro','macro','fin','math','other']; let seed = 5; const rnd = () => (seed = (seed * 9301 + 49297) % 233280) / 233280;
+  const W = 264, H = 140, hubs = G.map((g, i) => ({ x: W / 2 + 76 * Math.cos(i / 5 * 6.283), y: H / 2 + 40 * Math.sin(i / 5 * 6.283), g })); let out = '';
+  hubs.forEach(h => { for (let k = 0; k < 12; k++) { const a = rnd() * 6.283, r = 10 + rnd() * 26, x = h.x + r * Math.cos(a), y = h.y + r * Math.sin(a) * .75; out += `<line x1="${h.x}" y1="${h.y}" x2="${x}" y2="${y}" stroke="var(--blk-${h.g})" stroke-opacity=".45" stroke-width=".7"/><circle cx="${x}" cy="${y}" r="${1.4 + rnd() * 1.6}" fill="var(--blk-${h.g})" fill-opacity=".85"/>`; } });
+  hubs.forEach((h, i) => { const n = hubs[(i + 1) % 5]; out += `<line x1="${h.x}" y1="${h.y}" x2="${n.x}" y2="${n.y}" stroke="var(--text3)" stroke-opacity=".25" stroke-width=".6"/>`; });
+  hubs.forEach(h => { out += `<circle cx="${h.x}" cy="${h.y}" r="4.6" fill="var(--blk-${h.g})"/>`; }); svg.innerHTML = out; })();
+
+/* бегущая подсказка */
+(function () { const el = q; if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const PH = ['задачи на ценовую дискриминацию 3 степени с двумя группами', 'что-то про сложение спроса, типа два покупателя и надо найти равновесие', 'монополист с постоянными издержками и линейным спросом', 'тест на инфляцию для 9 класса, не сложный', 'Смотри, мне нужен кач про Канье Веста', 'задачки на сложные проценты и вклады'];
+  const SL = { 'а':'в','в':'а','о':'л','л':'о','и':'т','т':'и','е':'к','к':'е','с':'ч','ч':'с','н':'г','г':'н','р':'п','п':'р' };
+  let timer = null, stopped = false, i = 0, ph = 0; const sch = (fn, ms) => { if (!stopped) timer = setTimeout(fn, ms); };
+  const stop = () => { if (stopped) return; stopped = true; clearTimeout(timer); el.placeholder = 'Опишите задачу своими словами'; };
+  ['pointerdown', 'keydown', 'paste', 'input'].forEach(ev => el.addEventListener(ev, stop));
+  function type() { const full = PH[ph]; let slip = false; (function step() { if (i >= full.length) return sch(erase, 1700); const ch = full[i], w = SL[ch.toLowerCase()];
+    if (!slip && w && i > 2 && Math.random() < .11) { slip = true; el.placeholder = full.slice(0, i) + w; return sch(() => { el.placeholder = full.slice(0, i); sch(() => { el.placeholder = full.slice(0, ++i); sch(step, 58); }, 100); }, 200); }
+    el.placeholder = full.slice(0, ++i); sch(step, 45 + Math.random() * 30); })(); }
+  function erase() { const full = PH[ph]; (function back() { if (i <= 0) { ph = (ph + 1) % PH.length; return sch(type, 380); } el.placeholder = full.slice(0, --i); sch(back, 22); })(); }
+  i = PH[0].length; sch(erase, 1700); })();
+
+setRole('student');
+</script>
+</body>
+</html>

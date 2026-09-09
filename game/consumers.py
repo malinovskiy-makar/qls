@@ -121,13 +121,21 @@ class DuelConsumer(AsyncWebsocketConsumer):
         # а дубль на экране мигал бы.
         if event.get('user_id') == self.user_id:
             return
+        # ⚠️ Поля перечисляются ПОИМЁННО, а не пробрасываются словарём:
+        # белый список держит протокол видимым и не даёт внутреннему полю
+        # состояния уехать в браузер соперника.
         await self.send(text_data=json.dumps({
             'type': 'score', 'user_id': event['user_id'],
             'username': event.get('username', ''),
             'score': event.get('score', 0),
             'correct': event.get('correct', 0),
+            'wrong': event.get('wrong', 0),
+            'skipped': event.get('skipped', 0),
             'lives': event.get('lives', 0),
             'seconds_left': event.get('seconds_left'),
+            'at': event.get('at'),
+            'number': event.get('number', 0),
+            'combo': event.get('combo', 1),
         }, ensure_ascii=False))
 
     async def duel_emoji(self, event):
@@ -147,6 +155,13 @@ class DuelConsumer(AsyncWebsocketConsumer):
             'username': event.get('username', ''),
             'score': event.get('score', 0),
             'correct': event.get('correct', 0),
+            'wrong': event.get('wrong', 0),
+            'skipped': event.get('skipped', 0),
+            'lives': event.get('lives', 0),
+            'seconds_left': event.get('seconds_left'),
+            'at': event.get('at'),
+            'number': event.get('number', 0),
+            'combo': event.get('combo', 1),
         }, ensure_ascii=False))
 
     # ------------------------------------------------------------ помощь
@@ -223,14 +238,23 @@ class DuelConsumer(AsyncWebsocketConsumer):
                 continue
             name = User.objects.filter(pk=uid).values_list(
                 'username', flat=True).first() or ''
+            log = live.get('log', [])
+            # ⚠️ ТЕ ЖЕ ПОЛЯ И ТЕ ЖЕ ФОРМУЛЫ, ЧТО У ЖИВОГО СОБЫТИЯ. Табло
+            # после обрыва обязано выглядеть так же, как до него: иначе
+            # переподключение показывало бы другую игру.
             return {
                 'user_id': uid,
                 'username': name,
                 'score': live.get('score', 0),
-                'correct': sum(1 for r in live.get('log', [])
+                'correct': sum(1 for r in log
                                if r.get('outcome') == 'correct'),
+                'wrong': sum(1 for r in log if r.get('outcome') == 'wrong'),
+                'skipped': sum(1 for r in log if r.get('outcome') == 'skip'),
                 'lives': live.get('lives', 0),
-                'seconds_left': None,
+                'seconds_left': seconds_left_for(live),
+                'at': time.time(),
+                'number': len(log),
+                'combo': config.combo_multiplier(live.get('streak', 0)),
             }
 
         gset = GameSet.objects.filter(code=self.code, kind='duel').first()
@@ -242,13 +266,21 @@ class DuelConsumer(AsyncWebsocketConsumer):
                  .select_related('user').order_by('-created_at').first())
         if rival is None:
             return None
+        # Забег кончился: времени ноль, жизней ноль — это не «нет данных»,
+        # а известное состояние.
         return {
             'user_id': rival.user_id,
             'username': rival.user.get_username(),
             'score': rival.score,
             'correct': rival.correct_count,
+            'wrong': rival.wrong_count,
+            'skipped': rival.skip_count,
             'lives': 0,
             'seconds_left': 0,
+            'at': time.time(),
+            'number': rival.correct_count + rival.wrong_count
+            + rival.skip_count,
+            'combo': 1,
         }
 
 
@@ -263,21 +295,60 @@ async def health(scope, receive, send):
     await send({'type': 'http.response.body', 'body': b'ws ok'})
 
 
+def seconds_left_for(state):
+    u"""Сколько времени осталось у забега по СЕРВЕРНЫМ часам.
+
+    ⚠️ КЛИЕНТСКИЙ ТАЙМЕР СЮДА НЕ ПУСКАЕМ. Он приходит из браузера игрока и
+    подделывается из консоли; на табло соперника это означало бы «у него
+    ещё минута», когда у него секунда. Считаем тем же способом, каким
+    `_rank_run` ловит забег на паузе: стартовый запас плюс набранная
+    прибавка минус прошедшее время.
+
+    None означает «сказать нечего» (забег без отметки старта или режим
+    исчез из конфига) — и это честнее нуля: ноль на табло читается как
+    «время вышло».
+    """
+    mode = config.MODES.get(state.get('mode')) or {}
+    started = state.get('started_at')
+    if not started or not mode:
+        return None
+    spent = time.time() - started
+    left = mode['duration'] + state.get('bonus_total', 0) - spent
+    return max(0, int(left))
+
+
 def duel_score_event(state, user, seconds_left=None):
     u"""Событие табло из состояния забега. Зовётся из api_answer.
 
     Считает ЗДЕСЬ, а не во вьюхе, чтобы поле «верных» у табло и у сводки
     считалось одной формулой: два счётчика одного и того же разъезжаются.
+    По той же причине здесь же считаются «мимо» и «пропуски» — теми же
+    формулами, что в `build_summary`, а не вторыми счётчиками.
+
+    ⚠️ `seconds_left` считается СЕРВЕРОМ и аргументом больше не
+    перебивается без нужды: аргумент оставлен для вызовов, у которых своё
+    значение есть (готовый результат — там уже ноль).
     """
+    log = state.get('log', [])
+    if seconds_left is None:
+        seconds_left = seconds_left_for(state)
     return {
         'type': 'duel.score',
         'user_id': user.id if user and user.is_authenticated else None,
         'username': user.get_username() if user
         and user.is_authenticated else '',
         'score': state.get('score', 0),
-        'correct': sum(1 for r in state.get('log', [])
-                       if r.get('outcome') == 'correct'),
+        'correct': sum(1 for r in log if r.get('outcome') == 'correct'),
+        'wrong': sum(1 for r in log if r.get('outcome') == 'wrong'),
+        'skipped': sum(1 for r in log if r.get('outcome') == 'skip'),
         'lives': state.get('lives', config.MODES.get(
             state.get('mode'), {}).get('lives', 0)),
         'seconds_left': seconds_left,
+        # ⚠️ СЕРВЕРНАЯ МЕТКА МОМЕНТА. Событие приходит только на ответ
+        # соперника: думает он полминуты — все его числа стоят, а время у
+        # него на самом деле идёт. По этой метке клиент продолжает отсчёт
+        # сам, между событиями.
+        'at': time.time(),
+        'number': len(log),
+        'combo': config.combo_multiplier(state.get('streak', 0)),
     }

@@ -11,6 +11,7 @@ game.html и считает ими, а не копией — копия разъ
 кодом при первой правке порога.
 """
 import io
+import re
 import os
 import shutil
 import subprocess
@@ -26,6 +27,37 @@ SOUND = 'game/static/game/sound.js'
 
 def read(path):
     return io.open(path, encoding='utf-8').read()
+
+
+def no_comments(text):
+    u"""Текст без комментариев JS.
+
+    ⚠️ БЕЗ ЭТОГО ПРОВЕРКИ ОБМАНЫВАЕТ СОБСТВЕННЫЙ КОММЕНТАРИЙ. Поймано на
+    фазе 14: убрали вызов `wake()` из `thump()`, а тест остался зелёным —
+    строку `wake()` он нашёл в комментарии над убранным вызовом. Тест,
+    который не краснеет, — это не тест.
+    """
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    return re.sub(r'//[^\n]*', ' ', text)
+
+
+def body_of(src, header):
+    u"""Тело функции или блока от `header` до парной закрывающей скобки.
+
+    Нужно именно тело, а не «где-то в файле»: вызов `clearAlarm()` рядом с
+    `endRun`, но не внутри него, дефект не чинит.
+    """
+    start = src.index(header) + len(header)   # header кончается на `{`
+    depth = 1
+    i = start
+    while depth:
+        ch = src[i]
+        if ch == '{':
+            depth += 1
+        elif ch == '}':
+            depth -= 1
+        i += 1
+    return src[start:i]
 
 
 class AlarmArithmeticTest(SimpleTestCase):
@@ -115,6 +147,92 @@ class SoundModuleTests(SimpleTestCase):
         self.assertIn('master.gain.value = 0.18;', read(SOUND))
 
 
+class SoundSurvivesSleepAndDeviceChangeTests(SimpleTestCase):
+    u"""Звук перестаёт пропадать (08.09.2026).
+
+    ⚠️ ПРИЧИНА ОДНОЙ НЕ НАЗЫВАЕТСЯ. Владелец видел пропажу звука на
+    Windows; воспроизвести её на разборе не удалось, и утверждать «дело
+    было в этом» нечестно. Известны ТРИ механизма, и все три лечатся одним
+    приёмом — самовосстановлением контекста:
+
+    1. Chrome на Windows усыпляет AudioContext при уходе со вкладки, и
+       state становится `suspended`.
+    2. resume() звала только tone(), а сердцебиение (thump) — нет: после
+       сна пульс молчал, хотя ноты играли.
+    3. Смена устройства вывода (воткнули наушники) оставляет контекст в
+       состоянии `running`, но звука в нём больше нет; лечится только
+       пересозданием.
+
+    Проверяется наличие всех трёх лечений: закрытый контекст, спящий
+    контекст, неподвижные часы.
+    """
+
+    def setUp(self):
+        self.src = read(SOUND)
+
+    def test_wake_exists_and_resumes(self):
+        self.assertIn('function wake() {', self.src)
+        body = no_comments(body_of(self.src, 'function wake() {'))
+        self.assertIn("c.state !== 'running'", body)
+        self.assertIn('c.resume()', body)
+
+    def test_tone_thump_and_heartbeat_all_wake_first(self):
+        u"""Механизм 2: раньше будила только tone(), и пульс молчал.
+
+        ⚠️ Комментарии вырезаются: рядом с вызовом стоит объяснение, в
+        котором тоже написано `wake()`, и без чистки проверка находила бы
+        его вместо вызова (поймано мутацией на фазе 14).
+        """
+        for header in ('function tone(opts) {',
+                       'function thump(t0, vol) {'):
+            body = no_comments(body_of(self.src, header))
+            self.assertIn('= wake();', body, header)
+            self.assertNotIn('var c = ctx;', body, header)
+        # heartbeat.start — метод объекта, не функция
+        start = no_comments(self.src.split('start: function (bpm) {', 1)[1]
+                            .split('},', 1)[0])
+        self.assertIn('wake();', start)
+        self.assertNotIn('audio();', start)
+
+    def test_closed_context_is_recreated(self):
+        u"""Механизм 1 (крайний случай): закрытый контекст — не живой объект."""
+        body = no_comments(body_of(self.src, 'function audio() {'))
+        self.assertIn("ctx.state === 'closed'", body)
+        self.assertIn('ctx = null; master = null;', body)
+
+    def test_a_stopped_clock_counts_as_a_dead_context(self):
+        u"""Механизм 3: running, а currentTime стоит — контекст мёртв."""
+        body = no_comments(body_of(self.src, 'function watchClock(replay) {'))
+        self.assertIn('c.currentTime !== was', body)
+        self.assertIn("c.state !== 'running'", body)
+        self.assertIn('respawn()', body)
+
+    def test_the_retry_happens_exactly_once(self):
+        u"""⚠️ Бесконечная цепочка пересозданий хуже тишины."""
+        body = no_comments(body_of(self.src, 'function watchClock(replay) {'))
+        self.assertIn('if (clock.retried) return;', body)
+        self.assertIn('clock.retried = true;', body)
+        # И снимается, как только часы пошли: вторая смена наушников за
+        # сессию тоже должна лечиться.
+        self.assertIn('clock.retried = false;', body)
+
+    def test_respawn_reschedules_the_heartbeat(self):
+        u"""Часы нового контекста идут с нуля — иначе пульс замолчал бы."""
+        body = no_comments(body_of(self.src, 'function respawn() {'))
+        self.assertIn('hb.next = hbNow() + 0.05;', body)
+
+    def test_returning_to_the_tab_wakes_the_sound(self):
+        self.assertIn("addEventListener('visibilitychange'", self.src)
+        self.assertEqual(self.src.count("'visibilitychange'"), 1)
+
+    def test_nothing_here_can_break_the_game(self):
+        u"""Весь новый код — под try/catch, как beatApi и rush() на странице."""
+        for header in ('function wake() {',
+                       'function respawn() {',
+                       'function watchClock(replay) {'):
+            self.assertIn('try {', body_of(self.src, header), header)
+
+
 class AlarmPaintTests(TestCase):
     u"""2.1, 2.3 Виньетка, таймер и полоса."""
 
@@ -183,3 +301,61 @@ class AlarmPaintTests(TestCase):
         u"""Ключ хранения звука — тот же, что был на ветке: переименование
         игры не должно сбрасывать выбор игроков."""
         self.assertIn("var KEY = 'econ_rush_sound';", read(SOUND))
+
+
+class AlarmIsClearedOnRunEndTests(SimpleTestCase):
+    u"""Красная кайма не переживает забег (08.09.2026).
+
+    ⚠️ ЧТО БЫЛО. Класс `alarm` вешает на `#vignette` только `paintAlarm()`,
+    а её зовёт игровой цикл. После `show('finished')` цикл кончается, и
+    снять класс становится некому — а `#vignette` лежит `fixed; inset: 0`
+    поверх всего. Кайма переживала экран результата и возвращалась на
+    стартовый: игра живёт в одной странице на три экрана.
+
+    Дефект был виден не всегда: если забег кончался, когда времени было
+    много, последний `paintAlarm()` успевал снять класс сам. Красным он
+    оставался, только когда забег кончался В КРАСНОЙ ЗОНЕ — последние 10 %
+    запаса режима или последняя жизнь. Отсюда «после некоторых партий».
+    """
+
+    def setUp(self):
+        self.src = read(PAGE)
+
+    def test_clear_alarm_is_defined_once_and_actually_clears(self):
+        # ⚠️ Комментарии вырезаются везде в этом классе: рядом с вызовами
+        # стоят объяснения, и без чистки проверка могла бы найти имя
+        # функции в тексте про неё, а не сам вызов.
+        self.assertEqual(self.src.count('function clearAlarm('), 1)
+        body = no_comments(body_of(self.src, 'function clearAlarm() {'))
+        self.assertIn("classList.remove('alarm'", body)
+        self.assertIn('--alarm', body)
+        self.assertIn('alarmOn = false;', body)
+        self.assertIn("beatApi('stop')", body)
+
+    def test_end_of_run_clears_it(self):
+        body = no_comments(body_of(self.src, 'function endRun(reason) {'))
+        self.assertIn('clearAlarm(', body)
+        # ⚠️ Прежний голый `beatApi('stop')` из endRun убран: он теперь
+        # внутри clearAlarm. Два места, гасящие звук, разъедутся.
+        self.assertNotIn("beatApi('stop')", body)
+
+    def test_quitting_mid_run_clears_it(self):
+        u"""Кнопка выхода `btn-quit`.
+
+        ⚠️ Вызов стоит в `quitRun`, а не в `openQuit`: `btn-quit` только
+        открывает окно подтверждения, а забег за ним ПРОДОЛЖАЕТСЯ, и снятая
+        там кайма вернулась бы следующим же кадром. Бросают забег в
+        `quitRun` — туда вызов и поставлен.
+        """
+        self.assertIn("$('btn-quit').addEventListener('click', openQuit);",
+                      self.src)
+        self.assertIn('clearAlarm(', no_comments(body_of(self.src, 'function quitRun() {')))
+
+    def test_a_new_run_starts_clean(self):
+        self.assertIn('clearAlarm(', no_comments(body_of(self.src, 'function startRun(opts) {')))
+
+    def test_three_call_sites_at_least(self):
+        u"""Числовой инвариант: определение одно, вызовов не меньше трёх."""
+        self.assertEqual(self.src.count('function clearAlarm('), 1)
+        calls = self.src.count('clearAlarm(') - 1   # минус само определение
+        self.assertGreaterEqual(calls, 3, calls)

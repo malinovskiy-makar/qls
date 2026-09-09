@@ -257,3 +257,69 @@ class CounterIsRedTests(TestCase):
         body = self.client.get('/teacher/groups/%d/' % group.pk
                                ).content.decode()
         self.assertNotIn('class="k-count">0<', body)
+
+
+class ProfileTabsDoNotJumpTests(TestCase):
+    """Полоса вкладок стоит на одном месте на всех четырёх вкладках.
+
+    ⚠️ ЧТО БЫЛО. `profile.html` шёл в порядке «шапка → вкладки», а
+    `stats.html` начинался прямо с вкладок: заголовок «Это ваша статистика.»
+    стоял ПОД ними. Полоса на «Статистике» оказывалась выше ровно на высоту
+    `page-header`, и при переходе между вкладками перелетала на другое место.
+
+    Проверяется ПОРЯДОК В РАЗМЕТКЕ, а не высота в пикселях: пиксели требуют
+    браузера, а причина прыжка — именно порядок. Плюс два условия, без
+    которых порядок ничего не гарантирует: заголовок на странице один и
+    текст у него всюду одинаковый (другой текст — другая высота).
+    """
+
+    PAGES = ('/profile/?tab=data', '/profile/?tab=security',
+             '/profile/?tab=saved', '/profile/stats/')
+
+    def setUp(self):
+        self.user = make_student('tabs_student')
+        self.client.force_login(self.user)
+        cache.clear()
+
+    def _html(self, url):
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200, url)
+        return response.content.decode('utf-8')
+
+    def test_header_stands_above_the_tabs_on_all_four(self):
+        """Числовой инвариант фазы: 4 из 4."""
+        good = 0
+        for url in self.PAGES:
+            html = self._html(url)
+            header = html.find('class="page-header"')
+            tabs = html.find('<nav class="tabs">')
+            self.assertNotEqual(header, -1, url)
+            self.assertNotEqual(tabs, -1, url)
+            if header < tabs:
+                good += 1
+        self.assertEqual(good, 4)
+
+    def test_exactly_one_h1_on_every_page(self):
+        for url in self.PAGES:
+            self.assertEqual(self._html(url).count('<h1'), 1, url)
+
+    def test_the_h1_text_is_the_same_everywhere(self):
+        titles = set()
+        for url in self.PAGES:
+            found = re.findall(r'<h1[^>]*>(.*?)</h1>', self._html(url), re.S)
+            self.assertEqual(len(found), 1, url)
+            titles.add(found[0].strip())
+        self.assertEqual(titles, {'Профиль'}, titles)
+
+    def test_stats_header_survives_a_missing_profile(self):
+        """Профиля может не быть вовсе — шапка обязана собраться из логина.
+
+        ⚠️ И НЕ СОЗДАТЬ ПРОФИЛЬ ПО ДОРОГЕ: `/profile/stats/` — чтение, а
+        `get_or_create` на GET завёл бы строку в базе от одного просмотра.
+        """
+        from problems.models import UserProfile
+        UserProfile.objects.filter(user=self.user).delete()
+        html = self._html('/profile/stats/')
+        self.assertIn('class="page-header"', html)
+        self.assertIn('tabs_student', html)
+        self.assertFalse(UserProfile.objects.filter(user=self.user).exists())

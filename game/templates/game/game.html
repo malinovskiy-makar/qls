@@ -77,6 +77,42 @@ a:focus-visible, button:focus-visible {
   outline-offset: 2px;
 }
 
+/* ⚠️ ССЫЛКИ ВНУТРИ ИГРЫ КРАСИМ ЯВНО. Страница игры — самостоятельный
+   шаблон, а не наследник базового: правил для <a> на ней не было вовсе, и
+   браузер красил их системным синим. Он не из палитры и на графите
+   выглядит чужим — владелец принял это за «странные синие кнопки».
+   ⚠️ ПРАВИЛО ЗАВЁРНУТО В :where() РАДИ НУЛЕВОЙ ВЕСОМОСТИ. Без обёртки
+   `.rush-wrap a` (0,1,1) перебил бы `.set-back`, `.btn-board` и `.btn-copy`
+   (0,1,0) — четыре ссылки, у которых свой цвет есть и он осмысленный,
+   перекрасились бы заодно. Здесь нужен ИМЕННО запасной цвет: он берёт
+   только те ссылки, которым цвет не назначен нигде. */
+:where(.rush-wrap a) { color: var(--rush-accent); text-decoration: none; }
+:where(.rush-wrap a:hover) { text-decoration: underline; }
+
+/* ⚠️ ПОЛЯ ВВОДА — СВОЙ ФОКУС, ИНАЧЕ ЕГО РИСУЕТ БРАУЗЕР. У `#code-input` и
+   `#duel-link` правила `:focus` не было, и Safari обводил их своей синей
+   рамкой. Цвет тот же, что у остальных полей страницы (`.num-input`,
+   `.tag-search`), — нового не заводим. */
+.code-form input:focus,
+.code-form input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 1px;
+  border-color: var(--rush-accent);
+}
+.duel-lobby__row input:focus,
+.duel-lobby__row input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 1px;
+  border-color: var(--rush-accent);
+}
+/* Флажки и переключатели окна фильтров: их рисует система, и системная
+   обводка тоже синяя. Модальное окно лежит ВНЕ `.rush-wrap`, поэтому
+   селектор свой. */
+.fmodal input:focus-visible {
+  outline: 2px solid var(--rush-accent);
+  outline-offset: 2px;
+}
+
 .rush-wrap {
   max-width: 880px;
   margin: 0 auto;
@@ -538,6 +574,51 @@ a:focus-visible, button:focus-visible {
 }
 .fclear:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 
+/* ── Окно «Бросить вызов» ────────────────────────────────────────────
+   ⚠️ УСТРОЕНО КАК ОКНО ФИЛЬТРОВ И ЖИВЁТ РЯДОМ С НИМ: тот же класс
+   `.fmodal`, тот же способ показа, та же клавиша Esc, тот же возврат
+   фокуса. Своего механизма окон в игре не заводим — второй разъехался бы
+   с первым при первой правке.
+   ⚠️ В РАЗМЕТКЕ СТОИТ ПЕРЕД `#fmodal`: у обоих z-index 60, и окно
+   фильтров, открытое ПОВЕРХ вызова, обязано быть сверху. Решает порядок
+   в документе. */
+/* Шаг — одна колонка: сетка `.fmodal-body` в две колонки нужна
+   только списку фильтров. */
+.dm-step { display: block; }
+.dm-step[hidden] { display: none; }
+.dm-lead { margin: 0 0 14px; font-size: 14.5px; line-height: 1.5;
+           color: var(--text2); }
+.dm-modes { display: grid; gap: 10px; margin-bottom: 14px;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+.dm-mode {
+  font: inherit; text-align: left; cursor: pointer;
+  padding: 12px 14px; border-radius: 12px;
+  border: 1px solid var(--rush-border);
+  background: var(--rush-surface); color: var(--text);
+}
+.dm-mode:hover { border-color: var(--rush-accent); }
+.dm-mode[aria-pressed="true"] {
+  border-color: var(--rush-accent);
+  box-shadow: 0 0 0 1px var(--rush-accent) inset;
+}
+.dm-mode b { display: block; font-size: 15px; font-weight: 600; }
+.dm-mode small { display: block; margin-top: 4px; font-size: 12.5px;
+                 color: var(--text3); font-variant-numeric: tabular-nums; }
+.dm-mode small.low { color: var(--rush-bad); }
+.dm-summary { margin: 12px 0 0; font-size: 13.5px; color: var(--text2); }
+.dm-state { margin: 10px 0 0; font-size: 14px; color: var(--text2);
+            display: flex; align-items: center; gap: 8px; }
+.dm-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: var(--rush-accent);
+  animation: dmPulse 1.4s ease-in-out infinite;
+}
+.dm-state.is-here .dm-dot { animation: none; }
+@keyframes dmPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .dm-dot { animation: none; } }
+.dm-count { margin: 0; font-size: 13.5px; color: var(--text2);
+            font-variant-numeric: tabular-nums; }
+
 /* Число доступных вопросов на карточке режима + выключенная карточка. */
 .mode-avail { margin-top: 4px; font-size: 13px; color: var(--text3);
               font-variant-numeric: tabular-nums; }
@@ -733,7 +814,7 @@ a:focus-visible, button:focus-visible {
 .code-form button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .records-box {
   margin-top: 12px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   border: 1px solid var(--rush-border);
   border-radius: 12px;
   background: var(--rush-surface);
@@ -745,6 +826,45 @@ a:focus-visible, button:focus-visible {
   padding: 3px 0; color: var(--text2);
 }
 .records-box .rec-row b { color: var(--rush-accent); font-variant-numeric: tabular-nums; }
+
+/* ── Панель «Мои рекорды» (08.09.2026) ──────────────────────────────
+   Было четыре строки из localStorage, стало развёрнутое место на
+   серверных данных. Все числа — из `GameResult`, новых таблиц нет. */
+.rec-modes { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.rec-modes button {
+  font: inherit; font-size: 13px; padding: 5px 11px; cursor: pointer;
+  border: 1px solid var(--rush-border); border-radius: 999px;
+  background: transparent; color: var(--text2);
+}
+.rec-modes button:hover { border-color: var(--rush-accent); }
+.rec-modes button[aria-pressed="true"] {
+  border-color: var(--rush-accent); color: var(--rush-accent); font-weight: 600;
+}
+.rec-metrics {
+  display: grid; gap: 10px; margin-bottom: 14px;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+}
+.rec-metric { padding: 10px 12px; border-radius: 10px;
+              background: var(--rush-bg); }
+.rec-metric small { display: block; font-size: 12px; color: var(--text3); }
+.rec-metric b { display: block; font-size: 19px; font-weight: 700;
+                font-variant-numeric: tabular-nums; }
+.rec-metric i { font-style: normal; font-size: 12px; color: var(--text3); }
+.rec-block { margin-top: 14px; }
+.rec-block h4 { font-size: 13px; font-weight: 700; margin-bottom: 8px; }
+.rec-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.rec-table th, .rec-table td { text-align: left; padding: 4px 8px 4px 0;
+                               color: var(--text2); }
+.rec-table th { color: var(--text3); font-weight: 500; }
+.rec-table td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.rec-note { font-size: 13px; color: var(--text3); }
+/* Активность за 30 дней: клетка на день, плотность по числу раундов. */
+.rec-days { display: flex; gap: 3px; flex-wrap: wrap; }
+.rec-days i { width: 12px; height: 12px; border-radius: 3px;
+              background: var(--rush-border); }
+.rec-days i.a1 { background: var(--rush-accent); opacity: .35; }
+.rec-days i.a2 { background: var(--rush-accent); opacity: .65; }
+.rec-days i.a3 { background: var(--rush-accent); }
 
 /* ── Карточка забега по набору ──────────────────────────────────── */
 .set-intro {
@@ -777,23 +897,74 @@ a:focus-visible, button:focus-visible {
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
 
-/* ── Дуэль в реальном времени ──────────────────────────────────────
-   Полоса соперника стоит РЯДОМ со своим HUD, а не под ним: сравнение
-   работает только когда оба числа видны одним движением глаз.
-   Блока нет в разметке вовсе, когда забег не дуэльный. */
-.duel-bar {
-  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  margin: 0 0 12px; padding: 10px 14px;
-  border: 1px solid var(--rush-line); border-radius: 12px;
-  background: var(--rush-surface); font-size: 14px;
+/* ── Табло: вы, разрыв, вторая сторона ─────────────────────────────
+   ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
+   всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд в
+   этом режиме. Второго вида табло не заводим: два разъехались бы, а
+   сравнение с собой и сравнение с соперником — одно и то же движение
+   глаз.
+   Прежняя `.duel-bar` (одна строка «соперник · очки · верных · жизни»)
+   заменена целиком: своих чисел она не показывала вовсе, сравнивать было
+   не с чем. */
+.vs {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: stretch;
+  gap: 10px;
+  margin: 0 0 12px;
 }
-.duel-bar__who { font-weight: 600; }
-.duel-bar__num { font-variant-numeric: tabular-nums; font-weight: 700; }
-.duel-bar__lives { display: inline-flex; gap: 3px; }
-.duel-bar__lives .qi { width: 15px; height: 15px; }
-.duel-bar__lives .is-lost { opacity: .22; }
-.duel-bar--off { opacity: .55; }
-.duel-bar__state { margin-left: auto; color: var(--rush-dim); }
+.vs[hidden] { display: none; }
+.vs-side {
+  padding: 10px 14px;
+  border: 1px solid var(--rush-line); border-radius: 12px;
+  background: var(--rush-surface);
+  min-width: 0;
+}
+.vs-side--off { opacity: .55; }
+.vs-who { font-size: 12.5px; color: var(--rush-dim); text-transform: uppercase;
+          letter-spacing: .06em; }
+.vs-score { font-size: 30px; font-weight: 700; line-height: 1.1;
+            font-variant-numeric: tabular-nums; }
+.vs-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px;
+          font-size: 13px; color: var(--rush-dim); }
+.vs-row b { color: var(--rush-text); font-weight: 600;
+            font-variant-numeric: tabular-nums; }
+.vs-lives { display: inline-flex; gap: 3px; margin-top: 6px; }
+.vs-lives .qi { width: 15px; height: 15px; }
+.vs-lives .is-lost { opacity: .22; }
+.vs-state { margin-top: 6px; font-size: 13px; color: var(--rush-dim); }
+.vs-empty { margin: 6px 0 0; font-size: 13px; color: var(--rush-dim);
+            line-height: 1.4; }
+
+/* Лента последних десяти ответов: клетка на вопрос. */
+.vs-tape { display: flex; gap: 3px; margin-top: 8px; }
+.vs-tape i {
+  width: 12px; height: 6px; border-radius: 2px;
+  background: var(--rush-line);
+}
+.vs-tape i.ok { background: var(--rush-ok); }
+.vs-tape i.bad { background: var(--rush-bad); }
+.vs-tape i.skip { background: var(--rush-dim); opacity: .5; }
+.vs-tape i.now { background: var(--rush-accent); }
+
+/* Разрыв посередине: число крупно, под ним словами кто ведёт. */
+.vs-gap {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 2px;
+  min-width: 84px; padding: 0 6px; text-align: center;
+}
+.vs-gap[hidden] { display: none; }
+.vs-gap-num { font-size: 20px; font-weight: 700;
+              font-variant-numeric: tabular-nums; }
+.vs-gap-num.ahead { color: var(--rush-ok); }
+.vs-gap-num.behind { color: var(--rush-bad); }
+.vs-gap-note { font-size: 12px; color: var(--rush-dim); }
+
+@media (max-width: 620px) {
+  /* Узкий экран: карточки друг под другом, разрыв между ними. */
+  .vs { grid-template-columns: 1fr; }
+  .vs-score { font-size: 24px; }
+}
 
 /* Восемь реакций. Значки свои (templates/_icons.html), не эмодзи: эмодзи
    рисует операционная система, они всегда цветные и мимо палитры. */
@@ -834,7 +1005,10 @@ a:focus-visible, button:focus-visible {
 .duel-lobby p { margin: 0 0 10px; color: var(--rush-dim); font-size: 14px; }
 .duel-lobby__row { display: flex; gap: 8px; flex-wrap: wrap;
   align-items: center; }
-.duel-lobby input {
+/* ⚠️ Селектор по СТРОКЕ, а не по лобби: та же строка со ссылкой стоит в
+   окне «Бросить вызов», которое лежит вне `.duel-lobby`. Один вид у одного
+   и того же поля — второе правило разъехалось бы с первым. */
+.duel-lobby__row input {
   flex: 1 1 260px; font: inherit; padding: 8px 10px;
   border: 1px solid var(--rush-line); border-radius: 9px;
   background: var(--rush-bg); color: var(--rush-text);
@@ -1756,21 +1930,11 @@ body.figfull .vignette.alarm { opacity: .42; }
 .k-bad { background: var(--rush-bad); }
 .k-skip { background: var(--text3); opacity: .45; }
 
-/* Подробная статистика — свёрнута, графики строятся при раскрытии */
-.det-toggle {
-  font: inherit; font-size: 14px; font-weight: 600;
-  width: 100%;
-  height: 44px; padding: 0 16px;
-  text-align: left;
-  border: 1px solid var(--rush-border); border-radius: 10px;
-  background: var(--rush-surface); color: var(--text2);
-  cursor: pointer;
-}
-.det-toggle::after { content: ' ▾'; float: right; color: var(--text3); }
-.det-toggle[aria-expanded="true"]::after { content: ' ▴'; }
-.det-toggle:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+/* Подробная статистика — РАСКРЫТА СРАЗУ (08.09.2026). Кнопки-раскрывашки
+   больше нет: то, что спрятано за кнопкой, для половины игроков не
+   существует, а владелец просил статистику вернуть, а не спрятать. */
 .det-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-.det-body[hidden] { display: none; }
+@media (max-width: 720px) { .det-body { grid-template-columns: 1fr; } }
 .chart-card {
   background: var(--rush-surface);
   border: 1px solid var(--rush-border);
@@ -1784,6 +1948,25 @@ body.figfull .vignette.alarm { opacity: .42; }
    при масштабировании — vector-effect в самих линиях. */
 .chart-box svg { display: block; width: 100%; height: auto; }
 .chart-empty { font-size: 13px; color: var(--text3); padding: 18px 0; text-align: center; }
+
+/* «Микро и макро» и «Против себя обычного» рисуются списком, а не SVG:
+   там два-три ряда, и полоса из <i> честнее прямоугольника в холсте —
+   она сама переносится и сама берёт цвет темы. */
+.group-bars, .usual-rows { list-style: none; display: flex;
+                           flex-direction: column; gap: 10px; }
+.group-bars li, .usual-rows li { display: flex; align-items: center;
+                                 gap: 10px; font-size: 13px; }
+.gb-name { flex: 0 0 88px; color: var(--text2); }
+.gb-bar { flex: 1 1 auto; height: 8px; border-radius: 4px;
+          background: var(--rush-border); overflow: hidden; }
+.gb-bar i { display: block; height: 100%; background: var(--rush-accent); }
+.gb-num { flex: 0 0 auto; color: var(--text3);
+          font-variant-numeric: tabular-nums; }
+.usual-val { flex: 1 1 auto; color: var(--text2);
+             font-variant-numeric: tabular-nums; }
+.usual-mark { flex: 0 0 auto; font-weight: 600; color: var(--text3); }
+.usual-mark.up { color: var(--rush-ok); }
+.usual-mark.down { color: var(--rush-bad); }
 .chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
 .chart-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 8px; }
 .chart-key .k:first-child { margin-left: 0; }
@@ -1818,7 +2001,6 @@ body.figfull .vignette.alarm { opacity: .42; }
 }
 .share-row button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .share-row button[hidden] { display: none; }
-#share-canvas { display: none; }
 
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
@@ -2055,7 +2237,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <b>Бросить вызов</b><small>дуэль по ссылке</small>
         </button>
         <button class="entry" id="entry-records">
-          <b>Мои рекорды</b><small>по режимам, локально</small>
+          <b>Мои рекорды</b><small>по режимам, темам и дуэлям</small>
         </button>
       </div>
 
@@ -2122,15 +2304,41 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <button class="quit-x" id="btn-quit" title="Выйти из раунда" aria-label="Выйти из раунда">✕</button>
       <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
       <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
-      {% comment %} ── Дуэль: полоса соперника ────────────────────────────────
-           Блока нет вовсе, когда забег не дуэльный: рисовать пустую
-           полосу «соперника нет» на обычном забеге незачем. {% endcomment %}
-      <div class="duel-bar duel-bar--off" id="duel-bar" hidden>
-        <span class="duel-bar__who" id="duel-who">соперник</span>
-        <span>очки <b class="duel-bar__num" id="duel-score">0</b></span>
-        <span>верных <b class="duel-bar__num" id="duel-correct">0</b></span>
-        <span class="duel-bar__lives" id="duel-lives"></span>
-        <span class="duel-bar__state" id="duel-state">ждём соперника</span>
+      {% comment %} ── Табло: вы, разрыв, вторая сторона ──────────────────
+           ОДНА вёрстка на дуэль и на обычный забег. Справа в дуэли
+           соперник, в обычном забеге личный рекорд игрока в этом режиме.
+           Скрыто, пока сравнивать не с чем. {% endcomment %}
+      <div class="vs" id="vs" hidden>
+        <div class="vs-side" id="vs-me">
+          <div class="vs-who">вы</div>
+          <div class="vs-score" id="vs-my-score">0</div>
+          <div class="vs-row">
+            <span>верных <b id="vs-my-correct">0</b></span>
+            <span>точность <b id="vs-my-acc">&ndash;</b></span>
+            <span>комбо <b id="vs-my-combo">&times;1</b></span>
+            <span>время <b id="vs-my-time">&ndash;</b></span>
+          </div>
+          <div class="vs-tape" id="vs-my-tape" aria-hidden="true"></div>
+        </div>
+
+        <div class="vs-gap" id="vs-gap" hidden>
+          <div class="vs-gap-num" id="vs-gap-num">0</div>
+          <div class="vs-gap-note" id="vs-gap-note"></div>
+        </div>
+
+        <div class="vs-side vs-side--off" id="vs-them">
+          <div class="vs-who" id="vs-them-who">соперник</div>
+          <div class="vs-score" id="vs-them-score">0</div>
+          <div class="vs-row" id="vs-them-row">
+            <span>верных <b id="vs-them-correct">0</b></span>
+            <span>точность <b id="vs-them-acc">&ndash;</b></span>
+            <span>комбо <b id="vs-them-combo">&times;1</b></span>
+            <span>время <b id="vs-them-time">&ndash;</b></span>
+          </div>
+          <div class="vs-lives" id="vs-them-lives"></div>
+          <div class="vs-state" id="vs-them-state">ждём соперника</div>
+          <p class="vs-empty" id="vs-them-empty" hidden></p>
+        </div>
       </div>
       <div class="duel-emoji" id="duel-emoji" hidden></div>
       <div class="hud">
@@ -2263,13 +2471,15 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         </p>
       </section>
 
-      <!-- 5. Подробная статистика (графики — Фаза 5) -->
+      <!-- 5. Подробная статистика — ДЕВЯТЬ ГРАФИКОВ, БЛОК РАСКРЫТ СРАЗУ.
+           ⚠️ Кнопка-раскрывашка убрана (08.09.2026): владелец сказал, что
+           раньше статистики после игры было больше и она была нужна. То,
+           что спрятано за кнопкой, для половины игроков не существует. -->
       <section class="fin-details">
-        <button class="det-toggle" id="det-toggle" aria-expanded="false"
-                aria-controls="det-body">Подробная статистика</button>
-        <div class="det-body" id="det-body" hidden>
+        <h3>Подробная статистика</h3>
+        <div class="det-body" id="det-body">
           <div class="chart-card">
-            <h4>Динамика раунда</h4>
+            <h4>Ход раунда</h4>
             <div class="chart-box" id="chart-curve"></div>
             <p class="chart-key">
               <i class="k k-score"></i> счёт
@@ -2278,35 +2488,58 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             </p>
           </div>
           <div class="chart-card">
-            <h4>Время на ответ</h4>
+            <h4>Сколько думали</h4>
             <div class="chart-box" id="chart-time"></div>
           </div>
           <div class="chart-card">
-            <h4>Распределение сложностей</h4>
+            <h4>Держите ли сложное</h4>
             <div class="chart-box chart-donut" id="chart-diff"></div>
           </div>
           <div class="chart-card">
-            <h4>Сравнение с прошлыми играми</h4>
+            <h4>Последние раунды</h4>
             <div class="chart-box" id="chart-history"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Лента ответов</h4>
+            <div class="chart-box" id="chart-tape"></div>
+            <p class="chart-key">
+              <i class="k k-ok"></i> верно
+              <i class="k k-bad"></i> мимо
+              <i class="k k-skip"></i> пропуск
+              <span class="chart-x">выше клетка: дольше думали</span>
+            </p>
+          </div>
+          <div class="chart-card">
+            <h4>Время на ответ</h4>
+            <div class="chart-box" id="chart-times"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Где набрано</h4>
+            <div class="chart-box" id="chart-points"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Микро и макро</h4>
+            <div class="chart-box" id="chart-groups"></div>
+          </div>
+          <div class="chart-card">
+            <h4>Против себя обычного</h4>
+            <div class="chart-box" id="chart-usual"></div>
           </div>
         </div>
       </section>
 
-      <!-- 6. Шеринг: ссылка на публичную страницу + карточка-картинка -->
+      <!-- 6. Шеринг: ОДНА кнопка на публичную страницу результата.
+           ⚠️ Было четыре (картинкой, сторис, скопировать ссылку, системное
+           «Поделиться») — решение владельца 08.09.2026 оставило одну.
+           Рисование карточки на canvas удалено целиком: всё, что было на
+           картинке, лежит на странице /game/r/<код>/, и она к тому же
+           живая. -->
       <section class="fin-share" id="fin-share" hidden>
         <h3>Поделиться результатом</h3>
         <p class="share-lead" id="share-lead"></p>
         <div class="share-row">
-          <button type="button" id="btn-share-img">Поделиться картинкой</button>
-          <button type="button" id="btn-share-story">Вертикальная (сторис)</button>
-          <button type="button" id="btn-share-link">Скопировать ссылку</button>
-          <button type="button" id="btn-share-native" hidden>Поделиться</button>
+          <button type="button" id="btn-share">Поделиться</button>
         </div>
-        <!-- холст карточки: рисуем в браузере (кириллицу отрисует он сам),
-             на экране не показываем — он нужен только чтобы отдать PNG.
-             Размер ставится перед отрисовкой: 1200×630 широкая, 1080×1350
-             вертикальная под сторис. -->
-        <canvas id="share-canvas" width="1200" height="630" hidden></canvas>
       </section>
 
       <!-- 7. Действия -->
@@ -2332,6 +2565,58 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      «Особенности» и «Характер задачи» рисуются, ТОЛЬКО если у них есть
      варианты: серый переключатель, который не нажимается, хуже его
      отсутствия. Сегодня полей в базе нет, и групп на экране нет. -->
+<!-- ⚠️ ОКНО «БРОСИТЬ ВЫЗОВ» (08.09.2026, решение владельца). Раньше
+     кнопка вела прямо на /game/duel/new/, вьюха молча собирала набор из
+     десяти вопросов и уводила автора играть с `?auto=1`. Автор не видел ни
+     выбора режима, ни ссылки-приглашения; соперник приходил позже, и в
+     одном забеге они практически никогда не пересекались — из-за этого
+     живого табло не видел никто. Два шага: собрать вызов и позвать. -->
+<div class="fmodal" id="dmodal" hidden role="dialog" aria-modal="true"
+     aria-labelledby="dmodal-title">
+  <div class="fmodal-card">
+    <div class="fmodal-head">
+      <b id="dmodal-title">Бросить вызов</b>
+      <button type="button" class="fmodal-close" id="dmodal-close"
+              aria-label="Закрыть">&times;</button>
+    </div>
+
+    <!-- ШАГ 1: собрать вызов -->
+    <div class="fmodal-body dm-step" id="dm-step1">
+      <p class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам
+        в том же порядке. Раунд не ограничен числом вопросов: играете, пока
+        есть время и жизни. Вопросов до игры не видит никто: ни он, ни вы.</p>
+      <div class="dm-modes" id="dm-modes"></div>
+      <div class="filter-bar">
+        <button class="filter-open" id="dm-filters">Добавить фильтры</button>
+      </div>
+      <div class="filter-chips" id="dm-chips"></div>
+      <p class="dm-count" id="dm-count"></p>
+      <p class="start-notice" id="dm-error" hidden></p>
+    </div>
+
+    <!-- ШАГ 2: позвать соперника -->
+    <div class="fmodal-body dm-step" id="dm-step2" hidden>
+      <p class="dm-lead">Пришлите сопернику ссылку. Пока его нет, играть
+        можно: он догонит и увидит ваш счёт на своей полосе.</p>
+      <div class="duel-lobby__row">
+        <input type="text" id="dm-link" readonly aria-label="Ссылка вызова">
+        <button class="set-play" id="dm-copy" type="button">Скопировать</button>
+      </div>
+      <p class="dm-summary" id="dm-summary"></p>
+      <p class="dm-state" id="dm-state"><span class="dm-dot"></span><span
+         id="dm-state-text">Ждём соперника</span></p>
+    </div>
+
+    <div class="fmodal-foot">
+      <span class="fcounts" id="dm-foot-note"></span>
+      <div class="fmodal-actions">
+        <button type="button" class="fapply" id="dm-create">Создать вызов</button>
+        <button type="button" class="fapply" id="dm-play" hidden>Играть сейчас</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="fmodal" id="fmodal" hidden role="dialog" aria-modal="true"
      aria-labelledby="fmodal-title">
   <div class="fmodal-card">
@@ -2544,31 +2829,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      Старые ключи не трогаем: они просто перестают читаться. */
   function bestKey(m) { return 'econrush_best_v2_' + m; }
 
-  /* История забегов — для графика «сравнение с прошлыми играми». Раньше
-     в localStorage жил только рекорд, истории не было совсем. Храним
-     локально и только своё: серверного лидерборда у игры нет. */
-  var HISTORY_KEY = 'econ_rush_history';
-  var HISTORY_LIMIT = 30;   // сколько забегов помним
-  var HISTORY_SHOWN = 12;   // сколько показываем на графике
+  /* ⚠️ ИСТОРИЯ ЗАБЕГОВ ЖИВЁТ НА СЕРВЕРЕ (08.09.2026). Прежняя пара
+     «прочитать/дописать» и её ключ в localStorage удалены целиком:
+     история в браузере терялась при смене браузера, а два источника
+     истории разъехались бы при первом же расхождении. Источник теперь
+     один — `GameResult`, эндпоинт `/game/api/me/history/`. Имена и ключ
+     здесь намеренно не названы: тест сторожит их отсутствие в файле
+     буквально, и упоминание в комментарии его же и обмануло бы.
 
-  function loadHistory() {
-    try {
-      var raw = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
-      return Array.isArray(raw) ? raw : [];
-    } catch (e) { return []; }   // мусор в ключе не должен ронять экран
-  }
-
-  function saveRunToHistory(s) {
-    // Целевой забег и забег по набору в историю не идут: десять вопросов
-    // по темам ошибок (или фиксированный список набора) — не тот же забег,
-    // сравнивать его с полным нечестно.
-    if (mistakesRun || setRun || !s) return;
-    var h = loadHistory();
-    h.push({ mode: mode, score: s.score, accuracy: s.accuracy, at: Date.now() });
-    try {
-      localStorage.setItem(HISTORY_KEY, JSON.stringify(h.slice(-HISTORY_LIMIT)));
-    } catch (e) { /* приватный режим браузера — история не критична */ }
-  }
+     Аноним получает 403 и видит графики без сравнения. Выдуманных чисел
+     вместо истории на экране нет. */
+  var runHistory = null;        // {runs: [...], avg: {...}} или null
   (function migrateOldBest() {
     var old = localStorage.getItem('econrush_best');
     if (old && !localStorage.getItem(bestKey('blitz'))) {
@@ -2607,10 +2878,20 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var questionShownAt = 0;      // когда показали карточку (для elapsed_ms)
   var summary = null;           // сводка забега с сервера (экран результатов)
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
+
+  /* ── ТАБЛО ────────────────────────────────────────────────────────────
+     ⚠️ `myTape` — ПОСЛЕДОВАТЕЛЬНОСТЬ ИСХОДОВ, а не ещё один счётчик.
+     Счётчики верных, ошибок и пропусков остаются прежние; отсюда берётся
+     только порядок, и только он — иначе это был бы второй счёт того же
+     самого, а такие в этом проекте уже разъезжались. */
+  var myTape = [];              // 'correct' | 'wrong' | 'skip', по порядку
+  var vsBest = null;            // личный рекорд режима (обычный забег)
+  var vsRival = null;           // последнее событие соперника (дуэль)
+  var vsRivalAt = 0;            // когда оно пришло по ЧАСАМ БРАУЗЕРА
+  var vsRivalDone = false;      // соперник финишировал: время замерло
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var setRun = null;            // {code, kind, title, size} забега по набору
-  var chartsBuilt = false;      // графики подробной статистики уже построены?
   var shareInfo = null;         // {code, url} публичной страницы результата
   var bestNow = 0;              // рекорд режима с учётом этого забега
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
@@ -2652,6 +2933,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (opts.method === 'POST') {
       opts.headers = { 'Content-Type': 'application/json',
                        'X-CSRFToken': getCookie('csrftoken') };
+    } else {
+      // ⚠️ Метка «это fetch, а не адресная строка». Нужна ровно одной
+      // вьюхе — `duel_new`: окну вызова она отвечает строкой ошибки, а
+      // человеку, набравшему /game/duel/new/ руками, — страницей
+      // `duel_empty.html`. Получатели разные, ответ тоже.
+      opts.headers = { 'X-Requested-With': 'XMLHttpRequest' };
     }
     return fetch(url, opts).then(function (r) { return r.json(); });
   }
@@ -2926,10 +3213,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var srcTitles = {};
   (CFG.source_groups || []).forEach(function (g) { srcTitles[g.key] = g.title; });
 
-  /* Чипы выбранного: снять по одному, не открывая окно. */
+  /* Чипы выбранного: снять по одному, не открывая окно.
+     ⚠️ Рисуются в ДВА места — на стартовый экран и в окно «Бросить вызов».
+     Именно рисуются, а не копируются готовой разметкой: у крестика живой
+     обработчик, и копия через innerHTML осталась бы мёртвой. Список выбора
+     при этом ОДИН (`filter`), второго набора фильтров у дуэли нет. */
+  function chipBoxes() {
+    return [$('filter-chips'), document.getElementById('dm-chips')]
+      .filter(Boolean);
+  }
+
   function paintChips() {
-    var box = $('filter-chips');
-    box.innerHTML = '';
     var rows = [];
     filter.topics.forEach(function (t) { rows.push(['topics', t, t]); });
     filter.tags.forEach(function (t) {
@@ -2939,25 +3233,30 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       rows.push(['sources', x, srcTitles[x] || x]);
     });
     filter.stars.forEach(function (d) { rows.push(['stars', d, d + '★']); });
-    rows.forEach(function (r) {
-      var chip = document.createElement('span');
-      chip.className = 'fchip';
-      var label = document.createElement('span');
-      label.textContent = r[2];
-      var x = document.createElement('button');
-      x.type = 'button';
-      x.textContent = '×';
-      x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
-      x.addEventListener('click', function () {
-        filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
-        applyFilter();
+    chipBoxes().forEach(function (box) {
+      box.innerHTML = '';
+      rows.forEach(function (r) {
+        var chip = document.createElement('span');
+        chip.className = 'fchip';
+        var label = document.createElement('span');
+        label.textContent = r[2];
+        var x = document.createElement('button');
+        x.type = 'button';
+        x.textContent = '×';
+        x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
+        x.addEventListener('click', function () {
+          filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
+          applyFilter();
+        });
+        chip.appendChild(label);
+        chip.appendChild(x);
+        box.appendChild(chip);
       });
-      chip.appendChild(label);
-      chip.appendChild(x);
-      box.appendChild(chip);
     });
-    $('filter-open').textContent = rows.length ? 'Изменить фильтры'
-                                              : 'Добавить фильтры';
+    ['filter-open', 'dm-filters'].forEach(function (id) {
+      var b = document.getElementById(id);
+      if (b) b.textContent = rows.length ? 'Изменить фильтры' : 'Добавить фильтры';
+    });
     $('filter-reset').hidden = !rows.length;
     var note = $('filter-note');
     if (!isRanked()) {
@@ -2997,6 +3296,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             }).join(' · ');
         }
         renderModeCards();
+        // Счётчики обновились: окно «Бросить вызов» рисует по ним свои
+        // карточки. Событием, а не прямым вызовом, — оно объявлено ниже
+        // по файлу и своего запроса к серверу не делает.
+        try { window.dispatchEvent(new CustomEvent('rush:counts')); }
+        catch (e) { /* старый браузер: карточки обновятся при открытии */ }
         if (then) then();
       }).catch(function () { /* счётчик не критичен для игры */ });
     }, 250);
@@ -3087,19 +3391,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     applyFilter();
   }
 
-  function openFilters(open) {
+  /* Кто открыл окно фильтров — тому и вернём фокус. Окно зовут из двух
+     мест: со стартового экрана и из окна «Бросить вызов». */
+  var filtersOpener = null;
+
+  function openFilters(open, opener) {
     $('fmodal').hidden = !open;
     if (open) {
+      filtersOpener = opener || $('filter-open');
       syncFilterControls();
       renderTagList();
       refreshCounts();
       $('fmodal-close').focus();
     } else {
-      $('filter-open').focus();
+      (filtersOpener || $('filter-open')).focus();
     }
   }
 
-  $('filter-open').addEventListener('click', function () { openFilters(true); });
+  $('filter-open').addEventListener('click', function () {
+    openFilters(true, this);
+  });
   $('fmodal-close').addEventListener('click', function () { openFilters(false); });
   $('fmodal-apply').addEventListener('click', function () { openFilters(false); });
   $('filter-reset').addEventListener('click', function () {
@@ -3164,6 +3475,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      только эндпоинтом старта, дальше всё то же самое. Темы и пропорцию
      целевого считает сервер по журналу прошлого забега. */
   function startRun(opts) {
+    // След прошлого забега: игра живёт в ОДНОЙ странице на три экрана,
+    // и не снятый класс пережил бы возврат на старт.
+    clearAlarm();
     var mistakes = !!(opts && opts.mistakes);
     var setCode = opts && opts.setCode;
     var url = setCode
@@ -3189,6 +3503,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
         skippedCount = 0; isRecord = false; bestNow = 0;
+        myTape = [];
+        // Рекорд приходит вместе со стартом (сервер, не localStorage).
+        // У набора его нет: там справа соперник, а не своя история.
+        vsBest = d.best || null;
+        vsRival = null; vsRivalAt = 0; vsRivalDone = false;
+        setupVs();
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
         shareInfo = null;
         $('gameover-overlay').hidden = true;
@@ -3316,6 +3636,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
   }
 
+  /* ⚠️ ТРЕВОГУ СНИМАЕТ ОТДЕЛЬНАЯ ФУНКЦИЯ, И ЗОВЁТ ЕЁ КОНЕЦ ЗАБЕГА.
+     paintAlarm() живёт внутри игрового цикла: после show('finished') его
+     больше никто не зовёт, и класс `alarm` оставался на #vignette — а он
+     лежит fixed во весь экран. Красная кайма переживала экран результатов
+     и возвращалась на стартовый. Видно было только когда забег кончался в
+     красной зоне (последние 10 % запаса или последняя жизнь): иначе
+     последний paintAlarm() успевал снять класс сам. Отсюда «после
+     некоторых партий». */
+  function clearAlarm() {
+    var v = $('vignette');
+    if (v) v.classList.remove('alarm', 'beat', 'on');
+    document.documentElement.style.setProperty('--alarm', '0');
+    alarmOn = false;
+    beatApi('stop');
+  }
+
   /* Пульс картинки — по удару сердца, а не по своему таймеру. Событие
      приходит и при выключенном звуке: планировщик работает всегда. */
   window.addEventListener('rush:beat', function () {
@@ -3344,7 +3680,182 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сколько бы времени ни осталось: она перестаёт быть про время и
     // становится про опасность.
     paintAlarm();
+    // ⚠️ Табло перерисовывается ЗДЕСЬ, в игровом цикле, а не по приходу
+    // события: событие соперника приходит только на его ответ, а время у
+    // него идёт всё это время. Один водитель отрисовки — один и тот же
+    // кадр у HUD и у табло.
+    paintVs();
     tickSoundMaybe();
+  }
+
+  /* ---------- ТАБЛО: ВЫ, РАЗРЫВ, ВТОРАЯ СТОРОНА ----------
+     ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
+     всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд
+     игрока в этом режиме. Второго вида табло не заводим.
+
+     ⚠️ ВРЕМЯ СОПЕРНИКА ИДЁТ ЛОКАЛЬНО МЕЖДУ СОБЫТИЯМИ. Событие табло
+     приходит только на его ОТВЕТ: думает он полминуты — все его числа
+     стоят, а время у него на самом деле течёт. Поэтому клиент запоминает
+     `seconds_left` и серверную метку `at` из последнего события и дальше
+     вычитает разницу СВОИХ часов. Разницу серверных и клиентских часов не
+     выравниваем: нас интересует шаг, а не абсолют, и лишняя арифметика тут
+     только добавила бы способов ошибиться. */
+
+  function isDuelRun() { return !!(setRun && setRun.kind === 'duel'); }
+
+  function setupVs() {
+    var box = $('vs');
+    if (!box) return;
+    // Табло показывается всегда, когда есть с чем сравнивать: в дуэли это
+    // соперник, в обычном забеге личный рекорд. Первый раунд в режиме —
+    // сравнивать не с чем, но карточка остаётся: она говорит словами.
+    box.hidden = false;
+    $('vs-them-who').textContent = isDuelRun() ? 'соперник' : 'ваш рекорд';
+    paintVs();
+  }
+
+  function tapeHtml(seq) {
+    var last = seq.slice(-10);
+    var out = '';
+    for (var i = 0; i < last.length; i++) {
+      var cls = last[i] === 'correct' ? 'ok'
+              : last[i] === 'wrong' ? 'bad' : 'skip';
+      out += '<i class="' + cls + '"></i>';
+    }
+    // Текущий вопрос — отдельной клеткой: видно, что лента живая.
+    if (state === 'playing' && last.length < 10) out += '<i class="now"></i>';
+    return out;
+  }
+
+  function accText(right, tries) {
+    return tries ? Math.round(100 * right / tries) + '%' : '–';
+  }
+
+  function timeText(seconds) {
+    if (seconds == null) return '–';
+    var s = Math.max(0, Math.round(seconds));
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
+  /* Сколько времени у соперника ПРЯМО СЕЙЧАС. */
+  function rivalSeconds() {
+    if (!vsRival || vsRival.seconds_left == null) return null;
+    if (vsRivalDone) return 0;
+    var gone = (Date.now() - vsRivalAt) / 1000;
+    return Math.max(0, vsRival.seconds_left - gone);
+  }
+
+  function paintVs() {
+    var box = $('vs');
+    if (!box || box.hidden) return;
+
+    // ── Слева всегда вы ──
+    $('vs-my-score').textContent = score.toLocaleString('ru-RU');
+    $('vs-my-correct').textContent = correctCount;
+    $('vs-my-acc').textContent = accText(correctCount, answered);
+    $('vs-my-combo').textContent = '×' + multText(comboMult(streak));
+    $('vs-my-time').textContent = state === 'playing'
+      ? timeText(timeLeft) : '–';
+    $('vs-my-tape').innerHTML = tapeHtml(myTape);
+
+    if (isDuelRun()) { paintRival(); } else { paintBest(); }
+    paintGap();
+  }
+
+  function paintRival() {
+    var side = $('vs-them');
+    var empty = $('vs-them-empty');
+    var row = $('vs-them-row');
+    var lives = $('vs-them-lives');
+    if (!vsRival) {
+      // Соперника ещё нет: чисел не выдумываем, говорим словами.
+      side.classList.add('vs-side--off');
+      $('vs-them-score').textContent = '0';
+      row.hidden = true;
+      lives.hidden = true;
+      empty.hidden = false;
+      empty.textContent = 'Соперник ещё не начал. Играйте: он догонит и '
+        + 'увидит ваш счёт на своей полосе.';
+      return;
+    }
+    side.classList.remove('vs-side--off');
+    row.hidden = false;
+    lives.hidden = false;
+    empty.hidden = true;
+    $('vs-them-who').textContent = vsRival.username || 'соперник';
+    $('vs-them-score').textContent = (vsRival.score || 0).toLocaleString('ru-RU');
+    $('vs-them-correct').textContent = vsRival.correct || 0;
+    $('vs-them-acc').textContent = accText(
+      vsRival.correct || 0, (vsRival.correct || 0) + (vsRival.wrong || 0));
+    $('vs-them-combo').textContent = '×' + multText(vsRival.combo || 1);
+    $('vs-them-combo').parentNode.hidden = false;
+    $('vs-them-time').textContent = timeText(rivalSeconds());
+    lives.innerHTML = livesHtml(vsRival.lives || 0);
+  }
+
+  function paintBest() {
+    var side = $('vs-them');
+    var empty = $('vs-them-empty');
+    var row = $('vs-them-row');
+    var lives = $('vs-them-lives');
+    lives.hidden = true;
+    $('vs-them-state').textContent = '';
+    if (!vsBest) {
+      /* ⚠️ ПЕРВЫЙ РАУНД В РЕЖИМЕ: РЕКОРДА ЕЩЁ НЕТ. Ноль или прочерк
+         читались бы как «рекорд равен нулю», а выдуманного числа-заглушки
+         на экране быть не должно. Говорим словами. Аноним видит то же
+         самое: рекорды у него не хранятся. */
+      side.classList.add('vs-side--off');
+      $('vs-them-score').textContent = '';
+      row.hidden = true;
+      empty.hidden = false;
+      empty.textContent = CFG.is_authenticated
+        ? 'Первый раунд в этом режиме: он и станет рекордом.'
+        : 'Войдите, чтобы рекорды сохранялись.';
+      return;
+    }
+    side.classList.remove('vs-side--off');
+    row.hidden = false;
+    empty.hidden = true;
+    $('vs-them-score').textContent = vsBest.score.toLocaleString('ru-RU');
+    $('vs-them-correct').textContent = vsBest.correct;
+    $('vs-them-acc').textContent = vsBest.accuracy + '%';
+    // ⚠️ У рекорда комбо не храним, поэтому ячейка прячется — и ЯВНО
+    // возвращается в дуэли: одна страница живёт через несколько забегов
+    // подряд, и спрятанное здесь осталось бы спрятанным там.
+    $('vs-them-combo').parentNode.hidden = true;
+    $('vs-them-time').textContent = formatDate(vsBest.created_at) || '–';
+  }
+
+  /* Разрыв посередине. Сравнивать не с чем — колонки нет вовсе. */
+  function paintGap() {
+    var gap = $('vs-gap');
+    var other = isDuelRun()
+      ? (vsRival ? vsRival.score || 0 : null)
+      : (vsBest ? vsBest.score : null);
+    if (other == null) { gap.hidden = true; return; }
+    gap.hidden = false;
+    var diff = score - other;
+    var num = $('vs-gap-num');
+    num.textContent = (diff > 0 ? '+' : '') + diff.toLocaleString('ru-RU');
+    num.classList.toggle('ahead', diff > 0);
+    num.classList.toggle('behind', diff < 0);
+    $('vs-gap-note').textContent = diff > 0 ? 'вы ведёте'
+                                 : diff < 0 ? 'отстаёте' : 'вровень';
+  }
+
+  /* Жизни второй стороны. ⚠️ Запас НЕ выдумываем: он приходит из config.py
+     вместе с режимом (CFG). Тройка числом здесь означала бы второй источник
+     правды о механике. */
+  function livesHtml(n) {
+    var m = (MODE || CFG.modes[CFG.default_mode] || {});
+    var max = m.lives || n;
+    var out = '';
+    for (var i = 0; i < max; i++) {
+      out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
+        + (ICONS.heart || '') + '</span>';
+    }
+    return out;
   }
 
   /* Последняя жизнь: один и тот же вопрос задают три места (сердца,
@@ -3895,11 +4406,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function registerCorrect() {
     answered++; correctCount++;
+    myTape.push('correct');
     rush('correct', comboMult(streak));
   }
 
   function registerWrong(q, d) {
     answered++;
+    myTape.push('wrong');
     // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
     // Потеря жизни — ОТДЕЛЬНОЕ событие со своим звуком: игрок обязан
     // слышать разницу между «ошибся» и «сгорело сердце».
@@ -4066,6 +4579,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
       skippedCount++;
+      myTape.push('skip');
       // пропуск бесплатный — дельту показываем, только если она есть
       if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
@@ -4190,6 +4704,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function quitRun() {
     closeQuit();
     cancelAnimationFrame(rafId);
+    // ⚠️ Тревога снимается ЗДЕСЬ, а не в openQuit: пока окно подтверждения
+    // открыто, забег продолжается за ним, и гасить кайму рано — следующий
+    // же кадр вернул бы её обратно. Бросают забег именно тут.
+    clearAlarm();
     show('start');
     renderModeCards();
   }
@@ -4223,7 +4741,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     show('finished');
     // Экран результатов и перерисовка графиков звука не издают: он
     // сопровождает забег, а не отчёт о нём. Одно исключение — рекорд.
-    beatApi('stop');
+    // Вместе со звуком гасится и красная кайма — она пережила бы экран.
+    clearAlarm();
     rush('over');
 
     // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,
@@ -4243,8 +4762,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // результатов не имеет права пропасть.
     summary = localSummary();
     function done() {
-      saveRunToHistory(summary);
       paintFinal();
+      // История нужна трём графикам из девяти. Тянем ПОСЛЕ отрисовки: экран
+      // результата не имеет права ждать этот запрос, а три графика
+      // дорисуются, когда ответ придёт. Аноним получит 403 — и увидит те же
+      // графики без сравнения, а не выдуманные числа.
+      fetchHistory(function () { buildCompareCharts(); });
     }
     api('/game/api/session/finish/', {
       method: 'POST',
@@ -4410,11 +4933,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
     paintShare(s);
 
-    /* подробная статистика — заново свёрнута, графики построятся при
-       раскрытии уже по НОВОЙ сводке */
-    chartsBuilt = false;
-    $('det-body').hidden = true;
-    $('det-toggle').setAttribute('aria-expanded', 'false');
+    // Подробная статистика раскрыта сразу: графики строятся при отрисовке
+    // экрана результата, а не при нажатии на кнопку, которой больше нет.
+    buildCharts();
   }
 
   /* Блок работы над ошибками: полоса пропорции + легенда. Пропорция та же,
@@ -4584,10 +5105,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   /* ---------- ШЕРИНГ ----------
-     Делимся ссылкой на публичную страницу результата (её абсолютный URL
-     считает сервер: относительный в мессенджере не откроется) и картинкой,
-     которую рисует сам браузер — кириллицу он отрисует без наших забот
-     о шрифтах, а серверу не придётся держать рендер картинок. */
+     Делимся ссылкой на публичную страницу результата: её абсолютный URL
+     считает сервер — относительный в мессенджере не откроется. */
   function shareText() {
     var s = summary;
     return 'Wecon Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
@@ -4603,251 +5122,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     board.hidden = !setInfo;
     if (setInfo) board.href = setInfo.board_url;
     var box = $('fin-share');
-    // Нет ссылки (сеть подвела) — блока нет: делиться нечем.
+    // Нет ссылки (сеть подвела) — блока нет: делиться нечем. Больше блок
+    // ничего не решает: кнопка одна, и путь у неё один.
     box.hidden = !(shareInfo && shareInfo.url);
     if (box.hidden) return;
     $('share-lead').textContent = 'Ссылка открывается у всех, без регистрации';
-    $('btn-share-native').hidden = !navigator.share;
-  }
-
-  /* ---------- КАРТОЧКА РЕЗУЛЬТАТА ----------
-     Рисует canvas в браузере: кириллицу он отрисует сам, серверу рендер
-     картинок не нужен.
-
-     Два размера: 1200×630 (широкая, как превью ссылки) и 1080×1350
-     (вертикальная под сторис).
-
-     ⚠️ Карточка ВСЕГДА ТЁМНАЯ, независимо от темы сайта: её смотрят в
-     ленте мессенджера, и мы обязаны точно знать, как она выглядит у
-     чужого человека. Отсюда же захардкоженные цвета — осознанное
-     исключение из правила «каждый цвет через var(--…)»: canvas не читает
-     CSS-переменные, а картинка уезжает наружу.
-
-     Главный элемент — КРИВАЯ СЧЁТА со ступеньками комбо во всю ширину:
-     у каждого забега своя форма, ради этого её и показывают.
-
-     ⚠️ Внизу ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ фиксированной высоты,
-     сейчас ПУСТАЯ: домена ещё нет, а `127.0.0.1` на карточке — позор.
-     Появится домен — впишем строку, и вёрстка не сдвинется ни на пиксель. */
-  var CARD_SIZES = {
-    wide:  { w: 1200, h: 630 },
-    story: { w: 1080, h: 1350 }
-  };
-  var CARD = {
-    bg: '#0d0d12', panel: '#161b25', accent: '#FF4D94',
-    ink: '#ffffff', soft: '#96969f', dim: '#4a4a55',
-    ok: '#3fc77f', combo: '#f5a623'
-  };
-  /* Один вшитый шрифт вместо системного: на системном карточка выйдет
-     разной на разных устройствах, а местами с кривой кириллицей.
-     Файл кладётся в game/static/game/fonts/ — пока его нет, честно
-     работаем на системном стеке (и это видно в отчёте, а не молча). */
-  var CARD_FONT = 'RushCard';
-  var CARD_FALLBACK = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
-  var cardFontReady = false;
-
-  function cardFont(weight, size) {
-    var family = cardFontReady ? ('"' + CARD_FONT + '", ' + CARD_FALLBACK)
-                               : CARD_FALLBACK;
-    return weight + ' ' + size + 'px ' + family;
-  }
-
-  /* Ждём готовности шрифтов ДО отрисовки: иначе первый кадр уйдёт
-     системным шрифтом, а игрок увидит другую картинку, чем ожидал. */
-  function withFonts(done) {
-    if (!document.fonts || !document.fonts.ready) { done(); return; }
-    document.fonts.ready.then(function () {
-      try { cardFontReady = document.fonts.check('16px "' + CARD_FONT + '"'); }
-      catch (e) { cardFontReady = false; }
-      done();
-    }, done);
-  }
-
-  function roundRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.arcTo(x + w, y, x + w, y + h, r);
-    ctx.arcTo(x + w, y + h, x, y + h, r);
-    ctx.arcTo(x, y + h, x, y, r);
-    ctx.arcTo(x, y, x + w, y, r);
-    ctx.closePath();
-  }
-
-  /* Кривая счёта со ступеньками комбо — главный элемент карточки. */
-  function drawCurve(ctx, s, x, y, w, h) {
-    var scores = s.score_curve || [];
-    var combo = s.combo_curve || [];
-    ctx.fillStyle = CARD.panel;
-    roundRect(ctx, x, y, w, h, 18);
-    ctx.fill();
-    if (scores.length < 2) {
-      ctx.fillStyle = CARD.dim;
-      ctx.font = cardFont(600, 24);
-      ctx.fillText('слишком короткий раунд для кривой', x + 26, y + h / 2);
-      return;
-    }
-    var pad = 22;
-    var maxScore = Math.max.apply(null, scores) || 1;
-    var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
-    var px = function (i) { return x + pad + i * (w - 2 * pad) / (scores.length - 1); };
-    var py = function (v) { return y + h - pad - (v / maxScore) * (h - 2 * pad); };
-
-    // ступеньки комбо — СТУПЕНЧАТОЙ линией внизу поля. Блоками они
-    // сливались с розовой заливкой в грязно-коричневый; ступенька же
-    // читается как ступенька и не спорит с кривой счёта.
-    if (combo.length) {
-      var cy = function (v) {
-        return y + h - pad - (v / maxCombo) * (h - 2 * pad) * 0.34;
-      };
-      ctx.beginPath();
-      combo.forEach(function (c, i) {
-        if (i === 0) { ctx.moveTo(px(i), cy(c)); }
-        else { ctx.lineTo(px(i), cy(combo[i - 1])); ctx.lineTo(px(i), cy(c)); }
-      });
-      ctx.strokeStyle = 'rgba(245,166,35,.75)';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-    }
-
-    // заливка под кривой
-    ctx.beginPath();
-    ctx.moveTo(px(0), y + h - pad);
-    scores.forEach(function (v, i) { ctx.lineTo(px(i), py(v)); });
-    ctx.lineTo(px(scores.length - 1), y + h - pad);
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(255,77,148,.16)';
-    ctx.fill();
-
-    // сама кривая
-    ctx.beginPath();
-    scores.forEach(function (v, i) {
-      if (i === 0) { ctx.moveTo(px(i), py(v)); } else { ctx.lineTo(px(i), py(v)); }
-    });
-    ctx.strokeStyle = CARD.accent;
-    ctx.lineWidth = 4;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.stroke();
-  }
-
-  /* Ряд сердец: погашенные — контуром. */
-  function drawHearts(ctx, left, max, x, y, size) {
-    ctx.font = cardFont(400, size);
-    for (var i = 0; i < max; i++) {
-      var lost = i >= left;
-      ctx.fillStyle = lost ? CARD.dim : '#ff5470';
-      ctx.fillText(lost ? '♡' : '♥', x + i * (size * 0.95), y);
-    }
-  }
-
-  /* Кольцо сложностей в углу — маленькое, справочное. */
-  function drawDonut(ctx, s, cx, cy, r) {
-    var rows = (s.difficulty || []).filter(function (g) { return g.total > 0; });
-    var total = rows.reduce(function (a, g) { return a + g.total; }, 0);
-    if (!total) return;
-    var colors = { easy: CARD.ok, medium: CARD.soft, hard: CARD.combo };
-    var a0 = -Math.PI / 2;
-    rows.forEach(function (g) {
-      var a1 = a0 + (g.total / total) * Math.PI * 2;
-      ctx.beginPath();
-      ctx.arc(cx, cy, r, a0, a1);
-      ctx.strokeStyle = colors[g.key] || CARD.soft;
-      ctx.lineWidth = r * 0.42;
-      ctx.stroke();
-      a0 = a1;
-    });
-  }
-
-  /* Лента «НОВЫЙ РЕКОРД» по диагонали. */
-  function drawRecordRibbon(ctx, W) {
-    ctx.save();
-    ctx.translate(W - 130, 96);
-    ctx.rotate(Math.PI / 4);
-    ctx.fillStyle = CARD.accent;
-    ctx.fillRect(-170, -22, 340, 44);
-    ctx.fillStyle = '#fff';
-    ctx.font = cardFont(800, 24);
-    ctx.textAlign = 'center';
-    ctx.fillText('НОВЫЙ РЕКОРД', 0, 8);
-    ctx.restore();
-    ctx.textAlign = 'left';
-  }
-
-  /* Раскладка задана ЯВНЫМИ координатами на каждый размер, а не цепочкой
-     «предыдущий + отступ»: цепочка молча выезжала за нижнюю полосу, и
-     сердца с кольцом сложностей просто не влезали в кадр. */
-  var CARD_LAYOUT = {
-    wide: { pad: 64, linkBand: 96, mark: 88, mode: 134,
-            curveY: 164, curveH: 196, score: 470, scoreSize: 118,
-            metrics: 508, heartsY: 470, heartSize: 38,
-            donutX: 106, donutY: 440, donutR: 38 },
-    story: { pad: 72, linkBand: 120, mark: 124, mode: 182,
-             curveY: 220, curveH: 470, score: 850, scoreSize: 138,
-             metrics: 908, heartsY: 1040, heartSize: 50,
-             donutX: 124, donutY: 1010, donutR: 50 }
-  };
-
-  function drawShareCard(kind) {
-    var story = kind === 'story';
-    var size = CARD_SIZES[story ? 'story' : 'wide'];
-    var L = CARD_LAYOUT[story ? 'story' : 'wide'];
-    var cv = $('share-canvas');
-    cv.width = size.w;
-    cv.height = size.h;
-    var ctx = cv.getContext('2d');
-    var W = cv.width, H = cv.height, s = summary;
-
-    ctx.fillStyle = CARD.bg;
-    ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = CARD.accent;
-    ctx.fillRect(0, 0, 12, H);
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'alphabetic';
-
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(600, story ? 30 : 26);
-    ctx.fillText('Weconomics · Wecon Rush', L.pad, L.mark);
-    ctx.fillStyle = CARD.ink;
-    ctx.font = cardFont(700, story ? 38 : 32);
-    ctx.fillText('Режим «' + s.mode_title + '»', L.pad, L.mode);
-
-    // кривая счёта — главный элемент, во всю ширину
-    drawCurve(ctx, s, L.pad, L.curveY, W - L.pad * 2, L.curveH);
-
-    // крупный счёт
-    ctx.fillStyle = CARD.ink;
-    ctx.font = cardFont(800, L.scoreSize);
-    var scoreText = s.score.toLocaleString('ru-RU');
-    ctx.fillText(scoreText, L.pad, L.score);
-    var scoreW = ctx.measureText(scoreText).width;
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(600, story ? 32 : 28);
-    ctx.fillText('очков', L.pad + scoreW + 16, L.score);
-
-    // метрики строкой
-    ctx.fillStyle = CARD.soft;
-    ctx.font = cardFont(500, story ? 30 : 26);
-    ctx.fillText('точность ' + s.accuracy + '%  ·  комбо ×' + s.max_multiplier
-                 + '  ·  вопросов ' + (s.total + s.skipped),
-                 L.pad, L.metrics);
-
-    // сердца — справа (на широкой в одной строке со счётом, на
-    // вертикальной под ним), кольцо сложностей в углу
-    var heartsW = s.lives_max * L.heartSize * 0.95;
-    drawHearts(ctx, s.lives_left, s.lives_max,
-               W - L.pad - L.donutX - heartsW - 24, L.heartsY, L.heartSize);
-    drawDonut(ctx, s, W - L.pad - L.donutR, L.donutY, L.donutR);
-
-    if (isRecord) drawRecordRibbon(ctx, W);
-
-    // ЗАРЕЗЕРВИРОВАННАЯ ПОЛОСА ПОД ССЫЛКУ — пустая. Домен у сайта уже
-    // есть, но локально адрес забега — это 127.0.0.1, а такой адрес на
-    // картинке недопустим. Возврат ссылки — отдельное решение владельца.
-    ctx.fillStyle = CARD.panel;
-    ctx.fillRect(0, H - L.linkBand, W, L.linkBand);
-    ctx.fillStyle = CARD.accent;
-    ctx.font = cardFont(800, story ? 40 : 34);
-    ctx.fillText('Обгонишь?', L.pad, H - L.linkBand / 2 + (story ? 14 : 12));
   }
 
   function toast(btn, text, back) {
@@ -4855,76 +5134,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     setTimeout(function () { btn.textContent = back; }, 2000);
   }
 
-  /* Скачивание карточки — единственный запасной путь кнопки «Поделиться
-     картинкой». В текст не уходим НИКОГДА: нажали «картинкой» — получите
-     картинку. Текст и ссылка живут на соседних кнопках. */
-  function downloadCard(blob, btn, label) {
-    var a = document.createElement('a');
-    var href = URL.createObjectURL(blob);
-    a.href = href;
-    a.download = 'econ-rush.png';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(href);
-    toast(btn, 'Картинка скачана ✓', label || 'Поделиться картинкой');
-  }
+  /* ⚠️ ОДНА КНОПКА, ОДИН ПУТЬ (08.09.2026, решение владельца). Было
+     четыре: «картинкой», «сторис», «скопировать ссылку» и системное
+     «Поделиться». Рисование карточки на canvas удалено вместе с ними —
+     всё, что было на картинке, есть на публичной странице результата, и
+     она к тому же живая.
 
-  /* Общий обработчик обеих кнопок карточки: отличается только размером.
-     ⚠️ Ловушка Web Share (чинили 2026-07-16): в navigator.share рядом с
-     files НЕЛЬЗЯ класть text/url — системное окно берёт текст и
-     ВЫБРАСЫВАЕТ картинку. Отдаём только {files, title}. */
-  function shareCard(btn, kind, label) {
-    withFonts(function () {
-      drawShareCard(kind);
-      $('share-canvas').toBlob(function (blob) {
-      if (!blob) { toast(btn, 'Не вышло', label); return; }
-      var file = null;
-      try { file = new File([blob], 'econ-rush.png', { type: 'image/png' }); }
-      catch (e) { /* старый браузер без конструктора File — уйдём в скачивание */ }
-      if (!(file && navigator.canShare && navigator.canShare({ files: [file] }))) {
-        downloadCard(blob, btn, label);   // системного «Поделиться» с файлом нет
-        return;
-      }
-      /* ⚠️ Отдаём ТОЛЬКО файл — ни text, ни url. Положишь их рядом с files —
-         системное окно «Поделиться» на десктопе берёт текст и ВЫБРАСЫВАЕТ
-         картинку: именно так кнопка «поделиться картинкой» уходила текстовой
-         подписью. Проверено в браузере: было {files, text, url} → уезжал текст. */
-      navigator.share({ files: [file], title: 'Wecon Rush' })
-        .catch(function (e) {
-          // Игрок передумал (AbortError) — не ошибка, ничего не делаем.
-          // Любой другой отказ значит, что систему файл не взяла — скачиваем.
-          if (e && e.name === 'AbortError') return;
-          downloadCard(blob, btn, label);
-        });
-      }, 'image/png');
-    });
-  }
-
-  $('btn-share-img').addEventListener('click', function () {
-    shareCard(this, 'wide', 'Поделиться картинкой');
-  });
-  $('btn-share-story').addEventListener('click', function () {
-    shareCard(this, 'story', 'Вертикальная (сторис)');
-  });
-
-  $('btn-share-link').addEventListener('click', function () {
+     Есть системное окно — отдаём ему заголовок, текст и ссылку. Нет —
+     кладём ссылку в буфер и говорим об этом подписью на две секунды.
+     Нет и буфера (старый браузер, не защищённое соединение) — prompt со
+     ссылкой: скопировать вручную всегда можно. */
+  $('btn-share').addEventListener('click', function () {
     var btn = this;
     var url = shareInfo && shareInfo.url;
     if (!url) return;
+    if (navigator.share) {
+      navigator.share({ title: 'Wecon Rush', text: shareText(), url: url })
+        .catch(function () { /* игрок передумал — не ошибка */ });
+      return;
+    }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
-        function () { toast(btn, 'Ссылка скопирована ✓', 'Скопировать ссылку'); },
+        function () { toast(btn, 'Ссылка скопирована ✓', 'Поделиться'); },
         function () { prompt('Скопируйте ссылку:', url); });
     } else {
       prompt('Скопируйте ссылку:', url);
     }
-  });
-
-  $('btn-share-native').addEventListener('click', function () {
-    if (!navigator.share || !shareInfo) return;
-    navigator.share({ title: 'Wecon Rush', text: shareText(), url: shareInfo.url })
-      .catch(function () { /* игрок передумал — не ошибка */ });
   });
 
   /* ---------- ПОДРОБНАЯ СТАТИСТИКА: графики ----------
@@ -5093,8 +5328,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      «Классики» несравним — разные запасы времени). Текущий — акцентом. */
   function chartHistory(s) {
     var box = $('chart-history');
-    var rows = loadHistory().filter(function (r) { return r.mode === mode; });
-    rows = rows.slice(-HISTORY_SHOWN);
+    if (!CFG.is_authenticated) {
+      chartEmpty(box, 'Войдите, чтобы видеть свои прошлые раунды');
+      return;
+    }
+    var rows = (runHistory && runHistory.runs) || [];
     if (rows.length < 2) {
       chartEmpty(box, 'Это ваш первый раунд в этом режиме. Будет с чем сравнить');
       return;
@@ -5122,22 +5360,244 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
   }
 
+  /* ---------- ИСТОРИЯ ИГРОКА (СЕРВЕР) ----------
+     Тремя графиками из девяти («Последние раунды», «Время на ответ»,
+     «Против себя обычного») раунд сравнивается с прошлыми. История лежит
+     в `GameResult`, а не в localStorage: два источника истории разъехались
+     бы, а браузеров у человека несколько. */
+  function fetchHistory(then) {
+    if (!CFG.is_authenticated) { runHistory = null; if (then) then(); return; }
+    api('/game/api/me/history/?mode=' + encodeURIComponent(mode))
+      .then(function (d) {
+        runHistory = (d && d.runs) ? d : null;
+        if (then) then();
+      }, function () {
+        // Сеть подвела — сравнения не будет, а экран останется целым.
+        runHistory = null;
+        if (then) then();
+      });
+  }
+
+  /* 5. Лента ответов: клетка на вопрос, цвет — исход, высота — время. */
+  function chartTape(s) {
+    var box = $('chart-tape');
+    var seq = s.outcome_seq || [];
+    var times = s.time_seq || [];
+    if (!seq.length) { chartEmpty(box, 'Ни одного ответа в раунде'); return; }
+    var W = 400, H = 92, P = 8;
+    var svg = chartFrame(box, W, H);
+    var maxT = Math.max.apply(null, times.concat([1])) || 1;
+    var slot = (W - 2 * P) / seq.length;
+    var fill = { correct: 'var(--rush-ok)', wrong: 'var(--rush-bad)',
+                 skip: 'var(--text3)' };
+    seq.forEach(function (o, i) {
+      var t = times[i] || 0;
+      var bh = 10 + (t / maxT) * (H - P * 2 - 12);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.12, y: H - P - bh,
+        width: Math.max(slot * 0.76, 2), height: bh, rx: 2,
+        fill: fill[o] || 'var(--text3)', opacity: o === 'skip' ? .45 : .9
+      }));
+    });
+  }
+
+  /* 6. Время на ответ по вопросам. Ошибки красным, пунктиром — личное
+     среднее время верного ответа в этом режиме (с сервера). */
+  function chartTimes(s) {
+    var box = $('chart-times');
+    var times = s.time_seq || [];
+    var seq = s.outcome_seq || [];
+    if (!times.length) { chartEmpty(box, 'Нет данных о времени ответов'); return; }
+    var W = 400, H = 130, P = 8, BOT = 14;
+    var svg = chartFrame(box, W, H);
+    var avg = runHistory && runHistory.avg && runHistory.avg.avg_correct_ms;
+    var maxT = Math.max.apply(null, times.concat([avg || 0, 1])) || 1;
+    var slot = (W - 2 * P) / times.length;
+    var y = function (ms) { return H - BOT - (ms / maxT) * (H - P - BOT); };
+    times.forEach(function (t, i) {
+      var top = y(t);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.15, y: top,
+        width: Math.max(slot * 0.7, 2), height: Math.max(H - BOT - top, 2), rx: 2,
+        fill: seq[i] === 'wrong' ? 'var(--rush-bad)' : 'var(--rush-accent)',
+        opacity: seq[i] === 'skip' ? .3 : .85
+      }));
+    });
+    // ⚠️ Пунктира НЕТ, если среднего нет: линия по нулю говорила бы, что
+    // игрок обычно отвечает мгновенно. Отсутствие факта — не ноль.
+    if (avg) {
+      svg.appendChild(svgEl('line', {
+        x1: P, y1: y(avg), x2: W - P, y2: y(avg),
+        stroke: 'var(--text3)', 'stroke-width': 1,
+        'stroke-dasharray': '4 3', 'vector-effect': 'non-scaling-stroke'
+      }));
+      var lbl = svgEl('text', { x: W - P, y: y(avg) - 4, 'text-anchor': 'end',
+                                class: 'chart-lbl' });
+      lbl.textContent = 'обычно ' + (avg / 1000).toFixed(1).replace('.', ',') + ' с';
+      svg.appendChild(lbl);
+    }
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+  }
+
+  /* 7. Где набрано: очки за каждый вопрос. */
+  function chartPoints(s) {
+    var box = $('chart-points');
+    var pts = s.points_seq || [];
+    var total = pts.reduce(function (a, b) { return a + b; }, 0);
+    if (!total) { chartEmpty(box, 'Очков в этом раунде не набрано'); return; }
+    var W = 400, H = 130, P = 8, BOT = 14;
+    var svg = chartFrame(box, W, H);
+    var max = Math.max.apply(null, pts.concat([1])) || 1;
+    var slot = (W - 2 * P) / pts.length;
+    pts.forEach(function (v, i) {
+      var bh = (v / max) * (H - P - BOT);
+      svg.appendChild(svgEl('rect', {
+        x: P + i * slot + slot * 0.15, y: H - BOT - bh,
+        width: Math.max(slot * 0.7, 2), height: Math.max(bh, v ? 2 : 0), rx: 2,
+        fill: 'var(--rush-accent)', opacity: v ? .85 : .15
+      }));
+    });
+    svg.appendChild(svgEl('line', {
+      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
+      stroke: 'var(--rush-border)', 'stroke-width': 1
+    }));
+  }
+
+  /* 8. Микро и макро: те же ответы, свёрнутые в два раздела.
+     ⚠️ РАСКЛАДКА ТЕМ БЕРЁТСЯ ИЗ CFG.topic_groups, а она приезжает из
+     `problems/sections.py` через `game/filters.py::TOPIC_GROUPS`. ВТОРОЙ
+     копии раскладки не заводить — прямой запрет ADR 0071. */
+  function chartGroups(s) {
+    var box = $('chart-groups');
+    var groups = CFG.topic_groups || [];
+    var rows = s.topic_rows || [];
+    if (!groups.length || !rows.length) {
+      chartEmpty(box, 'Тем в раунде не набралось');
+      return;
+    }
+    var byTopic = {};
+    groups.forEach(function (g) {
+      (g.topics || []).forEach(function (t) { byTopic[t] = g.key; });
+    });
+    var acc = {};
+    groups.forEach(function (g) { acc[g.key] = { correct: 0, wrong: 0 }; });
+    var seen = false;
+    rows.forEach(function (r) {
+      var key = byTopic[r.topic];
+      if (!key || !acc[key]) return;      // «Без темы» ни в один раздел не идёт
+      acc[key].correct += r.correct;
+      acc[key].wrong += r.wrong;
+      seen = true;
+    });
+    if (!seen) { chartEmpty(box, 'Темы раунда не попали ни в один раздел'); return; }
+
+    box.innerHTML = '';
+    var list = document.createElement('ul');
+    list.className = 'group-bars';
+    groups.forEach(function (g) {
+      var cell = acc[g.key];
+      var tries = cell.correct + cell.wrong;
+      var li = document.createElement('li');
+      var name = document.createElement('span');
+      name.className = 'gb-name';
+      name.textContent = g.title;
+      var bar = document.createElement('span');
+      bar.className = 'gb-bar';
+      var fill = document.createElement('i');
+      fill.style.width = (tries ? 100 * cell.correct / tries : 0) + '%';
+      bar.appendChild(fill);
+      var num = document.createElement('span');
+      num.className = 'gb-num';
+      num.textContent = tries
+        ? cell.correct + '/' + tries + ' (' + Math.round(100 * cell.correct / tries) + '%)'
+        : 'не было';
+      li.appendChild(name);
+      li.appendChild(bar);
+      li.appendChild(num);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+  }
+
+  /* 9. Против себя обычного: счёт, точность и время этого раунда против
+     личного среднего в этом режиме. Средних нет — сравнивать не с чем, и
+     выдуманного среднего мы не рисуем. */
+  function chartUsual(s) {
+    var box = $('chart-usual');
+    if (!CFG.is_authenticated) {
+      chartEmpty(box, 'Войдите, чтобы сравнивать раунд со своим обычным');
+      return;
+    }
+    var avg = runHistory && runHistory.avg;
+    if (!avg) {
+      chartEmpty(box, 'Первый раунд в этом режиме: сравнивать пока не с чем');
+      return;
+    }
+    var myMs = 0, n = 0;
+    (s.time_seq || []).forEach(function (t, i) {
+      if ((s.outcome_seq || [])[i] === 'correct' && t) { myMs += t; n++; }
+    });
+    myMs = n ? Math.round(myMs / n) : null;
+
+    var rows = [
+      ['Счёт', s.score, avg.score, false],
+      ['Точность', s.accuracy, avg.accuracy, false],
+      // ⚠️ У времени «меньше» значит «лучше»: направление сравнения своё.
+      ['Время верного', myMs, avg.avg_correct_ms, true]
+    ];
+    box.innerHTML = '';
+    var list = document.createElement('ul');
+    list.className = 'usual-rows';
+    rows.forEach(function (r) {
+      var now = r[1], usual = r[2], lowerIsBetter = r[3];
+      if (now == null || usual == null) return;
+      var li = document.createElement('li');
+      var name = document.createElement('span');
+      name.className = 'gb-name';
+      name.textContent = r[0];
+      var val = document.createElement('span');
+      val.className = 'usual-val';
+      var fmt = function (v) {
+        return r[0] === 'Время верного'
+          ? (v / 1000).toFixed(1).replace('.', ',') + ' с'
+          : (r[0] === 'Точность' ? v + '%' : v.toLocaleString('ru-RU'));
+      };
+      val.textContent = fmt(now) + ' против ' + fmt(usual);
+      var mark = document.createElement('span');
+      var better = lowerIsBetter ? now < usual : now > usual;
+      var same = now === usual;
+      mark.className = 'usual-mark ' + (same ? '' : better ? 'up' : 'down');
+      mark.textContent = same ? 'как обычно' : better ? 'лучше' : 'хуже';
+      li.appendChild(name);
+      li.appendChild(val);
+      li.appendChild(mark);
+      list.appendChild(li);
+    });
+    box.appendChild(list);
+  }
+
+  /* Три графика из девяти зависят от истории с сервера: перерисовываем их
+     отдельно, когда ответ придёт. Остальные шесть уже нарисованы. */
+  function buildCompareCharts() {
+    if (!summary) return;
+    chartHistory(summary);
+    chartTimes(summary);
+    chartUsual(summary);
+  }
+
   function buildCharts() {
     if (!summary) return;
     chartCurve(summary);
     chartTime(summary);
     chartDifficulty(summary);
-    chartHistory(summary);
+    chartTape(summary);
+    chartPoints(summary);
+    chartGroups(summary);
+    buildCompareCharts();
   }
-
-  $('det-toggle').addEventListener('click', function () {
-    var body = $('det-body');
-    var open = body.hidden;
-    body.hidden = !open;
-    this.setAttribute('aria-expanded', open ? 'true' : 'false');
-    // графики строим лениво — при первом раскрытии в этом забеге
-    if (open && !chartsBuilt) { buildCharts(); chartsBuilt = true; }
-  });
 
   $('btn-review').addEventListener('click', function () {
     var list = $('miss-list');
@@ -5172,12 +5632,191 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       location.href = '/game/daily/';
     });
   }
-  if (CFG.has_duel) {
-    $('entry-duel').addEventListener('click', function () {
-      location.href = '/game/duel/new/?mode=' + encodeURIComponent(mode)
-        + '&' + filterQuery();
+  /* ---------- ОКНО «БРОСИТЬ ВЫЗОВ» ----------
+     ⚠️ ДВА ШАГА, А НЕ ПЕРЕХОД СРАЗУ В ИГРУ (08.09.2026). Раньше кнопка
+     делала `location.href = '/game/duel/new/?…'`, вьюха молча собирала
+     набор из десяти вопросов и возвращала редирект с `?auto=1` — забег
+     запускался немедленно. Автор не видел ни выбора режима, ни ссылки;
+     соперник приходил позже, и в одном забеге они практически никогда не
+     пересекались. Живого табло из-за этого не видел никто.
+
+     ⚠️ ВТОРОГО НАБОРА ФИЛЬТРОВ И ВТОРОГО «ТЕКУЩЕГО РЕЖИМА» ЗДЕСЬ НЕТ.
+     Окно правит тот же `filter` и тот же `mode`, что стартовый экран:
+     выбор в одном месте виден в другом, и разъезжаться нечему. */
+  (function duelWindow() {
+    var box = document.getElementById('dmodal');
+    if (!box || !CFG.has_duel) return;
+
+    var created = null;      // ответ duel_new: код, ссылки, сводка
+    var sock = null;
+    var opener = null;
+
+    function open(on) {
+      box.hidden = !on;
+      if (on) {
+        opener = document.activeElement;
+        step(1);
+        refreshCounts();
+        paintModes();
+        paintChips();
+        $('dmodal-close').focus();
+      } else {
+        if (opener && opener.focus) opener.focus();
+      }
+    }
+
+    function step(n) {
+      $('dm-step1').hidden = n !== 1;
+      $('dm-step2').hidden = n !== 2;
+      $('dm-create').hidden = n !== 1;
+      $('dm-play').hidden = n !== 2;
+    }
+
+    /* Карточки режимов окна. Число под каждой — сколько вопросов даёт
+       режим ПОД ТЕКУЩИМ ФИЛЬТРОМ; берётся из уже посчитанного
+       `poolCounts` (api_pool_counts), своего запроса не заводим. */
+    function paintModes() {
+      var grid = $('dm-modes');
+      grid.innerHTML = '';
+      MODE_ORDER.forEach(function (key) {
+        var m = CFG.modes[key];
+        if (!m || !CFG.pool_counts[key]) return;
+        var avail = (poolCounts && poolCounts[key] != null)
+          ? poolCounts[key] : CFG.pool_counts[key];
+        var low = avail < (CFG.min_playable || 10);
+        var b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'dm-mode';
+        b.dataset.mode = key;
+        b.setAttribute('aria-pressed', key === mode ? 'true' : 'false');
+        var name = document.createElement('b');
+        name.textContent = m.title;
+        var sub = document.createElement('small');
+        if (low) sub.className = 'low';
+        sub.textContent = avail + ' '
+          + plural(avail, ['вопрос', 'вопроса', 'вопросов']);
+        b.appendChild(name);
+        b.appendChild(sub);
+        b.addEventListener('click', function () {
+          mode = key;
+          renderModeCards();     // подсветка на стартовом экране — та же
+          paintModes();
+          paintCount();
+        });
+        grid.appendChild(b);
+      });
+      paintCount();
+    }
+
+    function paintCount() {
+      var avail = (poolCounts && poolCounts[mode] != null)
+        ? poolCounts[mode] : (CFG.pool_counts[mode] || 0);
+      $('dm-count').textContent = avail + ' '
+        + plural(avail, ['вопрос подходит', 'вопроса подходят',
+                         'вопросов подходит'])
+        + ' · играете, пока есть время и жизни';
+    }
+
+    function fail(text) {
+      var note = $('dm-error');
+      note.hidden = !text;
+      note.textContent = text || '';
+    }
+
+    /* Создать вызов. Ответ — JSON: вьюха больше не редиректит в игру. */
+    $('dm-create').addEventListener('click', function () {
+      var btn = this;
+      fail('');
+      btn.disabled = true;
+      api('/game/duel/new/?mode=' + encodeURIComponent(mode)
+          + '&' + filterQuery())
+        .then(function (d) {
+          btn.disabled = false;
+          if (!d || !d.ok) {
+            fail((d && d.error) || 'Не удалось создать вызов');
+            return;
+          }
+          created = d;
+          $('dm-link').value = d.duel_url;
+          $('dm-summary').textContent = 'Режим «' + d.mode_title
+            + '» · без лимита вопросов · ' + d.filter_text
+            + ' · код ' + d.code;
+          step(2);
+          $('dm-copy').focus();
+          listen(d.code);
+        }, function () {
+          btn.disabled = false;
+          fail('Не удалось создать вызов');
+        });
     });
-  }
+
+    $('dm-copy').addEventListener('click', function () {
+      var btn = this;
+      var input = $('dm-link');
+      input.select();
+      try {
+        navigator.clipboard.writeText(input.value);
+        btn.textContent = 'Скопировано';
+        setTimeout(function () { btn.textContent = 'Скопировать'; }, 1500);
+      } catch (e) { /* старый браузер: текст уже выделен */ }
+    });
+
+    $('dm-play').addEventListener('click', function () {
+      if (created) location.href = created.play_url;
+    });
+
+    /* Соперник открыл ссылку — узнаём об этом по сокету дуэли. Тот же
+       консьюмер, что рисует табло во время забега: своего канала не
+       заводим. Не подключился — строка так и останется «Ждём соперника»,
+       и это честно: врать «он на месте» нельзя. */
+    function listen(code) {
+      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
+      try {
+        sock = new WebSocket(proto + location.host + '/ws/duel/' + code + '/');
+      } catch (e) { return; }
+      sock.addEventListener('message', function (e) {
+        var m;
+        try { m = JSON.parse(e.data); } catch (err) { return; }
+        if (m.type === 'presence' && m.action === 'join') { here(); }
+        else if (m.type === 'start') { here(); countdown(m.in || 3); }
+      });
+    }
+
+    function here() {
+      $('dm-state').classList.add('is-here');
+      $('dm-state-text').textContent = 'Соперник на месте';
+    }
+
+    function countdown(n) {
+      $('dm-state-text').textContent = n > 0 ? String(n) : 'Поехали';
+      if (n > 0) { setTimeout(function () { countdown(n - 1); }, 1000); return; }
+      if (created) location.href = created.play_url;
+    }
+
+    $('entry-duel').addEventListener('click', function () { open(true); });
+    $('dmodal-close').addEventListener('click', function () { open(false); });
+    $('dm-filters').addEventListener('click', function () {
+      openFilters(true, this);
+    });
+    box.addEventListener('keydown', function (e) {
+      e.stopPropagation();
+      if (e.key === 'Escape') { e.preventDefault(); open(false); }
+    });
+
+    // Ссылка «Дуэль с другом» в строке под режимами открывает то же окно.
+    var link = document.querySelector('a[href="/game/duel/new/"]');
+    if (link) {
+      link.addEventListener('click', function (e) {
+        e.preventDefault();
+        open(true);
+      });
+    }
+
+    // Счётчики окна фильтров обновились — обновим и карточки вызова.
+    window.addEventListener('rush:counts', function () {
+      if (!box.hidden) paintModes();
+    });
+  })();
 
   /* Код набора: нечувствителен к регистру и пробелам — его переписывают
      руками с доски или из чата. */
@@ -5188,31 +5827,239 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     location.href = '/game/s/' + encodeURIComponent(code) + '/';
   });
 
+  /* ---------- ПАНЕЛЬ «МОИ РЕКОРДЫ» ----------
+     ⚠️ ДАННЫЕ С СЕРВЕРА, А НЕ ИЗ localStorage (08.09.2026, решение
+     владельца). Было четыре строки с рекордами по режимам, прочитанные из
+     браузера; рекорды при этом терялись при смене браузера. Всё, что здесь
+     есть, считается из `GameResult` — новых таблиц не заводится.
+
+     Ключ `econrush_best_v2_*` в localStorage остаётся: он больше не
+     источник правды (его пишет и читает только плашка «новый рекорд» по
+     ходу забега), а удалять ключи у живых игроков в эту сессию не входит.
+
+     ⚠️ АНОНИМУ НЕ РИСУЕМ НИ ОДНОГО ЧИСЛА. Ему нечего показывать, и
+     выдуманное число-заглушка хуже честной строки. */
+  var recMode = 'all';
+  var recLoading = false;
+
+  function recEl(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  function recMs(ms) {
+    return ms == null ? '–' : (ms / 1000).toFixed(1).replace('.', ',') + ' с';
+  }
+
+  function paintRecords(d) {
+    var box = $('records-box');
+    box.innerHTML = '';
+
+    // Переключатель режимов: «Все режимы» плюс те, что есть на экране.
+    var tabs = recEl('div', 'rec-modes');
+    [['all', 'Все режимы']].concat(visibleModes().map(function (k) {
+      return [k, CFG.modes[k].title];
+    })).forEach(function (pair) {
+      var b = recEl('button', null, pair[1]);
+      b.type = 'button';
+      b.setAttribute('aria-pressed', pair[0] === recMode ? 'true' : 'false');
+      b.addEventListener('click', function () {
+        recMode = pair[0];
+        loadRecords();
+      });
+      tabs.appendChild(b);
+    });
+    box.appendChild(tabs);
+
+    var p = d && d.panel;
+    if (!p || !p.runs) {
+      box.appendChild(recEl('p', 'rec-note',
+        'Раундов в этом режиме ещё не было. Сыграйте первый.'));
+      return;
+    }
+
+    // ── Четыре метрики ──
+    var grid = recEl('div', 'rec-metrics');
+    function metric(label, value, note) {
+      var cell = recEl('div', 'rec-metric');
+      cell.appendChild(recEl('small', null, label));
+      cell.appendChild(recEl('b', null, value));
+      if (note) cell.appendChild(recEl('i', null, note));
+      grid.appendChild(cell);
+    }
+    metric('Раундов', p.runs.toLocaleString('ru-RU'),
+           'зачётных ' + p.ranked_runs);
+    metric('Лучший счёт', p.best_score.toLocaleString('ru-RU'),
+           formatDate(p.best_score_at) + ' · ' + p.best_score_mode);
+    metric('Средняя точность', p.accuracy + '%');
+    metric('Верный ответ', recMs(p.avg_correct_ms), 'в среднем');
+    box.appendChild(grid);
+
+    // ── Место в таблице и разрыв до соседа сверху ──
+    if (p.place) {
+      var note = p.place.place + ' место из ' + p.place.total_players
+        + ' · ' + p.place.value.toLocaleString('ru-RU') + ' очков';
+      // ⚠️ Разрыва нет у первого места: догонять некого, и ноль здесь
+      // прочитался бы как «догнал».
+      note += p.place.gap == null
+        ? ' · выше никого'
+        : ' · до соседа сверху ' + p.place.gap.toLocaleString('ru-RU');
+      box.appendChild(recEl('p', 'rec-note', note));
+    }
+
+    recTimeline(box, p.timeline);
+    recModeTable(box, p.mode_rows);
+    recTopics(box, p.topic_rows);
+    recActivity(box, p.activity);
+    recDuels(box, p.duels);
+    recDifficulty(box, p.difficulty_rows);
+  }
+
+  function recBlock(box, title) {
+    var wrap = recEl('div', 'rec-block');
+    wrap.appendChild(recEl('h4', null, title));
+    box.appendChild(wrap);
+    return wrap;
+  }
+
+  /* График всех раундов: точка на раунд, линия личного рекорда на тот день.
+     Линия — нарастающий максимум: видно, КОГДА игрок себя обошёл. */
+  function recTimeline(box, rows) {
+    if (!rows || rows.length < 2) return;
+    var wrap = recBlock(box, 'Все раунды');
+    var holder = recEl('div', 'chart-box');
+    wrap.appendChild(holder);
+    var W = 400, H = 120, P = 8;
+    var svg = chartFrame(holder, W, H);
+    var max = Math.max.apply(null, rows.map(function (r) { return r.best; })) || 1;
+    var x = function (i) { return P + i * (W - 2 * P) / (rows.length - 1); };
+    var y = function (v) { return H - P - (v / max) * (H - 2 * P); };
+    svg.appendChild(svgEl('polyline', {
+      points: rows.map(function (r, i) { return x(i) + ',' + y(r.best); }).join(' '),
+      fill: 'none', stroke: 'var(--rush-accent)', 'stroke-width': 2,
+      'vector-effect': 'non-scaling-stroke'
+    }));
+    rows.forEach(function (r, i) {
+      svg.appendChild(svgEl('circle', {
+        cx: x(i), cy: y(r.score), r: 2.5,
+        fill: 'var(--text3)', opacity: .7
+      }));
+    });
+  }
+
+  function recModeTable(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Рекорды по режимам');
+    var table = recEl('table', 'rec-table');
+    var head = recEl('tr');
+    ['Режим', 'Счёт', 'Комбо', 'Точность'].forEach(function (t, i) {
+      var th = recEl('th', i ? 'num' : null, t);
+      head.appendChild(th);
+    });
+    table.appendChild(head);
+    rows.forEach(function (r) {
+      var tr = recEl('tr');
+      tr.appendChild(recEl('td', null, r.title));
+      tr.appendChild(recEl('td', 'num', r.score.toLocaleString('ru-RU')));
+      tr.appendChild(recEl('td', 'num', '×' + multText(r.combo)));
+      tr.appendChild(recEl('td', 'num', r.accuracy + '%'));
+      table.appendChild(tr);
+    });
+    wrap.appendChild(table);
+  }
+
+  function recTopics(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Точность по темам за всё время');
+    var list = recEl('ul', 'group-bars');
+    rows.slice(0, 8).forEach(function (r) {
+      var li = recEl('li');
+      li.appendChild(recEl('span', 'gb-name', r.topic));
+      var bar = recEl('span', 'gb-bar');
+      var fill = recEl('i');
+      fill.style.width = r.accuracy + '%';
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      li.appendChild(recEl('span', 'gb-num',
+        r.correct + '/' + r.total + ' (' + r.accuracy + '%)'));
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+  }
+
+  function recActivity(box, days) {
+    if (!days || !days.length) return;
+    var wrap = recBlock(box, 'Активность за 30 дней');
+    var strip = recEl('div', 'rec-days');
+    days.forEach(function (d) {
+      var cell = recEl('i', d.count >= 5 ? 'a3' : d.count >= 2 ? 'a2'
+                                                : d.count ? 'a1' : null);
+      cell.title = d.date + ': ' + d.count;
+      strip.appendChild(cell);
+    });
+    wrap.appendChild(strip);
+  }
+
+  function recDuels(box, duels) {
+    if (!duels || !duels.played) return;
+    var wrap = recBlock(box, 'Дуэли');
+    var text = 'побед ' + duels.wins + ' · поражений ' + duels.losses
+      + ' · ничьих ' + duels.draws;
+    // ⚠️ Процент может быть null: дуэли, где соперник не пришёл, в
+    // знаменатель не идут, и делить бывает не на что. Ноль тут соврал бы.
+    if (duels.win_percent != null) text += ' · ' + duels.win_percent + '%';
+    if (duels.top_rival) text += ' · чаще всего с ' + duels.top_rival;
+    wrap.appendChild(recEl('p', 'rec-note', text));
+  }
+
+  function recDifficulty(box, rows) {
+    if (!rows || !rows.length) return;
+    var wrap = recBlock(box, 'Доля верных по сложности');
+    var list = recEl('ul', 'group-bars');
+    rows.forEach(function (r) {
+      var li = recEl('li');
+      li.appendChild(recEl('span', 'gb-name', r.title));
+      var bar = recEl('span', 'gb-bar');
+      var fill = recEl('i');
+      fill.style.width = r.accuracy + '%';
+      bar.appendChild(fill);
+      li.appendChild(bar);
+      li.appendChild(recEl('span', 'gb-num',
+        r.correct + '/' + r.total + ' (' + r.accuracy + '%)'));
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+  }
+
+  function loadRecords() {
+    var box = $('records-box');
+    if (!CFG.is_authenticated) {
+      box.innerHTML = '';
+      box.appendChild(recEl('p', 'rec-note',
+        'Войдите, чтобы рекорды сохранялись и считались по всем устройствам.'));
+      box.hidden = false;
+      return;
+    }
+    if (recLoading) return;
+    recLoading = true;
+    box.hidden = false;
+    if (!box.innerHTML) box.appendChild(recEl('p', 'rec-note', 'Считаем…'));
+    api('/game/api/me/stats/?panel_mode=' + encodeURIComponent(recMode))
+      .then(function (d) { recLoading = false; paintRecords(d); },
+            function () {
+              recLoading = false;
+              box.innerHTML = '';
+              box.appendChild(recEl('p', 'rec-note',
+                'Не получилось загрузить рекорды. Попробуйте позже.'));
+            });
+  }
+
   $('entry-records').addEventListener('click', function () {
     var box = $('records-box');
     if (!box.hidden) { box.hidden = true; return; }
-    box.innerHTML = '';
-    var any = false;
-    visibleModes().forEach(function (key) {
-      var best = parseInt(localStorage.getItem(bestKey(key)) || '0', 10);
-      var row = document.createElement('div');
-      row.className = 'rec-row';
-      var name = document.createElement('span');
-      name.textContent = CFG.modes[key].title;
-      var val = document.createElement('b');
-      val.textContent = best > 0 ? best.toLocaleString('ru-RU') : '–';
-      if (best > 0) any = true;
-      row.appendChild(name);
-      row.appendChild(val);
-      box.appendChild(row);
-    });
-    if (!any) {
-      var hint = document.createElement('div');
-      hint.className = 'rec-row';
-      hint.textContent = 'Рекордов пока нет. Сыграйте первый раунд.';
-      box.appendChild(hint);
-    }
-    box.hidden = false;
+    loadRecords();
   });
 
   /* ---------- ЗАБЕГ ПО НАБОРУ ----------
@@ -5230,8 +6077,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-kind').textContent = AUTO_SET.kind === 'daily' ? 'Вызов дня'
       : AUTO_SET.kind === 'duel' ? 'Дуэль' : 'Набор';
     $('set-title').textContent = AUTO_SET.title;
+    // ⚠️ У ДУЭЛИ ЧИСЛА ВОПРОСОВ НЕТ. `size` — запас очереди (150), а не
+    // длина раунда: раунд кончается по времени и жизням. Показать «150
+    // вопр.» значило бы пообещать то, чего игрок никогда не увидит.
     $('set-meta').textContent = 'Режим «' + AUTO_SET.mode_title + '» · '
-      + AUTO_SET.size + ' вопр. · код ' + AUTO_SET.code;
+      + (AUTO_SET.kind === 'duel'
+          ? 'без лимита вопросов'
+          : AUTO_SET.size + ' вопр.')
+      + ' · код ' + AUTO_SET.code;
     $('set-board-link').href = AUTO_SET.board_url;
     if (!AUTO_SET.allowed) {
       var btn = $('set-play');
@@ -5244,8 +6097,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-play').addEventListener('click', function () {
       startRun({ setCode: AUTO_SET.code });
     });
-    // Автор дуэли уходит играть сразу: вопросов он не видел и увидеть
-    // не должен, показывать ему заставку не с чем.
+    // ⚠️ У ДУЭЛИ `autostart` ВСЕГДА false — так решает сервер (set_page).
+    // Автор дуэли приходит сюда из окна вызова и видит лобби со ссылкой;
+    // раньше забег начинался немедленно, и лобби никто не видел.
     if (AUTO_SET.autostart) startRun({ setCode: AUTO_SET.code });
   })();
 
@@ -5369,7 +6223,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var isDuel = AUTO_SET && AUTO_SET.kind === 'duel';
     if (!isDuel) return;
 
-    var bar = $('duel-bar');
+    var side = $('vs-them');
     var panel = $('duel-emoji');
     var lobby = $('duel-lobby');
     var countdown = $('duel-countdown');
@@ -5408,28 +6262,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (button) button.blur();
     }
 
-    function livesHtml(n) {
-      // ⚠️ Запас жизней НЕ ВЫДУМЫВАЕМ. Он приходит из config.py вместе с
-      // режимом: «три» здесь числом означало бы второй источник правды о
-      // механике, и он разошёлся бы с сервером при первой же правке.
-      var mode = CFG.modes[AUTO_SET.mode] || {};
-      var max = mode.lives || n;
-      var out = '';
-      for (var i = 0; i < max; i++) {
-        out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
-          + (window.QLS_ICONS ? window.QLS_ICONS.heart : '') + '</span>';
-      }
-      return out;
-    }
-
+    /* ⚠️ СОБЫТИЕ ТОЛЬКО ЗАПОМИНАЕТСЯ, РИСУЕТ ИГРОВОЙ ЦИКЛ. Событие
+       приходит на ответ соперника; между ответами его время всё равно
+       идёт, и отсчёт продолжает `paintVs()` от метки `at`. Рисовать здесь
+       значило бы заморозить время соперника до его следующего ответа —
+       ровно тот дефект, ради которого метка и заведена. */
     function showScore(row) {
-      bar.hidden = false;
-      bar.classList.remove('duel-bar--off');
-      $('duel-who').textContent = row.username || 'соперник';
-      $('duel-score').textContent = row.score;
-      $('duel-correct').textContent = row.correct;
-      $('duel-lives').innerHTML = livesHtml(row.lives);
-      $('duel-state').textContent = '';
+      vsRival = row;
+      vsRivalAt = Date.now();
+      $('vs-them-state').textContent = '';
+      paintVs();
     }
 
     function flyer(name, who) {
@@ -5462,7 +6304,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       } catch (e) { return; }
 
       sock.addEventListener('open', function () {
-        bar.hidden = false;
         panel.hidden = false;
         // «Привет» просит табло: после обрыва счёт соперника надо
         // восстановить, а не ждать его следующего ответа.
@@ -5475,19 +6316,25 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         else if (m.type === 'emoji') { flyer(m.name, m.username); }
         else if (m.type === 'start') { tick(m.in || 3); }
         else if (m.type === 'finished') {
+          // Забег соперника кончился: время замирает, а не продолжает
+          // течь локально. Иначе табло досчитало бы финишировавшего до нуля.
+          vsRivalDone = true;
           showScore(m);
-          $('duel-state').textContent = 'финишировал';
+          $('vs-them-state').textContent = 'финишировал';
         } else if (m.type === 'presence') {
           if (m.action === 'leave') {
-            bar.classList.add('duel-bar--off');
-            $('duel-state').textContent = 'соперник отключился';
+            // Ушёл — карточка гаснет вместе с отсчётом: показывать живое
+            // время того, кого нет, значит врать.
+            vsRivalDone = true;
+            side.classList.add('vs-side--off');
+            $('vs-them-state').textContent = 'соперник отключился';
           }
         }
       });
       sock.addEventListener('close', function () {
         // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться.
-        bar.classList.add('duel-bar--off');
-        $('duel-state').textContent = 'связь потеряна';
+        side.classList.add('vs-side--off');
+        $('vs-them-state').textContent = 'связь потеряна';
         setTimeout(connect, 4000);
       });
     }

@@ -1,342 +1,576 @@
 {
   "keepdb": false,
-  "total_seconds": 978.8,
-  "tests": 2431,
+  "total_seconds": 1577.7,
+  "tests": 4298,
   "modules": [
     {
-      "module": "problems.tests.test_r15_describe",
-      "seconds": 38.0,
-      "tests": 9,
+      "module": "calc2.tests.test_calc2_math",
+      "seconds": 108.7,
+      "tests": 1,
+      "ok": false
+    },
+    {
+      "module": "problems.tests.test_design_canon",
+      "seconds": 34.2,
+      "tests": 4,
       "ok": true
     },
     {
       "module": "problems.tests.test_night_bugs",
-      "seconds": 34.7,
+      "seconds": 25.3,
       "tests": 73,
       "ok": true
     },
     {
-      "module": "calc2.tests.test_calc2_math",
-      "seconds": 33.4,
-      "tests": 1,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_exams",
-      "seconds": 30.8,
+      "seconds": 23.0,
       "tests": 63,
       "ok": true
     },
     {
-      "module": "problems.tests.test_build_flow",
-      "seconds": 28.5,
-      "tests": 22,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_hw_generator",
-      "seconds": 27.2,
-      "tests": 19,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_search_first",
-      "seconds": 26.7,
-      "tests": 15,
+      "module": "game.tests.test_leaderboard",
+      "seconds": 20.2,
+      "tests": 25,
       "ok": true
     },
     {
       "module": "problems.tests.test_review55",
-      "seconds": 26.4,
+      "seconds": 19.5,
       "tests": 80,
       "ok": true
     },
     {
-      "module": "problems.tests.test_design_canon",
-      "seconds": 25.2,
-      "tests": 3,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_platform_models",
-      "seconds": 17.4,
+      "seconds": 13.3,
       "tests": 41,
       "ok": true
     },
     {
+      "module": "game.tests.test_duel_ws",
+      "seconds": 13.3,
+      "tests": 21,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_accounts",
+      "seconds": 13.2,
+      "tests": 35,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_students_screen",
-      "seconds": 16.2,
+      "seconds": 13.2,
       "tests": 15,
       "ok": true
     },
     {
+      "module": "problems.tests.test_object_access",
+      "seconds": 12.5,
+      "tests": 22,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_solo_merge",
-      "seconds": 14.3,
+      "seconds": 12.5,
       "tests": 17,
       "ok": true
     },
     {
-      "module": "problems.tests.test_obzor_students",
-      "seconds": 13.4,
-      "tests": 11,
+      "module": "problems.tests.test_blank_zero",
+      "seconds": 11.9,
+      "tests": 17,
+      "ok": true
+    },
+    {
+      "module": "teacher.tests.test_invites",
+      "seconds": 11.9,
+      "tests": 24,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_blocks_logic",
+      "seconds": 11.8,
+      "tests": 29,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_auth_hardening",
+      "seconds": 11.5,
+      "tests": 19,
       "ok": true
     },
     {
       "module": "problems.tests.test_obzor_review",
-      "seconds": 13.2,
+      "seconds": 11.3,
       "tests": 30,
       "ok": true
     },
     {
+      "module": "problems.tests.test_comment_visibility",
+      "seconds": 11.2,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_obzor_students",
+      "seconds": 11.2,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_individual",
+      "seconds": 11.1,
+      "tests": 21,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_option_grading",
-      "seconds": 13.2,
+      "seconds": 11.0,
       "tests": 29,
       "ok": true
     },
     {
       "module": "problems.tests.test_obzor_build",
-      "seconds": 12.6,
+      "seconds": 10.9,
       "tests": 25,
       "ok": true
     },
     {
-      "module": "problems.tests.test_individual",
-      "seconds": 12.5,
-      "tests": 21,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_comment_visibility",
-      "seconds": 12.2,
-      "tests": 18,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_obzor_overview",
-      "seconds": 11.9,
+      "seconds": 10.5,
       "tests": 20,
       "ok": true
     },
     {
-      "module": "problems.tests.test_own_parts_reach",
-      "seconds": 11.8,
-      "tests": 19,
+      "module": "game.tests.test_duel",
+      "seconds": 10.5,
+      "tests": 25,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_katex_dollars",
+      "seconds": 10.4,
+      "tests": 9,
       "ok": true
     },
     {
       "module": "problems.tests.test_obzor_nav",
-      "seconds": 10.9,
+      "seconds": 9.9,
       "tests": 20,
       "ok": true
     },
     {
       "module": "problems.tests.test_work_flow",
-      "seconds": 10.5,
+      "seconds": 9.7,
       "tests": 47,
       "ok": true
     },
     {
+      "module": "problems.tests.test_access_boundaries",
+      "seconds": 9.6,
+      "tests": 17,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_own_parts_reach",
+      "seconds": 9.5,
+      "tests": 19,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_waiting_count",
-      "seconds": 10.3,
+      "seconds": 9.5,
       "tests": 11,
       "ok": true
     },
     {
-      "module": "problems.tests.test_r15_regrade",
-      "seconds": 10.2,
-      "tests": 26,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_r15_crumbs",
-      "seconds": 10.1,
-      "tests": 18,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_work_review",
-      "seconds": 10.1,
-      "tests": 15,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_obzor_done",
-      "seconds": 9.8,
-      "tests": 16,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_obzor_student_card",
-      "seconds": 9.7,
-      "tests": 15,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_part_answers",
-      "seconds": 9.7,
-      "tests": 14,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_obzor_minutes",
-      "seconds": 9.6,
+      "seconds": 9.4,
       "tests": 15,
       "ok": true
     },
     {
       "module": "problems.tests.test_answer_approval",
-      "seconds": 9.5,
+      "seconds": 9.1,
       "tests": 20,
       "ok": true
     },
     {
-      "module": "problems.tests.test_obzor_solo",
+      "module": "problems.tests.test_obzor_done",
+      "seconds": 9.1,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_obzor_student_card",
+      "seconds": 9.1,
+      "tests": 15,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_xss_payloads",
+      "seconds": 9.1,
+      "tests": 20,
+      "ok": true
+    },
+    {
+      "module": "student.tests.test_join",
+      "seconds": 9.1,
+      "tests": 15,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_sets",
+      "seconds": 9.1,
+      "tests": 26,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_auto_zero",
+      "seconds": 8.9,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_obzor_minutes",
+      "seconds": 8.9,
+      "tests": 15,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_regrade",
+      "seconds": 8.9,
+      "tests": 26,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_answer_leakage",
       "seconds": 8.8,
-      "tests": 12,
+      "tests": 10,
       "ok": true
     },
     {
-      "module": "problems.tests.test_print_sheet",
+      "module": "problems.tests.test_group_history",
+      "seconds": 8.7,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_crumbs",
+      "seconds": 8.7,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_gamification",
       "seconds": 8.6,
-      "tests": 24,
+      "tests": 36,
       "ok": true
     },
     {
-      "module": "problems.tests.test_blank_zero",
+      "module": "calc2.tests.test_calc2_static_version",
+      "seconds": 8.6,
+      "tests": 4,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_mass_assignment",
       "seconds": 8.5,
-      "tests": 17,
+      "tests": 10,
       "ok": true
     },
     {
-      "module": "problems.tests.test_custom_parts",
+      "module": "problems.tests.test_part_answers",
+      "seconds": 8.5,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_game",
+      "seconds": 8.5,
+      "tests": 139,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_embedding_provenance",
       "seconds": 8.4,
       "tests": 14,
       "ok": true
     },
     {
-      "module": "problems.tests.test_group_history",
+      "module": "problems.tests.test_obzor_solo",
       "seconds": 8.4,
-      "tests": 9,
+      "tests": 12,
       "ok": true
     },
     {
-      "module": "problems.tests.test_gamification",
-      "seconds": 8.2,
-      "tests": 36,
+      "module": "game.tests.test_stats",
+      "seconds": 8.4,
+      "tests": 32,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_custom_parts",
+      "seconds": 8.3,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_filters",
+      "seconds": 8.3,
+      "tests": 30,
       "ok": true
     },
     {
       "module": "problems.tests.test_lost_bits",
-      "seconds": 8.1,
+      "seconds": 8.2,
       "tests": 23,
       "ok": true
     },
     {
-      "module": "problems.tests.test_auto_zero",
-      "seconds": 7.9,
-      "tests": 11,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_eyes_grading",
-      "seconds": 7.9,
+      "seconds": 8.1,
       "tests": 15,
       "ok": true
     },
     {
-      "module": "problems.tests.test_points_lock",
-      "seconds": 7.9,
-      "tests": 10,
+      "module": "problems.tests.test_print_sheet",
+      "seconds": 8.1,
+      "tests": 24,
+      "ok": true
+    },
+    {
+      "module": "calc2.tests.test_export_pdf",
+      "seconds": 8.0,
+      "tests": 13,
       "ok": true
     },
     {
       "module": "problems.tests.test_obzor_assignments",
-      "seconds": 7.8,
+      "seconds": 7.9,
       "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_ranked",
+      "seconds": 7.9,
+      "tests": 21,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_activity_block",
+      "seconds": 7.6,
+      "tests": 21,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_build_flow",
+      "seconds": 7.6,
+      "tests": 22,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_points_lock",
+      "seconds": 7.6,
+      "tests": 10,
       "ok": true
     },
     {
       "module": "problems.tests.test_section_order",
-      "seconds": 7.8,
+      "seconds": 7.6,
       "tests": 11,
       "ok": true
     },
     {
+      "module": "problems.tests.test_stats",
+      "seconds": 7.6,
+      "tests": 24,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_student_card",
-      "seconds": 7.8,
+      "seconds": 7.6,
+      "tests": 20,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_tails",
+      "seconds": 7.6,
       "tests": 20,
       "ok": true
     },
     {
       "module": "problems.tests.test_score_comma",
-      "seconds": 7.6,
-      "tests": 18,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_blocks_logic",
       "seconds": 7.5,
-      "tests": 29,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_activity_block",
-      "seconds": 7.2,
-      "tests": 21,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_obzor_own_problem",
-      "seconds": 7.2,
       "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_generators",
+      "seconds": 7.4,
+      "tests": 67,
       "ok": true
     },
     {
       "module": "problems.tests.test_assignment_export",
-      "seconds": 7.1,
+      "seconds": 7.3,
       "tests": 13,
       "ok": true
     },
     {
-      "module": "problems.tests.test_stats",
-      "seconds": 7.0,
-      "tests": 24,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_r15_format",
-      "seconds": 6.9,
-      "tests": 20,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_look_numbers",
-      "seconds": 6.7,
+      "module": "problems.tests.test_calendar_disclosure",
+      "seconds": 7.3,
       "tests": 12,
       "ok": true
     },
     {
-      "module": "problems.tests.test_tails",
-      "seconds": 6.6,
-      "tests": 20,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_topic_merge",
-      "seconds": 6.6,
+      "module": "problems.tests.test_hw_generator",
+      "seconds": 7.3,
       "tests": 19,
       "ok": true
     },
     {
-      "module": "problems.tests.test_assignment_rows",
-      "seconds": 6.4,
-      "tests": 20,
+      "module": "problems.tests.test_look_numbers",
+      "seconds": 7.3,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_obzor_own_problem",
+      "seconds": 7.3,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_stats_cards",
+      "seconds": 7.3,
+      "tests": 25,
       "ok": true
     },
     {
       "module": "problems.tests.test_work_settings",
-      "seconds": 6.4,
+      "seconds": 7.3,
       "tests": 23,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_chat_api",
+      "seconds": 7.3,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_topic_merge",
+      "seconds": 7.1,
+      "tests": 19,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_daily",
+      "seconds": 7.1,
+      "tests": 24,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_assignment_rows",
+      "seconds": 7.0,
+      "tests": 20,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_format",
+      "seconds": 7.0,
+      "tests": 20,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_batch2_unblock",
+      "seconds": 6.9,
+      "tests": 56,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_lockdown_sessions",
+      "seconds": 6.8,
+      "tests": 3,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_small_fixes",
+      "seconds": 6.8,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_attempt_files",
+      "seconds": 6.8,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_page_js",
+      "seconds": 6.8,
+      "tests": 28,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_diagnostics_out",
+      "seconds": 6.7,
+      "tests": 3,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_obzor_my_problems",
+      "seconds": 6.6,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_calendar_add_back",
+      "seconds": 6.5,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_score_integrity",
+      "seconds": 6.5,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_check_block",
+      "seconds": 6.4,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_minutes_on_site",
+      "seconds": 6.4,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_describe",
+      "seconds": 6.4,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_log_hygiene",
+      "seconds": 6.3,
+      "tests": 8,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_look_pick",
+      "seconds": 6.3,
+      "tests": 31,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_old_screens_gone",
+      "seconds": 6.3,
+      "tests": 22,
       "ok": true
     },
     {
@@ -346,321 +580,597 @@
       "ok": true
     },
     {
-      "module": "problems.tests.test_stats_cards",
-      "seconds": 6.3,
-      "tests": 21,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_small_fixes",
-      "seconds": 6.2,
-      "tests": 14,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_r15_builder",
-      "seconds": 6.0,
+      "seconds": 6.3,
       "tests": 23,
       "ok": true
     },
     {
-      "module": "problems.tests.test_obzor_my_problems",
-      "seconds": 5.9,
-      "tests": 12,
+      "module": "catalog.tests.test_filters_multi",
+      "seconds": 6.3,
+      "tests": 15,
       "ok": true
     },
     {
-      "module": "problems.tests.test_score_integrity",
-      "seconds": 5.9,
-      "tests": 12,
+      "module": "student.tests.test_student_cycle",
+      "seconds": 6.3,
+      "tests": 9,
       "ok": true
     },
     {
-      "module": "problems.tests.test_minutes_on_site",
-      "seconds": 5.8,
-      "tests": 11,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_old_screens_gone",
-      "seconds": 5.7,
-      "tests": 22,
-      "ok": true
-    },
-    {
-      "module": "game.tests.test_generators",
-      "seconds": 5.7,
-      "tests": 56,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_check_block",
-      "seconds": 5.5,
-      "tests": 12,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_r15_card",
-      "seconds": 5.5,
-      "tests": 17,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_talk_block",
-      "seconds": 5.4,
-      "tests": 11,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_true_numbers",
-      "seconds": 5.3,
-      "tests": 19,
+      "module": "teacher.tests.test_teacher_panel",
+      "seconds": 6.3,
+      "tests": 9,
       "ok": true
     },
     {
       "module": "problems.tests.test_look_check",
-      "seconds": 5.2,
+      "seconds": 6.2,
       "tests": 27,
       "ok": true
     },
     {
+      "module": "problems.tests.test_no_default_passwords",
+      "seconds": 6.2,
+      "tests": 3,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_saved_flagged",
+      "seconds": 6.2,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_talk_block",
+      "seconds": 6.2,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_filter_window",
+      "seconds": 6.2,
+      "tests": 31,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_run_state",
+      "seconds": 6.2,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_feedback",
+      "seconds": 6.1,
+      "tests": 25,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_solvehub",
+      "seconds": 6.1,
+      "tests": 23,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_look_cards",
+      "seconds": 6.1,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_search_first",
+      "seconds": 6.1,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_true_numbers",
+      "seconds": 6.1,
+      "tests": 19,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_attempt_api",
+      "seconds": 6.1,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_attempts",
+      "seconds": 6.1,
+      "tests": 8,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_figure_audit",
+      "seconds": 6.1,
+      "tests": 35,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_activity_shared",
+      "seconds": 6.0,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_deploy_dump_bank_only",
+      "seconds": 6.0,
+      "tests": 3,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_invariants",
+      "seconds": 6.0,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_shkolkovo",
+      "seconds": 6.0,
+      "tests": 15,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_label_set",
+      "seconds": 6.0,
+      "tests": 8,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_r15_align",
-      "seconds": 5.2,
+      "seconds": 6.0,
       "tests": 13,
       "ok": true
     },
     {
+      "module": "problems.tests.test_r15_card",
+      "seconds": 6.0,
+      "tests": 17,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_r15_pair",
-      "seconds": 5.2,
+      "seconds": 6.0,
       "tests": 13,
       "ok": true
     },
     {
       "module": "problems.tests.test_r15_scroll",
-      "seconds": 5.2,
+      "seconds": 6.0,
       "tests": 20,
       "ok": true
     },
     {
-      "module": "problems.tests.test_look_pick",
-      "seconds": 5.1,
-      "tests": 31,
+      "module": "catalog.tests.test_problem_page",
+      "seconds": 6.0,
+      "tests": 14,
       "ok": true
     },
     {
-      "module": "problems.tests.test_r15_minutes",
-      "seconds": 5.0,
-      "tests": 10,
+      "module": "game.tests.test_wecon_texts",
+      "seconds": 6.0,
+      "tests": 37,
       "ok": true
     },
     {
-      "module": "problems.tests.test_activity_shared",
-      "seconds": 4.8,
-      "tests": 11,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_look_cards",
-      "seconds": 4.8,
+      "module": "problems.tests.test_answer_check",
+      "seconds": 5.9,
       "tests": 16,
       "ok": true
     },
     {
+      "module": "problems.tests.test_backfill_embedding_provenance",
+      "seconds": 5.9,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_found_step",
+      "seconds": 5.9,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_lesh",
+      "seconds": 5.9,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_minutes",
+      "seconds": 5.9,
+      "tests": 10,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_smart_catalog",
+      "seconds": 5.9,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "student.tests.test_dashboard_queries",
+      "seconds": 5.9,
+      "tests": 2,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_guest_access",
+      "seconds": 5.8,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_search_service",
+      "seconds": 5.8,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_semantic_degradation",
+      "seconds": 5.8,
+      "tests": 13,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_feel",
+      "seconds": 5.8,
+      "tests": 21,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_embedding_versioning",
+      "seconds": 5.7,
+      "tests": 6,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_eval_set_b",
+      "seconds": 5.7,
+      "tests": 17,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_overview_look",
-      "seconds": 4.8,
+      "seconds": 5.7,
       "tests": 10,
       "ok": true
     },
     {
       "module": "problems.tests.test_r15_collect",
-      "seconds": 4.8,
+      "seconds": 5.7,
       "tests": 20,
-      "ok": true
-    },
-    {
-      "module": "student.tests.test_student_cycle",
-      "seconds": 4.8,
-      "tests": 9,
       "ok": true
     },
     {
       "module": "problems.tests.test_r15_sections",
-      "seconds": 4.7,
+      "seconds": 5.7,
       "tests": 20,
       "ok": true
     },
     {
-      "module": "teacher.tests.test_teacher_panel",
-      "seconds": 4.7,
-      "tests": 9,
+      "module": "catalog.tests.test_no_slop",
+      "seconds": 5.7,
+      "tests": 12,
       "ok": true
     },
     {
-      "module": "calc2.tests.test_export_pdf",
-      "seconds": 4.7,
-      "tests": 10,
+      "module": "problems.tests.test_exam_autosave_js",
+      "seconds": 5.6,
+      "tests": 4,
       "ok": true
     },
     {
-      "module": "problems.tests.test_answer_check",
-      "seconds": 4.4,
-      "tests": 16,
+      "module": "problems.tests.test_exam_timer_js",
+      "seconds": 5.6,
+      "tests": 5,
       "ok": true
     },
     {
-      "module": "problems.tests.test_r15_date",
-      "seconds": 4.4,
-      "tests": 26,
+      "module": "problems.tests.test_export_chatgpt_batch",
+      "seconds": 5.6,
+      "tests": 11,
       "ok": true
     },
     {
-      "module": "problems.tests.test_tables",
-      "seconds": 4.4,
-      "tests": 13,
-      "ok": true
-    },
-    {
-      "module": "game.tests.test_game",
-      "seconds": 4.4,
-      "tests": 136,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_import_vsosh",
-      "seconds": 4.3,
-      "tests": 7,
+      "module": "problems.tests.test_import_problem_attributes",
+      "seconds": 5.6,
+      "tests": 5,
       "ok": true
     },
     {
       "module": "problems.tests.test_look_sheet",
-      "seconds": 4.3,
+      "seconds": 5.6,
       "tests": 20,
       "ok": true
     },
     {
+      "module": "problems.tests.test_look_stats",
+      "seconds": 5.6,
+      "tests": 22,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_small_16",
+      "seconds": 5.6,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_whole_caption",
+      "seconds": 5.6,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_hints",
+      "seconds": 5.6,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_problem_test_page",
+      "seconds": 5.6,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_testplay",
+      "seconds": 5.6,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_alarm",
+      "seconds": 5.6,
+      "tests": 31,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_classify_test_types",
+      "seconds": 5.5,
+      "tests": 18,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_fix_sequences",
+      "seconds": 5.5,
+      "tests": 5,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_glue_pdf_lines",
+      "seconds": 5.5,
+      "tests": 49,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_vsosh",
+      "seconds": 5.5,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_link_olympiad_refs",
+      "seconds": 5.5,
+      "tests": 6,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_look_kit",
+      "seconds": 5.5,
+      "tests": 36,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_render_new_sources",
+      "seconds": 5.5,
+      "tests": 13,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_section_radar",
+      "seconds": 5.5,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_security_headers",
+      "seconds": 5.5,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_catalog_redesign",
+      "seconds": 5.5,
+      "tests": 31,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_similar_titles",
+      "seconds": 5.5,
+      "tests": 8,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_figure_mode",
+      "seconds": 5.5,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_answer_second_opinion",
+      "seconds": 5.4,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_diagnostics",
+      "seconds": 5.4,
+      "tests": 11,
+      "ok": true
+    },
+    {
       "module": "problems.tests.test_one_cart",
-      "seconds": 4.3,
+      "seconds": 5.4,
       "tests": 10,
       "ok": true
     },
     {
       "module": "problems.tests.test_r15_print",
-      "seconds": 4.3,
+      "seconds": 5.4,
       "tests": 13,
       "ok": true
     },
     {
-      "module": "problems.tests.test_readable",
-      "seconds": 4.3,
-      "tests": 14,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_small_16",
-      "seconds": 4.3,
-      "tests": 12,
-      "ok": true
-    },
-    {
       "module": "problems.tests.test_review_bundle",
-      "seconds": 4.2,
+      "seconds": 5.4,
       "tests": 25,
       "ok": true
     },
     {
-      "module": "problems.tests.test_template_hygiene",
-      "seconds": 4.2,
-      "tests": 2,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_whole_caption",
-      "seconds": 4.2,
-      "tests": 11,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_look_stats",
-      "seconds": 4.1,
-      "tests": 22,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_katex_dollars",
-      "seconds": 4.0,
-      "tests": 9,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_exam_timer_js",
-      "seconds": 3.9,
-      "tests": 5,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_found_step",
-      "seconds": 3.9,
-      "tests": 18,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_repair_wave1",
-      "seconds": 3.9,
-      "tests": 41,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_work_form_js",
-      "seconds": 3.9,
-      "tests": 6,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_batch2_unblock",
-      "seconds": 3.7,
-      "tests": 56,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_exam_autosave_js",
-      "seconds": 3.7,
-      "tests": 4,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_look_kit",
-      "seconds": 3.7,
-      "tests": 36,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_text_clean",
-      "seconds": 3.7,
-      "tests": 24,
-      "ok": true
-    },
-    {
       "module": "catalog.tests.test_catalog",
-      "seconds": 3.7,
-      "tests": 18,
+      "seconds": 5.4,
+      "tests": 19,
       "ok": true
     },
     {
-      "module": "catalog.tests.test_collections",
-      "seconds": 3.7,
-      "tests": 9,
+      "module": "game.tests.test_answer_letter_match",
+      "seconds": 5.4,
+      "tests": 7,
       "ok": true
     },
     {
-      "module": "game.tests.test_page_js",
-      "seconds": 3.7,
+      "module": "game.tests.test_inline_options",
+      "seconds": 5.4,
       "tests": 12,
       "ok": true
     },
     {
-      "module": "problems.tests.test_glue_pdf_lines",
-      "seconds": 3.6,
-      "tests": 49,
+      "module": "problems.tests.test_media_route",
+      "seconds": 5.3,
+      "tests": 12,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_r15_date",
+      "seconds": 5.3,
+      "tests": 26,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_readable",
+      "seconds": 5.3,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_revert_gate_v2_blocked_markdown",
+      "seconds": 5.3,
+      "tests": 6,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_tables",
+      "seconds": 5.3,
+      "tests": 13,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_filter_state_api",
+      "seconds": 5.3,
+      "tests": 7,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_missing_figures",
+      "seconds": 5.2,
+      "tests": 29,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_new_source_figures",
+      "seconds": 5.2,
+      "tests": 25,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_problem_figures",
+      "seconds": 5.2,
+      "tests": 29,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_repair_wave1",
+      "seconds": 5.2,
+      "tests": 41,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_search_eval_command",
+      "seconds": 5.2,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_template_hygiene",
+      "seconds": 5.2,
+      "tests": 2,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_topic_assignment",
+      "seconds": 5.2,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_work_form_js",
+      "seconds": 5.2,
+      "tests": 6,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_catalog_modal",
+      "seconds": 5.2,
+      "tests": 5,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_collections",
+      "seconds": 5.2,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_search_eval_scope",
+      "seconds": 5.1,
+      "tests": 5,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_text_clean",
+      "seconds": 5.1,
+      "tests": 24,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_figure_cascade",
+      "seconds": 4.0,
+      "tests": 28,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_ru_forms",
+      "seconds": 1.6,
+      "tests": 16,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_figure_draw",
+      "seconds": 1.4,
+      "tests": 1,
       "ok": true
     },
     {
@@ -670,51 +1180,201 @@
       "ok": true
     },
     {
-      "module": "problems.tests.test_ru_forms",
-      "seconds": 1.2,
-      "tests": 16,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_css_comments",
-      "seconds": 0.8,
+      "module": "calc2.tests.test_calc2_map",
+      "seconds": 0.9,
       "tests": 3,
       "ok": true
     },
     {
-      "module": "problems.tests.test_import_matek_clean",
+      "module": "problems.tests.test_production_settings",
+      "seconds": 0.8,
+      "tests": 23,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_typography",
       "seconds": 0.6,
-      "tests": 11,
+      "tests": 4,
       "ok": true
     },
     {
-      "module": "problems.tests.test_parse_vsosh",
+      "module": "problems.tests.test_css_comments",
       "seconds": 0.5,
-      "tests": 33,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_parse_vsosh_municip",
-      "seconds": 0.5,
-      "tests": 31,
-      "ok": true
-    },
-    {
-      "module": "problems.tests.test_fix_latex_junk",
-      "seconds": 0.4,
-      "tests": 10,
+      "tests": 5,
       "ok": true
     },
     {
       "module": "problems.tests.test_batch2_ns",
+      "seconds": 0.4,
+      "tests": 29,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_econ_terms",
+      "seconds": 0.4,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "catalog.tests.test_topic_map",
+      "seconds": 0.4,
+      "tests": 83,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_core",
+      "seconds": 0.3,
+      "tests": 122,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_criteria",
       "seconds": 0.3,
       "tests": 29,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_lesh",
+      "seconds": 0.3,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_math_canon",
+      "seconds": 0.3,
+      "tests": 27,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_preflight_gate",
+      "seconds": 0.3,
+      "tests": 17,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_report",
+      "seconds": 0.3,
+      "tests": 3,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_structure_guard",
+      "seconds": 0.3,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_tex_lexer",
+      "seconds": 0.3,
+      "tests": 21,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_converter_text_env",
+      "seconds": 0.3,
+      "tests": 28,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_corpus_dollar_diagnosis",
+      "seconds": 0.3,
+      "tests": 17,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_deploy_dump",
+      "seconds": 0.3,
+      "tests": 4,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_eval_set_c_markdown",
+      "seconds": 0.3,
+      "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_eval_sets",
+      "seconds": 0.3,
+      "tests": 14,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_fix_latex_junk",
+      "seconds": 0.3,
+      "tests": 10,
       "ok": true
     },
     {
       "module": "problems.tests.test_hints",
       "seconds": 0.3,
       "tests": 9,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_import_matek_clean",
+      "seconds": 0.3,
+      "tests": 11,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_mathkbd",
+      "seconds": 0.3,
+      "tests": 15,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_palette_tokens",
+      "seconds": 0.3,
+      "tests": 10,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_parse_vsosh",
+      "seconds": 0.3,
+      "tests": 33,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_parse_vsosh_municip",
+      "seconds": 0.3,
+      "tests": 31,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_rendering",
+      "seconds": 0.3,
+      "tests": 39,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_search_eval_metrics",
+      "seconds": 0.3,
+      "tests": 20,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_sections",
+      "seconds": 0.3,
+      "tests": 17,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_tokens_css",
+      "seconds": 0.3,
+      "tests": 5,
+      "ok": true
+    },
+    {
+      "module": "problems.tests.test_xml_entities",
+      "seconds": 0.3,
+      "tests": 6,
+      "ok": true
+    },
+    {
+      "module": "game.tests.test_scoring",
+      "seconds": 0.3,
+      "tests": 27,
       "ok": true
     }
   ]

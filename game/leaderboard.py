@@ -193,6 +193,241 @@ def personal_stats(user, mode):
     }
 
 
+def best_run(user, mode):
+    u"""Личный рекорд игрока в режиме или None, если рекорда ещё нет.
+
+    ⚠️ ТОЧНОСТЬ БЕРЁТСЯ У САМОГО РЕКОРДНОГО ЗАБЕГА, а не средняя за всё
+    время (её считает `personal_stats`). Табло сравнивает текущий раунд с
+    ОДНИМ конкретным забегом, и подмешивать туда среднее значило бы
+    показывать рядом два числа из разных вселенных.
+
+    None означает ровно одно: забегов в этом режиме не было. Экран в этом
+    случае говорит словами, а не рисует ноль: выдуманное число-заглушка на
+    табло хуже честного «первый раунд».
+    """
+    run = (GameResult.objects
+           .filter(user=user, mode=mode,
+                   economy_version=config.ECONOMY_VERSION)
+           .order_by('-score', 'created_at').first())
+    if run is None:
+        return None
+    attempts = run.correct_count + run.wrong_count
+    return {
+        'score': run.score,
+        'correct': run.correct_count,
+        'accuracy': round(100 * run.correct_count / attempts) if attempts else 0,
+        'created_at': run.created_at.isoformat(timespec='seconds'),
+    }
+
+
+# Сколько последних забегов показывает график «Последние раунды».
+# ⚠️ Число живёт ЗДЕСЬ, а не в клиенте: клиент рисует то, что дали.
+HISTORY_LIMIT = 20
+
+
+def run_history(user, mode):
+    u"""Последние забеги игрока в режиме плюс его средние по режиму.
+
+    ⚠️ ТОЛЬКО ПРО СЕБЯ. Параметра «чей» нет и не будет: он немедленно
+    превратил бы личную историю в публичную по перебору номеров — то же
+    правило, что у `personal_stats`.
+
+    ⚠️ СРЕДНИЕ СЧИТАЮТСЯ ПО ВСЕМ ЗАБЕГАМ РЕЖИМА, а список — по последним
+    двадцати. Это разные вопросы: «как я играю обычно» и «как шли последние
+    раунды». Считать среднее по двадцати значило бы менять смысл слова
+    «обычно» вместе с длиной списка.
+
+    Пустая история — это `runs: []` и `avg: None`, а не нули: нуля забегов
+    не бывает «в среднем», и рисовать по нему сравнение нечестно.
+    """
+    runs = GameResult.objects.filter(user=user, mode=mode,
+                                     economy_version=config.ECONOMY_VERSION)
+    total = runs.count()
+    if not total:
+        return {'mode': mode, 'runs': [], 'avg': None, 'total': 0}
+
+    recent = list(runs.order_by('-created_at')[:HISTORY_LIMIT])
+    recent.reverse()          # на графике время идёт слева направо
+    rows = [{
+        'score': r.score,
+        'accuracy': r.accuracy,
+        'avg_correct_ms': r.avg_correct_ms,
+        'created_at': r.created_at.isoformat(timespec='seconds'),
+    } for r in recent]
+
+    scores = list(runs.values_list('score', flat=True))
+    correct_sum = sum(runs.values_list('correct_count', flat=True))
+    attempts = sum(r.correct_count + r.wrong_count for r in runs)
+    speeds = [r.avg_correct_ms for r in runs if r.avg_correct_ms]
+    return {
+        'mode': mode,
+        'runs': rows,
+        'total': total,
+        'avg': {
+            'score': round(sum(scores) / total),
+            'accuracy': round(100 * correct_sum / attempts) if attempts else 0,
+            # None, а не ноль: «в среднем ноль миллисекунд» — не факт, а
+            # отсутствие факта, и пунктир по нему лёг бы по нулю.
+            'avg_correct_ms': (int(sum(speeds) / len(speeds))
+                               if speeds else None),
+        },
+    }
+
+
+# Панель «Мои рекорды» смотрит на активность за столько дней.
+ACTIVITY_DAYS = 30
+
+
+def records_panel(user, mode='all'):
+    u"""Всё, чем живёт панель «Мои рекорды». ВИДНА ТОЛЬКО ЕЁ ХОЗЯИНУ.
+
+    ⚠️ НОВЫХ ТАБЛИЦ НЕ ЗАВОДИМ. Всё считается из `GameResult`: разбивки по
+    темам и по сложности лежат в нём полями (`topic_breakdown`,
+    `difficulty_breakdown`), дуэли считает `duel_stats` по наборам. Вторая
+    таблица разъехалась бы с фактом при первом же удалении забега руками —
+    тот же довод, что у лидерборда (ADR 0056).
+
+    ⚠️ `mode='all'` — это ВСЕ РЕЖИМЫ, а не «режим по умолчанию». Счёт Пули
+    и Классики несравним (запасы времени отличаются вдесятеро), поэтому
+    «лучший счёт» по всем режимам не считается вовсе: вместо него таблица
+    рекордов по режимам, где каждый сравнивается сам с собой.
+
+    Забегов нет — возвращается `runs: 0` и больше ничего: рисовать нули
+    там, где игрок ещё не играл, значит выдумывать числа.
+    """
+    runs = GameResult.objects.filter(user=user,
+                                     economy_version=config.ECONOMY_VERSION)
+    if mode != 'all':
+        runs = runs.filter(mode=mode)
+    rows = list(runs.order_by('created_at'))
+    if not rows:
+        return {'mode': mode, 'runs': 0}
+
+    attempts = sum(r.correct_count + r.wrong_count for r in rows)
+    correct = sum(r.correct_count for r in rows)
+    speeds = [r.avg_correct_ms for r in rows if r.avg_correct_ms]
+    best = max(rows, key=lambda r: (r.score, r.created_at))
+
+    # ── График всех раундов: точка на раунд плюс рекорд НА ТОТ ДЕНЬ ──
+    # Линия рекорда строится нарастающим максимумом по порядку игры: она
+    # показывает, когда игрок себя обошёл, а не сегодняшний потолок.
+    timeline = []
+    running_best = 0
+    for r in rows:
+        running_best = max(running_best, r.score)
+        timeline.append({
+            'score': r.score,
+            'best': running_best,
+            'mode': r.mode,
+            'at': r.created_at.isoformat(timespec='seconds'),
+        })
+
+    # ── Таблица рекордов по режимам ──
+    by_mode = {}
+    for r in rows:
+        cell = by_mode.setdefault(r.mode, {
+            'mode': r.mode,
+            'title': config.MODES.get(r.mode, {}).get('title', r.mode),
+            'score': 0, 'combo': 1.0, 'correct': 0, 'attempts': 0, 'runs': 0})
+        cell['runs'] += 1
+        cell['score'] = max(cell['score'], r.score)
+        cell['combo'] = max(cell['combo'], r.max_combo or 1.0)
+        cell['correct'] += r.correct_count
+        cell['attempts'] += r.correct_count + r.wrong_count
+    mode_rows = []
+    for key in config.MODES:
+        cell = by_mode.get(key)
+        if not cell:
+            continue
+        cell['accuracy'] = (round(100 * cell['correct'] / cell['attempts'])
+                            if cell['attempts'] else 0)
+        mode_rows.append(cell)
+
+    # ── Точность по темам и по сложности за всё время ──
+    topics = {}
+    for r in rows:
+        for cell in (r.topic_breakdown or []):
+            name = cell.get('topic')
+            if not name:
+                continue
+            acc = topics.setdefault(name, {'correct': 0, 'wrong': 0})
+            acc['correct'] += cell.get('correct', 0)
+            acc['wrong'] += cell.get('wrong', 0)
+    topic_rows = []
+    for name, cell in topics.items():
+        tries = cell['correct'] + cell['wrong']
+        if not tries:
+            continue
+        topic_rows.append({'topic': name, 'correct': cell['correct'],
+                           'total': tries,
+                           'accuracy': round(100 * cell['correct'] / tries)})
+    topic_rows.sort(key=lambda t: (t['accuracy'], -t['total']))
+
+    diff = {}
+    for r in rows:
+        for cell in (r.difficulty_breakdown or []):
+            key = cell.get('key')
+            if not key:
+                continue
+            acc = diff.setdefault(key, {'key': key,
+                                        'title': cell.get('title', key),
+                                        'correct': 0, 'total': 0})
+            acc['correct'] += cell.get('correct', 0)
+            acc['total'] += cell.get('total', 0)
+    diff_rows = [dict(v, accuracy=(round(100 * v['correct'] / v['total'])
+                                   if v['total'] else 0))
+                 for v in diff.values() if v['total']]
+
+    # ── Активность за 30 дней: сколько раундов в день ──
+    since = timezone.now().date() - datetime.timedelta(days=ACTIVITY_DAYS - 1)
+    per_day = {}
+    for r in rows:
+        day = timezone.localtime(r.created_at).date()
+        if day >= since:
+            per_day[day] = per_day.get(day, 0) + 1
+    activity = [{'date': (since + datetime.timedelta(days=i)).isoformat(),
+                 'count': per_day.get(since + datetime.timedelta(days=i), 0)}
+                for i in range(ACTIVITY_DAYS)]
+
+    # ── Место в таблице и разрыв до соседа сверху ──
+    place = None
+    board_mode = mode if mode != 'all' else config.DEFAULT_MODE
+    row = my_row(user, board_mode, 'all', 'score')
+    if row:
+        ahead = (base_queryset(board_mode, 'all', 'score')
+                 .values('user').annotate(best=Max('score'))
+                 .filter(best__gt=row['value']).order_by('best')
+                 .values_list('best', flat=True).first())
+        place = {
+            'mode': board_mode,
+            'place': row['place'],
+            'value': row['value'],
+            'total_players': total_players(board_mode, 'all', 'score'),
+            # Разрыв до соседа СВЕРХУ. Первый в таблице — соседа нет, и
+            # ноль тут означал бы «догонять некого», а не «догнал».
+            'gap': (ahead - row['value']) if ahead is not None else None,
+        }
+
+    return {
+        'mode': mode,
+        'runs': len(rows),
+        'ranked_runs': sum(1 for r in rows if r.ranked),
+        'best_score': best.score,
+        'best_score_at': best.created_at.isoformat(timespec='seconds'),
+        'best_score_mode': config.MODES.get(best.mode, {}).get('title',
+                                                              best.mode),
+        'accuracy': round(100 * correct / attempts) if attempts else 0,
+        'avg_correct_ms': int(sum(speeds) / len(speeds)) if speeds else None,
+        'timeline': timeline,
+        'mode_rows': mode_rows,
+        'topic_rows': topic_rows,
+        'difficulty_rows': diff_rows,
+        'activity': activity,
+        'place': place,
+        'duels': duel_stats(user),
+    }
+
+
 def duel_stats(user):
     u"""Сводка по дуэлям игрока. Новых таблиц не заводим.
 

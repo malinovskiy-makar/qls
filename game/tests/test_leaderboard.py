@@ -280,3 +280,203 @@ class ApiShapeTests(TestCase):
     def test_first_tab_comes_with_the_page_so_it_does_not_blink(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         self.assertIn('"leaderboard"', html)
+
+
+class MyHistoryBoundaryTests(TestCase):
+    u"""История забегов: только про себя, и она с СЕРВЕРА (08.09.2026).
+
+    ⚠️ ПОЧЕМУ ПЕРЕЕХАЛА. Прежняя история жила в localStorage браузера:
+    терялась при смене браузера, а два источника истории разъехались бы при
+    первом же расхождении. Источник теперь один — `GameResult`.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.a = User.objects.create_user(username='hist_a', password='p12345')
+        self.b = User.objects.create_user(username='hist_b', password='p12345')
+
+    def url(self):
+        return reverse('game:my_history')
+
+    def test_anonymous_gets_403_not_a_redirect(self):
+        u"""⚠️ Эндпоинт зовёт fetch: редирект вернул бы ему HTML входа."""
+        r = self.client.get(self.url())
+        self.assertEqual(r.status_code, 403)
+        self.assertEqual(r['Content-Type'].split(';')[0], 'application/json')
+
+    def test_no_parameter_can_ask_for_someone_elses_history(self):
+        u"""Параметра «чей» нет и не будет: перебор номеров сделал бы личную
+        историю публичной. То же правило, что у `api_my_stats`."""
+        run(self.a, score=999, correct=30)
+        run(self.b, score=11, correct=1)
+        self.client.force_login(self.b)
+        for probe in ({'user': self.a.id}, {'user_id': self.a.id},
+                      {'username': 'hist_a'}, {'me': self.a.id}):
+            d = self.client.get(self.url(), probe).json()
+            self.assertEqual([r['score'] for r in d['runs']], [11],
+                             'параметр %r пробил границу' % probe)
+
+    def test_an_empty_history_is_empty_not_zeroed(self):
+        u"""⚠️ Нуля забегов не бывает «в среднем»: `avg` тут None, не ноль.
+
+        Иначе экран нарисовал бы сравнение с выдуманным средним.
+        """
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertEqual(d['runs'], [])
+        self.assertIsNone(d['avg'])
+        self.assertEqual(d['total'], 0)
+
+    def test_runs_come_oldest_first_and_are_capped(self):
+        u"""На графике время идёт слева направо, и хвост ограничен."""
+        from game import leaderboard as lb
+        for i in range(lb.HISTORY_LIMIT + 5):
+            run(self.a, score=i, correct=1)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertEqual(len(d['runs']), lb.HISTORY_LIMIT)
+        scores = [r['score'] for r in d['runs']]
+        self.assertEqual(scores, sorted(scores), 'порядок не по возрастанию')
+        self.assertEqual(scores[-1], lb.HISTORY_LIMIT + 4)   # последний забег
+        self.assertEqual(d['total'], lb.HISTORY_LIMIT + 5)
+
+    def test_the_average_is_over_all_runs_not_just_the_listed_ones(self):
+        u"""⚠️ «Как я играю обычно» и «как шли последние раунды» — разные
+        вопросы. Считать среднее по двадцати значило бы менять смысл слова
+        «обычно» вместе с длиной списка."""
+        from game import leaderboard as lb
+        for _ in range(lb.HISTORY_LIMIT):
+            run(self.a, score=100, correct=10)
+        run(self.a, score=0, correct=0, wrong=10, avg_ms=None)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        total = lb.HISTORY_LIMIT + 1
+        self.assertEqual(d['total'], total)
+        self.assertEqual(d['avg']['score'],
+                         round(100 * lb.HISTORY_LIMIT / total))
+
+    def test_history_is_per_mode(self):
+        run(self.a, mode='blitz', score=500, correct=20)
+        run(self.a, mode='bullet', score=70, correct=4)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url(), {'mode': 'bullet'}).json()
+        self.assertEqual([r['score'] for r in d['runs']], [70])
+
+    def test_a_missing_speed_never_becomes_a_zero(self):
+        u"""«В среднем ноль миллисекунд» — не факт, а отсутствие факта."""
+        run(self.a, score=100, correct=5, avg_ms=None)
+        self.client.force_login(self.a)
+        d = self.client.get(self.url()).json()
+        self.assertIsNone(d['avg']['avg_correct_ms'])
+
+
+class RecordsPanelTests(TestCase):
+    u"""Панель «Мои рекорды»: серверные данные, никаких новых таблиц.
+
+    ⚠️ ГДЕ ЖИВЁТ. Панель отдаёт `api_my_stats` полем `panel`, а не свой
+    эндпоинт: это ровно «личная статистика, только про себя», и граница у
+    неё та же самая — второй эндпоинт означал бы второе место, где ту же
+    границу надо не забыть удержать.
+    """
+
+    def setUp(self):
+        cache.clear()
+        self.a = User.objects.create_user(username='rec_a', password='p12345')
+        self.b = User.objects.create_user(username='rec_b', password='p12345')
+
+    def panel(self, mode='all', user=None):
+        self.client.force_login(user or self.a)
+        return self.client.get(reverse('game:my_stats'),
+                               {'panel_mode': mode}).json()['panel']
+
+    def test_a_player_without_runs_gets_no_numbers_at_all(self):
+        u"""⚠️ Числовой инвариант: у игрока без забегов панель пуста.
+
+        Нули вместо статистики — выдуманные числа: их на экране быть не
+        должно, а «сыграно 0 раундов, точность 0 %» читается как факт.
+        """
+        p = self.panel()
+        self.assertEqual(p['runs'], 0)
+        self.assertEqual(set(p), {'mode', 'runs'})
+
+    def test_aggregates_match_a_second_count_over_game_result(self):
+        u"""Числовой инвариант фазы: считаем двумя способами и сверяем."""
+        run(self.a, mode='blitz', score=300, correct=12, wrong=3, avg_ms=2000)
+        run(self.a, mode='blitz', score=500, correct=20, wrong=0, avg_ms=3000)
+        run(self.a, mode='bullet', score=90, correct=5, wrong=5, avg_ms=1000)
+
+        rows = GameResult.objects.filter(user=self.a,
+                                         economy_version=config.ECONOMY_VERSION)
+        correct = sum(r.correct_count for r in rows)
+        attempts = sum(r.correct_count + r.wrong_count for r in rows)
+        speeds = [r.avg_correct_ms for r in rows if r.avg_correct_ms]
+
+        p = self.panel('all')
+        self.assertEqual(p['runs'], rows.count())
+        self.assertEqual(p['best_score'], max(r.score for r in rows))
+        self.assertEqual(p['accuracy'], round(100 * correct / attempts))
+        self.assertEqual(p['avg_correct_ms'],
+                         int(sum(speeds) / len(speeds)))
+
+    def test_one_mode_counts_only_that_mode(self):
+        run(self.a, mode='blitz', score=300, correct=12)
+        run(self.a, mode='bullet', score=90, correct=5)
+        self.assertEqual(self.panel('blitz')['runs'], 1)
+        self.assertEqual(self.panel('blitz')['best_score'], 300)
+
+    def test_someone_elses_runs_never_leak_in(self):
+        run(self.a, score=100, correct=5)
+        run(self.b, score=9999, correct=99)
+        p = self.panel('all', user=self.a)
+        self.assertEqual(p['runs'], 1)
+        self.assertEqual(p['best_score'], 100)
+
+    def test_the_record_line_is_a_running_maximum(self):
+        u"""Линия рекорда показывает, КОГДА игрок себя обошёл."""
+        for score in (100, 50, 300, 200):
+            run(self.a, score=score, correct=5)
+        p = self.panel('all')
+        self.assertEqual([r['score'] for r in p['timeline']],
+                         [100, 50, 300, 200])
+        self.assertEqual([r['best'] for r in p['timeline']],
+                         [100, 100, 300, 300])
+
+    def test_topic_accuracy_is_aggregated_from_the_runs_themselves(self):
+        u"""Новой таблицы нет: разбивка лежит полем в каждом забеге."""
+        GameResult.objects.create(
+            code=make_result_code(), mode='blitz', user=self.a, score=10,
+            correct_count=1, wrong_count=1,
+            economy_version=config.ECONOMY_VERSION,
+            topic_breakdown=[{'topic': 'Эластичность', 'correct': 1, 'wrong': 1}])
+        GameResult.objects.create(
+            code=make_result_code(), mode='blitz', user=self.a, score=10,
+            correct_count=2, wrong_count=0,
+            economy_version=config.ECONOMY_VERSION,
+            topic_breakdown=[{'topic': 'Эластичность', 'correct': 2, 'wrong': 0}])
+        rows = {r['topic']: r for r in self.panel('all')['topic_rows']}
+        self.assertEqual(rows['Эластичность']['correct'], 3)
+        self.assertEqual(rows['Эластичность']['total'], 4)
+        self.assertEqual(rows['Эластичность']['accuracy'], 75)
+
+    def test_activity_covers_exactly_thirty_days(self):
+        from game import leaderboard as lb
+        run(self.a, score=100, correct=5)
+        days = self.panel('all')['activity']
+        self.assertEqual(len(days), lb.ACTIVITY_DAYS)
+        self.assertEqual(sum(d['count'] for d in days), 1)
+
+    def test_the_leader_has_no_gap_above_and_that_is_not_zero(self):
+        u"""⚠️ Ноль читался бы как «догнал». Выше никого — это None."""
+        run(self.a, mode='blitz', score=1000, correct=40)
+        self.assertIsNone(self.panel('blitz')['place']['gap'])
+
+    def test_the_gap_is_the_distance_to_the_neighbour_above(self):
+        run(self.a, mode='blitz', score=400, correct=20)
+        run(self.b, mode='blitz', score=650, correct=30)
+        place = self.panel('blitz', user=self.a)['place']
+        self.assertEqual(place['place'], 2)
+        self.assertEqual(place['gap'], 250)
+
+    def test_anonymous_is_turned_away_from_the_panel_too(self):
+        r = self.client.get(reverse('game:my_stats'), {'panel_mode': 'all'})
+        self.assertIn(r.status_code, (302, 403), r.status_code)
