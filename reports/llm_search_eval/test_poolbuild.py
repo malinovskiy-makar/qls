@@ -45,8 +45,12 @@ class DedupTests(unittest.TestCase):
     GROUPS = {10: ('g1', True), 11: ('g1', False), 12: ('g2', True), 13: (None, False)}
 
     def test_из_группы_остаётся_фаворит(self):
-        kept, dropped = poolbuild.collapse_dedup([10, 11, 12, 13], self.GROUPS)
+        # Фаворит стоит ВТОРЫМ намеренно: иначе тест не отличает «оставили
+        # фаворита» от «оставили первого попавшегося», и правило про
+        # фаворита оказывается никем не сторожимым.
+        kept, dropped = poolbuild.collapse_dedup([11, 10, 12, 13], self.GROUPS)
         self.assertEqual(kept, [10, 12, 13])
+        self.assertEqual(dropped, [{'id': 11, 'group': 'g1', 'kept': 10}])
 
     def test_убранный_записан_с_пометкой_и_причиной(self):
         _, dropped = poolbuild.collapse_dedup([10, 11], self.GROUPS)
