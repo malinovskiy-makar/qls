@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Сторож перед коммитом: блокирует дампы БД, .env и файлы больше 5 МБ.
+# Причина: 21.08.2026 db.sqlite3.backup-2026-08-21 (441,6 МБ) уехал в 15
+# коммитов через git add до того, как GitHub отбил пуш лимитом 100 МБ;
+# 14.07.2026 prod_backup_20260622_0210.dump (14,7 МБ) прошёл незамеченным
+# и остался в истории навсегда. Хук ловит оба класса ДО коммита, а не
+# постфактум в CI. Установка: git config core.hooksPath scripts/hooks
+
+set -euo pipefail
+
+MAX_BYTES=$((5 * 1024 * 1024))
+blocked=0
+
+while IFS= read -r -d '' file; do
+    [ -f "$file" ] || continue
+
+    base=$(basename "$file")
+    case "$base" in
+        *.sql|*.sqlite3|*.dump|.env|.env.*)
+            echo "СТОП: файл запрещённого типа для коммита: $file" >&2
+            blocked=1
+            continue
+            ;;
+    esac
+
+    size=$(wc -c < "$file" | tr -d ' ')
+    if [ "$size" -gt "$MAX_BYTES" ]; then
+        echo "СТОП: файл больше 5 МБ ($size байт): $file" >&2
+        blocked=1
+    fi
+done < <(git diff --cached --name-only --diff-filter=ACM -z)
+
+if [ "$blocked" -eq 1 ]; then
+    echo "" >&2
+    echo "Коммит отменён. Если файл не дамп/секрет и его размер оправдан —" >&2
+    echo "добавьте точное исключение в .gitignore/этот хук, а не убирайте проверку целиком." >&2
+    exit 1
+fi
+
+exit 0
