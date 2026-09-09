@@ -56,6 +56,11 @@ NORM_MIN, NORM_MAX = 0.5, 2.0
 #: Сколько задач пишем одной транзакцией.
 BATCH = 500
 
+#: `filter(pk__in=[...])` с десятками тысяч значений роняет SQLite
+#: («too many SQL variables») — читаем задачи порциями. PostgreSQL это же
+#: ограничение не задевает, но порция дешёвая и там.
+ID_CHUNK = 900
+
 
 class Command(BaseCommand):
     help = 'Ввезти посчитанные векторы в банк (по умолчанию — план, без записи).'
@@ -117,19 +122,21 @@ class Command(BaseCommand):
         ids = list(meta['ids'])
         хеши = dict(zip(ids, meta['hashes']))
         место = {pid: i for i, pid in enumerate(ids)}
-        задачи = (Problem.objects.filter(pk__in=ids)
-                  .prefetch_related(*PREFETCH))
 
         к_записи, разошлись = [], []
         нашлось = set()
-        for задача in задачи.iterator(chunk_size=BATCH):
-            нашлось.add(задача.id)
-            текст = build_text(задача, spec)
-            если_хеш = text_hash(текст)
-            if если_хеш != хеши.get(задача.id):
-                разошлись.append(задача.id)
-                continue
-            к_записи.append((задача.id, если_хеш))
+        for начало in range(0, len(ids), ID_CHUNK):
+            порция_ids = ids[начало:начало + ID_CHUNK]
+            задачи = (Problem.objects.filter(pk__in=порция_ids)
+                      .prefetch_related(*PREFETCH))
+            for задача in задачи.iterator(chunk_size=BATCH):
+                нашлось.add(задача.id)
+                текст = build_text(задача, spec)
+                если_хеш = text_hash(текст)
+                if если_хеш != хеши.get(задача.id):
+                    разошлись.append(задача.id)
+                    continue
+                к_записи.append((задача.id, если_хеш))
         пропало = [i for i in ids if i not in нашлось]
 
         self.stdout.write('Ввоз векторов: спецификация «%s» (версия %d)'
@@ -155,9 +162,14 @@ class Command(BaseCommand):
                                              TEXT_PROTECTED_FIELDS)
         сейчас = timezone.now()
         записано = 0
-        for начало in range(0, len(к_записи), BATCH):
-            кусок = к_записи[начало:начало + BATCH]
-            with transaction.atomic():
+        # ⚠️ ОДНА транзакция на весь ввоз, не на батч. Обрыв процесса между
+        # батчами при транзакции на каждые 500 задач оставил бы банк в смеси
+        # старой и новой формулы — а это не поймает ни один инвариант, поиск
+        # просто станет молча хуже. Разбивка на BATCH внутри — только чтобы
+        # не собирать все объекты в память разом, коммит один на всё.
+        with transaction.atomic():
+            for начало in range(0, len(к_записи), BATCH):
+                кусок = к_записи[начало:начало + BATCH]
                 for pid, хеш in кусок:
                     вектор = матрица[место[pid]]
                     Problem.objects.filter(pk=pid).update(
@@ -168,15 +180,15 @@ class Command(BaseCommand):
                         embedding_built_at=сейчас,
                     )
                     записано += 1
-            self.stdout.write('   записано %d/%d' % (записано, len(к_записи)))
+                self.stdout.write('   записано %d/%d' % (записано, len(к_записи)))
 
-        отпечаток_после = protected_fingerprint(Problem.objects.all(),
-                                                TEXT_PROTECTED_FIELDS)
-        if отпечаток_до != отпечаток_после:
-            raise CommandError(
-                'СВИП-ДЕТЕКТОР: тексты задач изменились во время ввоза '
-                '(%s → %s). Откат из бэкапа фазы 0.'
-                % (отпечаток_до, отпечаток_после))
+            отпечаток_после = protected_fingerprint(Problem.objects.all(),
+                                                    TEXT_PROTECTED_FIELDS)
+            if отпечаток_до != отпечаток_после:
+                raise CommandError(
+                    'СВИП-ДЕТЕКТОР: тексты задач изменились во время ввоза '
+                    '(%s → %s). Откат целиком — вся транзакция отменена.'
+                    % (отпечаток_до, отпечаток_после))
 
         self.stdout.write(self.style.SUCCESS(
             'Записано %d векторов. Свип-детектор: расхождений 0.' % записано))
