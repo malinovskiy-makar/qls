@@ -55,10 +55,23 @@ def complete_queries(pool, verdicts):
     return complete
 
 
-def query_metrics(pool, qid, verdicts, formulas):
+#: Что считается «годной» для precision@k и ранга первой годной. nDCG@10
+#: НЕ зависит от режима — она и так градуирована (годится=2, спорно=1,
+#: не годится=0), это ровно тот компромисс, ради которого шкала градуирована.
+GOOD_SETS = {
+    'strict': {'good'},             # годной считается только «годится»
+    'soft': {'good', 'unsure'},     # годной считается «годится» и «спорно»
+}
+
+
+def query_metrics(pool, qid, verdicts, formulas, mode='strict'):
     """{formula: {precision10, precision5, ndcg10, rank_first_good}} для
-    ОДНОГО (полностью размеченного) запроса."""
+    ОДНОГО (полностью размеченного) запроса.
+
+    `mode` ('strict'|'soft') решает, что считать «годной» для precision@k и
+    ранга первой годной — nDCG@10 от режима не зависит (см. GOOD_SETS)."""
     merged = pool['pool_per_query'][qid]  # {pid: {formula: {rank, score}}}
+    good_set = GOOD_SETS[mode]
 
     all_graded = [VERDICT_SCORE[verdicts[(qid, int(pid))]] for pid in merged.keys()]
     ideal_top10 = sorted(all_graded, reverse=True)[:10]
@@ -76,7 +89,7 @@ def query_metrics(pool, qid, verdicts, formulas):
         assert len(top10) == 10, f'{qid}/{name}: в пуле {len(top10)} мест топ-10, а не 10'
 
         graded = [VERDICT_SCORE[verdicts[(qid, pid)]] for pid in top10]
-        is_good = [verdicts[(qid, pid)] == 'good' for pid in top10]
+        is_good = [verdicts[(qid, pid)] in good_set for pid in top10]
 
         precision10 = sum(is_good) / 10.0
         precision5 = sum(is_good[:5]) / 5.0
@@ -137,14 +150,26 @@ def bootstrap_ci(per_query, formulas, query_ids, iters=10000, seed=20260909):
     return ci
 
 
-def run(pool, verdicts, verbose=True):
+def run(pool, verdicts, verbose=True, mode='strict', query_filter=None):
+    """query_filter: необязательный список/множество query_id — если задан,
+    используются только они (должны быть полностью размечены); остальные
+    полностью размеченные запросы в счёт не идут. Нужно для замера на
+    подмножестве запросов (Фаза «без q02/q07/q10»)."""
     formulas = pool['formulas']
     complete = complete_queries(pool, verdicts)
     complete_ids = [qid for qid, ok in complete.items() if ok]
     incomplete_ids = [qid for qid, ok in complete.items() if not ok]
 
+    if query_filter is not None:
+        missing = set(query_filter) - set(complete_ids)
+        if missing:
+            raise ValueError(f'query_filter просит запросы, которых нет среди '
+                              f'полностью размеченных: {sorted(missing)}')
+        complete_ids = [qid for qid in complete_ids if qid in set(query_filter)]
+
     if verbose:
-        print(f'Запросов размечено полностью: {len(complete_ids)} из {len(pool["queries"])}')
+        print(f'Запросов размечено полностью: {len(complete)} из {len(pool["queries"])}'
+              + (f', в счёт взято {len(complete_ids)}' if query_filter is not None else ''))
         if incomplete_ids:
             print('Пропущены (разметка неполная):', ', '.join(sorted(incomplete_ids)))
         if not complete_ids:
@@ -152,7 +177,7 @@ def run(pool, verdicts, verbose=True):
             return None
 
     per_query = {
-        qid: query_metrics(pool, qid, verdicts, formulas)
+        qid: query_metrics(pool, qid, verdicts, formulas, mode=mode)
         for qid in complete_ids
     }
     agg = aggregate(per_query, formulas, complete_ids)
@@ -161,7 +186,7 @@ def run(pool, verdicts, verbose=True):
     if verbose:
         _print_table(agg, ci, formulas)
     return {'aggregate': agg, 'ci': ci, 'complete_queries': complete_ids,
-            'incomplete_queries': incomplete_ids, 'per_query': per_query}
+            'incomplete_queries': incomplete_ids, 'per_query': per_query, 'mode': mode}
 
 
 def _print_table(agg, ci, formulas):
