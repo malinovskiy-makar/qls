@@ -446,3 +446,14 @@ reports/formula_v2/*
 !reports/formula_v2/*.md
 !reports/formula_v2/STATE.json
 !reports/formula_v2/manifest_run3.txt
+
+# Сессия «LLM-слой над поиском» (09.09.2026). reports/* исключён выше —
+# возвращаем отчёты, состояние, смету и код замера. Пулы, метки судей и
+# страница side-by-side (jsonl, html) остаются локальными: они большие и
+# пересобираются кодом отсюда.
+!reports/llm_search_eval/
+reports/llm_search_eval/*
+!reports/llm_search_eval/*.md
+!reports/llm_search_eval/*.py
+!reports/llm_search_eval/STATE.json
+!reports/llm_search_eval/estimate.json
