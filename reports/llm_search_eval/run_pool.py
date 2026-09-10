@@ -264,6 +264,16 @@ def main():
 
     dense = dense_runs(queries, timing)
 
+    # Нога S_concept подмешивается, если её прогон уже сделан
+    # (reports/llm_search_eval/run_concept.py). Без файла пул собирается
+    # из трёх ног — так он и собирался, пока не было ключей.
+    concept_path = os.path.join(HERE, 'concept_runs.json')
+    concept = {}
+    if os.path.exists(concept_path):
+        with open(concept_path, encoding='utf-8') as f:
+            concept = json.load(f)
+    timing['S_concept'] = 'есть' if concept else 'нет'
+
     anchor_state = anchor_reasons([q['anchor'] for q in queries if q['anchor']],
                                   visible)
     pool_rows, stats = [], {'anchor_in_pool': 0, 'sizes': [], 'dropped': 0,
@@ -274,9 +284,10 @@ def main():
         s0 = [int(pid) for pid, _ in dense[qid]]
         s1 = [int(pid) for pid, _ in bm25[qid]]
         s2 = poolbuild.rrf_merge({'dense': s0, 'bm25': s1})[:TOP_K]
+        sc = [int(pid) for pid in concept.get(qid, []) if pid in visible]
 
         order, seen = [], set()
-        for pid in s0 + s1 + s2:
+        for pid in s0 + s1 + s2 + sc:
             if pid not in seen:
                 seen.add(pid)
                 order.append(pid)
@@ -284,7 +295,8 @@ def main():
         poolbuild.check_pool(qid, kept, visible, groups)
 
         provenance = {}
-        for name, ranked in (('S0_dense', s0), ('S1_bm25', s1), ('S2_rrf', s2)):
+        for name, ranked in (('S0_dense', s0), ('S1_bm25', s1),
+                             ('S2_rrf', s2), ('S_concept', sc)):
             for rank, pid in enumerate(ranked):
                 provenance.setdefault(pid, {})[name] = rank + 1
 
@@ -312,7 +324,8 @@ def main():
             'manual_id': q['manual_id'],
             'pool': kept,
             'sources': {str(pid): provenance.get(pid, {}) for pid in kept},
-            'runs': {'S0_dense': s0, 'S1_bm25': s1, 'S2_rrf': s2},
+            'runs': {'S0_dense': s0, 'S1_bm25': s1, 'S2_rrf': s2,
+                     'S_concept': sc},
             'dropped_dups': dropped,
         })
 

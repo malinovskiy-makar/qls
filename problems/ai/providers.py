@@ -676,8 +676,23 @@ class DeepSeekProvider(BaseProvider):
 
     def complete(self, system_blocks, user_text, schema, model, max_tokens,
                  timeout=None, images=None):
+        """⚠️ УРОВЕНЬ РАССУЖДЕНИЯ ЗДЕСЬ РЕШАЕТ ДЕНЬГИ, А НЕ ВКУС.
+
+        DeepSeek V4 Pro по умолчанию рассуждает, и рассуждение
+        тарифицируется как выход. Замер на живой пачке из 25 карточек
+        (10.09.2026): с рассуждением выход 5 902 токена, без него 359.
+        На полном прогоне судьи это $10,45 против $4,25, то есть разница
+        между «не помещается в потолок $4,50» и «помещается».
+
+        Значение берётся из `AI_REASONING_EFFORT` — той же настройки, что
+        у OpenAI и Z.AI. Своего умолчания здесь нет намеренно: три
+        поставщика с тремя разными уровнями рассуждения сравнивать нельзя.
+        """
         import openai
 
+        from django.conf import settings
+
+        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
         instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
         client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
         try:
@@ -689,6 +704,7 @@ class DeepSeekProvider(BaseProvider):
                     {'role': 'user', 'content': user_text},
                 ],
                 response_format={'type': 'json_object'},
+                extra_body={'reasoning_effort': effort},
                 timeout=timeout,
             )
         except openai.APIConnectionError as error:

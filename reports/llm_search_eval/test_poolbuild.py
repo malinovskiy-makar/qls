@@ -99,8 +99,11 @@ class QueryTypeTests(unittest.TestCase):
         self.assertEqual(poolbuild.query_type('монополия налог'), 'короткий')
 
     def test_пунктуация_не_считается_словом(self):
-        self.assertEqual(poolbuild.query_type('спрос, предложение — равновесие'),
-                         'короткий')
+        # Четыре слова и три тире. По буквам это короткий запрос; по
+        # `split()` вышло бы семь «слов» и запрос стал бы описательным.
+        self.assertEqual(
+            poolbuild.query_type('спрос — предложение — равновесие — цена'),
+            'короткий')
 
 
 class InvariantTests(unittest.TestCase):

@@ -233,6 +233,19 @@ class JsonParseTests(unittest.TestCase):
         got = orclient.parse_json_object('{"12": 2, "13": 1, "14":')
         self.assertEqual(got, {'12': 2, '13': 1})
 
+    def test_обёртка_rows_разворачивается(self):
+        # Строгий режим OpenAI не умеет объект с произвольными ключами:
+        # {"12": 2} им не выразить. Поэтому судей просят отвечать
+        # {"rows": [{"id": 12, "score": 2}, ...]}, и обёртку надо снять.
+        got = orclient.parse_json_object(
+            '{"rows": [{"id": 12, "score": 2}, {"id": 13, "score": 0}]}')
+        self.assertEqual(got, {'12': 2, '13': 0})
+
+    def test_обычный_объект_не_путается_с_обёрткой(self):
+        # У объекта с ключом «rows» и НЕ списком внутри разворачивать нечего.
+        self.assertEqual(orclient.parse_json_object('{"rows": 5}'),
+                         {'rows': 5})
+
     def test_обрамление_markdown_снимается(self):
         self.assertEqual(
             orclient.parse_json_object('```json\n{"12": 2}\n```'), {'12': 2})

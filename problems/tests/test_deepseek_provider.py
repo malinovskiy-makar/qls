@@ -129,11 +129,25 @@ class RequestShapeTests(_Mixin, TestCase):
         self.assertEqual(system['role'], 'system')
         self.assertIn('JSON-СХЕМЕ', system['content'])
 
-    def test_полей_рассуждения_glm_здесь_нет(self):
-        # DeepSeek отвергает thinking/reasoning_effort — это и есть
-        # причина, по которой класс отдельный.
+    def test_поля_thinking_от_glm_здесь_нет(self):
+        # `thinking` — форма Z.AI. Слать её DeepSeek незачем: у него свой
+        # ключ, и это одна из причин, по которой класс отдельный.
         _, kwargs, _ = self.run_complete(_FakeCompletions())
-        self.assertNotIn('extra_body', kwargs)
+        self.assertNotIn('thinking', kwargs.get('extra_body') or {})
+
+    def test_уровень_рассуждения_берётся_из_настройки(self):
+        # ⚠️ Замерено на живой пачке из 25 карточек 10.09.2026: с
+        # рассуждением выход 5 902 токена, без него 359. Это разница
+        # между $10,45 и $4,25 на полном прогоне судьи — то есть между
+        # «не помещается в потолок» и «помещается».
+        _, kwargs, _ = self.run_complete(_FakeCompletions())
+        self.assertEqual(kwargs['extra_body']['reasoning_effort'], 'none')
+
+    def test_настройка_уровня_рассуждения_уважается(self):
+        from django.test import override_settings
+        with override_settings(AI_REASONING_EFFORT='high'):
+            _, kwargs, _ = self.run_complete(_FakeCompletions())
+        self.assertEqual(kwargs['extra_body']['reasoning_effort'], 'high')
 
 
 class UsageTests(_Mixin, TestCase):
