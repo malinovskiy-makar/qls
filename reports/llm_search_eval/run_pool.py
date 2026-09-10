@@ -42,7 +42,11 @@ QTYPES = os.path.join(HERE, 'query_types.csv')
 POOL = os.path.join(HERE, 'pool.jsonl')
 TIMING = os.path.join(HERE, 'timing.json')
 
-TOP_K = 30
+TOP_K = 50   # глубина каждой ноги; решение владельца 10.09 (было 30)
+
+#: Файл коротких запросов владельца: по одному на строку, якорей нет.
+SHORT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          'short_queries.txt')
 
 
 def norm_text(text):
@@ -76,6 +80,18 @@ def build_queries():
             'manual_id': manual.get(key),
             'type': poolbuild.query_type(case['query']),
         })
+    with open(SHORT_FILE, encoding='utf-8') as f:
+        shorts = [line.strip() for line in f if line.strip()]
+    for i, text in enumerate(shorts, 1):
+        queries.append({
+            'query_id': 's%02d' % i,
+            'text': text,
+            'anchor': None,          # якоря нет: размечают только судьи
+            'in_c58': False,
+            'manual_id': None,
+            'type': poolbuild.query_type(text),
+        })
+
     with open(QUERIES, 'w', encoding='utf-8') as f:
         json.dump(queries, f, ensure_ascii=False, indent=1)
     with open(QTYPES, 'w', encoding='utf-8', newline='') as f:
@@ -89,16 +105,37 @@ def build_queries():
 
 # ─── Корпус ───────────────────────────────────────────────────────────────
 
+def visible_queryset():
+    """Множество, с которым каталог будет жить по решению владельца от 08.09.
+
+    Опубликовано, не забраковано детектором качества, текст не признан
+    битым. Пометка `hidden_pending_review` ИГНОРИРУЕТСЯ: она означает «человек
+    ещё не смотрел», а не «плохо», и прячет 12 555 годных задач.
+
+    ⚠️ Это НЕ `catalog.filters.base_queryset` и не `semantic.index_queryset`.
+    Код каталога сессия не трогает: там пометка пока действует, и менять
+    поведение сайта ради замера нельзя. Здесь своё множество, и оно на
+    единственном экземпляре — этой функции.
+    """
+    from problems.models import Problem
+
+    return Problem.objects.filter(
+        status=Problem.Status.PUBLISHED,
+        needs_quality_review=False,
+        content_status=Problem.ContentStatus.OK,
+        embedding__isnull=False,
+    )
+
+
 def build_corpus():
     """Видимые поиску задачи с полями отпечатка. База только читается."""
     if os.path.exists(CORPUS):
         with open(CORPUS, encoding='utf-8') as f:
             return [json.loads(line) for line in f]
 
-    from catalog.semantic import index_queryset
     from problems.models import Problem, ProblemPart
 
-    ids = list(index_queryset('prod').values_list('id', flat=True))
+    ids = list(visible_queryset().values_list('id', flat=True))
     id_set = set(ids)
 
     parts = {}
@@ -158,12 +195,21 @@ def dense_runs(queries, timing):
         with open(cache, encoding='utf-8') as f:
             return json.load(f)
 
-    from problems.management.commands.search_eval import (
-        построить_индекс, _кодировщик_модели)
-    from problems.embedding_config import EMBEDDING_MAX_SEQ_LENGTH
+    from problems.management.commands.search_eval import _кодировщик_модели
+    from problems.embedding_config import EMBEDDING_DIM, EMBEDDING_MAX_SEQ_LENGTH
 
     started = time.perf_counter()
-    matrix, ids = построить_индекс('prod')
+    ids, vecs = [], []
+    for pid, raw in visible_queryset().values_list(
+            'id', 'embedding').iterator(chunk_size=1000):
+        raw = bytes(raw)
+        if len(raw) != EMBEDDING_DIM * 4:
+            continue          # повреждённый вектор — как и на проде, пропуск
+        ids.append(pid)
+        vecs.append(np.frombuffer(raw, dtype=np.float32))
+    matrix = np.stack(vecs)
+    matrix = matrix / np.where(np.linalg.norm(matrix, axis=1, keepdims=True) == 0,
+                               1e-9, np.linalg.norm(matrix, axis=1, keepdims=True))
     timing['dense_index_s'] = round(time.perf_counter() - started, 2)
     timing['dense_index_rows'] = len(ids)
 
@@ -190,6 +236,11 @@ def dense_runs(queries, timing):
     return runs
 
 
+def anchor_reasons(anchors, visible):
+    """{id якоря: виден ли поиску} — чтобы отличить «скрыт» от «не найден»."""
+    return {pid: pid in visible for pid in anchors}
+
+
 def main():
     timing = {}
     queries = build_queries()
@@ -213,7 +264,11 @@ def main():
 
     dense = dense_runs(queries, timing)
 
-    pool_rows, stats = [], {'anchor_in_pool': 0, 'sizes': [], 'dropped': 0}
+    anchor_state = anchor_reasons([q['anchor'] for q in queries if q['anchor']],
+                                  visible)
+    pool_rows, stats = [], {'anchor_in_pool': 0, 'sizes': [], 'dropped': 0,
+                            'anchor_hidden': 0, 'anchor_not_found': 0,
+                            'anchor_dropped_dup': 0, 'with_anchor': 0}
     for q in queries:
         qid = q['query_id']
         s0 = [int(pid) for pid, _ in dense[qid]]
@@ -235,11 +290,25 @@ def main():
 
         stats['sizes'].append(len(kept))
         stats['dropped'] += len(dropped)
-        if q['anchor'] in kept:
-            stats['anchor_in_pool'] += 1
+        anchor_why = None
+        if q['anchor'] is not None:
+            stats['with_anchor'] += 1
+            if q['anchor'] in kept:
+                stats['anchor_in_pool'] += 1
+            elif not anchor_state.get(q['anchor'], False):
+                anchor_why = 'скрыт признаком видимости'
+                stats['anchor_hidden'] += 1
+            elif any(d['id'] == q['anchor'] for d in dropped):
+                anchor_why = 'вытеснен как дубль фаворитом группы'
+                stats['anchor_dropped_dup'] += 1
+            else:
+                anchor_why = 'виден, но не в топ-%d ни одной ноги' % TOP_K
+                stats['anchor_not_found'] += 1
         pool_rows.append({
             'query_id': qid, 'text': q['text'], 'type': q['type'],
-            'anchor': q['anchor'], 'anchor_in_pool': q['anchor'] in kept,
+            'anchor': q['anchor'],
+            'anchor_in_pool': q['anchor'] is not None and q['anchor'] in kept,
+            'anchor_why': anchor_why,
             'manual_id': q['manual_id'],
             'pool': kept,
             'sources': {str(pid): provenance.get(pid, {}) for pid in kept},
@@ -254,10 +323,16 @@ def main():
     sizes = stats['sizes']
     timing['pool'] = {
         'queries': len(queries),
+        'с якорем': stats['with_anchor'],
+        'без якоря (короткие владельца)': len(queries) - stats['with_anchor'],
+        'якорь скрыт признаком видимости': stats['anchor_hidden'],
+        'якорь виден, но не в топ-%d' % TOP_K: stats['anchor_not_found'],
+        'якорь вытеснен дублем': stats['anchor_dropped_dup'],
         'size_min': min(sizes), 'size_max': max(sizes),
         'size_mean': round(sum(sizes) / len(sizes), 1),
         'anchor_in_pool': stats['anchor_in_pool'],
-        'anchor_in_pool_share': round(stats['anchor_in_pool'] / len(sizes), 3),
+        'anchor_in_pool_share': round(
+            stats['anchor_in_pool'] / max(stats['with_anchor'], 1), 3),
         'dropped_dups': stats['dropped'],
     }
     with open(TIMING, 'w', encoding='utf-8') as f:

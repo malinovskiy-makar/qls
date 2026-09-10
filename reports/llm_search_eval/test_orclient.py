@@ -66,10 +66,11 @@ class _Case(unittest.TestCase):
         self.dir = tempfile.mkdtemp()
         self.slept = []
         self.client = orclient.Client(
-            provider=None,
+            providers={},
             costs_path=os.path.join(self.dir, 'costs.json'),
             failures_path=os.path.join(self.dir, 'failures.jsonl'),
-            budget_usd=1.0,
+            budgets={'zai': 1.0, 'openai': 1.0, 'deepseek': 1.0,
+                     'anthropic': 1.0},
             sleep=self.slept.append)
 
     def failures(self):
@@ -79,11 +80,12 @@ class _Case(unittest.TestCase):
         with open(path, encoding='utf-8') as f:
             return [json.loads(line) for line in f if line.strip()]
 
-    def call(self, provider, **kwargs):
-        self.client.provider = provider
+    def call(self, fake, **kwargs):
+        name = kwargs.setdefault('provider', 'zai')
+        self.client.providers[name] = fake
         kwargs.setdefault('stage', 'test')
         kwargs.setdefault('query_id', 'q01')
-        kwargs.setdefault('model', 'z-ai/glm-5.3-flash')
+        kwargs.setdefault('model', 'glm-5.3-flash')
         kwargs.setdefault('system_blocks', ['s'])
         kwargs.setdefault('user_text', 'u')
         kwargs.setdefault('schema', {})
@@ -93,7 +95,7 @@ class _Case(unittest.TestCase):
 
 class BudgetTests(_Case):
     def test_превышение_бюджета_останавливает_до_вызова(self):
-        self.client.spent = 0.99
+        self.client.spent['zai'] = 0.99
         provider = _Provider(_Reply(cost_usd=0.5))
         with self.assertRaises(orclient.BudgetExceeded):
             self.call(provider, estimated_usd=0.5)
@@ -101,33 +103,63 @@ class BudgetTests(_Case):
 
     def test_потрачено_растёт_по_стоимости_из_ответа(self):
         self.call(_Provider(_Reply(cost_usd=0.0123)))
-        self.assertAlmostEqual(self.client.spent, 0.0123)
+        self.assertAlmostEqual(self.client.spent['zai'], 0.0123)
 
     def test_расход_разложен_по_этапам_и_моделям(self):
         self.call(_Provider(_Reply(cost_usd=0.01)), stage='2. судья')
         self.call(_Provider(_Reply(cost_usd=0.02)), stage='3. реранкер',
-                  model='z-ai/glm-5.3')
+                  model='glm-5.3')
         with open(self.client.costs_path, encoding='utf-8') as handle:
             costs = json.load(handle)
         self.assertAlmostEqual(
-            costs['by_stage']['2. судья']['z-ai/glm-5.3-flash']['usd'], 0.01)
+            costs['by_stage']['2. судья']['glm-5.3-flash']['usd'], 0.01)
         self.assertAlmostEqual(
-            costs['by_stage']['3. реранкер']['z-ai/glm-5.3']['usd'], 0.02)
+            costs['by_stage']['3. реранкер']['glm-5.3']['usd'], 0.02)
+        self.assertAlmostEqual(costs['by_provider']['zai']['usd'], 0.03)
         self.assertAlmostEqual(costs['total_usd'], 0.03)
 
-    def test_без_цены_от_посредника_считаем_по_прайсу(self):
-        # glm-5.3-flash: $0.075 за млн входа, $0.25 за млн выхода.
+    def test_без_цены_от_провайдера_считаем_по_прайсу(self):
+        # glm-5.3-flash, прямой прайс Z.ai: $0,15 вход, $0,50 выход.
         self.call(_Provider(_Reply(input_tokens=1_000_000,
                                    output_tokens=1_000_000, cost_usd=None)))
-        self.assertAlmostEqual(self.client.spent, 0.325)
+        self.assertAlmostEqual(self.client.spent['zai'], 0.65)
 
     def test_счётчик_переживает_перезапуск(self):
         self.call(_Provider(_Reply(cost_usd=0.04)))
-        second = orclient.Client(provider=None,
+        second = orclient.Client(providers={},
                                  costs_path=self.client.costs_path,
                                  failures_path=self.client.failures_path,
-                                 budget_usd=1.0)
-        self.assertAlmostEqual(second.spent, 0.04)
+                                 budgets={'zai': 1.0})
+        self.assertAlmostEqual(second.spent['zai'], 0.04)
+
+    def test_потолок_одного_провайдера_не_запирает_другого(self):
+        # Баланс у каждого провайдера свой: исчерпав Z.ai, судью на
+        # OpenAI останавливать не за что.
+        self.client.spent['zai'] = 1.0
+        with self.assertRaises(orclient.BudgetExceeded):
+            self.call(_Provider(_Reply(cost_usd=0.01)), estimated_usd=0.01)
+        reply = self.call(_Provider(_Reply(cost_usd=0.01)), provider='openai',
+                          model='gpt-5.6-sol', estimated_usd=0.01)
+        self.assertIsNotNone(reply)
+
+    def test_у_deepseek_пиковый_тариф_вдвое_дороже(self):
+        # Пик 01:00-04:00 и 06:00-10:00 UTC по будням, цена вдвое.
+        off = orclient.price_of_tokens('deepseek', 'deepseek-v4-pro',
+                                       1_000_000, 0, 0, peak=False)
+        peak = orclient.price_of_tokens('deepseek', 'deepseek-v4-pro',
+                                        1_000_000, 0, 0, peak=True)
+        self.assertAlmostEqual(off, 0.66)
+        self.assertAlmostEqual(peak, 1.32)
+
+    def test_пик_определяется_по_часу_utc_и_дню_недели(self):
+        import datetime
+        # Среда 02:30 UTC — пик; среда 12:00 UTC — не пик; суббота 02:30 — не пик.
+        self.assertTrue(orclient.is_peak(datetime.datetime(
+            2026, 9, 9, 2, 30, tzinfo=datetime.timezone.utc)))
+        self.assertFalse(orclient.is_peak(datetime.datetime(
+            2026, 9, 9, 12, 0, tzinfo=datetime.timezone.utc)))
+        self.assertFalse(orclient.is_peak(datetime.datetime(
+            2026, 9, 12, 2, 30, tzinfo=datetime.timezone.utc)))
 
 
 class RetryTests(_Case):

@@ -1,10 +1,14 @@
 # -*- coding: utf-8 -*-
-"""Клиент офлайн-замера поверх OpenRouterProvider.
+"""Клиент офлайн-замера поверх прямых провайдеров.
 
-Здесь живёт всё, чего НЕТ и не должно быть в поставщике: жёсткий счётчик
-бюджета, повторы с паузой, журнал отказов и терпимый разбор ответа.
-Поставщик остаётся тонким и одинаковым со своими четырьмя соседями —
-см. докстринг `OpenRouterProvider`.
+Здесь живёт всё, чего НЕТ и не должно быть в поставщике: счётчик потолка
+по каждому провайдеру, повторы с паузой, журнал отказов и терпимый разбор
+ответа. Поставщики остаются тонкими и одинаковыми между собой — см.
+докстринги `DeepSeekProvider` и `OpenRouterProvider`.
+
+⚠️ ПОСРЕДНИКА БОЛЬШЕ НЕТ. С 10.09.2026 работаем с четырьмя прямыми
+провайдерами: OpenAI, Anthropic, Z.ai, DeepSeek. `OpenRouterProvider` в
+коде оставлен, но не используется.
 
 Ничего не пишет в базу. Пишет только два файла: `costs.json` (счётчик) и
 `failures.jsonl` (журнал отказов).
@@ -15,27 +19,81 @@ import re
 import time
 from datetime import datetime, timezone
 
-#: Цены OpenRouter, $ за миллион токенов: (вход, выход).
-#: Сняты с GET /api/v1/models 09.09.2026. Используются ТОЛЬКО когда
-#: посредник не прислал `usage.cost` — своя копия чужих цен устаревает
-#: молча, поэтому она запасной путь, а не основной.
+#: ПРЯМЫЕ прайсы провайдеров, $ за миллион токенов: (вход, выход).
+#: Сняты со страниц тарифов 10.09.2026. Кэш префикса в СМЕТЕ не
+#: учитывается — указание владельца: кэш экономит, но полагаться на него
+#: при планировании потолка нельзя.
+#:
+#: ⚠️ У DeepSeek цена зависит от ЧАСА: в пик (01:00–04:00 и 06:00–10:00
+#: UTC по будням) она вдвое выше. Здесь лежит НЕ пиковая; множитель
+#: накладывает `price_of_tokens`.
 PRICES = {
-    'z-ai/glm-5.3-flash': (0.075, 0.25),
-    'z-ai/glm-5.3': (1.40, 4.40),
-    'anthropic/claude-haiku-4.5': (1.00, 5.00),
-    'anthropic/claude-sonnet-5': (2.00, 10.00),
-    'openai/gpt-5.6-sol': (2.00, 10.00),
-    'openai/gpt-5.6-terra': (2.00, 12.00),
-    'deepseek/deepseek-v4-pro': (0.87, 1.74),
+    ('zai', 'glm-5.3-flash'): (0.15, 0.50),
+    ('zai', 'glm-5.3'): (1.40, 4.40),
+    ('anthropic', 'claude-haiku-4-5'): (1.00, 5.00),
+    ('anthropic', 'claude-sonnet-5'): (2.00, 10.00),
+    ('openai', 'gpt-5.6-sol'): (4.00, 20.00),
+    ('openai', 'gpt-5.6-terra'): (2.00, 12.00),
+    ('deepseek', 'deepseek-v4-pro'): (0.66, 1.98),
+    ('deepseek', 'deepseek-flash'): (0.15, 0.60),
 }
 
+#: Цена чтения из кэша, $ за млн. В смету не входит, но ФАКТИЧЕСКИЙ расход
+#: считается по ней: провайдер уже применил скидку, и делать вид, что кэша
+#: не было, значит завышать счётчик и упереться в потолок раньше времени.
+CACHE_READ_PRICES = {
+    ('zai', 'glm-5.3-flash'): 0.03,
+    ('zai', 'glm-5.3'): 0.26,
+    ('anthropic', 'claude-haiku-4-5'): 0.10,
+    ('anthropic', 'claude-sonnet-5'): 0.20,
+    ('openai', 'gpt-5.6-sol'): 0.40,
+    ('openai', 'gpt-5.6-terra'): 0.20,
+    ('deepseek', 'deepseek-v4-pro'): 0.022,
+    ('deepseek', 'deepseek-flash'): 0.003,
+}
+
+#: Потолки по провайдерам: у каждого свой баланс, общего кошелька нет.
+BUDGETS = {'openai': 19.0, 'deepseek': 4.5, 'zai': 12.5, 'anthropic': 9.5}
+
+#: Пик DeepSeek: часы UTC (начало включительно, конец нет) по будням.
+DEEPSEEK_PEAK_HOURS = ((1, 4), (6, 10))
+PEAK_MULTIPLIER = 2.0
+
 ATTEMPTS = 3
-#: Паузы между попытками: 2 с, затем 4 с. После последней попытки паузы нет.
+#: Паузы между попытками: 2 с, затем 4 с. После последней паузы нет.
 BACKOFF_BASE = 2
 
 
 class BudgetExceeded(RuntimeError):
-    """Вызов не ушёл: он не помещается в остаток бюджета сессии."""
+    """Вызов не ушёл: он не помещается в остаток потолка СВОЕГО провайдера."""
+
+
+def is_peak(moment=None):
+    """Идёт ли сейчас пиковый тариф DeepSeek.
+
+    Будни по UTC, 01:00–04:00 и 06:00–10:00. В пик и вход, и выход стоят
+    вдвое, поэтому вызовы судьи планируются вне этих окон.
+    """
+    moment = moment or datetime.now(timezone.utc)
+    if moment.weekday() >= 5:      # суббота и воскресенье всегда вне пика
+        return False
+    hour = moment.hour + moment.minute / 60.0
+    return any(start <= hour < end for start, end in DEEPSEEK_PEAK_HOURS)
+
+
+def price_of_tokens(provider, model, input_tokens, output_tokens,
+                    cache_read_tokens=0, peak=None):
+    """Стоимость по прямому прайсу провайдера, $."""
+    price_in, price_out = PRICES.get((provider, model), (0.0, 0.0))
+    price_cache = CACHE_READ_PRICES.get((provider, model), price_in * 0.1)
+    if provider == 'deepseek':
+        peak = is_peak() if peak is None else peak
+        if peak:
+            price_in *= PEAK_MULTIPLIER
+            price_out *= PEAK_MULTIPLIER
+            price_cache *= PEAK_MULTIPLIER
+    return (input_tokens * price_in + output_tokens * price_out
+            + cache_read_tokens * price_cache) / 1e6
 
 
 def load_env_file(path, env):
@@ -151,52 +209,67 @@ def parse_json_object(text):
 # ─── Клиент ───────────────────────────────────────────────────────────────
 
 class Client(object):
-    """Один вызов = проверка бюджета, до трёх попыток, запись расхода."""
+    """Один вызов = проверка потолка провайдера, до трёх попыток, учёт.
 
-    def __init__(self, provider, costs_path, failures_path, budget_usd,
+    Потолок у КАЖДОГО провайдера свой: деньги лежат на четырёх разных
+    счетах, и исчерпание одного не повод останавливать вызовы к другому.
+    Общего кошелька у сессии нет, поэтому нет и общего потолка.
+    """
+
+    def __init__(self, providers, costs_path, failures_path, budgets,
                  sleep=time.sleep):
-        self.provider = provider
+        self.providers = dict(providers)
         self.costs_path = costs_path
         self.failures_path = failures_path
-        self.budget_usd = float(budget_usd)
+        self.budgets = dict(budgets)
         self.sleep = sleep
         self.costs = self._load_costs()
-        self.spent = self.costs['total_usd']
+        self.spent = {name: self.costs['by_provider'].get(name, {}).get('usd', 0.0)
+                      for name in self.budgets}
 
     # -- расход ----------------------------------------------------------
     def _load_costs(self):
         if os.path.exists(self.costs_path):
             with open(self.costs_path, encoding='utf-8') as handle:
-                return json.load(handle)
-        return {'total_usd': 0.0, 'calls': 0, 'by_stage': {}}
+                costs = json.load(handle)
+            costs.setdefault('by_provider', {})
+            return costs
+        return {'total_usd': 0.0, 'calls': 0, 'by_stage': {}, 'by_provider': {}}
 
     def _save_costs(self):
         os.makedirs(os.path.dirname(self.costs_path) or '.', exist_ok=True)
         with open(self.costs_path, 'w', encoding='utf-8') as handle:
             json.dump(self.costs, handle, ensure_ascii=False, indent=1)
 
-    def price_of(self, model, reply):
-        """Стоимость вызова: слово посредника сильнее нашей копии прайса."""
+    def price_of(self, provider, model, reply):
+        """Стоимость вызова: слово провайдера сильнее нашей копии прайса.
+
+        Прямые провайдеры цену в ответе не присылают — её называл только
+        посредник. Обычный путь здесь прайс; ветка с `cost_usd` оставлена
+        ради `OpenRouterProvider`, который в коде остался.
+        """
         if reply.cost_usd is not None:
             return float(reply.cost_usd)
-        price_in, price_out = PRICES.get(model, (0.0, 0.0))
-        full_input = reply.input_tokens + reply.cache_read_tokens
-        return (full_input * price_in + reply.output_tokens * price_out) / 1e6
+        return price_of_tokens(provider, model, reply.input_tokens,
+                               reply.output_tokens, reply.cache_read_tokens)
 
-    def _record(self, stage, model, reply, cost):
+    def _record(self, stage, provider, model, reply, cost):
         by_model = self.costs['by_stage'].setdefault(stage, {})
         row = by_model.setdefault(model, {'usd': 0.0, 'calls': 0,
                                           'input': 0, 'output': 0,
                                           'cache_read': 0, 'reasoning': 0})
-        row['usd'] += cost
-        row['calls'] += 1
+        prov = self.costs['by_provider'].setdefault(
+            provider, {'usd': 0.0, 'calls': 0})
+        for target in (row, prov):
+            target['usd'] += cost
+            target['calls'] += 1
         row['input'] += reply.input_tokens
         row['output'] += reply.output_tokens
         row['cache_read'] += reply.cache_read_tokens
         row['reasoning'] += reply.reasoning_tokens
         self.costs['total_usd'] += cost
         self.costs['calls'] += 1
-        self.spent = self.costs['total_usd']
+        self.spent[provider] = prov['usd']
         self._save_costs()
 
     # -- журнал отказов ---------------------------------------------------
@@ -219,18 +292,25 @@ class Client(object):
             os.fsync(handle.fileno())
 
     # -- вызов -------------------------------------------------------------
-    def call(self, stage, query_id, model, system_blocks, user_text, schema,
-             max_tokens, timeout=None, estimated_usd=0.0):
-        if self.spent + float(estimated_usd) > self.budget_usd:
+    def remaining(self, provider):
+        """Сколько ещё можно потратить у этого провайдера."""
+        return self.budgets.get(provider, 0.0) - self.spent.get(provider, 0.0)
+
+    def call(self, stage, query_id, provider, model, system_blocks, user_text,
+             schema, max_tokens, timeout=None, estimated_usd=0.0):
+        spent = self.spent.get(provider, 0.0)
+        ceiling = self.budgets.get(provider, 0.0)
+        if spent + float(estimated_usd) > ceiling:
             raise BudgetExceeded(
-                'Бюджет сессии исчерпан: потрачено $%.4f, вызов оценён в '
-                '$%.4f, потолок $%.2f. Это остановка, а не «доделать '
-                'чуть-чуть».' % (self.spent, estimated_usd, self.budget_usd))
+                'Потолок провайдера %s исчерпан: потрачено $%.4f, вызов '
+                'оценён в $%.4f, потолок $%.2f. Это остановка, а не '
+                '«доделать чуть-чуть».'
+                % (provider, spent, estimated_usd, ceiling))
 
         last = None
         for attempt in range(1, ATTEMPTS + 1):
             try:
-                reply = self.provider.complete(
+                reply = self.providers[provider].complete(
                     system_blocks=system_blocks, user_text=user_text,
                     schema=schema, model=model, max_tokens=max_tokens,
                     timeout=timeout)
@@ -245,6 +325,7 @@ class Client(object):
                     break
                 self.sleep(BACKOFF_BASE ** attempt)
                 continue
-            self._record(stage, model, reply, self.price_of(model, reply))
+            self._record(stage, provider, model, reply,
+                         self.price_of(provider, model, reply))
             return reply
         raise last

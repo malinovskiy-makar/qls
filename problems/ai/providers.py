@@ -621,6 +621,113 @@ class GLMProvider(BaseProvider):
         )
 
 
+class DeepSeekProvider(BaseProvider):
+    """DeepSeek через OpenAI-совместимый `chat.completions`.
+
+    Заведён 10.09.2026 для офлайн-замера LLM-слоя над поиском: DeepSeek
+    работает вторым судьёй разметки пула. К каталогу не подключён.
+
+    Отдельный класс, а не `GLMProvider` с другим `BASE_URL`, по одной
+    твёрдой причине: GLM обязан слать `thinking` и `reasoning_effort`
+    (без них Z.AI отвечает 400 code 1210), а DeepSeek этих полей не
+    принимает. Общий класс означал бы ветвление по адресу внутри — то
+    самое «поставщик знает, кто он», ради устранения которого этот слой и
+    существует.
+
+    ⚠️ СХЕМА ПОЛЯ КЭША У DEEPSEEK СВОЯ: `usage.prompt_cache_hit_tokens`,
+    а не `usage.prompt_tokens_details.cached_tokens`, как у OpenAI и Z.AI.
+    Прочитать чужое имя значило бы получить тихий ноль в кэше — ровно тот
+    баг, который у GLM прожил до Фазы 6 сессии run2 и стоил неверной сметы.
+    `prompt_tokens` при этом ПОЛНЫЙ вход, попадание кэша внутри него.
+    """
+
+    name = 'deepseek'
+    key_env = 'DEEPSEEK_API_KEY'
+    BASE_URL = 'https://api.deepseek.com'
+
+    def is_available(self):
+        if not self.api_key():
+            return False
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def unavailable_reason(self):
+        if not self.api_key():
+            return ('Работа с моделью выключена: не задан ключ '
+                    'DEEPSEEK_API_KEY.')
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return ('Работа с моделью выключена: не установлена '
+                    'библиотека openai.')
+        return ''
+
+    def _schema_instruction(self, schema):
+        """Схема — текстом: `json_schema` DeepSeek не поддерживает, только
+        `json_object`. Соответствие проверяется на нашей стороне после
+        ответа, как и у `GLMProvider`."""
+        return ('\n\nОТВЕЧАЙ РОВНО ОДНИМ JSON-ОБЪЕКТОМ, СТРОГО '
+                'СООТВЕТСТВУЮЩИМ ЭТОЙ JSON-СХЕМЕ (никакого текста ни до, '
+                'ни после, никакого markdown-обрамления ```):\n%s'
+                % json.dumps(schema, ensure_ascii=False))
+
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 timeout=None, images=None):
+        import openai
+
+        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': user_text},
+                ],
+                response_format={'type': 'json_object'},
+                timeout=timeout,
+            )
+        except openai.APIConnectionError as error:
+            raise self._fail(error, 'DeepSeek не ответил.')
+        except openai.RateLimitError as error:
+            raise self._fail(error, 'DeepSeek ограничил частоту запросов.',
+                             kind='limit')
+        except openai.APIStatusError as error:
+            kind = 'no_key' if error.status_code in (401, 403) else 'other'
+            raise self._fail(error, 'DeepSeek вернул ошибку (%s).'
+                             % error.status_code, kind=kind)
+        except Exception as error:
+            raise self._fail(error, 'Вызов DeepSeek не удался.')
+
+        return self._reply_from(response)
+
+    def _reply_from(self, response):
+        usage = getattr(response, 'usage', None)
+        total_input = _num(usage, 'prompt_tokens')
+        output = _num(usage, 'completion_tokens')
+        cache_read = _num(usage, 'prompt_cache_hit_tokens')
+        reasoning = _num(getattr(usage, 'completion_tokens_details', None),
+                         'reasoning_tokens')
+
+        text = ''
+        choices = getattr(response, 'choices', None) or []
+        if choices:
+            message = getattr(choices[0], 'message', None)
+            text = getattr(message, 'content', None) or ''
+
+        return Reply(
+            text=text,
+            input_tokens=max(total_input - cache_read, 0),
+            output_tokens=output,
+            cache_read_tokens=cache_read,
+            reasoning_tokens=reasoning,
+        )
+
+
 class OpenRouterProvider(BaseProvider):
     """OpenRouter — посредник: один ключ, много чужих моделей.
 
@@ -793,6 +900,7 @@ PROVIDERS = {
     AnthropicProvider.name: AnthropicProvider,
     OpenAIProvider.name: OpenAIProvider,
     GLMProvider.name: GLMProvider,
+    DeepSeekProvider.name: DeepSeekProvider,
     OpenRouterProvider.name: OpenRouterProvider,
     FakeProvider.name: FakeProvider,
 }

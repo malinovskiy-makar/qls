@@ -74,7 +74,12 @@ class DedupTests(unittest.TestCase):
 
 
 class QueryTypeTests(unittest.TestCase):
-    def test_короткий_запрос_без_глагола(self):
+    """Правило владельца от 10.09: тип решает ТОЛЬКО длина, ≤4 слов —
+    короткий. Прежняя проверка на глагол снята: она относила к описательным
+    «найти равновесие», хотя это ровно та короткая формулировка, ради
+    которой владелец и собрал отдельный файл коротких запросов."""
+
+    def test_короткий_запрос(self):
         self.assertEqual(poolbuild.query_type('цена бессрочной облигации'),
                          'короткий')
 
@@ -87,20 +92,20 @@ class QueryTypeTests(unittest.TestCase):
             poolbuild.query_type('кривая Лоренца и коэффициент Джини'),
             'описательный')
 
-    def test_глагол_делает_запрос_описательным_даже_коротким(self):
-        self.assertEqual(poolbuild.query_type('найти равновесие'),
-                         'описательный')
+    def test_глагол_на_тип_больше_не_влияет(self):
+        self.assertEqual(poolbuild.query_type('найти равновесие'), 'короткий')
 
-    def test_отглагольное_существительное_не_считается_глаголом(self):
-        # «нахождение» — существительное; иначе почти всё стало бы
-        # описательным и деление потеряло бы смысл.
-        self.assertEqual(poolbuild.query_type('нахождение предложения'),
+    def test_два_слова_из_файла_коротких(self):
+        self.assertEqual(poolbuild.query_type('монополия налог'), 'короткий')
+
+    def test_пунктуация_не_считается_словом(self):
+        self.assertEqual(poolbuild.query_type('спрос, предложение — равновесие'),
                          'короткий')
 
 
 class InvariantTests(unittest.TestCase):
     def setUp(self):
-        self.visible = set(range(1, 500))
+        self.visible = set(range(1, 600))
         self.groups = {}
 
     def check(self, pool):
@@ -115,7 +120,7 @@ class InvariantTests(unittest.TestCase):
 
     def test_большой_пул_роняет(self):
         with self.assertRaises(poolbuild.PoolInvariantError):
-            self.check(list(range(1, 300)))
+            self.check(list(range(1, 400)))
 
     def test_невидимая_задача_роняет(self):
         with self.assertRaises(poolbuild.PoolInvariantError):
