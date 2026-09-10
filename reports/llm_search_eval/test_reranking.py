@@ -52,8 +52,11 @@ class MergeTests(unittest.TestCase):
         self.assertEqual(got, [2, 3, 1])
 
     def test_кандидат_без_балла_уходит_в_хвост(self):
-        got = reranking.merge([{1: 10}], all_ids=[1, 2])
-        self.assertEqual(got, [1, 2])
+        # Оценённый кандидат стоит ВЫШЕ неоценённого, даже если его id
+        # больше: иначе тест не отличает «в хвост» от «отсортировать всех
+        # по номеру», и правило остаётся никем не сторожимым.
+        got = reranking.merge([{2: 10}], all_ids=[1, 2])
+        self.assertEqual(got, [2, 1])
 
     def test_равные_баллы_упорядочены_устойчиво_по_id(self):
         self.assertEqual(reranking.merge([{5: 50, 3: 50}]), [3, 5])

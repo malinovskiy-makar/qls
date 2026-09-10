@@ -128,6 +128,51 @@ class MergeTests(unittest.TestCase):
         self.assertTrue(got[1]['partial'])
 
 
+class MergeRuleTests(unittest.TestCase):
+    """Три правила слияния меток судей, решение владельца 10.09.2026.
+
+    Считаются все три, основным становится то, у которого согласие с
+    ручной разметкой владельца по шкале «годится / не годится» выше.
+    Два других идут в отчёт строками чувствительности: если выводы от
+    правила не зависят, это надо показать, а не утверждать.
+    """
+
+    def rule(self, name, a, b):
+        return judging.merge({1: a}, {1: b}, rule=name)[1]['label']
+
+    def test_согласие_годится_только_при_обоих_двойках(self):
+        self.assertEqual(self.rule('согласие', 2, 2), 2)
+        self.assertEqual(self.rule('согласие', 2, 1), 1)
+        self.assertEqual(self.rule('согласие', 2, 0), 1)
+        self.assertEqual(self.rule('согласие', 0, 0), 0)
+
+    def test_мягкое_засчитывает_одну_двойку(self):
+        self.assertEqual(self.rule('мягкое', 2, 0), 2)
+        self.assertEqual(self.rule('мягкое', 2, 1), 2)
+        self.assertEqual(self.rule('мягкое', 1, 0), 1)
+        self.assertEqual(self.rule('мягкое', 0, 0), 0)
+
+    def test_строгое_роняет_пару_от_одного_нуля(self):
+        self.assertEqual(self.rule('строгое', 2, 2), 2)
+        self.assertEqual(self.rule('строгое', 2, 0), 0)
+        self.assertEqual(self.rule('строгое', 2, 1), 1)
+        self.assertEqual(self.rule('строгое', 1, 1), 1)
+
+    def test_три_правила_расходятся_на_спорной_паре(self):
+        got = {name: self.rule(name, 2, 0)
+               for name in ('согласие', 'мягкое', 'строгое')}
+        self.assertEqual(got, {'согласие': 1, 'мягкое': 2, 'строгое': 0})
+
+    def test_флаг_разногласия_от_правила_не_зависит(self):
+        for name in ('согласие', 'мягкое', 'строгое'):
+            self.assertTrue(
+                judging.merge({1: 2}, {1: 0}, rule=name)[1]['disagreement'])
+
+    def test_неизвестное_правило_ошибка_а_не_тихий_откат(self):
+        with self.assertRaises(ValueError):
+            judging.merge({1: 2}, {1: 2}, rule='как-нибудь')
+
+
 class AgreementTests(unittest.TestCase):
     MANUAL = {1: 2, 2: 0, 3: 1, 4: 2}
 

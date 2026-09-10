@@ -31,6 +31,7 @@ METRICS = 'reports/llm_search_eval/metrics.py'
 CONCEPTS = 'reports/llm_search_eval/concepts.py'
 LEX = 'catalog/lexical_bm25.py'
 PROVIDERS = 'problems/ai/providers.py'
+RERANK = 'reports/llm_search_eval/reranking.py'
 
 #: (имя, файл, что заменить, на что, каким тестом ловим, вид запуска)
 MUTATIONS = [
@@ -187,6 +188,34 @@ MUTATIONS = [
      '              if machine[pid] != 1 and manual[pid] != 1]', '              ]',
      'test_judging.AgreementTests.test_спорное_выброшено_из_бинарной_доли', UNIT),
 
+    ('мягкое правило требует согласия обоих', JUDGE,
+     "        if a == 2 or b == 2:", "        if a == 2 and b == 2:",
+     'test_judging.MergeRuleTests.test_мягкое_засчитывает_одну_двойку', UNIT),
+    ('строгое правило прощает один ноль', JUDGE,
+     "        if a == 0 or b == 0:", "        if a == 0 and b == 0:",
+     'test_judging.MergeRuleTests.test_строгое_роняет_пару_от_одного_нуля', UNIT),
+    ('неизвестное правило тихо откатывается к строгому', JUDGE,
+     "    if rule == 'строгое':", "    if rule in ('строгое', 'как-нибудь'):",
+     'test_judging.MergeRuleTests.test_неизвестное_правило_ошибка_а_не_тихий_откат',
+     UNIT),
+
+    # ── реранкер ───────────────────────────────────────────────────────
+    ('в карточку реранкера попадает условие', RERANK,
+     "'тип: %s' % (row.get('problem_type') or ''),",
+     "'условие: %s' % (row.get('statement') or ''),",
+     'test_reranking.CardTests.test_карточка_короткая_и_без_условия', UNIT),
+    ('пометка о совпавших понятиях не пишется', RERANK,
+     '    if concept_hits:', '    if False:',
+     'test_reranking.CardTests.test_пометка_о_совпавших_понятиях_попадает_в_карточку',
+     UNIT),
+    ('неоценённый кандидат получает ноль вместо хвоста', RERANK,
+     '        ranked += [pid for pid in all_ids if pid not in scores]',
+     '        ranked = sorted(set(ranked) | set(all_ids))',
+     'test_reranking.MergeTests.test_кандидат_без_балла_уходит_в_хвост', UNIT),
+    ('балл вне шкалы не прижимается', RERANK,
+     'return max(0, min(100, int(score)))', 'return int(score)',
+     'test_reranking.MergeTests.test_балл_вне_шкалы_прижимается', UNIT),
+
     # ── метрики ────────────────────────────────────────────────────────
     ('спорное засчитывается как годное', METRICS,
      'GOOD = 2', 'GOOD = 1',
@@ -256,19 +285,10 @@ MUTATIONS = [
      "        cache_read = _num(getattr(usage, 'prompt_tokens_details', None),\n                          'cached_tokens')",
      'problems.tests.test_deepseek_provider.UsageTests.test_кэш_читается_из_своего_поля',
      DJANGO),
-    ('DeepSeek получает поля рассуждения от GLM', PROVIDERS,
-     """                response_format={'type': 'json_object'},
-                timeout=timeout,
-            )
-        except openai.APIConnectionError as error:
-            raise self._fail(error, 'DeepSeek не ответил.')""",
-     """                response_format={'type': 'json_object'},
-                extra_body={'thinking': {'type': 'enabled'}},
-                timeout=timeout,
-            )
-        except openai.APIConnectionError as error:
-            raise self._fail(error, 'DeepSeek не ответил.')""",
-     'problems.tests.test_deepseek_provider.RequestShapeTests.test_полей_рассуждения_glm_здесь_нет',
+    ('DeepSeek получает поле thinking от GLM', PROVIDERS,
+     "                extra_body={'reasoning_effort': effort},",
+     "                extra_body={'reasoning_effort': effort, 'thinking': {'type': 'enabled'}},",
+     'problems.tests.test_deepseek_provider.RequestShapeTests.test_поля_thinking_от_glm_здесь_нет',
      DJANGO),
     ('сырое исключение теряется по дороге в журнал', PROVIDERS,
      """        except openai.APIStatusError as error:
