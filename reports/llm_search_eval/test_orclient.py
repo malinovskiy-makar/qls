@@ -132,6 +132,29 @@ class BudgetTests(_Case):
                                  budgets={'zai': 1.0})
         self.assertAlmostEqual(second.spent['zai'], 0.04)
 
+    def test_второй_процесс_не_стирает_расход_первого(self):
+        """Два прогона в разных процессах пишут в один costs.json.
+
+        ⚠️ ЭТО БЫЛО ЖИВЫМ ДЕФЕКТОМ 10.09.2026. Пакетный судья держал
+        файл в памяти с начала прогона и переписывал его целиком после
+        каждой части — расход обоих сортировщиков ($4,36) исчез из учёта
+        молча. Счётчик обязан перечитывать файл перед записью.
+        """
+        other = orclient.Client(
+            providers={}, costs_path=self.client.costs_path,
+            failures_path=self.client.failures_path,
+            budgets={'zai': 1.0, 'openai': 1.0})
+        self.call(_Provider(_Reply(cost_usd=0.01)), stage='первый')
+        other.providers['openai'] = _Provider(_Reply(cost_usd=0.02))
+        other.call(stage='второй', query_id='q02', provider='openai',
+                   model='gpt-5.6-sol', system_blocks=['s'], user_text='u',
+                   schema={}, max_tokens=10)
+        with open(self.client.costs_path, encoding='utf-8') as handle:
+            costs = json.load(handle)
+        self.assertIn('первый', costs['by_stage'])
+        self.assertIn('второй', costs['by_stage'])
+        self.assertAlmostEqual(costs['total_usd'], 0.03)
+
     def test_потолок_одного_провайдера_не_запирает_другого(self):
         # Баланс у каждого провайдера свой: исчерпав Z.ai, судью на
         # OpenAI останавливать не за что.

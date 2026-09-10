@@ -264,6 +264,14 @@ class Client(object):
                                reply.output_tokens, reply.cache_read_tokens)
 
     def _record(self, stage, provider, model, reply, cost):
+        # ⚠️ ПЕРЕЧИТЫВАЕМ ФАЙЛ ПЕРЕД ЗАПИСЬЮ. Прогоны идут в разных
+        # процессах одновременно: пакетный судья ждёт OpenAI часами, а
+        # рядом работают сортировщики. Процесс, державший свою копию с
+        # начала работы, переписывал файл целиком и стирал чужой расход —
+        # 10.09.2026 так молча исчезли $4,36 обоих сортировщиков.
+        # Перечитывание не делает запись атомарной, но окно сужается с
+        # часов до миллисекунд, а деньги перестают теряться классом.
+        self.costs = self._load_costs()
         by_model = self.costs['by_stage'].setdefault(stage, {})
         row = by_model.setdefault(model, {'usd': 0.0, 'calls': 0,
                                           'input': 0, 'output': 0,

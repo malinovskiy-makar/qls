@@ -270,10 +270,20 @@ def main():
         lines.append('| %s | %.4f | %.5f |' % (stage, usd, usd / len(pool)))
     lines.append('| **итого** | **%.4f** | **%.5f** |'
                  % (costs['total_usd'], costs['total_usd'] / len(pool)))
-    lines += ['', 'Лексическая нога, замер на 91 запросе: p50 %.1f мс, '
-                  'p95 %.1f мс.' % (statistics.median(bm25_times),
-                                    sorted(bm25_times)[int(len(bm25_times) * .95)]),
-              '']
+    lines += ['', '### Задержка на ОДИНОЧНОМ запросе', '',
+              'Замерено строго последовательно (`run_latency.py`). Делить '
+              'время боевого прогона на число запросов нельзя: он шёл в '
+              'восемь потоков, а человек ждёт один свой запрос.', '',
+              '| система | p50, мс | p95, мс | замеров |', '|---|---|---|---|']
+    latency_path = os.path.join(HERE, 'latency.json')
+    if os.path.exists(latency_path):
+        with open(latency_path, encoding='utf-8') as handle:
+            for name, row in json.load(handle).items():
+                lines.append('| %s | %.0f | %.0f | %d |'
+                             % (name, row['p50'], row['p95'], row['n']))
+    else:
+        lines.append('| — | — | — | замер не делался |')
+    lines.append('')
 
     # ── доля пар с одним судьёй ────────────────────────────────────────
     stats = agreement['stats']
