@@ -53,7 +53,7 @@ CACHE_READ_PRICES = {
 }
 
 #: Потолки по провайдерам: у каждого свой баланс, общего кошелька нет.
-BUDGETS = {'openai': 19.0, 'deepseek': 4.5, 'zai': 12.5, 'anthropic': 9.5}
+BUDGETS = {'openai': 19.0, 'deepseek': 5.0, 'zai': 12.5, 'anthropic': 9.5}
 
 #: Пик DeepSeek: часы UTC (начало включительно, конец нет) по будням.
 DEEPSEEK_PEAK_HOURS = ((1, 4), (6, 10))
