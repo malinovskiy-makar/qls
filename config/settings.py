@@ -17,6 +17,29 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv_if_present(path):
+    """Локальный `runserver` подхватывает `.env` из корня проекта; прод
+    по-прежнему получает переменные из docker compose (там `.env` этого
+    файла просто нет — секреты приходят через `environment`/`env_file`
+    самого compose). Уже заданная переменная сильнее файла: то, что явно
+    выставлено в оболочке, `.env` молча не перезаписывает.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        name, _, value = line.partition('=')
+        name, value = name.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+            value = value[1:-1]
+        os.environ.setdefault(name, value)
+
+
+_load_dotenv_if_present(BASE_DIR / '.env')
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -308,6 +331,39 @@ AI_REASONING_EFFORT = os.environ.get('AI_REASONING_EFFORT', 'none').strip()
 # побочная правка.
 SEMANTIC_SEARCH_MIN_SCORE = float(
     os.environ.get('SEMANTIC_SEARCH_MIN_SCORE', '0.40').strip() or 0.40)
+
+# ─── Переранжирование умного поиска моделью (catalog/rerank.py) ─────────
+#
+# За флагом, только для сотрудников (`request.user.is_staff`), только
+# локально — Notion «Решения» 11.09.2026: переранжирование пула кандидатов
+# GLM-5.3-Flash подняло nDCG@10 с 0,77 до 0,95 на офлайн-замере 10.09.2026
+# (reports/llm_search_eval/). Умолчание — ВЫКЛЮЧЕНО: это не то же
+# предохранение, что у семантического поиска (там мина в памяти), здесь
+# просто платная функция, которая не должна включаться сама.
+SMART_SEARCH_RERANK = (
+    os.environ.get('SMART_SEARCH_RERANK', '0').strip().lower()
+    in ('1', 'true', 'yes', 'on')
+)
+SMART_SEARCH_RERANK_MODEL = os.environ.get(
+    'SMART_SEARCH_RERANK_MODEL', 'glm-5.3-flash').strip()
+# Глубина каждой ноги пула (дense/bm25 топ-N) и потолок пула ПОСЛЕ дедупа.
+SMART_SEARCH_RERANK_LEG_DEPTH = int(
+    os.environ.get('SMART_SEARCH_RERANK_LEG_DEPTH', '50').strip() or 50)
+SMART_SEARCH_RERANK_POOL_CAP = int(
+    os.environ.get('SMART_SEARCH_RERANK_POOL_CAP', '150').strip() or 150)
+# Размер пачки кандидатов на один вызов модели — тот же, что в замере
+# 10.09.2026 (reports/llm_search_eval/reranking.py:BATCH).
+SMART_SEARCH_RERANK_BATCH_SIZE = int(
+    os.environ.get('SMART_SEARCH_RERANK_BATCH_SIZE', '50').strip() or 50)
+# Общий бюджет времени на переранжирование одного запроса. Превышение —
+# деградация до базового порядка, а не ожидание сверх этого.
+SMART_SEARCH_RERANK_TIMEOUT = float(
+    os.environ.get('SMART_SEARCH_RERANK_TIMEOUT', '15').strip() or 15)
+# Какие ноги пула включены: 'dense', 'bm25' через запятую.
+SMART_SEARCH_RERANK_LEGS = frozenset(
+    leg.strip() for leg in
+    os.environ.get('SMART_SEARCH_RERANK_LEGS', 'dense,bm25').split(',')
+    if leg.strip())
 
 # Этап В1 — Кабинет ученика: URL для входа и редирект по умолчанию.
 LOGIN_URL = '/login/'
