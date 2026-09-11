@@ -1,0 +1,40 @@
+# НАДСТРОЙКА над docker-compose.dev.yml — ТОЛЬКО для локальной разработки.
+#
+# ⚠️ ЭТОТ ФАЙЛ НЕ УЧАСТВУЕТ В ПРОВЕРКЕ ИЗОЛЯЦИИ. `ComposeIsolationTests`
+# (catalog/tests/test_search_service.py) читает только `deploy/docker-compose.yml`
+# и `docker-compose.dev.yml` — базовый файл этой правкой не тронут, сервис
+# `search` в НЁМ по-прежнему без `ports`, раскладка «на проде видно только
+# по внутренней сети» продолжает проверяться.
+#
+# Проблема, которую решает этот файл: `manage.py runserver` на машине
+# владельца живёт ВНЕ Docker (Windows), а `SEARCH_SERVICE_URL` по умолчанию
+# указывает на `http://search:8001` — DNS-имя, которое разрешается только
+# ВНУТРИ сети Docker. Без публикации порта runserver до плотной ноги умного
+# поиска не достаёт никогда, даже когда контейнер поднят.
+#
+# Порт публикуется ТОЛЬКО на 127.0.0.1 (не 0.0.0.0): с другой машины в
+# локальной сети до сервиса всё равно не достучаться — `/encode` работает
+# без авторизации и жжёт CPU, открывать его шире собственной машины нельзя
+# (то же обоснование, что у изоляции в docs/SERVER.md).
+#
+# Поднять ТОЛЬКО вместе с базовым файлом (сам по себе он не описывает
+# сервис `search` — Compose объединяет оба):
+#
+#   docker compose -f docker-compose.dev.yml -f docker-compose.dev.local.yml up -d search
+#
+# Погасить:
+#
+#   docker compose -f docker-compose.dev.yml -f docker-compose.dev.local.yml down
+#
+# Затем в .env в корне проекта (config/settings.py подхватывает его сам
+# для runserver и любой команды manage.py):
+#
+#   SEARCH_SERVICE_URL=http://127.0.0.1:8001
+#
+# Подробности и разбор строки лога — docs/EMBEDDINGS.md, раздел «Плотная
+# нога локально, вне Docker».
+
+services:
+  search:
+    ports:
+      - '127.0.0.1:8001:8001'

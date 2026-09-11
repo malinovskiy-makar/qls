@@ -52,19 +52,30 @@ PROTECTED_FIELDS = (
     'embedding', 'content_format', 'human_review',
 )
 
+# ⚠️ То же самое БЕЗ `embedding` — для команд, чья работа и есть запись
+# вектора (`embeddings_import_vectors`). Полный список там неприменим: свип
+# краснел бы всегда, а сторож, который краснеет всегда, перестают читать.
+# Защищать при ввозе надо ровно тексты: вектор меняется по определению,
+# условие, решение и ответ не смеют измениться ни у одной задачи.
+TEXT_PROTECTED_FIELDS = tuple(f for f in PROTECTED_FIELDS if f != 'embedding')
+
 _SEP_FIELD = b'\x1f'
 _SEP_ROW = b'\x1e'
 
 
-def protected_fingerprint(queryset):
-    """MD5 по всем защищённым полям набора — свидетельство «тексты не тронуты».
+def protected_fingerprint(queryset, fields=PROTECTED_FIELDS):
+    """MD5 по защищённым полям набора — свидетельство «тексты не тронуты».
+
+    `fields` по умолчанию — весь `PROTECTED_FIELDS`. Команде, которая пишет
+    вектор осознанно, передают `TEXT_PROTECTED_FIELDS`: иначе свип краснеет
+    на собственной работе команды.
 
     ⚠️ `embedding` — BinaryField, и он отдаёт `memoryview`, а не `bytes`
     (ловушка описана в docs/EMBEDDINGS.md). Приводим явно, иначе отпечаток
     зависел бы от типа обёртки, а не от содержимого.
     """
     digest = hashlib.md5(usedforsecurity=False)
-    rows = queryset.order_by('pk').values_list('pk', *PROTECTED_FIELDS)
+    rows = queryset.order_by('pk').values_list('pk', *fields)
     for row in rows.iterator(chunk_size=2000):
         for value in row:
             if isinstance(value, memoryview):

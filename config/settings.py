@@ -17,6 +17,29 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv_if_present(path):
+    """Локальный `runserver` подхватывает `.env` из корня проекта; прод
+    по-прежнему получает переменные из docker compose (там `.env` этого
+    файла просто нет — секреты приходят через `environment`/`env_file`
+    самого compose). Уже заданная переменная сильнее файла: то, что явно
+    выставлено в оболочке, `.env` молча не перезаписывает.
+    """
+    if not path.exists():
+        return
+    for line in path.read_text(encoding='utf-8').splitlines():
+        line = line.strip()
+        if not line or line.startswith('#') or '=' not in line:
+            continue
+        name, _, value = line.partition('=')
+        name, value = name.strip(), value.strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in '"\'':
+            value = value[1:-1]
+        os.environ.setdefault(name, value)
+
+
+_load_dotenv_if_present(BASE_DIR / '.env')
+
+
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
@@ -280,22 +303,67 @@ AI_REASONING_EFFORT = os.environ.get('AI_REASONING_EFFORT', 'none').strip()
 # прогона обогащения отпечатки задач станут другими, и порог поедет;
 # место для калибровки — Dataset B.
 #
-# Стартовое значение 0,55 подобрано замером на живых запросах 01.09.2026
-# (корпус 14 458 видимых задач, BGE-M3):
+# Стартовое значение 0,55 было подобрано замером на живых запросах 01.09.2026
+# под формулу v1 (корпус 14 458 видимых задач, BGE-M3):
 #     бессмысленные запросы  «как сварить борщ» 0,493 · «квантовая
 #                            хромодинамика» 0,423 — оба ниже порога целиком;
 #     осмысленные            «монополия» 0,630 · «налог» 0,611 ·
 #                            «эластичность спроса по цене» 0,778.
 # Запас до ближайшего мусора — 0,057.
 #
+# ⚠️ Снижено до 0,40 при переходе на v2_meta_first (09.09.2026) — развёртка
+# по восьми порогам на 119 запросах (наборы C58+C65) показала, что от 0,30
+# до 0,55 recall@5/recall@10/nDCG@10 совпадают до четвёртого знака: порог в
+# этом диапазоне НЕ влияет на ранжирование топ-10 вовсе, только на то,
+# попадёт ли правильный ответ в выдачу целиком. При 0,55 отсекалось 43 из
+# 119 правильных ответов (36%) без единого выигрыша в качестве; при 0,40 —
+# только 6. Таблица — reports/formula_v2/search_threshold_sweep.json,
+# решение — Notion «Решения». 0,30 не взяли: порог обязан оставаться хоть
+# какой-то защитой от бессмысленного запроса. ⚠️ Замер «мусор vs осмысленное»
+# выше — калибровка под v1, под v2_meta_first (косинусы систематически
+# выше) не переснята; если появится сигнал, что 0,40 пропускает явный
+# бессмысленный запрос — перезамерить.
+#
 # ⚠️ БЛИЗОСТЬ BGE-M3 НЕ КАЛИБРОВАНА ПО ДЛИНЕ ЗАПРОСА, И ЭТО ВИДНО ЗАМЕРОМ.
 # Одно слово «монополия» даёт максимум 0,630, а абзац с описанием той же
-# задачи — 0,752. Порог 0,65 оставил бы абзацу 164 совпадения, а слову —
-# НОЛЬ. Поэтому 0,55: он не режет короткие запросы. Относительный порог
-# (доля от лучшего совпадения) напрашивается, но это смена поведения
-# поиска — решение владельца, а не побочная правка.
+# задачи — 0,752. Относительный порог (доля от лучшего совпадения)
+# напрашивается, но это смена поведения поиска — решение владельца, а не
+# побочная правка.
 SEMANTIC_SEARCH_MIN_SCORE = float(
-    os.environ.get('SEMANTIC_SEARCH_MIN_SCORE', '0.55').strip() or 0.55)
+    os.environ.get('SEMANTIC_SEARCH_MIN_SCORE', '0.40').strip() or 0.40)
+
+# ─── Переранжирование умного поиска моделью (catalog/rerank.py) ─────────
+#
+# За флагом, только для сотрудников (`request.user.is_staff`), только
+# локально — Notion «Решения» 11.09.2026: переранжирование пула кандидатов
+# GLM-5.3-Flash подняло nDCG@10 с 0,77 до 0,95 на офлайн-замере 10.09.2026
+# (reports/llm_search_eval/). Умолчание — ВЫКЛЮЧЕНО: это не то же
+# предохранение, что у семантического поиска (там мина в памяти), здесь
+# просто платная функция, которая не должна включаться сама.
+SMART_SEARCH_RERANK = (
+    os.environ.get('SMART_SEARCH_RERANK', '0').strip().lower()
+    in ('1', 'true', 'yes', 'on')
+)
+SMART_SEARCH_RERANK_MODEL = os.environ.get(
+    'SMART_SEARCH_RERANK_MODEL', 'glm-5.3-flash').strip()
+# Глубина каждой ноги пула (дense/bm25 топ-N) и потолок пула ПОСЛЕ дедупа.
+SMART_SEARCH_RERANK_LEG_DEPTH = int(
+    os.environ.get('SMART_SEARCH_RERANK_LEG_DEPTH', '50').strip() or 50)
+SMART_SEARCH_RERANK_POOL_CAP = int(
+    os.environ.get('SMART_SEARCH_RERANK_POOL_CAP', '150').strip() or 150)
+# Размер пачки кандидатов на один вызов модели — тот же, что в замере
+# 10.09.2026 (reports/llm_search_eval/reranking.py:BATCH).
+SMART_SEARCH_RERANK_BATCH_SIZE = int(
+    os.environ.get('SMART_SEARCH_RERANK_BATCH_SIZE', '50').strip() or 50)
+# Общий бюджет времени на переранжирование одного запроса. Превышение —
+# деградация до базового порядка, а не ожидание сверх этого.
+SMART_SEARCH_RERANK_TIMEOUT = float(
+    os.environ.get('SMART_SEARCH_RERANK_TIMEOUT', '15').strip() or 15)
+# Какие ноги пула включены: 'dense', 'bm25' через запятую.
+SMART_SEARCH_RERANK_LEGS = frozenset(
+    leg.strip() for leg in
+    os.environ.get('SMART_SEARCH_RERANK_LEGS', 'dense,bm25').split(',')
+    if leg.strip())
 
 # Этап В1 — Кабинет ученика: URL для входа и редирект по умолчанию.
 LOGIN_URL = '/login/'
@@ -587,3 +655,13 @@ GAME_FIGURE_ENABLED = os.environ.get('GAME_FIGURE_ENABLED', '') == '1'
 # владельца). Раздел собран целиком, но показывать его публике рано.
 # Персонал видит настоящие экраны и без флага — иначе разработка встанет.
 OLYMPIADS_PUBLIC = os.environ.get('OLYMPIADS_PUBLIC', '0') == '1'
+
+# ─── Бегун тестов ────────────────────────────────────────────────────────
+#
+# Участвует ТОЛЬКО в `manage.py test`: боевой процесс этот модуль не
+# импортирует вовсе. Бегун затирает ключи поставщиков и гасит
+# SMART_SEARCH_RERANK, чтобы прогон не зависел от `.env` разработчика —
+# пять модулей тестов `catalog` краснели только на машине владельца, а в
+# CI было зелено, и расхождение перестало быть сигналом поломки.
+# Подробности и сторож — config/test_runner.py, config/tests/test_env_isolation.py.
+TEST_RUNNER = 'config.test_runner.EnvIsolatedRunner'

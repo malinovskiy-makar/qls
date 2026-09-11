@@ -280,6 +280,49 @@ class CardTests(TestCase):
         self.assertNotIn('ct-card-id', results)
 
 
+# ── 1.4 Число близости на карточке (09.09.2026, переход на v2_focus_repeat) ─
+class ScoreTests(TestCase):
+    """Число близости показывается ТОЛЬКО у поисковой выдачи и в порядке
+    убывания косинуса — иначе непонятно, по чему отсортирован список."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.top = make_problem('Задача про эластичность спроса по цене.', title='Верхняя')
+        cls.mid = make_problem('Задача про эластичность предложения.', title='Средняя')
+        cls.low = make_problem('Задача про точечную эластичность.', title='Нижняя')
+
+    @staticmethod
+    def _hits(*pairs):
+        """[(problem, score), ...] → форма ответа catalog.semantic.search."""
+        return [{'problem': p, 'score': s} for p, s in pairs]
+
+    def test_процент_показывается_при_поиске(self):
+        with mock.patch('catalog.semantic.search',
+                        return_value=self._hits((self.top, 0.73))):
+            html = self.client.get(CATALOG_URL, {'q': 'эластичность'}).content.decode()
+        card = _card_html(html, self.top)
+        self.assertIn('ct-score', card)
+        self.assertIn('73 %', card)
+
+    def test_процент_не_показывается_без_запроса(self):
+        html = self.client.get(CATALOG_URL).content.decode()
+        card = _card_html(html, self.top)
+        self.assertNotIn('ct-score', card)
+        self.assertNotIn(' %', card)
+
+    def test_выдача_упорядочена_по_убыванию_близости(self):
+        with mock.patch('catalog.semantic.search',
+                        return_value=self._hits((self.top, 0.91), (self.mid, 0.68),
+                                                 (self.low, 0.55))):
+            resp = self.client.get(CATALOG_URL, {'q': 'эластичность'})
+        cards = resp.context['cards']
+        self.assertEqual([c['problem'].pk for c in cards],
+                         [self.top.pk, self.mid.pk, self.low.pk])
+        scores = [c['score'] for c in cards]
+        self.assertEqual(scores, sorted(scores, reverse=True),
+                         'Задача с большим косинусом обязана стоять выше.')
+
+
 class PreviewTextTests(SimpleTestCase):
     def test_formulas_become_text(self):
         self.assertEqual(

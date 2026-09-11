@@ -1,0 +1,1682 @@
+[
+ {
+  "query_id": "q01",
+  "problem_id": 59401,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 39318,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 555,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 30963,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 31988,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 47703,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 29839,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 62105,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 31428,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 48061,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 39307,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 48738,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 47684,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 4152,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 54213,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 1989,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 29982,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 54217,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 47701,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 39218,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 49083,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 35596,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 47700,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 50411,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 47698,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 49161,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 39192,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 42811,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 62034,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q01",
+  "problem_id": 5718,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 103,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 39718,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 58181,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 57091,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 4396,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 40416,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 28215,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 42911,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 5091,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 31528,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 5094,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 3901,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 58050,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 5093,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 34538,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 2783,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 59962,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 146,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 61597,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 4698,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 41632,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 57477,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 59749,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 34471,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q02",
+  "problem_id": 41642,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 26980,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42967,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 52076,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 33087,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 52402,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 28415,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 35710,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 29859,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 32992,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 35072,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 29136,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 26925,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42927,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 32767,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42920,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 28827,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 60512,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 30950,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42975,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 53829,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 33078,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42921,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42896,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 57018,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 28776,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42918,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 35764,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 62450,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 52376,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 41739,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 52087,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 5553,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 476,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 30143,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 29865,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 59477,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 42969,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 38676,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 5230,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 52407,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 34524,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 5199,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 38738,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q03",
+  "problem_id": 59081,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42885,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 30027,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42934,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 28400,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29650,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 41189,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29652,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42938,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42927,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 41191,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42853,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42926,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 41192,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 40152,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29651,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42876,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29654,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 27338,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29649,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42891,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42925,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 30038,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29656,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 776,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 3002,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 39728,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 2092,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 29655,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q04",
+  "problem_id": 42955,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 28191,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 31343,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 42148,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 50951,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 32132,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 57685,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 26683,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 36763,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 53825,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 4232,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 56791,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 58586,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 33853,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 39774,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 61842,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 32749,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 41236,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 1323,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 27939,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 60866,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 42009,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 57379,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 27947,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 62717,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 28139,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 60162,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 41324,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 61568,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 39877,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 34360,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 30179,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 57020,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 5356,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 31605,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 34249,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 33405,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 28986,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 32752,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 35087,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 60224,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 30176,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 34448,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 61700,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 32452,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q05",
+  "problem_id": 42338,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6942,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 47777,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6965,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 61341,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 58497,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 47764,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6950,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 61830,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 50132,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 37060,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6981,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 56591,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 55168,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 37028,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 55548,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 62604,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 37857,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 34777,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 37876,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 56801,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 33742,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 7548,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6941,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 56808,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 31947,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 62540,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 60922,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 6940,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 28173,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q06",
+  "problem_id": 50135,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 489,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 50159,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 37212,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 49383,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 31873,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 58672,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 62662,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 40665,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 7196,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 60354,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 42424,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 3618,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 42177,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 48840,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 37994,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 56850,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 37173,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 7175,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 60709,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 55996,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 29528,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 37150,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 33383,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 5398,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 29530,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 48734,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 59537,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 4755,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 4664,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 59376,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 26738,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 60284,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 37973,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 5397,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 28052,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 60744,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q07",
+  "problem_id": 50166,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 2687,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 2366,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 3606,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 31907,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 2998,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 34101,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 31348,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 43440,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 7142,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 7662,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 33782,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 42126,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 47922,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 37118,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 56960,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 55131,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 49424,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 29506,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 42181,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 56182,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 37121,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 60283,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 32428,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 49677,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 7664,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 33280,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 42182,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 3513,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 47924,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 7067,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 60812,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 2814,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 62534,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 2648,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 3555,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 62113,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q08",
+  "problem_id": 58874,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 43518,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 1403,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 30266,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 38231,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 29346,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 31146,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 32140,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 56681,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 35461,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 31588,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 57934,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 32642,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 7711,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 31784,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 62412,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 43620,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 4463,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 62472,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 26604,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 26794,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 28502,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 55010,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 54955,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 28510,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 59737,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 5969,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 50050,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 50053,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 34498,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 32063,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q09",
+  "problem_id": 34629,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 40506,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 58419,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 29259,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 43625,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 31089,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 54625,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 43536,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 59311,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 27776,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 31018,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 59635,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 43132,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 32108,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 59603,
+  "verdict": "bad"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 29258,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 54649,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 54673,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 32058,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 39182,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 53528,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 60837,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 37345,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 39150,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 32776,
+  "verdict": "unsure"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 40571,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 6640,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 39164,
+  "verdict": "good"
+ },
+ {
+  "query_id": "q10",
+  "problem_id": 32277,
+  "verdict": "good"
+ }
+]

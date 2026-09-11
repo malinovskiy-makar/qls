@@ -30,17 +30,25 @@ class Reply(object):
     выходные и уже входят в `output_tokens`; отдельное поле нужно, чтобы
     понять, куда ушёл бюджет, а не чтобы посчитать деньги дважды.
     Поэтому `_cost` его НЕ прибавляет — см. problems/ai/core.py.
+
+    ⚠️ `cost_usd` — стоимость вызова, НАЗВАННАЯ САМИМ ПОСТАВЩИКОМ, а не
+    посчитанная нами по прайсу. Есть только у посредника, который её
+    присылает (OpenRouter при `usage: {include: true}`); у остальных
+    остаётся `None`. `None` и 0.0 здесь РАЗНОЕ: `None` — «поставщик не
+    сказал, считай по прайсу», ноль — «вызов бесплатный». Слить их
+    значило бы молча занижать жёсткий счётчик бюджета.
     """
 
     def __init__(self, text, input_tokens=0, output_tokens=0,
                  cache_write_tokens=0, cache_read_tokens=0,
-                 reasoning_tokens=0):
+                 reasoning_tokens=0, cost_usd=None):
         self.text = text
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.cache_write_tokens = cache_write_tokens
         self.cache_read_tokens = cache_read_tokens
         self.reasoning_tokens = reasoning_tokens
+        self.cost_usd = cost_usd
 
 
 logger = logging.getLogger(__name__)
@@ -613,6 +621,263 @@ class GLMProvider(BaseProvider):
         )
 
 
+class DeepSeekProvider(BaseProvider):
+    """DeepSeek через OpenAI-совместимый `chat.completions`.
+
+    Заведён 10.09.2026 для офлайн-замера LLM-слоя над поиском: DeepSeek
+    работает вторым судьёй разметки пула. К каталогу не подключён.
+
+    Отдельный класс, а не `GLMProvider` с другим `BASE_URL`, по одной
+    твёрдой причине: GLM обязан слать `thinking` и `reasoning_effort`
+    (без них Z.AI отвечает 400 code 1210), а DeepSeek этих полей не
+    принимает. Общий класс означал бы ветвление по адресу внутри — то
+    самое «поставщик знает, кто он», ради устранения которого этот слой и
+    существует.
+
+    ⚠️ СХЕМА ПОЛЯ КЭША У DEEPSEEK СВОЯ: `usage.prompt_cache_hit_tokens`,
+    а не `usage.prompt_tokens_details.cached_tokens`, как у OpenAI и Z.AI.
+    Прочитать чужое имя значило бы получить тихий ноль в кэше — ровно тот
+    баг, который у GLM прожил до Фазы 6 сессии run2 и стоил неверной сметы.
+    `prompt_tokens` при этом ПОЛНЫЙ вход, попадание кэша внутри него.
+    """
+
+    name = 'deepseek'
+    key_env = 'DEEPSEEK_API_KEY'
+    BASE_URL = 'https://api.deepseek.com'
+
+    def is_available(self):
+        if not self.api_key():
+            return False
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def unavailable_reason(self):
+        if not self.api_key():
+            return ('Работа с моделью выключена: не задан ключ '
+                    'DEEPSEEK_API_KEY.')
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return ('Работа с моделью выключена: не установлена '
+                    'библиотека openai.')
+        return ''
+
+    def _schema_instruction(self, schema):
+        """Схема — текстом: `json_schema` DeepSeek не поддерживает, только
+        `json_object`. Соответствие проверяется на нашей стороне после
+        ответа, как и у `GLMProvider`."""
+        return ('\n\nОТВЕЧАЙ РОВНО ОДНИМ JSON-ОБЪЕКТОМ, СТРОГО '
+                'СООТВЕТСТВУЮЩИМ ЭТОЙ JSON-СХЕМЕ (никакого текста ни до, '
+                'ни после, никакого markdown-обрамления ```):\n%s'
+                % json.dumps(schema, ensure_ascii=False))
+
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 timeout=None, images=None):
+        """⚠️ УРОВЕНЬ РАССУЖДЕНИЯ ЗДЕСЬ РЕШАЕТ ДЕНЬГИ, А НЕ ВКУС.
+
+        DeepSeek V4 Pro по умолчанию рассуждает, и рассуждение
+        тарифицируется как выход. Замер на живой пачке из 25 карточек
+        (10.09.2026): с рассуждением выход 5 902 токена, без него 359.
+        На полном прогоне судьи это $10,45 против $4,25, то есть разница
+        между «не помещается в потолок $4,50» и «помещается».
+
+        Значение берётся из `AI_REASONING_EFFORT` — той же настройки, что
+        у OpenAI и Z.AI. Своего умолчания здесь нет намеренно: три
+        поставщика с тремя разными уровнями рассуждения сравнивать нельзя.
+        """
+        import openai
+
+        from django.conf import settings
+
+        effort = getattr(settings, 'AI_REASONING_EFFORT', 'none')
+        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': user_text},
+                ],
+                response_format={'type': 'json_object'},
+                extra_body={'reasoning_effort': effort},
+                timeout=timeout,
+            )
+        except openai.APIConnectionError as error:
+            raise self._fail(error, 'DeepSeek не ответил.')
+        except openai.RateLimitError as error:
+            raise self._fail(error, 'DeepSeek ограничил частоту запросов.',
+                             kind='limit')
+        except openai.APIStatusError as error:
+            kind = 'no_key' if error.status_code in (401, 403) else 'other'
+            raise self._fail(error, 'DeepSeek вернул ошибку (%s).'
+                             % error.status_code, kind=kind)
+        except Exception as error:
+            raise self._fail(error, 'Вызов DeepSeek не удался.')
+
+        return self._reply_from(response)
+
+    def _reply_from(self, response):
+        usage = getattr(response, 'usage', None)
+        total_input = _num(usage, 'prompt_tokens')
+        output = _num(usage, 'completion_tokens')
+        cache_read = _num(usage, 'prompt_cache_hit_tokens')
+        reasoning = _num(getattr(usage, 'completion_tokens_details', None),
+                         'reasoning_tokens')
+
+        text = ''
+        choices = getattr(response, 'choices', None) or []
+        if choices:
+            message = getattr(choices[0], 'message', None)
+            text = getattr(message, 'content', None) or ''
+
+        return Reply(
+            text=text,
+            input_tokens=max(total_input - cache_read, 0),
+            output_tokens=output,
+            cache_read_tokens=cache_read,
+            reasoning_tokens=reasoning,
+        )
+
+
+class OpenRouterProvider(BaseProvider):
+    """OpenRouter — посредник: один ключ, много чужих моделей.
+
+    Заведён 09.09.2026 для офлайн-замера LLM-слоя над поиском. К каталогу
+    НЕ подключён и в `AI_PROVIDER` по умолчанию не ставится.
+
+    Три отличия от соседей по файлу, каждое — причина существования
+    отдельного класса, а не параметра у `GLMProvider`:
+
+    1. МОДЕЛЬ — ПАРАМЕТР ВЫЗОВА, И ЭТО ЗДЕСЬ ГЛАВНОЕ. У остальных
+       поставщиков модель тоже приходит аргументом, но ключ привязан к
+       одному семейству. Здесь один `OPENROUTER_API_KEY` открывает и
+       GLM, и Claude, и GPT, и DeepSeek — ради этого замер и ведётся
+       через посредника, иначе сравнение семи моделей означало бы семь
+       ключей и семь веток кода.
+
+    2. СТОИМОСТЬ ПРИСЫЛАЕТ САМ ПОСРЕДНИК — но только если её попросить:
+       `extra_body={'usage': {'include': True}}`. Без этого поля
+       `usage.cost` в ответе просто нет, и жёсткий счётчик бюджета
+       пришлось бы вести по прайсу, то есть по нашей копии чужих цен.
+       Копия устаревает молча; названная поставщиком цена — нет.
+
+    3. `reasoning_tokens` лежит в `completion_tokens_details`, как у Z.AI,
+       а НЕ в `output_tokens_details`, как у OpenAI Responses API:
+       эндпоинт здесь `chat.completions`, а не Responses.
+
+    Повторов вызова здесь НЕТ намеренно. Ни один поставщик в этом файле
+    не повторяет запрос сам, и `core.run()` тоже: повтор с паузой и
+    журнал отказов живут снаружи, в вызывающем коде (для замера — в
+    `reports/llm_search_eval/orclient.py`). Один поставщик из пяти,
+    который втихую ретраит, — это разное поведение при одинаковом
+    контракте, и находится такое обычно по счёту.
+    """
+
+    name = 'openrouter'
+    key_env = 'OPENROUTER_API_KEY'
+    BASE_URL = 'https://openrouter.ai/api/v1'
+
+    def is_available(self):
+        if not self.api_key():
+            return False
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return False
+        return True
+
+    def unavailable_reason(self):
+        if not self.api_key():
+            return ('Работа с моделью выключена: не задан ключ '
+                    'OPENROUTER_API_KEY.')
+        try:
+            import openai  # noqa: F401
+        except ImportError:
+            return ('Работа с моделью выключена: не установлена '
+                    'библиотека openai.')
+        return ''
+
+    def _schema_instruction(self, schema):
+        """Схема — текстом в системном сообщении, а не параметром API.
+
+        У посредника за одним адресом стоят модели разных семейств, и
+        `json_schema`+`strict` поддерживают не все. Единственный формат,
+        который принимают все семь моделей замера, — `json_object`;
+        соответствие схеме поэтому проверяется на нашей стороне после
+        ответа. Ровно как у `GLMProvider`, и по той же причине.
+        """
+        return ('\n\nОТВЕЧАЙ РОВНО ОДНИМ JSON-ОБЪЕКТОМ, СТРОГО '
+                'СООТВЕТСТВУЮЩИМ ЭТОЙ JSON-СХЕМЕ (никакого текста ни до, '
+                'ни после, никакого markdown-обрамления ```):\n%s'
+                % json.dumps(schema, ensure_ascii=False))
+
+    def complete(self, system_blocks, user_text, schema, model, max_tokens,
+                 timeout=None, images=None):
+        import openai
+
+        instructions = '\n\n'.join(system_blocks) + self._schema_instruction(schema)
+        client = openai.OpenAI(api_key=self.api_key(), base_url=self.BASE_URL)
+        try:
+            response = client.chat.completions.create(
+                model=model,
+                max_tokens=max_tokens,
+                messages=[
+                    {'role': 'system', 'content': instructions},
+                    {'role': 'user', 'content': user_text},
+                ],
+                response_format={'type': 'json_object'},
+                extra_body={'usage': {'include': True}},
+                timeout=timeout,
+            )
+        except openai.APIConnectionError as error:
+            raise self._fail(error, 'Посредник OpenRouter не ответил.')
+        except openai.RateLimitError as error:
+            raise self._fail(error, 'OpenRouter ограничил частоту запросов.',
+                             kind='limit')
+        except openai.APIStatusError as error:
+            kind = 'no_key' if error.status_code in (401, 403) else 'other'
+            raise self._fail(error, 'OpenRouter вернул ошибку (%s).'
+                             % error.status_code, kind=kind)
+        except Exception as error:
+            raise self._fail(error, 'Вызов через OpenRouter не удался.')
+
+        return self._reply_from(response)
+
+    def _reply_from(self, response):
+        usage = getattr(response, 'usage', None)
+        total_input = _num(usage, 'prompt_tokens')
+        output = _num(usage, 'completion_tokens')
+        cache_read = _num(getattr(usage, 'prompt_tokens_details', None),
+                          'cached_tokens')
+        reasoning = _num(getattr(usage, 'completion_tokens_details', None),
+                         'reasoning_tokens')
+
+        # ⚠️ Именно getattr с None, а не `_num`: `_num` вернул бы 0, а
+        # ноль здесь читается как «бесплатный вызов». См. докстринг Reply.
+        cost = getattr(usage, 'cost', None)
+        cost = float(cost) if isinstance(cost, (int, float)) else None
+
+        text = ''
+        choices = getattr(response, 'choices', None) or []
+        if choices:
+            message = getattr(choices[0], 'message', None)
+            text = getattr(message, 'content', None) or ''
+
+        return Reply(
+            text=text,
+            input_tokens=max(total_input - cache_read, 0),
+            output_tokens=output,
+            cache_read_tokens=cache_read,
+            reasoning_tokens=reasoning,
+            cost_usd=cost,
+        )
+
+
 class FakeProvider(BaseProvider):
     """Подставной поставщик — доказательство сменяемости, а не заглушка.
 
@@ -651,6 +916,8 @@ PROVIDERS = {
     AnthropicProvider.name: AnthropicProvider,
     OpenAIProvider.name: OpenAIProvider,
     GLMProvider.name: GLMProvider,
+    DeepSeekProvider.name: DeepSeekProvider,
+    OpenRouterProvider.name: OpenRouterProvider,
     FakeProvider.name: FakeProvider,
 }
 

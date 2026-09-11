@@ -260,8 +260,9 @@ def _card(problem, score=None):
         'kind_label':       _kind_label(problem.problem_type) if is_test else '',
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
-        # Число близости наружу НЕ ИДЁТ (просьба владельца): в карточке
-        # оно лежит только для тестов и отладки.
+        # Число близости показывается ТОЛЬКО при поиске (решение владельца
+        # 09.09.2026) — при пустом запросе сортировка идёт по id, близости
+        # нет вовсе, и `score` здесь всегда None.
         'score':            score,
     }
 
@@ -434,6 +435,7 @@ def _catalog_context(request, missing_id=''):
     relief = None
     capped = False
 
+    smart_search_status = 'off'
     if searched:
         ids, scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
         # ⚠️ ПОЛУЧАЕМ СНАЧАЛА ОДНИ КЛЮЧИ, А ЗАДАЧИ — ТОЛЬКО НА СТРАНИЦУ.
@@ -441,6 +443,25 @@ def _catalog_context(request, missing_id=''):
         # ради двадцати показанных карточек.
         passed = set(qs.filter(pk__in=ids).values_list('pk', flat=True))
         ranked = [pid for pid in ids if pid in passed]
+
+        # ⚠️ ПЕРЕРАНЖИРОВАНИЕ (`catalog/rerank.py`), ЗА ФЛАГОМ И ТОЛЬКО ДЛЯ
+        # СОТРУДНИКОВ. `apply()` возвращает порядок ПУЛА (собран без учёта
+        # активных фильтров каталога — тема/тег/сложность и т.п.) либо
+        # `None`, если менять нечего; `None` означает побайтовое совпадение
+        # со старым поведением. Пул может содержать задачи, которых нет в
+        # `ranked` (плотная нога пула — БЕЗ порога близости, в отличие от
+        # базовой выдачи), поэтому активные фильтры накладываются здесь же
+        # заново — тем же способом, что и на `ids` выше.
+        from . import rerank as smart_rerank
+        pool_order, smart_search_status = smart_rerank.apply(
+            request.user, query)
+        if pool_order:
+            candidates = pool_order + [pid for pid in ranked
+                                       if pid not in set(pool_order)]
+            still_passed = set(qs.filter(pk__in=candidates)
+                               .values_list('pk', flat=True))
+            ranked = [pid for pid in candidates if pid in still_passed]
+
         total = len(ranked)
         # ⚠️ ЧИСЛО — ОЦЕНКА СНИЗУ, КОГДА СПИСОК УПЁРСЯ В ПОТОЛОК. Мы просим
         # у индекса пятьсот лучших; если порог прошли все пятьсот, похожих
@@ -473,6 +494,9 @@ def _catalog_context(request, missing_id=''):
         'query':          query,
         'searched':       searched,
         'degraded':       degraded,
+        # Не для шаблона — читается `problem_list`/`api_filter_state` для
+        # заголовка `X-Smart-Search` (`catalog/rerank.py`).
+        'smart_search_status': smart_search_status,
         'missing_id':     missing_id,
         'total':          total,
         'capped':         capped,
@@ -522,8 +546,10 @@ def problem_list(request):
     found_id, missing_id = _numeric_query(query)
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
-    return render(request, 'catalog/problem_list.html',
-                  _catalog_context(request, missing_id))
+    context = _catalog_context(request, missing_id)
+    response = render(request, 'catalog/problem_list.html', context)
+    response['X-Smart-Search'] = context['smart_search_status']
+    return response
 
 
 def _filter_counts(fctx):
@@ -568,7 +594,7 @@ def api_filter_state(request):
     """
     context = _catalog_context(request)
     fctx = context['filters']
-    return JsonResponse({
+    response = JsonResponse({
         'total': context['total'],
         'counts': _filter_counts(fctx),
         'selected_count': fctx['selected_count'],
@@ -578,6 +604,8 @@ def api_filter_state(request):
                                          context, request=request),
         'url': fctx['total_url'],
     })
+    response['X-Smart-Search'] = context['smart_search_status']
+    return response
 
 
 def smart_search(request):

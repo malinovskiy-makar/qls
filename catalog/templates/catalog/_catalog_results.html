@@ -53,12 +53,18 @@
         нет), формат теста при тесте, галочка при проверенном решении.
         Нет ничего — нет и строки.
         {% endcomment %}
-        {% if card.topics or card.difficulty or card.is_test or card.has_solution %}
+        {% if card.topics or card.difficulty or card.is_test or card.has_solution or card.score %}
         <div class="ct-line">
           {% for t in card.topics %}<span class="tchip" style="--gc: var(--map-g-{{ t.section }})">{{ t.name }}</span>{% endfor %}
           {% if card.difficulty %}<span class="ct-stars">{% for i in card.difficulty_stars %}★{% endfor %}{% for i in card.difficulty_empty %}☆{% endfor %}</span>{% endif %}
           {% if card.is_test %}<span class="ct-kind">{{ card.kind_label }}</span>{% endif %}
           {% if card.has_solution %}<span class="ct-sol">решение ✓</span>{% endif %}
+          {% comment %}
+          Близость — только у поисковой выдачи (`score` есть только когда
+          `searched`, см. catalog.views._card): при пустом запросе сортировка
+          по id и мерить нечего.
+          {% endcomment %}
+          {% if card.score %}<span class="ct-score">{% widthratio card.score 1 100 %} %</span>{% endif %}
         </div>
         {% endif %}
         {% comment %}

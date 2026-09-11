@@ -229,6 +229,10 @@ batch2_errors.txt
 shots/
 tools/*.mjs
 tools/*.py
+# ⚠️ Исключение: этот файл ЕДЕТ на арендованную видеокарту и на него
+# ссылается reports/formula_v2/RUNBOOK_GPU.md. Одноразовым скриптом он не
+# является — потерять его значит потерять аренду.
+!tools/gpu_encode.py
 
 # OCR кэши
 materials/attachments/kylchik_ocr_cache.txt
@@ -432,3 +436,33 @@ reports/enrich_pilot/*
 # сравнения, и в репозитории ему не место.
 !reports/enrich_pilot/raster_inventory.md
 !reports/enrich_pilot/model_choice_summary.md
+
+# Сессия «формула v2» (07.09.2026). reports/* исключён выше — возвращаем
+# только отчёты и манифест допрогона: манифест нужен фазе 2.2 (после мержа
+# исходный запрос `enrichment_source='run1'` его уже не воспроизведёт) и
+# ранбуку аренды, а весит 12 КБ. Журналы прогона и векторы — не в git.
+!reports/formula_v2/
+reports/formula_v2/*
+!reports/formula_v2/*.md
+!reports/formula_v2/STATE.json
+!reports/formula_v2/manifest_run3.txt
+
+# Сессия «LLM-слой над поиском» (09.09.2026). reports/* исключён выше —
+# возвращаем отчёты, состояние, смету и код замера. Пулы, метки судей и
+# страница side-by-side (jsonl, html) остаются локальными: они большие и
+# пересобираются кодом отсюда.
+!reports/llm_search_eval/
+reports/llm_search_eval/*
+!reports/llm_search_eval/*.md
+!reports/llm_search_eval/*.py
+!reports/llm_search_eval/STATE.json
+!reports/llm_search_eval/estimate.json
+
+# ИСКЛЮЧЕНИЕ: та же логика для переранжирования умного поиска
+# (feat/smart-search-rerank) — читаемый отчёт (.md) и скрипты Фаз 4-5
+# (.py) в репозитории, числа прогонов (.json/.jsonl) — локальные и
+# пересобираются скриптами отсюда.
+!reports/smart_search_rerank/
+reports/smart_search_rerank/*
+!reports/smart_search_rerank/*.md
+!reports/smart_search_rerank/*.py

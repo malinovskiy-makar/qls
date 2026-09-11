@@ -152,7 +152,7 @@ GLM_VARIANT = {
 }
 
 
-def battle_queryset():
+def battle_queryset(include_nonok=False):
     """Все ГОДНЫЕ задачи, кроме пяти служебных фикстур рендерера (Фаза 4),
     упорядоченные по id — детерминированный полный корпус боевого прогона.
     Проверка `--ids` идёт по нему; сама выборка контрольной точки — Фаза C,
@@ -164,11 +164,83 @@ def battle_queryset():
     прошлая сессия скрыла 3 836 задач с битым текстом (`needs_fix`/`junk`)
     и НАЗВАЛА, что этот фильтр здесь отсутствовал, но не чинила. Обогащение
     битого текста даёт битые поля; такие задачи обогащаются отдельным
-    маленьким проходом после починки текста, не этим прогоном."""
-    return (Problem.objects
-           .exclude(source_references__source__name=SERVICE_FIXTURE_SOURCE)
-           .filter(content_status=Problem.ContentStatus.OK)
-           .distinct().order_by('id'))
+    маленьким проходом после починки текста, не этим прогоном.
+
+    ⚠️ `include_nonok=True` (07.09.2026) — тот самый «отдельный маленький
+    проход». Фильтр выше и есть замкнутый круг: слабый первый прогон
+    пометил задачу битой, из-за пометки её не пускает сильный прогон, и она
+    навсегда вне каталога. Владелец круг размыкает; флаг размыкает его в
+    коде. Служебные фикстуры исключены и с флагом — они не задачи вовсе.
+    По умолчанию поведение не меняется, и это правильно: фильтр остаётся
+    защитой, а снятие защиты — осознанным действием с флагом."""
+    qs = Problem.objects.exclude(
+        source_references__source__name=SERVICE_FIXTURE_SOURCE)
+    if not include_nonok:
+        qs = qs.filter(content_status=Problem.ContentStatus.OK)
+    return qs.distinct().order_by('id')
+
+
+def read_ids_file(path):
+    """Список id из файла: один id на строку, `#` — комментарий.
+
+    ⚠️ Почему файл, а не `--ids`. 1 740 идентификаторов — около 10 КБ
+    командной строки, а `cmd.exe` рвётся на 8 191 символе, причём МОЛЧА
+    обрезая: прогон прошёл бы на куске манифеста и отчитался об успехе.
+
+    Порядок и повторы сохраняются ровно как у `--ids` — два способа задать
+    одну выборку обязаны давать один прогон. Нечисловая строка и пустой
+    результат — ошибка, а не молчаливый пропуск: пустой манифест прошёл бы
+    как «прогон на нуле задач» и тоже отчитался бы об успехе.
+    """
+    path = Path(path)
+    if not path.exists():
+        raise CommandError('--ids-file: файла нет: %s' % path)
+    ids = []
+    for номер, строка in enumerate(
+            path.read_text(encoding='utf-8').splitlines(), start=1):
+        строка = строка.split('#', 1)[0].strip()
+        if not строка:
+            continue
+        try:
+            ids.append(int(строка))
+        except ValueError:
+            raise CommandError(
+                '--ids-file %s, строка %d: «%s» — не число.'
+                % (path, номер, строка))
+    if not ids:
+        raise CommandError('--ids-file: в файле %s нет ни одного id.' % path)
+    return ids
+
+
+def classify_rejected_ids(requested, include_nonok=False):
+    """Почему каждый запрошенный id не попал в выборку — по трём причинам.
+
+    ⚠️ Прежнее предупреждение врало. Оно называло все отброшенные id
+    «фикстуры или не существуют», хотя 1 736 задач допрогона существуют, не
+    фикстуры и отброшены фильтром `content_status`. Молчаливая потеря
+    1 736 задач выглядела бы как успешный прогон на четырёх.
+    """
+    requested = list(requested)
+    allowed = set(battle_queryset(include_nonok=include_nonok)
+                  .values_list('id', flat=True))
+    отвергнутые = [i for i in requested if i not in allowed]
+    существуют = set(Problem.objects.filter(pk__in=отвергнутые)
+                     .values_list('id', flat=True))
+    фикстуры = set(
+        Problem.objects
+        .filter(pk__in=отвергнутые,
+                source_references__source__name=SERVICE_FIXTURE_SOURCE)
+        .values_list('id', flat=True))
+    причины = {'не существует': [], 'служебная фикстура': [],
+               'исключена по content_status': []}
+    for pid in sorted(set(отвергнутые)):
+        if pid not in существуют:
+            причины['не существует'].append(pid)
+        elif pid in фикстуры:
+            причины['служебная фикстура'].append(pid)
+        else:
+            причины['исключена по content_status'].append(pid)
+    return причины
 
 
 # ---------------------------------------------------------------------------
@@ -1264,6 +1336,33 @@ class Command(BaseCommand):
                  'чек-поинт «первые 300» (решение владельца 02.09.2026: '
                  'два честных прогона, не подмена выборки).')
         parser.add_argument(
+            '--ids-file', type=str, default=None,
+            help='То же, что --ids, но списком из файла: один id на строку, '
+                 '«#» — комментарий, пустые строки игнорируются. ⚠️ Нужен '
+                 'потому, что 1 740 идентификаторов — около 10 КБ '
+                 'командной строки, а cmd.exe рвётся на 8 191 символе, '
+                 'причём МОЛЧА обрезая: прогон прошёл бы на куске манифеста '
+                 'и отчитался бы об успехе.')
+        parser.add_argument(
+            '--empty-hints-stop-pct', type=float, default=EMPTY_HINTS_STOP_PCT,
+            help='Порог сторожа «пустые подсказки у задач с решением», %% '
+                 '(по умолчанию %.1f — поведение прежнее). ⚠️ Порог поднимают '
+                 'ТОЛЬКО с замером на руках, а не чтобы «прошло». Замер '
+                 '07.09.2026, допрогон 1 740 худших задач: сторож дал 5,2 %% '
+                 'при пороге 5,0 %%, тогда как на ТЕХ ЖЕ задачах слабый '
+                 'первый прогон даёт 6,4 %% — то есть новый прогон лучше '
+                 'ровно по метрике сторожа, а порог калиброван на здоровом '
+                 'корпусе из 37 тысяч. Решение владельца 07.09.2026.'
+                 % EMPTY_HINTS_STOP_PCT)
+        parser.add_argument(
+            '--include-nonok', action='store_true',
+            help='Не фильтровать --ids/--ids-file по content_status (07.09.2026). '
+                 'Размыкает замкнутый круг: слабый первый прогон пометил '
+                 'задачу битой, из-за пометки её не пускает сильный прогон. '
+                 'Служебные фикстуры рендерера исключены и с флагом. Без '
+                 'флага поведение прежнее — фильтр остаётся защитой по '
+                 'умолчанию.')
+        parser.add_argument(
             '--raw-out', type=str, default=None,
             help='Переопределить путь run_raw.jsonl (по умолчанию — '
                  'официальный файл ПЕРВОГО прогона, НЕПРИКОСНОВЕННЫЙ). '
@@ -1359,14 +1458,38 @@ class Command(BaseCommand):
         battle_manifest_path = (Path(options['battle_manifest'])
                                if options['battle_manifest'] else BATTLE_MANIFEST_PATH)
 
-        if options['ids']:
-            requested = [int(x) for x in options['ids'].split(',') if x.strip()]
-            allowed = set(battle_queryset().values_list('id', flat=True))
+        if options['ids'] and options['ids_file']:
+            raise CommandError('--ids и --ids-file вместе не задаются: '
+                               'выборка обязана быть одна и явная.')
+
+        if options['ids'] or options['ids_file']:
+            include_nonok = options['include_nonok']
+            if options['ids_file']:
+                requested = read_ids_file(options['ids_file'])
+            else:
+                requested = [int(x) for x in options['ids'].split(',') if x.strip()]
+            allowed = set(battle_queryset(include_nonok=include_nonok)
+                          .values_list('id', flat=True))
             problem_ids = [i for i in requested if i in allowed]
-            missing = set(requested) - allowed
-            if missing:
-                self.stdout.write('⚠️ вне battle_queryset() (фикстуры или не '
-                                  'существуют), пропущены: %s' % sorted(missing))
+            # ⚠️ Причина отказа печатается ПОИМЁННО по трём случаям.
+            # Прежнее «фикстуры или не существуют» было неправдой для
+            # 1 736 задач допрогона: они существуют, не фикстуры и
+            # отброшены фильтром content_status. Молчаливая потеря
+            # выглядела бы как успешный прогон на четырёх задачах.
+            причины = classify_rejected_ids(requested,
+                                            include_nonok=include_nonok)
+            if any(причины.values()):
+                self.stdout.write(
+                    '⚠️ вне battle_queryset(include_nonok=%s), пропущено %d id:'
+                    % (include_nonok, sum(len(v) for v in причины.values())))
+                for причина, ids_причины in причины.items():
+                    if ids_причины:
+                        self.stdout.write(
+                            '   %s: %d — %s' % (причина, len(ids_причины),
+                                                ids_причины[:50]))
+            self.stdout.write('=== ВЫБОРКА ПО СПИСКУ: запрошено %d, взято %d '
+                              '(include_nonok=%s) ==='
+                              % (len(requested), len(problem_ids), include_nonok))
         elif limit is not None and limit > CHECKPOINT_LIMIT:
             # ⚠️ БОЕВОЙ ПРОГОН. `--limit` больше размера контрольной точки
             # означает «весь корпус», и манифест чек-поинта здесь брать
@@ -1428,7 +1551,15 @@ class Command(BaseCommand):
                 'режим --call1-only: ровно ОДИН вызов на задачу; поля вызова '
                 '2 переносятся из старого журнала без изменений')
 
-        tracker = RunQualityTracker(call1_only=call1_only)
+        tracker = RunQualityTracker(
+            call1_only=call1_only,
+            empty_hints_stop_pct=options['empty_hints_stop_pct'])
+        if options['empty_hints_stop_pct'] != EMPTY_HINTS_STOP_PCT:
+            self.stdout.write(
+                '⚠️ порог сторожа «пустые подсказки» поднят с %.1f%% до %.1f%% '
+                '— это осознанное решение владельца, а не настройка по '
+                'умолчанию.' % (EMPTY_HINTS_STOP_PCT,
+                                options['empty_hints_stop_pct']))
         stop_event = threading.Event()
         processed_count = {'n': 0}
         count_lock = threading.Lock()

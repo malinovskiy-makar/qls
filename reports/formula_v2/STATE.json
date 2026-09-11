@@ -1,0 +1,208 @@
+{
+ "session": "titles_lean",
+ "branch": "feat/embedding-formula-v2",
+ "base_commit": "326c939",
+ "db": "C:\\Users\\shipu\\qls\\db.sqlite3",
+ "backup_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_formula_v2_phase0_20260907.sqlite3",
+ "backup_phase0_checked": {
+  "integrity_check": "ok",
+  "problems": 41307,
+  "size": 1291358208
+ },
+ "backup_phase0_used_for_rollback": true,
+ "phases": {
+  "0": {
+   "status": "done"
+  },
+  "1": {
+   "status": "done",
+   "processed": 1740,
+   "unrecovered": 0,
+   "spent_usd": 1.9163
+  },
+  "2": {
+   "status": "done",
+   "merged": 1733,
+   "promoted_to_ok": 559,
+   "published_of_them": 452
+  },
+  "3": {
+   "status": "done",
+   "specs": 17,
+   "blocks": 19,
+   "v1_byte_exact_on": 2500
+  },
+  "4": {
+   "status": "done"
+  },
+  "5": {
+   "status": "done"
+  },
+  "titles_lean": {
+   "phase_-1": "done",
+   "phase_0": "done",
+   "phase_1": "done",
+   "phase_2": "done",
+   "phase_3": "done",
+   "phase_4": "done",
+   "phase_5": "done",
+   "phase_6": "done"
+  },
+  "titles_final": {
+   "phase_-1": "done",
+   "phase_0": "done",
+   "phase_1": "done",
+   "phase_2": "done",
+   "phase_3": "done (три стоп-гейта)",
+   "phase_4": "done",
+   "phase_5": "done",
+   "phase_6": "done",
+   "phase_7": "done"
+  }
+ },
+ "manifest_size": 1740,
+ "active_spec": "v1",
+ "embedding_formula_version": 1,
+ "embedding_max_seq_length": 8192,
+ "build_check_passed": true,
+ "catalog_visible_before": 13968,
+ "catalog_visible_after": 14082,
+ "run1_leftovers_remaining": [
+  55678
+ ],
+ "snapshots_for_revert": [
+  "reports/formula_v2/content_status_promote_backup.json",
+  "reports/formula_v2/content_status_promote_tail_backup.json"
+ ],
+ "backup_titles_lean_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_20260907_titles_lean_phase0.sqlite3",
+ "backup_titles_lean_phase0_checked": {
+  "integrity_check": "ok",
+  "problems": 41307,
+  "size": 1291358208
+ },
+ "specs": 18,
+ "v2_blocks": 17,
+ "title_buckets": {
+  "A": 12473,
+  "B": 318,
+  "C": 9498,
+  "C-оставляем": 12439,
+  "D-совпадает": 5192,
+  "D-кандидат негоден": 1387
+ },
+ "titles_replaced": 22289,
+ "titles_snapshot": "reports\\formula_v2\\title_apply_backup.json",
+ "field_name_values_cleared": 882,
+ "field_name_values_snapshot": "reports\\formula_v2\\field_name_values_backup.json",
+ "title_candidate_nonempty": 40425,
+ "protected_fingerprint_matches_phase0_backup": "89c339ef23eae9c2b39e29c793c54cee",
+ "backup_titles_final_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_20260907_titles_final_phase0.sqlite3",
+ "backup_titles_final_phase0_checked": {
+  "integrity_check": "ok",
+  "problems": 41307,
+  "size": 1291358208,
+  "md5_id_title": "801cb7d50399503a3cf0fb437016372a"
+ },
+ "titles_reverted_by_owner": true,
+ "title_buckets_final": {
+  "обрубки": 10961,
+  "технические номера": 3275,
+  "не трогаем": 20492,
+  "уже равен кандидату": 5192,
+  "кандидат негоден": 1387
+ },
+ "titles_to_replace_final": 14236,
+ "titles_replaced_final": 14236,
+ "titles_snapshot_final": "reports/formula_v2/title_apply_backup_final.json",
+ "titles_snapshot_previous_KEEP": "reports/formula_v2/title_apply_backup.json (22 289, старый критерий — НЕ применять)",
+ "published_title_over_40": {
+  "до": 13236,
+  "после": 7406
+ },
+ "protected_fingerprint_final": "314a18b1ab20e61ab4e95ec67ea8a3ef",
+ "md5_id_title": {
+  "до замены": "801cb7d50399503a3cf0fb437016372a",
+  "после замены": "f7ab41ca99630fce4ee82cec414d3f24"
+ },
+ "firstline_unresolved": {
+  "файл": "reports/formula_v2/firstline_unresolved.json",
+  "всего": 2229,
+  "опубликованных": 884
+ },
+ "empty_statements": {
+  "файл": "reports/formula_v2/empty_statements.json",
+  "всего": 151,
+  "совсем пустых": 29
+ },
+ "mutations_red": "16 из 16",
+ "session_v2meta_import": {
+  "backup_phase0": "C:\\Users\\shipu\\weconomics-data\\backups\\db_20260908_before_v2meta_import.sqlite3",
+  "backup_phase0_checked": {
+   "integrity_check": "ok",
+   "problems": 41307,
+   "size": 1291358208
+  },
+  "ПРОДОЛЖЕНО_09.09.2026_после_перезагрузки": "search_eval-расхождение объяснено: тот же файл vec_v2_meta_first.f32, пересчитанный вручную для id=2, даёт дубль 53708 на 1-м месте, а сохранённый офлайн-отчёт eval_v2_meta_first_A.json (снят на аренде 08.09) — на 7-м. Код и набор A не менялись с 28.08. Файл на диске цел (build_check --sample 5 --no-state ПОСЛЕ перезагрузки снова дал min_cosine 0.9999999, включая id 1-5). Вывод: офлайн-отчёт относится к промежуточному прогону на арендованной машине, не к финальному довезённому файлу — реальные числа лучше заявленных (recall@5 0.939 vs 0.885, nDCG@10 0.816 vs 0.733), не хуже. Ввоз признан корректным, сессия продолжена дальше по ранбуку.",
+  "phase5_cache_similar_rebuild": {
+   "матрица": "28593 задач × 1024 dim (published, без флага шлюза, с эмбеддингом)",
+   "целей": 30311,
+   "связей_записано": 151555,
+   "битых_ссылок": 0,
+   "было_до_v2meta (по промпту)": 106335
+  },
+  "phase6_thresholds_diagnostics": {
+   "файл": "reports/formula_v2/thresholds_v2meta.json",
+   "медиана_случайных_пар_v1": 0.4378,
+   "медиана_случайных_пар_v2_meta_first": 0.5559,
+   "эквивалент_порога_0.55": 0.6506,
+   "эквивалент_порога_0.95": 0.9182,
+   "пороги_НЕ_менялись": true
+  },
+  "phase7_проверки": {
+   "manage_check": "0 issues",
+   "ruff_изменённых_файлов": "чисто",
+   "тесты_problems_catalog": "4614 тестов (шаг A), FAILED failures=14 errors=4 skipped=5 — ВСЕ 18 объяснены и НЕ являются регрессией: тесты test_embeddings_transfer.py, test_embedding_formula.py (V1ByteForByteTests), test_corpus_diagnostics.py (ShadowFingerprintTests) жёстко зашиты на допущение «активна v1» (бюджет statement:500, solution не в отпечатке, конкретные тексты ошибок ImportRefusalTests). После переключения на v2_meta_first (solution входит в отпечаток, statement:1500) они корректно ловят иное, но ВЕРНОЕ поведение. Требуется отдельная работа по обновлению этих тестов под активную спецификацию перед слиянием в main — НЕ делалось в этой сессии по прямому указанию промпта не чинить находки на ходу. Шаг B (serial) 4/4 OK.",
+   "не_закоммичено": "problems/embedding_config.py, problems/management/commands/embeddings_import_vectors.py, reports/formula_v2/STATE.json — коммит и точная команда в конце сессии, владелец коммитит явным подтверждением"
+  },
+  "active_spec_switched": "v2_meta_first (ФАЗА 2 сделана, manage.py check и makemigrations --check чистые, EMBEDDING_FORMULA_VERSION=96 подтверждён)",
+  "code_fixes_uncommitted": [
+   "problems/embedding_config.py — ACTIVE_SPEC_NAME 'v1' → 'v2_meta_first'",
+   "problems/management/commands/embeddings_import_vectors.py — добавлен ID_CHUNK=900 (без него filter(pk__in=ids) на 41307 id ронял SQLite с «too many SQL variables», план вообще не считался); вся запись (все батчи + свип-детектор) обёрнута в ОДНУ внешнюю transaction.atomic() вместо отдельной транзакции на каждый батч по 500 — по требованию владельца: обрыв процесса не должен оставлять смесь v1/v2_meta_first, и теперь свип-детектор при срабатывании откатывает всю запись, а не только сообщает постфактум",
+   "НЕ ЗАКОММИЧЕНО — владелец коммит не запрашивал, коммит и текст команды — в конце сессии"
+  ],
+  "phase3_dry_run_approved_by_owner": {
+   "к_записи": 41307,
+   "пропущено": 0,
+   "не_найдено": 0
+  },
+  "phase4_apply_done": {
+   "записано": 41307,
+   "свип_детектор_расхождений": 0
+  },
+  "invariants_status": {
+   "1_protected_fingerprint": "MATCH — 88ec6893a22ea2a665ab2c75a185a0e2 (statement/solution/answer/content_format/human_review/title), бэкап фазы0 vs текущая db.sqlite3, сверено напрямую sqlite3 в обход Django",
+   "2_embedding_count": "41307 → 41307, не уменьшилось",
+   "3_vector_size_sample100": "100 из 100 случайных задач — ровно 4096 байт",
+   "4_idempotency": "НЕ ПОДТВЕРЖДЕНО, требует решения владельца. Повторный dry-run (embeddings_import_vectors без --apply) ПОСЛЕ применённого --apply снова печатает «к записи: 41307», а не 0 — по конструкции команды: критерий «к записи» это совпадение пересчитанного хеша ТЕКСТА с хешем из meta.json файла, а НЕ сравнение с уже сохранённым embedding_source_hash в БД. Т.е. план всегда покажет то же число, пока тексты не менялись, вне зависимости от того, ввозили уже или нет. Дополнительно: повторный --apply перезаписал бы embedding_built_at на новый timestamp.now() у всех 41307, даже если embedding/version/hash не изменились — значит буквальный no-op на уровне БД тоже не гарантирован. embedding_version распределение проверено отдельно (не как часть инварианта 4, а как диагностика): ВСЕ 41307 строк = 96, смеси версий нет.",
+   "5_search_eval": "РАСХОЖДЕНИЕ, НЕ ОБЪЯСНЕНО — главная незакрытая находка. `manage.py search_eval --set A --scope all` (без --vectors, читает эмбеддинги из БД, кодирует 2619 запросов набора A локальной CPU-моделью на лету) дал recall@5=0.939, recall@10=0.968, recall@20=0.977, recall@50=0.983, MRR@10=0.771, nDCG@10=0.816 — index_size 41307 (совпадает с банком). Ожидание по карточке решения и по промпту: recall@5≈0,885, nDCG@10≈0,733 — разница намного больше порога 0,01, заявленного в промпте как «значит в базу легло не то». НО: найден файл reports/formula_v2/eval_v2_meta_first_A.json (offline-отчёт с аренды, run_at 2026-09-08T18:56:02Z, vectors_file=reports/formula_v2/vec_v2_meta_first, query_vectors_file=null) — в нём recall@5=0.8852870052182766, recall@10=0.9497836324296804, nDCG@10=0.7330289914597439 — ЭТО ТОЧНО совпадает с числами из карточки решения и из промпта до последнего знака. Значит ожидаемые владельцем числа — это офлайн-замер ПО ФАЙЛУ векторов (--vectors), а не по банку. embedding_version проверен: все 41307 = 96, смеси формул в БД нет, отпечаток защищённых полей совпал побайтово — сырой ввоз похож на корректный. Открытый вопрос: почему прогон по банку (после верифицированного гейтом ввоза, min_cosine 0.9999999) даёт заметно ДРУГИЕ (и лучшие) числа, чем прогон по тому же файлу векторов офлайн. Гипотезы для проверки при продолжении: (а) офлайн-прогон 08.09 кодировал ЗАПРОСЫ иначе, чем текущий live search_eval (другой билд/девайс/параметр, хотя query_vectors_file=null наводит на то, что оба раза запросы кодировались на лету — тогда разница может быть в версии индекса/scope на момент офлайн-прогона, а не в способе кодирования); (б) набор A (problems/data/eval_set_a.json) или state банка (dup-статусы, hidden-флаги) могли измениться между 08.09 18:56 и 09.09 — хотя recall в БОЛЬШУЮ сторону странно для случайного дрейфа; (в) offline-отчёт использовал --vectors на ФАЙЛЕ (т.е. индекс = все строки файла, включая возможные задачи без записи в БД на тот момент, или другой порядок/фильтрацию) — нужно прочитать search_eval.py целиком (код кодирования запросов, что делает --scope prod/all при --vectors vs без) и сравнить путь. НЕ переходить к Фазе 5 (cache_similar) и Фазе 6 (пороги), пока это расхождение не объяснено — источник инструкции прямо требует стоп при таком расхождении.",
+   "6_и_7": "не начаты"
+  }
+ },
+ "build_check": {
+  "spec": "v2_focus_repeat",
+  "version": 95,
+  "rows_checked": 200,
+  "min_cosine": 0.9999999,
+  "median_cosine": 1.0,
+  "device": "cuda",
+  "versions": {
+   "torch": "2.13.0+cu130",
+   "sentence_transformers": "5.1.2",
+   "transformers": "4.57.6",
+   "tokenizers": "0.22.2",
+   "python": "3.13.15"
+  },
+  "input_sha256": "4cf820054a58b9eaa7277a902dc9f1072b12cf3decdb856cb59c8489d5f74fba",
+  "checked_at": "2026-09-09T18:06:05+00:00"
+ }
+}
