@@ -379,7 +379,13 @@ def records_panel(user, mode='all'):
                  for v in diff.values() if v['total']]
 
     # ── Активность за 30 дней: сколько раундов в день ──
-    since = timezone.now().date() - datetime.timedelta(days=ACTIVITY_DAYS - 1)
+    # ⚠️ `localdate()`, А НЕ `now().date()`. Второе — дата по UTC, а день
+    # забега ниже считается по Москве (`localtime`). С полуночи до трёх
+    # ночи московская дата на сутки впереди, и сегодняшний забег оказывался
+    # ВЫШЕ верхнего края окна: полоса показывала ноль там, где человек
+    # только что играл. Обе стороны обязаны мерить время одним часовым
+    # поясом — местным.
+    since = timezone.localdate() - datetime.timedelta(days=ACTIVITY_DAYS - 1)
     per_day = {}
     for r in rows:
         day = timezone.localtime(r.created_at).date()

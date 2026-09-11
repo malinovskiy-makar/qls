@@ -5,6 +5,7 @@ u"""Лидерборд и личная статистика (фаза 6).
 «чужой не прошёл» границей не считается.
 """
 import datetime
+from unittest import mock
 
 from django.core.cache import cache
 from django.test import TestCase
@@ -464,6 +465,40 @@ class RecordsPanelTests(TestCase):
         days = self.panel('all')['activity']
         self.assertEqual(len(days), lb.ACTIVITY_DAYS)
         self.assertEqual(sum(d['count'] for d in days), 1)
+
+    def test_activity_keeps_todays_run_during_the_moscow_night(self):
+        u"""⚠️ С полуночи до трёх ночи по Москве дата в UTC на сутки позади.
+
+        Верхний край окна брался `timezone.now().date()` — это дата по UTC,
+        а день забега считался `timezone.localtime(...).date()` — это дата
+        по Москве. Три часа каждую ночь сегодняшний забег оказывался ВЫШЕ
+        верхнего края окна и пропадал с полосы активности целиком: полоса
+        показывала ноль там, где человек только что играл.
+
+        Время здесь заморожено намеренно. Тест выше (`covers_exactly_thirty_days`)
+        краснел ровно в эти три часа и зеленел в остальные двадцать один —
+        то есть ловил баг случайно, по часам машины.
+        """
+        мск = datetime.timezone(datetime.timedelta(hours=3))
+        полночь = datetime.datetime(2026, 9, 12, 0, 30, tzinfo=мск)
+        run(self.a, score=100, correct=5, when=полночь)
+
+        self.client.force_login(self.a)
+        # ⚠️ ИМЕННО В UTC. Настоящий `timezone.now()` всегда отдаёт время в
+        # UTC, и весь баг в том, что у такого значения `.date()` — дата по
+        # UTC. Подменка с московским смещением вернула бы московскую дату и
+        # тест зеленел бы на сломанном коде.
+        сейчас = (полночь + datetime.timedelta(minutes=10)).astimezone(
+            datetime.timezone.utc)                          # 11.09 по UTC
+        self.assertEqual(сейчас.date().isoformat(), '2026-09-11')
+        with mock.patch('django.utils.timezone.now', return_value=сейчас):
+            days = self.client.get(reverse('game:my_stats'),
+                                   {'panel_mode': 'all'}).json()['panel']['activity']
+
+        self.assertEqual(days[-1]['date'], '2026-09-12',
+                         'верхний край полосы — сегодняшний день по Москве')
+        self.assertEqual(sum(d['count'] for d in days), 1,
+                         'сегодняшний забег пропал с полосы активности')
 
     def test_the_leader_has_no_gap_above_and_that_is_not_zero(self):
         u"""⚠️ Ноль читался бы как «догнал». Выше никого — это None."""
