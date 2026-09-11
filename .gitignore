@@ -457,3 +457,12 @@ reports/llm_search_eval/*
 !reports/llm_search_eval/*.py
 !reports/llm_search_eval/STATE.json
 !reports/llm_search_eval/estimate.json
+
+# ИСКЛЮЧЕНИЕ: та же логика для переранжирования умного поиска
+# (feat/smart-search-rerank) — читаемый отчёт (.md) и скрипты Фаз 4-5
+# (.py) в репозитории, числа прогонов (.json/.jsonl) — локальные и
+# пересобираются скриптами отсюда.
+!reports/smart_search_rerank/
+reports/smart_search_rerank/*
+!reports/smart_search_rerank/*.md
+!reports/smart_search_rerank/*.py
