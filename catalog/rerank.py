@@ -446,6 +446,11 @@ def _score_pool(query, pool_ids, rows, timeout):
     Бросает исключение при любой поломке (нет ключа, таймаут, нечитаемый
     ответ) — фолбэк решает вызывающая сторона (`_run`), здесь причина не
     глушится.
+
+    Возвращает `(ranked, usage, scores)` — третий элемент, сырой словарь
+    `{id: балл}` по всем ОЦЕНЁННЫМ кандидатам (без хвоста неоценённых из
+    `ranked`), нужен только `manage.py rerank_trace` для отладочной печати;
+    `_run` его игнорирует.
     """
     from django.conf import settings
 
@@ -497,9 +502,13 @@ def _score_pool(query, pool_ids, rows, timeout):
                            % (len(chunks), len(batches)))
 
     ranked = merge(chunks, all_ids=pool_ids)
+    scores = {}
+    for chunk in chunks:
+        for pid, score in chunk.items():
+            scores[int(pid)] = clamp(score)
     usage = {'input_tokens': input_tokens, 'output_tokens': output_tokens,
              'batches': len(batches), 'model_seconds': round(model_seconds, 3)}
-    return ranked, usage
+    return ranked, usage, scores
 
 
 # ─── Кэш результата (час по нормализованному тексту запроса) ──────────────
@@ -547,7 +556,7 @@ def _run(query):
             return RerankResult(
                 [], 'fallback', reason='пустой пул', leg_sizes=leg_sizes,
                 total_seconds=time.perf_counter() - started)
-        ranked, usage = _score_pool(query, pool_ids, rows, timeout)
+        ranked, usage, _scores = _score_pool(query, pool_ids, rows, timeout)
         cost = _cost_usd(settings.SMART_SEARCH_RERANK_MODEL,
                          usage['input_tokens'], usage['output_tokens'])
         return RerankResult(

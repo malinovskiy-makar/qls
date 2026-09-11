@@ -13,11 +13,16 @@
 3. Лежащий сервис — это ДЕГРАДАЦИЯ, а не пятисотка. И, что не менее важно,
    Django при этом НЕ должен полезть за моделью сам.
 """
+import base64
 import importlib.util
+import json
 import os
+import re
 import sys
+import threading
 import unittest
 import urllib.request
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest import mock
 
@@ -337,6 +342,176 @@ class ComposeIsolationTests(SimpleTestCase):
                         'Публиковать его наружу нельзя: /encode работает без '
                         'авторизации, и открытый порт раздаёт нашу CPU-'
                         'молотилку кому угодно.' % относительный)
+
+
+class DevLocalOverrideTests(SimpleTestCase):
+    """`docker-compose.dev.local.yml` — надстройка ТОЛЬКО для runserver вне
+    Docker (Windows), публикующая порт `search` на loopback.
+
+    ⚠️ Файл намеренно НЕ входит в `ComposeIsolationTests.ФАЙЛЫ` выше — это
+    отступление от проверки изоляции для локальной машины, а не дыра в ней:
+    `ComposeIsolationTests` продолжает читать `docker-compose.dev.yml` живьём
+    и красит тест, если ports попадёт туда, — оверрай на это не влияет,
+    потому что лежит отдельным файлом. Здесь проверяется обратное свойство
+    самого оверрая: порт торчит НЕ на всех интерфейсах, а только на
+    127.0.0.1 — иначе `/encode` без авторизации стал бы виден всей локальной
+    сети, не только машине разработчика.
+    """
+
+    КОРЕНЬ = Path(__file__).resolve().parents[2]
+    ФАЙЛ = 'docker-compose.dev.local.yml'
+    _СТРОКА_ПОРТА_RE = re.compile(r"^\s*-\s*['\"]?([^'\"\s]+)['\"]?\s*$")
+
+    def _текст(self):
+        путь = self.КОРЕНЬ / self.ФАЙЛ
+        self.assertTrue(путь.exists(),
+                        'нет файла %s — он должен лежать в репозитории' % путь)
+        return путь.read_text(encoding='utf-8')
+
+    def test_файл_не_входит_в_список_проверки_изоляции(self):
+        self.assertNotIn(
+            self.ФАЙЛ, ComposeIsolationTests.ФАЙЛЫ,
+            'Локальная надстройка попала в список файлов ComposeIsolationTests '
+            '— проверка изоляции начнёт требовать от неё отсутствия ports, а '
+            'весь смысл этого файла ровно в обратном.')
+
+    def test_порт_search_публикуется_только_на_127_0_0_1(self):
+        # ⚠️ Смотрим ТОЛЬКО строки самой секции ports, а не весь текст файла:
+        # комментарий-объяснение выше по тексту сам упоминает «не 0.0.0.0»,
+        # и грубый assertNotIn по всему файлу ловил бы это упоминание, а не
+        # настоящую публикацию порта.
+        текст = self._текст()
+        строки_портов = []
+        внутри_ports = False
+        for строка in текст.splitlines():
+            if re.match(r'^\s*ports\s*:\s*$', строка):
+                внутри_ports = True
+                continue
+            if внутри_ports:
+                совпадение = self._СТРОКА_ПОРТА_RE.match(строка)
+                if совпадение:
+                    строки_портов.append(совпадение.group(1))
+                    continue
+                if строка.strip():
+                    внутри_ports = False
+
+        self.assertTrue(
+            строки_портов,
+            'В %s не нашлась секция ports сервиса search — нечего публиковать.'
+            % self.ФАЙЛ)
+        for запись in строки_портов:
+            self.assertTrue(
+                запись.startswith('127.0.0.1:'),
+                'Публикация порта %r не привязана к 127.0.0.1 — сервис без '
+                'авторизации станет виден всей локальной сети.' % запись)
+
+
+class _ЗаглушкаEncode(BaseHTTPRequestHandler):
+    """Игрушечная копия `search_service/app.py`: тот же контракт /encode и
+    /healthz, без модели — для проверки транспорта до loopback-адреса."""
+
+    protocol_version = 'HTTP/1.1'
+
+    def _тело_json(self):
+        длина = int(self.headers.get('Content-Length', 0))
+        return json.loads(self.rfile.read(длина).decode('utf-8'))
+
+    def do_GET(self):
+        if self.path != '/healthz':
+            self.send_response(404)
+            self.end_headers()
+            return
+        тело = json.dumps({'ok': True, 'model_loaded': True}).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(тело)))
+        self.end_headers()
+        self.wfile.write(тело)
+
+    def do_POST(self):
+        if self.path != '/encode':
+            self.send_response(404)
+            self.end_headers()
+            return
+        запрос = self._тело_json()
+        векторы = [
+            base64.b64encode(
+                np.full(EMBEDDING_DIM, 0.25, dtype=np.float32).tobytes()
+            ).decode('ascii')
+            for _ in запрос['texts']
+        ]
+        тело = json.dumps({
+            'vectors': векторы, 'dim': EMBEDDING_DIM,
+            'model_build': EMBEDDING_MODEL_BUILD,
+        }).encode('utf-8')
+        self.send_response(200)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(тело)))
+        self.end_headers()
+        self.wfile.write(тело)
+
+    def log_message(self, *args):  # noqa: D401 — тишина в выводе тестов
+        pass
+
+
+class LoopbackServiceReachableViaEnvTests(SimpleTestCase):
+    """⚠️ ГЛАВНОЕ ДОКАЗАТЕЛЬСТВО ЭТОГО ФАЙЛА ДЛЯ ЛОКАЛЬНОЙ РАСКЛАДКИ: адрес
+    сервиса кодирования настраивается извне (`SEARCH_SERVICE_URL`) и по
+    такому адресу на loopback реально можно дойти с обычного HTTP-клиента —
+    ровно тот механизм, на котором стоит `docker-compose.dev.local.yml`
+    (публикует `search` на `127.0.0.1`) плюс `.env` с
+    `SEARCH_SERVICE_URL=http://127.0.0.1:8001`.
+
+    Docker здесь не поднимается — игрушечный сервис на чистом
+    `http.server` даёт то же самое свойство (реальный TCP-сокет на
+    127.0.0.1, реальный HTTP) без веса контейнера и модели.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.сервер = ThreadingHTTPServer(('127.0.0.1', 0), _ЗаглушкаEncode)
+        cls.адрес = 'http://127.0.0.1:%d' % cls.сервер.server_address[1]
+        cls.поток = threading.Thread(target=cls.сервер.serve_forever,
+                                     daemon=True)
+        cls.поток.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.сервер.shutdown()
+        cls.сервер.server_close()
+        super().tearDownClass()
+
+    def setUp(self):
+        caches['search'].clear()
+
+    def test_encode_one_доходит_до_сервиса_по_адресу_из_настроек(self):
+        with override_settings(SEARCH_SERVICE_URL=self.адрес,
+                               SEARCH_SERVICE_TIMEOUT=2.0):
+            вектор = search_client.encode_one('пробный запрос на loopback')
+        self.assertEqual(вектор.shape, (EMBEDDING_DIM,))
+        self.assertEqual(вектор.dtype, np.float32)
+
+    def test_healthy_отвечает_true_когда_адрес_из_настроек_указывает_на_живой_сервис(self):
+        with override_settings(SEARCH_SERVICE_URL=self.адрес,
+                               SEARCH_SERVICE_TIMEOUT=2.0):
+            self.assertTrue(search_client.healthy())
+
+    def test_смысловой_поиск_видит_плотную_ногу_через_settings(self):
+        """Тот же путь, каким идёт `catalog/semantic.py::embed_query` —
+        через `SEMANTIC_SEARCH_ENABLED` и `SEARCH_SERVICE_URL` разом, без
+        подмены самого клиента. Это и есть то, что должен увидеть
+        `catalog.rerank._dense_leg`, когда сервис реально поднят и адрес
+        настроен верно."""
+        from catalog import semantic
+
+        with override_settings(SEMANTIC_SEARCH_ENABLED=True,
+                               SEARCH_SERVICE_URL=self.адрес,
+                               SEARCH_SERVICE_TIMEOUT=2.0):
+            вектор = semantic.embed_query('пробный запрос на loopback')
+        # embed_query нормализует вектор — заглушка отдаёт одинаковые
+        # компоненты, поэтому после нормировки норма обязана быть единицей.
+        self.assertAlmostEqual(float(np.linalg.norm(вектор)), 1.0, places=5)
 
 
 # ⚠️ SERIAL, И ВОТ ЗАПИСАННАЯ ПРИЧИНА (правило CLAUDE.md: метку ставим
