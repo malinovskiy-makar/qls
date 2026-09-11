@@ -267,6 +267,23 @@ docker compose exec -T web python manage.py build_game_pool
 # 7. WebSocket дуэли.
 docker compose up -d ws
 docker compose ps ws                       # healthy
+#
+#    ⚠️⚠️ ПОДНЯТЬ КОНТЕЙНЕР МАЛО — NGINX ОБЯЗАН ПЕРЕЧИТАТЬ КОНФИГУРАЦИЮ.
+#    Проверено на бою 12.09.2026: контейнер healthy, изнутри nginx
+#    `curl http://ws:8001/ws/health/` отвечает 200, а снаружи /ws/health/
+#    отдаёт 504.
+#
+#    Почему. `proxy_pass http://ws:8001` разрешает имя ОДИН РАЗ, при
+#    загрузке конфигурации. Nginx стартовал, когда контейнера ws не было:
+#    внутренний DNS Docker имя не нашёл, запрос ушёл к внешнему DNS, и тот
+#    на голое слово «ws» вернул ЧУЖОЙ ПУБЛИЧНЫЙ АДРЕС (в журнале —
+#    upstream: "http://64.70.19.33:8001/ws/health/"). Nginx запомнил его
+#    навсегда; настоящий ws при этом жил на 172.18.0.9.
+#
+#    Поэтому порядок именно такой: сначала ws, потом перезагрузка nginx.
+docker compose exec nginx nginx -t
+docker compose exec nginx nginx -s reload
+curl -fsS https://weconomics.site/ws/health/     # ждём «ws ok», не 504
 
 # 8. nginx — ⚠️⚠️ С 07.09.2026 ЭТОТ ШАГ ВСЛЕПУЮ ВЫПОЛНЯТЬ НЕЛЬЗЯ.
 #    В активном конфиге сервера живёт ЕЩЁ И блок площадки
