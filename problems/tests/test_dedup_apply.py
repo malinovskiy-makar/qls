@@ -307,6 +307,42 @@ class КомандаОбратима(TestCase):
         self.assertEqual(DupMark.objects.first().rule,
                          DupMark.Rule.APPROVED_PICTURE_REVIEW)
 
+    def test_правка_problem_во_время_записи_откатывает_всё(self):
+        """Сторож защищённых полей не докладывает, а ОТМЕНЯЕТ запись.
+
+        Подсовываем команде запись в `Problem.status` ВНУТРИ её транзакции —
+        так выглядела бы правка, случайно добавленная в будущем. Ожидаем
+        ошибку И чистую базу: ни пометок, ни изменённого статуса.
+
+        ⚠️ Граница сторожа: он откатывает то, что сделано внутри транзакции
+        записи. Правку, УЖЕ ЗАКРЕПЛЁННУЮ до неё, он заметит и назовёт, но
+        отменить не сможет — для этого у команды и нет ни одного пути записи
+        в `Problem`.
+        """
+        from django.core.management.base import CommandError
+        from django.db import transaction
+
+        from problems.management.commands import dedup_apply as модуль
+
+        настоящий = модуль.Command._write_marks
+
+        def порченый(сам, решения, отпечаток_до):
+            with transaction.atomic():
+                Problem.objects.all().update(status=Problem.Status.HIDDEN)
+                return настоящий(сам, решения, отпечаток_до)
+
+        модуль.Command._write_marks = порченый
+        try:
+            with self.assertRaises(CommandError):
+                self.прогон('--apply')
+        finally:
+            модуль.Command._write_marks = настоящий
+
+        self.assertEqual(DupMark.objects.count(), 0)
+        self.assertEqual(
+            set(Problem.objects.values_list('status', flat=True)),
+            {'published'})
+
     def test_одиночная_задача_в_группы_не_попадает(self):
         make_problem(statement='Одинокая задача.', content_hash='своё')
         self.прогон('--apply')
