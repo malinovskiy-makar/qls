@@ -466,3 +466,9 @@ reports/llm_search_eval/*
 reports/smart_search_rerank/*
 !reports/smart_search_rerank/*.md
 !reports/smart_search_rerank/*.py
+
+# Выкатка 12.09.2026: команды для владельца (собраны по факту состояния
+# сервера, а не по памяти) — нужны в репозитории, а не только на машине.
+!reports/deploy_20260912/
+reports/deploy_20260912/*
+!reports/deploy_20260912/DEPLOY_COMMANDS.md
