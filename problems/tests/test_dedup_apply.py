@@ -27,11 +27,12 @@ from problems.tests.factories import make_problem, make_topic
 
 
 def член(pid, approved=False, parts=0, solution='', figures=0, tags=0,
-         topics=0, content_format='plain'):
+         topics=0, content_format='plain', answer=''):
     """Словарь-задача для правил выбора: ровно те поля, что читает логика."""
     return {'id': pid, 'approved': approved, 'parts': parts,
             'solution': solution, 'figures': figures, 'tags': tags,
-            'topics': topics, 'content_format': content_format}
+            'topics': topics, 'content_format': content_format,
+            'answer': answer}
 
 
 class РёбраПоХешу(TestCase):
@@ -172,6 +173,61 @@ class ВыборФаворита(TestCase):
         ])
         self.assertEqual(правило, DupMark.Rule.APPROVED)
         self.assertEqual(лучший, 1)
+
+    def test_approved_без_ответа_при_двойнике_с_ответом_на_разбор(self):
+        """Задачу с пустым ответом нельзя дать ученику — решает человек."""
+        правило, лучший = choose_best([
+            член(1, approved=True, answer=''), член(2, answer='Q = 50'),
+        ])
+        self.assertEqual(правило, DupMark.Rule.APPROVED_ANSWER_REVIEW)
+        self.assertIsNone(лучший)
+        self.assertFalse(is_confident(правило))
+
+    def test_правило_ответа_не_смотрит_на_источник_двойника(self):
+        """Источник двойника в правило не входит вовсе — только сам ответ."""
+        правило, _ = choose_best([
+            член(1, approved=True, answer='    '),
+            член(2, answer='42'),
+        ])
+        self.assertEqual(правило, DupMark.Rule.APPROVED_ANSWER_REVIEW)
+
+    def test_approved_с_ответом_правило_ответа_не_включает(self):
+        правило, лучший = choose_best([
+            член(1, approved=True, answer='Q = 50'), член(2, answer='Q = 50'),
+        ])
+        self.assertEqual(правило, DupMark.Rule.APPROVED)
+        self.assertEqual(лучший, 1)
+
+    def test_оба_пустые_ответы_правило_ответа_не_включает(self):
+        правило, лучший = choose_best([
+            член(1, approved=True, answer=''), член(2, answer=''),
+        ])
+        self.assertEqual(правило, DupMark.Rule.APPROVED)
+        self.assertEqual(лучший, 1)
+
+    def test_при_обоих_исключениях_записывается_причина_картинки(self):
+        """Причина одна, и это картинка; пересечение команда считает отдельно."""
+        правило, лучший = choose_best([
+            член(1, approved=True, figures=0, answer=''),
+            член(2, figures=2, answer='42'),
+        ])
+        self.assertEqual(правило, DupMark.Rule.APPROVED_PICTURE_REVIEW)
+        self.assertIsNone(лучший)
+
+    def test_две_approved_сильнее_правила_ответа(self):
+        правило, _ = choose_best([
+            член(1, approved=True, answer=''), член(2, approved=True),
+            член(3, answer='42'),
+        ])
+        self.assertEqual(правило, DupMark.Rule.NEEDS_REVIEW_MULTI_APPROVED)
+
+    def test_правило_ответа_не_трогает_группы_без_approved(self):
+        """Без approved решает только полнота; `answer` в балл не входит."""
+        правило, лучший = choose_best([
+            член(1, answer='42'), член(2, answer=''),
+        ])
+        self.assertEqual(правило, DupMark.Rule.NEEDS_REVIEW_TIE)
+        self.assertIsNone(лучший)
 
     def test_две_approved_всегда_на_разбор(self):
         правило, лучший = choose_best([
@@ -342,6 +398,18 @@ class КомандаОбратима(TestCase):
         self.assertEqual(
             set(Problem.objects.values_list('status', flat=True)),
             {'published'})
+
+    def test_правило_ответа_на_живых_объектах(self):
+        """approved без ответа, у двойника ответ есть — группа на разбор."""
+        self.полная.human_review = Problem.HumanReview.APPROVED
+        self.полная.answer = ''
+        self.полная.save(update_fields=['human_review', 'answer'])
+        self.бедная.answer = 'P = 25'
+        self.бедная.save(update_fields=['answer'])
+        self.прогон('--apply')
+        self.assertEqual(DupMark.objects.filter(is_best=True).count(), 0)
+        self.assertEqual(DupMark.objects.first().rule,
+                         DupMark.Rule.APPROVED_ANSWER_REVIEW)
 
     def test_одиночная_задача_в_группы_не_попадает(self):
         make_problem(statement='Одинокая задача.', content_hash='своё')

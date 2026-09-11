@@ -1713,6 +1713,9 @@ class DupMark(models.Model):
         APPROVED_PICTURE_REVIEW = (
             'approved_picture_review',
             'У approved нет картинки, у двойника есть — смотрит человек')
+        APPROVED_ANSWER_REVIEW = (
+            'approved_answer_review',
+            'У approved нет ответа, у двойника есть — смотрит человек')
         COMPLETENESS_MARGIN = (
             'completeness_margin', 'Фаворит по полноте с отрывом ≥ 2 баллов')
         NEEDS_REVIEW_TIE = (

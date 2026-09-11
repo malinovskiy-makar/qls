@@ -532,7 +532,7 @@ Problem.objects.filter(tags__slug='missing-figure')
 |---|---|---|---|
 | `DuplicateCandidate` | `find_duplicates` | пара-кандидат по косинусу, 10 731 строка с 08.06 | вручную |
 | `Problem.dup_group` / `dup_is_best` / `dup_best_rule` | ночная сессия 08.09 | 10 810 задач, 4 571 фаворит; текстовые ступени | отката нет |
-| `DupMark` | `dedup_apply` | группы 11.09: хеш с гейтом по подпунктам + косинус `v1` с гейтами | `dedup_apply --revert --apply` |
+| `DupMark` | `dedup_apply` | группы 11.09: хеш с гейтом по подпунктам + косинус `v1` с гейтами; фаворит по approved с двумя исключениями (картинка, пустой ответ) | `dedup_apply --revert --apply` |
 
 ⚠️ `dedup_apply` НИЧЕГО НЕ ПРЯЧЕТ и в `Problem` не пишет вовсе — ни `status`,
 ни `duplicate_of`, ни `hidden_pending_review`. Отпечаток этих трёх полей

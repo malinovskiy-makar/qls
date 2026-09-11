@@ -173,8 +173,9 @@ class Command(BaseCommand):
                             n_figures=Count('figures', distinct=True),
                             n_tags=Count('tags', distinct=True),
                             n_topics=Count('topics', distinct=True))
-                  .values('id', 'human_review', 'solution', 'content_format',
-                          'n_parts', 'n_figures', 'n_tags', 'n_topics'))
+                  .values('id', 'human_review', 'answer', 'solution',
+                          'content_format', 'n_parts', 'n_figures', 'n_tags',
+                          'n_topics'))
             for r in qs:
                 данные[r['id']] = {
                     'id': r['id'],
@@ -183,6 +184,11 @@ class Command(BaseCommand):
                     'figures': r['n_figures'],
                     'tags': r['n_tags'],
                     'topics': r['n_topics'],
+                    # ⚠️ `answer` читается ТОЛЬКО правилом «у approved нет
+                    # ответа»; в балл полноты он намеренно не входит —
+                    # правило не про полноту, а про непригодность задачи с
+                    # пустым ответом для ученика.
+                    'answer': r['answer'] or '',
                     'solution': r['solution'] or '',
                     'content_format': r['content_format'],
                 }
@@ -230,10 +236,6 @@ class Command(BaseCommand):
         for строка in отчёт['печать']:
             say(строка)
 
-        if opts['out']:
-            self._write_report(opts, отчёт, решения, признаки)
-            say('Отчёт: %s' % opts['out'])
-
         if not opts['apply']:
             say('')
             say('⚠️ СТОП-ГЕЙТ. Это только счёт, база не тронута.')
@@ -243,6 +245,13 @@ class Command(BaseCommand):
             say('')
             say('ПРИМЕНЕНО: пометок в DupMark %d.' % DupMark.objects.count())
             say('Откат: dedup_apply --revert --apply')
+
+        # ⚠️ Отчёт пишется ПОСЛЕ записи, а не до неё. Иначе откат транзакции
+        # (сторож защищённых полей) оставил бы на диске файлы, описывающие
+        # состояние, которого в базе нет.
+        if opts['out']:
+            self._write_report(opts, отчёт, решения, признаки)
+            say('Отчёт: %s' % opts['out'])
 
         после = protected_digest()
         say('Защищённые поля ПОСЛЕ: %d строк, sha256 %s'
@@ -292,15 +301,27 @@ class Command(BaseCommand):
         с_approved = 0
         много_approved = 0
         картинка = 0
+        ответ = 0
+        оба_исключения = 0
         for правило, _, члены in решения.values():
-            n = sum(1 for i in члены
-                    if i in признаки and признаки[i]['approved'])
+            состав = [признаки[i] for i in члены if i in признаки]
+            n = sum(1 for m in состав if m['approved'])
             if n:
                 с_approved += 1
             if n > 1:
                 много_approved += 1
             if правило == DupMark.Rule.APPROVED_PICTURE_REVIEW:
                 картинка += 1
+                # Причина записана одна, но подойти могли обе. Считаем
+                # пересечение отдельно, чтобы ни одно число не читалось
+                # как полное.
+                свой = [m for m in состав if m['approved']][0]
+                прочие = [m for m in состав if m['id'] != свой['id']]
+                if not свой['answer'].strip() and any(
+                        m['answer'].strip() for m in прочие):
+                    оба_исключения += 1
+            if правило == DupMark.Rule.APPROVED_ANSWER_REVIEW:
+                ответ += 1
 
         данные = {
             'порог косинуса': opts['cos'],
@@ -316,6 +337,9 @@ class Command(BaseCommand):
             'групп на ручной разбор': len(группы) - уверенных,
             'групп с approved': с_approved,
             'из них ушло на разбор по правилу картинки': картинка,
+            'из них ушло на разбор по правилу пустого ответа': ответ,
+            'групп, где подходили ОБА исключения (учтены как картинка)':
+                оба_исключения,
             'групп с несколькими approved': много_approved,
             'уверенных решено полнотой': правила.get(
                 DupMark.Rule.COMPLETENESS_MARGIN, 0),
