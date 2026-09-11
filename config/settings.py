@@ -649,3 +649,13 @@ LOGGING = {
 # Локально включается переменной окружения — чтобы посмотреть режим глазами,
 # не правя настройки:  GAME_FIGURE_ENABLED=1 ./venv/bin/python manage.py runserver
 GAME_FIGURE_ENABLED = os.environ.get('GAME_FIGURE_ENABLED', '') == '1'
+
+# ─── Бегун тестов ────────────────────────────────────────────────────────
+#
+# Участвует ТОЛЬКО в `manage.py test`: боевой процесс этот модуль не
+# импортирует вовсе. Бегун затирает ключи поставщиков и гасит
+# SMART_SEARCH_RERANK, чтобы прогон не зависел от `.env` разработчика —
+# пять модулей тестов `catalog` краснели только на машине владельца, а в
+# CI было зелено, и расхождение перестало быть сигналом поломки.
+# Подробности и сторож — config/test_runner.py, config/tests/test_env_isolation.py.
+TEST_RUNNER = 'config.test_runner.EnvIsolatedRunner'
