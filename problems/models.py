@@ -1691,6 +1691,61 @@ class DuplicateCandidate(models.Model):
         return f'#{self.problem_a_id} ↔ #{self.problem_b_id} ({self.similarity:.3f})'
 
 
+class DupMark(models.Model):
+    """Пометка «задача входит в группу копий» — результат `dedup_apply`.
+
+    ⚠️ ОТДЕЛЬНАЯ ТАБЛИЦА, А НЕ ПОЛЯ `Problem.dup_*`. Причина одна и она
+    решающая: поля `dup_group` / `dup_is_best` / `dup_best_rule` уже заняты
+    ночной сессией 08.09 — 10 810 задач, 4 571 фаворит, и разведка 11.09
+    признала ту разметку актуальной. Запись новых групп поверх затёрла бы
+    её безвозвратно: `--revert` умеет только «снять своё», вернуть чужое
+    прежнее значение ему неоткуда. Отдельная таблица даёт откат одной
+    командой и ни одного изменения в `Problem` вообще — у `dedup_apply`
+    просто нет кода, который пишет в задачу.
+
+    Уверенность в строке НЕ хранится: она однозначно следует из `rule`
+    (см. `problems/dedup.py`, `CONFIDENT_RULES`). Два поля вместо одного
+    рано или поздно разошлись бы.
+    """
+
+    class Rule(models.TextChoices):
+        APPROVED = 'approved', 'Одна approved в группе — она фаворит'
+        APPROVED_PICTURE_REVIEW = (
+            'approved_picture_review',
+            'У approved нет картинки, у двойника есть — смотрит человек')
+        COMPLETENESS_MARGIN = (
+            'completeness_margin', 'Фаворит по полноте с отрывом ≥ 2 баллов')
+        NEEDS_REVIEW_TIE = (
+            'needs_review_tie', 'Полнота не разводит — смотрит человек')
+        NEEDS_REVIEW_MULTI_APPROVED = (
+            'needs_review_multi_approved',
+            'В группе больше одной approved — смотрит человек')
+
+    problem = models.OneToOneField(
+        Problem, on_delete=models.CASCADE, related_name='dup_mark',
+        verbose_name='Задача')
+    group = models.CharField(
+        'Группа копий', max_length=40, db_index=True,
+        help_text='Связная компонента рёбер дедупа; общая у всех членов')
+    is_best = models.BooleanField(
+        'Фаворит группы', default=False,
+        help_text='True только у фаворита уверенной группы. В группах, '
+                  'ушедших на ручной разбор, False у ВСЕХ.')
+    rule = models.CharField(
+        'Правило выбора', max_length=32, choices=Rule.choices,
+        help_text='Общее для всей группы; говорит и причину, и уверенность')
+    created_at = models.DateTimeField('Размечено', auto_now_add=True)
+
+    class Meta:
+        ordering = ['group', '-is_best', 'problem_id']
+        verbose_name = 'Пометка группы копий'
+        verbose_name_plural = 'Пометки групп копий'
+
+    def __str__(self):
+        return '#%s %s%s' % (self.problem_id, self.group,
+                             ' ★' if self.is_best else '')
+
+
 class OlympiadRef(models.Model):
     """Привязка задачи банка к конкретному туру реальной олимпиады,
     найденная сопоставлением по прямой ссылке (SourceReference.url) с
