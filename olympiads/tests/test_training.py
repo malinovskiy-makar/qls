@@ -8,7 +8,7 @@
 from datetime import timedelta
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -43,6 +43,10 @@ def make_problem(number, answer='42', problem_type='задача'):
     return problem
 
 
+# ⚠️ РАЗДЕЛ ЗАКРЫТ ЗАГЛУШКОЙ «СКОРО» (флаг OLYMPIADS_PUBLIC, 08.09.2026).
+# Классы ниже проверяют СОДЕРЖИМОЕ экранов, а не гейт, — поэтому раздел им
+# открывают явно. Сам гейт сторожит OlympiadsAreClosedTests.
+@override_settings(OLYMPIADS_PUBLIC=True)
 class GuestTests(TestCase):
     """Решать может любой. Вход не требуется ни на одном экране."""
 
@@ -101,6 +105,7 @@ class GuestTests(TestCase):
         self.assertEqual(TrainingAttempt.objects.count(), 2)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class TimerTests(TestCase):
 
     def setUp(self):
@@ -142,6 +147,7 @@ class TimerTests(TestCase):
             engine.start_attempt(self.variant, None, 'sess', True)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class DraftRaceTests(TestCase):
     """Гонка двух сохранений — страница, открытая в двух вкладках."""
 
@@ -189,6 +195,7 @@ class DraftRaceTests(TestCase):
         self.assertEqual(draft.answer_draft, '7')
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class SameGradingTests(TestCase):
     """ГЛАВНЫЙ ТЕСТ: тренировка и `grade_submission` дают ОДНО И ТО ЖЕ.
 
@@ -240,6 +247,7 @@ class SameGradingTests(TestCase):
         self.assertNotEqual(self._grade_directly('б'), self._grade_directly('в'))
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class NoTraceInProblemsTests(TestCase):
     """От тренировавшегося в `problems` не остаётся ни одной записи.
 
@@ -279,6 +287,7 @@ class NoTraceInProblemsTests(TestCase):
         self.assertFalse(engine.service_user().is_active)
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class UnlinkedVariantTests(TestCase):
 
     def test_variant_without_problems_is_not_trainable(self):
@@ -291,6 +300,7 @@ class UnlinkedVariantTests(TestCase):
         self.assertContains(response, 'Задания ещё не привязаны')
 
 
+@override_settings(OLYMPIADS_PUBLIC=True)
 class CleanupTests(TestCase):
 
     def setUp(self):

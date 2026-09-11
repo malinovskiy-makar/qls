@@ -538,12 +538,14 @@ class LivesTests(TestCase):
 
 def log_row(outcome='correct', topics=('Спрос и предложение',), difficulty=3,
             number=1, elapsed_ms=3000, running_score=100, running_combo=1,
-            lives_after=3, question_id=1, question_type='single'):
+            lives_after=3, question_id=1, question_type='single', points=None):
     """Одна запись журнала забега — как её пишет api_answer."""
+    if points is None:
+        points = 100 if outcome == 'correct' else 0
     return {
         'question_id': question_id, 'number': number, 'topics': list(topics),
         'difficulty': difficulty, 'question_type': question_type,
-        'outcome': outcome, 'elapsed_ms': elapsed_ms,
+        'outcome': outcome, 'elapsed_ms': elapsed_ms, 'points': points,
         'running_score': running_score, 'running_combo': running_combo,
         'lives_after': lives_after,
     }
@@ -1762,3 +1764,75 @@ class UnseenBetweenRunsTests(TestCase):
         run3 = self.collect_run(6)
         self.assertEqual(len(run3), 6)                   # круг начался заново
         self.assertEqual(len(set(run3)), 6)              # в забеге без повторов
+
+
+class SummarySequencesTests(TestCase):
+    u"""Три ленты раунда: исходы, время, очки (08.09.2026).
+
+    Экран результата рисует из них ленту ответов, график времени и график
+    «где набрано» — три графика из ОДНОГО места. Второго счётчика ни для
+    чего из этого не заводится: ленты лежат рядом с уже существующими
+    `score_curve` и `combo_curve` и считаются тем же обходом журнала.
+
+    `build_summary` остаётся чистой функцией журнала: в базу не ходит и
+    заново ничего не считает.
+    """
+
+    LOG = [
+        log_row(outcome='correct', elapsed_ms=2500, points=120),
+        log_row(outcome='wrong', elapsed_ms=9000, points=0),
+        log_row(outcome='skip', elapsed_ms=1200, points=0),
+        log_row(outcome='correct', elapsed_ms=3300, points=180),
+        log_row(outcome='correct', elapsed_ms=4100, points=200),
+    ]
+
+    def summary(self):
+        return build_summary(fake_state(self.LOG, score=500))
+
+    def test_all_three_are_as_long_as_the_log(self):
+        u"""Числовой инвариант: длина каждой ленты равна длине журнала."""
+        s = self.summary()
+        for field in ('outcome_seq', 'time_seq', 'points_seq'):
+            self.assertEqual(len(s[field]), len(self.LOG), field)
+
+    def test_points_add_up_to_the_raw_score(self):
+        u"""Числовой инвариант: сумма очков по вопросам равна `raw_score`.
+
+        ⚠️ Именно `raw_score`, а не `score`: итог умножается на точность, и
+        сумма по вопросам ему равняться не обязана. Три разных числа в
+        сводке путать нельзя.
+        """
+        s = self.summary()
+        self.assertEqual(sum(s['points_seq']), s['raw_score'])
+
+    def test_correct_count_matches_the_outcome_tape(self):
+        u"""Числовой инвариант: «верных» в ленте столько же, сколько в поле."""
+        s = self.summary()
+        self.assertEqual(s['outcome_seq'].count('correct'), s['correct'])
+        self.assertEqual(s['outcome_seq'].count('wrong'), s['wrong'])
+        self.assertEqual(s['outcome_seq'].count('skip'), s['skipped'])
+
+    def test_the_order_is_the_order_of_play(self):
+        s = self.summary()
+        self.assertEqual(s['outcome_seq'],
+                         ['correct', 'wrong', 'skip', 'correct', 'correct'])
+        self.assertEqual(s['time_seq'], [2500, 9000, 1200, 3300, 4100])
+        self.assertEqual(s['points_seq'], [120, 0, 0, 180, 200])
+
+    def test_a_missing_field_becomes_zero_not_a_crash(self):
+        u"""Старые записи журнала могут не иметь `points`/`elapsed_ms`.
+
+        Забег, начатый до выкатки, доигрывается — и сводка обязана
+        собраться. Ноль здесь честен: значения нет, а не оно нулевое.
+        """
+        row = log_row(outcome='correct')
+        row.pop('points')
+        row['elapsed_ms'] = None
+        s = build_summary(fake_state([row], score=0))
+        self.assertEqual(s['points_seq'], [0])
+        self.assertEqual(s['time_seq'], [0])
+
+    def test_the_old_curves_are_untouched(self):
+        s = self.summary()
+        self.assertEqual(len(s['score_curve']), len(self.LOG))
+        self.assertEqual(len(s['combo_curve']), len(self.LOG))

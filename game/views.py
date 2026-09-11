@@ -419,6 +419,19 @@ def api_my_stats(request):
     mode = request.GET.get('mode') or config.DEFAULT_MODE
     if mode not in config.MODES:
         mode = config.DEFAULT_MODE
+    # ⚠️ ПАНЕЛЬ «МОИ РЕКОРДЫ» ЖИВЁТ ЗДЕСЬ, А НЕ В СВОЁМ ЭНДПОИНТЕ
+    # (08.09.2026). Это ровно «личная статистика, только про себя», и
+    # граница у неё та же самая — она уже описана в этой вьюхе и закрыта
+    # тестами `MyStatsBoundaryTests`. Второй эндпоинт означал бы второе
+    # место, где ту же границу надо не забыть удержать. (Отдельный
+    # `api_my_history` существует по другой причине: он про ОДИН режим и
+    # про порядок последних забегов — его зовёт экран результата.)
+    #
+    # `panel_mode` может быть 'all': панель умеет показывать все режимы
+    # сразу, а `stats` — нет, счёт Пули и Классики несравним.
+    panel_mode = request.GET.get('panel_mode') or mode
+    if panel_mode != 'all' and panel_mode not in config.MODES:
+        panel_mode = mode
     return JsonResponse({
         'mode': mode,
         'stats': lb.personal_stats(request.user, mode),
@@ -426,7 +439,34 @@ def api_my_stats(request):
         # вторая таблица разъехалась бы с фактом при первом же удалении
         # забега руками (тот же довод, что у лидерборда, ADR 0056).
         'duels': lb.duel_stats(request.user),
+        'panel': lb.records_panel(request.user, panel_mode),
     })
+
+
+@require_GET
+def api_my_history(request):
+    u"""История забегов игрока в режиме. ВИДНА ТОЛЬКО ЕМУ САМОМУ.
+
+    ⚠️ ПОЛЬЗОВАТЕЛЬ БЕРЁТСЯ ИЗ `request.user` И БОЛЬШЕ НИОТКУДА. Параметра
+    «чей» здесь нет и не будет — то же правило, что у `api_my_stats`: он
+    немедленно превратил бы личную историю в публичную по перебору номеров.
+
+    ⚠️ ИСТОРИЯ ПЕРЕЕХАЛА С localStorage НА СЕРВЕР (08.09.2026). Прежний
+    ключ `econ_rush_history` жил в браузере: рекорды и история терялись при
+    смене браузера, а два источника истории разъехались бы при первом же
+    расхождении. Источник теперь один — `GameResult`.
+
+    ⚠️ АНОНИМУ ОТВЕЧАЕМ 403, А НЕ РЕДИРЕКТОМ НА ВХОД. Эндпоинт зовёт
+    fetch, и редирект вернул бы ему HTML страницы входа: клиент получил бы
+    200 и мусор вместо JSON. Экран в этом случае показывает графики без
+    сравнения, а не выдуманные числа.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'Только для вошедших'}, status=403)
+    mode = request.GET.get('mode') or config.DEFAULT_MODE
+    if mode not in config.MODES:
+        mode = config.DEFAULT_MODE
+    return JsonResponse(lb.run_history(request.user, mode))
 
 
 @require_GET
@@ -595,6 +635,10 @@ def _game_page_context(request):
                 'total_players': lb.total_players(config.DEFAULT_MODE, 'all',
                                                   'score'),
             },
+            # Вошёл ли человек. С 08.09.2026 этим живёт ещё и правая
+            # карточка табло: анониму она говорит «войдите, чтобы рекорды
+            # сохранялись», а вошедшему без рекорда — «первый раунд в этом
+            # режиме». Два разных факта, и выдуманного числа нет ни в одном.
             'is_authenticated': request.user.is_authenticated,
             'pool_tags': pool_tags(),
             'topic_counts': topic_counts(),
@@ -864,6 +908,16 @@ def api_session_start(request):
         'lives': state['lives'],
         'filter': run_filter,
         'question': _question_payload(gq, 1),
+        # ⚠️ ЛИЧНЫЙ РЕКОРД ОТДАЁТСЯ ВМЕСТЕ СО СТАРТОМ, А НЕ ОТДЕЛЬНЫМ
+        # ЗАПРОСОМ. Правая карточка табло нужна ровно в тот момент, когда
+        # забег начинается: вторым запросом она подъезжала бы после первого
+        # вопроса, и игрок успевал бы увидеть пустое место. Здесь же
+        # рекорд приходит из БАЗЫ, а не из localStorage: рекорды не должны
+        # теряться при смене браузера (решение владельца про «Мои
+        # рекорды»). У анонима рекордов нет — там None, и табло честно
+        # говорит словами.
+        'best': (lb.best_run(request.user, mode)
+                 if request.user.is_authenticated else None),
     })
 
 
@@ -1056,6 +1110,12 @@ def build_summary(state):
         # кривые для графиков: значение по номеру вопроса
         'score_curve': [r['running_score'] for r in log],
         'combo_curve': [r['running_combo'] for r in log],
+        # Лента раунда: по записи на вопрос, в порядке игры. Экран рисует из
+        # неё и ленту исходов, и график времени, и график очков — три графика
+        # из одного места, а не три счётчика одного и того же.
+        'outcome_seq': [r['outcome'] for r in log],
+        'time_seq': [r.get('elapsed_ms') or 0 for r in log],
+        'points_seq': [r.get('points') or 0 for r in log],
         'played_at': timezone.now().isoformat(timespec='seconds'),
     }
 
@@ -1507,10 +1567,20 @@ def set_page(request, code):
         'why': why,
         'board_url': reverse('game:set_board', args=[gset.code]),
     }
-    # ?auto=1 — начать сразу, без карточки-заставки: так уходит играть
-    # автор дуэли, который вопросов ещё не видел (и не должен увидеть).
+    # ?auto=1 — начать сразу, без карточки-заставки. Механизм остаётся у
+    # наборов другого рода (вызов дня, учительские): там его смысл в том,
+    # чтобы не показывать лишний экран перед известным заданием.
+    #
+    # ⚠️ У ДУЭЛИ АВТОСТАРТА НЕТ, И ЭТО ЗАПРЕТ, А НЕ УМОЛЧАНИЕ (08.09.2026).
+    # Раньше `duel_new` уводила автора сюда с `?auto=1`, забег начинался
+    # немедленно, и автор не видел ни лобби, ни ссылки-приглашения. Соперник
+    # приходил позже — в одном забеге они практически никогда не
+    # пересекались, и живого табло не видел никто. Условие стоит здесь, а не
+    # только в `duel_new`: иначе адрес с `?auto=1`, набранный руками или
+    # оставшийся в чьей-то закладке, вернул бы прежнее поведение.
     ctx['auto_set']['autostart'] = (request.GET.get('auto') == '1'
-                                    and allowed)
+                                    and allowed
+                                    and gset.kind != 'duel')
     # Ссылка-приглашение для лобби дуэли. Ведёт на страницу дуэли, а не на
     # забег: соперник должен сначала увидеть, во что его зовут.
     ctx['duel_url'] = request.build_absolute_uri(
@@ -1628,10 +1698,23 @@ def my_result_for(request, gset):
     return gset.results.filter(code=code).first() if code else None
 
 
+def _wants_json(request):
+    u"""Запрос пришёл из окна вызова (fetch), а не из адресной строки.
+
+    Нужно ровно для одного: на пустой пул отвечать по-разному. Окну нужна
+    строка ошибки, а человеку, набравшему адрес руками, — страница
+    `duel_empty.html`. Одно и то же условие в двух видах — не дубль:
+    получатели разные.
+    """
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return True
+    return 'application/json' in (request.headers.get('Accept') or '')
+
+
 @require_GET
 @login_required
 def duel_new(request):
-    """Создать дуэль и СРАЗУ уйти играть. ТОЛЬКО ДЛЯ ВОШЕДШИХ.
+    """Создать дуэль и вернуть ссылку-приглашение. ТОЛЬКО ДЛЯ ВОШЕДШИХ.
 
     ⚠️ ВХОД ОБЯЗАТЕЛЕН, И ЭТО НЕ ФОРМАЛЬНОСТЬ. Дуэль — это сравнение двух
     людей по имени; у анонима имени нет, и на доске он был бы «кто-то».
@@ -1642,6 +1725,14 @@ def duel_new(request):
     вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую первым, наравне
     с соперником. Поэтому экрана «вот твой набор, поехали» не существует —
     ни одна вьюха не отдаёт список вопросов до того, как игрок их сыграл.
+
+    ⚠️ В ИГРУ БОЛЬШЕ НЕ РЕДИРЕКТИТ (08.09.2026, решение владельца). Раньше
+    вьюха уводила автора на `/game/s/<код>/?auto=1`, а `auto=1` запускает
+    забег сразу: автор не видел ни лобби, ни ссылки-приглашения, соперник
+    приходил позже, и в одном забеге они практически никогда не
+    пересекались — из-за этого живого табло не видел никто. Теперь ответ —
+    JSON, а ссылку показывает окно «Бросить вызов»: автор зовёт соперника
+    и ждёт, а играть уходит сам, когда решит.
     """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
@@ -1651,6 +1742,11 @@ def duel_new(request):
     ids = [pk for pk, _d, _t, _g in _candidate_rows(probe)]
     if not ids:
         # Под фильтром пусто — не создаём пустую дуэль, а честно говорим.
+        if _wants_json(request):
+            return JsonResponse({
+                'ok': False,
+                'error': 'Под этим фильтром вопросов нет: дуэль не из '
+                         'чего собрать.'})
         return render(request, 'game/duel_empty.html', {
             'mode_title': config.MODES[mode]['title']}, status=200)
     random.shuffle(ids)
@@ -1667,9 +1763,26 @@ def duel_new(request):
         code=make_result_code(), mode=mode, kind='duel',
         title=title,
         author=request.user if request.user.is_authenticated else None,
-        question_ids=ids[:config.DUEL_SIZE],
+        # ⚠️ Это ЗАПАС ОЧЕРЕДИ, а не длина раунда: раунд кончается по
+        # времени и жизням. Вопросов под фильтром меньше запаса — берём
+        # сколько есть, и тогда `set_done` теоретически возможен. Это
+        # честно: обещать бесконечную очередь на сорока вопросах нельзя.
+        question_ids=ids[:config.DUEL_QUEUE_LIMIT],
         filter_snapshot=run_filter, attempts_allowed=1)
-    return redirect(reverse('game:set_page', args=[gset.code]) + '?auto=1')
+    return JsonResponse({
+        'ok': True,
+        'code': gset.code,
+        # ⚠️ БЕЗ `?auto=1`. Автор идёт в игру сам, из окна вызова, и лобби
+        # со ссылкой успевает показаться. Автостарт остаётся у наборов
+        # другого рода (вызов дня, учительские) — там его смысл другой.
+        'play_url': reverse('game:set_page', args=[gset.code]),
+        'duel_url': request.build_absolute_uri(
+            reverse('game:duel', args=[gset.code])),
+        'mode': mode,
+        'mode_title': config.MODES[mode]['title'],
+        'filter_text': _filter_text(run_filter),
+        'size': gset.size,
+    })
 
 
 @require_safe

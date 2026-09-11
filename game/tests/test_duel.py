@@ -43,13 +43,77 @@ class DuelCreationTests(TestCase):
         self.me = User.objects.create_user(username='duelist', password='p12345')
         self.client.force_login(self.me)
 
-    def test_new_duel_creates_a_set_and_sends_to_play(self):
+    def test_new_duel_answers_json_and_does_not_redirect(self):
+        u"""⚠️ ВЬЮХА БОЛЬШЕ НЕ УВОДИТ АВТОРА В ИГРУ (08.09.2026).
+
+        Раньше она возвращала редирект на `/game/s/<код>/?auto=1`, и забег
+        начинался немедленно: автор не видел ни лобби, ни ссылки, соперник
+        приходил позже, и в одном забеге они практически никогда не
+        пересекались. Живого табло из-за этого не видел никто.
+        """
         r = self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.content.decode('utf-8'))
         gset = GameSet.objects.get(kind='duel')
-        self.assertEqual(gset.size, config.DUEL_SIZE)
-        self.assertRedirects(
-            r, reverse('game:set_page', args=[gset.code]) + '?auto=1',
-            fetch_redirect_response=False)
+        self.assertTrue(d['ok'])
+        self.assertEqual(d['code'], gset.code)
+        self.assertIn('/game/d/', d['duel_url'])
+        self.assertEqual(d['play_url'],
+                         reverse('game:set_page', args=[gset.code]))
+        # ⚠️ Ни следа автостарта в адресе, куда уходит автор.
+        self.assertNotIn('auto=1', d['play_url'])
+
+    def test_the_queue_is_a_reserve_not_a_round_length(self):
+        u"""Числовой инвариант фазы: min(сколько есть, DUEL_QUEUE_LIMIT).
+
+        Проверяется на двух пулах — заведомо меньше запаса и заведомо
+        больше. Один случай доказывал бы только половину правила.
+        """
+        # 30 вопросов из setUp — меньше запаса: берём все.
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        small = GameSet.objects.get(kind='duel')
+        self.assertEqual(small.size, 30)
+        self.assertLess(small.size, config.DUEL_QUEUE_LIMIT)
+
+        # Добираем пул выше запаса: обрезаем ровно по нему.
+        make_q(config.DUEL_QUEUE_LIMIT + 20 - 30)
+        small.delete()
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        big = GameSet.objects.get(kind='duel')
+        self.assertEqual(big.size, config.DUEL_QUEUE_LIMIT)
+
+    def test_both_players_walk_the_same_queue(self):
+        u"""Суть дуэли: очередь перемешивается ОДИН раз при создании набора.
+
+        Оба игрока идут по `GameSet.question_ids`; добор из общего пула в
+        наборе запрещён. Разные очереди означали бы разные игры.
+        """
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        gset = GameSet.objects.get(kind='duel')
+
+        rival = User.objects.create_user(username='rival', password='p12345')
+        order = list(gset.question_ids)
+        seen = []
+        for user in (self.me, rival):
+            client = self.client_class()
+            client.force_login(user)
+            r = client.get(reverse('game:session_start_set', args=[gset.code]))
+            self.assertEqual(r.status_code, 200)
+            from django.core.cache import cache
+            from game import state as run_state
+            run_id = client.session.get(run_state.RUN_ID_KEY)
+            self.assertIsNotNone(run_id)
+            run = cache.get(run_state.cache_key(run_id))
+            self.assertIsNotNone(run, 'состояние забега не найдено')
+            # ⚠️ Сравниваем ОЧЕРЕДЬ ПЛЮС ВЫДАННЫЙ ВОПРОС: старт сразу
+            # снимает с очереди первый, и голая очередь у двоих отличалась
+            # бы на один элемент, хотя порядок один и тот же.
+            queue = list(run['queue'])
+            self.assertEqual(queue, order[len(order) - len(queue):],
+                             'очередь — не хвост общего списка')
+            seen.append(queue)
+        self.assertEqual(seen[0], seen[1])
+        self.assertEqual(len(seen[0]), len(order) - 1)
 
     def test_duel_respects_the_filter(self):
         make_q(5, topic='Рынок труда')
@@ -61,12 +125,62 @@ class DuelCreationTests(TestCase):
         self.assertEqual(gset.filter_snapshot['topics'], ['Рынок труда'])
 
     def test_empty_filter_does_not_create_an_empty_duel(self):
-        """Пустая дуэль = ссылка в никуда. Лучше честно сказать."""
-        r = self.client.get(reverse('game:duel_new'),
-                            {'mode': 'blitz', 'topics': 'Эконометрика и анализ данных'})
+        """Пустая дуэль = ссылка в никуда. Лучше честно сказать.
+
+        ⚠️ Ответ разный, и это не дубль: окну вызова (fetch) нужна строка
+        ошибки, а человеку, набравшему адрес руками, — страница. Получатели
+        разные. Набор не создаётся ни в том, ни в другом случае.
+        """
+        args = {'mode': 'blitz', 'topics': 'Эконометрика и анализ данных'}
+
+        r = self.client.get(reverse('game:duel_new'), args)
         self.assertEqual(r.status_code, 200)
         self.assertContains(r, 'Дуэль не собралась')
+
+        r = self.client.get(reverse('game:duel_new'), args,
+                            HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertEqual(r.status_code, 200)
+        d = json.loads(r.content.decode('utf-8'))
+        self.assertFalse(d['ok'])
+        self.assertTrue(d['error'])
+
         self.assertFalse(GameSet.objects.filter(kind='duel').exists())
+
+    def test_the_duel_set_page_does_not_start_the_run_by_itself(self):
+        u"""⚠️ ЗАПРЕТ, А НЕ УМОЛЧАНИЕ.
+
+        Условие стоит в `set_page`, а не только в `duel_new`: иначе адрес с
+        `?auto=1`, набранный руками или оставшийся в чьей-то закладке,
+        вернул бы прежнее поведение — забег автора начинался бы сразу, и
+        лобби со ссылкой он снова не увидел бы.
+        """
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        gset = GameSet.objects.get(kind='duel')
+        url = reverse('game:set_page', args=[gset.code])
+        for suffix in ('', '?auto=1'):
+            r = self.client.get(url + suffix)
+            self.assertEqual(r.status_code, 200, suffix)
+            self.assertFalse(r.context['auto_set']['autostart'], suffix)
+
+    def test_the_queue_reserve_never_shows_up_on_screen(self):
+        u"""Число 150 — внутренний запас. Игрок его не видит и не должен."""
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        gset = GameSet.objects.get(kind='duel')
+        html = self.client.get(
+            reverse('game:set_page', args=[gset.code])).content.decode('utf-8')
+
+        # ⚠️ Смотрим на ВИДИМУЮ разметку, без стилей и скриптов: в CSS
+        # страницы «150» встречается размером колонки, и проверка по всему
+        # файлу краснела бы на ровном месте, ничего не доказывая.
+        import re as _re
+        visible = _re.sub(r'<style.*?</style>', ' ', html, flags=_re.S)
+        visible = _re.sub(r'<script.*?</script>', ' ', visible, flags=_re.S)
+        self.assertNotIn(str(config.DUEL_QUEUE_LIMIT), visible)
+
+        # Вместо числа — слова. Подпись собирает клиент, в шаблоне лежит
+        # ветка «дуэль → без лимита».
+        self.assertIn('без лимита вопросов', html)
+        self.assertIn("AUTO_SET.kind === 'duel'", html)
 
     def test_author_is_recorded_when_logged_in(self):
         u = User.objects.create_user(username='u', password='pw12345')
@@ -306,3 +420,94 @@ class DuelLoginBoundaryTests(TestCase):
         self.assertFalse(r.ranked)
         self.assertEqual(r.unranked_reason, 'set_run')
         self.assertEqual(r.user, rival)
+
+
+class ScoreboardIsOneMarkupTests(TestCase):
+    u"""Табло `.vs` — одно и то же на дуэли и на обычном забеге.
+
+    Решение владельца 08.09.2026: второго вида табло не заводим. Проверяется
+    по РАЗМЕТКЕ обеих страниц: если когда-нибудь заведут вторую, страницы
+    разойдутся, и этот тест это увидит.
+    """
+
+    def setUp(self):
+        make_q(20)
+        self.me = User.objects.create_user(username='vs_user', password='p12345')
+        self.client.force_login(self.me)
+
+    def _vs_block(self, html):
+        self.assertIn('<div class="vs" id="vs"', html)
+        return html.split('<div class="vs" id="vs"', 1)[1].split(
+            '<div class="duel-emoji"', 1)[0]
+
+    def test_the_same_block_serves_both_run_kinds(self):
+        plain = self.client.get(reverse('game:page')).content.decode('utf-8')
+
+        self.client.get(reverse('game:duel_new'), {'mode': 'blitz'})
+        gset = GameSet.objects.get(kind='duel')
+        duel = self.client.get(
+            reverse('game:set_page', args=[gset.code])).content.decode('utf-8')
+
+        self.assertEqual(self._vs_block(plain), self._vs_block(duel))
+
+    def test_the_left_side_is_always_you(self):
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        block = self._vs_block(html)
+        self.assertIn('id="vs-my-score"', block)
+        self.assertIn('id="vs-my-correct"', block)
+        self.assertIn('id="vs-my-acc"', block)
+        self.assertIn('id="vs-my-combo"', block)
+        self.assertIn('id="vs-my-time"', block)
+        self.assertIn('id="vs-my-tape"', block)
+
+    def test_the_gap_column_stands_between_the_two_cards(self):
+        block = self._vs_block(
+            self.client.get(reverse('game:page')).content.decode('utf-8'))
+        self.assertLess(block.index('id="vs-me"'), block.index('id="vs-gap"'))
+        self.assertLess(block.index('id="vs-gap"'), block.index('id="vs-them"'))
+
+
+class PersonalBestComesWithTheStartTests(TestCase):
+    u"""Правая карточка обычного забега — личный рекорд, и он с СЕРВЕРА.
+
+    ⚠️ ВЫБОР ИСТОЧНИКА. Рекорд отдаёт `api_session_start` полем `best`, а не
+    отдельный запрос к `api_my_stats`: правая карточка нужна ровно в момент
+    старта забега, и вторым запросом она подъезжала бы после первого
+    вопроса. Плюс `api_my_stats` — про всю панель рекордов, и вешать на неё
+    открытие раунда значит связать раунд с запросом, который не про раунд.
+    """
+
+    def setUp(self):
+        make_q(20)
+        self.me = User.objects.create_user(username='best_user',
+                                           password='p12345')
+
+    def test_no_runs_means_no_record_and_no_invented_number(self):
+        self.client.force_login(self.me)
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        self.assertIsNone(json.loads(r.content.decode('utf-8'))['best'])
+
+    def test_an_anonymous_player_gets_no_record_either(self):
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        self.assertIsNone(json.loads(r.content.decode('utf-8'))['best'])
+
+    def test_the_record_run_reports_its_own_accuracy(self):
+        u"""Точность — у самого рекордного забега, не средняя за всё время."""
+        from game import config as game_config
+        GameResult.objects.create(
+            user=self.me, mode='blitz', score=900, correct_count=9,
+            wrong_count=1, total_count=10,
+            economy_version=game_config.ECONOMY_VERSION)
+        GameResult.objects.create(
+            user=self.me, mode='blitz', score=100, correct_count=1,
+            wrong_count=9, total_count=10,
+            economy_version=game_config.ECONOMY_VERSION)
+
+        self.client.force_login(self.me)
+        r = self.client.get(reverse('game:session_start'), {'mode': 'blitz'})
+        best = json.loads(r.content.decode('utf-8'))['best']
+        self.assertEqual(best['score'], 900)
+        self.assertEqual(best['correct'], 9)
+        # 9 из 10 попыток рекордного забега, а не (9+1)/20 по обоим.
+        self.assertEqual(best['accuracy'], 90)
+        self.assertTrue(best['created_at'])

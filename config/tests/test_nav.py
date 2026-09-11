@@ -3,7 +3,7 @@
 
 ⚠️ ПОЧЕМУ ПРОВЕРКИ ПО ОТРИСОВАННОЙ СТРАНИЦЕ, А НЕ ПО ШАБЛОНУ. До 04.09.2026
 `_nav.html` держал четыре копии одного ряда ссылок, и старые тесты считали в
-файле литералы («ровно четыре „Тренажёр"», «ровно восемь условий подсветки»).
+файле литералы («ровно четыре подписи», «ровно восемь условий подсветки»).
 Копий больше нет: состав собирает `config/context_processors.py::site_meta`.
 Считать в файле стало нечего — и это к лучшему: важно, что видит человек.
 """
@@ -48,7 +48,7 @@ class MenuByRoleTests(TestCase):
     def test_guest(self):
         self.assertEqual(
             self._labels(),
-            ['Каталог', 'Учебник', 'Олимпиады', 'Графики', 'Тренажёр'])
+            ['Каталог', 'Учебник', 'Олимпиады', 'Графики', 'Wecon Rush'])
 
     def test_student_has_lessons_and_no_stats(self):
         user = User.objects.create_user(username='nav_st', password=PASSWORD,
@@ -56,8 +56,8 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(
             labels,
-            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады', 'Календарь',
-             'Графики', 'Тренажёр'])
+            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады',
+             'Графики', 'Wecon Rush'])
         # Статистика живёт в профиле; двух входов в одно место быть не должно.
         self.assertNotIn('Статистика', labels)
 
@@ -66,8 +66,8 @@ class MenuByRoleTests(TestCase):
                                         role='teacher')
         self.assertEqual(
             self._labels(user),
-            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады', 'Календарь',
-             'Графики', 'Тренажёр'])
+            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады',
+             'Графики', 'Wecon Rush'])
 
     def test_staff_gets_admin_item(self):
         user = User.objects.create_user(username='nav_ad', password=PASSWORD,
@@ -93,25 +93,99 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(len(labels), len(set(labels)), labels)
 
+    def test_counts_are_five_six_six(self):
+        """Числовой инвариант состава: гость 5, ученик 6, учитель 6.
+
+        Было 5 / 7 / 7 — «Календарь» ушёл из шапки 08.09.2026.
+        """
+        student = User.objects.create_user(username='nav_c1', password=PASSWORD,
+                                           role='student')
+        teacher = User.objects.create_user(username='nav_c2', password=PASSWORD,
+                                           role='teacher')
+        self.client.logout()
+        self.assertEqual(len(self._labels()), 5)
+        self.client.logout()
+        self.assertEqual(len(self._labels(student)), 6)
+        self.client.logout()
+        self.assertEqual(len(self._labels(teacher)), 6)
+
+    def test_calendar_left_the_menu_but_the_page_is_alive(self):
+        """⚠️ Убрана ССЫЛКА, а не раздел.
+
+        Решение владельца 08.09.2026: пункта «Календарь» в шапке нет ни у
+        одной роли, но маршрут `/calendar/` и приложение `calendar_stub`
+        живы — страница открывается по прямому адресу. Два утверждения
+        держатся вместе: без второго правка выглядела бы как удаление
+        раздела, без первого — как будто ничего не сделано.
+        """
+        users = [
+            None,
+            User.objects.create_user(username='nav_k1', password=PASSWORD,
+                                     role='student'),
+            User.objects.create_user(username='nav_k2', password=PASSWORD,
+                                     role='teacher'),
+            User.objects.create_user(username='nav_k3', password=PASSWORD,
+                                     role='teacher', is_staff=True),
+        ]
+        for user in users:
+            self.client.logout()
+            self.assertNotIn('Календарь', self._labels(user))
+
+        for user in users:
+            self.client.logout()
+            if user is not None:
+                self.client.force_login(user)
+            self.assertNotEqual(self.client.get('/calendar/').status_code, 404)
+
 
 class ActiveItemTests(TestCase):
-    """«Где я сейчас» — подчёркивание плюс фон (ADR 0072)."""
+    """«Где я сейчас» — цвет подписи и линия под словом (08.09.2026).
+
+    Отменяет ADR 0072 «подчёркивание плюс фон»: заливка красила прямоугольник
+    во всю высоту полосы, и активный пункт отличался от пункта под курсором
+    только плотностью серого.
+    """
 
     def test_only_the_current_item_is_active(self):
         for url, expected in (('/catalog/', 'Каталог'),
                               ('/olympiads/', 'Олимпиады'),
-                              ('/game/', 'Тренажёр'),
+                              ('/game/', 'Wecon Rush'),
                               ('/textbook/', 'Учебник')):
             html = self.client.get(url).content.decode('utf-8')
             active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
             self.assertEqual(set(active), {expected}, '%s → %s' % (url, active))
 
-    def test_active_style_has_both_underline_and_background(self):
-        """Одного подчёркивания мало на графите, одного фона — при смене темы."""
+    def test_active_style_is_colour_and_underline_without_fill(self):
+        """Цвет подписи и линия под словом; заливки во всю высоту нет."""
         html = self.client.get('/catalog/').content.decode('utf-8')
+
         rule = html.split('.nav-link.is-active {', 1)[1].split('}', 1)[0]
-        self.assertIn('border-bottom-color: var(--accent)', rule)
-        self.assertIn('background: rgba(255, 255, 255, .12)', rule)
+        self.assertIn('color: var(--nav-accent)', rule)
+        # ⚠️ Заливки быть НЕ должно: именно она делала активный пункт похожим
+        # на пункт под курсором — .12 против .08, отличие только в плотности.
+        self.assertNotIn('background:', rule)
+
+        after = html.split('.nav-link.is-active::after {', 1)[1].split('}', 1)[0]
+        self.assertIn('background: var(--nav-accent)', after)
+        self.assertIn('box-shadow', after)
+
+    def test_nav_accent_is_one_colour_for_both_themes(self):
+        """⚠️ Токен объявлен ДВАЖДЫ и одинаково — светлая тема и тёмная.
+
+        Шапка не меняется по темам, а `--accent` меняется: в светлой он даёт
+        на графите #3c3531 контраст 2,30 при пороге 4,5. Если значения
+        разойдутся, подпись активного пункта в одной из тем станет
+        нечитаемой — и разойтись они могут молча, при следующей правке
+        палитры. Поэтому смысл «один цвет на обе темы» сторожится числом.
+        """
+        html = self.client.get('/catalog/').content.decode('utf-8')
+        values = re.findall(r'--nav-accent:\s*([^;]+);', html)
+        self.assertEqual(len(values), 2, values)
+        self.assertEqual(len(set(v.strip() for v in values)), 1, values)
+
+        glow = re.findall(r'--nav-accent-glow:\s*([^;]+);', html)
+        self.assertEqual(len(glow), 2, glow)
+        self.assertEqual(len(set(v.strip() for v in glow)), 1, glow)
 
 
 class VersionBadgeTests(TestCase):

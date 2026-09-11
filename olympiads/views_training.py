@@ -23,7 +23,7 @@ from django.views.decorators.http import require_POST
 
 from . import training_engine as engine
 from .models import Olympiad
-from .views import _has_placeholder
+from .views import _has_placeholder, soon_page
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,9 @@ def _base_context(olympiad, variant, request):
 
 def training_intro(request, slug, pk):
     """Что за комплект, сколько задач, сколько времени, что будет с итогом."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     olympiad, variant = _variant_or_404(slug, pk)
     user, session_key = _who(request)
 
@@ -96,6 +99,9 @@ def training_intro(request, slug, pk):
 @require_POST
 def training_start(request, slug, pk):
     """Начинает попытку. Таймер запускает СЕРВЕР в момент нажатия."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     olympiad, variant = _variant_or_404(slug, pk)
     user, session_key = _who(request)
     with_timer = request.POST.get('timer') == '1'
@@ -130,6 +136,9 @@ def training_start(request, slug, pk):
 
 def training_take(request, slug, pk):
     """Сам процесс: задачи, поля ответов, таймер, автосохранение."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     from problems.assignment_rows import (answer_parts, answer_input_name,
                                           display_parts, item_answer_form,
                                           item_max_score)
@@ -203,6 +212,9 @@ def training_time(request, slug, pk):
     таймеру, а не только вместе с автосохранением. Тот, кто смотрит на
     часы и не печатает, обязан сверяться с сервером тоже.
     """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     _, variant = _variant_or_404(slug, pk)
     user, session_key = _who(request)
     attempt = engine.current_attempt(variant, user, session_key)
@@ -220,6 +232,9 @@ def training_time(request, slug, pk):
 @require_POST
 def training_autosave(request, slug, pk):
     """Автосохранение одного поля. В ответе ВСЕГДА `seconds_remaining`."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     from problems.models import AssignmentItem, ProblemPart
 
     _, variant = _variant_or_404(slug, pk)
@@ -277,6 +292,9 @@ def training_finish(request, slug, pk):
     Форма шлёт содержимое ещё раз: последняя порция набранного могла не
     успеть уехать автосохранением, а терять её нельзя.
     """
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     from problems.assignment_rows import answer_parts, part_key
     from problems.part_grading import read_part_answers
 
@@ -317,6 +335,9 @@ def training_finish(request, slug, pk):
 
 def training_result(request, slug, pk):
     """Разбор последней сданной попытки: балл, ответы, эталоны, решения."""
+    stub = soon_page(request)
+    if stub is not None:
+        return stub
     from .models import TrainingAttempt
 
     olympiad, variant = _variant_or_404(slug, pk)
