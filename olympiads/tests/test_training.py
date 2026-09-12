@@ -206,7 +206,7 @@ class SameGradingTests(TestCase):
     def setUp(self):
         self.variant = make_variant()
         # Тест каталога: автопроверка работает без утверждения эталона.
-        self.problem = make_problem(1, answer='б', problem_type='тест')
+        self.problem = make_problem(1, answer='б', problem_type='тест: один ответ')
 
     def _grade_directly(self, answer):
         """Что скажет `grade_submission`, если позвать её напрямую."""
@@ -257,7 +257,7 @@ class NoTraceInProblemsTests(TestCase):
 
     def setUp(self):
         self.variant = make_variant()
-        self.problem = make_problem(1, answer='б', problem_type='тест')
+        self.problem = make_problem(1, answer='б', problem_type='тест: один ответ')
 
     def test_grading_leaves_no_submission(self):
         from problems.models import PartAnswer, Submission, TeacherFeedback

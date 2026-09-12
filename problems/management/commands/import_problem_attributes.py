@@ -6,7 +6,8 @@
 
 `character` — «qual», «quant» или «» (снять); `features` — список из
 «graph», «table», «proof» (пустой список — снять). Поле, которого в строке
-нет, не трогается. Ключи и подписи — `catalog.filters.CHARACTERS/FEATURES`.
+нет, не трогается. Ключи характера — `catalog.filters.CHARACTERS`; ключи особенностей —
+ВИТРИНЫ (`problems/enrich/features.py: CATALOG_VIEW_LABELS`), а не фильтра.
 
 ⚠️ ПИШЕТ ТОЛЬКО ДВА СВОИХ ПОЛЯ. `statement`, `answer`, `solution` и всё
 остальное команда не читает и не меняет (ADR 0005): запись идёт
@@ -33,12 +34,18 @@ import time
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
-from catalog.filters import CHARACTERS, FEATURES
+from catalog.filters import CHARACTERS
+from problems.enrich.features import CATALOG_VIEW_LABELS
 from problems.models import Problem
 
 OUT_DIR = os.path.join('reports', 'problem_attributes')
 CHARACTER_KEYS = ('',) + tuple(key for key, _label in CHARACTERS)
-FEATURE_KEYS = tuple(key for key, _label in FEATURES)
+# ⚠️ КЛЮЧИ ВИТРИНЫ, А НЕ ФИЛЬТРА (13.09.2026). Команда пишет
+# `Problem.features` — витрину из трёх ключей; фильтр каталога с того же дня
+# спрашивает СВЯЗЬ `ProblemFeature` и знает все двенадцать особенностей
+# (ADR 0101). Читать список у фильтра значило бы ждать во входном файле
+# имена особенностей, а писать в поле, которое их не хранит.
+FEATURE_KEYS = tuple(CATALOG_VIEW_LABELS)
 BATCH = 500
 PREVIEW = 20
 

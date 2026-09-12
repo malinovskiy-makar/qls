@@ -1295,7 +1295,22 @@ class GlmEnrichRunPricesRegressionTests(TestCase):
         self.metrics_path = self.tmp_dir / 'run_metrics.json'
         self.manifest_path = self.tmp_dir / 'run300_sample_ids.json'
 
+    @override_settings(AI_PRICES={})
     def test_метрики_считаются_без_внешнего_ai_prices(self):
+        """⚠️ ПУСТОЙ `AI_PRICES` ТЕПЕРЬ СТАВИТСЯ ЯВНО, А НЕ ПОДРАЗУМЕВАЕТСЯ.
+
+        До 13.09.2026 тест УТВЕРЖДАЛ, что цены GLM в боевых настройках нет,
+        и на этом строил проверку. С 13.09 она там есть: `catalog/rerank.py`
+        считает по ней стоимость переранжирования поиска (ADR 0100), и
+        суточный денежный потолок без неё не работал бы вовсе.
+
+        Смысл регресса от этого не меняется, а становится честнее: команда
+        обязана посчитать метрики СВОЕЙ ценой (она оборачивает `AI_PRICES`
+        сама, см. `override_settings` внутри неё), даже когда снаружи цены
+        нет. Раньше это условие было случайным свойством настроек, теперь
+        оно задаётся прямо здесь — и не сломается от того, что цену
+        добавили ради другой функции.
+        """
         from django.conf import settings
         self.assertNotIn(run_cmd.GLM_MODEL, getattr(settings, 'AI_PRICES', {}))
 
