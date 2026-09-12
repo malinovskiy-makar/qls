@@ -511,6 +511,9 @@ reports/night_20260913/*
 !reports/corpus_transfer_20260913/
 reports/corpus_transfer_20260913/*
 !reports/corpus_transfer_20260913/SELECTION_REPORT.md
+!reports/corpus_transfer_20260913/DEPLOY_COMMANDS.md
+!reports/corpus_transfer_20260913/TEST_WIDGET_RECON.md
+!reports/corpus_transfer_20260913/dead_test_widget_ids.txt
 !reports/corpus_transfer_20260913/transfer_new_ids_v3.txt
 !reports/corpus_transfer_20260913/transfer_scope_ids_v3.txt
 !reports/corpus_transfer_20260913/excluded_bad_ids_v3.txt
