@@ -52,11 +52,11 @@ sudo sh -c 'ls -1t /srv/weconomics/backups/*.dump.gz | head -3'
 
 ⚠️ **СНАЧАЛА ОТПРАВИТЬ КОММИТЫ.** Ночная сессия пуш выполнить НЕ СМОГЛА:
 `git push origin main` отклонён локальной политикой разрешений машины. Всё
-закоммичено в локальный `main`, он впереди `origin/main` на 14 коммитов.
+закоммичено в локальный `main`, он впереди `origin/main` на полтора десятка коммитов.
 Пока пуш не сделан, `git pull` на сервере не привезёт ничего.
 
 ```bash
-cd C:/Users/shipu/qls && git log --oneline -14 && git push origin main
+cd C:/Users/shipu/qls && git log --oneline origin/main..main && git push origin main
 ```
 
 Дальше — на сервере:
