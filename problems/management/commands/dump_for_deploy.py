@@ -31,9 +31,10 @@ import os
 
 from django.apps import apps
 from django.core import serializers
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
-from problems.models import Problem
+from problems.management.commands.glm_enrich_run import read_ids_file
+from problems.models import DupMark, Problem
 
 # Справочники без FK на Problem (грузятся первыми)
 TIER1 = [
@@ -97,6 +98,54 @@ BANK_ONLY_MISC = [
     # ни одного поля, ссылающегося на человека.
     'problems.Rubric', 'problems.RubricCriterion',
 ]
+
+#: Сколько id кладём в один `__in`. SQLite рвётся на «too many SQL variables»
+#: задолго до тысячи (CLAUDE.md команд, раздел ловушек), поэтому выборка по
+#: списку идёт кусками, а не одним запросом.
+ID_CHUNK = 900
+
+#: Как добраться от модели до `Problem.id`. Явная таблица, а НЕ угадывание по
+#: полям: модель, которой здесь нет, при `--ids-file` роняет команду, и это
+#: намеренно. Молча выгрузить её целиком значило бы увезти на прод строки,
+#: ссылающиеся на задачи, которых там нет, — ровно тот висячий внешний ключ,
+#: ради которого весь `--ids-file` и заведён.
+PROBLEM_PATH = {
+    'problems.Problem': 'pk__in',
+    'problems.SourceReference': 'problem_id__in',
+    'problems.ProblemPart': 'problem_id__in',
+    'problems.Hint': 'problem_id__in',
+    'problems.ProblemFigure': 'problem_id__in',
+    'problems.ProblemFeature': 'problem_id__in',
+    'problems.OlympiadRef': 'problem_id__in',
+    'problems.Rubric': 'problem_id__in',
+    'problems.RubricCriterion': 'rubric__problem_id__in',
+    'problems.DupMark': 'problem_id__in',
+    'problems.DupHumanChoice': 'chosen_problem_id__in',
+}
+
+
+def chunked_ids(ids, size=ID_CHUNK):
+    """Отсортированный список id кусками по `size` штук."""
+    ordered = sorted(ids)
+    for start in range(0, len(ordered), size):
+        yield ordered[start:start + size]
+
+
+def whole_groups_inside(ids):
+    """Строки `DupMark`, у которых ВСЯ группа внутри переносимого множества.
+
+    Половина группы на проде — это пометка «копия чего-то», чего там нет:
+    человек увидел бы пустую отсылку, а будущая команда выбора канонической
+    версии посчитала бы группу из одного участника. Поэтому группа едет
+    целиком или не едет вовсе — включая группы из трёх и более версий.
+    """
+    inside = set(ids)
+    members = {}
+    for group, pid in DupMark.objects.values_list('group', 'problem_id'):
+        members.setdefault(group, []).append(pid)
+    good = {group for group, pids in members.items()
+            if all(pid in inside for pid in pids)}
+    return DupMark.objects.filter(group__in=sorted(good)).order_by('pk')
 
 
 # Мелкие модели, зависящие от Problem/User (грузятся после Problem одним файлом)
@@ -187,6 +236,25 @@ class Command(BaseCommand):
             help='Только банк задач: без пользователей, работ учеников, '
                  'назначений и служебных таблиц — см. BANK_ONLY* в этом файле.',
         )
+        parser.add_argument(
+            '--ids-file',
+            help='Выгрузить ТОЛЬКО эти задачи (id по одному на строку, '
+                 '«#» — комментарий) и всё, что на них ссылается. Справочники '
+                 'выгружаются целиком: они маленькие и нужны любой задаче.',
+        )
+        parser.add_argument(
+            '--with-dupmark', action='store_true',
+            help='Добавить пометки групп копий (DupMark). Едут только группы, '
+                 'у которых ВСЕ участники будут на проде, — иначе получился бы '
+                 'внешний ключ в пустоту.',
+        )
+        parser.add_argument(
+            '--dupmark-scope-file',
+            help='Список задач, которые будут на проде ПОСЛЕ заливки: нынешние '
+                 'плюс переносимые. Нужен потому, что группа копий может стоять '
+                 'одной ногой в уже залитой задаче, а сама задача во второй раз '
+                 'не выгружается. По умолчанию — тот же --ids-file.',
+        )
 
     def write_file(self, outdir, name, objects):
         path = os.path.join(outdir, name)
@@ -194,7 +262,8 @@ class Command(BaseCommand):
             json.dump(objects, f, ensure_ascii=False)
         self.stdout.write(f'  {name}: {len(objects)} объектов')
 
-    def dump_model_chunked(self, outdir, prefix, model_label, chunk, strip=None):
+    def dump_model_chunked(self, outdir, prefix, model_label, chunk, strip=None,
+                           problem_ids=None):
         """Дамп одной модели порциями по chunk объектов.
 
         Порция ограничена и по числу объектов, и по РАЗМЕРУ файла. Одного
@@ -205,6 +274,17 @@ class Command(BaseCommand):
         qs = model.objects.all().order_by('pk')
         if model_label == 'problems.Problem':
             qs = qs.defer('embedding')
+
+        if problem_ids is not None:
+            lookup = PROBLEM_PATH.get(model_label)
+            if lookup is None:
+                raise CommandError(
+                    f'--ids-file: не знаю, как сузить {model_label} до списка '
+                    f'задач. Добавьте её в PROBLEM_PATH — выгружать целиком '
+                    f'нельзя, на проде получится ссылка в пустоту.')
+            self._dump_by_ids(outdir, prefix, qs, lookup, problem_ids, strip)
+            return
+
         total = qs.count()
         if total == 0:
             return
@@ -218,10 +298,55 @@ class Command(BaseCommand):
                 self.write_file(outdir, f'{prefix}_{idx:04d}.json', part)
             n += len(batch)
 
+    def _dump_by_ids(self, outdir, prefix, qs, lookup, problem_ids, strip):
+        """Выгрузка по списку задач: один файл на кусок id.
+
+        Кусок, а не общий `__in`: список на восемь тысяч номеров рвёт SQLite
+        («too many SQL variables»). Заодно это и есть порционность — размер
+        файла всё равно дополнительно режется `split_by_size`."""
+        idx = 0
+        for piece in chunked_ids(problem_ids):
+            data = serialize_qs(qs.filter(**{lookup: piece}), strip_fields=strip)
+            if not data:
+                continue
+            for part in split_by_size(data):
+                idx += 1
+                self.write_file(outdir, f'{prefix}_{idx:04d}.json', part)
+
     def handle(self, *args, **options):
         outdir = options['outdir']
         chunk = options['chunk']
         bank_only = options['bank_only']
+
+        problem_ids = None
+        if options['ids_file']:
+            problem_ids = sorted(set(read_ids_file(options['ids_file'])))
+            known = set()
+            for piece in chunked_ids(problem_ids):
+                known.update(Problem.objects.filter(pk__in=piece)
+                             .values_list('pk', flat=True))
+            missing = [pid for pid in problem_ids if pid not in known]
+            if missing:
+                raise CommandError(
+                    '--ids-file: в базе нет %d из %d задач списка, первые: %s. '
+                    'Молча пропустить нельзя: выгрузка вышла бы меньше '
+                    'заказанной, а отчиталась бы об успехе.'
+                    % (len(missing), len(problem_ids), missing[:10]))
+        if options['with_dupmark'] and problem_ids is None:
+            raise CommandError('--with-dupmark работает только вместе с --ids-file: '
+                               'без списка «вся группа внутри выгрузки» нечем проверить')
+        dupmark_scope = problem_ids
+        if options['dupmark_scope_file']:
+            if not options['with_dupmark']:
+                raise CommandError('--dupmark-scope-file без --with-dupmark '
+                                   'ничего не делает')
+            dupmark_scope = sorted(set(read_ids_file(options['dupmark_scope_file'])))
+            if not set(problem_ids) <= set(dupmark_scope):
+                raise CommandError(
+                    '--dupmark-scope-file обязан включать весь --ids-file: '
+                    'иначе выгруженная задача осталась бы вне области видимости '
+                    'групп и её пометка не уехала бы')
+
         os.makedirs(outdir, exist_ok=True)
 
         # Чистим старые файлы
@@ -248,12 +373,14 @@ class Command(BaseCommand):
         self.stdout.write(f'TIER 2 — Problem (вырезаны: {", ".join(problem_strip)}):')
         self.dump_model_chunked(
             outdir, '20_problem', 'problems.Problem', chunk,
-            strip=problem_strip,
+            strip=problem_strip, problem_ids=problem_ids,
         )
 
         self.stdout.write('TIER 3 — SourceReference / ProblemPart:')
-        self.dump_model_chunked(outdir, '30_sourceref', 'problems.SourceReference', chunk)
-        self.dump_model_chunked(outdir, '31_part', 'problems.ProblemPart', chunk)
+        self.dump_model_chunked(outdir, '30_sourceref', 'problems.SourceReference',
+                                chunk, problem_ids=problem_ids)
+        self.dump_model_chunked(outdir, '31_part', 'problems.ProblemPart',
+                                chunk, problem_ids=problem_ids)
 
         # ⚠️ TIER 4 пишется ПОРЦИЯМИ, как и всё остальное, а не одним файлом.
         # Раньше здесь был единственный 40_misc.json, и на боевом банке он
@@ -269,7 +396,20 @@ class Command(BaseCommand):
             except LookupError:
                 continue
             prefix = '40_misc_%02d_%s' % (i, model._meta.model_name)
-            self.dump_model_chunked(outdir, prefix, m_label, chunk)
+            self.dump_model_chunked(outdir, prefix, m_label, chunk,
+                                    problem_ids=problem_ids)
+
+        if options['with_dupmark']:
+            # ⚠️ 60_, а не 40_: файлы грузятся по алфавиту, а DupMark ссылается
+            # на Problem и обязан идти ПОСЛЕ всех 20_problem_*.
+            rows = whole_groups_inside(dupmark_scope)
+            data = serialize_qs(rows)
+            groups = len({obj['fields']['group'] for obj in data})
+            self.stdout.write(
+                'TIER 6 — DupMark: %d пометок в %d целиком вошедших группах'
+                % (len(data), groups))
+            for idx, part in enumerate(split_by_size(data), start=1):
+                self.write_file(outdir, f'60_dupmark_{idx:04d}.json', part)
 
         if bank_only:
             # DuplicateCandidate/AutoTopicAssignment/similar_problems —

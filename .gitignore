@@ -189,6 +189,7 @@ deploy_fixtures_bank/
 *.dump
 prod_backup_*
 deploy_fixtures_backup_*/
+deploy_fixtures_transfer/
 # Скрипты загрузки на прод содержат пароль продакшен-базы — НИКОГДА не коммитить
 load_to_*.sh
 # Ключ Anthropic API — НИКОГДА не коммитить
@@ -472,3 +473,18 @@ reports/smart_search_rerank/*
 !reports/deploy_20260912/
 reports/deploy_20260912/*
 !reports/deploy_20260912/DEPLOY_COMMANDS.md
+
+# ИСКЛЮЧЕНИЕ (2026-09-12): отбор корпуса на прод. Списки id — это ЧТО именно
+# уехало на боевой сервер: без них нельзя ни повторить выкатку, ни откатить
+# её, ни объяснить через месяц, почему задача там, а не здесь. Отчёт и план
+# команд — то, на что ссылается карточка Notion. Сам дамп (35 МБ .json.gz)
+# в гит не едет, он пересобирается из этих же списков одной командой.
+!reports/corpus_transfer_20260912/
+reports/corpus_transfer_20260912/*
+!reports/corpus_transfer_20260912/SELECTION_REPORT.md
+!reports/corpus_transfer_20260912/DEPLOY_COMMANDS.md
+!reports/corpus_transfer_20260912/transfer_new_ids.txt
+!reports/corpus_transfer_20260912/transfer_scope_ids.txt
+!reports/corpus_transfer_20260912/approved_conflicts.txt
+!reports/corpus_transfer_20260912/gate_would_pass_ids.txt
+!reports/corpus_transfer_20260912/defect_in_whitelist_ids.txt
