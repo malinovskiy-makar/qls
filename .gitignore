@@ -190,6 +190,8 @@ deploy_fixtures_bank/
 prod_backup_*
 deploy_fixtures_backup_*/
 deploy_fixtures_transfer/
+# То же для пересчёта 13.09.2026 (два добавленных критерия отбора).
+deploy_fixtures_transfer_v2/
 # Скрипты загрузки на прод содержат пароль продакшен-базы — НИКОГДА не коммитить
 load_to_*.sh
 # Ключ Anthropic API — НИКОГДА не коммитить
@@ -488,3 +490,13 @@ reports/corpus_transfer_20260912/*
 !reports/corpus_transfer_20260912/approved_conflicts.txt
 !reports/corpus_transfer_20260912/gate_would_pass_ids.txt
 !reports/corpus_transfer_20260912/defect_in_whitelist_ids.txt
+# Пересчёт ночной сессии 13.09.2026: к шести критериям добавлены
+# human_review != defect и needs_quality_review = False.
+!reports/corpus_transfer_20260912/transfer_new_ids_v2.txt
+!reports/corpus_transfer_20260912/transfer_scope_ids_v2.txt
+!reports/corpus_transfer_20260912/dropped_by_new_criteria_ids.txt
+
+# Журнал автономной ночной сессии 13.09.2026 — состояние работ.
+!reports/night_20260913/
+reports/night_20260913/*
+!reports/night_20260913/JOURNAL.md
