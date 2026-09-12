@@ -2,28 +2,30 @@
 
 Варианты — подпункты задачи (`ProblemPart`), верные метки —
 `answer_check.catalog_test_correct_labels`, правило «всё или ничего» —
-`answer_check.check_option_answer`. Форматов два по данным банка
-(04.09.2026): «тест: все верные» — множественный выбор; «тест: один
-ответ» и «тест: верно/неверно» — одиночный, у последнего плитки «Верно» и
-«Неверно» тоже хранятся подпунктами (348 из 348 видимых). Тест без
-вариантов или с верными метками вне вариантов игры не получает и
-показывается обычной задачей.
+`answer_check.check_option_answer`. Какой строке `problem_type` какой вид
+теста соответствует, знает `problems.problem_types` — одна точка правды на
+весь проект; здесь эти строки НЕ повторяются. Виджет отмечает варианты, и
+поэтому играются три вида из четырёх: `multi` — множественный выбор,
+`single` и `boolean` — одиночный (у «верно/неверно» плитки «Верно» и
+«Неверно» тоже хранятся подпунктами). Вид `numeric` вариантов не имеет
+вовсе, поля для ввода короткого ответа в каталоге нет — такой тест
+показывается обычной задачей. Тест без вариантов или с верными метками вне
+вариантов игры тоже не получает.
 
 Попытки не ограничены; счётчик живёт в сессии (и у гостя тоже), число
 верных сообщается с третьей попытки, то есть после двух неудач
 (ADR 0082). Верный ответ вошедшего фиксируется `CatalogAttempt`.
 """
-from problems import answer_check
+from problems import answer_check, problem_types
 
-from . import filters
-
-MULTI_TYPE = 'тест: все верные'
 SESSION_KEY = 'catalog_test_%d'
 COUNT_FROM_ATTEMPT = 3   # с какой попытки сообщается число верных
 
 
 def is_test(problem):
-    return (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
+    """Признак теста берётся из `problems.problem_types` — одной точки правды
+    на весь проект (оба словаря названий типа сразу, старый и v2)."""
+    return problem_types.is_test(problem.problem_type)
 
 
 def game_of(problem, parts=None):
@@ -46,7 +48,7 @@ def game_of(problem, parts=None):
     correct = answer_check.catalog_test_correct_labels(problem)
     if not correct or not correct <= labels:
         return None                       # верные метки вне вариантов: брак данных
-    multi = (problem.problem_type or '').lower() == MULTI_TYPE
+    multi = problem_types.test_kind(problem.problem_type) == problem_types.MULTI
     if not multi and len(correct) != 1:
         return None                       # одиночный выбор с несколькими верными
     return {

@@ -16,6 +16,8 @@ from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
 
+from problems import problem_types
+
 
 # ===========================================================================
 # Фаза 1. Профиль пользователя и роли
@@ -732,8 +734,7 @@ class AssignmentItem(models.Model):
             return self.custom_problem.is_test
         if self.catalog_problem_id is None:
             return False
-        ptype = self.catalog_problem.problem_type or ''
-        return ptype.startswith('тест')
+        return problem_types.is_test(self.catalog_problem.problem_type)
 
     @property
     def correct_answer(self):

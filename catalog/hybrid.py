@@ -25,6 +25,8 @@
 import logging
 import re
 
+from problems import problem_types
+
 logger = logging.getLogger(__name__)
 
 RRF_K = 60
@@ -96,9 +98,9 @@ def lexical_search(query, limit, content_kind='problems'):
                                       hidden_pending_review=False,
         content_status=Problem.ContentStatus.OK)
     if content_kind == 'problems':
-        queryset = queryset.exclude(problem_type__istartswith='тест')
+        queryset = queryset.exclude(problem_type__in=problem_types.TEST_TYPE_VALUES)
     elif content_kind == 'tests':
-        queryset = queryset.filter(problem_type__istartswith='тест')
+        queryset = queryset.filter(problem_type__in=problem_types.TEST_TYPE_VALUES)
 
     hits = {}
     for term in picked:

@@ -46,7 +46,9 @@ class ModalMarkupTests(TestCase):
         self.assertIn('data-count="topic:%d">1<' % self.mon.pk, html)
         self.assertIn('data-count="difficulty:5">1<', html)
         self.assertIn('data-count="kind:test">1<', html)
-        self.assertIn('data-count="test_type:тест: один ответ">1<', html)
+        # Формат теста в разметке — ВИД (`problems.problem_types`), а не
+        # строка `problem_type`: одному виду отвечают два словаря названий.
+        self.assertIn('data-count="test_type:single">1<', html)
         self.assertIn('data-count="has_solution">1<', html)
         self.assertIn('data-src="%d" aria-pressed="false"' % self.src.pk, html)
         self.assertIn('data-count="source:%d">1<' % self.src.pk, html)
@@ -60,14 +62,14 @@ class ModalMarkupTests(TestCase):
 
     def test_selected_state_is_drawn_by_the_server(self):
         html = self.client.get(CATALOG_URL, {
-            'topic': self.mon.pk, 'type': 'test', 'test_type': 'тест: один ответ',
+            'topic': self.mon.pk, 'type': 'test', 'test_type': 'single',
             'has_solution': '1', 'difficulty': 5}).content.decode()
         self.assertIn('data-topic="%d" data-section="micro" aria-pressed="true"' % self.mon.pk, html)
         self.assertIn('class="fl-acc is-open" data-acc="micro"', html)
         self.assertIn('data-acc-sel="micro">1<', html)
         self.assertIn('data-block-sel="topic">выбрано 1<', html)
         self.assertIn('class="fl-sub is-on" id="test-types"', html)
-        self.assertIn('data-ttype="тест: один ответ" aria-pressed="true"', html)
+        self.assertIn('data-ttype="single" aria-pressed="true"', html)
         self.assertIn('id="sol-switch" checked', html)
         self.assertIn('data-diff="5" aria-pressed="true"', html)
         self.assertIn('data-clear="topic">снять</button>', html)

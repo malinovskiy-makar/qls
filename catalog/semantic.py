@@ -15,6 +15,7 @@ import numpy as np
 
 from django.core.cache import cache
 
+from problems import problem_types
 from problems.embedding_config import EMBEDDING_MODEL_NAME, EMBEDDING_DIM
 
 logger = logging.getLogger(__name__)
@@ -185,7 +186,7 @@ def _build_index(scope='prod'):
         vec = np.frombuffer(raw, dtype=np.float32)
         ids.append(pid)
         vecs.append(vec)
-        is_test = (ptype or '').lower().startswith('тест:') or (pid in topic_test_ids)
+        is_test = problem_types.is_test(ptype) or (pid in topic_test_ids)
         is_test_flags.append(is_test)
 
     if not vecs:

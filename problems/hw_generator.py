@@ -31,7 +31,7 @@
 """
 import logging
 
-from problems import ai
+from problems import ai, problem_types
 from problems.text_clean import clean, preview_title
 
 logger = logging.getLogger(__name__)
@@ -428,8 +428,9 @@ def describes_order(text):
     return any(word in low for word in ORDER_WORDS)
 
 def is_test_problem(problem):
-    """Тест ли это. Признак — ТИП задачи, как во всём проекте."""
-    return (problem.problem_type or '').startswith('тест')
+    """Тест ли это. Признак — ТИП задачи, как во всём проекте: словарь
+    `problems.problem_types`, а не префикс строки (словарей названий два)."""
+    return problem_types.is_test(problem.problem_type)
 
 
 def allocate(total, weights):
@@ -589,9 +590,9 @@ def _any_problems(rows, limit, kind=None):
                                       hidden_pending_review=False,
         content_status=Problem.ContentStatus.OK)
     if kind == 'test':
-        queryset = queryset.filter(problem_type__istartswith='тест')
+        queryset = queryset.filter(problem_type__in=problem_types.TEST_TYPE_VALUES)
     else:
-        queryset = queryset.exclude(problem_type__istartswith='тест')
+        queryset = queryset.exclude(problem_type__in=problem_types.TEST_TYPE_VALUES)
     if levels:
         queryset = queryset.filter(difficulty__in=list(levels))
     ids = list(queryset.order_by('?').values_list('id', flat=True)[:limit])

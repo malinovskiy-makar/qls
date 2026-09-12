@@ -29,8 +29,10 @@ class ParseTests(SimpleTestCase):
         self.assertEqual(active['sources'], ['7'])
         self.assertEqual(active['features'], ['graph'])
         self.assertEqual(active['tags'], ['3'])
+        # Старый адрес нёс точную строку `problem_type`; разбор переводит
+        # её в ВИД теста — одна точка правды `problems.problem_types`.
         self.assertEqual((active['kind'], active['test_type']),
-                         ('test', 'тест: один ответ'))
+                         ('test', 'single'))
         self.assertEqual(active['character'], 'quant')
         self.assertTrue(active['has_solution'])
 
@@ -141,7 +143,7 @@ class MultiSelectQueryTests(TestCase):
         by_key = {g['key']: g for g in self._build('')['groups']}
         self.assertEqual([o['value'] for o in by_key['kind']['options']], ['open', 'test'])
         self.assertEqual([o['value'] for o in by_key['kind']['test_types']],
-                         ['тест: один ответ'])
+                         ['single'])
 
     def test_topics_sit_in_owner_blocks_in_owner_order(self):
         by_key = {g['key']: g for g in self._build('')['groups']}

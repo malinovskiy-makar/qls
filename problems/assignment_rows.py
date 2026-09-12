@@ -26,6 +26,8 @@ from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 
+from problems import problem_types
+
 
 # Как вводится ответ.
 ANSWER_TEXT = 'text'          # строка (открытая задача)
@@ -531,9 +533,8 @@ def item_answer_form(item):
     problem = item.catalog_problem
     if problem is None:
         return ANSWER_TEXT, []
-    ptype = problem.problem_type or ''
     parts = list(problem.parts.all())
-    if not ptype.startswith('тест') or not parts:
+    if not problem_types.is_test(problem.problem_type) or not parts:
         return ANSWER_TEXT, []
 
     # ⚠️ Флага `is_html` здесь БОЛЬШЕ НЕТ (сессия 3Б, фаза 2). Он стоял в
@@ -550,7 +551,7 @@ def item_answer_form(item):
     # утверждение с двумя вариантами «Верно»/«Неверно», то есть это выбор
     # ОДНОГО варианта, а не подмножества. Единственное исключение —
     # наша собственная демо-задача с враньём в типе (починена в seed).
-    if ptype == 'тест: все верные':
+    if problem_types.test_kind(problem.problem_type) == problem_types.MULTI:
         return ANSWER_CHECKBOX, options
     return ANSWER_RADIO, options
 

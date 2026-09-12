@@ -173,7 +173,7 @@ class BuildScreenTests(TestCase):
 
     def test_cart_rows_use_the_shared_order(self):
         """Порядок и подписи частей — та же сборка, что у ученика."""
-        test = make_problem('Тестовый вопрос', ptype='тест: один верный')
+        test = make_problem('Тестовый вопрос', ptype='тест: один ответ')
         task = make_problem('Открытая задача')
         rows = cart_rows([str(task.pk), str(test.pk)], self.tutor)
         self.assertEqual([row['key'] for row in rows],
@@ -186,7 +186,7 @@ class BuildScreenTests(TestCase):
 
     def test_cart_rows_respect_manual_order(self):
         """Ручной порядок не трогаем — репетитор расставил по смыслу урока."""
-        test = make_problem('Тестовый вопрос 2', ptype='тест: один верный')
+        test = make_problem('Тестовый вопрос 2', ptype='тест: один ответ')
         task = make_problem('Открытая задача 2')
         rows = cart_rows([str(task.pk), str(test.pk)], self.tutor,
                          manual_order=True)
@@ -200,9 +200,9 @@ class BuildScreenTests(TestCase):
         встала бы перед одним-единственным тестом, обещая часть, которой
         нет. Правило проверяет сам список, а не флаг.
         """
-        first = make_problem('Тест A', ptype='тест: один верный')
+        first = make_problem('Тест A', ptype='тест: один ответ')
         middle = make_problem('Задача A')
-        last = make_problem('Тест B', ptype='тест: один верный')
+        last = make_problem('Тест B', ptype='тест: один ответ')
         rows = cart_rows([str(first.pk), str(middle.pk), str(last.pk)],
                          self.tutor, manual_order=True)
         self.assertEqual([row['section'] for row in rows],

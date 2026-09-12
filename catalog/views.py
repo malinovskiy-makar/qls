@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
+from problems import problem_types
 from problems.jsonsafe import dumps_for_script
 
 from . import attachments, attempts, chat, filters, testplay
@@ -239,7 +240,7 @@ def _card(problem, score=None):
     refs = list(problem.source_references.all())
     d = problem.difficulty or 0
     title = (problem.title or '').strip()
-    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
+    is_test = problem_types.is_test(problem.problem_type)
     return {
         'problem':          problem,
         'preview':          cut_words(preview_text(problem.statement), PREVIEW_CHARS),
@@ -255,8 +256,8 @@ def _card(problem, score=None):
         'source':           refs[0].source.name if refs else '',
         'grade':            refs[0].grade if refs else '',
         'is_test':          is_test,
-        # «тест · один верный»: формат из `problem_type`, если он известен
-        # списку `TEST_TYPES`; иначе просто «тест».
+        # «тест · один верный»: вид теста по `problem_type`, если он известен
+        # словарю `problems.problem_types`; иначе просто «тест».
         'kind_label':       _kind_label(problem.problem_type) if is_test else '',
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
@@ -268,8 +269,8 @@ def _card(problem, score=None):
 
 
 def _kind_label(problem_type):
-    """Подпись формата теста в карточке."""
-    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    """Подпись вида теста в карточке."""
+    label = problem_types.kind_label(problem_type)
     return 'тест · ' + label if label else 'тест'
 
 
@@ -647,9 +648,9 @@ def _catalog_link(**changes):
 
 
 def _kind_cloud_label(problem_type):
-    if not (problem_type or '').lower().startswith(filters.TEST_PREFIX):
+    if not problem_types.is_test(problem_type):
         return 'Развёрнутая задача'
-    label = dict(filters.TEST_TYPES).get(problem_type or '')
+    label = problem_types.kind_label(problem_type)
     return 'Тест · ' + label if label else 'Тест'
 
 
@@ -672,10 +673,10 @@ def _clouds(problem, topics, tags, sources):
     if problem.character in dict(filters.CHARACTERS):
         row2.append({'kind': 'char', 'label': dict(filters.CHARACTERS)[problem.character],
                      'url': _catalog_link(character=problem.character)})
-    is_test = (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX)
+    is_test = problem_types.is_test(problem.problem_type)
     kind_changes = {'kind': 'test' if is_test else 'open'}
-    if is_test and problem.problem_type in dict(filters.TEST_TYPES):
-        kind_changes['test_type'] = problem.problem_type
+    if is_test:
+        kind_changes['test_type'] = problem_types.test_kind(problem.problem_type)
     row2.append({'kind': 'kind', 'label': _kind_cloud_label(problem.problem_type),
                  'url': _catalog_link(**kind_changes)})
     for key in problem.features or ():
@@ -1078,7 +1079,7 @@ def problem_detail(request, pk):
         'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
         'pd_config':    pd_config,
         'parts':        parts,
-        'is_test':      (problem.problem_type or '').lower().startswith(filters.TEST_PREFIX),
+        'is_test':      problem_types.is_test(problem.problem_type),
         'heading':      heading,
         'show_title':   show_title,
         'clouds_1':     row1,

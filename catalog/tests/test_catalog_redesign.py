@@ -152,6 +152,7 @@ class StripTests(TestCase):
     def test_selected_filters_become_chips_in_owner_order(self):
         resp = self.client.get(CATALOG_URL, {
             'topic': self.mon.pk, 'difficulty': 4, 'has_solution': '1',
+            # Старый адрес с точной строкой типа обязан продолжать работать.
             'type': 'тест: один ответ', 'source': self.source.pk,
         })
         html = resp.content.decode()
@@ -217,6 +218,11 @@ class CardTests(TestCase):
         cls.p_test = make_problem('Выберите верные утверждения.',
                                   title='Выберите верные утверждения.',
                                   problem_type='тест: все верные')
+        # ⚠️ Тип, которого НЕТ в `problems.problem_types`. Прежде признаком
+        # теста был префикс строки, и такая задача считалась тестом без
+        # известного формата. Теперь признак — словарь: неизвестное значение
+        # тестом не считается вовсе, и это намеренно. Новое имя типа
+        # заводится в одном месте, а не расползается по коду.
         cls.p_test_plain = make_problem('Что такое инфляция?', title='Инфляция',
                                         problem_type='тест')
 
@@ -268,8 +274,7 @@ class CardTests(TestCase):
         html = self.client.get(CATALOG_URL).content.decode()
         self.assertIn('<span class="ct-kind">тест · выбор всех верных</span>',
                       _card_html(html, self.p_test))
-        self.assertIn('<span class="ct-kind">тест</span>',
-                      _card_html(html, self.p_test_plain))
+        self.assertNotIn('ct-kind', _card_html(html, self.p_test_plain))
         self.assertNotIn('ct-kind', _card_html(html, self.p_named))
 
     def test_gallery_is_the_same_card_without_duplicate_title(self):

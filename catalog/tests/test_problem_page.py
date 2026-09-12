@@ -80,7 +80,8 @@ class ProblemPageTests(TestCase):
         self.assertIn('class="pp-sep"', html)
         self.assertIn('class="pp pp--src" href="/catalog/?source=%d">МатЭк</a>' % self.src.pk, html)
         test_html = self.client.get(_url(self.p_test)).content.decode()
-        self.assertIn('href="/catalog/?type=test&amp;test_type=%D1%82%D0%B5%D1%81%D1%82%3A+%D0%BE%D0%B4%D0%B8%D0%BD+%D0%BE%D1%82%D0%B2%D0%B5%D1%82">Тест · один верный</a>', test_html)
+        self.assertIn('href="/catalog/?type=test&amp;test_type=single">'
+                      'Тест · один верный</a>', test_html)
 
     def test_empty_properties_render_nothing(self):
         html = self.client.get(_url(self.p_cut)).content.decode()

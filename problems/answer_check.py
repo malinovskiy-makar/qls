@@ -26,6 +26,8 @@
 import re
 from fractions import Fraction
 
+from problems import problem_types
+
 # Что считаем «десятичной запятой» и как чистим ввод.
 _TRASH = ' \t '
 
@@ -161,8 +163,8 @@ def check_catalog_test(problem, submitted_answer, multiple=None):
     сравнивалось раньше, и ответ зависел от порядка отметок: «в, а» против
     эталона «а, в» считался бы неверным, хотя ученик отметил ровно то же.
     """
-    ptype = (problem.problem_type or '')
-    if not ptype.startswith('тест'):
+    kind = problem_types.test_kind(problem.problem_type)
+    if kind is None:
         return False, False
     given_raw = (submitted_answer or '').strip()
     if not given_raw:
@@ -170,7 +172,7 @@ def check_catalog_test(problem, submitted_answer, multiple=None):
         return True, False
 
     if multiple is None:
-        multiple = ptype != 'тест: один ответ' and problem.parts.exists()
+        multiple = kind != problem_types.SINGLE and problem.parts.exists()
 
     known = [part.label for part in problem.parts.all()]
     if multiple:

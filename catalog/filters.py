@@ -37,6 +37,7 @@ from collections import Counter
 from django.db.models import Count, Q, TextField
 from django.db.models.functions import Cast
 
+from problems import problem_types
 from problems.sections import canonical_groups
 
 from .topic_blocks import (
@@ -60,19 +61,16 @@ TOPIC_GROUPS = tuple(
 
 # ── «Задача или тест»: выбор из двух, у теста — форматы ПОД ним ─────────
 #
-# Полный список форматов теста — здесь; на экран попадают только те, что
-# есть в корпусе (правило нуля). «Короткий ответ» сегодня в корпусе не
-# встречается и не рендерится.
-TEST_TYPES = (
-    ('тест: один ответ', 'один верный'),
-    ('тест: верно/неверно', 'верно/неверно'),
-    ('тест: все верные', 'выбор всех верных'),
-    ('тест: числовой ответ', 'короткий ответ'),
+# Форматы — ВИДЫ теста (`problem_types.TEST_KINDS`), а не строки
+# `problem_type`: одному виду соответствует несколько строк сразу, потому
+# что в банке живут два словаря названий (старый и v2). На экран попадают
+# только те виды, что есть в корпусе (правило нуля).
+TEST_TYPES = tuple(
+    (kind, problem_types.KIND_LABELS[kind]) for kind in problem_types.TEST_KINDS
 )
 
-# Признак теста один на весь проект: `problem_type` начинается с «тест».
+# Признак теста один на весь проект и живёт в `problems.problem_types`.
 # Тот же признак у поиска по словам (`catalog.hybrid.lexical_search`).
-TEST_PREFIX = 'тест'
 
 # ── Особенности и характер — ключи и подписи полей `Problem.features`
 #    и `Problem.character`. Разметку заливает `import_problem_attributes`.
@@ -199,11 +197,16 @@ def parse(source):
 
     kind = one('type')
     test_type = one('test_type')
-    if kind in dict(TEST_TYPES):          # старая ссылка: точный тип теста
-        kind, test_type = 'test', kind
+    # Старые ссылки несли в этих параметрах точную строку `problem_type`
+    # («тест: один ответ»). Переводим её в вид теста, чтобы сохранённые
+    # людьми адреса продолжали открывать тот же фильтр.
+    if problem_types.is_test(kind):
+        kind, test_type = 'test', problem_types.test_kind(kind)
+    if problem_types.is_test(test_type):
+        test_type = problem_types.test_kind(test_type)
     if kind not in ('open', 'test'):
         kind = ''
-    if kind != 'test' or test_type not in dict(TEST_TYPES):
+    if kind != 'test' or test_type not in problem_types.TEST_KINDS:
         test_type = ''
 
     character = one('character')
@@ -337,11 +340,12 @@ def apply(qs, active, skip=()):
         qs = qs.filter(difficulty__in=[int(d) for d in active['difficulties']])
     if 'kind' not in skip and active['kind']:
         if active['kind'] == 'test':
-            qs = qs.filter(problem_type__istartswith=TEST_PREFIX)
+            qs = qs.filter(problem_type__in=problem_types.TEST_TYPE_VALUES)
             if active['test_type']:
-                qs = qs.filter(problem_type=active['test_type'])
+                qs = qs.filter(
+                    problem_type__in=problem_types.TYPES_BY_KIND[active['test_type']])
         else:
-            qs = qs.exclude(problem_type__istartswith=TEST_PREFIX)
+            qs = qs.exclude(problem_type__in=problem_types.TEST_TYPE_VALUES)
     if 'character' not in skip and active['character']:
         qs = qs.filter(character=active['character'])
     if 'source' not in skip and active['sources']:
@@ -467,7 +471,13 @@ def _difficulty_options(base, active, corpus):
 
 
 def _is_test(problem_type):
-    return (problem_type or '').lower().startswith(TEST_PREFIX)
+    return problem_types.is_test(problem_type)
+
+
+def _kind_tally(by_type, kind):
+    """Сколько задач у ВИДА теста: сумма по всем строкам `problem_type`,
+    которые ему отвечают. Строк у вида несколько — словаря названий два."""
+    return sum(by_type.get(value, 0) for value in problem_types.TYPES_BY_KIND[kind])
 
 
 def _kind_options(base, active, corpus):
@@ -487,9 +497,11 @@ def _kind_options(base, active, corpus):
     return {
         'options': options,
         # Форматы теста — ПОД «Тест»; только те, что есть в корпусе.
-        'test_types': [_option(value, label, by_type.get(value, 0),
-                               active['test_type'] == value)
-                       for value, label in TEST_TYPES if corpus['types'].get(value)],
+        # Счёт вида — сумма по всем строкам типа, которые ему отвечают.
+        'test_types': [_option(kind, label, _kind_tally(by_type, kind),
+                               active['test_type'] == kind)
+                       for kind, label in TEST_TYPES
+                       if _kind_tally(corpus['types'], kind)],
     }
 
 
@@ -602,7 +614,7 @@ def _chips(carry, active, topics, tags, kind, character, sources, feature):
     if active['kind']:
         label = 'Развёрнутая задача' if active['kind'] == 'open' else 'Тест'
         if active['test_type']:
-            label = 'Тест · ' + dict(TEST_TYPES)[active['test_type']]
+            label = 'Тест · ' + problem_types.KIND_LABELS[active['test_type']]
         chips.append({'kind': 'kind', 'value': active['kind'], 'label': label,
                       'remove_url': query(carry, active, kind='', test_type='')})
     if active['character']:

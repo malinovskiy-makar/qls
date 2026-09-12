@@ -13,6 +13,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
 
+from problems import problem_types
+
 from .access import (group_id_param, group_label_param,
                      group_param_refusal,
                      lesson_for_student, solo_lesson_for, tutor_required)
@@ -639,7 +641,7 @@ def _submission_is_test(submission):
     problem = submission.problem
     if problem is None:
         return False
-    return (problem.problem_type or '').startswith('тест')
+    return problem_types.is_test(problem.problem_type)
 
 
 @teacher_required
