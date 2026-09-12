@@ -179,6 +179,7 @@ data_dump.json
 deploy_fixtures/
 # Дамп approved-подмножества (dump_approved_for_deploy, сужение С1-С12)
 deploy_fixtures_approved/
+deploy_fixtures_v3/
 # Дамп --bank-only (dump_for_deploy --bank-only, сессия «Wecon Rush —
 # подготовка к выкатке»): содержимого без учётных записей, но всё равно
 # генерируемый локальный вывод — коммитить нечего.
@@ -501,3 +502,17 @@ reports/corpus_transfer_20260912/*
 reports/night_20260913/*
 !reports/night_20260913/JOURNAL.md
 !reports/night_20260913/DEPLOY_COMMANDS.md
+
+# ИСКЛЮЧЕНИЕ (2026-09-13, сессия «весь видимый каталог на прод»): решение
+# владельца поменялось — переносим не строгий whitelist, а весь видимый
+# каталог минус подтверждённый брак. Списки id — то, чем собран дамп: без
+# них выкатку нельзя ни повторить, ни объяснить. Сам дамп (160 МБ) в гит не
+# едет, он пересобирается из этих списков одной командой.
+!reports/corpus_transfer_20260913/
+reports/corpus_transfer_20260913/*
+!reports/corpus_transfer_20260913/SELECTION_REPORT.md
+!reports/corpus_transfer_20260913/transfer_new_ids_v3.txt
+!reports/corpus_transfer_20260913/transfer_scope_ids_v3.txt
+!reports/corpus_transfer_20260913/excluded_bad_ids_v3.txt
+!reports/corpus_transfer_20260913/prod_mentions_figure_ids.txt
+!reports/corpus_transfer_20260913/plain_skipped_with_material.txt
