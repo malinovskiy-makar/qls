@@ -1219,9 +1219,18 @@ class AiUsageLog(models.Model):
     должны молча пересчитаться.
     """
 
+    # ⚠️ ПУСТОЙ «КТО» РАЗРЕШЁН С 13.09.2026, И ЭТО НЕ ПОСЛАБЛЕНИЕ, А
+    # ЧИНКА УЧЁТА. Обязательный автор был верен, пока к модели обращались
+    # только вошедшие репетиторы. Переранжирование поиска работает и для
+    # ГОСТЯ — а строку расхода без пользователя записать было некуда, и
+    # `core._log` такие строки молча не писал вовсе. Денежный потолок,
+    # считающий по этому журналу, не видел бы тогда основную часть трат
+    # именно той функции, ради которой он и заведён. Пустое значение
+    # читается однозначно: «обращение без входа».
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
-        related_name='ai_usage', verbose_name='Кто')
+        related_name='ai_usage', verbose_name='Кто',
+        null=True, blank=True)
     kind = models.CharField('Что делали', max_length=40,
                             default='homework_plan')
     model_name = models.CharField('Модель', max_length=80)
@@ -1254,7 +1263,10 @@ class AiUsageLog(models.Model):
         verbose_name = 'Расход на ИИ'
         verbose_name_plural = 'Расходы на ИИ'
         ordering = ['-created_at']
-        indexes = [models.Index(fields=['user', 'created_at'])]
+        # Второй индекс — под суточный денежный потолок (`core.spent_today`):
+        # он суммирует стоимость по ВИДУ работы за сегодня, а не по автору.
+        indexes = [models.Index(fields=['user', 'created_at']),
+                   models.Index(fields=['kind', 'created_at'])]
 
     def __str__(self):
         return f'{self.user}: {self.model_name} ${self.cost_usd}'

@@ -19,6 +19,8 @@ import base64
 import hashlib
 import json
 import logging
+import threading
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -55,6 +57,66 @@ def service_url():
 
 def _timeout():
     return getattr(settings, 'SEARCH_SERVICE_TIMEOUT', 5.0)
+
+
+def _breaker_seconds():
+    """Сколько секунд не ходить к сервису после отказа (выключатель)."""
+    return getattr(settings, 'SEARCH_SERVICE_BREAKER_SECONDS', 30.0)
+
+
+# ─── Короткоживущий выключатель ───────────────────────────────────────────
+#
+# ⚠️ ЗАЧЕМ. У `urlopen` таймаут один на всё, и когда сервиса нет, КАЖДЫЙ
+# поисковый запрос платит его целиком: человек, набравший запрос в
+# каталоге, ждёт ровно столько, сколько ждал бы работающий поиск, и
+# только потом получает выдачу по словам. А «нет сервиса» — это не авария
+# на минуту: контейнер `search` на боевом сервере сегодня не поднят
+# ВООБЩЕ, то есть недоступность там — нормальное состояние. Первый отказ
+# закрывает дверь на `SEARCH_SERVICE_BREAKER_SECONDS`, и всё это время
+# поиск уходит по словам МГНОВЕННО, без единого сетевого вызова.
+#
+# ⚠️ ОТДЕЛЬНОГО ТАЙМАУТА НА ДОЗВОН ЗДЕСЬ НЕТ, И ЭТО ПРОВЕРЕНО, А НЕ
+# ЗАБЫТО. Замер 13.09.2026: `socket.create_connection` на заведомо
+# нероутируемые адреса (10.255.255.1, 192.0.2.1, 198.51.100.7) на машине
+# владельца возвращает УСПЕХ за миллисекунду — сетевой стек отвечает за
+# несуществующего соседа. То есть проба дозвона в таком окружении не
+# отличает живой сервис от мёртвого и стоила бы лишнего сокета на каждый
+# запрос, ничего не давая. Выключатель работает при любом виде отказа —
+# и при отказе в соединении, и при зависшем чтении.
+#
+# Состояние процессное, а не в общем кэше, и это намеренно: выключатель
+# должен работать и когда Redis сам недоступен, иначе он спасает ровно в
+# том случае, в котором чаще всего и не сработает. Цена — девять воркеров
+# пробуют по разу вместо одного; это девять полусекунд на полминуты.
+_breaker_lock = threading.Lock()
+_breaker_until = 0.0
+_breaker_reason = ''
+
+
+def _breaker_check():
+    """Закрыта ли дверь. Возвращает причину отказа или None."""
+    with _breaker_lock:
+        if _breaker_until > time.monotonic():
+            return _breaker_reason
+    return None
+
+
+def _breaker_trip(reason):
+    global _breaker_until, _breaker_reason
+    seconds = _breaker_seconds()
+    if seconds <= 0:
+        return
+    with _breaker_lock:
+        _breaker_until = time.monotonic() + seconds
+        _breaker_reason = reason
+
+
+def reset_breaker():
+    """Открыть дверь немедленно — для тестов и для ручной проверки."""
+    global _breaker_until, _breaker_reason
+    with _breaker_lock:
+        _breaker_until = 0.0
+        _breaker_reason = ''
 
 
 def _cache():
@@ -110,10 +172,18 @@ def _decode_vector(payload):
 
 
 def _post_encode(texts):
-    """Один POST /encode. Любая сетевая беда -> SearchServiceUnavailable."""
+    """Один POST /encode. Любая сетевая беда -> SearchServiceUnavailable.
+
+    Сначала спрашивается выключатель (память процесса) — пока он закрыт,
+    до сети дело не доходит вовсе.
+    """
+    closed = _breaker_check()
+    if closed:
+        raise SearchServiceUnavailable(closed)
     body = json.dumps({'texts': list(texts)}).encode('utf-8')
+    url = _checked_url(service_url().rstrip('/') + '/encode')
     request = urllib.request.Request(
-        _checked_url(service_url().rstrip('/') + '/encode'),
+        url,
         data=body,
         headers={'Content-Type': 'application/json'},
         method='POST',
@@ -125,9 +195,11 @@ def _post_encode(texts):
         raise SearchServiceUnavailable(
             'сервис ответил %s' % exc.code) from exc
     except urllib.error.URLError as exc:
+        _breaker_trip('нет связи с сервисом: %s' % exc.reason)
         raise SearchServiceUnavailable(
             'нет связи с сервисом: %s' % exc.reason) from exc
     except TimeoutError as exc:
+        _breaker_trip('таймаут запроса')
         raise SearchServiceUnavailable('таймаут запроса') from exc
     except (ValueError, OSError) as exc:
         raise SearchServiceUnavailable(
@@ -165,7 +237,12 @@ def encode_one(text):
 
 
 def healthy():
-    """Отвечает ли сервис. Модель не трогает (см. /healthz в сервисе)."""
+    """Отвечает ли сервис. Модель не трогает (см. /healthz в сервисе).
+
+    Выключатель здесь НЕ спрашивается и НЕ взводится: это проверка «ожил
+    ли сосед», и отвечать на неё из памяти процесса означало бы никогда
+    не заметить, что он ожил.
+    """
     try:
         url = _checked_url(service_url().rstrip('/') + '/healthz')
         with urllib.request.urlopen(url, timeout=_timeout()) as response:  # nosec B310 — схема проверена _checked_url выше

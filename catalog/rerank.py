@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 """catalog/rerank.py — переранжирование пула умного поиска моделью.
 
-За флагом `SMART_SEARCH_RERANK`, только для сотрудников
-(`request.user.is_staff`), только локально. Меняет ТОЛЬКО порядок задач в
+За флагом `SMART_SEARCH_RERANK` — и это ЕДИНСТВЕННЫЙ выключатель:
+включён флаг, значит работает для всех, в том числе для гостя (13.09.2026,
+прежнее «только сотрудникам» снято). Меняет ТОЛЬКО порядок задач в
 уже существующей выдаче каталога — рендер, шаблоны, фильтры и пагинация не
 задеты вовсе; вызывающая сторона (`catalog/views.py`) просто подставляет
 другой список id на вход тому же коду, что рисовал карточки раньше.
@@ -15,19 +16,32 @@
 `reports/llm_search_eval/reranking.py` и `poolbuild.py` импортируют эти
 имена отсюда, а не дублируют их.
 
-⚠️ ОДНА ДВЕРЬ НАРУЖУ (`problems/ai/core.run`, см. `problems/ai/CLAUDE.md`)
-ЗДЕСЬ СОЗНАТЕЛЬНО ОБОЙДЕНА. `core.run` — это единственная точка для
-ПРОФИЛЕЙ генерации (`problems/ai/prompts.py`): у неё общий суточный лимит
-на пользователя, кэш по профилю и `AiUsageLog`. Переранжирование поиска —
-не профиль генерации: у него СВОИ кэш (час по тексту запроса) и свой лог
-(`reports/smart_search_log.jsonl`), оно должно ВСЕГДА идти через
-GLM-5.3-Flash независимо от того, какой провайдер стоит в `AI_PROVIDER`
-для остального сайта (решение владельца 11.09.2026 зафиксировало именно
-эту модель), и гонять его через суточный лимит обычных ИИ-функций сайта
-означало бы одалживать чужой бюджет ради поисковой сортировки. Поэтому
-модуль зовёт `problems.ai.providers.get_provider('glm')` напрямую. Это
-осознанное отступление от правила «одна дверь», а не забытая деталь —
-см. отчёт сессии `feat/smart-search-rerank`.
+⚠️ ОДНА ДВЕРЬ НАРУЖУ (`problems/ai/core.run`) — ТЕПЕРЬ И ОТСЮДА
+(13.09.2026, карточка Notion «Сортировщик поиска зовёт GLMProvider в
+обход core.run», поставленная «до выхода на прод»). Раньше модуль звал
+`providers.get_provider('glm')` напрямую, и довод был такой: `core.run`
+— дверь для ПРОФИЛЕЙ генерации, у неё общий поставщик из `AI_PROVIDER`,
+общая модель из `AI_MODEL` и суточный лимит ОБРАЩЕНИЙ на пользователя,
+а переранжированию нужен свой поставщик, своя модель и никакого лимита
+на пользователя (поиском пользуются и без входа). Довод был верен про
+дверь и неверен про вывод: расход поисковой сортировки просто не
+попадал в `AiUsageLog`, то есть не был виден нигде рядом с остальными
+тратами сайта, и потолка у него не было вовсе.
+
+Теперь у `core.run` есть переопределения (`provider_name`, `model`,
+`system`, `parse`) и ВТОРОЙ вид лимита — суточный ДЕНЕЖНЫЙ потолок на
+функцию. Поэтому здесь:
+
+* поставщик по-прежнему `glm` и модель по-прежнему
+  `SMART_SEARCH_RERANK_MODEL` — они заданы решением владельца
+  11.09.2026 и за общей настройкой сайта не ездят;
+* суточный лимит обращений на пользователя НЕ применяется
+  (`check_limit=False`) — гостю списывать нечего;
+* зато применяется потолок `AI_DAILY_COST_CAPS['search_rerank']`, и
+  при его исчерпании выдача тихо уходит на базовый порядок;
+* свой кэш (час по тексту запроса) и свой лог
+  `reports/smart_search_log.jsonl` остаются: они про другое — про
+  задержку и про качество сортировки, а не про деньги.
 """
 import json
 import logging
@@ -267,8 +281,22 @@ def is_enabled():
 
 
 def is_available(user):
-    """Флаг включён И пользователь — сотрудник. Иначе прежний путь."""
-    return is_enabled() and bool(getattr(user, 'is_staff', False))
+    """Работает ли сортировщик для этого посетителя.
+
+    ⚠️ ОГРАНИЧЕНИЯ «ТОЛЬКО СОТРУДНИКАМ» БОЛЬШЕ НЕТ (13.09.2026). Оно
+    стояло, пока функция не была обкатана: `is_staff` служил кнопкой
+    «показать одному себе» в отсутствие второй кнопки. Теперь вторая
+    кнопка есть — `SMART_SEARCH_RERANK`, общий выключатель, и он же
+    остаётся единственным. Два выключателя подряд означали бы, что
+    включённый флаг всё равно ничего не меняет для тех, ради кого
+    функцию и делали: каталогом пользуются ученики, а поиском — и гости,
+    не входя вовсе.
+
+    `user` в подписи оставлен: вызывающая сторона его передаёт, а
+    различать посетителей эта функция ещё может понадобиться (например,
+    если появится платный тариф). Сегодня она их не различает.
+    """
+    return is_enabled()
 
 
 # ─── Корпус для карточек и bm25-индекс: синглтон в памяти процесса ────────
@@ -420,24 +448,31 @@ def build_pool(query):
 
 # ─── Вызов модели: пачки параллельно, слияние по баллу ────────────────────
 
-#: $ за миллион токенов (вход, выход) — прямой прайс Z.ai, тот же, что
-#: `reports/llm_search_eval/orclient.py:PRICES[('zai', 'glm-5.3-flash')]`.
-_PRICES_PER_MILLION = {
-    'glm-5.3-flash': (0.15, 0.50),
-    'glm-5.3': (1.40, 4.40),
-}
+# ⚠️ СВОЕЙ ТАБЛИЦЫ ЦЕН ЗДЕСЬ БОЛЬШЕ НЕТ (13.09.2026). Цена GLM переехала в
+# `settings.AI_PRICES` — туда, где её считает `core._cost` для всех
+# остальных функций сайта. Две таблицы цен разошлись бы так же тихо, как
+# разошлись два словаря `problem_type`.
 
 
-def _cost_usd(model, input_tokens, output_tokens):
-    price_in, price_out = _PRICES_PER_MILLION.get(model, (0.0, 0.0))
-    return (input_tokens * price_in + output_tokens * price_out) / 1e6
+#: Имя работы в журнале расхода (`AiUsageLog.kind`) и ключ денежного
+#: потолка (`AI_DAILY_COST_CAPS`). В `prompts.PROFILES` его НЕТ и быть не
+#: должно: это не профиль генерации, системный блок у него свой
+#: (`INSTRUCTION`), и менять его без повторного офлайн-замера запрещено.
+USAGE_KIND = 'search_rerank'
+
+PROVIDER_NAME = 'glm'
 
 
 def _get_provider():
     """Единственное место, где модуль знает имя поставщика — подмена в
-    тестах идёт через monkeypatch этой функции, без реального ключа."""
+    тестах идёт через monkeypatch этой функции, без реального ключа.
+
+    Поставщик разбирается ЗДЕСЬ и готовым объектом уходит в `core.run`:
+    так шов подмены остаётся один, и тест, подменивший его, проверяет тот
+    же путь, которым идёт боевой код.
+    """
     from problems.ai.providers import get_provider
-    return get_provider('glm')
+    return get_provider(PROVIDER_NAME)
 
 
 def _score_pool(query, pool_ids, rows, timeout):
@@ -454,10 +489,21 @@ def _score_pool(query, pool_ids, rows, timeout):
     """
     from django.conf import settings
 
+    from problems.ai import core
+
     provider = _get_provider()
     if not provider.is_available():
         raise RuntimeError(provider.unavailable_reason() or
                            'поставщик GLM недоступен')
+
+    # Суточный денежный потолок спрашивается ОДИН РАЗ и здесь, в потоке
+    # запроса: пачки уходят в рабочие потоки, и обращаться к базе оттуда
+    # нельзя (см. `log=False` ниже). Исчерпан — исключение, и `_run` выше
+    # тихо уводит выдачу на базовый порядок.
+    if core.budget_exceeded(USAGE_KIND):
+        raise RuntimeError(
+            'на сегодня исчерпан суточный бюджет сортировщика поиска ($%s)'
+            % core.daily_cost_cap(USAGE_KIND))
 
     batch_size = settings.SMART_SEARCH_RERANK_BATCH_SIZE
     model = settings.SMART_SEARCH_RERANK_MODEL
@@ -467,26 +513,43 @@ def _score_pool(query, pool_ids, rows, timeout):
     def call_one(ids_chunk):
         cards = [rows[pid] for pid in ids_chunk if pid in rows]
         started = time.perf_counter()
-        reply = provider.complete(
-            system_blocks=[INSTRUCTION], user_text=user_text(query, cards),
-            schema=SCHEMA, model=model, max_tokens=3000, timeout=timeout)
+        # ⚠️ ЧЕРЕЗ ОБЩУЮ ДВЕРЬ (см. докстринг модуля).
+        # `cache_seconds=0` намеренно: одинаковый запрос уже ловит СВОЙ
+        # кэш на час выше по стеку, а кэш `core` ключом по пачке
+        # кандидатов сработал бы только при побайтовом совпадении пачки и
+        # лишь дублировал бы первый.
+        # `log=False` — тоже намеренно: пачки идут в ПОТОКАХ, а
+        # соединение с базой в Django потоко-локальное и закрыть его в
+        # рабочем потоке некому. Расход складывается и пишется ОДНОЙ
+        # строкой ниже, в потоке запроса, — по строке на поисковый
+        # запрос человека, а не на пачку из пятидесяти карточек.
+        result = core.run(
+            USAGE_KIND, user_text(query, cards), SCHEMA, user=None,
+            max_tokens=3000, timeout=timeout, check_limit=False,
+            cache_seconds=0, provider=provider, model=model,
+            system=[INSTRUCTION], parse=parse_json_object, log=False,
+            check_budget=False)
         elapsed = time.perf_counter() - started
-        data = parse_json_object(reply.text)
-        scores, _missing, _extra = parse_scores(data, ids_chunk)
-        return scores, reply, elapsed
+        scores, _missing, _extra = parse_scores(result.data, ids_chunk)
+        return scores, result.usage, elapsed
 
     chunks = []
+    usages = []
     input_tokens = output_tokens = 0
+    cost_usd = 0.0
     model_seconds = 0.0
+    pool_started = time.perf_counter()
     executor = ThreadPoolExecutor(max_workers=max(len(batches), 1))
     try:
         futures = [executor.submit(call_one, chunk) for chunk in batches]
         try:
             for future in as_completed(futures, timeout=timeout):
-                scores, reply, elapsed = future.result()
+                scores, usage, elapsed = future.result()
                 chunks.append(scores)
-                input_tokens += reply.input_tokens
-                output_tokens += reply.output_tokens
+                usages.append(usage)
+                input_tokens += usage['input_tokens']
+                output_tokens += usage['output_tokens']
+                cost_usd += usage['cost_usd']
                 model_seconds = max(model_seconds, elapsed)
         except _FuturesTimeoutError:
             raise TimeoutError(
@@ -501,13 +564,18 @@ def _score_pool(query, pool_ids, rows, timeout):
         raise TimeoutError('обработаны не все пачки (%d из %d)'
                            % (len(chunks), len(batches)))
 
+    # ОДНА строка расхода на поисковый запрос — здесь, в потоке запроса.
+    core.record_usage(USAGE_KIND, provider.name, model, usages,
+                      time.perf_counter() - pool_started)
+
     ranked = merge(chunks, all_ids=pool_ids)
     scores = {}
     for chunk in chunks:
         for pid, score in chunk.items():
             scores[int(pid)] = clamp(score)
     usage = {'input_tokens': input_tokens, 'output_tokens': output_tokens,
-             'batches': len(batches), 'model_seconds': round(model_seconds, 3)}
+             'batches': len(batches), 'model_seconds': round(model_seconds, 3),
+             'cost_usd': cost_usd}
     return ranked, usage, scores
 
 
@@ -557,12 +625,11 @@ def _run(query):
                 [], 'fallback', reason='пустой пул', leg_sizes=leg_sizes,
                 total_seconds=time.perf_counter() - started)
         ranked, usage, _scores = _score_pool(query, pool_ids, rows, timeout)
-        cost = _cost_usd(settings.SMART_SEARCH_RERANK_MODEL,
-                         usage['input_tokens'], usage['output_tokens'])
         return RerankResult(
             ranked, 'rerank', leg_sizes=leg_sizes, batches=usage['batches'],
             model_seconds=usage['model_seconds'],
-            total_seconds=time.perf_counter() - started, cost_usd=cost)
+            total_seconds=time.perf_counter() - started,
+            cost_usd=usage['cost_usd'])
     except Exception as exc:                                # noqa: BLE001
         logger.warning('умный поиск: переранжирование упало (%s) — '
                        'базовый порядок', exc, exc_info=True)

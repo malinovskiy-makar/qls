@@ -23,16 +23,24 @@ from problems.tests.factories import make_user
 
 
 class _FakeReply(object):
+    # ⚠️ `cache_write_tokens` появился в двойнике 13.09.2026, когда вызов
+    # пошёл через `problems.ai.core.run`: общий учёт считает деньги по
+    # ЧЕТЫР�ём счётчикам токенов, и двойник обязан отвечать на все, иначе
+    # он проверяет не тот путь, которым идёт боевой код.
     def __init__(self, text, input_tokens=100, output_tokens=50):
         self.text = text
         self.input_tokens = input_tokens
         self.output_tokens = output_tokens
         self.cache_read_tokens = 0
+        self.cache_write_tokens = 0
         self.reasoning_tokens = 0
 
 
 class _FakeProvider(object):
     """Подмена `GLMProvider`: без сети, без ключа, без пакета `openai`."""
+
+    #: Имя поставщика пишется в строку расхода — у настоящего оно есть.
+    name = 'glm'
 
     def __init__(self, script, available=True):
         self._script = script
@@ -48,6 +56,12 @@ class _FakeProvider(object):
                 timeout=None, images=None):
         return self._script(system_blocks, user_text, schema, model,
                             max_tokens, timeout)
+
+
+def _usage(batches=1, cost=0.0):
+    """Расход одной сборки пула — форма, которую отдаёт `_score_pool`."""
+    return {'input_tokens': 100, 'output_tokens': 50, 'batches': batches,
+            'model_seconds': 0.1, 'cost_usd': cost}
 
 
 def _row(pid, **extra):
@@ -66,24 +80,39 @@ class _База(TestCase):
         self.ученик = make_user('student_rerank', is_staff=False)
 
 
-# ─── Доступ: флаг и is_staff ───────────────────────────────────────────────
+# ─── Доступ: выключатель ровно один ───────────────────────────────────────
+#
+# ⚠️ ОГРАНИЧЕНИЯ «ТОЛЬКО СОТРУДНИКАМ» БОЛЬШЕ НЕТ (13.09.2026). Прежде
+# `is_available` требовала `is_staff`, и тесты ниже проверяли, что ученик и
+# гость идут прежним путём даже при включённом флаге. Теперь выключатель
+# один — `SMART_SEARCH_RERANK`, — и тесты проверяют ровно это: при
+# включённом флаге сортировку получают ВСЕ, при выключенном — никто.
 
 class ДоступТесты(_База):
     @override_settings(SMART_SEARCH_RERANK=True)
-    def test_не_сотрудник_старый_путь(self):
-        pool_order, status = rerank.apply(self.ученик, 'монополия')
-        self.assertIsNone(pool_order)
-        self.assertEqual(status, 'off')
+    def test_ученик_получает_сортировку(self):
+        self.assertTrue(rerank.is_available(self.ученик))
 
     @override_settings(SMART_SEARCH_RERANK=True)
-    def test_анонимный_старый_путь(self):
-        pool_order, status = rerank.apply(AnonymousUser(), 'монополия')
-        self.assertIsNone(pool_order)
-        self.assertEqual(status, 'off')
+    def test_гость_тоже_получает_сортировку(self):
+        """Поиском в каталоге пользуются не входя — ради них и делалось."""
+        self.assertTrue(rerank.is_available(AnonymousUser()))
+        with mock.patch.object(rerank, 'build_pool',
+                               return_value=([1, 2], {'bm25': 2}, {})),              mock.patch.object(rerank, '_score_pool',
+                               return_value=([2, 1], _usage(), {})):
+            pool_order, status = rerank.apply(AnonymousUser(), 'монополия')
+        self.assertEqual(status, 'rerank')
+        self.assertEqual(pool_order, [2, 1])
 
     @override_settings(SMART_SEARCH_RERANK=False)
     def test_флаг_выключен_старый_путь_даже_для_сотрудника(self):
         pool_order, status = rerank.apply(self.сотрудник, 'монополия')
+        self.assertIsNone(pool_order)
+        self.assertEqual(status, 'off')
+
+    @override_settings(SMART_SEARCH_RERANK=False)
+    def test_флаг_выключен_старый_путь_и_для_гостя(self):
+        pool_order, status = rerank.apply(AnonymousUser(), 'монополия')
         self.assertIsNone(pool_order)
         self.assertEqual(status, 'off')
 
@@ -292,6 +321,70 @@ class ОтказоустойчивостьТесты(_База):
         self.assertEqual(result.status, 'rerank')
         self.assertEqual(result.ids, [4, 3, 2, 1])
         self.assertEqual(result.batches, 2)
+
+
+# ─── Общая дверь наружу и денежный потолок ────────────────────────────────
+
+class ОбщаяДверьТесты(_База):
+    """Вызов идёт через `problems.ai.core.run` — с учётом и с потолком."""
+
+    def _прогнать(self, запрос='монополия'):
+        rows = {1: _row(1), 2: _row(2)}
+
+        def script(system_blocks, user_text, schema, model, max_tokens, timeout):
+            return _FakeReply(json.dumps(
+                {'rows': [{'id': 1, 'score': 10}, {'id': 2, 'score': 90}]}))
+
+        with mock.patch.object(
+                rerank, 'build_pool',
+                return_value=([1, 2], {'bm25': 2}, rows)),             mock.patch.object(rerank, '_get_provider',
+                              return_value=_FakeProvider(script)):
+            return rerank._run(запрос)
+
+    def test_расход_попадает_в_общий_журнал(self):
+        """Строка `AiUsageLog` пишется, и пишется БЕЗ пользователя.
+
+        Поиском пользуются не входя; до 13.09.2026 такие строки не
+        писались вовсе, и денежный потолок считать было не по чему.
+        """
+        from problems.models import AiUsageLog
+
+        self.assertEqual(AiUsageLog.objects.count(), 0)
+        result = self._прогнать()
+        self.assertEqual(result.status, 'rerank')
+        row = AiUsageLog.objects.get()
+        self.assertEqual(row.kind, rerank.USAGE_KIND)
+        self.assertIsNone(row.user)
+        self.assertEqual(row.provider, 'glm')
+        self.assertGreater(row.cost_usd, 0)
+
+    def test_цена_считается_общей_таблицей_настроек(self):
+        """Своей таблицы цен у модуля нет — цена берётся из AI_PRICES."""
+        with override_settings(SMART_SEARCH_RERANK_MODEL='glm-5.3-flash'):
+            result = self._прогнать()
+        # 100 токенов входа по $0,15/млн + 50 выхода по $0,50/млн.
+        self.assertAlmostEqual(result.cost_usd, (100 * 0.15 + 50 * 0.50) / 1e6,
+                               places=9)
+
+    @override_settings(AI_DAILY_COST_CAPS={'search_rerank': 0.0000001})
+    def test_исчерпанный_бюджет_тихо_уводит_на_базовый_порядок(self):
+        """Потолок выбран — выдача та же, что без сортировщика вовсе."""
+        first = self._прогнать('первый запрос')
+        self.assertEqual(first.status, 'rerank')
+        second = self._прогнать('второй запрос')
+        self.assertEqual(second.status, 'fallback')
+        self.assertIn('бюджет', second.reason)
+        self.assertEqual(second.ids, [])     # «ничего не менять»
+
+    @override_settings(AI_DAILY_COST_CAPS={})
+    def test_без_потолка_ограничения_нет(self):
+        self._прогнать('первый запрос')
+        self.assertEqual(self._прогнать('второй запрос').status, 'rerank')
+
+    def test_суточный_лимит_обращений_на_пользователя_не_применяется(self):
+        """У поиска нет пользователя, которому списывать обращения."""
+        with override_settings(AI_GENERATOR_DAILY_LIMIT=0):
+            self.assertEqual(self._прогнать().status, 'rerank')
 
 
 # ─── Кэш: час по нормализованному тексту запроса ──────────────────────────

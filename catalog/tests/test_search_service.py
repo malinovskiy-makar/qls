@@ -20,6 +20,7 @@ import os
 import re
 import sys
 import threading
+import time
 import unittest
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -121,12 +122,20 @@ class QueryVectorCacheTests(SimpleTestCase):
 
 
 @override_settings(SEARCH_SERVICE_URL=МЁРТВЫЙ_АДРЕС,
-                   SEARCH_SERVICE_TIMEOUT=0.5)
+                   SEARCH_SERVICE_TIMEOUT=0.5,
+                   SEARCH_SERVICE_BREAKER_SECONDS=0)
 class ServiceUnavailableTests(SimpleTestCase):
-    """Отказ сервиса поднимает типизированное исключение, а не что попало."""
+    """Отказ сервиса поднимает типизированное исключение, а не что попало.
+
+    Выключатель здесь погашен (`SEARCH_SERVICE_BREAKER_SECONDS=0`): эти
+    тесты про то, что КАЖДОЕ обращение к мёртвому сервису отвечает
+    понятной ошибкой. Про сам выключатель — класс ниже.
+    """
 
     def setUp(self):
         caches['search'].clear()
+        search_client.reset_breaker()
+        self.addCleanup(search_client.reset_breaker)
 
     def test_отказ_соединения_даёт_типизированное_исключение(self):
         with self.assertRaises(search_client.SearchServiceUnavailable):
@@ -134,6 +143,69 @@ class ServiceUnavailableTests(SimpleTestCase):
 
     def test_healthy_отвечает_false_а_не_падает(self):
         self.assertFalse(search_client.healthy())
+
+
+@override_settings(SEARCH_SERVICE_URL=МЁРТВЫЙ_АДРЕС,
+                   SEARCH_SERVICE_TIMEOUT=0.5,
+                   SEARCH_SERVICE_BREAKER_SECONDS=30)
+class BreakerTests(SimpleTestCase):
+    """Короткоживущий выключатель: недоступный сервис отвечает БЫСТРО.
+
+    ⚠️ ЗАЧЕМ ЭТО ВООБЩЕ. Контейнера `search` на боевом сервере нет, и это
+    не авария на минуту, а сегодняшнее нормальное состояние. Без
+    выключателя КАЖДЫЙ поисковый запрос платил бы полный
+    `SEARCH_SERVICE_TIMEOUT` за пустое ожидание, и человек, набравший
+    запрос, ждал бы ровно столько, сколько ждал бы работающий поиск.
+    """
+
+    def setUp(self):
+        caches['search'].clear()
+        search_client.reset_breaker()
+        self.addCleanup(search_client.reset_breaker)
+
+    def test_после_первого_отказа_до_сети_дело_не_доходит(self):
+        with mock.patch.object(search_client, '_post_encode',
+                               wraps=search_client._post_encode) as шпион:
+            for _ in range(4):
+                with self.assertRaises(search_client.SearchServiceUnavailable):
+                    search_client.encode_one('эластичность спроса')
+        # Все четыре обращения отвечают ошибкой, но сеть трогает первое:
+        # остальные три отбивает выключатель — до `urlopen` они не доходят.
+        self.assertEqual(шпион.call_count, 4)
+
+    def test_второе_обращение_отвечает_мгновенно(self):
+        начало = time.perf_counter()
+        with self.assertRaises(search_client.SearchServiceUnavailable):
+            search_client.encode_one('первый запрос')
+        первое = time.perf_counter() - начало
+
+        начало = time.perf_counter()
+        with self.assertRaises(search_client.SearchServiceUnavailable):
+            search_client.encode_one('второй запрос')
+        второе = time.perf_counter() - начало
+
+        # Порог намеренно грубый: замер 13.09.2026 давал 2,03 с на первое
+        # обращение и 0,000 с на последующие. Смысл проверки — «второе
+        # обращение не ходит в сеть вовсе», а не точное число секунд.
+        self.assertLess(второе, 0.05,
+                        'второе обращение к мёртвому сервису ходило в сеть: '
+                        'первое %.3f с, второе %.3f с' % (первое, второе))
+
+    def test_выключатель_называет_причину_первого_отказа(self):
+        with self.assertRaises(search_client.SearchServiceUnavailable):
+            search_client.encode_one('первый запрос')
+        with self.assertRaises(search_client.SearchServiceUnavailable) as поймано:
+            search_client.encode_one('второй запрос')
+        self.assertIn('нет связи с сервисом', str(поймано.exception))
+
+    def test_сброс_открывает_дверь_снова(self):
+        with self.assertRaises(search_client.SearchServiceUnavailable):
+            search_client.encode_one('первый запрос')
+        search_client.reset_breaker()
+        with mock.patch.object(search_client, '_post_encode',
+                               side_effect=ValueError('до сети дошли')) as _:
+            with self.assertRaises(ValueError):
+                search_client.encode_one('третий запрос')
 
 
 @override_settings(SEARCH_SERVICE_URL='file:///etc/passwd',
