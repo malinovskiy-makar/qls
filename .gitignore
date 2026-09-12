@@ -500,3 +500,4 @@ reports/corpus_transfer_20260912/*
 !reports/night_20260913/
 reports/night_20260913/*
 !reports/night_20260913/JOURNAL.md
+!reports/night_20260913/DEPLOY_COMMANDS.md
