@@ -48,6 +48,20 @@ JACCARD_THRESHOLD = 0.80
 #: Отрыв по полноте, ниже которого лидер не считается доказанным.
 COMPLETENESS_MARGIN = 2
 
+#: Быстрые причины выбора фаворита человеком — ЕДИНСТВЕННАЯ точка правды.
+#: Читают и страница разметки (`dedup_human_review_html`), и приёмщик
+#: (`import_dup_human_choices`), и проверка допустимых значений. Заполнять
+#: их НЕ обязательно: разметка должна идти быстро, причина — подсказка
+#: будущему разбору, а не условие сохранения.
+REASON_TAGS = (
+    ('better_format', 'лучше отформатирован'),
+    ('has_figure', 'есть нужная картинка'),
+    ('has_answer', 'есть рабочий ответ'),
+    ('cleaner_text', 'чище текст'),
+    ('other_see_note', 'другое — см. заметку'),
+)
+REASON_TAG_KEYS = frozenset(key for key, _label in REASON_TAGS)
+
 
 def is_confident(rule):
     return rule in CONFIDENT_RULES

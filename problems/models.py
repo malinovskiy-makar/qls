@@ -1749,6 +1749,53 @@ class DupMark(models.Model):
                              ' ★' if self.is_best else '')
 
 
+class DupHumanChoice(models.Model):
+    """Живое решение человека по группе копий — разметка владельца.
+
+    ⚠️ ОТДЕЛЬНАЯ ТАБЛИЦА, А НЕ ПОЛЯ `DupMark`, И ЭТО ГЛАВНОЕ.
+    Смысл разметки — измерить СОГЛАСИЕ алгоритма и человека. Запиши
+    мы выбор человека в `DupMark.is_best` — сравнивать стало бы не с чем:
+    алгоритмическая пометка исчезла бы в момент записи. Две таблицы рядом — это
+    ровно то, что нужно: мера расхождения и возможность найти систематическую
+    ошибку в правиле приоритета (ADR 0096 про ту же логику разделения).
+
+    На `Problem` не ссылается ничего, кроме `chosen_problem`, и в саму задачу
+    эта таблица не пишет вовсе: откат разметки — удалить строки.
+    """
+
+    class Verdict(models.TextChoices):
+        CHOSEN = 'chosen', 'Фаворит выбран'
+        CANNOT_DECIDE = 'cannot_decide', 'Не могу решить'
+        NOT_DUPLICATES = 'not_duplicates', 'Это вообще не дубли'
+
+    group = models.CharField(
+        'Группа копий', max_length=40, unique=True,
+        help_text='Тот же ключ, что у DupMark.group — одно решение человека '
+                  'на группу; повторная разметка перезаписывает прежнее')
+    verdict = models.CharField(
+        'Вердикт', max_length=16, choices=Verdict.choices)
+    chosen_problem = models.ForeignKey(
+        Problem, on_delete=models.CASCADE, null=True, blank=True,
+        related_name='dup_human_choices', verbose_name='Выбранный фаворит',
+        help_text='Пусто у вердиктов «не могу решить» и «не дубли»')
+    reason_tags = models.CharField(
+        'Быстрые причины', max_length=200, blank=True,
+        help_text='Через запятую; список допустимых — problems/dedup.py, '
+                  'REASON_TAGS. Необязательны: пустое значение легитимно')
+    note = models.TextField('Заметка', blank=True)
+    labeled_at = models.DateTimeField('Размечено')
+
+    class Meta:
+        ordering = ['group']
+        verbose_name = 'Решение человека по группе копий'
+        verbose_name_plural = 'Решения человека по группам копий'
+
+    def __str__(self):
+        if self.chosen_problem_id:
+            return '%s → #%s' % (self.group, self.chosen_problem_id)
+        return '%s → %s' % (self.group, self.get_verdict_display())
+
+
 class OlympiadRef(models.Model):
     """Привязка задачи банка к конкретному туру реальной олимпиады,
     найденная сопоставлением по прямой ссылке (SourceReference.url) с
