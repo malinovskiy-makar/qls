@@ -158,7 +158,7 @@ numpy==2.5.2
     #   scipy
     #   transformers
 openai==3.13.0
-    # via -r requirements/local.in
+    # via -r requirements/base.in
 packaging==26.3
     # via
     #   huggingface-hub
