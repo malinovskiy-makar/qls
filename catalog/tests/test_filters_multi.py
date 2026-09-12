@@ -27,7 +27,12 @@ class ParseTests(SimpleTestCase):
         self.assertEqual(active['topics'], ['1', '2'])
         self.assertEqual(active['difficulties'], ['4', '5'])
         self.assertEqual(active['sources'], ['7'])
-        self.assertEqual(active['features'], ['graph'])
+        # Ключ ВИТРИНЫ в адресе разворачивается в свои особенности:
+        # фильтр спрашивает связь `ProblemFeature`, а витрина о девяти
+        # особенностях из двенадцати не знает вовсе.
+        self.assertEqual(active['features'],
+                         ['графическое_решение', 'нужен_график_в_ответе',
+                          'график_в_условии'])
         self.assertEqual(active['tags'], ['3'])
         # Старый адрес нёс точную строку `problem_type`; разбор переводит
         # её в ВИД теста — одна точка правды `problems.problem_types`.
@@ -42,7 +47,9 @@ class ParseTests(SimpleTestCase):
                                 'feature': ['graph', 'table'], 'character': 'x'})
         self.assertEqual(active['topics'], ['843'])
         self.assertEqual(active['difficulties'], ['4'])
-        self.assertEqual(active['features'], ['graph', 'table'])
+        self.assertEqual(active['features'],
+                         ['графическое_решение', 'нужен_график_в_ответе',
+                          'график_в_условии', 'табличка_в_условии'])
         self.assertEqual(active['character'], '')
 
     def test_query_round_trip(self):
@@ -173,12 +180,44 @@ class MultiSelectQueryTests(TestCase):
 
 
 class CharacterAndFeaturesTests(TestCase):
+    """Фильтр особенностей спрашивает СВЯЗЬ `ProblemFeature`, не витрину.
+
+    ⚠️ ПОЧЕМУ ТЕСТЫ ЗАВОДЯТ СВЯЗИ, А НЕ ПИШУТ `Problem.features`
+    (13.09.2026). Раньше они писали витрину — JSON из трёх ключей, — и
+    этого хватало, потому что и фильтр читал её же. Но в витрине девяти
+    особенностей из двенадцати нет ВООБЩЕ, а отбор шёл чтением текста
+    JSON у каждой строки банка (0,74 с на клик по 41 307 задачам).
+    Теперь источник правды один — связь, и тесты обязаны заводить
+    именно её, иначе они проверяют слой, который на отбор больше не
+    влияет.
+    """
+
     @classmethod
     def setUpTestData(cls):
         cls.topic = make_topic('Эластичность')
         cls.p1 = make_problem('С графиком.', topic=cls.topic, difficulty=3)
         cls.p2 = make_problem('С таблицей.', topic=cls.topic, difficulty=3)
         cls.p3 = make_problem('Без всего.', topic=cls.topic, difficulty=3)
+
+    @staticmethod
+    def _link(problem, *keys):
+        """Завести особенности задачи — и связь, и витрину следом.
+
+        Витрина пересчитывается ровно той функцией, которой её считает
+        `rebuild_feature_view`: второго способа её собрать в проекте нет.
+        """
+        from problems.enrich.features import CATALOG_FEATURES, catalog_view
+        from problems.models import Feature, ProblemFeature
+
+        labels = {key: (label, by) for key, label, by in CATALOG_FEATURES}
+        for key in keys:
+            label, by = labels[key]
+            feature, _ = Feature.objects.get_or_create(
+                key=key, defaults={'label': label, 'counted_by': by})
+            ProblemFeature.objects.get_or_create(
+                problem=problem, feature=feature, defaults={'source': by})
+        problem.features = catalog_view(keys)
+        problem.save(update_fields=['features'])
 
     def _keys(self):
         active = filters.parse(QueryDict(''))
@@ -188,33 +227,99 @@ class CharacterAndFeaturesTests(TestCase):
         self.assertNotIn('character', self._keys())
         self.assertNotIn('feature', self._keys())
         self.p1.character = 'quant'
-        self.p1.features = ['graph', 'table']
-        self.p1.save(update_fields=['character', 'features'])
-        self.p2.features = ['table']
-        self.p2.save(update_fields=['features'])
+        self.p1.save(update_fields=['character'])
+        self._link(self.p1, 'график_в_условии', 'табличка_в_условии')
+        self._link(self.p2, 'табличка_в_условии')
         self.assertIn('character', self._keys())
         self.assertIn('feature', self._keys())
         active = filters.parse(QueryDict(''))
         by_key = {g['key']: g for g in filters.build(filters.base_queryset('catalog'), active)[1]['groups']}
         self.assertEqual([(o['value'], o['count']) for o in by_key['character']['options']],
                          [('quant', 1)])
+        # Правило нуля: показаны ТОЛЬКО те особенности, что есть в корпусе,
+        # и в порядке справочника, а не в порядке появления.
         self.assertEqual([(o['value'], o['count']) for o in by_key['feature']['options']],
-                         [('graph', 1), ('table', 2)])
+                         [('график_в_условии', 1), ('табличка_в_условии', 2)])
 
     def test_filtering_by_character_and_features(self):
         self.p1.character = 'quant'
-        self.p1.features = ['graph']
-        self.p1.save(update_fields=['character', 'features'])
-        self.p2.features = ['table', 'proof']
-        self.p2.save(update_fields=['features'])
+        self.p1.save(update_fields=['character'])
+        self._link(self.p1, 'график_в_условии')
+        self._link(self.p2, 'табличка_в_условии', 'на_доказательство')
         ids = lambda params: {c['problem'].pk for c in
                               self.client.get(CATALOG_URL, params).context['cards']}
         self.assertEqual(ids({'character': 'quant'}), {self.p1.pk})
-        self.assertEqual(ids({'feature': 'graph'}), {self.p1.pk})
-        self.assertEqual(ids({'feature': ['graph', 'proof']}), {self.p1.pk, self.p2.pk})
-        self.assertEqual(ids({'feature': 'graph', 'character': 'quant'}), {self.p1.pk})
-        html = self.client.get(CATALOG_URL, {'feature': ['graph', 'proof'],
-                                             'character': 'quant'}).content.decode()
+        self.assertEqual(ids({'feature': 'график_в_условии'}), {self.p1.pk})
+        self.assertEqual(ids({'feature': ['график_в_условии', 'на_доказательство']}),
+                         {self.p1.pk, self.p2.pk})
+        self.assertEqual(ids({'feature': 'график_в_условии', 'character': 'quant'}),
+                         {self.p1.pk})
+        html = self.client.get(CATALOG_URL,
+                               {'feature': ['график_в_условии', 'на_доказательство'],
+                                'character': 'quant'}).content.decode()
         self.assertIn('data-chip="character">Количественная<a', html)
-        self.assertIn('data-chip="feature">Есть график<a', html)
-        self.assertIn('data-chip="feature">Требует доказательства<a', html)
+        self.assertIn('data-chip="feature">График в условии<a', html)
+        self.assertIn('data-chip="feature">На доказательство<a', html)
+
+    def test_all_twelve_features_are_filterable(self):
+        """Фильтруются ВСЕ двенадцать, а не три ключа витрины.
+
+        Девять из двенадцати витрина не хранит вовсе — до 13.09.2026
+        отфильтровать их было нечем.
+        """
+        from problems.enrich.features import CATALOG_FEATURES
+
+        for key, _label, _by in CATALOG_FEATURES:
+            self._link(self.p1, key)
+        for key, label, _by in CATALOG_FEATURES:
+            active = filters.parse({'feature': key})
+            self.assertEqual(active['features'], [key], key)
+            found = set(filters.apply(filters.base_queryset('catalog'), active)
+                        .values_list('pk', flat=True))
+            self.assertEqual(found, {self.p1.pk}, label)
+
+    def test_legacy_showcase_address_finds_the_same_problems(self):
+        """`?feature=graph` — сохранённые людьми ссылки и бейджики карточки.
+
+        Ключ витрины обязан находить объединение своих трёх особенностей,
+        ровно как раньше.
+        """
+        self._link(self.p1, 'графическое_решение')
+        self._link(self.p2, 'график_в_условии')
+        self._link(self.p3, 'табличка_в_условии')
+        base = filters.base_queryset('catalog')
+        found = set(filters.apply(base, filters.parse({'feature': 'graph'}))
+                    .values_list('pk', flat=True))
+        self.assertEqual(found, {self.p1.pk, self.p2.pk})
+        found = set(filters.apply(base, filters.parse({'feature': 'table'}))
+                    .values_list('pk', flat=True))
+        self.assertEqual(found, {self.p3.pk})
+
+    def test_problem_with_two_matching_features_is_counted_once(self):
+        """EXISTS, а не соединение: задача не размножается по числу ключей."""
+        self._link(self.p1, 'графическое_решение', 'график_в_условии')
+        active = filters.parse({'feature': 'graph'})
+        qs = filters.apply(filters.base_queryset('catalog'), active)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(list(qs.values_list('pk', flat=True)), [self.p1.pk])
+
+    def test_coverage_gate_hides_the_olympiad_feature_until_it_fills_up(self):
+        """«С реальной олимпиады» ждёт десятой части корпуса.
+
+        Порог покрытия — решение владельца 07.09.2026; проверяется в
+        `features.catalog_visible_keys`, а фильтр обязан его слушаться.
+        """
+        for i in range(20):
+            make_problem('Задача %d.' % i, topic=self.topic, difficulty=3)
+        self._link(self.p1, 'с_реальной_олимпиады')      # 1 из 23 — мало
+        by_key = {g['key']: g for g in filters.build(
+            filters.base_queryset('catalog'), filters.parse(QueryDict('')))[1]['groups']}
+        self.assertNotIn('feature', by_key)
+        # Добираем до порога: становится видна.
+        from problems.models import Problem
+        for problem in Problem.objects.exclude(pk=self.p1.pk)[:4]:
+            self._link(problem, 'с_реальной_олимпиады')
+        by_key = {g['key']: g for g in filters.build(
+            filters.base_queryset('catalog'), filters.parse(QueryDict('')))[1]['groups']}
+        self.assertEqual([o['value'] for o in by_key['feature']['options']],
+                         ['с_реальной_олимпиады'])

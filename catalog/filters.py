@@ -34,10 +34,11 @@ from __future__ import annotations
 
 from collections import Counter
 
-from django.db.models import Count, Q, TextField
+from django.db.models import Count, Exists, OuterRef, Q, TextField
 from django.db.models.functions import Cast
 
 from problems import problem_types
+from problems.enrich import features as enrich_features
 from problems.sections import canonical_groups
 
 from .topic_blocks import (
@@ -72,13 +73,34 @@ TEST_TYPES = tuple(
 # Признак теста один на весь проект и живёт в `problems.problem_types`.
 # Тот же признак у поиска по словам (`catalog.hybrid.lexical_search`).
 
-# ── Особенности и характер — ключи и подписи полей `Problem.features`
-#    и `Problem.character`. Разметку заливает `import_problem_attributes`.
-FEATURES = (
-    ('graph', 'Есть график'),
-    ('table', 'Есть таблица'),
-    ('proof', 'Требует доказательства'),
+# ── Особенности: ВСЕ ДВЕНАДЦАТЬ, прямо из справочника ───────────────────
+#
+# ⚠️ ФИЛЬТР СПРАШИВАЕТ СВЯЗЬ `ProblemFeature`, А НЕ ВИТРИНУ
+# `Problem.features` (13.09.2026). Витрина — это JSON из ТРЁХ ключей
+# (`graph`/`table`/`proof`), и фильтровать по ней значило две потери сразу.
+# Первая: девять особенностей из двенадцати отфильтровать было НЕЧЕМ —
+# витрина о них не знает. Вторая: отбор шёл `Cast(features -> text) LIKE
+# '%"graph"%'` (jsonb-вложение умеет только PostgreSQL, а тесты живут на
+# SQLite), то есть чтением текста у каждой строки банка. Замер 13.09.2026
+# на 41 307 задачах: 0,74 с на клик.
+#
+# Связь смоделирована правильно и уже проиндексирована внешним ключом —
+# новое денормализованное хранилище (массив, jsonb) заводить незачем, и это
+# тот самый случай, когда «не сверхинженерить» значит взять то, что уже
+# есть. Витрина остаётся как есть: она нужна бейджикам на карточке задачи,
+# где «Есть график» — объединение трёх особенностей.
+#
+# Канон списка — `problems/enrich/features.py`, и дублировать его здесь
+# нельзя: два списка разошлись бы молча.
+FEATURES = tuple(
+    (key, label) for key, label, _by in enrich_features.CATALOG_FEATURES
 )
+
+#: Старые адреса каталога несли ключ ВИТРИНЫ (`?feature=graph`). Их надо
+#: продолжать понимать: такие ссылки сохранены людьми, и ими же помечены
+#: бейджики на карточке задачи. Ключ витрины разворачивается в свои
+#: особенности — тот же набор задач, что и раньше.
+FEATURE_ALIASES = enrich_features.CATALOG_VIEW_MAP
 
 CHARACTERS = (
     ('qual', 'Качественная'),
@@ -224,7 +246,8 @@ def parse(source):
         'character': character,
         'sources': many('source', str.isdigit),
         'has_solution': one('has_solution') == '1',
-        'features': many('feature', lambda v: v in dict(FEATURES)),
+        'features': _feature_keys(many(
+            'feature', lambda v: v in dict(FEATURES) or v in FEATURE_ALIASES)),
     }
 
 
@@ -315,6 +338,16 @@ def base_queryset(gate='catalog'):
     return qs
 
 
+def _feature_keys(values):
+    """Ключи витрины разворачиваются в особенности, порядок сохраняется."""
+    out = []
+    for value in values:
+        for key in FEATURE_ALIASES.get(value, (value,)):
+            if key not in out:
+                out.append(key)
+    return out
+
+
 def _with_features_text(qs):
     """Особенности как текст — для вхождения ключа на любой базе.
 
@@ -356,10 +389,16 @@ def apply(qs, active, skip=()):
         # см. `apply_solution_review`, старое поведение сохранено параметром.
         qs = qs.exclude(solution='')
     if 'feature' not in skip and active['features']:
-        cond = Q()
-        for key in active['features']:
-            cond |= Q(features_text__contains='"%s"' % key)
-        qs = _with_features_text(qs).filter(cond)
+        # ⚠️ EXISTS, А НЕ СОЕДИНЕНИЕ С `distinct()`. У задачи
+        # особенностей несколько; обычное соединение размножило бы её
+        # строку по числу совпавших ключей, и `count()` соврал бы.
+        # `distinct()` это чинит, но ценой сортировки всего результата.
+        # EXISTS не размножает ничего и останавливается на первом
+        # совпадении.
+        from problems.models import ProblemFeature
+        qs = qs.filter(Exists(ProblemFeature.objects.filter(
+            problem=OuterRef('pk'),
+            feature__key__in=active['features'])))
     return qs
 
 
@@ -395,16 +434,19 @@ def _tally(qs, field):
 
 
 def _feature_tally(qs):
-    """Сколько задач с каждой особенностью.
+    """Сколько задач у каждой из двенадцати особенностей.
 
-    Группировка по значению поля целиком (списку ключей), раскладка по
-    ключам — в питоне: комбинаций мало, а jsonb-вложения на SQLite нет.
+    Одна группировка по связи `ProblemFeature`, а не чтение JSON у каждой
+    строки банка. `distinct=True` обязателен: у задачи особенностей
+    несколько, и считать надо ЗАДАЧИ, а не строки связи.
     """
-    tally = Counter()
-    for row in qs.values('features').annotate(n=Count('id', distinct=True)):
-        for key in row['features'] or ():
-            tally[key] += row['n']
-    return tally
+    from problems.models import ProblemFeature
+
+    rows = (ProblemFeature.objects
+            .filter(problem__in=qs.values('pk'))
+            .values('feature__key')
+            .annotate(n=Count('problem_id', distinct=True)))
+    return Counter({row['feature__key']: row['n'] for row in rows})
 
 
 def _corpus(base):
@@ -557,10 +599,23 @@ def _character_options(base, active, corpus):
 
 
 def _feature_options(base, active, corpus):
-    """Особенности — из поля `Problem.features`; пусто в корпусе → нет группы."""
+    """Особенности — из связи `ProblemFeature`.
+
+    Два порога, и они про разное. ПРАВИЛО НУЛЯ: особенности, которой в
+    корпусе нет ни у одной задачи, в списке нет вовсе — пустой фильтр хуже
+    отсутствующего, он обещает отбор и возвращает ноль. ПОРОГ ПОКРЫТИЯ
+    (`catalog_visible_keys`, решение владельца 07.09.2026): «С реальной
+    олимпиады» ждёт, пока признак наберётся хотя бы у десятой части задач.
+    Первый порог — про наличие данных вообще, второй — про их полноту.
+    """
+    total = base.count() if corpus['features'] else 0
+    coverage = {key: (n / total if total else 0.0)
+                for key, n in corpus['features'].items()}
+    visible = set(enrich_features.catalog_visible_keys(coverage))
     tally = _feature_tally(_counted(base, active, 'feature'))
     return [_option(value, label, tally.get(value, 0), value in active['features'])
-            for value, label in FEATURES if corpus['features'].get(value)]
+            for value, label in FEATURES
+            if corpus['features'].get(value) and value in visible]
 
 
 # ── Сборка контекста для шаблона ─────────────────────────────────────────

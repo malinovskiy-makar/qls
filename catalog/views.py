@@ -13,6 +13,7 @@ from django.utils.http import urlencode
 from django.views.decorators.http import require_POST
 
 from problems import problem_types
+from problems.enrich import features as enrich_features
 from problems.jsonsafe import dumps_for_script
 
 from . import attachments, attempts, chat, filters, testplay
@@ -680,9 +681,15 @@ def _clouds(problem, topics, tags, sources):
         kind_changes['test_type'] = problem_types.test_kind(problem.problem_type)
     row2.append({'kind': 'kind', 'label': _kind_cloud_label(problem.problem_type),
                  'url': _catalog_link(**kind_changes)})
+    # ⚠️ Бейджики берут подпись у ВИТРИНЫ (`Problem.features`), а не у
+    # фильтра. Это разные словари, и намеренно: «Есть график» на карточке
+    # — объединение трёх особенностей, а в фильтре каждая из двенадцати
+    # стоит отдельной строкой со своей подписью. Ссылка ведёт по ключу
+    # витрины; `filters.parse` разворачивает его в те же три особенности.
     for key in problem.features or ():
-        if key in dict(filters.FEATURES):
-            row2.append({'kind': 'feat', 'label': dict(filters.FEATURES)[key],
+        label = enrich_features.CATALOG_VIEW_LABELS.get(key)
+        if label:
+            row2.append({'kind': 'feat', 'label': label,
                          'url': _catalog_link(features=[key])})
     if sources:
         row2.append({'kind': 'sep'})

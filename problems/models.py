@@ -351,9 +351,14 @@ class Problem(models.Model):
     character = models.CharField(
         'Характер задачи', max_length=8, choices=Character.choices,
         default='', blank=True, db_index=True)
-    # Список ключей особенностей из `catalog.filters.FEATURES`
-    # («graph», «table», «proof»). JSON-список, а не M2M: три флага без
-    # собственной сущности, и правило «модели только в problems» не задето.
+    # ⚠️ ЭТО ВИТРИНА ДЛЯ БЕЙДЖИКОВ НА КАРТОЧКЕ, А НЕ ИСТОЧНИК ПРАВДЫ.
+    # Три ключа («graph», «table», «proof») из
+    # `problems/enrich/features.py: CATALOG_VIEW_MAP`; каждый объединяет
+    # несколько настоящих особенностей. Сами особенности живут связью
+    # `ProblemFeature`, их двенадцать, и ФИЛЬТР КАТАЛОГА спрашивает
+    # именно связь (13.09.2026) — по витрине отфильтровать девять из
+    # двенадцати было нечем. Пересчитывается только `features.catalog_view()`
+    # и командой `rebuild_feature_view`.
     features = models.JSONField('Особенности', default=list, blank=True)
 
     # ── Обогащение v2: раскладка журнала прогона (07.09.2026) ──────────────
