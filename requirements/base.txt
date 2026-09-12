@@ -19,6 +19,8 @@ autobahn==26.7.1
     # via daphne
 automat==25.4.16
     # via twisted
+bm25s==0.3.11
+    # via -r requirements/base.in
 cbor2==6.1.4
     # via autobahn
 cffi==2.1.1
@@ -76,7 +78,9 @@ msgpack==1.2.2
 nh3==0.3.7
     # via -r requirements/base.in
 numpy==2.5.2
-    # via -r requirements/base.in
+    # via
+    #   -r requirements/base.in
+    #   bm25s
 packaging==26.3
     # via incremental
 pdfminer-six==20260107
