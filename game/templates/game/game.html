@@ -243,13 +243,18 @@ a:focus-visible, button:focus-visible {
 .mode-terms b { color: var(--text2); font-weight: 600; }
 /* сердца в условиях режима — тем же красным, что и в HUD */
 .mt-hearts { color: var(--rush-bad); letter-spacing: 1px; }
+/* ⚠️ ВЫСОТА СТРОКИ «РЕКОРД» ЗАРЕЗЕРВИРОВАНА (15.09.2026). Кубок приходит
+   SVG 24×24 без размера в CSS: карточка с рекордом становилась выше карточки
+   без него, и ряд с ней расходился с соседним. */
 .mode-best {
   margin-top: 6px;
   font-size: 13px;
   color: var(--rush-accent);
   font-weight: 600;
-  min-height: 14px;
+  min-height: 20px;
+  line-height: 20px;
 }
+.mode-best .qi { width: 16px; height: 16px; vertical-align: -3px; }
 .mode-card.disabled {
   opacity: .55;
   cursor: default;
@@ -409,6 +414,13 @@ a:focus-visible, button:focus-visible {
 }
 .filter-open:focus-visible { outline: 2px solid var(--rush-accent);
                              outline-offset: 2px; }
+/* Число выбранных фильтров бейджем — как `.btn-all .n` каталога (15.09.2026).
+   При нуле бейджа нет в разметке вовсе. */
+.filter-open .n { display: inline-flex; align-items: center; justify-content: center;
+                  min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px;
+                  border-radius: var(--r-pill); background: var(--btn-bg);
+                  color: var(--on-btn); font-size: 12px; font-weight: 700;
+                  vertical-align: 1px; }
 .filter-reset {
   font: inherit; font-size: 13px;
   background: none; border: none; padding: 4px 6px;
@@ -660,7 +672,10 @@ a:focus-visible, button:focus-visible {
   #screen-start .col { max-width: 1280px; }
 }
 .start-left { min-width: 0; }
-.start-right { display: flex; flex-direction: column; gap: 16px; }
+/* ⚠️ `min-width: 0`, как у левой колонки (15.09.2026): вкладки доски стоят в
+   одну строку, и без него их общая ширина раздувала колонку сетки — на 380 px
+   страница становилась шире экрана на 22 px (замер браузерным тестом). */
+.start-right { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .lb-card {
   border: 1px solid var(--rush-border);
@@ -673,10 +688,16 @@ a:focus-visible, button:focus-visible {
   font-size: 16px; font-weight: 800; margin-bottom: 12px;
 }
 /* Вкладки режимов и сегменты показателей — по канону 3.8/3.9. */
-.lb-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: wrap; }
+/* ⚠️ ВКЛАДКИ В ОДНУ СТРОКУ (15.09.2026): в колонке 380 px они переносились на
+   вторую строку (замер: 64 px вместо 30) и сдвигали таблицу. Не влезли —
+   прокрутка вбок, полоса прокрутки скрыта. */
+.lb-tabs { display: flex; gap: 4px; margin-bottom: 10px; flex-wrap: nowrap;
+           overflow-x: auto; scrollbar-width: none; }
+.lb-tabs::-webkit-scrollbar { display: none; }
 .lb-tab {
   font: inherit; font-size: 13px; font-weight: 600;
   display: inline-flex; align-items: center; gap: 5px;
+  flex: none; white-space: nowrap;
   padding: 6px 10px; border-radius: 9px;
   border: 1px solid transparent; background: none;
   color: var(--text2); cursor: pointer;
@@ -688,14 +709,17 @@ a:focus-visible, button:focus-visible {
   border-color: var(--rush-accent);
   color: var(--rush-accent);
 }
+/* Два сегмента одной высоты и с одним зазором (15.09.2026). Раньше отступ
+   стоял слева у второго сегмента, и когда тот переносился под первый (колонка
+   380 px), он съезжал вправо на 8 px. */
+.lb-segs { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
 .lb-seg {
   display: inline-flex; border: 1px solid var(--rush-border);
-  border-radius: 9px; overflow: hidden; margin-bottom: 10px;
+  border-radius: 9px; overflow: hidden;
 }
-.lb-seg + .lb-seg { margin-left: 8px; }
 .lb-seg button {
   font: inherit; font-size: 13px; font-weight: 600;
-  padding: 6px 12px; border: none; background: none;
+  min-height: 32px; padding: 0 12px; border: none; background: none;
   color: var(--text2); cursor: pointer;
 }
 .lb-seg button[aria-pressed="true"] {
@@ -703,19 +727,25 @@ a:focus-visible, button:focus-visible {
 }
 
 .lb-rows { display: flex; flex-direction: column; }
+/* Строка — сетка «место | имя и дата | значение» (15.09.2026): значение
+   прижато вправо и стоит по центру двух строчек, дата мельче под именем.
+   Раньше дата тянулась и под значение (`grid-column: 2 / -1`). */
 .lb-row {
   display: grid;
-  grid-template-columns: 26px 1fr auto;
-  gap: 8px;
-  align-items: baseline;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  column-gap: 8px;
+  align-items: center;
   padding: 6px 8px;
   border-radius: 8px;
   font-size: 14px;
 }
-.lb-row .pl { color: var(--text3); font-variant-numeric: tabular-nums; }
-.lb-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.lb-row .vl { font-weight: 700; font-variant-numeric: tabular-nums; }
-.lb-row .dt { grid-column: 2 / -1; font-size: 12px; color: var(--text3); }
+.lb-row .pl { grid-row: 1 / span 2; color: var(--text3);
+              font-variant-numeric: tabular-nums; }
+.lb-row .nm { grid-column: 2; overflow: hidden; text-overflow: ellipsis;
+              white-space: nowrap; }
+.lb-row .vl { grid-column: 3; grid-row: 1 / span 2; text-align: right;
+              font-weight: 700; font-variant-numeric: tabular-nums; }
+.lb-row .dt { grid-column: 2; grid-row: 2; font-size: 12px; color: var(--text3); }
 /* Первые три места — тинтом из набора, сырого hex тут нет. */
 .lb-row.p1 { background: var(--amber-tint); }
 .lb-row.p2, .lb-row.p3 { background: var(--surface-2); }
@@ -751,6 +781,12 @@ a:focus-visible, button:focus-visible {
 .k-tip[hidden] { display: none; }
 .lb-foot { margin-top: 10px; font-size: 13px; color: var(--text3); }
 .lb-foot a { color: var(--accent-ink); }
+/* Гостю подвал — одна ссылка-кнопка «Войти» (15.09.2026). */
+.lb-login { display: inline-flex; align-items: center; min-height: 36px;
+            padding: 0 16px; border: 1px solid var(--rush-border);
+            border-radius: 10px; font-size: 14px; font-weight: 600;
+            text-decoration: none; }
+.lb-login:hover { border-color: var(--rush-accent); }
 
 .ms-rows { display: flex; flex-direction: column; gap: 7px; }
 .ms-row { display: flex; justify-content: space-between; gap: 12px;
@@ -759,12 +795,22 @@ a:focus-visible, button:focus-visible {
 .ms-row b { font-variant-numeric: tabular-nums; }
 
 /* ── Нижний ряд входов ──────────────────────────────────────────── */
+/* ⚠️ ЧЕТЫРЕ В РЯД, НИЖЕ 720 px — ДВЕ, НИЖЕ 480 — ОДНА (15.09.2026). `auto-fit`
+   раскладывал карточки 3 + 1 (замер на 700 px: 76, 76, 76 и одна 57), высоты
+   рядов расходились. `stretch` держит одну высоту в ряду. */
 .entry-row {
   margin-top: 22px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: stretch;
   gap: 10px;
   text-align: left;
+}
+@media (max-width: 720px) {
+  .entry-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 480px) {
+  .entry-row { grid-template-columns: 1fr; }
 }
 .entry {
   font: inherit;
@@ -2270,11 +2316,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <div class="filter-chips" id="filter-chips"></div>
       <p class="filter-note" id="filter-note"></p>
       {% if ranked_quota %}<p class="filter-note">{{ ranked_quota }}</p>{% endif %}
-      {% comment %}Скромная строка входов: сами карточки «Вызов дня» и
-         «Бросить вызов» стоят ниже, здесь короткий путь для тех, кто уже
-         знает, зачем.{% endcomment %}
-      <p class="filter-note"><a href="/game/daily/">Вызов дня</a> ·
-        <a href="/game/duel/new/">Дуэль с другом</a></p>
 
       </div><!-- /start-left -->
 
@@ -2285,7 +2326,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             {% include '_hint.html' with hint='Как сравниваются разные раунды. У каждого вопроса есть сложность от 1 до 5 звёзд, и она уточняется по ответам всех игроков. Очки за верный ответ растут со сложностью (от 20 за одну звезду до 250 за пять), за скорость ответа и за серию верных подряд. Раунд без фильтров получает ×1,3, точность ниже 85 % уменьшает итог, а раунд с фильтром по сложности – тренировочный и в таблицу не попадает. Поэтому в таблице сравнивается умение, а не удачная выборка вопросов.' %}
           </div>
           <div class="lb-tabs" id="lb-modes" role="tablist"></div>
-          <div>
+          <div class="lb-segs">
             <span class="lb-seg" id="lb-period" role="group" aria-label="Окно">
               <button type="button" data-period="week" aria-pressed="false">Неделя</button>
               <button type="button" data-period="all" aria-pressed="true">Всё время</button>
@@ -2337,7 +2378,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           </form>
         </div>
         <button class="entry" id="entry-duel" data-soon="1">
-          <b>Бросить вызов</b><small>дуэль по ссылке</small>
+          <b>Создать дуэль</b><small>соперник по ссылке или коду</small>
         </button>
         <button class="entry" id="entry-records">
           <b>Мои рекорды</b><small>по режимам, темам и дуэлям</small>
@@ -2696,7 +2737,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      aria-labelledby="dmodal-title">
   <div class="fmodal-card">
     <div class="fmodal-head">
-      <b id="dmodal-title">Бросить вызов</b>
+      <b id="dmodal-title">Создать дуэль</b>
       <button type="button" class="fmodal-close" id="dmodal-close"
               aria-label="Закрыть">&times;</button>
     </div>
@@ -2718,7 +2759,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     <div class="fmodal-foot">
       <span class="fcounts" id="dm-foot-note"></span>
       <div class="fmodal-actions">
-        <button type="button" class="fapply" id="dm-create">Создать вызов</button>
+        <button type="button" class="fapply" id="dm-create">Создать дуэль</button>
       </div>
     </div>
   </div>
@@ -3433,7 +3474,15 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
     ['filter-open', 'dm-filters'].forEach(function (id) {
       var b = document.getElementById(id);
-      if (b) b.textContent = rows.length ? 'Изменить фильтры' : 'Добавить фильтры';
+      if (!b) return;
+      b.textContent = rows.length ? 'Изменить фильтры' : 'Добавить фильтры';
+      // Число выбранных значений бейджем, как у «Все фильтры» в каталоге.
+      if (rows.length) {
+        var n = document.createElement('span');
+        n.className = 'n';
+        n.textContent = rows.length;
+        b.appendChild(n);
+      }
     });
     $('filter-reset').hidden = !rows.length;
     var note = $('filter-note');
@@ -4239,11 +4288,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       pin.appendChild(wrap);
     }
     if (!CFG.is_authenticated) {
+      // Одна ссылка-кнопка «Войти» (15.09.2026): строка «Войдите, чтобы попасть
+      // в таблицу: вход» говорила одно и то же дважды.
       foot.innerHTML = '';
-      foot.appendChild(document.createTextNode('Войдите, чтобы попасть в таблицу: '));
       var a = document.createElement('a');
-      a.href = '/login/';
-      a.textContent = 'вход';
+      a.className = 'lb-login';
+      a.href = '/login/?next=/game/';
+      a.textContent = 'Войти';
       foot.appendChild(a);
     } else {
       foot.textContent = d.total_players
@@ -6301,14 +6352,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           }
           if (!d || !d.ok) {
             again();
-            fail((d && d.error) || 'Не удалось создать вызов');
+            fail((d && d.error) || 'Не удалось создать дуэль');
             return;
           }
           if (window.weco) weco.track('duel_create', { mode: mode });
           location.href = d.play_url;
         }, function () {
           again();
-          fail('Не удалось создать вызов');
+          fail('Не удалось создать дуэль');
         });
     });
 
@@ -6322,7 +6373,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (e.key === 'Escape') { e.preventDefault(); open(false); }
     });
 
-    // Ссылка «Дуэль с другом» в строке под режимами открывает то же окно.
+    // Ссылка на /game/duel/new/, если она есть на странице, открывает то же окно.
+    // Строку «Вызов дня · Дуэль с другом» под режимами убрали 15.09.2026 (она
+    // дублировала карточки нижнего ряда) — привязка осталась с проверкой на null.
     var link = document.querySelector('a[href="/game/duel/new/"]');
     if (link) {
       link.addEventListener('click', function (e) {
