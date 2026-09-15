@@ -429,6 +429,12 @@ HTTP, очки считает сервер там же. По WebSocket идут 
 `location /ws/` в nginx выше `location /`, живость `/ws/health/`. Подробности —
 [SERVER.md](SERVER.md) и [RUNBOOK.md](RUNBOOK.md).
 
+Локально сокет держит сам `runserver`: `'daphne'` стоит первым в
+`INSTALLED_APPS`. С channels 4 ASGI-версия команды живёт в `daphne`, а не в
+`channels`; без него `runserver` — обычный WSGI, лобби дуэли не открывает сокет
+и отсчёт не начинается (найдено 15.09.2026, сторож —
+`config/tests/test_asgi_runserver.py`).
+
 ---
 
 ## Команды пула
