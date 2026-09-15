@@ -406,6 +406,90 @@ docker compose exec web curl -fsS http://search:8001/healthz
 `catalog/tests/test_search_service.py` читает оба compose-файла текстом и
 краснеет, если секция `ports` появится.
 
+### Включение смысловой ноги на бою
+
+⚠️ **Порядок важен: векторы в базе → контейнер `search` → флаг.** Флаг без
+векторов включит поиск по пустой матрице, контейнер без свободной памяти
+уронит соседей. Выполняет владелец; сессия 15.09.2026 подготовила команды,
+файл векторов и прогрев. Устройство — `docs/EMBEDDINGS.md`, раздел «Прогрев
+воркера, разбивка времени и векторы на бой».
+
+**0. Прогрев уже едет с кодом.** С 15.09 gunicorn стартует с
+`-c /app/config/gunicorn_conf.py`: хук `post_worker_init` запускает фоновый
+поток, который строит корпус bm25 (и матрицу векторов, если
+`SEMANTIC_SEARCH_ENABLED=1`) сразу после старта воркера. Замер на 14 082
+задачах: корпус 22–26 с, индекс 3 с. Выключатель — `SMART_SEARCH_WARMUP=0` в
+`/srv/weconomics/.env`. После выкатки в журнале у каждого воркера строка
+`прогрев: корпус N задач за X с, …`:
+
+```bash
+cd /srv/weconomics/app/deploy
+docker compose logs web | grep 'прогрев:'
+```
+
+**1. Векторы — файлом с машины владельца.** Посчитать их в `web` нечем
+(ADR 0002), а `dump_for_deploy` поле `embedding` не везёт. Дома, в
+`C:\Users\shipu\qls`:
+
+```bash
+venv313\Scripts\python.exe manage.py embeddings_export_vectors --out reports/vectors/catalog
+scp reports/vectors/catalog.f32 reports/vectors/catalog.meta.json reports/vectors/catalog.state.json <адрес из «Как подключиться»>:/srv/weconomics/vectors/
+```
+
+Получатся три файла: векторы (~55 МБ на 14 082 задачи), метаданные и копия
+отметки сверки билда. У контейнера `web` папки `/srv/weconomics` нет (томов
+только `static` и `media`), поэтому файлы кладутся внутрь `docker compose cp`:
+
+```bash
+cd /srv/weconomics/app/deploy
+docker compose cp /srv/weconomics/vectors/. web:/tmp/vectors/
+# план: сколько запишется, у скольких текст разошёлся, скольких нет в базе
+docker compose exec web python manage.py embeddings_import_vectors --vectors /tmp/vectors/catalog --state /tmp/vectors/catalog.state.json
+# запись — одной транзакцией, со свип-детектором текстов
+docker compose exec web python manage.py embeddings_import_vectors --vectors /tmp/vectors/catalog --state /tmp/vectors/catalog.state.json --apply
+```
+
+⚠️ **`embeddings_check_build` на бою не запускается и не нужен.** Модели нет
+в `web`, а у `search` нет ни базы, ни кода проекта. Сверку «видеокарта против
+CPU-контейнера поиска» провели дома 09.09.2026 на этих самых векторах
+(минимум косинуса 0,9999999) — её отметку и везёт `catalog.state.json`, без
+неё ввоз не пишет. Строка «пропущено, текст изменился» в плане — это задачи,
+у которых на бою текст другой: им вектор не пишется, и это правильно.
+
+**2. Контейнер поиска.**
+
+```bash
+free -m                                   # нужно ≥ 3 ГБ свободных вместе с buff/cache
+cd /srv/weconomics/app/deploy
+docker compose build search && docker compose up -d search
+docker compose logs -f search             # ждать загрузки модели (минуты), выход — Ctrl+C
+docker compose exec web curl -fsS http://search:8001/healthz
+```
+
+Затем три проверки закрытого порта из раздела выше — все три, не одну.
+
+**3. Флаги.** В `/srv/weconomics/.env`:
+`SEMANTIC_SEARCH_ENABLED=1`, `SMART_SEARCH_RERANK=1`,
+`SEARCH_SERVICE_URL=http://search:8001`. Затем:
+
+```bash
+docker compose up -d web ws
+```
+
+**4. Проверка.** Через минуту после перезапуска (прогрев):
+
+```bash
+curl -sI "https://weconomics.ai/catalog/?q=%D0%BD%D0%B0%D0%BB%D0%BE%D0%B3" | grep -i x-smart-search
+```
+
+Ожидается `X-Smart-Search: rerank` и `X-Smart-Search-Ms:` с числом. Плашки
+«Ищем по словам…» на странице поиска быть не должно. Первый запрос к
+`/encode` после старта `search` долгий (модель грузится) и законно уходит в
+поиск по словам — плашка на нём честная.
+
+**Откат:** `SEMANTIC_SEARCH_ENABLED=0` в `.env`, `docker compose up -d web ws`,
+затем `docker compose stop search`. Векторы в базе поиску по словам не мешают.
+
 ### Библиотеки браузера едут со своего же сервера
 
 С **04.09.2026 внешних CDN у сайта нет**: KaTeX, MathLive, D3, Math.js,
