@@ -605,7 +605,6 @@ a:focus-visible, button:focus-visible {
 .dm-mode small { display: block; margin-top: 4px; font-size: 12.5px;
                  color: var(--text3); font-variant-numeric: tabular-nums; }
 .dm-mode small.low { color: var(--rush-bad); }
-.dm-summary { margin: 12px 0 0; font-size: 13.5px; color: var(--text2); }
 .dm-state { margin: 10px 0 0; font-size: 14px; color: var(--text2);
             display: flex; align-items: center; gap: 8px; }
 .dm-dot {
@@ -914,21 +913,28 @@ a:focus-visible, button:focus-visible {
   margin: 0 0 12px;
 }
 .vs[hidden] { display: none; }
+/* ⚠️ ОДНА СТРОКА НА СТОРОНУ (решение владельца 15.09.2026): имя, счёт
+   крупно, «верных N», «время». Точность и комбо ушли в итог дуэли. Цифры не
+   переносятся: блоки `nowrap`, а не влезла строка — переносится блок
+   целиком. Лента, жизни и подписи — отдельной строкой под ней. */
 .vs-side {
-  padding: 10px 14px;
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px;
+  padding: 8px 14px;
   border: 1px solid var(--rush-line); border-radius: 12px;
   background: var(--rush-surface);
   min-width: 0;
 }
 .vs-side--off { opacity: .55; }
 .vs-who { font-size: 12.5px; color: var(--rush-dim); text-transform: uppercase;
-          letter-spacing: .06em; }
+          letter-spacing: .06em; white-space: nowrap; }
 .vs-score { font-size: 30px; font-weight: 700; line-height: 1.1;
-            font-variant-numeric: tabular-nums; }
-.vs-row { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 4px;
+            font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vs-row { display: flex; gap: 12px; white-space: nowrap;
           font-size: 13px; color: var(--rush-dim); }
 .vs-row b { color: var(--rush-text); font-weight: 600;
             font-variant-numeric: tabular-nums; }
+.vs-tape, .vs-lives, .vs-state, .vs-empty { flex-basis: 100%; }
+.vs-row[hidden], .vs-lives[hidden] { display: none; }
 .vs-lives { display: inline-flex; gap: 3px; margin-top: 6px; }
 .vs-lives .qi { width: 15px; height: 15px; }
 .vs-lives .is-lost { opacity: .22; }
@@ -960,8 +966,9 @@ a:focus-visible, button:focus-visible {
 .vs-gap-num.behind { color: var(--rush-bad); }
 .vs-gap-note { font-size: 12px; color: var(--rush-dim); }
 
-@media (max-width: 620px) {
-  /* Узкий экран: карточки друг под другом, разрыв между ними. */
+@media (max-width: 720px) {
+  /* Узкий экран (до 720 px, решение 15.09.2026): стороны друг под другом,
+     разрыв между ними. */
   .vs { grid-template-columns: 1fr; }
   .vs-score { font-size: 24px; }
 }
@@ -998,23 +1005,39 @@ a:focus-visible, button:focus-visible {
   .duel-flyer { animation: none; opacity: 1; }
 }
 
-/* Лобби: ждём соперника. */
-.duel-lobby { margin: 18px 0 0; padding: 16px 18px;
-  border: 1px dashed var(--rush-line); border-radius: 12px; }
-.duel-lobby h3 { font-size: 16px; margin: 0 0 6px; }
-.duel-lobby p { margin: 0 0 10px; color: var(--rush-dim); font-size: 14px; }
+/* ── Лобби дуэли (решение владельца 15.09.2026) ─────────────────────
+   Дуэль строго синхронна: кнопки «Играть» нет, оба ждут здесь. Код комнаты
+   крупно, главная кнопка — «Скопировать ссылку», строка «кто на месте» и
+   общий отсчёт. */
+.duel-lobby { max-width: 520px; margin: 18px auto 0; padding: 20px 18px;
+  border: 1px solid var(--rush-border); border-radius: 16px;
+  background: var(--rush-surface); text-align: center; }
+.duel-code-row { display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: center; gap: 8px 14px; margin-top: 16px; }
+.duel-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 44px; font-weight: 700; letter-spacing: .08em; line-height: 1.1;
+  color: var(--text); }
+.duel-copy-code { font: inherit; font-size: 14px; font-weight: 600;
+  height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--rush-border); background: transparent;
+  color: var(--text2); }
+.duel-copy-code:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.duel-copy { display: block; width: 100%; min-height: 48px; margin-top: 16px; }
 .duel-lobby__row { display: flex; gap: 8px; flex-wrap: wrap;
-  align-items: center; }
-/* ⚠️ Селектор по СТРОКЕ, а не по лобби: та же строка со ссылкой стоит в
-   окне «Бросить вызов», которое лежит вне `.duel-lobby`. Один вид у одного
-   и того же поля — второе правило разъехалось бы с первым. */
+  align-items: center; margin-top: 8px; }
 .duel-lobby__row input {
-  flex: 1 1 260px; font: inherit; padding: 8px 10px;
+  flex: 1 1 260px; min-width: 0; font: inherit; font-size: 13px;
+  padding: 8px 10px;
   border: 1px solid var(--rush-line); border-radius: 9px;
   background: var(--rush-bg); color: var(--rush-text);
 }
-.duel-countdown { font-size: 44px; font-weight: 700; text-align: center;
-  margin: 10px 0 0; font-variant-numeric: tabular-nums; }
+.duel-lobby .dm-state { justify-content: center; margin-top: 14px; }
+.duel-countdown { font-size: 96px; font-weight: 800; line-height: 1;
+  margin: 14px 0 0; color: var(--rush-accent);
+  font-variant-numeric: tabular-nums; }
+.duel-countdown.is-go { font-size: 48px; }
+.duel-cancel { display: inline-flex; align-items: center; min-height: 40px;
+  margin-top: 8px; font-size: 14px; color: var(--text3); }
 
 /* ── Панель прослушивания звука (staff, ?sound_check=1) ─────────────
    Служебный блок: намеренно неброский, без фирменных акцентов. Он не
@@ -1445,6 +1468,10 @@ body.figfull .vignette.alarm { opacity: .42; }
 }
 .quit-actions button { font: inherit; font-size: 16px; height: 44px;
                        padding: 0 26px; border-radius: 10px; cursor: pointer; }
+/* Ссылки в окне «Дуэль только с аккаунтом» — по виду те же кнопки. */
+.quit-actions a { display: inline-flex; align-items: center; font-size: 16px;
+                  height: 44px; padding: 0 22px; border-radius: 10px;
+                  text-decoration: none; }
 /* «Нет» — главное действие: вернуться в забег. Оно ярче. */
 .quit-no { border: none; background: var(--btn-bg); color: var(--on-btn);
            font-weight: 600; }
@@ -2328,25 +2355,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <p class="set-meta" id="set-meta"></p>
         <p class="set-note" id="set-note">Вопросы одинаковы у всех, кто играет этот набор.</p>
         <div class="set-actions">
-          <button class="set-play" id="set-play">Играть</button>
+          {% if auto_set.kind != 'duel' %}<button class="set-play" id="set-play">Играть</button>{% endif %}
           <a class="set-board-link" id="set-board-link" href="#">Доска результатов</a>
           <a class="set-back" href="/game/">В обычную игру</a>
         </div>
       </div>
     {% if auto_set and auto_set.kind == 'duel' %}
     {% comment %} ── Лобби дуэли ───────────────────────────────────────────────────
-         Показывается на карточке набора: соперника надо позвать, а ссылку
-         скопировать. Обратный отсчёт прилетает по сокету, когда оба на
-         месте (game/consumers.py). {% endcomment %}
+         Решение владельца 15.09.2026: дуэль строго синхронна. Кнопки «Играть»
+         нет ни у автора, ни у соперника: оба ждут здесь, и раунд начинается
+         у обоих по одному отсчёту, когда в комнате двое (game/consumers.py,
+         момент `started_at` — game/state.py). Карточки набора у дуэли нет. {% endcomment %}
     <div class="duel-lobby" id="duel-lobby">
-      <h3>Позовите соперника</h3>
-      <p>Вопросы у вас будут одни и те же и в одном порядке. Пока соперника
-        нет, играть можно: он догонит и увидит ваш счёт на своей полосе.</p>
-      <div class="duel-lobby__row">
-        <input type="text" id="duel-link" readonly value="{{ duel_url }}">
-        <button class="set-play" id="duel-copy" type="button">Скопировать</button>
+      <div class="set-kind">Дуэль</div>
+      <h2 class="set-title">{{ auto_set.title }}</h2>
+      <p class="set-meta">Режим «{{ auto_set.mode_title }}» · без лимита вопросов · у обоих одни и те же вопросы</p>
+      <div class="duel-code-row">
+        <span class="duel-code" id="duel-code">{{ auto_set.code }}</span>
+        <button type="button" class="duel-copy-code" id="duel-copy-code">Скопировать код</button>
       </div>
-      <p class="duel-countdown" id="duel-countdown" hidden></p>
+      <button type="button" class="set-play duel-copy" id="duel-copy">Скопировать ссылку</button>
+      <div class="duel-lobby__row">
+        <input type="text" id="duel-link" readonly value="{{ duel_url }}" aria-label="Ссылка на дуэль">
+      </div>
+      <p class="dm-state" id="duel-lobby-state"><span class="dm-dot"></span><span id="duel-lobby-text">{% if not auto_set.allowed %}{{ auto_set.why }}{% elif auto_set.is_author %}Ждём соперника…{% else %}Соперник: {{ auto_set.author }}{% endif %}</span></p>
+      <p class="duel-countdown" id="duel-countdown" hidden aria-live="assertive"></p>
+      <a class="duel-cancel" href="/game/">Отменить</a>
     </div>
     {% endif %}
     </div>
@@ -2390,8 +2424,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <div class="vs-score" id="vs-my-score">0</div>
           <div class="vs-row">
             <span>верных <b id="vs-my-correct">0</b></span>
-            <span>точность <b id="vs-my-acc">&ndash;</b></span>
-            <span>комбо <b id="vs-my-combo">&times;1</b></span>
             <span>время <b id="vs-my-time">&ndash;</b></span>
           </div>
           <div class="vs-tape" id="vs-my-tape" aria-hidden="true"></div>
@@ -2407,8 +2439,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <div class="vs-score" id="vs-them-score">0</div>
           <div class="vs-row" id="vs-them-row">
             <span>верных <b id="vs-them-correct">0</b></span>
-            <span>точность <b id="vs-them-acc">&ndash;</b></span>
-            <span>комбо <b id="vs-them-combo">&times;1</b></span>
             <span>время <b id="vs-them-time">&ndash;</b></span>
           </div>
           <div class="vs-lives" id="vs-them-lives"></div>
@@ -2660,7 +2690,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      десяти вопросов и уводила автора играть с `?auto=1`. Автор не видел ни
      выбора режима, ни ссылки-приглашения; соперник приходил позже, и в
      одном забеге они практически никогда не пересекались — из-за этого
-     живого табло не видел никто. Два шага: собрать вызов и позвать. -->
+     живого табло не видел никто. С 15.09.2026 шаг один: собрать вызов,
+     дальше лобби на странице набора (код, ссылка, общий отсчёт). -->
 <div class="fmodal" id="dmodal" hidden role="dialog" aria-modal="true"
      aria-labelledby="dmodal-title">
   <div class="fmodal-card">
@@ -2670,7 +2701,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
               aria-label="Закрыть">&times;</button>
     </div>
 
-    <!-- ШАГ 1: собрать вызов -->
+    <!-- Собрать вызов: режим и фильтры -->
     <div class="fmodal-body dm-step" id="dm-step1">
       <p class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам
         в том же порядке. Раунд не ограничен числом вопросов: играете, пока
@@ -2684,24 +2715,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <p class="start-notice" id="dm-error" hidden></p>
     </div>
 
-    <!-- ШАГ 2: позвать соперника -->
-    <div class="fmodal-body dm-step" id="dm-step2" hidden>
-      <p class="dm-lead">Пришлите сопернику ссылку. Пока его нет, играть
-        можно: он догонит и увидит ваш счёт на своей полосе.</p>
-      <div class="duel-lobby__row">
-        <input type="text" id="dm-link" readonly aria-label="Ссылка вызова">
-        <button class="set-play" id="dm-copy" type="button">Скопировать</button>
-      </div>
-      <p class="dm-summary" id="dm-summary"></p>
-      <p class="dm-state" id="dm-state"><span class="dm-dot"></span><span
-         id="dm-state-text">Ждём соперника</span></p>
-    </div>
-
     <div class="fmodal-foot">
       <span class="fcounts" id="dm-foot-note"></span>
       <div class="fmodal-actions">
         <button type="button" class="fapply" id="dm-create">Создать вызов</button>
-        <button type="button" class="fapply" id="dm-play" hidden>Играть сейчас</button>
       </div>
     </div>
   </div>
@@ -2846,6 +2863,17 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         <button type="button" class="quit-no" id="pr-again">Ещё раз</button>
         <button type="button" class="quit-yes" id="pr-home">На старт</button>
       </div>
+    </div>
+  </div>
+</div>
+{# Дуэль без аккаунта (решение владельца 15.09.2026): вместо окна вызова предложение войти. Окно как у выхода из раунда. #}
+<div class="quit-modal" id="dm-auth" hidden role="dialog" aria-modal="true"
+     aria-labelledby="dm-auth-text">
+  <div class="quit-card">
+    <p id="dm-auth-text">Дуэль только с аккаунтом: соперника нужно как-то называть</p>
+    <div class="quit-actions">
+      <a class="quit-no" id="dm-auth-register" href="/register/?next=/game/">Создать аккаунт</a>
+      <a class="quit-yes" href="/login/?next=/game/">Войти</a>
     </div>
   </div>
 </div>
@@ -3768,7 +3796,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function modalIsOpen() {
     return !!document.querySelector('.fb-back, .rp-back, dialog[open], '
       + '#quit-modal:not([hidden]), #fmodal:not([hidden]), #dmodal:not([hidden]), '
-      + '#pr-end:not([hidden])');
+      + '#pr-end:not([hidden])' + ', '
+      + '#dm-auth:not([hidden])');
   }
 
   document.addEventListener('weco:modal', function (e) {
@@ -3955,10 +3984,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     return out;
   }
 
-  function accText(right, tries) {
-    return tries ? Math.round(100 * right / tries) + '%' : '–';
-  }
-
   function timeText(seconds) {
     if (seconds == null) return '–';
     var s = Math.max(0, Math.round(seconds));
@@ -3980,8 +4005,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // ── Слева всегда вы ──
     $('vs-my-score').textContent = score.toLocaleString('ru-RU');
     $('vs-my-correct').textContent = correctCount;
-    $('vs-my-acc').textContent = accText(correctCount, answered);
-    $('vs-my-combo').textContent = '×' + multText(comboMult(streak));
     $('vs-my-time').textContent = state === 'playing'
       ? timeText(timeLeft) : '–';
     $('vs-my-tape').innerHTML = tapeHtml(myTape);
@@ -4013,10 +4036,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('vs-them-who').textContent = vsRival.username || 'соперник';
     $('vs-them-score').textContent = (vsRival.score || 0).toLocaleString('ru-RU');
     $('vs-them-correct').textContent = vsRival.correct || 0;
-    $('vs-them-acc').textContent = accText(
-      vsRival.correct || 0, (vsRival.correct || 0) + (vsRival.wrong || 0));
-    $('vs-them-combo').textContent = '×' + multText(vsRival.combo || 1);
-    $('vs-them-combo').parentNode.hidden = false;
     $('vs-them-time').textContent = timeText(rivalSeconds());
     lives.innerHTML = livesHtml(vsRival.lives || 0);
   }
@@ -4047,11 +4066,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     empty.hidden = true;
     $('vs-them-score').textContent = vsBest.score.toLocaleString('ru-RU');
     $('vs-them-correct').textContent = vsBest.correct;
-    $('vs-them-acc').textContent = vsBest.accuracy + '%';
-    // ⚠️ У рекорда комбо не храним, поэтому ячейка прячется — и ЯВНО
-    // возвращается в дуэли: одна страница живёт через несколько забегов
-    // подряд, и спрятанное здесь осталось бы спрятанным там.
-    $('vs-them-combo').parentNode.hidden = true;
     $('vs-them-time').textContent = formatDate(vsBest.created_at) || '–';
   }
 
@@ -5033,7 +5047,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function paintPracticeBand() {
     var band = $('practice-band');
     var total = (CFG.practice || {}).count || 0;
-    band.hidden = !total;     // правило нуля: тестов в пуле нет — полосы нет
+    // Правило нуля: тестов в пуле нет — полосы нет. На странице набора (и в
+    // лобби дуэли) полосы тоже нет: там играют набор, а не пул.
+    band.hidden = !total || !!AUTO_SET;
     if (!total) return;
     var n = practiceCount == null ? total : practiceCount;
     $('practice-count').textContent = n.toLocaleString('ru-RU') + ' '
@@ -5636,6 +5652,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var setInfo = shareInfo && shareInfo.set;
     board.hidden = !setInfo;
     if (setInfo) board.href = setInfo.board_url;
+    // У дуэли «доска» — страница дуэли с таблицей сравнения двоих (15.09.2026):
+    // соперник мог ещё не доиграть, поэтому таблица там, а не на этом экране.
+    board.textContent = isDuelRun() ? 'Итог дуэли' : 'Доска набора';
     var box = $('fin-share');
     // Нет ссылки (сеть подвела) — блока нет: делиться нечем. Больше блок
     // ничего не решает: кнопка одна, и путь у неё один.
@@ -6149,13 +6168,43 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       location.href = '/game/daily/';
     });
   }
+  /* ---------- ОКНО «ДУЭЛЬ ТОЛЬКО С АККАУНТОМ» ----------
+     Решение владельца 15.09.2026: дуэль сравнивает двоих по имени, а у гостя
+     имени нет. Окно открывают клик по карточке дуэли без входа и отказ
+     сервера `error: 'login'` (вход истёк, пока было открыто окно вызова).
+     Закрывается Esc и кликом мимо карточки. */
+  var authPrevFocus = null;
+
+  function openDuelAuth(on) {
+    var box = $('dm-auth');
+    if (box.hidden === !on) return;
+    box.hidden = !on;
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: on } }));
+    if (on) {
+      authPrevFocus = document.activeElement;
+      $('dm-auth-register').focus();
+    } else if (authPrevFocus && authPrevFocus.focus) {
+      authPrevFocus.focus();
+    }
+  }
+
+  $('dm-auth').addEventListener('click', function (e) {
+    if (e.target === this) openDuelAuth(false);
+  });
+  $('dm-auth').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape') { e.preventDefault(); openDuelAuth(false); }
+  });
+
   /* ---------- ОКНО «БРОСИТЬ ВЫЗОВ» ----------
-     ⚠️ ДВА ШАГА, А НЕ ПЕРЕХОД СРАЗУ В ИГРУ (08.09.2026). Раньше кнопка
+     ⚠️ ОКНО, А НЕ ПЕРЕХОД СРАЗУ В ИГРУ (08.09.2026). Раньше кнопка
      делала `location.href = '/game/duel/new/?…'`, вьюха молча собирала
      набор из десяти вопросов и возвращала редирект с `?auto=1` — забег
      запускался немедленно. Автор не видел ни выбора режима, ни ссылки;
      соперник приходил позже, и в одном забеге они практически никогда не
-     пересекались. Живого табло из-за этого не видел никто.
+     пересекались. Живого табло из-за этого не видел никто. С 15.09.2026
+     окно только собирает вызов и сразу уводит автора в лобби на странице
+     набора: код, ссылка и общий отсчёт живут там, сокет окно не слушает.
 
      ⚠️ ВТОРОГО НАБОРА ФИЛЬТРОВ И ВТОРОГО «ТЕКУЩЕГО РЕЖИМА» ЗДЕСЬ НЕТ.
      Окно правит тот же `filter` и тот же `mode`, что стартовый экран:
@@ -6164,15 +6213,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var box = document.getElementById('dmodal');
     if (!box || !CFG.has_duel) return;
 
-    var created = null;      // ответ duel_new: код, ссылки, сводка
-    var sock = null;
     var opener = null;
 
     function open(on) {
+      // Гостю окна вызова нет: дуэль только с аккаунтом.
+      if (on && !CFG.is_authenticated) { openDuelAuth(true); return; }
       box.hidden = !on;
       if (on) {
         opener = document.activeElement;
-        step(1);
         refreshCounts();
         paintModes();
         paintChips();
@@ -6180,13 +6228,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       } else {
         if (opener && opener.focus) opener.focus();
       }
-    }
-
-    function step(n) {
-      $('dm-step1').hidden = n !== 1;
-      $('dm-step2').hidden = n !== 2;
-      $('dm-create').hidden = n !== 1;
-      $('dm-play').hidden = n !== 2;
     }
 
     /* Карточки режимов окна. Число под каждой — сколько вопросов даёт
@@ -6240,76 +6281,36 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       note.textContent = text || '';
     }
 
-    /* Создать вызов. Ответ — JSON: вьюха больше не редиректит в игру. */
+    /* Создать вызов. Ответ — JSON; удалось — сразу в лобби (`play_url`). */
     $('dm-create').addEventListener('click', function () {
       var btn = this;
+      var label = btn.textContent;
+      function again() { btn.disabled = false; btn.textContent = label; }
       fail('');
       btn.disabled = true;
+      btn.textContent = 'Создаём…';
       api('/game/duel/new/?mode=' + encodeURIComponent(mode)
           + '&' + filterQuery())
         .then(function (d) {
-          btn.disabled = false;
+          if (d && d.error === 'login') {
+            // Вход истёк, пока окно было открыто: то же окно, что гостю.
+            again();
+            open(false);
+            openDuelAuth(true);
+            return;
+          }
           if (!d || !d.ok) {
+            again();
             fail((d && d.error) || 'Не удалось создать вызов');
             return;
           }
-          created = d;
           if (window.weco) weco.track('duel_create', { mode: mode });
-          $('dm-link').value = d.duel_url;
-          $('dm-summary').textContent = 'Режим «' + d.mode_title
-            + '» · без лимита вопросов · ' + d.filter_text
-            + ' · код ' + d.code;
-          step(2);
-          $('dm-copy').focus();
-          listen(d.code);
+          location.href = d.play_url;
         }, function () {
-          btn.disabled = false;
+          again();
           fail('Не удалось создать вызов');
         });
     });
-
-    $('dm-copy').addEventListener('click', function () {
-      var btn = this;
-      var input = $('dm-link');
-      input.select();
-      try {
-        navigator.clipboard.writeText(input.value);
-        btn.textContent = 'Скопировано';
-        setTimeout(function () { btn.textContent = 'Скопировать'; }, 1500);
-      } catch (e) { /* старый браузер: текст уже выделен */ }
-    });
-
-    $('dm-play').addEventListener('click', function () {
-      if (created) location.href = created.play_url;
-    });
-
-    /* Соперник открыл ссылку — узнаём об этом по сокету дуэли. Тот же
-       консьюмер, что рисует табло во время забега: своего канала не
-       заводим. Не подключился — строка так и останется «Ждём соперника»,
-       и это честно: врать «он на месте» нельзя. */
-    function listen(code) {
-      var proto = location.protocol === 'https:' ? 'wss://' : 'ws://';
-      try {
-        sock = new WebSocket(proto + location.host + '/ws/duel/' + code + '/');
-      } catch (e) { return; }
-      sock.addEventListener('message', function (e) {
-        var m;
-        try { m = JSON.parse(e.data); } catch (err) { return; }
-        if (m.type === 'presence' && m.action === 'join') { here(); }
-        else if (m.type === 'start') { here(); countdown(m.in || 3); }
-      });
-    }
-
-    function here() {
-      $('dm-state').classList.add('is-here');
-      $('dm-state-text').textContent = 'Соперник на месте';
-    }
-
-    function countdown(n) {
-      $('dm-state-text').textContent = n > 0 ? String(n) : 'Поехали';
-      if (n > 0) { setTimeout(function () { countdown(n - 1); }, 1000); return; }
-      if (created) location.href = created.play_url;
-    }
 
     $('entry-duel').addEventListener('click', function () { open(true); });
     $('dmodal-close').addEventListener('click', function () { open(false); });
@@ -6591,18 +6592,16 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var el = $(id);
       if (el) el.hidden = true;
     });
+    // ⚠️ У ДУЭЛИ КАРТОЧКИ НАБОРА И КНОПКИ «ИГРАТЬ» НЕТ (решение владельца
+    // 15.09.2026): вместо неё лобби из разметки, а раунд начинает общий
+    // отсчёт по сокету (блок «Дуэль в реальном времени» ниже). Число
+    // вопросов у дуэли не показывается и там: `size` — запас очереди.
+    if (AUTO_SET.kind === 'duel') return;
     $('set-intro').hidden = false;
-    $('set-kind').textContent = AUTO_SET.kind === 'daily' ? 'Вызов дня'
-      : AUTO_SET.kind === 'duel' ? 'Дуэль' : 'Набор';
+    $('set-kind').textContent = AUTO_SET.kind === 'daily' ? 'Вызов дня' : 'Набор';
     $('set-title').textContent = AUTO_SET.title;
-    // ⚠️ У ДУЭЛИ ЧИСЛА ВОПРОСОВ НЕТ. `size` — запас очереди (150), а не
-    // длина раунда: раунд кончается по времени и жизням. Показать «150
-    // вопр.» значило бы пообещать то, чего игрок никогда не увидит.
     $('set-meta').textContent = 'Режим «' + AUTO_SET.mode_title + '» · '
-      + (AUTO_SET.kind === 'duel'
-          ? 'без лимита вопросов'
-          : AUTO_SET.size + ' вопр.')
-      + ' · код ' + AUTO_SET.code;
+      + AUTO_SET.size + ' вопр. · код ' + AUTO_SET.code;
     $('set-board-link').href = AUTO_SET.board_url;
     if (!AUTO_SET.allowed) {
       var btn = $('set-play');
@@ -6615,9 +6614,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('set-play').addEventListener('click', function () {
       startRun({ setCode: AUTO_SET.code });
     });
-    // ⚠️ У ДУЭЛИ `autostart` ВСЕГДА false — так решает сервер (set_page).
-    // Автор дуэли приходит сюда из окна вызова и видит лобби со ссылкой;
-    // раньше забег начинался немедленно, и лобби никто не видел.
     if (AUTO_SET.autostart) startRun({ setCode: AUTO_SET.code });
   })();
 
@@ -6755,8 +6751,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
     var side = $('vs-them');
     var panel = $('duel-emoji');
-    var lobby = $('duel-lobby');
     var countdown = $('duel-countdown');
+    var startTimer = 0;
+    var scheduled = false;     // отсчёт этой страницы уже идёт или раунд начат
     var NAMES = ['gg', 'wow', 'fire', 'think', 'oops', 'fast', 'close', 'gl'];
     var TITLES = {
       gg: 'Хорошая игра', wow: 'Ого', fire: 'Горячо', think: 'Думаю',
@@ -6814,16 +6811,68 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       setTimeout(function () { el.remove(); }, 2400);
     }
 
-    function tick(seconds) {
-      if (!countdown) return;
-      countdown.hidden = false;
-      countdown.textContent = seconds;
-      if (seconds <= 0) {
-        countdown.textContent = 'Поехали';
-        setTimeout(function () { countdown.hidden = true; }, 900);
+    /* Строка лобби «кто на месте». Автор ждёт любого второго, соперник —
+       автора; свой же вход (вторая вкладка) соперником не считается. */
+    function lobbyLine(text, here) {
+      $('duel-lobby-text').textContent = text;
+      $('duel-lobby-state').classList.toggle('is-here', !!here);
+    }
+
+    function waitingLine() {
+      if (!AUTO_SET.allowed) return AUTO_SET.why || 'Играть нельзя';
+      return AUTO_SET.is_author ? 'Ждём соперника…' : 'Соперник: ' + AUTO_SET.author;
+    }
+
+    function isRival(username) {
+      return AUTO_SET.is_author ? username !== AUTO_SET.author
+                                : username === AUTO_SET.author;
+    }
+
+    /* ⚠️ ОТСЧЁТ ДО МОМЕНТА СЕРВЕРА, А НЕ СЕКУНДАМИ setTimeout (решение
+       владельца 15.09.2026: оба стартуют одновременно). `at` — момент старта
+       по часам сервера, `now` — его часы при отправке; их разница с
+       Date.now() и есть смещение наших часов. Пересчёт каждые 250 мс:
+       цепочка setTimeout в фоновой вкладке или на медленном телефоне уплыла
+       бы. Момент прошёл — стартуем сразу, пока раунд режима ещё идёт; прошёл
+       и раунд — говорим честно, опоздавший раунд не начинаем. */
+    function scheduleStart(m) {
+      if (scheduled || !AUTO_SET.allowed || state !== 'start' || !m.at) return;
+      var target = m.at - ((m.now || Date.now()) - Date.now());
+      var modeInfo = CFG.modes[AUTO_SET.mode];
+      if (modeInfo && Date.now() - target > modeInfo.duration * 1000) {
+        lobbyLine('Раунд этой дуэли уже прошёл', false);
         return;
       }
-      setTimeout(function () { tick(seconds - 1); }, 1000);
+      scheduled = true;
+      var shown = 0;
+      function step() {
+        var left = Math.ceil((target - Date.now()) / 1000);
+        if (left > 0) {
+          if (left !== shown) {
+            shown = left;
+            countdown.hidden = false;
+            countdown.classList.remove('is-go');
+            countdown.textContent = left;
+            rush('countdown', left);
+          }
+          return;
+        }
+        clearInterval(startTimer);
+        countdown.hidden = false;
+        countdown.classList.add('is-go');
+        countdown.textContent = 'Поехали!';
+        rush('countdown', 0);
+        setTimeout(function () { countdown.hidden = true; }, 900);
+        if (window.weco) {
+          weco.track('duel_start', { mode: AUTO_SET.mode,
+                                     late_ms: Math.max(0, Date.now() - target) });
+        }
+        startRun({ setCode: AUTO_SET.code });
+      }
+      // Интервал ставится ДО первого шага: момент уже прошёл — первый же шаг
+      // стартует раунд и снимает интервал, повторного старта не будет.
+      startTimer = setInterval(step, 250);
+      step();
     }
 
     function connect() {
@@ -6835,8 +6884,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       sock.addEventListener('open', function () {
         panel.hidden = false;
-        // «Привет» просит табло: после обрыва счёт соперника надо
-        // восстановить, а не ждать его следующего ответа.
+        if (!scheduled) lobbyLine(waitingLine(), false);
+        // «Привет» просит табло и назначенный старт: после обрыва счёт
+        // соперника надо восстановить, а отсчёт — вести к тому же моменту.
         sock.send(JSON.stringify({ type: 'hello' }));
       });
       sock.addEventListener('message', function (e) {
@@ -6844,15 +6894,18 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         try { m = JSON.parse(e.data); } catch (err) { return; }
         if (m.type === 'score') { showScore(m); }
         else if (m.type === 'emoji') { flyer(m.name, m.username); }
-        else if (m.type === 'start') { tick(m.in || 3); }
+        else if (m.type === 'start') { scheduleStart(m); }
         else if (m.type === 'finished') {
           // Забег соперника кончился: время замирает, а не продолжает
           // течь локально. Иначе табло досчитало бы финишировавшего до нуля.
           vsRivalDone = true;
           showScore(m);
           $('vs-them-state').textContent = 'финишировал';
-        } else if (m.type === 'presence') {
-          if (m.action === 'leave') {
+        } else if (m.type === 'presence' && isRival(m.username)) {
+          if (m.action === 'join') {
+            if (!scheduled && AUTO_SET.allowed) lobbyLine('Соперник: ' + m.username, true);
+          } else if (m.action === 'leave') {
+            if (!scheduled) lobbyLine(waitingLine(), false);
             // Ушёл — карточка гаснет вместе с отсчётом: показывать живое
             // время того, кого нет, значит врать.
             vsRivalDone = true;
@@ -6862,29 +6915,35 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         }
       });
       sock.addEventListener('close', function () {
-        // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться.
+        // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться. В лобби
+        // говорим прямо: без связи с комнатой общий старт не придёт.
+        if (!scheduled) lobbyLine('Нет связи с комнатой, пробуем снова…', false);
         side.classList.add('vs-side--off');
         $('vs-them-state').textContent = 'связь потеряна';
         setTimeout(connect, 4000);
       });
     }
 
-    if (lobby) {
-      var copy = $('duel-copy');
-      if (copy) {
-        copy.addEventListener('click', function () {
-          var input = $('duel-link');
-          input.select();
-          try {
-            navigator.clipboard.writeText(input.value);
-            copy.textContent = 'Скопировано';
-            setTimeout(function () { copy.textContent = 'Скопировать'; }, 1500);
-          } catch (e) { /* старый браузер: текст уже выделен */ }
-        });
-      }
+    /* Кнопки лобби. Буфера обмена нет (старый браузер, не https) — ссылка
+       остаётся выделенной в поле, а код и так виден крупно. */
+    function copyText(btn, text, label, field) {
+      if (field) field.select();
+      try {
+        navigator.clipboard.writeText(text);
+        btn.textContent = 'Скопировано';
+        setTimeout(function () { btn.textContent = label; }, 1500);
+      } catch (e) { /* старый браузер: текст уже выделен */ }
     }
+    $('duel-copy').addEventListener('click', function () {
+      copyText(this, $('duel-link').value, 'Скопировать ссылку', $('duel-link'));
+    });
+    $('duel-copy-code').addEventListener('click', function () {
+      copyText(this, AUTO_SET.code, 'Скопировать код', null);
+    });
 
-    connect();
+    // Гостю сокет закроют сразу (дуэль только с аккаунтом): не долбим сервер
+    // переподключением раз в четыре секунды, в лобби уже написано почему.
+    if (CFG.is_authenticated) connect();
   })();
 
   // ── Панель прослушивания (только staff, только ?sound_check=1) ────────

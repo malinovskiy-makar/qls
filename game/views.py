@@ -30,6 +30,7 @@ from urllib.parse import quote
 from django.conf import settings
 from django.contrib.admin.views.decorators import staff_member_required
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
 from django.db import IntegrityError
 from django.db.models import Q
 from django.http import Http404, JsonResponse
@@ -1642,6 +1643,11 @@ def set_page(request, code):
         'allowed': allowed,
         'why': why,
         'board_url': reverse('game:set_board', args=[gset.code]),
+        # Лобби дуэли: автору «Ждём соперника…», сопернику «Соперник: <автор>».
+        # Имя автора и так видно на странице дуэли — нового наружу не уходит.
+        'author': gset.author.username if gset.author_id else '',
+        'is_author': bool(request.user.is_authenticated
+                          and gset.author_id == request.user.id),
     }
     # ?auto=1 — начать сразу, без карточки-заставки. Механизм остаётся у
     # наборов другого рода (вызов дня, учительские): там его смысл в том,
@@ -1788,7 +1794,6 @@ def _wants_json(request):
 
 
 @require_GET
-@login_required
 def duel_new(request):
     """Создать дуэль и вернуть ссылку-приглашение. ТОЛЬКО ДЛЯ ВОШЕДШИХ.
 
@@ -1797,19 +1802,26 @@ def duel_new(request):
     Результат дуэли вдобавок пишется с `user`, иначе «процент побед» и
     «самый частый соперник» посчитать не из чего.
 
+    ⚠️ ГОСТЮ ИЗ ОКНА ВЫЗОВА: JSON 403 `{'ok': False, 'error': 'login'}`, А НЕ
+    РЕДИРЕКТ (15.09.2026). Под `@login_required` fetch получал страницу
+    входа, и гость читал «Не удалось создать вызов» вместо окна «Дуэль
+    только с аккаунтом». Адрес, набранный руками, по-прежнему ведёт на вход.
+
     ⚠️ Набор дуэли собирается СЛУЧАЙНО под выбранные фильтры, и автор
-    вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую первым, наравне
-    с соперником. Поэтому экрана «вот твой набор, поехали» не существует —
+    вызова НЕ ВИДИТ вопросы до игры: он играет их вслепую, наравне с
+    соперником. Поэтому экрана «вот твой набор, поехали» не существует —
     ни одна вьюха не отдаёт список вопросов до того, как игрок их сыграл.
 
-    ⚠️ В ИГРУ БОЛЬШЕ НЕ РЕДИРЕКТИТ (08.09.2026, решение владельца). Раньше
-    вьюха уводила автора на `/game/s/<код>/?auto=1`, а `auto=1` запускает
-    забег сразу: автор не видел ни лобби, ни ссылки-приглашения, соперник
-    приходил позже, и в одном забеге они практически никогда не
-    пересекались — из-за этого живого табло не видел никто. Теперь ответ —
-    JSON, а ссылку показывает окно «Бросить вызов»: автор зовёт соперника
-    и ждёт, а играть уходит сам, когда решит.
+    ⚠️ В ИГРУ НЕ РЕДИРЕКТИТ (08.09.2026, решение владельца). Раньше вьюха
+    уводила автора на `/game/s/<код>/?auto=1`, а `auto=1` запускает забег
+    сразу: автор не видел ни лобби, ни ссылки-приглашения, и живого табло
+    не видел никто. Ответ — JSON; окно вызова уводит автора в лобби
+    (`play_url`), и с 15.09.2026 оба стартуют там по общему отсчёту.
     """
+    if not request.user.is_authenticated:
+        if _wants_json(request):
+            return JsonResponse({'ok': False, 'error': 'login'}, status=403)
+        return redirect_to_login(request.get_full_path())
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
     if mode not in config.MODES:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
@@ -1848,9 +1860,9 @@ def duel_new(request):
     return JsonResponse({
         'ok': True,
         'code': gset.code,
-        # ⚠️ БЕЗ `?auto=1`. Автор идёт в игру сам, из окна вызова, и лобби
-        # со ссылкой успевает показаться. Автостарт остаётся у наборов
-        # другого рода (вызов дня, учительские) — там его смысл другой.
+        # ⚠️ БЕЗ `?auto=1`. Окно вызова уводит автора сюда, в лобби: там код,
+        # ссылка и общий отсчёт. Автостарт остаётся у наборов другого рода
+        # (вызов дня, учительские) — там его смысл другой.
         'play_url': reverse('game:set_page', args=[gset.code]),
         'duel_url': request.build_absolute_uri(
             reverse('game:duel', args=[gset.code])),
@@ -1986,7 +1998,14 @@ def _duel_broadcast(request, state, finished=False):
         logger.warning('дуэль %s: табло не разослано', code, exc_info=True)
 
 def _duel_compare(gset, a, b):
-    """Сравнение двух забегов лоб в лоб: метрики и полоса «кто что взял».
+    """Сравнение двух забегов лоб в лоб: таблица метрик и полоса «кто что взял».
+
+    Таблица (решение владельца 15.09.2026) — ТОЛЬКО то, что хранит
+    `GameResult`: очки, верные, ошибки, пропуски, точность, лучшее комбо,
+    среднее время ВЕРНОГО ответа и длительность раунда. Среднего времени всех
+    ответов в базе нет, поэтому и строки с ним нет: приблизительное число
+    хуже отсутствующего. Нет замера у старого результата — «–».
+    Победитель — по очкам, его столбец подсвечен; ничья — без подсветки.
 
     Полоса строится по question_outcomes: у каждого вопроса набора два
     значка — верно / неверно / пропуск / не дошёл.
@@ -1995,25 +2014,49 @@ def _duel_compare(gset, a, b):
         return {item.get('question_id'): item.get('outcome')
                 for item in (result.question_outcomes or [])}
 
+    def combo(value):
+        return '×' + ('%g' % value).replace('.', ',')
+
+    def seconds(ms):
+        return '–' if ms is None else ('%.1f' % (ms / 1000)).replace('.', ',') + ' с'
+
+    def clock(ms):
+        if ms is None:
+            return '–'
+        minutes, secs = divmod(round(ms / 1000), 60)
+        return '%d:%02d' % (minutes, secs)
+
     ma, mb = by_qid(a), by_qid(b)
     strip = []
     for i, qid in enumerate(gset.question_ids or []):
         strip.append({'number': i + 1,
                       'a': ma.get(qid, 'none'),
                       'b': mb.get(qid, 'none')})
+    metrics = (
+        ('Очки', lambda r: r.score),
+        ('Верных', lambda r: r.correct_count),
+        ('Ошибок', lambda r: r.wrong_count),
+        ('Пропусков', lambda r: r.skip_count),
+        ('Точность', lambda r: '%d%%' % r.accuracy),
+        ('Лучшее комбо', lambda r: combo(r.max_combo)),
+        ('Среднее время верного ответа', lambda r: seconds(r.avg_correct_ms)),
+        ('Время раунда', lambda r: clock(r.wall_ms)),
+    )
     if a.score > b.score:
+        winner = 'a'
         verdict = 'Побеждает %s' % (a.user.username if a.user else 'вызвавший')
     elif b.score > a.score:
+        winner = 'b'
         verdict = 'Побеждает %s' % (b.user.username if b.user else 'соперник')
     else:
+        winner = ''
         verdict = 'Ничья'
     return {
-        'a': {'name': (a.user.username if a.user else 'вызвавший'),
-              'score': a.score, 'accuracy': a.accuracy,
-              'max_combo': a.max_combo, 'reason': a.ended_reason},
-        'b': {'name': (b.user.username if b.user else 'соперник'),
-              'score': b.score, 'accuracy': b.accuracy,
-              'max_combo': b.max_combo, 'reason': b.ended_reason},
+        'a': {'name': (a.user.username if a.user else 'вызвавший'), 'score': a.score},
+        'b': {'name': (b.user.username if b.user else 'соперник'), 'score': b.score},
+        'rows': [{'label': label, 'a': value(a), 'b': value(b)}
+                 for label, value in metrics],
+        'winner': winner,
         'strip': strip,
         'verdict': verdict,
     }

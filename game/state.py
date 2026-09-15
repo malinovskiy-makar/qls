@@ -143,7 +143,8 @@ def drop_run(request):
 # игрок → его забег» и держит эта запись. В `GameResult` её не положить:
 # результат появляется только когда забег ЗАКОНЧЕН, а табло нужно во время.
 #
-# Запись одна на дуэль: {'runs': {user_id: run_id}, 'present': {user_id: ts}}.
+# Запись одна на дуэль: {'runs': {user_id: run_id}, 'present': {user_id: ts},
+# 'started_at': мс} — момент общего старта появляется, когда в комнате двое.
 # Гонки за неё нет по существу — игроков двое, и пишут они в разные ключи
 # словаря; редкая потеря «кто на месте» стоит одного лишнего обратного
 # отсчёта, а не поломки забега.
@@ -197,6 +198,26 @@ def duel_leave(code, user_id):
 
 def duel_present(code):
     return sorted(int(u) for u in _duel_room(code)['present'])
+
+
+def duel_start_at(code, at_ms):
+    u"""Назначить момент общего старта дуэли, если его ещё нет, и вернуть его.
+
+    ⚠️ МОМЕНТ ОДИН НА КОМНАТУ (решение владельца 15.09.2026: дуэль строго
+    синхронна). Второй сокет, перезагрузка лобби и переподключение получают
+    ТОТ ЖЕ `started_at`, а не новый отсчёт, — иначе игроки разошлись бы на
+    длину своего отсчёта.
+    """
+    room = _duel_room(code)
+    if not room.get('started_at'):
+        room['started_at'] = at_ms
+        cache.set(duel_key(code), room, DUEL_TTL)
+    return room['started_at']
+
+
+def duel_started_at(code):
+    u"""Назначенный момент старта в мс или None, пока двоих в комнате не было."""
+    return _duel_room(code).get('started_at')
 
 
 def _legacy(request):

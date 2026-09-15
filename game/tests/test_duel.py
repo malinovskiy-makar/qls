@@ -177,8 +177,8 @@ class DuelCreationTests(TestCase):
         visible = _re.sub(r'<script.*?</script>', ' ', visible, flags=_re.S)
         self.assertNotIn(str(config.DUEL_QUEUE_LIMIT), visible)
 
-        # Вместо числа — слова. Подпись собирает клиент, в шаблоне лежит
-        # ветка «дуэль → без лимита».
+        # Вместо числа — слова: лобби дуэли пишет «без лимита вопросов», а
+        # карточку набора с числом клиент у дуэли не показывает (ветка ниже).
         self.assertIn('без лимита вопросов', html)
         self.assertIn("AUTO_SET.kind === 'duel'", html)
 
@@ -455,10 +455,12 @@ class ScoreboardIsOneMarkupTests(TestCase):
         block = self._vs_block(html)
         self.assertIn('id="vs-my-score"', block)
         self.assertIn('id="vs-my-correct"', block)
-        self.assertIn('id="vs-my-acc"', block)
-        self.assertIn('id="vs-my-combo"', block)
         self.assertIn('id="vs-my-time"', block)
         self.assertIn('id="vs-my-tape"', block)
+        # Точность и комбо ушли в итог (решение владельца 15.09.2026): табло —
+        # одна строка на сторону, имя, счёт, верных и время.
+        self.assertNotIn('id="vs-my-acc"', block)
+        self.assertNotIn('id="vs-my-combo"', block)
 
     def test_the_gap_column_stands_between_the_two_cards(self):
         block = self._vs_block(

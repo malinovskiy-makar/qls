@@ -20,12 +20,14 @@ WebSocket дуэли Wecon Rush: живое табло соперника и р�
 Смотреть чужую дуэль можно на её обычной странице `/game/d/<код>/`.
 """
 import json
+import math
 import time
 
 from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 
 from game import config
+from game import state as run_state
 
 # Ровно восемь реакций. Белый список закрытый: свободный текст в дуэли
 # означал бы чат без модерации между школьниками.
@@ -35,8 +37,9 @@ EMOJI = ('gg', 'wow', 'fire', 'think', 'oops', 'fast', 'close', 'gl')
 # отвечать на них ошибкой значит учить клиента ретраить.
 EMOJI_COOLDOWN_S = 2.0
 
-# Обратный отсчёт перед стартом, когда оба на месте.
-COUNTDOWN_S = 3
+# Обратный отсчёт перед стартом, когда оба на месте. Решение владельца
+# 15.09.2026: дуэль строго синхронна — оба стартуют по одному отсчёту от пяти.
+COUNTDOWN_S = 5
 
 CLOSE_FORBIDDEN = 4403
 
@@ -99,6 +102,11 @@ class DuelConsumer(AsyncWebsocketConsumer):
         if kind == 'hello':
             # Переподключился: восстанавливаем табло по состоянию соперника.
             await self._send_board()
+            # Старт уже назначен (перезагрузка в лобби или посреди отсчёта):
+            # тот же момент, а не новый отсчёт — иначе игроки разойдутся.
+            at = await database_sync_to_async(run_state.duel_started_at)(self.code)
+            if at:
+                await self.duel_start({'at': at})
             return
 
         # ⚠️ `score` и всё прочее от клиента ИГНОРИРУЕТСЯ. Счёт рассылает
@@ -112,8 +120,16 @@ class DuelConsumer(AsyncWebsocketConsumer):
         }, ensure_ascii=False))
 
     async def duel_start(self, event):
+        # ⚠️ МОМЕНТ СТАРТА ОДИН НА КОМНАТУ (state.duel_start_at), а `now` —
+        # серверные часы в момент отправки: по их разнице клиент считает
+        # смещение своих часов и досчитывает до ТОГО ЖЕ момента, в том числе
+        # после перезагрузки. Отсчёт секундами в setTimeout уплыл бы у каждого
+        # по-своему (фоновая вкладка, медленный телефон).
+        now_ms = int(time.time() * 1000)
+        at = event.get('at') or now_ms + COUNTDOWN_S * 1000
         await self.send(text_data=json.dumps({
-            'type': 'start', 'in': event.get('in', COUNTDOWN_S),
+            'type': 'start', 'at': at, 'now': now_ms,
+            'in': max(0, math.ceil((at - now_ms) / 1000)),
         }))
 
     async def duel_score(self, event):
@@ -166,7 +182,6 @@ class DuelConsumer(AsyncWebsocketConsumer):
 
     # ------------------------------------------------------------ помощь
     async def _announce_presence(self, action):
-        from game import state as run_state
         if action == 'join':
             present = await database_sync_to_async(run_state.duel_join)(
                 self.code, self.user_id)
@@ -181,8 +196,12 @@ class DuelConsumer(AsyncWebsocketConsumer):
         # ПО СОКЕТАМ. У игрока может быть открыто две вкладки, и «двое в
         # комнате» тогда значило бы одного человека против самого себя.
         if action == 'join' and len(present) >= 2:
+            # Момент назначает первый, кто увидел двоих; повторный вход (второй
+            # сокет, перезагрузка) получает тот же момент.
+            at = await database_sync_to_async(run_state.duel_start_at)(
+                self.code, int(time.time() * 1000) + COUNTDOWN_S * 1000)
             await self.channel_layer.group_send(self.group, {
-                'type': 'duel.start', 'in': COUNTDOWN_S})
+                'type': 'duel.start', 'at': at})
 
     async def _send_board(self):
         u"""Табло соперника по состоянию его забега (переподключение)."""

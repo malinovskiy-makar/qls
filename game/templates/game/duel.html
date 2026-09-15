@@ -38,17 +38,11 @@
     border: 1px solid var(--border); border-radius: 9px;
     background: var(--surface-2); color: var(--text);
   }
-  .du-cols { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr;
-             gap: 14px; }
-  @media (max-width: 560px) { .du-cols { grid-template-columns: 1fr; } }
-  .du-col { border: 1px solid var(--border); border-radius: 14px;
-            background: var(--surface); padding: 14px 16px; }
-  .du-col h3 { font-size: 1rem; }
-  .du-col .big { font-size: 2rem; font-weight: 800; margin-top: 4px;
-                 font-variant-numeric: tabular-nums; }
-  .du-col .row { display: flex; justify-content: space-between;
-                 font-size: .88rem; color: var(--muted); padding: 2px 0; }
-  .du-col.win { border-color: var(--accent); }
+  /* Итог дуэли — таблица сравнения двоих (решение владельца 15.09.2026):
+     строка на метрику, столбец победителя подсвечен. */
+  table.du-compare th[scope="row"] { background: transparent; font-weight: 500;
+                                     color: var(--muted); }
+  table.du-compare .win { background: var(--accent-tint); font-weight: 700; }
   .du-verdict { margin-top: 18px; text-align: center; font-size: 1.35rem;
                 font-weight: 800; color: var(--accent); }
   .du-strip { margin-top: 18px; }
@@ -97,7 +91,9 @@
 
   <div class="du-acts">
     {% if allowed %}
-      <a class="du-btn" href="{{ play_url }}">Играть</a>
+      {% comment %} «Играть» у дуэли нет (решение 15.09.2026): вызов принимают,
+         и оба ждут друг друга в лобби, старт по общему отсчёту. {% endcomment %}
+      <a class="du-btn" href="{{ play_url }}">{% if request.user.is_authenticated and request.user.id == gset.author_id %}Вернуться в лобби{% else %}Принять вызов{% endif %}</a>
     {% else %}
       <button class="du-btn" disabled>{{ why }}</button>
     {% endif %}
@@ -125,27 +121,21 @@
     двоих по имени.</p>
 
   {% if compare %}
-    <div class="du-cols">
-      <div class="du-col {% if compare.a.score >= compare.b.score %}win{% endif %}">
-        <h3>{{ compare.a.name }}</h3>
-        <div class="big">{{ compare.a.score }}</div>
-        <div class="row"><span>точность</span><b>{{ compare.a.accuracy }}%</b></div>
-        <div class="row"><span>макс. комбо</span><b>×{{ compare.a.max_combo }}</b></div>
-        <div class="row"><span>чем кончилось</span><b>
-          {% if compare.a.reason == 'lives' %}выбыл
-          {% elif compare.a.reason == 'set_done' %}прошёл
-          {% else %}время{% endif %}</b></div>
-      </div>
-      <div class="du-col {% if compare.b.score >= compare.a.score %}win{% endif %}">
-        <h3>{{ compare.b.name }}</h3>
-        <div class="big">{{ compare.b.score }}</div>
-        <div class="row"><span>точность</span><b>{{ compare.b.accuracy }}%</b></div>
-        <div class="row"><span>макс. комбо</span><b>×{{ compare.b.max_combo }}</b></div>
-        <div class="row"><span>чем кончилось</span><b>
-          {% if compare.b.reason == 'lives' %}выбыл
-          {% elif compare.b.reason == 'set_done' %}прошёл
-          {% else %}время{% endif %}</b></div>
-      </div>
+    <div class="du-box">
+      <table class="du du-compare">
+        <thead>
+          <tr><th></th>
+              <th class="num{% if compare.winner == 'a' %} win{% endif %}">{{ compare.a.name }}</th>
+              <th class="num{% if compare.winner == 'b' %} win{% endif %}">{{ compare.b.name }}</th></tr>
+        </thead>
+        <tbody>
+        {% for row in compare.rows %}
+          <tr><th scope="row">{{ row.label }}</th>
+              <td class="num{% if compare.winner == 'a' %} win{% endif %}">{{ row.a }}</td>
+              <td class="num{% if compare.winner == 'b' %} win{% endif %}">{{ row.b }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
     </div>
 
     <p class="du-verdict">{{ compare.verdict }}</p>
