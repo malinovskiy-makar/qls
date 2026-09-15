@@ -14,50 +14,8 @@
 {% endcomment %}
 {% load static %}
 <style>
-/* Кнопка в шапке. На узком экране остаётся один значок. */
-.fb-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  font: inherit; font-size: 13px;
-  color: rgba(255, 255, 255, .6);
-  background: none;
-  border: 0.5px solid rgba(255, 255, 255, .2);
-  border-radius: var(--r);
-  padding: 5px 10px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.fb-btn:hover { color: #fff; background: rgba(255, 255, 255, .08); }
-.fb-btn svg { width: 15px; height: 15px; flex-shrink: 0; }
-.fb-btn.is-busy { opacity: .7; cursor: progress; }
-/* ⚠️ ПОРОГ 1420, И ОН ПОДБИРАЛСЯ ЗАМЕРОМ В ТРИ ЗАХОДА: 900 → 1160 → 1420.
-   Ниже — почему каждый следующий понадобился; число в правиле внизу и есть
-   итоговое.
-
-   Сначала было 900. Кнопка со словами
-   занимает около 230 px, и у ГОСТЯ правая часть шапки (кнопка + версия +
-   тема + «Войти» + «Создать аккаунт») переставала помещаться уже на 1024:
-   замер давал документ 1044 px при окне 1024. Порог тот же, что у имени в
-   плашке профиля.
-
-   ⚠️ 1160 ОКАЗАЛОСЬ МАЛО: выше него показывается ЕЩЁ И имя в плашке, и
-   вдвоём они снова не помещались — у учителя документ занимал 1405 px при
-   окне 1200. Слова у кнопки появляются с 1420 px, то есть практически
-   только на полноразмерном рабочем столе; ниже остаётся значок с
-   aria-label, а в панели ☰ слова есть всегда. */
-@media (max-width: 1420px) {
-  .fb-btn .fb-btn-text { display: none; }
-  .fb-btn { padding: 5px 7px; }
-}
-/* В панели ☰ кнопка со словами — там места хватает. */
-.nav-panel .fb-btn .fb-btn-text { display: inline; }
-
-/* На экранах входа кнопка стоит на светлом фоне, а не на графите. */
-.fb-btn--onpage {
-  color: var(--text2);
-  background: var(--surface);
-  border-color: var(--border);
-}
-.fb-btn--onpage:hover { color: var(--text); background: var(--surface-2); }
+/* Стили самой кнопки — в `_fb_btn_style.html`: они обязаны разбираться ДО её
+   разметки (шапка, экраны входа), а этот партиал стоит в конце <body>. */
 
 /* ── Окно ──────────────────────────────────────────────────────────── */
 .fb-back {

@@ -2165,6 +2165,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 <script defer src="{% static 'game/figure.js' %}"></script>
 <!-- Звук: синтез через Web Audio, без файлов. Наружу — window.rushSound. -->
 <script defer src="{% static 'game/sound.js' %}"></script>
+<script defer src="{% static 'game/chart_math.js' %}"></script>
 </head>
 <body>
 
@@ -5422,7 +5423,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var combo = s.combo_curve || [];
     var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
     var x = function (i) { return P + i * (W - 2 * P) / (scores.length - 1); };
-    var yScore = function (v) { return H - P - (v / maxScore) * (H - 2 * P); };
+    // ⚠️ Шкала очков и место подписи — в game/static/game/chart_math.js: над
+    // максимумом оставлена полоса под число, иначе оно уходило за верх рисунка.
+    var yScore = function (v) { return window.rushChartMath.scoreY(v, maxScore, H, P); };
     // комбо живёт в нижней трети — это фон к линии счёта, а не соперник
     var yCombo = function (v) { return H - P - (v / maxCombo) * (H - 2 * P) * 0.33; };
 
@@ -5447,7 +5450,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke'
     }));
     var last = svgEl('text', {
-      x: W - P, y: yScore(scores[scores.length - 1]) - 5,
+      x: W - P, y: window.rushChartMath.labelY(yScore(scores[scores.length - 1])),
       'text-anchor': 'end', class: 'chart-val'
     });
     last.textContent = scores[scores.length - 1].toLocaleString('ru-RU');
