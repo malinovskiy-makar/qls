@@ -152,7 +152,8 @@ class ChatApiTests(TestCase):
         for needle in ('id="ai-text"', 'id="ai-send"',
                        'data-mode="theory">Объясни теорию<', 'data-mode="method">Как решать<',
                        'data-mode="check">Проверь моё решение<', 'id="ai-clip"',
-                       '<input type="file" id="ai-file" hidden accept="image/*,application/pdf">',
+                       '<input type="file" id="ai-file" hidden accept=".jpg,.jpeg,.png,.webp,.pdf,'
+                       'image/jpeg,image/png,image/webp,application/pdf">',
                        '"chatUrl": "/catalog/api/chat/"',
                        '"chatUploadUrl": "/catalog/api/chat/upload/"'):
             self.assertTrue(needle in html, 'нет на странице: %s' % needle)

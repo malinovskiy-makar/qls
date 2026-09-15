@@ -577,7 +577,8 @@
         <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
         </button>
-        <input type="file" id="ai-file" hidden accept="image/*,application/pdf">
+        {% comment %}Список, а не `image/*`, как у аватара в профиле: звёздочка после косой черты открывает комментарий для сторожа стилей `test_css_comments`. Файл всё равно проверяет сервер.{% endcomment %}
+        <input type="file" id="ai-file" hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
         <textarea id="ai-text" rows="1" placeholder="Напишите вопрос по задаче…" aria-label="Вопрос ИИ"></textarea>
         <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg>

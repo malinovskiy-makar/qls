@@ -55,6 +55,13 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
+    # ⚠️ `daphne` СТОИТ ПЕРВЫМ, ВЫШЕ `django.contrib.staticfiles`. С channels 4
+    # ASGI-версия `runserver` живёт в нём, а не в `channels`; ниже статики
+    # команду забирает обычный WSGI-сервер, и локально не открывается сокет
+    # дуэли, без которого синхронная дуэль не стартует (ADR 0105). Статику
+    # версия daphne отдаёт сама. На бою ничего не меняет: `web` — gunicorn,
+    # сокеты держит контейнер `ws`. Найдено 15.09.2026.
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -77,10 +84,8 @@ INSTALLED_APPS = [
     'game',
     # Справочник олимпиад по экономике: даты, льготы, комплекты заданий.
     'olympiads',
-    # ⚠️ `channels` СТОИТ ПОСЛЕДНИМ, И ЭТО ВАЖНО. Оно подменяет команду
-    # `runserver` своей, ASGI-версией. Стоя выше `django.contrib.staticfiles`,
-    # оно ломало бы отдачу статики в разработке; ниже — обе команды
-    # уживаются. WebSocket нужен дуэли в реальном времени (ADR 0062).
+    # Консьюмеры и слой каналов дуэли в реальном времени (ADR 0062).
+    # `runserver` оно с версии 4 не подменяет — это делает `daphne` выше.
     'channels',
 ]
 

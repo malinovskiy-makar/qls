@@ -19,6 +19,7 @@ import subprocess
 
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.core.cache import cache
 from django.test import tag
 
 from game import config
@@ -125,6 +126,11 @@ class StartScreenBrowserTest(StaticLiveServerTestCase):
     """
 
     def setUp(self):
+        # ⚠️ Доска кэшируется на минуту (`leaderboard.top`), а база между
+        # браузерными тестами чистится, кэш — нет. В полном шаге B 15.09.2026
+        # предыдущий тест открыл `/game/` за полминуты до этого, оставил в кэше
+        # пустую доску — и строк на экране не было ни на одной ширине.
+        cache.clear()
         # По вопросам на каждый тип: карточек режимов должно быть несколько,
         # иначе «ровный ряд» проверять не на чем.
         for qtype in sorted({m['question_type'] for m in config.MODES.values()}):
