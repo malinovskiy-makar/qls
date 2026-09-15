@@ -158,6 +158,7 @@
       }).then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (answer) {
           if (answer && answer.ok) {
+            if (window.weco) weco.track('report_send', { kind: kind.value, source: button.getAttribute('data-source') || '' });
             box.innerHTML = '';
             box.appendChild(el('div', 'fb-title', 'Спасибо, разберёмся'));
             setTimeout(close, 1500);

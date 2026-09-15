@@ -620,6 +620,7 @@
         $('copy-label').textContent = 'Ссылка скопирована';
         setTimeout(function () { copy.classList.remove('pd-act--copied'); $('copy-label').textContent = 'Скопировать ссылку'; }, 1600);
       };
+      if (window.weco) weco.track('copy_link', { from: 'problem' });
       if (navigator.clipboard) { navigator.clipboard.writeText(location.href).then(done, done); } else { done(); }
     });
   }

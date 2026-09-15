@@ -17,6 +17,7 @@ from .models_platform import (
     LearningEvent,
     ProblemComment,
     ProblemReport,
+    Event,
     SavedFolder,
     SavedGraph,
     SavedProblem,
@@ -179,6 +180,33 @@ class FeedbackAdmin(admin.ModelAdmin):
         response = FileResponse(handle, content_type='image/jpeg')
         response['Cache-Control'] = 'private, max-age=60'
         return response
+
+
+@admin.register(Event)
+class EventAdmin(admin.ModelAdmin):
+    """События беты (решение владельца 15.09.2026): только чтение.
+
+    Разбор после беты — выгрузкой `analytics_export`; админка нужна, чтобы
+    глазами убедиться, что события идут и в них нет лишнего."""
+
+    list_display = ('ts', 'name', 'page_key', 'path', 'who', 'visitor_short')
+    list_filter = ('name', 'page_key', 'user')
+    search_fields = ('path', 'visitor')
+    date_hierarchy = 'ts'
+    list_select_related = ('user',)
+    readonly_fields = ('ts', 'user', 'visitor', 'session_key', 'page_key', 'path',
+                       'name', 'props', 'duration_ms', 'viewport', 'user_agent')
+
+    @admin.display(description='Кто')
+    def who(self, obj):
+        return obj.user.username if obj.user_id else 'гость'
+
+    @admin.display(description='Посетитель')
+    def visitor_short(self, obj):
+        return obj.visitor[:8]
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(ProblemReport)

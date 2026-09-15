@@ -63,6 +63,9 @@ urlpatterns = [
     # «Плохая задача?» из каталога и игры: гостю можно, CSRF обязателен (15.09.2026).
     path('api/problem-report/', views_platform.api_problem_report,
          name='api_problem_report'),
+    # Аналитика беты: гостю можно; CSRF нет осознанно — sendBeacon не ставит
+    # заголовков, вместо токена проверка Origin и счётчик (docs/SECURITY.md).
+    path('api/track/', views_platform.api_track, name='api_track'),
     # Статистика ученика — с геймификацией. Старая страница «Прогресс»
     # ПОГЛОЩЕНА этой: /student/progress/ ведёт сюда редиректом.
     path('profile/stats/', views_stats.student_stats, name='student_stats'),

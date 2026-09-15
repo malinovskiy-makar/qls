@@ -323,6 +323,7 @@
       }).then(function (r) { return r.json().catch(function () { return {}; }); })
         .then(function (answer) {
           if (answer && answer.ok) {
+            if (window.weco) weco.track('feedback_send', { kind: chosenKind });
             box.innerHTML = '';
             box.appendChild(el('div', 'fb-title', 'Спасибо, получили.'));
             box.appendChild(el('div', 'fb-ok', 'Мы читаем всё.'));

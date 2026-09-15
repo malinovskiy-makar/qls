@@ -92,6 +92,7 @@
 // ── Модальное окно ────────────────────────────────
 function openCatalogModal(pid, e) {
   if (e) { e.preventDefault(); e.stopPropagation(); }
+  if (window.weco) weco.track('problem_open', { problem_id: Number(pid), modal: true });
   document.getElementById('c-modal-backdrop').classList.add('open');
   document.getElementById('c-modal-title').textContent = '…';
   document.getElementById('c-modal-meta').innerHTML = '';

@@ -6,6 +6,8 @@
 """
 import io
 import json
+import re
+import time
 
 from django.utils import formats
 
@@ -15,6 +17,7 @@ from django.contrib.auth.forms import SetPasswordForm
 from django.core.files.base import ContentFile
 from django.http import FileResponse, Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 # Problem нужен и в профиле (пометка «снята с публикации»), и при
@@ -568,6 +571,131 @@ def api_problem_report(request):
     ratelimit.note_failure(PROBLEM_REPORT_SCOPE + ':ip',
                            ratelimit.client_ip(request), multiplier=2)
     return JsonResponse({'ok': True, 'id': report.pk})
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Аналитика беты: сырые события (решение владельца 15.09.2026)
+# ═══════════════════════════════════════════════════════════════════════
+
+TRACK_MAX_EVENTS = 50          # событий в одном запросе
+TRACK_MAX_PROPS = 2000         # символов props после сериализации
+TRACK_LIMIT = 600              # событий с посетителя за окно
+TRACK_WINDOW = 600             # секунд в окне
+TRACK_COOKIE = 'weco_vid'
+_VISITOR_RE = re.compile(r'[0-9A-Za-z-]{8,40}')
+
+
+def _own_origin(request):
+    """Origin (или Referer, если Origin нет) — наш хост из ALLOWED_HOSTS.
+
+    Та же проверка хоста, что у самого Django (`validate_host`), с тем же
+    запасным списком для разработки при пустом ALLOWED_HOSTS.
+    """
+    from urllib.parse import urlparse
+
+    from django.conf import settings
+    from django.http.request import split_domain_port, validate_host
+
+    source = request.META.get('HTTP_ORIGIN') or request.META.get('HTTP_REFERER') or ''
+    try:
+        netloc = urlparse(source).netloc
+    except ValueError:
+        return False
+    domain, _port = split_domain_port(netloc)
+    allowed = settings.ALLOWED_HOSTS
+    if settings.DEBUG and not allowed:
+        allowed = ['.localhost', '127.0.0.1', '[::1]']
+    return bool(domain) and validate_host(domain, allowed)
+
+
+def _track_props(props):
+    """props не длиннее TRACK_MAX_PROPS: строки режутся, лишние ключи отбрасываются."""
+    out = {}
+    if not isinstance(props, dict):
+        return out
+    for key, value in props.items():
+        if value is not None and not isinstance(value, (str, int, float, bool)):
+            value = json.dumps(value, ensure_ascii=False)
+        if isinstance(value, str):
+            value = value[:300]
+        key = str(key)[:48]
+        out[key] = value
+        if len(json.dumps(out, ensure_ascii=False)) > TRACK_MAX_PROPS:
+            del out[key]
+            break
+    return out
+
+
+def _track_duration(value):
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    value = int(value)
+    return value if 0 <= value <= _INT_MAX else None
+
+
+@csrf_exempt
+@require_POST
+def api_track(request):
+    """Принять пачку событий беты от `static/track.js`. Гостю можно.
+
+    ⚠️ CSRF_EXEMPT — ОСОЗНАННО. `navigator.sendBeacon` не ставит заголовков,
+    а без него событие ухода со страницы на закрытии вкладки не доходит вовсе.
+    Вместо CSRF-токена — две проверки: `Origin` (или `Referer`) обязан быть
+    нашим хостом из ALLOWED_HOSTS — чужая страница из браузера такой не
+    пришлёт, — и счётчик на посетителя (не больше TRACK_LIMIT событий за
+    TRACK_WINDOW секунд). Худшее, что остаётся, — мусор в своей же таблице
+    аналитики: данных пользователя вьюха не меняет и ничего не отдаёт
+    (docs/SECURITY.md).
+    ⚠️ `problems/ratelimit.py` не подходит: там лестница штрафов за промахи на
+    сутки, а здесь нужен простой счётчик окна.
+    """
+    from django.core.cache import cache
+
+    from problems.feedback_options import page_key_for
+    from problems.models_platform import Event
+
+    if not _own_origin(request):
+        return JsonResponse({'ok': False, 'error': 'origin'}, status=403)
+    visitor = request.COOKIES.get(TRACK_COOKIE, '')
+    if not _VISITOR_RE.fullmatch(visitor):
+        return JsonResponse({'ok': False, 'error': 'visitor'}, status=400)
+    data = _body(request)
+    events = data.get('events') if isinstance(data, dict) else None
+    if not isinstance(events, list) or not events:
+        return JsonResponse({'ok': False, 'error': 'events'}, status=400)
+    if len(events) > TRACK_MAX_EVENTS:
+        return JsonResponse({'ok': False, 'error': 'too_many'}, status=400)
+
+    key = 'track:%s:%d' % (visitor, int(time.time()) // TRACK_WINDOW)
+    cache.add(key, 0, TRACK_WINDOW)
+    try:
+        count = cache.incr(key, len(events))
+    except ValueError:                  # ключ истёк между add и incr
+        count = len(events)
+        cache.set(key, count, TRACK_WINDOW)
+    if count > TRACK_LIMIT:
+        return JsonResponse({'ok': False, 'error': 'rate'}, status=429)
+
+    user = request.user if request.user.is_authenticated else None
+    session_key = (request.session.session_key or '')[:40]
+    agent = request.META.get('HTTP_USER_AGENT', '')[:200]
+    rows = []
+    for raw in events:
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get('name') or '').strip()[:48]
+        if not name:
+            continue
+        # Путь без строки запроса: текст поиска в аналитику не пишем.
+        path = _path_of(str(raw.get('path') or '/'))[:500]
+        rows.append(Event(
+            user=user, visitor=visitor, session_key=session_key,
+            page_key=page_key_for(path), path=path, name=name,
+            props=_track_props(raw.get('props')),
+            duration_ms=_track_duration(raw.get('duration_ms')),
+            viewport=str(raw.get('viewport') or '')[:16], user_agent=agent))
+    Event.objects.bulk_create(rows)
+    return JsonResponse({'ok': True, 'saved': len(rows)})
 
 
 def _path_of(url):

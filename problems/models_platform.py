@@ -1689,3 +1689,41 @@ class ProblemReport(models.Model):
     def short(self):
         """Первые слова жалобы — для списка в админке; без текста — причина."""
         return self.text.strip()[:90] or self.get_kind_display()
+
+
+class Event(models.Model):
+    """Событие беты: экран, клик, время на экране, путь (решение владельца 15.09.2026).
+
+    ⚠️ СЫРЫЕ СОБЫТИЯ В СВОЮ ТАБЛИЦУ, БЕЗ ВНЕШНИХ СЕРВИСОВ: данные остаются у
+    нас, разбор — после беты. Согласие участников есть, но из профиля сверх
+    `user` и cookie посетителя ничего не пишется, а текст поиска — только
+    длиной (`q_len`).
+
+    Пишет `POST /api/track/` (`views_platform.api_track`), шлёт
+    `static/track.js`. `page_key` считает сервер по пути — как у `Feedback`.
+    """
+
+    ts = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='events', verbose_name='Кто', help_text='Пусто — гость.')
+    visitor = models.CharField('Посетитель', max_length=40, db_index=True,
+                               help_text='Cookie weco_vid: один браузер.')
+    session_key = models.CharField('Сессия', max_length=40, blank=True)
+    page_key = models.CharField('Экран', max_length=32, db_index=True)
+    path = models.CharField('Адрес', max_length=500)
+    name = models.CharField('Событие', max_length=48, db_index=True)
+    props = models.JSONField('Подробности', default=dict, blank=True)
+    duration_ms = models.PositiveIntegerField('Длительность, мс', null=True, blank=True)
+    viewport = models.CharField('Окно', max_length=16, blank=True)
+    user_agent = models.CharField('Браузер', max_length=200, blank=True)
+
+    class Meta:
+        verbose_name = 'Событие беты'
+        verbose_name_plural = 'События беты'
+        ordering = ['-ts']
+        indexes = [models.Index(fields=['name', 'ts']),
+                   models.Index(fields=['visitor', 'ts'])]
+
+    def __str__(self):
+        return '%s · %s' % (self.name, self.path)

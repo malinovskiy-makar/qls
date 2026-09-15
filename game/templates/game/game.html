@@ -3572,6 +3572,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         mode = d.mode.key;        // у целевого забега режим приходит с сервера
         mistakesRun = mistakes;
         MODE = d.mode; // тайминги и жизни режима — с сервера (единый источник)
+        if (window.weco) weco.track('game_start', { mode: mode, filtered: filterQuery() !== '', set: !!setRun, mistakes: mistakes });
         score = 0; streak = 0; bestStreak = 0;
         livesMax = MODE.lives; lives = d.lives;
         answered = 0; correctCount = 0;
@@ -4565,6 +4566,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       });
     }).then(function (d) {
       if (d.error) { answerFailed(d); return; }
+      if (window.weco) weco.track('game_answer', { mode: mode, correct: !!d.correct, skip: d.result === 'skip', elapsed_ms: payload.elapsed_ms, number: answered + 1 });
       // Очки, серия и жизни посчитаны сервером — здесь только присваиваем.
       if (typeof d.score === 'number') {
         score = d.score;
@@ -5011,6 +5013,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сеть подведёт совсем) — держим запасную из своих счётчиков: экран
     // результатов не имеет права пропасть.
     summary = localSummary();
+    if (window.weco) weco.track('game_end', { mode: mode, reason: endReason, score: score, answered: answered, correct: correctCount });
     function done() {
       paintFinal();
       // История нужна трём графикам из девяти. Тянем ПОСЛЕ отрисовки: экран
@@ -5989,6 +5992,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             return;
           }
           created = d;
+          if (window.weco) weco.track('duel_create', { mode: mode });
           $('dm-link').value = d.duel_url;
           $('dm-summary').textContent = 'Режим «' + d.mode_title
             + '» · без лимита вопросов · ' + d.filter_text
@@ -6653,6 +6657,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
 {% include '_feedback.html' %}
+{% include '_track.html' %}
 {% include '_problem_report.html' %}
 </body>
 </html>

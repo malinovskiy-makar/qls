@@ -256,6 +256,7 @@
         .then(function (d) {
           if (d.error) { why.textContent = d.message || 'Не удалось проверить, попробуйте ещё раз.'; why.hidden = false; return; }
           attempt = d.attempt;
+          if (window.weco) { weco.track('test_answer', { problem_id: Number((location.pathname.match(/\/problem\/(\d+)\//) || [])[1]) || null, correct: !!d.correct, attempt: d.attempt }); }
           if (d.correct) {
             mode = 'solved';
             correct = sel.slice();
