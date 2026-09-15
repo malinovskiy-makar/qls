@@ -79,8 +79,12 @@ try {
       await page.waitForTimeout(400);
       const m = await page.evaluate(measure);
       const columns = ENTRY_COLUMNS[width];
+      // В ряду не больше колонок, чем положено ширине, и все ряды, кроме
+      // последнего, полные. ⚠️ «Последний ряд может быть короче» раньше
+      // пропускал и ОДИН ряд из четырёх на 700 px — зубастость это поймала.
       check(key + 'entry_rows_even', m.entryRows.length > 0 && even(m.entryRows)
-            && m.entryRows.every((r, i) => r.length === columns || i === m.entryRows.length - 1),
+            && m.entryRows.every((r) => r.length <= columns)
+            && m.entryRows.slice(0, -1).every((r) => r.length === columns),
             { rows: m.entryRows, columns });
       check(key + 'mode_rows_even', m.modeRows.length > 0 && even(m.modeRows), m.modeRows);
       check(key + 'record_line_reserved', m.best.length > 1 && Math.max(...m.best) === Math.min(...m.best), m.best);
