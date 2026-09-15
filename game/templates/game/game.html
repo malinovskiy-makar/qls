@@ -3633,18 +3633,28 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      о себе одним событием `weco:modal` {open: true|false} — игра не знает,
      как устроено каждое из них, и новому окну достаточно послать событие.
 
-     ⚠️ СЕРВЕР ПАУЗЫ НЕ ЗНАЕТ, И ЭТО ПРИНЯТО (решение владельца 15.09.2026).
-     Время ответа он считает от выдачи вопроса (`issued_at` в api_answer),
-     поэтому бонус за скорость на вопросе, где стояла пауза, сгорит. Потолок
-     длительности в `_rank_run` меряет стенные часы: пауза, выведшая забег за
-     `duration × 2 + 60 с`, снимет его с зачёта (`time_overrun`). Учитывать
-     паузу на сервере со слов клиента нельзя — это та самая подкрутка
-     таймера, от которой потолок и стоит. */
+     ⚠️ ПАУЗУ ЗАСЧИТЫВАЕТ СЕРВЕР (решение владельца 15.09.2026). Клиент только
+     сообщает «окно открыто / закрыто» (`/game/api/pause/`, `/game/api/resume/`),
+     начало и конец сервер пишет своими часами и вычитает из длительности
+     раунда в `_rank_run`, не больше двух минут за раунд. Бонус за скорость на
+     вопросе с паузой по-прежнему сгорает: время ответа сервер считает от
+     выдачи вопроса (`issued_at`).
+     Сообщения идут одной очередью `pauseSync`, и ответ с вопросом уходят
+     ПОСЛЕ неё: иначе ответ, нажатый сразу после закрытия окна, обогнал бы
+     resume и получил 409 «пауза». */
   var pausedAt = null;
+  var pauseSync = Promise.resolve();
+
+  function tellServer(url) {
+    pauseSync = pauseSync.then(function () {
+      return api(url, { method: 'POST' });
+    }).then(function () {}, function () {});
+  }
 
   function rushPause() {
     if (state !== 'playing' || pausedAt) return;
     pausedAt = performance.now();
+    tellServer('/game/api/pause/');
     cancelAnimationFrame(rafId);
     // Сердцебиение молчит на паузе; вернёт его paintHud → paintAlarm,
     // увидев, что тревога есть, а звук снят.
@@ -3655,6 +3665,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function rushResume() {
     if (!pausedAt) return;
     pausedAt = null;
+    tellServer('/game/api/resume/');
     // Забег мог кончиться под окном (ответ ушёл до паузы) — тогда цикл не
     // поднимаем: paintHud вернул бы тревогу на экран итогов.
     if (state !== 'playing') return;
@@ -4496,7 +4507,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           prefetchFailed = true;
         }
       }
-      api('/game/api/question/').then(function (d) {
+      pauseSync.then(function () { return api('/game/api/question/'); }).then(function (d) {
         if (gen !== prefetchGen) return;
         if (d.exhausted) { poolExhausted = true; return; }
         if (d.question) { nextBuf = d.question; return; }
@@ -4547,9 +4558,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сколько игрок думал над этим вопросом — считает клиент (он знает
     // момент показа карточки), сервер кладёт число в журнал забега
     payload.elapsed_ms = Math.round(performance.now() - questionShownAt);
-    api('/game/api/answer/', {
-      method: 'POST',
-      body: JSON.stringify(payload)
+    pauseSync.then(function () {
+      return api('/game/api/answer/', {
+        method: 'POST',
+        body: JSON.stringify(payload)
+      });
     }).then(function (d) {
       if (d.error) { answerFailed(d); return; }
       // Очки, серия и жизни посчитаны сервером — здесь только присваиваем.
@@ -4582,6 +4595,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      нём не замерзает — забег доиграется до конца времени. */
   function answerFailed(d) {
     if (d.reason === 'no_run') { showRunLost(); return; }
+    // Ответ застал паузу открытой: сервер закрыл её этим запросом и ответ не
+    // принял. Окно и так перед глазами — молча вернуть кнопки, без тоста.
+    if (d.reason === 'paused') {
+      inputLocked = false;
+      if (current && current.type === 'numeric') $('num-input').disabled = false;
+      return;
+    }
     if (d.status === 409) { advance(); return; }
     inputLocked = false;
     // Классика блокирует поле на время отправки — возвращаем его.

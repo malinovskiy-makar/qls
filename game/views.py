@@ -838,6 +838,10 @@ def _new_state(mode, topic, run_filter=None):
         # Сколько секунд забег уже получил прибавкой за верные ответы.
         # Нужно для потолка: без него Классика становится бесконечной.
         'bonus_total': 0,
+        # Паузы раунда СЕРВЕРНЫМИ часами: [[начало_мс, конец_мс|None], …].
+        # Окно поверх раунда ставит его на паузу; зачтённая пауза вычитается
+        # из длительности в `_rank_run` (см. «Пауза раунда»).
+        'pauses': [],
         # Журнал забега: по записи на КАЖДЫЙ сыгранный вопрос, в порядке
         # игры. Из него целиком считается сводка (см. build_summary) —
         # отдельных счётчиков «сколько ошибок в теме» не заводим, иначе
@@ -931,6 +935,9 @@ def api_question(request):
         # неразличимы. Клиенту нужен признак, а не разбор текста ошибки.
         return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
                             status=400)
+    if _close_pause(state, _now_ms()):
+        run_state.save_run(request, state)
+        return _paused_response()
     gq = _pick_next(request, state)
     if gq is None:
         return JsonResponse({'exhausted': True})
@@ -1135,6 +1142,9 @@ def api_answer(request):
                             status=400)
     if state.get('ended'):
         return JsonResponse({'error': 'Забег уже завершён'}, status=409)
+    if _close_pause(state, _now_ms()):
+        run_state.save_run(request, state)
+        return _paused_response()
     try:
         body = json.loads(request.body.decode('utf-8'))
         qid = int(body['question_id'])
@@ -2038,6 +2048,9 @@ def api_session_finish(request):
         body = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:
         body = {}
+    # Открытая пауза (окно не успело сказать «закрыто») закрывается моментом
+    # финиша — иначе её длительность не попала бы в зачёт.
+    _close_pause(state, _now_ms())
     if not state.get('ended'):
         state['ended'] = _end_reason(state, body.get('reason'))
     run_state.save_run(request, state)
@@ -2186,6 +2199,84 @@ def _ranked_today(user, mode):
         created_at__gte=start, created_at__lt=end).count()
 
 
+# ─── Пауза раунда (решение владельца 15.09.2026) ─────────────────────────
+#
+# ⚠️ ПАУЗУ ФИКСИРУЕТ СЕРВЕР, А НЕ КЛИЕНТ. Окно поверх раунда (обратная связь,
+# «Плохая задача?», выход) останавливает клиентский таймер, а потолок
+# длительности в `_rank_run` меряет стенные часы и снимал такой раунд с
+# таблицы. Учесть паузу «со слов клиента» значит разрешить подкрутку
+# таймера. Поэтому клиент только сообщает «окно открыто / закрыто», а начало
+# и конец паузы сервер пишет СВОИМИ часами в `state['pauses']`. В зачёт идёт
+# не больше `PAUSE_CAP_SECONDS` за раунд и не больше `PAUSE_MAX_COUNT` пауз;
+# сверх потолка пауза принимается (игрок честно стоит), но не вычитается.
+# Отвечать на паузе нельзя: ответ или вопрос, заставший паузу открытой
+# (resume мог потеряться в сети), закрывает её своим моментом и получает
+# 409 `paused` — клиент повторит запрос уже без паузы.
+
+def _now_ms():
+    return int(time.time() * 1000)
+
+
+def _open_pause(state):
+    pauses = state.get('pauses') or []
+    return pauses[-1] if pauses and pauses[-1][1] is None else None
+
+
+def _close_pause(state, now_ms):
+    """Закрыть открытую паузу моментом `now_ms`. True — пауза была открыта."""
+    pause = _open_pause(state)
+    if pause is None:
+        return False
+    pause[1] = max(now_ms, pause[0])
+    return True
+
+
+def credited_pause_ms(state):
+    """Сколько закрытой паузы вычитается из стенного времени раунда."""
+    total = sum(end - start for start, end
+                in (state.get('pauses') or [])[:config.PAUSE_MAX_COUNT]
+                if end is not None)
+    return min(total, config.PAUSE_CAP_SECONDS * 1000)
+
+
+def _paused_response():
+    return JsonResponse({'error': 'paused', 'reason': 'paused'}, status=409)
+
+
+@require_POST
+def api_pause(request):
+    """Окно поверх раунда открылось: начало паузы по часам сервера."""
+    state = run_state.load_run(request)
+    if not state:
+        return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
+                            status=400)
+    if state.get('ended'):
+        return JsonResponse({'error': 'Забег уже завершён'}, status=409)
+    if _open_pause(state) is None:
+        pauses = state.setdefault('pauses', [])
+        # Паузы сверх PAUSE_MAX_COUNT в зачёт не идут, поэтому хранить их все
+        # незачем: последняя незачётная перезаписывается, и состояние в кэше
+        # не растёт от щелчков по окну.
+        if len(pauses) > config.PAUSE_MAX_COUNT:
+            pauses[-1] = [_now_ms(), None]
+        else:
+            pauses.append([_now_ms(), None])
+        run_state.save_run(request, state)
+    return JsonResponse({'ok': True, 'paused': True})
+
+
+@require_POST
+def api_resume(request):
+    """Окно закрылось: конец паузы по часам сервера."""
+    state = run_state.load_run(request)
+    if not state:
+        return JsonResponse({'error': 'Забег не начат', 'reason': 'no_run'},
+                            status=400)
+    if _close_pause(state, _now_ms()):
+        run_state.save_run(request, state)
+    return JsonResponse({'ok': True, 'paused': False})
+
+
 def _rank_run(request, state, summary, wall_ms):
     u"""Идёт ли забег в таблицу, и если нет — почему.
 
@@ -2214,7 +2305,10 @@ def _rank_run(request, state, summary, wall_ms):
     # так можно взять сколько угодно.
     limit_ms = int((config.MODES[state['mode']]['duration']
                     * (1 + config.TIME_BONUS_CAP_FACTOR) + 60) * 1000)
-    if wall_ms is not None and wall_ms > limit_ms:
+    # ⚠️ Зачтённая пауза вычитается ДО сравнения (решение владельца
+    # 15.09.2026): окно поверх раунда не снимает его с таблицы. В базу
+    # (`GameResult.wall_ms`) по-прежнему пишется настоящее стенное время.
+    if wall_ms is not None and wall_ms - credited_pause_ms(state) > limit_ms:
         return False, 'time_overrun'
     if _ranked_today(user, state['mode']) >= config.RANKED_RUNS_PER_DAY:
         return False, 'quota_exceeded'

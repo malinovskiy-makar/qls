@@ -29,6 +29,8 @@ urlpatterns = [
          name='session_start_mistakes'),
     path('api/question/', views.api_question, name='question'),
     path('api/answer/', views.api_answer, name='answer'),
+    path('api/pause/', views.api_pause, name='pause'),
+    path('api/resume/', views.api_resume, name='resume'),
     # Живые счётчики окна фильтров: сколько вопросов даст каждый режим.
     path('api/pool_counts/', views.api_pool_counts, name='pool_counts'),
     # Доска лидеров: публичная (её смысл в том, чтобы её видели все).
