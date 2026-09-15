@@ -227,6 +227,15 @@ class AnalyticsExportTests(TestCase):
         self.assertEqual(rows[1][1], 'search')
         self.assertEqual(json.loads(rows[1][-1]), {'q_len': 5})
 
+    def test_formula_like_cells_are_neutralised(self):
+        Event.objects.create(visitor='-12345678', page_key='home', path='=cmd|x',
+                             name='=HYPERLINK("http://evil")', user_agent='@SUM(1)')
+        row = self.export(since='2020-01-01')[1]
+        self.assertEqual(row[1], '\'=HYPERLINK("http://evil")')
+        self.assertEqual(row[3], "'=cmd|x")
+        self.assertEqual(row[5], "'-12345678")
+        self.assertEqual(row[9], "'@SUM(1)")
+
     def test_until_leaves_out_later_days(self):
         event = Event.objects.create(visitor=VISITOR, page_key='home', path='/',
                                      name='page_view')
