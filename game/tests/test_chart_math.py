@@ -47,7 +47,9 @@ class ChartLabelInsideFrameTests(SimpleTestCase):
         u"""Страница не держит вторую копию формулы: иначе проверялся бы
         модуль, а рисовала бы старая арифметика."""
         src = io.open(PAGE, encoding='utf-8').read()
-        self.assertIn("{% static 'game/chart_math.js' %}", src)
-        self.assertIn('rushChartMath.scoreY(', src)
-        self.assertIn('rushChartMath.labelY(', src)
-        self.assertNotIn('yScore(scores[scores.length - 1]) - 5', src)
+        # assertTrue, а не assertIn: тот напечатал бы в отчёт весь шаблон.
+        for needle in ("{% static 'game/chart_math.js' %}", 'rushChartMath.scoreY(',
+                       'rushChartMath.labelY('):
+            self.assertTrue(needle in src, 'в game.html нет %s' % needle)
+        self.assertFalse('yScore(scores[scores.length - 1]) - 5' in src,
+                         'в game.html осталась старая формула подписи')

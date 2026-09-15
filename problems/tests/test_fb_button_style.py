@@ -56,4 +56,5 @@ class FeedbackButtonStyleOrderTests(TestCase):
         src = io.open('templates/_feedback.html', encoding='utf-8').read()
         for head in ('.fb-btn {', '.fb-btn svg {', '.fb-btn.is-busy {',
                      '.fb-btn--onpage {', '.fb-btn .fb-btn-text {'):
-            self.assertNotIn(head, src, head)
+            # assertFalse, а не assertNotIn: тот напечатал бы в отчёт весь файл.
+            self.assertFalse(head in src, 'в _feedback.html осталось правило %s' % head)
