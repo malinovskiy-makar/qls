@@ -44,6 +44,9 @@ FALSE_WORDS = ('неверно', 'нет')
 
 _INLINE_OPTION_RE = re.compile(r'(\d)[.)]\s*(.+?)(?=\s+\d[.)]|$)')
 _UNESCAPED_DOLLAR_RE = re.compile(r'(?<!\\)\$')
+# Номер строки, повторённый в начале варианта: «1. (1) …», «1. 1) …», «1. 1. …».
+# Пробел после «N.» обязателен, иначе «1.5 млн» потеряло бы число.
+_REPEATED_NUMBER_RE = re.compile(r'^\s*(?:\((\d{1,2})\)\s*|(\d{1,2})[.)]\s+)')
 
 
 @dataclass(frozen=True)
@@ -100,7 +103,13 @@ def parse_with_reason(statement):
 
 def _label_and_text(groups, style):
     if style == 'numbered':
-        return str(int(groups[0])), groups[1]
+        label = str(int(groups[0]))
+        # ⚠️ Решение владельца 15.09: номер, повторённый в начале варианта
+        # («1. (1) …»), — нумерация, а не текст. Другой номер («1. (2) …») остаётся.
+        repeated = _REPEATED_NUMBER_RE.match(groups[1])
+        if repeated and str(int(repeated.group(1) or repeated.group(2))) == label:
+            return label, groups[1][repeated.end():]
+        return label, groups[1]
     if style == 'lettered':
         return groups[0].lower(), groups[1]
     return groups[1].lower(), groups[2]
@@ -190,6 +199,59 @@ def boolean_correct_label(answer, statement):
     if word in FALSE_WORDS:
         return BOOLEAN_PARTS[1][0]
     return None
+
+
+# Вариант «Верно»/«Неверно» в хвосте условия: «1) Верно», «а. неверно;»,
+# «(1) Верно», «1. 1) Верно» (номер повторён) или слово без номера.
+_BOOLEAN_TOKEN_RE = re.compile(
+    r'\s*(?:(\d|[а-яa-z])[.)]\s*(?:\(?\1\)|\1[.)])?\s*|\((\d|[а-яa-z])\)\s*)?'
+    r'((?:не)?верно)[.;,]?\s*', re.IGNORECASE)
+_BOOLEAN_TAIL_LABELS = (['', ''], ['1', '2'], ['а', 'б'], ['a', 'b'])
+
+
+def _boolean_tokens(line):
+    """[(метка, слово)], если строка целиком из вариантов «Верно»/«Неверно», иначе None."""
+    tokens, pos = [], 0
+    while pos < len(line):
+        m = _BOOLEAN_TOKEN_RE.match(line, pos)
+        if not m:
+            return None
+        tokens.append(((m.group(1) or m.group(2) or '').lower(), m.group(3).lower()))
+        pos = m.end()
+    return tokens or None
+
+
+def cut_boolean_tail(statement):
+    """(условие без хвоста «Верно/Неверно», 'boolean_tail') или (None, причина).
+
+    ⚠️ ЗАЧЕМ (решение владельца 15.09.2026). У «верно/неверно» плитки «Верно» и
+    «Неверно» — подпункты, а в хвосте условия та же пара осталась строкой
+    («1) Верно  2) Неверно»): ученик видит варианты дважды. Режется только
+    хвост ЦЕЛИКОМ из двух вариантов — по одному «верно» и «неверно», с номерами
+    1, 2 / а, б / a, b или без них, в одну строку или в две, с шапкой
+    «Варианты ответа» над ними. «Верно ли, что…», «Неверно, что…» и строка с
+    любым другим текстом остаются: ложный вырез хуже пропуска.
+    """
+    lines = (statement or '').split('\n')
+    cut, tokens = len(lines), []
+    while cut and len(tokens) < 2:
+        found = _boolean_tokens(lines[cut - 1]) if lines[cut - 1].strip() else []
+        if found is None:
+            break
+        tokens = found + tokens
+        cut -= 1
+    if (sorted(word for _label, word in tokens) != ['верно', 'неверно']
+            or [label for label, _word in tokens] not in _BOOLEAN_TAIL_LABELS):
+        return None, 'no_tail'
+    top = cut
+    while top and not lines[top - 1].strip():
+        top -= 1
+    if top and HEADER_RE.match(lines[top - 1]):
+        cut = top - 1
+    stem = '\n'.join(lines[:cut]).rstrip()
+    if not stem.strip():
+        return None, 'empty_stem'
+    return stem, 'boolean_tail'
 
 
 def formula_worse(before, after):

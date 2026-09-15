@@ -131,3 +131,83 @@ class TestOptionsCommandTests(TestCase):
             self.run_command('--apply')
         self.assertEqual(self.statements(), statements)
         self.assertEqual(ProblemPart.objects.count(), parts)
+
+    def test_ids_narrow_dry_run_apply_and_revert(self):
+        # --ids файлом — тот же список, что и --ids-file: к записи те же три.
+        self.assertTrue('к записи: задач 3' in self.run_command('--ids', self.ids_file),
+                        '--ids не читает файл')
+        self.run_command('--apply', '--ids', '%d,%d' % (self.single.pk, self.boolean.pk))
+        self.assertTrue(self.single.parts.exists(), 'задача из --ids не записана')
+        self.assertFalse(self.multi.parts.exists(), '--ids не сузил запись')
+        self.run_command('--revert', self.snapshot(), '--ids', str(self.boolean.pk))
+        self.assertTrue(self.single.parts.exists(), '--revert --ids откатил лишнее')
+        self.assertFalse(self.boolean.parts.exists(), '--revert --ids не откатил названную')
+
+
+def tiles(problem, correct):
+    """Плитки «верно/неверно», как у живых виджетов банка: «а» Верно, «б» Неверно."""
+    for order, (label, text) in enumerate((('а', 'Верно'), ('б', 'Неверно'))):
+        ProblemPart.objects.create(problem=problem, label=label, statement=text,
+                                   answer='верно' if label == correct else '', order=order)
+
+
+class BooleanTailCommandTests(TestCase):
+    """`--boolean-tail`: строка «1) Верно 2) Неверно» у задач с плитками (Фаза 8½)."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.report = os.path.join(tmp.name, 'report')
+        self.tail = make_problem(
+            'Кривая Лаффера показывает неравенство доходов.\n\n\n1) Верно  2) Неверно',
+            problem_type='верно_неверно', answer='Неверно')
+        tiles(self.tail, 'б')
+        self.question = make_problem('Верно ли, что спрос растёт при падении цены?',
+                                     problem_type='верно_неверно', answer='Верно')
+        tiles(self.question, 'а')
+        # Плитки без верной — виджета нет, строка в условии единственная.
+        self.dead = make_problem('Спрос растёт.\n1. Верно\n2. Неверно',
+                                 problem_type='верно_неверно', answer='')
+        tiles(self.dead, None)
+        # Без подпунктов этот проход не трогает вовсе: это работа основного прохода.
+        self.bare = make_problem('Цена растёт.\n1) Верно 2) Неверно',
+                                 problem_type='верно_неверно', answer='Верно')
+
+    def run_command(self, *args):
+        out = io.StringIO()
+        call_command('test_options_from_statement', '--boolean-tail', *args,
+                     report=self.report, stdout=out)
+        return out.getvalue()
+
+    def statement(self, problem):
+        return Problem.objects.get(pk=problem.pk).statement
+
+    def test_dry_run_counts_and_writes_nothing(self):
+        before = dict(Problem.objects.values_list('pk', 'statement'))
+        self.run_command()
+        self.assertEqual(dict(Problem.objects.values_list('pk', 'statement')), before)
+        with open(os.path.join(self.report, 'REPORT.md'), encoding='utf-8') as handle:
+            report = handle.read()
+        self.assertTrue('| `boolean_tail` | 1 |' in report, 'хвост не найден ровно у одной')
+        self.assertTrue('| `no_widget` | 1 |' in report, 'мёртвый виджет не отложен')
+        self.assertTrue('| `no_tail` | 1 |' in report, '«Верно ли, что…» принято за хвост')
+
+    def test_apply_cuts_only_the_tail_and_keeps_parts(self):
+        parts = ProblemPart.objects.count()
+        self.run_command('--apply')
+        self.assertEqual(self.statement(self.tail),
+                         'Кривая Лаффера показывает неравенство доходов.')
+        self.assertEqual(ProblemPart.objects.count(), parts)
+        self.assertEqual(self.statement(self.question),
+                         'Верно ли, что спрос растёт при падении цены?')
+        self.assertEqual(self.statement(self.dead), 'Спрос растёт.\n1. Верно\n2. Неверно')
+        self.assertEqual(self.statement(self.bare), 'Цена растёт.\n1) Верно 2) Неверно')
+
+    def test_second_run_finds_nothing_and_revert_restores(self):
+        self.run_command('--apply')
+        self.assertTrue('к записи: задач 0' in self.run_command(), 'проход не идемпотентен')
+        snapshot = glob.glob(os.path.join(self.report, 'snapshot_*.json'))[0]
+        call_command('test_options_from_statement', '--revert', snapshot, stdout=io.StringIO())
+        self.assertEqual(self.statement(self.tail),
+                         'Кривая Лаффера показывает неравенство доходов.\n\n\n1) Верно  2) Неверно')
+        self.assertEqual(ProblemPart.objects.filter(problem=self.tail).count(), 2)

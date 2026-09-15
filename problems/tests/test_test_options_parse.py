@@ -8,7 +8,7 @@
 from django.test import SimpleTestCase
 
 from problems.test_options_parse import (
-    boolean_correct_label, correct_labels, formula_worse, parse_options,
+    boolean_correct_label, correct_labels, cut_boolean_tail, formula_worse, parse_options,
     parse_with_reason,
 )
 
@@ -76,6 +76,69 @@ class ParseOptionsTests(SimpleTestCase):
 
     def test_empty_option_text_is_rejected(self):
         self.assertEqual(parse_with_reason('Вопрос?\n1) да\n2) ;'), (None, 'mixed_style'))
+
+
+class RepeatedNumberTests(SimpleTestCase):
+    """«1. (1) текст»: номер строки, повторённый в варианте, — не текст (решение 15.09)."""
+
+    def test_number_in_brackets_equal_to_label_is_dropped(self):
+        parsed = parse_options('Что будет с кофе?\n1. (1) спрос растёт;\n2. (2) спрос падает.')
+        self.assertEqual(parsed.options, (('1', 'спрос растёт'), ('2', 'спрос падает')))
+
+    def test_number_with_bracket_or_dot_equal_to_label_is_dropped(self):
+        self.assertEqual(parse_options('Вопрос?\n1. 1) да\n2. 2) нет').options,
+                         (('1', 'да'), ('2', 'нет')))
+        self.assertEqual(
+            parse_options('Когда прибыль максимальна?\n1. 1. $P = MC$\n2. 2. $P = AC$').options,
+            (('1', '$P = MC$'), ('2', '$P = AC$')))
+
+    def test_other_numbers_stay_in_the_text(self):
+        # Номер не равен метке — это текст варианта (ссылка на пункты условия).
+        self.assertEqual(parse_options('Какие верны?\n1. (2) и (3)\n2. (3) и (4)').options,
+                         (('1', '(2) и (3)'), ('2', '(3) и (4)')))
+        # Число без пробела после точки и число без скобки — тоже текст.
+        self.assertEqual(parse_options('Сколько?\n1. 1.5 млн\n2. 2.5 млн').options,
+                         (('1', '1.5 млн'), ('2', '2.5 млн')))
+        self.assertEqual(parse_options('Сколько?\n1) 1 000 рублей\n2) 2 000 рублей').options,
+                         (('1', '1 000 рублей'), ('2', '2 000 рублей')))
+
+    def test_answer_with_repeated_number_still_matches(self):
+        parsed = parse_options('Что будет с кофе?\n1. (1) спрос растёт;\n2. (2) спрос падает.')
+        self.assertEqual(correct_labels('2. (2) спрос падает;', parsed), {'2'})
+        self.assertEqual(correct_labels('спрос растёт', parsed), {'1'})
+
+
+class BooleanTailTests(SimpleTestCase):
+    """Хвост «Верно/Неверно» у «верно/неверно» с плитками (решение 15.09)."""
+
+    def test_one_line_tail_is_cut(self):
+        for tail in ('1) Верно  2) Неверно', 'а) верно\tб) неверно', 'Верно Неверно'):
+            with self.subTest(tail=tail):
+                self.assertEqual(cut_boolean_tail('Спрос растёт.\n\n\n%s\n' % tail),
+                                 ('Спрос растёт.', 'boolean_tail'))
+
+    def test_two_line_tail_is_cut_with_header(self):
+        for tail in ('1. Верно.\n2. Неверно.', '1. 1) Верно\n2. 2) Неверно',
+                     '(1) верно;\n\n(2) неверно'):
+            with self.subTest(tail=tail):
+                self.assertEqual(cut_boolean_tail('Спрос растёт.\n%s' % tail),
+                                 ('Спрос растёт.', 'boolean_tail'))
+        self.assertEqual(
+            cut_boolean_tail('Спрос растёт.\nВарианты ответа:\n\n1) Верно\n2) Неверно'),
+            ('Спрос растёт.', 'boolean_tail'))
+
+    def test_statement_text_is_not_a_tail(self):
+        for text in ('Верно ли, что спрос растёт?',
+                     'Спрос растёт.\nНеверно, что цена падает.',
+                     'Спрос растёт.\n1) Верно 2) Неверно, если цена растёт.',
+                     'Спрос растёт.\n1) Верно',
+                     'Спрос растёт.\n1) Верно\n2) Верно',
+                     'Спрос растёт.\n1) Верно 2) Неверно 3) Не знаю',
+                     'Спрос растёт.\n2) Верно\n3) Неверно',
+                     'Спрос растёт.\n1) Да\n2) Нет'):
+            with self.subTest(text=text):
+                self.assertEqual(cut_boolean_tail(text), (None, 'no_tail'))
+        self.assertEqual(cut_boolean_tail('1) Верно\n2) Неверно'), (None, 'empty_stem'))
 
 
 class CorrectLabelsTests(SimpleTestCase):

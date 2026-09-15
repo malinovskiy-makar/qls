@@ -20,7 +20,13 @@
 Что пишется: подпункты (`label`, `statement` = текст варианта, `answer` =
 «верно» у верных и пусто у остальных, `order` с нуля, `points` пусто) и
 `statement` = условие без блока — только у `single`/`multi`. У «верно/неверно»
-условие не меняется, подпункты — «а» Верно, «б» Неверно, как у живых.
+этот проход условие не меняет, подпункты — «а» Верно, «б» Неверно, как у живых.
+
+Проход `--boolean-tail` (Фаза 8½, решение владельца 15.09): у ВСЕХ
+«верно/неверно» с подпунктами вырезает из хвоста условия строку вариантов
+«1) Верно  2) Неверно» — плитки её дублируют. Подпункты он не трогает;
+задача без живого виджета не трогается вовсе: там строка — единственные
+варианты, которые видит ученик.
 
 ⚠️ ВЕРНЫЕ ОТМЕЧАЮТСЯ В ПОДПУНКТАХ, А НЕ В `Problem.answer`. Ответ трогать
 нельзя, а у большинства одиночных он хранит строку варианта целиком
@@ -31,11 +37,16 @@
 ⚠️ Эмбеддинги переписанных условий устаревают — их подхватит
 `build_embeddings --stale`; команда их не трогает.
 ⚠️ `answer`, `solution`, `status`, `human_review`, `content_status` не трогаются.
+⚠️ ОТКАТ НЕСКОЛЬКИХ СНИМКОВ — В ОБРАТНОМ ПОРЯДКЕ, от последнего к первому.
+Откат ищет в базе условие «после» своего снимка: если поверх легла следующая
+запись, условие он назовёт правленым и оставит.
 
 Запуск:
     manage.py test_options_from_statement                        # сухой прогон
     manage.py test_options_from_statement --apply
     manage.py test_options_from_statement --revert reports/night_20260915/test_options/snapshot_<время>.json
+    manage.py test_options_from_statement --revert <снимок> --ids 59576,59593   # только эти задачи
+    manage.py test_options_from_statement --boolean-tail [--apply]
 """
 import html
 import json
@@ -52,7 +63,7 @@ from catalog import testplay
 from problems import problem_types
 from problems.models import Problem, ProblemPart
 from problems.test_options_parse import (
-    BOOLEAN_PARTS, boolean_correct_label, correct_labels, formula_worse,
+    BOOLEAN_PARTS, boolean_correct_label, correct_labels, cut_boolean_tail, formula_worse,
     parse_with_reason,
 )
 
@@ -61,7 +72,8 @@ DEFAULT_REPORT = 'reports/night_20260915/test_options'
 KINDS = (problem_types.SINGLE, problem_types.MULTI, problem_types.BOOLEAN)
 REASONS = ('parsed', 'boolean_synthetic', 'no_block', 'mixed_style',
            'verb_like_subquestion', 'empty_stem', 'answer_mismatch',
-           'single_multi_correct', 'formula_balance')
+           'single_multi_correct', 'formula_balance', 'boolean_tail', 'no_tail',
+           'no_widget')
 CORRECT = 'верно'
 EXAMPLES = 20
 EDGES = 5
@@ -75,6 +87,13 @@ def read_ids(path):
     with open(path, encoding='utf-8') as handle:
         return [int(line.split('\t')[0]) for line in handle
                 if line.strip() and not line.startswith('#')]
+
+
+def parse_ids(value):
+    """id из `--ids`: «ID,ID,…» или путь к файлу в формате `read_ids`."""
+    if Path(value).is_file():
+        return read_ids(value)
+    return [int(chunk) for chunk in value.replace(' ', '').split(',') if chunk]
 
 
 def plan_for(problem, kind):
@@ -106,6 +125,19 @@ def plan_for(problem, kind):
     return {'stem': parsed.stem, 'parts': parts, 'correct': sorted(correct)}, 'parsed'
 
 
+def tail_plan_for(problem, _kind):
+    """План прохода `--boolean-tail`: только новое условие, подпункты не трогаются."""
+    stem, reason = cut_boolean_tail(problem.statement)
+    if stem is None:
+        return None, reason
+    if formula_worse(problem.statement, stem):
+        return None, 'formula_balance'
+    # Плиток нет — строка в условии и есть единственные варианты для ученика.
+    if testplay.game_of(problem) is None:
+        return None, 'no_widget'
+    return {'stem': stem, 'parts': [], 'correct': []}, 'boolean_tail'
+
+
 class Command(BaseCommand):
     help = ('Варианты теста из текста условия — в подпункты (по умолчанию сухой '
             'прогон с отчётом; --apply пишет со снимком; --revert откатывает).')
@@ -121,21 +153,40 @@ class Command(BaseCommand):
         parser.add_argument('--ids-file', default=DEFAULT_IDS,
                             help='Файл id кандидатов (по умолчанию %(default)s); '
                                  'объём сверяется с базой заново.')
+        parser.add_argument('--ids', default='',
+                            help='Только эти задачи: «ID,ID,…» или файл id. Сухой '
+                                 'прогон и --apply берут кандидатов отсюда вместо '
+                                 '--ids-file, --revert откатывает только их.')
+        parser.add_argument('--boolean-tail', action='store_true',
+                            help='Проход «верно/неверно» с подпунктами по всему '
+                                 'банку: вырезать из хвоста условия строку «1) '
+                                 'Верно  2) Неверно».')
         parser.add_argument('--limit', type=int, default=0,
                             help='Не больше N кандидатов (0 — все).')
         parser.add_argument('--report', default=DEFAULT_REPORT,
                             help='Куда писать отчёт и снимок (%(default)s).')
 
     def handle(self, *args, **options):
+        only = parse_ids(options['ids']) if options['ids'] else None
         if options['revert']:
-            return self._revert(Path(options['revert']))
+            return self._revert(Path(options['revert']), only)
         report_dir = Path(options['report'])
         report_dir.mkdir(parents=True, exist_ok=True)
-        ids = read_ids(options['ids_file'])
+        if options['boolean_tail']:
+            source = ('«верно/неверно» с подпунктами, %s'
+                      % ('--ids: id %d' % len(only) if only is not None else 'весь банк'))
+            candidates = self._boolean_candidates(only, options['limit'])
+            planner = tail_plan_for
+        else:
+            ids = only if only is not None else read_ids(options['ids_file'])
+            source = ('--ids: id %d' % len(ids) if only is not None
+                      else 'файл id %s, строк %d' % (options['ids_file'], len(ids)))
+            candidates = self._candidates(ids, options['limit'])
+            planner = plan_for
         plans, reasons, kinds, rejected = [], Counter(), Counter(), defaultdict(list)
-        for problem, kind in self._candidates(ids, options['limit']):
+        for problem, kind in candidates:
             kinds[kind] += 1
-            plan, reason = plan_for(problem, kind)
+            plan, reason = planner(problem, kind)
             reasons[reason] += 1
             if plan is None:
                 rejected[reason].append(problem.pk)
@@ -145,16 +196,14 @@ class Command(BaseCommand):
             plans.append(plan)
         plans.sort(key=lambda plan: plan['id'])
 
-        self.stdout.write('Файл id: %s — строк %d; кандидатов (тест без подпунктов): %d %s'
-                          % (options['ids_file'], len(ids), sum(kinds.values()),
-                             dict(kinds)))
+        self.stdout.write('Кандидаты — %s: %d %s' % (source, sum(kinds.values()), dict(kinds)))
         for reason in REASONS:
             self.stdout.write('   %-24s %d' % (reason, reasons.get(reason, 0)))
         self.stdout.write('   к записи: задач %d, подпунктов %d, условий переписать %d'
                           % (len(plans), sum(len(p['parts']) for p in plans),
                              sum(1 for p in plans if p['stem'] is not None)))
         snapshot = self._apply(plans, report_dir) if options['apply'] and plans else None
-        self._report(report_dir, ids, kinds, reasons, plans, rejected, options, snapshot)
+        self._report(report_dir, source, kinds, reasons, plans, rejected, options, snapshot)
         if not options['apply']:
             self.stdout.write(self.style.WARNING(
                 'Сухой прогон: база не менялась. Отчёт: %s' % (report_dir / 'REPORT.md')))
@@ -176,6 +225,24 @@ class Command(BaseCommand):
                 found += 1
                 if limit and found >= limit:
                     return
+
+    def _boolean_candidates(self, only, limit):
+        """(задача, вид) — «верно/неверно» С подпунктами: весь банк или `--ids`."""
+        # ⚠️ order_by() обязателен: сортировка модели попала бы в DISTINCT.
+        types = [value for value in (Problem.objects.order_by()
+                                     .values_list('problem_type', flat=True).distinct())
+                 if problem_types.test_kind(value) == problem_types.BOOLEAN]
+        wanted = set(only) if only is not None else None
+        found = 0
+        for problem in (Problem.objects.filter(problem_type__in=types)
+                        .annotate(parts_count=Count('parts')).filter(parts_count__gt=0)
+                        .only('id', 'problem_type', 'statement', 'answer').order_by('pk')):
+            if wanted is not None and problem.pk not in wanted:
+                continue
+            yield problem, problem_types.BOOLEAN
+            found += 1
+            if limit and found >= limit:
+                return
 
     def _apply(self, plans, report_dir):
         path = report_dir / ('snapshot_%s.json' % timezone.now().strftime('%Y%m%d_%H%M%S'))
@@ -235,8 +302,13 @@ class Command(BaseCommand):
                 'ИНВАРИАНТ: виджет теста не собрался у %d задач (%s) — транзакция '
                 'отменена.' % (len(dead), dead[:20]))
 
-    def _revert(self, path):
+    def _revert(self, path, only=None):
         data = json.loads(path.read_text(encoding='utf-8'))
+        absent = []
+        if only is not None:
+            wanted = set(map(str, only))
+            absent = sorted(wanted - set(data), key=int)
+            data = {key: entry for key, entry in data.items() if key in wanted}
         restored = deleted = 0
         edited_parts, edited_statements, missing = [], [], []
         with transaction.atomic():
@@ -263,7 +335,9 @@ class Command(BaseCommand):
                     continue
                 Problem.objects.filter(pk=pk).update(statement=entry['statement_before'])
                 restored += 1
-        self.stdout.write('Откат по %s: задач в снимке %d' % (path, len(data)))
+        self.stdout.write('Откат по %s: задач к откату %d' % (path, len(data)))
+        if only is not None:
+            self.stdout.write('   id из --ids, которых нет в снимке: %s' % absent[:50])
         self.stdout.write('   условий возвращено: %d; подпунктов удалено: %d'
                           % (restored, deleted))
         self.stdout.write('   подпункты правили после записи — оставлены: %s' % edited_parts)
@@ -271,14 +345,15 @@ class Command(BaseCommand):
         self.stdout.write('   подпунктов из снимка уже нет: %s' % missing[:50])
         return None
 
-    def _report(self, report_dir, ids, kinds, reasons, plans, rejected, options, snapshot):
+    def _report(self, report_dir, source, kinds, reasons, plans, rejected, options, snapshot):
         mode = 'запись' if options['apply'] else 'сухой прогон'
+        title = ('Хвост «Верно/Неверно» у тестов верно/неверно' if options['boolean_tail']
+                 else 'Варианты теста из условия')
         rewritten = [plan for plan in plans if plan['stem'] is not None]
-        lines = ['# Варианты теста из условия — отчёт (%s, %s)'
-                 % (mode, timezone.localtime().strftime('%d.%m.%Y %H:%M')), '',
-                 'Файл id: `%s` — строк %d. Кандидатов по базе (тест single/multi/'
-                 'boolean без подпунктов): %d — %s.'
-                 % (options['ids_file'], len(ids), sum(kinds.values()), dict(kinds))]
+        lines = ['# %s — отчёт (%s, %s)'
+                 % (title, mode, timezone.localtime().strftime('%d.%m.%Y %H:%M')), '',
+                 'Кандидаты — %s. По базе: %d — %s.'
+                 % (source, sum(kinds.values()), dict(kinds))]
         if options['limit']:
             lines.append('⚠️ Охват ограничен `--limit %d`.' % options['limit'])
         lines += ['', '## Причины', '', '| причина | задач |', '|---|---:|']
@@ -287,9 +362,10 @@ class Command(BaseCommand):
                   % (len(plans), sum(len(p['parts']) for p in plans), len(rewritten))]
         if snapshot:
             lines += ['', '**Записано.** Снимок для отката: `%s`' % snapshot]
-        lines += ['', '## Число вариантов (single/multi)', '']
-        lines += ['- %d: %d задач' % item
-                  for item in sorted(Counter(len(p['parts']) for p in rewritten).items())]
+        sizes = Counter(len(p['parts']) for p in rewritten if p['parts'])
+        if sizes:
+            lines += ['', '## Число вариантов (single/multi)', '']
+            lines += ['- %d: %d задач' % item for item in sorted(sizes.items())]
         sample = random.Random(SEED).sample(plans, min(EXAMPLES, len(plans)))
         by_cut = sorted(rewritten, key=lambda p: len(p['statement']) - len(p['stem']))
         edges = by_cut if len(by_cut) <= 2 * EDGES else by_cut[:EDGES] + by_cut[-EDGES:]
@@ -313,7 +389,7 @@ def _example(plan):
             plan['statement'], '```', '', 'Стало:', '', '```', after, '```', '',
             'Подпункты:', '']
     rows += ['- `%s` %s%s' % (label, text, ' — **верный**' if answer == CORRECT else '')
-             for label, text, answer in plan['parts']]
+             for label, text, answer in plan['parts']] or ['(подпункты не меняются)']
     rows += ['', 'Ответ задачи (не меняется): `%s`' % plan['answer'].replace('\n', ' / '), '']
     return rows
 
