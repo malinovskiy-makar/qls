@@ -1456,6 +1456,36 @@ body.figfull .vignette.alarm { opacity: .42; }
 .quit-actions button:focus-visible { outline: 2px solid var(--rush-accent);
                                      outline-offset: 2px; }
 
+/* ── «Бесконечные тесты» (решение владельца 15.09.2026) ─────────────────
+   Полоса на старте — как карточка режима. В игре body.practice прячет всё,
+   что про время, жизни и очки, и показывает счётчик и «Назад / Вперёд». */
+.practice-band { margin-top: 22px; display: flex; align-items: center; gap: 14px;
+  flex-wrap: wrap; padding: 14px 18px; border: 1px solid var(--rush-border);
+  border-radius: 16px; background: var(--rush-surface); color: var(--text); }
+.practice-band[hidden] { display: none; }
+.practice-text { flex: 1 1 220px; display: flex; flex-direction: column; gap: 2px; }
+.practice-text b { font-size: 17px; font-weight: 800; }
+.practice-text small { font-size: 13px; color: var(--text3); }
+.practice-count { font-size: 13px; color: var(--text2); }
+.practice-go { font: inherit; font-weight: 700; height: 44px; padding: 0 22px; border: none;
+  border-radius: 10px; background: var(--btn-bg); color: var(--on-btn); cursor: pointer; }
+.practice-go:hover { background: var(--btn-bg-hover); }
+.practice-go:disabled { opacity: .5; cursor: default; }
+.practice-go:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
+body.practice .hud-score, body.practice .timer-box, body.practice .time-track,
+body.practice .hud-lives, body.practice .hud-combo { display: none; }
+.hud-practice { display: none; font-size: 15px; color: var(--text2); }
+.hud-practice b { color: var(--text); font-variant-numeric: tabular-nums; }
+body.practice .hud-practice { display: block; }
+.practice-nav { display: none; justify-content: space-between; gap: 10px; margin-top: 14px; }
+body.practice .practice-nav { display: flex; }
+.practice-nav button { font: inherit; height: 44px; padding: 0 18px; border-radius: 10px;
+  border: 1px solid var(--rush-border); background: var(--rush-surface); color: var(--text);
+  cursor: pointer; }
+.practice-nav button:disabled { opacity: .45; cursor: default; }
+.practice-nav button:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
+.pr-sum-title { font-weight: 800; }
+
 .q-card {
   background: var(--rush-surface);
   border: 1px solid var(--rush-border);
@@ -2253,6 +2283,19 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       </aside>
       </div><!-- /start-cols -->
 
+      {% comment %} «Бесконечные тесты» (решение владельца 15.09.2026): тесты без
+         времени, жизней и очков на игровом пуле. Полоса между режимами и нижним
+         рядом входов; число вопросов под фильтром считает сервер. Пул тестов
+         пуст: полосы нет (hidden ставит скрипт). {% endcomment %}
+      <div class="practice-band" id="practice-band">
+        <div class="practice-text">
+          <b>Бесконечные тесты</b>
+          <small>без времени, жизней и очков: просто решай</small>
+        </div>
+        <span class="practice-count" id="practice-count"></span>
+        <button type="button" class="practice-go" id="practice-go">Начать</button>
+      </div>
+
       <!-- Нижний ряд входов -->
       <div class="entry-row" id="entry-row">
         <button class="entry" id="entry-daily" data-soon="1">
@@ -2381,6 +2424,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <div class="hud-lives" id="hud-lives" aria-label="Жизни"></div>
         </div>
         <div class="hud-combo" id="hud-combo"><span class="qi-slot"></span> ×1</div>
+        <div class="hud-practice">Вопрос <b id="pr-number">1</b> · верных <b id="pr-correct">0</b></div>
       </div>
       <div class="combo-toast" id="combo-toast"></div>
       <!-- Чипы вынесены НАД карточкой: .q-card — flex-обёртка ровно с
@@ -2412,6 +2456,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       <div class="opts" id="opts"></div>
       <div class="multi-actions" id="multi-actions" hidden>
         <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
+      </div>
+      <div class="practice-nav">
+        <button type="button" id="pr-back">← Назад</button>
+        <button type="button" id="pr-next">Вперёд →</button>
       </div>
       <!-- Режим «График» на узком экране: увеличенная плитка + явная
            кнопка. Второй тап по самой плитке делает то же самое. -->
@@ -2780,6 +2828,27 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     </div>
   </div>
 </div>
+{# «Бесконечные тесты»: выход спрашивает «Закончить?», затем сводка. Окно как у выхода из раунда. #}
+<div class="quit-modal" id="pr-end" hidden role="dialog" aria-modal="true"
+     aria-label="Бесконечные тесты">
+  <div class="quit-card">
+    <div id="pr-end-ask">
+      <p>Закончить?</p>
+      <div class="quit-actions">
+        <button type="button" class="quit-no" id="pr-end-no">Нет</button>
+        <button type="button" class="quit-yes" id="pr-end-yes">Да</button>
+      </div>
+    </div>
+    <div id="pr-end-sum" hidden>
+      <p class="pr-sum-title">Бесконечные тесты</p>
+      <p id="pr-sum-line"></p>
+      <div class="quit-actions">
+        <button type="button" class="quit-no" id="pr-again">Ещё раз</button>
+        <button type="button" class="quit-yes" id="pr-home">На старт</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="gameover-overlay" id="gameover-overlay" hidden>
   <div class="go-card">
     <div class="go-hearts"><span class="qi-slot"></span></div>
@@ -2933,6 +3002,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var questionShownAt = 0;      // когда показали карточку (для elapsed_ms)
   var summary = null;           // сводка забега с сервера (экран результатов)
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
+  /* «Бесконечные тесты» (решение владельца 15.09.2026), см. startPractice. */
+  var practice = false;         // идёт практика: без времени, жизней и очков
+  var practiceLog = [];         // [{q, chosen, right}] — сыгранные вопросы по порядку
+  var practiceAt = -1;          // какой из них на экране для чтения; -1 — живой
+  var practiceLive = null;      // живой вопрос, ещё без ответа
+  var practiceCount = null;     // тестов под фильтром (api_pool_counts)
 
   /* ── ТАБЛО ────────────────────────────────────────────────────────────
      ⚠️ `myTape` — ПОСЛЕДОВАТЕЛЬНОСТЬ ИСХОДОВ, а не ещё один счётчик.
@@ -3173,6 +3248,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var n = grid.children.length;
     grid.style.gridTemplateColumns =
       'repeat(' + (n === 4 ? 2 : Math.min(3, n || 1)) + ', 1fr)';
+    paintPracticeBand();
   }
 
   /* Режимы, реально показанные на экране, — по ним ходят клавиши 1–5. */
@@ -3355,6 +3431,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     countsTimer = setTimeout(function () {
       api('/game/api/pool_counts/?' + filterQuery()).then(function (d) {
         poolCounts = d.counts || {};
+        practiceCount = typeof d.practice === 'number' ? d.practice : null;
         var box = $('fcounts');
         if (box) {
           box.innerHTML = MODE_ORDER.filter(function (k) {
@@ -3554,11 +3631,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     clearAlarm();
     var mistakes = !!(opts && opts.mistakes);
     var setCode = opts && opts.setCode;
+    var wantPractice = !!(opts && opts.practice);
     var url = setCode
       ? '/game/api/session/start_set/' + encodeURIComponent(setCode) + '/'
       : mistakes
         ? '/game/api/session/start_mistakes/'
-        : '/game/api/session/start/?mode=' + encodeURIComponent(mode)
+        : '/game/api/session/start/?mode=' + encodeURIComponent(wantPractice ? 'practice' : mode)
           + '&' + filterQuery();
     api(url)
       .then(function (d) {
@@ -3568,6 +3646,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
            и никакого экрана результатов (см. api_session_start). */
         if (!d.ok) { showStartNotice(d.error || 'Не удалось начать игру'); return; }
         hideStartNotice();
+        practice = !!d.mode.practice;
+        document.body.classList.toggle('practice', practice);
+        if (practice) { startPractice(d); return; }
         setRun = d.set || null;   // забег по набору: код и происхождение
         mode = d.mode.key;        // у целевого забега режим приходит с сервера
         mistakesRun = mistakes;
@@ -3653,7 +3734,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   }
 
   function rushPause() {
-    if (state !== 'playing' || pausedAt) return;
+    // У практики нет времени: ставить нечего, а rushResume поднял бы таймер.
+    if (state !== 'playing' || pausedAt || practice) return;
     pausedAt = performance.now();
     tellServer('/game/api/pause/');
     cancelAnimationFrame(rafId);
@@ -3685,7 +3767,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function modalIsOpen() {
     return !!document.querySelector('.fb-back, .rp-back, dialog[open], '
-      + '#quit-modal:not([hidden]), #fmodal:not([hidden]), #dmodal:not([hidden])');
+      + '#quit-modal:not([hidden]), #fmodal:not([hidden]), #dmodal:not([hidden]), '
+      + '#pr-end:not([hidden])');
   }
 
   document.addEventListener('weco:modal', function (e) {
@@ -4402,6 +4485,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         hint.textContent = 'Используйте клавиши 1–' + q.options.length
           + ' для быстрого ответа, а пробел для пропуска задания';
       }
+      if (practice) hint.textContent += '. Стрелки влево и вправо листают вопросы';
     }
   }
 
@@ -4529,7 +4613,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var q = nextBuf;
       prefetchNext();
       showQuestion(q);
+      if (practice) { practiceLive = q; practiceAt = -1; paintPractice(); }
     } else if (poolExhausted) {
+      if (practice) { openPracticeEnd(true); return; }
       endRun('done'); // вопросы кончились — забег завершается досрочно
     } else if (runLost) {
       showRunLost();
@@ -4566,6 +4652,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       });
     }).then(function (d) {
       if (d.error) { answerFailed(d); return; }
+      // Практика: ни очков, ни времени, ни жизней — разбор целиком у practiceAnswer.
+      if (d.practice) { onResult(d); return; }
       if (window.weco) weco.track('game_answer', { mode: mode, correct: !!d.correct, skip: d.result === 'skip', elapsed_ms: payload.elapsed_ms, number: answered + 1 });
       // Очки, серия и жизни посчитаны сервером — здесь только присваиваем.
       if (typeof d.score === 'number') {
@@ -4700,6 +4788,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   // boolean / single / figure_audit: один клик — один ответ
   function answer(choice) {
     if (state !== 'playing' || inputLocked || !current) return;
+    if (practice) { practiceAnswer({ choice: choice }, [choice]); return; }
     // разворот закрываем: обратную связь (верно/неверно, сердца, дельту
     // времени) видно только на обычном экране
     if (figFull) setFigFull(false);
@@ -4746,6 +4835,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function submitMulti() {
     if (state !== 'playing' || inputLocked || !current) return;
     if (current.type !== 'multi' || selected.length === 0) return;
+    if (practice) { practiceAnswer({ choices: selected.slice() }, selected.slice()); return; }
     inputLocked = true;
     var q = current;
     var chosen = selected.slice();
@@ -4820,6 +4910,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   // Комбо НЕ сбрасывается.
   function skip() {
     if (state !== 'playing' || inputLocked || !current) return;
+    if (practice) { practiceAnswer({ choice: null }, []); return; }
     inputLocked = true;
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
@@ -4929,6 +5020,176 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   });
   paintSoundBtn();
 
+  /* ---------- «БЕСКОНЕЧНЫЕ ТЕСТЫ» ----------
+     Решение владельца 15.09.2026: тот же экран игры с body.practice, но без
+     таймера, жизней, очков и комбо; тесты (данетки, один и несколько верных)
+     из игрового пула под текущим фильтром. Сервер отвечает без очков и с
+     `correct_choices`, по ним подсвечиваются варианты.
+     История живёт здесь: `practiceLog` — сыгранные вопросы по порядку,
+     `practiceAt` — какой из них на экране только для чтения (-1 — живой
+     `practiceLive`). «Назад» листает историю; «Вперёд» ведёт к следующему по
+     истории, к живому вопросу или к новому, а с живого неотвеченного — это
+     пропуск. Паузы у практики нет (rushPause): времени нет. */
+  function paintPracticeBand() {
+    var band = $('practice-band');
+    var total = (CFG.practice || {}).count || 0;
+    band.hidden = !total;     // правило нуля: тестов в пуле нет — полосы нет
+    if (!total) return;
+    var n = practiceCount == null ? total : practiceCount;
+    $('practice-count').textContent = n.toLocaleString('ru-RU') + ' '
+      + plural(n, ['вопрос', 'вопроса', 'вопросов']) + ' под фильтром';
+    $('practice-go').disabled = n < 1;
+  }
+
+  function startPractice(d) {
+    if (window.weco) weco.track('practice_start', { filtered: filterQuery() !== '' });
+    setRun = null; mistakesRun = false;
+    answered = 0; correctCount = 0; skippedCount = 0;
+    practiceLog = []; practiceAt = -1; practiceLive = d.question;
+    nextBuf = null; poolExhausted = false; runLost = false; prefetchFailed = false;
+    $('vs').hidden = true;
+    $('gameover-overlay').hidden = true;
+    show('playing');
+    showQuestion(d.question);
+    paintPractice();
+    prefetchNext();
+  }
+
+  function paintPractice() {
+    var shown = practiceAt >= 0 ? practiceAt : practiceLog.length;
+    $('pr-number').textContent = shown + 1;
+    $('pr-correct').textContent = correctCount;
+    $('pr-back').disabled = shown === 0;
+  }
+
+  function practiceAnswer(body, chosen) {
+    inputLocked = true;
+    var q = current;
+    body.question_id = q.id;
+    postAnswer(body, function (d) {
+      var right = d.correct_choices || [];
+      practiceLog.push({ q: q, chosen: chosen, right: right });
+      practiceLive = null;
+      if (d.result === 'skip') { skippedCount++; advance(); return; }
+      answered++;
+      if (d.correct) correctCount++;
+      rush(d.correct ? 'correct' : 'wrong');
+      practiceAt = practiceLog.length - 1;
+      markPractice(chosen, right);
+      paintPractice();
+    });
+  }
+
+  function markPractice(chosen, right) {
+    $('opts').querySelectorAll('.opt').forEach(function (btn, i) {
+      var isRight = right.indexOf(i) !== -1;
+      var isChosen = chosen.indexOf(i) !== -1;
+      btn.classList.toggle('is-correct', isRight && isChosen);
+      btn.classList.toggle('is-wrong', isChosen && !isRight);
+      btn.classList.toggle('show-right', isRight && !isChosen);
+      btn.disabled = true;
+    });
+    $('btn-submit').disabled = true;
+  }
+
+  function showPracticeEntry(entry) {
+    showQuestion(entry.q);
+    inputLocked = true;           // прошлый вопрос — только для чтения
+    markPractice(entry.chosen, entry.right);
+    paintPractice();
+  }
+
+  function practiceBack() {
+    if (state !== 'playing') return;
+    var from = practiceAt >= 0 ? practiceAt : practiceLog.length;
+    if (from === 0) return;
+    practiceAt = from - 1;
+    showPracticeEntry(practiceLog[practiceAt]);
+  }
+
+  function practiceForward() {
+    if (state !== 'playing') return;
+    if (practiceAt < 0) { skip(); return; }          // живой без ответа: пропуск
+    if (practiceAt < practiceLog.length - 1) {
+      practiceAt++;
+      showPracticeEntry(practiceLog[practiceAt]);
+    } else if (practiceLive) {                       // назад ушли с живого: вернуться
+      practiceAt = -1;
+      showQuestion(practiceLive);
+      paintPractice();
+    } else {
+      advance();                                     // живой отвечен: новый вопрос
+    }
+  }
+
+  var practicePrevFocus = null;
+  function openPracticeEnd(summaryNow) {
+    if (state !== 'playing' || !$('pr-end').hidden) return;
+    practicePrevFocus = document.activeElement;
+    $('pr-end').hidden = false;
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: true } }));
+    $('pr-end-ask').hidden = !!summaryNow;
+    $('pr-end-sum').hidden = !summaryNow;
+    if (summaryNow) { finishPractice(); return; }
+    $('pr-end-no').focus();
+  }
+
+  function closePracticeEnd() {
+    $('pr-end').hidden = true;
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: false } }));
+    if (practicePrevFocus && practicePrevFocus.focus) practicePrevFocus.focus();
+  }
+
+  function finishPractice() {
+    $('pr-end-ask').hidden = true;
+    $('pr-end-sum').hidden = false;
+    $('pr-sum-line').textContent = 'Считаем…';
+    $('pr-again').focus();
+    if (window.weco) weco.track('practice_end', { answered: answered, correct: correctCount, skipped: skippedCount });
+    api('/game/api/session/finish/', { method: 'POST', body: JSON.stringify({ reason: 'done' }) })
+      .then(function (d) { paintPracticeSummary(d && d.summary); },
+            function () { paintPracticeSummary(null); });
+  }
+
+  function paintPracticeSummary(res) {
+    // Нет связи — те же числа из своих счётчиков: их по ходу присылал сервер.
+    if (!res || typeof res.answered !== 'number') {
+      res = { answered: answered, correct: correctCount, skipped: skippedCount,
+              accuracy: answered ? Math.round(100 * correctCount / answered) : 0 };
+    }
+    $('pr-sum-line').textContent = 'Решено ' + res.answered + ', верных ' + res.correct
+      + ', пропущено ' + res.skipped + ', точность ' + res.accuracy + ' %';
+  }
+
+  function leavePractice() {
+    practice = false;
+    document.body.classList.remove('practice');
+    closePracticeEnd();
+  }
+
+  $('practice-go').addEventListener('click', function () {
+    hideStartNotice();
+    startRun({ practice: true });
+  });
+  $('pr-back').addEventListener('click', practiceBack);
+  $('pr-next').addEventListener('click', practiceForward);
+  $('pr-end-no').addEventListener('click', closePracticeEnd);
+  $('pr-end-yes').addEventListener('click', finishPractice);
+  $('pr-again').addEventListener('click', function () {
+    leavePractice();
+    startRun({ practice: true });
+  });
+  $('pr-home').addEventListener('click', function () {
+    leavePractice();
+    show('start');
+    renderModeCards();
+  });
+  /* Клавиатура окна: Esc = «Нет», и события не уходят в игру под окном. */
+  $('pr-end').addEventListener('keydown', function (e) {
+    e.stopPropagation();
+    if (e.key === 'Escape' && !$('pr-end-ask').hidden) { e.preventDefault(); closePracticeEnd(); }
+  });
+
   /* ---------- ВЫХОД ИЗ ЗАБЕГА ---------- */
   /* ⚠️ ОКНО ВЫХОДА СТАВИТ ЗАБЕГ НА ПАУЗУ, как любое окно поверх игры
      (решение владельца 15.09.2026, см. rushPause). До 15.09 таймер здесь
@@ -4939,6 +5200,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function openQuit() {
     if (state !== 'playing') return;
+    if (practice) { openPracticeEnd(false); return; }
     quitPrevFocus = document.activeElement;
     $('quit-modal').hidden = false;
     document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: true } }));
@@ -6425,6 +6687,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     if (state === 'playing') {
       if (!current) return;
+      if (practice) {
+        // Практика: стрелки листают, пробел и стрелка вправо ведут дальше.
+        if (e.key === 'ArrowLeft') { e.preventDefault(); practiceBack(); return; }
+        if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); practiceForward(); return; }
+        if (e.key === 'Escape') { e.preventDefault(); openPracticeEnd(false); return; }
+      }
       if (current.type === 'figure_audit') {
         /* ⚠️ Здесь пробел РАЗВОРАЧИВАЕТ чертёж, а не пропускает вопрос:
            без разворота режим не играется (чертёж мелкий), и это главное

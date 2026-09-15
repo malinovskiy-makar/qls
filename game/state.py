@@ -58,6 +58,9 @@ def cache_key(run_id):
 
 def ttl_for(mode):
     u"""Срок жизни состояния забега этого режима, секунды."""
+    # У «Бесконечных тестов» нет длительности: решать можно долго (15.09.2026).
+    if mode == config.PRACTICE['key']:
+        return config.PRACTICE_TTL
     duration = config.MODES.get(mode, {}).get('duration', 600)
     return 2 * duration + TTL_SLACK
 

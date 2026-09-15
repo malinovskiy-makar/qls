@@ -146,6 +146,8 @@ def _mode_enabled(mode):
     фильтром — это НЕДОСТИЖИМОСТЬ режима. Пустой пул ПОД ФИЛЬТРОМ у
     режима, у которого вопросы вообще есть, — другая вещь (см.
     `_candidate_rows` в `api_session_start`)."""
+    if mode == config.PRACTICE['key']:
+        return any(_mode_enabled(key) for key in config.practice_modes())
     qtype = config.MODES[mode]['question_type']
     return _pool_qs().filter(question_type=qtype).exists()
 
@@ -310,6 +312,14 @@ def _candidate_rows(state):
     и здесь длинная таблица честно засчитывается целиком: на замере это
     разошлось у 2 вопросов из 10 076, и всегда в СТРОГУЮ сторону.
     """
+    if state['mode'] == config.PRACTICE['key']:
+        # «Бесконечные тесты» — кандидаты режимов их типов вместе, с порогами
+        # длины этих режимов: тогда счётчик практики ровно сумма их счётчиков,
+        # и экран не обещает больше, чем даст выдача.
+        out = []
+        for key in config.practice_modes():
+            out.extend(_candidate_rows(dict(state, mode=key)))
+        return out
     f = normalize_filter(state.get('filter'))
     mode = state['mode']
     qtype = config.MODES[mode]['question_type']
@@ -480,6 +490,8 @@ def api_pool_counts(request):
     return JsonResponse({
         'counts': counts,
         'total': sum(counts.values()),
+        # «Бесконечные тесты»: сумма режимов их типов — ровно столько даст выдача.
+        'practice': sum(counts[key] for key in config.practice_modes()),
         # Режим, у которого под фильтром меньше этого числа, играть нельзя:
         # забег из трёх вопросов — не забег.
         'min_playable': config.MIN_PLAYABLE,
@@ -525,6 +537,48 @@ def _mode_payload(mode_key):
         'time_skip': m['time_skip'],
         'lives': m['lives'],
     }
+
+
+def _practice_payload():
+    """«Бесконечные тесты» для клиента: времени и жизней у практики нет вовсе."""
+    return {'key': config.PRACTICE['key'], 'title': config.PRACTICE['title'],
+            'question_types': list(config.PRACTICE['question_types']), 'practice': True}
+
+
+def practice_summary(state):
+    u"""Сводка «Бесконечных тестов»: решено (без пропусков), верных, пропущено, точность."""
+    outcomes = list((state.get('answered') or {}).values())
+    correct = outcomes.count('correct')
+    answered = correct + outcomes.count('wrong')
+    return {'answered': answered, 'correct': correct, 'skipped': outcomes.count('skip'),
+            'accuracy': round(100 * correct / answered) if answered else 0}
+
+
+def _practice_answer(request, state, gq, is_skip, correct):
+    u"""Ответ в «Бесконечных тестах» (решение владельца 15.09.2026).
+
+    Ни очков, ни времени, ни жизней: только исход — для сводки и подсветки.
+    ⚠️ `correct_choices` ОТДАЁТСЯ ТОЛЬКО ЗДЕСЬ: в раунде верный вариант
+    приходит своими полями по типу вопроса. ⚠️ Статистику вопроса практика НЕ
+    пишет: ответ без часов, и доля верных вместе с ним стала бы легче, чем в
+    раунде, по которому считается измеренная сложность.
+    """
+    result = 'skip' if is_skip else ('correct' if correct else 'wrong')
+    state['answered'][str(gq.id)] = result
+    state['log'].append({'question_id': gq.id, 'number': state['seen'].index(gq.id) + 1,
+                         'question_type': gq.question_type, 'outcome': result})
+    run_state.save_run(request, state)
+    payload = {
+        'result': result,
+        'correct': correct,
+        'practice': True,
+        'correct_choices': (list(gq.correct_indices or []) if gq.question_type == 'multi'
+                            else [gq.correct_index]),
+        'problem_id': gq.problem_id,
+    }
+    if gq.is_generated and gq.gen_solution:
+        payload['solution'] = gq.gen_solution
+    return JsonResponse(payload)
 
 
 @ensure_csrf_cookie
@@ -598,6 +652,10 @@ def _game_page_context(request):
             'modes': {key: _mode_payload(key) for key in config.MODES},
             'default_mode': config.DEFAULT_MODE,
             'pool_counts': pool_counts,
+            # «Бесконечные тесты»: полоса на старте. Число — весь пул их типов;
+            # под фильтром его обновляет refreshCounts (api_pool_counts).
+            'practice': {'title': config.PRACTICE['title'],
+                         'count': sum(pool_counts[key] for key in config.practice_modes())},
             'economy_version': config.ECONOMY_VERSION,
             'base_by_difficulty': config.BASE_BY_DIFFICULTY,
             'combo_steps': config.COMBO_STEPS,
@@ -690,7 +748,7 @@ def _cap_generated(state, band):
     понял бы почему. По той же причине правило не касается «Графика»: там
     все вопросы сгенерированы по устройству.
     """
-    if config.MODES[state['mode']]['question_type'] == FIGURE_AUDIT:
+    if config.MODES.get(state['mode'], {}).get('question_type') == FIGURE_AUDIT:
         return band
     served = len(state.get('seen') or [])
     gen_served = int(state.get('generated_served') or 0)
@@ -721,7 +779,8 @@ def _pick_next(request, state):
 
     rows = [(pk, d, gen) for pk, d, _t, gen in _candidate_rows(state)
             if pk not in seen_run]
-    band = escalation_slice(rows, state.get('streak', 0))
+    # В практике серии нет: эскалация по комбо держала бы её на лёгких вечно.
+    band = rows if state.get('practice') else escalation_slice(rows, state.get('streak', 0))
     candidates = [pk for pk, _d, _g in _cap_generated(state, band)]
     if not candidates:
         return None  # пул исчерпан в этом забеге
@@ -804,6 +863,7 @@ def _new_state(mode, topic, run_filter=None):
     """Чистое состояние забега. Очки/серия/жизни — серверные, клиент их
     только рисует; ended заполняется на третьей ошибке (api_answer) либо
     при завершении забега (api_session_finish)."""
+    practice = mode == config.PRACTICE['key']
     return {
         # ⚠️ У КАЖДОГО ЗАБЕГА СВОЙ ИДЕНТИФИКАТОР, а не один на сессию.
         # Дуэль адресует чужой забег по нему (state.load_by_id), и если бы
@@ -818,7 +878,10 @@ def _new_state(mode, topic, run_filter=None):
         'filter': normalize_filter(run_filter),
         'seen': [],
         'answered': {},
-        'lives': config.MODES[mode]['lives'],
+        # «Бесконечные тесты» (решение 15.09.2026): без времени, жизней и очков.
+        'practice': practice,
+        'duration': None if practice else config.MODES[mode]['duration'],
+        'lives': None if practice else config.MODES[mode]['lives'],
         'score': 0,
         'streak': 0,            # текущая серия верных подряд
         'best_streak': 0,       # лучшая серия за забег
@@ -870,7 +933,8 @@ def api_session_start(request):
     уже были и пул под фильтром исчерпался в процессе (см. `_end_reason`).
     """
     mode = request.GET.get('mode', '').strip() or config.DEFAULT_MODE
-    if mode not in config.MODES:
+    practice = mode == config.PRACTICE['key']
+    if mode not in config.MODES and not practice:
         return JsonResponse({'error': 'Неизвестный режим'}, status=400)
 
     # Режим существует в конфиге, но у него сейчас нет ни одного вопроса —
@@ -908,7 +972,7 @@ def api_session_start(request):
     run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
-        'mode': _mode_payload(mode),
+        'mode': _practice_payload() if practice else _mode_payload(mode),
         'lives': state['lives'],
         'filter': run_filter,
         'question': _question_payload(gq, 1),
@@ -921,7 +985,7 @@ def api_session_start(request):
         # рекорды»). У анонима рекордов нет — там None, и табло честно
         # говорит словами.
         'best': (lb.best_run(request.user, mode)
-                 if request.user.is_authenticated else None),
+                 if request.user.is_authenticated and not practice else None),
     })
 
 
@@ -1166,6 +1230,8 @@ def api_answer(request):
     if isinstance(checked, JsonResponse):
         return checked
     is_skip, correct = checked
+    if state.get('practice'):
+        return _practice_answer(request, state, gq, is_skip, correct)
 
     mode_cfg = config.MODES[state['mode']]
     mode_key = state['mode']
@@ -2048,6 +2114,12 @@ def api_session_finish(request):
         body = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:
         body = {}
+    if state.get('practice'):
+        # «Бесконечные тесты»: сводка без рекорда, без GameResult и без «работы
+        # над ошибками» (LAST_KEY не пишется) — решение владельца 15.09.2026.
+        state['ended'] = state.get('ended') or 'done'
+        run_state.save_run(request, state)
+        return JsonResponse({'summary': practice_summary(state), 'practice': True})
     # Открытая пауза (окно не успело сказать «закрыто») закрывается моментом
     # финиша — иначе её длительность не попала бы в зачёт.
     _close_pause(state, _now_ms())
