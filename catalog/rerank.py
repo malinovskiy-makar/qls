@@ -362,18 +362,33 @@ def _shared_corpus_version():
     return version if version is not None else _NO_CACHE
 
 
+#: Сколько секунд заняла сборка корпуса в последнем `get_corpus()` ЭТОГО
+#: потока (0 — корпус был тёплый). У каждого потока своя: под `runserver`
+#: запросы идут параллельно, и чужая сборка не должна попасть в разбивку
+#: времени чужого поиска (15.09.2026).
+_corpus_build = threading.local()
+
+
 def get_corpus():
     """(bm25.Index, {id: row}) — строится лениво при первом обращении."""
     global _corpus_cache, _corpus_cache_version
+    _corpus_build.seconds = 0.0
     version = _shared_corpus_version()
     if version is _NO_CACHE:
         if _corpus_cache is None:
-            _corpus_cache = _build_corpus()
+            _corpus_cache = _timed_build()
         return _corpus_cache
     if _corpus_cache is None or _corpus_cache_version != version:
-        _corpus_cache = _build_corpus()
+        _corpus_cache = _timed_build()
         _corpus_cache_version = version
     return _corpus_cache
+
+
+def _timed_build():
+    started = time.perf_counter()
+    corpus = _build_corpus()
+    _corpus_build.seconds = time.perf_counter() - started
+    return corpus
 
 
 def invalidate_corpus():
@@ -594,11 +609,12 @@ class RerankResult:
     """Итог одного переранжирования — для лога и для `apply()`."""
 
     __slots__ = ('ids', 'status', 'reason', 'leg_sizes', 'batches',
-                 'model_seconds', 'total_seconds', 'cost_usd', 'cache_hit')
+                 'model_seconds', 'total_seconds', 'cost_usd', 'cache_hit',
+                 'corpus_build_seconds', 'pool_seconds')
 
     def __init__(self, ids, status, reason='', leg_sizes=None, batches=0,
                 model_seconds=0.0, total_seconds=0.0, cost_usd=0.0,
-                cache_hit=False):
+                cache_hit=False, corpus_build_seconds=0.0, pool_seconds=0.0):
         self.ids = ids
         self.status = status                # 'rerank' | 'fallback'
         self.reason = reason
@@ -608,34 +624,52 @@ class RerankResult:
         self.total_seconds = total_seconds
         self.cost_usd = cost_usd
         self.cache_hit = cache_hit
+        # Сборка корпуса в холодном воркере (0 — был тёплый) и сборка пула
+        # обеими ногами БЕЗ неё: вместе с model_seconds это разбивка total.
+        self.corpus_build_seconds = corpus_build_seconds
+        self.pool_seconds = pool_seconds
 
 
 def _run(query):
     """Пул → модель → результат. Любая поломка — `status='fallback'`,
-    исключение из этой функции наружу не уходит."""
+    исключение из этой функции наружу не уходит.
+
+    ⚠️ ВРЕМЯ РАЗЛОЖЕНО ПО ШАГАМ (15.09.2026): сборка корпуса в холодном
+    воркере, сборка пула, модель. Без разбивки «20+ с» было не отличить
+    холодный воркер от медленной модели. Сборку корпуса меряет сам
+    `get_corpus()` (поток-локально), поэтому подмена `build_pool` в тестах
+    честно даёт ноль, а не запускает настоящую сборку."""
     from django.conf import settings
 
     started = time.perf_counter()
     timeout = settings.SMART_SEARCH_RERANK_TIMEOUT
     leg_sizes = {}
+    corpus_seconds = pool_seconds = 0.0
     try:
+        _corpus_build.seconds = 0.0
+        pool_started = time.perf_counter()
         pool_ids, leg_sizes, rows = build_pool(query)
+        corpus_seconds = getattr(_corpus_build, 'seconds', 0.0)
+        pool_seconds = max(0.0, time.perf_counter() - pool_started - corpus_seconds)
         if not pool_ids:
             return RerankResult(
                 [], 'fallback', reason='пустой пул', leg_sizes=leg_sizes,
-                total_seconds=time.perf_counter() - started)
+                total_seconds=time.perf_counter() - started,
+                corpus_build_seconds=corpus_seconds, pool_seconds=pool_seconds)
         ranked, usage, _scores = _score_pool(query, pool_ids, rows, timeout)
         return RerankResult(
             ranked, 'rerank', leg_sizes=leg_sizes, batches=usage['batches'],
             model_seconds=usage['model_seconds'],
             total_seconds=time.perf_counter() - started,
-            cost_usd=usage['cost_usd'])
+            cost_usd=usage['cost_usd'],
+            corpus_build_seconds=corpus_seconds, pool_seconds=pool_seconds)
     except Exception as exc:                                # noqa: BLE001
         logger.warning('умный поиск: переранжирование упало (%s) — '
                        'базовый порядок', exc, exc_info=True)
         return RerankResult(
             [], 'fallback', reason='%s: %s' % (type(exc).__name__, exc),
-            leg_sizes=leg_sizes, total_seconds=time.perf_counter() - started)
+            leg_sizes=leg_sizes, total_seconds=time.perf_counter() - started,
+            corpus_build_seconds=corpus_seconds, pool_seconds=pool_seconds)
 
 
 def rerank(query):
@@ -702,16 +736,19 @@ def _log(query, result):
     outcome = 'rerank' if result.status == 'rerank' else (
         'fallback: %s' % (result.reason or 'причина не записана'))
     logger.info(
-        'умный поиск: запрос=%r пул=%s пачек=%d модель=%.3fс всего=%.3fс '
-        'стоимость=$%.4f итог=%s%s',
-        query, result.leg_sizes, result.batches, result.model_seconds,
-        result.total_seconds, result.cost_usd, outcome,
-        ' (кэш)' if result.cache_hit else '')
+        'умный поиск: запрос=%r пул=%s пачек=%d корпус=%.3fс пул=%.3fс '
+        'модель=%.3fс всего=%.3fс стоимость=$%.4f итог=%s%s',
+        query, result.leg_sizes, result.batches, result.corpus_build_seconds,
+        result.pool_seconds, result.model_seconds, result.total_seconds,
+        result.cost_usd, outcome, ' (кэш)' if result.cache_hit else '')
     row = {
         'ts': datetime.now(timezone.utc).isoformat(),
         'query': query,
         'pool_by_leg': result.leg_sizes,
         'batches': result.batches,
+        # Разбивка total_seconds: сборка корпуса (0 — тёплый воркер), пул, модель.
+        'corpus_build_seconds': round(result.corpus_build_seconds, 3),
+        'pool_seconds': round(result.pool_seconds, 3),
         'model_seconds': result.model_seconds,
         'total_seconds': round(result.total_seconds, 3),
         'cost_usd': round(result.cost_usd, 6),

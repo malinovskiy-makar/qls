@@ -89,7 +89,12 @@ echo "[entrypoint] статика…"
 python manage.py collectstatic --noinput
 
 echo "[entrypoint] gunicorn…"
+# ⚠️ `-c` подключает config/gunicorn_conf.py: хук post_worker_init греет корпус
+# умного поиска ДО первого запроса к воркеру (catalog/warmup.py). Без него
+# холодный воркер строил корпус прямо на запросе человека. Выключить прогрев —
+# SMART_SEARCH_WARMUP=0 в /srv/weconomics/.env.
 exec gunicorn config.wsgi:application \
+    -c /app/config/gunicorn_conf.py \
     --bind 0.0.0.0:8000 \
     --workers "${GUNICORN_WORKERS:-4}" \
     --timeout 60 \
