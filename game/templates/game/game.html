@@ -1514,6 +1514,35 @@ body.figfull .vignette.alarm { opacity: .42; }
                                     vertical-align: -.15em; }
 .go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
 .go-card p { font-size: 16px; opacity: .8; margin: 0; }
+/* «Забег потерян»: та же карточка, что у конца раунда, плюс одна кнопка. */
+.go-card .lost-home { margin-top: 20px; }
+
+/* Тост о сбое связи.
+   ⚠️ Сам тост прозрачен для кликов: он не имеет права закрыть собой вариант
+   ответа, который человеку и предлагают нажать ещё раз. Кликабельна только
+   кнопка «Повторить». */
+.net-toast {
+  position: fixed; left: 50%; bottom: 24px; z-index: 55;
+  transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px;
+  max-width: calc(100vw - 32px);
+  padding: 10px 14px;
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--rush-border); border-radius: 12px;
+  box-shadow: var(--shadow-pop);
+  font-size: 14px;
+  pointer-events: none;
+}
+.net-toast[hidden] { display: none; }
+.net-toast-retry {
+  pointer-events: auto;
+  font: inherit; font-size: 14px; font-weight: 600;
+  height: 34px; padding: 0 14px;
+  border: none; border-radius: 10px;
+  background: var(--btn-bg); color: var(--on-btn);
+  cursor: pointer; white-space: nowrap;
+}
+.net-toast-retry:hover { background: var(--btn-bg-hover); }
 @media (prefers-reduced-motion: reduce) {
   .gameover-overlay { animation: none; }
 }
@@ -2745,6 +2774,19 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     <p id="go-sub">Жизни кончились</p>
   </div>
 </div>
+{# Забег потерян: состояние на сервере истекло — продолжать нечем, путь один. #}
+<div class="gameover-overlay" id="lost-overlay" hidden role="alertdialog"
+     aria-modal="true" aria-labelledby="lost-title" aria-describedby="lost-sub">
+  <div class="go-card">
+    <h2 id="lost-title">Забег потерян</h2>
+    <p id="lost-sub">Соединение или время ожидания. Начните новый.</p>
+    <button type="button" class="btn-again lost-home" id="lost-home">На старт</button>
+  </div>
+</div>
+<div class="net-toast" id="net-toast" role="status" aria-live="polite" hidden>
+  <span id="net-toast-text"></span>
+  <button type="button" class="net-toast-retry" id="net-toast-retry" hidden>Повторить</button>
+</div>
 <canvas id="confetti-canvas" width="0" height="0"></canvas>
 
 <script>
@@ -2940,7 +2982,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       // `duel_empty.html`. Получатели разные, ответ тоже.
       opts.headers = { 'X-Requested-With': 'XMLHttpRequest' };
     }
-    return fetch(url, opts).then(function (r) { return r.json(); });
+    /* ⚠️ НЕ-JSON ОТВЕТ — ЭТО ОБЪЕКТ С ОШИБКОЙ, А НЕ ИСКЛЮЧЕНИЕ. Прокси
+       отвечает на перегрузку страницей HTML (502/504), лимит — 429, истёкший
+       вход — страницей логина после редиректа; `r.json()` на них бросал, у
+       цепочки не было обработчика, и `inputLocked` оставался true навсегда:
+       кнопка горит, игра стоит. Теперь вызывающий получает {error, status}.
+       Сетевой сбой (нет соединения) по-прежнему отклоняет промис — его ловит
+       второй обработчик у тех вызовов, от которых зависит экран. */
+    return fetch(url, opts).then(function (r) {
+      if (r.ok) {
+        return r.json().catch(function () {
+          return { error: 'Некорректный ответ сервера', status: r.status };
+        });
+      }
+      return r.json().catch(function () { return {}; }).then(function (d) {
+        if (!d || typeof d !== 'object') d = {};
+        d.error = d.error || ('HTTP ' + r.status);
+        d.status = r.status;
+        return d;
+      });
+    });
   }
 
   /* -- KaTeX: рендер формул внутри узла (как в каталоге) -- */
@@ -3536,6 +3597,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         prefetchNext();
         lastTick = performance.now();
         rafId = requestAnimationFrame(tick);
+      }, function () {
+        // Нет связи — игра не началась, и игрок должен это увидеть: без
+        // строки клик по режиму выглядел бы мёртвой кнопкой.
+        showStartNotice('Нет связи — игра не началась. Попробуйте ещё раз.');
       });
   }
 
@@ -4392,25 +4457,66 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('btn-submit').disabled = selected.length === 0;
   }
 
+  /* ⚠️ БУФЕР СЛЕДУЮЩЕГО ВОПРОСА ОБЯЗАН СООБЩИТЬ О СБОЕ. Раньше промис без
+     обработчика молча терял ответ, `nextBuf` оставался пустым, и advance()
+     крутился по таймеру вечно. Теперь три повтора с растущей паузой, потом
+     признак `prefetchFailed` — по нему advance() показывает «Повторить».
+     Поколение `prefetchGen` гасит поздний ответ старой цепочки: иначе он
+     переписал бы буфер, и выданный сервером вопрос пропал бы без показа. */
+  var PREFETCH_RETRY_MS = [300, 800, 1600];
+  var prefetchGen = 0;
+  var prefetchFailed = false;
+
   function prefetchNext() {
+    var gen = ++prefetchGen;
     nextBuf = null;
-    api('/game/api/question/').then(function (d) {
-      if (d.exhausted) { poolExhausted = true; return; }
-      if (d.question) nextBuf = d.question;
-    });
+    prefetchFailed = false;
+    (function attempt(n) {
+      function retry() {
+        if (gen !== prefetchGen) return;
+        if (n < PREFETCH_RETRY_MS.length) {
+          setTimeout(function () { attempt(n + 1); }, PREFETCH_RETRY_MS[n]);
+        } else {
+          prefetchFailed = true;
+        }
+      }
+      api('/game/api/question/').then(function (d) {
+        if (gen !== prefetchGen) return;
+        if (d.exhausted) { poolExhausted = true; return; }
+        if (d.question) { nextBuf = d.question; return; }
+        // Забега на сервере нет — повторять бессмысленно.
+        if (d.reason === 'no_run') { runLost = true; return; }
+        retry();
+      }, retry);
+    })(0);
   }
+
+  var bufferWaitSince = 0;      // с какого момента advance() ждёт буфер
 
   function advance() {
     if (state !== 'playing') return;
     if (runOver) { showGameOver(); return; }  // жизни кончились
     if (nextBuf) {
+      bufferWaitSince = 0;
       var q = nextBuf;
       prefetchNext();
       showQuestion(q);
     } else if (poolExhausted) {
       endRun('done'); // вопросы кончились — забег завершается досрочно
+    } else if (runLost) {
+      showRunLost();
+    } else if (prefetchFailed) {
+      bufferWaitSince = 0;
+      showNetToast('Нет связи: следующий вопрос не загрузился', function () {
+        prefetchNext();
+        advance();
+      });
     } else {
-      // буфер ещё в пути — короткая повторная попытка
+      // Буфер ещё в пути. Ждём дольше 6 с — запрос, похоже, завис без
+      // ответа и без ошибки: заводим новую цепочку.
+      var now = performance.now();
+      if (!bufferWaitSince) bufferWaitSince = now;
+      if (now - bufferWaitSince > 6000) { bufferWaitSince = now; prefetchNext(); }
       setTimeout(advance, 120);
     }
   }
@@ -4429,7 +4535,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       method: 'POST',
       body: JSON.stringify(payload)
     }).then(function (d) {
-      if (d.error) { inputLocked = false; return; }
+      if (d.error) { answerFailed(d); return; }
       // Очки, серия и жизни посчитаны сервером — здесь только присваиваем.
       if (typeof d.score === 'number') {
         score = d.score;
@@ -4445,7 +4551,53 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       showStatChip(d);
       onResult(d);
       paintHud();
-    });
+    }, function () { answerFailed({}); });
+  }
+
+  /* ---------- СБОЙ СВЯЗИ ----------
+     Ответ не принят. Исходов три, и у каждого свой честный экран: забега на
+     сервере больше нет — сказать и увести на старт; ответ уже засчитан
+     (первый запрос дошёл, а ответ на него потерялся) — идти дальше; всё
+     прочее — вернуть кнопки и попросить нажать ещё раз. Молча снять
+     блокировку нельзя: игрок видит замершую карточку и думает, что игра
+     зависла.
+     ⚠️ 409 у сервера два: «Вопрос уже отвечен» и «Забег уже завершён». Второй
+     бывает, только если тот же забег доиграли в другой вкладке; advance() на
+     нём не замерзает — забег доиграется до конца времени. */
+  function answerFailed(d) {
+    if (d.reason === 'no_run') { showRunLost(); return; }
+    if (d.status === 409) { advance(); return; }
+    inputLocked = false;
+    // Классика блокирует поле на время отправки — возвращаем его.
+    if (current && current.type === 'numeric') $('num-input').disabled = false;
+    showNetToast('Нет связи. Нажмите ответ ещё раз');
+  }
+
+  /* Состояние забега на сервере истекло по TTL или вытеснено Redis: очки,
+     жизни и очередь вопросов живут только там, продолжать нечем. */
+  var runLost = false;
+  function showRunLost() {
+    runLost = true;
+    inputLocked = true;
+    cancelAnimationFrame(rafId);
+    clearAlarm();
+    $('net-toast').hidden = true;
+    $('lost-overlay').hidden = false;
+    $('lost-home').focus();
+  }
+
+  /* Тост внизу экрана. С кнопкой — висит, пока по ней не нажали: без неё
+     забег сам не сдвинется. Без кнопки — гаснет через три секунды. */
+  var netToastTimer = null;
+  function showNetToast(text, onRetry) {
+    var box = $('net-toast');
+    var retry = $('net-toast-retry');
+    $('net-toast-text').textContent = text;
+    retry.hidden = !onRetry;
+    retry.onclick = onRetry ? function () { box.hidden = true; onRetry(); } : null;
+    box.hidden = false;
+    clearTimeout(netToastTimer);
+    if (!onRetry) netToastTimer = setTimeout(function () { box.hidden = true; }, 3000);
   }
 
   /* «Верно отвечают N %» — справка о вопросе, а не оценка ответа игрока.
@@ -4775,6 +4927,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   $('btn-quit').addEventListener('click', openQuit);
   $('quit-no').addEventListener('click', closeQuit);
   $('quit-yes').addEventListener('click', quitRun);
+  // «Забег потерян» — только на старт: продолжать на сервере нечего.
+  $('lost-home').addEventListener('click', function () { location.href = '/game/'; });
 
   /* Клавиатура окна: Esc = «Нет», Tab не выпускает фокус наружу. Обработчик
      стоит на СВОЁМ узле и гасит событие, чтобы пробел и цифры не уходили в
