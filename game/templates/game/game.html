@@ -2089,6 +2089,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
    Показывается только когда попыток набралось достаточно (порог в
    config.py); нейтральный, без сигнальных цветов: это справка, а не
    оценка ответа игрока. */
+/* «Плохая задача?» под вопросом: справа и мелко, чтобы не спорить с ответом. */
+.report-row { display: flex; justify-content: flex-end; margin-top: 10px; }
+
 .stat-chip {
   display: inline-block;
   font-size: 11px;
@@ -2424,6 +2427,15 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           <button class="btn-submit" id="btn-num-submit">Ответить</button>
         </div>
         <div class="num-feedback" id="num-feedback"></div>
+      </div>
+      <!-- «Плохая задача?» — окно в общем партиале _problem_report.html; номер
+           вопроса ставит showQuestion. Открытое окно ставит раунд на паузу. -->
+      <div class="report-row">
+        <button type="button" class="btn-report" id="btn-report" data-source="game">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2.5 4L16 12H5"/></svg>
+          <span>Плохая задача?</span>
+        </button>
       </div>
       <p class="keys-hint" id="keys-hint">Используйте клавиши 1–4 для быстрого ответа, а пробел для пропуска задания</p>
     </div>
@@ -4257,6 +4269,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function showQuestion(q) {
     current = q;
     inputLocked = false;
+    // Жалоба «Плохая задача?» уходит с номером ИГРОВОГО вопроса: задачу по
+    // нему находит сервер, а клиенту до ответа её знать не положено.
+    $('btn-report').setAttribute('data-game-question-id', q.id);
     selected = [];
     questionShownAt = performance.now();  // для elapsed_ms в журнале забега
     var isMulti = q.type === 'multi';
@@ -6618,5 +6633,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
 {% include '_feedback.html' %}
+{% include '_problem_report.html' %}
 </body>
 </html>

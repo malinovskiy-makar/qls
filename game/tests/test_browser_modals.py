@@ -23,7 +23,7 @@ from problems.models import Problem
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_modals.mjs')
 CHECKS = {'question_same', 'no_answers_sent', 'timer_paused', 'timer_resumed',
-          'escape_closes_modal'}
+          'escape_closes_modal', 'report_window_pauses'}
 
 
 # ⚠️ ПРИЧИНА МЕТКИ `serial`: класс поднимает живой сервер и гоняет по нему

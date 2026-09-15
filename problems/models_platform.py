@@ -1631,3 +1631,61 @@ class Feedback(models.Model):
         if self.choices:
             return '; '.join(str(c) for c in self.choices)[:90]
         return self.comment.strip()[:90] or '—'
+
+
+class ProblemReport(models.Model):
+    """«Плохая задача?» — жалоба на КОНКРЕТНУЮ задачу из каталога или игры.
+
+    ⚠️ ОТДЕЛЬНО ОТ `Feedback`. Та — про экран («поиск не находит»), эта — про
+    саму задачу («это не задача», «нет графика»): одну чинят в коде, другую в
+    банке задач. Кнопка одинаковая в каталоге и в Wecon Rush, пять причин, без
+    снимка экрана (решение владельца 15.09.2026).
+
+    ⚠️ ГОСТЮ МОЖНО — как и у `Feedback`: битую задачу видит любой школьник.
+
+    ⚠️ `game_question_id` — ЧИСЛО, А НЕ ВНЕШНИЙ КЛЮЧ: `game` зависит от
+    `problems`, а не наоборот. Задачу игрового вопроса находит сервер и кладёт
+    в `problem`; у сгенерированных вопросов задачи нет, и `problem` пуст.
+    """
+
+    class Kind(models.TextChoices):
+        NOT_PROBLEM = 'not_problem', 'Это вообще не задача'
+        NO_QUESTION = 'no_question', 'Непонятно, что нужно найти'
+        FIGURE = 'figure', 'Графика или таблицы нет, либо они неправильные'
+        DISPLAY = 'display', 'Плохо отображается: формулы, символы, обрывки текста'
+        OTHER = 'other', 'Другое'
+
+    class Source(models.TextChoices):
+        CATALOG = 'catalog', 'Каталог'
+        GAME = 'game', 'Wecon Rush'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='problem_reports',
+        verbose_name='Кто написал', help_text='Пусто — писал гость.')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='problem_reports', verbose_name='Задача')
+    game_question_id = models.PositiveIntegerField('Вопрос игры', null=True, blank=True)
+    source = models.CharField('Откуда', max_length=16, choices=Source.choices)
+    kind = models.CharField('Что не так', max_length=16, choices=Kind.choices)
+    text = models.TextField('Подробнее', blank=True)   # обязателен при kind=other
+    url = models.CharField('Адрес', max_length=500, blank=True)
+    user_agent = models.CharField('Браузер', max_length=300, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    handled = models.BooleanField('Разобрано', default=False, db_index=True)
+    note = models.TextField('Пометка для своих', blank=True)
+
+    class Meta:
+        verbose_name = 'Жалоба на задачу'
+        verbose_name_plural = 'Жалобы на задачи'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        who = self.user.username if self.user_id else 'гость'
+        return '%s · %s · %s' % (self.get_kind_display(), self.get_source_display(), who)
+
+    @property
+    def short(self):
+        """Первые слова жалобы — для списка в админке; без текста — причина."""
+        return self.text.strip()[:90] or self.get_kind_display()

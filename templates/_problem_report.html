@@ -1,0 +1,193 @@
+{% comment %}
+«Плохая задача?» — окно жалобы на КОНКРЕТНУЮ задачу (решение владельца 15.09.2026).
+
+Открывается кликом по любому `.btn-report` с `data-source` и `data-problem-id`
+и/или `data-game-question-id`. Подключается сразу после `_feedback.html` во всех
+базовых шаблонах и пользуется классами его окна (`fb-*`): у двух окон один вид,
+а стили не копируются.
+
+⚠️ ПРИЧИНЫ ПРИХОДЯТ С СЕРВЕРА (`ProblemReport.Kind` через контекст-процессор):
+вторая копия текстов в разметке разошлась бы с моделью молча.
+
+⚠️ ОКНО ОБЪЯВЛЯЕТ СЕБЯ СОБЫТИЕМ `weco:modal` — по нему Wecon Rush ставит раунд
+на паузу и не пускает клавиши в игру, пока человек пишет.
+{% endcomment %}
+<style>
+/* Кнопка «Плохая задача?» — одна и та же в каталоге и в игре. Тихая: её
+   находят, когда ищут, и она не спорит с ответом за внимание. */
+.btn-report {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: 500 13px/1 var(--font-ui);
+  padding: 7px 11px; border-radius: var(--r-pill);
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text2); cursor: pointer;
+  transition: border-color var(--t), color var(--t);
+}
+.btn-report:hover { color: var(--text); border-color: var(--accent); }
+.btn-report svg { width: 15px; height: 15px; flex-shrink: 0; }
+.rp-kinds { margin-top: 16px; display: flex; flex-direction: column; gap: 8px; }
+@media print {
+  .btn-report, .rp-back { display: none !important; }
+}
+</style>
+{{ problem_report_kinds|json_script:"rp-kinds" }}
+<script>
+(function () {
+  var KINDS = [];
+  try {
+    KINDS = JSON.parse(document.getElementById('rp-kinds').textContent || '[]');
+  } catch (e) { KINDS = []; }
+  var OTHER = 'other';
+  var LABEL_OPTIONAL = 'Расскажите подробнее (необязательно)';
+  var LABEL_REQUIRED = 'Расскажите, что не так';
+
+  var open = null;
+
+  function csrf() {
+    var m = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
+    if (m) return decodeURIComponent(m[2]);
+    var f = document.querySelector('input[name=csrfmiddlewaretoken]');
+    return f ? f.value : '';
+  }
+
+  function announce(isOpen) {
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: isOpen } }));
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+
+  function close() {
+    if (!open) return;
+    var back = open.back, focus = open.focus;
+    open = null;
+    back.remove();
+    announce(false);
+    if (focus && focus.focus) focus.focus();
+  }
+
+  function build(button) {
+    var back = el('div', 'fb-back rp-back');
+    back.setAttribute('role', 'dialog');
+    back.setAttribute('aria-modal', 'true');
+    back.setAttribute('aria-labelledby', 'rp-title');
+    var box = el('div', 'fb-box rp-box');
+
+    var head = el('div', 'fb-head');
+    var title = el('div', 'fb-title', 'Что не так с этой задачей?');
+    title.id = 'rp-title';
+    var x = el('button', 'fb-x', '✕');
+    x.type = 'button';
+    x.setAttribute('aria-label', 'Закрыть');
+    head.appendChild(title); head.appendChild(x);
+    box.appendChild(head);
+    box.appendChild(el('div', 'fb-sub', 'Одна кнопка – и мы починим'));
+
+    var list = el('div', 'rp-kinds');
+    KINDS.forEach(function (pair) {
+      var label = el('label', 'fb-opt');
+      var input = document.createElement('input');
+      input.type = 'radio'; input.name = 'rp-kind'; input.value = pair[0];
+      label.appendChild(input);
+      label.appendChild(el('span', null, pair[1]));
+      list.appendChild(label);
+    });
+    box.appendChild(list);
+
+    var field = el('div', 'fb-field');
+    var areaLabel = el('label', null, LABEL_OPTIONAL);
+    areaLabel.htmlFor = 'rp-text';
+    var area = document.createElement('textarea');
+    area.id = 'rp-text';
+    area.maxLength = 2000;
+    field.appendChild(areaLabel); field.appendChild(area);
+    box.appendChild(field);
+
+    var err = el('div', 'fb-err');
+    err.hidden = true;
+    box.appendChild(err);
+
+    var row = el('div', 'fb-row');
+    var send = el('button', 'fb-send', 'Отправить');
+    send.type = 'button';
+    send.disabled = true;
+    row.appendChild(send);
+    box.appendChild(row);
+
+    function chosen() { return box.querySelector('input[name=rp-kind]:checked'); }
+
+    list.addEventListener('change', function () {
+      var kind = chosen();
+      // «Другое» без слов ничего не говорит: поле из необязательного
+      // становится обязательным, и подпись говорит об этом прямо.
+      areaLabel.textContent = kind && kind.value === OTHER ? LABEL_REQUIRED : LABEL_OPTIONAL;
+      send.disabled = !kind;
+      err.hidden = true;
+    });
+    x.addEventListener('click', close);
+    back.addEventListener('click', function (e) { if (e.target === back) close(); });
+
+    send.addEventListener('click', function () {
+      var kind = chosen();
+      if (!kind) return;
+      var text = area.value.trim();
+      if (kind.value === OTHER && !text) {
+        err.hidden = false;
+        err.textContent = 'Напишите, что не так';
+        area.focus();
+        return;
+      }
+      var data = new FormData();
+      data.append('source', button.getAttribute('data-source') || '');
+      data.append('kind', kind.value);
+      data.append('text', text);
+      data.append('url', location.pathname + location.search);
+      var problemId = button.getAttribute('data-problem-id');
+      var questionId = button.getAttribute('data-game-question-id');
+      if (problemId) data.append('problem_id', problemId);
+      if (questionId) data.append('game_question_id', questionId);
+
+      send.disabled = true;
+      fetch('/api/problem-report/', {
+        method: 'POST', body: data, credentials: 'same-origin',
+        headers: { 'X-CSRFToken': csrf() },
+      }).then(function (r) { return r.json().catch(function () { return {}; }); })
+        .then(function (answer) {
+          if (answer && answer.ok) {
+            box.innerHTML = '';
+            box.appendChild(el('div', 'fb-title', 'Спасибо, разберёмся'));
+            setTimeout(close, 1500);
+          } else {
+            send.disabled = false;
+            err.hidden = false;
+            err.textContent = (answer && answer.error) || 'Не отправилось. Попробуйте ещё раз.';
+          }
+        }, function () {
+          send.disabled = false;
+          err.hidden = false;
+          err.textContent = 'Нет связи. Попробуйте ещё раз.';
+        });
+    });
+
+    back.appendChild(box);
+    document.body.appendChild(back);
+    open = { back: back, focus: document.activeElement };
+    announce(true);
+    var first = list.querySelector('input');
+    if (first) first.focus();
+  }
+
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
+
+  document.addEventListener('click', function (event) {
+    var button = event.target.closest('.btn-report');
+    if (!button || open) return;
+    event.preventDefault();
+    build(button);
+  });
+})();
+</script>

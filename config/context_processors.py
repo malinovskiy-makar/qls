@@ -137,4 +137,16 @@ def site_meta(request):
             'page': page_key_for(request.path),
             'options': FEEDBACK_OPTIONS,
         },
+        # Причины «Плохая задача?» — из модели `ProblemReport.Kind`, по той же
+        # причине, что и варианты выше: второй список в разметке разошёлся бы.
+        'problem_report_kinds': _problem_report_kinds(),
     }
+
+
+def _problem_report_kinds():
+    """Пары (значение, подпись) причин жалобы на задачу.
+
+    Импорт внутри функции: модулю контекст-процессоров незачем тянуть модели
+    в момент собственного импорта."""
+    from problems.models_platform import ProblemReport
+    return ProblemReport.Kind.choices

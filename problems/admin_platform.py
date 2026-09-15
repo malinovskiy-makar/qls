@@ -16,6 +16,7 @@ from .models_platform import (
     ExamAttempt,
     LearningEvent,
     ProblemComment,
+    ProblemReport,
     SavedFolder,
     SavedGraph,
     SavedProblem,
@@ -178,3 +179,33 @@ class FeedbackAdmin(admin.ModelAdmin):
         response = FileResponse(handle, content_type='image/jpeg')
         response['Cache-Control'] = 'private, max-age=60'
         return response
+
+
+@admin.register(ProblemReport)
+class ProblemReportAdmin(admin.ModelAdmin):
+    """«Плохая задача?» из каталога и игры. Читается глазами, как обратная связь.
+
+    Задача — ссылкой на её страницу в каталоге: разборщик должен увидеть
+    задачу так, как её увидел школьник."""
+
+    list_display = ('created_at', 'source', 'kind', 'problem_link',
+                    'game_question_id', 'who', 'short', 'handled')
+    list_filter = ('kind', 'source', 'handled', 'created_at')
+    search_fields = ('text', 'url', 'user__username')
+    readonly_fields = ('created_at', 'source', 'kind', 'problem_link',
+                       'game_question_id', 'text', 'url', 'user_agent', 'user')
+    fields = readonly_fields + ('handled', 'note')
+    date_hierarchy = 'created_at'
+    list_select_related = ('problem', 'user')
+
+    @admin.display(description='Кто')
+    def who(self, obj):
+        return obj.user.username if obj.user_id else 'гость'
+
+    @admin.display(description='Задача')
+    def problem_link(self, obj):
+        from django.utils.html import format_html
+        if not obj.problem_id:
+            return 'нет'
+        return format_html('<a href="/catalog/problem/{}/" target="_blank" '
+                           'rel="noopener">№ {}</a>', obj.problem_id, obj.problem_id)

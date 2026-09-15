@@ -478,6 +478,98 @@ def api_feedback(request):
     return JsonResponse({'ok': True, 'id': entry.pk})
 
 
+PROBLEM_REPORT_SCOPE = 'problem_report'
+PROBLEM_REPORT_TEXT_MAX = 2000
+_INT_MAX = 2_147_483_647                 # потолок PositiveIntegerField в PostgreSQL
+
+
+def _positive_int(value):
+    """Номер из формы: None — не прислан, False — прислан не номером."""
+    if value in (None, ''):
+        return None
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return False
+    return number if 0 < number <= _INT_MAX else False
+
+
+@require_POST
+def api_problem_report(request):
+    """Принять «Плохая задача?» из каталога или из Wecon Rush.
+
+    ⚠️ ПУБЛИЧНЫЙ ЭНДПОИНТ, И ЭТО ОСОЗНАННО: битую задачу видит любой школьник,
+    в том числе без аккаунта (решение владельца 15.09.2026). Защита — CSRF
+    (декоратора `csrf_exempt` здесь нет) и тот же лимит частоты, что у
+    обратной связи, со своим счётчиком.
+
+    ⚠️ АВТОР — ТОЛЬКО `request.user`. Поля «кто» в запросе нет и быть не может.
+
+    ⚠️ ЗАДАЧУ ИГРОВОГО ВОПРОСА НАХОДИТ СЕРВЕР И НАРУЖУ ЕЁ НЕ ОТДАЁТ. До ответа
+    клиент игры `problem_id` не знает намеренно (анти-чит: по нему в каталоге
+    открывались ответ и решение), поэтому в ответе только номер жалобы.
+    """
+    from django.apps import apps
+    from problems import ratelimit
+    from problems.models import Problem
+    from problems.models_platform import ProblemReport
+
+    wait = ratelimit.check(PROBLEM_REPORT_SCOPE, request, None)
+    if wait:
+        return JsonResponse(
+            {'ok': False, 'error': 'Слишком часто. Попробуйте позже.'}, status=429)
+
+    source = (request.POST.get('source') or '').strip()
+    if source not in dict(ProblemReport.Source.choices):
+        return JsonResponse({'ok': False, 'error': 'Непонятно, откуда жалоба.'},
+                            status=400)
+    kind = (request.POST.get('kind') or '').strip()
+    if kind not in dict(ProblemReport.Kind.choices):
+        return JsonResponse({'ok': False, 'error': 'Выберите, что не так.'}, status=400)
+    text = (request.POST.get('text') or '').strip()
+    if len(text) > PROBLEM_REPORT_TEXT_MAX:
+        return JsonResponse({'ok': False, 'error': 'Слишком длинно: до 2 000 знаков.'},
+                            status=400)
+    if kind == ProblemReport.Kind.OTHER and not text:
+        return JsonResponse({'ok': False, 'error': 'Напишите, что не так'}, status=400)
+
+    problem_id = _positive_int(request.POST.get('problem_id'))
+    question_id = _positive_int(request.POST.get('game_question_id'))
+    if problem_id is False or question_id is False:
+        return JsonResponse({'ok': False, 'error': 'Номер задачи — целое число.'},
+                            status=400)
+    if problem_id is None and question_id is None:
+        return JsonResponse({'ok': False, 'error': 'Непонятно, о какой задаче речь.'},
+                            status=400)
+
+    problem = None
+    if question_id is not None:
+        # Модель игры — через реестр приложений, а не импортом: у `problems`
+        # нет зависимости от `game` в коде, связь живёт только в этом запросе.
+        # Номер задачи, присланный рядом с вопросом, не нужен: сервер знает её сам.
+        GameQuestion = apps.get_model('game', 'GameQuestion')
+        row = GameQuestion.objects.filter(pk=question_id).values('problem_id').first()
+        if row is None:
+            return JsonResponse({'ok': False, 'error': 'Вопрос не найден.'}, status=400)
+        if row['problem_id']:
+            problem = Problem.objects.filter(pk=row['problem_id']).first()
+    else:
+        problem = Problem.objects.filter(pk=problem_id).first()
+        if problem is None:
+            return JsonResponse({'ok': False, 'error': 'Задача не найдена.'}, status=400)
+
+    report = ProblemReport.objects.create(
+        user=request.user if request.user.is_authenticated else None,
+        problem=problem, game_question_id=question_id,
+        source=source, kind=kind, text=text,
+        url=(request.POST.get('url') or '')[:500],
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:300],
+    )
+    ratelimit.note_failure(PROBLEM_REPORT_SCOPE + ':ip',
+                           ratelimit.client_ip(request), multiplier=2)
+    return JsonResponse({'ok': True, 'id': report.pk})
+
+
 def _path_of(url):
     """Путь из абсолютного адреса. Чужой домен нас не интересует."""
     from urllib.parse import urlparse

@@ -93,6 +93,22 @@ try {
   check('escape_closes_modal',
         closedByEsc && (await question()) === qEsc && answerPosts === postsEsc,
         { closedByEsc, answerPosts, postsEsc });
+
+  // «Плохая задача?»: окно жалобы тоже ставит раунд на паузу.
+  await page.click('#btn-report');
+  let reportOpen = true;
+  try {
+    await page.waitForSelector('.rp-back', { timeout: 5000 });
+  } catch (e) { reportOpen = false; }
+  const r0 = await secondsLeft(page);
+  await page.waitForTimeout(1500);
+  const r1 = await secondsLeft(page);
+  if (reportOpen) {
+    await page.click('.rp-back .fb-x');
+    await page.waitForSelector('.rp-back', { state: 'detached', timeout: 5000 }).catch(() => {});
+  }
+  check('report_window_pauses', reportOpen && Math.abs(r0 - r1) <= 0.1,
+        { reportOpen, r0, r1 });
 } catch (e) {
   out.error = String((e && e.stack) || e);
 } finally {
