@@ -8,9 +8,9 @@
 окно поверх страницы, а не то, на что человек жалуется.
 
 ⚠️ СНИМОК — ПРИЯТНОЕ ДОПОЛНЕНИЕ, А НЕ УСЛОВИЕ. `html2canvas` на тяжёлой
-странице может думать секунды или упасть вовсе; на это стоит таймаут в 4
-секунды, после которого окно открывается без снимка. Держать человека ради
-картинки нельзя.
+странице может думать секунды или упасть вовсе; на это стоит таймаут в 6
+секунд (до 15.09.2026 было 4), после которого окно открывается без снимка, а
+причина уходит полем `screenshot_note`. Держать человека ради картинки нельзя.
 {% endcomment %}
 {% load static %}
 <style>
@@ -166,14 +166,18 @@
     if (focus && focus.focus) focus.focus();
   }
 
-  /** Снимок экрана. Никогда не задерживает человека дольше 4 секунд. */
+  /** Снимок экрана. Никогда не задерживает человека дольше 6 секунд.
+      Отдаёт {blob, note}: note — что стало со снимком (ok | timeout | error |
+      nolib), чтобы пустой снимок в админке объяснял сам себя. */
   function grabShot() {
     return new Promise(function (resolve) {
-      if (typeof html2canvas !== 'function') { resolve(null); return; }
+      if (typeof html2canvas !== 'function') { resolve({ blob: null, note: 'nolib' }); return; }
       var done = false;
-      var timer = setTimeout(function () {
-        if (!done) { done = true; resolve(null); }
-      }, 4000);
+      var timer = setTimeout(function () { finish(null, 'timeout'); }, 6000);
+      function finish(blob, note) {
+        if (done) return;
+        done = true; clearTimeout(timer); resolve({ blob: blob, note: note });
+      }
       try {
         html2canvas(document.documentElement, {
           scale: 1, useCORS: false, logging: false,
@@ -190,14 +194,13 @@
             target.getContext('2d').drawImage(canvas, 0, 0, target.width, target.height);
           }
           target.toBlob(function (blob) {
-            if (done) return;
-            done = true; clearTimeout(timer); resolve(blob);
+            finish(blob, blob ? 'ok' : 'error');
           }, 'image/jpeg', 0.8);
         }, function () {
-          if (!done) { done = true; clearTimeout(timer); resolve(null); }
+          finish(null, 'error');
         });
       } catch (e) {
-        if (!done) { done = true; clearTimeout(timer); resolve(null); }
+        finish(null, 'error');
       }
     });
   }
@@ -248,7 +251,7 @@
     row.appendChild(send);
     box.appendChild(row);
 
-    if (shot) box.appendChild(el('div', 'fb-shot', 'Снимок экрана приложен.'));
+    if (shot.blob) box.appendChild(el('div', 'fb-shot', 'Снимок экрана приложен.'));
 
     function renderStep2(kind) {
       step2.innerHTML = '';
@@ -310,7 +313,8 @@
       var comment = box.querySelector('.fb-comment');
       data.append('other_text', other ? other.value : '');
       data.append('comment', comment ? comment.value : '');
-      if (shot) data.append('screenshot', shot, 'shot.jpg');
+      if (shot.blob) data.append('screenshot', shot.blob, 'shot.jpg');
+      data.append('screenshot_note', shot.note);
 
       send.disabled = true;
       fetch('/api/feedback/', {

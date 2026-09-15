@@ -124,12 +124,12 @@ class FeedbackAdmin(admin.ModelAdmin):
     """Разбор жалоб и предложений. Читается глазами, а не выгружается."""
 
     list_display = ('created_at', 'kind', 'page_key', 'who', 'short',
-                    'has_shot', 'handled')
+                    'has_shot', 'screenshot_note', 'handled')
     list_filter = ('kind', 'page_key', 'handled', 'created_at')
     search_fields = ('other_text', 'comment', 'url', 'user__username')
     readonly_fields = ('created_at', 'kind', 'page_key', 'url', 'choices',
                        'other_text', 'comment', 'viewport', 'theme',
-                       'user_agent', 'user', 'shot_link')
+                       'user_agent', 'user', 'shot_link', 'screenshot_note')
     fields = readonly_fields + ('handled', 'note')
     date_hierarchy = 'created_at'
 

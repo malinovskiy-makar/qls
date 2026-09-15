@@ -79,6 +79,20 @@ try {
   await page.waitForTimeout(1500);
   const t2 = await secondsLeft(page);
   check('timer_resumed', t1 - t2 >= 1.0, { t1, t2 });
+
+  // Escape внутри окна закрывает его и в забег не проходит.
+  await page.locator('.fb-btn:visible').first().click();
+  await page.waitForSelector('.fb-back', { timeout: 15000 });
+  const qEsc = await question();
+  const postsEsc = answerPosts;
+  await page.keyboard.press('Escape');
+  let closedByEsc = true;
+  try {
+    await page.waitForSelector('.fb-back', { state: 'detached', timeout: 3000 });
+  } catch (e) { closedByEsc = false; }
+  check('escape_closes_modal',
+        closedByEsc && (await question()) === qEsc && answerPosts === postsEsc,
+        { closedByEsc, answerPosts, postsEsc });
 } catch (e) {
   out.error = String((e && e.stack) || e);
 } finally {

@@ -462,6 +462,8 @@ def api_feedback(request):
         viewport=(request.POST.get('viewport') or '')[:32],
         theme=(request.POST.get('theme') or '')[:16],
         user_agent=request.META.get('HTTP_USER_AGENT', '')[:300],
+        # Почему нет снимка — со слов браузера; только режем по длине поля.
+        screenshot_note=(request.POST.get('screenshot_note') or '')[:16],
     )
 
     shot = request.FILES.get('screenshot')

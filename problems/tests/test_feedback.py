@@ -71,6 +71,37 @@ class PageKeyTests(TestCase):
         for key in ALL_PAGE_KEYS | {'home', 'other'}:
             self.assertTrue(options_for(key), key)
 
+    def test_home_and_textbook_have_their_own_lists(self):
+        """С 15.09.2026 у главной и учебника свои варианты, а не общий список."""
+        from problems.feedback_options import FEEDBACK_OPTIONS
+        self.assertNotEqual(options_for('home'), FEEDBACK_OPTIONS['other'])
+        self.assertNotEqual(options_for('textbook'), FEEDBACK_OPTIONS['other'])
+        self.assertIn('Непонятно, с чего начать', options_for('home'))
+        self.assertIn('Не открывается нужная глава', options_for('textbook'))
+
+    def test_problem_screen_stays_a_catalog_alias(self):
+        """Жалобы на саму задачу — в «Плохая задача»; здесь — про экран."""
+        self.assertEqual(options_for('problem'), options_for('catalog'))
+
+    def test_catalog_and_game_lists_are_the_owners_wording(self):
+        """Формулировки владельца 15.09.2026, словами школьника и по порядку."""
+        self.assertEqual(options_for('catalog'), [
+            'Поиск не находит нужное',
+            'Поиск слишком долгий',
+            'Фильтры работают не так',
+            'Тест не даёт выбрать вариант',
+            'Формулы или картинки отображаются неправильно',
+            'Задача открывается долго или не открывается',
+        ])
+        self.assertEqual(options_for('game'), [
+            'Игра зависла, кнопки не нажимаются',
+            'Вопрос с ошибкой или без верного ответа',
+            'Таймер, очки или жизни считаются странно',
+            'Дуэль не соединилась или не стартовала',
+            'Звук или анимация мешают',
+            'Не понял правила',
+        ])
+
 
 class AcceptTests(MediaTempMixin, TestCase):
     """Приём записи."""
@@ -115,6 +146,14 @@ class AcceptTests(MediaTempMixin, TestCase):
         self._post(choices=['График построен неправильно', 'выдуманное'])
         self.assertEqual(Feedback.objects.get().choices,
                          ['График построен неправильно'])
+
+    def test_screenshot_note_is_saved_and_trimmed(self):
+        """Что стало со снимком — сохраняется; мусор режется до 16 знаков."""
+        self._post(screenshot_note='timeout')
+        self.assertEqual(Feedback.objects.get().screenshot_note, 'timeout')
+        Feedback.objects.all().delete()
+        self._post(screenshot_note='x' * 50)
+        self.assertEqual(Feedback.objects.get().screenshot_note, 'x' * 16)
 
     def test_screenshot_is_recompressed(self):
         response = self.client.post('/api/feedback/', {
@@ -305,3 +344,14 @@ class OnEveryScreenTests(TestCase):
         block = html.split('@media print', 1)[1][:200]
         self.assertIn('.fb-btn', block)
         self.assertIn('.tg-fab', block)
+
+
+class ScreenshotNoteScriptTests(TestCase):
+    """Скрипт окна шлёт причину пустого снимка и ждёт снимок до 6 секунд."""
+
+    def test_script_sends_the_note_and_waits_six_seconds(self):
+        src = io.open('templates/_feedback.html', encoding='utf-8').read()
+        self.assertTrue("data.append('screenshot_note', shot.note)" in src)
+        self.assertTrue("finish(null, 'timeout'); }, 6000)" in src)
+        for note in ("'ok'", "'timeout'", "'error'", "'nolib'"):
+            self.assertTrue(note in src, note)

@@ -1600,6 +1600,11 @@ class Feedback(models.Model):
     # из запроса. Разбор — docs/SECURITY.md, раздел «Пользовательские файлы».
     screenshot = models.ImageField('Снимок экрана', upload_to='feedback/%Y/%m/',
                                    blank=True)
+    # Что стало со снимком на стороне браузера: ok — снят; timeout —
+    # html2canvas не уложился в 6 с; error — упал; nolib — не загрузился.
+    # Без поля пустой снимок в админке не отличить от сбоя (15.09.2026).
+    # Строкой без choices: значение присылает клиент, сервер его только режет.
+    screenshot_note = models.CharField('Что со снимком', max_length=16, blank=True)
 
     viewport = models.CharField('Окно', max_length=32, blank=True)
     theme = models.CharField('Тема', max_length=16, blank=True)
