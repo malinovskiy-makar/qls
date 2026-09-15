@@ -306,11 +306,28 @@
     renderTest();
   }
 
-  /* ── Чат по задаче ─────────────────────────────────────────────────── */
+  /* ── Чат по задаче: режимы и файл к реплике ─────────────────────────────
+   * Решение владельца 15.09.2026: три кнопки режимов над полем и скрепка для
+   * фото или PDF решения. Режим — свойство реплики, поэтому кнопки не исчезают.
+   * Номер разговора создаётся при загрузке страницы: вкладка — один разговор
+   * в журнале `ChatTurn` на сервере. */
   var chat = null;
   var aiIn = $('ai-in'), aiText = $('ai-text'), aiBody = $('ai-body'), aiSend = $('ai-send');
   if (aiIn && aiText && aiBody && aiSend && cfg.chatUrl) {
     var history = [];
+    var thread = (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
+        var r = Math.random() * 16 | 0;
+        return (c === 'x' ? r : (r & 3 | 8)).toString(16);
+      });
+    var attached = null;   /* {id, name}: одно вложение на реплику */
+    var aiClip = $('ai-clip'), aiFile = $('ai-file'), aiAtt = $('ai-att'),
+        aiAttName = $('ai-att-name'), aiAttX = $('ai-att-x');
+    function showAttached(label) {
+      if (!aiAtt || !aiAttName) { return; }
+      aiAtt.hidden = !(attached || label);
+      aiAttName.textContent = label || (attached ? attached.name : '');
+    }
     function bubble(cls, text) {
       var el = document.createElement('div');
       el.className = 'ai-msg ' + cls;
@@ -335,19 +352,25 @@
       aiText.style.height = 'auto';
       aiText.style.height = Math.min(120, aiText.scrollHeight) + 'px';
     }
-    function send(text) {
+    function send(text, mode) {
+      mode = mode || 'free';
       text = (text || aiText.value).trim();
       if (!text) { return; }
-      var sug = $('ai-sug');
-      if (sug) { sug.remove(); }
-      bubble('ai-msg--me', text);
+      bubble('ai-msg--me', attached ? text + '\n[файл: ' + attached.name + ']' : text);
       aiText.value = '';
       syncAi();
+      var payload = { problem_id: cfg.problemId, message: text, mode: mode, thread: thread,
+                      history: history.slice(-HISTORY_LIMIT) };
+      if (attached) { payload.attachment_id = attached.id; }
+      if (window.weco) { weco.track('chat_send', { problem_id: cfg.problemId, mode: mode, has_file: !!attached }); }
+      attached = null;
+      showAttached();
       var wait = typing();
-      post(cfg.chatUrl, { problem_id: cfg.problemId, message: text, history: history.slice(-HISTORY_LIMIT) })
+      post(cfg.chatUrl, payload)
         .then(function (d) {
           var reply = d.reply || d.message || 'Не получилось ответить, попробуйте ещё раз.';
           wait.textContent = reply;
+          renderMath(wait);
           aiBody.scrollTop = aiBody.scrollHeight;
           history.push({ role: 'me', text: text }, { role: 'ai', text: reply });
           history = history.slice(-HISTORY_LIMIT);
@@ -359,9 +382,40 @@
     aiText.addEventListener('input', syncAi);
     aiText.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
     aiSend.addEventListener('click', function () { send(); });
-    Array.prototype.forEach.call(document.querySelectorAll('[data-q]'), function (b) {
-      b.addEventListener('click', function () { aiText.value = b.dataset.q; syncAi(); aiText.focus(); });
+    Array.prototype.forEach.call(document.querySelectorAll('#ai-sug [data-mode]'), function (b) {
+      b.addEventListener('click', function () {
+        var mode = b.getAttribute('data-mode'), typed = aiText.value.trim();
+        /* Проверять нечего — ни текста, ни файла: подсказка вместо пустого запроса. */
+        if (mode === 'check' && !typed && !attached) {
+          bubble('ai-msg--ai', cfg.chatCheckEmpty);
+          return;
+        }
+        send(typed || b.textContent.trim(), mode);
+      });
     });
+    if (aiClip && aiFile && cfg.chatUploadUrl) {
+      aiClip.addEventListener('click', function () { aiFile.click(); });
+      aiFile.addEventListener('change', function () {
+        var file = aiFile.files && aiFile.files[0];
+        aiFile.value = '';
+        if (!file) { return; }
+        var form = new FormData();
+        form.append('file', file);
+        form.append('problem_id', cfg.problemId);
+        attached = null;
+        aiClip.disabled = true;
+        showAttached('Загружаем файл…');
+        fetch(cfg.chatUploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }, body: form })
+          .then(function (r) { return r.json(); })
+          .then(function (d) {
+            if (d.error) { bubble('ai-msg--ai', d.message || 'Файл не принят.'); return; }
+            attached = { id: d.id, name: d.name || 'файл' };
+          })
+          .catch(function () { bubble('ai-msg--ai', 'Не удалось загрузить файл, попробуйте ещё раз.'); })
+          .then(function () { aiClip.disabled = false; showAttached(); });
+      });
+      if (aiAttX) { aiAttX.addEventListener('click', function () { attached = null; showAttached(); }); }
+    }
     syncAi();
   }
 })();

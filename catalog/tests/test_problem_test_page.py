@@ -66,7 +66,8 @@ class TestPageTests(TestCase):
         self.assertNotIn('class="pd-stat"', html)
 
     def test_ask_why_button_needs_model_and_login(self):
-        with override_settings(AI_PROVIDER='fake'):
+        # Кнопка пишет в чат, поэтому зависит от поставщика чата (с 15.09.2026).
+        with override_settings(CATALOG_CHAT_PROVIDER='fake'):
             self.assertNotIn('Спросить ИИ, почему так', self.client.get(self.url).content.decode())
             self.client.force_login(make_user('игрок'))
             html = self.client.get(self.url).content.decode()

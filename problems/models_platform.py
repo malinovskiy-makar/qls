@@ -1727,3 +1727,103 @@ class Event(models.Model):
 
     def __str__(self):
         return '%s · %s' % (self.name, self.path)
+
+
+# ===========================================================================
+# Чат на странице задачи: вложения и полный журнал реплик (15.09.2026)
+# ===========================================================================
+
+class ChatAttachment(models.Model):
+    """Фото или PDF решения, приложенное к реплике чата на странице задачи.
+
+    ⚠️ ФАЙЛ НИКОМУ НЕ ОТДАЁТСЯ НАРУЖУ: `/media/` закрыт на всех слоях
+    (docs/SECURITY.md). Смотрит его только сотрудник — файловой вьюхой внутри
+    админки `ChatTurnAdmin`, тем же механизмом, что снимок экрана обратной связи.
+
+    `pages_json` — пути картинок, которые уйдут в модель зрения (не больше
+    пяти): страницы PDF в PNG шириной 1 400 px, картинка больше 1 600 px —
+    уменьшенным JPEG, картинка меньше — сам файл. Считаются один раз при
+    загрузке, а не на каждой реплике.
+
+    ⚠️ `user` — CASCADE: фото и переписка школьника уходят вместе с его
+    аккаунтом.
+    """
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='chat_attachments', verbose_name='Кто')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='chat_attachments', verbose_name='Задача')
+    file = models.FileField('Файл', upload_to='chat/%Y/%m/')
+    mime = models.CharField('Тип', max_length=40)
+    size = models.PositiveIntegerField('Размер, байт', default=0)
+    pages = models.PositiveSmallIntegerField('Картинок в модель', default=0)
+    pages_json = models.JSONField('Картинки для модели', default=list, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Вложение чата'
+        verbose_name_plural = 'Вложения чата'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return '%s · %s' % (self.mime, self.file.name)
+
+
+class ChatTurn(models.Model):
+    """Одна реплика чата на странице задачи — полный журнал беты.
+
+    ⚠️ ADR 0080 ХРАНЕНИЕ ПЕРЕПИСКИ ОТВЕРГАЛ; решение владельца 15.09.2026 его
+    пересматривает: цель беты — понять, подходит ли модель ученикам (почерк,
+    плохие фото, графики), а без журнала этого не узнать. Пишется КАЖДАЯ
+    реплика — и с ответом, и с ошибкой поставщика или отказом по лимиту.
+    История для модели по-прежнему приходит от клиента: журнал модель не читает.
+
+    `vision_*` — шаг зрения: расшифровка фото моделью зрения и её токены;
+    `input_tokens`/`output_tokens` — шаг разговора; `cost_usd` — оба шага
+    (из кэша ответов — ноль: второй раз за это не платили).
+    """
+
+    class Mode(models.TextChoices):
+        FREE = 'free', 'Вопрос'
+        THEORY = 'theory', 'Объясни теорию'
+        METHOD = 'method', 'Как решать'
+        CHECK = 'check', 'Проверь моё решение'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='chat_turns', verbose_name='Кто')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='chat_turns', verbose_name='Задача')
+    thread = models.UUIDField('Разговор', null=True, blank=True, db_index=True,
+                              help_text='Генерирует страница при загрузке: вкладка — разговор.')
+    mode = models.CharField('Режим', max_length=10, choices=Mode.choices,
+                            default=Mode.FREE)
+    user_text = models.TextField('Реплика ученика', blank=True)
+    attachment = models.ForeignKey(
+        ChatAttachment, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='turns', verbose_name='Вложение')
+    vision_text = models.TextField('Расшифровка фото', blank=True)
+    vision_input_tokens = models.PositiveIntegerField('Зрение: вход', default=0)
+    vision_output_tokens = models.PositiveIntegerField('Зрение: выход', default=0)
+    reply = models.TextField('Ответ помощника', blank=True)
+    provider = models.CharField('Поставщик', max_length=20, blank=True)
+    model = models.CharField('Модель', max_length=80, blank=True)
+    input_tokens = models.PositiveIntegerField('Вход', default=0)
+    output_tokens = models.PositiveIntegerField('Выход', default=0)
+    cost_usd = models.DecimalField('Стоимость, $', max_digits=10,
+                                   decimal_places=6, default=0)
+    latency_ms = models.PositiveIntegerField('Время ответа, мс', default=0)
+    error = models.CharField('Ошибка', max_length=500, blank=True)
+    created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Реплика чата'
+        verbose_name_plural = 'Реплики чата'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['thread', 'created_at'])]
+
+    def __str__(self):
+        return '%s · %s' % (self.get_mode_display(), self.user_text[:60])

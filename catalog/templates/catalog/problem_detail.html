@@ -286,6 +286,18 @@
 .ai-send { width: 32px; height: 32px; border-radius: var(--r-pill); border: 0; background: var(--surface); color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: background var(--t), color var(--t); }
 .ai-send svg { width: 16px; height: 16px; }
 .ai-in.has-text .ai-send { background: var(--accent); color: var(--act-ink-solid); }
+/* Режимы — над полем и не исчезают: режим — свойство реплики (решение 15.09.2026). */
+.ai-foot .ai-sug { flex-direction: row; flex-wrap: wrap; margin-bottom: 8px; }
+.ai-foot .ai-sug button { padding: 6px 10px; }
+.ai-clip { width: 32px; height: 32px; margin-left: -6px; border-radius: var(--r-pill); border: 0; background: transparent; color: var(--text3); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; flex: none; transition: color var(--t); }
+.ai-clip:hover { color: var(--accent); }
+.ai-clip:disabled { opacity: .5; cursor: default; }
+.ai-clip svg { width: 17px; height: 17px; }
+.ai-att { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); background: var(--surface-2); border-radius: 10px; padding: 4px 4px 4px 10px; margin-bottom: 8px; }
+.ai-att[hidden] { display: none; }
+.ai-att span { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ai-att button { width: 26px; height: 26px; flex: none; border: 0; border-radius: 50%; background: transparent; color: var(--text3); cursor: pointer; font-size: 17px; line-height: 1; }
+.ai-att button:hover { color: var(--text); }
 
 /* ── Похожие задачи ─────────────────────────────────────────────────── */
 .sim { margin-top: 30px; }
@@ -535,29 +547,37 @@
 
 <aside class="pd-side">
   {% comment %}
-  Карточка чата — только при доступной модели (правило нуля: без ключа её
-  нет вовсе). Три подсказки-вопроса — тексты интерфейса, одни на любую
-  задачу. Анониму вместо поля — ссылка на вход: чат только для вошедших.
+  Карточка чата — только при доступном поставщике чата (правило нуля: без
+  ключа её нет вовсе). Три кнопки режимов (решение владельца 15.09.2026):
+  режим — свойство реплики, поэтому кнопки стоят над полем и не исчезают после
+  первого вопроса. Скрепка — фото или PDF решения к реплике. Анониму вместо
+  поля — ссылка на вход: чат только для вошедших.
   {% endcomment %}
-  {% if ai_available %}
+  {% if chat_available %}
   <section class="ai" aria-label="Чат с ИИ по этой задаче">
     <div class="ai-head">
       <span class="ic"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 1.5l1.6 3.9 3.9 1.6-3.9 1.6L8 12.5 6.4 8.6 2.5 7l3.9-1.6z"/><path d="M13 11.5l.6 1.4 1.4.6-1.4.6-.6 1.4-.6-1.4-1.4-.6 1.4-.6z"/></svg></span>
       <div><h2>Спросить ИИ</h2><small>помощник по этой задаче</small></div>
     </div>
     <div class="ai-body" id="ai-body">
-      <p class="ai-intro">Объясню термин, проверю идею, подскажу, куда смотреть. Готовое решение не выдам: задача остаётся вашей.</p>
-      {% if user.is_authenticated %}
-      <div class="ai-sug" id="ai-sug">
-        <button type="button" data-q="Объясни условие проще">Объясни условие проще</button>
-        <button type="button" data-q="С чего начать?">С чего начать?</button>
-        <button type="button" data-q="Проверь мою идею">Проверь мою идею</button>
-      </div>
-      {% endif %}
+      <p class="ai-intro">Объясню теорию, подскажу план, проверю ваше решение, в том числе по фото. Готовое решение не выдам: задача остаётся вашей.</p>
     </div>
     <div class="ai-foot">
       {% if user.is_authenticated %}
+      <div class="ai-sug" id="ai-sug">
+        <button type="button" data-mode="theory">Объясни теорию</button>
+        <button type="button" data-mode="method">Как решать</button>
+        <button type="button" data-mode="check">Проверь моё решение</button>
+      </div>
+      <div class="ai-att" id="ai-att" hidden>
+        <span id="ai-att-name"></span>
+        <button type="button" id="ai-att-x" aria-label="Убрать файл">×</button>
+      </div>
       <div class="ai-in" id="ai-in">
+        <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+        </button>
+        <input type="file" id="ai-file" hidden accept="image/*,application/pdf">
         <textarea id="ai-text" rows="1" placeholder="Напишите вопрос по задаче…" aria-label="Вопрос ИИ"></textarea>
         <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/></svg>

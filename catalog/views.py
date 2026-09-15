@@ -955,7 +955,8 @@ def api_attempt(request):
         return JsonResponse({'error': exc.kind, 'message': message, 'attempt_id': attempt.pk})
 
     html = render_to_string('catalog/_attempt_result.html',
-                            {'attempt': attempt, 'chk': _attempt_view(attempt, can_chat=True)},
+                            {'attempt': attempt,
+                             'chk': _attempt_view(attempt, can_chat=chat.is_available())},
                             request=request)
     return JsonResponse({'attempt_id': attempt.pk, 'status': attempt.status, 'html': html,
                          'remaining': ai.remaining_today(request.user)})
@@ -963,11 +964,18 @@ def api_attempt(request):
 
 @require_POST
 def api_chat(request):
-    """Одна реплика помощника по задаче (этап 5, ADR 0080). Только вход.
+    """Одна реплика помощника по задаче (ADR 0080, решение владельца 15.09.2026).
 
-    История приходит от клиента и не хранится; лимит общий с проверкой.
-    `AiUnavailable` — человеческое сообщение в чате, а не ошибка сервера.
+    Только вход. `mode` — режим реплики (`free`, `theory`, `method`, `check`),
+    `attachment_id` — СВОЁ вложение к ЭТОЙ задаче, `thread` — номер разговора
+    вкладки. История приходит от клиента, каждая реплика пишется в `ChatTurn`
+    (`chat.answer`), лимит обращений общий с проверкой. `AiUnavailable` —
+    человеческое сообщение в чате, а не ошибка сервера.
     """
+    import uuid
+
+    from problems.models_platform import ChatAttachment
+
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'login', 'reply': 'Войдите, чтобы спросить помощника.'},
                             status=403)
@@ -976,26 +984,78 @@ def api_chat(request):
         problem = _visible_problem(int(data.get('problem_id') or 0))
     except (TypeError, ValueError):
         return JsonResponse({'error': 'problem', 'reply': 'Задача не указана.'}, status=400)
+    mode = data.get('mode') if data.get('mode') in chat.MODES else 'free'
+    attachment = None
+    if data.get('attachment_id') is not None:
+        # Номер из запроса — не право: только своё вложение и только к этой задаче.
+        raw_id = str(data.get('attachment_id'))
+        attachment = ChatAttachment.objects.filter(
+            pk=int(raw_id) if raw_id.isdigit() else 0, user=request.user,
+            problem=problem).first()
+        if attachment is None:
+            return JsonResponse({'error': 'file', 'reply': 'Файл не найден: прикрепите его заново.'},
+                                status=400)
     message = str(data.get('message') or '').strip()
     if not message:
-        return JsonResponse({'error': 'empty', 'reply': 'Напишите вопрос.'}, status=400)
+        return JsonResponse({'error': 'empty',
+                             'reply': chat.CHECK_EMPTY_TEXT if mode == 'check' else 'Напишите вопрос.'},
+                            status=400)
     if len(message) > chat.MESSAGE_MAX:
         return JsonResponse({'error': 'long', 'reply': 'Слишком длинный вопрос: сократите его.'},
                             status=400)
-    if not ai.is_available():
-        return JsonResponse({'error': 'no_key', 'reply': ai.unavailable_reason()})
-    if ai.remaining_today(request.user) <= 0:
-        return JsonResponse({'error': 'limit', 'reply': LIMIT_TEXT % ai.daily_limit()})
+    if not chat.is_available():
+        return JsonResponse({'error': 'no_key', 'reply': 'Помощник сейчас выключен.'})
+    try:
+        thread = uuid.UUID(str(data.get('thread') or ''))
+    except ValueError:
+        thread = None
     last_attempt = (CatalogAttempt.objects
                     .filter(user=request.user, problem=problem)
                     .order_by('-created_at').first())
     try:
         reply = chat.answer(problem, message, data.get('history'), request.user,
-                            last_attempt=last_attempt)
+                            last_attempt=last_attempt, mode=mode, attachment=attachment,
+                            thread=thread)
     except ai.AiUnavailable as exc:
+        # Дневной денежный потолок чата и суточный лимит обращений — оба «limit»,
+        # а сказать ученику надо разное.
+        if exc.kind == 'limit' and ai.budget_exceeded(chat.PROFILE):
+            return JsonResponse({'error': 'budget', 'reply': chat.BUDGET_TEXT})
         message_text = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
         return JsonResponse({'error': exc.kind, 'reply': message_text})
     return JsonResponse({'reply': reply, 'remaining': ai.remaining_today(request.user)})
+
+
+@require_POST
+def api_chat_upload(request):
+    """Фото или PDF решения к реплике чата (решение владельца 15.09.2026). Только вход.
+
+    Один файл на запрос: jpg/png/webp/pdf до 10 МБ — та же проверка, что у
+    файла к попытке (`attachments.validate_upload`: расширение, сигнатура PDF,
+    картинка открывается Pillow); не больше 10 файлов в сутки на человека. PDF
+    сразу раскладывается на картинки для модели, большая картинка уменьшается
+    (`chat.save_attachment`). Наружу файл не отдаётся никому.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login', 'message': 'Войдите, чтобы прикрепить файл.'},
+                            status=403)
+    try:
+        problem = _visible_problem(int(request.POST.get('problem_id') or 0))
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'problem', 'message': 'Задача не указана.'}, status=400)
+    if chat.uploads_today(request.user) >= chat.UPLOADS_PER_DAY:
+        return JsonResponse({'error': 'many', 'message': chat.TOO_MANY_UPLOADS}, status=429)
+    uploaded = request.FILES.get('file')
+    media_type, error = attachments.validate_upload(uploaded)
+    if error:
+        return JsonResponse({'error': 'file', 'message': error}, status=400)
+    name = (uploaded.name or '')[:80]
+    try:
+        attachment = chat.save_attachment(uploaded, media_type, request.user, problem)
+    except ValueError as exc:
+        return JsonResponse({'error': 'file', 'message': str(exc)}, status=400)
+    return JsonResponse({'id': attachment.pk, 'name': name, 'mime': media_type,
+                         'pages': attachment.pages})
 
 
 def _ordered_hints(problem):
@@ -1085,21 +1145,30 @@ def problem_detail(request, pk):
         pd_config['hintTotal'] = hint_total
     if ai_available:
         pd_config['attemptUrl'] = reverse('catalog:api_attempt')
-        pd_config['chatUrl'] = reverse('catalog:api_chat')
         if request.user.is_authenticated:
             # Файлы принимаются только от вошедших: гостю адрес не нужен.
             pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
             pd_config['maxFiles'] = attachments.MAX_FILES
+    # Чат живёт на своём поставщике (решение 15.09.2026): его карточка и кнопки,
+    # которые в него пишут, зависят от чата, а не от модели проверки.
+    chat_available = chat.is_available()
+    if chat_available:
+        pd_config['chatUrl'] = reverse('catalog:api_chat')
+        pd_config['chatCheckEmpty'] = chat.CHECK_EMPTY_TEXT
+        if request.user.is_authenticated:
+            pd_config['chatUploadUrl'] = reverse('catalog:api_chat_upload')
 
     from urllib.parse import urlencode
     context = {
         'problem':      problem,
         'ai_available': ai_available,
+        'chat_available': chat_available,
         'hint_total':   hint_total,
         'test':         test,
         'remaining':    remaining,
         'last_attempt': last_attempt,
-        'last_chk':     _attempt_view(last_attempt, can_chat=True) if last_attempt else None,
+        'last_chk':     (_attempt_view(last_attempt, can_chat=chat_available)
+                         if last_attempt else None),
         'pd_config':    pd_config,
         'parts':        parts,
         'is_test':      problem_types.is_test(problem.problem_type),

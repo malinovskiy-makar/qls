@@ -24,6 +24,8 @@ urlpatterns = [
     path('api/attempt-file/',                   views.api_attempt_file,   name='api_attempt_file'),
     # Чат по задаче — одна реплика, история на клиенте (ADR 0080).
     path('api/chat/',                           views.api_chat,           name='api_chat'),
+    # Фото или PDF решения к реплике чата: только вход, 10 файлов в сутки.
+    path('api/chat/upload/',                    views.api_chat_upload,    name='api_chat_upload'),
     # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
     path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
     # Тест как игра (этап 7): всё-или-ничего, попытки в сессии.

@@ -10,6 +10,7 @@ from django.contrib import admin
 from .models_platform import (
     AnswerDraft,
     AssignmentItem,
+    ChatTurn,
     Feedback,
     CustomProblem,
     CustomProblemOption,
@@ -237,3 +238,101 @@ class ProblemReportAdmin(admin.ModelAdmin):
             return 'нет'
         return format_html('<a href="/catalog/problem/{}/" target="_blank" '
                            'rel="noopener">№ {}</a>', obj.problem_id, obj.problem_id)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Чат на странице задачи: полный журнал беты (решение владельца 15.09.2026)
+# ═══════════════════════════════════════════════════════════════════════
+
+@admin.register(ChatTurn)
+class ChatTurnAdmin(admin.ModelAdmin):
+    """Реплики чата глазами: как модель прочитала фото и что ответила.
+
+    Только чтение — журнал пишет `catalog.chat.answer`; выгрузка по
+    разговорам — команда `chat_export`."""
+
+    list_display = ('created_at', 'mode', 'who', 'problem_link', 'short', 'has_file',
+                    'model', 'cost_usd', 'latency_ms', 'failed')
+    list_filter = ('mode', 'model', 'user')
+    search_fields = ('user_text', 'reply', 'vision_text')
+    date_hierarchy = 'created_at'
+    list_select_related = ('user', 'problem', 'attachment')
+    readonly_fields = ('created_at', 'user', 'problem_link', 'thread', 'mode', 'user_text',
+                       'file_link', 'vision_text', 'reply', 'error', 'provider', 'model',
+                       'vision_input_tokens', 'vision_output_tokens', 'input_tokens',
+                       'output_tokens', 'cost_usd', 'latency_ms')
+    fields = readonly_fields
+
+    def has_add_permission(self, request):
+        return False
+
+    @admin.display(description='Кто')
+    def who(self, obj):
+        return obj.user.username if obj.user_id else '—'
+
+    @admin.display(description='Реплика')
+    def short(self, obj):
+        return obj.user_text.strip()[:70]
+
+    @admin.display(description='Файл', boolean=True)
+    def has_file(self, obj):
+        return bool(obj.attachment_id)
+
+    @admin.display(description='Ошибка', boolean=True)
+    def failed(self, obj):
+        return bool(obj.error)
+
+    @admin.display(description='Задача')
+    def problem_link(self, obj):
+        from django.utils.html import format_html
+        if not obj.problem_id:
+            return 'нет'
+        return format_html('<a href="/catalog/problem/{}/" target="_blank" '
+                           'rel="noopener">№ {}</a>', obj.problem_id, obj.problem_id)
+
+    @admin.display(description='Файл решения')
+    def file_link(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+        if not obj.attachment_id:
+            return 'нет'
+        return format_html('<a href="{}" target="_blank" rel="noopener">{}, картинок в '
+                           'модель {}: открыть</a>',
+                           reverse('admin:problems_chatturn_file', args=[obj.pk]),
+                           obj.attachment.mime, obj.attachment.pages)
+
+    # ⚠️ ТРЕТЬЯ ФАЙЛОВАЯ ВЬЮХА ПРОЕКТА — ТОТ ЖЕ МЕХАНИЗМ, ЧТО У СНИМКА ЭКРАНА
+    # (`FeedbackAdmin.screenshot_view`): внутри админки, `admin_site.admin_view`
+    # требует staff, путь берётся из поля модели, из адреса — только номер
+    # записи. Сверх того — право на просмотр журнала у самого сотрудника. PDF
+    # отдаётся скачиванием: встроенному просмотрщику на нашем домене файл,
+    # присланный учеником, открывать незачем.
+    def get_urls(self):
+        from django.urls import path
+        custom = [
+            path('<int:pk>/file/', self.admin_site.admin_view(self.file_view),
+                 name='problems_chatturn_file'),
+        ]
+        return custom + super().get_urls()
+
+    def file_view(self, request, pk):
+        from django.core.exceptions import PermissionDenied
+        from django.http import FileResponse, Http404
+        from django.shortcuts import get_object_or_404
+
+        turn = get_object_or_404(ChatTurn.objects.select_related('attachment'), pk=pk)
+        if not self.has_view_permission(request, turn):
+            raise PermissionDenied
+        attachment = turn.attachment
+        if attachment is None or not attachment.file:
+            raise Http404('Файла нет')
+        try:
+            handle = attachment.file.open('rb')
+        except (FileNotFoundError, OSError):
+            raise Http404('Файла нет')
+        pdf = attachment.mime == 'application/pdf'
+        response = FileResponse(handle, content_type=attachment.mime, as_attachment=pdf,
+                                filename='chat_%d.%s' % (turn.pk,
+                                                         attachment.file.name.rsplit('.', 1)[-1]))
+        response['Cache-Control'] = 'private, max-age=60'
+        return response

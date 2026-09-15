@@ -137,7 +137,11 @@ class NoOtherFileServingViewTests(TestCase):
             'снимок экрана из обратной связи: живёт ВНУТРИ админки через '
             'ModelAdmin.get_urls и admin_site.admin_view — тот сам требует '
             'staff; путь из поля модели, из адреса только номер записи; '
-            'файл пересжат Pillow в JPEG. Разбор — Фаза 7 сессии 04.09.2026.',
+            'файл пересжат Pillow в JPEG. Разбор — Фаза 7 сессии 04.09.2026. '
+            'Там же, тем же механизмом, файл решения к реплике чата '
+            '(ChatTurnAdmin.file_view): staff и право на просмотр журнала, путь '
+            'из поля ChatAttachment, тип из проверенного при загрузке, PDF — '
+            'скачиванием. Разбор — Фаза 10 сессии 15.09.2026.',
     }
 
     def test_no_file_serving_helpers_in_views(self):

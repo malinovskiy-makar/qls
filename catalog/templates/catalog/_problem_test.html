@@ -51,7 +51,7 @@ is-missed, is-skip) с подписями из student/_option_review.html.
   {% endif %}
   <div class="tq-row" id="row-done" hidden>
     {% if test.more_url %}<a class="btn btn--main" href="{{ test.more_url }}">Ещё тест по этой теме</a>{% endif %}
-    {% if ai_available and user.is_authenticated %}<button class="btn btn--quiet" type="button" id="ask-why" data-ask="">Спросить ИИ, почему так</button>{% endif %}
+    {% if chat_available and user.is_authenticated %}<button class="btn btn--quiet" type="button" id="ask-why" data-ask="">Спросить ИИ, почему так</button>{% endif %}
     <span class="grow"></span>
     <button class="btn btn--quiet btn--sm" type="button" id="again-btn">Пройти заново</button>
   </div>

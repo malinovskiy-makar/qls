@@ -323,6 +323,11 @@ AI_PRICES = {
 AI_DAILY_COST_CAPS = {
     'search_rerank': float(
         os.environ.get('SEARCH_RERANK_DAILY_CAP_USD', '0.5').strip() or 0.5),
+    # Чат на странице задачи — оба шага, зрение и разговор, идут под одним
+    # именем работы (решение владельца 15.09.2026). Упёрлись — помощник
+    # отвечает «до завтра», страница не ломается.
+    'catalog_chat': float(
+        os.environ.get('CATALOG_CHAT_DAILY_CAP_USD', '1.0').strip() or 1.0),
 }
 
 # Уровень рассуждения у моделей, которые это умеют (OpenAI).
@@ -330,6 +335,24 @@ AI_DAILY_COST_CAPS = {
 # рассуждение тарифицируется как выход, и на прогоне в 41 307 задач
 # reasoning=low добавляет к смете +$74.
 AI_REASONING_EFFORT = os.environ.get('AI_REASONING_EFFORT', 'none').strip()
+
+# ─── Чат на странице задачи (catalog/chat.py) ────────────────────────────
+#
+# Решение владельца 15.09.2026 (Notion «Решения»): чат ведёт GLM-5.3, а не
+# общий AI_PROVIDER/AI_MODEL, — бета выясняет, подходит ли эта модель
+# ученикам (почерк, плохие фото, графики).
+#
+# ⚠️ GLM-5.3 КАРТИНКИ НЕ ПРИНИМАЕТ — ЭТО ЗАМЕР, А НЕ ДОГАДКА. Живой вызов
+# 15.09.2026 (scripts/glm_vision_probe.py): glm-5.3 с картинкой — 400, код
+# 1210 «content.type is invalid, allowed values: ['text']»; glm-5.3-flash
+# читает «Ответ: 42» (+178 токенов изображения). Поэтому фото и PDF сначала
+# переписывает в текст модель зрения, а разговор ведёт текстовая — тот же
+# приём, что ADR 0081. Пустая модель зрения — модель чата видит сама, и
+# картинки уходят прямо в неё.
+CATALOG_CHAT_PROVIDER = os.environ.get('CATALOG_CHAT_PROVIDER', 'glm').strip()
+CATALOG_CHAT_MODEL = os.environ.get('CATALOG_CHAT_MODEL', 'glm-5.3').strip()
+CATALOG_CHAT_VISION_MODEL = os.environ.get(
+    'CATALOG_CHAT_VISION_MODEL', 'glm-5.3-flash').strip()
 
 # ─── Порог близости смыслового поиска ────────────────────────────────────
 #

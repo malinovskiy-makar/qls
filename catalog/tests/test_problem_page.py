@@ -162,9 +162,10 @@ class ProblemPageTests(TestCase):
 
     def test_ai_card_needs_an_available_model(self):
         # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.
-        with self.settings(AI_PROVIDER='anthropic'):
+        # С 15.09.2026 у чата свой поставщик (CATALOG_CHAT_PROVIDER), не AI_PROVIDER.
+        with self.settings(CATALOG_CHAT_PROVIDER='anthropic'):
             self.assertNotIn('<h2>Спросить ИИ</h2>', self.client.get(_url(self.p_named)).content.decode())
-        with self.settings(AI_PROVIDER='fake'):
+        with self.settings(CATALOG_CHAT_PROVIDER='fake'):
             html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<h2>Спросить ИИ</h2>', html)
         self.assertIn('Данные профиля ему не передаются', html)

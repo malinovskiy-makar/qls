@@ -1,26 +1,61 @@
-"""Чат по одной задаче: сборка запроса, схема ответа, режим домашки.
+"""Чат по одной задаче: режимы, фото и PDF решения, полный журнал реплик.
 
-Этап 5 редизайна каталога (ADR 0080): один вызов `core.run('catalog_chat')`
-на реплику, история — последние шесть реплик — приходит от клиента и на
-сервере не хранится.
+Этап 5 редизайна каталога (ADR 0080) и решение владельца 15.09.2026:
+* модель — `CATALOG_CHAT_PROVIDER`/`CATALOG_CHAT_MODEL` (GLM-5.3), а не общий
+  `AI_PROVIDER`: бета выясняет, подходит ли эта модель ученикам;
+* режим — свойство реплики: `theory`, `method`, `check` или `free` (обычный
+  ввод); блок режима — третий системный блок (`prompts.CATALOG_CHAT_MODES`);
+* фото и PDF: GLM-5.3 картинок не принимает, поэтому реплика с файлом сначала
+  идёт в модель зрения (`CATALOG_CHAT_VISION_MODEL`) с задачей «перепиши
+  дословно», а расшифровка с пометкой `[расшифровка фото]` вклеивается в текст
+  реплики для модели чата (приём ADR 0081);
+* КАЖДАЯ реплика пишется в `ChatTurn`, в том числе ошибочная. История для
+  модели по-прежнему приходит от клиента — последние шесть реплик.
 
-⚠️ НАРУЖУ УХОДИТ ТОЛЬКО ТЕКСТ ЗАДАЧИ И РАЗГОВОРА: условие, подпункты,
-последняя попытка ученика и результат её проверки, реплики. Ни имени, ни
-почты, ни класса — ничего из профиля (P0).
+⚠️ НАРУЖУ УХОДИТ ТОЛЬКО ТЕКСТ ЗАДАЧИ И РАЗГОВОРА: условие, подпункты, последняя
+попытка ученика и результат её проверки, реплики, картинки приложенного
+решения; в режиме «Проверь моё решение» ещё эталонные ответ и решение — только
+системным блоком. Ни имени, ни почты, ни класса — ничего из профиля (P0).
 """
 from __future__ import annotations
 
+import hashlib
+import io
+import logging
+import time
+import uuid
+from decimal import Decimal
+
+from django.conf import settings
+from django.core.files.base import ContentFile
+from django.core.files.storage import default_storage
 from django.db.models import Q
 from django.utils import timezone
 
-from problems.ai import core
+from problems.ai import core, prompts, providers
+
+logger = logging.getLogger(__name__)
 
 PROFILE = 'catalog_chat'
 HISTORY_LIMIT = 6
 MESSAGE_MAX = 2000
 REPLY_MAX = 900
+CHECK_REPLY_MAX = 1200
+#: Эталонное решение режима проверки — не больше, чтобы одна реплика не стоила как десять.
+REFERENCE_MAX = 8000
+MODES = ('free', 'theory', 'method', 'check')
 HOMEWORK_MODE = ('РЕЖИМ: ТОЛЬКО НАВОДЯЩИЕ ВОПРОСЫ. Задача входит в домашку '
                  'ученика: не объясняй решение, задавай вопросы и говори, где искать.')
+VISION_MARK = '[расшифровка фото]'
+VISION_PAGES_MAX = 5
+UPLOADS_PER_DAY = 10
+PDF_WIDTH = 1400
+IMAGE_SIDE_MAX = 1600
+
+BUDGET_TEXT = 'Помощник на сегодня выбрал дневной бюджет. Завтра снова ответит.'
+CHECK_EMPTY_TEXT = 'Прикрепите фото или PDF решения или опишите решение текстом.'
+TOO_MANY_UPLOADS = 'На сегодня файлов достаточно: не больше 10 в день.'
+BAD_PDF = 'PDF не открылся: пришлите фото страниц.'
 
 CHAT_SCHEMA = {
     'type': 'object',
@@ -28,9 +63,31 @@ CHAT_SCHEMA = {
     'required': ['reply'],
     'properties': {'reply': {'type': 'string'}},
 }
+VISION_SCHEMA = {
+    'type': 'object',
+    'additionalProperties': False,
+    'required': ['text'],
+    'properties': {'text': {'type': 'string'}},
+}
 
 VERDICT_WORDS = {'ok': 'верно', 'partial': 'частично верно', 'wrong': 'неверно',
                  'needs_human': 'модель не поставила балл'}
+EXTENSIONS = {'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+              'application/pdf': 'pdf'}
+IMAGE_TYPES = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
+               'webp': 'image/webp'}
+
+
+def chat_provider():
+    return providers.get_provider(getattr(settings, 'CATALOG_CHAT_PROVIDER', 'glm'))
+
+
+def is_available():
+    """Есть ли карточка чата вообще: поставщик чата настроен (правило нуля)."""
+    try:
+        return chat_provider().is_available()
+    except KeyError:
+        return False
 
 
 def in_active_homework(user, problem):
@@ -94,14 +151,181 @@ def build_prompt(problem, parts, message, history, last_attempt=None, homework=F
     return '\n'.join(lines)
 
 
-def answer(problem, message, history, user, last_attempt=None):
-    """Одна реплика помощника. Поднимает `core.AiUnavailable`."""
-    parts = list(problem.parts.all())
-    prompt = build_prompt(problem, parts, message, clean_history(history),
-                          last_attempt=last_attempt,
-                          homework=in_active_homework(user, problem))
-    result = core.run(PROFILE, prompt, CHAT_SCHEMA, user)
-    reply = str((result.data or {}).get('reply') or '').strip()
-    if not reply:
-        raise core.AiUnavailable('Помощник не ответил. Попробуйте спросить иначе.')
-    return reply[:REPLY_MAX]
+def system_for(problem, mode):
+    """Системные блоки реплики: ядро, профиль чата, блок режима, эталон при проверке."""
+    blocks = prompts.system_blocks(PROFILE)
+    if mode in prompts.CATALOG_CHAT_MODES:
+        blocks.append(prompts.CATALOG_CHAT_MODES[mode])
+    if mode == 'check':
+        blocks.append(prompts.CATALOG_CHAT_REFERENCE % (
+            (problem.answer or '').strip() or 'не указан',
+            (problem.solution or '').strip()[:REFERENCE_MAX] or 'не указано'))
+    return blocks
+
+
+# ─── Файлы: загрузка, картинки для модели ──────────────────────────────────
+
+def uploads_today(user):
+    from problems.models_platform import ChatAttachment
+
+    start = timezone.localtime(timezone.now()).replace(hour=0, minute=0, second=0,
+                                                       microsecond=0)
+    return ChatAttachment.objects.filter(user=user, created_at__gte=start).count()
+
+
+def derived_images(raw, media_type):
+    """Картинки для модели зрения: [(расширение, байты)]; пусто — годится сам файл.
+
+    PDF — первые пять страниц в PNG шириной 1 400 px; картинка больше 1 600 px
+    по большей стороне — уменьшенный JPEG q85: токены изображения растут с
+    размером, а почерк на 1 600 px читается. Поднимает ValueError с текстом.
+    """
+    if media_type == 'application/pdf':
+        import fitz   # PyMuPDF — только здесь: остальным запросам библиотека не нужна
+
+        pages = []
+        try:
+            with fitz.open(stream=raw, filetype='pdf') as doc:
+                if doc.needs_pass:
+                    raise ValueError(BAD_PDF)
+                for page in doc:
+                    if len(pages) >= VISION_PAGES_MAX:
+                        break
+                    width, height = page.rect.width, page.rect.height
+                    # Лента в сотни страниц высотой развернулась бы в гигабайт.
+                    if width <= 0 or height * PDF_WIDTH / width > PDF_WIDTH * 4:
+                        raise ValueError(BAD_PDF)
+                    zoom = PDF_WIDTH / width
+                    pixmap = page.get_pixmap(matrix=fitz.Matrix(zoom, zoom), alpha=False)
+                    pages.append(('png', pixmap.tobytes('png')))
+        except ValueError:
+            raise
+        except Exception:
+            raise ValueError(BAD_PDF)
+        if not pages:
+            raise ValueError(BAD_PDF)
+        return pages
+    from PIL import Image, ImageOps
+
+    with Image.open(io.BytesIO(raw)) as image:
+        if max(image.size) <= IMAGE_SIDE_MAX:
+            return []
+        smaller = ImageOps.exif_transpose(image).convert('RGB')
+    smaller.thumbnail((IMAGE_SIDE_MAX, IMAGE_SIDE_MAX))
+    out = io.BytesIO()
+    smaller.save(out, 'JPEG', quality=85)
+    return [('jpg', out.getvalue())]
+
+
+def save_attachment(uploaded, media_type, user, problem):
+    """Файл и картинки для модели → `ChatAttachment`. ValueError — текст для ученика.
+
+    Имя файла даём сами: имя с телефона ученика в хранилище не нужно.
+    """
+    from problems.models_platform import ChatAttachment
+
+    raw = uploaded.read()
+    uploaded.seek(0)
+    pages = derived_images(raw, media_type)
+    uploaded.name = '%s.%s' % (uuid.uuid4().hex, EXTENSIONS[media_type])
+    attachment = ChatAttachment.objects.create(user=user, problem=problem, file=uploaded,
+                                               mime=media_type, size=len(raw))
+    if pages:
+        stem = attachment.file.name.rsplit('.', 1)[0]
+        paths = [default_storage.save('%s_p%d.%s' % (stem, number, ext), ContentFile(data))
+                 for number, (ext, data) in enumerate(pages, 1)]
+    else:
+        paths = [attachment.file.name]
+    attachment.pages_json = paths
+    attachment.pages = len(paths)
+    attachment.save(update_fields=['pages_json', 'pages'])
+    return attachment
+
+
+def attachment_images(attachment):
+    """[(MIME, байты)] для модели, не больше пяти — пары, как их ждёт GLMProvider."""
+    images = []
+    for path in (attachment.pages_json or [])[:VISION_PAGES_MAX]:
+        mime = IMAGE_TYPES.get(path.rsplit('.', 1)[-1].lower())
+        if mime:
+            with default_storage.open(path, 'rb') as handle:
+                images.append((mime, handle.read()))
+    return images
+
+
+def _digest(images):
+    """Хеш картинок в тексте запроса: кэш ответов ключ по картинкам не считает."""
+    return hashlib.sha256(b''.join(data for _mime, data in images)).hexdigest()
+
+
+def _spent(result):
+    """Деньги вызова; ответ из кэша ответов — ноль: второй раз за него не платили."""
+    return Decimal(0) if result.cached else Decimal(str((result.usage or {}).get('cost_usd', 0)))
+
+
+# ─── Реплика ───────────────────────────────────────────────────────────────
+
+def answer(problem, message, history, user, last_attempt=None, mode='free',
+           attachment=None, thread=None):
+    """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
+
+    ⚠️ `ChatTurn` пишется ВСЕГДА — и с ответом, и с ошибкой: журнал нужен как
+    раз для разбора неудач (нечитаемое фото, отказ поставщика, лимит).
+    """
+    from problems.models_platform import ChatTurn
+
+    mode = mode if mode in MODES else 'free'
+    provider = chat_provider()
+    model = getattr(settings, 'CATALOG_CHAT_MODEL', '') or None
+    vision_model = getattr(settings, 'CATALOG_CHAT_VISION_MODEL', '')
+    turn = ChatTurn(user=user, problem=problem, thread=thread, mode=mode,
+                    user_text=message, attachment=attachment, provider=provider.name,
+                    model=model or '')
+    started = time.monotonic()
+    try:
+        text, images = message, None
+        if attachment is not None:
+            pictures = attachment_images(attachment)
+            if pictures and vision_model:
+                seen = core.run(
+                    PROFILE, 'Перепиши дословно всё, что на этих фото или страницах. '
+                    'Картинок %d, sha256 %s.' % (len(pictures), _digest(pictures)),
+                    VISION_SCHEMA, user, images=pictures, provider=provider,
+                    model=vision_model, system=[prompts.CORE, prompts.CATALOG_CHAT_VISION])
+                turn.vision_text = str((seen.data or {}).get('text') or '').strip()
+                turn.vision_input_tokens = (seen.usage or {}).get('input_tokens', 0)
+                turn.vision_output_tokens = (seen.usage or {}).get('output_tokens', 0)
+                turn.cost_usd += _spent(seen)
+                text = '%s\n\n%s\n%s' % (message, VISION_MARK,
+                                         turn.vision_text or '(на фото ничего не прочитано)')
+            elif pictures:
+                images = pictures
+                text = '%s\n\n[фото: картинок %d, sha256 %s]' % (message, len(pictures),
+                                                                 _digest(pictures))
+        prompt = build_prompt(problem, list(problem.parts.all()), text, clean_history(history),
+                              last_attempt=last_attempt,
+                              homework=in_active_homework(user, problem))
+        # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
+        # кэша считается по тексту запроса — та же реплика в другом режиме
+        # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
+        result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
+                          provider=provider, model=model, system=system_for(problem, mode),
+                          cache_seconds=0)
+        turn.input_tokens = (result.usage or {}).get('input_tokens', 0)
+        turn.output_tokens = (result.usage or {}).get('output_tokens', 0)
+        turn.cost_usd += _spent(result)
+        reply = str((result.data or {}).get('reply') or '').strip()
+        if not reply:
+            raise core.AiUnavailable('Помощник не ответил. Попробуйте спросить иначе.')
+        turn.reply = reply[:CHECK_REPLY_MAX if mode == 'check' else REPLY_MAX]
+        return turn.reply
+    except core.AiUnavailable as exc:
+        turn.error = ('%s: %s' % (exc.kind, exc))[:500]
+        raise
+    finally:
+        turn.latency_ms = int((time.monotonic() - started) * 1000)
+        try:
+            turn.save()
+        except Exception:
+            # Как учёт расхода в `core._log`: упавший журнал не отнимает ответ.
+            logger.exception('Не удалось записать реплику чата — ответ ученику не тронут')
