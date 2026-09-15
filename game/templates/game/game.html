@@ -3549,6 +3549,61 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     rafId = requestAnimationFrame(tick);
   }
 
+  /* ---------- ОКНА ПОВЕРХ ЗАБЕГА: ПАУЗА И КЛАВИАТУРА ----------
+     Окно поверх забега («Проблема или предложение», «Плохая задача», выход)
+     ставит забег на паузу: пока человек пишет, время не горит. Окна сообщают
+     о себе одним событием `weco:modal` {open: true|false} — игра не знает,
+     как устроено каждое из них, и новому окну достаточно послать событие.
+
+     ⚠️ СЕРВЕР ПАУЗЫ НЕ ЗНАЕТ, И ЭТО ПРИНЯТО (решение владельца 15.09.2026).
+     Время ответа он считает от выдачи вопроса (`issued_at` в api_answer),
+     поэтому бонус за скорость на вопросе, где стояла пауза, сгорит. Потолок
+     длительности в `_rank_run` меряет стенные часы: пауза, выведшая забег за
+     `duration × 2 + 60 с`, снимет его с зачёта (`time_overrun`). Учитывать
+     паузу на сервере со слов клиента нельзя — это та самая подкрутка
+     таймера, от которой потолок и стоит. */
+  var pausedAt = null;
+
+  function rushPause() {
+    if (state !== 'playing' || pausedAt) return;
+    pausedAt = performance.now();
+    cancelAnimationFrame(rafId);
+    // Сердцебиение молчит на паузе; вернёт его paintHud → paintAlarm,
+    // увидев, что тревога есть, а звук снят.
+    beatApi('stop');
+    alarmOn = false;
+  }
+
+  function rushResume() {
+    if (!pausedAt) return;
+    pausedAt = null;
+    // Забег мог кончиться под окном (ответ ушёл до паузы) — тогда цикл не
+    // поднимаем: paintHud вернул бы тревогу на экран итогов.
+    if (state !== 'playing') return;
+    lastTick = performance.now();
+    rafId = requestAnimationFrame(tick);
+    paintHud();
+  }
+
+  /* ⚠️ Поле ответа Классики — единственное поле, где клавиши забега обязаны
+     работать: Enter отправляет ответ, пробел пропускает вопрос. */
+  function isTypingTarget(t) {
+    if (!t || t.id === 'num-input') return false;
+    return t.tagName === 'INPUT' || t.tagName === 'TEXTAREA'
+      || t.tagName === 'SELECT' || !!t.isContentEditable;
+  }
+
+  function modalIsOpen() {
+    return !!document.querySelector('.fb-back, .rp-back, dialog[open], '
+      + '#quit-modal:not([hidden]), #fmodal:not([hidden]), #dmodal:not([hidden])');
+  }
+
+  document.addEventListener('weco:modal', function (e) {
+    if (e.detail && e.detail.open) { rushPause(); return; }
+    // Закрылось одно окно, а под ним осталось другое — пауза продолжается.
+    if (!modalIsOpen()) rushResume();
+  });
+
   /* ─── ТРЕВОГА ────────────────────────────────────────────────────────
      Два повода, одна величина: время на исходе или последняя жизнь.
 
@@ -4685,19 +4740,24 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   paintSoundBtn();
 
   /* ---------- ВЫХОД ИЗ ЗАБЕГА ---------- */
-  /* ⚠️ ТАЙМЕР ПРОДОЛЖАЕТ ИДТИ, пока окно открыто: цикл rAF не трогаем.
-     Иначе окно выхода стало бы бесплатной паузой посреди забега. */
+  /* ⚠️ ОКНО ВЫХОДА СТАВИТ ЗАБЕГ НА ПАУЗУ, как любое окно поверх игры
+     (решение владельца 15.09.2026, см. rushPause). До 15.09 таймер здесь
+     шёл намеренно — «иначе окно выхода стало бы бесплатной паузой». Цена
+     паузы теперь другая: бонус за скорость на вопросе сгорает, а долгая
+     пауза снимает забег с зачёта по потолку длительности. */
   var quitPrevFocus = null;
 
   function openQuit() {
     if (state !== 'playing') return;
     quitPrevFocus = document.activeElement;
     $('quit-modal').hidden = false;
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: true } }));
     $('quit-no').focus();               // главное действие — остаться
   }
 
   function closeQuit() {
     $('quit-modal').hidden = true;
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: false } }));
     if (quitPrevFocus && quitPrevFocus.focus) quitPrevFocus.focus();
   }
 
@@ -6144,6 +6204,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   /* ---------- КЛАВИАТУРА ---------- */
   document.addEventListener('keydown', function (e) {
     if (e.repeat) return;
+    /* ⚠️ ПОВЕРХ ИГРЫ КЛАВИАТУРА ПРИНАДЛЕЖИТ ОКНУ И ПОЛЮ ВВОДА, А НЕ ЗАБЕГУ.
+       Без этих двух выходов человек печатал жалобу в «Проблема или
+       предложение», а пробел в тексте пропускал вопрос, цифра отвечала,
+       Enter отправлял — забег шёл под окном сам собой. */
+    if (isTypingTarget(e.target)) return;
+    if (modalIsOpen()) return;
     if (state === 'start') {
       // Ввод кода набора — клавиши экрана не перехватываем
       if (e.target && e.target.tagName === 'INPUT') return;

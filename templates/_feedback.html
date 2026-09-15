@@ -192,11 +192,19 @@
     return f ? f.value : '';
   }
 
+  /* Открытие и закрытие окна объявляются событием `weco:modal`: по нему
+     Wecon Rush ставит забег на паузу и не пускает клавиши в игру (решение
+     владельца 15.09.2026). Остальным страницам событие ничего не стоит. */
+  function announce(isOpen) {
+    document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: isOpen } }));
+  }
+
   function close() {
     if (!open) return;
     var back = open.back, focus = open.focus;
     open = null;
     back.remove();
+    announce(false);
     if (focus && focus.focus) focus.focus();
   }
 
@@ -375,6 +383,7 @@
     back.appendChild(box);
     document.body.appendChild(back);
     open = { back: back, focus: document.activeElement };
+    announce(true);
     problemBtn.focus();
   }
 
