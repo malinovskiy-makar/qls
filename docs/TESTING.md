@@ -355,10 +355,17 @@ venv313/Scripts/python.exe scripts/run_tests.py        # Windows
 **внешний ресурс, который нельзя разделить**: порт, браузер, живой сервер,
 настоящий Redis.
 
-У каждой метки в коде стоит комментарий с причиной. Сегодня их четыре:
+У каждой метки в коде стоит комментарий с причиной. Сегодня их десять: четыре
+ниже и шесть браузерных классов игры, добавленных ночной сессией 15.09.2026
+(у всех одна причина — живой сервер и Chromium отдельным процессом node):
 
 | Класс | Файл | Причина |
 |---|---|---|
+| `RushModalPauseBrowserTest` | `game/tests/test_browser_modals.py` | Живой сервер (`StaticLiveServerTestCase`) и Chromium: клавиши не пробивают окна, раунд встаёт на паузу |
+| `RushNetworkFailureBrowserTest` | `game/tests/test_browser_freeze.py` | То же: сбой ответа сервера не замораживает раунд |
+| `DuelLobbyNarrowBrowserTest` | `game/tests/test_browser_lobby.py` | То же: лобби дуэли и табло на 380 px |
+| `GamePagesLayoutBrowserTest`, `StartScreenBrowserTest` | `game/tests/test_browser_layout.py` | То же: раскладка страниц игры на 380 и 1280 px и ряды стартового экрана |
+| `DuelSyncStartBrowserTest` | `game/tests/test_browser_duel_sync.py` | Живой **daphne** (`ChannelsLiveServerTestCase`) и два Chromium: синхронный старт дуэли по WebSocket. Daphne идёт отдельным процессом и базу в памяти не видит — на SQLite в памяти тест пропускается с причиной, по-настоящему идёт на PostgreSQL |
 | `Calc2MathRegressionTest` | `calc2/tests/test_calc2_math.py` | Поднимает настоящий сервер (`StaticLiveServerTestCase`) и гоняет по нему Chromium отдельным процессом node. Порт и браузер поделить между воркерами нельзя; восемь Chromium разом выводят раннер за таймаут 180 с, и тест краснеет по причине, не имеющей отношения к calc2 |
 | `CanonBrowserChecks` | `problems/tests/test_design_canon.py` | То же самое, и хуже: таймаут раннера 600 с |
 | `RedisLiveTests` | `config/tests/test_cache_and_sessions.py` | Единственный класс, которому нужен **настоящий** Redis. На шаге A кэш уводится в память процесса, и эти проверки не пропустились бы, а упали: `REDIS_URL` задан, значит `skipUnless` не срабатывает, а `settings.CACHES` указывает на память |

@@ -427,6 +427,12 @@ cd /srv/weconomics/app/deploy
 docker compose logs web | grep 'прогрев:'
 ```
 
+⚠️ **С 15.09.2026 сначала досчитать векторы, потом выгружать.** Подпункты
+тестов из условия сделали устаревшими 4 096 векторов; пересчёт остановлен на
+3 200, осталось 896 (`docs/EMBEDDINGS.md`, «Векторы на бой — файлом»). Выгрузка
+до `build_embeddings --stale` унесёт на бой старые векторы, и ввоз пропустит эти
+задачи строкой «пропущено, текст изменился».
+
 **1. Векторы — файлом с машины владельца.** Посчитать их в `web` нечем
 (ADR 0002), а `dump_for_deploy` поле `embedding` не везёт. Дома, в
 `C:\Users\shipu\qls`:
@@ -489,6 +495,43 @@ curl -sI "https://weconomics.ai/catalog/?q=%D0%BD%D0%B0%D0%BB%D0%BE%D0%B3" | gre
 
 **Откат:** `SEMANTIC_SEARCH_ENABLED=0` в `.env`, `docker compose up -d web ws`,
 затем `docker compose stop search`. Векторы в базе поиску по словам не мешают.
+
+### Варианты теста из условия на бою (`test_options_from_statement`)
+
+Ночная сессия 15.09.2026 перенесла варианты теста из текста условия в подпункты
+(`ProblemPart`) и вырезала блок вариантов из условия — обратимо, со снимком
+([ADR 0104](adr/0104-test-options-from-statement.md), `docs/DATA.md`). На бою
+команда идёт изнутри `web` **после выкатки ветки и ДО ввоза векторов**: векторы
+посчитаны дома по уже укороченным условиям, и ввоз до записи пропустил бы эти
+задачи строкой «пропущено, текст изменился».
+
+⚠️ Перед записью — свежий дамп базы: бэкап в 03:20 может быть старым.
+
+```bash
+cd /srv/weconomics/app/deploy
+# 1. Сухой прогон основного прохода: REPORT.md и preview.html, база не меняется
+docker compose exec web python manage.py test_options_from_statement --dry-run --report /app/reports/test_options_prod
+docker compose cp web:/app/reports/test_options_prod ./test_options_prod   # прочитать REPORT.md и preview.html
+# 2. Запись основного прохода; снимок отката ложится в тот же каталог
+docker compose exec web python manage.py test_options_from_statement --apply --report /app/reports/test_options_prod
+# 3. Хвост «Верно/Неверно» у «верно/неверно» с подпунктами: сухой прогон, затем запись
+docker compose exec web python manage.py test_options_from_statement --boolean-tail --dry-run --report /app/reports/test_options_prod_tail
+docker compose exec web python manage.py test_options_from_statement --boolean-tail --apply --report /app/reports/test_options_prod_tail
+# 4. Снимки наружу СРАЗУ: пересборка контейнера унесёт /app/reports
+docker compose cp web:/app/reports/test_options_prod ./test_options_prod
+docker compose cp web:/app/reports/test_options_prod_tail ./test_options_prod_tail
+# 5. Идемпотентность: оба повторных сухих прогона обязаны сказать «к записи: задач 0»
+docker compose exec web python manage.py test_options_from_statement --dry-run --report /app/reports/test_options_prod_again
+docker compose exec web python manage.py test_options_from_statement --boolean-tail --dry-run --report /app/reports/test_options_prod_tail_again
+```
+
+Файл id основного прохода по умолчанию
+(`reports/corpus_transfer_20260913/dead_test_widget_ids.txt`) в образ не едет:
+`reports/` в `.gitignore`. Положить его в контейнер `docker compose cp` или
+передать свой `--ids-file`; проход хвоста кандидатов из файла не берёт, он идёт по
+всем «верно/неверно» с подпунктами. **Откат — в обратном порядке снимков:**
+сначала `--revert <снимок хвоста>`, затем `--revert <снимок основного прохода>`;
+правленые после записи условия и подпункты откат не трогает и называет.
 
 ### Библиотеки браузера едут со своего же сервера
 
