@@ -228,13 +228,19 @@ class QuitModalTests(TestCase):
         self.assertIn("if (e.key === 'Escape') { e.preventDefault(); closeQuit(); return; }",
                       self.src)
 
-    def test_card_behind_is_blurred_and_timer_keeps_running(self):
-        u"""Читать вопрос из-за окна нельзя, а окно не даёт бесплатной паузы:
-        цикл таймера при открытии не трогается."""
+    def test_card_behind_is_blurred_and_round_pauses(self):
+        u"""Читать вопрос из-за окна нельзя, а сам раунд под окном стоит.
+
+        ⚠️ РЕШЕНИЕ СМЕНИЛОСЬ 15.09.2026. До него окно выхода намеренно НЕ
+        ставило паузу («иначе бесплатная пауза»), и тест проверял, что цикл
+        таймера не трогается. Теперь любое окно поверх игры ставит паузу:
+        открытие объявляется событием `weco:modal`, по нему игра гасит цикл
+        (браузерная проверка — test_browser_modals.py)."""
         self.assertIn('backdrop-filter: blur(6px);', self.src)
         m = re.search(r'function openQuit\(\) \{(.*?)\n  \}', self.src, re.S)
         self.assertIsNotNone(m)
-        self.assertNotIn('cancelAnimationFrame', m.group(1))
+        self.assertIn("new CustomEvent('weco:modal', { detail: { open: true } })",
+                      m.group(1))
 
     def test_hover_on_the_x_has_no_sand_fill(self):
         self.assertNotIn('.quit-x:hover { color: var(--text); background:', self.src)

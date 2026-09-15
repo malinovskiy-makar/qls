@@ -1514,7 +1514,7 @@ body.figfull .vignette.alarm { opacity: .42; }
                                     vertical-align: -.15em; }
 .go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
 .go-card p { font-size: 16px; opacity: .8; margin: 0; }
-/* «Забег потерян»: та же карточка, что у конца раунда, плюс одна кнопка. */
+/* «Раунд потерян»: та же карточка, что у конца раунда, плюс одна кнопка. */
 .go-card .lost-home { margin-top: 20px; }
 
 /* Тост о сбое связи.
@@ -2774,11 +2774,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     <p id="go-sub">Жизни кончились</p>
   </div>
 </div>
-{# Забег потерян: состояние на сервере истекло — продолжать нечем, путь один. #}
+{# «Раунд потерян»: состояние на сервере истекло, продолжать нечем, путь один. #}
 <div class="gameover-overlay" id="lost-overlay" hidden role="alertdialog"
      aria-modal="true" aria-labelledby="lost-title" aria-describedby="lost-sub">
   <div class="go-card">
-    <h2 id="lost-title">Забег потерян</h2>
+    <h2 id="lost-title">Раунд потерян</h2>
     <p id="lost-sub">Соединение или время ожидания. Начните новый.</p>
     <button type="button" class="btn-again lost-home" id="lost-home">На старт</button>
   </div>
@@ -3600,7 +3600,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       }, function () {
         // Нет связи — игра не началась, и игрок должен это увидеть: без
         // строки клик по режиму выглядел бы мёртвой кнопкой.
-        showStartNotice('Нет связи — игра не началась. Попробуйте ещё раз.');
+        showStartNotice('Нет связи: игра не началась. Попробуйте ещё раз.');
       });
   }
 
@@ -4927,7 +4927,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   $('btn-quit').addEventListener('click', openQuit);
   $('quit-no').addEventListener('click', closeQuit);
   $('quit-yes').addEventListener('click', quitRun);
-  // «Забег потерян» — только на старт: продолжать на сервере нечего.
+  // «Раунд потерян» — только на старт: продолжать на сервере нечего.
   $('lost-home').addEventListener('click', function () { location.href = '/game/'; });
 
   /* Клавиатура окна: Esc = «Нет», Tab не выпускает фокус наружу. Обработчик
