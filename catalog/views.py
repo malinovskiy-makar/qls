@@ -19,7 +19,7 @@ from problems.jsonsafe import dumps_for_script
 
 from . import attachments, attempts, chat, filters, testplay
 from .placeholder_phrases import (
-    CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES,
+    CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
 from .preview import (
     PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
@@ -530,6 +530,8 @@ def _catalog_context(request, missing_id=''):
         # одной константы, партиал общий с главной.
         'catalog_phrases':   CATALOG_PHRASES,
         'catalog_stop_text': CATALOG_STOP_TEXT,
+        # Фразы ожидания поиска: первая — в разметке, все — в json_script.
+        'search_busy_phrases': SEARCH_BUSY_PHRASES,
         # Подпись блока карты — из данных карты, не литералом.
         'map_stats':         _map_stats(),
         # Стартовое состояние для скрипта окна «Все фильтры»: активные

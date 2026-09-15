@@ -36,7 +36,9 @@ def _card_html(html, problem):
     """Разметка одной карточки по адресу задачи."""
     href = reverse('catalog:problem_detail', args=[problem.pk])
     pos = html.index('href="%s"' % href)
-    start = html.rindex('<a class="ct-card"', 0, pos)
+    # Без закрывающей кавычки: у карточек выдачи поиска есть второй класс
+    # (`ct-appear`, появление лесенкой, 15.09.2026).
+    start = html.rindex('<a class="ct-card', 0, pos)
     return html[start:html.index('</a>', pos)]
 
 

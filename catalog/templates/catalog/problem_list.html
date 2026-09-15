@@ -86,6 +86,27 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
               border: 2px solid var(--accent-ring); border-top-color: var(--accent);
               animation: askSpin .8s linear infinite; }
 @keyframes askSpin { to { transform: rotate(360deg); } }
+/* Фразы ожидания сменяются через короткое угасание (скрипт каталога). */
+#ask-busy-text { transition: opacity .16s ease; }
+#ask-busy-text.is-fading { opacity: 0; }
+/* Появление выдачи после поиска (15.09.2026): лёгкий сдвиг снизу, первые
+   двенадцать карточек лесенкой по 40 мс. Только прозрачность и сдвиг. */
+.ct-card.ct-appear { animation: ctAppear .22s ease-out both; }
+.ct-card.ct-appear:nth-of-type(2)  { animation-delay: 40ms; }
+.ct-card.ct-appear:nth-of-type(3)  { animation-delay: 80ms; }
+.ct-card.ct-appear:nth-of-type(4)  { animation-delay: 120ms; }
+.ct-card.ct-appear:nth-of-type(5)  { animation-delay: 160ms; }
+.ct-card.ct-appear:nth-of-type(6)  { animation-delay: 200ms; }
+.ct-card.ct-appear:nth-of-type(7)  { animation-delay: 240ms; }
+.ct-card.ct-appear:nth-of-type(8)  { animation-delay: 280ms; }
+.ct-card.ct-appear:nth-of-type(9)  { animation-delay: 320ms; }
+.ct-card.ct-appear:nth-of-type(10) { animation-delay: 360ms; }
+.ct-card.ct-appear:nth-of-type(11) { animation-delay: 400ms; }
+.ct-card.ct-appear:nth-of-type(12) { animation-delay: 440ms; }
+@keyframes ctAppear { from { opacity: 0; transform: translateY(4px); } }
+@media (prefers-reduced-motion: reduce) {
+  .ask-busy i, .ct-card.ct-appear { animation: none; }
+}
 /* Очистить — маленький крестик, появляется только когда есть текст. */
 .ask-clear { border: 0; background: transparent; color: var(--text3);
              width: 32px; height: 32px; border-radius: var(--r-pill);
@@ -255,9 +276,10 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
           </svg>
           Ищем по смыслу: точные слова не нужны
         </span>
-        <span class="ask-busy" aria-live="polite"><i></i>Ищу похожие задачи…</span>
+        <span class="ask-busy" aria-live="polite"><i></i><span id="ask-busy-text">{{ search_busy_phrases.0 }}</span></span>
         <span class="ask-kbd">Enter – найти</span>
         <button class="ask-clear" type="button" id="ask-clear" aria-label="Очистить запрос">×</button>
+        {{ search_busy_phrases|json_script:"search-busy-phrases" }}
         <button class="ask-go" type="submit" id="ask-go" aria-label="Найти">
           <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M10 16V4M4.5 9.5 10 4l5.5 5.5"/>

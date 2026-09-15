@@ -49,8 +49,39 @@
   if (clear) clear.addEventListener('click', function () {
     field.value = ''; sync(); field.focus();
   });
+  /* Фразы ожидания (решение владельца 15.09.2026): первая всегда первая,
+     остальные — в новом случайном порядке на каждый запрос; смена раз в
+     1,6 с через угасание на 160 мс. При «уменьшить движение» остаётся
+     первая фраза без смены. */
+  var busyText = document.getElementById('ask-busy-text');
+  var phrasesNode = document.getElementById('search-busy-phrases');
+  var busyPhrases = phrasesNode ? JSON.parse(phrasesNode.textContent) : [];
+  var quiet = !!(window.matchMedia
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  var busyTimer = null;
+  function busyOrder() {
+    var rest = busyPhrases.slice(1);
+    for (var i = rest.length - 1; i > 0; i--) {
+      var j = Math.floor(Math.random() * (i + 1));
+      var t = rest[i]; rest[i] = rest[j]; rest[j] = t;
+    }
+    return busyPhrases.slice(0, 1).concat(rest);
+  }
   form.addEventListener('submit', function () {
-    if (field.value.trim()) form.classList.add('is-busy');
+    if (!field.value.trim()) return;
+    form.classList.add('is-busy');
+    if (!busyText || busyPhrases.length < 2 || quiet || busyTimer) return;
+    var order = busyOrder();
+    var n = 0;
+    busyText.textContent = order[0];
+    busyTimer = setInterval(function () {
+      busyText.classList.add('is-fading');
+      setTimeout(function () {
+        n = (n + 1) % order.length;
+        busyText.textContent = order[n];
+        busyText.classList.remove('is-fading');
+      }, 160);
+    }, 1600);
   });
   sync();
 })();

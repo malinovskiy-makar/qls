@@ -46,7 +46,7 @@
   {% if cards %}
     <div class="{% if view_mode == 'gallery' %}ct-gallery{% endif %}">
       {% for card in cards %}
-      <a class="ct-card" href="{% url 'catalog:problem_detail' card.problem.pk %}">
+      <a class="ct-card{% if searched and forloop.counter <= 12 %} ct-appear{% endif %}" href="{% url 'catalog:problem_detail' card.problem.pk %}">
         {% comment %}
         Строка признаков — только то, что есть у задачи: чип темы при теме,
         звёзды при заданной сложности (пустых ☆☆☆☆☆ у задачи без сложности
