@@ -368,27 +368,37 @@ def _shared_corpus_version():
 #: времени чужого поиска (15.09.2026).
 _corpus_build = threading.local()
 
+#: Корпус строит ОДИН поток за раз. С 15.09.2026 его строит фоновый прогрев
+#: воркера (`catalog/warmup.py`), и поиск, пришедший до конца сборки, без
+#: замка начал бы вторую такую же — ещё 20+ с процессора и базы в том же
+#: воркере. С замком он ждёт уже начатую.
+_corpus_lock = threading.Lock()
+
 
 def get_corpus():
-    """(bm25.Index, {id: row}) — строится лениво при первом обращении."""
+    """(bm25.Index, {id: row}) — строится лениво при первом обращении.
+
+    В `_corpus_build.seconds` попадает и своя сборка, и ОЖИДАНИЕ чужой под
+    замком: человек ждал столько же, кто бы корпус ни строил."""
     global _corpus_cache, _corpus_cache_version
     _corpus_build.seconds = 0.0
     version = _shared_corpus_version()
-    if version is _NO_CACHE:
-        if _corpus_cache is None:
-            _corpus_cache = _timed_build()
+    if _corpus_is_warm(version):
         return _corpus_cache
-    if _corpus_cache is None or _corpus_cache_version != version:
-        _corpus_cache = _timed_build()
-        _corpus_cache_version = version
+    started = time.perf_counter()
+    with _corpus_lock:
+        if not _corpus_is_warm(version):
+            _corpus_cache = _build_corpus()
+            if version is not _NO_CACHE:
+                _corpus_cache_version = version
+        _corpus_build.seconds = time.perf_counter() - started
     return _corpus_cache
 
 
-def _timed_build():
-    started = time.perf_counter()
-    corpus = _build_corpus()
-    _corpus_build.seconds = time.perf_counter() - started
-    return corpus
+def _corpus_is_warm(version):
+    if _corpus_cache is None:
+        return False
+    return version is _NO_CACHE or _corpus_cache_version == version
 
 
 def invalidate_corpus():

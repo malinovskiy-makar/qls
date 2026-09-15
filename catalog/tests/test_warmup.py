@@ -4,14 +4,17 @@
 ⚠️ СБОРКА КОРПУСА И ИНДЕКСА ЗДЕСЬ ПОДМЕНЯЕТСЯ. Пакета `bm25s` нет в
 `requirements/dev.txt`, по которому CI ставит тестовое окружение (та же
 ловушка, что описана в `test_rerank.py`), а проверяем мы не сборку, а то, что
-прогрев её зовёт, пишет итог и не роняет воркер.
+прогрев её зовёт, пишет итог, не роняет воркер, идёт в фоновом потоке и что
+поиск, пришедший во время прогрева, ждёт начатую сборку, а не строит вторую.
 """
 import io
+import threading
+import time
 from unittest import mock
 
 from django.test import SimpleTestCase, override_settings
 
-from catalog import warmup
+from catalog import rerank, semantic, warmup
 
 INDEX = {'ids': [1, 2, 3], 'matrix': None, 'is_test_flags': [False] * 3}
 
@@ -58,13 +61,19 @@ class WarmWorkerTests(SimpleTestCase):
         self.assertIsNone(result['corpus'])
         self.assertEqual(lines, [])
 
-    def test_heartbeat_between_steps(self):
-        notify = mock.Mock()
+    def test_closes_its_db_connection(self):
         with mock.patch('catalog.rerank.get_corpus', return_value=(None, {})), \
-                mock.patch('catalog.semantic.is_enabled', return_value=True), \
-                mock.patch('catalog.semantic.get_index', return_value=INDEX):
-            warmup.warm_worker(log=lambda line: None, notify=notify)
-        self.assertGreaterEqual(notify.call_count, 3)
+                mock.patch('catalog.semantic.is_enabled', return_value=False), \
+                mock.patch('django.db.connection.close') as close:
+            warmup.warm_worker(log=lambda line: None)
+        close.assert_called_once_with()
+
+    def test_closes_its_db_connection_when_warmup_fails(self):
+        with mock.patch('catalog.rerank.get_corpus', side_effect=RuntimeError('нет базы')), \
+                mock.patch('django.db.connection.close') as close, \
+                self.assertLogs('catalog.warmup', level='WARNING'):
+            warmup.warm_worker(log=lambda line: None)
+        close.assert_called_once_with()
 
     @override_settings(SMART_SEARCH_WARMUP=False)
     def test_switched_off_does_nothing(self):
@@ -75,13 +84,88 @@ class WarmWorkerTests(SimpleTestCase):
 
 class GunicornHookTests(SimpleTestCase):
 
-    def test_hook_warms_with_worker_log_and_heartbeat(self):
+    def test_hook_warms_in_a_background_thread_and_returns_at_once(self):
         from config import gunicorn_conf
         worker = mock.Mock()
-        with mock.patch('catalog.warmup.warm_worker') as warm:
+        entered, release = threading.Event(), threading.Event()
+
+        def slow_warm(log=None):
+            entered.set()
+            release.wait(10)
+
+        with mock.patch('catalog.warmup.warm_worker', side_effect=slow_warm) as warm:
+            started = time.perf_counter()
             gunicorn_conf.post_worker_init(worker)
-        warm.assert_called_once_with(log=worker.log.info, notify=worker.notify)
+            elapsed = time.perf_counter() - started
+            self.assertTrue(entered.wait(5), 'прогрев не запустился')
+            threads = [t for t in threading.enumerate()
+                       if t.name == 'smart-search-warmup']
+            release.set()
+        for thread in threads:
+            thread.join(5)
+        self.assertLess(elapsed, 1.0)
+        self.assertEqual(len(threads), 1)
+        self.assertTrue(threads[0].daemon)
+        warm.assert_called_once_with(log=worker.log.info)
 
     def test_entrypoint_loads_the_config(self):
         src = io.open('deploy/entrypoint.sh', encoding='utf-8').read()
         self.assertIn('-c /app/config/gunicorn_conf.py', src)
+
+
+class EarlySearchWaitsForWarmupTests(SimpleTestCase):
+    """Поиск во время прогрева ждёт начатую сборку, а не запускает вторую."""
+
+    def setUp(self):
+        rerank.invalidate_corpus()
+        semantic.invalidate_index()
+        self.addCleanup(rerank.invalidate_corpus)
+        self.addCleanup(semantic.invalidate_index)
+
+    def test_corpus_is_built_once(self):
+        waited = {}
+
+        def search():
+            rerank.get_corpus()
+            waited['seconds'] = rerank._corpus_build.seconds
+
+        entered = threading.Event()
+        builds = []
+
+        def slow_build():
+            builds.append(threading.current_thread().name)
+            entered.set()
+            time.sleep(0.3)
+            return None, {1: {}}
+
+        with mock.patch.object(rerank, '_build_corpus', side_effect=slow_build):
+            warm = threading.Thread(target=rerank.get_corpus, name='warm')
+            warm.start()
+            self.assertTrue(entered.wait(5), 'сборка не началась')
+            early = threading.Thread(target=search, name='early')
+            early.start()
+            warm.join(5)
+            early.join(5)
+        self.assertEqual(builds, ['warm'])
+        # Ожидание чужой сборки попадает в разбивку времени этого поиска.
+        self.assertGreater(waited['seconds'], 0.1)
+
+    def test_index_is_built_once(self):
+        entered = threading.Event()
+        builds = []
+
+        def slow_build():
+            builds.append(threading.current_thread().name)
+            entered.set()
+            time.sleep(0.3)
+            return INDEX
+
+        with mock.patch.object(semantic, '_build_index', side_effect=slow_build):
+            warm = threading.Thread(target=semantic.get_index, name='warm')
+            warm.start()
+            self.assertTrue(entered.wait(5), 'сборка не началась')
+            early = threading.Thread(target=semantic.get_index, name='early')
+            early.start()
+            warm.join(5)
+            early.join(5)
+        self.assertEqual(builds, ['warm'])

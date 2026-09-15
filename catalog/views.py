@@ -1,6 +1,7 @@
 import hashlib
 import json
 import re
+import time
 
 from django.contrib.auth.decorators import login_required
 from django.core.paginator import Paginator
@@ -438,8 +439,14 @@ def _catalog_context(request, missing_id=''):
     capped = False
 
     smart_search_status = 'off'
+    # Время поиска в мс — для заголовка `X-Smart-Search-Ms`: владелец меряет
+    # бой одним `curl -sI`, без доступа к журналу (15.09.2026). Считаются сам
+    # поиск и переранжирование, без сборки карточек; 0 — запроса не было.
+    smart_search_ms = 0
     if searched:
+        search_started = time.perf_counter()
         ids, scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
+        search_seconds = time.perf_counter() - search_started
         # ⚠️ ПОЛУЧАЕМ СНАЧАЛА ОДНИ КЛЮЧИ, А ЗАДАЧИ — ТОЛЬКО НА СТРАНИЦУ.
         # Первый вариант тянул из базы все пятьсот кандидатов со связями
         # ради двадцати показанных карточек.
@@ -456,8 +463,11 @@ def _catalog_context(request, missing_id=''):
         # базовой выдачи), поэтому активные фильтры накладываются здесь же
         # заново — тем же способом, что и на `ids` выше.
         from . import rerank as smart_rerank
+        rerank_started = time.perf_counter()
         pool_order, smart_search_status = smart_rerank.apply(
             request.user, query)
+        search_seconds += time.perf_counter() - rerank_started
+        smart_search_ms = int(round(search_seconds * 1000))
         if pool_order:
             candidates = pool_order + [pid for pid in ranked
                                        if pid not in set(pool_order)]
@@ -497,9 +507,10 @@ def _catalog_context(request, missing_id=''):
         'query':          query,
         'searched':       searched,
         'degraded':       degraded,
-        # Не для шаблона — читается `problem_list`/`api_filter_state` для
-        # заголовка `X-Smart-Search` (`catalog/rerank.py`).
+        # Статус умного поиска: заголовок `X-Smart-Search` (`problem_list`,
+        # `api_filter_state`) и текст плашки поиска по словам в шаблоне.
         'smart_search_status': smart_search_status,
+        'smart_search_ms': smart_search_ms,
         'missing_id':     missing_id,
         'total':          total,
         'capped':         capped,
@@ -552,6 +563,7 @@ def problem_list(request):
     context = _catalog_context(request, missing_id)
     response = render(request, 'catalog/problem_list.html', context)
     response['X-Smart-Search'] = context['smart_search_status']
+    response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
     return response
 
 
@@ -608,6 +620,7 @@ def api_filter_state(request):
         'url': fctx['total_url'],
     })
     response['X-Smart-Search'] = context['smart_search_status']
+    response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
     return response
 
 

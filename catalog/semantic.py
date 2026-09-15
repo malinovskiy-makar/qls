@@ -8,6 +8,7 @@ catalog/semantic.py — модуль семантического поиска �
 """
 
 import logging
+import threading
 import uuid
 from typing import Optional
 
@@ -42,6 +43,7 @@ _index = None   # словарь: {'matrix': ndarray (N, dim), 'ids': list[int],
 # разошлись. Цена — один `cache.get` на поисковый запрос.
 _VERSION_KEY = 'semantic:index_version'
 _index_version = None    # маркер, с которым построен _index в ЭТОМ процессе
+_index_lock = threading.Lock()   # сборку индекса делает один поток за раз
 
 # Ответ «кэш не работает» (DummyCache, кэш недоступен). В этом случае
 # ведём себя ровно как раньше: один процесс, сверять не с кем.
@@ -249,15 +251,19 @@ def get_index():
     """
     global _index, _index_version
     version = _shared_version()
-    if version is _NO_CACHE:
-        # Кэша нет — сверять не с чем, работаем как один процесс.
-        if _index is None:
+    # ⚠️ ПОД ЗАМКОМ (15.09.2026): индекс строит и фоновый прогрев воркера
+    # (`catalog/warmup.py`), и поиск, пришедший до конца сборки, без замка
+    # собрал бы вторую матрицу рядом с первой. С замком он ждёт начатую.
+    with _index_lock:
+        if version is _NO_CACHE:
+            # Кэша нет — сверять не с чем, работаем как один процесс.
+            if _index is None:
+                _index = _build_index()
+            return _index
+        if _index is None or _index_version != version:
             _index = _build_index()
+            _index_version = version
         return _index
-    if _index is None or _index_version != version:
-        _index = _build_index()
-        _index_version = version
-    return _index
 
 
 def invalidate_index():

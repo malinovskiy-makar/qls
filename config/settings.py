@@ -403,6 +403,17 @@ SMART_SEARCH_RERANK_LEGS = frozenset(
     os.environ.get('SMART_SEARCH_RERANK_LEGS', 'dense,bm25').split(',')
     if leg.strip())
 
+# Прогрев воркера gunicorn (`catalog/warmup.py`, `config/gunicorn_conf.py`):
+# корпус bm25 и смысловой индекс строятся в фоновом потоке сразу после
+# старта воркера, а не на первом поиске человека. Замер 15.09.2026 на
+# 14 082 видимых задачах: корпус 22–26 с, индекс 3 с. Включено по умолчанию
+# (решение владельца 15.09.2026); SMART_SEARCH_WARMUP=0 возвращает сборку на
+# первый поиск, как было до 15.09.
+SMART_SEARCH_WARMUP = (
+    os.environ.get('SMART_SEARCH_WARMUP', '1').strip().lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 # Этап В1 — Кабинет ученика: URL для входа и редирект по умолчанию.
 LOGIN_URL = '/login/'
 # Метка версии в правом углу шапки. Поднимает владелец руками: числа
