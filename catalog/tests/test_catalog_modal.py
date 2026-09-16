@@ -24,14 +24,14 @@ BASE = Path(settings.BASE_DIR)
 class ModalMarkupTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.mon = make_topic('Монополия и ценовая дискриминация')
-        cls.gdp = make_topic('ВВП и национальные счета')
+        cls.mon = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        cls.gdp = make_topic('ВВП и национальные счета', is_canonical=True)
         cls.src = make_source('Сборник')
         cls.p1 = make_problem('Монополист.', topic=cls.mon, difficulty=5,
                               problem_type='тест: один ответ', solution='Р.')
         cls.p2 = make_problem('ВВП.', topic=cls.gdp, difficulty=2)
         link_source(cls.p1, cls.src)
-        cls.tag = Tag.objects.create(name='Курно', slug='kurno')
+        cls.tag = Tag.objects.create(name='Курно', slug='kurno', kind='canonical')
         cls.p1.tags.add(cls.tag)
 
     def test_dialog_is_built_from_the_shared_module(self):

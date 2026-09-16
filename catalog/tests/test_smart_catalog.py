@@ -41,7 +41,7 @@ class _База(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.тема = make_topic(CANONICAL[7])          # «Монополия…»
+        cls.тема = make_topic(CANONICAL[7], is_canonical=True)          # «Монополия…»
         cls.источник = make_source('Тестовый сборник')
         # ⚠️ ТЕГ ЗАВОДИТСЯ НАРОЧНО, И БЕЗ НЕГО НАБОР ПРОВЕРОК ТУПОЙ.
         # Первая версия этого файла обходилась без тегов — и проверка
@@ -50,7 +50,7 @@ class _База(TestCase):
         # обоих экранах, и множества сходились на отсутствии. Поймано
         # подкладыванием дефекта, а не чтением кода.
         from problems.models import Tag
-        cls.тег = Tag.objects.create(name='монополия', slug='monopoliya')
+        cls.тег = Tag.objects.create(name='монополия', slug='monopoliya', kind='canonical')
         cls.задача = make_problem(
             statement='Монополист максимизирует прибыль при линейном спросе.',
             topic=cls.тема, difficulty=3, solution='Решение есть.',

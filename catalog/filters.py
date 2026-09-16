@@ -482,7 +482,10 @@ def _topic_options(base, active, corpus):
 
     tally = _tally(_counted(base, active, 'topic'), 'topics__id')
     by_block = {}
-    for topic in Topic.objects.filter(id__in=list(corpus['topics'])):
+    # ⚠️ ТОЛЬКО КАНОНИЧЕСКИЕ ТЕМЫ (решение владельца 17.09.2026). Одного
+    # `is_known` мало: он узнаёт и 23 старых названия, и на бою, пока старые
+    # связи не сняты синхронизацией, фильтр показывал 36 тем вместо 29.
+    for topic in Topic.objects.filter(id__in=list(corpus['topics']), is_canonical=True):
         if is_known(topic.name):
             by_block.setdefault(block_of(topic.name), []).append(topic)
 
@@ -576,7 +579,12 @@ def _tag_options(base, active):
     listed = []
     if active['topics']:
         tally = _tally(counted, 'tags__id')
-        top = sorted(tally.items(), key=lambda kv: -kv[1])[:40]
+        # Списком — только канонические теги (решение 17.09.2026): legacy
+        # остаются в базе и на задачах, но в фильтре их нет.
+        canonical = set(Tag.objects.filter(id__in=list(tally), kind='canonical')
+                        .values_list('id', flat=True))
+        top = sorted(((tid, n) for tid, n in tally.items() if tid in canonical),
+                     key=lambda kv: -kv[1])[:40]
         names = {t.id: t.name for t in Tag.objects.filter(id__in=dict(top))}
         listed = [_option(str(tid), names.get(tid, ''), n, str(tid) in active['tags'])
                   for tid, n in top if tid in names]

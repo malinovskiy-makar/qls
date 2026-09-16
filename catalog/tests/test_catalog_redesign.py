@@ -85,7 +85,7 @@ class TypingPlaceholderTests(TestCase):
 class SearchFieldTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.topic = make_topic('Эластичность')
+        cls.topic = make_topic('Эластичность', is_canonical=True)
         make_problem('Задача про эластичность спроса.', topic=cls.topic)
 
     def test_field_is_the_hero_with_buttons_inside(self):
@@ -131,8 +131,8 @@ class MapCaptionTests(TestCase):
 class StripTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.mon = make_topic('Монополия и ценовая дискриминация')
-        cls.gdp = make_topic('ВВП и национальные счета')
+        cls.mon = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        cls.gdp = make_topic('ВВП и национальные счета', is_canonical=True)
         cls.source = make_source('Сборник')
         cls.p1 = make_problem('Монополист с линейным спросом.', topic=cls.mon,
                               difficulty=4, solution='Решение.',
@@ -212,7 +212,7 @@ CUT_STATEMENT = ('Известно, что монополист получает
 class CardTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.mon = make_topic('Монополия и ценовая дискриминация')
+        cls.mon = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
         cls.p_cut = make_problem(CUT_STATEMENT, title=CUT_TITLE, topic=cls.mon)
         cls.p_named = make_problem('На школьной ярмарке спрос задан как $Q_d = 120 - P$.',
                                    title='Вмешательство — 5', topic=cls.mon,

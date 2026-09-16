@@ -87,9 +87,9 @@ class ParseTests(SimpleTestCase):
 class MultiSelectQueryTests(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.mon = make_topic('Монополия и ценовая дискриминация')
-        cls.el = make_topic('Эластичность')
-        cls.gdp = make_topic('ВВП и национальные счета')
+        cls.mon = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        cls.el = make_topic('Эластичность', is_canonical=True)
+        cls.gdp = make_topic('ВВП и национальные счета', is_canonical=True)
         cls.src_a = make_source('Сборник А')
         cls.src_b = make_source('Сборник Б')
         cls.p_a1 = make_problem('Монополист один.', topic=cls.mon, difficulty=4)
@@ -194,7 +194,7 @@ class CharacterAndFeaturesTests(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.topic = make_topic('Эластичность')
+        cls.topic = make_topic('Эластичность', is_canonical=True)
         cls.p1 = make_problem('С графиком.', topic=cls.topic, difficulty=3)
         cls.p2 = make_problem('С таблицей.', topic=cls.topic, difficulty=3)
         cls.p3 = make_problem('Без всего.', topic=cls.topic, difficulty=3)

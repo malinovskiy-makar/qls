@@ -1650,7 +1650,7 @@ def api_tags(request):
     topic_id = (request.GET.get('topic') or '').strip()
     if topic_id.isdigit():
         of_topic = visible & Q(problems__topics__id=int(topic_id))
-        rows = (Tag.objects
+        rows = (Tag.objects.filter(kind='canonical')
                 .annotate(n=Count('problems', filter=of_topic, distinct=True))
                 .filter(n__gt=0)
                 .order_by('-n', 'name'))
@@ -1660,8 +1660,9 @@ def api_tags(request):
     needle = (request.GET.get('q') or '').strip()
     if len(needle) < 2:
         return JsonResponse({'tags': []})
+    # Только канонические теги (решение 17.09.2026): legacy в подсказках нет.
     rows = (Tag.objects
-            .filter(name__icontains=needle)
+            .filter(name__icontains=needle, kind='canonical')
             .annotate(n=Count('problems', filter=visible, distinct=True))
             .filter(n__gt=0)
             .order_by('-n', 'name')[:10])

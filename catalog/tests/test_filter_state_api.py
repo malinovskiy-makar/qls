@@ -16,11 +16,11 @@ from problems.tests.factories import make_problem, make_topic
 class _Fixture(TestCase):
     @classmethod
     def setUpTestData(cls):
-        cls.mon = make_topic('Монополия и ценовая дискриминация')
-        cls.el = make_topic('Эластичность')
-        cls.t_kurno = Tag.objects.create(name='Курно', slug='kurno')
-        cls.t_tariff = Tag.objects.create(name='Двухчастный тариф', slug='tariff')
-        cls.t_hidden = Tag.objects.create(name='Скрытый тег', slug='hidden-tag')
+        cls.mon = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        cls.el = make_topic('Эластичность', is_canonical=True)
+        cls.t_kurno = Tag.objects.create(name='Курно', slug='kurno', kind='canonical')
+        cls.t_tariff = Tag.objects.create(name='Двухчастный тариф', slug='tariff', kind='canonical')
+        cls.t_hidden = Tag.objects.create(name='Скрытый тег', slug='hidden-tag', kind='canonical')
         cls.p1 = make_problem('Монополист один.', topic=cls.mon, difficulty=4)
         cls.p2 = make_problem('Монополист два.', topic=cls.mon, difficulty=5,
                               solution='Решение.')
