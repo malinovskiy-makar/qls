@@ -131,7 +131,9 @@ def dump(field, value):
     if kind == 'BinaryField':
         return base64.b64encode(bytes(value)).decode('ascii')
     if kind == 'DateTimeField':
-        return value.isoformat()
+        # До миллисекунд, как фикстуры Django: бой заливался ими, и дата с
+        # микросекундами дома иначе «отличалась» бы у 8 981 задачи без смысла.
+        return value.isoformat(timespec='milliseconds')
     if kind == 'DecimalField':
         return str(Decimal(value).quantize(Decimal(1).scaleb(-field.decimal_places)))
     return value
