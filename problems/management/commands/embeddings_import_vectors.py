@@ -78,6 +78,13 @@ class Command(BaseCommand):
             help='⚠️ Пропустить требование пройденной сверки билда. Только '
                  'для тестов конвейера на подставных векторах — на боевых '
                  'данных это ровно та ошибка, ради которой сверка заведена.')
+        parser.add_argument(
+            '--ignore-text-check', action='store_true',
+            help='⚠️ Ввозить и то, у чего отпечаток текста разошёлся с '
+                 'файлом — векторы посчитаны по другим (например домашним) '
+                 'текстам тех же задач. embedding_source_hash пишется хеш ИЗ '
+                 'ФАЙЛА, не пересчитанный. Временная мера: после синхронизации '
+                 'банка ввоз повторить без ключа.')
 
     def handle(self, *args, **options):
         матрица, meta = load_vectors(options['vectors'])
@@ -123,7 +130,8 @@ class Command(BaseCommand):
         хеши = dict(zip(ids, meta['hashes']))
         место = {pid: i for i, pid in enumerate(ids)}
 
-        к_записи, разошлись = [], []
+        игнор_текста = options['ignore_text_check']
+        к_записи, разошлись, по_ключу = [], [], []
         нашлось = set()
         for начало in range(0, len(ids), ID_CHUNK):
             порция_ids = ids[начало:начало + ID_CHUNK]
@@ -133,8 +141,13 @@ class Command(BaseCommand):
                 нашлось.add(задача.id)
                 текст = build_text(задача, spec)
                 если_хеш = text_hash(текст)
-                if если_хеш != хеши.get(задача.id):
-                    разошлись.append(задача.id)
+                хеш_из_файла = хеши.get(задача.id)
+                if если_хеш != хеш_из_файла:
+                    if игнор_текста:
+                        по_ключу.append(задача.id)
+                        к_записи.append((задача.id, хеш_из_файла))
+                    else:
+                        разошлись.append(задача.id)
                     continue
                 к_записи.append((задача.id, если_хеш))
         пропало = [i for i in ids if i not in нашлось]
@@ -145,8 +158,16 @@ class Command(BaseCommand):
         self.stdout.write('   к записи: %d' % len(к_записи))
         self.stdout.write('   пропущено, текст изменился после вывоза: %d %s'
                           % (len(разошлись), разошлись[:20]))
+        if игнор_текста:
+            self.stdout.write('   разошлись, но записаны по ключу: %d %s'
+                              % (len(по_ключу), по_ключу[:20]))
         self.stdout.write('   нет в банке вовсе (удалены после вывоза): %d %s'
                           % (len(пропало), пропало[:20]))
+        if игнор_текста:
+            self.stdout.write(self.style.WARNING(
+                'ВНИМАНИЕ: отпечаток текста не сверялся, векторы посчитаны '
+                'по домашним текстам; после синхронизации банка ввоз '
+                'повторить без ключа.'))
 
         if not options['apply']:
             self.stdout.write(self.style.WARNING(
