@@ -647,31 +647,39 @@ def revert(snapshot_path):
 
 
 # ── Отчёт ────────────────────────────────────────────────────────────────
-def _short(value, limit=160):
+def short(value, limit=160):
     text = value if isinstance(value, str) else json.dumps(value, ensure_ascii=False)
     text = text.replace('\n', ' ⏎ ').replace('|', '\\|')
     return text if len(text) <= limit else text[:limit] + '…'
 
 
-def report_lines(result, package, mode, names, total, snapshot=None, examples=20):
-    lines = ['# Синхронизация банка — %s' % mode, '',
-             '- Пакет: `%s`' % package, '- Поля: %s' % ', '.join(names),
-             '- Задач в пакете: %d; нет в базе (не создаются): %d; с изменениями: %d'
-             % (total, len(result['missing']), len(changed_ids(result))), '']
+def empty_plan(refs=(), children=()):
+    """Пустой план в формате `plan()` — его заполняют команды правок дома."""
+    return {'refs': {name: {'create': [], 'update': []} for name in refs},
+            'problems': [], 'missing': [], 'skipped': [],
+            'children': {name: {'create': [], 'update': [], 'delete': [], 'kept': []}
+                         for name in children}}
+
+
+def report_lines(result, snapshot=None, examples=20):
+    """Тело отчёта: справочники, поля задач, связи, пропуски. Шапку пишет команда."""
+    lines = ['- Задач с изменениями: %d' % len(changed_ids(result))]
     if snapshot:
-        lines += ['**Записано.** Снимок для отката: `%s`' % snapshot, '']
+        lines += ['', '**Записано.** Снимок для отката: `%s`' % snapshot]
     if result['missing']:
-        lines += ['Нет в базе (первые 50): %s' % ', '.join(map(str, result['missing'][:50])), '']
+        lines += ['', 'Нет в базе, не создаются: %d (первые 50: %s)'
+                  % (len(result['missing']), ', '.join(map(str, result['missing'][:50])))]
+    lines.append('')
 
     lines += ['## Справочники', '', '| справочник | создать | обновить |', '|---|---|---|']
     lines += ['| %s | %d | %d |' % (name, len(ops['create']), len(ops['update']))
               for name, ops in result['refs'].items()]
     for name, ops in result['refs'].items():
         for item in ops['update'][:examples]:
-            lines.append('- `%s` %s: %s → %s' % (name, _short(item['key'], 60),
-                                                  _short(item['old']), _short(item['new'])))
+            lines.append('- `%s` %s: %s → %s' % (name, short(item['key'], 60),
+                                                  short(item['old']), short(item['new'])))
         for item in ops['create'][:examples]:
-            lines.append('- `%s` создать %s: %s' % (name, _short(item['key'], 60), _short(item['row'])))
+            lines.append('- `%s` создать %s: %s' % (name, short(item['key'], 60), short(item['row'])))
     lines.append('')
 
     by_field = Counter(f for item in result['problems'] for f in item['new'])
@@ -680,7 +688,7 @@ def report_lines(result, package, mode, names, total, snapshot=None, examples=20
     for f in sorted(by_field):
         lines += ['', '### %s — примеры' % f, '', '| id | было | станет |', '|---|---|---|']
         sample = [item for item in result['problems'] if f in item['new']][:examples]
-        lines += ['| %d | %s | %s |' % (item['id'], _short(item['old'][f]), _short(item['new'][f]))
+        lines += ['| %d | %s | %s |' % (item['id'], short(item['old'][f]), short(item['new'][f]))
                   for item in sample]
     lines.append('')
 
@@ -694,20 +702,20 @@ def report_lines(result, package, mode, names, total, snapshot=None, examples=20
             continue
         lines += ['', '### %s — примеры' % name, '']
         for item in ops['update'][:examples]:
-            lines.append('- #%d [%s] обновить: %s → %s' % (item['problem'], _short(item['key'], 60),
-                                                            _short(item['old']), _short(item['new'])))
+            lines.append('- #%d [%s] обновить: %s → %s' % (item['problem'], short(item['key'], 60),
+                                                            short(item['old']), short(item['new'])))
         for item in ops['create'][:examples]:
-            lines.append('- #%d [%s] добавить: %s' % (item['problem'], _short(item['key'], 60),
-                                                       _short(item['row'])))
+            lines.append('- #%d [%s] добавить: %s' % (item['problem'], short(item['key'], 60),
+                                                       short(item['row'])))
         for item in ops['delete'][:examples]:
-            lines.append('- #%d [%s] удалить: %s' % (item['problem'], _short(item['key'], 60),
-                                                      _short(item['row'])))
+            lines.append('- #%d [%s] удалить: %s' % (item['problem'], short(item['key'], 60),
+                                                      short(item['row'])))
         for item in ops['kept'][:examples]:
-            lines.append('- #%d [%s] НЕ удалён: %s' % (item['problem'], _short(item['key'], 60),
+            lines.append('- #%d [%s] НЕ удалён: %s' % (item['problem'], short(item['key'], 60),
                                                         item['reason']))
     if result['skipped']:
         lines += ['', '## Пропуски', '', '| таблица | задача/ключ | причина |', '|---|---|---|']
-        lines += ['| %s | %s | %s |' % (a, _short(b, 60), c) for a, b, c in result['skipped'][:200]]
+        lines += ['| %s | %s | %s |' % (a, short(b, 60), c) for a, b, c in result['skipped'][:200]]
         if len(result['skipped']) > 200:
             lines.append('… всего %d' % len(result['skipped']))
     return lines

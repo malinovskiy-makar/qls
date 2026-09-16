@@ -14,7 +14,7 @@
     manage.py bank_sync_apply --package DIR                 # сухой прогон (по умолчанию)
     manage.py bank_sync_apply --package DIR --apply         # запись + снимок
     manage.py bank_sync_apply --package DIR --fields title  # сузить
-    manage.py bank_sync_apply --revert DIR/apply_<время>/snapshot.json
+    manage.py bank_sync_apply --revert DIR/apply_<время>/snapshot_<время>.json
 
 Повторный `--apply` того же пакета обязан дать 0 изменений.
 """
@@ -24,6 +24,8 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from problems import bank_sync
+from problems.management.commands._bank_edit import (invalidate_search, revert_and_report,
+                                                     summary)
 
 
 class Command(BaseCommand):
@@ -43,7 +45,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         if options['revert']:
-            return self._revert(Path(options['revert']))
+            return revert_and_report(Path(options['revert']), self.stdout, self.stderr)
         if not options['package']:
             raise CommandError('Нужен --package (или --revert).')
         package = Path(options['package'])
@@ -64,62 +66,22 @@ class Command(BaseCommand):
         if options['apply'] and not bank_sync.is_empty(result):
             snapshot = report_dir / ('snapshot_%s.json' % stamp)
             bank_sync.execute(result, names, package, snapshot)
-            self._invalidate_search()
+            invalidate_search(self.stderr)
         mode = 'запись (--apply)' if options['apply'] else 'сухой прогон'
-        lines = bank_sync.report_lines(result, package, mode, names, manifest['problems'],
-                                       snapshot=snapshot)
+        header = ['# Синхронизация банка — %s' % mode, '',
+                  '- Пакет: `%s` (HEAD %s, собран %s)' % (package, manifest['git_head'][:8],
+                                                         manifest['created_at']),
+                  '- Поля: %s' % ', '.join(names),
+                  '- Задач в пакете: %d; нет в базе: %d' % (manifest['problems'], len(result['missing'])),
+                  '']
+        lines = header + bank_sync.report_lines(result, snapshot=snapshot)
         (report_dir / 'REPORT.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
         (report_dir / 'changed_ids.txt').write_text(
             '\n'.join(map(str, bank_sync.changed_ids(result))) + '\n', encoding='utf-8')
-        self._summary(result, report_dir, snapshot, mode)
-
-    def _summary(self, result, report_dir, snapshot, mode):
-        out = self.stdout.write
-        out('Режим: %s' % mode)
-        out('Задач с изменениями: %d; нет в базе: %d; пропусков: %d'
-            % (len(bank_sync.changed_ids(result)), len(result['missing']), len(result['skipped'])))
-        for name, ops in result['refs'].items():
-            out('  справочник %s: создать %d, обновить %d' % (name, len(ops['create']), len(ops['update'])))
-        fields = {}
-        for item in result['problems']:
-            for f in item['new']:
-                fields[f] = fields.get(f, 0) + 1
-        for f, n in sorted(fields.items()):
-            out('  поле %s: %d' % (f, n))
-        for name, ops in result['children'].items():
-            if any(ops.values()):
-                out('  %s: добавить %d, обновить %d, удалить %d, не удалено %d'
-                    % (name, len(ops['create']), len(ops['update']), len(ops['delete']), len(ops['kept'])))
-        if bank_sync.is_empty(result):
-            out('Изменений нет.')
-        out('Отчёт: %s' % (report_dir / 'REPORT.md'))
+        self.stdout.write('Режим: %s' % mode)
+        self.stdout.write('Задач в пакете: %d; нет в базе: %d'
+                          % (manifest['problems'], len(result['missing'])))
+        summary(result, self.stdout)
+        self.stdout.write('Отчёт: %s' % (report_dir / 'REPORT.md'))
         if snapshot:
-            out('Снимок для отката: %s' % snapshot)
-
-    def _revert(self, path):
-        try:
-            stats, conflicts = bank_sync.revert(path)
-        except (OSError, ValueError, KeyError) as exc:
-            raise CommandError(exc)
-        self._invalidate_search()
-        for key, n in sorted(stats.items()):
-            self.stdout.write('  %s: %d' % (key, n))
-        lines = ['# Откат синхронизации банка', '', '- Снимок: `%s`' % path, '']
-        lines += ['- %s: %d' % (k, n) for k, n in sorted(stats.items())]
-        if conflicts:
-            lines += ['', '## Не возвращено (изменено после синхронизации)', '',
-                      '| таблица | где | причина |', '|---|---|---|']
-            lines += ['| %s | %s | %s |' % c for c in conflicts]
-        report = path.with_name(path.stem + '_REVERT.md')
-        report.write_text('\n'.join(lines) + '\n', encoding='utf-8')
-        self.stdout.write('Конфликтов: %d. Отчёт: %s' % (len(conflicts), report))
-
-    def _invalidate_search(self):
-        """Тексты и связи изменились — корпус умного поиска и смысловой индекс
-        перестраиваются по следующему запросу во ВСЕХ воркерах."""
-        try:
-            from catalog import rerank, semantic
-            rerank.invalidate_corpus()
-            semantic.invalidate_index()
-        except Exception as exc:  # noqa: BLE001 — поиск не должен ронять синхронизацию
-            self.stderr.write('Кэш поиска не сброшен: %s' % exc)
+            self.stdout.write('Снимок для отката: %s' % snapshot)

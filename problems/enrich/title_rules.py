@@ -105,3 +105,47 @@ def classify_and_pick_source(title, statement):
     """`(категория, Problem.TitleSource)` для текущего заголовка задачи."""
     category = classify_current_title(title, statement)
     return category, CATEGORY_TITLE_SOURCE[category]
+
+
+# ── Обрубок заголовка (правило владельца 17.09.2026) ─────────────────────
+#
+# Заменять `title` кандидатом только у «обрубков» (Фаза 1 сессии
+# «Синхронизация банка v4», reports/bank_sync_20260917/RECON.md, раздел 2).
+# Признаки — любой из пяти. Классификация A/B/C/D выше не используется: она
+# считала заголовки для прогона модели и пропускает коды источников.
+_STUB_TASK_N_RE = re.compile(r'(?i)\b(задача|задание|вопрос|question|problem|task|'
+                             r'упражнение|exercise)\s*№?\s*\d+[а-яa-z]?\s*\.?$')
+_STUB_ABBR_YEAR_RE = re.compile(r'^[A-ZА-ЯЁ]{2,6}\b.*\b(19|20)\d{2}\b')
+_STUB_ABBR_STAGE_RE = re.compile(r'^[A-ZА-ЯЁ]{2,6}\s+(?i:отбор|финал|регион\w*|'
+                                 r'муниципал\w*|заключ\w*|олимп\w*)')
+_STUB_DIGITS_RE = re.compile(r'^[\d\W_]+$')
+
+
+def stub_flags(title, statement):
+    """Какими признаками заголовок — обрубок: ['start', 'short', 'ellipsis',
+    'code', 'digits'] или пусто.
+
+    start — совпадает с началом условия (первые 40 знаков, пробелы и регистр
+    не в счёт); short — не больше двух слов; ellipsis — «…» или «...» в конце;
+    code — код источника («Олигополия. Задача 21», «Question 189», «МЭ 2020
+    9 задача 11», «ВП отбор»); digits — одни цифры и знаки. Пустой заголовок —
+    не обрубок: заменять там нечего решать.
+    """
+    raw = (title or '').strip()
+    if not raw:
+        return []
+    head = _norm(raw).lower().rstrip('.… ')
+    body = _norm(statement).lower()
+    k = min(40, len(head))
+    flags = []
+    if k and body[:k] == head[:k]:
+        flags.append('start')
+    if len(raw.split()) <= 2:
+        flags.append('short')
+    if raw.endswith('…') or raw.endswith('...'):
+        flags.append('ellipsis')
+    if _STUB_TASK_N_RE.search(raw) or _STUB_ABBR_YEAR_RE.search(raw) or _STUB_ABBR_STAGE_RE.search(raw):
+        flags.append('code')
+    if _STUB_DIGITS_RE.match(raw):
+        flags.append('digits')
+    return flags
