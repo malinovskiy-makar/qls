@@ -5,7 +5,8 @@
 
    Инварианты:
    - набор не теряется при смене темы и «Показать ещё 20» (прежний мастер
-     перезагружал страницу и стирал собранное);
+     перезагружал страницу и стирал собранное): два вопроса → тема → ещё 20 →
+     третий вопрос из нового списка → другая тема — в наборе три, по порядку;
    - случайная перезагрузка страницы восстанавливает набор из sessionStorage;
    - стрелка «ниже» меняет порядок, и скрытое поле question_ids — тоже;
    - смена режима при непустом наборе спрашивает, «Оставить как есть» ничего не меняет;
@@ -71,27 +72,35 @@ try {
     const items = await page.$$eval('#sb-list li', (li) => li.length);
     await page.click('#sb-more');
     await page.waitForFunction((n) => document.querySelectorAll('#sb-list li').length > n, items, { timeout: 8000 });
+    // Третий вопрос — из нового списка: правый столбец перерисуется из состояния скрипта,
+    // и набор, тихо переписанный при перерисовке списка, покажет себя на экране.
+    const third = await page.$eval('#sb-list li:not(.in) [data-toggle]', (b) => b.dataset.toggle);
+    await page.click('#sb-list li:not(.in) [data-toggle]');
+    const found2 = await page.$eval('#sb-found', (el) => el.textContent);
+    await page.click('#sb-topics button:nth-of-type(1)');   // «все темы»
+    await page.waitForFunction((t) => document.getElementById('sb-found').textContent !== t, found2, { timeout: 8000 });
+    const all = before + ',' + third;
     const after = { count: await count(page), ids: await pickedIds(page),
                     rows: await page.$$eval('#sb-picked li', (li) => li.length) };
-    check('set_survives_filters_and_paging', after.count === '2' && after.ids === before && after.rows === 2,
-          { before, after });
+    check('set_survives_filters_and_paging', after.count === '3' && after.ids === all && after.rows === 3,
+          { before, third, after });
 
     await page.reload({ waitUntil: 'load' });
     await page.waitForSelector('#sb-picked li', { timeout: 8000 });
     const restored = { count: await count(page), ids: await pickedIds(page) };
-    check('set_restored_after_reload', restored.count === '2' && restored.ids === before, restored);
+    check('set_restored_after_reload', restored.count === '3' && restored.ids === all, restored);
 
     await page.click('#sb-picked li:nth-child(1) button[data-op="down"]');
     const reordered = await pickedIds(page);
     const [a, b] = before.split(',');
-    check('arrows_reorder_question_ids', reordered === [b, a].join(','), { before, reordered });
+    check('arrows_reorder_question_ids', reordered === [b, a, third].join(','), { before, reordered });
 
     await page.click('.sb-mode[data-mode="bullet"]');
     const asked = await page.$eval('#sb-ask', (el) => !el.hidden);
     await page.click('#sb-ask-keep');
     const kept = { hidden: await page.$eval('#sb-ask', (el) => el.hidden), count: await count(page),
                    mode: await page.$eval('#sb-mode', (el) => el.value) };
-    check('mode_switch_asks_when_not_empty', asked && kept.hidden && kept.count === '2' && kept.mode === 'blitz',
+    check('mode_switch_asks_when_not_empty', asked && kept.hidden && kept.count === '3' && kept.mode === 'blitz',
           { asked, kept });
 
     await page.fill('#sb-title', 'Контрольная из браузера');

@@ -492,6 +492,13 @@ class TeacherSetsP7Tests(TestCase):
         self.assertEqual(main.count('<button type="button" class="sb-mode'), 1)   # в тестовом пуле только Блиц
         self.assertIn('один верный ответ · 2 мин · 70', main)
 
+    def test_no_internal_type_names_on_the_list_and_the_set_page(self):
+        gset = make_set(self.pool[:3], author=self.teacher, title='Моя контрольная')
+        for url in (reverse('teacher:game_sets'), reverse('teacher:game_set_detail', args=[gset.code])):
+            main = self.client.get(url).content.decode().split('<main', 1)[1].split('</main>', 1)[0]
+            for word in ('boolean', 'single', 'multi', 'numeric', '120 с'):
+                self.assertNotIn(word, main, url)
+
     def save(self, **fields):
         data = {'mode': 'blitz', 'title': 'Контрольная', 'attempts': '1',
                 'question_ids': ','.join(str(q.id) for q in self.pool[:3][::-1])}
@@ -516,23 +523,25 @@ class TeacherSetsP7Tests(TestCase):
 
     def test_detail_counts_anonymous_sorts_hard_first_and_shows_when(self):
         gset = make_set(self.pool[:3], author=self.teacher, title='Моя контрольная')
-        outcomes = lambda wrong_first: [  # noqa: E731
-            {'question_id': self.pool[0].id, 'outcome': 'wrong' if wrong_first else 'correct'},
-            {'question_id': self.pool[1].id, 'outcome': 'correct'},
-            {'question_id': self.pool[2].id, 'outcome': 'correct'}]
+        # Трудный — третий вопрос: у «сначала трудные» и «по порядку» разный первый ряд.
+        outcomes = [{'question_id': self.pool[0].id, 'outcome': 'correct'},
+                    {'question_id': self.pool[1].id, 'outcome': 'correct'},
+                    {'question_id': self.pool[2].id, 'outcome': 'wrong'}]
         GameResult.objects.create(code=make_code(), mode='blitz', game_set=gset, user=None, score=90,
-                                  correct_count=2, total_count=3, question_outcomes=outcomes(True))
+                                  correct_count=2, total_count=3, question_outcomes=outcomes)
         GameResult.objects.create(code=make_code(), mode='blitz', game_set=gset, user=self.teacher, score=120,
-                                  correct_count=2, total_count=3, question_outcomes=outcomes(True))
-        html = self.client.get(reverse('teacher:game_set_detail', args=[gset.code])).content.decode()
+                                  correct_count=2, total_count=3, question_outcomes=outcomes)
+        url = reverse('teacher:game_set_detail', args=[gset.code])
+        html = self.client.get(url).content.decode()
         self.assertIn('из них 1 без входа', html)
         self.assertIn('>Когда</th>', html)
-        self.assertIn('№&nbsp;1 · 0&nbsp;%', html)
-        first_row = html.split('<li class="sd-q', 1)[1]
-        self.assertTrue(first_row.startswith(' hard"><span class="qn">1</span>'))
+        self.assertIn('№&nbsp;3 · 0&nbsp;%', html)
+        first = lambda page: page.split('<li class="sd-q', 1)[1].split('</span>', 1)[0]  # noqa: E731
+        self.assertEqual(first(html), ' hard"><span class="qn">3')
         self.assertIn('ответ: Центральный банк Российской Федерации</small>', html)
-        by_order = self.client.get(reverse('teacher:game_set_detail', args=[gset.code]) + '?sort=order').content.decode()
+        by_order = self.client.get(url + '?sort=order').content.decode()
         self.assertIn('class="on" aria-current="true">по порядку', by_order)
+        self.assertEqual(first(by_order), '"><span class="qn">1')
 
     def test_deadline_of_a_foreign_set_cannot_be_changed(self):
         other = User.objects.create_user(username='chuzhoy', password='pw12345', role='teacher')
