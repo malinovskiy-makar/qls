@@ -82,21 +82,29 @@ try {
   await block(['hud_filter_and_four_tallies', 'wrong_answer_feedback_with_catalog_link', 'hover_is_border_only',
                'history_is_read_only', 'next_label_by_situation', 'skip_is_reversible',
                'escape_asks_then_result_screen'], async () => {
-    const { context, page } = await start();
-    const hud = await page.evaluate(() => {
-      const shown = (sel) => { const el = document.querySelector(sel); return !!el && el.checkVisibility(); };
-      return { name: shown('.pr-name'), chip: document.getElementById('pr-filter').textContent,
-               tallies: ['pr-answered', 'pr-correct', 'pr-wrong', 'pr-skipped'].filter((id) => shown('#' + id)).length,
-               timer: shown('#hud-timer'), lives: shown('#hud-lives'), score: shown('#hud-score') };
-    });
+    // ⚠️ Вопросы практики случайны, а в пуле стенда 3 сгенерированных из 43: ссылки в каталог у
+    // них нет (их разбор проверяет свой блок ниже). Второй вопрос выпал сгенерированным — начинаем
+    // заново с новой страницы; иначе проверка ссылки краснела примерно в каждом 14-м прогоне
+    // (поймано полным прогоном 17.09.2026).
+    let context, page, hud, firstLabel, q1, q2;
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      ({ context, page } = await start());
+      hud = await page.evaluate(() => {
+        const shown = (sel) => { const el = document.querySelector(sel); return !!el && el.checkVisibility(); };
+        return { name: shown('.pr-name'), chip: document.getElementById('pr-filter').textContent,
+                 tallies: ['pr-answered', 'pr-correct', 'pr-wrong', 'pr-skipped'].filter((id) => shown('#' + id)).length,
+                 timer: shown('#hud-timer'), lives: shown('#hud-lives'), score: shown('#hud-score') };
+      });
+      firstLabel = await page.$eval('#pr-next-text', (el) => el.textContent);
+      q1 = await questionText(page);
+      await page.keyboard.press(' ');                        // пропуск первого
+      await waitNewQuestion(page, q1);
+      q2 = await questionText(page);
+      if (!q2.startsWith('Сгенерированный вопрос')) break;
+      await context.close();
+    }
     check('hud_filter_and_four_tallies', hud.name && hud.chip === 'все вопросы' && hud.tallies === 4
           && !hud.timer && !hud.lives && !hud.score, hud);
-
-    const firstLabel = await page.$eval('#pr-next-text', (el) => el.textContent);
-    const q1 = await questionText(page);
-    await page.keyboard.press(' ');                          // пропуск первого
-    await waitNewQuestion(page, q1);
-    const q2 = await questionText(page);
     await answerWrong(page);
     const fb = await page.evaluate(() => ({
       text: document.getElementById('pr-fb-v').textContent,
