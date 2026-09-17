@@ -159,6 +159,24 @@ class HeartsTests(TestCase):
         self.assertIn('.heart.lost { color: var(--text3); opacity: .6; }', src)
 
 
+class FigureButtonIconTests(TestCase):
+    u"""Кнопки чертежа — значками, а не знаками «⤢» и «✕» (правило «значки только SVG»;
+    «Свернуть» заменён в P2, «Развернуть» — в P8 редизайна 17.09.2026)."""
+
+    def test_expand_and_collapse_are_icons_not_signs(self):
+        src = read(PAGE)
+        for button, icon in (('fig-expand', 'expand'), ('fig-close', 'close')):
+            markup = src.split('id="%s"' % button, 1)[1].split('</button>', 1)[0]
+            self.assertIn('{%% include "_icon.html" with name="%s" %%}' % icon, markup)
+        self.assertNotIn('⤢', src)
+
+    def test_expand_icon_is_one_string_in_markup_and_scripts(self):
+        markup = io.open('templates/_icon.html', encoding='utf-8').read()
+        found = re.search(r"\{% if name == 'expand' %\}(.*?)\{% endif %\}", markup, re.S)
+        self.assertIsNotNone(found)
+        self.assertIn("expand: '%s'" % found.group(1).strip(), read(ICONS))
+
+
 class KeyHintTests(TestCase):
     u"""1.7 Подсказка клавиш. С 17.09.2026 (ADR 0110) постоянной строки под
     вариантами нет: клавиши названы в отсчёте перед раундом, на кнопках
