@@ -442,6 +442,15 @@ SMART_SEARCH_WARMUP = (
     not in ('0', 'false', 'no', 'off', '')
 )
 
+# Корпус bm25 на диске (`catalog/rerank.py`, 17.09.2026): воркер при старте
+# читает готовый корпус из MEDIA_ROOT/_cache вместо сборки 20–25 с. Здесь по
+# умолчанию ВЫКЛЮЧЕНО — разработка и тесты не пишут десятки мегабайт в media/;
+# на бою включено в `config/settings_production.py`.
+SMART_SEARCH_CORPUS_DISK_CACHE = (
+    os.environ.get('SMART_SEARCH_CORPUS_DISK_CACHE', '0').strip().lower()
+    not in ('0', 'false', 'no', 'off', '')
+)
+
 # Этап В1 — Кабинет ученика: URL для входа и редирект по умолчанию.
 LOGIN_URL = '/login/'
 # Метка версии внизу страницы слева (`templates/_site_version.html`; до

@@ -221,3 +221,12 @@ GAME_GENERATED_ENABLED = False
 
 # Режим «График» на проде выключен (см. settings.py).
 GAME_FIGURE_ENABLED = False
+
+# ─── Корпус умного поиска на диске: на бою включён ──────────────────────────
+# Воркер при старте читает корпус из MEDIA_ROOT/_cache (том `media`) вместо
+# сборки 20–25 с (`catalog/rerank.py`, 17.09.2026). SMART_SEARCH_CORPUS_DISK_CACHE=0
+# в .env выключает.
+SMART_SEARCH_CORPUS_DISK_CACHE = (
+    os.environ.get('SMART_SEARCH_CORPUS_DISK_CACHE', '1').strip().lower()
+    not in ('0', 'false', 'no', 'off', '')
+)

@@ -43,12 +43,16 @@
   `reports/smart_search_log.jsonl` остаются: они про другое — про
   задержку и про качество сортировки, а не про деньги.
 """
+import hashlib
 import json
 import logging
 import os
+import shutil
+import tempfile
 import threading
 import time
 import uuid
+from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as _FuturesTimeoutError
 from concurrent.futures import as_completed
 from datetime import datetime, timezone
@@ -379,7 +383,8 @@ def get_corpus():
     """(bm25.Index, {id: row}) — строится лениво при первом обращении.
 
     В `_corpus_build.seconds` попадает и своя сборка, и ОЖИДАНИЕ чужой под
-    замком: человек ждал столько же, кто бы корпус ни строил."""
+    замком: человек ждал столько же, кто бы корпус ни строил. С включённым
+    `SMART_SEARCH_CORPUS_DISK_CACHE` корпус сначала ищется на диске."""
     global _corpus_cache, _corpus_cache_version
     _corpus_build.seconds = 0.0
     version = _shared_corpus_version()
@@ -388,11 +393,120 @@ def get_corpus():
     started = time.perf_counter()
     with _corpus_lock:
         if not _corpus_is_warm(version):
-            _corpus_cache = _build_corpus()
+            path = _corpus_path(version)
+            corpus = _load_corpus_file(path) if path else None
+            source = 'с диска'
+            if corpus is None:
+                corpus = _build_corpus()
+                source = 'собран'
+                if path:
+                    _save_corpus_file(path, corpus)
+            _corpus_cache = corpus
             if version is not _NO_CACHE:
                 _corpus_cache_version = version
+            logger.info('корпус умного поиска %s за %.1f с (%d задач)', source,
+                        time.perf_counter() - started, len(corpus[1]))
         _corpus_build.seconds = time.perf_counter() - started
     return _corpus_cache
+
+
+# ─── Корпус на диске (17.09.2026) ─────────────────────────────────────────
+#
+# Воркер gunicorn собирал корпус 20–25 с при КАЖДОМ старте, а перезапуск по
+# `--max-requests` бывает каждую тысячу запросов. Готовый корпус лежит в
+# `MEDIA_ROOT/_cache` (именованный том `media` переживает пересборку образа).
+#
+# ⚠️ КЛЮЧ ФАЙЛА — ОБЩАЯ ВЕРСИЯ КОРПУСА И ОТПЕЧАТОК ДАННЫХ, А НЕ ОДНА ВЕРСИЯ.
+# Версия — случайная метка в Redis, её меняет только `invalidate_corpus()`
+# (синхронизация банка и правки банка зовут его сами). Правка данных мимо
+# него раньше лечилась перезапуском воркера; файл перезапуск переживает,
+# поэтому к ключу добавлен дешёвый отпечаток (число и сумма id видимых задач,
+# последняя правка, число подпунктов и связей), а файл старше
+# CORPUS_FILE_MAX_AGE перестраивается.
+#
+# ⚠️ НЕ PICKLE: чтение pickle исполняет код из файла, и bandit (B301)
+# краснит джоб «Безопасность». Индекс — `lexical_bm25.save_index`, строки —
+# JSON.
+CORPUS_FILE_MAX_AGE = 12 * 3600
+
+
+def _data_fingerprint():
+    from django.db.models import Count, Max, Sum
+
+    from . import filters
+    from problems.models import Problem, ProblemPart
+
+    base = filters.base_queryset('catalog')
+    agg = base.aggregate(n=Count('id'), ids=Sum('id'), changed=Max('updated_at'))
+    counts = [ProblemPart.objects.filter(problem__in=base).count(),
+              Problem.topics.through.objects.filter(problem__in=base).count(),
+              Problem.tags.through.objects.filter(problem__in=base).count()]
+    raw = '|'.join(str(x) for x in (agg['n'], agg['ids'], agg['changed'], *counts))
+    return hashlib.sha1(raw.encode('utf-8'), usedforsecurity=False).hexdigest()[:16]
+
+
+def _corpus_path(version):
+    """Каталог корпуса на диске или None (выключено или нет общей версии)."""
+    from django.conf import settings
+
+    if not getattr(settings, 'SMART_SEARCH_CORPUS_DISK_CACHE', False) or version is _NO_CACHE:
+        return None
+    return Path(settings.MEDIA_ROOT) / '_cache' / ('corpus_%s_%s' % (version, _data_fingerprint()))
+
+
+def _load_corpus_file(path):
+    """Корпус с диска или None: файла нет, он старый или битый — строим заново."""
+    from . import lexical_bm25 as bm25
+
+    try:
+        meta = json.loads((path / 'meta.json').read_text(encoding='utf-8'))
+        if time.time() - float(meta['built_at']) > CORPUS_FILE_MAX_AGE:
+            return None
+        rows = {int(pid): row for pid, row in
+                json.loads((path / 'rows.json').read_text(encoding='utf-8')).items()}
+        index = bm25.load_index(str(path / 'index'))
+        if len(index.ids) != len(rows) or set(index.ids) != set(rows):
+            return None
+        return index, rows
+    except FileNotFoundError:
+        return None
+    except Exception as exc:  # noqa: BLE001 — битый файл не должен ронять поиск
+        logger.warning('корпус на диске не прочитан (%s), строим заново', exc)
+        return None
+
+
+def _save_corpus_file(path, corpus):
+    """Записать атомарно: во временный каталог, затем переименовать. Воркеры
+    стартуют разом и пишут одно и то же; кто не успел первым — выбрасывает
+    свою копию. Ошибка записи поиску не мешает."""
+    from . import lexical_bm25 as bm25
+
+    index, rows = corpus
+    root = path.parent
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+        tmp = Path(tempfile.mkdtemp(prefix='corpus_tmp_', dir=str(root)))
+        bm25.save_index(index, str(tmp / 'index'))
+        (tmp / 'rows.json').write_text(json.dumps(rows, ensure_ascii=False), encoding='utf-8')
+        (tmp / 'meta.json').write_text(json.dumps({'built_at': time.time(), 'rows': len(rows)}),
+                                       encoding='utf-8')
+        try:
+            os.replace(tmp, path)
+        except OSError:
+            shutil.rmtree(tmp, ignore_errors=True)
+        _prune_corpus_files(root, keep=path)
+    except OSError as exc:
+        logger.warning('корпус не записан на диск: %s', exc)
+
+
+def _prune_corpus_files(root, keep, older_than=600):
+    """Убрать чужие корпуса старше 10 минут: каждый — десятки мегабайт."""
+    for entry in root.glob('corpus_*'):
+        try:
+            if entry != keep and time.time() - entry.stat().st_mtime > older_than:
+                shutil.rmtree(entry, ignore_errors=True)
+        except OSError:
+            continue
 
 
 def _corpus_is_warm(version):

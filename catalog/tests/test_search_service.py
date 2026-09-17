@@ -28,6 +28,7 @@ from pathlib import Path
 from unittest import mock
 
 import numpy as np
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.cache import caches
 from django.test import TestCase, SimpleTestCase, override_settings, tag
@@ -586,6 +587,49 @@ class LoopbackServiceReachableViaEnvTests(SimpleTestCase):
         self.assertAlmostEqual(float(np.linalg.norm(вектор)), 1.0, places=5)
 
 
+@unittest.skipUnless(importlib.util.find_spec('fastapi'),
+            'fastapi не установлен: сервис поиска проверяется там, где он стоит')
+class ModelPreloadTests(SimpleTestCase):
+    """С 17.09.2026 модель грузится сама при старте процесса, а `/healthz`
+    отвечает 200 и `ok:true` только с загруженной моделью, иначе 503.
+    Настоящая модель здесь не грузится: загрузка подменяется."""
+
+    def setUp(self):
+        import search_service.app as service_app
+        from fastapi.testclient import TestClient
+
+        self.service_app = service_app
+        self.TestClient = TestClient
+        self.addCleanup(setattr, service_app, '_model', service_app._model)
+
+    def test_healthz_is_503_until_the_model_is_loaded(self):
+        self.service_app._model = None
+        with mock.patch.object(self.service_app, '_preload'):
+            with self.TestClient(self.service_app.app) as service:
+                answer = service.get('/healthz')
+        self.assertEqual(answer.status_code, 503)
+        self.assertIs(answer.json()['ok'], False)
+        self.assertIs(answer.json()['model_loaded'], False)
+
+    def test_healthz_is_ok_with_the_model(self):
+        self.service_app._model = object()
+        answer = self.TestClient(self.service_app.app).get('/healthz')
+        self.assertEqual(answer.status_code, 200)
+        self.assertIs(answer.json()['ok'], True)
+
+    def test_loading_starts_at_process_start(self):
+        started = threading.Event()
+        with mock.patch.object(self.service_app, 'get_model', side_effect=started.set):
+            with self.TestClient(self.service_app.app):
+                self.assertTrue(started.wait(5), 'загрузка модели не началась при старте')
+
+    def test_compose_waits_for_the_model(self):
+        compose = (Path(settings.BASE_DIR) / 'deploy' / 'docker-compose.yml').read_text(encoding='utf-8')
+        block = compose.split('\n  search:', 1)[1].split('\n  nginx:', 1)[0]
+        self.assertTrue(re.search(r'start_period:\s*240s', block), 'start_period у search не 240s')
+        self.assertTrue(re.search(r'interval:\s*15s', block), 'interval у search не 15s')
+
+
 # ⚠️ SERIAL, И ВОТ ЗАПИСАННАЯ ПРИЧИНА (правило CLAUDE.md: метку ставим
 # только когда тест делит неразделяемый внешний ресурс).
 #
@@ -674,18 +718,19 @@ class BitExactEncodingTests(SimpleTestCase):
             'Значит, транспорт теряет точность — поиск будет промахиваться '
             'по причине, которой не видно ни в одной другой проверке.')
 
-    def test_healthz_не_требует_модели(self):
-        """Проверка живости обязана отвечать до загрузки модели.
+    def test_healthz_не_трогает_модель_и_без_неё_отвечает_503(self):
+        """Проверка готовности отвечает сразу и модель не грузит.
 
-        Иначе контейнер считался бы мёртвым все минуты загрузки, и compose
-        убивал бы его по кругу, не давая догрузиться.
+        С 17.09.2026 без модели это 503 и `ok:false` (модель грузит поток
+        старта); с моделью — 200. Лёгкая версия без модели —
+        `ModelPreloadTests` выше.
         """
         сохранённая = self.service_app._model
         self.service_app._model = None
         try:
             ответ = self.service_client.get('/healthz')
-            self.assertEqual(ответ.status_code, 200)
-            self.assertIs(ответ.json()['ok'], True)
+            self.assertEqual(ответ.status_code, 503)
+            self.assertIs(ответ.json()['ok'], False)
             self.assertIs(ответ.json()['model_loaded'], False)
         finally:
             self.service_app._model = сохранённая

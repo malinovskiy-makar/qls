@@ -31,12 +31,16 @@ import base64
 import logging
 import os
 import threading
+import time
+from contextlib import asynccontextmanager
 
 import numpy as np
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
 from pydantic import BaseModel, Field
 
-logger = logging.getLogger('search_service')
+# Логгер uvicorn: у своего логгера сервиса обработчика нет, и строки о
+# загрузке модели не доходили до `docker compose logs search`.
+logger = logging.getLogger('uvicorn.error')
 
 # ⚠️ Имя модели и размерность НЕ дублируются строкой: они приходят из
 # переменных окружения, которые compose проставляет из тех же значений,
@@ -45,12 +49,10 @@ MODEL_NAME = os.environ.get('EMBEDDING_MODEL_NAME', 'BAAI/bge-m3')
 EMBEDDING_DIM = int(os.environ.get('EMBEDDING_DIM', '1024'))
 MODEL_BUILD = os.environ.get('EMBEDDING_MODEL_BUILD', 'bge-m3/st-fp32')
 
-app = FastAPI(title='weconomics search service', docs_url=None, redoc_url=None)
-
-# Ленивый синглтон: модель грузится при ПЕРВОМ кодировании, а не при старте.
-# Так контейнер поднимается за секунды и отвечает на /healthz сразу — это
-# важно и для healthcheck, и для проверки сетевой изоляции: она не должна
-# ждать двух гигабайт.
+# Синглтон модели. С 17.09.2026 загрузка начинается САМА при старте процесса,
+# в фоновом потоке (`lifespan` ниже): после перезагрузки сервера больше не
+# нужен ручной первый `/encode`. Сервер отвечает сразу, `/healthz` честно
+# говорит 503, пока модель грузится.
 _model = None
 _model_lock = threading.Lock()
 
@@ -70,9 +72,29 @@ def get_model():
                 from sentence_transformers import SentenceTransformer
 
                 logger.info('Загружаем модель %s...', MODEL_NAME)
+                started = time.monotonic()
                 _model = SentenceTransformer(MODEL_NAME, device='cpu')
-                logger.info('Модель загружена.')
+                logger.info('Модель загружена за %.1f с.', time.monotonic() - started)
     return _model
+
+
+def _preload():
+    """Загрузка модели при старте. Ошибка не роняет процесс: `/healthz`
+    останется 503, а следующий `/encode` попробует загрузить снова."""
+    try:
+        get_model()
+    except Exception:  # noqa: BLE001 — сервис жив и без модели, это видно по healthz
+        logger.exception('Модель не загрузилась при старте.')
+
+
+@asynccontextmanager
+async def lifespan(_app):
+    threading.Thread(target=_preload, name='model-preload', daemon=True).start()
+    yield
+
+
+app = FastAPI(title='weconomics search service', docs_url=None, redoc_url=None,
+              lifespan=lifespan)
 
 
 class EncodeRequest(BaseModel):
@@ -87,15 +109,18 @@ class EncodeResponse(BaseModel):
 
 
 @app.get('/healthz')
-def healthz():
-    """Живость процесса. Модель НЕ трогает намеренно.
+def healthz(response: Response):
+    """Готовность: `ok:true` и 200 — только когда модель загружена, иначе 503.
 
-    Если бы healthcheck дёргал модель, контейнер считался бы нездоровым
-    первые минуты после старта (пока грузятся 2,12 ГБ) и docker compose
-    перезапускал бы его по кругу, никогда не давая догрузиться.
+    Модель здесь НЕ грузится (это делает поток старта): healthcheck не
+    должен ждать 2,12 ГБ. Пока идёт загрузка, compose держит контейнер в
+    `starting` — `start_period: 240s` в `deploy/docker-compose.yml`; перезапуск
+    по нездоровью compose не делает, так что догрузке ничего не мешает.
     """
-    return {'ok': True, 'model_loaded': _model is not None,
-            'model_build': MODEL_BUILD}
+    loaded = _model is not None
+    if not loaded:
+        response.status_code = 503
+    return {'ok': loaded, 'model_loaded': loaded, 'model_build': MODEL_BUILD}
 
 
 @app.post('/encode', response_model=EncodeResponse)
