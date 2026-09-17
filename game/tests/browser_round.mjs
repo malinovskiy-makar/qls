@@ -108,10 +108,15 @@ try {
         keyInFirstCol: !!(key && o && key.left - o.getBoundingClientRect().left < 20),
         lastWide: !!(last && Math.abs(last.getBoundingClientRect().width - grid.width) < 2),
         rec: !document.getElementById('hud-rec').hidden,
+        // ⚠️ Прокрутки у раунда на ПК нет по устройству (overflow: hidden), поэтому
+        // «помещается» проверяется по краю: последний вариант и нижний ряд в окне.
+        lastBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null,
+        footBottom: Math.round(document.getElementById('btn-report').getBoundingClientRect().bottom),
       };
     });
     const s1 = await noScroll(page);
-    check('blitz_five_options_no_scroll', m.options === 5 && s1.sh <= s1.ih && s1.sw <= s1.cw, { m, s1 });
+    check('blitz_five_options_no_scroll', m.options === 5 && s1.sh <= s1.ih && s1.sw <= s1.cw
+          && m.lastBottom !== null && m.lastBottom <= s1.ih && m.footBottom <= s1.ih, { m, s1 });
     check('timer_is_m_ss', /^\d+:\d{2}$/.test(m.timer), m.timer);
     check('site_header_hidden', m.playing && m.navHidden, m);
     check('option_grid_three_columns', m.cols === 3 && m.keyInFirstCol && m.lastWide, m);
@@ -142,7 +147,7 @@ try {
     const before2 = log.length;
     const q2 = await questionText(page);
     await page.keyboard.press('2');
-    await page.waitForSelector('#reveal:not([hidden])', { timeout: 5000 });
+    await page.waitForSelector('#reveal:not([hidden])', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(500);
     // Подкачку следующего вопроса сервер отдаёт с задержкой 400 мс: так ответ,
     // нажатый сразу после разбора, наверняка застаёт её в пути.
@@ -184,7 +189,8 @@ try {
     const s = await noScroll(page);
     const inputVisible = await page.evaluate(() => {
       const r = document.getElementById('num-input').getBoundingClientRect();
-      return r.height > 0 && r.bottom <= window.innerHeight;
+      const f = document.getElementById('btn-report').getBoundingClientRect();
+      return r.height > 0 && r.bottom <= window.innerHeight && f.bottom <= window.innerHeight;
     });
     check('classic_600_chars_no_scroll', len >= 600 && s.sh <= s.ih && inputVisible, { len, s, inputVisible });
     await context.close();
@@ -198,10 +204,10 @@ try {
     await page.waitForSelector('#screen-start.active', { timeout: 15000 });
     await page.click('#play-btn');
     await page.waitForSelector('#screen-play.active', { timeout: 15000 });
-    await page.click('#countdown-card');
+    if (await page.isVisible('#countdown-card')) await page.click('#countdown-card');
     await page.waitForFunction(() => document.querySelectorAll('#opts .opt').length > 1, null, { timeout: 8000 });
     await page.evaluate(() => document.querySelectorAll('#opts .opt')[1].click());
-    await page.waitForSelector('#reveal:not([hidden])', { timeout: 5000 });
+    await page.waitForSelector('#reveal:not([hidden])', { timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(200);                       // «−1» у сердец ещё виден
     const mob = await page.evaluate(() => {
       const small = [];
