@@ -6,8 +6,9 @@
 
    Инварианты:
    - отсчёт 3-2-1: до его конца вопроса нет и таймер стоит; Enter — сразу;
-   - на 1440×800 нет прокрутки: Блиц с пятью вариантами и Классика с условием в
-     600 знаков; время на полосе — «m:ss»; шапка сайта скрыта;
+   - на 1440×800 всё в окне: Блиц с пятью вариантами и Классика с условием в
+     600 знаков — от строки над карточкой до нижнего ряда (прокрутки у раунда нет
+     по устройству, переполнение уходило бы под полосу); время — «m:ss»; шапка скрыта;
    - у варианта три колонки, номер в первой, пятый вариант — на обе колонки;
    - неверный ответ: pause → через 3000 ± 100 мс resume и следующий вопрос; во
      время разбора цифра не отвечает; пробел — resume раньше трёх секунд;
@@ -112,11 +113,15 @@ try {
         // «помещается» проверяется по краю: последний вариант и нижний ряд в окне.
         lastBottom: last ? Math.round(last.getBoundingClientRect().bottom) : null,
         footBottom: Math.round(document.getElementById('btn-report').getBoundingClientRect().bottom),
+        // Переполненный столбец уходит ВВЕРХ под полосу — верхний край тоже в окне.
+        metaTop: Math.round(document.querySelector('#screen-play .qmeta').getBoundingClientRect().top),
+        hudBottom: Math.round(document.getElementById('hud').getBoundingClientRect().bottom),
       };
     });
     const s1 = await noScroll(page);
     check('blitz_five_options_no_scroll', m.options === 5 && s1.sh <= s1.ih && s1.sw <= s1.cw
-          && m.lastBottom !== null && m.lastBottom <= s1.ih && m.footBottom <= s1.ih, { m, s1 });
+          && m.lastBottom !== null && m.lastBottom <= s1.ih && m.footBottom <= s1.ih
+          && m.metaTop >= m.hudBottom, { m, s1 });
     check('timer_is_m_ss', /^\d+:\d{2}$/.test(m.timer), m.timer);
     check('site_header_hidden', m.playing && m.navHidden, m);
     check('option_grid_three_columns', m.cols === 3 && m.keyInFirstCol && m.lastWide, m);
@@ -187,12 +192,19 @@ try {
                                null, { timeout: 8000 }).catch(() => {});
     const len = (await questionText(page)).length;
     const s = await noScroll(page);
-    const inputVisible = await page.evaluate(() => {
-      const r = document.getElementById('num-input').getBoundingClientRect();
-      const f = document.getElementById('btn-report').getBoundingClientRect();
-      return r.height > 0 && r.bottom <= window.innerHeight && f.bottom <= window.innerHeight;
+    const fit = await page.evaluate(() => {
+      const box = (el) => el.getBoundingClientRect();
+      const input = box(document.getElementById('num-input'));
+      return {
+        inputH: Math.round(input.height), inputBottom: Math.round(input.bottom),
+        footBottom: Math.round(box(document.getElementById('btn-report')).bottom),
+        metaTop: Math.round(box(document.querySelector('#screen-play .qmeta')).top),
+        hudBottom: Math.round(box(document.getElementById('hud')).bottom),
+      };
     });
-    check('classic_600_chars_no_scroll', len >= 600 && s.sh <= s.ih && inputVisible, { len, s, inputVisible });
+    const inputVisible = fit.inputH > 0 && fit.inputBottom <= s.ih && fit.footBottom <= s.ih
+      && fit.metaTop >= fit.hudBottom;
+    check('classic_600_chars_no_scroll', len >= 600 && s.sh <= s.ih && inputVisible, { len, s, fit });
     await context.close();
   }
 
