@@ -11,11 +11,13 @@
 - список кончился, а игрок жив → концовка set_done;
 - вторая попытка авторизованного отбивается сервером.
 """
+import datetime
 import json
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from game.models import GameQuestion, GameResult, GameSet, make_code, normalize_code
 from problems.models import Problem
@@ -187,10 +189,11 @@ class SetPagesTests(TestCase):
             self.assertNotIn(q.question, html)
         self.assertIn(self.gset.code, html)
 
-    def test_board_page_opens_and_shows_questions_only_after_play(self):
+    def test_board_address_leads_to_the_set_page_with_its_board(self):
+        u"""С 17.09.2026 (P6) доска живёт на странице набора: старый адрес — переход."""
         r = self.client.get(reverse('game:set_board', args=[self.gset.code]))
-        self.assertEqual(r.status_code, 200)
-        self.assertContains(r, 'Кто прошёл')
+        self.assertRedirects(r, reverse('game:set_page', args=[self.gset.code]))
+        self.assertContains(self.client.get(r['Location']), 'Кто прошёл')
 
     def test_unknown_code_is_404(self):
         r = self.client.get(reverse('game:set_page', args=['ZZZZZZZZ']))
@@ -310,3 +313,111 @@ class SetBoardStatsTests(TestCase):
         self.assertEqual(rows[0]['percent'], 50)     # 1 из 2 попыток
         self.assertEqual(rows[1]['percent'], 0)      # пропуск в долю не идёт
         self.assertEqual(rows[1]['skip'], 1)
+
+
+# ─── P6: страница набора ученика (решение владельца 17.09.2026, ADR 0115) ──
+
+class SetInvitationPageTests(TestCase):
+    u"""`/game/s/<код>/` — отдельная страница: приглашение и доска набора."""
+
+    def setUp(self):
+        self.qs = make_q(5)
+        self.teacher = User.objects.create_user(username='uchitel', password='pw12345')
+        self.gset = make_set(self.qs, title='Контрольная по спросу', author=self.teacher)
+        self.url = reverse('game:set_page', args=[self.gset.code])
+
+    def page(self, url=None, status=200):
+        r = self.client.get(url or self.url)
+        self.assertEqual(r.status_code, status)
+        return r.content.decode()
+
+    def result(self, user=None, score=100, **kw):
+        return GameResult.objects.create(code=make_code(), mode='blitz', game_set=self.gset, user=user,
+                                         score=score, correct_count=4, total_count=5, **kw)
+
+    def test_separate_page_with_invitation_and_both_board_parts(self):
+        html = self.page()
+        self.assertNotIn('id="mode-grid"', html)
+        self.assertNotIn('id="screen-start"', html)
+        self.assertIn('Контрольная по спросу', html)
+        self.assertIn('автор uchitel', html)
+        self.assertIn('Блиц · один верный ответ', html)
+        self.assertIn('<b>5</b> вопросов', html)
+        self.assertIn('href="%s?auto=1"' % self.url, html)
+        self.assertIn('Кто прошёл · 0', html)
+        self.assertIn('Где ошиблись', html)
+        self.assertNotIn('открыт до', html)
+
+    def test_guest_is_warned_and_offered_to_log_in(self):
+        html = self.page()
+        self.assertIn('учитель вас не узнает', html)
+        self.assertIn('/login/?next=%s' % self.url, html)
+
+    def test_no_play_button_when_attempts_are_spent(self):
+        student = User.objects.create_user(username='uchenik', password='pw12345')
+        self.result(student, score=186)
+        self.client.force_login(student)
+        html = self.page()
+        self.assertNotIn('?auto=1', html)
+        self.assertIn('попытки закончились', html)
+        self.assertIn('Ваш результат', html)
+        self.assertIn('Страница результата', html)
+
+    def test_closed_set_says_so_and_deadline_chip_only_with_closes_at(self):
+        self.gset.closes_at = timezone.now() - datetime.timedelta(days=1)
+        self.gset.save(update_fields=['closes_at'])
+        html = self.page()
+        self.assertIn('Набор закрыт', html)
+        self.assertIn('открыт до', html)
+        self.assertNotIn('?auto=1', html)
+
+    def test_question_texts_for_the_player_and_author_only(self):
+        text = self.qs[0].question
+        student = User.objects.create_user(username='sygral', password='pw12345')
+        self.result(student, question_outcomes=[{'question_id': self.qs[0].id, 'outcome': 'wrong'}])
+        self.assertNotIn(text, self.page())
+        self.assertIn('текст откроется после вашей попытки', self.page())
+        self.client.force_login(student)
+        self.assertIn(text, self.page())
+        self.client.force_login(self.teacher)
+        self.assertIn(text, self.page())
+
+    def test_anonymous_rounds_are_on_the_board_as_anonymous(self):
+        self.result(None, score=160)
+        self.result(User.objects.create_user(username='katya', password='pw12345'), score=214)
+        html = self.page()
+        self.assertIn('Кто прошёл · 2', html)
+        self.assertIn('class="who anon">аноним</td>', html)
+
+    def test_board_address_redirects_and_daily_without_auto_goes_to_daily(self):
+        r = self.client.get(reverse('game:set_board', args=[self.gset.code]))
+        self.assertRedirects(r, self.url)
+        from game import daily as daily_mod
+        daily = daily_mod.get_daily_set('blitz')
+        r = self.client.get(reverse('game:set_page', args=[daily.code]))
+        self.assertRedirects(r, reverse('game:daily'))
+        r = self.client.get(reverse('game:set_page', args=[daily.code]) + '?auto=1')
+        self.assertEqual(r.status_code, 200)
+
+    def test_autostart_plays_on_the_game_page(self):
+        html = self.page(self.url + '?auto=1')
+        self.assertIn('id="screen-start"', html)
+        self.assertIn('autostarting', html)
+
+    def test_wrong_code_is_a_game_page_with_status_404(self):
+        for url in (reverse('game:set_page', args=['QQQQ1111']), reverse('game:set_board', args=['QQQQ1111'])):
+            html = self.page(url, status=404)
+            self.assertIn('Набора с кодом', html)
+            self.assertIn('QQQQ1111', html)
+            self.assertIn('/game/api/set_check/', html)
+            self.assertNotIn('занятие или работа', html)
+
+    def test_finish_of_a_teacher_set_leads_back_to_its_page(self):
+        student = User.objects.create_user(username='finish', password='pw12345')
+        self.client.force_login(student)
+        d = self.client.get(reverse('game:session_start_set', args=[self.gset.code])).json()
+        self.client.post(reverse('game:answer'), json.dumps({'question_id': d['question']['id'], 'choice': 0}),
+                         content_type='application/json')
+        data = self.client.post(reverse('game:session_finish'), json.dumps({'reason': 'done'}),
+                                content_type='application/json').json()
+        self.assertTrue(data['share']['set']['board_url'].endswith(self.url))

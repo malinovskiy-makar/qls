@@ -1071,7 +1071,9 @@ class ResultPageTests(TestCase):
         r = self.client.get('/game/r/%s/' % d['share']['code'])
         self.assertEqual(r.status_code, 200)
         html = r.content.decode()
-        self.assertIn('Сыграть тоже', html)
+        # С 17.09.2026 (ADR 0115): «Сыграть в <режим>» с режимом в адресе.
+        self.assertIn('Сыграть в ', html)
+        self.assertIn('/game/?mode=', html)
         self.assertIn('Эластичность', html)
 
     def test_public_page_has_open_graph_tags(self):
@@ -1082,7 +1084,8 @@ class ResultPageTests(TestCase):
             self.assertIn(tag, html)
         self.assertIn('summary_large_image', html)
         summary = d['summary']
-        self.assertIn('%d очков в Wecon Rush' % summary['score'], html)
+        from game.views import points_word
+        self.assertIn('%d %s в Wecon Rush' % (summary['score'], points_word(summary['score'])), html)
         # og:url и og:image — абсолютные
         m = re.search(r'property="og:url" content="([^"]+)"', html)
         self.assertTrue(m.group(1).startswith('http://'))

@@ -1792,8 +1792,19 @@ def set_page(request, code):
     без куки они получают 403 (ловилось в браузере — забег молча вставал
     на первом же ответе).
     """
-    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    gset = GameSet.objects.filter(code=make_code_lookup(code)).first()
+    if gset is None:
+        return set_missing(request, code)
     allowed, why = set_run_allowed(request, gset)
+    auto = request.GET.get('auto') == '1'
+    # ⚠️ СТРАНИЦА ИГРЫ ЗДЕСЬ — ТОЛЬКО ДЛЯ ДУЭЛИ И ДЛЯ ЗАПУСКА `?auto=1` (P6,
+    # решение 17.09.2026). Приглашение набора учителя — своя страница
+    # (`set_page.html`), у вызова дня страница — `/game/daily/`: без
+    # автостарта или когда играть нельзя, человек идёт туда, где видно почему.
+    if gset.kind == 'daily' and not (auto and allowed):
+        return redirect('game:daily')
+    if gset.kind not in ('daily', 'duel') and not (auto and allowed):
+        return set_invitation(request, gset, allowed, why)
     ctx = _game_page_context(request)
     ctx['auto_set'] = {
         'code': gset.code,
@@ -1804,7 +1815,8 @@ def set_page(request, code):
         'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
         'allowed': allowed,
         'why': why,
-        'board_url': reverse('game:set_board', args=[gset.code]),
+        'board_url': (daily_mod.board_url(gset.mode, gset.day) if gset.kind == 'daily'
+                      else reverse('game:set_page', args=[gset.code])),
         # Лобби дуэли: автору «Ждём соперника…», сопернику «Соперник: <автор>».
         # Имя автора и так видно на странице дуэли — нового наружу не уходит.
         'author': gset.author.username if gset.author_id else '',
@@ -1861,46 +1873,96 @@ def initials(name):
 
 @require_safe
 def set_board(request, code):
-    """Доска набора: кто прошёл и на каких вопросах посыпался класс.
+    """Старый адрес доски набора `/game/s/<код>/board/` — только переход.
 
-    ⚠️ Тексты вопросов показываются НЕ ВСЕМ. Доска публичная, и ученик,
-    который ещё не играл контрольную, мог бы прочитать её вопросы отсюда —
-    это нашёл тест дуэли (первая версия доски выдавала весь список ДО
-    игры). Тексты видят: автор набора, персонал и тот, кто уже сыграл.
-    Остальным — «Вопрос N»: доля верных остаётся видна, содержание нет.
+    Доска живёт на странице набора (P6), у вызова дня — доска дня (P4), у
+    дуэли — её страница сравнения. Неверный код — та же страница «нет такого
+    набора», что и у `/game/s/<код>/`.
     """
-    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    gset = GameSet.objects.filter(code=make_code_lookup(code)).first()
+    if gset is None:
+        return set_missing(request, code)
     if gset.kind == 'duel':
         # У дуэли своя страница, и на ней вопросов нет вовсе.
         return redirect('game:duel', code=gset.code)
     if gset.kind == 'daily' and gset.day:
-        # У вызова дня доска одна — доска дня (P4); второй адрес — переход.
         return redirect(daily_mod.board_url(gset.mode, gset.day))
-    rows = list(gset.results.select_related('user').order_by(
-        '-score', 'created_at'))
-    board = [{
-        'place': i + 1,
-        'name': (r.user.username if r.user else 'аноним'),
-        'score': r.score,
-        'accuracy': r.accuracy,
-        'max_combo': r.max_combo,
-        'reason': r.ended_reason,
-        'at': r.created_at,
-        'is_me': bool(request.user.is_authenticated
-                      and r.user_id == request.user.id),
-    } for i, r in enumerate(rows)]
-    show_text = bool(
-        request.user.is_authenticated
-        and (request.user.is_staff or gset.author_id == request.user.id)
-    ) or my_result_for(request, gset) is not None
-    return render(request, 'game/set_board.html', {
+    return redirect('game:set_page', code=gset.code)
+
+
+# Как отвечают в режиме — строкой приглашения: «Блиц · один верный ответ».
+QUESTION_TYPE_TEXT = {'boolean': 'верно или неверно', 'single': 'один верный ответ',
+                      'multi': 'несколько верных ответов', 'numeric': 'числовой ответ',
+                      'figure_audit': 'найти неверный шаг'}
+
+
+def _moscow_text(moment, fmt='j E, H:i'):
+    u"""«20 сентября, 23:59» — по Москве, как отсечка вызова дня."""
+    from django.utils.formats import date_format
+    return date_format(timezone.localtime(moment, daily_mod.daily_tzinfo()), fmt) if moment else ''
+
+
+def set_invitation(request, gset, allowed, why):
+    u"""Страница набора ученика `/game/s/<код>/` (решение 17.09.2026, ADR 0115).
+
+    Приглашение (что за набор, одна кнопка «Играть» → `?auto=1`) и доска набора:
+    «Кто прошёл» с анонимами и «Где ошиблись». Кто уже сыграл — видит свой
+    результат и место. ⚠️ Тексты вопросов — автору, персоналу и сыгравшим: иначе
+    контрольную можно прочитать заранее.
+    """
+    me = request.user if request.user.is_authenticated else None
+    mine = my_result_for(request, gset)
+    top, my_row, total = daily_mod.board_rows(gset, me, limit=10, with_anonymous=True,
+                                              mine_code=mine.code if mine else None)
+    my_place = next((r['place'] for r in top if r['is_me']), my_row['place'] if my_row else None)
+    show_text = mine is not None or bool(me and (me.is_staff or gset.author_id == me.id))
+    questions = set_question_stats(gset, show_text=show_text)
+    for q in questions:
+        q['hard'] = q['percent'] is not None and q['percent'] < 40
+    mode_cfg = config.MODES.get(gset.mode, {})
+    why_text = {'Попытка уже использована': 'Попытки закончились',
+                'Набор ещё не открыт': 'Набор откроется ' + _moscow_text(gset.opens_at),
+                'Набор уже закрыт': 'Набор закрыт ' + _moscow_text(gset.closes_at)}.get(why, why)
+    own = reverse('game:set_page', args=[gset.code])
+    return render(request, 'game/set_page.html', {
         'gset': gset,
-        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
-        'board': board,
-        'questions': set_question_stats(gset, show_text=show_text),
+        'kind_label': gset.get_kind_display(),
+        'title': gset.title or 'Набор %s' % gset.code,
+        'author': gset.author.username if gset.author_id else '',
+        'mode_title': mode_cfg.get('title', gset.mode),
+        'type_text': QUESTION_TYPE_TEXT.get(mode_cfg.get('question_type'), ''),
+        'minutes': mode_cfg.get('duration', 0) // 60,
+        'lives': mode_cfg.get('lives', 0),
+        'closes_text': _moscow_text(gset.closes_at),
+        'allowed': allowed,
+        'why_text': why_text,
+        'attempts_left': max(0, gset.attempts_allowed - attempts_used(request, gset)),
+        'mine': mine,
+        'my_place': my_place,
+        'played_text': _moscow_text(mine.created_at, 'j E') if mine else '',
+        'result_url': reverse('game:result', args=[mine.code]) if mine else '',
+        'play_url': own + '?auto=1',
+        'login_url': '/login/?next=' + own,
+        'top': top,
+        'my_row': my_row,
+        'total': total,
+        'more': max(0, total - len(top)),
+        'board_title': 'Кто прошёл · %d' % total,
+        'questions': questions,
         'show_text': show_text,
-        'play_url': reverse('game:set_page', args=[gset.code]),
+        'has_stats': any(q['correct'] or q['wrong'] or q['skip'] for q in questions),
     })
+
+
+def set_missing(request, code):
+    u"""Неверный код набора — страница игры со статусом 404, а не общий 404 сайта.
+
+    Проверка кода та же, что на главной (`api/set_check`): ввёл верный —
+    переход на его страницу без перезагрузки этой.
+    """
+    return render(request, 'game/set_missing.html', {
+        'code': make_code_lookup(code)[:16],
+    }, status=404)
 
 
 def set_question_stats(gset, show_text=True):
@@ -3082,7 +3144,8 @@ def _save_result(request, state, summary):
             # вчерашнюю доску, а не на сегодняшнюю.
             board = daily_mod.board_url(gset.mode, gset.day)
         else:
-            board = reverse('game:set_board', args=[gset.code])
+            # Доска набора учителя живёт на его странице (P6).
+            board = reverse('game:set_page', args=[gset.code])
         out['set'] = {
             'code': gset.code,
             'kind': gset.kind,
@@ -3092,6 +3155,25 @@ def _save_result(request, state, summary):
     return out
 
 
+# Чем кончился раунд — словами публичной страницы (P6): каждый исход своим, а не
+# «время вышло» для всего, что не жизни.
+RESULT_ENDING = {'lives': 'жизни кончились', 'time': 'время вышло',
+                 'set_done': 'прошёл набор до конца', 'pool_empty': 'вопросы кончились',
+                 'quit': 'вышел из раунда'}
+# «Сыграть в Блиц», «в Пулю»: режим в винительном падеже.
+MODE_TO = {'bullet': 'в Пулю', 'blitz': 'в Блиц', 'rapid': 'в Рапид',
+           'classic': 'в Классику', 'figure': 'в График'}
+# «1-е место в таблице Блица»: режим в родительном.
+MODE_OF = {'bullet': 'Пули', 'blitz': 'Блица', 'rapid': 'Рапида',
+           'classic': 'Классики', 'figure': 'Графика'}
+
+
+def points_word(score):
+    u"""«очко / очка / очков» по числу: 1 очко, 22 очка, 25 очков, 111 очков."""
+    from problems.templatetags.ru import pick
+    return pick(score, 'очко', 'очка', 'очков')
+
+
 @require_safe
 def result_page(request, code):
     """Публичная страница результата — то, что видит человек по ссылке.
@@ -3099,22 +3181,75 @@ def result_page(request, code):
     Без логина и read-only: чужой забег нельзя ни продолжить, ни изменить.
     require_safe, а не require_GET: HEAD должен отвечать как везде на сайте
     (мессенджеры дёргают HEAD перед разворачиванием превью).
+
+    По решению 17.09.2026 (ADR 0115): ник игрока (у анонимного — «Игрок»),
+    место в таблице режима у зачётного, исход словами для всех пяти причин и
+    две кнопки — «Сыграть в <режим>» (или этот же набор) и «Вызвать на дуэль».
+    ⚠️ Страница ничего не пишет; запросов — постоянное число, место считает та
+    же функция, что строку «я» в лидерборде.
     """
-    result = get_object_or_404(GameResult, code=code)
-    mode_title = (config.MODES.get(result.mode) or {}).get('title', result.mode)
-    # Ссылки в мета-тегах — абсолютные: относительный путь мессенджер
-    # не развернёт.
-    page_url = request.build_absolute_uri(
-        reverse('game:result', args=[result.code]))
+    result = get_object_or_404(GameResult.objects.select_related('user', 'game_set'), code=code)
+    mode_cfg = config.MODES.get(result.mode) or {}
+    mode_title = mode_cfg.get('title', result.mode)
+    name = result.user.username if result.user_id else ''
+    gset = result.game_set
+    place = None
+    if result.ranked and result.user_id:
+        row = lb.my_row(result.user, result.mode, 'all', 'score')
+        place = row['place'] if row else None
+
+    set_line = ''
+    primary = {'text': 'Сыграть ' + MODE_TO.get(result.mode, mode_title),
+               'sub': 'обогнать %s' % result.score if result.score else '',
+               'url': reverse('game:page') + '?mode=' + result.mode}
+    if gset is not None and gset.kind == 'daily':
+        set_line = 'вызов дня · ' + _moscow_text(gset.opens_at or result.created_at, 'j E')
+        if gset.day == daily_mod.today():
+            primary = {'text': 'Сыграть этот же вызов', 'sub': '',
+                       'url': reverse('game:set_page', args=[gset.code]) + '?auto=1'}
+        else:
+            primary = {'text': 'Сегодняшний вызов дня', 'sub': '', 'url': reverse('game:daily')}
+    elif gset is not None and gset.kind == 'custom':
+        set_line = 'набор «%s»' % (gset.title or gset.code)
+        primary = {'text': 'Сыграть этот же набор', 'sub': '',
+                   'url': reverse('game:set_page', args=[gset.code])}
+    elif gset is not None and gset.kind == 'duel':
+        set_line = 'дуэль'
+
+    duel_target = reverse('game:page') + '?duel=' + result.mode
+    viewer = request.user if request.user.is_authenticated else None
+    rival = name if name and not (viewer and viewer.id == result.user_id) else ''
+    lives = mode_cfg.get('lives') or 0
+    lives_left = None
+    if lives and result.ended_reason != 'lives' and 0 <= lives - result.wrong_count <= lives:
+        lives_left = lives - result.wrong_count
+    points = points_word(result.score)
+    page_url = request.build_absolute_uri(reverse('game:result', args=[result.code]))
     return render(request, 'game/result.html', {
         'r': result,
+        'name': name,
+        'initials': initials(name),
         'mode_title': mode_title,
-        'accuracy': result.accuracy,
+        'type_text': QUESTION_TYPE_TEXT.get(mode_cfg.get('question_type'), ''),
+        'points_word': points,
+        'place': place,
+        'mode_of': MODE_OF.get(result.mode, mode_title),
+        'set_line': set_line,
+        'unranked_text': ('' if result.ranked or set_line
+                          else config.UNRANKED_TEXT.get(result.unranked_reason, '')),
+        'combo': '×' + ('%g' % (result.max_combo or 1)).replace('.', ','),
+        'ending': RESULT_ENDING.get(result.ended_reason, RESULT_ENDING['time']),
+        'lives': lives,
+        'lives_left': lives_left,
+        'primary': primary,
+        'duel_url': duel_target if viewer else '/login/?next=' + quote(duel_target, safe='/'),
+        'duel_text': 'Вызвать %s на дуэль' % rival if rival else 'Вызвать на дуэль',
+        'pool_total': _pool_qs().count(),
         'topics': [t for t in (result.topic_breakdown or []) if t.get('total')],
         'page_url': page_url,
         'game_url': request.build_absolute_uri(reverse('game:page')),
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': f'{result.score} очков в Wecon Rush – обгонишь?',
+        'og_title': '%s%d %s в Wecon Rush – обгонишь?' % (name + ': ' if name else '', result.score, points),
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),

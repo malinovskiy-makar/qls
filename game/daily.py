@@ -161,28 +161,31 @@ def first_day():
             .order_by('day').values_list('day', flat=True).first())
 
 
-def board_rows(gset, me=None, limit=50):
+def board_rows(gset, me=None, limit=50, with_anonymous=False, mine_code=None):
     """Доска набора: топ-N + отдельная строка «моё место», если я вне топа.
 
     Сортировка: по счёту вниз, при равенстве — кто раньше закончил, тот
     выше. Ничья по времени невозможна практически, но правило должно быть
     задано: одинаковый вход обязан давать одинаковый порядок.
 
-    На доске только авторизованные — см. докстринг модуля.
+    На доске дня только авторизованные — см. докстринг модуля. У набора
+    учителя анонимные раунды в таблице ЕСТЬ, с именем «аноним»
+    (`with_anonymous`, решение 17.09.2026); свою строку аноним узнаёт по
+    коду своего результата (`mine_code`).
     """
-    results = list(gset.results.filter(user__isnull=False)
-                   .select_related('user')
-                   .order_by('-score', 'created_at'))
+    results = gset.results.all() if with_anonymous else gset.results.filter(user__isnull=False)
+    results = list(results.select_related('user').order_by('-score', 'created_at'))
     rows = [{
         'place': i + 1,
-        'name': r.user.username,
+        'name': r.user.username if r.user_id else 'аноним',
+        'anon': not r.user_id,
         'score': r.score,
         'accuracy': r.accuracy,
         'max_combo': r.max_combo,
         'combo': '×' + ('%g' % (r.max_combo or 1)).replace('.', ','),
         'ending': ENDING_TEXT.get(r.ended_reason, ENDING_TEXT['time']),
         'at': r.created_at,
-        'is_me': bool(me and r.user_id == me.id),
+        'is_me': bool((me and r.user_id == me.id) or (mine_code and r.code == mine_code)),
     } for i, r in enumerate(results)]
     top = rows[:limit]
     my_row = None
