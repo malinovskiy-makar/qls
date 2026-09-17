@@ -62,9 +62,13 @@ const count = (page) => page.$eval('#picked-count', (el) => el.textContent.trim(
 
 try {
   await block(['set_survives_filters_and_paging', 'set_restored_after_reload', 'arrows_reorder_question_ids',
-               'mode_switch_asks_when_not_empty', 'save_clears_the_draft'], async () => {
+               'mode_switch_asks_when_not_empty', 'save_clears_the_draft', 'mode_captions_not_cut'], async () => {
     const { page } = await open('/teacher/game-sets/new/?mode=blitz');
     await page.waitForSelector('#sb-list [data-toggle]', { timeout: 15000 });
+    // Подпись режима целиком («один верный ответ · 2 мин · N»): в равных колонках она обрезалась многоточием.
+    const cut = await page.$$eval('.sb-mode span', (spans) => spans
+      .filter((el) => el.scrollWidth > el.clientWidth + 1).map((el) => el.textContent));
+    check('mode_captions_not_cut', cut.length === 0, { cut });
     await page.click('#sb-list li:nth-child(1) [data-toggle]');
     await page.click('#sb-list li:nth-child(2) [data-toggle]');
     const before = await pickedIds(page);

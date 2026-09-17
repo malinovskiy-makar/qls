@@ -35,7 +35,9 @@
 
   .sb-hd { display: flex; align-items: center; gap: 22px; }
   .sb-hd h1 { font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; white-space: nowrap; }
-  .sb-modes { margin-left: auto; width: 860px; max-width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  /* Ширина кнопок — по подписи («один верный ответ · 2 мин · 1 644»): в равных колонках по 860 px
+     подпись Блица и Рапида обрезалась многоточием уже на 1440. Многоточие — только если места нет. */
+  .sb-modes { margin-left: auto; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, max-content)); gap: 8px; }
   .sb-mode { font: inherit; color: var(--text); min-height: 52px; padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 12px;
              background: var(--surface); text-align: left; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
   .sb-mode:hover { border-color: var(--accent); }
@@ -111,7 +113,7 @@
   @media (max-width: 1100px) {
     .sb-main { padding: 16px 20px 84px; }
     .sb-hd { flex-direction: column; align-items: stretch; gap: 12px; }
-    .sb-modes { margin-left: 0; width: 100%; }
+    .sb-modes { margin-left: 0; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .sb-cols { grid-template-columns: 1fr; }
     .sb-set { position: static; order: -1; }
   }

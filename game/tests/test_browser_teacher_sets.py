@@ -22,7 +22,7 @@ from problems.models import Problem, User
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_teacher_sets.mjs')
 CHECKS = {'set_survives_filters_and_paging', 'set_restored_after_reload', 'arrows_reorder_question_ids',
           'mode_switch_asks_when_not_empty', 'save_clears_the_draft', 'builder_and_detail_mobile_no_side_scroll',
-          'version_at_the_bottom_of_short_pages'}
+          'version_at_the_bottom_of_short_pages', 'mode_captions_not_cut'}
 
 
 # ⚠️ ПРИЧИНА МЕТКИ `serial`: класс поднимает живой сервер и гоняет по нему
