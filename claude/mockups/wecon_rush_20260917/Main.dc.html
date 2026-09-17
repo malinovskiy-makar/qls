@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16;
+      --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --green: #186e3c;
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden;
+      font-size: 14px; line-height: 1.45;
+    }
+    .rush.dark {
+      --accent: #81b5b4; --accent-ink: #81b5b4; --on-accent: #1d1a16;
+      --accent-tint: rgba(129,181,180,.14); --accent-ring: rgba(129,181,180,.4);
+      --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+      --border: rgba(255,255,255,.14); --border-soft: rgba(255,255,255,.07);
+      --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+      --btn-bg: #c4bba9; --on-btn: #1d1a16;
+      --error: #ff8a8a; --green: #3fc77f;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.heart { width: 13px; height: 13px; fill: var(--error); stroke: none; }
+
+    /* ---------- навигация сайта (как есть) ---------- */
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .chip { border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; color: #cfc8b8; display: flex; align-items: center; gap: 6px; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 0; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+    /* ---------- каркас экрана ---------- */
+    .main { padding: 22px 40px 24px; display: grid; grid-template-columns: minmax(0, 1fr) 440px; grid-template-rows: auto auto; gap: 18px 24px; height: 752px; box-sizing: border-box; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+
+    /* ---------- зона А: забег ---------- */
+    .run { padding: 22px 26px 24px; display: flex; flex-direction: column; gap: 14px; }
+    .head { display: flex; align-items: baseline; gap: 14px; }
+    .wm { font-size: 24px; font-weight: 800; letter-spacing: -.5px; display: flex; align-items: center; gap: 4px; }
+    .wm b { color: var(--accent-ink); }
+    .pitch { font-size: 14px; color: var(--text2); }
+    .mtabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .mtab { height: 58px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); text-align: left; padding: 0 14px; display: flex; align-items: center; gap: 10px; transition: border-color .12s, background .12s; }
+    .mtab:hover { border-color: var(--accent); }
+    .mtab.on { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .mtab .key { width: 20px; height: 20px; border-radius: 6px; border: 1px solid var(--border); font-size: 11.5px; font-weight: 700; color: var(--text3); display: flex; align-items: center; justify-content: center; flex: none; }
+    .mtab.on .key { border-color: var(--accent); color: var(--accent-ink); }
+    .mtab .t { font-size: 15.5px; font-weight: 700; line-height: 1.15; }
+    .mtab .m { font-size: 12.5px; color: var(--text3); line-height: 1.15; margin-top: 2px; }
+    .detail { display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 22px; padding: 18px 20px; border: 1px solid var(--border-soft); border-radius: 12px; min-height: 176px; box-sizing: border-box; }
+    .detail .kind { font-size: 17px; font-weight: 600; }
+    .terms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .term .l { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .term .v { font-size: 20px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 3px; }
+    .pool { margin-top: 14px; font-size: 13px; color: var(--text2); display: flex; gap: 14px; align-items: center; }
+    .pool b { font-weight: 700; color: var(--text); }
+    .pool .rec { color: var(--accent-ink); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .mock { background: var(--surface-2); border-radius: 10px; padding: 14px; display: flex; flex-direction: column; justify-content: center; gap: 8px; }
+    .mock .q { font-size: 12px; color: var(--text3); margin-bottom: 2px; }
+    .mock .opt { height: 24px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); display: flex; align-items: center; padding: 0 8px; gap: 8px; }
+    .mock .dot { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid var(--text3); }
+    .mock .dot.f { background: var(--accent); border-color: var(--accent); }
+    .mock .sq { width: 9px; height: 9px; border-radius: 2px; border: 1.5px solid var(--text3); }
+    .mock .sq.f { background: var(--accent); border-color: var(--accent); }
+    .mock .bar { height: 24px; flex: 1; }
+    .mock .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .mock .yn { height: 30px; border: 1.5px solid var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12.5px; font-weight: 600; color: var(--text3); background: var(--surface); }
+    .mock .yn.on { border-color: var(--accent); color: var(--accent-ink); }
+    .mock .num { height: 30px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); display: flex; align-items: center; padding: 0 10px; font-size: 13px; color: var(--text2); }
+    .mock .num i { display: inline-block; width: 1.5px; height: 14px; background: var(--text); margin-left: 2px; }
+    .filters { display: flex; align-items: center; gap: 8px; }
+    .filters .lab { font-size: 13px; color: var(--text3); margin-right: 4px; }
+    .chip { height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); padding: 0 12px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .chip:hover { border-color: var(--accent); }
+    .chip b { font-weight: 600; }
+    .filters .edit { margin-left: auto; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: transparent; padding: 0 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .filters .edit:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .cta { display: flex; align-items: center; gap: 18px; margin-top: auto; }
+    .rush .play { height: 58px; min-width: 260px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn); font-size: 17px; font-weight: 700; letter-spacing: 0; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 0 30px; }
+    .rush .play:hover { filter: brightness(1.12); }
+    .rush .play svg.i { stroke: var(--on-btn); width: 18px; height: 18px; }
+    .hint { font-size: 12.5px; color: var(--text3); line-height: 1.5; }
+    .hint kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+    .quota { margin-left: auto; text-align: right; font-size: 13px; color: var(--text2); }
+    .quota b { font-size: 18px; font-weight: 800; color: var(--text); display: block; line-height: 1.1; }
+
+    /* ---------- зона B: таблица / я ---------- */
+    .side { padding: 18px 20px 18px; display: flex; flex-direction: column; gap: 12px; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface-2); }
+    .seg button { height: 32px; padding: 0 12px; border: 0; background: transparent; font-size: 13px; font-weight: 600; color: var(--text2); }
+    .seg button.on { background: var(--accent); color: var(--on-accent); }
+    .seg.big button { height: 34px; padding: 0 16px; font-size: 14px; }
+    .side .top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .how { border: 0; background: transparent; font-size: 12.5px; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; padding: 0; }
+    .bt { display: flex; align-items: center; gap: 8px; font-size: 16px; font-weight: 700; }
+    .bt .sub { font-weight: 500; color: var(--text3); font-size: 13px; }
+    .ctrls { display: flex; gap: 8px; flex-wrap: wrap; }
+    .rows { display: flex; flex-direction: column; gap: 4px; }
+    .row { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; height: 42px; padding: 0 10px; border-radius: 9px; background: var(--surface-2); }
+    .row.first { background: var(--accent-tint); }
+    .row .n { color: var(--text3); font-size: 13px; display: flex; align-items: center; justify-content: center; }
+    .rush svg.medal { width: 24px; height: 24px; display: block; }
+    .row .who { font-size: 14.5px; font-weight: 600; line-height: 1.1; }
+    .row .d { font-size: 11.5px; color: var(--text3); }
+    .row .sc { font-weight: 800; font-size: 16px; font-variant-numeric: tabular-nums; }
+    .empty { padding: 20px 8px; color: var(--text2); font-size: 13.5px; text-align: center; border: 1px dashed var(--border); border-radius: 9px; }
+    .you { margin-top: auto; display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; height: 42px; padding: 0 10px; border-radius: 9px; border: 1.5px solid var(--accent); }
+    .you .n { color: var(--accent-ink); font-size: 13px; font-weight: 700; }
+    .foot { margin-top: auto; font-size: 13px; color: var(--text2); display: flex; align-items: center; gap: 8px; }
+    .link { border: 0; background: transparent; padding: 0; color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: 13px; }
+    .stats { display: flex; flex-direction: column; }
+    .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 7px 0; border-bottom: 1px solid var(--border-soft); font-size: 13.5px; color: var(--text2); }
+    .stat b { color: var(--text); font-weight: 700; font-variant-numeric: tabular-nums; }
+    .recs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .rec-c { padding: 10px 12px; border-radius: 9px; background: var(--surface-2); }
+    .rec-c .t { font-size: 12px; color: var(--text3); }
+    .rec-c .v { font-size: 20px; font-weight: 800; }
+    .rec-c .v.none { color: var(--text3); font-weight: 500; font-size: 14px; }
+    .notice { padding: 10px 12px; border-radius: 9px; background: var(--accent-tint); font-size: 13px; color: var(--text2); line-height: 1.4; }
+    .btn { height: 36px; border: 1px solid var(--border); border-radius: 8px; background: transparent; padding: 0 14px; font-size: 13.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+    .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush a.btn { color: var(--text); text-decoration: none; box-sizing: border-box; }
+    .rush a.btn:hover { color: var(--accent-ink); }
+    .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; }
+    .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; }
+    .btn.amber:hover { color: var(--amber-ink); }
+
+    /* ---------- зона C: другие способы играть ---------- */
+    .band { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+    .cell { padding: 14px 16px; display: grid; grid-template-rows: auto auto 1fr; gap: 3px; min-height: 108px; }
+    .cell .t { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .cell .s { font-size: 13px; color: var(--text2); }
+    .cell .a { align-self: end; display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .cell .cnt { margin-left: auto; font-size: 12.5px; color: var(--text3); }
+    .code { height: 36px; flex: 1; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); padding: 0 10px; font-size: 13px; letter-spacing: .12em; text-transform: uppercase; }
+    .code::placeholder { color: var(--text3); letter-spacing: .12em; }
+    .go { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 8px; background: transparent; display: inline-flex; align-items: center; justify-content: center; }
+    .go:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+    /* ---------- всплывающие ---------- */
+    .pop { position: absolute; z-index: 5; width: 360px; padding: 14px 16px; border-radius: 12px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.14); font-size: 13px; color: var(--text2); line-height: 1.45; }
+    .pop b { color: var(--text); }
+    .pop .x { position: absolute; top: 8px; right: 10px; border: 0; background: transparent; font-size: 16px; color: var(--text3); }
+    .pop p { margin: 0 0 8px; }
+    .pop p:last-child { margin: 0; }
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal { width: 420px; padding: 22px 24px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); text-align: center; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+    .modal .t { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+    .modal .acts { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+  </style>
+</helmet>
+
+<div class="rush {{themeClass}}" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <!-- Навигация сайта — общая, здесь не меняется -->
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="#nav" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="chip"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"></path></svg>Проблема или предложение</div>
+    <div class="chip">beta 0.0</div>
+    <div class="chip" style="padding: 4px 7px;"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></div>
+    <sc-if value="{{isAnon}}" hint-placeholder-val="{{ true }}">
+      <button class="login">Войти</button>
+      <button class="ghost">Создать аккаунт</button>
+    </sc-if>
+    <sc-if value="{{isStudent}}" hint-placeholder-val="{{ false }}">
+      <div class="ava">МП</div>
+      <span style="font-size: 15px;">Марина Петрова</span>
+      <button class="ghost" style="border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px;">Выйти</button>
+    </sc-if>
+  </div>
+
+  <div class="main">
+
+    <!-- ЗОНА А: ЗАБЕГ -->
+    <div class="card run">
+      <div class="head">
+        <div class="wm">WECON <svg class="i" viewBox="0 0 24 24" style="stroke: #006c6d;"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg> <b>RUSH</b></div>
+        <div class="pitch">три жизни, четыре режима, вопросы из реальных олимпиад</div>
+      </div>
+
+      <div class="mtabs">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="4">
+          <button class="mtab {{m.cls}}" onClick="{{m.pick}}">
+            <span class="key">{{m.key}}</span>
+            <sc-if value="{{m.isBolt}}" hint-placeholder-val="{{ true }}"><svg class="i" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg></sc-if>
+            <sc-if value="{{m.isFlame}}" hint-placeholder-val="{{ false }}"><svg class="i" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.1-1.9-5-3.2-6.4-.7 2.3-1.8 3.4-3 3.6.3-3.3-.9-6.3-3.6-8.6C8.6 8.4 5 10.5 5 15c0 4 3 7 7 7z"></path></svg></sc-if>
+            <sc-if value="{{m.isTarget}}" hint-placeholder-val="{{ false }}"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg></sc-if>
+            <sc-if value="{{m.isCalc}}" hint-placeholder-val="{{ false }}"><svg class="i" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 12h3M13 12h3M8 16h3M13 16h3"></path></svg></sc-if>
+            <span><span class="t" style="display: block;">{{m.title}}</span><span class="m" style="display: block;">{{m.dur}} · {{m.pool}} вопр.</span></span>
+          </button>
+        </sc-for>
+      </div>
+
+      <div class="detail">
+        <div>
+          <div class="kind">{{cur.kind}}</div>
+          <div class="terms">
+            <div class="term"><div class="l">Время</div><div class="v">{{cur.dur}}</div></div>
+            <div class="term"><div class="l">За верный</div><div class="v">{{cur.bonus}}</div></div>
+            <div class="term"><div class="l">Жизни</div><div class="v"><svg class="heart" viewBox="0 0 24 24" style="width: 25px; height: 36px"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg><svg class="heart" viewBox="0 0 24 24" style="width: 25px; height: 36px"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg><svg class="heart" viewBox="0 0 24 24" style="width: 25px; height: 36px"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg><span style="font-size: 13px; font-weight: 600; color: var(--text2); margin-left: 4px;">ошибка стоит жизни</span></div></div>
+          </div>
+          <div class="pool">
+            <span><b>{{cur.pool}}</b> вопросов под фильтром</span>
+            <sc-if value="{{cur.hasBest}}" hint-placeholder-val="{{ true }}">
+              <span class="rec"><svg class="i s" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>рекорд {{cur.best}}<span style="color: var(--text3); font-weight: 500;">{{cur.bestNote}}</span></span>
+            </sc-if>
+          </div>
+        </div>
+        <div class="mock" style="position: relative">
+          <div class="q">Так выглядит вопрос</div>
+          <sc-if value="{{cur.isBolt}}" hint-placeholder-val="{{ true }}">
+            <div class="two"><div class="yn on">Верно</div><div class="yn">Неверно</div></div>
+          </sc-if>
+          <sc-if value="{{cur.isFlame}}" hint-placeholder-val="{{ false }}">
+            <div class="opt"><span class="dot f"></span><span class="bar"></span></div>
+            <div class="opt"><span class="dot"></span><span class="bar"></span></div>
+            <div class="opt"><span class="dot"></span><span class="bar"></span></div>
+          </sc-if>
+          <sc-if value="{{cur.isTarget}}" hint-placeholder-val="{{ false }}">
+            <div class="opt"><span class="sq f"></span><span class="bar"></span></div>
+            <div class="opt"><span class="sq"></span><span class="bar"></span></div>
+            <div class="opt"><span class="sq f"></span><span class="bar"></span></div>
+          </sc-if>
+          <sc-if value="{{cur.isCalc}}" hint-placeholder-val="{{ false }}">
+            <div class="num">12,5<i></i></div>
+          </sc-if>
+        </div>
+      </div>
+
+      <div class="filters">
+        <span class="lab">Что решаем</span>
+        <button class="chip" onClick="{{openFilters}}">Тема: <b>все</b></button>
+        <button class="chip" onClick="{{openFilters}}">Сложность: <b>любая</b></button>
+        <button class="chip" onClick="{{openFilters}}">Источник: <b>все</b></button>
+        <button class="edit" onClick="{{openFilters}}"><svg class="i s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Настроить фильтры</button>
+      </div>
+
+      <div class="cta">
+        <button class="play" onClick="{{startRun}}"><svg class="i" viewBox="0 0 24 24"><path d="M6 4v16l14-8z"></path></svg>Играть · {{cur.title}}</button>
+        <div class="hint"><kbd>Enter</kbd> — старт, <kbd>1</kbd>–<kbd>4</kbd> — режим,<br><kbd>F</kbd> — фильтры</div>
+        <sc-if value="{{isStudent}}" hint-placeholder-val="{{ false }}">
+          <div class="quota"><b>0 из 10</b>зачётных раундов сегодня</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <!-- ЗОНА B: ТАБЛИЦА / Я -->
+    <div class="card side">
+      <div class="top">
+        <div class="seg big">
+          <button class="{{tabBoardCls}}" onClick="{{showBoard}}">Таблица</button>
+          <button class="{{tabMeCls}}" onClick="{{showMe}}">Статистика<br></button>
+        </div>
+        <button class="how" onClick="{{toggleHow}}">Как считаются очки</button>
+      </div>
+
+      <sc-if value="{{showHow}}" hint-placeholder-val="{{ false }}">
+        <div class="pop" style="top: 62px; right: 20px;">
+          <button class="x" onClick="{{toggleHow}}" aria-label="Закрыть">×</button>
+          <p><b>За верный ответ</b> — от 20 очков за вопрос на 1★ до 250 за 5★, плюс за скорость и за серию верных подряд.</p>
+          <p><b>Раунд без фильтров</b> получает ×1,3; точность ниже 85 % уменьшает итог.</p>
+          <p><b>Фильтр по сложности</b> делает раунд тренировочным: в таблицу он не идёт.</p>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{tabIsBoard}}" hint-placeholder-val="{{ true }}">
+        <div class="bt"><svg class="i" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>Лидеры · {{cur.title}} <span class="sub">режим тот же, что слева</span></div>
+        <div class="ctrls">
+          <div class="seg"><button class="{{pWeekCls}}" onClick="{{setWeek}}">Неделя</button><button class="{{pAllCls}}" onClick="{{setAll}}">Всё время</button></div>
+          <div class="seg"><button class="{{mScoreCls}}" onClick="{{setScore}}">Очки</button><button class="{{mCorrCls}}" onClick="{{setCorr}}">Верных</button><button class="{{mSpeedCls}}" onClick="{{setSpeed}}">Скорость</button></div>
+        </div>
+        <sc-if value="{{hasRows}}" hint-placeholder-val="{{ true }}">
+          <div class="rows">
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+              <div class="row {{r.cls}}"><span class="n"><sc-if value="{{r.m1}}" hint-placeholder-val="{{ true }}"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m2}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #9a958c;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m3}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #b87333;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.mn}}" hint-placeholder-val="{{ false }}">{{r.n}}</sc-if></span><span><span class="who" style="display: block;">{{r.name}}</span><span class="d">{{r.date}}</span></span><span class="sc">{{r.score}}</span></div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{noRows}}" hint-placeholder-val="{{ false }}">
+          <div class="empty">Пока никого. Сыграйте зачётный раунд — и будете первым.</div>
+        </sc-if>
+        <sc-if value="{{isAnon}}" hint-placeholder-val="{{ true }}">
+          <div class="foot">Играть можно без входа, но в таблицу попадают только вошедшие. <button class="link">Войти</button></div>
+        </sc-if>
+        <sc-if value="{{isStudent}}" hint-placeholder-val="{{ false }}">
+          <div class="you"><span class="n" style="display: flex; align-items: center; justify-content: center;"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></span><span><span class="who" style="display: block;">Вы · Марина Петрова</span><span class="d">6 сент. 2026 г.</span></span><span class="sc">178</span></div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{tabIsMe}}" hint-placeholder-val="{{ false }}">
+        <sc-if value="{{isStudent}}" hint-placeholder-val="{{ false }}">
+          <div class="bt">Моя статистика <span class="sub">все режимы</span></div>
+          <div class="stats">
+            <div class="stat"><span>Раундов</span><b>2</b></div>
+            <div class="stat"><span>Лучший счёт</span><b>178 · 6 сент. 2026 г.</b></div>
+            <div class="stat"><span>Больше всего верных за раунд</span><b>5</b></div>
+            <div class="stat"><span>Средняя точность</span><b>54 %</b></div>
+            <div class="stat"><span>Среднее время верного</span><b>34,6 с</b></div>
+            <div class="stat"><span>Всего верных</span><b>7</b></div>
+            <div class="stat"><span>Моё место (очки, всё время)</span><b>1 из 1</b></div>
+          </div>
+          <div class="foot"><button class="btn">Все рекорды: по режимам, темам и дуэлям →</button></div>
+        </sc-if>
+        <sc-if value="{{isAnon}}" hint-placeholder-val="{{ true }}">
+          <div class="bt">Рекорды на этом устройстве <span class="sub">без входа</span></div>
+          <div class="recs">
+            <div class="rec-c"><div class="t">Пуля</div><div class="v">957</div></div>
+            <div class="rec-c"><div class="t">Блиц</div><div class="v">403</div></div>
+            <div class="rec-c"><div class="t">Рапид</div><div class="v none">ещё не играли</div></div>
+            <div class="rec-c"><div class="t">Классика</div><div class="v none">ещё не играли</div></div>
+          </div>
+          <div class="notice">Войдите, чтобы рекорды сохранялись и считались по всем устройствам, а результаты попадали в таблицу.</div>
+          <div class="foot" style="gap: 10px;"><button class="btn amber">Войти</button><button class="btn">Создать аккаунт</button></div>
+        </sc-if>
+      </sc-if>
+    </div>
+
+    <!-- ЗОНА C: ДРУГИЕ СПОСОБЫ ИГРАТЬ -->
+    <div class="band">
+      <div class="card cell">
+        <div class="t"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-5 6-5 9 0s6 5 9 0"></path><path d="M3 12c3 5 6 5 9 0s6-5 9 0"></path></svg>Бесконечные тесты</div>
+        <div class="s">без времени, жизней и очков — просто решай</div>
+        <div class="a"><button class="btn solid" onClick="{{startPractice}}">Начать</button><span class="cnt">2 771 вопрос</span></div>
+      </div>
+      <div class="card cell">
+        <div class="t"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg>Вызов дня</div>
+        <div class="s">{{dailyLine}}</div>
+        <div class="a"><a class="btn" href="Daily.dc.html">Открыть</a><span class="cnt">{{dailyLeft}}</span></div>
+      </div>
+      <div class="card cell">
+        <div class="t"><svg class="i" viewBox="0 0 24 24"><path d="M14 4l6 6-9 9-6-6zM5 13l-2 2 6 6 2-2M16 2l6 6"></path></svg>Дуэль</div>
+        <div class="s">те же вопросы у обоих, старт одновременно</div>
+        <div class="a"><button class="btn" onClick="{{createDuel}}">Создать</button><span class="cnt">соперник по ссылке или коду</span></div>
+      </div>
+      <div class="card cell">
+        <div class="t"><svg class="i" viewBox="0 0 24 24"><path d="M4 7V4h16v3M9 20h6M12 4v16"></path></svg>Играть по коду</div>
+        <div class="s">набор, дуэль или вызов, который вам прислали</div>
+        <div class="a"><label for="code" style="position: absolute; left: -9999px;">Код набора</label><input id="code" class="code" placeholder="код набора"><button class="go" aria-label="Открыть набор"><svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Заглушки переходов: показывают, куда ведёт действие -->
+  <sc-if value="{{hasNote}}" hint-placeholder-val="{{ false }}">
+    <div class="veil">
+      <div class="modal">
+        <div class="t">{{noteTitle}}</div>
+        <div>{{noteText}}</div>
+        <div class="acts">
+          <sc-if value="{{noteIsDuel}}" hint-placeholder-val="{{ false }}">
+            <button class="btn solid">Создать аккаунт</button>
+          </sc-if>
+          <button class="btn" onClick="{{closeNote}}">{{noteClose}}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"who":{"editor":"enum","options":["anon","student"],"default":"anon","section":"Состояние"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Состояние"},"mode":{"editor":"enum","options":["bullet","blitz","rapid","classic"],"default":"bullet","section":"Состояние"},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: null, tab: 'board', period: 'all', metric: 'score', how: false, note: null };
+  }
+  renderVals() {
+    var role = this.props.who || 'anon';
+    var isStudent = role === 'student';
+    var theme = this.props.theme || 'light';
+    var modeId = this.state.mode || this.props.mode || 'bullet';
+    var s = this.state;
+    var self = this;
+
+    var MODES = [
+      { id: 'bullet',  key: '1', title: 'Пуля',     kind: 'Данетки: верно или неверно',    dur: '1 мин',  bonus: '+2 с',  pool: '568',   bestAnon: '957', bestStud: '' },
+      { id: 'blitz',   key: '2', title: 'Блиц',     kind: 'Один верный ответ',              dur: '2 мин',  bonus: '+5 с',  pool: '1 659', bestAnon: '403', bestStud: '178' },
+      { id: 'rapid',   key: '3', title: 'Рапид',    kind: 'Несколько верных ответов',       dur: '5 мин',  bonus: '+15 с', pool: '544',   bestAnon: '',    bestStud: '' },
+      { id: 'classic', key: '4', title: 'Классика', kind: 'Числовой ответ без решения',     dur: '10 мин', bonus: '+30 с', pool: '436',   bestAnon: '',    bestStud: '' }
+    ];
+    /* Реальные строки таблицы на бою (16.09.2026), только «Очки · Всё время».
+       Другие сочетания в макете показывают пустое состояние — цифр у нас нет. */
+    var BOARD = {
+      bullet:  [ { name: 'lengler', date: '7 сент. 2026 г.', score: '2 714' },
+                 { name: 'malinovskii', date: '7 сент. 2026 г.', score: '2 699' },
+                 { name: 'weco_admin', date: '7 сент. 2026 г.', score: '991' } ],
+      blitz:   [ { name: 'Sonya_kitty', date: '7 сент. 2026 г.', score: '225' } ],
+      rapid:   [],
+      classic: []
+    };
+
+    var modes = MODES.map(function (m) {
+      var best = isStudent ? m.bestStud : m.bestAnon;
+      return {
+        id: m.id, key: m.key, title: m.title, kind: m.kind, dur: m.dur, bonus: m.bonus, pool: m.pool,
+        isBolt: m.id === 'bullet', isFlame: m.id === 'blitz', isTarget: m.id === 'rapid', isCalc: m.id === 'classic',
+        cls: m.id === modeId ? 'on' : '',
+        hasBest: !!best, best: best, bestNote: isStudent ? '' : ' · на этом устройстве',
+        pick: function () { self.setState({ mode: m.id }); }
+      };
+    });
+    var cur = modes.filter(function (m) { return m.id === modeId; })[0] || modes[0];
+
+    var rows = (s.period === 'all' && s.metric === 'score') ? (BOARD[modeId] || []) : [];
+    rows = rows.map(function (r, i) { return { n: i + 1, name: r.name, date: r.date, score: r.score, cls: i === 0 ? 'first' : '', m1: i === 0, m2: i === 1, m3: i === 2, mn: i > 2 }; });
+
+    /* Ячейка «Вызов дня»: живая строка. Остаток до московской полуночи считается на момент отрисовки. */
+    var dNow = new Date();
+    var dMsk = new Date(dNow.getTime() + (dNow.getTimezoneOffset() + 180) * 60000);
+    var dLeft = 1440 - (dMsk.getHours() * 60 + dMsk.getMinutes());
+    var dailyLeft = 'новый через ' + Math.floor(dLeft / 60) + ' ч ' + (dLeft % 60) + ' мин';
+    var dailyLine = isStudent ? 'сегодня сыграно 1 из 4 · серия 4 дня' : '4 вызова на сегодня · одна попытка на каждый';
+
+    var note = s.note;
+    var NOTES = {
+      run:      { title: 'Старт раунда', text: 'Здесь начинается забег в режиме «' + cur.title + '» — экран 3 (вопрос, таймер, жизни).', close: 'Понятно' },
+      practice: { title: 'Бесконечные тесты', text: 'Начинается режим без времени, жизней и очков — экран 11.', close: 'Понятно' },
+      filters:  { title: 'Окно фильтров', text: 'Открывается существующее окно фильтров: тема, тег, сложность, источник, живые счётчики — экран 2.', close: 'Закрыть' },
+      duelAnon: { title: 'Дуэль только с аккаунтом', text: 'Соперника нужно как-то называть — войдите или создайте аккаунт.', close: 'Войти' },
+      duel:     { title: 'Создать дуэль', text: 'Создаётся комната дуэли, вы получаете ссылку и код для соперника — экран 8.', close: 'Понятно' }
+    };
+    var n = note ? NOTES[note] : null;
+
+    return {
+      themeClass: theme === 'dark' ? 'dark' : '',
+      isAnon: !isStudent, isStudent: isStudent,
+      modes: modes, cur: cur,
+      openFilters: function () { self.setState({ note: 'filters' }); },
+      startRun: function () { self.setState({ note: 'run' }); },
+      startPractice: function () { self.setState({ note: 'practice' }); },
+      createDuel: function () { self.setState({ note: isStudent ? 'duel' : 'duelAnon' }); },
+      closeNote: function () { self.setState({ note: null }); },
+      hasNote: !!n, noteTitle: n ? n.title : '', noteText: n ? n.text : '', noteClose: n ? n.close : '',
+      noteIsDuel: note === 'duelAnon',
+      tabIsBoard: s.tab === 'board', tabIsMe: s.tab === 'me',
+      tabBoardCls: s.tab === 'board' ? 'on' : '', tabMeCls: s.tab === 'me' ? 'on' : '',
+      showBoard: function () { self.setState({ tab: 'board' }); },
+      showMe: function () { self.setState({ tab: 'me' }); },
+      showHow: s.how, toggleHow: function () { self.setState({ how: !s.how }); },
+      pWeekCls: s.period === 'week' ? 'on' : '', pAllCls: s.period === 'all' ? 'on' : '',
+      setWeek: function () { self.setState({ period: 'week' }); }, setAll: function () { self.setState({ period: 'all' }); },
+      mScoreCls: s.metric === 'score' ? 'on' : '', mCorrCls: s.metric === 'correct' ? 'on' : '', mSpeedCls: s.metric === 'speed' ? 'on' : '',
+      setScore: function () { self.setState({ metric: 'score' }); }, setCorr: function () { self.setState({ metric: 'correct' }); }, setSpeed: function () { self.setState({ metric: 'speed' }); },
+      rows: rows, hasRows: rows.length > 0, noRows: rows.length === 0,
+      dailyLine: dailyLine, dailyLeft: dailyLeft
+    };
+  }
+}
+</script>
+</body>
+</html>

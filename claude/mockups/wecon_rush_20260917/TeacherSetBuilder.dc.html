@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .page { flex: 1; padding: 20px 40px 22px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; white-space: nowrap; }
+    .rush a.btn { color: var(--text); text-decoration: none; }
+    .btn:hover, .rush a.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.solid:disabled { background: var(--surface-2); color: var(--text3); border-color: var(--border); cursor: default; filter: none; }
+    .rush .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 700; }
+    .btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+    .pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .ph { display: flex; align-items: baseline; gap: 12px; }
+    .ph b { font-size: 17px; font-weight: 700; }
+    .ph span { font-size: 12.5px; color: var(--text3); }
+    .num { text-align: right; }
+    .thead, .tr { display: grid; align-items: center; gap: 10px; padding: 0 12px; }
+    .thead { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; height: 26px; }
+    .trs { display: flex; flex-direction: column; gap: 4px; }
+    .tr { height: 40px; border-radius: 9px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .tr.first { background: var(--accent-tint); }
+    .tr.me { background: transparent; border: 1.5px solid var(--accent); padding: 0 10.5px; }
+    .tr .n { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+    .tr .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr .who.anon { font-weight: 500; color: var(--text3); font-style: italic; }
+    .tr .sc { font-weight: 800; font-size: 15.5px; }
+    .tr .end { color: var(--text2); font-size: 13px; white-space: nowrap; }
+    .qs { display: flex; flex-direction: column; }
+    .q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 100px 44px; align-items: center; gap: 12px; min-height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+    .q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .q .qt small { display: block; font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+    .q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+    .q.hard .bar i { background: var(--error); }
+    .q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .q.hard .pc { color: var(--error); }
+    .foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; margin-top: auto; }
+    .hd { display: flex; align-items: center; gap: 22px; }
+    .ttl { font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; }
+    .modes { margin-left: auto; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; width: 860px; }
+    .mode { height: 52px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; padding: 0 14px; display: flex; flex-direction: column; justify-content: center; }
+    .mode:hover { border-color: var(--accent); }
+    .mode.on { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .mode b { font-size: 14.5px; font-weight: 700; line-height: 1.15; }
+    .mode span { font-size: 12px; color: var(--text3); line-height: 1.2; }
+    .cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 16px; min-height: 0; }
+    .filters { display: flex; gap: 8px; align-items: center; }
+    .inp { height: 38px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 0 12px; font-size: 13.5px; box-sizing: border-box; }
+    .sel { height: 38px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 0 10px 0 12px; font-size: 13.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+    .tchips { display: flex; gap: 6px; flex-wrap: wrap; }
+    .tc { height: 30px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent; font-size: 12.5px; font-weight: 600; color: var(--text2); }
+    .tc:hover { border-color: var(--accent); }
+    .rush .tc.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+    .found { font-size: 12.5px; color: var(--text3); }
+    .pool { display: flex; flex-direction: column; gap: 6px; overflow: hidden; }
+    .pq { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 12px 10px 14px; border-radius: 10px; background: var(--surface-2); }
+    .pq.in { background: transparent; border: 1px solid var(--border-soft); padding: 9px 11px 9px 13px; }
+    .pq .t { font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pq .a { font-size: 12.5px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+    .pq .m { font-size: 12px; color: var(--text3); margin-top: 1px; }
+    .rush .btn.added { background: var(--green-tint); border-color: transparent; color: var(--green); }
+    .setp { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+    .fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; }
+    .fld { display: flex; flex-direction: column; gap: 4px; }
+    .fld.w { grid-column: 1 / -1; }
+    .fld label { font-size: 12px; color: var(--text3); font-weight: 600; }
+    .step { display: inline-flex; align-items: center; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); height: 38px; width: fit-content; }
+    .step button { width: 36px; height: 36px; border: 0; background: transparent; font-size: 17px; }
+    .step b { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; }
+    .fake { display: flex; align-items: center; justify-content: space-between; color: var(--text3); }
+    .sh { display: flex; align-items: baseline; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+    .sh b { font-size: 16px; font-weight: 700; }
+    .sh span { font-size: 12.5px; color: var(--text3); }
+    .picked { display: flex; flex-direction: column; gap: 4px; flex: 1; min-height: 0; overflow: hidden; }
+    .pk { display: grid; grid-template-columns: 16px 22px minmax(0, 1fr) auto; gap: 8px; align-items: center; height: 38px; padding: 0 6px 0 8px; border-radius: 9px; background: var(--surface-2); font-size: 13px; }
+    .pk .h { color: var(--text3); cursor: grab; display: flex; }
+    .pk .n { font-weight: 700; color: var(--text2); text-align: right; font-variant-numeric: tabular-nums; }
+    .pk .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .pk .ops { display: flex; gap: 2px; }
+    .pk .ops button { width: 26px; height: 26px; border: 0; border-radius: 6px; background: transparent; color: var(--text3); display: inline-flex; align-items: center; justify-content: center; padding: 0; }
+    .pk .ops button:hover { background: var(--surface); color: var(--text); }
+    .none { flex: 1; display: flex; align-items: center; justify-content: center; text-align: center; color: var(--text3); font-size: 13.5px; border: 1px dashed var(--border); border-radius: 10px; padding: 16px; }
+    .bot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal { width: 440px; padding: 22px 24px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); text-align: center; font-size: 14.5px; line-height: 1.5; }
+    .modal .t { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 940px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav"><div class="mark">W</div><a href="#nav" class="on">Ученики</a><a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html">Wecon Rush</a><div class="sp"></div><div class="ava">ММ</div><span style="font-size: 15px;">Макар Малиновский</span><button class="ghost">Выйти</button></div>
+  <div class="page">
+    <a class="back" href="TeacherSets.dc.html"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Игровые наборы</a>
+
+    <!-- Один экран вместо трёх шагов: режим сверху, слева вопросы, справа сам набор -->
+    <div class="hd">
+      <div class="ttl">Новый набор</div>
+      <div class="modes">
+        <sc-for list="{{modes}}" as="m" hint-placeholder-count="4">
+          <button class="mode {{m.cls}}" onClick="{{m.pick}}"><b>{{m.title}}</b><span>{{m.sub}}</span></button>
+        </sc-for>
+      </div>
+    </div>
+
+    <div class="cols">
+      <!-- ВОПРОСЫ: фильтры меняют список на месте, набор справа при этом не теряется -->
+      <div class="card pane">
+        <div class="filters">
+          <label for="q" style="position: absolute; left: -9999px;">Поиск по тексту</label>
+          <input id="q" class="inp" style="flex: 1;" placeholder="поиск по тексту вопроса">
+          <span class="sel">источник: все<svg class="i s" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></span>
+          <span class="sel">сложность: 1–5<svg class="i s" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></span>
+        </div>
+        <div class="tchips">
+          <sc-for list="{{topics}}" as="t" hint-placeholder-count="6">
+            <button class="tc {{t.cls}}" onClick="{{t.pick}}">{{t.title}}</button>
+          </sc-for>
+          <span class="sel" style="height: 30px; border-radius: 999px; font-size: 12.5px;">ещё 18 тем<svg class="i s" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></span>
+        </div>
+        <div class="found">{{foundText}}</div>
+        <div class="pool">
+          <sc-for list="{{pool}}" as="p" hint-placeholder-count="6">
+            <div class="pq {{p.cls}}">
+              <div><div class="t">{{p.text}}</div><div class="a">ответ: {{p.answer}}</div><div class="m">{{p.meta}}</div></div>
+              <sc-if value="{{p.out}}" hint-placeholder-val="{{ true }}"><button class="btn sm" onClick="{{p.toggle}}"><svg class="i s" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>В набор</button></sc-if>
+              <sc-if value="{{p.inn}}" hint-placeholder-val="{{ false }}"><button class="btn sm added" onClick="{{p.toggle}}"><svg class="i s" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg>В наборе</button></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <div class="foot"><button class="btn sm">Показать ещё 20</button>&nbsp;&nbsp;Здесь только вопросы, пригодные для игры: без рисунков и длинных условий.</div>
+      </div>
+
+      <!-- НАБОР -->
+      <div class="card setp">
+        <div class="fields">
+          <div class="fld w"><label for="title">Название набора</label><input id="title" class="inp" value="Контрольная по спросу, 10 класс"></div>
+          <div class="fld"><label>Попыток на человека</label><div class="step"><button aria-label="Меньше" onClick="{{attDown}}">−</button><b>{{attempts}}</b><button aria-label="Больше" onClick="{{attUp}}">+</button></div></div>
+          <div class="fld"><label>Открыт до · необязательно</label><div class="inp fake"><span>не задан — бессрочно</span><svg class="i s" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"></rect><path d="M3 10h18M8 3v4M16 3v4"></path></svg></div></div>
+        </div>
+        <div class="sh"><b>В наборе · {{count}} из 60</b><span>порядок у всех одинаков — перетащите или двигайте стрелками</span></div>
+        <sc-if value="{{hasPicked}}" hint-placeholder-val="{{ true }}">
+          <div class="picked">
+            <sc-for list="{{picked}}" as="k" hint-placeholder-count="3">
+              <div class="pk"><span class="h"><svg class="i s" viewBox="0 0 24 24"><path d="M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01"></path></svg></span><span class="n">{{k.n}}</span><span class="x">{{k.text}}</span>
+                <span class="ops"><button aria-label="Выше" onClick="{{k.up}}"><svg class="i s" viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"></path></svg></button><button aria-label="Ниже" onClick="{{k.down}}"><svg class="i s" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"></path></svg></button><button aria-label="Убрать из набора" onClick="{{k.remove}}"><svg class="i s" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-if>
+        <sc-if value="{{noPicked}}" hint-placeholder-val="{{ false }}">
+          <div class="none">Пока пусто. Добавляйте вопросы слева или доберите случайные под текущие фильтры.</div>
+        </sc-if>
+        <div class="bot">
+          <button class="btn" onClick="{{fill}}">Добрать 5 случайных</button>
+          <sc-if value="{{hasPicked}}" hint-placeholder-val="{{ true }}"><a class="btn solid" href="TeacherSetDetail.dc.html" style="color: var(--on-btn);">Сохранить и получить код</a></sc-if>
+          <sc-if value="{{noPicked}}" hint-placeholder-val="{{ false }}"><button class="btn solid" disabled="{{ true }}">Сохранить и получить код</button></sc-if>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{note}}" hint-placeholder-val="{{ false }}">
+    <div class="veil"><div class="modal"><div class="t">Сменить режим?</div><div>В каждом режиме свой тип вопросов, поэтому собранный набор очистится. Пока набор пуст, режим меняется без вопросов.</div><div style="margin-top: 16px; display: flex; gap: 10px; justify-content: center;"><button class="btn sm solid" onClick="{{closeNote}}">Оставить как есть</button><button class="btn sm" onClick="{{confirmMode}}">Сменить и очистить</button></div></div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: 'blitz', topic: '', picked: [5, 8, 9], attempts: 1, note: null };
+  }
+  renderVals() {
+    var self = this, s = this.state;
+    /* Вопросы настоящие, с боя (17.09.2026); ответы очищены от остатков разметки источника. */
+    var Q = [
+      { text: 'Кто устанавливает ключевую ставку в России?', answer: 'Центральный банк Российской Федерации', topic: 'Монетарная политика', d: 1, src: 'Сборники' },
+      { text: 'Какой из следующих вопросов относится к области позитивной экономической науки?', answer: 'Как изменится спрос на продукты питания, если повысится арендная плата за жильё?', topic: 'Введение в экономическую теорию', d: 2, src: 'ВсОШ' },
+      { text: 'Индивид весь свой бюджет тратит лишь на два товара, причём единицу первого товара он всегда готов заменить на две единицы второго. Первый товар стоит 20 рублей, второй — 5. Наилучший набор при доходе 300 рублей включает:', answer: '0 единиц первого товара', topic: 'Теория потребителя', d: 4, src: 'МОШ' },
+      { text: 'Рынок яиц страны P совершенно конкурентный. Страна — малая открытая экономика и импортирует яйца. Государство ввело пошлину на импорт. В таком случае:', answer: 'внутренняя цена увеличится на размер пошлины', topic: 'Международная торговля', d: 1, src: 'ВсОШ' },
+      { text: 'Фирма N действует на рынке монополистической конкуренции. Какое событие скорее всего приведёт к росту спроса на её продукцию?', answer: 'монополист на рынке товара-комплемента снизил цены', topic: 'Монополия', d: 2, src: 'МОШ' },
+      { text: 'Спрос на продукцию монополиста Q = 200 − 2P. Сейчас фирма производит Q = 50, AC(50) = 101,5, AC(51) = 100. Для максимизации прибыли фирме следует:', answer: 'увеличить выпуск и сократить цену', topic: 'Монополия', d: 2, src: 'ВсОШ' },
+      { text: 'Если номинальная ставка процента составляет 210 %, а реальная — 14 %, то ожидаемый темп инфляции составляет:', answer: '172 %', topic: 'Монетарная политика', d: 3, src: 'Сборники' },
+      { text: 'Рост предельной производительности труда в экономике при прочих равных условиях:', answer: 'повысит реальную заработную плату', topic: 'Рынок труда', d: 2, src: 'ВсОШ' },
+      { text: 'В результате введения нового акцизного налога на товар X:', answer: 'изменится только предложение товара X', topic: 'Вмешательство государства', d: 1, src: 'МОШ' },
+      { text: 'Пётр может потратить вечер на подготовку к экзамену или на подработку за 800 рублей. Чему равны альтернативные издержки подготовки к экзамену?', answer: '800 рублей', topic: 'Альтернативные издержки и КПВ', d: 1, src: 'ВсОШ' }
+    ];
+    var MODES = [
+      { id: 'bullet', title: 'Пуля', sub: 'верно / неверно · 1 мин · 566' },
+      { id: 'blitz', title: 'Блиц', sub: 'один верный ответ · 2 мин · 1 644' },
+      { id: 'rapid', title: 'Рапид', sub: 'несколько верных · 5 мин · 539' },
+      { id: 'classic', title: 'Классика', sub: 'числовой ответ · 10 мин · 436' }
+    ];
+    var TOPICS = ['', 'Монополия', 'Монетарная политика', 'Рынок труда', 'Международная торговля', 'Вмешательство государства'];
+    var picked = s.picked;
+    function setPicked(p) { self.setState({ picked: p }); }
+
+    var pool = [];
+    Q.forEach(function (q, i) {
+      if (s.topic && q.topic !== s.topic) return;
+      var inn = picked.indexOf(i) !== -1;
+      pool.push({ text: q.text, answer: q.answer, meta: q.topic + ' · сложность ' + q.d + ' · ' + q.src,
+        inn: inn, out: !inn, cls: inn ? 'in' : '',
+        toggle: function () { setPicked(inn ? picked.filter(function (x) { return x !== i; }) : picked.concat([i])); } });
+    });
+    pool = pool.slice(0, 6);
+
+    var pk = picked.map(function (qi, pos) {
+      return { n: pos + 1, text: Q[qi].text,
+        up: function () { if (pos === 0) return; var p = picked.slice(); p[pos] = p[pos - 1]; p[pos - 1] = qi; setPicked(p); },
+        down: function () { if (pos === picked.length - 1) return; var p = picked.slice(); p[pos] = p[pos + 1]; p[pos + 1] = qi; setPicked(p); },
+        remove: function () { setPicked(picked.filter(function (x) { return x !== qi; })); } };
+    });
+
+    return {
+      modes: MODES.map(function (m) { return { title: m.title, sub: m.sub, cls: m.id === s.mode ? 'on' : '',
+        pick: function () { if (m.id === s.mode) return; if (picked.length) self.setState({ note: m.id }); else self.setState({ mode: m.id }); } }; }),
+      topics: TOPICS.map(function (t) { return { title: t || 'все темы', cls: t === s.topic ? 'on' : '', pick: function () { self.setState({ topic: t }); } }; }),
+      foundText: s.topic ? 'Найдено по теме «' + s.topic + '»: ' + pool.length + ' · набор справа при смене фильтра не меняется'
+                         : 'Найдено 1 644 · показано 20 · набор справа при смене фильтра и подгрузке не меняется',
+      pool: pool, picked: pk, count: String(picked.length), hasPicked: picked.length > 0, noPicked: picked.length === 0,
+      attempts: String(s.attempts),
+      attUp: function () { self.setState({ attempts: Math.min(10, s.attempts + 1) }); },
+      attDown: function () { self.setState({ attempts: Math.max(1, s.attempts - 1) }); },
+      fill: function () { var p = picked.slice(); for (var i = 0; i < Q.length && p.length < picked.length + 5; i++) { if (p.indexOf(i) === -1 && (!s.topic || Q[i].topic === s.topic)) p.push(i); } setPicked(p); },
+      note: !!s.note, closeNote: function () { self.setState({ note: null }); },
+      confirmMode: function () { self.setState({ mode: s.note, picked: [], note: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

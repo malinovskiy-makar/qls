@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --error-border: rgba(185,53,38,.4);
+      --green: #186e3c; --green-tint: rgba(24,110,60,.10); --green-border: rgba(24,110,60,.45);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush.dark {
+      --accent: #81b5b4; --accent-ink: #81b5b4; --on-accent: #1d1a16;
+      --accent-tint: rgba(129,181,180,.14); --accent-ring: rgba(129,181,180,.4);
+      --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+      --border: rgba(255,255,255,.14); --border-soft: rgba(255,255,255,.07);
+      --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+      --btn-bg: #c4bba9; --on-btn: #1d1a16; --skip: #7d7668;
+      --error: #ff8a8a; --error-tint: rgba(255,138,138,.12); --error-border: rgba(255,138,138,.5);
+      --green: #3fc77f; --green-tint: rgba(63,199,127,.12); --green-border: rgba(63,199,127,.5);
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+
+    /* ---------- полоса сверху: та же, что в раунде, без часов и жизней ---------- */
+    .hud { height: 64px; padding: 0 40px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--border); flex: none; }
+    .hud .l { display: flex; align-items: center; gap: 12px; }
+    .hud .r { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+    .name { font-size: 17px; font-weight: 700; display: flex; align-items: center; gap: 9px; }
+    .name svg.i { color: var(--accent-ink); width: 22px; height: 22px; }
+    .fchip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+    .fchip b { color: var(--text); font-weight: 600; }
+    .tally { display: flex; align-items: center; gap: 22px; font-size: 13px; color: var(--text2); }
+    .tally span { display: inline-flex; align-items: baseline; gap: 6px; }
+    .tally b { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+    .tally .g b { color: var(--green); } .tally .e b { color: var(--error); }
+    .ib { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--text2); }
+    .ib:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+    /* ---------- лента пройденного ---------- */
+    .tape { height: 46px; padding: 0 40px; display: flex; align-items: center; gap: 14px; border-bottom: 1px solid var(--border-soft); flex: none; }
+    .tape .cap { font-size: 12px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .dots { display: flex; align-items: center; gap: 6px; }
+    .dot { width: 28px; height: 28px; border-radius: 8px; border: 1.5px solid transparent; background: var(--surface); font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-variant-numeric: tabular-nums; }
+    .rush .dot.ok { background: var(--green); color: #fff; }
+    .rush .dot.bad { background: var(--error); color: #fff; }
+    .rush .dot.skip { background: var(--skip); color: #fff; }
+    .rush .dot.live { border-color: var(--border); color: var(--text2); border-style: dashed; }
+    .dot.cur { box-shadow: 0 0 0 3px var(--accent-ring); border-color: var(--accent); }
+    .fold.r { margin-left: auto; }
+    .fold { height: 28px; padding: 0 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 12.5px; font-weight: 600; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+    .fold:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .tape .key { margin-left: auto; display: flex; gap: 14px; font-size: 12.5px; color: var(--text3); }
+    .tape .key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+
+    /* ---------- тело ---------- */
+    .body { flex: 1; padding: 18px 40px 18px; display: flex; flex-direction: column; min-height: 0; }
+    .qwrap { width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+    .qmeta { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--text3); min-height: 24px; }
+    .qmeta b { color: var(--text2); font-weight: 700; }
+    .qmeta .chip { height: 24px; padding: 0 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; display: flex; align-items: center; gap: 5px; }
+    .qcard { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 20px 26px; font-size: 18px; line-height: 1.5; }
+    .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .opt { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 12px; min-height: 58px; padding: 13px 14px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; font-size: 16px; line-height: 1.4; box-sizing: border-box; }
+    .opt:hover { border-color: var(--accent); }
+    .opt .k { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--text2); display: flex; align-items: center; justify-content: center; margin-top: -2px; }
+    .opt .mk { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; }
+    .opt.ok { background: var(--green-tint); border-color: var(--green-border); } .opt.ok .mk { color: var(--green); }
+    .opt.bad { background: var(--error-tint); border-color: var(--error-border); } .opt.bad .mk { color: var(--error); }
+    .opt.right { border-color: var(--green-border); box-shadow: 0 0 0 3px var(--green-tint); } .opt.right .mk { color: var(--green); }
+    .opt.mute { opacity: .5; }
+    .opt.ok:hover, .opt.bad:hover, .opt.right:hover, .opt.mute:hover { cursor: default; }
+    .opt.mute:hover { border-color: var(--border); }
+    .opt.wide { grid-column: 1 / -1; }
+
+    /* ---------- разбор после ответа ---------- */
+    .fb { border-radius: 12px; border: 1px solid var(--border-soft); background: var(--surface-2); padding: 12px 16px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; align-items: start; font-size: 14px; }
+    .fb.ok { background: var(--green-tint); border-color: var(--green-border); }
+    .fb.bad { background: var(--error-tint); border-color: var(--error-border); }
+    .fb .v { font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .fb .v b { font-weight: 700; }
+    .fb.ok .v svg.i { color: var(--green); } .fb.bad .v svg.i { color: var(--error); }
+    .fb .sol { grid-column: 1 / 2; color: var(--text); line-height: 1.5; }
+    .fb .sol small { display: block; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; margin-bottom: 2px; }
+    .fb .side { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; gap: 6px; align-items: flex-end; }
+    .rush a.open { height: 36px; padding: 0 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text); font-size: 13.5px; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 7px; white-space: nowrap; }
+    .rush a.open:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .gh { height: 32px; padding: 0 10px; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; }
+    .gh:hover { border-color: var(--border); color: var(--text); }
+
+    /* ---------- низ: листание ---------- */
+    .foot { margin-top: auto; display: grid; grid-template-columns: 200px minmax(0, 1fr) 200px; align-items: center; gap: 16px; }
+    .nb { height: 48px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); padding: 0 18px; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .nb:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .nb:disabled { opacity: .4; cursor: default; border-color: var(--border); color: inherit; }
+    .rush .nb.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .nb.solid:hover { filter: brightness(1.12); }
+    .keys { text-align: center; font-size: 12.5px; color: var(--text3); }
+    .keys kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal { width: 440px; padding: 24px 26px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); text-align: center; font-size: 14.5px; line-height: 1.5; }
+    .modal .t { font-weight: 700; font-size: 18px; margin-bottom: 4px; }
+    .modal .acts { display: flex; justify-content: center; gap: 10px; margin-top: 18px; }
+    .rush a.nb { color: var(--text); text-decoration: none; }
+  </style>
+</helmet>
+
+<div class="rush {{themeClass}}" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <!-- Полоса: что за режим и какой фильтр · счётчики сессии · звук и выход. Шапка сайта скрыта, как в раунде -->
+  <div class="hud">
+    <div class="l">
+      <div class="name"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-5 6-5 9 0s6 5 9 0"></path><path d="M3 12c3 5 6 5 9 0s6-5 9 0"></path></svg>Бесконечные тесты</div>
+      <div class="fchip">фильтр: <b>Эластичность, Рынки</b></div>
+    </div>
+    <div class="tally">
+      <span>отвечено <b>{{nAnswered}}</b></span>
+      <span class="g">верно <b>{{nCorrect}}</b></span>
+      <span class="e">ошибок <b>{{nWrong}}</b></span>
+      <span>пропущено <b>{{nSkipped}}</b></span>
+    </div>
+    <div class="r">
+      <button class="ib" aria-label="Звук"><svg class="i" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg></button>
+      <button class="ib" aria-label="Закончить" onClick="{{askEnd}}"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+    </div>
+  </div>
+
+  <!-- Лента: каждый открытый вопрос — квадратик, по клику переход -->
+  <div class="tape">
+    <span class="cap">Пройдено</span>
+    <sc-if value="{{many}}" hint-placeholder-val="{{ false }}">
+      <button class="fold" aria-label="Показать более ранние вопросы"><svg class="i s" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"></path></svg>ещё 76</button>
+    </sc-if>
+    <div class="dots">
+      <sc-for list="{{dots}}" as="d" hint-placeholder-count="4">
+        <button class="dot {{d.cls}}" aria-label="{{d.label}}" onClick="{{d.go}}">{{d.n}}</button>
+      </sc-for>
+    </div>
+    <sc-if value="{{many}}" hint-placeholder-val="{{ false }}">
+      <button class="fold r" aria-label="К ближайшему пропущенному вопросу">к пропущенным · {{nSkipped}}<svg class="i s" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></button>
+    </sc-if>
+    <sc-if value="{{few}}" hint-placeholder-val="{{ true }}">
+    <div class="key"><span><i style="background: var(--green);"></i>верно</span><span><i style="background: var(--error);"></i>ошибка</span><span><i style="background: var(--skip);"></i>пропущен — можно вернуться и ответить</span></div>
+    </sc-if>
+  </div>
+
+  <div class="body">
+    <div class="qwrap">
+      <div class="qmeta">
+        <span>Вопрос <b>{{qNo}}</b></span>
+        <sc-if value="{{isSkippedView}}" hint-placeholder-val="{{ false }}"><span class="chip">пропущен · можно ответить сейчас</span></sc-if>
+        <sc-if value="{{isHistory}}" hint-placeholder-val="{{ false }}"><span>уже отвечен · только просмотр</span></sc-if>
+      </div>
+
+      <div class="qcard">{{cur.q}}</div>
+
+      <div class="opts">
+        <sc-for list="{{opts}}" as="o" hint-placeholder-count="4">
+          <button class="opt {{o.cls}}" onClick="{{o.pick}}"><span class="k">{{o.n}}</span><span>{{o.text}}</span><span class="mk">{{o.mark}}</span></button>
+        </sc-for>
+      </div>
+
+      <!-- Разбор: вердикт, решение (если есть), ссылка на задачу (если она из каталога) -->
+      <sc-if value="{{isAnswered}}" hint-placeholder-val="{{ true }}">
+        <div class="fb {{fbCls}}">
+          <div class="v">
+            <sc-if value="{{isRight}}" hint-placeholder-val="{{ false }}"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg><b>Верно.</b></sc-if>
+            <sc-if value="{{isWrong}}" hint-placeholder-val="{{ true }}"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg><b>Неверно.</b><span>Верный ответ — {{rightNo}}.</span></sc-if>
+          </div>
+          <sc-if value="{{hasSol}}" hint-placeholder-val="{{ true }}">
+            <div class="sol"><small>Решение</small>{{cur.sol}}</div>
+          </sc-if>
+          <div class="side">
+            <sc-if value="{{hasProblem}}" hint-placeholder-val="{{ true }}">
+              <a class="open" href="#problem">Открыть задачу в каталоге<svg class="i s" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+            </sc-if>
+            <button class="gh"><svg class="i s" viewBox="0 0 24 24"><path d="M5 21V4h11l-1 3 1 3H5"></path></svg>Плохая задача?</button>
+          </div>
+        </div>
+      </sc-if>
+
+      <div class="foot">
+        <button class="nb" onClick="{{back}}" disabled="{{noBack}}"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Назад</button>
+        <div class="keys"><kbd>1</kbd>–<kbd>{{optCount}}</kbd> ответ · <kbd>←</kbd> <kbd>→</kbd> листать · <kbd>пробел</kbd> {{spaceHint}}</div>
+        <button class="nb {{nextCls}}" onClick="{{next}}">{{nextLabel}}<svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{askOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="veil">
+      <div class="modal">
+        <div class="t">Закончить?</div>
+        <div>Покажем итог: сколько верных, список ошибок и пропусков, точность по темам.</div>
+        <div class="acts">
+          <button class="nb solid" onClick="{{closeAsk}}">Нет, решать дальше</button>
+          <a class="nb" href="PracticeResult.dc.html">Да, к итогу</a>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+  <sc-if value="{{endOpen}}" hint-placeholder-val="{{ false }}">
+    <div class="veil">
+      <div class="modal">
+        <div class="t">В макете пять вопросов</div>
+        <div>На сайте здесь придёт следующий вопрос из пула — их 2 771, и лента поедет дальше.</div>
+        <div class="acts"><button class="nb" onClick="{{closeEnd}}">Понятно</button></div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"many":{"editor":"boolean","default":false,"section":"Состояние"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Состояние"},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    /* Стартовое состояние макета: три вопроса позади (ошибка, верно, пропуск),
+       на четвёртом только что ошиблись — виден разбор с решением и ссылкой. */
+    this.state = { at: 3, seen: 4, answers: { 0: 0, 1: 2, 3: 2 }, skipped: { 2: true }, ask: false, end: false };
+  }
+  renderVals() {
+    var self = this;
+    var s = this.state;
+    var theme = this.props.theme || 'light';
+
+    /* Вопросы 1–4 — настоящие, с боя (17.09.2026). Решение у вопроса 4 и весь вопрос 5 — условные. */
+    var Q = [
+      { q: 'Для какой из представленных КПВ альтернативные издержки производства товара y максимальны?',
+        opts: ['y = 45 − 44x', '44y + 45x = 12', '13 − y = 9x', '1 = x + 0,5y'], right: 1, problem: true },
+      { q: 'Предположим, что на рынке действует фирма-монополист. Если у этой фирмы неожиданно увеличились фиксированные издержки, то в краткосрочном периоде можно ожидать, что:',
+        opts: ['фирма увеличит объём выпуска', 'фирма повысит цену', 'фирма потеряет прибыль в размере увеличения фиксированных издержек', 'снизится потребительский излишек'], right: 2, problem: true },
+      { q: 'Если повышение цены на товар X не влияет на спрос на товар Y, то это означает, что:',
+        opts: ['перекрёстная эластичность спроса на товар Y по цене товара X положительна', 'товары X и Y являются дополняющими', 'спрос на товар Y обладает единичной эластичностью по цене товара Y', 'спрос на товар Y не меняется при изменении его цены', 'перекрёстная эластичность спроса на товар Y по цене товара X равна нулю'], right: 4, problem: true },
+      { q: 'В стране AAA на рынке шоколадок школьники предъявляют спрос Qd = 150 − P, а предложение имеет вид Qs = P. Регулятор считает, что шоколадки должны продаваться строго по цене 60 за штуку. Найдите размер дефицита шоколадок, вызванного этим решением.',
+        opts: ['30', '45', '60', '110'], right: 0, problem: true,
+        sol: 'При P = 60 спрос Qd = 150 − 60 = 90, предложение Qs = 60. Дефицит = 90 − 60 = 30.' },
+      { q: 'Спрос на товар задан функцией Qd = 120 − 2P, предложение — Qs = 4P. Найдите равновесную цену.',
+        opts: ['15', '20', '24', '30'], right: 1, problem: false,
+        sol: '120 − 2P = 4P, откуда 6P = 120 и P = 20. Задача сгенерирована — страницы в каталоге у неё нет.' }
+    ];
+
+    var at = s.at;
+    var cur = Q[at];
+    var chosen = s.answers[at];
+    var answered = chosen !== undefined && chosen !== null;
+    var isLast = at === s.seen - 1;
+
+    function setS(patch) { self.setState(patch); }
+    function pick(i) {
+      if (answered) return;
+      var a = Object.assign({}, s.answers); a[at] = i;
+      var k = Object.assign({}, s.skipped); delete k[at];
+      setS({ answers: a, skipped: k });
+    }
+    function next() {
+      if (!isLast) { setS({ at: at + 1 }); return; }
+      var k = Object.assign({}, s.skipped);
+      if (!answered) k[at] = true;
+      if (s.seen >= Q.length) { setS({ skipped: k, end: true }); return; }
+      setS({ skipped: k, seen: s.seen + 1, at: s.seen });
+    }
+
+    var opts = cur.opts.map(function (t, i) {
+      var cls = '', mark = '';
+      if (answered) {
+        if (i === chosen && i === cur.right) { cls = 'ok'; mark = 'верно'; }
+        else if (i === chosen) { cls = 'bad'; mark = 'ваш ответ'; }
+        else if (i === cur.right) { cls = 'right'; mark = 'верный'; }
+        else cls = 'mute';
+      }
+      if (cur.opts.length % 2 === 1 && i === cur.opts.length - 1) cls += ' wide';
+      return { n: i + 1, text: t, cls: cls, mark: mark, pick: function () { pick(i); } };
+    });
+
+    var nC = 0, nW = 0;
+    Object.keys(s.answers).forEach(function (k) { if (s.answers[k] === Q[k].right) nC++; else nW++; });
+    var nS = Object.keys(s.skipped).length;
+
+    /* Tweak many: сотый вопрос сессии. В ленту помещаются последние 24 квадратика, более ранние свёрнуты в «‹ ещё 76»;
+       легенда цветов уступает место квадратикам. */
+    var many = this.props.many === true;
+    var OFF = many ? 96 : 0;
+    var dots = [];
+    if (many) {
+      'ok bad ok ok skip ok ok ok bad ok skip ok ok bad ok ok ok skip ok bad'.split(' ').forEach(function (st, j) {
+        dots.push({ n: 77 + j, cls: st, label: 'Вопрос ' + (77 + j), go: function () {} });
+      });
+    }
+    for (var i = 0; i < s.seen; i++) {
+      (function (i) {
+        var a = s.answers[i];
+        var st = a !== undefined ? (a === Q[i].right ? 'ok' : 'bad') : (s.skipped[i] ? 'skip' : 'live');
+        var names = { ok: 'верно', bad: 'ошибка', skip: 'пропущен', live: 'без ответа' };
+        dots.push({ n: OFF + i + 1, cls: st + (i === at ? ' cur' : ''), label: 'Вопрос ' + (OFF + i + 1) + ': ' + names[st],
+                    go: function () { setS({ at: i }); } });
+      })(i);
+    }
+
+    var right = answered && chosen === cur.right;
+    return {
+      themeClass: theme === 'dark' ? 'dark' : '',
+      cur: cur, opts: opts, optCount: String(cur.opts.length), qNo: String(OFF + at + 1), dots: dots, many: many, few: !many,
+      nAnswered: String(nC + nW + (many ? 82 : 0)), nCorrect: String(nC + (many ? 58 : 0)), nWrong: String(nW + (many ? 24 : 0)), nSkipped: String(nS + (many ? 14 : 0)),
+      isAnswered: answered, isRight: right, isWrong: answered && !right, fbCls: right ? 'ok' : 'bad',
+      rightNo: String(cur.right + 1), hasSol: answered && !!cur.sol, hasProblem: !!cur.problem,
+      isSkippedView: !answered && !!s.skipped[at], isHistory: answered && !isLast,
+      back: function () { if (at > 0) setS({ at: at - 1 }); }, noBack: at === 0,
+      next: next,
+      nextLabel: answered ? (isLast ? 'Дальше' : 'Вперёд') : (isLast ? 'Пропустить' : 'Вперёд'),
+      nextCls: answered && isLast ? 'solid' : '',
+      spaceHint: answered ? 'дальше' : 'пропустить',
+      askOpen: s.ask, askEnd: function () { setS({ ask: true }); }, closeAsk: function () { setS({ ask: false }); },
+      endOpen: s.end, closeEnd: function () { setS({ end: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

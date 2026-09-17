@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16;
+      --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --green: #186e3c;
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden;
+      font-size: 14px; line-height: 1.45;
+    }
+    .rush.dark {
+      --accent: #81b5b4; --accent-ink: #81b5b4; --on-accent: #1d1a16;
+      --accent-tint: rgba(129,181,180,.14); --accent-ring: rgba(129,181,180,.4);
+      --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+      --border: rgba(255,255,255,.14); --border-soft: rgba(255,255,255,.07);
+      --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+      --btn-bg: #c4bba9; --on-btn: #1d1a16;
+      --error: #ff8a8a; --green: #3fc77f;
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.i.l { width: 22px; height: 22px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .chip { border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; color: #cfc8b8; display: flex; align-items: center; gap: 6px; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 0; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+    .page { flex: 1; padding: 20px 40px 20px; display: flex; flex-direction: column; gap: 16px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+
+    /* ---------- верх: заголовок + серия и отсчёт ---------- */
+    .top { display: grid; grid-template-columns: minmax(0, 1fr) 640px; gap: 24px; align-items: stretch; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .ttl { font-size: 32px; font-weight: 800; letter-spacing: -.5px; line-height: 1.1; margin: 8px 0 6px; display: flex; align-items: center; gap: 12px; }
+    .ttl .prog { font-size: 13px; font-weight: 700; letter-spacing: 0; color: var(--accent-ink); background: var(--accent-tint); border-radius: 999px; padding: 5px 12px; }
+    .sub { font-size: 14.5px; color: var(--text2); }
+    .meter { padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1fr) 1px 190px; gap: 20px; align-items: center; }
+    .meter .vr { background: var(--border-soft); align-self: stretch; }
+    .lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .streak { display: flex; align-items: center; gap: 14px; }
+    .streak .num { font-size: 30px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 6px; color: var(--text); }
+    .streak .num svg.i { color: var(--amber); stroke: var(--amber); fill: var(--amber); width: 22px; height: 22px; }
+    .streak .txt { font-size: 12.5px; color: var(--text2); line-height: 1.35; }
+    .week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin-top: 10px; }
+    .day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); font-weight: 600; }
+    .day i { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); box-sizing: border-box; display: flex; align-items: center; justify-content: center; }
+    .day.hit i { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+    .day.now i { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .day.now { color: var(--accent-ink); }
+    .day svg.i { width: 12px; height: 12px; stroke-width: 3; }
+    .clock .v { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 2px; }
+    .clock .n { font-size: 12.5px; color: var(--text2); margin-top: 2px; }
+    .join { display: flex; align-items: center; gap: 14px; }
+    .join .txt { font-size: 13.5px; color: var(--text2); line-height: 1.4; }
+    .join .txt b { color: var(--text); display: block; font-size: 15px; }
+
+    /* ---------- четыре вызова ---------- */
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; min-height: 0; }
+    .dcard { padding: 18px 18px 18px; display: flex; flex-direction: column; gap: 10px; }
+    .dcard.done { background: var(--surface-2); }
+    .dh { display: flex; align-items: center; gap: 10px; }
+    .dh .ic { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink); display: flex; align-items: center; justify-content: center; flex: none; }
+    .dh .dt { font-size: 20px; font-weight: 700; line-height: 1.1; }
+    .dh .dm { font-size: 12.5px; color: var(--text3); margin-top: 2px; }
+    .tag { margin-left: auto; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .tag.ok { background: var(--accent-tint); color: var(--accent-ink); }
+    .tag svg.i { width: 12px; height: 12px; stroke-width: 3; }
+    .cnt { display: flex; align-items: baseline; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+    .cnt b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .rows { display: flex; flex-direction: column; gap: 4px; }
+    .row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; height: 38px; padding: 0 10px; border-radius: 9px; background: var(--surface-2); }
+    .dcard.done .row { background: var(--surface); }
+    .row.me { background: transparent; border: 1.5px solid var(--accent); }
+    .row .n { font-size: 13px; color: var(--text3); display: flex; align-items: center; justify-content: center; }
+    .rush a.yday { font-size: 12.5px; color: var(--text3); text-decoration: none; display: flex; align-items: center; gap: 6px; padding: 2px 2px 0; }
+    .rush a.yday:hover { color: var(--accent-ink); }
+    .row .who { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .row .sc { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .empty { flex: 1; min-height: 124px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; text-align: center; color: var(--text2); font-size: 13.5px; border: 1px dashed var(--border); border-radius: 10px; padding: 12px; }
+    .empty b { color: var(--text); font-size: 14.5px; }
+    .act { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+    .btn { height: 46px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 18px; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
+    .rush a.btn { color: var(--text); text-decoration: none; }
+    .btn:hover, .rush a.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.solid svg.i { stroke: var(--on-btn); }
+    .rush .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 700; height: 40px; border-radius: 10px; font-size: 14px; }
+    .mine { display: flex; align-items: baseline; gap: 8px; padding: 0 2px; font-size: 13px; color: var(--text2); }
+    .mine b { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+
+    .rules { font-size: 12.5px; color: var(--text3); display: flex; gap: 22px; flex-wrap: wrap; }
+    .rules span { display: inline-flex; align-items: center; gap: 6px; }
+
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal { width: 440px; padding: 22px 24px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); text-align: center; font-size: 14.5px; line-height: 1.5; color: var(--text); }
+    .modal .t { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+    .modal .acts { display: flex; justify-content: center; gap: 10px; margin-top: 16px; }
+  </style>
+</helmet>
+
+<div class="rush {{themeClass}}" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="chip"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"></path></svg>Проблема или предложение</div>
+    <div class="chip">beta 0.0</div>
+    <div class="chip" style="padding: 4px 7px;"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></div>
+    <sc-if value="{{isAnon}}" hint-placeholder-val="{{ false }}">
+      <button class="login">Войти</button>
+      <button class="ghost">Создать аккаунт</button>
+    </sc-if>
+    <sc-if value="{{isStudent}}" hint-placeholder-val="{{ true }}">
+      <div class="ava">МП</div>
+      <span style="font-size: 15px;">Марина Петрова</span>
+      <button class="ghost" style="border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px;">Выйти</button>
+    </sc-if>
+  </div>
+
+  <div class="page">
+
+    <!-- ВЕРХ: что это + серия + отсчёт -->
+    <div class="top">
+      <div>
+        <a class="back" href="Main.dc.html"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Wecon Rush</a>
+        <div class="ttl">Вызов дня
+          <sc-if value="{{isStudent}}" hint-placeholder-val="{{ true }}"><span class="prog">сыграно {{playedCount}} из 4</span></sc-if>
+        </div>
+        <div class="sub">17 сентября · вопросы одинаковы у всех · одна попытка на режим</div>
+      </div>
+
+      <div class="card meter">
+        <sc-if value="{{isStudent}}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div class="streak">
+              <div>
+                <div class="lab">Серия</div>
+                <div class="num"><svg class="i" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.1-1.9-5-3.2-6.4-.7 2.3-1.8 3.4-3 3.6.3-3.3-.9-6.3-3.6-8.6C8.6 8.4 5 10.5 5 15c0 4 3 7 7 7z"></path></svg>{{streakNum}}</div>
+              </div>
+              <div class="txt">{{streakText}}<br>лучшая серия — 5 дней</div>
+            </div>
+            <div class="week">
+              <sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+                <div class="day {{d.cls}}"><i><sc-if value="{{d.hit}}" hint-placeholder-val="{{ false }}"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg></sc-if></i>{{d.name}}</div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+        <sc-if value="{{isAnon}}" hint-placeholder-val="{{ false }}">
+          <div class="join">
+            <div class="txt"><b>Играть можно и без входа</b>Результат покажем, но на доску попадают только вошедшие — и серия дней копится только у них.</div>
+            <button class="btn amber">Войти</button>
+          </div>
+        </sc-if>
+        <div class="vr"></div>
+        <div class="clock">
+          <div class="lab">Новый вызов через</div>
+          <div class="v">{{left}}</div>
+          <div class="n">в полночь по Москве</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ЧЕТЫРЕ ВЫЗОВА -->
+    <div class="grid">
+      <sc-for list="{{cards}}" as="c" hint-placeholder-count="4">
+        <div class="card dcard {{c.cls}}">
+          <div class="dh">
+            <span class="ic">
+              <sc-if value="{{c.isBolt}}" hint-placeholder-val="{{ true }}"><svg class="i l" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg></sc-if>
+              <sc-if value="{{c.isFlame}}" hint-placeholder-val="{{ false }}"><svg class="i l" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.1-1.9-5-3.2-6.4-.7 2.3-1.8 3.4-3 3.6.3-3.3-.9-6.3-3.6-8.6C8.6 8.4 5 10.5 5 15c0 4 3 7 7 7z"></path></svg></sc-if>
+              <sc-if value="{{c.isTarget}}" hint-placeholder-val="{{ false }}"><svg class="i l" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg></sc-if>
+              <sc-if value="{{c.isCalc}}" hint-placeholder-val="{{ false }}"><svg class="i l" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 12h3M13 12h3M8 16h3M13 16h3"></path></svg></sc-if>
+            </span>
+            <span>
+              <span class="dt" style="display: block;">{{c.title}}</span>
+              <span class="dm" style="display: block;">{{c.meta}}</span>
+            </span>
+            <sc-if value="{{c.played}}" hint-placeholder-val="{{ false }}"><span class="tag ok"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg>сыгран</span></sc-if>
+          </div>
+
+          <div class="cnt"><span class="lab">Сегодня сыграли</span><b>{{c.count}}</b></div>
+
+          <sc-if value="{{c.hasTop}}" hint-placeholder-val="{{ true }}">
+            <div class="rows">
+              <sc-for list="{{c.rows}}" as="r" hint-placeholder-count="3">
+                <div class="row {{r.cls}}"><span class="n"><sc-if value="{{r.m1}}" hint-placeholder-val="{{ true }}"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m2}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #9a958c;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m3}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #b87333;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.mn}}" hint-placeholder-val="{{ false }}">{{r.n}}</sc-if></span><span class="who">{{r.name}}</span><span class="sc">{{r.score}}</span></div>
+              </sc-for>
+            </div>
+            <a class="yday" href="DailyBoard.dc.html">{{c.yday}}<svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+          </sc-if>
+          <sc-if value="{{c.noTop}}" hint-placeholder-val="{{ false }}">
+            <div class="empty"><b>Ещё никто не сыграл</b>Первый результат сразу станет первым местом.</div>
+            <a class="yday" href="DailyBoard.dc.html">{{c.yday}}<svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></a>
+          </sc-if>
+
+          <sc-if value="{{c.canPlay}}" hint-placeholder-val="{{ true }}">
+            <div class="act">
+              <button class="btn solid" onClick="{{c.play}}"><svg class="i s" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>Играть</button>
+              <a class="btn" href="DailyBoard.dc.html">Доска</a>
+            </div>
+          </sc-if>
+          <sc-if value="{{c.played}}" hint-placeholder-val="{{ false }}">
+            <div class="mine" style="margin-top: auto;"><b>{{c.myScore}}</b><span>ваш счёт · {{c.myPlace}}</span></div>
+            <a class="btn" href="DailyBoard.dc.html">Доска и разбор вопросов</a>
+          </sc-if>
+        </div>
+      </sc-for>
+    </div>
+
+    <div class="rules">
+      <span><svg class="i s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v5M12 16v.5"></path></svg>Результат вызова идёт на доску дня, в общий лидерборд не идёт.</span>
+      <span>Брошенный раунд попытку не тратит.</span>
+      <span>Серия растёт, если за день сыгран хотя бы один вызов.</span>
+    </div>
+  </div>
+
+  <sc-if value="{{hasNote}}" hint-placeholder-val="{{ false }}">
+    <div class="veil">
+      <div class="modal">
+        <div class="t">{{noteTitle}}</div>
+        <div>Сразу отсчёт 3-2-1 и раунд — без захода на главную игры и без второго «Играть». После раунда итог ведёт на эту же доску дня.</div>
+        <div class="acts"><button class="btn" style="height: 38px; font-size: 14px;" onClick="{{closeNote}}">Понятно</button></div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"who":{"editor":"enum","options":["student","anon"],"default":"student","section":"Состояние"},"state":{"editor":"enum","options":["fresh","partial"],"default":"partial","section":"Состояние"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Состояние"},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { note: null };
+  }
+  componentDidMount() {
+    var self = this;
+    this._t = setInterval(function () { self.forceUpdate(); }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this._t);
+  }
+  renderVals() {
+    var self = this;
+    var isStudent = (this.props.who || 'student') === 'student';
+    var partial = isStudent && (this.props.state || 'partial') === 'partial';
+    var theme = this.props.theme || 'light';
+
+    /* Остаток до московской полуночи — считает клиент, как и на бою. */
+    var now = new Date();
+    var msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+    var left = 86400 - (msk.getHours() * 3600 + msk.getMinutes() * 60 + msk.getSeconds());
+    function two(n) { return (n < 10 ? '0' : '') + n; }
+    var leftText = Math.floor(left / 3600) + ':' + two(Math.floor(left % 3600 / 60)) + ':' + two(left % 60);
+
+    /* Размеры наборов — с боя (17.09.2026). Игроки и очки УСЛОВНЫЕ:
+       на бою вызов дня пока не играл никто. */
+    var DATA = [
+      { id: 'bullet',  title: 'Пуля',     meta: '15 данеток · 1 мин',          count: 14, yday: 'Вчера победил lengler · 702',
+        top: [['lengler', '640'], ['malinovskii', '585'], ['weco_admin', '410'], ['katya_m', '395'], ['timur07', '360']] },
+      { id: 'blitz',   title: 'Блиц',     meta: '12 вопросов · 2 мин',         count: 9,  yday: 'Вчера победила Sonya_kitty · 230',
+        top: [['Sonya_kitty', '214'], ['lengler', '198'], ['econ_fox', '171'], ['polina_ek', '150'], ['dmitry.v', '122']] },
+      { id: 'rapid',   title: 'Рапид',    meta: '10 вопросов · 5 мин',         count: 3,  yday: 'Вчера победил weco_admin · 88',
+        top: [['malinovskii', '96'], ['weco_admin', '71'], ['lengler', '40']] },
+      { id: 'classic', title: 'Классика', meta: '8 числовых ответов · 10 мин', count: 0,  yday: 'Вчера никто не играл', top: [] }
+    ];
+
+    var cards = DATA.map(function (m) {
+      var played = partial && m.id === 'blitz';
+      var top = m.top.slice();
+      var count = m.count;
+      if (played) { top.splice(2, 0, ['Вы · Марина Петрова', '186', 'me']); top = top.slice(0, 5); count = 10; }
+      var rows = top.map(function (r, i) {
+        return { n: i + 1, name: r[0], score: r[1], cls: r[2] || '', m1: i === 0, m2: i === 1, m3: i === 2, mn: i > 2 };
+      });
+      return {
+        title: m.title, meta: m.meta, count: count, yday: m.yday,
+        isBolt: m.id === 'bullet', isFlame: m.id === 'blitz', isTarget: m.id === 'rapid', isCalc: m.id === 'classic',
+        played: played, canPlay: !played, cls: played ? 'done' : '',
+        hasTop: rows.length > 0, noTop: rows.length === 0, rows: rows,
+        myScore: '186', myPlace: '3-е место из 10',
+        play: function () { self.setState({ note: m.title }); }
+      };
+    });
+
+    /* 17 сентября 2026 — четверг. Пн–Ср сыграны, сегодня — по состоянию. */
+    var NAMES = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+    var week = NAMES.map(function (n, i) {
+      var hit = i < 3 || (i === 3 && partial);
+      var cls = (hit ? 'hit' : '') + (i === 3 ? ' now' : '');
+      return { name: n, hit: hit, cls: cls };
+    });
+
+    return {
+      themeClass: theme === 'dark' ? 'dark' : '',
+      isStudent: isStudent, isAnon: !isStudent,
+      playedCount: partial ? '1' : '0',
+      streakNum: partial ? '4 дня' : '3 дня',
+      streakText: partial ? 'сегодняшний день засчитан' : 'сыграйте сегодня любой вызов, чтобы не прервать',
+      week: week, left: leftText, cards: cards,
+      hasNote: !!this.state.note,
+      noteTitle: this.state.note ? 'Старт вызова · ' + this.state.note : '',
+      closeNote: function () { self.setState({ note: null }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

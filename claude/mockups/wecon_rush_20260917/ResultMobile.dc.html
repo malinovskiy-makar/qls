@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff; --accent-tint: rgba(0,108,109,.10);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --green: #186e3c; --skip: #a39c8c;
+      background: var(--bg); color: var(--text); font-size: 13.5px; line-height: 1.45; overflow: hidden;
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .nav { height: 48px; background: var(--nav-bg); display: flex; align-items: center; padding: 0 14px; gap: 10px; color: #e9e2d1; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); color: #2f2b28; font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; }
+    .nav .sp { flex: 1; }
+    .nav .ava { width: 30px; height: 30px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 11px; display: flex; align-items: center; justify-content: center; }
+    .page { padding: 14px 14px 24px; display: flex; flex-direction: column; gap: 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
+    h3 { margin: 0; font-size: 14.5px; font-weight: 700; }
+    .sub { font-size: 12px; color: var(--text3); font-weight: 500; }
+    .vtitle { font-size: 22px; font-weight: 800; letter-spacing: -.3px; line-height: 1.1; }
+    .chips { display: flex; gap: 8px; align-items: center; font-size: 12px; color: var(--text3); flex-wrap: wrap; }
+    .chip { height: 22px; padding: 0 8px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; display: flex; align-items: center; }
+    .big b { font-size: 52px; font-weight: 800; line-height: .95; letter-spacing: -1.5px; display: block; }
+    .badge { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 9px; border-radius: 999px; background: var(--amber); color: var(--amber-ink); font-size: 12px; font-weight: 700; width: fit-content; }
+    .note { font-size: 12.5px; color: var(--text2); }
+    .note b { color: var(--text); }
+    .metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    .metric { padding: 8px 10px; border-radius: 9px; background: var(--surface-2); }
+    .metric small { display: block; font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .metric b { display: block; font-size: 19px; font-weight: 800; }
+    .metric span { font-size: 11.5px; color: var(--text2); }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 14px; font-size: 14px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 8px; text-align: left; }
+    .btn .n { font-size: 12px; color: var(--text3); font-weight: 500; }
+    .btn.primary { height: 54px; background: var(--btn-bg, #2e2b27); color: #ffffff; border-color: transparent; font-size: 17px; font-weight: 700; justify-content: center; }
+    .btn.work { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); }
+    .key { display: flex; gap: 10px; font-size: 11.5px; color: var(--text3); flex-wrap: wrap; }
+    .key i { display: inline-block; width: 9px; height: 9px; border-radius: 3px; margin-right: 4px; }
+    .tape { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; align-items: end; height: 60px; margin-top: 14px; }
+    .cell { border-radius: 3px 3px 1px 1px; }
+    .cell.ok { background: var(--green); } .cell.bad { background: var(--error); } .cell.skip { background: var(--skip); }
+    .qn { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 4px; font-size: 9.5px; color: var(--text3); text-align: center; }
+    .bars { display: flex; flex-direction: column; gap: 7px; }
+    .bar { font-size: 12.5px; }
+    .bar .lab { color: var(--text2); display: flex; justify-content: space-between; gap: 8px; }
+    .bar .lab b { color: var(--text); font-weight: 600; }
+    .bar .tr { height: 7px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; margin-top: 3px; }
+    .bar .tr i { display: block; height: 100%; }
+    .ok-f { background: var(--green); } .bad-f { background: var(--error); } .skip-f { background: var(--skip); } .pt-f { background: var(--accent); }
+    .two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .cmp .r { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; color: var(--text2); padding: 4px 0; border-bottom: 1px solid var(--border-soft); }
+    .cmp .r b { font-size: 15px; font-weight: 800; color: var(--text); }
+    .cmp .r .u { font-size: 11.5px; color: var(--text3); }
+    .up { color: var(--green); font-weight: 700; } .dn { color: var(--error); font-weight: 700; }
+    .hist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; align-items: end; height: 70px; margin-top: 16px; }
+    .hist .h { background: var(--accent-tint); border-radius: 4px 4px 1px 1px; position: relative; }
+    .hist .h.now { background: var(--accent); }
+    .hist .h span { position: absolute; top: -15px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--text2); }
+    .hist-x { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; font-size: 9.5px; color: var(--text3); text-align: center; }
+    .mi { display: grid; grid-template-columns: 24px minmax(0, 1fr); gap: 10px; padding: 9px 10px; border-radius: 9px; background: var(--surface-2); font-size: 12.5px; }
+    .mi .k { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; }
+    .mi .k.bad { background: var(--error); } .mi .k.skip { background: var(--skip); }
+    .mi .q small { display: block; color: var(--text3); font-size: 11.5px; }
+    .mi .a { margin-top: 3px; color: var(--text2); }
+    .mi .a b { color: var(--green); } .mi .a s { color: var(--error); }
+    .mi .a u { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; margin-left: 6px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 390px; height: 2040px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav"><div class="mark">W</div><div class="sp"></div><div class="ava">МП</div></div>
+  <div class="page">
+    <div class="card">
+      <div class="vtitle">Время вышло!</div>
+      <div class="chips"><span class="chip">Блиц</span><span>17 сентября, 14:07 · без фильтров</span></div>
+      <div class="big"><b>1 260</b></div>
+      <span class="badge"><svg class="i" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>личный рекорд · было 1 120</span>
+      <span class="note">В таблице: <b>3-е за неделю</b>, 12-е за всё время</span>
+      <span class="note">Точность 64 % — ниже 85 %, итог <b>×0,9</b></span>
+      <div class="metrics">
+        <div class="metric"><small>Верных</small><b>9 из 14</b><span>64 % · 3 пропуска</span></div>
+        <div class="metric"><small>Макс. комбо</small><b>×4</b><span>серия из 5</span></div>
+        <div class="metric"><small>Жизни</small><b>1 из 3</b><span>2 потеряно</span></div>
+        <div class="metric"><small>В игре</small><b>2:45</b><span>2:00 + 45 с</span></div>
+      </div>
+    </div>
+
+    <div class="card" style="gap: 8px;">
+      <button class="btn primary">Сыграть ещё раз</button>
+      <button class="btn work"><span>Работа над ошибками</span><span class="n">10 вопросов · 2 темы</span></button>
+      <button class="btn"><span>Разобрать ошибки и пропуски</span><span class="n">5</span></button>
+      <button class="btn"><span>Поделиться результатом</span><svg class="i" viewBox="0 0 24 24"><path d="M4 12v7h16v-7M12 3v13M8 7l4-4 4 4"></path></svg></button>
+      <button class="btn"><span>Темы раунда в каталоге</span><svg class="i" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+    </div>
+
+    <div class="card">
+      <h3>Ход раунда</h3>
+      <div class="key"><span><i style="background: var(--green);"></i>верно</span><span><i style="background: var(--error);"></i>неверно</span><span><i style="background: var(--skip);"></i>пропуск</span><span>выше — дольше думали</span></div>
+      <div class="tape">
+        <div class="cell ok" style="height: 16px;"></div><div class="cell ok" style="height: 23px;"></div><div class="cell ok" style="height: 36px;"></div><div class="cell ok" style="height: 18px;"></div><div class="cell ok" style="height: 49px;"></div><div class="cell bad" style="height: 29px;"></div><div class="cell ok" style="height: 13px;"></div><div class="cell ok" style="height: 44px;"></div><div class="cell skip" style="height: 23px;"></div><div class="cell skip" style="height: 57px;"></div><div class="cell ok" style="height: 34px;"></div><div class="cell bad" style="height: 21px;"></div><div class="cell skip" style="height: 39px;"></div><div class="cell ok" style="height: 26px;"></div>
+      </div>
+      <div class="qn"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span></div>
+      <div class="note">Счёт рос до пятого вопроса подряд (×4), после — по одному верному между пропусками.</div>
+    </div>
+
+    <div class="card">
+      <h3>Точность по темам</h3>
+      <div class="bars">
+        <div class="bar"><div class="lab"><span>Спрос и предложение</span><b>3 из 4</b></div><div class="tr"><i class="ok-f" style="width: 75%;"></i><i class="skip-f" style="width: 25%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Эластичность</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="bad-f" style="width: 33%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Издержки фирмы</span><b>1 из 3</b></div><div class="tr"><i class="ok-f" style="width: 33%;"></i><i class="bad-f" style="width: 33%;"></i><i class="skip-f" style="width: 34%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Деньги и инфляция</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="skip-f" style="width: 33%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Без темы</span><b>1 из 1</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="card">
+        <h3>Разделы</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>Микро</span><b>6/10</b></div><div class="tr"><i class="ok-f" style="width: 60%;"></i><i class="bad-f" style="width: 20%;"></i><i class="skip-f" style="width: 20%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Макро</span><b>2/3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="skip-f" style="width: 33%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Прочее</span><b>1/1</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Сложное</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>★ 1</span><b>2/2</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 2</span><b>4/5</b></div><div class="tr"><i class="ok-f" style="width: 80%;"></i><i class="skip-f" style="width: 20%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 3</span><b>3/6</b></div><div class="tr"><i class="ok-f" style="width: 50%;"></i><i class="bad-f" style="width: 33%;"></i><i class="skip-f" style="width: 17%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 4</span><b>0/1</b></div><div class="tr"><i class="skip-f" style="width: 100%;"></i></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Где набрано</h3>
+      <div class="bars">
+        <div class="bar"><div class="lab"><span>Спрос и предложение</span><b>380</b></div><div class="tr"><i class="pt-f" style="width: 100%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Деньги и инфляция</span><b>300</b></div><div class="tr"><i class="pt-f" style="width: 79%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Эластичность</span><b>290</b></div><div class="tr"><i class="pt-f" style="width: 76%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Издержки фирмы</span><b>190</b></div><div class="tr"><i class="pt-f" style="width: 50%;"></i></div></div>
+        <div class="bar"><div class="lab"><span>Без темы</span><b>100</b></div><div class="tr"><i class="pt-f" style="width: 26%;"></i></div></div>
+      </div>
+    </div>
+
+    <div class="two">
+      <div class="card">
+        <h3>Последние раунды <span class="sub">Блиц</span></h3>
+        <div class="hist"><div class="h" style="height: 30px;"><span>640</span></div><div class="h" style="height: 42px;"><span>890</span></div><div class="h" style="height: 37px;"><span>780</span></div><div class="h" style="height: 52px;"><span>1 120</span></div><div class="h now" style="height: 58px;"><span>1 260</span></div></div>
+        <div class="hist-x"><span>9.09</span><span>11.09</span><span>14.09</span><span>16.09</span><span>сегодня</span></div>
+      </div>
+      <div class="card cmp">
+        <h3>Против себя</h3>
+        <div class="r"><span>Точность</span><span><b>64 %</b> <span class="u">об. 58 <span class="up">↑</span></span></span></div>
+        <div class="r"><span>Сек на верный</span><span><b>9</b> <span class="u">об. 12 <span class="up">↑</span></span></span></div>
+        <div class="r"><span>Верных</span><span><b>9</b> <span class="u">об. 7 <span class="up">↑</span></span></span></div>
+        <div class="r" style="border: 0;"><span>Пропусков</span><span><b>3</b> <span class="u">об. 1 <span class="dn">↓</span></span></span></div>
+      </div>
+    </div>
+
+    <div class="card" style="gap: 8px;">
+      <h3>Ошибки и пропуски <span class="sub">· 5</span></h3>
+      <div class="mi"><span class="k bad">6</span><span class="q">Эластичность спроса по цене на участке, где выручка растёт с ростом цены, …<small>Эластичность · ★ 3</small><div class="a">ваш <s>2</s> → верный <b>4</b><u>в каталоге</u></div></span></div>
+      <div class="mi"><span class="k bad">12</span><span class="q">Средние общие издержки минимальны при таком выпуске, при котором …<small>Издержки фирмы · ★ 3</small><div class="a">ваш <s>1</s> → верный <b>3</b><u>в каталоге</u></div></span></div>
+      <div class="mi"><span class="k skip">9</span><span class="q">Если государство вводит потоварную субсидию производителям, …<small>Спрос и предложение · ★ 2</small><div class="a">пропуск → верный <b>3</b><u>в каталоге</u></div></span></div>
+      <div class="mi"><span class="k skip">10</span><span class="q">Реальная ставка процента при номинальной 12 % и инфляции 8 % …<small>Деньги и инфляция · ★ 3</small><div class="a">пропуск → верный <b>4</b><u>в каталоге</u></div></span></div>
+      <div class="mi"><span class="k skip">13</span><span class="q">Фирма на конкурентном рынке продолжает выпуск в краткосрочном периоде, если …<small>Издержки фирмы · ★ 4</small><div class="a">пропуск → верный <b>2</b><u>в каталоге</u></div></span></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":2040}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .page { flex: 1; padding: 20px 40px 22px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; white-space: nowrap; }
+    .rush a.btn { color: var(--text); text-decoration: none; }
+    .btn:hover, .rush a.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.solid:disabled { background: var(--surface-2); color: var(--text3); border-color: var(--border); cursor: default; filter: none; }
+    .rush .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 700; }
+    .btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+    .pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .ph { display: flex; align-items: baseline; gap: 12px; }
+    .ph b { font-size: 17px; font-weight: 700; }
+    .ph span { font-size: 12.5px; color: var(--text3); }
+    .num { text-align: right; }
+    .thead, .tr { display: grid; align-items: center; gap: 10px; padding: 0 12px; }
+    .thead { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; height: 26px; }
+    .trs { display: flex; flex-direction: column; gap: 4px; }
+    .tr { height: 40px; border-radius: 9px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .tr.first { background: var(--accent-tint); }
+    .tr.me { background: transparent; border: 1.5px solid var(--accent); padding: 0 10.5px; }
+    .tr .n { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+    .tr .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr .who.anon { font-weight: 500; color: var(--text3); font-style: italic; }
+    .tr .sc { font-weight: 800; font-size: 15.5px; }
+    .tr .end { color: var(--text2); font-size: 13px; white-space: nowrap; }
+    .qs { display: flex; flex-direction: column; }
+    .q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 100px 44px; align-items: center; gap: 12px; min-height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+    .q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .q .qt small { display: block; font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+    .q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+    .q.hard .bar i { background: var(--error); }
+    .q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .q.hard .pc { color: var(--error); }
+    .foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; margin-top: auto; }
+    .ttl { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.15; margin: 4px 0 8px; }
+    .top { display: grid; grid-template-columns: minmax(0, 1fr) 470px; gap: 16px; align-items: stretch; }
+    .info { padding: 18px 22px; }
+    .share { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+    .bigcode { font-size: 38px; line-height: 1; letter-spacing: .14em; }
+    .share .row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .share .tip { font-size: 12.5px; color: var(--text3); }
+    .kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+    .kpi { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+    .kpi b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .kpi span { font-size: 12.5px; color: var(--text2); }
+    .cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 600px; gap: 16px; min-height: 0; }
+    .thead, .tr { grid-template-columns: 40px minmax(0, 1fr) 70px 88px 96px 140px 96px; }
+    .q { min-height: 44px; }
+    .seg { margin-left: auto; display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .seg button { height: 28px; padding: 0 10px; border: 0; background: transparent; font-size: 12.5px; font-weight: 600; color: var(--text2); }
+    .rush .seg button.on { background: var(--accent); color: var(--on-accent); }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 940px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav"><div class="mark">W</div><a href="#nav" class="on">Ученики</a><a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html">Wecon Rush</a><div class="sp"></div><div class="ava">ММ</div><span style="font-size: 15px;">Макар Малиновский</span><button class="ghost">Выйти</button></div>
+  <div class="page">
+    <a class="back" href="TeacherSets.dc.html"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Игровые наборы</a>
+    <div class="top">
+      <div class="card info">
+        <div class="lab">Набор учителя</div>
+        <div class="ttl">Контрольная по спросу, 10 класс</div>
+        <div class="chips">
+          <span class="chip t">Блиц · один верный ответ</span><span class="chip"><b>12</b> вопросов</span><span class="chip">попыток: <b>1</b></span>
+          <span class="chip">открыт до <b>20 сентября, 23:59</b></span><button class="btn sm">Изменить срок</button>
+        </div>
+        <div class="kpis">
+          <div class="kpi"><span class="lab">Прошли</span><b>14</b><span>из них 2 без входа</span></div>
+          <div class="kpi"><span class="lab">Средняя точность</span><b>71 %</b></div>
+          <div class="kpi"><span class="lab">Средний счёт</span><b>142</b></div>
+          <div class="kpi"><span class="lab">Самый трудный</span><b style="color: var(--error);">№ 10 · 20 %</b></div>
+        </div>
+      </div>
+      <!-- Главное действие учителя после сборки — раздать код -->
+      <div class="card share">
+        <div class="lab">Код для класса</div>
+        <div class="code bigcode">K7M2 X9QD</div>
+        <div class="row">
+          <button class="btn solid sm"><svg class="i s" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>Скопировать ссылку</button>
+          <button class="btn sm"><svg class="i s" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V6a2 2 0 0 1 2-2h9"></path></svg>Скопировать код</button>
+          <a class="btn sm" href="SetPage.dc.html">Открыть как ученик</a>
+        </div>
+        <div class="tip">Ученик открывает weconomics.ai/game и вводит код в поле «Играть по коду» — или просто переходит по ссылке. Регистр и пробелы не важны.</div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <div class="card pane">
+        <div class="ph"><b>Кто прошёл · 14</b><span>учитель видит всех и время сдачи</span></div>
+        <div class="thead"><span></span><span>Игрок</span><span class="num">Счёт</span><span class="num">Точность</span><span class="num">Макс. комбо</span><span>Чем кончилось</span><span>Когда</span></div>
+        <div class="trs">
+          <div class="tr first"><span class="n"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></span><span class="who">katya_m</span><span class="sc num">214</span><span class="num">92 %</span><span class="num">×5</span><span class="end">прошёл до конца</span><span class="end">16.09 18:42</span></div><div class="tr"><span class="n"><svg class="medal" viewBox="0 0 24 24" style="color: #9a958c;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></span><span class="who">timur07</span><span class="sc num">198</span><span class="num">83 %</span><span class="num">×4</span><span class="end">прошёл до конца</span><span class="end">16.09 19:05</span></div><div class="tr"><span class="n"><svg class="medal" viewBox="0 0 24 24" style="color: #b87333;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></span><span class="who">polina_ek</span><span class="sc num">171</span><span class="num">83 %</span><span class="num">×3</span><span class="end">прошёл до конца</span><span class="end">17.09 08:11</span></div><div class="tr"><span class="n">4</span><span class="who anon">аноним</span><span class="sc num">160</span><span class="num">75 %</span><span class="num">×3</span><span class="end">время вышло</span><span class="end">17.09 08:30</span></div><div class="tr"><span class="n">5</span><span class="who">dmitry.v</span><span class="sc num">150</span><span class="num">75 %</span><span class="num">×3</span><span class="end">время вышло</span><span class="end">16.09 21:17</span></div><div class="tr"><span class="n">6</span><span class="who">alisa_k</span><span class="sc num">122</span><span class="num">67 %</span><span class="num">×3</span><span class="end">время вышло</span><span class="end">17.09 09:02</span></div><div class="tr"><span class="n">7</span><span class="who anon">аноним</span><span class="sc num">118</span><span class="num">67 %</span><span class="num">×2</span><span class="end">выбыл</span><span class="end">17.09 09:40</span></div><div class="tr"><span class="n">8</span><span class="who">econ_fox</span><span class="sc num">96</span><span class="num">58 %</span><span class="num">×2</span><span class="end">выбыл</span><span class="end">16.09 20:33</span></div><div class="tr"><span class="n">9</span><span class="who">Sonya_kitty</span><span class="sc num">74</span><span class="num">50 %</span><span class="num">×2</span><span class="end">выбыл</span><span class="end">17.09 10:15</span></div>
+        </div>
+        <div class="foot">и ещё 5. Анонимные раунды засчитаны, но узнать ученика по ним нельзя — попросите класс входить в аккаунт.</div>
+      </div>
+      <div class="card pane">
+        <div class="ph"><b>Где ошибся класс</b><span>доля верных в этом наборе</span><span class="seg"><button class="on">сначала трудные</button><button>по порядку</button></span></div>
+        <div class="qs">
+          <div class="q hard"><span class="qn">10</span><span class="qt">Перекрёстная эластичность равна нулю. Это значит, что товары…<small>ответ: независимы в потреблении</small></span><span class="bar"><i style="width: 20%;"></i></span><span class="pc">20 %</span></div><div class="q hard"><span class="qn">4</span><span class="qt">Какой налог не изменит объём продаж при совершенно неэластичном спросе?<small>ответ: любой потоварный</small></span><span class="bar"><i style="width: 30%;"></i></span><span class="pc">30 %</span></div><div class="q"><span class="qn">2</span><span class="qt">Эластичность спроса по цене равна −2. При росте цены на 5 % выручка…<small>ответ: упадёт примерно на 5 %</small></span><span class="bar"><i style="width: 40%;"></i></span><span class="pc">40 %</span></div><div class="q"><span class="qn">9</span><span class="qt">Если товары X и Y — комплементы, то рост цены X…<small>ответ: сдвинет спрос на Y влево</small></span><span class="bar"><i style="width: 40%;"></i></span><span class="pc">40 %</span></div><div class="q"><span class="qn">8</span><span class="qt">Спрос задан Qd = 40 − P. При какой цене выручка максимальна?<small>ответ: 20</small></span><span class="bar"><i style="width: 50%;"></i></span><span class="pc">50 %</span></div><div class="q"><span class="qn">6</span><span class="qt">Излишек потребителя на графике — это площадь…<small>ответ: под кривой спроса над ценой</small></span><span class="bar"><i style="width: 60%;"></i></span><span class="pc">60 %</span></div><div class="q"><span class="qn">3</span><span class="qt">Товар Гиффена — это товар, у которого…<small>ответ: спрос растёт при росте цены</small></span><span class="bar"><i style="width: 70%;"></i></span><span class="pc">70 %</span></div><div class="q"><span class="qn">11</span><span class="qt">Закон спроса нарушается для…<small>ответ: товаров Гиффена</small></span><span class="bar"><i style="width: 70%;"></i></span><span class="pc">70 %</span></div>
+        </div>
+        <div class="foot">ещё 4 вопроса — 80 % и выше. Учителю видны тексты и верные ответы; ученикам — только после своей попытки.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":940}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

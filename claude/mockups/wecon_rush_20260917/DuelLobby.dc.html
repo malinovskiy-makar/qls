@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff; --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10); --skip: #a39c8c;
+      background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; overflow: hidden; position: relative;
+    }
+    .rush button, .rush input { font: inherit; }
+    .rush button { cursor: pointer; color: inherit; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); }
+    .rush .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.primary { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.primary:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.big { height: 56px; font-size: 17px; padding: 0 30px; }
+    .rush .link { border: 0; background: transparent; padding: 0; color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: 13.5px; }
+    .lab { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+    .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+    .field { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 0 14px; font-size: 14px; color: var(--text2); display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+    .wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
+    .lobby { width: 720px; padding: 30px 34px 28px; display: flex; flex-direction: column; gap: 18px; align-items: center; text-align: center; }
+    .lobby h2 { margin: 6px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.3px; }
+    .terms { font-size: 14px; color: var(--text2); }
+    .code { display: flex; align-items: center; gap: 14px; }
+    .code b { font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 44px; letter-spacing: .12em; font-weight: 700; }
+    .linkrow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: 100%; }
+    .slots { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; width: 100%; margin-top: 4px; }
+    .slot { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1.5px solid var(--border); border-radius: 12px; text-align: left; background: var(--surface-2); }
+    .slot.on { border-color: var(--accent); background: var(--accent-tint); }
+    .slot.empty { border-style: dashed; }
+    .slot .who { font-size: 15px; font-weight: 700; line-height: 1.15; }
+    .slot .st { font-size: 12.5px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .slot .st i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .slot .av.q { background: var(--border-soft); color: var(--text3); }
+    .vs { font-size: 13px; font-weight: 800; color: var(--text3); letter-spacing: .1em; }
+    .note { font-size: 13px; color: var(--text2); }
+    .cd { font-size: 84px; font-weight: 800; line-height: 1; color: var(--accent-ink); letter-spacing: -2px; }
+    .cd-sub { font-size: 16px; font-weight: 700; margin-top: -8px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="#nav" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="ava">ММ</div><span style="font-size: 15px;">Макар Малиновский</span>
+  </div>
+  <div class="wrap">
+    <div class="card lobby">
+      <div><span class="lab">Дуэль</span><h2>Пуля · 1 мин · 3 жизни</h2><div class="terms">без фильтров · у обоих одни и те же вопросы · раунд без лимита вопросов</div></div>
+
+      <sc-if value="{{waiting}}" hint-placeholder-val="{{ true }}">
+        <div class="code"><b>SEB9M90X</b><button class="btn">Скопировать код</button></div>
+        <div class="linkrow"><div class="field">https://weconomics.ai/game/d/SEB9M90X/</div><button class="btn primary">Скопировать ссылку</button></div>
+      </sc-if>
+
+      <div class="slots">
+        <div class="slot on"><div class="av">ММ</div><div><div class="who">Макар Малиновский</div><div class="st"><i></i>автор · готов</div></div></div>
+        <div class="vs">VS</div>
+        <sc-if value="{{waiting}}" hint-placeholder-val="{{ true }}">
+          <div class="slot empty"><div class="av q">?</div><div><div class="who" style="color: var(--text3); font-weight: 600;">Ждём соперника…</div><div class="st">откроет ссылку или введёт код</div></div></div>
+        </sc-if>
+        <sc-if value="{{ready}}" hint-placeholder-val="{{ false }}">
+          <div class="slot on"><div class="av">L</div><div><div class="who">lengler</div><div class="st"><i></i>принял вызов</div></div></div>
+        </sc-if>
+      </div>
+
+      <sc-if value="{{ready}}" hint-placeholder-val="{{ false }}">
+        <div class="cd">5</div>
+        <div class="cd-sub">Старт у обоих одновременно</div>
+      </sc-if>
+
+      <sc-if value="{{waiting}}" hint-placeholder-val="{{ true }}">
+        <div class="note">Как только соперник примет вызов, у обоих пойдёт отсчёт пять секунд — не уходите со страницы. Принять вызов могут только вошедшие.</div>
+        <button class="link">Отменить дуэль</button>
+      </sc-if>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"state":{"editor":"enum","options":["waiting","ready"],"default":"waiting","section":"Состояние"},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var st = this.props.state || 'waiting';
+    return { waiting: st === 'waiting', ready: st === 'ready' };
+  }
+}
+</script>
+</body>
+</html>
