@@ -140,6 +140,8 @@ try {
         page.press('#code-input', 'Enter'),
       ]);
       check('duel_code_goes_to_duel_page', page.url().endsWith('/game/d/' + DUEL_CODE + '/'), page.url());
+    } else if (DUEL_CODE) {
+      check('duel_code_goes_to_duel_page', false, 'неверный код увёл со страницы раньше');
     }
     await context.close();
   }
