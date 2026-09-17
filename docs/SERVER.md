@@ -416,6 +416,110 @@ docker compose exec web curl -fsS http://search:8001/healthz
 `catalog/tests/test_search_service.py` читает оба compose-файла текстом и
 краснеет, если секция `ports` появится.
 
+### Синхронизация банка на бою (`bank_sync_export` → `bank_sync_apply`)
+
+Штатный путь любой правки банка на бой ([ADR 0107](adr/0107-bank-sync-by-update.md),
+`docs/DATA.md`, «Синхронизация банка с боем»): пакет собирается ДОМА, на бою
+меняется только отличающееся, со снимком и откатом. Задачи, которых на бою нет,
+не создаются; задачи боя вне пакета не трогаются. Выполняет владелец.
+Репетиция на копии боя 17.09.2026 — `reports/bank_sync_20260917/JOURNAL.md`,
+Фаза 6 (запись 33 с, откат 22 с, повторный прогон — 0 изменений).
+
+⚠️ Порядок: **код → бэкап → пакет каталога → (второй пакет) → векторы →
+«похожие» → перезапуск.** Векторы — ПОСЛЕ синхронизации: до неё ввоз снова
+разойдётся с текстами.
+
+**0. Код** с командами синхронизации — обычная выкатка («Обновить сайт до
+свежего кода»). Миграций у сессии 17.09 нет.
+
+**1. Свежая копия базы** — бэкап в 03:20 может быть старым:
+
+```bash
+sudo /srv/weconomics/app/deploy/backup.sh
+```
+
+**2. Пакет дома** (PowerShell, `C:\Users\shipu\qls`) и отправка сжатым — пакет
+каталога весит ~200 МБ, почти всё — картинки в base64:
+
+```bash
+venv313\Scripts\python.exe manage.py bank_sync_export --scope catalog --out reports/bank_sync/bank_sync_prod
+tar -czf reports/bank_sync/bank_sync_prod.tar.gz -C reports/bank_sync bank_sync_prod
+scp reports/bank_sync/bank_sync_prod.tar.gz <адрес из «Как подключиться»>:/srv/weconomics/bank_sync/
+```
+
+Второй пакет — задачи, скрытые дома, но видимые на бою (17.09: 139 задач,
+`content_status` needs_fix/junk), **только по решению владельца**:
+
+```bash
+venv313\Scripts\python.exe manage.py bank_sync_export --ids-file reports/bank_sync_20260917/prod_visible_home_hidden_ids.txt --out reports/bank_sync/bank_sync_prod_hidden
+tar -czf reports/bank_sync/bank_sync_prod_hidden.tar.gz -C reports/bank_sync bank_sync_prod_hidden
+scp reports/bank_sync/bank_sync_prod_hidden.tar.gz <адрес из «Как подключиться»>:/srv/weconomics/bank_sync/
+```
+
+**3. На сервере:** распаковать и положить в контейнер (томов с
+`/srv/weconomics` у `web` нет):
+
+```bash
+sudo mkdir -p /srv/weconomics/bank_sync && cd /srv/weconomics/bank_sync
+tar -xzf bank_sync_prod.tar.gz
+cd /srv/weconomics/app/deploy
+docker compose cp /srv/weconomics/bank_sync/bank_sync_prod web:/tmp/bank_sync_prod
+```
+
+**4. Сухой прогон и отчёт.** Отчёты — в `/tmp/bank_sync_reports`, а не в каталог
+пакета: `docker compose cp` кладёт пакет от root, и `weco` не создаст в нём папку.
+
+```bash
+docker compose exec web python manage.py bank_sync_apply --package /tmp/bank_sync_prod --report /tmp/bank_sync_reports/prod_dry
+docker compose cp web:/tmp/bank_sync_reports/prod_dry /srv/weconomics/bank_sync/prod_dry
+less /srv/weconomics/bank_sync/prod_dry/REPORT.md
+```
+
+Ждать (по копии боя 17.09): задач с изменениями ~7 300, нет в базе ~151,
+справочники source 5 и topic 13, флаги видимости — 0. Файл повреждён при
+переносе — команда откажет сама (хеши `manifest.json`).
+
+**5. Запись и снимок наружу СРАЗУ** (пересоздание контейнера унесёт `/tmp`):
+
+```bash
+docker compose exec web python manage.py bank_sync_apply --package /tmp/bank_sync_prod --apply --report /tmp/bank_sync_reports/prod_apply
+docker compose cp web:/tmp/bank_sync_reports/prod_apply /srv/weconomics/bank_sync/prod_apply
+# идемпотентность: обязано сказать «Изменений нет.»
+docker compose exec web python manage.py bank_sync_apply --package /tmp/bank_sync_prod --report /tmp/bank_sync_reports/prod_again
+```
+
+Второй пакет — те же шаги 3–5 с `bank_sync_prod_hidden`.
+
+**6. Векторы без ключа** (файлы — «Включение смысловой ноги на бою», шаг 1):
+
+```bash
+docker compose exec web python manage.py embeddings_import_vectors --vectors /tmp/vectors/catalog --state /tmp/vectors/catalog.state.json
+docker compose exec web python manage.py embeddings_import_vectors --vectors /tmp/vectors/catalog --state /tmp/vectors/catalog.state.json --apply
+```
+
+В плане «пропущено, текст изменился» должно быть 0.
+
+**7. «Похожие» и перезапуск:**
+
+```bash
+docker compose exec web python manage.py cache_similar --rebuild
+docker compose up -d --force-recreate web ws
+```
+
+Проверить: `/catalog/` — фильтр тем показывает 29 тем; чип источника на
+странице задачи ведёт на первоисточник; `/catalog/?has_solution=1` отвечает.
+Перезапуск без ручного прогрева — «Обслуживание».
+
+**Откат** — снимками в обратном порядке (сначала второй пакет):
+
+```bash
+docker compose cp /srv/weconomics/bank_sync/prod_apply web:/tmp/prod_apply
+docker compose exec web python manage.py bank_sync_apply --revert /tmp/prod_apply/snapshot_<время>.json
+```
+
+Правку, сделанную после синхронизации кем-то ещё, откат не затирает и
+называет в `snapshot_<время>_REVERT.md`.
+
 ### Включение смысловой ноги на бою
 
 ⚠️ **Порядок важен: векторы в базе → контейнер `search` → флаг.** Флаг без
@@ -496,11 +600,11 @@ CPU-контейнера поиска» провели дома 09.09.2026 на 
 docker compose exec web python manage.py embeddings_import_vectors --vectors /tmp/vectors/catalog --state /tmp/vectors/catalog.state.json --apply --ignore-text-check
 ```
 
-⚠️ Ключ — **временная мера**, не новый обычный режим. После отдельной сессии
-переноса корпуса (полная синхронизация банка с боем: обновить существующие
-задачи, связи и справочники — карточка в Notion «Задачи») ввоз повторяется
+⚠️ Ключ — **временная мера**, не новый обычный режим. После синхронизации
+банка (раздел «Синхронизация банка на бою» ниже, 17.09.2026) ввоз повторяется
 штатно, **без** ключа: только тогда расхождение отпечатка снова станет
-сигналом «текст правда другой», а не шумом от отставшего банка.
+сигналом «текст правда другой», а не шумом от отставшего банка. Репетиция на
+копии боя 17.09: после синхронизации «пропущено, текст изменился» — 0 из 13 931.
 
 **2. Контейнер поиска.**
 
