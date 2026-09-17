@@ -1996,65 +1996,127 @@ def duel_new(request):
 
 @require_safe
 def duel_page(request, code):
-    """Страница дуэли `/game/d/<код>/`.
+    """Страница дуэли `/game/d/<код>/` — одна для всех, в трёх видах (ADR 0112).
 
-    Соперник видит: кто вызвал, режим, фильтры, число вопросов, результат
-    вызвавшего — и кнопку «Играть». ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ.
+    - **Приглашение** (макет DuelInvite): ещё не играл и не автор — кто зовёт,
+      условия пилюлями, «Принять вызов» (гостю — «Войти, чтобы принять»). Автор
+      до своего раунда видит то же с «Вернуться в лобби».
+    - **Ожидание**: свой результат есть, второго нет — «lengler ещё играет» или
+      «ещё не пришёл», без таблицы.
+    - **Сравнение** (макет DuelResult): оба отыграли — вердикт, двое карточками,
+      «По цифрам» с лучшим в каждой строке, «Кто что взял», «Реванш».
 
-    Ссылку могут открыть больше двух человек — тогда страница показывает
-    всех сыгравших доской, автор помечен. Это надмножество сравнения двоих
-    и стоит ровно ничего.
+    ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ НИКОГДА: набор собран вслепую для обоих.
     """
     gset = get_object_or_404(GameSet, code=make_code_lookup(code), kind='duel')
     results = list(gset.results.select_related('user').order_by('created_at'))
-    # Страница дуэли ОТКРЫТА всем: по ссылке приходит соперник, и первое,
-    # что он должен увидеть, — во что его зовут. Играть, однако, может
-    # только вошедший (см. api_session_start_set) — об этом сказано на
-    # самой странице, а не выясняется после нажатия «Играть».
+    viewer = request.user if request.user.is_authenticated else None
+    is_author = bool(viewer and gset.author_id == viewer.id)
     mine = my_result_for(request, gset)
 
-    author_result = None
-    for r in results:
-        if gset.author_id and r.user_id == gset.author_id:
-            author_result = r
-            break
-    if author_result is None and results:
-        author_result = results[0]   # аноним-автор: первый сыгравший
+    # ⚠️ РЕЗУЛЬТАТ АВТОРА — ТОЛЬКО РЕЗУЛЬТАТ АВТОРА. Прежняя подмена «первый
+    # сыгравший» делала вызвавшим соперника, который просто закончил раньше
+    # автора. Подмена осталась для старых дуэлей без автора.
+    author_result = next((r for r in results
+                          if gset.author_id and r.user_id == gset.author_id), None)
+    if author_result is None and not gset.author_id and results:
+        author_result = results[0]
 
-    rows = []
-    for r in sorted(results, key=lambda x: (-x.score, x.created_at)):
-        rows.append({
-            'name': (r.user.username if r.user else 'аноним'),
-            'score': r.score,
-            'accuracy': r.accuracy,
-            'max_combo': r.max_combo,
-            'reason': r.ended_reason,
-            'is_author': author_result is not None and r.id == author_result.id,
-            'is_me': mine is not None and r.id == mine.id,
-        })
+    # ⚠️ ПАРА СРАВНЕНИЯ — АВТОР И ОДИН ДРУГОЙ РЕЗУЛЬТАТ (бой 17.09.2026: автор
+    # не видел сравнения, потому что пара строилась «автор + я», а у автора
+    # «я» и есть автор). Смотрит сыгравший соперник — второй его; остальным —
+    # первый сыгравший после автора.
+    if mine is not None and (author_result is None or mine.id != author_result.id):
+        rival_result = mine
+    else:
+        rival_result = next((r for r in results
+                             if author_result is None or r.id != author_result.id), None)
+    compare = (_duel_compare(gset, author_result, rival_result, mine)
+               if author_result and rival_result else None)
 
     allowed, why = set_run_allowed(request, gset)
-    compare = _duel_compare(gset, author_result, mine) \
-        if (mine and author_result and mine.id != author_result.id) else None
-
     f = normalize_filter(gset.filter_snapshot)
-    return render(request, 'game/duel.html', {
+    mode_cfg = config.MODES.get(gset.mode, {})
+    author_name = gset.author.username if gset.author else 'аноним'
+    ctx = {
         'gset': gset,
-        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
-        'author_name': (gset.author.username if gset.author else 'аноним'),
-        'author_result': author_result,
-        'rows': rows,
+        'mode_title': mode_cfg.get('title', gset.mode),
+        'mode_icon': DUEL_MODE_ICON.get(gset.mode, 'bolt'),
+        'duration_text': duration_text(mode_cfg.get('duration', 0)),
+        'time_correct': mode_cfg.get('time_correct', 0),
+        'lives': mode_cfg.get('lives', 0),
+        'author_name': author_name,
+        'author_initials': initials(author_name),
+        'is_author': is_author,
         'mine': mine,
         'compare': compare,
         'allowed': allowed,
         'why': why,
         'play_url': reverse('game:set_page', args=[gset.code]),
-        'again_url': (reverse('game:duel_new') + '?mode=' + gset.mode
-                      + _filter_query(f)),
-        'filter_text': _filter_text(f),
-        'page_url': request.build_absolute_uri(
-            reverse('game:duel', args=[gset.code])),
-    })
+        'login_url': '/login/?next=' + quote(reverse('game:duel', args=[gset.code])),
+        'challenge_url': '/game/?duel=' + gset.mode,
+        'rematch_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                        + _filter_query(f) + '&rematch=' + gset.code),
+        'filter_text': 'без фильтров' if is_empty_filter(f) else _filter_text(f),
+        'page_url': request.build_absolute_uri(reverse('game:duel', args=[gset.code])),
+        # Больше двоих сыграло по ссылке — остальные строкой-доской под сравнением.
+        'others': [{'name': r.user.username if r.user else 'аноним', 'score': r.score,
+                    'accuracy': r.accuracy}
+                   for r in sorted(results, key=lambda x: (-x.score, x.created_at))
+                   if compare is None or r.id not in (author_result.id, rival_result.id)],
+    }
+    if compare is None and mine is not None:
+        ctx['waiting'] = _duel_waiting(gset, viewer, is_author)
+        ctx['my_mistakes'] = mine.wrong_count + mine.skip_count
+    if compare is None and mine is None and gset.author_id:
+        ctx['author_line'] = _duel_author_line(gset)
+    return render(request, 'game/duel.html', ctx)
+
+
+# Значки режимов на странице дуэли — те же, что у вкладок главной (MODE_META
+# в game.html), и «в Пуле» для строки об авторе приглашения.
+DUEL_MODE_ICON = {'bullet': 'bolt', 'blitz': 'flame', 'rapid': 'target',
+                  'classic': 'keypad', 'figure': 'chart'}
+MODE_IN = {'bullet': 'в Пуле', 'blitz': 'в Блице', 'rapid': 'в Рапиде',
+           'classic': 'в Классике', 'figure': 'в Графике'}
+
+
+def _duel_author_line(gset):
+    u"""«дуэлей: 3 · побед 1 · лучший счёт в Пуле 957» — из журнала дуэлей и
+    рекордов автора; данных нет — части нет, пустая строка — строки нет."""
+    parts = []
+    stats = lb.duel_stats(gset.author)
+    if stats['played']:
+        parts.append('дуэлей: %d · побед %d' % (stats['played'], stats['wins']))
+    best = lb.best_scores(gset.author).get(gset.mode)
+    if best:
+        parts.append('лучший счёт %s %s' % (MODE_IN.get(gset.mode, ''), _thousands(best)))
+    return ' · '.join(parts)
+
+
+def _duel_waiting(gset, viewer, is_author):
+    u"""«lengler ещё играет» или «ещё не пришёл» — пока второго результата нет.
+
+    Играет ли второй, знает комната дуэли (game/state.py): его забег записан при
+    старте и ещё не закрыт. Комната живёт полчаса — дальше «не пришёл».
+    """
+    if is_author:
+        run_ids = [rid for _uid, rid in run_state.duel_rivals(gset.code, viewer.id)]
+        who = 'Соперник'
+    else:
+        rid = run_state.duel_run_of(gset.code, gset.author_id) if gset.author_id else None
+        run_ids = [rid] if rid else []
+        who = gset.author.username if gset.author_id else 'Автор вызова'
+    playing = False
+    for rid in run_ids:
+        st = run_state.load_by_id(rid)
+        if st and not st.get('ended'):
+            playing = True
+    return '%s %s' % (who, 'ещё играет' if playing else 'ещё не пришёл')
+
+
+def _thousands(n):
+    return '{:,}'.format(n).replace(',', '\u00a0')
 
 
 def _filter_query(f):
@@ -2118,69 +2180,154 @@ def _duel_broadcast(request, state, finished=False):
     except Exception:            # noqa: BLE001 — украшение забег не роняет
         logger.warning('дуэль %s: табло не разослано', code, exc_info=True)
 
-def _duel_compare(gset, a, b):
-    """Сравнение двух забегов лоб в лоб: таблица метрик и полоса «кто что взял».
+def _duel_compare(gset, a, b, mine=None):
+    """Сравнение двоих по макету DuelResult (ADR 0112): `a` — автор, `b` — соперник.
 
-    Таблица (решение владельца 15.09.2026) — ТОЛЬКО то, что хранит
-    `GameResult`: очки, верные, ошибки, пропуски, точность, лучшее комбо,
-    среднее время ВЕРНОГО ответа и длительность раунда. Среднего времени всех
-    ответов в базе нет, поэтому и строки с ним нет: приблизительное число
-    хуже отсутствующего. Нет замера у старого результата — «–».
-    Победитель — по очкам, его столбец подсвечен; ничья — без подсветки.
+    Смотрящий участник стоит слева и зовётся «Вы». Таблица «По цифрам» — только
+    то, что хранит `GameResult` (решение 15.09.2026): среднего времени ВСЕХ
+    ответов в базе нет, и строки с ним нет; нет замера — «–». ⚠️ ЛУЧШИЙ
+    ВЫДЕЛЯЕТСЯ В КАЖДОЙ СТРОКЕ, а не весь столбец победителя: по очкам
+    выиграл один, а быстрее отвечал, может быть, другой. Равные значения — без
+    выделения.
 
-    Полоса строится по question_outcomes: у каждого вопроса набора два
-    значка — верно / неверно / пропуск / не дошёл.
+    «Кто что взял» — по `question_outcomes`, только до последнего вопроса, до
+    которого дошёл хоть кто-то (запас очереди дуэли — 150 вопросов).
     """
-    def by_qid(result):
-        return {item.get('question_id'): item.get('outcome')
-                for item in (result.question_outcomes or [])}
+    left, right = (b, a) if (mine is not None and mine.id == b.id) else (a, b)
+    me_id = mine.id if mine is not None else None
+
+    def name(r, fallback):
+        return r.user.username if r.user else fallback
 
     def combo(value):
-        return '×' + ('%g' % value).replace('.', ',')
+        return '×' + ('%g' % (value or 1)).replace('.', ',')
 
-    def seconds(ms):
-        return '–' if ms is None else ('%.1f' % (ms / 1000)).replace('.', ',') + ' с'
+    def secs(ms):
+        return '–' if ms is None else ('%.1f' % (ms / 1000)).replace('.', ',')
 
     def clock(ms):
         if ms is None:
             return '–'
-        minutes, secs = divmod(round(ms / 1000), 60)
-        return '%d:%02d' % (minutes, secs)
+        minutes, rest = divmod(round(ms / 1000), 60)
+        return '%d:%02d' % (minutes, rest)
 
-    ma, mb = by_qid(a), by_qid(b)
-    strip = []
-    for i, qid in enumerate(gset.question_ids or []):
-        strip.append({'number': i + 1,
-                      'a': ma.get(qid, 'none'),
-                      'b': mb.get(qid, 'none')})
-    metrics = (
-        ('Очки', lambda r: r.score),
-        ('Верных', lambda r: r.correct_count),
-        ('Ошибок', lambda r: r.wrong_count),
-        ('Пропусков', lambda r: r.skip_count),
-        ('Точность', lambda r: '%d%%' % r.accuracy),
-        ('Лучшее комбо', lambda r: combo(r.max_combo)),
-        ('Среднее время верного ответа', lambda r: seconds(r.avg_correct_ms)),
-        ('Время раунда', lambda r: clock(r.wall_ms)),
-    )
-    if a.score > b.score:
-        winner = 'a'
-        verdict = 'Побеждает %s' % (a.user.username if a.user else 'вызвавший')
-    elif b.score > a.score:
-        winner = 'b'
-        verdict = 'Побеждает %s' % (b.user.username if b.user else 'соперник')
+    names = {a.id: name(a, 'автор'), b.id: name(b, 'соперник')}
+    cards = []
+    for r in (left, right):
+        answered = r.correct_count + r.wrong_count + r.skip_count
+        cards.append({'name': names[r.id], 'initials': initials(names[r.id]),
+                      'is_me': r.id == me_id, 'score': r.score,
+                      'sub': 'верных %d из %d · точность %d %% · комбо %s' % (
+                          r.correct_count, answered, r.accuracy, combo(r.max_combo)),
+                      'win': False})
+    if left.score != right.score:
+        winner = 0 if left.score > right.score else 1
+        cards[winner]['win'] = True
+        verdict = 'Вы победили' if cards[winner]['is_me'] else 'Победа за ' + cards[winner]['name']
     else:
-        winner = ''
         verdict = 'Ничья'
-    return {
-        'a': {'name': (a.user.username if a.user else 'вызвавший'), 'score': a.score},
-        'b': {'name': (b.user.username if b.user else 'соперник'), 'score': b.score},
-        'rows': [{'label': label, 'a': value(a), 'b': value(b)}
-                 for label, value in metrics],
-        'winner': winner,
-        'strip': strip,
-        'verdict': verdict,
-    }
+    hi, lo = max(left.score, right.score), min(left.score, right.score)
+    line = ['%s : %s' % (_thousands(hi), _thousands(lo))]
+    if hi != lo:
+        gap = hi - lo
+        line.append('разрыв %s %s' % (_thousands(gap), _plural(gap, 'очко', 'очка', 'очков')))
+    line.append(_duel_endings(left, right, cards))
+
+    # [подпись, значение, лучше больше?, как писать]
+    metrics = (
+        ('Очки', lambda r: r.score, True, _thousands),
+        ('Верных', lambda r: r.correct_count, True, str),
+        ('Ошибок', lambda r: r.wrong_count, False, str),
+        ('Пропусков', lambda r: r.skip_count, False, str),
+        ('Точность', lambda r: r.accuracy, True, lambda v: '%d %%' % v),
+        ('Лучшее комбо', lambda r: r.max_combo or 1, True, combo),
+        ('Секунд на верный', lambda r: r.avg_correct_ms, False, secs),
+        ('Продержался', lambda r: r.wall_ms, True, clock),
+    )
+    rows = []
+    for label, value, more_is_better, fmt in metrics:
+        va, vb = value(left), value(right)
+        best = ''
+        if va is not None and vb is not None and va != vb:
+            best = 'a' if (va > vb) == more_is_better else 'b'
+        rows.append({'label': label, 'a': fmt(va) if va is not None else '–',
+                     'b': fmt(vb) if vb is not None else '–', 'best': best})
+
+    def by_qid(result):
+        return {item.get('question_id'): item.get('outcome')
+                for item in (result.question_outcomes or [])}
+
+    ma, mb = by_qid(left), by_qid(right)
+    reached = max(len(left.question_outcomes or []), len(right.question_outcomes or []))
+    strip = [{'number': n + 1, 'a': ma.get(qid, 'none'), 'b': mb.get(qid, 'none')}
+             for n, qid in enumerate((gset.question_ids or [])[:reached])]
+    return {'cards': cards, 'verdict': verdict, 'line': ' · '.join(line),
+            'rows': rows, 'strip': strip,
+            'story': _duel_story(strip, cards)}
+
+
+ENDING_BOTH = {'lives': 'оба выбыли по жизням', 'time': 'у обоих вышло время',
+               'set_done': 'оба прошли все вопросы', 'pool_empty': 'у обоих кончились вопросы'}
+ENDING_ONE = {'lives': 'жизни кончились', 'time': 'время вышло',
+              'set_done': 'все вопросы пройдены', 'pool_empty': 'вопросы кончились'}
+
+
+def _duel_endings(left, right, cards):
+    u"""Чем кончились оба раунда — словами: «оба выбыли по жизням»."""
+    ra, rb = left.ended_reason or 'time', right.ended_reason or 'time'
+    if ra == rb and ra in ENDING_BOTH:
+        return ENDING_BOTH[ra]
+    who = ['у вас' if c['is_me'] else c['name'] for c in cards]
+    return '%s: %s, %s: %s' % (who[0], ENDING_ONE.get(ra, ra), who[1], ENDING_ONE.get(rb, rb))
+
+
+ORDINALS = ('первый', 'второй', 'третий', 'четвёртый', 'пятый', 'шестой', 'седьмой',
+            'восьмой', 'девятый', 'десятый', 'одиннадцатый', 'двенадцатый',
+            'тринадцатый', 'четырнадцатый', 'пятнадцатый', 'шестнадцатый',
+            'семнадцатый', 'восемнадцатый', 'девятнадцатый', 'двадцатый')
+
+
+def _duel_story(strip, cards):
+    u"""Одна фраза-вывод под «Кто что взял» (макет DuelResult).
+
+    «Первый взяли оба. Третий – только вы; второй и пятый – только lengler.
+    Дальше вас уже не было.» Номера после двадцатого — «№21».
+    """
+    def words(numbers):
+        items = [ORDINALS[n - 1] if n <= len(ORDINALS) else '№%d' % n for n in numbers]
+        return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' и ' + items[-1]
+
+    def who(card, case):
+        if card['is_me']:
+            return 'вы' if case == 'nom' else 'вас'
+        return card['name']
+
+    both = [c['number'] for c in strip if c['a'] == 'correct' and c['b'] == 'correct']
+    only_a = [c['number'] for c in strip if c['a'] == 'correct' and c['b'] != 'correct']
+    only_b = [c['number'] for c in strip if c['b'] == 'correct' and c['a'] != 'correct']
+    out = []
+    if both:
+        out.append('%s взяли оба' % words(both))
+    parts = []
+    if only_a:
+        parts.append('%s – только %s' % (words(only_a), who(cards[0], 'nom')))
+    if only_b:
+        parts.append('%s – только %s' % (words(only_b), who(cards[1], 'nom')))
+    if parts:
+        out.append('; '.join(parts))
+    if not out:
+        out.append('Верных не было ни у кого')
+    reached_a = sum(1 for c in strip if c['a'] != 'none')
+    reached_b = sum(1 for c in strip if c['b'] != 'none')
+    if reached_a != reached_b:
+        out.append('Дальше %s уже не было' % who(cards[0] if reached_a < reached_b else cards[1], 'gen'))
+    return '. '.join(p[0].upper() + p[1:] for p in out) + '.'
+
+
+def _plural(n, one, few, many):
+    if n % 100 in (11, 12, 13, 14):
+        return many
+    return one if n % 10 == 1 else few if 2 <= n % 10 <= 4 else many
 
 
 # ---------------------------------------------------------------------------

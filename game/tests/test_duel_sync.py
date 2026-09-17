@@ -192,13 +192,22 @@ class DuelCompareTableTests(TestCase):
                     total_count=9, max_combo=1.25, avg_correct_ms=None, wall_ms=None)
         self.client.force_login(self.b)
         html = self.client.get(reverse('game:duel', args=[self.gset.code])).content.decode('utf-8')
-        for needle in ('Очки', 'Верных', 'Ошибок', 'Пропусков', 'Точность', 'Лучшее комбо',
-                       'Среднее время верного ответа', 'Время раунда',
-                       '<td class="num win">1200</td>', '<td class="num">800</td>',
-                       '<td class="num win">82%</td>', '<td class="num win">×1,5</td>',
-                       '<td class="num win">1,8 с</td>', '<td class="num">–</td>',
-                       '<td class="num win">2:05</td>', 'Реванш'):
+        # Смотрит boris — его столбец слева. Лучший выделен В СТРОКЕ (ADR 0112):
+        # у anna больше очков, у boris меньше пропусков; нет замера — без выделения.
+        rows = {
+            'Очки': '<td>800</td><td class="w">1\u00a0200</td>',
+            'Верных': '<td>6</td><td class="w">9</td>',
+            'Ошибок': '<td>3</td><td class="w">2</td>',
+            'Пропусков': '<td class="w">0</td><td>1</td>',
+            'Точность': '<td>67 %</td><td class="w">82 %</td>',
+            'Лучшее комбо': '<td>×1,25</td><td class="w">×1,5</td>',
+            'Секунд на верный': '<td>–</td><td>1,8</td>',
+            'Продержался': '<td>–</td><td>2:05</td>',
+        }
+        for label, cells in rows.items():
+            needle = '<th scope="row">%s</th>%s' % (label, cells)
             self.assertTrue(needle in html, 'нет в итоге дуэли: %s' % needle)
+        self.assertTrue('Реванш' in html)
 
 
 class SoundCountdownTests(TestCase):

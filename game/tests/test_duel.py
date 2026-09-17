@@ -284,9 +284,14 @@ class DuelFlowTests(TestCase):
         self.assertEqual(page.status_code, 200)
         cmp_ = page.context['compare']
         self.assertIsNotNone(cmp_)
-        self.assertEqual(len(cmp_['strip']), gset.size)
-        self.assertIn('Побеждает', cmp_['verdict'])
-        self.assertGreater(cmp_['a']['score'], cmp_['b']['score'])
+        # Полоса — до последнего вопроса, до которого дошёл хоть кто-то (ADR 0112),
+        # а не весь запас очереди.
+        reached = max(len(r.question_outcomes) for r in gset.results.all())
+        self.assertEqual(len(cmp_['strip']), reached)
+        self.assertEqual(cmp_['verdict'], 'Победа за avtor')
+        me, other = cmp_['cards']
+        self.assertTrue(me['is_me'])
+        self.assertLess(me['score'], other['score'])
 
     def test_third_player_appears_on_the_board(self):
         a = self._logged('igrok_a')
@@ -297,15 +302,17 @@ class DuelFlowTests(TestCase):
         for cl in (a, b, c):
             self._play(cl, gset.code)
         page = c.get(reverse('game:duel', args=[gset.code]))
-        self.assertEqual(len(page.context['rows']), 3)
-        self.assertEqual(sum(1 for r in page.context['rows'] if r['is_author']), 1)
+        # Сравнение — автор и смотрящий; третий — строкой «Ещё сыграли».
+        names = {card['name'] for card in page.context['compare']['cards']}
+        self.assertEqual(names, {'igrok_a', 'igrok_v'})
+        self.assertEqual([r['name'] for r in page.context['others']], ['igrok_b'])
 
     def test_challenge_again_makes_a_new_set_with_the_same_filter(self):
         self.client.get(reverse('game:duel_new'),
                         {'mode': 'blitz', 'topics': 'Спрос и предложение'})
         first = GameSet.objects.get(kind='duel')
         page = self.client.get(reverse('game:duel', args=[first.code]))
-        again = page.context['again_url']
+        again = page.context['rematch_url']
         self.assertIn('topics=', again)
         self.client.get(again)
         sets = list(GameSet.objects.filter(kind='duel').order_by('id'))
@@ -386,8 +393,8 @@ class DuelLoginBoundaryTests(TestCase):
         r = self.client.get(reverse('game:duel', args=[self.gset.code]))
         self.assertEqual(r.status_code, 200)
         html = r.content.decode('utf-8')
-        self.assertIn('только вошедшие', html)
-        self.assertIn('Скопировать ссылку-приглашение', html)
+        self.assertIn('Дуэль только для вошедших', html)
+        self.assertIn('>Войти, чтобы принять</a>', html)
 
     def test_logged_in_player_can_accept(self):
         from problems.models import User

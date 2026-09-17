@@ -1,207 +1,277 @@
 {% extends 'catalog/base.html' %}
+{% load ru %}
 {% comment %}
-  Страница дуэли. Соперник видит: кто вызвал, режим, фильтры, число
-  вопросов, результат вызвавшего — и кнопку «Играть».
+  Страница дуэли `/game/d/<код>/` — одна для всех, в трёх видах (ADR 0112,
+  макеты claude/mockups/wecon_rush_20260917/DuelInvite и DuelResult):
+  приглашение, ожидание второго результата и сравнение двоих. Какой вид —
+  решает `views.duel_page`.
 
   ⚠️ ВОПРОСЫ ЗДЕСЬ НЕ ПОКАЗЫВАЮТСЯ И ПОКАЗАНЫ БЫТЬ НЕ МОГУТ. Набор дуэли
-  собирается случайно под фильтры, и автор вызова играет его вслепую
-  первым, наравне с соперником. Утечка списка убила бы смысл фичи.
-
-  Ссылку могут открыть больше двух человек — тогда внизу доска всех
-  сыгравших, автор помечен. Это надмножество сравнения двоих.
+  собирается случайно под фильтры, и автор играет его вслепую наравне с
+  соперником. Утечка списка убила бы смысл дуэли. Числа «150» (запас очереди)
+  на странице тоже нет.
 {% endcomment %}
 {% block title %}Дуэль {{ gset.code }} – Wecon Rush{% endblock %}
 
 {% block extra_style %}
 <style>
-  .du-wrap { max-width: 780px; margin: 0 auto; padding: 26px 20px 60px; }
-  .du-kind { font-size: .78rem; font-weight: 700; letter-spacing: .08em;
-             text-transform: uppercase; color: var(--accent); text-align: center; }
-  .du-wrap h1 { font-size: 1.6rem; text-align: center; margin-top: 4px; }
-  .du-sub { color: var(--muted); text-align: center; margin-top: 8px; }
-  .du-acts { margin-top: 18px; display: flex; gap: 10px; justify-content: center;
-             flex-wrap: wrap; }
-  .du-btn {
-    display: inline-block; padding: 10px 22px; border-radius: 11px;
-    text-decoration: none; font-weight: 600; font-size: .95rem;
-    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
-    cursor: pointer; font-family: inherit;
+  .du-page { max-width: 1000px; margin: 0 auto; padding: 24px 16px 40px; box-sizing: border-box;
+             display: flex; flex-direction: column; gap: 16px; }
+  .du-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+  .du-lab { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+  .du-av { width: 44px; height: 44px; border-radius: 50%; flex: none; display: flex; align-items: center;
+           justify-content: center; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 15px; }
+  .du-btn { font: inherit; height: 44px; padding: 0 18px; box-sizing: border-box; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; border: 1px solid var(--border); border-radius: 10px; background: transparent;
+            color: var(--text); font-size: 14.5px; font-weight: 700; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .du-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .du-btn.primary { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .du-btn.primary:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .du-btn.big { height: 56px; padding: 0 30px; font-size: 17px; }
+  .du-btn[disabled] { opacity: .55; cursor: default; }
+  .du-link { border: 0; background: transparent; padding: 0; min-height: 44px; display: inline-flex; align-items: center;
+             color: var(--accent-ink); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; font-size: 13.5px; }
+
+  /* Приглашение и ожидание: карточка 640 px по центру. */
+  .du-center { min-height: calc(100vh - 140px); display: flex; align-items: center; justify-content: center; }
+  .du-inv { width: 640px; max-width: 100%; padding: 32px 36px 28px; display: flex; flex-direction: column; gap: 16px;
+            align-items: center; text-align: center; }
+  .du-inv h1 { margin: 6px 0 0; font-size: 28px; font-weight: 800; letter-spacing: -.3px; line-height: 1.15; }
+  .du-inv h1 span { color: var(--accent-ink); }
+  .du-who { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); text-align: left; }
+  .du-who .n { font-size: 15px; font-weight: 700; line-height: 1.15; }
+  .du-who .s { font-size: 12.5px; color: var(--text3); }
+  .du-pills { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+  .du-pill { height: 30px; padding: 0 12px; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px;
+             border: 1px solid var(--border); font-size: 13px; color: var(--text2); }
+  .du-pill b { color: var(--text); font-weight: 700; }
+  .du-pill .qi { width: 14px; height: 14px; }
+  .du-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text2); }
+  .du-share { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: 100%; }
+  .du-share input { height: 44px; min-width: 0; box-sizing: border-box; padding: 0 14px; font: inherit; font-size: 14px;
+                    border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); color: var(--text2); }
+  .du-score { font-size: 56px; font-weight: 800; letter-spacing: -1px; line-height: 1; font-variant-numeric: tabular-nums; }
+  .du-wait { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text2); }
+  .du-wait i { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+
+  /* Сравнение (макет DuelResult). */
+  .du-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; font-size: 13px; color: var(--text3); }
+  .du-chip { height: 24px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center;
+             background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+  .du-verdict { text-align: center; padding: 6px 0 8px; }
+  .du-verdict h1 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.5px; line-height: 1.1; }
+  .du-verdict p { margin: 6px 0 0; font-size: 15px; color: var(--text2); }
+  .du-duo { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 16px; align-items: stretch; }
+  .du-pl { padding: 18px 22px; display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .du-pl.win { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+  .du-pl .nm { font-size: 16px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+  .du-pl .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+                background: var(--brand-amber); color: var(--brand-amber-ink); border-radius: 999px; padding: 2px 8px; }
+  .du-pl .sub { margin-top: 2px; font-size: 13px; color: var(--text2); }
+  .du-pl .sc { margin-left: auto; font-size: 44px; font-weight: 800; letter-spacing: -1px; line-height: 1;
+               font-variant-numeric: tabular-nums; }
+  .du-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+  .du-mid b { font-size: 26px; font-weight: 800; color: var(--text3); }
+  .du-mid span { font-size: 12px; color: var(--text3); text-align: center; }
+  .du-two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; }
+  .du-cb { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .du-cb h2 { margin: 0; font-size: 15px; font-weight: 700; }
+  .du-sub2 { font-size: 12.5px; color: var(--text3); font-weight: 500; }
+  table.du-compare { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  table.du-compare th, table.du-compare td { padding: 8px; border-bottom: 1px solid var(--border-soft); text-align: right;
+                                             font-variant-numeric: tabular-nums; }
+  table.du-compare th { font-weight: 600; color: var(--text2); }
+  table.du-compare th[scope="row"] { text-align: left; font-weight: 500; }
+  table.du-compare td.w { font-weight: 800; color: var(--accent-ink); }
+  table.du-compare tr:last-child th, table.du-compare tr:last-child td { border-bottom: 0; }
+  .du-strip-wrap { overflow-x: auto; }
+  .du-grid { display: grid; grid-template-columns: 90px repeat(var(--n), minmax(26px, 1fr)); gap: 8px 6px;
+             align-items: center; font-size: 12.5px; color: var(--text2); min-width: min-content; }
+  .du-grid .q { text-align: center; font-size: 12px; color: var(--text3); }
+  .du-grid .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .du-m { height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+          font-weight: 800; font-size: 14px; }
+  .du-m.correct { background: var(--green); color: var(--on-error); }
+  .du-m.wrong { background: var(--error); color: var(--on-error); }
+  .du-m.skip { background: var(--skip); color: var(--on-skip); }
+  .du-m.none { background: var(--border-soft); color: var(--text3); }
+  .du-legend { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 12px; color: var(--text3); }
+  .du-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+  .du-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .du-acts-note { margin: 0; font-size: 12.5px; color: var(--text3); }
+  .du-others { padding: 14px 18px; font-size: 13px; color: var(--text2); }
+  .du-err { margin: 0; font-size: 13px; color: var(--error-ink); }
+  .du-err[hidden] { display: none; }
+  @media (max-width: 720px) {
+    .du-inv { padding: 22px 16px; }
+    .du-inv h1 { font-size: 22px; }
+    .du-share { grid-template-columns: 1fr; }
+    .du-duo { grid-template-columns: 1fr; gap: 10px; }
+    .du-mid { flex-direction: row; gap: 8px; }
+    .du-two { grid-template-columns: 1fr; }
+    .du-verdict h1 { font-size: 26px; }
+    .du-pl .sc { font-size: 34px; }
+    .du-acts .du-btn { flex: 1 1 100%; }
   }
-  .du-btn.ghost { background: var(--surface); color: var(--text);
-                  border-color: var(--border); }
-  .du-btn[disabled] { opacity: .5; cursor: default; }
-  .du-note { margin-top: 8px; font-size: 13px; color: var(--text3); }
-.du-share { margin-top: 14px; display: flex; gap: 8px; justify-content: center;
-              flex-wrap: wrap; align-items: center; }
-  .du-share input {
-    font: inherit; font-size: .85rem; padding: 7px 10px; min-width: 300px;
-    border: 1px solid var(--border); border-radius: 9px;
-    background: var(--surface-2); color: var(--text);
-  }
-  /* Итог дуэли — таблица сравнения двоих (решение владельца 15.09.2026):
-     строка на метрику, столбец победителя подсвечен. */
-  table.du-compare th[scope="row"] { background: transparent; font-weight: 500;
-                                     color: var(--muted); }
-  table.du-compare .win { background: var(--accent-tint); font-weight: 700; }
-  .du-verdict { margin-top: 18px; text-align: center; font-size: 1.35rem;
-                font-weight: 800; color: var(--accent); }
-  .du-strip { margin-top: 18px; }
-  .du-strip h2 { font-size: 1rem; margin-bottom: 8px; }
-  .du-strip-row { display: flex; gap: 4px; flex-wrap: wrap; }
-  .du-cell { width: 30px; text-align: center; font-size: .72rem; color: var(--muted); }
-  .du-mark {
-    display: block; width: 26px; height: 26px; line-height: 26px;
-    border-radius: 7px; margin: 2px auto; font-size: .8rem; font-weight: 700;
-    border: 1px solid var(--border); background: var(--surface-2);
-  }
-  .du-mark.correct { background: var(--green-tint); color: var(--green);
-                     border-color: var(--green); }
-  .du-mark.wrong { background: var(--error-tint); color: var(--error);
-                   border-color: var(--error); }
-  .du-mark.skip { color: var(--muted); }
-  .du-mark.none { opacity: .35; }
-  .du-legend { margin-top: 8px; font-size: .8rem; color: var(--muted); }
-  .du-box { margin-top: 22px; border: 1px solid var(--border);
-            border-radius: 12px; background: var(--surface); overflow-x: auto; }
-  table.du { border-collapse: collapse; width: 100%; font-size: .9rem; }
-  table.du th, table.du td { padding: 9px 12px; text-align: left;
-                             border-bottom: 1px solid var(--border); }
-  table.du th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
-  table.du td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  table.du tr.me { background: var(--accent-tint); }
-  .du-empty { padding: 26px; text-align: center; color: var(--muted); }
-  .du-note { margin-top: 14px; font-size: .84rem; color: var(--muted);
-             text-align: center; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="du-wrap">
-  <div class="du-kind">Дуэль</div>
-  <h1>{{ author_name }} бросает вызов</h1>
-  <p class="du-sub">
-    Режим «{{ mode_title }}» · {{ gset.size }} вопр. · {{ filter_text }}<br>
-    {% if author_result %}
-      Результат вызвавшего: <b>{{ author_result.score }}</b> очков,
-      точность {{ author_result.accuracy }}%
-    {% else %}
-      Вызвавший ещё не доиграл.
-    {% endif %}
-  </p>
-
-  <div class="du-acts">
-    {% if allowed %}
-      {% comment %} «Играть» у дуэли нет (решение 15.09.2026): вызов принимают,
-         и оба ждут друг друга в лобби, старт по общему отсчёту. {% endcomment %}
-      <a class="du-btn" href="{{ play_url }}">{% if request.user.is_authenticated and request.user.id == gset.author_id %}Вернуться в лобби{% else %}Принять вызов{% endif %}</a>
-    {% else %}
-      <button class="du-btn" disabled>{{ why }}</button>
-    {% endif %}
-    {% if compare %}
-      {% comment %}
-        РЕВАНШ — отдельная кнопка и отдельный смысл. «Бросить вызов дальше»
-        зовёт кого угодно с теми же фильтрами; реванш зовёт ТОГО ЖЕ
-        соперника, и потому стоит первым, когда обе стороны отыграли.
-        Набор всё равно собирается заново: играть второй раз те же вопросы
-        значило бы соревноваться в памяти, а не в экономике.
-      {% endcomment %}
-      <a class="du-btn" href="{{ again_url }}&amp;rematch={{ gset.code }}">Реванш</a>
-    {% endif %}
-    <a class="du-btn ghost" href="{{ again_url }}">Бросить вызов дальше</a>
-    <a class="du-btn ghost" href="/game/">В обычную игру</a>
+{% if compare %}
+<div class="du-page">
+  <div class="du-head">
+    <span class="du-chip">Дуэль</span><span class="du-chip">{{ mode_title }}</span>
+    <span>{{ gset.created|date:"j E" }} · {{ filter_text }} · код {{ gset.code }}</span>
   </div>
-
-  <div class="du-share">
-    <input type="text" id="link" value="{{ page_url }}" readonly>
-    <button class="du-btn ghost" id="copy">Скопировать ссылку-приглашение</button>
+  <div class="du-verdict">
+    <h1>{{ compare.verdict }}</h1>
+    <p>{{ compare.line }}</p>
   </div>
-  {% comment %}Сказано ЗАРАНЕЕ, а не после нажатия «Играть»: соперник
-     должен понимать условие до того, как потратит на него время.{% endcomment %}
-  <p class="du-note">Принять вызов могут только вошедшие: дуэль сравнивает
-    двоих по имени.</p>
-
-  {% if compare %}
-    <div class="du-box">
-      <table class="du du-compare">
-        <thead>
-          <tr><th></th>
-              <th class="num{% if compare.winner == 'a' %} win{% endif %}">{{ compare.a.name }}</th>
-              <th class="num{% if compare.winner == 'b' %} win{% endif %}">{{ compare.b.name }}</th></tr>
-        </thead>
+  <div class="du-duo">
+    {% with p=compare.cards.0 %}
+    <div class="du-card du-pl{% if p.win %} win{% endif %}"><div class="du-av" aria-hidden="true">{{ p.initials }}</div>
+      <div><div class="nm">{% if p.is_me %}Вы · {% endif %}{{ p.name }}{% if p.win %} <span class="tag">победа</span>{% endif %}</div>
+        <div class="sub">{{ p.sub }}</div></div><div class="sc">{{ p.score }}</div></div>
+    {% endwith %}
+    <div class="du-mid"><b>VS</b><span>одни вопросы, один порядок</span></div>
+    {% with p=compare.cards.1 %}
+    <div class="du-card du-pl{% if p.win %} win{% endif %}"><div class="du-av" aria-hidden="true">{{ p.initials }}</div>
+      <div><div class="nm">{% if p.is_me %}Вы · {% endif %}{{ p.name }}{% if p.win %} <span class="tag">победа</span>{% endif %}</div>
+        <div class="sub">{{ p.sub }}</div></div><div class="sc">{{ p.score }}</div></div>
+    {% endwith %}
+  </div>
+  <div class="du-two">
+    <section class="du-card du-cb">
+      <h2>По цифрам <span class="du-sub2">· лучший в строке выделен</span></h2>
+      <table class="du-compare">
+        <thead><tr><th></th><th>{{ compare.cards.0.name }}</th><th>{{ compare.cards.1.name }}</th></tr></thead>
         <tbody>
         {% for row in compare.rows %}
-          <tr><th scope="row">{{ row.label }}</th>
-              <td class="num{% if compare.winner == 'a' %} win{% endif %}">{{ row.a }}</td>
-              <td class="num{% if compare.winner == 'b' %} win{% endif %}">{{ row.b }}</td></tr>
+          <tr><th scope="row">{{ row.label }}</th><td{% if row.best == 'a' %} class="w"{% endif %}>{{ row.a }}</td><td{% if row.best == 'b' %} class="w"{% endif %}>{{ row.b }}</td></tr>
         {% endfor %}
         </tbody>
       </table>
-    </div>
-
-    <p class="du-verdict">{{ compare.verdict }}</p>
-
-    <section class="du-strip">
-      <h2>Кто что взял</h2>
-      <div class="du-strip-row">
-        {% for c in compare.strip %}
-        <div class="du-cell">
-          {{ c.number }}
-          <span class="du-mark {{ c.a }}">{% if c.a == 'correct' %}✓{% elif c.a == 'wrong' %}✗{% elif c.a == 'skip' %}–{% else %}·{% endif %}</span>
-          <span class="du-mark {{ c.b }}">{% if c.b == 'correct' %}✓{% elif c.b == 'wrong' %}✗{% elif c.b == 'skip' %}–{% else %}·{% endif %}</span>
-        </div>
-        {% endfor %}
-      </div>
-      <p class="du-legend">
-        Верхний ряд: {{ compare.a.name }}, нижний: {{ compare.b.name }}.
-        ✓ верно · ✗ неверно · – пропуск · · не дошёл
-      </p>
     </section>
-  {% endif %}
-
-  <div class="du-box">
-    <table class="du">
-      <thead>
-        <tr><th>Игрок</th><th class="num">Счёт</th><th class="num">Точность</th>
-            <th class="num">Макс. комбо</th><th>Чем кончилось</th></tr>
-      </thead>
-      <tbody>
-      {% for r in rows %}
-        <tr class="{% if r.is_me %}me{% endif %}">
-          <td>{{ r.name }}{% if r.is_author %} · вызвавший{% endif %}</td>
-          <td class="num">{{ r.score }}</td>
-          <td class="num">{{ r.accuracy }}%</td>
-          <td class="num">×{{ r.max_combo }}</td>
-          <td>
-            {% if r.reason == 'lives' %}выбыл
-            {% elif r.reason == 'set_done' %}прошёл до конца
-            {% elif r.reason == 'pool_empty' %}вопросы кончились
-            {% else %}время вышло{% endif %}
-          </td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="du-empty">Дуэль ещё никто не сыграл.</td></tr>
-      {% endfor %}
-      </tbody>
-    </table>
+    <section class="du-card du-cb">
+      <h2>Кто что взял <span class="du-sub2">· по вопросам</span></h2>
+      <div class="du-strip-wrap">
+        <div class="du-grid" style="--n: {{ compare.strip|length }}">
+          <span>вопрос</span>{% for c in compare.strip %}<span class="q">{{ c.number }}</span>{% endfor %}
+          <span class="who">{{ compare.cards.0.name }}</span>{% for c in compare.strip %}<span class="du-m {{ c.a }}">{% if c.a == 'correct' %}✓{% elif c.a == 'wrong' %}✗{% elif c.a == 'skip' %}–{% else %}·{% endif %}</span>{% endfor %}
+          <span class="who">{{ compare.cards.1.name }}</span>{% for c in compare.strip %}<span class="du-m {{ c.b }}">{% if c.b == 'correct' %}✓{% elif c.b == 'wrong' %}✗{% elif c.b == 'skip' %}–{% else %}·{% endif %}</span>{% endfor %}
+        </div>
+      </div>
+      <div class="du-legend"><span><i style="background: var(--green)"></i>верно</span><span><i style="background: var(--error)"></i>неверно</span><span><i style="background: var(--skip)"></i>пропуск</span><span><i style="background: var(--border-soft)"></i>не дошёл</span></div>
+      <p class="du-sub2">{{ compare.story }}</p>
+    </section>
   </div>
-
-  <p class="du-note">
-    Вопросы дуэли не показываются до игры ни сопернику, ни автору вызова.
-    Ссылку могут открыть сколько угодно человек: все попадут в таблицу.
-  </p>
+  <div class="du-acts">
+    {% if mine and request.user.is_authenticated %}<button type="button" class="du-btn primary big" id="du-rematch" data-url="{{ rematch_url }}">Реванш</button>{% endif %}
+    <a class="du-btn" href="{{ challenge_url }}">Бросить вызов другому</a>
+    {% if mine %}<a class="du-btn" href="{% url 'game:result' mine.code %}">Разобрать свои ошибки ({{ mine.wrong_count|add:mine.skip_count }})</a>{% endif %}
+    <a class="du-btn" href="/game/">В обычную игру</a>
+  </div>
+  <p class="du-err" id="du-err" hidden></p>
+  <p class="du-acts-note">Реванш – тот же соперник, новые вопросы. Ссылка на эту страницу открывается у всех, без входа.</p>
+  {% if others %}
+  <div class="du-card du-others">Ещё сыграли по ссылке: {% for r in others %}{{ r.name }} – {{ r.score }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+  {% endif %}
 </div>
+{% elif mine %}
+<div class="du-page du-center">
+  <div class="du-card du-inv">
+    <div><span class="du-lab">Дуэль · {{ mode_title }}</span><h1>Ваш результат</h1></div>
+    <div class="du-score">{{ mine.score }}</div>
+    <p class="du-note">верных {{ mine.correct_count }} · точность {{ mine.accuracy }} % · комбо ×{{ mine.max_combo }}</p>
+    <p class="du-wait" id="du-waiting"><i aria-hidden="true"></i>{{ waiting }}</p>
+    <p class="du-note">Сравнение появится здесь, когда отыграют оба. Страница откроется по этой же ссылке.</p>
+    <div class="du-share">
+      <input type="text" id="link" value="{{ page_url }}" readonly aria-label="Ссылка на дуэль">
+      <button type="button" class="du-btn primary" id="copy">Скопировать ссылку</button>
+    </div>
+    <div class="du-acts" style="justify-content: center">
+      <a class="du-btn" href="{% url 'game:result' mine.code %}">Разобрать свои ошибки ({{ my_mistakes }})</a>
+      <a class="du-link" href="/game/">В обычную игру</a>
+    </div>
+  </div>
+</div>
+{% else %}
+<div class="du-page du-center">
+  <div class="du-card du-inv">
+    {% if is_author %}
+    <div><span class="du-lab">Ваш вызов</span><h1>Ждём соперника в лобби</h1></div>
+    {% else %}
+    <div><span class="du-lab">Вызов на дуэль</span><h1><span>{{ author_name }}</span> зовёт вас на дуэль</h1></div>
+    <div class="du-who"><div class="du-av" aria-hidden="true">{{ author_initials }}</div>
+      <div><div class="n">{{ author_name }}</div>{% if author_line %}<div class="s">{{ author_line }}</div>{% endif %}</div></div>
+    {% endif %}
+    <div class="du-pills">
+      <span class="du-pill">{% include "_icon.html" with name=mode_icon %}<b>{{ mode_title }}</b></span>
+      <span class="du-pill"><b>{{ duration_text }}</b> · верный +{{ time_correct }} с</span>
+      <span class="du-pill"><b>{{ lives|count_ru:"жизнь,жизни,жизней" }}</b></span>
+      <span class="du-pill">{{ filter_text }}</span>
+      <span class="du-pill">вопросы одни на двоих</span>
+    </div>
+    {% if is_author %}
+    <a class="du-btn primary big" style="width: 100%" href="{{ play_url }}">Вернуться в лобби</a>
+    <div class="du-share">
+      <input type="text" id="link" value="{{ page_url }}" readonly aria-label="Ссылка на дуэль">
+      <button type="button" class="du-btn" id="copy">Скопировать ссылку</button>
+    </div>
+    {% elif not request.user.is_authenticated %}
+    <a class="du-btn primary big" style="width: 100%" href="{{ login_url }}">Войти, чтобы принять</a>
+    {% elif allowed %}
+    <a class="du-btn primary big" style="width: 100%" href="{{ play_url }}">Принять вызов</a>
+    {% else %}
+    <button type="button" class="du-btn primary big" style="width: 100%" disabled>{{ why }}</button>
+    {% endif %}
+    <p class="du-note">После вашего согласия у обоих пойдёт отсчёт пять секунд и раунд начнётся одновременно.
+      Вопросов до старта не видит никто. Дуэль только для вошедших – соперника надо как-то называть.</p>
+    <a class="du-link" href="/game/">Не сейчас – в обычную игру</a>
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.getElementById('copy').addEventListener('click', function () {
-  var input = document.getElementById('link');
-  var btn = this;
-  function done() { btn.textContent = 'Скопировано ✓';
-                    setTimeout(function () { btn.textContent = 'Скопировать ссылку-приглашение'; }, 2000); }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
-  } else { input.select(); document.execCommand('copy'); done(); }
-});
+(function () {
+  'use strict';
+  var copy = document.getElementById('copy');
+  if (copy) {
+    copy.addEventListener('click', function () {
+      var input = document.getElementById('link');
+      var label = copy.textContent;
+      function done() { copy.textContent = 'Скопировано'; setTimeout(function () { copy.textContent = label; }, 2000); }
+      input.select();
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(input.value).then(done, function () {});
+      }
+    });
+  }
+  /* Реванш: адрес вызова отвечает окну JSON-ом, поэтому идём запросом и
+     уводим в лобби новой дуэли. Вход истёк — на страницу входа. */
+  var rematch = document.getElementById('du-rematch');
+  if (rematch) {
+    rematch.addEventListener('click', function () {
+      var err = document.getElementById('du-err');
+      rematch.disabled = true;
+      fetch(rematch.getAttribute('data-url'), { headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                                                credentials: 'same-origin' })
+        .then(function (r) { return r.json(); })
+        .then(function (d) {
+          if (d && d.ok && d.play_url) { location.href = d.play_url; return; }
+          if (d && d.error === 'login') { location.href = '{{ login_url|escapejs }}'; return; }
+          rematch.disabled = false;
+          err.textContent = (d && d.error) || 'Реванш не создался. Попробуйте ещё раз.';
+          err.hidden = false;
+        }, function () {
+          rematch.disabled = false;
+          err.textContent = 'Нет связи. Попробуйте ещё раз.';
+          err.hidden = false;
+        });
+    });
+  }
+})();
 </script>
 {% endblock %}
