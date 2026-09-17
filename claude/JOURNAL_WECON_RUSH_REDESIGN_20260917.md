@@ -57,15 +57,22 @@
   - [x] P1.2 Разметка `_start.html`, стили и код трёх зон, окно «Мои рекорды», `?mode=`/`?duel=`
   - [x] P1.3 Тесты: перенос старых проверок, новые (рендер, серия, код, клавиши), браузерный
   - [x] P1.4 Зубастость (50/50), Notion
-- [ ] P2 Раунд
+- [x] P2 Раунд
   - [x] P2.0 Стоп-гейт A: анализ и план записаны (раздел «Стоп-гейт A» ниже)
   - [x] P2.1 Сервер: разбор 3 с (константы), брошенный раунд `quit`, пауза в табло дуэли
   - [x] P2.2 Полоса HUD, шапка скрыта, вопрос и варианты, нижний ряд
   - [x] P2.3 Разбор ошибки 3 с при стоящих часах, отсчёт 3-2-1
   - [x] P2.4 Служебные окна одной семьёй (выход, набор, «прервался», «нет связи», конец по жизням)
   - [x] P2.5 ADR 0109/0110, GAME.md, тесты
-  - [ ] P2.6 Зубастость, Notion
+  - [x] P2.6 Зубастость (42/42), Notion
 - [ ] P3 Итог и дуэль
+  - [ ] P3.0 Сверка с кодом, базовый прогон, ADR
+  - [ ] P3.1 Сервер итога: длительность «В игре», места в таблице, прошлый рекорд, доска дня, варианты
+  - [ ] P3.2 Итог: вердикт и действия, «Ход раунда», два ряда карточек, ошибки на странице, телефон
+  - [ ] P3.3 Варианты итога: вызов дня, набор учителя, брошенный раунд, дуэль; правило рекорда
+  - [ ] P3.4 Дуэль: окно создания, лобби отдельной страницей
+  - [ ] P3.5 Дуэль: приглашение и сравнение (починка условия автора)
+  - [ ] P3.6 Тесты, зубастость, GAME.md, Notion (живое табло — только диагностика)
 - [ ] P4 Вызов дня
 - [ ] P5 Бесконечные тесты
 - [ ] P6 Страница набора ученика и публичная страница результата
@@ -270,6 +277,63 @@ P1: 50 дефектов, 50 красных. Раннер — `scratchpad/teeth.p
 Первый прогон `mb_code` покраснел ошибкой раннера, а не проверкой: раннер переписан (замер без падения
 на чужой странице, проверка кода дуэли записывается и когда до неё не дошли) — после этого красный
 именно на `wrong_code_stays`.
+
+| Фаза | Тест | Как ломал | Покраснел? |
+|---|---|---|---|
+| P2 | test_student_quit_with_an_answer_is_saved_unranked | _rank_run без проверки «раунд брошен» | да |
+| P2 | test_guest_quit_is_saved_with_the_first_reason_anonymous | проверка «брошен» раньше «аноним» | да |
+| P2 | test_quit_without_a_single_answer_saves_nothing | сервер сохраняет брошенный раунд без ответов | да |
+| P2 | test_quit_from_a_set_keeps_the_attempt | убрана проверка set_code — раунд набора сохраняется | да |
+| P2 | test_quit_is_the_second_reason_right_after_anonymous | quit третьим пунктом, после mistakes_run | да |
+| P2 | test_a_quit_round_is_not_a_record | best_run считает брошенный рекордом | да |
+| P2 | test_a_quit_round_is_not_a_record | best_scores считает брошенный рекордом | да |
+| P2 | test_closed_pause_is_not_spent_time | seconds_left_for не вычитает паузу | да |
+| P2 | test_an_open_pause_counts_up_to_now | открытая пауза не считается | да |
+| P2 | test_pause_credit_has_the_same_ceiling_as_ranking | без потолка 120 с | да |
+| P2 | test_question_carries_its_effective_difficulty | сложность не уходит с вопросом | да |
+| P2 | test_page_config_has_reveal_and_countdown_numbers | reveal_wrong_ms не уходит в CFG | да |
+| P2 | test_wrong_answer_pauses_and_the_end_of_reveal_resumes | разбор без вызова паузы | да |
+| P2 | test_practice_has_no_pause | практика ставит паузу | да |
+| P2 | test_keys_during_reveal_do_not_answer | цифра на разборе зовёт answer | да |
+| P2 | test_timer_is_minutes_and_seconds | секунды в таймере вместо m:ss | да |
+| P2 | test_record_chip_only_with_a_record_and_never_for_practice | чип рекорда в практике | да |
+| P2 | test_site_header_is_hidden_while_playing | класс rush-playing не ставится | да |
+| P2 | test_option_grid_keeps_the_number_in_its_own_column | align-items: center у варианта | да |
+| P2 | test_countdown_before_a_single_round_but_not_a_duel | старт без отсчёта | да |
+| P2 | test_old_scoreboard_and_hint_are_gone_from_the_round | вернул строку-подсказку keys-hint | да |
+| P2 | test_eight_duel_reactions_with_text_labels | семь подписей реакций | да |
+| P2 | test_escape_opens_the_quit_window | Esc не открывает окно выхода | да |
+| P2 | test_quit_run_saves_only_a_round_without_a_set | quitRun → show('start') без финиша | да |
+| P2 | test_quit_dialog_texts_by_kind | «незачётный» в окне набора | да |
+| P2 | test_all_windows_are_one_family | «Раунд прервался» своим классом | да |
+| P2 | RoundBrowserTest: countdown_holds_question_and_clock | старт без отсчёта (браузер) | да |
+| P2 | RoundBrowserTest: enter_skips_countdown | Enter не пропускает отсчёт: ни клавиша, ни фокус на карточке | да |
+| P2 | RoundBrowserTest: blitz_five_options_no_scroll | шапка сайта на раунде снова видна — низ раунда уезжает за экран | да |
+| P2 | RoundBrowserTest: timer_is_m_ss | секунды в таймере (браузер) | да |
+| P2 | RoundBrowserTest: site_header_hidden | шапка не скрывается | да |
+| P2 | RoundBrowserTest: option_grid_three_columns | пятый вариант в одну колонку | да |
+| P2 | RoundBrowserTest: guest_has_no_record_chip | чип рекорда у гостя | да |
+| P2 | RoundBrowserTest: digits_do_not_answer_during_reveal | обе защиты сняты: ветка разбора пропускает цифры и ввод на разборе открыт | да |
+| P2 | RoundBrowserTest: reveal_pause_to_resume_3000ms | разбор без вызова паузы (браузер) | да |
+| P2 | RoundBrowserTest: space_ends_reveal_early | пробел не завершает разбор | да |
+| P2 | RoundBrowserTest: student_record_chip | другой текст чипа рекорда | да |
+| P2 | RoundBrowserTest: mobile_reveal_no_side_scroll_targets_44 | «−1» справа от сердец на телефоне | да |
+| P2 | RoundBrowserTest: mobile_reveal_no_side_scroll_targets_44 | нижние кнопки 34 px на телефоне | да |
+| P2 | RoundBrowserTest: answer_waits_for_prefetch (раннер) | подкачка мимо очереди | да |
+| P2 | RushModalPauseBrowserTest: escape_opens_quit_and_pauses | Esc не открывает окно выхода (браузер) | да |
+| P2 | RoundBrowserTest: classic_600_chars_no_scroll + blitz_five_options_no_scroll | над карточкой 700 px — столбец вопроса уходит под полосу (Классика и Блиц) | да |
+
+P2: 42 дефекта, 42 красных. Первый проход дал 36 из 42; остальные шесть разобраны, и три проверки
+пришлось усилить, а не дефект подогнать:
+- `enter_skips_countdown` проходила бы и без Enter (отсчёт кончается сам) — теперь меряет, что вопрос
+  появился быстрее 700 мс; и Enter у отсчёта два пути (клавиша и фокус на карточке-кнопке), дефект
+  снимает оба;
+- «помещается» (Блиц, Классика) видела только прокрутку, а у раунда на ПК её нет по устройству
+  (`overflow: hidden`): переполнение уходило вверх под полосу, а фокус в поле ответа сдвигал и саму
+  полосу. Теперь проверки требуют полосу у верхнего края, строку над карточкой ниже полосы, последний
+  вариант, поле ответа и нижний ряд в окне;
+- раннер падал на жёстких ожиданиях раньше проверки (`b_countdown`, `b_queue`) — ожидания мягкие;
+- `m_esc` был красным с первого раза: unittest сократил строку, по которой искал раннер зубастости.
 
 ## Числа тестов
 
