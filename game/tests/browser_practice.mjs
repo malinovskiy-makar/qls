@@ -37,8 +37,22 @@ try {
   process.exit(3);
 }
 
+/* Каждый сценарий — отдельно: сбой одного (дефект уронил ожидание) записывается
+   в его проверки, а не обрывает весь прогон и не прячет имя проверки. */
+const contexts = [];
+async function block(names, fn) {
+  try {
+    await fn();
+  } catch (e) {
+    const detail = String((e && e.message) || e).slice(0, 400);
+    names.forEach((name) => { if (!out.checks[name]) check(name, false, { error: detail }); });
+  }
+  while (contexts.length) await contexts.pop().close().catch(() => {});
+}
+
 async function start({ width = 1440, height = 800, path = '/game/' } = {}) {
   const context = await browser.newContext({ viewport: { width, height } });
+  contexts.push(context);
   const page = await context.newPage();
   await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
   await page.waitForSelector('#practice-go:not([disabled])', { timeout: 15000 });
@@ -65,7 +79,9 @@ async function answerWrong(page) {
 
 try {
   // ── Полоса, разбор неверного ответа, листание и обратимый пропуск ──
-  {
+  await block(['hud_filter_and_four_tallies', 'wrong_answer_feedback_with_catalog_link', 'hover_is_border_only',
+               'history_is_read_only', 'next_label_by_situation', 'skip_is_reversible',
+               'escape_asks_then_result_screen'], async () => {
     const { context, page } = await start();
     const hud = await page.evaluate(() => {
       const shown = (sel) => { const el = document.querySelector(sel); return !!el && el.checkVisibility(); };
@@ -128,7 +144,8 @@ try {
       skipped: document.getElementById('pr-skipped').textContent,
     }));
     await page.click('#opts .opt:nth-child(1)');
-    await page.waitForSelector('#pr-fb:not([hidden])', { timeout: 8000 });
+    // Без .catch сломанный обратимый пропуск ронял бы весь раннер, а не одну проверку.
+    await page.waitForSelector('#pr-fb:not([hidden])', { timeout: 8000 }).catch(() => {});
     const afterAnswer = await page.evaluate(() => ({
       dot: document.querySelector('#pr-dots .pr-dot:nth-child(1)').className,
       skipped: document.getElementById('pr-skipped').textContent,
@@ -156,11 +173,10 @@ try {
     check('escape_asks_then_result_screen', ask === 'Закончить?' && result.screen && !result.round
           && result.rows === 1 && result.big === '1 из 2' && result.bars >= 1
           && result.solve.includes('Решать тему'), { ask, result });
-    await context.close();
-  }
+  });
 
   // ── 30 вопросов: лента сворачивает ранние, «к пропущенным» ведёт к пропуску ──
-  {
+  await block(['many_questions_fold_and_jump'], async () => {
     const { context, page } = await start();
     for (let i = 0; i < 30; i += 1) {
       const t = await questionText(page);
@@ -187,13 +203,12 @@ try {
           && tape.back === 'visible' && Number(folded) < Number(tape.first) && tape.toSkip
           && jumped.chip === 'пропущен · можно ответить сейчас' && /skip/.test(jumped.cur),
           { tape, folded, jumped });
-    await context.close();
-  }
+  });
 
   // ── Сгенерированный вопрос: решение без ссылки; 1440×800 без прокрутки ──
   // Тема есть только у сгенерированных: потолок доли машинных отступает, и
   // первый же вопрос — сгенерированный.
-  {
+  await block(['generated_solution_without_catalog_link', 'desktop_no_scroll_with_solution'], async () => {
     const { context, page } = await start({ path: '/game/?topics=' + encodeURIComponent(GEN_TOPIC) });
     const found = await page.$eval('#gen-note', (el) => !el.hidden);
     let gen = { found };
@@ -211,11 +226,10 @@ try {
     }
     check('generated_solution_without_catalog_link', gen.found && !!gen.sol && !gen.open, gen);
     check('desktop_no_scroll_with_solution', gen.found && gen.options === 5 && gen.sh <= gen.ih && gen.foot <= gen.ih, gen);
-    await context.close();
-  }
+  });
 
   // ── Телефон: листание внизу экрана, кнопки 50 px, без прокрутки вбок; итог ──
-  {
+  await block(['mobile_bottom_bar_no_side_scroll', 'mobile_result_no_side_scroll'], async () => {
     const { context, page } = await start({ width: 390, height: 844 });
     await answerWrong(page);
     const m = await page.evaluate(() => {
@@ -234,8 +248,7 @@ try {
     await page.waitForTimeout(700);
     const r = await page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
     check('mobile_result_no_side_scroll', r.sw <= r.cw, r);
-    await context.close();
-  }
+  });
 } catch (e) {
   out.error = String((e && e.stack) || e);
 }
