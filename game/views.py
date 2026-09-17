@@ -23,6 +23,7 @@ import datetime
 import json
 import logging
 import random
+import re
 import time
 from fractions import Fraction
 from urllib.parse import quote
@@ -651,8 +652,7 @@ def _game_page_context(request):
         # (`durationText`), числа под фильтром клиент обновит сам.
         'start_modes': [
             {'key': key, 'title': m['title'], 'pool': pool_counts[key],
-             'duration': (('%g мин' % (m['duration'] / 60)) if m['duration'] >= 60
-                          else '%d с' % m['duration'])}
+             'duration': duration_text(m['duration'])}
             for key, m in config.MODES.items() if pool_counts[key]],
         # Числа поповера «Как считаются очки» — из конфига, а не текстом:
         # поменяют экономику, и поповер не соврёт.
@@ -1762,8 +1762,34 @@ def set_page(request, code):
     # забег: соперник должен сначала увидеть, во что его зовут.
     ctx['duel_url'] = request.build_absolute_uri(
         reverse('game:duel', args=[gset.code])) if gset.kind == 'duel' else ''
+    if gset.kind == 'duel':
+        # Лобби дуэли по макету DuelLobby (ADR 0112): условия словами и два
+        # слота. ⚠️ Имена — логины, как на досках: страница дуэли публичная,
+        # и полное имя ученика по ссылке уходить не должно.
+        mode_cfg = config.MODES.get(gset.mode, {})
+        me = request.user.username if request.user.is_authenticated else ''
+        ctx['auto_set'].update({
+            'lives': mode_cfg.get('lives', 0),
+            'duration_text': duration_text(mode_cfg.get('duration', 0)),
+            'filter_text': ('без фильтров' if is_empty_filter(gset.filter_snapshot)
+                            else _filter_text(gset.filter_snapshot)),
+            'author_initials': initials(ctx['auto_set']['author']),
+            'me': me,
+            'me_initials': initials(me),
+        })
     ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
     return render(request, 'game/game.html', ctx)
+
+
+def duration_text(seconds):
+    u"""«1 мин», «2 мин», «45 с» — как `durationText` клиента."""
+    return ('%g мин' % (seconds / 60)) if seconds >= 60 else '%d с' % seconds
+
+
+def initials(name):
+    u"""Инициалы для кружка игрока: «Макар Малиновский» → «ММ», «lengler» → «L»."""
+    parts = [p for p in re.split(r'[\s_.\-]+', name or '') if p]
+    return ''.join(p[0] for p in parts[:2]).upper()
 
 
 @require_safe

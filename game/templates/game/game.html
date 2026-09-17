@@ -126,80 +126,10 @@ a:focus-visible, button:focus-visible {
 [hidden] { display: none !important; }
 
 /* ── Фильтры тренажёра ────────────────────────────────────────────
-   ⚠️ ЧИПОВ ТЕМ НА ГЛАВНОМ ЭКРАНЕ НЕТ. Двадцать чипов вверху занимали
-   первый экран целиком и уводили внимание с карточек режимов — а режим
-   выбирают в девяти случаях из десяти, фильтр в одном. Теперь под
-   карточками одна кнопка, а весь выбор живёт в окне.
-
-   ⚠️ СЧЁТЧИКИ ЖИВЫЕ, И ЭТО СМЕНА ПРАВИЛА. Раньше фильтр работал так,
-   будто задач по каждой теме неограниченно, — иначе экран рассказывал бы
-   о состоянии банка. Но с фильтром по тегу «неограниченно» перестало быть
-   правдой: тегов 344, и по многим в пуле единицы. Молчащий фильтр,
-   который даёт пустой забег, хуже честного числа. */
-.filter-bar {
-  margin-top: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-.filter-open {
-  font: inherit;
-  font-size: 15px;
-  font-weight: 600;
-  padding: 10px 22px;
-  border-radius: 11px;
-  border: 1px solid var(--rush-border);
-  background: var(--rush-surface);
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color .12s, color .12s, font-size .12s, font-weight .12s;
-}
-/* При наведении текст чуть жирнее и крупнее — просьба владельца. */
-.filter-open:hover {
-  border-color: var(--rush-accent);
-  color: var(--rush-accent);
-  font-size: 16px;
-  font-weight: 700;
-}
-.filter-open:focus-visible { outline: 2px solid var(--rush-accent);
-                             outline-offset: 2px; }
-/* Число выбранных фильтров бейджем — как `.btn-all .n` каталога (15.09.2026).
-   При нуле бейджа нет в разметке вовсе. */
-.filter-open .n { display: inline-flex; align-items: center; justify-content: center;
-                  min-width: 20px; height: 20px; padding: 0 6px; margin-left: 8px;
-                  border-radius: var(--r-pill); background: var(--btn-bg);
-                  color: var(--on-btn); font-size: 12px; font-weight: 700;
-                  vertical-align: 1px; }
-
-/* Выбранное — чипами с крестиком: снять по одному, не открывая окно. */
-.filter-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
-}
-.filter-chips:empty { display: none; }
-.fchip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font: inherit;
-  font-size: 13px;
-  padding: 5px 8px 5px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--rush-accent);
-  background: var(--rush-accent-tint);
-  color: var(--rush-accent);
-}
-.fchip button {
-  font: inherit; line-height: 1;
-  border: none; background: none; padding: 0 2px;
-  color: inherit; cursor: pointer; font-size: 15px;
-}
-.fchip button:hover { color: var(--rush-bad); }
+   ⚠️ ЧИПОВ ТЕМ НА ГЛАВНОМ ЭКРАНЕ НЕТ: выбор живёт в окне «Все фильтры», а на
+   главной и в окне дуэли — строка «Что решаем» тремя чипами-сводками (ADR 0108,
+   0112). ⚠️ СЧЁТЧИКИ ЖИВЫЕ: молчащий фильтр, который даёт пустой раунд, хуже
+   честного числа (тегов 344, и по многим в пуле единицы). */
 
 
 /* ── Окно «Все фильтры» ──────────────────────────────────────────── */
@@ -336,29 +266,62 @@ a:focus-visible, button:focus-visible {
    ⚠️ В РАЗМЕТКЕ СТОИТ ПЕРЕД `#fmodal`: у обоих z-index 60, и окно
    фильтров, открытое ПОВЕРХ вызова, обязано быть сверху. Решает порядок
    в документе. */
-/* Шаг — одна колонка: сетка `.fmodal-body` в две колонки нужна
-   только списку фильтров. */
-.dm-step { display: block; }
-.dm-step[hidden] { display: none; }
-.dm-lead { margin: 0 0 14px; font-size: 14.5px; line-height: 1.5;
-           color: var(--text2); }
-.dm-modes { display: grid; gap: 10px; margin-bottom: 14px;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); }
+/* Окно по макету DuelCreate (ADR 0112): режимы вкладками «1 мин · 568», строка
+   «Что решаем», в подвале число вопросов под фильтром. Числа «150» (запас
+   очереди) на экране нет нигде. */
+.dm-card {
+  width: 960px; max-width: 100%; max-height: calc(100vh - 40px); overflow-y: auto; box-sizing: border-box;
+  display: flex; flex-direction: column; gap: 16px; padding: 24px 28px 22px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow-pop);
+}
+.dm-head { display: flex; align-items: center; gap: 10px; }
+.dm-head h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 22px; font-weight: 800; }
+.dm-head h2 .qi { width: 22px; height: 22px; }
+.dm-x {
+  margin-left: auto; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 9px; background: transparent; color: var(--text3); cursor: pointer;
+}
+.dm-x:hover { border-color: var(--accent); color: var(--accent-ink); }
+.dm-x .qi { width: 16px; height: 16px; }
+.dm-lead { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text2); }
+.dm-modes { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .dm-mode {
-  font: inherit; text-align: left; cursor: pointer;
-  padding: 12px 14px; border-radius: 12px;
-  border: 1px solid var(--rush-border);
-  background: var(--rush-surface); color: var(--text);
+  font: inherit; height: 58px; padding: 0 14px; box-sizing: border-box; text-align: left; cursor: pointer;
+  display: flex; align-items: center; gap: 10px; color: var(--text);
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2);
 }
-.dm-mode:hover { border-color: var(--rush-accent); }
-.dm-mode[aria-pressed="true"] {
-  border-color: var(--rush-accent);
-  box-shadow: 0 0 0 1px var(--rush-accent) inset;
+.dm-mode:hover { border-color: var(--accent); }
+.dm-mode[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-ring); }
+.dm-mode .qi { width: 18px; height: 18px; flex: none; }
+.dm-mode .t { display: block; font-size: 15.5px; font-weight: 700; line-height: 1.15; white-space: nowrap; }
+.dm-mode .m { display: block; margin-top: 2px; font-size: 12.5px; line-height: 1.15; color: var(--text3);
+              white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dm-mode .m.low { color: var(--error-ink); }
+.dm-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.dm-filters .l { margin-right: 4px; font-size: 13px; color: var(--text3); white-space: nowrap; }
+.dm-chip, .dm-edit {
+  font: inherit; height: 34px; padding: 0 12px; display: inline-flex; align-items: center; gap: 5px;
+  font-size: 13px; color: var(--text); white-space: nowrap; cursor: pointer;
 }
-.dm-mode b { display: block; font-size: 15px; font-weight: 600; }
-.dm-mode small { display: block; margin-top: 4px; font-size: 12.5px;
-                 color: var(--text3); font-variant-numeric: tabular-nums; }
-.dm-mode small.low { color: var(--rush-bad); }
+.dm-chip { border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); }
+.dm-chip b { font-weight: 600; }
+.dm-edit { margin-left: auto; border: 1px solid var(--border); border-radius: 8px; background: transparent; font-weight: 700; }
+.dm-chip:hover, .dm-edit:hover { border-color: var(--accent); color: var(--accent-ink); }
+.dm-edit .qi { width: 14px; height: 14px; }
+.dm-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding-top: 4px; }
+.dm-count { margin: 0; font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.dm-count b { color: var(--text); }
+.dm-acts { margin-left: auto; display: flex; gap: 10px; }
+.dm-create { height: 48px; padding: 0 26px; font-size: 16px; }
+@media (max-width: 720px) {
+  .dm-card { padding: 18px 16px; gap: 14px; }
+  .dm-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dm-x { width: 44px; height: 44px; }
+  .dm-chip, .dm-edit { height: 44px; }
+  .dm-edit { margin-left: 0; }
+  .dm-acts { margin-left: 0; width: 100%; }
+  .dm-acts .dl-btn { flex: 1 1 0; }
+}
 .dm-state { margin: 10px 0 0; font-size: 14px; color: var(--text2);
             display: flex; align-items: center; gap: 8px; }
 .dm-dot {
@@ -369,8 +332,6 @@ a:focus-visible, button:focus-visible {
 .dm-state.is-here .dm-dot { animation: none; }
 @keyframes dmPulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .dm-dot { animation: none; } }
-.dm-count { margin: 0; font-size: 13.5px; color: var(--text2);
-            font-variant-numeric: tabular-nums; }
 
 
 
@@ -864,39 +825,86 @@ svg.medal { width: 24px; height: 24px; display: block; }
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
 
-/* ── Лобби дуэли (решение владельца 15.09.2026) ─────────────────────
-   Дуэль строго синхронна: кнопки «Играть» нет, оба ждут здесь. Код комнаты
-   крупно, главная кнопка — «Скопировать ссылку», строка «кто на месте» и
-   общий отсчёт. */
-.duel-lobby { max-width: 520px; margin: 18px auto 0; padding: 20px 18px;
-  border: 1px solid var(--rush-border); border-radius: 16px;
-  background: var(--rush-surface); text-align: center; }
-.duel-code-row { display: flex; flex-wrap: wrap; align-items: center;
-  justify-content: center; gap: 8px 14px; margin-top: 16px; }
-.duel-code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  font-size: 44px; font-weight: 700; letter-spacing: .08em; line-height: 1.1;
-  color: var(--text); }
-.duel-copy-code { font: inherit; font-size: 14px; font-weight: 600;
-  height: 40px; padding: 0 14px; border-radius: 10px; cursor: pointer;
-  border: 1px solid var(--rush-border); background: transparent;
-  color: var(--text2); }
-.duel-copy-code:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.duel-copy { display: block; width: 100%; min-height: 48px; margin-top: 16px; }
-.duel-lobby__row { display: flex; gap: 8px; flex-wrap: wrap;
-  align-items: center; margin-top: 8px; }
-.duel-lobby__row input {
-  flex: 1 1 260px; min-width: 0; font: inherit; font-size: 13px;
-  padding: 8px 10px;
-  border: 1px solid var(--rush-line); border-radius: 9px;
-  background: var(--rush-bg); color: var(--rush-text);
+/* ── Лобби дуэли: отдельная страница (макеты DuelLobby и DuelLobbyReady, ADR 0112) ──
+   Дуэль строго синхронна (15.09.2026): кнопки «Играть» нет, оба ждут здесь.
+   Главной позади нет: шапка сайта и по центру карточка 720 px — условия, код и
+   ссылка, слоты «автор VS соперник», общий отсчёт. */
+.start-set:has(> .duel-lobby) {
+  max-width: none; min-height: calc(100vh - 56px); box-sizing: border-box;
+  display: flex; align-items: center; justify-content: center; padding: 24px 16px;
 }
-.duel-lobby .dm-state { justify-content: center; margin-top: 14px; }
-.duel-countdown { font-size: 96px; font-weight: 800; line-height: 1;
-  margin: 14px 0 0; color: var(--rush-accent);
-  font-variant-numeric: tabular-nums; }
-.duel-countdown.is-go { font-size: 48px; }
-.duel-cancel { display: inline-flex; align-items: center; min-height: 40px;
-  margin-top: 8px; font-size: 14px; color: var(--text3); }
+.duel-lobby {
+  width: 720px; max-width: 100%; box-sizing: border-box; padding: 30px 34px 28px;
+  display: flex; flex-direction: column; align-items: center; gap: 18px; text-align: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+}
+.dl-lab { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+.dl-title { margin: 6px 0 0; font-size: 26px; font-weight: 800; letter-spacing: -.3px; }
+.dl-terms { margin: 4px 0 0; font-size: 14px; color: var(--text2); }
+.dl-invite { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+.dl-invite[hidden], .dl-note[hidden], .duel-cancel[hidden], .dl-cd-sub[hidden],
+.duel-lobby .dm-state[hidden] { display: none; }
+.duel-code-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 10px 14px; }
+.duel-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 44px; font-weight: 700; letter-spacing: .12em; line-height: 1.1; color: var(--text);
+}
+.dl-btn {
+  font: inherit; height: 44px; padding: 0 18px; box-sizing: border-box; white-space: nowrap;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 10px; background: transparent;
+  color: var(--text); font-size: 14.5px; font-weight: 700; cursor: pointer;
+}
+.dl-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.dl-btn.dl-primary { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+.dl-btn.dl-primary:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+.duel-lobby__row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; width: 100%; }
+.duel-lobby__row input {
+  height: 44px; min-width: 0; box-sizing: border-box; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2);
+  font: inherit; font-size: 14px; color: var(--text2);
+}
+.dl-slots { display: grid; grid-template-columns: 1fr auto 1fr; gap: 16px; align-items: center; width: 100%; margin-top: 4px; }
+.dl-slot {
+  display: flex; align-items: center; gap: 12px; min-width: 0; padding: 12px 14px; text-align: left;
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2);
+}
+.dl-slot.is-on { border-color: var(--accent); background: var(--accent-tint); }
+.dl-slot.is-empty { border-style: dashed; }
+.dl-av {
+  width: 44px; height: 44px; border-radius: 50%; flex: none;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent-tint); color: var(--accent-ink); font-size: 15px; font-weight: 800;
+}
+.dl-slot.is-empty .dl-av { background: var(--border-soft); color: var(--text3); }
+.dl-slot-t { min-width: 0; display: flex; flex-direction: column; }
+.dl-who { font-size: 15px; font-weight: 700; line-height: 1.15; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dl-slot.is-empty .dl-who { color: var(--text3); font-weight: 600; }
+.dl-st { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text3); }
+.dl-dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--green); }
+.dl-dot[hidden] { display: none; }
+.dl-dot.is-off { background: var(--error); }
+.dl-vs { font-size: 13px; font-weight: 800; letter-spacing: .1em; color: var(--text3); }
+.dl-note { margin: 0; font-size: 13px; color: var(--text2); }
+.duel-lobby .dm-state { margin: 0; justify-content: center; font-size: 12.5px; }
+.duel-lobby .dm-state.is-alarm .dm-dot { background: var(--error); animation: none; }
+.duel-countdown {
+  margin: 0; font-size: 84px; font-weight: 800; line-height: 1; letter-spacing: -2px;
+  color: var(--accent-ink); font-variant-numeric: tabular-nums;
+}
+.duel-countdown.is-go { font-size: 44px; letter-spacing: 0; }
+.dl-cd-sub { margin: -8px 0 0; font-size: 16px; font-weight: 700; }
+.duel-cancel {
+  display: inline-flex; align-items: center; min-height: 44px;
+  color: var(--accent-ink); font-size: 13.5px; font-weight: 700;
+  text-decoration: underline; text-underline-offset: 3px;
+}
+@media (max-width: 720px) {
+  .duel-lobby { padding: 22px 16px; gap: 14px; }
+  .dl-title { font-size: 21px; }
+  .dl-slots { grid-template-columns: 1fr; gap: 8px; }
+  .duel-lobby__row { grid-template-columns: 1fr; }
+}
 
 /* ── Панель прослушивания звука (staff, ?sound_check=1) ─────────────
    Служебный блок: намеренно неброский, без фирменных акцентов. Он не
@@ -1946,32 +1954,28 @@ body.on-final .rush-wrap { max-width: 1160px; }
      дальше лобби на странице набора (код, ссылка, общий отсчёт). -->
 <div class="fmodal" id="dmodal" hidden role="dialog" aria-modal="true"
      aria-labelledby="dmodal-title">
-  <div class="fmodal-card">
-    <div class="fmodal-head">
-      <b id="dmodal-title">Создать дуэль</b>
-      <button type="button" class="fmodal-close" id="dmodal-close"
-              aria-label="Закрыть">&times;</button>
+  <div class="dm-card">
+    <div class="dm-head">
+      <h2 id="dmodal-title">{% include "_icon.html" with name="duel" %}Дуэль</h2>
+      <button type="button" class="dm-x" id="dmodal-close" aria-label="Закрыть">{% include "_icon.html" with name="close" %}</button>
     </div>
-
-    <!-- Собрать вызов: режим и фильтры -->
-    <div class="fmodal-body dm-step" id="dm-step1">
-      <p class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам
-        в том же порядке. Раунд не ограничен числом вопросов: играете, пока
-        есть время и жизни. Вопросов до игры не видит никто: ни он, ни вы.</p>
-      <div class="dm-modes" id="dm-modes"></div>
-      <div class="filter-bar">
-        <button class="filter-open" id="dm-filters">Добавить фильтры</button>
-      </div>
-      <div class="filter-chips" id="dm-chips"></div>
+    <p class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам в том же порядке. Старт общий,
+      время и жизни как в обычном раунде. Вопросов до игры не видит никто – ни он, ни вы.</p>
+    <div class="dm-modes" id="dm-modes" role="group" aria-label="Режим дуэли"></div>
+    <div class="dm-filters">
+      <span class="l">Что решаем</span>
+      <button type="button" class="dm-chip" data-dm-filters="1">Тема: <b id="dmsum-topics">все</b></button>
+      <button type="button" class="dm-chip" data-dm-filters="1">Сложность: <b id="dmsum-stars">любая</b></button>
+      <button type="button" class="dm-chip" data-dm-filters="1">Источник: <b id="dmsum-sources">все</b></button>
+      <button type="button" class="dm-edit" id="dm-filters">{% include "_icon.html" with name="sliders" %}Настроить фильтры</button>
+    </div>
+    <p class="start-notice" id="dm-error" hidden></p>
+    <div class="dm-foot">
       <p class="dm-count" id="dm-count"></p>
-      <p class="start-notice" id="dm-error" hidden></p>
-    </div>
-
-    <div class="fmodal-foot">
-      <span class="fcounts" id="dm-foot-note"></span>
-      <div class="fmodal-actions">
-        <button type="button" class="fapply" id="dm-create">Создать дуэль</button>
-      </div>
+      <span class="dm-acts">
+        <button type="button" class="dl-btn" id="dm-cancel">Отмена</button>
+        <button type="button" class="dl-btn dl-primary dm-create" id="dm-create">Создать дуэль</button>
+      </span>
     </div>
   </div>
 </div>
@@ -2330,7 +2334,17 @@ body.on-final .rush-wrap { max-width: 1160px; }
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
   /* -- DOM -- */
-  var $ = function (id) { return document.getElementById(id); };
+  /* ⚠️ ЛОББИ ДУЭЛИ — СТРАНИЦА БЕЗ ГЛАВНОЙ (ADR 0112): зоны стартового экрана
+     сервер на ней не отдаёт вовсе. Код старта общий и при загрузке ищет свои
+     элементы — на этой странице он получает отсоединённую пустышку и работает
+     вхолостую, а не падает. На остальных страницах `$` честный: нет
+     элемента — null, и ошибку видно сразу. */
+  var inertEls = {};
+  var $ = function (id) {
+    var el = document.getElementById(id);
+    if (el || !(AUTO_SET && AUTO_SET.kind === 'duel')) return el;
+    return inertEls[id] || (inertEls[id] = document.createElement('div'));
+  };
   var screens = {
     start: $('screen-start'),
     playing: $('screen-play'),
@@ -2720,53 +2734,13 @@ body.on-final .rush-wrap { max-width: 1160px; }
      Именно рисуются, а не копируются готовой разметкой: у крестика живой
      обработчик, и копия через innerHTML осталась бы мёртвой. Список выбора
      при этом ОДИН (`filter`), второго набора фильтров у дуэли нет. */
-  function chipBoxes() {
-    return [document.getElementById('dm-chips')].filter(Boolean);
-  }
-
+  /* Сводка выбранного фильтра: «Сбросить всё», пометка «тренировочный» и
+     строка «Что решаем». Чипов с крестиком больше нет (ADR 0112): снять
+     фильтр — в окне фильтров или «Сбросить всё». */
   function paintChips() {
-    var rows = [];
-    filter.topics.forEach(function (t) { rows.push(['topics', t, t]); });
-    filter.tags.forEach(function (t) {
-      rows.push(['tags', t, tagNames[t] || ('тег ' + t)]);
-    });
-    filter.sources.forEach(function (x) {
-      rows.push(['sources', x, srcTitles[x] || x]);
-    });
-    filter.stars.forEach(function (d) { rows.push(['stars', d, d + '★']); });
-    chipBoxes().forEach(function (box) {
-      box.innerHTML = '';
-      rows.forEach(function (r) {
-        var chip = document.createElement('span');
-        chip.className = 'fchip';
-        var label = document.createElement('span');
-        label.textContent = r[2];
-        var x = document.createElement('button');
-        x.type = 'button';
-        x.textContent = '×';
-        x.setAttribute('aria-label', 'Снять фильтр ' + r[2]);
-        x.addEventListener('click', function () {
-          filter[r[0]] = filter[r[0]].filter(function (v) { return v !== r[1]; });
-          applyFilter();
-        });
-        chip.appendChild(label);
-        chip.appendChild(x);
-        box.appendChild(chip);
-      });
-    });
-    ['dm-filters'].forEach(function (id) {
-      var b = document.getElementById(id);
-      if (!b) return;
-      b.textContent = rows.length ? 'Изменить фильтры' : 'Добавить фильтры';
-      // Число выбранных значений бейджем, как у «Все фильтры» в каталоге.
-      if (rows.length) {
-        var n = document.createElement('span');
-        n.className = 'n';
-        n.textContent = rows.length;
-        b.appendChild(n);
-      }
-    });
-    $('filter-reset').hidden = !rows.length;
+    var rows = filter.topics.length + filter.tags.length + filter.sources.length
+      + filter.stars.length;
+    $('filter-reset').hidden = !rows;
     /* ⚠️ ФИЛЬТР ПО СЛОЖНОСТИ ДЕЛАЕТ РАУНД ТРЕНИРОВОЧНЫМ — игрок узнаёт это ДО
        раунда. Про ×1,3 без фильтров рассказывает поповер «Как считаются очки». */
     var note = $('filter-note');
@@ -2790,13 +2764,21 @@ body.on-final .rush-wrap { max-width: 1160px; }
           + plural(filter.tags.length, ['тег', 'тега', 'тегов']));
       }
     }
-    $('fsum-topics').textContent = topics.length ? topics.join(', ') : 'все';
-    $('fsum-stars').textContent = filter.stars.length
-      ? filter.stars.join(', ') + '★' : 'любая';
     var src = filter.sources;
-    $('fsum-sources').textContent = !src.length ? 'все'
-      : src.length === 1 ? (srcTitles[src[0]] || src[0])
-      : src.length + ' ' + plural(src.length, ['источник', 'источника', 'источников']);
+    var texts = {
+      topics: topics.length ? topics.join(', ') : 'все',
+      stars: filter.stars.length ? filter.stars.join(', ') + '★' : 'любая',
+      sources: !src.length ? 'все'
+        : src.length === 1 ? (srcTitles[src[0]] || src[0])
+        : src.length + ' ' + plural(src.length, ['источник', 'источника', 'источников'])
+    };
+    // Одна сводка на главной (`fsum-*`) и в окне дуэли (`dmsum-*`, ADR 0112).
+    ['fsum-', 'dmsum-'].forEach(function (prefix) {
+      Object.keys(texts).forEach(function (k) {
+        var el = document.getElementById(prefix + k);
+        if (el) el.textContent = texts[k];
+      });
+    });
   }
 
   /* Живые счётчики: сколько вопросов даст каждый режим под этим выбором. */
@@ -5758,31 +5740,27 @@ body.on-final .rush-wrap { max-width: 1160px; }
       }
     }
 
-    /* Карточки режимов окна. Число под каждой — сколько вопросов даёт
-       режим ПОД ТЕКУЩИМ ФИЛЬТРОМ; берётся из уже посчитанного
-       `poolCounts` (api_pool_counts), своего запроса не заводим. */
+    /* Вкладки режимов окна (макет DuelCreate): значок, название и «1 мин · 568».
+       Число — сколько вопросов даёт режим ПОД ТЕКУЩИМ ФИЛЬТРОМ; берётся из уже
+       посчитанного `poolCounts` (api_pool_counts), своего запроса не заводим. */
     function paintModes() {
       var grid = $('dm-modes');
       grid.innerHTML = '';
       MODE_ORDER.forEach(function (key) {
         var m = CFG.modes[key];
         if (!m || !CFG.pool_counts[key]) return;
-        var avail = (poolCounts && poolCounts[key] != null)
-          ? poolCounts[key] : CFG.pool_counts[key];
-        var low = avail < (CFG.min_playable || 10);
+        var avail = availFor(key);
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'dm-mode';
         b.dataset.mode = key;
         b.setAttribute('aria-pressed', key === mode ? 'true' : 'false');
-        var name = document.createElement('b');
-        name.textContent = m.title;
-        var sub = document.createElement('small');
-        if (low) sub.className = 'low';
-        sub.textContent = avail + ' '
-          + plural(avail, ['вопрос', 'вопроса', 'вопросов']);
-        b.appendChild(name);
-        b.appendChild(sub);
+        b.innerHTML = ICONS[(MODE_META[key] || {}).icon] || '';
+        var txt = finEl('span');
+        txt.appendChild(finEl('span', 't', m.title));
+        txt.appendChild(finEl('span', 'm' + (avail < (CFG.min_playable || 10) ? ' low' : ''),
+                              durationText(m.duration) + ' · ' + avail.toLocaleString('ru-RU')));
+        b.appendChild(txt);
         b.addEventListener('click', function () {
           mode = key;
           renderModeTabs();      // подсветка на стартовом экране — та же
@@ -5795,12 +5773,13 @@ body.on-final .rush-wrap { max-width: 1160px; }
     }
 
     function paintCount() {
-      var avail = (poolCounts && poolCounts[mode] != null)
-        ? poolCounts[mode] : (CFG.pool_counts[mode] || 0);
-      $('dm-count').textContent = avail + ' '
-        + plural(avail, ['вопрос подходит', 'вопроса подходят',
-                         'вопросов подходит'])
-        + ' · играете, пока есть время и жизни';
+      var avail = availFor(mode);
+      var el = $('dm-count');
+      el.innerHTML = '';
+      el.appendChild(finEl('b', null, avail.toLocaleString('ru-RU')));
+      el.appendChild(document.createTextNode(' '
+        + plural(avail, ['вопрос', 'вопроса', 'вопросов'])
+        + ' под фильтром · раунд без лимита вопросов'));
     }
 
     function fail(text) {
@@ -5843,8 +5822,12 @@ body.on-final .rush-wrap { max-width: 1160px; }
     openDuelWindow = open;
     $('entry-duel').addEventListener('click', function () { open(true); });
     $('dmodal-close').addEventListener('click', function () { open(false); });
+    $('dm-cancel').addEventListener('click', function () { open(false); });
     $('dm-filters').addEventListener('click', function () {
       openFilters(true, this);
+    });
+    box.querySelectorAll('[data-dm-filters]').forEach(function (chip) {
+      chip.addEventListener('click', function () { openFilters(true, chip); });
     });
     box.addEventListener('keydown', function (e) {
       e.stopPropagation();
@@ -6450,10 +6433,66 @@ body.on-final .rush-wrap { max-width: 1160px; }
     }
 
     /* Строка лобби «кто на месте». Автор ждёт любого второго, соперник —
-       автора; свой же вход (вторая вкладка) соперником не считается. */
-    function lobbyLine(text, here) {
+       автора; свой же вход (вторая вкладка) соперником не считается. Видна
+       строка, только когда слотам есть что добавить (`alarm`): нет связи,
+       раунд уже прошёл, играть нельзя. Кто на месте, показывают слоты. */
+    function lobbyLine(text, here, alarm) {
       $('duel-lobby-text').textContent = text;
-      $('duel-lobby-state').classList.toggle('is-here', !!here);
+      var line = $('duel-lobby-state');
+      line.classList.toggle('is-here', !!here);
+      line.classList.toggle('is-alarm', !!alarm);
+      line.hidden = !alarm;
+    }
+
+    /* Слоты «автор VS соперник» (макет DuelLobby). Свой слот — автора у
+       автора и соперника у соперника; точка у него — связь с комнатой. */
+    var openedAt = Date.now();
+    var ownSlot = AUTO_SET.is_author ? 'author' : 'rival';
+
+    function initialsOf(name) {
+      return (name || '').split(/[\s_.\-]+/).filter(Boolean).slice(0, 2)
+        .map(function (p) { return p.charAt(0); }).join('').toUpperCase() || '?';
+    }
+
+    function paintSlot(which, opts) {
+      var slot = $('duel-slot-' + which);
+      if ('on' in opts) {
+        slot.classList.toggle('is-on', opts.on);
+        slot.classList.toggle('is-empty', !opts.on && which === 'rival' && AUTO_SET.is_author);
+      }
+      if (opts.name != null) {
+        slot.querySelector('.dl-who').textContent = opts.name;
+        slot.querySelector('.dl-av').textContent = opts.initials || '?';
+      }
+      if (opts.state != null) $('duel-' + which + '-state').textContent = opts.state;
+      if ('dot' in opts) {
+        var dot = $('duel-' + which + '-dot');
+        dot.hidden = opts.dot === null;
+        dot.classList.toggle('is-off', opts.dot === false);
+      }
+    }
+
+    function paintOwnLink(on) {
+      paintSlot(ownSlot, {
+        dot: on,
+        state: on ? (AUTO_SET.is_author ? 'автор · готов' : 'принимаете вызов')
+                  : (AUTO_SET.is_author ? 'автор · нет связи' : 'нет связи')
+      });
+    }
+
+    /* Оба на месте и старт назначен: приглашать больше некого — код, ссылка
+       и «Отменить» уходят, по центру общий отсчёт (макет DuelLobbyReady). */
+    function paintReady() {
+      $('duel-invite').hidden = true;
+      $('duel-note').hidden = true;
+      $('duel-cancel').hidden = true;
+      $('duel-lobby-state').hidden = true;
+      $('duel-countdown-sub').hidden = false;
+      paintSlot('author', { on: true, state: 'автор · готов' });
+      paintSlot('rival', { on: true, state: 'принял вызов' });
+      if (AUTO_SET.is_author && $('duel-rival-name').textContent === 'Ждём соперника…') {
+        paintSlot('rival', { name: 'Соперник', initials: '?' });
+      }
     }
 
     function waitingLine() {
@@ -6478,10 +6517,11 @@ body.on-final .rush-wrap { max-width: 1160px; }
       var target = m.at - ((m.now || Date.now()) - Date.now());
       var modeInfo = CFG.modes[AUTO_SET.mode];
       if (modeInfo && Date.now() - target > modeInfo.duration * 1000) {
-        lobbyLine('Раунд этой дуэли уже прошёл', false);
+        lobbyLine('Раунд этой дуэли уже прошёл', false, true);
         return;
       }
       scheduled = true;
+      paintReady();
       var shown = 0;
       function step() {
         var left = Math.ceil((target - Date.now()) / 1000);
@@ -6500,7 +6540,10 @@ body.on-final .rush-wrap { max-width: 1160px; }
         countdown.classList.add('is-go');
         countdown.textContent = 'Поехали!';
         rush('countdown', 0);
-        setTimeout(function () { countdown.hidden = true; }, 900);
+        setTimeout(function () {
+          countdown.hidden = true;
+          $('duel-countdown-sub').hidden = true;
+        }, 900);
         if (window.weco) {
           weco.track('duel_start', { mode: AUTO_SET.mode,
                                      late_ms: Math.max(0, Date.now() - target) });
@@ -6523,7 +6566,10 @@ body.on-final .rush-wrap { max-width: 1160px; }
       sock.addEventListener('open', function () {
         panel.hidden = false;
         duelLink = true;
-        if (!scheduled) lobbyLine(waitingLine(), false);
+        if (!scheduled) {
+          lobbyLine(waitingLine(), false, !AUTO_SET.allowed);
+          paintOwnLink(true);
+        }
         // «Привет» просит табло и назначенный старт: после обрыва счёт
         // соперника надо восстановить, а отсчёт — вести к тому же моменту.
         sock.send(JSON.stringify({ type: 'hello' }));
@@ -6541,9 +6587,25 @@ body.on-final .rush-wrap { max-width: 1160px; }
           showScore(m);
         } else if (m.type === 'presence' && isRival(m.username)) {
           if (m.action === 'join') {
-            if (!scheduled && AUTO_SET.allowed) lobbyLine('Соперник: ' + m.username, true);
+            if (!scheduled && AUTO_SET.allowed) {
+              lobbyLine('Соперник: ' + m.username, true, false);
+              if (AUTO_SET.is_author) {
+                paintSlot('rival', { on: true, name: m.username, initials: initialsOf(m.username),
+                                     state: 'принял вызов', dot: true });
+              } else {
+                paintSlot('author', { on: true, state: 'автор · готов', dot: true });
+              }
+            }
           } else if (m.action === 'leave') {
-            if (!scheduled) lobbyLine(waitingLine(), false);
+            if (!scheduled) {
+              lobbyLine(waitingLine(), false, !AUTO_SET.allowed);
+              if (AUTO_SET.is_author) {
+                paintSlot('rival', { on: false, name: 'Ждём соперника…', initials: '?',
+                                     state: 'откроет ссылку или введёт код', dot: null });
+              } else {
+                paintSlot('author', { on: false, state: 'автор · вышел из лобби', dot: null });
+              }
+            }
             // Ушёл — карточка гаснет вместе с отсчётом: показывать живое
             // время того, кого нет, значит врать.
             vsRivalDone = true;
@@ -6554,8 +6616,16 @@ body.on-final .rush-wrap { max-width: 1160px; }
       sock.addEventListener('close', function () {
         // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться. В лобби
         // говорим прямо: без связи с комнатой общий старт не придёт.
-        if (!scheduled) lobbyLine('Нет связи с комнатой, пробуем снова…', false);
         duelLink = false;
+        if (!scheduled) {
+          // Первые две секунды сокет только поднимается — «нет связи» тогда
+          // пугало бы зря; сказать, если связи нет и после них.
+          setTimeout(function () {
+            if (duelLink || scheduled) return;
+            paintOwnLink(false);
+            lobbyLine('Нет связи с комнатой, пробуем снова…', false, true);
+          }, Math.max(0, 2000 - (Date.now() - openedAt)));
+        }
         setTimeout(connect, 4000);
       });
     }

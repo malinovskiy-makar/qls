@@ -16,6 +16,10 @@ ADR 0108, макеты `claude/mockups/wecon_rush_20260917/Main|Student|Dark|Mob
 зоны скрыты, а видна карточка набора `#set-intro` или лобби `#duel-lobby`.
 {% endcomment %}
 <section id="screen-start" class="screen active">
+  {% comment %} ⚠️ У ЛОББИ ДУЭЛИ ГЛАВНОЙ ПОЗАДИ НЕТ (ADR 0112): три зоны стартового
+     экрана на этой странице не отдаются вовсе. Код старта общий и ищет их при
+     загрузке — `$` в game.html отдаёт ему пустышки, а не падает. {% endcomment %}
+  {% if not auto_set or auto_set.kind != 'duel' %}
   <div class="start-main" id="start-main">
 
     {# ── ЗОНА A: ЗАБЕГ ───────────────────────────────────────────────── #}
@@ -178,6 +182,7 @@ ADR 0108, макеты `claude/mockups/wecon_rush_20260917/Main|Student|Dark|Mob
       </div>
     </div>
   </div>
+  {% endif %}
 
   {# Карточка набора и лобби дуэли — вместо трёх зон на `/game/s/<код>/`. #}
   <div class="start-set" id="start-set" hidden>
@@ -195,26 +200,59 @@ ADR 0108, макеты `claude/mockups/wecon_rush_20260917/Main|Student|Dark|Mob
       </div>
     </div>
     {% if auto_set and auto_set.kind == 'duel' %}
-    {% comment %} ── Лобби дуэли ───────────────────────────────────────────────────
+    {% comment %} ── Лобби дуэли (макеты DuelLobby и DuelLobbyReady, ADR 0112) ─────
          Решение владельца 15.09.2026: дуэль строго синхронна. Кнопки «Играть»
          нет ни у автора, ни у соперника: оба ждут здесь, и раунд начинается
          у обоих по одному отсчёту, когда в комнате двое (game/consumers.py,
-         момент `started_at` — game/state.py). Карточки набора у дуэли нет. {% endcomment %}
+         момент `started_at` — game/state.py). Слоты «автор VS соперник» и
+         отсчёт двигает блок «Дуэль в реальном времени» в game.html. {% endcomment %}
     <div class="duel-lobby" id="duel-lobby">
-      <div class="set-kind">Дуэль</div>
-      <h2 class="set-title">{{ auto_set.title }}</h2>
-      <p class="set-meta">Режим «{{ auto_set.mode_title }}» · без лимита вопросов · у обоих одни и те же вопросы</p>
-      <div class="duel-code-row">
-        <span class="duel-code" id="duel-code">{{ auto_set.code }}</span>
-        <button type="button" class="duel-copy-code" id="duel-copy-code">Скопировать код</button>
+      <div class="dl-head">
+        <span class="dl-lab">Дуэль</span>
+        <h2 class="dl-title">{{ auto_set.mode_title }} · {{ auto_set.duration_text }} · {{ auto_set.lives|count_ru:"жизнь,жизни,жизней" }}</h2>
+        <p class="dl-terms">{{ auto_set.filter_text }} · у обоих одни и те же вопросы · раунд без лимита вопросов</p>
       </div>
-      <button type="button" class="set-play duel-copy" id="duel-copy">Скопировать ссылку</button>
-      <div class="duel-lobby__row">
-        <input type="text" id="duel-link" readonly value="{{ duel_url }}" aria-label="Ссылка на дуэль">
+      <div class="dl-invite" id="duel-invite">
+        <div class="duel-code-row">
+          <b class="duel-code" id="duel-code">{{ auto_set.code }}</b>
+          <button type="button" class="dl-btn duel-copy-code" id="duel-copy-code">Скопировать код</button>
+        </div>
+        <div class="duel-lobby__row">
+          <input type="text" id="duel-link" readonly value="{{ duel_url }}" aria-label="Ссылка на дуэль">
+          <button type="button" class="dl-btn dl-primary duel-copy" id="duel-copy">Скопировать ссылку</button>
+        </div>
       </div>
-      <p class="dm-state" id="duel-lobby-state"><span class="dm-dot"></span><span id="duel-lobby-text">{% if not auto_set.allowed %}{{ auto_set.why }}{% elif auto_set.is_author %}Ждём соперника…{% else %}Соперник: {{ auto_set.author }}{% endif %}</span></p>
+      <div class="dl-slots">
+        <div class="dl-slot{% if auto_set.is_author %} is-on{% endif %}" id="duel-slot-author">
+          <span class="dl-av" aria-hidden="true">{{ auto_set.author_initials }}</span>
+          <span class="dl-slot-t"><b class="dl-who">{% if auto_set.is_author %}Вы · {% endif %}{{ auto_set.author }}</b>
+            <span class="dl-st"><i class="dl-dot" id="duel-author-dot" hidden></i><span id="duel-author-state">автор</span></span></span>
+        </div>
+        <span class="dl-vs" aria-hidden="true">VS</span>
+        {% if auto_set.is_author %}
+        <div class="dl-slot is-empty" id="duel-slot-rival">
+          <span class="dl-av" id="duel-rival-av" aria-hidden="true">?</span>
+          <span class="dl-slot-t"><b class="dl-who" id="duel-rival-name">Ждём соперника…</b>
+            <span class="dl-st"><i class="dl-dot" id="duel-rival-dot" hidden></i><span id="duel-rival-state">откроет ссылку или введёт код</span></span></span>
+        </div>
+        {% else %}
+        <div class="dl-slot is-on" id="duel-slot-rival">
+          <span class="dl-av" id="duel-rival-av" aria-hidden="true">{{ auto_set.me_initials|default:"?" }}</span>
+          <span class="dl-slot-t"><b class="dl-who" id="duel-rival-name">{% if auto_set.me %}Вы · {{ auto_set.me }}{% else %}Вы{% endif %}</b>
+            <span class="dl-st"><i class="dl-dot" id="duel-rival-dot" hidden></i><span id="duel-rival-state">{% if auto_set.allowed %}принимаете вызов{% else %}{{ auto_set.why }}{% endif %}</span></span></span>
+        </div>
+        {% endif %}
+      </div>
+      <p class="dm-state" id="duel-lobby-state"{% if auto_set.allowed %} hidden{% endif %}><span class="dm-dot"></span><span id="duel-lobby-text">{% if not auto_set.allowed %}{{ auto_set.why }}{% elif auto_set.is_author %}Ждём соперника…{% else %}Соперник: {{ auto_set.author }}{% endif %}</span></p>
       <p class="duel-countdown" id="duel-countdown" hidden aria-live="assertive"></p>
-      <a class="duel-cancel" href="/game/">Отменить</a>
+      <p class="dl-cd-sub" id="duel-countdown-sub" hidden>Старт у обоих одновременно</p>
+      {% if auto_set.is_author %}
+      <p class="dl-note" id="duel-note">Как только соперник примет вызов, у обоих пойдёт отсчёт пять секунд – не уходите со страницы. Принять вызов могут только вошедшие.</p>
+      <a class="duel-cancel" id="duel-cancel" href="/game/">Отменить дуэль</a>
+      {% else %}
+      <p class="dl-note" id="duel-note">Как только автор вызова будет в лобби, у обоих пойдёт отсчёт пять секунд – не уходите со страницы.</p>
+      <a class="duel-cancel" id="duel-cancel" href="/game/">Не сейчас – в обычную игру</a>
+      {% endif %}
     </div>
     {% endif %}
   </div>

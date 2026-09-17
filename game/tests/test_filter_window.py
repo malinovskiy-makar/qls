@@ -236,11 +236,15 @@ class FilterWindowMarkupTests(TestCase):
         self.assertNotIn('class="topic-chip', self.src)
 
     def test_one_button_instead(self):
-        self.assertIn('>Добавить фильтры</button>', self.src)
-        self.assertIn("'Изменить фильтры'", self.src)
-        # При наведении текст чуть жирнее и крупнее — просьба владельца.
-        self.assertIn('.filter-open:hover {', self.src)
-        self.assertIn('font-weight: 700;', self.src)
+        u"""С 17.09.2026 (ADR 0108, 0112) выбор фильтра виден строкой «Что решаем»
+        тремя чипами-сводками — на главной и в окне дуэли; каждый открывает окно."""
+        self.assertIn('<span>Настроить фильтры</span></button>', self.src)
+        self.assertIn('with name="sliders" %}Настроить фильтры</button>', self.src)
+        for prefix in ('fsum-', 'dmsum-'):
+            for part in ('topics', 'stars', 'sources'):
+                self.assertIn('id="%s%s"' % (prefix, part), self.src)
+        for gone in ('Добавить фильтры', "'Изменить фильтры'", 'class="fchip"', "'fchip'"):
+            self.assertNotIn(gone, self.src, gone)
 
     def test_modal_has_every_group(self):
         for marker in ('<h3>Тема</h3>', '<h3>Тег</h3>', '<h3>Сложность</h3>',
@@ -294,10 +298,11 @@ class FilterWindowMarkupTests(TestCase):
         self.assertIn("'/game/api/pool_counts/?'", self.src)
         self.assertIn('}, 250);', self.src)
 
-    def test_chips_have_a_cross_and_reset(self):
-        self.assertIn("chip.className = 'fchip';", self.src)
+    def test_reset_stays_and_chips_with_a_cross_are_gone(self):
+        u"""Чипы с крестиком жили только в окне дуэли; с 17.09.2026 там сводка
+        «Что решаем» (ADR 0112). Снять весь фильтр — «Сбросить всё»."""
         self.assertIn('>Сбросить всё</button>', self.src)
-        self.assertIn("'Снять фильтр '", self.src)
+        self.assertNotIn("'Снять фильтр '", self.src)
 
     def test_state_lives_in_the_url_and_storage(self):
         self.assertIn('history.replaceState', self.src)
