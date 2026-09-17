@@ -23,11 +23,17 @@ body {
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
+  /* Колонка во всю высоту окна: метка версии (`_site_version.html`, margin-top: auto)
+     стоит внизу окна и на короткой странице, а не посередине под содержимым. */
+  display: flex;
+  flex-direction: column;
   transition: background-color .2s ease, color .2s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+/* Во flex-колонке `margin: 0 auto` сжал бы main по содержимому — ширину задаём явно. */
+body > main { width: 100%; }
 
 /* ── Шапка ─────────────────────────────────────────── */
 .site-header {

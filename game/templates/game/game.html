@@ -50,6 +50,10 @@ body {
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
+  /* Колонка во всю высоту окна: экран игры растягивается до низа окна, и метка
+     версии стоит внизу и на коротком экране (итог практики), а не посередине. */
+  display: flex;
+  flex-direction: column;
   transition: background-color .2s ease, color .2s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -117,7 +121,15 @@ a:focus-visible, button:focus-visible {
   max-width: 880px;
   margin: 0 auto;
   padding: 24px 20px 40px;
+  /* Во flex-колонке `margin: 0 auto` сжал бы обёртку по содержимому; растёт до низа окна. */
+  width: 100%;
+  flex: 1 0 auto;
 }
+/* Метка версии (`_site_version.html`) — в нижнем поле экрана, без своей строки: главная
+   на 1440×800 занята ровно в высоту окна, и строка в 40 px дала бы прокрутку. Поднята
+   на свою высоту (10 + 14 px полей и строка 1,3em) и не ловит нажатия. В раунде её нет,
+   как и шапки сайта. `body >` — сильнее правила партиала, которое стоит ниже в документе. */
+body > .site-version { position: relative; margin-top: calc(-24px - 1.3em); pointer-events: none; }
 
 .screen { display: none; }
 .screen.active { display: block; }
@@ -1124,7 +1136,8 @@ body.figfull .vignette.alarm { opacity: .42; }
    окна, длинное условие листается ВНУТРИ карточки вопроса, а полоса, ответ и
    нижний ряд остаются на месте. */
 body.rush-playing nav.site-nav, body.rush-playing #nav-panel { display: none !important; }
-body.rush-playing .tg-fab, body.rush-playing .fb-btn { display: none !important; }
+body.rush-playing .tg-fab, body.rush-playing .fb-btn, body.rush-playing .site-version,
+body.figfull .site-version { display: none !important; }
 body.rush-playing .rush-wrap { max-width: none; padding: 0; }
 @media (min-width: 721px) {
   html:has(body.rush-playing), body.rush-playing { overflow: hidden; }
@@ -7176,6 +7189,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
 здесь — снимок экрана снимается на клиенте, в момент нажатия.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_site_version.html' %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 {% include '_problem_report.html' %}

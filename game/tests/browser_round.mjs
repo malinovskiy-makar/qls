@@ -104,6 +104,8 @@ try {
       return {
         playing: document.body.classList.contains('rush-playing'),
         navHidden: !nav || getComputedStyle(nav).display === 'none',
+        // Метка «Beta 1.0» уходит вместе с шапкой: иначе легла бы на нижний ряд раунда (P8).
+        versionHidden: getComputedStyle(document.querySelector('.site-version')).display === 'none',
         timer: document.getElementById('hud-timer').textContent.trim(),
         options: opts.length, cols,
         keyInFirstCol: !!(key && o && key.left - o.getBoundingClientRect().left < 20),
@@ -124,7 +126,7 @@ try {
           && m.lastBottom !== null && m.lastBottom <= s1.ih && m.footBottom <= s1.ih
           && m.hudTop >= 0 && m.metaTop >= m.hudBottom, { m, s1 });
     check('timer_is_m_ss', /^\d+:\d{2}$/.test(m.timer), m.timer);
-    check('site_header_hidden', m.playing && m.navHidden, m);
+    check('site_header_hidden', m.playing && m.navHidden && m.versionHidden, m);
     check('option_grid_three_columns', m.cols === 3 && m.keyInFirstCol && m.lastWide, m);
     check('guest_has_no_record_chip', !m.rec, m);
 

@@ -3,7 +3,8 @@ u"""Сборка игрового набора учителем в настоя�
 
 Раннер `browser_teacher_sets.mjs`: набор переживает смену темы, «Показать ещё 20» и
 перезагрузку страницы, стрелки меняют порядок, смена режима спрашивает, сохранение
-чистит черновик; сборка и страница набора на телефоне без прокрутки вбок.
+чистит черновик; сборка и страница набора на телефоне без прокрутки вбок. Заодно (фаза P8):
+метка «Beta 1.0» на короткой странице кабинета и на экране входа стоит внизу окна.
 
 Нет node или Playwright — тест ПРОПУСКАЕТСЯ, а не падает.
 """
@@ -20,7 +21,8 @@ from problems.models import Problem, User
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_teacher_sets.mjs')
 CHECKS = {'set_survives_filters_and_paging', 'set_restored_after_reload', 'arrows_reorder_question_ids',
-          'mode_switch_asks_when_not_empty', 'save_clears_the_draft', 'builder_and_detail_mobile_no_side_scroll'}
+          'mode_switch_asks_when_not_empty', 'save_clears_the_draft', 'builder_and_detail_mobile_no_side_scroll',
+          'version_at_the_bottom_of_short_pages'}
 
 
 # ⚠️ ПРИЧИНА МЕТКИ `serial`: класс поднимает живой сервер и гоняет по нему

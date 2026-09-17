@@ -11,7 +11,10 @@
    - стрелка «ниже» меняет порядок, и скрытое поле question_ids — тоже;
    - смена режима при непустом наборе спрашивает, «Оставить как есть» ничего не меняет;
    - сохранение ведёт на страницу набора и чистит черновик;
-   - телефон 390 px: сборка и страница набора без прокрутки вбок.
+   - телефон 390 px: сборка и страница набора без прокрутки вбок;
+   - метка «Beta 1.0» на короткой странице стоит внизу окна, а не посередине
+     (на бою 17.09 висела посреди `/teacher/game-sets/`; фаза P8) — список наборов
+     учителя и экран входа.
 
    Запуск руками:
      RUSH_BASE_URL=http://127.0.0.1:8000 RUSH_SESSION=значение_sessionid node game/tests/browser_teacher_sets.mjs
@@ -126,6 +129,25 @@ try {
       widths[href] = await page.evaluate(() => [document.documentElement.scrollWidth, document.documentElement.clientWidth]);
     }
     check('builder_and_detail_mobile_no_side_scroll', !!href && Object.values(widths).every(([sw, cw]) => sw <= cw), widths);
+  });
+
+  await block(['version_at_the_bottom_of_short_pages'], async () => {
+    const seen = {};
+    for (const [path, withSession] of [['/teacher/game-sets/', true], ['/login/', false]]) {
+      const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+      contexts.push(context);
+      if (withSession) await context.addCookies([{ name: 'sessionid', value: SESSION, domain: host, path: '/' }]);
+      const page = await context.newPage();
+      await page.goto(BASE + path, { waitUntil: 'load', timeout: 30000 });
+      seen[path] = await page.evaluate(() => {
+        const r = document.querySelector('.site-version').getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), left: Math.round(r.left),
+                 ih: innerHeight, sh: document.documentElement.scrollHeight };
+      });
+    }
+    // Короткая страница: прокрутки нет, метка у нижнего края окна (на входе — над полем body в 24 px), слева.
+    const ok = (p, gap) => p.sh === p.ih && Math.abs(p.ih - gap - p.bottom) <= 1 && p.left <= 24;
+    check('version_at_the_bottom_of_short_pages', ok(seen['/teacher/game-sets/'], 0) && ok(seen['/login/'], 24), seen);
   });
 } catch (e) {
   out.error = String((e && e.stack) || e);
