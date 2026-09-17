@@ -103,19 +103,6 @@ nav.site-nav {
 
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
-/* Метка версии. Стоит в липкой шапке (z-index 200) — её не закрывает ни
-   кружок Telegram снизу, ни панели калькулятора: угол, который всегда виден. */
-.nav-version {
-  font-size: 12px;
-  font-weight: 500;
-  color: rgba(255, 255, 255, .55);
-  border: 0.5px solid rgba(255, 255, 255, .2);
-  border-radius: var(--r);
-  padding: 3px 7px;
-  white-space: nowrap;
-  flex-shrink: 0;
-}
-
 /* Кнопки-иконки шапки (тема, ☰) и кнопка выхода — радиус по канону. */
 .nav-icon-btn {
   font-size: 14px;
@@ -207,7 +194,6 @@ nav.site-nav {
      без них правило доставало и до панели, а метка внутри неё получала
      `display: flex` и растягивалась на всю ширину. */
   nav.site-nav > .nav-links { display: none; }
-  .nav-right .nav-version { display: none; }
   .nav-panel {
     position: absolute;
     left: 0; right: 0;
@@ -235,7 +221,6 @@ nav.site-nav {
     border-left-color: var(--nav-accent);
     color: var(--nav-accent);
   }
-  .nav-panel .nav-version { display: inline-block; margin: 8px 0 0 10px; }
 }
 
 /* ⚠️ ИМЯ В ПЛАШКЕ ПОКАЗЫВАЕТСЯ ТОЛЬКО НА ШИРОКОМ ЭКРАНЕ. Оно бывает
@@ -286,7 +271,6 @@ nav.site-nav {
       </svg>
       <span class="fb-btn-text">Проблема или предложение</span>
     </button>
-    <span class="nav-version">{{ site_version }}</span>
     {% include '_theme_toggle.html' %}
     {% if user.is_authenticated %}
       <a class="nav-user" href="/profile/">
@@ -319,7 +303,6 @@ nav.site-nav {
       <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
       {% endfor %}
     </div>
-    <span class="nav-version">{{ site_version }}</span>
     <button type="button" class="fb-btn" aria-label="Проблема или предложение">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">

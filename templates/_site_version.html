@@ -1,0 +1,22 @@
+{% comment %}
+Метка версии сайта внизу страницы (решение владельца 17.09.2026).
+
+Маленький текст без рамки и фона, размер подписей. Раньше «beta 0.0» стояла
+в шапке. Слева — потому что справа внизу закреплены кружок Telegram и кнопка
+«Проблема или предложение». Не закреплена: строка в конце страницы не
+перекрывает содержимое. Значение — `SITE_VERSION` из настроек.
+Подключается перед `_feedback.html` во всех базовых шаблонах, кроме игры:
+`game/` ведёт сессия редизайна Wecon Rush.
+{% endcomment %}
+<style>
+.site-version {
+  display: block;
+  padding: 10px 16px 14px;
+  font-size: 12px;
+  line-height: 1.3;
+  color: var(--text3);
+  text-align: left;
+}
+</style>
+<style media="print">.site-version { display: none; }</style>
+<div class="site-version">{{ site_version }}</div>

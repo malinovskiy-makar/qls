@@ -189,7 +189,19 @@ class ActiveItemTests(TestCase):
 
 
 class VersionBadgeTests(TestCase):
-    """Метка версии — на всех семи шаблонах, которые подключают шапку."""
+    """Метка версии — строкой внизу страницы (решение владельца 17.09.2026).
+
+    До 17.09 «beta 0.0» стояла в шапке и на экранах входа; теперь «Beta 1.0»
+    одним партиалом `_site_version.html` во всех базовых шаблонах, кроме игры
+    (`game/` ведёт сессия редизайна Wecon Rush — там метки пока нет вовсе)."""
+
+    BASES = (
+        'templates/registration/login.html', 'templates/registration/register.html',
+        'catalog/templates/catalog/base.html', 'student/templates/student/base.html',
+        'teacher/templates/teacher/base.html', 'calc2/templates/calc2/calc2.html',
+        'problems/templates/platform/base.html',
+        'calendar_stub/templates/calendar_stub/calendar.html',
+    )
 
     def setUp(self):
         self.users = {
@@ -199,24 +211,36 @@ class VersionBadgeTests(TestCase):
                 username='nav_ver_tu', password=PASSWORD, role='teacher'),
         }
 
-    def test_version_on_every_template(self):
+    def test_version_at_the_bottom_of_every_template(self):
         for url, template, role in TEMPLATE_PAGES:
             self.client.force_login(self.users[role])
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200,
                              '%s (%s, %s)' % (url, template, role))
             html = response.content.decode('utf-8')
-            # Ровно два: один в шапке, один в панели узкого экрана. Это одна
-            # и та же метка в двух видах, а не две разные.
-            self.assertEqual(html.count('beta 0.0'), 2,
-                             '%s (%s)' % (url, template))
+            self.assertFalse('beta 0.0' in html, url)
+            self.assertFalse('nav-version' in html, url)
+            if template != 'game/game.html':
+                self.assertEqual(html.count('<div class="site-version">Beta 1.0</div>'), 1, url)
+
+    def test_login_and_register_have_it_below(self):
+        self.client.logout()
+        for url in ('/login/', '/register/'):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertTrue('<div class="site-version">Beta 1.0</div>' in html, url)
+            self.assertFalse('auth-version' in html, url)
+
+    def test_partial_is_included_in_every_base_template(self):
+        for path in self.BASES:
+            with open(path, encoding='utf-8') as fh:
+                self.assertTrue("{% include '_site_version.html' %}" in fh.read(), path)
 
     def test_version_comes_from_settings(self):
         self.client.force_login(self.users['student'])
-        with self.settings(SITE_VERSION='beta 9.9'):
+        with self.settings(SITE_VERSION='Beta 9.9'):
             html = self.client.get('/catalog/').content.decode('utf-8')
-        self.assertIn('beta 9.9', html)
-        self.assertNotIn('beta 0.0', html)
+        self.assertTrue('Beta 9.9' in html, 'значение не из настроек')
+        self.assertFalse('Beta 1.0' in html, 'значение зашито в шаблон')
 
 
 class LogoutTests(TestCase):

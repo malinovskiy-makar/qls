@@ -399,6 +399,14 @@ class OnEveryScreenTests(TestCase):
         self.assertNotIn('mark_safe(', src)
         self.assertNotIn('import mark_safe', src)
 
+    def test_telegram_circle_is_a_third_bigger_in_the_same_corner(self):
+        """17.09.2026: 40 → 53 px, значок 19 → 25 px; угол прежний."""
+        src = io.open('templates/_feedback.html', encoding='utf-8').read()
+        rule = src.split('.tg-fab {', 1)[1].split('}', 1)[0]
+        self.assertTrue('width: 53px; height: 53px;' in rule, rule)
+        self.assertTrue('right: 16px; bottom: 16px;' in rule, rule)
+        self.assertTrue('.tg-fab svg { width: 25px; height: 25px; }' in src, 'значок не увеличен')
+
     def test_hidden_from_print(self):
         html = self.client.get('/catalog/').content.decode('utf-8')
         self.assertIn('@media print', html)

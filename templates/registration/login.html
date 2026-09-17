@@ -23,7 +23,6 @@
     </svg>
     <span class="fb-btn-text">Проблема или предложение</span>
   </button>
-  <span class="auth-version">{{ site_version }}</span>
   {% include '_theme_toggle.html' with theme_btn_class='auth-icon-btn' %}
 </div>
 
@@ -99,6 +98,7 @@
 здесь — снимок экрана снимается на клиенте, в момент нажатия.
 {% endcomment %}
 <script src="{% static 'vendor/html2canvas-1.4.1/html2canvas.min.js' %}"></script>
+{% include '_site_version.html' %}
 {% include '_feedback.html' %}
 {% include '_track.html' %}
 </body>

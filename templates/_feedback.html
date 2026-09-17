@@ -81,10 +81,12 @@
 .fb-shot { font-size: 12px; color: var(--text3); margin-top: 10px; }
 
 /* ── Кружок Telegram ───────────────────────────────────────────────── */
-/* z-index 150: ниже шапки (200) и ниже любых окон (400+). */
+/* z-index 150: ниже шапки (200) и ниже любых окон (400+).
+   Размер 53 px и значок 25 px — на треть крупнее прежних 40 и 19 (решение
+   владельца 17.09.2026); угол прежний. */
 .tg-fab {
   position: fixed; right: 16px; bottom: 16px; z-index: 150;
-  width: 40px; height: 40px;
+  width: 53px; height: 53px;
   display: flex; align-items: center; justify-content: center;
   background: var(--surface);
   border: .5px solid var(--border);
@@ -94,7 +96,7 @@
   transition: transform .12s, border-color .12s;
 }
 .tg-fab:hover { transform: translateY(-2px); border-color: var(--accent-ring); }
-.tg-fab svg { width: 19px; height: 19px; }
+.tg-fab svg { width: 25px; height: 25px; }
 
 /* Печать: ни кнопки, ни кружка на листе. */
 @media print {
