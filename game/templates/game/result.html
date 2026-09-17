@@ -107,13 +107,15 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
 .share-row { display: flex; gap: 8px; margin-top: 10px; }
 .share-row button {
   flex: 1;
-  font: inherit; font-size: 14px; font-weight: 600;
+  font: inherit; font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   height: 42px;
   border: 1px solid var(--border); border-radius: 10px;
   background: var(--surface); color: var(--text2);
   cursor: pointer;
 }
 .share-row button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.share-row button .qi { width: 16px; height: 16px; }
 .foot { margin-top: 18px; font-size: 13px; color: var(--text3); text-align: center; }
 .foot a { color: var(--accent-ink); }
 @media (max-width: 480px) {
@@ -208,7 +210,7 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
         function () {
-          share.textContent = 'Ссылка скопирована ✓';
+          share.innerHTML = '{% filter escapejs %}{% include "_icon.html" with name="check" %}{% endfilter %}Ссылка скопирована';
           setTimeout(function () { share.textContent = 'Поделиться'; }, 2000);
         },
         function () { prompt('Ссылка:', url); });

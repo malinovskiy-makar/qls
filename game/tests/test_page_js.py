@@ -474,8 +474,9 @@ class ScoreboardTests(TestCase):
             self.assertNotIn(gone, self.src, gone)
 
     def test_one_markup_serves_both_cases(self):
-        u"""Блок `.vs` в разметке ровно один: второго вида табло нет."""
-        self.assertEqual(self.src.count('<div class="vs" id="vs"'), 1)
+        u"""Полоса HUD в разметке ровно одна (ADR 0110), старого `.vs` нет."""
+        self.assertEqual(self.src.count('<header class="hud" id="hud">'), 1)
+        self.assertNotIn('class="vs"', self.src)
         self.assertIn('function isDuelRun()', self.js)
         # Обе ветки правой карточки ходят через один и тот же блок.
         self.assertIn('if (isDuelRun()) { paintRival(); } else { paintBest(); }',
@@ -505,23 +506,25 @@ class ScoreboardTests(TestCase):
         self.assertIn('if (vsRivalDone) return 0;', self.js)
 
     def test_without_a_record_the_right_card_has_no_number(self):
-        u"""Первый раунд в режиме: выдуманного числа-заглушки быть не должно."""
+        u"""Первый раунд, аноним, набор: чипа рекорда нет вовсе — ни нуля, ни
+        призыва войти (решение владельца 17.09.2026)."""
         m = re.search(r'function paintBest\(\) \{(.*?)\n  \}', self.js, re.S)
         self.assertIsNotNone(m, 'paintBest не найден')
-        branch = m.group(1).split('if (!vsBest) {', 1)[1].split('return;', 1)[0]
-        self.assertIn("$('vs-them-score').textContent = '';", branch)
-        self.assertIn('Первый раунд в этом режиме', branch)
-        self.assertIn('Войдите, чтобы рекорды сохранялись', branch)
+        branch = m.group(1).split('if (!vsBest || practice) {', 1)[1].split('return;', 1)[0]
+        self.assertIn('rec.hidden = true;', branch)
+        self.assertNotIn('Войдите', m.group(1))
         # Ни одной цифры в ветке «рекорда нет».
         self.assertNotRegex(branch, r'\d')
+        self.assertIn("'новый рекорд'", m.group(1))
 
     def test_the_gap_disappears_when_there_is_nothing_to_compare(self):
         m = re.search(r'function paintGap\(\) \{(.*?)\n  \}', self.js, re.S)
         self.assertIsNotNone(m)
         body = m.group(1)
-        self.assertIn('if (other == null) { gap.hidden = true; return; }', body)
-        self.assertIn('вы ведёте', body)
-        self.assertIn('отстаёте', body)
+        self.assertIn("if (!isDuelRun() || !vsRival) { pill.hidden = true; return; }", body)
+        self.assertIn('вы ведёте на ', body)
+        self.assertIn('отстаёте на ', body)
+        self.assertIn("'равны'", body)
 
     def test_the_record_comes_from_the_server_not_from_local_storage(self):
         u"""Рекорды не должны теряться при смене браузера."""

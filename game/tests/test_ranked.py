@@ -178,7 +178,7 @@ class UnrankedReasonsTests(RunHelper):
         u"""Игрок обязан прочитать причину словами, а не код."""
         for key, text in config.UNRANKED_REASONS:
             self.assertTrue(text and not text.isupper(), key)
-        self.assertEqual(len(config.UNRANKED_TEXT), 8)
+        self.assertEqual(len(config.UNRANKED_TEXT), 9)
 
 
 def _req(client):

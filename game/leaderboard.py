@@ -198,11 +198,12 @@ def best_scores(user):
 
     Стартовый экран показывает рекорд выбранного режима (ADR 0108). Основа
     та же, что у `best_run`: все забеги текущей версии экономики, а не только
-    зачётные. Режима без забегов в словаре нет — экран тогда молчит, а не
-    рисует ноль.
+    зачётные, кроме брошенных. Режима без забегов в словаре нет — экран тогда
+    молчит, а не рисует ноль.
     """
     rows = (GameResult.objects
             .filter(user=user, economy_version=config.ECONOMY_VERSION)
+            .exclude(ended_reason='quit')
             .values('mode').annotate(best=Max('score')))
     return {r['mode']: r['best'] for r in rows if r['best']}
 
@@ -219,9 +220,12 @@ def best_run(user, mode):
     случае говорит словами, а не рисует ноль: выдуманное число-заглушка на
     табло хуже честного «первый раунд».
     """
+    # ⚠️ Брошенный раунд рекордом не считается (решение 17.09.2026): окно
+    # выхода обещает «в таблицу и рекорды не пойдёт».
     run = (GameResult.objects
            .filter(user=user, mode=mode,
                    economy_version=config.ECONOMY_VERSION)
+           .exclude(ended_reason='quit')
            .order_by('-score', 'created_at').first())
     if run is None:
         return None

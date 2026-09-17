@@ -423,11 +423,12 @@ class DuelLoginBoundaryTests(TestCase):
 
 
 class ScoreboardIsOneMarkupTests(TestCase):
-    u"""Табло `.vs` — одно и то же на дуэли и на обычном забеге.
+    u"""Полоса HUD — одна и та же на дуэли и на обычном раунде (ADR 0110).
 
-    Решение владельца 08.09.2026: второго вида табло не заводим. Проверяется
-    по РАЗМЕТКЕ обеих страниц: если когда-нибудь заведут вторую, страницы
-    разойдутся, и этот тест это увидит.
+    Решение владельца 08.09.2026: второго вида табло не заводим; с 17.09.2026
+    табло — одна полоса: слева вы, справа рекорд (одиночный раунд) или
+    соперник (дуэль). Проверяется по РАЗМЕТКЕ обеих страниц: заведут вторую —
+    страницы разойдутся, и тест это увидит.
     """
 
     def setUp(self):
@@ -435,10 +436,9 @@ class ScoreboardIsOneMarkupTests(TestCase):
         self.me = User.objects.create_user(username='vs_user', password='p12345')
         self.client.force_login(self.me)
 
-    def _vs_block(self, html):
-        self.assertIn('<div class="vs" id="vs"', html)
-        return html.split('<div class="vs" id="vs"', 1)[1].split(
-            '<div class="duel-emoji"', 1)[0]
+    def _hud(self, html):
+        self.assertIn('<header class="hud" id="hud">', html)
+        return html.split('<header class="hud" id="hud">', 1)[1].split('</header>', 1)[0]
 
     def test_the_same_block_serves_both_run_kinds(self):
         plain = self.client.get(reverse('game:page')).content.decode('utf-8')
@@ -448,25 +448,24 @@ class ScoreboardIsOneMarkupTests(TestCase):
         duel = self.client.get(
             reverse('game:set_page', args=[gset.code])).content.decode('utf-8')
 
-        self.assertEqual(self._vs_block(plain), self._vs_block(duel))
+        self.assertEqual(self._hud(plain), self._hud(duel))
 
     def test_the_left_side_is_always_you(self):
-        html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        block = self._vs_block(html)
-        self.assertIn('id="vs-my-score"', block)
-        self.assertIn('id="vs-my-correct"', block)
-        self.assertIn('id="vs-my-time"', block)
-        self.assertIn('id="vs-my-tape"', block)
-        # Точность и комбо ушли в итог (решение владельца 15.09.2026): табло —
-        # одна строка на сторону, имя, счёт, верных и время.
-        self.assertNotIn('id="vs-my-acc"', block)
-        self.assertNotIn('id="vs-my-combo"', block)
+        hud = self._hud(self.client.get(reverse('game:page')).content.decode('utf-8'))
+        for need in ('id="hud-score"', 'id="hud-combo"', 'id="hud-timer"', 'id="hud-lives"',
+                     'id="hud-correct"', 'id="hud-qno"'):
+            self.assertIn(need, hud)
+        self.assertLess(hud.index('id="hud-score"'), hud.index('id="hud-timer"'))
 
-    def test_the_gap_column_stands_between_the_two_cards(self):
-        block = self._vs_block(
-            self.client.get(reverse('game:page')).content.decode('utf-8'))
-        self.assertLess(block.index('id="vs-me"'), block.index('id="vs-gap"'))
-        self.assertLess(block.index('id="vs-gap"'), block.index('id="vs-them"'))
+    def test_the_rival_block_has_his_numbers_and_the_gap_is_under_the_bar(self):
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        hud = self._hud(html)
+        for need in ('id="opp"', 'id="opp-name"', 'id="opp-dot"', 'id="opp-correct"',
+                     'id="opp-lives"', 'id="opp-time"', 'id="opp-score"', 'id="hud-rec"'):
+            self.assertIn(need, hud)
+        # Разрыв — пилюлей ПОД полосой, а не колонкой внутри неё.
+        self.assertNotIn('id="gap-pill"', hud)
+        self.assertLess(html.index('</header>'), html.index('id="gap-pill"'))
 
 
 class PersonalBestComesWithTheStartTests(TestCase):

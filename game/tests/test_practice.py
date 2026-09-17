@@ -166,8 +166,9 @@ class PracticeClientTests(TestCase):
         self.assertTrue("if (practice) { openPracticeEnd(false); return; }" in self.js)
 
     def test_hud_hides_time_lives_score_and_combo(self):
-        self.assertTrue('body.practice .hud-score, body.practice .timer-box, body.practice .time-track,\n'
-                        'body.practice .hud-lives, body.practice .hud-combo { display: none; }' in self.src)
+        self.assertTrue('body.practice .hud-score, body.practice .hud-clock, body.practice .time-track,\n'
+                        'body.practice .hud-lives-wrap, body.practice .hud-combo, body.practice .hud-stat,\n'
+                        'body.practice .hud-rec, body.practice #q-points { display: none; }' in self.src)
         self.assertTrue('Вопрос <b id="pr-number">1</b> · верных <b id="pr-correct">0</b>' in self.src)
 
     def test_keys_and_track_events(self):

@@ -174,8 +174,8 @@ class SoundModuleTests(TestCase):
     def setUp(self):
         with open(SOUND_JS, encoding='utf-8') as f:
             self.src = f.read()
-        with open(TEMPLATE, encoding='utf-8') as f:
-            self.page = f.read()
+        from game.tests.test_page_js import page_source
+        self.page = page_source()   # разметка экранов — в game/_*.html
 
     def test_module_parses(self):
         import shutil
@@ -241,8 +241,8 @@ class ShareCardIsGoneTests(TestCase):
     """
 
     def setUp(self):
-        with open(TEMPLATE, encoding='utf-8') as f:
-            self.page = f.read()
+        from game.tests.test_page_js import page_source
+        self.page = page_source()   # разметка экранов — в game/_*.html
 
     def test_nothing_of_the_card_is_left(self):
         for gone in ('drawShareCard', 'drawCurve', 'drawHearts', 'drawDonut',

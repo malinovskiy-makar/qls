@@ -1,0 +1,136 @@
+{% comment %}
+ЭКРАН 2: РАУНД — одна полоса HUD и вопрос в центре (решение владельца 17.09.2026,
+ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile`).
+
+Полоса: слева счёт и серия, в центре время m:ss и жизни, справа «верных · вопрос»,
+рекорд (вошедшему) или соперник (дуэль), звук и выход. Шапка сайта на время
+раунда скрыта (`body.rush-playing`). Под полосой — полоса времени.
+
+Разбор неверного ответа — плашка `#reveal`: верный вариант подсвечен три
+секунды, часы стоят (серверная пауза, ADR 0109). Отсчёт 3-2-1 перед одиночным
+раундом — `#countdown`.
+
+Тот же экран играет «Бесконечные тесты» (`body.practice`): без времени, жизней и
+очков, справа «Вопрос N · верных M», снизу «Назад / Вперёд».
+{% endcomment %}
+<section id="screen-play" class="screen">
+  <header class="hud" id="hud">
+    <div class="hud-l">
+      <div class="hud-score"><b id="hud-score">0</b><span>очки</span></div>
+      <div class="hud-combo" id="hud-combo" hidden><span class="qi-slot"></span><span id="hud-combo-text"></span></div>
+    </div>
+    <div class="hud-c">
+      <div class="hud-clock" id="hud-clock">
+        <b class="timer-num" id="hud-timer">0:00</b>
+        <span class="hud-paused" id="hud-paused" hidden>{% include "_icon.html" with name="pause" %}стоит</span>
+        <span class="time-delta" id="time-delta"></span>
+      </div>
+      <div class="hud-lives-wrap">
+        <div class="hud-lives" id="hud-lives" role="img" aria-label="Жизни"></div>
+        <span class="lives-delta" id="lives-delta"></span>
+      </div>
+    </div>
+    <div class="hud-r">
+      <p class="hud-stat">верных <b id="hud-correct">0</b><span class="hud-qno"> · вопрос <b id="hud-qno">1</b></span></p>
+      <p class="hud-practice">Вопрос <b id="pr-number">1</b> · верных <b id="pr-correct">0</b></p>
+      <p class="hud-rec" id="hud-rec" hidden></p>
+      {% comment %} Соперник в дуэли: инициал, имя с точкой связи, его верные,
+         жизни и время, справа его счёт. Данные — событие табло по сокету. {% endcomment %}
+      <div class="opp" id="opp" hidden>
+        <span class="opp-av" id="opp-av" aria-hidden="true"></span>
+        <span class="opp-who">
+          <span class="opp-nm"><i class="opp-dot" id="opp-dot"></i><span id="opp-name">соперник</span></span>
+          <span class="opp-sub">верных <b id="opp-correct">0</b><span class="opp-lives" id="opp-lives"></span><span id="opp-time">–</span></span>
+        </span>
+        <b class="opp-sc" id="opp-score">0</b>
+      </div>
+      <button type="button" class="ib" id="btn-sound" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
+      <button type="button" class="ib" id="btn-quit" aria-label="Выйти из раунда">{% include "_icon.html" with name="close" %}</button>
+    </div>
+  </header>
+  <div class="time-track" id="time-track"><div class="time-fill" id="time-fill"></div></div>
+  <p class="gap-pill" id="gap-pill" hidden>{% include "_icon.html" with name="arrow_up" %}<span id="gap-text"></span></p>
+  <p class="opp-toast" id="opp-toast" hidden></p>
+
+  <div class="play-body">
+    <div class="qwrap">
+      <div class="qmeta" id="qmeta">
+        <span class="qchip" id="q-diff" hidden>{% include "_icon.html" with name="star" %}<span id="q-diff-text"></span></span>
+        <span id="q-points" hidden></span>
+        <span class="stat-chip" id="stat-chip" hidden></span>
+      </div>
+      <!-- Формулировка режима «График» — ОТДЕЛЬНОЙ строкой над условием:
+           она одна и та же на все сюжеты, и слипаясь с условием, читается
+           как часть задачи. -->
+      <p class="q-prompt" id="q-prompt" hidden></p>
+      <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
+      <p class="gen-note" id="gen-note" hidden>Вопрос сгенерирован ИИ</p>
+      <!-- Режим «График»: чертёж чужого решения. Разворачивается на весь
+           экран НАЛОЖЕНИЕМ (CSS), варианты и таймер при этом остаются
+           видимыми и рабочими. -->
+      <div class="fig-wrap" id="fig-wrap" hidden>
+        <div class="fig-tools">
+          <!-- ⚠️ Пропуск здесь кнопкой и клавишей S, а не пробелом: в этом
+               режиме пробел разворачивает чертёж (так задумано), и без
+               отдельной кнопки пропуск стал бы недоступен вовсе. -->
+          <button class="fig-btn" id="fig-skip" type="button">Пропустить (S)</button>
+          <button class="fig-btn" id="fig-text" type="button" hidden>Условие</button>
+          <button class="fig-btn" id="fig-expand" type="button">⤢ Развернуть (F)</button>
+          <button class="fig-btn" id="fig-close" type="button" hidden>{% include "_icon.html" with name="close" %}Свернуть (Esc)</button>
+        </div>
+        <div class="fig-holder" id="fig-holder"></div>
+        <p class="fig-hint" id="fig-hint">Клик по чертежу, F или пробел разворачивают его на весь экран</p>
+      </div>
+      <div class="opts" id="opts"></div>
+      <div class="multi-actions" id="multi-actions" hidden>
+        <button type="button" class="btn-submit" id="btn-submit" disabled>Ответить · Enter</button>
+      </div>
+      <div class="practice-nav">
+        <button type="button" id="pr-back">← Назад</button>
+        <button type="button" id="pr-next">Вперёд →</button>
+      </div>
+      <!-- Режим «График» на узком экране: увеличенная плитка + явная
+           кнопка. Второй тап по самой плитке делает то же самое. -->
+      <div class="tile-actions" id="tile-answer" hidden>
+        <button class="btn-submit" id="btn-tile-submit">Ответить этим графиком</button>
+        <button class="btn-skip" id="btn-tile-back">Назад ко всем</button>
+      </div>
+      <div class="numeric-block" id="numeric-block" hidden>
+        <div class="num-unit" id="num-unit" hidden></div>
+        <div class="num-row">
+          <label class="sr-only" for="num-input">Ответ</label>
+          <input id="num-input" class="num-input" inputmode="decimal"
+                 autocomplete="off" spellcheck="false" placeholder="Например: 12,5">
+          <button type="button" class="btn-submit" id="btn-num-submit">Ответить · Enter</button>
+        </div>
+        <p class="num-hint" id="num-hint">дробь – через слэш, точку или запятую</p>
+        <div class="num-feedback" id="num-feedback"></div>
+      </div>
+      {% comment %} Разбор неверного ответа (ADR 0109): три секунды, часы стоят. {% endcomment %}
+      <div class="reveal" id="reveal" role="status" aria-live="polite" hidden>
+        <span class="reveal-cnt" id="reveal-cnt" aria-hidden="true">3</span>
+        <p class="reveal-text" id="reveal-text"></p>
+        <button type="button" class="reveal-next" id="reveal-next">Дальше сразу · пробел</button>
+      </div>
+      <div class="play-foot">
+        <button type="button" class="gh" id="btn-skip">{% include "_icon.html" with name="skip" %}Пропустить <kbd>пробел</kbd></button>
+        {% comment %} Восемь реакций дуэли с подписями — рисует скрипт дуэли. {% endcomment %}
+        <div class="duel-emoji" id="duel-emoji" hidden></div>
+        <!-- «Плохая задача?» — окно в общем партиале _problem_report.html; номер
+             вопроса ставит showQuestion. Открытое окно ставит раунд на паузу. -->
+        <button type="button" class="gh btn-report" id="btn-report" data-source="game">{% include "_icon.html" with name="flag" %}<span>Плохая задача?</span></button>
+      </div>
+    </div>
+  </div>
+
+  {% comment %} Отсчёт 3-2-1 перед одиночным раундом (ADR 0110): первый вопрос уже
+     загружен, но показывается и таймер стартует только в конце отсчёта или по Enter. {% endcomment %}
+  <div class="countdown" id="countdown" hidden>
+    <button type="button" class="cd-card" id="countdown-card" aria-label="Начать без отсчёта">
+      <span class="cd-n" id="cd-n" aria-live="assertive">3</span>
+      <span class="cd-m" id="cd-m"></span>
+      <span class="cd-s" id="cd-s"></span>
+      <span class="cd-k">клавиши <kbd>1</kbd>–<kbd>5</kbd> отвечают, <kbd>пробел</kbd> пропускает · <kbd>Enter</kbd> – начать без отсчёта</span>
+    </button>
+  </div>
+</section>

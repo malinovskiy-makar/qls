@@ -229,11 +229,13 @@ a:focus-visible, button:focus-visible {
 }
 .fmodal-head b { font-size: 17px; }
 .fmodal-close {
-  font: inherit; font-size: 18px; line-height: 1;
+  font: inherit; line-height: 1;
   width: 32px; height: 32px; border-radius: 8px;
+  display: inline-flex; align-items: center; justify-content: center;
   border: none; background: none; color: var(--text3); cursor: pointer;
 }
-.fmodal-close:hover { color: var(--text); font-weight: 700; }
+.fmodal-close .qi { width: 18px; height: 18px; }
+.fmodal-close:hover { color: var(--text); }
 .fmodal-body {
   padding: 16px 20px;
   overflow-y: auto;
@@ -870,115 +872,6 @@ svg.medal { width: 24px; height: 24px; display: block; }
 .set-board-link, .set-back { font-size: 13px; color: var(--rush-accent); }
 .set-back { color: var(--text3); }
 
-/* ── Табло: вы, разрыв, вторая сторона ─────────────────────────────
-   ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
-   всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд в
-   этом режиме. Второго вида табло не заводим: два разъехались бы, а
-   сравнение с собой и сравнение с соперником — одно и то же движение
-   глаз.
-   Прежняя `.duel-bar` (одна строка «соперник · очки · верных · жизни»)
-   заменена целиком: своих чисел она не показывала вовсе, сравнивать было
-   не с чем. */
-.vs {
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: stretch;
-  gap: 10px;
-  margin: 0 0 12px;
-}
-.vs[hidden] { display: none; }
-/* ⚠️ ОДНА СТРОКА НА СТОРОНУ (решение владельца 15.09.2026): имя, счёт
-   крупно, «верных N», «время». Точность и комбо ушли в итог дуэли. Цифры не
-   переносятся: блоки `nowrap`, а не влезла строка — переносится блок
-   целиком. Лента, жизни и подписи — отдельной строкой под ней. */
-.vs-side {
-  display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 12px;
-  padding: 8px 14px;
-  border: 1px solid var(--rush-line); border-radius: 12px;
-  background: var(--rush-surface);
-  min-width: 0;
-}
-.vs-side--off { opacity: .55; }
-.vs-who { font-size: 12.5px; color: var(--rush-dim); text-transform: uppercase;
-          letter-spacing: .06em; white-space: nowrap; }
-.vs-score { font-size: 30px; font-weight: 700; line-height: 1.1;
-            font-variant-numeric: tabular-nums; white-space: nowrap; }
-.vs-row { display: flex; gap: 12px; white-space: nowrap;
-          font-size: 13px; color: var(--rush-dim); }
-.vs-row b { color: var(--rush-text); font-weight: 600;
-            font-variant-numeric: tabular-nums; }
-.vs-tape, .vs-lives, .vs-state, .vs-empty { flex-basis: 100%; }
-.vs-row[hidden], .vs-lives[hidden] { display: none; }
-.vs-lives { display: inline-flex; gap: 3px; margin-top: 6px; }
-.vs-lives .qi { width: 15px; height: 15px; }
-.vs-lives .is-lost { opacity: .22; }
-.vs-state { margin-top: 6px; font-size: 13px; color: var(--rush-dim); }
-.vs-empty { margin: 6px 0 0; font-size: 13px; color: var(--rush-dim);
-            line-height: 1.4; }
-
-/* Лента последних десяти ответов: клетка на вопрос. */
-.vs-tape { display: flex; gap: 3px; margin-top: 8px; }
-.vs-tape i {
-  width: 12px; height: 6px; border-radius: 2px;
-  background: var(--rush-line);
-}
-.vs-tape i.ok { background: var(--rush-ok); }
-.vs-tape i.bad { background: var(--rush-bad); }
-.vs-tape i.skip { background: var(--rush-dim); opacity: .5; }
-.vs-tape i.now { background: var(--rush-accent); }
-
-/* Разрыв посередине: число крупно, под ним словами кто ведёт. */
-.vs-gap {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: 2px;
-  min-width: 84px; padding: 0 6px; text-align: center;
-}
-.vs-gap[hidden] { display: none; }
-.vs-gap-num { font-size: 20px; font-weight: 700;
-              font-variant-numeric: tabular-nums; }
-.vs-gap-num.ahead { color: var(--rush-ok); }
-.vs-gap-num.behind { color: var(--rush-bad); }
-.vs-gap-note { font-size: 12px; color: var(--rush-dim); }
-
-@media (max-width: 720px) {
-  /* Узкий экран (до 720 px, решение 15.09.2026): стороны друг под другом,
-     разрыв между ними. */
-  .vs { grid-template-columns: 1fr; }
-  .vs-score { font-size: 24px; }
-}
-
-/* Восемь реакций. Значки свои (templates/_icons.html), не эмодзи: эмодзи
-   рисует операционная система, они всегда цветные и мимо палитры. */
-.duel-emoji { display: flex; gap: 6px; flex-wrap: wrap; }
-.duel-emoji button {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 34px; height: 34px; padding: 0; cursor: pointer;
-  border: 1px solid var(--rush-line); border-radius: 9px;
-  background: transparent; color: var(--rush-text);
-}
-.duel-emoji button:hover { border-color: var(--rush-accent); }
-.duel-emoji button:disabled { opacity: .35; cursor: default; }
-.duel-emoji .qi { width: 19px; height: 19px; }
-
-/* Прилетевшая реакция соперника: всплывает и тает. */
-.duel-flyer {
-  position: fixed; right: 26px; bottom: 90px; z-index: 40;
-  display: flex; align-items: center; gap: 8px;
-  padding: 8px 12px; border-radius: 12px;
-  border: 1px solid var(--rush-line); background: var(--rush-surface);
-  animation: duel-fly 2.2s ease-out forwards; pointer-events: none;
-}
-.duel-flyer .qi { width: 22px; height: 22px; }
-@keyframes duel-fly {
-  0%   { opacity: 0; transform: translateY(14px) scale(.9); }
-  12%  { opacity: 1; transform: translateY(0) scale(1); }
-  80%  { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-26px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .duel-flyer { animation: none; opacity: 1; }
-}
-
 /* ── Лобби дуэли (решение владельца 15.09.2026) ─────────────────────
    Дуэль строго синхронна: кнопки «Играть» нет, оба ждут здесь. Код комнаты
    крупно, главная кнопка — «Скопировать ссылку», строка «кто на месте» и
@@ -1132,12 +1025,14 @@ svg.medal { width: 24px; height: 24px; display: block; }
   display: flex; gap: 8px;
 }
 .fig-btn {
-  font: inherit; font-size: 13px; font-weight: 600;
+  font: inherit; font-size: 13px; font-weight: 700;
+  display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 11px; border-radius: 999px; cursor: pointer;
   color: var(--rush-fg); background: var(--rush-bg);
   border: 1px solid var(--rush-line);
 }
 .fig-btn:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+.fig-btn .qi { width: 14px; height: 14px; }
 .fig-hint { font-size: 12.5px; color: var(--rush-dim); margin: 4px 2px 0; }
 
 /* Разворот на весь экран — НАЛОЖЕНИЕ средствами CSS, а НЕ системный
@@ -1151,18 +1046,17 @@ body.figfull { overflow: hidden; }
    что display объявлен инлайном (переопределить иначе нечем). */
 body.figfull nav { display: none !important; }
 body.figfull .time-track {
-  position: fixed; top: 0; left: 0; right: 0; z-index: 71; margin: 0;
+  position: fixed; top: 64px; left: 0; right: 0; z-index: 71; margin: 0;
   border-radius: 0;
 }
 body.figfull .hud {
-  position: fixed; top: 8px; left: 0; right: 0; z-index: 71;
-  padding: 0 16px; margin: 0;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 71; margin: 0;
 }
-body.figfull .q-chips, body.figfull .keys-hint,
+body.figfull .qmeta, body.figfull .play-foot, body.figfull .reveal,
 body.figfull .q-prompt { display: none; }
 /* условие сворачивается: на чертёж нужно всё место, а текст уже прочитан */
 body.figfull .q-card {
-  position: fixed; z-index: 73; left: 12px; right: 12px; top: 62px;
+  position: fixed; z-index: 73; left: 12px; right: 12px; top: 72px;
   max-height: 0; padding: 0; border-width: 0; overflow: hidden;
   min-height: 0; transition: none;
   /* ⚠️ Свёрнутое условие обязано быть НЕКЛИКАБЕЛЬНЫМ. Ноль высоты его от
@@ -1181,7 +1075,7 @@ body.figfull.figtext .q-card {
   pointer-events: auto;
 }
 body.figfull .fig-wrap {
-  position: fixed; z-index: 70; left: 0; right: 0; top: 58px;
+  position: fixed; z-index: 70; left: 0; right: 0; top: 68px;
   bottom: var(--fig-bar, 116px); margin: 0; padding: 6px 12px 0;
   background: var(--rush-bg);
   display: flex; flex-direction: column;
@@ -1223,47 +1117,138 @@ body.figfull .vignette.alarm { opacity: .42; }
   28% { transform: scale(1.25); }
   46% { transform: scale(1); }
 }
-.sound-x {
-  position: absolute; top: 10px; right: 44px;
-  font: inherit; font-size: 15px; line-height: 1;
-  width: 28px; height: 28px; border-radius: 8px;
-  border: 1px solid var(--rush-border);
-  background: var(--rush-surface); color: var(--text3);
-  cursor: pointer; padding: 0;
-}
-.sound-x:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.sound-x .qi { width: 16px; height: 16px; display: block; margin: 0 auto; }
-.sound-x.off { opacity: .5; }
 
-/* ── Экран 2: игра ─────────────────────────────────────────────── */
-#screen-play .scene {
-  max-width: 760px;
-  margin: 0 auto;
+/* ═══ ЭКРАН РАУНДА: ОДНА ПОЛОСА HUD (ADR 0110) ══════════════════════════
+   Решение владельца 17.09.2026, макеты claude/mockups/wecon_rush_20260917/
+   Round*.dc.html и RoundMobile.dc.html. Разметка — game/templates/game/_play.html.
+
+   ⚠️ НА 1440×800 У ДОКУМЕНТА НЕТ ПРОКРУТКИ даже на длинной Классике: шапка
+   сайта на время раунда скрыта (`body.rush-playing`), экран ровно в высоту
+   окна, длинное условие листается ВНУТРИ карточки вопроса, а полоса, ответ и
+   нижний ряд остаются на месте. */
+body.rush-playing nav.site-nav, body.rush-playing #nav-panel { display: none !important; }
+body.rush-playing .tg-fab, body.rush-playing .fb-btn { display: none !important; }
+body.rush-playing .rush-wrap { max-width: none; padding: 0; }
+@media (min-width: 721px) {
+  html:has(body.rush-playing), body.rush-playing { overflow: hidden; }
+  body.rush-playing #screen-play.active { height: 100vh; display: flex; flex-direction: column; }
+}
+
+.hud {
   position: relative;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center; gap: 24px;
+  height: 64px; padding: 0 40px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
 }
-.time-track {
-  height: 8px;
-  border-radius: 4px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-soft);
-  overflow: hidden;
+.hud-l { display: flex; align-items: center; gap: 16px; min-width: 0; }
+.hud-r { display: flex; align-items: center; justify-content: flex-end; gap: 14px; min-width: 0; }
+.hud-c { display: flex; align-items: center; gap: 18px; }
+.hud-score { display: flex; align-items: baseline; gap: 7px; }
+.hud-score b { font-size: 30px; font-weight: 800; letter-spacing: -.5px; line-height: 1;
+               font-variant-numeric: tabular-nums; }
+.hud-score span { font-size: 12.5px; font-weight: 600; letter-spacing: .04em;
+                  text-transform: uppercase; color: var(--text3); }
+/* Серия: множитель и длина — только когда множитель больше ×1. */
+.hud-combo {
+  height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+  border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink);
+  font-size: 13px; font-weight: 700; white-space: nowrap;
 }
+.hud-combo[hidden] { display: none; }
+.hud-combo .qi { width: 14px; height: 14px; }
+.hud-combo.bump { animation: comboBump .35s var(--rush-ease); }
+@keyframes comboBump { 30% { transform: scale(1.12); } 100% { transform: scale(1); } }
+
+.hud-clock { position: relative; display: flex; align-items: baseline; gap: 8px; }
+/* Цифры краснеют ПОСТЕПЕННО вместе с тревогой: --alarm ставит JS каждый
+   кадр. Вспышки ответа (flash-*) специфичнее и перебивают её на 300 мс. */
+.timer-num {
+  font-size: 34px; font-weight: 800; letter-spacing: -.5px; line-height: 1;
+  font-variant-numeric: tabular-nums;
+  transition: color .12s ease;
+  color: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%), var(--text));
+}
+.timer-num.flash-plus { color: var(--rush-ok); }
+.timer-num.flash-minus { color: var(--rush-bad); }
+.timer-num.flash-skip { color: var(--text3); }
+.hud-clock.paused .timer-num { color: var(--text3); }
+.hud-paused {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3);
+}
+.hud-paused[hidden] { display: none; }
+.hud-paused .qi { width: 13px; height: 13px; }
+/* Дельта «+5 с» — справа от времени, «−1» — справа от сердец. Появляется
+   мгновенно, ~700 мс висит и уплывает вверх. */
+.time-delta, .lives-delta {
+  position: absolute; left: 100%; top: -4px; margin-left: 8px;
+  font-size: 14px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums;
+  opacity: 0; pointer-events: none;
+}
+.time-delta.plus { color: var(--green); }
+.time-delta.skip { color: var(--text3); }
+.lives-delta { top: -2px; color: var(--error); }
+.lives-delta .qi { width: 12px; height: 12px; vertical-align: -1px; }
+.time-delta.show, .lives-delta.show { animation: deltaFloat .7s var(--rush-ease) forwards; }
+@keyframes deltaFloat {
+  0% { opacity: 0; transform: translateY(4px); }
+  12% { opacity: 1; transform: none; }
+  70% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: translateY(-8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .time-delta.show, .lives-delta.show { animation: none; opacity: 1; }
+}
+
+/* Жизни: запас виден целиком, потраченная — контур и прозрачность. */
+.hud-lives-wrap { position: relative; }
+.hud-lives { display: flex; align-items: center; gap: 4px; }
+.heart { display: inline-flex; color: var(--rush-bad);
+         transition: color .2s ease, opacity .2s ease, transform .2s var(--rush-ease); }
+.heart .qi { width: 22px; height: 22px; display: block; }
+.heart.lost { color: var(--text3); opacity: .6; }
+.heart.lost .qi path { fill: none; stroke: currentColor; stroke-width: 1.8; }
+.heart.pop { animation: heartPop .45s var(--rush-ease); }
+@keyframes heartPop { 0% { transform: scale(1); } 35% { transform: scale(1.4); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .heart.pop { animation: none; } }
+
+.hud-stat, .hud-practice { margin: 0; display: flex; gap: 4px; white-space: nowrap;
+  font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
+.hud-stat b, .hud-practice b { font-weight: 700; color: var(--text); }
+.hud-practice { display: none; }
+/* Рекорд вошедшего: «рекорд 1 260 · ещё 240», побитый — «новый рекорд». */
+.hud-rec {
+  margin: 0; height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+  border: 1px solid var(--border); border-radius: 999px;
+  font-size: 12.5px; color: var(--text2); white-space: nowrap;
+}
+.hud-rec[hidden] { display: none; }
+.hud-rec b { font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.hud-rec .qi { width: 14px; height: 14px; }
+.hud-rec.is-new { border-color: var(--accent); color: var(--accent-ink); font-weight: 700; }
+.ib {
+  width: 36px; height: 36px; flex: none;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 9px;
+  background: transparent; color: var(--text2); cursor: pointer;
+}
+.ib:hover { border-color: var(--accent); color: var(--accent-ink); }
+.ib .qi { width: 18px; height: 18px; display: block; }
+.ib.off { opacity: .55; }
+
+/* Полоса времени под HUD: 4 px, на паузе серая. */
+.time-track { height: 4px; background: var(--border-soft); overflow: hidden; }
 .time-fill {
-  height: 100%;
-  width: 100%;
-  border-radius: 4px;
-  /* ⚠️ ЦВЕТ ПОЛОСЫ ВЕДЁТ ТРЕВОГА, а не абсолютные секунды. Прежние пороги
-     (амбер < 15 с, красный < 7 с) были одинаковыми для Пули и Классики,
-     где запас отличается в десять раз: в Пуле «амбер» наступал ещё до
-     старта, в Классике — когда всё уже потеряно. Теперь один закон:
-     последние 10 % запаса режима. Амбер на полосе больше не используется. */
-  background: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%),
-                        var(--rush-time-hi));
-  transform-origin: left center;
-  /* ширина через transform: scaleX — без reflow на каждый кадр */
+  height: 100%; width: 100%;
+  /* ⚠️ ЦВЕТ ПОЛОСЫ ВЕДЁТ ТРЕВОГА, а не абсолютные секунды: последние 10 %
+     запаса режима, один закон для Пули и Классики. */
+  background: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%), var(--rush-time-hi));
+  transform-origin: left center;       /* ширина через scaleX — без reflow на кадр */
 }
-/* Импульс полосы остался, но идёт В ТАКТ УДАРУ СЕРДЦА, а не сам по себе:
-   бесконечная CSS-анимация жила своей жизнью и расходилась со звуком. */
+.time-track.paused .time-fill { background: var(--text3); }
+/* Импульс полосы — в такт удару сердца, а не сам по себе. */
 .time-fill.beat { animation: barBeat .3s ease-out; }
 @keyframes barBeat { 0%, 100% { opacity: 1; } 35% { opacity: .55; } }
 .time-flash { animation: trackFlash .4s var(--rush-ease); }
@@ -1271,201 +1256,373 @@ body.figfull .vignette.alarm { opacity: .42; }
 .time-flash-bad { animation: trackFlashBad .4s var(--rush-ease); }
 @keyframes trackFlashBad { 0% { box-shadow: 0 0 0 3px var(--rush-bad); } 100% { box-shadow: none; } }
 
-.hud {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin: 12px 0 16px;
-  gap: 12px;
+/* ── Вопрос и ответ ── */
+.play-body { flex: 1; min-height: 0; padding: 20px 40px 18px; }
+.qwrap { width: 960px; max-width: 100%; height: 100%; margin: 0 auto;
+         display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+.qwrap > * { flex: none; }
+.qmeta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-height: 24px;
+         font-size: 12.5px; color: var(--text3); }
+.qchip, .stat-chip {
+  height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 9px;
+  border: 1px solid var(--border); border-radius: 999px; background: transparent;
+  font-size: 12.5px; color: var(--text3); white-space: nowrap;
 }
-.hud-score {
-  font-size: 22px;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  min-width: 90px;
+.qchip[hidden], .stat-chip[hidden], #q-points[hidden] { display: none; }
+.qchip .qi { width: 13px; height: 13px; }
+.q-card {
+  flex: 0 1 auto; min-height: 0; overflow-y: auto;
+  padding: 22px 26px;
+  border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  font-size: 18px; line-height: 1.5;
 }
-.hud-score small { font-size: 13px; font-weight: 600; color: var(--text3); letter-spacing: .5px; display: block; }
-.hud-timer {
-  font-size: 34px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: -.5px;
-  text-align: center;
-  flex: 1;
+.q-text { width: 100%; }
+/* Ошибка: карточка коротко краснеет рамкой. */
+.q-card.flash-bad { animation: cardBad .45s var(--rush-ease); }
+@keyframes cardBad {
+  0%, 60% { border-color: var(--error-border); }
+  100% { border-color: var(--border); }
 }
-/* .timer-box — inline-block ровно по ширине цифр (.timer-num — просто
-   текст): дельта (.time-delta) встаёт вплотную справа от НИХ, а не от
-   края широкого flex:1-блока .hud-timer. */
-.timer-box {
-  position: relative;
-  display: inline-block;
-}
-/* Жизни: три сердца под таймером. Погасшее — серый контур, а не отсутствие
-   символа: запас всегда виден целиком, «сколько было и сколько осталось». */
-.hud-lives {
-  display: flex;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 2px;
-  font-size: 16px;
-  line-height: 1;
-}
-.heart .qi { width: 15px; height: 15px; display: block; }
-.heart {
-  color: var(--rush-bad);
-  transition: color .2s ease, transform .2s var(--rush-ease);
-}
-.heart.lost {
-  color: var(--text3);
-  opacity: .45;
-  transform: scale(.85);
-}
-/* сердце гаснет с толчком — единственный момент, когда оно двигается */
-.heart.pop { animation: heartPop .45s var(--rush-ease); }
-@keyframes heartPop {
-  0% { transform: scale(1); }
-  35% { transform: scale(1.5); }
-  100% { transform: scale(.85); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .heart.pop { animation: none; }
-}
+@media (prefers-reduced-motion: reduce) { .q-card.flash-bad { animation: none; } }
+.q-slide-in { animation: qSlide .35s var(--rush-ease); }
+@keyframes qSlide { 0% { opacity: 0; transform: translateY(12px); } 100% { opacity: 1; transform: none; } }
+.gen-note { margin: -8px 0 0; text-align: right; font-size: 12px; color: var(--text3); }
+.gen-note[hidden] { display: none; }
 
-/* Цифры краснеют ПОСТЕПЕННО вместе с тревогой: --alarm ставит JS каждый
-   кадр. Вспышки ответа (flash-*) специфичнее и перебивают её на 400 мс. */
-.timer-num {
-  transition: color .12s ease;
-  color: color-mix(in srgb, var(--rush-bad) calc(var(--alarm, 0) * 100%),
-                   var(--text));
-}
-.timer-num.flash-plus { color: var(--rush-ok); }
-.timer-num.flash-minus { color: var(--rush-bad); }
-.timer-num.flash-skip { color: var(--text3); }
+/* KaTeX внутри строки не переносится сам по себе; в display-формуле можно. */
+.q-text .katex, .opt .katex, .miss-item .katex { white-space: nowrap; }
+.q-text .katex-display .katex, .miss-item .katex-display .katex { white-space: normal; }
+.q-text .katex-display, .miss-item .katex-display { margin: 12px 0; overflow-x: auto; }
 
-/* крупная дельта времени у таймера: появляется мгновенно, ~700мс висит,
-   уплывает вверх с fade (направление одно и для минуса — смысл несёт цвет) */
-.time-delta {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  margin-left: 8px;
-  transform: translateY(-50%);
-  font-size: 24px; /* ~70% размера таймера */
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
+/* Варианты: номер ВСЕГДА в первой колонке, текст любой длины его не сдвигает. */
+.opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.opt {
+  font: inherit; color: var(--text); position: relative;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 12px;
+  min-height: 58px; padding: 13px 14px;
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface);
+  text-align: left; font-size: 16px; line-height: 1.4; cursor: pointer;
+  transition: border-color .12s, background .12s, opacity .12s;
 }
-.time-delta.plus { color: var(--rush-ok); }
-.time-delta.minus { color: var(--rush-bad); }
-.time-delta.skip { color: var(--text3); }
-.time-delta.show { animation: deltaFloat .7s var(--rush-ease) forwards; }
-@keyframes deltaFloat {
-  0% { opacity: 0; transform: translateY(-40%); }
-  12% { opacity: 1; transform: translateY(-50%); }
-  70% { opacity: 1; transform: translateY(-50%); }
-  100% { opacity: 0; transform: translateY(-85%); }
+/* нечётный «хвост» (3-й из трёх, 5-й из пяти) — на обе колонки */
+.opt:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.opt:hover { border-color: var(--accent); }
+.opt:disabled { cursor: default; }
+.opt .key {
+  width: 28px; height: 28px; margin-top: -2px;
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--border); border-radius: 7px; background: var(--surface-2);
+  font-size: 13px; font-weight: 700; color: var(--text2);
 }
-@media (prefers-reduced-motion: reduce) {
-  .time-delta.show { animation: none; opacity: 1; }
-}
-.hud-combo {
-  min-width: 90px;
-  text-align: right;
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text3);
-  opacity: 0;
-  transform: scale(.85);
-  transition: opacity .15s, transform .15s, color .15s;
-}
-/* бейдж серии — только со ×2 и выше, «×1» не несёт информации */
-.hud-combo.show { opacity: 1; transform: scale(1); }
-.hud-combo.hot { color: var(--rush-accent); }
-.hud-combo.bump { animation: comboBump .35s var(--rush-ease); }
-@keyframes comboBump { 30% { transform: scale(1.25); } 100% { transform: scale(1); } }
+.opt-mark { font-size: 15px; font-weight: 800; margin-top: -1px; }
+.opt.is-correct { background: var(--green-tint); border-color: var(--green-border); }
+.opt.is-correct .opt-mark { color: var(--green); }
+.opt.is-wrong { background: var(--error-tint); border-color: var(--error-border); }
+.opt.is-wrong .opt-mark { color: var(--error); }
+.opt.show-right { border-color: var(--green-border); box-shadow: 0 0 0 3px var(--green-tint); }
+.opt.show-right .opt-mark { margin-top: 3px; font-size: 12px; font-weight: 700; letter-spacing: .04em;
+                            text-transform: uppercase; color: var(--green); }
+.opt.opt-muted { opacity: .5; }
+.opt.selected { border-color: var(--accent); background: var(--accent-tint); }
+.opt.selected .key { border-color: var(--accent); color: var(--accent-ink); }
+/* Рапид: верный, но пропущенный — пунктир и подпись «надо было выбрать». */
+.opt.opt-missed { border-style: dashed; border-color: var(--green-border); }
+.opt-caption { grid-column: 2 / -1; font-size: 13px; font-weight: 600; color: var(--green); }
+/* Пуля: две крупные кнопки, номер слева. */
+.opts.opts-bool .opt { min-height: 78px; align-items: center; font-size: 19px; font-weight: 700; }
+.opts.opts-bool .opt .key { margin-top: 0; }
 
-.quit-x {
-  position: absolute;
-  top: -6px;
-  right: -40px;
-  width: 32px; height: 32px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--text3);
-  font-size: 18px;
-  cursor: pointer;
+.multi-actions { display: flex; justify-content: center; }
+.btn-submit {
+  font: inherit; height: 58px; padding: 0 26px;
+  border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn);
+  font-size: 16px; font-weight: 700; cursor: pointer;
+  transition: background .12s;
 }
-/* ⚠️ 1.10 При наведении крестик НЕ получает песочную заливку — только
-   чуть тяжелеет и подрастает. Заливка на прозрачном фоне игры читалась
-   как вторая кнопка. Кольцо фокуса для клавиатуры остаётся. */
-.quit-x:hover { color: var(--text); font-weight: 700; transform: scale(1.1); }
-.quit-x:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
+.btn-submit:not(:disabled):hover { background: var(--btn-bg-hover); }
+/* ⚠️ До выбора — светлая с рамкой и серым текстом, а не полупрозрачная:
+   полупрозрачная тёмная читалась как «уже можно». */
+.btn-submit:disabled { background: var(--surface-2); color: var(--text3);
+                       border: 1px solid var(--border); cursor: default; }
 
-/* ── Окно «Закончить игру?» ────────────────────────────────────────────
-   ⚠️ СВОЁ окно, а не нативное. Нативный диалог замораживает вкладку
-   целиком и выглядит чужим на странице (канон 2.8). Здесь это важнее
-   вдвойне: таймер забега продолжает идти, пока окно открыто, — окно не
-   должно быть бесплатной паузой. Карточка вопроса за окном размыта:
-   читать её, пока думаешь над выходом, нельзя. */
+/* Классика: поле и кнопка в ряд по центру, подсказка под полем. */
+.numeric-block { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.num-row { display: flex; align-items: center; justify-content: center; gap: 12px; max-width: 100%; }
+.num-input {
+  font: inherit; width: 380px; max-width: 100%; height: 58px; padding: 0 16px;
+  border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
+  font-size: 20px; text-align: center; font-variant-numeric: tabular-nums;
+}
+.num-input:focus { outline: 2px solid var(--rush-accent); outline-offset: 2px; border-color: var(--rush-accent); }
+.num-input.bad, .num-input.bad:disabled { border-color: var(--error-border); background: var(--error-tint); color: var(--error); }
+.num-input.ok, .num-input.ok:disabled { border-color: var(--green-border); background: var(--green-tint); color: var(--green); }
+.num-unit { font-size: 14.5px; font-weight: 600; color: var(--text2); }
+.num-hint { margin: 0; font-size: 12.5px; color: var(--text3); }
+.num-feedback { min-height: 0; text-align: center; font-size: 16px; color: var(--text2); }
+.num-feedback:empty { display: none; }
+.num-feedback b { font-size: 22px; font-weight: 800; color: var(--green); font-variant-numeric: tabular-nums; }
+.btn-skip {
+  font: inherit; height: 46px; padding: 0 20px;
+  border: 1px solid var(--rush-border); border-radius: 10px; background: var(--rush-surface);
+  color: var(--text2); font-size: 16px; font-weight: 500; cursor: pointer;
+}
+.btn-skip:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
+
+/* Разбор: три секунды, часы стоят (ADR 0109). */
+.reveal {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 10px 14px; border: 1px solid var(--border-soft); border-radius: 12px;
+  background: var(--surface-2); font-size: 13.5px; color: var(--text2);
+}
+.reveal[hidden] { display: none; }
+.reveal.is-ok { background: var(--green-tint); border-color: var(--green-border); }
+.reveal-cnt {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  border: 2.5px solid var(--accent); border-radius: 50%;
+  font-size: 15px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums;
+}
+.reveal.is-ok .reveal-cnt { border-color: var(--green); color: var(--green); }
+.reveal-text { margin: 0; }
+.reveal-text b { color: var(--text); }
+.reveal-next {
+  font: inherit; height: 34px; padding: 0 14px;
+  border: 1px solid var(--border); border-radius: 8px; background: transparent;
+  font-size: 13px; font-weight: 700; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.reveal-next:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* Нижний ряд: пропуск слева, реакции дуэли посередине, «Плохая задача?» справа. */
+.play-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.gh, #btn-report.gh {
+  font: inherit; height: 34px; padding: 0 12px;
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid transparent; border-radius: 8px; background: transparent;
+  font-size: 13px; color: var(--text2); cursor: pointer; white-space: nowrap;
+}
+.gh:hover, #btn-report.gh:hover { border-color: var(--border); color: var(--text); }
+.gh .qi, #btn-report.gh .qi { width: 14px; height: 14px; }
+.gh kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border);
+          border-radius: 5px; padding: 0 5px; }
+body.practice #btn-skip { display: none; }
+
+/* Отсчёт 3-2-1 перед одиночным раундом. */
+.countdown {
+  position: fixed; inset: 0; z-index: 45;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(0, 0, 0, .12);
+}
+.countdown[hidden] { display: none; }
+.cd-card {
+  font: inherit; color: var(--text);
+  width: 460px; max-width: 100%; padding: 34px 30px 28px;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  border: 1px solid var(--border); border-radius: 18px; background: var(--surface);
+  box-shadow: var(--shadow-pop); cursor: pointer;
+}
+.cd-n { font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -2px; color: var(--accent-ink);
+        font-variant-numeric: tabular-nums; }
+.cd-m { margin-top: 10px; font-size: 17px; font-weight: 700; }
+.cd-s { margin-top: 4px; font-size: 13.5px; color: var(--text2); }
+.cd-k { margin-top: 18px; font-size: 12.5px; color: var(--text3); }
+.cd-k kbd { font: inherit; font-weight: 700; border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
+/* ── Дуэль в раунде: соперник в полосе, разрыв, реакции ── */
+.opp { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px 0 8px;
+       border: 1px solid var(--border); border-radius: 10px; min-width: 0; }
+.opp[hidden] { display: none; }
+.opp-av { width: 30px; height: 30px; flex: none; display: flex; align-items: center; justify-content: center;
+          border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink);
+          font-size: 12px; font-weight: 800; text-transform: uppercase; }
+.opp-who { display: flex; flex-direction: column; min-width: 0; }
+.opp-nm { display: flex; align-items: center; gap: 5px; font-size: 12.5px; line-height: 1.1; color: var(--text2);
+          white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.opp-dot { width: 7px; height: 7px; flex: none; border-radius: 50%; background: var(--green); }
+.opp-dot.off { background: var(--error); }
+.opp-sub { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text3); white-space: nowrap; }
+.opp-sub b { color: var(--text2); font-weight: 700; }
+.opp-lives { display: inline-flex; gap: 1px; color: var(--rush-bad); }
+.opp-lives .qi { width: 12px; height: 12px; }
+.opp-lives .is-lost { opacity: .3; color: var(--text3); }
+.opp-sc { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+.opp.is-done { opacity: .75; }
+.gap-pill {
+  position: absolute; z-index: 2; left: 50%; top: 72px; transform: translateX(-50%);
+  margin: 0; height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 12px;
+  border-radius: 999px; background: var(--surface-2); color: var(--text2);
+  font-size: 12.5px; font-weight: 700; white-space: nowrap;
+}
+.gap-pill[hidden] { display: none; }
+.gap-pill .qi { width: 13px; height: 13px; }
+.gap-pill.lead { background: var(--green-tint); color: var(--green); }
+.gap-pill.behind { background: var(--error-tint); color: var(--error); }
+.gap-pill.behind .qi { transform: rotate(180deg); }
+.gap-pill.even .qi { display: none; }
+#screen-play { position: relative; }
+.opp-toast {
+  position: absolute; z-index: 3; right: 40px; top: 74px; margin: 0;
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface); box-shadow: var(--shadow-pop);
+  font-size: 13px; color: var(--text2);
+}
+.opp-toast[hidden] { display: none; }
+.opp-toast b { color: var(--text); }
+.opp-toast .qi { width: 16px; height: 16px; }
+.duel-emoji { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.duel-emoji[hidden] { display: none; }
+.duel-emoji button {
+  font: inherit; height: 32px; padding: 0 10px;
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--border); border-radius: 999px; background: transparent;
+  font-size: 12.5px; color: var(--text2); cursor: pointer;
+}
+.duel-emoji button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.duel-emoji button:disabled { opacity: .45; cursor: default; }
+.duel-emoji .qi { width: 14px; height: 14px; }
+
+/* ═══ СЛУЖЕБНЫЕ ОКНА РАУНДА — ОДНА СЕМЬЯ (макеты Dialog*.dc.html) ════════
+   Выход, выход из набора, «Раунд прервался», конец по жизням, окно практики
+   и «Дуэль только с аккаунтом»: карточка 460 px, заголовок, текст, две кнопки
+   в ряд, основная слева и в фокусе. ⚠️ Карточка вопроса за окном РАЗМЫТА:
+   часы на паузе, и читать условие, пока окно открыто, было бы бесплатным
+   временем на подумать. */
 .quit-modal[hidden] { display: none; }
 .quit-modal {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  background: rgba(0, 0, 0, .45);
-  backdrop-filter: blur(6px);
-  -webkit-backdrop-filter: blur(6px);
+  position: fixed; inset: 0; z-index: 60;
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+  background: rgba(29, 26, 22, .5);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
 }
 .quit-card {
-  background: var(--surface);
-  border: 1px solid var(--rush-border);
-  border-radius: 16px;
-  box-shadow: var(--shadow-pop);
-  padding: 22px 24px 20px;
-  max-width: 380px;
-  width: 100%;
-  text-align: center;
+  width: 460px; max-width: 100%;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 24px 26px 22px;
+  border: 1px solid var(--border); border-radius: 16px; background: var(--surface);
+  box-shadow: var(--shadow-pop); text-align: left;
 }
-.quit-card p { font-size: 16px; line-height: 1.5; color: var(--text); }
-.quit-actions {
-  display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-top: 18px;
+.quit-card > p, .quit-card > div > p { margin: 0; font-size: 15px; line-height: 1.5; color: var(--text); }
+.quit-card .dlg-t { font-size: 20px; font-weight: 800; letter-spacing: -.2px;
+                    display: flex; align-items: center; gap: 10px; }
+.dlg-t .qi { width: 22px; height: 22px; color: var(--error); flex: none; }
+.quit-card .dlg-p { font-size: 14.5px; color: var(--text2); }
+.dlg-p b { color: var(--text); }
+.dlg-paused {
+  width: fit-content; height: 26px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
+  border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink);
+  font-size: 12.5px; font-weight: 700;
 }
-.quit-actions button { font: inherit; font-size: 16px; height: 44px;
-                       padding: 0 26px; border-radius: 10px; cursor: pointer; }
-/* Ссылки в окне «Дуэль только с аккаунтом» — по виду те же кнопки. */
-.quit-actions a { display: inline-flex; align-items: center; font-size: 16px;
-                  height: 44px; padding: 0 22px; border-radius: 10px;
-                  text-decoration: none; }
-/* «Нет» — главное действие: вернуться в забег. Оно ярче. */
-.quit-no { border: none; background: var(--btn-bg); color: var(--on-btn);
-           font-weight: 600; }
-.quit-no:hover { background: var(--btn-bg-hover); }
-/* «Да» — тихое: выйти и потерять результат. */
-.quit-yes { border: 1px solid var(--rush-border); background: var(--rush-surface);
-            color: var(--text2); font-weight: 500; }
-.quit-yes:hover { border-color: var(--rush-bad); color: var(--rush-bad); }
-.quit-actions button:focus-visible { outline: 2px solid var(--rush-accent);
-                                     outline-offset: 2px; }
+.dlg-paused .qi { width: 14px; height: 14px; }
+.dlg-stake { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.dlg-stake[hidden] { display: none; }
+.dlg-stake > div { padding: 9px 12px; border-radius: 10px; background: var(--surface-2);
+                   font-size: 12.5px; color: var(--text2); }
+.dlg-stake > div[hidden] { display: none; }
+.dlg-stake b { display: block; font-size: 20px; font-weight: 800; color: var(--text);
+               font-variant-numeric: tabular-nums; }
+.quit-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 4px; }
+.quit-actions button, .quit-actions a {
+  font: inherit; height: 44px; padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border-radius: 12px; font-size: 14.5px; font-weight: 600;
+  text-decoration: none; white-space: nowrap; cursor: pointer;
+}
+/* Основное действие — вернуться в раунд. Оно ярче и стоит слева. */
+.quit-no { border: 1px solid transparent; background: var(--btn-bg); color: var(--on-btn); font-weight: 700; }
+.quit-no:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+.quit-yes { border: 1px solid var(--border); background: transparent; color: var(--text); }
+.quit-yes:hover { border-color: var(--accent); color: var(--accent-ink); }
+.quit-actions button:focus-visible, .quit-actions a:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
+.go-hearts { display: inline-flex; color: var(--rush-bad); }
+.go-hearts .qi { width: 22px; height: 22px; }
+@media (prefers-reduced-motion: reduce) { .quit-modal { animation: none; } }
+
+/* «Нет связи»: тёмная плашка внизу по центру. ⚠️ Сама плашка прозрачна для
+   кликов — не закрывает вариант, который предлагают нажать ещё раз. */
+.net-toast {
+  position: fixed; left: 50%; bottom: 28px; z-index: 55; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 14px; max-width: calc(100vw - 32px);
+  padding: 12px 14px 12px 18px; border-radius: 14px;
+  background: var(--btn-bg); color: var(--on-btn); box-shadow: var(--shadow-pop);
+  font-size: 14.5px; pointer-events: none;
+}
+.net-toast[hidden] { display: none; }
+.net-toast .qi { width: 20px; height: 20px; flex: none; }
+.net-toast small { display: block; font-size: 12.5px; opacity: .75; }
+.net-toast-retry {
+  pointer-events: auto; font: inherit; height: 38px; padding: 0 16px;
+  border: 0; border-radius: 10px; background: var(--on-btn); color: var(--btn-bg);
+  font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap;
+}
+.net-toast-retry[hidden] { display: none; }
+
+/* ── Телефон (≤ 720 px) — по макету RoundMobile.dc.html ── */
+@media (max-width: 720px) {
+  .hud { height: auto; grid-template-columns: 1fr auto 1fr; gap: 8px; padding: 8px 14px; }
+  .hud-c { display: contents; }
+  .hud-score b { font-size: 24px; }
+  .hud-score span { font-size: 11px; }
+  .hud-clock { grid-column: 2; grid-row: 1; flex-direction: column; align-items: center; gap: 2px; }
+  .timer-num { font-size: 26px; }
+  .hud-paused { font-size: 10.5px; }
+  .hud-lives-wrap { grid-column: 3; grid-row: 1; justify-self: end; }
+  /* Сердца у правого края: «−1» всплывает слева от них, иначе вылезает за экран. */
+  .lives-delta { left: auto; right: 100%; margin: 0 6px 0 0; }
+  .heart .qi { width: 18px; height: 18px; }
+  .hud-l { grid-column: 1; grid-row: 1; gap: 8px; }
+  .hud-combo { display: none; }
+  .hud-r { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; gap: 6px; }
+  .hud-stat, .hud-rec { font-size: 12px; }
+  /* Рекорд на телефоне — продолжение строки «верных · вопрос», как в макете
+     RoundMobile: без рамки, значка и «ещё N», иначе строка шире экрана. */
+  .hud-rec { height: auto; padding: 0; border: 0; border-radius: 0; gap: 4px; }
+  .hud-rec::before { content: "·"; }
+  .hud-rec .qi, .hud-rec .rec-left { display: none; }
+  #btn-sound { margin-left: auto; }
+  /* Квадрат значка 30 px, как в макете, а зона нажатия 44 px: рамку рисует
+     ::before, отрицательные поля не раздувают строку. */
+  .ib { width: 44px; height: 44px; margin: -7px -4px; position: relative; border-color: transparent; }
+  .ib::before { content: ""; position: absolute; inset: 7px; border: 1px solid var(--border); border-radius: 8px; }
+  .ib:hover::before { border-color: var(--accent); }
+  .ib .qi { width: 15px; height: 15px; }
+  .opp { height: 38px; }
+  .play-body { padding: 14px 14px 12px; }
+  .qwrap { gap: 12px; }
+  .q-card { padding: 14px 16px; border-radius: 14px; font-size: 16px; line-height: 1.45; }
+  .opts { grid-template-columns: 1fr; gap: 8px; }
+  .opt { grid-template-columns: 26px minmax(0, 1fr) auto; gap: 10px; min-height: 48px; padding: 11px 12px;
+         border-radius: 11px; font-size: 15px; line-height: 1.35; }
+  .opt .key { width: 26px; height: 26px; font-size: 12px; }
+  .opts.opts-bool { grid-template-columns: 1fr 1fr; }
+  .opts.opts-bool .opt { min-height: 64px; font-size: 17px; }
+  .num-row { flex-direction: column; align-items: stretch; width: 100%; }
+  .num-input { width: 100%; }
+  .btn-submit { height: 52px; }
+  .reveal { grid-template-columns: auto minmax(0, 1fr); padding: 10px 12px; font-size: 12.5px; }
+  .reveal-next { grid-column: 1 / -1; height: 44px; }
+  .reveal-cnt { width: 30px; height: 30px; font-size: 14px; }
+  .play-foot { flex-wrap: wrap; }
+  .gh, #btn-report.gh { height: 44px; border-color: var(--border); }
+  .gh kbd { display: none; }
+  .gap-pill { top: auto; position: static; transform: none; margin: 8px auto 0; width: fit-content; }
+  .opp-toast { right: 14px; top: 96px; }
+  .quit-actions { grid-template-columns: 1fr; }
+  .cd-n { font-size: 72px; }
+}
+/* Самые узкие телефоны (320 px): номер вопроса уступает место кнопкам. */
+@media (max-width: 360px) {
+  .hud-qno { display: none; }
+}
+@media (hover: none) {
+  .gh kbd, .cd-k { display: none; }
+}
 
 /* ── «Бесконечные тесты» (решение владельца 15.09.2026) ─────────────────
    Вход на старте — ячейка нижней полосы (стили стартового экрана). В игре
    body.practice прячет всё, что про время, жизни и очки, и показывает
    счётчик и «Назад / Вперёд». */
-body.practice .hud-score, body.practice .timer-box, body.practice .time-track,
-body.practice .hud-lives, body.practice .hud-combo { display: none; }
-.hud-practice { display: none; font-size: 15px; color: var(--text2); }
-.hud-practice b { color: var(--text); font-variant-numeric: tabular-nums; }
-body.practice .hud-practice { display: block; }
+body.practice .hud-score, body.practice .hud-clock, body.practice .time-track,
+body.practice .hud-lives-wrap, body.practice .hud-combo, body.practice .hud-stat,
+body.practice .hud-rec, body.practice #q-points { display: none; }
+body.practice .hud-practice { display: flex; }
 .practice-nav { display: none; justify-content: space-between; gap: 10px; margin-top: 14px; }
 body.practice .practice-nav { display: flex; }
 .practice-nav button { font: inherit; height: 44px; padding: 0 18px; border-radius: 10px;
@@ -1475,290 +1632,8 @@ body.practice .practice-nav { display: flex; }
 .practice-nav button:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
 .pr-sum-title { font-weight: 800; }
 
-.q-card {
-  background: var(--rush-surface);
-  border: 1px solid var(--rush-border);
-  border-radius: 16px;
-  box-shadow: 0 2px 14px rgba(0,0,0,.07);
-  padding: 24px 28px;
-  font-size: 19px;
-  line-height: 1.55;
-  min-height: 108px;
-  display: flex;
-  align-items: center;
-}
-/* .q-card — flex-обёртка ровно с ОДНИМ ребёнком (.q-text), иначе при
-   display-формуле внутри вопроса браузер расколол бы текст на анонимные
-   flex-элементы и расставил их в ряд, а не друг под другом. */
-.q-text { width: 100%; }
-
-/* Ошибка: короткая красная вспышка карточки. Цвет гаснет сам — это
-   уведомление о потере жизни, а не состояние. */
-.q-card.flash-bad { animation: cardBad .45s var(--rush-ease); }
-@keyframes cardBad {
-  0%   { border-color: var(--rush-bad); background: var(--rush-bad-tint); }
-  60%  { border-color: var(--rush-bad); background: var(--rush-bad-tint); }
-  100% { border-color: var(--rush-border); background: var(--rush-surface); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .q-card.flash-bad { animation: none; }
-}
-
-/* Оверлей конца забега по жизням: живёт поверх сцены ~1.1 с, потом
-   уходим на экран результатов. Появляется ТОЛЬКО когда жизни кончились —
-   по времени забег завершается без оверлея (таймер и так на виду). */
-.gameover-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(0,0,0,.55);
-  backdrop-filter: blur(3px);
-  animation: goFade .2s ease;
-}
-.gameover-overlay[hidden] { display: none; }
-@keyframes goFade { from { opacity: 0; } to { opacity: 1; } }
-.go-card {
-  text-align: center;
-  color: #fff;
-  padding: 28px 40px;
-}
-.go-hearts { margin-bottom: 10px; display: flex; justify-content: center; }
-.go-hearts .qi { width: 38px; height: 38px; }
-/* Иконки в гнёздах статической разметки: логотип, комбо, рекорд. */
-.rush-logo .bolt .qi { width: .9em; height: .9em; vertical-align: -.1em; }
-.hud-combo .qi, .record-badge .qi { width: 1em; height: 1em;
-                                    vertical-align: -.15em; }
-.go-card h2 { font-size: 30px; font-weight: 800; margin: 0 0 6px; }
-.go-card p { font-size: 16px; opacity: .8; margin: 0; }
-/* «Раунд потерян»: та же карточка, что у конца раунда, плюс одна кнопка. */
-.go-card .lost-home { margin-top: 20px; }
-
-/* Тост о сбое связи.
-   ⚠️ Сам тост прозрачен для кликов: он не имеет права закрыть собой вариант
-   ответа, который человеку и предлагают нажать ещё раз. Кликабельна только
-   кнопка «Повторить». */
-.net-toast {
-  position: fixed; left: 50%; bottom: 24px; z-index: 55;
-  transform: translateX(-50%);
-  display: flex; align-items: center; gap: 12px;
-  max-width: calc(100vw - 32px);
-  padding: 10px 14px;
-  background: var(--surface); color: var(--text);
-  border: 1px solid var(--rush-border); border-radius: 12px;
-  box-shadow: var(--shadow-pop);
-  font-size: 14px;
-  pointer-events: none;
-}
-.net-toast[hidden] { display: none; }
-.net-toast-retry {
-  pointer-events: auto;
-  font: inherit; font-size: 14px; font-weight: 600;
-  height: 34px; padding: 0 14px;
-  border: none; border-radius: 10px;
-  background: var(--btn-bg); color: var(--on-btn);
-  cursor: pointer; white-space: nowrap;
-}
-.net-toast-retry:hover { background: var(--btn-bg-hover); }
-@media (prefers-reduced-motion: reduce) {
-  .gameover-overlay { animation: none; }
-}
-.q-slide-in { animation: qSlide .5s var(--rush-ease); }
-@keyframes qSlide {
-  0% { opacity: 0; transform: translateY(26px); }
-  100% { opacity: 1; transform: none; }
-}
-
-/* KaTeX внутри строчного контекста не должен переноситься сам по себе
-   (иначе «Q =» и «1/P» расползаются на разные строки посреди фразы) —
-   формула летит в строке целиком или целиком уходит на следующую. */
-.q-text .katex, .opt .katex, .miss-item .katex {
-  white-space: nowrap;
-}
-/* Внутри display-формулы (кусочные функции, матрицы) перенос разрешён —
-   там формула и так занимает свою строку целиком. */
-.q-text .katex-display .katex, .miss-item .katex-display .katex {
-  white-space: normal;
-}
-.q-text .katex-display, .miss-item .katex-display {
-  margin: 12px 0;
-  overflow-x: auto;
-}
-
-.opts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  margin-top: 16px;
-}
-.opt {
-  font: inherit;
-  font-size: 16px;
-  line-height: 1.4;
-  min-height: 56px;
-  padding: 12px 14px 12px 12px;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  text-align: left;
-  border: 1px solid var(--rush-border);
-  border-radius: 12px;
-  background: var(--rush-surface);
-  color: var(--text);
-  cursor: pointer;
-  transition: border-color .12s, background .12s, transform .1s;
-}
-/* нечётный «хвост» (3-й из трёх, 5-й из пяти) занимает всю ширину */
-.opt:last-child:nth-child(odd) { grid-column: 1 / -1; }
-.opt:hover { border-color: var(--rush-accent); background: var(--rush-accent-tint); }
-.opt:active { transform: scale(.98); }
-.opt .key {
-  flex-shrink: 0;
-  width: 26px; height: 26px;
-  display: flex; align-items: center; justify-content: center;
-  border: 1px solid var(--rush-border);
-  border-bottom-width: 2px;
-  border-radius: 6px;
-  background: var(--surface-2);
-  color: var(--text3);
-  font-size: 14px;
-  font-weight: 600;
-}
-.opt.is-correct {
-  background: var(--rush-ok-tint);
-  border-color: var(--rush-ok);
-  color: var(--text);
-}
-.opt.is-wrong {
-  background: var(--rush-bad-tint);
-  border-color: var(--rush-bad);
-  animation: optShake .3s linear;
-}
-.opt.show-right { border-color: var(--rush-ok); border-width: 2px; padding: 11px 13px 11px 11px; }
-
-/* Разбор по каждому варианту в Рапиде (мультивыбор) после ответа:
-   правильный+выбранный — заливка (is-correct выше); правильный, но
-   пропущенный — пунктирная рамка + подпись; выбранный, но неверный —
-   is-wrong (заливка выше); ни то ни другое — приглушаем. */
-.opt.opt-missed {
-  background: var(--rush-surface);
-  border-color: var(--rush-ok);
-  border-width: 2px;
-  border-style: dashed;
-  padding: 11px 13px 11px 11px;
-}
-.opt.opt-muted { opacity: .5; }
-.opt-mark {
-  margin-left: auto;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-.opt.is-correct .opt-mark { color: var(--rush-ok); }
-.opt.is-wrong .opt-mark { color: var(--rush-bad); }
-.opt-caption {
-  flex: 1 0 100%;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--rush-ok);
-}
-@keyframes optShake {
-  20% { transform: translateX(-6px); }
-  45% { transform: translateX(5px); }
-  70% { transform: translateX(-3px); }
-  90% { transform: translateX(2px); }
-}
-
-/* Данетка (Пуля): две крупные кнопки во всю ширину сетки */
-.opts.opts-bool .opt {
-  min-height: 92px;
-  font-size: 18px;
-  font-weight: 700;
-  justify-content: center;
-}
-
-/* Мультивыбор (Рапид): клик/клавиша переключает выделение */
-.opt.selected {
-  border-color: var(--rush-accent);
-  background: var(--rush-accent-tint);
-}
-.opt.selected .key {
-  background: var(--rush-accent);
-  border-color: var(--rush-accent);
-  color: var(--act-ink-solid);   /* белый на светлом акценте тёмной темы — 2,28 */
-}
-.multi-actions {
-  display: flex;
-  justify-content: center;
-  margin-top: 14px;
-}
-.btn-submit {
-  font: inherit; font-size: 16px; font-weight: 600;
-  height: 46px; padding: 0 36px;
-  border: none; border-radius: 10px;
-  background: var(--btn-bg); color: var(--on-btn);
-  cursor: pointer;
-  transition: background .12s, transform .1s, opacity .12s;
-}
-.btn-submit:disabled { opacity: .45; cursor: default; }
-.btn-submit:not(:disabled):hover { background: var(--btn-bg-hover); }
-.btn-submit:not(:disabled):active { transform: scale(.97); }
-
-/* Числовой ответ (Классика): поле ввода + отправить/пропустить */
-.numeric-block {
-  margin-top: 16px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-.num-input {
-  font: inherit;
-  font-size: 22px;
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  width: min(340px, 100%);
-  height: 56px;
-  border: 1px solid var(--rush-border);
-  border-radius: 12px;
-  background: var(--surface-2);
-  color: var(--text);
-}
-.num-input:focus {
-  outline: 2px solid var(--rush-accent);
-  outline-offset: 2px;
-  border-color: var(--rush-accent);
-}
-/* единица измерения ответа («ответ в %») — приходит с вопросом Классики */
-.num-unit { font-size: 14.5px; font-weight: 600; color: var(--text2); }
-.numeric-actions { display: flex; gap: 10px; }
-.btn-skip {
-  font: inherit; font-size: 16px; font-weight: 500;
-  height: 46px; padding: 0 20px;
-  border: 1px solid var(--rush-border); border-radius: 10px;
-  background: var(--rush-surface); color: var(--text2);
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.btn-skip:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.num-feedback {
-  font-size: 16px;
-  font-weight: 600;
-  min-height: 20px;
-  text-align: center;
-}
-.num-feedback.ok { color: var(--rush-ok); }
-.num-feedback.bad { color: var(--rush-bad); }
-
-.keys-hint {
-  margin-top: 14px;
-  text-align: center;
-  font-size: 13px;
-  color: var(--text3);
-}
+/* Иконки в гнёздах статической разметки: рекорд на итоге. */
+.record-badge .qi { width: 1em; height: 1em; vertical-align: -.15em; }
 
 /* красная виньетка при ошибке */
 .vignette {
@@ -1803,25 +1678,6 @@ body.practice .practice-nav { display: flex; }
 @media (prefers-reduced-motion: reduce) {
   /* Тревога остаётся, пульс — нет: сообщение то же, движения нет. */
   .vignette.alarm.beat { animation: none; }
-}
-
-/* всплывашка «Комбо ×N!» */
-.combo-toast {
-  position: absolute;
-  top: 46px;
-  right: 0;
-  font-size: 14px;
-  font-weight: 700;
-  color: var(--rush-accent);
-  opacity: 0;
-  pointer-events: none;
-}
-.combo-toast.on { animation: comboToast 1s var(--rush-ease); }
-@keyframes comboToast {
-  0% { opacity: 0; transform: translateY(6px); }
-  20% { opacity: 1; transform: none; }
-  75% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-8px); }
 }
 
 /* ── Экран 3: финал ────────────────────────────────────────────── */
@@ -2040,7 +1896,8 @@ body.practice .practice-nav { display: flex; }
 .share-lead { margin-top: 3px; font-size: 13px; color: var(--text3); }
 .share-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
 .share-row button {
-  font: inherit; font-size: 14px; font-weight: 600;
+  font: inherit; font-size: 14px; font-weight: 700;
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   height: 42px; padding: 0 16px;
   border: 1px solid var(--rush-border); border-radius: 10px;
   background: var(--rush-surface); color: var(--text2);
@@ -2049,6 +1906,7 @@ body.practice .practice-nav { display: flex; }
 }
 .share-row button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 .share-row button[hidden] { display: none; }
+.share-row button .qi { width: 16px; height: 16px; }
 
 .final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 .btn-again {
@@ -2086,42 +1944,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 .miss-item a { color: var(--accent-ink); text-decoration: none; font-size: 13px; }
 .miss-item a:hover { text-decoration: underline; }
 
-.q-chips {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  min-height: 22px;
-}
-/* Пометка о происхождении вопроса — мелкой строкой ПОД карточкой, справа.
-   Плашка внутри карточки спорила с условием за внимание; здесь она честно
-   сообщает происхождение и не мешает читать. Ставится всем вопросам с
-   `generated: true` — и архетипам-генераторам, и ручным «по мотивам». */
-.gen-note {
-  margin-top: 6px;
-  text-align: right;
-  font-size: 12px;
-  color: var(--text3);
-}
-.gen-note[hidden] { display: none; }
-
-/* Чип «верно отвечают N %» — появляется ПОСЛЕ ответа, рядом с разбором.
-   Показывается только когда попыток набралось достаточно (порог в
-   config.py); нейтральный, без сигнальных цветов: это справка, а не
-   оценка ответа игрока. */
-/* «Плохая задача?» под вопросом: справа и мелко, чтобы не спорить с ответом. */
-.report-row { display: flex; justify-content: flex-end; margin-top: 10px; }
-
-.stat-chip {
-  display: inline-block;
-  font-size: 11px;
-  line-height: 1;
-  padding: 4px 9px;
-  border: 1px solid var(--rush-border);
-  border-radius: 999px;
-  background: var(--rush-surface);
-  color: var(--text3);
-}
-
 /* Разбор сгенерированного вопроса: кнопка-ссылка + разворачиваемое решение */
 .mi-sol-btn {
   background: none; border: none; padding: 0; cursor: pointer;
@@ -2148,15 +1970,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 /* ── Мобильная версия (≤720px) ─────────────────────────────────── */
 @media (max-width: 720px) {
   .rush-wrap { padding: 16px 12px 32px; }
-  .opts { grid-template-columns: 1fr; }
-  /* данетка: две большие тап-зоны рядом даже на узком экране */
-  .opts.opts-bool { grid-template-columns: 1fr 1fr; }
-  .opts.opts-bool .opt { min-height: 76px; }
-  .opt .key { display: none; }
-  .keys-hint { display: none; }
-  .q-card { font-size: 16.5px; padding: 18px 18px; min-height: 84px; }
-  .hud-timer { font-size: 28px; }
-  .quit-x { position: static; float: right; }
   /* результаты: всё в один столбец, метрики по две в ряд */
   .fin-metrics { grid-template-columns: 1fr 1fr; }
   .det-body { grid-template-columns: 1fr; }
@@ -2164,11 +1977,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   .final-actions { flex-direction: column; align-items: stretch; }
   .final-actions .btn-again, .final-actions .btn-copy { width: 100%; }
   .btn-catalog { display: flex; align-items: center; justify-content: center; }
-}
-/* на тач-устройствах подсказки клавиш не нужны при любой ширине */
-@media (hover: none) {
-  .opt .key { display: none; }
-  .keys-hint { display: none; }
 }
 
 /* ── Уменьшенное движение: мгновенные замены ───────────────────── */
@@ -2197,116 +2005,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   {% comment %} ЭКРАН 1: СТАРТ — разметка в _start.html (ADR 0108). {% endcomment %}
   {% include 'game/_start.html' %}
 
-  <!-- ЭКРАН 2: ИГРА -->
-  <section id="screen-play" class="screen">
-    <div class="scene">
-      <button class="quit-x" id="btn-quit" title="Выйти из раунда" aria-label="Выйти из раунда">✕</button>
-      <button class="sound-x" id="btn-sound" title="Звук" aria-label="Включить или выключить звук"><span class="qi-slot"></span></button>
-      <div class="time-track"><div class="time-fill" id="time-fill"></div></div>
-      {% comment %} ── Табло: вы, разрыв, вторая сторона ──────────────────
-           ОДНА вёрстка на дуэль и на обычный забег. Справа в дуэли
-           соперник, в обычном забеге личный рекорд игрока в этом режиме.
-           Скрыто, пока сравнивать не с чем. {% endcomment %}
-      <div class="vs" id="vs" hidden>
-        <div class="vs-side" id="vs-me">
-          <div class="vs-who">вы</div>
-          <div class="vs-score" id="vs-my-score">0</div>
-          <div class="vs-row">
-            <span>верных <b id="vs-my-correct">0</b></span>
-            <span>время <b id="vs-my-time">&ndash;</b></span>
-          </div>
-          <div class="vs-tape" id="vs-my-tape" aria-hidden="true"></div>
-        </div>
-
-        <div class="vs-gap" id="vs-gap" hidden>
-          <div class="vs-gap-num" id="vs-gap-num">0</div>
-          <div class="vs-gap-note" id="vs-gap-note"></div>
-        </div>
-
-        <div class="vs-side vs-side--off" id="vs-them">
-          <div class="vs-who" id="vs-them-who">соперник</div>
-          <div class="vs-score" id="vs-them-score">0</div>
-          <div class="vs-row" id="vs-them-row">
-            <span>верных <b id="vs-them-correct">0</b></span>
-            <span>время <b id="vs-them-time">&ndash;</b></span>
-          </div>
-          <div class="vs-lives" id="vs-them-lives"></div>
-          <div class="vs-state" id="vs-them-state">ждём соперника</div>
-          <p class="vs-empty" id="vs-them-empty" hidden></p>
-        </div>
-      </div>
-      <div class="duel-emoji" id="duel-emoji" hidden></div>
-      <div class="hud">
-        <div class="hud-score"><small>СЧЁТ</small><span id="hud-score">0</span></div>
-        <div class="hud-timer">
-          <span class="timer-box"><span class="timer-num" id="hud-timer">60</span><span class="time-delta" id="time-delta"></span></span>
-          <div class="hud-lives" id="hud-lives" aria-label="Жизни"></div>
-        </div>
-        <div class="hud-combo" id="hud-combo"><span class="qi-slot"></span> ×1</div>
-        <div class="hud-practice">Вопрос <b id="pr-number">1</b> · верных <b id="pr-correct">0</b></div>
-      </div>
-      <div class="combo-toast" id="combo-toast"></div>
-      <!-- Чипы вынесены НАД карточкой: .q-card — flex-обёртка ровно с
-           одним ребёнком (см. её стиль), а лишние дети вставали в ряд
-           рядом с текстом вопроса. -->
-      <div class="q-chips"><span class="stat-chip" id="stat-chip" hidden></span></div>
-      <!-- Формулировка режима «График» — ОТДЕЛЬНОЙ строкой над условием:
-           она одна и та же на все сюжеты, и слипаясь с условием, читается
-           как часть задачи. -->
-      <p class="q-prompt" id="q-prompt" hidden></p>
-      <div class="q-card" id="q-card"><div class="q-text" id="q-text"></div></div>
-      <p class="gen-note" id="gen-note" hidden>Вопрос сгенерирован ИИ</p>
-      <!-- Режим «График»: чертёж чужого решения. Разворачивается на весь
-           экран НАЛОЖЕНИЕМ (CSS), варианты и таймер при этом остаются
-           видимыми и рабочими. -->
-      <div class="fig-wrap" id="fig-wrap" hidden>
-        <div class="fig-tools">
-          <!-- ⚠️ Пропуск здесь кнопкой и клавишей S, а не пробелом: в этом
-               режиме пробел разворачивает чертёж (так задумано), и без
-               отдельной кнопки пропуск стал бы недоступен вовсе. -->
-          <button class="fig-btn" id="fig-skip" type="button">Пропустить (S)</button>
-          <button class="fig-btn" id="fig-text" type="button" hidden>Условие</button>
-          <button class="fig-btn" id="fig-expand" type="button">⤢ Развернуть (F)</button>
-          <button class="fig-btn" id="fig-close" type="button" hidden>✕ Свернуть (Esc)</button>
-        </div>
-        <div class="fig-holder" id="fig-holder"></div>
-        <p class="fig-hint" id="fig-hint">Клик по чертежу, F или пробел разворачивают его на весь экран</p>
-      </div>
-      <div class="opts" id="opts"></div>
-      <div class="multi-actions" id="multi-actions" hidden>
-        <button class="btn-submit" id="btn-submit" disabled>Ответить</button>
-      </div>
-      <div class="practice-nav">
-        <button type="button" id="pr-back">← Назад</button>
-        <button type="button" id="pr-next">Вперёд →</button>
-      </div>
-      <!-- Режим «График» на узком экране: увеличенная плитка + явная
-           кнопка. Второй тап по самой плитке делает то же самое. -->
-      <div class="tile-actions" id="tile-answer" hidden>
-        <button class="btn-submit" id="btn-tile-submit">Ответить этим графиком</button>
-        <button class="btn-skip" id="btn-tile-back">Назад ко всем</button>
-      </div>
-      <div class="numeric-block" id="numeric-block" hidden>
-        <div class="num-unit" id="num-unit" hidden></div>
-        <input id="num-input" class="num-input" inputmode="decimal"
-               autocomplete="off" spellcheck="false" placeholder="Например: 12,5">
-        <div class="numeric-actions">
-          <button class="btn-submit" id="btn-num-submit">Ответить</button>
-        </div>
-        <div class="num-feedback" id="num-feedback"></div>
-      </div>
-      <!-- «Плохая задача?» — окно в общем партиале _problem_report.html; номер
-           вопроса ставит showQuestion. Открытое окно ставит раунд на паузу. -->
-      <div class="report-row">
-        <button type="button" class="btn-report" id="btn-report" data-source="game">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
-               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2.5 4L16 12H5"/></svg>
-          <span>Плохая задача?</span>
-        </button>
-      </div>
-      <p class="keys-hint" id="keys-hint">Используйте клавиши 1–4 для быстрого ответа, а пробел для пропуска задания</p>
-    </div>
-  </section>
+  {% comment %} ЭКРАН 2: РАУНД — разметка в _play.html (ADR 0110). {% endcomment %}
+  {% include 'game/_play.html' %}
 
   <!-- ЭКРАН 3: ФИНАЛ.
        Порядок блоков = порядок важности: чем кончилось → сколько набрал →
@@ -2518,7 +2218,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     <div class="fmodal-head">
       <b id="fmodal-title">Все фильтры</b>
       <button type="button" class="fmodal-close" id="fmodal-close"
-              aria-label="Закрыть">✕</button>
+              aria-label="Закрыть">{% include "_icon.html" with name="close" %}</button>
     </div>
 
     <div class="fmodal-body">
@@ -2635,13 +2335,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     <div class="records-box" id="records-box"></div>
   </div>
 </div>
+{% comment %} Окно выхода из раунда (макеты DialogQuit и DialogQuitSet): заголовок и текст
+   под вид раунда ставит paintQuitDialog. Часы на паузе, пока окно открыто. {% endcomment %}
 <div class="quit-modal" id="quit-modal" hidden role="dialog" aria-modal="true"
-     aria-labelledby="quit-text">
+     aria-labelledby="quit-title" aria-describedby="quit-text">
   <div class="quit-card">
-    <p id="quit-text">Закончить игру? Результат не сохранится.</p>
+    <p class="dlg-t" id="quit-title">Выйти из раунда?</p>
+    <span class="dlg-paused">{% include "_icon.html" with name="pause" %}часы стоят, пока окно открыто</span>
+    <div class="dlg-stake" id="quit-stake" hidden>
+      <div>сейчас<b id="quit-now">0 очков</b></div>
+      <div id="quit-best-tile"><span id="quit-best-label">до вашего рекорда</span><b id="quit-best"></b></div>
+    </div>
+    <p class="dlg-p" id="quit-text">Раунд сохранится как <b>незачётный</b>: в таблицу и рекорды не пойдёт, но итог и разбор ошибок вы увидите.</p>
     <div class="quit-actions">
-      <button type="button" class="quit-no" id="quit-no">Нет</button>
-      <button type="button" class="quit-yes" id="quit-yes">Да</button>
+      <button type="button" class="quit-no" id="quit-no">Продолжить раунд</button>
+      <button type="button" class="quit-yes" id="quit-yes">Выйти к итогу</button>
     </div>
   </div>
 </div>
@@ -2677,24 +2385,30 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     </div>
   </div>
 </div>
-<div class="gameover-overlay" id="gameover-overlay" hidden>
-  <div class="go-card">
-    <div class="go-hearts"><span class="qi-slot"></span></div>
-    <h2>Раунд окончен</h2>
-    <p id="go-sub">Жизни кончились</p>
+{# Конец по жизням: карточка той же семьи, ~1,1 с, затем итог. #}
+<div class="quit-modal" id="gameover-overlay" hidden role="alertdialog" aria-modal="true"
+     aria-labelledby="go-title" aria-describedby="go-sub">
+  <div class="quit-card">
+    <p class="dlg-t" id="go-title"><span class="go-hearts"><span class="qi-slot"></span></span>Раунд окончен</p>
+    <p class="dlg-p" id="go-sub">Жизни кончились</p>
   </div>
 </div>
-{# «Раунд потерян»: состояние на сервере истекло, продолжать нечем, путь один. #}
-<div class="gameover-overlay" id="lost-overlay" hidden role="alertdialog"
-     aria-modal="true" aria-labelledby="lost-title" aria-describedby="lost-sub">
-  <div class="go-card">
-    <h2 id="lost-title">Раунд потерян</h2>
-    <p id="lost-sub">Соединение или время ожидания. Начните новый.</p>
-    <button type="button" class="btn-again lost-home" id="lost-home">На старт</button>
+{# «Раунд прервался» (макет DialogLost): состояние на сервере истекло, продолжать нечем. #}
+<div class="quit-modal" id="lost-overlay" hidden role="alertdialog" aria-modal="true"
+     aria-labelledby="lost-title" aria-describedby="lost-sub">
+  <div class="quit-card">
+    <p class="dlg-t" id="lost-title">{% include "_icon.html" with name="alert" %}Раунд прервался</p>
+    <p class="dlg-p" id="lost-sub">Связь пропадала слишком надолго, и сервер закрыл раунд – продолжить его нельзя. <b>Результат не сохранён</b>, в статистику и лимит зачётных раундов он не попал.</p>
+    <div class="quit-actions">
+      <button type="button" class="quit-no" id="lost-again">Сыграть ещё раз</button>
+      <button type="button" class="quit-yes" id="lost-home">На старт</button>
+    </div>
   </div>
 </div>
+{# «Нет связи» (макет DialogOffline): тёмная плашка внизу, раунд не потерян. #}
 <div class="net-toast" id="net-toast" role="status" aria-live="polite" hidden>
-  <span id="net-toast-text"></span>
+  {% include "_icon.html" with name="wifi_off" %}
+  <div><span id="net-toast-text"></span><small id="net-toast-sub">пробуем снова сами, раунд не потерян</small></div>
   <button type="button" class="net-toast-retry" id="net-toast-retry" hidden>Повторить</button>
 </div>
 <canvas id="confetti-canvas" width="0" height="0"></canvas>
@@ -2757,7 +2471,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      держать второй набор путей. */
   (function fillIconSlots() {
     var slots = {
-      'rush-logo-bolt': 'bolt', 'hud-combo': 'flame',
+      'rush-logo-bolt': 'bolt', 'hud-combo': 'bolt',
       'record-badge': 'trophy', 'go-hearts': 'heart'
     };
     document.querySelectorAll('.bolt').forEach(function (el) {
@@ -2837,16 +2551,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var practiceLive = null;      // живой вопрос, ещё без ответа
   var practiceCount = null;     // тестов под фильтром (api_pool_counts)
 
-  /* ── ТАБЛО ────────────────────────────────────────────────────────────
-     ⚠️ `myTape` — ПОСЛЕДОВАТЕЛЬНОСТЬ ИСХОДОВ, а не ещё один счётчик.
-     Счётчики верных, ошибок и пропусков остаются прежние; отсюда берётся
-     только порядок, и только он — иначе это был бы второй счёт того же
-     самого, а такие в этом проекте уже разъезжались. */
-  var myTape = [];              // 'correct' | 'wrong' | 'skip', по порядку
+  /* ── ПОЛОСА HUD: РЕКОРД ИЛИ СОПЕРНИК ──────────────────────────────── */
   var vsBest = null;            // личный рекорд режима (обычный забег)
   var vsRival = null;           // последнее событие соперника (дуэль)
   var vsRivalAt = 0;            // когда оно пришло по ЧАСАМ БРАУЗЕРА
   var vsRivalDone = false;      // соперник финишировал: время замерло
+  var duelLink = true;          // сокет дуэли жив (точка у имени соперника)
+  var runUnfiltered = true;     // раунд без единого фильтра (×1,3) — из старта
+  var runRanked = true;         // фильтра по сложности нет
   var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var setRun = null;            // {code, kind, title, size} забега по набору
@@ -2869,6 +2581,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
     // Стартовый экран шире игры и итога (ADR 0108): ширину отпускает класс.
     document.body.classList.toggle('on-start', name === 'start');
+    // На время раунда шапка сайта и плавающие кнопки скрыты (ADR 0110).
+    document.body.classList.toggle('rush-playing', name === 'playing');
   }
 
   /* Сервер честно отказался начинать забег (режим за флагом, пустой пул
@@ -2947,15 +2661,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      покажем секунды. */
   /* «−1 ♥» на всплывашке ошибки: иконка вместо типографского сердца. */
   function wrongDeltaHTML(d) {
-    return d.time_delta ? (d.time_delta + ' с')
-                        : ('−1 ' + (ICONS.heart_fill || ''));
-  }
-
-  /* Цена пропуска берётся из конфига: сейчас 0 (пропуск бесплатный),
-     но если режим снова начнут тюнить временем — подсказка не соврёт. */
-  function skipLabel() {
-    return MODE.time_skip ? 'пропустить (' + MODE.time_skip + ' с)'
-                          : 'пропустить (бесплатно)';
+    return d.time_delta ? (d.time_delta + ' с') : '−1';
   }
 
   /* ═══ СТАРТОВЫЙ ЭКРАН: ЗАБЕГ (ADR 0108, макет Main.dc.html) ═══════════
@@ -3573,15 +3279,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
         skippedCount = 0; isRecord = false; bestNow = 0;
-        myTape = [];
+        runLost = false; prefetchFailed = false;
         // Рекорд приходит вместе со стартом (сервер, не localStorage).
         // У набора его нет: там справа соперник, а не своя история.
         vsBest = d.best || null;
         vsRival = null; vsRivalAt = 0; vsRivalDone = false;
-        setupVs();
+        var f = d.filter || {};
+        runRanked = !(f.stars && f.stars.length);
+        runUnfiltered = !['topics', 'tags', 'sources', 'stars', 'features'].some(function (k) {
+          return f[k] && f[k].length;
+        }) && !f.character;
         endReason = 'time'; runOver = false; goInfo = null; summary = null;
         shareInfo = null;
+        pausedAt = null;
+        paintPausedHud(false);
         $('gameover-overlay').hidden = true;
+        $('lost-overlay').hidden = true;
         /* ⚠️ ПЛАШКА ДЕЛЬТЫ У ТАЙМЕРА ЧИСТИТСЯ ЯВНО, И ЭТО НЕ ПЕДАНТИЗМ.
            У неё анимация `deltaFloat ... forwards`, а CSS-анимация
            ПЕРЕЗАПУСКАЕТСЯ, когда элемент снова становится видимым
@@ -3589,23 +3302,31 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
            новый забег начинался бы с «−1» от прошлого — при трёх целых
            жизнях. Ровно это владелец и видел, входя в Рапид после Блица;
            замер: 100 и 400 мс, непрозрачность 1, жизней 3 из 3. */
-        var deltaChip = $('time-delta');
-        deltaChip.className = 'time-delta';
-        deltaChip.innerHTML = '';
-        deltaChip.style.opacity = '';
+        ['time-delta', 'lives-delta'].forEach(function (id) {
+          var chip = $(id);
+          chip.className = id;
+          chip.innerHTML = '';
+          chip.style.opacity = '';
+        });
         clearTimeout(deltaTimer1);
         clearTimeout(deltaTimer2);
         timeLeft = MODE.duration;
+        clearQuestion();
         show('playing');
-        rush('start');
-        lastTickSecond = -1;
+        setupVs();
         paintHud();
         paintLives(false);
-        // ok:true гарантирует вопрос — забег из нуля вопросов не начинается.
-        showQuestion(d.question);
-        prefetchNext();
-        lastTick = performance.now();
-        rafId = requestAnimationFrame(tick);
+        function go() {
+          rush('start');
+          lastTickSecond = -1;
+          // ok:true гарантирует вопрос — забег из нуля вопросов не начинается.
+          showQuestion(d.question);
+          prefetchNext();
+          lastTick = performance.now();
+          rafId = requestAnimationFrame(tick);
+        }
+        // У дуэли свой общий отсчёт в лобби — второго не показываем.
+        if (isDuelRun()) { go(); } else { runCountdown(go); }
       }, function () {
         // Нет связи — игра не началась, и игрок должен это увидеть: без
         // строки клик по режиму выглядел бы мёртвой кнопкой.
@@ -3635,24 +3356,39 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      раунда в `_rank_run`, не больше двух минут за раунд. Бонус за скорость на
      вопросе с паузой по-прежнему сгорает: время ответа сервер считает от
      выдачи вопроса (`issued_at`).
-     Сообщения идут одной очередью `pauseSync`, и ответ с вопросом уходят
-     ПОСЛЕ неё: иначе ответ, нажатый сразу после закрытия окна, обогнал бы
-     resume и получил 409 «пауза». */
+     ⚠️ ОДНА ОЧЕРЕДЬ ЗАПРОСОВ ЗАБЕГА (`queueRun`): пауза, возобновление,
+     подкачка вопроса, ответ и финиш уходят строго по одному. Сервер читает
+     состояние забега целиком и целиком же пишет его обратно, и два запроса
+     одновременно теряют запись одного из них. Без очереди ответ, нажатый
+     сразу после закрытия окна, обогнал бы resume и получил 409 «пауза», а
+     после разбора ошибки (ADR 0109) ответ и подкачка ждали одного resume и
+     уходили разом: сервер терял выданный вопрос, и ответ на него вечно
+     получал «не выдавался». Зависший запрос держит очередь не дольше
+     QUEUE_STALL_MS — дальше следующий уходит без его ответа. */
   var pausedAt = null;
-  var pauseSync = Promise.resolve();
+  var runQueue = Promise.resolve();
+  var QUEUE_STALL_MS = 8000;
+
+  function queueRun(send) {
+    var p = runQueue.then(send);
+    runQueue = Promise.race([p, new Promise(function (r) { setTimeout(r, QUEUE_STALL_MS); })])
+      .then(function () {}, function () {});
+    return p;
+  }
 
   function tellServer(url) {
-    pauseSync = pauseSync.then(function () {
-      return api(url, { method: 'POST' });
-    }).then(function () {}, function () {});
+    queueRun(function () { return api(url, { method: 'POST' }); }).then(null, function () {});
   }
 
   function rushPause() {
     // У практики нет времени: ставить нечего, а rushResume поднял бы таймер.
     if (state !== 'playing' || pausedAt || practice) return;
     pausedAt = performance.now();
-    tellServer('/game/api/pause/');
+    // Жизни кончились: забег на сервере уже закрыт и паузу отверг бы 409 —
+    // часы разбора последней ошибки стоят только здесь.
+    if (!runOver) tellServer('/game/api/pause/');
     cancelAnimationFrame(rafId);
+    paintPausedHud(true);
     // Сердцебиение молчит на паузе; вернёт его paintHud → paintAlarm,
     // увидев, что тревога есть, а звук снят.
     beatApi('stop');
@@ -3662,10 +3398,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   function rushResume() {
     if (!pausedAt) return;
     pausedAt = null;
-    tellServer('/game/api/resume/');
+    if (!runOver) tellServer('/game/api/resume/');
+    paintPausedHud(false);
     // Забег мог кончиться под окном (ответ ушёл до паузы) — тогда цикл не
-    // поднимаем: paintHud вернул бы тревогу на экран итогов.
-    if (state !== 'playing') return;
+    // поднимаем: paintHud вернул бы тревогу на экран итогов. Во время отсчёта
+    // цикла ещё нет — его поднимет конец отсчёта.
+    if (state !== 'playing' || countdownOn) return;
     lastTick = performance.now();
     rafId = requestAnimationFrame(tick);
     paintHud();
@@ -3690,7 +3428,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   document.addEventListener('weco:modal', function (e) {
     if (e.detail && e.detail.open) { rushPause(); return; }
     // Закрылось одно окно, а под ним осталось другое — пауза продолжается.
-    if (!modalIsOpen()) rushResume();
+    // Разбор ошибки держит паузу сам: снимет её конец разбора.
+    if (!modalIsOpen() && !revealOn) rushResume();
   });
 
   /* ─── ТРЕВОГА ────────────────────────────────────────────────────────
@@ -3808,15 +3547,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     });
   });
 
+  /* Время на полосе — всегда «m:ss» (решение владельца 17.09.2026): секунды
+     с десятыми на последних секундах читались как другое число. */
+  function clockText(sec) {
+    var s = Math.max(0, Math.ceil(sec));
+    return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+  }
+
   function paintHud() {
-    var t = $('hud-timer');
-    t.textContent = timeLeft <= 10 ? timeLeft.toFixed(1).replace('.', ',') : Math.ceil(timeLeft);
+    $('hud-timer').textContent = clockText(timeLeft);
     $('hud-score').textContent = score.toLocaleString('ru-RU');
+    $('hud-correct').textContent = correctCount;
+    $('hud-qno').textContent = (current && current.number) || (answered + skippedCount + 1);
     var mult = comboMult(streak);
     var combo = $('hud-combo');
-    combo.innerHTML = (ICONS.flame || '') + ' ×' + multText(mult);
-    combo.classList.toggle('hot', mult > 1);
-    combo.classList.toggle('show', mult > 1);
+    combo.hidden = !(mult > 1);
+    if (mult > 1) $('hud-combo-text').textContent = '×' + multText(mult) + ' · серия ' + streak;
     var fill = $('time-fill');
     var frac = Math.max(0, Math.min(1, timeLeft / MODE.duration));
     fill.style.transform = 'scaleX(' + frac + ')';
@@ -3824,51 +3570,41 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сколько бы времени ни осталось: она перестаёт быть про время и
     // становится про опасность.
     paintAlarm();
-    // ⚠️ Табло перерисовывается ЗДЕСЬ, в игровом цикле, а не по приходу
-    // события: событие соперника приходит только на его ответ, а время у
-    // него идёт всё это время. Один водитель отрисовки — один и тот же
-    // кадр у HUD и у табло.
+    // ⚠️ Правая часть полосы (рекорд или соперник) перерисовывается ЗДЕСЬ, в
+    // игровом цикле, а не по приходу события: событие соперника приходит
+    // только на его ответ, а время у него идёт всё это время.
     paintVs();
     tickSoundMaybe();
   }
 
-  /* ---------- ТАБЛО: ВЫ, РАЗРЫВ, ВТОРАЯ СТОРОНА ----------
-     ⚠️ ОДНА ВЁРСТКА НА ДВА СЛУЧАЯ (08.09.2026, решение владельца). Слева
-     всегда «вы». Справа в дуэли соперник, в обычном забеге личный рекорд
-     игрока в этом режиме. Второго вида табло не заводим.
+  /* Часы стоят (окно поверх раунда или разбор ошибки): число и полоса серые,
+     рядом «стоит». */
+  function paintPausedHud(on) {
+    $('hud-clock').classList.toggle('paused', on);
+    $('hud-paused').hidden = !on;
+    $('time-track').classList.toggle('paused', on);
+  }
+
+  /* ---------- ПОЛОСА HUD: РЕКОРД ИЛИ СОПЕРНИК (ADR 0110) ----------
+     В одиночном раунде справа — чип «рекорд N · ещё M» вошедшему (рекорд
+     приходит со стартом, `d.best`); у анонима и у набора рекорда нет — и чипа
+     нет. В дуэли — блок соперника: его верные, жизни, время и счёт, под
+     полосой пилюля разрыва «вы ведёте на N / отстаёте на N / равны».
 
      ⚠️ ВРЕМЯ СОПЕРНИКА ИДЁТ ЛОКАЛЬНО МЕЖДУ СОБЫТИЯМИ. Событие табло
      приходит только на его ОТВЕТ: думает он полминуты — все его числа
      стоят, а время у него на самом деле течёт. Поэтому клиент запоминает
      `seconds_left` и серверную метку `at` из последнего события и дальше
-     вычитает разницу СВОИХ часов. Разницу серверных и клиентских часов не
-     выравниваем: нас интересует шаг, а не абсолют, и лишняя арифметика тут
-     только добавила бы способов ошибиться. */
+     вычитает разницу СВОИХ часов. */
 
   function isDuelRun() { return !!(setRun && setRun.kind === 'duel'); }
 
   function setupVs() {
-    var box = $('vs');
-    if (!box) return;
-    // Табло показывается всегда, когда есть с чем сравнивать: в дуэли это
-    // соперник, в обычном забеге личный рекорд. Первый раунд в режиме —
-    // сравнивать не с чем, но карточка остаётся: она говорит словами.
-    box.hidden = false;
-    $('vs-them-who').textContent = isDuelRun() ? 'соперник' : 'ваш рекорд';
+    $('opp').hidden = !isDuelRun();
+    $('gap-pill').hidden = true;
+    $('hud-rec').hidden = true;
+    vsPainted = '';
     paintVs();
-  }
-
-  function tapeHtml(seq) {
-    var last = seq.slice(-10);
-    var out = '';
-    for (var i = 0; i < last.length; i++) {
-      var cls = last[i] === 'correct' ? 'ok'
-              : last[i] === 'wrong' ? 'bad' : 'skip';
-      out += '<i class="' + cls + '"></i>';
-    }
-    // Текущий вопрос — отдельной клеткой: видно, что лента живая.
-    if (state === 'playing' && last.length < 10) out += '<i class="now"></i>';
-    return out;
   }
 
   function timeText(seconds) {
@@ -3885,104 +3621,77 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     return Math.max(0, vsRival.seconds_left - gone);
   }
 
+  /* Правая часть полосы перерисовывается в игровом цикле, но DOM трогается,
+     только когда видимое изменилось: innerHTML на каждый кадр — лишняя работа. */
+  var vsPainted = '';
+
   function paintVs() {
-    var box = $('vs');
-    if (!box || box.hidden) return;
-
-    // ── Слева всегда вы ──
-    $('vs-my-score').textContent = score.toLocaleString('ru-RU');
-    $('vs-my-correct').textContent = correctCount;
-    $('vs-my-time').textContent = state === 'playing'
-      ? timeText(timeLeft) : '–';
-    $('vs-my-tape').innerHTML = tapeHtml(myTape);
-
     if (isDuelRun()) { paintRival(); } else { paintBest(); }
     paintGap();
   }
 
   function paintRival() {
-    var side = $('vs-them');
-    var empty = $('vs-them-empty');
-    var row = $('vs-them-row');
-    var lives = $('vs-them-lives');
-    if (!vsRival) {
-      // Соперника ещё нет: чисел не выдумываем, говорим словами.
-      side.classList.add('vs-side--off');
-      $('vs-them-score').textContent = '0';
-      row.hidden = true;
-      lives.hidden = true;
-      empty.hidden = false;
-      empty.textContent = 'Соперник ещё не начал. Играйте: он догонит и '
-        + 'увидит ваш счёт на своей полосе.';
-      return;
-    }
-    side.classList.remove('vs-side--off');
-    row.hidden = false;
-    lives.hidden = false;
-    empty.hidden = true;
-    $('vs-them-who').textContent = vsRival.username || 'соперник';
-    $('vs-them-score').textContent = (vsRival.score || 0).toLocaleString('ru-RU');
-    $('vs-them-correct').textContent = vsRival.correct || 0;
-    $('vs-them-time').textContent = timeText(rivalSeconds());
-    lives.innerHTML = livesHtml(vsRival.lives || 0);
+    var name = (vsRival && vsRival.username)
+      || (AUTO_SET && !AUTO_SET.is_author && AUTO_SET.author) || 'соперник';
+    var key = [name, vsRival ? vsRival.score : '-', vsRival ? vsRival.correct : '-',
+               vsRival ? vsRival.lives : '-', timeText(rivalSeconds()), vsRivalDone,
+               duelLink].join('|');
+    if (key === vsPainted) return;
+    vsPainted = key;
+    $('opp-name').textContent = name;               // textContent: имя пришло от человека
+    $('opp-av').textContent = name.charAt(0);
+    $('opp-score').textContent = vsRival ? (vsRival.score || 0).toLocaleString('ru-RU') : '0';
+    $('opp-correct').textContent = vsRival ? (vsRival.correct || 0) : 0;
+    $('opp-time').textContent = timeText(rivalSeconds());
+    $('opp-lives').innerHTML = vsRival ? livesHtml(vsRival.lives || 0) : '';
+    $('opp').classList.toggle('is-done', vsRivalDone);
+    var dot = $('opp-dot');
+    dot.classList.toggle('off', !duelLink);
+    dot.setAttribute('role', 'img');
+    dot.setAttribute('aria-label', duelLink ? 'соперник на связи' : 'связь потеряна');
   }
 
   function paintBest() {
-    var side = $('vs-them');
-    var empty = $('vs-them-empty');
-    var row = $('vs-them-row');
-    var lives = $('vs-them-lives');
-    lives.hidden = true;
-    $('vs-them-state').textContent = '';
-    if (!vsBest) {
-      /* ⚠️ ПЕРВЫЙ РАУНД В РЕЖИМЕ: РЕКОРДА ЕЩЁ НЕТ. Ноль или прочерк
-         читались бы как «рекорд равен нулю», а выдуманного числа-заглушки
-         на экране быть не должно. Говорим словами. Аноним видит то же
-         самое: рекорды у него не хранятся. */
-      side.classList.add('vs-side--off');
-      $('vs-them-score').textContent = '';
-      row.hidden = true;
-      empty.hidden = false;
-      empty.textContent = CFG.is_authenticated
-        ? 'Первый раунд в этом режиме: он и станет рекордом.'
-        : 'Войдите, чтобы рекорды сохранялись.';
+    var rec = $('hud-rec');
+    /* ⚠️ ПЕРВЫЙ РАУНД В РЕЖИМЕ, АНОНИМ ИЛИ НАБОР: РЕКОРДА НЕТ — И ЧИПА НЕТ.
+       Ноль или прочерк читались бы как «рекорд равен нулю», а у анонима на
+       раунде никаких призывов войти (решение владельца 17.09.2026). */
+    if (!vsBest || practice) {
+      if (vsPainted !== 'none') { rec.hidden = true; vsPainted = 'none'; }
       return;
     }
-    side.classList.remove('vs-side--off');
-    row.hidden = false;
-    empty.hidden = true;
-    $('vs-them-score').textContent = vsBest.score.toLocaleString('ru-RU');
-    $('vs-them-correct').textContent = vsBest.correct;
-    $('vs-them-time').textContent = formatDate(vsBest.created_at) || '–';
+    var beaten = score > vsBest.score;
+    var key = beaten ? 'new' : 'left' + (vsBest.score - score);
+    if (key === vsPainted) return;
+    vsPainted = key;
+    rec.hidden = false;
+    rec.classList.toggle('is-new', beaten);
+    rec.innerHTML = (ICONS.trophy || '') + (beaten ? 'новый рекорд'
+      : 'рекорд <b>' + vsBest.score.toLocaleString('ru-RU') + '</b><span class="rec-left"> · ещё <b>'
+        + (vsBest.score - score).toLocaleString('ru-RU') + '</b></span>');
   }
 
-  /* Разрыв посередине. Сравнивать не с чем — колонки нет вовсе. */
+  /* Разрыв в дуэли — пилюлей под полосой. Сравнивать не с чем — пилюли нет. */
   function paintGap() {
-    var gap = $('vs-gap');
-    var other = isDuelRun()
-      ? (vsRival ? vsRival.score || 0 : null)
-      : (vsBest ? vsBest.score : null);
-    if (other == null) { gap.hidden = true; return; }
-    gap.hidden = false;
-    var diff = score - other;
-    var num = $('vs-gap-num');
-    num.textContent = (diff > 0 ? '+' : '') + diff.toLocaleString('ru-RU');
-    num.classList.toggle('ahead', diff > 0);
-    num.classList.toggle('behind', diff < 0);
-    $('vs-gap-note').textContent = diff > 0 ? 'вы ведёте'
-                                 : diff < 0 ? 'отстаёте' : 'вровень';
+    var pill = $('gap-pill');
+    if (!isDuelRun() || !vsRival) { pill.hidden = true; return; }
+    var diff = score - (vsRival.score || 0);
+    pill.hidden = false;
+    pill.className = 'gap-pill ' + (diff > 0 ? 'lead' : diff < 0 ? 'behind' : 'even');
+    $('gap-text').textContent = diff > 0 ? 'вы ведёте на ' + diff.toLocaleString('ru-RU')
+      : diff < 0 ? 'отстаёте на ' + (-diff).toLocaleString('ru-RU') : 'равны';
   }
 
-  /* Жизни второй стороны. ⚠️ Запас НЕ выдумываем: он приходит из config.py
-     вместе с режимом (CFG). Тройка числом здесь означала бы второй источник
-     правды о механике. */
+  /* Жизни соперника мелкими сердцами. ⚠️ Запас НЕ выдумываем: он приходит из
+     config.py вместе с режимом (CFG). Тройка числом здесь означала бы второй
+     источник правды о механике. */
   function livesHtml(n) {
     var m = (MODE || CFG.modes[CFG.default_mode] || {});
     var max = m.lives || n;
     var out = '';
     for (var i = 0; i < max; i++) {
       out += '<span class="' + (i < n ? '' : 'is-lost') + '">'
-        + (ICONS.heart || '') + '</span>';
+        + (ICONS.heart_fill || '') + '</span>';
     }
     return out;
   }
@@ -4339,11 +4048,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
     var card = $('q-text');
     card.textContent = q.question;
+    card.parentNode.scrollTop = 0;
     $('q-prompt').hidden = !isAudit;
     $('q-prompt').textContent = isAudit ? q.prompt : '';
     paintAuditFigure(isAudit ? q : null);
     $('gen-note').hidden = !q.generated;
     $('stat-chip').hidden = true;   // статистика приходит только с ответом
+    paintQuestionMeta(q);
+    if (!revealOn) $('reveal').hidden = true;
     if (!REDUCED) {
       card.classList.remove('q-slide-in');
       void card.offsetWidth; // перезапуск анимации
@@ -4366,6 +4078,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       var inp = $('num-input');
       inp.value = '';
       inp.disabled = false;
+      inp.classList.remove('ok', 'bad');
+      $('btn-num-submit').hidden = false;
+      $('num-hint').hidden = false;
       var fb = $('num-feedback');
       fb.textContent = '';
       fb.className = 'num-feedback';
@@ -4417,38 +4132,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     renderMath(card);
     renderMath(opts);
 
-    // подсказка под сеткой — своя на каждый тип вопроса
-    var hint = $('keys-hint');
-    if (hint) {
-      if (isAudit) {
-        hint.textContent = 'Используйте клавиши 1–4 для ответа, F или '
-          + 'пробел чтобы развернуть чертёж, S чтобы ' + skipLabel();
-      } else if (isFigure) {
-        hint.textContent = NARROW()
-          ? 'Тап увеличивает чертёж, второй тап отвечает. Пробел чтобы '
-            + skipLabel()
-          : 'Используйте клавиши 1–4 для выбора чертежа, а пробел чтобы '
-            + skipLabel();
-      } else if (isBool) {
-        hint.textContent = 'Используйте клавиши 1–2 для быстрого ответа, '
-          + 'а пробел для пропуска задания';
-      } else if (isMulti) {
-        // Enter здесь обязателен: без него несколько выбранных вариантов
-        // не отправить.
-        hint.textContent = 'Используйте клавиши 1–' + q.options.length
-          + ' для выбора вариантов, Enter для ответа, а пробел для пропуска '
-          + 'задания';
-      } else if (isNumeric) {
-        // ОДНА подсказка вместо двух: вторая строка («Enter — отправить»,
-        // «дробь как 1/3») больше не показывается.
-        hint.textContent = 'Дроби можно вводить через слэш, точку или '
-          + 'запятую. Используйте пробел для пропуска задания.';
-      } else {
-        hint.textContent = 'Используйте клавиши 1–' + q.options.length
-          + ' для быстрого ответа, а пробел для пропуска задания';
-      }
-      if (practice) hint.textContent += '. Стрелки влево и вправо листают вопросы';
-    }
   }
 
   /* ---------- РЕЖИМ «ГРАФИК»: чертёж и его разворот ----------
@@ -4554,7 +4237,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           prefetchFailed = true;
         }
       }
-      pauseSync.then(function () { return api('/game/api/question/'); }).then(function (d) {
+      queueRun(function () { return api('/game/api/question/'); }).then(function (d) {
         if (gen !== prefetchGen) return;
         if (d.exhausted) { poolExhausted = true; return; }
         if (d.question) { nextBuf = d.question; return; }
@@ -4583,7 +4266,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       showRunLost();
     } else if (prefetchFailed) {
       bufferWaitSince = 0;
-      showNetToast('Нет связи: следующий вопрос не загрузился', function () {
+      showNetToast('Нет связи – следующий вопрос не загрузился', function () {
         prefetchNext();
         advance();
       });
@@ -4597,6 +4280,96 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
   }
 
+  /* ---------- ОТСЧЁТ 3-2-1 ПЕРЕД РАУНДОМ (ADR 0110) ----------
+     Поверх полосы в стартовых значениях: цифра, режим и зачётность. Первый
+     вопрос уже пришёл со стартом, но показывается и таймер стартует только в
+     конце отсчёта или по Enter / клику. У дуэли отсчёта здесь нет — у неё
+     свой общий, в лобби; у практики нет времени. */
+  var countdownOn = false;
+  var countdownTimer = null;
+  var countdownThen = null;
+
+  function countdownNote() {
+    if (mistakesRun) return 'работа над ошибками – в таблицу не идёт';
+    if (setRun) return setRun.kind === 'daily' ? 'вызов дня – одна попытка' : 'раунд по набору';
+    if (!CFG.is_authenticated) return 'без входа – в таблицу не идёт';
+    if (!runRanked) return 'фильтр по сложности – раунд тренировочный';
+    return runUnfiltered ? 'без фильтров – раунд зачётный' : 'с фильтрами – раунд зачётный';
+  }
+
+  function runCountdown(then) {
+    var left = CFG.round_countdown_s || 3;
+    countdownOn = true;
+    countdownThen = then;
+    $('cd-m').textContent = MODE.title + ' · ' + durationText(MODE.duration) + ' · '
+      + MODE.lives + ' ' + plural(MODE.lives, ['жизнь', 'жизни', 'жизней']);
+    $('cd-s').textContent = countdownNote();
+    $('countdown').hidden = false;
+    (function stepCountdown() {
+      if (!countdownOn) return;
+      if (left <= 0) { finishCountdown(); return; }
+      $('cd-n').textContent = left;
+      rush('countdown', left);
+      left -= 1;
+      countdownTimer = setTimeout(stepCountdown, 1000);
+    })();
+    $('countdown-card').focus();
+  }
+
+  function finishCountdown() {
+    if (!countdownOn) return;
+    cancelCountdown();
+    var then = countdownThen;
+    countdownThen = null;
+    if (then) then();
+  }
+
+  function cancelCountdown() {
+    countdownOn = false;
+    clearTimeout(countdownTimer);
+    $('countdown').hidden = true;
+  }
+
+  $('countdown-card').addEventListener('click', finishCountdown);
+
+  /* Карточка вопроса пустеет перед отсчётом: прошлый раунд не виден под вуалью. */
+  function clearQuestion() {
+    current = null;
+    $('q-text').textContent = '';
+    $('opts').innerHTML = '';
+    $('numeric-block').hidden = true;
+    $('multi-actions').hidden = true;
+    $('q-diff').hidden = true;
+    $('q-points').hidden = true;
+    $('stat-chip').hidden = true;
+    stopReveal();
+  }
+
+  /* Над карточкой: «сложность 3 из 5» и «очков за верный – до N». Максимум —
+     по тем же числам из config.py, что у сервера: база сложности × лучший бонус
+     за скорость × серия после этого ответа × ×1,3 без фильтров × последняя жизнь. */
+  function maxPointsFor(q) {
+    var d = Math.max(CFG.difficulty_min || 1, Math.min(CFG.difficulty_max || 5, q.difficulty || 0));
+    var base = (CFG.base_by_difficulty || {})[d];
+    if (!base) return null;
+    var pts = base * (1 + (CFG.speed_bonus_max || 0)) * comboMult(streak + 1);
+    if (runUnfiltered) pts *= CFG.scope_multiplier || 1;
+    if (lives === 1) pts *= CFG.last_life_multiplier || 1;
+    return Math.floor(pts + 0.5);
+  }
+
+  function paintQuestionMeta(q) {
+    var diff = $('q-diff');
+    diff.hidden = !q.difficulty;
+    if (q.difficulty) {
+      $('q-diff-text').textContent = 'сложность ' + q.difficulty + ' из ' + (CFG.difficulty_max || 5);
+    }
+    var pts = practice ? null : maxPointsFor(q);
+    var el = $('q-points');
+    el.hidden = !pts;
+    if (pts) el.textContent = 'очков за верный – до ' + pts.toLocaleString('ru-RU');
+  }
+
   /* ---------- ОТВЕТ / ПРОПУСК ---------- */
   // Общий каркас: POST ответа, дельта времени, финал по нулю времени.
   // (Время кончилось прямо на дельте — не ждём следующего кадра rAF:
@@ -4607,7 +4380,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // сколько игрок думал над этим вопросом — считает клиент (он знает
     // момент показа карточки), сервер кладёт число в журнал забега
     payload.elapsed_ms = Math.round(performance.now() - questionShownAt);
-    pauseSync.then(function () {
+    queueRun(function () {
       return api('/game/api/answer/', {
         method: 'POST',
         body: JSON.stringify(payload)
@@ -4670,8 +4443,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     cancelAnimationFrame(rafId);
     clearAlarm();
     $('net-toast').hidden = true;
+    stopReveal();
+    cancelCountdown();
     $('lost-overlay').hidden = false;
-    $('lost-home').focus();
+    $('lost-again').focus();
   }
 
   /* Тост внизу экрана. С кнопкой — висит, пока по ней не нажали: без неё
@@ -4682,6 +4457,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var retry = $('net-toast-retry');
     $('net-toast-text').textContent = text;
     retry.hidden = !onRetry;
+    $('net-toast-sub').hidden = !onRetry;
     retry.onclick = onRetry ? function () { box.hidden = true; onRetry(); } : null;
     box.hidden = false;
     clearTimeout(netToastTimer);
@@ -4701,13 +4477,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
   function registerCorrect() {
     answered++; correctCount++;
-    myTape.push('correct');
     rush('correct', comboMult(streak));
   }
 
   function registerWrong(q, d) {
     answered++;
-    myTape.push('wrong');
     // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
     // Потеря жизни — ОТДЕЛЬНОЕ событие со своим звуком: игрок обязан
     // слышать разницу между «ошибся» и «сгорело сердце».
@@ -4761,18 +4535,23 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       if (d.correct) {
         registerCorrect();
         buttons[choice].classList.add('is-correct');
+        addMark(buttons[choice], '✓');
         showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
+        showOk(d);
         setTimeout(advance, REDUCED ? 0 : 500);
       } else {
         registerWrong(q, d);
-        buttons[choice].classList.add('is-wrong');
-        if (buttons[d.correct_index]) buttons[d.correct_index].classList.add('show-right');
+        buttons.forEach(function (btn, i) {
+          if (i === choice) { btn.classList.add('is-wrong'); addMark(btn, '✗'); }
+          else if (i === d.correct_index) { btn.classList.add('show-right'); addMark(btn, 'верный ответ'); }
+          else { btn.classList.add('opt-muted'); }
+        });
         showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
-        setTimeout(advance, REDUCED ? 0 : 900);
+        revealWrong();
       }
     });
   }
@@ -4801,12 +4580,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     inputLocked = true;
     var q = current;
     var chosen = selected.slice();
+    $('btn-submit').disabled = true;
     postAnswer({ question_id: q.id, choices: chosen }, function (d) {
       var buttons = $('opts').querySelectorAll('.opt');
       var right = d.correct_indices || [];
       buttons.forEach(function (btn, i) {
         var isRight = right.indexOf(i) !== -1;
         var isChosen = chosen.indexOf(i) !== -1;
+        btn.classList.remove('selected');
         if (isRight && isChosen) {
           btn.classList.add('is-correct');
           addMark(btn, '✓');
@@ -4820,18 +4601,20 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           btn.classList.add('opt-muted');
         }
       });
+      $('multi-actions').hidden = true;
       if (d.correct) {
         registerCorrect();
         showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
+        showOk(d);
         setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
         registerWrong(q, d);
         showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
-        setTimeout(advance, REDUCED ? 0 : 1500);
+        revealWrong();
       }
     });
   }
@@ -4847,25 +4630,105 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('num-input').disabled = true;
     postAnswer({ question_id: q.id, value: value }, function (d) {
       var fb = $('num-feedback');
+      var input = $('num-input');
+      $('btn-num-submit').hidden = true;
+      $('num-hint').hidden = true;
       if (d.correct) {
         registerCorrect();
-        fb.textContent = '✓ Верно';
-        fb.className = 'num-feedback ok';
+        input.classList.add('ok');
         showDelta('+' + d.time_delta + ' с', 'plus');
         flashTrack(false);
         comboToastMaybe();
+        showOk(d);
         setTimeout(advance, REDUCED ? 0 : 600);
       } else {
         registerWrong(q, d);
-        fb.textContent = 'Правильный ответ: ' + d.correct_value;
-        fb.className = 'num-feedback bad';
+        input.classList.add('bad');
+        fb.innerHTML = 'Правильный ответ <b></b>';
+        fb.querySelector('b').textContent = d.correct_value;
         showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
-        setTimeout(advance, REDUCED ? 0 : 1300);
+        revealWrong();
       }
     });
   }
+
+  /* ---------- РАЗБОР ОТВЕТА (ADR 0109) ----------
+     ⚠️ НЕВЕРНЫЙ ОТВЕТ: ТРИ СЕКУНДЫ, ЧАСЫ СТОЯТ (решение владельца 17.09.2026).
+     Раньше разбор висел 0,9–1,5 с при идущих часах, и на длинной задаче
+     верный ответ прочитать было нельзя. Часы останавливает та же серверная
+     пауза, что у окон поверх раунда (`rushPause`), — второго механизма нет.
+     Раньше трёх секунд — пробел, Enter, «Дальше сразу» или клик по экрану.
+     Пока плашка видна, цифры не отвечают: ввод заперт до следующего вопроса. */
+  var revealOn = false;
+  var revealTimer = null;
+  var revealTick = null;
+
+  function showOk(d) {
+    var box = $('reveal');
+    stopReveal();
+    box.classList.add('is-ok');
+    $('reveal-cnt').textContent = '✓';
+    $('reveal-text').innerHTML = '<b>Верно' + (d.time_delta ? ', +' + d.time_delta + ' с' : '')
+      + '.</b>';
+    $('reveal-next').hidden = true;
+    box.hidden = false;
+  }
+
+  function revealWrong() {
+    var box = $('reveal');
+    var ms = CFG.reveal_wrong_ms || 3000;
+    stopReveal();
+    box.classList.remove('is-ok');
+    $('reveal-next').hidden = false;
+    var sec = Math.round(ms / 1000);
+    $('reveal-text').innerHTML = '<b>Неверно.</b> Верный ответ подсвечен. Часы стоят '
+      + numberWord(sec) + ' ' + plural(sec, ['секунду', 'секунды', 'секунд'])
+      + ' – следующий вопрос сам.';
+    box.hidden = false;
+    revealOn = true;
+    rushPause();
+    var ends = performance.now() + ms;
+    function paintCnt() {
+      $('reveal-cnt').textContent = Math.max(1, Math.ceil((ends - performance.now()) / 1000));
+    }
+    paintCnt();
+    revealTick = setInterval(paintCnt, 200);
+    revealTimer = setTimeout(endReveal, ms);
+  }
+
+  /* «три секунды» словом: так пишет макет, а число берётся из конфига. */
+  function numberWord(n) {
+    return ['ноль', 'одну', 'две', 'три', 'четыре', 'пять', 'шесть', 'семь', 'восемь',
+            'девять', 'десять'][n] || String(n);
+  }
+
+  function stopReveal() {
+    clearTimeout(revealTimer);
+    clearInterval(revealTick);
+    revealOn = false;
+    $('reveal').hidden = true;
+  }
+
+  function endReveal() {
+    if (!revealOn) return;
+    stopReveal();
+    // Окно, открытое поверх разбора, держит паузу само: снимет её закрытие окна.
+    if (!modalIsOpen()) rushResume();
+    advance();
+  }
+
+  $('reveal-next').addEventListener('click', function (e) {
+    e.stopPropagation();
+    endReveal();
+  });
+  // Клик по экрану раунда во время разбора — дальше сразу (кроме служебных кнопок).
+  $('screen-play').addEventListener('click', function (e) {
+    if (!revealOn) return;
+    if (e.target.closest('#btn-quit, #btn-sound, #btn-report, .duel-emoji')) return;
+    endReveal();
+  });
 
   // Пропуск: работает для любого типа ({choice:null} сервер трактует как
   // скип и для multi/numeric — нужного поля просто нет в теле).
@@ -4877,7 +4740,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
       skippedCount++;
-      myTape.push('skip');
       // пропуск бесплатный — дельту показываем, только если она есть
       if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
@@ -4911,21 +4773,22 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   // (неверно) / 'skip' (пропуск). Одновременно вспыхивают цифры таймера
   // тем же цветом. При reduced-motion — без полёта, просто показать/скрыть.
   function showDelta(text, kind) {
-    var chip = $('time-delta');
+    // «+5 с» — справа от времени, «−1» — справа от сердец (макет полосы).
+    var chip = $(kind === 'minus' ? 'lives-delta' : 'time-delta');
     var num = $('hud-timer');
-    // ⚠️ `innerHTML`, а не `textContent`: в потере жизни едет иконка-картинка.
-    // Строка собирается НАМИ (`wrongDeltaHTML`), пользовательского текста тут
-    // нет — подставить чужую разметку неоткуда.
+    // ⚠️ `innerHTML`, а не `textContent`: строка собирается НАМИ
+    // (`wrongDeltaHTML`), пользовательского текста тут нет.
     chip.innerHTML = text;
     num.className = 'timer-num flash-' + kind;
+    var base = kind === 'minus' ? 'lives-delta' : 'time-delta ' + kind;
     if (REDUCED) {
-      chip.className = 'time-delta ' + kind;
+      chip.className = base;
       chip.style.opacity = '1';
       clearTimeout(deltaTimer1);
       deltaTimer1 = setTimeout(function () { chip.style.opacity = '0'; }, 700);
     } else {
       chip.style.opacity = '';
-      chip.className = 'time-delta ' + kind;
+      chip.className = base;
       void chip.offsetWidth; // перезапуск анимации
       chip.classList.add('show');
     }
@@ -4948,15 +4811,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     v.classList.add('on');
   }
 
+  /* Серия выросла до новой ступени — чип серии коротко подпрыгивает. */
   function comboToastMaybe() {
-    var mult = comboMult(streak);
-    var prev = comboMult(streak - 1);
-    if (mult > prev) {
-      var t = $('combo-toast');
-      t.textContent = 'Комбо ×' + multText(mult) + '!';
-      t.classList.remove('on');
-      void t.offsetWidth;
-      t.classList.add('on');
+    if (comboMult(streak) > comboMult(streak - 1)) {
       var badge = $('hud-combo');
       badge.classList.remove('bump');
       void badge.offsetWidth;
@@ -4974,7 +4831,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var slot = btn.querySelector('.qi-slot');
     if (slot) slot.innerHTML = (on ? ICONS.sound_on : ICONS.sound_off) || '';
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
-    btn.title = on ? 'Звук включён' : 'Звук выключен';
   }
   $('btn-sound').addEventListener('click', function () {
     if (window.rushSound) window.rushSound.toggle();
@@ -5011,7 +4867,9 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     answered = 0; correctCount = 0; skippedCount = 0;
     practiceLog = []; practiceAt = -1; practiceLive = d.question;
     nextBuf = null; poolExhausted = false; runLost = false; prefetchFailed = false;
-    $('vs').hidden = true;
+    $('opp').hidden = true;
+    $('hud-rec').hidden = true;
+    $('gap-pill').hidden = true;
     $('gameover-overlay').hidden = true;
     show('playing');
     showQuestion(d.question);
@@ -5154,24 +5012,72 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     if (e.key === 'Escape' && !$('pr-end-ask').hidden) { e.preventDefault(); closePracticeEnd(); }
   });
 
-  /* ---------- ВЫХОД ИЗ ЗАБЕГА ---------- */
-  /* ⚠️ ОКНО ВЫХОДА СТАВИТ ЗАБЕГ НА ПАУЗУ, как любое окно поверх игры
-     (решение владельца 15.09.2026, см. rushPause). До 15.09 таймер здесь
-     шёл намеренно — «иначе окно выхода стало бы бесплатной паузой». Цена
-     паузы теперь другая: бонус за скорость на вопросе сгорает, а долгая
-     пауза снимает забег с зачёта по потолку длительности. */
+  /* ---------- ВЫХОД ИЗ РАУНДА ----------
+     ⚠️ ОКНО ВЫХОДА СТАВИТ РАУНД НА ПАУЗУ, как любое окно поверх игры
+     (решение владельца 15.09.2026, см. rushPause). Открывается крестиком и Esc.
+
+     Решение 17.09.2026: брошенный ОБЫЧНЫЙ раунд (и работа над ошибками)
+     сохраняется как незачётный — итог и разбор ошибок игрок видит. Раунд по
+     набору, вызову дня и дуэли — нет: у набора в зачёт идёт только доигранный
+     раунд, и выход сжёг бы единственную попытку. Раунд без единого ответа
+     сохранять нечего. */
   var quitPrevFocus = null;
+
+  function paintQuitDialog() {
+    var title = $('quit-title'), text = $('quit-text'), stake = $('quit-stake');
+    var yes = $('quit-yes');
+    var played = answered + skippedCount > 0;
+    stake.hidden = true;
+    if (isDuelRun()) {
+      title.textContent = 'Выйти из дуэли?';
+      text.textContent = 'Результат не сохранится: на странице дуэли останется только результат соперника.';
+      yes.textContent = 'Выйти';
+    } else if (setRun) {
+      var daily = setRun.kind === 'daily';
+      title.textContent = daily ? 'Выйти из вызова дня?' : 'Выйти из набора?';
+      text.innerHTML = '<b>Попытка не потратится</b> – '
+        + (daily ? 'вызов можно начать заново сегодня до полуночи.'
+                 : 'набор можно начать заново, пока он открыт.')
+        + ' Набранное в этом раунде не сохранится: у набора в зачёт идёт только раунд, доигранный до конца.';
+      yes.textContent = 'Выйти';
+    } else {
+      title.textContent = 'Выйти из раунда?';
+      if (played) {
+        stake.hidden = false;
+        $('quit-now').textContent = score.toLocaleString('ru-RU') + ' '
+          + plural(score, ['очко', 'очка', 'очков']);
+        var best = $('quit-best-tile');
+        best.hidden = !vsBest;
+        if (vsBest) {
+          $('quit-best-label').textContent = score > vsBest.score ? 'рекорд' : 'до вашего рекорда';
+          $('quit-best').textContent = score > vsBest.score ? 'новый рекорд'
+            : 'ещё ' + (vsBest.score - score).toLocaleString('ru-RU');
+        }
+        text.innerHTML = 'Раунд сохранится как <b>незачётный</b>: в таблицу и рекорды не пойдёт, '
+          + 'но итог и разбор ошибок вы увидите.';
+        yes.textContent = 'Выйти к итогу';
+      } else {
+        text.textContent = 'Вы ещё не ответили ни на один вопрос – сохранять нечего.';
+        yes.textContent = 'Выйти';
+      }
+    }
+  }
 
   function openQuit() {
     if (state !== 'playing') return;
     if (practice) { openPracticeEnd(false); return; }
+    // Отсчёт ещё идёт — терять нечего: сразу на старт, без окна.
+    if (countdownOn) { cancelCountdown(); quitRun(); return; }
+    if (!$('quit-modal').hidden) return;
     quitPrevFocus = document.activeElement;
+    paintQuitDialog();
     $('quit-modal').hidden = false;
     document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: true } }));
     $('quit-no').focus();               // главное действие — остаться
   }
 
   function closeQuit() {
+    if ($('quit-modal').hidden) return;
     $('quit-modal').hidden = true;
     document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: false } }));
     if (quitPrevFocus && quitPrevFocus.focus) quitPrevFocus.focus();
@@ -5184,6 +5090,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // открыто, забег продолжается за ним, и гасить кайму рано — следующий
     // же кадр вернул бы её обратно. Бросают забег именно тут.
     clearAlarm();
+    stopReveal();
+    if (!setRun && answered + skippedCount > 0) {
+      endRun('quit');                   // незачётный итог с разбором ошибок
+      return;
+    }
     show('start');
     renderModeTabs();
   }
@@ -5191,8 +5102,20 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   $('btn-quit').addEventListener('click', openQuit);
   $('quit-no').addEventListener('click', closeQuit);
   $('quit-yes').addEventListener('click', quitRun);
-  // «Раунд потерян» — только на старт: продолжать на сервере нечего.
+  // «Раунд прервался»: продолжать на сервере нечего — новый раунд того же вида
+  // или на старт.
   $('lost-home').addEventListener('click', function () { location.href = '/game/'; });
+  $('lost-again').addEventListener('click', function () {
+    $('lost-overlay').hidden = true;
+    runLost = false;
+    if (isDuelRun()) { location.href = '/game/'; return; }
+    if (setRun) { startRun({ setCode: setRun.code }); return; }
+    startRun(mistakesRun ? { mistakes: true } : null);
+  });
+  $('btn-skip').addEventListener('click', function (e) {
+    e.stopPropagation();
+    skip();
+  });
 
   /* Клавиатура окна: Esc = «Нет», Tab не выпускает фокус наружу. Обработчик
      стоит на СВОЁМ узле и гасит событие, чтобы пробел и цифры не уходили в
@@ -5227,7 +5150,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // а не состояние. Пересчитай его при повторной отрисовке — и рекорд,
     // уже записанный в localStorage, перестал бы быть рекордом сам себе.
     var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
-    isRecord = score > best && score > 0;
+    // Брошенный раунд рекордом не бывает: окно выхода это обещает.
+    isRecord = endReason !== 'quit' && score > best && score > 0;
     bestNow = Math.max(best, score);
     if (isRecord) {
       localStorage.setItem(bestKey(mode), String(score));
@@ -5235,7 +5159,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     // Рекорд вошедшего на стартовом экране — серверный: освежаем его здесь,
     // чтобы после раунда не показывать прошлый до перезагрузки страницы.
-    if (CFG.is_authenticated && CFG.my_best && score > (CFG.my_best[mode] || 0)) {
+    if (endReason !== 'quit' && CFG.is_authenticated && CFG.my_best
+        && score > (CFG.my_best[mode] || 0)) {
       CFG.my_best[mode] = score;
     }
     renderModeTabs();  // освежить рекорд и квоту к возврату на старт
@@ -5253,9 +5178,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       // графики без сравнения, а не выдуманные числа.
       fetchHistory(function () { buildCompareCharts(); });
     }
-    api('/game/api/session/finish/', {
-      method: 'POST',
-      body: JSON.stringify({ reason: endReason })
+    // В очереди: последний ответ записан раньше, чем сервер закроет забег.
+    queueRun(function () {
+      return api('/game/api/session/finish/', {
+        method: 'POST',
+        body: JSON.stringify({ reason: endReason })
+      });
     }).then(function (d) {
       if (d && d.summary) {
         summary = d.summary;
@@ -5312,6 +5240,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      фильтром) и set_done (курированный список пройден): клиент знает про
      конец вопросов, но не знает, какой это был забег. */
   function titleText(s) {
+    if (s.ended_reason === 'quit') return 'Вы вышли из раунда';
     if (s.ended_reason === 'lives') return 'Раунд окончен';
     if (s.ended_reason === 'set_done') return 'Пройдено!';
     if (s.ended_reason === 'pool_empty') return 'Вопросы кончились';
@@ -5616,8 +5545,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     $('share-lead').textContent = 'Ссылка открывается у всех, без регистрации';
   }
 
-  function toast(btn, text, back) {
-    btn.textContent = text;
+  function toast(btn, html, back) {
+    btn.innerHTML = html;
     setTimeout(function () { btn.textContent = back; }, 2000);
   }
 
@@ -5642,7 +5571,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
-        function () { toast(btn, 'Ссылка скопирована ✓', 'Поделиться'); },
+        function () { toast(btn, (ICONS.check || '') + 'Ссылка скопирована', 'Поделиться'); },
         function () { prompt('Скопируйте ссылку:', url); });
     } else {
       prompt('Скопируйте ссылку:', url);
@@ -6726,7 +6655,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       return;
     }
     if (state === 'playing') {
+      // Отсчёт перед раундом: Enter — начать сразу, Esc — на старт.
+      if (countdownOn) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); finishCountdown(); }
+        else if (e.key === 'Escape') { e.preventDefault(); openQuit(); }
+        return;
+      }
+      // Разбор ошибки: пробел или Enter — дальше сразу, цифры не отвечают.
+      if (revealOn) {
+        if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); endReveal(); }
+        else if (e.key === 'Escape') { e.preventDefault(); openQuit(); }
+        return;
+      }
       if (!current) return;
+      // Esc — окно выхода (в развороте чертежа Esc сначала сворачивает его).
+      if (e.key === 'Escape' && !practice && !figFull) { e.preventDefault(); openQuit(); return; }
       if (practice) {
         // Практика: стрелки листают, пробел и стрелка вправо ведут дальше.
         if (e.key === 'ArrowLeft') { e.preventDefault(); practiceBack(); return; }
@@ -6793,15 +6736,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var isDuel = AUTO_SET && AUTO_SET.kind === 'duel';
     if (!isDuel) return;
 
-    var side = $('vs-them');
     var panel = $('duel-emoji');
     var countdown = $('duel-countdown');
     var startTimer = 0;
     var scheduled = false;     // отсчёт этой страницы уже идёт или раунд начат
     var NAMES = ['gg', 'wow', 'fire', 'think', 'oops', 'fast', 'close', 'gl'];
     var TITLES = {
-      gg: 'Хорошая игра', wow: 'Ого', fire: 'Горячо', think: 'Думаю',
-      oops: 'Промах', fast: 'Быстро', close: 'Близко', gl: 'Удачи'
+      gg: 'gg', wow: 'вау', fire: 'огонь', think: 'думаю',
+      oops: 'упс', fast: 'быстро', close: 'близко', gl: 'удачи'
     };
     var COOLDOWN_MS = 2000;
     var lastSent = 0;
@@ -6810,10 +6752,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     NAMES.forEach(function (name) {
       var b = document.createElement('button');
       b.type = 'button';
-      b.title = TITLES[name];
-      b.setAttribute('aria-label', TITLES[name]);
-      b.innerHTML = (window.QLS_ICONS && window.QLS_ICONS['duel_' + name])
-        || TITLES[name];
+      b.innerHTML = (window.QLS_ICONS && window.QLS_ICONS['duel_' + name]) || '';
+      b.appendChild(document.createTextNode(TITLES[name]));
       b.addEventListener('click', function () { sendEmoji(name, b); });
       panel.appendChild(b);
     });
@@ -6841,18 +6781,21 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     function showScore(row) {
       vsRival = row;
       vsRivalAt = Date.now();
-      $('vs-them-state').textContent = '';
       paintVs();
     }
 
+    /* Реакция соперника — тост у его блока в полосе: «lengler: огонь», 2,4 с. */
+    var toastTimer = 0;
     function flyer(name, who) {
-      var el = document.createElement('div');
-      el.className = 'duel-flyer';
-      el.innerHTML = ((window.QLS_ICONS
-        && window.QLS_ICONS['duel_' + name]) || '')
-        + '<span>' + (who || 'соперник') + '</span>';
-      document.body.appendChild(el);
-      setTimeout(function () { el.remove(); }, 2400);
+      if (!TITLES[name]) return;
+      var el = $('opp-toast');
+      el.innerHTML = ((window.QLS_ICONS && window.QLS_ICONS['duel_' + name]) || '')
+        + '<span></span><b></b>';
+      el.querySelector('span').textContent = (who || 'соперник') + ':';   // имя пришло от человека
+      el.querySelector('b').textContent = TITLES[name];
+      el.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(function () { el.hidden = true; }, 2400);
     }
 
     /* Строка лобби «кто на месте». Автор ждёт любого второго, соперник —
@@ -6928,6 +6871,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 
       sock.addEventListener('open', function () {
         panel.hidden = false;
+        duelLink = true;
         if (!scheduled) lobbyLine(waitingLine(), false);
         // «Привет» просит табло и назначенный старт: после обрыва счёт
         // соперника надо восстановить, а отсчёт — вести к тому же моменту.
@@ -6944,7 +6888,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           // течь локально. Иначе табло досчитало бы финишировавшего до нуля.
           vsRivalDone = true;
           showScore(m);
-          $('vs-them-state').textContent = 'финишировал';
         } else if (m.type === 'presence' && isRival(m.username)) {
           if (m.action === 'join') {
             if (!scheduled && AUTO_SET.allowed) lobbyLine('Соперник: ' + m.username, true);
@@ -6953,8 +6896,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
             // Ушёл — карточка гаснет вместе с отсчётом: показывать живое
             // время того, кого нет, значит врать.
             vsRivalDone = true;
-            side.classList.add('vs-side--off');
-            $('vs-them-state').textContent = 'соперник отключился';
+            paintVs();
           }
         }
       });
@@ -6962,8 +6904,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         // ⚠️ Обрыв НЕ трогает забег. Гасим табло и пробуем вернуться. В лобби
         // говорим прямо: без связи с комнатой общий старт не придёт.
         if (!scheduled) lobbyLine('Нет связи с комнатой, пробуем снова…', false);
-        side.classList.add('vs-side--off');
-        $('vs-them-state').textContent = 'связь потеряна';
+        duelLink = false;
         setTimeout(connect, 4000);
       });
     }

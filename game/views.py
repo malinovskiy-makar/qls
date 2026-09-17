@@ -687,6 +687,10 @@ def _game_page_context(request):
             'accuracy_min_mult': config.ACCURACY_MIN_MULT,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
             'last_life_multiplier': config.LAST_LIFE_MULTIPLIER,
+            # Разбор ошибки и отсчёт перед стартом (ADR 0109): числа — только
+            # из конфига, клиент их не выдумывает.
+            'reveal_wrong_ms': config.REVEAL_WRONG_MS,
+            'round_countdown_s': config.ROUND_COUNTDOWN_S,
             'difficulty_min': config.DIFFICULTY_MIN,
             'difficulty_max': config.DIFFICULTY_MAX,
             'topic_groups': [{'key': key, 'title': title, 'topics': names}
@@ -747,6 +751,10 @@ def _question_payload(gq, number):
         # посмотреть ДО того, как ответишь. Ссылку «в каталог» клиент
         # собирает из ответа api_answer, когда отвечать уже поздно.
         'generated': gq.is_generated,    # строка «Вопрос сгенерирован ИИ»
+        # Сложность над карточкой вопроса (ADR 0110): «сложность 3 из 5» и
+        # «очков за верный – до N». Та же эффективная сложность, по которой
+        # сервер начислит очки; ответа она не выдаёт.
+        'difficulty': stats_mod.effective_difficulty(gq),
     }
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
@@ -2227,6 +2235,15 @@ def api_session_finish(request):
         state['ended'] = state.get('ended') or 'done'
         run_state.save_run(request, state)
         return JsonResponse({'summary': practice_summary(state), 'practice': True})
+    # ⚠️ БРОШЕННЫЙ РАУНД СОХРАНЯЕТСЯ ТОЛЬКО БЕЗ НАБОРА (решение 17.09.2026).
+    # У набора, вызова дня и дуэли в зачёт идёт только доигранный раунд:
+    # сохрани мы брошенный — выход сжёг бы единственную попытку. Раунд без
+    # единого ответа сохранять нечего. Клиент эти случаи сам не шлёт; здесь
+    # вторая защита от старой вкладки и ручного запроса.
+    if body.get('reason') == 'quit' and not state.get('ended'):
+        if state.get('set_code') or not state.get('log'):
+            return JsonResponse({'error': 'Этот раунд не сохраняется',
+                                 'reason': 'quit_not_saved'}, status=400)
     # Открытая пауза (окно не успело сказать «закрыто») закрывается моментом
     # финиша — иначе её длительность не попала бы в зачёт.
     _close_pause(state, _now_ms())
@@ -2330,6 +2347,10 @@ def _end_reason(state, claimed):
     или свободный, — а сервер знает. Поэтому он присылает нейтральное
     'done' (и старые клиенты тоже), а разделение делает сервер.
     """
+    if claimed == 'quit':
+        # Игрок вышел крестиком или Esc (решение 17.09.2026). Сохраняется
+        # только раунд без набора — это проверяет `api_session_finish`.
+        return 'quit'
     if claimed == 'time':
         return 'time'
     if claimed in ('done', 'pool_empty', 'set_done'):
@@ -2431,6 +2452,20 @@ def credited_pause_ms(state):
     return min(total, config.PAUSE_CAP_SECONDS * 1000)
 
 
+def paused_ms_now(state, now_ms=None):
+    u"""Сколько раунд простоял на паузе к моменту `now_ms` — для часов
+    соперника в дуэли (`consumers.seconds_left_for`).
+
+    Те же правила зачёта, что у `credited_pause_ms`, плюс пауза, открытая
+    прямо сейчас (разбор ошибки, окно), если она из первых PAUSE_MAX_COUNT.
+    """
+    now_ms = _now_ms() if now_ms is None else now_ms
+    pauses = (state.get('pauses') or [])[:config.PAUSE_MAX_COUNT]
+    total = sum((end if end is not None else max(now_ms, start)) - start
+                for start, end in pauses)
+    return min(total, config.PAUSE_CAP_SECONDS * 1000)
+
+
 def _paused_response():
     return JsonResponse({'error': 'paused', 'reason': 'paused'}, status=409)
 
@@ -2482,6 +2517,8 @@ def _rank_run(request, state, summary, wall_ms):
     user = request.user if request.user.is_authenticated else None
     if user is None:
         return False, 'anonymous'
+    if state.get('ended') == 'quit':
+        return False, 'quit'
     if state.get('mistakes_run'):
         return False, 'mistakes_run'
     if state.get('set_code'):

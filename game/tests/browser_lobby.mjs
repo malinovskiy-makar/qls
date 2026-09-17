@@ -61,7 +61,7 @@ try {
   // В лобби играют набор, а не пул: полосы «Бесконечные тесты» там нет.
   check('lobby_has_no_practice_band', !lobby.practiceBand, lobby);
 
-  // Табло раунда на 380 px: обычный Блиц, та же вёрстка `.vs`, что в дуэли.
+  // Полоса раунда на 380 px: обычный Блиц, та же вёрстка, что в дуэли.
   await page.goto(BASE + '/game/', { waitUntil: 'load', timeout: 30000 });
   await page.waitForSelector('#screen-start.active', { timeout: 15000 });
   await page.keyboard.press('Enter');
@@ -69,11 +69,12 @@ try {
   await page.waitForFunction(
     () => document.getElementById('q-text').textContent.trim().length > 0,
     null, { timeout: 15000 });
+  // С 17.09.2026 (ADR 0110) табло — одна полоса HUD, та же, что в дуэли.
   const scene = await page.evaluate(() => {
-    const el = document.querySelector('.scene');
-    const vs = document.getElementById('vs');
+    const el = document.getElementById('screen-play');
+    const hud = document.getElementById('hud');
     return { scrollWidth: el.scrollWidth, clientWidth: el.clientWidth,
-             vsShown: !!vs && !vs.hidden };
+             vsShown: !!hud && hud.getBoundingClientRect().height > 0 };
   });
   check('scene_no_hscroll', scene.scrollWidth <= scene.clientWidth, scene);
   check('scoreboard_shown', scene.vsShown, scene);

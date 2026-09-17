@@ -26,7 +26,12 @@ SOUND = 'game/static/game/sound.js'
 
 
 def read(path):
-    return io.open(path, encoding='utf-8').read()
+    src = io.open(path, encoding='utf-8').read()
+    if path == PAGE:
+        # Разметка экранов вынесена в game/_*.html (ADR 0108, 0110).
+        from game.tests.test_page_js import expand_includes
+        src = expand_includes(src)
+    return src
 
 
 def no_comments(text):
@@ -269,9 +274,10 @@ class AlarmPaintTests(TestCase):
 
     def test_timer_digits_redden_with_alarm(self):
         self.assertIn('color: color-mix(in srgb, var(--rush-bad) '
-                      'calc(var(--alarm, 0) * 100%),', self.src)
-        # Десятые при < 10 с не потеряны.
-        self.assertIn("timeLeft <= 10 ? timeLeft.toFixed(1)", self.src)
+                      'calc(var(--alarm, 0) * 100%), var(--text));', self.src)
+        # С 17.09.2026 время на полосе всегда «m:ss» (ADR 0110): десятые
+        # на последних секундах читались как другое число.
+        self.assertIn("$('hud-timer').textContent = clockText(timeLeft);", self.src)
 
     def test_bar_colour_is_a_gradient_not_three_steps(self):
         u"""Амбер на полосе больше не используется, ступеней mid/low нет."""
@@ -280,8 +286,7 @@ class AlarmPaintTests(TestCase):
         self.assertNotIn('--rush-time-mid', self.src)
         self.assertNotIn('--rush-time-low', self.src)
         self.assertIn('background: color-mix(in srgb, var(--rush-bad) '
-                      'calc(var(--alarm, 0) * 100%),\n                        '
-                      'var(--rush-time-hi));', self.src)
+                      'calc(var(--alarm, 0) * 100%), var(--rush-time-hi));', self.src)
 
     def test_last_life_no_longer_has_its_own_frame(self):
         u"""Раньше рамка последней жизни жила отдельно и на исходе времени
