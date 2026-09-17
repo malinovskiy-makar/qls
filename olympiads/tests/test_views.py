@@ -420,6 +420,30 @@ class OlympiadsAreClosedTests(TestCase):
                   if 'Скоро.' in visible_text(self.client.get(u))]
         self.assertEqual(len(closed), 5, closed)
 
+    def test_every_address_of_urls_py_is_closed_for_a_guest(self):
+        """Все адреса `olympiads/urls.py`, а не пять: у тренировки семь адресов, и
+        три из них принимают только POST (17.09.2026, фаза P8 редизайна Wecon Rush).
+
+        Список берётся из самого `urls.py`: новый адрес без заглушки покраснеет
+        здесь без правки теста. Комплекта 999 нет — заглушка обязана сработать
+        раньше поиска комплекта.
+        """
+        from olympiads import urls as olympiad_urls
+        closed, other = [], {}
+        for pattern in olympiad_urls.urlpatterns:
+            kwargs = {name: ('vseros' if name == 'slug' else 999)
+                      for name in pattern.pattern.converters}
+            url = reverse('olympiads:' + pattern.name, kwargs=kwargs)
+            response = self.client.get(url)
+            if response.status_code == 405:
+                response = self.client.post(url)
+            if response.status_code == 200 and 'Скоро.' in visible_text(response):
+                closed.append(url)
+            else:
+                other[url] = response.status_code
+        self.assertEqual(other, {})
+        self.assertGreaterEqual(len(closed), 11)
+
     def test_staff_walks_straight_in(self):
         """Персонал видит настоящий раздел и без флага."""
         self.client.force_login(
