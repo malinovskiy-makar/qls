@@ -115,18 +115,25 @@ try {
     await page.fill('#code-input', 'zz zz 9999');
     await page.press('#code-input', 'Enter');
     await page.waitForSelector('#code-error:not([hidden])', { timeout: 10000 }).catch(() => {});
-    const wrong = await page.evaluate(() => ({
-      path: location.pathname, error: document.getElementById('code-error').textContent.trim(),
-      shown: !document.getElementById('code-error').hidden,
-    }));
-    check('wrong_code_stays', wrong.path === '/game/' && wrong.shown
+    // ⚠️ Замер без падения на чужой странице: ушли по неверному коду на 404 —
+    // это красная проверка, а не ошибка раннера.
+    const wrong = await page.evaluate(() => {
+      const err = document.getElementById('code-error');
+      return { path: location.pathname, error: err ? err.textContent.trim() : null,
+               shown: !!err && !err.hidden };
+    });
+    const stayed = wrong.path === '/game/';
+    check('wrong_code_stays', stayed && wrong.shown
           && wrong.error === 'Набора с таким кодом нет. Проверьте код.', wrong);
-    await page.type('#code-input', 'x');
-    const cleared = await page.evaluate(() => document.getElementById('code-error').hidden);
-    check('wrong_code_message_clears_on_input', cleared, { cleared });
+    let cleared = false;
+    if (stayed) {
+      await page.type('#code-input', 'x');
+      cleared = await page.evaluate(() => document.getElementById('code-error').hidden);
+    }
+    check('wrong_code_message_clears_on_input', cleared, { cleared, stayed });
 
     // Код дуэли ведёт на её страницу.
-    if (DUEL_CODE) {
+    if (DUEL_CODE && stayed) {
       await page.fill('#code-input', DUEL_CODE.toLowerCase());
       await Promise.all([
         page.waitForURL('**/game/d/' + DUEL_CODE + '/', { timeout: 10000 }).catch(() => {}),
