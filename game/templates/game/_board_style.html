@@ -1,0 +1,67 @@
+{% comment %}
+  Стили общих частей доски (P4, макет DailyBoard): «Таблица» (`_board_table.html`),
+  «Где ошиблись» (`_board_questions.html`) и медаль (`_medal.html`). Подключается
+  ВНУТРИ `<style>` страницы: `{% include "game/_board_style.html" %}`.
+  Доска дня — первая страница; страница набора ученика (P6) берёт те же части.
+{% endcomment %}
+  .gb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+  .gb-pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .gb-ph { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .gb-ph h2 { margin: 0; font-size: 17px; font-weight: 700; }
+  .gb-ph span { font-size: 12.5px; color: var(--text3); }
+  .gb-foot { margin: auto 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text3); }
+  .gb-empty { flex: 1; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+              gap: 6px; text-align: center; color: var(--text2); font-size: 14px; border: 1px dashed var(--border);
+              border-radius: 12px; padding: 20px; margin: 0; }
+  .gb-empty b { color: var(--text); font-size: 16px; }
+
+  .gb-medal { display: inline-flex; width: 22px; height: 22px; }
+  .gb-medal svg { width: 100%; height: 100%; display: block; }
+  .gb-medal.m1 { color: var(--medal-gold); }
+  .gb-medal.m2 { color: var(--medal-silver); }
+  .gb-medal.m3 { color: var(--medal-bronze); }
+
+  /* Таблица: строки-плашки с зазором 4 px, как в макете, но таблицей — ради чтения экранным диктором. */
+  .gb-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+  .gb-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .gb-table th { height: 26px; padding: 0 10px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase;
+                 color: var(--text3); font-weight: 600; text-align: left; white-space: nowrap; }
+  .gb-table td { height: 42px; padding: 0 10px; background: var(--surface-2); white-space: nowrap; }
+  .gb-table td:first-child { width: 40px; border-radius: 9px 0 0 9px; text-align: center; color: var(--text3); font-size: 13px; }
+  .gb-table td:last-child { border-radius: 0 9px 9px 0; }
+  .gb-table .num { text-align: right; }
+  .gb-table td.who { font-weight: 600; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+  .gb-table td.sc { font-weight: 800; font-size: 15.5px; }
+  .gb-table td.end { color: var(--text2); font-size: 13px; }
+  .gb-table td .gb-medal { vertical-align: middle; }
+  .gb-table tr.first td { background: var(--accent-tint); }
+  .gb-table tr.me td { background: transparent; box-shadow: inset 0 1.5px var(--accent), inset 0 -1.5px var(--accent); }
+  .gb-table tr.me td:first-child { box-shadow: inset 1.5px 1.5px var(--accent), inset 0 -1.5px var(--accent); }
+  .gb-table tr.me td:last-child { box-shadow: inset -1.5px 1.5px var(--accent), inset 0 -1.5px var(--accent); }
+  .gb-table tr.gb-more td { height: auto; padding: 2px 12px 4px; background: transparent; color: var(--text3); font-size: 13px;
+                            white-space: normal; text-align: left; border-radius: 0; }
+
+  /* Где ошиблись: номер · текст в одну строку · полоска доли верных · процент. */
+  .gb-qs { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+  .gb-q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 110px 48px; align-items: center; gap: 12px;
+          min-height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  .gb-q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .gb-q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .gb-q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+  .gb-q .qt.lock .qi { width: 14px; height: 14px; flex: none; }
+  .gb-q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+  .gb-q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .gb-q.hard .bar i { background: var(--error); }
+  .gb-q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .gb-q.hard .pc { color: var(--error); }
+
+  @media (max-width: 720px) {
+    /* Телефон: место, игрок, счёт и точность; комбо и «чем кончилось» — на широком экране. */
+    .gb-table .c-combo, .gb-table .c-end { display: none; }
+    .gb-table td:nth-last-child(3) { border-radius: 0 9px 9px 0; }
+    .gb-table tr.me td:nth-last-child(3) { box-shadow: inset -1.5px 1.5px var(--accent), inset 0 -1.5px var(--accent); }
+    .gb-pane { padding: 14px; }
+    .gb-empty { min-height: 140px; }
+    .gb-q { grid-template-columns: 22px minmax(0, 1fr) 56px 44px; gap: 8px; }
+  }

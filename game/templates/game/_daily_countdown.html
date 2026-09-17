@@ -1,0 +1,28 @@
+{% comment %}
+  Отсчёт до смены вызова дня — «ч:мм:сс» (страница вызова и доска сегодняшнего дня).
+  Момент смены считает сервер (московская полночь, `daily.next_reset`) и кладёт
+  в `data-reset-at`; клиент только рисует остаток и в полночь перечитывает
+  страницу: вчерашние карточки с «Играть» висеть не должны.
+{% endcomment %}<script>
+(function () {
+  var el = document.getElementById('countdown');
+  if (!el || !el.dataset.resetAt) return;
+  var target = new Date(el.dataset.resetAt).getTime();
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  // ⚠️ Перечитываем, только если отсчёт на глазах дошёл до нуля. Часы клиента,
+  // убежавшие вперёд, дали бы ноль сразу при загрузке — и вечную перезагрузку.
+  var running = target > Date.now();
+  var timer = null;
+  function tick() {
+    var left = Math.max(0, Math.floor((target - Date.now()) / 1000));
+    el.textContent = Math.floor(left / 3600) + ':' + two(Math.floor(left % 3600 / 60)) + ':' + two(left % 60);
+    if (left === 0 && running) {
+      running = false;
+      clearInterval(timer);
+      setTimeout(function () { location.reload(); }, 1500);
+    }
+  }
+  tick();
+  timer = setInterval(tick, 1000);
+})();
+</script>

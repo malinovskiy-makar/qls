@@ -121,6 +121,8 @@ a:focus-visible, button:focus-visible {
 
 .screen { display: none; }
 .screen.active { display: block; }
+/* Автостарт набора: старт невидим до ответа сервера (`_start.html`). */
+.screen.autostarting { visibility: hidden; }
 
 /* hidden обязан побеждать display:flex на классах (.multi-actions и т.п.) */
 [hidden] { display: none !important; }
@@ -2353,6 +2355,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
 
   function show(name) {
     state = name;
+    // Любой переход экрана снимает невидимость автостарта: вернувшись из
+    // раунда набора на старт, человек должен видеть карточку набора.
+    screens.start.classList.remove('autostarting');
     Object.keys(screens).forEach(function (k) {
       screens[k].classList.toggle('active', k === name);
     });
@@ -2368,9 +2373,12 @@ body.on-final .rush-wrap { max-width: 1160px; }
      под фильтром) — спокойная строка на стартовом экране, а не alert()
      и не переход на экран результатов (см. api_session_start). */
   function showStartNotice(text) {
+    screens.start.classList.remove('autostarting');
     var el = $('start-notice');
     el.textContent = text;
     el.hidden = false;
+    // На странице набора три зоны скрыты: причину видно в карточке набора.
+    if (AUTO_SET && AUTO_SET.kind !== 'duel') $('set-note').textContent = text;
   }
   function hideStartNotice() {
     $('start-notice').hidden = true;

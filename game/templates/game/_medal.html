@@ -1,0 +1,7 @@
+{% comment %}
+  Медаль мест 1–3 на досках, отданных сервером (доска дня, карточки вызова дня).
+  Рисунок тот же, что `MEDAL_SVG` в game.html (лидерборд главной рисует скрипт):
+  лента и кружок, цвет — токеном места `--medal-gold/silver/bronze`.
+
+      {% include "game/_medal.html" with place=r.place %}
+{% endcomment %}<span class="gb-medal m{{ place }}" role="img" aria-label="{{ place }} место"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"/><circle cx="12" cy="15.5" r="6" fill="currentColor"/><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="var(--medal-ring)" stroke-width="1.3"/></svg></span>

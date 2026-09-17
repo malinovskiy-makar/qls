@@ -1806,6 +1806,9 @@ def set_board(request, code):
     if gset.kind == 'duel':
         # У дуэли своя страница, и на ней вопросов нет вовсе.
         return redirect('game:duel', code=gset.code)
+    if gset.kind == 'daily' and gset.day:
+        # У вызова дня доска одна — доска дня (P4); второй адрес — переход.
+        return redirect(daily_mod.board_url(gset.mode, gset.day))
     rows = list(gset.results.select_related('user').order_by(
         '-score', 'created_at'))
     board = [{
@@ -2336,70 +2339,163 @@ def _plural(n, one, few, many):
 
 @require_safe
 def daily_page(request):
-    """Четыре карточки вызова дня — по одной на режим."""
-    from . import daily as daily_mod
+    """Вызов дня `/game/daily/` (P4, решение владельца 17.09.2026, макет Daily).
+
+    Серия дней и отсчёт до новой полуночи сверху, ниже карточка на каждый
+    режим: число сыгравших, топ-5 доски, вчерашний победитель, «Играть» сразу
+    в раунд (`?auto=1`) или, если уже сыграно, свой счёт и место.
+
+    ⚠️ БЕЗ ЗАПРОСА НА ИГРОКА И НА КАРТОЧКУ. Наборы сегодня и вчера — одной
+    выборкой, результаты всех восьми — второй; топ-5, число сыгравших, моё
+    место и вчерашний победитель считаются из неё. Число запросов страницы
+    не растёт с числом игроков — держит тест.
+    """
     day = daily_mod.today()
+    yesterday = day - datetime.timedelta(days=1)
+    user = request.user if request.user.is_authenticated else None
+    known = {(s.mode, s.day): s for s in
+             GameSet.objects.filter(kind='daily', day__in=(day, yesterday))}
+    today_sets = []
+    for key in config.MODES:
+        gset = known.get((key, day)) or daily_mod.get_daily_set(key, day)
+        if gset is not None:        # в пуле нет вопросов этого типа — вызова нет
+            today_sets.append(gset)
+    yesterday_sets = {mode: s for (mode, d), s in known.items() if d == yesterday}
+
+    board = {}
+    set_ids = [s.id for s in today_sets] + [s.id for s in yesterday_sets.values()]
+    for r in (GameResult.objects.filter(game_set_id__in=set_ids, user__isnull=False)
+              .order_by('-score', 'created_at')
+              .values('game_set_id', 'user_id', 'user__username', 'score')):
+        board.setdefault(r['game_set_id'], []).append(r)
+    # Свой результат анонима (и вошедшего, сыгравшего до входа) — по сессии.
+    session_codes = request.session.get(MY_RESULTS_KEY) or {}
+    wanted = [session_codes[s.code] for s in today_sets if s.code in session_codes]
+    by_session = {r.game_set_id: r.score for r in
+                  GameResult.objects.filter(code__in=wanted).only('game_set', 'score')
+                  } if wanted else {}
+    played_codes = set(played_set_codes(request))
+
     cards = []
-    for key, m in config.MODES.items():
-        gset = daily_mod.get_daily_set(key, day)
-        if gset is None:
-            continue     # в пуле нет вопросов этого типа — вызова нет
-        mine = None
-        if request.user.is_authenticated:
-            mine = gset.results.filter(user=request.user).first()
-        played = bool(mine) or gset.code in played_set_codes(request)
+    for gset in today_sets:
+        rows = board.get(gset.id, [])
+        my_place = my_score = None
+        if user is not None:
+            for i, r in enumerate(rows):
+                if r['user_id'] == user.id:
+                    my_place, my_score = i + 1, r['score']
+                    break
+        if my_score is None:
+            my_score = by_session.get(gset.id)
+        yset = yesterday_sets.get(gset.mode)
+        yrows = board.get(yset.id, []) if yset else []
         cards.append({
-            'mode': key,
-            'title': m['title'],
-            'size': gset.size,
-            'code': gset.code,
-            'played': played,
-            'my_score': mine.score if mine else None,
-            'play_url': reverse('game:set_page', args=[gset.code]),
-            'board_url': reverse('game:daily_board', args=[key]),
+            'mode': gset.mode,
+            'title': config.MODES[gset.mode]['title'],
+            'icon': DUEL_MODE_ICON.get(gset.mode, 'bolt'),
+            'meta': daily_mod.set_line(gset.mode, gset.size),
+            'count': len(rows),
+            'top': [{'place': i + 1, 'name': r['user__username'], 'score': r['score'],
+                     'is_me': bool(user and r['user_id'] == user.id)}
+                    for i, r in enumerate(rows[:5])],
+            'yesterday_winner': ({'name': yrows[0]['user__username'],
+                                  'score': yrows[0]['score']} if yrows else None),
+            'yesterday_url': daily_mod.board_url(gset.mode, yesterday),
+            'played': my_score is not None or gset.code in played_codes,
+            'my_score': my_score,
+            'my_place': my_place,
+            'play_url': reverse('game:set_page', args=[gset.code]) + '?auto=1',
+            'board_url': daily_mod.board_url(gset.mode, day),
         })
     return render(request, 'game/daily.html', {
         'cards': cards,
         'day': day,
+        'played_count': sum(1 for c in cards if c['played']),
+        'streak': daily_mod.streak_for(user, today=day) if user is not None else None,
         'reset_at': daily_mod.next_reset().isoformat(),
     })
 
 
 @require_safe
 def daily_board(request, mode, day=None):
-    """Доска вызова дня: топ-50 + твоё место, если ты вне топа."""
-    from . import daily as daily_mod
+    """Доска дня `/game/daily/<режим>/[<день>/]` (P4, макет DailyBoard).
+
+    Одна на вызов: страница вызова, итог раунда и старый адрес доски набора
+    ведут сюда. Сводка сверху, «Таблица» (первые 10 и своя строка) и «Где
+    ошиблись» по вопросам; режим и день переключаются ссылками.
+
+    ⚠️ ДНЯ БЕЗ НАБОРА В ВИДЕ 404 НЕ БЫВАЕТ. Наборы создаются лениво: если в
+    прошедший день на страницу вызова никто не заходил, набора нет, и доска
+    честно пустая — «В этот день вызов никто не сыграл». Задним числом наборы
+    НЕ создаются. 404 — только неизвестный режим, кривая дата и будущее.
+
+    ⚠️ ТЕКСТЫ ВОПРОСОВ: пока вызов открыт (сегодня), их видят персонал и тот,
+    кто вызов уже сыграл, — иначе набор можно подсмотреть до попытки. После
+    закрытия дня тексты открыты всем (дополнение к решению 17.09.2026).
+    """
     if mode not in config.MODES:
         raise Http404('Неизвестный режим')
+    today = daily_mod.today()
     if day:
         try:
             day_obj = datetime.datetime.strptime(day, '%Y-%m-%d').date()
         except ValueError:
             raise Http404('Неверная дата')
+        if day_obj > today:
+            raise Http404('Этот день ещё не наступил')
     else:
-        day_obj = daily_mod.today()
-    # Вчерашнюю доску показываем, но задним числом наборы не создаём:
-    # архив дальше вчера не требуется, а плодить наборы за прошлое нечестно.
-    create = day_obj == daily_mod.today()
-    gset = daily_mod.get_daily_set(mode, day_obj, create=create)
-    if gset is None:
-        raise Http404('Вызова на этот день нет')
+        day_obj = today
+    is_today = day_obj == today
+    gset = daily_mod.get_daily_set(mode, day_obj, create=is_today)
 
     me = request.user if request.user.is_authenticated else None
-    top, my_row, total = daily_mod.board_rows(gset, me)
-    yesterday = day_obj - datetime.timedelta(days=1)
+    top, my_row, total, mine, my_place = [], None, 0, None, None
+    questions, show_text = [], not is_today
+    if gset is not None:
+        top, my_row, total = daily_mod.board_rows(gset, me, limit=10)
+        mine = my_result_for(request, gset)
+        my_place = next((r['place'] for r in top if r['is_me']),
+                        my_row['place'] if my_row else None)
+        show_text = (not is_today or mine is not None
+                     or bool(me and (me.is_staff or gset.author_id == me.id)))
+        questions = set_question_stats(gset, show_text=show_text)
+    for q in questions:
+        q['hard'] = q['percent'] is not None and q['percent'] < 40
+
+    one = datetime.timedelta(days=1)
+    first = daily_mod.first_day()
+    prev_day = day_obj - one if first is not None and day_obj - one >= first else None
+    next_day = day_obj + one if day_obj < today else None
+    enabled = set(_pool_qs().order_by().values_list('question_type', flat=True).distinct())
+    tabs = [{'title': m['title'], 'on': key == mode,
+             'url': daily_mod.board_url(key, day_obj)}
+            for key, m in config.MODES.items()
+            if m['question_type'] in enabled or key == mode]
     return render(request, 'game/daily_board.html', {
         'gset': gset,
         'mode': mode,
         'mode_title': config.MODES[mode]['title'],
+        'set_line': daily_mod.set_line(mode, gset.size if gset else None),
+        'tabs': tabs,
         'day': day_obj,
-        'is_today': day_obj == daily_mod.today(),
+        'is_today': is_today,
+        'is_yesterday': day_obj == today - one,
+        'show_year': day_obj.year != today.year,
+        'prev_url': daily_mod.board_url(mode, prev_day) if prev_day else '',
+        'next_url': daily_mod.board_url(mode, next_day) if next_day else '',
+        'reset_at': daily_mod.next_reset().isoformat() if is_today else '',
         'top': top,
         'my_row': my_row,
         'total': total,
-        'play_url': reverse('game:set_page', args=[gset.code]),
-        'yesterday_url': reverse('game:daily_board_day',
-                                 args=[mode, yesterday.isoformat()]),
+        'more': max(0, total - len(top)),
+        'mine': mine,
+        'my_place': my_place,
+        'result_url': reverse('game:result', args=[mine.code]) if mine else '',
+        'play_url': (reverse('game:set_page', args=[gset.code]) + '?auto=1'
+                     if gset is not None else ''),
+        'questions': questions,
+        'show_text': show_text,
+        'has_stats': any(q['correct'] or q['wrong'] or q['skip'] for q in questions),
     })
 
 
@@ -2541,7 +2637,7 @@ def _daily_extras(request, saved, gset, user):
     попадает — места у него нет, это итог и скажет словами.
     """
     ranked = gset.results.filter(user__isnull=False)
-    info = {'board_url': reverse('game:daily_board', args=[gset.mode]),
+    info = {'board_url': daily_mod.board_url(gset.mode, gset.day),
             'total': ranked.count(), 'place': None, 'streak': 0, 'next': None}
     if user is not None and saved.user_id == user.id:
         ahead = ranked.filter(Q(score__gt=saved.score)
@@ -2914,8 +3010,10 @@ def _save_result(request, state, summary):
         if gset.kind == 'duel':
             board = reverse('game:duel', args=[gset.code])
         elif gset.kind == 'daily':
-            # У вызова дня одна доска — доска дня режима (P4), а не доска набора.
-            board = reverse('game:daily_board', args=[gset.mode])
+            # У вызова дня одна доска — доска дня его режима и ЕГО дня (P4):
+            # раунд вчерашнего набора, законченный после полуночи, ведёт на
+            # вчерашнюю доску, а не на сегодняшнюю.
+            board = daily_mod.board_url(gset.mode, gset.day)
         else:
             board = reverse('game:set_board', args=[gset.code])
         out['set'] = {

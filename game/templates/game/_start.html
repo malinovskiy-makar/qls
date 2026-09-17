@@ -15,7 +15,10 @@ ADR 0108, макеты `claude/mockups/wecon_rush_20260917/Main|Student|Dark|Mob
 ⚠️ Страница набора и лобби дуэли (`/game/s/<код>/`) — та же страница: там три
 зоны скрыты, а видна карточка набора `#set-intro` или лобби `#duel-lobby`.
 {% endcomment %}
-<section id="screen-start" class="screen active">
+{% comment %} ⚠️ `?auto=1` (вызов дня, набор учителя): экран старта не мелькает даже на долю
+   секунды — он невидим, пока сервер не ответил на старт раунда. Откажет сервер —
+   класс снимает `showStartNotice`, и карточка набора покажет причину. {% endcomment %}
+<section id="screen-start" class="screen active{% if auto_set.autostart %} autostarting{% endif %}">
   {% comment %} ⚠️ У ЛОББИ ДУЭЛИ ГЛАВНОЙ ПОЗАДИ НЕТ (ADR 0112): три зоны стартового
      экрана на этой странице не отдаются вовсе. Код старта общий и ищет их при
      загрузке — `$` в game.html отдаёт ему пустышки, а не падает. {% endcomment %}

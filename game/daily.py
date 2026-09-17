@@ -115,6 +115,52 @@ def get_daily_set(mode, day=None, create=True):
         return GameSet.objects.filter(kind='daily', mode=mode, day=day).first()
 
 
+# ─── Страница вызова и доска дня (P4, решение владельца 17.09.2026) ──────
+
+# Чем кончился раунд — словами доски дня (макет DailyBoard).
+ENDING_TEXT = {'set_done': 'прошёл все вопросы', 'pool_empty': 'прошёл все вопросы',
+               'lives': 'кончились жизни', 'time': 'вышло время',
+               'quit': 'вышел из раунда'}
+
+# Как называть вопросы режима на карточке: «15 данеток», «8 числовых ответов».
+QUESTION_WORDS = {'boolean': ('данетка', 'данетки', 'данеток'),
+                  'numeric': ('числовой ответ', 'числовых ответа', 'числовых ответов')}
+DEFAULT_WORDS = ('вопрос', 'вопроса', 'вопросов')
+
+
+def set_line(mode, size=None):
+    """«15 данеток · 1 мин». Без размера (набора в тот день не было) — «1 мин».
+
+    ⚠️ Кода набора в строке нет и быть не должно: у вызова дня он игроку не
+    нужен, играют по кнопке, а не по коду (решение 17.09.2026).
+    """
+    from problems.templatetags.ru import pick
+    from .views import duration_text
+    duration = duration_text(config.MODES[mode]['duration'])
+    if size is None:
+        return duration
+    words = QUESTION_WORDS.get(config.MODES[mode]['question_type'], DEFAULT_WORDS)
+    return '%d %s · %s' % (size, pick(size, *words), duration)
+
+
+def board_url(mode, day):
+    """Адрес доски дня: у сегодняшней — без даты, у прошедшей — с датой.
+
+    Доска у вызова одна (P4): страница вызова, итог раунда и старый адрес
+    `/game/s/<код>/board/` ведут сюда.
+    """
+    from django.urls import reverse
+    if day == today():
+        return reverse('game:daily_board', args=[mode])
+    return reverse('game:daily_board_day', args=[mode, day.isoformat()])
+
+
+def first_day():
+    """День первого в базе набора вызова — раньше него доску не листаем."""
+    return (GameSet.objects.filter(kind='daily', day__isnull=False)
+            .order_by('day').values_list('day', flat=True).first())
+
+
 def board_rows(gset, me=None, limit=50):
     """Доска набора: топ-N + отдельная строка «моё место», если я вне топа.
 
@@ -133,6 +179,8 @@ def board_rows(gset, me=None, limit=50):
         'score': r.score,
         'accuracy': r.accuracy,
         'max_combo': r.max_combo,
+        'combo': '×' + ('%g' % (r.max_combo or 1)).replace('.', ','),
+        'ending': ENDING_TEXT.get(r.ended_reason, ENDING_TEXT['time']),
         'at': r.created_at,
         'is_me': bool(me and r.user_id == me.id),
     } for i, r in enumerate(results)]
@@ -174,6 +222,7 @@ def played_pairs(user):
     return set(GameResult.objects
                .filter(user=user, game_set__kind='daily',
                        game_set__day__isnull=False)
+               .order_by()          # порядок модели добавил бы created_at в DISTINCT
                .values_list('game_set__day', 'game_set__mode')
                .distinct())
 
