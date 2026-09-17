@@ -217,29 +217,31 @@ class TeacherConstructorTests(TestCase):
         r = self.client.get(reverse('teacher:game_set_create'))
         self.assertIn(r.status_code, (302, 403))
 
-    def test_teacher_sees_step_one_first(self):
-        """★ Режим выбирается ПЕРВЫМ: набор для «Классики» может содержать
-        только числовые вопросы. Дай собирать сначала — половина набора
-        окажется несовместимой."""
-        self.client.login(username='t', password='pw12345')
-        r = self.client.get(reverse('teacher:game_set_create'))
-        self.assertContains(r, 'Сначала режим')
-        self.assertNotContains(r, 'Здесь только вопросы, пригодные для игры')
+    def builder_data(self, **params):
+        r = self.client.get(reverse('teacher:game_set_create'), params)
+        self.assertEqual(r.status_code, 200)
+        return r, json.loads(r.content.decode().split('<script id="sb-data" type="application/json">', 1)[1]
+                             .split('</script>', 1)[0])
 
-    def test_step_two_filters_the_pool_by_question_type(self):
+    def test_mode_buttons_on_one_screen(self):
+        u"""С 17.09.2026 (ADR 0116) шагов нет: режим — кнопками над вопросами и набором."""
         self.client.login(username='t', password='pw12345')
-        r = self.client.get(reverse('teacher:game_set_create'),
-                            {'mode': 'classic'})
+        r, data = self.builder_data()
+        self.assertEqual(data['mode'], 'blitz')
         self.assertContains(r, 'Здесь только вопросы, пригодные для игры')
-        self.assertContains(r, 'Сколько?')
-        self.assertNotContains(r, 'Вопрос 0?')
+        self.assertContains(r, 'data-mode="classic"')
+
+    def test_pool_is_filtered_by_the_type_of_the_mode(self):
+        self.client.login(username='t', password='pw12345')
+        _r, data = self.builder_data(mode='classic')
+        texts = [item['text'] for item in data['pool']['items']]
+        self.assertEqual(texts, ['Сколько?'])
 
     def test_teacher_sees_the_right_answer(self):
         """Учитель и так видит всё — собирать набор вслепую невозможно."""
         self.client.login(username='t', password='pw12345')
-        r = self.client.get(reverse('teacher:game_set_create'),
-                            {'mode': 'classic'})
-        self.assertContains(r, 'ответ: 12')
+        _r, data = self.builder_data(mode='classic')
+        self.assertEqual(data['pool']['items'][0]['answer'], '12')
 
     def test_saving_keeps_the_order(self):
         self.client.login(username='t', password='pw12345')
@@ -251,7 +253,7 @@ class TeacherConstructorTests(TestCase):
         self.assertEqual(gset.question_ids, ids)
         self.assertEqual(gset.author, self.teacher)
         self.assertRedirects(r, reverse('teacher:game_set_detail',
-                                        args=[gset.code]))
+                                        args=[gset.code]) + '?created=1')
 
     def test_saving_drops_questions_of_a_foreign_type(self):
         self.client.login(username='t', password='pw12345')
@@ -421,3 +423,149 @@ class SetInvitationPageTests(TestCase):
         data = self.client.post(reverse('game:session_finish'), json.dumps({'reason': 'done'}),
                                 content_type='application/json').json()
         self.assertTrue(data['share']['set']['board_url'].endswith(self.url))
+
+
+# ─── P7: кабинет учителя — список, сборка на одном экране, страница набора (ADR 0116) ──
+
+class TeacherSetsP7Tests(TestCase):
+    def setUp(self):
+        topics = ['Монополия', 'Рынок труда']
+        self.pool = []
+        for i in range(70):
+            p = Problem.objects.create(title='П%d' % i, statement='Условие %d' % i, problem_type='тест: один ответ',
+                                       answer='а', status=Problem.Status.PUBLISHED)
+            self.pool.append(GameQuestion.objects.create(
+                problem=p, question_type='single', question='Вопрос про спрос %d?' % i if i % 2 else 'Вопрос %d?' % i,
+                options=['(b) Центральный банк Российской Федерации;', 'б', 'в'], correct_index=0,
+                difficulty=1 + i % 5, topics=[topics[i % 2]], lang='ru', source_group='vsosh' if i % 3 else 'books'))
+        self.teacher = User.objects.create_user(username='uchitel', password='pw12345', role='teacher')
+        self.client.force_login(self.teacher)
+
+    def pool_api(self, **params):
+        params.setdefault('mode', 'blitz')
+        return self.client.get(reverse('teacher:api_game_set_pool'), params)
+
+    def expected(self, q='', topic='', source='', dmin=None, dmax=None):
+        rows = GameQuestion.objects.filter(question_type='single')
+        if q:
+            rows = rows.filter(question__icontains=q)
+        if source:
+            rows = rows.filter(source_group=source)
+        if dmin:
+            rows = rows.filter(difficulty__gte=dmin)
+        if dmax:
+            rows = rows.filter(difficulty__lte=dmax)
+        return [g.id for g in rows.order_by('id') if not topic or topic in g.topics]
+
+    def test_pool_api_total_matches_the_selection_for_three_filters(self):
+        for params, kwargs in (({'q': 'спрос'}, {'q': 'спрос'}),
+                               ({'topic': 'Монополия', 'source': 'vsosh'}, {'topic': 'Монополия', 'source': 'vsosh'}),
+                               ({'dmin': '2', 'dmax': '4'}, {'dmin': 2, 'dmax': 4})):
+            data = self.pool_api(**params).json()
+            self.assertEqual(data['total'], len(self.expected(**kwargs)), params)
+
+    def test_pool_api_pages_without_repeats_or_gaps_and_hides_types(self):
+        ids, offset = [], 0
+        for _ in range(3):
+            r = self.pool_api(offset=offset)
+            data = r.json()
+            ids += [item['id'] for item in data['items']]
+            offset = data['next_offset']
+            self.assertNotIn('question_type', r.content.decode())
+        self.assertEqual(ids, self.expected()[:60])
+        self.assertEqual(len(set(ids)), 60)
+
+    def test_pool_api_refuses_students_and_guests(self):
+        student = User.objects.create_user(username='uchenik', password='pw12345', role='student')
+        self.client.force_login(student)
+        self.assertEqual(self.pool_api().status_code, 403)
+        self.client.logout()
+        self.assertEqual(self.pool_api().status_code, 302)
+
+    def test_builder_has_no_internal_type_names_seconds_or_reloading_filters(self):
+        html = self.client.get(reverse('teacher:game_set_create')).content.decode()
+        main = html.split('<main', 1)[1].split('</main>', 1)[0]
+        for word in ('boolean', 'single', 'multi', 'numeric', '120 с', '600 с'):
+            self.assertNotIn(word, main)
+        self.assertNotIn('method="get"', html)
+        self.assertNotIn('?page=', html)
+        self.assertEqual(main.count('<button type="button" class="sb-mode'), 1)   # в тестовом пуле только Блиц
+        self.assertIn('один верный ответ · 2 мин · 70', main)
+
+    def save(self, **fields):
+        data = {'mode': 'blitz', 'title': 'Контрольная', 'attempts': '1',
+                'question_ids': ','.join(str(q.id) for q in self.pool[:3][::-1])}
+        data.update(fields)
+        return self.client.post(reverse('teacher:game_set_create'), data)
+
+    def test_deadline_is_moscow_time_and_order_is_kept(self):
+        from game import daily as daily_mod
+        day = daily_mod.today() + datetime.timedelta(days=3)
+        self.save(closes_at='%sT23:59' % day.isoformat())
+        gset = GameSet.objects.get(title='Контрольная')
+        utc = gset.closes_at.astimezone(datetime.timezone.utc)
+        self.assertEqual((utc.date(), utc.hour, utc.minute), (day, 20, 59))
+        self.assertEqual(gset.question_ids, [q.id for q in self.pool[:3][::-1]])
+
+    def test_past_deadline_is_refused_and_empty_means_no_deadline(self):
+        r = self.save(closes_at='2020-01-01T10:00')
+        self.assertFalse(GameSet.objects.filter(title='Контрольная').exists())
+        self.assertRedirects(r, reverse('teacher:game_set_create') + '?mode=blitz', fetch_redirect_response=False)
+        self.save(closes_at='')
+        self.assertIsNone(GameSet.objects.get(title='Контрольная').closes_at)
+
+    def test_detail_counts_anonymous_sorts_hard_first_and_shows_when(self):
+        gset = make_set(self.pool[:3], author=self.teacher, title='Моя контрольная')
+        outcomes = lambda wrong_first: [  # noqa: E731
+            {'question_id': self.pool[0].id, 'outcome': 'wrong' if wrong_first else 'correct'},
+            {'question_id': self.pool[1].id, 'outcome': 'correct'},
+            {'question_id': self.pool[2].id, 'outcome': 'correct'}]
+        GameResult.objects.create(code=make_code(), mode='blitz', game_set=gset, user=None, score=90,
+                                  correct_count=2, total_count=3, question_outcomes=outcomes(True))
+        GameResult.objects.create(code=make_code(), mode='blitz', game_set=gset, user=self.teacher, score=120,
+                                  correct_count=2, total_count=3, question_outcomes=outcomes(True))
+        html = self.client.get(reverse('teacher:game_set_detail', args=[gset.code])).content.decode()
+        self.assertIn('из них 1 без входа', html)
+        self.assertIn('>Когда</th>', html)
+        self.assertIn('№&nbsp;1 · 0&nbsp;%', html)
+        first_row = html.split('<li class="sd-q', 1)[1]
+        self.assertTrue(first_row.startswith(' hard"><span class="qn">1</span>'))
+        self.assertIn('ответ: Центральный банк Российской Федерации</small>', html)
+        by_order = self.client.get(reverse('teacher:game_set_detail', args=[gset.code]) + '?sort=order').content.decode()
+        self.assertIn('class="on" aria-current="true">по порядку', by_order)
+
+    def test_deadline_of_a_foreign_set_cannot_be_changed(self):
+        other = User.objects.create_user(username='chuzhoy', password='pw12345', role='teacher')
+        gset = make_set(self.pool[:3], author=other)
+        r = self.client.post(reverse('teacher:game_set_deadline', args=[gset.code]), {'clear': '1',
+                             'closes_at': '2030-01-01T10:00'})
+        self.assertEqual(r.status_code, 403)
+        mine = make_set(self.pool[:3], author=self.teacher, closes_at=timezone.now() + datetime.timedelta(days=1))
+        self.client.post(reverse('teacher:game_set_deadline', args=[mine.code]), {'clear': '1'})
+        mine.refresh_from_db()
+        self.assertIsNone(mine.closes_at)
+
+    def test_answer_is_cleaned_for_display_only(self):
+        from teacher.game_sets import answer_display
+        cases = {'(b) Центральный банк Российской Федерации;': 'Центральный банк Российской Федерации',
+                 '(3) 800 рублей;': '800 рублей', '1,5%': '1,5%',
+                 'увеличить выпуск и сократить цену': 'увеличить выпуск и сократить цену',
+                 '(все перечисленное)': '(все перечисленное)'}
+        self.assertEqual({k: answer_display(k) for k in cases}, cases)
+        self.assertEqual(GameQuestion.objects.get(id=self.pool[0].id).options[0],
+                         '(b) Центральный банк Российской Федерации;')
+
+    def test_sets_list_queries_do_not_grow_with_sets(self):
+        from django.db import connection
+        from django.test.utils import CaptureQueriesContext
+        make_set(self.pool[:3], author=self.teacher, title='Один')
+        with CaptureQueriesContext(connection) as one:
+            html = self.client.get(reverse('teacher:game_sets')).content.decode()
+        self.assertIn('бессрочно', html)
+        for i in range(19):
+            make_set(self.pool[:3], author=self.teacher, title='Набор %d' % i,
+                     closes_at=timezone.now() + datetime.timedelta(days=2))
+        with CaptureQueriesContext(connection) as twenty:
+            html = self.client.get(reverse('teacher:game_sets')).content.decode()
+        self.assertEqual(len(one), len(twenty))
+        self.assertIn('открыт до', html)

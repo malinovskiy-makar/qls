@@ -142,4 +142,8 @@ urlpatterns = [
          name='game_set_detail'),
     path('api/game-set/fill/', game_sets.api_game_set_fill,
          name='api_game_set_fill'),
+    path('api/game-set/pool/', game_sets.api_game_set_pool,
+         name='api_game_set_pool'),
+    path('game-sets/<str:code>/deadline/', game_sets.game_set_deadline,
+         name='game_set_deadline'),
 ]

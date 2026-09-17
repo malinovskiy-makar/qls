@@ -23,7 +23,8 @@
   .gb-medal.m3 { color: var(--medal-bronze); }
 
   /* Таблица: строки-плашки с зазором 4 px, как в макете, но таблицей — ради чтения экранным диктором. */
-  .gb-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; }
+  /* position: relative — невидимая подпись «Место» (absolute) не растягивает страницу вбок. */
+  .gb-scroll { overflow-x: auto; margin: 0 -4px; padding: 0 4px; position: relative; }
   .gb-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
   .gb-table th { height: 26px; padding: 0 10px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase;
                  color: var(--text3); font-weight: 600; text-align: left; white-space: nowrap; }

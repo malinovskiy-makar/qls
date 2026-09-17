@@ -1,68 +1,128 @@
 {% extends 'teacher/base.html' %}
 {% comment %}
-  Список игровых наборов учителя. Набор — забег с зафиксированным списком
-  вопросов: собрал, получил код, раздал классу, посмотрел доску.
+  Список игровых наборов учителя (решение владельца 17.09.2026, ADR 0116; макет
+  claude/mockups/wecon_rush_20260917/TeacherSets.dc.html). Набор — раунд Wecon Rush
+  с зафиксированным списком вопросов: собрал, получил код, раздал классу.
+  Счётчики строк — агрегатами одним запросом (`game_sets.game_sets_list`).
 {% endcomment %}
 {% block title %}Игровые наборы{% endblock %}
+{% block main_class %}gs-main{% endblock %}
 
 {% block extra_style %}
-<style>
-  .gs-head { display: flex; align-items: center; justify-content: space-between;
-             gap: 14px; flex-wrap: wrap; margin-bottom: 6px; }
-  .gs-lead { color: var(--text2); margin-bottom: 18px; max-width: 70ch; }
-  .gs-btn {
-    display: inline-block; padding: 9px 18px; border-radius: 10px;
-    text-decoration: none; font-weight: 600; font-size: .92rem;
-    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  .gs-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .gs-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 84px; display: flex; flex-direction: column; gap: 14px; }
+  .gs-hd { display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  .gs-hd > div { flex: 1; min-width: 0; }
+  .gs-ttl { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; }
+  .gs-sub { margin-top: 6px; max-width: 760px; font-size: 13.5px; color: var(--text2); }
+  .gs-btn { font: inherit; height: 44px; padding: 0 18px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 14.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .gs-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .gs-btn .qi { width: 15px; height: 15px; }
+  .gs-btn.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .gs-btn.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .gs-btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+  .gs-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 16px 18px;
+             display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  /* Таблица шире телефона листается внутри карточки, страница вбок не едет. */
+  /* position: relative — невидимая подпись колонки (absolute) остаётся внутри прокрутки,
+     иначе она растягивала страницу вбок до правого края таблицы. */
+  .gs-scroll { overflow-x: auto; max-width: 100%; position: relative; }
+  .gs-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .gs-table th { height: 26px; padding: 0 12px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3);
+                 font-weight: 600; text-align: left; white-space: nowrap; }
+  .gs-table td { height: 60px; padding: 0 12px; background: var(--surface-2); white-space: nowrap; }
+  .gs-table td:first-child { border-radius: 9px 0 0 9px; white-space: normal; min-width: 240px; }
+  .gs-table td:last-child { border-radius: 0 9px 9px 0; }
+  .gs-table .num { text-align: right; }
+  .gs-nm { font-weight: 700; font-size: 15px; }
+  .gs-nm small { display: block; font-weight: 500; font-size: 12.5px; color: var(--text3); }
+  .gs-code { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 4px 0 12px; border: 1px solid var(--border);
+             border-radius: 9px; background: var(--surface); }
+  .gs-code b { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+  .gs-copy { font: inherit; width: 30px; height: 30px; border: 0; border-radius: 7px; background: transparent; color: var(--text3);
+             display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+  .gs-copy:hover { color: var(--accent-ink); background: var(--accent-tint); }
+  .gs-copy .qi { width: 15px; height: 15px; }
+  .gs-st { font-size: 12.5px; font-weight: 600; }
+  .gs-st.open { color: var(--green); }
+  .gs-st.closed { color: var(--text3); }
+  .gs-zero { color: var(--text3); }
+  .gs-when { color: var(--text2); font-size: 13px; }
+  .gs-foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; }
+  .gs-empty { min-height: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+              text-align: center; color: var(--text2); border: 1px dashed var(--border); border-radius: 14px; padding: 24px; }
+  .gs-empty b { color: var(--text); font-size: 18px; }
+  @media (max-width: 720px) {
+    .gs-main { padding: 16px 16px 84px; }
+    .gs-ttl { font-size: 24px; }
+    .gs-hd .gs-btn { width: 100%; }
   }
-  .gs-box { border: 1px solid var(--border); border-radius: 12px;
-            background: var(--surface); overflow-x: auto; }
-  table.gs { border-collapse: collapse; width: 100%; font-size: .92rem; }
-  table.gs th, table.gs td { padding: 10px 12px; text-align: left;
-                             border-bottom: 1px solid var(--border); }
-  table.gs th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
-  table.gs td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  .gs-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-             letter-spacing: .1em; font-weight: 700; }
-  .gs-empty { padding: 30px; text-align: center; color: var(--text2); }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="gs-head">
-  <h1>Игровые наборы</h1>
-  <a class="gs-btn" href="{% url 'teacher:game_set_create' %}">Собрать набор</a>
+<div class="gs-hd">
+  <div>
+    <h1 class="gs-ttl">Игровые наборы</h1>
+    <p class="gs-sub">Набор – раунд Wecon Rush с вашим списком вопросов. У всех, кто играет по коду, вопросы одни и те же и в одном порядке, поэтому результаты сравнимы.</p>
+  </div>
+  <a class="gs-btn solid" href="{% url 'teacher:game_set_create' %}">{% include "_icon.html" with name="plus" %}Собрать набор</a>
 </div>
-<p class="gs-lead">
-  Набор это раунд в Wecon Rush с зафиксированным списком вопросов: у всех, кто
-  играет по коду, вопросы одни и те же и в одном порядке. Поэтому результаты
-  сравнимы и складываются в доску.
-</p>
 
-<div class="gs-box">
-  <table class="gs">
-    <thead>
-      <tr>
-        <th>Название</th><th>Режим</th><th class="num">Вопросов</th>
-        <th>Код</th><th class="num">Прошло</th><th>Доска</th>
-      </tr>
-    </thead>
-    <tbody>
-    {% for r in rows %}
-      <tr>
-        <td>{{ r.gset.title }}</td>
-        <td>{{ r.mode_title }}</td>
-        <td class="num">{{ r.gset.size }}</td>
-        <td><span class="gs-code">{{ r.gset.code }}</span></td>
-        <td class="num">{{ r.played }}</td>
-        <td><a href="{% url 'teacher:game_set_detail' r.gset.code %}">открыть</a></td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="6" class="gs-empty">
-        Наборов пока нет. Соберите первый: это пять минут.
-      </td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
+{% if rows %}
+<section class="gs-card" aria-label="Мои наборы">
+  <div class="gs-scroll">
+    <table class="gs-table">
+      <thead><tr><th scope="col">Набор</th><th scope="col">Код</th><th scope="col">Срок</th><th scope="col" class="num">Прошли</th>
+                 <th scope="col" class="num">Ср. точность</th><th scope="col">Создан</th><th scope="col"><span class="gs-sr">Действия</span></th></tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><span class="gs-nm">{{ r.gset.title }}<small>{{ r.meta }}</small></span></td>
+          <td><span class="gs-code"><b>{{ r.gset.code }}</b><button type="button" class="gs-copy" data-copy="{{ r.gset.code }}" aria-label="Скопировать код {{ r.gset.code }}">{% include "_icon.html" with name="copy" %}</button></span></td>
+          <td><span class="gs-st {{ r.deadline_state }}">{{ r.deadline }}</span></td>
+          <td class="num">{% if r.played %}{{ r.played }}{% else %}<span class="gs-zero">0</span>{% endif %}</td>
+          <td class="num">{% if r.accuracy is not None %}{{ r.accuracy }}&nbsp;%{% else %}<span class="gs-zero">–</span>{% endif %}</td>
+          <td class="gs-when">{{ r.created }}</td>
+          <td class="num"><a class="gs-btn sm" href="{% url 'teacher:game_set_detail' r.gset.code %}">Открыть</a></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="gs-foot">Код нечувствителен к регистру и пробелам – его можно продиктовать или написать на доске. Ученик вводит его на странице игры в поле «Играть по коду».</p>
+</section>
+{% else %}
+<div class="gs-empty">
+  <b>Наборов пока нет</b>
+  <span>Соберите первый – это пять минут: режим, вопросы, название.</span>
+  <a class="gs-btn solid" href="{% url 'teacher:game_set_create' %}">Собрать набор</a>
 </div>
+{% endif %}
+<template id="gs-check">{% include "_icon.html" with name="check" %}</template>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Скопировать код из строки: галочка на полторы секунды вместо значка. */
+(function () {
+  var check = document.getElementById('gs-check').innerHTML;
+  document.querySelectorAll('.gs-copy').forEach(function (btn) {
+    var icon = btn.innerHTML;
+    btn.addEventListener('click', function () {
+      var code = btn.dataset.copy;
+      function done() {
+        btn.innerHTML = check;
+        setTimeout(function () { btn.innerHTML = icon; }, 1500);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done, function () { prompt('Код набора:', code); });
+      } else {
+        prompt('Код набора:', code);
+      }
+    });
+  });
+})();
+</script>
 {% endblock %}

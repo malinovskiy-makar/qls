@@ -1,138 +1,236 @@
 {% extends 'teacher/base.html' %}
+{% load ru %}
 {% comment %}
-  Доска набора глазами автора. Самое ценное здесь — не список счетов, а
-  нижняя таблица: на каких вопросах посыпался класс. Доля верных считается
-  ВНУТРИ набора, а не по всему сайту.
+  Страница набора глазами автора (решение владельца 17.09.2026, ADR 0116; макет
+  claude/mockups/wecon_rush_20260917/TeacherSetDetail.dc.html). Главное действие после
+  сборки — раздать код, поэтому «Код для класса» справа сверху. Ниже — кто прошёл
+  (все строки, с анонимами и временем сдачи по Москве) и где ошибся класс (тексты и
+  верные ответы учителю видны всегда; сначала трудные).
+  Доска ученика живёт на странице набора `/game/s/<код>/` — «Публичной доски» здесь нет.
 {% endcomment %}
-{% block title %}Набор {{ gset.code }}{% endblock %}
+{% block title %}{{ gset.title }} – игровой набор{% endblock %}
+{% block main_class %}sd-main{% endblock %}
 
 {% block extra_style %}
-<style>
-  .sd-kind { font-size: .78rem; font-weight: 700; letter-spacing: .08em;
-             text-transform: uppercase; color: var(--accent); }
-  .sd-meta { color: var(--text2); margin-top: 6px; font-size: .92rem; }
-  .sd-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-             letter-spacing: .12em; font-weight: 700; font-size: 1.05rem; }
-  .sd-share { margin-top: 14px; display: flex; gap: 10px; flex-wrap: wrap;
-              align-items: center; }
-  .sd-share input {
-    font: inherit; font-size: .86rem; padding: 8px 10px; min-width: 320px;
-    border: 1px solid var(--border); border-radius: 9px;
-    background: var(--surface-2); color: var(--text);
+  .sd-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sd-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 84px; display: flex; flex-direction: column; gap: 14px; }
+  .sd-back { align-self: flex-start; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none;
+             display: inline-flex; align-items: center; gap: 6px; }
+  .sd-back .qi { width: 14px; height: 14px; }
+  .sd-lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+  .sd-btn { font: inherit; height: 44px; padding: 0 18px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 14.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .sd-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .sd-btn .qi { width: 14px; height: 14px; }
+  .sd-btn.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .sd-btn.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .sd-btn.sm { height: 36px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+  .sd-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; min-width: 0; }
+  .sd-chip { height: 28px; padding: 0 11px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px;
+             color: var(--text2); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .sd-chip b { color: var(--text); font-weight: 600; }
+  .sd-chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+
+  .sd-top { display: grid; grid-template-columns: minmax(0, 1fr) 470px; gap: 16px; align-items: stretch; }
+  .sd-info { padding: 18px 22px; }
+  .sd-ttl { margin: 4px 0 10px; font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.15; overflow-wrap: anywhere; }
+  .sd-chips { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .sd-deadline { margin-top: 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 10px;
+                 background: var(--surface-2); }
+  .sd-deadline[hidden] { display: none; }
+  .sd-deadline input { font: inherit; height: 36px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 9px;
+                       background: var(--surface); color: var(--text); padding: 0 10px; font-size: 13.5px; }
+  .sd-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 14px; }
+  .sd-kpi { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+  .sd-kpi b { display: block; margin-top: 2px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .sd-kpi b.hard { color: var(--error); }
+  .sd-kpi span { font-size: 12.5px; color: var(--text2); }
+  .sd-share { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+  .sd-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; font-size: 38px; line-height: 1;
+             letter-spacing: .14em; overflow-wrap: anywhere; }
+  .sd-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .sd-tip { font-size: 12.5px; color: var(--text3); }
+
+  .sd-cols { display: grid; grid-template-columns: minmax(0, 1fr) 600px; gap: 16px; align-items: start; }
+  .sd-pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .sd-ph { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+  .sd-ph h2 { font-size: 17px; font-weight: 700; }
+  .sd-ph > span { font-size: 12.5px; color: var(--text3); }
+  .sd-seg { margin-left: auto; display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .sd-seg a { min-height: 32px; padding: 0 10px; display: inline-flex; align-items: center; font-size: 12.5px; font-weight: 600;
+              color: var(--text2); text-decoration: none; }
+  .sd-seg a + a { border-left: 1px solid var(--border-soft); }
+  .sd-seg a.on { background: var(--accent); color: var(--on-accent); }
+  .sd-scroll { overflow: auto; max-height: 560px; position: relative; }
+  .sd-table { width: 100%; border-collapse: separate; border-spacing: 0 4px; font-size: 14px; font-variant-numeric: tabular-nums; }
+  .sd-table th { height: 26px; padding: 0 10px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3);
+                 font-weight: 600; text-align: left; white-space: nowrap; }
+  .sd-table td { height: 40px; padding: 0 10px; background: var(--surface-2); white-space: nowrap; }
+  .sd-table td:first-child { width: 40px; border-radius: 9px 0 0 9px; text-align: center; color: var(--text3); font-size: 13px; }
+  .sd-table td:last-child { border-radius: 0 9px 9px 0; }
+  .sd-table .num { text-align: right; }
+  .sd-table td.who { font-weight: 600; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+  .sd-table td.who.anon { font-weight: 500; font-style: italic; color: var(--text3); }
+  .sd-table td.sc { font-weight: 800; font-size: 15.5px; }
+  .sd-table td.end { color: var(--text2); font-size: 13px; }
+  .sd-table tr.first td { background: var(--accent-tint); }
+  .sd-medal { display: inline-flex; width: 22px; height: 22px; vertical-align: middle; }
+  .sd-medal svg { width: 100%; height: 100%; }
+  .sd-medal.m1 { color: var(--medal-gold); }
+  .sd-medal.m2 { color: var(--medal-silver); }
+  .sd-medal.m3 { color: var(--medal-bronze); }
+  .sd-qs { list-style: none; display: flex; flex-direction: column; }
+  .sd-q { display: grid; grid-template-columns: 26px minmax(0, 1fr) 100px 48px; align-items: center; gap: 12px; min-height: 48px; padding: 4px 0;
+          border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+  .sd-q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+  .sd-q .qt { min-width: 0; }
+  .sd-q .qt span { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sd-q .qt small { display: block; font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sd-q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+  .sd-q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+  .sd-q.hard .bar i { background: var(--error); }
+  .sd-q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .sd-q.hard .pc { color: var(--error); }
+  .sd-foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; }
+  .sd-empty { padding: 28px 16px; text-align: center; color: var(--text2); border: 1px dashed var(--border); border-radius: 12px; }
+
+  @media (max-width: 1100px) {
+    .sd-main { padding: 16px 20px 84px; }
+    .sd-top, .sd-cols { grid-template-columns: 1fr; }
   }
-  .sd-btn { font: inherit; font-size: .9rem; font-weight: 600;
-            padding: 8px 16px; border-radius: 9px; cursor: pointer;
-            border: 1px solid var(--btn-bg); background: var(--btn-bg);
-            color: var(--on-btn); text-decoration: none; display: inline-block; }
-  .sd-btn.ghost { background: var(--surface); color: var(--text);
-                  border-color: var(--border); }
-  h2 { font-size: 1.05rem; margin: 26px 0 10px; }
-  .sd-box { border: 1px solid var(--border); border-radius: 12px;
-            background: var(--surface); overflow-x: auto; }
-  table.sd { border-collapse: collapse; width: 100%; font-size: .9rem; }
-  table.sd th, table.sd td { padding: 9px 12px; text-align: left;
-                             border-bottom: 1px solid var(--border); }
-  table.sd th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
-  table.sd td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  table.sd td.q { max-width: 460px; }
-  .sd-hard { color: var(--error); font-weight: 700; }
-  .sd-empty { padding: 28px; text-align: center; color: var(--text2); }
-  .sd-note { margin-top: 10px; font-size: .82rem; color: var(--text2); }
-</style>
+  @media (max-width: 720px) {
+    .sd-main { padding: 16px 16px 84px; }
+    .sd-ttl { font-size: 22px; }
+    .sd-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sd-code { font-size: 30px; }
+    .sd-q { grid-template-columns: 22px minmax(0, 1fr) 56px 44px; gap: 8px; }
+  }
 {% endblock %}
 
 {% block content %}
-<div class="sd-kind">{{ gset.get_kind_display }}</div>
-<h1>{{ gset.title }}</h1>
-<p class="sd-meta">
-  Режим «{{ mode_title }}» · {{ gset.size }} вопр. ·
-  попыток на человека: {{ gset.attempts_allowed }} ·
-  код <span class="sd-code">{{ gset.code }}</span>
-</p>
+  <a class="sd-back" href="{% url 'teacher:game_sets' %}">{% include "_icon.html" with name="arrow_left" %}Игровые наборы</a>
 
-<div class="sd-share">
-  <input type="text" id="link" value="{{ play_url }}" readonly>
-  <button class="sd-btn" id="copy">Скопировать ссылку</button>
-  <a class="sd-btn ghost" href="{{ play_url }}">Открыть</a>
-  <a class="sd-btn ghost" href="{{ board_url }}">Публичная доска</a>
-  <a class="sd-btn ghost" href="{% url 'teacher:game_sets' %}">Все наборы</a>
-</div>
+  <div class="sd-top">
+    <section class="sd-card sd-info" aria-labelledby="sd-title">
+      <div class="sd-lab">{{ gset.get_kind_display }}</div>
+      <h1 class="sd-ttl" id="sd-title">{{ gset.title }}</h1>
+      <div class="sd-chips">
+        <span class="sd-chip t">{{ mode_title }}{% if type_text %} · {{ type_text }}{% endif %}</span>
+        <span class="sd-chip"><b>{{ gset.size }}</b>&nbsp;{{ gset.size|plural_ru:"вопрос,вопроса,вопросов" }}</span>
+        <span class="sd-chip">попыток: <b>{{ gset.attempts_allowed }}</b></span>
+        <span class="sd-chip" id="sd-deadline-chip">{% if closes_long %}открыт до <b>{{ closes_long }}</b>{% else %}бессрочно{% endif %}</span>
+        <button type="button" class="sd-btn sm" id="sd-deadline-open" aria-expanded="false" aria-controls="sd-deadline">Изменить срок</button>
+      </div>
+      <form class="sd-deadline" id="sd-deadline" method="post" action="{% url 'teacher:game_set_deadline' gset.code %}" hidden>
+        {% csrf_token %}
+        <label for="sd-closes" class="sd-lab">Открыт до</label>
+        <input type="datetime-local" id="sd-closes" name="closes_at" value="{{ closes_value }}">
+        <button type="submit" class="sd-btn sm solid">Сохранить срок</button>
+        {% if closes_value %}<button type="submit" class="sd-btn sm" name="clear" value="1">Снять срок</button>{% endif %}
+        <span class="sd-tip">время московское</span>
+      </form>
+      <div class="sd-kpis">
+        <div class="sd-kpi"><span class="sd-lab">Прошли</span><b id="sd-played">{{ played }}</b>{% if anonymous %}<span>из них {{ anonymous }} без входа</span>{% endif %}</div>
+        <div class="sd-kpi"><span class="sd-lab">Средняя точность</span><b>{% if avg_accuracy is not None %}{{ avg_accuracy }}&nbsp;%{% else %}–{% endif %}</b></div>
+        <div class="sd-kpi"><span class="sd-lab">Средний счёт</span><b>{% if avg_score is not None %}{{ avg_score }}{% else %}–{% endif %}</b></div>
+        <div class="sd-kpi"><span class="sd-lab">Самый трудный</span>{% if hardest %}<b class="hard">№&nbsp;{{ hardest.number }} · {{ hardest.percent }}&nbsp;%</b>{% else %}<b>–</b>{% endif %}</div>
+      </div>
+    </section>
 
-<h2>Кто прошёл</h2>
-<div class="sd-box">
-  <table class="sd">
-    <thead>
-      <tr><th>#</th><th>Игрок</th><th class="num">Счёт</th>
-          <th class="num">Точность</th><th class="num">Макс. комбо</th>
-          <th>Чем кончилось</th><th>Когда</th></tr>
-    </thead>
-    <tbody>
-    {% for r in board %}
-      <tr>
-        <td class="num">{{ r.place }}</td>
-        <td>{{ r.name }}</td>
-        <td class="num">{{ r.score }}</td>
-        <td class="num">{{ r.accuracy }}%</td>
-        <td class="num">×{{ r.max_combo }}</td>
-        <td>
-          {% if r.reason == 'lives' %}выбыл
-          {% elif r.reason == 'set_done' %}прошёл до конца
-          {% elif r.reason == 'pool_empty' %}вопросы кончились
-          {% else %}время вышло{% endif %}
-        </td>
-        <td>{{ r.at|date:"d.m H:i" }}</td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="7" class="sd-empty">
-        Набор ещё никто не сыграл. Раздайте код классу.
-      </td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
+    <section class="sd-card sd-share" aria-label="Код для класса">
+      <div class="sd-lab">Код для класса</div>
+      <div class="sd-code" aria-label="Код {{ gset.code }}">{{ code_spaced }}</div>
+      <div class="sd-row">
+        <button type="button" class="sd-btn sm solid" data-copy="{{ play_url }}" data-done="Ссылка скопирована">{% include "_icon.html" with name="copy" %}<span>Скопировать ссылку</span></button>
+        <button type="button" class="sd-btn sm" data-copy="{{ gset.code }}" data-done="Код скопирован">{% include "_icon.html" with name="copy" %}<span>Скопировать код</span></button>
+        <a class="sd-btn sm" href="{{ play_path }}">Открыть как ученик</a>
+      </div>
+      <p class="sd-tip">Ученик открывает {{ host }}/game и вводит код в поле «Играть по коду» – или просто переходит по ссылке. Регистр и пробелы не важны.</p>
+    </section>
+  </div>
 
-<h2>На чём посыпался класс</h2>
-<div class="sd-box">
-  <table class="sd">
-    <thead>
-      <tr><th>№</th><th>Вопрос</th><th class="num">Верно</th>
-          <th class="num">Неверно</th><th class="num">Пропуск</th>
-          <th class="num">% верных</th></tr>
-    </thead>
-    <tbody>
-    {% for q in questions %}
-      <tr>
-        <td class="num">{{ q.number }}</td>
-        <td class="q">{{ q.text }}</td>
-        <td class="num">{{ q.correct }}</td>
-        <td class="num">{{ q.wrong }}</td>
-        <td class="num">{{ q.skip }}</td>
-        <td class="num {% if q.percent is not None and q.percent < 50 %}sd-hard{% endif %}">
-          {% if q.percent is not None %}{{ q.percent }}%{% else %}–{% endif %}
-        </td>
-      </tr>
-    {% empty %}
-      <tr><td colspan="6" class="sd-empty">В наборе нет вопросов.</td></tr>
-    {% endfor %}
-    </tbody>
-  </table>
-</div>
-<p class="sd-note">
-  Доля верных считается ВНУТРИ этого набора, по раундам тех, кто его играл.
-  Пропуск в долю не входит: он не ответ.
-</p>
+  <div class="sd-cols">
+    <section class="sd-card sd-pane" aria-labelledby="sd-board-h">
+      <div class="sd-ph"><h2 id="sd-board-h">Кто прошёл · {{ played }}</h2><span>учитель видит всех и время сдачи</span></div>
+      {% if board %}
+      <div class="sd-scroll">
+        <table class="sd-table">
+          <thead><tr><th scope="col"><span class="sd-sr">Место</span></th><th scope="col">Игрок</th><th scope="col" class="num">Счёт</th>
+                     <th scope="col" class="num">Точность</th><th scope="col" class="num">Макс. комбо</th><th scope="col">Чем кончилось</th><th scope="col">Когда</th></tr></thead>
+          <tbody>
+          {% for r in board %}
+            <tr{% if r.place == 1 %} class="first"{% endif %}>
+              <td>{% if r.place <= 3 %}<span class="sd-medal m{{ r.place }}" role="img" aria-label="{{ r.place }} место"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"/><circle cx="12" cy="15.5" r="6" fill="currentColor"/><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="var(--medal-ring)" stroke-width="1.3"/></svg></span>{% else %}{{ r.place }}{% endif %}</td>
+              <td class="who{% if r.anon %} anon{% endif %}">{{ r.name }}</td>
+              <td class="num sc">{{ r.score }}</td>
+              <td class="num">{{ r.accuracy }}&nbsp;%</td>
+              <td class="num">{{ r.combo }}</td>
+              <td class="end">{{ r.ending }}</td>
+              <td class="end">{{ r.when }}</td>
+            </tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <p class="sd-foot">Анонимные раунды засчитаны, но узнать ученика по ним нельзя – попросите класс входить в аккаунт.</p>
+      {% else %}
+      <p class="sd-empty">Набор ещё никто не сыграл. Раздайте код классу.</p>
+      {% endif %}
+    </section>
+
+    <section class="sd-card sd-pane" aria-labelledby="sd-where-h">
+      <div class="sd-ph">
+        <h2 id="sd-where-h">Где ошибся класс</h2><span>доля верных в этом наборе</span>
+        <nav class="sd-seg" aria-label="Порядок вопросов">
+          <a href="?sort=hard"{% if not by_order %} class="on" aria-current="true"{% endif %}>сначала трудные</a><a href="?sort=order"{% if by_order %} class="on" aria-current="true"{% endif %}>по порядку</a>
+        </nav>
+      </div>
+      <ol class="sd-qs">
+        {% for q in questions %}<li class="sd-q{% if q.hard %} hard{% endif %}"><span class="qn">{{ q.number }}</span><span class="qt"><span title="{{ q.text }}">{{ q.text }}</span>{% if q.answer %}<small>ответ: {{ q.answer }}</small>{% endif %}</span><span class="bar" aria-hidden="true"><i style="width: {{ q.percent|default:0 }}%"></i></span><span class="pc">{% if q.percent is None %}–{% else %}{{ q.percent }}&nbsp;%{% endif %}</span></li>
+        {% empty %}<li class="sd-empty">В наборе нет вопросов.</li>{% endfor %}
+      </ol>
+      <p class="sd-foot">Учителю видны тексты и верные ответы; ученикам – только после своей попытки.</p>
+    </section>
+  </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.getElementById('copy').addEventListener('click', function () {
-  var input = document.getElementById('link');
-  var btn = this;
-  function done() { btn.textContent = 'Скопировано ✓';
-                    setTimeout(function () { btn.textContent = 'Скопировать ссылку'; }, 2000); }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(input.value).then(done, function () { input.select(); });
-  } else { input.select(); document.execCommand('copy'); done(); }
-});
+(function () {
+  /* Набор сохранён — черновик сборки в sessionStorage больше не нужен. */
+  if (/[?&]created=1/.test(location.search)) {
+    try {
+      Object.keys(sessionStorage).forEach(function (k) {
+        if (k.indexOf('teacher-game-set:') === 0) sessionStorage.removeItem(k);
+      });
+    } catch (e) { /* приватный режим браузера */ }
+  }
+  /* «Изменить срок» — маленькая форма под плашками. */
+  var open = document.getElementById('sd-deadline-open');
+  var form = document.getElementById('sd-deadline');
+  open.addEventListener('click', function () {
+    form.hidden = !form.hidden;
+    open.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+    if (!form.hidden) document.getElementById('sd-closes').focus();
+  });
+  /* Скопировать ссылку и код: подпись меняется на полторы секунды. */
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    var label = btn.querySelector('span');
+    var plain = label.textContent;
+    btn.addEventListener('click', function () {
+      var text = btn.dataset.copy;
+      function done() {
+        label.textContent = btn.dataset.done;
+        setTimeout(function () { label.textContent = plain; }, 1500);
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done, function () { prompt('Скопируйте:', text); });
+      } else {
+        prompt('Скопируйте:', text);
+      }
+    });
+  });
+})();
 </script>
 {% endblock %}
