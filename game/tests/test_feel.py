@@ -218,11 +218,11 @@ class SoundModuleTests(TestCase):
         body = m.group(1)
         self.assertIn("rush('over')", body)
         self.assertIn("rush('record')", body)
-        # графики строятся отдельно и звука не издают
-        charts = re.search(r'function buildCharts\(\) \{(.*?)\n  \}',
-                           self.page, re.S)
-        self.assertIsNotNone(charts)
-        self.assertNotIn('rush(', charts.group(1))
+        # экран итога рисуется отдельно и звука не издаёт (ADR 0111)
+        paint = re.search(r'function paintFinal\(\) \{(.*?)\n  \}',
+                          self.page, re.S)
+        self.assertIsNotNone(paint)
+        self.assertNotIn('rush(', paint.group(1))
 
 
 class ShareCardIsGoneTests(TestCase):

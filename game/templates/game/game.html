@@ -373,14 +373,6 @@ a:focus-visible, button:focus-visible {
             font-variant-numeric: tabular-nums; }
 
 
-.btn-board {
-  font: inherit; font-size: 14px; font-weight: 600;
-  padding: 10px 20px; border-radius: 11px;
-  border: 1px solid var(--rush-border);
-  background: var(--rush-surface); color: var(--text2);
-  text-decoration: none; display: inline-flex; align-items: center;
-}
-.btn-board:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
 
 /* ═══ СТАРТОВЫЙ ЭКРАН: «СТАРТОВЫЙ ЭКРАН АРКАДЫ» (ADR 0108) ═════════════
    Решение владельца 17.09.2026, макеты claude/mockups/wecon_rush_20260917/
@@ -923,11 +915,6 @@ svg.medal { width: 24px; height: 24px; display: block; }
 }
 .sound-check__row button:hover { border-color: var(--text3); }
 .sound-check__note { display: block; margin-top: 8px; color: var(--text3); }
-/* Плашка «этот забег по набору» на экране результатов */
-.fin-chip-set {
-  border-color: var(--rush-accent);
-  color: var(--rush-accent);
-}
 
 /* Узкий экран: окно фильтров садится шторкой снизу — так до кнопок
    «Применить» дотягивается большой палец, а не мизинец. */
@@ -1633,7 +1620,6 @@ body.practice .practice-nav { display: flex; }
 .pr-sum-title { font-weight: 800; }
 
 /* Иконки в гнёздах статической разметки: рекорд на итоге. */
-.record-badge .qi { width: 1em; height: 1em; vertical-align: -.15em; }
 
 /* красная виньетка при ошибке */
 .vignette {
@@ -1680,285 +1666,223 @@ body.practice .practice-nav { display: flex; }
   .vignette.alarm.beat { animation: none; }
 }
 
-/* ── Экран 3: финал ────────────────────────────────────────────── */
-/* ── Экран результатов ─────────────────────────────────────────────
-   Один столбец сверху вниз по важности. Акцент сайта (малиновый) —
-   ровно на одном блоке: «Работа над ошибками». Всё остальное —
-   поверхности и текст. */
-#screen-final .final {
-  max-width: 760px;
-  margin: 0 auto;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+/* ═══ ЭКРАН ИТОГА: ВЕРДИКТ И ДЕЙСТВИЯ СВЕРХУ (ADR 0111) ═════════════════
+   Решение владельца 17.09.2026, макеты claude/mockups/wecon_rush_20260917/
+   Result.dc.html и ResultMobile.dc.html. Разметка — game/templates/game/_final.html.
+   Страница 1120 px, карточки как на главной; ⚠️ пустых карточек не бывает —
+   `paintFinal` прячет карточку без данных целиком. */
+body.on-final .rush-wrap { max-width: 1160px; }
+#screen-final .final { display: flex; flex-direction: column; gap: 18px; }
+.fin-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 16px;
+  box-sizing: border-box; min-width: 0;
 }
-.fin-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-}
-.fin-head h2 { font-size: 26px; font-weight: 800; letter-spacing: -.5px; }
-.fin-sub { margin-top: 6px; display: flex; align-items: center; gap: 8px; }
-.fin-chip {
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: var(--rush-accent-tint);
-  color: var(--rush-accent);
-  font-size: 13px;
-  font-weight: 700;
-}
-/* чип целевого забега — не акцент: акцент на экране занят блоком
-   «Работа над ошибками», а это просто пометка, чем был забег */
-.fin-chip-alt { background: var(--surface-2); color: var(--text2); font-weight: 600; }
-.fin-chip-alt[hidden] { display: none; }
-.fin-date { font-size: 13px; color: var(--text3); }
+.fin-card[hidden], .fin-row[hidden] { display: none; }
+.fin-card h3 { margin: 0; font-size: 15px; font-weight: 700; }
+.fin-h3-sub { font-size: 12.5px; font-weight: 500; color: var(--text3); }
 
-.fin-metrics {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
-  gap: 10px;
+/* 1. Вердикт: слева заголовок, счёт и метрики, справа столбик действий. */
+/* ⚠️ Столбец действий шире макета (320 px): кнопки в доме — 700, а не 600, и
+   «Работа над ошибками · 10 вопросов · 2 темы» в 320 px обрезалась. */
+.fin-verdict { display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 24px; padding: 24px 28px; }
+.fin-title {
+  margin: 0; display: flex; align-items: center; gap: 12px;
+  font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1;
 }
-.metric {
-  background: var(--rush-surface);
-  border: 1px solid var(--rush-border);
-  border-radius: 12px;
-  padding: 12px 14px;
+.fin-title-i .qi { width: 26px; height: 26px; display: block; }
+.fin-chips {
+  margin: 8px 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text3);
 }
-.metric small { font-size: 13px; font-weight: 600; color: var(--text3); letter-spacing: .3px; }
-.metric b {
-  display: block;
-  margin-top: 2px;
-  font-size: 22px;
-  font-weight: 700;
+.fin-chip {
+  height: 24px; padding: 0 9px; border-radius: 999px; display: inline-flex; align-items: center;
+  background: var(--accent-tint); color: var(--accent-ink); font-weight: 600;
+}
+.fin-chip[hidden] { display: none; }
+.fin-big { display: flex; align-items: flex-end; gap: 18px; margin-top: 18px; flex-wrap: wrap; }
+.fin-score {
+  font-size: 64px; font-weight: 800; line-height: .9; letter-spacing: -2px;
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.fin-notes { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; min-width: 0; }
+.fin-badge {
+  display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; width: fit-content;
+  border-radius: 999px; background: var(--brand-amber); color: var(--brand-amber-ink); font-size: 13px; font-weight: 700;
+}
+.fin-badge[hidden], .fin-note[hidden] { display: none; }
+.fin-badge .qi { width: 14px; height: 14px; }
+.fin-note { font-size: 13px; color: var(--text2); }
+.fin-note b { color: var(--text); font-weight: 700; }
+.fin-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+.fin-metric { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.fin-metric small {
+  display: block; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--text3); font-weight: 600;
+}
+.fin-metric b { display: block; margin-top: 2px; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.fin-metric span { font-size: 12.5px; color: var(--text2); }
+
+.fin-actions { display: flex; flex-direction: column; gap: 8px; }
+.fin-btn {
+  font: inherit; height: 44px; padding: 0 16px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--border); border-radius: 10px; background: transparent;
+  color: var(--text); font-size: 14.5px; font-weight: 700; text-align: left;
+  text-decoration: none; cursor: pointer;
+}
+.fin-btn[hidden] { display: none; }
+.fin-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.fin-btn .qi { width: 14px; height: 14px; flex: none; }
+.fin-btn > span:first-child { white-space: nowrap; }
+.fin-btn .n { font-size: 12px; color: var(--text3); font-weight: 500; white-space: nowrap;
+              min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.fin-btn kbd { display: none; }
+.fin-btn.fin-primary {
+  height: 56px; justify-content: center; border-color: transparent;
+  background: var(--btn-bg); color: var(--on-btn); font-size: 17px;
+}
+.fin-btn.fin-primary:hover { color: var(--on-btn); background: var(--btn-bg-hover); }
+.fin-btn.fin-primary kbd {
+  display: inline; font: inherit; font-size: 12px; font-weight: 700; opacity: .75;
+  border: 1px solid currentColor; border-radius: 5px; padding: 0 5px;
+}
+.fin-btn.fin-work { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); }
+.fin-btn.fin-work:hover { border-color: var(--accent); }
+.fin-share-note { margin: 0; font-size: 12px; color: var(--text3); text-align: center; }
+.fin-share-note[hidden] { display: none; }
+
+/* 2. Ход раунда: кривая счёта и лента вопросов на одной оси. */
+.fin-flow { padding: 18px 24px 16px; }
+.fin-card-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 6px 16px; }
+.fin-key { margin: 0; display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--text3); }
+.fin-key[hidden], .fin-key span[hidden] { display: none; }
+.k { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.k-score { background: var(--accent); }
+.k-ok, .ok-f { background: var(--green); }
+.k-bad, .bad-f { background: var(--error); }
+.k-skip, .skip-f { background: var(--skip); }
+.pt-f { background: var(--accent); }
+.fin-curve { margin-top: 12px; }
+.fin-curve[hidden] { display: none; }
+.fin-curve-val { font-size: 12px; font-weight: 700; fill: var(--text); }
+.fin-tape {
+  display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: var(--gap, 8px);
+  align-items: end; height: 64px; margin-top: 22px; padding: 0 12px;
+}
+.fin-tape i { display: block; position: relative; border-radius: 5px 5px 2px 2px; min-height: 4px; }
+.fin-tape i.ok { background: var(--green); }
+.fin-tape i.bad { background: var(--error); }
+.fin-tape i.skip { background: var(--skip); }
+.fin-tape i span {
+  position: absolute; top: -16px; left: -6px; right: -6px; text-align: center;
+  font-size: 10.5px; font-style: normal; color: var(--text3); font-variant-numeric: tabular-nums;
+}
+.fin-qn {
+  display: grid; grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr)); gap: var(--gap, 8px);
+  padding: 0 12px; margin-top: 4px; font-size: 11px; color: var(--text3); text-align: center;
   font-variant-numeric: tabular-nums;
 }
-.metric > span { font-size: 13px; color: var(--text3); }
-.acc-note {
-  display: block;
-  margin-top: 4px;
-  font-size: 13px;
-  color: var(--text3);
-}
-.acc-note[hidden] { display: none; }
-.metric-main b.final-score {
-  font-size: 38px;
-  letter-spacing: -1.5px;
-  line-height: 1.1;
-}
-.record-badge {
-  display: none;
-  margin-top: 6px;
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: var(--rush-accent);
-  color: #fff;
-  font-weight: 700;
-  font-size: 13px;
-}
-.record-badge.on { display: inline-block; }
 
-/* Работа над ошибками — единственный акцентный блок экрана */
-.fin-mistakes {
-  border: 1.5px solid var(--rush-accent);
-  border-radius: 14px;
-  background: var(--rush-accent-tint);
-  padding: 18px 20px;
+/* 3–4. Два ряда по три карточки. */
+.fin-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: start; }
+.fin-cb { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.fin-bars { display: flex; flex-direction: column; gap: 8px; }
+.fin-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 8px; align-items: center; font-size: 13px; }
+.fin-bar .lab { color: var(--text2); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                display: inline-flex; align-items: center; gap: 4px; }
+.fin-bar .lab .qi { width: 13px; height: 13px; flex: none; }
+.fin-bar b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fin-bar .tr { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; }
+.fin-bar .tr i { display: block; height: 100%; }
+.fin-none { margin: 0; font-size: 12.5px; color: var(--text3); }
+.fin-none[hidden] { display: none; }
+.fin-hist { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 8px;
+            align-items: end; height: 96px; margin-top: 18px; }
+.fin-hist i { display: block; position: relative; border-radius: 5px 5px 2px 2px; background: var(--accent-tint); }
+.fin-hist i.now { background: var(--accent); }
+.fin-hist i span {
+  position: absolute; top: -18px; left: -10px; right: -10px; text-align: center; font-style: normal;
+  font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.fin-mistakes[hidden], .fin-clean[hidden], .fin-topics[hidden] { display: none; }
-.fin-mistakes h3 { font-size: 17px; font-weight: 800; color: var(--rush-accent); }
-.fm-lead { margin-top: 3px; font-size: 14px; color: var(--text2); }
-/* полоса пропорции: доли тем в будущем забеге, ширина = доля */
-.fm-bar {
-  display: flex;
-  height: 10px;
-  margin: 14px 0 10px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--rush-surface);
-}
-.fm-bar i { display: block; height: 100%; }
-.fm-legend { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 16px; }
-.fm-legend li { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text2); }
-.fm-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-.fm-go {
-  font: inherit; font-size: 16px; font-weight: 700;
-  margin-top: 14px;
-  height: 46px; padding: 0 22px;
-  border: none; border-radius: 10px;
-  background: var(--rush-accent); color: #fff;
-  cursor: pointer;
-  transition: filter .12s, transform .1s;
-}
-.fm-go:hover { filter: brightness(1.08); }
-.fm-go:active { transform: scale(.97); }
+.fin-hist-x { display: grid; grid-template-columns: repeat(var(--n, 5), minmax(0, 1fr)); gap: 8px;
+              font-size: 10.5px; color: var(--text3); text-align: center; }
+.fin-cmp { display: flex; flex-direction: column; gap: 8px; }
+.fin-cmp .r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: baseline;
+              font-size: 13px; color: var(--text2); }
+.fin-cmp .r b { font-size: 16px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+.fin-cmp .u { font-size: 12px; color: var(--text3); white-space: nowrap; }
+.fin-cmp .up { color: var(--green); font-weight: 700; }
+.fin-cmp .dn { color: var(--error); font-weight: 700; }
+.fin-login { grid-column: span 2; margin: 0; padding: 16px 18px; font-size: 14px; color: var(--text2); }
+.fin-login a { color: var(--accent-ink); font-weight: 700; }
 
-.fin-clean {
-  border: 1px solid var(--rush-ok);
-  background: var(--rush-ok-tint);
-  border-radius: 14px;
-  padding: 16px 20px;
-}
-.fin-clean b { font-size: 16px; color: var(--rush-ok); }
-.fin-clean p { margin-top: 3px; font-size: 14px; color: var(--text2); }
-/* текстовая кнопка-ссылка (внутри предложения) */
-.link-btn {
-  font: inherit; font-weight: 700;
-  padding: 0; border: none; background: none;
-  color: var(--rush-accent); cursor: pointer;
-  text-decoration: underline;
-}
-
-/* Точность по темам */
-.fin-topics h3, .fin-details h3 { font-size: 16px; font-weight: 700; margin-bottom: 10px; }
-.tp-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-.tp-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; }
-.tp-name { font-size: 14px; font-weight: 600; }
-.tp-num { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
-.tp-bar {
-  grid-column: 1 / -1;
-  display: flex;
-  height: 8px;
-  border-radius: 999px;
-  overflow: hidden;
-  background: var(--surface-2);
-}
-.tp-bar i { display: block; height: 100%; }
-.tp-ok { background: var(--rush-ok); }
-.tp-bad { background: var(--rush-bad); }
-.tp-skip { background: var(--text3); opacity: .45; }
-.tp-key { margin-top: 12px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
-.tp-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 10px; }
-.tp-key .k:first-child { margin-left: 0; }
-.k-ok { background: var(--rush-ok); }
-.k-bad { background: var(--rush-bad); }
-.k-skip { background: var(--text3); opacity: .45; }
-
-/* Подробная статистика — РАСКРЫТА СРАЗУ (08.09.2026). Кнопки-раскрывашки
-   больше нет: то, что спрятано за кнопкой, для половины игроков не
-   существует, а владелец просил статистику вернуть, а не спрятать. */
-.det-body { margin-top: 12px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-@media (max-width: 720px) { .det-body { grid-template-columns: 1fr; } }
-.chart-card {
-  background: var(--rush-surface);
-  border: 1px solid var(--rush-border);
-  border-radius: 12px;
-  padding: 14px 16px;
-}
-.chart-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
-.chart-box { width: 100%; }
-/* SVG рисуем сами: цвета идут через var(--…), поэтому переключение темы
-   сайта перекрашивает графики без единой строки JS. Обводки не тончают
-   при масштабировании — vector-effect в самих линиях. */
-.chart-box svg { display: block; width: 100%; height: auto; }
-.chart-empty { font-size: 13px; color: var(--text3); padding: 18px 0; text-align: center; }
-
-/* «Микро и макро» и «Против себя обычного» рисуются списком, а не SVG:
-   там два-три ряда, и полоса из <i> честнее прямоугольника в холсте —
-   она сама переносится и сама берёт цвет темы. */
-.group-bars, .usual-rows { list-style: none; display: flex;
-                           flex-direction: column; gap: 10px; }
-.group-bars li, .usual-rows li { display: flex; align-items: center;
-                                 gap: 10px; font-size: 13px; }
-.gb-name { flex: 0 0 88px; color: var(--text2); }
-.gb-bar { flex: 1 1 auto; height: 8px; border-radius: 4px;
-          background: var(--rush-border); overflow: hidden; }
-.gb-bar i { display: block; height: 100%; background: var(--rush-accent); }
-.gb-num { flex: 0 0 auto; color: var(--text3);
-          font-variant-numeric: tabular-nums; }
-.usual-val { flex: 1 1 auto; color: var(--text2);
-             font-variant-numeric: tabular-nums; }
-.usual-mark { flex: 0 0 auto; font-weight: 600; color: var(--text3); }
-.usual-mark.up { color: var(--rush-ok); }
-.usual-mark.down { color: var(--rush-bad); }
-.chart-key { margin-top: 8px; display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text3); }
-.chart-key .k { width: 9px; height: 9px; border-radius: 3px; margin-left: 8px; }
-.chart-key .k:first-child { margin-left: 0; }
-.k-score { background: var(--rush-accent); }
-.k-combo { background: var(--text3); opacity: .5; }
-.chart-x { margin-left: auto; }
-.chart-lbl { font-size: 9px; fill: var(--text3); }
-.chart-val { font-size: 9px; fill: var(--text2); font-weight: 700; }
-/* Кольцевая сложностей: легенда рядом с кольцом */
-.chart-donut { display: flex; align-items: center; gap: 14px; }
-.chart-donut svg { width: 104px; flex-shrink: 0; }
-.donut-legend { list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13px; }
-.donut-legend li { display: flex; align-items: center; gap: 6px; color: var(--text2); }
-.donut-legend i { width: 9px; height: 9px; border-radius: 3px; flex-shrink: 0; }
-/* сложность: лёгкие → средние → сложные. Янтарь тут в своём законном
-   смысле (это шкала сложности), зелёный и красный — концы шкалы. */
-.d-easy { background: var(--rush-ok); }
-.d-medium { background: var(--amber); }
-.d-hard { background: var(--rush-bad); }
-
-.fin-share[hidden] { display: none; }
-.fin-share h3 { font-size: 16px; font-weight: 700; }
-.share-lead { margin-top: 3px; font-size: 13px; color: var(--text3); }
-.share-row { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-.share-row button {
-  font: inherit; font-size: 14px; font-weight: 700;
-  display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-  height: 42px; padding: 0 16px;
-  border: 1px solid var(--rush-border); border-radius: 10px;
-  background: var(--rush-surface); color: var(--text2);
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.share-row button:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-.share-row button[hidden] { display: none; }
-.share-row button .qi { width: 16px; height: 16px; }
-
-.final-actions { display: flex; gap: 10px; flex-wrap: wrap; }
-.btn-again {
-  font: inherit; font-size: 16px; font-weight: 600;
-  height: 46px; padding: 0 28px;
-  border: none; border-radius: 10px;
-  background: var(--btn-bg); color: var(--on-btn);
-  cursor: pointer;
-  transition: background .12s, transform .1s;
-}
-.btn-again:hover { background: var(--btn-bg-hover); }
-.btn-again:active { transform: scale(.97); }
-.btn-copy {
-  font: inherit; font-size: 16px; font-weight: 500;
-  height: 46px; padding: 0 20px;
-  border: 1px solid var(--rush-border); border-radius: 10px;
-  background: var(--rush-surface); color: var(--text2);
-  cursor: pointer;
-  transition: border-color .12s, color .12s;
-}
-.btn-copy:hover { border-color: var(--rush-accent); color: var(--rush-accent); }
-/* ссылка «в каталог» носит вид кнопки .btn-copy — выравниваем текст по центру */
-a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
-
-.miss-list { list-style: none; max-height: 420px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+/* 5. Ошибки и пропуски — списком, без кнопки-раскрывашки. */
+.fin-misses { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.miss-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .miss-item {
-  background: var(--rush-surface);
-  border: 1px solid var(--rush-border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  line-height: 1.45;
+  display: grid; grid-template-columns: 28px minmax(0, 1fr) 260px auto; gap: 12px; align-items: center;
+  padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px;
 }
-.miss-item .mi-topic { font-size: 13px; color: var(--text3); display: block; margin-bottom: 2px; }
-.miss-item a { color: var(--accent-ink); text-decoration: none; font-size: 13px; }
-.miss-item a:hover { text-decoration: underline; }
-
-/* Разбор сгенерированного вопроса: кнопка-ссылка + разворачиваемое решение */
-.mi-sol-btn {
-  background: none; border: none; padding: 0; cursor: pointer;
-  color: var(--rush-accent); font-size: 13px; font-family: inherit;
+.mi-k {
+  width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: var(--on-error); font-variant-numeric: tabular-nums;
 }
-.mi-sol-btn:hover { text-decoration: underline; }
+.mi-k.bad { background: var(--error); }
+.mi-k.skip { background: var(--skip); color: var(--on-skip); }
+.mi-q { color: var(--text); min-width: 0; }
+.mi-q .mi-text { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi-q small { display: block; color: var(--text3); font-size: 12px; }
+.mi-q small .qi { width: 12px; height: 12px; vertical-align: -1px; margin-right: 2px; }
+.mi-a { font-size: 12.5px; color: var(--text2); }
+.mi-a b { color: var(--green-ink); font-weight: 700; }
+.mi-a s { color: var(--error-ink); }
+.mi-lnk, .mi-sol-btn {
+  font: inherit; height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px;
+  background: transparent; color: var(--text); font-size: 12.5px; font-weight: 700; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px; text-decoration: none; cursor: pointer;
+}
+.mi-lnk:hover, .mi-sol-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.mi-lnk .qi { width: 13px; height: 13px; }
 .mi-solution {
-  margin-top: 6px;
-  padding: 8px 10px;
-  border-left: 2px solid var(--rush-accent);
-  background: var(--rush-surface);
-  font-size: 14px;
-  white-space: pre-line;   /* шаги решения разделены \n */
+  grid-column: 1 / -1; padding: 8px 10px; border-left: 2px solid var(--rush-accent);
+  background: var(--surface); font-size: 14px; white-space: pre-line;
 }
-.miss-empty { color: var(--text3); font-size: 14px; }
+.mi-solution[hidden] { display: none; }
+
+/* Общие с панелью «Мои рекорды»: коробка графика и полоски разделов. */
+.chart-box { width: 100%; }
+.chart-box svg { display: block; width: 100%; height: auto; }
+.group-bars { list-style: none; display: flex; flex-direction: column; gap: 8px; font-size: 13px; }
+.group-bars li { display: flex; align-items: center; gap: 10px; }
+.gb-name { flex: 0 0 88px; color: var(--text2); }
+.gb-bar { flex: 1 1 auto; height: 8px; border-radius: 4px; background: var(--border-soft); overflow: hidden; }
+.gb-bar i { display: block; height: 100%; background: var(--rush-accent); }
+.gb-num { flex: 0 0 auto; color: var(--text3); font-variant-numeric: tabular-nums; }
+
+/* Телефон (≤ 720 px) — макет ResultMobile: всё столбиком, действия сразу под
+   вердиктом, метрики 2×2, ряды карточек по одной. */
+@media (max-width: 720px) {
+  .fin-verdict { grid-template-columns: 1fr; gap: 16px; padding: 14px; border-radius: 14px; }
+  .fin-title { font-size: 22px; }
+  .fin-title-i .qi { width: 22px; height: 22px; }
+  .fin-chips { font-size: 12px; }
+  .fin-big { margin-top: 12px; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .fin-score { font-size: 52px; letter-spacing: -1.5px; }
+  .fin-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 14px; }
+  .fin-metric b { font-size: 19px; }
+  .fin-btn.fin-primary { height: 54px; }
+  .fin-btn.fin-primary kbd { display: none; }
+  .fin-flow { padding: 14px; }
+  .fin-curve-val { display: none; }
+  .fin-tape { height: 60px; padding: 0; margin-top: 18px; }
+  .fin-tape i span { display: none; }
+  .fin-qn { padding: 0; font-size: 9.5px; }
+  .fin-row { grid-template-columns: 1fr; gap: 12px; }
+  .fin-login { grid-column: auto; }
+  .miss-item { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
+  .mi-a, .mi-lnk, .mi-sol-btn { grid-column: 2; justify-self: start; }
+  .mi-q .mi-text { white-space: normal; }
+}
 
 #confetti-canvas {
   position: fixed;
@@ -1970,13 +1894,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
 /* ── Мобильная версия (≤720px) ─────────────────────────────────── */
 @media (max-width: 720px) {
   .rush-wrap { padding: 16px 12px 32px; }
-  /* результаты: всё в один столбец, метрики по две в ряд */
-  .fin-metrics { grid-template-columns: 1fr 1fr; }
-  .det-body { grid-template-columns: 1fr; }
-  .fin-head { flex-direction: column; }
-  .final-actions { flex-direction: column; align-items: stretch; }
-  .final-actions .btn-again, .final-actions .btn-copy { width: 100%; }
-  .btn-catalog { display: flex; align-items: center; justify-content: center; }
 }
 
 /* ── Уменьшенное движение: мгновенные замены ───────────────────── */
@@ -2008,160 +1925,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   {% comment %} ЭКРАН 2: РАУНД — разметка в _play.html (ADR 0110). {% endcomment %}
   {% include 'game/_play.html' %}
 
-  <!-- ЭКРАН 3: ФИНАЛ.
-       Порядок блоков = порядок важности: чем кончилось → сколько набрал →
-       ЧТО С ЭТИМ ДЕЛАТЬ (работа над ошибками, акцент сайта) → где именно
-       ошибся (точность по темам) → необязательные подробности и шеринг. -->
-  <section id="screen-final" class="screen">
-    <div class="final">
-
-      <!-- 1. Шапка: чем кончился забег -->
-      <header class="fin-head">
-        <div>
-          <h2 id="final-title">Время вышло!</h2>
-          <p class="fin-sub">
-            <span class="fin-chip" id="fin-mode-chip">Блиц</span>
-            <span class="fin-chip fin-chip-alt" id="fin-mistakes-chip" hidden>работа над ошибками</span>
-            <span class="fin-chip fin-chip-set" id="fin-set-chip" hidden></span>
-            <span class="fin-date" id="fin-date"></span>
-          </p>
-        </div>
-      </header>
-
-      <!-- 2. Метрики забега -->
-      <div class="fin-metrics">
-        <div class="metric metric-main">
-          <small>Итоговый счёт</small>
-          <b class="final-score" id="final-score">0</b>
-          <span class="acc-note" id="acc-note" hidden></span>
-          <span class="acc-note" id="ranked-note" hidden></span>
-          <span class="record-badge" id="record-badge"><span class="qi-slot"></span> личный рекорд</span>
-        </div>
-        <div class="metric">
-          <small>Верных</small>
-          <b id="st-correct">0/0</b>
-          <span id="st-acc">0%</span>
-        </div>
-        <div class="metric">
-          <small>Макс. комбо</small>
-          <b id="st-streak">×1</b>
-          <span id="st-streak-sub">серия 0</span>
-        </div>
-        <div class="metric">
-          <small>Жизни</small>
-          <b id="st-lives">3/3</b>
-          <span id="st-lives-sub">целы</span>
-        </div>
-      </div>
-
-      <!-- 3. Работа над ошибками — главное действие экрана -->
-      <section class="fin-mistakes" id="fin-mistakes" hidden>
-        <h3>Работа над ошибками</h3>
-        <p class="fm-lead" id="fm-lead">Соберём раунд по темам, где вы ошиблись</p>
-        <div class="fm-bar" id="fm-bar"></div>
-        <ul class="fm-legend" id="fm-legend"></ul>
-        <button class="fm-go" id="btn-mistakes">Начать работу над ошибками</button>
-      </section>
-
-      <!-- 3б. Идеальный забег: ошибок нет -->
-      <section class="fin-clean" id="fin-clean" hidden>
-        <b>Чисто! Ошибок нет</b>
-        <p id="clean-sub"></p>
-      </section>
-
-      <!-- 4. Точность по темам — обучающее ядро -->
-      <section class="fin-topics" id="fin-topics" hidden>
-        <h3>Точность по темам</h3>
-        <ul class="tp-list" id="tp-list"></ul>
-        <p class="tp-key">
-          <i class="k k-ok"></i> верно
-          <i class="k k-bad"></i> неверно
-          <i class="k k-skip"></i> пропуск
-        </p>
-      </section>
-
-      <!-- 5. Подробная статистика — ДЕВЯТЬ ГРАФИКОВ, БЛОК РАСКРЫТ СРАЗУ.
-           ⚠️ Кнопка-раскрывашка убрана (08.09.2026): владелец сказал, что
-           раньше статистики после игры было больше и она была нужна. То,
-           что спрятано за кнопкой, для половины игроков не существует. -->
-      <section class="fin-details">
-        <h3>Подробная статистика</h3>
-        <div class="det-body" id="det-body">
-          <div class="chart-card">
-            <h4>Ход раунда</h4>
-            <div class="chart-box" id="chart-curve"></div>
-            <p class="chart-key">
-              <i class="k k-score"></i> счёт
-              <i class="k k-combo"></i> комбо
-              <span class="chart-x">номер вопроса →</span>
-            </p>
-          </div>
-          <div class="chart-card">
-            <h4>Сколько думали</h4>
-            <div class="chart-box" id="chart-time"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Держите ли сложное</h4>
-            <div class="chart-box chart-donut" id="chart-diff"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Последние раунды</h4>
-            <div class="chart-box" id="chart-history"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Лента ответов</h4>
-            <div class="chart-box" id="chart-tape"></div>
-            <p class="chart-key">
-              <i class="k k-ok"></i> верно
-              <i class="k k-bad"></i> мимо
-              <i class="k k-skip"></i> пропуск
-              <span class="chart-x">выше клетка: дольше думали</span>
-            </p>
-          </div>
-          <div class="chart-card">
-            <h4>Время на ответ</h4>
-            <div class="chart-box" id="chart-times"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Где набрано</h4>
-            <div class="chart-box" id="chart-points"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Микро и макро</h4>
-            <div class="chart-box" id="chart-groups"></div>
-          </div>
-          <div class="chart-card">
-            <h4>Против себя обычного</h4>
-            <div class="chart-box" id="chart-usual"></div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 6. Шеринг: ОДНА кнопка на публичную страницу результата.
-           ⚠️ Было четыре (картинкой, сторис, скопировать ссылку, системное
-           «Поделиться») — решение владельца 08.09.2026 оставило одну.
-           Рисование карточки на canvas удалено целиком: всё, что было на
-           картинке, лежит на странице /game/r/<код>/, и она к тому же
-           живая. -->
-      <section class="fin-share" id="fin-share" hidden>
-        <h3>Поделиться результатом</h3>
-        <p class="share-lead" id="share-lead"></p>
-        <div class="share-row">
-          <button type="button" id="btn-share">Поделиться</button>
-        </div>
-      </section>
-
-      <!-- 7. Действия -->
-      <div class="final-actions">
-        <a class="btn-board" id="btn-board" href="#" hidden>Доска набора</a>
-        <button class="btn-again" id="btn-again">Сыграть ещё раз</button>
-        <button class="btn-copy" id="btn-review" hidden>Разобрать все ошибки</button>
-        <a class="btn-copy" id="btn-catalog" href="/catalog/">Перейти к темам в каталоге</a>
-      </div>
-      <ul class="miss-list" id="miss-list" hidden></ul>
-
-    </div>
-  </section>
+  {% include 'game/_final.html' %}
 
 </div>
 
@@ -2472,7 +2236,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   (function fillIconSlots() {
     var slots = {
       'rush-logo-bolt': 'bolt', 'hud-combo': 'bolt',
-      'record-badge': 'trophy', 'go-hearts': 'heart'
+      'go-hearts': 'heart'
     };
     document.querySelectorAll('.bolt').forEach(function (el) {
       el.innerHTML = ICONS.bolt || '';
@@ -2559,11 +2323,10 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
   var duelLink = true;          // сокет дуэли жив (точка у имени соперника)
   var runUnfiltered = true;     // раунд без единого фильтра (×1,3) — из старта
   var runRanked = true;         // фильтра по сложности нет
-  var isRecord = false;         // побит ли личный рекорд этим забегом
   var mistakesRun = false;      // это забег «работа над ошибками»?
   var setRun = null;            // {code, kind, title, size} забега по набору
   var shareInfo = null;         // {code, url} публичной страницы результата
-  var bestNow = 0;              // рекорд режима с учётом этого забега
+  var bonusGained = 0;          // секунд, прибавленных за верные ответы («В игре» итога)
   var selected = [];            // выделенные варианты (мультивыбор, Рапид)
 
   /* -- DOM -- */
@@ -2583,6 +2346,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     document.body.classList.toggle('on-start', name === 'start');
     // На время раунда шапка сайта и плавающие кнопки скрыты (ADR 0110).
     document.body.classList.toggle('rush-playing', name === 'playing');
+    // Итог — страница 1120 px (ADR 0111).
+    document.body.classList.toggle('on-final', name === 'finished');
   }
 
   /* Сервер честно отказался начинать забег (режим за флагом, пустой пул
@@ -3278,7 +3043,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         livesMax = MODE.lives; lives = d.lives;
         answered = 0; correctCount = 0;
         misses = []; nextBuf = null; poolExhausted = false;
-        skippedCount = 0; isRecord = false; bestNow = 0;
+        skippedCount = 0; bonusGained = 0;
         runLost = false; prefetchFailed = false;
         // Рекорд приходит вместе со стартом (сервер, не localStorage).
         // У набора его нет: там справа соперник, а не своя история.
@@ -4403,6 +4168,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       // доигрываем — оверлей поднимет advance() по своему таймауту.
       if (d.game_over) { runOver = true; goInfo = d.game_over; }
       timeLeft = Math.max(0, timeLeft + d.time_delta);
+      if (d.time_delta > 0) bonusGained += d.time_delta;
       if (timeLeft <= 0 && !runOver) { paintHud(); endRun('time'); return; }
       showStatChip(d);
       onResult(d);
@@ -4482,7 +4248,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     rush('correct', comboMult(streak));
   }
 
-  function registerWrong(q, d) {
+  function registerWrong(q, d, given) {
     answered++;
     // Ошибка стоит жизни: гасим сердце и коротко подсвечиваем карточку.
     // Потеря жизни — ОТДЕЛЬНОЕ событие со своим звуком: игрок обязан
@@ -4499,13 +4265,36 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     // ⚠️ `problem_id` берём из ОТВЕТА, а не из вопроса: в вопросе его
     // больше нет (по нему задача открывалась в каталоге вместе с ответом
     // ещё до того, как игрок ответил).
-    misses.push({ q: q, problemId: (d && d.problem_id) || null,
-                  solution: (d && d.solution) || null,
-                  figure: (d && d.figure) || null,
-                  // эталонный чертёж режима «График»: разбор показывает
-                  // «как было в решении» и «как правильно» рядом
-                  figureRef: (d && d.figure_ref) || null,
-                  step: (d && d.injected_step) || '' });
+    misses.push(missEntry(q, d, 'wrong', given));
+  }
+
+  /* Запись для «Ошибок и пропусков» итога (ADR 0111). solution приходит
+     только у сгенерированных вопросов (после ответа) — разбор показывает его
+     вместо ссылки в каталог. ⚠️ `problem_id` берём из ОТВЕТА, а не из
+     вопроса: в вопросе его нет (по нему задача открывалась с ответом ещё до
+     того, как игрок ответил). Верный ответ сервер присылает и у пропуска. */
+  function missEntry(q, d, kind, given) {
+    return { kind: kind, q: q, number: q.number || misses.length + 1,
+             given: given || '', right: rightText(q, d || {}),
+             problemId: (d && d.problem_id) || null,
+             solution: (d && d.solution) || null,
+             figure: (d && d.figure) || null,
+             // эталонный чертёж режима «График»: «как было» и «как правильно»
+             figureRef: (d && d.figure_ref) || null,
+             step: (d && d.injected_step) || '' };
+  }
+
+  /* Варианты в разборе — номером, как на кнопках; у «Верно/Неверно» — словом. */
+  function optionLabel(q, i) {
+    return q.type === 'boolean' && q.options ? q.options[i] : String(i + 1);
+  }
+
+  function rightText(q, d) {
+    if (d.correct_value != null) return String(d.correct_value);
+    if (d.correct_indices) {
+      return d.correct_indices.map(function (i) { return optionLabel(q, i); }).join(', ');
+    }
+    return typeof d.correct_index === 'number' ? optionLabel(q, d.correct_index) : '';
   }
 
   /* Оверлей «Забег окончен» — только для конца по жизням: по времени
@@ -4544,7 +4333,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         showOk(d);
         setTimeout(advance, REDUCED ? 0 : 500);
       } else {
-        registerWrong(q, d);
+        registerWrong(q, d, optionLabel(q, choice));
         buttons.forEach(function (btn, i) {
           if (i === choice) { btn.classList.add('is-wrong'); addMark(btn, '✗'); }
           else if (i === d.correct_index) { btn.classList.add('show-right'); addMark(btn, 'верный ответ'); }
@@ -4612,7 +4401,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         showOk(d);
         setTimeout(advance, REDUCED ? 0 : 1500);
       } else {
-        registerWrong(q, d);
+        registerWrong(q, d, chosen.slice().sort(function (a, b) { return a - b; }).map(function (i) { return optionLabel(q, i); }).join(', '));
         showDelta(wrongDeltaHTML(d), 'minus');
         flashTrack(true);
         vignette();
@@ -4644,7 +4433,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         showOk(d);
         setTimeout(advance, REDUCED ? 0 : 600);
       } else {
-        registerWrong(q, d);
+        registerWrong(q, d, value);
         input.classList.add('bad');
         fb.innerHTML = 'Правильный ответ <b></b>';
         fb.querySelector('b').textContent = d.correct_value;
@@ -4742,6 +4531,7 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     var q = current;
     postAnswer({ question_id: q.id, choice: null }, function (d) {
       skippedCount++;
+      misses.push(missEntry(q, d, 'skip', ''));
       // пропуск бесплатный — дельту показываем, только если она есть
       if (d.time_delta) showDelta(d.time_delta + ' с', 'skip');
       advance();
@@ -5148,24 +4938,14 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     clearAlarm();
     rush('over');
 
-    // Рекорд считаем ЗДЕСЬ и ровно один раз: «новый рекорд» — событие,
-    // а не состояние. Пересчитай его при повторной отрисовке — и рекорд,
-    // уже записанный в localStorage, перестал бы быть рекордом сам себе.
-    var best = parseInt(localStorage.getItem(bestKey(mode)) || '0', 10);
-    // Брошенный раунд рекордом не бывает: окно выхода это обещает.
-    isRecord = endReason !== 'quit' && score > best && score > 0;
-    bestNow = Math.max(best, score);
-    if (isRecord) {
-      localStorage.setItem(bestKey(mode), String(score));
-      rush('record');
+    // Рекорд этого устройства — для стартового экрана гостя (ADR 0108).
+    // Плашку «личный рекорд» на итоге ставит СЕРВЕР по правилу зачётных
+    // раундов (ADR 0111): рекорд устройства бывает и у незачётного раунда.
+    if (endReason !== 'quit' && score > 0 && score > readLocalBest(mode)) {
+      try { localStorage.setItem(bestKey(mode), String(score)); } catch (e) { /* приватный режим */ }
     }
-    // Рекорд вошедшего на стартовом экране — серверный: освежаем его здесь,
-    // чтобы после раунда не показывать прошлый до перезагрузки страницы.
-    if (endReason !== 'quit' && CFG.is_authenticated && CFG.my_best
-        && score > (CFG.my_best[mode] || 0)) {
-      CFG.my_best[mode] = score;
-    }
-    renderModeTabs();  // освежить рекорд и квоту к возврату на старт
+    // История прошлого раунда (или другого режима) к этому итогу не относится.
+    runHistory = null;
 
     // Сводку считает сервер по журналу забега. Пока она в пути (и если
     // сеть подведёт совсем) — держим запасную из своих счётчиков: экран
@@ -5173,12 +4953,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     summary = localSummary();
     if (window.weco) weco.track('game_end', { mode: mode, reason: endReason, score: score, answered: answered, correct: correctCount });
     function done() {
+      renderModeTabs();  // освежить рекорд и квоту к возврату на старт
       paintFinal();
-      // История нужна трём графикам из девяти. Тянем ПОСЛЕ отрисовки: экран
-      // результата не имеет права ждать этот запрос, а три графика
-      // дорисуются, когда ответ придёт. Аноним получит 403 — и увидит те же
-      // графики без сравнения, а не выдуманные числа.
-      fetchHistory(function () { buildCompareCharts(); });
+      // История нужна двум карточкам. Тянем ПОСЛЕ отрисовки: экран итога не
+      // имеет права ждать этот запрос, карточки появятся, когда ответ придёт.
+      fetchHistory(function () { paintCompare(summary); });
     }
     // В очереди: последний ответ записан раньше, чем сервер закроет забег.
     queueRun(function () {
@@ -5191,6 +4970,13 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         summary = d.summary;
         endReason = summary.ended_reason;
         shareInfo = d.share || null;   // абсолютный URL страницы результата
+        var rec = summary.record;
+        // Рекорд вошедшего на стартовом экране — серверный и по тому же
+        // правилу: освежаем, чтобы не показывать прошлый до перезагрузки.
+        if (rec && CFG.my_best && (rec.is_record || rec.prev_best == null)) {
+          CFG.my_best[mode] = summary.score;
+        }
+        if (rec && rec.is_record) rush('record');
       }
       done();
     }, done);
@@ -5214,12 +5000,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       score_curve: [], combo_curve: [], offline: true
     };
   }
-
-  /* Сегменты полосы «работы над ошибками» — один акцентный цвет с разной
-     плотностью, а не своя палитра: зелёный и янтарь заняты смыслом
-     (верно / сложность), и новый цветной набор конкурировал бы с ними. */
-  var SEG_ALPHA = [1, .68, .45, .3, .2];
-  function segAlpha(i) { return SEG_ALPHA[Math.min(i, SEG_ALPHA.length - 1)]; }
 
   function plural(n, forms) {  // [ошибка, ошибки, ошибок]
     var n10 = n % 10, n100 = n % 100;
@@ -5249,9 +5029,26 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     return 'Время вышло!';
   }
 
+  /* ═══ ИТОГ РАУНДА: ВЕРДИКТ, ДЕЙСТВИЯ, КАРТОЧКИ (ADR 0111) ══════════════
+     Экран строится из серверной сводки (`build_summary` + `_finish_extras`).
+     ⚠️ Пустых карточек нет: данных нет — карточка скрыта целиком, а не
+     подписана «не набрано». Порядок блоков — в разметке `_final.html`. */
+  var TITLE_ICON = { time: 'clock', lives: 'heart', quit: 'flag',
+                     set_done: 'check', pool_empty: 'check' };
+
+  function finEl(tag, cls, text) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (text != null) el.textContent = text;
+    return el;
+  }
+
+  function ordinal(n) { return n + '-е'; }
+
   function paintFinal() {
     var s = summary;
-    $('final-title').textContent = titleText(s);
+    $('final-title-text').textContent = titleText(s);
+    $('final-title-icon').innerHTML = ICONS[TITLE_ICON[s.ended_reason] || 'clock'] || '';
     $('fin-mode-chip').textContent = s.mode_title;
     $('fin-mistakes-chip').hidden = !mistakesRun;
     var setChip = $('fin-set-chip');
@@ -5261,262 +5058,463 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
         : setRun.kind === 'duel' ? 'дуэль' : 'набор ' + setRun.code;
     }
     $('fin-date').textContent = formatDate(s.played_at);
+    // У набора и работы над ошибками вопросы заданы — про фильтры молчим.
+    $('fin-filter').textContent = setRun || mistakesRun ? ''
+      : '· ' + (runUnfiltered ? 'без фильтров' : 'с фильтрами');
 
     /* метрики */
-    $('st-correct').textContent = s.correct + '/' + s.total;
-    $('st-acc').textContent = s.accuracy + '%';
-    $('st-streak').textContent = '×' + s.max_multiplier;
-    $('st-streak-sub').textContent = 'серия ' + s.best_streak;
-    $('st-lives').textContent = s.lives_left + '/' + s.lives_max;
+    $('st-correct').textContent = s.correct + ' из ' + (s.correct + s.wrong);
+    $('st-acc').textContent = s.accuracy + ' %' + (s.skipped
+      ? ' · ' + s.skipped + ' ' + plural(s.skipped, ['пропуск', 'пропуска', 'пропусков']) : '');
+    $('st-streak').textContent = '×' + multText(s.max_multiplier);
+    $('st-streak-sub').textContent = s.best_streak
+      ? 'серия из ' + s.best_streak + ' ' + plural(s.best_streak, ['верного', 'верных', 'верных'])
+      : 'без серии';
+    $('st-lives').textContent = s.lives_left + ' из ' + s.lives_max;
     var lost = s.lives_max - s.lives_left;
     $('st-lives-sub').textContent = lost
-      ? lost + ' ' + plural(lost, ['потеряна', 'потеряно', 'потеряно'])
-      : 'целы';
+      ? lost + ' ' + plural(lost, ['потеряна', 'потеряно', 'потеряно']) : 'все целы';
+    // «В игре» — по своим часам: сколько раунд шёл по таймеру. Сервер этого
+    // не знает (отсчёт мог быть пропущен Enter), а таймер знает точно.
+    var duration = MODE.duration || 0;
+    $('st-played').textContent = timeText(Math.max(0, duration + bonusGained - timeLeft));
+    $('st-played-sub').textContent = timeText(duration)
+      + (bonusGained > 0 ? ' + ' + Math.round(bonusGained) + ' с за верные' : '');
 
-    /* ⚠️ ТОЧНОСТЬ СНИЖАЕТ ИТОГ, и игрок обязан видеть, где потерял. В HUD
-       во время забега идут СЫРЫЕ очки (сумма за ответы), а на этом экране
-       стоит ИТОГ. Без этой строки разница выглядела бы как ошибка счёта. */
-    var accNote = $('acc-note');
-    if (accNote) {
-      var raw = s.raw_score != null ? s.raw_score : s.score;
-      var mult = s.accuracy_mult != null ? s.accuracy_mult : 1;
-      if (mult >= 1 || raw === s.score) {
-        accNote.textContent = 'Точность ' + s.accuracy + ' %: итог без потерь';
-      } else {
-        accNote.textContent = 'Очки ' + raw.toLocaleString('ru-RU')
-          + ' · ×' + multText(mult) + ' за точность ' + s.accuracy + ' % → итог '
-          + s.score.toLocaleString('ru-RU');
-      }
-      accNote.hidden = false;
-    }
-
-    /* ⚠️ ПОЧЕМУ ЗАБЕГ НЕ В ТАБЛИЦЕ — ОДНОЙ СТРОКОЙ. «Просто не поехал»
-       читается как поломка; человек обязан узнать причину и понять, что
-       делать иначе. Текст причины приходит с сервера: список причин там
-       один (config.UNRANKED_REASONS), второй здесь разошёлся бы. */
-    var rn = $('ranked-note');
-    if (rn) {
-      if (s.ranked) {
-        rn.textContent = 'Раунд в таблице'
-          + (s.ranked_today != null
-             ? ' · зачётных сегодня ' + s.ranked_today + ' из ' + s.ranked_per_day
-             : '');
-        rn.hidden = false;
-      } else if (s.unranked_text) {
-        rn.textContent = 'Не в таблице: ' + s.unranked_text;
-        rn.hidden = false;
-      } else {
-        rn.hidden = true;
-      }
-    }
-
-    /* рекорд — посчитан в endRun (см. там про «событие, а не состояние») */
-    $('record-badge').classList.toggle('on', isRecord);
-    if (isRecord && !REDUCED) confetti();
-
-    /* счёт: count-up ~800 мс */
-    var scoreEl = $('final-score');
-    if (REDUCED) {
-      scoreEl.textContent = s.score.toLocaleString('ru-RU');
-    } else {
-      var t0 = performance.now();
-      (function up(ts) {
-        var k = Math.min(1, (ts - t0) / 800);
-        var eased = 1 - Math.pow(1 - k, 3);
-        scoreEl.textContent = Math.round(s.score * eased).toLocaleString('ru-RU');
-        if (k < 1) requestAnimationFrame(up);
-      })(t0);
-    }
-
-    /* работа над ошибками / чистый забег.
-       Темы берём из s.mistake_topics — это ровно то, что соберёт сервер.
-       Своим фильтром по s.topic_rows экран обещал бы разбор «Без темы»,
-       в которую целиться нечем. */
-    var mt = s.mistake_topics || [];
-    $('fin-mistakes').hidden = !mt.length;
-    // «Чисто!» — только когда ошибок ТОЧНО не было И хотя бы один ответ
-    // был верным: при total=0 (ни одного вопроса сыграно) хвалить не за что,
-    // а s.wrong > 0 сам по себе этого не ловит (0 верных, 0 неверных —
-    // тоже "wrong > 0 === false").
-    var clean = s.correct > 0 && !s.wrong;
-    $('fin-clean').hidden = !clean;
-    if (mt.length) paintMistakes(mt);
-    else if (clean) paintClean();
-
+    paintNotes(s);
+    paintScore(s);
+    paintActions(s);
+    paintFlow(s);
     paintTopics(s);
+    paintGroups(s);
+    paintStars(s);
+    paintPoints(s);
+    paintCompare(s);
     paintMisses();
-
-    paintShare(s);
-
-    // Подробная статистика раскрыта сразу: графики строятся при отрисовке
-    // экрана результата, а не при нажатии на кнопку, которой больше нет.
-    buildCharts();
   }
 
-  /* Блок работы над ошибками: полоса пропорции + легенда. Пропорция та же,
-     по которой сервер соберёт целевой забег — по сырому числу ошибок. */
-  function paintMistakes(rows) {
-    var totalWrong = rows.reduce(function (a, t) { return a + t.wrong; }, 0);
-    $('fm-lead').textContent = 'Соберём раунд из ' + MISTAKES_RUN_SIZE
-      + ' вопросов по темам, где вы ошиблись: ' + totalWrong + ' '
-      + plural(totalWrong, ['ошибка', 'ошибки', 'ошибок']) + ' в '
-      + rows.length + ' ' + plural(rows.length, ['теме', 'темах', 'темах']);
-    var bar = $('fm-bar'); bar.innerHTML = '';
-    var leg = $('fm-legend'); leg.innerHTML = '';
-    rows.forEach(function (t, i) {
-      var seg = document.createElement('i');
-      seg.style.width = (100 * t.wrong / totalWrong) + '%';
-      seg.style.background = 'var(--rush-accent)';
-      seg.style.opacity = segAlpha(i);
-      bar.appendChild(seg);
-
-      var li = document.createElement('li');
-      var sw = document.createElement('i');
-      sw.style.background = 'var(--rush-accent)';
-      sw.style.opacity = segAlpha(i);
-      var txt = document.createElement('span');
-      txt.textContent = t.topic + ': ' + t.wrong;
-      li.appendChild(sw);
-      li.appendChild(txt);
-      leg.appendChild(li);
-    });
-  }
-
-  /* Идеальный забег: вместо блока ошибок — предложение режима сложнее
-     (следующего по порядку контроля времени). */
-  function paintClean() {
-    var sub = $('clean-sub');
-    sub.textContent = '';
-    var next = MODE_ORDER[MODE_ORDER.indexOf(mode) + 1];
-    if (next && CFG.pool_counts[next]) {
-      sub.appendChild(document.createTextNode('Попробуйте режим сложнее: '));
-      var b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'link-btn';
-      b.textContent = CFG.modes[next].title;
-      b.addEventListener('click', function () { mode = next; startRun(); });
-      sub.appendChild(b);
-    } else {
-      sub.textContent = 'Чище уже некуда. Попробуйте побить свой рекорд.';
+  /* Плашки у счёта: рекорд, место или причина «не в таблице», точность. */
+  function paintNotes(s) {
+    var rec = s.record;
+    var badge = $('record-badge');
+    // ⚠️ Рекорд — лучший ЗАЧЁТНЫЙ раунд (решение 17.09.2026): сервер отдаёт
+    // `record` только у зачётного раунда, рядом с «Не в таблице» плашки нет.
+    badge.hidden = !(rec && rec.is_record);
+    if (!badge.hidden) {
+      $('record-text').textContent = 'личный рекорд · было ' + rec.prev_best.toLocaleString('ru-RU');
+      if (!REDUCED) confetti();
     }
+
+    var rn = $('ranked-note');
+    rn.innerHTML = '';
+    if (s.daily) {
+      if (s.daily.place) {
+        rn.appendChild(finEl('b', null, ordinal(s.daily.place) + ' место из ' + s.daily.total));
+        rn.appendChild(document.createTextNode(' на доске дня'));
+        if (s.daily.streak) {
+          rn.appendChild(document.createTextNode(' · серия '));
+          rn.appendChild(finEl('b', null, String(s.daily.streak)));
+          rn.appendChild(document.createTextNode(' '
+            + plural(s.daily.streak, ['день', 'дня', 'дней'])));
+        }
+      } else {
+        rn.textContent = 'На доску дня попадают только вошедшие';
+      }
+    } else if (s.ranked) {
+      var p = s.places || {};
+      rn.appendChild(document.createTextNode('В таблице: '));
+      if (p.week) {
+        rn.appendChild(finEl('b', null, ordinal(p.week) + ' место за неделю'));
+        if (p.all) rn.appendChild(document.createTextNode(', ' + ordinal(p.all) + ' за всё время'));
+      } else {
+        rn.appendChild(finEl('b', null, 'раунд засчитан'));
+      }
+    } else if (s.unranked_text) {
+      /* ⚠️ ПОЧЕМУ РАУНД НЕ В ТАБЛИЦЕ — ОДНОЙ СТРОКОЙ, текстом с сервера
+         (config.UNRANKED_REASONS): «просто не поехал» читается как поломка. */
+      rn.textContent = 'Не в таблице: ' + s.unranked_text;
+    }
+    rn.hidden = !rn.textContent;
+
+    /* ⚠️ ТОЧНОСТЬ СНИЖАЕТ ИТОГ, и игрок обязан видеть, где потерял: в HUD шли
+       сырые очки, здесь стоит итог. Без строки разница выглядела бы ошибкой. */
+    var acc = $('acc-note');
+    acc.innerHTML = '';
+    if (!s.offline && s.correct + s.wrong > 0) {
+      var mult = s.accuracy_mult != null ? s.accuracy_mult : 1;
+      if (mult < 1) {
+        acc.appendChild(document.createTextNode('Точность ' + s.accuracy + ' % – ниже '
+          + Math.round(100 * (CFG.accuracy_full_at || 1)) + ' %, итог '));
+        acc.appendChild(finEl('b', null, '×' + multText(mult)));
+      } else {
+        acc.textContent = 'Точность ' + s.accuracy + ' %: итог без потерь';
+      }
+    }
+    acc.hidden = !acc.textContent;
   }
 
-  /* Точность по темам: зелёный верно / красный неверно / серый пропуск */
+  /* Счёт: набегает за 800 мс. ⚠️ Итоговое число ставится ещё и таймером:
+     в фоновой вкладке кадры не идут, и счётчик застывал на первых значениях
+     («6» при итоге 52 на бою 17.09). */
+  function paintScore(s) {
+    var scoreEl = $('final-score');
+    var total = s.score.toLocaleString('ru-RU');
+    if (REDUCED) { scoreEl.textContent = total; return; }
+    var t0 = performance.now();
+    (function up(ts) {
+      var k = Math.max(0, Math.min(1, (ts - t0) / 800));
+      scoreEl.textContent = Math.round(s.score * (1 - Math.pow(1 - k, 3))).toLocaleString('ru-RU');
+      if (k < 1) requestAnimationFrame(up);
+    })(t0);
+    setTimeout(function () { scoreEl.textContent = total; }, 850);
+  }
+
+  /* Столбик действий. Первая видимая кнопка — основная, её жмёт Enter:
+     у вызова дня «Доска дня», у набора «К набору и доске», у дуэли «Итог
+     дуэли», у обычного раунда «Сыграть ещё раз». */
+  function paintActions(s) {
+    var board = $('btn-board'), again = $('btn-again'), next = $('btn-next-daily');
+    var info = shareInfo && shareInfo.set;
+    board.hidden = true; next.hidden = true; again.hidden = false;
+    $('btn-rematch').hidden = true;
+    $('btn-home').hidden = true;
+    if (setRun && setRun.kind === 'daily') {
+      again.hidden = true;                          // попытка у вызова одна
+      board.hidden = false;
+      board.href = (s.daily && s.daily.board_url) || (info && info.board_url) || '/game/daily/';
+      $('btn-board-text').textContent = 'Доска дня';
+      var nx = s.daily && s.daily.next;
+      if (nx) {
+        next.hidden = false;
+        next.href = nx.url;
+        $('btn-next-daily-text').textContent = 'Следующий вызов: ' + nx.title;
+      }
+    } else if (setRun && setRun.kind === 'duel') {
+      again.hidden = true;
+      board.hidden = false;
+      board.href = (s.duel && s.duel.url) || (info && info.board_url) || '/game/';
+      $('btn-board-text').textContent = 'Итог дуэли';
+      // Реванш — когда соперник уже отыграл: иначе звать его некуда.
+      $('btn-rematch').hidden = !(s.duel && s.duel.rival_done);
+      $('btn-home').hidden = false;
+    } else if (setRun) {
+      board.hidden = false;
+      board.href = '/game/s/' + encodeURIComponent(setRun.code) + '/';
+      $('btn-board-text').textContent = 'К набору и доске';
+      again.hidden = !(s.attempts_left > 0);
+    }
+    var primary = !board.hidden ? board : (!again.hidden ? again : null);
+    [board, again].forEach(function (b) { b.classList.toggle('fin-primary', b === primary); });
+
+    var mt = s.mistake_topics || [];
+    $('btn-mistakes').hidden = !mt.length;
+    $('btn-mistakes-n').textContent = MISTAKES_RUN_SIZE + ' '
+      + plural(MISTAKES_RUN_SIZE, ['вопрос', 'вопроса', 'вопросов']) + ' · ' + mt.length + ' '
+      + plural(mt.length, ['тема', 'темы', 'тем']);
+    $('btn-review').hidden = !misses.length;
+    $('btn-review-n').textContent = misses.length;
+    // Нет ссылки (сеть подвела) — делиться нечем.
+    $('btn-share').hidden = !(shareInfo && shareInfo.url);
+    $('share-note').hidden = $('btn-share').hidden;
+  }
+
+  /* ── «Ход раунда»: кривая счёта и лента вопросов ── */
+  function paintFlow(s) {
+    var seq = s.outcome_seq || [];
+    $('fin-flow').hidden = !seq.length;
+    if (!seq.length) return;
+    chartCurve(s);
+    var n = seq.length;
+    var gap = n <= 30 ? 8 : n <= 60 ? 4 : 2;
+    var tape = $('fin-tape'), qn = $('fin-qn');
+    [tape, qn].forEach(function (el) {
+      el.innerHTML = '';
+      el.style.setProperty('--n', n);
+      el.style.setProperty('--gap', gap + 'px');
+    });
+    var times = s.time_seq || [];
+    var maxT = Math.max.apply(null, times.concat([1]));
+    var words = { correct: 'верно', wrong: 'неверно', skip: 'пропуск' };
+    seq.forEach(function (o, i) {
+      var t = times[i] || 0;
+      var cell = finEl('i', o === 'correct' ? 'ok' : o === 'wrong' ? 'bad' : 'skip');
+      cell.style.height = Math.max(4, Math.round(57 * t / maxT)) + 'px';
+      cell.title = 'Вопрос ' + (i + 1) + ': ' + words[o] + ', ' + secText(t) + ' с';
+      if (n <= 30) cell.appendChild(finEl('span', null, String(Math.round(t / 1000))));
+      tape.appendChild(cell);
+      qn.appendChild(finEl('span', null, n <= 30 || i === 0 || (i + 1) % 5 === 0 ? String(i + 1) : ''));
+    });
+    tape.setAttribute('role', 'img');
+    tape.setAttribute('aria-label', 'Вопросов ' + n + ': верно ' + s.correct + ', неверно '
+      + s.wrong + ', пропусков ' + s.skipped);
+  }
+
+  function secText(ms) {
+    var sec = (ms || 0) / 1000;
+    return sec < 10 ? (Math.round(sec * 10) / 10).toLocaleString('ru-RU') : String(Math.round(sec));
+  }
+
+  function numText(v) { return (Math.round(v * 10) / 10).toLocaleString('ru-RU'); }
+
+  /* Строка-полоска карточек итога: подпись, число и полоса из частей. */
+  function barRow(label, value, parts, total) {
+    var row = finEl('div', 'fin-bar');
+    var lab = finEl('span', 'lab');
+    if (typeof label === 'string') lab.textContent = label; else lab.appendChild(label);
+    row.appendChild(lab);
+    row.appendChild(finEl('b', null, value));
+    var tr = finEl('span', 'tr');
+    parts.forEach(function (p) {
+      if (!p[1] || !total) return;
+      var seg = finEl('i', p[0]);
+      seg.style.width = (100 * p[1] / total) + '%';
+      tr.appendChild(seg);
+    });
+    row.appendChild(tr);
+    return row;
+  }
+
+  function outcomeParts(c) { return [['ok-f', c.correct], ['bad-f', c.wrong], ['skip-f', c.skip]]; }
+
   function paintTopics(s) {
-    var rows = s.topic_rows || [];
-    $('fin-topics').hidden = !rows.length;
-    var list = $('tp-list');
-    list.innerHTML = '';
+    var rows = (s.topic_rows || []).slice(0, 6);
+    var box = $('tp-list');
+    box.innerHTML = '';
     rows.forEach(function (t) {
-      var li = document.createElement('li');
-      li.className = 'tp-row';
-      var name = document.createElement('span');
-      name.className = 'tp-name';
-      name.textContent = t.topic;
-      var num = document.createElement('span');
-      num.className = 'tp-num';
-      var tries = t.correct + t.wrong;
-      num.textContent = tries
-        ? t.correct + '/' + tries + ' · ' + t.accuracy + '%'
-        : 'пропущено';
-      var bar = document.createElement('div');
-      bar.className = 'tp-bar';
-      [['tp-ok', t.correct], ['tp-bad', t.wrong], ['tp-skip', t.skip]]
-        .forEach(function (pair) {
-          if (!pair[1]) return;
-          var seg = document.createElement('i');
-          seg.className = pair[0];
-          seg.style.width = (100 * pair[1] / t.total) + '%';
-          bar.appendChild(seg);
-        });
-      li.appendChild(name);
-      li.appendChild(num);
-      li.appendChild(bar);
-      list.appendChild(li);
+      box.appendChild(barRow(t.topic, t.correct + ' из ' + t.total, outcomeParts(t), t.total));
+    });
+    $('fin-topics').hidden = !rows.length;
+  }
+
+  /* «Разделы»: разделы — из `CFG.topic_groups` (ADR 0071: вторую раскладку
+     тем в шаблоне не заводим). Показываются только разделы этого раунда,
+     остальные — одной строкой. Тема вне разделов никуда не идёт. */
+  function paintGroups(s) {
+    var groups = CFG.topic_groups || [];
+    var byTopic = {};
+    groups.forEach(function (g) {
+      (g.topics || []).forEach(function (t) { byTopic[t] = g.key; });
+    });
+    var acc = {};
+    (s.topic_rows || []).forEach(function (r) {
+      var key = byTopic[r.topic];
+      if (!key) return;
+      var c = acc[key] || (acc[key] = { correct: 0, wrong: 0, skip: 0, total: 0 });
+      c.correct += r.correct; c.wrong += r.wrong; c.skip += r.skip; c.total += r.total;
+    });
+    var box = $('groups-list');
+    box.innerHTML = '';
+    var absent = [];
+    groups.forEach(function (g) {
+      var c = acc[g.key];
+      if (!c || !c.total) { absent.push(g.title.toLowerCase()); return; }
+      box.appendChild(barRow(g.title, c.correct + ' из ' + c.total + ' · '
+        + Math.round(100 * c.correct / c.total) + ' %', outcomeParts(c), c.total));
+    });
+    var shown = box.children.length > 0;
+    $('fin-groups').hidden = !shown;
+    var none = $('groups-none');
+    none.hidden = !shown || !absent.length;
+    none.textContent = none.hidden ? '' : 'Не было в этом раунде: ' + absent.join(', ');
+  }
+
+  /* «Держите ли сложное»: полоски по звёздам вместо пончика. */
+  function paintStars(s) {
+    var rows = s.stars || [];
+    var box = $('stars-list');
+    box.innerHTML = '';
+    rows.forEach(function (r) {
+      var lab = document.createDocumentFragment();
+      var icon = finEl('span');
+      icon.innerHTML = ICONS.star || '';
+      lab.appendChild(icon.firstChild || icon);
+      lab.appendChild(finEl('span', null, String(r.stars)));
+      lab.appendChild(finEl('span', 'sr-only', 'звёзд сложности'));
+      box.appendChild(barRow(lab, r.correct + ' из ' + r.total, outcomeParts(r), r.total));
+    });
+    $('fin-stars').hidden = !rows.length;
+    var hard = rows.filter(function (r) { return r.stars >= 4; });
+    var missed = hard.length > 0 && hard.every(function (r) { return !r.correct; });
+    var none = $('stars-none');
+    none.hidden = !missed;
+    none.textContent = missed ? 'На сложности 4 и выше пока мимо – там и растут очки' : '';
+  }
+
+  /* «Где набрано»: очки по темам. Очков нет — карточки нет. */
+  function paintPoints(s) {
+    var rows = (s.topic_rows || []).filter(function (t) { return t.points > 0; })
+      .sort(function (a, b) { return b.points - a.points; }).slice(0, 5);
+    var box = $('points-list');
+    box.innerHTML = '';
+    var max = rows.length ? rows[0].points : 0;
+    rows.forEach(function (t) {
+      box.appendChild(barRow(t.topic, t.points.toLocaleString('ru-RU'), [['pt-f', t.points]], max));
+    });
+    $('fin-points').hidden = !rows.length;
+  }
+
+  /* «Последние раунды» и «Против себя обычного» — из истории с сервера
+     (`/game/api/me/history/`), только вошедшему. ⚠️ Сравнивать первый раунд
+     режима не с чем: история из одного этого раунда карточек не рисует. */
+  function paintCompare(s) {
+    var authed = !!CFG.is_authenticated;
+    $('fin-login').hidden = authed;
+    var h = authed && runHistory && runHistory.runs && runHistory.runs.length >= 2 ? runHistory : null;
+    paintHistory(s, h);
+    paintUsual(s, h && h.avg ? h : null);
+    ['fin-row-a', 'fin-row-b'].forEach(function (id) {
+      var row = $(id);
+      row.hidden = !Array.prototype.some.call(row.children, function (c) { return !c.hidden; });
     });
   }
 
-  /* Список промахов — под кнопкой «Разобрать все ошибки».
-     Тексты вопросов есть только у клиента (в журнале сервера их нет). */
-  function paintMisses() {
-    var btn = $('btn-review');
-    btn.hidden = !misses.length;
-    btn.textContent = 'Разобрать все ошибки (' + misses.length + ')';
-    var list = $('miss-list');
-    list.hidden = true;
-    list.innerHTML = '';
-    misses.forEach(function (m) {
-      var li = document.createElement('li');
-      li.className = 'miss-item';
-      var topicName = (m.q.topics && m.q.topics[0]) || 'Экономика';
-      li.innerHTML = '<span class="mi-topic"></span><span class="mi-q"></span><br>';
-      li.querySelector('.mi-topic').textContent = topicName;
-      li.querySelector('.mi-q').textContent = m.q.question.slice(0, 120) + (m.q.question.length > 120 ? '…' : '');
-      if (m.q.generated) {
-        // у сгенерированного вопроса нет задачи в каталоге —
-        // вместо ссылки разворачиваем пошаговое решение
-        var sbtn = document.createElement('button');
-        sbtn.type = 'button';
-        sbtn.className = 'mi-sol-btn';
-        sbtn.textContent = 'Показать решение';
-        var sol = document.createElement('div');
-        sol.className = 'mi-solution';
-        sol.textContent = m.solution || 'Решение недоступно.';
-        sol.hidden = true;
-        // Чертёж (если архетип графический) — над шагами решения: сначала
-        // «как это выглядит», потом «как это считается».
-        // У режима «График» чертежей ДВА: «как было в решении» и «как
-        // правильно», рядом. Рисует их тот же единственный рисователь.
-        if (m.figureRef) {
-          var pair = document.createElement('div');
-          pair.className = 'mi-figpair';
-          /* ⚠️ Когда ошибки НЕ БЫЛО, чертёж один: два одинаковых с
-             подписями «как было» и «как правильно» — это загадка, а не
-             разбор. Видно только в браузере на живом промахе. */
-          var rows = m.step === 'clean'
-            ? [['решение было верным, ошибки нет', m.figureRef]]
-            : [['как было в решении', m.figure],
-               ['как правильно', m.figureRef]];
-          rows.forEach(function (row) {
-            var cell = document.createElement('div');
-            cell.className = 'mi-figcell';
-            var cap = document.createElement('b');
-            cap.textContent = row[0];
-            cell.appendChild(cap);
-            var node = drawFigure(row[1]);
-            if (node) cell.appendChild(node);
-            pair.appendChild(cell);
-          });
-          if (m.step && m.step !== 'clean') {
-            var diff = document.createElement('p');
-            diff.className = 'mi-figdiff';
-            diff.textContent = 'Первый неверный шаг: '
-              + (STEP_TITLE[m.step] || m.step);
-            pair.appendChild(diff);
-          }
-          sol.insertBefore(pair, sol.firstChild);
-        } else if (m.figure) {
-          var fig = drawFigure(m.figure);
-          if (fig) sol.insertBefore(fig, sol.firstChild);
+  var MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+  function shortDay(iso) {
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    if (d.toDateString() === new Date().toDateString()) return 'сегодня';
+    return d.getDate() + ' ' + MONTHS_SHORT[d.getMonth()];
+  }
+
+  function paintHistory(s, h) {
+    $('fin-history').hidden = !h;
+    if (!h) return;
+    $('history-mode').textContent = '· ' + s.mode_title;
+    var runs = h.runs.slice(-5);
+    var box = $('chart-history'), xs = $('history-x');
+    box.innerHTML = '';
+    xs.innerHTML = '';
+    box.style.setProperty('--n', runs.length);
+    xs.style.setProperty('--n', runs.length);
+    var max = Math.max.apply(null, runs.map(function (r) { return r.score; }).concat([1]));
+    runs.forEach(function (r, i) {
+      // Последний в истории — этот раунд: он уже сохранён.
+      var bar = finEl('i', i === runs.length - 1 ? 'now' : null);
+      bar.style.height = Math.max(4, Math.round(79 * r.score / max)) + 'px';
+      bar.appendChild(finEl('span', null, r.score.toLocaleString('ru-RU')));
+      box.appendChild(bar);
+      xs.appendChild(finEl('span', null, shortDay(r.created_at)));
+    });
+  }
+
+  function paintUsual(s, h) {
+    var card = $('fin-usual');
+    var box = $('usual-list');
+    box.innerHTML = '';
+    if (h) {
+      var avg = h.avg;
+      var myMs = s.avg_correct_ms;
+      if (myMs == null) {
+        var sum = 0, n = 0;
+        (s.time_seq || []).forEach(function (t, i) {
+          if ((s.outcome_seq || [])[i] === 'correct' && t) { sum += t; n++; }
+        });
+        myMs = n ? Math.round(sum / n) : null;
+      }
+      // [подпись, сейчас, обычно, меньше — лучше, как писать]
+      [['Точность', s.accuracy, avg.accuracy, false, function (v) { return v + ' %'; }],
+       ['Секунд на верный', myMs, avg.avg_correct_ms, true, secText],
+       ['Верных за раунд', s.correct, avg.correct, false, numText],
+       ['Пропусков', s.skipped, avg.skipped, true, numText]].forEach(function (r) {
+        if (r[1] == null || r[2] == null) return;
+        var line = finEl('div', 'r');
+        line.appendChild(finEl('span', null, r[0]));
+        line.appendChild(finEl('b', null, r[4](r[1])));
+        var u = finEl('span', 'u', 'обычно ' + r[4](r[2]));
+        if (r[4](r[1]) !== r[4](r[2])) {
+          var better = r[3] ? r[1] < r[2] : r[1] > r[2];
+          var mark = finEl('span', better ? 'up' : 'dn', better ? ' ↑' : ' ↓');
+          mark.setAttribute('aria-label', better ? 'лучше обычного' : 'хуже обычного');
+          u.appendChild(mark);
         }
-        sbtn.addEventListener('click', function (b, x) {
-          return function () {
-            x.hidden = !x.hidden;
-            b.textContent = x.hidden ? 'Показать решение' : 'Скрыть решение';
-          };
-        }(sbtn, sol));
-        li.appendChild(sbtn);
-        li.appendChild(sol);
+        line.appendChild(u);
+        box.appendChild(line);
+      });
+    }
+    card.hidden = !box.children.length;
+  }
+
+  /* «Ошибки и пропуски» — списком на странице, без раскрывашки. Тексты
+     вопросов есть только у клиента (в журнале сервера их нет). */
+  function paintMisses() {
+    var list = $('miss-list');
+    list.innerHTML = '';
+    $('fin-misses').hidden = !misses.length;
+    misses.forEach(function (m) {
+      var li = finEl('li', 'miss-item');
+      li.appendChild(finEl('span', 'mi-k ' + (m.kind === 'skip' ? 'skip' : 'bad'), String(m.number)));
+      var q = finEl('span', 'mi-q');
+      q.appendChild(finEl('span', 'mi-text', m.q.question));
+      var meta = finEl('small', null, ((m.q.topics && m.q.topics[0]) || 'Без темы')
+        + (m.q.difficulty ? ' · ' : ''));
+      if (m.q.difficulty) {
+        var star = finEl('span');
+        star.innerHTML = ICONS.star || '';
+        meta.appendChild(star);
+        meta.appendChild(document.createTextNode(String(m.q.difficulty)));
+      }
+      q.appendChild(meta);
+      li.appendChild(q);
+      var a = finEl('span', 'mi-a');
+      if (m.kind === 'skip') {
+        a.appendChild(document.createTextNode('пропуск → верный '));
       } else {
-        var a = document.createElement('a');
-        a.href = '/catalog/' + m.problemId + '/';
-        a.textContent = 'Открыть задачу →';
-        a.target = '_blank';
-        li.appendChild(a);
+        a.appendChild(document.createTextNode('ваш ответ '));
+        a.appendChild(finEl('s', null, m.given));
+        a.appendChild(document.createTextNode(' → верный '));
+      }
+      a.appendChild(finEl('b', null, m.right));
+      li.appendChild(a);
+      if (m.q.generated) {
+        paintMissSolution(li, m);
+      } else if (m.problemId) {
+        var link = finEl('a', 'mi-lnk', 'В каталоге');
+        link.href = '/catalog/' + m.problemId + '/';
+        link.target = '_blank';
+        link.insertAdjacentHTML('beforeend', ICONS.arrow_right || '');
+        li.appendChild(link);
       }
       list.appendChild(li);
     });
     renderMath(list);
+  }
+
+  /* У сгенерированного вопроса задачи в каталоге нет — вместо ссылки
+     разворачивается пошаговое решение с чертежом. */
+  function paintMissSolution(li, m) {
+    var sbtn = finEl('button', 'mi-sol-btn', 'Показать решение');
+    sbtn.type = 'button';
+    var sol = finEl('div', 'mi-solution', m.solution || 'Решение недоступно.');
+    sol.hidden = true;
+    // У режима «График» чертежей ДВА: «как было в решении» и «как правильно».
+    if (m.figureRef) {
+      var pair = finEl('div', 'mi-figpair');
+      /* ⚠️ Когда ошибки НЕ БЫЛО, чертёж один: два одинаковых с подписями
+         «как было» и «как правильно» — это загадка, а не разбор. */
+      var rows = m.step === 'clean'
+        ? [['решение было верным, ошибки нет', m.figureRef]]
+        : [['как было в решении', m.figure], ['как правильно', m.figureRef]];
+      rows.forEach(function (row) {
+        var cell = finEl('div', 'mi-figcell');
+        cell.appendChild(finEl('b', null, row[0]));
+        var node = drawFigure(row[1]);
+        if (node) cell.appendChild(node);
+        pair.appendChild(cell);
+      });
+      if (m.step && m.step !== 'clean') {
+        pair.appendChild(finEl('p', 'mi-figdiff', 'Первый неверный шаг: ' + (STEP_TITLE[m.step] || m.step)));
+      }
+      sol.insertBefore(pair, sol.firstChild);
+    } else if (m.figure) {
+      var fig = drawFigure(m.figure);
+      if (fig) sol.insertBefore(fig, sol.firstChild);
+    }
+    sbtn.addEventListener('click', function () {
+      sol.hidden = !sol.hidden;
+      sbtn.textContent = sol.hidden ? 'Показать решение' : 'Скрыть решение';
+    });
+    li.appendChild(sbtn);
+    li.appendChild(sol);
   }
 
   /* ---------- ШЕРИНГ ----------
@@ -5527,24 +5525,6 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     return 'Wecon Rush · ' + s.mode_title + ' · ' + s.score.toLocaleString('ru-RU')
       + ' очков · ' + s.correct + '/' + s.total + ' · комбо ×' + s.max_multiplier
       + ' – обгонишь?';
-  }
-
-  function paintShare(s) {
-    // Ссылка на доску набора — она интереснее личной ссылки: там видно,
-    // кто ещё играл тот же список.
-    var board = $('btn-board');
-    var setInfo = shareInfo && shareInfo.set;
-    board.hidden = !setInfo;
-    if (setInfo) board.href = setInfo.board_url;
-    // У дуэли «доска» — страница дуэли с таблицей сравнения двоих (15.09.2026):
-    // соперник мог ещё не доиграть, поэтому таблица там, а не на этом экране.
-    board.textContent = isDuelRun() ? 'Итог дуэли' : 'Доска набора';
-    var box = $('fin-share');
-    // Нет ссылки (сеть подвела) — блока нет: делиться нечем. Больше блок
-    // ничего не решает: кнопка одна, и путь у неё один.
-    box.hidden = !(shareInfo && shareInfo.url);
-    if (box.hidden) return;
-    $('share-lead').textContent = 'Ссылка открывается у всех, без регистрации';
   }
 
   function toast(btn, html, back) {
@@ -5584,8 +5564,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
      Рисуем SVG руками, без библиотеки. Причина не в размере: цвета идут
      через var(--rush-*), поэтому переключатель темы сайта перекрашивает
      графики сам — canvas-библиотеке пришлось бы перерисовывать всё на
-     каждую смену темы. Четыре графика тут простые, экономия не стоила бы
-     этой возни. Данные — только из серверной сводки. */
+     каждую смену темы. SVG здесь — кривая счёта итога и линия панели «Мои
+     рекорды»; полоски карточек итога — обычная разметка. */
   var SVG_NS = 'http://www.w3.org/2000/svg';
 
   function svgEl(tag, attrs) {
@@ -5603,188 +5583,53 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     return svg;
   }
 
-  function chartEmpty(box, text) {
-    box.innerHTML = '';
-    var p = document.createElement('p');
-    p.className = 'chart-empty';
-    p.textContent = text;
-    box.appendChild(p);
-  }
-
-  /* 1. Динамика: счёт линией (акцент) + комбо ступенькой (приглушённо,
-     своя шкала — величины разного порядка, общая ось врала бы). */
+  /* Кривая счёта «Хода раунда» — во всю ширину карточки. Очков нет или
+     вопрос один — кривой нет, остаётся лента. */
   function chartCurve(s) {
     var box = $('chart-curve');
     var scores = s.score_curve || [];
-    if (scores.length < 2) {
-      chartEmpty(box, 'Раунд слишком короткий для графика');
-      return;
-    }
-    var W = 400, H = 130, P = 8;
+    var show = scores.length >= 2 && Math.max.apply(null, scores) > 0;
+    box.hidden = !show;
+    $('flow-key-score').hidden = !show;
+    if (!show) { box.innerHTML = ''; return; }
+    var W = 1000, H = 120, P = 10, X0 = 20;
     var svg = chartFrame(box, W, H);
     var maxScore = Math.max.apply(null, scores) || 1;
-    var combo = s.combo_curve || [];
-    var maxCombo = Math.max.apply(null, combo.concat([1])) || 1;
-    var x = function (i) { return P + i * (W - 2 * P) / (scores.length - 1); };
+    var x = function (i) { return X0 + i * (W - 2 * X0) / (scores.length - 1); };
     // ⚠️ Шкала очков и место подписи — в game/static/game/chart_math.js: над
     // максимумом оставлена полоса под число, иначе оно уходило за верх рисунка.
     var yScore = function (v) { return window.rushChartMath.scoreY(v, maxScore, H, P); };
-    // комбо живёт в нижней трети — это фон к линии счёта, а не соперник
-    var yCombo = function (v) { return H - P - (v / maxCombo) * (H - 2 * P) * 0.33; };
-
+    var end = scores[scores.length - 1];
+    svg.setAttribute('aria-label', 'Счёт по вопросам, в конце ' + end.toLocaleString('ru-RU'));
     svg.appendChild(svgEl('line', {
-      x1: P, y1: H - P, x2: W - P, y2: H - P,
+      x1: X0, y1: H - P, x2: W - X0, y2: H - P,
       stroke: 'var(--rush-border)', 'stroke-width': 1
     }));
-    if (combo.length === scores.length) {
-      var cpts = [];
-      combo.forEach(function (c, i) {
-        if (i) cpts.push(x(i) + ',' + yCombo(combo[i - 1]));  // ступенька
-        cpts.push(x(i) + ',' + yCombo(c));
-      });
-      svg.appendChild(svgEl('polyline', {
-        points: cpts.join(' '), fill: 'none', stroke: 'var(--text3)',
-        'stroke-width': 1.5, opacity: .5, 'vector-effect': 'non-scaling-stroke'
-      }));
-    }
     svg.appendChild(svgEl('polyline', {
       points: scores.map(function (v, i) { return x(i) + ',' + yScore(v); }).join(' '),
-      fill: 'none', stroke: 'var(--rush-accent)', 'stroke-width': 2,
+      fill: 'none', stroke: 'var(--rush-accent)', 'stroke-width': 2.5,
       'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke'
     }));
-    var last = svgEl('text', {
-      x: W - P, y: window.rushChartMath.labelY(yScore(scores[scores.length - 1])),
-      'text-anchor': 'end', class: 'chart-val'
+    var endY = yScore(end);
+    svg.appendChild(svgEl('circle', { cx: x(scores.length - 1), cy: endY, r: 4, fill: 'var(--rush-accent)' }));
+    // Подпись над точкой; у самого верха рисунка — под ней, чтобы не срезалась.
+    var labelY = window.rushChartMath.labelY(endY);
+    var label = svgEl('text', {
+      x: W - X0 - 18, y: labelY < 14 ? endY + 18 : labelY,
+      'text-anchor': 'end', class: 'fin-curve-val'
     });
-    last.textContent = scores[scores.length - 1].toLocaleString('ru-RU');
-    svg.appendChild(last);
-  }
-
-  /* 2. Гистограмма времени по корзинам сводки */
-  function chartTime(s) {
-    var box = $('chart-time');
-    var buckets = s.time_buckets || [];
-    var total = buckets.reduce(function (a, b) { return a + b.count; }, 0);
-    if (!total) { chartEmpty(box, 'Нет данных о времени ответов'); return; }
-    var W = 400, H = 130, P = 8, BOT = 22;
-    var svg = chartFrame(box, W, H);
-    var max = Math.max.apply(null, buckets.map(function (b) { return b.count; })) || 1;
-    var slot = (W - 2 * P) / buckets.length;
-    buckets.forEach(function (b, i) {
-      var bh = (b.count / max) * (H - P - BOT - 10);
-      var bx = P + i * slot + slot * 0.15;
-      var bw = slot * 0.7;
-      svg.appendChild(svgEl('rect', {
-        x: bx, y: H - BOT - bh, width: bw, height: Math.max(bh, b.count ? 2 : 0),
-        rx: 2, fill: 'var(--rush-accent)', opacity: b.count ? .85 : .15
-      }));
-      if (b.count) {
-        var v = svgEl('text', { x: bx + bw / 2, y: H - BOT - bh - 4,
-                                'text-anchor': 'middle', class: 'chart-val' });
-        v.textContent = b.count;
-        svg.appendChild(v);
-      }
-      var l = svgEl('text', { x: bx + bw / 2, y: H - 8,
-                              'text-anchor': 'middle', class: 'chart-lbl' });
-      l.textContent = b.title.replace(' с', '');
-      svg.appendChild(l);
-    });
-    svg.appendChild(svgEl('line', {
-      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
-      stroke: 'var(--rush-border)', 'stroke-width': 1
-    }));
-  }
-
-  /* 3. Кольцевая сложностей. Янтарь тут в своём законном смысле —
-     это шкала сложности, а не акцент. */
-  var DIFF_COLOR = { easy: 'var(--rush-ok)', medium: 'var(--amber)',
-                     hard: 'var(--rush-bad)' };
-
-  function chartDifficulty(s) {
-    var box = $('chart-diff');
-    var rows = (s.difficulty || []).filter(function (g) { return g.total > 0; });
-    var total = rows.reduce(function (a, g) { return a + g.total; }, 0);
-    if (!total) { chartEmpty(box, 'Нет данных о сложности'); return; }
-    box.innerHTML = '';
-    var W = 104, R = 40, SW = 14, C = W / 2;
-    var svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + W, role: 'img' });
-    var len = 2 * Math.PI * R;
-    var offset = 0;
-    rows.forEach(function (g) {
-      var frac = g.total / total;
-      var arc = svgEl('circle', {
-        cx: C, cy: C, r: R, fill: 'none',
-        stroke: DIFF_COLOR[g.key] || 'var(--text3)',
-        'stroke-width': SW,
-        'stroke-dasharray': (len * frac) + ' ' + (len * (1 - frac)),
-        'stroke-dashoffset': -offset,
-        transform: 'rotate(-90 ' + C + ' ' + C + ')'
-      });
-      svg.appendChild(arc);
-      offset += len * frac;
-    });
-    var mid = svgEl('text', { x: C, y: C + 4, 'text-anchor': 'middle',
-                              class: 'chart-val' });
-    mid.textContent = total;
-    svg.appendChild(mid);
-    box.appendChild(svg);
-
-    var leg = document.createElement('ul');
-    leg.className = 'donut-legend';
-    rows.forEach(function (g) {
-      var li = document.createElement('li');
-      var sw = document.createElement('i');
-      sw.className = 'd-' + g.key;
-      var txt = document.createElement('span');
-      txt.textContent = g.title + ': ' + g.total + ' (верно ' + g.correct + ')';
-      li.appendChild(sw);
-      li.appendChild(txt);
-      leg.appendChild(li);
-    });
-    box.appendChild(leg);
-  }
-
-  /* 4. Сравнение с прошлыми забегами ЭТОГО режима (счёт «Пули» и
-     «Классики» несравним — разные запасы времени). Текущий — акцентом. */
-  function chartHistory(s) {
-    var box = $('chart-history');
-    if (!CFG.is_authenticated) {
-      chartEmpty(box, 'Войдите, чтобы видеть свои прошлые раунды');
-      return;
-    }
-    var rows = (runHistory && runHistory.runs) || [];
-    if (rows.length < 2) {
-      chartEmpty(box, 'Это ваш первый раунд в этом режиме. Будет с чем сравнить');
-      return;
-    }
-    var W = 400, H = 130, P = 8, BOT = 18;
-    var svg = chartFrame(box, W, H);
-    var max = Math.max.apply(null, rows.map(function (r) { return r.score; })) || 1;
-    var slot = (W - 2 * P) / rows.length;
-    rows.forEach(function (r, i) {
-      var bh = (r.score / max) * (H - P - BOT - 12);
-      var bx = P + i * slot + slot * 0.15;
-      var bw = slot * 0.7;
-      var isNow = i === rows.length - 1;
-      svg.appendChild(svgEl('rect', {
-        x: bx, y: H - BOT - bh, width: bw, height: Math.max(bh, 2), rx: 2,
-        fill: isNow ? 'var(--rush-accent)' : 'var(--text3)',
-        opacity: isNow ? 1 : .35
-      }));
-      if (isNow || rows.length <= 6) {
-        var v = svgEl('text', { x: bx + bw / 2, y: H - BOT - bh - 4,
-                                'text-anchor': 'middle', class: 'chart-val' });
-        v.textContent = r.score;
-        svg.appendChild(v);
-      }
-    });
+    // ⚠️ Кривая — СЫРЫЕ очки по ходу раунда, а крупное число итога — после
+    // поправки на точность. Разные числа без пояснения читались бы ошибкой.
+    label.textContent = end.toLocaleString('ru-RU') + (s.score !== end
+      ? ' · ×' + multText(s.accuracy_mult) + ' → ' + s.score.toLocaleString('ru-RU') : '');
+    svg.appendChild(label);
   }
 
   /* ---------- ИСТОРИЯ ИГРОКА (СЕРВЕР) ----------
-     Тремя графиками из девяти («Последние раунды», «Время на ответ»,
-     «Против себя обычного») раунд сравнивается с прошлыми. История лежит
-     в `GameResult`, а не в localStorage: два источника истории разъехались
-     бы, а браузеров у человека несколько. */
+     Карточками «Последние раунды» и «Против себя обычного» раунд
+     сравнивается с прошлыми. История лежит в `GameResult`, а не в
+     localStorage: два источника истории разъехались бы, а браузеров у
+     человека несколько. */
   function fetchHistory(then) {
     if (!CFG.is_authenticated) { runHistory = null; if (then) then(); return; }
     api('/game/api/me/history/?mode=' + encodeURIComponent(mode))
@@ -5798,238 +5643,32 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       });
   }
 
-  /* 5. Лента ответов: клетка на вопрос, цвет — исход, высота — время. */
-  function chartTape(s) {
-    var box = $('chart-tape');
-    var seq = s.outcome_seq || [];
-    var times = s.time_seq || [];
-    if (!seq.length) { chartEmpty(box, 'Ни одного ответа в раунде'); return; }
-    var W = 400, H = 92, P = 8;
-    var svg = chartFrame(box, W, H);
-    var maxT = Math.max.apply(null, times.concat([1])) || 1;
-    var slot = (W - 2 * P) / seq.length;
-    var fill = { correct: 'var(--rush-ok)', wrong: 'var(--rush-bad)',
-                 skip: 'var(--text3)' };
-    seq.forEach(function (o, i) {
-      var t = times[i] || 0;
-      var bh = 10 + (t / maxT) * (H - P * 2 - 12);
-      svg.appendChild(svgEl('rect', {
-        x: P + i * slot + slot * 0.12, y: H - P - bh,
-        width: Math.max(slot * 0.76, 2), height: bh, rx: 2,
-        fill: fill[o] || 'var(--text3)', opacity: o === 'skip' ? .45 : .9
-      }));
-    });
-  }
-
-  /* 6. Время на ответ по вопросам. Ошибки красным, пунктиром — личное
-     среднее время верного ответа в этом режиме (с сервера). */
-  function chartTimes(s) {
-    var box = $('chart-times');
-    var times = s.time_seq || [];
-    var seq = s.outcome_seq || [];
-    if (!times.length) { chartEmpty(box, 'Нет данных о времени ответов'); return; }
-    var W = 400, H = 130, P = 8, BOT = 14;
-    var svg = chartFrame(box, W, H);
-    var avg = runHistory && runHistory.avg && runHistory.avg.avg_correct_ms;
-    var maxT = Math.max.apply(null, times.concat([avg || 0, 1])) || 1;
-    var slot = (W - 2 * P) / times.length;
-    var y = function (ms) { return H - BOT - (ms / maxT) * (H - P - BOT); };
-    times.forEach(function (t, i) {
-      var top = y(t);
-      svg.appendChild(svgEl('rect', {
-        x: P + i * slot + slot * 0.15, y: top,
-        width: Math.max(slot * 0.7, 2), height: Math.max(H - BOT - top, 2), rx: 2,
-        fill: seq[i] === 'wrong' ? 'var(--rush-bad)' : 'var(--rush-accent)',
-        opacity: seq[i] === 'skip' ? .3 : .85
-      }));
-    });
-    // ⚠️ Пунктира НЕТ, если среднего нет: линия по нулю говорила бы, что
-    // игрок обычно отвечает мгновенно. Отсутствие факта — не ноль.
-    if (avg) {
-      svg.appendChild(svgEl('line', {
-        x1: P, y1: y(avg), x2: W - P, y2: y(avg),
-        stroke: 'var(--text3)', 'stroke-width': 1,
-        'stroke-dasharray': '4 3', 'vector-effect': 'non-scaling-stroke'
-      }));
-      var lbl = svgEl('text', { x: W - P, y: y(avg) - 4, 'text-anchor': 'end',
-                                class: 'chart-lbl' });
-      lbl.textContent = 'обычно ' + (avg / 1000).toFixed(1).replace('.', ',') + ' с';
-      svg.appendChild(lbl);
-    }
-    svg.appendChild(svgEl('line', {
-      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
-      stroke: 'var(--rush-border)', 'stroke-width': 1
-    }));
-  }
-
-  /* 7. Где набрано: очки за каждый вопрос. */
-  function chartPoints(s) {
-    var box = $('chart-points');
-    var pts = s.points_seq || [];
-    var total = pts.reduce(function (a, b) { return a + b; }, 0);
-    if (!total) { chartEmpty(box, 'Очков в этом раунде не набрано'); return; }
-    var W = 400, H = 130, P = 8, BOT = 14;
-    var svg = chartFrame(box, W, H);
-    var max = Math.max.apply(null, pts.concat([1])) || 1;
-    var slot = (W - 2 * P) / pts.length;
-    pts.forEach(function (v, i) {
-      var bh = (v / max) * (H - P - BOT);
-      svg.appendChild(svgEl('rect', {
-        x: P + i * slot + slot * 0.15, y: H - BOT - bh,
-        width: Math.max(slot * 0.7, 2), height: Math.max(bh, v ? 2 : 0), rx: 2,
-        fill: 'var(--rush-accent)', opacity: v ? .85 : .15
-      }));
-    });
-    svg.appendChild(svgEl('line', {
-      x1: P, y1: H - BOT, x2: W - P, y2: H - BOT,
-      stroke: 'var(--rush-border)', 'stroke-width': 1
-    }));
-  }
-
-  /* 8. Микро и макро: те же ответы, свёрнутые в два раздела.
-     ⚠️ РАСКЛАДКА ТЕМ БЕРЁТСЯ ИЗ CFG.topic_groups, а она приезжает из
-     `problems/sections.py` через `game/filters.py::TOPIC_GROUPS`. ВТОРОЙ
-     копии раскладки не заводить — прямой запрет ADR 0071. */
-  function chartGroups(s) {
-    var box = $('chart-groups');
-    var groups = CFG.topic_groups || [];
-    var rows = s.topic_rows || [];
-    if (!groups.length || !rows.length) {
-      chartEmpty(box, 'Тем в раунде не набралось');
-      return;
-    }
-    var byTopic = {};
-    groups.forEach(function (g) {
-      (g.topics || []).forEach(function (t) { byTopic[t] = g.key; });
-    });
-    var acc = {};
-    groups.forEach(function (g) { acc[g.key] = { correct: 0, wrong: 0 }; });
-    var seen = false;
-    rows.forEach(function (r) {
-      var key = byTopic[r.topic];
-      if (!key || !acc[key]) return;      // «Без темы» ни в один раздел не идёт
-      acc[key].correct += r.correct;
-      acc[key].wrong += r.wrong;
-      seen = true;
-    });
-    if (!seen) { chartEmpty(box, 'Темы раунда не попали ни в один раздел'); return; }
-
-    box.innerHTML = '';
-    var list = document.createElement('ul');
-    list.className = 'group-bars';
-    groups.forEach(function (g) {
-      var cell = acc[g.key];
-      var tries = cell.correct + cell.wrong;
-      var li = document.createElement('li');
-      var name = document.createElement('span');
-      name.className = 'gb-name';
-      name.textContent = g.title;
-      var bar = document.createElement('span');
-      bar.className = 'gb-bar';
-      var fill = document.createElement('i');
-      fill.style.width = (tries ? 100 * cell.correct / tries : 0) + '%';
-      bar.appendChild(fill);
-      var num = document.createElement('span');
-      num.className = 'gb-num';
-      num.textContent = tries
-        ? cell.correct + '/' + tries + ' (' + Math.round(100 * cell.correct / tries) + '%)'
-        : 'не было';
-      li.appendChild(name);
-      li.appendChild(bar);
-      li.appendChild(num);
-      list.appendChild(li);
-    });
-    box.appendChild(list);
-  }
-
-  /* 9. Против себя обычного: счёт, точность и время этого раунда против
-     личного среднего в этом режиме. Средних нет — сравнивать не с чем, и
-     выдуманного среднего мы не рисуем. */
-  function chartUsual(s) {
-    var box = $('chart-usual');
-    if (!CFG.is_authenticated) {
-      chartEmpty(box, 'Войдите, чтобы сравнивать раунд со своим обычным');
-      return;
-    }
-    var avg = runHistory && runHistory.avg;
-    if (!avg) {
-      chartEmpty(box, 'Первый раунд в этом режиме: сравнивать пока не с чем');
-      return;
-    }
-    var myMs = 0, n = 0;
-    (s.time_seq || []).forEach(function (t, i) {
-      if ((s.outcome_seq || [])[i] === 'correct' && t) { myMs += t; n++; }
-    });
-    myMs = n ? Math.round(myMs / n) : null;
-
-    var rows = [
-      ['Счёт', s.score, avg.score, false],
-      ['Точность', s.accuracy, avg.accuracy, false],
-      // ⚠️ У времени «меньше» значит «лучше»: направление сравнения своё.
-      ['Время верного', myMs, avg.avg_correct_ms, true]
-    ];
-    box.innerHTML = '';
-    var list = document.createElement('ul');
-    list.className = 'usual-rows';
-    rows.forEach(function (r) {
-      var now = r[1], usual = r[2], lowerIsBetter = r[3];
-      if (now == null || usual == null) return;
-      var li = document.createElement('li');
-      var name = document.createElement('span');
-      name.className = 'gb-name';
-      name.textContent = r[0];
-      var val = document.createElement('span');
-      val.className = 'usual-val';
-      var fmt = function (v) {
-        return r[0] === 'Время верного'
-          ? (v / 1000).toFixed(1).replace('.', ',') + ' с'
-          : (r[0] === 'Точность' ? v + '%' : v.toLocaleString('ru-RU'));
-      };
-      val.textContent = fmt(now) + ' против ' + fmt(usual);
-      var mark = document.createElement('span');
-      var better = lowerIsBetter ? now < usual : now > usual;
-      var same = now === usual;
-      mark.className = 'usual-mark ' + (same ? '' : better ? 'up' : 'down');
-      mark.textContent = same ? 'как обычно' : better ? 'лучше' : 'хуже';
-      li.appendChild(name);
-      li.appendChild(val);
-      li.appendChild(mark);
-      list.appendChild(li);
-    });
-    box.appendChild(list);
-  }
-
-  /* Три графика из девяти зависят от истории с сервера: перерисовываем их
-     отдельно, когда ответ придёт. Остальные шесть уже нарисованы. */
-  function buildCompareCharts() {
-    if (!summary) return;
-    chartHistory(summary);
-    chartTimes(summary);
-    chartUsual(summary);
-  }
-
-  function buildCharts() {
-    if (!summary) return;
-    chartCurve(summary);
-    chartTime(summary);
-    chartDifficulty(summary);
-    chartTape(summary);
-    chartPoints(summary);
-    chartGroups(summary);
-    buildCompareCharts();
-  }
-
   $('btn-review').addEventListener('click', function () {
-    var list = $('miss-list');
-    list.hidden = !list.hidden;
-    if (!list.hidden) list.scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'nearest' });
+    $('fin-misses').scrollIntoView({ behavior: REDUCED ? 'auto' : 'smooth', block: 'start' });
   });
 
   $('btn-again').addEventListener('click', function () {
-    // В забеге по набору «ещё раз» не имеет смысла: попытка одна, а список
-    // фиксирован. Отправляем в обычную игру — там выбор режима и фильтров.
-    if (setRun) { location.href = '/game/'; return; }
+    // «Ещё раз» у набора видно, только пока остались попытки (paintActions):
+    // тот же набор заново. У вызова дня и дуэли кнопки нет — попытка одна.
+    if (setRun) { startRun({ setCode: setRun.code }); return; }
     startRun();
+  });
+
+  /* Реванш: тот же соперник и фильтр, новые вопросы. Адрес собирает сервер
+     (`_finish_extras`), ответ — лобби новой дуэли. */
+  $('btn-rematch').addEventListener('click', function () {
+    var url = summary && summary.duel && summary.duel.rematch_url;
+    var btn = this;
+    if (!url || btn.disabled) return;
+    btn.disabled = true;
+    api(url).then(function (d) {
+      if (d && d.ok && d.play_url) { location.href = d.play_url; return; }
+      btn.disabled = false;
+      showNetToast((d && d.error) || 'Реванш не создался. Попробуйте ещё раз');
+    }, function () {
+      btn.disabled = false;
+      showNetToast('Нет связи. Попробуйте ещё раз');
+    });
   });
   $('btn-mistakes').addEventListener('click', function () {
     startRun({ mistakes: true });
@@ -6658,7 +6297,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
       return;
     }
     if (state === 'finished') {
-      if (e.key === 'Enter') { e.preventDefault(); startRun(); }
+      // Enter — основная кнопка итога (у набора и дуэли это не «ещё раз»).
+      // На кнопке или ссылке Enter нажимает её саму.
+      if (e.key === 'Enter' && !(e.target.closest && e.target.closest('button, a, input, textarea'))) {
+        var primary = document.querySelector('#fin-actions .fin-primary');
+        if (primary) { e.preventDefault(); primary.click(); }
+      }
       return;
     }
     if (state === 'playing') {

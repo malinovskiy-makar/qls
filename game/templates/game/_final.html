@@ -1,0 +1,119 @@
+{% comment %}
+  ЭКРАН 3: ИТОГ РАУНДА (решение владельца 17.09.2026, ADR 0111; макеты
+  claude/mockups/wecon_rush_20260917/Result.dc.html и ResultMobile.dc.html).
+
+  Порядок сверху вниз: вердикт и действия — всё главное на первом экране;
+  «Ход раунда» — счёт и каждый вопрос на одной оси; темы, разделы, сложность;
+  где набрано, последние раунды, против себя обычного; ошибки и пропуски
+  списком прямо на странице.
+
+  ⚠️ НИ ОДНОГО БЛОКА ЗА РАСКРЫВАШКОЙ (решение 08.09.2026) И НИ ОДНОЙ ПУСТОЙ
+  КАРТОЧКИ: данных нет — карточки нет, а не «не набрано». Какие карточки и
+  кнопки видны, решает `paintFinal`; стили — блок «ЭКРАН ИТОГА» в game.html.
+{% endcomment %}
+<section id="screen-final" class="screen">
+  <div class="final">
+
+    <div class="fin-card fin-verdict">
+      <div class="fin-main">
+        <h2 class="fin-title" id="final-title"><span class="fin-title-i" id="final-title-icon" aria-hidden="true"></span><span id="final-title-text">Время вышло!</span></h2>
+        <p class="fin-chips">
+          <span class="fin-chip" id="fin-mode-chip">Блиц</span>
+          <span class="fin-chip" id="fin-set-chip" hidden></span>
+          <span class="fin-chip" id="fin-mistakes-chip" hidden>работа над ошибками</span>
+          <span id="fin-date"></span>
+          <span id="fin-filter"></span>
+        </p>
+        <div class="fin-big">
+          <b class="fin-score" id="final-score">0</b>
+          <div class="fin-notes">
+            <span class="fin-badge" id="record-badge" hidden>{% include "_icon.html" with name="trophy" %}<span id="record-text">личный рекорд</span></span>
+            <span class="fin-note" id="ranked-note" hidden></span>
+            <span class="fin-note" id="acc-note" hidden></span>
+          </div>
+        </div>
+        <div class="fin-metrics">
+          <div class="fin-metric"><small>Верных</small><b id="st-correct">0 из 0</b><span id="st-acc"></span></div>
+          <div class="fin-metric"><small>Макс. комбо</small><b id="st-streak">×1</b><span id="st-streak-sub"></span></div>
+          <div class="fin-metric"><small>Жизни</small><b id="st-lives">0 из 0</b><span id="st-lives-sub"></span></div>
+          <div class="fin-metric"><small>В игре</small><b id="st-played">0:00</b><span id="st-played-sub"></span></div>
+        </div>
+      </div>
+
+      {% comment %} Действия: первая видимая кнопка — основная (класс ставит
+         `paintActions`), Enter на экране итога нажимает её. У вызова дня
+         первая — «Доска дня», у набора — «К набору и доске», у дуэли —
+         «Итог дуэли», у обычного раунда — «Сыграть ещё раз». {% endcomment %}
+      <div class="fin-actions" id="fin-actions">
+        <a class="fin-btn" id="btn-board" href="/game/" hidden><span id="btn-board-text">Доска</span>{% include "_icon.html" with name="arrow_right" %}</a>
+        <button type="button" class="fin-btn" id="btn-again"><span>Сыграть ещё раз</span><kbd>Enter</kbd></button>
+        <a class="fin-btn" id="btn-next-daily" href="/game/daily/" hidden><span id="btn-next-daily-text">Следующий вызов</span>{% include "_icon.html" with name="arrow_right" %}</a>
+        <button type="button" class="fin-btn" id="btn-rematch" hidden><span>Реванш</span>{% include "_icon.html" with name="duel" %}</button>
+        <a class="fin-btn" id="btn-home" href="/game/" hidden><span>В обычную игру</span>{% include "_icon.html" with name="arrow_right" %}</a>
+        <button type="button" class="fin-btn fin-work" id="btn-mistakes" hidden><span>Работа над ошибками</span><span class="n" id="btn-mistakes-n"></span></button>
+        <button type="button" class="fin-btn" id="btn-review" hidden><span>Разобрать ошибки и пропуски</span><span class="n" id="btn-review-n"></span></button>
+        <button type="button" class="fin-btn" id="btn-share" hidden><span>Поделиться результатом</span>{% include "_icon.html" with name="share" %}</button>
+        <a class="fin-btn" id="btn-catalog" href="/catalog/"><span>Темы этого раунда в каталоге</span>{% include "_icon.html" with name="arrow_right" %}</a>
+        <p class="fin-share-note" id="share-note" hidden>ссылка на результат открывается у всех, без входа</p>
+      </div>
+    </div>
+
+    <section class="fin-card fin-flow" id="fin-flow" hidden>
+      <div class="fin-card-head">
+        <h3>Ход раунда</h3>
+        <p class="fin-key">
+          <span id="flow-key-score"><i class="k k-score"></i>счёт</span>
+          <span><i class="k k-ok"></i>верно</span>
+          <span><i class="k k-bad"></i>неверно</span>
+          <span><i class="k k-skip"></i>пропуск</span>
+          <span>высота столбика – сколько думали, над ним секунды</span>
+        </p>
+      </div>
+      <div class="chart-box fin-curve" id="chart-curve"></div>
+      <div class="fin-tape" id="fin-tape"></div>
+      <div class="fin-qn" id="fin-qn" aria-hidden="true"></div>
+    </section>
+
+    <div class="fin-row" id="fin-row-a">
+      <section class="fin-card fin-cb" id="fin-topics" hidden>
+        <h3>Точность по темам</h3>
+        <div class="fin-bars" id="tp-list"></div>
+      </section>
+      <section class="fin-card fin-cb" id="fin-groups" hidden>
+        <h3>Разделы</h3>
+        <div class="fin-bars" id="groups-list"></div>
+        <p class="fin-none" id="groups-none" hidden></p>
+      </section>
+      <section class="fin-card fin-cb" id="fin-stars" hidden>
+        <h3>Держите ли сложное</h3>
+        <div class="fin-bars" id="stars-list"></div>
+        <p class="fin-none" id="stars-none" hidden></p>
+      </section>
+    </div>
+
+    <div class="fin-row" id="fin-row-b">
+      <section class="fin-card fin-cb" id="fin-points" hidden>
+        <h3>Где набрано</h3>
+        <div class="fin-bars" id="points-list"></div>
+      </section>
+      <section class="fin-card fin-cb" id="fin-history" hidden>
+        <h3>Последние раунды <span class="fin-h3-sub" id="history-mode"></span></h3>
+        <div class="fin-hist" id="chart-history"></div>
+        <div class="fin-hist-x" id="history-x"></div>
+      </section>
+      <section class="fin-card fin-cb" id="fin-usual" hidden>
+        <h3>Против себя обычного</h3>
+        <div class="fin-cmp" id="usual-list"></div>
+      </section>
+      <p class="fin-card fin-login" id="fin-login" hidden>
+        <a href="/login/?next=/game/">Войдите</a>: сравним этот раунд с вашими прошлыми.
+      </p>
+    </div>
+
+    <section class="fin-card fin-misses" id="fin-misses" hidden>
+      <h3>Ошибки и пропуски <span class="fin-h3-sub">· каждую можно открыть в каталоге и решить не спеша</span></h3>
+      <ul class="miss-list" id="miss-list"></ul>
+    </section>
+
+  </div>
+</section>
