@@ -366,7 +366,11 @@ class StreakTests(TestCase):
     def test_week_is_monday_to_sunday_with_today_marked(self):
         s = daily.streak_for(self.user)
         self.assertEqual([d['label'] for d in s['week']], list(daily.WEEKDAY_LABELS))
+        self.assertEqual(datetime.date.fromisoformat(s['week'][0]['day']).weekday(), 0)
         self.assertEqual(sum(1 for d in s['week'] if d['is_today']), 1)
+        self.assertTrue(s['week'][self.today.weekday()]['is_today'])
+        self.play(self.today)
+        self.assertTrue(daily.streak_for(self.user)['week'][self.today.weekday()]['hit'])
 
     def test_anonymous_has_no_streak_and_no_errors(self):
         from django.contrib.auth.models import AnonymousUser
