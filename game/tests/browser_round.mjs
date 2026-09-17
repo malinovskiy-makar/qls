@@ -116,12 +116,13 @@ try {
         // Переполненный столбец уходит ВВЕРХ под полосу — верхний край тоже в окне.
         metaTop: Math.round(document.querySelector('#screen-play .qmeta').getBoundingClientRect().top),
         hudBottom: Math.round(document.getElementById('hud').getBoundingClientRect().bottom),
+        hudTop: Math.round(document.getElementById('hud').getBoundingClientRect().top),
       };
     });
     const s1 = await noScroll(page);
     check('blitz_five_options_no_scroll', m.options === 5 && s1.sh <= s1.ih && s1.sw <= s1.cw
           && m.lastBottom !== null && m.lastBottom <= s1.ih && m.footBottom <= s1.ih
-          && m.metaTop >= m.hudBottom, { m, s1 });
+          && m.hudTop >= 0 && m.metaTop >= m.hudBottom, { m, s1 });
     check('timer_is_m_ss', /^\d+:\d{2}$/.test(m.timer), m.timer);
     check('site_header_hidden', m.playing && m.navHidden, m);
     check('option_grid_three_columns', m.cols === 3 && m.keyInFirstCol && m.lastWide, m);
@@ -200,10 +201,13 @@ try {
         footBottom: Math.round(box(document.getElementById('btn-report')).bottom),
         metaTop: Math.round(box(document.querySelector('#screen-play .qmeta')).top),
         hudBottom: Math.round(box(document.getElementById('hud')).bottom),
+        // Фокус в поле ответа прокручивает и «непрокручиваемую» страницу: полоса
+        // уезжает за верхний край. Она обязана стоять на месте.
+        hudTop: Math.round(box(document.getElementById('hud')).top),
       };
     });
     const inputVisible = fit.inputH > 0 && fit.inputBottom <= s.ih && fit.footBottom <= s.ih
-      && fit.metaTop >= fit.hudBottom;
+      && fit.hudTop >= 0 && fit.metaTop >= fit.hudBottom;
     check('classic_600_chars_no_scroll', len >= 600 && s.sh <= s.ih && inputVisible, { len, s, fit });
     await context.close();
   }
