@@ -83,11 +83,14 @@ try {
     const f1 = await fillFrac(page);
     check('countdown_holds_question_and_clock', cd.shown && cd.q === '' && f0 === 1 && f1 === 1,
           { cd, f0, f1 });
+    // Прошло 1,6 с из трёх: сам отсчёт кончился бы через 1,4 с, Enter — сразу.
+    const enterAt = Date.now();
     await page.keyboard.press('Enter');
     await page.waitForFunction(() => document.getElementById('q-text').textContent.trim().length > 0,
                                null, { timeout: 5000 });
+    const waited = Date.now() - enterAt;
     const started = await page.evaluate(() => document.getElementById('countdown').hidden);
-    check('enter_skips_countdown', started, { started });
+    check('enter_skips_countdown', started && waited < 700, { started, waited });
 
     const m = await page.evaluate(() => {
       const nav = document.querySelector('nav.site-nav');
