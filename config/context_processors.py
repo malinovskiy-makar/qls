@@ -12,7 +12,7 @@
 """
 from django.conf import settings
 
-from problems.feedback_options import FEEDBACK_OPTIONS, page_key_for
+from problems.feedback_options import FEEDBACK_OPTIONS, OTHER_CHOICE, list_key_for, page_key_for
 
 
 def _match(request, *, namespace=None, url_name=None, url_name_has=None,
@@ -134,8 +134,9 @@ def site_meta(request):
         # источника. `json_script` экранирует `<`, `>` и `&` сам, а ключ
         # экрана уезжает внутрь того же словаря — значит и тег нужен один.
         'feedback_data': {
-            'page': page_key_for(request.path),
+            'page': list_key_for(page_key_for(request.path)),
             'options': FEEDBACK_OPTIONS,
+            'other': OTHER_CHOICE,
         },
         # Причины «Плохая задача?» — из модели `ProblemReport.Kind`, по той же
         # причине, что и варианты выше: второй список в разметке разошёлся бы.

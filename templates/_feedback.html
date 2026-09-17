@@ -140,6 +140,7 @@
   } catch (e) { DATA = {}; }
   var OPTIONS = DATA.options || {};
   var PAGE_KEY = DATA.page || 'other';
+  var OTHER = DATA.other || '';
 
   var open = null;
 
@@ -256,9 +257,10 @@
     function renderStep2(kind) {
       step2.innerHTML = '';
       err.hidden = true;
+      var otherBox = null;
       if (kind === 'problem') {
         var list = el('div', 'fb-list');
-        var items = OPTIONS[PAGE_KEY] || OPTIONS.other || [];
+        var items = (OPTIONS[PAGE_KEY] || OPTIONS.other || []).concat([OTHER]);
         items.forEach(function (text) {
           var label = el('label', 'fb-opt');
           var input = document.createElement('input');
@@ -266,16 +268,25 @@
           label.appendChild(input);
           label.appendChild(el('span', null, text));
           list.appendChild(label);
+          if (text === OTHER) otherBox = input;
         });
         step2.appendChild(list);
       }
       var field = el('div', 'fb-field');
       field.appendChild(el('label', null, kind === 'idea'
-        ? 'Что предлагаете' : 'Другое, своими словами'));
+        ? 'Что предлагаете' : 'Опишите, что случилось'));
       var area = document.createElement('textarea');
       area.className = 'fb-other';
       field.appendChild(area);
       step2.appendChild(field);
+      if (otherBox) {
+        /* Поле текста — только по галочке «Другое, своими словами». */
+        field.hidden = true;
+        otherBox.addEventListener('change', function () {
+          field.hidden = !otherBox.checked;
+          if (otherBox.checked) area.focus();
+        });
+      }
 
       var extra = el('div', 'fb-field');
       extra.appendChild(el('label', null, 'Комментарий (необязательно)'));
@@ -301,6 +312,13 @@
 
     send.addEventListener('click', function () {
       if (!chosenKind) { return; }
+      var picked = box.querySelectorAll('.fb-choice:checked');
+      var otherOn = Array.prototype.some.call(picked, function (c) { return c.value === OTHER; });
+      var text = box.querySelector('.fb-other');
+      var problem = '';
+      if (chosenKind === 'problem' && !picked.length) problem = 'Отметьте, что случилось.';
+      else if (otherOn && !(text && text.value.trim())) problem = 'Опишите своими словами.';
+      if (problem) { err.hidden = false; err.textContent = problem; return; }
       var data = new FormData();
       data.append('kind', chosenKind);
       data.append('url', location.pathname + location.search);
@@ -311,7 +329,10 @@
       });
       var other = box.querySelector('.fb-other');
       var comment = box.querySelector('.fb-comment');
-      data.append('other_text', other ? other.value : '');
+      /* Текст «Другое» уходит, только если галочка стоит: скрытое поле с
+         забытым текстом не должно приехать молча. */
+      var sendOther = chosenKind === 'idea' || otherOn;
+      data.append('other_text', other && sendOther ? other.value : '');
       data.append('comment', comment ? comment.value : '');
       if (shot.blob) data.append('screenshot', shot.blob, 'shot.jpg');
       data.append('screenshot_note', shot.note);

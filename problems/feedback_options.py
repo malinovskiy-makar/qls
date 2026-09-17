@@ -125,7 +125,23 @@ def page_key_for(path):
     return 'other'
 
 
+#: Последний пункт списка «Проблема»: поле текста открывается только по нему
+#: (решение владельца 17.09.2026). В `choices` записи уходит этой строкой.
+OTHER_CHOICE = 'Другое, своими словами'
+
+
+def list_key_for(page_key):
+    """Ключ списка в `FEEDBACK_OPTIONS` с учётом синонимов.
+
+    ⚠️ ОКНО ОБЯЗАНО ПОКАЗЫВАТЬ ТОТ ЖЕ СПИСОК, ЧТО ПРОВЕРЯЕТ СЕРВЕР. До 17.09
+    клиент получал сырой ключ («problem»), своего списка у него нет, и окно
+    показывало общий `other`, а сервер ждал варианты каталога и молча
+    выбрасывал отмеченное — «Отметьте, что случилось» с отмеченной галочкой.
+    """
+    key = FEEDBACK_ALIASES.get(page_key, page_key)
+    return key if key in FEEDBACK_OPTIONS else 'other'
+
+
 def options_for(page_key):
     """Список вариантов для экрана. Незнакомый ключ → общий список."""
-    key = FEEDBACK_ALIASES.get(page_key, page_key)
-    return FEEDBACK_OPTIONS.get(key, FEEDBACK_OPTIONS['other'])
+    return FEEDBACK_OPTIONS[list_key_for(page_key)]

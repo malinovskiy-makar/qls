@@ -424,7 +424,7 @@ def api_feedback(request):
     ценнее картинки, и терять его из-за картинки нельзя.
     """
     from problems import ratelimit
-    from problems.feedback_options import options_for, page_key_for
+    from problems.feedback_options import OTHER_CHOICE, options_for, page_key_for
     from problems.models_platform import Feedback
 
     wait = ratelimit.check(FEEDBACK_SCOPE, request, None)
@@ -444,16 +444,19 @@ def api_feedback(request):
     page_key = page_key_for(url if url.startswith('/') else
                             _path_of(url))
 
-    allowed = set(options_for(page_key))
+    allowed = set(options_for(page_key)) | {OTHER_CHOICE}
     chosen = [c for c in request.POST.getlist('choices') if c in allowed]
     other_text = (request.POST.get('other_text') or '').strip()[:4000]
     comment = (request.POST.get('comment') or '').strip()[:4000]
 
-    if kind == Feedback.Kind.PROBLEM and not chosen and not other_text:
-        return JsonResponse(
-            {'ok': False,
-             'error': 'Отметьте, что случилось, или опишите своими словами.'},
-            status=400)
+    # Правило окна (решение владельца 17.09.2026): хотя бы одна галочка, а
+    # у «Другое, своими словами» ещё и непустой текст. Та же проверка — в окне.
+    if kind == Feedback.Kind.PROBLEM and not chosen:
+        return JsonResponse({'ok': False, 'error': 'Отметьте, что случилось.'},
+                            status=400)
+    if kind == Feedback.Kind.PROBLEM and OTHER_CHOICE in chosen and not other_text:
+        return JsonResponse({'ok': False, 'error': 'Опишите своими словами.'},
+                            status=400)
     if kind == Feedback.Kind.IDEA and not other_text:
         return JsonResponse({'ok': False, 'error': 'Напишите предложение.'},
                             status=400)

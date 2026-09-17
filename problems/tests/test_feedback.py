@@ -14,7 +14,7 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 from PIL import Image
 
-from problems.feedback_options import options_for, page_key_for
+from problems.feedback_options import OTHER_CHOICE, options_for, page_key_for
 from problems.models import User
 from problems.models_platform import Feedback
 
@@ -134,10 +134,10 @@ class AcceptTests(MediaTempMixin, TestCase):
     def test_page_key_comes_from_the_url_not_from_the_client(self):
         """Клиент не присылает `page_key` вовсе — иначе группировка развалится.
 
-        ⚠️ Варианты здесь текстом, а не галочкой: галочка чужого экрана
-        сервером отбрасывается (см. тест ниже), и запись бы не создалась.
+        ⚠️ Вариант здесь «Другое» с текстом: галочка чужого экрана сервером
+        отбрасывается (см. тест ниже), а «Другое» есть на любом экране.
         """
-        self._post(url='/game/', page_key='подделка', choices=[],
+        self._post(url='/game/', page_key='подделка', choices=[OTHER_CHOICE],
                    other_text='Дуэль не соединилась')
         self.assertEqual(Feedback.objects.get().page_key, 'game')
 
@@ -219,11 +219,45 @@ class RefuseTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Feedback.objects.count(), 0)
 
-    def test_problem_with_only_free_text_is_accepted(self):
-        """«Другое» без галочек — это тоже жалоба."""
+    def test_one_checkbox_without_text_is_accepted(self):
+        """Правило 17.09.2026: одной галочки достаточно, текст не обязателен."""
+        response = self.client.post('/api/feedback/', {
+            'kind': 'problem', 'url': '/calc2/', 'choices': ['Медленно или подвисает']})
+        self.assertEqual(response.status_code, 200)
+
+    def test_other_with_text_is_accepted(self):
+        response = self.client.post('/api/feedback/', {
+            'kind': 'problem', 'url': '/calc2/', 'choices': [OTHER_CHOICE],
+            'other_text': 'Всё сломалось'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Feedback.objects.get().choices, [OTHER_CHOICE])
+
+    def test_other_without_text_is_400(self):
+        response = self.client.post('/api/feedback/', {
+            'kind': 'problem', 'url': '/calc2/', 'choices': [OTHER_CHOICE]})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(Feedback.objects.count(), 0)
+
+    def test_text_without_any_checkbox_is_400(self):
+        """Хотя бы одна галочка: текст без «Другое» — не жалоба по правилу окна."""
         response = self.client.post('/api/feedback/', {
             'kind': 'problem', 'url': '/calc2/', 'other_text': 'Всё сломалось'})
+        self.assertEqual(response.status_code, 400)
+
+    def test_problem_page_checkbox_is_accepted(self):
+        """Страница задачи — синоним каталога. Окно показывало общий список,
+        сервер ждал список каталога и выбрасывал галочку (до 17.09.2026)."""
+        from problems.tests.factories import make_problem
+        problem = make_problem('Условие для окна обратной связи.')
+        html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode('utf-8')
+        payload = html.split('id="fb-options"', 1)[1].split('>', 1)[1].split('</script>', 1)[0]
+        import json as _json
+        data = _json.loads(payload)
+        shown = data['options'][data['page']]
+        response = self.client.post('/api/feedback/', {
+            'kind': 'problem', 'url': '/catalog/problem/%d/' % problem.pk, 'choices': [shown[0]]})
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(Feedback.objects.get().choices, [shown[0]])
 
     def test_unknown_kind_is_400(self):
         response = self.client.post('/api/feedback/',
@@ -323,6 +357,16 @@ class OnEveryScreenTests(TestCase):
         for url in self.PAGES:
             html = self.client.get(url).content.decode('utf-8')
             self.assertIn('name="csrfmiddlewaretoken"', html, url)
+
+    def test_other_is_the_last_checkbox_and_its_field_starts_hidden(self):
+        """Окно строится скриптом: проверяем данные и ветку скрытия поля."""
+        import json as _json
+        html = self.client.get('/calc2/').content.decode('utf-8')
+        payload = html.split('id="fb-options"', 1)[1].split('>', 1)[1].split('</script>', 1)[0]
+        self.assertEqual(_json.loads(payload)['other'], OTHER_CHOICE)
+        self.assertTrue('.concat([OTHER])' in html, 'пункт «Другое» не добавляется последним')
+        self.assertTrue('field.hidden = true;' in html, 'поле текста не скрыто по умолчанию')
+        self.assertTrue('field.hidden = !otherBox.checked;' in html, 'поле не открывается по галочке')
 
     def test_options_are_served_by_the_server(self):
         r"""Список вариантов приходит с сервера, клиент его не дублирует.
