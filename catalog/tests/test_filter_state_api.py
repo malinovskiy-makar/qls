@@ -97,6 +97,29 @@ class FilterStateApiTests(_Fixture):
         self.assertEqual(self._get(params)['results_html'].strip(), section.strip())
 
 
+class HasSolutionFilterTests(_Fixture):
+    """«Только задачи с решением» первым фильтром ронял и страницу, и API:
+    подпись «с решением» без `%s`, а `scope_label` подставлял в неё значение."""
+
+    def _check(self, params):
+        resp = self.client.get(reverse('catalog:api_filter_state'), params)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.has_header('X-Smart-Search'), 'нет X-Smart-Search')
+        self.assertTrue(resp.has_header('X-Smart-Search-Ms'), 'нет X-Smart-Search-Ms')
+        return json.loads(resp.content)
+
+    def test_without_query(self):
+        data = self._check({'has_solution': 1})
+        self.assertEqual(data['total'], 1)
+        self.assertTrue('/catalog/problem/%d/' % self.p2.pk in data['results_html'], 'нет задачи с решением')
+
+    def test_with_query(self):
+        self._check({'has_solution': 1, 'q': 'монополист'})
+
+    def test_page(self):
+        self.assertEqual(self.client.get('/catalog/', {'has_solution': 1}).status_code, 200)
+
+
 class ApiTagsByTopicTests(_Fixture):
     def test_topic_mode_lists_only_that_topics_tags_without_zeros(self):
         url = reverse('catalog:api_tags')

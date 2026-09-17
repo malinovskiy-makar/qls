@@ -146,11 +146,15 @@ class FeedbackAdmin(admin.ModelAdmin):
 
     @admin.display(description='Снимок экрана')
     def shot_link(self, obj):
+        from django.urls import reverse
         from django.utils.html import format_html
         if not obj.screenshot:
             return 'нет'
-        return format_html('<a href="{}" target="_blank">открыть</a>',
-                           'screenshot/')
+        # ⚠️ АДРЕС ПО ИМЕНИ МАРШРУТА, НЕ ОТНОСИТЕЛЬНЫЙ. «screenshot/» со страницы
+        # записи вёл на …/<pk>/change/screenshot/, его ловил общий шаблон
+        # админки, и Django писал «не существует, возможно, удалён» (17.09.2026).
+        return format_html('<a href="{}" target="_blank" rel="noopener">открыть</a>',
+                           reverse('admin:problems_feedback_screenshot', args=[obj.pk]))
 
     # ⚠️ ВТОРАЯ И ПОСЛЕДНЯЯ ФАЙЛОВАЯ ВЬЮХА ПРОЕКТА. Живёт ВНУТРИ админки, а
     # не отдельным маршрутом: `admin_site.admin_view` сам требует staff,

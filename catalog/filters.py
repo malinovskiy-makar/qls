@@ -170,6 +170,10 @@ def scope_label(key, labels):
     """«по теме «X»», «по темам «X», «Y»», «по 5 темам» — второе число счётчика."""
     one, few, many = _SCOPE[key]
     labels = list(labels)
+    if '%' not in one:
+        # «с решением»: подставлять некуда. Раньше `%` ронял и страницу, и
+        # api/filter-state, когда «Есть решение» был первым выбранным фильтром.
+        return one
     if key == 'difficulty':
         text = difficulty_label(labels, star=False) if labels else ''
         return (one if len(labels) <= 1 else few) % text

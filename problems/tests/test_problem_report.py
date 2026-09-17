@@ -180,6 +180,14 @@ class ScreenTests(TestCase):
         self.assertTrue('btn-report' in html)
         self.assertTrue('data-problem-id="%d"' % problem.pk in html)
 
+    def test_problem_page_button_is_called_error_in_problem(self):
+        """Переименование 17.09.2026; заголовок окна прежний."""
+        problem = make_problem('Условие с кнопкой жалобы.')
+        html = self.client.get('/catalog/problem/%d/' % problem.pk).content.decode('utf-8')
+        self.assertTrue('Ошибка в задаче?' in html, 'нет новой подписи кнопки')
+        self.assertFalse('Плохая задача?' in html, 'осталась старая подпись')
+        self.assertTrue('Что не так с этой задачей?' in html, 'заголовок окна пропал')
+
     def test_game_page_has_the_button(self):
         html = self.client.get('/game/').content.decode('utf-8')
         self.assertTrue('id="btn-report"' in html)

@@ -360,12 +360,12 @@
       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M6.5 9.5a3 3 0 0 0 4.2 0l2-2a3 3 0 0 0-4.2-4.2l-1 1"/><path d="M9.5 6.5a3 3 0 0 0-4.2 0l-2 2a3 3 0 0 0 4.2 4.2l1-1"/></svg>
       <span id="copy-label">Скопировать ссылку</span>
     </button>
-    {# «Плохая задача?» — окно и отправка в общем партиале _problem_report.html. #}
+    {# «Ошибка в задаче?» (до 17.09 «Плохая задача?») — окно и отправка в общем партиале _problem_report.html. #}
     <button class="pd-act btn-report" type="button" data-source="catalog"
             data-problem-id="{{ problem.pk }}">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"
            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 21V4"/><path d="M5 4h11l-2.5 4L16 12H5"/></svg>
-      <span>Плохая задача?</span>
+      <span>Ошибка в задаче?</span>
     </button>
     {% if user.is_authenticated and user.role == 'teacher' %}
     <div class="ca-hw-wrap" id="hw-wrap-{{ problem.pk }}">

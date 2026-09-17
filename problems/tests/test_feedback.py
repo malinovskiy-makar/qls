@@ -263,6 +263,23 @@ class ScreenshotAccessTests(MediaTempMixin, TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'image/jpeg')
 
+    def test_open_link_on_the_change_page_leads_to_the_image(self):
+        """Ссылка «открыть» была ОТНОСИТЕЛЬНОЙ: со страницы записи она вела на
+        …/<pk>/change/screenshot/, этот адрес ловил общий шаблон админки, и
+        Django отвечал «…не существует. Возможно, он был удалён?» (17.09.2026).
+        Переходим ровно так, как браузер: href со страницы + адрес страницы."""
+        import re
+        from urllib.parse import urljoin
+        staff = User.objects.create_user(username='fb_staff3', password=PASSWORD,
+                                         is_staff=True, is_superuser=True)
+        self.client.force_login(staff)
+        change = '/admin/problems/feedback/%d/change/' % self.entry.pk
+        html = self.client.get(change).content.decode('utf-8')
+        href = re.search(r'<a href="([^"]+)"[^>]*>открыть</a>', html).group(1)
+        response = self.client.get(urljoin(change, href))
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response['Content-Type'].startswith('image/'), response['Content-Type'])
+
     def test_ordinary_user_is_refused(self):
         user = User.objects.create_user(username='fb_plain', password=PASSWORD,
                                         role='student')
