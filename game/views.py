@@ -548,16 +548,67 @@ def _practice_payload():
             'question_types': list(config.PRACTICE['question_types']), 'practice': True}
 
 
+def _choice_numbers(indices):
+    u"""Номера вариантов словами игрока: [0, 2] → «1, 3»."""
+    return ', '.join(str(i + 1) for i in sorted(indices))
+
+
 def practice_summary(state):
-    u"""Сводка «Бесконечных тестов»: решено (без пропусков), верных, пропущено, точность."""
+    u"""Итог «Бесконечных тестов» (решение владельца 17.09.2026, ADR 0114).
+
+    Числа: отвечено (верные и ошибки, без пропусков), верных, ошибок, пропущено,
+    точность. `mistakes` — ошибки и пропуски по порядку открытия: текст, тема,
+    ответ игрока и верный ответ номерами вариантов, `problem_id` и решение
+    (есть только у сгенерированного). `topics` — по образцу `topic_rows` итога
+    раунда: верно / ошибка / пропуск на тему.
+
+    ⚠️ Пропуск, на который потом ответили, пропуском не считается: в журнале
+    один исход на вопрос — последний (`_practice_answer`).
+    """
     outcomes = list((state.get('answered') or {}).values())
     correct = outcomes.count('correct')
-    answered = correct + outcomes.count('wrong')
-    return {'answered': answered, 'correct': correct, 'skipped': outcomes.count('skip'),
-            'accuracy': round(100 * correct / answered) if answered else 0}
+    wrong = outcomes.count('wrong')
+    answered = correct + wrong
+    log = sorted(state.get('log') or [], key=lambda e: e.get('number') or 0)
+    missed = [e for e in log if e.get('outcome') in ('wrong', 'skip')]
+    questions = (GameQuestion.objects.in_bulk([e['question_id'] for e in missed])
+                 if missed else {})
+    mistakes = []
+    for e in missed:
+        gq = questions.get(e['question_id'])
+        right = []
+        if gq is not None:
+            right = (gq.correct_indices or []) if gq.question_type == 'multi' else [gq.correct_index]
+        mistakes.append({
+            'number': e.get('number'),
+            'outcome': e['outcome'],
+            'question_id': e['question_id'],
+            'text': gq.question if gq is not None else '(вопрос исчез из пула)',
+            'topic': (e.get('topics') or [NO_TOPIC])[0],
+            'your': _choice_numbers(e.get('chosen') or []),
+            'right': _choice_numbers(right),
+            'problem_id': gq.problem_id if gq is not None else None,
+            'solution': (gq.gen_solution if gq is not None and gq.is_generated
+                         and gq.gen_solution else ''),
+        })
+    topics = {}
+    for e in log:
+        for name in (e.get('topics') or [NO_TOPIC]):
+            cell = topics.setdefault(name, {'topic': name, 'correct': 0, 'wrong': 0, 'skip': 0})
+            if e.get('outcome') in cell:
+                cell[e['outcome']] += 1
+    topic_rows = []
+    for cell in topics.values():
+        cell['total'] = cell['correct'] + cell['wrong'] + cell['skip']
+        topic_rows.append(cell)
+    topic_rows.sort(key=lambda t: (-t['total'], t['topic']))
+    return {'answered': answered, 'correct': correct, 'wrong': wrong,
+            'skipped': outcomes.count('skip'),
+            'accuracy': round(100 * correct / answered) if answered else 0,
+            'mistakes': mistakes, 'topics': topic_rows}
 
 
-def _practice_answer(request, state, gq, is_skip, correct):
+def _practice_answer(request, state, gq, is_skip, correct, body):
     u"""Ответ в «Бесконечных тестах» (решение владельца 15.09.2026).
 
     Ни очков, ни времени, ни жизней: только исход — для сводки и подсветки.
@@ -565,22 +616,34 @@ def _practice_answer(request, state, gq, is_skip, correct):
     приходит своими полями по типу вопроса. ⚠️ Статистику вопроса практика НЕ
     пишет: ответ без часов, и доля верных вместе с ним стала бы легче, чем в
     раунде, по которому считается измеренная сложность.
+
+    ⚠️ ПРОПУСК ОБРАТИМ (решение 17.09.2026): на пропущенный вопрос можно
+    ответить позже, и в журнале остаётся ОДИН исход на вопрос — последний.
+    Выбранные варианты и темы лежат в записи журнала: по ним итог строит
+    список ошибок и точность по темам, не спрашивая клиента.
     """
     result = 'skip' if is_skip else ('correct' if correct else 'wrong')
     state['answered'][str(gq.id)] = result
-    state['log'].append({'question_id': gq.id, 'number': state['seen'].index(gq.id) + 1,
-                         'question_type': gq.question_type, 'outcome': result})
+    if is_skip:
+        chosen = []
+    elif gq.question_type == 'multi':
+        chosen = sorted(body.get('choices') or [])
+    else:
+        chosen = [body.get('choice')]
+    entry = {'question_id': gq.id, 'number': state['seen'].index(gq.id) + 1,
+             'question_type': gq.question_type, 'outcome': result,
+             'chosen': chosen, 'topics': list(gq.topics or [])}
+    state['log'] = [e for e in state['log'] if e.get('question_id') != gq.id] + [entry]
     run_state.save_run(request, state)
-    payload = {
-        'result': result,
-        'correct': correct,
-        'practice': True,
-        'correct_choices': (list(gq.correct_indices or []) if gq.question_type == 'multi'
-                            else [gq.correct_index]),
-        'problem_id': gq.problem_id,
-    }
-    if gq.is_generated and gq.gen_solution:
-        payload['solution'] = gq.gen_solution
+    payload = {'result': result, 'correct': correct, 'practice': True}
+    # ⚠️ ВЕРНЫЙ ОТВЕТ, ЗАДАЧА И РЕШЕНИЕ — ТОЛЬКО С ОТВЕТОМ, НЕ С ПРОПУСКОМ. Пропуск
+    # обратим: пришли они с пропуском — вернуться и «ответить» мог бы любой.
+    if not is_skip:
+        payload['correct_choices'] = (list(gq.correct_indices or []) if gq.question_type == 'multi'
+                                      else [gq.correct_index])
+        payload['problem_id'] = gq.problem_id
+        if gq.is_generated and gq.gen_solution:
+            payload['solution'] = gq.gen_solution
     return JsonResponse(payload)
 
 
@@ -1275,7 +1338,11 @@ def api_answer(request):
 
     if qid not in state['seen']:
         return JsonResponse({'error': 'Этот вопрос не выдавался'}, status=404)
-    if str(qid) in state['answered']:
+    # ⚠️ В «Бесконечных тестах» пропуск обратим: на пропущенный вопрос можно
+    # ответить позже (решение 17.09.2026). В раунде — нет: там пропуск
+    # засчитан, и второй ответ на тот же вопрос был бы вторым шансом.
+    previous = state['answered'].get(str(qid))
+    if previous is not None and not (state.get('practice') and previous == 'skip'):
         return JsonResponse({'error': 'Вопрос уже отвечен'}, status=409)
 
     try:
@@ -1288,7 +1355,7 @@ def api_answer(request):
         return checked
     is_skip, correct = checked
     if state.get('practice'):
-        return _practice_answer(request, state, gq, is_skip, correct)
+        return _practice_answer(request, state, gq, is_skip, correct, body)
 
     mode_cfg = config.MODES[state['mode']]
     mode_key = state['mode']

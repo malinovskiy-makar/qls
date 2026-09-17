@@ -10,12 +10,16 @@ ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile
 секунды, часы стоят (серверная пауза, ADR 0109). Отсчёт 3-2-1 перед одиночным
 раундом — `#countdown`.
 
-Тот же экран играет «Бесконечные тесты» (`body.practice`): без времени, жизней и
-очков, справа «Вопрос N · верных M», снизу «Назад / Вперёд».
+Тот же экран играет «Бесконечные тесты» (`body.practice`, ADR 0106 и 0114, макеты
+`Practice`, `PracticeMobile`): без времени, жизней и очков. В полосе — название и
+фильтр, в центре счётчики сессии; под полосой лента пройденного (`#pr-tape`); после
+ответа — разбор `#pr-fb`; снизу «Назад / Пропустить · Дальше · Вперёд» (`.pr-foot`).
 {% endcomment %}
 <section id="screen-play" class="screen">
   <header class="hud" id="hud">
     <div class="hud-l">
+      <p class="pr-name">{% include "_icon.html" with name="infinity" %}<span class="pr-title">Бесконечные тесты</span><span class="pr-title-short">Тесты</span></p>
+      <p class="pr-fchip">фильтр: <b id="pr-filter">все вопросы</b></p>
       <div class="hud-score"><b id="hud-score">0</b><span>очки</span></div>
       <div class="hud-combo" id="hud-combo" hidden><span class="qi-slot"></span><span id="hud-combo-text"></span></div>
     </div>
@@ -29,10 +33,15 @@ ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile
         <div class="hud-lives" id="hud-lives" role="img" aria-label="Жизни"></div>
         <span class="lives-delta" id="lives-delta"></span>
       </div>
+      <p class="pr-tally" aria-live="polite">
+        <span class="t-all">отвечено <b id="pr-answered">0</b></span>
+        <span class="t-ok">{% include "_icon.html" with name="check" %}<i>верно</i> <b id="pr-correct">0</b></span>
+        <span class="t-bad">{% include "_icon.html" with name="close" %}<i>ошибок</i> <b id="pr-wrong">0</b></span>
+        <span class="t-skip">{% include "_icon.html" with name="skip" %}<i>пропущено</i> <b id="pr-skipped">0</b></span>
+      </p>
     </div>
     <div class="hud-r">
       <p class="hud-stat">верных <b id="hud-correct">0</b><span class="hud-qno"> · вопрос <b id="hud-qno">1</b></span></p>
-      <p class="hud-practice">Вопрос <b id="pr-number">1</b> · верных <b id="pr-correct">0</b></p>
       <p class="hud-rec" id="hud-rec" hidden></p>
       {% comment %} Соперник в дуэли: инициал, имя с точкой связи, его верные,
          жизни и время, справа его счёт. Данные — событие табло по сокету. {% endcomment %}
@@ -49,12 +58,24 @@ ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile
     </div>
   </header>
   <div class="time-track" id="time-track"><div class="time-fill" id="time-fill"></div></div>
+  {% comment %} Лента пройденного: квадратик на каждый открытый вопрос, по клику переход.
+     Не влезают — ранние свёрнуты в «‹ ещё N» (на телефоне лента листается пальцем). {% endcomment %}
+  <nav class="pr-tape" id="pr-tape" aria-label="Пройденные вопросы">
+    <span class="pr-cap">Пройдено</span>
+    <button type="button" class="pr-fold" id="pr-fold-back" aria-label="Показать более ранние вопросы">{% include "_icon.html" with name="chevron_left" %}ещё <b id="pr-fold-n">0</b></button>
+    <div class="pr-dots" id="pr-dots"></div>
+    <button type="button" class="pr-fold" id="pr-fold-fwd" aria-label="Показать более поздние вопросы">{% include "_icon.html" with name="chevron_right" %}</button>
+    <button type="button" class="pr-fold pr-to-skip" id="pr-to-skip">к пропущенным · <b id="pr-to-skip-n">0</b>{% include "_icon.html" with name="chevron_right" %}</button>
+    <p class="pr-key" id="pr-key"><span><i class="k k-ok"></i>верно</span><span><i class="k k-bad"></i>ошибка</span><span><i class="k k-skip"></i>пропущен – можно вернуться и ответить</span></p>
+  </nav>
   <p class="gap-pill" id="gap-pill" hidden>{% include "_icon.html" with name="arrow_up" %}<span id="gap-text"></span></p>
   <p class="opp-toast" id="opp-toast" hidden></p>
 
   <div class="play-body">
     <div class="qwrap">
       <div class="qmeta" id="qmeta">
+        <span class="pr-qno">Вопрос <b id="pr-number">1</b></span>
+        <span class="pr-state" id="pr-state" hidden></span>
         <span class="qchip" id="q-diff" hidden>{% include "_icon.html" with name="star" %}<span id="q-diff-text"></span></span>
         <span id="q-points" hidden></span>
         <span class="stat-chip" id="stat-chip" hidden></span>
@@ -85,9 +106,16 @@ ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile
       <div class="multi-actions" id="multi-actions" hidden>
         <button type="button" class="btn-submit" id="btn-submit" disabled>Ответить · Enter</button>
       </div>
-      <div class="practice-nav">
-        <button type="button" id="pr-back">← Назад</button>
-        <button type="button" id="pr-next">Вперёд →</button>
+      {% comment %} Разбор после ответа в «Бесконечных тестах»: вердикт, решение (если его
+         прислал сервер — есть только у сгенерированных) и ссылка на задачу в каталоге.
+         ⚠️ Темы вопроса здесь нет — решение владельца 17.09.2026. {% endcomment %}
+      <div class="pr-fb" id="pr-fb" role="status" aria-live="polite" hidden>
+        <p class="pr-fb-v" id="pr-fb-v"></p>
+        <div class="pr-fb-sol" id="pr-fb-sol" hidden><small>Решение</small><div id="pr-fb-sol-text"></div></div>
+        <div class="pr-fb-side">
+          <a class="pr-open" id="pr-open" href="/catalog/" target="_blank" rel="noopener" hidden>Открыть задачу в каталоге{% include "_icon.html" with name="external" %}</a>
+          <button type="button" class="gh btn-report" id="pr-report" data-source="game">{% include "_icon.html" with name="flag" %}<span>Плохая задача?</span></button>
+        </div>
       </div>
       <!-- Режим «График» на узком экране: увеличенная плитка + явная
            кнопка. Второй тап по самой плитке делает то же самое. -->
@@ -111,6 +139,11 @@ ADR 0110; макеты `claude/mockups/wecon_rush_20260917/Round*`, `RoundMobile
         <span class="reveal-cnt" id="reveal-cnt" aria-hidden="true">3</span>
         <p class="reveal-text" id="reveal-text"></p>
         <button type="button" class="reveal-next" id="reveal-next">Дальше сразу · пробел</button>
+      </div>
+      <div class="pr-foot">
+        <button type="button" class="pr-nb" id="pr-back">{% include "_icon.html" with name="arrow_left" %}Назад</button>
+        <p class="pr-keys"><kbd>1</kbd>–<kbd id="pr-keys-n">4</kbd> ответ · <kbd>←</kbd> <kbd>→</kbd> листать · <kbd>пробел</kbd> <span id="pr-keys-space">пропустить</span></p>
+        <button type="button" class="pr-nb" id="pr-next"><span id="pr-next-text">Пропустить</span>{% include "_icon.html" with name="arrow_right" %}</button>
       </div>
       <div class="play-foot">
         <button type="button" class="gh" id="btn-skip">{% include "_icon.html" with name="skip" %}Пропустить <kbd>пробел</kbd></button>

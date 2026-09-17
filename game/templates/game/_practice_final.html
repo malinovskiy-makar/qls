@@ -1,0 +1,50 @@
+{% comment %}
+  ИТОГ «БЕСКОНЕЧНЫХ ТЕСТОВ» (решение владельца 17.09.2026, ADR 0114; макет
+  claude/mockups/wecon_rush_20260917/PracticeResult.dc.html). Живёт на экране итога
+  раунда (`#screen-final`) вместо `#fin-round` и собран из тех же карточек: вердикт с
+  действиями, «Ошибки и пропуски» тем же списком, что у раунда, «Точность по темам».
+
+  Без очков, рекордов и таблицы: практика в них не идёт и `GameResult` не пишет.
+  Заполняет `paintPracticeFinal` — сводкой сервера, а без связи своими числами.
+{% endcomment %}
+<div class="final pr-final" id="fin-practice" hidden>
+  <div class="fin-card fin-verdict">
+    <div class="fin-main">
+      <h2 class="fin-title"><span class="fin-title-i" aria-hidden="true">{% include "_icon.html" with name="infinity" %}</span><span>Бесконечные тесты</span></h2>
+      <p class="fin-chips">
+        <span class="fin-chip">итог сессии</span>
+        <span id="prf-date"></span>
+        <span id="prf-filter"></span>
+      </p>
+      <div class="fin-big">
+        <b class="fin-score prf-score"><span id="prf-big">0 из 0</span><small>верных</small></b>
+        <p class="fin-note prf-acc">точность <b id="prf-acc">0 %</b> · пропуски в неё не входят</p>
+      </div>
+      <div class="fin-metrics">
+        <div class="fin-metric"><small>Отвечено</small><b id="prf-answered">0</b></div>
+        <div class="fin-metric"><small>Верно</small><b class="prf-ok" id="prf-correct">0</b></div>
+        <div class="fin-metric"><small>Ошибок</small><b class="prf-bad" id="prf-wrong">0</b></div>
+        <div class="fin-metric"><small>Пропущено</small><b id="prf-skipped">0</b></div>
+      </div>
+    </div>
+    <div class="fin-actions">
+      <button type="button" class="fin-btn fin-primary" id="prf-again"><span>Ещё раз</span><kbd>Enter</kbd></button>
+      <button type="button" class="fin-btn" id="prf-filters"><span>Поменять фильтры</span><span class="n">темы, сложность, источник</span></button>
+      <button type="button" class="fin-btn" id="prf-home"><span>На старт</span>{% include "_icon.html" with name="arrow_right" %}</button>
+      <p class="fin-share-note">Бесконечные тесты не идут ни в таблицу, ни в рекорды – итог показывается один раз.</p>
+    </div>
+  </div>
+
+  <div class="prf-cols">
+    <section class="fin-card fin-misses" id="prf-misses">
+      <h3>Ошибки и пропуски · <span id="prf-miss-n">0</span> <span class="fin-h3-sub">у каждой – верный ответ, решение (если есть) и страница задачи в каталоге</span></h3>
+      <ul class="miss-list" id="prf-list"></ul>
+      <p class="fin-none" id="prf-clean" hidden>Ни одной ошибки и ни одного пропуска.</p>
+    </section>
+    <section class="fin-card fin-cb" id="prf-topics">
+      <div class="prf-th"><h3>Точность по темам</h3><p class="prf-key"><span><i class="k k-ok"></i>верно</span><span><i class="k k-bad"></i>ошибка</span><span><i class="k k-skip"></i>пропуск</span></p></div>
+      <div class="prf-bars" id="prf-bars"></div>
+      <p class="fin-none">«Решать тему» запускает бесконечные тесты с фильтром на эту тему.</p>
+    </section>
+  </div>
+</div>

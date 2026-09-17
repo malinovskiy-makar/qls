@@ -18,7 +18,8 @@ class FinalScreenMarkupTests(TestCase):
         self.src = page_source()
         self.js = inline_js(self.src)
         i = self.src.index('<section id="screen-final"')
-        self.final = self.src[i:self.src.index('</section>\n\n  </div>\n</section>', i)]
+        # Итог раунда — до итога «Бесконечных тестов», который живёт на том же экране (P5).
+        self.final = self.src[i:self.src.index('<div class="final pr-final"', i)]
 
     def body(self, name):
         m = re.search(r'function %s\([^)]*\) \{(.*?)\n  \}' % name, self.js, re.S)
@@ -111,7 +112,8 @@ class FinalScreenLogicTests(TestCase):
     def test_enter_presses_the_primary_action(self):
         m = re.search(r"if \(state === 'finished'\) \{(.*?)\n    \}", self.js, re.S)
         self.assertIsNotNone(m)
-        self.assertIn("document.querySelector('#fin-actions .fin-primary')", m.group(1))
+        # Основная кнопка видимого итога: у раунда и у «Бесконечных тестов» своя (P5).
+        self.assertIn("document.querySelector('#screen-final .final:not([hidden]) .fin-primary')", m.group(1))
         self.assertNotIn('startRun()', m.group(1))
 
     def test_score_counter_always_lands_on_the_total(self):
@@ -128,7 +130,18 @@ class FinalScreenLogicTests(TestCase):
     def test_misses_collect_wrong_answers_and_skips(self):
         self.assertIn("misses.push(missEntry(q, d, 'wrong', given));", self.body('registerWrong'))
         self.assertIn("misses.push(missEntry(q, d, 'skip', ''));", self.body('skip'))
-        self.assertIn("'пропуск → верный '", self.body('paintMisses'))
+        self.assertIn("answerLine(m.kind === 'skip', m.given, m.right)", self.body('paintMisses'))
+        # Строка ответа: «пропуск» / «ваш ответ» и стрелка — значком, а не знаком «→».
+        line = self.body('answerLine')
+        self.assertIn("ICONS.arrow_right", line)
+        self.assertNotIn('→', line)
+
+    def test_catalog_link_goes_to_the_problem_page(self):
+        u"""Страница задачи — /catalog/problem/<id>/; /catalog/<id>/ отвечал 404 (найдено в P5)."""
+        from django.urls import resolve
+        self.assertIn("link.href = '/catalog/problem/' + m.problemId + '/';", self.body('paintMisses'))
+        self.assertNotIn("'/catalog/' + m.problemId", self.js)
+        self.assertEqual(resolve('/catalog/problem/7/').url_name, 'problem_detail')
 
     def test_every_helper_the_final_screen_calls_is_defined(self):
         u"""Сборка итога однажды удалила `plural` вместе с соседней функцией:
@@ -136,7 +149,7 @@ class FinalScreenLogicTests(TestCase):
         code = ''.join(self.body(n) for n in (
             'paintFinal', 'paintNotes', 'paintActions', 'paintFlow', 'paintGroups',
             'paintStars', 'paintPoints', 'paintHistory', 'paintUsual', 'paintMisses',
-            'paintMissSolution', 'chartCurve'))
+            'paintMissSolution', 'chartCurve', 'answerLine'))
         defined = set(re.findall(r'\bfunction (\w+)\(', self.js))
         called = set(re.findall(r'(?<![.\w])([a-z]\w*)\(', code))
         # Помощники-форматтеры передаются и значением (`numText` в строках

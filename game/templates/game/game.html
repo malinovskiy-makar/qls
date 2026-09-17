@@ -1211,10 +1211,9 @@ body.rush-playing .rush-wrap { max-width: none; padding: 0; }
 @keyframes heartPop { 0% { transform: scale(1); } 35% { transform: scale(1.4); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .heart.pop { animation: none; } }
 
-.hud-stat, .hud-practice { margin: 0; display: flex; gap: 4px; white-space: nowrap;
+.hud-stat { margin: 0; display: flex; gap: 4px; white-space: nowrap;
   font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
-.hud-stat b, .hud-practice b { font-weight: 700; color: var(--text); }
-.hud-practice { display: none; }
+.hud-stat b { font-weight: 700; color: var(--text); }
 /* Рекорд вошедшего: «рекорд 1 260 · ещё 240», побитый — «новый рекорд». */
 .hud-rec {
   margin: 0; height: 28px; display: inline-flex; align-items: center; gap: 6px; padding: 0 10px;
@@ -1390,17 +1389,16 @@ body.rush-playing .rush-wrap { max-width: none; padding: 0; }
 
 /* Нижний ряд: пропуск слева, реакции дуэли посередине, «Плохая задача?» справа. */
 .play-foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.gh, #btn-report.gh {
+.gh, #btn-report.gh, #pr-report.gh {
   font: inherit; height: 34px; padding: 0 12px;
   display: inline-flex; align-items: center; gap: 7px;
   border: 1px solid transparent; border-radius: 8px; background: transparent;
   font-size: 13px; color: var(--text2); cursor: pointer; white-space: nowrap;
 }
-.gh:hover, #btn-report.gh:hover { border-color: var(--border); color: var(--text); }
-.gh .qi, #btn-report.gh .qi { width: 14px; height: 14px; }
+.gh:hover, #btn-report.gh:hover, #pr-report.gh:hover { border-color: var(--border); color: var(--text); }
+.gh .qi, #btn-report.gh .qi, #pr-report.gh .qi { width: 14px; height: 14px; }
 .gh kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border);
           border-radius: 5px; padding: 0 5px; }
-body.practice #btn-skip { display: none; }
 
 /* Отсчёт 3-2-1 перед одиночным раундом. */
 .countdown {
@@ -1597,7 +1595,7 @@ body.practice #btn-skip { display: none; }
   .reveal-next { grid-column: 1 / -1; height: 44px; }
   .reveal-cnt { width: 30px; height: 30px; font-size: 14px; }
   .play-foot { flex-wrap: wrap; }
-  .gh, #btn-report.gh { height: 44px; border-color: var(--border); }
+  .gh, #btn-report.gh, #pr-report.gh { height: 44px; border-color: var(--border); }
   .gh kbd { display: none; }
   .gap-pill { top: auto; position: static; transform: none; margin: 8px auto 0; width: fit-content; }
   .opp-toast { right: 14px; top: 96px; }
@@ -1612,22 +1610,169 @@ body.practice #btn-skip { display: none; }
   .gh kbd, .cd-k { display: none; }
 }
 
-/* ── «Бесконечные тесты» (решение владельца 15.09.2026) ─────────────────
-   Вход на старте — ячейка нижней полосы (стили стартового экрана). В игре
-   body.practice прячет всё, что про время, жизни и очки, и показывает
-   счётчик и «Назад / Вперёд». */
+/* ── «Бесконечные тесты» (ADR 0106 и 0114; макеты Practice, PracticeMobile) ──
+   Вход на старте — ячейка нижней полосы (стили стартового экрана). В игре тот же
+   экран, что у раунда: body.practice прячет всё про время, жизни и очки и
+   показывает название с фильтром, счётчики сессии, ленту пройденного, разбор после
+   ответа и листание. */
+.pr-name, .pr-fchip, .pr-tally, .pr-tape, .pr-qno, .pr-state, .pr-fb, .pr-foot { display: none; }
 body.practice .hud-score, body.practice .hud-clock, body.practice .time-track,
 body.practice .hud-lives-wrap, body.practice .hud-combo, body.practice .hud-stat,
-body.practice .hud-rec, body.practice #q-points { display: none; }
-body.practice .hud-practice { display: flex; }
-.practice-nav { display: none; justify-content: space-between; gap: 10px; margin-top: 14px; }
-body.practice .practice-nav { display: flex; }
-.practice-nav button { font: inherit; height: 44px; padding: 0 18px; border-radius: 10px;
-  border: 1px solid var(--rush-border); background: var(--rush-surface); color: var(--text);
-  cursor: pointer; }
-.practice-nav button:disabled { opacity: .45; cursor: default; }
-.practice-nav button:focus-visible { outline: 2px solid var(--rush-accent); outline-offset: 2px; }
-.pr-sum-title { font-weight: 800; }
+body.practice .hud-rec, body.practice #q-points, body.practice #q-diff, body.practice #stat-chip,
+body.practice .opp, body.practice .play-foot { display: none; }
+body.practice .pr-name { display: flex; align-items: center; gap: 9px; margin: 0; font-size: 17px; font-weight: 700; white-space: nowrap; }
+.pr-name .qi { width: 22px; height: 22px; color: var(--accent-ink); }
+.pr-title-short { display: none; }
+body.practice .pr-fchip {
+  display: block; margin: 0; height: 28px; padding: 0 11px; box-sizing: border-box; min-width: 0; max-width: 360px;
+  border: 1px solid var(--border); border-radius: 999px; line-height: 26px;
+  font-size: 12.5px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.pr-fchip b { color: var(--text); font-weight: 600; }
+body.practice .pr-tally { display: flex; align-items: baseline; gap: 22px; margin: 0; font-size: 13px; color: var(--text2); white-space: nowrap; }
+.pr-tally span { display: inline-flex; align-items: baseline; gap: 6px; }
+.pr-tally i { font-style: normal; }
+.pr-tally b { font-size: 24px; font-weight: 800; line-height: 1; color: var(--text); font-variant-numeric: tabular-nums; }
+.pr-tally .t-ok b { color: var(--green); }
+.pr-tally .t-bad b { color: var(--error); }
+.pr-tally .qi { display: none; width: 14px; height: 14px; stroke-width: 3; }
+
+/* Лента пройденного: квадратик 28 px на вопрос; не влезают — ранние свёрнуты. */
+body.practice .pr-tape {
+  display: flex; align-items: center; gap: 14px; height: 46px; padding: 0 40px; box-sizing: border-box;
+  border-bottom: 1px solid var(--border-soft); flex: none; min-width: 0;
+}
+.pr-cap { font-size: 12px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); white-space: nowrap; }
+/* Поля 4 px вокруг квадратиков — чтобы кольцо текущего не срезала обрезка ленты. */
+.pr-dots { flex: 1 1 0; min-width: 0; display: flex; align-items: center; gap: 6px; overflow: hidden; padding: 4px; margin: -4px 0; }
+.pr-dot {
+  font: inherit; flex: none; width: 28px; height: 28px; padding: 0; box-sizing: border-box;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid transparent; border-radius: 8px; background: var(--surface); color: var(--text2);
+  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; cursor: pointer;
+}
+.pr-dot.ok { background: var(--green); color: var(--on-green); }
+.pr-dot.bad { background: var(--error); color: var(--on-error); }
+.pr-dot.skip { background: var(--skip); color: var(--on-skip); }
+.pr-dot.live { border-color: var(--border); border-style: dashed; }
+.pr-dot.cur { border-color: var(--accent); border-style: solid; box-shadow: 0 0 0 3px var(--accent-ring); }
+.pr-fold {
+  font: inherit; flex: none; height: 28px; padding: 0 10px; display: none; align-items: center; gap: 4px;
+  border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text2);
+  font-size: 12.5px; font-weight: 700; white-space: nowrap; cursor: pointer;
+}
+.pr-fold .qi { width: 14px; height: 14px; }
+.pr-fold:hover { border-color: var(--accent); color: var(--accent-ink); }
+.pr-tape.is-many .pr-fold { display: inline-flex; }
+.pr-tape.is-many .pr-fold.is-off { visibility: hidden; }
+.pr-tape.is-many .pr-fold[hidden] { display: none; }
+.pr-key { margin: 0; display: flex; gap: 14px; font-size: 12.5px; color: var(--text3); white-space: nowrap; }
+.pr-tape.is-many .pr-key { display: none; }
+
+/* Над карточкой: «Вопрос N» и состояние вопроса из истории. */
+body.practice .pr-qno { display: inline; }
+.pr-qno b { color: var(--text2); font-weight: 700; }
+body.practice .pr-state:not([hidden]) { display: inline-flex; align-items: center; height: 24px; }
+.pr-state.is-skip { padding: 0 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; }
+.opt-mark.pr-mk { margin-top: 3px; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+
+/* Разбор после ответа: вердикт, решение, ссылка на задачу и «Плохая задача?». */
+body.practice .pr-fb:not([hidden]) { display: grid; }
+.pr-fb {
+  grid-template-columns: minmax(0, 1fr) auto; gap: 8px 18px; align-items: start; padding: 12px 16px;
+  border: 1px solid var(--border-soft); border-radius: 12px; background: var(--surface-2); font-size: 14px;
+}
+.pr-fb.is-ok { background: var(--green-tint); border-color: var(--green-border); }
+.pr-fb.is-bad { background: var(--error-tint); border-color: var(--error-border); }
+.pr-fb-v { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 15px; }
+.pr-fb-v .qi { width: 18px; height: 18px; }
+.pr-fb.is-ok .pr-fb-v .qi { color: var(--green); }
+.pr-fb.is-bad .pr-fb-v .qi { color: var(--error); }
+.pr-fb-sol { grid-column: 1; line-height: 1.5; color: var(--text); white-space: pre-line; }
+.pr-fb-sol[hidden] { display: none; }
+.pr-fb-sol small { display: block; margin-bottom: 2px; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+.pr-fb-side { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.pr-open {
+  height: 36px; padding: 0 14px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  border: 1px solid var(--border); border-radius: 9px; background: var(--surface); color: var(--text);
+  font-size: 13.5px; font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.pr-open[hidden] { display: none; }
+.pr-open .qi { width: 14px; height: 14px; }
+.pr-open:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* Низ: «Назад» · клавиши · кнопка по ситуации (Пропустить / Дальше / Вперёд). */
+body.practice .pr-foot { display: grid; }
+.pr-foot { margin-top: auto; grid-template-columns: 200px minmax(0, 1fr) 200px; align-items: center; gap: 16px; }
+.pr-nb {
+  font: inherit; height: 48px; padding: 0 18px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+}
+.pr-nb .qi { width: 14px; height: 14px; }
+.pr-nb:hover { border-color: var(--accent); color: var(--accent-ink); }
+.pr-nb:disabled { opacity: .4; cursor: default; border-color: var(--border); color: var(--text); }
+.pr-nb.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+.pr-nb.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+.pr-keys { margin: 0; text-align: center; font-size: 12.5px; color: var(--text3); }
+.pr-keys kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
+/* Итог сессии (макет PracticeResult): каркас итога раунда без очков и таблицы. */
+#screen-final .final[hidden] { display: none; }
+.prf-score small { margin-left: 8px; font-size: 22px; font-weight: 700; letter-spacing: 0; color: var(--text2); }
+.prf-acc { padding-bottom: 4px; }
+.fin-metric b.prf-ok { color: var(--green); }
+.fin-metric b.prf-bad { color: var(--error); }
+.prf-cols { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; align-items: start; }
+.prf-th { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 10px; }
+.prf-key { margin: 0; display: flex; gap: 14px; font-size: 12.5px; color: var(--text3); }
+.prf-bars { display: flex; flex-direction: column; gap: 12px; }
+.prf-bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; font-size: 13px; }
+.prf-bar .lab { display: flex; justify-content: space-between; gap: 8px; color: var(--text2); min-width: 0; }
+.prf-bar .lab b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.prf-bar .tr { grid-column: 1; height: 8px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; }
+.prf-bar .tr i { display: block; height: 100%; }
+.prf-bar .mi-lnk { grid-column: 2; grid-row: 1 / span 2; }
+
+@media (max-width: 720px) {
+  /* Телефон (макет PracticeMobile): полоса 56 px в одну строку, счётчики значками. */
+  body.practice .hud { display: flex; height: 56px; padding: 0 12px 0 14px; gap: 10px; }
+  body.practice .hud-l, body.practice .hud-r { display: contents; }
+  body.practice .pr-fchip, .pr-title { display: none; }
+  .pr-title-short { display: inline; }
+  body.practice .pr-name { font-size: 15px; gap: 7px; }
+  .pr-name .qi { width: 20px; height: 20px; }
+  body.practice .pr-tally { margin-left: auto; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; }
+  .pr-tally .t-all, .pr-tally i { display: none; }
+  .pr-tally span { align-items: center; gap: 3px; }
+  .pr-tally .qi { display: block; }
+  .pr-tally b { font-size: 15px; }
+  .pr-tally .t-ok { color: var(--green); }
+  .pr-tally .t-bad { color: var(--error); }
+  .pr-tally .t-skip, .pr-tally .t-skip b { color: var(--text3); }
+  body.practice #btn-sound { margin-left: 0; }
+  /* Лента листается пальцем: все квадратики, без свёртки. */
+  body.practice .pr-tape { padding: 0 14px; gap: 6px; }
+  .pr-cap, .pr-key, .pr-tape .pr-fold { display: none !important; }
+  .pr-dots { overflow-x: auto; scrollbar-width: none; }
+  .pr-dots::-webkit-scrollbar { display: none; }
+  .pr-dot { width: 30px; height: 30px; }
+  body.practice .opt { min-height: 52px; }
+  .pr-fb { grid-template-columns: 1fr; padding: 12px 14px; }
+  .pr-fb-side { grid-column: 1; grid-row: auto; align-items: stretch; }
+  .pr-open { height: 44px; }
+  body.practice #pr-report { justify-content: center; }
+  /* Листание прижато к низу экрана; кружок обратной связи на время тестов скрыт. */
+  body.practice .play-body { padding-bottom: 92px; }
+  body.practice .pr-foot {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 20;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px;
+    padding: 10px 14px 14px; background: var(--bg); border-top: 1px solid var(--border-soft);
+  }
+  .pr-keys { display: none; }
+  .pr-nb { height: 50px; font-size: 15.5px; }
+  .prf-cols { grid-template-columns: 1fr; }
+}
 
 /* Иконки в гнёздах статической разметки: рекорд на итоге. */
 
@@ -1733,6 +1878,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
 .fin-metric span { font-size: 12.5px; color: var(--text2); }
 
 .fin-actions { display: flex; flex-direction: column; gap: 8px; }
+/* Колонки вердикта не раздуваются содержимым: подписи кнопок в одну строку иначе
+   выталкивали столбец за экран телефона (итог «Бесконечных тестов», P5). */
+.fin-main, .fin-actions { min-width: 0; }
 .fin-btn {
   font: inherit; height: 44px; padding: 0 16px; box-sizing: border-box;
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
@@ -1852,6 +2000,8 @@ body.on-final .rush-wrap { max-width: 1160px; }
   display: inline-flex; align-items: center; gap: 5px; text-decoration: none; cursor: pointer;
 }
 .mi-lnk:hover, .mi-sol-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.mi-links { display: flex; gap: 6px; justify-content: flex-end; }
+.mi-arrow .qi { width: 12px; height: 12px; margin: 0 4px; vertical-align: -1px; }
 .mi-lnk .qi { width: 13px; height: 13px; }
 .mi-solution {
   grid-column: 1 / -1; padding: 8px 10px; border-left: 2px solid var(--rush-accent);
@@ -1890,7 +2040,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
   .fin-row { grid-template-columns: 1fr; gap: 12px; }
   .fin-login { grid-column: auto; }
   .miss-item { grid-template-columns: 24px minmax(0, 1fr); gap: 10px; }
-  .mi-a, .mi-lnk, .mi-sol-btn { grid-column: 2; justify-self: start; }
+  .mi-a, .mi-lnk, .mi-sol-btn, .mi-links { grid-column: 2; justify-self: start; }
   .mi-q .mi-text { white-space: normal; }
 }
 
@@ -2123,24 +2273,15 @@ body.on-final .rush-wrap { max-width: 1160px; }
     </div>
   </div>
 </div>
-{# «Бесконечные тесты»: выход спрашивает «Закончить?», затем сводка. Окно как у выхода из раунда. #}
+{# «Бесконечные тесты»: крестик и Esc спрашивают «Закончить?» (решение 17.09.2026), «Да» ведёт к итогу. Окно — семья окон раунда. #}
 <div class="quit-modal" id="pr-end" hidden role="dialog" aria-modal="true"
-     aria-label="Бесконечные тесты">
+     aria-labelledby="pr-end-title" aria-describedby="pr-end-text">
   <div class="quit-card">
-    <div id="pr-end-ask">
-      <p>Закончить?</p>
-      <div class="quit-actions">
-        <button type="button" class="quit-no" id="pr-end-no">Нет</button>
-        <button type="button" class="quit-yes" id="pr-end-yes">Да</button>
-      </div>
-    </div>
-    <div id="pr-end-sum" hidden>
-      <p class="pr-sum-title">Бесконечные тесты</p>
-      <p id="pr-sum-line"></p>
-      <div class="quit-actions">
-        <button type="button" class="quit-no" id="pr-again">Ещё раз</button>
-        <button type="button" class="quit-yes" id="pr-home">На старт</button>
-      </div>
+    <p class="dlg-t" id="pr-end-title">Закончить?</p>
+    <p class="dlg-p" id="pr-end-text">Покажем итог: сколько верных, список ошибок и пропусков, точность по темам.</p>
+    <div class="quit-actions">
+      <button type="button" class="quit-no" id="pr-end-no">Нет, решать дальше</button>
+      <button type="button" class="quit-yes" id="pr-end-yes">Да, к итогу</button>
     </div>
   </div>
 </div>
@@ -2316,9 +2457,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
   var skippedCount = 0;         // пропущено (для запасной сводки без сети)
   /* «Бесконечные тесты» (решение владельца 15.09.2026), см. startPractice. */
   var practice = false;         // идёт практика: без времени, жизней и очков
-  var practiceLog = [];         // [{q, chosen, right}] — сыгранные вопросы по порядку
-  var practiceAt = -1;          // какой из них на экране для чтения; -1 — живой
-  var practiceLive = null;      // живой вопрос, ещё без ответа
+  var practiceLog = [];         // записи открытых вопросов по порядку, см. startPractice
+  var practiceAt = -1;          // какая запись на экране
+  var tapeStart = 0;            // первый квадратик в видимом окне ленты
   var practiceCount = null;     // тестов под фильтром (api_pool_counts)
 
   /* ── ПОЛОСА HUD: РЕКОРД ИЛИ СОПЕРНИК ──────────────────────────────── */
@@ -2932,8 +3073,14 @@ body.on-final .rush-wrap { max-width: 1160px; }
   document.querySelectorAll('[data-open-filters]').forEach(function (chip) {
     chip.addEventListener('click', function () { openFilters(true, this); });
   });
-  $('fmodal-close').addEventListener('click', function () { openFilters(false); });
-  $('fmodal-apply').addEventListener('click', function () { openFilters(false); });
+  $('fmodal-close').addEventListener('click', function () {
+    practiceAfterFilters = false;
+    openFilters(false);
+  });
+  $('fmodal-apply').addEventListener('click', function () {
+    openFilters(false);
+    if (practiceAfterFilters) { practiceAfterFilters = false; againPractice(); }
+  });
   $('filter-reset').addEventListener('click', function () {
     filter = emptyFilter();
     applyFilter();
@@ -4014,8 +4161,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
       bufferWaitSince = 0;
       var q = nextBuf;
       prefetchNext();
-      showQuestion(q);
-      if (practice) { practiceLive = q; practiceAt = -1; paintPractice(); }
+      if (practice) { openPracticeQuestion(q); } else { showQuestion(q); }
     } else if (poolExhausted) {
       if (practice) { openPracticeEnd(true); return; }
       endRun('done'); // вопросы кончились — забег завершается досрочно
@@ -4185,7 +4331,12 @@ body.on-final .rush-wrap { max-width: 1160px; }
       if (current && current.type === 'numeric') $('num-input').disabled = false;
       return;
     }
-    if (d.status === 409) { advance(); return; }
+    // Ответ уже засчитан. В практике запись остаётся на месте — вперёд игрок идёт сам.
+    if (d.status === 409) {
+      if (practice) { inputLocked = false; return; }
+      advance();
+      return;
+    }
     inputLocked = false;
     // Классика блокирует поле на время отправки — возвращаем его.
     if (current && current.type === 'numeric') $('num-input').disabled = false;
@@ -4621,15 +4772,20 @@ body.on-final .rush-wrap { max-width: 1160px; }
   paintSoundBtn();
 
   /* ---------- «БЕСКОНЕЧНЫЕ ТЕСТЫ» ----------
-     Решение владельца 15.09.2026: тот же экран игры с body.practice, но без
-     таймера, жизней, очков и комбо; тесты (данетки, один и несколько верных)
-     из игрового пула под текущим фильтром. Сервер отвечает без очков и с
-     `correct_choices`, по ним подсвечиваются варианты.
-     История живёт здесь: `practiceLog` — сыгранные вопросы по порядку,
-     `practiceAt` — какой из них на экране только для чтения (-1 — живой
-     `practiceLive`). «Назад» листает историю; «Вперёд» ведёт к следующему по
-     истории, к живому вопросу или к новому, а с живого неотвеченного — это
-     пропуск. Паузы у практики нет (rushPause): времени нет. */
+     Решения владельца 15.09.2026 (ADR 0106) и 17.09.2026 (ADR 0114): тот же
+     экран игры с body.practice, но без таймера, жизней, очков и комбо; тесты
+     (данетки, один и несколько верных) из игрового пула под текущим фильтром.
+     Сверху название, фильтр и счётчики сессии, под полосой лента пройденного,
+     после ответа — разбор: вердикт, решение и ссылка на задачу в каталоге.
+
+     История живёт здесь: `practiceLog` — запись на КАЖДЫЙ открытый вопрос по
+     порядку {q, status: live|skip|correct|wrong, chosen, right, problemId,
+     solution}, последняя — живой вопрос; `practiceAt` — какая запись на экране.
+     ⚠️ ПРОПУСК ОБРАТИМ: на запись со статусом skip можно ответить, вернувшись к
+     ней (стрелкой, квадратиком ленты, «к пропущенным»); отвеченную — только
+     посмотреть. Сервер принимает такой ответ только в практике (api_answer).
+     Верный ответ, решение и задачу сервер присылает только с ответом, не с
+     пропуском: иначе пропуск стал бы подглядыванием. Паузы нет: времени нет. */
   function paintPracticeBand() {
     var band = $('practice-band');
     var total = (CFG.practice || {}).count || 0;
@@ -4643,126 +4799,437 @@ body.on-final .rush-wrap { max-width: 1160px; }
     $('practice-go').disabled = n < 1;
   }
 
+  var DOT_CLASS = { live: 'live', skip: 'skip', correct: 'ok', wrong: 'bad' };
+  var DOT_NAME = { live: 'без ответа', skip: 'пропущен', correct: 'верно', wrong: 'ошибка' };
+  var practiceStartedAt = null;
+  var practiceAfterFilters = false;   // «Поменять фильтры» на итоге: после окна — новая сессия
+
+  /* Сводка фильтра словами для полосы и итога: «Эластичность, Рынки», «3 темы · ВсОШ». */
+  function practiceFilterText() {
+    var parts = [];
+    var n = filter.topics.length;
+    if (n) parts.push(n <= 2 ? filter.topics.join(', ') : n + ' ' + plural(n, ['тема', 'темы', 'тем']));
+    if (filter.tags.length) {
+      parts.push(filter.tags.length + ' ' + plural(filter.tags.length, ['тег', 'тега', 'тегов']));
+    }
+    var src = filter.sources;
+    if (src.length) {
+      parts.push(src.length === 1 ? (srcTitles[src[0]] || src[0])
+        : src.length + ' ' + plural(src.length, ['источник', 'источника', 'источников']));
+    }
+    if (filter.stars.length) parts.push(filter.stars.join(', ') + '★');
+    return parts.length ? parts.join(' · ') : 'все вопросы';
+  }
+
   function startPractice(d) {
     if (window.weco) weco.track('practice_start', { filtered: filterQuery() !== '' });
     setRun = null; mistakesRun = false;
     answered = 0; correctCount = 0; skippedCount = 0;
-    practiceLog = []; practiceAt = -1; practiceLive = d.question;
+    practiceLog = []; practiceAt = -1; tapeStart = 0;
+    practiceStartedAt = new Date();
     nextBuf = null; poolExhausted = false; runLost = false; prefetchFailed = false;
     $('opp').hidden = true;
     $('hud-rec').hidden = true;
     $('gap-pill').hidden = true;
     $('gameover-overlay').hidden = true;
+    $('pr-filter').textContent = practiceFilterText();
     show('playing');
-    showQuestion(d.question);
-    paintPractice();
+    openPracticeQuestion(d.question);
     prefetchNext();
   }
 
-  function paintPractice() {
-    var shown = practiceAt >= 0 ? practiceAt : practiceLog.length;
-    $('pr-number').textContent = shown + 1;
-    $('pr-correct').textContent = correctCount;
-    $('pr-back').disabled = shown === 0;
+  /* Новый вопрос из пула — новая запись ленты, и он же на экране. */
+  function openPracticeQuestion(q) {
+    practiceLog.push({ q: q, status: 'live', chosen: [], right: [], problemId: null, solution: '' });
+    showPracticeEntry(practiceLog.length - 1);
   }
 
-  function practiceAnswer(body, chosen) {
-    inputLocked = true;
-    var q = current;
-    body.question_id = q.id;
-    postAnswer(body, function (d) {
-      var right = d.correct_choices || [];
-      practiceLog.push({ q: q, chosen: chosen, right: right });
-      practiceLive = null;
-      if (d.result === 'skip') { skippedCount++; advance(); return; }
-      answered++;
-      if (d.correct) correctCount++;
-      rush(d.correct ? 'correct' : 'wrong');
-      practiceAt = practiceLog.length - 1;
-      markPractice(chosen, right);
-      paintPractice();
-    });
-  }
+  function isAnswered(entry) { return entry.status === 'correct' || entry.status === 'wrong'; }
 
-  function markPractice(chosen, right) {
-    $('opts').querySelectorAll('.opt').forEach(function (btn, i) {
-      var isRight = right.indexOf(i) !== -1;
-      var isChosen = chosen.indexOf(i) !== -1;
-      btn.classList.toggle('is-correct', isRight && isChosen);
-      btn.classList.toggle('is-wrong', isChosen && !isRight);
-      btn.classList.toggle('show-right', isRight && !isChosen);
-      btn.disabled = true;
-    });
-    $('btn-submit').disabled = true;
-  }
-
-  function showPracticeEntry(entry) {
+  function showPracticeEntry(i) {
+    practiceAt = i;
+    var entry = practiceLog[i];
     showQuestion(entry.q);
-    inputLocked = true;           // прошлый вопрос — только для чтения
-    markPractice(entry.chosen, entry.right);
+    if (isAnswered(entry)) {
+      inputLocked = true;          // отвеченный — только просмотр
+      markPractice(entry);
+    }
+    paintPracticeFeedback(isAnswered(entry) ? entry : null);
     paintPractice();
   }
 
-  function practiceBack() {
-    if (state !== 'playing') return;
-    var from = practiceAt >= 0 ? practiceAt : practiceLog.length;
-    if (from === 0) return;
-    practiceAt = from - 1;
-    showPracticeEntry(practiceLog[practiceAt]);
+  function practiceCounts() {
+    var c = { correct: 0, wrong: 0, skip: 0 };
+    practiceLog.forEach(function (e) { if (e.status in c) c[e.status]++; });
+    return c;
   }
 
-  function practiceForward() {
-    if (state !== 'playing') return;
-    if (practiceAt < 0) { skip(); return; }          // живой без ответа: пропуск
-    if (practiceAt < practiceLog.length - 1) {
-      practiceAt++;
-      showPracticeEntry(practiceLog[practiceAt]);
-    } else if (practiceLive) {                       // назад ушли с живого: вернуться
-      practiceAt = -1;
-      showQuestion(practiceLive);
-      paintPractice();
-    } else {
-      advance();                                     // живой отвечен: новый вопрос
+  function paintPractice() {
+    var c = practiceCounts();
+    answered = c.correct + c.wrong;
+    correctCount = c.correct;
+    skippedCount = c.skip;
+    $('pr-answered').textContent = answered;
+    $('pr-correct').textContent = c.correct;
+    $('pr-wrong').textContent = c.wrong;
+    $('pr-skipped').textContent = c.skip;
+    var entry = practiceLog[practiceAt];
+    if (!entry) return;
+    var last = practiceAt === practiceLog.length - 1;
+    var done = isAnswered(entry);
+    $('pr-number').textContent = practiceAt + 1;
+    var st = $('pr-state');
+    st.hidden = !(entry.status === 'skip' || (done && !last));
+    st.classList.toggle('is-skip', entry.status === 'skip');
+    st.textContent = entry.status === 'skip' ? 'пропущен · можно ответить сейчас'
+      : 'уже отвечен · только просмотр';
+    $('pr-back').disabled = practiceAt === 0;
+    // Кнопка справа называется по ситуации (решение 17.09.2026).
+    $('pr-next-text').textContent = !last ? 'Вперёд' : done ? 'Дальше' : 'Пропустить';
+    $('pr-next').classList.toggle('solid', last && done);
+    $('pr-keys-space').textContent = last && !done ? 'пропустить' : 'дальше';
+    $('pr-keys-n').textContent = (entry.q.options || []).length || 1;
+    paintTape(false);
+  }
+
+  /* Лента: на ПК — окно из стольких квадратиков, сколько влезает, ранние
+     свёрнуты в «‹ ещё N»; текущий вопрос при переходе всегда в окне. На
+     телефоне — все квадратики, лента листается пальцем. `keepWindow` — окно
+     сдвинул сам игрок кнопкой свёртки, текущий вопрос его не возвращает. */
+  function paintTape(keepWindow) {
+    var tape = $('pr-tape');
+    var dots = $('pr-dots');
+    var total = practiceLog.length;
+    var narrow = window.matchMedia('(max-width: 720px)').matches;
+    // Квадратик 28 px и зазор 6 px; 8 px — поля ленты под кольцо текущего.
+    var fits = function () { return Math.max(1, Math.floor((dots.clientWidth - 8 + 6) / 34)); };
+    var cap = total;
+    tape.classList.remove('is-many');
+    if (!narrow) {
+      cap = fits();
+      if (total > cap) {
+        tape.classList.add('is-many');
+        cap = fits();
+      }
+    }
+    if (total <= cap) {
+      tapeStart = 0;
+    } else if (!keepWindow) {
+      if (practiceAt < tapeStart) tapeStart = practiceAt;
+      if (practiceAt >= tapeStart + cap) tapeStart = practiceAt - cap + 1;
+    }
+    tapeStart = Math.max(0, Math.min(tapeStart, total - cap));
+    var stop = Math.min(total, tapeStart + cap);
+    dots.innerHTML = '';
+    for (var i = tapeStart; i < stop; i++) {
+      var e = practiceLog[i];
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pr-dot ' + DOT_CLASS[e.status] + (i === practiceAt ? ' cur' : '');
+      b.textContent = i + 1;
+      b.dataset.index = i;
+      b.setAttribute('aria-label', 'Вопрос ' + (i + 1) + ': ' + DOT_NAME[e.status]);
+      if (i === practiceAt) b.setAttribute('aria-current', 'step');
+      dots.appendChild(b);
+    }
+    var many = tape.classList.contains('is-many');
+    $('pr-fold-back').classList.toggle('is-off', tapeStart === 0);
+    $('pr-fold-n').textContent = tapeStart;
+    $('pr-fold-fwd').classList.toggle('is-off', stop >= total);
+    var skips = practiceCounts().skip;
+    $('pr-to-skip').hidden = !many || !skips;
+    $('pr-to-skip-n').textContent = skips;
+    if (narrow) {
+      var cur = dots.querySelector('.cur');
+      if (cur) dots.scrollLeft = cur.offsetLeft - dots.clientWidth / 2 + cur.offsetWidth / 2;
+    }
+  }
+
+  function goPractice(i) {
+    if (state !== 'playing' || i < 0 || i >= practiceLog.length) return;
+    showPracticeEntry(i);
+  }
+
+  function practiceAnswer(body, chosen) {
+    var i = practiceAt;
+    var entry = practiceLog[i];
+    if (!entry || isAnswered(entry)) return;
+    inputLocked = true;
+    body.question_id = entry.q.id;
+    postAnswer(body, function (d) {
+      entry.status = d.result;
+      if (d.result === 'skip') {
+        // Пропуск живого вопроса ведёт к новому; пропущенный из истории остаётся на месте.
+        if (i === practiceLog.length - 1) { advance(); return; }
+        inputLocked = false;
+        paintPractice();
+        return;
+      }
+      entry.chosen = chosen;
+      entry.right = d.correct_choices || [];
+      entry.problemId = d.problem_id || null;
+      entry.solution = d.solution || '';
+      rush(d.correct ? 'correct' : 'wrong');
+      if (practiceAt === i) showPracticeEntry(i);
+      else paintPractice();
+    });
+  }
+
+  function markPractice(entry) {
+    $('opts').querySelectorAll('.opt').forEach(function (btn, i) {
+      var isRight = entry.right.indexOf(i) !== -1;
+      var isChosen = entry.chosen.indexOf(i) !== -1;
+      btn.classList.remove('selected');
+      btn.classList.toggle('is-correct', isRight && isChosen);
+      btn.classList.toggle('is-wrong', isChosen && !isRight);
+      btn.classList.toggle('show-right', isRight && !isChosen);
+      btn.classList.toggle('opt-muted', !isRight && !isChosen);
+      var text = isRight && isChosen ? 'верно' : isChosen ? 'ваш ответ' : isRight ? 'верный' : '';
+      if (text) {
+        addMark(btn, text);
+        btn.lastChild.classList.add('pr-mk');
+      }
+      btn.disabled = true;
+    });
+    $('btn-submit').disabled = true;
+    $('multi-actions').hidden = true;
+  }
+
+  /* Разбор после ответа. ⚠️ Темы вопроса здесь нет — решение владельца 17.09.2026. */
+  function paintPracticeFeedback(entry) {
+    var fb = $('pr-fb');
+    fb.hidden = !entry;
+    if (!entry) return;
+    var ok = entry.status === 'correct';
+    fb.className = 'pr-fb ' + (ok ? 'is-ok' : 'is-bad');
+    var v = $('pr-fb-v');
+    v.innerHTML = (ok ? ICONS.check : ICONS.close) || '';
+    v.appendChild(finEl('b', null, ok ? 'Верно.' : 'Неверно.'));
+    if (!ok && entry.right.length) {
+      v.appendChild(finEl('span', null, (entry.right.length > 1 ? 'Верные ответы – ' : 'Верный ответ – ')
+        + entry.right.map(function (n) { return n + 1; }).join(', ') + '.'));
+    }
+    $('pr-fb-sol').hidden = !entry.solution;
+    var sol = $('pr-fb-sol-text');
+    sol.textContent = entry.solution || '';
+    if (entry.solution) renderMath(sol);
+    var open = $('pr-open');
+    open.hidden = !entry.problemId;
+    if (entry.problemId) open.href = '/catalog/problem/' + entry.problemId + '/';
+    $('pr-report').setAttribute('data-game-question-id', entry.q.id);
+  }
+
+  function practiceBack() {
+    if (state !== 'playing' || practiceAt <= 0) return;
+    showPracticeEntry(practiceAt - 1);
+  }
+
+  /* «Пропустить / Дальше / Вперёд», пробел и стрелка вправо. */
+  function practiceNext() {
+    if (state !== 'playing' || !practiceLog.length) return;
+    if (practiceAt < practiceLog.length - 1) { showPracticeEntry(practiceAt + 1); return; }
+    if (practiceLog[practiceAt].status === 'live') { skip(); return; }
+    advance();                     // последний отвечен — новый вопрос из пула
+  }
+
+  /* «к пропущенным»: ближайший пропущенный после текущего, по кругу. */
+  function practiceToSkipped() {
+    var n = practiceLog.length;
+    for (var k = 1; k <= n; k++) {
+      var i = (practiceAt + k) % n;
+      if (practiceLog[i].status === 'skip') { showPracticeEntry(i); return; }
     }
   }
 
   var practicePrevFocus = null;
-  function openPracticeEnd(summaryNow) {
+  function openPracticeEnd(exhausted) {
     if (state !== 'playing' || !$('pr-end').hidden) return;
     practicePrevFocus = document.activeElement;
+    $('pr-end-title').textContent = exhausted ? 'Вопросы кончились' : 'Закончить?';
+    $('pr-end-text').textContent = (exhausted ? 'Под этим фильтром вопросов больше нет. ' : '')
+      + 'Покажем итог: сколько верных, список ошибок и пропусков, точность по темам.';
     $('pr-end').hidden = false;
     document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: true } }));
-    $('pr-end-ask').hidden = !!summaryNow;
-    $('pr-end-sum').hidden = !summaryNow;
-    if (summaryNow) { finishPractice(); return; }
     $('pr-end-no').focus();
   }
 
   function closePracticeEnd() {
+    if ($('pr-end').hidden) return;
     $('pr-end').hidden = true;
     document.dispatchEvent(new CustomEvent('weco:modal', { detail: { open: false } }));
     if (practicePrevFocus && practicePrevFocus.focus) practicePrevFocus.focus();
   }
 
-  function finishPractice() {
-    $('pr-end-ask').hidden = true;
-    $('pr-end-sum').hidden = false;
-    $('pr-sum-line').textContent = 'Считаем…';
-    $('pr-again').focus();
-    if (window.weco) weco.track('practice_end', { answered: answered, correct: correctCount, skipped: skippedCount });
-    api('/game/api/session/finish/', { method: 'POST', body: JSON.stringify({ reason: 'done' }) })
-      .then(function (d) { paintPracticeSummary(d && d.summary); },
-            function () { paintPracticeSummary(null); });
+  /* Итог из своих записей — пока нет ответа сервера и когда нет связи. Верный
+     ответ у пропуска клиенту неизвестен (сервер его с пропуском не шлёт). */
+  function practiceLocalSummary() {
+    var c = practiceCounts();
+    var sum = { answered: c.correct + c.wrong, correct: c.correct, wrong: c.wrong, skipped: c.skip,
+                mistakes: [], topics: [] };
+    sum.accuracy = sum.answered ? Math.round(100 * c.correct / sum.answered) : 0;
+    var byTopic = {};
+    practiceLog.forEach(function (e, i) {
+      if (e.status === 'live') return;
+      var names = e.q.topics && e.q.topics.length ? e.q.topics : ['Без темы'];
+      names.forEach(function (name) {
+        if (!byTopic[name]) {
+          byTopic[name] = { topic: name, correct: 0, wrong: 0, skip: 0, total: 0 };
+          sum.topics.push(byTopic[name]);
+        }
+        byTopic[name][e.status]++;
+        byTopic[name].total++;
+      });
+      if (e.status === 'wrong' || e.status === 'skip') {
+        sum.mistakes.push({ number: i + 1, outcome: e.status, question_id: e.q.id, text: e.q.question,
+                            topic: names[0], your: numbersText(e.chosen), right: numbersText(e.right),
+                            problem_id: e.problemId, solution: e.solution });
+      }
+    });
+    sum.topics.sort(function (a, b) { return b.total - a.total || (a.topic < b.topic ? -1 : 1); });
+    return sum;
   }
 
-  function paintPracticeSummary(res) {
-    // Нет связи — те же числа из своих счётчиков: их по ходу присылал сервер.
-    if (!res || typeof res.answered !== 'number') {
-      res = { answered: answered, correct: correctCount, skipped: skippedCount,
-              accuracy: answered ? Math.round(100 * correctCount / answered) : 0 };
+  function numbersText(list) {
+    return list.slice().sort(function (a, b) { return a - b; })
+      .map(function (n) { return n + 1; }).join(', ');
+  }
+
+  function finishPractice() {
+    closePracticeEnd();
+    if (window.weco) weco.track('practice_end', { answered: answered, correct: correctCount, skipped: skippedCount });
+    showPracticeFinal(practiceLocalSummary());
+    api('/game/api/session/finish/', { method: 'POST', body: JSON.stringify({ reason: 'done' }) })
+      .then(function (d) {
+        if (d && d.summary && typeof d.summary.answered === 'number') paintPracticeFinal(d.summary);
+      }, function () { /* нет связи — итог уже нарисован своими числами */ });
+  }
+
+  function showPracticeFinal(sum) {
+    $('fin-round').hidden = true;
+    $('fin-practice').hidden = false;
+    paintPracticeFinal(sum);
+    show('finished');
+    window.scrollTo(0, 0);
+    $('prf-again').focus();
+  }
+
+  function paintPracticeFinal(sum) {
+    var when = practiceStartedAt || new Date();
+    $('prf-date').textContent = when.toLocaleString('ru-RU', { day: 'numeric', month: 'long' })
+      + ', ' + when.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    $('prf-filter').textContent = '· фильтр: ' + practiceFilterText();
+    $('prf-big').textContent = sum.correct + ' из ' + (sum.correct + sum.wrong);
+    $('prf-acc').textContent = sum.accuracy + ' %';
+    $('prf-answered').textContent = sum.answered;
+    $('prf-correct').textContent = sum.correct;
+    $('prf-wrong').textContent = sum.wrong;
+    $('prf-skipped').textContent = sum.skipped;
+    paintPracticeMisses(sum.mistakes || []);
+    paintPracticeTopics(sum.topics || []);
+  }
+
+  /* «Ошибки и пропуски» — тем же списком, что у итога раунда. */
+  function paintPracticeMisses(list) {
+    var box = $('prf-list');
+    box.innerHTML = '';
+    $('prf-miss-n').textContent = list.length;
+    $('prf-clean').hidden = list.length > 0;
+    list.forEach(function (m) {
+      var li = finEl('li', 'miss-item');
+      li.appendChild(finEl('span', 'mi-k ' + (m.outcome === 'skip' ? 'skip' : 'bad'), String(m.number)));
+      var q = finEl('span', 'mi-q');
+      q.appendChild(finEl('span', 'mi-text', m.text));
+      q.appendChild(finEl('small', null, m.topic || 'Без темы'));
+      li.appendChild(q);
+      li.appendChild(answerLine(m.outcome === 'skip', m.your, m.right));
+      var links = finEl('span', 'mi-links');
+      if (m.solution) {
+        var sbtn = finEl('button', 'mi-sol-btn', 'Решение');
+        sbtn.type = 'button';
+        sbtn.setAttribute('aria-expanded', 'false');
+        var sol = finEl('div', 'mi-solution', m.solution);
+        sol.hidden = true;
+        sbtn.addEventListener('click', function () {
+          sol.hidden = !sol.hidden;
+          sbtn.setAttribute('aria-expanded', sol.hidden ? 'false' : 'true');
+        });
+        links.appendChild(sbtn);
+        li.appendChild(links);
+        li.appendChild(sol);
+      } else {
+        li.appendChild(links);
+      }
+      if (m.problem_id) {
+        var link = finEl('a', 'mi-lnk', 'В каталоге');
+        link.href = '/catalog/problem/' + m.problem_id + '/';
+        link.target = '_blank';
+        link.rel = 'noopener';
+        links.appendChild(link);
+      }
+      box.appendChild(li);
+    });
+    renderMath(box);
+  }
+
+  /* «ваш ответ 1 → верный 2» / «пропуск → верный 5»; стрелка — значок, а не знак. */
+  function answerLine(isSkip, given, right) {
+    var a = finEl('span', 'mi-a');
+    if (isSkip) {
+      a.appendChild(document.createTextNode('пропуск'));
+    } else {
+      a.appendChild(document.createTextNode('ваш ответ '));
+      a.appendChild(finEl('s', null, given));
     }
-    $('pr-sum-line').textContent = 'Решено ' + res.answered + ', верных ' + res.correct
-      + ', пропущено ' + res.skipped + ', точность ' + res.accuracy + ' %';
+    if (right) {
+      var arrow = finEl('span', 'mi-arrow');
+      arrow.innerHTML = ICONS.arrow_right || '';
+      a.appendChild(arrow);
+      a.appendChild(document.createTextNode('верный '));
+      a.appendChild(finEl('b', null, right));
+    }
+    return a;
+  }
+
+  /* «Точность по темам» и «Решать тему» — новая сессия с фильтром на эту тему. */
+  function paintPracticeTopics(rows) {
+    var box = $('prf-bars');
+    box.innerHTML = '';
+    $('prf-topics').hidden = !rows.length;
+    rows.forEach(function (t) {
+      var row = finEl('div', 'prf-bar');
+      var lab = finEl('div', 'lab');
+      lab.appendChild(finEl('span', null, t.topic));
+      lab.appendChild(finEl('b', null, t.correct + ' из ' + t.total));
+      row.appendChild(lab);
+      var known = window.CSS && CSS.escape
+        && document.querySelector('.f-topic[value="' + CSS.escape(t.topic) + '"]');
+      if (known) {
+        var go = finEl('button', 'mi-lnk', 'Решать тему');
+        go.type = 'button';
+        go.addEventListener('click', function () { practiceTopic(t.topic); });
+        row.appendChild(go);
+      }
+      var tr = finEl('div', 'tr');
+      [['correct', 'ok-f'], ['wrong', 'bad-f'], ['skip', 'skip-f']].forEach(function (part) {
+        if (!t[part[0]]) return;
+        var seg = finEl('i', part[1]);
+        seg.style.width = (100 * t[part[0]] / t.total) + '%';
+        tr.appendChild(seg);
+      });
+      row.appendChild(tr);
+      box.appendChild(row);
+    });
+  }
+
+  function practiceTopic(topic) {
+    filter.topics = [topic];
+    applyFilter();
+    againPractice();
+  }
+
+  function againPractice() {
+    leavePractice();
+    startRun({ practice: true });
   }
 
   function leavePractice() {
@@ -4776,22 +5243,39 @@ body.on-final .rush-wrap { max-width: 1160px; }
     startRun({ practice: true });
   });
   $('pr-back').addEventListener('click', practiceBack);
-  $('pr-next').addEventListener('click', practiceForward);
+  $('pr-next').addEventListener('click', practiceNext);
+  $('pr-dots').addEventListener('click', function (e) {
+    var dot = e.target.closest('.pr-dot');
+    if (dot) goPractice(parseInt(dot.dataset.index, 10));
+  });
+  $('pr-fold-back').addEventListener('click', function () {
+    tapeStart = Math.max(0, tapeStart - Math.max(1, $('pr-dots').children.length));
+    paintTape(true);
+  });
+  $('pr-fold-fwd').addEventListener('click', function () {
+    tapeStart += Math.max(1, $('pr-dots').children.length);
+    paintTape(true);
+  });
+  $('pr-to-skip').addEventListener('click', practiceToSkipped);
   $('pr-end-no').addEventListener('click', closePracticeEnd);
   $('pr-end-yes').addEventListener('click', finishPractice);
-  $('pr-again').addEventListener('click', function () {
-    leavePractice();
-    startRun({ practice: true });
+  $('prf-again').addEventListener('click', againPractice);
+  $('prf-filters').addEventListener('click', function () {
+    practiceAfterFilters = true;
+    openFilters(true, this);
   });
-  $('pr-home').addEventListener('click', function () {
+  $('prf-home').addEventListener('click', function () {
     leavePractice();
     show('start');
     renderModeTabs();
   });
+  window.addEventListener('resize', function () {
+    if (practice && state === 'playing' && practiceLog.length) paintTape(false);
+  });
   /* Клавиатура окна: Esc = «Нет», и события не уходят в игру под окном. */
   $('pr-end').addEventListener('keydown', function (e) {
     e.stopPropagation();
-    if (e.key === 'Escape' && !$('pr-end-ask').hidden) { e.preventDefault(); closePracticeEnd(); }
+    if (e.key === 'Escape') { e.preventDefault(); closePracticeEnd(); }
   });
 
   /* ---------- ВЫХОД ИЗ РАУНДА ----------
@@ -5037,6 +5521,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
 
   function paintFinal() {
     var s = summary;
+    // Экран итога общий с «Бесконечными тестами» — у раунда свой вердикт.
+    $('fin-round').hidden = false;
+    $('fin-practice').hidden = true;
     $('final-title-text').textContent = titleText(s);
     $('final-title-icon').innerHTML = ICONS[TITLE_ICON[s.ended_reason] || 'clock'] || '';
     $('fin-mode-chip').textContent = s.mode_title;
@@ -5445,21 +5932,13 @@ body.on-final .rush-wrap { max-width: 1160px; }
       }
       q.appendChild(meta);
       li.appendChild(q);
-      var a = finEl('span', 'mi-a');
-      if (m.kind === 'skip') {
-        a.appendChild(document.createTextNode('пропуск → верный '));
-      } else {
-        a.appendChild(document.createTextNode('ваш ответ '));
-        a.appendChild(finEl('s', null, m.given));
-        a.appendChild(document.createTextNode(' → верный '));
-      }
-      a.appendChild(finEl('b', null, m.right));
-      li.appendChild(a);
+      li.appendChild(answerLine(m.kind === 'skip', m.given, m.right));
       if (m.q.generated) {
         paintMissSolution(li, m);
       } else if (m.problemId) {
         var link = finEl('a', 'mi-lnk', 'В каталоге');
-        link.href = '/catalog/' + m.problemId + '/';
+        // ⚠️ Страница задачи — /catalog/problem/<id>/; прежний /catalog/<id>/ отвечал 404.
+        link.href = '/catalog/problem/' + m.problemId + '/';
         link.target = '_blank';
         link.insertAdjacentHTML('beforeend', ICONS.arrow_right || '');
         li.appendChild(link);
@@ -6291,7 +6770,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
       // Enter — основная кнопка итога (у набора и дуэли это не «ещё раз»).
       // На кнопке или ссылке Enter нажимает её саму.
       if (e.key === 'Enter' && !(e.target.closest && e.target.closest('button, a, input, textarea'))) {
-        var primary = document.querySelector('#fin-actions .fin-primary');
+        var primary = document.querySelector('#screen-final .final:not([hidden]) .fin-primary');
         if (primary) { e.preventDefault(); primary.click(); }
       }
       return;
@@ -6315,7 +6794,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
       if (practice) {
         // Практика: стрелки листают, пробел и стрелка вправо ведут дальше.
         if (e.key === 'ArrowLeft') { e.preventDefault(); practiceBack(); return; }
-        if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); practiceForward(); return; }
+        if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); practiceNext(); return; }
         if (e.key === 'Escape') { e.preventDefault(); openPracticeEnd(false); return; }
       }
       if (current.type === 'figure_audit') {
