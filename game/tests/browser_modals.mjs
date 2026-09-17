@@ -64,7 +64,9 @@ try {
   await page.locator('.fb-btn:visible').first().click();
   await page.waitForSelector('.fb-back', { timeout: 15000 });
   const t0 = await secondsLeft(page);
-  await page.click('.fb-kind');            // «Проблема» — появляется поле текста
+  await page.click('.fb-kind');            // «Проблема» — появляется список причин
+  // С 17.09 (коммит 364d3e1c) поле текста открывается только галочкой «Другое, своими словами».
+  await page.locator('.fb-choice[value="Другое, своими словами"]').check();
   await page.click('.fb-other');
   await page.keyboard.type(' 1');
   await page.keyboard.press('Enter');
