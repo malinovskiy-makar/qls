@@ -50,13 +50,13 @@
 
 - [x] Фаза −1 — сверка, ветка, макеты в репозитории, журнал, сводная карточка Notion
 
-- [ ] P1 Главная `/game/`
+- [x] P1 Главная `/game/`
   - [x] P1.0 ADR 0108, `docs/GAME.md` «Стартовый экран»
   - [x] P1.1 Сервер: вкладки режимов, квота по режимам, рекорды вошедшего, ячейка «Вызов дня»
         (`daily.daily_cell`, `daily.streak_for` — P4.1 сделана заранее), `api/set_check`
   - [x] P1.2 Разметка `_start.html`, стили и код трёх зон, окно «Мои рекорды», `?mode=`/`?duel=`
   - [x] P1.3 Тесты: перенос старых проверок, новые (рендер, серия, код, клавиши), браузерный
-  - [ ] P1.4 Зубастость, Notion
+  - [x] P1.4 Зубастость (50/50), Notion
 - [ ] P2 Раунд
 - [ ] P3 Итог и дуэль
 - [ ] P4 Вызов дня
@@ -120,6 +120,61 @@
 
 | Фаза | Тест | Как ломал | Покраснел? |
 |---|---|---|---|
+| P1 | test_three_zones_for_a_guest | класс ячейки «Играть по коду» испорчен | да |
+| P1 | test_what_the_owner_removed_is_gone | вернул класс rush-head на заголовок | да |
+| P1 | test_mode_without_questions_has_no_tab | сервер рисует вкладку и режиму без вопросов | да |
+| P1 | test_tab_caption_is_duration_and_pool | «мин» → «минут» в подписи | да |
+| P1 | test_guest_sees_login_line_under_the_board_and_no_quota | другая строка гостя под таблицей | да |
+| P1 | test_student_sees_quota_stats_and_records_button | квота скрыта у вошедшего | да |
+| P1 | test_how_points_popover_takes_numbers_from_config | в поповере зашито 25 вместо конфига | да |
+| P1 | test_guest_line_has_no_streak_and_no_played | гостю «сыграно 0 из 4» | да |
+| P1 | test_student_with_one_played_daily_today | сыграно N+1 | да |
+| P1 | test_reset_moment_comes_from_the_server | пустой data-reset-at | да |
+| P1 | test_unknown_code | неизвестный код → exists=true | да |
+| P1 | test_set_code_leads_to_the_set_page_case_and_spaces_ignored | код без нормализации | да |
+| P1 | test_duel_code_leads_to_the_duel_page | дуэль ведёт на /game/s/ | да |
+| P1 | test_many_misses_from_one_address_are_slowed_down | промах не пишется в лестницу | да |
+| P1 | test_empty_code_is_not_a_miss | пустой код считается промахом | да |
+| P1 | test_best_scores_per_mode_for_the_student | рекорды без фильтра версии экономики | да |
+| P1 | test_page_config_carries_best_and_quota_only_for_the_student | гостю my_best не пуст | да |
+| P1 | test_quota_is_counted_per_mode_for_today | квота пишется в один режим | да |
+| P1 | test_digits_select_a_mode_and_do_not_start | цифра стартует раунд | да |
+| P1 | test_f_opens_the_filter_window_and_modifiers_are_left_to_the_browser | убрана проверка Cmd/Ctrl/Alt | да |
+| P1 | test_tab_click_only_selects | клик по вкладке стартует | да |
+| P1 | test_medals_for_places_one_to_three | медали только у 1–2 | да |
+| P1 | test_board_follows_the_selected_mode | доска не перезапрашивается при смене режима | да |
+| P1 | test_code_is_checked_without_leaving_the_page | код уводит на /game/s/ | да |
+| P1 | test_mode_and_duel_from_the_address | адрес не чистится | да |
+| P1 | test_tokens_exist_in_both_themes | нет --on-accent в тёмной | да |
+| P1 | test_no_hex_colours_in_the_start_markup | хекс в разметке старта | да |
+| P1 | test_time_left_to_moscow_midnight_is_drawn_not_computed | остаток считается по часам браузера | да |
+| P1 | test_nothing_played | best +1 | да |
+| P1 | test_chain_up_to_yesterday_is_kept_until_midnight | серия только от сегодня | да |
+| P1 | test_a_gap_of_one_day_resets | цепочка не рвётся на пропуске | да |
+| P1 | test_two_challenges_on_one_day_are_one_day | сыграно считает дни, а не вызовы | да |
+| P1 | test_round_saved_after_midnight_counts_for_its_set_day | день по created_at, а не по набору | да |
+| P1 | test_week_is_monday_to_sunday_with_today_marked | неделя с воскресенья | да |
+| P1 | test_anonymous_has_no_streak_and_no_errors | аноним уходит в запрос | да |
+| P1 | test_one_query_per_user | второй запрос в streak_for | да |
+| P1 | StartScreenBrowserTest: key1_selects_not_starts | цифра стартует раунд (браузер) | да |
+| P1 | StartScreenBrowserTest: three_medals_then_number | медали только у 1–2 (браузер) | да |
+| P1 | StartScreenBrowserTest: guest_no_vscroll_1440x800 + student_no_vscroll_1440x800 | min-height 900 px | да |
+| P1 | StartScreenBrowserTest: wrong_code_stays | неверный код уводит на /game/s/ (браузер) | да |
+| P1 | StartScreenBrowserTest: url_duel_guest_sees_account_window + url_duel_student_opens_create_window | ?duel= не открывает окно | да |
+| P1 | StartScreenBrowserTest: f_opens_filters | F не открывает фильтры | да |
+| P1 | StartScreenBrowserTest: board_follows_mode | доска не следует за режимом (браузер) | да |
+| P1 | StartScreenBrowserTest: guest_stats_tab | нет контейнера рекордов гостя | да |
+| P1 | StartScreenBrowserTest: four_mode_tabs | пятая вкладка без вопросов | да |
+| P1 | StartScreenBrowserTest: four_band_cells | ячейка «Вызов дня» скрыта | да |
+| P1 | StartScreenBrowserTest: enter_starts_one_round | Enter стартует дважды | да |
+| P1 | StartScreenBrowserTest: url_mode_selects_rapid | ?mode= не выбирает режим | да |
+| P1 | StartScreenBrowserTest: wrong_code_message_clears_on_input | строка ошибки не гаснет при вводе | да |
+| P1 | StartScreenBrowserTest: duel_code_goes_to_duel_page | код дуэли на /game/s/ (браузер) | да |
+
+P1: 50 дефектов, 50 красных. Раннер — `scratchpad/teeth.py` (дефект → прогон одного теста → `git checkout`).
+Первый прогон `mb_code` покраснел ошибкой раннера, а не проверкой: раннер переписан (замер без падения
+на чужой странице, проверка кода дуэли записывается и когда до неё не дошли) — после этого красный
+именно на `wrong_code_stays`.
 
 ## Числа тестов
 
@@ -127,6 +182,8 @@
 |---|---|---|---|
 | Фаза −1, до правок | game + olympiads.tests.test_views + test_training | 867 | failures=1 (устаревший браузерный тест), skipped=1 |
 | Фаза −1, после починки теста | game.tests.test_browser_modals | 1 | OK |
+| P1, после фазы | game + config.tests.test_nav + problems.tests.test_stats_cards/test_obzor_nav/test_palette_tokens | 931 | OK (skipped=1) |
+| P1, новые тесты | game.tests.test_start_layout (+ браузерный StartScreenBrowserTest, 16 проверок) | 38 + 1 | OK |
 
 ## Удалено
 
