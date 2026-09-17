@@ -63,7 +63,11 @@ https://app.notion.com/p/3d1b11c92bc18148888ed95df85ab4d4
 .strip-reset:hover { opacity: 1; }
 
 /* ── Окно «Все фильтры» ─────────────────────────────────────────────── */
-.ct-all { border: 0; padding: 0; background: transparent;
+/* ⚠️ `color` ЗАДАН ЯВНО. У <dialog> свой цвет текста из браузера (чёрный,
+   CanvasText) — он не наследует `body`, и в тёмной теме заголовок «Все
+   фильтры» и подпись тумблера «Только задачи с решением» были чёрными на
+   тёмном: контраст 1,45 (замер `catalog/tests/test_contrast.py`, 17.09.2026). */
+.ct-all { border: 0; padding: 0; background: transparent; color: var(--text);
           width: min(1000px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
           margin: auto; }
 /* Затемнение — как у прежнего окна каталога. */
