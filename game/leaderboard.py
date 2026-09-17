@@ -193,6 +193,20 @@ def personal_stats(user, mode):
     }
 
 
+def best_scores(user):
+    u"""Личные рекорды вошедшего по всем режимам: `{режим: счёт}` одним запросом.
+
+    Стартовый экран показывает рекорд выбранного режима (ADR 0108). Основа
+    та же, что у `best_run`: все забеги текущей версии экономики, а не только
+    зачётные. Режима без забегов в словаре нет — экран тогда молчит, а не
+    рисует ноль.
+    """
+    rows = (GameResult.objects
+            .filter(user=user, economy_version=config.ECONOMY_VERSION)
+            .values('mode').annotate(best=Max('score')))
+    return {r['mode']: r['best'] for r in rows if r['best']}
+
+
 def best_run(user, mode):
     u"""Личный рекорд игрока в режиме или None, если рекорда ещё нет.
 

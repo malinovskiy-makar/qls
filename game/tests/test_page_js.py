@@ -39,9 +39,22 @@ FAKE_CONFIG = (
 )
 
 
+GAME_TEMPLATES = os.path.join(settings.BASE_DIR, 'game', 'templates')
+
+
+def expand_includes(src):
+    u"""Разметка экранов вынесена в `game/_*.html` (ADR 0108): подставляем
+    их на место `{% include %}`, чтобы проверки видели страницу целиком, а не
+    каркас без экранов."""
+    def paste(m):
+        with open(os.path.join(GAME_TEMPLATES, m.group(1)), encoding='utf-8') as f:
+            return expand_includes(f.read())
+    return re.sub(r"\{% include '(game/_\w+\.html)' %\}", paste, src)
+
+
 def page_source():
     with open(TEMPLATE, encoding='utf-8') as f:
-        return f.read()
+        return expand_includes(f.read())
 
 
 def inline_js(src):
@@ -542,7 +555,9 @@ class NineChartsTests(TestCase):
         self.assertEqual(self.src.count('<div class="chart-card">'), 9)
 
     def test_the_toggle_is_gone_with_its_state(self):
-        for gone in ('det-toggle', 'chartsBuilt', 'aria-expanded="false"'):
+        # ⚠️ `aria-expanded` на странице законно есть у поповера «Как считаются
+        # очки» (ADR 0108); сторожим именно раскрывашку графиков.
+        for gone in ('det-toggle', 'chartsBuilt', 'aria-controls="det-body"'):
             self.assertNotIn(gone, self.src, gone)
         self.assertNotIn('<div class="det-body" id="det-body" hidden>', self.src)
 
@@ -638,10 +653,11 @@ class RecordsPanelClientTests(TestCase):
 
     def test_the_old_four_line_box_is_gone(self):
         u"""Прежняя панель читала рекорды режимов прямо из localStorage."""
-        m = re.search(r"\$\('entry-records'\)\.addEventListener"
-                      r"\('click', function \(\) \{(.*?)\n  \}\);",
-                      self.js, re.S)
-        self.assertIsNotNone(m, 'обработчик entry-records не найден')
+        # С 17.09.2026 (ADR 0108) панель открывается окном со вкладки
+        # «Статистика»: кнопка `records-open` → `openRecords`.
+        self.assertIn("$('records-open').addEventListener('click'", self.js)
+        m = re.search(r"function openRecords\(on\) \{(.*?)\n  \}", self.js, re.S)
+        self.assertIsNotNone(m, 'openRecords не найден')
         self.assertNotIn('bestKey', m.group(1))
         self.assertIn('loadRecords()', m.group(1))
         self.assertNotIn('по режимам, локально', self.src)

@@ -1,0 +1,243 @@
+{% load ru %}
+{% comment %}
+ЭКРАН 1: СТАРТ — «стартовый экран аркады» (решение владельца 17.09.2026,
+ADR 0108, макеты `claude/mockups/wecon_rush_20260917/Main|Student|Dark|Mobile`).
+
+Три зоны: «Забег» (режим → подробности → фильтры → одна кнопка «Играть»),
+«Таблица / Статистика» (лидерборд в режиме, выбранном слева) и «Другие способы
+играть» (четыре ячейки одной анатомии). На окне 1440×800 у документа нет
+вертикальной прокрутки — держит браузерный тест `browser_start.mjs`.
+
+Вкладки режимов, числа под фильтром, строки таблицы и статистики рисует скрипт
+страницы (блок «СТАРТОВЫЙ ЭКРАН» в game.html): они меняются вместе с фильтром и
+режимом. Сервер кладёт сюда только то, что от них не зависит.
+
+⚠️ Страница набора и лобби дуэли (`/game/s/<код>/`) — та же страница: там три
+зоны скрыты, а видна карточка набора `#set-intro` или лобби `#duel-lobby`.
+{% endcomment %}
+<section id="screen-start" class="screen active">
+  <div class="start-main" id="start-main">
+
+    {# ── ЗОНА A: ЗАБЕГ ───────────────────────────────────────────────── #}
+    <section class="st-card st-run" aria-label="Раунд">
+      <div class="st-head">
+        {% comment %} ⚠️ Знак — ОБЩИЙ с блоком игры на личной статистике
+        (`templates/_rush_logo.html`), размер задаёт `.rush-logo--start`. {% endcomment %}
+        <h1 class="st-wm">{% include "_rush_logo.html" with extra="rush-logo--start" %}</h1>
+        <p class="st-pitch">три жизни, четыре режима, вопросы из реальных олимпиад</p>
+      </div>
+
+      {% comment %} Вкладки рисует сервер: режим без единого вопроса не показывается
+         вовсе. Иконку, выбранный режим и числа под фильтром дорисовывает скрипт. {% endcomment %}
+      <div class="mtabs" id="mode-grid" role="radiogroup" aria-label="Режим" style="--tabs: {{ start_modes|length }}">
+        {% for m in start_modes %}<button type="button" class="mtab" role="radio" aria-checked="false" data-mode="{{ m.key }}"><span class="key" aria-hidden="true">{{ forloop.counter }}</span><span class="mtab-i" aria-hidden="true"></span><span class="mtab-txt"><span class="mtab-t">{{ m.title }}</span><span class="mtab-m">{{ m.duration }} · <span class="mtab-n">{{ m.pool }}</span> вопр.</span></span></button>
+        {% endfor %}
+      </div>
+
+      <div class="detail" id="mode-detail">
+        <div class="detail-main">
+          <p class="detail-kind" id="detail-kind"></p>
+          <div class="terms">
+            <div class="term"><span class="term-l">Время</span><b class="term-v" id="term-time"></b></div>
+            <div class="term"><span class="term-l">За верный</span><b class="term-v" id="term-bonus"></b></div>
+            <div class="term"><span class="term-l">Жизни</span><span class="term-v term-lives" id="term-lives"></span></div>
+          </div>
+          <p class="detail-pool">
+            <span id="detail-pool"></span>
+            <span class="detail-rec" id="detail-rec" hidden></span>
+          </p>
+        </div>
+        <div class="mock" aria-hidden="true">
+          <span class="mock-q">Так выглядит вопрос</span>
+          <div class="mock-body" id="mode-mock"></div>
+        </div>
+      </div>
+
+      {# Сервер честно отказался начинать раунд — спокойная строка, не alert(). #}
+      <p class="start-notice" id="start-notice" hidden></p>
+
+      <div class="filters" id="filter-bar">
+        <span class="filters-lab">Что решаем</span>
+        <button type="button" class="fsum" data-open-filters="1">Тема: <b id="fsum-topics">все</b></button>
+        <button type="button" class="fsum" data-open-filters="1">Сложность: <b id="fsum-stars">любая</b></button>
+        <button type="button" class="fsum" data-open-filters="1">Источник: <b id="fsum-sources">все</b></button>
+        <button type="button" class="filters-reset" id="filter-reset" hidden>Сбросить всё</button>
+        <button type="button" class="filters-edit" id="filter-open">{% include "_icon.html" with name="sliders" %}<span>Настроить фильтры</span></button>
+      </div>
+      <p class="filter-note" id="filter-note" hidden></p>
+
+      <div class="cta">
+        <button type="button" class="play" id="play-btn">{% include "_icon.html" with name="play" %}<span id="play-label">Играть</span></button>
+        <p class="cta-hint"><kbd>Enter</kbd> – старт, <kbd>1</kbd>–<kbd id="key-last">4</kbd> – режим,<br><kbd>F</kbd> – фильтры</p>
+        {% if not request.user.is_authenticated %}
+        <p class="cta-guest">Играть можно без входа; в таблицу попадают только вошедшие</p>
+        {% endif %}
+        {% if ranked_quota %}
+        <p class="quota" id="quota"><b id="quota-num">0 из {{ ranked_quota.max }}</b>зачётных раундов сегодня</p>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ── ЗОНА B: ТАБЛИЦА / СТАТИСТИКА ────────────────────────────────── #}
+    <section class="st-card st-side" id="lb-card" aria-label="Таблица и статистика">
+      <div class="side-top">
+        <div class="seg seg-big" role="tablist" aria-label="Таблица или статистика">
+          <button type="button" role="tab" id="tab-board" aria-selected="true" aria-controls="pane-board">Таблица</button>
+          <button type="button" role="tab" id="tab-stats" aria-selected="false" aria-controls="pane-stats" tabindex="-1">Статистика</button>
+        </div>
+        <button type="button" class="how" id="how-open" aria-expanded="false" aria-controls="how-pop">Как считаются очки</button>
+      </div>
+      <div class="how-pop" id="how-pop" role="dialog" aria-label="Как считаются очки" hidden>
+        <button type="button" class="how-x" id="how-close" aria-label="Закрыть">{% include "_icon.html" with name="close" %}</button>
+        <p><b>За верный ответ</b> – от {{ score_rules.base_min }} очков за вопрос на 1★ до {{ score_rules.base_max }} за 5★, плюс за скорость и за серию верных подряд.</p>
+        <p><b>Раунд без фильтров</b> получает ×{{ score_rules.scope }}; точность ниже {{ score_rules.accuracy_full_pct }} % уменьшает итог.</p>
+        <p><b>Фильтр по сложности</b> делает раунд тренировочным: в таблицу он не идёт.</p>
+      </div>
+
+      <div class="pane" id="pane-board" role="tabpanel" aria-labelledby="tab-board">
+        <h2 class="bt">{% include "_icon.html" with name="trophy" %}<span>Лидеры · <span id="lb-title"></span></span><small>режим тот же, что слева</small></h2>
+        <div class="lb-segs">
+          <span class="seg" id="lb-period" role="group" aria-label="Окно">
+            <button type="button" data-period="week" aria-pressed="false">Неделя</button>
+            <button type="button" data-period="all" aria-pressed="true">Всё время</button>
+          </span>
+          <span class="seg" id="lb-metric" role="group" aria-label="Показатель">
+            <button type="button" data-metric="score" aria-pressed="true">Очки</button>
+            <button type="button" data-metric="correct" aria-pressed="false">Верных</button>
+            <button type="button" data-metric="speed" aria-pressed="false">Скорость</button>
+          </span>
+        </div>
+        <div class="lb-rows" id="lb-rows"></div>
+        <div class="lb-pinned" id="lb-pinned"></div>
+        <p class="lb-total" id="lb-total"></p>
+        {% if not request.user.is_authenticated %}
+        <p class="lb-foot">Играть можно без входа, но в таблицу попадают только вошедшие. <a href="/login/?next=/game/">Войти</a></p>
+        {% endif %}
+      </div>
+
+      <div class="pane" id="pane-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+        {% if request.user.is_authenticated %}
+        <h2 class="bt"><span>Моя статистика · <span id="ms-title"></span></span><small>режим тот же, что слева</small></h2>
+        <div class="ms-rows" id="ms-rows"></div>
+        <div class="side-acts">
+          <button type="button" class="st-btn" id="records-open">Все рекорды: по режимам, темам и дуэлям {% include "_icon.html" with name="arrow_right" %}</button>
+        </div>
+        {% else %}
+        <h2 class="bt"><span>Рекорды на этом устройстве</span><small>без входа</small></h2>
+        <div class="recs" id="local-records"></div>
+        <p class="notice">Войдите, чтобы рекорды сохранялись и считались по всем устройствам, а результаты попадали в таблицу.</p>
+        <div class="side-acts">
+          <a class="st-btn st-btn--amber" href="/login/?next=/game/">Войти</a>
+          <a class="st-btn" href="/register/?next=/game/">Создать аккаунт</a>
+        </div>
+        {% endif %}
+      </div>
+    </section>
+
+    {# ── ЗОНА C: ДРУГИЕ СПОСОБЫ ИГРАТЬ ───────────────────────────────── #}
+    <div class="band" id="entry-row">
+      {% comment %} «Бесконечные тесты» (ADR 0106). Пул тестов пуст — ячейки нет
+         (hidden ставит скрипт, `paintPracticeBand`). {% endcomment %}
+      <div class="st-card cell" id="practice-band">
+        <h2 class="cell-t">{% include "_icon.html" with name="infinity" %}Бесконечные тесты</h2>
+        <p class="cell-s">без времени, жизней и очков: просто решайте</p>
+        <div class="cell-a">
+          <button type="button" class="st-btn st-btn--solid" id="practice-go">Начать</button>
+          <span class="cell-cnt" id="practice-count"></span>
+        </div>
+      </div>
+
+      <div class="st-card cell" id="daily-cell">
+        <h2 class="cell-t">{% include "_icon.html" with name="calendar" %}Вызов дня</h2>
+        <p class="cell-s" id="daily-line">{% if daily_cell.is_authenticated %}сегодня сыграно <b>{{ daily_cell.played }}</b> из {{ daily_cell.total }}{% if daily_cell.streak %} · серия <b>{{ daily_cell.streak }}</b> {{ daily_cell.streak|plural_ru:"день,дня,дней" }}{% endif %}{% else %}{{ daily_cell.total }} {{ daily_cell.total|plural_ru:"вызов,вызова,вызовов" }} на сегодня · одна попытка на каждый{% endif %}</p>
+        <div class="cell-a">
+          <a class="st-btn" id="entry-daily" href="/game/daily/">Открыть</a>
+          <span class="cell-cnt" id="daily-left" data-reset-at="{{ daily_cell.reset_at }}"></span>
+        </div>
+      </div>
+
+      <div class="st-card cell">
+        <h2 class="cell-t">{% include "_icon.html" with name="duel" %}Дуэль</h2>
+        <p class="cell-s">те же вопросы у обоих, старт одновременно</p>
+        <div class="cell-a">
+          <button type="button" class="st-btn" id="entry-duel">Создать</button>
+          <span class="cell-cnt">соперник по ссылке или коду</span>
+        </div>
+      </div>
+
+      <div class="st-card cell entry-code">
+        <h2 class="cell-t">{% include "_icon.html" with name="code" %}Играть по коду</h2>
+        <p class="cell-s">набор, дуэль или вызов, который вам прислали</p>
+        <form class="code-form cell-a" id="code-form" novalidate>
+          <label class="sr-only" for="code-input">Код набора</label>
+          <input id="code-input" maxlength="12" autocomplete="off" spellcheck="false"
+                 placeholder="код набора" aria-describedby="code-error">
+          <button type="submit" class="code-go" id="code-go" aria-label="Открыть набор">{% include "_icon.html" with name="arrow_right" %}</button>
+        </form>
+        <p class="code-error" id="code-error" role="alert" hidden></p>
+      </div>
+    </div>
+  </div>
+
+  {# Карточка набора и лобби дуэли — вместо трёх зон на `/game/s/<код>/`. #}
+  <div class="start-set" id="start-set" hidden>
+    <!-- Карточка забега по набору. Вопросов тут НЕТ — иначе автор дуэли
+         увидел бы задания до игры. -->
+    <div class="set-intro" id="set-intro" hidden>
+      <div class="set-kind" id="set-kind"></div>
+      <h2 class="set-title" id="set-title"></h2>
+      <p class="set-meta" id="set-meta"></p>
+      <p class="set-note" id="set-note">Вопросы одинаковы у всех, кто играет этот набор.</p>
+      <div class="set-actions">
+        {% if auto_set.kind != 'duel' %}<button class="set-play" id="set-play">Играть</button>{% endif %}
+        <a class="set-board-link" id="set-board-link" href="#">Доска результатов</a>
+        <a class="set-back" href="/game/">В обычную игру</a>
+      </div>
+    </div>
+    {% if auto_set and auto_set.kind == 'duel' %}
+    {% comment %} ── Лобби дуэли ───────────────────────────────────────────────────
+         Решение владельца 15.09.2026: дуэль строго синхронна. Кнопки «Играть»
+         нет ни у автора, ни у соперника: оба ждут здесь, и раунд начинается
+         у обоих по одному отсчёту, когда в комнате двое (game/consumers.py,
+         момент `started_at` — game/state.py). Карточки набора у дуэли нет. {% endcomment %}
+    <div class="duel-lobby" id="duel-lobby">
+      <div class="set-kind">Дуэль</div>
+      <h2 class="set-title">{{ auto_set.title }}</h2>
+      <p class="set-meta">Режим «{{ auto_set.mode_title }}» · без лимита вопросов · у обоих одни и те же вопросы</p>
+      <div class="duel-code-row">
+        <span class="duel-code" id="duel-code">{{ auto_set.code }}</span>
+        <button type="button" class="duel-copy-code" id="duel-copy-code">Скопировать код</button>
+      </div>
+      <button type="button" class="set-play duel-copy" id="duel-copy">Скопировать ссылку</button>
+      <div class="duel-lobby__row">
+        <input type="text" id="duel-link" readonly value="{{ duel_url }}" aria-label="Ссылка на дуэль">
+      </div>
+      <p class="dm-state" id="duel-lobby-state"><span class="dm-dot"></span><span id="duel-lobby-text">{% if not auto_set.allowed %}{{ auto_set.why }}{% elif auto_set.is_author %}Ждём соперника…{% else %}Соперник: {{ auto_set.author }}{% endif %}</span></p>
+      <p class="duel-countdown" id="duel-countdown" hidden aria-live="assertive"></p>
+      <a class="duel-cancel" href="/game/">Отменить</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if sound_check %}
+  {% comment %} ── Панель прослушивания звука ─────────────────────────────────────
+     Служебная: только staff и только по ?sound_check=1. Нужна для приёмки
+     НА СЛУХ — иначе, чтобы услышать «жизнь», надо трижды ошибиться, а
+     чтобы услышать «рекорд», сначала его поставить.
+     Кнопки зовут ровно те же функции, что и игра (window.rushSound), а не
+     свои копии: панель, играющая другой звук, бесполезна. {% endcomment %}
+  <div class="sound-check" id="sound-check">
+    <b>Прослушать звуки</b>
+    <div class="sound-check__row">
+      <button type="button" data-sound="correct">верно</button>
+      <button type="button" data-sound="wrong">неверно</button>
+      <button type="button" data-sound="lifeLost">жизнь</button>
+      <button type="button" data-sound="record">рекорд</button>
+      <button type="button" data-hb="70">сердцебиение 70</button>
+      <button type="button" data-hb="130">сердцебиение 130</button>
+      <button type="button" data-hb="stop">стоп</button>
+    </div>
+    <span class="sound-check__note" id="sound-check-note"></span>
+  </div>
+  {% endif %}
+</section>

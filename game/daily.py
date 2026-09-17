@@ -143,3 +143,96 @@ def board_rows(gset, me=None, limit=50):
         if mine and mine[0]['place'] > limit:
             my_row = mine[0]
     return top, my_row, len(rows)
+
+
+# ─── Серия дней (решение владельца 17.09.2026) ───────────────────────────
+#
+# ⚠️ СЕРИЯ СЧИТАЕТСЯ ИЗ `GameResult`, СВОЕЙ ТАБЛИЦЫ У НЕЁ НЕТ. Счётчик в
+# отдельной таблице разошёлся бы с фактом при первой же правке или удалении
+# результата руками — тот же довод, что у лидерборда (ADR 0056).
+#
+# День засчитан, если сыгран ХОТЯ БЫ ОДИН из четырёх вызовов. Дата — день
+# НАБОРА (`game_set.day`), а не момент сохранения: раунд, начатый в 23:59 и
+# сохранённый в 00:01, относится к дню своего набора.
+
+WEEKDAY_LABELS = ('пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс')
+
+# `streak_for` принимает параметр `today` (так его зовёт спецификация),
+# и внутри функции он закрывает модульную `today()`. Ссылка на неё — здесь.
+_moscow_today = today
+
+
+def played_pairs(user):
+    """Множество пар (день набора, режим) сыгранных пользователем вызовов.
+
+    Один запрос на пользователя. Аноним — пустое множество: у него нет
+    имени на доске и серии нет вовсе.
+    """
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return set()
+    from .models import GameResult
+    return set(GameResult.objects
+               .filter(user=user, game_set__kind='daily',
+                       game_set__day__isnull=False)
+               .values_list('game_set__day', 'game_set__mode')
+               .distinct())
+
+
+def played_days(user):
+    """Московские даты, в которые у пользователя есть сыгранный вызов дня."""
+    return {day for day, _mode in played_pairs(user)}
+
+
+def streak_for(user, today=None, pairs=None):
+    """Серия дней: `{'current', 'best', 'week', 'played_today'}`.
+
+    `current` — длина цепочки подряд идущих дней, кончающейся сегодня; если
+    сегодня ещё не сыграно — вчера: серия не сгорает до полуночи. `best` —
+    самая длинная цепочка за всё время. `week` — текущая неделя пн–вс.
+    `pairs` — уже прочитанные `played_pairs(user)`, чтобы не ходить в базу
+    второй раз.
+    """
+    day0 = today or _moscow_today()
+    days = {d for d, _m in (played_pairs(user) if pairs is None else pairs)}
+    one = datetime.timedelta(days=1)
+
+    current = 0
+    cursor = day0 if day0 in days else day0 - one
+    while cursor in days:
+        current += 1
+        cursor -= one
+
+    best = run = 0
+    prev = None
+    for d in sorted(days):
+        run = run + 1 if prev is not None and d - prev == one else 1
+        best = max(best, run)
+        prev = d
+
+    monday = day0 - datetime.timedelta(days=day0.weekday())
+    week = []
+    for i in range(7):
+        d = monday + datetime.timedelta(days=i)
+        week.append({'day': d.isoformat(), 'label': WEEKDAY_LABELS[i],
+                     'hit': d in days, 'is_today': d == day0})
+    return {'current': current, 'best': max(best, current), 'week': week,
+            'played_today': day0 in days}
+
+
+def daily_cell(user):
+    """Живая ячейка «Вызов дня» на главной игры.
+
+    Вошедшему — сколько из четырёх вызовов сыграно сегодня и серия дней;
+    анониму — только число вызовов. Момент смены вызова отдаёт сервер
+    (`next_reset`), клиент лишь рисует остаток.
+    """
+    day0 = _moscow_today()
+    cell = {'total': len(config.MODES),
+            'reset_at': next_reset().isoformat(timespec='seconds'),
+            'is_authenticated': bool(user is not None
+                                     and getattr(user, 'is_authenticated', False))}
+    if cell['is_authenticated']:
+        pairs = played_pairs(user)
+        cell['played'] = len({m for d, m in pairs if d == day0})
+        cell['streak'] = streak_for(user, today=day0, pairs=pairs)['current']
+    return cell

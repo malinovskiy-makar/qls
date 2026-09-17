@@ -226,7 +226,8 @@ class FilterWindowMarkupTests(TestCase):
     u"""Разметка окна и главного экрана."""
 
     def setUp(self):
-        self.src = io.open(PAGE, encoding='utf-8').read()
+        from game.tests.test_page_js import page_source
+        self.src = page_source()
 
     def test_topic_chips_are_gone_from_the_start_screen(self):
         u"""Двадцать чипов занимали первый экран целиком и уводили внимание
@@ -303,8 +304,11 @@ class FilterWindowMarkupTests(TestCase):
         self.assertIn("localStorage.setItem(FILTER_KEY", self.src)
 
     def test_mode_card_shows_the_available_count(self):
+        u"""С 17.09.2026 режим — вкладка, а не карточка (ADR 0108): число под
+        фильтром на вкладке и в панели, мало вопросов — вкладка выключена."""
         self.assertIn("' под фильтром'", self.src)
-        self.assertIn("card.classList.add('is-off')", self.src)
+        self.assertIn("tab.classList.toggle('is-off', !playable)", self.src)
+        self.assertIn('tab.disabled = !playable;', self.src)
         # ⚠️ Сверяем САМО СРАВНЕНИЕ, а не упоминание константы:
         # `CFG.min_playable` встречается ещё в подписи и в обходе клавиш, и
         # проверка на упоминание проспала бы «playable = true».
@@ -312,10 +316,14 @@ class FilterWindowMarkupTests(TestCase):
                       self.src)
 
     def test_ranked_note_is_shown_before_the_run(self):
-        u"""Игрок обязан знать ДО раунда, поедет ли результат на доску."""
-        self.assertIn('Тренировочный раунд: выбрана сложность', self.src)
-        self.assertIn("'Без фильтров: ×'", self.src)
-        self.assertIn("'С фильтрами: множителя ×'", self.src)
+        u"""Игрок обязан знать ДО раунда, поедет ли результат на доску.
+
+        С 17.09.2026 (ADR 0108) под строкой фильтров — только пометка
+        тренировочного раунда; про ×1,3 без фильтров говорит поповер
+        «Как считаются очки»."""
+        self.assertIn("'Раунд тренировочный: в таблицу не идёт'", self.src)
+        self.assertIn('note.hidden = isRanked();', self.src)
+        self.assertIn('<b>Раунд без фильтров</b> получает ×', self.src)
 
 
 class PoolGateTests(TestCase):

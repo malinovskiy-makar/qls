@@ -48,8 +48,9 @@ from . import sources as game_sources
 from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
-from . import (config, filters as game_filters, leaderboard as lb,
-               scoring, state as run_state, stats as stats_mod)
+from . import (config, daily as daily_mod, filters as game_filters,
+               leaderboard as lb, scoring, state as run_state,
+               stats as stats_mod)
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
@@ -599,12 +600,18 @@ def _game_page_context(request):
     единого вопроса на экране не показывается вовсе (играть в него нечем).
     """
     _tc = topic_counts()
-    # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
+    # Сколько ru-вопросов доступно на каждый режим (для вкладок на старте).
     type_counts = {}
     for qtype in _pool_qs().values_list('question_type', flat=True):
         type_counts[qtype] = type_counts.get(qtype, 0) + 1
     pool_counts = {key: type_counts.get(m['question_type'], 0)
                    for key, m in config.MODES.items()}
+    user = request.user if request.user.is_authenticated else None
+    # Ячейка «Вызов дня» на главной (решение владельца 17.09.2026): вызовов
+    # столько, сколько режимов с непустым пулом, — ровно столько карточек
+    # рисует `/game/daily/` (режим без вопросов вызова не получает).
+    daily_cell = daily_mod.daily_cell(user)
+    daily_cell['total'] = sum(1 for key in config.MODES if pool_counts[key])
 
     return {
         'auto_set': None,
@@ -637,15 +644,28 @@ def _game_page_context(request):
         'pool_tags': pool_tags(),
         # Квота зачётных забегов на сегодня — вошедшему. Аноним её не видит:
         # у него зачётных забегов не бывает вовсе.
-        'ranked_quota': _quota_line(request),
+        'ranked_quota': _quota_payload(request),
+        'daily_cell': daily_cell,
+        # Вкладки режимов стартового экрана (ADR 0108): режим без единого
+        # вопроса не рисуется вовсе. Подпись времени — как у клиента
+        # (`durationText`), числа под фильтром клиент обновит сам.
+        'start_modes': [
+            {'key': key, 'title': m['title'], 'pool': pool_counts[key],
+             'duration': (('%g мин' % (m['duration'] / 60)) if m['duration'] >= 60
+                          else '%d с' % m['duration'])}
+            for key, m in config.MODES.items() if pool_counts[key]],
+        # Числа поповера «Как считаются очки» — из конфига, а не текстом:
+        # поменяют экономику, и поповер не соврёт.
+        'score_rules': {
+            'base_min': min(config.BASE_BY_DIFFICULTY.values()),
+            'base_max': max(config.BASE_BY_DIFFICULTY.values()),
+            'scope': ('%g' % config.SCOPE_MULTIPLIER).replace('.', ','),
+            'accuracy_full_pct': int(round(config.ACCURACY_FULL_AT * 100)),
+        },
         # Группы-заготовки: показываются, ТОЛЬКО если у них есть варианты.
         # Серый переключатель, который не нажимается, хуже его отсутствия.
         'feature_options': game_filters.feature_options(),
         'character_options': game_filters.character_options(),
-        # «Вопросов из реальных олимпиад» — считаем ТОЛЬКО вопросы банка:
-        # сгенерированные тренировочные из олимпиад не приходили, и врать
-        # в цифре на первом экране нельзя.
-        'pool_total': _pool_qs().filter(is_generated=False).count(),
         # JSON для JS-клиента: механика читается только из config.py
         # Здесь лежат только константы из game/config.py, но правило
         # одно на проект: JSON внутри <script> собирается помощником.
@@ -701,6 +721,11 @@ def _game_page_context(request):
             'is_authenticated': request.user.is_authenticated,
             'pool_tags': pool_tags(),
             'topic_counts': topic_counts(),
+            # Стартовый экран (ADR 0108): квота зачётных по режимам и серверные
+            # рекорды вошедшего. Аноним получает None и {}: его рекорды живут
+            # в localStorage этого устройства.
+            'ranked_quota': _quota_payload(request),
+            'my_best': lb.best_scores(user) if user else {},
         }),
     }
 
@@ -1617,6 +1642,45 @@ def make_code_lookup(raw):
     return normalize_code(raw)
 
 
+# Лестница задержек за промахи проверки кода — общая с входом и кодом
+# занятия (`problems/ratelimit.py`), своя область.
+SET_CHECK_SCOPE = 'game_set_check'
+
+
+@require_GET
+def api_set_check(request):
+    u"""Есть ли набор с таким кодом: ячейка «Играть по коду» на главной.
+
+    Ответ `{exists, url}`. Решение владельца 17.09.2026: неверный код
+    оставляет игрока на главной со строкой под полем, а не уводит на общий
+    404 сайта. Дуэль ведёт на свою страницу `/game/d/<код>/`, остальные
+    наборы — на `/game/s/<код>/`.
+
+    ⚠️ НОВОГО НАРУЖУ НЕ УХОДИТ. Существует ли код, и раньше было видно по
+    ответу `/game/s/<код>/` (404 или страница); здесь то же знание, только
+    без ухода со страницы. Пространство кодов 32^8, перебор вслепую
+    бессмыслен, но промахи всё равно двигают лестницу задержек по адресу —
+    так же, как у кода занятия.
+    """
+    from problems import ratelimit
+    wait = ratelimit.check(SET_CHECK_SCOPE, request, None)
+    if wait:
+        return JsonResponse({
+            'exists': False, 'url': '', 'wait': wait,
+            'error': 'Слишком много попыток. Попробуйте через %d с.' % wait,
+        }, status=429)
+    code = make_code_lookup(request.GET.get('code'))
+    gset = (GameSet.objects.filter(code=code).only('code', 'kind').first()
+            if code else None)
+    if gset is None:
+        if code:
+            ratelimit.register_failure(SET_CHECK_SCOPE, request, None)
+        return JsonResponse({'exists': False, 'url': ''})
+    name = 'game:duel' if gset.kind == 'duel' else 'game:set_page'
+    return JsonResponse({'exists': True,
+                         'url': reverse(name, args=[gset.code])})
+
+
 @ensure_csrf_cookie
 @require_safe
 def set_page(request, code):
@@ -2273,17 +2337,30 @@ def _end_reason(state, claimed):
     return 'time'
 
 
-def _quota_line(request):
-    u"""Строка «Зачётных забегов сегодня: 7 из 10» — или пусто анониму.
+def _quota_payload(request):
+    u"""Квота зачётных раундов на сегодня по режимам — или None анониму.
 
-    Считается по режиму по умолчанию: на стартовом экране режим ещё не
-    выбран, а показывать четыре строки ради одной цифры незачем.
+    `{'used': {режим: N}, 'max': M}`. Стартовый экран показывает «N из M»
+    у выбранного режима и меняет число вместе с режимом (ADR 0108): квота
+    считается по режиму (`_ranked_today`), и одна цифра режима по умолчанию
+    врала бы у остальных. Один запрос на все режимы.
     """
     if not request.user.is_authenticated:
-        return ''
-    used = _ranked_today(request.user, config.DEFAULT_MODE)
-    return 'Зачётных раундов сегодня: %d из %d' % (
-        min(used, config.RANKED_RUNS_PER_DAY), config.RANKED_RUNS_PER_DAY)
+        return None
+    from django.db.models import Count
+    from zoneinfo import ZoneInfo
+    msk = ZoneInfo('Europe/Moscow')
+    start = datetime.datetime.combine(_moscow_day(), datetime.time.min,
+                                      tzinfo=msk)
+    rows = (GameResult.objects
+            .filter(user=request.user, ranked=True, created_at__gte=start,
+                    created_at__lt=start + datetime.timedelta(days=1))
+            .values('mode').annotate(n=Count('id')))
+    used = {key: 0 for key in config.MODES}
+    for row in rows:
+        if row['mode'] in used:
+            used[row['mode']] = min(row['n'], config.RANKED_RUNS_PER_DAY)
+    return {'used': used, 'max': config.RANKED_RUNS_PER_DAY}
 
 
 def _moscow_day(when=None):

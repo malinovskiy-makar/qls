@@ -33,6 +33,8 @@ urlpatterns = [
     path('api/resume/', views.api_resume, name='resume'),
     # Живые счётчики окна фильтров: сколько вопросов даст каждый режим.
     path('api/pool_counts/', views.api_pool_counts, name='pool_counts'),
+    # Проверка кода набора без ухода с главной: {exists, url}.
+    path('api/set_check/', views.api_set_check, name='set_check'),
     # Доска лидеров: публичная (её смысл в том, чтобы её видели все).
     path('api/leaderboard/', views.api_leaderboard, name='leaderboard'),
     # Личная статистика: только своя, аноним сюда не проходит.

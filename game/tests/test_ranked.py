@@ -283,12 +283,28 @@ class QuotaTests(RunHelper):
         self.assertEqual(views._moscow_day(utc_morning),
                          datetime.date(2026, 9, 2))
 
-    def test_quota_line_is_empty_for_anonymous(self):
+    def test_quota_is_absent_for_anonymous(self):
         from django.test import RequestFactory
         from django.contrib.auth.models import AnonymousUser
         r = RequestFactory().get('/game/')
         r.user = AnonymousUser()
-        self.assertEqual(views._quota_line(r), '')
+        self.assertIsNone(views._quota_payload(r))
+
+    def test_quota_is_counted_per_mode_for_today(self):
+        u"""Стартовый экран показывает квоту выбранного режима (ADR 0108):
+        вчерашние и чужие режимы в сегодняшнее число не попадают."""
+        from django.test import RequestFactory
+        u = self.login()
+        self._fill(u, 3)
+        self._fill(u, 2, when=timezone.now() - datetime.timedelta(days=1))
+        GameResult.objects.create(code=make_result_code(), mode='bullet',
+                                  ranked=False, user=u)
+        r = RequestFactory().get('/game/')
+        r.user = u
+        q = views._quota_payload(r)
+        self.assertEqual(q['max'], config.RANKED_RUNS_PER_DAY)
+        self.assertEqual(q['used']['blitz'], 3)
+        self.assertEqual(q['used']['bullet'], 0)
 
 
 class AntiCheatTests(RunHelper):

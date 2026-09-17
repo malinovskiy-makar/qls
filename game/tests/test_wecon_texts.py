@@ -106,12 +106,16 @@ class StartScreenTextTests(TestCase):
     u"""1.3, 1.4, 1.5 — тексты стартового экрана."""
 
     def setUp(self):
-        self.src = read(PAGE)
+        from game.tests.test_page_js import page_source
+        self.src = page_source()
 
     def test_subtitle_is_the_owners_wording(self):
-        self.assertIn('Решайте тестовые задачи в условиях ограниченного',
+        u"""С 17.09.2026 (ADR 0108) большого логотипа с лозунгом нет: рядом со
+        словесным знаком одна строка из макета «стартового экрана аркады»."""
+        self.assertIn('три жизни, четыре режима, вопросы из реальных олимпиад',
                       self.src)
-        self.assertIn('тем дольше длится ваша игра!', self.src)
+        self.assertNotIn('Решайте тестовые задачи в условиях ограниченного',
+                         self.src)
         self.assertNotIn('Четыре режима', self.src)
 
     def test_click_and_enter_line_is_gone(self):

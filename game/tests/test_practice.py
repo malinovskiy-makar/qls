@@ -125,8 +125,9 @@ class PracticeApiTests(TestCase):
 
     def test_start_page_has_the_band_with_its_count(self):
         html = self.client.get('/game/').content.decode()
-        for needle in ('<div class="practice-band" id="practice-band">', '<b>Бесконечные тесты</b>',
-                       'без времени, жизней и очков: просто решай',
+        # С 17.09.2026 вход — ячейка нижней полосы стартового экрана (ADR 0108).
+        for needle in ('<div class="st-card cell" id="practice-band">', 'Бесконечные тесты</h2>',
+                       'без времени, жизней и очков: просто решайте',
                        '"practice": {"title": "Бесконечные тесты", "count": 9}'):
             self.assertTrue(needle in html, 'нет на стартовой: %s' % needle)
 
