@@ -344,6 +344,13 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 ⚠️ Третьего исключения быть не должно: появится — правило пора переписывать,
 а не пристраивать к нему ещё одну оговорку.
 
+**Wecon Rush после редизайна 17.09 (ADR 0108–0116):** экраны `game.html` — include-файлы `game/_start.html`, `_play.html`,
+`_final.html`, `_practice_final.html`; доски дня и набора — общие `game/_board_*.html`. Адреса: `/game/daily/` и
+`/game/daily/<режим>/[<дата>/]`, страница набора `/game/s/<код>/` (`/board/` — переход), дуэль `/game/d/<код>/`,
+результат `/game/r/<код>/`; API `game/api/set_check/`, `teacher/api/game-set/pool/`, срок набора
+`teacher/game-sets/<код>/deadline/`. Макеты и спецификации — `claude/mockups/wecon_rush_20260917/`,
+журнал прогона — `claude/JOURNAL_WECON_RUSH_REDESIGN_20260917.md`.
+
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·
 [`problems/management/commands/`](problems/management/commands/CLAUDE.md) ·

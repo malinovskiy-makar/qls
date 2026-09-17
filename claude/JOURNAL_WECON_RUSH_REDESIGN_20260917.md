@@ -104,7 +104,12 @@
         «Где ошибся класс» сначала трудные
   - [x] P7.4 Тесты (11 серверных + браузерный на 6 проверок), ADR 0116, GAME.md
   - [x] P7.5 Зубастость (20/20), Notion
-- [ ] P8 Олимпиады, Beta 1.0, финал
+- [x] P8 Олимпиады, Beta 1.0, финал
+  - [x] P8.1 «Олимпиады»: 11 вьюх с `soon_page`, тест на все адреса `urls.py` (было 5 из 11), вид как у «Учебника»
+  - [x] P8.2 «Beta 1.0» внизу окна на коротких страницах (кабинеты, каталог, профиль, вход), метка в игре
+  - [x] P8.2a «Развернуть (F)» у чертежа — значком вместо «⤢»
+  - [x] P8.2b Итоговые снимки: подписи кнопок режима в сборке набора обрезались (дефект P7) — починено
+  - [x] P8.3 Финал: прогон затронутого, GAME.md, CLAUDE.md (6 строк), зубастость (14/14), Notion, отчёт
 
 ## Стоп-гейт A (P2) — анализ и план
 
@@ -325,6 +330,36 @@
    в первой колонке, и тест раскладки P6 на 380 px их не ловил; `.gb-scroll` поправлен заодно тем же
    правилом.
 
+### P8
+1. Все 11 вьюх раздела «Олимпиады» (4 в `views.py`, 7 в `views_training.py`) начинаются с
+   `stub = soon_page(request)`; три адреса тренировки — только POST (`start`, `autosave`, `finish`).
+   Тесты закрытого раздела знали 5 адресов из 11 (четыре главных и `training_intro`).
+2. `olympiads/soon.html` и `catalog/textbook.html` одинаковы: знак, «Скоро.», одна строка, без форм и
+   кнопок, те же правила стилей; различаются только префикс класса (намеренно, записано в шаблоне) и
+   текст. Приводить нечего.
+3. Файл флагов на сервере — `/srv/weconomics/.env` (`docs/SERVER.md`: состояние сервера вне клона), а не
+   `/srv/weconomics/app/deploy/.env`, как в спецификации. Флаг читается как `== '1'`: пусто или `0` —
+   раздел закрыт.
+4. «Beta 1.0» посреди окна — не выпавший подвал, а обычная строка после `main`: у `body` был
+   `min-height: 100vh`, но не колонка. Замер до правки на 1440×900: `/teacher/game-sets/` — метка на
+   459–499 px, `/teacher/groups/` — 366, `/student/` — 567, `/game/daily/` — 760. На экранах входа и
+   регистрации `body` — flex-строка по центру, и метка стояла справа от карточки посередине высоты.
+5. В игре метки не было вовсе (`game.html` не подключал партиал; карточка «подключить метку Beta 1.0 в
+   game.html»). Главная игры на 1440×800 занята ровно в высоту окна (48 + 752 px): строка в 40 px дала
+   бы прокрутку. Итог практики на 1440×900 короткий — метка встала бы на 579 px.
+6. `calendar_stub/calendar.html` (метка на 514 px в пустом календаре стенда) и `calc2.html` (метка под
+   нижним краем экрана-приложения) — свои шаблоны вне кабинета и каталога; не тронуты.
+7. Оставшиеся знаки в экранах игры: «⤢ Развернуть (F)» у чертежа — заменён; `←`/`→` на клавишах
+   `<kbd>`, «1★…5★» сложности, ✓/✗ меток вариантов и полосы дуэли, «↑/↓» сравнения «против себя
+   обычного» — типографика по спецификациям P2–P5, не значки кнопок. «✕» закрытия окна
+   `_problem_report.html` — общий партиал сайта, не игры; не тронут.
+8. Первый итоговый прогон (`game teacher olympiads… config.tests.test_nav`) дал одно падение:
+   `PracticeBrowserTest: wrong_answer_feedback_with_catalog_link` — ссылка `/catalog/` вместо страницы
+   задачи. Причина в тесте P5, а не в коде: вопросы практики случайны, в пуле стенда 3 сгенерированных
+   из 43, у них ссылки нет, и второй вопрос изредка выпадал сгенерированным (порядка 7 % прогонов).
+9. На итоговых снимках: в сборке набора (P7) подписи кнопок Блица и Рапида обрезались многоточием уже
+   на 1440 — равные колонки по 860 px уже подписи «один верный ответ · 2 мин · N».
+
 ## Решения по ходу
 
 ### P1
@@ -445,6 +480,27 @@
   (та же строка на странице набора ученика).
 - Телефон: над списком вопросов — строка «В наборе N из 60 · Открыть», режимы 2×2.
 - Во всех таблицах с невидимой подписью (`.gs-scroll`, `.sd-scroll`, `.gb-scroll`) — `position: relative`.
+
+### P8
+- Тест закрытого раздела берёт адреса из самого `olympiads/urls.py` (GET, при 405 — POST): новый адрес
+  без заглушки покраснеет без правки теста; комплекта 999 нет — заглушка обязана сработать раньше поиска.
+- «Beta 1.0»: `body` — flex-колонка во всю высоту окна в базовых шаблонах каталога, кабинетов ученика и
+  учителя и профиля; `.site-version { margin-top: auto }` в партиале (у блочного `body` это ноль).
+  `body > main { width: 100% }` — во flex-колонке `margin: 0 auto` сжал бы `main` по содержимому.
+  Ширины `main` сверены до и после на 14 страницах при 1440 и 390 px — совпали все.
+- Вход и регистрация: колонка, карточка посередине окна за счёт `margin-block: auto`, метка внизу слева.
+  Карточка стоит посередине места над меткой (на 20 px выше центра окна) — не заметно.
+- Игра: метка подключена перед `_feedback.html`, лежит в нижнем поле экрана без своей строки
+  (`margin-top: calc(-24px - 1.3em)`, `pointer-events: none`); `.rush-wrap` растёт до низа окна. На
+  главной 1440×800 прокрутки нет, под меткой только обёртки (проверено `elementsFromPoint`); на итоге
+  раунда и практики, на ПК и телефоне под меткой пусто. В раунде и при развороте чертежа метка скрыта,
+  как шапка сайта.
+- Календарь и calc2 не трогаю: свои шаблоны, у calc2 свой владелец; записано в карточке.
+- Значок `expand` — в оба набора одной строкой, как `close` у «Свернуть (Esc)».
+- Браузерный тест практики: второй вопрос выпал сгенерированным — сценарий начинается заново с новой
+  страницы (до 8 раз). Смысл проверки прежний; дефект P5 `b_problem_id` после правки снова красный.
+- Кнопки режима в сборке: колонки по подписи (`minmax(0, max-content)`), многоточие — только если места
+  нет; до 1100 px — прежние равные колонки. Проверка `mode_captions_not_cut` в браузерном тесте сборки.
 
 ## Зубастость
 
@@ -745,6 +801,28 @@ P7: 20 дефектов, 20 красных. Первый проход дал 16 
 - добавлен тест «нет внутренних имён типов на списке и странице набора» (числовой инвариант спецификации
   про все страницы учителя) и дефект к нему.
 
+| Фаза | Тест | Как ломал | Покраснел? |
+|---|---|---|---|
+| P8 | test_every_address_of_urls_py_is_closed_for_a_guest | без заглушки адрес «сколько осталось» (GET) | да |
+| P8 | test_every_address_of_urls_py_is_closed_for_a_guest | без заглушки автосохранение (только POST) | да |
+| P8 | test_version_stands_at_the_bottom_of_a_short_page | `body` кабинета учителя снова блочный | да |
+| P8 | TeacherSetsBrowserTest: version_at_the_bottom_of_short_pages | `body` кабинета учителя снова блочный (браузер) | да |
+| P8 | test_version_stands_at_the_bottom_of_a_short_page | у метки нет `margin-top: auto` | да |
+| P8 | TeacherSetsBrowserTest: version_at_the_bottom_of_short_pages | у метки нет `margin-top: auto` (браузер) | да |
+| P8 | test_version_stands_at_the_bottom_of_a_short_page | `main` каталога без ширины 100 % | да |
+| P8 | test_version_at_the_bottom_of_every_template | в игре снова нет метки | да |
+| P8 | StartScreenBrowserTest: student_no_vscroll_1440x800 | метка своей строкой — у главной игры прокрутка (браузер) | да |
+| P8 | RoundBrowserTest: site_header_hidden | метка видна в раунде (браузер) | да |
+| P8 | TeacherSetsBrowserTest: version_at_the_bottom_of_short_pages | экран входа снова строкой (браузер) | да |
+| P8 | test_expand_and_collapse_are_icons_not_signs | вернул знак «⤢» на «Развернуть» | да |
+| P8 | test_expand_icon_is_one_string_in_markup_and_scripts | значок expand в скриптах разошёлся с разметкой | да |
+| P8 | TeacherSetsBrowserTest: mode_captions_not_cut | кнопки режима снова в равных колонках по 860 px (браузер) | да |
+
+P8: 14 дефектов, 14 красных с первого прохода (8 проверок сервера и разметки, 6 браузерных). После правки
+теста практики перепроверен дефект P5 `b_problem_id` (нет ссылки в каталог в разборе) — красный.
+
+Итого по прогону: 241 дефект, 241 красный (P1 50, P2 42, P3 47, P4 26, P5 25, P6 17, P7 20, P8 14).
+
 ## Числа тестов
 
 | Когда | Набор | Тестов | Итог |
@@ -772,6 +850,13 @@ P7: 20 дефектов, 20 красных. Первый проход дал 16 
 | P7, новые тесты | test_sets +11 (TeacherSetsP7Tests), три теста TeacherConstructorTests переписаны под один экран + браузерный TeacherSetsBrowserTest (6 проверок) | 11 + 1 | OK |
 | P7, после фазы | test_sets, test_result_page, test_game, test_daily, teacher, problems test_obzor_nav и test_palette_tokens, config test_nav | 361 | OK |
 | P7, после усиления тестов | test_sets + браузерный teacher_sets | 47 + 1 | OK |
+| P8, до правок | olympiads.tests.test_views + test_training | 49 | OK |
+| P8, новые тесты | olympiads +1 (все адреса `urls.py`), config test_nav +1 (метка внизу), test_wecon_texts +2 (значок «Развернуть»); проверки браузерных: version_at_the_bottom_of_short_pages, mode_captions_not_cut, скрытая метка в раунде | 4 | OK |
+| P8, затронутые шаблоны | тесты, читающие базовые шаблоны и вход (problems print/tables/hints/report/r15/track/look, catalog no_slop/math, config test_nav, game test_daily, palette_tokens; design_canon, auth_hardening; talk_block, r15_align, catalog contrast) | 290 + 23 + 25 | OK |
+| P8, браузерные игры | teacher_sets, layout, round, final, practice, modals, daily, freeze, lobby | 10 | OK |
+| Финал, первый заход | `manage.py test game teacher olympiads.tests.test_views olympiads.tests.test_training config.tests.test_nav` | 1 096 | failures=1 (тест практики, см. факты P8), skipped=1 |
+| Финал | та же команда после правки теста практики, 2 мин 51 с | 1 096 | OK (skipped=1: синхронная дуэль — только PostgreSQL) |
+| Финал, CI tests на PostgreSQL | `scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads --settings=config.settings_test_pg` (локальный PostgreSQL 17, 6 мин 54 с): шаг A / шаг B | 6 253 / 20 | A: failures=18, errors=35, skipped=12; B: failures=1, skipped=6 — разбор в разделе «CI перед сдачей» |
 
 ## Удалено
 
@@ -870,6 +955,44 @@ P7: 20 дефектов, 20 красных. Первый проход дал 16 
 - Длинное тире «—» как пустое значение в `_answer_text` и «темы» карточки — теперь «–» и «без темы».
 - Тесты: `test_teacher_sees_step_one_first` (шагов больше нет), `test_step_two_filters_the_pool_by_question_type`
   (стал `test_pool_is_filtered_by_the_type_of_the_mode`), проверка «ответ: 12» в HTML (ответ — в данных сборки).
+
+### P8 (всё осталось в git до коммитов P8)
+- Исключение игры в `config/tests/test_nav.py::test_version_at_the_bottom_of_every_template`
+  (`if template != 'game/game.html'`) — метка теперь есть и в игре.
+- Знак «⤢» на кнопке «Развернуть (F)» у чертежа.
+- Раскладка экранов входа и регистрации строкой (`body` — flex без `flex-direction: column`).
+
+## CI перед сдачей (пять джобов `ci.yml`, локально)
+
+| Джоб | Команда | Итог |
+|---|---|---|
+| lint | `ruff check .` | зелёный |
+| security | `bandit -r problems catalog teacher student game calc2 config olympiads -ll`; `pip-audit -r requirements/base.txt` | зелёный: средних и высоких нет; «No known vulnerabilities found» |
+| migrations | `migrate --noinput` на пустой базе PostgreSQL 17 + `makemigrations --check --dry-run` | зелёный: миграции с нуля применились, «No changes detected» |
+| tests | полный прогон на PostgreSQL, два шага | красный — ни одного падения от этого прогона после правки фокуса; разбор ниже |
+| deploy-check | `check --deploy --fail-level WARNING` с подставным окружением из `ci.yml` | зелёный |
+
+Разбор красного в `tests` (шаг A: 18 падений и 35 ошибок, шаг B: 1 падение):
+- 18 — известный красный из `CLAUDE.md`: `test_embeddings_transfer` 10, `test_embedding_formula` 6,
+  `test_corpus_diagnostics` 2 (тесты зашиты на спецификацию отпечатка `v1`).
+- 31 ошибка — окружение этой машины: в `venv313` нет `rapidfuzz` (`test_find_olympiad_text_duplicates` 11,
+  `test_text_dedup` 3), `pymorphy3` и `bm25s` (`test_lexical_bm25` 11, `test_corpus_disk_cache` 6). В CI
+  зависимости ставятся из `requirements`; ставить пакеты не стал.
+- 3 падения — дефект `main`, не прогона: в панели отбора `/teacher/work/` нет группы тем
+  (`test_work_settings`, `test_obzor_build`, `test_exams`), воспроизводится на `e586516e` отдельной
+  рабочей копией. Карточка «Надо» в Notion `3deb11c9-2bc1-819e-94d5-e058dd0e003b`.
+- 1 падение — ПРОГОНА: `test_small_fixes.FocusRingTests` — поле сборки набора (P7) обводилось
+  `var(--accent)` вместо нейтрального `var(--focus)`. Починено (`cf8ec1de`), тест зелёный.
+- Шаг B: `calc2.tests.test_calc2_math` — одна проверка из 238 («Регулятор сцены · правка значения»:
+  ширина поля 40,375 px при пороге 40). Дефект `main`: на `e586516e` отдельной рабочей копией то же
+  падение, те же 40,375 px; calc2 в прогоне не менялся. Комментарий в карточке calc2
+  `3c3b11c9-2bc1-8166-9688-fd5e4cbf9f70`, статус не трогал.
+- В логе шага B `Internal Server Error: /game/api/question/` — не дефект: запрос закрывающегося браузера
+  теста раунда пришёл после очистки базы между тестами (кандидаты читаются из базы на каждый запрос).
+
+После правки фокуса и подписей кнопок режима: `game.tests.test_sets`, `test_browser_teacher_sets`, `teacher`,
+`problems.tests.test_small_fixes`, `config.tests.test_nav`, `problems.tests.test_palette_tokens` — 133 теста OK;
+`ruff check .` чисто, длинных тире в `game`, `templates`, `teacher` — 0.
 
 ## ADR этого прогона
 
