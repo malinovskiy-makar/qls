@@ -67,7 +67,11 @@ class FinalScreenMarkupTests(TestCase):
         for url in re.findall(r'<script[^>]*src="([^"]+)"', self.src):
             for lib in ('chart.js', 'd3', 'plotly', 'echarts', 'highcharts'):
                 self.assertNotIn(lib, url.lower(), url)
-        self.assertIn("'var(--rush-accent)'", self.body('chartCurve'))
+        curve = self.body('chartCurve')
+        # Каждый цвет рисунка — токеном: иначе смена темы его не перекрасит.
+        colours = re.findall(r"(?:stroke|fill): '([^']+)'", curve)
+        self.assertTrue(colours)
+        self.assertEqual([c for c in colours if not c.startswith('var(--') and c != 'none'], [])
 
     def test_local_storage_history_is_gone_entirely(self):
         for gone in ('econ_rush_history', 'saveRunToHistory', 'loadHistory', 'HISTORY_KEY'):
@@ -135,6 +139,9 @@ class FinalScreenLogicTests(TestCase):
             'paintMissSolution', 'chartCurve'))
         defined = set(re.findall(r'\bfunction (\w+)\(', self.js))
         called = set(re.findall(r'(?<![.\w])([a-z]\w*)\(', code))
+        # Помощники-форматтеры передаются и значением (`numText` в строках
+        # «Против себя обычного`), без скобок: их имена кончаются на Text.
+        called |= set(re.findall(r'(?<![.\w\'])([a-z]\w*Text)\b(?!\')', code))
         # Глобали браузера, рисователь чертежей из static/game/figure.js,
         # локальные функции-выражения кривой и `var(` внутри строк цветов.
         browser = {'function', 'if', 'return', 'parseInt', 'setTimeout', 'String',

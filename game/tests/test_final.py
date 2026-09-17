@@ -6,9 +6,11 @@ u"""Итог раунда (фаза P3 редизайна 17.09.2026, ADR 0111):
 дня, место, серия, следующий вызов), остаток попыток набора и данные дуэли
 для «Реванша». Разметку и код экрана держит `test_final_screen.py`.
 """
+import datetime
 import json
 
 from django.test import TestCase
+from django.utils import timezone
 from django.urls import reverse
 
 from game import config, daily as daily_mod, leaderboard as lb
@@ -95,12 +97,14 @@ class RankedExtrasTests(RunHelper):
         self.assertNotIn('places', s)
 
     def test_played_at_is_the_saved_moment(self):
+        u"""Дата итога — момент сохранения результата, а не повторного finish."""
         self.login()
-        first = self.play(correct=6)['summary']['played_at']
+        self.play(correct=6)
+        # Результат сохранён час назад: повторный finish обязан отдать тот момент.
+        hour_ago = timezone.now() - datetime.timedelta(hours=1)
+        GameResult.objects.update(created_at=hour_ago)
         again = finish(self.client)['summary']['played_at']
-        saved = GameResult.objects.get()
-        self.assertEqual(first, saved.created_at.isoformat(timespec='seconds'))
-        self.assertEqual(again, first)
+        self.assertEqual(again, hour_ago.isoformat(timespec='seconds'))
 
 
 class SetVariantsTests(TestCase):
