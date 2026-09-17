@@ -448,7 +448,7 @@ scp reports/bank_sync/bank_sync_prod.tar.gz <адрес из «Как подкл
 ```
 
 Второй пакет — задачи, скрытые дома, но видимые на бою (17.09: 139 задач,
-`content_status` needs_fix/junk), **только по решению владельца**:
+`content_status` needs_fix/junk) — **везти, решение владельца 17.09.2026**: дом — источник истины и по видимости:
 
 ```bash
 venv313\Scripts\python.exe manage.py bank_sync_export --ids-file reports/bank_sync_20260917/prod_visible_home_hidden_ids.txt --out reports/bank_sync/bank_sync_prod_hidden
