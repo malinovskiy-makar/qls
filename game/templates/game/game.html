@@ -3964,9 +3964,11 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
           return;
         }
         box.appendChild(msRow('Раундов', st.runs.toLocaleString('ru-RU')));
-        box.appendChild(msRow('Лучший счёт',
-          st.best_score.toLocaleString('ru-RU')
-          + (st.best_score_at ? ' · ' + lbDate(st.best_score_at) : '')));
+        // Рекорд — по зачётным раундам (ADR 0111): их может ещё не быть.
+        box.appendChild(msRow('Лучший счёт', st.best_score == null
+          ? '– · зачётных раундов ещё нет'
+          : st.best_score.toLocaleString('ru-RU')
+            + (st.best_score_at ? ' · ' + lbDate(st.best_score_at) : '')));
         box.appendChild(msRow('Больше всего верных за раунд',
                               st.best_correct.toLocaleString('ru-RU')));
         box.appendChild(msRow('Средняя точность', st.accuracy + ' %'));
@@ -6345,8 +6347,12 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     }
     metric('Раундов', p.runs.toLocaleString('ru-RU'),
            'зачётных ' + p.ranked_runs);
-    metric('Лучший счёт', p.best_score.toLocaleString('ru-RU'),
-           formatDate(p.best_score_at) + ' · ' + p.best_score_mode);
+    if (p.best_score == null) {
+      metric('Лучший счёт', '–', 'зачётных раундов ещё нет');
+    } else {
+      metric('Лучший счёт', p.best_score.toLocaleString('ru-RU'),
+             formatDate(p.best_score_at) + ' · ' + p.best_score_mode);
+    }
     metric('Средняя точность', p.accuracy + '%');
     metric('Верный ответ', recMs(p.avg_correct_ms), 'в среднем');
     box.appendChild(grid);
@@ -6416,7 +6422,8 @@ a.btn-copy { display: inline-flex; align-items: center; text-decoration: none; }
     rows.forEach(function (r) {
       var tr = recEl('tr');
       tr.appendChild(recEl('td', null, r.title));
-      tr.appendChild(recEl('td', 'num', r.score.toLocaleString('ru-RU')));
+      // Рекорд режима — по зачётным раундам; нет их — прочерк, не ноль.
+      tr.appendChild(recEl('td', 'num', r.score ? r.score.toLocaleString('ru-RU') : '–'));
       tr.appendChild(recEl('td', 'num', '×' + multText(r.combo)));
       tr.appendChild(recEl('td', 'num', r.accuracy + '%'));
       table.appendChild(tr);

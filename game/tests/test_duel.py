@@ -497,11 +497,11 @@ class PersonalBestComesWithTheStartTests(TestCase):
         from game import config as game_config
         GameResult.objects.create(
             user=self.me, mode='blitz', score=900, correct_count=9,
-            wrong_count=1, total_count=10,
+            wrong_count=1, total_count=10, ranked=True,
             economy_version=game_config.ECONOMY_VERSION)
         GameResult.objects.create(
             user=self.me, mode='blitz', score=100, correct_count=1,
-            wrong_count=9, total_count=10,
+            wrong_count=9, total_count=10, ranked=True,
             economy_version=game_config.ECONOMY_VERSION)
 
         self.client.force_login(self.me)

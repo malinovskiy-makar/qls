@@ -197,10 +197,13 @@ class StartScreenServerDataTests(TestCase):
         from game import leaderboard as lb
         user = User.objects.create_user(username='best_one', password='p12345')
         for mode, score in (('blitz', 300), ('blitz', 450), ('bullet', 90)):
-            GameResult.objects.create(user=user, mode=mode, score=score,
+            GameResult.objects.create(user=user, mode=mode, score=score, ranked=True,
                                       economy_version=config.ECONOMY_VERSION)
-        GameResult.objects.create(user=user, mode='rapid', score=999,
+        GameResult.objects.create(user=user, mode='rapid', score=999, ranked=True,
                                   economy_version=config.ECONOMY_VERSION - 1)
+        # Незачётный раунд рекордом не бывает (правило рекорда, ADR 0111).
+        GameResult.objects.create(user=user, mode='blitz', score=5000, ranked=False,
+                                  economy_version=config.ECONOMY_VERSION)
         self.assertEqual(lb.best_scores(user), {'blitz': 450, 'bullet': 90})
 
     def test_page_config_carries_best_and_quota_only_for_the_student(self):
@@ -208,7 +211,7 @@ class StartScreenServerDataTests(TestCase):
         self.assertIn('"my_best": {}', html)
         self.assertIn('"ranked_quota": null', html)
         user = User.objects.create_user(username='cfg_student', password='p12345')
-        GameResult.objects.create(user=user, mode='classic', score=77,
+        GameResult.objects.create(user=user, mode='classic', score=77, ranked=True,
                                   economy_version=config.ECONOMY_VERSION)
         self.client.force_login(user)
         html = self.client.get(reverse('game:page')).content.decode('utf-8')

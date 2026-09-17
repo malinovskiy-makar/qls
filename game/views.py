@@ -1117,7 +1117,10 @@ DIFFICULTY_GROUPS = [('easy', 'Лёгкие', (1, 2)),
 # при сохранении результата. Список нужен, чтобы тест «клиент не читает
 # несуществующего поля» видел обе половины сводки, а не одну.
 FINISH_EXTRA_FIELDS = ('ranked', 'unranked_reason', 'unranked_text',
-                       'ranked_today', 'ranked_per_day')
+                       'ranked_today', 'ranked_per_day',
+                       # итог по макету 17.09.2026 (ADR 0111), см. _finish_extras
+                       'places', 'record', 'daily', 'attempts_left', 'duel',
+                       'avg_correct_ms')
 
 
 def build_summary(state):
@@ -1139,8 +1142,12 @@ def build_summary(state):
     topics = {}
     for r in log:
         for name in (r['topics'] or [NO_TOPIC]):
-            cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0})
+            cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0,
+                                            'points': 0})
             cell[r['outcome']] += 1
+            # «Где набрано» на итоге (ADR 0111). Вопрос с двумя темами кладёт
+            # очки в обе: карточка показывает вклад темы, а не делит итог.
+            cell['points'] += r.get('points') or 0
     topic_rows = []
     for name, cell in topics.items():
         tries = cell['correct'] + cell['wrong']
@@ -1151,6 +1158,7 @@ def build_summary(state):
             'skip': cell['skip'],
             'total': cell['correct'] + cell['wrong'] + cell['skip'],
             'accuracy': round(100 * cell['correct'] / tries) if tries else 0,
+            'points': cell['points'],
         })
     # Сначала темы с ошибками (главное на экране), потом по объёму.
     topic_rows.sort(key=lambda t: (-t['wrong'], -t['total'], t['topic']))
@@ -1164,6 +1172,20 @@ def build_summary(state):
             'total': len(rows),
             'correct': sum(1 for r in rows if r['outcome'] == 'correct'),
         })
+
+    # «Держите ли сложное» на итоге (ADR 0111): полоски по звёздам вместо
+    # трёх групп. Звёзды — ЭФФЕКТИВНАЯ сложность, та же, что над карточкой
+    # вопроса и в очках; у старой записи журнала её нет — берём хранимую.
+    stars = {}
+    for r in log:
+        level = r.get('difficulty_effective') or r.get('difficulty')
+        if not level:
+            continue
+        level = max(1, min(5, int(round(level))))
+        cell = stars.setdefault(level, {'stars': level, 'total': 0, 'correct': 0,
+                                        'wrong': 0, 'skip': 0})
+        cell['total'] += 1
+        cell[r['outcome']] += 1
 
     buckets = []
     for lo, hi, title in TIME_BUCKETS:
@@ -1211,6 +1233,7 @@ def build_summary(state):
                            sorted(mistakes_by_topic(log).items(),
                                   key=lambda kv: (-kv[1], kv[0]))],
         'difficulty': difficulty,
+        'stars': [stars[k] for k in sorted(stars)],
         'time_buckets': buckets,
         # кривые для графиков: значение по номеру вопроса
         'score_curve': [r['running_score'] for r in log],
@@ -2277,7 +2300,99 @@ def api_session_finish(request):
     if saved is not None and saved.ranked and saved.user_id:
         summary['ranked_today'] = _ranked_today(saved.user, saved.mode)
         summary['ranked_per_day'] = config.RANKED_RUNS_PER_DAY
+    if saved is not None:
+        # Момент раунда — момент сохранения результата, а не повторного
+        # вызова finish: иначе дата итога «ехала» бы с каждым обновлением.
+        summary['played_at'] = saved.created_at.isoformat(timespec='seconds')
+        summary.update(_finish_extras(request, saved))
     return JsonResponse({'summary': summary, 'share': share})
+
+
+def _finish_extras(request, saved):
+    u"""Поля итога раунда по макету 17.09.2026 (ADR 0111), читаются из базы.
+
+    - `places` — места игрока в таблице режима за неделю и за всё время;
+      только у зачётного раунда вошедшего.
+    - `record` — {is_record, prev_best}: ⚠️ ЛИЧНЫЙ РЕКОРД — ЛУЧШИЙ ЗАЧЁТНЫЙ
+      РАУНД РЕЖИМА (решение 17.09.2026, то же правило у чипа рекорда на
+      раунде и в «Моей статистике»). У незачётного раунда плашки нет вовсе:
+      «личный рекорд» рядом с «Не в таблице» читался бы как противоречие.
+    - `daily` — место на доске дня, серия дней и следующий несыгранный вызов.
+    - `attempts_left` — остаток попыток набора учителя.
+    - `duel` — страница сравнения, отыграл ли соперник и адрес реванша.
+    """
+    out = {'avg_correct_ms': saved.avg_correct_ms}
+    user = request.user if request.user.is_authenticated else None
+    if saved.ranked and user is not None:
+        week = lb.my_row(user, saved.mode, 'week', 'score')
+        whole = lb.my_row(user, saved.mode, 'all', 'score')
+        out['places'] = {'week': week['place'] if week else None,
+                         'all': whole['place'] if whole else None}
+        prev = (GameResult.objects
+                .filter(user=user, mode=saved.mode, ranked=True,
+                        economy_version=config.ECONOMY_VERSION,
+                        created_at__lt=saved.created_at)
+                .exclude(pk=saved.pk)
+                .order_by('-score').values_list('score', flat=True).first())
+        out['record'] = {'is_record': prev is not None and saved.score > prev,
+                         'prev_best': prev}
+    gset = saved.game_set
+    if gset is None:
+        return out
+    if gset.kind == 'daily':
+        out['daily'] = _daily_extras(request, saved, gset, user)
+    elif gset.kind == 'duel':
+        others = gset.results.exclude(pk=saved.pk)
+        if user is not None:
+            others = others.exclude(user=user)
+        out['duel'] = {
+            'url': reverse('game:duel', args=[gset.code]),
+            'rival_done': others.exists(),
+            # Реванш — тот же режим и фильтр, новые вопросы; окно зовёт этот
+            # адрес запросом и уходит в лобби новой дуэли.
+            'rematch_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                            + _filter_query(gset.filter_snapshot)
+                            + '&rematch=' + gset.code),
+        }
+    else:
+        out['attempts_left'] = max(0, gset.attempts_allowed
+                                   - attempts_used(request, gset))
+    return out
+
+
+def _daily_extras(request, saved, gset, user):
+    u"""Итог вызова дня: место на доске дня, серия и следующий вызов.
+
+    Место считается тем же порядком, что у доски (`daily.board_rows`): по
+    счёту, при равенстве выше тот, кто закончил раньше. Аноним на доску не
+    попадает — места у него нет, это итог и скажет словами.
+    """
+    ranked = gset.results.filter(user__isnull=False)
+    info = {'board_url': reverse('game:daily_board', args=[gset.mode]),
+            'total': ranked.count(), 'place': None, 'streak': 0, 'next': None}
+    if user is not None and saved.user_id == user.id:
+        ahead = ranked.filter(Q(score__gt=saved.score)
+                              | Q(score=saved.score,
+                                  created_at__lt=saved.created_at)).count()
+        info['place'] = ahead + 1
+        pairs = daily_mod.played_pairs(user)
+        info['streak'] = daily_mod.streak_for(user, pairs=pairs)['current']
+    else:
+        pairs = set()
+    day0 = daily_mod.today()
+    played_codes = set(played_set_codes(request))
+    for mode in config.MODES:
+        if mode == gset.mode and gset.day == day0:
+            continue
+        if (day0, mode) in pairs:
+            continue
+        nxt = daily_mod.get_daily_set(mode, day0)
+        if nxt is None or nxt.code in played_codes:
+            continue
+        info['next'] = {'mode': mode, 'title': config.MODES[mode]['title'],
+                        'url': reverse('game:set_page', args=[nxt.code]) + '?auto=1'}
+        break
+    return info
 
 
 def _log_learning_events(request, state):
@@ -2623,8 +2738,13 @@ def _save_result(request, state, summary):
     if gset is not None:
         # У дуэли «доска» — это её страница сравнения, а не общая доска
         # набора: соперника интересует счёт лоб в лоб.
-        board = reverse('game:duel', args=[gset.code]) if gset.kind == 'duel' \
-            else reverse('game:set_board', args=[gset.code])
+        if gset.kind == 'duel':
+            board = reverse('game:duel', args=[gset.code])
+        elif gset.kind == 'daily':
+            # У вызова дня одна доска — доска дня режима (P4), а не доска набора.
+            board = reverse('game:daily_board', args=[gset.mode])
+        else:
+            board = reverse('game:set_board', args=[gset.code])
         out['set'] = {
             'code': gset.code,
             'kind': gset.kind,

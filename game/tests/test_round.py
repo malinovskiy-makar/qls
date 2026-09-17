@@ -92,9 +92,10 @@ class QuitSavesAsUnrankedTests(RunHelper):
 
     def test_a_quit_round_is_not_a_record(self):
         user = self.login()
-        GameResult.objects.create(user=user, mode='blitz', score=100,
+        GameResult.objects.create(user=user, mode='blitz', score=100, ranked=True,
                                   economy_version=config.ECONOMY_VERSION)
         GameResult.objects.create(user=user, mode='blitz', score=900, ended_reason='quit',
+                                  unranked_reason='quit',
                                   economy_version=config.ECONOMY_VERSION)
         self.assertEqual(lb.best_run(user, 'blitz')['score'], 100)
         self.assertEqual(lb.best_scores(user), {'blitz': 100})

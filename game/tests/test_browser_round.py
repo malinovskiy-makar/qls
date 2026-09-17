@@ -59,7 +59,7 @@ class RoundBrowserTest(StaticLiveServerTestCase):
                     correct_index=0, correct_value='30', difficulty=3, topics=[], lang='ru')
         self.student = User.objects.create_user(username='round_student', password='p12345')
         GameResult.objects.create(user=self.student, mode='blitz', score=1260, correct_count=9,
-                                  total_count=10, wrong_count=1,
+                                  total_count=10, wrong_count=1, ranked=True,
                                   economy_version=config.ECONOMY_VERSION)
 
     def test_round_screen(self):
