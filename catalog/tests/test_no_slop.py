@@ -59,7 +59,10 @@ def visible_text(html):
 
     Пробелы схлопнуты (и неразрывный тоже): «<b>0</b> задач» — это «0 задач».
     """
-    text = _RX_SCRIPT.sub(' ', html)
+    # Метка версии сайта (Beta 1.0) — осознанное число из настроек, а не
+    # данные банка: правило нуля её не касается (17.09.2026).
+    text = re.sub(r'<div class="site-version">.*?</div>', ' ', html)
+    text = _RX_SCRIPT.sub(' ', text)
     text = _RX_STYLE.sub(' ', text)
     text = _RX_HTML_COMMENT.sub(' ', text)
     text = _RX_TAG.sub(' ', text)

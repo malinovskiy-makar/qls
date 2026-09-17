@@ -78,7 +78,8 @@ class ProblemPageTests(TestCase):
         self.assertIn('class="pp pp--diff" href="/catalog/?difficulty=4"><span class="st">★★★★☆</span> сложность 4</a>', html)
         self.assertIn('class="pp pp--kind" href="/catalog/?type=open">Развёрнутая задача</a>', html)
         self.assertIn('class="pp-sep"', html)
-        self.assertIn('class="pp pp--src" href="/catalog/?source=%d">МатЭк</a>' % self.src.pk, html)
+        # Чип источника без адреса — текст, не ссылка (17.09.2026: ссылка ведёт на первоисточник).
+        self.assertIn('<span class="pp pp--src">МатЭк</span>', html)
         test_html = self.client.get(_url(self.p_test)).content.decode()
         self.assertIn('href="/catalog/?type=test&amp;test_type=single">'
                       'Тест · один верный</a>', test_html)

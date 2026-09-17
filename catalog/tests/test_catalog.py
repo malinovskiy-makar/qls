@@ -294,6 +294,8 @@ class CurrencyEscapeFrontendTests(TestCase):
         self.assertIn('1.56\\$', html)
         # фикс H3: функция маскировки и её вызов до KaTeX
         self.assertIn('function maskEscapedDollars', html)
-        self.assertIn('maskEscapedDollars(document.body)', html)
+        # С 17.09.2026 конвейер один: renderMathIn(root) маскирует до KaTeX.
+        self.assertIn('renderMathIn(document.body)', html)
+        self.assertIn('maskEscapedDollars(root)', html)
         # маскировка перед перерендером раскрывашки тоже стоит
         self.assertIn('maskEscapedDollars(block)', html)

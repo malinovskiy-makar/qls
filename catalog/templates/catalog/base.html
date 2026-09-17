@@ -143,20 +143,32 @@ button:focus-visible {
 
 <script>
 
+// ⚠️ ОДИН КОНВЕЙЕР ФОРМУЛ НА ВСЁ, ЧТО ПОЯВЛЯЕТСЯ НА СТРАНИЦЕ: при загрузке,
+// после подмены выдачи фильтром (`catalog_filters.js`) и в модалке
+// «Условие» (`_catalog_js.html`). До 17.09.2026 подменённая фильтром выдача
+// оставалась с сырым TeX: KaTeX звался только на загрузке.
+function renderMathIn(root) {
+  if (!root) { return; }
+  maskEscapedDollars(root);
+  if (typeof renderMathInElement !== 'undefined') {
+    renderMathInElement(root, {
+      delimiters: [
+        // ВАЖНО: $$ должен идти РАНЬШЕ $, иначе auto-render режет $$...$$ как два пустых $...$
+        { left: '$$',   right: '$$',   display: true  },
+        { left: '$',    right: '$',    display: false },
+        { left: '\\[',  right: '\\]',  display: true  },
+        { left: '\\(',  right: '\\)',  display: false }
+      ],
+      throwOnError: false,
+      trust: false
+    });
+  }
+  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился.
+  fixCurrencyDollars(root);
+}
+
 function initKaTeX() {
-  maskEscapedDollars(document.body);
-  renderMathInElement(document.body, {
-    delimiters: [
-      // ВАЖНО: $$ должен идти РАНЬШЕ $, иначе auto-render режет $$...$$ как два пустых $...$
-      { left: '$$',   right: '$$',   display: true  },
-      { left: '$',    right: '$',    display: false },
-      { left: '\\[',  right: '\\]',  display: true  },
-      { left: '\\(',  right: '\\)',  display: false }
-    ],
-    throwOnError: false,
-    trust: false
-  });
-  fixCurrencyDollars(document.body);
+  renderMathIn(document.body);
 }
 
 // Страховка: deferred-скрипты CDN выполняются ДО DOMContentLoaded, поэтому

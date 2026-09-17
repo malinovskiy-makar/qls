@@ -104,7 +104,12 @@
     if (results) {
       var tpl = document.createElement('template');
       tpl.innerHTML = data.results_html.trim();
-      if (tpl.content.firstElementChild) { results.replaceWith(tpl.content.firstElementChild); }
+      var fresh = tpl.content.firstElementChild;
+      if (fresh) {
+        results.replaceWith(fresh);
+        // Новые карточки — тем же конвейером формул, что при загрузке страницы.
+        if (typeof window.renderMathIn === 'function') { window.renderMathIn(fresh); }
+      }
     }
     var chips = document.getElementById('ct-chips');
     if (chips) { chips.innerHTML = data.chips_html; collapseChips(); }

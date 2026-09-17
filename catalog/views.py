@@ -21,9 +21,7 @@ from . import attachments, attempts, chat, filters, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
-from .preview import (
-    PREVIEW_CHARS, cut_words, looks_like_statement_cut, preview_text,
-)
+from .preview import PREVIEW_CHARS, looks_like_statement_cut, tex_preview
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
 from problems.models import (
@@ -245,7 +243,7 @@ def _card(problem, score=None):
     is_test = problem_types.is_test(problem.problem_type)
     return {
         'problem':          problem,
-        'preview':          cut_words(preview_text(problem.statement), PREVIEW_CHARS),
+        'preview':          tex_preview(problem.statement, PREVIEW_CHARS),
         # Тема несёт раздел карты — им красится чип (`--map-g-*`).
         'topics':           [{'name': t.name, 'section': section_of(t.name)}
                              for t in problem.topics.all()
@@ -709,9 +707,28 @@ def _clouds(problem, topics, tags, sources):
     if sources:
         row2.append({'kind': 'sep'})
         for ref in sources:
-            row2.append({'kind': 'src', 'label': ref.source.name,
-                         'url': _catalog_link(sources=[str(ref.source_id)])})
+            # Чип источника — ссылка на первоисточник в новой вкладке, если
+            # адрес есть (решение владельца 17.09.2026); нет — чип без ссылки.
+            row2.append({'kind': 'src', 'label': ref.source.name, 'url': source_url(ref)})
     return row1, row2
+
+
+#: Главная страница источника — когда у привязки своей ссылки нет. Адрес дал
+#: владелец 17.09.2026 только для ILE: у SolveHub и Школково ссылка есть у
+#: каждой привязки, у МатЭк и «Сборника тестов АА» ссылок нет — чип без ссылки.
+SOURCE_HOMEPAGES = (('ILE', 'https://iloveeconomics.ru/'),)
+
+
+def source_url(ref):
+    """Внешний адрес задачи в источнике или ''. Только http(s): адрес приходит
+    из данных импорта, а `javascript:` в ссылке — исполняемый код."""
+    url = (ref.url or '').strip()
+    if url.startswith(('https://', 'http://')):
+        return url
+    for prefix, home in SOURCE_HOMEPAGES:
+        if ref.source.name.startswith(prefix):
+            return home
+    return ''
 
 
 def _norm_answer(text):
@@ -754,7 +771,6 @@ def _similar_cards(problem):
     for s in rows:
         topics = [t for t in s.topics.all() if is_known(t.name)][:1]
         title = (s.title or '').strip()
-        text = preview_text(s.statement)
         d = s.difficulty or 0
         cards.append({
             'problem': s,
@@ -766,8 +782,8 @@ def _similar_cards(problem):
             # его отсутствие — начало условия без разметки.
             'title_display': (similar_title(s)
                               if title and not looks_like_statement_cut(title, s.statement)
-                              else cut_words(text, 120)),
-            'preview': cut_words(text, 160),
+                              else tex_preview(s.statement, 120)),
+            'preview': tex_preview(s.statement, 160),
             'difficulty': d,
             'stars': ('★' * d + '☆' * (5 - d)) if d else '',
             'has_solution': bool(s.solution) and not s.solution_needs_review,
@@ -1447,28 +1463,40 @@ def catalog_api_problem(request, pk):
         return JsonResponse({'error': 'Not found'}, status=404)
 
     d = problem.difficulty or 0
+
+    # ⚠️ ТЕКСТ ОТРИСОВЫВАЕТ СЕРВЕР ТЕМ ЖЕ ПАРТИАЛОМ, ЧТО СТРАНИЦУ ЗАДАЧИ
+    # (решение 17.09.2026): markdown — через санитайзер `problems/rendering.py`
+    # с картинками по маркеру `[[FIGURE:…]]`, plain — экранирование и переносы.
+    # Скрипт модалки вставляет готовое `*_html` и зовёт KaTeX; сырой текст
+    # в `innerHTML` не попадает никогда.
+    def html(text):
+        return render_to_string('catalog/_math_text.html', {'text': text, 'problem': problem}).strip()
+
     parts = [
         {
             'label':  part.label,
             'text':   part.statement,
+            'html':   html(part.statement),
             'points': float(part.points) if part.points is not None else None,
         }
         for part in problem.parts.all()
     ]
     topics  = list(problem.topics.values_list('name', flat=True))
-    sources = [ref.source.name for ref in problem.source_references.select_related('source').all()]
+    refs = list(problem.source_references.select_related('source').all())
 
     return JsonResponse({
         'id':             problem.pk,
         'title':          problem.title or f'Задача #{problem.pk}',
         'statement':      problem.statement,
+        'statement_html': html(problem.statement),
         'parts':          parts,
         'difficulty':     d,
         'difficulty_str': '★' * d + '☆' * (5 - d),
         'topics':         topics,
         'problem_type':   problem.problem_type,
         'has_solution':   bool(problem.solution) and not problem.solution_needs_review,
-        'sources':        sources,
+        'sources':        [ref.source.name for ref in refs],
+        'source_links':   [{'name': ref.source.name, 'url': source_url(ref)} for ref in refs],
     })
 
 

@@ -139,7 +139,8 @@ function chip(text, extraClass) {
 }
 
 function renderCatalogModal(data) {
-  document.getElementById('c-modal-title').textContent = data.title;
+  const titleEl = document.getElementById('c-modal-title');
+  titleEl.textContent = data.title;
   document.getElementById('c-modal-link').href = '/catalog/problem/' + data.id + '/';
 
   const meta = document.getElementById('c-modal-meta');
@@ -154,14 +155,30 @@ function renderCatalogModal(data) {
   if (data.problem_type) { meta.appendChild(chip(data.problem_type)); }
   if (data.has_solution) { meta.appendChild(chip('решение ✓', 'sol')); }
 
-  if (data.sources && data.sources.length) {
-    document.getElementById('c-modal-source').textContent = data.sources.join(', ');
-  }
+  // Источник — ссылка на первоисточник в новой вкладке, если адрес есть
+  // (адрес пришёл с сервера и там же проверен на http/https).
+  const sourceBox = document.getElementById('c-modal-source');
+  (data.source_links || []).forEach((src, i) => {
+    if (i) { sourceBox.appendChild(document.createTextNode(', ')); }
+    const node = document.createElement(src.url ? 'a' : 'span');
+    node.textContent = src.name;
+    if (src.url) {
+      node.href = src.url;
+      node.target = '_blank';
+      node.rel = 'noopener';
+      node.insertAdjacentHTML('beforeend', EXTERNAL_ICON);
+    }
+    sourceBox.appendChild(node);
+  });
 
+  // ⚠️ УСЛОВИЕ И ПОДПУНКТЫ — ГОТОВЫЙ HTML С СЕРВЕРА (17.09.2026): тот же
+  // партиал `_math_text.html`, что на странице задачи (санитайзер markdown,
+  // картинки по маркеру, у plain — экранирование). Сырое `data.statement`
+  // в разметку по-прежнему не попадает никогда.
   const body = document.getElementById('c-modal-body');
   body.textContent = '';
   const stmt = document.createElement('div');
-  stmt.textContent = data.statement || '';
+  stmt.innerHTML = data.statement_html || '';
   body.appendChild(stmt);
 
   if (data.parts && data.parts.length) {
@@ -183,29 +200,23 @@ function renderCatalogModal(data) {
       wrap.appendChild(label);
 
       const text = document.createElement('div');
-      text.textContent = part.text || '';
+      text.innerHTML = part.html || '';
       wrap.appendChild(text);
 
       body.appendChild(wrap);
     });
   }
 
-  maskEscapedDollars(document.getElementById('c-modal-body'));
-  if (typeof renderMathInElement !== 'undefined') {
-    renderMathInElement(document.getElementById('c-modal-body'), {
-      delimiters: [
-        { left: '$$', right: '$$', display: true  },
-        { left: '$',  right: '$',  display: false },
-        { left: '\\[', right: '\\]', display: true  },
-        { left: '\\(', right: '\\)', display: false }
-      ],
-      throwOnError: false,
-      trust: false
-    });
-  }
-  // Чистка эскейпов — всегда, даже если CDN KaTeX не загрузился
-  fixCurrencyDollars(document.getElementById('c-modal-body'));
+  // Формулы — тем же конвейером, что вся страница (`renderMathIn`, base.html).
+  renderMathIn(titleEl);
+  renderMathIn(body);
 }
+
+// Значок «внешняя ссылка», 12 px — наша собственная разметка, не данные.
+const EXTERNAL_ICON = '<svg class="c-modal-ext" width="12" height="12" viewBox="0 0 16 16" fill="none" '
+  + 'stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" '
+  + 'aria-hidden="true"><path d="M9.5 2.5h4v4"/><path d="M13.5 2.5 7 9"/>'
+  + '<path d="M12 9.5v4H2.5V4h4"/></svg>';
 
 function closeCatalogModal(e) {
   if (e.target === document.getElementById('c-modal-backdrop')) {

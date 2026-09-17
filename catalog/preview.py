@@ -1,12 +1,15 @@
-"""Превью условия для карточек каталога и «похожих»: формулы упрощаются,
-а не вырезаются, заголовок-обрезок не показывается.
+"""Превью условия для карточек каталога и «похожих»: сырой TeX для KaTeX,
+заголовок-обрезок не показывается.
 
-⚠️ ПОЧЕМУ НЕ ВЫРЕЗАТЬ ФОРМУЛЫ. Прежний `_strip_latex` удалял `$…$`
-целиком, и превью оставалось с сиротами: «в точке , » и «спроса .» —
-карточка Notion 3d0b11c92bc1811e9d6de18e28c6c46e (аудит 04.09.2026).
-Формула в превью нужна как ТЕКСТ: `$P=20$` → «P=20», `\\frac{a}{b}` →
-«a/b». Длинная формула (больше 40 знаков после упрощения) превью не
-помогает — на её месте многоточие.
+⚠️ ФОРМУЛЫ В ПРЕВЬЮ — TeX, ИХ РИСУЕТ KaTeX (решение владельца 17.09.2026).
+До этого превью переводило формулы в текст («\\frac{a}{b}» → «a/b»), и
+нарисованными оказывались только те карточки, где случайно уцелела пара `$`.
+Теперь `tex_preview` оставляет формулы как есть, режет по словам и никогда
+не внутри формулы, вырезает токены картинок `[[FIGURE:…]]`. KaTeX на
+карточках зовётся при загрузке, после подмены выдачи фильтром и в модалке
+(`renderMathIn` в `catalog/base.html`). Ещё раньше формулы вырезались
+целиком, и превью оставалось с сиротами «в точке , » — карточка Notion
+3d0b11c92bc1811e9d6de18e28c6c46e.
 
 ⚠️ ЗАГОЛОВОК-ОБРЕЗОК. У части источников в поле `title` лежат первые
 полсотни знаков самого условия («Известно, что монополист получает
@@ -21,85 +24,74 @@ import re
 
 # Сколько знаков превью в карточке каталога (обрезка — по слову).
 PREVIEW_CHARS = 180
-# Формула длиннее этого после упрощения заменяется многоточием.
-FORMULA_MAX = 40
 # Заголовок длиннее этого без точки на конце — обрезок, а не название.
 TITLE_MAX = 70
 
-# `$$…$$` и `\[…\]` раньше `$…$` — тот же порядок, что у KaTeX на странице:
-# иначе `$$x$$` читался бы как два пустых `$…$`.
-_RX_FORMULA = re.compile(
-    r'\$\$(.+?)\$\$|\\\[(.+?)\\\]|\$([^$\n]+?)\$|\\\((.+?)\\\)', re.DOTALL)
-_RX_FRAC = re.compile(r'\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}')
-_RX_SQRT = re.compile(r'\\sqrt\s*\{([^{}]*)\}')
-_RX_SCRIPT = re.compile(r'([_^])\{([^{}]*)\}')
+# Формулы — в порядке KaTeX на странице: `$$` и `\[` раньше `$`, иначе
+# `$$x$$` читался бы как два пустых `$…$`.
+_RX_MATH = re.compile(r'\$\$(.+?)\$\$|\\\[(.+?)\\\]|\$(.+?)\$|\\\((.+?)\\\)', re.DOTALL)
+# Токены картинок и таблиц: страница задачи ставит на их место картинку.
+_RX_TOKEN = re.compile(r'\[\[[A-Z_]+:[^\]]*\]\]')
 _RX_CMD_ARG = re.compile(r'\\[a-zA-Z]+\*?\s*\{([^{}]*)\}')
 _RX_CMD = re.compile(r'\\[a-zA-Z]+\*?')
 _RX_SPACE = re.compile(r'[\s\u00a0]+')
-_RX_ORPHAN_BEFORE = re.compile(r'\s+([,.;:!?)»])')
-_RX_ORPHAN_AFTER = re.compile(r'([(«])\s+')
-_RX_EMPTY_PAREN = re.compile(r'\(\s*\)')
-_RX_DOUBLE_PUNCT = re.compile(r'([,;:])(\s*[,;:])+')
+# Экранированные знаки ВНЕ формулы: в карточке — сам знак.
+_TEXT_ESCAPES = ((r'\%', '%'), (r'\_', '_'), (r'\&', '&'), (r'\#', '#'))
 
-# Литеральный доллар (`\$` — цена, не формула) прячется на время разбора.
+# Литеральный доллар (`\$` — цена, не формула) прячется на время разбора и
+# возвращается как `\$`: его разбирает общий конвейер долларов страницы.
 _DOLLAR = '\x00'
 
-# Команды без аргумента → знак. Порядок не важен: заменяются по словам.
-_SYMBOLS = {
-    'cdot': '·', 'times': '×', 'le': '≤', 'leq': '≤', 'leqslant': '≤',
-    'ge': '≥', 'geq': '≥', 'geqslant': '≥', 'ne': '≠', 'neq': '≠',
-    'to': '→', 'rightarrow': '→', 'Rightarrow': '⇒', 'infty': '∞',
-    'pm': '±', 'approx': '≈', 'sum': 'Σ', 'prod': 'Π', 'int': '∫',
-    'partial': '∂', 'ldots': '…', 'dots': '…', 'cdots': '…',
-    'alpha': 'α', 'beta': 'β', 'gamma': 'γ', 'delta': 'δ', 'epsilon': 'ε',
-    'varepsilon': 'ε', 'lambda': 'λ', 'mu': 'μ', 'pi': 'π', 'sigma': 'σ',
-    'tau': 'τ', 'theta': 'θ', 'omega': 'ω', 'rho': 'ρ', 'eta': 'η',
-    'phi': 'φ', 'varphi': 'φ', 'Delta': 'Δ', 'Sigma': 'Σ', 'Pi': 'Π',
-    'Omega': 'Ω', 'quad': ' ', 'qquad': ' ', 'left': '', 'right': '',
-    'displaystyle': '', 'limits': '', 'nolimits': '',
-}
-_RX_SYMBOL = re.compile(r'\\(' + '|'.join(sorted(_SYMBOLS, key=len, reverse=True))
-                        + r')(?![a-zA-Z])')
+
+def _text_piece(piece):
+    """Кусок вне формулы: экранированные знаки раскрыть, команды снять,
+    оставив содержимое («\\textbf{Итог}» → «Итог»): вне формулы KaTeX их
+    не рисует."""
+    for escaped, char in _TEXT_ESCAPES:
+        piece = piece.replace(escaped, char)
+    piece = _RX_CMD_ARG.sub(r'\1', piece)
+    return _RX_CMD.sub('', piece)
 
 
-def _simplify_formula(body):
-    """Тело формулы → читаемый текст: `\\frac{a}{b}` → a/b, `\\cdot` → ·."""
-    text = body
-    for _ in range(4):                       # вложенные дроби — снаружи внутрь
-        text, n = _RX_FRAC.subn(r'\1/\2', text)
-        if not n:
-            break
-    text = _RX_SQRT.sub(r'√\1', text)
-    text = _RX_SYMBOL.sub(lambda m: _SYMBOLS[m.group(1)], text)
-    text = text.replace(r'\%', '%').replace(r'\,', ' ').replace(r'\;', ' ')
-    text = text.replace(r'\!', '').replace('\\ ', ' ').replace('\\\\', ' ')
-    text = _RX_SCRIPT.sub(r'\1\2', text)     # _{ab} → _ab
-    text = _RX_CMD_ARG.sub(r'\1', text)      # \text{руб} → руб
-    text = _RX_CMD.sub('', text)             # остальное без аргумента — прочь
-    text = text.replace('{', '').replace('}', '')
+def _join(pieces):
+    return _RX_SPACE.sub(' ', ''.join(pieces)).strip()
+
+
+def tex_preview(statement, limit=PREVIEW_CHARS):
+    """Условие одной строкой не длиннее `limit`: текст и формулы как TeX.
+
+    Выносные формулы становятся строчными: блок посреди карточки рвёт
+    строку. Разрез попадает в формулу — режем перед ней; если формула
+    первая и сама длиннее `limit`, она остаётся целиком: пустое превью хуже
+    длинного.
+    """
+    text = _RX_TOKEN.sub(' ', statement or '').replace(r'\$', _DOLLAR)
     text = _RX_SPACE.sub(' ', text).strip()
-    if len(text) > FORMULA_MAX:
-        return '…'
-    return text
+    pieces, pos = [], 0
+    for match in _RX_MATH.finditer(text):
+        if match.start() > pos:
+            pieces.append((False, _text_piece(text[pos:match.start()])))
+        body = next(g for g in match.groups() if g is not None).strip()
+        pieces.append((True, '$%s$' % body))
+        pos = match.end()
+    if pos < len(text):
+        pieces.append((False, _text_piece(text[pos:])))
 
-
-def preview_text(statement):
-    """Условие одной строкой для превью: формулы текстом, без сирот."""
-    text = (statement or '').replace(r'\$', _DOLLAR)
-    text = _RX_FORMULA.sub(
-        lambda m: _simplify_formula(next(g for g in m.groups() if g is not None)),
-        text)
-    # Команды вне формул (`\textbf{…}`) — оставить содержимое.
-    text = _RX_CMD_ARG.sub(r'\1', text)
-    text = _RX_CMD.sub('', text)
-    text = text.replace(_DOLLAR, '$')
-    text = _RX_SPACE.sub(' ', text)
-    text = _RX_ORPHAN_BEFORE.sub(r'\1', text)
-    text = _RX_ORPHAN_AFTER.sub(r'\1', text)
-    text = _RX_EMPTY_PAREN.sub('', text)
-    text = _RX_DOUBLE_PUNCT.sub(r'\1', text)
-    text = _RX_SPACE.sub(' ', text)
-    return text.strip()
+    out, used = [], 0
+    for is_math, piece in pieces:
+        piece = piece.replace(_DOLLAR, r'\$')
+        if used + len(piece) <= limit:
+            out.append(piece)
+            used += len(piece)
+            continue
+        if is_math:
+            if not out:
+                out.append(piece)
+            return _join(out).rstrip(' ,;:.-–—') + '…'
+        lead = piece[:len(piece) - len(piece.lstrip())]
+        out.append(lead + cut_words(piece.lstrip(), max(limit - used - len(lead), 0)))
+        return _join(out)
+    return _join(out)
 
 
 def cut_words(text, limit):

@@ -103,6 +103,18 @@ def _both_forms(text):
     return [text, json.dumps(text, ensure_ascii=True)[1:-1]]
 
 
+def assert_modal_html_inert(test, data, where):
+    """Готовый HTML модалки: ни одной живой нагрузки, ни одной ссылки javascript:."""
+    fragments = [data['statement_html']] + [part['html'] for part in data['parts']]
+    test.assertTrue(fragments[0], '%s: пустой statement_html' % where)
+    for fragment in fragments:
+        for payload in PAYLOADS:
+            if payload.is_markup:
+                for form in _both_forms(payload.raw):
+                    test.assertNotIn(form, fragment, '%s: нагрузка «%s» живая' % (where, payload.key))
+        test.assertNotIn('href="javascript:', fragment, '%s: ссылка javascript:' % where)
+
+
 class XssTestCase(TestCase):
     """Общая заготовка: нагрузки уже лежат во всех полях, которые видны."""
 
@@ -244,6 +256,13 @@ class CatalogXssTests(XssTestCase):
         self.assertEqual(response.headers['Content-Type'], 'application/json')
         self.assertEqual(response.headers.get('X-Content-Type-Options'),
                          'nosniff')
+
+    def test_modal_html_fields_are_inert(self):
+        """С 17.09.2026 модалка вставляет готовый HTML условия и подпунктов
+        (`statement_html`, `parts[].html`) — тот же партиал, что страница
+        задачи. Ни одна нагрузка не доезжает в эти поля живой."""
+        data = Client().get(reverse('catalog:api_problem', args=[self.problem.pk])).json()
+        assert_modal_html_inert(self, data, 'модалка каталога, %s' % self.problem.content_format)
 
     def test_modal_builds_nodes_not_html(self):
         """Окно предпросмотра не собирает разметку из данных строкой.
@@ -447,6 +466,13 @@ class MarkdownRendererXssTests(XssTestCase):
             reverse('catalog:problem_detail', args=[self.problem.pk]))
         self.assertEqual(response.status_code, 200)
         self.assert_inert(response, 'markdown-режим, staff')
+
+    def test_modal_html_fields_are_inert(self):
+        """С 17.09.2026 модалка вставляет готовый HTML условия и подпунктов
+        (`statement_html`, `parts[].html`) — тот же партиал, что страница
+        задачи. Ни одна нагрузка не доезжает в эти поля живой."""
+        data = Client().get(reverse('catalog:api_problem', args=[self.problem.pk])).json()
+        assert_modal_html_inert(self, data, 'модалка каталога, %s' % self.problem.content_format)
 
     def test_markdown_still_renders_normally_alongside_payloads(self):
         """Контроль: рендерер не «чинит» защиту запретом всего вывода —

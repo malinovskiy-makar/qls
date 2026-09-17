@@ -16,7 +16,7 @@ from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
 from catalog import filters, placeholder_phrases as phrases, topic_blocks
-from catalog.preview import cut_words, looks_like_statement_cut, preview_text
+from catalog.preview import cut_words, looks_like_statement_cut, tex_preview
 from catalog.taxonomy_map import JSON_PATH
 from problems.tests.factories import (
     link_source, make_problem, make_source, make_topic,
@@ -331,27 +331,37 @@ class ScoreTests(TestCase):
 
 
 class PreviewTextTests(SimpleTestCase):
-    def test_formulas_become_text(self):
-        self.assertEqual(
-            preview_text(CUT_STATEMENT),
-            'Известно, что монополист получает максимальную выручку в точке '
-            'P=20, Q=40. Найдите функцию спроса.')
-        self.assertEqual(preview_text(r'Доля $\frac{a}{b}$ и $x \cdot y \le 3$.'),
-                         'Доля a/b и x · y ≤ 3.')
-        self.assertEqual(preview_text(r'Спрос \(Q_{d} = 10 \times P\) растёт.'),
-                         'Спрос Q_d = 10 × P растёт.')
-        self.assertEqual(preview_text(r'Скобки $\left(a+b\right)$ и \[x \ge 2\].'),
-                         'Скобки (a+b) и x ≥ 2.')
+    """Превью — сырой TeX для KaTeX (решение 17.09.2026), не текст-заменитель."""
 
-    def test_long_formula_becomes_ellipsis_without_orphans(self):
-        long = '$$' + ' + '.join('x_%d^{2}' % i for i in range(12)) + '$$'
-        text = preview_text('Минимизируйте ( %s ), где x — вектор.' % long)
-        self.assertEqual(text, 'Минимизируйте (…), где x — вектор.')
-        for orphan in (' , ', ' .', ' ?,', '( )'):
-            self.assertNotIn(orphan, text)
+    def test_formulas_stay_tex_and_display_becomes_inline(self):
+        self.assertEqual(tex_preview(r'Доля $\frac{a}{b}$ и \(x \le 3\).'),
+                         r'Доля $\frac{a}{b}$ и $x \le 3$.')
+        self.assertEqual(tex_preview(r'Итог: $$Q = 5$$ и \[P \ge 2\].'),
+                         r'Итог: $Q = 5$ и $P \ge 2$.')
 
-    def test_literal_dollar_survives(self):
-        self.assertEqual(preview_text(r'Цена \$5 за штуку.'), 'Цена $5 за штуку.')
+    def test_text_escapes_open_and_commands_leave_content(self):
+        self.assertEqual(tex_preview(r'Налог 10\% на x\_1 и R\&D \textbf{Итог}.'),
+                         'Налог 10% на x_1 и R&D Итог.')
+
+    def test_literal_dollar_is_left_for_the_page_pipeline(self):
+        self.assertEqual(tex_preview(r'Цена \$5 за штуку.'), r'Цена \$5 за штуку.')
+
+    def test_figure_token_is_cut_out(self):
+        text = tex_preview('См. рисунок [[FIGURE:%s]] и найдите $P$.' % ('a' * 64))
+        self.assertFalse('[[' in text, text)
+        self.assertEqual(text, 'См. рисунок и найдите $P$.')
+
+    def test_cut_never_lands_inside_a_formula(self):
+        statement = 'Спрос $Q_d = 100 - 2P$ и предложение $Q_s = 3P$. ' * 6
+        for limit in range(20, 200, 7):
+            text = tex_preview(statement, limit)
+            dollars = len(re.findall(r'(?<!\\)\$', text))
+            self.assertEqual(dollars % 2, 0, (limit, text))
+            self.assertTrue(len(text) <= limit + 1, (limit, text))
+
+    def test_long_first_formula_is_kept_whole(self):
+        formula = '$' + '+'.join('x_%d' % i for i in range(80)) + '$'
+        self.assertEqual(tex_preview(formula + ' дальше', 50), formula + '…')
 
     def test_looks_like_statement_cut(self):
         self.assertTrue(looks_like_statement_cut(CUT_TITLE, CUT_STATEMENT))

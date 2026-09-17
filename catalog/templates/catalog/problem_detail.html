@@ -61,6 +61,10 @@
 .pp--feat { background: var(--pending-tint); color: var(--pending); border-color: transparent; }
 .pp--feat svg { width: 13px; height: 13px; }
 .pp--src { background: transparent; color: var(--text3); border-color: var(--border); font-weight: 400; }
+/* Источник без адреса — не ссылка (МатЭк, «Сборник тестов АА»): без отклика на наведение. */
+span.pp--src:hover { border-color: var(--border); }
+span.pp--src:active { transform: none; }
+.pp-ext { flex: none; }
 .pp-sep { width: 1px; height: 18px; background: var(--border); margin: 0 3px; }
 .pd-stat { margin: -8px 0 16px; font-size: 13px; color: var(--text3); }
 
@@ -385,7 +389,7 @@
     {% endif %}
     {% if clouds_2 %}
     <div class="pp-row">
-      {% for c in clouds_2 %}{% if c.kind == 'sep' %}<span class="pp-sep" aria-hidden="true"></span>{% else %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}">{% if c.stars %}<span class="st">{{ c.stars }}</span> {% endif %}{% if c.kind == 'feat' %}<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 13V3M2 13h12M4 10l3-4 3 2 3-5"/></svg>{% endif %}{{ c.label }}</a>{% endif %}{% endfor %}
+      {% for c in clouds_2 %}{% if c.kind == 'sep' %}<span class="pp-sep" aria-hidden="true"></span>{% elif c.kind == 'src' %}{% if c.url %}<a class="pp pp--src" href="{{ c.url }}" target="_blank" rel="noopener">{{ c.label }}<svg class="pp-ext" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4"/><path d="M13.5 2.5 7 9"/><path d="M12 9.5v4H2.5V4h4"/></svg></a>{% else %}<span class="pp pp--src">{{ c.label }}</span>{% endif %}{% else %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}">{% if c.stars %}<span class="st">{{ c.stars }}</span> {% endif %}{% if c.kind == 'feat' %}<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><path d="M2 13V3M2 13h12M4 10l3-4 3 2 3-5"/></svg>{% endif %}{{ c.label }}</a>{% endif %}{% endfor %}
     </div>
     {% endif %}
   </div>
