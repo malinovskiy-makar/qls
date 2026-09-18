@@ -55,7 +55,7 @@
 - [~] P10 — документы (ADR 0119, 0120, catalog/CLAUDE.md) и Notion; зачистки нет
 - [ ] C1 Полный прогон `feat/beta-prep`
 - [x] C2 Пять джобов CI (4 из 5 до конца C1)
-- [ ] C3 `feat/catalog-stol`
+- [x] C3 `feat/catalog-stol` — B не закончена: `test catalog teacher` 568 OK
 - [ ] C4 Notion
 - [ ] C5 Отчёт
 
@@ -285,6 +285,14 @@
   результат» (`test_design_canon` в C1). В `../qls-beta` сделана ссылка-junction на
   `../qls/node_modules`, там `test_design_canon` — 4 теста OK. **Удалять дерево только после
   `rmdir` ссылки**, иначе удаление пройдёт в настоящий `node_modules`.
+
+## C3 — `feat/catalog-stol` (B не закончена → только `catalog teacher`)
+
+- `dbae3435`: 549 тестов, OK (skipped=1), 6,3 мин.
+- `21f03e7e`: 557, OK (skipped=1), 5,7 мин.
+- `413689a6` (голова, с `test_scripts_import_safe`, с `node_modules`): **568 тестов, OK**, 14 мин.
+- Дерево `../qls-stol` удалено (ссылка `node_modules` снята `rmdir` до удаления; настоящий
+  `node_modules` цел).
 
 ## C1 — почему полный прогон шёл часами (найдено в 06:05)
 
