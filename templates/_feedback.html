@@ -131,6 +131,10 @@
 {% endcomment %}
 <form hidden aria-hidden="true">{% csrf_token %}</form>
 
+{% include '_corner_stack.html' %}
+{% comment %}Пульс не спрашивают на входе и регистрации: человек ещё не пользовался сайтом.{% endcomment %}
+{% if request.resolver_match.url_name != 'login' and request.resolver_match.url_name != 'register' %}{% include '_pulse.html' %}{% endif %}
+
 {{ feedback_data|json_script:"fb-options" }}
 <script>
 (function () {
@@ -169,6 +173,60 @@
     if (focus && focus.focus) focus.focus();
   }
 
+  /** Кадр снимка — ровно видимая область, а не весь документ.
+
+      Весь документ длинного каталога — полотно в 5–8 тысяч пикселей: сервер
+      не принимал такие, и до админки доживали только короткие страницы.
+      Клон документа html2canvas рисует непрокрученным (scrollX/Y = 0), а
+      кадр вырезается по x/y — текущей прокрутке. Какой набор ключей верный,
+      решила проба scripts/feedback_shot_probe.mjs, а не память. */
+  /* Цвет `color(srgb …)` → `rgba(…)`. Chrome отдаёт так вычисленный
+     color-mix() (каталог, задача, игра), а html2canvas 1.4.1 такого не
+     понимает и падает на ВСЕЙ странице — снимок выходил только на главной,
+     где color-mix нет. Отсюда и «в админке всегда главная». */
+  var SRGB = /color\(srgb ([-\d.e]+) ([-\d.e]+) ([-\d.e]+)(?: \/ ([-\d.e]+%?))?\)/g;
+  var COLOR_PROPS = ['color', 'background-color', 'background-image',
+    'border-top-color', 'border-right-color', 'border-bottom-color',
+    'border-left-color', 'outline-color', 'text-decoration-color',
+    'box-shadow', 'text-shadow', 'fill', 'stroke', 'caret-color',
+    '-webkit-text-fill-color', '-webkit-text-stroke-color'];
+
+  function srgbToRgba(value) {
+    return value.replace(SRGB, function (m, r, g, b, a) {
+      var alpha = a === undefined ? 1
+        : (a.slice(-1) === '%' ? parseFloat(a) / 100 : parseFloat(a));
+      return 'rgba(' + Math.round(r * 255) + ', ' + Math.round(g * 255) + ', '
+        + Math.round(b * 255) + ', ' + alpha + ')';
+    });
+  }
+
+  function flattenModernColors(doc) {
+    var view = doc.defaultView;
+    doc.querySelectorAll('*').forEach(function (node) {
+      var cs = view.getComputedStyle(node);
+      COLOR_PROPS.forEach(function (prop) {
+        var v = cs.getPropertyValue(prop);
+        if (v.indexOf('color(srgb') !== -1) {
+          node.style.setProperty(prop, srgbToRgba(v), 'important');
+        }
+      });
+    });
+  }
+
+  function shotOptions() {
+    var root = document.documentElement;
+    return {
+      scale: 1, useCORS: false, logging: false,
+      onclone: flattenModernColors,
+      x: window.scrollX, y: window.scrollY,
+      width: root.clientWidth, height: root.clientHeight,
+      scrollX: 0, scrollY: 0,
+      windowWidth: root.clientWidth, windowHeight: root.clientHeight,
+    };
+  }
+  window.weco = window.weco || {};
+  weco.feedback = { shotOptions: shotOptions };
+
   /** Снимок экрана. Никогда не задерживает человека дольше 6 секунд.
       Отдаёт {blob, note}: note — что стало со снимком (ok | timeout | error |
       nolib), чтобы пустой снимок в админке объяснял сам себя. */
@@ -182,11 +240,7 @@
         done = true; clearTimeout(timer); resolve({ blob: blob, note: note });
       }
       try {
-        html2canvas(document.documentElement, {
-          scale: 1, useCORS: false, logging: false,
-          windowWidth: document.documentElement.clientWidth,
-          windowHeight: document.documentElement.clientHeight,
-        }).then(function (canvas) {
+        html2canvas(document.documentElement, shotOptions()).then(function (canvas) {
           if (done) return;
           var wide = canvas.width > 1600;
           var target = canvas;

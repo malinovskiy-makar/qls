@@ -1,0 +1,123 @@
+{% comment %}
+ПЛАШКА «ВСЁ ЛИ НРАВИТСЯ?» — для вернувшегося посетителя (18.09.2026).
+
+Ответ уходит на `/api/feedback/` видом `pulse` (`problems/pulse.py`): оценка
+в `choices`, текст в `comment`. Отдельной модели нет — запись видна в той же
+админке обратной связи.
+
+⚠️ ПРАВИЛА ПОКАЗА (решение владельца 18.09) — все здесь, в `due()`:
+не первый визит; не больше двух раз за бету; не чаще раза в 7 дней; не
+раньше минуты на сайте в этом сеансе браузера; угол свободен. Визит — сеанс
+браузера: `sessionStorage['weco_t0']` ставится один раз, и тогда же растёт
+`localStorage['weco_pulse'].visits`.
+
+⚠️ ОДИН POST: при «Отправить», при крестике после выбора и через 20 секунд
+без действий — выбор человека не теряется, даже если он просто ушёл.
+Крестик ДО выбора — тоже данные: событие `pulse_dismiss`, показ засчитан.
+
+Не включается на экранах входа и регистрации (условие в `_feedback.html`).
+{% endcomment %}
+<template id="pulse-card-tpl">
+  <div class="corner-card" role="dialog" aria-label="Всё ли нравится?">
+    <button type="button" class="corner-close" data-pulse="close" aria-label="Закрыть">{% include '_icon.html' with name='close' %}</button>
+    <div class="corner-q">Всё ли нравится?</div>
+    <div class="corner-row" data-pulse="ask">
+      <button type="button" class="corner-btn" data-pulse="like">{% include '_icon.html' with name='thumb_up' %}<span>Нравится</span></button>
+      <button type="button" class="corner-btn" data-pulse="dislike">{% include '_icon.html' with name='thumb_down' %}<span>Не очень</span></button>
+    </div>
+    <form data-pulse="why" hidden>
+      <label class="corner-q" for="pulse-text">Что улучшить? (необязательно)</label>
+      <input class="corner-input" id="pulse-text" maxlength="300" autocomplete="off">
+      <button type="submit" class="corner-btn corner-btn--primary">Отправить</button>
+    </form>
+    <div class="corner-thanks" data-pulse="thanks" hidden>Спасибо</div>
+  </div>
+</template>
+<script>
+(function () {
+  window.weco = window.weco || {};
+  if (weco.pulse) return;
+  var KEY = 'weco_pulse';
+  var T0 = 'weco_t0';
+  var MIN_VISITS = 2;
+  var MAX_SHOWS = 2;
+  var GAP_MS = 7 * 24 * 3600 * 1000;
+  var AFTER_MS = 60 * 1000;
+  var AUTO_SEND_MS = 20 * 1000;
+  var RETRY_MS = 20 * 1000;
+  var THANKS_MS = 1500;
+  var URL = '{% url "api_feedback" %}';
+
+  function state() {
+    var s = weco.corner.load(KEY);
+    return (s && typeof s.visits === 'number' && Array.isArray(s.shown))
+      ? s : { visits: 0, shown: [] };
+  }
+
+  /** Начало сеанса браузера; первый экран сеанса засчитывает визит. */
+  function sessionStart(now) {
+    try {
+      var t0 = Number(sessionStorage.getItem(T0));
+      if (t0) return t0;
+      sessionStorage.setItem(T0, String(now));
+    } catch (e) { return null; }
+    var s = state(); s.visits += 1; weco.corner.save(KEY, s);
+    return now;
+  }
+
+  /** Все правила показа — здесь и только здесь. */
+  function due(s, t0, now) {
+    var last = s.shown.length ? s.shown[s.shown.length - 1] : 0;
+    return s.visits >= MIN_VISITS && s.shown.length < MAX_SHOWS
+      && now - last >= GAP_MS && now - t0 >= AFTER_MS;
+  }
+
+  function build() {
+    var card = document.getElementById('pulse-card-tpl').content.firstElementChild.cloneNode(true);
+    var part = function (name) { return card.querySelector('[data-pulse="' + name + '"]'); };
+    var choice = null, sent = false, auto = null;
+
+    function send() {
+      if (sent || !choice) return;
+      sent = true; clearTimeout(auto);
+      weco.corner.post(URL, { kind: 'pulse', choices: choice,
+                              comment: part('why').querySelector('input').value.trim(),
+                              url: location.pathname });
+      if (weco.track) weco.track('pulse', { choice: choice });
+      part('ask').hidden = true; part('why').hidden = true; part('thanks').hidden = false;
+      setTimeout(function () { weco.corner.hide(card); }, THANKS_MS);
+    }
+    function pick(value) {
+      choice = value;
+      part('ask').hidden = true; part('why').hidden = false;
+      part('why').querySelector('input').focus();
+      auto = setTimeout(send, AUTO_SEND_MS);
+    }
+    part('like').addEventListener('click', function () { pick('like'); });
+    part('dislike').addEventListener('click', function () { pick('dislike'); });
+    part('why').addEventListener('submit', function (e) { e.preventDefault(); send(); });
+    part('close').addEventListener('click', function () {
+      if (choice) { send(); return; }
+      if (weco.track) weco.track('pulse_dismiss', {});
+      weco.corner.hide(card);
+    });
+    return card;
+  }
+
+  function tryShow(t0) {
+    var now = Date.now(), s = state();
+    if (!due(s, t0, now)) return;
+    if (weco.corner.busy()) { setTimeout(function () { tryShow(t0); }, RETRY_MS); return; }
+    s.shown.push(now);
+    if (weco.corner.save(KEY, s)) weco.corner.show(build());
+  }
+
+  weco.pulse = { due: due };
+  document.addEventListener('DOMContentLoaded', function () {
+    if (!weco.corner) return;
+    var now = Date.now(), t0 = sessionStart(now);
+    if (!t0) return;
+    setTimeout(function () { tryShow(t0); }, Math.max(0, t0 + AFTER_MS - now));
+  });
+})();
+</script>
