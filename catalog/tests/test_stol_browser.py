@@ -18,10 +18,10 @@ import subprocess
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
-from django.test import override_settings, tag
+from django.test import Client, override_settings, tag
 
 from problems.models import ProblemPart
-from problems.tests.factories import make_problem, make_topic, make_user
+from problems.tests.factories import make_assignment, make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_runner.mjs')
 
@@ -65,6 +65,13 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         # Вошедший ученик — для помощи и теста (сессия уходит в раннер кукой).
         self.client.force_login(make_user('stol_browser_student'))
         self.session = self.client.cookies['sessionid'].value
+        # Репетитор с одной работой — для корзины (README §7).
+        teacher = make_user('stol_browser_teacher', role='teacher')
+        make_assignment(teacher, name='ДЗ корзины')
+        # Свой клиент: второй force_login на том же стёр бы сессию ученика.
+        other = Client()
+        other.force_login(teacher)
+        self.teacher_session = other.cookies['sessionid'].value
 
     def _run(self):
         node = shutil.which('node')
@@ -74,7 +81,8 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
             self.skipTest('playwright не установлен в node_modules')
         env = dict(os.environ, STOL_BASE_URL=self.live_server_url, STOL_TOPIC=str(self.topic.pk),
                    STOL_PROBLEM='/catalog/problem/%d/' % self.problem.pk,
-                   STOL_TEST='/catalog/problem/%d/' % self.test.pk, STOL_SESSION=self.session)
+                   STOL_TEST='/catalog/problem/%d/' % self.test.pk, STOL_SESSION=self.session,
+                   STOL_TEACHER_SESSION=self.teacher_session)
         try:
             res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
                                  capture_output=True, text=True, encoding='utf-8',
@@ -235,5 +243,21 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         # prefers-reduced-motion: без движения, только смена.
         box = data['map reduce']
         check(box['view'] == 'map' and box['on'] and box['transit'] is None, 'reduced-motion: %s' % box)
+
+        # README §7: корзина репетитора.
+        box = data['basket']
+        picked = box['picked']
+        check(not box['errors'], 'корзина: ошибки страницы %s' % box['errors'])
+        check(picked['boot'] == box['boot'] and picked['path'] == '/catalog/' and picked['view'] == 'entry',
+              'галочка открыла задачу или перезагрузила страницу: %s' % picked)
+        check(picked['bar'] and picked['n'] == '3' and picked['checked'] == 3 and picked['status'] == 0,
+              'корзина после трёх галочек: %s' % picked)
+        check(abs(picked['barBox']['left'] - picked['barBox']['right']) <= 1 and picked['barBox']['bottom'] == 18,
+              'полоса корзины не по центру снизу: %s' % picked['barBox'])
+        check(picked['scrollWidth'] <= picked['innerWidth'], 'корзина: шире окна')
+        check(box['reloaded'] == {'n': '3', 'checked': 3}, 'корзина не пережила перезагрузку: %s' % box['reloaded'])
+        added = box['added']
+        check(added['text'] == 'Добавлено в «ДЗ корзины»: 3 задачи' and not added['bar'] and added['stored'] == '[]'
+              and added['hw'] == 'в 1 домашке', 'после «В домашку»: %s' % added)
 
         self.assertEqual(problems, [], 'Расхождения со спецификацией:\n' + '\n'.join(problems))

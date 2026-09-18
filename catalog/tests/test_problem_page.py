@@ -165,11 +165,14 @@ class ProblemPageTests(TestCase):
     def test_teacher_gets_homework_button(self):
         self.client.force_login(make_user('tutor', role='teacher'))
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('id="hw-btn-%d"' % self.p_named.pk, html)
-        self.assertIn('function toggleHwDropdown', html)
+        # С S5 (18.09.2026) «+ В домашку» заменена корзиной репетитора (README §7).
+        self.assertIn('id="basket-toggle" data-basket="%d"' % self.p_named.pk, html)
+        self.assertIn('catalog/js/stol_basket.js', html)
+        self.assertNotIn('toggleHwDropdown', html)
         self.client.force_login(make_user('pupil'))
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertNotIn('toggleHwDropdown', html)
+        self.assertNotIn('basket-toggle', html)
+        self.assertNotIn('stol_basket.js', html)
 
     def test_ai_card_needs_an_available_model(self):
         # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.

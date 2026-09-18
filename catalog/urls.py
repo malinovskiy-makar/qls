@@ -59,6 +59,7 @@ urlpatterns = [
 
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),
+    path('collection/from-basket/',             views.collection_from_basket, name='collection_from_basket'),
     path('collection/<str:token>/',             views.collection_detail,  name='collection_detail'),
     path('collection/<str:token>/add/',         views.collection_add,     name='collection_add'),
     path('collection/<str:token>/remove/',      views.collection_remove,  name='collection_remove'),

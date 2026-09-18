@@ -26,12 +26,9 @@
   <span class="tb-pos" id="tb-pos">{% if meta.position %}{{ meta.position }} из {{ meta.total }}{% endif %}</span>
   <span class="grow"></span>
   <button class="tb-btn tb-btn--pill" type="button" data-stol="focus" title="Фокус (F)"><span class="stol-focus-label">Фокус</span></button>
-  {% if user.is_authenticated and user.role == 'teacher' %}
-  <div class="ca-hw-wrap" id="hw-wrap-{{ problem.pk }}">
-    <button class="tb-btn tb-btn--pill" type="button" id="hw-btn-{{ problem.pk }}"
-            onclick="toggleHwDropdown({{ problem.pk }}, event)">+ В домашку</button>
-    <div class="ca-dropdown" id="hw-dd-{{ problem.pk }}"></div>
-  </div>
+  {% if is_tutor %}{% comment %}Корзина репетитора (README §7): «+ В корзину» / «В корзине» — `stol_basket.js`.{% endcomment %}
+  <button class="tb-btn tb-btn--pill tb-basket" type="button" id="basket-toggle" data-basket="{{ problem.pk }}"
+          data-basket-title="{{ heading }}" aria-pressed="false">+ В корзину</button>
   {% endif %}
   {% if user.is_authenticated %}
   <button class="tb-btn{% if saved %} is-on{% endif %}" type="button" id="save-btn" data-problem="{{ problem.pk }}"

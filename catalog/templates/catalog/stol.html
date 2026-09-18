@@ -17,7 +17,8 @@
 `catalog/css/stol.css`, цвета только токенами `_tokens.html`. Сценарий:
 `stol.js` (вид, адреса, панели, лента), `stol_task.js` (всё внутри задачи,
 `init(root)` после каждой подмены) и `stol_map.js` (карта: грузится при
-первом нажатии «Карта тем» вместе с движком `topic_map.js`).
+первом нажатии «Карта тем» вместе с движком `topic_map.js`). Репетитору —
+корзина: `_stol_basket.html` и `stol_basket.js` (README §7).
 
 Вид `map` — это вход с открытой поверх него картой: выход с карты
 возвращает на вход без перезагрузки.
@@ -35,7 +36,6 @@
 
 {% block extra_style %}
 {% include "catalog/_catalog_filters_css.html" %}
-{% if user.is_authenticated and user.role == 'teacher' %}{% include "catalog/_catalog_actions_css.html" %}{% endif %}
 {% endblock %}
 
 {% block extra_head %}
@@ -45,6 +45,7 @@
 <script defer src="{% static 'catalog/js/catalog_filters.js' %}"></script>
 <script defer src="{% static 'catalog/js/stol_task.js' %}"></script>
 <script defer src="{% static 'catalog/js/stol.js' %}"></script>
+{% if is_tutor %}<script defer src="{% static 'catalog/js/stol_basket.js' %}"></script>{% endif %}
 {% if view == 'map' %}<link rel="stylesheet" href="{% static 'catalog/css/topic_map.css' %}">
 <script defer src="{% static 'catalog/js/stol_map.js' %}"></script>{% endif %}
 {% endblock %}
@@ -60,6 +61,7 @@
   {% if view == 'map' %}{% include "catalog/stol/_stol_map.html" %}{% endif %}
 </div>
 {% if view == 'entry' or view == 'map' %}{% include "catalog/_catalog_modal.html" %}{% endif %}
+{% if is_tutor %}{% include "catalog/stol/_stol_basket.html" %}{% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -67,5 +69,5 @@
 {% include "_typing_placeholder.html" with el_id="ct-q" phrases=catalog_phrases stop_text=catalog_stop_text %}
 {% include "_search_rating.html" %}
 {% endif %}
-{% if user.is_authenticated and user.role == 'teacher' %}{% include "catalog/_hw_dropdown_js.html" %}{% endif %}
+
 {% endblock %}

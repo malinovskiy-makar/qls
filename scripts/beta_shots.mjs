@@ -282,6 +282,29 @@ const STOL_SCENES = [
       await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
   { phase: 's1', name: 'entry_continue', who: 'student', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
+  /* S5: корзина репетитора (README §7, снимки 21–25) — демо-репетитор `scripts/stol_demo_teacher.py`. */
+  { phase: 's5', name: 'teacher_basket', who: 'teacher', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      for (const n of [1, 3, 5]) await p.click('#ct-rows .rail-row:nth-child(' + n + ') .rail-check');
+      await p.evaluate(() => window.scrollTo(0, 360)); await p.waitForTimeout(300); } },
+  { phase: 's5', name: 'teacher_basket_list', who: 'teacher', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      for (const n of [1, 3, 5]) await p.click('#ct-rows .rail-row:nth-child(' + n + ') .rail-check');
+      await p.evaluate(() => window.scrollTo(0, 360)); await p.click('#basket-count'); await p.waitForTimeout(300); } },
+  { phase: 's5', name: 'teacher_hw_menu', who: 'teacher', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      for (const n of [1, 3, 5]) await p.click('#ct-rows .rail-row:nth-child(' + n + ') .rail-check');
+      await p.evaluate(() => window.scrollTo(0, 360)); await p.click('#basket-hw-btn'); await p.waitForTimeout(300); } },
+  { phase: 's5', name: 'teacher_added', who: 'teacher', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      for (const n of [1, 3, 5]) await p.click('#ct-rows .rail-row:nth-child(' + n + ') .rail-check');
+      await p.evaluate(() => window.scrollTo(0, 360)); await p.click('#basket-hw-btn');
+      await p.click('#basket-hw [data-hw]'); await p.waitForSelector('#basket-done:not([hidden])');
+      await p.waitForTimeout(300); } },
+  { phase: 's5', name: 'teacher_problem', who: 'teacher', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#ct-rows .rail-row:nth-child(2) .rail-title'); await p.waitForSelector('#stol-center .stm');
+      await p.click('#basket-toggle'); await p.waitForTimeout(500); } },
   /* S4: карта тем (README §6, снимки 05–08). Облако входа на карте стоит — его не ждём. */
   { phase: 's4', name: 'map', noBg: true, go: async p => {
       await p.goto(BASE + '/catalog/map/?topic=843&topic=99', { waitUntil: 'load' });
@@ -320,14 +343,22 @@ function resetShotUser() {
   execFileSync(PY, ['manage.py', 'shell', '-c', code], { encoding: 'utf8' });
 }
 
+function resetTeacher() {
+  execFileSync(PY, ['manage.py', 'shell', '-c',
+    "exec(open('scripts/stol_demo_teacher.py', encoding='utf-8').read())"], { encoding: 'utf8' });
+  return sessionFor('stol-teacher@test.local');
+}
+
 async function runStol() {
   fs.mkdirSync(OUT, { recursive: true });
   const phase = SET.includes(':') ? SET.split(':')[1] : '';
   const scenes = STOL_SCENES.filter(sc => !phase || sc.phase === phase);
   const needsShots = scenes.some(sc => sc.who === 'shots');
+  const needsTeacher = scenes.some(sc => sc.who === 'teacher');
   if (needsShots) resetShotUser();
   const sessions = { student: sessionFor('student1@test.local'),
-                     shots: needsShots ? sessionFor('stol-shots@test.local') : '' };
+                     shots: needsShots ? sessionFor('stol-shots@test.local') : '',
+                     teacher: needsTeacher ? resetTeacher() : '' };
   const browser = await chromium.launch();
   const errors = [];
   for (const sc of scenes) {
@@ -345,6 +376,9 @@ async function runStol() {
         page.on('pageerror', e => errors.push(`[${sc.name} ${theme} ${width}] pageerror ${e.message}`));
         page.on('console', m => { if (m.type() === 'error') errors.push(`[${sc.name} ${theme} ${width}] ${m.text()}`); });
         if (sc.who === 'shots') resetShotUser();
+        /* Демо-репетитор заново: сцена «добавлено» пишет в его работу. */
+        if (sc.who === 'teacher') sessions.teacher = resetTeacher();
+        if (sc.who === 'teacher') await ctx.addCookies([{ name: 'sessionid', value: sessions.teacher, url: BASE }]);
         /* Своя сессия на сцену: счётчик попыток теста живёт в сессии. */
         if (sc.who === 'shots') await ctx.addCookies([{ name: 'sessionid', value: sessionFor('stol-shots@test.local'), url: BASE }]);
         await sc.go(page);

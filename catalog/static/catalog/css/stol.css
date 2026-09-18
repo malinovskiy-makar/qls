@@ -206,7 +206,7 @@
 .rail-row:hover, .rail-row.is-cursor { background: var(--surface-2); }
 .rail-row.is-current { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-ring); }
 .rail-row > .rail-body, .rail-row > .rail-meta { grid-column: 2; }
-.rail-row > .rail-status { grid-row: 1 / span 2; }
+.rail-row > .rail-status, .rail-row > .rail-check { grid-row: 1 / span 2; }
 .rail-status { width: 18px; height: 18px; flex: none; margin-top: 1px; border-radius: 50%;
                display: inline-flex; align-items: center; justify-content: center;
                border: 1.5px solid var(--border); color: var(--on-accent); }
@@ -254,7 +254,7 @@
    звёзды, «решение»/«тест», звезда «сохранено» (README §2). */
 .rail--wide .rail-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
                         padding: 10px 10px; column-gap: 16px; }
-.rail--wide .rail-row > .rail-status { grid-row: 1; }
+.rail--wide .rail-row > .rail-status, .rail--wide .rail-row > .rail-check { grid-row: 1; }
 .rail--wide .rail-row > .rail-meta { grid-column: 3; grid-row: 1; gap: 14px; font-size: 13px; }
 .rail--wide .rail-title { font-size: 15px; }
 .rail--wide .rail-preview { display: block; font-size: 13px; color: var(--text2);
@@ -955,3 +955,58 @@ body:has(.stol-app[data-view="map"]) #corner-stack { display: none; }
 .stol-map .tmap-foot .btn .qi { width: 16px; height: 16px; }
 .stol-map .tmap-tour-foot .tmap-btn { display: inline-flex; align-items: center; justify-content: center; }
 .stol-map .tmap-tour-foot .qi { width: 14px; height: 14px; }
+
+/* ── Корзина репетитора (README §7, снимки 21–25) ───────────────────────
+   Галочка 22 px вместо статуса; «в N домашках» справа; тёмная полоса снизу
+   по центру, над ней — стек плашек угла; зелёная плашка после добавления. */
+.rail-check { width: 22px; height: 22px; flex: none; border-radius: 6px; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--text3); background: var(--surface); color: transparent; }
+.rail-check .qi { width: 14px; height: 14px; stroke-width: 2.6; }
+.rail-check[aria-checked="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.rail-check:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.rail-hw { flex: none; white-space: nowrap; color: var(--text3); }
+.rail--narrow .rail-hw { display: none; }
+.tb-basket.is-on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+.basket { position: fixed; left: 50%; bottom: 18px; z-index: 170; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 18px; border-radius: 16px;
+  background: var(--btn-bg); color: var(--on-btn); box-shadow: var(--shadow-pop); }
+.basket button { font: 600 14px/1 var(--font-ui); border: 0; cursor: pointer; }
+.basket .qi { width: 15px; height: 15px; }
+.basket-count { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 8px 0 0;
+  background: transparent; color: var(--on-btn); }
+.basket-main { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+  border-radius: 8px; background: var(--brand-amber); color: var(--brand-amber-ink); }
+.basket-pdf { height: 32px; padding: 0 12px; border-radius: 8px;
+  background: color-mix(in srgb, var(--on-btn) 16%, transparent); color: var(--on-btn); }
+.basket-x { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 8px; background: transparent; color: var(--on-btn); }
+.basket-count:hover, .basket-x:hover { opacity: .8; }
+.basket-pop { position: absolute; bottom: calc(100% + 8px); left: 0; min-width: 340px; max-width: 420px;
+  max-height: 50vh; overflow-y: auto; padding: 8px; border-radius: 14px; background: var(--surface);
+  color: var(--text); border: var(--line) solid var(--border); box-shadow: var(--shadow-pop); }
+.basket-pop--hw { left: auto; right: 0; }
+.basket-items { list-style: none; margin: 0; padding: 0; }
+.basket-items li { display: flex; align-items: center; gap: 10px; padding: 9px 10px; font-size: 14px; }
+.basket-item-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.basket .basket-item-x { width: 24px; height: 24px; background: transparent; color: var(--text2); font-size: 18px; font-weight: 400; }
+.basket .basket-clear { display: block; margin: 4px 10px 6px auto; background: transparent; color: var(--text);
+  text-decoration: underline; font-weight: 500; font-size: 13.5px; }
+.basket-pop-h { margin: 6px 10px 6px; font-size: 11px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text2); }
+.basket .basket-hw-row { display: flex; align-items: baseline; gap: 12px; width: 100%; padding: 10px;
+  border-radius: 8px; background: transparent; color: var(--text); text-align: left; }
+.basket .basket-hw-row:hover, .basket .basket-hw-row:focus-visible { background: var(--surface-2); }
+.basket-hw-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14.5px; }
+.basket-hw-sub { flex: none; font-size: 12.5px; font-weight: 500; color: var(--text2); }
+.basket-done { position: fixed; left: 50%; bottom: 18px; z-index: 171; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 16px; border-radius: 16px;
+  background: var(--green); color: var(--on-green); font: 600 15px/1.3 var(--font-ui); box-shadow: var(--shadow-pop); }
+.basket-done.is-error { background: var(--error); }
+.basket-done .qi { width: 18px; height: 18px; flex: none; }
+.basket-done-ok { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; cursor: pointer;
+  background: color-mix(in srgb, var(--on-green) 20%, transparent); color: var(--on-green); font: 600 14px/1 var(--font-ui); }
+body.has-basket { --corner-offset: 155px; }
+body.has-basket .tg-fab { bottom: 90px; }
+body:has(.stol-app[data-view="map"]) .basket { display: none; }

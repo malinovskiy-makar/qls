@@ -15,7 +15,7 @@ from django.views.decorators.http import require_POST
 
 from problems import problem_types
 from problems.enrich import features as enrich_features
-from problems.jsonsafe import dumps_for_script
+from problems.templatetags.ru import plural_ru
 
 from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, testplay
 from .placeholder_phrases import (
@@ -272,10 +272,22 @@ def _card(problem):
     }
 
 
+def _is_tutor(user):
+    """Репетитор ли (обе системы ролей, `teacher.access.is_tutor`)."""
+    from teacher.access import is_tutor
+    return is_tutor(user)
+
+
 def _cards_with_marks(user, problems):
     """Карточки строк ленты со статусом ученика и звездой «сохранено» —
-    по одному запросу на страницу строк, а не на строку."""
+    по одному запросу на страницу строк, а не на строку.
+
+    Репетитору (README §7) вместо статуса — галочка корзины (`teach`) и
+    пометка «в N домашках» (`in_hw`): сколько ЕГО работ уже содержат задачу,
+    тоже одним запросом на страницу строк.
+    """
     from problems.models import SavedProblem
+    from problems.models_platform import AssignmentItem
 
     problems = list(problems)
     ids = [p.pk for p in problems]
@@ -285,11 +297,19 @@ def _cards_with_marks(user, problems):
         saved = set(SavedProblem.objects.filter(owner=user, is_deleted=False,
                                                 catalog_problem_id__in=ids)
                     .values_list('catalog_problem_id', flat=True))
+    teach = _is_tutor(user)
+    in_hw = {}
+    if teach and ids:
+        in_hw = dict(AssignmentItem.objects.filter(assignment__author=user, catalog_problem_id__in=ids)
+                     .values('catalog_problem_id').annotate(n=Count('assignment', distinct=True))
+                     .values_list('catalog_problem_id', 'n'))
     cards = []
     for problem in problems:
         card = _card(problem)
         card['status'] = statuses.get(problem.pk, '')
         card['saved'] = problem.pk in saved
+        card['teach'] = teach
+        card['in_hw'] = in_hw.get(problem.pk, 0)
         cards.append(card)
     return cards
 
@@ -301,10 +321,13 @@ def _kind_label(problem_type):
 
 
 def _teacher_assignments(request):
-    """Активные домашки репетитора — для кнопки «в домашку» на карточке."""
-    if not (request.user.is_authenticated
-            and getattr(request.user, 'role', '') == 'teacher'):
-        return '[]'
+    """Активные домашки репетитора — меню «В домашку ▾» корзины (README §7).
+
+    Название, сколько в работе задач (позиций) и кому она выдана: имя
+    занятия, иначе число учеников; некому — строки «кому» нет (правило нуля).
+    """
+    if not _is_tutor(request.user):
+        return []
     from django.utils import timezone
 
     from problems.models import Assignment
@@ -313,10 +336,19 @@ def _teacher_assignments(request):
                  .filter(author=request.user)
                  .filter(Q(deadline__isnull=True)
                          | Q(deadline__gte=timezone.now()))
+                 .select_related('group')
+                 .annotate(n_items=Count('items', distinct=True), n_students=Count('students', distinct=True))
                  .order_by('-id')[:50])
-    # Названия работ печатает репетитор, а уезжают они в <script>:
-    # экранируем `<`, `>`, `&` (см. problems/jsonsafe.py).
-    return dumps_for_script([{'id': a.pk, 'name': a.name} for a in active_qs])
+    rows = []
+    for a in active_qs:
+        if a.group_id:
+            to = a.group.name
+        elif a.n_students:
+            to = '%d %s' % (a.n_students, plural_ru(a.n_students, 'ученик,ученика,учеников'))
+        else:
+            to = ''
+        rows.append({'id': a.pk, 'name': a.name, 'n': a.n_items, 'to': to})
+    return rows
 
 
 def _search_ids(query, limit):
@@ -546,7 +578,7 @@ def _catalog_context(request, missing_id=''):
         'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
         'step':           PAGE_STEP,
         'relief':         relief,
-        'teacher_assignments_json': _teacher_assignments(request),
+        'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
         # Бегущая подсказка поля: фразы и текст после остановки — из
         # одной константы, партиал общий с главной.
         'catalog_phrases':   CATALOG_PHRASES,
@@ -837,12 +869,10 @@ def _visible(qs):
 
 def _rail_response(request, problems, current_id=None):
     """Строки ленты одним ответом: `{rows_html, total}`; статусы — одним запросом."""
-    problems = list(problems)
-    statuses = progress.statuses_for(request.user, [p.pk for p in problems])
     show_status = request.user.is_authenticated
     rows = [render_to_string('catalog/stol/_rail_row.html', {
-        'card': _card(p), 'status': statuses.get(p.pk, ''), 'show_status': show_status,
-        'current_id': current_id}, request=request) for p in problems]
+        'card': card, 'status': card['status'], 'show_status': show_status,
+        'current_id': current_id}, request=request) for card in _cards_with_marks(request.user, problems)]
     return JsonResponse({'rows_html': ''.join(rows), 'total': len(rows)})
 
 
@@ -1348,8 +1378,8 @@ def _problem_context(request, problem):
         my_progress = ProblemProgress.objects.filter(user=request.user, problem=problem).first()
         cfg['progressUrl'] = reverse('catalog:api_progress', args=[problem.pk])
     # «Как прошло?» — не у тестов (статус ставит сам тест) и не у учителя.
-    show_how = (request.user.is_authenticated and not game
-                and getattr(request.user, 'role', '') != 'teacher')
+    # У репетитора блока «Как прошло?» нет (README §7).
+    show_how = request.user.is_authenticated and not game and not _is_tutor(request.user)
     meta = _neighbours(request, problem, similar_rows)
     meta.update(_neighbour_titles(meta))
 
@@ -1394,7 +1424,7 @@ def _problem_context(request, problem):
         'part_answers': part_answers,
         # Лестница пуста, только пока человек ничем не пользовался.
         'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt),
-        'teacher_assignments_json': _teacher_assignments(request),
+        'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
         # Как эту задачу решают в игре (строка под условием и в тесте).
         'game_stat':    _game_stat(problem.pk),
     }
@@ -1495,6 +1525,35 @@ def collection_new(request):
         col = Collection.objects.create(name=name, template_type=template_type)
         return redirect('catalog:collection_detail', token=col.token)
     return render(request, 'catalog/collection_new.html', {})
+
+
+@require_POST
+def collection_from_basket(request):
+    """Корзина репетитора → подборка → существующий конструктор (README §7).
+
+    Только репетитору; остальным адреса «нет» (404). Задачи — в порядке
+    корзины, за шлюзом качества; не прошедшие называются в `refused`. Сборку
+    PDF здесь не трогаем: конструктор тот же (карточка Notion …8154).
+    """
+    if not _is_tutor(request.user):
+        raise Http404('Нет такой страницы')
+    try:
+        raw = json.loads(request.body).get('problem_ids')
+    except (ValueError, AttributeError):
+        raw = None
+    from teacher.views import BASKET_MAX
+    if not isinstance(raw, list) or not raw or len(raw) > BASKET_MAX:
+        return JsonResponse({'error': 'problem_ids required'}, status=400)
+    wanted = list(dict.fromkeys(int(i) for i in raw if str(i).isdigit()))
+    visible = set(_visible(Problem.objects.filter(pk__in=wanted)).values_list('pk', flat=True))
+    order = [pk for pk in wanted if pk in visible]
+    if not order:
+        return JsonResponse({'error': 'empty', 'refused': wanted}, status=400)
+    collection = Collection.objects.create(name='Из корзины каталога', author=request.user,
+                                           template_type=Collection.HOMEWORK, problem_order=order)
+    collection.problems.add(*order)
+    return JsonResponse({'ok': True, 'url': reverse('catalog:collection_detail', args=[collection.token]),
+                         'refused': [pk for pk in wanted if pk not in visible]})
 
 
 def collection_detail(request, token):

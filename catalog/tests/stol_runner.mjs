@@ -379,6 +379,36 @@ try {
     out['map reduce'].errors = errors;
     await ctx.close();
   }
+
+  /* ── S5: корзина репетитора (README §7) — галочка не открывает строку, корзина
+     переживает перезагрузку, «В домашку» → плашка, корзина пуста, пометка растёт ── */
+  if (process.env.STOL_TEACHER_SESSION && TOPIC) {
+    const asTeacher = async p => p.context().addCookies([{ name: 'sessionid', value: process.env.STOL_TEACHER_SESSION, url: BASE }]);
+    const { ctx, page, errors } = await fresh(1280, { path: '/catalog/?topic=' + TOPIC, route: asTeacher });
+    const boot = await page.evaluate(() => window.__stolBoot);
+    const ids = await page.$$eval('#ct-rows .rail-row', rs => rs.slice(0, 3).map(r => r.dataset.id));
+    for (const n of [1, 2, 3]) await page.click('#ct-rows .rail-row:nth-child(' + n + ') .rail-check');
+    /* Подмена задачи асинхронна: ждём, не открылась ли она после ответа `?pane=1`. */
+    await page.waitForTimeout(1500);
+    const picked = await page.evaluate(() => ({ boot: window.__stolBoot, path: location.pathname,
+      view: document.getElementById('stol-app').dataset.view,
+      bar: !document.getElementById('basket').hidden, n: document.getElementById('basket-n').textContent,
+      checked: document.querySelectorAll('#ct-rows .rail-check[aria-checked="true"]').length,
+      status: document.querySelectorAll('#ct-rows .rail-status').length,
+      barBox: (b => ({ left: Math.round(b.left), right: Math.round(innerWidth - b.right), bottom: Math.round(innerHeight - b.bottom) }))(document.getElementById('basket').getBoundingClientRect()),
+      scrollWidth: document.documentElement.scrollWidth, innerWidth }));
+    await page.reload({ waitUntil: 'load' });
+    const reloaded = await page.evaluate(() => ({ n: document.getElementById('basket-n').textContent,
+      checked: document.querySelectorAll('#ct-rows .rail-check[aria-checked="true"]').length }));
+    await page.click('#basket-hw-btn');
+    await page.click('#basket-hw [data-hw]');
+    await page.waitForSelector('#basket-done:not([hidden])');
+    const added = await page.evaluate(first => ({ text: document.getElementById('basket-done-t').textContent,
+      bar: !document.getElementById('basket').hidden, stored: localStorage.getItem(Object.keys(localStorage).find(k => k.indexOf('weco_basket_') === 0)),
+      hw: (document.querySelector('#ct-rows .rail-row[data-id="' + first + '"] .rail-hw') || {}).textContent || '' }), ids[0]);
+    out['basket'] = { boot, picked, reloaded, added, errors };
+    await ctx.close();
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }
