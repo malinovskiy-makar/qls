@@ -218,6 +218,30 @@ const STOL_SCENES = [
   { phase: 's1', name: 'entry_filters', go: async p => {
       await p.goto(BASE + '/catalog/?topic=843&topic=99&tag=652', { waitUntil: 'load' });
       await p.waitForTimeout(1800); } },
+  { phase: 's2', name: 'desk_from_entry', who: 'student', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' });
+      await p.click('#ct-rows .rail-row'); await p.waitForSelector('#stol-center .stm'); await p.waitForTimeout(800); } },
+  { phase: 's2', name: 'desk_rail_open', who: 'student', panels: { rail: true, help: true }, go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' });
+      await p.click('#ct-rows .rail-row'); await p.waitForSelector('#stol-center .stm');
+      await p.evaluate(() => weco.stol.openPanel('rail')); await p.waitForTimeout(800); } },
+  { phase: 's2', name: 'desk_both_closed', who: 'student', panels: { rail: false, help: false }, go: async p => {
+      await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(800); } },
+  { phase: 's2', name: 'desk_focus', who: 'student', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.keyboard.press('f');
+      await p.waitForTimeout(500); } },
+  { phase: 's2', name: 'desk_after_next', who: 'student', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' });
+      await p.click('#ct-rows .rail-row'); await p.waitForSelector('#stol-center .stm');
+      const before = await p.evaluate(() => location.pathname);
+      await p.click('#tb-next'); await p.waitForFunction(b => location.pathname !== b, before);
+      await p.waitForSelector('#stol-center .stm'); await p.waitForTimeout(800); } },
+  { phase: 's2', name: 'entry_after_back', who: 'student', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' });
+      await p.evaluate(() => window.scrollTo(0, 400));
+      await p.click('#ct-rows .rail-row:nth-child(4)'); await p.waitForSelector('#stol-center .stm');
+      await p.goBack(); await p.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
+      await p.waitForTimeout(600); } },
   { phase: 'w', name: 'w_entry', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(800); } },
   { phase: 'w', name: 'w_map', go: async p => {
@@ -241,6 +265,7 @@ async function runStol() {
         const ctx = await browser.newContext({ viewport: { width, height } });
         if (sc.who) await ctx.addCookies([{ name: 'sessionid', value: sessions[sc.who], url: BASE }]);
         await ctx.addInitScript(initScript(theme, STATE.none));
+        if (sc.panels) await ctx.addInitScript(`localStorage.setItem('weco_stol', ${JSON.stringify(JSON.stringify(sc.panels))});`);
         const page = await ctx.newPage();
         page.setDefaultNavigationTimeout(120000);
         page.setDefaultTimeout(60000);

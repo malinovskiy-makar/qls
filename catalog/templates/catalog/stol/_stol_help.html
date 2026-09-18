@@ -1,0 +1,57 @@
+{% comment %}
+ПАНЕЛЬ ПОМОЩИ «СТОЛА» (392 px, README §4) и её полоска 52 px.
+
+Полоска свёрнутой помощи: «открыть помощь», лампочка со счётчиком подсказок,
+ИИ, решение — каждая иконка только при данных (правило нуля).
+
+Панель — `help_html` ответа `?pane=1`; сценарий подменяет её вместе с центром.
+Карточка чата — только при доступном поставщике чата: три режима реплики над
+полем и не исчезают (решение 15.09.2026), скрепка — до трёх фото или PDF к
+реплике, анониму вместо поля — ссылка на вход. Наружу уходят условие, текст
+решения и реплика — ничего из профиля.
+{% endcomment %}
+<nav class="stol-strip stol-strip--help" aria-label="Помощь">
+  <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Открыть помощь" title="Помощь (])">{% include '_icon.html' with name='chevron_left' %}</button>
+  {% if hint_total %}<button type="button" class="stol-strip-btn" data-help-open="hint" aria-label="Подсказка" title="Подсказка">{% include '_icon.html' with name='bulb' %}<span class="stol-strip-badge" id="strip-hints">{{ hint_total }}</span></button>{% endif %}
+  {% if chat_available %}<button type="button" class="stol-strip-btn" data-help-open="ai" aria-label="Спросить ИИ" title="Спросить ИИ">{% include '_icon.html' with name='sparkle' %}</button>{% endif %}
+  {% if sol.has_any and not test %}<button type="button" class="stol-strip-btn" data-help-open="sol" aria-label="Решение" title="Решение">{% include '_icon.html' with name='book' %}</button>{% endif %}
+</nav>
+<aside class="help-panel" aria-label="Помощь по задаче">
+  <div class="help-head">
+    <span class="ic">{% include '_icon.html' with name='sparkle' %}</span>
+    <div><b>Помощь</b><small id="help-used">пока ничем не пользовались</small></div>
+    <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button>
+  </div>
+  <div class="help-body">
+  {% if chat_available %}
+  <section class="ai" aria-label="Чат с ИИ по этой задаче">
+    <div class="ai-body" id="ai-body">
+      <p class="ai-intro">Объясню теорию, подскажу план, проверю ваше решение, в том числе по фото. Готовое решение не выдам: задача остаётся вашей.</p>
+    </div>
+    <div class="ai-foot">
+      {% if user.is_authenticated %}
+      <div class="ai-sug" id="ai-sug">
+        <button type="button" data-mode="theory" data-prompt="Объясни теорию">Теория</button>
+        <button type="button" data-mode="method" data-prompt="Как решать">Как решать</button>
+        <button type="button" data-mode="check" data-prompt="Проверь моё решение">Проверь решение</button>
+      </div>
+      <div class="ai-att" id="ai-att" hidden>
+        <span class="ai-att-status" id="ai-att-status" hidden></span>
+      </div>
+      <template id="ai-chip-tpl"><span class="ai-chip"><span class="ai-chip-name"></span><button type="button" class="ai-chip-x" aria-label="Убрать файл">{% include '_icon.html' with name='close' %}</button></span></template>
+      <div class="ai-in" id="ai-in">
+        <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">{% include '_icon.html' with name='clip' %}</button>
+        {% comment %}Список типов, а не `image/*`: звёздочка после косой черты открывает комментарий для сторожа стилей `test_css_comments`. Файл всё равно проверяет сервер.{% endcomment %}
+        <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
+        <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или фото" aria-label="Вопрос ИИ"></textarea>
+        <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">{% include '_icon.html' with name='arrow_up' %}</button>
+      </div>
+      {% else %}
+      <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
+      {% endif %}
+      <p class="ai-note">ИИ видит условие и ваше решение. Данные профиля ему не передаются.</p>
+    </div>
+  </section>
+  {% endif %}
+  </div>
+</aside>

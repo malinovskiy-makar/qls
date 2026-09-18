@@ -104,11 +104,25 @@
     });
   }, true);
 
-  track('page_view', { view: view, referrer: document.referrer.slice(0, 200) });
+  function pageView(referrer) {
+    track('page_view', { view: view, referrer: referrer.slice(0, 200) });
+    // Страница задачи: номер из адреса, разметку ради аналитики не трогаем.
+    var problem = location.pathname.match(/^\/catalog\/problem\/(\d+)\//);
+    if (problem) track('problem_open', { problem_id: Number(problem[1]) });
+  }
+  pageView(document.referrer);
 
-  // Страница задачи: номер из адреса, разметку ради аналитики не трогаем.
-  var problem = location.pathname.match(/^\/catalog\/problem\/(\d+)\//);
-  if (problem) track('problem_open', { problem_id: Number(problem[1]) });
+  /* Смена экрана без перезагрузки («Стол», 18.09.2026): прежний просмотр
+     закрывается уходом с активным временем, новый — свой `view`. */
+  var lastPath = location.pathname;
+  function trackPage() {
+    if (shownAt !== null) leave();
+    view = randomId();
+    activeMs = 0;
+    shownAt = document.visibilityState === 'hidden' ? null : Date.now();
+    pageView(location.origin + lastPath);
+    lastPath = location.pathname;
+  }
 
   // Выдача поиска: состояние кладёт сервер в data-атрибуты секции результатов.
   var query = document.getElementById('ct-q');
@@ -131,4 +145,5 @@
 
   window.weco = window.weco || {};
   window.weco.track = track;
+  window.weco.trackPage = trackPage;
 })();

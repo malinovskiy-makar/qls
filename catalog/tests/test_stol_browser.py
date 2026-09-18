@@ -20,6 +20,7 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.test import tag
 
+from problems.models import ProblemPart
 from problems.tests.factories import make_problem, make_topic
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_runner.mjs')
@@ -46,6 +47,13 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         for i in range(25):
             make_problem('Монополист %d выбирает выпуск: $TC = Q^2$.' % i, topic=self.topic,
                          title='Монополист %d' % i, difficulty=1 + i % 5)
+        # Задача с подпунктами и решением — для замеров «Стола» (последняя в выдаче по -id).
+        self.problem = make_problem('Монополист продаёт электроэнергию. Спрос $Q = 20 - P$.',
+                                    topic=self.topic, title='Двухступенчатый тариф', difficulty=4,
+                                    solution='Решение длиной больше тридцати знаков: $MR = MC$.')
+        for i, label in enumerate(('а', 'б')):
+            ProblemPart.objects.create(problem=self.problem, label=label, order=i,
+                                       statement='Найдите цену %s.' % label)
 
     def _run(self):
         node = shutil.which('node')
@@ -53,7 +61,8 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
             self.skipTest('node не найден — замеры «Стола» не запускались')
         if not os.path.isdir(os.path.join(settings.BASE_DIR, 'node_modules', 'playwright')):
             self.skipTest('playwright не установлен в node_modules')
-        env = dict(os.environ, STOL_BASE_URL=self.live_server_url, STOL_TOPIC=str(self.topic.pk))
+        env = dict(os.environ, STOL_BASE_URL=self.live_server_url, STOL_TOPIC=str(self.topic.pk),
+                   STOL_PROBLEM='/catalog/problem/%d/' % self.problem.pk)
         try:
             res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
                                  capture_output=True, text=True, encoding='utf-8',
@@ -111,5 +120,47 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         box = data['loading feedback']
         check(box == {'loading': True, 'busyShown': True, 'skeletonRows': 6, 'pressed': 'true'},
               'выбор темы при медленном ответе без мгновенного отклика: %s' % box)
+
+        # Смена задачи без перезагрузки: метка загрузки не меняется (README §1, S2.3).
+        box = data['no reload']
+        opened = box['opened']
+        check(not box['errors'], 'без перезагрузки: ошибки страницы %s' % box['errors'])
+        check(opened['boot'] == box['boot'], 'клик по строке перезагрузил страницу')
+        check(opened['path'] == '/catalog/problem/%d/' % box['ids'][0],
+              'адрес после клика %s, ждали задачу %d' % (opened['path'], box['ids'][0]))
+        check(opened['view'] == 'stol' and opened['statement'], 'задача не показана: %s' % opened)
+        check(opened['railOpen'] == 'closed' and opened['helpOpen'] == 'open',
+              'первое открытие: лента %s, помощь %s (README: свёрнута и открыта)'
+              % (opened['railOpen'], opened['helpOpen']))
+        check(opened['pos'] == '1 из 26', 'позиция «%s», ждали «1 из 26»' % opened['pos'])
+        check(box['next']['boot'] == box['boot'], '«Дальше» перезагрузил страницу')
+        check(box['next']['path'] == '/catalog/problem/%d/' % box['ids'][1],
+              '«Дальше» открыл %s, ждали следующую по выдаче %d' % (box['next']['path'], box['ids'][1]))
+        check(box['back']['boot'] == box['boot'], '«назад» перезагрузил страницу')
+        check(box['back']['rows'] == len(box['ids']),
+              '«назад»: строк %d, было %d' % (box['back']['rows'], len(box['ids'])))
+
+        # README §1: колонка условия 680 при любых панелях; лента 316, помощь 392,
+        # полоска свёрнутой панели 52. На 1280 открытая лента лежит поверх задачи,
+        # и её полоска остаётся на месте.
+        for width in DESKTOP:
+            for name in ('rail-closed help-open', 'rail-open help-open',
+                         'rail-closed help-closed', 'rail-open help-closed'):
+                box = data['desk %d %s' % (width, name)]
+                key = 'задача %d, %s' % (width, name)
+                rail_open, help_open = name.startswith('rail-open'), name.endswith('help-open')
+                check(not box['errors'], '%s: ошибки страницы %s' % (key, box['errors']))
+                check(box['col'] == 680, '%s: колонка условия %s, по README 680' % (key, box['col']))
+                check(box['scrollWidth'] <= box['innerWidth'], '%s: шире окна (%d)' % (key, box['scrollWidth']))
+                check(box['title'] == 26, '%s: заголовок %s, по README 26' % (key, box['title']))
+                check(box['statement'] == 16.5, '%s: условие %s, по README 16,5' % (key, box['statement']))
+                check(box['rail'] == (316 if rail_open else 0), '%s: лента %s, по README 316' % (key, box['rail']))
+                check(box['help'] == (392 if help_open else 0), '%s: помощь %s, по README 392' % (key, box['help']))
+                check(box['helpStrip'] == (0 if help_open else 52), '%s: полоска помощи %s' % (key, box['helpStrip']))
+                strip = 52 if (not rail_open or width < 1400) else 0
+                check(box['railStrip'] == strip, '%s: полоска ленты %s, ждали %d' % (key, box['railStrip'], strip))
+        for width in PHONE:
+            box = data['desk %d' % width]
+            check(box['scrollWidth'] <= box['innerWidth'], 'задача %d: шире окна (%d)' % (width, box['scrollWidth']))
 
         self.assertEqual(problems, [], 'Расхождения со спецификацией:\n' + '\n'.join(problems))

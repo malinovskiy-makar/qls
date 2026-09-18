@@ -124,7 +124,8 @@ class ProblemDetailTests(TestCase):
         """Блок «Похожие» не содержит зафлагованных задач даже из кэша."""
         resp = self.client.get(
             reverse('catalog:problem_detail', args=[self.p.pk]))
-        similar_ids = {item['problem'].pk for item in resp.context['similar']}
+        # «Похожие» — вкладка ленты «Стола» (18.09.2026), те же карточки за шлюзом.
+        similar_ids = {item['problem'].pk for item in resp.context['similar_cards']}
         self.assertIn(self.p_visible_similar.pk, similar_ids)
         self.assertNotIn(self.p_hidden_similar.pk, similar_ids)
 
@@ -277,8 +278,14 @@ class CurrencyEscapeFrontendTests(TestCase):
         self.assertIn("split('\\\\_').join('_')", html)
         # страховочный вызов после KaTeX / при недоступном CDN
         self.assertIn("addEventListener('DOMContentLoaded'", html)
-        # чистка в раскрывашках вызывается безусловно
-        self.assertIn('fixCurrencyDollars(block)', html)
+        # раскрывашки (решение, «почему так») идут общим конвейером renderMathIn,
+        # а он чистит эскейпы безусловно — `stol_task.js`, 18.09.2026
+        self.assertIn('fixCurrencyDollars(root)', html)
+        from pathlib import Path
+        from django.conf import settings
+        task_js = (Path(settings.BASE_DIR) / 'catalog/static/catalog/js/stol_task.js').read_text(encoding='utf-8')
+        self.assertIn('window.renderMathIn(el)', task_js)
+        self.assertIn('math(sol)', task_js)
 
     def test_page_contains_dollar_masking_fix_v3(self):
         """Сессия H3: «\\$» маскируется ДО KaTeX приватным символом, иначе
@@ -297,5 +304,8 @@ class CurrencyEscapeFrontendTests(TestCase):
         # С 17.09.2026 конвейер один: renderMathIn(root) маскирует до KaTeX.
         self.assertIn('renderMathIn(document.body)', html)
         self.assertIn('maskEscapedDollars(root)', html)
-        # маскировка перед перерендером раскрывашки тоже стоит
-        self.assertIn('maskEscapedDollars(block)', html)
+        # маскировка перед перерендером раскрывашки — тот же конвейер renderMathIn
+        from pathlib import Path
+        from django.conf import settings
+        task_js = (Path(settings.BASE_DIR) / 'catalog/static/catalog/js/stol_task.js').read_text(encoding='utf-8')
+        self.assertIn('math(sol)', task_js)

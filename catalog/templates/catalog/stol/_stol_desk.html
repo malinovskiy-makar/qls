@@ -1,0 +1,28 @@
+{% comment %}
+«СТОЛ» С ОТКРЫТОЙ ЗАДАЧЕЙ (вид `stol`, README §1): лента · задача · помощь.
+
+Прямая ссылка на задачу рисует всё здесь на сервере. На входе каркас стоит
+пустым и скрытым: сценарий кладёт в `#stol-center` и `#stol-help` ответ
+`?pane=1` (те же партиалы) и переключает вид, не перезагружая страницу.
+Свёрнутая панель — полоска 52 px с иконками (вариант S1); состояние панелей
+живёт в `localStorage` (`stol.js`), первое открытие — лента свёрнута,
+помощь открыта (решение владельца 17.09).
+{% endcomment %}
+<div class="desk" id="stol" data-rail="closed" data-help="open"{% if problem %} data-problem="{{ problem.pk }}"{% endif %}>
+  <div class="desk-side desk-side--rail">
+    <nav class="stol-strip stol-strip--rail" aria-label="Лента">
+      <button type="button" class="stol-strip-btn" data-stol="rail" aria-label="Открыть ленту" title="Лента ([)">{% include '_icon.html' with name='chevron_right' %}</button>
+      <span class="stol-strip-pos" id="strip-pos"></span>
+      <button type="button" class="stol-strip-btn" data-stol-step="-1" aria-label="Предыдущая задача" title="Предыдущая (K)">{% include '_icon.html' with name='chevron_up' %}</button>
+      <button type="button" class="stol-strip-btn" data-stol-step="1" aria-label="Следующая задача" title="Следующая (J)">{% include '_icon.html' with name='chevron_down' %}</button>
+      <a class="stol-strip-btn stol-strip-end" href="{% url 'catalog:problem_list' %}" data-stol-home aria-label="Весь каталог" title="Весь каталог">{% include '_icon.html' with name='grid' %}</a>
+    </nav>
+    {% include "catalog/stol/_stol_rail.html" %}
+  </div>
+
+  <article class="desk-center" aria-label="Задача">
+    <div class="desk-col" id="stol-center">{% if problem %}{% include "catalog/stol/_stol_center.html" %}{% endif %}</div>
+  </article>
+
+  <div class="desk-side desk-side--help" id="stol-help">{% if problem %}{% include "catalog/stol/_stol_help.html" %}{% endif %}</div>
+</div>

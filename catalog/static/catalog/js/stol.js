@@ -225,176 +225,376 @@
   weco.stol.entry = { closeDropdowns: closeAll, map: function () { return bgMap; } };
 })();
 
-/* ── Страница задачи: ночной первый шаг (ADR 0120), переезжает в S2 ────── */
-/* «Стол» на странице задачи (часть B ночи 18.09.2026, первый шаг).
+/* ── «Стол»: лента · задача · помощь (вид `stol`, README §1, §3) ──────────
+   Панели: лента слева и помощь справа сворачиваются в полоски 52 px; первое
+   открытие — лента свёрнута, помощь открыта (решение владельца 17.09), дальше
+   состояние запоминается (`localStorage`). «Фокус» (F) убирает обе панели и
+   шапку, Esc выходит. Клавиши: [ лента, ] помощь, J/K и стрелки по ленте,
+   Enter открыть, / поиск; молчат, пока курсор в поле ввода.
 
-   Панели: лента слева и помощь справа сворачиваются в полоски 52 px;
-   первое открытие — лента свёрнута, помощь открыта (решение владельца
-   17.09), дальше состояние запоминается в localStorage за браузером.
-   «Фокус» (F) убирает обе панели и шапку, Esc выходит. Клавиши [ и ]
-   — лента и помощь, J/K и стрелки ходят по ленте, Enter открывает.
-   Клавиши молчат, пока курсор в поле ввода.
-
-   Вкладка «Мои» догружает строки с сервера (`/catalog/api/rail/saved/`),
-   «Похожие» нарисованы сервером. «Как прошло?» пишет прогресс
-   (`/catalog/api/progress/<id>/`, ADR 0119). Одно пространство имён —
-   `weco.stol`. */
+   Смена задачи — без перезагрузки: `GET /catalog/problem/<id>/?pane=1`
+   отдаёт центр и помощь теми же партиалами, что прямая ссылка; сценарий
+   подменяет их, ставит адрес `pushState` и зовёт `weco.stolTask.init`.
+   «Назад» браузера возвращает прежнюю задачу или вход с теми же результатами
+   и прокруткой (вход не перерисовывается, он просто скрыт). */
 (function () {
+  'use strict';
   window.weco = window.weco || {};
-  var root = document.getElementById('stol');
-  if (!root || (weco.stol && weco.stol.toggle)) return;
+  weco.stol = weco.stol || {};
+  var app = document.getElementById('stol-app');
+  var desk = document.getElementById('stol');
+  if (!app || !desk) return;
 
   var KEY = 'weco_stol';
-  var cfgEl = document.getElementById('pd-config');
-  var cfg = {};
-  try { cfg = JSON.parse((cfgEl && cfgEl.textContent) || '{}'); } catch (e) { cfg = {}; }
-  var csrf = (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '';
+  var center = document.getElementById('stol-center');
+  var help = document.getElementById('stol-help');
+  var rail = document.getElementById('stol-rail');
+  var list = document.getElementById('stol-rail-list');
+  var entry = document.getElementById('stol-entry');
+  var entryUrl = app.getAttribute('data-entry-url');
+  var paneBase = app.getAttribute('data-pane-base');
+  var F = weco.filters;
+  var OVERLAY = window.matchMedia('(max-width: 1399px)');
 
-  function load() {
-    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; }
-  }
-  function save(state) {
-    try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) { /* приватное окно */ }
-  }
-  var state = load() || { rail: false, help: true };
+  function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state.panels)); } catch (e) { /* приватное окно */ } }
+  function inField(el) { return el && (el.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)); }
 
+  var state = weco.stol.state = {
+    view: app.getAttribute('data-view'),
+    problemId: Number(desk.getAttribute('data-problem')) || null,
+    panels: load() || { rail: false, help: true },
+    focus: false,
+    tab: entry ? 'results' : 'similar',
+    filters: F ? F.state : null,
+    results: [],
+    scroll: 0
+  };
+
+  /* ── Панели и «Фокус» ──────────────────────────────────────────────── */
   function paint() {
-    root.setAttribute('data-rail', state.rail ? 'open' : 'closed');
-    root.setAttribute('data-help', state.help ? 'open' : 'closed');
+    desk.setAttribute('data-rail', state.panels.rail ? 'open' : 'closed');
+    desk.setAttribute('data-help', state.panels.help ? 'open' : 'closed');
   }
-  function toggle(panel) {
-    // Из «Фокуса» кнопка панели её открывает, а не переключает вслепую.
-    if (document.body.classList.contains('stol-is-focus')) {
-      focus(false);
-      state[panel] = true;
-    } else {
-      state[panel] = !state[panel];
-    }
-    save(state);
-    paint();
-  }
-  function focus(on) {
+  function focusMode(on) {
+    state.focus = on;
     document.body.classList.toggle('stol-is-focus', on);
-    root.querySelectorAll('.stol-focus-label').forEach(function (el) {
+    desk.querySelectorAll('.stol-focus-label').forEach(function (el) {
       el.textContent = on ? 'Выйти из фокуса' : 'Фокус';
+      el.parentNode.classList.toggle('tb-btn--dark', on);
     });
   }
-
-  root.addEventListener('click', function (e) {
+  function toggle(panel) {
+    /* Из «Фокуса» кнопка панели её открывает, а не переключает вслепую. */
+    if (state.focus) { focusMode(false); state.panels[panel] = true; }
+    else { state.panels[panel] = !state.panels[panel]; }
+    save();
+    paint();
+  }
+  function openPanel(panel) {
+    if (state.focus) focusMode(false);
+    if (!state.panels[panel]) { state.panels[panel] = true; save(); paint(); }
+  }
+  /* Лента поверх задачи (1100–1399) и шторки (< 1100) закрываются кликом мимо. */
+  document.addEventListener('click', function (e) {
+    if (state.view !== 'stol' || !OVERLAY.matches) return;
+    if (e.target.closest('.stol-rail, .help-panel, .stol-strip, [data-stol], .ct-all, .rp-back')) return;
+    var changed = false;
+    if (state.panels.rail) { state.panels.rail = false; changed = true; }
+    if (window.innerWidth < 1100 && state.panels.help) { state.panels.help = false; changed = true; }
+    if (changed) paint();
+  });
+  document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-stol]');
     if (!btn) return;
     var what = btn.getAttribute('data-stol');
-    if (what === 'focus') { focus(!document.body.classList.contains('stol-is-focus')); } else { toggle(what); }
+    if (what === 'focus') focusMode(!state.focus); else toggle(what);
   });
 
-  /* 1100–1399: лента выезжает поверх задачи — клик мимо неё закрывает. */
-  var OVERLAY = window.matchMedia('(min-width: 1100px) and (max-width: 1399px)');
-  document.addEventListener('click', function (e) {
-    if (!state.rail || !OVERLAY.matches) return;
-    if (e.target.closest('.stol-rail, [data-stol]')) return;
-    state.rail = false; save(state); paint();
-  });
-
-  /* ── Лента: вкладки и ход по строкам ────────────────────────────────── */
-  var list = document.getElementById('stol-rail-list');
-  var similarHtml = list ? list.innerHTML : '';
-  var savedHtml = null;
-  root.querySelectorAll('[data-rail-tab]').forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      root.querySelectorAll('[data-rail-tab]').forEach(function (t) {
-        t.classList.toggle('is-on', t === tab);
-        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+  /* ── Лента: вкладки «Выдача / Похожие / Мои» ───────────────────────── */
+  var tabs = rail.querySelectorAll('[data-rail-tab]');
+  var similarHtml = list.innerHTML, savedHtml = null;
+  function tabBtn(name) { return rail.querySelector('[data-rail-tab="' + name + '"]'); }
+  /* Выдача — строки блока результатов входа, один источник с ним. */
+  function resultsRows() {
+    var box = document.getElementById('ct-rows');
+    return box ? Array.prototype.slice.call(box.querySelectorAll('.rail-row')) : [];
+  }
+  function fillList() {
+    if (state.tab === 'results') {
+      list.textContent = '';
+      resultsRows().forEach(function (row) {
+        var copy = row.cloneNode(true);
+        copy.classList.remove('ct-appear');
+        list.appendChild(copy);
       });
-      if (tab.getAttribute('data-rail-tab') === 'similar') { list.innerHTML = similarHtml; return; }
-      if (savedHtml !== null) { list.innerHTML = savedHtml; return; }
-      /* Строки рисует сервер тем же партиалом (экранированный шаблон), не сырые данные. */
-      fetch(cfg.railSavedUrl, { credentials: 'same-origin' })
+      var more = document.querySelector('#ct-results [data-more]');
+      if (more) {
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'ct-btn ct-btn--quiet rail-more';
+        btn.textContent = more.textContent;
+        btn.addEventListener('click', function () { more.click(); });
+        list.appendChild(btn);
+      }
+    } else if (state.tab === 'similar') {
+      list.innerHTML = similarHtml;
+    } else if (savedHtml !== null) {
+      list.innerHTML = savedHtml;
+    } else {
+      list.textContent = '';
+      fetch(rail.getAttribute('data-saved-url'), { credentials: 'same-origin' })
         .then(function (r) { return r.json(); })
         .then(function (d) {
           savedHtml = d.rows_html || '<p class="rail-empty">Сохранённых задач пока нет.</p>';
-          list.innerHTML = savedHtml;
+          if (state.tab === 'saved') { list.innerHTML = savedHtml; markCurrent(); }
         })
-        .catch(function () { /* вкладка остаётся прежней */ });
+        .catch(function () { /* вкладка остаётся пустой */ });
+    }
+    markCurrent();
+    if (typeof window.renderMathIn === 'function') window.renderMathIn(list);
+  }
+  function setTab(name) {
+    state.tab = name;
+    tabs.forEach(function (t) { t.setAttribute('aria-selected', t.getAttribute('data-rail-tab') === name ? 'true' : 'false'); });
+    fillList();
+    neighbours();
+  }
+  tabs.forEach(function (t) { t.addEventListener('click', function () { setTab(t.getAttribute('data-rail-tab')); }); });
+
+  function rowsOfTab() { return Array.prototype.slice.call(list.querySelectorAll('.rail-row')); }
+  function markCurrent() {
+    rowsOfTab().forEach(function (row) {
+      row.classList.toggle('is-current', Number(row.getAttribute('data-id')) === state.problemId);
     });
-  });
-  var cursor = -1;
-  function rows() { return list ? Array.prototype.slice.call(list.querySelectorAll('.rail-row')) : []; }
-  function move(step) {
-    var all = rows();
-    if (!all.length) return;
-    if (!state.rail) { state.rail = true; save(state); paint(); }
-    cursor = Math.max(0, Math.min(all.length - 1, cursor + step));
-    all.forEach(function (row, i) { row.classList.toggle('is-cursor', i === cursor); });
-    all[cursor].scrollIntoView({ block: 'nearest' });
   }
 
+  /* ── Позиция «3 из 506», стрелки, соседи с названиями, «Дальше» ────── */
+  function titleOf(row) { var t = row.querySelector('.rail-title'); return t ? t.textContent.trim() : ''; }
+  function totalOfTab(rows) {
+    if (state.tab === 'results') {
+      var res = document.getElementById('ct-results');
+      var n = res && Number(res.getAttribute('data-total'));
+      if (n) return n;
+    }
+    return rows.length;
+  }
+  function neighbours() {
+    if (!state.problemId) return;
+    var rows = rowsOfTab();
+    var i = -1;
+    rows.forEach(function (row, k) { if (Number(row.getAttribute('data-id')) === state.problemId) i = k; });
+    if (i < 0 && state.tab !== 'results' && !rows.length) return;   /* список ещё грузится */
+    var prev = i > 0 ? rows[i - 1] : null;
+    var next = i >= 0 ? rows[i + 1] || null : rows[0] || null;
+    if (next && Number(next.getAttribute('data-id')) === state.problemId) next = null;
+    var pos = i >= 0 ? (i + 1) + ' из ' + totalOfTab(rows) : '';
+    var tbPos = document.getElementById('tb-pos'); if (tbPos) tbPos.textContent = pos;
+    var sPos = document.getElementById('strip-pos'); if (sPos) sPos.textContent = i >= 0 ? (i + 1) + '/' + rows.length : '';
+    desk.querySelectorAll('[data-stol-step]').forEach(function (a) {
+      var row = a.getAttribute('data-stol-step') === '-1' ? prev : next;
+      if (a.tagName === 'A') {
+        if (row) { a.href = row.getAttribute('href'); a.removeAttribute('aria-disabled'); }
+        else { a.removeAttribute('href'); a.setAttribute('aria-disabled', 'true'); }
+      } else {
+        a.disabled = !row;
+      }
+    });
+    var nb = document.getElementById('stol-nb');
+    if (nb) {
+      nb.textContent = '';
+      [[prev, 'prev', '← предыдущая', '-1'], [next, 'next', 'следующая →', '1']].forEach(function (spec) {
+        if (!spec[0]) return;
+        var a = document.createElement('a');
+        a.className = 'nb-a nb-a--' + spec[1];
+        a.href = spec[0].getAttribute('href');
+        a.setAttribute('data-stol-step', spec[3]);
+        var s = document.createElement('small'); s.textContent = spec[2];
+        var b = document.createElement('b'); b.textContent = titleOf(spec[0]);
+        a.appendChild(s); a.appendChild(b);
+        nb.appendChild(a);
+      });
+      nb.hidden = !prev && !next;
+    }
+    var howNext = document.getElementById('how-next');
+    if (howNext) {
+      var marked = !!document.querySelector('#how [aria-pressed="true"]');
+      howNext.hidden = !next || !marked;
+    }
+    desk.querySelectorAll('#test-next, .stol-phonebar .is-main').forEach(function (a) { a.hidden = !next; });
+  }
+  document.addEventListener('weco:progress', neighbours);
+
+  /* ── Смена задачи без перезагрузки ─────────────────────────────────── */
+  var seq = 0;
+  function show(view) {
+    state.view = view;
+    if (weco.stol.setView) weco.stol.setView(view);
+  }
+  function open(id, opts) {
+    opts = opts || {};
+    var mine = ++seq;
+    if (state.view === 'entry') { state.scroll = window.scrollY; }
+    center.classList.add('is-loading');
+    var url = paneBase + id + '/?pane=1' + (F && F.buildQuery() && !F.state.q ? '&' + F.buildQuery() : '');
+    return fetch(url, { credentials: 'same-origin', headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+      .then(function (d) {
+        if (mine !== seq) return;
+        center.innerHTML = d.center_html;
+        help.innerHTML = d.help_html;
+        similarHtml = d.similar_html;
+        center.classList.remove('is-loading');
+        state.problemId = d.id;
+        desk.setAttribute('data-problem', d.id);
+        if (!tabBtn('results') || tabBtn('results').hidden) { if (state.tab === 'results') state.tab = 'similar'; }
+        var first = state.view !== 'stol';
+        show('stol');
+        if (first && !load()) { state.panels = { rail: false, help: true }; }
+        paint();
+        if (opts.push !== false) history.pushState({ stol: 'problem', id: d.id }, '', d.url);
+        document.title = d.title + ' · Экономика';
+        window.scrollTo(0, 0);
+        if (typeof window.renderMathIn === 'function') { window.renderMathIn(center); window.renderMathIn(help); }
+        if (weco.stolTask) weco.stolTask.init(desk);
+        setTab(state.tab);
+        if (weco.trackPage) weco.trackPage();
+        if (OVERLAY.matches && state.panels.rail) { state.panels.rail = false; paint(); }
+      })
+      .catch(function () {
+        if (mine !== seq) return;
+        center.classList.remove('is-loading');
+        /* Честное сообщение и обычная ссылка: сеть подвела, а не задача пропала. */
+        var box = document.createElement('p');
+        box.className = 'pane-error';
+        box.appendChild(document.createTextNode('Задача не загрузилась. '));
+        var a = document.createElement('a');
+        a.href = paneBase + id + '/';
+        a.textContent = 'Открыть обычной ссылкой';
+        box.appendChild(a);
+        center.insertBefore(box, center.firstChild);
+        show('stol');
+      });
+  }
+  function toEntry(push) {
+    if (!entry) { location.href = entryUrl; return; }
+    focusMode(false);
+    show('entry');
+    if (push !== false) history.pushState({ stol: 'entry' }, '', entryUrl + (F && F.buildQuery() ? '?' + F.buildQuery() : ''));
+    document.title = 'Умный каталог · Экономика';
+    window.scrollTo(0, state.scroll);
+    if (weco.trackPage) weco.trackPage();
+  }
+  weco.stol.open = open;
+  weco.stol.toEntry = toEntry;
+  weco.stol.openPanel = openPanel;
+  weco.stol.toggle = toggle;
+  weco.stol.focus = focusMode;
+
+  function plainClick(e) { return !(e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey); }
+  function idOf(href) { var m = /\/catalog\/problem\/(\d+)\/?(?:$|\?)/.exec(href || ''); return m ? Number(m[1]) : null; }
+  document.addEventListener('click', function (e) {
+    if (!plainClick(e)) return;
+    var a = e.target.closest('a');
+    if (!a) return;
+    if (a.hasAttribute('data-stol-home') || (a.pathname === entryUrl && a.closest('.site-nav') && entry)) {
+      if (!entry) return;
+      e.preventDefault();
+      toEntry();
+      return;
+    }
+    if (a.getAttribute('aria-disabled') === 'true') { e.preventDefault(); return; }
+    if (!a.closest('#stol-app')) return;
+    var id = idOf(a.getAttribute('href'));
+    if (!id || a.target === '_blank') return;
+    e.preventDefault();
+    if (id === state.problemId && state.view === 'stol') return;
+    open(id);
+  });
+  window.addEventListener('popstate', function () {
+    var id = idOf(location.pathname);
+    if (id) { open(id, { push: false }); return; }
+    if (location.pathname === entryUrl && entry) { toEntry(false); return; }
+    location.reload();
+  });
+  if (state.view === 'entry') history.replaceState({ stol: 'entry' }, '', location.href);
+  else if (state.problemId) history.replaceState({ stol: 'problem', id: state.problemId }, '', location.href);
+
+  /* ── Поиск и фильтры ленты — то же состояние, что у входа ───────────── */
+  var railAsk = document.getElementById('rail-ask');
+  if (railAsk && F && entry) {
+    railAsk.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var q = railAsk.querySelector('input').value.trim();
+      F.state.q = q;
+      var field = document.getElementById('ct-q');
+      if (field) field.value = q;
+      F.refresh({ log: !!q });
+      setTab('results');
+    });
+  }
+  var railFilt = document.getElementById('rail-filters');
+  if (railFilt && F && F.open) {
+    railFilt.addEventListener('click', function (e) { e.preventDefault(); F.open(); });
+  }
+  function filterSummary() {
+    if (!F) return;
+    var s = F.state, parts = [];
+    s.topics.forEach(function (v) { var el = document.querySelector('.se-opt[data-topic="' + v + '"] .se-opt-l'); if (el) parts.push(el.textContent.trim()); });
+    if (s.difficulties.size) parts.push(Array.from(s.difficulties).sort().map(function (d) { return d + '★'; }).join(' '));
+    if (s.kind) parts.push(s.kind === 'test' ? 'тесты' : 'задачи');
+    if (s.has_solution) parts.push('с решением');
+    var n = document.getElementById('rail-filt-n'), sum = document.getElementById('rail-filt-sum');
+    var count = s.topics.size + s.tags.size + s.difficulties.size + s.sources.size + s.features.size +
+                (s.kind ? 1 : 0) + (s.character ? 1 : 0) + (s.has_solution ? 1 : 0);
+    if (n) n.textContent = count ? ' · ' + count : '';
+    if (sum) sum.textContent = parts.join(', ');
+    var q = document.getElementById('rail-q');
+    if (q && document.activeElement !== q) q.value = s.q || '';
+  }
+  document.addEventListener('weco:filters', function () {
+    filterSummary();
+    if (state.tab === 'results') fillList();
+    neighbours();
+  });
+
+  /* ── Клавиши (README §1) ────────────────────────────────────────────── */
+  var cursor = -1;
+  function move(step) {
+    var rows = rowsOfTab();
+    if (!rows.length) return;
+    openPanel('rail');
+    if (cursor < 0) rows.forEach(function (row, k) { if (row.classList.contains('is-current')) cursor = k; });
+    cursor = Math.max(0, Math.min(rows.length - 1, cursor + step));
+    rows.forEach(function (row, k) { row.classList.toggle('is-cursor', k === cursor); });
+    rows[cursor].scrollIntoView({ block: 'nearest' });
+  }
   document.addEventListener('keydown', function (e) {
-    var t = e.target;
-    if (e.altKey || e.ctrlKey || e.metaKey) return;
-    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName))) return;
-    if (document.querySelector('[aria-modal="true"]:not([hidden]), .fb-back')) return;
+    if (state.view !== 'stol') {
+      if (e.key === 'Escape' || inField(e.target)) return;
+      if (e.key === '/' && document.getElementById('ct-q')) { e.preventDefault(); document.getElementById('ct-q').focus(); }
+      return;
+    }
+    if (e.altKey || e.ctrlKey || e.metaKey || inField(e.target)) return;
+    if (document.querySelector('dialog[open], .fb-back, .rp-back.is-open')) return;
     var k = e.key;
-    if (k === '[') { toggle('rail'); } else if (k === ']') { toggle('help'); }
-    else if (k === 'f' || k === 'F' || k === 'а' || k === 'А') { focus(!document.body.classList.contains('stol-is-focus')); }
-    else if (k === 'Escape' && document.body.classList.contains('stol-is-focus')) { focus(false); }
-    else if (k === 'j' || k === 'ArrowDown') { move(1); }
-    else if (k === 'k' || k === 'ArrowUp') { move(-1); }
-    else if (k === 'Enter' && cursor >= 0 && rows()[cursor]) { location.href = rows()[cursor].href; }
+    if (k === '[') { toggle('rail'); }
+    else if (k === ']') { toggle('help'); }
+    else if (k === 'f' || k === 'F' || k === 'а' || k === 'А') { focusMode(!state.focus); }
+    else if (k === 'Escape') { if (state.focus) focusMode(false); else if (entry) toEntry(); else return; }
+    else if (k === 'j' || k === 'о' || k === 'ArrowDown') { move(1); }
+    else if (k === 'k' || k === 'л' || k === 'ArrowUp') { move(-1); }
+    else if (k === 'Enter' && cursor >= 0 && rowsOfTab()[cursor]) { open(idOf(rowsOfTab()[cursor].getAttribute('href'))); cursor = -1; }
+    else if (k === '/') { openPanel('rail'); var q = document.getElementById('rail-q'); if (q) q.focus(); }
     else { return; }
     e.preventDefault();
   });
 
-  /* ── «Как прошло?» и следы помощи ───────────────────────────────────── */
-  function progress(payload) {
-    if (!cfg.progressUrl) return Promise.resolve(null);
-    return fetch(cfg.progressUrl, {
-      method: 'POST', credentials: 'same-origin',
-      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
-      body: JSON.stringify(payload)
-    }).then(function (r) { return r.json(); });
-  }
-  var how = document.getElementById('how');
-  if (how) {
-    how.addEventListener('click', function (e) {
-      var btn = e.target.closest('[data-how]');
-      if (!btn || btn.disabled) return;
-      var again = btn.getAttribute('aria-pressed') === 'true';
-      progress({ status: again ? null : btn.getAttribute('data-how') }).then(function (d) {
-        if (!d || d.error) return;
-        how.querySelectorAll('[data-how]').forEach(function (b) {
-          b.setAttribute('aria-pressed', !again && b === btn ? 'true' : 'false');
-        });
-      });
-    });
-  }
-  document.addEventListener('weco:solution-viewed', function () {
-    progress({ solution_viewed: true });
-    var self = how && how.querySelector('[data-how="self"]');
-    if (self) { self.disabled = true; self.title = 'Решение уже открыто'; }
-  });
-
-  /* Телефон: кнопки нижней панели нажимают кнопки страницы. */
-  var PHONE = { hint: 'hint-btn', sol: 'sol-btn', reveal: 'reveal-btn' };
-  document.addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-phone]');
-    if (!btn) return;
-    var what = btn.getAttribute('data-phone');
-    if (what === 'ai') {
-      var ai = document.querySelector('.pd-side .ai');
-      if (ai) { ai.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
-      var field = document.getElementById('ai-text');
-      if (field) { field.focus({ preventScroll: true }); }
-      return;
-    }
-    var target = document.getElementById(PHONE[what]);
-    if (target && !target.disabled) {
-      target.click();
-      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    }
-  });
-
+  /* ── Старт ─────────────────────────────────────────────────────────── */
   paint();
-  weco.stol = weco.stol || {};
-  weco.stol.toggle = toggle;
-  weco.stol.focus = focus;
+  filterSummary();
+  if (state.view === 'stol') {
+    if (weco.stolTask) weco.stolTask.init(desk);
+    setTab(state.tab);
+  }
 })();

@@ -329,8 +329,10 @@ class PhoneBarTests(TestCase):
 
     def test_bare_problem_has_no_hint_solution_or_next(self):
         bar = self._bar()
-        for absent in ('data-phone="hint"', 'data-phone="sol"', 'Дальше'):
+        for absent in ('data-phone="hint"', 'data-phone="sol"'):
             self.assertNotIn(absent, bar)
+        # «Дальше» стоит скрытым: соседа по ленте знает сценарий (18.09.2026).
+        self.assertIn('<a class="is-main" data-stol-step="1" hidden>', bar)
 
     def test_hint_solution_and_next_appear_with_data(self):
         from problems.models import Hint

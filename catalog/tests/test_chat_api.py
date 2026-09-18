@@ -143,7 +143,7 @@ class ChatApiTests(TestCase):
 
     def test_anonymous_gets_403_and_a_login_link_instead_of_the_field(self):
         html = self.client.get(self.page).content.decode()
-        self.assertIn('<h2>Спросить ИИ</h2>', html)
+        self.assertIn('aria-label="Чат с ИИ по этой задаче"', html)
         self.assertNotIn('id="ai-text"', html)
         self.assertIn('Войти, чтобы спросить', html)
         self.assertEqual(self._post().status_code, 403)
@@ -152,8 +152,11 @@ class ChatApiTests(TestCase):
         self.client.force_login(self.user)
         html = self.client.get(self.page).content.decode()
         for needle in ('id="ai-text"', 'id="ai-send"',
-                       'data-mode="theory">Объясни теорию<', 'data-mode="method">Как решать<',
-                       'data-mode="check">Проверь моё решение<', 'id="ai-clip"',
+                       # Режимы по README §4: «Теория / Как решать / Проверь решение»;
+                       # текст реплики без набранного вопроса — в data-prompt.
+                       'data-mode="theory" data-prompt="Объясни теорию">Теория<',
+                       'data-mode="method" data-prompt="Как решать">Как решать<',
+                       'data-mode="check" data-prompt="Проверь моё решение">Проверь решение<', 'id="ai-clip"',
                        # `multiple` — до трёх файлов к реплике (18.09.2026).
                        '<input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,'
                        'image/jpeg,image/png,image/webp,application/pdf">',

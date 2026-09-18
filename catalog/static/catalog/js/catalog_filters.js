@@ -443,5 +443,5 @@
   syncDialog();
 
   window.weco = window.weco || {};
-  weco.filters = { state: state, refresh: refresh, buildQuery: function () { return buildQuery(state); } };
+  weco.filters = { state: state, refresh: refresh, open: openAll, buildQuery: function () { return buildQuery(state); } };
 })();

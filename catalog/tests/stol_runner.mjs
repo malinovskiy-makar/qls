@@ -36,6 +36,11 @@ async function fresh(width, opts = {}) {
     reducedMotion: opts.reduce ? 'reduce' : 'no-preference',
   });
   await ctx.addInitScript(`try { localStorage.setItem('theme', ${JSON.stringify(opts.theme || 'light')}); } catch (e) {}`);
+  /* Метка загрузки документа: меняется только при настоящей перезагрузке. */
+  await ctx.addInitScript('window.__stolBoot = Date.now() + Math.random();');
+  if (opts.panels) {
+    await ctx.addInitScript(`try { localStorage.setItem('weco_stol', ${JSON.stringify(JSON.stringify(opts.panels))}); } catch (e) {}`);
+  }
   const page = await ctx.newPage();
   page.setDefaultTimeout(60000);
   const errors = [];
@@ -122,6 +127,64 @@ try {
       pressed: document.querySelector('#se-dd-topic [data-topic="' + t + '"]').getAttribute('aria-pressed'),
     }), TOPIC);
     await ctx.close();
+  }
+  /* ── S2: задача без перезагрузки, «назад» к той же выдаче, «Дальше» ──── */
+  if (TOPIC) {
+    const { ctx, page, errors } = await fresh(1440, { path: '/catalog/?topic=' + TOPIC });
+    const boot = await page.evaluate(() => window.__stolBoot);
+    const ids = await page.$$eval('#ct-rows .rail-row', rows => rows.map(r => Number(r.dataset.id)));
+    await page.click('#ct-rows .rail-row');
+    await page.waitForSelector('#stol-center .stm');
+    const opened = await page.evaluate(() => ({
+      boot: window.__stolBoot, path: location.pathname,
+      view: document.getElementById('stol-app').dataset.view,
+      statement: !!document.querySelector('#stol-center .stm .math-content'),
+      helpOpen: document.getElementById('stol').dataset.help,
+      railOpen: document.getElementById('stol').dataset.rail,
+      pos: (document.getElementById('tb-pos') || {}).textContent || '' }));
+    await page.click('#tb-next');
+    await page.waitForFunction(first => location.pathname !== '/catalog/problem/' + first + '/', ids[0]);
+    await page.waitForSelector('#stol-center .stm');
+    const next = await page.evaluate(() => ({ boot: window.__stolBoot, path: location.pathname }));
+    await page.goBack();
+    await page.waitForFunction(first => location.pathname === '/catalog/problem/' + first + '/', ids[0]);
+    await page.goBack();
+    await page.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
+    const back = await page.evaluate(() => ({ boot: window.__stolBoot, path: location.pathname + location.search,
+                                             rows: document.querySelectorAll('#ct-rows .rail-row').length }));
+    out['no reload'] = { boot, ids, opened, next, back, errors };
+    await ctx.close();
+  }
+
+  /* ── S2: колонка условия 680 при любых панелях, ширины панелей ─────────── */
+  if (process.env.STOL_PROBLEM) {
+    const states = {
+      'rail-closed help-open': { rail: false, help: true }, 'rail-open help-open': { rail: true, help: true },
+      'rail-closed help-closed': { rail: false, help: false }, 'rail-open help-closed': { rail: true, help: false },
+    };
+    for (const width of DESKTOP) {
+      for (const [name, panels] of Object.entries(states)) {
+        const { ctx, page, errors } = await fresh(width, { path: process.env.STOL_PROBLEM, panels });
+        const box = await page.evaluate(() => {
+          const w = sel => { const el = document.querySelector(sel); if (!el) return null; const r = el.getBoundingClientRect(); return Math.round(r.width); };
+          const px = (sel, p) => { const el = document.querySelector(sel); return el ? parseFloat(getComputedStyle(el)[p]) : null; };
+          return { col: w('#stol-center'), rail: w('.stol-rail'), help: w('.help-panel'),
+                   railStrip: w('.stol-strip--rail'), helpStrip: w('.stol-strip--help'),
+                   title: px('.pd-title', 'fontSize'), statement: px('#stol-center .stm', 'fontSize'),
+                   scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth };
+        });
+        box.errors = errors;
+        out['desk ' + width + ' ' + name] = box;
+        await ctx.close();
+      }
+    }
+    for (const width of PHONE) {
+      const { ctx, page, errors } = await fresh(width, { path: process.env.STOL_PROBLEM });
+      const box = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      box.errors = errors;
+      out['desk ' + width] = box;
+      await ctx.close();
+    }
   }
 } catch (e) {
   out.error = String(e && e.stack || e);
