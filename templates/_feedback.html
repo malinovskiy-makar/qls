@@ -132,6 +132,8 @@
 <form hidden aria-hidden="true">{% csrf_token %}</form>
 
 {% include '_corner_stack.html' %}
+{% comment %}Пульс не спрашивают на входе и регистрации: человек ещё не пользовался сайтом.{% endcomment %}
+{% if request.resolver_match.url_name != 'login' and request.resolver_match.url_name != 'register' %}{% include '_pulse.html' %}{% endif %}
 
 {{ feedback_data|json_script:"fb-options" }}
 <script>

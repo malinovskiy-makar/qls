@@ -427,6 +427,7 @@ def api_feedback(request):
     ценнее картинки, и терять его из-за картинки нельзя.
     """
     from problems import ratelimit
+    from problems import pulse
     from problems.feedback_options import OTHER_CHOICE, options_for, page_key_for
     from problems.models_platform import Feedback
 
@@ -463,6 +464,11 @@ def api_feedback(request):
     if kind == Feedback.Kind.IDEA and not other_text:
         return JsonResponse({'ok': False, 'error': 'Напишите предложение.'},
                             status=400)
+    if kind == Feedback.Kind.PULSE:
+        verdict = pulse.validate(request.POST)
+        if isinstance(verdict, str):
+            return JsonResponse({'ok': False, 'error': verdict}, status=400)
+        (chosen, comment), other_text = verdict, ''
 
     entry = Feedback(
         user=request.user if request.user.is_authenticated else None,

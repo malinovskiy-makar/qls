@@ -1626,6 +1626,8 @@ class Feedback(models.Model):
     class Kind(models.TextChoices):
         PROBLEM = 'problem', 'Проблема'
         IDEA = 'idea', 'Предложение'
+        # «Всё ли нравится?» для вернувшегося (18.09.2026, problems/pulse.py).
+        PULSE = 'pulse', 'Пульс'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,

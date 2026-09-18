@@ -503,3 +503,65 @@ class ScreenshotNoteScriptTests(TestCase):
         у главной страницы."""
         src = io.open('templates/_feedback.html', encoding='utf-8').read()
         self.assertTrue('onclone: flattenModernColors' in src)
+
+
+class PulseTests(TestCase):
+    """18.09.2026: «Всё ли нравится?» — третий вид обратной связи."""
+
+    def setUp(self):
+        cache.clear()
+
+    def _post(self, **over):
+        data = {'kind': 'pulse', 'url': '/catalog/', 'choices': ['like']}
+        data.update(over)
+        return self.client.post('/api/feedback/', data)
+
+    def test_like_is_saved_as_pulse(self):
+        self.assertEqual(self._post(comment='Удобный поиск').status_code, 200)
+        entry = Feedback.objects.get()
+        self.assertEqual((entry.kind, entry.choices, entry.comment),
+                         ('pulse', ['like'], 'Удобный поиск'))
+
+    def test_dislike_is_saved(self):
+        self._post(choices=['dislike'])
+        self.assertEqual(Feedback.objects.get().choices, ['dislike'])
+
+    def test_unknown_choice_is_refused(self):
+        self.assertEqual(self._post(choices=['meh']).status_code, 400)
+        self.assertEqual(Feedback.objects.count(), 0)
+
+    def test_both_choices_at_once_are_refused(self):
+        self.assertEqual(self._post(choices=['like', 'dislike']).status_code, 400)
+
+    def test_comment_over_three_hundred_is_refused(self):
+        self.assertEqual(self._post(comment='я' * 301).status_code, 400)
+
+    def test_other_text_is_ignored(self):
+        self._post(other_text='лишнее')
+        self.assertEqual(Feedback.objects.get().other_text, '')
+
+    def test_problem_without_choices_is_still_refused(self):
+        response = self.client.post('/api/feedback/', {'kind': 'problem', 'url': '/'})
+        self.assertEqual(response.status_code, 400)
+
+
+class PulseCardTests(TestCase):
+    """Плашка есть на рабочих экранах и отсутствует на входе и регистрации."""
+
+    def test_card_is_on_catalog_and_home(self):
+        for url in ('/catalog/', '/'):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertIn('id="pulse-card-tpl"', html, url)
+
+    def test_card_is_not_on_login_and_register(self):
+        for url in ('/login/', '/register/'):
+            html = self.client.get(url).content.decode('utf-8')
+            self.assertNotIn('id="pulse-card-tpl"', html, url)
+
+    def test_show_rules_live_in_one_function(self):
+        src = io.open('templates/_pulse.html', encoding='utf-8').read()
+        for rule in ('var MIN_VISITS = 2;', 'var MAX_SHOWS = 2;',
+                     'var GAP_MS = 7 * 24 * 3600 * 1000;', 'var AFTER_MS = 60 * 1000;',
+                     'var AUTO_SEND_MS = 20 * 1000;'):
+            self.assertIn(rule, src)
+        self.assertIn("weco.track('pulse_dismiss'", src)
