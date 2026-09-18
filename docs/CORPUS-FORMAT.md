@@ -19,7 +19,8 @@ Markdown+LaTeX; Школково, 3 414 задач, чистый LaTeX) в фо�
 ## Раздел 1. Что сайт умеет сегодня
 
 Факты — из чтения кода (`catalog/templates/catalog/base.html`,
-`catalog/templates/catalog/problem_detail.html`, `problems/models.py`,
+`catalog/templates/catalog/problem_detail.html` (с 19.09.2026 — `catalog/_math_text.html`
+в партиалах «Стола»), `problems/models.py`,
 `docs/SECURITY.md`) и из живой проверки пятью тестовыми задачами
 (разбор ниже, в конце раздела).
 
