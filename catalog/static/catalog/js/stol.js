@@ -59,6 +59,14 @@
     if (what === 'focus') { focus(!document.body.classList.contains('stol-is-focus')); } else { toggle(what); }
   });
 
+  /* 1100–1399: лента выезжает поверх задачи — клик мимо неё закрывает. */
+  var OVERLAY = window.matchMedia('(min-width: 1100px) and (max-width: 1399px)');
+  document.addEventListener('click', function (e) {
+    if (!state.rail || !OVERLAY.matches) return;
+    if (e.target.closest('.stol-rail, [data-stol]')) return;
+    state.rail = false; save(state); paint();
+  });
+
   /* ── Лента: вкладки и ход по строкам ────────────────────────────────── */
   var list = document.getElementById('stol-rail-list');
   var similarHtml = list ? list.innerHTML : '';
