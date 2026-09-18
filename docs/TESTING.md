@@ -827,4 +827,9 @@ manage.py test                           # полный прогон
 базу (`Destroying old test database`) — второй прогон запускать с другим
 `TEST_DATABASE_NAME` (18.09.2026: так погиб полный прогон на 70 минут).
 
+⚠️ **`scripts/test_*.py` импортируются полным прогоном без меток** (`scripts` — пакет):
+код верхнего уровня в них выполнится. До 18.09.2026 `scripts/test_timing.py` так гнал весь
+набор помодульно на SQLite (часы) и переписывал `reports/calc2_22aug/timing_plain.json`;
+теперь всё внутри `main()`, сторож — `problems/tests/test_scripts_import_safe.py`.
+
 И — визуальная проверка человеком того, что менялось на экране.
