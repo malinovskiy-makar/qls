@@ -220,3 +220,12 @@ class SearchRatingCardTests(_Fixture):
         self.assertIn('var PAUSE_MS = 20 * 60 * 1000;', src)
         self.assertIn('var DWELL_MS = 15 * 1000;', src)
         self.assertIn('s.n % EVERY_NTH === 0 && now - s.last >= PAUSE_MS', src)
+
+
+class CornerStackCssTests(TestCase):
+    """Скрытые части карточки угла действительно скрыты."""
+
+    def test_hidden_parts_beat_their_own_display(self):
+        src = io.open('templates/_corner_stack.html', encoding='utf-8').read()
+        self.assertIn('.corner-card [hidden] { display: none; }', src.replace(
+            '.corner-card[hidden], ', ''))

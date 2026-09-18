@@ -25,7 +25,9 @@
   box-shadow: var(--shadow-pop);
   font-size: 14px; line-height: 1.4;
 }
-.corner-card[hidden] { display: none; }
+/* `hidden` сильнее собственного display у рядов карточки: без этого ряд
+   кнопок с display:flex оставался видимым после выбора (снимки 18.09). */
+.corner-card[hidden], .corner-card [hidden] { display: none; }
 .corner-close {
   position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
   display: inline-flex; align-items: center; justify-content: center;

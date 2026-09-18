@@ -225,6 +225,9 @@ body > .site-version { position: relative; margin-top: calc(-24px - 1.3em); poin
 .fl-tile-l { flex: 1 1 auto; }
 .fl-tile-n { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
 .tag-scope { font-size: 13px; color: var(--text3); margin: -2px 0 6px; }
+/* Кружок Telegram (z-index 150) стоит выше окна и на телефоне ложился на
+   «Показать N вопросов» (снимки 18.09): пока окно открыто, его нет. */
+body:has(#fmodal:not([hidden])) .tg-fab { display: none; }
 @media (prefers-reduced-motion: reduce) {
   .fl-acc-body, .fl-acc-head .qi { transition: none; }
 }
