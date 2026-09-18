@@ -568,6 +568,13 @@ def problem_list(request):
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
     context = _catalog_context(request, missing_id)
+    # «Продолжить» (P3 «Стола»): только на чистом входе, без запроса и фильтров.
+    if not context['query'] and not context['filters']['selected_count']:
+        context['continue_rows'] = [
+            {'problem': p, 'title': similar_title(p) if (p.title or '').strip()
+             and not looks_like_statement_cut(p.title, p.statement)
+             else tex_preview(p.statement, 70)}
+            for p in progress.continue_for(request.user, _visible(Problem.objects.all()))]
     visitor, new_visitor = search_log.visitor_for(request)
     context['search_log_id'] = search_log.log_search(request, context, visitor)
     response = render(request, 'catalog/problem_list.html', context)

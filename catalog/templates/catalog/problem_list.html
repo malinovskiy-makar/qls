@@ -154,6 +154,14 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
                  border-color: var(--border); }
 
 /* ── Блок найденных задач ────────────────────────────────────────── */
+/* «Продолжить» — пилюли над результатами (P3 «Стола»). */
+.ct-continue { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; }
+.ct-continue-l { font-size: 13px; color: var(--text3); }
+.ct-continue-a { max-width: 280px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+                 font-size: 13.5px; padding: 6px 12px; border-radius: var(--r-pill);
+                 background: var(--surface); border: .5px solid var(--border); color: var(--text);
+                 text-decoration: none; }
+.ct-continue-a:hover { border-color: var(--accent-ring); }
 .ct-results { background: var(--surface-info); border: 1.5px solid var(--brand-amber);
               border-radius: 16px; padding: 16px 18px 20px; }
 .ct-count-row { display: flex; justify-content: space-between; gap: 14px;
@@ -333,6 +341,14 @@ https://app.notion.com/p/3cdb11c92bc181299d39eab3d0464276
 {% if missing_id %}
 <div class="ct-note">Задачи с номером {{ missing_id }} в каталоге нет.
   Возможно, она ещё не прошла проверку или номер набран с опечаткой.</div>
+{% endif %}
+
+{% if continue_rows %}
+{% comment %}«Продолжить» (P3 «Стола»): «не получилось» и «открывал», свежие первыми; нет таких — строки нет.{% endcomment %}
+<nav class="ct-continue" aria-label="Продолжить">
+  <span class="ct-continue-l">Продолжить</span>
+  {% for row in continue_rows %}<a class="ct-continue-a" href="{% url 'catalog:problem_detail' row.problem.pk %}">{{ row.title }}</a>{% endfor %}
+</nav>
 {% endif %}
 
 {% include "catalog/_catalog_results.html" %}

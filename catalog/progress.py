@@ -114,6 +114,22 @@ def statuses_for(user, problem_ids):
                 .values_list('problem_id', 'status'))
 
 
+#: Сколько задач в строке «Продолжить» на входе каталога.
+CONTINUE_MAX = 3
+
+
+def continue_for(user, visible_qs):
+    """«Продолжить»: до CONTINUE_MAX задач «не получилось» и «открывал», свежие
+    первыми. `visible_qs` — задачи за шлюзом качества (решает вызывающий)."""
+    if not getattr(user, 'is_authenticated', False):
+        return []
+    Progress = _model()
+    rows = (Progress.objects.filter(user=user, problem__in=visible_qs,
+                                    status__in=(Progress.Status.FAILED, Progress.Status.OPENED))
+            .select_related('problem').order_by('-updated_at')[:CONTINUE_MAX])
+    return [row.problem for row in rows]
+
+
 def as_json(row):
     return {'status': row.status, 'hints_opened': row.hints_opened,
             'solution_viewed': row.solution_viewed}

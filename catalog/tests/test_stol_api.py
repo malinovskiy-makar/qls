@@ -262,3 +262,41 @@ class StolProblemPageTests(TestCase):
         ProblemProgress.objects.create(user=user, problem=self.problem, solution_viewed=True)
         self.client.force_login(user)
         self.assertRegex(self._html(), r'data-how="self" disabled')
+
+
+class ContinueRowTests(TestCase):
+    """«Продолжить» на входе каталога (P3): правило нуля, шлюз, свежие первыми."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = make_user('stol_continue')
+        self.failed = make_problem('Не получилось.')
+        self.opened = make_problem('Открывал.')
+        self.solved = make_problem('Решил.')
+        self.hidden = make_problem('Скрытая.', flagged=True)
+        for problem, status in ((self.failed, 'failed'), (self.opened, 'opened'),
+                                (self.solved, 'solved_self'), (self.hidden, 'failed')):
+            ProblemProgress.objects.create(user=self.user, problem=problem, status=status)
+
+    def _html(self, **params):
+        return self.client.get('/catalog/', params).content.decode('utf-8')
+
+    def test_student_sees_failed_and_opened_but_not_solved_or_hidden(self):
+        self.client.force_login(self.user)
+        html = self._html()
+        block = html.split('class="ct-continue"', 1)[1].split('</nav>', 1)[0]
+        for problem in (self.failed, self.opened):
+            self.assertIn('/catalog/problem/%d/' % problem.pk, block)
+        for problem in (self.solved, self.hidden):
+            self.assertNotIn('/catalog/problem/%d/' % problem.pk, block)
+
+    def test_no_rows_no_block(self):
+        self.client.force_login(make_user('stol_continue_empty'))
+        self.assertNotIn('class="ct-continue"', self._html())
+
+    def test_guest_has_no_block(self):
+        self.assertNotIn('class="ct-continue"', self._html())
+
+    def test_search_hides_the_block(self):
+        self.client.force_login(self.user)
+        self.assertNotIn('class="ct-continue"', self._html(q='монополия'))
