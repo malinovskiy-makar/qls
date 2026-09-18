@@ -1778,6 +1778,50 @@ class Event(models.Model):
         return '%s · %s' % (self.name, self.path)
 
 
+class SearchLog(models.Model):
+    """Поисковый запрос каталога и оценка выдачи (18.09.2026, ADR 0117).
+
+    ⚠️ ТЕКСТ ЗАПРОСА — ЗДЕСЬ, А НЕ В `Event`: события пишет клиент, и там
+    запрос хранится только длиной. Строку заводит СЕРВЕР при полном рендере
+    каталога (`catalog/search_log.py`), со склейкой повторов за 30 с —
+    иначе каждое нажатие фильтра под тем же запросом давало бы строку.
+
+    Текст запроса в модель ИИ не уходит; выгрузка — staff-командой
+    `search_export`.
+    """
+
+    class Rating(models.TextChoices):
+        YES = 'yes', 'Да'
+        NO = 'no', 'Нет'
+
+    ts = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='search_logs', verbose_name='Кто', help_text='Пусто — гость.')
+    visitor = models.CharField('Посетитель', max_length=64, blank=True, db_index=True,
+                               help_text='Cookie weco_vid: один браузер.')
+    session_key = models.CharField('Сессия', max_length=40, blank=True)
+    query = models.CharField('Запрос', max_length=300)
+    status = models.CharField('Умный поиск', max_length=16, blank=True)
+    ms = models.PositiveIntegerField('Думали, мс', null=True, blank=True)
+    total = models.PositiveIntegerField('Нашли', default=0)
+    degraded = models.BooleanField('Упрощённый режим', default=False)
+    top_ids = models.JSONField('Первые выданные задачи', default=list, blank=True)
+    rating = models.CharField('Оценка', max_length=4, blank=True,
+                              choices=Rating.choices)
+    rated_at = models.DateTimeField('Когда оценил', null=True, blank=True)
+    rating_text = models.CharField('Что не так', max_length=300, blank=True)
+
+    class Meta:
+        verbose_name = 'Поисковый запрос'
+        verbose_name_plural = 'Поисковые запросы'
+        ordering = ['-ts']
+        indexes = [models.Index(fields=['visitor', 'ts'])]
+
+    def __str__(self):
+        return self.query
+
+
 # ===========================================================================
 # Чат на странице задачи: вложения и полный журнал реплик (15.09.2026)
 # ===========================================================================

@@ -131,6 +131,8 @@
 {% endcomment %}
 <form hidden aria-hidden="true">{% csrf_token %}</form>
 
+{% include '_corner_stack.html' %}
+
 {{ feedback_data|json_script:"fb-options" }}
 <script>
 (function () {

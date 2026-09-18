@@ -17,7 +17,7 @@ from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.jsonsafe import dumps_for_script
 
-from . import attachments, attempts, chat, filters, testplay
+from . import attachments, attempts, chat, filters, search_log, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -561,6 +561,7 @@ def problem_list(request):
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
     context = _catalog_context(request, missing_id)
+    context['search_log_id'] = search_log.log_search(request, context)
     response = render(request, 'catalog/problem_list.html', context)
     response['X-Smart-Search'] = context['smart_search_status']
     response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
@@ -608,6 +609,10 @@ def api_filter_state(request):
     что и страница, — из того же контекста.
     """
     context = _catalog_context(request)
+    # Журнал поиска — только по явной просьбе (`log=1`): иначе каждое
+    # нажатие фильтра под тем же запросом было бы новой строкой.
+    if request.GET.get(search_log.LOG_PARAM) == '1':
+        context['search_log_id'] = search_log.log_search(request, context)
     fctx = context['filters']
     response = JsonResponse({
         'total': context['total'],

@@ -1,0 +1,105 @@
+{% comment %}
+СТЕК УГЛА — одно место для плашек-вопросов (18.09.2026): «Нашли, что искали?»
+(`_search_rating.html`) и «Всё ли нравится?» (`_pulse.html`).
+
+⚠️ ОДНА КАРТОЧКА ЗА РАЗ. Две плашки разом — уже опрос, а не вопрос: вторая
+ждёт, пока угол освободится (`weco.corner.show` отвечает false).
+
+⚠️ НАД КРУЖКОМ TELEGRAM, НЕ ПОВЕРХ. Кружок `.tg-fab` (`_feedback.html`)
+53 px с отступом 16 px; `--corner-offset` поднимает стек над ним. На
+телефоне карточка — от края до края над тем же рядом.
+
+Включается один раз — из `_feedback.html`, то есть на каждом экране с
+кнопкой обратной связи.
+{% endcomment %}
+<style>
+:root { --corner-offset: 81px; }   /* 16 отступ + 53 кружок + 12 зазор */
+.corner-stack {
+  position: fixed; right: 16px; bottom: var(--corner-offset); z-index: 160;
+  width: 320px; max-width: calc(100vw - 32px);
+}
+.corner-card {
+  position: relative; padding: 14px 40px 14px 16px;
+  background: var(--surface); color: var(--text);
+  border: .5px solid var(--border); border-radius: var(--r);
+  box-shadow: var(--shadow-pop);
+  font-size: 14px; line-height: 1.4;
+}
+.corner-card[hidden] { display: none; }
+.corner-close {
+  position: absolute; top: 8px; right: 8px; width: 28px; height: 28px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 0; border-radius: 50%; background: transparent; color: var(--text3);
+  cursor: pointer;
+}
+.corner-close:hover { background: var(--line); color: var(--text); }
+.corner-close svg { width: 16px; height: 16px; }
+.corner-q { font-weight: 600; margin-bottom: 10px; }
+.corner-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.corner-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font: inherit; font-size: 14px; padding: 7px 14px; cursor: pointer;
+  border: .5px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); color: var(--text);
+}
+.corner-btn:hover { border-color: var(--accent-ring); }
+.corner-btn svg { width: 16px; height: 16px; }
+.corner-btn--primary { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.corner-input {
+  width: 100%; font: inherit; font-size: 14px; padding: 8px 10px; margin-bottom: 8px;
+  border: .5px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); color: var(--text);
+}
+.corner-thanks { color: var(--text2); }
+@media (max-width: 759px) {
+  .corner-stack { left: 16px; right: 16px; width: auto; max-width: none; }
+}
+@media print { .corner-stack { display: none !important; } }
+</style>
+<div class="corner-stack" id="corner-stack" aria-live="polite"></div>
+<script>
+(function () {
+  window.weco = window.weco || {};
+  if (weco.corner) return;                    // включён дважды
+  var stack = document.getElementById('corner-stack');
+
+  /** Поставить карточку в угол. Угол занят — false, карточка не встаёт. */
+  function show(card) {
+    if (!stack || stack.firstElementChild) return false;
+    stack.appendChild(card);
+    return true;
+  }
+  function hide(card) { if (card && card.parentNode === stack) stack.removeChild(card); }
+  function busy() { return !!(stack && stack.firstElementChild); }
+
+  /* Токен — как у окна обратной связи: кука, а без неё поле скрытой
+     формы `_feedback.html` (Django ставит куку, только если токен просили). */
+  function csrf() {
+    var m = document.cookie.match(/(^|;\s*)csrftoken=([^;]*)/);
+    if (m) return decodeURIComponent(m[2]);
+    var f = document.querySelector('input[name=csrfmiddlewaretoken]');
+    return f ? f.value : '';
+  }
+
+  /** POST формы; ответ плашкам не важен — оценка ушла или нет, человек
+      видит «Спасибо» (ждать сеть ради вежливости незачем). */
+  function post(url, fields) {
+    var data = new FormData();
+    Object.keys(fields).forEach(function (k) {
+      [].concat(fields[k]).forEach(function (v) { data.append(k, v); });
+    });
+    return fetch(url, { method: 'POST', body: data, credentials: 'same-origin',
+                        headers: { 'X-CSRFToken': csrf() } }).catch(function () {});
+  }
+
+  /* localStorage может не быть (приватное окно) — тогда плашки молчат. */
+  function load(key) {
+    try { return JSON.parse(localStorage.getItem(key) || 'null'); } catch (e) { return null; }
+  }
+  function save(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); return true; } catch (e) { return false; }
+  }
+
+  weco.corner = { show: show, hide: hide, busy: busy, post: post, load: load, save: save };
+})();
+</script>

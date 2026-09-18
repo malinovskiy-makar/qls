@@ -494,6 +494,32 @@ def api_feedback(request):
     return JsonResponse({'ok': True, 'id': entry.pk})
 
 
+@require_POST
+def api_search_rating(request):
+    """Оценка выдачи поиска: «Нашли, что искали?» (18.09.2026, ADR 0117).
+
+    Поля: `log` (номер строки журнала), `rating` (yes | no), `text` (до 300).
+    Своя строка — по куке посетителя или вошедшему; чужая и несуществующая
+    отвечают одинаково 404. CSRF обязателен, как у `api_feedback`.
+    """
+    from catalog import search_log
+    from problems.models_platform import SearchLog
+
+    rating = request.POST.get('rating') or ''
+    text = (request.POST.get('text') or '').strip()
+    if rating not in SearchLog.Rating.values:
+        return JsonResponse({'ok': False, 'error': 'rating'}, status=400)
+    if len(text) > search_log.RATING_TEXT_MAX:
+        return JsonResponse({'ok': False, 'error': 'text'}, status=400)
+    try:
+        log_id = int(request.POST.get('log') or '')
+    except ValueError:
+        return JsonResponse({'ok': False, 'error': 'log'}, status=400)
+    if not search_log.rate(request, log_id, rating, text):
+        return JsonResponse({'ok': False}, status=404)
+    return JsonResponse({'ok': True})
+
+
 PROBLEM_REPORT_SCOPE = 'problem_report'
 PROBLEM_REPORT_TEXT_MAX = 2000
 _INT_MAX = 2_147_483_647                 # потолок PositiveIntegerField в PostgreSQL
