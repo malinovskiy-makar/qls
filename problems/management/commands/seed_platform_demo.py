@@ -119,7 +119,7 @@ class Command(BaseCommand):
             self._user(login, name, surname, 'student', grade=grade)
             for login, name, surname, grade in zip(
                 STUDENTS, ['Пётр', 'Анна', 'Сергей'],
-                ['Иванов', 'Соколова', 'Дмитриев'], [10, 11, 9])
+                ['Иванов', 'Соколова', 'Дмитриев'], ['10', '11', '9'])
         ]
         self._user(PARENT, 'Ольга', 'Иванова', 'parent')
 
@@ -194,9 +194,9 @@ class Command(BaseCommand):
             return []
 
         people = [
-            (SOLO_STUDENTS[0], 'Мария', 'Ким', 11, 'Санкт-Петербург',
+            (SOLO_STUDENTS[0], 'Мария', 'Ким', '11', 'Санкт-Петербург',
              'заключительный этап ВсОШ'),
-            (SOLO_STUDENTS[1], 'Тимур', 'Ахметов', 9, 'Казань',
+            (SOLO_STUDENTS[1], 'Тимур', 'Ахметов', '9', 'Казань',
              'призёр регионального этапа'),
         ]
         lessons = []

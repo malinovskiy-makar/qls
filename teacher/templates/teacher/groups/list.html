@@ -110,7 +110,7 @@
         при любом числе, и на экране было «3 ученик · 11 задани».
         {% endcomment %}
         <div class="gc-meta">
-          {% if card.solo %}{% if card.solo_profile.grade %}{{ card.solo_profile.grade }} класс · {% endif %}{% else %}{{ card.students|count_ru:"ученик,ученика,учеников" }} · {% endif %}{{ card.assignments|count_ru:"задание,задания,заданий" }}
+          {% if card.solo %}{% if card.solo_profile.grade %}{{ card.solo_profile.get_grade_display }} · {% endif %}{% else %}{{ card.students|count_ru:"ученик,ученика,учеников" }} · {% endif %}{{ card.assignments|count_ru:"задание,задания,заданий" }}
         </div>
       </div>
       <span class="k-chip-kind" style="margin-left:auto">{{ card.group.kind_label }}</span>

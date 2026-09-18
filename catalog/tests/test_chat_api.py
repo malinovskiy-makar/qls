@@ -84,6 +84,8 @@ class ChatApiTests(TestCase):
         return self.client.post(self.url, json.dumps(body), content_type='application/json')
 
     def test_reply_comes_back_and_prompt_has_no_profile_fields(self):
+        from problems.tests.profile_markers import FORBIDDEN, fill_profile_with_markers
+        fill_profile_with_markers(self.user)
         self.client.force_login(self.user)
         seen = {}
         with override_settings(AI_FAKE_REPLY=_capture(seen)):
@@ -95,7 +97,7 @@ class ChatApiTests(TestCase):
         for present in ('Две фирмы выбирают выпуск последовательно.', 'Ученик: Привет',
                         'Помощник: Здравствуйте', 'ВОПРОС УЧЕНИКА:', 'С чего начать?'):
             self.assertIn(present, text)
-        for absent in ('Мария', 'masha@example.org', 'маша'):
+        for absent in ('Мария', 'masha@example.org', 'маша') + FORBIDDEN:
             self.assertNotIn(absent, text)
             self.assertNotIn(absent, seen['system'])
         self.assertNotIn(chat.HOMEWORK_MODE, text)
@@ -152,7 +154,8 @@ class ChatApiTests(TestCase):
         for needle in ('id="ai-text"', 'id="ai-send"',
                        'data-mode="theory">Объясни теорию<', 'data-mode="method">Как решать<',
                        'data-mode="check">Проверь моё решение<', 'id="ai-clip"',
-                       '<input type="file" id="ai-file" hidden accept=".jpg,.jpeg,.png,.webp,.pdf,'
+                       # `multiple` — до трёх файлов к реплике (18.09.2026).
+                       '<input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,'
                        'image/jpeg,image/png,image/webp,application/pdf">',
                        '"chatUrl": "/catalog/api/chat/"',
                        '"chatUploadUrl": "/catalog/api/chat/upload/"'):
@@ -173,7 +176,8 @@ class ChatApiTests(TestCase):
         self.assertEqual([h['text'] for h in chat.clean_history(history)],
                          ['реплика %d' % i for i in range(4, 10)])
         self.client.force_login(self.user)
-        with override_settings(AI_FAKE_REPLY=_capture({}, reply='x' * 2000)):
+        # Потолки — предохранитель (18.09.2026: 8 000 и 10 000): длиннее — режется.
+        with override_settings(AI_FAKE_REPLY=_capture({}, reply='x' * 12000)):
             self.assertEqual(len(json.loads(self._post().content)['reply']), chat.REPLY_MAX)
             data = json.loads(self._post('Вот решение: q1 = 30', mode='check').content)
         self.assertEqual(len(data['reply']), chat.CHECK_REPLY_MAX)

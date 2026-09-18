@@ -81,6 +81,19 @@ class RegisterForm(UserCreationForm):
         return username
 
 
+class KnownCodesField(forms.MultipleChoiceField):
+    """Галочки списком кодов; неизвестный код молча отбрасывается.
+
+    Штатное поле на чужой код валит ВСЮ форму — человек теряет имя и класс
+    из-за устаревшей галочки в кэше страницы. Необязательный самоотчёт
+    того не стоит.
+    """
+
+    def clean(self, value):
+        known = {code for code, _ in self.choices}
+        return [v for v in dict.fromkeys(self.to_python(value)) if v in known]
+
+
 class ProfileForm(forms.ModelForm):
     """Данные профиля. Роль здесь не меняется — она про права."""
 
@@ -91,9 +104,19 @@ class ProfileForm(forms.ModelForm):
         label='Почта', required=False,
         help_text='Необязательно, не подтверждается, нужно только для связи.')
 
+    # Множественный выбор — списком кодов. Варианты живут в модели, форма
+    # их только читает.
+    prep_mode = KnownCodesField(
+        label='Как готовлюсь', choices=UserProfile.PREP_MODES,
+        widget=forms.CheckboxSelectMultiple, required=False)
+    olympiad_history = KnownCodesField(
+        label='Какие олимпиады уже писал', choices=UserProfile.OLYMPIAD_HISTORY,
+        widget=forms.CheckboxSelectMultiple, required=False)
+
     class Meta:
         model = UserProfile
-        fields = ('grade', 'school', 'level', 'phone')
+        fields = ('grade', 'school', 'city', 'level', 'goal', 'prep_mode',
+                  'hours_week', 'source_channel', 'olympiad_history', 'phone')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -104,6 +127,23 @@ class ProfileForm(forms.ModelForm):
         self.fields['email'].initial = user.email
         self.fields['grade'].required = False
         self.fields['school'].required = False
+        # Пустой вариант списка — «не указано», а не прочерк Django.
+        for name in ('grade', 'hours_week', 'source_channel'):
+            self.fields[name].choices = [('', 'Не указано')] + [
+                c for c in self.fields[name].choices if c[0]]
+
+    @staticmethod
+    def _known_codes(values, choices):
+        known = {code for code, _ in choices}
+        return [v for v in values if v in known]
+
+    def clean_prep_mode(self):
+        return self._known_codes(self.cleaned_data.get('prep_mode') or [],
+                                 UserProfile.PREP_MODES)
+
+    def clean_olympiad_history(self):
+        return self._known_codes(self.cleaned_data.get('olympiad_history') or [],
+                                 UserProfile.OLYMPIAD_HISTORY)
 
     def clean_username(self):
         """Логин можно менять, но он остаётся уникальным."""

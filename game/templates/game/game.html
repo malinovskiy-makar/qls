@@ -1,4 +1,4 @@
-{% load static %}
+{% load static %}{% load ru %}
 {% comment %}
   Wecon Rush — публичная игра на скорость. Три экрана (старт / игра / финал)
   в одном шаблоне, переключаются JS-машиной состояний.
@@ -194,12 +194,42 @@ body > .site-version { position: relative; margin-top: calc(-24px - 1.3em); poin
   font-size: 14px; font-weight: 700; margin-bottom: 8px;
   text-transform: uppercase; letter-spacing: .04em; color: var(--text2);
 }
-.fgroup-wide { grid-column: 1 / -1; }
-.topic-cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 16px; }
-@media (max-width: 760px) { .topic-cols { grid-template-columns: 1fr; } }
-.topic-col h4 {
-  font-size: 13px; font-weight: 700; color: var(--text3);
-  margin-bottom: 4px;
+/* Темы разделами — приём окна каталога (_catalog_filters_css.html), копия
+   18.09.2026; свести в общий партиал после «Стола». Раскрытие —
+   grid-template-rows 0fr→1fr, без измерения высоты скриптом. */
+.fcol { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.fl-acc { border-top: 1px solid var(--border-soft); }
+.fl-acc:first-child { border-top: 0; }
+.fl-acc-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 9px 6px 9px 4px;
+               background: none; border: 0; cursor: pointer; text-align: left;
+               font: 600 14.5px/1.3 var(--font-ui); color: var(--text); border-radius: 8px; }
+.fl-acc-head:hover { background: var(--surface-2); }
+.fl-acc-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--gc); flex: none; }
+.fl-acc-name { flex: 1 1 auto; }
+.fl-acc-n { font-weight: 400; font-size: 13px; color: var(--text3);
+            font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fl-acc-sel { font-size: 12px; font-weight: 600; background: var(--rush-accent); color: var(--act-ink-solid);
+              border-radius: var(--r-pill); padding: 1px 7px; }
+.fl-acc-sel:empty { display: none; }
+.fl-acc-head .qi { width: 16px; height: 16px; transition: transform var(--t-slow); color: var(--text3); flex: none; }
+.fl-acc.is-open .fl-acc-head .qi { transform: rotate(180deg); }
+.fl-acc-body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s ease; }
+.fl-acc.is-open .fl-acc-body { grid-template-rows: 1fr; }
+.fl-acc-inner { overflow: hidden; }
+.fl-tiles { display: flex; flex-direction: column; gap: 1px; padding: 2px 0 10px 22px; }
+.fl-tile { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 8px;
+           cursor: pointer; font: 400 14px/1.35 var(--font-ui); color: var(--text); }
+.fl-tile:hover { background: var(--surface-2); }
+.fl-tile:has(input:checked) { background: var(--accent-tint); }
+.fl-tile input { margin: 0; accent-color: var(--rush-accent); cursor: pointer; flex: none; }
+.fl-tile-l { flex: 1 1 auto; }
+.fl-tile-n { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+.tag-scope { font-size: 13px; color: var(--text3); margin: -2px 0 6px; }
+/* Кружок Telegram (z-index 150) стоит выше окна и на телефоне ложился на
+   «Показать N вопросов» (снимки 18.09): пока окно открыто, его нет. */
+body:has(#fmodal:not([hidden])) .tg-fab { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .fl-acc-body, .fl-acc-head .qi { transition: none; }
 }
 .check {
   display: flex; align-items: flex-start; gap: 7px;
@@ -2154,8 +2184,16 @@ body.on-final .rush-wrap { max-width: 1160px; }
               aria-label="Закрыть">{% include "_icon.html" with name="close" %}</button>
     </div>
 
+    {% comment %}
+    Приём скопирован из окна каталога 18.09.2026 (`catalog/_catalog_modal_block.html`,
+    классы `fl-acc`/`fl-tile`); свести в общий партиал после того, как «Стол»
+    устаканится (карточка в Notion). Две колонки: слева темы разделами, справа
+    теги выбранных тем и прочие фильтры. Галочки — настоящие `.f-topic`: логика
+    окна и счётчики (`api_pool_counts`, та же функция, что выбирает вопросы)
+    не менялись.
+    {% endcomment %}
     <div class="fmodal-body">
-      <section class="fgroup fgroup-wide">
+      <section class="fgroup fcol">
         <h3>Тема</h3>
         <div class="preset-row">
           <button type="button" class="preset" data-preset="all">все</button>
@@ -2163,27 +2201,40 @@ body.on-final .rush-wrap { max-width: 1160px; }
           <button type="button" class="preset" data-preset="macro">макро</button>
           <button type="button" class="preset" data-preset="none">снять всё</button>
         </div>
-        <div class="topic-cols">
+        <div class="fl-accs" id="topic-accs">
           {% for g in topic_groups %}
-          <div class="topic-col" data-group="{{ g.key }}">
-            <h4>{{ g.title }}</h4>
-            {% for t in g.topics %}
-            <label class="check">
-              <input type="checkbox" class="f-topic" value="{{ t.name }}">
-              <span>{{ t.name }} <span class="cnt">{{ t.count }}</span></span>
-            </label>
-            {% endfor %}
+          <div class="fl-acc" data-group="{{ g.key }}" style="--gc: var(--map-g-{{ g.key }}, var(--map-g-other))">
+            <button class="fl-acc-head" type="button" aria-expanded="false" data-acc-toggle>
+              <span class="fl-acc-dot"></span>
+              <span class="fl-acc-name">{{ g.title }}</span>
+              <span class="fl-acc-sel" data-acc-sel></span>
+              <span class="fl-acc-n">{{ g.topics|length }}&nbsp;{{ g.topics|length|plural_ru:"тема,темы,тем" }} · <span data-acc-sum></span></span>
+              {% include "_icon.html" with name="chevron_down" %}
+            </button>
+            <div class="fl-acc-body"><div class="fl-acc-inner">
+              <div class="fl-tiles">
+                {% for t in g.topics %}
+                <label class="fl-tile">
+                  <input type="checkbox" class="f-topic" value="{{ t.name }}" data-count="{{ t.count }}">
+                  <span class="fl-tile-l">{{ t.name }}</span>
+                  <span class="fl-tile-n">{{ t.count }}</span>
+                </label>
+                {% endfor %}
+              </div>
+            </div></div>
           </div>
           {% endfor %}
         </div>
       </section>
 
+      <div class="fcol">
       {% if pool_tags %}
       <section class="fgroup">
         <h3>Тег</h3>
         <input type="search" class="tag-search" id="tag-search"
                placeholder="Поиск по названию" autocomplete="off"
                aria-label="Поиск тега">
+        <p class="tag-scope" id="tag-scope" hidden>Теги выбранных тем</p>
         <div class="tag-list" id="tag-list"></div>
       </section>
       {% endif %}
@@ -2244,6 +2295,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
         </div>
       </section>
       {% endif %}
+      </div>
     </div>
 
     <div class="fmodal-foot">
@@ -2967,6 +3019,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
             }).join(' · ');
         }
         renderModeTabs();
+        paintShowButton();
         // Счётчики обновились: окно «Создать дуэль» рисует по ним свои
         // карточки. Событием, а не прямым вызовом, — оно объявлено ниже
         // по файлу и своего запроса к серверу не делает.
@@ -2995,10 +3048,16 @@ body.on-final .rush-wrap { max-width: 1160px; }
     if (!box) return;
     var needle = ($('tag-search').value || '').trim().toLowerCase();
     var all = CFG.pool_tags || [];
+    // Как в каталоге: без поиска при выбранных темах — теги этих тем.
+    var byTopic = !needle && filter.topics.length > 0;
+    $('tag-scope').hidden = !byTopic;
     var chosen = all.filter(function (t) { return filter.tags.indexOf(t.id) >= 0; });
     var rest = all.filter(function (t) {
       return filter.tags.indexOf(t.id) < 0
-          && (!needle || t.name.toLowerCase().indexOf(needle) >= 0);
+          && (!needle || t.name.toLowerCase().indexOf(needle) >= 0)
+          && (!byTopic || (t.topics || []).some(function (name) {
+            return filter.topics.indexOf(name) >= 0;
+          }));
     });
     box.innerHTML = '';
     // Выбранные — всегда сверху и всегда видны, даже мимо поиска: иначе
@@ -3041,7 +3100,28 @@ body.on-final .rush-wrap { max-width: 1160px; }
       b.setAttribute('aria-pressed',
         filter.stars.indexOf(Number(b.dataset.star)) >= 0 ? 'true' : 'false');
     });
+    paintTopicBlocks();
+    paintShowButton();
     if (!$('fmodal').hidden) renderTagList();
+  }
+
+  /* Разделы тем: сколько вопросов в разделе и сколько тем в нём выбрано. */
+  function paintTopicBlocks() {
+    document.querySelectorAll('#topic-accs .fl-acc').forEach(function (acc) {
+      var boxes = [].slice.call(acc.querySelectorAll('.f-topic'));
+      var sum = boxes.reduce(function (n, cb) { return n + Number(cb.dataset.count || 0); }, 0);
+      var picked = boxes.filter(function (cb) { return cb.checked; }).length;
+      acc.querySelector('[data-acc-sum]').textContent = sum.toLocaleString('ru-RU');
+      acc.querySelector('[data-acc-sel]').textContent = picked ? String(picked) : '';
+    });
+  }
+
+  /* «Показать N вопросов» — число режима, выбранного на старте: то же,
+     что покажет вкладка (`availFor` читает ответ api_pool_counts). */
+  function paintShowButton() {
+    var n = availFor(mode);
+    $('fmodal-apply').textContent = 'Показать ' + n.toLocaleString('ru-RU') + ' '
+      + plural(n, ['вопрос', 'вопроса', 'вопросов']);
   }
 
   function readFilterControls() {
@@ -3121,6 +3201,14 @@ body.on-final .rush-wrap { max-width: 1160px; }
     if (e.key === 'Escape') { e.preventDefault(); openFilters(false); }
   });
   $('fmodal').addEventListener('click', function (e) {
+    var head = e.target.closest('[data-acc-toggle]');
+    if (head) {
+      var acc = head.closest('.fl-acc');
+      var open = !acc.classList.contains('is-open');
+      acc.classList.toggle('is-open', open);
+      head.setAttribute('aria-expanded', open ? 'true' : 'false');
+      return;
+    }
     var star = e.target.closest('.f-star');
     if (star) {
       var d = Number(star.dataset.star);

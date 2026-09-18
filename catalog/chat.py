@@ -39,8 +39,17 @@ logger = logging.getLogger(__name__)
 PROFILE = 'catalog_chat'
 HISTORY_LIMIT = 6
 MESSAGE_MAX = 2000
-REPLY_MAX = 900
-CHECK_REPLY_MAX = 1200
+# Потолки ответа — предохранитель от «модель поехала», а не формат: длину
+# ответа больше не задаёт промпт (18.09.2026). Раньше 900/1 200 знаков резали
+# ответ посреди слова.
+REPLY_MAX = 8000
+CHECK_REPLY_MAX = 10000
+#: Токены ответа реплики — явно: без них длинный ответ обрезал бы уже поставщик.
+CHAT_MAX_TOKENS = 3000
+#: Не больше трёх файлов к одной реплике; страниц в модель зрения — всего пять.
+FILES_PER_TURN = 3
+QUOTE_MAX = 300
+CUT_MARK = ' …'
 #: Эталонное решение режима проверки — не больше, чтобы одна реплика не стоила как десять.
 REFERENCE_MAX = 8000
 MODES = ('free', 'theory', 'method', 'check')
@@ -56,6 +65,8 @@ BUDGET_TEXT = 'Помощник на сегодня выбрал дневной 
 CHECK_EMPTY_TEXT = 'Прикрепите фото или PDF решения или опишите решение текстом.'
 TOO_MANY_UPLOADS = 'На сегодня файлов достаточно: не больше 10 в день.'
 BAD_PDF = 'PDF не открылся: пришлите фото страниц.'
+TOO_MANY_FILES = 'Не больше трёх файлов к одной реплике.'
+PAGES_NOTE = 'Смотрю первые пять страниц.'
 
 CHAT_SCHEMA = {
     'type': 'object',
@@ -120,7 +131,31 @@ def clean_history(history):
     return out[-HISTORY_LIMIT:]
 
 
-def build_prompt(problem, parts, message, history, last_attempt=None, homework=False):
+def cut_reply(text, limit):
+    """Ответ не длиннее `limit` — по границе предложения, а не посреди слова.
+
+    Граница — последняя `. ! ? \\n` до лимита; нет её — последний пробел.
+    Обрезанное помечается « …», чтобы было видно, что ответ не весь.
+    """
+    if len(text) <= limit:
+        return text
+    head = text[:limit - len(CUT_MARK)]
+    cut = max(head.rfind(mark) for mark in ('. ', '! ', '? ', '\n'))
+    if cut > 0:
+        head = head[:cut + 1]
+    elif head.rfind(' ') > 0:
+        head = head[:head.rfind(' ')]
+    return head.rstrip() + CUT_MARK
+
+
+def pages_note(attachments):
+    """Честная приписка, если страниц больше, чем смотрит модель зрения."""
+    total = sum(a.pages for a in attachments)
+    return PAGES_NOTE if total > VISION_PAGES_MAX else ''
+
+
+def build_prompt(problem, parts, message, history, last_attempt=None, homework=False,
+                 quote=''):
     lines = ['УСЛОВИЕ:', (problem.statement or '').strip()]
     for part in parts:
         if (part.statement or '').strip():
@@ -147,6 +182,10 @@ def build_prompt(problem, parts, message, history, last_attempt=None, homework=F
         lines.append('РАЗГОВОР (последние реплики):')
         for item in history:
             lines.append(('Ученик: ' if item['role'] == 'me' else 'Помощник: ') + item['text'])
+    if quote:
+        # Выделенный учеником кусок условия — текстом реплики, не системным
+        # блоком: это его вопрос, а не наше правило.
+        lines.append('Фрагмент условия: «%s»' % quote)
     lines += ['ВОПРОС УЧЕНИКА:', message.strip()]
     return '\n'.join(lines)
 
@@ -217,7 +256,7 @@ def derived_images(raw, media_type):
     return [('jpg', out.getvalue())]
 
 
-def save_attachment(uploaded, media_type, user, problem):
+def save_attachment(uploaded, media_type, user, problem, name=''):
     """Файл и картинки для модели → `ChatAttachment`. ValueError — текст для ученика.
 
     Имя файла даём сами: имя с телефона ученика в хранилище не нужно.
@@ -229,7 +268,8 @@ def save_attachment(uploaded, media_type, user, problem):
     pages = derived_images(raw, media_type)
     uploaded.name = '%s.%s' % (uuid.uuid4().hex, EXTENSIONS[media_type])
     attachment = ChatAttachment.objects.create(user=user, problem=problem, file=uploaded,
-                                               mime=media_type, size=len(raw))
+                                               mime=media_type, size=len(raw),
+                                               name=name[:80])
     if pages:
         stem = attachment.file.name.rsplit('.', 1)[0]
         paths = [default_storage.save('%s_p%d.%s' % (stem, number, ext), ContentFile(data))
@@ -242,14 +282,18 @@ def save_attachment(uploaded, media_type, user, problem):
     return attachment
 
 
-def attachment_images(attachment):
-    """[(MIME, байты)] для модели, не больше пяти — пары, как их ждёт GLMProvider."""
+def attachment_images(*attachments):
+    """[(MIME, байты)] для модели со всех вложений подряд, всего не больше
+    VISION_PAGES_MAX — пары, как их ждёт GLMProvider."""
     images = []
-    for path in (attachment.pages_json or [])[:VISION_PAGES_MAX]:
-        mime = IMAGE_TYPES.get(path.rsplit('.', 1)[-1].lower())
-        if mime:
-            with default_storage.open(path, 'rb') as handle:
-                images.append((mime, handle.read()))
+    for attachment in attachments:
+        for path in attachment.pages_json or []:
+            if len(images) >= VISION_PAGES_MAX:
+                return images
+            mime = IMAGE_TYPES.get(path.rsplit('.', 1)[-1].lower())
+            if mime:
+                with default_storage.open(path, 'rb') as handle:
+                    images.append((mime, handle.read()))
     return images
 
 
@@ -266,8 +310,13 @@ def _spent(result):
 # ─── Реплика ───────────────────────────────────────────────────────────────
 
 def answer(problem, message, history, user, last_attempt=None, mode='free',
-           attachment=None, thread=None):
+           attachments=(), thread=None, quote=''):
     """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
+
+    `attachments` — до FILES_PER_TURN своих вложений; картинки со всех подряд,
+    всего не больше VISION_PAGES_MAX страниц (больше — честная приписка).
+    Старое поле `ChatTurn.attachment` получает первое вложение: журнал беты
+    до 18.09 читается по нему.
 
     ⚠️ `ChatTurn` пишется ВСЕГДА — и с ответом, и с ошибкой: журнал нужен как
     раз для разбора неудач (нечитаемое фото, отказ поставщика, лимит).
@@ -278,14 +327,16 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
     provider = chat_provider()
     model = getattr(settings, 'CATALOG_CHAT_MODEL', '') or None
     vision_model = getattr(settings, 'CATALOG_CHAT_VISION_MODEL', '')
+    attachments = list(attachments)
     turn = ChatTurn(user=user, problem=problem, thread=thread, mode=mode,
-                    user_text=message, attachment=attachment, provider=provider.name,
-                    model=model or '')
+                    user_text=message, attachment=attachments[0] if attachments else None,
+                    provider=provider.name, model=model or '')
     started = time.monotonic()
     try:
-        text, images = message, None
-        if attachment is not None:
-            pictures = attachment_images(attachment)
+        note = pages_note(attachments)
+        text, images = ('%s\n\n%s' % (message, note)) if note else message, None
+        if attachments:
+            pictures = attachment_images(*attachments)
             if pictures and vision_model:
                 seen = core.run(
                     PROFILE, 'Перепиши дословно всё, что на этих фото или страницах. '
@@ -296,28 +347,28 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
                 turn.vision_input_tokens = (seen.usage or {}).get('input_tokens', 0)
                 turn.vision_output_tokens = (seen.usage or {}).get('output_tokens', 0)
                 turn.cost_usd += _spent(seen)
-                text = '%s\n\n%s\n%s' % (message, VISION_MARK,
+                text = '%s\n\n%s\n%s' % (text, VISION_MARK,
                                          turn.vision_text or '(на фото ничего не прочитано)')
             elif pictures:
                 images = pictures
-                text = '%s\n\n[фото: картинок %d, sha256 %s]' % (message, len(pictures),
+                text = '%s\n\n[фото: картинок %d, sha256 %s]' % (text, len(pictures),
                                                                  _digest(pictures))
         prompt = build_prompt(problem, list(problem.parts.all()), text, clean_history(history),
                               last_attempt=last_attempt,
-                              homework=in_active_homework(user, problem))
+                              homework=in_active_homework(user, problem), quote=quote)
         # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
         # кэша считается по тексту запроса — та же реплика в другом режиме
         # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
         result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
                           provider=provider, model=model, system=system_for(problem, mode),
-                          cache_seconds=0)
+                          cache_seconds=0, max_tokens=CHAT_MAX_TOKENS)
         turn.input_tokens = (result.usage or {}).get('input_tokens', 0)
         turn.output_tokens = (result.usage or {}).get('output_tokens', 0)
         turn.cost_usd += _spent(result)
         reply = str((result.data or {}).get('reply') or '').strip()
         if not reply:
             raise core.AiUnavailable('Помощник не ответил. Попробуйте спросить иначе.')
-        turn.reply = reply[:CHECK_REPLY_MAX if mode == 'check' else REPLY_MAX]
+        turn.reply = cut_reply(reply, CHECK_REPLY_MAX if mode == 'check' else REPLY_MAX)
         return turn.reply
     except core.AiUnavailable as exc:
         turn.error = ('%s: %s' % (exc.kind, exc))[:500]
@@ -326,6 +377,8 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
         turn.latency_ms = int((time.monotonic() - started) * 1000)
         try:
             turn.save()
+            if attachments:
+                turn.attachments.set(attachments)
         except Exception:
             # Как учёт расхода в `core._log`: упавший журнал не отнимает ответ.
             logger.exception('Не удалось записать реплику чата — ответ ученику не тронут')

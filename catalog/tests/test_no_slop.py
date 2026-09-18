@@ -246,7 +246,10 @@ class MapCaptionFollowsDataTests(TestCase):
 class NoPromisesInTemplatesTests(SimpleTestCase):
     """В шаблонах каталога нет слов-обещаний и заглушек."""
 
-    TEMPLATES = ('catalog/templates/catalog', 'templates/_typing_placeholder.html')
+    TEMPLATES = ('catalog/templates/catalog', 'templates/_typing_placeholder.html',
+                 # Плашки угла беты (18.09.2026).
+                 'templates/_corner_stack.html', 'templates/_search_rating.html',
+                 'templates/_pulse.html')
 
     # Заглушка раздела и есть обещание раздела: исключение сознательное — решение владельца 04.09 и 06.09.2026 (сторожит `config.tests.test_nav`).
     EXEMPT = ('textbook.html',)

@@ -64,26 +64,66 @@ class UserProfile(models.Model):
         PARENT = 'parent', 'Родитель'
 
     class Level(models.TextChoices):
-        """Уровень подготовки. Спрашиваем у ученика ОДИН раз, в профиле.
+        """Уровень подготовки — одна ось «дальше всего дошёл» (18.09.2026).
 
-        Названия и описания — слова владельца (04.09.2026). Это данные в
-        одном месте: переименовать можно, не трогая ни один экран.
+        Было две оси вперемешку: «сколько знаю» (Новичок, Базовый) и «куда
+        доходил» (Региональный, Всеросник) — ответы несравнимы. Коды в базе
+        прежние, меняются только подписи и описания.
         """
-        NOVICE = 'novice', 'Новичок'
-        BASIC = 'basic', 'Базовый'
-        REGION = 'region', 'Региональный'
-        FINAL = 'final', 'Всеросник'
+        NOVICE = 'novice', 'Ещё не участвовал'
+        BASIC = 'basic', 'Школьный или муниципальный этап'
+        REGION = 'region', 'Региональный этап ВсОШ или отбор перечневой'
+        FINAL = 'final', 'Заключительный этап ВсОШ или призёр перечневой'
 
     # Описание уровня — рядом с самим уровнем, чтобы не разъехалось.
     LEVEL_HINTS = {
-        'novice': 'Только начинаю, экономику почти не изучал',
-        'basic': 'Знаю основные модели, решаю задачи школьного и '
-                 'муниципального этапов',
-        'region': 'Участвовал в региональном этапе ВсОШ или в отборах '
-                  'перечневых олимпиад',
-        'final': 'Выходил на заключительный этап ВсОШ или призёр перечневых '
-                 'олимпиад первого уровня',
+        'novice': 'Олимпиады по экономике пока не писал',
+        'basic': 'Дальше всего дошёл до школьного или муниципального этапа ВсОШ',
+        'region': 'Писал региональный этап ВсОШ или отборочный тур перечневой '
+                  'олимпиады',
+        'final': 'Выходил на заключительный этап ВсОШ или становился призёром '
+                 'перечневой олимпиады',
     }
+
+    class Grade(models.TextChoices):
+        """Класс — списком, а не числом (18.09.2026): нужны «7 и младше» и
+        «уже не школьник», которых в числе 5…11 не было."""
+        LE7 = 'le7', '7 класс и младше'
+        G8 = '8', '8 класс'
+        G9 = '9', '9 класс'
+        G10 = '10', '10 класс'
+        G11 = '11', '11 класс'
+        NONE = 'none', 'Уже не школьник'
+
+    class HoursWeek(models.TextChoices):
+        LT1 = 'lt1', 'Меньше 1'
+        H1_3 = '1_3', '1–3'
+        H3_6 = '3_6', '3–6'
+        GT6 = 'gt6', 'Больше 6'
+
+    class SourceChannel(models.TextChoices):
+        TELEGRAM = 'telegram', 'Telegram-канал'
+        TEACHER = 'teacher', 'Преподаватель'
+        FRIEND = 'friend', 'Друг'
+        SEARCH = 'search', 'Поиск в интернете'
+        OTHER = 'other', 'Другое'
+
+    # Множественный выбор хранится списком кодов (JSONField). Допустимые
+    # коды — здесь, и форма, и выгрузка читают отсюда.
+    PREP_MODES = (
+        ('self', 'Сам'),
+        ('tutor', 'С репетитором'),
+        ('club', 'В кружке или школе'),
+        ('course', 'На курсах'),
+    )
+    OLYMPIAD_HISTORY = (
+        ('vsosh_school', 'ВсОШ, школьный'),
+        ('vsosh_municipal', 'ВсОШ, муниципальный'),
+        ('vsosh_region', 'ВсОШ, региональный'),
+        ('vsosh_final', 'ВсОШ, заключительный'),
+        ('listed', 'Перечневые'),
+        ('none', 'Ни одной'),
+    )
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -94,11 +134,8 @@ class UserProfile(models.Model):
     role = models.CharField('Роль', max_length=16,
                             choices=Role.choices, default=Role.STUDENT)
 
-    grade = models.PositiveSmallIntegerField(
-        'Класс', null=True, blank=True,
-        validators=[MinValueValidator(5), MaxValueValidator(11)],
-        help_text='5–11, необязательно.',
-    )
+    grade = models.CharField('Класс', max_length=8, blank=True, default='',
+                             choices=Grade.choices)
     school = models.CharField('Школа', max_length=200, blank=True)
     # ⚠️ ГОРОД И ЦЕЛЬ — ПЕРСОНАЛЬНЫЕ ДАННЫЕ НЕСОВЕРШЕННОЛЕТНЕГО (сессия 7,
     # фаза 10.2). Оба НЕОБЯЗАТЕЛЬНЫ, наружу не отдаются и в родительский
@@ -118,6 +155,18 @@ class UserProfile(models.Model):
         'Уровень подготовки', max_length=16, blank=True,
         choices=Level.choices,
         help_text='Необязательно. Нужен, чтобы подбирать задачи по силам.')
+
+    # ⚠️ Самоотчёт для аналитики беты (18.09.2026). Всё необязательно, видно
+    # только в своём профиле и в staff-выгрузке `profiles_export`; в модель
+    # ИИ НЕ УХОДИТ НИКОГДА (P0, CLAUDE.md).
+    prep_mode = models.JSONField('Как готовлюсь', default=list, blank=True)
+    hours_week = models.CharField('Часов в неделю', max_length=8, blank=True,
+                                  default='', choices=HoursWeek.choices)
+    source_channel = models.CharField('Откуда узнали', max_length=16,
+                                      blank=True, default='',
+                                      choices=SourceChannel.choices)
+    olympiad_history = models.JSONField('Какие олимпиады писал',
+                                        default=list, blank=True)
 
     # ⚠️ ПЕРВОЕ ПОЛЕ С ФАЙЛОМ В ПРОЕКТЕ. Что кладётся — решает НЕ загрузчик:
     # форма пересжимает картинку Pillow в JPEG 256×256 и сама задаёт имя
@@ -1577,6 +1626,8 @@ class Feedback(models.Model):
     class Kind(models.TextChoices):
         PROBLEM = 'problem', 'Проблема'
         IDEA = 'idea', 'Предложение'
+        # «Всё ли нравится?» для вернувшегося (18.09.2026, problems/pulse.py).
+        PULSE = 'pulse', 'Пульс'
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
@@ -1729,6 +1780,50 @@ class Event(models.Model):
         return '%s · %s' % (self.name, self.path)
 
 
+class SearchLog(models.Model):
+    """Поисковый запрос каталога и оценка выдачи (18.09.2026, ADR 0117).
+
+    ⚠️ ТЕКСТ ЗАПРОСА — ЗДЕСЬ, А НЕ В `Event`: события пишет клиент, и там
+    запрос хранится только длиной. Строку заводит СЕРВЕР при полном рендере
+    каталога (`catalog/search_log.py`), со склейкой повторов за 30 с —
+    иначе каждое нажатие фильтра под тем же запросом давало бы строку.
+
+    Текст запроса в модель ИИ не уходит; выгрузка — staff-командой
+    `search_export`.
+    """
+
+    class Rating(models.TextChoices):
+        YES = 'yes', 'Да'
+        NO = 'no', 'Нет'
+
+    ts = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='search_logs', verbose_name='Кто', help_text='Пусто — гость.')
+    visitor = models.CharField('Посетитель', max_length=64, blank=True, db_index=True,
+                               help_text='Cookie weco_vid: один браузер.')
+    session_key = models.CharField('Сессия', max_length=40, blank=True)
+    query = models.CharField('Запрос', max_length=300)
+    status = models.CharField('Умный поиск', max_length=16, blank=True)
+    ms = models.PositiveIntegerField('Думали, мс', null=True, blank=True)
+    total = models.PositiveIntegerField('Нашли', default=0)
+    degraded = models.BooleanField('Упрощённый режим', default=False)
+    top_ids = models.JSONField('Первые выданные задачи', default=list, blank=True)
+    rating = models.CharField('Оценка', max_length=4, blank=True,
+                              choices=Rating.choices)
+    rated_at = models.DateTimeField('Когда оценил', null=True, blank=True)
+    rating_text = models.CharField('Что не так', max_length=300, blank=True)
+
+    class Meta:
+        verbose_name = 'Поисковый запрос'
+        verbose_name_plural = 'Поисковые запросы'
+        ordering = ['-ts']
+        indexes = [models.Index(fields=['visitor', 'ts'])]
+
+    def __str__(self):
+        return self.query
+
+
 # ===========================================================================
 # Чат на странице задачи: вложения и полный журнал реплик (15.09.2026)
 # ===========================================================================
@@ -1760,6 +1855,9 @@ class ChatAttachment(models.Model):
     size = models.PositiveIntegerField('Размер, байт', default=0)
     pages = models.PositiveSmallIntegerField('Картинок в модель', default=0)
     pages_json = models.JSONField('Картинки для модели', default=list, blank=True)
+    # Имя с устройства ученика — ТОЛЬКО для подписи в пузыре и истории
+    # (18.09.2026). В хранилище файл лежит под нашим uuid-именем.
+    name = models.CharField('Имя файла у ученика', max_length=80, blank=True)
     created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
 
     class Meta:
@@ -1805,6 +1903,11 @@ class ChatTurn(models.Model):
     attachment = models.ForeignKey(
         ChatAttachment, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='turns', verbose_name='Вложение')
+    # До трёх файлов к реплике (18.09.2026). Старое `attachment` оставлено:
+    # журнал беты до этой даты читается по нему; новое — первое вложение.
+    attachments = models.ManyToManyField(
+        ChatAttachment, blank=True, related_name='turns_all',
+        verbose_name='Вложения')
     vision_text = models.TextField('Расшифровка фото', blank=True)
     vision_input_tokens = models.PositiveIntegerField('Зрение: вход', default=0)
     vision_output_tokens = models.PositiveIntegerField('Зрение: выход', default=0)
