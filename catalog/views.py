@@ -21,7 +21,10 @@ from . import attachments, attempts, chat, filters, search_log, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
-from .preview import PREVIEW_CHARS, looks_like_statement_cut, tex_preview
+from .preview import (
+    PREVIEW_CHARS, looks_like_statement_cut, solution_is_statement_copy,
+    strip_statement_retell, tex_preview,
+)
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
 from problems.models import (
@@ -252,7 +255,9 @@ def _card(problem, score=None):
         'difficulty_stars': range(d),
         'difficulty_empty': range(5 - d),
         'has_solution':     bool(problem.solution)
-                            and not problem.solution_needs_review,
+                            and not problem.solution_needs_review
+                            and not solution_is_statement_copy(problem.statement,
+                                                               problem.solution),
         'source':           refs[0].source.name if refs else '',
         'grade':            refs[0].grade if refs else '',
         'is_test':          is_test,
@@ -757,6 +762,11 @@ def _solution_block(problem, parts):
     """
     answer = (problem.answer or '').strip()
     solution = '' if problem.solution_needs_review else (problem.solution or '').strip()
+    # Аудит P0 «Стола»: пересказ условия в начале срезается, копия условия —
+    # это не решение (данные не трогаем, правило действует при показе).
+    solution = strip_statement_retell(problem.statement, solution)
+    if solution_is_statement_copy(problem.statement, solution):
+        solution = ''
     if solution and (len(solution) < 30 or _norm_answer(solution) == _norm_answer(answer)):
         if not answer:
             answer = solution

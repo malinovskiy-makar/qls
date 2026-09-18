@@ -139,3 +139,48 @@ def looks_like_statement_cut(title, statement):
     head = _RX_TRAIL_DOTS.sub('', _norm(raw)).strip()
     body = _norm(statement)
     return bool(head) and bool(body) and body.startswith(head)
+
+
+# ── Решение, повторяющее условие (аудит P0 «Стола», 18.09.2026) ───────────
+# 4 задачи из 7 055 с решением держат в «решении» копию условия, ещё 21 —
+# начинают решение с пересказа всего условия. Данные не трогаем: правило
+# действует при показе.
+
+#: Доля слов решения, встречающихся в условии, при которой это копия.
+COPY_WORD_SHARE = 0.9
+#: Копия — примерно той же длины, что условие. Короткий ответ («Дед прав»)
+#: весь состоит из слов условия, но копией не является.
+COPY_LEN_RANGE = (0.7, 1.3)
+#: Сколько последних знаков условия искать в начале решения.
+RETELL_TAIL = 60
+
+
+def solution_is_statement_copy(statement, solution):
+    """Решение — это условие ещё раз (такая задача показывается без решения)."""
+    st, so = _norm(statement), _norm(solution)
+    if not st or not so:
+        return False
+    low, high = COPY_LEN_RANGE
+    if not low * len(st) <= len(so) <= high * len(st):
+        return False
+    words = set(so.split())
+    return len(words & set(st.split())) / len(words) >= COPY_WORD_SHARE
+
+
+def strip_statement_retell(statement, solution):
+    """Решение без пересказа условия в начале.
+
+    Срез только если решение начинается со ВСЕГО условия: его хвост
+    (последние RETELL_TAIL знаков) стоит в решении не дальше длины условия
+    с запасом. Частичная цитата («На рынке… — отсюда…») не режется: там
+    цитата часть рассуждения.
+    """
+    text = (solution or '').strip()
+    tail = (statement or '').strip()[-RETELL_TAIL:]
+    if len(tail) < RETELL_TAIL or not text:
+        return text
+    end = text.find(tail, 0, int(len(statement.strip()) * 1.2) + RETELL_TAIL)
+    if end < 0:
+        return text
+    rest = text[end + len(tail):].strip()
+    return rest or text
