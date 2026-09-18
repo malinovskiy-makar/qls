@@ -111,6 +111,24 @@
           .then(function () { save.disabled = false; });
       });
     }
+    /* Телефон: меню задачи «≡» (лента, ссылка, «Ошибка в задаче?») зовёт те же кнопки. */
+    var menuBtn = t.$('tb-menu-btn'), menuPop = t.$('tb-menu-pop');
+    if (menuBtn && once(menuBtn)) {
+      menuBtn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = menuPop.hidden;
+        menuPop.hidden = !open;
+        menuBtn.setAttribute('aria-expanded', String(open));
+      });
+      menuPop.addEventListener('click', function (e) {
+        var item = e.target.closest('button');
+        if (!item) return;
+        menuPop.hidden = true;
+        menuBtn.setAttribute('aria-expanded', 'false');
+        var proxy = item.getAttribute('data-proxy');
+        if (proxy) { var target = t.root.querySelector(proxy); if (target) target.click(); }
+      });
+    }
     var copy = t.$('copy-btn');
     if (once(copy)) {
       copy.addEventListener('click', function () {
@@ -197,6 +215,8 @@
           var left = d.total - d.n;
           var badge = document.getElementById('strip-hints');
           if (badge) { badge.textContent = String(left); badge.parentNode.hidden = !left; }
+          var phone = document.getElementById('phone-hints');
+          if (phone) { phone.textContent = String(left); phone.hidden = !left; }
           if (hintBtn) {
             hintBtn.hidden = !left;
             var n = hintBtn.querySelector('.n'); if (n) n.textContent = (d.n + 1) + ' из ' + d.total;
@@ -631,6 +651,11 @@
   }
 
   /* ── Общие для документа слушатели — один раз на страницу ─────────────── */
+  /* Меню задачи на телефоне закрывается тапом мимо. */
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('.tb-menu')) return;
+    Array.prototype.forEach.call(document.querySelectorAll('.tb-menu-pop'), function (p) { p.hidden = true; });
+  });
   document.addEventListener('click', function (e) {
     if (!cur) return;
     var ask = e.target.closest('[data-ask]');

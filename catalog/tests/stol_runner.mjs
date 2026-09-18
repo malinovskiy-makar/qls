@@ -409,6 +409,64 @@ try {
     out['basket'] = { boot, picked, reloaded, added, errors };
     await ctx.close();
   }
+
+  /* ── S6: телефон (README §8) — шторка «Тема» ставит фильтр, задача без
+     перезагрузки со свёрнутыми панелями, подсказка в шторке, ширина ≤ окна ── */
+  if (TOPIC && process.env.STOL_SESSION) {
+    const asStudent = async p => p.context().addCookies([{ name: 'sessionid', value: process.env.STOL_SESSION, url: BASE }]);
+    for (const width of PHONE) {
+      const { ctx, page, errors } = await fresh(width, { route: asStudent, init: NO_TOUR });
+      const wide = () => page.evaluate(() => document.documentElement.scrollWidth - innerWidth);
+      const box = { entryOver: await wide(), errors,
+        entryFab: await page.evaluate(() => [...document.querySelectorAll('.tg-fab')].filter(x => getComputedStyle(x).display !== 'none').length) };
+      const boot = await page.evaluate(() => window.__stolBoot);
+      await page.click('[data-dd="topic"]');
+      box.sheet = await page.evaluate(() => {
+        const r = document.getElementById('se-dd-topic').getBoundingClientRect();
+        return { left: Math.round(r.left), right: Math.round(innerWidth - r.right), bottom: Math.round(innerHeight - r.bottom),
+                 tall: Math.round(r.height / innerHeight * 100), head: (document.querySelector('#se-dd-topic .se-dd-head b') || {}).textContent };
+      });
+      await page.click('#se-dd-topic [data-topic="' + TOPIC + '"]');
+      await page.waitForFunction(t => weco.filters.state.topics.has(t), TOPIC);
+      await page.click('#se-dd-topic [data-dd-close]');
+      await page.waitForFunction(() => !document.getElementById('stol-entry').classList.contains('is-loading'));
+      box.filter = await page.evaluate(() => ({ url: location.search, closed: document.getElementById('se-dd-topic').hidden }));
+      /* Обычная задача (у теста вопрос крупнее): условие 15,5 по README §8. */
+      const pid = process.env.STOL_PROBLEM.match(/\d+/)[0];
+      await page.click('#ct-rows .rail-row[data-id="' + pid + '"]');
+      await page.waitForSelector('#stol-center .stm');
+      box.problem = await page.evaluate(b => ({ same: window.__stolBoot === b, view: document.getElementById('stol-app').dataset.view,
+        help: document.getElementById('stol').dataset.help, rail: document.getElementById('stol').dataset.rail,
+        over: document.documentElement.scrollWidth - innerWidth,
+        statement: parseFloat(getComputedStyle(document.querySelector('#stol-center .stm .math-content')).fontSize),
+        back: !!document.querySelector('.tb-back') && getComputedStyle(document.querySelector('.tb-back')).display !== 'none',
+        fab: [...document.querySelectorAll('.tg-fab')].filter(x => getComputedStyle(x).display !== 'none').length }), boot);
+      if (await page.$('.stol-phonebar [data-phone="hint"]')) {
+        await page.click('.stol-phonebar [data-phone="hint"]');
+        await page.waitForSelector('#help-feed .feed-hint, .help-panel .feed-hint');
+        box.help = await page.evaluate(() => {
+          const r = document.querySelector('.help-panel').getBoundingClientRect();
+          return { top: Math.round(r.top), bottom: Math.round(innerHeight - r.bottom), help: document.getElementById('stol').dataset.help,
+                   hint: document.querySelectorAll('.help-panel .feed-hint').length,
+                   top1: document.elementFromPoint(innerWidth / 2, 400).closest('.help-panel') !== null };
+        });
+      }
+      await ctx.close();
+      const map = await fresh(width, { path: '/catalog/map/?topic=' + TOPIC, init: NO_TOUR });
+      await map.page.waitForFunction(() => window.TMAP && TMAP.isReady(), null, { timeout: 30000 });
+      await map.page.waitForTimeout(500);
+      box.map = await map.page.evaluate(() => ({ over: document.documentElement.scrollWidth - innerWidth,
+        panel: getComputedStyle(document.querySelector('.stol-map .tmap-panel')).display,
+        foot: (r => ({ left: Math.round(r.left), right: Math.round(innerWidth - r.right) }))(document.querySelector('.stol-map .tmap-foot').getBoundingClientRect()),
+        W: TMAP.view().W, H: TMAP.view().H, tall: TMAP.view().tall,
+        /* Форма корпуса на экране: высота разлёта узлов к ширине (README §8 — вертикальный). */
+        shape: (ns => +((Math.max(...ns.map(n => n.py)) - Math.min(...ns.map(n => n.py))) /
+                        (Math.max(...ns.map(n => n.px)) - Math.min(...ns.map(n => n.px)))).toFixed(2))(TMAP.nodes().filter(n => n.pz > 0)) }));
+      box.map.errors = map.errors;
+      await map.ctx.close();
+      out['phone ' + width] = box;
+    }
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }

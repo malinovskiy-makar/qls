@@ -58,6 +58,7 @@
             <span class="se-chip-l" data-chip-label="topic">Тема</span>{% include '_icon.html' with name='chevron_down' %}
           </button>
           <div class="se-dd se-dd--topic" id="se-dd-topic" role="group" aria-label="Тема" hidden>
+            <div class="se-dd-head"><b>Тема</b><span>несколько тем складываются: «или»</span></div>
             <div class="se-dd-body">
               {% for grp in g.groups %}
               <div class="se-dd-group" style="--gc: var(--map-g-{{ grp.section }})"><span class="se-dot"></span>{{ grp.label }}</div>
@@ -81,6 +82,7 @@
             <span class="se-chip-l" data-chip-label="difficulty">Сложность</span>{% include '_icon.html' with name='chevron_down' %}
           </button>
           <div class="se-dd se-dd--diff" id="se-dd-difficulty" role="group" aria-label="Сложность" hidden>
+            <div class="se-dd-head"><b>Сложность</b><span>можно несколько</span></div>
             <div class="se-dd-body">
               {% for o in g.options %}
               <button class="se-opt{% if o.zero %} is-zero{% endif %}" type="button" data-diff="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
@@ -101,6 +103,7 @@
             <span class="se-chip-l" data-chip-label="kind">Задачи и тесты</span>{% include '_icon.html' with name='chevron_down' %}
           </button>
           <div class="se-dd se-dd--kind" id="se-dd-kind" role="group" aria-label="Задачи и тесты" hidden>
+            <div class="se-dd-head"><b>Задачи и тесты</b><span>одно из трёх</span></div>
             <div class="se-dd-body">
               <button class="se-opt se-opt--radio" type="button" data-clear="kind" data-kind-all aria-pressed="{% if g.value %}false{% else %}true{% endif %}">
                 <span class="se-box se-box--radio"></span><span class="se-opt-l">Все</span>
@@ -152,7 +155,7 @@
       {% if continue_rows %}
       <nav class="se-continue" aria-label="Продолжить">
         <span class="se-continue-l">Продолжить</span>
-        {% for row in continue_rows %}<a class="se-pill" href="{% url 'catalog:problem_detail' row.problem.pk %}" data-id="{{ row.problem.pk }}"><span class="rail-status rail-status--{{ row.status|default:'none' }}" aria-hidden="true">{% if row.status == 'failed' %}{% include '_icon.html' with name='arrow_left' %}{% endif %}</span><span class="se-pill-l">{{ row.title }}</span></a>{% endfor %}
+        <span class="se-pills">{% for row in continue_rows %}<a class="se-pill" href="{% url 'catalog:problem_detail' row.problem.pk %}" data-id="{{ row.problem.pk }}"><span class="rail-status rail-status--{{ row.status|default:'none' }}" aria-hidden="true">{% if row.status == 'failed' %}{% include '_icon.html' with name='arrow_left' %}{% endif %}</span><span class="se-pill-l">{{ row.title }}</span></a>{% endfor %}</span>
       </nav>
       {% endif %}
       <a class="se-random" id="se-random" href="{% url 'catalog:random_problem' %}{% if filters.total_url != '?' %}{{ filters.total_url }}{% endif %}">Случайная задача</a>

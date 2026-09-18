@@ -243,6 +243,14 @@
     var root = $('stol-map');
     if (!root || root.hasAttribute('data-bound')) return;
     root.setAttribute('data-bound', '');
+    var searchBtn = $('tmap-search-btn');
+    if (searchBtn) searchBtn.addEventListener('click', function () {
+      var head = root.querySelector('.tmap-head');
+      var open = !head.classList.contains('is-search');
+      head.classList.toggle('is-search', open);
+      searchBtn.setAttribute('aria-expanded', String(open));
+      if (open) $('tmap-q').focus();
+    });
     root.addEventListener('click', function (e) {
       var a = e.target.closest('[data-map-exit]');
       if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;

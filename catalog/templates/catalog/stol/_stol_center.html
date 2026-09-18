@@ -20,6 +20,8 @@
 <script type="application/json" class="stol-cfg">{{ task_cfg|script_json|safe }}</script>
 
 <div class="task-bar">
+  {% comment %}Телефон (README §8, снимок 34): «‹ Каталог · 2 из 872 · звезда · меню»; стрелки, «Фокус», ссылка и флаг — в меню и нижней панели.{% endcomment %}
+  <a class="tb-btn tb-btn--pill tb-back tb-phone-only" data-stol-home href="{% url 'catalog:problem_list' %}">{% include '_icon.html' with name='chevron_left' %}Каталог</a>
   <button class="tb-btn tb-btn--pill tb-focus-only" type="button" data-stol="rail" title="Лента ([)">{% include '_icon.html' with name='sliders' %}Лента</button>
   <a class="tb-btn" id="tb-prev" data-stol-step="-1"{% if meta.prev %} href="{% url 'catalog:problem_detail' meta.prev %}"{% else %} aria-disabled="true"{% endif %} aria-label="Предыдущая задача">{% include '_icon.html' with name='chevron_left' %}</a>
   <a class="tb-btn" id="tb-next" data-stol-step="1"{% if meta.next %} href="{% url 'catalog:problem_detail' meta.next %}"{% else %} aria-disabled="true"{% endif %} aria-label="Следующая задача">{% include '_icon.html' with name='chevron_right' %}</a>
@@ -39,6 +41,14 @@
   {% comment %}«Ошибка в задаче?» — окно и отправка в общем партиале `_problem_report.html` (слушает клики по `.btn-report`).{% endcomment %}
   <button class="tb-btn btn-report" type="button" data-source="catalog" data-problem-id="{{ problem.pk }}"
           aria-label="Ошибка в задаче?" title="Ошибка в задаче?">{% include '_icon.html' with name='flag' %}</button>
+  <div class="tb-menu tb-phone-only">
+    <button class="tb-btn" type="button" id="tb-menu-btn" aria-expanded="false" aria-controls="tb-menu-pop" aria-label="Меню задачи">{% include '_icon.html' with name='menu' %}</button>
+    <div class="tb-menu-pop" id="tb-menu-pop" hidden>
+      <button type="button" data-stol="rail">{% include '_icon.html' with name='sliders' %}Лента задач</button>
+      <button type="button" data-proxy="#copy-btn">{% include '_icon.html' with name='share' %}Скопировать ссылку</button>
+      <button type="button" data-proxy=".task-bar .btn-report">{% include '_icon.html' with name='flag' %}Ошибка в задаче?</button>
+    </div>
+  </div>
   <button class="tb-btn tb-btn--pill tb-focus-only" type="button" data-stol="help" title="Помощь (])">{% include '_icon.html' with name='sparkle' %}Помощь</button>
 </div>
 
@@ -102,7 +112,7 @@
 
 {% comment %}Телефон: нижняя панель зовёт кнопки задачи, каждая — только при данных; «Дальше» — следующая по текущей вкладке ленты.{% endcomment %}
 <nav class="stol-phonebar" aria-label="Помощь по задаче">
-  {% if hint_total %}<button type="button" data-phone="hint">{% include '_icon.html' with name='bulb' %}<span>Подсказка</span></button>{% endif %}
+  {% if hint_total %}<button type="button" data-phone="hint">{% include '_icon.html' with name='bulb' %}<span>Подсказка</span>{% if hints_left %}<i class="phone-badge" id="phone-hints">{{ hints_left }}</i>{% endif %}</button>{% endif %}
   {% if chat_available %}<button type="button" data-phone="ai">{% include '_icon.html' with name='sparkle' %}<span>Спросить ИИ</span></button>{% endif %}
   {% if test %}<button type="button" data-phone="reveal">{% include '_icon.html' with name='check' %}<span>Ответ</span></button>{% elif sol.has_any %}<button type="button" data-phone="sol">{% include '_icon.html' with name='book' %}<span>Решение</span></button>{% endif %}
   <a class="is-main" data-stol-step="1"{% if meta.next %} href="{% url 'catalog:problem_detail' meta.next %}"{% else %} hidden{% endif %}>{% include '_icon.html' with name='arrow_right' %}<span>Дальше</span></a>

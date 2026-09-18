@@ -529,9 +529,17 @@ function viewSpread() {
    коэффициент уточняется, пока не сойдётся (обычно за два прохода). */
 function spreadCloud() {
   var i, n0;
+  /* «Стол» на телефоне (README §8, снимок 33): холст узкий (ширина/высота
+     < 0,8) — оси раскладки меняются местами, корпус встаёт вертикально и
+     тянется по вертикали, вписываясь в ширину. README называет растяжение
+     ~1,3 для облака макета; наш корпус круглее, и форму снимка 33 (высота
+     к ширине ≈ 1,5) даёт предел 1,6. */
+  var tall = !!EMBED && W / H < 0.8;
+  layoutTall = tall;
   for (i = 0; i < nodes.length; i++) {
     n0 = nodes[i];
-    n0.x = n0.bx; n0.y = n0.by; n0.z = n0.bz;
+    if (tall) { n0.x = n0.by; n0.y = n0.bx; } else { n0.x = n0.bx; n0.y = n0.by; }
+    n0.z = n0.bz;
   }
 
   /* Оси камеры в мировых координатах при стартовом ракурсе.
@@ -546,6 +554,7 @@ function spreadCloud() {
   var ux = sy * sp, uy = cp, uz = -cy * sp;   /* ось «вверх»  */
 
   var want = W / H;                           /* форма холста */
+  var stretch = 1;                            /* телефон: итог растяжения ≤ TALL_STRETCH */
   for (var pass = 0; pass < 8; pass++) {
     /* Собственно облако на экране: и края, и середина. */
     var x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, sSum = 0, cnt = 0;
@@ -578,6 +587,7 @@ function spreadCloud() {
     var m = (x1 - x0) / (want * (y1 - y0));   /* во сколько раз сжать вертикаль */
     if (m > 2.5) m = 2.5;
     if (m < 0.4) m = 0.4;
+    if (tall) { m = Math.min(TALL_STRETCH / stretch, Math.max(1, m)); stretch *= m; }
     for (i = 0; i < nodes.length; i++) { nodes[i].y *= m; }
 
     if (Math.abs(m - 1) < 0.004 && Math.abs(dax) < 1 && Math.abs(day) < 1) break;
@@ -1691,7 +1701,7 @@ function drawLabels(dim) {
     var isTheme = n.k === 'theme';
     var item = {
       key: n.id, kind: n.k,
-      text: isTheme ? cutLabel(n.l, THEME_MAX_CHARS) : n.l,
+      text: isTheme ? cutLabel(n.l, W < 560 ? 28 : THEME_MAX_CHARS) : n.l,
       lines: isTheme ? null : wrapLabel(n.l, TAG_WRAP_CHARS, 2),
       node: n, ax: n.px, ay: n.py,
       talpha: 1, prio: prio, stick: !!stick,
@@ -2110,6 +2120,8 @@ function frame(now) {
    фонового облака (`from`: его угол, масштаб, центр в окне и координаты узлов)
    к карте в покое; корпус доворачивается на ~70° (0,034·sin²(πt) рад/кадр),
    узлы вспухают волной от центра. Обратно — то же, t от 1 к 0. */
+var layoutTall = false;      /* корпус раскладки сейчас вертикальный (телефон) */
+var TALL_STRETCH = 1.6;      /* «Стол», телефон: предел вертикального растяжения */
 var TR_MS = 1250;
 /* В «Столе» движок стоит, пока карта не открыта (`TMAP.pause(false)`). */
 var tr = null, paused = !!EMBED;
@@ -2123,12 +2135,15 @@ function smooth(a, b, x) {
    сбоку панель (340 px с полями), сверху шапка и снизу полоса (190 px). */
 function restZoom() {
   if (!EMBED) return 1;
+  /* Телефон: панели справа нет, снизу — карточка выбора выше (≈ 170 px). */
+  if (W < 760) return 1.1 * Math.min(1, (H - 250) / H * 1.4);
   var side = W >= 1100 ? 340 : 48;
   return 0.95 * Math.min((W - side) / W, (H - 190) / H);
 }
 
 function restView() {
-  return { zoom: restZoom(), ox: EMBED ? EMBED.offsetX() : 0, oy: EMBED ? -7 : 0,
+  /* Центр по вертикали — середина свободного места: на телефоне снизу карточка выбора выше. */
+  return { zoom: restZoom(), ox: EMBED ? EMBED.offsetX() : 0, oy: EMBED ? (W < 760 ? -50 : -7) : 0,
            pitch: EMBED ? EMBED.pitch : START_PITCH, tx: 0, ty: 0, tz: 0 };
 }
 
@@ -3196,7 +3211,7 @@ window.TMAP = {
   },
   view: function () {
     return { yaw: cam.yaw, pitch: cam.pitch, zoom: cam.zoom, fit: fitScale, ox: cam.ox, oy: cam.oy,
-             W: W, H: H, transit: tr ? { t: +tr.t.toFixed(3), dir: tr.dir } : null };
+             W: W, H: H, tall: layoutTall, transit: tr ? { t: +tr.t.toFixed(3), dir: tr.dir } : null };
   },
   fps: function () { return fpsValue; },
   stats: layoutStats,

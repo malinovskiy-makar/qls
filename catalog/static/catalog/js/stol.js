@@ -283,6 +283,11 @@
   var paneBase = app.getAttribute('data-pane-base');
   var F = weco.filters;
   var OVERLAY = window.matchMedia('(max-width: 1399px)');
+  /* Телефон (README §8): лента и помощь — шторки снизу, обе закрыты при каждом
+     открытии задачи и в память десктопа не пишутся. */
+  var PHONE = window.matchMedia('(max-width: 759px)');
+  var phonePanels = { rail: false, help: false };
+  function panels() { return PHONE.matches ? phonePanels : state.panels; }
 
   function load() { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) { return null; } }
   function save() { try { localStorage.setItem(KEY, JSON.stringify(state.panels)); } catch (e) { /* приватное окно */ } }
@@ -302,9 +307,12 @@
 
   /* ── Панели и «Фокус» ──────────────────────────────────────────────── */
   function paint() {
-    desk.setAttribute('data-rail', state.panels.rail ? 'open' : 'closed');
-    desk.setAttribute('data-help', state.panels.help ? 'open' : 'closed');
+    var p = panels();
+    desk.setAttribute('data-rail', p.rail ? 'open' : 'closed');
+    desk.setAttribute('data-help', p.help ? 'open' : 'closed');
+    document.body.classList.toggle('stol-sheet-open', PHONE.matches && (p.rail || p.help));
   }
+  if (PHONE.addEventListener) PHONE.addEventListener('change', paint);
   function focusMode(on) {
     state.focus = on;
     document.body.classList.toggle('stol-is-focus', on);
@@ -315,22 +323,29 @@
   }
   function toggle(panel) {
     /* Из «Фокуса» кнопка панели её открывает, а не переключает вслепую. */
-    if (state.focus) { focusMode(false); state.panels[panel] = true; }
-    else { state.panels[panel] = !state.panels[panel]; }
-    save();
+    var p = panels();
+    if (state.focus) { focusMode(false); p[panel] = true; }
+    else { p[panel] = !p[panel]; }
+    if (PHONE.matches && p[panel]) p[panel === 'rail' ? 'help' : 'rail'] = false;
+    if (!PHONE.matches) save();
     paint();
   }
   function openPanel(panel) {
     if (state.focus) focusMode(false);
-    if (!state.panels[panel]) { state.panels[panel] = true; save(); paint(); }
+    var p = panels();
+    if (!p[panel]) {
+      p[panel] = true;
+      if (PHONE.matches) p[panel === 'rail' ? 'help' : 'rail'] = false; else save();
+      paint();
+    }
   }
   /* Лента поверх задачи (1100–1399) и шторки (< 1100) закрываются кликом мимо. */
   document.addEventListener('click', function (e) {
     if (state.view !== 'stol' || !OVERLAY.matches) return;
-    if (e.target.closest('.stol-rail, .help-panel, .stol-strip, [data-stol], .ct-all, .rp-back')) return;
-    var changed = false;
-    if (state.panels.rail) { state.panels.rail = false; changed = true; }
-    if (window.innerWidth < 1100 && state.panels.help) { state.panels.help = false; changed = true; }
+    if (e.target.closest('.stol-rail, .help-panel, .stol-strip, .stol-phonebar, [data-stol], [data-help-open], .ct-all, .rp-back')) return;
+    var changed = false, p = panels();
+    if (p.rail) { p.rail = false; changed = true; }
+    if (window.innerWidth < 1100 && p.help) { p.help = false; changed = true; }
     if (changed) paint();
   });
   document.addEventListener('click', function (e) {
@@ -488,7 +503,8 @@
         if (weco.stolTask) weco.stolTask.init(desk);
         setTab(state.tab);
         if (weco.trackPage) weco.trackPage();
-        if (OVERLAY.matches && state.panels.rail) { state.panels.rail = false; paint(); }
+        if (PHONE.matches) { phonePanels.rail = false; phonePanels.help = false; paint(); }
+        else if (OVERLAY.matches && state.panels.rail) { state.panels.rail = false; paint(); }
       })
       .catch(function () {
         if (mine !== seq) return;

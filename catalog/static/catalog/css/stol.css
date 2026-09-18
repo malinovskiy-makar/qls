@@ -762,9 +762,13 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .stol-phonebar { display: none; }
 @media (max-width: 759px) {
   .desk { grid-template-columns: minmax(0, 1fr); }
-  .desk-side--rail, .desk-side--help { position: static; height: 0; border: 0; }
+  /* ⚠️ z-index у элемента сетки создаёт свой контекст наложения и без позиции:
+     шторки внутри колонок оказывались под затемнением. */
+  .desk-side--rail, .desk-side--help { position: static; height: 0; border: 0; z-index: auto; }
   .stol-strip { display: none !important; }
   .desk-center { grid-column: 1; padding: 12px 12px 90px; }
+  .stm { font-size: 15.5px; padding: 16px 16px 6px; }
+  .stm--q .math-content { font-size: 16.5px; }
   .stol-phonebar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 140; display: flex; gap: 6px;
                    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: var(--surface);
                    border-top: .5px solid var(--border); }
@@ -1010,3 +1014,96 @@ body:has(.stol-app[data-view="map"]) #corner-stack { display: none; }
 body.has-basket { --corner-offset: 155px; }
 body.has-basket .tg-fab { bottom: 90px; }
 body:has(.stol-app[data-view="map"]) .basket { display: none; }
+
+/* ═════════════════════════════════════════════════════════════════════
+   ТЕЛЕФОН (README §8, снимки 30–35): < 760 px.
+   Вход: «Продолжить» — ряд пилюль с прокруткой, «случайная задача» ссылкой
+   справа; выпадашки — шторки снизу до 72 % высоты. Задача: «‹ Каталог · N из M
+   · звезда · меню»; лента и помощь — шторки снизу от 120 px, закрываются
+   стрелкой или тапом мимо. Карта: вертикальный корпус, шапка «‹ В каталог ·
+   Карта тем · лупа · ?», снизу карточка выбора с двумя кнопками. Плавающей
+   кнопки на экранах каталога нет (значок обратной связи — в шапке сайта).
+   ═════════════════════════════════════════════════════════════════════ */
+.tb-phone-only, .se-dd-head, .tmap-search-btn { display: none; }
+.se-pills { display: contents; }
+.tb-menu { position: relative; }
+.tb-menu-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 150; min-width: 230px; padding: 6px;
+  border-radius: 12px; background: var(--surface); border: var(--line) solid var(--border); box-shadow: var(--shadow-pop); }
+.tb-menu-pop button { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 10px; border: 0;
+  border-radius: 8px; background: transparent; color: var(--text); font: 500 15px/1.2 var(--font-ui); text-align: left; cursor: pointer; }
+.tb-menu-pop button:hover { background: var(--surface-2); }
+.tb-menu-pop .qi { width: 17px; height: 17px; color: var(--text2); }
+.stol-phonebar > * { position: relative; }
+.phone-badge { position: absolute; top: 5px; left: calc(50% + 3px); min-width: 16px; height: 16px; padding: 0 4px;
+  border-radius: var(--r-pill); background: var(--accent); color: var(--on-accent); font: 700 10px/16px var(--font-ui);
+  font-style: normal; text-align: center; }
+.phone-badge[hidden] { display: none; }
+
+@media (max-width: 759px) {
+  body:has(.stol-app) .tg-fab { display: none; }
+
+  /* Вход */
+  .se-line { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 12px; }
+  .se-continue { display: contents; }
+  .se-continue-l { grid-column: 1; grid-row: 1; }
+  .se-random { grid-column: 2; grid-row: 1; height: auto; padding: 0; border: 0; background: none; box-shadow: none;
+    color: var(--text); font-weight: 500; text-decoration: underline; }
+  .se-pills { display: flex; grid-column: 1 / -1; grid-row: 2; gap: 8px; overflow-x: auto; scrollbar-width: none;
+    margin: 0 -16px; padding: 0 16px 2px; }
+  .se-pills::-webkit-scrollbar { display: none; }
+  .se-pill { flex: none; max-width: 250px; }
+  .se-dd, .se-dd--diff, .se-dd--kind { position: fixed; left: 0; right: 0; bottom: 0; top: auto; width: auto;
+    max-height: 72vh !important; z-index: 260; border: 0; border-radius: 20px 20px 0 0; }
+  .se-dd::before { content: ''; align-self: center; width: 40px; height: 4px; margin-top: 8px; flex: none;
+    border-radius: 2px; background: var(--border); }
+  .se-dd-wrap:has(> .se-dd:not([hidden]))::after { content: ''; position: fixed; inset: 0; z-index: 250;
+    background: rgba(0, 0, 0, .35); }
+  .se-dd-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 10px 16px 4px; }
+  .se-dd-head b { font-size: 18px; font-weight: 700; }
+  .se-dd-head span { font-size: 12.5px; color: var(--text2); text-align: right; }
+  .se-dd-body { padding: 4px 6px; }
+  .se-opt { padding: 11px 10px; font-size: 16px; }
+  .se-dd-foot { flex-direction: column; align-items: stretch; gap: 8px; border-top: 0;
+    padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); }
+  .se-dd-foot .se-dd-note { display: none; }
+  .se-done { height: 52px; border-radius: 14px; font-size: 16px; }
+
+  /* Задача: строка над задачей */
+  .tb-phone-only { display: inline-flex; }
+  .task-bar .grow, .task-bar #tb-prev, .task-bar #tb-next, .task-bar [data-stol="focus"],
+  .task-bar #copy-btn, .task-bar .btn-report { display: none; }
+  .task-bar .tb-pos { flex: 1; text-align: center; }
+  .tb-back .qi { width: 16px; height: 16px; }
+
+  /* Лента и помощь — шторки снизу от 120 px */
+  .desk[data-help="open"] .help-panel, .desk[data-rail="open"] .stol-rail {
+    display: flex; position: fixed; left: 0; right: 0; bottom: 0; top: 120px; width: auto; height: auto; max-width: none;
+    z-index: 260; border-radius: 20px 20px 0 0; background: var(--surface); box-shadow: var(--shadow-pop); }
+  .desk[data-help="open"] .help-panel::before, .desk[data-rail="open"] .stol-rail::before {
+    content: ''; align-self: center; width: 40px; height: 4px; margin-top: 8px; flex: none;
+    border-radius: 2px; background: var(--border); }
+  body.stol-sheet-open { overflow: hidden; }
+  /* Затемнение под шторкой — на `.stol-app`: `body::before/::after` заняты водяными «W». */
+  body.stol-sheet-open .stol-app::before { content: ''; position: fixed; inset: 0; z-index: 250; background: rgba(0, 0, 0, .35); }
+  body.stol-sheet-open .stol-phonebar { display: none; }
+  .help-panel [data-stol="help"] .qi { transform: rotate(90deg); }
+
+  /* Карта */
+  .stol-map .tmap-head { top: 12px; left: 12px; right: 12px; gap: 8px; flex-wrap: wrap; }
+  .tmap-back { padding: 0 12px 0 8px; font-size: 14px; }
+  .stol-map .tmap-head h1 { font-size: 17px; }
+  .stol-map .tmap-sub { display: block; font-size: 12px; }
+  .tmap-sub-x { display: none; }
+  .stol-map .tmap-head-title { flex: 1; min-width: 0; }
+  .stol-map .tmap-search { display: none; order: 9; flex: 1 1 100%; margin: 0; }
+  .stol-map .tmap-head.is-search .tmap-search { display: block; }
+  .stol-map .tmap-search input { width: 100%; }
+  .tmap-search-btn { display: flex; }
+  .stol-map .tmap-head a.tmap-icon-btn, .stol-map .tmap-panel, .stol-map .tmap-zoom { display: none; }
+  .stol-map .tmap-foot { left: 12px; right: 12px; bottom: 12px; height: auto; flex-wrap: wrap; gap: 10px; padding: 14px; }
+  .tmap-sel { flex: 1 1 100%; white-space: normal; }
+  .tmap-sel b { display: block; margin: 0 0 4px; font-size: 16px; }
+  .tmap-sel-names { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .stol-map .tmap-foot .btn { height: 48px; justify-content: center; }
+  .stol-map #stol-map-show { flex: 1; }
+}

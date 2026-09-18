@@ -21,7 +21,7 @@
     <a class="tmap-back" href="{% url 'catalog:problem_list' %}{% if filters_query %}?{{ filters_query }}{% endif %}" data-map-exit>{% include '_icon.html' with name='chevron_left' %}В каталог</a>
     <div class="tmap-head-title">
       <h1>Карта тем</h1>
-      <p class="tmap-sub">{{ theme_count }}&nbsp;{{ theme_count|plural_ru:"тема,темы,тем" }} · {{ tag_count }}&nbsp;{{ tag_count|plural_ru:"тег,тега,тегов" }} · связи между разделами</p>
+      <p class="tmap-sub">{{ theme_count }}&nbsp;{{ theme_count|plural_ru:"тема,темы,тем" }} · {{ tag_count }}&nbsp;{{ tag_count|plural_ru:"тег,тега,тегов" }}<span class="tmap-sub-x"> · связи между разделами</span></p>
     </div>
     <div class="tmap-search">
       {% include '_icon.html' with name='search' %}
@@ -29,6 +29,8 @@
              placeholder="Поиск по темам и тегам" aria-label="Поиск по темам и тегам">
       <span class="tmap-search-count" id="tmap-q-count" aria-live="polite"></span>
     </div>
+    {% comment %}Телефон (снимок 33): поле поиска свёрнуто в лупу, по нажатию встаёт строкой под шапкой.{% endcomment %}
+    <button type="button" class="tmap-icon-btn tmap-search-btn" id="tmap-search-btn" aria-label="Поиск по темам и тегам" aria-expanded="false">{% include '_icon.html' with name='search' %}</button>
     <button type="button" class="tmap-icon-btn" id="tmap-help" title="Как пользоваться картой" aria-label="Как пользоваться картой">?</button>
     <a class="tmap-icon-btn" href="{% url 'catalog:problem_list' %}{% if filters_query %}?{{ filters_query }}{% endif %}" data-map-exit title="Закрыть карту" aria-label="Закрыть карту">{% include '_icon.html' with name='close' %}</a>
   </header>

@@ -282,6 +282,28 @@ const STOL_SCENES = [
       await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
   { phase: 's1', name: 'entry_continue', who: 'student', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
+  /* S6: телефон (README §8, снимки 30–35): 390×844, ширины 360 и 430 — для замеров. */
+  { phase: 's6', name: 'phone_entry', who: 'student', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1200); } },
+  { phase: 's6', name: 'phone_topic_sheet', who: 'student', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('[data-dd="topic"]'); await p.waitForTimeout(500); } },
+  { phase: 's6', name: 'phone_filtered', who: 'student', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(1200); } },
+  { phase: 's6', name: 'phone_problem', who: 'student', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#ct-rows .rail-row:nth-child(2)'); await p.waitForSelector('#stol-center .stm');
+      await p.waitForTimeout(800); } },
+  { phase: 's6', name: 'phone_help', who: 'shots', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('.stol-phonebar [data-phone="hint"], .stol-phonebar [data-help-open="hint"]');
+      await p.waitForTimeout(1500); } },
+  { phase: 's6', name: 'phone_map', noBg: true, widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/map/?topic=852', { waitUntil: 'load' });
+      await p.waitForFunction(() => window.TMAP && TMAP.isReady()); await p.waitForTimeout(2500); } },
+  { phase: 's6', name: 'phone_test', who: 'shots', widths: [[390, 844]], go: async p => {
+      await p.goto(BASE + '/catalog/problem/63243/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('.opt[data-l="a"]'); await p.click('#check-btn'); await p.waitForTimeout(800); } },
   /* S5: корзина репетитора (README §7, снимки 21–25) — демо-репетитор `scripts/stol_demo_teacher.py`. */
   { phase: 's5', name: 'teacher_basket', who: 'teacher', go: async p => {
       await p.goto(BASE + '/catalog/?topic=843', { waitUntil: 'load' }); await p.waitForTimeout(800);

@@ -20,7 +20,7 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.test import Client, override_settings, tag
 
-from problems.models import ProblemPart
+from problems.models import Hint, ProblemPart
 from problems.tests.factories import make_assignment, make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_runner.mjs')
@@ -62,6 +62,9 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
                                           'устанавливает ЦБ РФ.  ( $4$ балла)')
         for i, label in enumerate('abcd'):
             ProblemPart.objects.create(problem=self.test, label=label, order=i, statement='Вариант %s' % label)
+        # Подсказки у задачи с подпунктами (телефон: «Подсказка» → шторка помощи).
+        for i in range(2):
+            Hint.objects.create(problem=self.problem, text='Подсказка %d: начните с MR = MC.' % (i + 1), order=i)
         # Вошедший ученик — для помощи и теста (сессия уходит в раннер кукой).
         self.client.force_login(make_user('stol_browser_student'))
         self.session = self.client.cookies['sessionid'].value
@@ -259,5 +262,29 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         added = box['added']
         check(added['text'] == 'Добавлено в «ДЗ корзины»: 3 задачи' and not added['bar'] and added['stored'] == '[]'
               and added['hw'] == 'в 1 домашке', 'после «В домашку»: %s' % added)
+
+        # README §8: телефон 360/390/430.
+        topic = str(self.topic.pk)
+        for width in PHONE:
+            box = data['phone %d' % width]
+            key = 'телефон %d' % width
+            check(not box['errors'] and not box['map']['errors'], '%s: ошибки страницы' % key)
+            check(box['entryOver'] <= 0, '%s: вход шире окна на %d' % (key, box['entryOver']))
+            check(box['entryFab'] == 0, '%s: плавающая кнопка на входе' % key)
+            sheet = box['sheet']
+            check(sheet['left'] == 0 and sheet['right'] == 0 and sheet['bottom'] == 0 and sheet['tall'] <= 72
+                  and sheet['head'] == 'Тема', '%s: «Тема» не шторкой снизу: %s' % (key, sheet))
+            check(box['filter'] == {'url': '?topic=' + topic, 'closed': True}, '%s: фильтр из шторки %s' % (key, box['filter']))
+            pr = box['problem']
+            check(pr['same'] and pr['view'] == 'stol' and pr['help'] == 'closed' and pr['rail'] == 'closed',
+                  '%s: задача открылась не так: %s' % (key, pr))
+            check(pr['over'] <= 0 and pr['statement'] == 15.5 and pr['back'] and pr['fab'] == 0,
+                  '%s: экран задачи %s' % (key, pr))
+            hp = box.get('help') or {}
+            check(hp.get('top') == 120 and hp.get('bottom') == 0 and hp.get('hint', 0) >= 1 and hp.get('top1'),
+                  '%s: помощь-шторка %s' % (key, hp))
+            mp = box['map']
+            check(mp['over'] <= 0 and mp['panel'] == 'none' and mp['foot'] == {'left': 12, 'right': 12}
+                  and mp['W'] / mp['H'] < 0.8 and mp['shape'] >= 1.2 and mp['tall'], '%s: карта %s' % (key, mp))
 
         self.assertEqual(problems, [], 'Расхождения со спецификацией:\n' + '\n'.join(problems))
