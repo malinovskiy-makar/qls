@@ -1,57 +1,108 @@
-{% comment %}
+{% load catalog_filters %}{% comment %}
 ПАНЕЛЬ ПОМОЩИ «СТОЛА» (392 px, README §4) и её полоска 52 px.
 
-Полоска свёрнутой помощи: «открыть помощь», лампочка со счётчиком подсказок,
-ИИ, решение — каждая иконка только при данных (правило нуля).
+Полоска свёрнутой помощи: «открыть помощь», лампочка со счётчиком оставшихся
+подсказок (клик открывает помощь и сразу даёт подсказку), ИИ, решение —
+каждая иконка только при данных (правило нуля).
 
-Панель — `help_html` ответа `?pane=1`; сценарий подменяет её вместе с центром.
-Карточка чата — только при доступном поставщике чата: три режима реплики над
-полем и не исчезают (решение 15.09.2026), скрепка — до трёх фото или PDF к
-реплике, анониму вместо поля — ссылка на вход. Наружу уходят условие, текст
-решения и реплика — ничего из профиля.
+Пустое состояние — ЛЕСТНИЦА «берите столько помощи, сколько нужно»: ступени
+только при данных — подсказки, разговор с ИИ, ответ по одному пункту (только
+если ответы по пунктам заполнены, без акцента — решение 17.09), полное
+решение; у теста вместо двух последних — «Показать ответ». После первого
+действия — ОДНА ЛЕНТА ПО ВРЕМЕНИ: подсказки, реплики, проверка решения,
+подтверждение и само решение. Лента переживает перезагрузку: подсказки и
+решение — из прогресса (сервер рисует их здесь), разговор — из `ChatTurn`.
+
+Поле внизу — одно на разговор и на проверку решения: режим «Проверь решение»
+при доступной модели проверки отправляет текст и фото на проверку (результат
+— карточкой `_attempt_result.html` в ленту), иначе это реплика чата.
+Наружу уходят условие, текст решения и реплика — ничего из профиля.
+Строки, которые кладёт сценарий, лежат здесь шаблонами (`<template>`).
 {% endcomment %}
 <nav class="stol-strip stol-strip--help" aria-label="Помощь">
   <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Открыть помощь" title="Помощь (])">{% include '_icon.html' with name='chevron_left' %}</button>
-  {% if hint_total %}<button type="button" class="stol-strip-btn" data-help-open="hint" aria-label="Подсказка" title="Подсказка">{% include '_icon.html' with name='bulb' %}<span class="stol-strip-badge" id="strip-hints">{{ hint_total }}</span></button>{% endif %}
+  {% if hint_total %}<button type="button" class="stol-strip-btn" data-help-open="hint" aria-label="Подсказка" title="Подсказка"{% if not hints_left %} hidden{% endif %}>{% include '_icon.html' with name='bulb' %}<span class="stol-strip-badge" id="strip-hints">{{ hints_left }}</span></button>{% endif %}
   {% if chat_available %}<button type="button" class="stol-strip-btn" data-help-open="ai" aria-label="Спросить ИИ" title="Спросить ИИ">{% include '_icon.html' with name='sparkle' %}</button>{% endif %}
   {% if sol.has_any and not test %}<button type="button" class="stol-strip-btn" data-help-open="sol" aria-label="Решение" title="Решение">{% include '_icon.html' with name='book' %}</button>{% endif %}
 </nav>
 <aside class="help-panel" aria-label="Помощь по задаче">
   <div class="help-head">
     <span class="ic">{% include '_icon.html' with name='sparkle' %}</span>
-    <div><b>Помощь</b><small id="help-used">пока ничем не пользовались</small></div>
+    <div><b>Помощь</b><small id="help-used" data-total="{{ hint_total }}">{% if opened_hints or solution_viewed %}{% if opened_hints %}подсказок {{ opened_hints|length }} из {{ hint_total }}{% endif %}{% if opened_hints and solution_viewed %} · {% endif %}{% if solution_viewed %}решение{% endif %}{% else %}пока ничем не пользовались{% endif %}</small></div>
     <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button>
   </div>
-  <div class="help-body">
-  {% if chat_available %}
-  <section class="ai" aria-label="Чат с ИИ по этой задаче">
-    <div class="ai-body" id="ai-body">
-      <p class="ai-intro">Объясню теорию, подскажу план, проверю ваше решение, в том числе по фото. Готовое решение не выдам: задача остаётся вашей.</p>
-    </div>
-    <div class="ai-foot">
-      {% if user.is_authenticated %}
-      <div class="ai-sug" id="ai-sug">
-        <button type="button" data-mode="theory" data-prompt="Объясни теорию">Теория</button>
-        <button type="button" data-mode="method" data-prompt="Как решать">Как решать</button>
-        <button type="button" data-mode="check" data-prompt="Проверь моё решение">Проверь решение</button>
-      </div>
-      <div class="ai-att" id="ai-att" hidden>
-        <span class="ai-att-status" id="ai-att-status" hidden></span>
-      </div>
-      <template id="ai-chip-tpl"><span class="ai-chip"><span class="ai-chip-name"></span><button type="button" class="ai-chip-x" aria-label="Убрать файл">{% include '_icon.html' with name='close' %}</button></span></template>
-      <div class="ai-in" id="ai-in">
-        <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">{% include '_icon.html' with name='clip' %}</button>
-        {% comment %}Список типов, а не `image/*`: звёздочка после косой черты открывает комментарий для сторожа стилей `test_css_comments`. Файл всё равно проверяет сервер.{% endcomment %}
-        <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
-        <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или фото" aria-label="Вопрос ИИ"></textarea>
-        <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">{% include '_icon.html' with name='arrow_up' %}</button>
-      </div>
+
+  <div class="help-body" id="help-body">
+    <div class="help-ladder" id="help-ladder"{% if help_used %} hidden{% endif %}>
+      <p class="ladder-lead"><b>Берите столько помощи, сколько нужно, и не больше.</b> Всё, что откроете, останется здесь лентой и после перезагрузки.</p>
+      {% if hint_total %}<button type="button" class="step step--main" data-step="hint">{% include '_icon.html' with name='bulb' %}<span><b>Подсказка 1 из {{ hint_total }}</b><small>наведёт на первый шаг, не раскрывая ход</small></span></button>{% endif %}
+      {% if chat_available %}<button type="button" class="step" data-step="ai">{% include '_icon.html' with name='sparkle' %}<span><b>Спросить ИИ</b><small>теория, план, проверка вашего решения по фото</small></span></button>{% endif %}
+      {% if test %}
+      <button type="button" class="step" data-step="reveal">{% include '_icon.html' with name='check' %}<span><b>Показать ответ</b><small>верный вариант и разбор «почему так»</small></span></button>
       {% else %}
-      <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
+      {% if part_answers %}<button type="button" class="step" data-step="part">{% include '_icon.html' with name='target' %}<span><b>Ответ по одному пункту</b><small>ответ к пункту, который выберете</small></span></button>{% endif %}
+      {% if sol.has_any %}<button type="button" class="step" data-step="sol">{% include '_icon.html' with name='book' %}<span><b>Полное решение</b><small>в самом конце, когда остальное не помогло</small></span></button>{% endif %}
+      {% if not hint_total and not sol.has_any %}<p class="ladder-none">К этой задаче в банке нет ни подсказок, ни решения{% if chat_available %}: остаётся ИИ{% endif %}.</p>{% endif %}
       {% endif %}
-      <p class="ai-note">ИИ видит условие и ваше решение. Данные профиля ему не передаются.</p>
     </div>
-  </section>
-  {% endif %}
+
+    <div class="help-feed" id="help-feed" aria-live="polite">
+      {% for h in opened_hints %}{% include "catalog/stol/_help_hint.html" %}{% endfor %}
+      {% if last_attempt %}<div class="feed-card feed-chk" id="chk-holder">{% include "catalog/_attempt_result.html" with attempt=last_attempt chk=last_chk %}</div>{% endif %}
+      {% if solution_viewed %}{% include "catalog/stol/_help_solution.html" %}{% endif %}
+    </div>
   </div>
+
+  {% if chat_available or ai_available %}
+  <div class="help-foot">
+    {% if chat_available %}<p class="help-tip">Выделите фрагмент условия, чтобы спросить именно о нём.</p>{% endif %}
+    <div class="help-quick">
+      {% if hint_total %}<button type="button" class="quick-btn" id="hint-btn"{% if not hints_left %} hidden{% endif %}>{% include '_icon.html' with name='bulb' %}Подсказка <span class="n" id="hint-n">{{ next_hint }} из {{ hint_total }}</span></button>{% endif %}
+      {% if test %}<button type="button" class="quick-link" data-step="reveal">Ответ</button>{% elif sol.has_any %}<button type="button" class="quick-link" id="sol-btn" data-step="sol"{% if solution_viewed %} hidden{% endif %}>Решение</button>{% endif %}
+    </div>
+    {% if user.is_authenticated %}
+    <div class="ai-sug" id="ai-sug">
+      {% if chat_available %}<button type="button" data-mode="theory" data-prompt="Объясни теорию">Теория</button>
+      <button type="button" data-mode="method" data-prompt="Как решать">Как решать</button>{% endif %}
+      <button type="button" data-mode="check" data-prompt="Проверь моё решение">Проверь решение</button>
+    </div>
+    <div class="ai-quote" id="ai-quote" hidden><span class="ai-quote-t"></span><button type="button" class="ai-chip-x" aria-label="Убрать цитату">{% include '_icon.html' with name='close' %}</button></div>
+    <div class="ai-att" id="ai-att" hidden><span class="ai-att-status" id="ai-att-status" hidden></span></div>
+    <div class="ai-in" id="ai-in">
+      <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">{% include '_icon.html' with name='clip' %}</button>
+      {% comment %}Список типов, а не `image/*`: звёздочка после косой черты открывает комментарий для сторожа стилей `test_css_comments`. Файл всё равно проверяет сервер.{% endcomment %}
+      <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
+      <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или фото" aria-label="Вопрос ИИ или решение на проверку"></textarea>
+      <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">{% include '_icon.html' with name='arrow_up' %}</button>
+    </div>
+    {% if ai_available %}<p class="sv-limit">проверка решения · осталось сегодня <b id="sv-remaining">{{ remaining }}</b></p>{% endif %}
+    {% else %}
+    <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
+    {% endif %}
+    <p class="ai-note">ИИ видит условие и ваше решение. Данные профиля ему не передаются.</p>
+  </div>
+  {% else %}
+  {% if hint_total or sol.has_any or test %}
+  <div class="help-foot help-foot--plain">
+    <div class="help-quick">
+      {% if hint_total %}<button type="button" class="quick-btn" id="hint-btn"{% if not hints_left %} hidden{% endif %}>{% include '_icon.html' with name='bulb' %}Подсказка <span class="n" id="hint-n">{{ next_hint }} из {{ hint_total }}</span></button>{% endif %}
+      {% if test %}<button type="button" class="quick-link" data-step="reveal">Ответ</button>{% elif sol.has_any %}<button type="button" class="quick-link" id="sol-btn" data-step="sol"{% if solution_viewed %} hidden{% endif %}>Решение</button>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+  {% endif %}
 </aside>
+
+{% comment %}Шаблоны для сценария (`stol_task.js`): разметка наша, данные — через textContent.{% endcomment %}
+<template id="help-hint-tpl">{% include "catalog/stol/_help_hint.html" with h=None %}</template>
+{% if sol.has_any and not test %}
+<template id="help-confirm-tpl"><div class="feed-card feed-confirm"><p>Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».</p><div class="feed-row"><button type="button" class="btn btn--main btn--sm" data-confirm="yes">Открыть</button><button type="button" class="btn btn--quiet btn--sm" data-confirm="no">Ещё подумаю</button></div></div></template>
+{% if not solution_viewed %}<template id="help-sol-tpl">{% include "catalog/stol/_help_solution.html" %}</template>{% endif %}
+{% endif %}
+{% if part_answers %}
+<template id="help-parts-tpl"><div class="feed-card feed-parts"><p class="feed-k-l">Ответ к какому пункту показать?</p><div class="feed-row">{% for p in part_answers %}<button type="button" class="btn btn--quiet btn--sm" data-part="{{ forloop.counter0 }}">{{ p.label|partlabel }}</button>{% endfor %}</div></div></template>
+<template id="help-part-answers-tpl">{% for p in part_answers %}<div class="feed-card feed-part" data-part="{{ forloop.counter0 }}"><div class="feed-k"><span class="feed-k-l">Ответ к пункту {{ p.label|partlabel }}</span></div><div class="feed-t math-content">{% include "catalog/_math_text.html" with text=p.answer %}</div></div>{% endfor %}</template>
+{% endif %}
+{% if ai_available and user.is_authenticated %}
+<template id="help-busy-tpl"><div class="feed-card chk chk--wait is-on"><div class="chk-busy"><div class="line"><span class="spin" aria-hidden="true"></span>Проверяю решение: обычно 10–20 секунд</div><div class="bar" aria-hidden="true"><i></i></div><small>Сверяю с эталоном по шагам. Можно пока перечитать условие.</small></div></div></template>
+{% endif %}

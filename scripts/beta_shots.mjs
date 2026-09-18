@@ -242,6 +242,38 @@ const STOL_SCENES = [
       await p.click('#ct-rows .rail-row:nth-child(4)'); await p.waitForSelector('#stol-center .stm');
       await p.goBack(); await p.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
       await p.waitForTimeout(600); } },
+  /* S3 снимается на демо-сервере (порт 8611, `scripts/stol_demo_settings.py`). */
+  { phase: 's3', name: 'help_ladder', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63316/', { waitUntil: 'load' }); await p.waitForTimeout(1200); } },
+  { phase: 's3', name: 'help_hints_ai', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63310/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#help-ladder [data-step="hint"]'); await p.waitForSelector('#help-feed .feed-hint');
+      await p.click('#hint-btn'); await p.waitForFunction(() => document.querySelectorAll('#help-feed .feed-hint').length >= 2);
+      await p.fill('#ai-text', 'С чего начать пункт а)?'); await p.click('#ai-send');
+      await p.waitForFunction(() => document.querySelector('#help-feed .ai-msg--ai .katex'), null, { timeout: 60000 });
+      await p.waitForTimeout(600); } },
+  { phase: 's3', name: 'help_confirm', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63309/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#help-ladder [data-step="sol"]'); await p.waitForSelector('.feed-confirm'); await p.waitForTimeout(300); } },
+  { phase: 's3', name: 'help_solution', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63308/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#help-ladder [data-step="sol"]'); await p.click('[data-confirm="yes"]');
+      await p.waitForSelector('.feed-sol'); await p.waitForTimeout(600); } },
+  { phase: 's3', name: 'help_check', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63307/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.fill('#ai-text', 'Излишек покупателя равен нулю, отсюда p1 = 20 - k/2.');
+      await p.click('#ai-sug [data-mode="check"]');
+      await p.waitForSelector('#help-feed .chk:not(.chk--wait)', { timeout: 60000 }); await p.waitForTimeout(600); } },
+  { phase: 's3', name: 'test_wrong', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63243/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('#again-btn').catch(() => {});
+      await p.click('.opt[data-l="a"]'); await p.click('#check-btn');
+      await p.waitForSelector('.opt.is-tried'); await p.waitForTimeout(500); } },
+  { phase: 's3', name: 'test_right', who: 'shots', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63243/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('.opt[data-l="a"]'); await p.click('#check-btn'); await p.waitForSelector('.opt.is-tried');
+      await p.click('.opt[data-l="b"]'); await p.click('#check-btn');
+      await p.waitForSelector('.opt.is-hit'); await p.waitForTimeout(500); } },
   { phase: 'w', name: 'w_entry', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(800); } },
   { phase: 'w', name: 'w_map', go: async p => {
@@ -252,11 +284,29 @@ const STOL_SCENES = [
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
 ];
 
+/* Демо-ученик снимков «Стола» (`stol-shots@test.local`): сцены помощи меняют
+   его прогресс, поэтому перед каждой сценой с `reset` его следы стираются —
+   иначе вторая тема снимала бы уже открытые подсказки. Данные задач не трогаются. */
+function resetShotUser() {
+  const code = [
+    'from django.contrib.auth import get_user_model',
+    'from problems.models_platform import ProblemProgress, ChatTurn',
+    'from problems.models import CatalogAttempt',
+    "U = get_user_model(); u, _ = U.objects.get_or_create(username='stol-shots@test.local', defaults={'email': 'stol-shots@test.local'})",
+    "u.role = 'student'; u.first_name = 'Демо'; u.save()",
+    'ProblemProgress.objects.filter(user=u).delete(); ChatTurn.objects.filter(user=u).delete(); CatalogAttempt.objects.filter(user=u).delete()',
+  ].join('\n');
+  execFileSync(PY, ['manage.py', 'shell', '-c', code], { encoding: 'utf8' });
+}
+
 async function runStol() {
   fs.mkdirSync(OUT, { recursive: true });
   const phase = SET.includes(':') ? SET.split(':')[1] : '';
   const scenes = STOL_SCENES.filter(sc => !phase || sc.phase === phase);
-  const sessions = { student: sessionFor('student1@test.local') };
+  const needsShots = scenes.some(sc => sc.who === 'shots');
+  if (needsShots) resetShotUser();
+  const sessions = { student: sessionFor('student1@test.local'),
+                     shots: needsShots ? sessionFor('stol-shots@test.local') : '' };
   const browser = await chromium.launch();
   const errors = [];
   for (const sc of scenes) {
@@ -271,6 +321,9 @@ async function runStol() {
         page.setDefaultTimeout(60000);
         page.on('pageerror', e => errors.push(`[${sc.name} ${theme} ${width}] pageerror ${e.message}`));
         page.on('console', m => { if (m.type() === 'error') errors.push(`[${sc.name} ${theme} ${width}] ${m.text()}`); });
+        if (sc.who === 'shots') resetShotUser();
+        /* Своя сессия на сцену: счётчик попыток теста живёт в сессии. */
+        if (sc.who === 'shots') await ctx.addCookies([{ name: 'sessionid', value: sessionFor('stol-shots@test.local'), url: BASE }]);
         await sc.go(page);
         await settleBg(page);
         await snap(page, sc.name, theme, width);

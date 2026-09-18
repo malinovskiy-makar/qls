@@ -7,9 +7,11 @@
 Свойства: чипы тем и звёзды, строкой ниже «развёрнутая · количественная · …»
 и источник, справа «Теги · N ▸» — теги свёрнуты у всех (решение 17.09).
 Условие — карточка `--surface-info`, 16,5/1,7, подпункты с пунктирными
-разделителями. Под условием «Как прошло?» и соседи «← предыдущая /
+разделителями, у пункта — «спросить ИИ про этот пункт»; выделенный фрагмент условия —
+всплывающая «Спросить об этом» (`stol_task.js`). Под условием «Как прошло?» и соседи «← предыдущая /
 следующая →» с названиями (по текущей ленте; сценарий пересчитывает их по
-своему списку). «Похожих» под условием больше нет — они во вкладке ленты.
+своему списку). «Похожих» под условием больше нет — они во вкладке ленты; карточки
+«Решение» с полем тоже нет — попытка и решение живут в панели помощи (README §4).
 
 Этот же партиал — `center_html` ответа `?pane=1`: сценарий подменяет им
 `#stol-center` и зовёт `weco.stolTask.init(root)` (`stol_task.js`), который
@@ -78,7 +80,8 @@
   <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
   {% if parts %}
   <ol class="parts">
-    {% for part in parts %}<li class="part"><b>{{ part.label|partlabel }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span></li>{% endfor %}
+    {% comment %}У пункта справа — «спросить ИИ про этот пункт» (README §3): открывает помощь, ставит в поле «Пункт б): » и цитату пункта. Только при карточке чата (правило нуля).{% endcomment %}
+    {% for part in parts %}<li class="part" data-part-label="{{ part.label|partlabel }}"><b>{{ part.label|partlabel }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span>{% if chat_available and user.is_authenticated %}<button type="button" class="part-ask" data-ask-part aria-label="Спросить ИИ про пункт {{ part.label|partlabel }}" title="Спросить ИИ про этот пункт">{% include '_icon.html' with name='sparkle' %}</button>{% endif %}</li>{% endfor %}
   </ol>
   {% endif %}
 </section>
@@ -99,86 +102,6 @@
   {% if meta.prev %}<a class="nb-a nb-a--prev" data-stol-step="-1" href="{% url 'catalog:problem_detail' meta.prev %}"><small>← предыдущая</small><b>{{ meta.prev_title }}</b></a>{% endif %}
   {% if meta.next %}<a class="nb-a nb-a--next" data-stol-step="1" href="{% url 'catalog:problem_detail' meta.next %}"><small>следующая →</small><b>{{ meta.next_title }}</b></a>{% endif %}
 </nav>
-
-{% if not test %}
-{% if ai_available or hint_total or sol.has_any %}
-{% comment %}
-Карточка «Решение» живёт по правилу нуля: поле ввода только при доступной
-модели, подсказки только при подсказках, кнопка решения только при решении
-или ответе. Нет ничего — нет карточки. (S3 уносит её в панель помощи.)
-{% endcomment %}
-<section class="sv" id="sv" aria-label="Решение">
-  <div class="sv-head"><h2>Решение</h2>{% if parts %}<small>одно на всю задачу, подпункты внутри</small>{% endif %}</div>
-  {% if ai_available %}
-  <div class="sv-field">
-    <textarea id="sv-text" placeholder="Запишите ход решения и ответы по пунктам. Можно кратко: главное, идея каждого шага.{% if user.is_authenticated %} Или приложите фото тетради.{% endif %}"></textarea>
-    {% if user.is_authenticated %}
-    <div class="sv-attach" id="sv-attach">
-      <input type="file" id="att-input" accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf" hidden>
-      <button class="att-add" type="button" id="att-add">{% include '_icon.html' with name='clip' %}Фото или файл</button>
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-  <div class="sv-row">
-    {% if ai_available %}
-      {% if user.is_authenticated %}
-      <button class="btn btn--main" type="button" id="sv-submit">{% include '_icon.html' with name='check' %}Отправить на проверку</button>
-      <span class="sv-limit">проверяет ИИ · осталось сегодня <b id="sv-remaining">{{ remaining }}</b></span>
-      {% else %}
-      <a class="btn btn--main" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы отправить на проверку</a>
-      {% endif %}
-    {% endif %}
-    <span class="grow"></span>
-    {% if hint_total %}
-    <button class="btn btn--quiet" type="button" id="hint-btn">{% include '_icon.html' with name='bulb' %} Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
-    {% endif %}
-    {% if sol.has_any %}
-    <button class="btn btn--quiet" type="button" id="sol-btn">{% include '_icon.html' with name='book' %}Показать решение</button>
-    {% endif %}
-  </div>
-  <p class="sv-limit" id="sv-note" hidden></p>
-  {% if hint_total %}
-  <p class="sv-limit" id="hint-done" hidden>Это была последняя подсказка</p>
-  <div class="hints" id="hints" aria-live="polite"></div>
-  {% endif %}
-  {% if sol.has_any %}
-  <div class="sv-confirm" id="sol-confirm">
-    Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».
-    <button class="btn btn--main btn--sm" type="button" id="sol-yes">Открыть</button>
-    <button class="btn btn--quiet btn--sm" type="button" id="sol-no">Ещё подумаю</button>
-  </div>
-  <div class="sol" id="sol">
-    <div class="sol-head">
-      <h3>{% if sol.solution %}Решение{% else %}Ответ{% endif %}</h3>
-      {% if sol.answer %}<span class="sol-ans">Ответ: <b class="math-content">{% include "catalog/_math_text.html" with text=sol.answer %}</b></span>{% endif %}
-    </div>
-    {% if sol.solution or sol.parts %}
-    <div class="sol-body">
-      {% if sol.solution %}<div class="math-content">{% include "catalog/_math_text.html" with text=sol.solution %}</div>{% endif %}
-      {% if sol.parts %}
-      <ol class="parts">
-        {% for row in sol.parts %}<li class="part"><b>{{ row.label|partlabel }}</b><span class="math-content">{% if row.answer %}<span>Ответ: {% include "catalog/_math_text.html" with text=row.answer %}</span>{% endif %}{% if row.solution %}{% if row.answer %}<br>{% endif %}{% include "catalog/_math_text.html" with text=row.solution %}{% endif %}</span></li>{% endfor %}
-      </ol>
-      {% endif %}
-    </div>
-    {% endif %}
-  </div>
-  {% endif %}
-</section>
-{% endif %}
-
-{% if ai_available and user.is_authenticated %}
-<section class="chk chk--wait is-on" id="chk-busy" aria-live="polite" hidden>
-  <div class="chk-busy">
-    <div class="line"><span class="spin" aria-hidden="true"></span>Проверяю решение: обычно 10–20 секунд</div>
-    <div class="bar" aria-hidden="true"><i></i></div>
-    <small>Сверяю с эталоном по шагам. Можно пока перечитать условие.</small>
-  </div>
-</section>
-<div id="chk-holder">{% if last_attempt %}{% include "catalog/_attempt_result.html" with attempt=last_attempt chk=last_chk %}{% endif %}</div>
-{% endif %}
-{% endif %}
 
 {% comment %}Телефон: нижняя панель зовёт кнопки задачи, каждая — только при данных; «Дальше» — следующая по текущей вкладке ленты.{% endcomment %}
 <nav class="stol-phonebar" aria-label="Помощь по задаче">

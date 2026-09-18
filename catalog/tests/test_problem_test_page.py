@@ -32,7 +32,10 @@ class TestPageTests(TestCase):
         self.assertIn('верных может быть несколько: отметьте все', main)
         self.assertIn('<kbd>1</kbd>–<kbd>4</kbd>', main)
         self.assertIn('id="check-btn" disabled', main)
-        self.assertEqual(main.count('Показать ответ'), 1)
+        # «Показать ответ» — одна кнопка в строке теста и ступень лестницы помощи (README §4–§5).
+        centre = main.split('id="stol-help"')[0]
+        self.assertEqual(centre.count('Показать ответ'), 1)
+        self.assertIn('data-step="reveal"', main.split('id="stol-help"')[1])
         self.assertIn('Почему так', main)
         self.assertIn('каждому своя цена', main)
         for absent in ('id="sol-btn"', 'id="sv"', 'id="sv-text"', 'id="sol-confirm"',
@@ -47,9 +50,10 @@ class TestPageTests(TestCase):
         one = make_problem('Один верный.', problem_type='тест: один ответ', answer='б')
         _parts(one, 'абв')
         html = self.client.get(reverse('catalog:problem_detail', args=[one.pk])).content.decode()
-        self.assertIn('выберите один', html)
+        # Правило над вариантами — только у теста с несколькими верными (README §5).
+        self.assertNotIn('class="tq-rule"', html)
         self.assertIn('"multi": false', html)
-        self.assertIn('Попробуйте другой вариант.', html)
+        self.assertIn('<b>Не то</b> попробуйте другой вариант', html)
 
     def test_more_test_link_only_with_another_test_by_topic(self):
         other = make_problem('Второй тест.', problem_type='тест: один ответ', answer='а', topic=self.topic)
@@ -76,9 +80,12 @@ class TestPageTests(TestCase):
     def test_hint_button_lives_in_the_play_row(self):
         Hint.objects.create(problem=self.p, order=1, text='Вспомните определение.', reviewed=True)
         html = self.client.get(self.url).content.decode()
+        # С S3 (18.09.2026) подсказка теста — в панели помощи, а не в строке игры.
         row = html.split('id="row-play"')[1].split('id="row-done"')[0]
-        self.assertIn('id="hint-btn"', row)
-        self.assertIn('1 из 1', row)
+        self.assertNotIn('id="hint-btn"', row)
+        help_panel = html.split('<aside class="help-panel"')[1]
+        self.assertIn('id="hint-btn"', help_panel)
+        self.assertIn('1 из 1', help_panel)
 
     def test_test_without_game_is_an_ordinary_problem(self):
         numeric = make_problem('Сколько будет два плюс два?', problem_type='тест: числовой ответ',
@@ -87,7 +94,7 @@ class TestPageTests(TestCase):
         main = html.split('<main')[1]
         for absent in ('id="tq"', 'Проверить', 'Показать ответ', 'aria-pressed', '"checkUrl"'):
             self.assertNotIn(absent, main)
-        self.assertIn('id="sv"', main)
+        self.assertIn('data-step="sol"', main)
         self.assertIn('id="sol-btn"', main)
         outside = make_problem('Верные вне меток.', problem_type='тест: все верные', answer='бд')
         _parts(outside, 'абвг')

@@ -18,10 +18,10 @@ import subprocess
 from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
-from django.test import tag
+from django.test import override_settings, tag
 
 from problems.models import ProblemPart
-from problems.tests.factories import make_problem, make_topic
+from problems.tests.factories import make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_runner.mjs')
 
@@ -34,6 +34,7 @@ PHONE = (360, 390, 430)
 # Chromium отдельным процессом node — внешние ресурсы, поделить их между
 # воркерами шага A нельзя.
 @tag('catalog', 'browser', 'serial')
+@override_settings(CATALOG_CHAT_PROVIDER='fake', AI_PROVIDER='fake')
 class StolNumbersBrowserTest(StaticLiveServerTestCase):
 
     @classmethod
@@ -54,6 +55,16 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         for i, label in enumerate(('а', 'б')):
             ProblemPart.objects.create(problem=self.problem, label=label, order=i,
                                        statement='Найдите цену %s.' % label)
+        # Тест с живым «Почему так» 63243: повтор верного варианта и баллы срезаются.
+        self.test = make_problem('Кто устанавливает ключевую ставку в России?', topic=self.topic,
+                                 problem_type='тест: один ответ', answer='b',
+                                 solution='(b) Центральный банк.  Пояснение: Ключевую ставку '
+                                          'устанавливает ЦБ РФ.  ( $4$ балла)')
+        for i, label in enumerate('abcd'):
+            ProblemPart.objects.create(problem=self.test, label=label, order=i, statement='Вариант %s' % label)
+        # Вошедший ученик — для помощи и теста (сессия уходит в раннер кукой).
+        self.client.force_login(make_user('stol_browser_student'))
+        self.session = self.client.cookies['sessionid'].value
 
     def _run(self):
         node = shutil.which('node')
@@ -62,7 +73,8 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         if not os.path.isdir(os.path.join(settings.BASE_DIR, 'node_modules', 'playwright')):
             self.skipTest('playwright не установлен в node_modules')
         env = dict(os.environ, STOL_BASE_URL=self.live_server_url, STOL_TOPIC=str(self.topic.pk),
-                   STOL_PROBLEM='/catalog/problem/%d/' % self.problem.pk)
+                   STOL_PROBLEM='/catalog/problem/%d/' % self.problem.pk,
+                   STOL_TEST='/catalog/problem/%d/' % self.test.pk, STOL_SESSION=self.session)
         try:
             res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
                                  capture_output=True, text=True, encoding='utf-8',
@@ -132,7 +144,8 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         check(opened['railOpen'] == 'closed' and opened['helpOpen'] == 'open',
               'первое открытие: лента %s, помощь %s (README: свёрнута и открыта)'
               % (opened['railOpen'], opened['helpOpen']))
-        check(opened['pos'] == '1 из 26', 'позиция «%s», ждали «1 из 26»' % opened['pos'])
+        in_topic = self.topic.problems.count()
+        check(opened['pos'] == '1 из %d' % in_topic, 'позиция «%s», ждали «1 из %d»' % (opened['pos'], in_topic))
         check(box['next']['boot'] == box['boot'], '«Дальше» перезагрузил страницу')
         check(box['next']['path'] == '/catalog/problem/%d/' % box['ids'][1],
               '«Дальше» открыл %s, ждали следующую по выдаче %d' % (box['next']['path'], box['ids'][1]))
@@ -162,5 +175,26 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         for width in PHONE:
             box = data['desk %d' % width]
             check(box['scrollWidth'] <= box['innerWidth'], 'задача %d: шире окна (%d)' % (width, box['scrollWidth']))
+
+        # README §4: ответ ИИ показывается целиком (5 000 знаков, ни одного шага не срезано).
+        box = data['long reply']
+        check(not box['errors'], 'длинный ответ: ошибки страницы %s' % box['errors'])
+        check(box['steps'] == box['want'] and not box['overflow'],
+              'длинный ответ показан не целиком: %d из %d шагов' % (box['steps'], box['want']))
+        # README §3: «спросить ИИ про этот пункт» — «Пункт а): » в поле и цитата пункта.
+        box = data['part ask']
+        check(box['field'].startswith('Пункт а): ') and box['quoteShown'] and 'Найдите цену а' in box['quote']
+              and box['focused'] == 'ai-text', 'кнопка у пункта: %s' % box)
+        # README §5: «не то» — вариант красный и второй раз не выбирается; после верного —
+        # «верно», «вы выбирали», одна строка кнопок, «Почему так» без повтора и баллов.
+        box = data['test tried']
+        check(box == {'note': 'не то', 'disabled': True, 'pressed': 'false', 'wrongShown': True,
+                      'check': True, 'rowsVisible': ['row-play'], 'errors': []},
+              'тест после ошибки: %s' % box)
+        box = data['test solved']
+        check(box['ok'] == 'Верно со 2-й попытки' and box['tried'] == 'вы выбирали' and box['hit'] == 'верно'
+              and box['rowsVisible'] == ['row-done']
+              and box['why'].strip() == 'Ключевую ставку устанавливает ЦБ РФ.',
+              'тест после верного: %s' % box)
 
         self.assertEqual(problems, [], 'Расхождения со спецификацией:\n' + '\n'.join(problems))

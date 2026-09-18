@@ -285,7 +285,7 @@ class CurrencyEscapeFrontendTests(TestCase):
         from django.conf import settings
         task_js = (Path(settings.BASE_DIR) / 'catalog/static/catalog/js/stol_task.js').read_text(encoding='utf-8')
         self.assertIn('window.renderMathIn(el)', task_js)
-        self.assertIn('math(sol)', task_js)
+        self.assertIn('math(t.feed(sol))', task_js)
 
     def test_page_contains_dollar_masking_fix_v3(self):
         """Сессия H3: «\\$» маскируется ДО KaTeX приватным символом, иначе
@@ -308,4 +308,4 @@ class CurrencyEscapeFrontendTests(TestCase):
         from pathlib import Path
         from django.conf import settings
         task_js = (Path(settings.BASE_DIR) / 'catalog/static/catalog/js/stol_task.js').read_text(encoding='utf-8')
-        self.assertIn('math(sol)', task_js)
+        self.assertIn('math(t.feed(sol))', task_js)

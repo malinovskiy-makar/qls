@@ -189,8 +189,42 @@ def strip_statement_retell(statement, solution):
 # ── «Почему так» у теста: баллы составителя не нужны ученику (P6, 18.09.2026) ─
 # 25 видимых тестов держат в решении хвосты «(6 баллов)», «**(3 балла)**» —
 # разбалловку жюри. При показе они срезаются; данные не трогаем.
-_RX_SCORE_TAIL = re.compile(r'\s*\*{0,2}\(\s*\d+(?:[.,]\d+)?\s*балл(?:а|ов)?\s*\)\*{0,2}')
+# Число бывает и формулой: «( $4$ балла)» (63243, 62901).
+_RX_SCORE_TAIL = re.compile(r'\s*\*{0,2}\(\s*\$?\s*\d+(?:[.,]\d+)?\s*\$?\s*балл(?:а|ов)?\s*\)\*{0,2}')
 
 
 def strip_score_tails(text):
     return _RX_SCORE_TAIL.sub('', text or '').strip()
+
+
+# ── «Почему так» у теста: повтор верного варианта не нужен (S3, 18.09.2026) ──
+# 342 из 1 975 тестов с решением начинают его с верного ответа: «(b) Центральный
+# банк Российской Федерации.  Пояснение: Ключевую ставку…». Ученик только что
+# видел верную плитку, и «Почему так» должно начинаться с объяснения (README §5,
+# снимок 19). Срез — только при показе и только если метка в начале верная.
+_RX_ANSWER_HEAD = re.compile(r'^\s*\(?\s*([A-Za-zА-Яа-яЁё0-9])\s*\)\s*')
+_RX_EXPLAIN = re.compile(r'^(.*?)\s*Пояснение\s*:\s*', re.S)
+
+
+def _norm(text):
+    return re.sub(r'[\s.;:,$]+', ' ', (text or '').casefold()).strip()
+
+
+def strip_correct_repeat(text, game):
+    """Срезать в начале «(метка) текст верного варианта [Пояснение:]»."""
+    from problems.answer_check import normalize_label
+
+    text = (text or '').strip()
+    head = _RX_ANSWER_HEAD.match(text)
+    if not head or not game or normalize_label(head.group(1)) not in game['correct']:
+        return text
+    rest = text[head.end():]
+    explain = _RX_EXPLAIN.match(rest)
+    if explain and len(explain.group(1)) <= 400:
+        return rest[explain.end():].strip() or text
+    option = next((o['text'] for o in game['options']
+                   if o['label'] == normalize_label(head.group(1))), '')
+    first = rest.split('\n', 1)[0]
+    if option and _norm(first).startswith(_norm(option)):
+        return rest[len(first):].strip() or text
+    return text

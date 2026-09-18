@@ -6,6 +6,10 @@
 
 /* ── Каркас ─────────────────────────────────────────────────────────── */
 .stol { max-width: none; padding: 0; }
+/* ⚠️ `hidden` сильнее любого `display` на этом экране: строки кнопок теста,
+   «Дальше», соседи и карточки прячутся атрибутом, а их `display: flex/grid`
+   иначе перебивал его (обе строки теста были видны разом, 18.09.2026). */
+.stol [hidden] { display: none !important; }
 .stol-app { position: relative; min-height: calc(100vh - 52px); }
 
 /* ── Вход ───────────────────────────────────────────────────────────── */
@@ -776,3 +780,110 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 }
 /* Подсказка про клавиши теста — не на сенсорном экране (README §5). */
 @media (hover: none), (max-width: 759px) { .tq-kbd { display: none; } }
+
+/* ═════════════════════════════════════════════════════════════════════
+   ПАНЕЛЬ ПОМОЩИ (README §4, снимки 09, 12): лестница → одна лента по времени.
+   ═════════════════════════════════════════════════════════════════════ */
+.help-body { padding: 14px; gap: 10px; }
+.help-ladder { display: flex; flex-direction: column; gap: 8px; }
+.help-ladder[hidden] { display: none; }
+.ladder-lead { font-size: 14.5px; line-height: 1.5; color: var(--text2); margin: 0 0 6px; }
+.ladder-lead b { color: var(--text); }
+.ladder-none { font-size: 14px; color: var(--text2); margin: 4px 0 0; }
+.step { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px;
+        border-radius: 12px; border: .5px solid var(--border); background: var(--surface-2); color: var(--text);
+        font: inherit; cursor: pointer; }
+.step:hover { border-color: var(--accent); }
+.step > .qi { width: 18px; height: 18px; flex: none; padding: 6px; box-sizing: content-box; border-radius: 50%;
+              background: var(--surface); color: var(--text2); }
+.step b { display: block; font-size: 14.5px; }
+.step small { display: block; font-size: 12.5px; color: var(--text2); margin-top: 2px; line-height: 1.35; }
+.step--main { background: var(--accent-tint); border-color: var(--accent-ring); }
+.step--main > .qi { color: var(--accent-ink); }
+
+.help-feed { display: flex; flex-direction: column; gap: 10px; }
+.help-feed:empty { display: none; }
+.feed-card { border-radius: 12px; border: .5px solid var(--border); background: var(--surface-2);
+             padding: 12px 14px; font-size: 14.5px; line-height: 1.55; animation: chipIn .18s ease-out; }
+.feed-k { display: flex; align-items: center; gap: 6px; margin: 0 0 4px; }
+.feed-k .qi { width: 14px; height: 14px; color: var(--accent-ink); }
+.feed-k-l { font-size: 12px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--accent-ink); margin: 0; }
+.feed-parts .feed-k-l { margin: 0 0 8px; }
+.feed-note { font-size: 12px; color: var(--text3); margin-top: 4px; }
+.feed-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.feed-confirm { background: var(--surface); }
+.feed-confirm p { margin: 0; color: var(--text2); }
+.feed-err { background: var(--error-tint); color: var(--error); border-color: var(--error-border); margin: 0; }
+.feed-sol { padding: 0; background: var(--surface); }
+.feed-chk { padding: 0; border: 0; background: none; }
+.feed-chk .chk { margin: 0; }
+.help-feed .chk--wait { display: block; }
+
+.help-feed .ai-msg { max-width: 92%; font-size: 14.5px; line-height: 1.55; padding: 10px 13px; border-radius: 14px; white-space: normal; }
+.help-feed .ai-msg--me { align-self: flex-end; background: var(--btn-bg); color: var(--on-btn); border-bottom-right-radius: 4px; }
+.help-feed .ai-msg--ai { align-self: flex-start; background: var(--surface-2); color: var(--text); border: .5px solid var(--border);
+                         border-bottom-left-radius: 4px; max-width: 100%; }
+.ai-msg p { margin: 0 0 .6em; }
+.ai-msg p:last-child { margin-bottom: 0; }
+.ai-msg ul, .ai-msg ol { margin: 0 0 .6em 1.2em; padding: 0; }
+.ai-msg .katex-display { overflow-x: auto; overflow-y: hidden; margin: .5em 0; }
+.ai-msg-quote { font-size: 12.5px; opacity: .8; border-left: 2px solid currentColor; padding-left: 8px; margin-bottom: 6px; }
+
+.help-foot { border-top: .5px solid var(--border-soft); padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 8px; flex: none; }
+.help-foot .ai-sug { flex-direction: row; flex-wrap: wrap; gap: 6px; margin: 0; }
+.help-foot .ai-sug button { font: 600 13px/1 var(--font-ui); padding: 7px 11px; border-radius: var(--r-pill);
+                            background: var(--surface-2); border: .5px solid var(--border); color: var(--text); cursor: pointer; }
+.help-foot .ai-sug button:hover { border-color: var(--accent); }
+.help-tip { font-size: 12.5px; color: var(--text2); margin: 0; }
+.help-quick { display: flex; align-items: center; gap: 12px; }
+.help-quick:empty { display: none; }
+.quick-btn { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-ui); padding: 8px 12px;
+             border-radius: 10px; border: .5px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.quick-btn .qi { width: 15px; height: 15px; }
+.quick-btn .n { font-weight: 600; }
+.quick-link { border: 0; background: none; padding: 4px 2px; font: 600 13.5px/1 var(--font-ui); color: var(--text);
+              text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.quick-link[hidden], .quick-btn[hidden] { display: none; }
+.ai-quote { display: flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text2); background: var(--surface-2);
+            border-radius: 10px; padding: 4px 4px 4px 10px; }
+.ai-quote[hidden] { display: none; }
+.ai-quote-t { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.help-foot .ai-in { background: var(--surface-2); border-radius: 14px; }
+.help-foot .ai-send { background: var(--brand-amber); color: var(--brand-amber-ink); }
+.help-foot .ai-note { margin: 0; }
+.help-foot .sv-limit { margin: 0; }
+
+/* «Спросить ИИ про этот пункт» и «Спросить об этом» по выделению (README §3). */
+.stm .part { position: relative; padding-right: 38px; }
+.part-ask { position: absolute; right: 0; top: 10px; width: 28px; height: 28px; border-radius: 50%;
+            border: .5px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer;
+            display: inline-flex; align-items: center; justify-content: center; }
+.part-ask:hover { color: var(--accent-ink); border-color: var(--accent); }
+.part-ask .qi { width: 14px; height: 14px; }
+.ask-pop { position: absolute; z-index: 300; padding: 8px 12px; border-radius: 9px; border: 0;
+           background: var(--btn-bg); color: var(--on-btn); font: 600 13px/1 var(--font-ui); cursor: pointer;
+           box-shadow: var(--shadow-pop); }
+.ask-pop[hidden] { display: none; }
+
+/* Тест (README §5): белая карточка вариантов, «не то», одна главная кнопка. */
+.tq-rule { font-size: 13.5px; color: var(--text2); margin: 0 0 10px; }
+.tq-try { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; margin: 0; }
+.tq-msg .qi { width: 16px; height: 16px; flex: none; }
+.tq-msg--ok b { font-weight: 700; }
+.opt.is-tried { border-color: var(--error); background: var(--error-tint); cursor: not-allowed; }
+.opt.is-tried .opt-l { background: var(--error); border-color: var(--error); color: var(--on-error); }
+.opt.is-tried .opt-note { display: inline; color: var(--error); }
+.opt:disabled { cursor: default; }
+.opt.is-skip { opacity: .55; }
+.tq-expl { margin: 0 0 18px; background: var(--surface); }
+.tq-expl.is-on { display: block; }
+
+/* Кружок Telegram и стек плашек угла не садятся на панель помощи: на широком
+   экране — левее панели (или её полоски 52 px), в «Фокусе» — на своё место. */
+@media (min-width: 1100px) {
+  body:has(.stol-app[data-view="stol"] .desk[data-help="open"]) .tg-fab,
+  body:has(.stol-app[data-view="stol"] .desk[data-help="open"]) #corner-stack { right: calc(392px + 16px); }
+  body:has(.stol-app[data-view="stol"] .desk[data-help="closed"]) .tg-fab,
+  body:has(.stol-app[data-view="stol"] .desk[data-help="closed"]) #corner-stack { right: calc(52px + 16px); }
+  body.stol-is-focus .tg-fab, body.stol-is-focus #corner-stack { right: 16px; }
+}

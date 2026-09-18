@@ -110,24 +110,28 @@ class ProblemPageTests(TestCase):
 
     def test_solution_needs_soft_confirmation_before_reveal(self):
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('id="sol-confirm"', html)
+        # С S3 (18.09.2026) подтверждение — карточка ленты помощи из шаблона.
+        self.assertIn('<template id="help-confirm-tpl">', html)
         # Текст подтверждения — README §4 (прежний про «отправку попытки» убран).
         self.assertIn('Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
-        self.assertIn('id="sol-yes"', html)
-        self.assertIn('id="sol-no"', html)
+        self.assertIn('data-confirm="yes"', html)
+        self.assertIn('data-confirm="no"', html)
 
     def test_parts_live_inside_the_statement(self):
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<ol class="parts">', html)
         self.assertIn('<b>а)</b>', html)
-        self.assertIn('одно на всю задачу, подпункты внутри', html)
+        # Попытка одна на всю задачу — режим «Проверь решение» помощи, а не поле у пункта.
+        self.assertEqual(html.count('class="help-foot'), 1)
+        self.assertNotIn('id="sv-text"', html)
 
     def test_test_options_are_playable_tiles(self):
         """Этап 7: варианты теста — кнопки игры, а не статичные плитки."""
         html = self.client.get(_url(self.p_test)).content.decode()
         self.assertEqual(html.count('aria-pressed="false"'), 3)
         self.assertIn('<span class="opt-l">а</span>', html)
-        self.assertEqual(html.count('Показать ответ'), 1)
+        centre = html.split('id="stol-help"')[0]
+        self.assertEqual(centre.count('Показать ответ'), 1)
         self.assertNotIn('id="sol-btn"', html)
         self.assertNotIn('Ответ: <b class="math-content">б</b>', html)
 
@@ -171,8 +175,8 @@ class ProblemPageTests(TestCase):
         # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.
         # С 15.09.2026 у чата свой поставщик (CATALOG_CHAT_PROVIDER), не AI_PROVIDER.
         with self.settings(CATALOG_CHAT_PROVIDER='anthropic'):
-            self.assertNotIn('aria-label="Чат с ИИ по этой задаче"', self.client.get(_url(self.p_named)).content.decode())
+            self.assertNotIn('Выделите фрагмент условия', self.client.get(_url(self.p_named)).content.decode())
         with self.settings(CATALOG_CHAT_PROVIDER='fake'):
             html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('aria-label="Чат с ИИ по этой задаче"', html)
+        self.assertIn('Выделите фрагмент условия', html)
         self.assertIn('Данные профиля ему не передаются', html)

@@ -143,7 +143,7 @@ class ChatApiTests(TestCase):
 
     def test_anonymous_gets_403_and_a_login_link_instead_of_the_field(self):
         html = self.client.get(self.page).content.decode()
-        self.assertIn('aria-label="Чат с ИИ по этой задаче"', html)
+        self.assertIn('<aside class="help-panel"', html)
         self.assertNotIn('id="ai-text"', html)
         self.assertIn('Войти, чтобы спросить', html)
         self.assertEqual(self._post().status_code, 403)
@@ -193,7 +193,9 @@ class ChatApiTests(TestCase):
         resp = self.client.get(self.page)
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
-        for absent in ('Спросить ИИ', 'id="ai-text"', 'chatUrl', 'chatUploadUrl'):
+        # Поле помощи без чата остаётся только для проверки решения (S3, 18.09.2026):
+        # ни разговора, ни режимов «Теория» и «Как решать».
+        for absent in ('Спросить ИИ', 'chatUrl', 'chatUploadUrl', 'data-mode="theory"', 'data-mode="method"'):
             self.assertFalse(absent in html, 'без ключа чата на странице: %s' % absent)
 
 

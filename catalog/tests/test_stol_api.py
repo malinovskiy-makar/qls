@@ -364,7 +364,7 @@ class TestNextButtonTests(TestCase):
     def test_next_is_the_main_button_when_there_is_somewhere_to_go(self):
         done = self._html(True).split('id="row-done"', 1)[1].split('</div>', 1)[0]
         self.assertIn('class="btn btn--main"', done)
-        self.assertIn('Дальше ›', done)
+        self.assertIn('Дальше <svg', done.replace('\n', ''))
 
     def test_no_next_without_similar(self):
         done = self._html(False).split('id="row-done"', 1)[1].split('</div>', 1)[0]

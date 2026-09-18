@@ -23,7 +23,7 @@ from .placeholder_phrases import (
 )
 from .preview import (
     PREVIEW_CHARS, looks_like_statement_cut, solution_is_statement_copy,
-    strip_score_tails, strip_statement_retell, tex_preview,
+    strip_correct_repeat, strip_score_tails, strip_statement_retell, tex_preview,
 )
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
@@ -1218,6 +1218,15 @@ def _ordered_hints(problem):
     return general + by_part
 
 
+def _hint_view(n, hint, total):
+    """Подсказка для ленты помощи — одна форма у ответа API и у перезагрузки."""
+    return {
+        'n': n, 'total': total, 'text': hint.text,
+        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
+        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
+    }
+
+
 def api_hint(request, problem_id, n):
     """Подсказка номер `n` (с единицы) к видимой задаче; за пределом — 404.
 
@@ -1228,13 +1237,8 @@ def api_hint(request, problem_id, n):
     hints = _ordered_hints(problem)
     if n < 1 or n > len(hints):
         raise Http404('такой подсказки нет')
-    hint = hints[n - 1]
     progress.note_hint(request.user, problem, n)
-    return JsonResponse({
-        'n': n, 'total': len(hints), 'text': hint.text,
-        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
-        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
-    })
+    return JsonResponse(_hint_view(n, hints[n - 1], len(hints)))
 
 
 def _neighbours(request, problem, similar_rows):
@@ -1349,6 +1353,16 @@ def _problem_context(request, problem):
     meta = _neighbours(request, problem, similar_rows)
     meta.update(_neighbour_titles(meta))
 
+    # Панель помощи (README §4) переживает перезагрузку: открытые подсказки и
+    # факт открытого решения — из прогресса ученика, разговор — из `ChatTurn`.
+    hints = _ordered_hints(problem) if hint_total else []
+    opened = min(my_progress.hints_opened, hint_total) if my_progress else 0
+    opened_hints = [_hint_view(n, hint, hint_total) for n, hint in enumerate(hints[:opened], 1)]
+    sol = _solution_block(problem, parts)
+    # Ступень «Ответ по одному пункту» — только при ответах в данных (решение 17.09).
+    part_answers = ([{'label': part.label, 'answer': part.answer} for part in parts
+                     if (part.answer or '').strip()] if not game else [])
+
     return {
         'problem':      problem,
         'similar_cards': _cards_with_marks(request.user, similar_rows),
@@ -1370,9 +1384,16 @@ def _problem_context(request, problem):
         'clouds_1':     row1,
         'tags_total':   sum(1 for c in row1 if c['kind'] == 'tag'),
         'clouds_2':     row2,
-        'sol':          _solution_block(problem, parts),
+        'sol':          sol,
         'saved':        saved,
         'meta':         meta,
+        'opened_hints': opened_hints,
+        'hints_left':   hint_total - opened,
+        'next_hint':    opened + 1,
+        'solution_viewed': bool(my_progress and my_progress.solution_viewed and sol['has_any']),
+        'part_answers': part_answers,
+        # Лестница пуста, только пока человек ничем не пользовался.
+        'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt),
         'teacher_assignments_json': _teacher_assignments(request),
         # Как эту задачу решают в игре (строка под условием и в тесте).
         'game_stat':    _game_stat(problem.pk),
@@ -1437,7 +1458,9 @@ def _test_context(problem, game, topics):
         'rule':     game['rule'],
         'options':  game['options'],
         'more_url': more_url,
-        'expl':     strip_score_tails(problem.solution),
+        # «Почему так» — без разбалловки жюри и без повтора верного варианта
+        # (README §5; оба среза только при показе, данные не трогаем).
+        'expl':     strip_correct_repeat(strip_score_tails(problem.solution), game),
         'stat':     _game_stat(problem.pk),
     }
 

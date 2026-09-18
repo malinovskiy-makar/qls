@@ -186,6 +186,69 @@ try {
       await ctx.close();
     }
   }
+  /* ── S3: помощь и тест у вошедшего ученика (чат — подставной поставщик) ── */
+  if (process.env.STOL_SESSION) {
+    const login = async ctx => ctx.addCookies([{ name: 'sessionid', value: process.env.STOL_SESSION, url: BASE }]);
+    /* Длинный ответ ИИ показывается целиком: 5 000 знаков, ни одного не срезано. */
+    {
+      const long = 'Шаг решения с формулой $MR = MC$. '.repeat(160).slice(0, 5000);
+      const { ctx, page, errors } = await fresh(1440, {
+        path: process.env.STOL_PROBLEM,
+        route: async p => { await login(p.context()); await p.route('**/api/chat/', r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ reply: long }) })); },
+      });
+      await page.fill('#ai-text', 'Объясни решение подробно');
+      await page.click('#ai-send');
+      await page.waitForFunction(() => document.querySelectorAll('#help-feed .ai-msg--ai .katex').length > 0);
+      out['long reply'] = await page.evaluate(n => {
+        const el = [...document.querySelectorAll('#help-feed .ai-msg--ai')].pop();
+        const clone = el.cloneNode(true);
+        clone.querySelectorAll('.katex').forEach(k => k.replaceWith('F'));
+        return { steps: (el.textContent.match(/Шаг решения/g) || []).length, want: n,
+                 overflow: el.scrollHeight > el.clientHeight + 2 && getComputedStyle(el).overflowY === 'hidden' };
+      }, (long.match(/Шаг решения/g) || []).length);
+      out['long reply'].errors = errors;
+      await ctx.close();
+    }
+    /* «Спросить ИИ про этот пункт»: «Пункт а): » в поле и цитата пункта. */
+    {
+      const { ctx, page, errors } = await fresh(1440, { path: process.env.STOL_PROBLEM, route: async p => login(p.context()) });
+      await page.click('.part-ask');
+      out['part ask'] = await page.evaluate(() => ({
+        field: document.getElementById('ai-text').value,
+        quote: document.querySelector('#ai-quote .ai-quote-t').textContent,
+        quoteShown: !document.getElementById('ai-quote').hidden,
+        focused: document.activeElement && document.activeElement.id,
+      }));
+      out['part ask'].errors = errors;
+      await ctx.close();
+    }
+    /* Тест: ошибочный вариант краснеет «не то» и второй раз не выбирается (README §5). */
+    if (process.env.STOL_TEST) {
+      const { ctx, page, errors } = await fresh(1440, { path: process.env.STOL_TEST, route: async p => login(p.context()) });
+      await page.click('.opt[data-l="a"]');
+      await page.click('#check-btn');
+      await page.waitForSelector('.opt.is-tried');
+      await page.click('.opt[data-l="a"]', { force: true });
+      out['test tried'] = await page.evaluate(() => {
+        const a = document.querySelector('.opt[data-l="a"]');
+        return { note: a.querySelector('.opt-note').textContent, disabled: a.disabled,
+                 pressed: a.getAttribute('aria-pressed'), wrongShown: document.getElementById('msg-wrong').classList.contains('is-on'),
+                 check: document.getElementById('check-btn').disabled,
+                 rowsVisible: [...document.querySelectorAll('.tq-row')].filter(r => r.offsetParent !== null).map(r => r.id) };
+      });
+      await page.click('.opt[data-l="b"]');
+      await page.click('#check-btn');
+      await page.waitForSelector('.opt.is-hit');
+      out['test solved'] = await page.evaluate(() => ({
+        ok: document.getElementById('ok-sub').textContent,
+        tried: document.querySelector('.opt[data-l="a"] .opt-note').textContent,
+        hit: document.querySelector('.opt[data-l="b"] .opt-note').textContent,
+        why: (document.querySelector('#expl .b') || {}).textContent || '',
+        rowsVisible: [...document.querySelectorAll('.tq-row')].filter(r => r.offsetParent !== null).map(r => r.id) }));
+      out['test tried'].errors = errors;
+      await ctx.close();
+    }
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }
