@@ -75,10 +75,10 @@
 
 /* Ряд чипов: высота 32; активный чип тёмный и показывает значение. */
 .se-chips { display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
-            gap: 8px; margin-top: 12px; }
-.se-chip { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px;
+            gap: 6px; margin-top: 12px; }
+.se-chip { display: inline-flex; align-items: center; gap: 5px; height: 32px; padding: 0 11px;
            border-radius: var(--r-pill); border: 1px solid var(--border); background: var(--surface);
-           color: var(--text); font: 500 14px/1 var(--font-ui); cursor: pointer; max-width: 240px; }
+           color: var(--text); font: 500 13.5px/1 var(--font-ui); cursor: pointer; max-width: 220px; }
 .se-chip:hover { border-color: var(--brand-amber); }
 .se-chip .qi { width: 15px; height: 15px; flex: none; }
 .se-chip-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -213,10 +213,12 @@
 .rail-topic-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rail-dot { display: inline-block; width: 7px; height: 7px; margin-right: 5px; border-radius: 50%;
             background: var(--gc); flex: none; }
-.rail-stars { color: var(--amber); letter-spacing: 1px; flex: none; }
-.rail-star-off { opacity: .55; }
+/* Метки строки лежат на песочной плашке ленты — цвета «чернилами» (--*-ink), иначе в
+   тёмной теме звёзды и «решение» ниже WCAG 4,5 (замер test_contrast, 18.09.2026). */
+.rail-stars { color: var(--amber-ink); letter-spacing: 1px; flex: none; }
+.rail-star-off { font-weight: 400; }
 .rail-mark { flex: none; }
-.rail-mark--sol { color: var(--green); }
+.rail-mark--sol { color: var(--green-ink); }
 .rail-saved { flex: none; color: var(--amber); display: inline-flex; }
 .rail-saved .qi { width: 15px; height: 15px; }
 .rail-empty { font-size: 13px; color: var(--text3); padding: 6px 8px; }

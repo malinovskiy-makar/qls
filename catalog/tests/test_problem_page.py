@@ -68,7 +68,8 @@ class ProblemPageTests(TestCase):
     def test_page_uses_its_own_wide_column(self):
         # «Стол» (18.09.2026): полоса страницы задачи шире — лента и помощь по краям.
         self.assertIn('<main class="pd-wrap stol-wrap">', self.client.get(_url(self.p_named)).content.decode())
-        self.assertIn('<main class="page-wrap">', self.client.get('/catalog/').content.decode())
+        # Вход каталога — вид «entry» единого экрана «Стол» во всю ширину окна (18.09.2026).
+        self.assertIn('<main class="stol stol--entry">', self.client.get('/catalog/').content.decode())
 
     def test_clouds_link_to_the_catalog_with_that_filter(self):
         html = self.client.get(_url(self.p_named)).content.decode()

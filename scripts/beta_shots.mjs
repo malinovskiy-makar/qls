@@ -198,6 +198,15 @@ async function run() {
    Сцена — { phase, name, who, widths, go(page) }. Поиск на локальной базе
    идёт по словам 12–15 с — таймауты с запасом. */
 const QUERY = 'монополист с двумя заводами и налогом';
+/* Облако фона стартует лениво (простой браузера, данные, раскладка) — для
+   кадра дожидаемся данных и досчитываем раскладку вручную (pump). */
+async function settleBg(p) {
+  await p.waitForFunction(() => {
+    const el = document.getElementById('stol-bg');
+    return !el || (el.__tmapPreview && el.__tmapPreview.stats().nodes > 0);
+  }, null, { timeout: 60000 });
+  await p.evaluate(() => { const el = document.getElementById('stol-bg'); if (el) el.__tmapPreview.pump(150); });
+}
 const STOL_SCENES = [
   { phase: 's1', name: 'entry_empty', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
@@ -233,6 +242,7 @@ async function runStol() {
         page.on('pageerror', e => errors.push(`[${sc.name} ${theme} ${width}] pageerror ${e.message}`));
         page.on('console', m => { if (m.type() === 'error') errors.push(`[${sc.name} ${theme} ${width}] ${m.text()}`); });
         await sc.go(page);
+        await settleBg(page);
         await snap(page, sc.name, theme, width);
         await ctx.close();
       }

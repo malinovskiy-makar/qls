@@ -89,7 +89,10 @@
       var open = btn.getAttribute('aria-expanded') !== 'true';
       closeAll(btn);
       btn.setAttribute('aria-expanded', String(open));
-      document.getElementById(btn.getAttribute('aria-controls')).hidden = !open;
+      var dd = document.getElementById(btn.getAttribute('aria-controls'));
+      dd.hidden = !open;
+      /* Не ниже края окна: «Готово» внизу выпадашки обязано быть видно. */
+      if (open) dd.style.maxHeight = Math.max(220, Math.min(430, window.innerHeight - dd.getBoundingClientRect().top - 16)) + 'px';
       return;
     }
     if (e.target.closest('[data-dd-close]')) { closeAll(); return; }
@@ -169,7 +172,7 @@
   if (bg && window.TopicMapPreview) {
     bgMap = TopicMapPreview.mount(bg, {
       dataUrl: bg.getAttribute('data-map-url'), inert: true,
-      zoom: 1.9, pitch: -0.26, cy: 0.4, dim: 0.5,
+      zoom: 1.55, nodeScale: 1.1, pitch: -0.26, cy: 0.42, dim: 0.5,
       selected: selNode ? JSON.parse(selNode.textContent) : null
     });
   }
