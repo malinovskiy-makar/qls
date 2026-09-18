@@ -23,7 +23,7 @@ from .placeholder_phrases import (
 )
 from .preview import (
     PREVIEW_CHARS, looks_like_statement_cut, solution_is_statement_copy,
-    strip_statement_retell, tex_preview,
+    strip_score_tails, strip_statement_retell, tex_preview,
 )
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
@@ -1373,7 +1373,7 @@ def _test_context(problem, game, topics):
         'rule':     game['rule'],
         'options':  game['options'],
         'more_url': more_url,
-        'expl':     (problem.solution or '').strip(),
+        'expl':     strip_score_tails(problem.solution),
         'stat':     _game_stat(problem.pk),
     }
 

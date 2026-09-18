@@ -184,3 +184,13 @@ def strip_statement_retell(statement, solution):
         return text
     rest = text[end + len(tail):].strip()
     return rest or text
+
+
+# ── «Почему так» у теста: баллы составителя не нужны ученику (P6, 18.09.2026) ─
+# 25 видимых тестов держат в решении хвосты «(6 баллов)», «**(3 балла)**» —
+# разбалловку жюри. При показе они срезаются; данные не трогаем.
+_RX_SCORE_TAIL = re.compile(r'\s*\*{0,2}\(\s*\d+(?:[.,]\d+)?\s*балл(?:а|ов)?\s*\)\*{0,2}')
+
+
+def strip_score_tails(text):
+    return _RX_SCORE_TAIL.sub('', text or '').strip()

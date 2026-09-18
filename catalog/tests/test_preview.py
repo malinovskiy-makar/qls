@@ -6,7 +6,9 @@
 """
 from django.test import SimpleTestCase
 
-from catalog.preview import solution_is_statement_copy, strip_statement_retell
+from catalog.preview import (
+    solution_is_statement_copy, strip_score_tails, strip_statement_retell,
+)
 
 STATEMENT_63315 = (
     'Монополист продает электроэнергию. Функция спроса единственного покупателя '
@@ -49,3 +51,18 @@ class CopyTests(SimpleTestCase):
 
     def test_real_solution_is_not_a_copy(self):
         self.assertFalse(solution_is_statement_copy(STATEMENT_2056, SOLUTION_2056))
+
+
+class ScoreTailTests(SimpleTestCase):
+    """Живые хвосты из банка: 62601, 63234, 63244."""
+
+    def test_spaced_tails_are_cut(self):
+        self.assertEqual(strip_score_tails('Ответ: a = 6 ( 4 балла) и b = 2 ( 4 балла)'),
+                         'Ответ: a = 6 и b = 2')
+
+    def test_bold_tail_is_cut(self):
+        self.assertEqual(strip_score_tails('доход 5000/125=40 гринчиков **(3 балла)**'),
+                         'доход 5000/125=40 гринчиков')
+
+    def test_plain_parentheses_stay(self):
+        self.assertEqual(strip_score_tails('Ответ: 8 (в тысячах)'), 'Ответ: 8 (в тысячах)')
