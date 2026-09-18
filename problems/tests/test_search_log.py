@@ -84,6 +84,12 @@ class SearchLogWriteTests(_Fixture):
         self._page(q='эластичность')
         self.assertEqual(SearchLog.objects.count(), 2)
 
+    def test_live_state_without_log_param_writes_nothing(self):
+        """Без `log=1` живое состояние не пишет вовсе — не только склейкой."""
+        self._live()
+        self._live(q='эластичность')
+        self.assertEqual(SearchLog.objects.count(), 0)
+
     def test_live_state_writes_only_on_explicit_log_param(self):
         self._live(log='1')
         self._live(log='1', topic=self.mon.pk)
