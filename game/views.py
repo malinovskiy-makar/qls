@@ -364,20 +364,26 @@ def pool_tags(f=None):
     Показывать тег, по которому ничего не найдётся, — значит обещать выбор,
     которого нет. Считаем по всему пулу (без учёта режима): игрок выбирает
     теги до выбора режима.
+
+    ⚠️ ТОЛЬКО КАНОНИЧЕСКИЕ (18.09.2026), как в фильтре каталога: legacy-теги,
+    убранные из каталога 17.09, в окне игры не показываются. Данные пула не
+    трогаются — вопрос с legacy-тегом по-прежнему считается по своей теме
+    (`pool_counts_for` этой правкой не задет).
+
+    `topics` — темы вопросов с этим тегом: окно показывает «теги выбранных
+    тем», как каталог.
     """
     from problems.models import Tag
-    used = set()
-    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
-        used.update(tag_ids or [])
-    if not used:
-        return []
-    rows = Tag.objects.filter(id__in=used).values_list('id', 'name')
-    counts = {}
-    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
+    counts, topics_of = {}, {}
+    for tag_ids, topics in _pool_qs().values_list('tag_ids', 'topics'):
         for t in (tag_ids or []):
             counts[t] = counts.get(t, 0) + 1
+            topics_of.setdefault(t, set()).update(topics or [])
+    if not counts:
+        return []
+    rows = Tag.objects.filter(id__in=counts, kind='canonical').values_list('id', 'name')
     return sorted(
-        ({'id': pk, 'name': name, 'count': counts.get(pk, 0)}
+        ({'id': pk, 'name': name, 'count': counts[pk], 'topics': sorted(topics_of[pk])}
          for pk, name in rows),
         key=lambda r: (-r['count'], r['name']))
 
