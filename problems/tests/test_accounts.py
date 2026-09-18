@@ -590,11 +590,16 @@ class BetaProfileFieldsTests(TestCase):
 
 
 class GradeMigrationTests(TestCase):
-    """Перевод класса в коды (миграция 0069) — функции миграции на живой схеме."""
+    """Перевод класса в коды (миграция 0070) — функции миграции на живой схеме.
+
+    ⚠️ Данные и схема разъехались по разным файлам 18.09.2026 (прод-инцидент
+    с pending trigger events, см. docstring 0069_beta_profile_fields) —
+    grade_to_codes/grade_to_numbers теперь в 0070_beta_profile_grade_data.
+    """
 
     def _migration(self):
         import importlib
-        return importlib.import_module('problems.migrations.0069_beta_profile_fields')
+        return importlib.import_module('problems.migrations.0070_beta_profile_grade_data')
 
     def _profile(self, grade):
         user = User.objects.create_user(username='mig_%s' % grade,
