@@ -266,6 +266,8 @@ def _card(problem, score=None):
         'kind_label':       _kind_label(problem.problem_type) if is_test else '',
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
+        # Заголовок в строке ленты «Стола» — без обрывка формулы, как у «Похожих».
+        'title_display':    similar_title(problem) if title else '',
         # Число близости показывается ТОЛЬКО при поиске (решение владельца
         # 09.09.2026) — при пустом запросе сортировка идёт по id, близости
         # нет вовсе, и `score` здесь всегда None.
@@ -1298,8 +1300,28 @@ def problem_detail(request, pk):
         if request.user.is_authenticated:
             pd_config['chatUploadUrl'] = reverse('catalog:api_chat_upload')
 
+    # «Стол» (часть B, 18.09.2026): лента «Похожие» рисуется сервером —
+    # прямая ссылка работает без скрипта; «Мои» скрипт догружает по вкладке.
+    similar_rows = list(_visible(problem.similar_problems.all())
+                        .prefetch_related('topics', 'parts', 'source_references__source')
+                        [:RAIL_MAX])
+    statuses = progress.statuses_for(request.user, [p.pk for p in similar_rows])
+    rail_rows = [{'card': _card(p), 'status': statuses.get(p.pk, '')} for p in similar_rows]
+    my_progress = None
+    if request.user.is_authenticated:
+        from problems.models_platform import ProblemProgress
+        my_progress = ProblemProgress.objects.filter(user=request.user, problem=problem).first()
+        pd_config['progressUrl'] = reverse('catalog:api_progress', args=[problem.pk])
+        pd_config['railSavedUrl'] = reverse('catalog:api_rail_saved')
+    # «Как прошло?» — не у тестов (статус ставит сам тест) и не у учителя.
+    show_how = (request.user.is_authenticated and not game
+                and getattr(request.user, 'role', '') != 'teacher')
+
     from urllib.parse import urlencode
     context = {
+        'rail_rows':    rail_rows,
+        'my_progress':  my_progress,
+        'show_how':     show_how,
         'problem':      problem,
         'ai_available': ai_available,
         'chat_available': chat_available,
@@ -1315,6 +1337,7 @@ def problem_detail(request, pk):
         'heading':      heading,
         'show_title':   show_title,
         'clouds_1':     row1,
+        'tags_total':   sum(1 for c in row1 if c['kind'] == 'tag'),
         'clouds_2':     row2,
         'sol':          _solution_block(problem, parts),
         'similar':      _similar_cards(problem),

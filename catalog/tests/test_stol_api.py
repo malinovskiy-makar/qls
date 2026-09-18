@@ -190,7 +190,7 @@ class RailTests(TestCase):
         self.assertNotIn('/catalog/problem/%d/' % self.hidden.pk, html)
 
     def test_guest_rows_have_no_status_column(self):
-        self.assertNotIn('rail-status', self._similar()['rows_html'])
+        self.assertNotIn('class="rail-status', self._similar()['rows_html'])
 
     def test_logged_in_rows_carry_the_status(self):
         ProblemProgress.objects.create(user=self.user, problem=self.similar, status='failed')
@@ -215,3 +215,50 @@ class RailTests(TestCase):
     def test_similar_of_a_flagged_problem_is_404(self):
         response = self.client.get(reverse('catalog:api_rail_similar', args=[self.hidden.pk]))
         self.assertEqual(response.status_code, 404)
+
+
+class StolProblemPageTests(TestCase):
+    """«Стол» на странице задачи: лента сервером, теги свёрнуты, «Как прошло?»."""
+
+    def setUp(self):
+        cache.clear()
+        from problems.models import Tag
+        from problems.tests.factories import make_topic
+        topic = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        self.problem = make_problem('Монополист выбирает выпуск.', topic=topic)
+        self.problem.tags.add(Tag.objects.create(name='Курно', slug='kurno', kind='canonical'))
+        self.similar = make_problem('Похожая задача.')
+        self.problem.similar_problems.add(self.similar)
+        self.url = reverse('catalog:problem_detail', args=[self.problem.pk])
+
+    def _html(self):
+        return self.client.get(self.url).content.decode('utf-8')
+
+    def test_rail_is_rendered_by_the_server(self):
+        html = self._html()
+        self.assertIn('id="stol-rail-list"', html)
+        self.assertIn('/catalog/problem/%d/' % self.similar.pk, html)
+
+    def test_tags_are_folded_for_everyone(self):
+        html = self._html()
+        self.assertIn('<details class="pp-tags">', html)
+        self.assertIn('Теги · 1', html)
+
+    def test_guest_has_no_how_block_and_no_status_column(self):
+        html = self._html()
+        self.assertNotIn('id="how"', html)
+        self.assertNotIn('class="rail-status', html)
+
+    def test_student_sees_how_block(self):
+        self.client.force_login(make_user('stol_page_student'))
+        self.assertIn('id="how"', self._html())
+
+    def test_teacher_has_no_how_block(self):
+        self.client.force_login(make_user('stol_page_teacher', role='teacher'))
+        self.assertNotIn('id="how"', self._html())
+
+    def test_solution_viewed_disables_solved_self(self):
+        user = make_user('stol_page_viewed')
+        ProblemProgress.objects.create(user=user, problem=self.problem, solution_viewed=True)
+        self.client.force_login(user)
+        self.assertRegex(self._html(), r'data-how="self" disabled')

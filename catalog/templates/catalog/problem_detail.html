@@ -14,7 +14,7 @@
 {% endcomment %}
 
 {% block title %}{{ heading }}{% endblock %}
-{% block main_class %}pd-wrap{% endblock %}
+{% block main_class %}pd-wrap stol-wrap{% endblock %}
 
 {% block extra_style %}
 /* ── Каркас: своя полоса под карточку справа (ADR 0078) ─────────────── */
@@ -346,10 +346,36 @@ span.pp--src:active { transform: none; }
 .ai-note { font-size: 11.5px; color: var(--text3); margin: 8px 2px 0; line-height: 1.4; }
 
 {% include "catalog/_catalog_actions_css.html" %}
+{% include "catalog/stol/_stol_css.html" %}
 {% endblock %}
 
 {% block content %}
-<div class="pd-grid">
+{% comment %}
+«СТОЛ» НА СТРАНИЦЕ ЗАДАЧИ (часть B ночи 18.09.2026, первый шаг): лента слева ·
+задача 680 px · помощь справа. Панели сворачиваются в полоски 52 px, «Фокус»
+убирает обе; состояние панелей — `localStorage` (`stol.js`). Лента «Похожие»
+рисуется сервером — прямая ссылка работает без скрипта. Вход каталога, карта
+и учитель — следующие фазы (журнал ночи).
+{% endcomment %}
+<div class="pd-grid stol" id="stol" data-rail="closed" data-help="open">
+<nav class="stol-strip stol-strip--rail" aria-label="Лента">
+  <button type="button" class="stol-strip-btn" data-stol="rail" aria-label="Открыть ленту" title="Лента ([)">{% include '_icon.html' with name='chevron_right' %}</button>
+  <a class="stol-strip-btn" href="{% url 'catalog:problem_list' %}" aria-label="Весь каталог" title="Весь каталог">{% include '_icon.html' with name='search' %}</a>
+</nav>
+<aside class="stol-rail" id="stol-rail" aria-label="Лента задач">
+  <div class="stol-rail-head">
+    <div class="stol-tabs" role="tablist">
+      <button type="button" role="tab" class="stol-tab is-on" data-rail-tab="similar" aria-selected="true">Похожие</button>
+      {% if user.is_authenticated %}<button type="button" role="tab" class="stol-tab" data-rail-tab="saved" aria-selected="false">Мои</button>{% endif %}
+    </div>
+    <button type="button" class="stol-strip-btn" data-stol="rail" aria-label="Свернуть ленту" title="Свернуть ([)">{% include '_icon.html' with name='chevron_left' %}</button>
+  </div>
+  <div class="rail rail--narrow" id="stol-rail-list">
+    {% for row in rail_rows %}{% include 'catalog/stol/_rail_row.html' with card=row.card status=row.status show_status=user.is_authenticated current_id=problem.pk %}{% endfor %}
+    {% if not rail_rows %}<p class="rail-empty">Похожих задач в банке пока нет.</p>{% endif %}
+  </div>
+  <a class="rail-all" href="{% url 'catalog:problem_list' %}">Весь каталог</a>
+</aside>
 <article class="pd-main">
 
   {% comment %}
@@ -359,6 +385,8 @@ span.pp--src:active { transform: none; }
   {% if show_title %}<h1 class="pd-title">{{ problem.title }}</h1>{% else %}<h1 class="sr-only">{{ heading }}</h1>{% endif %}
 
   <div class="pd-acts">
+    <button class="pd-act stol-only" type="button" data-stol="rail" title="Лента ([)">{% include '_icon.html' with name='chevron_right' %}<span>Лента</span></button>
+    <button class="pd-act stol-only" type="button" data-stol="focus" title="Фокус (F)">{% include '_icon.html' with name='expand' %}<span class="stol-focus-label">Фокус</span></button>
     {% if user.is_authenticated %}
     <button class="pd-act{% if saved %} is-on{% endif %}" type="button" id="save-btn" data-problem="{{ problem.pk }}"
             data-url="{% url 'api_save_problem' %}">
@@ -384,14 +412,22 @@ span.pp--src:active { transform: none; }
       <div class="ca-dropdown" id="hw-dd-{{ problem.pk }}"></div>
     </div>
     {% endif %}
+    <button class="pd-act stol-only" type="button" data-stol="help" title="Помощь (])"><span>Помощь</span>{% include '_icon.html' with name='chevron_left' %}</button>
   </div>
 
   {% if clouds_1 or clouds_2 %}
   <div class="pp-rows" aria-label="Свойства задачи">
     {% if clouds_1 %}
     <div class="pp-row">
-      {% for c in clouds_1 %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endfor %}
+      {% for c in clouds_1 %}{% if c.kind != 'tag' %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}
     </div>
+    {% comment %}Теги свёрнуты у всех (решение владельца 17.09: теги выдают метод); раскрываются без скрипта.{% endcomment %}
+    {% if tags_total %}
+    <details class="pp-tags">
+      <summary>Теги · {{ tags_total }}</summary>
+      <div class="pp-row">{% for c in clouds_1 %}{% if c.kind == 'tag' %}<a class="pp pp--{{ c.kind }}" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}</div>
+    </details>
+    {% endif %}
     {% endif %}
     {% if clouds_2 %}
     <div class="pp-row">
@@ -433,6 +469,16 @@ span.pp--src:active { transform: none; }
       </ol>
     {% endif %}
   </section>
+
+  {% if show_how %}
+  {% comment %}«Как прошло?» — один клик, повторный снимает; «Решил сам» недоступно после открытого решения (ADR 0119).{% endcomment %}
+  <section class="how" id="how" aria-label="Как прошло" data-status="{{ my_progress.status|default:'opened' }}"{% if my_progress.solution_viewed %} data-solution-viewed{% endif %}>
+    <span class="how-q">Как прошло?</span>
+    <button type="button" class="how-btn" data-how="self"{% if my_progress.solution_viewed %} disabled title="Решение уже открыто"{% endif %} aria-pressed="{% if my_progress.status == 'solved_self' %}true{% else %}false{% endif %}">Решил сам</button>
+    <button type="button" class="how-btn" data-how="hint" aria-pressed="{% if my_progress.status == 'solved_hint' %}true{% else %}false{% endif %}">С подсказкой</button>
+    <button type="button" class="how-btn" data-how="failed" aria-pressed="{% if my_progress.status == 'failed' %}true{% else %}false{% endif %}">Не получилось</button>
+  </section>
+  {% endif %}
 
   {% if ai_available or hint_total or sol.has_any %}
   {% comment %}
@@ -555,7 +601,12 @@ span.pp--src:active { transform: none; }
   {% endif %}
 </article>
 
+<nav class="stol-strip stol-strip--help" aria-label="Помощь">
+  <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Открыть помощь" title="Помощь (])">{% include '_icon.html' with name='chevron_left' %}</button>
+  {% if hint_total %}<span class="stol-strip-note" title="Подсказок у задачи">{% include '_icon.html' with name='bulb' %}<b>{{ hint_total }}</b></span>{% endif %}
+</nav>
 <aside class="pd-side">
+  <div class="stol-help-head"><b>Помощь</b><button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button></div>
   {% comment %}
   Карточка чата — только при доступном поставщике чата (правило нуля: без
   ключа её нет вовсе). Три кнопки режимов (решение владельца 15.09.2026):
@@ -614,6 +665,7 @@ span.pp--src:active { transform: none; }
 {% endcomment %}
 <script type="application/json" id="pd-config">{{ pd_config|script_json|safe }}</script>
 <script defer src="{% static 'catalog/js/problem_page.js' %}"></script>
+<script defer src="{% static 'catalog/js/stol.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
@@ -669,6 +721,8 @@ span.pp--src:active { transform: none; }
       solBtn.textContent = 'Решение открыто';
       if (confirmBox) { confirmBox.classList.remove('is-on'); }
       if (!submitted) { window.solutionViewedBefore = true; }
+      /* «Стол»: открытое решение — след в прогрессе (stol.js, ADR 0119). */
+      document.dispatchEvent(new CustomEvent('weco:solution-viewed'));
       /* Формулы в раскрытом блоке — тем же конвейером, что у страницы:
          маскировка «\$» до KaTeX, «$$» раньше «$», чистка эскейпов после. */
       var block = sol;
