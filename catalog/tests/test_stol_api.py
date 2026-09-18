@@ -300,3 +300,16 @@ class ContinueRowTests(TestCase):
     def test_search_hides_the_block(self):
         self.client.force_login(self.user)
         self.assertNotIn('class="ct-continue"', self._html(q='монополия'))
+
+
+class MapApplyIsAFilterTests(TestCase):
+    """«Показать задачи» на карте — фильтр каталога, а не текстовый поиск (P7)."""
+
+    def test_script_builds_topic_and_tag_params_from_db_keys(self):
+        import io
+        src = io.open('catalog/static/catalog/js/topic_map.js', encoding='utf-8').read()
+        handler = src.split("getElementById('tmap-apply').addEventListener", 1)[1]
+        handler = handler.split('\n});', 1)[0]
+        self.assertIn("node.k === 'theme' ? 'topic=' : 'tag='", handler)
+        self.assertIn('node.db', handler)
+        self.assertNotIn('?q=', handler)

@@ -2762,16 +2762,20 @@ document.getElementById('tmap-reset').addEventListener('click', function () {
   clearPick(); touchActivity();
 });
 
-/* Кнопка «Показать задачи» ведёт в каталог поиском по названиям выбранного
-   (04.09.2026): узлы карты — номера тем и тегов таксономии, а не
-   идентификаторы базы, поэтому в фильтр каталога они не переводятся.
-   Точный перевод в фильтр (логика И/ИЛИ) — карточка идеи в Notion,
-   https://app.notion.com/p/3cbb11c92bc181629f4aff24af52d837 */
+/* Кнопка «Показать задачи» — выбор карты становится ФИЛЬТРОМ каталога
+   (решение владельца 17.09: карта и фильтры — одно состояние): узлы несут
+   ключ справочника `db` (catalog/map_numbers.py, 18.09.2026), темы уходят
+   параметром `topic` (складываются по «или»), теги — `tag` (по «и»).
+   До 18.09 выбор уходил текстовым поиском `?q=` по названиям. Узел без
+   ключа в фильтр не переводится. */
 document.getElementById('tmap-apply').addEventListener('click', function () {
-  var names = Object.keys(picked).filter(function (k) { return picked[k] && byId[k]; })
-    .map(function (k) { return byId[k].l; });
-  if (!names.length) return;
-  window.location.href = '/catalog/?q=' + encodeURIComponent(names.join(', '));
+  var params = [];
+  Object.keys(picked).forEach(function (k) {
+    var node = picked[k] && byId[k];
+    if (!node || node.db == null) return;
+    params.push((node.k === 'theme' ? 'topic=' : 'tag=') + encodeURIComponent(node.db));
+  });
+  window.location.href = '/catalog/' + (params.length ? '?' + params.join('&') : '');
 });
 
 /* Чипы: крестик снимает выбор. */
