@@ -23,7 +23,7 @@
   </span>
   <span class="rail-meta">
     {% with topic=card.topics.0 %}{% if topic %}<span class="rail-topic" style="--gc: var(--map-g-{{ topic.section }})"><span class="rail-dot"></span><span class="rail-topic-l">{{ topic.name }}</span></span>{% endif %}{% endwith %}
-    {% if card.difficulty %}<span class="rail-stars" aria-label="сложность {{ card.difficulty }}">{% for _ in card.difficulty_stars %}★{% endfor %}{% for _ in card.difficulty_empty %}<span class="rail-star-off">☆</span>{% endfor %}</span>{% endif %}
+    {% if card.difficulty %}<span class="rail-stars" role="img" aria-label="сложность {{ card.difficulty }}">{% for _ in card.difficulty_stars %}★{% endfor %}{% for _ in card.difficulty_empty %}<span class="rail-star-off">☆</span>{% endfor %}</span>{% endif %}
     {% if card.is_test %}<span class="rail-mark">тест</span>{% elif card.has_solution %}<span class="rail-mark rail-mark--sol">решение</span>{% endif %}
     {% if card.in_hw %}<span class="rail-hw" data-hw-n="{{ card.in_hw }}">в {{ card.in_hw }} {{ card.in_hw|plural_ru:"домашке,домашках,домашках" }}</span>{% endif %}
     {% if card.saved %}<span class="rail-saved" aria-label="сохранена">{% include '_icon.html' with name='star' %}</span>{% endif %}

@@ -226,7 +226,9 @@
             background: var(--gc); flex: none; }
 /* Метки строки лежат на песочной плашке ленты — цвета «чернилами» (--*-ink), иначе в
    тёмной теме звёзды и «решение» ниже WCAG 4,5 (замер test_contrast, 18.09.2026). */
-.rail-stars { color: var(--amber-ink); letter-spacing: 1px; flex: none; }
+/* Звёзды — СИГНАЛ `--amber` (канон токенов), не текст: `role="img"` с подписью
+   «сложность N», для графики норма контраста 3:1 (WCAG 1.4.11). */
+.rail-stars { color: var(--amber); letter-spacing: 1px; flex: none; }
 .rail-star-off { font-weight: 400; }
 .rail-mark { flex: none; }
 .rail-mark--sol { color: var(--green-ink); }
@@ -432,7 +434,7 @@ span.pp--src:active { transform: none; }
 .sv-head h2 { margin: 0; font-size: 17px; font-weight: 600; }
 .sv-head small { color: var(--text3); font-size: 13px; }
 .sv-field { border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); transition: border-color var(--t), box-shadow var(--t); }
-.sv-field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-ring); background: var(--surface); }
+.sv-field:focus-within { border-color: var(--focus); box-shadow: 0 0 0 4px var(--focus-ring); background: var(--surface); }
 .sv-field textarea { width: 100%; border: 0; background: transparent; resize: none; display: block; min-height: 118px;
   padding: 12px 14px; font: 400 15.5px/1.55 var(--font-ui); color: var(--text); outline: none; }
 .sv-field textarea::placeholder { color: var(--text3); }
@@ -589,7 +591,7 @@ span.pp--src:active { transform: none; }
 .ai-intro { font-size: 13.5px; color: var(--text2); line-height: 1.5; margin: 0; }
 .ai-foot { padding: 10px 12px 12px; border-top: 1px solid var(--border-soft); }
 .ai-in { display: flex; align-items: flex-end; gap: 6px; background: var(--surface-2); border: 1.5px solid transparent; border-radius: 12px; padding: 6px 6px 6px 12px; transition: border-color var(--t), box-shadow var(--t); }
-.ai-in:focus-within { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px var(--accent-ring); }
+.ai-in:focus-within { border-color: var(--focus); background: var(--surface); box-shadow: 0 0 0 3px var(--focus-ring); }
 .ai-in textarea { flex: 1 1 auto; border: 0; background: transparent; resize: none; font: 400 14px/1.45 var(--font-ui); color: var(--text); outline: none; min-height: 24px; max-height: 120px; padding: 6px 0; }
 .ai-in textarea::placeholder { color: var(--text3); }
 .ai-note { font-size: 11.5px; color: var(--text3); margin: 8px 2px 0; line-height: 1.4; }

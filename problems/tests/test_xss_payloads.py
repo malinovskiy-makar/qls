@@ -277,8 +277,10 @@ class CatalogXssTests(XssTestCase):
 
         from django.conf import settings
 
-        source = (Path(settings.BASE_DIR) / 'catalog' / 'templates'
-                  / 'catalog' / 'problem_list.html').read_text(encoding='utf-8')
+        # С S7 «Стола» (19.09.2026) данные в разметку кладут скрипты «Стола».
+        js = Path(settings.BASE_DIR) / 'catalog' / 'static' / 'catalog' / 'js'
+        source = ''.join((js / name).read_text(encoding='utf-8')
+                         for name in ('stol.js', 'stol_task.js', 'stol_map.js', 'stol_basket.js'))
         for bad in ('${data.statement}', '${part.text', '${a.name}',
                     '${t}</span>'):
             self.assertNotIn(

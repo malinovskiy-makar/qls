@@ -477,7 +477,7 @@ summary { cursor: pointer; font-weight: 600; font-size: 1.05rem; padding: 4px 0;
    проверить глазами — а ровно для этого страница и делается. */
 .col .converted-block { border: 1px solid #eee; border-radius: 4px; padding: 8px; margin: 0 0 8px; background: #fff; }
 /* Те же правила, что на боевой странице задачи
-   (catalog/problem_detail.html): широкое прокручивается
+   (catalog/_math_text.html): широкое прокручивается
    внутри себя, картинка не шире колонки. */
 .math-content .katex-display { overflow-x: auto; overflow-y: hidden; }
 .math-content table { display: block; width: fit-content; max-width: 100%; overflow-x: auto; border-collapse: collapse; }

@@ -9,7 +9,7 @@ r"""Пакет случайной выборки задач для ревью м
 диск, отправка это отдельное решение человека.
 
 **Показ дословно повторяет ветку боевого шаблона.**
-`catalog/templates/catalog/problem_detail.html` выбирает по
+`catalog/templates/catalog/_math_text.html` выбирает по
 `content_format`:
 
     markdown -> {{ поле|render_markdown|render_figures:problem|safe }}
@@ -289,7 +289,7 @@ class Command(BaseCommand):
   случайно, сид `{options['seed']}`. Повторный запуск с тем же сидом даёт
   ту же выборку (`manifest.json` -> `ids`).
 - Охват: ВЕСЬ банк, а не только новые источники — легаси включён.
-- Показ: дословно ветка боевого шаблона `catalog/problem_detail.html`
+- Показ: дословно ветка боевого шаблона `catalog/_math_text.html`
   (`markdown` -> `render_markdown` + `render_figures`, `plain` ->
   `linebreaksbr`), математика — KaTeX 0.16.9 с той же конфигурацией, что
   на сайте. То есть страница показывает то, что реально увидит ученик.

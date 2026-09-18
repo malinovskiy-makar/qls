@@ -6,7 +6,7 @@
 дублировать код между выборочной и полной диагностикой.
 
 HTML-карточка воспроизводит реальный рендер страницы задачи
-(catalog/templates/catalog/problem_detail.html): statement/part.statement
+(catalog/templates/catalog/_math_text.html): statement/part.statement
 вставляются БЕЗ фильтров (только Django-автоэкранирование), в контейнер
 .math-content без переопределения white-space (то есть браузер схлопывает
 переносы строк — это фактическое поведение сайта сегодня). Правая колонка —

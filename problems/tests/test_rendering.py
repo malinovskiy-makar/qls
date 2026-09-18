@@ -31,9 +31,10 @@ from problems.rendering import (
     render_markdown, _sanitize_html, _protect_math_and_currency,
 )
 
-PROBLEM_DETAIL_TEMPLATE = (
-    Path(settings.BASE_DIR) / 'catalog' / 'templates' / 'catalog'
-    / 'problem_detail.html'
+#: С S7 «Стола» (19.09.2026) стили условия задачи живут в одном файле `stol.css`
+#: (прежний `problem_detail.html` удалён).
+PROBLEM_CSS = (
+    Path(settings.BASE_DIR) / 'catalog' / 'static' / 'catalog' / 'css' / 'stol.css'
 )
 
 
@@ -328,7 +329,7 @@ class TableCssTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.source = PROBLEM_DETAIL_TEMPLATE.read_text(encoding='utf-8')
+        cls.source = PROBLEM_CSS.read_text(encoding='utf-8')
 
     def test_table_has_dedicated_css_rule(self):
         self.assertIn('.math-content table', self.source,

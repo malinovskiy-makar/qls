@@ -85,7 +85,7 @@ def render_markdown_filter(value):
     """Обёртка над problems.rendering.render_markdown для content_format='markdown'.
 
     ⚠️ Результат НЕ помечается mark_safe здесь — `|safe` ставится явно в
-    шаблоне (problem_detail.html), чтобы каждое использование оставалось
+    шаблоне (`_math_text.html`), чтобы каждое использование оставалось
     видно текстом при поиске по `|safe` (docs/SECURITY.md держит список
     `|safe` в проекте коротким и проверяемым grep'ом; спрятанный внутри
     фильтра mark_safe в этот список не попал бы).

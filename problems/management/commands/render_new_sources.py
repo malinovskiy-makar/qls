@@ -11,7 +11,7 @@
 такого расхождения нет: конвертер отработал НА ИМПОРТЕ, в базе уже лежит
 его результат. Поэтому шлюзу отдаётся ровно то, что лежит в базе, и
 `render_markdown(problem.statement)` внутри шлюза — дословно тот же вызов,
-что делает шаблон `catalog/problem_detail.html`. Что проверили, то и
+что делает шаблон `catalog/_math_text.html`. Что проверили, то и
 покажем.
 
 Инварианты, каждый падает `CommandError`:
@@ -54,7 +54,7 @@ def build_blocks_from_stored(problem, parts):
     Исходник и «канонизированный» здесь совпадают намеренно: в базе уже
     лежит выход конвертера, второй прогон дал бы другой текст, и шлюз
     судил бы не то, что увидит ученик. Порядок повторяет
-    `catalog/templates/catalog/problem_detail.html`."""
+    `catalog/templates/catalog/_math_text.html`."""
     blocks = [('Условие', problem.statement, problem.statement)]
     for part in parts:
         blocks.append((f'Часть {part.label}', part.statement, part.statement))

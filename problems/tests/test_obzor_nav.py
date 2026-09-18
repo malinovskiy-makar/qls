@@ -280,7 +280,9 @@ class MenuAndIconTests(TestCase):
         Требование п. 1.5 (никаких эмодзи в пустом состоянии) от этого не
         отменилось и проверяется на том экране, который его заменил.
         """
-        page = read('catalog', 'templates', 'catalog', 'problem_list.html')
+        # С S7 «Стола» (19.09.2026) вход каталога — `stol.html` + `stol/_stol_entry.html`.
+        page = (read('catalog', 'templates', 'catalog', 'stol.html')
+                + read('catalog', 'templates', 'catalog', 'stol', '_stol_entry.html'))
         for emoji in ('💡', '🔍'):
             self.assertNotIn(emoji, page)
 
