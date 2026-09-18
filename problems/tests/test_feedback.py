@@ -190,7 +190,7 @@ class AcceptTests(MediaTempMixin, TestCase):
     def test_huge_screenshot_does_not_lose_the_message(self):
         import os
         from django.core.files.uploadedfile import SimpleUploadedFile
-        big = SimpleUploadedFile('big.jpg', os.urandom(3_000_000),
+        big = SimpleUploadedFile('big.jpg', os.urandom(6_000_000),
                                  content_type='image/jpeg')
         response = self.client.post('/api/feedback/', {
             'kind': 'idea', 'url': '/', 'other_text': 'Всё равно запишите',
@@ -199,6 +199,66 @@ class AcceptTests(MediaTempMixin, TestCase):
         entry = Feedback.objects.get()
         self.assertFalse(entry.screenshot)
         self.assertEqual(entry.other_text, 'Всё равно запишите')
+
+
+class ServerShotNoteTests(MediaTempMixin, TestCase):
+    """18.09.2026: сервер уменьшает высокий снимок и сам пишет, почему не принял.
+
+    Раньше всё выше 4 000 px и тяжелее 2,5 МБ молча пропадало, а в
+    `screenshot_note` оставалось клиентское «ok» — пустой снимок в админке
+    выглядел как «браузер снял, а у нас ничего».
+    """
+
+    def setUp(self):
+        cache.clear()
+
+    def _post(self, blob, note='ok'):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        return self.client.post('/api/feedback/', {
+            'kind': 'idea', 'url': '/catalog/', 'other_text': 'Снимок длинной страницы',
+            'screenshot_note': note,
+            'screenshot': SimpleUploadedFile('shot.jpg', blob, content_type='image/jpeg')})
+
+    def test_tall_screenshot_is_downscaled_not_dropped(self):
+        self.assertEqual(self._post(jpeg_bytes(1600, 5000)).status_code, 200)
+        entry = Feedback.objects.get()
+        self.assertTrue(entry.screenshot)
+        self.assertLessEqual(Image.open(entry.screenshot.path).height, 4000)
+
+    def test_downscaled_screenshot_keeps_the_client_note(self):
+        self._post(jpeg_bytes(1600, 5000), note='ok')
+        self.assertEqual(Feedback.objects.get().screenshot_note, 'ok')
+
+    def test_absurdly_tall_screenshot_is_refused_as_tall(self):
+        self._post(jpeg_bytes(1600, 13000))
+        entry = Feedback.objects.get()
+        self.assertFalse(entry.screenshot)
+        self.assertEqual(entry.screenshot_note, 'tall')
+
+    def test_four_megabyte_screenshot_is_accepted(self):
+        import os
+        side = 1150
+        noise = Image.frombytes('RGB', (side, side), os.urandom(side * side * 3))
+        buffer = io.BytesIO()
+        noise.save(buffer, format='PNG')
+        blob = buffer.getvalue()
+        self.assertTrue(3_500_000 < len(blob) < 5_000_000, len(blob))
+        self._post(blob)
+        self.assertTrue(Feedback.objects.get().screenshot)
+
+    def test_six_megabyte_file_is_refused_as_big(self):
+        import os
+        self._post(os.urandom(6_000_000))
+        entry = Feedback.objects.get()
+        self.assertFalse(entry.screenshot)
+        self.assertEqual(entry.screenshot_note, 'big')
+
+    def test_not_an_image_is_refused_as_bad(self):
+        self._post(b'not an image')
+        entry = Feedback.objects.get()
+        self.assertFalse(entry.screenshot)
+        self.assertEqual(entry.screenshot_note, 'bad')
+        self.assertEqual(entry.other_text, 'Снимок длинной страницы')
 
 
 class RefuseTests(TestCase):
@@ -424,3 +484,22 @@ class ScreenshotNoteScriptTests(TestCase):
         self.assertTrue("finish(null, 'timeout'); }, 6000)" in src)
         for note in ("'ok'", "'timeout'", "'error'", "'nolib'"):
             self.assertTrue(note in src, note)
+
+    def test_script_shoots_the_visible_frame_not_the_whole_document(self):
+        """18.09.2026: кадр собирает shotOptions() — видимая область по прокрутке.
+
+        Весь документ длинного каталога — полотно в тысячи пикселей; проба
+        кадра — scripts/feedback_shot_probe.mjs.
+        """
+        src = io.open('templates/_feedback.html', encoding='utf-8').read()
+        self.assertTrue('function shotOptions()' in src)
+        self.assertTrue('html2canvas(document.documentElement, shotOptions())' in src)
+        self.assertTrue('x: window.scrollX, y: window.scrollY' in src)
+        self.assertTrue('width: root.clientWidth, height: root.clientHeight' in src)
+
+    def test_modern_colors_are_flattened_before_the_shot(self):
+        """html2canvas 1.4.1 падает на `color(srgb …)` — так Chrome отдаёт
+        color-mix() каталога, задачи и игры. Без onclone снимок был только
+        у главной страницы."""
+        src = io.open('templates/_feedback.html', encoding='utf-8').read()
+        self.assertTrue('onclone: flattenModernColors' in src)

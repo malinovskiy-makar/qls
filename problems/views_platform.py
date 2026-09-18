@@ -404,7 +404,12 @@ def api_graph_save(request):
 # ═══════════════════════════════════════════════════════════════════════
 
 FEEDBACK_SCOPE = 'feedback'
-FEEDBACK_MAX_SCREENSHOT = 2_500_000     # 2,5 МБ
+FEEDBACK_MAX_SCREENSHOT = 5_000_000     # 5 МБ
+# Длинная сторона снимка: выше SIDE_MAX уменьшаем, выше SIDE_HARD_MAX не
+# открываем вовсе — такой файл разворачивается в памяти в сотни мегабайт.
+FEEDBACK_SHOT_SIDE_MAX = 4000
+FEEDBACK_SHOT_SIDE_HARD_MAX = 12000
+FEEDBACK_SHOT_WIDTH = 1600
 
 
 @require_POST
@@ -472,11 +477,18 @@ def api_feedback(request):
         screenshot_note=(request.POST.get('screenshot_note') or '')[:16],
     )
 
+    # Сервер не принял снимок — пишет почему сам (big | tall | bad). Иначе в
+    # поле оставалось клиентское «ok», и пустой снимок в админке врал.
     shot = request.FILES.get('screenshot')
-    if shot is not None and shot.size <= FEEDBACK_MAX_SCREENSHOT:
-        blob = _feedback_screenshot(shot)
-        if blob is not None:
-            entry.screenshot.save('shot.jpg', ContentFile(blob), save=False)
+    if shot is not None:
+        if shot.size > FEEDBACK_MAX_SCREENSHOT:
+            entry.screenshot_note = 'big'
+        else:
+            blob, note = _feedback_screenshot(shot)
+            if blob is None:
+                entry.screenshot_note = note
+            else:
+                entry.screenshot.save('shot.jpg', ContentFile(blob), save=False)
 
     entry.save()
     ratelimit.note_failure(FEEDBACK_SCOPE + ':ip',
@@ -711,7 +723,12 @@ def _path_of(url):
 
 
 def _feedback_screenshot(uploaded):
-    """Пересжать снимок в JPEG. Не картинка — вернуть None, не падать.
+    """Пересжать снимок в JPEG → (байты | None, note).
+
+    note — 'ok', 'tall' (длинная сторона больше FEEDBACK_SHOT_SIDE_HARD_MAX)
+    или 'bad' (не открывается как картинка). Высокий снимок УМЕНЬШАЕТСЯ, а
+    не выбрасывается: раньше всё выше 4 000 px молча пропадало, и до админки
+    доживали только короткие страницы.
 
     Та же осторожность, что у аватара: сначала целостность, потом размеры в
     пикселях, и только потом обработка — иначе мелкий файл разворачивается в
@@ -724,17 +741,19 @@ def _feedback_screenshot(uploaded):
         probe.verify()
         uploaded.seek(0)
         image = Image.open(uploaded)
-        if image.width > 4000 or image.height > 4000:
-            return None
+        if max(image.size) > FEEDBACK_SHOT_SIDE_HARD_MAX:
+            return None, 'tall'
         uploaded.seek(0)
         image = Image.open(uploaded).convert('RGB')
-    except (UnidentifiedImageError, OSError, ValueError):
-        return None
+    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
+        return None, 'bad'
 
-    if image.width > 1600:
-        height = max(1, round(image.height * 1600 / image.width))
-        image = image.resize((1600, height), Image.LANCZOS)
+    if max(image.size) > FEEDBACK_SHOT_SIDE_MAX:
+        image.thumbnail((FEEDBACK_SHOT_SIDE_MAX, FEEDBACK_SHOT_SIDE_MAX), Image.LANCZOS)
+    if image.width > FEEDBACK_SHOT_WIDTH:
+        height = max(1, round(image.height * FEEDBACK_SHOT_WIDTH / image.width))
+        image = image.resize((FEEDBACK_SHOT_WIDTH, height), Image.LANCZOS)
 
     buffer = io.BytesIO()
     image.save(buffer, format='JPEG', quality=80, optimize=True)
-    return buffer.getvalue()
+    return buffer.getvalue(), 'ok'
