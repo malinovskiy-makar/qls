@@ -131,3 +131,40 @@ class StatusesForPageTests(TestCase):
         from catalog import progress
         self.assertEqual(progress.statuses_for(AnonymousUser(), [1, 2]), {})
 
+
+
+class MapNumbersTests(TestCase):
+    """Узлы карты несут ключ справочника и живое число (P1.5)."""
+
+    def setUp(self):
+        cache.clear()
+
+    def _nodes(self):
+        data = json.loads(self.client.get(reverse('catalog:topic_map_data')).content)
+        return {n['l']: n for n in data['nodes']}
+
+    def test_theme_node_gets_its_topic_key_and_live_count(self):
+        from problems.tests.factories import make_topic
+        topic = make_topic('Эластичность', is_canonical=True)
+        make_problem('Эластичность спроса.', topic=topic)
+        make_problem('Скрытая эластичность.', topic=topic, flagged=True)
+        node = self._nodes()['Эластичность']
+        self.assertEqual((node['db'], node['c']), (topic.pk, 1))
+
+    def test_live_count_equals_the_catalog_filter_count(self):
+        from catalog import filters
+        from problems.tests.factories import make_topic
+        topic = make_topic('Эластичность', is_canonical=True)
+        for i in range(3):
+            make_problem('Задача %d.' % i, topic=topic)
+        groups = filters.build(filters.base_queryset('catalog'), filters.parse({}),
+                               mode='strip')[1]['groups']
+        topic_group = next(g for g in groups if g['key'] == 'topic')
+        count = next(o['count'] for block in topic_group['groups'] for o in block['options']
+                     if o['value'] == str(topic.pk))
+        self.assertEqual(self._nodes()['Эластичность']['c'], count)
+
+    def test_node_without_canonical_twin_is_not_selectable(self):
+        node = self._nodes()['Эластичность']
+        self.assertIsNone(node['db'])
+        self.assertIsNone(node['c'])

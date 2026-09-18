@@ -17,7 +17,7 @@ from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.jsonsafe import dumps_for_script
 
-from . import attachments, attempts, chat, filters, progress, search_log, testplay
+from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -1723,14 +1723,19 @@ def topic_map_preview_demo(request):
 
 
 def topic_map_data(request):
-    """JSON карты. Кэш на сутки и ETag: файл меняется только с деплоем."""
-    text, etag = _topic_map_payload()
+    """JSON карты с живыми числами и ключами справочника (`map_numbers`).
+
+    Числа меняются вместе с банком, поэтому кэш браузера — те же 10 минут,
+    что у сервера, а не сутки, как было у статичного файла; ETag — от текста
+    с числами.
+    """
+    text, etag = map_numbers.live_payload(*_topic_map_payload())
     if request.headers.get('If-None-Match') == etag:
         response = HttpResponse(status=304)
     else:
         response = HttpResponse(text, content_type='application/json')
     response['ETag'] = etag
-    response['Cache-Control'] = 'public, max-age=86400'
+    response['Cache-Control'] = 'public, max-age=%d' % map_numbers.CACHE_SECONDS
     return response
 
 
