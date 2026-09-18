@@ -781,6 +781,46 @@ def _solution_block(problem, parts):
             'has_any': bool(answer or solution or part_rows)}
 
 
+#: Строк в ленте «Похожие» и «Мои» рядом с задачей.
+RAIL_MAX = 20
+
+
+def _visible(qs):
+    """Шлюз качества для новых выдач «Стола»: то же, что у страницы задачи."""
+    return qs.filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                     hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
+
+
+def _rail_response(request, problems, current_id=None):
+    """Строки ленты одним ответом: `{rows_html, total}`; статусы — одним запросом."""
+    problems = list(problems)
+    statuses = progress.statuses_for(request.user, [p.pk for p in problems])
+    show_status = request.user.is_authenticated
+    rows = [render_to_string('catalog/stol/_rail_row.html', {
+        'card': _card(p), 'status': statuses.get(p.pk, ''), 'show_status': show_status,
+        'current_id': current_id}, request=request) for p in problems]
+    return JsonResponse({'rows_html': ''.join(rows), 'total': len(rows)})
+
+
+def api_rail_similar(request, problem_id):
+    """«Похожие» для ленты рядом с задачей — нынешний кэш M2M, за шлюзом."""
+    problem = _visible_problem(problem_id)
+    rows = (_visible(problem.similar_problems.all())
+            .prefetch_related('topics', 'parts', 'source_references__source')[:RAIL_MAX])
+    return _rail_response(request, rows, current_id=problem.pk)
+
+
+def api_rail_saved(request):
+    """«Мои ★» — сохранённые задачи каталога. Только вход (гостю 401 JSON)."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=401)
+    saved = (_visible(Problem.objects.filter(saved_by__owner=request.user,
+                                             saved_by__is_deleted=False))
+             .order_by('-saved_by__created_at').distinct()
+             .prefetch_related('topics', 'parts', 'source_references__source')[:RAIL_MAX])
+    return _rail_response(request, saved)
+
+
 def _similar_cards(problem):
     """Похожие — из кэша M2M, без задач за шлюзами, до четырёх (сетка 2×2)."""
     rows = (problem.similar_problems

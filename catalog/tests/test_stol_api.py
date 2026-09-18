@@ -168,3 +168,50 @@ class MapNumbersTests(TestCase):
         node = self._nodes()['Эластичность']
         self.assertIsNone(node['db'])
         self.assertIsNone(node['c'])
+
+
+class RailTests(TestCase):
+    """Ленты «Похожие» и «Мои ★»: шлюз качества, статусы, вход."""
+
+    def setUp(self):
+        cache.clear()
+        self.problem = make_problem('Открытая задача.')
+        self.similar = make_problem('Похожая задача.')
+        self.hidden = make_problem('Скрытая похожая.', flagged=True)
+        self.problem.similar_problems.add(self.similar, self.hidden)
+        self.user = make_user('stol_rail')
+
+    def _similar(self):
+        return self.client.get(reverse('catalog:api_rail_similar', args=[self.problem.pk])).json()
+
+    def test_similar_skips_flagged(self):
+        html = self._similar()['rows_html']
+        self.assertIn('/catalog/problem/%d/' % self.similar.pk, html)
+        self.assertNotIn('/catalog/problem/%d/' % self.hidden.pk, html)
+
+    def test_guest_rows_have_no_status_column(self):
+        self.assertNotIn('rail-status', self._similar()['rows_html'])
+
+    def test_logged_in_rows_carry_the_status(self):
+        ProblemProgress.objects.create(user=self.user, problem=self.similar, status='failed')
+        self.client.force_login(self.user)
+        self.assertIn('rail-status--failed', self._similar()['rows_html'])
+
+    def test_rows_show_no_similarity_percent(self):
+        self.assertNotIn('%', self._similar()['rows_html'].replace('%}', ''))
+
+    def test_saved_needs_login(self):
+        self.assertEqual(self.client.get(reverse('catalog:api_rail_saved')).status_code, 401)
+
+    def test_saved_lists_own_visible_problems(self):
+        from problems.models_platform import SavedProblem
+        SavedProblem.objects.create(owner=self.user, catalog_problem=self.similar)
+        SavedProblem.objects.create(owner=self.user, catalog_problem=self.hidden)
+        self.client.force_login(self.user)
+        data = self.client.get(reverse('catalog:api_rail_saved')).json()
+        self.assertEqual(data['total'], 1)
+        self.assertIn('/catalog/problem/%d/' % self.similar.pk, data['rows_html'])
+
+    def test_similar_of_a_flagged_problem_is_404(self):
+        response = self.client.get(reverse('catalog:api_rail_similar', args=[self.hidden.pk]))
+        self.assertEqual(response.status_code, 404)

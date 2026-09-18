@@ -26,6 +26,9 @@ urlpatterns = [
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Фото или PDF решения к реплике чата: только вход, 10 файлов в сутки.
     path('api/chat/upload/',                    views.api_chat_upload,    name='api_chat_upload'),
+    # Ленты «Стола»: «Похожие» и «Мои ★» (строки одним партиалом).
+    path('api/rail/similar/<int:problem_id>/',  views.api_rail_similar,   name='api_rail_similar'),
+    path('api/rail/saved/',                     views.api_rail_saved,     name='api_rail_saved'),
     # «Как прошло?» и следы помощи (каталог «Стол», ADR 0119).
     path('api/progress/<int:problem_id>/',      views.api_progress,       name='api_progress'),
     path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),
