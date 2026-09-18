@@ -219,6 +219,12 @@ const STOL_SCENES = [
   { phase: 's1', name: 'entry_filters', go: async p => {
       await p.goto(BASE + '/catalog/?topic=843&topic=99&tag=652', { waitUntil: 'load' });
       await p.waitForTimeout(1800); } },
+  { phase: 'w', name: 'w_entry', go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(800); } },
+  { phase: 'w', name: 'w_map', go: async p => {
+      await p.goto(BASE + '/catalog/map/', { waitUntil: 'load' }); await p.waitForTimeout(4000); } },
+  { phase: 'w', name: 'w_problem', go: async p => {
+      await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
   { phase: 's1', name: 'entry_continue', who: 'student', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
 ];

@@ -127,7 +127,7 @@ button:focus-visible {
 {% endcomment %}
 {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
 
 {% include '_nav.html' %}
 

@@ -5,6 +5,21 @@
    поиск пишут в него и перерисовываются по событию `weco:filters`.
    Без скрипта экран рабочий: поиск — GET-форма, строки — ссылки. */
 
+/* ── Вид экрана: `entry` · `stol` · `map` ───────────────────────────────
+   Одна точка смены вида: атрибут `data-view` у `#stol-app` и узор «W» на
+   фоне — он есть только у открытой задачи (решение владельца 18.09.2026: на
+   входе и на карте фоном служит облако тем). */
+(function () {
+  'use strict';
+  window.weco = window.weco || {};
+  weco.stol = weco.stol || {};
+  weco.stol.setView = function (view) {
+    var app = document.getElementById('stol-app');
+    if (app) app.setAttribute('data-view', view);
+    if (view === 'stol') { delete document.body.dataset.bgPattern; } else { document.body.dataset.bgPattern = 'off'; }
+  };
+})();
+
 /* ── Вход (вид `entry`): поиск, чипы, лента, карта-фон ────────────────── */
 (function () {
   'use strict';

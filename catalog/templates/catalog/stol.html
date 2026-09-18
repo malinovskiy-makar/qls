@@ -20,6 +20,8 @@
 
 {% block title %}Умный каталог{% endblock %}
 {% block main_class %}stol stol--{{ view }}{% endblock %}
+{% comment %}Водяные «W» — только у открытой задачи; на входе и карте фон — облако тем (решение 18.09.2026).{% endcomment %}
+{% block body_attrs %}{% if view != 'stol' %} data-bg-pattern="off"{% endif %}{% endblock %}
 
 {% block extra_style %}
 {% include "catalog/_catalog_filters_css.html" %}

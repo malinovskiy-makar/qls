@@ -1,5 +1,7 @@
 {% extends 'catalog/base.html' %}
 {% load static %}
+{% comment %}Без водяных «W»: фоном служит сама карта (решение владельца 18.09.2026); с S4 карта — вид `map` шаблона stol.html.{% endcomment %}
+{% block body_attrs %} data-bg-pattern="off"{% endblock %}
 
 {% comment %}
 Карта тем и тегов — трёхмерный граф корпуса.
