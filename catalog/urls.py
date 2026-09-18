@@ -26,6 +26,8 @@ urlpatterns = [
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Фото или PDF решения к реплике чата: только вход, 10 файлов в сутки.
     path('api/chat/upload/',                    views.api_chat_upload,    name='api_chat_upload'),
+    # «Как прошло?» и следы помощи (каталог «Стол», ADR 0119).
+    path('api/progress/<int:problem_id>/',      views.api_progress,       name='api_progress'),
     path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),
     # Третья файловая вьюха: только владельцу или сотруднику (ADR 0118).
     path('chat/attachment/<int:pk>/',            chat_files.chat_attachment, name='chat_attachment'),

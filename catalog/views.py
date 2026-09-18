@@ -17,7 +17,7 @@ from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.jsonsafe import dumps_for_script
 
-from . import attachments, attempts, chat, filters, search_log, testplay
+from . import attachments, attempts, chat, filters, progress, search_log, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -889,6 +889,7 @@ def api_test_check(request, problem_id):
     out = {'correct': correct, 'attempt': attempt}
     if correct:
         testplay.reset_attempts(request.session, problem.pk)
+        progress.note_test_result(request.user, problem, first_try=attempt == 1)
         if request.user.is_authenticated:
             CatalogAttempt.objects.create(
                 user=request.user, problem=problem, text='',
@@ -906,7 +907,27 @@ def api_test_reveal(request, problem_id):
     if error:
         return error
     testplay.reset_attempts(request.session, problem.pk)
+    progress.note_test_revealed(request.user, problem)
     return JsonResponse({'correct_labels': sorted(game['correct'])})
+
+
+@require_POST
+def api_progress(request, problem_id):
+    """«Как прошло?» и следы помощи (каталог «Стол», ADR 0119). Только вход.
+
+    Тело JSON: `status` (`self` | `hint` | `failed` | `null`), `hints_opened`,
+    `solution_viewed`. Гостю 401 JSON; задача за шлюзом — 404; «решил сам»
+    после открытого решения — 400 с текстом. Правила — `catalog/progress.py`.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=401)
+    problem = _visible_problem(problem_id)
+    try:
+        data = _json_body(request)
+        row = progress.update(request.user, problem, data if isinstance(data, dict) else {})
+    except progress.ProgressError as exc:
+        return JsonResponse({'error': 'progress', 'message': str(exc)}, status=400)
+    return JsonResponse(progress.as_json(row))
 
 
 @require_POST
@@ -1155,6 +1176,7 @@ def api_hint(request, problem_id, n):
     if n < 1 or n > len(hints):
         raise Http404('такой подсказки нет')
     hint = hints[n - 1]
+    progress.note_hint(request.user, problem, n)
     return JsonResponse({
         'n': n, 'total': len(hints), 'text': hint.text,
         'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
@@ -1180,6 +1202,7 @@ def problem_detail(request, pk):
     from problems.event_log import log_problem_event
     log_problem_event('catalog', 'opened', request.user, problem,
                       request=request)
+    progress.note_opened(request.user, problem)
 
     topics = [t for t in problem.topics.all() if is_known(t.name)]
     tags = list(problem.tags.all())
