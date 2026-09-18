@@ -522,7 +522,7 @@ span.pp--src:active { transform: none; }
       {% endif %}
       <span class="grow"></span>
       {% if hint_total %}
-      <button class="btn btn--quiet" type="button" id="hint-btn">💡 Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
+      <button class="btn btn--quiet" type="button" id="hint-btn">{% include '_icon.html' with name='bulb' %} Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
       {% endif %}
       {% if sol.has_any %}
       <button class="btn btn--quiet" type="button" id="sol-btn">
@@ -602,6 +602,13 @@ span.pp--src:active { transform: none; }
   {% endif %}
 </article>
 
+{% comment %}Телефон (P9 «Стола», первый шаг): нижняя панель зовёт кнопки страницы, а не дублирует их; каждая — только при данных. «Дальше» — первая похожая, пока нет ленты выдачи.{% endcomment %}
+<nav class="stol-phonebar" aria-label="Помощь по задаче">
+  {% if hint_total %}<button type="button" data-phone="hint">{% include '_icon.html' with name='bulb' %}<span>Подсказка</span></button>{% endif %}
+  {% if chat_available %}<button type="button" data-phone="ai">{% include '_icon.html' with name='info' %}<span>Спросить ИИ</span></button>{% endif %}
+  {% if test %}<button type="button" data-phone="reveal">{% include '_icon.html' with name='check' %}<span>Ответ</span></button>{% elif sol.has_any %}<button type="button" data-phone="sol">{% include '_icon.html' with name='book' %}<span>Решение</span></button>{% endif %}
+  {% if rail_rows %}<a class="is-main" href="{% url 'catalog:problem_detail' rail_rows.0.card.problem.pk %}">{% include '_icon.html' with name='arrow_right' %}<span>Дальше</span></a>{% endif %}
+</nav>
 <nav class="stol-strip stol-strip--help" aria-label="Помощь">
   <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Открыть помощь" title="Помощь (])">{% include '_icon.html' with name='chevron_left' %}</button>
   {% if hint_total %}<span class="stol-strip-note" title="Подсказок у задачи">{% include '_icon.html' with name='bulb' %}<b>{{ hint_total }}</b></span>{% endif %}

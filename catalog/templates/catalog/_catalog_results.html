@@ -77,7 +77,7 @@
         <p class="ct-card-preview">{{ card.preview }}</p>
         <div class="ct-acts" onclick="event.stopPropagation();">
           <button class="ca-btn ca-preview" type="button"
-                  onclick="openCatalogModal({{ card.problem.pk }}, event)">👁 Условие</button>
+                  onclick="openCatalogModal({{ card.problem.pk }}, event)">Условие</button>
           {% if user.is_authenticated and user.role == 'teacher' %}
           <div class="ca-hw-wrap" id="hw-wrap-{{ card.problem.pk }}">
             <button class="ca-btn ca-add" type="button" id="hw-btn-{{ card.problem.pk }}"

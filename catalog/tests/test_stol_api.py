@@ -313,3 +313,37 @@ class MapApplyIsAFilterTests(TestCase):
         self.assertIn("node.k === 'theme' ? 'topic=' : 'tag='", handler)
         self.assertIn('node.db', handler)
         self.assertNotIn('?q=', handler)
+
+
+class PhoneBarTests(TestCase):
+    """Нижняя панель телефона: кнопка — только при данных (правило нуля)."""
+
+    def setUp(self):
+        cache.clear()
+        self.problem = make_problem('Условие без подсказок и решения.')
+
+    def _bar(self, problem=None):
+        html = self.client.get(reverse('catalog:problem_detail',
+                                       args=[(problem or self.problem).pk])).content.decode()
+        return html.split('class="stol-phonebar"', 1)[1].split('</nav>', 1)[0]
+
+    def test_bare_problem_has_no_hint_solution_or_next(self):
+        bar = self._bar()
+        for absent in ('data-phone="hint"', 'data-phone="sol"', 'Дальше'):
+            self.assertNotIn(absent, bar)
+
+    def test_hint_solution_and_next_appear_with_data(self):
+        from problems.models import Hint
+        problem = make_problem('С подсказкой.', solution='Длинное решение этой задачи по шагам.')
+        Hint.objects.create(problem=problem, text='Подсказка', order=1)
+        problem.similar_problems.add(self.problem)
+        bar = self._bar(problem)
+        for present in ('data-phone="hint"', 'data-phone="sol"',
+                        '/catalog/problem/%d/' % self.problem.pk):
+            self.assertIn(present, bar)
+
+    def test_no_emoji_on_the_hint_button(self):
+        from problems.models import Hint
+        Hint.objects.create(problem=self.problem, text='Подсказка', order=1)
+        html = self.client.get(reverse('catalog:problem_detail', args=[self.problem.pk])).content.decode()
+        self.assertNotIn('💡', html)

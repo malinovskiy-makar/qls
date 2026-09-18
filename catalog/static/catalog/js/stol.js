@@ -145,6 +145,26 @@
     if (self) { self.disabled = true; self.title = 'Решение уже открыто'; }
   });
 
+  /* Телефон: кнопки нижней панели нажимают кнопки страницы. */
+  var PHONE = { hint: 'hint-btn', sol: 'sol-btn', reveal: 'reveal-btn' };
+  document.addEventListener('click', function (e) {
+    var btn = e.target.closest('[data-phone]');
+    if (!btn) return;
+    var what = btn.getAttribute('data-phone');
+    if (what === 'ai') {
+      var ai = document.querySelector('.pd-side .ai');
+      if (ai) { ai.scrollIntoView({ block: 'start', behavior: 'smooth' }); }
+      var field = document.getElementById('ai-text');
+      if (field) { field.focus({ preventScroll: true }); }
+      return;
+    }
+    var target = document.getElementById(PHONE[what]);
+    if (target && !target.disabled) {
+      target.click();
+      target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  });
+
   paint();
   weco.stol = { toggle: toggle, focus: focus };
 })();

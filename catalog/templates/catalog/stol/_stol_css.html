@@ -111,4 +111,23 @@ body.stol-is-focus .pd-act[data-stol="rail"], body.stol-is-focus .pd-act[data-st
   .stol > .stol-strip, .stol > .stol-rail, .stol-only { display: none !important; }
   .stol[data-help="closed"] > .pd-side { display: block; }
 }
+/* Телефон: нижняя панель из кнопок по 52 px; кружок Telegram прячется (он
+   садился бы на панель), плашки угла встают над панелью (README §8). */
+.stol-phonebar { display: none; }
+@media (max-width: 759px) {
+  .stol-phonebar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 140; display: flex; gap: 6px;
+    padding: 6px 8px calc(6px + env(safe-area-inset-bottom)); background: var(--surface);
+    border-top: .5px solid var(--border);
+  }
+  .stol-phonebar > * {
+    flex: 1 1 0; min-height: 52px; display: inline-flex; flex-direction: column; align-items: center;
+    justify-content: center; gap: 2px; font: inherit; font-size: 12px; color: var(--text);
+    background: var(--surface-2); border: 0; border-radius: 12px; text-decoration: none; cursor: pointer;
+  }
+  .stol-phonebar .qi { width: 18px; height: 18px; }
+  .stol-phonebar .is-main { background: var(--btn-bg); color: var(--on-btn); }
+  body:has(.stol-phonebar > *) { padding-bottom: 72px; --corner-offset: 76px; }
+  body:has(.stol-phonebar > *) .tg-fab { display: none; }
+}
 @media (prefers-reduced-motion: reduce) { .stol * { transition: none !important; } }

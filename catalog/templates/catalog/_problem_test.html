@@ -41,7 +41,7 @@ is-missed, is-skip) с подписями из student/_option_review.html.
     <span class="grow"></span>
     <span class="tq-kbd"><kbd>1</kbd>–<kbd>{{ test.options|length }}</kbd> выбрать · <kbd>Enter</kbd> проверить</span>
     {% if hint_total %}
-    <button class="btn btn--quiet" type="button" id="hint-btn">💡 Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
+    <button class="btn btn--quiet" type="button" id="hint-btn">{% include '_icon.html' with name='bulb' %} Подсказка <span class="n" id="hint-n">1 из {{ hint_total }}</span></button>
     {% endif %}
     <button class="btn btn--quiet" type="button" id="reveal-btn">Показать ответ</button>
   </div>

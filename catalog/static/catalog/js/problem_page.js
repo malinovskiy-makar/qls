@@ -163,8 +163,11 @@
           hints.appendChild(card);
           renderMath(text);
           if (hintN < d.total) {
+            /* Значок — тот же SVG из разметки (эмодзи в интерфейсе нет). */
+            var bulb = hintBtn.querySelector('svg');
             hintBtn.innerHTML = '';
-            hintBtn.appendChild(document.createTextNode('💡 Ещё подсказка '));
+            if (bulb) { hintBtn.appendChild(bulb); }
+            hintBtn.appendChild(document.createTextNode(' Ещё подсказка '));
             var n = document.createElement('span');
             n.className = 'n';
             n.id = 'hint-n';
