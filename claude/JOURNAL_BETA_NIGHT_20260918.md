@@ -308,6 +308,23 @@
 `problems/tests/test_scripts_import_safe.py` (на старом скрипте красный); строка в
 docs/TESTING.md. C1 перезапущен в 06:09 с метками приложений, как джоб CI.
 
+## C1 — полный прогон `feat/beta-prep` (дерево `../qls-beta`, `c910affe`, с метками приложений)
+
+**Шаг A:** 6 353 теста за 30,7 мин, `FAILED (failures=18, errors=4, skipped=1)`:
+- `test_embedding_formula` 6, `test_embeddings_transfer` 6 + 4 ошибки, `test_corpus_diagnostics` 2 —
+  **ровно известные 14 падений и 4 ошибки** (спецификация отпечатка `v1`/`v2_focus_repeat`,
+  CLAUDE.md);
+- `test_exams`, `test_work_settings`, `test_obzor_build` — по 1: нет `data-fl="topic"` в
+  конструкторе работы — известная карточка Notion «Подбор задач в работу: фильтр тем пропал
+  из панели — три теста красные на main» (3deb…819e), на `main` красные (проверено для
+  `test_exams` в отдельном дереве);
+- `config.tests.test_nav.VersionBadgeTests.test_version_stands_at_the_bottom_of_a_short_page` —
+  **мой**: после метки «Beta 1.0» встали стек плашек угла и `<template>` плашек. Они вне потока
+  (fixed и инертный шаблон) — тест переписан честно: вырезает `<template>` и явно разрешает
+  закреплённый стек (коммит `0c330c61` в beta-prep, cherry-pick `b4f23034` в stol). Модуль — 28 OK.
+- После шага A скрипт упал на печати сводки (`UnicodeEncodeError` cp1251 при выводе в файл),
+  шаг B не стартовал — запущен отдельно `--only-serial` с `PYTHONIOENCODING=utf-8`.
+
 ## C2 — джобы CI на `feat/beta-prep` (дерево `../qls-beta`, `8ef89437`), 05:34
 
 | Джоб | Итог |
