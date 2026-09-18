@@ -165,6 +165,21 @@ BGE-M3 НЕ калибрована по длине запроса: одно сл
 
 ---
 
+## «Стол» (ветка `feat/catalog-stol`, первый шаг 18.09.2026, ADR 0120)
+
+Спецификация — `claude/mockups/catalog_stol_20260917/README.md`. Сделано на странице задачи:
+сетка лента 316 · условие 680 · помощь 392, полоски 52 px, «Фокус», клавиши
+(`catalog/static/catalog/js/stol.js`, стили `catalog/stol/_stol_css.html`); строка ленты —
+один партиал `catalog/stol/_rail_row.html` на широкую и узкую ленту; «Похожие» рисует сервер,
+«Мои ★» — `/catalog/api/rail/saved/`. Прогресс ученика — `ProblemProgress`, правила только в
+`catalog/progress.py` (ADR 0119), `POST /catalog/api/progress/<id>/`. Узлы карты несут `db`
+(ключ канонической темы/тега) и живое `c` (`catalog/map_numbers.py`, кэш 10 мин). Решение,
+повторяющее условие: `preview.solution_is_statement_copy` (показывается как «без решения»),
+`preview.strip_statement_retell` (пересказ всего условия срезается при показе).
+⚠️ Шлюз качества в новых ответах — `views._visible(qs)`. Что не сделано — ADR 0120.
+
+---
+
 ## Фильтры — ОДИН модуль на каталог и домашку, ДВЕ разметки
 
 `catalog/filters.py` — единственное место, где разбираются параметры отбора,

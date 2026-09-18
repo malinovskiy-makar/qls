@@ -354,6 +354,10 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 вьюха (ADR 0118, docs/SECURITY.md). Поля профиля (класс кодом `le7`…`none`, самоотчёт) в модель ИИ не
 уходят — сторож `problems/tests/profile_markers.py`.
 
+**Каталог «Стол» (ветка `feat/catalog-stol`, первый шаг 18.09, ADR 0119–0120):** страница задачи —
+лента · условие 680 · помощь; прогресс ученика `ProblemProgress` (`catalog/progress.py`); живые числа
+карты (`catalog/map_numbers.py`). Раздел «Стол» — [catalog/CLAUDE.md](catalog/CLAUDE.md).
+
 **Wecon Rush после редизайна 17.09 (ADR 0108–0116):** экраны `game.html` — include-файлы `game/_start.html`, `_play.html`,
 `_final.html`, `_practice_final.html`; доски дня и набора — общие `game/_board_*.html`. Адреса: `/game/daily/` и
 `/game/daily/<режим>/[<дата>/]`, страница набора `/game/s/<код>/` (`/board/` — переход), дуэль `/game/d/<код>/`,
