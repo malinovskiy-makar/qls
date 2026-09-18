@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('problems', '0071_feedback_pulse'),
+        ('problems', '0073_feedback_pulse'),
     ]
 
     operations = [
