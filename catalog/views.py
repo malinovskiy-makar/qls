@@ -1299,6 +1299,8 @@ def problem_detail(request, pk):
         pd_config['chatCheckEmpty'] = chat.CHECK_EMPTY_TEXT
         if request.user.is_authenticated:
             pd_config['chatUploadUrl'] = reverse('catalog:api_chat_upload')
+            pd_config['chatHistoryUrl'] = reverse('catalog:api_chat_history',
+                                                  args=[problem.pk])
 
     # «Стол» (часть B, 18.09.2026): лента «Похожие» рисуется сервером —
     # прямая ссылка работает без скрипта; «Мои» скрипт догружает по вкладке.

@@ -290,3 +290,13 @@ class HistoryAndQuoteTests(_ChatCase):
 
     def test_quote_over_three_hundred_is_refused(self):
         self.assertEqual(self._post(quote='я' * 301).status_code, 400)
+
+
+@override_settings(AI_PROVIDER='fake', CATALOG_CHAT_PROVIDER='fake', CATALOG_CHAT_MODEL='glm-5.3')
+class HistoryOnPageTests(_ChatCase):
+    """Страница задачи знает адрес истории — разговор переживает перезагрузку."""
+
+    def test_page_config_carries_the_history_url(self):
+        html = self.client.get(reverse('catalog:problem_detail', args=[self.problem.pk])).content.decode()
+        self.assertIn('"chatHistoryUrl": "%s"' % reverse('catalog:api_chat_history',
+                                                         args=[self.problem.pk]), html)

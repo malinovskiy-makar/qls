@@ -6,7 +6,8 @@
  * странице нет — тогда этот файл не находит своих узлов и молчит.
  *
  * ⚠️ Наружу уходит текст решения и вопрос — ничего из профиля.
- * ⚠️ История чата живёт только здесь, последние шесть реплик (ADR 0080).
+ * ⚠️ В модель уходят последние шесть реплик (ADR 0080); при загрузке
+ *    разговор поднимается из журнала `ChatTurn` (история, 18.09.2026).
  */
 (function () {
   'use strict';
@@ -417,6 +418,21 @@
         .catch(function () { wait.textContent = 'Не получилось ответить, попробуйте ещё раз.'; });
     }
     chat = { send: send };
+    /* Разговор переживает перезагрузку (P5 «Стола»): свои реплики по этой
+       задаче из журнала `ChatTurn` — пузырями с формулами и ссылками на файлы. */
+    if (cfg.chatHistoryUrl) {
+      fetch(cfg.chatHistoryUrl, { credentials: 'same-origin' })
+        .then(function (r) { return r.ok ? r.json() : { turns: [] }; })
+        .then(function (d) {
+          (d.turns || []).forEach(function (t) {
+            bubble('ai-msg--me', t.message, t.attachments);
+            renderMath(bubble('ai-msg--ai', t.reply));
+            history.push({ role: 'me', text: t.message }, { role: 'ai', text: t.reply });
+          });
+          history = history.slice(-HISTORY_LIMIT);
+        })
+        .catch(function () { /* без истории чат работает как раньше */ });
+    }
     aiText.addEventListener('input', syncAi);
     aiText.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } });
     aiSend.addEventListener('click', function () { send(); });
