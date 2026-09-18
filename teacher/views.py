@@ -1033,6 +1033,56 @@ def api_assignment_add_problem(request, pk):
     return JsonResponse({'ok': True, 'problem_id': problem.pk, 'assignment_id': assignment.pk})
 
 
+#: Сколько задач корзины каталога принимает одна домашка за раз.
+BASKET_MAX = 100
+
+
+@teacher_required
+@require_POST
+def api_assignment_add_problems(request, pk):
+    """Корзина каталога «Стол» → в домашку пачкой (решение владельца 17.09).
+
+    Та же логика и та же проверка владельца, что у `api_assignment_add_problem`:
+    чужая работа — 404 (объекта для учителя нет). Задача за шлюзом качества в
+    домашку из корзины не добавляется и называется в ответе (`refused`), а не
+    пропадает молча. Ответ: сколько добавлено, сколько уже было.
+    """
+    from problems.models import Assignment, Problem
+
+    assignment = get_object_or_404(Assignment, pk=pk, author=request.user)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    raw = data.get('problem_ids') if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw or len(raw) > BASKET_MAX:
+        return JsonResponse({'error': 'problem_ids required'}, status=400)
+    wanted = list(dict.fromkeys(int(i) for i in raw if str(i).isdigit()))
+    visible = set(Problem.objects.filter(
+        pk__in=wanted, status=Problem.Status.PUBLISHED, needs_quality_review=False,
+        hidden_pending_review=False, content_status=Problem.ContentStatus.OK,
+    ).values_list('pk', flat=True))
+    # Источник правды домашки — позиции `AssignmentItem` (старый M2M — для
+    # совместимости, его заполняем тоже, как `make_assignment`).
+    from django.db import transaction
+    from django.db.models import Max
+
+    from problems.models_platform import AssignmentItem
+    already = set(AssignmentItem.objects.filter(assignment=assignment, catalog_problem_id__in=visible)
+                  .values_list('catalog_problem_id', flat=True))
+    fresh = [pk_ for pk_ in wanted if pk_ in visible and pk_ not in already]
+    with transaction.atomic():
+        start = (AssignmentItem.objects.filter(assignment=assignment)
+                 .aggregate(top=Max('order'))['top'])
+        start = -1 if start is None else start
+        AssignmentItem.objects.bulk_create([
+            AssignmentItem(assignment=assignment, catalog_problem_id=pk_, order=start + 1 + i)
+            for i, pk_ in enumerate(fresh)])
+        assignment.problems.add(*fresh)
+    return JsonResponse({'ok': True, 'added': len(fresh), 'already': len(already),
+                         'refused': [pk_ for pk_ in wanted if pk_ not in visible]})
+
+
 # ---------------------------------------------------------------------------
 # устарело, удалить после сессии 5
 # Старые адреса проверки решений. Ведут на новые (внутри группы). Оставлены
