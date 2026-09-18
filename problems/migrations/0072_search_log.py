@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('problems', '0069_beta_profile_fields'),
+        ('problems', '0071_beta_profile_grade_choices'),
     ]
 
     operations = [
