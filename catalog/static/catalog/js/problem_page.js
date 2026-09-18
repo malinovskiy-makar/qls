@@ -320,18 +320,49 @@
         var r = Math.random() * 16 | 0;
         return (c === 'x' ? r : (r & 3 | 8)).toString(16);
       });
-    var attached = null;   /* {id, name}: одно вложение на реплику */
+    /* До трёх файлов к реплике (18.09.2026): [{id, name, mime, url}]. */
+    var FILES_PER_TURN = 3;
+    var attached = [];
     var aiClip = $('ai-clip'), aiFile = $('ai-file'), aiAtt = $('ai-att'),
-        aiAttName = $('ai-att-name'), aiAttX = $('ai-att-x');
+        aiAttStatus = $('ai-att-status'), chipTpl = $('ai-chip-tpl');
     function showAttached(label) {
-      if (!aiAtt || !aiAttName) { return; }
-      aiAtt.hidden = !(attached || label);
-      aiAttName.textContent = label || (attached ? attached.name : '');
+      if (!aiAtt) { return; }
+      Array.prototype.forEach.call(aiAtt.querySelectorAll('.ai-chip'), function (c) { c.remove(); });
+      attached.forEach(function (file, index) {
+        var chip = chipTpl.content.firstElementChild.cloneNode(true);
+        chip.querySelector('.ai-chip-name').textContent = file.name;
+        chip.querySelector('.ai-chip-x').addEventListener('click', function () {
+          attached.splice(index, 1);
+          showAttached();
+        });
+        aiAtt.appendChild(chip);
+      });
+      if (aiAttStatus) { aiAttStatus.textContent = label || ''; aiAttStatus.hidden = !label; }
+      aiAtt.hidden = !(attached.length || label);
     }
-    function bubble(cls, text) {
+    /* Свои файлы в пузыре — ссылками на вьюху вложения; картинка миниатюрой. */
+    function fileLinks(files) {
+      var box = document.createElement('div');
+      box.className = 'ai-files';
+      files.forEach(function (file) {
+        var a = document.createElement('a');
+        a.href = file.url; a.target = '_blank'; a.rel = 'noopener';
+        if (/^image\//.test(file.mime || '')) {
+          var img = document.createElement('img');
+          img.className = 'ai-thumb'; img.src = file.url; img.alt = file.name;
+          a.appendChild(img);
+        } else {
+          a.textContent = file.name;
+        }
+        box.appendChild(a);
+      });
+      return box;
+    }
+    function bubble(cls, text, files) {
       var el = document.createElement('div');
       el.className = 'ai-msg ' + cls;
       el.textContent = text;
+      if (files && files.length) { el.appendChild(fileLinks(files)); }
       aiBody.appendChild(el);
       aiBody.scrollTop = aiBody.scrollHeight;
       return el;
@@ -356,20 +387,27 @@
       mode = mode || 'free';
       text = (text || aiText.value).trim();
       if (!text) { return; }
-      bubble('ai-msg--me', attached ? text + '\n[файл: ' + attached.name + ']' : text);
+      var files = attached.slice();
+      bubble('ai-msg--me', text, files);
       aiText.value = '';
       syncAi();
       var payload = { problem_id: cfg.problemId, message: text, mode: mode, thread: thread,
                       history: history.slice(-HISTORY_LIMIT) };
-      if (attached) { payload.attachment_id = attached.id; }
-      if (window.weco) { weco.track('chat_send', { problem_id: cfg.problemId, mode: mode, has_file: !!attached }); }
-      attached = null;
+      if (files.length) { payload.attachment_ids = files.map(function (f) { return f.id; }); }
+      if (window.weco) { weco.track('chat_send', { problem_id: cfg.problemId, mode: mode, has_file: files.length > 0, files: files.length }); }
+      attached = [];
       showAttached();
       var wait = typing();
       post(cfg.chatUrl, payload)
         .then(function (d) {
           var reply = d.reply || d.message || 'Не получилось ответить, попробуйте ещё раз.';
           wait.textContent = reply;
+          if (d.note) {
+            var noteLine = document.createElement('div');
+            noteLine.className = 'ai-msg-note';
+            noteLine.textContent = d.note;
+            wait.appendChild(noteLine);
+          }
           renderMath(wait);
           aiBody.scrollTop = aiBody.scrollHeight;
           history.push({ role: 'me', text: text }, { role: 'ai', text: reply });
@@ -386,7 +424,7 @@
       b.addEventListener('click', function () {
         var mode = b.getAttribute('data-mode'), typed = aiText.value.trim();
         /* Проверять нечего — ни текста, ни файла: подсказка вместо пустого запроса. */
-        if (mode === 'check' && !typed && !attached) {
+        if (mode === 'check' && !typed && !attached.length) {
           bubble('ai-msg--ai', cfg.chatCheckEmpty);
           return;
         }
@@ -395,26 +433,36 @@
     });
     if (aiClip && aiFile && cfg.chatUploadUrl) {
       aiClip.addEventListener('click', function () { aiFile.click(); });
-      aiFile.addEventListener('change', function () {
-        var file = aiFile.files && aiFile.files[0];
-        aiFile.value = '';
-        if (!file) { return; }
+      /* Файлы грузятся по одному (сервер принимает один на запрос), лишние
+         сверх трёх — честной строкой в чате, а не молча. */
+      function upload(file) {
         var form = new FormData();
         form.append('file', file);
         form.append('problem_id', cfg.problemId);
-        attached = null;
-        aiClip.disabled = true;
-        showAttached('Загружаем файл…');
-        fetch(cfg.chatUploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }, body: form })
+        return fetch(cfg.chatUploadUrl, { method: 'POST', headers: { 'X-CSRFToken': csrf, 'X-Requested-With': 'XMLHttpRequest' }, body: form })
           .then(function (r) { return r.json(); })
           .then(function (d) {
             if (d.error) { bubble('ai-msg--ai', d.message || 'Файл не принят.'); return; }
-            attached = { id: d.id, name: d.name || 'файл' };
+            attached.push({ id: d.id, name: d.name || 'файл', mime: d.mime, url: d.url });
           })
-          .catch(function () { bubble('ai-msg--ai', 'Не удалось загрузить файл, попробуйте ещё раз.'); })
+          .catch(function () { bubble('ai-msg--ai', 'Не удалось загрузить файл, попробуйте ещё раз.'); });
+      }
+      aiFile.addEventListener('change', function () {
+        var files = Array.prototype.slice.call(aiFile.files || []);
+        aiFile.value = '';
+        if (!files.length) { return; }
+        var room = FILES_PER_TURN - attached.length;
+        if (files.length > room) {
+          bubble('ai-msg--ai', 'Не больше трёх файлов к одной реплике.');
+          files = files.slice(0, Math.max(0, room));
+        }
+        if (!files.length) { return; }
+        aiClip.disabled = true;
+        showAttached('Загружаем файл…');
+        files.reduce(function (chain, file) { return chain.then(function () { return upload(file); }); },
+                     Promise.resolve())
           .then(function () { aiClip.disabled = false; showAttached(); });
       });
-      if (aiAttX) { aiAttX.addEventListener('click', function () { attached = null; showAttached(); }); }
     }
     syncAi();
   }

@@ -1855,6 +1855,9 @@ class ChatAttachment(models.Model):
     size = models.PositiveIntegerField('Размер, байт', default=0)
     pages = models.PositiveSmallIntegerField('Картинок в модель', default=0)
     pages_json = models.JSONField('Картинки для модели', default=list, blank=True)
+    # Имя с устройства ученика — ТОЛЬКО для подписи в пузыре и истории
+    # (18.09.2026). В хранилище файл лежит под нашим uuid-именем.
+    name = models.CharField('Имя файла у ученика', max_length=80, blank=True)
     created_at = models.DateTimeField('Когда', auto_now_add=True, db_index=True)
 
     class Meta:
@@ -1900,6 +1903,11 @@ class ChatTurn(models.Model):
     attachment = models.ForeignKey(
         ChatAttachment, on_delete=models.SET_NULL, null=True, blank=True,
         related_name='turns', verbose_name='Вложение')
+    # До трёх файлов к реплике (18.09.2026). Старое `attachment` оставлено:
+    # журнал беты до этой даты читается по нему; новое — первое вложение.
+    attachments = models.ManyToManyField(
+        ChatAttachment, blank=True, related_name='turns_all',
+        verbose_name='Вложения')
     vision_text = models.TextField('Расшифровка фото', blank=True)
     vision_input_tokens = models.PositiveIntegerField('Зрение: вход', default=0)
     vision_output_tokens = models.PositiveIntegerField('Зрение: выход', default=0)

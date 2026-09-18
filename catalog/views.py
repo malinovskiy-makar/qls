@@ -1006,16 +1006,27 @@ def api_chat(request):
     except (TypeError, ValueError):
         return JsonResponse({'error': 'problem', 'reply': 'Задача не указана.'}, status=400)
     mode = data.get('mode') if data.get('mode') in chat.MODES else 'free'
-    attachment = None
-    if data.get('attachment_id') is not None:
-        # Номер из запроса — не право: только своё вложение и только к этой задаче.
-        raw_id = str(data.get('attachment_id'))
-        attachment = ChatAttachment.objects.filter(
-            pk=int(raw_id) if raw_id.isdigit() else 0, user=request.user,
-            problem=problem).first()
-        if attachment is None:
-            return JsonResponse({'error': 'file', 'reply': 'Файл не найден: прикрепите его заново.'},
-                                status=400)
+    # `attachment_ids` — до трёх файлов (18.09.2026); старый `attachment_id`
+    # по-прежнему понимается: открытые вкладки со старым скриптом живут до вечера.
+    raw_ids = data.get('attachment_ids')
+    if raw_ids is None and data.get('attachment_id') is not None:
+        raw_ids = [data.get('attachment_id')]
+    if not isinstance(raw_ids, list):
+        raw_ids = []
+    if len(raw_ids) > chat.FILES_PER_TURN:
+        return JsonResponse({'error': 'files', 'reply': chat.TOO_MANY_FILES}, status=400)
+    wanted = [int(str(i)) if str(i).isdigit() else 0 for i in raw_ids]
+    # Номер из запроса — не право: только свои вложения и только к этой задаче.
+    found = {a.pk: a for a in ChatAttachment.objects.filter(
+        pk__in=wanted, user=request.user, problem=problem)}
+    if len(found) != len(set(wanted)):
+        return JsonResponse({'error': 'file', 'reply': 'Файл не найден: прикрепите его заново.'},
+                            status=400)
+    attachments = [found[pk] for pk in dict.fromkeys(wanted)]
+    quote = str(data.get('quote') or '').strip()
+    if len(quote) > chat.QUOTE_MAX:
+        return JsonResponse({'error': 'quote', 'reply': 'Слишком длинный фрагмент: выделите короче.'},
+                            status=400)
     message = str(data.get('message') or '').strip()
     if not message:
         return JsonResponse({'error': 'empty',
@@ -1035,8 +1046,8 @@ def api_chat(request):
                     .order_by('-created_at').first())
     try:
         reply = chat.answer(problem, message, data.get('history'), request.user,
-                            last_attempt=last_attempt, mode=mode, attachment=attachment,
-                            thread=thread)
+                            last_attempt=last_attempt, mode=mode, attachments=attachments,
+                            thread=thread, quote=quote)
     except ai.AiUnavailable as exc:
         # Дневной денежный потолок чата и суточный лимит обращений — оба «limit»,
         # а сказать ученику надо разное.
@@ -1044,7 +1055,11 @@ def api_chat(request):
             return JsonResponse({'error': 'budget', 'reply': chat.BUDGET_TEXT})
         message_text = LIMIT_TEXT % ai.daily_limit() if exc.kind == 'limit' else str(exc)
         return JsonResponse({'error': exc.kind, 'reply': message_text})
-    return JsonResponse({'reply': reply, 'remaining': ai.remaining_today(request.user)})
+    answer = {'reply': reply, 'remaining': ai.remaining_today(request.user)}
+    note = chat.pages_note(attachments)
+    if note:
+        answer['note'] = note
+    return JsonResponse(answer)
 
 
 @require_POST
@@ -1072,11 +1087,36 @@ def api_chat_upload(request):
         return JsonResponse({'error': 'file', 'message': error}, status=400)
     name = (uploaded.name or '')[:80]
     try:
-        attachment = chat.save_attachment(uploaded, media_type, request.user, problem)
+        attachment = chat.save_attachment(uploaded, media_type, request.user, problem,
+                                          name=name)
     except ValueError as exc:
         return JsonResponse({'error': 'file', 'message': str(exc)}, status=400)
     return JsonResponse({'id': attachment.pk, 'name': name, 'mime': media_type,
-                         'pages': attachment.pages})
+                         'pages': attachment.pages,
+                         'url': reverse('catalog:chat_attachment', args=[attachment.pk])})
+
+
+#: Сколько реплик отдаёт история чата — последние, удачные.
+CHAT_HISTORY_MAX = 20
+
+
+def api_chat_history(request, problem_id):
+    """История СВОЕГО разговора по ЭТОЙ задаче (18.09.2026): последние 20
+    удачных реплик. Гостю 401; чужие реплики не отдаются никогда."""
+    from problems.models_platform import ChatTurn
+
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=401)
+    turns = (ChatTurn.objects.filter(user=request.user, problem_id=problem_id, error='')
+             .exclude(reply='').prefetch_related('attachments')
+             .order_by('-created_at')[:CHAT_HISTORY_MAX])
+    return JsonResponse({'turns': [
+        {'message': t.user_text, 'reply': t.reply, 'mode': t.mode,
+         'ts': t.created_at.isoformat(),
+         'attachments': [{'id': a.pk, 'name': a.name, 'mime': a.mime,
+                          'url': reverse('catalog:chat_attachment', args=[a.pk])}
+                         for a in t.attachments.all()]}
+        for t in reversed(list(turns))]})
 
 
 def _ordered_hints(problem):

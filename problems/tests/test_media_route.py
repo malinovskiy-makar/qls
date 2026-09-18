@@ -142,6 +142,12 @@ class NoOtherFileServingViewTests(TestCase):
             '(ChatTurnAdmin.file_view): staff и право на просмотр журнала, путь '
             'из поля ChatAttachment, тип из проверенного при загрузке, PDF — '
             'скачиванием. Разбор — Фаза 10 сессии 15.09.2026.',
+        'catalog/chat_files.py':
+            'своё вложение чата ученику: только владельцу или staff, иначе 404 '
+            '(и гостю); путь из поля ChatAttachment.file, из адреса только '
+            'целое число; тип из поля mime, проверенного при загрузке; nosniff; '
+            'PDF скачиванием. Модуль из одной вьюхи нарочно. Разбор — ADR 0118, '
+            'ночь 18.09.2026.',
     }
 
     def test_no_file_serving_helpers_in_views(self):
