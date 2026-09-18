@@ -503,6 +503,8 @@
         if (weco.stolTask) weco.stolTask.init(desk);
         setTab(state.tab);
         if (weco.trackPage) weco.trackPage();
+        /* Открытие задачи на месте — событие беты (прежде слала модалка «Условие», `_catalog_js.html`). */
+        if (weco.track) weco.track('problem_open', { problem_id: d.id, from: first ? 'entry' : 'stol' });
         if (PHONE.matches) { phonePanels.rail = false; phonePanels.help = false; paint(); }
         else if (OVERLAY.matches && state.panels.rail) { state.panels.rail = false; paint(); }
       })

@@ -14,7 +14,7 @@
   (ночной журнал называл 568; красного нет, разница в один тест не мешает — записано)
 - Ответы владельца: `feat/beta-prep` — пуш и слияние позже, в отчёте S8; сервер на 8000 — да, в фоне
 
-Куда продолжать: S7.1 · стоп-гейт удаления — список владельцу, ждать «да»
+Куда продолжать: S7.1 · ждём «да» владельца на стоп-лист удаления (раздел «S7.1 — стоп-гейт»), потом удаление
 
 ⚠️ РЕЖИМ С 18.09 (решение владельца после S1): остановок после визуальных фаз нет; стоп только перед
 необратимым (S7, записи в данные, слияние, пуш) и один раз — переход в карту в S4. После каждой фазы —
@@ -361,6 +361,35 @@
   плавающая кнопка с первого раза остались ЗЕЛЁНЫМИ: без смены осей `spreadCloud` сам тянет облако
   до ×2,5 (форма 2,06 проходила порог), а кнопку на задаче прятало правило нижней панели. Добавлены
   `TMAP.view().tall` и замер кнопки на входе — повтор обоих красный. После отката всё зелёное.
+
+## S7.1 — стоп-гейт удаления (ждёт «да» владельца)
+
+Проверено поиском по репозиторию: ни один адрес эти файлы не рисует и не подключает, кроме
+перечисленных здесь же старых файлов. Удаляется:
+
+| Файл | Чем заменён |
+|---|---|
+| `catalog/templates/catalog/problem_list.html` | `stol.html` (вид `entry`) + `stol/_stol_entry.html` |
+| `catalog/templates/catalog/problem_detail.html` | `stol.html` (вид `stol`) + `stol/_stol_desk/_stol_center/_stol_help/_stol_rail.html` |
+| `catalog/static/catalog/js/problem_page.js` | `stol_task.js` (`init(root)`) |
+| `catalog/templates/catalog/_problem_modal.html` | модалки «Условие» нет (S1): задача открывается на месте |
+| `catalog/templates/catalog/topic_map.html` | `stol.html` (вид `map`) + `stol/_stol_map.html` |
+| `catalog/templates/catalog/_catalog_js.html` | модуль входа в `stol.js`; `problem_open` — теперь в `stol.js` |
+| `catalog/templates/catalog/_hw_dropdown_js.html` | корзина: `stol_basket.js` + `stol/_stol_basket.html` |
+| `catalog/templates/catalog/_catalog_actions_css.html` | стили корзины в `stol.css` |
+| `catalog/templates/catalog/stol/_stol_css.html` (ночной) | `catalog/static/catalog/css/stol.css` |
+
+Галерея и процент близости отдельных файлов не имеют — жили в `problem_list.html`, из кода сняты в S1.
+Остаются: `topic_map.js`, `topic_map.css` (движок и стиль карты «Стола»), `_filters*.html`
+(конструктор домашки), `topic_map_preview_demo.html` (стенд), эндпоинт `add_problem`.
+
+Старые тесты, которые читают удаляемые файлы, ПЕРЕПИСЫВАЮТСЯ на замену (факт тот же), не удаляются:
+`test_rendering.TableCssTests` → `stol.css`; `test_track` → события в `stol.js`/`stol_task.js`;
+`test_search_busy` → `stol.js`; `test_obzor_nav` (эмодзи) → `stol/_stol_entry.html`;
+`test_obzor_review` (звёзды) и `test_r15_align` → `stol.css`; `test_review55` (кольцо фокуса) →
+`stol.css`; `test_xss_payloads` (данные не склеиваются в разметку) → скрипты «Стола». Упоминания
+`problem_detail.html` в докстрингах `problems/` → `stol/_stol_center.html` + `_math_text.html`.
+До «да» — `problem_open` добавлен в `stol.js` (единственное, чего «Стол» не слал).
 
 ## Решил сам
 
