@@ -25,6 +25,9 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
 BASE = Path(settings.BASE_DIR)
+#: Эмодзи: пиктограммы и символы (U+1F300–1FAFF), разное и дингбаты с эмодзи-видом
+#: (U+2600–27BF кроме ★☆, ✓ и ✕), вариационный селектор эмодзи U+FE0F.
+_RX_EMOJI = re.compile('[\U0001F300-\U0001FAFF\u2600-\u2604\u2607-\u2712\u2716-\u27BF\uFE0F]')
 
 # Слова-обещания и заглушки, запрещённые в интерфейсе (§0.5 промпта).
 FORBIDDEN = (
@@ -271,6 +274,26 @@ class NoPromisesInTemplatesTests(SimpleTestCase):
         for path in self._files():
             text = template_user_text(path.read_text(encoding='utf-8'))
             hits = sorted({m.group(1).lower() for m in _RX_FORBIDDEN.finditer(text)})
+            if hits:
+                offenders[str(path.relative_to(BASE))] = hits
+        self.assertEqual(offenders, {})
+
+    def test_no_emoji_in_stol_screens(self):
+        """«Стол» (README §9): значки — SVG из общего набора, эмодзи в экранах нет.
+
+        Шаблон `stol.html`, все партиалы `catalog/stol/` и четыре скрипта «Стола»;
+        символы-метки (★ звёзды, × крестик, → стрелка) — не эмодзи.
+        """
+        files = [BASE / 'catalog/templates/catalog/stol.html']
+        files += sorted((BASE / 'catalog/templates/catalog/stol').glob('*.html'))
+        files += [BASE / 'catalog/static/catalog/js' / name
+                  for name in ('stol.js', 'stol_task.js', 'stol_map.js', 'stol_basket.js')]
+        offenders = {}
+        for path in files:
+            text = path.read_text(encoding='utf-8')
+            # Только то, что видит человек: без комментариев шаблона и скрипта.
+            text = template_user_text(text) if path.suffix == '.html' else _RX_JS_COMMENT.sub('', text)
+            hits = sorted(set(_RX_EMOJI.findall(text)))
             if hits:
                 offenders[str(path.relative_to(BASE))] = hits
         self.assertEqual(offenders, {})

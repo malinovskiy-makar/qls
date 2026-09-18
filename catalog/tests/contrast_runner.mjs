@@ -23,6 +23,8 @@ const PAGES = [
   { name: 'каталог', path: '/catalog/', root: 'body' },
   { name: 'страница задачи', path: PROBLEM, root: 'body' },
   { name: 'окно фильтров', path: '/catalog/', root: '#ct-all', open: '#ct-all-open' },
+  // «Стол» (S7, 19.09.2026): карта тем — шапка, «Разделы корпуса», нижняя полоса.
+  { name: 'карта тем', path: '/catalog/map/', root: '#stol-map' },
   { name: 'вход', path: '/login/', root: 'body' },
 ];
 const THEMES = ['light', 'dark'];
