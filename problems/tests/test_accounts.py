@@ -385,7 +385,7 @@ class ProfileFormTests(TestCase):
         self.user.refresh_from_db()
         self.profile.refresh_from_db()
         self.assertEqual(self.user.first_name, 'Иван')
-        self.assertEqual(self.profile.grade, 10)
+        self.assertEqual(self.profile.grade, '10')
         self.assertEqual(self.profile.level, 'region')
 
     def test_username_can_change(self):
@@ -517,3 +517,95 @@ class TelegramChannelCardTests(TestCase):
         for name in ('telegram', 'thumb_up', 'thumb_down'):
             svg = markup.split("{%% if name == '%s' %%}" % name, 1)[1].split('{% endif %}', 1)[0]
             self.assertIn("%s: '%s'" % (name, svg), scripts)
+
+
+class BetaProfileFieldsTests(TestCase):
+    """18.09.2026: класс списком, одна ось уровня, самоотчёт для аналитики беты."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(username='beta_anketa',
+                                             password=GOOD_PASSWORD,
+                                             role='student')
+        self.profile = UserProfile.objects.get(user=self.user)
+        self.client.force_login(self.user)
+
+    def _save(self, **over):
+        data = {'action': 'data', 'username': 'beta_anketa', 'first_name': '',
+                'last_name': '', 'email': '', 'grade': 'none', 'school': '',
+                'city': 'Казань', 'level': 'basic', 'goal': 'Регион',
+                'prep_mode': ['self', 'club'], 'hours_week': '3_6',
+                'source_channel': 'telegram',
+                'olympiad_history': ['vsosh_school', 'listed'], 'phone': ''}
+        data.update(over)
+        return self.client.post('/profile/', data)
+
+    def test_all_new_fields_are_saved_and_read_back(self):
+        self.assertEqual(self._save().status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(
+            (self.profile.grade, self.profile.city, self.profile.goal,
+             self.profile.prep_mode, self.profile.hours_week,
+             self.profile.source_channel, self.profile.olympiad_history),
+            ('none', 'Казань', 'Регион', ['self', 'club'], '3_6', 'telegram',
+             ['vsosh_school', 'listed']))
+
+    def test_unknown_prep_mode_code_is_dropped_not_fatal(self):
+        self.assertEqual(self._save(prep_mode=['self', 'hacker']).status_code, 302)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.prep_mode, ['self'])
+
+    def test_unknown_grade_code_is_refused(self):
+        self.assertEqual(self._save(grade='12').status_code, 200)
+        self.profile.refresh_from_db()
+        self.assertEqual(self.profile.grade, '')
+
+    def test_form_shows_the_saved_choices_checked(self):
+        self._save()
+        html = self.client.get('/profile/').content.decode('utf-8')
+        self.assertRegex(html, r'value="club"[^>]*checked')
+
+    def test_level_hints_cover_every_level(self):
+        self.assertEqual(set(UserProfile.LEVEL_HINTS),
+                         {code for code, _ in UserProfile.Level.choices})
+
+    def test_level_is_one_axis_of_furthest_stage(self):
+        self.assertEqual(UserProfile.Level('novice').label, 'Ещё не участвовал')
+        self.assertEqual(UserProfile.Level('final').label,
+                         'Заключительный этап ВсОШ или призёр перечневой')
+
+    def test_not_a_schoolkid_is_named_in_teacher_group_list(self):
+        from problems.models import StudentGroup
+        teacher = User.objects.create_user(username='beta_tutor',
+                                           password=GOOD_PASSWORD, role='teacher')
+        self.profile.grade = 'none'
+        self.profile.save()
+        lesson = StudentGroup.objects.create(name='Индивидуально', teacher=teacher,
+                                             kind=StudentGroup.Kind.INDIVIDUAL)
+        lesson.students.set([self.user])
+        self.client.force_login(teacher)
+        html = self.client.get('/teacher/groups/').content.decode('utf-8')
+        self.assertIn('Уже не школьник', html)
+        self.assertNotIn('none класс', html)
+
+
+class GradeMigrationTests(TestCase):
+    """Перевод класса в коды (миграция 0069) — функции миграции на живой схеме."""
+
+    def _migration(self):
+        import importlib
+        return importlib.import_module('problems.migrations.0069_beta_profile_fields')
+
+    def _profile(self, grade):
+        user = User.objects.create_user(username='mig_%s' % grade,
+                                        password=GOOD_PASSWORD, role='student')
+        UserProfile.objects.filter(user=user).update(grade=grade)
+        return user.profile
+
+    def test_young_grades_become_le7(self):
+        from django.apps import apps
+        profiles = [self._profile(g) for g in ('5', '6', '7')]
+        self._migration().grade_to_codes(apps, None)
+        for profile in profiles:
+            profile.refresh_from_db()
+            self.assertEqual(profile.grade, 'le7')

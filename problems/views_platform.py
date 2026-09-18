@@ -93,7 +93,6 @@ def password_change(request):
             'password_form': form,
             'tab': 'security',
             'subtab': 'problems',
-            'grades': range(5, 12),
             'levels': [(value, label, UserProfile.LEVEL_HINTS.get(value, ''))
                        for value, label in UserProfile.Level.choices],
             'facts': _profile_facts(request.user, request.user.profile),
@@ -194,7 +193,6 @@ def profile(request):
         'avatar_error': avatar_error,
         'tab': tab,
         'subtab': subtab,
-        'grades': range(5, 12),
         # Уровень отдаём тройками (значение, название, описание): фильтра
         # «взять по ключу» в проекте нет, а заводить его ради одного экрана
         # значит завести ещё одну общую вещь.

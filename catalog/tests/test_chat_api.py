@@ -84,6 +84,8 @@ class ChatApiTests(TestCase):
         return self.client.post(self.url, json.dumps(body), content_type='application/json')
 
     def test_reply_comes_back_and_prompt_has_no_profile_fields(self):
+        from problems.tests.profile_markers import FORBIDDEN, fill_profile_with_markers
+        fill_profile_with_markers(self.user)
         self.client.force_login(self.user)
         seen = {}
         with override_settings(AI_FAKE_REPLY=_capture(seen)):
@@ -95,7 +97,7 @@ class ChatApiTests(TestCase):
         for present in ('Две фирмы выбирают выпуск последовательно.', 'Ученик: Привет',
                         'Помощник: Здравствуйте', 'ВОПРОС УЧЕНИКА:', 'С чего начать?'):
             self.assertIn(present, text)
-        for absent in ('Мария', 'masha@example.org', 'маша'):
+        for absent in ('Мария', 'masha@example.org', 'маша') + FORBIDDEN:
             self.assertNotIn(absent, text)
             self.assertNotIn(absent, seen['system'])
         self.assertNotIn(chat.HOMEWORK_MODE, text)

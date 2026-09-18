@@ -17,6 +17,15 @@
   color: var(--text2); font-size: 14px;
 }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 16px; }
+/* Галочки самоотчёта: плитки в строку, переносятся на узком экране. */
+.pf-beta-note { margin-top: 8px; }
+.pf-checks { display: flex; flex-wrap: wrap; gap: 8px; }
+.form-field .pf-check {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0;
+  padding: 7px 12px; border: 0.5px solid var(--border); border-radius: var(--r);
+  background: var(--surface-2); font-weight: 400; cursor: pointer;
+}
+.form-field .pf-check input { width: auto; margin: 0; accent-color: var(--accent); }
 .saved-item {
   display: flex; align-items: center; justify-content: space-between;
   gap: 10px; flex-wrap: wrap;
@@ -278,6 +287,10 @@
         {{ form.school }}
       </div>
     </div>
+    <div class="form-field">
+      <label for="{{ form.city.id_for_label }}">Город</label>
+      {{ form.city }}
+    </div>
 
     {% comment %}
     Уровень подготовки — плитками с описанием (канон 3.10): название без
@@ -296,6 +309,41 @@
         </label>
         {% endfor %}
       </div>
+    </div>
+    <div class="form-field">
+      <label for="{{ form.goal.id_for_label }}">Цель на год</label>
+      {{ form.goal }}
+    </div>
+
+    {% comment %}
+    Самоотчёт для аналитики беты (18.09.2026). Всё необязательно; варианты —
+    в модели `UserProfile`, здесь только раскладка. В модель ИИ не уходит.
+    {% endcomment %}
+    <p class="pf-hint pf-hint--block pf-beta-note">Необязательно. Помогает нам понять, кто пользуется платформой во время беты.</p>
+    <div class="form-field">
+      <label>Как готовлюсь</label>
+      <div class="pf-checks">
+        {% for opt in form.prep_mode %}<label class="pf-check">{{ opt.tag }}<span>{{ opt.choice_label }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="{{ form.hours_week.id_for_label }}">Часов в неделю на олимпиадную экономику</label>
+      {{ form.hours_week }}
+    </div>
+    <div class="form-field">
+      <label>Какие олимпиады уже писал</label>
+      <div class="pf-checks">
+        {% for opt in form.olympiad_history %}<label class="pf-check">{{ opt.tag }}<span>{{ opt.choice_label }}</span></label>{% endfor %}
+      </div>
+    </div>
+    <div class="form-field">
+      <label for="{{ form.source_channel.id_for_label }}">Откуда узнали о Weconomics</label>
+      {{ form.source_channel }}
+    </div>
+    <div class="form-field">
+      <label for="{{ form.phone.id_for_label }}">Телефон</label>
+      {{ form.phone }}
+      <div class="pf-hint">Необязательно.</div>
     </div>
     {% endif %}
 

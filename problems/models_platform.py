@@ -64,26 +64,66 @@ class UserProfile(models.Model):
         PARENT = 'parent', 'Родитель'
 
     class Level(models.TextChoices):
-        """Уровень подготовки. Спрашиваем у ученика ОДИН раз, в профиле.
+        """Уровень подготовки — одна ось «дальше всего дошёл» (18.09.2026).
 
-        Названия и описания — слова владельца (04.09.2026). Это данные в
-        одном месте: переименовать можно, не трогая ни один экран.
+        Было две оси вперемешку: «сколько знаю» (Новичок, Базовый) и «куда
+        доходил» (Региональный, Всеросник) — ответы несравнимы. Коды в базе
+        прежние, меняются только подписи и описания.
         """
-        NOVICE = 'novice', 'Новичок'
-        BASIC = 'basic', 'Базовый'
-        REGION = 'region', 'Региональный'
-        FINAL = 'final', 'Всеросник'
+        NOVICE = 'novice', 'Ещё не участвовал'
+        BASIC = 'basic', 'Школьный или муниципальный этап'
+        REGION = 'region', 'Региональный этап ВсОШ или отбор перечневой'
+        FINAL = 'final', 'Заключительный этап ВсОШ или призёр перечневой'
 
     # Описание уровня — рядом с самим уровнем, чтобы не разъехалось.
     LEVEL_HINTS = {
-        'novice': 'Только начинаю, экономику почти не изучал',
-        'basic': 'Знаю основные модели, решаю задачи школьного и '
-                 'муниципального этапов',
-        'region': 'Участвовал в региональном этапе ВсОШ или в отборах '
-                  'перечневых олимпиад',
-        'final': 'Выходил на заключительный этап ВсОШ или призёр перечневых '
-                 'олимпиад первого уровня',
+        'novice': 'Олимпиады по экономике пока не писал',
+        'basic': 'Дальше всего дошёл до школьного или муниципального этапа ВсОШ',
+        'region': 'Писал региональный этап ВсОШ или отборочный тур перечневой '
+                  'олимпиады',
+        'final': 'Выходил на заключительный этап ВсОШ или становился призёром '
+                 'перечневой олимпиады',
     }
+
+    class Grade(models.TextChoices):
+        """Класс — списком, а не числом (18.09.2026): нужны «7 и младше» и
+        «уже не школьник», которых в числе 5…11 не было."""
+        LE7 = 'le7', '7 класс и младше'
+        G8 = '8', '8 класс'
+        G9 = '9', '9 класс'
+        G10 = '10', '10 класс'
+        G11 = '11', '11 класс'
+        NONE = 'none', 'Уже не школьник'
+
+    class HoursWeek(models.TextChoices):
+        LT1 = 'lt1', 'Меньше 1'
+        H1_3 = '1_3', '1–3'
+        H3_6 = '3_6', '3–6'
+        GT6 = 'gt6', 'Больше 6'
+
+    class SourceChannel(models.TextChoices):
+        TELEGRAM = 'telegram', 'Telegram-канал'
+        TEACHER = 'teacher', 'Преподаватель'
+        FRIEND = 'friend', 'Друг'
+        SEARCH = 'search', 'Поиск в интернете'
+        OTHER = 'other', 'Другое'
+
+    # Множественный выбор хранится списком кодов (JSONField). Допустимые
+    # коды — здесь, и форма, и выгрузка читают отсюда.
+    PREP_MODES = (
+        ('self', 'Сам'),
+        ('tutor', 'С репетитором'),
+        ('club', 'В кружке или школе'),
+        ('course', 'На курсах'),
+    )
+    OLYMPIAD_HISTORY = (
+        ('vsosh_school', 'ВсОШ, школьный'),
+        ('vsosh_municipal', 'ВсОШ, муниципальный'),
+        ('vsosh_region', 'ВсОШ, региональный'),
+        ('vsosh_final', 'ВсОШ, заключительный'),
+        ('listed', 'Перечневые'),
+        ('none', 'Ни одной'),
+    )
 
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
@@ -94,11 +134,8 @@ class UserProfile(models.Model):
     role = models.CharField('Роль', max_length=16,
                             choices=Role.choices, default=Role.STUDENT)
 
-    grade = models.PositiveSmallIntegerField(
-        'Класс', null=True, blank=True,
-        validators=[MinValueValidator(5), MaxValueValidator(11)],
-        help_text='5–11, необязательно.',
-    )
+    grade = models.CharField('Класс', max_length=8, blank=True, default='',
+                             choices=Grade.choices)
     school = models.CharField('Школа', max_length=200, blank=True)
     # ⚠️ ГОРОД И ЦЕЛЬ — ПЕРСОНАЛЬНЫЕ ДАННЫЕ НЕСОВЕРШЕННОЛЕТНЕГО (сессия 7,
     # фаза 10.2). Оба НЕОБЯЗАТЕЛЬНЫ, наружу не отдаются и в родительский
@@ -118,6 +155,18 @@ class UserProfile(models.Model):
         'Уровень подготовки', max_length=16, blank=True,
         choices=Level.choices,
         help_text='Необязательно. Нужен, чтобы подбирать задачи по силам.')
+
+    # ⚠️ Самоотчёт для аналитики беты (18.09.2026). Всё необязательно, видно
+    # только в своём профиле и в staff-выгрузке `profiles_export`; в модель
+    # ИИ НЕ УХОДИТ НИКОГДА (P0, CLAUDE.md).
+    prep_mode = models.JSONField('Как готовлюсь', default=list, blank=True)
+    hours_week = models.CharField('Часов в неделю', max_length=8, blank=True,
+                                  default='', choices=HoursWeek.choices)
+    source_channel = models.CharField('Откуда узнали', max_length=16,
+                                      blank=True, default='',
+                                      choices=SourceChannel.choices)
+    olympiad_history = models.JSONField('Какие олимпиады писал',
+                                        default=list, blank=True)
 
     # ⚠️ ПЕРВОЕ ПОЛЕ С ФАЙЛОМ В ПРОЕКТЕ. Что кладётся — решает НЕ загрузчик:
     # форма пересжимает картинку Pillow в JPEG 256×256 и сама задаёт имя

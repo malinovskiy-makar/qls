@@ -98,6 +98,8 @@ class CheckAttemptTests(TestCase):
         self.assertIn(attempts.NO_REFERENCE, prompt)
 
     def test_prompt_carries_the_problem_but_no_profile_fields(self):
+        from problems.tests.profile_markers import FORBIDDEN, fill_profile_with_markers
+        fill_profile_with_markers(self.user)
         seen = {}
 
         def capture(system_blocks, user_text):
@@ -111,7 +113,7 @@ class CheckAttemptTests(TestCase):
         for present in ('На школьной ярмарке', 'а) Ставки?', 'ОТВЕТ: 1800',
                         'функция реакции Егора', 'РЕШЕНИЕ УЧЕНИКА:', 't1 = t2 = 40'):
             self.assertIn(present, text)
-        for absent in ('Иван', 'Петров', 'ivan@example.org', 'ivan'):
+        for absent in ('Иван', 'Петров', 'ivan@example.org', 'ivan') + FORBIDDEN:
             self.assertNotIn(absent, text)
             self.assertNotIn(absent, seen['system'])
         self.assertIn('ПОШАГОВО', seen['system'])
