@@ -18,6 +18,7 @@
 Всё в try/except, как у журнала событий: упавший журнал не ломает каталог.
 """
 import logging
+import uuid
 from datetime import timedelta
 
 from django.utils import timezone
@@ -31,6 +32,8 @@ LOG_PARAM = 'log'
 TOP_IDS = 10
 QUERY_MAX = 300
 RATING_TEXT_MAX = 300
+#: Кука посетителя живёт год — как у `static/track.js`, который её обычно ставит.
+VISITOR_MAX_AGE = 365 * 24 * 3600
 
 
 def _visitor(request):
@@ -39,12 +42,33 @@ def _visitor(request):
     return value if _VISITOR_RE.fullmatch(value) else ''
 
 
+def visitor_for(request):
+    """(id посетителя, выдан ли он сейчас).
+
+    ⚠️ Куку обычно ставит `track.js` — но уже ПОСЛЕ ответа сервера. Первый
+    поиск с нового браузера записался бы без владельца, и его оценка из того
+    же браузера получала бы 404 (поймано снимками 18.09). Поэтому без куки
+    сервер выдаёт id сам, того же вида, что у скрипта (uuid), и ставит куку
+    в ответ (`remember_visitor`); скрипт существующую куку не перезаписывает.
+    """
+    value = _visitor(request)
+    return (value, False) if value else (str(uuid.uuid4()), True)
+
+
+def remember_visitor(response, visitor):
+    response.set_cookie(TRACK_COOKIE, visitor, max_age=VISITOR_MAX_AGE,
+                        samesite='Lax')
+
+
 def _norm(query):
     return query.strip().lower()
 
 
-def log_search(request, context):
-    """Записать поиск из собранного контекста каталога → id строки или None."""
+def log_search(request, context, visitor=None):
+    """Записать поиск из собранного контекста каталога → id строки или None.
+
+    `visitor` — из `visitor_for` (выданный сейчас id ещё не пришёл кукой).
+    """
     from problems.models_platform import SearchLog
 
     if not context.get('searched'):
@@ -52,7 +76,7 @@ def log_search(request, context):
     try:
         query = context['query'].strip()[:QUERY_MAX]
         user = request.user if request.user.is_authenticated else None
-        visitor = _visitor(request)
+        visitor = visitor if visitor is not None else _visitor(request)
         if user or visitor:
             owner = {'user': user} if user else {'visitor': visitor}
             since = timezone.now() - timedelta(seconds=DEDUP_SECONDS)

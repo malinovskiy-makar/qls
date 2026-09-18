@@ -95,10 +95,25 @@ class SearchLogWriteTests(_Fixture):
         self._live(log='1', topic=self.mon.pk)
         self.assertEqual(SearchLog.objects.count(), 1)
 
-    def test_guest_without_cookie_gets_an_empty_visitor(self):
+    def test_guest_without_cookie_gets_a_visitor_id_and_the_cookie(self):
+        """Кука `track.js` ставится после ответа: без выданного сервером id
+        первый поиск нового браузера нельзя было бы оценить (18.09, снимки)."""
+        self.client.cookies.clear()
+        response = self._page()
+        row = SearchLog.objects.get()
+        self.assertTrue(row.visitor)
+        self.assertEqual(response.cookies['weco_vid'].value, row.visitor)
+
+    def test_first_search_of_a_new_browser_can_be_rated(self):
         self.client.cookies.clear()
         self._page()
-        self.assertEqual(SearchLog.objects.get().visitor, '')
+        row = SearchLog.objects.get()
+        response = self.client.post('/api/search-rating/', {'log': row.pk, 'rating': 'yes'})
+        self.assertEqual(response.status_code, 200)
+
+    def test_existing_cookie_is_not_overwritten(self):
+        response = self._page()
+        self.assertNotIn('weco_vid', response.cookies)
 
     def test_flagged_problem_never_reaches_top_ids(self):
         self._page()

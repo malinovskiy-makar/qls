@@ -561,8 +561,11 @@ def problem_list(request):
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
     context = _catalog_context(request, missing_id)
-    context['search_log_id'] = search_log.log_search(request, context)
+    visitor, new_visitor = search_log.visitor_for(request)
+    context['search_log_id'] = search_log.log_search(request, context, visitor)
     response = render(request, 'catalog/problem_list.html', context)
+    if new_visitor and context['search_log_id']:
+        search_log.remember_visitor(response, visitor)
     response['X-Smart-Search'] = context['smart_search_status']
     response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
     return response
@@ -611,8 +614,9 @@ def api_filter_state(request):
     context = _catalog_context(request)
     # Журнал поиска — только по явной просьбе (`log=1`): иначе каждое
     # нажатие фильтра под тем же запросом было бы новой строкой.
+    visitor, new_visitor = search_log.visitor_for(request)
     if request.GET.get(search_log.LOG_PARAM) == '1':
-        context['search_log_id'] = search_log.log_search(request, context)
+        context['search_log_id'] = search_log.log_search(request, context, visitor)
     fctx = context['filters']
     response = JsonResponse({
         'total': context['total'],
@@ -626,6 +630,8 @@ def api_filter_state(request):
     })
     response['X-Smart-Search'] = context['smart_search_status']
     response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
+    if new_visitor and context.get('search_log_id'):
+        search_log.remember_visitor(response, visitor)
     return response
 
 
