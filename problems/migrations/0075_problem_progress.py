@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('problems', '0072_chat_turn_attachments'),
+        ('problems', '0074_chat_turn_attachments'),
     ]
 
     operations = [
