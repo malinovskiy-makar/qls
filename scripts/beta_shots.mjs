@@ -198,14 +198,13 @@ async function run() {
    Сцена — { phase, name, who, widths, go(page) }. Поиск на локальной базе
    идёт по словам 12–15 с — таймауты с запасом. */
 const QUERY = 'монополист с двумя заводами и налогом';
-/* Облако фона стартует лениво (простой браузера, данные, раскладка) — для
-   кадра дожидаемся данных и досчитываем раскладку вручную (pump). */
+/* Облако фона рисуется само при загрузке (`eager`): ждём первого кадра, но НЕ
+   дорисовываем его сами — прежний `pump()` скрывал пустое облако (18.09.2026). */
 async function settleBg(p) {
   await p.waitForFunction(() => {
     const el = document.getElementById('stol-bg');
-    return !el || (el.__tmapPreview && el.__tmapPreview.stats().nodes > 0);
+    return !el || (el.__tmapPreview && el.__tmapPreview.stats().drawn > 0);
   }, null, { timeout: 60000 });
-  await p.evaluate(() => { const el = document.getElementById('stol-bg'); if (el) el.__tmapPreview.pump(150); });
 }
 const STOL_SCENES = [
   { phase: 's1', name: 'entry_empty', go: async p => {

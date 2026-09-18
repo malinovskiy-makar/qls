@@ -223,6 +223,14 @@ nav.site-nav {
   }
 }
 
+/* ⚠️ НА 360–400 px РЯД ГОСТЯ НЕ ВЛЕЗАЛ НА 6 px (замер 18.09.2026, раннер
+   «Стола»): «Создать аккаунт» уезжает в панель ☰, «Войти» остаётся в шапке. */
+.nav-panel-register { display: none; }
+@media (max-width: 400px) {
+  .nav-right > .nav-register { display: none; }
+  .nav-panel .nav-panel-register { display: flex; align-items: center; }
+}
+
 /* ⚠️ ИМЯ В ПЛАШКЕ ПОКАЗЫВАЕТСЯ ТОЛЬКО НА ШИРОКОМ ЭКРАНЕ. Оно бывает
    длинным («Преподаватель Пробный» — около 150 px) и именно оно решало,
    поместится ли ряд: замер по ширинам показал, что учителю без этой правки
@@ -302,6 +310,7 @@ nav.site-nav {
       {% for item in nav_items %}
       <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
       {% endfor %}
+      {% if not user.is_authenticated %}<a class="nav-link nav-panel-register" href="{% url 'register' %}">Создать аккаунт</a>{% endif %}
     </div>
     <button type="button" class="fb-btn" aria-label="Проблема или предложение">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75"

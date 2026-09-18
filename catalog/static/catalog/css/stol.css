@@ -126,6 +126,13 @@
 .se-dd-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px;
               padding: 10px 12px; border-top: 1px solid var(--border-soft); font-size: 12.5px;
               color: var(--text2); }
+/* Пока идёт ответ состояния: «Обновляю…» вместо пояснения, числа приглушены. */
+.se-dd-busy { display: none; align-items: center; gap: 7px; color: var(--text2); }
+.se-dd-busy i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--accent-ring);
+                border-top-color: var(--accent); animation: askSpin .8s linear infinite; }
+.is-loading .se-dd-note { display: none; }
+.is-loading .se-dd-busy { display: inline-flex; }
+.is-loading .se-opt-n, .is-loading .ct-count { opacity: .45; transition: opacity .15s; }
 .se-done { border: 0; border-radius: 9px; padding: 8px 14px; background: var(--btn-bg);
            color: var(--on-btn); font: 600 13.5px/1 var(--font-ui); cursor: pointer; }
 

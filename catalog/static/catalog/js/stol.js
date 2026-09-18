@@ -157,12 +157,17 @@
       box.appendChild(row);
     }
   }
-  document.addEventListener('weco:filters-start', function (e) {
+  /* Отклик на выбор — сразу, а не когда придёт ответ: на медленной базе
+     `api_filter_state` думает секунды, и немой экран читается как «не нажалось»
+     (замечание владельца 18.09.2026). Галочка ставится до запроса
+     (`catalog_filters.js`), здесь — скелет ленты и «Обновляю…» в выпадашке. */
+  function loading(on) { entry.classList.toggle('is-loading', on); }
+  document.addEventListener('weco:filters-start', function () {
     clearTimeout(skelTimer);
-    /* Ответ фильтра приходит за доли секунды — скелет, только если ждём дольше. */
-    skelTimer = setTimeout(skeleton, e.detail.log ? 0 : 250);
+    loading(true);
+    skeleton();
   });
-  document.addEventListener('weco:filters-error', function () { clearTimeout(skelTimer); busy(false); });
+  document.addEventListener('weco:filters-error', function () { clearTimeout(skelTimer); loading(false); busy(false); });
   function replaceResults(html) {
     var tpl = document.createElement('template');
     tpl.innerHTML = html.trim();
@@ -187,7 +192,7 @@
   if (bg && window.TopicMapPreview) {
     bgMap = TopicMapPreview.mount(bg, {
       dataUrl: bg.getAttribute('data-map-url'), inert: true,
-      zoom: 1.55, nodeScale: 1.1, pitch: -0.26, cy: 0.42, dim: 0.5,
+      zoom: 1.55, nodeScale: 1.1, pitch: -0.26, cy: 0.42, dim: 0.5, eager: true,
       selected: selNode ? JSON.parse(selNode.textContent) : null
     });
   }
@@ -205,6 +210,7 @@
   document.addEventListener('weco:filters', function (e) {
     var s = e.detail.state, data = e.detail.data;
     clearTimeout(skelTimer);
+    loading(false);
     busy(false);
     entry.classList.toggle('is-calm', !s.q && !data.selected_count);
     paintChips(s);

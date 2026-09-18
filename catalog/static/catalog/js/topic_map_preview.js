@@ -88,7 +88,8 @@ var DEFAULTS = {
   pitch: -0.22,
   cy: 0.5,
   dim: 1,
-  selected: null
+  selected: null,
+  eager: false
 };
 
 /* ── Мелкие утилиты ──────────────────────────────────────────────────── */
@@ -172,6 +173,13 @@ function mount(el, options) {
   el.appendChild(canvas);
 
   var ctx = canvas.getContext('2d');
+  /* ⚠️ ПРИГЛУШЕНИЕ — ЦЕЛИКОМ СЛОЕМ, А НЕ ПО УЗЛАМ. Прозрачность на каждом
+     узле складывается там, где узлы и линии лежат друг на друге: при `dim`
+     0,5 самые плотные места доходили до 0,77 (замер владельца 18.09.2026:
+     альфа 183–196 из 255). Облако рисуется непрозрачным в буфер и кладётся
+     на экран одним слоем с прозрачностью `dim` — выше неё не бывает нигде. */
+  var buf = opt.dim < 1 ? document.createElement('canvas') : null;
+  var bctx = buf ? buf.getContext('2d') : ctx;
 
   var W = 0, H = 0, DPR = 1;
   var nodes = [], links = [], byId = {}, themeList = [], tagsOfTheme = {};
@@ -345,11 +353,12 @@ function mount(el, options) {
 
   function draw() {
     var t0 = performance.now();
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var g = bctx;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
     /* ⚠️ ФОН НЕ ЗАКРАШИВАЕТСЯ, А ОЧИЩАЕТСЯ. Блок стоит в чужом экране, и
        свой цвет холста он бы вырезал прямоугольником поверх карточки
        хозяина. Фон задаёт CSS блока. */
-    ctx.clearRect(0, 0, W, H);
+    g.clearRect(0, 0, W, H);
 
     var CY = Math.cos(yaw), SY = Math.sin(yaw);
     var CP = Math.cos(pitch), SP = Math.sin(pitch);
@@ -377,14 +386,13 @@ function mount(el, options) {
       path.moveTo(a.px, a.py);
       path.lineTo(b.px, b.py);
     }
-    ctx.lineWidth = 1;
-    ctx.globalAlpha = opt.dim;
-    ctx.strokeStyle = rgba(PAL.node, PAL.dark ? 0.30 : 0.38);
-    ctx.stroke(pTree);
-    ctx.setLineDash([2, 3]);
-    ctx.strokeStyle = rgba(PAL.node, PAL.dark ? 0.18 : 0.24);
-    ctx.stroke(pCross);
-    ctx.setLineDash([]);
+    g.lineWidth = 1;
+    g.strokeStyle = rgba(PAL.node, PAL.dark ? 0.30 : 0.38);
+    g.stroke(pTree);
+    g.setLineDash([2, 3]);
+    g.strokeStyle = rgba(PAL.node, PAL.dark ? 0.18 : 0.24);
+    g.stroke(pCross);
+    g.setLineDash([]);
 
     /* Узлы: дальние раньше ближних. Порядок пересобирается каждый кадр —
        сцена вращается, и глубина меняется у всех. */
@@ -397,14 +405,21 @@ function mount(el, options) {
       if (n.px < -20 || n.px > W + 20 || n.py < -20 || n.py > H + 20) continue;
       if (isPicked(n)) { chosen.push(n); continue; }
       var r = Math.max(0.8, n.r0 * n.ps * opt.nodeScale);
-      ctx.fillStyle = n.k === 'theme'
+      g.fillStyle = n.k === 'theme'
         ? (PAL.theme[n.g] || fallbackTheme)
         : (PAL.tag[n.g] || fallbackTag);
-      ctx.beginPath();
-      ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
-      ctx.fill();
+      g.beginPath();
+      g.arc(n.px, n.py, r, 0, 6.283185307179586);
+      g.fill();
     }
-    ctx.globalAlpha = 1;
+    if (buf) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = opt.dim;
+      ctx.drawImage(buf, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
     if (chosen.length) drawChosen(chosen);
 
     drawn++;
@@ -499,6 +514,7 @@ function mount(el, options) {
     DPR = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
+    if (buf) { buf.width = canvas.width; buf.height = canvas.height; }
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     if (state === 'live') { computeFit(); draw(); }
@@ -529,7 +545,7 @@ function mount(el, options) {
         alpha = 1;
         state = 'settling';
         resize();
-        schedule();
+        if (opt.eager) settleNow(); else schedule();
       })
       .catch(function () {
         state = 'error';
@@ -537,15 +553,37 @@ function mount(el, options) {
       });
   }
 
+  /* ⚠️ ФОН ЭКРАНА ОБЯЗАН ПОЯВИТЬСЯ БЕЗ ДЕЙСТВИЯ ЧЕЛОВЕКА (`eager`, 18.09.2026).
+     Обычный путь — видимость блока → простой браузера → кадры анимации — в
+     неактивной или фоновой вкладке не доходит до первого кадра, и облако
+     входа оставалось пустым, пока его не перерисовало что-то постороннее
+     (замер владельца). Здесь раскладка досчитывается срезами по таймеру, а
+     готовый кадр рисуется напрямую; вращение дальше — обычными кадрами. */
+  function settleNow() {
+    if (dead) return;
+    var until = performance.now() + 8;
+    while (left > 0 && performance.now() < until) { step(); left--; }
+    recentre();
+    computeFit();
+    if (left > 0) { setTimeout(settleNow, 0); return; }
+    state = 'live';
+    draw();
+    schedule();
+  }
+
   /* ── Наблюдатели ───────────────────────────────────────────────────── */
 
   var io = null;
+  if (opt.eager) {
+    visible = true;
+    start();
+  }
   if (window.IntersectionObserver) {
     io = new IntersectionObserver(function (entries) {
       var was = visible;
       visible = entries[entries.length - 1].isIntersecting;
       if (visible && !was) {
-        if (state === 'idle') whenIdle(start);
+        if (state === 'idle' && !opt.eager) whenIdle(start);
         else schedule();
       }
       /* Ушли за край экрана — кадр не просто пропускаем, а снимаем
@@ -554,7 +592,7 @@ function mount(el, options) {
       if (!visible && raf) { cancelAnimationFrame(raf); raf = 0; }
     }, { rootMargin: '120px' });
     io.observe(el);
-  } else {
+  } else if (!opt.eager) {
     visible = true;
     whenIdle(start);
   }
