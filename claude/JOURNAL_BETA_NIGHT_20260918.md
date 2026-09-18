@@ -6,7 +6,7 @@
 - Docker: PostgreSQL 17 (55432), Redis 7 (56379), search — подняты `up -d` (были выключены)
 - ГРАНИЦА_B = 05:30, ГРАНИЦА_C = 08:00
 
-Куда продолжать: C · дождаться full_run_beta_prep.log (../qls-beta) и c3_catalog_teacher.log (../qls-stol), разобрать красное, C4 Notion, C5 отчёт; деревья ../qls-beta и ../qls-stol удалить в конце
+Куда продолжать: C · ждать full_run_beta_prep.log (../qls-beta на feat/beta-prep c910affe, с метками приложений), затем C4 Notion, C5 отчёт; ../qls-beta удалить только после rmdir node_modules
 
 ## Чек-лист
 
@@ -285,6 +285,20 @@
   результат» (`test_design_canon` в C1). В `../qls-beta` сделана ссылка-junction на
   `../qls/node_modules`, там `test_design_canon` — 4 теста OK. **Удалять дерево только после
   `rmdir` ссылки**, иначе удаление пройдёт в настоящий `node_modules`.
+
+## C1 — почему полный прогон шёл часами (найдено в 06:05)
+
+Строки «NN.Ns  N  ok/FAIL  модуль» в логе были НЕ прогоном на PostgreSQL, а выводом
+`scripts/test_timing.py`: с коммита `dade0c54` (`--scope-from-git`) папка `scripts` — пакет,
+и прогон **без меток** (`run_tests.py --settings=…`, как в промпте ночи) находит
+`scripts/test_timing.py` по шаблону `test*.py` и импортирует его, а код верхнего уровня
+гонит все 341 модуль по одному на SQLite (~2,5 ч) и переписывает
+`reports/calc2_22aug/timing_plain.json` (отсюда и «грязный» `timing_plain.json` в stash от
+12.09). Первые два прогона ночи шли так же. CI не задет: джоб `tests` запускает с метками
+приложений. Починка (коммит `c910affe` на `feat/beta-prep`, cherry-pick `efa7418a` в
+`feat/catalog-stol`): тело скрипта в `main()` под `if __name__ == '__main__'`; сторож
+`problems/tests/test_scripts_import_safe.py` (на старом скрипте красный); строка в
+docs/TESTING.md. C1 перезапущен в 06:09 с метками приложений, как джоб CI.
 
 ## C2 — джобы CI на `feat/beta-prep` (дерево `../qls-beta`, `8ef89437`), 05:34
 
