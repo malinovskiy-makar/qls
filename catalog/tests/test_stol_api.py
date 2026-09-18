@@ -347,3 +347,23 @@ class PhoneBarTests(TestCase):
         Hint.objects.create(problem=self.problem, text='Подсказка', order=1)
         html = self.client.get(reverse('catalog:problem_detail', args=[self.problem.pk])).content.decode()
         self.assertNotIn('💡', html)
+
+
+class TestNextButtonTests(TestCase):
+    """После ответа у теста главная кнопка — «Дальше ›» (P6), при похожих."""
+
+    def _html(self, with_similar):
+        problem = make_problem('Выберите верное.', problem_type='тест: один ответ', answer='а')
+        _parts(problem, 'аб')
+        if with_similar:
+            problem.similar_problems.add(make_problem('Похожая.'))
+        return self.client.get(reverse('catalog:problem_detail', args=[problem.pk])).content.decode()
+
+    def test_next_is_the_main_button_when_there_is_somewhere_to_go(self):
+        done = self._html(True).split('id="row-done"', 1)[1].split('</div>', 1)[0]
+        self.assertIn('class="btn btn--main"', done)
+        self.assertIn('Дальше ›', done)
+
+    def test_no_next_without_similar(self):
+        done = self._html(False).split('id="row-done"', 1)[1].split('</div>', 1)[0]
+        self.assertNotIn('Дальше ›', done)

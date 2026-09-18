@@ -130,4 +130,6 @@ body.stol-is-focus .pd-act[data-stol="rail"], body.stol-is-focus .pd-act[data-st
   body:has(.stol-phonebar > *) { padding-bottom: 72px; --corner-offset: 76px; }
   body:has(.stol-phonebar > *) .tg-fab { display: none; }
 }
+/* Подсказка про клавиши теста — не на сенсорном экране (README §5). */
+@media (hover: none), (max-width: 759px) { .stol .tq-kbd { display: none; } }
 @media (prefers-reduced-motion: reduce) { .stol * { transition: none !important; } }

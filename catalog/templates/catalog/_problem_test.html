@@ -50,7 +50,8 @@ is-missed, is-skip) с подписями из student/_option_review.html.
   <div class="hints" id="hints" aria-live="polite"></div>
   {% endif %}
   <div class="tq-row" id="row-done" hidden>
-    {% if test.more_url %}<a class="btn btn--main" href="{{ test.more_url }}">Ещё тест по этой теме</a>{% endif %}
+    {% if rail_rows %}<a class="btn btn--main" href="{% url 'catalog:problem_detail' rail_rows.0.card.problem.pk %}">Дальше ›</a>{% endif %}
+    {% if test.more_url %}<a class="btn {% if rail_rows %}btn--quiet{% else %}btn--main{% endif %}" href="{{ test.more_url }}">Ещё тест по этой теме</a>{% endif %}
     {% if chat_available and user.is_authenticated %}<button class="btn btn--quiet" type="button" id="ask-why" data-ask="">Спросить ИИ, почему так</button>{% endif %}
     <span class="grow"></span>
     <button class="btn btn--quiet btn--sm" type="button" id="again-btn">Пройти заново</button>
