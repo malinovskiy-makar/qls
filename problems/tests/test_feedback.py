@@ -190,7 +190,7 @@ class AcceptTests(MediaTempMixin, TestCase):
     def test_huge_screenshot_does_not_lose_the_message(self):
         import os
         from django.core.files.uploadedfile import SimpleUploadedFile
-        big = SimpleUploadedFile('big.jpg', os.urandom(6_000_000),
+        big = SimpleUploadedFile('big.jpg', os.urandom(3_000_000),
                                  content_type='image/jpeg')
         response = self.client.post('/api/feedback/', {
             'kind': 'idea', 'url': '/', 'other_text': 'Всё равно запишите',
@@ -199,66 +199,6 @@ class AcceptTests(MediaTempMixin, TestCase):
         entry = Feedback.objects.get()
         self.assertFalse(entry.screenshot)
         self.assertEqual(entry.other_text, 'Всё равно запишите')
-
-
-class ServerShotNoteTests(MediaTempMixin, TestCase):
-    """18.09.2026: сервер уменьшает высокий снимок и сам пишет, почему не принял.
-
-    Раньше всё выше 4 000 px и тяжелее 2,5 МБ молча пропадало, а в
-    `screenshot_note` оставалось клиентское «ok» — пустой снимок в админке
-    выглядел как «браузер снял, а у нас ничего».
-    """
-
-    def setUp(self):
-        cache.clear()
-
-    def _post(self, blob, note='ok'):
-        from django.core.files.uploadedfile import SimpleUploadedFile
-        return self.client.post('/api/feedback/', {
-            'kind': 'idea', 'url': '/catalog/', 'other_text': 'Снимок длинной страницы',
-            'screenshot_note': note,
-            'screenshot': SimpleUploadedFile('shot.jpg', blob, content_type='image/jpeg')})
-
-    def test_tall_screenshot_is_downscaled_not_dropped(self):
-        self.assertEqual(self._post(jpeg_bytes(1600, 5000)).status_code, 200)
-        entry = Feedback.objects.get()
-        self.assertTrue(entry.screenshot)
-        self.assertLessEqual(Image.open(entry.screenshot.path).height, 4000)
-
-    def test_downscaled_screenshot_keeps_the_client_note(self):
-        self._post(jpeg_bytes(1600, 5000), note='ok')
-        self.assertEqual(Feedback.objects.get().screenshot_note, 'ok')
-
-    def test_absurdly_tall_screenshot_is_refused_as_tall(self):
-        self._post(jpeg_bytes(1600, 13000))
-        entry = Feedback.objects.get()
-        self.assertFalse(entry.screenshot)
-        self.assertEqual(entry.screenshot_note, 'tall')
-
-    def test_four_megabyte_screenshot_is_accepted(self):
-        import os
-        side = 1150
-        noise = Image.frombytes('RGB', (side, side), os.urandom(side * side * 3))
-        buffer = io.BytesIO()
-        noise.save(buffer, format='PNG')
-        blob = buffer.getvalue()
-        self.assertTrue(3_500_000 < len(blob) < 5_000_000, len(blob))
-        self._post(blob)
-        self.assertTrue(Feedback.objects.get().screenshot)
-
-    def test_six_megabyte_file_is_refused_as_big(self):
-        import os
-        self._post(os.urandom(6_000_000))
-        entry = Feedback.objects.get()
-        self.assertFalse(entry.screenshot)
-        self.assertEqual(entry.screenshot_note, 'big')
-
-    def test_not_an_image_is_refused_as_bad(self):
-        self._post(b'not an image')
-        entry = Feedback.objects.get()
-        self.assertFalse(entry.screenshot)
-        self.assertEqual(entry.screenshot_note, 'bad')
-        self.assertEqual(entry.other_text, 'Снимок длинной страницы')
 
 
 class RefuseTests(TestCase):
@@ -484,84 +424,3 @@ class ScreenshotNoteScriptTests(TestCase):
         self.assertTrue("finish(null, 'timeout'); }, 6000)" in src)
         for note in ("'ok'", "'timeout'", "'error'", "'nolib'"):
             self.assertTrue(note in src, note)
-
-    def test_script_shoots_the_visible_frame_not_the_whole_document(self):
-        """18.09.2026: кадр собирает shotOptions() — видимая область по прокрутке.
-
-        Весь документ длинного каталога — полотно в тысячи пикселей; проба
-        кадра — scripts/feedback_shot_probe.mjs.
-        """
-        src = io.open('templates/_feedback.html', encoding='utf-8').read()
-        self.assertTrue('function shotOptions()' in src)
-        self.assertTrue('html2canvas(document.documentElement, shotOptions())' in src)
-        self.assertTrue('x: window.scrollX, y: window.scrollY' in src)
-        self.assertTrue('width: root.clientWidth, height: root.clientHeight' in src)
-
-    def test_modern_colors_are_flattened_before_the_shot(self):
-        """html2canvas 1.4.1 падает на `color(srgb …)` — так Chrome отдаёт
-        color-mix() каталога, задачи и игры. Без onclone снимок был только
-        у главной страницы."""
-        src = io.open('templates/_feedback.html', encoding='utf-8').read()
-        self.assertTrue('onclone: flattenModernColors' in src)
-
-
-class PulseTests(TestCase):
-    """18.09.2026: «Всё ли нравится?» — третий вид обратной связи."""
-
-    def setUp(self):
-        cache.clear()
-
-    def _post(self, **over):
-        data = {'kind': 'pulse', 'url': '/catalog/', 'choices': ['like']}
-        data.update(over)
-        return self.client.post('/api/feedback/', data)
-
-    def test_like_is_saved_as_pulse(self):
-        self.assertEqual(self._post(comment='Удобный поиск').status_code, 200)
-        entry = Feedback.objects.get()
-        self.assertEqual((entry.kind, entry.choices, entry.comment),
-                         ('pulse', ['like'], 'Удобный поиск'))
-
-    def test_dislike_is_saved(self):
-        self._post(choices=['dislike'])
-        self.assertEqual(Feedback.objects.get().choices, ['dislike'])
-
-    def test_unknown_choice_is_refused(self):
-        self.assertEqual(self._post(choices=['meh']).status_code, 400)
-        self.assertEqual(Feedback.objects.count(), 0)
-
-    def test_both_choices_at_once_are_refused(self):
-        self.assertEqual(self._post(choices=['like', 'dislike']).status_code, 400)
-
-    def test_comment_over_three_hundred_is_refused(self):
-        self.assertEqual(self._post(comment='я' * 301).status_code, 400)
-
-    def test_other_text_is_ignored(self):
-        self._post(other_text='лишнее')
-        self.assertEqual(Feedback.objects.get().other_text, '')
-
-    def test_problem_without_choices_is_still_refused(self):
-        response = self.client.post('/api/feedback/', {'kind': 'problem', 'url': '/'})
-        self.assertEqual(response.status_code, 400)
-
-
-class PulseCardTests(TestCase):
-    """Плашка есть на рабочих экранах и отсутствует на входе и регистрации."""
-
-    def test_card_is_on_catalog_and_home(self):
-        for url in ('/catalog/', '/'):
-            html = self.client.get(url).content.decode('utf-8')
-            self.assertIn('id="pulse-card-tpl"', html, url)
-
-    def test_card_is_not_on_login_and_register(self):
-        for url in ('/login/', '/register/'):
-            html = self.client.get(url).content.decode('utf-8')
-            self.assertNotIn('id="pulse-card-tpl"', html, url)
-
-    def test_show_rules_live_in_one_function(self):
-        src = io.open('templates/_pulse.html', encoding='utf-8').read()
-        for rule in ('var MIN_VISITS = 2;', 'var MAX_SHOWS = 2;',
-                     'var GAP_MS = 7 * 24 * 3600 * 1000;', 'var AFTER_MS = 60 * 1000;',
-                     'var AUTO_SEND_MS = 20 * 1000;'):
-            self.assertIn(rule, src)
-        self.assertIn("weco.track('pulse_dismiss'", src)

@@ -93,6 +93,7 @@ def password_change(request):
             'password_form': form,
             'tab': 'security',
             'subtab': 'problems',
+            'grades': range(5, 12),
             'levels': [(value, label, UserProfile.LEVEL_HINTS.get(value, ''))
                        for value, label in UserProfile.Level.choices],
             'facts': _profile_facts(request.user, request.user.profile),
@@ -193,6 +194,7 @@ def profile(request):
         'avatar_error': avatar_error,
         'tab': tab,
         'subtab': subtab,
+        'grades': range(5, 12),
         # Уровень отдаём тройками (значение, название, описание): фильтра
         # «взять по ключу» в проекте нет, а заводить его ради одного экрана
         # значит завести ещё одну общую вещь.
@@ -402,12 +404,7 @@ def api_graph_save(request):
 # ═══════════════════════════════════════════════════════════════════════
 
 FEEDBACK_SCOPE = 'feedback'
-FEEDBACK_MAX_SCREENSHOT = 5_000_000     # 5 МБ
-# Длинная сторона снимка: выше SIDE_MAX уменьшаем, выше SIDE_HARD_MAX не
-# открываем вовсе — такой файл разворачивается в памяти в сотни мегабайт.
-FEEDBACK_SHOT_SIDE_MAX = 4000
-FEEDBACK_SHOT_SIDE_HARD_MAX = 12000
-FEEDBACK_SHOT_WIDTH = 1600
+FEEDBACK_MAX_SCREENSHOT = 2_500_000     # 2,5 МБ
 
 
 @require_POST
@@ -427,7 +424,6 @@ def api_feedback(request):
     ценнее картинки, и терять его из-за картинки нельзя.
     """
     from problems import ratelimit
-    from problems import pulse
     from problems.feedback_options import OTHER_CHOICE, options_for, page_key_for
     from problems.models_platform import Feedback
 
@@ -464,11 +460,6 @@ def api_feedback(request):
     if kind == Feedback.Kind.IDEA and not other_text:
         return JsonResponse({'ok': False, 'error': 'Напишите предложение.'},
                             status=400)
-    if kind == Feedback.Kind.PULSE:
-        verdict = pulse.validate(request.POST)
-        if isinstance(verdict, str):
-            return JsonResponse({'ok': False, 'error': verdict}, status=400)
-        (chosen, comment), other_text = verdict, ''
 
     entry = Feedback(
         user=request.user if request.user.is_authenticated else None,
@@ -481,49 +472,16 @@ def api_feedback(request):
         screenshot_note=(request.POST.get('screenshot_note') or '')[:16],
     )
 
-    # Сервер не принял снимок — пишет почему сам (big | tall | bad). Иначе в
-    # поле оставалось клиентское «ok», и пустой снимок в админке врал.
     shot = request.FILES.get('screenshot')
-    if shot is not None:
-        if shot.size > FEEDBACK_MAX_SCREENSHOT:
-            entry.screenshot_note = 'big'
-        else:
-            blob, note = _feedback_screenshot(shot)
-            if blob is None:
-                entry.screenshot_note = note
-            else:
-                entry.screenshot.save('shot.jpg', ContentFile(blob), save=False)
+    if shot is not None and shot.size <= FEEDBACK_MAX_SCREENSHOT:
+        blob = _feedback_screenshot(shot)
+        if blob is not None:
+            entry.screenshot.save('shot.jpg', ContentFile(blob), save=False)
 
     entry.save()
     ratelimit.note_failure(FEEDBACK_SCOPE + ':ip',
                            ratelimit.client_ip(request), multiplier=2)
     return JsonResponse({'ok': True, 'id': entry.pk})
-
-
-@require_POST
-def api_search_rating(request):
-    """Оценка выдачи поиска: «Нашли, что искали?» (18.09.2026, ADR 0117).
-
-    Поля: `log` (номер строки журнала), `rating` (yes | no), `text` (до 300).
-    Своя строка — по куке посетителя или вошедшему; чужая и несуществующая
-    отвечают одинаково 404. CSRF обязателен, как у `api_feedback`.
-    """
-    from catalog import search_log
-    from problems.models_platform import SearchLog
-
-    rating = request.POST.get('rating') or ''
-    text = (request.POST.get('text') or '').strip()
-    if rating not in SearchLog.Rating.values:
-        return JsonResponse({'ok': False, 'error': 'rating'}, status=400)
-    if len(text) > search_log.RATING_TEXT_MAX:
-        return JsonResponse({'ok': False, 'error': 'text'}, status=400)
-    try:
-        log_id = int(request.POST.get('log') or '')
-    except ValueError:
-        return JsonResponse({'ok': False, 'error': 'log'}, status=400)
-    if not search_log.rate(request, log_id, rating, text):
-        return JsonResponse({'ok': False}, status=404)
-    return JsonResponse({'ok': True})
 
 
 PROBLEM_REPORT_SCOPE = 'problem_report'
@@ -753,12 +711,7 @@ def _path_of(url):
 
 
 def _feedback_screenshot(uploaded):
-    """Пересжать снимок в JPEG → (байты | None, note).
-
-    note — 'ok', 'tall' (длинная сторона больше FEEDBACK_SHOT_SIDE_HARD_MAX)
-    или 'bad' (не открывается как картинка). Высокий снимок УМЕНЬШАЕТСЯ, а
-    не выбрасывается: раньше всё выше 4 000 px молча пропадало, и до админки
-    доживали только короткие страницы.
+    """Пересжать снимок в JPEG. Не картинка — вернуть None, не падать.
 
     Та же осторожность, что у аватара: сначала целостность, потом размеры в
     пикселях, и только потом обработка — иначе мелкий файл разворачивается в
@@ -771,19 +724,17 @@ def _feedback_screenshot(uploaded):
         probe.verify()
         uploaded.seek(0)
         image = Image.open(uploaded)
-        if max(image.size) > FEEDBACK_SHOT_SIDE_HARD_MAX:
-            return None, 'tall'
+        if image.width > 4000 or image.height > 4000:
+            return None
         uploaded.seek(0)
         image = Image.open(uploaded).convert('RGB')
-    except (UnidentifiedImageError, OSError, ValueError, Image.DecompressionBombError):
-        return None, 'bad'
+    except (UnidentifiedImageError, OSError, ValueError):
+        return None
 
-    if max(image.size) > FEEDBACK_SHOT_SIDE_MAX:
-        image.thumbnail((FEEDBACK_SHOT_SIDE_MAX, FEEDBACK_SHOT_SIDE_MAX), Image.LANCZOS)
-    if image.width > FEEDBACK_SHOT_WIDTH:
-        height = max(1, round(image.height * FEEDBACK_SHOT_WIDTH / image.width))
-        image = image.resize((FEEDBACK_SHOT_WIDTH, height), Image.LANCZOS)
+    if image.width > 1600:
+        height = max(1, round(image.height * 1600 / image.width))
+        image = image.resize((1600, height), Image.LANCZOS)
 
     buffer = io.BytesIO()
     image.save(buffer, format='JPEG', quality=80, optimize=True)
-    return buffer.getvalue(), 'ok'
+    return buffer.getvalue()

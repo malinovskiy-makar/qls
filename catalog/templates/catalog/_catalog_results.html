@@ -7,7 +7,7 @@
 всё, что относится к списку, живёт здесь, а не в странице — иначе список
 под окном и список после перезагрузки разошлись бы.
 {% endcomment %}
-<section class="ct-results" id="ct-results"{% if searched %} data-search-status="{{ smart_search_status }}" data-search-total="{{ total }}"{% if degraded %} data-search-degraded{% endif %}{% if search_log_id %} data-search-log="{{ search_log_id }}"{% endif %}{% endif %}>
+<section class="ct-results" id="ct-results"{% if searched %} data-search-status="{{ smart_search_status }}" data-search-total="{{ total }}"{% if degraded %} data-search-degraded{% endif %}{% endif %}>
   <div class="ct-count-row">
     <div class="ct-count">
       {% if searched %}

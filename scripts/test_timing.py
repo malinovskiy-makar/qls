@@ -8,49 +8,39 @@
 """
 import subprocess, sys, time, pathlib, json, re
 
+KEEPDB = '--keepdb' in sys.argv
+root = pathlib.Path(__file__).resolve().parent.parent
+mods = []
+for app in ('problems', 'catalog', 'student', 'teacher', 'game', 'calc2'):
+    d = root / app / 'tests'
+    if d.is_dir():
+        mods += [f'{app}.tests.{p.stem}' for p in sorted(d.glob('test_*.py'))]
+    f = root / app / 'tests.py'
+    if f.is_file():
+        mods.append(f'{app}.tests')
 
-# ⚠️ ВСЁ — ВНУТРИ main() (18.09.2026). С тех пор как `scripts` стал пакетом
-# (`__init__.py`, фаза --scope-from-git), полный прогон БЕЗ меток находит этот
-# файл по шаблону `test*.py` и импортирует его: код верхнего уровня гнал
-# весь набор помодульно на SQLite (часы) и переписывал timing_plain.json.
-def main():
-    KEEPDB = '--keepdb' in sys.argv
-    root = pathlib.Path(__file__).resolve().parent.parent
-    mods = []
-    for app in ('problems', 'catalog', 'student', 'teacher', 'game', 'calc2'):
-        d = root / app / 'tests'
-        if d.is_dir():
-            mods += [f'{app}.tests.{p.stem}' for p in sorted(d.glob('test_*.py'))]
-        f = root / app / 'tests.py'
-        if f.is_file():
-            mods.append(f'{app}.tests')
+rows = []
+for m in mods:
+    cmd = [sys.executable, 'manage.py', 'test', m, '-v', '1']
+    if KEEPDB:
+        cmd.append('--keepdb')
+    t0 = time.time()
+    r = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+    dt = time.time() - t0
+    n = re.search(r'Ran (\d+) test', r.stderr or '')
+    rows.append({'module': m, 'seconds': round(dt, 1),
+                 'tests': int(n.group(1)) if n else 0,
+                 'ok': r.returncode == 0})
+    print(f'{dt:7.1f}s  {rows[-1]["tests"]:4d}  {"ok " if r.returncode==0 else "FAIL"}  {m}', flush=True)
 
-    rows = []
-    for m in mods:
-        cmd = [sys.executable, 'manage.py', 'test', m, '-v', '1']
-        if KEEPDB:
-            cmd.append('--keepdb')
-        t0 = time.time()
-        r = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
-        dt = time.time() - t0
-        n = re.search(r'Ran (\d+) test', r.stderr or '')
-        rows.append({'module': m, 'seconds': round(dt, 1),
-                     'tests': int(n.group(1)) if n else 0,
-                     'ok': r.returncode == 0})
-        print(f'{dt:7.1f}s  {rows[-1]["tests"]:4d}  {"ok " if r.returncode==0 else "FAIL"}  {m}', flush=True)
-
-    rows.sort(key=lambda x: -x['seconds'])
-    total = sum(x['seconds'] for x in rows)
-    tests = sum(x['tests'] for x in rows)
-    out = {'keepdb': KEEPDB, 'total_seconds': round(total, 1), 'tests': tests, 'modules': rows}
-    dest = root / 'reports' / 'calc2_22aug' / ('timing_keepdb.json' if KEEPDB else 'timing_plain.json')
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    dest.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(f'\nИТОГО {total:.0f} с, тестов {tests}, модулей {len(rows)}')
-    print('Десятка самых долгих:')
-    for x in rows[:10]:
-        print(f'  {x["seconds"]:7.1f}s  {x["tests"]:4d}  {x["module"]}')
-
-
-if __name__ == '__main__':
-    main()
+rows.sort(key=lambda x: -x['seconds'])
+total = sum(x['seconds'] for x in rows)
+tests = sum(x['tests'] for x in rows)
+out = {'keepdb': KEEPDB, 'total_seconds': round(total, 1), 'tests': tests, 'modules': rows}
+dest = root / 'reports' / 'calc2_22aug' / ('timing_keepdb.json' if KEEPDB else 'timing_plain.json')
+dest.parent.mkdir(parents=True, exist_ok=True)
+dest.write_text(json.dumps(out, ensure_ascii=False, indent=2), encoding='utf-8')
+print(f'\nИТОГО {total:.0f} с, тестов {tests}, модулей {len(rows)}')
+print('Десятка самых долгих:')
+for x in rows[:10]:
+    print(f'  {x["seconds"]:7.1f}s  {x["tests"]:4d}  {x["module"]}')

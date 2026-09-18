@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import chat_files, views
+from . import views
 
 app_name = 'catalog'
 
@@ -26,9 +26,6 @@ urlpatterns = [
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Фото или PDF решения к реплике чата: только вход, 10 файлов в сутки.
     path('api/chat/upload/',                    views.api_chat_upload,    name='api_chat_upload'),
-    path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),
-    # Третья файловая вьюха: только владельцу или сотруднику (ADR 0118).
-    path('chat/attachment/<int:pk>/',            chat_files.chat_attachment, name='chat_attachment'),
     # Подсказки уровнями: n с единицы, за пределом 404 (этап 6).
     path('api/hint/<int:problem_id>/<int:n>/',  views.api_hint,           name='api_hint'),
     # Тест как игра (этап 7): всё-или-ничего, попытки в сессии.

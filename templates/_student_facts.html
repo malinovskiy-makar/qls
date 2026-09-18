@@ -11,11 +11,9 @@
 под именем — то есть как то, что можно не читать. Репетитор смотрит сюда
 ПЕРЕД занятием: класс и цель — рабочие сведения, а не оформление.
 Крупнее и ярче делаем ровно значение; метка остаётся мелкой и тихой.
-У класса метки нет (18.09.2026): подпись кода уже «11 класс» или
-«Уже не школьник», метка «класс» перед ней была бы повтором.
 {% endcomment %}{% if profile %}{% if profile.grade or profile.city or profile.goal %}
 <div class="student-facts">
-  {% if profile.grade %}<span><b class="fact">{{ profile.get_grade_display }}</b></span>{% endif %}
+  {% if profile.grade %}<span><span class="cap">класс</span><b class="fact">{{ profile.grade }}</b></span>{% endif %}
   {% if profile.city %}<span><span class="cap">город</span><b class="fact">{{ profile.city }}</b></span>{% endif %}
   {% if profile.goal %}<span><span class="cap">цель на год</span><b class="fact">{{ profile.goal }}</b></span>{% endif %}
 </div>

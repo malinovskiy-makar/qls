@@ -261,15 +261,11 @@ class VersionBadgeTests(TestCase):
             with open(path, encoding='utf-8') as fh:
                 self.assertIn('body > main { width: 100%; }', fh.read(), path)
         # Метка — последний видимый в потоке элемент страницы: за ней только скрипты,
-        # закреплённые кнопки обратной связи, скрытая форма, закреплённый стек плашек
-        # угла (`_corner_stack.html`, position: fixed — вне потока) и инертные
-        # `<template>` плашек (18.09.2026).
+        # закреплённые кнопки обратной связи и скрытая форма.
         self.client.force_login(self.users['teacher'])
         html = self.client.get('/teacher/game-sets/').content.decode('utf-8')
         tail = html.split('<div class="site-version">', 1)[1].split('</div>', 1)[1]
-        tail = re.sub(r'<script\b.*?</script>|<style\b.*?</style>|<template\b.*?</template>',
-                      '', tail, flags=re.S)
-        tail = tail.replace('<div class="corner-stack" id="corner-stack"', '')
+        tail = re.sub(r'<script\b.*?</script>|<style\b.*?</style>', '', tail, flags=re.S)
         self.assertEqual(re.findall(r'<(main|section|div|nav|footer)\b', tail), [])
 
     def test_version_comes_from_settings(self):

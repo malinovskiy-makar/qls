@@ -37,9 +37,8 @@ class TagFilterTests(TestCase):
     u"""Фильтр по тегам: денормализованный список id, без join."""
 
     def setUp(self):
-        # Канонические: окно игры показывает только их (18.09.2026).
-        self.t_graph = Tag.objects.create(name='график', slug='graph', kind='canonical')
-        self.t_hard = Tag.objects.create(name='олимпиадная', slug='hard', kind='canonical')
+        self.t_graph = Tag.objects.create(name='график', slug='graph')
+        self.t_hard = Tag.objects.create(name='олимпиадная', slug='hard')
         self.with_graph = make_q(tag_ids=[self.t_graph.id])
         self.with_both = make_q(tag_ids=[self.t_graph.id, self.t_hard.id])
         self.plain = make_q(tag_ids=[])
@@ -284,7 +283,7 @@ class FilterWindowMarkupTests(TestCase):
         self.assertNotIn('id="tag-search"', html)
 
     def test_tag_group_appears_once_there_are_tags(self):
-        tag = Tag.objects.create(name='график', slug='graph', kind='canonical')
+        tag = Tag.objects.create(name='график', slug='graph')
         make_q(tag_ids=[tag.id])
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         self.assertIn('id="tag-search"', html)
