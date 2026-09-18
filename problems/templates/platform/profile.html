@@ -46,6 +46,17 @@
 .pf-hint--block { margin: 0 0 16px; font-size: 13px; line-height: 1.5; }
 .pf-err { font-size: 13px; color: var(--error); margin-top: 5px; }
 
+/* Карточка канала в Telegram — вся карточка ссылка, цвета токенами. */
+.pf-tg { display: flex; align-items: center; gap: 14px; margin-top: 16px;
+         background: var(--surface); color: var(--text); text-decoration: none; }
+.pf-tg:hover { border-color: var(--accent-ring); }
+.pf-tg-icon { display: inline-flex; width: 40px; height: 40px; flex: none;
+              align-items: center; justify-content: center; border-radius: 50%;
+              background: var(--accent-tint); color: var(--accent); }
+.pf-tg-icon .qi { width: 20px; height: 20px; }
+.pf-tg-text { display: flex; flex-direction: column; gap: 2px; }
+.pf-tg-text span { font-size: 13px; color: var(--text2); }
+
 /* Полоса фактов: три-четыре числа, посчитанные не здесь. */
 .pf-facts {
   display: flex; flex-wrap: wrap; gap: 8px;
@@ -291,6 +302,18 @@
     <button type="submit" class="btn-primary">Сохранить</button>
   </form>
 </div>
+
+{% comment %}
+Канал в Telegram (18.09.2026). Ссылка на ЛЕНТУ канала, без `?direct`:
+`?direct` у кружка в углу открывает личную переписку, а здесь зовём читать.
+{% endcomment %}
+<a class="card pf-card pf-tg" href="https://t.me/weconomics_ru" target="_blank" rel="noopener">
+  <span class="pf-tg-icon">{% include '_icon.html' with name='telegram' %}</span>
+  <span class="pf-tg-text">
+    <b>Мы в Telegram</b>
+    <span>Разборы задач и новости платформы</span>
+  </span>
+</a>
 
 {% elif tab == 'security' %}
 <div class="card pf-card">

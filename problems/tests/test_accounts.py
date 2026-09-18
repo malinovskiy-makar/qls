@@ -476,3 +476,44 @@ class FullJourneyTests(MediaTempMixin, TestCase):
         self.assertIn('/profile/avatar/%d/' % user.pk, html)
         self.assertEqual(
             self.client.get('/profile/avatar/%d/' % user.pk).status_code, 200)
+
+
+class TelegramChannelCardTests(TestCase):
+    """18.09.2026: карточка канала в профиле ведёт на ленту, а не в личку."""
+
+    CHANNEL = 'href="https://t.me/weconomics_ru"'
+
+    def setUp(self):
+        cache.clear()
+        self.user = User.objects.create_user(username='tg_reader',
+                                             password=GOOD_PASSWORD,
+                                             role='student')
+        self.client.force_login(self.user)
+
+    def _card(self, html):
+        return html.split('class="card pf-card pf-tg"', 1)[1].split('</a>', 1)[0]
+
+    def test_profile_links_to_the_channel_feed(self):
+        html = self.client.get('/profile/').content.decode('utf-8')
+        self.assertIn('class="card pf-card pf-tg" ' + self.CHANNEL, html)
+
+    def test_channel_card_has_no_direct_suffix(self):
+        html = self.client.get('/profile/').content.decode('utf-8')
+        self.assertNotIn('?direct', self._card(html))
+
+    def test_welcome_screen_shows_the_same_card(self):
+        html = self.client.get('/profile/?welcome=1').content.decode('utf-8')
+        self.assertIn('Мы в Telegram', html)
+
+    def test_login_keeps_the_direct_link(self):
+        self.client.logout()
+        html = self.client.get('/login/').content.decode('utf-8')
+        self.assertIn('https://t.me/weconomics_ru?direct', html)
+
+    def test_new_icons_are_the_same_in_markup_and_scripts(self):
+        """Оба набора иконок держат один и тот же рисунок посимвольно."""
+        markup = io.open('templates/_icon.html', encoding='utf-8').read()
+        scripts = io.open('templates/_icons.html', encoding='utf-8').read()
+        for name in ('telegram', 'thumb_up', 'thumb_down'):
+            svg = markup.split("{%% if name == '%s' %%}" % name, 1)[1].split('{% endif %}', 1)[0]
+            self.assertIn("%s: '%s'" % (name, svg), scripts)
