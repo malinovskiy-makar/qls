@@ -374,6 +374,7 @@ span.pp--src:active { transform: none; }
     {% for row in rail_rows %}{% include 'catalog/stol/_rail_row.html' with card=row.card status=row.status show_status=user.is_authenticated current_id=problem.pk %}{% endfor %}
     {% if not rail_rows %}<p class="rail-empty">Похожих задач в банке пока нет.</p>{% endif %}
   </div>
+  {% if rail_rows %}<a class="rail-all" href="{{ similar_url }}">Все похожие в каталоге</a>{% endif %}
   <a class="rail-all" href="{% url 'catalog:problem_list' %}">Весь каталог</a>
 </aside>
 <article class="pd-main">

@@ -94,6 +94,9 @@ body.stol-is-focus .stol-strip { display: none !important; }
 body.stol-is-focus .pd-grid.stol { --rail-col: 0px; --help-col: 0px; }
 body.stol-is-focus .pd-act[data-stol="rail"], body.stol-is-focus .pd-act[data-stol="help"] { display: inline-flex !important; }
 
+/* «Похожие» живут в ленте; блок под условием остаётся только там, где
+   ленты нет (уже 1100 px), пока не сделан телефонный вид (P9). */
+@media (min-width: 1100px) { .stol .sim { display: none; } }
 @media (min-width: 1100px) and (max-width: 1399px) {
   .stol[data-rail="open"] { --rail-col: 52px; }
   .stol[data-rail="open"] > .stol-strip--rail { display: flex; }
