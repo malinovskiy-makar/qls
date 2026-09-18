@@ -1,0 +1,46 @@
+{% extends "catalog/base.html" %}
+{% load static %}
+
+{% comment %}
+«СТОЛ» — ОДИН ЭКРАН НА КАТАЛОГ, ЗАДАЧУ И КАРТУ ТЕМ.
+
+Решения владельца 17–18.09.2026 (Notion, «Решения»; спецификация —
+`claude/mockups/catalog_stol_20260917/README.md`): три адреса — `/catalog/`
+(вход), `/catalog/problem/<id>/` (задача) и `/catalog/map/` (карта) — рисует
+этот шаблон, вид задаёт `view`. Каждый адрес сервер отдаёт целиком, без
+скрипта (прямая ссылка работает); сценарий `stol.js` переключает виды на
+месте.
+
+Партиалы вида лежат в `catalog/stol/`: `_stol_entry.html` — вход. Стили —
+один файл `catalog/css/stol.css`, цвета только токенами `_tokens.html`.
+
+⚠️ ФИЛЬТРЫ — ОДНО СОСТОЯНИЕ: окно «Все фильтры» (`_catalog_modal.html` +
+`catalog_filters.js`), чипы входа и карта тем пишут `weco.filters.state`.
+{% endcomment %}
+
+{% block title %}Умный каталог{% endblock %}
+{% block main_class %}stol stol--{{ view }}{% endblock %}
+
+{% block extra_style %}
+{% include "catalog/_catalog_filters_css.html" %}
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'catalog/css/stol.css' %}">
+<link rel="stylesheet" href="{% static 'catalog/css/topic_map_preview.css' %}">
+<script defer src="{% static 'catalog/js/topic_map_preview.js' %}"></script>
+<script defer src="{% static 'catalog/js/catalog_filters.js' %}"></script>
+<script defer src="{% static 'catalog/js/stol.js' %}"></script>
+{% endblock %}
+
+{% block content %}
+<div class="stol-app" id="stol-app" data-view="{{ view }}">
+  {% if view == 'entry' %}{% include "catalog/stol/_stol_entry.html" %}{% endif %}
+</div>
+{% include "catalog/_catalog_modal.html" %}
+{% endblock %}
+
+{% block extra_js %}
+{% include "_typing_placeholder.html" with el_id="ct-q" phrases=catalog_phrases stop_text=catalog_stop_text %}
+{% include "_search_rating.html" %}
+{% endblock %}

@@ -284,7 +284,7 @@ class ContinueRowTests(TestCase):
     def test_student_sees_failed_and_opened_but_not_solved_or_hidden(self):
         self.client.force_login(self.user)
         html = self._html()
-        block = html.split('class="ct-continue"', 1)[1].split('</nav>', 1)[0]
+        block = html.split('class="se-continue"', 1)[1].split('</nav>', 1)[0]
         for problem in (self.failed, self.opened):
             self.assertIn('/catalog/problem/%d/' % problem.pk, block)
         for problem in (self.solved, self.hidden):
@@ -292,14 +292,14 @@ class ContinueRowTests(TestCase):
 
     def test_no_rows_no_block(self):
         self.client.force_login(make_user('stol_continue_empty'))
-        self.assertNotIn('class="ct-continue"', self._html())
+        self.assertNotIn('class="se-continue"', self._html())
 
     def test_guest_has_no_block(self):
-        self.assertNotIn('class="ct-continue"', self._html())
+        self.assertNotIn('class="se-continue"', self._html())
 
     def test_search_hides_the_block(self):
         self.client.force_login(self.user)
-        self.assertNotIn('class="ct-continue"', self._html(q='монополия'))
+        self.assertNotIn('class="se-continue"', self._html(q='монополия'))
 
 
 class MapApplyIsAFilterTests(TestCase):

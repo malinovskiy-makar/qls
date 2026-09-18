@@ -42,6 +42,21 @@
  *   var h = window.TopicMapPreview.mount(el, { href: '/catalog/map/' });
  *   h.stats();     // { state, frames, visible, reduced, msPerFrame }
  *   h.destroy();   // снять наблюдателей и остановить цикл
+ *
+ * ── Фон входа каталога «Стол» (README §6, 18.09.2026) ─────────────────
+ *
+ *   TopicMapPreview.mount(el, { inert: true, zoom: 1.32, pitch: -0.26,
+ *                               cy: 0.4, dim: 0.5,
+ *                               selected: { topics: ['843'], tags: [] } });
+ *   h.select({ topics: [...], tags: [...] });  // выбор = фильтры каталога
+ *   h.getAngle();  // { yaw, pitch, scale } — отдать полной карте (переход)
+ *
+ * `inert` — блок не ссылка и клик не слушает (фон под шапкой, мышь
+ * достаётся карточке поиска). `zoom` — во сколько раз крупнее обзора
+ * «облако целиком» (мы как бы внутри). `cy` — где центр облака по высоте
+ * блока (доля). `dim` — прозрачность невыбранного; выбранные узлы (ключ
+ * справочника `db` у узла) — полной яркостью, с кольцом, подписью и яркой
+ * связью тега с его темой.
  */
 (function () {
 'use strict';
@@ -67,7 +82,13 @@ var DEFAULTS = {
   /* Во сколько раз крупнее рисовать узлы. В маленьком окне обзор ужимает
      их до точек, и граф выглядит пылью. */
   nodeScale: 1.7,
-  margin: 0.05
+  margin: 0.05,
+  inert: false,
+  zoom: 1,
+  pitch: -0.22,
+  cy: 0.5,
+  dim: 1,
+  selected: null
 };
 
 /* ── Мелкие утилиты ──────────────────────────────────────────────────── */
@@ -156,7 +177,18 @@ function mount(el, options) {
   var nodes = [], links = [], byId = {}, themeList = [], tagsOfTheme = {};
   var PAL = { node: [74, 82, 96], bg: [245, 245, 243] };
 
-  var yaw = 0.35, pitch = -0.22, fitScale = 1;
+  var yaw = 0.35, pitch = opt.pitch, fitScale = 1;
+  var picked = { topics: {}, tags: {} };
+  function setSelected(sel) {
+    picked = { topics: {}, tags: {} };
+    ((sel && sel.topics) || []).forEach(function (v) { picked.topics[String(v)] = true; });
+    ((sel && sel.tags) || []).forEach(function (v) { picked.tags[String(v)] = true; });
+  }
+  function isPicked(n) {
+    if (n.db === null || n.db === undefined) return false;
+    return n.k === 'theme' ? !!picked.topics[String(n.db)] : !!picked.tags[String(n.db)];
+  }
+  setSelected(opt.selected);
   var DIST = 1240, FOCAL = 900;
 
   var state = 'idle';          /* idle | loading | settling | live | error */
@@ -281,7 +313,7 @@ function mount(el, options) {
       }
     }
     var availX = W * (0.5 - opt.margin), availY = H * (0.5 - opt.margin);
-    fitScale = Math.max(0.05, Math.min(4, Math.min(availX / hx, availY / hy)));
+    fitScale = Math.max(0.05, Math.min(4, Math.min(availX / hx, availY / hy))) * opt.zoom;
   }
 
   /* ── Отрисовка ─────────────────────────────────────────────────────── */
@@ -292,6 +324,10 @@ function mount(el, options) {
     var cs = getComputedStyle(el);
     PAL.node = hexToRgb(cs.getPropertyValue('--map-node') || '#4A5260');
     PAL.dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    PAL.ink = (cs.getPropertyValue('--text') || '#222').trim();
+    PAL.halo = (cs.getPropertyValue('--bg') || '#fff').trim();
+    PAL.font = cs.fontFamily || 'sans-serif';
+    PAL.sect = {};
     /* Готовые строки цвета по разделам: в кадре разбирать CSS-цвет 372
        раза дороже всей отрисовки. Ключи берём из самих узлов — списка
        разделов у предпросмотра нет, он его и не показывает. */
@@ -303,6 +339,7 @@ function mount(el, options) {
       var col = raw && raw.trim() ? hexToRgb(raw) : PAL.node;
       PAL.theme[g] = rgba(col, 1);
       PAL.tag[g] = rgba(col, 0.72);
+      PAL.sect[g] = col;
     }
   }
 
@@ -325,7 +362,7 @@ function mount(el, options) {
       if (pz < 60) { n.pz = -1; continue; }
       var s = FOCAL / pz * fitScale;
       n.px = W / 2 + ax * s;
-      n.py = H / 2 + ay * s;
+      n.py = H * opt.cy + ay * s;
       n.ps = s;
       n.pz = pz;
     }
@@ -341,6 +378,7 @@ function mount(el, options) {
       path.lineTo(b.px, b.py);
     }
     ctx.lineWidth = 1;
+    ctx.globalAlpha = opt.dim;
     ctx.strokeStyle = rgba(PAL.node, PAL.dark ? 0.30 : 0.38);
     ctx.stroke(pTree);
     ctx.setLineDash([2, 3]);
@@ -352,10 +390,12 @@ function mount(el, options) {
        сцена вращается, и глубина меняется у всех. */
     nodes.sort(function (p, q) { return q.pz - p.pz; });
     var fallbackTheme = rgba(PAL.node, 1), fallbackTag = rgba(PAL.node, 0.72);
+    var chosen = [];
     for (i = 0; i < nodes.length; i++) {
       n = nodes[i];
       if (n.pz < 0) continue;
       if (n.px < -20 || n.px > W + 20 || n.py < -20 || n.py > H + 20) continue;
+      if (isPicked(n)) { chosen.push(n); continue; }
       var r = Math.max(0.8, n.r0 * n.ps * opt.nodeScale);
       ctx.fillStyle = n.k === 'theme'
         ? (PAL.theme[n.g] || fallbackTheme)
@@ -364,9 +404,43 @@ function mount(el, options) {
       ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
       ctx.fill();
     }
+    ctx.globalAlpha = 1;
+    if (chosen.length) drawChosen(chosen);
 
     drawn++;
     drawMs += performance.now() - t0;
+  }
+
+  /* Выбранные узлы поверх приглушённого облака: полная яркость, кольцо,
+     подпись и яркая связь тега с его темой (README §6). Подпись с ореолом
+     цветом фона: без него её перечёркивают линии облака. */
+  function drawChosen(list) {
+    var i, n;
+    for (i = 0; i < links.length; i++) {
+      var ln = links[i];
+      if (ln.k !== 'tree') continue;
+      var tag = byId[ln.t], theme = byId[ln.s];
+      if (!isPicked(tag) || theme.pz < 0 || tag.pz < 0) continue;
+      ctx.strokeStyle = rgba(PAL.sect[tag.g] || PAL.node, 0.95);
+      ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(theme.px, theme.py); ctx.lineTo(tag.px, tag.py); ctx.stroke();
+    }
+    ctx.font = '600 13px ' + PAL.font;
+    ctx.textBaseline = 'middle';
+    for (i = 0; i < list.length; i++) {
+      n = list[i];
+      var r = Math.max(3, n.r0 * n.ps * opt.nodeScale);
+      ctx.fillStyle = n.k === 'theme' ? (PAL.theme[n.g] || rgba(PAL.node, 1)) : rgba(PAL.sect[n.g] || PAL.node, 1);
+      ctx.beginPath(); ctx.arc(n.px, n.py, r, 0, 6.283185307179586); ctx.fill();
+      ctx.strokeStyle = PAL.ink; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(n.px, n.py, r + 4, 0, 6.283185307179586); ctx.stroke();
+      var label = String(n.l || '');
+      if (label.length > 40) label = label.slice(0, 39) + '…';
+      ctx.lineWidth = 4; ctx.strokeStyle = PAL.halo; ctx.lineJoin = 'round';
+      ctx.strokeText(label, n.px + r + 8, n.py);
+      ctx.fillStyle = PAL.ink;
+      ctx.fillText(label, n.px + r + 8, n.py);
+    }
   }
 
   /* ── Цикл кадров ───────────────────────────────────────────────────── */
@@ -519,7 +593,7 @@ function mount(el, options) {
   function onKey(e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
   }
-  var ownsClick = el.tagName !== 'A';
+  var ownsClick = el.tagName !== 'A' && !opt.inert;
   if (ownsClick) {
     el.addEventListener('click', onClick);
     el.addEventListener('keydown', onKey);
@@ -545,6 +619,15 @@ function mount(el, options) {
        ИНВАРИАНТ «вне экрана не рисуем»: не «кадры те же самые», а заявки на
        кадр нет вовсе. */
     looping: function () { return !!raf; },
+    /* Выбор = фильтры каталога: подсветка без пересчёта раскладки. */
+    select: function (sel) {
+      setSelected(sel);
+      if (state === 'live') draw();
+    },
+    /* Угол и масштаб кадра — чтобы полная карта продолжила с того же места. */
+    getAngle: function () {
+      return { yaw: yaw, pitch: pitch, scale: fitScale };
+    },
     /* Прогон N кадров ВРУЧНУЮ, без requestAnimationFrame — тем же приёмом,
        что TMAP.spinFrames() у полной карты: в скрытой вкладке браузер кадры
        не гоняет, и ни раскладку досчитать, ни стоимость кадра снять нельзя.

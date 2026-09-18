@@ -20,6 +20,13 @@
  *    импортом, это чужой текст, разметку из него собирать нельзя.
  * ⚠️ БЕЗ ЭТОГО ФАЙЛА СТРАНИЦА РАБОТАЕТ: форма поиска и крестики чипов —
  *    серверные ссылки; скрипт лишь перехватывает их.
+ *
+ * ⚠️ СОСТОЯНИЕ ОДНО НА ЭКРАН «СТОЛ» (решение владельца 17.09.2026): окно,
+ *    чипы входа с выпадашками, поиск и карта тем меняют ЭТО состояние.
+ *    Варианты с `data-topic`, `data-diff`, `data-kind`… ловятся во всём
+ *    документе, а не только в окне; чужие скрипты пишут через
+ *    `weco.filters.state` + `weco.filters.refresh()` и узнают об ответе
+ *    событием `weco:filters` (перед запросом — `weco:filters-start`).
  */
 (function () {
   'use strict';
@@ -46,7 +53,7 @@
     features: new Set(boot.active.features),
     kind: boot.active.kind || '', test_type: boot.active.test_type || '',
     character: boot.active.character || '', has_solution: !!boot.active.has_solution,
-    q: boot.active.q || '', view: boot.view || 'rows',
+    q: boot.active.q || '',
     expandTopics: false, expandTags: false
   };
 
@@ -64,7 +71,6 @@
   function buildQuery(s) {
     var params = new URLSearchParams();
     if (s.q) params.append('q', s.q);
-    if (s.view && s.view !== 'rows') params.append('view', s.view);
     Object.keys(PARAM).forEach(function (key) {
       var name = PARAM[key];
       if (LISTS.indexOf(key) >= 0) { s[key].forEach(function (v) { params.append(name, v); }); }
@@ -76,27 +82,36 @@
   function resetHref() {
     var params = new URLSearchParams();
     if (state.q) params.append('q', state.q);
-    if (state.view && state.view !== 'rows') params.append('view', state.view);
     var query = params.toString();
     return boot.urls.page + (query ? '?' + query : '');
   }
 
   /* ── Запрос живого состояния ─────────────────────────────────────── */
   var timer = null, controller = null, seq = 0;
-  function refresh() {
+  /* `opts.log` — это поиск, а не щелчок фильтра: строка журнала поиска
+     пишется только по явной просьбе (`log=1`, ADR 0117). */
+  function refresh(opts) {
+    opts = opts || {};
     syncDialog();
     clearTimeout(timer);
+    document.dispatchEvent(new CustomEvent('weco:filters-start', { detail: { state: state, log: !!opts.log } }));
     timer = setTimeout(function () {
       if (controller) controller.abort();
       controller = new AbortController();
       var query = buildQuery(state);
+      if (opts.log) { query += (query ? '&' : '') + 'log=1'; }
       var mine = ++seq;
       fetch(boot.urls.state + (query ? '?' + query : ''),
             { signal: controller.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
         .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
         .then(function (data) { if (mine === seq) { applyResponse(data); } })
-        .catch(function (err) { if (err && err.name !== 'AbortError') { showError(true); } });
-    }, DEBOUNCE);
+        .catch(function (err) {
+          if (err && err.name !== 'AbortError') {
+            showError(true);
+            document.dispatchEvent(new CustomEvent('weco:filters-error', { detail: { state: state } }));
+          }
+        });
+    }, opts.log ? 0 : DEBOUNCE);
   }
   function applyResponse(data) {
     showError(false);
@@ -116,7 +131,11 @@
     updateCounts(data.counts || {});
     setFound(data.total);
     setBadge(data.selected_count);
-    if (data.url) { history.replaceState(null, '', data.url); }
+    /* Адрес меняется только на входе: у открытой задачи строка адреса — её. */
+    if (data.url && location.pathname === boot.urls.page) {
+      history.replaceState(history.state, '', boot.urls.page + (data.url === '?' ? '' : data.url));
+    }
+    document.dispatchEvent(new CustomEvent('weco:filters', { detail: { state: state, data: data } }));
   }
   function showError(on) { var el = document.getElementById('ct-all-err'); if (el) { el.hidden = !on; } }
 
@@ -186,8 +205,9 @@
   }
 
   /* ── Синхронизация окна с состоянием ───────────────────────────────── */
+  /* Во всём документе: те же варианты стоят в выпадашках чипов входа. */
   function pressed(sel, test) {
-    qa(sel, dlg).forEach(function (b) { b.setAttribute('aria-pressed', String(test(b.dataset))); });
+    qa(sel).forEach(function (b) { b.setAttribute('aria-pressed', String(test(b.dataset))); });
   }
   function syncDialog() {
     pressed('[data-topic]', function (d) { return state.topics.has(d.topic); });
@@ -421,4 +441,7 @@
   /* Стартовая полоса: чипы пришли с сервера все — схлопнуть лишние. */
   collapseChips();
   syncDialog();
+
+  window.weco = window.weco || {};
+  weco.filters = { state: state, refresh: refresh, buildQuery: function () { return buildQuery(state); } };
 })();

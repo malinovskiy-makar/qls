@@ -13,8 +13,12 @@
    боевом коде нет.
 
    Запуск (сервер уже поднят на порту):
-     node scripts/beta_shots.mjs <префикс> [порт]
+     node scripts/beta_shots.mjs <префикс> [порт] [набор]
    Выход: reports/beta_20260918/shots/<префикс>_<имя>_<тема>_<ширина>.png
+
+   Набор `stol` (дневная сессия «Стол», 18.09.2026) — экраны единого экрана
+   каталога, выход в reports/stol_20260918/shots/; `stol:s1` — только сцены
+   фазы S1 (префикс сцены до двоеточия).
    Для каждого экрана печатает, не шире ли документ окна, и ошибки консоли. */
 import { chromium } from 'playwright';
 import { execFileSync } from 'node:child_process';
@@ -23,8 +27,10 @@ import path from 'node:path';
 
 const PREFIX = process.argv[2] || 'beta';
 const PORT = process.argv[3] || '8611';
+const SET = process.argv[4] || 'beta';
 const BASE = 'http://127.0.0.1:' + PORT;
-const OUT = path.join('reports', 'beta_20260918', 'shots');
+const OUT = SET.startsWith('stol') ? path.join('reports', 'stol_20260918', 'shots')
+                                   : path.join('reports', 'beta_20260918', 'shots');
 const PY = process.platform === 'win32' ? 'venv313/Scripts/python.exe' : 'venv313/bin/python';
 const WIDTHS = [[1440, 900], [390, 844]];
 const THEMES = ['light', 'dark'];
@@ -188,4 +194,55 @@ async function run() {
   process.exit(wide.length || errors.length ? 1 : 0);
 }
 
-run();
+/* ── Набор «Стол» ─────────────────────────────────────────────────────
+   Сцена — { phase, name, who, widths, go(page) }. Поиск на локальной базе
+   идёт по словам 12–15 с — таймауты с запасом. */
+const QUERY = 'монополист с двумя заводами и налогом';
+const STOL_SCENES = [
+  { phase: 's1', name: 'entry_empty', go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
+  { phase: 's1', name: 'entry_search', go: async p => {
+      await p.goto(BASE + '/catalog/?q=' + encodeURIComponent(QUERY), { waitUntil: 'load' });
+      await p.waitForTimeout(1500); } },
+  { phase: 's1', name: 'entry_topic_dd', go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(800);
+      await p.click('[data-dd="topic"]'); await p.waitForTimeout(400); } },
+  { phase: 's1', name: 'entry_filters', go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843&topic=99&tag=652', { waitUntil: 'load' });
+      await p.waitForTimeout(1800); } },
+  { phase: 's1', name: 'entry_continue', who: 'student', go: async p => {
+      await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
+];
+
+async function runStol() {
+  fs.mkdirSync(OUT, { recursive: true });
+  const phase = SET.includes(':') ? SET.split(':')[1] : '';
+  const scenes = STOL_SCENES.filter(sc => !phase || sc.phase === phase);
+  const sessions = { student: sessionFor('student1@test.local') };
+  const browser = await chromium.launch();
+  const errors = [];
+  for (const sc of scenes) {
+    for (const [width, height] of (sc.widths || [[1440, 900], [1280, 800]])) {
+      for (const theme of THEMES) {
+        const ctx = await browser.newContext({ viewport: { width, height } });
+        if (sc.who) await ctx.addCookies([{ name: 'sessionid', value: sessions[sc.who], url: BASE }]);
+        await ctx.addInitScript(initScript(theme, STATE.none));
+        const page = await ctx.newPage();
+        page.setDefaultNavigationTimeout(120000);
+        page.setDefaultTimeout(60000);
+        page.on('pageerror', e => errors.push(`[${sc.name} ${theme} ${width}] pageerror ${e.message}`));
+        page.on('console', m => { if (m.type() === 'error') errors.push(`[${sc.name} ${theme} ${width}] ${m.text()}`); });
+        await sc.go(page);
+        await snap(page, sc.name, theme, width);
+        await ctx.close();
+      }
+    }
+  }
+  await browser.close();
+  console.log(`
+снимков ${shots.length}; ошибок консоли: ${errors.length}`);
+  errors.forEach(e => console.log('  ' + e));
+  process.exit(errors.length ? 1 : 0);
+}
+
+if (SET.startsWith('stol')) runStol(); else run();

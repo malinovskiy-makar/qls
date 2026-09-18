@@ -1130,17 +1130,22 @@ class PreviewModeTests(SimpleTestCase):
         super().setUpClass()
         cls.src = cls.JS.read_text(encoding='utf-8')
 
-    def test_preview_draws_no_labels_at_all(self):
-        """Ни одной подписи: только узлы и связи.
+    def test_preview_labels_only_the_chosen_nodes(self):
+        """Подписи только у выбранных узлов, остальное — узлы и связи.
 
         Подпись на холсте рисуется единственным способом — `fillText` или
-        `strokeText`. Нет их в файле — нет и подписей, и никакая правка не
-        протащит их незаметно.
+        `strokeText`. Фон входа «Стола» подписывает выбранные темы и теги
+        (README §6, решение 17.09.2026 «карта = фильтры»), и делает это одна
+        функция `drawChosen`: вывод текста вне неё — подписи у всего облака.
         """
+        body = self.src[self.src.index('function drawChosen('):]
+        body = body[:body.index('\n  }\n') + 4]
+        outside = self.src.replace(body, '')
         for call in ('fillText', 'strokeText', 'measureText'):
             self.assertNotIn(
-                call, self.src,
-                'в предпросмотре появился вывод текста: %s' % call)
+                call, outside,
+                'в предпросмотре появился вывод текста вне выбранных узлов: %s' % call)
+        self.assertIn('isPicked(n)', self.src)
 
     def test_preview_listens_to_no_pointer_events(self):
         """Курсор на карту не влияет — и это держится устройством.

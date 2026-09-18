@@ -115,7 +115,7 @@ class EmptyCatalogTests(TestCase):
     def test_catalog_page_shows_no_selection_ui(self):
         html = self.client.get('/catalog/').content.decode()
         self.assertNotIn('data-chip=', html)
-        self.assertNotIn('ct-card', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
+        self.assertNotIn('rail-row', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
 
 
 class EmptyCatalogWindowTests(TestCase):
@@ -240,7 +240,7 @@ class MapCaptionFollowsDataTests(TestCase):
         fake = (json.dumps({'nodes': nodes}), '"etag-2-7"')
         with mock.patch('catalog.views._topic_map_payload', return_value=fake):
             text = visible_text(self.client.get('/catalog/').content.decode())
-        self.assertIn('Карта тем · 2 темы, 7 тегов', text)
+        self.assertIn('Карта тем: 2 темы, 7 тегов', text)
 
 
 class NoPromisesInTemplatesTests(SimpleTestCase):
@@ -261,7 +261,8 @@ class NoPromisesInTemplatesTests(SimpleTestCase):
                 yield path
             else:
                 # Партиалы `*_css.html` — чистый CSS, текста для человека там нет.
-                yield from (f for f in sorted(path.glob('*.html'))
+                # Обход с подпапками: партиалы «Стола» лежат в `catalog/stol/`.
+                yield from (f for f in sorted(path.rglob('*.html'))
                             if not f.name.endswith('_css.html')
                             and f.name not in self.EXEMPT)
 

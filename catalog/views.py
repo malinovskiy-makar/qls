@@ -229,7 +229,7 @@ def random_problem(request):
 
 
 # ── Список задач ────────────────────────────────────────────────────────────
-def _card(problem, score=None):
+def _card(problem):
     """Одна карточка выдачи.
 
     ⚠️ НОМЕРА ЗАДАЧИ В КАРТОЧКЕ НЕТ (решение владельца 04.09.2026): он
@@ -267,12 +267,31 @@ def _card(problem, score=None):
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
         # Заголовок в строке ленты «Стола» — без обрывка формулы, как у «Похожих».
+        # Процента близости в строке нет (решение владельца 17.09.2026).
         'title_display':    similar_title(problem) if title else '',
-        # Число близости показывается ТОЛЬКО при поиске (решение владельца
-        # 09.09.2026) — при пустом запросе сортировка идёт по id, близости
-        # нет вовсе, и `score` здесь всегда None.
-        'score':            score,
     }
+
+
+def _cards_with_marks(user, problems):
+    """Карточки строк ленты со статусом ученика и звездой «сохранено» —
+    по одному запросу на страницу строк, а не на строку."""
+    from problems.models import SavedProblem
+
+    problems = list(problems)
+    ids = [p.pk for p in problems]
+    statuses = progress.statuses_for(user, ids)
+    saved = set()
+    if getattr(user, 'is_authenticated', False) and ids:
+        saved = set(SavedProblem.objects.filter(owner=user, is_deleted=False,
+                                                catalog_problem_id__in=ids)
+                    .values_list('catalog_problem_id', flat=True))
+    cards = []
+    for problem in problems:
+        card = _card(problem)
+        card['status'] = statuses.get(problem.pk, '')
+        card['saved'] = problem.pk in saved
+        cards.append(card)
+    return cards
 
 
 def _kind_label(problem_type):
@@ -413,16 +432,12 @@ def _catalog_context(request, missing_id=''):
     active = filters.parse(request.GET)
     query = active['q']
 
-    # ⚠️ ТАБЛИЧНОГО ВИДА БОЛЬШЕ НЕТ (решение владельца 04.09.2026): старые
-    # адреса с `?view=table` открываются строками, а не ошибкой.
-    view_mode = (request.GET.get('view') or 'rows').strip()
-    if view_mode not in ('rows', 'gallery'):
-        view_mode = 'rows'
-
+    # ⚠️ ВИД ОДИН — СТРОКИ. Таблицы нет с 04.09.2026, галереи — с 17.09.2026
+    # (решение владельца: в «Столе» условие целиком показывает сама задача).
+    # Старые адреса с `?view=table` и `?view=gallery` открываются строками и
+    # параметр дальше не несут.
     base = filters.base_queryset('catalog')
     carry = {}
-    if view_mode != 'rows':
-        carry['view'] = view_mode
     qs, fctx = filters.build(base, active, mode='strip', carry=carry)
 
     # Сколько подходит под ФИЛЬТРЫ без запроса — второе число счётчика.
@@ -439,7 +454,6 @@ def _catalog_context(request, missing_id=''):
 
     degraded = False
     searched = bool(query) and not missing_id
-    scores = {}
     relief = None
     capped = False
 
@@ -450,7 +464,7 @@ def _catalog_context(request, missing_id=''):
     smart_search_ms = 0
     if searched:
         search_started = time.perf_counter()
-        ids, scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
+        ids, _scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
         search_seconds = time.perf_counter() - search_started
         # ⚠️ ПОЛУЧАЕМ СНАЧАЛА ОДНИ КЛЮЧИ, А ЗАДАЧИ — ТОЛЬКО НА СТРАНИЦУ.
         # Первый вариант тянул из базы все пятьсот кандидатов со связями
@@ -503,12 +517,16 @@ def _catalog_context(request, missing_id=''):
         page_rows = list(ordered[:shown])
         has_more = total > shown
 
-    cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
+    cards = _cards_with_marks(request.user, page_rows)
 
     return {
         'filters':        fctx,
         'cards':          cards,
-        'view_mode':      view_mode,
+        # Статус в строке — только у вошедшего: у гостя колонки нет (README §2).
+        'show_status':    request.user.is_authenticated,
+        # Чипы входа «Тема / Сложность / Задачи и тесты / С решением» рисуют
+        # варианты тех же групп, что окно «Все фильтры»: одно состояние.
+        'entry_groups':   {g['key']: g for g in fctx['groups']},
         'query':          query,
         'searched':       searched,
         'degraded':       degraded,
@@ -528,8 +546,6 @@ def _catalog_context(request, missing_id=''):
         'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
         'step':           PAGE_STEP,
         'relief':         relief,
-        'view_urls':      {mode: filters.query(dict(carry, view=mode), active)
-                           for mode in ('rows', 'gallery')},
         'teacher_assignments_json': _teacher_assignments(request),
         # Бегущая подсказка поля: фразы и текст после остановки — из
         # одной константы, партиал общий с главной.
@@ -543,12 +559,37 @@ def _catalog_context(request, missing_id=''):
         # значения (уже списками) и адреса эндпоинтов — по имени, не строкой.
         'filter_state': {
             'active': active,
-            'view': view_mode,
             'urls': {'state': reverse('catalog:api_filter_state'),
                      'tags': reverse('catalog:api_tags'),
                      'page': reverse('catalog:problem_list')},
         },
     }
+
+
+def _entry_context(request, context):
+    """Что добавляет к контексту каталога вид «вход» единого экрана «Стол».
+
+    Заголовок «Это умный каталог.» и крупная шапка — только пока нет ни
+    запроса, ни фильтров (README §2): первый выбор сжимает шапку. «Продолжить»
+    — только на чистом входе: при поиске он уводил бы от найденного.
+    """
+    selected = context['filters']['selected_count']
+    active = context['filters']['active']
+    calm = not context['query'] and not selected
+    extra = {'view': 'entry', 'entry_calm': calm, 'continue_rows': [],
+             # Выбранное на карте = фильтры: подсветка фона и подпись пилюли.
+             'map_selected': {'topics': active['topics'], 'tags': active['tags']},
+             'map_selected_n': len(active['topics']) + len(active['tags'])}
+    if calm:
+        problems = progress.continue_for(request.user, _visible(Problem.objects.all()))
+        statuses = progress.statuses_for(request.user, [p.pk for p in problems])
+        extra['continue_rows'] = [
+            {'problem': p, 'status': statuses.get(p.pk, ''),
+             'title': similar_title(p) if (p.title or '').strip()
+             and not looks_like_statement_cut(p.title, p.statement)
+             else tex_preview(p.statement, 70)}
+            for p in problems]
+    return extra
 
 
 def problem_list(request):
@@ -568,16 +609,10 @@ def problem_list(request):
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
     context = _catalog_context(request, missing_id)
-    # «Продолжить» (P3 «Стола»): только на чистом входе, без запроса и фильтров.
-    if not context['query'] and not context['filters']['selected_count']:
-        context['continue_rows'] = [
-            {'problem': p, 'title': similar_title(p) if (p.title or '').strip()
-             and not looks_like_statement_cut(p.title, p.statement)
-             else tex_preview(p.statement, 70)}
-            for p in progress.continue_for(request.user, _visible(Problem.objects.all()))]
+    context.update(_entry_context(request, context))
     visitor, new_visitor = search_log.visitor_for(request)
     context['search_log_id'] = search_log.log_search(request, context, visitor)
-    response = render(request, 'catalog/problem_list.html', context)
+    response = render(request, 'catalog/stol.html', context)
     if new_visitor and context['search_log_id']:
         search_log.remember_visitor(response, visitor)
     response['X-Smart-Search'] = context['smart_search_status']

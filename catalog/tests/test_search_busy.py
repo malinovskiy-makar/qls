@@ -43,12 +43,12 @@ class BusyPhrasesPageTests(TestCase):
                for i in range(14)]
         with mock.patch('catalog.views._search_ids', return_value=(ids, {}, False)):
             html = self.page(q='налог')
-        self.assertEqual(html.count('class="ct-card ct-appear"'),
+        self.assertEqual(html.count('class="rail-row ct-appear"'),
                          min(12, views.PAGE_STEP))
 
     def test_plain_catalog_does_not_animate_cards(self):
         make_problem('Спрос и предложение.')
-        self.assertFalse('class="ct-card ct-appear"' in self.page(),
+        self.assertFalse('class="rail-row ct-appear"' in self.page(),
                          'карточки анимируются без поиска')
 
 
