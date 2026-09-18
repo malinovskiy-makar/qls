@@ -1,5 +1,12 @@
 /* Карта тем и тегов — /catalog/map/
  *
+ * ⚠️ С 18.09.2026 карта живёт в «Столе» (README §6): фоновое облако входа
+ * выходит на передний план на том же экране. Настройки встраивания кладёт
+ * `stol_map.js` в `window.TMAP_EMBED` ДО загрузки этого файла: наклон и
+ * сдвиг покоя, подписи тем, текст подсказки и `onPick` — выбор уходит в
+ * фильтры каталога. Переход — `TMAP.enter(from)` / `TMAP.leave(to)`: камера,
+ * раскладка и прозрачность едут от кадра фонового облака к полной карте.
+ *
  * Свой движок на canvas 2D: перспективная проекция, силовая раскладка в трёх
  * измерениях, попадание курсором по экранным координатам. Библиотек нет —
  * вся отрисовка это 372 круга и 425 отрезков, three.js или d3-force дали бы
@@ -17,6 +24,9 @@
 
 var root = document.getElementById('tmap');
 if (!root) return;
+
+/* Встраивание в «Стол» (см. шапку файла); без него — прежняя страница. */
+var EMBED = window.TMAP_EMBED || null;
 
 var canvas = document.getElementById('tmap-canvas');
 var ctx = canvas.getContext('2d');
@@ -449,6 +459,7 @@ var cam = {
   yaw: START_YAW, pitch: START_PITCH,
   zoom: 1, zoomTarget: 1,
   tx: 0, ty: 0, tz: 0,               /* точка, вокруг которой вращаемся */
+  ox: 0, oy: 0,                      /* сдвиг центра кадра, px (место панели) */
   goalX: null, goalY: null, goalZ: null, goalZoom: null
 };
 
@@ -600,8 +611,8 @@ function project() {
     var ay = y * CP - az * SP, pz = y * SP + az * CP + DIST;
     if (pz < 60) { n.pz = -1; continue; }      /* за камерой */
     var s = FOCAL / pz * cam.zoom * fitScale;
-    n.px = W / 2 + ax * s;
-    n.py = H / 2 + ay * s;
+    n.px = W / 2 + cam.ox + ax * s;
+    n.py = H / 2 + cam.oy + ay * s;
     n.ps = s;
     n.pz = pz;
   }
@@ -615,8 +626,8 @@ function projectPoint(x, y, z, out) {
   var ay = dy * CP - az * SP, pz = dy * SP + az * CP + DIST;
   if (pz < 60) { out.pz = -1; return out; }
   var s = FOCAL / pz * cam.zoom * fitScale;
-  out.px = W / 2 + ax * s;
-  out.py = H / 2 + ay * s;
+  out.px = W / 2 + cam.ox + ax * s;
+  out.py = H / 2 + cam.oy + ay * s;
   out.ps = s;
   out.pz = pz;
   return out;
@@ -626,7 +637,7 @@ function projectPoint(x, y, z, out) {
    нужно, чтобы зумить К ТОЧКЕ ПОД КУРСОРОМ, а не к центру экрана. */
 function screenToWorld(sx, sy, depth) {
   var s = FOCAL / depth * cam.zoom * fitScale;
-  var ax = (sx - W / 2) / s, ay = (sy - H / 2) / s;
+  var ax = (sx - W / 2 - cam.ox) / s, ay = (sy - H / 2 - cam.oy) / s;
   var az = (depth - DIST + ay * SP * 0) / 1;   /* глубину берём заданной */
   /* Разворачиваем поворот: сначала pitch, потом yaw. */
   var y = ay * CP + (az - DIST) * SP;
@@ -851,7 +862,9 @@ function edgeKey(a, b) { return a < b ? a + '|' + b : b + '|' + a; }
 
 function rebuildHighlight() {
   var any = false, k;
-  for (k in picked) { if (picked[k]) { any = true; break; } }
+  /* «Стол» (снимок 07): выбранное — кольцо и подпись, остальное не гаснет;
+     подсветку зажигает только наведение. */
+  if (!EMBED) for (k in picked) { if (picked[k]) { any = true; break; } }
   if (!any && !active) { litSet = litNear = litEdges = null; return; }
 
   litSet = {}; litNear = {}; litEdges = {};
@@ -861,7 +874,7 @@ function rebuildHighlight() {
      визуальный слой поверх, а не второй источник подсветки. Иначе картина
      перестраивалась бы на каждом шаге пути. */
   var seeds = [];
-  for (k in picked) if (picked[k]) seeds.push(byId[k]);
+  if (!EMBED) for (k in picked) if (picked[k]) seeds.push(byId[k]);
   if (active) seeds.push(active);
 
   seeds.forEach(function (n) {
@@ -1109,6 +1122,7 @@ var LABEL_BUDGET = 90;       /* лимит подписей тегов на ка
 var LABEL_MAX_AWAY = 90;     /* дальше подпись от своего узла не уходит */
 var LABEL_LEADER_MIN = 24;   /* ближе выноска не нужна                  */
 var THEME_QUIET_ALPHA = 0.3; /* чужое имя темы в фокус-режиме           */
+var THEME_NEAR = 0.4;        /* «Стол»: ближе этой доли глубины имя темы видно */
 
 /* Счётчики последнего кадра — для приёмки через window.TMAP. */
 var lastQuietCount = 0;      /* приглушённых имён тем                   */
@@ -1252,6 +1266,8 @@ function draw() {
   project();
 
   var dim = !!(litSet || searchHits);
+  /* Переход из фонового облака (README §6): невыбранное — от 0,5 к 1. */
+  var trA = tr ? 0.5 + 0.5 * tr.e : 1;
   /* Сила подсветки. Пока она гаснет, карта плавно возвращается к обычному
      виду: подсвеченное теряет акцент, приглушённое — приглушение. */
   var hl = dim ? hlAlpha : 0;
@@ -1280,6 +1296,7 @@ function draw() {
   }
 
   var ed = dim ? PAL.edgeDim : PAL.edge;
+  ctx.globalAlpha = trA;
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
   ctx.strokeStyle = PAL.borderShades[shadeIndex(ed.far)];
@@ -1290,6 +1307,7 @@ function draw() {
   ctx.strokeStyle = PAL.borderShades[shadeIndex(ed.cross)];
   ctx.stroke(pCross);
   ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
 
   /* Подсвеченные дороги — их единицы, поэтому штучно и акцентом.
      Прямая дорога тема→тег сплошная и в полную силу; смежный тег из
@@ -1369,6 +1387,13 @@ function draw() {
     if (n.pz < 0) continue;
     var r = nodeRadius(n);
     if (n.px < -40 || n.px > W + 40 || n.py < -40 || n.py > H + 40) continue;
+    if (tr) {
+      /* Узлы вспухают волной от центра (до +42 %), только по пути на карту. */
+      var wx = (tr.t - (n.trD || 0) * 0.35) / 0.45;
+      var pop = tr.dir > 0 && wx > 0 && wx < 1 ? Math.sin(Math.PI * wx) * 0.42 : 0;
+      r *= (0.8 + 0.2 * tr.e) * (1 + pop);
+    }
+    ctx.globalAlpha = picked[n.id] ? 1 : trA;
 
     var on = isLit(n);
     var near = litNear && litNear[n.id];
@@ -1404,7 +1429,13 @@ function draw() {
       ctx.fill();
     }
 
-    if (picked[n.id]) {
+    if (picked[n.id] && EMBED) {
+      /* «Стол» (снимки 06–07): тёмное кольцо, узел своего раздела. */
+      ctx.strokeStyle = PAL.textCss;
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(n.px, n.py, Math.max(r, 4.2) + 4.5, 0, 6.283185307179586); ctx.stroke();
+      ctx.lineWidth = 1;
+    } else if (picked[n.id]) {
       /* Ореол и обводка — тем же акцентом: выбранное видно всегда. */
       ctx.strokeStyle = PAL.accentShades[shadeIndex(0.35)];
       ctx.lineWidth = 5;
@@ -1420,6 +1451,7 @@ function draw() {
       ctx.lineWidth = 1;
     }
   }
+  ctx.globalAlpha = 1;
 
   drawLabels(dim);
 }
@@ -1599,7 +1631,7 @@ function drawLabels(dim) {
   /* ⚠️ ВСЕ ПОДПИСИ ДЕЛЯТ ОДИН ХОЛСТ, ЗНАЧИТ И ОДИН СПИСОК ЗАНЯТЫХ МЕСТ.
      Пока каждый слой раскладывался сам по себе, они честно не пересекались
      внутри себя и дружно налезали друг на друга. */
-  var placed = [];
+  var placed = EMBED ? coverRects.slice() : [];
 
   /* ── 1. Кто вообще должен быть виден ─────────────────────────────────
      ⚠️ ИМЁН ТЕМ И ТЕГОВ В ПОКОЕ БОЛЬШЕ НЕТ. Двадцать девять подписей во
@@ -1616,7 +1648,7 @@ function drawLabels(dim) {
   /* Разделы. */
   var zoomFade = 1 - (cam.zoom - GROUP_ZOOM_FROM) / (GROUP_ZOOM_TO - GROUP_ZOOM_FROM);
   if (zoomFade > 1) zoomFade = 1; else if (zoomFade < 0) zoomFade = 0;
-  var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade;
+  var groupAlpha = (lit ? GROUP_ALPHA_DIM : GROUP_ALPHA) * zoomFade * (tr ? smooth(0.5, 0.95, tr.t) : 1);
   if (!focusTheme) {
     /* Сначала глубины всех разделов — доля считается от РАЗМАХА этого
        кадра, а не от абсолютного pz: облако то ближе, то дальше, и
@@ -1687,6 +1719,28 @@ function drawLabels(dim) {
     askNode(pn, 2, true);
     if (pn && pn.k === 'tag') askNode(byId['t' + pn.n], 3, true);
   }
+  /* «Стол»: имена ближних тем видны и в покое (README §6, снимок 06), с 62 %
+     перехода. Дальние скрыты, наложения запрещает общая раскладка. */
+  if (EMBED && EMBED.themeLabels && !focusTheme) {
+    var gate = tr ? smooth(0.62, 1, tr.t) : 1;
+    var tzMin = 1e9, tzMax = -1e9;
+    for (i = 0; i < themeList.length; i++) {
+      var tz = themeList[i].pz;
+      if (tz < 0) continue;
+      if (tz < tzMin) tzMin = tz;
+      if (tz > tzMax) tzMax = tz;
+    }
+    for (i = 0; gate > 0.01 && i < themeList.length; i++) {
+      var th = themeList[i];
+      if (th.pz < 0) continue;
+      var near1 = tzMax - tzMin > 1 ? (tzMax - th.pz) / (tzMax - tzMin) : 1;
+      if (near1 < THEME_NEAR) continue;
+      askNode(th, 5, !!tr);
+      var tw = nodeWant[th.id];
+      if (tw && tw.prio === 5) tw.talpha = gate * Math.min(1, (near1 - THEME_NEAR) / 0.2);
+    }
+  }
+
   /* Найденное поиском — с лимитом: сотня строк на экране это не помощь. */
   if (searchHits) {
     var shown = 0;
@@ -1987,12 +2041,13 @@ var fpsFrames = 0, fpsSince = 0, fpsValue = 0;
 
 function frame(now) {
   requestAnimationFrame(frame);
-  if (!ready) return;
+  if (!ready || paused) return;
 
   var moved = false;
+  if (tr) { transTick(now); moved = true; }
 
   /* Раскладка досчитывается, пока не остыла. */
-  if (alpha > 0.03) {
+  if (alpha > 0.03 && !tr) {
     step();
     alpha *= 0.975;
     moved = true;
@@ -2019,8 +2074,8 @@ function frame(now) {
     }
   }
 
-  var spin = spinSpeed(now);
-  if (spin > 0) { cam.yaw += spin; moved = true; }
+  var spin = tr ? SPIN_START : spinSpeed(now);
+  if (spin > 0) { cam.yaw += spin * (tr ? tr.dir : 1); moved = true; }
 
   /* Скорость сцены и шаг анимации подписей — до отрисовки: кадр рисует
      то, куда подписи доехали к этому моменту. */
@@ -2048,6 +2103,96 @@ function frame(now) {
     fpsValue = Math.round(fpsFrames * 1000 / (now - fpsSince));
     fpsFrames = 0; fpsSince = now;
   }
+}
+
+/* ── Переход «фон ↔ карта» (README §6) ──────────────────────────────────
+   1,25 с, easeInOutCubic: масштаб, центр, наклон и раскладка едут от кадра
+   фонового облака (`from`: его угол, масштаб, центр в окне и координаты узлов)
+   к карте в покое; корпус доворачивается на ~70° (0,034·sin²(πt) рад/кадр),
+   узлы вспухают волной от центра. Обратно — то же, t от 1 к 0. */
+var TR_MS = 1250;
+/* В «Столе» движок стоит, пока карта не открыта (`TMAP.pause(false)`). */
+var tr = null, paused = !!EMBED;
+
+function smooth(a, b, x) {
+  var k = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return k * k * (3 - 2 * k);
+}
+
+/* Масштаб покоя в «Столе» — обзор с поправкой на карточки поверх холста:
+   сбоку панель (340 px с полями), сверху шапка и снизу полоса (190 px). */
+function restZoom() {
+  if (!EMBED) return 1;
+  var side = W >= 1100 ? 340 : 48;
+  return 0.95 * Math.min((W - side) / W, (H - 190) / H);
+}
+
+function restView() {
+  return { zoom: restZoom(), ox: EMBED ? EMBED.offsetX() : 0, oy: EMBED ? -7 : 0,
+           pitch: EMBED ? EMBED.pitch : START_PITCH, tx: 0, ty: 0, tz: 0 };
+}
+
+function transStart(from, dir, done) {
+  var rect = canvas.getBoundingClientRect();
+  var bg = { zoom: from.scale / fitScale, ox: from.cx - rect.left - W / 2,
+             oy: from.cy - rect.top - H / 2, pitch: from.pitch, tx: 0, ty: 0, tz: 0 };
+  var map = dir > 0 ? restView()
+                    : { zoom: cam.zoom, ox: cam.ox, oy: cam.oy, pitch: cam.pitch,
+                        tx: cam.tx, ty: cam.ty, tz: cam.tz };
+  var full = {};
+  nodes.forEach(function (n) { full[n.id] = [n.x, n.y, n.z]; });
+  tr = { dir: dir, t0: performance.now(), t: dir > 0 ? 0 : 1, e: dir > 0 ? 0 : 1,
+         bg: bg, map: map, pos: from.pos || {}, full: full, done: done };
+  if (dir > 0) cam.yaw = from.yaw;
+  cam.goalX = cam.goalY = cam.goalZ = cam.goalZoom = null;
+  active = null; route = null;
+  /* Волна узлов: задержка по расстоянию от центра кадра фонового облака. */
+  transApply(dir > 0 ? 0 : 1);
+  camPrepare(); project();
+  var cx = W / 2 + bg.ox, cy = H / 2 + bg.oy, far = 1;
+  nodes.forEach(function (n) { n.trD = Math.hypot(n.px - cx, n.py - cy); if (n.trD > far) far = n.trD; });
+  nodes.forEach(function (n) { n.trD /= far; });
+  if (reduceMotion) { transEnd(); return; }
+  wake();
+}
+
+function transApply(t) {
+  var e = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+  var a = tr.bg, b = tr.map;
+  function mix(k) { return a[k] + (b[k] - a[k]) * e; }
+  tr.t = t; tr.e = e;
+  cam.zoom = cam.zoomTarget = mix('zoom');
+  cam.ox = mix('ox'); cam.oy = mix('oy'); cam.pitch = mix('pitch');
+  cam.tx = mix('tx'); cam.ty = mix('ty'); cam.tz = mix('tz');
+  for (var i = 0; i < nodes.length; i++) {
+    var n = nodes[i], p = tr.pos[n.id], f = tr.full[n.id];
+    if (!p) continue;
+    n.x = p[0] + (f[0] - p[0]) * e;
+    n.y = p[1] + (f[1] - p[1]) * e;
+    n.z = p[2] + (f[2] - p[2]) * e;
+  }
+}
+
+function transTick(now) {
+  var k = Math.max(0, Math.min(1, (now - tr.t0) / TR_MS));
+  var t = tr.dir > 0 ? k : 1 - k;
+  transApply(t);
+  if (!reduceMotion) cam.yaw += 0.034 * Math.pow(Math.sin(Math.PI * t), 2) * tr.dir;
+  if (k >= 1) transEnd();
+}
+
+function transEnd() {
+  var done = tr.done, dir = tr.dir;
+  transApply(dir > 0 ? 1 : 0);
+  /* Раскладка карты — своя, а не облака: после перехода узлы на местах. */
+  nodes.forEach(function (n) { var f = tr.full[n.id]; n.x = f[0]; n.y = f[1]; n.z = f[2]; });
+  if (dir > 0) { var r = restView(); cam.zoom = cam.zoomTarget = r.zoom; cam.ox = r.ox; cam.oy = r.oy; cam.pitch = r.pitch; }
+  tr = null;
+  labelSig = '';
+  measureCovers();
+  showZoom();
+  wake();
+  if (done) done();
 }
 
 /* ── Размер холста ───────────────────────────────────────────────────── */
@@ -2202,7 +2347,7 @@ function zoomAt(mx, my, factor) {
      Работаем в осях камеры: right и up получены разворотом проекции. */
   camPrepare();
   var s = FOCAL / DIST * before * fitScale, s2 = FOCAL / DIST * after * fitScale;
-  var ax = (mx - W / 2) / s, ay = (my - H / 2) / s;
+  var ax = (mx - W / 2 - cam.ox) / s, ay = (my - H / 2 - cam.oy) / s;
   var k = 1 - s / s2;
   var dax = ax * k, day = ay * k;
   var rightX = CY, rightY = 0, rightZ = SY;
@@ -2230,7 +2375,7 @@ canvas.addEventListener('wheel', function (e) {
    в кадре: человек должен увидеть, куда едет масштаб, сразу. */
 var zoomLabel = document.getElementById('tmap-zoom-val');
 function showZoom() {
-  if (zoomLabel) zoomLabel.textContent = Math.round(cam.zoomTarget * 100) + '%';
+  if (zoomLabel) zoomLabel.textContent = Math.round(cam.zoomTarget / restZoom() * 100) + '%';
 }
 
 function flyTo(n, zoom) {
@@ -2255,20 +2400,23 @@ function flyTo(n, zoom) {
 function resetView() {
   cam.goalX = cam.goalY = cam.goalZ = null;
   cam.tx = cam.ty = cam.tz = 0;
-  cam.zoomTarget = 1;
+  var rv = restView();
+  cam.zoomTarget = rv.zoom;
   cam.yaw = START_YAW;
-  cam.pitch = START_PITCH;
-  if (reduceMotion) cam.zoom = 1;
+  cam.pitch = rv.pitch;
+  cam.ox = rv.ox;
+  cam.oy = rv.oy;
+  if (reduceMotion) cam.zoom = rv.zoom;
   showZoom();
   wake();
 }
 
 /* ── Кнопки масштаба ─────────────────────────────────────────────────── */
 document.getElementById('tmap-zoom-in').addEventListener('click', function () {
-  zoomAt(W / 2, H / 2, 1.12); touchActivity();
+  zoomAt(W / 2 + cam.ox, H / 2 + cam.oy, 1.12); touchActivity();
 });
 document.getElementById('tmap-zoom-out').addEventListener('click', function () {
-  zoomAt(W / 2, H / 2, 0.893); touchActivity();
+  zoomAt(W / 2 + cam.ox, H / 2 + cam.oy, 0.893); touchActivity();
 });
 document.getElementById('tmap-zoom-fit').addEventListener('click', function () {
   resetView(); touchActivity();
@@ -2377,7 +2525,7 @@ var HOWTO = '<ul class="tmap-howto">' +
 var hoverHead = document.getElementById('tmap-hover-head');
 
 function setHoverHead(text) {
-  if (hoverHead) hoverHead.textContent = text;
+  if (hoverHead) { hoverHead.textContent = text; hoverHead.hidden = !text; }
 }
 
 function renderHover(n) {
@@ -2394,8 +2542,13 @@ function renderHover(n) {
       for (var k in picked) { if (picked[k]) { last = byId[k]; break; } }
     }
     if (last) { renderHover(last); return; }
-    hoverBox.innerHTML = HOWTO;
-    setHoverHead('Как пользоваться');
+    if (EMBED && EMBED.howto) {
+      hoverBox.innerHTML = '<p class="tmap-rest">' + esc(EMBED.howto) + '</p>';
+      setHoverHead('');
+    } else {
+      hoverBox.innerHTML = HOWTO;
+      setHoverHead('Как пользоваться');
+    }
     return;
   }
   setHoverHead('Под курсором');
@@ -2476,6 +2629,26 @@ function renderRoute(r) {
   hoverBox.innerHTML = html;
 }
 
+/* Выбор, пришедший СНАРУЖИ (фильтры каталога), наружу не отдаётся. */
+var silentPick = false;
+function setPicked(sel) {
+  var topics = {}, tags = {};
+  ((sel && sel.topics) || []).forEach(function (v) { topics[String(v)] = true; });
+  ((sel && sel.tags) || []).forEach(function (v) { tags[String(v)] = true; });
+  picked = {};
+  nodes.forEach(function (n) {
+    if (n.db === null || n.db === undefined) return;
+    if (n.k === 'theme' ? topics[String(n.db)] : tags[String(n.db)]) picked[n.id] = true;
+  });
+  if (lastPickedId && !picked[lastPickedId]) lastPickedId = null;
+  silentPick = true;
+  rebuildHighlight();
+  renderPicked();
+  silentPick = false;
+  refreshHoverPanel();
+  wake();
+}
+
 function renderPicked() {
   var ids = Object.keys(picked).filter(function (k) { return picked[k]; });
   var block = document.getElementById('tmap-picked-block');
@@ -2525,6 +2698,9 @@ function renderPicked() {
           ? 'примерно ' + fmtNum(sum) + ' ' +
             plural(sum, 'задача', 'задачи', 'задач')
           : 'число задач пока неизвестно');
+  }
+  if (EMBED && EMBED.onPick && !silentPick) {
+    EMBED.onPick(ids.map(function (id) { return byId[id]; }).filter(Boolean));
   }
   var apply = document.getElementById('tmap-apply');
   var why = document.getElementById('tmap-why');
@@ -2689,7 +2865,8 @@ function placeTourCard() {
   var cw = tourCard.offsetWidth || 340, ch = tourCard.offsetHeight || 190;
   var box = wrap.getBoundingClientRect();
   var left = box.right - cw - 16;
-  var top = box.bottom - ch - 16;
+  /* «Стол»: над нижней полосой карты (она 62 px и 18 px от края окна). */
+  var top = EMBED ? window.innerHeight - 100 - ch : box.bottom - ch - 16;
   left = Math.max(8, Math.min(window.innerWidth - cw - 8, left));
   top = Math.max(root.getBoundingClientRect().top + 8,
                  Math.min(window.innerHeight - ch - 8, top));
@@ -2768,7 +2945,8 @@ document.getElementById('tmap-reset').addEventListener('click', function () {
    параметром `topic` (складываются по «или»), теги — `tag` (по «и»).
    До 18.09 выбор уходил текстовым поиском `?q=` по названиям. Узел без
    ключа в фильтр не переводится. */
-document.getElementById('tmap-apply').addEventListener('click', function () {
+var applyBtn = document.getElementById('tmap-apply');
+if (applyBtn) applyBtn.addEventListener('click', function () {
   var params = [];
   Object.keys(picked).forEach(function (k) {
     var node = picked[k] && byId[k];
@@ -2779,7 +2957,8 @@ document.getElementById('tmap-apply').addEventListener('click', function () {
 });
 
 /* Чипы: крестик снимает выбор. */
-document.getElementById('tmap-chips').addEventListener('click', function (e) {
+var chipsBox = document.getElementById('tmap-chips');
+if (chipsBox) chipsBox.addEventListener('click', function (e) {
   var b = e.target.closest('[data-drop]');
   if (!b) return;
   delete picked[b.dataset.drop];
@@ -2890,10 +3069,27 @@ if (panelBox) panelBox.addEventListener('scroll', showPanelFade, { passive: true
    панель, схлопнутая правая колонка, а в будущем — открытие карты во
    всплывающем окне. На событии `resize` окна это не ловится вовсе, и
    карта остаётся посчитанной под прежний, иногда нулевой размер. */
+/* «Стол»: карточки поверх холста (шапка, «Разделы корпуса», нижняя полоса,
+   масштаб) — занятые места для раскладки подписей. Центр и размер, как у
+   `placed`; пересчёт — при смене размера и после перехода. */
+var coverRects = [];
+function measureCovers() {
+  coverRects = [];
+  if (!EMBED) return;
+  var c = canvas.getBoundingClientRect();
+  root.querySelectorAll('.tmap-head > *, .tmap-panel, .tmap-foot, .tmap-zoom').forEach(function (el) {
+    var b = el.getBoundingClientRect();
+    if (!b.width || !b.height) return;
+    coverRects.push({ x: b.left - c.left + b.width / 2, y: b.top - c.top + b.height / 2,
+                      w: b.width + 8, h: b.height + 8, l: '' });
+  });
+}
+
 function onBoxResize() {
   var r = wrap.getBoundingClientRect();
   if (r.width < 2 || r.height < 2) return;   /* холст ещё не разложен */
   resize();
+  measureCovers();
   /* Форма холста поменялась — значит, и растяжение облака под неё, и
      обзор. Растяжение всегда считается ОТ БАЗОВЫХ координат, поэтому
      повторный вызов не множится на прежний. */
@@ -2957,6 +3153,13 @@ fetch(window.TMAP_URL, { credentials: 'same-origin' })
     resize();
     spreadCloud();          /* облако под форму холста */
     computeFit();           /* и обзор по обеим осям сразу */
+    if (EMBED) {
+      var rv = restView();
+      cam.pitch = rv.pitch; cam.ox = rv.ox; cam.oy = rv.oy; cam.zoom = cam.zoomTarget = rv.zoom;
+      silentPick = true;
+      setPicked(EMBED.selected);
+      silentPick = false;
+    }
     ready = true;
     renderHover(null);
     renderPicked();
@@ -2965,7 +3168,9 @@ fetch(window.TMAP_URL, { credentials: 'same-origin' })
 
     var show = false;
     try { show = !localStorage.getItem(TOUR_KEY); } catch (e) { show = false; }
-    if (show) setTimeout(tourStart, 400);
+    /* В «Столе» обучение зовёт сценарий карты — после перехода, а не поверх него. */
+    if (show && !EMBED) setTimeout(tourStart, 400);
+    if (EMBED && EMBED.onReady) EMBED.onReady();
   })
   .catch(function (err) {
     ready = false;
@@ -2977,6 +3182,22 @@ fetch(window.TMAP_URL, { credentials: 'same-origin' })
 
 /* Отладочный доступ: числа для отчёта о приёмке. */
 window.TMAP = {
+  /* «Стол»: переход, выбор = фильтры, пауза вне вида карты, обучение. */
+  isReady: function () { return ready; },
+  enter: function (from, done) { transStart(from, 1, done); },
+  leave: function (to, done) { transStart(to, -1, done); },
+  setPicked: setPicked,
+  picked: function () { return Object.keys(picked).filter(function (k) { return picked[k]; }); },
+  pause: function (on) { paused = !!on; if (!on) { onBoxResize(); wake(); } },
+  tour: function () {
+    var show = false;
+    try { show = !localStorage.getItem(TOUR_KEY); } catch (e) { show = false; }
+    if (show) tourStart();
+  },
+  view: function () {
+    return { yaw: cam.yaw, pitch: cam.pitch, zoom: cam.zoom, fit: fitScale, ox: cam.ox, oy: cam.oy,
+             W: W, H: H, transit: tr ? { t: +tr.t.toFixed(3), dir: tr.dir } : null };
+  },
   fps: function () { return fpsValue; },
   stats: layoutStats,
   nodes: function () { return nodes; },

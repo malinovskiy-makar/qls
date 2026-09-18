@@ -197,4 +197,43 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
               and box['why'].strip() == 'Ключевую ставку устанавливает ЦБ РФ.',
               'тест после верного: %s' % box)
 
+        # README §6: карта по прямому адресу — холст нарисован без действия человека,
+        # «Разделы корпуса» 272 справа, нижняя полоса 62, вход скрыт, выбор из адреса
+        # виден на карте, выходы несут фильтр.
+        topic = str(self.topic.pk)
+        for width in DESKTOP:
+            box = data['map %d' % width]
+            key = 'карта %d' % width
+            check(not box['errors'], '%s: ошибки страницы %s' % (key, box['errors']))
+            check(box['painted'] > 0, '%s: холст карты не нарисован при загрузке' % key)
+            check(box['view'] == 'map' and box['on'] and box['entryHidden'], '%s: вид %s' % (key, box['view']))
+            check(box['scrollWidth'] <= box['innerWidth'], '%s: шире окна (%d)' % (key, box['scrollWidth']))
+            check(box['panel']['w'] == 272 and box['panel']['right'] == 24, '%s: панель %s' % (key, box['panel']))
+            check(box['foot']['h'] == 62 and box['foot']['bottom'] == 18, '%s: полоса %s' % (key, box['foot']))
+            check(box['picked'] == [topic] and box['count'] == 'Выбрано: 1\xa0тема' and box['show'] == 'Показать задачи',
+                  '%s: выбор из фильтра %s / %s' % (key, box['picked'], box['count']))
+            check(all(href == '/catalog/?topic=' + topic for href in box['exits']), '%s: выходы %s' % (key, box['exits']))
+            check(box['v']['ox'] == -140 and box['v']['pitch'] == -0.4, '%s: камера покоя %s' % (key, box['v']))
+        # README §6: переход 1,25 с на том же экране, туда и обратно без перезагрузки.
+        box = data['map transition']
+        check(not box['errors'], 'переход: ошибки страницы %s' % box['errors'])
+        trace = box['trace']
+        check(len(trace) > 20 and trace == sorted(trace), 'переход: t не растёт плавно (%d кадров)' % len(trace))
+        check(box['last'] is not None and 1000 <= box['last'] - box['first'] <= 1500,
+              'переход длился %s мс, по README 1250' % (box['last'] - box['first'] if box['last'] is not None else None))
+        opened, back = box['opened'], box['back']
+        check(opened['boot'] == box['boot'] and back['boot'] == box['boot'], 'переход перезагрузил страницу')
+        check(opened['url'] == '/catalog/map/?topic=' + topic and opened['on'] and opened['entryHidden'],
+              'после перехода: %s' % opened)
+        check(opened['panels'] == [1, 1, 1], 'панели карты не вошли: %s' % opened['panels'])
+        check(back['url'] == '/catalog/?topic=' + topic and back['mapHidden'] and back['bg'] == 'live'
+              and back['bgVisible'] and back['search'] == 1, '«В каталог»: %s' % back)
+        # Выбор на карте = фильтр каталога.
+        box = data['map pick']
+        check(box['clicked'] and box['topics'] == [topic] and box['url'] == '/catalog/map/?topic=' + topic
+              and box['count'] == 'Выбрано: 1\xa0тема', 'клик по теме на карте: %s' % box)
+        # prefers-reduced-motion: без движения, только смена.
+        box = data['map reduce']
+        check(box['view'] == 'map' and box['on'] and box['transit'] is None, 'reduced-motion: %s' % box)
+
         self.assertEqual(problems, [], 'Расхождения со спецификацией:\n' + '\n'.join(problems))

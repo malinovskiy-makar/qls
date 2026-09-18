@@ -887,3 +887,71 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
   body:has(.stol-app[data-view="stol"] .desk[data-help="closed"]) #corner-stack { right: calc(52px + 16px); }
   body.stol-is-focus .tg-fab, body.stol-is-focus #corner-stack { right: 16px; }
 }
+
+/* ── Карта тем (README §6, снимки 06–07) ─────────────────────────────────
+   Холст на всё окно под шапкой сайта; шапка карты, «Разделы корпуса» и нижняя
+   полоса — карточки поверх холста. Во время перехода холст прозрачен и лежит
+   ПОД уходящим содержимым входа; когда карта встала — вход скрыт, страница не
+   прокручивается. Каскад и вход панелей — `stol_map.js` (Web Animations). */
+.stol-map { position: fixed; left: 0; right: 0; top: 48px; bottom: 0; z-index: 0; }
+.stol-app.is-map-on .stol-map { z-index: 50; }
+.stol-app.is-map-moving .se-col { pointer-events: none; }
+.stol-app.is-map-on .stol-entry { visibility: hidden; }
+body:has(.stol-app[data-view="map"]) { overflow: hidden; }
+body:has(.stol-app[data-view="map"]) .tg-fab,
+body:has(.stol-app[data-view="map"]) #corner-stack { display: none; }
+.stol-app.is-map-moving .stol-bg .tmap-preview-canvas,
+.stol-app.is-map-on .stol-bg .tmap-preview-canvas { visibility: hidden; }
+.se-map.is-loading { opacity: .7; cursor: progress; }
+
+.stol-map .tmap { height: 100%; min-height: 0; position: relative; display: block; overflow: hidden; }
+.stol-map .tmap-body { position: absolute; inset: 0; display: block; }
+.stol-map .tmap-canvas-wrap { position: absolute; inset: 0; background: transparent; }
+
+.stol-map .tmap-head { position: absolute; top: 18px; left: 24px; right: 24px; z-index: 2;
+  padding: 0; border: 0; background: transparent; gap: 14px; pointer-events: none; }
+.stol-map .tmap-head > * { pointer-events: auto; }
+.stol-map .tmap-head-title { pointer-events: none; }
+.tmap-back { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 18px 0 12px;
+  border-radius: 12px; border: var(--line) solid var(--border); background: var(--surface);
+  color: var(--text); font: 600 15px/1 var(--font-ui); text-decoration: none;
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--text) 6%, transparent); }
+.tmap-back:hover { background: var(--surface-2); }
+.tmap-back .qi { width: 18px; height: 18px; }
+.stol-map .tmap-head h1 { font-size: 21px; font-weight: 700; letter-spacing: -.01em; }
+.stol-map .tmap-sub { font-size: 12.5px; color: var(--text2); }
+.stol-map .tmap-search .qi { position: absolute; left: 12px; top: 50%; width: 16px; height: 16px;
+  transform: translateY(-50%); color: var(--text3); pointer-events: none; }
+.stol-map .tmap-search input { width: 300px; height: 40px; padding-left: 36px; border-radius: 12px;
+  background: var(--surface); font-size: 14px; }
+.stol-map .tmap-icon-btn { width: 40px; height: 40px; border-radius: 12px; background: var(--surface); }
+.stol-map .tmap-icon-btn .qi { width: 18px; height: 18px; }
+
+.stol-map .tmap-panel { position: absolute; top: 86px; right: 24px; width: 272px; z-index: 2;
+  max-height: calc(100% - 86px - 104px); border: var(--line) solid var(--border); border-radius: 16px;
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--text) 8%, transparent); overflow: hidden; }
+.stol-map .tmap-panel-fade { display: none; }
+.stol-map .tmap-block-h { font-size: 11px; letter-spacing: .08em; }
+.stol-map #tmap-hover-block { height: auto; max-height: 300px; border-top: var(--line) solid var(--border-soft); }
+.stol-map .tmap-sec-row { gap: 10px; }
+.tmap-sec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--gc); flex: none; }
+.stol-map .tmap-sec-name { color: var(--text); font-weight: 600; }
+.stol-map .tmap-sec-cnt { margin-left: auto; }
+.tmap-rest { font-size: 13px; line-height: 1.5; color: var(--text2); margin: 0; }
+
+.stol-map .tmap-zoom { left: 24px; bottom: 100px; z-index: 2; }
+.stol-map .tmap-zoom button { display: inline-flex; align-items: center; justify-content: center; }
+.stol-map .tmap-zoom .qi { width: 14px; height: 14px; }
+
+.stol-map .tmap-foot { position: absolute; left: 24px; right: 24px; bottom: 18px; z-index: 2;
+  display: flex; align-items: center; gap: 12px; height: 62px; padding: 0 12px 0 18px;
+  border: var(--line) solid var(--border); border-radius: 16px; background: var(--surface);
+  box-shadow: 0 6px 22px color-mix(in srgb, var(--text) 8%, transparent); }
+.tmap-sel { flex: 1; min-width: 0; margin: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  font-size: 14.5px; color: var(--text); }
+.tmap-sel b { font-weight: 700; margin-right: 8px; }
+.tmap-sel-names { font-size: 13.5px; color: var(--text2); }
+.stol-map .tmap-foot .btn { flex: none; }
+.stol-map .tmap-foot .btn .qi { width: 16px; height: 16px; }
+.stol-map .tmap-tour-foot .tmap-btn { display: inline-flex; align-items: center; justify-content: center; }
+.stol-map .tmap-tour-foot .qi { width: 14px; height: 14px; }

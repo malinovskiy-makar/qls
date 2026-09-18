@@ -282,6 +282,27 @@ const STOL_SCENES = [
       await p.goto(BASE + '/catalog/problem/63315/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
   { phase: 's1', name: 'entry_continue', who: 'student', go: async p => {
       await p.goto(BASE + '/catalog/', { waitUntil: 'load' }); await p.waitForTimeout(1500); } },
+  /* S4: карта тем (README §6, снимки 05–08). Облако входа на карте стоит — его не ждём. */
+  { phase: 's4', name: 'map', noBg: true, go: async p => {
+      await p.goto(BASE + '/catalog/map/?topic=843&topic=99', { waitUntil: 'load' });
+      await p.waitForFunction(() => window.TMAP && TMAP.isReady()); await p.waitForTimeout(2500); } },
+  { phase: 's4', name: 'map_pick', noBg: true, go: async p => {
+      await p.goto(BASE + '/catalog/map/?topic=843&topic=99&topic=861&tag=652', { waitUntil: 'load' });
+      await p.waitForFunction(() => window.TMAP && TMAP.isReady()); await p.waitForTimeout(2500); } },
+  { phase: 's4', name: 'map_tour', noBg: true, tour: true, go: async p => {
+      await p.goto(BASE + '/catalog/map/', { waitUntil: 'load' });
+      await p.waitForFunction(() => window.TMAP && TMAP.isReady()); await p.waitForTimeout(1500); } },
+  { phase: 's4', name: 'map_transition_500ms', noBg: true, go: async p => {
+      await p.goto(BASE + '/catalog/?topic=843&topic=99', { waitUntil: 'load' }); await settleBg(p);
+      await p.hover('#se-map'); await p.waitForFunction(() => window.TMAP && TMAP.isReady());
+      await p.click('#se-map');
+      await p.waitForFunction(() => { const v = TMAP.view(); return v.transit && v.transit.t >= 0.4; }); } },
+  { phase: 's4', name: 'map_back_filters', go: async p => {
+      await p.goto(BASE + '/catalog/map/?topic=843&topic=99', { waitUntil: 'load' });
+      await p.waitForFunction(() => window.TMAP && TMAP.isReady()); await p.waitForTimeout(1000);
+      await p.click('#stol-map-show');
+      await p.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
+      await p.waitForTimeout(2200); } },
 ];
 
 /* Демо-ученик снимков «Стола» (`stol-shots@test.local`): сцены помощи меняют
@@ -315,6 +336,8 @@ async function runStol() {
         const ctx = await browser.newContext({ viewport: { width, height } });
         if (sc.who) await ctx.addCookies([{ name: 'sessionid', value: sessions[sc.who], url: BASE }]);
         await ctx.addInitScript(initScript(theme, STATE.none));
+        /* Обучение карты — только в своей сцене (`tour`), иначе оно закрывает снимок. */
+        if (!sc.tour) await ctx.addInitScript("try { localStorage.setItem('weconomics.map.tour.v2', 'done'); } catch (e) {}");
         if (sc.panels) await ctx.addInitScript(`localStorage.setItem('weco_stol', ${JSON.stringify(JSON.stringify(sc.panels))});`);
         const page = await ctx.newPage();
         page.setDefaultNavigationTimeout(120000);
@@ -325,7 +348,7 @@ async function runStol() {
         /* Своя сессия на сцену: счётчик попыток теста живёт в сессии. */
         if (sc.who === 'shots') await ctx.addCookies([{ name: 'sessionid', value: sessionFor('stol-shots@test.local'), url: BASE }]);
         await sc.go(page);
-        await settleBg(page);
+        if (!sc.noBg) await settleBg(page);
         await snap(page, sc.name, theme, width);
         await ctx.close();
       }

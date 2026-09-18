@@ -17,7 +17,25 @@
     var app = document.getElementById('stol-app');
     if (app) app.setAttribute('data-view', view);
     if (view === 'stol') { delete document.body.dataset.bgPattern; } else { document.body.dataset.bgPattern = 'off'; }
+    document.dispatchEvent(new CustomEvent('weco:view', { detail: { view: view } }));
   };
+
+  /* Карта тем (README §6): `stol_map.js` и движок грузятся при наведении на
+     «Карта тем» или при первом нажатии — не на каждый вход в каталог. */
+  var waiting = null;
+  function withMap(cb) {
+    if (weco.stolMap) { cb(weco.stolMap); return; }
+    if (waiting) { waiting.push(cb); return; }
+    waiting = [cb];
+    var app = document.getElementById('stol-app');
+    var s = document.createElement('script');
+    s.src = app.getAttribute('data-map-js');
+    s.onload = function () { var list = waiting; waiting = null; list.forEach(function (f) { f(weco.stolMap); }); };
+    s.onerror = function () { location.href = app.getAttribute('data-map-url'); };
+    document.head.appendChild(s);
+  }
+  weco.stol.openMap = function (opts) { withMap(function (m) { m.open(opts); }); };
+  weco.stol.prefetchMap = function () { withMap(function (m) { m.prefetch(); }); };
 })();
 
 /* ── Вход (вид `entry`): поиск, чипы, лента, карта-фон ────────────────── */
@@ -196,6 +214,16 @@
       selected: selNode ? JSON.parse(selNode.textContent) : null
     });
   }
+  var mapPill = document.getElementById('se-map');
+  if (mapPill) mapPill.addEventListener('click', function (e) {
+    if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    e.preventDefault();
+    weco.stol.openMap();
+  });
+  if (mapPill) {
+    mapPill.addEventListener('pointerenter', weco.stol.prefetchMap, { once: true });
+    mapPill.addEventListener('focus', weco.stol.prefetchMap, { once: true });
+  }
   var mapLabel = document.getElementById('se-map-l');
   var mapTotal = document.getElementById('se-map-total');
   function paintMap(s) {
@@ -270,6 +298,7 @@
     results: [],
     scroll: 0
   };
+  document.addEventListener('weco:view', function (e) { state.view = e.detail.view; });
 
   /* ── Панели и «Фокус» ──────────────────────────────────────────────── */
   function paint() {
@@ -500,6 +529,7 @@
     if (a.hasAttribute('data-stol-home') || (a.pathname === entryUrl && a.closest('.site-nav') && entry)) {
       if (!entry) return;
       e.preventDefault();
+      if (state.view === 'map') { if (weco.stolMap) weco.stolMap.close(); return; }
       toEntry();
       return;
     }
@@ -513,7 +543,19 @@
   });
   window.addEventListener('popstate', function () {
     var id = idOf(location.pathname);
+    var mapUrl = app.getAttribute('data-map-url');
+    if (state.view === 'map' && location.pathname !== mapUrl) {
+      /* «Назад» с карты: сначала закрыть карту, потом — куда вёл адрес. */
+      if (id) { if (weco.stolMap) weco.stolMap.close({ push: false, instant: true }); open(id, { push: false }); return; }
+      if (weco.stolMap) weco.stolMap.close({ push: false });
+      return;
+    }
     if (id) { open(id, { push: false }); return; }
+    if (location.pathname === mapUrl && entry) {
+      if (state.view === 'stol') toEntry(false);
+      weco.stol.openMap({ push: false });
+      return;
+    }
     if (location.pathname === entryUrl && entry) { toEntry(false); return; }
     location.reload();
   });
@@ -571,7 +613,7 @@
   }
   document.addEventListener('keydown', function (e) {
     if (state.view !== 'stol') {
-      if (e.key === 'Escape' || inField(e.target)) return;
+      if (state.view === 'map' || e.key === 'Escape' || inField(e.target)) return;
       if (e.key === '/' && document.getElementById('ct-q')) { e.preventDefault(); document.getElementById('ct-q').focus(); }
       return;
     }

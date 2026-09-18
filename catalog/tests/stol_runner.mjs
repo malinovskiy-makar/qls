@@ -38,6 +38,7 @@ async function fresh(width, opts = {}) {
   await ctx.addInitScript(`try { localStorage.setItem('theme', ${JSON.stringify(opts.theme || 'light')}); } catch (e) {}`);
   /* Метка загрузки документа: меняется только при настоящей перезагрузке. */
   await ctx.addInitScript('window.__stolBoot = Date.now() + Math.random();');
+  if (opts.init) await ctx.addInitScript(opts.init);
   if (opts.panels) {
     await ctx.addInitScript(`try { localStorage.setItem('weco_stol', ${JSON.stringify(JSON.stringify(opts.panels))}); } catch (e) {}`);
   }
@@ -248,6 +249,135 @@ try {
       out['test tried'].errors = errors;
       await ctx.close();
     }
+  }
+
+  /* ── S4: карта тем по прямому адресу — свежая страница, без кликов (README §6) ── */
+  const NO_TOUR = "try { localStorage.setItem('weconomics.map.tour.v2', 'done'); } catch (e) {}";
+  const mapPath = '/catalog/map/' + (TOPIC ? '?topic=' + TOPIC : '');
+  async function mapReady(page) {
+    await page.waitForFunction(() => window.TMAP && TMAP.isReady(), null, { timeout: 30000 });
+  }
+  for (const width of DESKTOP) {
+    const { ctx, page, errors } = await fresh(width, { path: mapPath, init: NO_TOUR });
+    await mapReady(page);
+    let painted = 0;
+    for (let t = 0; t < 30 && !painted; t++) {
+      await page.waitForTimeout(300);
+      painted = await page.evaluate(() => {
+        const c = document.getElementById('tmap-canvas');
+        const d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+        /* Движок льёт фон сплошь: считаем пиксели, отличные от фона в углу. */
+        let n = 0;
+        for (let i = 0; i < d.length; i += 4) if (d[i] !== d[0] || d[i + 1] !== d[1] || d[i + 2] !== d[2]) n++;
+        return n;
+      });
+    }
+    out['map ' + width] = await page.evaluate(() => {
+      const r = sel => {
+        const el = document.querySelector(sel);
+        if (!el) return null;
+        const b = el.getBoundingClientRect();
+        return { w: Math.round(b.width), h: Math.round(b.height), top: Math.round(b.top),
+                 right: Math.round(innerWidth - b.right), bottom: Math.round(innerHeight - b.bottom) };
+      };
+      const app = document.getElementById('stol-app');
+      return { view: app.dataset.view, on: app.classList.contains('is-map-on'),
+               scrollWidth: document.documentElement.scrollWidth, innerWidth: innerWidth,
+               panel: r('.stol-map .tmap-panel'), foot: r('.stol-map .tmap-foot'), back: r('.tmap-back'),
+               entryHidden: getComputedStyle(document.getElementById('stol-entry')).visibility === 'hidden',
+               bodyScroll: getComputedStyle(document.body).overflow,
+               picked: TMAP.picked().map(id => String(TMAP.nodes().find(n => n.id === id).db)),
+               count: document.getElementById('stol-map-count').textContent,
+               show: document.getElementById('stol-map-show-l').textContent,
+               exits: [...document.querySelectorAll('[data-map-exit]')].map(a => a.getAttribute('href')),
+               v: TMAP.view() };
+    });
+    out['map ' + width].painted = painted;
+    out['map ' + width].errors = errors;
+    await ctx.close();
+  }
+
+  /* ── S4: переход «вход → карта → вход» без перезагрузки, 1,25 с (README §6) ── */
+  if (TOPIC) {
+    const { ctx, page, errors } = await fresh(1440, { path: '/catalog/?topic=' + TOPIC, init: NO_TOUR });
+    await page.waitForFunction(() => {
+      const h = document.getElementById('stol-bg').__tmapPreview;
+      return h && h.stats().state === 'live';
+    }, null, { timeout: 30000 });
+    const boot = await page.evaluate(() => window.__stolBoot);
+    await page.hover('#se-map');
+    await page.waitForFunction(() => window.TMAP && TMAP.isReady(), null, { timeout: 30000 });
+    await page.click('#se-map');
+    const trace = await page.evaluate(() => new Promise(res => {
+      const rows = [], t0 = performance.now();
+      (function tick() {
+        const v = window.TMAP ? TMAP.view() : null;
+        rows.push({ ms: Math.round(performance.now() - t0), t: v && v.transit ? v.transit.t : null });
+        if (performance.now() - t0 < 2600) requestAnimationFrame(tick); else res(rows);
+      })();
+    }));
+    const opened = await page.evaluate(() => {
+      const app = document.getElementById('stol-app');
+      const op = sel => Number(getComputedStyle(document.querySelector(sel)).opacity);
+      return { boot: window.__stolBoot, url: location.pathname + location.search, view: app.dataset.view,
+               on: app.classList.contains('is-map-on'), v: TMAP.view(),
+               panels: [op('.stol-map .tmap-head'), op('.stol-map .tmap-panel'), op('.stol-map .tmap-foot')],
+               entryHidden: getComputedStyle(document.getElementById('stol-entry')).visibility === 'hidden' };
+    });
+    await page.click('.tmap-back');
+    await page.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry', null, { timeout: 10000 });
+    await page.waitForTimeout(700);
+    const back = await page.evaluate(() => ({
+      boot: window.__stolBoot, url: location.pathname + location.search,
+      mapHidden: document.getElementById('stol-map').hidden,
+      bg: document.getElementById('stol-bg').__tmapPreview.stats().state,
+      bgVisible: getComputedStyle(document.querySelector('#stol-bg canvas')).visibility === 'visible',
+      search: Number(getComputedStyle(document.querySelector('.se-search')).opacity) }));
+    const moving = trace.filter(r => r.t !== null && r.t > 0 && r.t < 1);
+    out['map transition'] = { boot, trace: moving.map(r => r.t), first: moving.length ? moving[0].ms : null,
+                              last: moving.length ? moving[moving.length - 1].ms : null, opened, back, errors };
+    await ctx.close();
+  }
+
+  /* ── S4: выбор на карте = фильтр каталога (клик по узлу темы) ─────────── */
+  if (TOPIC) {
+    const { ctx, page, errors } = await fresh(1440, { path: '/catalog/map/', init: NO_TOUR });
+    await mapReady(page);
+    let pt = null;
+    for (let t = 0; t < 40 && !pt; t++) {
+      await page.waitForTimeout(250);
+      pt = await page.evaluate(db => {
+        const c = document.getElementById('tmap-canvas').getBoundingClientRect();
+        const n = TMAP.nodes().find(x => String(x.db) === db && x.k === 'theme');
+        if (!n || n.pz < 0) return null;
+        const x = c.left + n.px, y = c.top + n.py;
+        return document.elementFromPoint(x, y) === document.getElementById('tmap-canvas') ? { x, y } : null;
+      }, TOPIC);
+    }
+    if (pt) {
+      await page.mouse.move(pt.x, pt.y);
+      await page.waitForTimeout(150);
+      await page.mouse.click(pt.x, pt.y);
+      await page.waitForTimeout(300);
+    }
+    out['map pick'] = Object.assign({ clicked: !!pt }, await page.evaluate(() => ({
+      topics: Array.from(weco.filters.state.topics), url: location.pathname + location.search,
+      count: document.getElementById('stol-map-count').textContent,
+      show: document.getElementById('stol-map-show-l').textContent })), { errors });
+    await ctx.close();
+  }
+
+  /* ── S4: prefers-reduced-motion — без движения, только смена ─────────── */
+  {
+    const { ctx, page, errors } = await fresh(1440, { reduce: true, init: NO_TOUR });
+    await page.hover('#se-map');
+    await page.waitForFunction(() => window.TMAP && TMAP.isReady(), null, { timeout: 30000 });
+    await page.click('#se-map');
+    await page.waitForTimeout(250);
+    out['map reduce'] = await page.evaluate(() => ({ view: document.getElementById('stol-app').dataset.view,
+      on: document.getElementById('stol-app').classList.contains('is-map-on'), transit: TMAP.view().transit }));
+    out['map reduce'].errors = errors;
+    await ctx.close();
   }
 } catch (e) {
   out.error = String(e && e.stack || e);

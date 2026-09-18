@@ -50,6 +50,10 @@
  *                               selected: { topics: ['843'], tags: [] } });
  *   h.select({ topics: [...], tags: [...] });  // выбор = фильтры каталога
  *   h.getAngle();  // { yaw, pitch, scale } — отдать полной карте (переход)
+ *   h.handoff();   // кадр для перехода в карту: угол, масштаб, центр в окне,
+ *                  // координаты узлов (README §6, `TMAP.enter`)
+ *   h.hold(true);  // пока открыта карта — не рисовать; h.setYaw(y) — принять
+ *                  // угол карты при возврате, чтобы облако продолжило с него
  *
  * `inert` — блок не ссылка и клик не слушает (фон под шапкой, мышь
  * достаётся карточке поиска). `zoom` — во сколько раз крупнее обзора
@@ -185,7 +189,7 @@ function mount(el, options) {
   var nodes = [], links = [], byId = {}, themeList = [], tagsOfTheme = {};
   var PAL = { node: [74, 82, 96], bg: [245, 245, 243] };
 
-  var yaw = 0.35, pitch = opt.pitch, fitScale = 1;
+  var yaw = 0.35, pitch = opt.pitch, fitScale = 1, held = false;
   var picked = { topics: {}, tags: {} };
   function setSelected(sel) {
     picked = { topics: {}, tags: {} };
@@ -496,7 +500,7 @@ function mount(el, options) {
   }
 
   function schedule() {
-    if (dead || raf) return;
+    if (dead || raf || held) return;
     if (!visible) return;                          /* блока нет на экране */
     if (reduced && state === 'live') return;       /* движение отключено  */
     if (state !== 'settling' && state !== 'live') return;
@@ -666,6 +670,20 @@ function mount(el, options) {
     getAngle: function () {
       return { yaw: yaw, pitch: pitch, scale: fitScale };
     },
+    /* Кадр целиком для перехода в полную карту: центр облака — в координатах
+       окна, раскладка — по ключам узлов. Пока раскладка не готова — null. */
+    handoff: function () {
+      if (state !== 'live') return null;
+      var r = el.getBoundingClientRect(), pos = {};
+      for (var i = 0; i < nodes.length; i++) pos[nodes[i].id] = [nodes[i].x, nodes[i].y, nodes[i].z];
+      return { yaw: yaw, pitch: pitch, scale: fitScale,
+               cx: r.left + W / 2, cy: r.top + H * opt.cy, pos: pos };
+    },
+    hold: function (on) {
+      held = !!on;
+      if (!held) { resize(); if (state === 'live') draw(); schedule(); }
+    },
+    setYaw: function (y) { yaw = y; if (state === 'live') draw(); },
     /* Прогон N кадров ВРУЧНУЮ, без requestAnimationFrame — тем же приёмом,
        что TMAP.spinFrames() у полной карты: в скрытой вкладке браузер кадры
        не гоняет, и ни раскладку досчитать, ни стоимость кадра снять нельзя.

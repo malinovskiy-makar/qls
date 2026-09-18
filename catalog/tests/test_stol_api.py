@@ -308,11 +308,21 @@ class MapApplyIsAFilterTests(TestCase):
     def test_script_builds_topic_and_tag_params_from_db_keys(self):
         import io
         src = io.open('catalog/static/catalog/js/topic_map.js', encoding='utf-8').read()
-        handler = src.split("getElementById('tmap-apply').addEventListener", 1)[1]
+        handler = src.split("applyBtn.addEventListener('click'", 1)[1]
         handler = handler.split('\n});', 1)[0]
         self.assertIn("node.k === 'theme' ? 'topic=' : 'tag='", handler)
         self.assertIn('node.db', handler)
         self.assertNotIn('?q=', handler)
+
+    def test_stol_map_writes_the_same_filter_state(self):
+        # С S4 (18.09.2026) выбор на карте «Стола» сразу пишет `weco.filters.state`.
+        import io
+        src = io.open('catalog/static/catalog/js/stol_map.js', encoding='utf-8').read()
+        pick = src.split('function onPick(list) {', 1)[1].split('\n  }\n', 1)[0]
+        self.assertIn("(n.k === 'theme' ? topics : tags).push(String(n.db))", pick)
+        self.assertIn('F.state.topics = new Set(topics)', pick)
+        self.assertIn('F.state.tags = new Set(tags)', pick)
+        self.assertNotIn('q=', pick)
 
 
 class PhoneBarTests(TestCase):

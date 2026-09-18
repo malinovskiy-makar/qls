@@ -1817,9 +1817,8 @@ def _map_stats():
     return _TOPIC_MAP_CACHE['stats']
 
 
-def topic_map(request):
-    """Страница карты. Разметка — самостоятельный блок: позже он переедет
-    во всплывающее окно переработанного поиска без переделки."""
+def _map_context():
+    """Дерево разделов и числа шапки карты тем — для партиала `_stol_map.html`."""
     text, _etag = _topic_map_payload()
     data = json.loads(text)
     themes = [n for n in data['nodes'] if n['k'] == 'theme']
@@ -1856,11 +1855,30 @@ def topic_map(request):
             })
         sections.append({'key': g['k'], 'label': g['l'], 'themes': rows})
 
-    return render(request, 'catalog/topic_map.html', {
-        'theme_count': len(themes),
-        'tag_count': len(tags),
-        'sections': sections,
-    })
+    return {'theme_count': len(themes), 'tag_count': len(tags), 'sections': sections}
+
+
+def topic_map(request):
+    """`/catalog/map/` — «Стол» сразу в режиме карты (README §1, §6).
+
+    Под картой лежит вход с теми же фильтрами: любой выход с карты
+    возвращает на него без перезагрузки. `?pane=1` отдаёт одну разметку
+    карты — её берёт `stol_map.js`, когда карту открывают со входа.
+    Выбор на карте — фильтр каталога, поэтому ссылки выхода несут фильтры
+    адреса (`filters_query`).
+    """
+    active = filters.parse(request.GET)
+    map_ctx = _map_context()
+    map_ctx['filters_query'] = filters.query({}, active)[1:]
+    if request.GET.get('pane') == '1':
+        map_ctx.update({'map_selected': {'topics': active['topics'], 'tags': active['tags']},
+                        'map_selected_n': len(active['topics']) + len(active['tags'])})
+        return JsonResponse({'html': render_to_string('catalog/stol/_stol_map.html', map_ctx, request=request)})
+    context = _catalog_context(request, None)
+    context.update(_entry_context(request, context))
+    context.update(map_ctx)
+    context['view'] = 'map'
+    return render(request, 'catalog/stol.html', context)
 
 
 def topic_map_preview_demo(request):

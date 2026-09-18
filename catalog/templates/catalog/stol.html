@@ -13,9 +13,14 @@
 
 Партиалы — в `catalog/stol/`: `_stol_entry.html` (вход), `_stol_desk.html`
 (лента · задача · помощь), `_stol_rail.html`, `_stol_center.html`,
-`_stol_help.html`. Стили — один файл `catalog/css/stol.css`, цвета только
-токенами `_tokens.html`. Сценарий: `stol.js` (вид, адреса, панели, лента) и
-`stol_task.js` (всё внутри задачи, `init(root)` после каждой подмены).
+`_stol_help.html`, `_stol_map.html` (карта тем). Стили — один файл
+`catalog/css/stol.css`, цвета только токенами `_tokens.html`. Сценарий:
+`stol.js` (вид, адреса, панели, лента), `stol_task.js` (всё внутри задачи,
+`init(root)` после каждой подмены) и `stol_map.js` (карта: грузится при
+первом нажатии «Карта тем» вместе с движком `topic_map.js`).
+
+Вид `map` — это вход с открытой поверх него картой: выход с карты
+возвращает на вход без перезагрузки.
 
 ⚠️ ФИЛЬТРЫ — ОДНО СОСТОЯНИЕ: окно «Все фильтры» (`_catalog_modal.html` +
 `catalog_filters.js`), чипы входа и карта тем пишут `weco.filters.state`.
@@ -23,7 +28,7 @@
 группам, а задаче он не нужен — лента ведёт в каталог обычной ссылкой.
 {% endcomment %}
 
-{% block title %}{% if view == 'stol' %}{{ heading }}{% else %}Умный каталог{% endif %}{% endblock %}
+{% block title %}{% if view == 'stol' %}{{ heading }}{% elif view == 'map' %}Карта тем{% else %}Умный каталог{% endif %}{% endblock %}
 {% block main_class %}stol stol--{{ view }}{% endblock %}
 {% comment %}Водяные «W» — только у открытой задачи; на входе и карте фон — облако тем (решение 18.09.2026).{% endcomment %}
 {% block body_attrs %}{% if view != 'stol' %} data-bg-pattern="off"{% endif %}{% endblock %}
@@ -40,19 +45,25 @@
 <script defer src="{% static 'catalog/js/catalog_filters.js' %}"></script>
 <script defer src="{% static 'catalog/js/stol_task.js' %}"></script>
 <script defer src="{% static 'catalog/js/stol.js' %}"></script>
+{% if view == 'map' %}<link rel="stylesheet" href="{% static 'catalog/css/topic_map.css' %}">
+<script defer src="{% static 'catalog/js/stol_map.js' %}"></script>{% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="stol-app" id="stol-app" data-view="{{ view }}"
-     data-entry-url="{% url 'catalog:problem_list' %}" data-pane-base="/catalog/problem/">
-  {% if view == 'entry' %}{% include "catalog/stol/_stol_entry.html" %}{% endif %}
+<div class="stol-app{% if view == 'map' %} is-map-on{% endif %}" id="stol-app" data-view="{{ view }}"
+     data-entry-url="{% url 'catalog:problem_list' %}" data-pane-base="/catalog/problem/"
+     data-map-url="{% url 'catalog:topic_map' %}" data-map-data="{% url 'catalog:topic_map_data' %}"
+     data-map-js="{% static 'catalog/js/stol_map.js' %}" data-map-engine="{% static 'catalog/js/topic_map.js' %}"
+     data-map-css="{% static 'catalog/css/topic_map.css' %}">
+  {% if view == 'entry' or view == 'map' %}{% include "catalog/stol/_stol_entry.html" %}{% endif %}
   {% include "catalog/stol/_stol_desk.html" %}
+  {% if view == 'map' %}{% include "catalog/stol/_stol_map.html" %}{% endif %}
 </div>
-{% if view == 'entry' %}{% include "catalog/_catalog_modal.html" %}{% endif %}
+{% if view == 'entry' or view == 'map' %}{% include "catalog/_catalog_modal.html" %}{% endif %}
 {% endblock %}
 
 {% block extra_js %}
-{% if view == 'entry' %}
+{% if view == 'entry' or view == 'map' %}
 {% include "_typing_placeholder.html" with el_id="ct-q" phrases=catalog_phrases stop_text=catalog_stop_text %}
 {% include "_search_rating.html" %}
 {% endif %}

@@ -9,10 +9,13 @@ import pathlib
 import re
 import statistics
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
 from catalog.taxonomy_map import (GROUPS, JSON_PATH, build_map, load_tree,
                                   parse_cross_links, parse_tree, read_map)
+
+#: С 18.09.2026 (S4 «Стола») разметка карты — партиал вида `map` единого экрана.
+MAP_PARTIAL = pathlib.Path(__file__).resolve().parents[1] / 'templates' / 'catalog' / 'stol' / '_stol_map.html'
 
 
 class TreeInvariantsTests(SimpleTestCase):
@@ -668,9 +671,13 @@ class MapTextsTests(SimpleTestCase):
         а заголовок «Под курсором» над ним сообщал неправду: под курсором
         в этот момент ровно ничего.
         """
-        html = self.client.get('/catalog/map/').content.decode('utf-8')
-        self.assertIn('id="tmap-hover-head">Как пользоваться<', html)
+        # С S4 (18.09.2026) карта — вид «Стола»: в покое вместо легенды короткая
+        # подсказка без заголовка (снимок 06), заголовок прячется вместе с текстом.
+        html = MAP_PARTIAL.read_text(encoding='utf-8')
+        self.assertIn('id="tmap-hover-head" hidden>Как пользоваться<', html)
         self.assertIn("setHoverHead('Как пользоваться')", self.src)
+        self.assertIn("setHoverHead('')", self.src)
+        self.assertIn('hoverHead.hidden = !text', self.src)
         self.assertIn("setHoverHead('Под курсором')", self.src)
 
     def test_legend_text_has_no_long_dashes(self):
@@ -725,12 +732,12 @@ class MapTextsTests(SimpleTestCase):
         обучении, а не в шапке: человек читает её раньше, чем понял, зачем
         ему карта. Тому же учит теперь интерактивный тур.
         """
-        html = self.client.get('/catalog/map/').content.decode('utf-8')
-        self.assertIn('<h1>Интерактивная карта задач</h1>', html)
+        html = MAP_PARTIAL.read_text(encoding='utf-8')
+        self.assertIn('<h1>Карта тем</h1>', html)
         self.assertNotIn('наведитесь на тег', html)
 
 
-class PanelTreeTests(SimpleTestCase):
+class PanelTreeTests(TestCase):
     """Правая панель — дерево разделы → темы → теги.
 
     Плоский список из 29 тем с бледными заголовками разделов заменён на
@@ -882,7 +889,7 @@ class InteractiveTourTests(SimpleTestCase):
         Каждое `tourNotice` стоит в том обработчике, где действие реально
         происходит: перетаскивание, колесо, наведение, приход по линии, выбор.
         """
-        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        html = MAP_PARTIAL.read_text(encoding='utf-8')
         self.assertNotIn('>Дальше<', html)
         self.assertIn('Пропустить шаг', html)
         for call in ("tourNotice('drag'", "tourNotice('zoom'", "tourNotice('pick'",
@@ -1028,9 +1035,10 @@ class SelectionAndViewTests(SimpleTestCase):
         относится она к случаю, который может его и не касаться. Неполнота
         теперь проговаривается в самом счётчике и только когда она есть.
         """
-        html = self.client.get('/catalog/map/').content.decode('utf-8')
+        html = MAP_PARTIAL.read_text(encoding='utf-8')
         self.assertNotIn('Оценка снизу', html)
         self.assertNotIn('tmap-note', html)
+        self.assertNotIn('tmap-note', self.src)
 
     def test_selection_has_exactly_one_entry_point(self):
         """Выбор идёт через `selectNode`, и второго пути нет.
@@ -1084,8 +1092,13 @@ class SelectionAndViewTests(SimpleTestCase):
         reset = self.src[self.src.index('function resetView()'):]
         reset = reset[:reset.index('\n}')]
         self.assertIn('cam.yaw = START_YAW', reset)
-        self.assertIn('cam.pitch = START_PITCH', reset)
-        self.assertIn('cam.zoomTarget = 1', reset)
+        self.assertIn('var rv = restView();', reset)
+        self.assertIn('cam.pitch = rv.pitch', reset)
+        self.assertIn('cam.zoomTarget = rv.zoom', reset)
+        rest = self.src[self.src.index('function restView()'):]
+        rest = rest[:rest.index('\n}')]
+        self.assertIn('pitch: EMBED ? EMBED.pitch : START_PITCH', rest)
+        self.assertIn("if (!EMBED) return 1;", self.src[self.src.index('function restZoom()'):])
 
         dbl = self.src[self.src.index("addEventListener('dblclick'"):]
         dbl = dbl[:dbl.index('});')]
