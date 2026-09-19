@@ -15,13 +15,16 @@ from django.views.decorators.http import require_POST
 
 from problems import problem_types
 from problems.enrich import features as enrich_features
-from problems.jsonsafe import dumps_for_script
+from problems.templatetags.ru import plural_ru
 
-from . import attachments, attempts, chat, filters, search_log, testplay
+from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
-from .preview import PREVIEW_CHARS, looks_like_statement_cut, tex_preview
+from .preview import (
+    PREVIEW_CHARS, looks_like_statement_cut, solution_is_statement_copy,
+    strip_correct_repeat, strip_score_tails, strip_statement_retell, tex_preview,
+)
 from .topic_blocks import is_known, normalize as normalize_topic, section_of
 from problems.ai import core as ai
 from problems.models import (
@@ -226,7 +229,7 @@ def random_problem(request):
 
 
 # ── Список задач ────────────────────────────────────────────────────────────
-def _card(problem, score=None):
+def _card(problem):
     """Одна карточка выдачи.
 
     ⚠️ НОМЕРА ЗАДАЧИ В КАРТОЧКЕ НЕТ (решение владельца 04.09.2026): он
@@ -252,7 +255,9 @@ def _card(problem, score=None):
         'difficulty_stars': range(d),
         'difficulty_empty': range(5 - d),
         'has_solution':     bool(problem.solution)
-                            and not problem.solution_needs_review,
+                            and not problem.solution_needs_review
+                            and not solution_is_statement_copy(problem.statement,
+                                                               problem.solution),
         'source':           refs[0].source.name if refs else '',
         'grade':            refs[0].grade if refs else '',
         'is_test':          is_test,
@@ -261,11 +266,52 @@ def _card(problem, score=None):
         'kind_label':       _kind_label(problem.problem_type) if is_test else '',
         'show_title':       bool(title) and not looks_like_statement_cut(
                                 title, problem.statement),
-        # Число близости показывается ТОЛЬКО при поиске (решение владельца
-        # 09.09.2026) — при пустом запросе сортировка идёт по id, близости
-        # нет вовсе, и `score` здесь всегда None.
-        'score':            score,
+        # Заголовок в строке ленты «Стола» — без обрывка формулы, как у «Похожих».
+        # Процента близости в строке нет (решение владельца 17.09.2026).
+        'title_display':    similar_title(problem) if title else '',
     }
+
+
+def _is_tutor(user):
+    """Репетитор ли (обе системы ролей, `teacher.access.is_tutor`)."""
+    from teacher.access import is_tutor
+    return is_tutor(user)
+
+
+def _cards_with_marks(user, problems):
+    """Карточки строк ленты со статусом ученика и звездой «сохранено» —
+    по одному запросу на страницу строк, а не на строку.
+
+    Репетитору (README §7) вместо статуса — галочка корзины (`teach`) и
+    пометка «в N домашках» (`in_hw`): сколько ЕГО работ уже содержат задачу,
+    тоже одним запросом на страницу строк.
+    """
+    from problems.models import SavedProblem
+    from problems.models_platform import AssignmentItem
+
+    problems = list(problems)
+    ids = [p.pk for p in problems]
+    statuses = progress.statuses_for(user, ids)
+    saved = set()
+    if getattr(user, 'is_authenticated', False) and ids:
+        saved = set(SavedProblem.objects.filter(owner=user, is_deleted=False,
+                                                catalog_problem_id__in=ids)
+                    .values_list('catalog_problem_id', flat=True))
+    teach = _is_tutor(user)
+    in_hw = {}
+    if teach and ids:
+        in_hw = dict(AssignmentItem.objects.filter(assignment__author=user, catalog_problem_id__in=ids)
+                     .values('catalog_problem_id').annotate(n=Count('assignment', distinct=True))
+                     .values_list('catalog_problem_id', 'n'))
+    cards = []
+    for problem in problems:
+        card = _card(problem)
+        card['status'] = statuses.get(problem.pk, '')
+        card['saved'] = problem.pk in saved
+        card['teach'] = teach
+        card['in_hw'] = in_hw.get(problem.pk, 0)
+        cards.append(card)
+    return cards
 
 
 def _kind_label(problem_type):
@@ -275,10 +321,13 @@ def _kind_label(problem_type):
 
 
 def _teacher_assignments(request):
-    """Активные домашки репетитора — для кнопки «в домашку» на карточке."""
-    if not (request.user.is_authenticated
-            and getattr(request.user, 'role', '') == 'teacher'):
-        return '[]'
+    """Активные домашки репетитора — меню «В домашку ▾» корзины (README §7).
+
+    Название, сколько в работе задач (позиций) и кому она выдана: имя
+    занятия, иначе число учеников; некому — строки «кому» нет (правило нуля).
+    """
+    if not _is_tutor(request.user):
+        return []
     from django.utils import timezone
 
     from problems.models import Assignment
@@ -287,10 +336,19 @@ def _teacher_assignments(request):
                  .filter(author=request.user)
                  .filter(Q(deadline__isnull=True)
                          | Q(deadline__gte=timezone.now()))
+                 .select_related('group')
+                 .annotate(n_items=Count('items', distinct=True), n_students=Count('students', distinct=True))
                  .order_by('-id')[:50])
-    # Названия работ печатает репетитор, а уезжают они в <script>:
-    # экранируем `<`, `>`, `&` (см. problems/jsonsafe.py).
-    return dumps_for_script([{'id': a.pk, 'name': a.name} for a in active_qs])
+    rows = []
+    for a in active_qs:
+        if a.group_id:
+            to = a.group.name
+        elif a.n_students:
+            to = '%d %s' % (a.n_students, plural_ru(a.n_students, 'ученик,ученика,учеников'))
+        else:
+            to = ''
+        rows.append({'id': a.pk, 'name': a.name, 'n': a.n_items, 'to': to})
+    return rows
 
 
 def _search_ids(query, limit):
@@ -406,16 +464,12 @@ def _catalog_context(request, missing_id=''):
     active = filters.parse(request.GET)
     query = active['q']
 
-    # ⚠️ ТАБЛИЧНОГО ВИДА БОЛЬШЕ НЕТ (решение владельца 04.09.2026): старые
-    # адреса с `?view=table` открываются строками, а не ошибкой.
-    view_mode = (request.GET.get('view') or 'rows').strip()
-    if view_mode not in ('rows', 'gallery'):
-        view_mode = 'rows'
-
+    # ⚠️ ВИД ОДИН — СТРОКИ. Таблицы нет с 04.09.2026, галереи — с 17.09.2026
+    # (решение владельца: в «Столе» условие целиком показывает сама задача).
+    # Старые адреса с `?view=table` и `?view=gallery` открываются строками и
+    # параметр дальше не несут.
     base = filters.base_queryset('catalog')
     carry = {}
-    if view_mode != 'rows':
-        carry['view'] = view_mode
     qs, fctx = filters.build(base, active, mode='strip', carry=carry)
 
     # Сколько подходит под ФИЛЬТРЫ без запроса — второе число счётчика.
@@ -432,7 +486,6 @@ def _catalog_context(request, missing_id=''):
 
     degraded = False
     searched = bool(query) and not missing_id
-    scores = {}
     relief = None
     capped = False
 
@@ -443,7 +496,7 @@ def _catalog_context(request, missing_id=''):
     smart_search_ms = 0
     if searched:
         search_started = time.perf_counter()
-        ids, scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
+        ids, _scores, degraded = _search_ids(query, SEARCH_CANDIDATES)
         search_seconds = time.perf_counter() - search_started
         # ⚠️ ПОЛУЧАЕМ СНАЧАЛА ОДНИ КЛЮЧИ, А ЗАДАЧИ — ТОЛЬКО НА СТРАНИЦУ.
         # Первый вариант тянул из базы все пятьсот кандидатов со связями
@@ -496,12 +549,16 @@ def _catalog_context(request, missing_id=''):
         page_rows = list(ordered[:shown])
         has_more = total > shown
 
-    cards = [_card(problem, scores.get(problem.pk)) for problem in page_rows]
+    cards = _cards_with_marks(request.user, page_rows)
 
     return {
         'filters':        fctx,
         'cards':          cards,
-        'view_mode':      view_mode,
+        # Статус в строке — только у вошедшего: у гостя колонки нет (README §2).
+        'show_status':    request.user.is_authenticated,
+        # Чипы входа «Тема / Сложность / Задачи и тесты / С решением» рисуют
+        # варианты тех же групп, что окно «Все фильтры»: одно состояние.
+        'entry_groups':   {g['key']: g for g in fctx['groups']},
         'query':          query,
         'searched':       searched,
         'degraded':       degraded,
@@ -521,9 +578,7 @@ def _catalog_context(request, missing_id=''):
         'more_url':       fctx['total_url'] + '&show=%d' % (shown + PAGE_STEP),
         'step':           PAGE_STEP,
         'relief':         relief,
-        'view_urls':      {mode: filters.query(dict(carry, view=mode), active)
-                           for mode in ('rows', 'gallery')},
-        'teacher_assignments_json': _teacher_assignments(request),
+        'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
         # Бегущая подсказка поля: фразы и текст после остановки — из
         # одной константы, партиал общий с главной.
         'catalog_phrases':   CATALOG_PHRASES,
@@ -536,12 +591,37 @@ def _catalog_context(request, missing_id=''):
         # значения (уже списками) и адреса эндпоинтов — по имени, не строкой.
         'filter_state': {
             'active': active,
-            'view': view_mode,
             'urls': {'state': reverse('catalog:api_filter_state'),
                      'tags': reverse('catalog:api_tags'),
                      'page': reverse('catalog:problem_list')},
         },
     }
+
+
+def _entry_context(request, context):
+    """Что добавляет к контексту каталога вид «вход» единого экрана «Стол».
+
+    Заголовок «Это умный каталог.» и крупная шапка — только пока нет ни
+    запроса, ни фильтров (README §2): первый выбор сжимает шапку. «Продолжить»
+    — только на чистом входе: при поиске он уводил бы от найденного.
+    """
+    selected = context['filters']['selected_count']
+    active = context['filters']['active']
+    calm = not context['query'] and not selected
+    extra = {'view': 'entry', 'entry_calm': calm, 'continue_rows': [],
+             # Выбранное на карте = фильтры: подсветка фона и подпись пилюли.
+             'map_selected': {'topics': active['topics'], 'tags': active['tags']},
+             'map_selected_n': len(active['topics']) + len(active['tags'])}
+    if calm:
+        problems = progress.continue_for(request.user, _visible(Problem.objects.all()))
+        statuses = progress.statuses_for(request.user, [p.pk for p in problems])
+        extra['continue_rows'] = [
+            {'problem': p, 'status': statuses.get(p.pk, ''),
+             'title': similar_title(p) if (p.title or '').strip()
+             and not looks_like_statement_cut(p.title, p.statement)
+             else tex_preview(p.statement, 70)}
+            for p in problems]
+    return extra
 
 
 def problem_list(request):
@@ -561,9 +641,10 @@ def problem_list(request):
     if found_id:
         return redirect('catalog:problem_detail', pk=found_id)
     context = _catalog_context(request, missing_id)
+    context.update(_entry_context(request, context))
     visitor, new_visitor = search_log.visitor_for(request)
     context['search_log_id'] = search_log.log_search(request, context, visitor)
-    response = render(request, 'catalog/problem_list.html', context)
+    response = render(request, 'catalog/stol.html', context)
     if new_visitor and context['search_log_id']:
         search_log.remember_visitor(response, visitor)
     response['X-Smart-Search'] = context['smart_search_status']
@@ -757,6 +838,11 @@ def _solution_block(problem, parts):
     """
     answer = (problem.answer or '').strip()
     solution = '' if problem.solution_needs_review else (problem.solution or '').strip()
+    # Аудит P0 «Стола»: пересказ условия в начале срезается, копия условия —
+    # это не решение (данные не трогаем, правило действует при показе).
+    solution = strip_statement_retell(problem.statement, solution)
+    if solution_is_statement_copy(problem.statement, solution):
+        solution = ''
     if solution and (len(solution) < 30 or _norm_answer(solution) == _norm_answer(answer)):
         if not answer:
             answer = solution
@@ -771,35 +857,42 @@ def _solution_block(problem, parts):
             'has_any': bool(answer or solution or part_rows)}
 
 
-def _similar_cards(problem):
-    """Похожие — из кэша M2M, без задач за шлюзами, до четырёх (сетка 2×2)."""
-    rows = (problem.similar_problems
-            .filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
-                    hidden_pending_review=False,
-                    content_status=Problem.ContentStatus.OK)
-            .prefetch_related('topics')[:4])
-    cards = []
-    for s in rows:
-        topics = [t for t in s.topics.all() if is_known(t.name)][:1]
-        title = (s.title or '').strip()
-        d = s.difficulty or 0
-        cards.append({
-            'problem': s,
-            'topic': ({'name': topics[0].name, 'section': section_of(topics[0].name)}
-                      if topics else None),
-            # Заголовок карточки: настоящий заголовок — через `similar_title`
-            # (полировка к бете: обрывок формулы срезается по незакрытому
-            # доллару, валюта «$3» остаётся); заголовок-обрезок условия или
-            # его отсутствие — начало условия без разметки.
-            'title_display': (similar_title(s)
-                              if title and not looks_like_statement_cut(title, s.statement)
-                              else tex_preview(s.statement, 120)),
-            'preview': tex_preview(s.statement, 160),
-            'difficulty': d,
-            'stars': ('★' * d + '☆' * (5 - d)) if d else '',
-            'has_solution': bool(s.solution) and not s.solution_needs_review,
-        })
-    return cards
+#: Строк в ленте «Похожие» и «Мои» рядом с задачей.
+RAIL_MAX = 20
+
+
+def _visible(qs):
+    """Шлюз качества для новых выдач «Стола»: то же, что у страницы задачи."""
+    return qs.filter(status=Problem.Status.PUBLISHED, needs_quality_review=False,
+                     hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
+
+
+def _rail_response(request, problems, current_id=None):
+    """Строки ленты одним ответом: `{rows_html, total}`; статусы — одним запросом."""
+    show_status = request.user.is_authenticated
+    rows = [render_to_string('catalog/stol/_rail_row.html', {
+        'card': card, 'status': card['status'], 'show_status': show_status,
+        'current_id': current_id}, request=request) for card in _cards_with_marks(request.user, problems)]
+    return JsonResponse({'rows_html': ''.join(rows), 'total': len(rows)})
+
+
+def api_rail_similar(request, problem_id):
+    """«Похожие» для ленты рядом с задачей — нынешний кэш M2M, за шлюзом."""
+    problem = _visible_problem(problem_id)
+    rows = (_visible(problem.similar_problems.all())
+            .prefetch_related('topics', 'parts', 'source_references__source')[:RAIL_MAX])
+    return _rail_response(request, rows, current_id=problem.pk)
+
+
+def api_rail_saved(request):
+    """«Мои ★» — сохранённые задачи каталога. Только вход (гостю 401 JSON)."""
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=401)
+    saved = (_visible(Problem.objects.filter(saved_by__owner=request.user,
+                                             saved_by__is_deleted=False))
+             .order_by('-saved_by__created_at').distinct()
+             .prefetch_related('topics', 'parts', 'source_references__source')[:RAIL_MAX])
+    return _rail_response(request, saved)
 
 
 NEEDS_HUMAN_TEXT = ('Модель не ставит балл: ход решения нестандартный. Можно '
@@ -879,6 +972,7 @@ def api_test_check(request, problem_id):
     out = {'correct': correct, 'attempt': attempt}
     if correct:
         testplay.reset_attempts(request.session, problem.pk)
+        progress.note_test_result(request.user, problem, first_try=attempt == 1)
         if request.user.is_authenticated:
             CatalogAttempt.objects.create(
                 user=request.user, problem=problem, text='',
@@ -896,7 +990,27 @@ def api_test_reveal(request, problem_id):
     if error:
         return error
     testplay.reset_attempts(request.session, problem.pk)
+    progress.note_test_revealed(request.user, problem)
     return JsonResponse({'correct_labels': sorted(game['correct'])})
+
+
+@require_POST
+def api_progress(request, problem_id):
+    """«Как прошло?» и следы помощи (каталог «Стол», ADR 0119). Только вход.
+
+    Тело JSON: `status` (`self` | `hint` | `failed` | `null`), `hints_opened`,
+    `solution_viewed`. Гостю 401 JSON; задача за шлюзом — 404; «решил сам»
+    после открытого решения — 400 с текстом. Правила — `catalog/progress.py`.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=401)
+    problem = _visible_problem(problem_id)
+    try:
+        data = _json_body(request)
+        row = progress.update(request.user, problem, data if isinstance(data, dict) else {})
+    except progress.ProgressError as exc:
+        return JsonResponse({'error': 'progress', 'message': str(exc)}, status=400)
+    return JsonResponse(progress.as_json(row))
 
 
 @require_POST
@@ -1134,6 +1248,15 @@ def _ordered_hints(problem):
     return general + by_part
 
 
+def _hint_view(n, hint, total):
+    """Подсказка для ленты помощи — одна форма у ответа API и у перезагрузки."""
+    return {
+        'n': n, 'total': total, 'text': hint.text,
+        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
+        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
+    }
+
+
 def api_hint(request, problem_id, n):
     """Подсказка номер `n` (с единицы) к видимой задаче; за пределом — 404.
 
@@ -1144,33 +1267,52 @@ def api_hint(request, problem_id, n):
     hints = _ordered_hints(problem)
     if n < 1 or n > len(hints):
         raise Http404('такой подсказки нет')
-    hint = hints[n - 1]
-    return JsonResponse({
-        'n': n, 'total': len(hints), 'text': hint.text,
-        'ai': hint.generated_by_ai, 'reviewed': hint.reviewed,
-        'part': (hint.part.label or '').strip().rstrip(').') if hint.part_id else '',
-    })
+    progress.note_hint(request.user, problem, n)
+    return JsonResponse(_hint_view(n, hints[n - 1], len(hints)))
 
 
-def problem_detail(request, pk):
-    """Страница задачи (редизайн 04.09.2026, мокап `problem_page_mockup.html`).
+def _neighbours(request, problem, similar_rows):
+    """Позиция задачи и соседи по выдаче — для строки «3 из 506» и «Дальше».
 
-    Полоса 1120 px с постоянной карточкой справа (ADR 0078). Заголовок —
-    только если это название, а не обрезок условия; номер задачи нигде,
-    кроме адреса. Облачка свойств ведут в каталог с этим фильтром. Всё на
-    экране — из данных: нет тегов — нет ряда, нет сложности — нет звёзд,
-    нет решения и ответа — нет кнопки (правило нуля).
+    Выдача без запроса — это фильтры адреса, упорядоченные по `-id`, как у
+    входа: считается двумя запросами без поиска. С запросом `q` порядок задаёт
+    смысловой поиск (секунды), и повторять его ради соседей нельзя — тогда
+    соседей и позицию считает сценарий по своему списку строк. Без выдачи
+    (прямая ссылка без фильтров) «следующая» — первая похожая.
     """
-    problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
-                                needs_quality_review=False,
-                                hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
+    active = filters.parse(request.GET)
+    if active['q']:
+        return {'position': None, 'total': None, 'prev': None, 'next': None, 'from': 'client'}
+    if not filters.is_empty(active):
+        qs = filters.apply(filters.base_queryset('catalog'), active).distinct()
+        if qs.filter(pk=problem.pk).exists():
+            before = qs.filter(pk__gt=problem.pk)
+            prev = before.order_by('id').values_list('id', flat=True).first()
+            nxt = qs.filter(pk__lt=problem.pk).order_by('-id').values_list('id', flat=True).first()
+            return {'position': before.count() + 1, 'total': qs.count(),
+                    'prev': prev, 'next': nxt, 'from': 'filters'}
+    nxt = similar_rows[0].pk if similar_rows else None
+    return {'position': None, 'total': None, 'prev': None, 'next': nxt, 'from': 'similar'}
 
-    # Учебное событие: задачу открыли. Запись неблокирующая — см.
-    # problems/event_log.py (её падение не должно ронять страницу).
-    from problems.event_log import log_problem_event
-    log_problem_event('catalog', 'opened', request.user, problem,
-                      request=request)
 
+def _neighbour_titles(meta):
+    """Названия соседей для кнопок «← предыдущая / следующая →» (README §3)."""
+    ids = [pk for pk in (meta['prev'], meta['next']) if pk]
+    titles = {}
+    for p in _visible(Problem.objects.filter(pk__in=ids)):
+        card = _card(p)
+        titles[p.pk] = card['title_display'] if card['show_title'] else card['preview']
+    return {'prev_title': titles.get(meta['prev'], ''), 'next_title': titles.get(meta['next'], '')}
+
+
+def _problem_context(request, problem):
+    """Всё, что рисуют партиалы задачи «Стола» (`stol/_stol_center.html`,
+    `stol/_stol_help.html`) — и при прямой ссылке, и в ответе `?pane=1`.
+
+    Заголовок — только если это название, а не обрезок условия; номер задачи
+    нигде, кроме адреса. Всё на экране — из данных (правило нуля): нет тегов —
+    нет «Теги · N», нет сложности — нет звёзд, нет решения и ответа — нет кнопки.
+    """
     topics = [t for t in problem.topics.all() if is_known(t.name)]
     tags = list(problem.tags.all())
     sources = list(problem.source_references.select_related('source').all())
@@ -1199,35 +1341,63 @@ def problem_detail(request, pk):
     hint_total = len(_ordered_hints(problem))
     game = testplay.game_of(problem, parts)
     test = _test_context(problem, game, topics) if game else None
-    pd_config = {'problemId': problem.pk}
+    cfg = {'problemId': problem.pk}
     if test:
-        pd_config['test'] = {
+        cfg['test'] = {
             'checkUrl':  reverse('catalog:api_test_check', args=[problem.pk]),
             'revealUrl': reverse('catalog:api_test_reveal', args=[problem.pk]),
             'multi':     game['multi'],
             'labels':    [opt['label'] for opt in game['options']],
         }
     if hint_total:
-        pd_config['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
-        pd_config['hintTotal'] = hint_total
+        cfg['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
+        cfg['hintTotal'] = hint_total
     if ai_available:
-        pd_config['attemptUrl'] = reverse('catalog:api_attempt')
+        cfg['attemptUrl'] = reverse('catalog:api_attempt')
         if request.user.is_authenticated:
             # Файлы принимаются только от вошедших: гостю адрес не нужен.
-            pd_config['fileUrl'] = reverse('catalog:api_attempt_file')
-            pd_config['maxFiles'] = attachments.MAX_FILES
+            cfg['fileUrl'] = reverse('catalog:api_attempt_file')
+            cfg['maxFiles'] = attachments.MAX_FILES
     # Чат живёт на своём поставщике (решение 15.09.2026): его карточка и кнопки,
     # которые в него пишут, зависят от чата, а не от модели проверки.
     chat_available = chat.is_available()
     if chat_available:
-        pd_config['chatUrl'] = reverse('catalog:api_chat')
-        pd_config['chatCheckEmpty'] = chat.CHECK_EMPTY_TEXT
+        cfg['chatUrl'] = reverse('catalog:api_chat')
+        cfg['chatCheckEmpty'] = chat.CHECK_EMPTY_TEXT
         if request.user.is_authenticated:
-            pd_config['chatUploadUrl'] = reverse('catalog:api_chat_upload')
+            cfg['chatUploadUrl'] = reverse('catalog:api_chat_upload')
+            cfg['chatHistoryUrl'] = reverse('catalog:api_chat_history', args=[problem.pk])
 
-    from urllib.parse import urlencode
-    context = {
+    # Лента «Похожие» рисуется сервером — прямая ссылка работает без скрипта.
+    similar_rows = list(_visible(problem.similar_problems.all())
+                        .prefetch_related('topics', 'parts', 'source_references__source')
+                        [:RAIL_MAX])
+    my_progress = None
+    if request.user.is_authenticated:
+        from problems.models_platform import ProblemProgress
+        my_progress = ProblemProgress.objects.filter(user=request.user, problem=problem).first()
+        cfg['progressUrl'] = reverse('catalog:api_progress', args=[problem.pk])
+    # «Как прошло?» — не у тестов (статус ставит сам тест) и не у учителя.
+    # У репетитора блока «Как прошло?» нет (README §7).
+    show_how = request.user.is_authenticated and not game and not _is_tutor(request.user)
+    meta = _neighbours(request, problem, similar_rows)
+    meta.update(_neighbour_titles(meta))
+
+    # Панель помощи (README §4) переживает перезагрузку: открытые подсказки и
+    # факт открытого решения — из прогресса ученика, разговор — из `ChatTurn`.
+    hints = _ordered_hints(problem) if hint_total else []
+    opened = min(my_progress.hints_opened, hint_total) if my_progress else 0
+    opened_hints = [_hint_view(n, hint, hint_total) for n, hint in enumerate(hints[:opened], 1)]
+    sol = _solution_block(problem, parts)
+    # Ступень «Ответ по одному пункту» — только при ответах в данных (решение 17.09).
+    part_answers = ([{'label': part.label, 'answer': part.answer} for part in parts
+                     if (part.answer or '').strip()] if not game else [])
+
+    return {
         'problem':      problem,
+        'similar_cards': _cards_with_marks(request.user, similar_rows),
+        'my_progress':  my_progress,
+        'show_how':     show_how,
         'ai_available': ai_available,
         'chat_available': chat_available,
         'hint_total':   hint_total,
@@ -1236,24 +1406,67 @@ def problem_detail(request, pk):
         'last_attempt': last_attempt,
         'last_chk':     (_attempt_view(last_attempt, can_chat=chat_available)
                          if last_attempt else None),
-        'pd_config':    pd_config,
+        'task_cfg':     cfg,
         'parts':        parts,
         'is_test':      problem_types.is_test(problem.problem_type),
         'heading':      heading,
         'show_title':   show_title,
         'clouds_1':     row1,
+        'tags_total':   sum(1 for c in row1 if c['kind'] == 'tag'),
         'clouds_2':     row2,
-        'sol':          _solution_block(problem, parts),
-        'similar':      _similar_cards(problem),
-        # «Все похожие» — поиск по смыслу с началом условия этой задачи.
-        'similar_url':  reverse('catalog:problem_list') + '?' + urlencode(
-            {'q': problem.statement[:200]}),
+        'sol':          sol,
         'saved':        saved,
-        'teacher_assignments_json': _teacher_assignments(request),
-        # Как эту задачу решают в игре — понадобится тесту (этап 7).
+        'meta':         meta,
+        'opened_hints': opened_hints,
+        'hints_left':   hint_total - opened,
+        'next_hint':    opened + 1,
+        'solution_viewed': bool(my_progress and my_progress.solution_viewed and sol['has_any']),
+        'part_answers': part_answers,
+        # Лестница пуста, только пока человек ничем не пользовался.
+        'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt),
+        'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
+        # Как эту задачу решают в игре (строка под условием и в тесте).
         'game_stat':    _game_stat(problem.pk),
     }
-    return render(request, 'catalog/problem_detail.html', context)
+
+
+def problem_detail(request, pk):
+    """Задача на экране «Стол»: прямая ссылка — весь экран, `?pane=1` — панель.
+
+    Прямая ссылка рисует `catalog/stol.html` в виде `stol` целиком на сервере
+    (работает без скрипта). `?pane=1` отдаёт JSON с теми же партиалами центра и
+    помощи — им сценарий `stol.js` подменяет задачу без перезагрузки (решение
+    владельца 18.09.2026: клик со входа и любая смена задачи — на месте).
+    Шлюз качества один на оба ответа: скрытая задача — 404.
+    """
+    problem = get_object_or_404(Problem, pk=pk, status=Problem.Status.PUBLISHED,
+                                needs_quality_review=False,
+                                hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
+
+    # Учебное событие и прогресс: задачу открыли — и прямой ссылкой, и на месте.
+    # Записи неблокирующие (problems/event_log.py, catalog/progress.py).
+    from problems.event_log import log_problem_event
+    log_problem_event('catalog', 'opened', request.user, problem, request=request)
+    progress.note_opened(request.user, problem)
+
+    context = _problem_context(request, problem)
+    if request.GET.get('pane') == '1':
+        meta = context['meta']
+        return JsonResponse({
+            'id': problem.pk,
+            'title': context['heading'],
+            'url': reverse('catalog:problem_detail', args=[problem.pk]),
+            'center_html': render_to_string('catalog/stol/_stol_center.html', context, request=request),
+            'help_html': render_to_string('catalog/stol/_stol_help.html', context, request=request),
+            'similar_html': render_to_string('catalog/stol/_stol_similar_rows.html', context, request=request),
+            'meta': {'position': meta['position'], 'total': meta['total'],
+                     'prev': meta['prev'], 'next': meta['next'],
+                     'saved': context['saved'],
+                     'status': context['my_progress'].status if context['my_progress'] else '',
+                     'is_test': bool(context['test'])},
+        })
+    context['view'] = 'stol'
+    return render(request, 'catalog/stol.html', context)
 
 
 def _test_context(problem, game, topics):
@@ -1275,7 +1488,9 @@ def _test_context(problem, game, topics):
         'rule':     game['rule'],
         'options':  game['options'],
         'more_url': more_url,
-        'expl':     (problem.solution or '').strip(),
+        # «Почему так» — без разбалловки жюри и без повтора верного варианта
+        # (README §5; оба среза только при показе, данные не трогаем).
+        'expl':     strip_correct_repeat(strip_score_tails(problem.solution), game),
         'stat':     _game_stat(problem.pk),
     }
 
@@ -1310,6 +1525,35 @@ def collection_new(request):
         col = Collection.objects.create(name=name, template_type=template_type)
         return redirect('catalog:collection_detail', token=col.token)
     return render(request, 'catalog/collection_new.html', {})
+
+
+@require_POST
+def collection_from_basket(request):
+    """Корзина репетитора → подборка → существующий конструктор (README §7).
+
+    Только репетитору; остальным адреса «нет» (404). Задачи — в порядке
+    корзины, за шлюзом качества; не прошедшие называются в `refused`. Сборку
+    PDF здесь не трогаем: конструктор тот же (карточка Notion …8154).
+    """
+    if not _is_tutor(request.user):
+        raise Http404('Нет такой страницы')
+    try:
+        raw = json.loads(request.body).get('problem_ids')
+    except (ValueError, AttributeError):
+        raw = None
+    from teacher.views import BASKET_MAX
+    if not isinstance(raw, list) or not raw or len(raw) > BASKET_MAX:
+        return JsonResponse({'error': 'problem_ids required'}, status=400)
+    wanted = list(dict.fromkeys(int(i) for i in raw if str(i).isdigit()))
+    visible = set(_visible(Problem.objects.filter(pk__in=wanted)).values_list('pk', flat=True))
+    order = [pk for pk in wanted if pk in visible]
+    if not order:
+        return JsonResponse({'error': 'empty', 'refused': wanted}, status=400)
+    collection = Collection.objects.create(name='Из корзины каталога', author=request.user,
+                                           template_type=Collection.HOMEWORK, problem_order=order)
+    collection.problems.add(*order)
+    return JsonResponse({'ok': True, 'url': reverse('catalog:collection_detail', args=[collection.token]),
+                         'refused': [pk for pk in wanted if pk not in visible]})
 
 
 def collection_detail(request, token):
@@ -1632,9 +1876,8 @@ def _map_stats():
     return _TOPIC_MAP_CACHE['stats']
 
 
-def topic_map(request):
-    """Страница карты. Разметка — самостоятельный блок: позже он переедет
-    во всплывающее окно переработанного поиска без переделки."""
+def _map_context():
+    """Дерево разделов и числа шапки карты тем — для партиала `_stol_map.html`."""
     text, _etag = _topic_map_payload()
     data = json.loads(text)
     themes = [n for n in data['nodes'] if n['k'] == 'theme']
@@ -1671,11 +1914,30 @@ def topic_map(request):
             })
         sections.append({'key': g['k'], 'label': g['l'], 'themes': rows})
 
-    return render(request, 'catalog/topic_map.html', {
-        'theme_count': len(themes),
-        'tag_count': len(tags),
-        'sections': sections,
-    })
+    return {'theme_count': len(themes), 'tag_count': len(tags), 'sections': sections}
+
+
+def topic_map(request):
+    """`/catalog/map/` — «Стол» сразу в режиме карты (README §1, §6).
+
+    Под картой лежит вход с теми же фильтрами: любой выход с карты
+    возвращает на него без перезагрузки. `?pane=1` отдаёт одну разметку
+    карты — её берёт `stol_map.js`, когда карту открывают со входа.
+    Выбор на карте — фильтр каталога, поэтому ссылки выхода несут фильтры
+    адреса (`filters_query`).
+    """
+    active = filters.parse(request.GET)
+    map_ctx = _map_context()
+    map_ctx['filters_query'] = filters.query({}, active)[1:]
+    if request.GET.get('pane') == '1':
+        map_ctx.update({'map_selected': {'topics': active['topics'], 'tags': active['tags']},
+                        'map_selected_n': len(active['topics']) + len(active['tags'])})
+        return JsonResponse({'html': render_to_string('catalog/stol/_stol_map.html', map_ctx, request=request)})
+    context = _catalog_context(request, None)
+    context.update(_entry_context(request, context))
+    context.update(map_ctx)
+    context['view'] = 'map'
+    return render(request, 'catalog/stol.html', context)
 
 
 def topic_map_preview_demo(request):
@@ -1690,14 +1952,19 @@ def topic_map_preview_demo(request):
 
 
 def topic_map_data(request):
-    """JSON карты. Кэш на сутки и ETag: файл меняется только с деплоем."""
-    text, etag = _topic_map_payload()
+    """JSON карты с живыми числами и ключами справочника (`map_numbers`).
+
+    Числа меняются вместе с банком, поэтому кэш браузера — те же 10 минут,
+    что у сервера, а не сутки, как было у статичного файла; ETag — от текста
+    с числами.
+    """
+    text, etag = map_numbers.live_payload(*_topic_map_payload())
     if request.headers.get('If-None-Match') == etag:
         response = HttpResponse(status=304)
     else:
         response = HttpResponse(text, content_type='application/json')
     response['ETag'] = etag
-    response['Cache-Control'] = 'public, max-age=86400'
+    response['Cache-Control'] = 'public, max-age=%d' % map_numbers.CACHE_SECONDS
     return response
 
 

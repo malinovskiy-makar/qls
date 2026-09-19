@@ -1,9 +1,14 @@
 """Редизайн каталога, этап 1: поле поиска, полоса выбранного, карточки.
 
 Промпт владельца 04.09.2026 и решения Notion (04.09): поле — единственный
-герой, бегущая подсказка общая с главной, карта в высоту поля с подписью
-из данных, полоса — только выбранное, карточки без номера и без таблицы,
-превью без сирот, заголовок-обрезок не показывается.
+герой, бегущая подсказка общая с главной, подпись карты из данных, полоса —
+только выбранное, карточки без номера и без таблицы, превью без сирот,
+заголовок-обрезок не показывается.
+
+18.09.2026 (вход «Стола», README §2): карточки стали строками общего
+партиала `stol/_rail_row.html`, галерея и процент близости убраны, тема,
+сложность, вид и «с решением» показываются самими чипами-кнопками — факты
+тестов те же, разметка новая.
 """
 import json
 import os
@@ -36,9 +41,8 @@ def _card_html(html, problem):
     """Разметка одной карточки по адресу задачи."""
     href = reverse('catalog:problem_detail', args=[problem.pk])
     pos = html.index('href="%s"' % href)
-    # Без закрывающей кавычки: у карточек выдачи поиска есть второй класс
-    # (`ct-appear`, появление лесенкой, 15.09.2026).
-    start = html.rindex('<a class="ct-card', 0, pos)
+    # Без закрывающей кавычки: у открытой задачи есть второй класс (`is-current`).
+    start = html.rindex('<a class="rail-row', 0, pos)
     return html[start:html.index('</a>', pos)]
 
 
@@ -112,18 +116,18 @@ class MapCaptionTests(TestCase):
         fake = (json.dumps({'nodes': nodes}), '"fake-etag"')
         with mock.patch('catalog.views._topic_map_payload', return_value=fake):
             html = self.client.get(CATALOG_URL).content.decode()
-        self.assertIn('<b>Карта тем</b> · 3&nbsp;темы, 5&nbsp;тегов', html)
+        self.assertIn('<span id="se-map-l">Карта тем: 3&nbsp;темы, 5&nbsp;тегов', html)
 
     def test_caption_matches_the_real_map_file(self):
         data = json.loads(JSON_PATH.read_text(encoding='utf-8'))
         themes = sum(1 for n in data['nodes'] if n['k'] == 'theme')
         tags = len(data['nodes']) - themes
         html = self.client.get(CATALOG_URL).content.decode()
-        self.assertIn('<b>Карта тем</b> · %d&nbsp;' % themes, html)
+        self.assertIn('Карта тем: %d&nbsp;' % themes, html)
         self.assertIn(', %d&nbsp;' % tags, html)
 
     def test_no_literal_caption_left_in_template(self):
-        src = (BASE / 'catalog/templates/catalog/problem_list.html').read_text(encoding='utf-8')
+        src = (BASE / 'catalog/templates/catalog/stol/_stol_entry.html').read_text(encoding='utf-8')
         self.assertNotIn('29 тем', src)
         self.assertNotIn('343 тега', src)
 
@@ -146,7 +150,7 @@ class StripTests(TestCase):
         self.assertIn('id="ct-all-open"', html)
         self.assertNotIn('data-chip=', html)
         # «Сбросить» есть в разметке для скрипта, но скрыта, пока нечего снимать.
-        self.assertIn('data-clear="all" hidden>Сбросить</a>', html)
+        self.assertIn('id="strip-reset" href="?" data-clear="all" hidden>Сбросить</a>', html)
         self.assertNotIn('<span class="n">', html)
         # Старые пять чипов-групп каталог больше не подключает.
         self.assertNotIn('class="fl-chip', html)
@@ -158,34 +162,40 @@ class StripTests(TestCase):
             'type': 'тест: один ответ', 'source': self.source.pk,
         })
         html = resp.content.decode()
-        kinds = re.findall(r'data-chip="(\w+)"', html)
-        self.assertEqual(kinds, ['topic', 'difficulty', 'kind', 'solution', 'source'])
-        labels = re.findall(r'data-chip="\w+"[^>]*>([^<]+)<a', html)
-        self.assertEqual(labels, ['Монополия и ценовая дискриминация', '★ 4',
-                                  'Тест · один верный', 'С решением ✓', 'Сборник'])
+        # Модуль по-прежнему собирает все пять чипов в порядке владельца.
+        chips = resp.context['filters']['chips']
+        self.assertEqual([c['kind'] for c in chips],
+                         ['topic', 'difficulty', 'kind', 'solution', 'source'])
+        self.assertEqual([c['label'] for c in chips],
+                         ['Монополия и ценовая дискриминация', '★ 4',
+                          'Тест · один верный', 'С решением ✓', 'Сборник'])
+        # Ряд под чипами — только то, у чего своего чипа-кнопки нет (README §2).
+        self.assertEqual(re.findall(r'data-chip="(\w+)"', html), ['source'])
+        # Тема, сложность, вид и решение отмечены в самих чипах-кнопках; чип
+        # темы окрашен блоком: монополия — «Микро» (пять цветов, решение 05.09).
+        self.assertIn('data-topic="%d" data-section="micro" aria-pressed="true"' % self.mon.pk, html)
+        self.assertIn('data-diff="4" aria-pressed="true"', html)
+        self.assertIn('data-kind="test" aria-pressed="true"', html)
+        self.assertIn('id="se-sol" aria-pressed="true"', html)
         self.assertIn('<span class="n">5</span>', html)
-        self.assertIn('class="strip-reset" id="strip-reset" href=', html)
+        self.assertIn('id="strip-reset" href=', html)
         self.assertNotIn('data-clear="all" hidden>', html)
-        # Чип темы окрашен блоком: монополия — «Микро» (пять цветов, решение 05.09).
-        self.assertIn('class="chip chip--g" style="--gc: var(--map-g-micro)"', html)
         self.assertEqual(len(resp.context['cards']), 1)
 
     def test_chip_cross_removes_only_its_own_filter(self):
-        html = self.client.get(CATALOG_URL, {'topic': self.mon.pk,
-                                             'difficulty': 4}).content.decode()
+        html = self.client.get(CATALOG_URL, {'topic': self.mon.pk, 'difficulty': 4,
+                                             'source': self.source.pk}).content.decode()
         hrefs = dict(re.findall(r'href="([^"]+)" data-remove="(\w+):', html))
         by_kind = {kind: href for href, kind in hrefs.items()}
-        self.assertNotIn('topic=', by_kind['topic'])
-        self.assertIn('difficulty=4', by_kind['topic'])
-        self.assertNotIn('difficulty=', by_kind['difficulty'])
-        self.assertIn('topic=%d' % self.mon.pk, by_kind['difficulty'])
+        self.assertNotIn('source=', by_kind['source'])
+        self.assertIn('difficulty=4', by_kind['source'])
+        self.assertIn('topic=%d' % self.mon.pk, by_kind['source'])
 
     def test_active_source_keeps_its_chip_even_at_zero_count(self):
         """Источник выбран, под остальными фильтрами у него ноль — чип есть."""
         html = self.client.get(CATALOG_URL, {'source': self.source.pk,
                                              'difficulty': 2}).content.decode()
-        self.assertEqual(re.findall(r'data-chip="(\w+)"', html),
-                         ['difficulty', 'source'])
+        self.assertEqual(re.findall(r'data-chip="(\w+)"', html), ['source'])
         self.assertIn('data-chip="source">Сборник<a', html)
         self.assertIn('<span class="n">2</span>', html)
 
@@ -234,14 +244,14 @@ class CardTests(TestCase):
         self.assertNotIn('ct-card-id', html)
         self.assertNotIn('№', results)
         self.assertNotIn('>Таблица<', html)
-        self.assertIn('>Строки<', html)
-        self.assertIn('>Галерея<', html)
+        # Переключателя видов нет вовсе: галерея убрана (решение 17.09.2026).
+        self.assertNotIn('>Галерея<', html)
 
     def test_table_address_falls_back_to_rows(self):
         resp = self.client.get(CATALOG_URL, {'view': 'table'})
         self.assertEqual(resp.status_code, 200)
-        self.assertEqual(resp.context['view_mode'], 'rows')
         self.assertNotIn('<table', resp.content.decode())
+        self.assertIn('class="rail rail--wide"', resp.content.decode())
 
     def test_preview_keeps_formula_text_without_orphans(self):
         cards = {c['problem'].pk: c for c in self.client.get(CATALOG_URL).context['cards']}
@@ -256,41 +266,40 @@ class CardTests(TestCase):
         self.assertFalse(cards[self.p_cut.pk]['show_title'])
         self.assertTrue(cards[self.p_named.pk]['show_title'])
         html = self.client.get(CATALOG_URL).content.decode()
-        self.assertNotIn('<div class="ct-card-title">%s</div>' % CUT_TITLE, html)
-        self.assertIn('<div class="ct-card-title">Вмешательство — 5</div>', html)
+        self.assertNotIn('<span class="rail-title">%s</span>' % CUT_TITLE, html)
+        self.assertIn('<span class="rail-title">Вмешательство — 5</span>', html)
 
     def test_stars_only_when_difficulty_is_set(self):
         html = self.client.get(CATALOG_URL).content.decode()
         self.assertNotIn('☆', _card_html(html, self.p_cut))
-        self.assertNotIn('ct-stars', _card_html(html, self.p_cut))
-        self.assertIn('★★★★☆', _card_html(html, self.p_named))
+        self.assertNotIn('rail-stars', _card_html(html, self.p_cut))
+        self.assertIn('★★★★<span class="rail-star-off">☆</span>', _card_html(html, self.p_named))
 
     def test_topic_chip_only_when_there_is_a_topic(self):
         html = self.client.get(CATALOG_URL).content.decode()
-        self.assertNotIn('tchip', _card_html(html, self.p_test))
-        self.assertIn('<span class="tchip" style="--gc: var(--map-g-micro)">'
-                      'Монополия и ценовая дискриминация</span>',
+        self.assertNotIn('rail-topic', _card_html(html, self.p_test))
+        self.assertIn('<span class="rail-topic" style="--gc: var(--map-g-micro)"><span class="rail-dot">'
+                      '</span><span class="rail-topic-l">Монополия и ценовая дискриминация</span>',
                       _card_html(html, self.p_named))
 
     def test_test_format_label(self):
         html = self.client.get(CATALOG_URL).content.decode()
-        self.assertIn('<span class="ct-kind">тест · выбор всех верных</span>',
-                      _card_html(html, self.p_test))
-        self.assertNotIn('ct-kind', _card_html(html, self.p_test_plain))
-        self.assertNotIn('ct-kind', _card_html(html, self.p_named))
+        self.assertIn('<span class="rail-mark">тест</span>', _card_html(html, self.p_test))
+        self.assertNotIn('>тест<', _card_html(html, self.p_test_plain))
+        self.assertIn('rail-mark--sol', _card_html(html, self.p_named))
 
-    def test_gallery_is_the_same_card_without_duplicate_title(self):
+    def test_gallery_address_opens_rows_without_duplicate_title(self):
         html = self.client.get(CATALOG_URL, {'view': 'gallery'}).content.decode()
         results = _results_section(html)
-        self.assertIn('class="ct-gallery"', results)
+        self.assertNotIn('ct-gallery', results)
         self.assertEqual(results.count('Вмешательство — 5'), 1)
         self.assertNotIn('ct-card-id', results)
 
 
-# ── 1.4 Число близости на карточке (09.09.2026, переход на v2_focus_repeat) ─
+# ── 1.4 Порядок поисковой выдачи (09.09.2026); процента близости нет (17.09.2026) ─
 class ScoreTests(TestCase):
-    """Число близости показывается ТОЛЬКО у поисковой выдачи и в порядке
-    убывания косинуса — иначе непонятно, по чему отсортирован список."""
+    """Поисковая выдача идёт по убыванию близости, а самого числа на строке
+    нет: процент убран решением владельца 17.09.2026 (README §2)."""
 
     @classmethod
     def setUpTestData(cls):
@@ -303,18 +312,17 @@ class ScoreTests(TestCase):
         """[(problem, score), ...] → форма ответа catalog.semantic.search."""
         return [{'problem': p, 'score': s} for p, s in pairs]
 
-    def test_процент_показывается_при_поиске(self):
+    def test_процента_нет_и_при_поиске(self):
         with mock.patch('catalog.semantic.search',
                         return_value=self._hits((self.top, 0.73))):
             html = self.client.get(CATALOG_URL, {'q': 'эластичность'}).content.decode()
         card = _card_html(html, self.top)
-        self.assertIn('ct-score', card)
-        self.assertIn('73 %', card)
+        self.assertNotIn('73', card)
+        self.assertNotIn('%', card)
 
     def test_процент_не_показывается_без_запроса(self):
         html = self.client.get(CATALOG_URL).content.decode()
         card = _card_html(html, self.top)
-        self.assertNotIn('ct-score', card)
         self.assertNotIn(' %', card)
 
     def test_выдача_упорядочена_по_убыванию_близости(self):
@@ -324,9 +332,7 @@ class ScoreTests(TestCase):
             resp = self.client.get(CATALOG_URL, {'q': 'эластичность'})
         cards = resp.context['cards']
         self.assertEqual([c['problem'].pk for c in cards],
-                         [self.top.pk, self.mid.pk, self.low.pk])
-        scores = [c['score'] for c in cards]
-        self.assertEqual(scores, sorted(scores, reverse=True),
+                         [self.top.pk, self.mid.pk, self.low.pk],
                          'Задача с большим косинусом обязана стоять выше.')
 
 

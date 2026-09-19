@@ -7,7 +7,7 @@ HTML-фрагмент на выходе. Ничего не пишет в баз�
 
 ⚠️ Легаси (``content_format='plain'``, все 31 694 сегодняшних задачи) через
 этот модуль НЕ проходит вообще — шаблон выбирает ветку по полю, см.
-``catalog/templates/catalog/problem_detail.html``.
+``catalog/templates/catalog/_math_text.html``.
 
 ## Почему это вообще осторожно писать
 

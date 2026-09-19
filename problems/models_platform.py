@@ -1023,6 +1023,43 @@ class SavedProblem(models.Model):
         return problem.title or f'Задача #{problem.pk}'
 
 
+
+class ProblemProgress(models.Model):
+    """Как прошла задача у ученика (каталог «Стол», 18.09.2026, ADR 0119).
+
+    Статус в строке ленты и «Как прошло?» под условием. Одна строка на пару
+    (пользователь, задача). Правила — в `catalog/progress.py`: открытие
+    вошедшим заводит `opened`; «решил сам» после открытого решения
+    недоступно; тест ставит статус сам по попыткам.
+    """
+
+    class Status(models.TextChoices):
+        OPENED = 'opened', 'Открывал'
+        SOLVED_SELF = 'solved_self', 'Решил сам'
+        SOLVED_HINT = 'solved_hint', 'С подсказкой'
+        FAILED = 'failed', 'Не получилось'
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='problem_progress', verbose_name='Ученик')
+    problem = models.ForeignKey(
+        'problems.Problem', on_delete=models.CASCADE,
+        related_name='progress', verbose_name='Задача')
+    status = models.CharField('Как прошло', max_length=16, choices=Status.choices,
+                              default=Status.OPENED)
+    hints_opened = models.PositiveSmallIntegerField('Открыто подсказок', default=0)
+    solution_viewed = models.BooleanField('Смотрел решение', default=False)
+    updated_at = models.DateTimeField('Изменено', auto_now=True, db_index=True)
+
+    class Meta:
+        verbose_name = 'Прогресс по задаче'
+        verbose_name_plural = 'Прогресс по задачам'
+        constraints = [models.UniqueConstraint(fields=['user', 'problem'],
+                                               name='uniq_progress_user_problem')]
+
+    def __str__(self):
+        return '%s · %s' % (self.problem_id, self.get_status_display())
+
 class SavedGraph(models.Model):
     """График, сохранённый пользователем из калькулятора.
 

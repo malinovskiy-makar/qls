@@ -207,6 +207,7 @@ class CatalogDifficultyTests(TestCase):
     """
 
     def test_difficulty_column_is_centred(self):
-        page = read('catalog', 'templates', 'catalog', 'problem_list.html')
+        # С S7 «Стола» (19.09.2026): стили каталога — `stol.css`.
+        page = read('catalog', 'static', 'catalog', 'css', 'stol.css')
         self.assertNotIn('.ct-table', page,
                          'таблица вернулась — верните проверку центровки')

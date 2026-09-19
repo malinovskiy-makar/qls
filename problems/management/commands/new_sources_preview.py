@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 r"""HTML-предпросмотр трёх новых источников для глазами владельца.
 
-Показ дословно повторяет боевой путь `catalog/problem_detail.html`:
+Показ дословно повторяет боевой путь `catalog/_math_text.html`:
 
     markdown -> render_markdown | render_figures
     plain    -> linebreaksbr

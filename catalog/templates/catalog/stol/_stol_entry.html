@@ -1,0 +1,166 @@
+{% load ru catalog_filters %}{% comment %}
+ВХОД «СТОЛА» (вариант E3, README §2 и §6-фон).
+
+Сверху вниз: заголовок (только без запроса и фильтров) → карточка поиска с
+чипами → пилюля «Карта тем» → «Продолжить» и «Случайная задача» → широкая
+лента. За шапкой — декоративная карта тем (`topic_map_preview.js` в режиме
+`inert`): мышь не слушает, выбранные темы и теги на ней подсвечены.
+
+⚠️ ВЫПАДАШКИ ЧИПОВ — ТЕ ЖЕ ВАРИАНТЫ, ЧТО В ОКНЕ «ВСЕ ФИЛЬТРЫ»: атрибуты
+`data-topic` / `data-diff` / `data-kind`, числа `data-count`. Скрипт окна
+(`catalog_filters.js`) ловит их во всём документе, поэтому чипы и окно
+меняют одно состояние, а числа приходят одним ответом `api_filter_state`.
+
+⚠️ ПРАВИЛО НУЛЯ: пилюля карты считает темы и теги из данных карты, чип
+группы рисуется только при вариантах в корпусе, «Продолжить» — только при
+строках. Слов-обещаний нет (`test_no_slop.py`).
+{% endcomment %}
+<div class="stol-entry{% if entry_calm %} is-calm{% endif %}" id="stol-entry">
+  <div class="stol-bg" id="stol-bg" aria-hidden="true"
+       data-map-url="{% url 'catalog:topic_map_data' %}"></div>
+  {{ map_selected|json_script:"stol-map-selected" }}
+
+  <div class="se-col">
+    <div class="se-head">
+      <h1 class="se-title">Это умный каталог.</h1>
+    </div>
+
+    <section class="se-search" aria-label="Поиск задач">
+      <form class="ask" method="get" action="{% url 'catalog:problem_list' %}" id="ct-ask-form">
+        {% comment %}
+        ⚠️ ПОЛЕ МНОГОСТРОЧНОЕ: поиск ждёт ОПИСАНИЕ задачи, а не слово. Enter —
+        найти, Shift+Enter — перенос. Активные фильтры едут скрытыми полями:
+        без них отправка без скрипта молча снимала бы всё выбранное.
+        В placeholder — первая фраза бегущей подсказки (она же статична при
+        «уменьшить движение» и без скрипта).
+        {% endcomment %}
+        {% for name, value in filters.hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
+        <textarea id="ct-q" name="q" rows="3" aria-label="Опишите задачу"
+                  placeholder="{{ catalog_phrases.0.text }}">{{ query }}</textarea>
+        <div class="ask-foot">
+          <span class="ask-hint">{% include '_icon.html' with name='sparkle' %}Ищем по смыслу: точные слова не нужны</span>
+          <span class="ask-busy" aria-live="polite"><i></i><span id="ask-busy-text">{{ search_busy_phrases.0 }}</span></span>
+          <span class="ask-kbd">Enter – найти</span>
+          <button class="ask-clear" type="button" id="ask-clear" aria-label="Очистить запрос">{% include '_icon.html' with name='close' %}</button>
+          {{ search_busy_phrases|json_script:"search-busy-phrases" }}
+          <button class="ask-go" type="submit" id="ask-go" aria-label="Найти">{% include '_icon.html' with name='arrow_up' %}</button>
+        </div>
+      </form>
+
+      <div class="se-chips" id="se-chips" aria-label="Фильтры">
+        <button class="se-chip" type="button" id="ct-all-open" aria-haspopup="dialog" aria-controls="ct-all">
+          {% include '_icon.html' with name='sliders' %}Все фильтры{% if filters.selected_count %} <span class="n">{{ filters.selected_count }}</span>{% endif %}
+        </button>
+
+        {% with g=entry_groups.topic %}{% if g %}
+        <div class="se-dd-wrap">
+          <button class="se-chip" type="button" data-dd="topic" aria-expanded="false" aria-controls="se-dd-topic">
+            <span class="se-chip-l" data-chip-label="topic">Тема</span>{% include '_icon.html' with name='chevron_down' %}
+          </button>
+          <div class="se-dd se-dd--topic" id="se-dd-topic" role="group" aria-label="Тема" hidden>
+            <div class="se-dd-head"><b>Тема</b><span>несколько тем складываются: «или»</span></div>
+            <div class="se-dd-body">
+              {% for grp in g.groups %}
+              <div class="se-dd-group" style="--gc: var(--map-g-{{ grp.section }})"><span class="se-dot"></span>{{ grp.label }}</div>
+              {% for o in grp.options %}
+              <button class="se-opt{% if o.zero %} is-zero{% endif %}" type="button" data-topic="{{ o.value }}" data-section="{{ o.section }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
+                <span class="se-box">{% include '_icon.html' with name='check' %}</span>
+                <span class="se-opt-l">{{ o.label }}</span>
+                <span class="se-opt-n" data-count="topic:{{ o.value }}">{{ o.count|spaceint }}</span>
+              </button>
+              {% endfor %}
+              {% endfor %}
+            </div>
+            <div class="se-dd-foot"><span class="se-dd-note">несколько тем складываются: «или»</span><span class="se-dd-busy" aria-live="polite"><i></i>Обновляю…</span><button class="se-done" type="button" data-dd-close>Готово</button></div>
+          </div>
+        </div>
+        {% endif %}{% endwith %}
+
+        {% with g=entry_groups.difficulty %}{% if g %}
+        <div class="se-dd-wrap">
+          <button class="se-chip" type="button" data-dd="difficulty" aria-expanded="false" aria-controls="se-dd-difficulty">
+            <span class="se-chip-l" data-chip-label="difficulty">Сложность</span>{% include '_icon.html' with name='chevron_down' %}
+          </button>
+          <div class="se-dd se-dd--diff" id="se-dd-difficulty" role="group" aria-label="Сложность" hidden>
+            <div class="se-dd-head"><b>Сложность</b><span>можно несколько</span></div>
+            <div class="se-dd-body">
+              {% for o in g.options %}
+              <button class="se-opt{% if o.zero %} is-zero{% endif %}" type="button" data-diff="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
+                <span class="se-box">{% include '_icon.html' with name='check' %}</span>
+                <span class="se-opt-l se-stars">{{ o.label }}</span>
+                <span class="se-opt-n" data-count="difficulty:{{ o.value }}">{{ o.count|spaceint }}</span>
+              </button>
+              {% endfor %}
+            </div>
+            <div class="se-dd-foot"><span class="se-dd-note">можно несколько</span><span class="se-dd-busy" aria-live="polite"><i></i>Обновляю…</span><button class="se-done" type="button" data-dd-close>Готово</button></div>
+          </div>
+        </div>
+        {% endif %}{% endwith %}
+
+        {% with g=entry_groups.kind %}{% if g %}
+        <div class="se-dd-wrap">
+          <button class="se-chip" type="button" data-dd="kind" aria-expanded="false" aria-controls="se-dd-kind">
+            <span class="se-chip-l" data-chip-label="kind">Задачи и тесты</span>{% include '_icon.html' with name='chevron_down' %}
+          </button>
+          <div class="se-dd se-dd--kind" id="se-dd-kind" role="group" aria-label="Задачи и тесты" hidden>
+            <div class="se-dd-head"><b>Задачи и тесты</b><span>одно из трёх</span></div>
+            <div class="se-dd-body">
+              <button class="se-opt se-opt--radio" type="button" data-clear="kind" data-kind-all aria-pressed="{% if g.value %}false{% else %}true{% endif %}">
+                <span class="se-box se-box--radio"></span><span class="se-opt-l">Все</span>
+              </button>
+              {% for o in g.options %}
+              <button class="se-opt se-opt--radio{% if o.zero %} is-zero{% endif %}" type="button" data-kind="{{ o.value }}" aria-pressed="{{ o.active|yesno:'true,false' }}">
+                <span class="se-box se-box--radio"></span>
+                <span class="se-opt-l" data-kind-label="{{ o.value }}">{% if o.value == 'test' %}Тесты{% else %}Задачи{% endif %}</span>
+                <span class="se-opt-n" data-count="kind:{{ o.value }}">{{ o.count|spaceint }}</span>
+              </button>
+              {% endfor %}
+            </div>
+            <div class="se-dd-foot"><span class="se-dd-note">одно из трёх</span><span class="se-dd-busy" aria-live="polite"><i></i>Обновляю…</span><button class="se-done" type="button" data-dd-close>Готово</button></div>
+          </div>
+        </div>
+        {% endif %}{% endwith %}
+
+        {% with g=entry_groups.has_solution %}{% if g %}
+        <button class="se-chip se-chip--toggle" type="button" id="se-sol" aria-pressed="{{ g.option.active|yesno:'true,false' }}">С решением</button>
+        {% endif %}{% endwith %}
+
+        <a class="se-reset" id="strip-reset" href="{{ filters.reset_url }}" data-clear="all"{% if not filters.selected_count %} hidden{% endif %}>Сбросить</a>
+      </div>
+      <div class="se-tags" id="ct-chips">{% include "catalog/_catalog_chips.html" %}</div>
+    </section>
+
+    <a class="se-map" id="se-map" href="{% url 'catalog:topic_map' %}">
+      {% include '_icon.html' with name='network' %}
+      <span id="se-map-l">{% if map_selected_n %}Карта тем: выбрано {{ map_selected_n }}{% else %}Карта тем: {{ map_stats.themes|spaceint }}&nbsp;{{ map_stats.themes|plural_ru:"тема,темы,тем" }}, {{ map_stats.tags|spaceint }}&nbsp;{{ map_stats.tags|plural_ru:"тег,тега,тегов" }}{% endif %}</span>
+      {% include '_icon.html' with name='chevron_right' %}
+    </a>
+    <span id="se-map-total" hidden>Карта тем: {{ map_stats.themes|spaceint }}&nbsp;{{ map_stats.themes|plural_ru:"тема,темы,тем" }}, {{ map_stats.tags|spaceint }}&nbsp;{{ map_stats.tags|plural_ru:"тег,тега,тегов" }}</span>
+
+    {% if degraded %}
+    {% if smart_search_status == 'rerank' %}
+    <div class="ct-note">Ищем по словам с умной сортировкой. Поиск по смыслу пока выключен,
+      результаты могут быть беднее обычного.</div>
+    {% else %}
+    <div class="ct-note">Ищем по словам. Смысловой поиск сейчас недоступен,
+      результаты могут быть беднее обычного. Фильтры работают как всегда.</div>
+    {% endif %}
+    {% endif %}
+    {% if missing_id %}
+    <div class="ct-note">Задачи с номером {{ missing_id }} в каталоге нет.
+      Возможно, она ещё не прошла проверку или номер набран с опечаткой.</div>
+    {% endif %}
+
+    <div class="se-line">
+      {% if continue_rows %}
+      <nav class="se-continue" aria-label="Продолжить">
+        <span class="se-continue-l">Продолжить</span>
+        <span class="se-pills">{% for row in continue_rows %}<a class="se-pill" href="{% url 'catalog:problem_detail' row.problem.pk %}" data-id="{{ row.problem.pk }}"><span class="rail-status rail-status--{{ row.status|default:'none' }}" aria-hidden="true">{% if row.status == 'failed' %}{% include '_icon.html' with name='arrow_left' %}{% endif %}</span><span class="se-pill-l">{{ row.title }}</span></a>{% endfor %}</span>
+      </nav>
+      {% endif %}
+      <a class="se-random" id="se-random" href="{% url 'catalog:random_problem' %}{% if filters.total_url != '?' %}{{ filters.total_url }}{% endif %}">Случайная задача</a>
+    </div>
+
+    {% include "catalog/_catalog_results.html" %}
+  </div>
+</div>

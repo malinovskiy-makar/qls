@@ -743,6 +743,12 @@ body::after,
   background-image: url("{% static 'img/bg-pattern-bright.svg' %}");
   opacity: var(--bg-pattern-bright-alpha, .08);
 }
+/* ⚠️ ЭКРАН МОЖЕТ ПОПРОСИТЬ БЕЗ УЗОРА: атрибут `data-bg-pattern="off"` у тела страницы.
+   Решение владельца 18.09.2026: на входе каталога и на открытой карте тем
+   фоном служит облако карты — второй слой сверху делает экран грязным.
+   Ставит атрибут вид экрана «Стол» (`catalog/stol.html`, `stol.js`). */
+body[data-bg-pattern="off"]::before,
+body[data-bg-pattern="off"]::after { display: none; }
 @media (prefers-reduced-motion: reduce) {
   body::before, body::after,
   .bg-pattern-host::before, .bg-pattern-host::after { display: none; }

@@ -1,0 +1,16 @@
+{% load catalog_filters %}{% comment %}Решение и ответ карточкой ленты помощи (README §4). `solution_needs_review` прячет решение, ответ остаётся; копия и пересказ условия срезаны в `_solution_block`.{% endcomment %}<div class="feed-card feed-sol sol is-on" id="sol">
+  <div class="sol-head">
+    <h3>{% if sol.solution %}Решение{% else %}Ответ{% endif %}</h3>
+    {% if sol.answer %}<span class="sol-ans">Ответ: <b class="math-content">{% include "catalog/_math_text.html" with text=sol.answer %}</b></span>{% endif %}
+  </div>
+  {% if sol.solution or sol.parts %}
+  <div class="sol-body">
+    {% if sol.solution %}<div class="math-content">{% include "catalog/_math_text.html" with text=sol.solution %}</div>{% endif %}
+    {% if sol.parts %}
+    <ol class="parts">
+      {% for row in sol.parts %}<li class="part"><b>{{ row.label|partlabel }}</b><span class="math-content">{% if row.answer %}<span>Ответ: {% include "catalog/_math_text.html" with text=row.answer %}</span>{% endif %}{% if row.solution %}{% if row.answer %}<br>{% endif %}{% include "catalog/_math_text.html" with text=row.solution %}{% endif %}</span></li>{% endfor %}
+    </ol>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>

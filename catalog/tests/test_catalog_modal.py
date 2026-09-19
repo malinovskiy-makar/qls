@@ -81,14 +81,15 @@ class ModalMarkupTests(TestCase):
         self.assertEqual(state['urls']['state'], '/catalog/api/filter-state/')
         self.assertEqual(state['urls']['tags'], '/catalog/api/tags/')
 
-    def test_old_window_markup_is_gone_and_problem_modal_stays(self):
+    def test_old_window_markup_and_problem_modal_are_gone(self):
+        # Модалка «Условие» и выпадашка «+ В домашку» на карточке ушли со
+        # входа «Стола» (решения владельца 17.09.2026: условие показывает
+        # сама задача, учителю — корзина).
         html = self.client.get(CATALOG_URL).content.decode()
         for gone in ('details class="fl-chip', 'class="fl-pop"', 'data-tag-box',
-                     'fl-opts--next', 'class="fl-group"'):
+                     'fl-opts--next', 'class="fl-group"', 'id="c-modal-backdrop"',
+                     'function openCatalogModal', 'function toggleHwDropdown'):
             self.assertNotIn(gone, html)
-        self.assertIn('id="c-modal-backdrop"', html)
-        self.assertIn('function openCatalogModal', html)
-        self.assertIn('function toggleHwDropdown', html)
         self.assertIn("catalog/js/catalog_filters.js", html)
 
 

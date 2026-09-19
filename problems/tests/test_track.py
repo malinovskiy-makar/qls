@@ -182,9 +182,10 @@ class TrackScriptTests(TestCase):
                                               'duel_create'),
             'templates/_feedback.html': ('feedback_send',),
             'templates/_problem_report.html': ('report_send',),
-            'catalog/templates/catalog/_catalog_js.html': ('problem_open',),
-            'catalog/templates/catalog/problem_detail.html': ('copy_link',),
-            'catalog/static/catalog/js/problem_page.js': ('test_answer',),
+            # С S7 «Стола» (19.09.2026): открытие задачи на месте — `stol.js`,
+            # ссылка и ответ теста — `stol_task.js` (старые шаблоны удалены).
+            'catalog/static/catalog/js/stol.js': ('problem_open',),
+            'catalog/static/catalog/js/stol_task.js': ('copy_link', 'test_answer', 'chat_send'),
         }
         for path, names in expected.items():
             with open(path, encoding='utf-8') as handle:

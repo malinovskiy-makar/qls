@@ -107,11 +107,12 @@ class AttemptFileTests(TestCase):
     def test_page_offers_the_button_only_with_model_and_login(self):
         page = reverse('catalog:problem_detail', args=[self.problem.pk])
         html = self.client.get(page).content.decode()
-        self.assertIn('id="att-add"', html)
+        # С S3 (18.09.2026) файл к попытке прикрепляет скрепка поля помощи.
+        self.assertIn('id="ai-clip"', html)
         self.assertIn('"fileUrl": "/catalog/api/attempt-file/"', html)
         self.client.logout()
         html = self.client.get(page).content.decode()
-        self.assertNotIn('id="att-add"', html)
+        self.assertNotIn('id="ai-clip"', html)
 
     def test_anonymous_upload_is_403(self):
         self.client.logout()

@@ -26,6 +26,11 @@ urlpatterns = [
     path('api/chat/',                           views.api_chat,           name='api_chat'),
     # Фото или PDF решения к реплике чата: только вход, 10 файлов в сутки.
     path('api/chat/upload/',                    views.api_chat_upload,    name='api_chat_upload'),
+    # Ленты «Стола»: «Похожие» и «Мои ★» (строки одним партиалом).
+    path('api/rail/similar/<int:problem_id>/',  views.api_rail_similar,   name='api_rail_similar'),
+    path('api/rail/saved/',                     views.api_rail_saved,     name='api_rail_saved'),
+    # «Как прошло?» и следы помощи (каталог «Стол», ADR 0119).
+    path('api/progress/<int:problem_id>/',      views.api_progress,       name='api_progress'),
     path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),
     # Третья файловая вьюха: только владельцу или сотруднику (ADR 0118).
     path('chat/attachment/<int:pk>/',            chat_files.chat_attachment, name='chat_attachment'),
@@ -54,6 +59,7 @@ urlpatterns = [
 
     # Конструктор подборок (Этап Б1)
     path('collection/new/',                     views.collection_new,     name='collection_new'),
+    path('collection/from-basket/',             views.collection_from_basket, name='collection_from_basket'),
     path('collection/<str:token>/',             views.collection_detail,  name='collection_detail'),
     path('collection/<str:token>/add/',         views.collection_add,     name='collection_add'),
     path('collection/<str:token>/remove/',      views.collection_remove,  name='collection_remove'),

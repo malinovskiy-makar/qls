@@ -47,16 +47,17 @@ class CatalogMathTests(TestCase):
         self.assertTrue('problem-figure' in data['statement_html'], 'картинка не тем механизмом')
         self.assertFalse('[[FIGURE:' in data['statement_html'], 'токен в модалке')
 
-    def test_katex_runs_after_filter_swap_and_in_modal(self):
+    def test_katex_runs_after_filter_swap_and_show_more(self):
+        # Модалки «Условие» на входе «Стола» больше нет (решение 17.09.2026):
+        # условие показывает сама задача. Подменённые куски выдачи — фильтр
+        # и «Показать ещё» — идут тем же конвейером формул.
         base = Path(settings.BASE_DIR)
         filters_js = (base / 'catalog/static/catalog/js/catalog_filters.js').read_text(encoding='utf-8')
-        modal_js = (base / 'catalog/templates/catalog/_catalog_js.html').read_text(encoding='utf-8')
+        stol_js = (base / 'catalog/static/catalog/js/stol.js').read_text(encoding='utf-8')
         base_html = (base / 'catalog/templates/catalog/base.html').read_text(encoding='utf-8')
         self.assertTrue('function renderMathIn(root)' in base_html, 'нет общего конвейера формул')
         self.assertTrue('window.renderMathIn(fresh)' in filters_js, 'выдача фильтра без KaTeX')
-        self.assertTrue('renderMathIn(body)' in modal_js, 'модалка без KaTeX')
-        self.assertTrue('max-height: 60vh' in self.client.get(reverse('catalog:problem_list'))
-                        .content.decode('utf-8'), 'картинка модалки не ограничена по высоте')
+        self.assertTrue('window.renderMathIn(fresh)' in stol_js, '«Показать ещё» без KaTeX')
 
 
 class SourceLinkTests(TestCase):

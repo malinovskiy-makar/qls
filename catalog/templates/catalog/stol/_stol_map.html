@@ -1,0 +1,117 @@
+{% load ru catalog_filters %}
+{% comment %}
+КАРТА ТЕМ В «СТОЛЕ» (README §6): фоновое облако входа выходит на передний
+план на том же экране. Движок — полная карта `topic_map.js` (поиск по темам
+и тегам, дерево разделов, обучение, масштаб, хождение по линиям); его
+подгружает `stol_map.js` при первом нажатии «Карта тем» (разметка приходит
+ответом `/catalog/map/?pane=1`), а `/catalog/map/` рисует её сразу.
+
+Холст на всё окно под шапкой сайта; шапка карты, «Разделы корпуса» и нижняя
+полоса лежат поверх него карточками и входят после отъезда камеры.
+
+⚠️ ВЫБОР = ФИЛЬТР КАТАЛОГА. Клик по теме или тегу пишет `weco.filters.state`
+(темы по «или», теги по «и»), нижняя полоса и «Показать задачи» считаются из
+него же. Ссылки выхода — обычные адреса каталога: без скрипта они работают.
+Идентификаторы `tmap-*` читает движок — переименовывать вместе с ним.
+{% endcomment %}
+<section class="stol-map" id="stol-map" aria-label="Карта тем"{% if view != 'map' %} hidden{% endif %}>
+<div class="tmap" id="tmap">
+
+  <header class="tmap-head">
+    <a class="tmap-back" href="{% url 'catalog:problem_list' %}{% if filters_query %}?{{ filters_query }}{% endif %}" data-map-exit>{% include '_icon.html' with name='chevron_left' %}В каталог</a>
+    <div class="tmap-head-title">
+      <h1>Карта тем</h1>
+      <p class="tmap-sub">{{ theme_count }}&nbsp;{{ theme_count|plural_ru:"тема,темы,тем" }} · {{ tag_count }}&nbsp;{{ tag_count|plural_ru:"тег,тега,тегов" }}<span class="tmap-sub-x"> · связи между разделами</span></p>
+    </div>
+    <div class="tmap-search">
+      {% include '_icon.html' with name='search' %}
+      <input type="search" id="tmap-q" autocomplete="off" spellcheck="false"
+             placeholder="Поиск по темам и тегам" aria-label="Поиск по темам и тегам">
+      <span class="tmap-search-count" id="tmap-q-count" aria-live="polite"></span>
+    </div>
+    {% comment %}Телефон (снимок 33): поле поиска свёрнуто в лупу, по нажатию встаёт строкой под шапкой.{% endcomment %}
+    <button type="button" class="tmap-icon-btn tmap-search-btn" id="tmap-search-btn" aria-label="Поиск по темам и тегам" aria-expanded="false">{% include '_icon.html' with name='search' %}</button>
+    <button type="button" class="tmap-icon-btn" id="tmap-help" title="Как пользоваться картой" aria-label="Как пользоваться картой">?</button>
+    <a class="tmap-icon-btn" href="{% url 'catalog:problem_list' %}{% if filters_query %}?{{ filters_query }}{% endif %}" data-map-exit title="Закрыть карту" aria-label="Закрыть карту">{% include '_icon.html' with name='close' %}</a>
+  </header>
+
+  <div class="tmap-body">
+    <div class="tmap-canvas-wrap" id="tmap-canvas-wrap">
+      <canvas id="tmap-canvas" tabindex="0" aria-label="Трёхмерная карта тем и тегов корпуса"></canvas>
+      <div class="tmap-zoom" role="group" aria-label="Масштаб карты">
+        <span class="tmap-zoom-val" id="tmap-zoom-val">100%</span>
+        <button type="button" id="tmap-zoom-in" aria-label="Приблизить">+</button>
+        <button type="button" id="tmap-zoom-out" aria-label="Отдалить">{% include '_icon.html' with name='minus' %}</button>
+        <button type="button" id="tmap-zoom-fit" aria-label="Вернуть обзор">{% include '_icon.html' with name='refresh' %}</button>
+      </div>
+    </div>
+
+    <aside class="tmap-panel" id="tmap-panel">
+      <div class="tmap-panel-scroll" id="tmap-panel-scroll">
+        <section class="tmap-block">
+          <h2 class="tmap-block-h">Разделы корпуса</h2>
+          <div class="tmap-tree" id="tmap-themes">
+            {% for s in sections %}
+              <div class="tmap-tree-sec" data-sec="{{ s.key }}" style="--gc: var(--map-g-{{ s.key }})">
+                <button type="button" class="tmap-sec-row" data-open="sec" aria-expanded="false">
+                  <span class="tmap-arrow" aria-hidden="true"></span>
+                  <span class="tmap-sec-dot" aria-hidden="true"></span>
+                  <span class="tmap-sec-name">{{ s.label }}</span>
+                  <span class="tmap-sec-cnt">{{ s.themes|length }}&nbsp;{{ s.themes|length|plural_ru:"тема,темы,тем" }}</span>
+                </button>
+                <div class="tmap-sec-body" hidden>
+                  {% for t in s.themes %}
+                    <div class="tmap-tree-theme">
+                      <button type="button" class="tmap-theme-row" data-open="theme" data-theme="{{ t.n }}" aria-expanded="false">
+                        <span class="tmap-arrow" aria-hidden="true"></span>
+                        <span class="tmap-theme-name">{{ t.title }}</span>
+                        {% if t.count %}<span class="tmap-theme-cnt" title="{{ t.count }} задач по тегам темы">{{ t.count }}</span>{% else %}<span class="tmap-theme-cnt tmap-cnt--none" title="счётчик задач у тегов темы не задан">–</span>{% endif %}
+                      </button>
+                      <div class="tmap-theme-body" hidden>
+                        {% for g in t.tags %}
+                          <button type="button" class="tmap-tag-row" data-go-tag="{{ g.id }}">
+                            <span class="tmap-tag-name">{{ g.label }}</span>
+                            {% if g.count %}<span class="tmap-tag-cnt">{{ g.count }}</span>{% else %}<span class="tmap-tag-cnt tmap-cnt--none" title="счётчика нет, тег размечается вручную">–</span>{% endif %}
+                          </button>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+        <section class="tmap-block tmap-block--hover" id="tmap-hover-block">
+          <h2 class="tmap-block-h" id="tmap-hover-head" hidden>Как пользоваться</h2>
+          <div id="tmap-hover"></div>
+        </section>
+      </div>
+    </aside>
+    <div class="tmap-panel-fade" id="tmap-panel-fade" aria-hidden="true"></div>
+  </div>
+
+  <footer class="tmap-foot">
+    <p class="tmap-sel"><b id="stol-map-count">{% if map_selected_n %}Выбрано: {% with nt=map_selected.topics|length ng=map_selected.tags|length %}{% if nt %}{{ nt }}&nbsp;{{ nt|plural_ru:"тема,темы,тем" }}{% endif %}{% if nt and ng %}, {% endif %}{% if ng %}{{ ng }}&nbsp;{{ ng|plural_ru:"тег,тега,тегов" }}{% endif %}{% endwith %}{% else %}Темы и теги не выбраны{% endif %}</b> <span class="tmap-sel-names" id="stol-map-names"></span></p>
+    <button type="button" class="btn btn--quiet" id="tmap-reset"{% if not map_selected_n %} hidden{% endif %}>Сбросить</button>
+    <a class="btn btn--main" id="stol-map-show" href="{% url 'catalog:problem_list' %}{% if filters_query %}?{{ filters_query }}{% endif %}" data-map-exit="show"><span id="stol-map-show-l">{% if map_selected_n %}Показать задачи{% else %}Показать все задачи{% endif %}</span>{% include '_icon.html' with name='chevron_right' %}</a>
+  </footer>
+
+  <div class="tmap-tour" id="tmap-tour" hidden>
+    <div class="tmap-tour-hole" id="tmap-tour-hole"></div>
+    <div class="tmap-tour-card" id="tmap-tour-card" role="dialog" aria-modal="true" aria-labelledby="tmap-tour-title">
+      <div class="tmap-tour-step" id="tmap-tour-step">Шаг 1 из 5</div>
+      <h2 id="tmap-tour-title">Это весь корпус</h2>
+      <p id="tmap-tour-text"></p>
+      <div class="tmap-tour-ask" id="tmap-tour-hint"></div>
+      <div class="tmap-tour-foot">
+        <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-skip">Пропустить</button>
+        <span class="tmap-tour-dots" id="tmap-tour-dots"></span>
+        <button type="button" class="tmap-btn" id="tmap-tour-prev" aria-label="Назад">{% include '_icon.html' with name='chevron_left' %}</button>
+        <button type="button" class="tmap-btn tmap-btn--quiet" id="tmap-tour-next">Пропустить шаг</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</section>

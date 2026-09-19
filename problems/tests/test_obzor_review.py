@@ -254,8 +254,9 @@ class PendingColourTests(TestCase):
         каталога стал `.ct-stars` объединённого. Требование не
         менялось — звёзды остаются сигнальным янтарём.
         """
-        page = read('catalog', 'templates', 'catalog', 'problem_list.html')
-        stars = [l for l in page.split('\n') if '.ct-stars' in l][0]
+        # С S7 «Стола» (19.09.2026): звёзды строки — `.rail-stars` в `stol.css`.
+        page = read('catalog', 'static', 'catalog', 'css', 'stol.css')
+        stars = [l for l in page.split('\n') if l.startswith('.rail-stars')][0]
         self.assertIn('var(--amber)', stars)
         self.assertNotIn('amber-ink', stars)
 

@@ -1,0 +1,119 @@
+{% load catalog_filters %}{% comment %}
+ЗАДАЧА В ЦЕНТРЕ «СТОЛА» (README §3, снимки 09–13, 17–19).
+
+Строка над задачей (34 px): [«Лента» — в «Фокусе»] ‹ › «3 из 506» · … ·
+«Фокус» · сохранить · ссылка · «Ошибка в задаче?» · [«Помощь» — в «Фокусе»].
+Заголовок 26 px — по `show_title` (обрезок условия уходит в скрытый h1).
+Свойства: чипы тем и звёзды, строкой ниже «развёрнутая · количественная · …»
+и источник, справа «Теги · N ▸» — теги свёрнуты у всех (решение 17.09).
+Условие — карточка `--surface-info`, 16,5/1,7, подпункты с пунктирными
+разделителями, у пункта — «спросить ИИ про этот пункт»; выделенный фрагмент условия —
+всплывающая «Спросить об этом» (`stol_task.js`). Под условием «Как прошло?» и соседи «← предыдущая /
+следующая →» с названиями (по текущей ленте; сценарий пересчитывает их по
+своему списку). «Похожих» под условием больше нет — они во вкладке ленты; карточки
+«Решение» с полем тоже нет — попытка и решение живут в панели помощи (README §4).
+
+Этот же партиал — `center_html` ответа `?pane=1`: сценарий подменяет им
+`#stol-center` и зовёт `weco.stolTask.init(root)` (`stol_task.js`), который
+читает настройки задачи из `.stol-cfg` ниже. Правило нуля — везде.
+{% endcomment %}
+<script type="application/json" class="stol-cfg">{{ task_cfg|script_json|safe }}</script>
+
+<div class="task-bar">
+  {% comment %}Телефон (README §8, снимок 34): «‹ Каталог · 2 из 872 · звезда · меню»; стрелки, «Фокус», ссылка и флаг — в меню и нижней панели.{% endcomment %}
+  <a class="tb-btn tb-btn--pill tb-back tb-phone-only" data-stol-home href="{% url 'catalog:problem_list' %}">{% include '_icon.html' with name='chevron_left' %}Каталог</a>
+  <button class="tb-btn tb-btn--pill tb-focus-only" type="button" data-stol="rail" title="Лента ([)">{% include '_icon.html' with name='sliders' %}Лента</button>
+  <a class="tb-btn" id="tb-prev" data-stol-step="-1"{% if meta.prev %} href="{% url 'catalog:problem_detail' meta.prev %}"{% else %} aria-disabled="true"{% endif %} aria-label="Предыдущая задача">{% include '_icon.html' with name='chevron_left' %}</a>
+  <a class="tb-btn" id="tb-next" data-stol-step="1"{% if meta.next %} href="{% url 'catalog:problem_detail' meta.next %}"{% else %} aria-disabled="true"{% endif %} aria-label="Следующая задача">{% include '_icon.html' with name='chevron_right' %}</a>
+  <span class="tb-pos" id="tb-pos">{% if meta.position %}{{ meta.position }} из {{ meta.total }}{% endif %}</span>
+  <span class="grow"></span>
+  <button class="tb-btn tb-btn--pill" type="button" data-stol="focus" title="Фокус (F)"><span class="stol-focus-label">Фокус</span></button>
+  {% if is_tutor %}{% comment %}Корзина репетитора (README §7): «+ В корзину» / «В корзине» — `stol_basket.js`.{% endcomment %}
+  <button class="tb-btn tb-btn--pill tb-basket" type="button" id="basket-toggle" data-basket="{{ problem.pk }}"
+          data-basket-title="{{ heading }}" aria-pressed="false">+ В корзину</button>
+  {% endif %}
+  {% if user.is_authenticated %}
+  <button class="tb-btn{% if saved %} is-on{% endif %}" type="button" id="save-btn" data-problem="{{ problem.pk }}"
+          data-url="{% url 'api_save_problem' %}" aria-pressed="{{ saved|yesno:'true,false' }}"
+          aria-label="{% if saved %}Сохранено{% else %}Сохранить{% endif %}" title="{% if saved %}Сохранено{% else %}Сохранить{% endif %}">{% include '_icon.html' with name='star' %}</button>
+  {% endif %}
+  <button class="tb-btn" type="button" id="copy-btn" aria-label="Скопировать ссылку" title="Скопировать ссылку">{% include '_icon.html' with name='share' %}</button>
+  {% comment %}«Ошибка в задаче?» — окно и отправка в общем партиале `_problem_report.html` (слушает клики по `.btn-report`).{% endcomment %}
+  <button class="tb-btn btn-report" type="button" data-source="catalog" data-problem-id="{{ problem.pk }}"
+          aria-label="Ошибка в задаче?" title="Ошибка в задаче?">{% include '_icon.html' with name='flag' %}</button>
+  <div class="tb-menu tb-phone-only">
+    <button class="tb-btn" type="button" id="tb-menu-btn" aria-expanded="false" aria-controls="tb-menu-pop" aria-label="Меню задачи">{% include '_icon.html' with name='menu' %}</button>
+    <div class="tb-menu-pop" id="tb-menu-pop" hidden>
+      <button type="button" data-stol="rail">{% include '_icon.html' with name='sliders' %}Лента задач</button>
+      <button type="button" data-proxy="#copy-btn">{% include '_icon.html' with name='share' %}Скопировать ссылку</button>
+      <button type="button" data-proxy=".task-bar .btn-report">{% include '_icon.html' with name='flag' %}Ошибка в задаче?</button>
+    </div>
+  </div>
+  <button class="tb-btn tb-btn--pill tb-focus-only" type="button" data-stol="help" title="Помощь (])">{% include '_icon.html' with name='sparkle' %}Помощь</button>
+</div>
+
+{% if show_title %}<h1 class="pd-title">{{ problem.title }}</h1>{% else %}<h1 class="sr-only">{{ heading }}</h1>{% endif %}
+
+{% if clouds_1 or clouds_2 %}
+<div class="pp-line" aria-label="Темы и сложность">
+  {% for c in clouds_1 %}{% if c.kind == 'topic' %}<a class="pp pp--topic" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}
+  {% for c in clouds_2 %}{% if c.kind == 'diff' %}<a class="pp-stars" href="{{ c.url }}" aria-label="{{ c.label }}">{{ c.stars }}</a>{% endif %}{% endfor %}
+</div>
+<div class="pp-sub" aria-label="Свойства задачи">
+  {% for c in clouds_2 %}{% if c.kind == 'kind' or c.kind == 'char' or c.kind == 'feat' %}<a class="pp-w" href="{{ c.url }}">{{ c.label|lower }}</a>{% endif %}{% endfor %}
+  {% for c in clouds_2 %}{% if c.kind == 'src' %}{% if c.url %}<a class="pp pp--src" href="{{ c.url }}" target="_blank" rel="noopener">{{ c.label }}<svg class="pp-ext" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4"/><path d="M13.5 2.5 7 9"/><path d="M12 9.5v4H2.5V4h4"/></svg></a>{% else %}<span class="pp pp--src">{{ c.label }}</span>{% endif %}{% endif %}{% endfor %}
+  {% if tags_total %}
+  {% comment %}Теги свёрнуты у всех (решение владельца 17.09: теги выдают метод); раскрываются без скрипта, каждый ведёт в каталог с этим фильтром.{% endcomment %}
+  <details class="pp-tags">
+    <summary>Теги · {{ tags_total }}</summary>
+    <div class="pp-tag-list">{% for c in clouds_1 %}{% if c.kind == 'tag' %}<a class="pp pp--tag" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}</div>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
+
+{% comment %}Строка из игры Wecon Rush — только когда попыток набралось достаточно (порог в game/config.py).{% endcomment %}
+{% if game_stat and not test %}
+<p class="pd-stat" title="Доля верных ответов среди первых встреч игроков с этим вопросом">В игре решают верно: {{ game_stat.percent }}% ({{ game_stat.attempts }} попыт.)</p>
+{% endif %}
+
+{% if test %}
+<section class="stm stm--q" aria-label="Условие">
+  <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
+</section>
+{% include "catalog/_problem_test.html" %}
+{% else %}
+<section class="stm" aria-label="Условие">
+  <div class="math-content">{% include "catalog/_math_text.html" with text=problem.statement %}</div>
+  {% if parts %}
+  <ol class="parts">
+    {% comment %}У пункта справа — «спросить ИИ про этот пункт» (README §3): открывает помощь, ставит в поле «Пункт б): » и цитату пункта. Только при карточке чата (правило нуля).{% endcomment %}
+    {% for part in parts %}<li class="part" data-part-label="{{ part.label|partlabel }}"><b>{{ part.label|partlabel }}</b><span class="math-content">{% include "catalog/_math_text.html" with text=part.statement %}</span>{% if chat_available and user.is_authenticated %}<button type="button" class="part-ask" data-ask-part aria-label="Спросить ИИ про пункт {{ part.label|partlabel }}" title="Спросить ИИ про этот пункт">{% include '_icon.html' with name='sparkle' %}</button>{% endif %}</li>{% endfor %}
+  </ol>
+  {% endif %}
+</section>
+
+{% if show_how %}
+{% comment %}«Как прошло?» — один клик, повторный снимает; «Решил сам» недоступно после открытого решения (ADR 0119); после отметки справа «Дальше ›».{% endcomment %}
+<section class="how" id="how" aria-label="Как прошло" data-status="{{ my_progress.status|default:'opened' }}"{% if my_progress.solution_viewed %} data-solution-viewed{% endif %}>
+  <span class="how-q">Как прошло?</span>
+  <button type="button" class="how-btn" data-how="self"{% if my_progress.solution_viewed %} disabled title="Решение уже открыто"{% endif %} aria-pressed="{% if my_progress.status == 'solved_self' %}true{% else %}false{% endif %}">Решил сам</button>
+  <button type="button" class="how-btn" data-how="hint" aria-pressed="{% if my_progress.status == 'solved_hint' %}true{% else %}false{% endif %}">С подсказкой</button>
+  <button type="button" class="how-btn" data-how="failed" aria-pressed="{% if my_progress.status == 'failed' %}true{% else %}false{% endif %}">Не получилось</button>
+  <a class="btn btn--main how-next" id="how-next" data-stol-step="1"{% if meta.next %} href="{% url 'catalog:problem_detail' meta.next %}"{% endif %}{% if my_progress.status != 'solved_self' and my_progress.status != 'solved_hint' and my_progress.status != 'failed' or not meta.next %} hidden{% endif %}>Дальше {% include '_icon.html' with name='chevron_right' %}</a>
+</section>
+{% endif %}
+{% endif %}
+
+<nav class="nb" id="stol-nb" aria-label="Соседние задачи"{% if not meta.prev and not meta.next %} hidden{% endif %}>
+  {% if meta.prev %}<a class="nb-a nb-a--prev" data-stol-step="-1" href="{% url 'catalog:problem_detail' meta.prev %}"><small>← предыдущая</small><b>{{ meta.prev_title }}</b></a>{% endif %}
+  {% if meta.next %}<a class="nb-a nb-a--next" data-stol-step="1" href="{% url 'catalog:problem_detail' meta.next %}"><small>следующая →</small><b>{{ meta.next_title }}</b></a>{% endif %}
+</nav>
+
+{% comment %}Телефон: нижняя панель зовёт кнопки задачи, каждая — только при данных; «Дальше» — следующая по текущей вкладке ленты.{% endcomment %}
+<nav class="stol-phonebar" aria-label="Помощь по задаче">
+  {% if hint_total %}<button type="button" data-phone="hint">{% include '_icon.html' with name='bulb' %}<span>Подсказка</span>{% if hints_left %}<i class="phone-badge" id="phone-hints">{{ hints_left }}</i>{% endif %}</button>{% endif %}
+  {% if chat_available %}<button type="button" data-phone="ai">{% include '_icon.html' with name='sparkle' %}<span>Спросить ИИ</span></button>{% endif %}
+  {% if test %}<button type="button" data-phone="reveal">{% include '_icon.html' with name='check' %}<span>Ответ</span></button>{% elif sol.has_any %}<button type="button" data-phone="sol">{% include '_icon.html' with name='book' %}<span>Решение</span></button>{% endif %}
+  <a class="is-main" data-stol-step="1"{% if meta.next %} href="{% url 'catalog:problem_detail' meta.next %}"{% else %} hidden{% endif %}>{% include '_icon.html' with name='arrow_right' %}<span>Дальше</span></a>
+</nav>

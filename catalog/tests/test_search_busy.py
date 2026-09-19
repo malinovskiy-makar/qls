@@ -16,7 +16,8 @@ from catalog import views
 from catalog.placeholder_phrases import SEARCH_BUSY_PHRASES
 from problems.tests.factories import make_problem
 
-JS = 'catalog/templates/catalog/_catalog_js.html'
+#: С S7 «Стола» (19.09.2026) фразы ожидания крутит модуль входа `stol.js`.
+JS = 'catalog/static/catalog/js/stol.js'
 
 
 @override_settings(SEMANTIC_SEARCH_ENABLED=False, SMART_SEARCH_RERANK=False)
@@ -43,12 +44,12 @@ class BusyPhrasesPageTests(TestCase):
                for i in range(14)]
         with mock.patch('catalog.views._search_ids', return_value=(ids, {}, False)):
             html = self.page(q='налог')
-        self.assertEqual(html.count('class="ct-card ct-appear"'),
+        self.assertEqual(html.count('class="rail-row ct-appear"'),
                          min(12, views.PAGE_STEP))
 
     def test_plain_catalog_does_not_animate_cards(self):
         make_problem('Спрос и предложение.')
-        self.assertFalse('class="ct-card ct-appear"' in self.page(),
+        self.assertFalse('class="rail-row ct-appear"' in self.page(),
                          'карточки анимируются без поиска')
 
 
@@ -64,7 +65,7 @@ class BusyPhrasesSourceTests(SimpleTestCase):
         self.assertTrue("getElementById('search-busy-phrases')" in js,
                         'скрипт не читает фразы')
         self.assertTrue('}, 1600);' in js, 'нет смены раз в 1,6 с')
-        self.assertTrue("matchMedia('(prefers-reduced-motion: reduce)')" in js,
+        self.assertTrue('quiet' in js and 'prefers-reduced-motion' in js,
                         'смена фраз не уважает «уменьшить движение»')
         self.assertTrue('busyPhrases.slice(0, 1).concat(rest)' in js,
                         'первая фраза не закреплена первой')

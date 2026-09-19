@@ -162,7 +162,8 @@ submission = get_object_or_404(visible_submissions(request.user), pk=pk)
 
 | Место | Что там | Почему допустимо |
 |---|---|---|
-| `platform/stats.html`, `catalog/problem_list.html`, `game/game.html`, `calendar_stub/calendar.html` | JSON внутри `<script>` | значение готовит `dumps_for_script`: выйти из тега им нельзя |
+| `platform/stats.html`, `game/game.html`, `calendar_stub/calendar.html`; каталог «Стол» — `catalog/stol/_stol_center.html` (настройки задачи) и `catalog/_catalog_modal.html` (состояние фильтров) через фильтр `script_json` | JSON внутри `<script>` | значение готовит `dumps_for_script`: выйти из тега им нельзя |
+| `catalog/_math_text.html` | `{{ text\|render_markdown\|render_figures:problem\|safe }}` — условие в формате markdown | `render_markdown` чистит HTML санитайзером (`problems/rendering.py`), `\|safe` стоит явно, чтобы его находил grep |
 | `registration/password_change_form.html` | `{{ field.help_text\|safe }}` | текст пишет сам Django, не пользователь |
 
 Других `|safe`, `{% autoescape off %}` и `mark_safe` в проекте нет.

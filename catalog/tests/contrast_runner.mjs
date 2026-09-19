@@ -23,6 +23,8 @@ const PAGES = [
   { name: 'каталог', path: '/catalog/', root: 'body' },
   { name: 'страница задачи', path: PROBLEM, root: 'body' },
   { name: 'окно фильтров', path: '/catalog/', root: '#ct-all', open: '#ct-all-open' },
+  // «Стол» (S7, 19.09.2026): карта тем — шапка, «Разделы корпуса», нижняя полоса.
+  { name: 'карта тем', path: '/catalog/map/', root: '#stol-map' },
   { name: 'вход', path: '/login/', root: 'body' },
 ];
 const THEMES = ['light', 'dark'];
@@ -90,7 +92,10 @@ function measure(rootSelector) {
     const value = ratio(seenColor, bg);
     const size = parseFloat(cs.fontSize);
     const weight = parseInt(cs.fontWeight, 10) || 400;
-    const need = size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
+    /* Графика с подписью (`role="img"`, например звёзды сложности) — не текст:
+       норма 3:1, WCAG 1.4.11. */
+    const graphic = !!el.closest('[role="img"]');
+    const need = graphic || size >= 24 || (size >= 18.66 && weight >= 700) ? 3 : 4.5;
     out.checked += 1;
     if (value < need) {
       out.violations.push({ sel: selector(el), text: node.textContent.trim().slice(0, 40),

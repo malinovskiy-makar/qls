@@ -50,8 +50,10 @@ class FilterStateApiTests(_Fixture):
         self.assertEqual(data['total'], page.context['total'])
         self.assertEqual(data['total'], 1)
         self.assertEqual(data['selected_count'], 2)
-        self.assertIn('data-chip="topic"', data['chips_html'])
-        self.assertIn('data-chip="difficulty"', data['chips_html'])
+        # Тема и сложность — в чипах-кнопках входа «Стола», а не в ряду под
+        # ними (README §2): ряд их не повторяет, а счётчик выбранного — 2.
+        self.assertNotIn('data-chip="topic"', data['chips_html'])
+        self.assertNotIn('data-chip="difficulty"', data['chips_html'])
         self.assertIn('id="ct-results"', data['results_html'])
         self.assertIn('/catalog/problem/%d/' % self.p2.pk, data['results_html'])
         self.assertIn('topic=%d' % self.mon.pk, data['url'])
@@ -78,11 +80,13 @@ class FilterStateApiTests(_Fixture):
         self.assertEqual(data['total'], 3)
         self.assertEqual(data['url'].count('topic='), 2)
 
-    def test_view_mode_and_query_ride_along(self):
+    def test_query_rides_along_and_gallery_is_gone(self):
+        # Галерея убрана (решение 17.09.2026): старый `view=gallery` не
+        # переносится в адрес и не меняет разметку списка.
         data = self._get({'view': 'gallery', 'topic': self.mon.pk})
-        self.assertIn('view=gallery', data['url'])
+        self.assertNotIn('view=', data['url'])
         self.assertIn('topic=%d' % self.mon.pk, data['url'])
-        self.assertIn('class="ct-gallery"', data['results_html'])
+        self.assertNotIn('ct-gallery', data['results_html'])
         # С запросом список зависит от поиска (в тестах он идёт по словам),
         # поэтому здесь проверяется только адрес: запрос и фильтр остаются.
         with_query = self._get({'view': 'gallery', 'topic': self.mon.pk, 'q': 'спрос'})

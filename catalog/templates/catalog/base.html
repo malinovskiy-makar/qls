@@ -127,7 +127,7 @@ button:focus-visible {
 {% endcomment %}
 {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
 
 {% include '_nav.html' %}
 
@@ -150,8 +150,8 @@ button:focus-visible {
 <script>
 
 // ⚠️ ОДИН КОНВЕЙЕР ФОРМУЛ НА ВСЁ, ЧТО ПОЯВЛЯЕТСЯ НА СТРАНИЦЕ: при загрузке,
-// после подмены выдачи фильтром (`catalog_filters.js`) и в модалке
-// «Условие» (`_catalog_js.html`). До 17.09.2026 подменённая фильтром выдача
+// после подмены выдачи фильтром (`catalog_filters.js`) и после подмены задачи «Стола» (`stol.js`; модалки «Условие»
+// нет с 18.09.2026). До 17.09.2026 подменённая фильтром выдача
 // оставалась с сырым TeX: KaTeX звался только на загрузке.
 function renderMathIn(root) {
   if (!root) { return; }

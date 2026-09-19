@@ -1,0 +1,31 @@
+{% load ru %}{% comment %}
+СТРОКА ЛЕНТЫ «СТОЛА» — одна на широкую ленту входа и узкую рядом с задачей:
+плотность решает CSS контейнера (`.rail--wide` / `.rail--narrow`), разметка
+одна. Ждёт `card` из `catalog.views._card` и `status` (код `ProblemProgress`
+или пусто); `show_status` — только у вошедшего: у гостя колонки статуса нет.
+`card.saved` — звезда «сохранено» (есть только у строк входа и выдачи);
+`appear` — первые двенадцать строк поисковой выдачи появляются лесенкой (15.09.2026).
+Репетитору (`card.teach`, README §7) вместо статуса — галочка корзины 22 px
+(`stol_basket.js` ловит клик, строка при этом не открывается) и справа
+«в N домашках» (`card.in_hw`, сколько его работ уже содержат задачу).
+
+Правило нуля: чип темы — только при теме, звёзды — при сложности, «решение»
+и «тест» — из данных. Процента близости нет (решение владельца 17.09).
+Вся строка — ссылка на задачу; кнопок в строке нет (кроме галочки репетитора). Свойства (`rail-meta`) —
+соседом тела, а не внутри: широкая строка ставит их колонкой справа, узкая —
+второй строкой под названием.
+{% endcomment %}
+<a class="rail-row{% if card.problem.pk == current_id %} is-current{% endif %}{% if appear and forloop.counter <= 12 %} ct-appear{% endif %}" href="{% url 'catalog:problem_detail' card.problem.pk %}" data-id="{{ card.problem.pk }}">
+  {% if card.teach %}<span class="rail-check" role="checkbox" aria-checked="false" tabindex="0" aria-label="В корзину" data-basket="{{ card.problem.pk }}" data-basket-title="{% if card.show_title %}{{ card.title_display }}{% else %}{{ card.preview|truncatechars:80 }}{% endif %}">{% include '_icon.html' with name='check' %}</span>{% elif show_status %}<span class="rail-status rail-status--{{ status|default:'none' }}" aria-hidden="true">{% if status == 'solved_self' or status == 'solved_hint' %}{% include '_icon.html' with name='check' %}{% elif status == 'failed' %}{% include '_icon.html' with name='arrow_left' %}{% endif %}</span>{% endif %}
+  <span class="rail-body">
+    <span class="rail-title">{% if card.show_title %}{{ card.title_display }}{% else %}{{ card.preview }}{% endif %}</span>
+    {% if card.show_title %}<span class="rail-preview">{{ card.preview }}</span>{% endif %}
+  </span>
+  <span class="rail-meta">
+    {% with topic=card.topics.0 %}{% if topic %}<span class="rail-topic" style="--gc: var(--map-g-{{ topic.section }})"><span class="rail-dot"></span><span class="rail-topic-l">{{ topic.name }}</span></span>{% endif %}{% endwith %}
+    {% if card.difficulty %}<span class="rail-stars" role="img" aria-label="сложность {{ card.difficulty }}">{% for _ in card.difficulty_stars %}★{% endfor %}{% for _ in card.difficulty_empty %}<span class="rail-star-off">☆</span>{% endfor %}</span>{% endif %}
+    {% if card.is_test %}<span class="rail-mark">тест</span>{% elif card.has_solution %}<span class="rail-mark rail-mark--sol">решение</span>{% endif %}
+    {% if card.in_hw %}<span class="rail-hw" data-hw-n="{{ card.in_hw }}">в {{ card.in_hw }} {{ card.in_hw|plural_ru:"домашке,домашках,домашках" }}</span>{% endif %}
+    {% if card.saved %}<span class="rail-saved" aria-label="сохранена">{% include '_icon.html' with name='star' %}</span>{% endif %}
+  </span>
+</a>

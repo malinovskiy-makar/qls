@@ -42,6 +42,25 @@
  *   var h = window.TopicMapPreview.mount(el, { href: '/catalog/map/' });
  *   h.stats();     // { state, frames, visible, reduced, msPerFrame }
  *   h.destroy();   // снять наблюдателей и остановить цикл
+ *
+ * ── Фон входа каталога «Стол» (README §6, 18.09.2026) ─────────────────
+ *
+ *   TopicMapPreview.mount(el, { inert: true, zoom: 1.32, pitch: -0.26,
+ *                               cy: 0.4, dim: 0.5,
+ *                               selected: { topics: ['843'], tags: [] } });
+ *   h.select({ topics: [...], tags: [...] });  // выбор = фильтры каталога
+ *   h.getAngle();  // { yaw, pitch, scale } — отдать полной карте (переход)
+ *   h.handoff();   // кадр для перехода в карту: угол, масштаб, центр в окне,
+ *                  // координаты узлов (README §6, `TMAP.enter`)
+ *   h.hold(true);  // пока открыта карта — не рисовать; h.setYaw(y) — принять
+ *                  // угол карты при возврате, чтобы облако продолжило с него
+ *
+ * `inert` — блок не ссылка и клик не слушает (фон под шапкой, мышь
+ * достаётся карточке поиска). `zoom` — во сколько раз крупнее обзора
+ * «облако целиком» (мы как бы внутри). `cy` — где центр облака по высоте
+ * блока (доля). `dim` — прозрачность невыбранного; выбранные узлы (ключ
+ * справочника `db` у узла) — полной яркостью, с кольцом, подписью и яркой
+ * связью тега с его темой.
  */
 (function () {
 'use strict';
@@ -67,7 +86,14 @@ var DEFAULTS = {
   /* Во сколько раз крупнее рисовать узлы. В маленьком окне обзор ужимает
      их до точек, и граф выглядит пылью. */
   nodeScale: 1.7,
-  margin: 0.05
+  margin: 0.05,
+  inert: false,
+  zoom: 1,
+  pitch: -0.22,
+  cy: 0.5,
+  dim: 1,
+  selected: null,
+  eager: false
 };
 
 /* ── Мелкие утилиты ──────────────────────────────────────────────────── */
@@ -151,12 +177,30 @@ function mount(el, options) {
   el.appendChild(canvas);
 
   var ctx = canvas.getContext('2d');
+  /* ⚠️ ПРИГЛУШЕНИЕ — ЦЕЛИКОМ СЛОЕМ, А НЕ ПО УЗЛАМ. Прозрачность на каждом
+     узле складывается там, где узлы и линии лежат друг на друге: при `dim`
+     0,5 самые плотные места доходили до 0,77 (замер владельца 18.09.2026:
+     альфа 183–196 из 255). Облако рисуется непрозрачным в буфер и кладётся
+     на экран одним слоем с прозрачностью `dim` — выше неё не бывает нигде. */
+  var buf = opt.dim < 1 ? document.createElement('canvas') : null;
+  var bctx = buf ? buf.getContext('2d') : ctx;
 
   var W = 0, H = 0, DPR = 1;
   var nodes = [], links = [], byId = {}, themeList = [], tagsOfTheme = {};
   var PAL = { node: [74, 82, 96], bg: [245, 245, 243] };
 
-  var yaw = 0.35, pitch = -0.22, fitScale = 1;
+  var yaw = 0.35, pitch = opt.pitch, fitScale = 1, held = false;
+  var picked = { topics: {}, tags: {} };
+  function setSelected(sel) {
+    picked = { topics: {}, tags: {} };
+    ((sel && sel.topics) || []).forEach(function (v) { picked.topics[String(v)] = true; });
+    ((sel && sel.tags) || []).forEach(function (v) { picked.tags[String(v)] = true; });
+  }
+  function isPicked(n) {
+    if (n.db === null || n.db === undefined) return false;
+    return n.k === 'theme' ? !!picked.topics[String(n.db)] : !!picked.tags[String(n.db)];
+  }
+  setSelected(opt.selected);
   var DIST = 1240, FOCAL = 900;
 
   var state = 'idle';          /* idle | loading | settling | live | error */
@@ -281,7 +325,7 @@ function mount(el, options) {
       }
     }
     var availX = W * (0.5 - opt.margin), availY = H * (0.5 - opt.margin);
-    fitScale = Math.max(0.05, Math.min(4, Math.min(availX / hx, availY / hy)));
+    fitScale = Math.max(0.05, Math.min(4, Math.min(availX / hx, availY / hy))) * opt.zoom;
   }
 
   /* ── Отрисовка ─────────────────────────────────────────────────────── */
@@ -292,6 +336,10 @@ function mount(el, options) {
     var cs = getComputedStyle(el);
     PAL.node = hexToRgb(cs.getPropertyValue('--map-node') || '#4A5260');
     PAL.dark = document.documentElement.getAttribute('data-theme') === 'dark';
+    PAL.ink = (cs.getPropertyValue('--text') || '#222').trim();
+    PAL.halo = (cs.getPropertyValue('--bg') || '#fff').trim();
+    PAL.font = cs.fontFamily || 'sans-serif';
+    PAL.sect = {};
     /* Готовые строки цвета по разделам: в кадре разбирать CSS-цвет 372
        раза дороже всей отрисовки. Ключи берём из самих узлов — списка
        разделов у предпросмотра нет, он его и не показывает. */
@@ -303,16 +351,18 @@ function mount(el, options) {
       var col = raw && raw.trim() ? hexToRgb(raw) : PAL.node;
       PAL.theme[g] = rgba(col, 1);
       PAL.tag[g] = rgba(col, 0.72);
+      PAL.sect[g] = col;
     }
   }
 
   function draw() {
     var t0 = performance.now();
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    var g = bctx;
+    g.setTransform(DPR, 0, 0, DPR, 0, 0);
     /* ⚠️ ФОН НЕ ЗАКРАШИВАЕТСЯ, А ОЧИЩАЕТСЯ. Блок стоит в чужом экране, и
        свой цвет холста он бы вырезал прямоугольником поверх карточки
        хозяина. Фон задаёт CSS блока. */
-    ctx.clearRect(0, 0, W, H);
+    g.clearRect(0, 0, W, H);
 
     var CY = Math.cos(yaw), SY = Math.sin(yaw);
     var CP = Math.cos(pitch), SP = Math.sin(pitch);
@@ -325,7 +375,7 @@ function mount(el, options) {
       if (pz < 60) { n.pz = -1; continue; }
       var s = FOCAL / pz * fitScale;
       n.px = W / 2 + ax * s;
-      n.py = H / 2 + ay * s;
+      n.py = H * opt.cy + ay * s;
       n.ps = s;
       n.pz = pz;
     }
@@ -340,33 +390,76 @@ function mount(el, options) {
       path.moveTo(a.px, a.py);
       path.lineTo(b.px, b.py);
     }
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = rgba(PAL.node, PAL.dark ? 0.30 : 0.38);
-    ctx.stroke(pTree);
-    ctx.setLineDash([2, 3]);
-    ctx.strokeStyle = rgba(PAL.node, PAL.dark ? 0.18 : 0.24);
-    ctx.stroke(pCross);
-    ctx.setLineDash([]);
+    g.lineWidth = 1;
+    g.strokeStyle = rgba(PAL.node, PAL.dark ? 0.30 : 0.38);
+    g.stroke(pTree);
+    g.setLineDash([2, 3]);
+    g.strokeStyle = rgba(PAL.node, PAL.dark ? 0.18 : 0.24);
+    g.stroke(pCross);
+    g.setLineDash([]);
 
     /* Узлы: дальние раньше ближних. Порядок пересобирается каждый кадр —
        сцена вращается, и глубина меняется у всех. */
     nodes.sort(function (p, q) { return q.pz - p.pz; });
     var fallbackTheme = rgba(PAL.node, 1), fallbackTag = rgba(PAL.node, 0.72);
+    var chosen = [];
     for (i = 0; i < nodes.length; i++) {
       n = nodes[i];
       if (n.pz < 0) continue;
       if (n.px < -20 || n.px > W + 20 || n.py < -20 || n.py > H + 20) continue;
+      if (isPicked(n)) { chosen.push(n); continue; }
       var r = Math.max(0.8, n.r0 * n.ps * opt.nodeScale);
-      ctx.fillStyle = n.k === 'theme'
+      g.fillStyle = n.k === 'theme'
         ? (PAL.theme[n.g] || fallbackTheme)
         : (PAL.tag[n.g] || fallbackTag);
-      ctx.beginPath();
-      ctx.arc(n.px, n.py, r, 0, 6.283185307179586);
-      ctx.fill();
+      g.beginPath();
+      g.arc(n.px, n.py, r, 0, 6.283185307179586);
+      g.fill();
     }
+    if (buf) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.globalAlpha = opt.dim;
+      ctx.drawImage(buf, 0, 0);
+      ctx.globalAlpha = 1;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+    if (chosen.length) drawChosen(chosen);
 
     drawn++;
     drawMs += performance.now() - t0;
+  }
+
+  /* Выбранные узлы поверх приглушённого облака: полная яркость, кольцо,
+     подпись и яркая связь тега с его темой (README §6). Подпись с ореолом
+     цветом фона: без него её перечёркивают линии облака. */
+  function drawChosen(list) {
+    var i, n;
+    for (i = 0; i < links.length; i++) {
+      var ln = links[i];
+      if (ln.k !== 'tree') continue;
+      var tag = byId[ln.t], theme = byId[ln.s];
+      if (!isPicked(tag) || theme.pz < 0 || tag.pz < 0) continue;
+      ctx.strokeStyle = rgba(PAL.sect[tag.g] || PAL.node, 0.95);
+      ctx.lineWidth = 1.8;
+      ctx.beginPath(); ctx.moveTo(theme.px, theme.py); ctx.lineTo(tag.px, tag.py); ctx.stroke();
+    }
+    ctx.font = '600 13px ' + PAL.font;
+    ctx.textBaseline = 'middle';
+    for (i = 0; i < list.length; i++) {
+      n = list[i];
+      var r = Math.max(3, n.r0 * n.ps * opt.nodeScale);
+      ctx.fillStyle = n.k === 'theme' ? (PAL.theme[n.g] || rgba(PAL.node, 1)) : rgba(PAL.sect[n.g] || PAL.node, 1);
+      ctx.beginPath(); ctx.arc(n.px, n.py, r, 0, 6.283185307179586); ctx.fill();
+      ctx.strokeStyle = PAL.ink; ctx.lineWidth = 1.6;
+      ctx.beginPath(); ctx.arc(n.px, n.py, r + 4, 0, 6.283185307179586); ctx.stroke();
+      var label = String(n.l || '');
+      if (label.length > 40) label = label.slice(0, 39) + '…';
+      ctx.lineWidth = 4; ctx.strokeStyle = PAL.halo; ctx.lineJoin = 'round';
+      ctx.strokeText(label, n.px + r + 8, n.py);
+      ctx.fillStyle = PAL.ink;
+      ctx.fillText(label, n.px + r + 8, n.py);
+    }
   }
 
   /* ── Цикл кадров ───────────────────────────────────────────────────── */
@@ -407,7 +500,7 @@ function mount(el, options) {
   }
 
   function schedule() {
-    if (dead || raf) return;
+    if (dead || raf || held) return;
     if (!visible) return;                          /* блока нет на экране */
     if (reduced && state === 'live') return;       /* движение отключено  */
     if (state !== 'settling' && state !== 'live') return;
@@ -425,6 +518,7 @@ function mount(el, options) {
     DPR = Math.min(2, window.devicePixelRatio || 1);
     canvas.width = Math.round(W * DPR);
     canvas.height = Math.round(H * DPR);
+    if (buf) { buf.width = canvas.width; buf.height = canvas.height; }
     canvas.style.width = W + 'px';
     canvas.style.height = H + 'px';
     if (state === 'live') { computeFit(); draw(); }
@@ -455,7 +549,7 @@ function mount(el, options) {
         alpha = 1;
         state = 'settling';
         resize();
-        schedule();
+        if (opt.eager) settleNow(); else schedule();
       })
       .catch(function () {
         state = 'error';
@@ -463,15 +557,37 @@ function mount(el, options) {
       });
   }
 
+  /* ⚠️ ФОН ЭКРАНА ОБЯЗАН ПОЯВИТЬСЯ БЕЗ ДЕЙСТВИЯ ЧЕЛОВЕКА (`eager`, 18.09.2026).
+     Обычный путь — видимость блока → простой браузера → кадры анимации — в
+     неактивной или фоновой вкладке не доходит до первого кадра, и облако
+     входа оставалось пустым, пока его не перерисовало что-то постороннее
+     (замер владельца). Здесь раскладка досчитывается срезами по таймеру, а
+     готовый кадр рисуется напрямую; вращение дальше — обычными кадрами. */
+  function settleNow() {
+    if (dead) return;
+    var until = performance.now() + 8;
+    while (left > 0 && performance.now() < until) { step(); left--; }
+    recentre();
+    computeFit();
+    if (left > 0) { setTimeout(settleNow, 0); return; }
+    state = 'live';
+    draw();
+    schedule();
+  }
+
   /* ── Наблюдатели ───────────────────────────────────────────────────── */
 
   var io = null;
+  if (opt.eager) {
+    visible = true;
+    start();
+  }
   if (window.IntersectionObserver) {
     io = new IntersectionObserver(function (entries) {
       var was = visible;
       visible = entries[entries.length - 1].isIntersecting;
       if (visible && !was) {
-        if (state === 'idle') whenIdle(start);
+        if (state === 'idle' && !opt.eager) whenIdle(start);
         else schedule();
       }
       /* Ушли за край экрана — кадр не просто пропускаем, а снимаем
@@ -480,7 +596,7 @@ function mount(el, options) {
       if (!visible && raf) { cancelAnimationFrame(raf); raf = 0; }
     }, { rootMargin: '120px' });
     io.observe(el);
-  } else {
+  } else if (!opt.eager) {
     visible = true;
     whenIdle(start);
   }
@@ -519,7 +635,7 @@ function mount(el, options) {
   function onKey(e) {
     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); }
   }
-  var ownsClick = el.tagName !== 'A';
+  var ownsClick = el.tagName !== 'A' && !opt.inert;
   if (ownsClick) {
     el.addEventListener('click', onClick);
     el.addEventListener('keydown', onKey);
@@ -545,6 +661,29 @@ function mount(el, options) {
        ИНВАРИАНТ «вне экрана не рисуем»: не «кадры те же самые», а заявки на
        кадр нет вовсе. */
     looping: function () { return !!raf; },
+    /* Выбор = фильтры каталога: подсветка без пересчёта раскладки. */
+    select: function (sel) {
+      setSelected(sel);
+      if (state === 'live') draw();
+    },
+    /* Угол и масштаб кадра — чтобы полная карта продолжила с того же места. */
+    getAngle: function () {
+      return { yaw: yaw, pitch: pitch, scale: fitScale };
+    },
+    /* Кадр целиком для перехода в полную карту: центр облака — в координатах
+       окна, раскладка — по ключам узлов. Пока раскладка не готова — null. */
+    handoff: function () {
+      if (state !== 'live') return null;
+      var r = el.getBoundingClientRect(), pos = {};
+      for (var i = 0; i < nodes.length; i++) pos[nodes[i].id] = [nodes[i].x, nodes[i].y, nodes[i].z];
+      return { yaw: yaw, pitch: pitch, scale: fitScale,
+               cx: r.left + W / 2, cy: r.top + H * opt.cy, pos: pos };
+    },
+    hold: function (on) {
+      held = !!on;
+      if (!held) { resize(); if (state === 'live') draw(); schedule(); }
+    },
+    setYaw: function (y) { yaw = y; if (state === 'live') draw(); },
     /* Прогон N кадров ВРУЧНУЮ, без requestAnimationFrame — тем же приёмом,
        что TMAP.spinFrames() у полной карты: в скрытой вкладке браузер кадры
        не гоняет, и ни раскладку досчитать, ни стоимость кадра снять нельзя.
