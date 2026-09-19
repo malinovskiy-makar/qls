@@ -1,0 +1,21 @@
+{% comment %}
+  _seo_meta.html — метаданные для поисковиков и карточек ссылок. Подключается
+  в <head> каждого публичного базового шаблона (catalog/base, calc2, game,
+  вход/регистрация, кабинеты).
+
+  Постоянное — на любой странице: имя сайта и подтверждение владения в
+  Google Search Console и Яндекс.Вебмастере (решение владельца 19.09.2026:
+  подтверждение мета-тегом, а не DNS-записью).
+
+  По контексту страницы (ставит представление; см. catalog/seo.py):
+    seo_title, seo_description — то же в og:title / og:description и описание;
+    seo_noindex               — «не индексировать» (выдача по строке поиска).
+{% endcomment %}
+<meta property="og:site_name" content="Weconomics.ai | Олимпиадная экономика">
+<meta name="google-site-verification" content="NqSKqN6aS731NKo_q1A1GKZj_45h_x_k4O-grGlrMFY">
+<meta name="yandex-verification" content="524e770a1722738e">
+{% if seo_noindex %}<meta name="robots" content="noindex, nofollow">
+{% endif %}{% if seo_description %}<meta name="description" content="{{ seo_description }}">
+<meta property="og:description" content="{{ seo_description }}">
+{% endif %}{% if seo_title %}<meta property="og:title" content="{{ seo_title }}">
+{% endif %}

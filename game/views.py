@@ -692,9 +692,12 @@ def _game_page_context(request):
         # Картинка одна и та же (game/static/game/og_default.png), рисует её
         # `make_og_image`.
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': 'Wecon Rush · игра на скорость по экономике',
-        'og_description': ('Три жизни, четыре режима, вопросы из реальных '
-                           'олимпиад. Сколько наберёшь?'),
+        # ⚠️ Заголовок и описание — по шаблону SEO (Notion, «Решения» 19.09.2026):
+        # они же попадают в `<title>`, `description` и карточку ссылки.
+        'og_title': 'Wecon Rush — игра для подготовки к олимпиадам по экономике | Weconomics.ai',
+        'og_description': ('Образовательная игра по экономике: решайте тесты на скорость, '
+                           'соревнуйтесь с друзьями и готовьтесь к олимпиадам интересно '
+                           'на Weconomics.ai.'),
         'page_url': request.build_absolute_uri(),
         # Панель прослушивания звука — служебная: только staff и только по
         # явному ?sound_check=1. Обычному игроку блока нет в разметке вовсе.

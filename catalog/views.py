@@ -17,7 +17,7 @@ from problems import problem_types
 from problems.enrich import features as enrich_features
 from problems.templatetags.ru import plural_ru
 
-from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, testplay
+from . import attachments, attempts, chat, filters, map_numbers, progress, search_log, seo, testplay
 from .placeholder_phrases import (
     CATALOG_PHRASES, CATALOG_STOP_TEXT, HOME_PHRASES, SEARCH_BUSY_PHRASES,
 )
@@ -205,6 +205,8 @@ def home(request):
         'topics_count':    LANDING_TOPICS,
         # Бегущая подсказка поля — общий партиал, фразы из одной константы.
         'home_phrases':    HOME_PHRASES,
+        'seo_title':       seo.HOME_TITLE,
+        'seo_description': seo.HOME_DESCRIPTION,
     }
     return render(request, 'catalog/home.html', context)
 
@@ -513,10 +515,17 @@ def _catalog_context(request, missing_id=''):
         # `ranked` (плотная нога пула — БЕЗ порога близости, в отличие от
         # базовой выдачи), поэтому активные фильтры накладываются здесь же
         # заново — тем же способом, что и на `ids` выше.
+        # ⚠️ КРАУЛЕРУ ПЛАТНОЕ ПЕРЕРАНЖИРОВАНИЕ НЕ ДОСТАЁТСЯ (19.09.2026).
+        # Amazonbot и Googlebot по адресам `?q=…` выбирали суточный потолок
+        # $0,50 к 9:18 утра, и живые ученики до конца суток получали поиск
+        # без переранжирования. Бот получает обычную выдачу, статус `off`.
         from . import rerank as smart_rerank
         rerank_started = time.perf_counter()
-        pool_order, smart_search_status = smart_rerank.apply(
-            request.user, query)
+        if seo.is_crawler(request):
+            pool_order, smart_search_status = None, 'off'
+        else:
+            pool_order, smart_search_status = smart_rerank.apply(
+                request.user, query)
         search_seconds += time.perf_counter() - rerank_started
         smart_search_ms = int(round(search_seconds * 1000))
         if pool_order:
@@ -624,6 +633,24 @@ def _entry_context(request, context):
     return extra
 
 
+def _seo_context(context):
+    """Метаданные входа каталога для поисковиков.
+
+    Выдача по строке поиска — `noindex, nofollow` (страница под каждый
+    запрос бесконечна и дорога). Каталог, отфильтрованный ровно одной темой и
+    ничем больше, — страница темы со своим заголовком и описанием; любые
+    другие сочетания фильтров заголовка не меняют.
+    """
+    if context['query']:
+        return {'seo_noindex': True}
+    active = context['filters']['active']
+    if context['filters']['selected_count'] == 1 and len(active['topics']) == 1:
+        topic = Topic.objects.filter(pk=active['topics'][0]).first()
+        if topic and is_known(topic.name):
+            return seo.topic_meta(topic.name, _fmt_number(context['total']))
+    return {}
+
+
 def problem_list(request):
     """Умный каталог: один экран, один поиск, восемь фильтров.
 
@@ -643,7 +670,11 @@ def problem_list(request):
     context = _catalog_context(request, missing_id)
     context.update(_entry_context(request, context))
     visitor, new_visitor = search_log.visitor_for(request)
-    context['search_log_id'] = search_log.log_search(request, context, visitor)
+    # Краулер в журнал поиска не пишется: 25 строк из 30 в первый день
+    # журнала были от Amazonbot и Google, а не от людей.
+    context['search_log_id'] = (None if seo.is_crawler(request)
+                                else search_log.log_search(request, context, visitor))
+    context.update(_seo_context(context))
     response = render(request, 'catalog/stol.html', context)
     if new_visitor and context['search_log_id']:
         search_log.remember_visitor(response, visitor)
@@ -696,7 +727,7 @@ def api_filter_state(request):
     # Журнал поиска — только по явной просьбе (`log=1`): иначе каждое
     # нажатие фильтра под тем же запросом было бы новой строкой.
     visitor, new_visitor = search_log.visitor_for(request)
-    if request.GET.get(search_log.LOG_PARAM) == '1':
+    if request.GET.get(search_log.LOG_PARAM) == '1' and not seo.is_crawler(request):
         context['search_log_id'] = search_log.log_search(request, context, visitor)
     fctx = context['filters']
     response = JsonResponse({
@@ -1466,6 +1497,7 @@ def problem_detail(request, pk):
                      'is_test': bool(context['test'])},
         })
     context['view'] = 'stol'
+    context.update(seo.problem_meta(problem, context['heading']))
     return render(request, 'catalog/stol.html', context)
 
 
