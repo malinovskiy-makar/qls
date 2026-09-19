@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Каталог задач{% endblock %} · Экономика</title>
+  <title>{% if seo_title %}{{ seo_title }}{% else %}{% block title %}Каталог задач{% endblock %} · Экономика{% endif %}</title>
+  {% include '_seo_meta.html' %}
 
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}

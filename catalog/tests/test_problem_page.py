@@ -51,11 +51,11 @@ class ProblemPageTests(TestCase):
     def test_named_title_is_shown_and_cut_title_is_hidden(self):
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<h1 class="pd-title">Вмешательство — 5</h1>', html)
-        self.assertIn('<title>Вмешательство — 5 · Экономика</title>', html)
+        self.assertIn('<title>Вмешательство — 5 — олимпиадная задача по экономике | Weconomics.ai</title>', html)
         html = self.client.get(_url(self.p_cut)).content.decode()
         self.assertNotIn('class="pd-title"', html)
         self.assertIn('<h1 class="sr-only">Задача: Монополия и ценовая дискриминация</h1>', html)
-        self.assertIn('<title>Задача: Монополия и ценовая дискриминация · Экономика</title>', html)
+        self.assertIn('<title>Задача: Монополия и ценовая дискриминация — олимпиадная задача по экономике | Weconomics.ai</title>', html)
         html = self.client.get(_url(self.p_bare)).content.decode()
         self.assertIn('<h1 class="sr-only">Задача</h1>', html)
 

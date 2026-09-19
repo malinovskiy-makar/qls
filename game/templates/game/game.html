@@ -17,12 +17,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wecon Rush – игра на скорость по экономике</title>
+  <title>{{ og_title }}</title>
   <meta name="description" content="{{ og_description }}">
 
   {# Карточка ссылки: та же картинка, что у страницы результата. #}
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Weconomics">
+  {% include '_seo_meta.html' %}
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_description }}">
   <meta property="og:url" content="{{ page_url }}">
