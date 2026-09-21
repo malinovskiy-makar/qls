@@ -129,6 +129,8 @@ pyopenssl==26.4.0
     # via twisted
 pypandoc==1.17
     # via -r requirements/base.in
+pyyaml==6.0.3
+    # via -r requirements/base.in
 redis==8.1.0
     # via
     #   -r requirements/base.in
