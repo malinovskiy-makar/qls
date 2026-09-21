@@ -15,6 +15,7 @@ app_name = 'vp'
 urlpatterns = [
     path('', views.index, name='index'),
     path('a/<str:code>/', views.take, name='take'),
+    path('a/<str:code>/save/', views.save, name='save'),
     path('<slug:slug>/', views.intro, name='intro'),
     path('<slug:slug>/start/', views.start, name='start'),
 ]

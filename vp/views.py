@@ -14,20 +14,23 @@
 только с безопасными полями задания, а не сами задания: эталон, верные номера и
 буквы связки змейки страница не видит.
 """
+import json
 import logging
 import secrets
 from datetime import timedelta
 
 from django.db.models import Q
-from django.http import Http404
+from django.db import transaction
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from problems import exam_engine
-from vp import blocks, scoring
+from vp import answers, blocks, scoring
 from vp.models import VPAttempt, VPItem, VPVariant
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,10 @@ SESSION_ATTEMPTS_LIMIT = 50
 
 # Раздел «Классы» на странице списка: (значение `grade_band`, подпись).
 BANDS = (('9-10', '9–10 классы'), ('11', '11 класс'))
+
+# Пачка автосохранения — до 44 ответов по паре сотен знаков; больше — не наш клиент.
+MAX_SAVE_BYTES = 20000
+MAX_SAVE_ANSWERS = 100
 
 # Варианты, чьи подписи умещаются в такую длину (числа, «Нет верного ответа»),
 # рисуются «таблетками» в ряд, а не столбцом.
@@ -262,6 +269,7 @@ def take(request, code):
     answered = [row['number'] for s in sections for row in s['rows'] if row['answered']]
     seconds_left = exam_engine.seconds_remaining(attempt, timezone.now())
     config = {
+        'saveUrl': reverse('vp:save', args=[code]),
         'numbers': numbers,
         'textNumbers': [i.number for i in items if i.kind == VPItem.Kind.SHORT_TEXT],
         'timed': attempt.with_timer,
@@ -273,3 +281,76 @@ def take(request, code):
         'answered_count': len(answered), 'total': len(numbers),
         'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
     })
+
+
+# ------------------------------------------------------- автосохранение
+
+def _json(data, status=200):
+    response = JsonResponse(data, status=status)
+    response['Cache-Control'] = 'no-store'
+    return response
+
+
+def _read_save_body(request):
+    """Тело сохранения → словарь или None.
+
+    Обычный путь — JSON. `navigator.sendBeacon` на уходе со страницы не умеет ни
+    заголовка `X-CSRFToken`, ни JSON-типа, поэтому он шлёт форму с полями
+    `csrfmiddlewaretoken` и `payload` (тот же JSON строкой).
+    """
+    try:
+        if request.content_type == 'application/json':
+            body = json.loads(request.body.decode('utf-8'))
+        else:
+            body = json.loads(request.POST.get('payload', ''))
+    except (ValueError, UnicodeDecodeError):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+@require_POST
+def save(request, code):
+    """Автосохранение пачкой: `{"answers": [{"item": 12, "raw": "лаг"}, …]}`.
+
+    Пишет только `raw` (upsert по паре попытка + задание), баллов не считает.
+    Ответ: `{"saved": N, "seconds_remaining": M}`.
+    """
+    attempt = _get_attempt(request, code)
+    now = timezone.now()
+    if attempt.submitted_at is not None:
+        return _json({'error': 'Работа сдана', 'expired': True,
+                      'seconds_remaining': 0}, status=409)
+    try:
+        too_big = int(request.META.get('CONTENT_LENGTH') or 0) > MAX_SAVE_BYTES
+    except ValueError:
+        too_big = True
+    if too_big:
+        return _json({'error': 'Слишком большой запрос'}, status=400)
+    body = _read_save_body(request)
+    entries = body.get('answers') if body else None
+    if not isinstance(entries, list) or len(entries) > MAX_SAVE_ANSWERS:
+        return _json({'error': 'Неверный формат'}, status=400)
+
+    by_number = {item.number: item for item in attempt.variant.items.all()}
+    cleaned = {}                                   # повтор номера: побеждает последний
+    for entry in entries:
+        number = entry.get('item') if isinstance(entry, dict) else None
+        item = by_number.get(number) if isinstance(number, int) and not isinstance(number, bool) else None
+        if item is None:
+            return _json({'error': 'Нет такого задания'}, status=400)
+        try:
+            cleaned[item.number] = (item, answers.clean_answer(item, entry.get('raw')))
+        except answers.AnswerError as error:
+            return _json({'error': f'Задание {number}: {error}'}, status=400)
+    try:
+        with transaction.atomic():
+            answers.save_answers(attempt, list(cleaned.values()))
+    except Exception:
+        # ⚠️ Автосохранение НИКОГДА не отвечает пятисоткой: для клиента она
+        # неотличима от «сохранилось», и он выбросил бы значения из очереди.
+        # Отвечаем «попробуй ещё» — написанное остаётся на странице.
+        logger.exception('Автосохранение ВП не удалось (попытка %s)', attempt.pk)
+        return _json({'error': 'Не удалось сохранить, пробуем ещё', 'retry': True,
+                      'seconds_remaining': exam_engine.seconds_remaining(attempt, now)})
+    return _json({'saved': len(cleaned),
+                  'seconds_remaining': exam_engine.seconds_remaining(attempt, now)})

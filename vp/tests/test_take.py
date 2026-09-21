@@ -3,16 +3,19 @@
 Нумерация `test_NN_…` — сценарии из задания сессии 2; остальные тесты — рядом.
 Время двигается через `at(...)` (патч `django.utils.timezone.now`), пауз нет.
 """
+import json
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal as D
 from types import SimpleNamespace
+from unittest import mock
 
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError
 from django.test import Client, TestCase
 from django.urls import reverse
 
 from vp import views
-from vp.models import VPAttempt
+from vp.models import VPAnswer, VPAttempt
 from vp.tests.helpers import at, make_published
 
 User = get_user_model()
@@ -261,3 +264,174 @@ class PenaltyExampleTests(TestCase):
             item = multi([1, 2], points=points)              # 2 верных, 3 неверных
             self.assertEqual(score_item(item, [1])[0], per_right)
             self.assertEqual(score_item(item, [1, 2, 3])[0], D(points) - per_wrong)
+
+
+class SaveTests(ViewBase):
+    def save_url(self, attempt):
+        return reverse('vp:save', args=[attempt.public_code])
+
+    def post(self, client, attempt, answers, **extra):
+        return client.post(self.save_url(attempt), json.dumps({'answers': answers}),
+                           content_type='application/json', **extra)
+
+    def rows(self, attempt):
+        return {a.item.number: a for a in attempt.answers.select_related('item')}
+
+    def test_05_save_writes_raw_and_a_repeat_updates_the_row(self):
+        attempt, _ = self.start()
+        self.assertEqual(self.post(self.guest, attempt, [{'item': 1, 'raw': 'первый'}]).status_code, 200)
+        self.post(self.guest, attempt, [{'item': 1, 'raw': 'второй'}])
+        rows = self.rows(attempt)
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[1].raw, 'второй')
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 1)
+
+    def test_twelve_fields_make_twelve_rows_with_raw_and_no_score(self):
+        attempt, _ = self.start()
+        batch = [{'item': n, 'raw': f'ответ {n}'} for n in range(1, 13)]
+        response = self.post(self.guest, attempt, batch)
+        self.assertEqual(response.json()['saved'], 12)
+        rows = VPAnswer.objects.filter(attempt=attempt)
+        self.assertEqual(rows.count(), 12)
+        self.assertEqual(rows.exclude(raw__isnull=True).count(), 12)
+        self.assertEqual(rows.filter(score__isnull=True, max_score__isnull=True,
+                                     is_correct__isnull=True).count(), 12)
+
+    def test_response_shape_is_saved_and_seconds_remaining(self):
+        with at(T0):
+            attempt, _ = self.start(with_timer='1')
+        with at(T0 + timedelta(seconds=100)):
+            body = self.post(self.guest, attempt, [{'item': 1, 'raw': 'x'}]).json()
+        self.assertEqual(body, {'saved': 1, 'seconds_remaining': 1700})
+
+    def test_untimed_response_has_null_seconds(self):
+        attempt, _ = self.start(with_timer='0')
+        body = self.post(self.guest, attempt, [{'item': 1, 'raw': 'x'}]).json()
+        self.assertEqual(body, {'saved': 1, 'seconds_remaining': None})
+
+    def test_every_kind_is_saved_as_its_own_shape(self):
+        attempt, _ = self.start()
+        item = self.variant.items.get(number=44)
+        item.kind, item.options, item.correct = 'match', [{'n': 1, 'text': 'а'}, {'n': 2, 'text': 'б'}], {'к1': 2, 'к2': 1}
+        item.save()
+        batch = [{'item': 1, 'raw': '  картель '}, {'item': 31, 'raw': 2},
+                 {'item': 36, 'raw': [3, 1, 3]}, {'item': 44, 'raw': {'к1': 2, 'к2': ''}}]
+        self.assertEqual(self.post(self.guest, attempt, batch).status_code, 200)
+        raws = {n: a.raw for n, a in self.rows(attempt).items()}
+        self.assertEqual(raws, {1: 'картель', 31: 2, 36: [1, 3], 44: {'к1': 2}})
+
+    def test_clearing_an_answer_keeps_the_row_with_null(self):
+        attempt, _ = self.start()
+        self.post(self.guest, attempt, [{'item': 1, 'raw': 'x'}, {'item': 36, 'raw': [1]}])
+        self.post(self.guest, attempt, [{'item': 1, 'raw': ''}, {'item': 36, 'raw': []}])
+        rows = self.rows(attempt)
+        self.assertIsNone(rows[1].raw)
+        self.assertIsNone(rows[36].raw)
+        self.assertEqual(len(rows), 2)
+
+    def test_repeated_item_in_one_batch_last_one_wins(self):
+        attempt, _ = self.start()
+        self.post(self.guest, attempt, [{'item': 1, 'raw': 'старый'}, {'item': 1, 'raw': 'новый'}])
+        self.assertEqual(self.rows(attempt)[1].raw, 'новый')
+
+    def test_reload_shows_what_was_saved(self):
+        attempt, _ = self.start()
+        self.post(self.guest, attempt, [{'item': 1, 'raw': 'мой ответ'}, {'item': 31, 'raw': 3},
+                                        {'item': 36, 'raw': [1, 4]}])
+        html = self.guest.get(self.take_url(attempt)).content.decode()
+        self.assertIn('value="мой ответ"', html)
+        self.assertRegex(html, r'name="item-31" value="3" checked')
+        self.assertRegex(html, r'name="item-36" value="4" checked')
+        self.assertRegex(html, r'отвечено <b id="vp-answered">3</b> из 44')
+
+    def test_04b_foreign_code_is_404_on_save_and_saves_nothing(self):
+        attempt, _ = self.start()
+        other = User.objects.create_user('vp_o', password='p12345')
+        logged = Client()
+        logged.force_login(other)
+        for client in (self.stranger, Client(), logged):
+            response = self.post(client, attempt, [{'item': 1, 'raw': 'подмена'}])
+            self.assertEqual(response.status_code, 404)
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 0)
+
+    def test_a_bad_entry_rejects_the_whole_batch(self):
+        attempt, _ = self.start()
+        cases = [
+            [{'item': 1, 'raw': 'ок'}, {'item': 99, 'raw': 'x'}],           # нет такого задания
+            [{'item': 1, 'raw': 'ок'}, {'item': 31, 'raw': 9}],             # нет такого варианта
+            [{'item': 1, 'raw': 'ок'}, {'item': 36, 'raw': [1, 8]}],
+            [{'item': 1, 'raw': 'ок'}, {'item': 2, 'raw': 'я' * 201}],      # длиннее предела
+            [{'item': 1, 'raw': 'ок'}, {'raw': 'нет номера'}],
+            [{'item': 1, 'raw': 'ок'}, {'item': True, 'raw': 'x'}],
+            [{'item': 1, 'raw': 'ок'}, 'не словарь'],
+        ]
+        for batch in cases:
+            self.assertEqual(self.post(self.guest, attempt, batch).status_code, 400, batch)
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 0)
+
+    def test_malformed_bodies_are_400(self):
+        attempt, _ = self.start()
+        url = self.save_url(attempt)
+        for body in ('не json', '[]', '{"answers": "нет"}', '{}', '{"answers": %s}' % json.dumps([{'item': 1, 'raw': 'x'}] * 101)):
+            response = self.guest.post(url, body, content_type='application/json')
+            self.assertEqual(response.status_code, 400, body[:30])
+
+    def test_oversized_body_is_rejected(self):
+        attempt, _ = self.start()
+        body = json.dumps({'answers': [{'item': 1, 'raw': 'x' * 30000}]})
+        response = self.guest.post(self.save_url(attempt), body, content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 0)
+
+    def test_csrf_is_enforced_for_json(self):
+        attempt, _ = self.start()
+        strict = Client(enforce_csrf_checks=True)
+        strict.cookies = self.guest.cookies
+        response = self.post(strict, attempt, [{'item': 1, 'raw': 'x'}])
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 0)
+
+    def test_beacon_form_with_token_and_payload_is_accepted(self):
+        """sendBeacon не ставит заголовки: токен и пачка едут полями формы."""
+        attempt, _ = self.start()
+        strict = Client(enforce_csrf_checks=True)
+        strict.cookies = self.guest.cookies
+        token = strict.get(self.take_url(attempt)).cookies['csrftoken'].value
+        payload = json.dumps({'answers': [{'item': 3, 'raw': 'по маяку'}]})
+        response = strict.post(self.save_url(attempt),
+                               {'csrfmiddlewaretoken': token, 'payload': payload})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(self.rows(attempt)[3].raw, 'по маяку')
+        response = strict.post(self.save_url(attempt),
+                               {'csrfmiddlewaretoken': 'чужой', 'payload': payload})
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_is_not_allowed(self):
+        attempt, _ = self.start()
+        self.assertEqual(self.guest.get(self.save_url(attempt)).status_code, 405)
+
+    def test_saving_into_a_submitted_attempt_is_409(self):
+        attempt, _ = self.start()
+        VPAttempt.objects.filter(pk=attempt.pk).update(submitted_at=T0)
+        response = self.post(self.guest, attempt, [{'item': 1, 'raw': 'поздно'}])
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(VPAnswer.objects.filter(attempt=attempt).count(), 0)
+
+    def test_racing_insert_falls_back_to_update(self):
+        """Второй INSERT об уникальность (attempt, item) не должен стать 500."""
+        attempt, _ = self.start()
+        item = self.variant.items.get(number=1)
+        VPAnswer.objects.create(attempt=attempt, item=item, raw='чужой')
+        with mock.patch.object(VPAnswer.objects, 'update_or_create',
+                               side_effect=IntegrityError('dup')):
+            response = self.post(self.guest, attempt, [{'item': 1, 'raw': 'мой'}])
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual([a.raw for a in VPAnswer.objects.filter(attempt=attempt, item=item)], ['мой'])
+
+    def test_a_server_failure_is_reported_as_retry_never_as_500(self):
+        attempt, _ = self.start()
+        with mock.patch('vp.answers.save_answers', side_effect=RuntimeError('boom')):
+            response = self.post(self.guest, attempt, [{'item': 1, 'raw': 'x'}])
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()['retry'])
+        self.assertNotIn('saved', response.json())

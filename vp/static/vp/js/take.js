@@ -5,8 +5,9 @@
  *   1. ответы — чтение полей, «отвечено», плитки навигатора;
  *   2. «сейчас здесь» и переход к заданию;
  *   3. клавиатура: Enter ведёт по змейке вниз и НИКОГДА не сдаёт работу;
- *   4. шапка: высота, тема.
- * Автосохранение, таймер и сдача добавляются ниже своими разделами.
+ *   4. шапка: высота, тема;
+ *   5. автосохранение пачкой.
+ * Таймер и сдача добавляются ниже своими разделами.
  *
  * ⚠️ Имена узлов задаёт `templates/vp/take.html` и `_take_item.html`:
  * `#vp-item-<n>`, `.vp-cell[data-n]`, поля `name="item-<n>"`.
@@ -31,6 +32,10 @@
   var reduceMotion = window.matchMedia
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var countNode = $('vp-answered');
+  var stateNode = $('vp-save-state');
+  var csrfField = form.querySelector('input[name=csrfmiddlewaretoken]');
+  var csrf = csrfField ? csrfField.value : '';
+  function now() { return performance.now(); }
 
   // =============================================================== 1. ответы
   /** Что сейчас введено в задании — в том виде, в каком это уходит на сервер. */
@@ -160,9 +165,15 @@
     var n = itemOf(event.target);
     if (n === null) { return; }
     repaintAnswered(n);
+    markDirty(n);
   }
   form.addEventListener('input', onEdited);
   form.addEventListener('change', onEdited);
+  // Ушли из поля — не ждём тишины в 3 секунды (но и не чаще одного запроса в 10).
+  form.addEventListener('focusout', function (event) {
+    var n = itemOf(event.target);
+    if (n !== null && dirty[n]) { scheduleFlush(0); }
+  });
 
   document.addEventListener('click', function (event) {
     var cell = event.target.closest ? event.target.closest('.vp-cell') : null;
@@ -203,6 +214,147 @@
     paintTheme();
   }
 
+  // ================================================ 5. автосохранение пачкой
+  // Изменения копятся и уходят ОДНОЙ пачкой: через 3 секунды после последнего
+  // нажатия, но не чаще одного запроса в 10 секунд; сразу (без ожидания) — только
+  // при уходе со страницы. Потеря фокуса полем приближает отправку к моменту, когда
+  // минимальный интервал позволит, но интервал не нарушает.
+  var IDLE_MS = 3000;
+  var MIN_GAP_MS = 10000;
+  var dirty = {};          // n → true, пока сервер не подтвердил ТЕКУЩЕЕ значение
+  var version = {};        // n → счётчик правок (чтобы не снять «грязное» зря)
+  var flushTimer = null;
+  var lastSentAt = null;
+  var inFlight = false;
+  var offline = false;
+  var stopped = false;
+
+  function anyDirty() { return Object.keys(dirty).length > 0; }
+
+  function paintSave() {
+    if (!stateNode) { return; }
+    stateNode.classList.toggle('is-offline', offline);
+    if (offline) {
+      stateNode.textContent = 'нет связи, ответы сохранены на странице, пробуем отправить';
+    } else if (inFlight || anyDirty()) {
+      stateNode.textContent = 'сохраняем…';
+    } else {
+      stateNode.textContent = 'сохранено';
+    }
+  }
+
+  function markDirty(n) {
+    if (stopped) { return; }
+    version[n] = (version[n] || 0) + 1;
+    dirty[n] = true;
+    paintSave();
+    scheduleFlush(IDLE_MS);
+  }
+
+  /** Отправка через `delay` мс, но не раньше, чем пройдёт MIN_GAP_MS с прошлой. */
+  function scheduleFlush(delay) {
+    if (stopped) { return; }
+    var wait = delay;
+    if (lastSentAt !== null) { wait = Math.max(wait, lastSentAt + MIN_GAP_MS - now()); }
+    clearTimeout(flushTimer);
+    flushTimer = setTimeout(flush, Math.max(0, wait));
+  }
+
+  function collect() {
+    var numbers = Object.keys(dirty).map(Number).sort(function (a, b) { return a - b; });
+    var sent = {};
+    var answers = numbers.map(function (n) {
+      sent[n] = version[n] || 0;
+      return { item: n, raw: readValue(n) };
+    });
+    return { answers: answers, sent: sent };
+  }
+
+  function flush() {
+    flushTimer = null;
+    if (stopped || inFlight || !anyDirty()) { paintSave(); return; }
+    var batch = collect();
+    inFlight = true;
+    lastSentAt = now();
+    paintSave();
+    fetch(cfg.saveUrl, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ answers: batch.answers })
+    })
+      .then(function (response) {
+        return response.json().then(function (data) {
+          return { ok: response.ok, status: response.status, data: data };
+        });
+      })
+      .then(function (result) {
+        inFlight = false;
+        offline = false;
+        if (result.status === 409) { onClosed(); return; }
+        if (result.ok) {
+          Object.keys(batch.sent).forEach(function (key) {
+            if ((version[key] || 0) === batch.sent[key]) { delete dirty[key]; }
+          });
+          onServerTime(result.data.seconds_remaining);
+        } else if (result.data && result.data.retry) {
+          offline = true;               // сервер честно сказал «не сохранил» — повтор
+        } else {
+          // Отказ по существу (400): повторять то же самое бессмысленно.
+          Object.keys(batch.sent).forEach(function (key) { delete dirty[key]; });
+        }
+        paintSave();
+        if (anyDirty()) { scheduleFlush(offline ? MIN_GAP_MS : IDLE_MS); }
+      })
+      .catch(function () {
+        inFlight = false;
+        offline = true;
+        paintSave();
+        scheduleFlush(MIN_GAP_MS);
+      });
+  }
+
+  /** Работа закрыта на сервере (сдана или время вышло): дальше решает сервер. */
+  function onClosed() {
+    stopped = true;
+    window.location.reload();
+  }
+
+  function onServerTime() { /* часы появятся в разделе «время» */ }
+
+  /** Уход со страницы: всё несохранённое уезжает сразу, без интервала. `sendBeacon`
+   * не умеет заголовков, поэтому шлёт форму: токен CSRF и та же пачка строкой. */
+  function flushOnLeave() {
+    if (stopped || !anyDirty()) { return; }
+    var payload = JSON.stringify({ answers: collect().answers });
+    var data = new FormData();
+    data.append('csrfmiddlewaretoken', csrf);
+    data.append('payload', payload);
+    var queued = false;
+    try { queued = navigator.sendBeacon && navigator.sendBeacon(cfg.saveUrl, data); }
+    catch (error) { queued = false; }
+    if (!queued) {
+      try {
+        fetch(cfg.saveUrl, { method: 'POST', keepalive: true, credentials: 'same-origin',
+                             headers: { 'X-CSRFToken': csrf }, body: data });
+      } catch (error) { /* страница закрывается — больше сделать нечего */ }
+    }
+  }
+
+  window.addEventListener('pagehide', flushOnLeave);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') { flushOnLeave(); }
+  });
+  window.addEventListener('online', function () {
+    offline = false; paintSave(); if (anyDirty()) { scheduleFlush(0); }
+  });
+  window.addEventListener('offline', function () { offline = true; paintSave(); });
+  // Возврат кнопкой «назад» из кэша страницы: работа могла быть уже сдана, а
+  // страница ожила бы со старым состоянием. Решает сервер.
+  window.addEventListener('pageshow', function (event) {
+    if (event.persisted) { window.location.reload(); }
+  });
+
   measureBar();
   recount();
+  paintSave();
 })();
