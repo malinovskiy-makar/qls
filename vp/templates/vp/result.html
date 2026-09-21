@@ -1,0 +1,40 @@
+{% extends 'vp/base_vp.html' %}
+{% load vp_extras %}
+{% comment %}
+Минимальный результат. Публичен по коду: ссылкой можно поделиться, поэтому здесь
+ТОЛЬКО итоги — ни ответов, ни эталонов, ни сведений о том, кто решал. Разбор
+цепочки и арифметика штрафов — следующая сессия; обещаний на эту тему нет.
+{% endcomment %}
+{% block title %}Результат · {{ variant.title }}{% endblock %}
+{% block content %}
+<div class="vp-wrap">
+  <div class="vp-result">
+
+    <div class="vp-card vp-score-card">
+      <div>
+        <div class="vp-mute">{{ variant.title }} · {{ variant.grade_band|grade_label }}</div>
+        <div class="vp-score-num"><b>{{ score|num }}</b><span>из {{ max|num }}</span></div>
+        <div class="vp-mute vp-mt-sm">{{ time_text }}{% if auto %} · сдано по истечении времени{% endif %}</div>
+      </div>
+    </div>
+
+    <div class="vp-card">
+      <h2 class="vp-h3">По блокам</h2>
+      <div class="vp-rows">
+        {% for b in blocks %}
+        <div class="vp-brow">
+          <span class="vp-brow-name">{{ b.name }}, {{ b.range }}</span>
+          <span class="vp-brow-score">{{ b.score|num }} / {{ b.max|num }}</span>
+          <span class="vp-brow-track"><span class="vp-brow-fill is-{{ b.tone }}" style="width: {{ b.percent }}%"></span></span>
+          <span class="vp-brow-pct">{{ b.percent }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div>
+      <a class="vp-btn" href="{% url 'vp:index' %}">Пройти другой вариант</a>
+    </div>
+  </div>
+</div>
+{% endblock %}

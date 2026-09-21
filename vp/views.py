@@ -16,6 +16,7 @@
 """
 import json
 import logging
+import math
 import secrets
 from datetime import timedelta
 
@@ -27,11 +28,11 @@ from django.templatetags.static import static
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.urls import reverse
-from django.views.decorators.http import require_POST
+from django.views.decorators.http import require_GET, require_POST
 
 from problems import exam_engine
 from vp import answers, blocks, scoring
-from vp.models import VPAttempt, VPItem, VPVariant
+from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +43,9 @@ SESSION_ATTEMPTS_LIMIT = 50
 
 # Раздел «Классы» на странице списка: (значение `grade_band`, подпись).
 BANDS = (('9-10', '9–10 классы'), ('11', '11 класс'))
+
+# Клиентскому «время вышло» верим, только если серверные часы с ним согласны.
+AUTO_SUBMIT_TOLERANCE = timedelta(seconds=3)
 
 # Пачка автосохранения — до 44 ответов по паре сотен знаков; больше — не наш клиент.
 MAX_SAVE_BYTES = 20000
@@ -105,7 +109,12 @@ def _current_attempt(request, variant):
         if key:
             mine |= Q(session_key=key)
         attempts = attempts.filter(user__isnull=True).filter(mine)
-    return attempts.order_by('-started_at', '-id').first()
+    attempt = attempts.order_by('-started_at', '-id').first()
+    if attempt is not None and _lapsed(attempt):
+        # Показывать «продолжить» у работы, время которой вышло, значило бы обманывать.
+        _finalize(attempt, auto=True)
+        return None
+    return attempt
 
 
 def _new_code():
@@ -114,6 +123,81 @@ def _new_code():
         code = secrets.token_urlsafe(9)[:12]
         if not VPAttempt.objects.filter(public_code=code).exists():
             return code
+
+
+# ------------------------------------------------------ время и сдача
+
+def _lapsed(attempt, now=None):
+    """Время попытки вышло: срок и запас (`exam_engine.GRACE_SECONDS`) прошли.
+
+    Запас нужен ради последнего ответа, который летит по сети в момент, когда таймер
+    дошёл до нуля: «всё, что введено, засчитается» — обещание экрана, и оно
+    выполняется только с запасом. Арифметику остатка не пишем: `can_accept` берём
+    у `problems.exam_engine` — там же защита «остаток не больше выданного».
+    """
+    if attempt.submitted_at is not None or attempt.expires_at is None:
+        return False
+    return not exam_engine.can_accept(attempt, now or timezone.now())
+
+
+def _finalize(attempt, auto, now=None):
+    """Сдаёт попытку: баллы по КАЖДОМУ заданию, итог, момент сдачи. Одна функция на
+    ручную и на автосдачу. Идемпотентна: сданную не пересчитывает и не трогает.
+
+    Возвращает True, если именно этот вызов сдал попытку.
+    """
+    now = now or timezone.now()
+    with transaction.atomic():
+        locked = VPAttempt.objects.select_for_update().select_related('variant').get(pk=attempt.pk)
+        if locked.submitted_at is not None:
+            done = False
+        else:
+            _grade(locked)
+            locked.score = scoring.score_attempt(locked)
+            locked.max_score = locked.variant.max_score
+            moment = now
+            if locked.expires_at is not None and moment > locked.expires_at:
+                moment = locked.expires_at     # время сдачи — срок, а не «когда заметили»
+            locked.submitted_at = moment
+            locked.is_auto_submitted = bool(auto)
+            locked.save(update_fields=['score', 'max_score', 'submitted_at', 'is_auto_submitted'])
+            done = True
+    attempt.refresh_from_db()
+    return done
+
+
+def _grade(attempt):
+    """Баллы, максимум и «верно/нет/не отвечено» по каждому заданию варианта.
+
+    Неотвеченные тоже получают строку: `score=0`, `is_correct=None`. Всё считает
+    `scoring.score_item`.
+    """
+    existing = {a.item_id: a for a in attempt.answers.all()}
+    fresh, changed = [], []
+    for item in attempt.variant.items.all():
+        answer = existing.get(item.pk)
+        if answer is None:
+            answer = VPAnswer(attempt=attempt, item=item)
+            fresh.append(answer)
+        else:
+            changed.append(answer)
+        answer.score, answer.is_correct = scoring.score_item(item, answer.raw)
+        answer.max_score = item.points
+    VPAnswer.objects.bulk_create(fresh)
+    VPAnswer.objects.bulk_update(changed, ['score', 'max_score', 'is_correct'])
+
+
+def _load_attempt(request, code):
+    """Попытка владельца; если время вышло — сначала сдана автоматически.
+
+    Через неё идут `take`, `save`, `time_left` и `finish`: любое обращение по
+    истёкшей попытке закрывает её. Фонового задания, которое ходило бы и
+    закрывало, нет, и на нашем хостинге быть не может.
+    """
+    attempt = _get_attempt(request, code)
+    if _lapsed(attempt):
+        _finalize(attempt, auto=True)
+    return attempt
 
 
 # --------------------------------------------------------- список и вход
@@ -256,7 +340,9 @@ def _row(item, raw):
 @never_cache
 def take(request, code):
     """Страница прохождения: все задания варианта сразу, с сохранёнными ответами."""
-    attempt = _get_attempt(request, code)
+    attempt = _load_attempt(request, code)
+    if attempt.submitted_at is not None:
+        return redirect('vp:result', code=code)
     variant = attempt.variant
     raw = {a.item_id: a.raw for a in attempt.answers.all()}
     items = list(variant.items.all())
@@ -270,6 +356,7 @@ def take(request, code):
     seconds_left = exam_engine.seconds_remaining(attempt, timezone.now())
     config = {
         'saveUrl': reverse('vp:save', args=[code]),
+        'timeUrl': reverse('vp:time', args=[code]),
         'numbers': numbers,
         'textNumbers': [i.number for i in items if i.kind == VPItem.Kind.SHORT_TEXT],
         'timed': attempt.with_timer,
@@ -280,6 +367,7 @@ def take(request, code):
         'numbers': numbers, 'answered_numbers': answered,
         'answered_count': len(answered), 'total': len(numbers),
         'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
+        'finish_url': reverse('vp:finish', args=[code]),
     })
 
 
@@ -315,7 +403,7 @@ def save(request, code):
     Пишет только `raw` (upsert по паре попытка + задание), баллов не считает.
     Ответ: `{"saved": N, "seconds_remaining": M}`.
     """
-    attempt = _get_attempt(request, code)
+    attempt = _load_attempt(request, code)
     now = timezone.now()
     if attempt.submitted_at is not None:
         return _json({'error': 'Работа сдана', 'expired': True,
@@ -354,3 +442,116 @@ def save(request, code):
                       'seconds_remaining': exam_engine.seconds_remaining(attempt, now)})
     return _json({'saved': len(cleaned),
                   'seconds_remaining': exam_engine.seconds_remaining(attempt, now)})
+
+
+# ------------------------------------------------------------------ время
+
+@never_cache
+@require_GET
+def time_left(request, code):
+    """«Сколько осталось» — самый дешёвый запрос страницы (клиент — раз в 20 секунд)."""
+    attempt = _load_attempt(request, code)
+    if attempt.submitted_at is not None:
+        return _json({'expired': True, 'seconds_remaining': 0})
+    left = exam_engine.seconds_remaining(attempt, timezone.now())
+    return _json({'expired': left == 0, 'seconds_remaining': left})
+
+
+# ------------------------------------------------------------------ сдача
+
+def _final_answer(request, item):
+    """Значение поля из формы сдачи или `_MISSING`, если поля в форме нет."""
+    prefix = f'item-{item.number}'
+    if item.kind == VPItem.Kind.MATCH:
+        pairs = {key[len(prefix) + 1:]: value for key, value in request.POST.items()
+                 if key.startswith(prefix + '.')}
+        return pairs or _MISSING
+    if prefix not in request.POST:
+        return _MISSING
+    sent = [v for v in request.POST.getlist(prefix) if v != '']
+    if item.kind == VPItem.Kind.MULTI:
+        return sent
+    if item.kind == VPItem.Kind.SINGLE:
+        return sent[-1] if sent else None
+    return request.POST.get(prefix, '')
+
+
+_MISSING = object()
+
+
+@require_POST
+def finish(request, code):
+    """Сдача по кнопке (и по «времени вышло» — клиент шлёт `auto=1`).
+
+    Форма везёт содержимое ВСЕХ полей ещё раз: последняя порция набранного могла
+    не успеть уехать автосохранением, а терять её нельзя. Побеждает последний.
+    Повторная сдача сданной попытки ничего не пересчитывает: идёт на результат.
+    """
+    attempt = _load_attempt(request, code)
+    now = timezone.now()
+    if attempt.submitted_at is None:
+        if exam_engine.can_accept(attempt, now):
+            for item in attempt.variant.items.all():
+                value = _final_answer(request, item)
+                if value is _MISSING:
+                    continue
+                try:
+                    cleaned = answers.clean_answer(item, value)
+                except answers.AnswerError:
+                    continue        # мусорное поле не должно ронять сдачу всей работы
+                answers.save_answers(attempt, [(item, cleaned)])
+        timed_out = attempt.expires_at is not None and (
+            now >= attempt.expires_at
+            or (request.POST.get('auto') == '1' and now >= attempt.expires_at - AUTO_SUBMIT_TOLERANCE))
+        _finalize(attempt, auto=timed_out, now=now)
+    return redirect('vp:result', code=code)
+
+
+# --------------------------------------------------------------- результат
+
+def _time_text(attempt):
+    """Строка под баллом: «28:41 из 30:00» или «без таймера»."""
+    if not attempt.with_timer or attempt.expires_at is None:
+        return 'без таймера'
+    # ⚠️ Лимит округляем ВВЕРХ: `started_at` ставит база (`auto_now_add`) на доли
+    # секунды позже, чем считался `expires_at`, и `int()` показал бы «29:59 из 30:00».
+    limit = math.ceil((attempt.expires_at - attempt.started_at).total_seconds())
+    spent = limit if attempt.is_auto_submitted else int(
+        (attempt.submitted_at - attempt.started_at).total_seconds())
+    spent = max(0, min(spent, limit))
+    return f'{spent // 60:02d}:{spent % 60:02d} из {limit // 60:02d}:{limit % 60:02d}'
+
+
+def _percent(got, top):
+    return max(0, min(100, round(float(got) / float(top) * 100))) if top else 0
+
+
+@never_cache
+def result(request, code):
+    """Минимальный результат: балл, разбивка по блокам, время. Публичен по коду.
+
+    ⚠️ Публичен ОСОЗНАННО: ссылкой можно поделиться. Поэтому здесь ТОЛЬКО итоги —
+    ни ответов, ни эталонов, ни сведений о том, кто решал. Полный разбор — сессия 3.
+    Несданную попытку видит только владелец, и его ведёт обратно к заданиям.
+    """
+    attempt = get_object_or_404(
+        VPAttempt.objects.select_related('variant'), public_code=code)
+    if attempt.submitted_at is None:
+        _get_attempt(request, code)              # чужой — 404
+        return redirect('vp:take', code=code)
+
+    totals = scoring.block_totals(attempt)
+    sections = blocks.sections(list(attempt.variant.items.all()))
+    rows = []
+    for section in sections:
+        got, top = totals.get(section['block'], (0, section['total']))
+        percent = _percent(got, top)
+        rows.append({'name': section['titles']['short'], 'range': section['range'],
+                     'score': got, 'max': top, 'percent': percent,
+                     'tone': 'good' if percent >= 75 else 'mid' if percent >= 50 else 'bad'})
+    return render(request, 'vp/result.html', {
+        'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True,
+        'score': attempt.score, 'max': attempt.max_score or attempt.variant.max_score,
+        'time_text': _time_text(attempt), 'auto': attempt.is_auto_submitted,
+        'blocks': rows,
+    })

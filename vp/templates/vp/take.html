@@ -55,8 +55,9 @@
     </div>
   </aside>
 
-  <form class="vp-main-col" id="vp-form" method="post" autocomplete="off">
+  <form class="vp-main-col" id="vp-form" method="post" action="{{ finish_url }}" autocomplete="off">
     {% csrf_token %}
+    <input type="hidden" name="auto" value="0" id="vp-auto">
     {% for s in sections %}
     <section class="vp-section" aria-labelledby="vp-sec-{{ s.first }}">
       <div class="vp-section-head">
@@ -70,6 +71,23 @@
     </section>
     {% endfor %}
   </form>
+</div>
+
+<dialog class="vp-dialog" id="vp-dialog" aria-labelledby="vp-dialog-title">
+  <h2 class="vp-h2" id="vp-dialog-title">Сдать работу?</h2>
+  <p id="vp-dialog-text"></p>
+  <div class="vp-chips" id="vp-dialog-chips"></div>
+  <div class="vp-dialog-row">
+    <button type="button" class="vp-btn" id="vp-confirm">Сдать и посмотреть разбор</button>
+    <button type="button" class="vp-btn vp-btn--plain" id="vp-back" autofocus>Вернуться к заданиям</button>
+  </div>
+</dialog>
+
+<div class="vp-timeup" role="alertdialog" aria-live="assertive" aria-label="Время вышло">
+  <div class="vp-card">
+    <h2>Время вышло</h2>
+    <p>Сдаём работу — засчитается всё, что было введено к этому моменту.</p>
+  </div>
 </div>
 
 {{ config|json_script:"vp-config" }}

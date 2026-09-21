@@ -186,3 +186,17 @@ def penalty_example(points):
     """
     points = Fraction(points)
     return _round(points / 2), _round(points / 3)
+
+
+def block_totals(attempt):
+    """Баллы сданной попытки по блокам: `{блок: (набрано, максимум)}`.
+
+    Читает баллы, записанные при сдаче в `VPAnswer`, и складывает их по блокам;
+    порядок блоков — по номеру первого задания. Своей проверки ответов не делает.
+    """
+    totals = {}
+    answers = attempt.answers.select_related('item').order_by('item__number')
+    for answer in answers:
+        got, top = totals.get(answer.item.block, (_ZERO, _ZERO))
+        totals[answer.item.block] = (got + (answer.score or _ZERO), top + answer.item.points)
+    return totals

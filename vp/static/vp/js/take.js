@@ -6,8 +6,14 @@
  *   2. «сейчас здесь» и переход к заданию;
  *   3. клавиатура: Enter ведёт по змейке вниз и НИКОГДА не сдаёт работу;
  *   4. шапка: высота, тема;
- *   5. автосохранение пачкой.
- * Таймер и сдача добавляются ниже своими разделами.
+ *   5. автосохранение пачкой;
+ *   6. время: часы, состояния шапки, опрос сервера;
+ *   7. сдача: окно подтверждения, «время вышло».
+ *
+ * ⚠️ КЛИЕНТ НЕ ИСТОЧНИК ПРАВДЫ О ВРЕМЕНИ. Он рисует обратный отсчёт (часы —
+ * `platform/exam_timer.js`: монотонные, `Date.now()` не вызывается, серверная
+ * сверка умеет только УМЕНЬШИТЬ остаток), а решение «время вышло» принимает
+ * СЕРВЕР. Здесь мы приходим к нему сдаваться.
  *
  * ⚠️ Имена узлов задаёт `templates/vp/take.html` и `_take_item.html`:
  * `#vp-item-<n>`, `.vp-cell[data-n]`, поля `name="item-<n>"`.
@@ -165,6 +171,7 @@
     var n = itemOf(event.target);
     if (n === null) { return; }
     repaintAnswered(n);
+    paintBanner();
     markDirty(n);
   }
   form.addEventListener('input', onEdited);
@@ -313,13 +320,14 @@
       });
   }
 
-  /** Работа закрыта на сервере (сдана или время вышло): дальше решает сервер. */
+  /** Работа закрыта на сервере (сдана или время вышло): идём к нему сдаваться. */
   function onClosed() {
-    stopped = true;
-    window.location.reload();
+    // Без таймера «закрыто» значит «сдано в другой вкладке» — экран «время вышло»
+    // был бы неправдой: просто идём на результат.
+    if (timer) { enterTimeUp(); } else { submitNow(false); }
   }
 
-  function onServerTime() { /* часы появятся в разделе «время» */ }
+  function onServerTime(seconds) { syncFromServer(seconds); }
 
   /** Уход со страницы: всё несохранённое уезжает сразу, без интервала. `sendBeacon`
    * не умеет заголовков, поэтому шлёт форму: токен CSRF и та же пачка строкой. */
@@ -354,7 +362,175 @@
     if (event.persisted) { window.location.reload(); }
   });
 
+  // ============================================================== 6. время
+  var POLL_MS = 20000;
+  var timer = (cfg.timed && window.ExamTimer)
+    ? window.ExamTimer.create({ seconds: cfg.seconds }) : null;
+  var timeUp = false;
+  var intervals = [];
+  var banner = $('vp-banner');
+  var timerNode = $('vp-timer');
+  var clockNode = $('vp-clock');
+  var capNode = $('vp-timer-cap');
+
+  function plural(n, one, few, many) {
+    var m = Math.abs(n) % 100;
+    if (m >= 11 && m <= 14) { return many; }
+    m = m % 10;
+    if (m === 1) { return one; }
+    if (m >= 2 && m <= 4) { return few; }
+    return many;
+  }
+
+  function setBanner(text, danger) {
+    if (!banner) { return; }
+    if (text === null) { banner.hidden = true; return; }
+    banner.hidden = false;
+    banner.classList.toggle('is-danger', danger);
+    // Живой регион: перезапись тем же текстом заставила бы читалку экрана
+    // повторять фразу каждую секунду.
+    if (banner.textContent !== text) { banner.textContent = text; }
+  }
+
+  function paintBanner() {
+    if (!timer) { return; }
+    var left = timer.remaining();
+    if (timeUp || left <= 60) {
+      setBanner('Последняя минута. Работа сдастся сама — всё, что введено, '
+        + 'засчитается.', true);
+    } else if (left <= 300) {
+      var missed = missedNumbers();
+      setBanner('Осталось пять минут. ' + (missed.length
+        ? 'Не отвечено ' + missed.length + ' '
+          + plural(missed.length, 'задание', 'задания', 'заданий')
+          + ': ' + missed.join(', ') + '.'
+        : 'Все задания отвечены.'), false);
+    } else {
+      setBanner(null, false);
+    }
+  }
+
+  function paintTimer() {
+    if (!timer || !timerNode) { return; }
+    var left = timer.remaining();
+    var danger = timeUp || left <= 60;
+    var warn = !danger && left <= 300;
+    timerNode.textContent = timeUp ? '00:00' : timer.text();
+    clockNode.classList.toggle('is-warn', warn);
+    clockNode.classList.toggle('is-danger', danger);
+    if (capNode) {
+      capNode.textContent = timeUp ? 'время вышло'
+        : (danger ? 'последняя минута'
+          : (warn ? 'осталось пять минут' : 'осталось'));
+    }
+    paintBanner();
+  }
+
+  function syncFromServer(value) {
+    if (timer && timer.applyServer(value) === 'accepted') { paintTimer(); }
+  }
+
+  function tick() {
+    if (!timer || timeUp) { return; }
+    paintTimer();
+    if (timer.expired()) { enterTimeUp(); }
+  }
+
+  /** Опрос сервера: клиент рисует секунды сам, а тут сверяется с настоящими. */
+  function pollTime() {
+    if (stopped || timeUp || !cfg.timeUrl) { return; }
+    fetch(cfg.timeUrl, { credentials: 'same-origin',
+                         headers: { 'X-Requested-With': 'fetch' } })
+      .then(function (response) { return response.json(); })
+      .then(function (data) {
+        offline = false;
+        if (data.expired) { enterTimeUp(); return; }
+        syncFromServer(data.seconds_remaining);
+        paintSave();
+      })
+      .catch(function () { /* сеть отвалилась — отсчёт идёт своими часами */ });
+  }
+
+  // ============================================================== 7. сдача
+  function stopAll() {
+    stopped = true;
+    clearTimeout(flushTimer);
+    intervals.forEach(function (id) { clearInterval(id); });
+    intervals = [];
+  }
+
+  /** Форма уезжает на сервер со ВСЕМИ полями: последняя порция набранного не
+   * теряется, даже если автосохранение отстало. */
+  function submitNow(auto) {
+    if (form.dataset.submitted) { return; }
+    form.dataset.submitted = '1';
+    stopAll();
+    var flag = $('vp-auto');
+    if (flag) { flag.value = auto ? '1' : '0'; }
+    form.submit();
+  }
+
+  /** Время вышло (по нашим часам, опросу или ответу 409): показываем экран и
+   * сдаёмся. Засчитывается всё, что введено, — решение за сервером. */
+  function enterTimeUp() {
+    if (timeUp) { return; }
+    timeUp = true;
+    stopAll();
+    paintTimer();
+    document.body.classList.add('vp-is-timeup');
+    setTimeout(function () { submitNow(true); }, 300);
+  }
+
+  var dialog = $('vp-dialog');
+  function openDialog() {
+    var missed = missedNumbers();
+    var total = cfg.numbers.length;
+    var head = timer ? 'Осталось ' + timer.text() + ', и не отвечено ' : 'Не отвечено ';
+    var text = missed.length
+      ? head + missed.length + ' ' + plural(missed.length, 'задание', 'задания', 'заданий')
+        + '. Неотвеченное засчитывается как ноль.'
+      : 'Отвечены все ' + total + ' ' + plural(total, 'задание', 'задания', 'заданий') + '.';
+    text += ' После сдачи менять ответы нельзя.';
+
+    if (!dialog || typeof dialog.showModal !== 'function') {
+      if (window.confirm(text)) { submitNow(false); }
+      return;
+    }
+    $('vp-dialog-text').textContent = text;
+    var chips = $('vp-dialog-chips');
+    chips.textContent = '';
+    missed.forEach(function (n) {
+      var link = document.createElement('a');
+      link.className = 'vp-chip';
+      link.href = '#vp-item-' + n;
+      link.dataset.n = n;
+      link.textContent = n;
+      chips.appendChild(link);
+    });
+    dialog.showModal();
+  }
+
+  $('vp-submit').addEventListener('click', openDialog);
+  $('vp-back').addEventListener('click', function () { dialog.close(); });
+  $('vp-confirm').addEventListener('click', function () {
+    dialog.close();
+    submitNow(false);
+  });
+  // Номер в окне: закрыть окно и прокрутить к заданию.
+  $('vp-dialog-chips').addEventListener('click', function (event) {
+    var chip = event.target.closest ? event.target.closest('.vp-chip') : null;
+    if (!chip) { return; }
+    event.preventDefault();
+    dialog.close();
+    focusItem(parseInt(chip.dataset.n, 10), 'center');
+  });
+
   measureBar();
   recount();
   paintSave();
+  paintTimer();
+  if (timer) {
+    intervals.push(setInterval(tick, 1000));
+    intervals.push(setInterval(pollTime, POLL_MS));
+  }
 })();
