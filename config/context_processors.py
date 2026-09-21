@@ -82,6 +82,10 @@ def _menu(request):
     add('/catalog/', 'Каталог', namespace='catalog')
     add('/textbook/', 'Учебник', url_name='textbook')
     add('/olympiads/', 'Олимпиады', namespace='olympiads')
+    # ⚠️ ПУНКТ СЕЗОННЫЙ: нужен до 30 сентября 2026, потом решается его судьба (даты тура —
+    # `vp/config.py`). Убирать вместе с записью в sitemap (`catalog/seo.py::StaticSitemap`),
+    # ADR 0127.
+    add('/vp/', 'Высшая проба', namespace='vp')
     add('/calc2/', 'Графики', path_has='calc2')
     add('/game/', 'Wecon Rush', path_has='/game/')
 

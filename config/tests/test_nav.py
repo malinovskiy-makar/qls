@@ -48,7 +48,7 @@ class MenuByRoleTests(TestCase):
     def test_guest(self):
         self.assertEqual(
             self._labels(),
-            ['Каталог', 'Учебник', 'Олимпиады', 'Графики', 'Wecon Rush'])
+            ['Каталог', 'Учебник', 'Олимпиады', 'Высшая проба', 'Графики', 'Wecon Rush'])
 
     def test_student_has_lessons_and_no_stats(self):
         user = User.objects.create_user(username='nav_st', password=PASSWORD,
@@ -56,7 +56,7 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(
             labels,
-            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады',
+            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады', 'Высшая проба',
              'Графики', 'Wecon Rush'])
         # Статистика живёт в профиле; двух входов в одно место быть не должно.
         self.assertNotIn('Статистика', labels)
@@ -66,7 +66,7 @@ class MenuByRoleTests(TestCase):
                                         role='teacher')
         self.assertEqual(
             self._labels(user),
-            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады',
+            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады', 'Высшая проба',
              'Графики', 'Wecon Rush'])
 
     def test_staff_gets_admin_item(self):
@@ -93,21 +93,22 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(len(labels), len(set(labels)), labels)
 
-    def test_counts_are_five_six_six(self):
-        """Числовой инвариант состава: гость 5, ученик 6, учитель 6.
+    def test_counts_are_six_seven_seven(self):
+        """Числовой инвариант состава: гость 6, ученик 7, учитель 7.
 
-        Было 5 / 7 / 7 — «Календарь» ушёл из шапки 08.09.2026.
+        Было 5 / 7 / 7 — «Календарь» ушёл из шапки 08.09.2026; стало на один больше у
+        всех — «Высшая проба» встала после «Олимпиад» (сезонный пункт, сессия 4).
         """
         student = User.objects.create_user(username='nav_c1', password=PASSWORD,
                                            role='student')
         teacher = User.objects.create_user(username='nav_c2', password=PASSWORD,
                                            role='teacher')
         self.client.logout()
-        self.assertEqual(len(self._labels()), 5)
+        self.assertEqual(len(self._labels()), 6)
         self.client.logout()
-        self.assertEqual(len(self._labels(student)), 6)
+        self.assertEqual(len(self._labels(student)), 7)
         self.client.logout()
-        self.assertEqual(len(self._labels(teacher)), 6)
+        self.assertEqual(len(self._labels(teacher)), 7)
 
     def test_calendar_left_the_menu_but_the_page_is_alive(self):
         """⚠️ Убрана ССЫЛКА, а не раздел.
@@ -149,6 +150,7 @@ class ActiveItemTests(TestCase):
     def test_only_the_current_item_is_active(self):
         for url, expected in (('/catalog/', 'Каталог'),
                               ('/olympiads/', 'Олимпиады'),
+                              ('/vp/', 'Высшая проба'),
                               ('/game/', 'Wecon Rush'),
                               ('/textbook/', 'Учебник')):
             html = self.client.get(url).content.decode('utf-8')
