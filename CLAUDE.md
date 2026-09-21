@@ -393,6 +393,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | Слои проверок и их ловушки | [docs/TESTING.md](docs/TESTING.md) |
 | Банк задач: цифры, конвейеры, брак | [docs/DATA.md](docs/DATA.md) |
 | **Игра: механика, экономика, таблица, анти-чит, дуэль в реальном времени** | [docs/GAME.md](docs/GAME.md) |
+| **Тренажёр «Высшая проба»: маршруты, доступ к попытке, время, сохранение, тесты** | [docs/VP.md](docs/VP.md) |
 | Цвета, типографика, правила экранов (канон, части 0–5) | [DESIGN.md](DESIGN.md) |
 | Почему решили именно так | [docs/adr/](docs/adr/) |
 | Как это было сделано (история сессий) | [CLAUDE_ARCHIVE.md](CLAUDE_ARCHIVE.md) |
