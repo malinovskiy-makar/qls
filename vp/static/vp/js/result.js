@@ -11,6 +11,14 @@
   var csrf = csrfField ? csrfField.value : '';
   var urlNode = document.getElementById('vp-practice-url');
   var practiceUrl = urlNode ? JSON.parse(urlNode.textContent) : '';
+  var variantNode = document.querySelector('[data-variant]');
+  var variantSlug = variantNode ? variantNode.getAttribute('data-variant') : '';
+
+  /* Аналитика: `weco.track` шлёт события на существующий /api/track/. Нет `weco`
+     (заблокирован) - молча ничего, кнопки от этого работать не перестают. */
+  function track(name, props) {
+    if (window.weco && window.weco.track) window.weco.track(name, props);
+  }
 
   /* ── Поделиться: ссылка в буфер обмена, без внешних сервисов ───────────── */
   var share = document.getElementById('vp-share');
@@ -40,6 +48,7 @@
 
   if (share) {
     share.addEventListener('click', function () {
+      track('vp_share_click', { variant: variantSlug });
       var link = window.location.origin + window.location.pathname;
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(link).then(function () { shared(true); },
@@ -79,6 +88,7 @@
       return response.json().then(function (data) { return { ok: response.ok, data: data }; });
     }).then(function (reply) {
       if (!reply.ok) { show(out, reply.data.error || 'Не удалось проверить.', 'bad'); return; }
+      track('vp_practice_check', { variant: variantSlug, item: Number(box.getAttribute('data-item')) });
       if (reply.data.is_correct) show(out, 'Верно: ' + reply.data.right, 'ok');
       else show(out, 'Неверно. Верный ответ: ' + reply.data.right, 'bad');
     }).catch(function () {

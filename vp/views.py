@@ -31,9 +31,12 @@ from django.views.decorators.cache import never_cache
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
+from catalog import seo
 from problems import exam_engine
-from vp import answers, blocks, review, scoring
+from vp import answers, blocks, landing, review, scoring, tracking
+from vp.config import BANDS, TOUR_DATES
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
+from vp.templatetags.vp_extras import grade_label
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +44,6 @@ logger = logging.getLogger(__name__)
 # после входа в аккаунт (ключ сессии при входе меняется, данные сессии — нет).
 SESSION_ATTEMPTS = 'vp_attempts'
 SESSION_ATTEMPTS_LIMIT = 50
-
-# Раздел «Классы» на странице списка: (значение `grade_band`, подпись).
-BANDS = (('9-10', '9–10 классы'), ('11', '11 класс'))
 
 # Клиентскому «время вышло» верим, только если серверные часы с ним согласны.
 AUTO_SUBMIT_TOLERANCE = timedelta(seconds=3)
@@ -210,17 +210,32 @@ def _load_attempt(request, code):
 # --------------------------------------------------------- список и вход
 
 def index(request):
-    """Опубликованные варианты по классам. Публичный экран."""
+    """Посадочная: что за тур, формат, как считаются баллы, змейка, варианты по классам.
+
+    Публичный экран. Числа формата и пример змейки берутся из ОПУБЛИКОВАННЫХ вариантов, а
+    в списке персонал видит и черновики: страница не должна показывать другие числа тому,
+    кто открыл её вошедшим.
+    """
     variants = VPVariant.objects.all()
     if not _is_staff(request):
         variants = variants.filter(is_published=True)
-    variants = list(variants)
+    variants = list(variants.prefetch_related('items'))
+    published = [v for v in variants if v.is_published]
     bands = []
     for code, label in BANDS:
         chosen = [v for v in variants if v.grade_band == code]
         if chosen:
             bands.append({'label': label, 'variants': chosen})
-    return render(request, 'vp/index.html', {'bands': bands})
+    groups = landing.format_groups(published)
+    has_demo = any(v.source_kind == VPVariant.SourceKind.DEMO for v in published)
+    return render(request, 'vp/index.html', {
+        'bands': bands, 'groups': groups, 'facts': landing.facts(groups),
+        'tour_dates': landing.dates_text(TOUR_DATES),
+        'has_snake': any(r['block'] == 'snake' for g in groups for r in g['rows']),
+        'snake': landing.snake_example(published),
+        'vp_events': [tracking.event('vp_landing_open')],
+        **seo.vp_landing_meta(has_demo),
+    })
 
 
 def _answered_count(attempt):
@@ -255,6 +270,8 @@ def intro(request, slug):
         'penalty_example': example,
         'attempt': attempt,
         'attempt_answered': _answered_count(attempt) if attempt else 0,
+        'vp_events': [tracking.event('vp_intro_open', variant=variant.slug)],
+        **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year),
     })
 
 
@@ -284,6 +301,7 @@ def start(request, slug):
             max_score=variant.max_score,
             public_code=_new_code(),
         )
+        tracking.defer(request, 'vp_start', variant=variant.slug, with_timer=with_timer)
     _remember(request, attempt.public_code)
     return redirect('vp:take', code=attempt.public_code)
 
@@ -375,6 +393,7 @@ def take(request, code):
         'answered_count': len(answered), 'total': len(numbers),
         'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
         'finish_url': reverse('vp:finish', args=[code]),
+        'vp_events': tracking.take_deferred(request),
     })
 
 
@@ -523,16 +542,29 @@ def finish(request, code):
 
 # --------------------------------------------------------------- результат
 
+def _limit_seconds(attempt):
+    """Лимит времени попытки на время, секунды.
+
+    ⚠️ Округляем ВВЕРХ: `started_at` ставит база (`auto_now_add`) на доли секунды позже,
+    чем считался `expires_at`, и `int()` показал бы «29:59 из 30:00».
+    """
+    return math.ceil((attempt.expires_at - attempt.started_at).total_seconds())
+
+
+def _spent_seconds(attempt):
+    """Сколько секунд ушло на попытку. На время — не больше лимита, автосдача — весь лимит."""
+    spent = int((attempt.submitted_at - attempt.started_at).total_seconds())
+    if not attempt.with_timer or attempt.expires_at is None:
+        return max(0, spent)
+    limit = _limit_seconds(attempt)
+    return max(0, min(limit if attempt.is_auto_submitted else spent, limit))
+
+
 def _time_text(attempt):
     """Строка под баллом: «28:41 из 30:00» или «без таймера»."""
     if not attempt.with_timer or attempt.expires_at is None:
         return 'без таймера'
-    # ⚠️ Лимит округляем ВВЕРХ: `started_at` ставит база (`auto_now_add`) на доли
-    # секунды позже, чем считался `expires_at`, и `int()` показал бы «29:59 из 30:00».
-    limit = math.ceil((attempt.expires_at - attempt.started_at).total_seconds())
-    spent = limit if attempt.is_auto_submitted else int(
-        (attempt.submitted_at - attempt.started_at).total_seconds())
-    spent = max(0, min(spent, limit))
+    limit, spent = _limit_seconds(attempt), _spent_seconds(attempt)
     return f'{spent // 60:02d}:{spent % 60:02d} из {limit // 60:02d}:{limit % 60:02d}'
 
 
@@ -568,11 +600,19 @@ def result(request, code):
                      'score': got, 'max': top, 'percent': percent,
                      'tone': 'good' if percent >= 75 else 'mid' if percent >= 50 else 'bad'})
     top_score = attempt.max_score or attempt.variant.max_score
+    slug = attempt.variant.slug
+    events = []
+    if owner and tracking.first_submit_view(request, code):
+        events.append(tracking.event(
+            'vp_submit', variant=slug, score=float(attempt.score or 0),
+            answered=_answered_count(attempt), seconds_used=_spent_seconds(attempt),
+            auto=attempt.is_auto_submitted))
+    events.append(tracking.event('vp_result_open', variant=slug, own=owner))
     context = {
         'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True,
         'score': attempt.score, 'max': top_score, 'score_percent': _percent(attempt.score, top_score),
         'time_text': _time_text(attempt), 'auto': attempt.is_auto_submitted,
-        'blocks': rows, 'is_owner': owner,
+        'blocks': rows, 'is_owner': owner, 'vp_events': events,
     }
     comparison = review.comparison(attempt)
     if comparison is not None:

@@ -251,7 +251,7 @@ class IntroTests(ViewBase):
     def test_empty_index_is_honest(self):
         self.variant.is_published = False
         self.variant.save()
-        self.assertContains(self.guest.get(reverse('vp:index')), 'Варианты появятся здесь')
+        self.assertContains(self.guest.get(reverse('vp:index')), 'Опубликованных вариантов пока нет')
 
 
 class PenaltyExampleTests(TestCase):

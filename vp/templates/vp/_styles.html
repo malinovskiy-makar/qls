@@ -110,6 +110,26 @@
 }
 .vp-resume p { flex: 1 1 260px; }
 
+/* ── Посадочная ──────────────────────────────────────────────────── */
+.vp-lead { margin-top: 10px; max-width: 64ch; font-size: 16.5px; line-height: 1.55; color: var(--text2); }
+.vp-hero .vp-btn { margin-top: 20px; }
+.vp-sec { margin-top: 36px; scroll-margin-top: 64px; }
+.vp-table thead th {
+  text-align: left; font-size: 12.5px; font-weight: 600; color: var(--text2);
+  padding: 0 0 6px; border-bottom: var(--line, 1px) solid var(--border);
+}
+.vp-table th.is-num, .vp-table td.is-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.vp-table th.is-num, .vp-table td.is-num { padding-left: 14px; }
+.vp-table td.is-num { width: 1%; }
+.vp-table tfoot td { border-top: var(--line, 1px) solid var(--border); border-bottom: 0; font-weight: 600; }
+.vp-table tfoot td:first-child { color: inherit; }
+.vp-sec .vp-card > .vp-stack:first-child { margin-top: 0; }
+.vp-vlist { display: flex; flex-direction: column; gap: 10px; margin-top: 10px; }
+.vp-vrow { display: flex; align-items: center; justify-content: space-between; gap: 12px 16px; flex-wrap: wrap; padding: 16px 20px; }
+.vp-vrow-main { flex: 1 1 260px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.vp-vrow-main b { font-size: 16px; overflow-wrap: anywhere; }
+.vp-vrow-main .vp-pill { align-self: flex-start; }
+
 /* ── Прохождение ─────────────────────────────────────────────────── */
 /* На странице прохождения шапка сайта, кружки угла и кнопка Telegram спрятаны: до
    задания меньше отвлекающего, двойная липкая шапка закрыла бы поле на телефоне, а
@@ -377,6 +397,12 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 @media (max-width: 760px) {
   .vp-wrap { padding: 20px 16px 40px; }
   .vp-h1 { font-size: 24px; }
+  .vp-lead { font-size: 15.5px; }
+  .vp-sec { margin-top: 28px; }
+  .vp-vrow { padding: 14px 16px; }
+  .vp-vrow .vp-btn { flex: 1 1 100%; }
+  .vp-table td:first-child { width: 48px; }
+  .vp-table th.is-num, .vp-table td.is-num { padding-left: 8px; }
   .vp-head-clock { text-align: left; }
   .vp-bar-row { flex-wrap: wrap; gap: 8px 12px; padding: 8px 16px; min-height: 0; }
   /* Название варианта на телефоне не нужно, пока решаешь: остаётся одна короткая

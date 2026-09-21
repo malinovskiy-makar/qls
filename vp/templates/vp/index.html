@@ -1,29 +1,143 @@
 {% extends 'vp/base_vp.html' %}
 {% load vp_extras %}
+{% comment %}
+Посадочная `/vp/`: что за тур, что в нём нового, из чего состоит вариант, как считаются
+баллы, что такое змейка, список вариантов, что делать, если сайт не открывается.
+
+⚠️ ЧИСЛА ЗДЕСЬ ТОЛЬКО ИЗ ДАННЫХ. Число заданий, минуты, баллы и таблица блоков считаются
+из заданий ОПУБЛИКОВАННЫХ вариантов (`vp/landing.py`), цепочка змейки – из настоящего
+варианта, даты тура – из `vp/config.py`. Вбитых чисел в шаблоне нет (тест
+`test_landing`). Расходятся варианты разных классов – таблица и правила выводятся по
+классам.
+
+⚠️ ТОЛЬКО ТО, ЧТО РАБОТАЕТ СЕГОДНЯ. Режимов и кнопок, которых нет в приложении, на
+странице нет. Длинного тире в видимом тексте нет (правило сайта, `scripts/check_em_dash.py`).
+{% endcomment %}
 {% block title %}Высшая проба, 1 тур{% endblock %}
 {% block content %}
 <div class="vp-wrap">
-  <div class="vp-eyebrow">Отборочный этап · 1 тур</div>
-  <h1 class="vp-h1">Тренажёр «Высшей пробы»</h1>
-  <p class="vp-sub">Варианты первого тура: задания на время, проверка сразу после сдачи.</p>
 
-  {% for band in bands %}
-  <section class="vp-band">
-    <h2 class="vp-h2">{{ band.label }}</h2>
-    <div class="vp-cards">
-      {% for v in band.variants %}
-      <a class="vp-card vp-vcard" href="{% url 'vp:intro' v.slug %}">
-        <b>{{ v.title }}</b>
-        <span class="vp-mute">{{ v.year }}{% if v.author %} · {{ v.author }}{% endif %}</span>
-        {% if not v.is_published %}<span class="vp-pill vp-pill--draft">Не опубликован</span>{% endif %}
-      </a>
-      {% endfor %}
+  <header class="vp-hero">
+    <div class="vp-eyebrow">Отборочный этап · 1 тур</div>
+    <h1 class="vp-h1">Высшая проба по экономике, 1 тур</h1>
+    <p class="vp-lead">Тренажёр 1 тура отборочного этапа олимпиады «Высшая проба» по экономике: варианты на время, автоматическая проверка и разбор после сдачи.</p>
+    {% if bands %}<a class="vp-btn vp-btn--lg" href="#vp-variants">Выбрать вариант</a>{% endif %}
+  </header>
+
+  <section class="vp-sec" id="vp-new" aria-labelledby="vp-new-h">
+    <h2 class="vp-h2" id="vp-new-h">Что изменилось в этом году</h2>
+    <div class="vp-card vp-mt-sm">
+      <div class="vp-stack">
+        <p>1 тур появился в отборочном этапе впервые{% if tour_dates %} и проходит {{ tour_dates }}{% endif %}.</p>
+        <p>Формат новый{% if facts %}: {{ facts.count|plural:"задание,задания,заданий" }} за {{ facts.minutes|plural:"минуту,минуты,минут" }}, {{ facts.total|points_word }}{% endif %}, всё проверяется автоматически.{% if groups %} Тренажёр устроен так же: блоки заданий и подсчёт баллов описаны ниже.{% endif %}</p>
+      </div>
     </div>
   </section>
-  {% empty %}
-  <div class="vp-card vp-mt-lg">
-    <p>Варианты появятся здесь перед началом тура.</p>
-  </div>
-  {% endfor %}
+
+  {% if groups %}
+  <section class="vp-sec" id="vp-format" aria-labelledby="vp-format-h">
+    <h2 class="vp-h2" id="vp-format-h">Из чего состоит вариант</h2>
+    {% for g in groups %}
+    <div class="vp-card vp-mt-sm">
+      {% if groups|length > 1 %}<h3 class="vp-h3">{{ g.label }}</h3>{% endif %}
+      <table class="vp-table vp-table--blocks">
+        <thead>
+          <tr>
+            <th scope="col">Задания</th>
+            <th scope="col">Блок</th>
+            <th scope="col" class="is-num">Заданий</th>
+            <th scope="col" class="is-num">Баллов</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in g.rows %}
+          <tr data-block="{{ r.block }}">
+            <td>{{ r.range }}</td>
+            <td>{{ r.title }}</td>
+            <td class="is-num">{{ r.count }}</td>
+            <td class="is-num">{{ r.total|num }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td></td>
+            <td>Всего</td>
+            <td class="is-num">{{ g.count }}</td>
+            <td class="is-num">{{ g.total|num }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% endfor %}
+  </section>
+
+  <section class="vp-sec" id="vp-scoring" aria-labelledby="vp-scoring-h">
+    <h2 class="vp-h2" id="vp-scoring-h">Как считаются баллы</h2>
+    {% for g in groups %}
+    <div class="vp-card vp-mt-sm">
+      {% if groups|length > 1 %}<h3 class="vp-h3">{{ g.label }}</h3>{% endif %}
+      <div class="vp-stack">
+        {% if g.whole_ranges %}<p>Задания {{ g.whole_ranges|join:" и " }}: или полный балл, или ноль. Частично верный ответ баллов не приносит.</p>{% endif %}
+        {% if g.partial_ranges %}
+        <p>В заданиях {{ g.partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю балла, а <b>каждый лишний отнимает</b> свою долю.{% if g.penalty_example %} Если в задании 2 верных и 3 неверных варианта, верный даёт +{{ g.penalty_example.0|num }}, лишний отнимает {{ g.penalty_example.1|num }}.{% endif %}</p>
+        <p>Отметить все варианты подряд не получится: верные принесут долю балла, лишние заберут её обратно, и за задание выйдет ноль. Ниже нуля за одно задание не уходим.</p>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </section>
+  {% endif %}
+
+  {% if has_snake %}
+  <section class="vp-sec" id="vp-snake" aria-labelledby="vp-snake-h">
+    <h2 class="vp-h2" id="vp-snake-h">Что такое змейка</h2>
+    <div class="vp-card vp-mt-sm">
+      <p class="vp-text">В змейке каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов, берётся вторая буква первого слова. Это не только правило, но и проверка себя: не сходится буква, значит, где-то ошибка.</p>
+      {% if snake %}
+      <p class="vp-mute vp-mt">Так выглядит цепочка из {{ snake.words|length }} заданий варианта «{{ snake.variant.title }}». Выделена вторая буква ответа: с неё начинается следующий.</p>
+      <div class="vp-chain-demo" role="img" aria-label="Цепочка из {{ snake.words|length }} ответов: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+        {% for w in snake.words %}<span>{{ w.before }}{% if w.mark %}<b>{{ w.mark }}</b>{% endif %}{{ w.after }}</span>{% if not forloop.last %}<i aria-hidden="true">→</i>{% endif %}{% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </section>
+  {% endif %}
+
+  <section class="vp-sec" id="vp-variants" aria-labelledby="vp-variants-h">
+    <h2 class="vp-h2" id="vp-variants-h">Варианты</h2>
+    {% if bands %}
+    <p class="vp-mute vp-mt-xs">Регистрация не нужна. Ответы сохраняются сами, проходить вариант можно сколько угодно раз.</p>
+    {% for band in bands %}
+    <div class="vp-band">
+      <h3 class="vp-h3">{{ band.label }}</h3>
+      <div class="vp-vlist">
+        {% for v in band.variants %}
+        <article class="vp-card vp-vrow">
+          <div class="vp-vrow-main">
+            <b>{{ v.title }}</b>
+            <span class="vp-mute">{{ v.get_source_kind_display }} · {{ v.year }}{% if v.author %} · {{ v.author }}{% endif %}{% if v.source_note %} · {{ v.source_note }}{% endif %}</span>
+            {% if not v.is_published %}<span class="vp-pill vp-pill--draft">Не опубликован</span>{% endif %}
+          </div>
+          <a class="vp-btn" href="{% url 'vp:intro' v.slug %}" aria-label="Пройти вариант «{{ v.title }}»">Пройти</a>
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+    {% endfor %}
+    {% else %}
+    <div class="vp-card vp-mt-sm">
+      <p class="vp-text">Опубликованных вариантов пока нет.</p>
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="vp-sec" id="vp-help" aria-labelledby="vp-help-h">
+    <div class="vp-card">
+      <h2 class="vp-h2" id="vp-help-h">Если сайт не открывается</h2>
+      <p class="vp-text">У части провайдеров и через VPN сайт может не открываться. Помогает отключить VPN или добавить weconomics.ai в его исключения.</p>
+    </div>
+  </section>
+
 </div>
 {% endblock %}
