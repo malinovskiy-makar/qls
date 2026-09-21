@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Каталог задач{% endblock %} · Экономика</title>
+  <title>{% if seo_title %}{{ seo_title }}{% else %}{% block title %}Каталог задач{% endblock %} · Экономика{% endif %}</title>
+  {% include '_seo_meta.html' %}
 
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
@@ -23,11 +24,17 @@ body {
   color: var(--text);
   background: var(--bg);
   min-height: 100vh;
+  /* Колонка во всю высоту окна: метка версии (`_site_version.html`, margin-top: auto)
+     стоит внизу окна и на короткой странице, а не посередине под содержимым. */
+  display: flex;
+  flex-direction: column;
   transition: background-color .2s ease, color .2s ease;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
 }
+/* Во flex-колонке `margin: 0 auto` сжал бы main по содержимому — ширину задаём явно. */
+body > main { width: 100%; }
 
 /* ── Шапка ─────────────────────────────────────────── */
 .site-header {
@@ -121,7 +128,7 @@ button:focus-visible {
 {% endcomment %}
 {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body{% block body_attrs %}{% endblock %}>
 
 {% include '_nav.html' %}
 
@@ -144,8 +151,8 @@ button:focus-visible {
 <script>
 
 // ⚠️ ОДИН КОНВЕЙЕР ФОРМУЛ НА ВСЁ, ЧТО ПОЯВЛЯЕТСЯ НА СТРАНИЦЕ: при загрузке,
-// после подмены выдачи фильтром (`catalog_filters.js`) и в модалке
-// «Условие» (`_catalog_js.html`). До 17.09.2026 подменённая фильтром выдача
+// после подмены выдачи фильтром (`catalog_filters.js`) и после подмены задачи «Стола» (`stol.js`; модалки «Условие»
+// нет с 18.09.2026). До 17.09.2026 подменённая фильтром выдача
 // оставалась с сырым TeX: KaTeX звался только на загрузке.
 function renderMathIn(root) {
   if (!root) { return; }

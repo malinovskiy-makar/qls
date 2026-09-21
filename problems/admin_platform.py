@@ -22,6 +22,7 @@ from .models_platform import (
     SavedFolder,
     SavedGraph,
     SavedProblem,
+    SearchLog,
     UserProfile,
 )
 
@@ -211,6 +212,28 @@ class EventAdmin(admin.ModelAdmin):
         return obj.visitor[:8]
 
     def has_add_permission(self, request):
+        return False
+
+
+@admin.register(SearchLog)
+class SearchLogAdmin(admin.ModelAdmin):
+    """Журнал поиска каталога (18.09.2026): только чтение.
+
+    Разбор качества поиска — выгрузкой `search_export`; здесь — убедиться
+    глазами, что строки идут по одной на запрос и оценки доходят."""
+
+    list_display = ('ts', 'query', 'status', 'ms', 'total', 'rating', 'rating_text')
+    list_filter = ('rating', 'status', 'degraded')
+    search_fields = ('query',)
+    date_hierarchy = 'ts'
+    readonly_fields = ('ts', 'user', 'visitor', 'session_key', 'query', 'status',
+                       'ms', 'total', 'degraded', 'top_ids', 'rating', 'rated_at',
+                       'rating_text')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
 

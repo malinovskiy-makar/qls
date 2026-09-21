@@ -165,23 +165,24 @@ def personal_stats(user, mode):
 
     Считается по ВСЕМ его забегам этого режима, а не только зачётным:
     человеку интересно, сколько он играл, а не сколько попало в таблицу.
-    Место при этом берётся с доски — там правила общие.
+    ⚠️ Кроме рекорда: лучший счёт — по зачётным (`record_runs`), и без них он
+    None. Место при этом берётся с доски — там правила общие.
     """
     runs = GameResult.objects.filter(user=user, mode=mode,
                                      economy_version=config.ECONOMY_VERSION)
     total = runs.count()
     if not total:
         return {'runs': 0}
-    agg = runs.aggregate(best=Max('score'), best_correct=Max('correct_count'),
-                         first_best=Min('created_at'))
-    best_run = runs.order_by('-score', 'created_at').first()
+    agg = runs.aggregate(best_correct=Max('correct_count'))
+    # Рекорд — по зачётным раундам (`record_runs`); зачётных нет — рекорда нет.
+    best_run = record_runs(user, mode).order_by('-score', 'created_at').first()
     correct_sum = sum(runs.values_list('correct_count', flat=True))
     attempts = sum(r.correct_count + r.wrong_count for r in runs)
     speeds = [r.avg_correct_ms for r in runs if r.avg_correct_ms]
     place = my_row(user, mode, 'all', 'score')
     return {
         'runs': total,
-        'best_score': agg['best'] or 0,
+        'best_score': best_run.score if best_run else None,
         'best_score_at': (best_run.created_at.isoformat(timespec='seconds')
                           if best_run else None),
         'best_correct': agg['best_correct'] or 0,
@@ -193,6 +194,35 @@ def personal_stats(user, mode):
     }
 
 
+# ⚠️ ОДНО ПРАВИЛО ЛИЧНОГО РЕКОРДА (решение 17.09.2026, ADR 0111): рекорд —
+# лучший ЗАЧЁТНЫЙ раунд режима в текущей версии экономики. Им живут чип
+# рекорда на раунде и окно выхода (`best_run`), стартовый экран
+# (`best_scores`), «Моя статистика» (`personal_stats`), панель «Мои рекорды»
+# (`records_panel`) и плашка «личный рекорд» итога (`views._finish_extras`).
+# Незачётный раунд (без входа, фильтр по сложности, набор, дуэль, работа над
+# ошибками, брошенный) рекордом не бывает: иначе итог показывал бы «личный
+# рекорд» рядом с «Не в таблице». Счётчики раундов, точность и среднее время
+# по-прежнему считаются по ВСЕМ раундам — это не рекорды.
+def record_runs(user, mode=None):
+    u"""Раунды, из которых считается личный рекорд (см. правило выше)."""
+    qs = GameResult.objects.filter(user=user, ranked=True,
+                                   economy_version=config.ECONOMY_VERSION)
+    return qs.filter(mode=mode) if mode else qs
+
+
+def best_scores(user):
+    u"""Личные рекорды вошедшего по всем режимам: `{режим: счёт}` одним запросом.
+
+    Стартовый экран показывает рекорд выбранного режима (ADR 0108). Основа
+    та же, что у `best_run`: ЗАЧЁТНЫЕ забеги текущей версии экономики
+    (`RECORD_RULE` ниже). Режима без таких забегов в словаре нет — экран тогда
+    молчит, а не рисует ноль.
+    """
+    rows = (record_runs(user)
+            .values('mode').annotate(best=Max('score')))
+    return {r['mode']: r['best'] for r in rows if r['best']}
+
+
 def best_run(user, mode):
     u"""Личный рекорд игрока в режиме или None, если рекорда ещё нет.
 
@@ -201,14 +231,13 @@ def best_run(user, mode):
     ОДНИМ конкретным забегом, и подмешивать туда среднее значило бы
     показывать рядом два числа из разных вселенных.
 
-    None означает ровно одно: забегов в этом режиме не было. Экран в этом
-    случае говорит словами, а не рисует ноль: выдуманное число-заглушка на
-    табло хуже честного «первый раунд».
+    None означает ровно одно: зачётных забегов в этом режиме не было (правило
+    рекорда — `record_runs`). Экран в этом случае говорит словами, а не рисует
+    ноль: выдуманное число-заглушка на табло хуже честного «первый раунд».
+    Брошенный раунд зачётным не бывает — окно выхода обещает «в таблицу и
+    рекорды не пойдёт», и это правда.
     """
-    run = (GameResult.objects
-           .filter(user=user, mode=mode,
-                   economy_version=config.ECONOMY_VERSION)
-           .order_by('-score', 'created_at').first())
+    run = record_runs(user, mode).order_by('-score', 'created_at').first()
     if run is None:
         return None
     attempts = run.correct_count + run.wrong_count
@@ -257,6 +286,7 @@ def run_history(user, mode):
 
     scores = list(runs.values_list('score', flat=True))
     correct_sum = sum(runs.values_list('correct_count', flat=True))
+    skip_sum = sum(runs.values_list('skip_count', flat=True))
     attempts = sum(r.correct_count + r.wrong_count for r in runs)
     speeds = [r.avg_correct_ms for r in runs if r.avg_correct_ms]
     return {
@@ -270,6 +300,10 @@ def run_history(user, mode):
             # отсутствие факта, и пунктир по нему лёг бы по нулю.
             'avg_correct_ms': (int(sum(speeds) / len(speeds))
                                if speeds else None),
+            # «Против себя обычного» на итоге (ADR 0111): верных и пропусков
+            # за раунд в среднем, с одним знаком после запятой.
+            'correct': round(correct_sum / total, 1),
+            'skipped': round(skip_sum / total, 1),
         },
     }
 
@@ -306,15 +340,19 @@ def records_panel(user, mode='all'):
     attempts = sum(r.correct_count + r.wrong_count for r in rows)
     correct = sum(r.correct_count for r in rows)
     speeds = [r.avg_correct_ms for r in rows if r.avg_correct_ms]
-    best = max(rows, key=lambda r: (r.score, r.created_at))
+    # Рекорд — только по зачётным раундам (правило у `record_runs`).
+    ranked_rows = [r for r in rows if r.ranked]
+    best = max(ranked_rows, key=lambda r: (r.score, r.created_at)) if ranked_rows else None
 
     # ── График всех раундов: точка на раунд плюс рекорд НА ТОТ ДЕНЬ ──
     # Линия рекорда строится нарастающим максимумом по порядку игры: она
-    # показывает, когда игрок себя обошёл, а не сегодняшний потолок.
+    # показывает, когда игрок себя обошёл, а не сегодняшний потолок. Точки —
+    # все раунды, линию двигают только зачётные.
     timeline = []
     running_best = 0
     for r in rows:
-        running_best = max(running_best, r.score)
+        if r.ranked:
+            running_best = max(running_best, r.score)
         timeline.append({
             'score': r.score,
             'best': running_best,
@@ -330,7 +368,8 @@ def records_panel(user, mode='all'):
             'title': config.MODES.get(r.mode, {}).get('title', r.mode),
             'score': 0, 'combo': 1.0, 'correct': 0, 'attempts': 0, 'runs': 0})
         cell['runs'] += 1
-        cell['score'] = max(cell['score'], r.score)
+        if r.ranked:
+            cell['score'] = max(cell['score'], r.score)
         cell['combo'] = max(cell['combo'], r.max_combo or 1.0)
         cell['correct'] += r.correct_count
         cell['attempts'] += r.correct_count + r.wrong_count
@@ -418,10 +457,10 @@ def records_panel(user, mode='all'):
         'mode': mode,
         'runs': len(rows),
         'ranked_runs': sum(1 for r in rows if r.ranked),
-        'best_score': best.score,
-        'best_score_at': best.created_at.isoformat(timespec='seconds'),
-        'best_score_mode': config.MODES.get(best.mode, {}).get('title',
-                                                              best.mode),
+        'best_score': best.score if best else None,
+        'best_score_at': best.created_at.isoformat(timespec='seconds') if best else None,
+        'best_score_mode': (config.MODES.get(best.mode, {}).get('title', best.mode)
+                            if best else None),
         'accuracy': round(100 * correct / attempts) if attempts else 0,
         'avg_correct_ms': int(sum(speeds) / len(speeds)) if speeds else None,
         'timeline': timeline,

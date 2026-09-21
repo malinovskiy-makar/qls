@@ -30,9 +30,11 @@ class AttemptApiTests(TestCase):
     @override_settings(AI_PROVIDER='fake')
     def test_anonymous_sees_login_link_and_gets_403(self):
         html = self.client.get(self.page).content.decode()
-        self.assertNotIn('id="sv-submit"', html)
+        # С S3 (18.09.2026) попытка — режим «Проверь решение» поля помощи; гостю
+        # вместо поля одна ссылка входа на вопрос и проверку.
+        self.assertNotIn('data-mode="check"', html)
         self.assertIn('href="/login/?next=', html)
-        self.assertIn('Войти, чтобы отправить на проверку', html)
+        self.assertIn('Войти, чтобы спросить', html)
         self.assertNotIn('id="sv-remaining"', html)
         resp = self._post()
         self.assertEqual(resp.status_code, 403)
@@ -43,9 +45,9 @@ class AttemptApiTests(TestCase):
     def test_checked_attempt_renders_partial_with_first_error(self):
         self.client.force_login(self.user)
         html = self.client.get(self.page).content.decode()
-        self.assertIn('id="sv-submit"', html)
+        self.assertIn('data-mode="check" data-prompt="Проверь моё решение"', html)
         self.assertIn('осталось сегодня <b id="sv-remaining">30</b>', html)
-        self.assertIn('id="chk-busy"', html)
+        self.assertIn('<template id="help-busy-tpl">', html)
         self.assertIn('"attemptUrl": "/catalog/api/attempt/"', html)
         with override_settings(AI_FAKE_REPLY=_reply()):
             resp = self._post(solution_viewed_before=True)

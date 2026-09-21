@@ -21,7 +21,12 @@ NAV = 'templates/_nav.html'
 
 
 def read(path):
-    return io.open(path, encoding='utf-8').read()
+    src = io.open(path, encoding='utf-8').read()
+    if path == PAGE:
+        # Разметка экранов вынесена в game/_*.html (ADR 0108, 0110).
+        from game.tests.test_page_js import expand_includes
+        src = expand_includes(src)
+    return src
 
 
 class LogoMarkTests(TestCase):
@@ -106,12 +111,16 @@ class StartScreenTextTests(TestCase):
     u"""1.3, 1.4, 1.5 — тексты стартового экрана."""
 
     def setUp(self):
-        self.src = read(PAGE)
+        from game.tests.test_page_js import page_source
+        self.src = page_source()
 
     def test_subtitle_is_the_owners_wording(self):
-        self.assertIn('Решайте тестовые задачи в условиях ограниченного',
+        u"""С 17.09.2026 (ADR 0108) большого логотипа с лозунгом нет: рядом со
+        словесным знаком одна строка из макета «стартового экрана аркады»."""
+        self.assertIn('три жизни, четыре режима, вопросы из реальных олимпиад',
                       self.src)
-        self.assertIn('тем дольше длится ваша игра!', self.src)
+        self.assertNotIn('Решайте тестовые задачи в условиях ограниченного',
+                         self.src)
         self.assertNotIn('Четыре режима', self.src)
 
     def test_click_and_enter_line_is_gone(self):
@@ -147,34 +156,50 @@ class HeartsTests(TestCase):
         u"""Погашенная жизнь — та же картинка с прозрачностью, а не другой
         символ: видно, «сколько было и сколько осталось»."""
         src = read(PAGE)
-        self.assertIn('.heart.lost {', src)
-        self.assertIn('opacity: .45;', src)
+        self.assertIn('.heart.lost { color: var(--text3); opacity: .6; }', src)
+
+
+class FigureButtonIconTests(TestCase):
+    u"""Кнопки чертежа — значками, а не знаками «⤢» и «✕» (правило «значки только SVG»;
+    «Свернуть» заменён в P2, «Развернуть» — в P8 редизайна 17.09.2026)."""
+
+    def test_expand_and_collapse_are_icons_not_signs(self):
+        src = read(PAGE)
+        for button, icon in (('fig-expand', 'expand'), ('fig-close', 'close')):
+            markup = src.split('id="%s"' % button, 1)[1].split('</button>', 1)[0]
+            self.assertIn('{%% include "_icon.html" with name="%s" %%}' % icon, markup)
+        self.assertNotIn('⤢', src)
+
+    def test_expand_icon_is_one_string_in_markup_and_scripts(self):
+        markup = io.open('templates/_icon.html', encoding='utf-8').read()
+        found = re.search(r"\{% if name == 'expand' %\}(.*?)\{% endif %\}", markup, re.S)
+        self.assertIsNotNone(found)
+        self.assertIn("expand: '%s'" % found.group(1).strip(), read(ICONS))
 
 
 class KeyHintTests(TestCase):
-    u"""1.7 Подсказка клавиш — своя на каждый тип вопроса."""
+    u"""1.7 Подсказка клавиш. С 17.09.2026 (ADR 0110) постоянной строки под
+    вариантами нет: клавиши названы в отсчёте перед раундом, на кнопках
+    («Ответить · Enter», «Пропустить пробел») и в разборе («Дальше сразу · пробел»)."""
 
     def setUp(self):
         self.src = read(PAGE)
 
-    def test_bullet_hint(self):
-        self.assertIn('Используйте клавиши 1–2 для быстрого ответа, '
-                      "'\n          + 'а пробел для пропуска задания", self.src)
+    def test_the_permanent_hint_line_is_gone(self):
+        self.assertNotIn('keys-hint', self.src)
+        self.assertNotIn('Используйте клавиши', self.src)
 
-    def test_single_choice_hint_counts_real_options(self):
-        self.assertIn("'Используйте клавиши 1–' + q.options.length\n"
-                      "          + ' для быстрого ответа, а пробел для пропуска задания'",
-                      self.src)
+    def test_keys_are_named_before_the_round(self):
+        self.assertIn('клавиши <kbd>1</kbd>–<kbd>5</kbd> отвечают, <kbd>пробел</kbd> пропускает', self.src)
 
-    def test_multi_hint_mentions_enter(self):
+    def test_multi_submit_mentions_enter(self):
         u"""Без Enter несколько выбранных вариантов не отправить."""
-        self.assertIn('для выбора вариантов, Enter для ответа', self.src)
+        self.assertIn('id="btn-submit" disabled>Ответить · Enter</button>', self.src)
 
     def test_classic_has_exactly_one_hint(self):
-        u"""Вторая строка («Enter — отправить», «дробь как 1/3») убрана."""
-        self.assertIn('Дроби можно вводить через слэш, точку или', self.src)
+        u"""Под полем одна подсказка про дроби; «дробь как 1/3» убрана."""
+        self.assertEqual(self.src.count('дробь – через слэш, точку или запятую'), 1)
         self.assertNotIn('Дробь можно вводить как 1/3', self.src)
-        self.assertNotIn('num-hint', self.src)
 
 
 class SkipTests(TestCase):
@@ -186,6 +211,8 @@ class SkipTests(TestCase):
     def test_classic_skip_button_is_gone(self):
         self.assertNotIn('btn-num-skip', self.src)
         self.assertIn("id=\"btn-num-submit\"", self.src)   # «Ответить» осталась
+        # Пропуск — одной кнопкой в нижнем ряду на все режимы (ADR 0110).
+        self.assertIn('id="btn-skip"', self.src)
 
     def test_space_skips_in_the_numeric_mode(self):
         self.assertIn("if (e.key === ' ') { e.preventDefault(); skip(); return; }",
@@ -214,15 +241,19 @@ class QuitModalTests(TestCase):
         self.assertNotIn('confirm(', self.src)
 
     def test_modal_markup_and_wording(self):
-        self.assertIn('Закончить игру? Результат не сохранится.', self.src)
+        u"""С 17.09.2026 (макет DialogQuit): брошенный обычный раунд
+        сохраняется как незачётный, и окно говорит это прямо."""
         self.assertIn('id="quit-modal"', self.src)
         self.assertIn('aria-modal="true"', self.src)
-        self.assertIn('>Нет</button>', self.src)
-        self.assertIn('>Да</button>', self.src)
+        self.assertIn('>Выйти из раунда?</p>', self.src)
+        self.assertIn('часы стоят, пока окно открыто', self.src)
+        self.assertIn('>Продолжить раунд</button>', self.src)
+        self.assertIn('>Выйти к итогу</button>', self.src)
+        self.assertIn('Раунд сохранится как <b>незачётный</b>', self.src)
 
     def test_no_is_the_main_action_and_takes_focus(self):
         self.assertIn("$('quit-no').focus();", self.src)
-        self.assertIn('.quit-no { border: none; background: var(--btn-bg);', self.src)
+        self.assertIn('.quit-no { border: 1px solid transparent; background: var(--btn-bg);', self.src)
 
     def test_escape_means_no(self):
         self.assertIn("if (e.key === 'Escape') { e.preventDefault(); closeQuit(); return; }",
@@ -243,8 +274,10 @@ class QuitModalTests(TestCase):
                       m.group(1))
 
     def test_hover_on_the_x_has_no_sand_fill(self):
-        self.assertNotIn('.quit-x:hover { color: var(--text); background:', self.src)
-        self.assertIn('.quit-x:hover { color: var(--text); font-weight: 700;',
+        u"""Крестик — квадратная кнопка полосы (ADR 0110): при наведении
+        меняется рамка и цвет значка, песочной заливки нет."""
+        self.assertNotIn('.quit-x', self.src)
+        self.assertIn('.ib:hover { border-color: var(--accent); color: var(--accent-ink); }',
                       self.src)
 
 
@@ -306,9 +339,11 @@ class DeltaChipTests(TestCase):
         m = re.search(r'function startRun\(opts\) \{(.*?)\n  \}', src, re.S)
         self.assertIsNotNone(m)
         body = m.group(1)
-        self.assertIn("deltaChip.className = 'time-delta';", body)
-        self.assertIn("deltaChip.innerHTML = '';", body)
-        self.assertIn("deltaChip.style.opacity = '';", body)
+        # С 17.09.2026 дельт две: «+5 с» у времени и «−1» у сердец.
+        self.assertIn("['time-delta', 'lives-delta'].forEach(function (id) {", body)
+        self.assertIn("chip.className = id;", body)
+        self.assertIn("chip.innerHTML = '';", body)
+        self.assertIn("chip.style.opacity = '';", body)
 
 
 class EmDashTests(TestCase):

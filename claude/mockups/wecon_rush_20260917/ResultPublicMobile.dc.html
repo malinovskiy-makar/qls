@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .page { flex: 1; padding: 20px 40px 22px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; white-space: nowrap; }
+    .rush a.btn { color: var(--text); text-decoration: none; }
+    .btn:hover, .rush a.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.solid:disabled { background: var(--surface-2); color: var(--text3); border-color: var(--border); cursor: default; filter: none; }
+    .rush .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 700; }
+    .btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+    .pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .ph { display: flex; align-items: baseline; gap: 12px; }
+    .ph b { font-size: 17px; font-weight: 700; }
+    .ph span { font-size: 12.5px; color: var(--text3); }
+    .num { text-align: right; }
+    .thead, .tr { display: grid; align-items: center; gap: 10px; padding: 0 12px; }
+    .thead { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; height: 26px; }
+    .trs { display: flex; flex-direction: column; gap: 4px; }
+    .tr { height: 40px; border-radius: 9px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .tr.first { background: var(--accent-tint); }
+    .tr.me { background: transparent; border: 1.5px solid var(--accent); padding: 0 10.5px; }
+    .tr .n { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+    .tr .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr .who.anon { font-weight: 500; color: var(--text3); font-style: italic; }
+    .tr .sc { font-weight: 800; font-size: 15.5px; }
+    .tr .end { color: var(--text2); font-size: 13px; white-space: nowrap; }
+    .qs { display: flex; flex-direction: column; }
+    .q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 100px 44px; align-items: center; gap: 12px; min-height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+    .q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .q .qt small { display: block; font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+    .q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+    .q.hard .bar i { background: var(--error); }
+    .q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .q.hard .pc { color: var(--error); }
+    .foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; margin-top: auto; }
+    .brand { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; letter-spacing: -.2px; }
+    .brand .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .brand b { color: var(--accent-ink); }
+    .brand span { font-weight: 500; color: var(--text3); font-size: 13px; }
+    .who { display: flex; align-items: center; gap: 12px; }
+    .who .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; flex: none; }
+    .who .nm { font-size: 18px; font-weight: 700; line-height: 1.15; }
+    .who .sb { font-size: 13px; color: var(--text2); }
+    .score { font-weight: 800; line-height: .9; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+    .score small { font-size: 20px; font-weight: 700; letter-spacing: 0; color: var(--text2); margin-left: 8px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 11px; border-radius: 999px; background: var(--amber); color: var(--amber-ink); font-size: 13px; font-weight: 700; width: fit-content; }
+    .metrics { display: grid; gap: 10px; }
+    .metric { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+    .metric small { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .metric b { display: block; font-size: 20px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .metric span { font-size: 12.5px; color: var(--text2); }
+    .curve { border-radius: 10px; background: var(--surface-2); padding: 10px 12px 6px; }
+    .curve svg { display: block; width: 100%; height: 64px; }
+    .bars { display: flex; flex-direction: column; gap: 10px; }
+    .bar .lb { display: flex; justify-content: space-between; font-size: 13px; color: var(--text2); }
+    .bar .lb b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .bar .tr { height: 8px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; margin-top: 4px; }
+    .bar .tr i { display: block; height: 100%; }
+    .ok-f { background: var(--green); } .bad-f { background: var(--error); } .skip-f { background: var(--skip); }
+    .rush .cta { height: 58px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn); font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; }
+    .rush .cta span { font-weight: 500; opacity: .8; font-size: 14px; }
+    .about { font-size: 13px; color: var(--text3); line-height: 1.5; }
+    h3 { margin: 0; font-size: 15px; font-weight: 700; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 390px; height: 1180px; box-sizing: border-box; display: flex; flex-direction: column; padding: 16px 16px 20px; gap: 12px;">
+  <div class="brand"><div class="mark">W</div>WECON <svg class="i" viewBox="0 0 24 24" style="stroke: #006c6d;"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg> <b>RUSH</b></div>
+  <div class="card" style="padding: 18px 18px 16px;">
+    <div class="who"><div class="av">SK</div><div><div class="nm">Sonya_kitty</div><div class="sb">Блиц · один верный ответ · 7 сентября 2026</div></div></div>
+        <div class="score" style="font-size: 64px; margin-top: 18px;">225<small>очков</small></div>
+        <div class="badge" style="margin-top: 12px;"><svg class="i s" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>1-е место в таблице Блица</div>
+    <div class="metrics" style="grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px;"><div class="metric"><small>Верных</small><b>11 из 14</b><span>точность 79 %</span></div>
+          <div class="metric"><small>Макс. комбо</small><b>×1,5</b><span>серия из 6 верных</span></div>
+          <div class="metric" style="grid-column: 1 / -1;"><small>Чем кончилось</small><b>время вышло</b><span>жизней осталось 2 из 3</span></div></div>
+  </div>
+  <!-- Действия сразу после счёта: человек пришёл по ссылке «обгонишь?» -->
+  <button class="cta"><svg class="i" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>Сыграть в Блиц <span>обогнать 225</span></button>
+  <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px;">
+    <button class="btn"><svg class="i s" viewBox="0 0 24 24"><path d="M14 4l6 6-9 9-6-6zM5 13l-2 2 6 6 2-2M16 2l6 6"></path></svg>Вызвать на дуэль</button>
+    <button class="btn" aria-label="Поделиться"><svg class="i s" viewBox="0 0 24 24"><path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v14"></path></svg></button>
+  </div>
+  <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;">
+    <h3>Счёт по ходу раунда</h3>
+    <div class="curve"><svg viewBox="0 0 300 64" preserveAspectRatio="none"><polyline fill="none" stroke="#00797a" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" points="3,60 26,52 49,52 72,43 95,36 118,36 141,27 164,27 187,19 210,14 233,14 256,8 279,4 297,4"></polyline></svg></div>
+  </div>
+  <div class="card" style="padding: 14px 16px; display: flex; flex-direction: column; gap: 12px;">
+    <h3>Точность по темам</h3>
+    <div class="bars"><div class="bar"><div class="lb"><span>Спрос и предложение</span><b>4 из 4</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div><div class="bar"><div class="lb"><span>Эластичность</span><b>3 из 4</b></div><div class="tr"><i class="ok-f" style="width: 75%;"></i><i class="bad-f" style="width: 25%;"></i></div></div><div class="bar"><div class="lb"><span>Издержки фирмы</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="skip-f" style="width: 33%;"></i></div></div><div class="bar"><div class="lb"><span>Деньги и инфляция</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="bad-f" style="width: 33%;"></i></div></div></div>
+  </div>
+  <div class="about">Wecon Rush — игра на скорость по олимпиадной экономике: 3 185 вопросов из реальных олимпиад, четыре режима, три жизни. Играть можно без регистрации.</div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

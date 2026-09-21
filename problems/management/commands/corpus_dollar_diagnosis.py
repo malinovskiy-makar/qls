@@ -11,7 +11,7 @@ scaleup/reshalki_dollar_diagnosis.md. Этот файл — тестируемы
 Рендерер (`problems/rendering.py::render_markdown`) вызывается по
 каждому полю (`statement`/`answer`/`solution`/`part.statement`/
 `part.answer`) НЕЗАВИСИМО (см. `catalog/templates/catalog/
-problem_detail.html`), поэтому непарный `$$` в конце одного поля и
+_math_text.html`), поэтому непарный `$$` в конце одного поля и
 непарный `$$` в начале следующего — не одна формула, разорванная на
 две, а две отдельные поломки рендера, каждая в своём поле."""
 from django.core.management.base import BaseCommand
@@ -27,7 +27,7 @@ SOURCES = {
 EXCLUDED_SOURCE_NAME = 'Служебное: фикстуры рендерера (не публиковать)'
 
 #: порядок полей ровно как их рендерит catalog/templates/catalog/
-#: problem_detail.html — statement, затем части по порядку, затем
+#: catalog/stol/_stol_center.html — statement, затем части по порядку, затем
 #: answer, затем solution.
 TOP_FIELDS = ('statement', 'answer', 'solution')
 

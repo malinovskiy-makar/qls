@@ -37,8 +37,9 @@ class TagFilterTests(TestCase):
     u"""Фильтр по тегам: денормализованный список id, без join."""
 
     def setUp(self):
-        self.t_graph = Tag.objects.create(name='график', slug='graph')
-        self.t_hard = Tag.objects.create(name='олимпиадная', slug='hard')
+        # Канонические: окно игры показывает только их (18.09.2026).
+        self.t_graph = Tag.objects.create(name='график', slug='graph', kind='canonical')
+        self.t_hard = Tag.objects.create(name='олимпиадная', slug='hard', kind='canonical')
         self.with_graph = make_q(tag_ids=[self.t_graph.id])
         self.with_both = make_q(tag_ids=[self.t_graph.id, self.t_hard.id])
         self.plain = make_q(tag_ids=[])
@@ -226,7 +227,8 @@ class FilterWindowMarkupTests(TestCase):
     u"""Разметка окна и главного экрана."""
 
     def setUp(self):
-        self.src = io.open(PAGE, encoding='utf-8').read()
+        from game.tests.test_page_js import page_source
+        self.src = page_source()
 
     def test_topic_chips_are_gone_from_the_start_screen(self):
         u"""Двадцать чипов занимали первый экран целиком и уводили внимание
@@ -235,11 +237,15 @@ class FilterWindowMarkupTests(TestCase):
         self.assertNotIn('class="topic-chip', self.src)
 
     def test_one_button_instead(self):
-        self.assertIn('>Добавить фильтры</button>', self.src)
-        self.assertIn("'Изменить фильтры'", self.src)
-        # При наведении текст чуть жирнее и крупнее — просьба владельца.
-        self.assertIn('.filter-open:hover {', self.src)
-        self.assertIn('font-weight: 700;', self.src)
+        u"""С 17.09.2026 (ADR 0108, 0112) выбор фильтра виден строкой «Что решаем»
+        тремя чипами-сводками — на главной и в окне дуэли; каждый открывает окно."""
+        self.assertIn('<span>Настроить фильтры</span></button>', self.src)
+        self.assertIn('with name="sliders" %}Настроить фильтры</button>', self.src)
+        for prefix in ('fsum-', 'dmsum-'):
+            for part in ('topics', 'stars', 'sources'):
+                self.assertIn('id="%s%s"' % (prefix, part), self.src)
+        for gone in ('Добавить фильтры', "'Изменить фильтры'", 'class="fchip"', "'fchip'"):
+            self.assertNotIn(gone, self.src, gone)
 
     def test_modal_has_every_group(self):
         for marker in ('<h3>Тема</h3>', '<h3>Тег</h3>', '<h3>Сложность</h3>',
@@ -278,7 +284,7 @@ class FilterWindowMarkupTests(TestCase):
         self.assertNotIn('id="tag-search"', html)
 
     def test_tag_group_appears_once_there_are_tags(self):
-        tag = Tag.objects.create(name='график', slug='graph')
+        tag = Tag.objects.create(name='график', slug='graph', kind='canonical')
         make_q(tag_ids=[tag.id])
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         self.assertIn('id="tag-search"', html)
@@ -293,18 +299,22 @@ class FilterWindowMarkupTests(TestCase):
         self.assertIn("'/game/api/pool_counts/?'", self.src)
         self.assertIn('}, 250);', self.src)
 
-    def test_chips_have_a_cross_and_reset(self):
-        self.assertIn("chip.className = 'fchip';", self.src)
+    def test_reset_stays_and_chips_with_a_cross_are_gone(self):
+        u"""Чипы с крестиком жили только в окне дуэли; с 17.09.2026 там сводка
+        «Что решаем» (ADR 0112). Снять весь фильтр — «Сбросить всё»."""
         self.assertIn('>Сбросить всё</button>', self.src)
-        self.assertIn("'Снять фильтр '", self.src)
+        self.assertNotIn("'Снять фильтр '", self.src)
 
     def test_state_lives_in_the_url_and_storage(self):
         self.assertIn('history.replaceState', self.src)
         self.assertIn("localStorage.setItem(FILTER_KEY", self.src)
 
     def test_mode_card_shows_the_available_count(self):
+        u"""С 17.09.2026 режим — вкладка, а не карточка (ADR 0108): число под
+        фильтром на вкладке и в панели, мало вопросов — вкладка выключена."""
         self.assertIn("' под фильтром'", self.src)
-        self.assertIn("card.classList.add('is-off')", self.src)
+        self.assertIn("tab.classList.toggle('is-off', !playable)", self.src)
+        self.assertIn('tab.disabled = !playable;', self.src)
         # ⚠️ Сверяем САМО СРАВНЕНИЕ, а не упоминание константы:
         # `CFG.min_playable` встречается ещё в подписи и в обходе клавиш, и
         # проверка на упоминание проспала бы «playable = true».
@@ -312,10 +322,14 @@ class FilterWindowMarkupTests(TestCase):
                       self.src)
 
     def test_ranked_note_is_shown_before_the_run(self):
-        u"""Игрок обязан знать ДО раунда, поедет ли результат на доску."""
-        self.assertIn('Тренировочный раунд: выбрана сложность', self.src)
-        self.assertIn("'Без фильтров: ×'", self.src)
-        self.assertIn("'С фильтрами: множителя ×'", self.src)
+        u"""Игрок обязан знать ДО раунда, поедет ли результат на доску.
+
+        С 17.09.2026 (ADR 0108) под строкой фильтров — только пометка
+        тренировочного раунда; про ×1,3 без фильтров говорит поповер
+        «Как считаются очки»."""
+        self.assertIn("'Раунд тренировочный: в таблицу не идёт'", self.src)
+        self.assertIn('note.hidden = isRanked();', self.src)
+        self.assertIn('<b>Раунд без фильтров</b> получает ×', self.src)
 
 
 class PoolGateTests(TestCase):

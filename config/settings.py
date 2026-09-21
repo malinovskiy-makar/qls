@@ -68,6 +68,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    # sitemap.xml (catalog/seo.py): приложению нужны только его шаблоны, моделей нет.
+    'django.contrib.sitemaps',
     # Наше приложение с задачами:
     'problems',
     # Этап А — Публичный каталог задач:

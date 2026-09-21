@@ -61,11 +61,14 @@ try {
   const question = async () => (await page.textContent('#q-text')).trim();
   const q0 = await question();
 
-  await page.locator('.fb-btn:visible').first().click();
-  await page.waitForSelector('.fb-back', { timeout: 15000 });
+  /* ⚠️ С 17.09.2026 (ADR 0110) шапка сайта на время раунда скрыта, и окно
+     «Проблема или предложение» из неё не открыть. Окно поверх раунда — это
+     «Плохая задача?» из нижнего ряда: оно устроено тем же партиалом формы и
+     так же ставит раунд на паузу. */
+  await page.click('#btn-report');
+  await page.waitForSelector('.rp-back', { timeout: 15000 });
   const t0 = await secondsLeft(page);
-  await page.click('.fb-kind');            // «Проблема» — появляется поле текста
-  await page.click('.fb-other');
+  await page.click('.rp-back textarea');
   await page.keyboard.type(' 1');
   await page.keyboard.press('Enter');
   await page.waitForTimeout(2000);
@@ -74,41 +77,42 @@ try {
   check('no_answers_sent', answerPosts === 0, { answerPosts });
   check('timer_paused', Math.abs(t0 - t1) <= 0.1, { t0, t1 });
 
-  await page.click('.fb-x');
-  await page.waitForSelector('.fb-back', { state: 'detached', timeout: 5000 });
+  await page.click('.rp-back .fb-x');
+  await page.waitForSelector('.rp-back', { state: 'detached', timeout: 5000 });
   await page.waitForTimeout(1500);
   const t2 = await secondsLeft(page);
   check('timer_resumed', t1 - t2 >= 1.0, { t1, t2 });
 
-  // Escape внутри окна закрывает его и в забег не проходит.
-  await page.locator('.fb-btn:visible').first().click();
-  await page.waitForSelector('.fb-back', { timeout: 15000 });
+  // Escape внутри окна закрывает его и в раунд не проходит.
+  await page.click('#btn-report');
+  await page.waitForSelector('.rp-back', { timeout: 15000 });
   const qEsc = await question();
   const postsEsc = answerPosts;
   await page.keyboard.press('Escape');
   let closedByEsc = true;
   try {
-    await page.waitForSelector('.fb-back', { state: 'detached', timeout: 3000 });
+    await page.waitForSelector('.rp-back', { state: 'detached', timeout: 3000 });
   } catch (e) { closedByEsc = false; }
   check('escape_closes_modal',
         closedByEsc && (await question()) === qEsc && answerPosts === postsEsc,
         { closedByEsc, answerPosts, postsEsc });
 
-  // «Плохая задача?»: окно жалобы тоже ставит раунд на паузу.
-  await page.click('#btn-report');
-  let reportOpen = true;
+  // Esc в раунде открывает окно выхода, и часы в нём стоят (решение 17.09.2026:
+  // на бою Esc окно не открывал). Второй Esc — продолжить раунд.
+  await page.waitForTimeout(300);
+  await page.keyboard.press('Escape');
+  let quitOpen = true;
   try {
-    await page.waitForSelector('.rp-back', { timeout: 5000 });
-  } catch (e) { reportOpen = false; }
-  const r0 = await secondsLeft(page);
+    await page.waitForSelector('#quit-modal:not([hidden])', { timeout: 3000 });
+  } catch (e) { quitOpen = false; }
+  const q0t = await secondsLeft(page);
   await page.waitForTimeout(1500);
-  const r1 = await secondsLeft(page);
-  if (reportOpen) {
-    await page.click('.rp-back .fb-x');
-    await page.waitForSelector('.rp-back', { state: 'detached', timeout: 5000 }).catch(() => {});
-  }
-  check('report_window_pauses', reportOpen && Math.abs(r0 - r1) <= 0.1,
-        { reportOpen, r0, r1 });
+  const q1t = await secondsLeft(page);
+  const pill = quitOpen && (await page.textContent('#quit-modal')).includes('часы стоят');
+  await page.keyboard.press('Escape');
+  const quitClosed = await page.$eval('#quit-modal', (el) => el.hidden);
+  check('escape_opens_quit_and_pauses', quitOpen && pill && quitClosed
+        && Math.abs(q0t - q1t) <= 0.1, { quitOpen, pill, quitClosed, q0t, q1t });
 } catch (e) {
   out.error = String((e && e.stack) || e);
 } finally {

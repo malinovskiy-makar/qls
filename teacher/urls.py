@@ -126,6 +126,9 @@ urlpatterns = [
          name='api_problem_detail'),
     path('api/assignment/<int:pk>/add_problem/',
          views.api_assignment_add_problem, name='api_assignment_add_problem'),
+    # Корзина каталога «Стол»: пачка задач в домашку (часть B ночи 18.09).
+    path('api/assignment/<int:pk>/add_problems/',
+         views.api_assignment_add_problems, name='api_assignment_add_problems'),
 
     # ---- устарело, удалить после сессии 5 --------------------------------
     # Старые адреса проверки решений. Ведут редиректом на групповые, чтобы
@@ -142,4 +145,8 @@ urlpatterns = [
          name='game_set_detail'),
     path('api/game-set/fill/', game_sets.api_game_set_fill,
          name='api_game_set_fill'),
+    path('api/game-set/pool/', game_sets.api_game_set_pool,
+         name='api_game_set_pool'),
+    path('game-sets/<str:code>/deadline/', game_sets.game_set_deadline,
+         name='game_set_deadline'),
 ]

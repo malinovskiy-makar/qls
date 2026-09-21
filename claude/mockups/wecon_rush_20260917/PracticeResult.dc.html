@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.10);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --green: #186e3c;
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 0; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+    .page { padding: 22px 40px 24px; display: flex; flex-direction: column; gap: 16px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    h3 { margin: 0; font-size: 15px; font-weight: 700; }
+    .sub { font-size: 12.5px; color: var(--text3); }
+
+    .verdict { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; padding: 22px 28px; }
+    .vtitle { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; display: flex; align-items: center; gap: 12px; }
+    .vtitle svg.i { width: 26px; height: 26px; color: var(--accent-ink); }
+    .chips { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--text3); }
+    .chip { height: 24px; padding: 0 9px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; display: flex; align-items: center; }
+    .big { display: flex; align-items: flex-end; gap: 18px; margin-top: 16px; }
+    .big .num { font-size: 56px; font-weight: 800; line-height: .9; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .big .num small { font-size: 22px; font-weight: 700; letter-spacing: 0; color: var(--text2); margin-left: 8px; }
+    .note { font-size: 13px; color: var(--text2); padding-bottom: 4px; }
+    .note b { color: var(--text); font-weight: 700; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+    .metric { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+    .metric small { display: block; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .metric b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .metric b.g { color: var(--green); } .metric b.e { color: var(--error); }
+    .actions { display: flex; flex-direction: column; gap: 8px; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 16px; font-size: 14.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+    .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .btn .n { font-size: 12.5px; color: var(--text3); font-weight: 500; }
+    .rush .btn.primary { height: 56px; background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-size: 17px; font-weight: 700; justify-content: center; }
+    .btn.primary kbd { font: inherit; font-size: 12px; font-weight: 700; opacity: .75; border: 1px solid rgba(255,255,255,.45); border-radius: 5px; padding: 0 5px; }
+    .share-note { font-size: 12px; color: var(--text3); text-align: center; line-height: 1.4; }
+
+    .cols { display: grid; grid-template-columns: minmax(0, 1fr) 440px; gap: 16px; align-items: start; }
+    .miss { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+    .mh { display: flex; align-items: baseline; gap: 10px; margin-bottom: 2px; }
+    .mi { display: grid; grid-template-columns: 28px minmax(0, 1fr) 190px auto; gap: 12px; align-items: center; padding: 9px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
+    .mi .k { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .mi .k.bad { background: var(--error); } .mi .k.skip { background: var(--skip); }
+    .mi .q { color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mi .q small { display: block; color: var(--text3); font-size: 12px; }
+    .mi .a { font-size: 12.5px; color: var(--text2); }
+    .mi .a b { color: var(--green); font-weight: 700; }
+    .mi .a s { color: var(--error); }
+    .mi .ls { display: flex; gap: 6px; justify-content: flex-end; }
+    .lnk { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+    .rush a.lnk { color: var(--text); text-decoration: none; }
+    .lnk:hover, .rush a.lnk:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+    .cb { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+    .bars { display: flex; flex-direction: column; gap: 12px; }
+    .bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; align-items: center; font-size: 13px; }
+    .bar .lab { color: var(--text2); display: flex; justify-content: space-between; gap: 8px; }
+    .bar .lab b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .bar .tr { grid-column: 1 / 2; height: 8px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; }
+    .bar .tr i { display: block; height: 100%; }
+    .bar .more { grid-row: 1 / span 2; grid-column: 2; }
+    .ok-f { background: var(--green); } .bad-f { background: var(--error); } .skip-f { background: var(--skip); }
+    .key { display: flex; gap: 14px; font-size: 12.5px; color: var(--text3); }
+    .key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 880px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="ava">МП</div>
+    <span style="font-size: 15px;">Марина Петрова</span>
+    <button class="ghost" style="border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px;">Выйти</button>
+  </div>
+
+  <div class="page">
+
+    <!-- ВЕРДИКТ И ДЕЙСТВИЯ — тот же каркас, что у итога раунда, без очков, рекордов и таблицы -->
+    <div class="card verdict">
+      <div>
+        <div class="vtitle"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-5 6-5 9 0s6 5 9 0"></path><path d="M3 12c3 5 6 5 9 0s6-5 9 0"></path></svg>Бесконечные тесты</div>
+        <div class="chips"><span class="chip">итог сессии</span><span>17 сентября, 14:32</span><span>·</span><span>фильтр: Эластичность, Рынки</span></div>
+        <div class="big">
+          <div class="num">8 из 12<small>верных</small></div>
+          <div class="note">точность <b>67 %</b> · пропуски в неё не входят</div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><small>Отвечено</small><b>12</b></div>
+          <div class="metric"><small>Верно</small><b class="g">8</b></div>
+          <div class="metric"><small>Ошибок</small><b class="e">4</b></div>
+          <div class="metric"><small>Пропущено</small><b>2</b></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary">Ещё раз <kbd>Enter</kbd></button>
+        <button class="btn">Поменять фильтры<span class="n">темы, сложность, источник</span></button>
+        <a class="btn" href="Main.dc.html" style="color: var(--text); text-decoration: none;">На старт</a>
+        <div class="share-note">Бесконечные тесты не идут ни в таблицу, ни в рекорды — итог показывается один раз.</div>
+      </div>
+    </div>
+
+    <div class="cols">
+      <!-- ОШИБКИ И ПРОПУСКИ -->
+      <div class="card miss">
+        <div class="mh"><h3>Ошибки и пропуски · 6</h3><span class="sub">у каждой — верный ответ, решение (если есть) и страница задачи в каталоге</span></div>
+
+        <div class="mi"><span class="k bad">1</span><span class="q">Для какой из представленных КПВ альтернативные издержки производства товара y максимальны?<small>КПВ и альтернативные издержки</small></span><span class="a">ваш ответ <s>1</s> → верный <b>2</b></span><span class="ls"><a class="lnk" href="#problem">В каталоге</a></span></div>
+        <div class="mi"><span class="k skip">3</span><span class="q">Если повышение цены на товар X не влияет на спрос на товар Y, то это означает, что:<small>Эластичность</small></span><span class="a">пропуск → верный <b>5</b></span><span class="ls"><a class="lnk" href="#problem">В каталоге</a></span></div>
+        <div class="mi"><span class="k bad">4</span><span class="q">В стране AAA на рынке шоколадок школьники предъявляют спрос Qd = 150 − P, а предложение…<small>Госрегулирование</small></span><span class="a">ваш ответ <s>3</s> → верный <b>1</b></span><span class="ls"><button class="lnk">Решение</button><a class="lnk" href="#problem">В каталоге</a></span></div>
+        <div class="mi"><span class="k bad">7</span><span class="q">Эластичность спроса по цене на участке, где выручка растёт с ростом цены, …<small>Эластичность</small></span><span class="a">ваш ответ <s>2</s> → верный <b>4</b></span><span class="ls"><a class="lnk" href="#problem">В каталоге</a></span></div>
+        <div class="mi"><span class="k skip">9</span><span class="q">Предположим, что на рынке действует фирма-монополист. Если у этой фирмы неожиданно увеличились…<small>Монополия</small></span><span class="a">пропуск → верный <b>3</b></span><span class="ls"><a class="lnk" href="#problem">В каталоге</a></span></div>
+        <div class="mi"><span class="k bad">12</span><span class="q">Если государство вводит потоварную субсидию производителям, то на конкурентном рынке …<small>Спрос и предложение</small></span><span class="a">ваш ответ <s>1</s> → верный <b>3</b></span><span class="ls"><button class="lnk">Решение</button></span></div>
+      </div>
+
+      <!-- ТОЧНОСТЬ ПО ТЕМАМ -->
+      <div class="card cb">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px;"><h3>Точность по темам</h3>
+          <div class="key"><span><i class="ok-f"></i>верно</span><span><i class="bad-f"></i>ошибка</span><span><i class="skip-f"></i>пропуск</span></div>
+        </div>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>Эластичность</span><b>3 из 5</b></div><button class="lnk more">Решать тему</button><div class="tr"><i class="ok-f" style="width: 60%;"></i><i class="bad-f" style="width: 20%;"></i><i class="skip-f" style="width: 20%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Спрос и предложение</span><b>3 из 4</b></div><button class="lnk more">Решать тему</button><div class="tr"><i class="ok-f" style="width: 75%;"></i><i class="bad-f" style="width: 25%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Монополия</span><b>1 из 2</b></div><button class="lnk more">Решать тему</button><div class="tr"><i class="ok-f" style="width: 50%;"></i><i class="skip-f" style="width: 50%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>КПВ и альтернативные издержки</span><b>1 из 2</b></div><button class="lnk more">Решать тему</button><div class="tr"><i class="ok-f" style="width: 50%;"></i><i class="bad-f" style="width: 50%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Госрегулирование</span><b>0 из 1</b></div><button class="lnk more">Решать тему</button><div class="tr"><i class="bad-f" style="width: 100%;"></i></div></div>
+        </div>
+        <div class="sub">«Решать тему» запускает бесконечные тесты с фильтром на эту тему.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":880}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

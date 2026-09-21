@@ -1,0 +1,374 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16;
+      --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --green: #186e3c;
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden;
+      font-size: 14px; line-height: 1.45;
+    }
+    .rush.dark {
+      --accent: #81b5b4; --accent-ink: #81b5b4; --on-accent: #1d1a16;
+      --accent-tint: rgba(129,181,180,.14); --accent-ring: rgba(129,181,180,.4);
+      --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+      --border: rgba(255,255,255,.14); --border-soft: rgba(255,255,255,.07);
+      --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+      --btn-bg: #c4bba9; --on-btn: #1d1a16;
+      --error: #ff8a8a; --green: #3fc77f;
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .chip { border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 4px 9px; font-size: 12.5px; color: #cfc8b8; display: flex; align-items: center; gap: 6px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 0; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+    .page { flex: 1; padding: 20px 40px 22px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+
+    .head { display: flex; align-items: center; gap: 20px; }
+    .ttl { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; }
+    .seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+    .seg button { height: 40px; padding: 0 16px; border: 0; background: transparent; font-size: 14.5px; font-weight: 600; color: var(--text2); display: inline-flex; align-items: center; gap: 7px; }
+    .seg button + button { border-left: 1px solid var(--border-soft); }
+    .rush .seg button.on { background: var(--accent); color: var(--on-accent); }
+    .step { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .step .when { min-width: 210px; text-align: center; font-size: 15px; font-weight: 700; }
+    .step .when span { display: block; font-size: 12px; font-weight: 500; color: var(--text3); }
+    .arr { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); display: inline-flex; align-items: center; justify-content: center; }
+    .arr:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .arr:disabled { opacity: .35; cursor: default; border-color: var(--border); color: inherit; }
+
+    .sum { padding: 14px 20px; display: flex; align-items: center; gap: 28px; }
+    .sum .k { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .sum .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+    .sum .sp { flex: 1; }
+    .sum .mine { text-align: right; }
+    .sum .mine .v { font-size: 22px; font-weight: 800; }
+    .tag { font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 12px; background: var(--surface-2); color: var(--text2); border: 1px solid var(--border-soft); }
+    .btn { height: 46px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 22px; font-size: 15px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { filter: brightness(1.12); }
+    .rush .btn.solid svg.i { stroke: var(--on-btn); }
+    .rush a.lnk { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; }
+
+    .cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 16px; min-height: 0; }
+    .pane { padding: 16px 18px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .ph { display: flex; align-items: baseline; gap: 12px; }
+    .ph b { font-size: 17px; font-weight: 700; }
+    .ph span { font-size: 12.5px; color: var(--text3); }
+
+    .thead, .tr { display: grid; grid-template-columns: 40px minmax(0, 1fr) 84px 96px 110px 190px; align-items: center; gap: 10px; padding: 0 12px; }
+    .thead { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; height: 26px; }
+    .trs { display: flex; flex-direction: column; gap: 4px; }
+    .tr { height: 42px; border-radius: 9px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .tr.first { background: var(--accent-tint); }
+    .tr.me { background: transparent; border: 1.5px solid var(--accent); padding: 0 10.5px; }
+    .tr .n { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+    .tr .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr .sc { font-weight: 800; font-size: 15.5px; }
+    .tr .end { color: var(--text2); font-size: 13px; white-space: nowrap; }
+    .num { text-align: right; }
+    .more { font-size: 13px; color: var(--text3); padding: 4px 12px 0; }
+    .empty { flex: 1; min-height: 220px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; color: var(--text2); font-size: 14px; border: 1px dashed var(--border); border-radius: 12px; padding: 20px; }
+    .empty b { color: var(--text); font-size: 16px; }
+
+    .qs { display: flex; flex-direction: column; }
+    .q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 110px 44px; align-items: center; gap: 12px; height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+    .q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+    .q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+    .q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+    .q.hard .bar i { background: var(--error); }
+    .q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .q.hard .pc { color: var(--error); }
+    .foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; margin-top: auto; }
+  </style>
+</helmet>
+
+<div class="rush {{themeClass}}" style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="chip"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.2L4 21l1.8-5.4A8 8 0 1 1 21 12z"></path></svg>Проблема или предложение</div>
+    <div class="chip">beta 0.0</div>
+    <div class="chip" style="padding: 4px 7px;"><svg class="i s" viewBox="0 0 24 24"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg></div>
+    <div class="ava">МП</div>
+    <span style="font-size: 15px;">Марина Петрова</span>
+    <button class="ghost" style="border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px;">Выйти</button>
+  </div>
+
+  <div class="page">
+    <a class="back" href="Daily.dc.html"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Вызов дня</a>
+
+    <!-- Заголовок: режим и день переключаются на месте, без перехода на другую страницу -->
+    <div class="head">
+      <div class="ttl">Доска дня</div>
+      <div class="seg">
+        <sc-for list="{{tabs}}" as="t" hint-placeholder-count="4">
+          <button class="{{t.cls}}" onClick="{{t.pick}}">{{t.title}}</button>
+        </sc-for>
+      </div>
+      <div class="step">
+        <button class="arr" aria-label="Предыдущий день" onClick="{{prevDay}}" disabled="{{noPrev}}"><svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"></path></svg></button>
+        <div class="when">{{dayTitle}}<span>{{dayNote}}</span></div>
+        <button class="arr" aria-label="Следующий день" onClick="{{nextDay}}" disabled="{{noNext}}"><svg class="i" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"></path></svg></button>
+      </div>
+    </div>
+
+    <!-- Сводка: что за набор, сколько сыграли, что со мной -->
+    <div class="card sum">
+      <div><div class="k">Набор</div><div class="v">{{setLine}}</div></div>
+      <div><div class="k">Сыграли</div><div class="v">{{count}}</div></div>
+      <sc-if value="{{isToday}}" hint-placeholder-val="{{ true }}">
+        <div><div class="k">До конца вызова</div><div class="v">{{left}}</div></div>
+      </sc-if>
+      <div class="sp"></div>
+      <sc-if value="{{showMine}}" hint-placeholder-val="{{ true }}">
+        <div class="mine"><div class="k">Ваш результат</div><div class="v">{{myScore}} · {{myPlace}}</div></div>
+        <a class="lnk" href="#result">Страница результата</a>
+      </sc-if>
+      <sc-if value="{{showPlay}}" hint-placeholder-val="{{ false }}">
+        <span style="font-size: 13px; color: var(--text2);">Вы ещё не играли этот вызов</span>
+        <button class="btn solid"><svg class="i s" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>Играть</button>
+      </sc-if>
+      <sc-if value="{{showClosed}}" hint-placeholder-val="{{ false }}">
+        <span class="tag">вызов закрыт</span>
+      </sc-if>
+    </div>
+
+    <div class="cols">
+      <!-- ТАБЛИЦА -->
+      <div class="card pane">
+        <div class="ph"><b>Таблица</b><span>по счёту; при равенстве выше тот, кто закончил раньше</span></div>
+        <sc-if value="{{hasRows}}" hint-placeholder-val="{{ true }}">
+          <div class="thead"><span></span><span>Игрок</span><span class="num">Счёт</span><span class="num">Точность</span><span class="num">Макс. комбо</span><span>Чем кончилось</span></div>
+          <div class="trs">
+            <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+              <div class="tr {{r.cls}}">
+                <span class="n"><sc-if value="{{r.m1}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m2}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #9a958c;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m3}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #b87333;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.mn}}" hint-placeholder-val="{{ true }}">{{r.n}}</sc-if></span>
+                <span class="who">{{r.name}}</span>
+                <span class="sc num">{{r.score}}</span>
+                <span class="num">{{r.acc}}</span>
+                <span class="num">{{r.combo}}</span>
+                <span class="end">{{r.end}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <sc-if value="{{hasMore}}" hint-placeholder-val="{{ false }}"><div class="more">{{moreText}}</div></sc-if>
+        </sc-if>
+        <sc-if value="{{noRows}}" hint-placeholder-val="{{ false }}">
+          <div class="empty"><b>{{emptyTitle}}</b>{{emptyText}}</div>
+        </sc-if>
+        <div class="foot">На доске только вошедшие в аккаунт: у анонимного игрока нет имени.</div>
+      </div>
+
+      <!-- НА ЧЁМ ПОСЫПАЛИСЬ -->
+      <div class="card pane">
+        <div class="ph"><b>Где ошиблись</b><span>доля верных среди сыгравших этот вызов</span></div>
+        <sc-if value="{{hasStats}}" hint-placeholder-val="{{ true }}">
+          <div class="qs">
+            <sc-for list="{{qs}}" as="q" hint-placeholder-count="12">
+              <div class="q {{q.cls}}">
+                <span class="qn">{{q.n}}</span>
+                <sc-if value="{{q.open}}" hint-placeholder-val="{{ true }}"><span class="qt">{{q.text}}</span></sc-if>
+                <sc-if value="{{q.locked}}" hint-placeholder-val="{{ false }}"><span class="qt lock"><svg class="i s" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>текст откроется после вашей попытки</span></sc-if>
+                <span class="bar"><i style="width: {{q.w}};"></i></span>
+                <span class="pc">{{q.pct}}</span>
+              </div>
+            </sc-for>
+          </div>
+          <div class="foot">{{statsNote}}</div>
+        </sc-if>
+        <sc-if value="{{noStats}}" hint-placeholder-val="{{ false }}">
+          <div class="empty"><b>Пока нечего считать</b>{{statsEmpty}}</div>
+        </sc-if>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"played":{"editor":"boolean","default":true,"section":"Состояние"},"mode":{"editor":"enum","options":["bullet","blitz","rapid","classic"],"default":"blitz","section":"Состояние"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Состояние"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { mode: null, day: 0 };
+  }
+  componentDidMount() {
+    var self = this;
+    this._t = setInterval(function () { self.forceUpdate(); }, 1000);
+  }
+  componentWillUnmount() {
+    clearInterval(this._t);
+  }
+  renderVals() {
+    var self = this;
+    var played = this.props.played !== false;
+    var theme = this.props.theme || 'light';
+    var modeId = this.state.mode || this.props.mode || 'blitz';
+    var day = this.state.day;               /* 0 сегодня, -1 вчера, -2 позавчера */
+
+    var now = new Date();
+    var msk = new Date(now.getTime() + (now.getTimezoneOffset() + 180) * 60000);
+    var left = 86400 - (msk.getHours() * 3600 + msk.getMinutes() * 60 + msk.getSeconds());
+    function two(n) { return (n < 10 ? '0' : '') + n; }
+    var leftText = Math.floor(left / 3600) + ':' + two(Math.floor(left % 3600 / 60)) + ':' + two(left % 60);
+
+    var MODES = [
+      { id: 'bullet',  title: 'Пуля',     set: '15 данеток · 1 мин',          size: 15 },
+      { id: 'blitz',   title: 'Блиц',     set: '12 вопросов · 2 мин',         size: 12 },
+      { id: 'rapid',   title: 'Рапид',    set: '10 вопросов · 5 мин',         size: 10 },
+      { id: 'classic', title: 'Классика', set: '8 числовых ответов · 10 мин', size: 8 }
+    ];
+    var DAYS = {
+      '0':  { title: 'Сегодня · 17 сентября', note: 'четверг' },
+      '-1': { title: 'Вчера · 16 сентября',   note: 'среда' },
+      '-2': { title: '15 сентября',           note: 'вторник' }
+    };
+    var ALL = 'прошёл все вопросы', LIVES = 'кончились жизни', TIME = 'вышло время';
+    var ME = 'Вы · Марина Петрова';
+
+    /* Размеры наборов — с боя. Игроки, очки и тексты вопросов УСЛОВНЫЕ:
+       на бою вызов дня пока никто не играл. */
+    var BOARD = {
+      '0': {
+        bullet: { total: 14, rows: [
+          ['lengler', '640', '93 %', '×6', ALL], ['malinovskii', '585', '87 %', '×5', ALL], ['weco_admin', '410', '80 %', '×4', ALL],
+          ['katya_m', '395', '80 %', '×4', TIME], ['timur07', '360', '73 %', '×3', ALL], ['econ_fox', '330', '73 %', '×3', TIME],
+          ['Sonya_kitty', '305', '67 %', '×3', LIVES], ['polina_ek', '270', '67 %', '×2', TIME], ['dmitry.v', '240', '60 %', '×2', LIVES],
+          ['alisa_k', '215', '60 %', '×2', LIVES] ] },
+        blitz: { total: 9, rows: [
+          ['Sonya_kitty', '214', '92 %', '×5', ALL], ['lengler', '198', '83 %', '×4', ALL], ['econ_fox', '171', '83 %', '×3', ALL],
+          ['polina_ek', '150', '75 %', '×3', TIME], ['dmitry.v', '122', '67 %', '×3', TIME], ['katya_m', '118', '67 %', '×2', LIVES],
+          ['timur07', '96', '58 %', '×2', LIVES], ['weco_admin', '74', '50 %', '×2', LIVES], ['alisa_k', '41', '42 %', '×1', LIVES] ],
+          mine: [ME, '186', '83 %', '×4', ALL, 2] },
+        rapid: { total: 3, rows: [
+          ['malinovskii', '96', '70 %', '×3', TIME], ['weco_admin', '71', '60 %', '×2', TIME], ['lengler', '40', '40 %', '×1', LIVES] ] },
+        classic: { total: 0, rows: [] }
+      },
+      '-1': {
+        bullet: { total: 5, rows: [
+          ['lengler', '702', '100 %', '×7', ALL], ['katya_m', '540', '87 %', '×5', ALL], ['malinovskii', '515', '87 %', '×4', ALL],
+          [ME, '430', '80 %', '×4', TIME, 'me'], ['timur07', '388', '73 %', '×3', TIME] ] },
+        blitz: { total: 4, rows: [
+          ['Sonya_kitty', '230', '92 %', '×6', ALL], [ME, '162', '75 %', '×3', TIME, 'me'], ['econ_fox', '140', '67 %', '×3', LIVES], ['dmitry.v', '88', '50 %', '×2', LIVES] ] },
+        rapid: { total: 2, rows: [ ['weco_admin', '88', '70 %', '×3', TIME], ['malinovskii', '52', '50 %', '×2', LIVES] ] },
+        classic: { total: 0, rows: [] }
+      }
+    };
+    var TEXTS = {
+      '0': [
+        'Кривая спроса сдвинется вправо, если…',
+        'Эластичность спроса по цене равна −2. При росте цены на 5 % выручка…',
+        'Монополист максимизирует прибыль при условии…',
+        'Какой налог не изменит объём продаж при совершенно неэластичном спросе?',
+        'Альтернативные издержки обучения в вузе включают…',
+        'Номинальный ВВП вырос на 8 %, дефлятор — на 3 %. Реальный ВВП…',
+        'Потолок цены ниже равновесной приводит к…',
+        'Кривая Лоренца совпадает с биссектрисой, если…',
+        'При росте ключевой ставки курс национальной валюты, как правило…',
+        'Товар Гиффена — это товар, у которого…',
+        'Излишек потребителя на графике — это площадь…',
+        'Фрикционная безработица возникает из-за…' ],
+      '-1': [
+        'Предельные издержки пересекают средние общие в точке…',
+        'В долгосрочном периоде прибыль фирмы при совершенной конкуренции…',
+        'Девальвация национальной валюты выгодна прежде всего…',
+        'Коэффициент Джини равен нулю, когда…',
+        'Субсидия производителю сдвигает кривую предложения…',
+        'Доход вырос на 10 %, спрос на товар упал на 4 %. Этот товар…',
+        'Агрегат М2 отличается от М1 тем, что включает…',
+        'Естественная монополия возникает, когда…',
+        'Положительный внешний эффект потребления ведёт к…',
+        'Кривая производственных возможностей выпукла вверх из-за…',
+        'Индекс потребительских цен измеряет…',
+        'Дилемма заключённых иллюстрирует…' ]
+    };
+    var PCT = [90, 40, 70, 30, 80, 60, 90, 50, 40, 20, 70, 80, 60, 50, 70];
+
+    var m = MODES.filter(function (x) { return x.id === modeId; })[0] || MODES[1];
+    var isToday = day === 0;
+    var pack = (BOARD[String(day)] || {})[modeId] || { total: 0, rows: [] };
+    var list = pack.rows.slice();
+    var total = pack.total;
+    var iPlayed = false, myRow = null;
+    if (isToday && pack.mine && played) {
+      myRow = pack.mine.slice(0, 5).concat(['me']);
+      list.splice(pack.mine[5], 0, myRow);
+      total += 1; iPlayed = true;
+    }
+    list.forEach(function (r) { if (r[5] === 'me') { iPlayed = true; myRow = r; } });
+    var shown = list.slice(0, 10);
+    var rows = shown.map(function (r, i) {
+      var me = r[5] === 'me';
+      return { n: i + 1, name: r[0], score: r[1], acc: r[2], combo: r[3], end: r[4],
+               cls: me ? 'me' : (i === 0 ? 'first' : ''), m1: i === 0, m2: i === 1, m3: i === 2, mn: i > 2 };
+    });
+    var myPlace = myRow ? (list.indexOf(myRow) + 1) + '-е место из ' + total : '';
+
+    var texts = TEXTS[String(day)];
+    var canRead = iPlayed && modeId === 'blitz' && !!texts;
+    var qs = [];
+    for (var i = 0; i < m.size; i++) {
+      var p = PCT[(i + (day === 0 ? 0 : 5) + m.size) % PCT.length];
+      qs.push({ n: i + 1, pct: p + ' %', w: p + '%', cls: p < 40 ? 'hard' : '',
+                open: canRead, locked: !canRead, text: canRead ? texts[i] : '' });
+    }
+
+    var tabs = MODES.map(function (x) {
+      return { title: x.title, cls: x.id === modeId ? 'on' : '', pick: function () { self.setState({ mode: x.id }); } };
+    });
+    var d = DAYS[String(day)];
+
+    return {
+      themeClass: theme === 'dark' ? 'dark' : '',
+      tabs: tabs, dayTitle: d.title, dayNote: d.note,
+      prevDay: function () { if (day > -2) self.setState({ day: day - 1 }); },
+      nextDay: function () { if (day < 0) self.setState({ day: day + 1 }); },
+      noPrev: day <= -2, noNext: day >= 0,
+      setLine: m.title + ' · ' + m.set, count: String(total), left: leftText, isToday: isToday,
+      showMine: !!myRow, myScore: myRow ? myRow[1] : '', myPlace: myPlace,
+      showPlay: isToday && !myRow, showClosed: !isToday && !myRow,
+      rows: rows, hasRows: rows.length > 0, noRows: rows.length === 0,
+      hasMore: list.length > 10 || total > list.length,
+      moreText: 'и ещё ' + (total - shown.length) + ' — показаны первые 10; своя строка видна всегда, даже если вы ниже',
+      emptyTitle: isToday ? 'Сегодня этот вызов ещё никто не прошёл' : 'В этот день вызов никто не сыграл',
+      emptyText: isToday ? 'Первый результат сразу станет первым местом.' : 'Доска пустая — а не «страница не найдена», даже если в этот день на сайт никто не заходил.',
+      qs: qs, hasStats: total > 0, noStats: total === 0,
+      statsEmpty: isToday ? 'Разбор появится после первого сыгранного раунда.' : 'В этот день никто не играл.',
+      statsNote: canRead ? 'Красным — вопросы, на которых ошиблось больше 60 % сыгравших. Пропуск в долю не входит.'
+                         : 'Доля верных видна всем, тексты — только тем, кто сыграл этот вызов: иначе набор можно подсмотреть заранее.'
+    };
+  }
+}
+</script>
+</body>
+</html>

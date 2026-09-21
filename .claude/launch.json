@@ -169,6 +169,17 @@
         "--noreload"
       ],
       "port": 8433
+    },
+    {
+      "name": "stol-demo",
+      "runtimeExecutable": "venv313/Scripts/python.exe",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8611",
+        "--settings=scripts.stol_demo_settings"
+      ],
+      "port": 8611
     }
   ]
 }

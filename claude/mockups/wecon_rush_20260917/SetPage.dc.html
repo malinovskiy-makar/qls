@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.09); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.medal { width: 22px; height: 22px; display: block; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; flex: none; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .login { background: var(--amber); color: var(--amber-ink); font-weight: 700; border: 0; border-radius: 8px; padding: 7px 14px; }
+    .nav .ghost { color: #e9e2d1; background: transparent; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; padding: 6px 12px; font-size: 15px; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .page { flex: 1; padding: 20px 40px 22px; display: flex; flex-direction: column; gap: 14px; box-sizing: border-box; min-height: 0; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush a.back { font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+    .lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 12px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-sizing: border-box; white-space: nowrap; }
+    .rush a.btn { color: var(--text); text-decoration: none; }
+    .btn:hover, .rush a.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.solid:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.solid:disabled { background: var(--surface-2); color: var(--text3); border-color: var(--border); cursor: default; filter: none; }
+    .rush .btn.amber { background: var(--amber); color: var(--amber-ink); border-color: transparent; font-weight: 700; }
+    .btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+    .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+    .chip { height: 28px; padding: 0 11px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .chip b { color: var(--text); font-weight: 600; }
+    .chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+    .code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+    .pane { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .ph { display: flex; align-items: baseline; gap: 12px; }
+    .ph b { font-size: 17px; font-weight: 700; }
+    .ph span { font-size: 12.5px; color: var(--text3); }
+    .num { text-align: right; }
+    .thead, .tr { display: grid; align-items: center; gap: 10px; padding: 0 12px; }
+    .thead { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; height: 26px; }
+    .trs { display: flex; flex-direction: column; gap: 4px; }
+    .tr { height: 40px; border-radius: 9px; background: var(--surface-2); font-size: 14px; font-variant-numeric: tabular-nums; }
+    .tr.first { background: var(--accent-tint); }
+    .tr.me { background: transparent; border: 1.5px solid var(--accent); padding: 0 10.5px; }
+    .tr .n { display: flex; align-items: center; justify-content: center; color: var(--text3); font-size: 13px; }
+    .tr .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .tr .who.anon { font-weight: 500; color: var(--text3); font-style: italic; }
+    .tr .sc { font-weight: 800; font-size: 15.5px; }
+    .tr .end { color: var(--text2); font-size: 13px; white-space: nowrap; }
+    .qs { display: flex; flex-direction: column; }
+    .q { display: grid; grid-template-columns: 22px minmax(0, 1fr) 100px 44px; align-items: center; gap: 12px; min-height: 33px; border-bottom: 1px solid var(--border-soft); font-size: 13px; }
+    .q .qn { color: var(--text3); font-weight: 600; text-align: right; font-variant-numeric: tabular-nums; }
+    .q .qt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .qt.lock { color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .q .qt small { display: block; font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .q .bar { height: 8px; border-radius: 999px; background: var(--surface-2); overflow: hidden; display: block; }
+    .q .bar i { display: block; height: 100%; border-radius: 999px; background: var(--accent); }
+    .q.hard .bar i { background: var(--error); }
+    .q .pc { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+    .q.hard .pc { color: var(--error); }
+    .foot { font-size: 12.5px; color: var(--text3); line-height: 1.45; margin-top: auto; }
+    .inv { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 28px; padding: 22px 28px; }
+    .kick { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+    .ttl { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.15; margin: 4px 0 6px; }
+    .by { font-size: 13.5px; color: var(--text2); }
+    .inv .chips { margin-top: 14px; }
+    .inv .rule { margin-top: 12px; font-size: 13px; color: var(--text3); }
+    .acts { display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+    .rush .play { height: 58px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn); font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .rush .play:hover { filter: brightness(1.12); }
+    .play kbd { font: inherit; font-size: 12px; font-weight: 700; opacity: .75; border: 1px solid rgba(255,255,255,.45); border-radius: 5px; padding: 0 5px; }
+    .hint { font-size: 12.5px; color: var(--text3); text-align: center; }
+    .warn { font-size: 13px; color: var(--text2); background: var(--accent-tint); border-radius: 10px; padding: 10px 12px; line-height: 1.4; display: flex; gap: 10px; align-items: center; }
+    .mine { text-align: center; padding: 6px 0 2px; }
+    .mine b { display: block; font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .mine span { font-size: 13.5px; color: var(--text2); }
+    .cols { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 540px; gap: 16px; min-height: 0; }
+    .thead, .tr { grid-template-columns: 40px minmax(0, 1fr) 80px 92px 104px 170px; }
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.35); display: flex; align-items: center; justify-content: center; }
+    .modal { width: 440px; padding: 22px 24px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); text-align: center; font-size: 14.5px; line-height: 1.5; }
+    .modal .t { font-weight: 700; font-size: 16px; margin-bottom: 6px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 900px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav"><div class="mark">W</div><a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="Main.dc.html" class="on">Wecon Rush</a><div class="sp"></div><sc-if value="{{isStudent}}" hint-placeholder-val="{{ true }}"><div class="ava">МП</div><span style="font-size: 15px;">Марина Петрова</span><button class="ghost">Выйти</button></sc-if><sc-if value="{{isAnon}}" hint-placeholder-val="{{ false }}"><button class="login">Войти</button></sc-if></div>
+  <div class="page">
+    <a class="back" href="Main.dc.html"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Wecon Rush</a>
+
+    <!-- ПРИГЛАШЕНИЕ: что за набор и одна главная кнопка. Лежит наверху, без прокрутки -->
+    <div class="card inv">
+      <div>
+        <div class="kick">Набор учителя</div>
+        <div class="ttl">Контрольная по спросу, 10 класс</div>
+        <div class="by">автор malinovskii · код <span class="code">K7M2X9QD</span></div>
+        <div class="chips">
+          <span class="chip t">Блиц · один верный ответ</span>
+          <span class="chip"><b>12</b> вопросов</span>
+          <span class="chip"><b>2</b> минуты · 3 жизни</span>
+          <span class="chip">попыток: <b>1</b></span>
+          <span class="chip">открыт до <b>20 сентября, 23:59</b></span>
+        </div>
+        <div class="rule">Вопросы и их порядок одинаковы у всех. Результат идёт на доску этого набора, в общий лидерборд не идёт. Брошенный раунд попытку не тратит.</div>
+      </div>
+      <div class="acts">
+        <sc-if value="{{canPlay}}" hint-placeholder-val="{{ true }}">
+          <button class="play" onClick="{{play}}"><svg class="i" viewBox="0 0 24 24"><path d="M7 4l13 8-13 8z"></path></svg>Играть <kbd>Enter</kbd></button>
+          <div class="hint">осталась 1 попытка из 1</div>
+          <sc-if value="{{isAnon}}" hint-placeholder-val="{{ false }}">
+            <div class="warn"><span>Вы не вошли: на доске будете записаны как «аноним», учитель вас не узнает.</span><button class="btn sm amber">Войти</button></div>
+          </sc-if>
+        </sc-if>
+        <sc-if value="{{played}}" hint-placeholder-val="{{ false }}">
+          <div class="mine"><span class="lab">Ваш результат</span><b>186</b><span>3-е место из 15 · точность 83 %</span></div>
+          <a class="btn" href="#result">Страница результата</a>
+          <div class="hint">попытки закончились · набор сыгран 17 сентября</div>
+        </sc-if>
+        <a class="btn" href="Main.dc.html">В обычную игру</a>
+      </div>
+    </div>
+
+    <!-- ДОСКА НАБОРА: та же, что доска дня, без переключателей режима и дня -->
+    <div class="cols">
+      <div class="card pane">
+        <div class="ph"><b>Кто прошёл · {{count}}</b><span>по счёту; при равенстве выше тот, кто закончил раньше</span></div>
+        <div class="thead"><span></span><span>Игрок</span><span class="num">Счёт</span><span class="num">Точность</span><span class="num">Макс. комбо</span><span>Чем кончилось</span></div>
+        <div class="trs">
+          <sc-for list="{{rows}}" as="r" hint-placeholder-count="8">
+            <div class="tr {{r.cls}}"><span class="n"><sc-if value="{{r.m1}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #d6a525;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m2}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #9a958c;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.m3}}" hint-placeholder-val="{{ false }}"><svg class="medal" viewBox="0 0 24 24" style="color: #b87333;"><path d="M7 2h4l1 3 1-3h4l-3 7h-4z" fill="currentColor" opacity=".55"></path><circle cx="12" cy="15.5" r="6" fill="currentColor"></circle><circle cx="12" cy="15.5" r="3.6" fill="none" stroke="rgba(255,255,255,.8)" stroke-width="1.3"></circle></svg></sc-if><sc-if value="{{r.mn}}" hint-placeholder-val="{{ true }}">{{r.n}}</sc-if></span><span class="who {{r.wcls}}">{{r.name}}</span><span class="sc num">{{r.score}}</span><span class="num">{{r.acc}}</span><span class="num">{{r.combo}}</span><span class="end">{{r.end}}</span></div>
+          </sc-for>
+        </div>
+        <div class="foot">{{moreText}}</div>
+      </div>
+      <div class="card pane">
+        <div class="ph"><b>Где ошиблись</b><span>доля верных среди сыгравших этот набор</span></div>
+        <div class="qs">
+          <sc-for list="{{qs}}" as="q" hint-placeholder-count="12">
+            <div class="q {{q.cls}}">
+              <span class="qn">{{q.n}}</span>
+              <sc-if value="{{q.open}}" hint-placeholder-val="{{ false }}"><span class="qt">{{q.text}}</span></sc-if>
+              <sc-if value="{{q.locked}}" hint-placeholder-val="{{ true }}"><span class="qt lock"><svg class="i s" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"></rect><path d="M8 11V8a4 4 0 0 1 8 0v3"></path></svg>текст откроется после вашей попытки</span></sc-if>
+              <span class="bar"><i style="width: {{q.w}};"></i></span>
+              <span class="pc">{{q.pct}}</span>
+            </div>
+          </sc-for>
+        </div>
+        <div class="foot">Тексты видят автор набора и те, кто его уже сыграл, — иначе контрольную можно прочитать заранее.</div>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{note}}" hint-placeholder-val="{{ false }}">
+    <div class="veil"><div class="modal"><div class="t">Старт набора</div><div>Сразу отсчёт 3-2-1 и раунд «Блиц» на 12 вопросов. После раунда итог ведёт обратно на эту страницу — уже с вашей строкой в таблице и открытыми текстами вопросов.</div><div style="margin-top: 16px;"><button class="btn sm" onClick="{{closeNote}}">Понятно</button></div></div></div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"who":{"editor":"enum","options":["student","anon"],"default":"student","section":"Состояние"},"state":{"editor":"enum","options":["fresh","played"],"default":"fresh","section":"Состояние"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { note: false }; }
+  renderVals() {
+    var self = this;
+    var isStudent = (this.props.who || 'student') === 'student';
+    var played = isStudent && (this.props.state || 'fresh') === 'played';
+    var ALL = 'прошёл до конца', LIVES = 'выбыл', TIME = 'время вышло';
+    /* Игроки и очки условные: на бою у владельца пока нет ни одного набора. */
+    var list = [
+      ['katya_m', '214', '92 %', '×5', ALL], ['timur07', '198', '83 %', '×4', ALL], ['polina_ek', '171', '83 %', '×3', ALL],
+      ['аноним', '160', '75 %', '×3', TIME, 'anon'], ['dmitry.v', '150', '75 %', '×3', TIME], ['alisa_k', '122', '67 %', '×3', TIME],
+      ['аноним', '118', '67 %', '×2', LIVES, 'anon'], ['econ_fox', '96', '58 %', '×2', LIVES], ['Sonya_kitty', '74', '50 %', '×2', LIVES]
+    ];
+    if (played) list.splice(2, 0, ['Вы · Марина Петрова', '186', '83 %', '×4', ALL, 'me']);
+    var total = played ? 15 : 14;
+    var rows = list.slice(0, 10).map(function (r, i) {
+      return { n: i + 1, name: r[0], score: r[1], acc: r[2], combo: r[3], end: r[4],
+               cls: r[5] === 'me' ? 'me' : (i === 0 ? 'first' : ''), wcls: r[5] === 'anon' ? 'anon' : '',
+               m1: i === 0, m2: i === 1, m3: i === 2, mn: i > 2 };
+    });
+    var TEXTS = ['Кривая спроса сдвинется вправо, если…', 'Эластичность спроса по цене равна −2. При росте цены на 5 % выручка…', 'Товар Гиффена — это товар, у которого…',
+      'Какой налог не изменит объём продаж при совершенно неэластичном спросе?', 'Потолок цены ниже равновесной приводит к…', 'Излишек потребителя на графике — это площадь…',
+      'Рост дохода потребителей сдвигает кривую спроса на низший товар…', 'Спрос задан Qd = 40 − P. При какой цене выручка максимальна?', 'Если товары X и Y — комплементы, то рост цены X…',
+      'Перекрёстная эластичность равна нулю. Это значит, что товары…', 'Закон спроса нарушается для…', 'Рыночный спрос получают из индивидуальных…'];
+    var PCT = [90, 40, 70, 30, 80, 60, 90, 50, 40, 20, 70, 80];
+    var qs = TEXTS.map(function (t, i) { return { n: i + 1, text: t, open: played, locked: !played, pct: PCT[i] + ' %', w: PCT[i] + '%', cls: PCT[i] < 40 ? 'hard' : '' }; });
+    return {
+      isStudent: isStudent, isAnon: !isStudent, played: played, canPlay: !played,
+      rows: rows, qs: qs, count: String(total),
+      moreText: 'и ещё ' + (total - rows.length) + ' · анонимные раунды в таблице есть, но без имени',
+      note: this.state.note, play: function () { self.setState({ note: true }); }, closeNote: function () { self.setState({ note: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

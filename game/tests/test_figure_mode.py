@@ -168,8 +168,8 @@ class ClientTests(TestCase):
     """Разметка и логика клиента для режима."""
 
     def setUp(self):
-        with open(TEMPLATE, encoding='utf-8') as f:
-            self.src = f.read()
+        from game.tests.test_page_js import page_source
+        self.src = page_source()   # разметка экранов — в game/_*.html
 
     def test_tiles_are_drawn_by_the_shared_renderer(self):
         """Второго рисователя не заводим ни под каким видом."""

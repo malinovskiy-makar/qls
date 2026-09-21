@@ -174,8 +174,8 @@ class SoundModuleTests(TestCase):
     def setUp(self):
         with open(SOUND_JS, encoding='utf-8') as f:
             self.src = f.read()
-        with open(TEMPLATE, encoding='utf-8') as f:
-            self.page = f.read()
+        from game.tests.test_page_js import page_source
+        self.page = page_source()   # разметка экранов — в game/_*.html
 
     def test_module_parses(self):
         import shutil
@@ -218,11 +218,11 @@ class SoundModuleTests(TestCase):
         body = m.group(1)
         self.assertIn("rush('over')", body)
         self.assertIn("rush('record')", body)
-        # графики строятся отдельно и звука не издают
-        charts = re.search(r'function buildCharts\(\) \{(.*?)\n  \}',
-                           self.page, re.S)
-        self.assertIsNotNone(charts)
-        self.assertNotIn('rush(', charts.group(1))
+        # экран итога рисуется отдельно и звука не издаёт (ADR 0111)
+        paint = re.search(r'function paintFinal\(\) \{(.*?)\n  \}',
+                          self.page, re.S)
+        self.assertIsNotNone(paint)
+        self.assertNotIn('rush(', paint.group(1))
 
 
 class ShareCardIsGoneTests(TestCase):
@@ -241,8 +241,8 @@ class ShareCardIsGoneTests(TestCase):
     """
 
     def setUp(self):
-        with open(TEMPLATE, encoding='utf-8') as f:
-            self.page = f.read()
+        from game.tests.test_page_js import page_source
+        self.page = page_source()   # разметка экранов — в game/_*.html
 
     def test_nothing_of_the_card_is_left(self):
         for gone in ('drawShareCard', 'drawCurve', 'drawHearts', 'drawDonut',

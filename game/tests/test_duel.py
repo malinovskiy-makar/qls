@@ -284,9 +284,14 @@ class DuelFlowTests(TestCase):
         self.assertEqual(page.status_code, 200)
         cmp_ = page.context['compare']
         self.assertIsNotNone(cmp_)
-        self.assertEqual(len(cmp_['strip']), gset.size)
-        self.assertIn('Побеждает', cmp_['verdict'])
-        self.assertGreater(cmp_['a']['score'], cmp_['b']['score'])
+        # Полоса — до последнего вопроса, до которого дошёл хоть кто-то (ADR 0112),
+        # а не весь запас очереди.
+        reached = max(len(r.question_outcomes) for r in gset.results.all())
+        self.assertEqual(len(cmp_['strip']), reached)
+        self.assertEqual(cmp_['verdict'], 'Победа за avtor')
+        me, other = cmp_['cards']
+        self.assertTrue(me['is_me'])
+        self.assertLess(me['score'], other['score'])
 
     def test_third_player_appears_on_the_board(self):
         a = self._logged('igrok_a')
@@ -297,15 +302,17 @@ class DuelFlowTests(TestCase):
         for cl in (a, b, c):
             self._play(cl, gset.code)
         page = c.get(reverse('game:duel', args=[gset.code]))
-        self.assertEqual(len(page.context['rows']), 3)
-        self.assertEqual(sum(1 for r in page.context['rows'] if r['is_author']), 1)
+        # Сравнение — автор и смотрящий; третий — строкой «Ещё сыграли».
+        names = {card['name'] for card in page.context['compare']['cards']}
+        self.assertEqual(names, {'igrok_a', 'igrok_v'})
+        self.assertEqual([r['name'] for r in page.context['others']], ['igrok_b'])
 
     def test_challenge_again_makes_a_new_set_with_the_same_filter(self):
         self.client.get(reverse('game:duel_new'),
                         {'mode': 'blitz', 'topics': 'Спрос и предложение'})
         first = GameSet.objects.get(kind='duel')
         page = self.client.get(reverse('game:duel', args=[first.code]))
-        again = page.context['again_url']
+        again = page.context['rematch_url']
         self.assertIn('topics=', again)
         self.client.get(again)
         sets = list(GameSet.objects.filter(kind='duel').order_by('id'))
@@ -386,8 +393,8 @@ class DuelLoginBoundaryTests(TestCase):
         r = self.client.get(reverse('game:duel', args=[self.gset.code]))
         self.assertEqual(r.status_code, 200)
         html = r.content.decode('utf-8')
-        self.assertIn('только вошедшие', html)
-        self.assertIn('Скопировать ссылку-приглашение', html)
+        self.assertIn('Дуэль только для вошедших', html)
+        self.assertIn('>Войти, чтобы принять</a>', html)
 
     def test_logged_in_player_can_accept(self):
         from problems.models import User
@@ -423,11 +430,12 @@ class DuelLoginBoundaryTests(TestCase):
 
 
 class ScoreboardIsOneMarkupTests(TestCase):
-    u"""Табло `.vs` — одно и то же на дуэли и на обычном забеге.
+    u"""Полоса HUD — одна и та же на дуэли и на обычном раунде (ADR 0110).
 
-    Решение владельца 08.09.2026: второго вида табло не заводим. Проверяется
-    по РАЗМЕТКЕ обеих страниц: если когда-нибудь заведут вторую, страницы
-    разойдутся, и этот тест это увидит.
+    Решение владельца 08.09.2026: второго вида табло не заводим; с 17.09.2026
+    табло — одна полоса: слева вы, справа рекорд (одиночный раунд) или
+    соперник (дуэль). Проверяется по РАЗМЕТКЕ обеих страниц: заведут вторую —
+    страницы разойдутся, и тест это увидит.
     """
 
     def setUp(self):
@@ -435,10 +443,9 @@ class ScoreboardIsOneMarkupTests(TestCase):
         self.me = User.objects.create_user(username='vs_user', password='p12345')
         self.client.force_login(self.me)
 
-    def _vs_block(self, html):
-        self.assertIn('<div class="vs" id="vs"', html)
-        return html.split('<div class="vs" id="vs"', 1)[1].split(
-            '<div class="duel-emoji"', 1)[0]
+    def _hud(self, html):
+        self.assertIn('<header class="hud" id="hud">', html)
+        return html.split('<header class="hud" id="hud">', 1)[1].split('</header>', 1)[0]
 
     def test_the_same_block_serves_both_run_kinds(self):
         plain = self.client.get(reverse('game:page')).content.decode('utf-8')
@@ -448,25 +455,24 @@ class ScoreboardIsOneMarkupTests(TestCase):
         duel = self.client.get(
             reverse('game:set_page', args=[gset.code])).content.decode('utf-8')
 
-        self.assertEqual(self._vs_block(plain), self._vs_block(duel))
+        self.assertEqual(self._hud(plain), self._hud(duel))
 
     def test_the_left_side_is_always_you(self):
-        html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        block = self._vs_block(html)
-        self.assertIn('id="vs-my-score"', block)
-        self.assertIn('id="vs-my-correct"', block)
-        self.assertIn('id="vs-my-time"', block)
-        self.assertIn('id="vs-my-tape"', block)
-        # Точность и комбо ушли в итог (решение владельца 15.09.2026): табло —
-        # одна строка на сторону, имя, счёт, верных и время.
-        self.assertNotIn('id="vs-my-acc"', block)
-        self.assertNotIn('id="vs-my-combo"', block)
+        hud = self._hud(self.client.get(reverse('game:page')).content.decode('utf-8'))
+        for need in ('id="hud-score"', 'id="hud-combo"', 'id="hud-timer"', 'id="hud-lives"',
+                     'id="hud-correct"', 'id="hud-qno"'):
+            self.assertIn(need, hud)
+        self.assertLess(hud.index('id="hud-score"'), hud.index('id="hud-timer"'))
 
-    def test_the_gap_column_stands_between_the_two_cards(self):
-        block = self._vs_block(
-            self.client.get(reverse('game:page')).content.decode('utf-8'))
-        self.assertLess(block.index('id="vs-me"'), block.index('id="vs-gap"'))
-        self.assertLess(block.index('id="vs-gap"'), block.index('id="vs-them"'))
+    def test_the_rival_block_has_his_numbers_and_the_gap_is_under_the_bar(self):
+        html = self.client.get(reverse('game:page')).content.decode('utf-8')
+        hud = self._hud(html)
+        for need in ('id="opp"', 'id="opp-name"', 'id="opp-dot"', 'id="opp-correct"',
+                     'id="opp-lives"', 'id="opp-time"', 'id="opp-score"', 'id="hud-rec"'):
+            self.assertIn(need, hud)
+        # Разрыв — пилюлей ПОД полосой, а не колонкой внутри неё.
+        self.assertNotIn('id="gap-pill"', hud)
+        self.assertLess(html.index('</header>'), html.index('id="gap-pill"'))
 
 
 class PersonalBestComesWithTheStartTests(TestCase):
@@ -498,11 +504,11 @@ class PersonalBestComesWithTheStartTests(TestCase):
         from game import config as game_config
         GameResult.objects.create(
             user=self.me, mode='blitz', score=900, correct_count=9,
-            wrong_count=1, total_count=10,
+            wrong_count=1, total_count=10, ranked=True,
             economy_version=game_config.ECONOMY_VERSION)
         GameResult.objects.create(
             user=self.me, mode='blitz', score=100, correct_count=1,
-            wrong_count=9, total_count=10,
+            wrong_count=9, total_count=10, ranked=True,
             economy_version=game_config.ECONOMY_VERSION)
 
         self.client.force_login(self.me)

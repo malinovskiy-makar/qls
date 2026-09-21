@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff; --accent-tint: rgba(0,108,109,.10);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10);
+      --green: #186e3c; --green-tint: rgba(24,110,60,.10);
+      --skip: #a39c8c;
+      background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; overflow: hidden;
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+
+    .page { width: 1120px; margin: 0 auto; padding: 26px 0 40px; display: flex; flex-direction: column; gap: 18px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    h3 { margin: 0; font-size: 15px; font-weight: 700; }
+    .sub { font-size: 12.5px; color: var(--text3); }
+
+    /* ---------- вердикт ---------- */
+    .verdict { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 24px; padding: 24px 28px; }
+    .vtitle { font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; display: flex; align-items: center; gap: 12px; }
+    .chips { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 13px; color: var(--text3); }
+    .chip { height: 24px; padding: 0 9px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; display: flex; align-items: center; }
+    .big { display: flex; align-items: flex-end; gap: 18px; margin-top: 18px; }
+    .big .num { font-size: 64px; font-weight: 800; line-height: .9; letter-spacing: -2px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .big .notes { display: flex; flex-direction: column; gap: 6px; padding-bottom: 4px; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--amber); color: var(--amber-ink); font-size: 13px; font-weight: 700; width: fit-content; }
+    .note { font-size: 13px; color: var(--text2); }
+    .note b { color: var(--text); font-weight: 700; }
+    .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-top: 20px; }
+    .metric { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); }
+    .metric small { display: block; font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+    .metric b { display: block; font-size: 22px; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
+    .metric span { font-size: 12.5px; color: var(--text2); }
+    .actions { display: flex; flex-direction: column; gap: 8px; }
+    .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 16px; font-size: 14.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; gap: 10px; text-align: left; }
+    .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .btn .n { font-size: 12.5px; color: var(--text3); font-weight: 500; }
+    .btn.primary { height: 56px; background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-size: 17px; font-weight: 700; justify-content: center; }
+    .btn.primary:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .btn.primary kbd { font: inherit; font-size: 12px; font-weight: 700; opacity: .75; border: 1px solid rgba(255,255,255,.45); border-radius: 5px; padding: 0 5px; }
+    .btn.work { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); }
+    .btn.work:hover { border-color: var(--accent); }
+    .share-note { font-size: 12px; color: var(--text3); text-align: center; }
+
+    /* ---------- ход раунда ---------- */
+    .flow { padding: 18px 24px 16px; }
+    .flow .head { display: flex; justify-content: space-between; align-items: baseline; }
+    .key { display: flex; gap: 14px; font-size: 12.5px; color: var(--text3); }
+    .key i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+    .curve { margin-top: 12px; }
+    .tape { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 8px; align-items: end; height: 64px; margin-top: 6px; padding: 0 12px; }
+    .cell { border-radius: 5px 5px 2px 2px; position: relative; }
+    .cell.ok { background: var(--green); } .cell.bad { background: var(--error); } .cell.skip { background: var(--skip); }
+    .cell .t { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-size: 10.5px; color: var(--text3); }
+    .qn { display: grid; grid-template-columns: repeat(14, minmax(0, 1fr)); gap: 8px; padding: 0 12px; margin-top: 4px; font-size: 11px; color: var(--text3); text-align: center; }
+
+    /* ---------- три колонки ---------- */
+    .row3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+    .cb { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+    .bars { display: flex; flex-direction: column; gap: 8px; }
+    .bar { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; font-size: 13px; }
+    .bar .lab { color: var(--text2); display: flex; justify-content: space-between; gap: 8px; }
+    .bar .lab b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .bar .tr { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; }
+    .bar .tr i { display: block; height: 100%; }
+    .ok-f { background: var(--green); } .bad-f { background: var(--error); } .skip-f { background: var(--skip); } .pt-f { background: var(--accent); }
+    .none { color: var(--text3); font-size: 12.5px; }
+    .cmp { display: flex; flex-direction: column; gap: 8px; }
+    .cmp .r { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; font-size: 13px; color: var(--text2); align-items: baseline; }
+    .cmp .r b { font-size: 16px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; }
+    .cmp .r .u { font-size: 12px; color: var(--text3); }
+    .up { color: var(--green); font-weight: 700; } .dn { color: var(--error); font-weight: 700; }
+    .hist { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; align-items: end; height: 96px; }
+    .hist .h { background: var(--accent-tint); border-radius: 5px 5px 2px 2px; position: relative; }
+    .hist .h.now { background: var(--accent); }
+    .hist .h span { position: absolute; top: -18px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--text2); font-variant-numeric: tabular-nums; }
+    .hist-x { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; font-size: 10.5px; color: var(--text3); text-align: center; }
+
+    /* ---------- ошибки и пропуски ---------- */
+    .miss { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+    .mi { display: grid; grid-template-columns: 28px minmax(0, 1fr) 260px auto; gap: 12px; align-items: center; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 13.5px; }
+    .mi .k { width: 26px; height: 26px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .mi .k.bad { background: var(--error); } .mi .k.skip { background: var(--skip); }
+    .mi .q { color: var(--text); }
+    .mi .q small { display: block; color: var(--text3); font-size: 12px; }
+    .mi .a { font-size: 12.5px; color: var(--text2); }
+    .mi .a b { color: var(--green); font-weight: 700; }
+    .mi .a s { color: var(--error); }
+    .mi .lnk { height: 30px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: transparent; font-size: 12.5px; font-weight: 600; display: inline-flex; align-items: center; gap: 5px; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 1460px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="#nav" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="ava">МП</div><span style="font-size: 15px;">Марина Петрова</span>
+  </div>
+
+  <div class="page">
+    <!-- 1. Вердикт и действия: всё главное на первом экране -->
+    <div class="card verdict">
+      <div>
+        <div class="vtitle"><svg class="i" viewBox="0 0 24 24" style="width: 26px; height: 26px;"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>Время вышло!</div>
+        <div class="chips"><span class="chip">Блиц</span><span>17 сентября, 14:07</span><span>·</span><span>без фильтров</span></div>
+        <div class="big">
+          <b class="num">1 260</b>
+          <div class="notes">
+            <span class="badge"><svg class="i s" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>личный рекорд · было 1 120</span>
+            <span class="note">В таблице: <b>3-е место за неделю</b>, 12-е за всё время</span>
+            <span class="note">Точность 64 % — ниже 85 %, итог <b>×0,9</b></span>
+          </div>
+        </div>
+        <div class="metrics">
+          <div class="metric"><small>Верных</small><b>9 из 14</b><span>64 % · 3 пропуска</span></div>
+          <div class="metric"><small>Макс. комбо</small><b>×4</b><span>серия из 5 верных</span></div>
+          <div class="metric"><small>Жизни</small><b>1 из 3</b><span>2 потеряно</span></div>
+          <div class="metric"><small>В игре</small><b>2:45</b><span>2:00 + 45 с за верные</span></div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn primary">Сыграть ещё раз <kbd>Enter</kbd></button>
+        <button class="btn work"><span>Работа над ошибками</span><span class="n">10 вопросов · 2 темы</span></button>
+        <button class="btn"><span>Разобрать ошибки и пропуски</span><span class="n">5</span></button>
+        <button class="btn"><span>Поделиться результатом</span><svg class="i s" viewBox="0 0 24 24"><path d="M4 12v7h16v-7M12 3v13M8 7l4-4 4 4"></path></svg></button>
+        <button class="btn"><span>Темы этого раунда в каталоге</span><svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+        <div class="share-note">ссылка на результат открывается у всех, без входа</div>
+      </div>
+    </div>
+
+    <!-- 2. Ход раунда: счёт и каждый вопрос на одной оси -->
+    <div class="card flow">
+      <div class="head">
+        <h3>Ход раунда</h3>
+        <div class="key"><span><i style="background: var(--accent);"></i>счёт</span><span><i style="background: var(--green);"></i>верно</span><span><i style="background: var(--error);"></i>неверно</span><span><i style="background: var(--skip);"></i>пропуск</span><span>высота столбика — сколько думали, над ним секунды</span></div>
+      </div>
+      <svg class="curve" viewBox="0 0 1000 120" width="1000" height="120" style="width: 100%; height: 120px;">
+        <line x1="20" y1="110" x2="980" y2="110" stroke="rgba(45,45,45,.14)" stroke-width="1"></line>
+        <polyline points="20,103.7 93.8,96.5 167.7,87 241.5,75.1 315.4,62.4 389.2,62.4 463.1,54.4 536.9,45.7 610.8,45.7 684.6,45.7 758.5,33.8 832.3,33.8 906.2,33.8 980,10" fill="none" stroke="#00797a" stroke-width="2.5" stroke-linejoin="round"></polyline>
+        <circle cx="980" cy="10" r="4" fill="#00797a"></circle>
+        <text x="962" y="30" font-size="12" font-weight="700" fill="#2d2d2d" text-anchor="end">1 260</text>
+        <text x="330" y="52" font-size="11" fill="#665e51">×4 после пятого подряд</text>
+      </svg>
+      <div class="tape">
+        <div class="cell ok" style="height: 16px;"><span class="t">6</span></div>
+        <div class="cell ok" style="height: 23px;"><span class="t">9</span></div>
+        <div class="cell ok" style="height: 36px;"><span class="t">14</span></div>
+        <div class="cell ok" style="height: 18px;"><span class="t">7</span></div>
+        <div class="cell ok" style="height: 49px;"><span class="t">19</span></div>
+        <div class="cell bad" style="height: 29px;"><span class="t">11</span></div>
+        <div class="cell ok" style="height: 13px;"><span class="t">5</span></div>
+        <div class="cell ok" style="height: 44px;"><span class="t">17</span></div>
+        <div class="cell skip" style="height: 23px;"><span class="t">9</span></div>
+        <div class="cell skip" style="height: 57px;"><span class="t">22</span></div>
+        <div class="cell ok" style="height: 34px;"><span class="t">13</span></div>
+        <div class="cell bad" style="height: 21px;"><span class="t">8</span></div>
+        <div class="cell skip" style="height: 39px;"><span class="t">15</span></div>
+        <div class="cell ok" style="height: 26px;"><span class="t">10</span></div>
+      </div>
+      <div class="qn"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span><span>10</span><span>11</span><span>12</span><span>13</span><span>14</span></div>
+    </div>
+
+    <!-- 3. Темы, разделы, сложность -->
+    <div class="row3">
+      <div class="card cb">
+        <h3>Точность по темам</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>Спрос и предложение</span><b>3 из 4</b></div><div class="tr"><i class="ok-f" style="width: 75%;"></i><i class="skip-f" style="width: 25%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Эластичность</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="bad-f" style="width: 33%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Издержки фирмы</span><b>1 из 3</b></div><div class="tr"><i class="ok-f" style="width: 33%;"></i><i class="bad-f" style="width: 33%;"></i><i class="skip-f" style="width: 34%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Деньги и инфляция</span><b>2 из 3</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="skip-f" style="width: 33%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Без темы</span><b>1 из 1</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+        </div>
+      </div>
+      <div class="card cb">
+        <h3>Разделы</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>Микро</span><b>6 из 10 · 60 %</b></div><div class="tr"><i class="ok-f" style="width: 60%;"></i><i class="bad-f" style="width: 20%;"></i><i class="skip-f" style="width: 20%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Макро</span><b>2 из 3 · 67 %</b></div><div class="tr"><i class="ok-f" style="width: 67%;"></i><i class="skip-f" style="width: 33%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Прочее</span><b>1 из 1</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+        </div>
+        <div class="none">Финансы и математика в этом раунде не попадались</div>
+      </div>
+      <div class="card cb">
+        <h3>Держите ли сложное</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>★ 1</span><b>2 из 2</b></div><div class="tr"><i class="ok-f" style="width: 100%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 2</span><b>4 из 5</b></div><div class="tr"><i class="ok-f" style="width: 80%;"></i><i class="skip-f" style="width: 20%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 3</span><b>3 из 6</b></div><div class="tr"><i class="ok-f" style="width: 50%;"></i><i class="bad-f" style="width: 33%;"></i><i class="skip-f" style="width: 17%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>★ 4</span><b>0 из 1</b></div><div class="tr"><i class="skip-f" style="width: 100%;"></i></div></div>
+        </div>
+        <div class="none">на 4★ и выше пока мимо — там и растут очки</div>
+      </div>
+    </div>
+
+    <!-- 4. Очки, история, против себя обычного -->
+    <div class="row3">
+      <div class="card cb">
+        <h3>Где набрано</h3>
+        <div class="bars">
+          <div class="bar"><div class="lab"><span>Спрос и предложение</span><b>380</b></div><div class="tr"><i class="pt-f" style="width: 100%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Деньги и инфляция</span><b>300</b></div><div class="tr"><i class="pt-f" style="width: 79%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Эластичность</span><b>290</b></div><div class="tr"><i class="pt-f" style="width: 76%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Издержки фирмы</span><b>190</b></div><div class="tr"><i class="pt-f" style="width: 50%;"></i></div></div>
+          <div class="bar"><div class="lab"><span>Без темы</span><b>100</b></div><div class="tr"><i class="pt-f" style="width: 26%;"></i></div></div>
+        </div>
+      </div>
+      <div class="card cb">
+        <h3>Последние раунды <span class="sub">· Блиц</span></h3>
+        <div class="hist" style="margin-top: 18px;">
+          <div class="h" style="height: 40px;"><span>640</span></div>
+          <div class="h" style="height: 56px;"><span>890</span></div>
+          <div class="h" style="height: 49px;"><span>780</span></div>
+          <div class="h" style="height: 70px;"><span>1 120</span></div>
+          <div class="h now" style="height: 79px;"><span>1 260</span></div>
+        </div>
+        <div class="hist-x"><span>9 сен</span><span>11 сен</span><span>14 сен</span><span>16 сен</span><span>сегодня</span></div>
+      </div>
+      <div class="card cb">
+        <h3>Против себя обычного</h3>
+        <div class="cmp">
+          <div class="r"><span>Точность</span><b>64 %</b><span class="u">обычно 58 % <span class="up">↑</span></span></div>
+          <div class="r"><span>Секунд на верный</span><b>9</b><span class="u">обычно 12 <span class="up">↑</span></span></div>
+          <div class="r"><span>Верных за раунд</span><b>9</b><span class="u">обычно 7 <span class="up">↑</span></span></div>
+          <div class="r"><span>Пропусков</span><b>3</b><span class="u">обычно 1 <span class="dn">↓</span></span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Ошибки и пропуски — сразу на странице, без кнопки-раскрывашки -->
+    <div class="card miss">
+      <h3>Ошибки и пропуски <span class="sub">· каждую можно открыть в каталоге и решить не спеша</span></h3>
+      <div class="mi"><span class="k bad">6</span><span class="q">Эластичность спроса по цене на участке, где выручка растёт с ростом цены, …<small>Эластичность · ★ 3</small></span><span class="a">ваш ответ <s>2</s> → верный <b>4</b></span><button class="lnk">В каталоге <svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+      <div class="mi"><span class="k bad">12</span><span class="q">Средние общие издержки минимальны при таком выпуске, при котором …<small>Издержки фирмы · ★ 3</small></span><span class="a">ваш ответ <s>1</s> → верный <b>3</b></span><button class="lnk">В каталоге <svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+      <div class="mi"><span class="k skip">9</span><span class="q">Если государство вводит потоварную субсидию производителям, то на конкурентном рынке …<small>Спрос и предложение · ★ 2</small></span><span class="a">пропуск → верный <b>3</b></span><button class="lnk">В каталоге <svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+      <div class="mi"><span class="k skip">10</span><span class="q">Реальная ставка процента при номинальной 12 % и инфляции 8 % примерно равна …<small>Деньги и инфляция · ★ 3</small></span><span class="a">пропуск → верный <b>4</b></span><button class="lnk">В каталоге <svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+      <div class="mi"><span class="k skip">13</span><span class="q">Фирма на конкурентном рынке в краткосрочном периоде продолжает выпуск, если цена …<small>Издержки фирмы · ★ 4</small></span><span class="a">пропуск → верный <b>2</b></span><button class="lnk">В каталоге <svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button></div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":1460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -308,10 +308,8 @@ class ClientTests(TestCase):
     def setUp(self):
         import os
         from django.conf import settings
-        path = os.path.join(settings.BASE_DIR, 'game', 'templates', 'game',
-                            'game.html')
-        with open(path, encoding='utf-8') as f:
-            self.src = f.read()
+        from game.tests.test_page_js import page_source
+        self.src = page_source()   # разметка экранов — в game/_*.html
 
     def test_the_figure_is_drawn_by_the_one_shared_renderer(self):
         u"""Второго рисователя не заводим ни под каким видом."""

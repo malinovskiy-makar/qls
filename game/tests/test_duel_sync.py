@@ -21,7 +21,7 @@ from django.core.cache import cache
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 
-from game import consumers, routing as game_routing, state as run_state
+from game import config, consumers, routing as game_routing, state as run_state
 from game.models import GameResult, GameSet
 from game.tests.test_duel import make_q
 from game.tests.test_page_js import inline_js, page_source
@@ -73,8 +73,27 @@ class DuelLobbyTests(TestCase):
         self.assertFalse('id="set-play"' in html, 'у дуэли осталась кнопка «Играть»')
         for needle in ('id="duel-lobby"', 'id="duel-code">%s<' % self.gset.code,
                        '>Скопировать код<', '>Скопировать ссылку<', 'Ждём соперника',
-                       'href="/game/">Отменить<'):
+                       'href="/game/">Отменить дуэль<'):
             self.assertTrue(needle in html, 'нет в лобби: %s' % needle)
+
+    def test_lobby_is_a_page_without_the_start_screen_behind(self):
+        u"""Макет DuelLobby (ADR 0112): шапка сайта и карточка, зон главной нет."""
+        html = self.client.get(self.url).content.decode('utf-8')
+        for gone in ('id="mode-grid"', 'id="start-main"', 'id="lb-card"', 'id="entry-row"',
+                     'id="play-btn"'):
+            self.assertFalse(gone in html, 'в лобби осталась главная: %s' % gone)
+        # На обычной странице игры зоны на месте.
+        self.assertTrue('id="mode-grid"' in self.client.get(reverse('game:page')).content.decode('utf-8'))
+
+    def test_lobby_says_terms_and_shows_two_slots(self):
+        html = self.client.get(self.url).content.decode('utf-8')
+        mode = config.MODES['blitz']
+        title = '%s · 2 мин · 3 жизни' % mode['title']
+        self.assertTrue(title in html, 'нет условий дуэли: %s' % title)
+        self.assertTrue('без фильтров · у обоих одни и те же вопросы · раунд без лимита вопросов' in html)
+        self.assertTrue('Вы · avtor' in html)
+        self.assertTrue('id="duel-slot-rival"' in html and 'Ждём соперника…' in html)
+        self.assertFalse('150' in html.split('id="duel-lobby"', 1)[1].split('</section>', 1)[0])
 
     def test_rival_sees_the_author_in_the_lobby(self):
         self.client.force_login(User.objects.create_user(username='sopernik', password='p12345'))
@@ -173,13 +192,22 @@ class DuelCompareTableTests(TestCase):
                     total_count=9, max_combo=1.25, avg_correct_ms=None, wall_ms=None)
         self.client.force_login(self.b)
         html = self.client.get(reverse('game:duel', args=[self.gset.code])).content.decode('utf-8')
-        for needle in ('Очки', 'Верных', 'Ошибок', 'Пропусков', 'Точность', 'Лучшее комбо',
-                       'Среднее время верного ответа', 'Время раунда',
-                       '<td class="num win">1200</td>', '<td class="num">800</td>',
-                       '<td class="num win">82%</td>', '<td class="num win">×1,5</td>',
-                       '<td class="num win">1,8 с</td>', '<td class="num">–</td>',
-                       '<td class="num win">2:05</td>', 'Реванш'):
+        # Смотрит boris — его столбец слева. Лучший выделен В СТРОКЕ (ADR 0112):
+        # у anna больше очков, у boris меньше пропусков; нет замера — без выделения.
+        rows = {
+            'Очки': '<td>800</td><td class="w">1\u00a0200</td>',
+            'Верных': '<td>6</td><td class="w">9</td>',
+            'Ошибок': '<td>3</td><td class="w">2</td>',
+            'Пропусков': '<td class="w">0</td><td>1</td>',
+            'Точность': '<td>67 %</td><td class="w">82 %</td>',
+            'Лучшее комбо': '<td>×1,25</td><td class="w">×1,5</td>',
+            'Секунд на верный': '<td>–</td><td>1,8</td>',
+            'Продержался': '<td>–</td><td>2:05</td>',
+        }
+        for label, cells in rows.items():
+            needle = '<th scope="row">%s</th>%s' % (label, cells)
             self.assertTrue(needle in html, 'нет в итоге дуэли: %s' % needle)
+        self.assertTrue('Реванш' in html)
 
 
 class SoundCountdownTests(TestCase):

@@ -162,7 +162,8 @@ submission = get_object_or_404(visible_submissions(request.user), pk=pk)
 
 | Место | Что там | Почему допустимо |
 |---|---|---|
-| `platform/stats.html`, `catalog/problem_list.html`, `game/game.html`, `calendar_stub/calendar.html` | JSON внутри `<script>` | значение готовит `dumps_for_script`: выйти из тега им нельзя |
+| `platform/stats.html`, `game/game.html`, `calendar_stub/calendar.html`; каталог «Стол» — `catalog/stol/_stol_center.html` (настройки задачи) и `catalog/_catalog_modal.html` (состояние фильтров) через фильтр `script_json` | JSON внутри `<script>` | значение готовит `dumps_for_script`: выйти из тега им нельзя |
+| `catalog/_math_text.html` | `{{ text\|render_markdown\|render_figures:problem\|safe }}` — условие в формате markdown | `render_markdown` чистит HTML санитайзером (`problems/rendering.py`), `\|safe` стоит явно, чтобы его находил grep |
 | `registration/password_change_form.html` | `{{ field.help_text\|safe }}` | текст пишет сам Django, не пользователь |
 
 Других `|safe`, `{% autoescape off %}` и `mark_safe` в проекте нет.
@@ -445,8 +446,8 @@ Python, а всё, что ниже WARNING, пропадало молча. На�
 что её кто-то отсекает, а потому что отвечать некому. `WHITENOISE_ROOT` не
 задан, поэтому WhiteNoise отдаёт только `STATIC_ROOT`.
 
-⚠️ **С 15.09.2026 в проекте ТРИ представления, отдающих файл**, и все
-разобраны поимённо:
+⚠️ **С 18.09.2026 в проекте ЧЕТЫРЕ представления, отдающих файл** (четвёртое —
+вложение чата ученику, раздел ниже), и все разобраны поимённо:
 
 1. `/profile/avatar/<id>/` ([`problems/views_platform.py`](../problems/views_platform.py))
    — аватар, виден любому ВОШЕДШЕМУ;
@@ -538,6 +539,32 @@ nginx не поднимает).
   только сотрудники с правом на просмотр; при удалении аккаунта реплики и
   вложения ученика удаляются вместе с ним (CASCADE). Выгрузка `chat_export` —
   номер пользователя без имени и почты.
+
+### Третья файловая вьюха: вложение чата (18.09.2026, ADR 0118)
+
+`GET /catalog/chat/attachment/<id>/` — ученик открывает СВОЁ фото или PDF,
+приложенное к реплике чата (до этого файл видела только админка). Живёт
+отдельным модулем [`catalog/chat_files.py`](../catalog/chat_files.py): сторож
+`NoOtherFileServingViewTests` разрешает файловые вьюхи пофайлово, и вписать
+туда весь `catalog/views.py` значило бы пропускать любую будущую отдачу файла.
+
+- **Кто видит:** владелец вложения (`ChatAttachment.user`) и сотрудник
+  (`is_staff`). Больше никто.
+- **Почему 404, а не 403:** чужое, несуществующее и запрос гостя отвечают
+  одинаково — номер вложения не должен говорить, есть ли такой файл. Гостю
+  тоже 404, а не редирект на вход: редирект был бы тем же «да, файл есть».
+- **Почему тип из модели:** `Content-Type` берётся из поля `mime`, которое
+  сервер определил сам при загрузке (`catalog/attachments.validate_upload`:
+  расширение из списка, сигнатура PDF, картинка открывается Pillow), плюс
+  `X-Content-Type-Options: nosniff`. Из запроса не берётся ничего, кроме
+  целого номера; путь — из поля `file`.
+- **Картинка — `inline`, PDF — скачиванием**, как у `ChatTurnAdmin.file_view`:
+  PDF не открывается на нашем домене. `Cache-Control: private, max-age=0`.
+- Тесты — `catalog/tests/test_chat_beta.py::AttachmentViewTests` (свой — 200 и
+  тип из модели; чужой, гость, несуществующий — 404; сотрудник — 200).
+- **История разговора** `GET /catalog/api/chat/history/<problem_id>/` отдаёт
+  только реплики ЭТОГО пользователя по ЭТОЙ задаче (гостю 401) — там же ссылки
+  на его вложения.
 
 ---
 

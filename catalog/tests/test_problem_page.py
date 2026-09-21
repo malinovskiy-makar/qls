@@ -51,11 +51,11 @@ class ProblemPageTests(TestCase):
     def test_named_title_is_shown_and_cut_title_is_hidden(self):
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<h1 class="pd-title">Вмешательство — 5</h1>', html)
-        self.assertIn('<title>Вмешательство — 5 · Экономика</title>', html)
+        self.assertIn('<title>Вмешательство — 5 — олимпиадная задача по экономике | Weconomics.ai</title>', html)
         html = self.client.get(_url(self.p_cut)).content.decode()
         self.assertNotIn('class="pd-title"', html)
         self.assertIn('<h1 class="sr-only">Задача: Монополия и ценовая дискриминация</h1>', html)
-        self.assertIn('<title>Задача: Монополия и ценовая дискриминация · Экономика</title>', html)
+        self.assertIn('<title>Задача: Монополия и ценовая дискриминация — олимпиадная задача по экономике | Weconomics.ai</title>', html)
         html = self.client.get(_url(self.p_bare)).content.decode()
         self.assertIn('<h1 class="sr-only">Задача</h1>', html)
 
@@ -66,8 +66,10 @@ class ProblemPageTests(TestCase):
         self.assertNotIn('Задача #', html)
 
     def test_page_uses_its_own_wide_column(self):
-        self.assertIn('<main class="pd-wrap">', self.client.get(_url(self.p_named)).content.decode())
-        self.assertIn('<main class="page-wrap">', self.client.get('/catalog/').content.decode())
+        # «Стол» (18.09.2026): задача — вид «stol» единого экрана во всю ширину окна.
+        self.assertIn('<main class="stol stol--stol">', self.client.get(_url(self.p_named)).content.decode())
+        # Вход каталога — вид «entry» единого экрана «Стол» во всю ширину окна (18.09.2026).
+        self.assertIn('<main class="stol stol--entry">', self.client.get('/catalog/').content.decode())
 
     def test_clouds_link_to_the_catalog_with_that_filter(self):
         html = self.client.get(_url(self.p_named)).content.decode()
@@ -75,20 +77,20 @@ class ProblemPageTests(TestCase):
                       'Монополия и ценовая дискриминация</a>' % self.mon.pk, html)
         self.assertIn('class="pp pp--tag" href="/catalog/?tag=%d" style="--gc: var(--map-g-micro)">'
                       'обратная индукция</a>' % self.tag.pk, html)
-        self.assertIn('class="pp pp--diff" href="/catalog/?difficulty=4"><span class="st">★★★★☆</span> сложность 4</a>', html)
-        self.assertIn('class="pp pp--kind" href="/catalog/?type=open">Развёрнутая задача</a>', html)
-        self.assertIn('class="pp-sep"', html)
+        # «Стол» (README §3): звёзды рядом с темами, вид и характер — строкой ниже словами.
+        self.assertIn('<a class="pp-stars" href="/catalog/?difficulty=4" aria-label="сложность 4">★★★★☆</a>', html)
+        self.assertIn('<a class="pp-w" href="/catalog/?type=open">развёрнутая задача</a>', html)
         # Чип источника без адреса — текст, не ссылка (17.09.2026: ссылка ведёт на первоисточник).
         self.assertIn('<span class="pp pp--src">МатЭк</span>', html)
         test_html = self.client.get(_url(self.p_test)).content.decode()
         self.assertIn('href="/catalog/?type=test&amp;test_type=single">'
-                      'Тест · один верный</a>', test_html)
+                      'тест · один верный</a>', test_html)
 
     def test_empty_properties_render_nothing(self):
         html = self.client.get(_url(self.p_cut)).content.decode()
         # Проверяем РАЗМЕТКУ (класс на элементе), а не текст страницы: правила
         # `.pp--tag` лежат в CSS и есть всегда.
-        for absent in ('class="pp pp--tag"', 'class="pp pp--diff"', 'class="pp pp--src"', 'class="pp-sep"'):
+        for absent in ('class="pp pp--tag"', 'class="pp-stars"', 'class="pp pp--src"', 'class="pp-tags"'):
             self.assertNotIn(absent, html)
         self.assertIn('class="pp pp--topic"', html)
 
@@ -108,23 +110,28 @@ class ProblemPageTests(TestCase):
 
     def test_solution_needs_soft_confirmation_before_reveal(self):
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('id="sol-confirm"', html)
-        self.assertIn('Открыть решение до отправки?', html)
-        self.assertIn('id="sol-yes"', html)
-        self.assertIn('id="sol-no"', html)
+        # С S3 (18.09.2026) подтверждение — карточка ленты помощи из шаблона.
+        self.assertIn('<template id="help-confirm-tpl">', html)
+        # Текст подтверждения — README §4 (прежний про «отправку попытки» убран).
+        self.assertIn('Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
+        self.assertIn('data-confirm="yes"', html)
+        self.assertIn('data-confirm="no"', html)
 
     def test_parts_live_inside_the_statement(self):
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('<ol class="parts">', html)
         self.assertIn('<b>а)</b>', html)
-        self.assertIn('одно на всю задачу, подпункты внутри', html)
+        # Попытка одна на всю задачу — режим «Проверь решение» помощи, а не поле у пункта.
+        self.assertEqual(html.count('class="help-foot'), 1)
+        self.assertNotIn('id="sv-text"', html)
 
     def test_test_options_are_playable_tiles(self):
         """Этап 7: варианты теста — кнопки игры, а не статичные плитки."""
         html = self.client.get(_url(self.p_test)).content.decode()
         self.assertEqual(html.count('aria-pressed="false"'), 3)
         self.assertIn('<span class="opt-l">а</span>', html)
-        self.assertEqual(html.count('Показать ответ'), 1)
+        centre = html.split('id="stol-help"')[0]
+        self.assertEqual(centre.count('Показать ответ'), 1)
         self.assertNotIn('id="sol-btn"', html)
         self.assertNotIn('Ответ: <b class="math-content">б</b>', html)
 
@@ -132,13 +139,16 @@ class ProblemPageTests(TestCase):
         others = [make_problem('Похожая %d.' % i, topic=self.mon, difficulty=3) for i in range(4)]
         hidden = make_problem('Скрытая похожая.', flagged=True)
         self.p_named.similar_problems.set(others + [hidden])
+        # «Похожие» — вкладка ленты «Стола» (README §3), блока под условием нет.
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertEqual(html.count('class="sim-card"'), 4)
-        self.assertIn('<a href="/catalog/?q=', html)
-        self.assertIn('style="--gc: var(--map-g-micro)">Монополия и ценовая дискриминация</span>', html)
-        self.assertIn('<span class="ct-stars">★★★☆☆</span>', html)
-        self.assertIn('без решения', html)
-        self.assertNotIn('class="sim"', self.client.get(_url(self.p_bare)).content.decode())
+        rail = html[html.index('id="stol-rail-list"'):html.index('</aside>', html.index('id="stol-rail-list"'))]
+        self.assertEqual(rail.count('<a class="rail-row'), 4)
+        self.assertNotIn('Скрытая похожая', rail)
+        self.assertIn('<span class="rail-topic-l">Монополия и ценовая дискриминация</span>', rail)
+        self.assertIn('★★★<span class="rail-star-off">☆</span><span class="rail-star-off">☆</span>', rail)
+        self.assertNotIn('class="sim"', html)
+        bare = self.client.get(_url(self.p_bare)).content.decode()
+        self.assertIn('Похожих задач в банке нет.', bare)
 
     def test_save_button_only_for_logged_in_and_reflects_state(self):
         self.assertNotIn('id="save-btn"', self.client.get(_url(self.p_named)).content.decode())
@@ -146,27 +156,30 @@ class ProblemPageTests(TestCase):
         self.client.force_login(user)
         html = self.client.get(_url(self.p_named)).content.decode()
         self.assertIn('id="save-btn"', html)
-        self.assertIn('<span id="save-label">Сохранить</span>', html)
+        self.assertIn('aria-pressed="false"\n          aria-label="Сохранить"', html)
         SavedProblem.objects.create(owner=user, catalog_problem=self.p_named)
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('class="pd-act is-on"', html)
-        self.assertIn('<span id="save-label">Сохранено</span>', html)
+        self.assertIn('class="tb-btn is-on"', html)
+        self.assertIn('aria-pressed="true"\n          aria-label="Сохранено"', html)
 
     def test_teacher_gets_homework_button(self):
         self.client.force_login(make_user('tutor', role='teacher'))
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('id="hw-btn-%d"' % self.p_named.pk, html)
-        self.assertIn('function toggleHwDropdown', html)
+        # С S5 (18.09.2026) «+ В домашку» заменена корзиной репетитора (README §7).
+        self.assertIn('id="basket-toggle" data-basket="%d"' % self.p_named.pk, html)
+        self.assertIn('catalog/js/stol_basket.js', html)
+        self.assertNotIn('toggleHwDropdown', html)
         self.client.force_login(make_user('pupil'))
         html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertNotIn('toggleHwDropdown', html)
+        self.assertNotIn('basket-toggle', html)
+        self.assertNotIn('stol_basket.js', html)
 
     def test_ai_card_needs_an_available_model(self):
         # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.
         # С 15.09.2026 у чата свой поставщик (CATALOG_CHAT_PROVIDER), не AI_PROVIDER.
         with self.settings(CATALOG_CHAT_PROVIDER='anthropic'):
-            self.assertNotIn('<h2>Спросить ИИ</h2>', self.client.get(_url(self.p_named)).content.decode())
+            self.assertNotIn('Выделите фрагмент условия', self.client.get(_url(self.p_named)).content.decode())
         with self.settings(CATALOG_CHAT_PROVIDER='fake'):
             html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('<h2>Спросить ИИ</h2>', html)
+        self.assertIn('Выделите фрагмент условия', html)
         self.assertIn('Данные профиля ему не передаются', html)

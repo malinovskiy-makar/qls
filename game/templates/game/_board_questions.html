@@ -1,0 +1,23 @@
+{% comment %}
+  «Где ошиблись» (название — правка владельца 17.09.2026, НЕ «На чём посыпались»).
+  Параметры:
+    questions  — `views.set_question_stats` + флаг `hard` (доля верных ниже 40 %);
+    show_text  — видны ли тексты вопросов этому зрителю (решает страница);
+    has_stats  — сыграл ли кто-нибудь вообще;
+    empty_text — вторая строка пустого блока;
+    note       — строка под списком;
+    caption    — подпись заголовка (по умолчанию про вызов дня).
+  ⚠️ Тексты без `show_text` в разметку не попадают вовсе: не «спрятаны стилем»,
+  а не отданы — иначе набор читался бы из исходника страницы.
+{% endcomment %}<section class="gb-card gb-pane gb-where" aria-labelledby="gb-where-h">
+  <div class="gb-ph"><h2 id="gb-where-h">Где ошиблись</h2><span>{{ caption|default:"доля верных среди сыгравших этот вызов" }}</span></div>
+  {% if has_stats %}
+  <ol class="gb-qs">
+    {% for q in questions %}<li class="gb-q{% if q.hard %} hard{% endif %}"><span class="qn">{{ q.number }}</span>{% if show_text %}<span class="qt" title="{{ q.text }}">{{ q.text }}</span>{% else %}<span class="qt lock">{% include "_icon.html" with name="lock" %}<span>текст откроется после вашей попытки</span></span>{% endif %}<span class="bar" aria-hidden="true"><i style="width: {{ q.percent|default:0 }}%"></i></span><span class="pc">{% if q.percent is None %}–{% else %}{{ q.percent }}&nbsp;%{% endif %}</span></li>
+    {% endfor %}
+  </ol>
+  <p class="gb-foot">{{ note }}</p>
+  {% else %}
+  <p class="gb-empty"><b>Пока нечего считать</b><span>{{ empty_text }}</span></p>
+  {% endif %}
+</section>

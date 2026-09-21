@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff; --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10); --skip: #a39c8c;
+      background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; overflow: hidden; position: relative;
+    }
+    .rush button, .rush input { font: inherit; }
+    .rush button { cursor: pointer; color: inherit; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); }
+    .rush .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.primary { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.primary:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.big { height: 56px; font-size: 17px; padding: 0 30px; }
+    .rush .link { border: 0; background: transparent; padding: 0; color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: 13.5px; }
+    .lab { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+    .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+    .field { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 0 14px; font-size: 14px; color: var(--text2); display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+    .dm-veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.30); display: flex; align-items: center; justify-content: center; }
+    .dm-modal { width: 960px; max-width: none; text-align: left; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.2); box-sizing: border-box; padding: 24px 28px 22px; display: flex; flex-direction: column; gap: 16px; }
+    .dm-modal h2 { margin: 0; font-size: 22px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+    .dm-modal .dm-x { margin-left: auto; width: 34px; height: 34px; border: 1px solid var(--border); border-radius: 9px; background: transparent; font-size: 18px; color: var(--text3); }
+    .dm-lead { font-size: 14px; color: var(--text2); }
+    .dm-tabs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+    .dm-tab { height: 58px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface-2); text-align: left; padding: 0 14px; display: flex; align-items: center; gap: 10px; }
+    .dm-tab.on { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .dm-tab .t { font-size: 15.5px; font-weight: 700; line-height: 1.15; display: block; }
+    .dm-tab .m { font-size: 12.5px; color: var(--text3); line-height: 1.15; display: block; margin-top: 2px; white-space: nowrap; }
+    .dm-tab .t { white-space: nowrap; }
+    .dm-filters { display: flex; align-items: center; gap: 8px; }
+    .dm-filters .l { font-size: 13px; color: var(--text3); margin-right: 4px; white-space: nowrap; }
+    .dm-chip, .dm-edit { white-space: nowrap; }
+    .dm-chip { height: 34px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); padding: 0 12px; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+    .dm-chip b { font-weight: 600; }
+    .dm-edit { margin-left: auto; height: 34px; border: 1px solid var(--border); border-radius: 8px; background: transparent; padding: 0 12px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+    .dm-foot { display: flex; align-items: center; gap: 12px; padding-top: 4px; }
+    .dm-foot .n { font-size: 13px; color: var(--text2); white-space: nowrap; }
+    .dm-foot .btn { white-space: nowrap; }
+    .dm-foot .n b { color: var(--text); }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <dc-import name="Main" who="student" theme="light" mode="bullet" hint-size="1440px,800px"></dc-import>
+  <div class="dm-veil">
+    <div class="dm-modal">
+      <h2><svg class="i" viewBox="0 0 24 24"><path d="M14 4l6 6-9 9-6-6zM5 13l-2 2 6 6 2-2M16 2l6 6"></path></svg>Дуэль<button class="dm-x" aria-label="Закрыть">×</button></h2>
+      <div class="dm-lead">Соперник получит ссылку и пойдёт по тем же вопросам в том же порядке. Старт общий, время и жизни как в обычном раунде. Вопросов до игры не видит никто — ни он, ни вы.</div>
+      <div class="dm-tabs">
+        <button class="dm-tab on"><svg class="i" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg><span><span class="t">Пуля</span><span class="m">1 мин · 568</span></span></button>
+        <button class="dm-tab"><svg class="i" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.1-1.9-5-3.2-6.4-.7 2.3-1.8 3.4-3 3.6.3-3.3-.9-6.3-3.6-8.6C8.6 8.4 5 10.5 5 15c0 4 3 7 7 7z"></path></svg><span><span class="t">Блиц</span><span class="m">2 мин · 1 659</span></span></button>
+        <button class="dm-tab"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><circle cx="12" cy="12" r="5"></circle><circle cx="12" cy="12" r="1"></circle></svg><span><span class="t">Рапид</span><span class="m">5 мин · 544</span></span></button>
+        <button class="dm-tab"><svg class="i" viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="2"></rect><path d="M8 7h8M8 12h3M13 12h3M8 16h3M13 16h3"></path></svg><span><span class="t">Классика</span><span class="m">10 мин · 436</span></span></button>
+      </div>
+      <div class="dm-filters">
+        <span class="l">Что решаем</span>
+        <button class="dm-chip">Тема: <b>все</b></button>
+        <button class="dm-chip">Сложность: <b>любая</b></button>
+        <button class="dm-chip">Источник: <b>все</b></button>
+        <button class="dm-edit"><svg class="i s" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"></path></svg>Настроить фильтры</button>
+      </div>
+      <div class="dm-foot">
+        <span class="n"><b>568</b> вопросов под фильтром · раунд без лимита вопросов</span>
+        <span style="margin-left: auto; display: flex; gap: 10px;"><button class="btn">Отмена</button><button class="btn primary big" style="height: 48px;">Создать дуэль</button></span>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

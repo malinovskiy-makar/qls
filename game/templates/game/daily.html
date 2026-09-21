@@ -1,99 +1,234 @@
 {% extends 'catalog/base.html' %}
+{% load ru %}
 {% comment %}
-  Вызов дня: четыре набора в сутки, по одному на каждый режим. Набор
-  создаётся ЛЕНИВО при первом обращении — крона нет и не будет (бесплатный
-  хостинг засыпает), поэтому список собирается детерминированно от даты.
-  Отсечка суток — по Москве.
+  Вызов дня `/game/daily/` (решение владельца 17.09.2026, макеты
+  claude/mockups/wecon_rush_20260917/Daily.dc.html и DailyMobile.dc.html).
+
+  Сверху — что это, серия дней и отсчёт до московской полуночи; ниже карточка на
+  каждый режим: сколько сыграли, топ-5 доски, вчерашний победитель и «Играть»
+  сразу в раунд (`?auto=1`, без главной игры). Сыгранная карточка приглушена и
+  показывает свой счёт и место.
+
+  ⚠️ КОДА НАБОРА НА КАРТОЧКАХ НЕТ: у вызова дня он игроку не нужен.
+  Механика прежняя: четыре набора в сутки, ленивое детерминированное создание
+  (`game/daily.py`), одна попытка, на доске только вошедшие.
 {% endcomment %}
 {% block title %}Вызов дня – Wecon Rush{% endblock %}
+{% block main_class %}dy-main{% endblock %}
 
 {% block extra_style %}
-<style>
-  .dl-wrap { max-width: 860px; margin: 0 auto; padding: 26px 20px 60px; }
-  .dl-head { text-align: center; margin-bottom: 22px; }
-  .dl-wrap h1 { font-size: 1.7rem; }
-  .dl-sub { color: var(--muted); margin-top: 6px; }
-  .dl-timer { margin-top: 10px; font-size: .92rem; color: var(--text); }
-  .dl-timer b { color: var(--accent); font-variant-numeric: tabular-nums; }
-  .dl-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
-  @media (max-width: 640px) { .dl-grid { grid-template-columns: 1fr; } }
-  .dl-card {
-    border: 1px solid var(--border); border-radius: 16px;
-    background: var(--surface); padding: 16px 18px;
+  {% include "game/_board_style.html" %}
+  .dy-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 56px; box-sizing: border-box;
+             display: flex; flex-direction: column; gap: 16px; }
+  .dy-back { min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink);
+             text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .dy-back .qi { width: 14px; height: 14px; }
+  .dy-back:hover { text-decoration: underline; }
+  .dy-lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+  .dy-btn { font: inherit; height: 46px; padding: 0 18px; box-sizing: border-box; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 15px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+  .dy-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .dy-btn .qi { width: 14px; height: 14px; }
+  .dy-btn.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .dy-btn.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .dy-btn.solid .qi { fill: currentColor; }
+  .dy-btn.amber { height: 44px; border-radius: 10px; font-size: 14px; background: var(--brand-amber); border-color: transparent;
+                  color: var(--brand-amber-ink); }
+  .dy-btn.amber:hover { background: var(--brand-amber-hover); color: var(--brand-amber-ink); }
+
+  /* ── Верх: заголовок, серия и отсчёт ── */
+  .dy-top { display: grid; grid-template-columns: minmax(0, 1fr) 640px; gap: 24px; align-items: stretch; }
+  .dy-ttl { margin: 8px 0 6px; font-size: 32px; font-weight: 800; letter-spacing: -.5px; line-height: 1.1;
+            display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+  .dy-prog { font-size: 13px; font-weight: 700; letter-spacing: 0; color: var(--accent-ink); background: var(--accent-tint);
+             border-radius: 999px; padding: 5px 12px; }
+  .dy-sub { margin: 0; font-size: 14.5px; color: var(--text2); }
+  .dy-meter { padding: 14px 20px; display: grid; grid-template-columns: minmax(0, 1fr) 1px 190px; gap: 20px; align-items: center; }
+  .dy-vr { background: var(--border-soft); align-self: stretch; }
+  .dy-streak { display: flex; align-items: center; gap: 14px; }
+  .dy-num { font-size: 30px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; display: flex;
+            align-items: center; gap: 6px; white-space: nowrap; }
+  .dy-num .qi { width: 22px; height: 22px; color: var(--amber); fill: currentColor; }
+  .dy-txt { margin: 0; font-size: 12.5px; color: var(--text2); line-height: 1.35; }
+  .dy-week { list-style: none; margin: 10px 0 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+  .dy-day { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11px; color: var(--text3); font-weight: 600; }
+  .dy-day i { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid var(--border); box-sizing: border-box;
+              display: flex; align-items: center; justify-content: center; }
+  .dy-day i .qi { width: 12px; height: 12px; stroke-width: 3; }
+  .dy-day.hit i { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .dy-day.now i { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+  .dy-day.now { color: var(--accent-ink); }
+  .dy-clock .dy-v { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; margin-top: 2px; }
+  .dy-clock .dy-n { font-size: 12.5px; color: var(--text2); margin-top: 2px; }
+  .dy-join { display: flex; align-items: center; gap: 14px; }
+  .dy-join p { margin: 0; font-size: 13.5px; color: var(--text2); line-height: 1.4; }
+  .dy-join b { display: block; color: var(--text); font-size: 15px; }
+
+  /* ── Четыре вызова ── */
+  .dy-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .dy-dc { padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .dy-dc.done { background: var(--surface-2); }
+  .dy-dh { display: flex; align-items: center; gap: 10px; }
+  .dy-ic { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-tint); color: var(--accent-ink);
+           display: flex; align-items: center; justify-content: center; flex: none; }
+  .dy-ic .qi { width: 22px; height: 22px; }
+  .dy-dt { margin: 0; font-size: 20px; font-weight: 700; line-height: 1.1; }
+  .dy-dm { display: block; margin-top: 2px; font-size: 12.5px; color: var(--text3); }
+  .dy-tag { margin-left: auto; font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; display: inline-flex;
+            align-items: center; gap: 5px; white-space: nowrap; background: var(--accent-tint); color: var(--accent-ink); }
+  .dy-tag .qi { width: 12px; height: 12px; stroke-width: 3; }
+  .dy-cnt { display: flex; align-items: baseline; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+  .dy-cnt b { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .dy-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .dy-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto auto; align-items: center; gap: 8px; height: 38px;
+            padding: 0 10px; border-radius: 9px; background: var(--surface-2); box-sizing: border-box; }
+  .dy-dc.done .dy-row { background: var(--surface); }
+  .dy-row.me { background: transparent; border: 1.5px solid var(--accent); }
+  .dy-dc.done .dy-row.me { background: transparent; }
+  .dy-row .n { font-size: 13px; color: var(--text3); display: flex; align-items: center; justify-content: center; }
+  .dy-row .who { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .dy-row .sc { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .dy-row .cm { display: none; color: var(--text3); font-size: 12.5px; white-space: nowrap; }
+  .dy-empty { flex: 1; min-height: 124px; margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+              gap: 4px; text-align: center; color: var(--text2); font-size: 13.5px; border: 1px dashed var(--border);
+              border-radius: 10px; padding: 12px; }
+  .dy-empty b { color: var(--text); font-size: 14.5px; }
+  .dy-yday { min-height: 32px; font-size: 12.5px; color: var(--text3); text-decoration: none; display: flex; align-items: center; gap: 6px; }
+  .dy-yday .qi { width: 14px; height: 14px; flex: none; }
+  .dy-yday:hover { color: var(--accent-ink); }
+  .dy-act { margin-top: auto; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .dy-mine { margin: auto 0 0; display: flex; align-items: baseline; gap: 8px; padding: 0 2px; font-size: 13px; color: var(--text2); }
+  .dy-mine b { font-size: 24px; font-weight: 800; color: var(--text); font-variant-numeric: tabular-nums; line-height: 1; }
+  .dy-none { margin: 0; color: var(--text2); }
+
+  .dy-rules { margin: 0; font-size: 12.5px; color: var(--text3); display: flex; gap: 6px 22px; flex-wrap: wrap; }
+  .dy-rules span { display: inline-flex; align-items: center; gap: 6px; }
+  .dy-rules .qi { width: 14px; height: 14px; }
+
+  @media (max-width: 1100px) {
+    .dy-main { padding: 16px 20px 84px; }
+    .dy-top { grid-template-columns: 1fr; }
+    .dy-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  .dl-card h2 { font-size: 1.15rem; }
-  .dl-meta { color: var(--muted); font-size: .86rem; margin-top: 4px; }
-  .dl-state { margin-top: 10px; font-size: .92rem; }
-  .dl-state.done { color: var(--green); font-weight: 600; }
-  .dl-acts { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .dl-btn {
-    display: inline-block; padding: 8px 16px; border-radius: 10px;
-    text-decoration: none; font-weight: 600; font-size: .9rem;
-    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  /* Телефон (макет DailyMobile): всё столбиком, счётчик — серия | отсчёт и неделя,
+     карточка — одна строка лидера вместо топ-5 и кнопки в ряд. */
+  @media (max-width: 720px) {
+    .dy-main { padding: 16px 16px 84px; gap: 12px; }
+    .dy-ttl { font-size: 26px; margin: 6px 0 4px; }
+    .dy-prog { font-size: 12px; padding: 4px 10px; }
+    .dy-sub { font-size: 13.5px; }
+    .dy-meter { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding: 14px 16px; }
+    .dy-vr { display: none; }
+    .dy-streak-box { display: contents; }
+    .dy-streak { display: block; }
+    .dy-num, .dy-clock .dy-v { font-size: 26px; line-height: 1.1; }
+    .dy-num .qi { width: 20px; height: 20px; }
+    .dy-txt, .dy-clock .dy-n { font-size: 12px; }
+    .dy-txt .now-note { display: none; }
+    .dy-clock { grid-column: 2; grid-row: 1; }
+    .dy-week { grid-column: 1 / -1; grid-row: 2; margin: 0; padding-top: 12px; border-top: 1px solid var(--border-soft); gap: 4px; }
+    .dy-day i { width: 24px; height: 24px; }
+    .dy-join { grid-column: 1 / -1; flex-wrap: wrap; }
+    .dy-meter:has(.dy-join) .dy-clock { grid-column: 1 / -1; grid-row: auto; }
+    .dy-grid { grid-template-columns: 1fr; gap: 12px; }
+    .dy-dc { padding: 14px; }
+    .dy-ic { width: 36px; height: 36px; }
+    .dy-dt { font-size: 18px; }
+    .dy-cnt, .dy-yday { display: none; }
+    .dy-rows .dy-row:nth-child(n+2) { display: none; }
+    .dy-row .cm { display: inline; }
+    .dy-empty { min-height: 0; flex-direction: row; flex-wrap: wrap; gap: 4px 6px; padding: 9px 10px; }
+    .dy-empty b { font-size: 13.5px; }
+    .dy-rules { display: block; line-height: 1.5; }
+    .dy-rules span { display: inline; }
+    .dy-rules .qi { display: none; }
   }
-  .dl-btn.ghost { background: var(--surface); color: var(--text);
-                  border-color: var(--border); }
-  .dl-note { margin-top: 20px; font-size: .85rem; color: var(--muted);
-             text-align: center; }
-</style>
 {% endblock %}
 
 {% block content %}
-<div class="dl-wrap">
-  <header class="dl-head">
-    <h1>Вызов дня</h1>
-    <p class="dl-sub">
-      Один и тот же набор вопросов у всех, одна попытка. {{ day|date:"d E Y" }}.
-    </p>
-    <p class="dl-timer">Новый вызов через <b id="countdown">–</b></p>
-  </header>
+  <div class="dy-top">
+    <div>
+      <a class="dy-back" href="{% url 'game:page' %}">{% include "_icon.html" with name="arrow_left" %}Wecon Rush</a>
+      <h1 class="dy-ttl">Вызов дня{% if user.is_authenticated and cards %} <span class="dy-prog" id="dy-played">сыграно {{ played_count }} из {{ cards|length }}</span>{% endif %}</h1>
+      <p class="dy-sub">{{ day|date:"j E" }} · вопросы одинаковы у всех · одна попытка на режим</p>
+    </div>
 
-  <div class="dl-grid">
-    {% for c in cards %}
-    <section class="dl-card">
-      <h2>{{ c.title }}</h2>
-      <p class="dl-meta">{{ c.size }} вопр. · код {{ c.code }}</p>
-      <p class="dl-state {% if c.played %}done{% endif %}">
-        {% if c.played %}
-          Сыграно{% if c.my_score is not None %} · {{ c.my_score }} очков{% endif %}
-        {% else %}
-          Ещё не сыграно
-        {% endif %}
-      </p>
-      <div class="dl-acts">
-        {% if not c.played %}
-        <a class="dl-btn" href="{{ c.play_url }}">Играть</a>
-        {% endif %}
-        <a class="dl-btn ghost" href="{{ c.board_url }}">Доска</a>
+    <section class="gb-card dy-meter" aria-label="{% if streak %}Серия дней и отсчёт{% else %}Отсчёт до нового вызова{% endif %}">
+      {% if streak %}
+      <div class="dy-streak-box" id="dy-streak">
+        <div class="dy-streak">
+          <div>
+            <div class="dy-lab">Серия</div>
+            <div class="dy-num">{% include "_icon.html" with name="flame" %}{{ streak.current|count_ru:"день,дня,дней" }}</div>
+          </div>
+          <p class="dy-txt"><span class="now-note">{% if streak.played_today %}сегодняшний день засчитан{% elif streak.current %}сыграйте сегодня любой вызов, чтобы не прервать{% else %}сыграйте любой вызов, чтобы начать серию{% endif %}<br></span>{% if streak.best %}лучшая серия – {{ streak.best|count_ru:"день,дня,дней" }}{% endif %}</p>
+        </div>
+        <ol class="dy-week" aria-label="Эта неделя">
+          {% for d in streak.week %}<li class="dy-day{% if d.hit %} hit{% endif %}{% if d.is_today %} now{% endif %}"><i>{% if d.hit %}{% include "_icon.html" with name="check" %}{% endif %}</i>{{ d.label }}<span class="gb-sr">{% if d.hit %} – сыгран{% else %} – не сыгран{% endif %}{% if d.is_today %}, сегодня{% endif %}</span></li>
+          {% endfor %}
+        </ol>
+      </div>
+      {% else %}
+      <div class="dy-join">
+        <p><b>Играть можно и без входа</b>Результат покажем, но на доску попадают только вошедшие – и серия дней копится только у них.</p>
+        <a class="dy-btn amber" href="/login/?next={% url 'game:daily' %}">Войти</a>
+      </div>
+      {% endif %}
+      <div class="dy-vr"></div>
+      <div class="dy-clock">
+        <div class="dy-lab">Новый вызов через</div>
+        <div class="dy-v" id="countdown" data-reset-at="{{ reset_at }}">–</div>
+        <div class="dy-n">в полночь по Москве</div>
       </div>
     </section>
+  </div>
+
+  <div class="dy-grid">
+    {% for c in cards %}
+    <section class="gb-card dy-dc{% if c.played %} done{% endif %}" data-mode="{{ c.mode }}" aria-labelledby="dy-t-{{ c.mode }}">
+      <div class="dy-dh">
+        <span class="dy-ic" aria-hidden="true">{% include "_icon.html" with name=c.icon %}</span>
+        <span>
+          <h2 class="dy-dt" id="dy-t-{{ c.mode }}">{{ c.title }}</h2>
+          <span class="dy-dm">{{ c.meta }}</span>
+        </span>
+        {% if c.played %}<span class="dy-tag">{% include "_icon.html" with name="check" %}сыгран</span>{% endif %}
+      </div>
+
+      <div class="dy-cnt"><span class="dy-lab">Сегодня сыграли</span><b>{{ c.count }}</b></div>
+      {% if c.top %}
+      <ol class="dy-rows">
+        {% for r in c.top %}<li class="dy-row{% if r.is_me %} me{% endif %}"><span class="n">{% if r.place <= 3 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</span><span class="who">{% if r.is_me %}Вы · {% endif %}{{ r.name }}</span><span class="sc">{{ r.score }}</span>{% if forloop.first %}<span class="cm">· сыграли {{ c.count }}</span>{% endif %}</li>
+        {% endfor %}
+      </ol>
+      {% else %}
+      <p class="dy-empty"><b>Ещё никто не сыграл</b><span>Первый результат сразу станет первым местом.</span></p>
+      {% endif %}
+      <a class="dy-yday" href="{{ c.yesterday_url }}">{% if c.yesterday_winner %}Вчера: 1-е место – {{ c.yesterday_winner.name }} · {{ c.yesterday_winner.score }}{% else %}Вчера никто не играл{% endif %}{% include "_icon.html" with name="arrow_right" %}</a>
+
+      {% if c.played %}
+      {% if c.my_score is not None %}<p class="dy-mine"><b>{{ c.my_score }}</b><span>ваш счёт{% if c.my_place %} · {{ c.my_place }}-е место из {{ c.count }}{% endif %}</span></p>{% endif %}
+      <a class="dy-btn" href="{{ c.board_url }}"{% if c.my_score is None %} style="margin-top: auto"{% endif %}>Доска и разбор вопросов</a>
+      {% else %}
+      <div class="dy-act">
+        <a class="dy-btn solid dy-play" href="{{ c.play_url }}">{% include "_icon.html" with name="play" %}Играть</a>
+        <a class="dy-btn" href="{{ c.board_url }}">Доска</a>
+      </div>
+      {% endif %}
+    </section>
     {% empty %}
-    <p class="dl-note">Сегодня вызовов нет: в пуле не нашлось вопросов.</p>
+    <p class="dy-none">Сегодня вызовов нет: в пуле не нашлось вопросов.</p>
     {% endfor %}
   </div>
 
-  <p class="dl-note">
-    На доску попадают только вошедшие в аккаунт: у анонимного игрока нет
-    имени. Играть можно и без входа: результат покажем, на доску не поставим.
+  <p class="dy-rules">
+    <span>{% include "_icon.html" with name="info" %}Результат вызова идёт на доску дня, в общий лидерборд не идёт.</span>
+    <span>Брошенный раунд попытку не тратит.</span>
+    <span>Серия растёт, если за день сыгран хотя бы один вызов.</span>
   </p>
-</div>
 {% endblock %}
 
 {% block extra_js %}
-<script>
-/* Обратный отсчёт до смены вызова. Момент считает сервер (московская
-   полночь) — клиент только рисует остаток. */
-(function () {
-  var target = new Date('{{ reset_at }}');
-  var el = document.getElementById('countdown');
-  function tick() {
-    var left = Math.max(0, Math.floor((target - new Date()) / 1000));
-    var h = Math.floor(left / 3600), m = Math.floor(left % 3600 / 60), s = left % 60;
-    el.textContent = h + ' ч ' + String(m).padStart(2, '0') + ' мин '
-      + String(s).padStart(2, '0') + ' с';
-  }
-  tick();
-  setInterval(tick, 1000);
-})();
-</script>
+{% include "game/_daily_countdown.html" %}
 {% endblock %}

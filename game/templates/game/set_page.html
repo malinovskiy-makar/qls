@@ -1,0 +1,145 @@
+{% extends 'catalog/base.html' %}
+{% load ru %}
+{% comment %}
+  Страница набора для ученика `/game/s/<код>/` (решение владельца 17.09.2026, ADR 0115;
+  макет claude/mockups/wecon_rush_20260917/SetPage.dc.html).
+
+  Одна страница вместо главной игры с карточкой под сгибом и отдельной доски:
+  сверху приглашение (что за набор и одна главная кнопка), ниже доска набора —
+  «Кто прошёл» и «Где ошиблись», те же части, что у доски дня (`_board_*.html`).
+  «Играть» ведёт на `?auto=1`: страница игры сразу в отсчёт и раунд.
+
+  Анонимы играют как раньше: в таблице они есть, с именем «аноним». Тексты
+  вопросов видят автор набора, персонал и те, кто уже сыграл.
+  У дуэли и вызова дня своих страниц хватает — сюда они не попадают (`views.set_page`).
+{% endcomment %}
+{% block title %}{{ title }} – Wecon Rush{% endblock %}
+{% block main_class %}dy-main{% endblock %}
+
+{% block extra_style %}
+  {% include "game/_board_style.html" %}
+  .dy-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 84px; box-sizing: border-box;
+             display: flex; flex-direction: column; gap: 14px; }
+  .dy-back { align-self: flex-start; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink);
+             text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .dy-back .qi { width: 14px; height: 14px; }
+  .dy-back:hover { text-decoration: underline; }
+  .sp-lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+  .sp-btn { font: inherit; height: 44px; padding: 0 18px; box-sizing: border-box; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 14.5px; font-weight: 700; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .sp-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .sp-btn .qi { width: 14px; height: 14px; }
+  .sp-btn.amber { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; border-color: transparent;
+                  background: var(--brand-amber); color: var(--brand-amber-ink); }
+  .sp-btn.amber:hover { background: var(--brand-amber-hover); color: var(--brand-amber-ink); }
+
+  /* Приглашение: слева что за набор, справа одна главная кнопка. */
+  .sp-inv { display: grid; grid-template-columns: minmax(0, 1fr) 340px; grid-template-rows: auto 1fr; gap: 12px 28px; padding: 22px 28px; }
+  .sp-main { grid-column: 1; grid-row: 1; min-width: 0; }
+  .sp-rule { grid-column: 1; grid-row: 2; margin: 0; font-size: 13px; color: var(--text3); align-self: start; }
+  .sp-acts { grid-column: 2; grid-row: 1 / span 2; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+  .sp-kick { font-size: 12px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+  .sp-ttl { margin: 4px 0 6px; font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.15; overflow-wrap: anywhere; }
+  .sp-by { margin: 0; font-size: 13.5px; color: var(--text2); }
+  .sp-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 700; letter-spacing: .08em; }
+  .sp-chips { margin: 14px 0 0; padding: 0; list-style: none; display: flex; gap: 8px; flex-wrap: wrap; }
+  .sp-chip { height: 28px; padding: 0 11px; box-sizing: border-box; border-radius: 999px; border: 1px solid var(--border);
+             font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+  .sp-chip b { color: var(--text); font-weight: 600; }
+  .sp-chip.t { background: var(--accent-tint); border-color: transparent; color: var(--accent-ink); font-weight: 600; }
+  .sp-play { font: inherit; height: 58px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn);
+             font-size: 17px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px;
+             text-decoration: none; }
+  .sp-play:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .sp-play .qi { width: 18px; height: 18px; fill: currentColor; }
+  .sp-play kbd { font: inherit; font-size: 12px; font-weight: 700; opacity: .75; border: 1px solid currentColor; border-radius: 5px; padding: 0 5px; }
+  .sp-hint { margin: 0; font-size: 12.5px; color: var(--text3); text-align: center; }
+  .sp-why { margin: 0; padding: 14px 12px; border-radius: 12px; background: var(--surface-2); text-align: center;
+            font-size: 15px; font-weight: 700; color: var(--text2); }
+  .sp-warn { margin: 0; font-size: 13px; color: var(--text2); background: var(--accent-tint); border-radius: 10px; padding: 10px 12px;
+             line-height: 1.4; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+  .sp-mine { text-align: center; padding: 6px 0 2px; }
+  .sp-mine b { display: block; margin: 2px 0; font-size: 40px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+  .sp-mine span { font-size: 13.5px; color: var(--text2); }
+
+  .sp-cols { display: grid; grid-template-columns: minmax(0, 1fr) 540px; gap: 16px; align-items: stretch; }
+  .gb-table td.who.anon { font-weight: 500; font-style: italic; color: var(--text3); }
+
+  @media (hover: none) { .sp-play kbd { display: none; } }
+  @media (max-width: 1100px) {
+    .dy-main { padding: 16px 20px 84px; }
+    .sp-cols { grid-template-columns: 1fr; }
+  }
+  /* Телефон: приглашение столбиком — кнопка «Играть» на всю ширину сразу под плашками. */
+  @media (max-width: 720px) {
+    .dy-main { padding: 16px 16px 84px; gap: 12px; }
+    .sp-inv { display: flex; flex-direction: column; gap: 14px; padding: 16px; }
+    .sp-acts { order: 2; }
+    .sp-rule { order: 3; }
+    .sp-play kbd { display: none; }
+    .sp-ttl { font-size: 22px; }
+    .sp-chips { margin-top: 10px; }
+    .sp-warn { flex-wrap: wrap; }
+  }
+{% endblock %}
+
+{% block content %}
+  <a class="dy-back" href="{% url 'game:page' %}">{% include "_icon.html" with name="arrow_left" %}Wecon Rush</a>
+
+  <section class="gb-card sp-inv" aria-labelledby="sp-title">
+    <div class="sp-main">
+      <div class="sp-kick">{{ kind_label }}</div>
+      <h1 class="sp-ttl" id="sp-title">{{ title }}</h1>
+      <p class="sp-by">{% if author %}автор {{ author }} · {% endif %}код <span class="sp-code">{{ gset.code }}</span></p>
+      <ul class="sp-chips">
+        <li class="sp-chip t">{{ mode_title }} · {{ type_text }}</li>
+        <li class="sp-chip"><b>{{ gset.size }}</b> {{ gset.size|plural_ru:"вопрос,вопроса,вопросов" }}</li>
+        <li class="sp-chip"><b>{{ minutes }}</b> {{ minutes|plural_ru:"минута,минуты,минут" }} · {{ lives|count_ru:"жизнь,жизни,жизней" }}</li>
+        <li class="sp-chip">попыток: <b>{{ gset.attempts_allowed }}</b></li>
+        {% if closes_text %}<li class="sp-chip">открыт до <b>{{ closes_text }}</b></li>{% endif %}
+      </ul>
+    </div>
+    <p class="sp-rule">Вопросы и их порядок одинаковы у всех. Результат идёт на доску этого набора, в общий лидерборд не идёт. Брошенный раунд попытку не тратит.</p>
+
+    <div class="sp-acts">
+      {% if mine %}
+        <div class="sp-mine"><span class="sp-lab">Ваш результат</span><b>{{ mine.score }}</b><span>{% if my_place %}{{ my_place }}-е место из {{ total }} · {% endif %}точность {{ mine.accuracy }}&nbsp;%</span></div>
+        <a class="sp-btn" href="{{ result_url }}">Страница результата</a>
+      {% endif %}
+      {% if allowed %}
+        <a class="sp-play" id="sp-play" href="{{ play_url }}">{% include "_icon.html" with name="play" %}{% if mine %}Сыграть ещё раз{% else %}Играть{% endif %} <kbd>Enter</kbd></a>
+        <p class="sp-hint">{{ attempts_left|plural_ru:"осталась,осталось,осталось" }} {{ attempts_left|count_ru:"попытка,попытки,попыток" }} из {{ gset.attempts_allowed }}</p>
+        {% if not user.is_authenticated %}
+        <p class="sp-warn"><span>Вы не вошли: на доске будете записаны как «аноним», учитель вас не узнает.</span><a class="sp-btn amber" href="{{ login_url }}">Войти</a></p>
+        {% endif %}
+      {% else %}
+        {% if not mine %}<p class="sp-why" id="sp-why">{{ why_text }}</p>{% endif %}
+        {% if mine %}<p class="sp-hint">{{ why_text|lower }}{% if played_text %} · набор сыгран {{ played_text }}{% endif %}</p>{% endif %}
+      {% endif %}
+      <a class="sp-btn" href="{% url 'game:page' %}">В обычную игру</a>
+    </div>
+  </section>
+
+  <div class="sp-cols">
+    {% include "game/_board_table.html" with rows=top title=board_title more_note="анонимные раунды в таблице есть, но без имени" empty_title="Этот набор ещё никто не прошёл" empty_text="Первый результат сразу станет первым местом." foot="Анонимные раунды в таблице есть, но без имени: учитель их не узнает." %}
+    {% include "game/_board_questions.html" with caption="доля верных среди сыгравших этот набор" empty_text="Разбор появится после первого сыгранного раунда." note="Тексты видят автор набора и те, кто его уже сыграл, – иначе контрольную можно прочитать заранее." %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Enter на странице набора — «Играть», как на главной игры. На кнопке и ссылке
+   Enter нажимает их саму. */
+(function () {
+  var play = document.getElementById('sp-play');
+  if (!play) return;
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.defaultPrevented) return;
+    if (e.target.closest && e.target.closest('a, button, input, textarea, select')) return;
+    e.preventDefault();
+    play.click();
+  });
+})();
+</script>
+{% endblock %}

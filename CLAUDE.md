@@ -253,6 +253,8 @@ test_options_from_statement [--apply|--revert S]  # варианты теста 
 embeddings_export_vectors --out PREFIX        # векторы каталога файлом для ввоза на бой
 analytics_export --since D [--until D] --out F  # события беты (Event) в CSV
 chat_export --since D [--until D] --out F     # журнал чата на задаче, JSONL по разговорам
+profiles_export --since D [--until D] --out F # самоотчёт профилей беты в CSV (без телефона, логина, почты)
+search_export --since D [--until D] --out F   # журнал поиска SearchLog с оценками в CSV (ADR 0117)
 scripts/glm_vision_probe.py                   # руками: читает ли модель GLM картинку
 bank_sync_export [--scope catalog|--ids-file F] [--fields a,b]  # пакет синхронизации банка (дома)
 bank_sync_apply --package DIR [--apply|--revert S] [--fields]   # на бою: только отличающееся, снимок (ADR 0107)
@@ -343,6 +345,27 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 `Problem` не ссылается вовсе, [ADR 0063](docs/adr/0063-olympiads-own-models.md).
 ⚠️ Третьего исключения быть не должно: появится — правило пора переписывать,
 а не пристраивать к нему ещё одну оговорку.
+
+**Бета 18.09 (журнал `claude/JOURNAL_BETA_NIGHT_20260918.md`):** `SearchLog` — журнал поиска, пишет
+сервер при полном рендере каталога со склейкой 30 с (`catalog/search_log.py`, ADR 0117), оценка
+`POST /api/search-rating/`; `Feedback.Kind.PULSE` — плашка «Всё ли нравится?» (`problems/pulse.py`);
+плашки угла живут в `templates/_corner_stack.html`; до трёх вложений к реплике чата
+(`ChatTurn.attachments`); ученику своё вложение отдаёт `catalog/chat_files.py` — четвёртая файловая
+вьюха (ADR 0118, docs/SECURITY.md). Поля профиля (класс кодом `le7`…`none`, самоотчёт) в модель ИИ не
+уходят — сторож `problems/tests/profile_markers.py`.
+
+**Каталог «Стол» (ветка `feat/catalog-stol`, 18–19.09, ADR 0119, 0121–0123):** один шаблон
+`catalog/stol.html` на `/catalog/`, `/catalog/problem/<id>/` и `/catalog/map/`; задача меняется без
+перезагрузки (`?pane=1`), карта тем = фильтры каталога, помощь — лестница и лента, корзина репетитора;
+прогресс ученика `ProblemProgress` (`catalog/progress.py`). Старые `problem_list.html`,
+`problem_detail.html`, `topic_map.html` удалены. Раздел «Стол» — [catalog/CLAUDE.md](catalog/CLAUDE.md).
+
+**Wecon Rush после редизайна 17.09 (ADR 0108–0116):** экраны `game.html` — include-файлы `game/_start.html`, `_play.html`,
+`_final.html`, `_practice_final.html`; доски дня и набора — общие `game/_board_*.html`. Адреса: `/game/daily/` и
+`/game/daily/<режим>/[<дата>/]`, страница набора `/game/s/<код>/` (`/board/` — переход), дуэль `/game/d/<код>/`,
+результат `/game/r/<код>/`; API `game/api/set_check/`, `teacher/api/game-set/pool/`, срок набора
+`teacher/game-sets/<код>/deadline/`. Макеты и спецификации — `claude/mockups/wecon_rush_20260917/`,
+журнал прогона — `claude/JOURNAL_WECON_RUSH_REDESIGN_20260917.md`.
 
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·

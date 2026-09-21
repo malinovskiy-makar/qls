@@ -39,9 +39,22 @@ FAKE_CONFIG = (
 )
 
 
+GAME_TEMPLATES = os.path.join(settings.BASE_DIR, 'game', 'templates')
+
+
+def expand_includes(src):
+    u"""Разметка экранов вынесена в `game/_*.html` (ADR 0108): подставляем
+    их на место `{% include %}`, чтобы проверки видели страницу целиком, а не
+    каркас без экранов."""
+    def paste(m):
+        with open(os.path.join(GAME_TEMPLATES, m.group(1)), encoding='utf-8') as f:
+            return expand_includes(f.read())
+    return re.sub(r"\{% include '(game/_\w+\.html)' %\}", paste, src)
+
+
 def page_source():
     with open(TEMPLATE, encoding='utf-8') as f:
-        return f.read()
+        return expand_includes(f.read())
 
 
 def inline_js(src):
@@ -163,14 +176,6 @@ class PageJsTests(TestCase):
         self.assertIsNotNone(m2)
         for reason in ('lives', 'set_done', 'pool_empty'):
             self.assertIn("'%s'" % reason, m2.group(1))
-
-    def test_clean_badge_requires_at_least_one_correct_answer(self):
-        """«Чисто! Ошибок нет» ошибочно показывалась и при 0/0 (пустой
-        забег из нуля вопросов) — s.wrong > 0 у пустого забега тоже false.
-        Ловим регрессию: условие обязано требовать s.correct > 0."""
-        m = re.search(r'var clean = (.*?);', self.js)
-        self.assertIsNotNone(m, 'условие clean не найдено')
-        self.assertIn('s.correct > 0', m.group(1))
 
     def test_start_refusal_shows_a_calm_banner_not_an_alert(self):
         """Отказ сервера начать забег (режим за флагом, пустой пул под
@@ -336,13 +341,13 @@ class NoBrowserBlueTests(TestCase):
         u"""⚠️ Обёртка :where() обязательна — она и есть смысл правила.
 
         Без неё `.rush-wrap a` весит (0,1,1) и перебивает `.set-back`,
-        `.btn-board`, `.btn-copy` (0,1,0): четыре ссылки со своим осмысленным
-        цветом перекрасились бы заодно. Нужен ЗАПАСНОЙ цвет, а не общий.
+        `.fin-btn`, `.mi-lnk` (0,1,0): ссылки со своим осмысленным цветом
+        перекрасились бы заодно. Нужен ЗАПАСНОЙ цвет, а не общий.
         """
         self.assertNotIn('\n.rush-wrap a {', self.src)
         for rule in ('.set-back { color: var(--text3); }',
-                     '.btn-board:hover { border-color: var(--rush-accent)',
-                     '.btn-copy:hover { border-color: var(--rush-accent)'):
+                     '.fin-btn:hover { border-color: var(--accent)',
+                     '.mi-lnk:hover, .mi-sol-btn:hover { border-color: var(--accent)'):
             self.assertIn(rule, self.src)
 
     def test_the_code_field_has_a_focus_rule(self):
@@ -461,8 +466,9 @@ class ScoreboardTests(TestCase):
             self.assertNotIn(gone, self.src, gone)
 
     def test_one_markup_serves_both_cases(self):
-        u"""Блок `.vs` в разметке ровно один: второго вида табло нет."""
-        self.assertEqual(self.src.count('<div class="vs" id="vs"'), 1)
+        u"""Полоса HUD в разметке ровно одна (ADR 0110), старого `.vs` нет."""
+        self.assertEqual(self.src.count('<header class="hud" id="hud">'), 1)
+        self.assertNotIn('class="vs"', self.src)
         self.assertIn('function isDuelRun()', self.js)
         # Обе ветки правой карточки ходят через один и тот же блок.
         self.assertIn('if (isDuelRun()) { paintRival(); } else { paintBest(); }',
@@ -492,23 +498,25 @@ class ScoreboardTests(TestCase):
         self.assertIn('if (vsRivalDone) return 0;', self.js)
 
     def test_without_a_record_the_right_card_has_no_number(self):
-        u"""Первый раунд в режиме: выдуманного числа-заглушки быть не должно."""
+        u"""Первый раунд, аноним, набор: чипа рекорда нет вовсе — ни нуля, ни
+        призыва войти (решение владельца 17.09.2026)."""
         m = re.search(r'function paintBest\(\) \{(.*?)\n  \}', self.js, re.S)
         self.assertIsNotNone(m, 'paintBest не найден')
-        branch = m.group(1).split('if (!vsBest) {', 1)[1].split('return;', 1)[0]
-        self.assertIn("$('vs-them-score').textContent = '';", branch)
-        self.assertIn('Первый раунд в этом режиме', branch)
-        self.assertIn('Войдите, чтобы рекорды сохранялись', branch)
+        branch = m.group(1).split('if (!vsBest || practice) {', 1)[1].split('return;', 1)[0]
+        self.assertIn('rec.hidden = true;', branch)
+        self.assertNotIn('Войдите', m.group(1))
         # Ни одной цифры в ветке «рекорда нет».
         self.assertNotRegex(branch, r'\d')
+        self.assertIn("'новый рекорд'", m.group(1))
 
     def test_the_gap_disappears_when_there_is_nothing_to_compare(self):
         m = re.search(r'function paintGap\(\) \{(.*?)\n  \}', self.js, re.S)
         self.assertIsNotNone(m)
         body = m.group(1)
-        self.assertIn('if (other == null) { gap.hidden = true; return; }', body)
-        self.assertIn('вы ведёте', body)
-        self.assertIn('отстаёте', body)
+        self.assertIn("if (!isDuelRun() || !vsRival) { pill.hidden = true; return; }", body)
+        self.assertIn('вы ведёте на ', body)
+        self.assertIn('отстаёте на ', body)
+        self.assertIn("'равны'", body)
 
     def test_the_record_comes_from_the_server_not_from_local_storage(self):
         u"""Рекорды не должны теряться при смене браузера."""
@@ -523,90 +531,6 @@ class ScoreboardTests(TestCase):
         body = m.group(1)
         self.assertIn('m.lives', body)
         self.assertNotRegex(body, r'i < 3;')
-
-
-class NineChartsTests(TestCase):
-    u"""Экран результата: девять графиков, блок раскрыт сразу (08.09.2026).
-
-    Владелец: «раньше было больше статистики после игры, надо вернуть, там
-    было много классной». Кнопка-раскрывашка убрана: то, что спрятано за
-    кнопкой, для половины игроков не существует.
-    """
-
-    def setUp(self):
-        self.src = page_source()
-        self.js = inline_js(self.src)
-
-    def test_there_are_exactly_nine_chart_cards(self):
-        u"""Числовой инвариант фазы: карточек-графиков ровно девять."""
-        self.assertEqual(self.src.count('<div class="chart-card">'), 9)
-
-    def test_the_toggle_is_gone_with_its_state(self):
-        for gone in ('det-toggle', 'chartsBuilt', 'aria-expanded="false"'):
-            self.assertNotIn(gone, self.src, gone)
-        self.assertNotIn('<div class="det-body" id="det-body" hidden>', self.src)
-
-    def test_charts_are_built_when_the_screen_is_painted(self):
-        m = re.search(r'function buildCharts\(\) \{(.*?)\n  \}', self.js, re.S)
-        self.assertIsNotNone(m, 'buildCharts не найден')
-        body = m.group(1)
-        for fn in ('chartCurve', 'chartTime', 'chartDifficulty', 'chartTape',
-                   'chartPoints', 'chartGroups', 'buildCompareCharts'):
-            self.assertIn(fn + '(', body, fn)
-        # buildCompareCharts несёт три графика, зависящих от истории.
-        m2 = re.search(r'function buildCompareCharts\(\) \{(.*?)\n  \}',
-                       self.js, re.S)
-        for fn in ('chartHistory', 'chartTimes', 'chartUsual'):
-            self.assertIn(fn + '(', m2.group(1), fn)
-
-    def test_local_storage_history_is_gone_entirely(self):
-        u"""⚠️ Два источника истории разъедутся при первом расхождении."""
-        for gone in ('econ_rush_history', 'saveRunToHistory', 'loadHistory',
-                     'HISTORY_KEY', 'HISTORY_SHOWN'):
-            self.assertNotIn(gone, self.src, gone)
-        self.assertIn("api('/game/api/me/history/", self.js)
-
-    def test_the_topic_layout_is_not_copied_a_second_time(self):
-        u"""⚠️ ADR 0071: второй раскладки тем не заводить.
-
-        «Микро и макро» берёт разделы из `CFG.topic_groups`, а она приезжает
-        из `problems/sections.py` через `game/filters.py::TOPIC_GROUPS`.
-        Список тем, написанный в шаблоне руками, разошёлся бы с каталогом.
-        """
-        m = re.search(r'function chartGroups\(s\) \{(.*?)\n  \}', self.js, re.S)
-        self.assertIsNotNone(m, 'chartGroups не найден')
-        body = m.group(1)
-        self.assertIn('CFG.topic_groups', body)
-        # Ни одного названия раздела и ни одной темы литералом.
-        for literal in ('Микроэкономика', 'Макроэкономика', "'micro'",
-                        "'macro'", 'Эластичность'):
-            self.assertNotIn(literal, body, literal)
-
-    def test_missing_history_never_becomes_an_invented_number(self):
-        u"""Нет среднего — нет пунктира и нет сравнения. Ноль тут ложь."""
-        m = re.search(r'function chartTimes\(s\) \{(.*?)\n  \}', self.js, re.S)
-        self.assertIn('if (avg) {', m.group(1))
-        m2 = re.search(r'function chartUsual\(s\) \{(.*?)\n  \}', self.js, re.S)
-        body = m2.group(1)
-        self.assertIn('if (!avg) {', body)
-        self.assertIn('сравнивать пока не с чем', body)
-        self.assertIn('Войдите, чтобы сравнивать', body)
-
-    def test_charts_are_still_hand_drawn_svg(self):
-        u"""Библиотеку не подключаем: тему перекрашивает CSS, а не JS.
-
-        ⚠️ Ищем ПОДКЛЮЧЁННЫЕ файлы, а не имена библиотек подстрокой: слово
-        «echarts» живёт внутри `buildCompareCharts`, и наивная проверка
-        краснела бы на собственной функции.
-        """
-        self.assertIn('var SVG_NS', self.js)
-        srcs = re.findall(r'<script[^>]*src="([^"]+)"', self.src)
-        for url in srcs:
-            low = url.lower()
-            for lib in ('chart.js', 'd3', 'plotly', 'echarts', 'highcharts'):
-                self.assertNotIn(lib, low, url)
-        # Цвета графиков идут токенами — иначе смена темы их не перекрасит.
-        self.assertIn("'var(--rush-accent)'", self.js)
 
 
 class RecordsPanelClientTests(TestCase):
@@ -638,10 +562,11 @@ class RecordsPanelClientTests(TestCase):
 
     def test_the_old_four_line_box_is_gone(self):
         u"""Прежняя панель читала рекорды режимов прямо из localStorage."""
-        m = re.search(r"\$\('entry-records'\)\.addEventListener"
-                      r"\('click', function \(\) \{(.*?)\n  \}\);",
-                      self.js, re.S)
-        self.assertIsNotNone(m, 'обработчик entry-records не найден')
+        # С 17.09.2026 (ADR 0108) панель открывается окном со вкладки
+        # «Статистика»: кнопка `records-open` → `openRecords`.
+        self.assertIn("$('records-open').addEventListener('click'", self.js)
+        m = re.search(r"function openRecords\(on\) \{(.*?)\n  \}", self.js, re.S)
+        self.assertIsNotNone(m, 'openRecords не найден')
         self.assertNotIn('bestKey', m.group(1))
         self.assertIn('loadRecords()', m.group(1))
         self.assertNotIn('по режимам, локально', self.src)

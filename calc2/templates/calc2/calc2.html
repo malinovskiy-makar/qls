@@ -3,7 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Графики · Weconomics</title>
+  {% with seo_title='Графический калькулятор по экономике — онлайн | Weconomics.ai' seo_description='Бесплатный графический калькулятор по экономике: кривые спроса и предложения, эластичность, монополия и другие модели — стройте графики онлайн на Weconomics.ai.' %}
+  <title>{{ seo_title }}</title>
+  {% include '_seo_meta.html' %}
+  {% endwith %}
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).

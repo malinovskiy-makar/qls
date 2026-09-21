@@ -202,7 +202,7 @@ class DegradedPageTests(_База):
             reverse('catalog:problem_detail', args=[self.нужная.pk]))
         self.assertEqual(ответ.status_code, 200)
         похожие = [s['problem'].pk if isinstance(s, dict) else s.pk
-                   for s in ответ.context['similar']]
+                   for s in ответ.context['similar_cards']]
         self.assertIn(self.посторонняя.pk, похожие)
         self.assertEqual(self._снимок_модулей() - было, set())
 

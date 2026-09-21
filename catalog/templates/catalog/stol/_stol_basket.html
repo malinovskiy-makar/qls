@@ -1,0 +1,35 @@
+{% load ru catalog_filters %}{% comment %}
+КОРЗИНА РЕПЕТИТОРА «СТОЛА» (README §7, снимки 21–24). Рисуется только
+репетитору (`is_tutor`); ученик и гость её не получают вовсе.
+
+Корзина живёт в браузере (`localStorage`, ключ с id пользователя) и переживает
+фильтры, поиск, открытие задач и перезагрузку — ведёт её `stol_basket.js`.
+Непустая корзина — тёмная полоса снизу по центру: «Выбрано N» (список с
+крестиками и «Очистить корзину») · «В домашку ▾» (работы репетитора: название
+и «12 задач · 9Б») · «PDF или TeX» (подборка → существующий конструктор) · «×»
+(очистить). После добавления — зелёная плашка «Добавлено в «…»: N задач».
+В режиме карты полосы нет. Нет активных работ — нет и «В домашку» (правило нуля).
+
+⚠️ «Новой домашки из корзины» нет: конструктор работы (`teacher/picker.py`)
+не принимает список задач адресом, а одной правкой чтения параметра его не
+научить (журнал S5). Названия работ печатает репетитор — только через
+шаблон (экранирование), в сценарий они не уходят строкой.
+{% endcomment %}
+<script type="application/json" id="basket-cfg">{% with uid=user.pk %}{"uid": {{ uid }}, "addUrl": "/teacher/api/assignment/0/add_problems/", "pdfUrl": "{% url 'catalog:collection_from_basket' %}", "max": 100}{% endwith %}</script>
+<div class="basket" id="basket" role="region" aria-label="Корзина задач" hidden>
+  <div class="basket-pop" id="basket-list" hidden>
+    <ul class="basket-items" id="basket-items"></ul>
+    <button type="button" class="basket-clear" id="basket-clear">Очистить корзину</button>
+  </div>
+  {% if teacher_assignments %}
+  <div class="basket-pop basket-pop--hw" id="basket-hw" role="menu" hidden>
+    <p class="basket-pop-h">Добавить в</p>
+    {% for a in teacher_assignments %}<button type="button" class="basket-hw-row" role="menuitem" data-hw="{{ a.id }}" data-hw-name="{{ a.name }}"><span class="basket-hw-name">{{ a.name }}</span><small class="basket-hw-sub" data-hw-n="{{ a.n }}" data-hw-to="{{ a.to }}">{{ a.n }}&nbsp;{{ a.n|plural_ru:"задача,задачи,задач" }}{% if a.to %} · {{ a.to }}{% endif %}</small></button>{% endfor %}
+  </div>
+  {% endif %}
+  <button type="button" class="basket-count" id="basket-count" aria-expanded="false" aria-controls="basket-list">Выбрано <b id="basket-n">0</b>{% include '_icon.html' with name='arrow_up' %}</button>
+  {% if teacher_assignments %}<button type="button" class="basket-main" id="basket-hw-btn" aria-expanded="false" aria-controls="basket-hw">В домашку{% include '_icon.html' with name='chevron_down' %}</button>{% endif %}
+  <button type="button" class="basket-pdf" id="basket-pdf">PDF или TeX</button>
+  <button type="button" class="basket-x" id="basket-x" aria-label="Очистить корзину" title="Очистить корзину">{% include '_icon.html' with name='close' %}</button>
+</div>
+<div class="basket-done" id="basket-done" role="status" hidden>{% include '_icon.html' with name='check' %}<span id="basket-done-t"></span><button type="button" class="basket-done-ok" id="basket-done-ok">Понятно</button></div>

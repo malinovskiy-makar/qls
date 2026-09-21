@@ -4,7 +4,7 @@
 READ-ONLY. Чем отличается от `render_legacy_review_v2`: та страница
 показывала пары «исходник → канонизированный текст» ДО записи. Эта
 показывает то, что уже лежит в базе, ровно тем конвейером, каким его
-покажет ученику `catalog/problem_detail.html`:
+покажет ученику `catalog/_math_text.html`:
 
     problem.statement | render_markdown | render_figures
 

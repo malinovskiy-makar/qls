@@ -145,8 +145,8 @@ class RankWithPauseTests(TestCase):
 class ClientPauseTests(SimpleTestCase):
 
     def setUp(self):
-        with open(TEMPLATE, encoding='utf-8') as handle:
-            self.html = handle.read()
+        from game.tests.test_page_js import page_source
+        self.html = page_source()   # разметка экранов — в game/_*.html
 
     def test_window_tells_the_server_about_the_pause(self):
         self.assertTrue("tellServer('/game/api/pause/')" in self.html,

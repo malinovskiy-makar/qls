@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --btn-bg: #2e2b27; --on-btn: #ffffff; --skip: #a39a88;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --error-border: rgba(185,53,38,.4);
+      --green: #186e3c; --green-tint: rgba(24,110,60,.10); --green-border: rgba(24,110,60,.45);
+      background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; overflow: hidden; position: relative;
+    }
+    .rush button { font: inherit; color: inherit; cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+
+    .hud { height: 56px; padding: 0 12px 0 14px; display: flex; align-items: center; gap: 10px; background: var(--surface); border-bottom: 1px solid var(--border); flex: none; }
+    .name { font-size: 15px; font-weight: 700; display: flex; align-items: center; gap: 7px; }
+    .name svg.i { color: var(--accent-ink); width: 20px; height: 20px; }
+    .tally { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .tally span { display: inline-flex; align-items: center; gap: 3px; }
+    .tally .g { color: var(--green); } .tally .e { color: var(--error); } .tally .k { color: var(--text3); }
+    .tally svg.i { width: 14px; height: 14px; stroke-width: 3; }
+    .ib { width: 40px; height: 40px; border: 1px solid var(--border); border-radius: 10px; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--text2); }
+
+    .tape { height: 46px; padding: 0 14px; display: flex; align-items: center; gap: 6px; border-bottom: 1px solid var(--border-soft); flex: none; }
+    .dot { width: 30px; height: 30px; border-radius: 8px; border: 1.5px solid transparent; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: #fff; }
+    .dot.ok { background: var(--green); } .dot.bad { background: var(--error); } .dot.skip { background: var(--skip); }
+    .dot.cur { box-shadow: 0 0 0 3px var(--accent-ring); border-color: var(--accent); }
+    .tape .cap { margin-left: auto; font-size: 12px; color: var(--text3); }
+
+    .wrap { flex: 1; padding: 14px 14px 0; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .qmeta { font-size: 12.5px; color: var(--text3); }
+    .qmeta b { color: var(--text2); }
+    .qcard { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px 16px; font-size: 16px; line-height: 1.5; }
+    .opts { display: flex; flex-direction: column; gap: 8px; }
+    .opt { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 52px; padding: 10px 12px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; font-size: 16px; box-sizing: border-box; }
+    .opt .k { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--text2); display: flex; align-items: center; justify-content: center; }
+    .opt .mk { font-size: 11.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+    .opt.bad { background: var(--error-tint); border-color: var(--error-border); } .opt.bad .mk { color: var(--error); }
+    .opt.right { border-color: var(--green-border); box-shadow: 0 0 0 3px var(--green-tint); } .opt.right .mk { color: var(--green); }
+    .opt.mute { opacity: .5; }
+
+    .fb { border-radius: 12px; border: 1px solid var(--error-border); background: var(--error-tint); padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+    .fb .v { display: flex; align-items: center; gap: 8px; font-size: 15px; }
+    .fb .v svg.i { color: var(--error); }
+    .fb .sol small { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; margin-bottom: 2px; }
+    .rush a.open { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 14px; font-weight: 600; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 7px; }
+    .gh { height: 32px; border: 0; background: transparent; font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+
+    .bar { flex: none; margin-top: auto; padding: 10px 14px 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 10px; background: var(--bg); border-top: 1px solid var(--border-soft); }
+    .nb { height: 50px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); font-size: 15.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+    .rush .nb.solid { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 390px; height: 960px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="hud">
+    <div class="name"><svg class="i" viewBox="0 0 24 24"><path d="M3 12c3-5 6-5 9 0s6 5 9 0"></path><path d="M3 12c3 5 6 5 9 0s6-5 9 0"></path></svg>Тесты</div>
+    <div class="tally">
+      <span class="g"><svg class="i" viewBox="0 0 24 24"><path d="M5 12l5 5 9-10"></path></svg>1</span>
+      <span class="e"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg>2</span>
+      <span class="k"><svg class="i" viewBox="0 0 24 24"><path d="M5 4v16l9-8zM19 4v16"></path></svg>1</span>
+    </div>
+    <button class="ib" aria-label="Звук"><svg class="i" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7"></path></svg></button>
+    <button class="ib" aria-label="Закончить"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+  </div>
+
+  <div class="tape">
+    <button class="dot bad" aria-label="Вопрос 1: ошибка">1</button>
+    <button class="dot ok" aria-label="Вопрос 2: верно">2</button>
+    <button class="dot skip" aria-label="Вопрос 3: пропущен">3</button>
+    <button class="dot bad cur" aria-label="Вопрос 4: ошибка">4</button>
+    <span class="cap">лента листается пальцем</span>
+  </div>
+
+  <div class="wrap">
+    <div class="qmeta">Вопрос <b>4</b></div>
+    <div class="qcard">В стране AAA на рынке шоколадок школьники предъявляют спрос Qd = 150 − P, а предложение имеет вид Qs = P. Регулятор считает, что шоколадки должны продаваться строго по цене 60 за штуку. Найдите размер дефицита шоколадок.</div>
+    <div class="opts">
+      <button class="opt right"><span class="k">1</span><span>30</span><span class="mk">верный</span></button>
+      <button class="opt mute"><span class="k">2</span><span>45</span><span class="mk"></span></button>
+      <button class="opt bad"><span class="k">3</span><span>60</span><span class="mk">ваш ответ</span></button>
+      <button class="opt mute"><span class="k">4</span><span>110</span><span class="mk"></span></button>
+    </div>
+    <div class="fb">
+      <div class="v"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg><b>Неверно.</b><span>Верный ответ — 1.</span></div>
+      <div class="sol"><small>Решение</small>При P = 60 спрос Qd = 150 − 60 = 90, предложение Qs = 60. Дефицит = 90 − 60 = 30.</div>
+      <a class="open" href="#problem">Открыть задачу в каталоге<svg class="i s" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"></path></svg></a>
+      <button class="gh"><svg class="i s" viewBox="0 0 24 24"><path d="M5 21V4h11l-1 3 1 3H5"></path></svg>Плохая задача?</button>
+    </div>
+  </div>
+
+  <!-- Листание прижато к низу экрана; кружок обратной связи сайта в тестах скрыт — иначе он закрывает «Дальше» -->
+  <div class="bar">
+    <button class="nb"><svg class="i s" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"></path></svg>Назад</button>
+    <button class="nb solid">Дальше<svg class="i s" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"></path></svg></button>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":960}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

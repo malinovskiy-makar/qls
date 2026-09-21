@@ -1,0 +1,73 @@
+{% extends 'catalog/base.html' %}
+{% comment %}
+  Неверный код набора `/game/s/<код>/` (и `/board/`) — страница в оформлении игры со
+  статусом 404, а не общий 404 сайта «занятие или работа удалены» (P6, ADR 0115).
+  Проверка кода та же, что на главной игры: `api/set_check` без ухода со страницы.
+{% endcomment %}
+{% block title %}Набор не найден – Wecon Rush{% endblock %}
+
+{% block extra_style %}
+  .sm-wrap { min-height: calc(100vh - 200px); display: flex; align-items: center; justify-content: center; padding: 24px 0; }
+  .sm-card { width: 560px; max-width: 100%; box-sizing: border-box; padding: 30px 32px 26px; display: flex; flex-direction: column; gap: 14px;
+             background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+  .sm-card h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -.3px; line-height: 1.2; overflow-wrap: anywhere; }
+  .sm-code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .08em; color: var(--accent-ink); }
+  .sm-card p { margin: 0; font-size: 14.5px; color: var(--text2); line-height: 1.5; }
+  .sm-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; margin-top: 4px; }
+  .sm-form input { font: inherit; height: 48px; box-sizing: border-box; min-width: 0; padding: 0 14px; border: 1.5px solid var(--border);
+                   border-radius: 12px; background: var(--surface-2); color: var(--text); font-size: 17px; letter-spacing: .08em;
+                   text-transform: uppercase; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .sm-form input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+  .sm-btn { font: inherit; height: 48px; padding: 0 20px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; border: 1px solid transparent; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn);
+            font-size: 15px; font-weight: 700; text-decoration: none; cursor: pointer; white-space: nowrap; }
+  .sm-btn:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .sm-btn .qi { width: 16px; height: 16px; }
+  .sm-btn.ghost { background: transparent; border-color: var(--border); color: var(--text); }
+  .sm-btn.ghost:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .sm-err { min-height: 20px; font-size: 13.5px; color: var(--error); }
+  .sm-err:empty { min-height: 0; }
+  @media (max-width: 520px) {
+    .sm-card { padding: 20px 18px; }
+    .sm-card h1 { font-size: 22px; }
+    .sm-form { grid-template-columns: 1fr; }
+  }
+{% endblock %}
+
+{% block content %}
+<div class="sm-wrap">
+  <section class="sm-card" aria-labelledby="sm-title">
+    <h1 id="sm-title">Набора с кодом <span class="sm-code">{{ code }}</span> нет</h1>
+    <p>Проверьте код – он из 8 букв и цифр, регистр и пробелы не важны.</p>
+    <form class="sm-form" id="sm-form" autocomplete="off">
+      <input id="sm-code" name="code" maxlength="16" placeholder="код набора" aria-label="Код набора" spellcheck="false">
+      <button type="submit" class="sm-btn">Открыть{% include "_icon.html" with name="arrow_right" %}</button>
+    </form>
+    <p class="sm-err" id="sm-err" role="alert"></p>
+    <a class="sm-btn ghost" href="{% url 'game:page' %}">В игру</a>
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+/* Та же проверка кода, что на главной: верный — переход, неверный — строка под полем. */
+(function () {
+  var form = document.getElementById('sm-form');
+  var input = document.getElementById('sm-code');
+  var err = document.getElementById('sm-err');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var code = input.value.replace(/\s+/g, '');
+    if (!code) { input.focus(); return; }
+    err.textContent = '';
+    fetch('/game/api/set_check/?code=' + encodeURIComponent(code), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (d.exists && d.url) { location.href = d.url; return; }
+        err.textContent = d.error || 'Набора с таким кодом нет';
+      }, function () { err.textContent = 'Нет связи. Попробуйте ещё раз.'; });
+  });
+})();
+</script>
+{% endblock %}

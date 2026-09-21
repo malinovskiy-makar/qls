@@ -1,91 +1,129 @@
 {% extends 'catalog/base.html' %}
 {% comment %}
-  Доска вызова дня. Сортировка: по счёту вниз, при равенстве — кто раньше
-  закончил, тот выше (правило должно быть задано, иначе одинаковый вход
-  даст разный порядок).
+  Доска дня `/game/daily/<режим>/[<день>/]` (решение владельца 17.09.2026, макет
+  claude/mockups/wecon_rush_20260917/DailyBoard.dc.html). Доска у вызова ОДНА:
+  страница вызова, итог раунда и старый адрес `/game/s/<код>/board/` ведут сюда.
 
-  На доске только вошедшие в аккаунт: у анонима нет имени, а «аноним №4»
-  ничего не значит. Играть при этом может кто угодно.
+  Страница серверная: режим и день переключаются обычными ссылками. Сортировка
+  доски: по счёту, при равенстве выше тот, кто закончил раньше. На доске только
+  вошедшие: у анонима нет имени. «Таблица» и «Где ошиблись» — общие части
+  (`_board_table.html`, `_board_questions.html`), их же берёт страница набора.
+
+  ⚠️ Прошедший день без набора — пустая доска, а не 404 (`views.daily_board`).
 {% endcomment %}
-{% block title %}Доска вызова дня – {{ mode_title }}{% endblock %}
+{% block title %}Доска дня · {{ mode_title }} – Wecon Rush{% endblock %}
+{% block main_class %}dy-main{% endblock %}
 
 {% block extra_style %}
-<style>
-  .db-wrap { max-width: 780px; margin: 0 auto; padding: 26px 20px 60px; }
-  .db-wrap h1 { font-size: 1.5rem; }
-  .db-sub { color: var(--muted); margin-top: 6px; }
-  .db-acts { margin-top: 14px; display: flex; gap: 8px; flex-wrap: wrap; }
-  .db-btn {
-    display: inline-block; padding: 8px 16px; border-radius: 10px;
-    text-decoration: none; font-weight: 600; font-size: .9rem;
-    background: var(--btn-bg); color: var(--on-btn); border: 1px solid var(--btn-bg);
+  {% include "game/_board_style.html" %}
+  .dy-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 84px; box-sizing: border-box;
+             display: flex; flex-direction: column; gap: 14px; }
+  .dy-back { align-self: flex-start; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink);
+             text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .dy-back .qi { width: 14px; height: 14px; }
+  .dy-back:hover { text-decoration: underline; }
+  .dy-lab { font-size: 11.5px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+  .dy-btn { font: inherit; height: 46px; padding: 0 22px; box-sizing: border-box; display: inline-flex; align-items: center;
+            justify-content: center; gap: 8px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 15px; font-weight: 700; text-decoration: none; white-space: nowrap; }
+  .dy-btn .qi { width: 14px; height: 14px; }
+  .dy-btn.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .dy-btn.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .dy-btn.solid .qi { fill: currentColor; }
+
+  .db-head { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; }
+  .db-ttl { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; }
+  .db-seg { display: inline-flex; border: 1px solid var(--border); border-radius: 10px; overflow: hidden; background: var(--surface); }
+  .db-seg a { min-height: 40px; padding: 0 16px; display: inline-flex; align-items: center; font-size: 14.5px; font-weight: 600;
+              color: var(--text2); text-decoration: none; }
+  .db-seg a + a { border-left: 1px solid var(--border-soft); }
+  .db-seg a:hover { color: var(--accent-ink); }
+  .db-seg a.on { background: var(--accent); color: var(--on-accent); }
+  .db-step { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+  .db-when { min-width: 210px; text-align: center; font-size: 15px; font-weight: 700; }
+  .db-when span { display: block; font-size: 12px; font-weight: 500; color: var(--text3); }
+  .db-arr { width: 44px; height: 44px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px;
+            background: var(--surface); color: var(--text); display: inline-flex; align-items: center; justify-content: center; }
+  .db-arr .qi { width: 18px; height: 18px; }
+  a.db-arr:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .db-arr.off { opacity: .35; }
+
+  .db-sum { padding: 14px 20px; display: flex; flex-wrap: wrap; align-items: center; gap: 12px 28px; }
+  .db-sum .v { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .db-sum .sp { flex: 1; }
+  .db-mine { text-align: right; }
+  .db-mine .v { font-size: 22px; font-weight: 800; }
+  .db-not { font-size: 13px; color: var(--text2); }
+  .db-lnk { min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; font-weight: 700; color: var(--accent-ink);
+            text-decoration: underline; text-underline-offset: 3px; }
+  .db-tag { font-size: 12.5px; font-weight: 700; border-radius: 999px; padding: 6px 12px; background: var(--surface-2);
+            color: var(--text2); border: 1px solid var(--border-soft); }
+
+  .db-cols { display: grid; grid-template-columns: minmax(0, 1fr) 560px; gap: 16px; align-items: stretch; }
+
+  @media (max-width: 1100px) {
+    .dy-main { padding: 16px 20px 84px; }
+    .db-cols { grid-template-columns: 1fr; }
+    .db-step { margin-left: 0; }
   }
-  .db-btn.ghost { background: var(--surface); color: var(--text);
-                  border-color: var(--border); }
-  .db-box { margin-top: 20px; border: 1px solid var(--border);
-            border-radius: 12px; background: var(--surface); overflow-x: auto; }
-  table.db { border-collapse: collapse; width: 100%; font-size: .92rem; }
-  table.db th, table.db td { padding: 9px 12px; text-align: left;
-                             border-bottom: 1px solid var(--border); }
-  table.db th { background: var(--surface-2); font-weight: 600; white-space: nowrap; }
-  table.db td.num { text-align: right; font-variant-numeric: tabular-nums; }
-  table.db tr.me { background: var(--accent-tint); font-weight: 600; }
-  table.db tr.gap td { text-align: center; color: var(--muted); }
-  .db-empty { padding: 28px; text-align: center; color: var(--muted); }
-  .db-note { margin-top: 12px; font-size: .84rem; color: var(--muted); }
-</style>
+  @media (max-width: 720px) {
+    .dy-main { padding: 16px 16px 84px; gap: 12px; }
+    .db-ttl { font-size: 24px; }
+    .db-seg { width: 100%; }
+    .db-seg a { flex: 1; justify-content: center; padding: 0 6px; font-size: 13.5px; min-height: 44px; }
+    .db-step { width: 100%; justify-content: space-between; }
+    .db-when { min-width: 0; }
+    .db-sum { padding: 14px 16px; gap: 10px 20px; }
+    .db-sum .sp { display: none; }
+    .db-mine { text-align: left; }
+  }
 {% endblock %}
 
 {% block content %}
-<div class="db-wrap">
-  <h1>Вызов дня · {{ mode_title }}</h1>
-  <p class="db-sub">
-    {{ day|date:"d E Y" }} · {{ gset.size }} вопр. · сыграли: {{ total }}
-    {% if not is_today %} · архивная доска{% endif %}
-  </p>
-  <div class="db-acts">
-    {% if is_today %}<a class="db-btn" href="{{ play_url }}">Играть</a>{% endif %}
-    <a class="db-btn ghost" href="{% url 'game:daily' %}">Все вызовы дня</a>
-    <a class="db-btn ghost" href="{{ yesterday_url }}">Вчерашняя доска</a>
+  <a class="dy-back" href="{% url 'game:daily' %}">{% include "_icon.html" with name="arrow_left" %}Вызов дня</a>
+
+  <div class="db-head">
+    <h1 class="db-ttl">Доска дня</h1>
+    <nav class="db-seg" aria-label="Режим">
+      {% for t in tabs %}<a href="{{ t.url }}"{% if t.on %} class="on" aria-current="page"{% endif %}>{{ t.title }}</a>{% endfor %}
+    </nav>
+    <div class="db-step">
+      {% if prev_url %}<a class="db-arr" href="{{ prev_url }}" aria-label="Предыдущий день">{% include "_icon.html" with name="chevron_left" %}</a>{% else %}<span class="db-arr off" aria-hidden="true">{% include "_icon.html" with name="chevron_left" %}</span>{% endif %}
+      <div class="db-when">{% if is_today %}Сегодня · {% elif is_yesterday %}Вчера · {% endif %}{{ day|date:"j E" }}{% if show_year %} {{ day|date:"Y" }}{% endif %}<span>{{ day|date:"l"|lower }}</span></div>
+      {% if next_url %}<a class="db-arr" href="{{ next_url }}" aria-label="Следующий день">{% include "_icon.html" with name="chevron_right" %}</a>{% else %}<span class="db-arr off" aria-hidden="true">{% include "_icon.html" with name="chevron_right" %}</span>{% endif %}
+    </div>
   </div>
 
-  <div class="db-box">
-    <table class="db">
-      <thead>
-        <tr><th>Место</th><th>Ник</th><th class="num">Счёт</th>
-            <th class="num">Точность</th><th class="num">Макс. комбо</th></tr>
-      </thead>
-      <tbody>
-      {% for r in top %}
-        <tr class="{% if r.is_me %}me{% endif %}">
-          <td class="num">{{ r.place }}</td>
-          <td>{{ r.name }}</td>
-          <td class="num">{{ r.score }}</td>
-          <td class="num">{{ r.accuracy }}%</td>
-          <td class="num">×{{ r.max_combo }}</td>
-        </tr>
-      {% empty %}
-        <tr><td colspan="5" class="db-empty">
-          Сегодня этот вызов ещё никто не прошёл. Будь первым.
-        </td></tr>
-      {% endfor %}
-      {% if my_row %}
-        <tr class="gap"><td colspan="5">⋯</td></tr>
-        <tr class="me">
-          <td class="num">{{ my_row.place }}</td>
-          <td>{{ my_row.name }}</td>
-          <td class="num">{{ my_row.score }}</td>
-          <td class="num">{{ my_row.accuracy }}%</td>
-          <td class="num">×{{ my_row.max_combo }}</td>
-        </tr>
-      {% endif %}
-      </tbody>
-    </table>
-  </div>
+  <section class="gb-card db-sum" aria-label="Сводка">
+    <div><div class="dy-lab">Набор</div><div class="v">{{ mode_title }} · {{ set_line }}</div></div>
+    <div><div class="dy-lab">Сыграли</div><div class="v">{{ total }}</div></div>
+    {% if is_today %}<div><div class="dy-lab">До конца вызова</div><div class="v" id="countdown" data-reset-at="{{ reset_at }}">–</div></div>{% endif %}
+    <div class="sp"></div>
+    {% if mine %}
+      <div class="db-mine"><div class="dy-lab">Ваш результат</div><div class="v">{{ mine.score }}{% if my_place %} · {{ my_place }}-е место из {{ total }}{% endif %}</div>{% if not my_place %}<div class="db-not">на доске только вошедшие</div>{% endif %}</div>
+      <a class="db-lnk" href="{{ result_url }}">Страница результата</a>
+    {% elif is_today and gset %}
+      <span class="db-not">Вы ещё не играли этот вызов</span>
+      <a class="dy-btn solid" id="db-play" href="{{ play_url }}">{% include "_icon.html" with name="play" %}Играть</a>
+    {% elif not is_today %}
+      <span class="db-tag">вызов закрыт</span>
+    {% endif %}
+  </section>
 
-  <p class="db-note">
-    Сортировка: по счёту, при равенстве выше тот, кто закончил раньше.
-    На доску попадают только вошедшие в аккаунт.
-  </p>
-</div>
+  <div class="db-cols">
+    {% if is_today %}
+      {% include "game/_board_table.html" with rows=top empty_title="Сегодня этот вызов ещё никто не прошёл" empty_text="Первый результат сразу станет первым местом." foot="На доске только вошедшие в аккаунт: у анонимного игрока нет имени." %}
+    {% else %}
+      {% include "game/_board_table.html" with rows=top empty_title="В этот день вызов никто не сыграл" empty_text="Доска пустая: сыграть этот вызов уже нельзя." foot="На доске только вошедшие в аккаунт: у анонимного игрока нет имени." %}
+    {% endif %}
+    {% if show_text %}
+      {% include "game/_board_questions.html" with empty_text=is_today|yesno:"Разбор появится после первого сыгранного раунда.,В этот день никто не играл." note="Красным – вопросы, на которых ошиблось больше 60 % сыгравших. Пропуск в долю не входит." %}
+    {% else %}
+      {% include "game/_board_questions.html" with empty_text="Разбор появится после первого сыгранного раунда." note="Доля верных видна всем, тексты – только тем, кто сыграл этот вызов: иначе набор можно подсмотреть заранее." %}
+    {% endif %}
+  </div>
+{% endblock %}
+
+{% block extra_js %}
+{% if is_today %}{% include "game/_daily_countdown.html" %}{% endif %}
 {% endblock %}

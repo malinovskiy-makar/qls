@@ -1,6 +1,8 @@
 {% comment %}
   Публичная страница результата забега — то, что открывается по ссылке,
-  которой поделились. Read-only и без логина.
+  которой поделились. Read-only и без логина. Вид — решение владельца 17.09.2026
+  (ADR 0115), макеты claude/mockups/wecon_rush_20260917/ResultPublicMobile (главный:
+  ссылку открывают с телефона) и ResultPublic.
 
   Содержимое рисует сервер: никакого JS для самой сводки (мини-график —
   <polyline>, точки посчитаны во вьюхе). JS тут только на кнопках шеринга,
@@ -18,7 +20,7 @@
   <meta name="description" content="{{ og_description }}">
 
   <meta property="og:type" content="website">
-  <meta property="og:site_name" content="Weconomics">
+  {% include '_seo_meta.html' %}
   <meta property="og:title" content="{{ og_title }}">
   <meta property="og:description" content="{{ og_description }}">
   <meta property="og:url" content="{{ page_url }}">
@@ -31,160 +33,160 @@
   <meta name="twitter:image" content="{{ og_image }}">
 
   {% include '_tokens.html' %}
-
+{% load ru %}
   <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { font-size: 16px; }
-body {
-  font-family: var(--font-ui);
-  color: var(--text);
-  background: var(--bg);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
-}
-.wrap { max-width: 520px; margin: 0 auto; padding: 40px 16px 48px; }
-.brand {
-  display: flex; align-items: center; gap: 8px;
-  font-size: 14px; font-weight: 700; color: var(--text3);
-  text-decoration: none; letter-spacing: .3px;
-  /* Ссылка в игру — элемент управления: 18 px строки мало для пальца (15.09.2026). */
-  min-height: 32px;
-}
+body { font-family: var(--font-ui); color: var(--text); background: var(--bg); min-height: 100vh;
+       -webkit-font-smoothing: antialiased; font-size: 14px; line-height: 1.45; }
+.qi { width: 18px; height: 18px; flex: none; }
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 40px 24px; display: flex; flex-direction: column; gap: 18px; }
+.top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { display: flex; align-items: center; gap: 10px; min-height: 32px; font-size: 15px; font-weight: 800; letter-spacing: -.2px;
+         color: var(--text); text-decoration: none; }
+.brand .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--accent); color: var(--on-accent);
+               display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; }
+.brand .qi { width: 18px; height: 18px; color: var(--accent-ink); }
 .brand b { color: var(--accent-ink); }
-.card {
-  margin-top: 16px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 26px 24px;
-}
-.chip {
-  display: inline-block;
-  padding: 3px 10px; border-radius: 999px;
-  background: var(--accent-tint); color: var(--accent-ink);
-  font-size: 13px; font-weight: 700;
-}
-.date { margin-left: 6px; font-size: 13px; color: var(--text3); }
-.score {
-  margin: 12px 0 2px;
-  font-size: 54px; font-weight: 800; letter-spacing: -2px;
-  font-variant-numeric: tabular-nums; line-height: 1;
-}
-.score small { font-size: 16px; font-weight: 600; color: var(--text3); letter-spacing: 0; margin-left: 8px; }
-.facts { display: flex; gap: 22px; margin-top: 18px; }
-.fact b { display: block; font-size: 20px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.fact span { font-size: 13px; color: var(--text3); }
-.curve { margin-top: 18px; }
-.curve svg { display: block; width: 100%; height: auto; }
-.curve p { margin-top: 4px; font-size: 13px; color: var(--text3); }
-
-h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
-.tp { list-style: none; display: flex; flex-direction: column; gap: 9px; }
-.tp-row { display: grid; grid-template-columns: 1fr auto; gap: 3px 10px; }
-.tp-name { font-size: 14px; font-weight: 600; }
-.tp-num { font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
-.tp-bar {
-  grid-column: 1 / -1;
-  display: flex; height: 7px; border-radius: 999px; overflow: hidden;
-  background: var(--surface-2);
-}
-.tp-bar i { display: block; height: 100%; }
-.ok { background: var(--green); }
-.bad { background: var(--error); }
-.skip { background: var(--text3); opacity: .45; }
-
-.cta {
-  display: block; margin-top: 26px;
-  height: 54px; line-height: 54px;
-  border-radius: 12px;
-  background: var(--accent); color: var(--act-ink-solid);  /* белый даёт 2,28 в тёмной */
-  font-size: 17px; font-weight: 700; text-align: center;
-  text-decoration: none;
-  transition: filter .12s, transform .1s;
-}
-.cta:hover { filter: brightness(1.08); }
-.cta:active { transform: scale(.98); }
-.share-row { display: flex; gap: 8px; margin-top: 10px; }
-.share-row button {
-  flex: 1;
-  font: inherit; font-size: 14px; font-weight: 600;
-  height: 42px;
-  border: 1px solid var(--border); border-radius: 10px;
-  background: var(--surface); color: var(--text2);
-  cursor: pointer;
-}
-.share-row button:hover { border-color: var(--accent); color: var(--accent-ink); }
-.foot { margin-top: 18px; font-size: 13px; color: var(--text3); text-align: center; }
-.foot a { color: var(--accent-ink); }
-@media (max-width: 480px) {
-  .facts { gap: 14px; }
-  .score { font-size: 44px; }
+.brand-sub { font-weight: 500; color: var(--text3); font-size: 13px; }
+.btn { font: inherit; height: 44px; padding: 0 18px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+       color: var(--text); font-size: 14.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+       gap: 8px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+.btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+.btn .qi { width: 15px; height: 15px; }
+.btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; }
+.grid { display: grid; grid-template-columns: minmax(0, 1fr) 400px; grid-template-areas: "main actions" "curve topics"; gap: 16px; align-items: start; }
+.c-main { grid-area: main; padding: 26px 30px; min-width: 0; }
+.c-actions { grid-area: actions; padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+.c-curve { grid-area: curve; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+.c-topics { grid-area: topics; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; }
+.who { display: flex; align-items: center; gap: 12px; }
+.av { width: 44px; height: 44px; border-radius: 50%; flex: none; background: var(--accent-tint); color: var(--accent-ink);
+      font-weight: 800; font-size: 16px; display: flex; align-items: center; justify-content: center; }
+.nm { font-size: 18px; font-weight: 700; line-height: 1.15; overflow-wrap: anywhere; }
+.sb { font-size: 13px; color: var(--text2); }
+.score { margin-top: 18px; font-size: 88px; font-weight: 800; line-height: .9; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.score small { margin-left: 8px; font-size: 20px; font-weight: 700; letter-spacing: 0; color: var(--text2); }
+.badge, .pill { margin-top: 12px; width: fit-content; max-width: 100%; min-height: 28px; padding: 3px 11px; border-radius: 999px;
+                display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; }
+.badge { background: var(--brand-amber); color: var(--brand-amber-ink); }
+.badge .qi { width: 14px; height: 14px; }
+.pill { background: var(--surface-2); color: var(--text2); border: 1px solid var(--border-soft); font-weight: 600; }
+.metrics { margin-top: 22px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metric { padding: 10px 12px; border-radius: 10px; background: var(--surface-2); min-width: 0; }
+.metric small { display: block; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text3); font-weight: 600; }
+.metric b { display: block; margin-top: 2px; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.metric span { font-size: 12.5px; color: var(--text2); }
+/* «прошёл набор до конца» не должен ломаться на три строки в узкой плитке. */
+.metric.wide b { font-size: 17px; line-height: 1.25; }
+.cta { font: inherit; height: 58px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn); font-size: 17px;
+       font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; text-decoration: none; padding: 0 14px; }
+.cta:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+.cta .qi { fill: currentColor; }
+.cta span { font-weight: 500; opacity: .8; font-size: 14px; white-space: nowrap; }
+.row2 { display: flex; flex-direction: column; gap: 10px; }
+.duel .short { display: none; }
+.note { font-size: 13px; color: var(--text3); line-height: 1.5; text-align: center; }
+h2 { font-size: 15px; font-weight: 700; }
+.curve { border-radius: 10px; background: var(--surface-2); padding: 10px 12px 6px; }
+.curve svg { display: block; width: 100%; height: 64px; }
+.bars { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.lb { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--text2); }
+.lb b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tr { height: 8px; margin-top: 4px; border-radius: 4px; background: var(--border-soft); display: flex; overflow: hidden; }
+.tr i { display: block; height: 100%; }
+.ok-f { background: var(--green); }
+.bad-f { background: var(--error); }
+.skip-f { background: var(--skip); }
+.about { font-size: 13px; color: var(--text3); line-height: 1.5; }
+@media (max-width: 860px) {
+  .wrap { padding: 16px 16px 20px; gap: 12px; }
+  .brand-sub, .top .btn { display: none; }
+  .grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "main" "actions" "curve" "topics"; gap: 12px; }
+  .c-main { padding: 18px 18px 16px; }
+  .c-actions { padding: 0; background: transparent; border: 0; }
+  .c-curve, .c-topics { padding: 14px 16px; }
+  .score { font-size: 64px; }
+  .metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 16px; }
+  .metric.wide { grid-column: 1 / -1; }
+  .row2 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+  .duel .long { display: none; }
+  .duel .short { display: inline; }
+  .share .share-text { display: none; }
+  .share { width: 44px; padding: 0; }
 }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <a class="brand" href="{{ game_url }}"><b>Weconomics</b> · Wecon Rush</a>
+  <header class="top">
+    <a class="brand" href="{{ game_url }}"><span class="mark" aria-hidden="true">W</span>WECON {% include "_icon.html" with name="bolt" %} <b>RUSH</b><span class="brand-sub">· игра на скорость по олимпиадной экономике</span></a>
+    <a class="btn sm" href="{{ game_url }}">Что это за игра</a>
+  </header>
 
-  <div class="card">
-    <span class="chip">{{ mode_title }}</span>
-    <span class="date">{{ r.created_at|date:"j E Y" }}</span>
+  <div class="grid">
+    <section class="card c-main" aria-label="Результат">
+      <div class="who">
+        <div class="av" aria-hidden="true">{% if name %}{{ initials }}{% else %}{% include "_icon.html" with name="bolt" %}{% endif %}</div>
+        <div>
+          <p class="nm">{% if name %}{{ name }}{% else %}Игрок{% endif %}</p>
+          <p class="sb">{{ mode_title }}{% if type_text %} · {{ type_text }}{% endif %} · {{ r.created_at|date:"j E Y" }}</p>
+        </div>
+      </div>
+      <p class="score">{{ r.score }}<small>{{ points_word }}</small></p>
+      {% if place %}<p class="badge">{% include "_icon.html" with name="trophy" %}{{ place }}-е место в таблице {{ mode_of }}</p>
+      {% elif set_line %}<p class="pill">{{ set_line }}</p>
+      {% elif unranked_text %}<p class="pill">не в таблице: {{ unranked_text }}</p>{% endif %}
+      <div class="metrics">
+        <div class="metric"><small>Верных</small><b>{{ r.correct_count }} из {{ r.total_count }}</b><span>точность {{ r.accuracy }}&nbsp;%</span></div>
+        <div class="metric"><small>Макс. комбо</small><b>{{ combo }}</b></div>
+        <div class="metric wide"><small>Чем кончилось</small><b id="ending">{{ ending }}</b>{% if lives_left is not None %}<span>{{ lives_left|plural_ru:"осталась,осталось,осталось" }} {{ lives_left|count_ru:"жизнь,жизни,жизней" }} из {{ lives }}</span>{% endif %}</div>
+      </div>
+    </section>
 
-    <div class="score">{{ r.score }}<small>очков</small></div>
-
-    <div class="facts">
-      <div class="fact">
-        <b>{{ r.correct_count }}/{{ r.total_count }}</b>
-        <span>верных · {{ accuracy }}%</span>
+    <section class="card c-actions" aria-label="Что дальше">
+      <a class="cta" id="cta" href="{{ primary.url }}">{% include "_icon.html" with name="play" %}{{ primary.text }}{% if primary.sub %} <span>{{ primary.sub }}</span>{% endif %}</a>
+      <div class="row2">
+        <a class="btn duel" id="duel" href="{{ duel_url }}">{% include "_icon.html" with name="duel" %}<span class="long">{{ duel_text }}</span><span class="short">Вызвать на дуэль</span></a>
+        <button type="button" class="btn share" id="btn-share" data-url="{{ page_url }}" aria-label="Поделиться">{% include "_icon.html" with name="share" %}<span class="share-text">Поделиться</span></button>
       </div>
-      <div class="fact">
-        <b>×{{ r.max_combo }}</b>
-        <span>макс. комбо</span>
-      </div>
-      <div class="fact">
-        <b>{% if r.ended_reason == 'lives' %}0/3{% else %}–{% endif %}</b>
-        <span>{% if r.ended_reason == 'lives' %}жизни кончились{% else %}время вышло{% endif %}</span>
-      </div>
-    </div>
+      <p class="note">Дуэль – те же вопросы у обоих, старт одновременно. Нужен аккаунт.</p>
+    </section>
 
     {% if curve_points %}
-    <div class="curve">
-      <svg viewBox="0 0 300 60" role="img" aria-label="Рост счёта по ходу раунда">
-        <polyline points="{{ curve_points }}" fill="none" stroke="var(--accent)"
-                  stroke-width="2" stroke-linejoin="round"
-                  vector-effect="non-scaling-stroke"/>
-      </svg>
-      <p>счёт по ходу раунда</p>
-    </div>
+    <section class="card c-curve">
+      <h2>Счёт по ходу раунда</h2>
+      <div class="curve">
+        <svg viewBox="0 0 300 60" preserveAspectRatio="none" role="img" aria-label="Рост счёта по ходу раунда">
+          <polyline points="{{ curve_points }}" fill="none" stroke="var(--accent)"
+                    stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"
+                    vector-effect="non-scaling-stroke"/>
+        </svg>
+      </div>
+    </section>
     {% endif %}
 
     {% if topics %}
-    <h2>Точность по темам</h2>
-    <ul class="tp">
-      {% for t in topics %}
-      <li class="tp-row">
-        <span class="tp-name">{{ t.topic }}</span>
-        <span class="tp-num">{{ t.correct }}/{{ t.total }} · {{ t.accuracy }}%</span>
-        <span class="tp-bar">
-          {% if t.correct %}<i class="ok" style="width: {% widthratio t.correct t.total 100 %}%"></i>{% endif %}
-          {% if t.wrong %}<i class="bad" style="width: {% widthratio t.wrong t.total 100 %}%"></i>{% endif %}
-          {% if t.skip %}<i class="skip" style="width: {% widthratio t.skip t.total 100 %}%"></i>{% endif %}
-        </span>
-      </li>
-      {% endfor %}
-    </ul>
+    <section class="card c-topics">
+      <h2>Точность по темам</h2>
+      <ul class="bars">
+        {% for t in topics %}
+        <li>
+          <div class="lb"><span>{{ t.topic }}</span><b>{{ t.correct }} из {{ t.total }}</b></div>
+          <div class="tr" aria-hidden="true">
+            {% if t.correct %}<i class="ok-f" style="width: {% widthratio t.correct t.total 100 %}%"></i>{% endif %}
+            {% if t.wrong %}<i class="bad-f" style="width: {% widthratio t.wrong t.total 100 %}%"></i>{% endif %}
+            {% if t.skip %}<i class="skip-f" style="width: {% widthratio t.skip t.total 100 %}%"></i>{% endif %}
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
     {% endif %}
-
-    <a class="cta" href="{{ game_url }}">Сыграть тоже</a>
-    <!-- ⚠️ ОДНА КНОПКА (08.09.2026, решение владельца): была пара
-         «Скопировать ссылку» / «Поделиться». -->
-    <div class="share-row">
-      <button type="button" id="btn-share" data-url="{{ page_url }}">Поделиться</button>
-    </div>
   </div>
 
-  <p class="foot">Wecon Rush – игра на скорость по олимпиадной экономике.
-    <a href="{{ game_url }}">Играть</a></p>
+  <p class="about">Wecon Rush – игра на скорость по олимпиадной экономике: {{ pool_total }} {{ pool_total|plural_ru:"вопрос,вопроса,вопросов" }} из реальных олимпиад, четыре режима, три жизни. Играть можно без регистрации.</p>
 </div>
 
 <script>
@@ -198,6 +200,8 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
   var share = document.getElementById('btn-share');
   var url = share.dataset.url;
   var title = document.title;
+  var label = share.querySelector('.share-text');
+  var plain = label.textContent;
 
   share.addEventListener('click', function () {
     if (navigator.share) {
@@ -208,8 +212,9 @@ h2 { font-size: 14px; font-weight: 700; margin: 24px 0 10px; }
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(url).then(
         function () {
-          share.textContent = 'Ссылка скопирована ✓';
-          setTimeout(function () { share.textContent = 'Поделиться'; }, 2000);
+          label.textContent = 'Ссылка скопирована';
+          share.classList.add('copied');
+          setTimeout(function () { label.textContent = plain; share.classList.remove('copied'); }, 2000);
         },
         function () { prompt('Ссылка:', url); });
     } else {

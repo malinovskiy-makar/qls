@@ -124,7 +124,7 @@ def convert_problem_v2(statement, answer='', solution='', existing_parts=None):
 def build_blocks(raw_statement, raw_parts, raw_answer, raw_solution, result):
     """Пары «исходник → канонизированный markdown» в порядке показа.
 
-    Порядок повторяет `catalog/templates/catalog/problem_detail.html`:
+    Порядок повторяет `catalog/templates/catalog/stol/_stol_center.html`:
     каждое поле рендерится ОТДЕЛЬНЫМ вызовом `render_markdown`, общего
     склеенного текста задачи не существует нигде."""
     blocks = [('Условие', raw_statement, result['statement_md'])]

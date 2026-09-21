@@ -192,8 +192,8 @@ class VersionBadgeTests(TestCase):
     """Метка версии — строкой внизу страницы (решение владельца 17.09.2026).
 
     До 17.09 «beta 0.0» стояла в шапке и на экранах входа; теперь «Beta 1.0»
-    одним партиалом `_site_version.html` во всех базовых шаблонах, кроме игры
-    (`game/` ведёт сессия редизайна Wecon Rush — там метки пока нет вовсе)."""
+    одним партиалом `_site_version.html` во всех базовых шаблонах и в игре
+    (подключена в редизайне Wecon Rush, фаза P8)."""
 
     BASES = (
         'templates/registration/login.html', 'templates/registration/register.html',
@@ -201,6 +201,13 @@ class VersionBadgeTests(TestCase):
         'teacher/templates/teacher/base.html', 'calc2/templates/calc2/calc2.html',
         'problems/templates/platform/base.html',
         'calendar_stub/templates/calendar_stub/calendar.html',
+        'game/templates/game/game.html',
+    )
+    # Шаблоны, где метка обязана стоять внизу окна и на короткой странице.
+    COLUMN_BASES = (
+        'catalog/templates/catalog/base.html', 'student/templates/student/base.html',
+        'teacher/templates/teacher/base.html', 'problems/templates/platform/base.html',
+        'game/templates/game/game.html', 'templates/registration/_auth_style.html',
     )
 
     def setUp(self):
@@ -220,8 +227,7 @@ class VersionBadgeTests(TestCase):
             html = response.content.decode('utf-8')
             self.assertFalse('beta 0.0' in html, url)
             self.assertFalse('nav-version' in html, url)
-            if template != 'game/game.html':
-                self.assertEqual(html.count('<div class="site-version">Beta 1.0</div>'), 1, url)
+            self.assertEqual(html.count('<div class="site-version">Beta 1.0</div>'), 1, url)
 
     def test_login_and_register_have_it_below(self):
         self.client.logout()
@@ -234,6 +240,37 @@ class VersionBadgeTests(TestCase):
         for path in self.BASES:
             with open(path, encoding='utf-8') as fh:
                 self.assertTrue("{% include '_site_version.html' %}" in fh.read(), path)
+
+    def test_version_stands_at_the_bottom_of_a_short_page(self):
+        """На бою 17.09 «Beta 1.0» висела посреди окна у короткой страницы кабинета:
+        строка шла сразу за содержимым. Теперь `body` — колонка во всю высоту окна,
+        а метку прижимает вниз `margin-top: auto`. Как это выглядит в браузере —
+        `game/tests/browser_teacher_sets.mjs`, проверка `version_at_the_bottom_of_short_pages`."""
+        with open('templates/_site_version.html', encoding='utf-8') as fh:
+            partial = fh.read()
+        rule = partial.split('.site-version {', 1)[1].split('}', 1)[0]
+        self.assertIn('margin-top: auto;', rule)
+        for path in self.COLUMN_BASES:
+            with open(path, encoding='utf-8') as fh:
+                css = fh.read()
+            body = css.split('\nbody {', 1)[1].split('\n}', 1)[0]
+            self.assertIn('display: flex;', body, path)
+            self.assertIn('flex-direction: column;', body, path)
+            self.assertIn('min-height: 100vh;', body, path)
+        for path in self.COLUMN_BASES[:4]:
+            with open(path, encoding='utf-8') as fh:
+                self.assertIn('body > main { width: 100%; }', fh.read(), path)
+        # Метка — последний видимый в потоке элемент страницы: за ней только скрипты,
+        # закреплённые кнопки обратной связи, скрытая форма, закреплённый стек плашек
+        # угла (`_corner_stack.html`, position: fixed — вне потока) и инертные
+        # `<template>` плашек (18.09.2026).
+        self.client.force_login(self.users['teacher'])
+        html = self.client.get('/teacher/game-sets/').content.decode('utf-8')
+        tail = html.split('<div class="site-version">', 1)[1].split('</div>', 1)[1]
+        tail = re.sub(r'<script\b.*?</script>|<style\b.*?</style>|<template\b.*?</template>',
+                      '', tail, flags=re.S)
+        tail = tail.replace('<div class="corner-stack" id="corner-stack"', '')
+        self.assertEqual(re.findall(r'<(main|section|div|nav|footer)\b', tail), [])
 
     def test_version_comes_from_settings(self):
         self.client.force_login(self.users['student'])

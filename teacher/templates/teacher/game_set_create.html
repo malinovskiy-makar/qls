@@ -1,346 +1,551 @@
 {% extends 'teacher/base.html' %}
 {% comment %}
-  Конструктор игрового набора. Три шага, и порядок принципиален:
+  Сборка игрового набора на одном экране (решение владельца 17.09.2026, ADR 0116; макет
+  claude/mockups/wecon_rush_20260917/TeacherSetBuilder.dc.html). Режим — кнопками сверху,
+  слева вопросы с фильтрами, справа сам набор.
 
-  Шаг 1 — ВЫБОР РЕЖИМА ПЕРВЫМ. Набор для «Классики» может содержать только
-  числовые вопросы, для «Пули» — только данетки. Дай собирать сначала —
-  половина набора окажется несовместимой, и работу придётся выбрасывать.
+  ⚠️ ФИЛЬТРЫ И «ПОКАЗАТЬ ЕЩЁ» НЕ ПЕРЕЗАГРУЖАЮТ СТРАНИЦУ. Левый список приходит из
+  `api/game-set/pool/`, набор живёт в скрипте и дублируется в sessionStorage (ключ с
+  режимом): прежний мастер делал фильтры формой method=get и страницы ссылками, и
+  каждый переход стирал собранное. Первая порция вопросов приходит с сервером.
 
-  Шаг 2 — две колонки, как в конструкторе домашек: слева пул (уже
-  отфильтрованный по типу вопроса режима), справа собранный набор с
-  перетаскиванием порядка.
-
-  Шаг 3 — название и сохранение (форма внизу правой колонки).
+  Учителю не показываются внутренние имена типов вопросов и секунды: режим — словами
+  и минутами (`game_sets._mode_choices`).
 {% endcomment %}
-{% block title %}Собрать игровой набор{% endblock %}
+{% block title %}Новый игровой набор{% endblock %}
+{% block main_class %}sb-main{% endblock %}
 
 {% block extra_style %}
-<style>
-  .sc-steps { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .sc-step { font-size: .8rem; padding: 4px 12px; border-radius: 999px;
-             border: 1px solid var(--border); color: var(--text2); }
-  .sc-step.on { background: var(--accent); border-color: var(--accent); color: #fff; }
-  .sc-lead { color: var(--text2); max-width: 72ch; margin-bottom: 18px; }
+  .sb-sr { position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .sb-main { max-width: 1440px; margin: 0 auto; padding: 20px 40px 84px; display: flex; flex-direction: column; gap: 14px; }
+  .sb-back { align-self: flex-start; min-height: 32px; font-size: 13px; font-weight: 600; color: var(--accent-ink); text-decoration: none;
+             display: inline-flex; align-items: center; gap: 6px; }
+  .sb-back .qi { width: 14px; height: 14px; }
+  .sb-btn { font: inherit; height: 44px; padding: 0 18px; border: 1px solid var(--border); border-radius: 12px; background: transparent;
+            color: var(--text); font-size: 14.5px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center;
+            gap: 8px; text-decoration: none; white-space: nowrap; cursor: pointer; }
+  .sb-btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .sb-btn .qi { width: 14px; height: 14px; }
+  .sb-btn.solid { background: var(--btn-bg); border-color: transparent; color: var(--on-btn); }
+  .sb-btn.solid:hover { background: var(--btn-bg-hover); color: var(--on-btn); }
+  .sb-btn.solid:disabled { background: var(--surface-2); color: var(--text3); border-color: var(--border); cursor: default; }
+  .sb-btn.sm { height: 34px; border-radius: 9px; padding: 0 12px; font-size: 13px; }
+  .sb-btn.added { background: var(--green-tint); border-color: transparent; color: var(--green); }
+  .sb-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; min-width: 0; }
 
-  .mode-pick { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr));
-               gap: 12px; }
-  .mode-pick a {
-    display: block; padding: 16px 18px; border: 1px solid var(--border);
-    border-radius: 14px; background: var(--surface); text-decoration: none;
-    color: var(--text);
-  }
-  .mode-pick a:hover { border-color: var(--accent); }
-  .mode-pick b { font-size: 1.05rem; }
-  .mode-pick small { display: block; color: var(--text2); margin-top: 4px; font-size: .84rem; }
+  .sb-hd { display: flex; align-items: center; gap: 22px; }
+  .sb-hd h1 { font-size: 26px; font-weight: 800; letter-spacing: -.4px; line-height: 1.1; white-space: nowrap; }
+  /* Ширина кнопок — по подписи («один верный ответ · 2 мин · 1 644»): в равных колонках по 860 px
+     подпись Блица и Рапида обрезалась многоточием уже на 1440. Многоточие — только если места нет. */
+  .sb-modes { margin-left: auto; min-width: 0; display: grid; grid-template-columns: repeat(4, minmax(0, max-content)); gap: 8px; }
+  .sb-mode { font: inherit; color: var(--text); min-height: 52px; padding: 6px 14px; border: 1.5px solid var(--border); border-radius: 12px;
+             background: var(--surface); text-align: left; display: flex; flex-direction: column; justify-content: center; cursor: pointer; }
+  .sb-mode:hover { border-color: var(--accent); }
+  .sb-mode.on { border-color: var(--accent); background: var(--accent-tint); box-shadow: 0 0 0 3px var(--accent-ring); }
+  .sb-mode b { font-size: 14.5px; font-weight: 700; line-height: 1.15; }
+  .sb-mode span { font-size: 12px; color: var(--text3); line-height: 1.2; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-  .sc-cols { display: grid; grid-template-columns: 1.35fr 1fr; gap: 18px; align-items: start; }
-  @media (max-width: 900px) { .sc-cols { grid-template-columns: 1fr; } }
-  .sc-panel { border: 1px solid var(--border); border-radius: 14px;
-              background: var(--surface); padding: 14px; }
-  .sc-warn {
-    border: 1px solid var(--border); border-left: 3px solid var(--accent);
-    border-radius: 10px; background: var(--surface-2);
-    padding: 10px 12px; font-size: .86rem; color: var(--text2);
-    margin-bottom: 12px;
+  .sb-cols { display: grid; grid-template-columns: minmax(0, 1fr) 500px; gap: 16px; align-items: start; }
+  .sb-pool { padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; }
+  .sb-filters { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sb-inp { font: inherit; height: 38px; box-sizing: border-box; border: 1px solid var(--border); border-radius: 10px;
+            background: var(--surface-2); color: var(--text); padding: 0 12px; font-size: 13.5px; min-width: 0; }
+  .sb-inp:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+  #sb-q { flex: 1 1 240px; }
+  .sb-topics { display: flex; gap: 6px; flex-wrap: wrap; }
+  .sb-tc { font: inherit; min-height: 32px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border); background: transparent;
+           font-size: 12.5px; font-weight: 600; color: var(--text2); cursor: pointer; }
+  .sb-tc:hover { border-color: var(--accent); color: var(--accent-ink); }
+  .sb-tc.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  select.sb-tc { padding-right: 8px; max-width: 100%; }
+  .sb-inp { max-width: 100%; }
+  .sb-found { font-size: 12.5px; color: var(--text3); }
+  .sb-list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+  .sb-q { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 10px 12px 10px 14px;
+          border-radius: 10px; background: var(--surface-2); border: 1px solid transparent; }
+  .sb-q.in { background: transparent; border-color: var(--border-soft); }
+  .sb-q .t { font-size: 14px; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+  .sb-q .a { margin-top: 2px; font-size: 12.5px; color: var(--green); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-q .m { margin-top: 1px; font-size: 12px; color: var(--text3); }
+  .sb-empty { padding: 26px 12px; text-align: center; color: var(--text3); border: 1px dashed var(--border); border-radius: 10px; }
+  .sb-more-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-size: 12.5px; color: var(--text3); }
+
+  .sb-set { padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; position: sticky; top: 12px; }
+  .sb-peek { display: none; }
+  .sb-form { display: flex; flex-direction: column; gap: 12px; }
+  .sb-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px 12px; }
+  .sb-fld { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+  .sb-fld.w { grid-column: 1 / -1; }
+  .sb-fld > span, .sb-fld > label { font-size: 12px; color: var(--text3); font-weight: 600; }
+  .sb-fld small { font-size: 12px; color: var(--text3); }
+  .sb-step { display: inline-flex; align-items: center; height: 38px; width: fit-content; border: 1px solid var(--border); border-radius: 10px;
+             background: var(--surface-2); }
+  .sb-step button { font: inherit; width: 38px; height: 36px; border: 0; background: transparent; color: var(--text); font-size: 18px; cursor: pointer; }
+  .sb-step b { min-width: 28px; text-align: center; font-variant-numeric: tabular-nums; }
+  .sb-sh { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+  .sb-sh b { font-size: 16px; font-weight: 700; }
+  .sb-sh > span { font-size: 12.5px; color: var(--text3); }
+  .sb-picked { list-style: none; display: flex; flex-direction: column; gap: 4px; max-height: 420px; overflow-y: auto; }
+  .sb-pk { display: grid; grid-template-columns: 18px 24px minmax(0, 1fr) auto; gap: 8px; align-items: center; min-height: 40px;
+           padding: 0 6px 0 8px; border-radius: 9px; background: var(--surface-2); font-size: 13px; }
+  .sb-pk.drag { opacity: .45; }
+  .sb-pk .h { color: var(--text3); cursor: grab; display: flex; }
+  .sb-pk .h .qi { width: 16px; height: 16px; }
+  .sb-pk .n { font-weight: 700; color: var(--text2); text-align: right; font-variant-numeric: tabular-nums; }
+  .sb-pk .x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sb-pk .ops { display: flex; gap: 2px; }
+  .sb-pk .ops button { font: inherit; width: 32px; height: 32px; border: 0; border-radius: 7px; background: transparent; color: var(--text3);
+                       display: inline-flex; align-items: center; justify-content: center; padding: 0; cursor: pointer; }
+  .sb-pk .ops button:hover { background: var(--surface); color: var(--text); }
+  .sb-pk .ops button:disabled { opacity: .35; cursor: default; }
+  .sb-pk .ops .qi { width: 15px; height: 15px; }
+  .sb-none { padding: 16px; text-align: center; color: var(--text3); font-size: 13.5px; border: 1px dashed var(--border); border-radius: 10px; }
+  .sb-none[hidden] { display: none; }
+  .sb-bot { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; }
+
+  .sb-veil { position: fixed; inset: 0; z-index: 60; background: rgba(0, 0, 0, .35); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  .sb-veil[hidden] { display: none; }
+  .sb-modal { width: 440px; max-width: 100%; padding: 22px 24px; border-radius: 14px; background: var(--surface); border: 1px solid var(--border);
+              box-shadow: var(--shadow-pop); font-size: 14.5px; line-height: 1.5; }
+  .sb-modal .t { font-weight: 700; font-size: 17px; margin-bottom: 6px; }
+  .sb-modal .acts { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+
+  @media (max-width: 1100px) {
+    .sb-main { padding: 16px 20px 84px; }
+    .sb-hd { flex-direction: column; align-items: stretch; gap: 12px; }
+    .sb-modes { margin-left: 0; width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .sb-cols { grid-template-columns: 1fr; }
+    .sb-set { position: static; order: -1; }
   }
-  .sc-filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
-  .sc-filters input, .sc-filters select {
-    font: inherit; font-size: .86rem; padding: 6px 9px;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: var(--surface-2); color: var(--text);
+  /* Телефон: набор сверху свёрнутой строкой, режимы 2×2. */
+  @media (max-width: 720px) {
+    .sb-main { padding: 16px 16px 84px; }
+    .sb-hd h1 { font-size: 22px; }
+    .sb-modes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .sb-peek { font: inherit; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 44px; width: 100%;
+               border: 0; background: transparent; color: var(--text); font-size: 15px; padding: 0; cursor: pointer; }
+    .sb-peek .go { color: var(--accent-ink); font-weight: 700; }
+    .sb-mode span { white-space: normal; }
+    .sb-set:not(.open) .sb-form { display: none; }
+    .sb-fields { grid-template-columns: 1fr; }
+    .sb-bot { grid-template-columns: 1fr; }
+    .sb-q { grid-template-columns: 1fr; }
   }
-  .sc-filters button {
-    font: inherit; font-size: .86rem; padding: 6px 14px; border-radius: 8px;
-    border: 1px solid var(--btn-bg); background: var(--btn-bg);
-    color: var(--on-btn); cursor: pointer;
-  }
-  .q-item {
-    border: 1px solid var(--border); border-radius: 10px;
-    padding: 9px 11px; margin-bottom: 8px; background: var(--surface-2);
-  }
-  .q-item .q-text { font-size: .88rem; }
-  .q-item .q-meta { font-size: .76rem; color: var(--text2); margin-top: 4px;
-                    display: flex; gap: 10px; flex-wrap: wrap; }
-  .q-item .q-ans { color: var(--green); font-weight: 600; }
-  .q-item .q-act {
-    float: right; font: inherit; font-size: .8rem; padding: 3px 10px;
-    border-radius: 7px; border: 1px solid var(--border);
-    background: var(--surface); color: var(--text2); cursor: pointer;
-  }
-  .q-item .q-act:hover { border-color: var(--accent); color: var(--accent); }
-  #picked .q-item { cursor: grab; }
-  #picked .q-item.drag { opacity: .45; }
-  .sc-count { font-size: .86rem; color: var(--text2); margin-bottom: 8px; }
-  .sc-pager { margin-top: 10px; font-size: .86rem; display: flex; gap: 10px; }
-  .sc-save { margin-top: 14px; border-top: 1px solid var(--border); padding-top: 12px; }
-  .sc-save label { display: block; font-size: .82rem; color: var(--text2); margin-bottom: 4px; }
-  .sc-save input[type=text], .sc-save input[type=number] {
-    font: inherit; width: 100%; padding: 8px 10px; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
-    margin-bottom: 10px;
-  }
-  .sc-save button {
-    font: inherit; font-size: .95rem; font-weight: 600; width: 100%;
-    padding: 10px; border-radius: 10px; border: 1px solid var(--btn-bg);
-    background: var(--btn-bg); color: var(--on-btn); cursor: pointer;
-  }
-  .sc-save button[disabled] { opacity: .5; cursor: default; }
-</style>
 {% endblock %}
 
 {% block content %}
-<h1>Собрать игровой набор</h1>
-
-<div class="sc-steps">
-  <span class="sc-step {% if step == 1 %}on{% endif %}">1 · Режим</span>
-  <span class="sc-step {% if step == 2 %}on{% endif %}">2 · Вопросы</span>
-  <span class="sc-step {% if step == 2 %}on{% endif %}">3 · Название и код</span>
-</div>
-
-{% if step == 1 %}
-  <p class="sc-lead">
-    Сначала режим, и это не формальность. В «Классике» бывают только числовые
-    вопросы, в «Пуле» только данетки. Выберете режим потом, и половина
-    собранного набора окажется несовместимой с ним.
-  </p>
-  <div class="mode-pick">
-    {% for m in modes %}
-    <a href="?mode={{ m.key }}">
-      <b>{{ m.title }}</b>
-      <small>
-        {{ m.duration }} с · {{ m.lives }} ♥ ·
-        в пуле {{ m.pool }} вопр. типа «{{ m.question_type }}»
-      </small>
-    </a>
-    {% empty %}
-    <p class="sc-lead">В игровом пуле нет ни одного вопроса, собирать не из чего.</p>
-    {% endfor %}
+  <a class="sb-back" href="{% url 'teacher:game_sets' %}">{% include "_icon.html" with name="arrow_left" %}Игровые наборы</a>
+  <div class="sb-hd">
+    <h1>Новый набор</h1>
+    <div class="sb-modes" role="radiogroup" aria-label="Режим">
+      {% for m in modes %}<button type="button" class="sb-mode{% if m.key == mode %} on{% endif %}" role="radio" aria-checked="{% if m.key == mode %}true{% else %}false{% endif %}" data-mode="{{ m.key }}"><b>{{ m.title }}</b><span>{{ m.sub }}</span></button>{% endfor %}
+    </div>
   </div>
 
-{% else %}
-  <p class="sc-lead">
-    Режим: <b>{{ mode_title }}</b> (вопросы типа «{{ question_type }}»).
-    <a href="{% url 'teacher:game_set_create' %}">сменить режим</a>
-  </p>
-
-  <div class="sc-cols">
-    <!-- ЛЕВАЯ КОЛОНКА: пул -->
-    <div class="sc-panel">
-      <div class="sc-warn">
-        Здесь только вопросы, пригодные для игры. Часть задач каталога
-        в игру не конвертируется (длинные условия, рисунки, сложная вёрстка),
-        и их тут не будет.
-      </div>
-
-      <form class="sc-filters" method="get">
-        <input type="hidden" name="mode" value="{{ mode }}">
-        <input type="search" name="q" value="{{ f_q }}" placeholder="поиск по тексту">
-        <select name="topic">
-          <option value="">все темы</option>
-          {% for t in topics %}
-          <option value="{{ t }}" {% if f_topic == t %}selected{% endif %}>{{ t }}</option>
-          {% endfor %}
+  {% if not modes %}
+  <p class="sb-empty">В игровом пуле нет ни одного вопроса – собирать не из чего.</p>
+  {% else %}
+  <div class="sb-cols">
+    <section class="sb-card sb-pool" aria-label="Вопросы">
+      <div class="sb-filters">
+        <label class="sb-sr" for="sb-q">Поиск по тексту вопроса</label>
+        <input class="sb-inp" id="sb-q" type="search" placeholder="поиск по тексту вопроса" autocomplete="off">
+        <label class="sb-sr" for="sb-source">Источник</label>
+        <select class="sb-inp" id="sb-source">
+          <option value="">источник: все</option>
+          {% for key, title in source_groups %}<option value="{{ key }}">{{ title }}</option>{% endfor %}
         </select>
-        <select name="source">
-          <option value="">все источники</option>
-          {% for key, title in source_groups %}
-          <option value="{{ key }}" {% if f_source == key %}selected{% endif %}>{{ title }}</option>
-          {% endfor %}
+        <label class="sb-sr" for="sb-dmin">Сложность от</label>
+        <select class="sb-inp" id="sb-dmin">
+          <option value="">сложность от 1</option>
+          {% for i in levels %}<option value="{{ i }}">от {{ i }}</option>{% endfor %}
         </select>
-        <select name="dmin">
-          <option value="">сложность от</option>
-          {% for i in levels %}
-          <option value="{{ i }}" {% if f_dmin == i|stringformat:'s' %}selected{% endif %}>от {{ i }}</option>
-          {% endfor %}
+        <label class="sb-sr" for="sb-dmax">Сложность до</label>
+        <select class="sb-inp" id="sb-dmax">
+          <option value="">до 5</option>
+          {% for i in levels %}<option value="{{ i }}">до {{ i }}</option>{% endfor %}
         </select>
-        <select name="dmax">
-          <option value="">до</option>
-          {% for i in levels %}
-          <option value="{{ i }}" {% if f_dmax == i|stringformat:'s' %}selected{% endif %}>до {{ i }}</option>
-          {% endfor %}
-        </select>
-        <button type="submit">Найти</button>
-      </form>
-
-      <div class="sc-count">Найдено: {{ total }}</div>
-
-      <div id="pool">
-        {% for c in cards %}
-        {% comment %}исходный текст и ответ в data-*: справа они пересобираются
-           заново, а textContent уже отрисованной KaTeX-формулы вернул бы
-           «Qd=165−PQ_d = 165 - P» (разметка и исходник вперемешку){% endcomment %}
-        <div class="q-item" data-id="{{ c.q.id }}"
-             data-text="{{ c.q.question }}" data-answer="{{ c.answer }}"
-             data-topics="{{ c.topics }}">
-          <button type="button" class="q-act" data-add="{{ c.q.id }}">＋</button>
-          <div class="q-text math">{{ c.q.question }}</div>
-          <div class="q-meta">
-            <span class="q-ans">ответ: {{ c.answer }}</span>
-            <span>{{ c.topics }}</span>
-            <span>сложность {{ c.difficulty }}</span>
-            {% if c.percent is not None %}<span>верно {{ c.percent }}%</span>{% endif %}
-          </div>
-        </div>
-        {% empty %}
-        <p class="sc-lead">Под эти фильтры ничего не нашлось.</p>
-        {% endfor %}
       </div>
-
-      <div class="sc-pager">
-        {% if page_obj.has_previous %}
-        <a href="?{{ base_query }}&page={{ page_obj.previous_page_number }}">← назад</a>
-        {% endif %}
-        <span>стр. {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-        {% if page_obj.has_next %}
-        <a href="?{{ base_query }}&page={{ page_obj.next_page_number }}">вперёд →</a>
-        {% endif %}
+      <div class="sb-topics" id="sb-topics" role="group" aria-label="Темы"></div>
+      <p class="sb-found" id="sb-found" aria-live="polite"></p>
+      <ul class="sb-list" id="sb-list"></ul>
+      <div class="sb-more-row">
+        <button type="button" class="sb-btn sm" id="sb-more">Показать ещё 20</button>
+        <span>Здесь только вопросы, пригодные для игры: без рисунков и длинных условий.</span>
       </div>
-    </div>
+    </section>
 
-    <!-- ПРАВАЯ КОЛОНКА: набор -->
-    <div class="sc-panel">
-      <div class="sc-count">
-        В наборе: <b id="picked-count">0</b> / {{ max_size }}
-        <button type="button" class="q-act" id="btn-fill">добрать 5 случайных</button>
-      </div>
-      <div id="picked"></div>
-
-      <form class="sc-save" method="post" id="save-form">
+    <section class="sb-card sb-set" id="sb-set" aria-label="Набор">
+      <button type="button" class="sb-peek" id="sb-peek" aria-expanded="false" aria-controls="sb-form"><span>В наборе <b id="sb-peek-n">0</b> из {{ max_size }}</span><span class="go">Открыть</span></button>
+      <form method="post" class="sb-form" id="sb-form">
         {% csrf_token %}
-        <input type="hidden" name="mode" value="{{ mode }}">
+        <input type="hidden" name="mode" id="sb-mode" value="{{ mode }}">
         <input type="hidden" name="question_ids" id="question_ids" value="">
-        <label for="title">Название набора</label>
-        <input type="text" id="title" name="title" maxlength="120"
-               placeholder="Контрольная по спросу, 10 класс">
-        <label for="attempts">Сколько попыток на человека</label>
-        <input type="number" id="attempts" name="attempts" min="1" max="10" value="1">
-        <button type="submit" id="btn-save" disabled>Сохранить и получить код</button>
+        <input type="hidden" name="attempts" id="sb-attempts" value="1">
+        <div class="sb-fields">
+          <div class="sb-fld w"><label for="sb-title">Название набора</label>
+            <input class="sb-inp" id="sb-title" name="title" maxlength="120" placeholder="Контрольная по спросу, 10 класс"></div>
+          <div class="sb-fld"><span id="sb-att-lab">Попыток на человека</span>
+            <div class="sb-step" role="group" aria-labelledby="sb-att-lab">
+              <button type="button" id="sb-att-down" aria-label="Меньше попыток">−</button><b id="sb-att" aria-live="polite">1</b><button type="button" id="sb-att-up" aria-label="Больше попыток">+</button>
+            </div></div>
+          <div class="sb-fld"><label for="sb-closes">Открыт до · необязательно</label>
+            <input class="sb-inp" type="datetime-local" id="sb-closes" name="closes_at">
+            <small id="sb-closes-note">не задан – бессрочно, время московское</small></div>
+        </div>
+        <div class="sb-sh"><b>В наборе · <span id="picked-count">0</span> из {{ max_size }}</b><span>порядок у всех одинаков – перетащите или двигайте стрелками</span></div>
+        <ol class="sb-picked" id="sb-picked"></ol>
+        <p class="sb-none" id="sb-none">Пока пусто. Добавляйте вопросы слева или доберите случайные под текущие фильтры.</p>
+        <div class="sb-bot">
+          <button type="button" class="sb-btn" id="btn-fill">Добрать 5 случайных</button>
+          <button type="submit" class="sb-btn solid" id="btn-save" disabled>Сохранить и получить код</button>
+        </div>
       </form>
+    </section>
+  </div>
+
+  <div class="sb-veil" id="sb-ask" hidden role="dialog" aria-modal="true" aria-labelledby="sb-ask-t" aria-describedby="sb-ask-p">
+    <div class="sb-modal">
+      <p class="t" id="sb-ask-t">Сменить режим?</p>
+      <p id="sb-ask-p">В каждом режиме свой тип вопросов, поэтому собранный набор очистится.</p>
+      <div class="acts">
+        <button type="button" class="sb-btn solid" id="sb-ask-keep">Оставить как есть</button>
+        <button type="button" class="sb-btn" id="sb-ask-go">Сменить и очистить</button>
+      </div>
     </div>
   </div>
-{% endif %}
+
+  <div hidden id="sb-icons">
+    <span data-icon="plus">{% include "_icon.html" with name="plus" %}</span>
+    <span data-icon="check">{% include "_icon.html" with name="check" %}</span>
+    <span data-icon="grip">{% include "_icon.html" with name="grip" %}</span>
+    <span data-icon="up">{% include "_icon.html" with name="chevron_up" %}</span>
+    <span data-icon="down">{% include "_icon.html" with name="chevron_down" %}</span>
+    <span data-icon="close">{% include "_icon.html" with name="close" %}</span>
+  </div>
+  {{ builder_json|json_script:"sb-data" }}
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}
-{% if step == 2 %}
+{% if modes %}
 <script>
-/* Конструктор набора: две колонки, перетаскивание порядка справа.
-   Порядок вопросов — часть контракта набора: при разном порядке сравнение
-   результатов нечестно, поэтому он сохраняется ровно так, как собран. */
+/* Сборка набора. Порядок вопросов — часть контракта набора: при разном порядке
+   сравнение результатов нечестно, поэтому он сохраняется ровно так, как собран.
+   ⚠️ `picked` НЕ ТРОГАЕТСЯ при перерисовке левого списка: фильтры и подгрузка
+   меняют только `pool` (баг прежнего мастера — набор терялся при каждом переходе). */
 (function () {
   'use strict';
-  var MAX = {{ max_size }};
-  var MODE = '{{ mode }}';
-  var picked = [];   // [{id, text, answer, topics, difficulty}]
+  var D = JSON.parse(document.getElementById('sb-data').textContent);
+  var MAX = D.max;
+  var mode = D.mode;
+  var picked = [];              // [{id, text, answer, topics}]
+  var pool = D.pool.items.slice();
+  var total = D.pool.total;
+  var nextOffset = D.pool.next_offset;
+  var filters = { q: '', topic: '', source: '', dmin: '', dmax: '' };
+  var attempts = 1;
+  var reqGen = 0;
+  var pendingMode = null;
+  var STORE = 'teacher-game-set:';
+  var ICON = {};
+  document.querySelectorAll('#sb-icons [data-icon]').forEach(function (el) { ICON[el.dataset.icon] = el.innerHTML; });
 
   function $(id) { return document.getElementById(id); }
+  function el(tag, cls, text) {
+    var node = document.createElement(tag);
+    if (cls) node.className = cls;
+    if (text != null) node.textContent = text;
+    return node;
+  }
+  function num(n) { return n.toLocaleString('ru-RU'); }
+  function isPicked(id) { return picked.some(function (p) { return p.id === id; }); }
 
-  function renderPicked() {
-    var box = $('picked');
-    box.innerHTML = '';
-    picked.forEach(function (item, i) {
-      var el = document.createElement('div');
-      el.className = 'q-item';
-      el.draggable = true;
-      el.dataset.idx = i;
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'q-act';
-      btn.textContent = '✕';
-      btn.addEventListener('click', function () {
-        picked.splice(i, 1);
-        renderPicked();
-      });
-      el.appendChild(btn);
-      var t = document.createElement('div');
-      t.className = 'q-text math';
-      t.textContent = (i + 1) + '. ' + item.text;
-      el.appendChild(t);
-      var m = document.createElement('div');
-      m.className = 'q-meta';
-      m.innerHTML = '<span class="q-ans"></span><span></span>';
-      m.children[0].textContent = 'ответ: ' + item.answer;
-      m.children[1].textContent = item.topics;
-      el.appendChild(m);
-      box.appendChild(el);
-    });
-    $('picked-count').textContent = picked.length;
-    $('question_ids').value = picked.map(function (p) { return p.id; }).join(',');
-    $('btn-save').disabled = picked.length === 0;
-    // KaTeX грузится с defer — на первом проходе его ещё нет
-    if (window.initKaTeX && typeof renderMathInElement === 'function') {
-      window.initKaTeX();
-    }
+  /* ── Страховка от случайной перезагрузки: состав, название, попытки и срок ── */
+  function store() {
+    try {
+      sessionStorage.setItem(STORE + mode, JSON.stringify({
+        picked: picked, title: $('sb-title').value, attempts: attempts, closes: $('sb-closes').value }));
+    } catch (e) { /* приватный режим браузера */ }
+  }
+  function restore() {
+    try {
+      var raw = JSON.parse(sessionStorage.getItem(STORE + mode) || 'null');
+      if (!raw) return;
+      picked = Array.isArray(raw.picked) ? raw.picked.slice(0, MAX) : [];
+      $('sb-title').value = raw.title || '';
+      attempts = Math.max(1, Math.min(10, parseInt(raw.attempts, 10) || 1));
+      $('sb-closes').value = raw.closes || '';
+    } catch (e) { picked = []; }
   }
 
-  function addFromCard(card) {
-    var id = parseInt(card.dataset.id, 10);
-    if (picked.some(function (p) { return p.id === id; })) return;
-    if (picked.length >= MAX) { alert('В наборе уже ' + MAX + ' вопросов.'); return; }
-    picked.push({
-      id: id,
-      text: card.dataset.text || '',
-      answer: card.dataset.answer || '–',
-      topics: card.dataset.topics || ''
+  /* ── Левый список ── */
+  function renderTopics() {
+    var box = $('sb-topics');
+    box.innerHTML = '';
+    var top = D.top_topics[mode] || [];
+    [''].concat(top).forEach(function (name) {
+      var b = el('button', 'sb-tc' + (filters.topic === name ? ' on' : ''), name || 'все темы');
+      b.type = 'button';
+      b.setAttribute('aria-pressed', filters.topic === name ? 'true' : 'false');
+      b.addEventListener('click', function () { setFilter('topic', name); });
+      box.appendChild(b);
     });
+    var rest = D.topics.filter(function (t) { return top.indexOf(t) === -1; });
+    if (!rest.length) return;
+    var sel = el('select', 'sb-tc' + (filters.topic && top.indexOf(filters.topic) === -1 ? ' on' : ''));
+    sel.setAttribute('aria-label', 'Другие темы');
+    sel.appendChild(new Option('ещё ' + rest.length + ' ' + plural(rest.length, ['тема', 'темы', 'тем']), ''));
+    rest.forEach(function (t) { sel.appendChild(new Option(t, t, false, filters.topic === t)); });
+    sel.addEventListener('change', function () { setFilter('topic', sel.value); });
+    box.appendChild(sel);
+  }
+
+  function plural(n, forms) {
+    var a = Math.abs(n) % 100, b = a % 10;
+    if (a > 10 && a < 20) return forms[2];
+    if (b > 1 && b < 5) return forms[1];
+    return b === 1 ? forms[0] : forms[2];
+  }
+
+  function renderPool() {
+    var list = $('sb-list');
+    list.innerHTML = '';
+    if (!pool.length) {
+      list.appendChild(el('li', 'sb-empty', 'Под эти фильтры ничего не нашлось.'));
+    }
+    pool.forEach(function (q) {
+      var inn = isPicked(q.id);
+      var li = el('li', 'sb-q' + (inn ? ' in' : ''));
+      li.dataset.id = q.id;
+      var body = el('div');
+      body.appendChild(el('div', 't math', q.text));
+      body.appendChild(el('div', 'a', 'ответ: ' + q.answer));
+      body.appendChild(el('div', 'm', [q.topics, 'сложность ' + q.difficulty, q.source].filter(Boolean).join(' · ')
+        + (q.percent != null ? ' · верно ' + q.percent + ' %' : '')));
+      li.appendChild(body);
+      var btn = el('button', 'sb-btn sm' + (inn ? ' added' : ''));
+      btn.type = 'button';
+      btn.dataset.toggle = q.id;
+      btn.setAttribute('aria-pressed', inn ? 'true' : 'false');
+      btn.innerHTML = inn ? ICON.check : ICON.plus;
+      btn.appendChild(document.createTextNode(inn ? 'В наборе' : 'В набор'));
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+    $('sb-found').textContent = 'Найдено ' + num(total) + ' · показано ' + num(pool.length)
+      + ' · набор справа при смене фильтра и подгрузке не меняется';
+    $('sb-more').hidden = nextOffset == null;
+    if (window.initKaTeX && typeof renderMathInElement === 'function') window.initKaTeX();
+  }
+
+  function fetchPool(reset) {
+    var gen = ++reqGen;
+    var params = new URLSearchParams({ mode: mode, offset: reset ? 0 : nextOffset });
+    Object.keys(filters).forEach(function (k) { if (filters[k]) params.set(k, filters[k]); });
+    fetch(D.pool_url + '?' + params.toString(), { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        if (gen !== reqGen || d.error) return;
+        pool = reset ? d.items : pool.concat(d.items);
+        total = d.total;
+        nextOffset = d.next_offset;
+        renderPool();
+      });
+  }
+
+  function setFilter(key, value) {
+    filters[key] = value;
+    renderTopics();
+    fetchPool(true);
+  }
+
+  /* ── Набор справа ── */
+  function renderPicked() {
+    var box = $('sb-picked');
+    box.innerHTML = '';
+    picked.forEach(function (item, i) {
+      var li = el('li', 'sb-pk');
+      li.draggable = true;
+      li.dataset.idx = i;
+      var grip = el('span', 'h');
+      grip.innerHTML = ICON.grip;
+      grip.setAttribute('aria-hidden', 'true');
+      li.appendChild(grip);
+      li.appendChild(el('span', 'n', String(i + 1)));
+      li.appendChild(el('span', 'x', item.text));
+      var ops = el('span', 'ops');
+      [['up', 'Выше', i === 0], ['down', 'Ниже', i === picked.length - 1], ['close', 'Убрать из набора', false]]
+        .forEach(function (op) {
+          var b = el('button');
+          b.type = 'button';
+          b.dataset.op = op[0];
+          b.dataset.idx = i;
+          b.disabled = op[2];
+          b.setAttribute('aria-label', op[1] + ': вопрос ' + (i + 1));
+          b.innerHTML = ICON[op[0]];
+          ops.appendChild(b);
+        });
+      li.appendChild(ops);
+      box.appendChild(li);
+    });
+    $('picked-count').textContent = picked.length;
+    $('sb-peek-n').textContent = picked.length;
+    $('sb-none').hidden = picked.length > 0;
+    $('question_ids').value = picked.map(function (p) { return p.id; }).join(',');
+    $('btn-save').disabled = picked.length === 0;
+    $('sb-att').textContent = attempts;
+    $('sb-attempts').value = attempts;
+    store();
+  }
+
+  function toggle(id) {
+    var at = -1;
+    picked.forEach(function (p, i) { if (p.id === id) at = i; });
+    if (at !== -1) {
+      picked.splice(at, 1);
+    } else {
+      if (picked.length >= MAX) { alert('В наборе уже ' + MAX + ' вопросов.'); return; }
+      var q = pool.filter(function (x) { return x.id === id; })[0];
+      if (!q) return;
+      picked.push({ id: q.id, text: q.text, answer: q.answer, topics: q.topics });
+    }
+    renderPicked();
+    renderPool();
+  }
+
+  function move(from, to) {
+    if (to < 0 || to >= picked.length || from === to) return;
+    var item = picked.splice(from, 1)[0];
+    picked.splice(to, 0, item);
     renderPicked();
   }
 
-  $('pool').addEventListener('click', function (e) {
-    var btn = e.target.closest('[data-add]');
-    if (!btn) return;
-    addFromCard(btn.closest('.q-item'));
+  $('sb-list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-toggle]');
+    if (b) toggle(parseInt(b.dataset.toggle, 10));
+  });
+  $('sb-more').addEventListener('click', function () { fetchPool(false); });
+  $('sb-picked').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-op]');
+    if (!b) return;
+    var i = parseInt(b.dataset.idx, 10);
+    if (b.dataset.op === 'up') move(i, i - 1);
+    else if (b.dataset.op === 'down') move(i, i + 1);
+    else { picked.splice(i, 1); renderPicked(); renderPool(); }
   });
 
-  /* Перетаскивание порядка в правой колонке */
+  /* Перетаскивание порядка */
   var dragIdx = null;
-  $('picked').addEventListener('dragstart', function (e) {
-    var item = e.target.closest('.q-item');
+  $('sb-picked').addEventListener('dragstart', function (e) {
+    var item = e.target.closest('.sb-pk');
     if (!item) return;
     dragIdx = parseInt(item.dataset.idx, 10);
     item.classList.add('drag');
   });
-  $('picked').addEventListener('dragend', function (e) {
-    var item = e.target.closest('.q-item');
+  $('sb-picked').addEventListener('dragend', function (e) {
+    var item = e.target.closest('.sb-pk');
     if (item) item.classList.remove('drag');
   });
-  $('picked').addEventListener('dragover', function (e) { e.preventDefault(); });
-  $('picked').addEventListener('drop', function (e) {
+  $('sb-picked').addEventListener('dragover', function (e) { e.preventDefault(); });
+  $('sb-picked').addEventListener('drop', function (e) {
     e.preventDefault();
-    var item = e.target.closest('.q-item');
+    var item = e.target.closest('.sb-pk');
     if (!item || dragIdx === null) return;
-    var to = parseInt(item.dataset.idx, 10);
-    var moved = picked.splice(dragIdx, 1)[0];
-    picked.splice(to, 0, moved);
+    move(dragIdx, parseInt(item.dataset.idx, 10));
     dragIdx = null;
-    renderPicked();
   });
 
-  /* «Добрать N случайных по текущему фильтру» — сервер отдаёт готовые
-     строки, чтобы не тащить сюда второй запрос за текстами. */
+  /* Фильтры: поиск — с паузой после ввода, остальное — сразу. */
+  var typing = null;
+  $('sb-q').addEventListener('input', function () {
+    clearTimeout(typing);
+    typing = setTimeout(function () { setFilter('q', $('sb-q').value.trim()); }, 300);
+  });
+  ['source', 'dmin', 'dmax'].forEach(function (key) {
+    $('sb-' + key).addEventListener('change', function () { setFilter(key, this.value); });
+  });
+
+  /* Попытки, срок, название */
+  $('sb-att-down').addEventListener('click', function () { attempts = Math.max(1, attempts - 1); renderPicked(); });
+  $('sb-att-up').addEventListener('click', function () { attempts = Math.min(10, attempts + 1); renderPicked(); });
+  $('sb-title').addEventListener('input', store);
+  $('sb-closes').addEventListener('change', function () {
+    $('sb-closes-note').textContent = this.value ? 'время московское' : 'не задан – бессрочно, время московское';
+    store();
+  });
+
+  /* «Добрать 5 случайных» — под текущие фильтры, без уже выбранных. */
   $('btn-fill').addEventListener('click', function () {
-    var params = new URLSearchParams(location.search);
-    fetch('{% url "teacher:api_game_set_fill" %}', {
+    var body = { mode: mode, n: 5, exclude: picked.map(function (p) { return p.id; }) };
+    Object.keys(filters).forEach(function (k) { body[k] = filters[k]; });
+    fetch(D.fill_url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json',
                  'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-      body: JSON.stringify({
-        mode: MODE, n: 5,
-        exclude: picked.map(function (p) { return p.id; }),
-        q: params.get('q') || '', topic: params.get('topic') || '',
-        source: params.get('source') || ''
-      })
+      body: JSON.stringify(body)
     }).then(function (r) { return r.json(); }).then(function (d) {
       (d.questions || []).forEach(function (q) {
-        if (picked.length >= MAX) return;
-        if (picked.some(function (p) { return p.id === q.id; })) return;
-        picked.push(q);
+        if (picked.length >= MAX || isPicked(q.id)) return;
+        picked.push({ id: q.id, text: q.text, answer: q.answer, topics: q.topics });
       });
       renderPicked();
+      renderPool();
     });
   });
 
+  /* Режим: пустой набор — сразу, непустой — через окно «Сменить режим?». */
+  function applyMode(next) {
+    mode = next;
+    $('sb-mode').value = mode;
+    document.querySelectorAll('.sb-mode').forEach(function (b) {
+      var on = b.dataset.mode === mode;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-checked', on ? 'true' : 'false');
+    });
+    try { history.replaceState(null, '', location.pathname + '?mode=' + mode); } catch (e) {}
+    picked = [];
+    restore();
+    filters.topic = '';
+    renderTopics();
+    renderPicked();
+    fetchPool(true);
+  }
+  function closeAsk() {
+    $('sb-ask').hidden = true;
+    pendingMode = null;
+  }
+  document.querySelectorAll('.sb-mode').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var next = b.dataset.mode;
+      if (next === mode) return;
+      if (!picked.length) { applyMode(next); return; }
+      pendingMode = next;
+      $('sb-ask').hidden = false;
+      $('sb-ask-keep').focus();
+    });
+  });
+  $('sb-ask-keep').addEventListener('click', closeAsk);
+  $('sb-ask-go').addEventListener('click', function () {
+    var next = pendingMode;
+    picked = [];
+    store();
+    closeAsk();
+    applyMode(next);
+  });
+  $('sb-ask').addEventListener('keydown', function (e) { if (e.key === 'Escape') { e.preventDefault(); closeAsk(); } });
+
+  /* Телефон: набор свёрнут строкой «В наборе N из 60 · Открыть». */
+  $('sb-peek').addEventListener('click', function () {
+    var open = $('sb-set').classList.toggle('open');
+    this.setAttribute('aria-expanded', open ? 'true' : 'false');
+    this.querySelector('.go').textContent = open ? 'Свернуть' : 'Открыть';
+  });
+
+  restore();
+  renderTopics();
   renderPicked();
+  renderPool();
 })();
 </script>
 {% endif %}

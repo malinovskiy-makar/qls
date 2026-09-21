@@ -1,0 +1,392 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff;
+      --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --error-border: rgba(185,53,38,.4);
+      --green: #186e3c; --green-tint: rgba(24,110,60,.10); --green-border: rgba(24,110,60,.45);
+      background: var(--bg); color: var(--text); position: relative; overflow: hidden; font-size: 14px; line-height: 1.45;
+    }
+    .rush.dark {
+      --accent: #81b5b4; --accent-ink: #81b5b4; --on-accent: #1d1a16;
+      --accent-tint: rgba(129,181,180,.14); --accent-ring: rgba(129,181,180,.4);
+      --bg: #1d1a16; --surface: #2c2925; --surface-2: #232019;
+      --border: rgba(255,255,255,.14); --border-soft: rgba(255,255,255,.07);
+      --text: #f2ecd9; --text2: #c3bca8; --text3: #b5ab99;
+      --btn-bg: #c4bba9; --on-btn: #1d1a16;
+      --error: #ff8a8a; --error-tint: rgba(255,138,138,.12); --error-border: rgba(255,138,138,.5);
+      --green: #3fc77f; --green-tint: rgba(63,199,127,.12); --green-border: rgba(63,199,127,.5);
+    }
+    .rush button, .rush input { font: inherit; color: inherit; }
+    .rush button { cursor: pointer; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .rush svg.heart { width: 22px; height: 22px; fill: var(--error); stroke: none; }
+    .rush svg.heart.off { fill: none; stroke: var(--text3); stroke-width: 1.8; opacity: .6; }
+
+    /* ---------- HUD: одна полоса ---------- */
+    .hud { height: 64px; padding: 0 40px; display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+    .hud .l { display: flex; align-items: center; gap: 16px; }
+    .hud .r { display: flex; align-items: center; gap: 14px; justify-content: flex-end; }
+    .score { display: flex; align-items: baseline; gap: 7px; }
+    .score b { font-size: 30px; font-weight: 800; letter-spacing: -.5px; font-variant-numeric: tabular-nums; line-height: 1; }
+    .score span { font-size: 12.5px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .combo { height: 28px; padding: 0 10px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-size: 13px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+    .center { display: flex; align-items: center; gap: 18px; }
+    .clock { display: flex; align-items: baseline; gap: 8px; position: relative; }
+    .clock b { font-size: 34px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.5px; line-height: 1; }
+    .clock.paused b { color: var(--text3); }
+    .clock .pz { display: flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; color: var(--text3); text-transform: uppercase; letter-spacing: .04em; }
+    .delta { position: absolute; left: 100%; top: -4px; margin-left: 8px; white-space: nowrap; font-size: 14px; font-weight: 800; }
+    .delta.plus { color: var(--green); }
+    .delta.minus { color: var(--error); }
+    .hearts { display: flex; gap: 4px; align-items: center; position: relative; }
+    .stat { font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; display: flex; gap: 12px; }
+    .stat b { color: var(--text); font-weight: 700; }
+    .rec { height: 28px; padding: 0 10px; border-radius: 999px; border: 1px solid var(--border); font-size: 12.5px; color: var(--text2); display: flex; align-items: center; gap: 6px; }
+    .rec b { color: var(--text); font-weight: 700; }
+    .ib { width: 36px; height: 36px; border: 1px solid var(--border); border-radius: 9px; background: transparent; display: inline-flex; align-items: center; justify-content: center; color: var(--text2); }
+    .ib:hover { border-color: var(--accent); color: var(--accent-ink); }
+    /* ---------- дуэль: соперник, разрыв, реакции ---------- */
+    .opp { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 8px; height: 44px; border: 1px solid var(--border); border-radius: 10px; }
+    .opp .av { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .opp .nm { font-size: 12.5px; color: var(--text2); line-height: 1.1; display: flex; align-items: center; gap: 5px; }
+    .opp .nm i { width: 7px; height: 7px; border-radius: 50%; background: var(--green); display: inline-block; }
+    .opp .nm i.off { background: var(--error); }
+    .opp .sc { font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
+    .opp .sub { font-size: 11.5px; color: var(--text3); display: flex; align-items: center; gap: 6px; }
+    .opp svg.heart { width: 12px; height: 12px; }
+    .gap { position: absolute; left: 50%; transform: translateX(-50%); top: 72px; height: 26px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; z-index: 2; }
+    .gap.lead { background: var(--green-tint); color: var(--green); }
+    .gap.behind { background: var(--error-tint); color: var(--error); }
+    .reacts { display: flex; gap: 6px; }
+    .rx { height: 32px; padding: 0 10px; border: 1px solid var(--border); border-radius: 999px; background: transparent; font-size: 12.5px; color: var(--text2); display: inline-flex; align-items: center; gap: 5px; }
+    .rx:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rtoast { position: absolute; right: 40px; top: 74px; padding: 6px 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--border); box-shadow: 0 6px 20px rgba(0,0,0,.14); font-size: 13px; z-index: 3; display: flex; align-items: center; gap: 6px; }
+    .track { height: 4px; background: var(--border-soft); }
+    .track i { display: block; height: 100%; background: var(--accent); }
+    .track.paused i { background: var(--text3); }
+
+    /* ---------- тело: вопрос и ответ ---------- */
+    .body { padding: 20px 40px 18px; display: flex; flex-direction: column; gap: 14px; height: 732px; box-sizing: border-box; }
+    .qwrap { width: 960px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1; min-height: 0; }
+    .qmeta { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text3); min-height: 20px; }
+    .qmeta .chip { height: 24px; padding: 0 9px; border-radius: 999px; border: 1px solid var(--border); display: flex; align-items: center; gap: 5px; }
+    .qcard { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 22px 26px; font-size: 18px; line-height: 1.5; }
+    .qcard.bad { border-color: var(--error-border); }
+    .opts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .opt { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; align-items: start; gap: 12px; min-height: 58px; padding: 13px 14px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); text-align: left; font-size: 16px; line-height: 1.4; position: relative; }
+    .opt:hover { border-color: var(--accent); }
+    .opt .k { width: 28px; height: 28px; border-radius: 7px; border: 1px solid var(--border); background: var(--surface-2); font-size: 13px; font-weight: 700; color: var(--text2); display: flex; align-items: center; justify-content: center; margin-top: -2px; }
+    .opt .mk { font-size: 15px; font-weight: 800; margin-top: -1px; }
+    .opt.ok { background: var(--green-tint); border-color: var(--green-border); }
+    .opt.ok .mk { color: var(--green); }
+    .opt.bad { background: var(--error-tint); border-color: var(--error-border); }
+    .opt.bad .mk { color: var(--error); }
+    .opt.right { border-color: var(--green-border); box-shadow: 0 0 0 3px var(--green-tint); }
+    .opt.right .mk { color: var(--green); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; margin-top: 3px; }
+    .opt.mute { opacity: .5; }
+    .opt.sel { border-color: var(--accent); background: var(--accent-tint); }
+    .opt.wide { grid-column: 1 / -1; }
+    .yn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .yn .opt { min-height: 78px; align-items: center; justify-items: start; font-size: 19px; font-weight: 700; }
+    .numrow { display: flex; gap: 12px; align-items: center; justify-content: center; }
+    .num { width: 380px; height: 58px; border: 1.5px solid var(--border); border-radius: 12px; background: var(--surface); padding: 0 16px; font-size: 20px; text-align: center; font-variant-numeric: tabular-nums; }
+    .num.bad { border-color: var(--error-border); background: var(--error-tint); color: var(--error); }
+    .rush .go { height: 58px; padding: 0 26px; border: 0; border-radius: 12px; background: var(--btn-bg); color: var(--on-btn); font-size: 16px; font-weight: 700; }
+    .rush .go.off { background: var(--surface-2); color: var(--text3); border: 1px solid var(--border); cursor: default; }
+    .ans { display: flex; align-items: center; justify-content: center; gap: 10px; font-size: 16px; color: var(--text2); }
+    .ans b { font-size: 22px; font-weight: 800; color: var(--green); font-variant-numeric: tabular-nums; }
+    .numhint { text-align: center; font-size: 12.5px; color: var(--text3); }
+
+    /* ---------- разбор: 3 секунды, часы стоят ---------- */
+    .reveal { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 12px; background: var(--surface-2); border: 1px solid var(--border-soft); font-size: 13.5px; color: var(--text2); }
+    .reveal .cnt { width: 34px; height: 34px; border-radius: 50%; border: 2.5px solid var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; color: var(--text); }
+    .reveal b { color: var(--text); }
+    .reveal .next { height: 34px; padding: 0 14px; border: 1px solid var(--border); border-radius: 8px; background: transparent; font-size: 13px; font-weight: 600; }
+    .reveal .next:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; }
+    .gh { height: 34px; padding: 0 12px; border: 1px solid transparent; border-radius: 8px; background: transparent; font-size: 13px; color: var(--text2); display: inline-flex; align-items: center; gap: 7px; }
+    .gh:hover { border-color: var(--border); color: var(--text); }
+    .gh kbd { font: inherit; font-weight: 700; color: var(--text2); border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+
+    /* ---------- отсчёт перед стартом ---------- */
+    .veil { position: absolute; inset: 0; z-index: 9; background: rgba(0,0,0,.12); display: flex; align-items: center; justify-content: center; }
+    .cd { width: 460px; padding: 34px 30px 28px; border-radius: 18px; background: var(--surface); border: 1px solid var(--border); text-align: center; box-shadow: 0 6px 20px rgba(0,0,0,.2); }
+    .cd .n { font-size: 96px; font-weight: 800; line-height: 1; color: var(--accent-ink); letter-spacing: -2px; }
+    .cd .m { margin-top: 10px; font-size: 17px; font-weight: 700; }
+    .cd .s { margin-top: 4px; font-size: 13.5px; color: var(--text2); }
+    .cd .k { margin-top: 18px; font-size: 12.5px; color: var(--text3); }
+    .cd kbd { font: inherit; font-weight: 700; border: 1px solid var(--border); border-radius: 5px; padding: 0 5px; }
+  </style>
+</helmet>
+
+<div class="rush {{themeClass}}" style="width: 1440px; height: 800px; box-sizing: border-box; display: flex; flex-direction: column;">
+
+  <!-- HUD: счёт · время · жизни · служебное. Навигация сайта на время забега скрыта -->
+  <div class="hud">
+    <div class="l">
+      <div class="score"><b>{{scoreText}}</b><span>очки</span></div>
+      <sc-if value="{{hasCombo}}" hint-placeholder-val="{{ true }}">
+        <div class="combo"><svg class="i s" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg>×2 · серия 3</div>
+      </sc-if>
+    </div>
+    <div class="center">
+      <div class="clock {{clockCls}}">
+        <b>{{timeText}}</b>
+        <sc-if value="{{isPaused}}" hint-placeholder-val="{{ false }}">
+          <span class="pz"><svg class="i s" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"></path></svg>стоит</span>
+        </sc-if>
+        <sc-if value="{{showPlus}}" hint-placeholder-val="{{ false }}"><span class="delta plus">+5 с</span></sc-if>
+      </div>
+      <div class="hearts">
+        <svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg>
+        <svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg>
+        <svg class="heart {{heart3Cls}}" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg>
+        <sc-if value="{{showMinus}}" hint-placeholder-val="{{ false }}"><span class="delta minus" style="top: 0;">−1</span></sc-if>
+      </div>
+    </div>
+    <div class="r">
+      <div class="stat"><span>верных <b>{{correctText}}</b></span><span>вопрос <b>{{qNo}}</b></span></div>
+      <sc-if value="{{showRec}}" hint-placeholder-val="{{ false }}">
+        <div class="rec"><svg class="i s" viewBox="0 0 24 24"><path d="M8 21h8M12 17v4M7 4h10v4a5 5 0 0 1-10 0zM7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"></path></svg>рекорд <b>1 260</b> · ещё <b>{{toRecord}}</b></div>
+      </sc-if>
+      <sc-if value="{{isDuel}}" hint-placeholder-val="{{ false }}">
+        <div class="opp">
+          <div class="av">L</div>
+          <div>
+            <div class="nm"><i></i>lengler</div>
+            <div class="sub"><span>верных <b>{{oppCorrect}}</b></span><span style="display: inline-flex; gap: 2px;"><svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg><svg class="heart" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg><svg class="heart off" viewBox="0 0 24 24"><path d="M12 21s-7-4.5-9-9a5 5 0 0 1 9-3 5 5 0 0 1 9 3c-2 4.5-9 9-9 9z"></path></svg></span><span>0:41</span></div>
+          </div>
+          <div class="sc">{{oppScore}}</div>
+        </div>
+      </sc-if>
+      <button class="ib" aria-label="Звук"><svg class="i" viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4zM15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"></path></svg></button>
+      <button class="ib" aria-label="Выйти из раунда"><svg class="i" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+    </div>
+  </div>
+  <div class="track {{clockCls}}"><i style="width: {{trackW}};"></i></div>
+  <sc-if value="{{isDuel}}" hint-placeholder-val="{{ false }}">
+    <div class="gap {{gapCls}}"><svg class="i s" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"></path></svg>{{gapText}}</div>
+    <div class="rtoast"><span class="av" style="width: 22px; height: 22px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 10px; display: inline-flex; align-items: center; justify-content: center;">L</span>lengler: <b>огонь</b></div>
+  </sc-if>
+
+  <div class="body">
+    <div class="qwrap">
+      <sc-if value="{{showQ}}" hint-placeholder-val="{{ true }}">
+      <div class="qmeta">
+        <span class="chip"><svg class="i s" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path></svg>сложность 3 из 5</span>
+        <span>очков за верный — до 90</span>
+      </div>
+      </sc-if>
+
+      <!-- Вопрос -->
+      <sc-if value="{{showQ}}" hint-placeholder-val="{{ true }}">
+      <div class="qcard {{qcardCls}}">{{cur.q}}</div>
+
+      <!-- Ответ: Блиц — один верный -->
+      <sc-if value="{{cur.isBlitz}}" hint-placeholder-val="{{ true }}">
+        <div class="opts">
+          <sc-for list="{{opts}}" as="o" hint-placeholder-count="5">
+            <button class="opt {{o.cls}}" onClick="{{o.pick}}"><span class="k">{{o.n}}</span><span>{{o.text}}</span><span class="mk">{{o.mark}}</span></button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- Пуля — верно / неверно -->
+      <sc-if value="{{cur.isBullet}}" hint-placeholder-val="{{ false }}">
+        <div class="yn">
+          <sc-for list="{{opts}}" as="o" hint-placeholder-count="2">
+            <button class="opt {{o.cls}}" onClick="{{o.pick}}"><span class="k">{{o.n}}</span><span>{{o.text}}</span><span class="mk">{{o.mark}}</span></button>
+          </sc-for>
+        </div>
+      </sc-if>
+
+      <!-- Рапид — несколько верных, кнопка «Ответить» -->
+      <sc-if value="{{cur.isRapid}}" hint-placeholder-val="{{ false }}">
+        <div class="opts">
+          <sc-for list="{{opts}}" as="o" hint-placeholder-count="4">
+            <button class="opt {{o.cls}}" onClick="{{o.pick}}"><span class="k">{{o.n}}</span><span>{{o.text}}</span><span class="mk">{{o.mark}}</span></button>
+          </sc-for>
+        </div>
+        <sc-if value="{{noFb}}" hint-placeholder-val="{{ true }}">
+          <div class="numrow"><button class="go {{goCls}}" onClick="{{submit}}">Ответить · Enter</button></div>
+        </sc-if>
+      </sc-if>
+
+      <!-- Классика — число -->
+      <sc-if value="{{cur.isClassic}}" hint-placeholder-val="{{ false }}">
+        <div class="numrow">
+          <label for="num" style="position: absolute; left: -9999px;">Ответ</label>
+          <input id="num" class="num {{numCls}}" value="{{numValue}}" placeholder="Например: 12,5">
+          <sc-if value="{{noFb}}" hint-placeholder-val="{{ true }}"><button class="go" onClick="{{submit}}">Ответить · Enter</button></sc-if>
+        </div>
+        <sc-if value="{{noFb}}" hint-placeholder-val="{{ true }}"><div class="numhint">дробь — через слэш, точку или запятую</div></sc-if>
+        <sc-if value="{{isWrong}}" hint-placeholder-val="{{ false }}"><div class="ans">Правильный ответ <b>30</b></div></sc-if>
+      </sc-if>
+
+      <!-- Разбор после ошибки: 3 секунды, время в игре не идёт -->
+      <sc-if value="{{isWrong}}" hint-placeholder-val="{{ false }}">
+        <div class="reveal">
+          <div class="cnt">3</div>
+          <div><b>Неверно.</b> Верный ответ подсвечен. Часы стоят три секунды — следующий вопрос сам.</div>
+          <button class="next" onClick="{{next}}">Дальше сразу · пробел</button>
+        </div>
+      </sc-if>
+      <sc-if value="{{isCorrect}}" hint-placeholder-val="{{ false }}">
+        <div class="reveal" style="background: var(--green-tint); border-color: var(--green-border);">
+          <div class="cnt" style="border-color: var(--green); color: var(--green);">✓</div>
+          <div><b>Верно, +5 с.</b> Следующий вопрос через полсекунды.</div>
+          <button class="next" onClick="{{next}}">Дальше</button>
+        </div>
+      </sc-if>
+
+      </sc-if>
+
+      <div class="foot">
+        <button class="gh"><svg class="i s" viewBox="0 0 24 24"><path d="M5 4v16l9-8zM19 4v16"></path></svg>Пропустить <kbd>пробел</kbd></button>
+        <sc-if value="{{isDuel}}" hint-placeholder-val="{{ false }}">
+          <div class="reacts">
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><path d="M7 11V7a5 5 0 0 1 10 0v4M5 11h14l-1 9H6z"></path></svg>gg</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9 9h.01M15 9h.01M9 14a3 3 0 0 0 6 0"></path></svg>вау</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><path d="M12 22c4.4 0 7-2.9 7-6.6 0-3.1-1.9-5-3.2-6.4-.7 2.3-1.8 3.4-3 3.6.3-3.3-.9-6.3-3.6-8.6C8.6 8.4 5 10.5 5 15c0 4 3 7 7 7z"></path></svg>огонь</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l2 2"></path></svg>думаю</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path d="M9 10h.01M15 10h.01M9 16c1-1.5 5-1.5 6 0"></path></svg>упс</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"></path></svg>быстро</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><path d="M4 12h16M4 7h16M4 17h16"></path></svg>близко</button>
+            <button class="rx"><svg class="i s" viewBox="0 0 24 24"><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1 6.2L12 17.3 6.5 20.2l1-6.2L3 9.6l6.2-.9z"></path></svg>удачи</button>
+          </div>
+        </sc-if>
+        <button class="gh"><svg class="i s" viewBox="0 0 24 24"><path d="M5 21V4h11l-1 3 1 3H5"></path></svg>Плохая задача?</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Отсчёт перед стартом (состояние по Tweaks: state = countdown) -->
+  <sc-if value="{{isCountdown}}" hint-placeholder-val="{{ false }}">
+    <div class="veil">
+      <button class="cd" onClick="{{start}}" style="font: inherit; color: inherit; cursor: pointer;">
+        <div class="n">3</div>
+        <div class="m">{{cur.title}} · {{cur.dur}} · 3 жизни</div>
+        <div class="s">без фильтров — раунд зачётный</div>
+        <div class="k">клавиши <kbd>1</kbd>–<kbd>5</kbd> отвечают, <kbd>пробел</kbd> пропускает · <kbd>Enter</kbd> — начать без отсчёта</div>
+      </button>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"who":{"editor":"enum","options":["anon","student"],"default":"anon","section":"Состояние"},"theme":{"editor":"enum","options":["light","dark"],"default":"light","section":"Состояние"},"mode":{"editor":"enum","options":["blitz","bullet","rapid","classic"],"default":"blitz","section":"Состояние"},"state":{"editor":"enum","options":["question","correct","wrong","countdown"],"default":"question","section":"Состояние"},"duel":{"editor":"boolean","default":false,"section":"Состояние"},"$preview":{"width":1440,"height":800}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { fb: null, chosen: -1, sel: [], cleared: false };
+  }
+  renderVals() {
+    var self = this;
+    var isStudent = (this.props.who || 'anon') === 'student';
+    var theme = this.props.theme || 'light';
+    var modeId = this.props.mode || 'blitz';
+    var pre = this.props.state || 'question';
+    var duel = this.props.duel === true || this.props.duel === 'true';
+    var fb = this.state.fb || (!this.state.cleared && (pre === 'correct' || pre === 'wrong') ? pre : null);
+
+    /* Вопросы — настоящие, с боя 17.09.2026 */
+    var MODES = {
+      blitz:   { title: 'Блиц', dur: '2 мин', q: 'Если потенциальный ВВП равен 100 млрд рублей, фактический ВВП равен 92,5 млрд рублей, а коэффициент Оукена равен 2,5, то уровень циклической безработицы составил:',
+                 opts: ['0 %', '1 %', '2 %', '3 %', '6 %'], right: [3] },
+      bullet:  { title: 'Пуля', dur: '1 мин', q: 'Ключевая ставка Банка России (ЦБ РФ) — это ставка процента, которую ЦБ РФ начисляет на обязательные резервы коммерческих банков, размещённые в нём.',
+                 opts: ['Верно', 'Неверно'], right: [1] },
+      rapid:   { title: 'Рапид', dur: '5 мин', q: 'Какие из этих мер, скорее всего, приведут к снижению безработицы?',
+                 opts: ['Повышение ключевой ставки ЦБ', 'Снижение пособия по безработице', 'Увеличение государственных закупок', 'Улучшение механизма профессиональной переподготовки работников'], right: [1, 2, 3] },
+      classic: { title: 'Классика', dur: '10 мин', q: 'В 2023 году в Мурии темп инфляции был равен 10 %, а в 2024 году — 13 %. На сколько процентов изменился за год темп инфляции в Мурии? В ответе укажите число без знака процента.',
+                 opts: [], right: [] }
+    };
+    var m = MODES[modeId] || MODES.blitz;
+    var FULL = { blitz: '2:00', bullet: '1:00', rapid: '5:00', classic: '10:00' };
+    var cd = pre === 'countdown' && !this.state.cleared;
+    var cur = { q: m.q, title: m.title, dur: m.dur, isBlitz: modeId === 'blitz', isBullet: modeId === 'bullet', isRapid: modeId === 'rapid', isClassic: modeId === 'classic' };
+    var chosen = this.state.chosen;
+    var sel = this.state.sel;
+    var isWrong = fb === 'wrong';
+    var isCorrect = fb === 'correct';
+
+    var opts = m.opts.map(function (text, i) {
+      var isRight = m.right.indexOf(i) !== -1;
+      var cls = '';
+      var mark = '';
+      if (modeId === 'rapid') {
+        var picked = sel.indexOf(i) !== -1 || (fb && chosen === -1 && (i === 0 || i === 1));
+        if (!fb) { cls = picked ? 'sel' : ''; }
+        else if (isRight && picked) { cls = 'ok'; mark = '✓'; }
+        else if (isRight && !picked) { cls = 'right'; mark = 'надо было'; }
+        else if (!isRight && picked) { cls = 'bad'; mark = '✗'; }
+        else { cls = 'mute'; }
+      } else if (fb) {
+        var wasChosen = chosen === i || (chosen === -1 && (isCorrect ? isRight : i === 0));
+        if (isCorrect && wasChosen) { cls = 'ok'; mark = '✓'; }
+        else if (isWrong && wasChosen) { cls = 'bad'; mark = '✗'; }
+        else if (isWrong && isRight) { cls = 'right'; mark = 'верный ответ'; }
+        else { cls = 'mute'; }
+      }
+      if (modeId === 'blitz' && i === 4) cls += ' wide';
+      return {
+        n: i + 1, text: text, cls: cls, mark: mark,
+        pick: function () {
+          if (fb) return;
+          if (modeId === 'rapid') {
+            var s2 = sel.slice(); var at = s2.indexOf(i);
+            if (at === -1) s2.push(i); else s2.splice(at, 1);
+            self.setState({ sel: s2 });
+          } else {
+            self.setState({ fb: isRight ? 'correct' : 'wrong', chosen: i });
+          }
+        }
+      };
+    });
+
+    return {
+      themeClass: theme === 'dark' ? 'dark' : '',
+      isStudent: isStudent, isDuel: duel, showRec: isStudent && !duel,
+      oppScore: cd ? '0' : '120', oppCorrect: cd ? '0' : '3',
+      gapCls: 'lead', gapText: cd ? 'равны' : ('вы ведёте на ' + (isCorrect ? '975' : '900')),
+      cur: cur, opts: opts,
+      noFb: !fb, isWrong: isWrong, isCorrect: isCorrect,
+      isCountdown: cd, showQ: !cd,
+      trackW: cd ? '100%' : '61%', qNo: cd ? '1' : '8',
+      start: function () { self.setState({ cleared: true }); },
+      hasCombo: !isWrong && !cd,
+      scoreText: cd ? '0' : (isCorrect ? '1 095' : '1 020'),
+      correctText: cd ? '0' : (isCorrect ? '6' : '5'),
+      toRecord: cd ? '1 260' : (isCorrect ? '165' : '240'),
+      timeText: cd ? (FULL[modeId] || '2:00') : (isCorrect ? '1:53' : '1:48'),
+      clockCls: isWrong ? 'paused' : '',
+      isPaused: isWrong,
+      showPlus: isCorrect, showMinus: isWrong,
+      heart3Cls: isWrong ? 'off' : '',
+      qcardCls: isWrong && modeId === 'classic' ? 'bad' : '',
+      numValue: isWrong ? '3' : '',
+      numCls: isWrong ? 'bad' : '',
+      goCls: (modeId === 'rapid' && sel.length === 0 && !fb) ? 'off' : '',
+      submit: function () { if (fb) return; if (modeId === 'rapid' && sel.length === 0) return; self.setState({ fb: 'wrong', chosen: -1 }); },
+      next: function () { self.setState({ fb: null, chosen: -1, sel: [], cleared: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&amp;display=swap">
+  <style>
+    body { margin: 0; font-family: 'Montserrat', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    a { color: #006c6d; } a:hover { color: #016769; }
+    .rush {
+      --accent: #00797a; --accent-ink: #006c6d; --on-accent: #ffffff; --accent-tint: rgba(0,108,109,.10); --accent-ring: rgba(0,121,122,.32);
+      --bg: #f4eed2; --surface: #fffce6; --surface-2: #f4eed2;
+      --border: rgba(45,45,45,.16); --border-soft: rgba(45,45,45,.08);
+      --text: #2d2d2d; --text2: #5c5346; --text3: #665e51;
+      --amber: #d6a525; --amber-ink: #1d1a16; --btn-bg: #2e2b27; --on-btn: #ffffff;
+      --nav-bg: #3c3531; --nav-accent: #81b5b4;
+      --error: #b93526; --error-tint: rgba(185,53,38,.10); --green: #186e3c; --green-tint: rgba(24,110,60,.10); --skip: #a39c8c;
+      background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.45; overflow: hidden; position: relative;
+    }
+    .rush button, .rush input { font: inherit; }
+    .rush button { cursor: pointer; color: inherit; }
+    .rush svg.i { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+    .rush svg.i.s { width: 14px; height: 14px; }
+    .nav { height: 48px; background: var(--nav-bg); color: #e9e2d1; display: flex; align-items: center; padding: 0 24px; gap: 26px; }
+    .nav .mark { width: 30px; height: 30px; border-radius: 50%; background: var(--nav-accent); display: flex; align-items: center; justify-content: center; color: #2f2b28; font-weight: 800; font-size: 15px; }
+    .nav a { color: #cfc8b8; text-decoration: none; font-size: 15px; }
+    .nav a.on { color: var(--nav-accent); border-bottom: 2px solid var(--nav-accent); padding-bottom: 2px; }
+    .nav .sp { flex: 1; }
+    .nav .ava { width: 32px; height: 32px; border-radius: 50%; background: #e9e2d1; color: #2f2b28; font-weight: 700; font-size: 12px; display: flex; align-items: center; justify-content: center; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; box-sizing: border-box; }
+    .rush .btn { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: transparent; padding: 0 18px; font-size: 14.5px; font-weight: 600; display: inline-flex; align-items: center; justify-content: center; gap: 8px; color: var(--text); }
+    .rush .btn:hover { border-color: var(--accent); color: var(--accent-ink); }
+    .rush .btn.primary { background: var(--btn-bg); color: var(--on-btn); border-color: transparent; font-weight: 700; }
+    .rush .btn.primary:hover { color: var(--on-btn); filter: brightness(1.12); }
+    .rush .btn.big { height: 56px; font-size: 17px; padding: 0 30px; }
+    .rush .link { border: 0; background: transparent; padding: 0; color: var(--accent-ink); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; font-size: 13.5px; }
+    .lab { font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--accent-ink); font-weight: 700; }
+    .av { width: 44px; height: 44px; border-radius: 50%; background: var(--accent-tint); color: var(--accent-ink); font-weight: 800; font-size: 15px; display: flex; align-items: center; justify-content: center; flex: none; }
+    .field { height: 44px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); padding: 0 14px; font-size: 14px; color: var(--text2); display: flex; align-items: center; min-width: 0; overflow: hidden; white-space: nowrap; }
+    .page { width: 1000px; margin: 0 auto; padding: 24px 0 36px; display: flex; flex-direction: column; gap: 16px; }
+    .head { display: flex; align-items: center; gap: 12px; font-size: 13px; color: var(--text3); }
+    .chip { height: 24px; padding: 0 9px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-ink); font-weight: 600; display: inline-flex; align-items: center; }
+    .verdict { text-align: center; padding: 6px 0 2px; }
+    .verdict h2 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.5px; line-height: 1.1; }
+    .verdict .s { margin-top: 6px; font-size: 15px; color: var(--text2); }
+    .duo { display: grid; grid-template-columns: 1fr 120px 1fr; gap: 16px; align-items: stretch; }
+    .pl { padding: 18px 22px; display: flex; align-items: center; gap: 16px; }
+    .pl.win { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+    .pl .nm { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+    .pl .nm .tag { font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--amber-ink); background: var(--amber); border-radius: 999px; padding: 2px 8px; }
+    .pl .sub { font-size: 13px; color: var(--text2); margin-top: 2px; }
+    .pl .sc { margin-left: auto; font-size: 44px; font-weight: 800; letter-spacing: -1px; font-variant-numeric: tabular-nums; line-height: 1; }
+    .mid { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    .mid b { font-size: 26px; font-weight: 800; color: var(--text3); }
+    .mid span { font-size: 12px; color: var(--text3); text-align: center; }
+    .two { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .cb { padding: 16px 20px; display: flex; flex-direction: column; gap: 10px; }
+    h3 { margin: 0; font-size: 15px; font-weight: 700; }
+    .sub2 { font-size: 12.5px; color: var(--text3); font-weight: 500; }
+    table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+    th, td { padding: 8px 8px; border-bottom: 1px solid var(--border-soft); text-align: right; font-variant-numeric: tabular-nums; }
+    th { font-weight: 600; color: var(--text2); }
+    th[scope="row"], td.l { text-align: left; color: var(--text2); font-weight: 500; }
+    td.w { font-weight: 800; color: var(--accent-ink); }
+    tr:last-child td, tr:last-child th { border-bottom: 0; }
+    .strip { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; }
+    .q { display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 11.5px; color: var(--text3); }
+    .m { width: 100%; height: 30px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 14px; color: #fff; }
+    .m.ok { background: var(--green); } .m.bad { background: var(--error); } .m.skip { background: var(--skip); } .m.none { background: var(--border-soft); color: var(--text3); }
+    .names { display: grid; grid-template-columns: 90px 1fr; gap: 8px; align-items: center; font-size: 12.5px; color: var(--text2); }
+    .legend { display: flex; gap: 12px; font-size: 12px; color: var(--text3); }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
+    .acts { display: flex; gap: 10px; align-items: center; flex-wrap: nowrap; }
+    .acts .btn { white-space: nowrap; flex: none; }
+    .acts-note { font-size: 12.5px; color: var(--text3); }
+  </style>
+</helmet>
+
+<div class="rush" style="width: 1440px; height: 980px; box-sizing: border-box; display: flex; flex-direction: column;">
+  <div class="nav">
+    <div class="mark">W</div>
+    <a href="#nav">Каталог</a><a href="#nav">Учебник</a><a href="#nav">Олимпиады</a><a href="#nav">Графики</a><a href="#nav" class="on">Wecon Rush</a>
+    <div class="sp"></div>
+    <div class="ava">ММ</div><span style="font-size: 15px;">Макар Малиновский</span>
+  </div>
+  <div class="page">
+    <div class="head"><span class="chip">Дуэль</span><span class="chip">Пуля</span><span>17 сентября · без фильтров · код SEB9M90X</span></div>
+
+    <div class="verdict">
+      <h2>lengler победил</h2>
+      <div class="s">185 : 52 · разрыв 133 очка · оба выбыли по жизням</div>
+    </div>
+
+    <div class="duo">
+      <div class="card pl"><div class="av">ММ</div><div><div class="nm">Вы · malinovskii</div><div class="sub">верных 2 из 5 · точность 40 % · комбо ×1,0</div></div><div class="sc">52</div></div>
+      <div class="mid"><b>VS</b><span>одни вопросы,<br>один порядок</span></div>
+      <div class="card pl win"><div class="av">L</div><div><div class="nm">lengler <span class="tag">победа</span></div><div class="sub">верных 5 из 8 · точность 62 % · комбо ×1,25</div></div><div class="sc">185</div></div>
+    </div>
+
+    <div class="two">
+      <div class="card cb">
+        <h3>По цифрам <span class="sub2">· лучший в строке выделен</span></h3>
+        <table>
+          <thead><tr><th></th><th>malinovskii</th><th>lengler</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Очки</th><td>52</td><td class="w">185</td></tr>
+            <tr><th scope="row">Верных</th><td>2</td><td class="w">5</td></tr>
+            <tr><th scope="row">Ошибок</th><td>3</td><td>3</td></tr>
+            <tr><th scope="row">Пропусков</th><td>0</td><td>0</td></tr>
+            <tr><th scope="row">Точность</th><td>40 %</td><td class="w">62 %</td></tr>
+            <tr><th scope="row">Лучшее комбо</th><td>×1,0</td><td class="w">×1,25</td></tr>
+            <tr><th scope="row">Секунд на верный</th><td class="w">5,4</td><td>7,1</td></tr>
+            <tr><th scope="row">Продержался</th><td>0:16</td><td class="w">0:48</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card cb">
+        <h3>Кто что взял <span class="sub2">· по вопросам</span></h3>
+        <div class="names"><span>вопрос</span><div class="strip" style="font-size: 12px; color: var(--text3); text-align: center;"><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span></div></div>
+        <div class="names"><span>malinovskii</span><div class="strip"><div class="m ok">✓</div><div class="m bad">✗</div><div class="m ok">✓</div><div class="m bad">✗</div><div class="m bad">✗</div><div class="m none">·</div><div class="m none">·</div><div class="m none">·</div></div></div>
+        <div class="names"><span>lengler</span><div class="strip"><div class="m ok">✓</div><div class="m ok">✓</div><div class="m bad">✗</div><div class="m ok">✓</div><div class="m ok">✓</div><div class="m bad">✗</div><div class="m ok">✓</div><div class="m bad">✗</div></div></div>
+        <div class="legend"><span><i style="background: var(--green);"></i>верно</span><span><i style="background: var(--error);"></i>неверно</span><span><i style="background: var(--skip);"></i>пропуск</span><span><i style="background: var(--border-soft);"></i>не дошёл</span></div>
+        <div class="sub2">Первый взяли оба. Третий — только вы; второй, четвёртый и пятый — только он. Дальше вас уже не было.</div>
+      </div>
+    </div>
+
+    <div class="acts">
+      <button class="btn primary big">Реванш</button>
+      <button class="btn">Бросить вызов другому</button>
+      <button class="btn">Разобрать свои ошибки (3)</button>
+      <button class="btn">В обычную игру</button>
+    </div>
+    <div class="acts-note">Реванш — тот же соперник, новые вопросы. Ссылка на эту страницу открывается у всех, без входа.</div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":1440,"height":980}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {};
+  }
+}
+</script>
+</body>
+</html>

@@ -331,7 +331,11 @@ def seconds_left_for(state):
     started = state.get('started_at')
     if not started or not mode:
         return None
-    spent = time.time() - started
+    # ⚠️ ПАУЗА ВРЕМЯ НЕ СЪЕДАЕТ (ADR 0109): разбор ошибки ставит часы игрока
+    # на три секунды, и без вычета табло соперника убегало бы вперёд на каждой
+    # его ошибке. Правила зачёта паузы — те же, что у `_rank_run`.
+    from game.views import paused_ms_now
+    spent = time.time() - started - paused_ms_now(state) / 1000
     left = mode['duration'] + state.get('bonus_total', 0) - spent
     return max(0, int(left))
 

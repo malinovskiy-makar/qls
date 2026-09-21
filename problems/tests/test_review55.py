@@ -441,8 +441,9 @@ class CatalogFocusRingTests(TestCase):
         # ⚠️ `smart_search.html` УДАЛЁН: экран слился с каталогом (решение
         # владельца 01.09.2026). Требование «в правилах фокуса нет акцента»
         # никуда не делось и проверяется на экране, который его заменил, —
-        # `problem_list.html` в списке был и остался.
-        'catalog/templates/catalog/problem_list.html',
+        # `problem_list.html` был в списке до S7 «Стола» (19.09.2026); его стили
+        # теперь в `stol.css`.
+        'catalog/static/catalog/css/stol.css',
         'catalog/templates/catalog/_filters_css.html',
         'catalog/templates/catalog/collection_new.html',
         'catalog/templates/catalog/collection_detail.html',

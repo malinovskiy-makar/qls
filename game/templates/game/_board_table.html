@@ -1,0 +1,31 @@
+{% comment %}
+  «Таблица» доски (P4, макет DailyBoard; доска набора — P6, макет SetPage). Параметры:
+    rows         — первые строки доски (`daily.board_rows`): place, name, anon, score,
+                   accuracy, combo, ending, is_me;
+    title        — заголовок (по умолчанию «Таблица»; у набора «Кто прошёл · N»);
+    more_note    — пояснение к «и ещё N» (у набора — про анонимов);
+    my_row       — своя строка, когда она ниже показанных (или None);
+    more         — сколько строк не показано;
+    empty_title, empty_text — пустая доска (у сегодняшней и прошедшей — разные слова);
+    foot         — строка под таблицей.
+  ⚠️ Слов «сегодня» и «будь первым» у прошедшего дня быть не может — выбирает
+  страница, подставляя свои empty_title/empty_text.
+{% endcomment %}<section class="gb-card gb-pane gb-board" aria-labelledby="gb-table-h">
+  <div class="gb-ph"><h2 id="gb-table-h">{{ title|default:"Таблица" }}</h2><span>по счёту; при равенстве выше тот, кто закончил раньше</span></div>
+  {% if rows %}
+  <div class="gb-scroll">
+    <table class="gb-table">
+      <thead><tr><th scope="col"><span class="gb-sr">Место</span></th><th scope="col">Игрок</th><th scope="col" class="num">Счёт</th><th scope="col" class="num">Точность</th><th scope="col" class="num c-combo">Макс. комбо</th><th scope="col" class="c-end">Чем кончилось</th></tr></thead>
+      <tbody>
+        {% for r in rows %}<tr class="{% if r.is_me %}me{% elif r.place == 1 %}first{% endif %}"><td>{% if r.place <= 3 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</td><td class="who{% if r.anon %} anon{% endif %}">{% if r.is_me %}Вы · {% endif %}{{ r.name }}</td><td class="num sc">{{ r.score }}</td><td class="num">{{ r.accuracy }}&nbsp;%</td><td class="num c-combo">{{ r.combo }}</td><td class="end c-end">{{ r.ending }}</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if more %}<tbody><tr class="gb-more"><td colspan="6">и ещё {{ more }} – {% if more_note %}{{ more_note }}{% else %}показаны первые {{ rows|length }}; своя строка видна всегда, даже если вы ниже{% endif %}</td></tr></tbody>{% endif %}
+      {% if my_row %}<tbody><tr class="me"><td>{{ my_row.place }}</td><td class="who{% if my_row.anon %} anon{% endif %}">Вы · {{ my_row.name }}</td><td class="num sc">{{ my_row.score }}</td><td class="num">{{ my_row.accuracy }}&nbsp;%</td><td class="num c-combo">{{ my_row.combo }}</td><td class="end c-end">{{ my_row.ending }}</td></tr></tbody>{% endif %}
+    </table>
+  </div>
+  {% else %}
+  <p class="gb-empty"><b>{{ empty_title }}</b><span>{{ empty_text }}</span></p>
+  {% endif %}
+  <p class="gb-foot">{{ foot }}</p>
+</section>

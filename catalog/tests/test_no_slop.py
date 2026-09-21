@@ -25,6 +25,9 @@ from django.conf import settings
 from django.test import SimpleTestCase, TestCase
 
 BASE = Path(settings.BASE_DIR)
+#: Эмодзи: пиктограммы и символы (U+1F300–1FAFF), разное и дингбаты с эмодзи-видом
+#: (U+2600–27BF кроме ★☆, ✓ и ✕), вариационный селектор эмодзи U+FE0F.
+_RX_EMOJI = re.compile('[\U0001F300-\U0001FAFF\u2600-\u2604\u2607-\u2712\u2716-\u27BF\uFE0F]')
 
 # Слова-обещания и заглушки, запрещённые в интерфейсе (§0.5 промпта).
 FORBIDDEN = (
@@ -115,7 +118,7 @@ class EmptyCatalogTests(TestCase):
     def test_catalog_page_shows_no_selection_ui(self):
         html = self.client.get('/catalog/').content.decode()
         self.assertNotIn('data-chip=', html)
-        self.assertNotIn('ct-card', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
+        self.assertNotIn('rail-row', _RX_SCRIPT.sub('', html).split('<section class="ct-results"')[1])
 
 
 class EmptyCatalogWindowTests(TestCase):
@@ -240,13 +243,16 @@ class MapCaptionFollowsDataTests(TestCase):
         fake = (json.dumps({'nodes': nodes}), '"etag-2-7"')
         with mock.patch('catalog.views._topic_map_payload', return_value=fake):
             text = visible_text(self.client.get('/catalog/').content.decode())
-        self.assertIn('Карта тем · 2 темы, 7 тегов', text)
+        self.assertIn('Карта тем: 2 темы, 7 тегов', text)
 
 
 class NoPromisesInTemplatesTests(SimpleTestCase):
     """В шаблонах каталога нет слов-обещаний и заглушек."""
 
-    TEMPLATES = ('catalog/templates/catalog', 'templates/_typing_placeholder.html')
+    TEMPLATES = ('catalog/templates/catalog', 'templates/_typing_placeholder.html',
+                 # Плашки угла беты (18.09.2026).
+                 'templates/_corner_stack.html', 'templates/_search_rating.html',
+                 'templates/_pulse.html')
 
     # Заглушка раздела и есть обещание раздела: исключение сознательное — решение владельца 04.09 и 06.09.2026 (сторожит `config.tests.test_nav`).
     EXEMPT = ('textbook.html',)
@@ -258,7 +264,8 @@ class NoPromisesInTemplatesTests(SimpleTestCase):
                 yield path
             else:
                 # Партиалы `*_css.html` — чистый CSS, текста для человека там нет.
-                yield from (f for f in sorted(path.glob('*.html'))
+                # Обход с подпапками: партиалы «Стола» лежат в `catalog/stol/`.
+                yield from (f for f in sorted(path.rglob('*.html'))
                             if not f.name.endswith('_css.html')
                             and f.name not in self.EXEMPT)
 
@@ -267,6 +274,26 @@ class NoPromisesInTemplatesTests(SimpleTestCase):
         for path in self._files():
             text = template_user_text(path.read_text(encoding='utf-8'))
             hits = sorted({m.group(1).lower() for m in _RX_FORBIDDEN.finditer(text)})
+            if hits:
+                offenders[str(path.relative_to(BASE))] = hits
+        self.assertEqual(offenders, {})
+
+    def test_no_emoji_in_stol_screens(self):
+        """«Стол» (README §9): значки — SVG из общего набора, эмодзи в экранах нет.
+
+        Шаблон `stol.html`, все партиалы `catalog/stol/` и четыре скрипта «Стола»;
+        символы-метки (★ звёзды, × крестик, → стрелка) — не эмодзи.
+        """
+        files = [BASE / 'catalog/templates/catalog/stol.html']
+        files += sorted((BASE / 'catalog/templates/catalog/stol').glob('*.html'))
+        files += [BASE / 'catalog/static/catalog/js' / name
+                  for name in ('stol.js', 'stol_task.js', 'stol_map.js', 'stol_basket.js')]
+        offenders = {}
+        for path in files:
+            text = path.read_text(encoding='utf-8')
+            # Только то, что видит человек: без комментариев шаблона и скрипта.
+            text = template_user_text(text) if path.suffix == '.html' else _RX_JS_COMMENT.sub('', text)
+            hits = sorted(set(_RX_EMOJI.findall(text)))
             if hits:
                 offenders[str(path.relative_to(BASE))] = hits
         self.assertEqual(offenders, {})

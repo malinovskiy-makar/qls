@@ -23,6 +23,7 @@ import datetime
 import json
 import logging
 import random
+import re
 import time
 from fractions import Fraction
 from urllib.parse import quote
@@ -48,8 +49,9 @@ from . import sources as game_sources
 from .sources import GROUP_KEYS
 from .models import (ArchetypeStat, GameQuestion, GameResult, GameSet,
                      make_result_code)
-from . import (config, filters as game_filters, leaderboard as lb,
-               scoring, state as run_state, stats as stats_mod)
+from . import (config, daily as daily_mod, filters as game_filters,
+               leaderboard as lb, scoring, state as run_state,
+               stats as stats_mod)
 from .figures import base as figures_base
 from .figures.base import QUESTION_TYPE as FIGURE_AUDIT
 
@@ -362,20 +364,26 @@ def pool_tags(f=None):
     Показывать тег, по которому ничего не найдётся, — значит обещать выбор,
     которого нет. Считаем по всему пулу (без учёта режима): игрок выбирает
     теги до выбора режима.
+
+    ⚠️ ТОЛЬКО КАНОНИЧЕСКИЕ (18.09.2026), как в фильтре каталога: legacy-теги,
+    убранные из каталога 17.09, в окне игры не показываются. Данные пула не
+    трогаются — вопрос с legacy-тегом по-прежнему считается по своей теме
+    (`pool_counts_for` этой правкой не задет).
+
+    `topics` — темы вопросов с этим тегом: окно показывает «теги выбранных
+    тем», как каталог.
     """
     from problems.models import Tag
-    used = set()
-    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
-        used.update(tag_ids or [])
-    if not used:
-        return []
-    rows = Tag.objects.filter(id__in=used).values_list('id', 'name')
-    counts = {}
-    for tag_ids in _pool_qs().values_list('tag_ids', flat=True):
+    counts, topics_of = {}, {}
+    for tag_ids, topics in _pool_qs().values_list('tag_ids', 'topics'):
         for t in (tag_ids or []):
             counts[t] = counts.get(t, 0) + 1
+            topics_of.setdefault(t, set()).update(topics or [])
+    if not counts:
+        return []
+    rows = Tag.objects.filter(id__in=counts, kind='canonical').values_list('id', 'name')
     return sorted(
-        ({'id': pk, 'name': name, 'count': counts.get(pk, 0)}
+        ({'id': pk, 'name': name, 'count': counts[pk], 'topics': sorted(topics_of[pk])}
          for pk, name in rows),
         key=lambda r: (-r['count'], r['name']))
 
@@ -546,16 +554,67 @@ def _practice_payload():
             'question_types': list(config.PRACTICE['question_types']), 'practice': True}
 
 
+def _choice_numbers(indices):
+    u"""Номера вариантов словами игрока: [0, 2] → «1, 3»."""
+    return ', '.join(str(i + 1) for i in sorted(indices))
+
+
 def practice_summary(state):
-    u"""Сводка «Бесконечных тестов»: решено (без пропусков), верных, пропущено, точность."""
+    u"""Итог «Бесконечных тестов» (решение владельца 17.09.2026, ADR 0114).
+
+    Числа: отвечено (верные и ошибки, без пропусков), верных, ошибок, пропущено,
+    точность. `mistakes` — ошибки и пропуски по порядку открытия: текст, тема,
+    ответ игрока и верный ответ номерами вариантов, `problem_id` и решение
+    (есть только у сгенерированного). `topics` — по образцу `topic_rows` итога
+    раунда: верно / ошибка / пропуск на тему.
+
+    ⚠️ Пропуск, на который потом ответили, пропуском не считается: в журнале
+    один исход на вопрос — последний (`_practice_answer`).
+    """
     outcomes = list((state.get('answered') or {}).values())
     correct = outcomes.count('correct')
-    answered = correct + outcomes.count('wrong')
-    return {'answered': answered, 'correct': correct, 'skipped': outcomes.count('skip'),
-            'accuracy': round(100 * correct / answered) if answered else 0}
+    wrong = outcomes.count('wrong')
+    answered = correct + wrong
+    log = sorted(state.get('log') or [], key=lambda e: e.get('number') or 0)
+    missed = [e for e in log if e.get('outcome') in ('wrong', 'skip')]
+    questions = (GameQuestion.objects.in_bulk([e['question_id'] for e in missed])
+                 if missed else {})
+    mistakes = []
+    for e in missed:
+        gq = questions.get(e['question_id'])
+        right = []
+        if gq is not None:
+            right = (gq.correct_indices or []) if gq.question_type == 'multi' else [gq.correct_index]
+        mistakes.append({
+            'number': e.get('number'),
+            'outcome': e['outcome'],
+            'question_id': e['question_id'],
+            'text': gq.question if gq is not None else '(вопрос исчез из пула)',
+            'topic': (e.get('topics') or [NO_TOPIC])[0],
+            'your': _choice_numbers(e.get('chosen') or []),
+            'right': _choice_numbers(right),
+            'problem_id': gq.problem_id if gq is not None else None,
+            'solution': (gq.gen_solution if gq is not None and gq.is_generated
+                         and gq.gen_solution else ''),
+        })
+    topics = {}
+    for e in log:
+        for name in (e.get('topics') or [NO_TOPIC]):
+            cell = topics.setdefault(name, {'topic': name, 'correct': 0, 'wrong': 0, 'skip': 0})
+            if e.get('outcome') in cell:
+                cell[e['outcome']] += 1
+    topic_rows = []
+    for cell in topics.values():
+        cell['total'] = cell['correct'] + cell['wrong'] + cell['skip']
+        topic_rows.append(cell)
+    topic_rows.sort(key=lambda t: (-t['total'], t['topic']))
+    return {'answered': answered, 'correct': correct, 'wrong': wrong,
+            'skipped': outcomes.count('skip'),
+            'accuracy': round(100 * correct / answered) if answered else 0,
+            'mistakes': mistakes, 'topics': topic_rows}
 
 
-def _practice_answer(request, state, gq, is_skip, correct):
+def _practice_answer(request, state, gq, is_skip, correct, body):
     u"""Ответ в «Бесконечных тестах» (решение владельца 15.09.2026).
 
     Ни очков, ни времени, ни жизней: только исход — для сводки и подсветки.
@@ -563,22 +622,34 @@ def _practice_answer(request, state, gq, is_skip, correct):
     приходит своими полями по типу вопроса. ⚠️ Статистику вопроса практика НЕ
     пишет: ответ без часов, и доля верных вместе с ним стала бы легче, чем в
     раунде, по которому считается измеренная сложность.
+
+    ⚠️ ПРОПУСК ОБРАТИМ (решение 17.09.2026): на пропущенный вопрос можно
+    ответить позже, и в журнале остаётся ОДИН исход на вопрос — последний.
+    Выбранные варианты и темы лежат в записи журнала: по ним итог строит
+    список ошибок и точность по темам, не спрашивая клиента.
     """
     result = 'skip' if is_skip else ('correct' if correct else 'wrong')
     state['answered'][str(gq.id)] = result
-    state['log'].append({'question_id': gq.id, 'number': state['seen'].index(gq.id) + 1,
-                         'question_type': gq.question_type, 'outcome': result})
+    if is_skip:
+        chosen = []
+    elif gq.question_type == 'multi':
+        chosen = sorted(body.get('choices') or [])
+    else:
+        chosen = [body.get('choice')]
+    entry = {'question_id': gq.id, 'number': state['seen'].index(gq.id) + 1,
+             'question_type': gq.question_type, 'outcome': result,
+             'chosen': chosen, 'topics': list(gq.topics or [])}
+    state['log'] = [e for e in state['log'] if e.get('question_id') != gq.id] + [entry]
     run_state.save_run(request, state)
-    payload = {
-        'result': result,
-        'correct': correct,
-        'practice': True,
-        'correct_choices': (list(gq.correct_indices or []) if gq.question_type == 'multi'
-                            else [gq.correct_index]),
-        'problem_id': gq.problem_id,
-    }
-    if gq.is_generated and gq.gen_solution:
-        payload['solution'] = gq.gen_solution
+    payload = {'result': result, 'correct': correct, 'practice': True}
+    # ⚠️ ВЕРНЫЙ ОТВЕТ, ЗАДАЧА И РЕШЕНИЕ — ТОЛЬКО С ОТВЕТОМ, НЕ С ПРОПУСКОМ. Пропуск
+    # обратим: пришли они с пропуском — вернуться и «ответить» мог бы любой.
+    if not is_skip:
+        payload['correct_choices'] = (list(gq.correct_indices or []) if gq.question_type == 'multi'
+                                      else [gq.correct_index])
+        payload['problem_id'] = gq.problem_id
+        if gq.is_generated and gq.gen_solution:
+            payload['solution'] = gq.gen_solution
     return JsonResponse(payload)
 
 
@@ -599,12 +670,18 @@ def _game_page_context(request):
     единого вопроса на экране не показывается вовсе (играть в него нечем).
     """
     _tc = topic_counts()
-    # Сколько ru-вопросов доступно на каждый режим (для карточек на старте).
+    # Сколько ru-вопросов доступно на каждый режим (для вкладок на старте).
     type_counts = {}
     for qtype in _pool_qs().values_list('question_type', flat=True):
         type_counts[qtype] = type_counts.get(qtype, 0) + 1
     pool_counts = {key: type_counts.get(m['question_type'], 0)
                    for key, m in config.MODES.items()}
+    user = request.user if request.user.is_authenticated else None
+    # Ячейка «Вызов дня» на главной (решение владельца 17.09.2026): вызовов
+    # столько, сколько режимов с непустым пулом, — ровно столько карточек
+    # рисует `/game/daily/` (режим без вопросов вызова не получает).
+    daily_cell = daily_mod.daily_cell(user)
+    daily_cell['total'] = sum(1 for key in config.MODES if pool_counts[key])
 
     return {
         'auto_set': None,
@@ -615,9 +692,12 @@ def _game_page_context(request):
         # Картинка одна и та же (game/static/game/og_default.png), рисует её
         # `make_og_image`.
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': 'Wecon Rush · игра на скорость по экономике',
-        'og_description': ('Три жизни, четыре режима, вопросы из реальных '
-                           'олимпиад. Сколько наберёшь?'),
+        # ⚠️ Заголовок и описание — по шаблону SEO (Notion, «Решения» 19.09.2026):
+        # они же попадают в `<title>`, `description` и карточку ссылки.
+        'og_title': 'Wecon Rush — игра для подготовки к олимпиадам по экономике | Weconomics.ai',
+        'og_description': ('Образовательная игра по экономике: решайте тесты на скорость, '
+                           'соревнуйтесь с друзьями и готовьтесь к олимпиадам интересно '
+                           'на Weconomics.ai.'),
         'page_url': request.build_absolute_uri(),
         # Панель прослушивания звука — служебная: только staff и только по
         # явному ?sound_check=1. Обычному игроку блока нет в разметке вовсе.
@@ -637,15 +717,27 @@ def _game_page_context(request):
         'pool_tags': pool_tags(),
         # Квота зачётных забегов на сегодня — вошедшему. Аноним её не видит:
         # у него зачётных забегов не бывает вовсе.
-        'ranked_quota': _quota_line(request),
+        'ranked_quota': _quota_payload(request),
+        'daily_cell': daily_cell,
+        # Вкладки режимов стартового экрана (ADR 0108): режим без единого
+        # вопроса не рисуется вовсе. Подпись времени — как у клиента
+        # (`durationText`), числа под фильтром клиент обновит сам.
+        'start_modes': [
+            {'key': key, 'title': m['title'], 'pool': pool_counts[key],
+             'duration': duration_text(m['duration'])}
+            for key, m in config.MODES.items() if pool_counts[key]],
+        # Числа поповера «Как считаются очки» — из конфига, а не текстом:
+        # поменяют экономику, и поповер не соврёт.
+        'score_rules': {
+            'base_min': min(config.BASE_BY_DIFFICULTY.values()),
+            'base_max': max(config.BASE_BY_DIFFICULTY.values()),
+            'scope': ('%g' % config.SCOPE_MULTIPLIER).replace('.', ','),
+            'accuracy_full_pct': int(round(config.ACCURACY_FULL_AT * 100)),
+        },
         # Группы-заготовки: показываются, ТОЛЬКО если у них есть варианты.
         # Серый переключатель, который не нажимается, хуже его отсутствия.
         'feature_options': game_filters.feature_options(),
         'character_options': game_filters.character_options(),
-        # «Вопросов из реальных олимпиад» — считаем ТОЛЬКО вопросы банка:
-        # сгенерированные тренировочные из олимпиад не приходили, и врать
-        # в цифре на первом экране нельзя.
-        'pool_total': _pool_qs().filter(is_generated=False).count(),
         # JSON для JS-клиента: механика читается только из config.py
         # Здесь лежат только константы из game/config.py, но правило
         # одно на проект: JSON внутри <script> собирается помощником.
@@ -667,6 +759,10 @@ def _game_page_context(request):
             'accuracy_min_mult': config.ACCURACY_MIN_MULT,
             'mistakes_run_size': config.MISTAKES_RUN_SIZE,
             'last_life_multiplier': config.LAST_LIFE_MULTIPLIER,
+            # Разбор ошибки и отсчёт перед стартом (ADR 0109): числа — только
+            # из конфига, клиент их не выдумывает.
+            'reveal_wrong_ms': config.REVEAL_WRONG_MS,
+            'round_countdown_s': config.ROUND_COUNTDOWN_S,
             'difficulty_min': config.DIFFICULTY_MIN,
             'difficulty_max': config.DIFFICULTY_MAX,
             'topic_groups': [{'key': key, 'title': title, 'topics': names}
@@ -701,6 +797,11 @@ def _game_page_context(request):
             'is_authenticated': request.user.is_authenticated,
             'pool_tags': pool_tags(),
             'topic_counts': topic_counts(),
+            # Стартовый экран (ADR 0108): квота зачётных по режимам и серверные
+            # рекорды вошедшего. Аноним получает None и {}: его рекорды живут
+            # в localStorage этого устройства.
+            'ranked_quota': _quota_payload(request),
+            'my_best': lb.best_scores(user) if user else {},
         }),
     }
 
@@ -722,6 +823,10 @@ def _question_payload(gq, number):
         # посмотреть ДО того, как ответишь. Ссылку «в каталог» клиент
         # собирает из ответа api_answer, когда отвечать уже поздно.
         'generated': gq.is_generated,    # строка «Вопрос сгенерирован ИИ»
+        # Сложность над карточкой вопроса (ADR 0110): «сложность 3 из 5» и
+        # «очков за верный – до N». Та же эффективная сложность, по которой
+        # сервер начислит очки; ответа она не выдаёт.
+        'difficulty': stats_mod.effective_difficulty(gq),
     }
     if gq.question_type == 'numeric' and gq.unit:
         # единица измерения («%», «руб.») — подсказка у поля ввода, не ответ
@@ -1084,7 +1189,10 @@ DIFFICULTY_GROUPS = [('easy', 'Лёгкие', (1, 2)),
 # при сохранении результата. Список нужен, чтобы тест «клиент не читает
 # несуществующего поля» видел обе половины сводки, а не одну.
 FINISH_EXTRA_FIELDS = ('ranked', 'unranked_reason', 'unranked_text',
-                       'ranked_today', 'ranked_per_day')
+                       'ranked_today', 'ranked_per_day',
+                       # итог по макету 17.09.2026 (ADR 0111), см. _finish_extras
+                       'places', 'record', 'daily', 'attempts_left', 'duel',
+                       'avg_correct_ms')
 
 
 def build_summary(state):
@@ -1106,8 +1214,12 @@ def build_summary(state):
     topics = {}
     for r in log:
         for name in (r['topics'] or [NO_TOPIC]):
-            cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0})
+            cell = topics.setdefault(name, {'correct': 0, 'wrong': 0, 'skip': 0,
+                                            'points': 0})
             cell[r['outcome']] += 1
+            # «Где набрано» на итоге (ADR 0111). Вопрос с двумя темами кладёт
+            # очки в обе: карточка показывает вклад темы, а не делит итог.
+            cell['points'] += r.get('points') or 0
     topic_rows = []
     for name, cell in topics.items():
         tries = cell['correct'] + cell['wrong']
@@ -1118,6 +1230,7 @@ def build_summary(state):
             'skip': cell['skip'],
             'total': cell['correct'] + cell['wrong'] + cell['skip'],
             'accuracy': round(100 * cell['correct'] / tries) if tries else 0,
+            'points': cell['points'],
         })
     # Сначала темы с ошибками (главное на экране), потом по объёму.
     topic_rows.sort(key=lambda t: (-t['wrong'], -t['total'], t['topic']))
@@ -1131,6 +1244,20 @@ def build_summary(state):
             'total': len(rows),
             'correct': sum(1 for r in rows if r['outcome'] == 'correct'),
         })
+
+    # «Держите ли сложное» на итоге (ADR 0111): полоски по звёздам вместо
+    # трёх групп. Звёзды — ЭФФЕКТИВНАЯ сложность, та же, что над карточкой
+    # вопроса и в очках; у старой записи журнала её нет — берём хранимую.
+    stars = {}
+    for r in log:
+        level = r.get('difficulty_effective') or r.get('difficulty')
+        if not level:
+            continue
+        level = max(1, min(5, int(round(level))))
+        cell = stars.setdefault(level, {'stars': level, 'total': 0, 'correct': 0,
+                                        'wrong': 0, 'skip': 0})
+        cell['total'] += 1
+        cell[r['outcome']] += 1
 
     buckets = []
     for lo, hi, title in TIME_BUCKETS:
@@ -1178,6 +1305,7 @@ def build_summary(state):
                            sorted(mistakes_by_topic(log).items(),
                                   key=lambda kv: (-kv[1], kv[0]))],
         'difficulty': difficulty,
+        'stars': [stars[k] for k in sorted(stars)],
         'time_buckets': buckets,
         # кривые для графиков: значение по номеру вопроса
         'score_curve': [r['running_score'] for r in log],
@@ -1219,7 +1347,11 @@ def api_answer(request):
 
     if qid not in state['seen']:
         return JsonResponse({'error': 'Этот вопрос не выдавался'}, status=404)
-    if str(qid) in state['answered']:
+    # ⚠️ В «Бесконечных тестах» пропуск обратим: на пропущенный вопрос можно
+    # ответить позже (решение 17.09.2026). В раунде — нет: там пропуск
+    # засчитан, и второй ответ на тот же вопрос был бы вторым шансом.
+    previous = state['answered'].get(str(qid))
+    if previous is not None and not (state.get('practice') and previous == 'skip'):
         return JsonResponse({'error': 'Вопрос уже отвечен'}, status=409)
 
     try:
@@ -1232,7 +1364,7 @@ def api_answer(request):
         return checked
     is_skip, correct = checked
     if state.get('practice'):
-        return _practice_answer(request, state, gq, is_skip, correct)
+        return _practice_answer(request, state, gq, is_skip, correct, body)
 
     mode_cfg = config.MODES[state['mode']]
     mode_key = state['mode']
@@ -1617,6 +1749,45 @@ def make_code_lookup(raw):
     return normalize_code(raw)
 
 
+# Лестница задержек за промахи проверки кода — общая с входом и кодом
+# занятия (`problems/ratelimit.py`), своя область.
+SET_CHECK_SCOPE = 'game_set_check'
+
+
+@require_GET
+def api_set_check(request):
+    u"""Есть ли набор с таким кодом: ячейка «Играть по коду» на главной.
+
+    Ответ `{exists, url}`. Решение владельца 17.09.2026: неверный код
+    оставляет игрока на главной со строкой под полем, а не уводит на общий
+    404 сайта. Дуэль ведёт на свою страницу `/game/d/<код>/`, остальные
+    наборы — на `/game/s/<код>/`.
+
+    ⚠️ НОВОГО НАРУЖУ НЕ УХОДИТ. Существует ли код, и раньше было видно по
+    ответу `/game/s/<код>/` (404 или страница); здесь то же знание, только
+    без ухода со страницы. Пространство кодов 32^8, перебор вслепую
+    бессмыслен, но промахи всё равно двигают лестницу задержек по адресу —
+    так же, как у кода занятия.
+    """
+    from problems import ratelimit
+    wait = ratelimit.check(SET_CHECK_SCOPE, request, None)
+    if wait:
+        return JsonResponse({
+            'exists': False, 'url': '', 'wait': wait,
+            'error': 'Слишком много попыток. Попробуйте через %d с.' % wait,
+        }, status=429)
+    code = make_code_lookup(request.GET.get('code'))
+    gset = (GameSet.objects.filter(code=code).only('code', 'kind').first()
+            if code else None)
+    if gset is None:
+        if code:
+            ratelimit.register_failure(SET_CHECK_SCOPE, request, None)
+        return JsonResponse({'exists': False, 'url': ''})
+    name = 'game:duel' if gset.kind == 'duel' else 'game:set_page'
+    return JsonResponse({'exists': True,
+                         'url': reverse(name, args=[gset.code])})
+
+
 @ensure_csrf_cookie
 @require_safe
 def set_page(request, code):
@@ -1630,8 +1801,19 @@ def set_page(request, code):
     без куки они получают 403 (ловилось в браузере — забег молча вставал
     на первом же ответе).
     """
-    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    gset = GameSet.objects.filter(code=make_code_lookup(code)).first()
+    if gset is None:
+        return set_missing(request, code)
     allowed, why = set_run_allowed(request, gset)
+    auto = request.GET.get('auto') == '1'
+    # ⚠️ СТРАНИЦА ИГРЫ ЗДЕСЬ — ТОЛЬКО ДЛЯ ДУЭЛИ И ДЛЯ ЗАПУСКА `?auto=1` (P6,
+    # решение 17.09.2026). Приглашение набора учителя — своя страница
+    # (`set_page.html`), у вызова дня страница — `/game/daily/`: без
+    # автостарта или когда играть нельзя, человек идёт туда, где видно почему.
+    if gset.kind == 'daily' and not (auto and allowed):
+        return redirect('game:daily')
+    if gset.kind not in ('daily', 'duel') and not (auto and allowed):
+        return set_invitation(request, gset, allowed, why)
     ctx = _game_page_context(request)
     ctx['auto_set'] = {
         'code': gset.code,
@@ -1642,7 +1824,8 @@ def set_page(request, code):
         'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
         'allowed': allowed,
         'why': why,
-        'board_url': reverse('game:set_board', args=[gset.code]),
+        'board_url': (daily_mod.board_url(gset.mode, gset.day) if gset.kind == 'daily'
+                      else reverse('game:set_page', args=[gset.code])),
         # Лобби дуэли: автору «Ждём соперника…», сопернику «Соперник: <автор>».
         # Имя автора и так видно на странице дуэли — нового наружу не уходит.
         'author': gset.author.username if gset.author_id else '',
@@ -1667,49 +1850,128 @@ def set_page(request, code):
     # забег: соперник должен сначала увидеть, во что его зовут.
     ctx['duel_url'] = request.build_absolute_uri(
         reverse('game:duel', args=[gset.code])) if gset.kind == 'duel' else ''
+    if gset.kind == 'duel':
+        # Лобби дуэли по макету DuelLobby (ADR 0112): условия словами и два
+        # слота. ⚠️ Имена — логины, как на досках: страница дуэли публичная,
+        # и полное имя ученика по ссылке уходить не должно.
+        mode_cfg = config.MODES.get(gset.mode, {})
+        me = request.user.username if request.user.is_authenticated else ''
+        ctx['auto_set'].update({
+            'lives': mode_cfg.get('lives', 0),
+            'duration_text': duration_text(mode_cfg.get('duration', 0)),
+            'filter_text': ('без фильтров' if is_empty_filter(gset.filter_snapshot)
+                            else _filter_text(gset.filter_snapshot)),
+            'author_initials': initials(ctx['auto_set']['author']),
+            'me': me,
+            'me_initials': initials(me),
+        })
     ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
     return render(request, 'game/game.html', ctx)
 
 
+def duration_text(seconds):
+    u"""«1 мин», «2 мин», «45 с» — как `durationText` клиента."""
+    return ('%g мин' % (seconds / 60)) if seconds >= 60 else '%d с' % seconds
+
+
+def initials(name):
+    u"""Инициалы для кружка игрока: «Макар Малиновский» → «ММ», «lengler» → «L»."""
+    parts = [p for p in re.split(r'[\s_.\-]+', name or '') if p]
+    return ''.join(p[0] for p in parts[:2]).upper()
+
+
 @require_safe
 def set_board(request, code):
-    """Доска набора: кто прошёл и на каких вопросах посыпался класс.
+    """Старый адрес доски набора `/game/s/<код>/board/` — только переход.
 
-    ⚠️ Тексты вопросов показываются НЕ ВСЕМ. Доска публичная, и ученик,
-    который ещё не играл контрольную, мог бы прочитать её вопросы отсюда —
-    это нашёл тест дуэли (первая версия доски выдавала весь список ДО
-    игры). Тексты видят: автор набора, персонал и тот, кто уже сыграл.
-    Остальным — «Вопрос N»: доля верных остаётся видна, содержание нет.
+    Доска живёт на странице набора (P6), у вызова дня — доска дня (P4), у
+    дуэли — её страница сравнения. Неверный код — та же страница «нет такого
+    набора», что и у `/game/s/<код>/`.
     """
-    gset = get_object_or_404(GameSet, code=make_code_lookup(code))
+    gset = GameSet.objects.filter(code=make_code_lookup(code)).first()
+    if gset is None:
+        return set_missing(request, code)
     if gset.kind == 'duel':
         # У дуэли своя страница, и на ней вопросов нет вовсе.
         return redirect('game:duel', code=gset.code)
-    rows = list(gset.results.select_related('user').order_by(
-        '-score', 'created_at'))
-    board = [{
-        'place': i + 1,
-        'name': (r.user.username if r.user else 'аноним'),
-        'score': r.score,
-        'accuracy': r.accuracy,
-        'max_combo': r.max_combo,
-        'reason': r.ended_reason,
-        'at': r.created_at,
-        'is_me': bool(request.user.is_authenticated
-                      and r.user_id == request.user.id),
-    } for i, r in enumerate(rows)]
-    show_text = bool(
-        request.user.is_authenticated
-        and (request.user.is_staff or gset.author_id == request.user.id)
-    ) or my_result_for(request, gset) is not None
-    return render(request, 'game/set_board.html', {
+    if gset.kind == 'daily' and gset.day:
+        return redirect(daily_mod.board_url(gset.mode, gset.day))
+    return redirect('game:set_page', code=gset.code)
+
+
+# Как отвечают в режиме — строкой приглашения: «Блиц · один верный ответ».
+QUESTION_TYPE_TEXT = {'boolean': 'верно / неверно', 'single': 'один верный ответ',
+                      'multi': 'несколько верных', 'numeric': 'числовой ответ',
+                      'figure_audit': 'найти неверный шаг'}
+
+
+def _moscow_text(moment, fmt='j E, H:i'):
+    u"""«20 сентября, 23:59» — по Москве, как отсечка вызова дня."""
+    from django.utils.formats import date_format
+    return date_format(timezone.localtime(moment, daily_mod.daily_tzinfo()), fmt) if moment else ''
+
+
+def set_invitation(request, gset, allowed, why):
+    u"""Страница набора ученика `/game/s/<код>/` (решение 17.09.2026, ADR 0115).
+
+    Приглашение (что за набор, одна кнопка «Играть» → `?auto=1`) и доска набора:
+    «Кто прошёл» с анонимами и «Где ошиблись». Кто уже сыграл — видит свой
+    результат и место. ⚠️ Тексты вопросов — автору, персоналу и сыгравшим: иначе
+    контрольную можно прочитать заранее.
+    """
+    me = request.user if request.user.is_authenticated else None
+    mine = my_result_for(request, gset)
+    top, my_row, total = daily_mod.board_rows(gset, me, limit=10, with_anonymous=True,
+                                              mine_code=mine.code if mine else None)
+    my_place = next((r['place'] for r in top if r['is_me']), my_row['place'] if my_row else None)
+    show_text = mine is not None or bool(me and (me.is_staff or gset.author_id == me.id))
+    questions = set_question_stats(gset, show_text=show_text)
+    for q in questions:
+        q['hard'] = q['percent'] is not None and q['percent'] < 40
+    mode_cfg = config.MODES.get(gset.mode, {})
+    why_text = {'Попытка уже использована': 'Попытки закончились',
+                'Набор ещё не открыт': 'Набор откроется ' + _moscow_text(gset.opens_at),
+                'Набор уже закрыт': 'Набор закрыт ' + _moscow_text(gset.closes_at)}.get(why, why)
+    own = reverse('game:set_page', args=[gset.code])
+    return render(request, 'game/set_page.html', {
         'gset': gset,
-        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
-        'board': board,
-        'questions': set_question_stats(gset, show_text=show_text),
+        'kind_label': gset.get_kind_display(),
+        'title': gset.title or 'Набор %s' % gset.code,
+        'author': gset.author.username if gset.author_id else '',
+        'mode_title': mode_cfg.get('title', gset.mode),
+        'type_text': QUESTION_TYPE_TEXT.get(mode_cfg.get('question_type'), ''),
+        'minutes': mode_cfg.get('duration', 0) // 60,
+        'lives': mode_cfg.get('lives', 0),
+        'closes_text': _moscow_text(gset.closes_at),
+        'allowed': allowed,
+        'why_text': why_text,
+        'attempts_left': max(0, gset.attempts_allowed - attempts_used(request, gset)),
+        'mine': mine,
+        'my_place': my_place,
+        'played_text': _moscow_text(mine.created_at, 'j E') if mine else '',
+        'result_url': reverse('game:result', args=[mine.code]) if mine else '',
+        'play_url': own + '?auto=1',
+        'login_url': '/login/?next=' + own,
+        'top': top,
+        'my_row': my_row,
+        'total': total,
+        'more': max(0, total - len(top)),
+        'board_title': 'Кто прошёл · %d' % total,
+        'questions': questions,
         'show_text': show_text,
-        'play_url': reverse('game:set_page', args=[gset.code]),
+        'has_stats': any(q['correct'] or q['wrong'] or q['skip'] for q in questions),
     })
+
+
+def set_missing(request, code):
+    u"""Неверный код набора — страница игры со статусом 404, а не общий 404 сайта.
+
+    Проверка кода та же, что на главной (`api/set_check`): ввёл верный —
+    переход на его страницу без перезагрузки этой.
+    """
+    return render(request, 'game/set_missing.html', {
+        'code': make_code_lookup(code)[:16],
+    }, status=404)
 
 
 def set_question_stats(gset, show_text=True):
@@ -1875,65 +2137,127 @@ def duel_new(request):
 
 @require_safe
 def duel_page(request, code):
-    """Страница дуэли `/game/d/<код>/`.
+    """Страница дуэли `/game/d/<код>/` — одна для всех, в трёх видах (ADR 0112).
 
-    Соперник видит: кто вызвал, режим, фильтры, число вопросов, результат
-    вызвавшего — и кнопку «Играть». ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ.
+    - **Приглашение** (макет DuelInvite): ещё не играл и не автор — кто зовёт,
+      условия пилюлями, «Принять вызов» (гостю — «Войти, чтобы принять»). Автор
+      до своего раунда видит то же с «Вернуться в лобби».
+    - **Ожидание**: свой результат есть, второго нет — «lengler ещё играет» или
+      «ещё не пришёл», без таблицы.
+    - **Сравнение** (макет DuelResult): оба отыграли — вердикт, двое карточками,
+      «По цифрам» с лучшим в каждой строке, «Кто что взял», «Реванш».
 
-    Ссылку могут открыть больше двух человек — тогда страница показывает
-    всех сыгравших доской, автор помечен. Это надмножество сравнения двоих
-    и стоит ровно ничего.
+    ВОПРОСЫ НЕ ПОКАЗЫВАЮТСЯ НИКОГДА: набор собран вслепую для обоих.
     """
     gset = get_object_or_404(GameSet, code=make_code_lookup(code), kind='duel')
     results = list(gset.results.select_related('user').order_by('created_at'))
-    # Страница дуэли ОТКРЫТА всем: по ссылке приходит соперник, и первое,
-    # что он должен увидеть, — во что его зовут. Играть, однако, может
-    # только вошедший (см. api_session_start_set) — об этом сказано на
-    # самой странице, а не выясняется после нажатия «Играть».
+    viewer = request.user if request.user.is_authenticated else None
+    is_author = bool(viewer and gset.author_id == viewer.id)
     mine = my_result_for(request, gset)
 
-    author_result = None
-    for r in results:
-        if gset.author_id and r.user_id == gset.author_id:
-            author_result = r
-            break
-    if author_result is None and results:
-        author_result = results[0]   # аноним-автор: первый сыгравший
+    # ⚠️ РЕЗУЛЬТАТ АВТОРА — ТОЛЬКО РЕЗУЛЬТАТ АВТОРА. Прежняя подмена «первый
+    # сыгравший» делала вызвавшим соперника, который просто закончил раньше
+    # автора. Подмена осталась для старых дуэлей без автора.
+    author_result = next((r for r in results
+                          if gset.author_id and r.user_id == gset.author_id), None)
+    if author_result is None and not gset.author_id and results:
+        author_result = results[0]
 
-    rows = []
-    for r in sorted(results, key=lambda x: (-x.score, x.created_at)):
-        rows.append({
-            'name': (r.user.username if r.user else 'аноним'),
-            'score': r.score,
-            'accuracy': r.accuracy,
-            'max_combo': r.max_combo,
-            'reason': r.ended_reason,
-            'is_author': author_result is not None and r.id == author_result.id,
-            'is_me': mine is not None and r.id == mine.id,
-        })
+    # ⚠️ ПАРА СРАВНЕНИЯ — АВТОР И ОДИН ДРУГОЙ РЕЗУЛЬТАТ (бой 17.09.2026: автор
+    # не видел сравнения, потому что пара строилась «автор + я», а у автора
+    # «я» и есть автор). Смотрит сыгравший соперник — второй его; остальным —
+    # первый сыгравший после автора.
+    if mine is not None and (author_result is None or mine.id != author_result.id):
+        rival_result = mine
+    else:
+        rival_result = next((r for r in results
+                             if author_result is None or r.id != author_result.id), None)
+    compare = (_duel_compare(gset, author_result, rival_result, mine)
+               if author_result and rival_result else None)
 
     allowed, why = set_run_allowed(request, gset)
-    compare = _duel_compare(gset, author_result, mine) \
-        if (mine and author_result and mine.id != author_result.id) else None
-
     f = normalize_filter(gset.filter_snapshot)
-    return render(request, 'game/duel.html', {
+    mode_cfg = config.MODES.get(gset.mode, {})
+    author_name = gset.author.username if gset.author else 'аноним'
+    ctx = {
         'gset': gset,
-        'mode_title': config.MODES.get(gset.mode, {}).get('title', gset.mode),
-        'author_name': (gset.author.username if gset.author else 'аноним'),
-        'author_result': author_result,
-        'rows': rows,
+        'mode_title': mode_cfg.get('title', gset.mode),
+        'mode_icon': DUEL_MODE_ICON.get(gset.mode, 'bolt'),
+        'duration_text': duration_text(mode_cfg.get('duration', 0)),
+        'time_correct': mode_cfg.get('time_correct', 0),
+        'lives': mode_cfg.get('lives', 0),
+        'author_name': author_name,
+        'author_initials': initials(author_name),
+        'is_author': is_author,
         'mine': mine,
         'compare': compare,
         'allowed': allowed,
         'why': why,
         'play_url': reverse('game:set_page', args=[gset.code]),
-        'again_url': (reverse('game:duel_new') + '?mode=' + gset.mode
-                      + _filter_query(f)),
-        'filter_text': _filter_text(f),
-        'page_url': request.build_absolute_uri(
-            reverse('game:duel', args=[gset.code])),
-    })
+        'login_url': '/login/?next=' + quote(reverse('game:duel', args=[gset.code])),
+        'challenge_url': '/game/?duel=' + gset.mode,
+        'rematch_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                        + _filter_query(f) + '&rematch=' + gset.code),
+        'filter_text': 'без фильтров' if is_empty_filter(f) else _filter_text(f),
+        'page_url': request.build_absolute_uri(reverse('game:duel', args=[gset.code])),
+        # Больше двоих сыграло по ссылке — остальные строкой-доской под сравнением.
+        'others': [{'name': r.user.username if r.user else 'аноним', 'score': r.score,
+                    'accuracy': r.accuracy}
+                   for r in sorted(results, key=lambda x: (-x.score, x.created_at))
+                   if compare is None or r.id not in (author_result.id, rival_result.id)],
+    }
+    if compare is None and mine is not None:
+        ctx['waiting'] = _duel_waiting(gset, viewer, is_author)
+        ctx['my_mistakes'] = mine.wrong_count + mine.skip_count
+    if compare is None and mine is None and gset.author_id:
+        ctx['author_line'] = _duel_author_line(gset)
+    return render(request, 'game/duel.html', ctx)
+
+
+# Значки режимов на странице дуэли — те же, что у вкладок главной (MODE_META
+# в game.html), и «в Пуле» для строки об авторе приглашения.
+DUEL_MODE_ICON = {'bullet': 'bolt', 'blitz': 'flame', 'rapid': 'target',
+                  'classic': 'keypad', 'figure': 'chart'}
+MODE_IN = {'bullet': 'в Пуле', 'blitz': 'в Блице', 'rapid': 'в Рапиде',
+           'classic': 'в Классике', 'figure': 'в Графике'}
+
+
+def _duel_author_line(gset):
+    u"""«дуэлей: 3 · побед 1 · лучший счёт в Пуле 957» — из журнала дуэлей и
+    рекордов автора; данных нет — части нет, пустая строка — строки нет."""
+    parts = []
+    stats = lb.duel_stats(gset.author)
+    if stats['played']:
+        parts.append('дуэлей: %d · побед %d' % (stats['played'], stats['wins']))
+    best = lb.best_scores(gset.author).get(gset.mode)
+    if best:
+        parts.append('лучший счёт %s %s' % (MODE_IN.get(gset.mode, ''), _thousands(best)))
+    return ' · '.join(parts)
+
+
+def _duel_waiting(gset, viewer, is_author):
+    u"""«lengler ещё играет» или «ещё не пришёл» — пока второго результата нет.
+
+    Играет ли второй, знает комната дуэли (game/state.py): его забег записан при
+    старте и ещё не закрыт. Комната живёт полчаса — дальше «не пришёл».
+    """
+    if is_author:
+        run_ids = [rid for _uid, rid in run_state.duel_rivals(gset.code, viewer.id)]
+        who = 'Соперник'
+    else:
+        rid = run_state.duel_run_of(gset.code, gset.author_id) if gset.author_id else None
+        run_ids = [rid] if rid else []
+        who = gset.author.username if gset.author_id else 'Автор вызова'
+    playing = False
+    for rid in run_ids:
+        st = run_state.load_by_id(rid)
+        if st and not st.get('ended'):
+            playing = True
+    return '%s %s' % (who, 'ещё играет' if playing else 'ещё не пришёл')
+
+
+def _thousands(n):
+    return '{:,}'.format(n).replace(',', '\u00a0')
 
 
 def _filter_query(f):
@@ -1997,69 +2321,154 @@ def _duel_broadcast(request, state, finished=False):
     except Exception:            # noqa: BLE001 — украшение забег не роняет
         logger.warning('дуэль %s: табло не разослано', code, exc_info=True)
 
-def _duel_compare(gset, a, b):
-    """Сравнение двух забегов лоб в лоб: таблица метрик и полоса «кто что взял».
+def _duel_compare(gset, a, b, mine=None):
+    """Сравнение двоих по макету DuelResult (ADR 0112): `a` — автор, `b` — соперник.
 
-    Таблица (решение владельца 15.09.2026) — ТОЛЬКО то, что хранит
-    `GameResult`: очки, верные, ошибки, пропуски, точность, лучшее комбо,
-    среднее время ВЕРНОГО ответа и длительность раунда. Среднего времени всех
-    ответов в базе нет, поэтому и строки с ним нет: приблизительное число
-    хуже отсутствующего. Нет замера у старого результата — «–».
-    Победитель — по очкам, его столбец подсвечен; ничья — без подсветки.
+    Смотрящий участник стоит слева и зовётся «Вы». Таблица «По цифрам» — только
+    то, что хранит `GameResult` (решение 15.09.2026): среднего времени ВСЕХ
+    ответов в базе нет, и строки с ним нет; нет замера — «–». ⚠️ ЛУЧШИЙ
+    ВЫДЕЛЯЕТСЯ В КАЖДОЙ СТРОКЕ, а не весь столбец победителя: по очкам
+    выиграл один, а быстрее отвечал, может быть, другой. Равные значения — без
+    выделения.
 
-    Полоса строится по question_outcomes: у каждого вопроса набора два
-    значка — верно / неверно / пропуск / не дошёл.
+    «Кто что взял» — по `question_outcomes`, только до последнего вопроса, до
+    которого дошёл хоть кто-то (запас очереди дуэли — 150 вопросов).
     """
-    def by_qid(result):
-        return {item.get('question_id'): item.get('outcome')
-                for item in (result.question_outcomes or [])}
+    left, right = (b, a) if (mine is not None and mine.id == b.id) else (a, b)
+    me_id = mine.id if mine is not None else None
+
+    def name(r, fallback):
+        return r.user.username if r.user else fallback
 
     def combo(value):
-        return '×' + ('%g' % value).replace('.', ',')
+        return '×' + ('%g' % (value or 1)).replace('.', ',')
 
-    def seconds(ms):
-        return '–' if ms is None else ('%.1f' % (ms / 1000)).replace('.', ',') + ' с'
+    def secs(ms):
+        return '–' if ms is None else ('%.1f' % (ms / 1000)).replace('.', ',')
 
     def clock(ms):
         if ms is None:
             return '–'
-        minutes, secs = divmod(round(ms / 1000), 60)
-        return '%d:%02d' % (minutes, secs)
+        minutes, rest = divmod(round(ms / 1000), 60)
+        return '%d:%02d' % (minutes, rest)
 
-    ma, mb = by_qid(a), by_qid(b)
-    strip = []
-    for i, qid in enumerate(gset.question_ids or []):
-        strip.append({'number': i + 1,
-                      'a': ma.get(qid, 'none'),
-                      'b': mb.get(qid, 'none')})
-    metrics = (
-        ('Очки', lambda r: r.score),
-        ('Верных', lambda r: r.correct_count),
-        ('Ошибок', lambda r: r.wrong_count),
-        ('Пропусков', lambda r: r.skip_count),
-        ('Точность', lambda r: '%d%%' % r.accuracy),
-        ('Лучшее комбо', lambda r: combo(r.max_combo)),
-        ('Среднее время верного ответа', lambda r: seconds(r.avg_correct_ms)),
-        ('Время раунда', lambda r: clock(r.wall_ms)),
-    )
-    if a.score > b.score:
-        winner = 'a'
-        verdict = 'Побеждает %s' % (a.user.username if a.user else 'вызвавший')
-    elif b.score > a.score:
-        winner = 'b'
-        verdict = 'Побеждает %s' % (b.user.username if b.user else 'соперник')
+    names = {a.id: name(a, 'автор'), b.id: name(b, 'соперник')}
+    cards = []
+    for r in (left, right):
+        answered = r.correct_count + r.wrong_count + r.skip_count
+        cards.append({'name': names[r.id], 'initials': initials(names[r.id]),
+                      'is_me': r.id == me_id, 'score': r.score,
+                      'sub': 'верных %d из %d · точность %d %% · комбо %s' % (
+                          r.correct_count, answered, r.accuracy, combo(r.max_combo)),
+                      'win': False})
+    if left.score != right.score:
+        winner = 0 if left.score > right.score else 1
+        cards[winner]['win'] = True
+        verdict = 'Вы победили' if cards[winner]['is_me'] else 'Победа за ' + cards[winner]['name']
     else:
-        winner = ''
         verdict = 'Ничья'
-    return {
-        'a': {'name': (a.user.username if a.user else 'вызвавший'), 'score': a.score},
-        'b': {'name': (b.user.username if b.user else 'соперник'), 'score': b.score},
-        'rows': [{'label': label, 'a': value(a), 'b': value(b)}
-                 for label, value in metrics],
-        'winner': winner,
-        'strip': strip,
-        'verdict': verdict,
-    }
+    hi, lo = max(left.score, right.score), min(left.score, right.score)
+    line = ['%s : %s' % (_thousands(hi), _thousands(lo))]
+    if hi != lo:
+        gap = hi - lo
+        line.append('разрыв %s %s' % (_thousands(gap), _plural(gap, 'очко', 'очка', 'очков')))
+    line.append(_duel_endings(left, right, cards))
+
+    # [подпись, значение, лучше больше?, как писать]
+    metrics = (
+        ('Очки', lambda r: r.score, True, _thousands),
+        ('Верных', lambda r: r.correct_count, True, str),
+        ('Ошибок', lambda r: r.wrong_count, False, str),
+        ('Пропусков', lambda r: r.skip_count, False, str),
+        ('Точность', lambda r: r.accuracy, True, lambda v: '%d %%' % v),
+        ('Лучшее комбо', lambda r: r.max_combo or 1, True, combo),
+        ('Секунд на верный', lambda r: r.avg_correct_ms, False, secs),
+        ('Продержался', lambda r: r.wall_ms, True, clock),
+    )
+    rows = []
+    for label, value, more_is_better, fmt in metrics:
+        va, vb = value(left), value(right)
+        best = ''
+        if va is not None and vb is not None and va != vb:
+            best = 'a' if (va > vb) == more_is_better else 'b'
+        rows.append({'label': label, 'a': fmt(va) if va is not None else '–',
+                     'b': fmt(vb) if vb is not None else '–', 'best': best})
+
+    def by_qid(result):
+        return {item.get('question_id'): item.get('outcome')
+                for item in (result.question_outcomes or [])}
+
+    ma, mb = by_qid(left), by_qid(right)
+    reached = max(len(left.question_outcomes or []), len(right.question_outcomes or []))
+    strip = [{'number': n + 1, 'a': ma.get(qid, 'none'), 'b': mb.get(qid, 'none')}
+             for n, qid in enumerate((gset.question_ids or [])[:reached])]
+    return {'cards': cards, 'verdict': verdict, 'line': ' · '.join(line),
+            'rows': rows, 'strip': strip,
+            'story': _duel_story(strip, cards)}
+
+
+ENDING_BOTH = {'lives': 'оба выбыли по жизням', 'time': 'у обоих вышло время',
+               'set_done': 'оба прошли все вопросы', 'pool_empty': 'у обоих кончились вопросы'}
+ENDING_ONE = {'lives': 'жизни кончились', 'time': 'время вышло',
+              'set_done': 'все вопросы пройдены', 'pool_empty': 'вопросы кончились'}
+
+
+def _duel_endings(left, right, cards):
+    u"""Чем кончились оба раунда — словами: «оба выбыли по жизням»."""
+    ra, rb = left.ended_reason or 'time', right.ended_reason or 'time'
+    if ra == rb and ra in ENDING_BOTH:
+        return ENDING_BOTH[ra]
+    who = ['у вас' if c['is_me'] else c['name'] for c in cards]
+    return '%s: %s, %s: %s' % (who[0], ENDING_ONE.get(ra, ra), who[1], ENDING_ONE.get(rb, rb))
+
+
+ORDINALS = ('первый', 'второй', 'третий', 'четвёртый', 'пятый', 'шестой', 'седьмой',
+            'восьмой', 'девятый', 'десятый', 'одиннадцатый', 'двенадцатый',
+            'тринадцатый', 'четырнадцатый', 'пятнадцатый', 'шестнадцатый',
+            'семнадцатый', 'восемнадцатый', 'девятнадцатый', 'двадцатый')
+
+
+def _duel_story(strip, cards):
+    u"""Одна фраза-вывод под «Кто что взял» (макет DuelResult).
+
+    «Первый взяли оба. Третий – только вы; второй и пятый – только lengler.
+    Дальше вас уже не было.» Номера после двадцатого — «№21».
+    """
+    def words(numbers):
+        items = [ORDINALS[n - 1] if n <= len(ORDINALS) else '№%d' % n for n in numbers]
+        return items[0] if len(items) == 1 else ', '.join(items[:-1]) + ' и ' + items[-1]
+
+    def who(card, case):
+        if card['is_me']:
+            return 'вы' if case == 'nom' else 'вас'
+        return card['name']
+
+    both = [c['number'] for c in strip if c['a'] == 'correct' and c['b'] == 'correct']
+    only_a = [c['number'] for c in strip if c['a'] == 'correct' and c['b'] != 'correct']
+    only_b = [c['number'] for c in strip if c['b'] == 'correct' and c['a'] != 'correct']
+    out = []
+    if both:
+        out.append('%s взяли оба' % words(both))
+    parts = []
+    if only_a:
+        parts.append('%s – только %s' % (words(only_a), who(cards[0], 'nom')))
+    if only_b:
+        parts.append('%s – только %s' % (words(only_b), who(cards[1], 'nom')))
+    if parts:
+        out.append('; '.join(parts))
+    if not out:
+        out.append('Верных не было ни у кого')
+    reached_a = sum(1 for c in strip if c['a'] != 'none')
+    reached_b = sum(1 for c in strip if c['b'] != 'none')
+    if reached_a != reached_b:
+        out.append('Дальше %s уже не было' % who(cards[0] if reached_a < reached_b else cards[1], 'gen'))
+    return '. '.join(p[0].upper() + p[1:] for p in out) + '.'
+
+
+def _plural(n, one, few, many):
+    if n % 100 in (11, 12, 13, 14):
+        return many
+    return one if n % 10 == 1 else few if 2 <= n % 10 <= 4 else many
 
 
 # ---------------------------------------------------------------------------
@@ -2068,70 +2477,163 @@ def _duel_compare(gset, a, b):
 
 @require_safe
 def daily_page(request):
-    """Четыре карточки вызова дня — по одной на режим."""
-    from . import daily as daily_mod
+    """Вызов дня `/game/daily/` (P4, решение владельца 17.09.2026, макет Daily).
+
+    Серия дней и отсчёт до новой полуночи сверху, ниже карточка на каждый
+    режим: число сыгравших, топ-5 доски, вчерашний победитель, «Играть» сразу
+    в раунд (`?auto=1`) или, если уже сыграно, свой счёт и место.
+
+    ⚠️ БЕЗ ЗАПРОСА НА ИГРОКА И НА КАРТОЧКУ. Наборы сегодня и вчера — одной
+    выборкой, результаты всех восьми — второй; топ-5, число сыгравших, моё
+    место и вчерашний победитель считаются из неё. Число запросов страницы
+    не растёт с числом игроков — держит тест.
+    """
     day = daily_mod.today()
+    yesterday = day - datetime.timedelta(days=1)
+    user = request.user if request.user.is_authenticated else None
+    known = {(s.mode, s.day): s for s in
+             GameSet.objects.filter(kind='daily', day__in=(day, yesterday))}
+    today_sets = []
+    for key in config.MODES:
+        gset = known.get((key, day)) or daily_mod.get_daily_set(key, day)
+        if gset is not None:        # в пуле нет вопросов этого типа — вызова нет
+            today_sets.append(gset)
+    yesterday_sets = {mode: s for (mode, d), s in known.items() if d == yesterday}
+
+    board = {}
+    set_ids = [s.id for s in today_sets] + [s.id for s in yesterday_sets.values()]
+    for r in (GameResult.objects.filter(game_set_id__in=set_ids, user__isnull=False)
+              .order_by('-score', 'created_at')
+              .values('game_set_id', 'user_id', 'user__username', 'score')):
+        board.setdefault(r['game_set_id'], []).append(r)
+    # Свой результат анонима (и вошедшего, сыгравшего до входа) — по сессии.
+    session_codes = request.session.get(MY_RESULTS_KEY) or {}
+    wanted = [session_codes[s.code] for s in today_sets if s.code in session_codes]
+    by_session = {r.game_set_id: r.score for r in
+                  GameResult.objects.filter(code__in=wanted).only('game_set', 'score')
+                  } if wanted else {}
+    played_codes = set(played_set_codes(request))
+
     cards = []
-    for key, m in config.MODES.items():
-        gset = daily_mod.get_daily_set(key, day)
-        if gset is None:
-            continue     # в пуле нет вопросов этого типа — вызова нет
-        mine = None
-        if request.user.is_authenticated:
-            mine = gset.results.filter(user=request.user).first()
-        played = bool(mine) or gset.code in played_set_codes(request)
+    for gset in today_sets:
+        rows = board.get(gset.id, [])
+        my_place = my_score = None
+        if user is not None:
+            for i, r in enumerate(rows):
+                if r['user_id'] == user.id:
+                    my_place, my_score = i + 1, r['score']
+                    break
+        if my_score is None:
+            my_score = by_session.get(gset.id)
+        yset = yesterday_sets.get(gset.mode)
+        yrows = board.get(yset.id, []) if yset else []
         cards.append({
-            'mode': key,
-            'title': m['title'],
-            'size': gset.size,
-            'code': gset.code,
-            'played': played,
-            'my_score': mine.score if mine else None,
-            'play_url': reverse('game:set_page', args=[gset.code]),
-            'board_url': reverse('game:daily_board', args=[key]),
+            'mode': gset.mode,
+            'title': config.MODES[gset.mode]['title'],
+            'icon': DUEL_MODE_ICON.get(gset.mode, 'bolt'),
+            'meta': daily_mod.set_line(gset.mode, gset.size),
+            'count': len(rows),
+            'top': [{'place': i + 1, 'name': r['user__username'], 'score': r['score'],
+                     'is_me': bool(user and r['user_id'] == user.id)}
+                    for i, r in enumerate(rows[:5])],
+            'yesterday_winner': ({'name': yrows[0]['user__username'],
+                                  'score': yrows[0]['score']} if yrows else None),
+            'yesterday_url': daily_mod.board_url(gset.mode, yesterday),
+            'played': my_score is not None or gset.code in played_codes,
+            'my_score': my_score,
+            'my_place': my_place,
+            'play_url': reverse('game:set_page', args=[gset.code]) + '?auto=1',
+            'board_url': daily_mod.board_url(gset.mode, day),
         })
     return render(request, 'game/daily.html', {
         'cards': cards,
         'day': day,
+        'played_count': sum(1 for c in cards if c['played']),
+        'streak': daily_mod.streak_for(user, today=day) if user is not None else None,
         'reset_at': daily_mod.next_reset().isoformat(),
     })
 
 
 @require_safe
 def daily_board(request, mode, day=None):
-    """Доска вызова дня: топ-50 + твоё место, если ты вне топа."""
-    from . import daily as daily_mod
+    """Доска дня `/game/daily/<режим>/[<день>/]` (P4, макет DailyBoard).
+
+    Одна на вызов: страница вызова, итог раунда и старый адрес доски набора
+    ведут сюда. Сводка сверху, «Таблица» (первые 10 и своя строка) и «Где
+    ошиблись» по вопросам; режим и день переключаются ссылками.
+
+    ⚠️ ДНЯ БЕЗ НАБОРА В ВИДЕ 404 НЕ БЫВАЕТ. Наборы создаются лениво: если в
+    прошедший день на страницу вызова никто не заходил, набора нет, и доска
+    честно пустая — «В этот день вызов никто не сыграл». Задним числом наборы
+    НЕ создаются. 404 — только неизвестный режим, кривая дата и будущее.
+
+    ⚠️ ТЕКСТЫ ВОПРОСОВ: пока вызов открыт (сегодня), их видят персонал и тот,
+    кто вызов уже сыграл, — иначе набор можно подсмотреть до попытки. После
+    закрытия дня тексты открыты всем (дополнение к решению 17.09.2026).
+    """
     if mode not in config.MODES:
         raise Http404('Неизвестный режим')
+    today = daily_mod.today()
     if day:
         try:
             day_obj = datetime.datetime.strptime(day, '%Y-%m-%d').date()
         except ValueError:
             raise Http404('Неверная дата')
+        if day_obj > today:
+            raise Http404('Этот день ещё не наступил')
     else:
-        day_obj = daily_mod.today()
-    # Вчерашнюю доску показываем, но задним числом наборы не создаём:
-    # архив дальше вчера не требуется, а плодить наборы за прошлое нечестно.
-    create = day_obj == daily_mod.today()
-    gset = daily_mod.get_daily_set(mode, day_obj, create=create)
-    if gset is None:
-        raise Http404('Вызова на этот день нет')
+        day_obj = today
+    is_today = day_obj == today
+    gset = daily_mod.get_daily_set(mode, day_obj, create=is_today)
 
     me = request.user if request.user.is_authenticated else None
-    top, my_row, total = daily_mod.board_rows(gset, me)
-    yesterday = day_obj - datetime.timedelta(days=1)
+    top, my_row, total, mine, my_place = [], None, 0, None, None
+    questions, show_text = [], not is_today
+    if gset is not None:
+        top, my_row, total = daily_mod.board_rows(gset, me, limit=10)
+        mine = my_result_for(request, gset)
+        my_place = next((r['place'] for r in top if r['is_me']),
+                        my_row['place'] if my_row else None)
+        show_text = (not is_today or mine is not None
+                     or bool(me and (me.is_staff or gset.author_id == me.id)))
+        questions = set_question_stats(gset, show_text=show_text)
+    for q in questions:
+        q['hard'] = q['percent'] is not None and q['percent'] < 40
+
+    one = datetime.timedelta(days=1)
+    first = daily_mod.first_day()
+    prev_day = day_obj - one if first is not None and day_obj - one >= first else None
+    next_day = day_obj + one if day_obj < today else None
+    enabled = set(_pool_qs().order_by().values_list('question_type', flat=True).distinct())
+    tabs = [{'title': m['title'], 'on': key == mode,
+             'url': daily_mod.board_url(key, day_obj)}
+            for key, m in config.MODES.items()
+            if m['question_type'] in enabled or key == mode]
     return render(request, 'game/daily_board.html', {
         'gset': gset,
         'mode': mode,
         'mode_title': config.MODES[mode]['title'],
+        'set_line': daily_mod.set_line(mode, gset.size if gset else None),
+        'tabs': tabs,
         'day': day_obj,
-        'is_today': day_obj == daily_mod.today(),
+        'is_today': is_today,
+        'is_yesterday': day_obj == today - one,
+        'show_year': day_obj.year != today.year,
+        'prev_url': daily_mod.board_url(mode, prev_day) if prev_day else '',
+        'next_url': daily_mod.board_url(mode, next_day) if next_day else '',
+        'reset_at': daily_mod.next_reset().isoformat() if is_today else '',
         'top': top,
         'my_row': my_row,
         'total': total,
-        'play_url': reverse('game:set_page', args=[gset.code]),
-        'yesterday_url': reverse('game:daily_board_day',
-                                 args=[mode, yesterday.isoformat()]),
+        'more': max(0, total - len(top)),
+        'mine': mine,
+        'my_place': my_place,
+        'result_url': reverse('game:result', args=[mine.code]) if mine else '',
+        'play_url': (reverse('game:set_page', args=[gset.code]) + '?auto=1'
+                     if gset is not None else ''),
+        'questions': questions,
+        'show_text': show_text,
+        'has_stats': any(q['correct'] or q['wrong'] or q['skip'] for q in questions),
     })
 
 
@@ -2163,6 +2665,15 @@ def api_session_finish(request):
         state['ended'] = state.get('ended') or 'done'
         run_state.save_run(request, state)
         return JsonResponse({'summary': practice_summary(state), 'practice': True})
+    # ⚠️ БРОШЕННЫЙ РАУНД СОХРАНЯЕТСЯ ТОЛЬКО БЕЗ НАБОРА (решение 17.09.2026).
+    # У набора, вызова дня и дуэли в зачёт идёт только доигранный раунд:
+    # сохрани мы брошенный — выход сжёг бы единственную попытку. Раунд без
+    # единого ответа сохранять нечего. Клиент эти случаи сам не шлёт; здесь
+    # вторая защита от старой вкладки и ручного запроса.
+    if body.get('reason') == 'quit' and not state.get('ended'):
+        if state.get('set_code') or not state.get('log'):
+            return JsonResponse({'error': 'Этот раунд не сохраняется',
+                                 'reason': 'quit_not_saved'}, status=400)
     # Открытая пауза (окно не успело сказать «закрыто») закрывается моментом
     # финиша — иначе её длительность не попала бы в зачёт.
     _close_pause(state, _now_ms())
@@ -2196,7 +2707,99 @@ def api_session_finish(request):
     if saved is not None and saved.ranked and saved.user_id:
         summary['ranked_today'] = _ranked_today(saved.user, saved.mode)
         summary['ranked_per_day'] = config.RANKED_RUNS_PER_DAY
+    if saved is not None:
+        # Момент раунда — момент сохранения результата, а не повторного
+        # вызова finish: иначе дата итога «ехала» бы с каждым обновлением.
+        summary['played_at'] = saved.created_at.isoformat(timespec='seconds')
+        summary.update(_finish_extras(request, saved))
     return JsonResponse({'summary': summary, 'share': share})
+
+
+def _finish_extras(request, saved):
+    u"""Поля итога раунда по макету 17.09.2026 (ADR 0111), читаются из базы.
+
+    - `places` — места игрока в таблице режима за неделю и за всё время;
+      только у зачётного раунда вошедшего.
+    - `record` — {is_record, prev_best}: ⚠️ ЛИЧНЫЙ РЕКОРД — ЛУЧШИЙ ЗАЧЁТНЫЙ
+      РАУНД РЕЖИМА (решение 17.09.2026, то же правило у чипа рекорда на
+      раунде и в «Моей статистике»). У незачётного раунда плашки нет вовсе:
+      «личный рекорд» рядом с «Не в таблице» читался бы как противоречие.
+    - `daily` — место на доске дня, серия дней и следующий несыгранный вызов.
+    - `attempts_left` — остаток попыток набора учителя.
+    - `duel` — страница сравнения, отыграл ли соперник и адрес реванша.
+    """
+    out = {'avg_correct_ms': saved.avg_correct_ms}
+    user = request.user if request.user.is_authenticated else None
+    if saved.ranked and user is not None:
+        week = lb.my_row(user, saved.mode, 'week', 'score')
+        whole = lb.my_row(user, saved.mode, 'all', 'score')
+        out['places'] = {'week': week['place'] if week else None,
+                         'all': whole['place'] if whole else None}
+        prev = (GameResult.objects
+                .filter(user=user, mode=saved.mode, ranked=True,
+                        economy_version=config.ECONOMY_VERSION,
+                        created_at__lt=saved.created_at)
+                .exclude(pk=saved.pk)
+                .order_by('-score').values_list('score', flat=True).first())
+        out['record'] = {'is_record': prev is not None and saved.score > prev,
+                         'prev_best': prev}
+    gset = saved.game_set
+    if gset is None:
+        return out
+    if gset.kind == 'daily':
+        out['daily'] = _daily_extras(request, saved, gset, user)
+    elif gset.kind == 'duel':
+        others = gset.results.exclude(pk=saved.pk)
+        if user is not None:
+            others = others.exclude(user=user)
+        out['duel'] = {
+            'url': reverse('game:duel', args=[gset.code]),
+            'rival_done': others.exists(),
+            # Реванш — тот же режим и фильтр, новые вопросы; окно зовёт этот
+            # адрес запросом и уходит в лобби новой дуэли.
+            'rematch_url': (reverse('game:duel_new') + '?mode=' + gset.mode
+                            + _filter_query(gset.filter_snapshot)
+                            + '&rematch=' + gset.code),
+        }
+    else:
+        out['attempts_left'] = max(0, gset.attempts_allowed
+                                   - attempts_used(request, gset))
+    return out
+
+
+def _daily_extras(request, saved, gset, user):
+    u"""Итог вызова дня: место на доске дня, серия и следующий вызов.
+
+    Место считается тем же порядком, что у доски (`daily.board_rows`): по
+    счёту, при равенстве выше тот, кто закончил раньше. Аноним на доску не
+    попадает — места у него нет, это итог и скажет словами.
+    """
+    ranked = gset.results.filter(user__isnull=False)
+    info = {'board_url': daily_mod.board_url(gset.mode, gset.day),
+            'total': ranked.count(), 'place': None, 'streak': 0, 'next': None}
+    if user is not None and saved.user_id == user.id:
+        ahead = ranked.filter(Q(score__gt=saved.score)
+                              | Q(score=saved.score,
+                                  created_at__lt=saved.created_at)).count()
+        info['place'] = ahead + 1
+        pairs = daily_mod.played_pairs(user)
+        info['streak'] = daily_mod.streak_for(user, pairs=pairs)['current']
+    else:
+        pairs = set()
+    day0 = daily_mod.today()
+    played_codes = set(played_set_codes(request))
+    for mode in config.MODES:
+        if mode == gset.mode and gset.day == day0:
+            continue
+        if (day0, mode) in pairs:
+            continue
+        nxt = daily_mod.get_daily_set(mode, day0)
+        if nxt is None or nxt.code in played_codes:
+            continue
+        info['next'] = {'mode': mode, 'title': config.MODES[mode]['title'],
+                        'url': reverse('game:set_page', args=[nxt.code]) + '?auto=1'}
+        break
+    return info
 
 
 def _log_learning_events(request, state):
@@ -2266,6 +2869,10 @@ def _end_reason(state, claimed):
     или свободный, — а сервер знает. Поэтому он присылает нейтральное
     'done' (и старые клиенты тоже), а разделение делает сервер.
     """
+    if claimed == 'quit':
+        # Игрок вышел крестиком или Esc (решение 17.09.2026). Сохраняется
+        # только раунд без набора — это проверяет `api_session_finish`.
+        return 'quit'
     if claimed == 'time':
         return 'time'
     if claimed in ('done', 'pool_empty', 'set_done'):
@@ -2273,17 +2880,30 @@ def _end_reason(state, claimed):
     return 'time'
 
 
-def _quota_line(request):
-    u"""Строка «Зачётных забегов сегодня: 7 из 10» — или пусто анониму.
+def _quota_payload(request):
+    u"""Квота зачётных раундов на сегодня по режимам — или None анониму.
 
-    Считается по режиму по умолчанию: на стартовом экране режим ещё не
-    выбран, а показывать четыре строки ради одной цифры незачем.
+    `{'used': {режим: N}, 'max': M}`. Стартовый экран показывает «N из M»
+    у выбранного режима и меняет число вместе с режимом (ADR 0108): квота
+    считается по режиму (`_ranked_today`), и одна цифра режима по умолчанию
+    врала бы у остальных. Один запрос на все режимы.
     """
     if not request.user.is_authenticated:
-        return ''
-    used = _ranked_today(request.user, config.DEFAULT_MODE)
-    return 'Зачётных раундов сегодня: %d из %d' % (
-        min(used, config.RANKED_RUNS_PER_DAY), config.RANKED_RUNS_PER_DAY)
+        return None
+    from django.db.models import Count
+    from zoneinfo import ZoneInfo
+    msk = ZoneInfo('Europe/Moscow')
+    start = datetime.datetime.combine(_moscow_day(), datetime.time.min,
+                                      tzinfo=msk)
+    rows = (GameResult.objects
+            .filter(user=request.user, ranked=True, created_at__gte=start,
+                    created_at__lt=start + datetime.timedelta(days=1))
+            .values('mode').annotate(n=Count('id')))
+    used = {key: 0 for key in config.MODES}
+    for row in rows:
+        if row['mode'] in used:
+            used[row['mode']] = min(row['n'], config.RANKED_RUNS_PER_DAY)
+    return {'used': used, 'max': config.RANKED_RUNS_PER_DAY}
 
 
 def _moscow_day(when=None):
@@ -2354,6 +2974,20 @@ def credited_pause_ms(state):
     return min(total, config.PAUSE_CAP_SECONDS * 1000)
 
 
+def paused_ms_now(state, now_ms=None):
+    u"""Сколько раунд простоял на паузе к моменту `now_ms` — для часов
+    соперника в дуэли (`consumers.seconds_left_for`).
+
+    Те же правила зачёта, что у `credited_pause_ms`, плюс пауза, открытая
+    прямо сейчас (разбор ошибки, окно), если она из первых PAUSE_MAX_COUNT.
+    """
+    now_ms = _now_ms() if now_ms is None else now_ms
+    pauses = (state.get('pauses') or [])[:config.PAUSE_MAX_COUNT]
+    total = sum((end if end is not None else max(now_ms, start)) - start
+                for start, end in pauses)
+    return min(total, config.PAUSE_CAP_SECONDS * 1000)
+
+
 def _paused_response():
     return JsonResponse({'error': 'paused', 'reason': 'paused'}, status=409)
 
@@ -2405,6 +3039,8 @@ def _rank_run(request, state, summary, wall_ms):
     user = request.user if request.user.is_authenticated else None
     if user is None:
         return False, 'anonymous'
+    if state.get('ended') == 'quit':
+        return False, 'quit'
     if state.get('mistakes_run'):
         return False, 'mistakes_run'
     if state.get('set_code'):
@@ -2509,8 +3145,16 @@ def _save_result(request, state, summary):
     if gset is not None:
         # У дуэли «доска» — это её страница сравнения, а не общая доска
         # набора: соперника интересует счёт лоб в лоб.
-        board = reverse('game:duel', args=[gset.code]) if gset.kind == 'duel' \
-            else reverse('game:set_board', args=[gset.code])
+        if gset.kind == 'duel':
+            board = reverse('game:duel', args=[gset.code])
+        elif gset.kind == 'daily':
+            # У вызова дня одна доска — доска дня его режима и ЕГО дня (P4):
+            # раунд вчерашнего набора, законченный после полуночи, ведёт на
+            # вчерашнюю доску, а не на сегодняшнюю.
+            board = daily_mod.board_url(gset.mode, gset.day)
+        else:
+            # Доска набора учителя живёт на его странице (P6).
+            board = reverse('game:set_page', args=[gset.code])
         out['set'] = {
             'code': gset.code,
             'kind': gset.kind,
@@ -2520,6 +3164,25 @@ def _save_result(request, state, summary):
     return out
 
 
+# Чем кончился раунд — словами публичной страницы (P6): каждый исход своим, а не
+# «время вышло» для всего, что не жизни.
+RESULT_ENDING = {'lives': 'жизни кончились', 'time': 'время вышло',
+                 'set_done': 'прошёл набор до конца', 'pool_empty': 'вопросы кончились',
+                 'quit': 'вышел из раунда'}
+# «Сыграть в Блиц», «в Пулю»: режим в винительном падеже.
+MODE_TO = {'bullet': 'в Пулю', 'blitz': 'в Блиц', 'rapid': 'в Рапид',
+           'classic': 'в Классику', 'figure': 'в График'}
+# «1-е место в таблице Блица»: режим в родительном.
+MODE_OF = {'bullet': 'Пули', 'blitz': 'Блица', 'rapid': 'Рапида',
+           'classic': 'Классики', 'figure': 'Графика'}
+
+
+def points_word(score):
+    u"""«очко / очка / очков» по числу: 1 очко, 22 очка, 25 очков, 111 очков."""
+    from problems.templatetags.ru import pick
+    return pick(score, 'очко', 'очка', 'очков')
+
+
 @require_safe
 def result_page(request, code):
     """Публичная страница результата — то, что видит человек по ссылке.
@@ -2527,22 +3190,75 @@ def result_page(request, code):
     Без логина и read-only: чужой забег нельзя ни продолжить, ни изменить.
     require_safe, а не require_GET: HEAD должен отвечать как везде на сайте
     (мессенджеры дёргают HEAD перед разворачиванием превью).
+
+    По решению 17.09.2026 (ADR 0115): ник игрока (у анонимного — «Игрок»),
+    место в таблице режима у зачётного, исход словами для всех пяти причин и
+    две кнопки — «Сыграть в <режим>» (или этот же набор) и «Вызвать на дуэль».
+    ⚠️ Страница ничего не пишет; запросов — постоянное число, место считает та
+    же функция, что строку «я» в лидерборде.
     """
-    result = get_object_or_404(GameResult, code=code)
-    mode_title = (config.MODES.get(result.mode) or {}).get('title', result.mode)
-    # Ссылки в мета-тегах — абсолютные: относительный путь мессенджер
-    # не развернёт.
-    page_url = request.build_absolute_uri(
-        reverse('game:result', args=[result.code]))
+    result = get_object_or_404(GameResult.objects.select_related('user', 'game_set'), code=code)
+    mode_cfg = config.MODES.get(result.mode) or {}
+    mode_title = mode_cfg.get('title', result.mode)
+    name = result.user.username if result.user_id else ''
+    gset = result.game_set
+    place = None
+    if result.ranked and result.user_id:
+        row = lb.my_row(result.user, result.mode, 'all', 'score')
+        place = row['place'] if row else None
+
+    set_line = ''
+    primary = {'text': 'Сыграть ' + MODE_TO.get(result.mode, mode_title),
+               'sub': 'обогнать %s' % result.score if result.score else '',
+               'url': reverse('game:page') + '?mode=' + result.mode}
+    if gset is not None and gset.kind == 'daily':
+        set_line = 'вызов дня · ' + _moscow_text(gset.opens_at or result.created_at, 'j E')
+        if gset.day == daily_mod.today():
+            primary = {'text': 'Сыграть этот же вызов', 'sub': '',
+                       'url': reverse('game:set_page', args=[gset.code]) + '?auto=1'}
+        else:
+            primary = {'text': 'Сегодняшний вызов дня', 'sub': '', 'url': reverse('game:daily')}
+    elif gset is not None and gset.kind == 'custom':
+        set_line = 'набор «%s»' % (gset.title or gset.code)
+        primary = {'text': 'Сыграть этот же набор', 'sub': '',
+                   'url': reverse('game:set_page', args=[gset.code])}
+    elif gset is not None and gset.kind == 'duel':
+        set_line = 'дуэль'
+
+    duel_target = reverse('game:page') + '?duel=' + result.mode
+    viewer = request.user if request.user.is_authenticated else None
+    rival = name if name and not (viewer and viewer.id == result.user_id) else ''
+    lives = mode_cfg.get('lives') or 0
+    lives_left = None
+    if lives and result.ended_reason != 'lives' and 0 <= lives - result.wrong_count <= lives:
+        lives_left = lives - result.wrong_count
+    points = points_word(result.score)
+    page_url = request.build_absolute_uri(reverse('game:result', args=[result.code]))
     return render(request, 'game/result.html', {
         'r': result,
+        'name': name,
+        'initials': initials(name),
         'mode_title': mode_title,
-        'accuracy': result.accuracy,
+        'type_text': QUESTION_TYPE_TEXT.get(mode_cfg.get('question_type'), ''),
+        'points_word': points,
+        'place': place,
+        'mode_of': MODE_OF.get(result.mode, mode_title),
+        'set_line': set_line,
+        'unranked_text': ('' if result.ranked or set_line
+                          else config.UNRANKED_TEXT.get(result.unranked_reason, '')),
+        'combo': '×' + ('%g' % (result.max_combo or 1)).replace('.', ','),
+        'ending': RESULT_ENDING.get(result.ended_reason, RESULT_ENDING['time']),
+        'lives': lives,
+        'lives_left': lives_left,
+        'primary': primary,
+        'duel_url': duel_target if viewer else '/login/?next=' + quote(duel_target, safe='/'),
+        'duel_text': 'Вызвать %s на дуэль' % rival if rival else 'Вызвать на дуэль',
+        'pool_total': _pool_qs().count(),
         'topics': [t for t in (result.topic_breakdown or []) if t.get('total')],
         'page_url': page_url,
         'game_url': request.build_absolute_uri(reverse('game:page')),
         'og_image': request.build_absolute_uri(static('game/og_default.png')),
-        'og_title': f'{result.score} очков в Wecon Rush – обгонишь?',
+        'og_title': '%s%d %s в Wecon Rush – обгонишь?' % (name + ': ' if name else '', result.score, points),
         'og_description': (f'Режим «{mode_title}» · точность {result.accuracy}% '
                            f'· комбо ×{result.max_combo}'),
         'curve_points': _curve_points(result.score_curve),

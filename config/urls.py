@@ -6,10 +6,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import views as auth_views
 from django.contrib.auth.views import LogoutView
+from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 from django.views.generic import RedirectView
 
-from catalog import views as catalog_views
+from catalog import seo, views as catalog_views
 from problems import views_parent, views_platform, views_stats
 from config.csp_report import csp_report
 from config.health import health, healthz
@@ -20,6 +21,11 @@ urlpatterns = [
     # Главная страница сайта: статистика, поиск, навигация.
     path('', catalog_views.home, name='home'),
     path('admin/', admin.site.urls),
+    # Поисковым роботам: что не ходить (`?q=` каталога — платный ИИ-вызов) и
+    # карта видимых задач. Через nginx проходят обычным `location /`.
+    path('robots.txt', seo.robots_txt, name='robots_txt'),
+    path('sitemap.xml', sitemap, {'sitemaps': seo.SITEMAPS},
+         name='django.contrib.sitemaps.views.sitemap'),
     # Куда браузер шлёт нарушения Content-Security-Policy. Политика идёт в
     # режиме отчёта: она ничего не блокирует, но рассказывает, что заблокировал
     # бы боевой режим. См. config/security_headers.py.
@@ -60,6 +66,8 @@ urlpatterns = [
     path('profile/avatar/<int:user_id>/', views_platform.avatar, name='avatar'),
     # Обратная связь беты: гостю можно, CSRF обязателен (ADR 0076).
     path('api/feedback/', views_platform.api_feedback, name='api_feedback'),
+    path('api/search-rating/', views_platform.api_search_rating,
+         name='api_search_rating'),
     # «Плохая задача?» из каталога и игры: гостю можно, CSRF обязателен (15.09.2026).
     path('api/problem-report/', views_platform.api_problem_report,
          name='api_problem_report'),

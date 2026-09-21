@@ -32,8 +32,13 @@ START_RUNNER = os.path.join(os.path.dirname(__file__), 'browser_start.mjs')
 WIDTHS = (380, 1280)
 KINDS = ('no_hscroll', 'controls_32px', 'no_three_line_buttons')
 START_WIDTHS = (1280, 700, 460, 380)
-START_KINDS = ('entry_rows_even', 'mode_rows_even', 'record_line_reserved', 'lb_tabs_one_line',
-               'lb_segments_even', 'lb_row_grid', 'no_hscroll')
+START_KINDS = ('guest_no_vscroll_1440x800', 'four_mode_tabs', 'four_band_cells',
+               'three_medals_then_number', 'key1_selects_not_starts', 'board_follows_mode',
+               'f_opens_filters', 'guest_stats_tab', 'wrong_code_stays',
+               'wrong_code_message_clears_on_input', 'duel_code_goes_to_duel_page',
+               'enter_starts_one_round', 'url_mode_selects_rapid',
+               'url_duel_guest_sees_account_window', 'student_no_vscroll_1440x800',
+               'url_duel_student_opens_create_window')
 
 
 def run_node(test, runner, env, timeout):
@@ -120,10 +125,12 @@ class GamePagesLayoutBrowserTest(StaticLiveServerTestCase):
 # Chromium — внешние ресурсы, поделить их между воркерами шага A нельзя.
 @tag('game', 'browser', 'serial')
 class StartScreenBrowserTest(StaticLiveServerTestCase):
-    u"""Стартовый экран: карточки нижнего ряда и режимов ровными рядами (строка
-    «рекорд» у одной карточки не двигает соседей), вкладки доски в одну строку,
-    сегменты одной высоты, строка доски сеткой, подвал «Войти», нет дубля ссылок.
+    u"""Стартовый экран «аркады» (ADR 0108): без прокрутки на 1440×800 у гостя и
+    у вошедшего, четыре вкладки, три медали, клавиши 1 / Enter / F, проверка
+    кода без ухода со страницы, адреса ?mode= и ?duel=, статистика гостя.
     """
+
+    MAIN_MODES = ('bullet', 'blitz', 'rapid', 'classic')
 
     def setUp(self):
         # ⚠️ Доска кэшируется на минуту (`leaderboard.top`), а база между
@@ -131,9 +138,10 @@ class StartScreenBrowserTest(StaticLiveServerTestCase):
         # предыдущий тест открыл `/game/` за полминуты до этого, оставил в кэше
         # пустую доску — и строк на экране не было ни на одной ширине.
         cache.clear()
-        # По вопросам на каждый тип: карточек режимов должно быть несколько,
-        # иначе «ровный ряд» проверять не на чем.
-        for qtype in sorted({m['question_type'] for m in config.MODES.values()}):
+        # Вопросы только четырёх основных режимов: вкладок ровно четыре и при
+        # включённом «Графике» (его вкладка появляется только с вопросами).
+        for key in self.MAIN_MODES:
+            qtype = config.MODES[key]['question_type']
             for i in range(config.MIN_PLAYABLE + 2):
                 problem = Problem.objects.create(
                     title='', statement='Вопрос %s %d?' % (qtype, i), answer='',
@@ -143,17 +151,25 @@ class StartScreenBrowserTest(StaticLiveServerTestCase):
                     question='Вопрос %s номер %d?' % (qtype, i),
                     options=['Фирмы', 'Страны', 'Планеты', 'Климат'],
                     correct_index=0, difficulty=2, topics=[], lang='ru')
-        for i, score in enumerate((1250, 980, 640)):
+        # Четыре строки таблицы: три медали и число у четвёртой.
+        for i, score in enumerate((1250, 980, 640, 410)):
             user = User.objects.create_user(username='start_player_%d' % i, password='p12345')
             GameResult.objects.create(user=user, mode=config.DEFAULT_MODE, score=score,
                                       correct_count=9, total_count=11, wrong_count=2,
                                       ranked=True, economy_version=config.ECONOMY_VERSION)
+        self.student = User.objects.create_user(username='start_student', password='p12345')
+        duel = make_set(GameQuestion.objects.filter(question_type='single')[:5],
+                        kind='duel', title='Дуэль · Блиц', author=self.student)
+        self.duel_code = duel.code
 
-    def test_start_screen_rows_are_even(self):
-        data = run_node(self, START_RUNNER, {'RUSH_BASE_URL': self.live_server_url,
-                                             'RUSH_RECORD_MODE': config.DEFAULT_MODE}, 300)
-        expected = {'start@%d:%s' % (width, kind) for width in START_WIDTHS for kind in START_KINDS}
-        expected |= {'start@1280:login_button', 'start@1280:no_duplicate_links'}
+    def test_start_screen_arcade(self):
+        self.client.force_login(self.student)
+        data = run_node(self, START_RUNNER, {
+            'RUSH_BASE_URL': self.live_server_url,
+            'RUSH_DUEL_CODE': self.duel_code,
+            'RUSH_SESSION': self.client.cookies[settings.SESSION_COOKIE_NAME].value,
+        }, 300)
+        expected = set(START_KINDS) | {'no_hscroll@%d' % w for w in START_WIDTHS}
         self.assertEqual(set(data['checks']), expected)
         failed = {k: v['detail'] for k, v in data['checks'].items() if not v['ok']}
         self.assertFalse(failed, 'стартовый экран игры:\n'

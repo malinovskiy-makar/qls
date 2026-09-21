@@ -152,7 +152,8 @@ class StatsPageCardsTests(TestCase):
 
     def test_logo_markup_lives_in_one_place(self):
         """⚠️ Копия знака разошлась бы с оригиналом при первой правке."""
-        game = read('game', 'templates', 'game', 'game.html')
+        # С 17.09.2026 знак стоит в разметке стартового экрана (ADR 0108).
+        game = read('game', 'templates', 'game', '_start.html')
         self.assertIn('_rush_logo.html', game)
         self.assertNotIn('<span class="rush">RUSH</span>', game)
 

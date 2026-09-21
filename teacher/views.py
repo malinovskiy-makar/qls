@@ -8,7 +8,7 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.core.paginator import Paginator
 from django.db.models import Q
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.views.decorators.http import require_POST
@@ -1011,10 +1011,49 @@ def _own_problem_json(request, pk):
     })
 
 
+def add_catalog_problems(assignment, wanted):
+    """Задачи каталога → в домашку позициями. Одна точка на оба эндпоинта.
+
+    ⚠️ ИСТОЧНИК ПРАВДЫ ДОМАШКИ — ПОЗИЦИИ `AssignmentItem`, а не старый M2M
+    `Assignment.problems`: экран домашки ученика ходит по позициям. До 18.09.2026
+    одиночная «+ В домашку» писала только M2M, и задача на экране не появлялась
+    (баг Notion 3dfb11c9…81ce). M2M заполняется тоже — для совместимости, как
+    `make_assignment`. Задача за шлюзом качества не добавляется и возвращается
+    в `refused`, а не пропадает молча.
+
+    Возвращает `(fresh, already, refused)` — списки id в порядке запроса.
+    """
+    from django.db import transaction
+    from django.db.models import Max
+
+    from problems.models import Problem
+    from problems.models_platform import AssignmentItem
+
+    wanted = list(dict.fromkeys(wanted))
+    visible = set(Problem.objects.filter(
+        pk__in=wanted, status=Problem.Status.PUBLISHED, needs_quality_review=False,
+        hidden_pending_review=False, content_status=Problem.ContentStatus.OK,
+    ).values_list('pk', flat=True))
+    already = set(AssignmentItem.objects.filter(assignment=assignment, catalog_problem_id__in=visible)
+                  .values_list('catalog_problem_id', flat=True))
+    fresh = [pk_ for pk_ in wanted if pk_ in visible and pk_ not in already]
+    with transaction.atomic():
+        start = (AssignmentItem.objects.filter(assignment=assignment)
+                 .aggregate(top=Max('order'))['top'])
+        start = -1 if start is None else start
+        AssignmentItem.objects.bulk_create([
+            AssignmentItem(assignment=assignment, catalog_problem_id=pk_, order=start + 1 + i)
+            for i, pk_ in enumerate(fresh)])
+        assignment.problems.add(*fresh)
+    return (fresh, [pk_ for pk_ in wanted if pk_ in already],
+            [pk_ for pk_ in wanted if pk_ not in visible])
+
+
 @teacher_required
 @require_POST
 def api_assignment_add_problem(request, pk):
-    from problems.models import Assignment, Problem
+    """Одна задача каталога → в домашку. Позицией, как пакетный эндпоинт."""
+    from problems.models import Assignment
 
     assignment = get_object_or_404(Assignment, pk=pk, author=request.user)
 
@@ -1024,13 +1063,46 @@ def api_assignment_add_problem(request, pk):
         return JsonResponse({'error': 'Invalid JSON'}, status=400)
 
     problem_id = data.get('problem_id')
-    if not problem_id:
+    if not problem_id or not str(problem_id).isdigit():
         return JsonResponse({'error': 'problem_id required'}, status=400)
 
-    problem = get_object_or_404(Problem, pk=problem_id)
-    assignment.problems.add(problem)
+    fresh, already, refused = add_catalog_problems(assignment, [int(problem_id)])
+    if refused:
+        # Скрытая или несуществующая задача для репетитора «не существует».
+        raise Http404('Задачи нет в каталоге')
+    return JsonResponse({'ok': True, 'problem_id': int(problem_id), 'assignment_id': assignment.pk,
+                         'added': len(fresh), 'already': len(already)})
 
-    return JsonResponse({'ok': True, 'problem_id': problem.pk, 'assignment_id': assignment.pk})
+
+#: Сколько задач корзины каталога принимает одна домашка за раз.
+BASKET_MAX = 100
+
+
+@teacher_required
+@require_POST
+def api_assignment_add_problems(request, pk):
+    """Корзина каталога «Стол» → в домашку пачкой (решение владельца 17.09).
+
+    Та же логика и та же проверка владельца, что у `api_assignment_add_problem`:
+    чужая работа — 404 (объекта для учителя нет). Задача за шлюзом качества в
+    домашку из корзины не добавляется и называется в ответе (`refused`), а не
+    пропадает молча. Ответ: сколько добавлено, сколько уже было.
+    """
+    from problems.models import Assignment
+
+    assignment = get_object_or_404(Assignment, pk=pk, author=request.user)
+    try:
+        data = json.loads(request.body)
+    except (json.JSONDecodeError, ValueError):
+        return JsonResponse({'error': 'Invalid JSON'}, status=400)
+    raw = data.get('problem_ids') if isinstance(data, dict) else None
+    if not isinstance(raw, list) or not raw or len(raw) > BASKET_MAX:
+        return JsonResponse({'error': 'problem_ids required'}, status=400)
+    fresh, already, refused = add_catalog_problems(
+        assignment, [int(i) for i in raw if str(i).isdigit()])
+    # `added_ids` — корзине, чтобы у строк обновилась пометка «в N домашках».
+    return JsonResponse({'ok': True, 'added': len(fresh), 'already': len(already),
+                         'added_ids': fresh, 'refused': refused})
 
 
 # ---------------------------------------------------------------------------
