@@ -11,7 +11,10 @@
   (значит, ни одно число не вбито руками в свёртку);
 * --purge не оставляет ни одной строки с демо-логинами и не трогает чужих;
 * экран /profile/stats/ не содержит ни одной фразы пустого состояния, а
-  карточка ученика у репетитора открывается (не редирект на занятие).
+  карточка ученика у репетитора открывается (не редирект на занятие);
+* редкость достижений НЕ знает о демо-аккаунтах (ни в числителе, ни в
+  знаменателе), а «считать не на ком» — это None и молчащая плитка, а не
+  «этого добились 0 %» (`ShowcaseRarityTests`).
 
 Числа маленькие (`--days 14`): тест идёт секунды, а не минуты. Полные цели
 90-дневной истории проверяет отчёт самой команды («факт против цели»).
@@ -21,6 +24,7 @@ import io
 import re
 import secrets
 
+from django.core.cache import cache
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, TestCase
@@ -32,7 +36,10 @@ from problems.models import (
     Assignment, ExamAttempt, LearningEvent, StudentGroup, StudentProgressProfile,
     StudentSkillProgress, Submission, TeacherFeedback, User,
 )
-from problems.models_gamification import DailySummary, EarnedAchievement, PersonalRecord
+from problems.models_gamification import (
+    RARITY_CACHE_KEY, Achievement, DailySummary, EarnedAchievement, PersonalRecord,
+    is_showcase_login, rarity_map,
+)
 from problems.models_platform import TutorNote, WorkDifficulty
 from problems.sections import CANONICAL_SECTION
 from problems.tests.factories import make_problem, make_topic, make_user
@@ -266,3 +273,110 @@ class ShowcaseAppliedTests(TestCase):
                      for e in LearningEvent.objects.filter(user=self.student))
         self.assertGreaterEqual((timezone.localdate() - oldest).days, DAYS - 3)
         self.assertLessEqual((timezone.localdate() - oldest).days, DAYS)
+
+
+class ShowcaseRarityTests(TestCase):
+    """Редкость достижений не видит витринных аккаунтов и не врёт на пустой
+    платформе. Банк задач здесь не нужен: команда не запускается."""
+
+    def setUp(self):
+        cache.clear()                 # редкость кэшируется на 10 минут между тестами
+        self.a = Achievement.objects.create(code='t-a', title='Награда А', description='условие А')
+        self.b = Achievement.objects.create(code='t-b', title='Награда Б', description='условие Б')
+
+    def tearDown(self):
+        cache.clear()
+
+    @staticmethod
+    def student(name, xp=0, *awards):
+        user = make_user(name, password=PASSWORD)
+        if xp:
+            StudentProgressProfile.objects.create(user=user, xp_total=xp)
+        for award in awards:
+            EarnedAchievement.objects.create(user=user, achievement=award)
+        return user
+
+    def html_of(self, user):
+        client = Client()
+        client.force_login(user)
+        response = client.get('/profile/stats/')
+        self.assertEqual(response.status_code, 200)
+        return response.content.decode()
+
+    # 1. Демо-ученики не двигают редкость настоящих наград.
+    def test_showcase_students_do_not_move_real_rarity(self):
+        self.student('real-1', 50, self.a)
+        # Демо держат: ту же награду А, другую Б, и ни одной. Без фильтра в любом
+        # из двух запросов число «А» уходит от 100 % (25 %, 50 %, 200 %).
+        self.student('demo', 999, self.a)
+        self.student('demo-2', 999, self.b)
+        self.student('demo-3', 999)
+        cache.clear()
+        self.assertEqual(self.a.rarity_percent(), 100.0)
+        self.assertEqual(self.b.rarity_percent(), 0.0)          # у настоящих её нет: законный ноль
+        # и с двумя настоящими: делится на двух, а не на пять
+        self.student('real-2', 30)
+        cache.clear()
+        self.assertEqual(self.a.rarity_percent(), 50.0)
+
+    # 2. Без настоящих учеников — «нет данных», а не 0 %.
+    def test_no_real_students_means_no_data_not_zero(self):
+        self.student('demo', 999, self.a)                       # демо есть, живых нет
+        self.student('demo-2', 999, self.a, self.b)
+        self.assertIsNone(rarity_map())
+        self.assertIsNone(self.a.rarity_percent())
+        self.assertIsNone(self.b.rarity_percent())
+        self.assertIsNone(self.a.rarity_percent())              # и из кэша — то же, не ноль
+
+    def test_stale_empty_dict_in_cache_is_not_read_as_zero(self):
+        """До правки пустое состояние лежало в кэше как `{}` и читалось бы как
+        «у всех 0 %». Запись старого формата обязана пересчитаться."""
+        self.student('real-1', 50, self.a)
+        cache.set(RARITY_CACHE_KEY, {}, 600)
+        self.assertEqual(self.a.rarity_percent(), 100.0)
+
+    # 3. Настоящий ученик есть, награду не получил никто — законные 0 %.
+    def test_zero_is_a_legitimate_value_when_students_exist(self):
+        self.student('real-1', 50)
+        self.assertEqual(self.a.rarity_percent(), 0.0)
+        self.assertIsNotNone(self.a.rarity_percent())
+        self.assertIsNotNone(rarity_map())
+
+    # 4. Экран при пустом знаменателе: 200 и нет «этого добились».
+    def test_screen_says_nothing_about_rarity_when_there_is_no_one_to_count(self):
+        viewer = self.student('real-1', 0, self.a)              # награда есть, опыта нет: знаменатель пуст
+        self.student('demo', 999, self.a, self.b)
+        html = self.html_of(viewer)
+        self.assertNotIn('этого добились', html)
+        self.assertIn('получено', html)                          # полученная — только дата
+        # Плитки стоят сеткой: пустая подпись держит высоту неразрывным пробелом.
+        self.assertRegex(html, r'class="meta">\s*&nbsp;\s*</div>')
+
+    # 5. Экран при непустом знаменателе: строка есть.
+    def test_screen_shows_rarity_when_there_is_someone_to_count(self):
+        viewer = self.student('real-1', 50, self.a)
+        html = self.html_of(viewer)
+        self.assertIn('этого добились', html)
+        self.assertNotRegex(html, r'class="meta">\s*&nbsp;\s*</div>')
+
+    # 6. Защита из фазы 1: логины команды подпадают под правило опознания.
+    def test_command_logins_match_the_showcase_rule(self):
+        for username in ('demo', 'demo-anna'):
+            self.assertTrue(all(is_showcase_login(login) for login in all_logins(username)),
+                            username)
+
+    def test_showcase_rule_truth_table(self):
+        for yes in ('demo', 'demo-2', 'demo-tutor', 'DEMO', 'Demo-Anna'):
+            self.assertTrue(is_showcase_login(yes), yes)
+        for no in ('', None, 'demonstrator', 'demo1', 'demo_2', 'my-demo', 'real-1'):
+            self.assertFalse(is_showcase_login(no), no)
+
+    def test_command_refuses_logins_outside_the_rule_before_writing(self):
+        """Переименовали демо-ученика — исключение из редкости молча перестало бы
+        работать. Команда обязана отказаться до первой записи."""
+        for mode in (['--apply'], [], ['--purge']):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('seed_showcase_student', '--password', PASSWORD,
+                             '--username', 'showcase', *mode, stdout=io.StringIO())
+            self.assertIn('showcase-tutor', str(ctx.exception))
+        self.assertFalse(User.objects.filter(username__startswith='showcase').exists())
