@@ -102,8 +102,6 @@ def _score_single(item, raw):
 
 def _score_multi(item, raw):
     points = Fraction(item.points)
-    if _is_blank(raw):
-        return Fraction(0), False  # пусто — 0 баллов и никакого штрафа
     correct = _marked(item.correct)
     numbers = {n for n in (_to_int(o.get('n')) for o in (item.options or []))
                if n is not None}
@@ -124,7 +122,7 @@ def _score_multi(item, raw):
 def _score_match(item, raw):
     points = Fraction(item.points)
     correct = item.correct if isinstance(item.correct, dict) else {}
-    if _is_blank(raw) or not isinstance(raw, dict) or not correct:
+    if not isinstance(raw, dict) or not correct:
         return Fraction(0), False
     right = sum(1 for key, truth in correct.items()
                 if key in raw and _to_int(raw[key]) == _to_int(truth))
@@ -140,16 +138,23 @@ _SCORERS = {
 }
 
 
-def score_item(item, raw):
+def score_item(item, raw) -> tuple[Decimal, bool | None]:
     """Балл за одно задание: `(балл, верно_ли)`.
 
-    `raw=None` или пустой ответ — «не отвечено». Что именно начисляется, зависит
-    от `item.kind` (см. `_score_*`). Верно — значит получен полный балл задания.
+    Пустой или отсутствующий ответ — «не отвечено»: `(0.00, None)`. Это НЕ
+    «неверно» (`False`): в разборе и статистике «не успел» и «ошибся» — разные
+    вещи. Штраф `wrong_penalty` к пустому ответу не применяется никогда — только
+    к реально неверному.
+
+    Для непустого ответа что именно начисляется, зависит от `item.kind` (см.
+    `_score_*`); `True` — получен полный балл задания, `False` — нет.
     """
     try:
         scorer = _SCORERS[item.kind]
     except KeyError:
         raise ValueError(f'Неизвестный вид задания: {item.kind!r}') from None
+    if _is_blank(raw):
+        return _ZERO, None
     value, is_correct = scorer(item, raw)
     return _round(value), is_correct
 
@@ -158,7 +163,7 @@ def score_attempt(attempt):
     """Балл попытки: сумма по всем её ответам, не ниже нуля.
 
     Ничего не пишет в базу: считает по `raw` каждого `VPAnswer`. Задание без
-    ответа в сумму просто не входит — оно дало бы 0.
+    ответа в сумму не входит — оно даёт 0 и штрафа не несёт.
     """
     total = _ZERO
     for answer in attempt.answers.select_related('item'):

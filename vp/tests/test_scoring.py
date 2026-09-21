@@ -44,9 +44,27 @@ class ShortTextTests(SimpleTestCase):
     def test_03_yo_equals_ye(self):
         self.assertEqual(score_item(short('емкость'), 'ёмкость'), (D('2.00'), True))
 
-    def test_04_blank_is_zero_and_wrong(self):
-        self.assertEqual(score_item(short('лоренца'), ''), (D('0.00'), False))
-        self.assertEqual(score_item(short('лоренца'), None), (D('0.00'), False))
+    def test_04_blank_is_zero_and_not_answered(self):
+        # Пустое — «не отвечено» (None), а не «неверно» (False).
+        self.assertEqual(score_item(short('лоренца'), ''), (D('0.00'), None))
+        self.assertEqual(score_item(short('лоренца'), None), (D('0.00'), None))
+        self.assertEqual(score_item(short('лоренца'), '   '), (D('0.00'), None))
+
+    def test_04b_penalty_never_applies_to_blank(self):
+        item = short('лоренца', wrong_penalty=D('1'))
+        self.assertEqual(score_item(item, ''), (D('0.00'), None))
+        self.assertEqual(score_item(item, None), (D('0.00'), None))
+        # А реально неверный ответ по-прежнему штрафуется.
+        self.assertEqual(score_item(item, 'кейнса'), (D('-1.00'), False))
+        single_item = single([3], wrong_penalty=D('1'))
+        self.assertEqual(score_item(single_item, None), (D('0.00'), None))
+        self.assertEqual(score_item(single_item, 2), (D('-1.00'), False))
+
+    def test_04c_blank_of_every_kind_is_not_answered(self):
+        cases = ((single([3]), None), (multi([1, 3]), []), (multi([1, 3]), None),
+                 (match({'а': 1}), {}), (match({'а': 1}), None))
+        for item, raw in cases:
+            self.assertEqual(score_item(item, raw), (D('0.00'), None), (item.kind, raw))
 
     def test_05_wrong_penalty(self):
         item = short('лоренца', wrong_penalty=D('1'))

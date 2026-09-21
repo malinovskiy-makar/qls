@@ -1,3 +1,5 @@
+from decimal import Decimal as D
+
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
@@ -50,3 +52,30 @@ class AdminTests(TestCase):
         self.assertEqual(response.status_code, 302)
         item.refresh_from_db()
         self.assertEqual((item.chain_first, item.chain_second), ('е', 'м'))
+
+    def test_variant_page_warns_when_points_sum_differs_from_max_score(self):
+        self.variant.max_score = D('98.00')   # сумма заданий 100,00
+        self.variant.save()
+        response = self.client.get(
+            reverse('admin:vp_vpvariant_change', args=[self.variant.pk]))
+        self.assertContains(
+            response, 'Сумма баллов заданий 100,00 ≠ max_score 98,00; пересчитывается импортом.')
+        self.assertContains(response, 'class="warning"')
+
+    def test_variant_page_is_quiet_when_sums_agree(self):
+        response = self.client.get(
+            reverse('admin:vp_vpvariant_change', args=[self.variant.pk]))
+        self.assertNotContains(response, 'пересчитывается импортом')
+        self.assertNotContains(response, 'class="warning"')
+
+    def test_warning_does_not_recompute_max_score(self):
+        self.variant.max_score = D('98.00')
+        self.variant.save()
+        self.client.get(reverse('admin:vp_vpvariant_change', args=[self.variant.pk]))
+        self.variant.refresh_from_db()
+        self.assertEqual(self.variant.max_score, D('98.00'))
+
+    def test_add_page_has_no_warning(self):
+        response = self.client.get(reverse('admin:vp_vpvariant_add'))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'пересчитывается импортом')
