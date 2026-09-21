@@ -78,12 +78,12 @@ class VPItem(models.Model):
     suffix = models.CharField('Напечатано после пропуска', max_length=120,
                               blank=True)
     # [{"n": 1, "text": "ОПЕК"}, ...] — нумерация с единицы.
-    options = models.JSONField('Варианты', default=list)
+    options = models.JSONField('Варианты', default=list, blank=True)
     # [2] | [1, 3, 5] | {"а": 3, "б": 1}
-    correct = models.JSONField('Верные', default=list)
+    correct = models.JSONField('Верные', default=list, blank=True)
     answer = models.CharField('Эталон короткого ответа', max_length=200,
                               blank=True)
-    accepted = models.JSONField('Также засчитываем', default=list)
+    accepted = models.JSONField('Также засчитываем', default=list, blank=True)
     points = models.DecimalField('Баллы', max_digits=5, decimal_places=2)
     wrong_penalty = models.DecimalField(
         'Штраф за неверный', max_digits=5, decimal_places=2, default=0)

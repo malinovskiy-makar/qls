@@ -235,6 +235,7 @@ lockdown_dev_accounts [--apply]   # погасить дев-аккаунты
 seed_olympiads_demo --yes [--wipe] # демо-данные раздела олимпиад (без --yes только план)
 import_olympiads_data             # настоящие факты раздела олимпиад из data/olympiads/out/*.jsonl
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
+import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
 search_eval                       # измеритель поиска на эталонных наборах A/B/C (docs/EMBEDDINGS.md)
 human_review_mark [--apply/--revert]     # approved/defect по вердиктам ReviewVerdict
