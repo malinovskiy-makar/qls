@@ -13,11 +13,13 @@ import subprocess
 from decimal import Decimal as D
 
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.db import connection
-from django.test import tag
+from django.test import Client, tag
 from django.utils import timezone
 
+from problems.models_platform import Event
 from vp.models import VPAttempt, VPVariant
 from vp.tests import browser_fixture
 
@@ -25,6 +27,19 @@ RUNNER = os.path.join(os.path.dirname(__file__), 'browser_take.mjs')
 
 # Каждая проверка раннера обязана отработать: пустой или обрезанный прогон — не «зелено».
 EXPECTED = {
+    # посадочная /vp/, сессия 4: десктоп и телефон
+    'd.landing_six_sections', 'd.landing_block_table_five_rows', 'd.landing_chain_example_four_words',
+    'd.landing_lists_four_variants', 'd.landing_no_hscroll', 'd.landing_nav_item_is_active',
+    'd.landing.contrast_light', 'd.landing.contrast_dark', 'd.landing_events_are_on_the_page',
+    'd.landing_go_opens_the_variant', 'd.intro_events_are_on_the_page',
+    'm.landing_no_hscroll', 'm.landing.contrast_light', 'm.landing.contrast_dark',
+    'm.landing_burger_lists_the_item', 'm.landing_go_button_fits_and_is_tappable',
+    'm.landing_go_button_opens_a_variant',
+    # шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
+    'd.nav_staff_has_eight_items_or_burger',
+    *{f'd.nav_staff_fits_{w}' for w in (390, 821, 900, 980, 981, 1161, 1300, 1421, 1440, 1500, 1920)},
+    # «Поделиться» копирует ссылку (и шлёт vp_share_click – его строку в базе проверяет check_database)
+    'd.share_click_copies_the_link',
     # десктоп: вход, сценарии 1, 2, 3, 5
     'd.intro_five_blocks', 'd.intro_no_hscroll', 'd.intro_snake_paragraph_is_flowing_text',
     'd.take_hides_feedback_fab', 'd.intro.contrast_light', 'd.intro.contrast_dark',
@@ -84,6 +99,11 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
             browser_fixture.write(browser_fixture.rich_data(slug=slug, duration=duration, title=title))
         # Девятнадцать «других людей» у варианта vp-ui: с гостем, который пройдёт его в браузере,
         # получается ровно двадцать — граница, с которой на экране появляется сравнение.
+        # Персонал для замера шапки (у него восемь пунктов — самый широкий ряд): сессия уходит раннеру.
+        staff = get_user_model().objects.create_user('vp_br_staff', password='p12345', is_staff=True, role='teacher')
+        client = Client()
+        client.force_login(staff)
+        self.staff_session = client.cookies['sessionid'].value
         now = timezone.now()
         variant = VPVariant.objects.get(slug='vp-ui')
         for i in range(19):
@@ -97,7 +117,7 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
             self.skipTest('node не найден — браузерная проверка ВП не запускалась')
         if not os.path.isdir(os.path.join(settings.BASE_DIR, 'node_modules', 'playwright')):
             self.skipTest('playwright не установлен в node_modules')
-        env = dict(os.environ, VP_BASE_URL=self.live_server_url)
+        env = dict(os.environ, VP_BASE_URL=self.live_server_url, VP_STAFF_SESSION=self.staff_session)
         try:
             res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
                                  capture_output=True, text=True, encoding='utf-8',
@@ -157,6 +177,17 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
         self.assertEqual(fast.submitted_at, fast.expires_at)
         self.assertEqual(fast.answers.get(item__number=1).raw, 'абум')
         self.assertEqual(fast.score, D('2.00'))
+
+        # События раздела: браузер отправил, /api/track/ принял, строки лежат в таблице (ADR 0127).
+        names = set(Event.objects.filter(name__startswith='vp_').values_list('name', flat=True))
+        self.assertGreaterEqual(names, {'vp_landing_open', 'vp_intro_open', 'vp_start', 'vp_submit',
+                                        'vp_result_open', 'vp_share_click', 'vp_practice_check'})
+        start = Event.objects.filter(name='vp_start', props__variant='vp-ui').order_by('pk').first()
+        self.assertIs(start.props['with_timer'], True)
+        submit = Event.objects.filter(name='vp_submit', props__variant='vp-ui').order_by('pk').first()
+        self.assertEqual(submit.props['answered'], 39)
+        self.assertEqual(submit.props['auto'], False)
+        self.assertEqual(submit.path, '/vp/r/%s/' % codes['desktop'])
 
         # Телефон: сдал с телефона.
         phone = attempt('phone')

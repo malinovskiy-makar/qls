@@ -203,14 +203,14 @@ class ClassesTests(LandingBase):
     def test_same_displayed_format_is_one_table_without_class_labels(self):
         self.eleven()
         html = page(self.guest)
-        self.assertEqual(html.count('vp-table--blocks'), 1)
+        self.assertEqual(html.count('class="vp-table vp-table--blocks"'), 1)
         self.assertEqual(section(html, 'vp-format-h', 'vp-scoring-h').count('<h3'), 0)
 
     def test_classes_that_differ_in_points_get_a_table_each(self):
         self.eleven(points_of_first=3)                # змейка 11 класса — 61 балл
         html = page(self.guest)
         block = section(html, 'vp-format-h', 'vp-scoring-h')
-        self.assertEqual(block.count('vp-table--blocks'), 2)
+        self.assertEqual(block.count('class="vp-table vp-table--blocks"'), 2)
         self.assertIn('<h3 class="vp-h3">9–10 классы</h3>', block)
         self.assertIn('<h3 class="vp-h3">11 класс</h3>', block)
         self.assertEqual([r[4] for r in table_rows(block) if r[0] == 'snake'], ['60', '61'])
@@ -219,6 +219,20 @@ class ClassesTests(LandingBase):
         # Когда формата два, общего «44 задания за 30 минут» на странице нет.
         self.assertIn('Формат новый, всё проверяется автоматически.', html)
         self.assertNotIn('44 задания за', html)
+
+
+class DurationTests(LandingBase):
+    def test_variants_that_differ_only_in_duration_share_a_table_but_not_the_minutes_claim(self):
+        """Длительность в таблице не видна: две одинаковые таблицы были бы шумом. А «за 30 минут» на
+        странице нет, раз минуты у вариантов разные."""
+        other = make_published('vp-short')
+        VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1500)
+        html = page(self.guest)
+        self.assertEqual(html.count('class="vp-table vp-table--blocks"'), 1)
+        self.assertIn('Формат новый, всё проверяется автоматически.', html)
+        self.assertNotRegex(html, r'\d+ минут')
+        VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1800)
+        self.assertIn('44 задания за 30 минут', page(self.guest))
 
 
 class ScoringRulesTests(LandingBase):
@@ -352,6 +366,7 @@ class SeoTests(LandingBase):
         description = re.search(r'<meta name="description" content="(.*?)">', html, re.S).group(1)
         self.assertIn('9–10 классы', description)
         self.assertIn('2026', description)
+        self.assertNotIn('—', description)                      # правило сайта: длинного тире нет
         self.assertNotIn('noindex', html)
 
     def test_05_sitemap_lists_the_landing_and_the_variants_but_no_personal_pages(self):

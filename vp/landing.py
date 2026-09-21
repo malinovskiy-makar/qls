@@ -64,10 +64,11 @@ def _format_of(variant):
         'partial_ranges': blocks.merged_ranges(partial),
         'penalty_example': scoring.penalty_example(sample.points) if sample else None,
     }
-    # Подпись — ровно то, что страница показывает. Баллы отдельных заданий внутри блока
-    # (у 11 класса №43 и №44 по 4,5, у 9–10 – 4 и 5) на странице не видны, и две
-    # одинаковые таблицы под разными подписями были бы шумом.
-    fmt['signature'] = (fmt['count'], fmt['total'], fmt['minutes'],
+    # Подпись — ровно то, что таблица и правила показывают. Баллы отдельных заданий внутри
+    # блока (у 11 класса №43 и №44 по 4,5, у 9–10 – 4 и 5) и длительность в таблице не видны,
+    # и две одинаковые таблицы под разными подписями были бы шумом. Длительность держит
+    # `facts`: «за N минут» говорится, только если она у всех одна.
+    fmt['signature'] = (fmt['count'], fmt['total'],
                         tuple((r['block'], r['range'], r['count'], r['total']) for r in rows),
                         tuple(fmt['whole_ranges']), tuple(fmt['partial_ranges']),
                         fmt['penalty_example'])
@@ -84,7 +85,8 @@ def format_groups(published):
     groups = {}
     for variant in published:
         fmt = _format_of(variant)
-        group = groups.setdefault(fmt['signature'], dict(fmt, bands=[]))
+        group = groups.setdefault(fmt['signature'], dict(fmt, bands=[], minutes_all=set()))
+        group['minutes_all'].add(fmt['minutes'])
         if variant.grade_band not in group['bands']:
             group['bands'].append(variant.grade_band)
     result = list(groups.values())
@@ -94,8 +96,12 @@ def format_groups(published):
 
 
 def facts(groups):
-    """Число заданий, минуты и баллы «в этом году» — только если формат один на всех."""
-    if len(groups) != 1:
+    """Число заданий, минуты и баллы «в этом году» — только если формат один на всех.
+
+    Разные длительности у вариантов – тоже «не один»: «за 30 минут» тогда было бы
+    правдой не про все.
+    """
+    if len(groups) != 1 or len(groups[0]['minutes_all']) != 1:
         return None
     group = groups[0]
     return {'count': group['count'], 'minutes': group['minutes'], 'total': group['total']}

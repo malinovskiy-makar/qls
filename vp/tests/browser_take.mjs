@@ -12,6 +12,10 @@
      4. телефон: при фокусе нет зума, шапка не закрывает поле;
      5. тёмная тема на любом экране.
 
+   Сессия 4 (ADR 0127): посадочная `/vp/` (десктоп и телефон 390 px, контраст в обеих темах),
+   посадочная отдаёт события скрипту аналитики (что они доходят до базы, сверяет питон) и шапка
+   персонала (8 пунктов) на десяти ширинах — новый пункт меню не должен распирать страницу.
+
    Запуск руками против живого сервера:
      VP_BASE_URL=http://127.0.0.1:8000 VP_SHOT_DIR=/tmp/vp node vp/tests/browser_take.mjs
 
@@ -121,6 +125,8 @@ const TAKE_SELECTORS = ['.vp-item-text', '.vp-input', '.vp-opt span', '.vp-timer
   '.vp-legend span', '.vp-rail-cap', '.vp-item-num'];
 const INTRO_SELECTORS = ['.vp-h1', '.vp-h2', '.vp-sub', '.vp-table td', '.vp-stack', '.vp-note', '.vp-mode b',
   '.vp-mode span span', '.vp-btn', '.vp-mute', '.vp-eyebrow', '.vp-big'];
+const LANDING_SELECTORS = ['.vp-h1', '.vp-lead', '.vp-h2', '.vp-h3', '.vp-stack p', '.vp-text', '.vp-table th',
+  '.vp-table td', '.vp-mute', '.vp-eyebrow', '.vp-btn', '.vp-vrow-main b', '.vp-chain-demo span', '.vp-pill'];
 const RESULT_SELECTORS = ['.vp-score-num b', '.vp-score-num span', '.vp-mute', '.vp-h3', '.vp-brow-name',
   '.vp-brow-score', '.vp-brow-pct', '.vp-btn', '.vp-cmp-head', '.vp-cmp-axis span', '.vp-cmp-label',
   '.vp-crow-n', '.vp-crow-mine', '.vp-crow-right', '.vp-crow-right b', '.vp-crow-pts', '.vp-clink',
@@ -154,6 +160,58 @@ try {
   const desktop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await desktop.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   const page = await desktop.newPage();
+
+  // ---- посадочная /vp/
+  const lp = await desktop.newPage();
+  await lp.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
+  check('d.landing_six_sections', (await lp.locator('.vp-sec').count()) === 6, await lp.locator('.vp-sec h2').allInnerTexts());
+  check('d.landing_block_table_five_rows', (await lp.locator('.vp-table--blocks tbody tr').count()) === 5);
+  check('d.landing_chain_example_four_words', (await lp.locator('.vp-chain-demo span').count()) === 4,
+    await lp.locator('.vp-chain-demo').allInnerTexts());
+  check('d.landing_lists_four_variants', (await lp.locator('.vp-vrow').count()) === 4);
+  check('d.landing_no_hscroll', await noHScroll(lp));
+  check('d.landing_nav_item_is_active', await lp.evaluate(() => {
+    const active = [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link.is-active')].map((a) => a.textContent.trim());
+    return active.length === 1 && active[0] === 'Высшая проба';
+  }));
+  await shot(lp, 'landing_light_desktop', true);
+  await contrastBothThemes(lp, 'd.landing', LANDING_SELECTORS);
+  await setTheme(lp, true);
+  await shot(lp, 'landing_dark_desktop', true);
+  await setTheme(lp, false);
+  // Тело `sendBeacon` Playwright не отдаёт, поэтому сами события сверяет питон по таблице `Event`
+  // (`test_browser.check_database`); здесь – что скрипт аналитики и список событий на странице есть.
+  check('d.landing_events_are_on_the_page', await lp.evaluate(() => {
+    const node = document.getElementById('vp-events');
+    return !!node && JSON.parse(node.textContent).some((e) => e.name === 'vp_landing_open')
+      && !!(window.weco && typeof window.weco.track === 'function');
+  }));
+  await Promise.all([lp.waitForURL(/\/vp\/vp-ui\/$/, { timeout: 30000 }), lp.click('a[href="/vp/vp-ui/"]')]);
+  check('d.landing_go_opens_the_variant', /Пробный вариант/.test(await lp.textContent('h1')), await lp.textContent('h1'));
+  check('d.intro_events_are_on_the_page', await lp.evaluate(() => {
+    const node = document.getElementById('vp-events');
+    return !!node && JSON.parse(node.textContent).some((e) => e.name === 'vp_intro_open' && e.props.variant === 'vp-ui');
+  }));
+  await lp.close();
+
+  // ---- шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
+  const staffSession = process.env.VP_STAFF_SESSION || '';
+  if (staffSession) {
+    const staffCtx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    await staffCtx.addCookies([{ name: 'sessionid', value: staffSession, url: BASE }]);
+    const sp2 = await staffCtx.newPage();
+    await sp2.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
+    check('d.nav_staff_has_eight_items_or_burger', await sp2.evaluate(() =>
+      document.querySelectorAll('nav.site-nav > .nav-links .nav-link').length === 8), await sp2.evaluate(() =>
+      [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link')].map((a) => a.textContent.trim())));
+    for (const w of [390, 821, 900, 980, 981, 1161, 1300, 1421, 1440, 1500, 1920]) {
+      await sp2.setViewportSize({ width: w, height: 900 });
+      await sleep(150);
+      const wide = await sp2.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+      check(`d.nav_staff_fits_${w}`, wide.sw <= wide.iw, wide);
+    }
+    await staffCtx.close();
+  }
 
   // ---- вход
   await page.goto(`${BASE}/vp/vp-ui/`, { waitUntil: 'load', timeout: 30000 });
@@ -287,6 +345,10 @@ try {
   }));
   check('d.review_five_practice_buttons', (await page.locator('[data-practice-open]').count()) === 5);
   check('d.review_share_button', (await page.locator('#vp-share').count()) === 1);
+  await page.click('#vp-share');
+  check('d.share_click_copies_the_link', await page.evaluate(async (expected) => {
+    try { return (await navigator.clipboard.readText()) === expected; } catch (e) { return 'нет доступа к буферу'; }
+  }, resultUrl) === true, resultUrl);
   check('d.comparison_shown', await page.evaluate(() => /Выше, чем у \d+% прошедших этот вариант/.test(
     (document.querySelector('.vp-cmp-head') || {}).textContent || '')
     && !!document.querySelector('.vp-cmp-you') && !!document.querySelector('.vp-cmp-med')));
@@ -360,6 +422,8 @@ try {
   const foreign = await sp.goto(takeUrl, { waitUntil: 'load' });
   check('d.foreign_take_404', foreign.status() === 404, foreign.status());
   await stranger.close();
+  // События копятся в браузере и уходят пачкой раз в пять секунд: ждём последнюю, потом закрываем.
+  await sleep(6500);
   await desktop.close();
 
   // ============================================================ СЦЕНАРИЙ 4: ТЕЛЕФОН
@@ -368,6 +432,25 @@ try {
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   });
   const mp = await phone.newPage();
+  const mlp = await phone.newPage();
+  await mlp.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
+  check('m.landing_no_hscroll', await noHScroll(mlp));
+  await shot(mlp, 'landing_light_phone', true);
+  await contrastBothThemes(mlp, 'm.landing', LANDING_SELECTORS);
+  await setTheme(mlp, true);
+  await shot(mlp, 'landing_dark_phone', true);
+  await setTheme(mlp, false);
+  await mlp.click('.nav-burger');
+  check('m.landing_burger_lists_the_item', await mlp.evaluate(() => [...document.querySelectorAll('.nav-panel .nav-link')]
+    .some((a) => a.textContent.trim() === 'Высшая проба' && a.classList.contains('is-active'))));
+  await mlp.click('.nav-burger');
+  const goButton = mlp.locator('.vp-vrow a.vp-btn').first();
+  await goButton.scrollIntoViewIfNeeded();
+  const goBox = await goButton.boundingBox();
+  check('m.landing_go_button_fits_and_is_tappable', !!goBox && goBox.height >= 44 && goBox.x >= 0 && goBox.x + goBox.width <= 390, goBox);
+  await Promise.all([mlp.waitForURL(/\/vp\/vp-[a-z]+\/$/, { timeout: 30000 }), goButton.tap()]);
+  check('m.landing_go_button_opens_a_variant', /\/vp\/vp-[a-z]+\/$/.test(mlp.url()), mlp.url());
+  await mlp.close();
   await mp.goto(`${BASE}/vp/vp-ui/`, { waitUntil: 'load', timeout: 30000 });
   check('m.intro_no_hscroll', await noHScroll(mp));
   await shot(mp, 'intro_light_phone', true);
