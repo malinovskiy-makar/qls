@@ -14,6 +14,7 @@
 Считаем ТОЧНЫМИ ДРОБЯМИ (`fractions.Fraction`), округляем один раз, только
 результат: до сотых, `ROUND_HALF_UP`. Промежуточных float нет.
 """
+from collections import namedtuple
 from decimal import Decimal
 from fractions import Fraction
 from math import floor
@@ -104,23 +105,37 @@ def _score_single(item, raw):
     return -Fraction(item.wrong_penalty), False
 
 
-def _score_multi(item, raw):
+_MultiParts = namedtuple(
+    '_MultiParts', 'points right wrong correct_total wrong_total gain loss')
+
+
+def _multi_parts(item, raw):
+    """Составные части долевого балла: и подсчёт, и разбор берут их ОТСЮДА.
+
+    `gain` — доля за найденные верные, `loss` — штраф за лишние (только у заданий со
+    штрафом). Дроби точные, округляет тот, кто показывает или записывает.
+    """
     points = Fraction(item.points)
     correct = _marked(item.correct)
     numbers = {n for n in (_to_int(o.get('n')) for o in (item.options or []))
                if n is not None}
     wrong_all = numbers - correct
     marked = _marked(raw) & numbers
-    if not correct:
-        return Fraction(0), False
     right = len(marked & correct)
     wrong = len(marked - correct)
-    value = points * Fraction(right, len(correct))
-    if item.penalty and wrong_all:
-        value -= points * Fraction(wrong, len(wrong_all))
+    gain = points * Fraction(right, len(correct)) if correct else Fraction(0)
+    loss = points * Fraction(wrong, len(wrong_all)) if item.penalty and wrong_all else Fraction(0)
+    return _MultiParts(points, right, wrong, len(correct), len(wrong_all), gain, loss)
+
+
+def _score_multi(item, raw):
+    parts = _multi_parts(item, raw)
+    if not parts.correct_total:
+        return Fraction(0), False
+    value = parts.gain - parts.loss
     if CLAMP_MULTI_AT_ZERO and value < 0:
         value = Fraction(0)
-    return value, value == points
+    return value, value == parts.points
 
 
 def _score_match(item, raw):
@@ -161,6 +176,44 @@ def score_item(item, raw) -> tuple[Decimal, bool | None]:
         return _ZERO, None
     value, is_correct = scorer(item, raw)
     return _round(value), is_correct
+
+
+def explain_item(item, raw) -> dict:
+    """Как получился балл за задание — СТРУКТУРА для экрана разбора, не готовая строка.
+
+    Ничего не считает сама: балл берёт у `score_item`, доли — у `_multi_parts`, ту же
+    арифметику, что и подсчёт. Текст «3 × 2/2 − 3 × 1/3 = 3,00 − 1,00 = 2,00» собирает
+    шаблон. Виды:
+
+    * `blank` — не отвечено (`is_correct` — `None`);
+    * `share` — долевой подсчёт (`multi`): найдено `correct_hit` из `correct_total`
+      верных, лишних отмечено `wrong_hit` из `wrong_total` неверных, `gain`/`loss` —
+      прибавка и штраф, `clamped` — итог ушёл бы ниже нуля и поднят до нуля
+      (`before_clamp` — каким он был бы: «−0,50 → 0,00»). `penalty` — есть ли у
+      задания штраф вообще;
+    * `binary` — короткий ответ и «один верный»: `score` и `is_correct`.
+
+    ⚠️ `gain` и `loss` округлены каждый сам, а `score` — один раз из точных дробей,
+    поэтому у заданий с «некруглым» баллом разность может отличаться от `score` на
+    копейку. У формата 1 тура (3 балла, до пяти вариантов) они совпадают.
+    """
+    score, is_correct = score_item(item, raw)
+    if is_correct is None:
+        return {'kind': 'blank', 'score': score, 'is_correct': None}
+    if item.kind == 'multi':
+        parts = _multi_parts(item, raw)
+        return {
+            'kind': 'share',
+            'points': _round(parts.points),
+            'correct_total': parts.correct_total, 'correct_hit': parts.right,
+            'wrong_total': parts.wrong_total, 'wrong_hit': parts.wrong,
+            'penalty': bool(item.penalty and parts.wrong_total),
+            'gain': _round(parts.gain), 'loss': _round(parts.loss),
+            'before_clamp': _round(parts.gain - parts.loss),
+            'clamped': parts.gain - parts.loss < 0,
+            'score': score, 'is_correct': is_correct,
+        }
+    return {'kind': 'binary', 'score': score, 'is_correct': is_correct}
 
 
 def score_attempt(attempt):
