@@ -36,10 +36,12 @@ DailySummary, StudentTopicProgress, EarnedAchievement, PersonalRecord).
 Пароль — обязательный аргумент `--password`, значения по умолчанию нет
 (репозиторий публичный).
 """
+import io
 import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
+from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.cache import cache
 from django.core.management import call_command
@@ -91,11 +93,11 @@ TOPIC_PLAN = [
 # Веса сложности 1..5 для попытки по роли темы. Осторожно: на XP влияет
 # резко (15 / 45 / 90 за сложность 3 / 4 / 5) — подбирается замером.
 DIFF_WEIGHTS = {
-    'mastered': (0.16, 0.38, 0.28, 0.11, 0.07),
-    'confident': (0.18, 0.40, 0.28, 0.09, 0.05),
-    'weak': (0.15, 0.35, 0.30, 0.12, 0.08),
-    'misc': (0.20, 0.42, 0.25, 0.08, 0.05),
-    'other': (0.25, 0.45, 0.20, 0.07, 0.03),
+    'mastered': (0.17, 0.43, 0.26, 0.10, 0.04),
+    'confident': (0.19, 0.44, 0.27, 0.08, 0.02),
+    'weak': (0.16, 0.38, 0.29, 0.12, 0.05),
+    'misc': (0.21, 0.45, 0.24, 0.08, 0.02),
+    'other': (0.25, 0.47, 0.19, 0.07, 0.02),
 }
 
 # (тема, название, номинальный отступ в днях назад, исход)
@@ -126,6 +128,39 @@ EXAMS = [
       ('Монетарная политика', 2), ('Финансы и финансовые инструменты', 2),
       ('Вмешательство государства', 2), ('Неравенство доходов', 2)], 7),
 ]
+
+# Метки ошибок и их вес в проверках репетитора: распределение НЕРАВНОМЕРНОЕ —
+# блок «Что отмечает преподаватель» осмыслен, только когда видно, что одна-две
+# ошибки повторяются. Первые три имени уже есть в справочнике (seed_demo).
+MISTAKE_TAGS = [
+    ('Арифметическая ошибка в вычислениях', 34),
+    ('Эластичность без модуля', 24),
+    ('Путает сдвиг и движение вдоль кривой', 18),
+    ('Забыл ограничение (область определения)', 12),
+    ('Игнорирует доминирующую стратегию', 7),
+    ('Не проверил единицы измерения', 5),
+]
+# (навык, уровень 0–100)
+SKILLS = [
+    ('Построить КПВ', 88), ('Считать эластичность', 84), ('Читать и строить графики', 76),
+    ('Найти MR', 70), ('Посчитать DWL', 62), ('Написать интерпретацию', 51),
+    ('Проверить NE', 38),
+]
+COMMENT_FULL = ('', '', 'Верно.', 'Хорошее решение.', 'Всё чисто, ход мысли понятен.')
+COMMENT_PART = ('Ход верный, но часть баллов потеряна — проверь вычисления.',
+                'Почти. Обрати внимание на ограничения в условии.',
+                'Идея правильная, оформление краткое — распиши шаги.')
+COMMENT_FAIL = ('Смотри разбор: неверно выбрана модель. Разберём на занятии.',
+                'Не хватает ключевого шага. Вернись к теории по этой теме.',
+                'Решение не приводит к ответу — давай посмотрим вместе.')
+WORK_COMMENTS = {
+    'high': 'Сильная работа: чистые выкладки и верные выводы. Так держать.',
+    'mid': 'Хорошая работа, но есть повторяющиеся мелкие ошибки — разберём на занятии.',
+    'low': 'Работа тяжёлая. Пройдись по теории темы и пересдай слабые задачи.',
+}
+TUTOR_NOTE = ('Сильная база по микроэкономике и издержкам. Теория игр и монополия — '
+              'слабое место: на следующем занятии разбираем олигополию и ценовую '
+              'дискриминацию. Хорошо держит темп, после отпуска вернулся без просадки.')
 
 RUN_LENGTH = 27          # верных подряд: «Двадцать пять» получено, «Пятьдесят» — нет
 WEEKDAY_WEIGHT = (1.0, 1.0, 1.0, 1.0, 1.0, 0.55, 0.55)   # будни плотнее выходных
@@ -315,6 +350,10 @@ class Command(BaseCommand):
         self._plan_main()
         self._plan_mates()
         self._write_catalog_events()
+        self._write_works()
+        self._write_extras()
+        self._write_game()
+        self._gamify()
         self._report()
 
     # -- аккаунты -------------------------------------------------------------
@@ -763,7 +802,7 @@ class Command(BaseCommand):
             (230, 0.72, 44, 2, 89, 0),
             (160, 0.60, 36, 16, 80, 0),
         ]
-        self.mate_slots = {}
+        self.mate_slots, self.mate_last, self.mate_used = {}, {}, {}
         for mate, (n, acc, active, first, last, tail) in zip(self.mates, profiles):
             rng = random.Random(f'{self.opts["seed"]}:{mate.username}')
             n = max(24, round(n * scale))
@@ -792,6 +831,8 @@ class Command(BaseCommand):
             for o, day_slots in by_day.items():
                 self._place_day(rng, self.today - timedelta(days=o), day_slots, [], times)
             self.mate_slots[mate.pk] = slots
+            self.mate_last[mate.pk] = min(offsets)
+            self.mate_used[mate.pk] = times
 
     def _save_events(self, user, slots):
         """bulk_create + bulk_update(created_at): created_at — auto_now_add, а
@@ -825,7 +866,344 @@ class Command(BaseCommand):
 
     # -----------------------------------------------------------------------
     # ЧАСТЬ 3: домашки, контрольные, проверки
+    # -----------------------------------------------------------------------
+
+    def _local(self, day, hour, minute):
+        return timezone.make_aware(datetime.combine(day, time(hour, minute)), self.tz)
+
+    def _ensure_tags(self):
+        from problems.models import MistakeTag
+        return [(MistakeTag.objects.get_or_create(name=name)[0], weight)
+                for name, weight in MISTAKE_TAGS]
+
+    def _write_works(self):
+        """Работы репетитора, сдачи, проверки, попытки контрольных — и события
+        по ним (те же слоты, что вынуты из тематических квот)."""
+        from problems.models import Assignment, AssignmentItem
+        rng = random.Random(f'{self.opts["seed"]}:works')
+        self.tags = self._ensure_tags()
+        self.submitted = defaultdict(list)       # pk ученика -> [WorkSpec]
+        extra_slots = defaultdict(list)          # pk ученика -> слоты для записи событий
+        students = [self.student, *self.mates]
+        join = [(0.92, 0.85), (0.75, 0.72), (0.55, 0.60)]       # (сдаёт, доля верных)
+        for work in sorted(self.works, key=lambda w: -(w.nominal_offset if w.submit_offset is None
+                                                       else w.submit_offset)):
+            slots = work.slots
+            first = min((s.when for s in slots), default=None)
+            last = max((s.when for s in slots), default=None)
+            fields = {}
+            if work.kind == 'exam':
+                deadline = last + timedelta(minutes=30)
+                fields = {'exam_mode': 'window', 'starts_at': first - timedelta(minutes=10),
+                          'ends_at': deadline}
+            elif last is None:      # не сдана: срок прошёл на номинальный день
+                deadline = self._local(self.today - timedelta(days=work.nominal_offset), 23, 59)
+            else:
+                day = timezone.localtime(last).date()
+                deadline = self._local(day - timedelta(days=1) if work.late
+                                       else day + timedelta(days=1), 23, 59)
+            assignment = Assignment.objects.create(
+                name=work.title, author=self.tutor, group=self.group,
+                deadline=deadline, kind=work.kind, **fields)
+            assignment.students.set(students)
+            assignment.problems.set([e[0] for e in work.entries])
+            Assignment.objects.filter(pk=assignment.pk).update(
+                created_at=(first or deadline) - timedelta(days=5))
+            work.assignment = assignment
+            work.items = [AssignmentItem.objects.create(assignment=assignment, order=i,
+                                                        catalog_problem=e[0])
+                          for i, e in enumerate(work.entries, start=1)]
+            if slots:
+                self._submit_work(work, self.student, [e[3] for e in work.entries], rng)
+                self.submitted[self.student.pk].append(work)
+            for mate, (p_join, acc) in zip(self.mates, join):
+                mate_slots = self._mate_slots(work, mate, p_join, acc, rng)
+                if mate_slots:
+                    self._submit_work(work, mate, mate_slots, rng)
+                    self.submitted[mate.pk].append(work)
+                    extra_slots[mate.pk] += mate_slots
+        self._save_events(self.student, self.work_slots)
+        for mate in self.mates:
+            if extra_slots[mate.pk]:
+                self._save_events(mate, extra_slots[mate.pk])
+        n = Counter(w.status for w in self.works)
+        self.stdout.write(f'Работ выдано: {len(self.works)} (домашек '
+                          f'{sum(1 for w in self.works if w.kind == "homework")}, контрольных '
+                          f'{sum(1 for w in self.works if w.kind == "exam")}); витринный ученик: '
+                          f'проверено {n["reviewed"]}, ждут проверки {n["submitted"]}, '
+                          f'не сдано {n["none"]}.')
+
+    def _mate_slots(self, work, mate, p_join, acc, rng):
+        """Слоты одноклассника по работе (или None, если он её не сдавал)."""
+        offset = work.submit_offset if work.submit_offset is not None else work.nominal_offset
+        if work.submit_offset is None and work.kind == 'homework' and rng.random() > 0.35:
+            return None                     # «не сдана» — не сдаёт и большинство группы
+        if offset < self.mate_last[mate.pk] or rng.random() > p_join:
+            return None                     # уже «пропал» из группы либо не сдал
+        slots = [Slot(topic=e[1], problem=e[0], diff=e[2], source=work.kind, work=work,
+                      outcome='solved' if rng.random() < acc else 'failed')
+                 for e in work.entries]
+        used = self.mate_used[mate.pk]
+        if work.kind == 'exam':      # внутрь окна главного ученика, чуть позже него
+            base = [s.when for s in work.slots]
+            for slot, when in zip(slots, base):
+                t = timezone.localtime(when).replace(tzinfo=None) + timedelta(
+                    minutes=rng.randint(1, 4), seconds=rng.randint(0, 59))
+                while t in used:
+                    t += timedelta(seconds=1)
+                used.add(t)
+                slot.when = timezone.make_aware(t, self.tz)
+                slot.seconds = rng.randint(120, 600)
+        else:
+            shift = 1 if (rng.random() < 0.3 and offset > 1) else 0
+            self._place_day(rng, self.today - timedelta(days=offset - shift), [], [slots], used)
+        return slots
+
+    def _submit_work(self, work, student, slots, rng):
+        """Submission (+ проверка) на каждую позицию; событие получает pk сдачи.
+        Домашку, не проверенную репетитором, боевой код журналирует как
+        `attempted`; контрольную проверяет машина (reviewed_by = NULL)."""
+        from problems.models import Submission, TeacherFeedback
+        exam = work.kind == 'exam'
+        by_slot_time = sorted(slots, key=lambda s: s.when)
+        recent = timezone.localtime(by_slot_time[-1].when).date() >= self.today - timedelta(days=3)
+        reviewed = exam or (work.status == 'reviewed' if student == self.student else not recent)
+        for item, slot in zip(work.items, slots):
+            problem = item.catalog_problem
+            sub = Submission.objects.create(
+                student=student, assignment=work.assignment, problem=problem, problem_item=item,
+                status='reviewed' if reviewed else 'submitted', submitted_at=slot.when,
+                submitted_answer=(((problem.answer or '').strip()[:80] or 'см. решение')
+                                  if slot.outcome == 'solved' else 'Ответ получить не удалось'),
+                solution_text=('Решил(а) по стандартной схеме: записал условия и нашёл ответ.'
+                               if slot.outcome == 'solved'
+                               else 'Дошёл(ла) до середины, финальный шаг не получился.'))
+            slot.payload['submission_id'] = sub.pk
+            if not reviewed:
+                slot.outcome = 'attempted'
+                continue
+            points = Decimal(str(item.points or 1))
+            factor = (rng.choice((1, 1, 1, 1, 0.9, 0.8, 0.7)) if slot.outcome == 'solved'
+                      else rng.choice((0, 0, 0, 0.05)))
+            score = (points * Decimal(str(factor)) * 2).quantize(Decimal('1'), ROUND_HALF_UP) / 2
+            full = score >= points
+            comment = '' if exam else rng.choice(
+                COMMENT_FULL if full else COMMENT_PART if slot.outcome == 'solved' else COMMENT_FAIL)
+            feedback = TeacherFeedback.objects.create(
+                submission=sub, score=score, comment=comment,
+                reviewed_by=None if exam else self.tutor)
+            if not full and not exam:
+                tags = rng.choices([t for t, _ in self.tags], [w for _, w in self.tags],
+                                   k=1 if rng.random() < 0.7 else 2)
+                feedback.mistakes.set(set(tags))
+            TeacherFeedback.objects.filter(pk=feedback.pk).update(
+                reviewed_at=min(self.now - timedelta(minutes=1),
+                                slot.when + timedelta(hours=rng.randint(6, 40)) if not exam
+                                else slot.when + timedelta(minutes=5)))
+        if exam:
+            from problems.models import ExamAttempt
+            first, last = by_slot_time[0].when, by_slot_time[-1].when
+            attempt = ExamAttempt.objects.create(
+                assignment=work.assignment, student=student,
+                expires_at=work.assignment.ends_at, submitted_at=last + timedelta(minutes=3))
+            ExamAttempt.objects.filter(pk=attempt.pk).update(started_at=first - timedelta(minutes=3))
+        elif reviewed and student == self.student:
+            from problems.models import WorkFeedback
+            done = sum(1 for s in slots if s.outcome == 'solved') / max(1, len(slots))
+            WorkFeedback.objects.update_or_create(
+                assignment=work.assignment, student=student,
+                defaults={'author': self.tutor,
+                          'comment': WORK_COMMENTS['high' if done >= 0.8 else 'mid' if done >= 0.55 else 'low']})
+
+    def _write_extras(self):
+        """Навыки, оценки сложности работ (ставит ученик), заметка репетитора."""
+        from problems.models import Skill, StudentSkillProgress
+        from problems.models_platform import TutorNote, WorkDifficulty
+        for name, level in SKILLS:
+            skill, _ = Skill.objects.get_or_create(name=name)
+            StudentSkillProgress.objects.update_or_create(
+                student=self.student, skill=skill, defaults={'level': level})
+        votes = {self.student.pk: (4, 5, 6, 6, 7, 6, 7), self.mates[0].pk: (5, 6, 5),
+                 self.mates[1].pk: (6, 7)}
+        for user in (self.student, *self.mates):
+            homework = [w for w in self.submitted[user.pk] if w.kind == 'homework'
+                        and (user != self.student or w.status == 'reviewed')]
+            homework.sort(key=lambda w: w.assignment.pk)
+            for work, value in zip(homework, votes.get(user.pk, ())):
+                WorkDifficulty.objects.update_or_create(
+                    assignment=work.assignment, student=user, defaults={'value': value})
+        TutorNote.objects.update_or_create(tutor=self.tutor, student=self.student,
+                                           defaults={'text': TUTOR_NOTE})
+
+    # -----------------------------------------------------------------------
+    # (конец части 3)
+    # -----------------------------------------------------------------------
     # ЧАСТЬ 4: игра, пересчёт, даты достижений
+    # -----------------------------------------------------------------------
+
+    def _write_game(self):
+        """События Wecon Rush (source='game'). GameResult НЕ создаём — см.
+        docstring модуля. Сессии — вечером после обычных занятий дня, в дни,
+        которые не пересекают окно «верных подряд»; у КАЖДОГО события тема,
+        иначе список «Чаще всего промахиваешься в игре» пуст."""
+        rng = random.Random(f'{self.opts["seed"]}:game')
+        scale = self.opts['days'] / 90
+        total = max(24, round(200 * scale))
+        sessions = max(3, round(14 * scale))
+        last_of_day = {}
+        for slot in [*self.catalog_slots, *self.work_slots]:
+            day = timezone.localtime(slot.when).date()
+            last_of_day[day] = max(last_of_day.get(day, slot.when), slot.when)
+        days = sorted(d for d in last_of_day
+                      if d < self.today and d not in self.run_dates
+                      and self.kinds.get((self.today - d).days) in ('streak', 'counted'))
+        days = sorted(rng.sample(days, min(sessions, len(days))))
+        modes = [('bullet', 'blitz', 'rapid', 'classic')[i % 4] for i in range(len(days))]
+        rng.shuffle(modes)
+        weak = [t for t, _a, _s, role in TOPIC_PLAN if role == 'weak' and t in self.pools]
+        every = [t for t, *_ in TOPIC_PLAN if t in self.pools and t != OTHER]
+        per = apportion(total, {d: 1 for d in days}, {d: 1 for d in days})
+        used = {timezone.localtime(s.when).replace(tzinfo=None)
+                for s in [*self.catalog_slots, *self.work_slots]}
+        slots = []
+        for day, mode in zip(days, modes):
+            cursor = (timezone.localtime(last_of_day[day]).replace(tzinfo=None)
+                      + timedelta(minutes=rng.randint(15, 30)))
+            for _ in range(per[day]):
+                solved = rng.random() < 0.65
+                name = rng.choice(every if solved else weak * 4 + every)
+                t = cursor
+                while t in used:
+                    t += timedelta(seconds=1)
+                used.add(t)
+                slots.append(Slot(
+                    topic=self.pools[name].topic, problem=None, diff=rng.choice((1, 2, 2, 3)),
+                    outcome='solved' if solved else 'failed', source='game',
+                    when=timezone.make_aware(t, self.tz), seconds=rng.randint(6, 25),
+                    payload={'mode': mode}))
+                cursor += timedelta(seconds=rng.randint(20, 60))
+        self._save_events(self.student, slots)
+        self.stdout.write(f'Игра: {len(slots)} событий в {len(days)} сессиях, режимы '
+                          f'{", ".join(sorted(set(modes)))}. GameResult не создаётся.')
+
+    def _weekly_goal(self):
+        """Цель недели так, чтобы полоса на экране была заполнена на ~80 %:
+        60–100 % выглядит живо, 0 и ровно 100 % — как подстроенное."""
+        from problems.stats import solved_by_day
+        monday = self.today - timedelta(days=self.today.weekday())
+        done = sum(v for d, v in solved_by_day(self.student).items() if monday <= d <= self.today)
+        return max(3, -(-done * 5 // 4))          # ceil(done / 0.8)
+
+    def _gamify(self):
+        """Свёртки — ТОЛЬКО пересчётом из событий, по одному ученику (никогда
+        без --user-id: на бою команда без ключа обошла бы всех пользователей)."""
+        from problems import stats
+        from problems.management.commands.seed_achievements import ACHIEVEMENTS
+        from problems.models_gamification import Achievement, StudentProgressProfile
+        if Achievement.objects.count() < len(ACHIEVEMENTS):
+            call_command('seed_achievements', stdout=io.StringIO())
+        profile, _ = StudentProgressProfile.objects.get_or_create(user=self.student)
+        profile.weekly_goal = self._weekly_goal()          # ДО пересчёта: он её не трогает
+        profile.save(update_fields=['weekly_goal'])
+        for user in (self.student, *self.mates):
+            call_command('recalculate_gamification', user_id=user.pk, verbosity=0)
+        for user in (self.student, *self.mates):
+            self._backdate(user)
+        if self.apply:
+            for user in (self.student, *self.mates):
+                stats.invalidate(user)
+            cache.delete('achv_rarity_map')
+
+    def _backdate(self, user):
+        """Даты «получено» и рекордов задним числом: пересчёт пишет их
+        «сейчас» (auto_now_add / auto_now), и все награды выглядели бы
+        полученными сегодня. Ставим `.update()` на день, когда условие
+        впервые выполнилось: реальные правила гоняем по префиксам истории
+        в откатываемых точках сохранения (данные не трогаются)."""
+        from problems.models import LearningEvent, Submission
+        from problems.models_gamification import EarnedAchievement, PersonalRecord
+        earned = list(EarnedAchievement.objects.filter(user=user).select_related('achievement'))
+        events = list(LearningEvent.objects.filter(user=user).order_by('created_at', 'pk'))
+        if not earned or not events:
+            return
+        local = timezone.localtime
+        by_day = defaultdict(list)
+        for e in events:
+            by_day[local(e.created_at).date()].append(e.created_at)
+        for sub in Submission.objects.filter(student=user, submitted_at__isnull=False):
+            by_day[local(sub.submitted_at).date()].append(sub.submitted_at)
+        days = sorted(by_day)
+        step = max(1, len(days) // 40)                       # не больше ~40 проб на ученика
+        probes = sorted(set(days[step - 1::step]) | {days[-1]})
+        want, found = {e.achievement.code for e in earned}, {}
+        for cut in probes:
+            end = timezone.make_aware(datetime.combine(cut, time(23, 59, 59)), self.tz)
+            point = transaction.savepoint()
+            try:
+                LearningEvent.objects.filter(user=user, created_at__gt=end).delete()
+                Submission.objects.filter(student=user, submitted_at__gt=end).delete()
+                EarnedAchievement.objects.filter(user=user).delete()
+                PersonalRecord.objects.filter(user=user).delete()
+                call_command('recalculate_gamification', user_id=user.pk, verbosity=0)
+                got = set(EarnedAchievement.objects.filter(user=user)
+                          .values_list('achievement__code', flat=True))
+            finally:
+                transaction.savepoint_rollback(point)
+            for code in got - set(found):
+                found[code] = cut
+            if want <= set(found):
+                break
+        weekly = {code: self._goal_week_end(user, int(code.rsplit('_', 1)[1]))
+                  for code in want if code.startswith('weekly_goal_')}
+        for row in earned:
+            code = row.achievement.code
+            day = weekly.get(code) or found.get(code) or days[-1]
+            stamps = by_day.get(day) or [self.now]
+            when = min(self.now - timedelta(minutes=1), max(stamps) + timedelta(minutes=1))
+            EarnedAchievement.objects.filter(pk=row.pk).update(earned_at=when)
+        self._backdate_records(user, events)
+
+    def _goal_week_end(self, user, weeks):
+        """Воскресенье, на котором набралась `weeks`-я подряд неделя с
+        выполненной целью (счёт назад от прошлой недели, как в геймификации)."""
+        from problems.models_gamification import StudentProgressProfile
+        from problems.stats import solved_by_day
+        goal = StudentProgressProfile.objects.get(user=user).weekly_goal
+        rows = solved_by_day(user)
+        monday = self.today - timedelta(days=self.today.weekday())
+        run, week = [], monday - timedelta(days=7)
+        while sum(v for d, v in rows.items() if week <= d < week + timedelta(days=7)) >= goal:
+            run.append(week)
+            week -= timedelta(days=7)
+        if len(run) < weeks:
+            return None
+        return run[-1] + timedelta(days=7 * (weeks - 1) + 6)
+
+    def _backdate_records(self, user, events):
+        from problems.models_gamification import PersonalRecord
+        streak = best = 0
+        best_end = None
+        for e in events:
+            if e.event_type == 'solved':
+                streak += 1
+                if streak > best:
+                    best, best_end = streak, e.created_at
+            elif e.event_type == 'failed':
+                streak = 0
+        for record in PersonalRecord.objects.filter(user=user):
+            when = None
+            if record.kind == 'best_correct_streak':
+                when = best_end
+            elif record.kind == 'hardest_solved':
+                when = next((e.created_at for e in events if e.event_type == 'solved'
+                             and (e.difficulty or 0) >= record.value), None)
+            elif record.kind == 'most_productive_day':
+                day = record.payload.get('date')
+                when = max((e.created_at for e in events if e.event_type == 'solved'
+                            and str(timezone.localtime(e.created_at).date()) == day), default=None)
+            if when:
+                PersonalRecord.objects.filter(pk=record.pk).update(achieved_at=when)
+
     # -----------------------------------------------------------------------
     # ЧАСТЬ 5: отчёт «факт против цели»
     # -----------------------------------------------------------------------
@@ -870,24 +1248,115 @@ class Command(BaseCommand):
         }
 
     def _report(self):
+        """Таблица «факт против цели» с отметками ✓/✗. Цели — из задания;
+        расхождение по источникам (Д1) отмечено в журнале сессии."""
         m = self._metrics()
+        g = self._gamification()
         w = self.stdout.write
+
+        def inside(value, lo=None, hi=None):
+            return (lo is None or value >= lo) and (hi is None or value <= hi)
+
+        rows = [
+            ('активных дней', '52–68 из 90', m['active_days'], inside(m['active_days'], 52, 68)),
+            ('решено верно (без игры)', '550–650', m['solved'], inside(m['solved'], 550, 650)),
+            ('доля верных, %', '74–82', m['accuracy'], inside(m['accuracy'], 74, 82)),
+            ('решено сложности 4–5', '≥55', m['hard_solved'], m['hard_solved'] >= 55),
+            ('уровни сложности', 'все пять', ','.join(map(str, m['levels'])), m['levels'] == [1, 2, 3, 4, 5]),
+            ('тем затронуто', '≥12', m['topics'], m['topics'] >= 12),
+            ('слабых тем (<60 %)', '2–3', m['weak_topics'], inside(m['weak_topics'], 2, 3)),
+            ('разделов паутинки непустых', '5 из 5', m['sections'], m['sections'] == 5),
+            ('источники catalog/homework/exam, %', '≈45/40/15, см. Д1',
+             '/'.join(str(m['split'][k]) for k in ('catalog', 'homework', 'exam')), None),
+            ('событий игры', '150–250', m['game'], inside(m['game'], 150, 250)),
+            ('верных подряд (макс.)', '25–49', m['run'], inside(m['run'], 25, 49)),
+            ('всего событий', '—', m['events'], None),
+            ('уровень', '≥12', g['level'], g['level'] >= 12),
+            ('опыт', '—', g['xp'], None),
+            ('серия текущая / лучшая', '12–25 / ≥30', f'{g["cur"]} / {g["best"]}',
+             inside(g['cur'], 12, 25) and g['best'] >= 30),
+            ('тем mastered / confident', '≥3 / ≥4', f'{g["mastered"]} / {g["confident"]}',
+             g['mastered'] >= 3 and g['confident'] >= 4),
+            (f'достижений получено из {g["total"]}', '16–24', g['got'], inside(g['got'], 16, 24)),
+            ('достижений НЕ получено', '≥5', g['total'] - g['got'], g['total'] - g['got'] >= 5),
+            ('сдано работ / проверено', '10–12 / ≥8', f'{g["submitted"]} / {g["reviewed"]}',
+             inside(g['submitted'], 10, 12) and g['reviewed'] >= 8),
+            ('контрольных пройдено', '2', g['exams'], g['exams'] == 2),
+            ('игра: режимов / тем промахов', '4 / ≥3', f'{g["modes"]} / {g["miss"]}',
+             g['modes'] == 4 and g['miss'] >= 3),
+            ('недельная цель: сделано / цель', '60–100 %',
+             f'{g["done"]} / {g["goal"]} = {g["fill"]} %', inside(g['fill'], 60, 100)),
+            ('редкость достижений min / max, %', '—', g['rarity'], None),
+            ('навыков / проверок с метками', '5–8 / —', f'{g["skills"]} / {g["tagged"]}',
+             inside(g['skills'], 5, 8)),
+        ]
         w('')
         w('Факт против цели (витринный ученик):')
-        rows = [
-            ('активных дней', '52–68 из 90', m['active_days']),
-            ('решено верно (без игры)', '550–650', m['solved']),
-            ('доля верных, %', '74–82', m['accuracy']),
-            ('решено сложности 4–5', '≥55', m['hard_solved']),
-            ('уровни сложности', 'все пять', ','.join(map(str, m['levels']))),
-            ('тем затронуто', '≥12', m['topics']),
-            ('слабых тем (<60 %)', '2–3', m['weak_topics']),
-            ('разделов паутинки непустых', '5 из 5', m['sections']),
-            ('источники catalog/homework/exam, %', '≈45/40/15 (см. журнал, Д1)',
-             '/'.join(str(m['split'][k]) for k in ('catalog', 'homework', 'exam'))),
-            ('событий игры', '150–250', m['game']),
-            ('верных подряд (макс.)', '25–49', m['run']),
-            ('всего событий', '—', m['events']),
-        ]
-        for name, goal, fact in rows:
-            w(f'  {name:<38} цель {goal:<26} факт {fact}')
+        for name, goal, fact, ok in rows:
+            mark = '  ' if ok is None else ('✓ ' if ok else '✗ ')
+            w(f'  {mark}{name:<36} цель {goal:<20} факт {fact}')
+        missed = [name for name, _g, _f, ok in rows if ok is False]
+        if missed:
+            w(self.style.WARNING('Не достигнуто: ' + '; '.join(missed) +
+                                 '. Попробуйте другое зерно: --seed <число>.'))
+        else:
+            w(self.style.SUCCESS('Все цели достигнуты.'))
+        self._report_details()
+
+    def _gamification(self):
+        from problems.models import (ExamAttempt, LearningEvent, StudentSkillProgress,
+                                     StudentTopicProgress, Submission, TeacherFeedback)
+        from problems.models_gamification import (Achievement, EarnedAchievement,
+                                                  StudentProgressProfile, rarity_map)
+        from problems.stats import solved_by_day
+        profile = StudentProgressProfile.objects.filter(user=self.student).first()
+        levels = Counter(StudentTopicProgress.objects.filter(student=self.student)
+                         .values_list('mastery_level', flat=True))
+        rarity = rarity_map() if profile and profile.xp_total else {}
+        mine = [rarity[a] for a in EarnedAchievement.objects.filter(user=self.student)
+                .values_list('achievement_id', flat=True) if a in rarity]
+        works = Submission.objects.filter(student=self.student, assignment__kind='homework',
+                                          status__in=('submitted', 'reviewed'))
+        game = LearningEvent.objects.filter(user=self.student, source='game')
+        monday = self.today - timedelta(days=self.today.weekday())
+        done = sum(v for d, v in solved_by_day(self.student).items() if monday <= d <= self.today)
+        goal = profile.weekly_goal if profile else 0
+        return {
+            'level': profile.level if profile else 0, 'xp': profile.xp_total if profile else 0,
+            'cur': profile.current_streak if profile else 0,
+            'best': profile.longest_streak if profile else 0,
+            'mastered': levels['mastered'], 'confident': levels['confident'],
+            'total': Achievement.objects.count(),
+            'got': EarnedAchievement.objects.filter(user=self.student).count(),
+            'submitted': works.values('assignment').distinct().count(),
+            'reviewed': works.filter(status='reviewed').values('assignment').distinct().count(),
+            'exams': ExamAttempt.objects.filter(student=self.student,
+                                                submitted_at__isnull=False).count(),
+            'modes': len({e.payload.get('mode') for e in game}),
+            'miss': len({e.topic_id for e in game.filter(event_type='failed') if e.topic_id}),
+            'done': done, 'goal': goal, 'fill': min(100, round(100 * done / max(1, goal))),
+            'rarity': f'{min(mine):.0f} / {max(mine):.0f}' if mine else '—',
+            'skills': StudentSkillProgress.objects.filter(student=self.student).count(),
+            'tagged': TeacherFeedback.objects.filter(submission__student=self.student,
+                                                     mistakes__isnull=False).distinct().count(),
+        }
+
+    def _report_details(self):
+        """Что не получено, рекорды, метки ошибок: глазами проверить, что
+        картина осмысленна, а не только числа сошлись."""
+        from problems.models import LearningEvent, TeacherFeedback
+        from problems.models_gamification import Achievement, EarnedAchievement, PersonalRecord
+        w = self.stdout.write
+        have = set(EarnedAchievement.objects.filter(user=self.student)
+                   .values_list('achievement__code', flat=True))
+        w('  не получено: ' + ', '.join(sorted(Achievement.objects.exclude(code__in=have)
+                                                  .values_list('code', flat=True))))
+        for r in PersonalRecord.objects.filter(user=self.student):
+            w(f'  рекорд {r.kind}: {r.value:g} {r.payload.get("date", "")}')
+        tags = Counter()
+        for fb in TeacherFeedback.objects.filter(submission__student=self.student).prefetch_related('mistakes'):
+            tags.update(m.name for m in fb.mistakes.all())
+        w('  метки ошибок: ' + '; '.join(f'{n} ×{c}' for n, c in tags.most_common(4)))
+        w('  сводка по классу: ' + ', '.join(
+            f'{m.username} {LearningEvent.objects.filter(user=m).count()} соб.'
+            for m in self.mates))
