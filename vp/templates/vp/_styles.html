@@ -273,6 +273,106 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-brow-fill.is-bad { background: var(--error); }
 .vp-brow-pct { width: 52px; flex-shrink: 0; text-align: right; font-size: 13px; color: var(--text2); font-variant-numeric: tabular-nums; }
 
+/* Сравнение с другими: полоса по баллам, «вы» — отметка, медиана — короткая черта. */
+.vp-cmp { flex: 1 1 320px; min-width: 240px; }
+.vp-cmp-head { font-size: 15px; font-weight: 600; }
+.vp-cmp-scale { position: relative; height: 34px; margin-top: 22px; }
+.vp-cmp-scale::before {
+  content: ''; position: absolute; left: 0; right: 0; top: 13px; height: 8px;
+  border-radius: var(--r-pill); background: var(--chip-bg);
+}
+.vp-cmp-fill { position: absolute; left: 0; top: 13px; height: 8px; border-radius: var(--r-pill); background: var(--accent); }
+.vp-cmp-med { position: absolute; top: 9px; width: 2px; height: 16px; margin-left: -1px; background: var(--text3); }
+.vp-cmp-you { position: absolute; top: 4px; width: 3px; height: 26px; margin-left: -1px; border-radius: 2px; background: var(--text); }
+.vp-cmp-you i {
+  position: absolute; left: 50%; top: -19px; transform: translateX(-50%);
+  font-style: normal; font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap;
+}
+.vp-cmp-axis { display: flex; justify-content: space-between; font-size: 12px; color: var(--text3); font-variant-numeric: tabular-nums; }
+
+/* Разбор: змейка цепочкой. Цвет не один в строке: у каждого состояния есть слово и знак балла. */
+.vp-card-head { display: flex; align-items: baseline; gap: 4px 12px; flex-wrap: wrap; }
+.vp-chain { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; }
+.vp-crow {
+  display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap;
+  padding: 7px 10px; border-radius: var(--r-sm); font-size: 14.5px;
+}
+.vp-crow.is-bad { background: var(--error-tint); }
+.vp-crow-n { width: 26px; flex-shrink: 0; font-size: 12.5px; color: var(--text3); text-align: right; }
+.vp-dot { width: 8px; height: 8px; border-radius: var(--r-pill); flex-shrink: 0; background: var(--green); }
+.is-bad > .vp-dot { background: var(--error); }
+.is-blank > .vp-dot { background: var(--skip); }
+.vp-crow-main { flex: 1 1 200px; min-width: 0; display: flex; gap: 2px 14px; flex-wrap: wrap; align-items: baseline; overflow-wrap: anywhere; }
+.vp-crow-right { font-size: 13.5px; color: var(--text2); }
+.vp-crow-right b { color: var(--green-ink); }
+.vp-crow-pts { width: 42px; flex-shrink: 0; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; color: var(--green-ink); }
+.is-bad > .vp-crow-pts { color: var(--error-ink); }
+.is-blank > .vp-crow-pts { color: var(--text3); }
+.vp-crow-text { flex: 1 0 100%; padding-left: 36px; font-size: 13.5px; line-height: 1.5; color: var(--text2); overflow-wrap: anywhere; }
+.vp-clink { display: flex; align-items: center; gap: 8px; padding: 1px 0 1px 30px; font-size: 12px; line-height: 1.4; color: var(--text2); }
+.vp-clink::before { content: ''; width: 1px; height: 14px; margin-left: 5px; flex-shrink: 0; background: var(--border); }
+.vp-clink.is-broken { color: var(--error-ink); font-weight: 600; }
+.vp-clink.is-broken::before { width: 2px; margin-left: 4px; background: var(--error); }
+
+/* Проверка ответа на лету (после сдачи) */
+.vp-btn--sm { min-height: 36px; padding: 7px 14px; font-size: 13.5px; }
+.vp-practice { flex: 1 0 100%; padding-left: 36px; margin-top: 2px; }
+.vp-practice-form { margin-top: 8px; display: flex; flex-direction: column; gap: 10px; }
+.vp-practice-form[hidden] { display: none; }
+.vp-practice-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.vp-practice-out { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.vp-practice-out:empty { display: none; }
+.vp-practice-out.is-ok { color: var(--green-ink); }
+.vp-practice-out.is-bad { color: var(--error-ink); }
+
+/* Разбор: тесты 31–44 */
+.vp-tests { display: flex; flex-direction: column; gap: 12px; margin-top: 14px; }
+.vp-tcard { border: var(--line, 1px) solid var(--border); border-radius: var(--r-card); padding: 13px 16px; background: var(--surface-2); }
+.vp-tcard-head { display: flex; align-items: baseline; gap: 4px 10px; flex-wrap: wrap; }
+.vp-tcard-n { font-size: 13px; font-weight: 600; color: var(--text3); }
+.vp-tcard-title { flex: 1 1 auto; font-size: 13px; color: var(--text2); }
+.vp-tcard-score { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.vp-tcard.is-ok .vp-tcard-score { color: var(--green-ink); }
+.vp-tcard.is-mid .vp-tcard-score { color: var(--amber-ink); }
+.vp-tcard.is-bad .vp-tcard-score { color: var(--error-ink); }
+.vp-tcard.is-blank .vp-tcard-score { color: var(--text3); }
+.vp-tcard-text { margin-top: 8px; font-size: 14.5px; line-height: 1.55; overflow-wrap: anywhere; }
+.vp-tcard .vp-figure, .vp-tcard .vp-scroll { margin-top: 10px; }
+.vp-tcard .vp-practice { padding-left: 0; margin-top: 8px; }
+.vp-topts { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.vp-topt {
+  display: flex; gap: 10px; align-items: baseline; padding: 6px 10px; font-size: 14px; line-height: 1.45;
+  border: var(--line, 1px) solid var(--border-soft); border-radius: var(--r); overflow-wrap: anywhere;
+}
+.vp-topt.is-wrong { background: var(--error-tint); }
+.vp-topt-n { width: 18px; flex-shrink: 0; text-align: right; color: var(--text3); font-variant-numeric: tabular-nums; }
+.vp-topt-tags { margin-left: auto; display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.vp-tag { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: var(--r-pill); white-space: nowrap; }
+.vp-tag--mine { background: var(--accent-tint); color: var(--accent-ink); }
+.vp-tag--right { background: var(--green-tint); color: var(--green-ink); }
+.vp-tag--wrong { background: var(--error-tint); color: var(--error-ink); }
+.vp-tcard-line { margin-top: 10px; font-size: 13.5px; line-height: 1.6; }
+.vp-math {
+  margin-top: 6px; display: inline-block; max-width: 100%; padding: 8px 12px; border-radius: 6px;
+  font-size: 14px; font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace;
+  color: var(--accent-ink); background: var(--accent-tint); overflow-wrap: anywhere;
+}
+.vp-solution { margin-top: 10px; font-size: 14px; line-height: 1.55; }
+.vp-solution summary { cursor: pointer; font-weight: 600; color: var(--accent-ink); }
+.vp-solution summary:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.vp-solution div { margin-top: 6px; overflow-wrap: anywhere; }
+
+/* Низ страницы: регистрация (только гостю) и кнопки */
+.vp-cta { display: flex; gap: 18px; align-items: stretch; flex-wrap: wrap; }
+.vp-cta-card { flex: 1 1 320px; background: var(--btn-bg); color: var(--on-btn); border-radius: var(--r-panel); padding: 20px 24px; }
+.vp-cta-card p { margin-top: 7px; font-size: 13.5px; line-height: 1.55; }
+.vp-cta-row { margin-top: 14px; display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.vp-cta-btn, .vp-cta-btn:hover { background: var(--on-btn); color: var(--btn-bg); }
+.vp-cta-link { color: var(--on-btn); font-size: 14px; font-weight: 500; }
+.vp-cta-link:focus-visible, .vp-cta-btn:focus-visible { outline: 2px solid var(--on-btn); outline-offset: 2px; }
+.vp-actions { flex: 0 1 330px; display: flex; flex-direction: column; gap: 10px; }
+.vp-actions--solo { flex: none; flex-direction: row; flex-wrap: wrap; }
+
 /* ── Телефон ─────────────────────────────────────────────────────── */
 @media (max-width: 760px) {
   .vp-wrap { padding: 20px 16px 40px; }
@@ -305,6 +405,11 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-brow-name { width: 100%; }
   .vp-brow-track { flex: 1 1 120px; }
   .vp-score-num b { font-size: 44px; }
+  .vp-crow-text, .vp-practice { padding-left: 0; }
+  .vp-topt { flex-wrap: wrap; }
+  .vp-topt-tags { margin-left: 28px; justify-content: flex-start; }
+  .vp-cta-card { padding: 18px; }
+  .vp-actions { flex: 1 1 100%; }
   .vp-dialog { padding: 18px; }
 }
 @media (prefers-reduced-motion: reduce) {

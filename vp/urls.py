@@ -18,6 +18,7 @@ urlpatterns = [
     path('a/<str:code>/save/', views.save, name='save'),
     path('a/<str:code>/time/', views.time_left, name='time'),
     path('a/<str:code>/finish/', views.finish, name='finish'),
+    path('a/<str:code>/practice-check/', views.practice_check, name='practice'),
     path('r/<str:code>/', views.result, name='result'),
     path('<slug:slug>/', views.intro, name='intro'),
     path('<slug:slug>/start/', views.start, name='start'),

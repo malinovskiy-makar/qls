@@ -3,8 +3,9 @@
 ⚠️ ВХОД НЕ ТРЕБУЕТСЯ НИГДЕ, И ЭТО РЕШЕНИЕ, А НЕ ПРОПУСК: тренажёр открыт любому
 посетителю. Вошедшего узнаём по пользователю, гостя — по сессии. Публичны
 осознанно: список и вход (только опубликованные варианты), старт попытки и
-страница результата (голый балл, без ответов). Всё остальное принадлежит
-владельцу попытки: чужой код даёт 404 — как будто такой попытки нет.
+страница результата (владельцу — полный разбор, остальным — голый балл без
+ответов). Всё остальное принадлежит владельцу попытки: чужой код даёт 404 — как
+будто такой попытки нет.
 
 ⚠️ ВЛАДЕЛЕЦ БЕРЁТСЯ ИЗ `request.user` И СЕССИИ, НИКОГДА ИЗ ДАННЫХ ЗАПРОСА. Адрес
 попытки (`public_code`) — не право доступа, а только адрес; его проверяет ровно
@@ -31,7 +32,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
 
 from problems import exam_engine
-from vp import answers, blocks, scoring
+from vp import answers, blocks, review, scoring
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 
 logger = logging.getLogger(__name__)
@@ -77,23 +78,26 @@ def _remember(request, code):
     request.session[SESSION_ATTEMPTS] = codes[-SESSION_ATTEMPTS_LIMIT:]
 
 
-def _get_attempt(request, code):
-    """Попытка владельца или 404 — ЕДИНСТВЕННОЕ место, где проверяется доступ.
+def _owns(request, attempt):
+    """Принадлежит ли попытка тому, кто спрашивает — ЕДИНСТВЕННОЕ правило доступа.
 
     Владелец попытки — пользователь (если он у попытки есть), иначе тот браузер,
     код попытки которого лежит в сессии или чей ключ сессии записан в попытке.
-    Именно 404, а не 403: чужую попытку не должно быть видно даже по факту
-    существования.
+    """
+    if attempt.user_id is not None:
+        return request.user.is_authenticated and attempt.user_id == request.user.pk
+    key = request.session.session_key
+    remembered = attempt.public_code in request.session.get(SESSION_ATTEMPTS, [])
+    return bool(remembered or (key and attempt.session_key == key))
+
+
+def _get_attempt(request, code):
+    """Попытка владельца или 404. Именно 404, а не 403: чужую попытку не должно быть
+    видно даже по факту существования. Правило — в `_owns`, других проверок нет.
     """
     attempt = get_object_or_404(
         VPAttempt.objects.select_related('variant'), public_code=code)
-    if attempt.user_id is not None:
-        if not (request.user.is_authenticated and attempt.user_id == request.user.pk):
-            raise Http404
-        return attempt
-    key = request.session.session_key
-    remembered = code in request.session.get(SESSION_ATTEMPTS, [])
-    if not (remembered or (key and attempt.session_key == key)):
+    if not _owns(request, attempt):
         raise Http404
     return attempt
 
@@ -538,16 +542,20 @@ def _percent(got, top):
 
 @never_cache
 def result(request, code):
-    """Минимальный результат: балл, разбивка по блокам, время. Публичен по коду.
+    """Результат попытки. Адрес публичен, содержимое — по владельцу.
 
-    ⚠️ Публичен ОСОЗНАННО: ссылкой можно поделиться. Поэтому здесь ТОЛЬКО итоги —
-    ни ответов, ни эталонов, ни сведений о том, кто решал. Полный разбор — сессия 3.
-    Несданную попытку видит только владелец, и его ведёт обратно к заданиям.
+    ⚠️ ДВА ВИДА, РАЗВЕДЕНЫ НА УРОВНЕ ДАННЫХ. Владелец получает полный разбор: змейку
+    цепочкой, арифметику тестов, решения. Всем остальным в контекст не попадает ни
+    строка разбора: только балл, блоки, время, процентиль и имя. Прятать чужому
+    эталоны стилями нельзя — они не должны попасть в HTML (`test_review`). Несданную
+    попытку видит только владелец, и его ведёт обратно к заданиям.
     """
     attempt = get_object_or_404(
-        VPAttempt.objects.select_related('variant'), public_code=code)
+        VPAttempt.objects.select_related('variant', 'user'), public_code=code)
+    owner = _owns(request, attempt)
     if attempt.submitted_at is None:
-        _get_attempt(request, code)              # чужой — 404
+        if not owner:
+            raise Http404
         return redirect('vp:take', code=code)
 
     totals = scoring.block_totals(attempt)
@@ -559,9 +567,61 @@ def result(request, code):
         rows.append({'name': section['titles']['short'], 'range': section['range'],
                      'score': got, 'max': top, 'percent': percent,
                      'tone': 'good' if percent >= 75 else 'mid' if percent >= 50 else 'bad'})
-    return render(request, 'vp/result.html', {
+    top_score = attempt.max_score or attempt.variant.max_score
+    context = {
         'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True,
-        'score': attempt.score, 'max': attempt.max_score or attempt.variant.max_score,
+        'score': attempt.score, 'max': top_score, 'score_percent': _percent(attempt.score, top_score),
         'time_text': _time_text(attempt), 'auto': attempt.is_auto_submitted,
-        'blocks': rows,
-    })
+        'blocks': rows, 'is_owner': owner,
+    }
+    comparison = review.comparison(attempt)
+    if comparison is not None:
+        comparison['median_percent'] = _percent(comparison['median'], top_score)
+    context['comparison'] = comparison
+    if owner:
+        tests = review.tests_review(attempt)
+        for row in tests:
+            row['figure_url'] = _figure_url(row['figure'])
+        context.update(
+            chain=review.chain_review(attempt), tests=tests,
+            practice_url=reverse('vp:practice', args=[code]),
+            offer_signup=not request.user.is_authenticated)
+    else:
+        # Ник — логин: отдельного «ника» в проекте нет. Имя и фамилию не показываем.
+        context['author'] = attempt.user.get_username() if attempt.user_id else 'Участник'
+        context['again_url'] = (reverse('vp:intro', args=[attempt.variant.slug])
+                                if attempt.variant.is_published else '')
+    return render(request, 'vp/result.html', context)
+
+
+@require_POST
+def practice_check(request, code):
+    """«Дорешать вне зачёта»: проверка ответа на лету, `{"item": 27, "raw": "…"}`.
+
+    ⚠️ НИЧЕГО НЕ ПИШЕТ: ни `VPAnswer`, ни балл попытки. Только владельцу и только по
+    СДАННОЙ попытке (иначе 404, как чужая): балл уже записан и не меняется. Доступ
+    через `_get_attempt`, а не `_load_attempt` — тот способен сдать просроченную
+    попытку, то есть записать.
+    """
+    attempt = _get_attempt(request, code)
+    if attempt.submitted_at is None:
+        raise Http404
+    try:
+        too_big = int(request.META.get('CONTENT_LENGTH') or 0) > MAX_SAVE_BYTES
+    except ValueError:
+        too_big = True
+    body = None if too_big else _read_save_body(request)
+    number = body.get('item') if body else None
+    item = None
+    if isinstance(number, int) and not isinstance(number, bool):
+        item = attempt.variant.items.filter(number=number).first()
+    if item is None:
+        return _json({'error': 'Нет такого задания'}, status=400)
+    try:
+        cleaned = answers.clean_answer(item, body.get('raw'))
+    except answers.AnswerError as error:
+        return _json({'error': str(error)}, status=400)
+    if cleaned is None:
+        return _json({'error': 'Пустой ответ'}, status=400)
+    _, is_correct = scoring.score_item(item, cleaned)
+    return _json({'is_correct': bool(is_correct), 'right': review.right_answer(item)})

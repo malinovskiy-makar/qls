@@ -1,9 +1,13 @@
 {% extends 'vp/base_vp.html' %}
-{% load vp_extras %}
+{% load static vp_extras %}
 {% comment %}
-Минимальный результат. Публичен по коду: ссылкой можно поделиться, поэтому здесь
-ТОЛЬКО итоги — ни ответов, ни эталонов, ни сведений о том, кто решал. Разбор
-цепочки и арифметика штрафов — следующая сессия; обещаний на эту тему нет.
+Результат попытки. Адрес публичен, содержимое — по владельцу (`is_owner`).
+
+⚠️ ЧУЖОМУ В КОНТЕКСТ НЕ ПОПАДАЕТ НИ СТРОКА РАЗБОРА (`chain`, `tests`, `practice_url`
+есть только у владельца, см. `views.result`). Эти блоки закрыты `{% if is_owner %}`
+для порядка, а не для защиты: защита — в данных. Тест `test_review` ищет в HTML чужого
+эталоны и не находит.
+Слова «эталон» нет нигде вне блоков владельца.
 {% endcomment %}
 {% block title %}Результат · {{ variant.title }}{% endblock %}
 {% block content %}
@@ -12,10 +16,23 @@
 
     <div class="vp-card vp-score-card">
       <div>
-        <div class="vp-mute">{{ variant.title }} · {{ variant.grade_band|grade_label }}</div>
+        <div class="vp-mute">{% if not is_owner %}{{ author }} · {% endif %}{{ variant.title }} · {{ variant.grade_band|grade_label }}</div>
         <div class="vp-score-num"><b>{{ score|num }}</b><span>из {{ max|num }}</span></div>
         <div class="vp-mute vp-mt-sm">{{ time_text }}{% if auto %} · сдано по истечении времени{% endif %}</div>
       </div>
+      {% if comparison %}
+      <div class="vp-cmp">
+        <div class="vp-cmp-head">Выше, чем у {{ comparison.percent }}% прошедших этот вариант</div>
+        <div class="vp-cmp-scale" role="img"
+             aria-label="Шкала от 0 до {{ max|num }}: {% if is_owner %}ваш балл{% else %}балл участника{% endif %} {{ score|num }}, медиана {{ comparison.median|num }}">
+          <span class="vp-cmp-fill" style="width: {{ score_percent }}%"></span>
+          <span class="vp-cmp-med" style="left: {{ comparison.median_percent }}%"></span>
+          <span class="vp-cmp-you" style="left: {{ score_percent }}%"><i>{% if is_owner %}вы{% else %}участник{% endif %}</i></span>
+        </div>
+        <div class="vp-cmp-axis"><span>0</span><span>медиана {{ comparison.median|num }}</span><span>{{ max|num }}</span></div>
+        <div class="vp-mute vp-mt-sm">По первым попыткам {{ comparison.count|plural:"человек,человека,человек" }}, прошедших вариант на время.</div>
+      </div>
+      {% endif %}
     </div>
 
     <div class="vp-card">
@@ -32,9 +49,128 @@
       </div>
     </div>
 
-    <div>
-      <a class="vp-btn" href="{% url 'vp:index' %}">Пройти другой вариант</a>
+    {% if is_owner %}
+    <div hidden>{% csrf_token %}</div>
+
+    <div class="vp-card" id="vp-chain">
+      <div class="vp-card-head">
+        <h2 class="vp-h3">Змейка целиком</h2>
+        <span class="vp-mute">Каждый ответ начинается со второй буквы предыдущего. Красным отмечено, где цепь порвалась.</span>
+      </div>
+      <ol class="vp-chain">
+        {% for c in chain %}
+        <li>
+          <div class="vp-crow {% if c.blank %}is-blank{% elif c.is_correct %}is-ok{% else %}is-bad{% endif %}" id="vp-r-{{ c.number }}">
+            <span class="vp-crow-n">{{ c.number }}</span>
+            <span class="vp-dot" aria-hidden="true"></span>
+            <span class="vp-crow-main">
+              {% if c.blank %}
+              <span class="vp-mute"><span class="vp-sr">Задание {{ c.number }}: </span>не отвечено</span>
+              {% else %}
+              <span class="vp-crow-mine"><span class="vp-sr">Задание {{ c.number }}, {% if c.is_correct %}верно{% else %}неверно{% endif %}: </span>{{ c.mine }}</span>
+              {% if not c.is_correct %}<span class="vp-crow-right">эталон: <b>{{ c.right }}</b></span>{% endif %}
+              {% endif %}
+            </span>
+            <span class="vp-crow-pts">{{ c.score|signed }}</span>
+            {% if c.blank %}
+            {% if c.statement %}<div class="vp-crow-text">{{ c.statement|linebreaksbr }}</div>{% endif %}
+            {% include 'vp/_practice.html' with number=c.number kind='short_text' options=None prefix=c.prefix suffix=c.suffix %}
+            {% endif %}
+          </div>
+          {% if c.link_letter %}
+          <div class="vp-clink{% if c.broke_chain %} is-broken{% endif %}">
+            {% if c.broke_chain %}
+            здесь цепь порвалась: следующий ответ должен был начинаться на «{{ c.link_letter }}», а {% if c.my_letter %}у вас вторая буква «{{ c.my_letter }}»{% else %}в вашем ответе нет второй буквы{% endif %}
+            {% elif c.blank %}
+            следующий ответ на «{{ c.link_letter }}»
+            {% else %}
+            вторая буква «{{ c.link_letter }}» → следующий ответ на «{{ c.link_letter }}»
+            {% endif %}
+          </div>
+          {% endif %}
+        </li>
+        {% endfor %}
+      </ol>
     </div>
+
+    <div class="vp-card" id="vp-tests">
+      <h2 class="vp-h3">Откуда взялись баллы за тесты</h2>
+      <p class="vp-mute vp-mt-xs">В заданиях с несколькими верными балл делится по долям, а лишние варианты его уменьшают.</p>
+      <div class="vp-tests">
+        {% for t in tests %}
+        <article class="vp-tcard is-{{ t.tone }}" id="vp-r-{{ t.number }}">
+          <header class="vp-tcard-head">
+            <span class="vp-tcard-n">{{ t.number }}</span>
+            <span class="vp-tcard-title">{{ t.block_title }}</span>
+            <span class="vp-tcard-score">{{ t.score|num }} из {{ t.max|num }}</span>
+          </header>
+          <div class="vp-tcard-text">{% for chunk in t.statement|gap_parts %}{{ chunk|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+          {% if t.figure_url %}
+          <figure class="vp-figure">
+            <img src="{{ t.figure_url }}" alt="{{ t.figure_caption|default:'Рисунок к заданию' }}" loading="lazy">
+            {% if t.figure_caption or t.figure_source %}<figcaption>{{ t.figure_caption }}{% if t.figure_source %} Источник: {{ t.figure_source }}{% endif %}</figcaption>{% endif %}
+          </figure>
+          {% endif %}
+          {% if t.table_html %}<div class="vp-scroll">{{ t.table_html|safe }}</div>{% endif %}
+
+          {% if t.blank %}
+          <p class="vp-mute vp-mt-sm">Не отвечено — 0 баллов.</p>
+          {% include 'vp/_practice.html' with number=t.number kind=t.kind options=t.options prefix='' suffix='' %}
+          {% else %}
+          <ul class="vp-topts">
+            {% for o in t.options %}
+            <li class="vp-topt{% if o.chosen and not o.right %} is-wrong{% endif %}">
+              <span class="vp-topt-n">{{ o.n }}</span>
+              <span>{{ o.text }}</span>
+              <span class="vp-topt-tags">
+                {% if o.chosen %}<span class="vp-tag vp-tag--mine">ваш выбор</span>{% endif %}
+                {% if o.right %}<span class="vp-tag vp-tag--right">верный</span>{% elif o.chosen %}<span class="vp-tag vp-tag--wrong">неверный</span>{% endif %}
+              </span>
+            </li>
+            {% endfor %}
+          </ul>
+          {% with e=t.explain %}
+          {% if e.kind == 'share' %}
+          <p class="vp-tcard-line">Найдено верных {{ e.correct_hit }} из {{ e.correct_total }}{% if e.penalty %}, лишних отмечено {{ e.wrong_hit }} из {{ e.wrong_total }}{% endif %}.</p>
+          <div class="vp-math">{{ e.points|num }} × {{ e.correct_hit }}/{{ e.correct_total }}{% if e.loss %} − {{ e.points|num }} × {{ e.wrong_hit }}/{{ e.wrong_total }}{% endif %} = {{ e.gain|dec2 }}{% if e.loss %} − {{ e.loss|dec2 }} = {% if e.clamped %}{{ e.before_clamp|dec2 }} → {% endif %}{{ e.score|dec2 }}{% endif %}</div>
+          {% endif %}
+          {% endwith %}
+          {% if t.solution %}
+          <details class="vp-solution"><summary>Решение</summary><div>{{ t.solution|linebreaksbr }}</div></details>
+          {% endif %}
+          {% endif %}
+        </article>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="vp-cta">
+      {% if offer_signup %}
+      <div class="vp-cta-card">
+        <h2 class="vp-h3">Сохранить прогресс</h2>
+        <p>С аккаунтом этот результат останется у вас, а не только в этом браузере. Попытка привяжется к аккаунту сама, как только вы войдёте.</p>
+        <div class="vp-cta-row">
+          <a class="vp-btn vp-cta-btn" href="{% url 'register' %}?next={{ request.path|urlencode }}">Завести аккаунт</a>
+          <a class="vp-cta-link" href="{% url 'login' %}?next={{ request.path|urlencode }}">Уже есть — войти</a>
+        </div>
+      </div>
+      {% endif %}
+      <div class="vp-card vp-actions">
+        <a class="vp-btn" href="{% url 'vp:index' %}">Пройти другой вариант</a>
+        <button type="button" class="vp-btn vp-btn--plain" id="vp-share">Поделиться результатом</button>
+        <p class="vp-mute" id="vp-share-note" role="status" aria-live="polite">Ссылка открывается у кого угодно и показывает балл без ваших ответов.</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="vp-card vp-actions vp-actions--solo">
+      {% if again_url %}<a class="vp-btn" href="{{ again_url }}">Пройти этот же вариант</a>{% endif %}
+      <a class="vp-btn vp-btn--plain" href="{% url 'vp:index' %}">Все варианты</a>
+    </div>
+    {% endif %}
   </div>
 </div>
+{% if is_owner %}
+{{ practice_url|json_script:"vp-practice-url" }}
+<script src="{% static 'vp/js/result.js' %}"></script>
+{% endif %}
 {% endblock %}

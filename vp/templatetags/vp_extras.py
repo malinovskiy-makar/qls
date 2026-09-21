@@ -32,6 +32,25 @@ def num(value):
 
 
 
+@register.filter
+def signed(value):
+    """Балл со знаком: «+2», «0», «−1» (только оформление)."""
+    number = _decimal(value)
+    if number is None:
+        return value
+    text = num(number)
+    return f'+{text}' if number > 0 else text
+
+
+@register.filter
+def dec2(value):
+    """Два знака после запятой по-русски: «3,00», «−1,50» (только оформление)."""
+    number = _decimal(value)
+    if number is None:
+        return value
+    return f'{number:.2f}'.replace('.', ',').replace('-', _MINUS)
+
+
 def _plural(number, one, few, many):
     if number != number.to_integral_value():
         return few  # «4,5 балла»

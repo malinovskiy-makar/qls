@@ -1,0 +1,33 @@
+{% comment %}
+«Дорешать вне зачёта» у неотвеченного задания. Ждёт `number`, `kind`, `options`
+(список `{n, text}`), при короткой строке — `prefix` и `suffix`.
+
+⚠️ Ни эталона, ни верных вариантов тут нет и быть не может: страница их не знает,
+ответ проверяет `practice_check` (`static/vp/js/result.js`). Балл не пишется никуда.
+{% endcomment %}
+<div class="vp-practice" data-practice data-item="{{ number }}" data-kind="{{ kind }}">
+  <button type="button" class="vp-btn vp-btn--plain vp-btn--sm" data-practice-open aria-expanded="false">Дорешать вне зачёта</button>
+  <form class="vp-practice-form" data-practice-form hidden novalidate>
+    {% if kind == 'short_text' %}
+    <div class="vp-answer">
+      {% if prefix %}<span class="vp-affix">{{ prefix }}</span>{% endif %}
+      <label class="vp-sr" for="vp-pr-{{ number }}">Ответ на задание {{ number }}</label>
+      <input class="vp-input" id="vp-pr-{{ number }}" name="raw" type="text" maxlength="200" lang="ru"
+             autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false">
+      {% if suffix %}<span class="vp-affix">{{ suffix }}</span>{% endif %}
+    </div>
+    {% else %}
+    <fieldset class="vp-options">
+      <legend class="vp-sr">Варианты ответа на задание {{ number }}{% if kind == 'multi' %}, можно выбрать несколько{% endif %}</legend>
+      {% for o in options %}
+      <label class="vp-opt"><input type="{% if kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="raw" value="{{ o.n }}"><span>{{ o.text }}</span></label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+    <div class="vp-practice-row">
+      <button type="submit" class="vp-btn vp-btn--sm">Проверить</button>
+      <span class="vp-mute">На балл не влияет, он уже записан.</span>
+    </div>
+    <p class="vp-practice-out" data-practice-out role="status" aria-live="polite"></p>
+  </form>
+</div>
