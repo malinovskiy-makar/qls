@@ -675,15 +675,36 @@ class FinishTests(TimeAndFinishBase):
             self.post_save(self.guest, attempt, [{'item': 36, 'raw': [1, 2]}])
         with at(T0 + timedelta(seconds=60)):
             self.finish(self.guest, attempt, **{
-                'item-1': 'термин 1', 'item-31': ['', '3'], 'item-36': [''],   # снято до нуля
+                'item-1': 'термин 1', 'item-31': ['', '3'],
                 'item-37': ['', '1', '3'], 'item-2': 'вставлено не тем'})
         rows = {a.item.number: a.raw for a in attempt.answers.select_related('item')}
         self.assertEqual(rows[1], 'термин 1')
         self.assertEqual(rows[31], 3)
-        self.assertIsNone(rows[36])
         self.assertEqual(rows[37], [1, 3])
         attempt.refresh_from_db()
-        self.assertEqual(attempt.score, D('7.00'))               # 2 + 2 + 3
+        self.assertEqual(attempt.score, D('7.50'))               # 2 + 2 + 36: 3/2 − 3/3 + 37: 3
+
+    def test_blank_form_value_never_erases_a_saved_answer(self):
+        """Страница, отрисованная раньше последней записи, несёт устаревшие пустые
+        поля: «побеждает последний» затёр бы ими сохранённое."""
+        attempt = self.started()
+        with at(T0 + timedelta(seconds=30)):
+            self.post_save(self.guest, attempt, [
+                {'item': 1, 'raw': 'термин 1'}, {'item': 31, 'raw': 3}, {'item': 36, 'raw': [1, 3]}])
+        with at(T0 + timedelta(seconds=60)):
+            self.finish(self.guest, attempt, **{'item-1': '', 'item-31': [''], 'item-36': ['']})
+        rows = {a.item.number: a.raw for a in attempt.answers.select_related('item')}
+        self.assertEqual((rows[1], rows[31], rows[36]), ('термин 1', 3, [1, 3]))
+        attempt.refresh_from_db()
+        self.assertEqual(attempt.score, D('7.00'))               # 2 + 2 + 3: всё уцелело
+
+    def test_an_answer_is_cleared_only_through_save(self):
+        attempt = self.started()
+        with at(T0 + timedelta(seconds=30)):
+            self.post_save(self.guest, attempt, [{'item': 1, 'raw': 'термин 1'}])
+            self.post_save(self.guest, attempt, [{'item': 1, 'raw': ''}])       # участник стёр
+            self.finish(self.guest, attempt)
+        self.assertIsNone(attempt.answers.get(item__number=1).raw)
 
     def test_a_garbage_field_does_not_break_the_submission(self):
         attempt = self.started()
@@ -715,6 +736,7 @@ class FinishTests(TimeAndFinishBase):
             self.finish(self.guest, late, auto='1')
         late.refresh_from_db()
         self.assertTrue(late.is_auto_submitted)
+        self.assertEqual(late.submitted_at, late.expires_at)     # автосдача — по сроку, не «сейчас»
 
     def test_finish_inside_grace_takes_the_final_fields_and_is_marked_auto(self):
         attempt = self.started(with_timer='1')

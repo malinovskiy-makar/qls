@@ -84,6 +84,7 @@
 .vp-table tr:last-child td { border-bottom: 0; }
 .vp-table td:first-child { color: var(--text3); width: 64px; }
 .vp-table td:last-child { text-align: right; font-weight: 600; white-space: nowrap; }
+.vp-text { margin-top: 8px; font-size: 14.5px; line-height: 1.55; }
 .vp-stack { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; font-size: 14.5px; line-height: 1.55; }
 .vp-chain-demo {
   margin-top: 12px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
@@ -110,9 +111,10 @@
 .vp-resume p { flex: 1 1 260px; }
 
 /* ── Прохождение ─────────────────────────────────────────────────── */
-/* На странице прохождения шапка сайта и кружки угла спрятаны: до задания
-   меньше отвлекающего, а двойная липкая шапка закрыла бы поле на телефоне. */
-body.vp-focus .site-nav, body.vp-focus #corner-stack { display: none !important; }
+/* На странице прохождения шапка сайта, кружки угла и кнопка Telegram спрятаны: до
+   задания меньше отвлекающего, двойная липкая шапка закрыла бы поле на телефоне, а
+   кнопка справа внизу перекрывала бы варианты ответа. */
+body.vp-focus .site-nav, body.vp-focus #corner-stack, body.vp-focus .tg-fab { display: none !important; }
 html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px); }
 .vp-bar {
   position: sticky; top: 0; z-index: 60;
@@ -241,6 +243,7 @@ html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px)
   background: var(--surface-2); font-size: 13px; color: var(--text); text-decoration: none;
 }
 .vp-dialog-row { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+.vp-dialog-row .vp-btn { padding: 11px 16px; }
 .vp-timeup {
   position: fixed; inset: 0; z-index: 500; display: none; align-items: center; justify-content: center;
   background: rgba(8, 11, 18, .6); padding: 20px;
@@ -276,9 +279,11 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-h1 { font-size: 24px; }
   .vp-head-clock { text-align: left; }
   .vp-bar-row { flex-wrap: wrap; gap: 8px 12px; padding: 8px 16px; min-height: 0; }
+  /* Название варианта на телефоне не нужно, пока решаешь: остаётся одна короткая
+     строка «класс · сохранено» — индикатор надёжности виден всегда (DESIGN 2.9). */
   .vp-bar-title { order: 3; flex: 1 1 100%; width: auto; }
-  .vp-bar-name { display: inline; }
-  .vp-bar-sub { display: inline; margin-left: 6px; }
+  .vp-bar-name { display: none; }
+  .vp-bar-sub { white-space: nowrap; }
   .vp-clock { order: 1; flex: 0 0 auto; justify-content: flex-start; }
   .vp-timer { font-size: 26px; }
   .vp-timer-cap { display: none; }
@@ -293,7 +298,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-rail { display: none; }
   .vp-layout { padding: 14px 16px 48px; }
   .vp-item { padding: 12px; gap: 8px; }
-  .vp-item-num { width: auto; padding-top: 2px; text-align: left; }
+  .vp-item-num { width: 22px; padding-top: 2px; text-align: left; }
   .vp-item-body { padding-top: 0; }
   .vp-input { width: 100%; flex: 1 1 auto; }
   .vp-brow { flex-wrap: wrap; gap: 4px 12px; }
@@ -301,9 +306,6 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-brow-track { flex: 1 1 120px; }
   .vp-score-num b { font-size: 44px; }
   .vp-dialog { padding: 18px; }
-}
-@media (max-width: 760px) {
-  .vp-item { flex-direction: column; }
 }
 @media (prefers-reduced-motion: reduce) {
   .vp-input, .vp-btn { transition: none; }

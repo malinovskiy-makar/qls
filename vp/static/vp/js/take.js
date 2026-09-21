@@ -302,6 +302,7 @@
           Object.keys(batch.sent).forEach(function (key) {
             if ((version[key] || 0) === batch.sent[key]) { delete dirty[key]; }
           });
+          if (!anyDirty()) { forgetStash(); }
           onServerTime(result.data.seconds_remaining);
         } else if (result.data && result.data.retry) {
           offline = true;               // сервер честно сказал «не сохранил» — повтор
@@ -329,10 +330,70 @@
 
   function onServerTime(seconds) { syncFromServer(seconds); }
 
+  // --- откладывание несохранённого на время перезагрузки -------------------------
+  // ⚠️ `sendBeacon` доставляется ПАРАЛЛЕЛЬНО загрузке новой страницы: сервер может
+  // отрисовать её раньше, чем дойдёт последняя запись, — участник увидел бы пустые
+  // поля, хотя всё сохранено. Поэтому несохранённое ещё и СИНХРОННО откладывается в
+  // sessionStorage и при загрузке возвращается в поля (и уходит на сервер снова).
+  var STORE_KEY = 'vp:dirty:' + cfg.saveUrl;
+
+  function forgetStash() {
+    try { sessionStorage.removeItem(STORE_KEY); } catch (error) { /* нет хранилища */ }
+  }
+
+  function stashDirty() {
+    try {
+      var snapshot = {};
+      Object.keys(dirty).forEach(function (n) { snapshot[n] = readValue(parseInt(n, 10)); });
+      if (Object.keys(snapshot).length) {
+        sessionStorage.setItem(STORE_KEY, JSON.stringify(snapshot));
+      } else {
+        sessionStorage.removeItem(STORE_KEY);
+      }
+    } catch (error) { /* хранилище недоступно — остаётся sendBeacon */ }
+  }
+
+  /** Возвращает значение в поля задания (обратное к `readValue`). */
+  function applyValue(n, value) {
+    var box = card(n);
+    if (!box) { return; }
+    var kind = box.dataset.kind;
+    if (kind === 'short_text') {
+      var field = box.querySelector('input[type=text]');
+      if (field) { field.value = value || ''; }
+    } else if (kind === 'match') {
+      box.querySelectorAll('select[data-key]').forEach(function (select) {
+        var chosen = value && value[select.dataset.key];
+        select.value = chosen === undefined || chosen === null ? '' : String(chosen);
+      });
+    } else {
+      var wanted = kind === 'single' ? (value === null ? [] : [value]) : (value || []);
+      box.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(function (input) {
+        input.checked = wanted.indexOf(parseInt(input.value, 10)) !== -1;
+      });
+    }
+  }
+
+  function restoreDirty() {
+    var snapshot = null;
+    try { snapshot = JSON.parse(sessionStorage.getItem(STORE_KEY) || 'null'); }
+    catch (error) { snapshot = null; }
+    forgetStash();
+    if (!snapshot) { return; }
+    Object.keys(snapshot).forEach(function (key) {
+      var n = parseInt(key, 10);
+      applyValue(n, snapshot[key]);
+      repaintAnswered(n);
+      markDirty(n);                     // и на сервер — ещё раз, повтор безвреден
+    });
+  }
+
   /** Уход со страницы: всё несохранённое уезжает сразу, без интервала. `sendBeacon`
    * не умеет заголовков, поэтому шлёт форму: токен CSRF и та же пачка строкой. */
   function flushOnLeave() {
-    if (stopped || !anyDirty()) { return; }
+    if (stopped) { return; }
+    stashDirty();
+    if (!anyDirty()) { return; }
     var payload = JSON.stringify({ answers: collect().answers });
     var data = new FormData();
     data.append('csrfmiddlewaretoken', csrf);
@@ -350,7 +411,7 @@
 
   window.addEventListener('pagehide', flushOnLeave);
   document.addEventListener('visibilitychange', function () {
-    if (document.visibilityState === 'hidden') { flushOnLeave(); }
+    if (document.visibilityState === 'hidden') { flushOnLeave(); } else { forgetStash(); }
   });
   window.addEventListener('online', function () {
     offline = false; paintSave(); if (anyDirty()) { scheduleFlush(0); }
@@ -464,10 +525,24 @@
   function submitNow(auto) {
     if (form.dataset.submitted) { return; }
     form.dataset.submitted = '1';
+    var wasDirty = anyDirty() && !offline && !auto;
+    var batch = wasDirty ? collect() : null;
     stopAll();
+    forgetStash();
     var flag = $('vp-auto');
     if (flag) { flag.value = auto ? '1' : '0'; }
-    form.submit();
+    if (!batch) { form.submit(); return; }
+    // ⚠️ Стереть ответ можно только через `save`, а он несёт лишь то, что участник
+    // менял: пустые поля формы сдачи ничего не стирают (устаревшая страница не
+    // должна затирать сохранённое). Поэтому сначала дожидаемся отправки изменённого.
+    var sent = false;
+    function go() { if (!sent) { sent = true; form.submit(); } }
+    setTimeout(go, 4000);               // не ждём дольше: форма — запасной путь
+    fetch(cfg.saveUrl, {
+      method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrf },
+      body: JSON.stringify({ answers: batch.answers })
+    }).then(go, go);
   }
 
   /** Время вышло (по нашим часам, опросу или ответу 409): показываем экран и
@@ -526,6 +601,7 @@
   });
 
   measureBar();
+  restoreDirty();
   recount();
   paintSave();
   paintTimer();

@@ -156,8 +156,11 @@ def _finalize(attempt, auto, now=None):
             locked.score = scoring.score_attempt(locked)
             locked.max_score = locked.variant.max_score
             moment = now
-            if locked.expires_at is not None and moment > locked.expires_at:
-                moment = locked.expires_at     # время сдачи — срок, а не «когда заметили»
+            if locked.expires_at is not None and (auto or moment > locked.expires_at):
+                # Время автосдачи — срок, а не «когда заметили»: участник уснул над
+                # работой — сдано ровно по истечении, клиент нажал на долю секунды
+                # раньше серверных часов — тоже.
+                moment = locked.expires_at
             locked.submitted_at = moment
             locked.is_auto_submitted = bool(auto)
             locked.save(update_fields=['score', 'max_score', 'submitted_at', 'is_auto_submitted'])
@@ -485,6 +488,11 @@ def finish(request, code):
 
     Форма везёт содержимое ВСЕХ полей ещё раз: последняя порция набранного могла
     не успеть уехать автосохранением, а терять её нельзя. Побеждает последний.
+
+    ⚠️ ПУСТОЕ ЗНАЧЕНИЕ ИЗ ФОРМЫ НИЧЕГО НЕ СТИРАЕТ. Страница, отрисованная раньше, чем
+    дошла последняя запись автосохранения (перезагрузка, вторая вкладка), несёт
+    устаревшие пустые поля; «побеждает последний» затёр бы ими сохранённое. Стирание
+    ответа идёт только через `save`: клиент шлёт там лишь то, что участник менял.
     Повторная сдача сданной попытки ничего не пересчитывает: идёт на результат.
     """
     attempt = _load_attempt(request, code)
@@ -499,6 +507,8 @@ def finish(request, code):
                     cleaned = answers.clean_answer(item, value)
                 except answers.AnswerError:
                     continue        # мусорное поле не должно ронять сдачу всей работы
+                if cleaned is None:
+                    continue        # пустое из формы ответ не стирает (см. docstring)
                 answers.save_answers(attempt, [(item, cleaned)])
         timed_out = attempt.expires_at is not None and (
             now >= attempt.expires_at
