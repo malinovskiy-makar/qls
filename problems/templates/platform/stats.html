@@ -284,9 +284,19 @@
       <div class="ico">{{ row.achievement.icon }}</div>
       <div class="ttl">{{ row.achievement.title }}</div>
       <div class="cond">{{ row.achievement.description }}</div>
+      {% comment %}
+      Подпись плитки. `row.rarity` — три разных состояния (см.
+      `Achievement.rarity_percent`): число (в том числе законный 0), либо None —
+      «считать не на ком» (нет учеников с опытом). При None фразы «этого
+      добились» нет ВООБЩЕ: «0%» тут сказал бы «никто не получил», а это
+      неправда. Полученная награда оставляет «получено <дата>», неполученная —
+      пустую подпись.
+      ⚠️ Плитки стоят сеткой: пустая подпись схлопнула бы плитку по высоте и
+      сделала бы сетку рваной. Поэтому при пустой подписи в `.meta` стоит
+      неразрывный пробел `&nbsp;` — он держит строку той же высоты, что и текст.
+      {% endcomment %}
       <div class="meta">
-        {% if row.earned %}получено {{ row.earned_at|date:"d.m.Y" }} · {% endif %}
-        этого добились {{ row.rarity }}%
+        {% if row.rarity is None %}{% if row.earned %}получено {{ row.earned_at|date:"d.m.Y" }}{% else %}&nbsp;{% endif %}{% else %}{% if row.earned %}получено {{ row.earned_at|date:"d.m.Y" }} · {% endif %}этого добились {{ row.rarity }}%{% endif %}
       </div>
     </div>
     {% endfor %}

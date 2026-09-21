@@ -277,6 +277,24 @@ def all_logins(username):
     return [lg['student'], lg['tutor'], *lg['mates']]
 
 
+def check_showcase_logins(username):
+    """Все пять логинов обязаны подпадать под правило витринных аккаунтов.
+
+    Правило одно на всю платформу и живёт в `problems/models_gamification.py`
+    (`is_showcase_login`): по нему редкость достижений не учитывает демо. Если
+    когда-нибудь переименовать демо-ученика, исключение молча перестанет
+    работать, а молча переставшая работать защита хуже отсутствующей. Поэтому
+    команда отказывается работать до первой записи."""
+    from problems.models_gamification import is_showcase_login
+    bad = [login for login in all_logins(username) if not is_showcase_login(login)]
+    if bad:
+        raise CommandError(
+            'Логины ' + ', '.join(bad) + ' не подходят под правило витринных аккаунтов '
+            '(`demo` либо начинается на `demo-`, problems/models_gamification.py::'
+            'is_showcase_login). Иначе «этого добились N %» у наград настоящих учеников '
+            'снова считало бы демо-учеников. Задайте --username вида demo или demo-<имя>.')
+
+
 # ---------------------------------------------------------------------------
 # Команда
 # ---------------------------------------------------------------------------
@@ -307,6 +325,7 @@ class Command(BaseCommand):
     def handle(self, *args, **opts):
         if opts['days'] < 7:
             raise CommandError('--days: история короче недели не имеет смысла.')
+        check_showcase_logins(opts['username'])          # до первой записи, в том числе для --purge
         self.opts = opts
         self.apply = opts['apply']
         self.stdout.write(self.style.MIGRATE_HEADING(
@@ -1327,9 +1346,13 @@ class Command(BaseCommand):
         profile = StudentProgressProfile.objects.filter(user=self.student).first()
         levels = Counter(StudentTopicProgress.objects.filter(student=self.student)
                          .values_list('mastery_level', flat=True))
-        rarity = rarity_map() if profile and profile.xp_total else {}
-        mine = [rarity[a] for a in EarnedAchievement.objects.filter(user=self.student)
-                .values_list('achievement_id', flat=True) if a in rarity]
+        # Редкость — как на экране: витринные аккаунты в ней не учтены, поэтому
+        # награда, которую кроме демо не получил никто, показывает 0 %; None —
+        # считать не на ком (живых учеников с опытом нет): экран цифры не печатает.
+        shares = rarity_map() if profile and profile.xp_total else None
+        mine = ([] if shares is None else
+                [shares.get(a, 0.0) for a in EarnedAchievement.objects.filter(user=self.student)
+                 .values_list('achievement_id', flat=True)])
         works = Submission.objects.filter(student=self.student, assignment__kind='homework',
                                           status__in=('submitted', 'reviewed'))
         game = LearningEvent.objects.filter(user=self.student, source='game')
@@ -1350,7 +1373,8 @@ class Command(BaseCommand):
             'modes': len({e.payload.get('mode') for e in game}),
             'miss': len({e.topic_id for e in game.filter(event_type='failed') if e.topic_id}),
             'done': done, 'goal': goal, 'fill': min(100, round(100 * done / max(1, goal))),
-            'rarity': f'{min(mine):.0f} / {max(mine):.0f}' if mine else '—',
+            'rarity': ('нет данных (живых учеников с опытом нет)' if shares is None else
+                       f'{min(mine):.0f} / {max(mine):.0f}' if mine else '—'),
             'skills': StudentSkillProgress.objects.filter(student=self.student).count(),
             'tagged': TeacherFeedback.objects.filter(submission__student=self.student,
                                                      mistakes__isnull=False).distinct().count(),
