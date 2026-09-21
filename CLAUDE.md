@@ -117,7 +117,7 @@ venv313/Scripts/python.exe manage.py runserver   # Windows
 ruff check .
 
 # 2. security — статический разбор и уязвимости зависимостей
-bandit -r problems catalog teacher student game calc2 config olympiads -ll
+bandit -r problems catalog teacher student game calc2 config olympiads vp -ll
 pip-audit -r requirements/base.txt
 
 # 3. migrations — схема с нуля (нужен пустой PostgreSQL 17, см. docker-compose.dev.yml)
@@ -125,7 +125,7 @@ python manage.py migrate --noinput --settings=config.settings_test_pg
 python manage.py makemigrations --check --dry-run --settings=config.settings_test_pg
 
 # 4. tests — полный набор на PostgreSQL (см. ниже про два шага)
-python scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads \
+python scripts/run_tests.py problems catalog teacher student calc2 game calendar_stub config olympiads vp \
   --settings=config.settings_test_pg --verbosity 2
 
 # 5. deploy-check — боевые настройки глазами Django (переменные окружения — см. ci.yml, джоб deploy-check)
@@ -336,15 +336,19 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | `calc2` | Графический калькулятор — единственный |
 | `calendar_stub` | Календарь занятий |
 | `olympiads` | Справочник олимпиад: даты туров, льготы вузов, комплекты |
+| `vp` | Тренажёр 1 тура «Высшей пробы»: варианты из файлов, таймер, подсчёт баллов ([ADR 0124](docs/adr/0124-vp-app-separate-from-bank.md)) |
 
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
-её в `problems/models*.py`, а не у себя. Исключений **два**, оба записаны:
+её в `problems/models*.py`, а не у себя. Исключений **три**, все записаны:
 `game.GameQuestion` — игровой пул намеренно отделён от банка, чтобы удаление
 задачи не ломало журнал; `olympiads.*` — справочник ВНЕШНИХ фактов (приказы,
 правила приёма, проходные баллы) сущностями банка задач не является и на
-`Problem` не ссылается вовсе, [ADR 0063](docs/adr/0063-olympiads-own-models.md).
-⚠️ Третьего исключения быть не должно: появится — правило пора переписывать,
-а не пристраивать к нему ещё одну оговорку.
+`Problem` не ссылается вовсе, [ADR 0063](docs/adr/0063-olympiads-own-models.md);
+`vp.*` — пункты теста чужого формата (44 задания × варианты), которым нельзя
+попасть в каталог, поиск и дедуп, а правка банка не смеет менять журнал
+попыток, [ADR 0124](docs/adr/0124-vp-app-separate-from-bank.md).
+⚠️ Четвёртого исключения быть не должно: появится — правило пора переписывать
+целиком, а не пристраивать к нему ещё одну оговорку.
 
 **Бета 18.09 (журнал `claude/JOURNAL_BETA_NIGHT_20260918.md`):** `SearchLog` — журнал поиска, пишет
 сервер при полном рендере каталога со склейкой 30 с (`catalog/search_log.py`, ADR 0117), оценка
