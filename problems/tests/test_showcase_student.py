@@ -359,6 +359,17 @@ class ShowcaseRarityTests(TestCase):
         self.assertIn('этого добились', html)
         self.assertNotRegex(html, r'class="meta">\s*&nbsp;\s*</div>')
 
+    def test_showcase_viewer_never_sees_zero_percent_next_to_earned(self):
+        """Демо-аккаунт не в числителе: его награда, которой нет у живых, дала бы
+        «получено … · этого добились 0%». У полученной плитки ноль не печатается,
+        у неполученной законный ноль остаётся."""
+        self.student('real-1', 50)                              # живой есть, наград у него нет
+        viewer = self.student('demo', 999, self.a)
+        html = self.html_of(viewer)
+        self.assertIn('получено', html)
+        self.assertNotRegex(html, r'получено[^<]*·\s*этого добились')
+        self.assertEqual(html.count('этого добились'), 1)       # только неполученная Б: «0,0%»
+
     # 6. Защита из фазы 1: логины команды подпадают под правило опознания.
     def test_command_logins_match_the_showcase_rule(self):
         for username in ('demo', 'demo-anna'):
