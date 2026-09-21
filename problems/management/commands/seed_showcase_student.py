@@ -40,7 +40,7 @@ import io
 import random
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
-from datetime import date, datetime, time, timedelta
+from datetime import datetime, time, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.core.cache import cache
@@ -504,6 +504,15 @@ class Command(BaseCommand):
         if other:      # самая «населённая» неканоническая тема — ось «Прочее»
             name = max(other, key=lambda n: (len(other[n]), n))
             self.pools[OTHER] = TopicPool(other_obj[name], other[name], rng)
+        with_topic = sum(len(v) for v in by_topic.values()) + sum(len(v) for v in other.values())
+        real = sum(1 for v in by_topic.values() for p in v if p.difficulty)
+        self.stdout.write(f'Банк: видимых задач с темой {with_topic}, из них с реальной сложностью '
+                          f'{real}, каноничных тем {len(by_topic)}.')
+        if with_topic < 1500:
+            self.stdout.write(self.style.WARNING(
+                'Банк тонкий (<1500 видимых задач с темой): задачи в истории будут '
+                'повторяться, цели таблицы могут не достичься. Смотрите отчёт ниже '
+                'и не записывайте, пока он не зелёный.'))
         missing = [t for t, *_ in TOPIC_PLAN if t not in self.pools]
         if missing:
             self.stdout.write(self.style.WARNING(
@@ -1101,6 +1110,12 @@ class Command(BaseCommand):
         from problems.management.commands.seed_achievements import ACHIEVEMENTS
         from problems.models_gamification import Achievement, StudentProgressProfile
         if Achievement.objects.count() < len(ACHIEVEMENTS):
+            # Справочник ОБЩИЙ: заведя его, мы включаем награды для всех
+            # учеников платформы, а не только для демо. Поэтому — громко.
+            self.stdout.write(self.style.WARNING(
+                f'Справочник достижений неполон ({Achievement.objects.count()} из '
+                f'{len(ACHIEVEMENTS)}) — завожу его командой seed_achievements. '
+                'Он общий для всей платформы.'))
             call_command('seed_achievements', stdout=io.StringIO())
         profile, _ = StudentProgressProfile.objects.get_or_create(user=self.student)
         profile.weekly_goal = self._weekly_goal()          # ДО пересчёта: он её не трогает
