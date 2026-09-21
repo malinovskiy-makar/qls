@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Результат и разбор</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+body{margin:0;font-family:'Montserrat',system-ui,sans-serif;background:#f4eed2;color:#2d2d2d}
+a{color:#00797a}a:hover{color:#016769}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1600px; box-sizing: border-box; background: #f4eed2; display: flex; justify-content: center; padding: 30px 0; overflow: hidden;">
+  <div style="width: 960px; display: flex; flex-direction: column; gap: 18px;">
+
+    <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 24px 26px; display: flex; gap: 30px; align-items: center;">
+      <div style="flex-shrink: 0;">
+        <div style="font-size: 13px; color: #5c5346;">Вариант 1 · 9–10 классы</div>
+        <div style="display: flex; align-items: baseline; gap: 8px; margin-top: 2px;">
+          <span style="font-size: 54px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums;">74</span>
+          <span style="font-size: 20px; color: #5c5346;">из 100</span>
+        </div>
+        <div style="font-size: 13px; color: #5c5346; margin-top: 8px;">28:41 из 30:00 · сдано вовремя</div>
+      </div>
+      <div style="flex-grow: 1;">
+        <div style="font-size: 15px; font-weight: 600; margin-bottom: 10px;">Выше, чем у 62% прошедших этот вариант</div>
+        <div style="position: relative; height: 34px;">
+          <div style="position: absolute; left: 0; right: 0; top: 13px; height: 8px; border-radius: 999px; background: linear-gradient(90deg, #e6dfc4 0%, #cfe0dc 62%, #00797a 62%, #00797a 100%);"></div>
+          <div style="position: absolute; left: 62%; top: 4px; width: 3px; height: 26px; border-radius: 2px; background: #2e2b27;"></div>
+          <div style="position: absolute; left: 62%; top: -2px; transform: translateX(-50%); font-size: 12px; font-weight: 600; color: #2e2b27;">вы</div>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-size: 12px; color: #665e51;">
+          <span>0</span><span>медиана 58</span><span>100</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 20px 26px;">
+      <div style="font-size: 17px; font-weight: 600; margin-bottom: 14px;">По блокам</div>
+      <div style="display: flex; flex-direction: column; gap: 9px;">
+        <sc-for list="{{blocks}}" as="b" hint-placeholder-count="5">
+          <div style="display: flex; align-items: center; gap: 14px;">
+            <span style="width: 250px; flex-shrink: 0; font-size: 14.5px;">{{b.name}}</span>
+            <span style="width: 90px; flex-shrink: 0; font-size: 14.5px; font-weight: 600; font-variant-numeric: tabular-nums;">{{b.score}}</span>
+            <span style="flex-grow: 1; height: 10px; border-radius: 999px; background: #eee6c8; overflow: hidden; display: block;">
+              <span style="{{b.bar}}"></span>
+            </span>
+            <span style="width: 52px; flex-shrink: 0; text-align: right; font-size: 13px; color: #5c5346; font-variant-numeric: tabular-nums;">{{b.pct}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 20px 26px;">
+      <div style="display: flex; align-items: baseline; gap: 12px; margin-bottom: 6px;">
+        <div style="font-size: 17px; font-weight: 600;">Змейка целиком</div>
+        <div style="font-size: 13px; color: #5c5346;">одна ошибка тянет за собой следующие — смотрите, где порвалась цепь</div>
+      </div>
+      <div style="display: flex; flex-direction: column;">
+        <sc-for list="{{chain}}" as="c" hint-placeholder-count="7">
+          <div>
+            <div style="{{c.row}}">
+              <span style="width: 26px; flex-shrink: 0; font-size: 12.5px; color: #665e51; text-align: right;">{{c.n}}</span>
+              <span style="{{c.mark}}"></span>
+              <span style="flex-grow: 1; font-size: 14.5px;">{{c.mine}}</span>
+              <sc-if value="{{c.wrong}}" hint-placeholder-val="{{true}}">
+                <span style="font-size: 13.5px; color: #5c5346;">эталон: <b style="color:#186e3c;">{{c.right}}</b></span>
+              </sc-if>
+              <span style="width: 42px; flex-shrink: 0; text-align: right; font-size: 13.5px; font-weight: 600; color: {{c.ptsColor}}; font-variant-numeric: tabular-nums;">{{c.pts}}</span>
+            </div>
+            <sc-if value="{{c.link}}" hint-placeholder-val="{{true}}">
+              <div style="display: flex; align-items: center; gap: 8px; padding: 1px 0 1px 30px;">
+                <span style="width: 1px; height: 14px; background: rgba(45,45,45,.2); display: inline-block; margin-left: 5px;"></span>
+                <span style="{{c.linkStyle}}">{{c.link}}</span>
+              </div>
+            </sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="margin-top: 10px; font-size: 13px; color: #5c5346;">Показаны первые задания. Ниже — остальные до тридцатого.</div>
+    </div>
+
+    <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 20px 26px;">
+      <div style="font-size: 17px; font-weight: 600; margin-bottom: 4px;">Откуда взялись баллы за тесты</div>
+      <div style="font-size: 13px; color: #5c5346; margin-bottom: 14px;">В заданиях 36–42 балл делится по долям, а лишние варианты его уменьшают</div>
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <sc-for list="{{tests}}" as="t" hint-placeholder-count="2">
+          <div style="border: 1px solid rgba(45,45,45,.12); border-radius: 8px; padding: 13px 16px; background: #ffffff;">
+            <div style="display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-size: 13px; font-weight: 600; color: #665e51;">{{t.n}}</span>
+              <span style="flex-grow: 1; font-size: 14.5px;">{{t.title}}</span>
+              <span style="font-size: 15px; font-weight: 700; color: {{t.color}}; font-variant-numeric: tabular-nums;">{{t.score}}</span>
+            </div>
+            <div style="margin-top: 9px; font-size: 13.5px; line-height: 1.6; color: #2d2d2d;">{{t.chose}}</div>
+            <div style="margin-top: 6px; font-size: 14px; font-family: ui-monospace, 'SFMono-Regular', Menlo, monospace; color: #016769; background: rgba(0,108,109,.07); border-radius: 6px; padding: 8px 12px; display: inline-block;">{{t.math}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 18px; align-items: stretch;">
+      <div style="flex-grow: 1; background: #3c3531; border-radius: 12px; padding: 20px 24px; color: #fffce6;">
+        <div style="font-size: 16px; font-weight: 600;">Сохранить прогресс</div>
+        <div style="margin-top: 7px; font-size: 13.5px; line-height: 1.55; color: #d8d2c6;">С аккаунтом видно, как растёт балл от варианта к варианту, и какие темы проседают. Сейчас результат живёт только в этом браузере.</div>
+        <div style="margin-top: 14px; display: flex; gap: 10px;">
+          <a href="#" style="background: #81b5b4; color: #1d1a16; text-decoration: none; font-size: 14px; font-weight: 600; padding: 10px 18px; border-radius: 8px;">Завести аккаунт</a>
+          <a href="#" style="color: #d8d2c6; text-decoration: none; font-size: 14px; font-weight: 500; padding: 10px 6px;">Уже есть — войти</a>
+        </div>
+      </div>
+      <div style="width: 330px; flex-shrink: 0; background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 20px 24px; display: flex; flex-direction: column; gap: 10px;">
+        <a href="Main.dc.html" style="background: #2e2b27; color: #fffce6; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 12px 20px; border-radius: 8px; text-align: center;">Пройти другой вариант</a>
+        <button type="button" style="font-family: inherit; background: transparent; color: #2d2d2d; border: 1px solid rgba(45,45,45,.24); font-size: 14.5px; font-weight: 500; padding: 12px 20px; border-radius: 8px; cursor: pointer;">Поделиться результатом</button>
+        <div style="font-size: 12.5px; color: #5c5346; line-height: 1.5;">Ссылка открывается у кого угодно и показывает балл без ваших ответов.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1600}}'>
+class Component extends DCLogic {
+  renderVals() {
+    function bar(p, c) { return 'display: block; height: 10px; width: ' + p + '%; background: ' + c + '; border-radius: 999px;'; }
+    var blocks = [
+      { name: 'Змейка, 1–30', score: '50 / 60', pct: '83%', bar: bar(83, '#186e3c') },
+      { name: 'Пропущенные слова, 31–35', score: '8 / 10', pct: '80%', bar: bar(80, '#186e3c') },
+      { name: 'Все верные, 36–40', score: '9 / 15', pct: '60%', bar: bar(60, '#96500c') },
+      { name: 'Рисунок и таблица, 41–42', score: '3 / 6', pct: '50%', bar: bar(50, '#96500c') },
+      { name: 'Расчётные, 43–44', score: '4 / 9', pct: '44%', bar: bar(44, '#b93526') }
+    ];
+    var rowOk = 'display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px;';
+    var rowBad = 'display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-radius: 6px; background: rgba(185,53,38,.07);';
+    var okMark = 'width: 8px; height: 8px; border-radius: 999px; background: #186e3c; flex-shrink: 0; display: inline-block;';
+    var badMark = 'width: 8px; height: 8px; border-radius: 999px; background: #b93526; flex-shrink: 0; display: inline-block;';
+    var linkOk = 'font-size: 12px; color: #5c5346;';
+    var linkBad = 'font-size: 12px; color: #b93526; font-weight: 600;';
+    var raw = [
+      [1, 'экономическая прибыль', '', false, '+2', 'вторая буква «к» → следующий ответ на «к»', false],
+      [2, 'картель', '', false, '+2', 'вторая буква «а» → следующий ответ на «а»', false],
+      [3, 'абсолютное преимущество', '', false, '+2', 'вторая буква «б» → следующий ответ на «б»', false],
+      [4, 'денежный мультипликатор', 'банковский мультипликатор', true, '0', 'здесь цепь порвалась: ответ должен был начинаться на «б», а начался на «д»', true],
+      [5, 'асимметрия информации', '', false, '+2', 'вторая буква «с» → следующий ответ на «с»', false],
+      [6, 'скорость обращения', '', false, '+2', 'вторая буква «к» → следующий ответ на «к»', false],
+      [7, 'конвейер', '', false, '+2', '', false]
+    ];
+    var chain = raw.map(function (r) {
+      return {
+        n: r[0], mine: r[1], right: r[2], wrong: r[3], pts: r[4], link: r[5],
+        row: r[3] ? rowBad : rowOk,
+        mark: r[3] ? badMark : okMark,
+        ptsColor: r[3] ? '#b93526' : '#186e3c',
+        linkStyle: r[6] ? linkBad : linkOk
+      };
+    });
+    var tests = [
+      {
+        n: '37', title: 'Издержки пекарни', score: '2,00 из 3', color: '#96500c',
+        chose: 'Отмечено 2 и 4. Верные — 2, 4 и 5: третий верный вариант пропущен, лишних нет.',
+        math: '3 × 2/3 = 2,00'
+      },
+      {
+        n: '42', title: 'Возрастная структура населения', score: '0,50 из 3', color: '#b93526',
+        chose: 'Отмечено 1, 3 и 5. Верные — 3, 4 и 5: два верных найдено, но вариант 1 лишний, и он отнимает.',
+        math: '3 × 2/3 − 3 × 1/2 = 2,00 − 1,50 = 0,50'
+      }
+    ];
+    return { blocks: blocks, chain: chain, tests: tests };
+  }
+}
+</script>
+</body>
+</html>

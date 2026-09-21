@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Состояния таймера и сдача</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+body{margin:0;font-family:'Montserrat',system-ui,sans-serif;background:#f4eed2;color:#2d2d2d}
+a{color:#00797a}a:hover{color:#016769}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1180px; box-sizing: border-box; background: #f4eed2; padding: 32px; display: flex; flex-direction: column; gap: 26px;">
+
+  <div>
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: #5c5346; margin-bottom: 10px;">1 · Осталось пять минут</div>
+    <div style="border: 1px solid rgba(45,45,45,.14); border-radius: 12px; overflow: hidden;">
+      <div style="height: 64px; background: #fffce6; border-bottom: 1px solid rgba(45,45,45,.14); display: flex; align-items: center; padding: 0 28px; gap: 24px;">
+        <div style="width: 300px; font-size: 14.5px; font-weight: 600;">Вариант 1 · 9–10 классы</div>
+        <div style="flex-grow: 1; display: flex; justify-content: center; align-items: baseline; gap: 10px;">
+          <span style="font-size: 30px; font-weight: 700; color: #96500c; font-variant-numeric: tabular-nums;">05:00</span>
+          <span style="font-size: 12.5px; color: #96500c; font-weight: 600;">осталось пять минут</span>
+        </div>
+        <div style="width: 300px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;">
+          <span style="font-size: 13px; color: #5c5346;">отвечено <b style="color:#2d2d2d">34</b> из 44</span>
+          <button type="button" style="font-family: inherit; background: #2e2b27; color: #fffce6; border: 0; font-size: 14.5px; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Сдать</button>
+        </div>
+      </div>
+      <div style="background: rgba(150,80,12,.1); padding: 11px 28px; font-size: 14px; color: #96500c;">Осталось пять минут. Не отвечено 10 заданий: 14, 19, 27, 29, 33, 38, 39, 41, 43, 44.</div>
+    </div>
+  </div>
+
+  <div>
+    <div style="font-size: 13px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: #5c5346; margin-bottom: 10px;">2 · Последняя минута</div>
+    <div style="border: 1px solid rgba(45,45,45,.14); border-radius: 12px; overflow: hidden;">
+      <div style="height: 64px; background: #fffce6; border-bottom: 1px solid rgba(45,45,45,.14); display: flex; align-items: center; padding: 0 28px; gap: 24px;">
+        <div style="width: 300px; font-size: 14.5px; font-weight: 600;">Вариант 1 · 9–10 классы</div>
+        <div style="flex-grow: 1; display: flex; justify-content: center; align-items: baseline; gap: 10px;">
+          <span style="font-size: 30px; font-weight: 700; color: #b93526; font-variant-numeric: tabular-nums;">00:47</span>
+          <span style="font-size: 12.5px; color: #b93526; font-weight: 600;">последняя минута</span>
+        </div>
+        <div style="width: 300px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;">
+          <span style="font-size: 13px; color: #5c5346;">отвечено <b style="color:#2d2d2d">38</b> из 44</span>
+          <button type="button" style="font-family: inherit; background: #2e2b27; color: #fffce6; border: 0; font-size: 14.5px; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Сдать</button>
+        </div>
+      </div>
+      <div style="background: rgba(185,53,38,.1); padding: 11px 28px; font-size: 14px; color: #b93526;">Последняя минута. Работа сдастся сама — всё, что введено, засчитается.</div>
+    </div>
+  </div>
+
+  <div style="display: flex; gap: 26px; align-items: flex-start;">
+
+    <div style="width: 520px; flex-shrink: 0;">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: #5c5346; margin-bottom: 10px;">3 · Нажал «Сдать» сам</div>
+      <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 24px; box-shadow: 0 8px 28px rgba(45,45,45,.12);">
+        <div style="font-size: 19px; font-weight: 600;">Сдать работу?</div>
+        <div style="margin-top: 10px; font-size: 14.5px; line-height: 1.55; color: #2d2d2d;">Осталось 11:38, и не отвечено 6 заданий. Неотвеченное засчитывается как ноль.</div>
+        <div style="margin-top: 12px; display: flex; gap: 6px; flex-wrap: wrap;">
+          <sc-for list="{{missed}}" as="m" hint-placeholder-count="6">
+            <a href="#" style="display: inline-flex; align-items: center; justify-content: center; min-width: 34px; height: 30px; padding: 0 8px; border-radius: 6px; border: 1px solid rgba(45,45,45,.2); background: #ffffff; font-size: 13px; color: #2d2d2d; text-decoration: none;">{{m}}</a>
+          </sc-for>
+        </div>
+        <div style="margin-top: 20px; display: flex; gap: 10px;">
+          <button type="button" style="font-family: inherit; background: #2e2b27; color: #fffce6; border: 0; font-size: 14.5px; font-weight: 600; padding: 11px 22px; border-radius: 8px; cursor: pointer;">Сдать и посмотреть разбор</button>
+          <button type="button" style="font-family: inherit; background: transparent; color: #2d2d2d; border: 1px solid rgba(45,45,45,.24); font-size: 14.5px; font-weight: 500; padding: 11px 22px; border-radius: 8px; cursor: pointer;">Вернуться к заданиям</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1;">
+      <div style="font-size: 13px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: #5c5346; margin-bottom: 10px;">4 · Время вышло — сдалось само</div>
+      <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 24px;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#96500c" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path></svg>
+          <div style="font-size: 22px; font-weight: 700;">Тридцать минут вышли</div>
+        </div>
+        <div style="margin-top: 12px; font-size: 14.5px; line-height: 1.6; color: #2d2d2d;">Работа сдана автоматически, засчитано всё, что было введено к этому моменту. Балл зафиксирован — ровно как на олимпиаде.</div>
+        <div style="margin-top: 18px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+          <a href="Result.dc.html" style="background: #2e2b27; color: #fffce6; text-decoration: none; font-size: 14.5px; font-weight: 600; padding: 12px 24px; border-radius: 8px;">Посмотреть разбор</a>
+          <button type="button" style="font-family: inherit; background: transparent; color: #2d2d2d; border: 1px solid rgba(45,45,45,.24); font-size: 14.5px; font-weight: 500; padding: 12px 24px; border-radius: 8px; cursor: pointer;">Дорешать вне зачёта</button>
+        </div>
+        <div style="margin-top: 12px; font-size: 13px; color: #5c5346; line-height: 1.5;">«Дорешать вне зачёта» открывает шесть неотвеченных заданий без таймера. На балл это не влияет — он уже записан.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1180}}'>
+class Component extends DCLogic {
+  renderVals() { return { missed: [14, 19, 27, 38, 41, 44] }; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Прохождение — блоки 31–44</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+body{margin:0;font-family:'Montserrat',system-ui,sans-serif;background:#f4eed2;color:#2d2d2d}
+a{color:#00797a}a:hover{color:#016769}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1460px; box-sizing: border-box; background: #f4eed2; display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 64px; flex-shrink: 0; background: #fffce6; border-bottom: 1px solid rgba(45,45,45,.14); display: flex; align-items: center; padding: 0 28px; gap: 24px; box-sizing: border-box;">
+    <div style="width: 300px;">
+      <div style="font-size: 14.5px; font-weight: 600;">Вариант 1 · 9–10 классы</div>
+      <div style="font-size: 12.5px; color: #5c5346;">1 тур «Высшей пробы»</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; justify-content: center; align-items: baseline; gap: 10px;">
+      <span style="font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px;">11:38</span>
+      <span style="font-size: 12.5px; color: #5c5346;">осталось</span>
+    </div>
+    <div style="width: 300px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;">
+      <span style="font-size: 13px; color: #5c5346;">отвечено <b style="color:#2d2d2d">34</b> из 44</span>
+      <button type="button" style="font-family: inherit; background: #2e2b27; color: #fffce6; border: 0; font-size: 14.5px; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Сдать</button>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; justify-content: center; padding: 22px 28px 0 28px; box-sizing: border-box; overflow: hidden;">
+    <div style="width: 880px; display: flex; flex-direction: column; gap: 22px;">
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="margin: 0; font-size: 19px; font-weight: 600;">Задания 31–35. Пропущенные слова</h2>
+          <span style="font-size: 13px; color: #5c5346;">по 2 балла</span>
+        </div>
+        <div style="background: #f2e8bd; border-radius: 8px; padding: 12px 16px; font-size: 13.5px; line-height: 1.5; color: #5c5346;">
+          Прочитайте текст о заводе Генри Форда и рождении массового производства и выберите слово, наиболее подходящее на место пропуска в каждом предложении.
+        </div>
+        <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 10px; padding: 16px 20px;">
+          <div style="display: flex; gap: 12px;">
+            <span style="font-size: 13px; font-weight: 600; color: #665e51; padding-top: 2px;">31</span>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 15px; line-height: 1.55;">В 1913 г. на заводе Форда сборку автомобиля расщепили на сотни простых повторяющихся операций — довели до предела <span style="border-bottom: 2px solid #00797a; padding: 0 26px;"></span>, о котором писал ещё Адам Смит на примере булавочной мануфактуры.</div>
+              <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <sc-for list="{{g31}}" as="o" hint-placeholder-count="5">
+                  <label style="{{o.style}}">
+                    <input type="radio" name="q31" checked="{{o.on}}" style="accent-color: #00797a; width: 16px; height: 16px; flex-shrink: 0;">
+                    <span style="font-size: 14.5px;">{{o.text}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="margin: 0; font-size: 19px; font-weight: 600;">Задания 36–40. Все верные утверждения</h2>
+          <span style="font-size: 13px; color: #5c5346;">по 3 балла · за лишние варианты балл уменьшается</span>
+        </div>
+        <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 10px; padding: 16px 20px;">
+          <div style="display: flex; gap: 12px;">
+            <span style="font-size: 13px; font-weight: 600; color: #665e51; padding-top: 2px;">37</span>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 15px; line-height: 1.55;">Пекарня арендует помещение за 50 тыс. руб. в месяц, платит пекарям сдельно за каждую выпеченную партию и закупает муку. Выберите все верные утверждения.</div>
+              <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <sc-for list="{{g37}}" as="o" hint-placeholder-count="5">
+                  <label style="{{o.style}}">
+                    <input type="checkbox" checked="{{o.on}}" style="accent-color: #00797a; width: 16px; height: 16px; flex-shrink: 0;">
+                    <span style="font-size: 14.5px;">{{o.text}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="margin: 0; font-size: 19px; font-weight: 600;">Задания 41–42. Анализ рисунка или таблицы</h2>
+          <span style="font-size: 13px; color: #5c5346;">по 3 балла</span>
+        </div>
+        <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 10px; padding: 16px 20px;">
+          <div style="display: flex; gap: 12px;">
+            <span style="font-size: 13px; font-weight: 600; color: #665e51; padding-top: 2px;">42</span>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 15px; line-height: 1.55;">В таблице приведена возрастная структура населения четырёх стран, %. Выберите все верные утверждения.</div>
+              <table style="margin-top: 12px; border-collapse: collapse; font-size: 14px; width: 100%;">
+                <thead>
+                  <tr style="background: #f2e8bd;">
+                    <th style="text-align: left; padding: 8px 12px; font-weight: 600;">Страна</th>
+                    <th style="text-align: right; padding: 8px 12px; font-weight: 600;">0–14 лет</th>
+                    <th style="text-align: right; padding: 8px 12px; font-weight: 600;">15–64 года</th>
+                    <th style="text-align: right; padding: 8px 12px; font-weight: 600;">65 лет и старше</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <sc-for list="{{rows}}" as="r" hint-placeholder-count="4">
+                    <tr style="border-bottom: 1px solid rgba(45,45,45,.1);">
+                      <td style="padding: 7px 12px;">{{r.c}}</td>
+                      <td style="padding: 7px 12px; text-align: right; font-variant-numeric: tabular-nums;">{{r.a}}</td>
+                      <td style="padding: 7px 12px; text-align: right; font-variant-numeric: tabular-nums;">{{r.b}}</td>
+                      <td style="padding: 7px 12px; text-align: right; font-variant-numeric: tabular-nums;">{{r.d}}</td>
+                    </tr>
+                  </sc-for>
+                </tbody>
+              </table>
+              <div style="margin-top: 6px; font-size: 12px; color: #665e51;">Источник: The World Factbook, 2024 г., округлённо</div>
+              <div style="margin-top: 12px; display: flex; flex-direction: column; gap: 6px;">
+                <sc-for list="{{g42}}" as="o" hint-placeholder-count="5">
+                  <label style="{{o.style}}">
+                    <input type="checkbox" checked="{{o.on}}" style="accent-color: #00797a; width: 16px; height: 16px; flex-shrink: 0;">
+                    <span style="font-size: 14.5px;">{{o.text}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px;">
+        <div style="display: flex; align-items: baseline; gap: 12px;">
+          <h2 style="margin: 0; font-size: 19px; font-weight: 600;">Задания 43–44. Расчётные, один ответ</h2>
+          <span style="font-size: 13px; color: #5c5346;">по 4,5 балла</span>
+        </div>
+        <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 10px; padding: 16px 20px;">
+          <div style="display: flex; gap: 12px;">
+            <span style="font-size: 13px; font-weight: 600; color: #665e51; padding-top: 2px;">43</span>
+            <div style="flex-grow: 1;">
+              <div style="font-size: 15px; line-height: 1.55;">Предприниматель закупает в Китае один вид товара для перепродажи в России. У него есть 330 000 руб., курс — 11 руб. за юань, доставка всей партии стоит 3000 юаней независимо от её размера, других издержек нет. Товар A стоит 15 юаней и продаётся в России за 400 руб., товар B — 1500 юаней и 22 000 руб., товар C — 90 юаней и 1500 руб. Предприниматель выбирает товар, приносящий максимальную прибыль. Чему равна эта прибыль в рублях?</div>
+              <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+                <sc-for list="{{g43}}" as="o" hint-placeholder-count="5">
+                  <label style="{{o.style}}">
+                    <input type="radio" name="q43" checked="{{o.on}}" style="accent-color: #00797a; width: 16px; height: 16px; flex-shrink: 0;">
+                    <span style="font-size: 14.5px; font-variant-numeric: tabular-nums;">{{o.text}}</span>
+                  </label>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var off = 'display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 6px; border: 1px solid rgba(45,45,45,.16); background: #ffffff; cursor: pointer;';
+    var on = 'display: flex; align-items: flex-start; gap: 10px; padding: 9px 12px; border-radius: 6px; border: 2px solid #00797a; background: rgba(0,108,109,.09); cursor: pointer;';
+    var pillOff = 'display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; border: 1px solid rgba(45,45,45,.16); background: #ffffff; cursor: pointer;';
+    var pillOn = 'display: inline-flex; align-items: center; gap: 8px; padding: 9px 16px; border-radius: 999px; border: 2px solid #00797a; background: rgba(0,108,109,.09); cursor: pointer;';
+    function mk(list, picked, styleOn, styleOff) {
+      return list.map(function (t, i) {
+        var sel = picked.indexOf(i + 1) >= 0;
+        return { text: t, on: sel, style: sel ? styleOn : styleOff };
+      });
+    }
+    return {
+      g31: mk(['разделение труда', 'урбанизацию', 'бартер', 'автаркию', 'приватизацию'], [1], on, off),
+      g37: mk([
+        'Сдельная оплата труда пекарей относится к постоянным издержкам.',
+        'Расходы на муку относятся к переменным издержкам.',
+        'При росте выпуска средние постоянные издержки растут.',
+        'Арендная плата относится к постоянным издержкам.',
+        'Если пекарня ничего не производит, её переменные издержки равны нулю.'
+      ], [2, 4], on, off),
+      g42: mk([
+        'Высокая доля детей в Нигерии свидетельствует о низкой рождаемости.',
+        'Доля людей старше 65 лет в Японии (30%) означает, что уровень безработицы в Японии равен 30%.',
+        'Индия находится на этапе, когда доля населения трудоспособного возраста особенно велика, — это может ускорить экономический рост.',
+        'В Нигерии на одного человека трудоспособного возраста приходится больше детей, чем в Германии.',
+        'В Японии и Германии высокая доля пожилых увеличивает нагрузку на пенсионную систему и расходы бюджета на здравоохранение.'
+      ], [3, 5], on, off),
+      g43: mk(['390 000', '400 000', '437 000', '470 000', 'Нет верного ответа'], [], pillOn, pillOff),
+      rows: [
+        { c: 'Нигерия', a: '40', b: '56', d: '4' },
+        { c: 'Индия', a: '25', b: '69', d: '6' },
+        { c: 'Германия', a: '14', b: '62', d: '24' },
+        { c: 'Япония', a: '12', b: '58', d: '30' }
+      ]
+    };
+  }
+}
+</script>
+</body>
+</html>
