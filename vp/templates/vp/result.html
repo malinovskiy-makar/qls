@@ -27,7 +27,8 @@
              aria-label="Шкала от 0 до {{ max|num }}: {% if is_owner %}ваш балл{% else %}балл участника{% endif %} {{ score|num }}, медиана {{ comparison.median|num }}">
           <span class="vp-cmp-fill" style="width: {{ score_percent }}%"></span>
           <span class="vp-cmp-med" style="left: {{ comparison.median_percent }}%"></span>
-          <span class="vp-cmp-you" style="left: {{ score_percent }}%"><i>{% if is_owner %}вы{% else %}участник{% endif %}</i></span>
+          <span class="vp-cmp-you" style="left: {{ score_percent }}%"></span>
+          <span class="vp-cmp-label" style="left: {{ score_percent }}%">{% if is_owner %}вы{% else %}участник{% endif %}</span>
         </div>
         <div class="vp-cmp-axis"><span>0</span><span>медиана {{ comparison.median|num }}</span><span>{{ max|num }}</span></div>
         <div class="vp-mute vp-mt-sm">По первым попыткам {{ comparison.count|plural:"человек,человека,человек" }}, прошедших вариант на время.</div>
@@ -158,7 +159,7 @@
       <div class="vp-card vp-actions">
         <a class="vp-btn" href="{% url 'vp:index' %}">Пройти другой вариант</a>
         <button type="button" class="vp-btn vp-btn--plain" id="vp-share">Поделиться результатом</button>
-        <p class="vp-mute" id="vp-share-note" role="status" aria-live="polite">Ссылка открывается у кого угодно и показывает балл без ваших ответов.</p>
+        <p class="vp-mute" id="vp-share-note" role="status" aria-live="polite">Ссылка открывается у кого угодно и показывает балл{% if request.user.is_authenticated %} и ваш логин{% endif %} без ваших ответов.</p>
       </div>
     </div>
     {% else %}

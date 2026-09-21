@@ -16,8 +16,9 @@ from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.db import connection
 from django.test import tag
+from django.utils import timezone
 
-from vp.models import VPAttempt
+from vp.models import VPAttempt, VPVariant
 from vp.tests import browser_fixture
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_take.mjs')
@@ -37,7 +38,15 @@ EXPECTED = {
     'd.theme_toggle_take', 'd.theme_toggle_back', 'd.take.contrast_light', 'd.take.contrast_dark',
     'd.submit_goes_to_result', 'd.result_score_present', 'd.result_has_five_blocks',
     'd.result_no_hscroll', 'd.result.contrast_light', 'd.result.contrast_dark', 'd.result_theme_toggle',
+    'd.review_chain_30_rows', 'd.review_tests_14_cards', 'd.review_link_broken_named',
+    'd.review_five_practice_buttons', 'd.review_share_button', 'd.comparison_shown',
+    'd.comparison_marker_inside_scale', 'd.practice_form_opens', 'd.practice_wrong_gives_reference',
+    'd.practice_reference_was_not_on_page', 'd.practice_right_says_right', 'd.practice_choice_is_checked',
+    'd.practice_score_unchanged', 'd.practice_says_it_does_not_count',
     'd.take_after_submit_redirects', 'd.public_result_open', 'd.public_result_no_answers',
+    'd.public_result_references_loaded', 'd.public_result_no_reference', 'd.public_result_no_review_blocks',
+    'd.public_result_repeat_button', 'd.public_result_comparison', 'd.public.contrast_light',
+    'd.public.contrast_dark',
     'd.foreign_take_404',
     # телефон: сценарий 4
     'm.intro_no_hscroll', 'm.take_no_hscroll', 'm.strip_visible_rail_hidden', 'm.inputs_16px',
@@ -73,6 +82,14 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
                 ('vp-danger', 'Вариант на минуту', 55),
                 ('vp-fast', 'Вариант на десять секунд', 10)):
             browser_fixture.write(browser_fixture.rich_data(slug=slug, duration=duration, title=title))
+        # Девятнадцать «других людей» у варианта vp-ui: с гостем, который пройдёт его в браузере,
+        # получается ровно двадцать — граница, с которой на экране появляется сравнение.
+        now = timezone.now()
+        variant = VPVariant.objects.get(slug='vp-ui')
+        for i in range(19):
+            VPAttempt.objects.create(
+                variant=variant, public_code='fake-%02d' % i, session_key='fake-%02d' % i, score=D(i),
+                max_score=D('100'), submitted_at=now, expires_at=now)
 
     def run_runner(self):
         node = shutil.which('node')

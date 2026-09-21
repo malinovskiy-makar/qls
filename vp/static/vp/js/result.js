@@ -33,7 +33,7 @@
 
   function shared(ok) {
     if (!note) return;
-    note.textContent = ok ? 'Ссылка скопирована. Её откроет любой, но увидит только балл.'
+    note.textContent = ok ? 'Ссылка скопирована. Её откроет любой, но ваших ответов не увидит.'
                           : 'Не получилось скопировать. Скопируйте адрес страницы из строки браузера.';
     window.setTimeout(function () { note.textContent = noteText; }, 4000);
   }

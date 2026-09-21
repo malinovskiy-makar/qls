@@ -416,6 +416,29 @@ class ResultViewTests(ReviewBase):
         for private in ('Пётр', 'Тайный'):
             self.assertNotIn(private, html)
 
+    def test_signed_in_non_owner_gets_the_reduced_view_of_any_attempt(self):
+        """Вошедший — не значит владелец: чужая попытка, гостевая или с хозяином, — как у чужого."""
+        other = Client()
+        other.force_login(User.objects.create_user('vp_bystander', password='p12345'))
+        owned = submit(self.variant, right_answers(self.variant),
+                       user=User.objects.create_user('vp_host', password='p12345'), session_key='')
+        for attempt in (self.attempt, owned):
+            html = other.get(reverse('vp:result', args=[attempt.public_code])).content.decode()
+            for marker in ('Змейка целиком', 'эталон', 'id="vp-chain"', 'data-practice', chain_word(4)):
+                self.assertNotIn(marker, html, marker)
+        self.assertEqual(other.post(reverse('vp:practice', args=[owned.public_code]),
+                                    json.dumps({'item': 1, 'raw': 'x'}),
+                                    content_type='application/json').status_code, 404)
+
+    def test_share_note_tells_a_signed_in_owner_that_the_login_is_shown(self):
+        self.assertNotIn('ваш логин', self.html(self.owner))            # гостю нечего раскрывать
+        user = User.objects.create_user('vp_shared', password='p12345')
+        attempt = submit(self.variant, {}, user=user, session_key='')
+        client = Client()
+        client.force_login(user)
+        html = client.get(reverse('vp:result', args=[attempt.public_code])).content.decode()
+        self.assertIn('показывает балл и ваш логин без ваших ответов', html)
+
     def test_no_comparison_block_below_twenty_people(self):
         for i in range(10):
             cohort_attempt(self.variant, 10 + i)
@@ -433,7 +456,7 @@ class ResultViewTests(ReviewBase):
         self.assertIn('медиана', html)
         self.assertIn('По первым попыткам 25 человек', html)
         self.assertIn('Выше, чем у', self.html(Client()))     # чужому — та же полоса, без «вы»
-        self.assertNotIn('<i>вы</i>', self.html(Client()))
+        self.assertNotIn('>вы<', self.html(Client()))
 
     def test_guest_owner_is_offered_to_keep_progress_and_a_signed_in_owner_is_not(self):
         self.assertIn('Сохранить прогресс', self.html(self.owner))

@@ -122,7 +122,11 @@ const TAKE_SELECTORS = ['.vp-item-text', '.vp-input', '.vp-opt span', '.vp-timer
 const INTRO_SELECTORS = ['.vp-h1', '.vp-h2', '.vp-sub', '.vp-table td', '.vp-stack', '.vp-note', '.vp-mode b',
   '.vp-mode span span', '.vp-btn', '.vp-mute', '.vp-eyebrow', '.vp-big'];
 const RESULT_SELECTORS = ['.vp-score-num b', '.vp-score-num span', '.vp-mute', '.vp-h3', '.vp-brow-name',
-  '.vp-brow-score', '.vp-brow-pct', '.vp-btn'];
+  '.vp-brow-score', '.vp-brow-pct', '.vp-btn', '.vp-cmp-head', '.vp-cmp-axis span', '.vp-cmp-label',
+  '.vp-crow-n', '.vp-crow-mine', '.vp-crow-right', '.vp-crow-right b', '.vp-crow-pts', '.vp-clink',
+  '.vp-crow-text', '.vp-tcard-n', '.vp-tcard-title', '.vp-tcard-score', '.vp-tcard-text', '.vp-tcard-line',
+  '.vp-topt', '.vp-topt-n', '.vp-tag', '.vp-math', '.vp-solution summary', '.vp-cta-card h2', '.vp-cta-card p',
+  '.vp-cta-btn', '.vp-cta-link', '.vp-practice-out'];
 
 async function contrastBothThemes(page, prefix, selectors) {
   await setTheme(page, false);
@@ -274,6 +278,62 @@ try {
   await page.click('#theme-toggle');
   check('d.result_theme_toggle', await page.evaluate(() => document.documentElement.getAttribute('data-theme') === 'dark'));
   await page.click('#theme-toggle');
+  // ---- разбор: змейка цепочкой, тесты, «дорешать вне зачёта»
+  check('d.review_chain_30_rows', (await page.locator('#vp-chain .vp-crow').count()) === 30);
+  check('d.review_tests_14_cards', (await page.locator('#vp-tests .vp-tcard').count()) === 14);
+  check('d.review_link_broken_named', await page.evaluate(() => {
+    const broken = document.querySelector('.vp-clink.is-broken');
+    return !!broken && /здесь цепь порвалась: следующий ответ должен был начинаться на «./.test(broken.textContent);
+  }));
+  check('d.review_five_practice_buttons', (await page.locator('[data-practice-open]').count()) === 5);
+  check('d.review_share_button', (await page.locator('#vp-share').count()) === 1);
+  check('d.comparison_shown', await page.evaluate(() => /Выше, чем у \d+% прошедших этот вариант/.test(
+    (document.querySelector('.vp-cmp-head') || {}).textContent || '')
+    && !!document.querySelector('.vp-cmp-you') && !!document.querySelector('.vp-cmp-med')));
+  check('d.comparison_marker_inside_scale', await page.evaluate(() => {
+    const scale = document.querySelector('.vp-cmp-scale').getBoundingClientRect();
+    const you = document.querySelector('.vp-cmp-you').getBoundingClientRect();
+    return you.left >= scale.left - 2 && you.right <= scale.right + 2;
+  }));
+  const pageBefore = await page.content();
+  const scoreBefore = (await page.textContent('.vp-score-num b')).trim();
+  await page.locator('#vp-r-17 [data-practice-open]').click();
+  check('d.practice_form_opens', await page.locator('#vp-r-17 [data-practice-form]').isVisible());
+  await page.fill('#vp-pr-17', 'неверноеслово');
+  await page.click('#vp-r-17 [data-practice-form] button[type=submit]');
+  let wrongText = '';
+  try {
+    await page.waitForFunction(() => /Неверно\. Верный ответ: /.test(
+      document.querySelector('#vp-r-17 [data-practice-out]').textContent), null, { timeout: 15000 });
+    wrongText = await page.textContent('#vp-r-17 [data-practice-out]');
+  } catch (e) { wrongText = (await page.textContent('#vp-r-17 [data-practice-out]')) || ''; }
+  const reference17 = wrongText.replace(/^.*Верный ответ:\s*/, '').trim();
+  check('d.practice_wrong_gives_reference', /^Неверно\. Верный ответ: \S+$/.test(wrongText), wrongText);
+  check('d.practice_reference_was_not_on_page', reference17.length > 0 && !pageBefore.includes(reference17), reference17);
+  await shot(page, 'result_practice_wrong_desktop');
+  await page.fill('#vp-pr-17', reference17);
+  await page.click('#vp-r-17 [data-practice-form] button[type=submit]');
+  let rightText = '';
+  try {
+    await page.waitForFunction(() => /^Верно: /.test(
+      document.querySelector('#vp-r-17 [data-practice-out]').textContent), null, { timeout: 15000 });
+    rightText = await page.textContent('#vp-r-17 [data-practice-out]');
+  } catch (e) { rightText = (await page.textContent('#vp-r-17 [data-practice-out]')) || ''; }
+  check('d.practice_right_says_right', rightText === 'Верно: ' + reference17, rightText);
+  await page.locator('#vp-r-35 [data-practice-open]').click();
+  await page.locator('#vp-r-35 input[name=raw]').first().check();
+  await page.click('#vp-r-35 [data-practice-form] button[type=submit]');
+  let choiceText = '';
+  try {
+    await page.waitForFunction(() => /^(Верно|Неверно)/.test(
+      document.querySelector('#vp-r-35 [data-practice-out]').textContent), null, { timeout: 15000 });
+    choiceText = await page.textContent('#vp-r-35 [data-practice-out]');
+  } catch (e) { choiceText = (await page.textContent('#vp-r-35 [data-practice-out]')) || ''; }
+  check('d.practice_choice_is_checked', /^(Верно: |Неверно\. Верный ответ: )\d+\. /.test(choiceText), choiceText);
+  check('d.practice_score_unchanged', (await page.textContent('.vp-score-num b')).trim() === scoreBefore, scoreBefore);
+  check('d.practice_says_it_does_not_count', /На балл не влияет, он уже записан/.test(
+    await page.textContent('#vp-r-17 [data-practice-form]')));
+  await shot(page, 'result_review_desktop', true);
   // после сдачи назад на страницу прохождения не попасть
   await page.goto(takeUrl, { waitUntil: 'load' });
   check('d.take_after_submit_redirects', /\/vp\/r\//.test(page.url()), page.url());
@@ -285,6 +345,18 @@ try {
   const sharedText = await sp.textContent('body');
   check('d.public_result_open', shared.status() === 200 && /из 100/.test(sharedText), shared.status());
   check('d.public_result_no_answers', !/слово\d|ПОСЛЕДНЕЕ/.test(sharedText));
+  const references = [...fs.readFileSync('data/vp/_selftest.yaml', 'utf8').matchAll(/^\s+answer: (.+?)\s*$/gm)]
+    .map((m) => m[1]);
+  check('d.public_result_references_loaded', references.length === 30, references.length);
+  const sharedHtml = await sp.content();
+  const leaked = references.filter((word) => sharedHtml.includes(word));
+  check('d.public_result_no_reference', leaked.length === 0, leaked);
+  check('d.public_result_no_review_blocks', (await sp.locator('#vp-chain, #vp-tests, [data-practice], #vp-share').count()) === 0
+    && !/эталон/.test(sharedText));
+  check('d.public_result_repeat_button', (await sp.locator('a:has-text("Пройти этот же вариант")').count()) === 1);
+  check('d.public_result_comparison', /Выше, чем у \d+% прошедших этот вариант/.test(sharedText));
+  await shot(sp, 'result_public_desktop', true);
+  await contrastBothThemes(sp, 'd.public', RESULT_SELECTORS);
   const foreign = await sp.goto(takeUrl, { waitUntil: 'load' });
   check('d.foreign_take_404', foreign.status() === 404, foreign.status());
   await stranger.close();
