@@ -198,9 +198,26 @@ html:has(body.vp-focus) { scroll-padding-top: calc(var(--vp-bar-h, 64px) + 16px)
   display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; cursor: pointer;
   border-radius: var(--r); border: var(--line, 1px) solid var(--border);
   background: var(--surface-2); font-size: 14.5px; line-height: 1.45;
+  min-height: 44px; /* зона нажатия на телефоне не ниже 44 px */
 }
 .vp-opt:has(input:checked) { border: 2px solid var(--accent); padding: 9px 11px; background: var(--accent-tint); }
 .vp-opt input { accent-color: var(--accent); width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; }
+.vp-pairs { display: flex; flex-direction: column; gap: 8px; }
+.vp-pair { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-height: 44px; }
+.vp-pair-key { width: 24px; font-weight: 600; color: var(--text3); }
+/* Список — по канону (DESIGN 3.2): без нативного вида, стрелка — у обёртки. */
+.vp-select-wrap { position: relative; flex: 1 1 220px; max-width: 420px; }
+.vp-select-wrap::after {
+  content: '▾'; position: absolute; right: 12px; top: 50%; transform: translateY(-50%);
+  font-size: 11px; color: var(--text2); pointer-events: none;
+}
+.vp-select {
+  appearance: none; -webkit-appearance: none; width: 100%; min-height: 44px;
+  font: inherit; font-size: 16px; padding: 9px 30px 9px 12px;
+  background: var(--surface-2); color: var(--text);
+  border: var(--line, 1px) solid var(--border); border-radius: var(--r);
+}
+.vp-select:focus { outline: none; border-color: var(--focus); box-shadow: 0 0 0 3px var(--focus-ring); }
 .vp-opt--pill { border-radius: var(--r-pill); padding: 9px 16px; align-items: center; font-variant-numeric: tabular-nums; }
 .vp-opt--pill:has(input:checked) { padding: 8px 15px; }
 .vp-figure { margin: 0; }

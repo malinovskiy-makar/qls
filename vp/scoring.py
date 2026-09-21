@@ -62,6 +62,10 @@ def _is_blank(raw):
     return False
 
 
+#: Публичное имя: «пусто ли» — правило подсчёта, экраны спрашивают его здесь.
+is_blank = _is_blank
+
+
 def _to_int(value):
     """Номер варианта из ответа: число или строка-число, иначе None."""
     if isinstance(value, bool):

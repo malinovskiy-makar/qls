@@ -21,12 +21,14 @@ from datetime import timedelta
 from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
+from django.templatetags.static import static
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from problems import exam_engine
 from vp import blocks, scoring
-from vp.models import VPAttempt, VPVariant
+from vp.models import VPAttempt, VPItem, VPVariant
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +39,10 @@ SESSION_ATTEMPTS_LIMIT = 50
 
 # Раздел «Классы» на странице списка: (значение `grade_band`, подпись).
 BANDS = (('9-10', '9–10 классы'), ('11', '11 класс'))
+
+# Варианты, чьи подписи умещаются в такую длину (числа, «Нет верного ответа»),
+# рисуются «таблетками» в ряд, а не столбцом.
+PILL_MAX_LENGTH = 22
 
 
 # ------------------------------------------------------------------ доступ
@@ -186,9 +192,84 @@ def start(request, slug):
 
 # ------------------------------------------------------------ прохождение
 
+def _figure_url(path):
+    """Адрес рисунка в статике приложения или пусто.
+
+    ⚠️ На боевом хранилище (`Manifest…`) `static()` бросает ValueError для файла,
+    которого нет в манифесте. Опечатка в пути рисунка не должна ронять страницу
+    прохождения пятисоткой посреди тура: рисунок пропускаем, в лог — предупреждение.
+    """
+    if not path:
+        return ''
+    try:
+        return static(path)
+    except ValueError:
+        logger.warning('Рисунок ВП не найден в статике: %s', path)
+        return ''
+
+
+def _row(item, raw):
+    """Задание для страницы прохождения — ТОЛЬКО то, что участнику можно видеть.
+
+    Сами `VPItem` в шаблон не уходят: эталон, `correct`, `accepted`, решение и буквы
+    связки страница не получает (тест `test_take_hides_answers`). Для `match` наружу
+    идут только подписи пар (ключи `correct`), но не значения.
+    """
+    options = [{'n': o['n'], 'text': o['text']} for o in (item.options or [])
+               if isinstance(o, dict) and 'n' in o]
+    chosen = []
+    if item.kind == VPItem.Kind.MULTI and isinstance(raw, list):
+        chosen = [n for n in raw if isinstance(n, int)]
+    elif item.kind == VPItem.Kind.SINGLE and isinstance(raw, int):
+        chosen = [raw]
+    pairs = []
+    if item.kind == VPItem.Kind.MATCH and isinstance(item.correct, dict):
+        given = raw if isinstance(raw, dict) else {}
+        pairs = [{'key': key, 'value': given.get(key)} for key in item.correct]
+    return {
+        'number': item.number,
+        'kind': item.kind,
+        'statement': item.statement,
+        'prefix': item.prefix,
+        'suffix': item.suffix,
+        'options': options,
+        'pills': bool(options) and all(len(o['text']) <= PILL_MAX_LENGTH for o in options),
+        'chosen': chosen,
+        'text': raw if (item.kind == VPItem.Kind.SHORT_TEXT and isinstance(raw, str)) else '',
+        'pairs': pairs,
+        'figure_url': _figure_url(item.figure),
+        'figure_caption': item.figure_caption,
+        'figure_source': item.figure_source,
+        'table_html': item.table_html,
+        'points': item.points,
+        'answered': not scoring.is_blank(raw),
+    }
+
+
 @never_cache
 def take(request, code):
-    """Страница прохождения (наполняется в следующей фазе)."""
+    """Страница прохождения: все задания варианта сразу, с сохранёнными ответами."""
     attempt = _get_attempt(request, code)
+    variant = attempt.variant
+    raw = {a.item_id: a.raw for a in attempt.answers.all()}
+    items = list(variant.items.all())
+    sections = blocks.sections(items)
+    for section in sections:
+        section['rows'] = [_row(item, raw.get(item.pk)) for item in section['items']]
+        del section['items']          # в шаблон — только безопасные строки
+
+    numbers = [item.number for item in items]
+    answered = [row['number'] for s in sections for row in s['rows'] if row['answered']]
+    seconds_left = exam_engine.seconds_remaining(attempt, timezone.now())
+    config = {
+        'numbers': numbers,
+        'textNumbers': [i.number for i in items if i.kind == VPItem.Kind.SHORT_TEXT],
+        'timed': attempt.with_timer,
+        'seconds': seconds_left,
+    }
     return render(request, 'vp/take.html', {
-        'attempt': attempt, 'variant': attempt.variant, 'seo_noindex': True})
+        'attempt': attempt, 'variant': variant, 'sections': sections,
+        'numbers': numbers, 'answered_numbers': answered,
+        'answered_count': len(answered), 'total': len(numbers),
+        'seconds_left': seconds_left, 'config': config, 'seo_noindex': True,
+    })

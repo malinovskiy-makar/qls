@@ -1,0 +1,58 @@
+{% load vp_extras %}{% comment %}
+Одно задание на странице прохождения. Ждёт `row` (словарь из `vp.views._row`).
+
+⚠️ Имена узлов держит `static/vp/js/take.js`: `#vp-item-<n>`, `data-kind`, поля
+`name="item-<n>"` (у `match` — `item-<n>.<ключ пары>`). Менять их, не поправив
+скрипт, нельзя.
+⚠️ У заданий с вариантами перед радио/галочками стоит скрытое пустое поле с тем же
+именем: без него снятая до нуля отметка исчезла бы из отправляемой формы, и
+сервер не отличил бы «сняли» от «не присылали».
+{% endcomment %}
+<section class="vp-item" id="vp-item-{{ row.number }}" data-n="{{ row.number }}" data-kind="{{ row.kind }}">
+  <div class="vp-item-num" aria-hidden="true">{{ row.number }}</div>
+  <div class="vp-item-body">
+    <div class="vp-item-text"><span class="vp-sr">Задание {{ row.number }}. </span>{% for chunk in row.statement|gap_parts %}{{ chunk|linebreaksbr }}{% if not forloop.last %}<span class="vp-gap" role="img" aria-label="пропуск"></span>{% endif %}{% endfor %}</div>
+    {% if row.figure_url %}
+    <figure class="vp-figure">
+      <img src="{{ row.figure_url }}" alt="{{ row.figure_caption|default:'Рисунок к заданию' }}" loading="lazy">
+      {% if row.figure_caption or row.figure_source %}<figcaption>{{ row.figure_caption }}{% if row.figure_source %} Источник: {{ row.figure_source }}{% endif %}</figcaption>{% endif %}
+    </figure>
+    {% endif %}
+    {% if row.table_html %}
+    {% comment %}
+    ⚠️ `|safe` здесь безопасен: `table_html` приходит ТОЛЬКО из наших YAML через
+    `import_vp` и из админки, куда есть доступ лишь у staff. Пользовательский ввод в
+    это поле не попадает никогда (ни один экран и ни один API его не пишет).
+    {% endcomment %}
+    <div class="vp-scroll">{{ row.table_html|safe }}</div>
+    {% endif %}
+    {% if row.kind == 'short_text' %}
+    <div class="vp-answer">
+      {% if row.prefix %}<span class="vp-affix">{{ row.prefix }}</span>{% endif %}
+      <label class="vp-sr" for="vp-in-{{ row.number }}">Ответ на задание {{ row.number }}</label>
+      <input class="vp-input" id="vp-in-{{ row.number }}" name="item-{{ row.number }}" type="text"
+             value="{{ row.text }}" maxlength="200" lang="ru" autocomplete="off"
+             autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="next">
+      {% if row.suffix %}<span class="vp-affix">{{ row.suffix }}</span>{% endif %}
+    </div>
+    {% elif row.kind == 'match' %}
+    <div class="vp-pairs">
+      {% for pair in row.pairs %}
+      <label class="vp-pair"><span class="vp-pair-key">{{ pair.key }}</span>
+        <span class="vp-select-wrap"><select class="vp-select" data-key="{{ pair.key }}" name="item-{{ row.number }}.{{ pair.key }}">
+          <option value="">—</option>
+          {% for o in row.options %}<option value="{{ o.n }}"{% if o.n == pair.value %} selected{% endif %}>{{ o.text }}</option>{% endfor %}
+        </select></span></label>
+      {% endfor %}
+    </div>
+    {% else %}
+    <input type="hidden" name="item-{{ row.number }}" value="">
+    <fieldset class="vp-options{% if row.pills %} is-pills{% endif %}">
+      <legend class="vp-sr">Варианты ответа на задание {{ row.number }}{% if row.kind == 'multi' %}, можно выбрать несколько{% endif %}</legend>
+      {% for o in row.options %}
+      <label class="vp-opt{% if row.pills %} vp-opt--pill{% endif %}"><input type="{% if row.kind == 'multi' %}checkbox{% else %}radio{% endif %}" name="item-{{ row.number }}" value="{{ o.n }}"{% if o.n in row.chosen %} checked{% endif %}><span>{{ o.text }}</span></label>
+      {% endfor %}
+    </fieldset>
+    {% endif %}
+  </div>
+</section>

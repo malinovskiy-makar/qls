@@ -47,7 +47,8 @@ def sections(items):
     Возвращает список словарей: `block`, `items`, `first`, `last`, `range`,
     `total` (сумма баллов), `uniform` (одинаковые баллы за задание или None),
     `points_min` / `points_max`,
-    `penalty` (есть ли штраф за лишнее), `intro` (вступление блока).
+    `penalty` (есть ли штраф за лишнее), `intro` (вступление блока: `intro` его
+    первого задания, а если пусто — подпись по умолчанию для блока).
     """
     result = []
     for item in sorted(items, key=lambda i: i.number):
@@ -66,8 +67,7 @@ def sections(items):
             uniform=next(iter(points)) if len(points) == 1 else None,
             points_min=min(points), points_max=max(points),
             penalty=any(i.penalty for i in items_),
-            intro=(next((i.intro for i in items_ if i.intro), '')
-                   or DEFAULT_HINTS.get(section['block'], '')),
+            intro=(items_[0].intro or DEFAULT_HINTS.get(section['block'], '')),
             titles=TITLES.get(section['block'], {
                 'table': section['block'], 'heading': section['block'],
                 'short': section['block']}),
