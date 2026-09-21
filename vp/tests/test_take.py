@@ -841,8 +841,8 @@ class ResultTests(TimeAndFinishBase):
             for private in ('мой личный ответ', 'термин 1', 'термин 7', 'эталон'):
                 self.assertNotIn(private, html)
 
-    def test_shared_result_names_the_owner_by_nick_only(self):
-        """Сессия 3: чужому виден ник вошедшего автора, но не имя и фамилия."""
+    def test_shared_result_does_not_name_the_owner(self):
+        """Ни имя, ни фамилия, ни логин вошедшего автора чужому не видны (сессия 4, ADR 0127)."""
         user = User.objects.create_user('vp_named', password='p12345',
                                         first_name='Иван', last_name='Секретов')
         client = Client()
@@ -851,9 +851,10 @@ class ResultTests(TimeAndFinishBase):
         with at(T0 + timedelta(seconds=30)):
             self.finish(client, attempt)
         html = self.html(Client(), attempt)
-        self.assertIn('vp_named', html)
         self.assertNotIn('Секретов', html)
         self.assertNotIn('Иван', html)
+        self.assertNotIn('vp_named', html)
+        self.assertIn('Участник', html)         # положительный контроль: страница не пустая
 
     def test_unsubmitted_attempt_is_not_a_result(self):
         attempt = self.started()

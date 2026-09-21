@@ -546,12 +546,12 @@ def result(request, code):
 
     ⚠️ ДВА ВИДА, РАЗВЕДЕНЫ НА УРОВНЕ ДАННЫХ. Владелец получает полный разбор: змейку
     цепочкой, арифметику тестов, решения. Всем остальным в контекст не попадает ни
-    строка разбора: только балл, блоки, время, процентиль и имя. Прятать чужому
+    строка разбора: только балл, блоки, время и процентиль, без имени автора. Прятать чужому
     эталоны стилями нельзя — они не должны попасть в HTML (`test_review`). Несданную
     попытку видит только владелец, и его ведёт обратно к заданиям.
     """
     attempt = get_object_or_404(
-        VPAttempt.objects.select_related('variant', 'user'), public_code=code)
+        VPAttempt.objects.select_related('variant'), public_code=code)
     owner = _owns(request, attempt)
     if attempt.submitted_at is None:
         if not owner:
@@ -587,8 +587,11 @@ def result(request, code):
             practice_url=reverse('vp:practice', args=[code]),
             offer_signup=not request.user.is_authenticated)
     else:
-        # Ник — логин: отдельного «ника» в проекте нет. Имя и фамилию не показываем.
-        context['author'] = attempt.user.get_username() if attempt.user_id else 'Участник'
+        # ⚠️ ВЛАДЕЛЬЦА НЕ НАЗЫВАЕМ НИКОМУ, КРОМЕ НЕГО САМОГО — ни имя, ни логин, вошёл
+        # автор или нет (ADR 0127, отмена части ADR 0126). Ссылка открывается кем угодно,
+        # отдельного ника в проекте нет, логин обычно совпадает с именем, аудитория —
+        # школьники.
+        context['author'] = 'Участник'
         context['again_url'] = (reverse('vp:intro', args=[attempt.variant.slug])
                                 if attempt.variant.is_published else '')
     return render(request, 'vp/result.html', context)

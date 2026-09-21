@@ -407,14 +407,18 @@ class ResultViewTests(ReviewBase):
             self.assertNotIn(key, response.context, key)
         self.assertFalse(response.context['is_owner'])
 
-    def test_signed_in_author_is_named_by_nick_and_not_by_full_name(self):
+    def test_signed_in_author_is_not_named_at_all(self):
+        """Всем посторонним — «Участник», вошёл автор или нет: логин школьника публичным не бывает."""
         user = User.objects.create_user('vp_nick', password='p12345',
                                         first_name='Пётр', last_name='Тайный')
         attempt = submit(self.variant, {}, user=user, session_key='')
-        html = Client().get(reverse('vp:result', args=[attempt.public_code])).content.decode()
-        self.assertIn('vp_nick', html)
-        for private in ('Пётр', 'Тайный'):
-            self.assertNotIn(private, html)
+        stranger = Client()
+        stranger.force_login(User.objects.create_user('vp_looker', password='p12345'))
+        for client in (Client(), stranger):
+            html = client.get(reverse('vp:result', args=[attempt.public_code])).content.decode()
+            for private in ('vp_nick', 'Пётр', 'Тайный'):
+                self.assertNotIn(private, html, private)
+            self.assertIn('Участник', html)
 
     def test_signed_in_non_owner_gets_the_reduced_view_of_any_attempt(self):
         """Вошедший — не значит владелец: чужая попытка, гостевая или с хозяином, — как у чужого."""
@@ -430,14 +434,16 @@ class ResultViewTests(ReviewBase):
                                     json.dumps({'item': 1, 'raw': 'x'}),
                                     content_type='application/json').status_code, 404)
 
-    def test_share_note_tells_a_signed_in_owner_that_the_login_is_shown(self):
-        self.assertNotIn('ваш логин', self.html(self.owner))            # гостю нечего раскрывать
+    def test_share_note_says_the_link_shows_the_score_without_name_and_answers(self):
+        """Подпись у «Поделиться» одна для гостя и для вошедшего: имени в ссылке нет ни у кого."""
         user = User.objects.create_user('vp_shared', password='p12345')
         attempt = submit(self.variant, {}, user=user, session_key='')
-        client = Client()
-        client.force_login(user)
-        html = client.get(reverse('vp:result', args=[attempt.public_code])).content.decode()
-        self.assertIn('показывает балл и ваш логин без ваших ответов', html)
+        signed_in = Client()
+        signed_in.force_login(user)
+        for html in (self.html(self.owner),
+                     signed_in.get(reverse('vp:result', args=[attempt.public_code])).content.decode()):
+            self.assertIn('показывает балл без имени и без ваших ответов', html)
+            self.assertNotIn('логин', html)
 
     def test_no_comparison_block_below_twenty_people(self):
         for i in range(10):

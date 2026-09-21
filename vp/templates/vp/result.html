@@ -159,7 +159,7 @@
       <div class="vp-card vp-actions">
         <a class="vp-btn" href="{% url 'vp:index' %}">Пройти другой вариант</a>
         <button type="button" class="vp-btn vp-btn--plain" id="vp-share">Поделиться результатом</button>
-        <p class="vp-mute" id="vp-share-note" role="status" aria-live="polite">Ссылка открывается у кого угодно и показывает балл{% if request.user.is_authenticated %} и ваш логин{% endif %} без ваших ответов.</p>
+        <p class="vp-mute" id="vp-share-note" role="status" aria-live="polite">Ссылка открывается у кого угодно и показывает балл без имени и без ваших ответов.</p>
       </div>
     </div>
     {% else %}
