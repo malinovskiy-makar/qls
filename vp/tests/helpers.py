@@ -51,3 +51,24 @@ def answer_all(variant, right=True):
             raw = item.correct if right else [2, 4, 5]
         VPAnswer.objects.create(attempt=attempt, item=item, raw=raw)
     return attempt
+
+
+# --------------------------------------------------------------- экраны
+
+def make_published(slug='vp-t'):
+    """Опубликованный вариант из 44 заданий (сумма 100) — для тестов экранов."""
+    variant = make_full_variant(slug)
+    variant.is_published = True
+    variant.save()
+    return variant
+
+
+def at(moment):
+    """Заморозить `timezone.now()` для всего проекта, пока идёт `with at(...)`.
+
+    Патчится `django.utils.timezone.now`: им пользуются и экраны ВП, и
+    `problems.exam_engine`, и поля `auto_now_add` — так время в тестах двигается
+    по-настоящему, без реальных пауз.
+    """
+    from unittest import mock
+    return mock.patch('django.utils.timezone.now', return_value=moment)

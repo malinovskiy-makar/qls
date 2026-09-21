@@ -1,0 +1,95 @@
+{% extends 'vp/base_vp.html' %}
+{% load vp_extras %}
+{% comment %}
+Вход в вариант. Раскладка — макет Main.dc.html. ⚠️ ЧИСЛА ЗДЕСЬ — ТОЛЬКО ИЗ ДАННЫХ
+ВАРИАНТА: количество заданий, диапазоны номеров и суммы баллов по блокам считает
+`vp.blocks.sections` из заданий в базе; пример штрафа — `vp.scoring.penalty_example`.
+Вбитых чисел в шаблоне нет (тест `test_intro_numbers_come_from_the_database`).
+{% endcomment %}
+{% block title %}{{ variant.title }}{% endblock %}
+{% block content %}
+<div class="vp-wrap">
+  <div class="vp-head">
+    <div class="vp-head-main">
+      <div class="vp-eyebrow">Отборочный этап · {{ variant.tour }} тур</div>
+      <h1 class="vp-h1">{{ variant.title }}</h1>
+      <div class="vp-sub">{{ variant.grade_band|grade_label }} · {{ variant.year }}{% if variant.author %} · {{ variant.author }}{% endif %}{% if variant.source_note %} · {{ variant.source_note }}{% endif %}</div>
+    </div>
+    <div class="vp-head-clock">
+      <div class="vp-big">{{ variant.duration_seconds|mmss }}</div>
+      <div class="vp-mute">{{ items_count|plural:"задание,задания,заданий" }} · {{ variant.max_score|points_word }}</div>
+    </div>
+  </div>
+
+  <div class="vp-cols">
+    <div class="vp-card">
+      <h2 class="vp-h2">Из чего состоит вариант</h2>
+      <table class="vp-table" id="vp-blocks">
+        <tbody>
+          {% for s in sections %}
+          <tr data-block="{{ s.block }}">
+            <td>{{ s.range }}</td>
+            <td>{{ s.titles.table }}</td>
+            <td>{{ s.total|num }} б.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="vp-card vp-card--rules">
+      <h2 class="vp-h2">Как считаются баллы</h2>
+      <div class="vp-stack">
+        {% if whole_ranges %}<div>Задания {{ whole_ranges|join:" и " }} — или полный балл, или ноль.</div>{% endif %}
+        {% if partial_ranges %}
+        <div>В заданиях {{ partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд — гарантированный ноль.</div>
+        {% if penalty_example %}<div class="vp-note">Если в задании 2 верных и 3 неверных, верный даёт +{{ penalty_example.0|num }}, лишний — −{{ penalty_example.1|num }}. Ниже нуля за одно задание не уходим.</div>{% endif %}
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if sections.0.block == 'snake' %}
+  <div class="vp-card vp-mt">
+    <h2 class="vp-h2">Что такое змейка</h2>
+    <p class="vp-stack vp-mt-sm">Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов — со второй буквы первого слова. Это не только правило, но и проверка себя: не сходится буква — где-то ошибка.</p>
+    <div class="vp-chain-demo" aria-label="Пример цепочки">
+      <span>л<b>а</b>г</span><i>→</i>
+      <span>а<b>в</b>таркия</span><i>→</i>
+      <span>в<b>а</b>лютный курс</span><i>→</i>
+      <span>а<b>л</b>ьтернативные издержки</span><i>→</i>
+      <span>ликвидность</span>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if attempt %}
+  <div class="vp-resume">
+    <p>У вас есть начатая работа: отвечено {{ attempt_answered }} из {{ items_count }}{% if attempt.with_timer %}. Время идёт на сервере и не останавливается, даже если закрыть вкладку{% endif %}.</p>
+    <form method="post" action="{% url 'vp:start' variant.slug %}">
+      {% csrf_token %}
+      <button type="submit" class="vp-btn">Продолжить вариант</button>
+    </form>
+  </div>
+  {% else %}
+  <form method="post" action="{% url 'vp:start' variant.slug %}">
+    {% csrf_token %}
+    <fieldset class="vp-modes">
+      <legend class="vp-sr">Режим прохождения</legend>
+      <label class="vp-mode">
+        <input type="radio" name="with_timer" value="1" checked>
+        <span><b>С таймером — {{ variant.duration_seconds|minutes }}</b><span>Как на олимпиаде. Время вышло — работа сдаётся сама.</span></span>
+      </label>
+      <label class="vp-mode">
+        <input type="radio" name="with_timer" value="0">
+        <span><b>Без таймера</b><span>Разобраться в формате, не торопясь.</span></span>
+      </label>
+    </fieldset>
+    <div class="vp-start">
+      <button type="submit" class="vp-btn vp-btn--lg">Начать вариант</button>
+      <div class="vp-mute">Ответы сохраняются сами — можно закрыть вкладку и вернуться.<br>Проходить можно сколько угодно раз.</div>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

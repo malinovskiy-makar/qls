@@ -170,3 +170,15 @@ def score_attempt(attempt):
         score, _ = score_item(answer.item, answer.raw)
         total += score
     return max(total, _ZERO).quantize(_CENT)
+
+
+def penalty_example(points):
+    """Числа для примера в правилах на входе: в задании 2 верных и 3 неверных варианта.
+
+    Верный вариант приносит долю `points / 2`, лишний отнимает `points / 3`
+    (доля верных отметок и доля лишних — те же, что в `_score_multi`). Возвращает
+    `(за верный, за лишний)`, округлено до сотых. Живёт здесь, а не в шаблоне и не
+    во view: арифметику баллов держим в одном модуле.
+    """
+    points = Fraction(points)
+    return _round(points / 2), _round(points / 3)

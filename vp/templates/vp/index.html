@@ -1,0 +1,29 @@
+{% extends 'vp/base_vp.html' %}
+{% load vp_extras %}
+{% block title %}Высшая проба, 1 тур{% endblock %}
+{% block content %}
+<div class="vp-wrap">
+  <div class="vp-eyebrow">Отборочный этап · 1 тур</div>
+  <h1 class="vp-h1">Тренажёр «Высшей пробы»</h1>
+  <p class="vp-sub">Варианты первого тура: задания на время, проверка сразу после сдачи.</p>
+
+  {% for band in bands %}
+  <section class="vp-band">
+    <h2 class="vp-h2">{{ band.label }}</h2>
+    <div class="vp-cards">
+      {% for v in band.variants %}
+      <a class="vp-card vp-vcard" href="{% url 'vp:intro' v.slug %}">
+        <b>{{ v.title }}</b>
+        <span class="vp-mute">{{ v.year }}{% if v.author %} · {{ v.author }}{% endif %}</span>
+        {% if not v.is_published %}<span class="vp-pill vp-pill--draft">Не опубликован</span>{% endif %}
+      </a>
+      {% endfor %}
+    </div>
+  </section>
+  {% empty %}
+  <div class="vp-card vp-mt-lg">
+    <p>Варианты появятся здесь перед началом тура.</p>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
