@@ -46,7 +46,7 @@
         <span>Змейка · задания {{ snake_range }}</span>
         {% if snake %}<em>пример из варианта «{{ snake.variant.title }}»</em>{% endif %}
       </div>
-      <p>Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>: не сходится буква — где-то ошибка. В прохождении связка не подсказывается, как на олимпиаде, а раскрывается в разборе.</p>
+      <p>Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>: не сходится буква – где-то ошибка. В прохождении связка не подсказывается, как на олимпиаде, а раскрывается в разборе.</p>
       {% if snake %}
       <div class="vp-chain" role="img" aria-label="Цепочка: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
         {% for w in snake.words %}<span>{{ w.before }}{% if w.mark %}<b>{{ w.mark }}</b>{% endif %}{{ w.after }}</span>{% if not forloop.last %}<i aria-hidden="true">→</i>{% endif %}{% endfor %}

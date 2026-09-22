@@ -1,8 +1,13 @@
-"""Посадочная `/vp/`, вход в раздел и SEO (сессия 4, ADR 0127).
+"""Посадочная `/vp/`, вход в раздел и SEO (сессия 4, ADR 0127; сессия 5 — редизайн).
 
 Нумерация `test_NN_…` — сценарии из задания сессии 4; остальные тесты — рядом. Числа на
 странице проверяются ИЗМЕНЕНИЕМ данных: правим задания — число на экране следует за
 ними, а не за шаблоном.
+
+⚠️ С 22.09.2026 посадочная — три зоны на один экран, а формат и правила живут в
+ОКНЕ «Правила и формат» (`vp/_rules.html`). Разметка окна лежит в HTML страницы,
+поэтому таблица блоков ищется там же, где раньше, — просто внутри окна. Список
+вариантов уехал на `/vp/variants/`, и его проверяет `test_variants`.
 """
 import re
 from datetime import date
@@ -45,6 +50,23 @@ def section(html, start, end):
     return html.split(f'id="{start}"', 1)[1].split(f'id="{end}"', 1)[0]
 
 
+def rules(html):
+    """Содержимое окна «Правила и формат» — там живут формат, баллы и ссылки."""
+    return html.split('id="vp-rules-cont"', 1)[1]
+
+
+#: ⚠️ Куски ищутся по РАЗМЕТКЕ, а не по имени класса: стили страницы лежат в том
+#: же HTML, и `vp-land-facts` нашлось бы в `<style>` даже на пустой странице.
+HERO_OPEN = 'class="vp-land-card vp-land-hero"'
+BOARD_OPEN = 'class="vp-land-card vp-land-board"'
+FACTS = 'aria-label="Формат варианта"'
+
+
+def hero(html):
+    """Зона A: тур, плитки фактов, змейка, кнопки."""
+    return html.split(HERO_OPEN, 1)[1].split(BOARD_OPEN, 1)[0]
+
+
 def set_chain(variant, letters, tail):
     """Связная змейка из другого алфавита: ответ №N — `letters[N]` + `letters[N+1]` + хвост."""
     size = len(letters)
@@ -67,7 +89,7 @@ class LandingTests(LandingBase):
         self.assertEqual(reverse('vp:index'), '/vp/')
 
     def test_02_block_table_and_totals_follow_the_items_not_the_template(self):
-        rows = table_rows(page(self.guest))
+        rows = table_rows(rules(page(self.guest)))
         self.assertEqual(
             [(b, r, c, t) for b, r, _, c, t in rows],
             [('snake', '1–30', '30', '60'), ('gapfill', '31–35', '5', '10'),
@@ -82,64 +104,79 @@ class LandingTests(LandingBase):
         self.variant.items.get(number=44).delete()
         VPVariant.objects.filter(pk=self.variant.pk).update(duration_seconds=1500)
         html = page(self.guest)
-        rows = {b: (r, c, t) for b, r, _, c, t in table_rows(html)}
+        rows = {b: (r, c, t) for b, r, _, c, t in table_rows(rules(html))}
         self.assertEqual(rows['snake'], ('1–30', '30', '61'))
         self.assertEqual(rows['single'], ('43', '1', '4'))
-        self.assertEqual(FOOT.search(html).groups(), ('43', '96'))
-        self.assertIn('43 задания за 25 минут, 96 баллов', html)
+        self.assertEqual(FOOT.search(rules(html)).groups(), ('43', '96'))
+        self.assertIn('43 задания, 25 минут, 96 баллов', html)
         self.assertNotIn('44 задания', html)
         self.assertNotIn('100 баллов', html)
 
-    def test_facts_sentence_is_computed_from_the_data(self):
+    def test_facts_tiles_are_computed_from_the_data(self):
+        """Плитки зоны «тур»: число, минуты, баллы и дни — из данных, не из шаблона."""
+        block = hero(page(self.guest))
+        self.assertIn('<b>44</b><span>задания</span>', block)
+        self.assertIn('<b>30</b><span>минут</span>', block)
+        self.assertIn('<b>100</b><span>баллов</span>', block)
+        self.assertIn('<b>26 и 30 сент.</b><span>дни тура</span>', block)
+
+    def test_three_zones_are_on_the_page(self):
+        """Тур, таблица лучших попыток и полоса «моё» — три зоны экрана."""
         html = page(self.guest)
-        self.assertIn('Формат новый: 44 задания за 30 минут, 100 баллов, всё проверяется автоматически.', html)
-        self.assertIn('1 тур появился в отборочном этапе впервые', html)
+        for marker in (HERO_OPEN, BOARD_OPEN, 'class="vp-land-band"'):
+            self.assertIn(marker, html)
+        self.assertIn('Лучшие попытки', html)
 
-    def test_03_draft_is_hidden_from_a_guest_and_visible_to_staff(self):
-        draft = make_published('vp-draft')
-        draft.title = 'Черновик ВП для проверки'
-        draft.is_published = False
-        draft.save()
-        self.assertNotContains(self.guest.get(reverse('vp:index')), 'Черновик ВП для проверки')
-        staff = Client()
-        staff.force_login(User.objects.create_user('vp_lstaff', password='p12345', is_staff=True))
-        html = page(staff)
-        self.assertIn('Черновик ВП для проверки', html)
-        self.assertIn('Не опубликован', html)
-
-    def test_numbers_on_the_page_do_not_depend_on_who_looks(self):
-        """Черновик другой структуры не меняет числа страницы у персонала: они — из опубликованных."""
-        draft = make_published('vp-draft2')
-        draft.is_published = False
-        draft.save()
-        draft.items.filter(number__gt=30).delete()
-        staff = Client()
-        staff.force_login(User.objects.create_user('vp_lstaff2', password='p12345', is_staff=True))
-        self.assertEqual(table_rows(page(staff)), table_rows(page(self.guest)))
-        self.assertIn('44 задания за 30 минут', page(staff))
-
-    def test_every_published_variant_has_a_go_button_to_its_intro(self):
-        other = make_published('vp-11')
-        other.grade_band = '11'
-        other.title = 'Вариант для 11 класса'
-        other.save()
+    def test_choose_variant_leads_to_the_variants_screen(self):
+        """Список вариантов уехал: посадочная только ведёт на него."""
         html = page(self.guest)
-        for variant in (self.variant, other):
-            self.assertIn(f'href="{reverse("vp:intro", args=[variant.slug])}"', html)
-        self.assertEqual(html.count('>Пройти</a>'), 2)
-        listing = section(html, 'vp-variants-h', 'vp-help-h')
-        self.assertLess(listing.index('9–10 классы'), listing.index('11 класс'))
-        self.assertIn('Демонстрационный · 2026', listing)        # чей вариант виден
+        self.assertIn(f'href="{reverse("vp:variants")}"', html)
+        self.assertIn('Выбрать вариант', html)
+        # Карточек вариантов на посадочной больше нет.
+        self.assertNotIn(f'href="{reverse("vp:intro", args=["vp-land"])}"', html)
+
+    def test_rules_dialog_holds_the_format_and_all_six_sections(self):
+        html = page(self.guest)
+        self.assertIn('<dialog class="vp-rules" id="vp-rules"', html)
+        self.assertIn('class="vp-table vp-table--blocks"', rules(html))
+        for anchor in ('vp-r-format', 'vp-r-score', 'vp-r-snake',
+                       'vp-r-board', 'vp-r-tour', 'vp-r-vpn'):
+            self.assertIn(f'id="{anchor}"', html, anchor)
+
+    def test_hse_materials_link_is_on_the_page_and_in_the_rules(self):
+        html = page(self.guest)
+        self.assertEqual(html.count('https://olymp.hse.ru/mmo/materials-eco'), 2)
+
+    def test_source_links_in_the_rules_follow_the_data(self):
+        """Ссылок источников ровно столько, сколько РАЗНЫХ источников у опубликованных."""
+        self.assertEqual(self._source_links(), 0)                # у фикстуры источника нет
+
+        VPVariant.objects.filter(pk=self.variant.pk).update(
+            source_label='Олмат', source_url='https://t.me/vsosh_aa_bot')
+        self.assertEqual(self._source_links(), 1)
+
+        second = make_published('vp-second')
+        VPVariant.objects.filter(pk=second.pk).update(
+            source_label='Олмат', source_url='https://t.me/vsosh_aa_bot')
+        self.assertEqual(self._source_links(), 1)                # тот же источник — одна ссылка
+
+        third = make_published('vp-third')
+        VPVariant.objects.filter(pk=third.pk).update(
+            source_label='Другой сборник', source_url='https://example.org/econ')
+        self.assertEqual(self._source_links(), 2)
+
+    def _source_links(self):
+        block = rules(page(self.guest)).split('id="vp-r-tour"', 1)[1].split('</section>', 1)[0]
+        # Ссылка ВШЭ стоит всегда и источником не является.
+        return block.count('↗') - 1
 
     def test_empty_landing_is_honest_and_has_no_invented_numbers(self):
         VPVariant.objects.update(is_published=False)
         html = page(self.guest)
-        self.assertIn('Опубликованных вариантов пока нет', html)
         self.assertIn('Если сайт не открывается', html)          # полезное остаётся
-        for absent in ('vp-format-h', 'vp-scoring-h', 'vp-snake-h', 'Выбрать вариант'):
-            self.assertNotIn(absent, html)
-        self.assertNotRegex(html, r'\d+ задани')
-        self.assertIn('Формат новый, всё проверяется автоматически.', html)
+        self.assertNotIn(FACTS, html)
+        self.assertNotIn('class="vp-table vp-table--blocks"', html)
+        self.assertNotRegex(hero(html), r'\d+ задани')
 
     def test_help_block_for_people_who_cannot_open_the_site(self):
         html = page(self.guest)
@@ -148,32 +185,51 @@ class LandingTests(LandingBase):
         self.assertIn('weconomics.ai', html)
 
     def test_no_promises_of_modes_that_do_not_exist_and_no_long_dash(self):
-        """Тренировки блоками и бесконечной змейки пока нет — ни слова, ни кнопки на странице."""
+        """Тренировки блоками и бесконечной змейки пока нет — ни слова, ни кнопки на странице.
+
+        «Тренировка» как режим НЕ ищется: с 22.09 это законное слово таблицы
+        (повторная попытка — тренировка). Ищутся именно обещанные режимы.
+        """
         text = visible_text(page(self.guest))
-        for promise in ('блоками', 'бесконечн', 'скоро', 'появится', 'в разработке', 'тренировк'):
+        for promise in ('блоками', 'бесконечн', 'скоро', 'появится', 'в разработке'):
             self.assertNotIn(promise, text.lower(), promise)
         self.assertNotIn('—', text)                              # правило сайта: длинного тире нет
+        self.assertNotIn('забег', text.lower())                  # слово раздела — «попытка»
 
-    def test_order_of_sections_follows_the_brief(self):
+    def test_no_page_promises_registration_is_not_needed(self):
+        self.assertNotIn('Регистрация не нужна', page(self.guest))
+
+    def test_guest_band_invites_to_register_with_a_way_back(self):
         html = page(self.guest)
-        anchors = ['vp-new-h', 'vp-format-h', 'vp-scoring-h', 'vp-snake-h', 'vp-variants-h', 'vp-help-h']
-        positions = [html.index(f'id="{a}"') for a in anchors]
-        self.assertEqual(positions, sorted(positions))
+        self.assertIn('/register/?next=%2Fvp%2F', html)
+        self.assertIn('/login/?next=%2Fvp%2F', html)
+        self.assertIn('Чтобы пройти вариант, нужна короткая бесплатная регистрация', html)
 
 
 class TourDatesTests(LandingBase):
     def test_dates_come_from_config_not_from_the_template(self):
-        self.assertIn('проходит 26 и 30 сентября 2026', page(self.guest))
+        self.assertIn('26 и 30 сентября 2026', page(self.guest))
         with mock.patch.object(views, 'TOUR_DATES', (date(2027, 10, 3), date(2027, 10, 10))):
             html = page(self.guest)
-        self.assertIn('проходит 3 и 10 октября 2027', html)
+        self.assertIn('3 и 10 октября 2027', html)
+        self.assertIn('3 и 10 окт.', html)
         self.assertNotIn('сентября', html)
 
-    def test_no_dates_no_phrase(self):
+    def test_no_dates_no_phrase_and_no_tile(self):
         with mock.patch.object(views, 'TOUR_DATES', ()):
             html = page(self.guest)
-        self.assertNotIn(' и проходит ', html)
-        self.assertIn('1 тур появился в отборочном этапе впервые.', html)
+        self.assertNotIn('дни тура', html)
+        self.assertIn('1 тур появился в отборочном этапе впервые.', rules(html))
+        # Остальные три плитки на месте: дат нет, формат есть.
+        self.assertIn('<b>44</b>', hero(html))
+
+    def test_dates_short(self):
+        self.assertEqual(landing.dates_short([date(2026, 9, 30), date(2026, 9, 26)]), '26 и 30 сент.')
+        self.assertEqual(landing.dates_short([date(2026, 9, 26)]), '26 сент.')
+        self.assertEqual(landing.dates_short([date(2026, 5, 3)]), '3 мая')
+        self.assertEqual(landing.dates_short([date(2026, 9, 30), date(2026, 10, 2)]),
+                         '30 сент. и 2 окт.')
+        self.assertEqual(landing.dates_short([]), '')
 
     def test_dates_text(self):
         self.assertEqual(landing.dates_text([date(2026, 9, 30), date(2026, 9, 26)]), '26 и 30 сентября 2026')
@@ -202,23 +258,23 @@ class ClassesTests(LandingBase):
 
     def test_same_displayed_format_is_one_table_without_class_labels(self):
         self.eleven()
-        html = page(self.guest)
+        html = rules(page(self.guest))
         self.assertEqual(html.count('class="vp-table vp-table--blocks"'), 1)
-        self.assertEqual(section(html, 'vp-format-h', 'vp-scoring-h').count('<h3'), 0)
+        self.assertEqual(html.count('class="vp-rsec-h4"'), 0)
 
     def test_classes_that_differ_in_points_get_a_table_each(self):
         self.eleven(points_of_first=3)                # змейка 11 класса — 61 балл
         html = page(self.guest)
-        block = section(html, 'vp-format-h', 'vp-scoring-h')
+        block = section(rules(html), 'vp-r-format', 'vp-r-score')
         self.assertEqual(block.count('class="vp-table vp-table--blocks"'), 2)
-        self.assertIn('<h3 class="vp-h3">9–10 классы</h3>', block)
-        self.assertIn('<h3 class="vp-h3">11 класс</h3>', block)
+        self.assertIn('<h4 class="vp-rsec-h4">9–10 классы</h4>', block)
+        self.assertIn('<h4 class="vp-rsec-h4">11 класс</h4>', block)
         self.assertEqual([r[4] for r in table_rows(block) if r[0] == 'snake'], ['60', '61'])
-        rules = section(html, 'vp-scoring-h', 'vp-snake-h')
-        self.assertEqual(rules.count('или полный балл, или ноль'), 2)
-        # Когда формата два, общего «44 задания за 30 минут» на странице нет.
-        self.assertIn('Формат новый, всё проверяется автоматически.', html)
-        self.assertNotIn('44 задания за', html)
+        scoring = section(rules(html), 'vp-r-score', 'vp-r-snake')
+        self.assertEqual(scoring.count('или полный балл, или ноль'), 2)
+        # Когда формата два, плиток фактов и общего «44 задания» на странице нет.
+        self.assertNotIn(FACTS, html)
+        self.assertIn('Формат различается по классам', rules(html))
 
 
 class DurationTests(LandingBase):
@@ -228,16 +284,16 @@ class DurationTests(LandingBase):
         other = make_published('vp-short')
         VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1500)
         html = page(self.guest)
-        self.assertEqual(html.count('class="vp-table vp-table--blocks"'), 1)
-        self.assertIn('Формат новый, всё проверяется автоматически.', html)
-        self.assertNotRegex(html, r'\d+ минут')
+        self.assertEqual(rules(html).count('class="vp-table vp-table--blocks"'), 1)
+        self.assertNotIn(FACTS, html)
+        self.assertNotRegex(hero(html), r'\d+ минут')
         VPVariant.objects.filter(pk=other.pk).update(duration_seconds=1800)
-        self.assertIn('44 задания за 30 минут', page(self.guest))
+        self.assertIn('44 задания, 30 минут, 100 баллов', page(self.guest))
 
 
 class ScoringRulesTests(LandingBase):
     def test_three_rules_ranges_and_penalty_example_follow_the_data(self):
-        html = page(self.guest)
+        html = rules(page(self.guest))
         self.assertIn('Задания 1–35 и 43–44: или полный балл, или ноль.', html)
         self.assertIn('В заданиях 36–42 балл делится', html)
         self.assertIn('верный даёт +1,5, лишний отнимает 1.', html)          # для трёхбалльных
@@ -245,7 +301,7 @@ class ScoringRulesTests(LandingBase):
         for item in self.variant.items.filter(block__in=('multi', 'analytic')):
             item.points = 6
             item.save()
-        html = page(self.guest)
+        html = rules(page(self.guest))
         self.assertIn('верный даёт +3, лишний отнимает 2.', html)
 
 
@@ -254,7 +310,7 @@ class SnakeExampleTests(TestCase):
         self.guest = Client()
 
     def chips(self, html):
-        chain = html.split('class="vp-chain-demo"', 1)[1].split('</div>', 1)[0]
+        chain = html.split('class="vp-chain"', 1)[1].split('</div>', 1)[0]
         return [re.sub(r'<[^>]+>', '', span) for span in re.findall(r'<span>(.*?)</span>', chain)]
 
     def test_example_is_a_real_chain_of_four_from_a_published_variant(self):
@@ -262,9 +318,11 @@ class SnakeExampleTests(TestCase):
         html = page(self.guest)
         self.assertEqual(self.chips(html), [chain_word(n) for n in (1, 2, 3, 4)])
         # Вторая буква выделена у всех, кроме последнего слова: с неё начнётся следующее.
-        marks = re.findall(r'<b>(.)</b>', html.split('class="vp-chain-demo"', 1)[1].split('</div>', 1)[0])
+        marks = re.findall(r'<b>(.)</b>', html.split('class="vp-chain"', 1)[1].split('</div>', 1)[0])
         self.assertEqual(marks, [chain_word(n)[1] for n in (1, 2, 3)])
-        self.assertIn('Так выглядит цепочка из 4 заданий варианта «Тестовый вариант»', html)
+        # Подпись честно называет вариант примера — и на странице, и в окне правил.
+        self.assertIn('пример из варианта «Тестовый вариант»', html)
+        self.assertIn('Цепочка из варианта «Тестовый вариант».', html)
 
     def test_demonstration_variant_is_preferred_over_an_authored_one(self):
         """Пример открывает настоящие ответы: берём демоверсию, авторский вариант бережём."""
@@ -284,7 +342,7 @@ class SnakeExampleTests(TestCase):
         variant = make_review_variant('vp-broken')
         variant.items.filter(block='snake').update(answer='ба')                # связки нигде нет
         html = page(self.guest)
-        self.assertNotIn('class="vp-chain-demo"', html)
+        self.assertNotIn('class="vp-chain"', html)
         self.assertIn('Что такое змейка', html)
 
     def test_draft_variants_never_feed_the_example(self):
@@ -294,7 +352,7 @@ class SnakeExampleTests(TestCase):
         make_published('vp-plain')                                              # опубликован, но связки нет
         staff = Client()
         staff.force_login(User.objects.create_user('vp_snake_staff', password='p12345', is_staff=True))
-        self.assertNotIn('class="vp-chain-demo"', page(staff))
+        self.assertNotIn('class="vp-chain"', page(staff))
 
     def test_marked_letter_is_the_second_letter_of_the_first_word(self):
         self.assertEqual(landing._marked('валютный курс', False),
