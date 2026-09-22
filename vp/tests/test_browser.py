@@ -10,7 +10,9 @@ import json
 import os
 import shutil
 import subprocess
+from datetime import date
 from decimal import Decimal as D
+from unittest import mock
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -37,7 +39,9 @@ EXPECTED = {
     'm.landing_go_button_opens_a_variant',
     # шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
     'd.nav_staff_has_eight_items_or_burger',
-    *{f'd.nav_staff_fits_{w}' for w in (390, 821, 900, 980, 981, 1161, 1300, 1421, 1440, 1500, 1920)},
+    *{f'd.nav_staff_fits_{w}' for w in (390, 821, 900, 1023, 1024, 1119, 1120, 1161, 1300, 1421, 1440, 1559, 1560, 1920)},
+    # числовой инвариант ряда (запас 5 px без имени, 35 с именем) и то, что метка NEW при замере включена
+    'd.nav_staff_flag_is_on', 'd.nav_staff_row_margin',
     # «Поделиться» копирует ссылку (и шлёт vp_share_click – его строку в базе проверяет check_database)
     'd.share_click_copies_the_link',
     # десктоп: вход, сценарии 1, 2, 3, 5
@@ -119,9 +123,13 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
             self.skipTest('playwright не установлен в node_modules')
         env = dict(os.environ, VP_BASE_URL=self.live_server_url, VP_STAFF_SESSION=self.staff_session)
         try:
-            res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
-                                 capture_output=True, text=True, encoding='utf-8',
-                                 errors='replace', timeout=420)
+            # ⚠️ МЕТКА NEW ЗАКРЕПЛЕНА ВКЛЮЧЁННОЙ ПАТЧЕМ, А НЕ ПО КАЛЕНДАРЮ: живой сервер живёт в этом же
+            # процессе, поэтому подмена даты гашения видна ему. Без неё после 1 октября замер шапки
+            # мерил бы более узкий ряд (без метки) и молчал, пока пороги не разойдутся с настоящим.
+            with mock.patch('config.context_processors.NEW_BADGE_UNTIL', date(9999, 12, 31)):
+                res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
+                                     capture_output=True, text=True, encoding='utf-8',
+                                     errors='replace', timeout=420)
         except (OSError, subprocess.TimeoutExpired) as exc:
             self.skipTest('раннер не запустился: %s' % exc)
         out = (res.stdout or '') + (res.stderr or '')

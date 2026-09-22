@@ -206,12 +206,50 @@ try {
     check('d.nav_staff_has_eight_items_or_burger', await sp2.evaluate(() =>
       document.querySelectorAll('nav.site-nav > .nav-links .nav-link').length === 8), await sp2.evaluate(() =>
       [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link')].map((a) => a.textContent.trim())));
-    for (const w of [390, 821, 900, 980, 981, 1161, 1300, 1421, 1440, 1500, 1920]) {
+    // Ширины у краёв порогов (бургер 1023/1024, отступы 1119/1120, имя 1559/1560, 22.09.2026) и между ними.
+    for (const w of [390, 821, 900, 1023, 1024, 1119, 1120, 1161, 1300, 1421, 1440, 1559, 1560, 1920]) {
       await sp2.setViewportSize({ width: w, height: 900 });
       await sleep(150);
       const wide = await sp2.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
       check(`d.nav_staff_fits_${w}`, wide.sw <= wide.iw, wide);
     }
+    // ---- ЧИСЛОВОЙ ИНВАРИАНТ ряда: пока он виден в шапке, ему нужно места НЕ БОЛЬШЕ окна минус запас.
+    // Пороги бургера и имени здесь НЕ пересказаны: раннер читает со страницы, виден ли ряд и имя,
+    // и проверяет каждую ширину от 700 до 1920 px с шагом 1. Нужная ширина — `nav { width: max-content }`.
+    // ⚠️ ЗАПАС: 5 px без имени = 17 px полосы прокрутки Windows (headless её прячет) − 12 px отступа
+    // шапки; 35 px с именем — длинные имена (сессия 4). Запас мал намеренно: ещё одна буква в подписи
+    // пункта (~9 px) краснит проверку, и пороги в `_nav.html` перемеряют, а не «как-нибудь пройдёт».
+    // ⚠️ Метка NEW обязана быть включена: без неё измерялся бы более узкий ряд, а проверка молчала.
+    const ROW_MARGIN = 5, NAME_MARGIN = 35;
+    await sp2.setViewportSize({ width: 1280, height: 900 });
+    check('d.nav_staff_flag_is_on', await sp2.evaluate(() => !!document.querySelector(
+      'nav.site-nav > .nav-links .nav-link.is-new .nav-flag')));
+    const violations = [];
+    let rowFrom = null, nameFrom = null, minRow = Infinity, minName = Infinity;
+    for (let w = 700; w <= 1920; w += 1) {
+      await sp2.setViewportSize({ width: w, height: 900 });
+      const m = await sp2.evaluate(() => {
+        const nav = document.querySelector('nav.site-nav');
+        nav.style.width = 'max-content';
+        const need = nav.getBoundingClientRect().width;
+        nav.style.width = '';
+        const name = nav.querySelector('.nav-user span:last-child');
+        return {
+          need,
+          row: getComputedStyle(nav.querySelector(':scope > .nav-links')).display !== 'none',
+          name: !!name && getComputedStyle(name).display !== 'none',
+        };
+      });
+      if (!m.row) continue;
+      const slack = w - m.need;
+      if (rowFrom === null) rowFrom = w;
+      if (m.name && nameFrom === null) nameFrom = w;
+      if (m.name) minName = Math.min(minName, slack); else minRow = Math.min(minRow, slack);
+      if (slack < (m.name ? NAME_MARGIN : ROW_MARGIN)) violations.push({ w, need: Math.round(m.need * 10) / 10, name: m.name });
+    }
+    check('d.nav_staff_row_margin', violations.length === 0 && rowFrom !== null && nameFrom !== null,
+      { violations: violations.slice(0, 6), count: violations.length, rowFrom, nameFrom,
+        minRow: Math.round(minRow * 10) / 10, minName: Math.round(minName * 10) / 10 });
     await staffCtx.close();
   }
 
