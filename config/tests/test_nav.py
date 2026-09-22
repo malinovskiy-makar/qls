@@ -9,6 +9,7 @@
 """
 import re
 from datetime import datetime, time, timedelta
+from datetime import timezone as dt_timezone
 from unittest import mock
 
 from django.test import TestCase
@@ -237,7 +238,9 @@ class VpItemTests(TestCase):
     def _get(self, url, moment, user=None):
         if user is not None:
             self.client.force_login(user)
-        with mock.patch('django.utils.timezone.now', return_value=moment):
+        # Настоящий `timezone.now()` отдаёт время в UTC — патчим им же, иначе проверка «по UTC
+        # вместо местной даты» проходила бы: `.date()` московского момента и так московский.
+        with mock.patch('django.utils.timezone.now', return_value=moment.astimezone(dt_timezone.utc)):
             return self.client.get(url)
 
     def _html(self, url='/catalog/', moment=None):
@@ -264,11 +267,10 @@ class VpItemTests(TestCase):
         users = [None,
                  User.objects.create_user(username='nav_vp_st', password=PASSWORD, role='student'),
                  User.objects.create_user(username='nav_vp_te', password=PASSWORD, role='teacher')]
+        moment = self._edge() - timedelta(days=1)      # метка горит: хелперы обязаны её пережить
         for user in users:
             self.client.logout()
-            if user is not None:
-                self.client.force_login(user)
-            rows = self._rows(self.client.get('/catalog/').content.decode('utf-8'))
+            rows = self._rows(self._get('/catalog/', moment, user).content.decode('utf-8'))
             self.assertEqual(len(rows), 2)
             for row in rows:
                 labels = [link_label(inner) for _, inner in NAV_LINK.findall(row)]
@@ -281,6 +283,12 @@ class VpItemTests(TestCase):
         self.assertEqual(html.count('<span class="nav-flag">NEW</span>'), 2)
         for row in self._rows(html):
             self.assertEqual(row.count('<span class="nav-flag">NEW</span>'), 1, row)
+
+    def test_helpers_see_the_flagged_item(self):
+        """Хелперы подписей видят пункт с меткой — иначе он пропадал бы из списков молча."""
+        html = self._html()
+        self.assertEqual(nav_labels(html),
+                         ['Каталог', 'Учебник', 'Олимпиады', 'Тренажёр ВП', 'Графики', 'Wecon Rush'])
 
     def test_only_the_trainer_carries_the_new_class(self):
         """Состав остальных пунктов не тронут: is-new только у ВП, в обоих рядах."""

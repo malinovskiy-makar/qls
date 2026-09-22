@@ -95,7 +95,11 @@ class NavigationTests(TestCase):
         labels = self._nav_labels(html)
         self.assertEqual(labels.count('Wecon Rush'), 1, labels)
         self.assertNotIn('Игра', labels)
+        # Сравнение ТОЧНОЕ, по списку: старое имя игры «Тренажёр» ловится, а соседний пункт
+        # «Тренажёр ВП» (раздел «Высшая проба») — нет. Заодно проверка, что хелпер видит пункт
+        # с меткой NEW: иначе он пропадал бы из списка молча.
         self.assertNotIn('Тренажёр', labels)
+        self.assertIn('Тренажёр ВП', labels)
 
     def test_textbook_stands_right_after_catalog(self):
         u"""Порядок задан владельцем: «Учебник» сразу за «Каталогом»."""
