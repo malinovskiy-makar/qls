@@ -18,10 +18,12 @@ MARKER_VALUES = {
     'hours_week': 'gt6',
     'source_channel': 'friend',
     'olympiad_history': ['vsosh_final'],
+    'telegram': 'tgmarker_nick',
 }
 
 #: Что не должно встретиться в тексте запроса и в системном блоке.
 FORBIDDEN = ('ШколаМаркер', 'ГородМаркер', 'ЦельМаркер', '+79990001122',
+             'tgmarker_nick',
              'Уже не школьник', 'vsosh_final', 'На курсах', 'Больше 6',
              'prep_mode', 'hours_week', 'source_channel', 'olympiad_history')
 
