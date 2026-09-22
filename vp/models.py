@@ -5,6 +5,7 @@
 правка банка не смеет менять журнал попыток школьника.
 """
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.db import models
 
 
@@ -27,6 +28,11 @@ class VPVariant(models.Model):
         'Происхождение', max_length=10, choices=SourceKind.choices)
     source_note = models.CharField('Примечание', max_length=300, blank=True)
     author = models.CharField('Автор', max_length=200, blank=True)
+    # Правообладатель (Олмат и т.п.): подпись рисуется гиперссылкой на карточке
+    # и на интро. Источников будет больше одного, так что это поле у варианта,
+    # а не константа в шаблоне — подпись едет вместе с данными.
+    source_label = models.CharField('Подпись источника', max_length=64, blank=True)
+    source_url = models.URLField('Ссылка на источник', blank=True)
     duration_seconds = models.PositiveIntegerField(
         'Длительность, с', default=1800)
     # ⚠️ Считается загрузчиком из суммы points, а не читается из файла.
@@ -43,6 +49,18 @@ class VPVariant(models.Model):
 
     def __str__(self):
         return self.title
+
+    def clean(self):
+        super().clean()
+        if bool(self.source_label) != bool(self.source_url):
+            raise ValidationError(
+                'source_label и source_url заполняются оба или оба пусты')
+        if self.source_url and not self.source_url.startswith('https://'):
+            raise ValidationError('source_url должен начинаться с https://')
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 
 class VPItem(models.Model):

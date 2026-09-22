@@ -117,6 +117,7 @@
           <div class="vp-vrow-main">
             <b>{{ v.title }}</b>
             <span class="vp-mute">{{ v.get_source_kind_display }} · {{ v.year }}{% if v.author %} · {{ v.author }}{% endif %}{% if v.source_note %} · {{ v.source_note }}{% endif %}</span>
+            {% if v.source_label %}<span class="vp-source">Источник: <a class="vp-link" href="{{ v.source_url }}" target="_blank" rel="noopener">{{ v.source_label }}</a></span>{% endif %}
             {% if not v.is_published %}<span class="vp-pill vp-pill--draft">Не опубликован</span>{% endif %}
           </div>
           <a class="vp-btn" href="{% url 'vp:intro' v.slug %}" aria-label="Пройти вариант «{{ v.title }}»">Пройти</a>

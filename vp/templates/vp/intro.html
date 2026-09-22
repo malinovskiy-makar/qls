@@ -14,6 +14,7 @@
       <div class="vp-eyebrow">Отборочный этап · {{ variant.tour }} тур</div>
       <h1 class="vp-h1">{{ variant.title }}</h1>
       <div class="vp-sub">{{ variant.grade_band|grade_label }} · {{ variant.year }}{% if variant.author %} · {{ variant.author }}{% endif %}{% if variant.source_note %} · {{ variant.source_note }}{% endif %}</div>
+      {% if variant.source_label %}<div class="vp-source">Источник: <a class="vp-link" href="{{ variant.source_url }}" target="_blank" rel="noopener">{{ variant.source_label }}</a></div>{% endif %}
     </div>
     <div class="vp-head-clock">
       <div class="vp-big">{{ variant.duration_seconds|mmss }}</div>

@@ -12,6 +12,9 @@ source_kind: author
 author: "Олмат «Экономика», Артём Астахов"
 source_note: "Пробный вариант, 21.09.2026"
 duration_seconds: 1800
+source:
+  label: "Олмат"
+  url: "https://t.me/vsosh_aa_bot"
 items:
   - n: 1
     block: snake

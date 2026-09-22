@@ -289,7 +289,31 @@ def _normalize_variant(data, errors):
                           f'({data.get(name)!r})')
             number = default or 0
         values[name] = number
+    values.update(_normalize_source(data, errors))
     return values
+
+
+def _normalize_source(data, errors):
+    """`source: {label, url}` — необязательный блок; оба поля или ни одного.
+
+    Отсутствие блока — не предупреждение, а нормальное состояние (у
+    официальных демовариантов ВШЭ подписи источника нет).
+    """
+    source = data.get('source') or {}
+    if not isinstance(source, dict):
+        errors.append('вариант: `source` должен быть словарём {label, url}')
+        source = {}
+    label = _text(source.get('label'))
+    url = _text(source.get('url'))
+    _check_length(VPVariant, 'source_label', label, 'вариант', errors)
+    _check_length(VPVariant, 'source_url', url, 'вариант', errors)
+    if bool(label) != bool(url):
+        errors.append('вариант: `source.label` и `source.url` заполняются оба '
+                      'или оба пусты')
+    elif url and not url.startswith('https://'):
+        errors.append(f'вариант: `source.url` должен начинаться с https:// '
+                      f'({url!r})')
+    return {'source_label': label, 'source_url': url}
 
 
 def normalize(data):
