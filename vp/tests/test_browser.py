@@ -40,8 +40,9 @@ EXPECTED = {
     # шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
     'd.nav_staff_has_eight_items_or_burger',
     *{f'd.nav_staff_fits_{w}' for w in (390, 821, 900, 1023, 1024, 1119, 1120, 1161, 1300, 1421, 1440, 1559, 1560, 1920)},
-    # числовой инвариант ряда (запас 5 px без имени, 35 с именем) и то, что метка NEW при замере включена
-    'd.nav_staff_flag_is_on', 'd.nav_staff_row_margin',
+    # числовой инвариант ряда (запас 5 px без имени, 35 с именем) и то, что замер идёт на худшем случае:
+    # метка NEW включена, имя в плашке длинное
+    'd.nav_staff_measure_is_worst_case', 'd.nav_staff_row_margin',
     # «Поделиться» копирует ссылку (и шлёт vp_share_click – его строку в базе проверяет check_database)
     'd.share_click_copies_the_link',
     # десктоп: вход, сценарии 1, 2, 3, 5
@@ -104,7 +105,12 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
         # Девятнадцать «других людей» у варианта vp-ui: с гостем, который пройдёт его в браузере,
         # получается ровно двадцать — граница, с которой на экране появляется сравнение.
         # Персонал для замера шапки (у него восемь пунктов — самый широкий ряд): сессия уходит раннеру.
-        staff = get_user_model().objects.create_user('vp_br_staff', password='p12345', is_staff=True, role='teacher')
+        # ⚠️ ИМЯ ДЛИННОЕ НАМЕРЕННО: запас 35 px у порога имени в `_nav.html` считан над именем
+        # «Преподаватель Пробный» (~150 px, сессия 4). С коротким логином вместо имени запас «съедался»
+        # бы разницей длин, и возврат порога 1500 проходил незамеченным (нашла проверка зубастости).
+        staff = get_user_model().objects.create_user(
+            'vp_br_staff', password='p12345', is_staff=True, role='teacher',
+            first_name='Преподаватель', last_name='Пробный')
         client = Client()
         client.force_login(staff)
         self.staff_session = client.cookies['sessionid'].value

@@ -219,11 +219,13 @@ try {
     // ⚠️ ЗАПАС: 5 px без имени = 17 px полосы прокрутки Windows (headless её прячет) − 12 px отступа
     // шапки; 35 px с именем — длинные имена (сессия 4). Запас мал намеренно: ещё одна буква в подписи
     // пункта (~9 px) краснит проверку, и пороги в `_nav.html` перемеряют, а не «как-нибудь пройдёт».
-    // ⚠️ Метка NEW обязана быть включена: без неё измерялся бы более узкий ряд, а проверка молчала.
+    // ⚠️ ЗАМЕР ОБЯЗАН ИДТИ НА ХУДШЕМ СЛУЧАЕ: метка NEW включена и имя в плашке длинное («Преподаватель
+    // Пробный», над ним считан запас 35 px). Иначе измерялся бы более узкий ряд, а проверка молчала.
     const ROW_MARGIN = 5, NAME_MARGIN = 35;
-    await sp2.setViewportSize({ width: 1280, height: 900 });
-    check('d.nav_staff_flag_is_on', await sp2.evaluate(() => !!document.querySelector(
-      'nav.site-nav > .nav-links .nav-link.is-new .nav-flag')));
+    await sp2.setViewportSize({ width: 1600, height: 900 });
+    check('d.nav_staff_measure_is_worst_case', await sp2.evaluate(() =>
+      !!document.querySelector('nav.site-nav > .nav-links .nav-link.is-new .nav-flag')
+      && document.querySelector('.nav-user span:last-child').textContent.trim() === 'Преподаватель Пробный'));
     const violations = [];
     let rowFrom = null, nameFrom = null, minRow = Infinity, minName = Infinity;
     for (let w = 700; w <= 1920; w += 1) {
