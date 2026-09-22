@@ -102,6 +102,32 @@ nav.site-nav {
   box-shadow: 0 0 10px 1px var(--nav-accent-glow);
 }
 
+/* ⚠️ НОВЫЙ РАЗДЕЛ ВЫДЕЛЯЕТСЯ ЯНТАРЁМ, А НЕ БИРЮЗОЙ (22.09.2026).
+   Бирюза --nav-accent в шапке уже занята: ею подсвечивается открытый
+   раздел. Тот же цвет на новом пункте читался бы как «вы сейчас здесь».
+   Янтарь --brand-amber в шапке свободен, правило территории янтаря
+   публичные поверхности (шапку в их числе) разрешает, и на графите
+   #3c3531 он даёт 5,31 при пороге 4,5. Сигнальный --amber #96500c
+   отвергнут: на том же графите 1,98 — подпись нечитаема.
+   ⚠️ ОТКРЫТЫЙ РАЗДЕЛ ГЛАВНЕЕ НОВИЗНЫ: при is-active подпись и линия
+   становятся канонными бирюзовыми, «новое» дальше несёт только метка.
+   ⚠️ Правила наведения закрыты `:not(.is-active)`: без этого их
+   специфичность (0,3,1) перебивала бы неоновую линию открытого раздела,
+   и она при наведении желтела бы. */
+.nav-link.is-new { color: var(--brand-amber); font-weight: 600; gap: 8px; }
+.nav-link.is-new:not(.is-active):hover { color: var(--brand-amber-hover); }
+.nav-link.is-new:not(.is-active):hover::after { background: rgba(214, 165, 37, .35); }
+.nav-link.is-new.is-active { color: var(--nav-accent); }
+
+/* Метка: чернила --brand-amber-ink, а не --text — на янтаре они дают
+   7,65 при пороге AAA 7,0, тот же замер, что у кнопки «Войти». */
+.nav-flag {
+  font-size: 10px; font-weight: 700; letter-spacing: .5px; line-height: 1;
+  padding: 3px 5px; border-radius: 3px;
+  background: var(--brand-amber); color: var(--brand-amber-ink);
+  flex-shrink: 0;
+}
+
 .nav-right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
 
 /* Кнопки-иконки шапки (тема, ☰) и кнопка выхода — радиус по канону. */
@@ -227,6 +253,15 @@ nav.site-nav {
     border-left-color: var(--nav-accent);
     color: var(--nav-accent);
   }
+  /* ⚠️ РИСКА СЛЕВА ЗАРЕЗЕРВИРОВАНА ЗА ОТКРЫТЫМ РАЗДЕЛОМ. Новому пункту
+     она НЕ ставится: иначе в панели будет две одинаковые риски и
+     непонятно, где человек находится. Новизну в панели держат янтарная
+     подпись и метка. */
+  .nav-panel .nav-link.is-new { color: var(--brand-amber); }
+  .nav-panel .nav-link.is-new.is-active {
+    color: var(--nav-accent);
+    border-left-color: var(--nav-accent);
+  }
 }
 
 /* ⚠️ НА 360–400 px РЯД ГОСТЯ НЕ ВЛЕЗАЛ НА 6 px (замер 18.09.2026, раннер
@@ -276,7 +311,7 @@ nav.site-nav {
   {# Один ряд на все роли: состав и подсветку считает site_meta. #}
   <div class="nav-links">
     {% for item in nav_items %}
-    <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
+    <a class="nav-link{% if item.active %} is-active{% endif %}{% if item.is_new %} is-new{% endif %}" href="{{ item.url }}">{{ item.label }}{% if item.flag %}<span class="nav-flag">{{ item.flag }}</span>{% endif %}</a>
     {% endfor %}
   </div>
 
@@ -321,7 +356,7 @@ nav.site-nav {
   <div class="nav-panel" id="nav-panel">
     <div class="nav-links">
       {% for item in nav_items %}
-      <a class="nav-link{% if item.active %} is-active{% endif %}" href="{{ item.url }}">{{ item.label }}</a>
+      <a class="nav-link{% if item.active %} is-active{% endif %}{% if item.is_new %} is-new{% endif %}" href="{{ item.url }}">{{ item.label }}{% if item.flag %}<span class="nav-flag">{{ item.flag }}</span>{% endif %}</a>
       {% endfor %}
       {% if not user.is_authenticated %}<a class="nav-link nav-panel-register" href="{% url 'register' %}">Создать аккаунт</a>{% endif %}
     </div>

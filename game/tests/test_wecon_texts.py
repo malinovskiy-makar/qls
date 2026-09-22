@@ -84,7 +84,11 @@ class NavigationTests(TestCase):
     def _nav_labels(self, html):
         u"""Подписи пунктов шапки в порядке слева направо."""
         block = html.split('<div class="nav-links">', 1)[-1].split('</div>', 1)[0]
-        return re.findall(r'class="nav-link[^"]*"[^>]*>([^<]+)</a>', block)
+        # ⚠️ Метка NEW у соседнего пункта — вложенный <span>: прежняя регулярка
+        # `[^<]+` роняла такой пункт из списка молча. Метку вырезаем целиком, остальные
+        # теги чистим, подпись обрезаем.
+        return [re.sub(r'<[^>]+>', '', re.sub(r'<span class="nav-flag">.*?</span>', '', inner)).strip()
+                for inner in re.findall(r'class="nav-link[^"]*"[^>]*>(.*?)</a>', block, flags=re.S)]
 
     def test_rendered_page_shows_the_new_name(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
@@ -103,7 +107,10 @@ class NavigationTests(TestCase):
     def test_active_item_is_marked_on_the_game_page(self):
         u"""«Где я сейчас» осталось на месте после переезда логики в питон."""
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
+        # Класс ищем среди классов: у пункта с меткой их три, порядок не важен.
+        active = [inner.strip() for classes, inner in
+                  re.findall(r'<a class="(nav-link[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S)
+                  if 'is-active' in classes.split()]
         self.assertEqual(set(active), {'Wecon Rush'}, active)
 
 

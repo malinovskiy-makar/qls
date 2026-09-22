@@ -171,8 +171,10 @@ try {
   check('d.landing_lists_four_variants', (await lp.locator('.vp-vrow').count()) === 4);
   check('d.landing_no_hscroll', await noHScroll(lp));
   check('d.landing_nav_item_is_active', await lp.evaluate(() => {
-    const active = [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link.is-active')].map((a) => a.textContent.trim());
-    return active.length === 1 && active[0] === 'Высшая проба';
+    // Подпись — первый текстовый узел: метка NEW у пункта лежит в <span>, и `textContent` был бы «Тренажёр ВПNEW».
+    const active = [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link.is-active')]
+      .map((a) => a.firstChild.textContent.trim());
+    return active.length === 1 && active[0] === 'Тренажёр ВП';
   }));
   await shot(lp, 'landing_light_desktop', true);
   await contrastBothThemes(lp, 'd.landing', LANDING_SELECTORS);
@@ -442,7 +444,7 @@ try {
   await setTheme(mlp, false);
   await mlp.click('.nav-burger');
   check('m.landing_burger_lists_the_item', await mlp.evaluate(() => [...document.querySelectorAll('.nav-panel .nav-link')]
-    .some((a) => a.textContent.trim() === 'Высшая проба' && a.classList.contains('is-active'))));
+    .some((a) => a.firstChild.textContent.trim() === 'Тренажёр ВП' && a.classList.contains('is-active'))));
   await mlp.click('.nav-burger');
   const goButton = mlp.locator('.vp-vrow a.vp-btn').first();
   await goButton.scrollIntoViewIfNeeded();

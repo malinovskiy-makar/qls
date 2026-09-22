@@ -318,8 +318,8 @@ class MenuTests(TestCase):
                 client.force_login(user)
             items = self.nav(client)
             labels = [i['label'] for i in items]
-            self.assertEqual(labels[labels.index('Олимпиады') + 1], 'Высшая проба', labels)
-            item = items[labels.index('Высшая проба')]
+            self.assertEqual(labels[labels.index('Олимпиады') + 1], 'Тренажёр ВП', labels)
+            item = items[labels.index('Тренажёр ВП')]
             self.assertEqual(item['url'], '/vp/')
             self.assertTrue(item['active'])                                    # мы на /vp/
 
@@ -329,9 +329,9 @@ class MenuTests(TestCase):
         client.post(reverse('vp:start', args=['vp-menu']))
         for name, args in (('vp:intro', ['vp-menu']),):
             active = [i['label'] for i in client.get(reverse(name, args=args)).context['nav_items'] if i['active']]
-            self.assertEqual(active, ['Высшая проба'])
+            self.assertEqual(active, ['Тренажёр ВП'])
         catalog = client.get('/catalog/').context['nav_items']
-        self.assertFalse([i for i in catalog if i['label'] == 'Высшая проба' and i['active']])
+        self.assertFalse([i for i in catalog if i['label'] == 'Тренажёр ВП' and i['active']])
         self.assertTrue(variant.is_published)
 
 

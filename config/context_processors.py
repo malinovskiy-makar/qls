@@ -11,8 +11,10 @@
 Заодно это проверяемо тестом без разбора разметки.
 """
 from django.conf import settings
+from django.utils import timezone
 
 from problems.feedback_options import FEEDBACK_OPTIONS, OTHER_CHOICE, list_key_for, page_key_for
+from vp.config import NEW_BADGE_UNTIL
 
 
 def _match(request, *, namespace=None, url_name=None, url_name_has=None,
@@ -65,8 +67,9 @@ def _menu(request):
     user = getattr(request, 'user', None)
     items = []
 
-    def add(url, label, **match):
-        items.append({'url': url, 'label': label, 'active': _match(request, **match)})
+    def add(url, label, is_new=False, **match):
+        items.append({'url': url, 'label': label, 'active': _match(request, **match),
+                      'is_new': is_new, 'flag': 'NEW' if is_new else ''})
 
     authed = bool(user and user.is_authenticated)
     role = getattr(user, 'role', None) if authed else None
@@ -85,7 +88,10 @@ def _menu(request):
     # ⚠️ ПУНКТ СЕЗОННЫЙ: нужен до 30 сентября 2026, потом решается его судьба (даты тура —
     # `vp/config.py`). Убирать вместе с записью в sitemap (`catalog/seo.py::StaticSitemap`),
     # ADR 0127.
-    add('/vp/', 'Высшая проба', namespace='vp')
+    # ⚠️ МЕТКА NEW ГАСНЕТ САМА ПО `vp.config.NEW_BADGE_UNTIL`, ОТДЕЛЬНО ОТ СЕЗОННОСТИ ПУНКТА:
+    # оставят пункт после тура — «новое» вместе с ним не останется. Подпись «Тренажёр ВП», а не
+    # «Высшая проба»: слово «тренажёр» говорит, что внутри можно решать (решение 22.09.2026).
+    add('/vp/', 'Тренажёр ВП', is_new=timezone.localdate() < NEW_BADGE_UNTIL, namespace='vp')
     add('/calc2/', 'Графики', path_has='calc2')
     add('/game/', 'Wecon Rush', path_has='/game/')
 
