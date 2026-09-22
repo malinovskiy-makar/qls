@@ -166,6 +166,14 @@ class VPAttempt(models.Model):
                             default=Mode.FULL)
     block = models.CharField('Блок', max_length=10, blank=True)
     with_timer = models.BooleanField('На время', default=True)
+    # ⚠️ СТАВИТСЯ ОДИН РАЗ, В `views.start`, И БОЛЬШЕ НЕ ПЕРЕСЧИТЫВАЕТСЯ.
+    # Зачётная = попытка с таймером, у которой у этого пользователя по этому
+    # варианту нет более ранней попытки с таймером (сданной или нет). Гостевая
+    # попытка зачётной не бывает никогда: у неё нет пользователя.
+    # Правило записано в данные в момент старта, а не вычисляется задним числом:
+    # будущая смена правила не должна переписать уже сыгранную историю.
+    # Что с этим флагом делает таблица лучших попыток — `vp/board.py`.
+    is_ranked = models.BooleanField('Зачётная', default=False, db_index=True)
     started_at = models.DateTimeField('Начата', auto_now_add=True)
     expires_at = models.DateTimeField('Истекает', null=True, blank=True)
     submitted_at = models.DateTimeField('Сдана', null=True, blank=True)

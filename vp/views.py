@@ -17,7 +17,6 @@
 """
 import json
 import logging
-import math
 import secrets
 from datetime import timedelta
 
@@ -33,7 +32,7 @@ from django.views.decorators.http import require_GET, require_POST
 
 from catalog import seo
 from problems import exam_engine
-from vp import answers, blocks, landing, review, scoring, tracking
+from vp import answers, blocks, board, landing, review, scoring, tracking
 from vp.config import BANDS, TOUR_DATES
 from vp.models import VPAnswer, VPAttempt, VPItem, VPVariant
 from vp.templatetags.vp_extras import grade_label
@@ -291,11 +290,17 @@ def start(request, slug):
         user = request.user if request.user.is_authenticated else None
         if user is None and not request.session.session_key:
             request.session.create()
+        # Зачётность решается ОДИН РАЗ, здесь, и в базу уезжает вместе с попыткой:
+        # первая попытка человека по этому варианту с таймером. Считать её задним
+        # числом нельзя — смена правила переписала бы уже сыгранное (`vp/board.py`).
+        is_ranked = bool(user is not None and with_timer and not VPAttempt.objects.filter(
+            user=user, variant=variant, with_timer=True).exists())
         attempt = VPAttempt.objects.create(
             variant=variant,
             user=user,
             session_key='' if user else request.session.session_key,
             with_timer=with_timer,
+            is_ranked=is_ranked,
             expires_at=(timezone.now() + timedelta(seconds=variant.duration_seconds)
                         if with_timer else None),
             max_score=variant.max_score,
@@ -543,21 +548,13 @@ def finish(request, code):
 # --------------------------------------------------------------- результат
 
 def _limit_seconds(attempt):
-    """Лимит времени попытки на время, секунды.
-
-    ⚠️ Округляем ВВЕРХ: `started_at` ставит база (`auto_now_add`) на доли секунды позже,
-    чем считался `expires_at`, и `int()` показал бы «29:59 из 30:00».
-    """
-    return math.ceil((attempt.expires_at - attempt.started_at).total_seconds())
+    """Лимит времени попытки на время, секунды. Считает `vp.board`."""
+    return board.limit_seconds(attempt)
 
 
 def _spent_seconds(attempt):
-    """Сколько секунд ушло на попытку. На время — не больше лимита, автосдача — весь лимит."""
-    spent = int((attempt.submitted_at - attempt.started_at).total_seconds())
-    if not attempt.with_timer or attempt.expires_at is None:
-        return max(0, spent)
-    limit = _limit_seconds(attempt)
-    return max(0, min(limit if attempt.is_auto_submitted else spent, limit))
+    """Сколько секунд ушло на попытку. Считает `vp.board`: там же этим меряется таблица."""
+    return board.spent_seconds(attempt)
 
 
 def _time_text(attempt):
