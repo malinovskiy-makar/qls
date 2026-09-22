@@ -108,7 +108,17 @@ class LandingTests(LandingBase):
         self.assertEqual(rows['snake'], ('1–30', '30', '61'))
         self.assertEqual(rows['single'], ('43', '1', '4'))
         self.assertEqual(FOOT.search(rules(html)).groups(), ('43', '96'))
-        self.assertIn('43 задания, 25 минут, 96 баллов', html)
+        self.assertIn('43 задания, 25 минут, 96 баллов', rules(html))
+        # ⚠️ ПЛИТКИ ФАКТОВ ТОЖЕ ОБЯЗАНЫ ПОСЛЕДОВАТЬ ЗА ДАННЫМИ. Проверять только
+        # фразу в окне правил мало: вбитое в плитку число «44» она не ловит —
+        # проверка зубастости 22.09.2026 показала это прямо.
+        tiles = hero(html)
+        self.assertIn('<b>43</b>', tiles)
+        self.assertIn('<b>25</b>', tiles)
+        self.assertIn('<b>96</b>', tiles)
+        self.assertNotIn('<b>44</b>', tiles)
+        self.assertNotIn('<b>30</b>', tiles)
+        self.assertNotIn('<b>100</b>', tiles)
         self.assertNotIn('44 задания', html)
         self.assertNotIn('100 баллов', html)
 
