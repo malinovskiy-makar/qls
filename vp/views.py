@@ -505,7 +505,8 @@ def start(request, slug):
         # Зачётность решается ОДИН РАЗ, здесь, и в базу уезжает вместе с попыткой:
         # первая попытка человека по этому варианту с таймером. Считать её задним
         # числом нельзя — смена правила переписала бы уже сыгранное (`vp/board.py`).
-        is_ranked = True
+        is_ranked = bool(user is not None and with_timer and not VPAttempt.objects.filter(
+            user=user, variant=variant, with_timer=True).exists())
         attempt = VPAttempt.objects.create(
             variant=variant,
             user=user,

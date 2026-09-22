@@ -115,7 +115,7 @@
           {% if t.table_html %}<div class="vp-scroll">{{ t.table_html|safe }}</div>{% endif %}
 
           {% if t.blank %}
-          <p class="vp-mute vp-mt-sm">Не отвечено — 0 баллов.</p>
+          <p class="vp-mute vp-mt-sm">Не отвечено – 0 баллов.</p>
           {% include 'vp/_practice.html' with number=t.number kind=t.kind options=t.options prefix='' suffix='' %}
           {% else %}
           <ul class="vp-topts">
@@ -152,7 +152,7 @@
         <p>С аккаунтом этот результат останется у вас, а не только в этом браузере. Попытка привяжется к аккаунту сама, как только вы войдёте.</p>
         <div class="vp-cta-row">
           <a class="vp-btn vp-cta-btn" href="{% url 'register' %}?next={{ request.path|urlencode }}">Завести аккаунт</a>
-          <a class="vp-cta-link" href="{% url 'login' %}?next={{ request.path|urlencode }}">Уже есть — войти</a>
+          <a class="vp-cta-link" href="{% url 'login' %}?next={{ request.path|urlencode }}">Уже есть – войти</a>
         </div>
       </div>
       {% endif %}

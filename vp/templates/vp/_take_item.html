@@ -40,7 +40,7 @@
       {% for pair in row.pairs %}
       <label class="vp-pair"><span class="vp-pair-key">{{ pair.key }}</span>
         <span class="vp-select-wrap"><select class="vp-select" data-key="{{ pair.key }}" name="item-{{ row.number }}.{{ pair.key }}">
-          <option value="">—</option>
+          <option value="">–</option>
           {% for o in row.options %}<option value="{{ o.n }}"{% if o.n == pair.value %} selected{% endif %}>{{ o.text }}</option>{% endfor %}
         </select></span></label>
       {% endfor %}

@@ -457,7 +457,7 @@
     if (!timer) { return; }
     var left = timer.remaining();
     if (timeUp || left <= 60) {
-      setBanner('Последняя минута. Работа сдастся сама — всё, что введено, '
+      setBanner('Последняя минута. Работа сдастся сама – всё, что введено, '
         + 'засчитается.', true);
     } else if (left <= 300) {
       var missed = missedNumbers();

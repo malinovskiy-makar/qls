@@ -68,35 +68,6 @@ class RegisterForm(UserCreationForm):
         for field in self.fields.values():
             field.widget.attrs.setdefault('autocomplete', 'off')
 
-    #: Что люди приносят вместо ника: адрес канала, ссылка, собачка, пробелы.
-    _TELEGRAM_PREFIXES = ('https://', 'http://', 'www.', 't.me/', 'telegram.me/')
-    _TELEGRAM_RE = re.compile(r'^[A-Za-z0-9_]{5,32}$')
-
-    def clean_telegram(self):
-        """Ник без «@» и без адреса: хранится голым, показывается с собачкой.
-
-        Нормализуем, а не отбраковываем: человек копирует из Telegram ссылку
-        целиком, и отказ «неверный формат» был бы придиркой.
-        """
-        value = (self.cleaned_data.get('telegram') or '').strip()
-        changed = True
-        while changed and value:
-            changed = False
-            for prefix in self._TELEGRAM_PREFIXES:
-                if value.lower().startswith(prefix):
-                    value = value[len(prefix):]
-                    changed = True
-            if value.startswith('@'):
-                value = value.lstrip('@')
-                changed = True
-        value = value.strip().rstrip('/')
-        if not value:
-            return ''
-        if not self._TELEGRAM_RE.match(value):
-            raise forms.ValidationError(
-                'Ник в Telegram: 5–32 символа, латинские буквы, цифры и подчёркивание.')
-        return value
-
     def clean_username(self):
         """⚠️ ЗАНЯТЫЙ ЛОГИН НАЗЫВАЕТСЯ ЧЕСТНО, И ЭТО НЕ ОПЛОШНОСТЬ.
 

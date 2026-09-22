@@ -182,11 +182,18 @@ class TelegramTests(TestCase):
 
     def test_every_shape_of_the_same_nick_lands_the_same_way(self):
         for value in ('@masha_orl', 'masha_orl', 'https://t.me/masha_orl',
-                      't.me/masha_orl', '  @masha_orl  '):
+                      't.me/masha_orl', 'telegram.me/masha_orl', '  @masha_orl  '):
             with self.subTest(value):
+                # ⚠️ ПЕРЕД КАЖДЫМ ШАГОМ СТИРАЕМ НИК. Без этого неудачное
+                # сохранение проходило бы незамеченным: в профиле оставался
+                # ник с прошлого шага, и проверка сходилась впустую
+                # (нашла проверка зубастости 22.09.2026).
+                self.user.profile.telegram = ''
+                self.user.profile.save(update_fields=['telegram'])
+
                 self._post(value)
                 self.user.profile.refresh_from_db()
-                self.assertEqual(self.user.profile.telegram, 'masha_orl')
+                self.assertEqual(self.user.profile.telegram, 'masha_orl', value)
                 html = self.client.get('/profile/?tab=data').content.decode()
                 self.assertIn('value="@masha_orl"', html)
 
