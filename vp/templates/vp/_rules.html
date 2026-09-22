@@ -1,0 +1,118 @@
+{% load vp_extras %}
+{% comment %}
+Окно «Правила и формат» посадочной `/vp/`.
+
+⚠️ СОДЕРЖИМОЕ РЕНДЕРИТ СЕРВЕР И ОНО ЛЕЖИТ В HTML СТРАНИЦЫ — просто скрыто до
+открытия. Так правила индексируются поисковиком и читаются без JS, а посадочная
+при этом остаётся в один экран (решение владельца 22.09.2026).
+
+⚠️ ЧИСЛА И ССЫЛКИ — ИЗ ДАННЫХ. Таблица блоков и правила баллов считаются из
+заданий опубликованных вариантов (`vp/landing.py`), цепочка змейки — из
+настоящего варианта, ссылки источников — из полей `source_label`/`source_url`.
+{% endcomment %}
+<dialog class="vp-rules" id="vp-rules" aria-labelledby="vp-rules-h">
+  <button type="button" class="vp-rules-x" data-close aria-label="Закрыть">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+  </button>
+
+  <div class="vp-rules-h">
+    <h2 id="vp-rules-h">Правила и формат</h2>
+    <p>Всё, что ниже, тренажёр считает из заданий опубликованных вариантов – так же, как на самой олимпиаде.</p>
+  </div>
+
+  <div class="vp-rules-body">
+    <nav class="vp-rules-nav" aria-label="Разделы правил">
+      <button type="button" class="is-on" data-sec="vp-r-format">Из чего состоит вариант</button>
+      <button type="button" data-sec="vp-r-score">Как считаются баллы</button>
+      <button type="button" data-sec="vp-r-snake">Что такое змейка</button>
+      <button type="button" data-sec="vp-r-board">Таблица лучших попыток</button>
+      <button type="button" data-sec="vp-r-tour">Про тур и ссылки</button>
+      <button type="button" data-sec="vp-r-vpn">Если сайт не открывается</button>
+    </nav>
+
+    <div class="vp-rules-cont" id="vp-rules-cont">
+
+      <section class="vp-rsec" id="vp-r-format">
+        <h3>Из чего состоит вариант</h3>
+        {% if facts %}
+        <p>{{ facts.count|plural:"задание,задания,заданий" }}, {{ facts.minutes|plural:"минута,минуты,минут" }}, {{ facts.total|points_word }}.
+          {% if groups|length == 1 %}Формат одинаков для {{ groups.0.label }}, всё проверяется автоматически.{% endif %}</p>
+        {% elif groups|length > 1 %}
+        <p>Формат различается по классам, ниже по таблице на класс.</p>
+        {% endif %}
+        {% for g in groups %}
+        {% if groups|length > 1 %}<h4 class="vp-rsec-h4">{{ g.label }}</h4>{% endif %}
+        <table class="vp-table vp-table--blocks">
+          <thead>
+            <tr>
+              <th scope="col">Задания</th>
+              <th scope="col">Блок</th>
+              <th scope="col" class="is-num">Заданий</th>
+              <th scope="col" class="is-num">Баллов</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in g.rows %}
+            <tr data-block="{{ r.block }}">
+              <td>{{ r.range }}</td>
+              <td>{{ r.title }}</td>
+              <td class="is-num">{{ r.count }}</td>
+              <td class="is-num">{{ r.total|num }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+          <tfoot>
+            <tr><td></td><td>Всего</td><td class="is-num">{{ g.count }}</td><td class="is-num">{{ g.total|num }}</td></tr>
+          </tfoot>
+        </table>
+        {% endfor %}
+      </section>
+
+      <section class="vp-rsec" id="vp-r-score">
+        <h3>Как считаются баллы</h3>
+        {% for g in groups %}
+        {% if groups|length > 1 %}<h4 class="vp-rsec-h4">{{ g.label }}</h4>{% endif %}
+        {% if g.whole_ranges %}<p>Задания {{ g.whole_ranges|join:" и " }}: или полный балл, или ноль. Частично верный ответ баллов не приносит.</p>{% endif %}
+        {% if g.partial_ranges %}
+        <p>В заданиях {{ g.partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю балла, а <b>каждый лишний отнимает</b> свою долю.{% if g.penalty_example %} Если в задании 2 верных и 3 неверных варианта, верный даёт +{{ g.penalty_example.0|num }}, лишний отнимает {{ g.penalty_example.1|num }}.{% endif %}</p>
+        <p>Отметить все варианты подряд не получится: верные принесут долю балла, лишние заберут её обратно, и за задание выйдет ноль. Ниже нуля за одно задание не уходим.</p>
+        {% endif %}
+        {% endfor %}
+      </section>
+
+      <section class="vp-rsec" id="vp-r-snake">
+        <h3>Что такое змейка</h3>
+        <p>В змейке каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов, берётся вторая буква первого слова. Это не только правило, но и проверка себя: не сходится буква, значит, где-то ошибка.</p>
+        {% if snake %}
+        <div class="vp-land-chain" role="img" aria-label="Пример цепочки: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+          {% for w in snake.words %}<span>{{ w.before }}{% if w.mark %}<b>{{ w.mark }}</b>{% endif %}{{ w.after }}</span>{% if not forloop.last %}<i aria-hidden="true">→</i>{% endif %}{% endfor %}
+        </div>
+        <p class="vp-rsec-note">Цепочка из варианта «{{ snake.variant.title }}». В прохождении связка не подсказывается, как на олимпиаде; вся цепочка раскрывается в разборе после сдачи.</p>
+        {% endif %}
+      </section>
+
+      <section class="vp-rsec" id="vp-r-board">
+        <h3>Таблица лучших попыток</h3>
+        <p>В таблицу идёт <b>первая попытка по каждому варианту с таймером</b>. Повторные прохождения и работы без таймера – тренировка: они сохраняются в вашей истории, но место в таблице не меняют.</p>
+        <p>Показываются десять лучших аккаунтов по баллу одной попытки; при равных баллах выше тот, кто сдал быстрее. Гость в таблицу не попадает: попытки без входа в тренажёре нет.</p>
+      </section>
+
+      <section class="vp-rsec" id="vp-r-tour">
+        <h3>Про тур и ссылки</h3>
+        <p>1 тур появился в отборочном этапе впервые{% if tour_dates %} и проходит {{ tour_dates }}{% endif %}. Тренажёр повторяет его формат и правила подсчёта баллов.</p>
+        <div class="vp-rsec-lnk">
+          <a href="https://olymp.hse.ru/mmo/materials-eco" target="_blank" rel="noopener">Материалы олимпиады на сайте ВШЭ ↗<small>регламент, демоверсии, ответы на вопросы про тур</small></a>
+          {% for link in source_links %}
+          <a href="{{ link.url }}" target="_blank" rel="noopener">{{ link.label }} ↗<small>источник пробных вариантов в тренажёре</small></a>
+          {% endfor %}
+        </div>
+      </section>
+
+      <section class="vp-rsec" id="vp-r-vpn">
+        <h3>Если сайт не открывается</h3>
+        <p>У части провайдеров и через VPN сайт может не открываться. Помогает отключить VPN или добавить weconomics.ai в его исключения.</p>
+      </section>
+
+    </div>
+  </div>
+</dialog>

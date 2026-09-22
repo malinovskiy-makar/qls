@@ -1,0 +1,406 @@
+# Синтетический вариант для самопроверки импорта и подсчёта баллов (vp/tests/test_import.py).
+# Содержание учебное; важна структура 30/5/5/2/2, целая цепочка змейки и сумма ровно 100.
+slug: vp-selftest
+title: 'Самопроверка: синтетический вариант 1 тура'
+olympiad_slug: vysshaya-proba
+tour: 1
+grade_band: 9-10
+year: 2026
+source_kind: demo
+author: Claude Code
+source_note: Синтетика для проверки import_vp и scoring; не для школьников
+duration_seconds: 1800
+items:
+- n: 1
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 1: ответ начинается с «а»'
+  answer: абум
+  points: 2
+- n: 2
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 2: ответ начинается с «б»'
+  answer: бвум
+  points: 2
+- n: 3
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 3: ответ начинается с «в»'
+  answer: вгум
+  points: 2
+- n: 4
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 4: ответ начинается с «г»'
+  answer: гдум
+  points: 2
+- n: 5
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 5: ответ начинается с «д»'
+  answer: деум
+  points: 2
+- n: 6
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 6: ответ начинается с «е»'
+  answer: ежум
+  points: 2
+- n: 7
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 7: ответ начинается с «ж»'
+  answer: жзум
+  points: 2
+- n: 8
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 8: ответ начинается с «з»'
+  answer: зиум
+  points: 2
+- n: 9
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 9: ответ начинается с «и»'
+  answer: икум
+  points: 2
+- n: 10
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 10: ответ начинается с «к»'
+  answer: клум
+  points: 2
+- n: 11
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 11: ответ начинается с «л»'
+  answer: лмум
+  points: 2
+- n: 12
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 12: ответ начинается с «м»'
+  answer: мнум ещё
+  points: 2
+  suffix: ещё-напечатано
+  accepted:
+  - ёмкость учебная
+- n: 13
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 13: ответ начинается с «н»'
+  answer: ноум
+  points: 2
+- n: 14
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 14: ответ начинается с «о»'
+  answer: опум
+  points: 2
+- n: 15
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 15: ответ начинается с «п»'
+  answer: прум
+  points: 2
+- n: 16
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 16: ответ начинается с «р»'
+  answer: рсум
+  points: 2
+- n: 17
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 17: ответ начинается с «с»'
+  answer: стум
+  points: 2
+- n: 18
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 18: ответ начинается с «т»'
+  answer: туум
+  points: 2
+- n: 19
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 19: ответ начинается с «у»'
+  answer: уфум
+  points: 2
+- n: 20
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 20: ответ начинается с «ф»'
+  answer: фхум
+  points: 2
+- n: 21
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 21: ответ начинается с «х»'
+  answer: хцум
+  points: 2
+- n: 22
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 22: ответ начинается с «ц»'
+  answer: цчум
+  points: 2
+- n: 23
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 23: ответ начинается с «ч»'
+  answer: чшум
+  points: 2
+- n: 24
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 24: ответ начинается с «ш»'
+  answer: шэум
+  points: 2
+- n: 25
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 25: ответ начинается с «э»'
+  answer: эюум
+  points: 2
+- n: 26
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 26: ответ начинается с «ю»'
+  answer: юяум
+  points: 2
+- n: 27
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 27: ответ начинается с «я»'
+  answer: яаум
+  points: 2
+- n: 28
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 28: ответ начинается с «а»'
+  answer: абум
+  points: 2
+- n: 29
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 29: ответ начинается с «б»'
+  answer: бвум
+  points: 2
+- n: 30
+  block: snake
+  kind: short_text
+  statement: 'Учебный термин 30: ответ начинается с «в»'
+  answer: вгум
+  points: 2
+- n: 31
+  block: gapfill
+  kind: single
+  intro: Прочитайте учебный текст и выберите слово на место пропуска.
+  statement: Учебный текст 1 с пропуском ______.
+  options:
+  - вариант 31.1
+  - вариант 31.2
+  - вариант 31.3
+  - вариант 31.4
+  - вариант 31.5
+  correct:
+  - 1
+  points: 2
+- n: 32
+  block: gapfill
+  kind: single
+  statement: Учебный текст 2 с пропуском ______.
+  options:
+  - вариант 32.1
+  - вариант 32.2
+  - вариант 32.3
+  - вариант 32.4
+  - вариант 32.5
+  correct:
+  - 2
+  points: 2
+- n: 33
+  block: gapfill
+  kind: single
+  statement: Учебный текст 3 с пропуском ______.
+  options:
+  - вариант 33.1
+  - вариант 33.2
+  - вариант 33.3
+  - вариант 33.4
+  - вариант 33.5
+  correct:
+  - 3
+  points: 2
+- n: 34
+  block: gapfill
+  kind: single
+  statement: Учебный текст 4 с пропуском ______.
+  options:
+  - вариант 34.1
+  - вариант 34.2
+  - вариант 34.3
+  - вариант 34.4
+  - вариант 34.5
+  correct:
+  - 4
+  points: 2
+- n: 35
+  block: gapfill
+  kind: single
+  statement: Учебный текст 5 с пропуском ______.
+  options:
+  - вариант 35.1
+  - вариант 35.2
+  - вариант 35.3
+  - вариант 35.4
+  - вариант 35.5
+  correct:
+  - 5
+  points: 2
+- n: 36
+  block: multi
+  kind: multi
+  intro: Выберите все верные утверждения.
+  statement: Учебное утверждение-набор 1.
+  options:
+  - вариант 36.1
+  - вариант 36.2
+  - вариант 36.3
+  - вариант 36.4
+  - вариант 36.5
+  correct:
+  - 1
+  - 3
+  points: 3
+  penalty: true
+  solution: Учебное решение.
+- n: 37
+  block: multi
+  kind: multi
+  statement: Учебное утверждение-набор 2.
+  options:
+  - вариант 37.1
+  - вариант 37.2
+  - вариант 37.3
+  - вариант 37.4
+  - вариант 37.5
+  correct:
+  - 2
+  - 4
+  - 5
+  points: 3
+  penalty: true
+  solution: Учебное решение.
+- n: 38
+  block: multi
+  kind: multi
+  statement: Учебное утверждение-набор 3.
+  options:
+  - вариант 38.1
+  - вариант 38.2
+  - вариант 38.3
+  - вариант 38.4
+  - вариант 38.5
+  correct:
+  - 1
+  - 3
+  points: 3
+  penalty: true
+  solution: Учебное решение.
+- n: 39
+  block: multi
+  kind: multi
+  statement: Учебное утверждение-набор 4.
+  options:
+  - вариант 39.1
+  - вариант 39.2
+  - вариант 39.3
+  - вариант 39.4
+  - вариант 39.5
+  correct:
+  - 2
+  - 4
+  - 5
+  points: 3
+  penalty: true
+  solution: Учебное решение.
+- n: 40
+  block: multi
+  kind: multi
+  statement: Учебное утверждение-набор 5.
+  options:
+  - вариант 40.1
+  - вариант 40.2
+  - вариант 40.3
+  - вариант 40.4
+  - вариант 40.5
+  correct:
+  - 1
+  - 3
+  points: 3
+  penalty: true
+  solution: Учебное решение.
+- n: 41
+  block: analytic
+  kind: multi
+  statement: 'Учебная диаграмма: что верно?'
+  figure: vp/figures/selftest/41.png
+  figure_caption: Учебный рисунок
+  figure_source: Синтетика
+  options:
+  - вариант 41.1
+  - вариант 41.2
+  - вариант 41.3
+  - вариант 41.4
+  - вариант 41.5
+  correct:
+  - 1
+  - 3
+  - 5
+  points: 3
+  penalty: true
+- n: 42
+  block: analytic
+  kind: multi
+  statement: 'Учебная таблица: что верно?'
+  table_html: <table><tr><th>Год</th><th>Значение</th></tr><tr><td>2020</td><td>1</td></tr></table>
+  options:
+  - вариант 42.1
+  - вариант 42.2
+  - вариант 42.3
+  - вариант 42.4
+  - вариант 42.5
+  correct:
+  - 2
+  - 4
+  points: 3
+  penalty: true
+- n: 43
+  block: single
+  kind: single
+  statement: Учебная задача с формулой $Q^d = 100 - 2P$.
+  options:
+  - '0'
+  - '10'
+  - '12'
+  - '14'
+  - Нет верного ответа
+  correct:
+  - 3
+  points: 4
+- n: 44
+  block: single
+  kind: single
+  statement: Учебная задача повышенной сложности.
+  options:
+  - вариант 44.1
+  - вариант 44.2
+  - вариант 44.3
+  - вариант 44.4
+  - вариант 44.5
+  correct:
+  - 5
+  points: 5

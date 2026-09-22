@@ -64,6 +64,11 @@ ROBOTS_TXT = '\n'.join([
     'Disallow: /catalog/?q=*',
     # То же, когда `q` идёт не первым параметром (фильтры + запрос).
     'Disallow: /catalog/*&q=',
+    # Попытки «Высшей пробы» — личные страницы человека (чужому 404), ботам там нечего
+    # искать. `/vp/r/` НЕ закрыт намеренно: результат открывается по ссылке, и бот
+    # обязан дойти до страницы, чтобы прочитать её `noindex` (закрытый адрес индекс
+    # не запрещает — он лишь не даёт прочитать запрет).
+    'Disallow: /vp/a/',
     '',
     'Sitemap: %s/sitemap.xml' % SITE_URL,
     '',
@@ -99,20 +104,42 @@ class ProblemSitemap(Sitemap):
 
 
 class StaticSitemap(Sitemap):
-    """Постоянные входы: главная, каталог, калькулятор, игра, карта тем."""
+    """Постоянные входы: главная, каталог, калькулятор, игра, карта тем, «Высшая проба»."""
     protocol = 'https'
     changefreq = 'weekly'
     priority = 0.8
 
     def items(self):
         return ['home', 'catalog:problem_list', 'catalog:topic_map',
-                'calc2:calculator', 'game:page']
+                'calc2:calculator', 'game:page', 'vp:index']
 
     def location(self, name):
         return reverse(name)
 
 
-SITEMAPS = {'static': StaticSitemap, 'problems': ProblemSitemap}
+class VPSitemap(Sitemap):
+    """Страницы опубликованных вариантов «Высшей пробы» (`/vp/<слаг>/`).
+
+    ⚠️ ТОЛЬКО опубликованные: черновик отдаёт 404 всем, кроме персонала. Страниц попыток
+    и результатов (`/vp/a/…`, `/vp/r/…`) в карте нет и быть не может — это личные
+    адреса людей (на них `noindex`, попытки закрыты и в `robots.txt`).
+    """
+    protocol = 'https'
+    changefreq = 'monthly'
+    priority = 0.7
+
+    def items(self):
+        from vp.models import VPVariant     # приложение сезонное: не тянем его при импорте
+        return VPVariant.objects.filter(is_published=True).only('slug', 'created_at').order_by('order', 'id')
+
+    def location(self, variant):
+        return reverse('vp:intro', args=[variant.slug])
+
+    def lastmod(self, variant):
+        return variant.created_at
+
+
+SITEMAPS = {'static': StaticSitemap, 'problems': ProblemSitemap, 'vp': VPSitemap}
 
 
 # ── Заголовки и описания ────────────────────────────────────────────────────
@@ -145,6 +172,49 @@ GAME_DESCRIPTION = (
     'Образовательная игра по экономике: решайте тесты на скорость, '
     'соревнуйтесь с друзьями и готовьтесь к олимпиадам интересно на '
     'Weconomics.ai.')
+
+# ⚠️ «Без регистрации» отсюда убрано 22.09.2026 вместе со стеной регистрации:
+# описание в выдаче не должно обещать того, чего страница больше не даёт.
+VP_DESCRIPTION = (
+    'Варианты 1 тура олимпиады «Высшая проба» по экономике онлайн: решайте на время, '
+    'получайте автоматическую проверку, разбор змейки и тестов.')
+
+
+def vp_landing_meta(has_demo):
+    """`seo_title` и `seo_description` посадочной `/vp/`.
+
+    Слово «демоверсия» — в заголовке, только если демонстрационный вариант
+    опубликован: люди ищут именно его, но обещать его в выдаче, когда его нет, значило
+    бы обманывать.
+    """
+    what = 'тренажёр и демоверсия' if has_demo else 'тренажёр с автопроверкой'
+    return {
+        'seo_title': 'Высшая проба, 1 тур по экономике – %s | %s' % (what, BRAND),
+        'seo_description': VP_DESCRIPTION,
+    }
+
+
+def vp_variants_meta():
+    """`seo_title` и `seo_description` экрана выбора варианта `/vp/variants/`."""
+    return {
+        'seo_title': 'Варианты 1 тура «Высшей пробы» по экономике | %s' % BRAND,
+        'seo_description': (
+            'Варианты 1 тура отборочного этапа олимпиады «Высшая проба» по экономике '
+            'для 9\u201310 и 11 классов: демоверсии и пробные, на время или без таймера, '
+            'с автопроверкой и разбором.'),
+    }
+
+
+def vp_variant_meta(title, band_label, year):
+    """`seo_title` и `seo_description` страницы варианта `/vp/<слаг>/`."""
+    return {
+        'seo_title': '%s – вариант 1 тура «Высшая проба» по экономике | %s' % (title, BRAND),
+        'seo_description': (
+            'Вариант 1 тура олимпиады «Высшая проба» по экономике, %s, %s год: пройдите '
+            'на время или без таймера: автопроверка и разбор ответов сразу после сдачи.'
+            % (band_label, year)),
+    }
+
 
 _RX_SPACE = re.compile(r'\s+')
 #: Разметка формул, которой в `<title>` и в описании не место.

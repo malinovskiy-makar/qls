@@ -1,0 +1,14 @@
+{% extends 'catalog/base.html' %}
+{% load static %}
+{% comment %}
+Каркас тренажёра ВП. Стили — ТОЛЬКО в партиале `_styles.html`: ни одной строки
+CSS в шаблонах экранов. Полоса контента задаётся самим экраном (`.vp-wrap`).
+
+События аналитики: экран кладёт в контекст `vp_events`, скрипт отдаёт их `weco.track`
+(ADR 0127, `vp/tracking.py`). Экран, который переопределяет `extra_js`, зовёт
+`{{ block.super }}` первой строкой, иначе события у него не уйдут.
+{% endcomment %}
+{% block extra_style %}{% include 'vp/_styles.html' %}{% endblock %}
+{% block main_class %}vp-main{% endblock %}
+{% block extra_js %}{% if vp_events %}{{ vp_events|json_script:"vp-events" }}
+<script src="{% static 'vp/js/track.js' %}" defer></script>{% endif %}{% endblock %}

@@ -1,0 +1,98 @@
+{% extends 'vp/base_vp.html' %}
+{% load static vp_extras %}
+{% comment %}
+Прохождение варианта: одна страница, все задания в разметке сразу, сплошной список
+(«змейка» ведётся клавишей Enter), липкая шапка с таймером и счётчиком, навигатор
+по номерам. Раскладка — макеты Take / Tests / Mobile.
+
+⚠️ РАЗМЕТКА ПОДЧИНЕНА `static/vp/js/take.js`: узлы `#vp-form`, `#vp-timer`,
+`#vp-clock`, `#vp-banner`, `#vp-answered`, `#vp-save-state`, `#vp-submit`,
+`#vp-dialog*`, `.vp-cell[data-n]`, `.vp-item[data-n]`. Менять имена нельзя, не
+поправив скрипт. Часы — `platform/exam_timer.js` без копирования: монотонные,
+остаток не растёт.
+⚠️ Ответов, эталонов и букв связки на странице НЕТ (тест `test_take_hides_answers`).
+{% endcomment %}
+{% block title %}Решаю · {{ variant.title }}{% endblock %}
+{% block body_attrs %} class="vp-focus"{% endblock %}
+{% block content %}
+<noscript><div class="vp-banner is-danger">Для прохождения нужен включённый JavaScript: без него не работают таймер и автосохранение.</div></noscript>
+
+<header class="vp-bar" id="vp-bar">
+  <div class="vp-bar-row">
+    <div class="vp-bar-title">
+      <div class="vp-bar-name">{{ variant.title }}</div>
+      <div class="vp-bar-sub">{{ variant.grade_band|grade_label }} · <span class="vp-save" id="vp-save-state">все ответы сохраняются сами</span></div>
+    </div>
+    <div class="vp-clock" id="vp-clock">
+      {% if attempt.with_timer %}
+      <span class="vp-timer" id="vp-timer" role="timer" data-seconds="{{ seconds_left }}">{{ seconds_left|mmss }}</span>
+      <span class="vp-timer-cap" id="vp-timer-cap">осталось</span>
+      {% else %}
+      <span class="vp-timer-cap">без таймера</span>
+      {% endif %}
+    </div>
+    <div class="vp-bar-side">
+      <span class="vp-count">отвечено <b id="vp-answered">{{ answered_count }}</b> из {{ total }}</span>
+      {# Шапка сайта на этом экране спрятана, а тему переключать надо: кнопка жмёт её скрытый переключатель (реализация одна на сайт). #}
+      <button type="button" class="vp-icon-btn" id="vp-theme" aria-label="Сменить тему" title="Светлая / тёмная тема">☾</button>
+      <button type="button" class="vp-btn" id="vp-submit">Сдать</button>
+    </div>
+  </div>
+  <div class="vp-banner" id="vp-banner" role="status" hidden></div>
+  <nav class="vp-strip" id="vp-strip" aria-label="Задания">{% for n in numbers %}<a class="vp-cell{% if n in answered_numbers %} is-answered{% endif %}" href="#vp-item-{{ n }}" data-n="{{ n }}">{{ n }}</a>{% endfor %}</nav>
+</header>
+
+<div class="vp-layout">
+  <aside class="vp-rail">
+    <div class="vp-rail-card">
+      <div class="vp-rail-cap">Задания</div>
+      <nav class="vp-grid" id="vp-grid" aria-label="Задания">{% for n in numbers %}<a class="vp-cell{% if n in answered_numbers %} is-answered{% endif %}" href="#vp-item-{{ n }}" data-n="{{ n }}">{{ n }}</a>{% endfor %}</nav>
+      <div class="vp-legend">
+        <span><i class="is-a"></i>отвечено</span>
+        <span><i></i>пусто</span>
+        <span><i class="is-c"></i>сейчас здесь</span>
+      </div>
+    </div>
+  </aside>
+
+  <form class="vp-main-col" id="vp-form" method="post" action="{{ finish_url }}" autocomplete="off">
+    {% csrf_token %}
+    <input type="hidden" name="auto" value="0" id="vp-auto">
+    {% for s in sections %}
+    <section class="vp-section" aria-labelledby="vp-sec-{{ s.first }}">
+      <div class="vp-section-head">
+        <h2 class="vp-h2" id="vp-sec-{{ s.first }}">{% if s.first == s.last %}Задание{% else %}Задания{% endif %} {{ s.range }}. {{ s.titles.heading }}</h2>
+        <span class="vp-mute">· {% if s.uniform %}{{ s.uniform|points_each }}{% else %}от {{ s.points_min|num }} до {{ s.points_max|points_word }}{% endif %}{% if s.penalty %} · за лишние варианты балл уменьшается{% endif %}</span>
+      </div>
+      {% if s.intro %}<div class="vp-note">{{ s.intro|linebreaksbr }}</div>{% endif %}
+      <div class="vp-list">
+        {% for row in s.rows %}{% include 'vp/_take_item.html' %}{% endfor %}
+      </div>
+    </section>
+    {% endfor %}
+  </form>
+</div>
+
+<dialog class="vp-dialog" id="vp-dialog" aria-labelledby="vp-dialog-title">
+  <h2 class="vp-h2" id="vp-dialog-title">Сдать работу?</h2>
+  <p id="vp-dialog-text"></p>
+  <div class="vp-chips" id="vp-dialog-chips"></div>
+  <div class="vp-dialog-row">
+    <button type="button" class="vp-btn" id="vp-confirm">Сдать и посмотреть разбор</button>
+    <button type="button" class="vp-btn vp-btn--plain" id="vp-back" autofocus>Вернуться к заданиям</button>
+  </div>
+</dialog>
+
+<div class="vp-timeup" role="alertdialog" aria-live="assertive" aria-label="Время вышло">
+  <div class="vp-card">
+    <h2>Время вышло</h2>
+    <p>Сдаём работу: засчитается всё, что было введено к этому моменту.</p>
+  </div>
+</div>
+
+{{ config|json_script:"vp-config" }}
+{% endblock %}
+{% block extra_js %}{{ block.super }}
+<script src="{% static 'platform/exam_timer.js' %}"></script>
+<script src="{% static 'vp/js/take.js' %}"></script>
+{% endblock %}

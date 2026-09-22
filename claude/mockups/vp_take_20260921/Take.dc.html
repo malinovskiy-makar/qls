@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Прохождение — змейка</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap">
+<style>
+body{margin:0;font-family:'Montserrat',system-ui,sans-serif;background:#f4eed2;color:#2d2d2d}
+a{color:#00797a}a:hover{color:#016769}
+</style>
+</helmet>
+<div style="width: 1280px; height: 1460px; box-sizing: border-box; background: #f4eed2; display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 64px; flex-shrink: 0; background: #fffce6; border-bottom: 1px solid rgba(45,45,45,.14); display: flex; align-items: center; padding: 0 28px; gap: 24px; box-sizing: border-box;">
+    <div style="width: 300px;">
+      <div style="font-size: 14.5px; font-weight: 600;">Вариант 1 · 9–10 классы</div>
+      <div style="font-size: 12.5px; color: #5c5346;">1 тур «Высшей пробы»</div>
+    </div>
+    <div style="flex-grow: 1; display: flex; justify-content: center; align-items: baseline; gap: 10px;">
+      <span style="font-size: 30px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: .5px;">24:13</span>
+      <span style="font-size: 12.5px; color: #5c5346;">осталось</span>
+    </div>
+    <div style="width: 300px; display: flex; align-items: center; justify-content: flex-end; gap: 16px;">
+      <span style="font-size: 13px; color: #5c5346;">отвечено <b style="color:#2d2d2d">12</b> из 44</span>
+      <button type="button" style="font-family: inherit; background: #2e2b27; color: #fffce6; border: 0; font-size: 14.5px; font-weight: 600; padding: 10px 20px; border-radius: 8px; cursor: pointer;">Сдать</button>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; display: flex; gap: 28px; padding: 22px 28px 0 28px; box-sizing: border-box; overflow: hidden;">
+
+    <div style="width: 216px; flex-shrink: 0;">
+      <div style="background: #fffce6; border: 1px solid rgba(45,45,45,.14); border-radius: 12px; padding: 14px;">
+        <div style="font-size: 12.5px; color: #5c5346; margin-bottom: 10px;">Задания</div>
+        <div style="display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px;">
+          <sc-for list="{{cells}}" as="c" hint-placeholder-count="44">
+            <a href="#" style="{{c.style}}">{{c.n}}</a>
+          </sc-for>
+        </div>
+        <div style="margin-top: 14px; display: flex; flex-direction: column; gap: 7px; font-size: 12px; color: #5c5346;">
+          <span style="display: flex; align-items: center; gap: 7px;"><span style="width: 14px; height: 14px; border-radius: 4px; background: rgba(0,108,109,.09); border: 1px solid #00797a; display: inline-block;"></span>отвечено</span>
+          <span style="display: flex; align-items: center; gap: 7px;"><span style="width: 14px; height: 14px; border-radius: 4px; background: #fffce6; border: 1px solid rgba(45,45,45,.2); display: inline-block;"></span>пусто</span>
+          <span style="display: flex; align-items: center; gap: 7px;"><span style="width: 14px; height: 14px; border-radius: 4px; background: #fffce6; border: 2px solid #2d2d2d; display: inline-block;"></span>сейчас здесь</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 14px;">
+
+      <div style="display: flex; align-items: baseline; gap: 12px;">
+        <h2 style="margin: 0; font-size: 19px; font-weight: 600;">Задания 1–30. Змейка</h2>
+        <span style="font-size: 13px; color: #5c5346;">по 2 балла</span>
+      </div>
+
+      <div style="background: #f2e8bd; border-radius: 8px; padding: 12px 16px; font-size: 13.5px; line-height: 1.5; color: #5c5346;">
+        Ответ — одно слово или словосочетание в именительном падеже, строчными буквами, в единственном числе. Каждый следующий ответ начинается со второй буквы предыдущего.
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 4px;">
+
+        <sc-for list="{{items}}" as="it" hint-placeholder-count="8">
+          <div style="{{it.row}}">
+            <div style="width: 30px; flex-shrink: 0; padding-top: 11px; font-size: 13px; font-weight: 600; color: #665e51; text-align: right;">{{it.n}}</div>
+            <div style="flex-grow: 1; display: flex; flex-direction: column; gap: 7px; padding: 9px 0 11px 0;">
+              <div style="font-size: 15px; line-height: 1.5;">{{it.text}}</div>
+              <div style="display: flex; align-items: center; gap: 9px;">
+                <sc-if value="{{it.pre}}" hint-placeholder-val="{{true}}">
+                  <span style="font-size: 15px; color: #5c5346;">{{it.pre}}</span>
+                </sc-if>
+                <label style="position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0);" for="{{it.id}}">Ответ на задание {{it.n}}</label>
+                <input id="{{it.id}}" type="text" value="{{it.val}}" placeholder="{{it.ph}}" style="{{it.input}}">
+                <sc-if value="{{it.post}}" hint-placeholder-val="{{true}}">
+                  <span style="font-size: 15px; color: #5c5346;">{{it.post}}</span>
+                </sc-if>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+
+      </div>
+
+      <div style="text-align: center; padding: 6px 0 0 0; font-size: 13px; color: #5c5346;">задания 9–30 ниже · дальше блоки 31–44</div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1460}}'>
+class Component extends DCLogic {
+  renderVals() {
+    var base = 'display: flex; gap: 10px; border-radius: 8px; background: #fffce6; border: 1px solid rgba(45,45,45,.14); padding: 2px 16px 2px 8px;';
+    var cur = 'display: flex; gap: 10px; border-radius: 8px; background: #fffce6; border: 1px solid rgba(45,45,45,.14); box-shadow: inset 3px 0 0 #00797a; padding: 2px 16px 2px 8px;';
+    var inp = 'font-family: inherit; font-size: 15px; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(45,45,45,.24); background: #ffffff; color: #2d2d2d; width: 300px; box-sizing: border-box;';
+    var inpFocus = 'font-family: inherit; font-size: 15px; padding: 8px 12px; border-radius: 6px; border: 2px solid #00797a; background: #ffffff; color: #2d2d2d; width: 300px; box-sizing: border-box;';
+    var data = [
+      [1,'Разница между выручкой фирмы и суммой явных и неявных затрат. Нулевое значение означает, что владелец получает ровно столько, сколько принесла бы лучшая альтернатива','','экономическая прибыль','','',false],
+      [2,'Соглашение нескольких продавцов о единой цене или о разделе рынка, позволяющее им действовать как единый монополист','','картель','','',false],
+      [3,'Способность страны производить больше товара с такими же затратами ресурсов, как и другие страны','','абсолютное преимущество','','',false],
+      [4,'Коэффициент, показывающий, во сколько раз может вырасти сумма депозитов при поступлении в кредитную систему дополнительной единицы резервов','','','','',true],
+      [5,'Положение, при котором одна сторона сделки знает о её предмете существенно больше другой и может этим воспользоваться','','','','',false],
+      [6,'Число раз, которое денежная единица за год переходит из рук в руки при покупке конечных товаров и услуг','','','','денег',false],
+      [7,'Способ поточной сборки, при котором изделие движется мимо рабочих, каждый из которых выполняет одну операцию','','конвейер','','',false],
+      [8,'Соотношение долей сельского хозяйства, промышленности и услуг в выпуске страны, по которому судят об уровне её развития','','','','',false]
+    ];
+    var items = data.map(function (d) {
+      return {
+        n: d[0], text: d[1], pre: d[2], val: d[3], ph: d[6] ? 'вводите ответ' : '', post: d[5],
+        id: 'a' + d[0],
+        row: d[6] ? cur : base,
+        input: d[6] ? inpFocus : inp
+      };
+    });
+    var answered = { 1: 1, 2: 1, 3: 1, 7: 1, 9: 1, 10: 1, 11: 1, 15: 1, 16: 1, 19: 1, 22: 1, 31: 1 };
+    var cells = [];
+    for (var i = 1; i <= 44; i++) {
+      var s = 'display: flex; align-items: center; justify-content: center; height: 26px; border-radius: 5px; font-size: 12px; font-weight: 500; text-decoration: none; ';
+      if (i === 4) { s += 'background: #fffce6; border: 2px solid #2d2d2d; color: #2d2d2d;'; }
+      else if (answered[i]) { s += 'background: rgba(0,108,109,.09); border: 1px solid #00797a; color: #006c6d;'; }
+      else { s += 'background: #fffce6; border: 1px solid rgba(45,45,45,.2); color: #665e51;'; }
+      cells.push({ n: i, style: s });
+    }
+    return { items: items, cells: cells };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+{% extends 'vp/base_vp.html' %}
+{% load vp_extras %}
+{% comment %}
+«Мои попытки» `/vp/my/` — только вошедшему.
+
+⚠️ РАЗБОР ЗДЕСЬ НЕ РИСУЕТСЯ: строка ведёт на существующую страницу результата,
+где и живут два разных вида (владельцу полный разбор, чужому голый балл).
+Просроченные попытки закрывает вью ДО выборки, иначе список врал бы про «не сдана».
+{% endcomment %}
+{% block title %}Мои попытки{% endblock %}
+{% block content %}
+<div class="vp-my">
+  <a class="vp-back" href="{% url 'vp:index' %}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    Тренажёр ВП
+  </a>
+  <h1>Мои попытки</h1>
+  <p class="vp-my-sub">Все прохождения с разбором: где ошиблись, какой ответ верный и как сомкнулась змейка. Разбор видите только вы; по ссылке другие видят лишь балл.</p>
+
+  <div class="vp-my-tabs" role="group" aria-label="Фильтр">
+    {% for f in filters %}
+    <a href="?f={{ f.code }}"{% if f.code == chosen %} aria-current="true"{% endif %}>{{ f.label }} · {{ f.count }}</a>
+    {% endfor %}
+  </div>
+
+  {% if rows %}
+  <div class="vp-arow is-head">
+    <span>Дата</span><span>Вариант</span><span>Режим</span>
+    <span class="is-num">Балл</span><span class="is-num">Время</span><span>Статус</span><span></span>
+  </div>
+  {% for r in rows %}
+  <div class="vp-arow{% if r.kind == 'open' %} is-live{% endif %}">
+    <span class="vp-arow-d">{{ r.attempt.started_at|date:"d.m, H:i" }}</span>
+    <span class="vp-arow-v">{{ r.variant.title }}<small>{% if r.variant.source_label %}{{ r.variant.source_label }}{% else %}{{ r.variant.get_source_kind_display }}{% endif %}{% if r.variant.author %} · {{ r.variant.author }}{% endif %}</small></span>
+    <span class="vp-arow-m">{% if r.attempt.with_timer %}с таймером{% else %}без таймера{% endif %}</span>
+    <span class="vp-arow-s">{% if r.attempt.submitted_at %}{{ r.attempt.score|num }}{% else %}–{% endif %}</span>
+    <span class="vp-arow-t">{% if r.attempt.submitted_at %}{{ r.seconds|mmss }}{% else %}{{ r.answered }} из {{ r.count }}{% endif %}</span>
+    <span class="vp-arow-k{% if r.kind == 'ranked' %} is-ok{% elif r.kind == 'open' %} is-live{% endif %}">
+      {% if r.kind == 'ranked' %}
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+      в таблице{% if r.place %} · {{ r.place }}-е{% endif %}
+      {% elif r.kind == 'training' %}
+      тренировка{% if r.repeat %} · повтор{% endif %}
+      {% else %}
+      <span class="vp-land-live"><i aria-hidden="true"></i></span>не сдана, идёт
+      {% endif %}
+    </span>
+    <span class="vp-arow-a">
+      {% if r.attempt.submitted_at %}
+      <a class="vp-land-btn" href="{% url 'vp:result' r.attempt.public_code %}">Разбор</a>
+      {% else %}
+      <a class="vp-land-btn is-solid" href="{% url 'vp:take' r.attempt.public_code %}">Продолжить</a>
+      {% endif %}
+    </span>
+  </div>
+  {% endfor %}
+  {% else %}
+  <p class="vp-land-empty">Здесь пока пусто. <a class="vp-link" href="{% url 'vp:variants' %}">Выберите вариант</a>, и попытка появится в списке.</p>
+  {% endif %}
+
+  <p class="vp-my-note">В таблицу лучших попыток идёт первая попытка по каждому варианту с таймером. Повторные и без таймера – тренировка, их разбор доступен так же.</p>
+</div>
+{% endblock %}

@@ -84,14 +84,22 @@ class NavigationTests(TestCase):
     def _nav_labels(self, html):
         u"""Подписи пунктов шапки в порядке слева направо."""
         block = html.split('<div class="nav-links">', 1)[-1].split('</div>', 1)[0]
-        return re.findall(r'class="nav-link[^"]*"[^>]*>([^<]+)</a>', block)
+        # ⚠️ Метка NEW у соседнего пункта — вложенный <span>: прежняя регулярка
+        # `[^<]+` роняла такой пункт из списка молча. Метку вырезаем целиком, остальные
+        # теги чистим, подпись обрезаем.
+        return [re.sub(r'<[^>]+>', '', re.sub(r'<span class="nav-flag">.*?</span>', '', inner)).strip()
+                for inner in re.findall(r'class="nav-link[^"]*"[^>]*>(.*?)</a>', block, flags=re.S)]
 
     def test_rendered_page_shows_the_new_name(self):
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
         labels = self._nav_labels(html)
         self.assertEqual(labels.count('Wecon Rush'), 1, labels)
         self.assertNotIn('Игра', labels)
+        # Сравнение ТОЧНОЕ, по списку: старое имя игры «Тренажёр» ловится, а соседний пункт
+        # «Тренажёр ВП» (раздел «Высшая проба») — нет. Заодно проверка, что хелпер видит пункт
+        # с меткой NEW: иначе он пропадал бы из списка молча.
         self.assertNotIn('Тренажёр', labels)
+        self.assertIn('Тренажёр ВП', labels)
 
     def test_textbook_stands_right_after_catalog(self):
         u"""Порядок задан владельцем: «Учебник» сразу за «Каталогом»."""
@@ -103,7 +111,10 @@ class NavigationTests(TestCase):
     def test_active_item_is_marked_on_the_game_page(self):
         u"""«Где я сейчас» осталось на месте после переезда логики в питон."""
         html = self.client.get(reverse('game:page')).content.decode('utf-8')
-        active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
+        # Класс ищем среди классов: у пункта с меткой их три, порядок не важен.
+        active = [inner.strip() for classes, inner in
+                  re.findall(r'<a class="(nav-link[^"]*)"[^>]*>(.*?)</a>', html, flags=re.S)
+                  if 'is-active' in classes.split()]
         self.assertEqual(set(active), {'Wecon Rush'}, active)
 
 

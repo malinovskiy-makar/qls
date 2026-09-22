@@ -1,0 +1,212 @@
+{% extends 'vp/base_vp.html' %}
+{% load static vp_extras %}
+{% comment %}
+Посадочная `/vp/`: три зоны на один экран (макет 22.09.2026, решение владельца).
+Слева тур, справа таблица лучших попыток, внизу полоса «моё». Правила, формат и
+ссылки — в окне поверх страницы, чтобы страница не росла. Список вариантов уехал
+на `/vp/variants/`.
+
+⚠️ ЭКРАН БЕЗ ВЕРТИКАЛЬНОЙ ПРОКРУТКИ НА 1440×800 — это инвариант, его держит
+браузерный тест (`d.landing_no_vscroll_1440x800_*`). Всё новое кладётся в окно
+правил или в полосу, а не в конец страницы.
+
+⚠️ ЧИСЛА ЗДЕСЬ ТОЛЬКО ИЗ ДАННЫХ. Число заданий, минуты, баллы и таблица блоков
+считаются из заданий ОПУБЛИКОВАННЫХ вариантов (`vp/landing.py`), цепочка змейки —
+из настоящего варианта, даты тура — из `vp/config.py`, таблица — из `vp/board.py`.
+Вбитых чисел в шаблоне нет (тест `test_landing`).
+
+⚠️ ТОЛЬКО ТО, ЧТО РАБОТАЕТ СЕГОДНЯ. Режимов и кнопок, которых нет в приложении, на
+странице нет. Длинного тире в видимом тексте нет (правило сайта, `scripts/check_em_dash.py`).
+{% endcomment %}
+{% block title %}Высшая проба, 1 тур{% endblock %}
+{% block content %}
+<div class="vp-land">
+
+  {# ─── Зона A: тур ─────────────────────────────────────────────── #}
+  <div class="vp-land-card vp-land-hero">
+    <div class="vp-land-eyebrow">
+      <span>Отборочный этап · 1 тур</span>
+      {% if tour_dates %}<span class="vp-land-dot" aria-hidden="true"></span><span class="vp-land-dates">{{ tour_dates }}</span>{% endif %}
+    </div>
+    <h1 class="vp-land-h1">Высшая проба по экономике<small>тренажёр нового первого тура</small></h1>
+    <p class="vp-land-lead">Вариант на время, как на олимпиаде, автоматическая проверка и разбор после сдачи.</p>
+
+    {% if facts %}
+    <div class="vp-land-facts" aria-label="Формат варианта">
+      <div class="vp-land-fact"><b>{{ facts.count }}</b><span>{{ facts.count|plural_word:"задание,задания,заданий" }}</span></div>
+      <div class="vp-land-fact"><b>{{ facts.minutes }}</b><span>минут</span></div>
+      <div class="vp-land-fact"><b>{{ facts.total|num }}</b><span>баллов</span></div>
+      {% if tour_dates_short %}<div class="vp-land-fact is-date"><b>{{ tour_dates_short }}</b><span>дни тура</span></div>{% endif %}
+    </div>
+    {% endif %}
+
+    {% if has_snake %}
+    <div class="vp-land-snake">
+      <div class="vp-land-snake-t">
+        <span>Змейка · задания {{ snake_range }}</span>
+        {% if snake %}<em>пример из варианта «{{ snake.variant.title }}»</em>{% endif %}
+      </div>
+      <p>Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>: не сходится буква – где-то ошибка. В прохождении связка не подсказывается, как на олимпиаде, а раскрывается в разборе.</p>
+      {% if snake %}
+      <div class="vp-land-chain" role="img" aria-label="Цепочка: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+        {% for w in snake.words %}<span>{{ w.before }}{% if w.mark %}<b>{{ w.mark }}</b>{% endif %}{{ w.after }}</span>{% if not forloop.last %}<i aria-hidden="true">→</i>{% endif %}{% endfor %}
+        <span class="vp-land-chain-more">… и так {{ snake_total|plural:"задание,задания,заданий" }} подряд</span>
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="vp-land-cta">
+      <a class="vp-play" href="{% url 'vp:variants' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Выбрать вариант
+      </a>
+      <button type="button" class="vp-play vp-play--ghost" data-open-rules>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v15H6.5A2.5 2.5 0 0 0 4 20.5z"/><path d="M4 20.5V5.5M8 7h8M8 11h6"/></svg>
+        Правила и формат
+      </button>
+      <a class="vp-ext" href="https://olymp.hse.ru/mmo/materials-eco" target="_blank" rel="noopener">Материалы ВШЭ
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg>
+      </a>
+    </div>
+  </div>
+
+  {# ─── Зона B: таблица лучших попыток ──────────────────────────── #}
+  <aside class="vp-land-card vp-land-board" aria-labelledby="vp-board-h">
+    <h2 class="vp-land-bt" id="vp-board-h">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4v2a3 3 0 0 0 3 3M17 6h3v2a3 3 0 0 1-3 3"/></svg>
+      <span>Лучшие попытки</span>
+    </h2>
+    <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.</p>
+
+    {% if rows %}
+    <div class="vp-land-rows">
+      <div class="vp-land-row is-head"><span>#</span><span>Игрок</span><span>Класс</span><span class="is-num">Балл</span><span class="is-num">Время</span></div>
+      {% for r in rows %}
+      <div class="vp-land-row">
+        <span class="vp-land-pl">{% if r.place < 4 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</span>
+        <span class="vp-land-who">{{ r.name }}</span>
+        <span class="vp-land-cls">{{ r.band|grade_chip }}</span>
+        <span class="vp-land-sc">{{ r.score|num }}</span>
+        <span class="vp-land-tm">{{ r.seconds|mmss }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    {% if my_row %}
+    <div class="vp-land-pin">
+      <div class="vp-land-row is-me">
+        <span class="vp-land-pl">{{ my_row.place }}</span>
+        <span class="vp-land-who">Вы · {{ my_row.name }}</span>
+        <span class="vp-land-cls">{{ my_row.band|grade_chip }}</span>
+        <span class="vp-land-sc">{{ my_row.score|num }}</span>
+        <span class="vp-land-tm">{{ my_row.seconds|mmss }}</span>
+      </div>
+    </div>
+    {% endif %}
+    {% else %}
+    <p class="vp-land-empty">Пока никого. Первая сданная попытка с таймером займёт первое место.</p>
+    {% endif %}
+
+    <p class="vp-land-bfoot">
+      {% if not user.is_authenticated %}
+        В таблицу попадают только зарегистрированные. Попыток в таблице: {{ board_attempts }}.
+      {% elif mine.best %}
+        Попыток в таблице: {{ board_attempts }}. Ваша лучшая – {{ mine.best_place }}-е место; выше можно подняться первой попыткой по другому варианту.
+      {% else %}
+        Попыток в таблице: {{ board_attempts }}. Первая попытка с таймером по любому варианту попадёт сюда.
+      {% endif %}
+    </p>
+  </aside>
+
+  {# ─── Зона C: полоса «моё» или приглашение гостю ──────────────── #}
+  <div class="vp-land-band">
+    {% if not mine %}
+    <div class="vp-land-card vp-land-cell is-guest">
+      <div class="vp-land-gtxt">
+        <b>Чтобы пройти вариант, нужна короткая бесплатная регистрация</b>
+        <span>Логин и пароль, без почты. Правила, таблица и описания вариантов открыты всем.</span>
+      </div>
+      <div class="vp-land-ca">
+        <a class="vp-land-btn is-amber" href="{{ register_url }}">Зарегистрироваться</a>
+        <a class="vp-land-btn" href="{{ login_url }}">Войти</a>
+      </div>
+    </div>
+    {% else %}
+
+    {# Ячейка 1: начатая работа или следующий вариант #}
+    <div class="vp-land-card vp-land-cell{% if mine.current %} is-live{% endif %}">
+      {% if mine.current %}
+      <p class="vp-land-ct">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        Начатая работа
+        {% if mine.current.with_timer %}<span class="vp-land-live"><i aria-hidden="true"></i>время идёт</span>{% endif %}
+      </p>
+      <p class="vp-land-cv">{{ mine.current.variant.title }}</p>
+      <p class="vp-land-cs">Отвечено {{ mine.current_answered }} из {{ mine.current_count }} · {% if mine.current.with_timer %}осталось {{ mine.current_left|mmss }}{% else %}без таймера{% endif %}</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:take' mine.current.public_code %}">Продолжить</a></div>
+      {% elif mine.next_variant %}
+      <p class="vp-land-ct">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Следующий вариант
+      </p>
+      <p class="vp-land-cv">{{ mine.next_variant.title }}</p>
+      <p class="vp-land-cs">{{ mine.next_variant.grade_band|grade_label }} · ещё не открывали</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
+      {% else %}
+      <p class="vp-land-ct">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+        Следующий вариант
+      </p>
+      <p class="vp-land-cv">Все варианты пройдены</p>
+      <p class="vp-land-cs">Можно перерешать любой: повторные идут тренировкой</p>
+      <div class="vp-land-ca"><a class="vp-land-btn is-solid" href="{% url 'vp:variants' %}">Все варианты</a></div>
+      {% endif %}
+    </div>
+
+    {# Ячейка 2: моя лучшая попытка #}
+    <div class="vp-land-card vp-land-cell">
+      <p class="vp-land-ct">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0z"/></svg>
+        Моя лучшая попытка
+      </p>
+      {% if mine.best %}
+      <p class="vp-land-cv"><b>{{ mine.best.score|num }}</b> из {{ mine.best.max_score|num }} · {{ mine.best_seconds|mmss }}</p>
+      <p class="vp-land-cs">{{ mine.best.variant.title }} · {{ mine.best_place }}-е место</p>
+      <div class="vp-land-ca">
+        <a class="vp-land-btn" href="{% url 'vp:result' mine.best.public_code %}">Разбор</a>
+        <a class="vp-land-more" href="{% url 'vp:my' %}">Все попытки</a>
+      </div>
+      {% else %}
+      <p class="vp-land-cv">Пока нет</p>
+      <p class="vp-land-cs">Первая попытка с таймером по любому варианту попадёт в таблицу</p>
+      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:variants' %}">Выбрать вариант</a></div>
+      {% endif %}
+    </div>
+
+    {# Ячейка 3: пройдено вариантов #}
+    <div class="vp-land-card vp-land-cell">
+      <p class="vp-land-ct">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        Пройдено вариантов
+      </p>
+      <p class="vp-land-cv"><b>{{ mine.done }}</b> из {{ mine.total }}
+        <span class="vp-land-dots" aria-hidden="true">{% for dot in mine.dots %}<i class="{{ dot }}"></i>{% endfor %}</span>
+      </p>
+      {% if mine.next_variant %}
+      <p class="vp-land-cs">Ещё не решали: {{ mine.next_variant.title }}</p>
+      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:intro' mine.next_variant.slug %}">Открыть</a></div>
+      {% else %}
+      <p class="vp-land-cs">Все варианты пройдены</p>
+      <div class="vp-land-ca"><a class="vp-land-btn" href="{% url 'vp:variants' %}">Все варианты</a></div>
+      {% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{% include 'vp/_rules.html' %}
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}
+<script src="{% static 'vp/js/landing.js' %}" defer></script>
+{% endblock %}

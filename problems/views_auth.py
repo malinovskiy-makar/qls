@@ -30,6 +30,7 @@ Django, а не наша: `ModelBackend` при несуществующем и�
 from django.contrib.auth import login
 from django.contrib.auth.views import LoginView, LogoutView  # noqa: F401
 from django.shortcuts import redirect
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.edit import FormView
 
 from problems import ratelimit
@@ -118,10 +119,27 @@ class RegisterView(FormView):
 
     Почты нет: подтверждать её нечем (решение владельца 04.09.2026).
     «Забыли пароль» — через Telegram и админку, там же в шаблоне ссылка.
+
+    ⚠️ `next` СЛУШАЕТСЯ, НО ТОЛЬКО СВОЙ. Тренажёр ВП уводит гостя сюда со своего
+    варианта и ждёт, что после регистрации человек вернётся туда же (решение
+    владельца 22.09.2026). Чужой адрес в `next` — это открытый перенаправитель,
+    поэтому он проверяется `url_has_allowed_host_and_scheme` и при непригодности
+    молча заменяется прежним `/profile/?welcome=1`.
     """
 
     template_name = 'registration/register.html'
     form_class = RegisterForm
+    #: Куда уходит тот, кто пришёл без `next`.
+    default_next = '/profile/?welcome=1'
+
+    def _next(self):
+        """Безопасный адрес возврата из запроса или пусто."""
+        target = self.request.POST.get('next') or self.request.GET.get('next') or ''
+        if target and url_has_allowed_host_and_scheme(
+                target, allowed_hosts={self.request.get_host()},
+                require_https=self.request.is_secure()):
+            return target
+        return ''
 
     def dispatch(self, request, *args, **kwargs):
         # Вошедшему регистрироваться незачем — уводим в профиль.
@@ -133,6 +151,7 @@ class RegisterView(FormView):
         context = super().get_context_data(**kwargs)
         context['locked_seconds'] = ratelimit.check(REGISTER_SCOPE,
                                                     self.request, None)
+        context['next'] = self._next()
         return context
 
     def post(self, request, *args, **kwargs):
@@ -162,4 +181,4 @@ class RegisterView(FormView):
                                multiplier=1)
 
         login(self.request, user)   # cycle_key Django делает сам
-        return redirect('/profile/?welcome=1')
+        return redirect(self._next() or self.default_next)

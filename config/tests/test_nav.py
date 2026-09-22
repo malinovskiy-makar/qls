@@ -8,10 +8,15 @@
 Считать в файле стало нечего — и это к лучшему: важно, что видит человек.
 """
 import re
+from datetime import datetime, time, timedelta
+from datetime import timezone as dt_timezone
+from unittest import mock
 
 from django.test import TestCase
+from django.utils import timezone
 
 from problems.models import User
+from vp.config import NEW_BADGE_UNTIL
 
 PASSWORD = 'nav-probe-2026'
 
@@ -31,10 +36,36 @@ TEMPLATE_PAGES = (
 )
 
 
+NAV_LINK = re.compile(r'<a class="(nav-link[^"]*)"[^>]*>(.*?)</a>', re.S)
+NAV_FLAG = re.compile(r'<span class="nav-flag">.*?</span>', re.S)
+
+
+def link_label(inner):
+    """Подпись пункта из содержимого `<a>`: без метки NEW и без вложенной разметки.
+
+    ⚠️ МЕТКА ВЫРЕЗАЕТСЯ ЦЕЛИКОМ, А НЕ ТОЛЬКО ТЕГИ. Прежняя регулярка брала текст без
+    вложенных тегов, и пункт с `<span class="nav-flag">` пропадал из списка — тесты
+    оставались бы зелёными на пустом месте. А если вычищать одни теги, подпись стала бы
+    «Тренажёр ВПNEW» и перестала бы совпадать сразу после 1 октября, когда метка гаснет
+    по дате: тест сломался бы от календаря, а не от кода.
+    """
+    return re.sub(r'<[^>]+>', '', NAV_FLAG.sub('', inner)).strip()
+
+
 def nav_labels(html):
     """Подписи пунктов ряда в шапке (не в панели узкого экрана)."""
     block = html.split('<div class="nav-links">', 1)[-1].split('</div>', 1)[0]
-    return re.findall(r'class="nav-link[^"]*"[^>]*>([^<]+)</a>', block)
+    return [link_label(inner) for _, inner in NAV_LINK.findall(block)]
+
+
+def active_labels(html):
+    """Подписи пунктов с классом is-active по всей странице (шапка и панель).
+
+    Класс ищется среди классов, а не строкой `class="nav-link is-active"`: у пункта с
+    меткой их три, и порядок не должен иметь значения.
+    """
+    return [link_label(inner) for classes, inner in NAV_LINK.findall(html)
+            if 'is-active' in classes.split()]
 
 
 class MenuByRoleTests(TestCase):
@@ -48,7 +79,7 @@ class MenuByRoleTests(TestCase):
     def test_guest(self):
         self.assertEqual(
             self._labels(),
-            ['Каталог', 'Учебник', 'Олимпиады', 'Графики', 'Wecon Rush'])
+            ['Каталог', 'Учебник', 'Олимпиады', 'Тренажёр ВП', 'Графики', 'Wecon Rush'])
 
     def test_student_has_lessons_and_no_stats(self):
         user = User.objects.create_user(username='nav_st', password=PASSWORD,
@@ -56,7 +87,7 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(
             labels,
-            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады',
+            ['Занятия', 'Каталог', 'Учебник', 'Олимпиады', 'Тренажёр ВП',
              'Графики', 'Wecon Rush'])
         # Статистика живёт в профиле; двух входов в одно место быть не должно.
         self.assertNotIn('Статистика', labels)
@@ -66,7 +97,7 @@ class MenuByRoleTests(TestCase):
                                         role='teacher')
         self.assertEqual(
             self._labels(user),
-            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады',
+            ['Ученики', 'Каталог', 'Учебник', 'Олимпиады', 'Тренажёр ВП',
              'Графики', 'Wecon Rush'])
 
     def test_staff_gets_admin_item(self):
@@ -93,21 +124,22 @@ class MenuByRoleTests(TestCase):
         labels = self._labels(user)
         self.assertEqual(len(labels), len(set(labels)), labels)
 
-    def test_counts_are_five_six_six(self):
-        """Числовой инвариант состава: гость 5, ученик 6, учитель 6.
+    def test_counts_are_six_seven_seven(self):
+        """Числовой инвариант состава: гость 6, ученик 7, учитель 7.
 
-        Было 5 / 7 / 7 — «Календарь» ушёл из шапки 08.09.2026.
+        Было 5 / 7 / 7 — «Календарь» ушёл из шапки 08.09.2026; стало на один больше у
+        всех — «Тренажёр ВП» (до 22.09.2026 «Высшая проба») встал после «Олимпиад» (сезонный пункт, сессия 4).
         """
         student = User.objects.create_user(username='nav_c1', password=PASSWORD,
                                            role='student')
         teacher = User.objects.create_user(username='nav_c2', password=PASSWORD,
                                            role='teacher')
         self.client.logout()
-        self.assertEqual(len(self._labels()), 5)
+        self.assertEqual(len(self._labels()), 6)
         self.client.logout()
-        self.assertEqual(len(self._labels(student)), 6)
+        self.assertEqual(len(self._labels(student)), 7)
         self.client.logout()
-        self.assertEqual(len(self._labels(teacher)), 6)
+        self.assertEqual(len(self._labels(teacher)), 7)
 
     def test_calendar_left_the_menu_but_the_page_is_alive(self):
         """⚠️ Убрана ССЫЛКА, а не раздел.
@@ -149,10 +181,11 @@ class ActiveItemTests(TestCase):
     def test_only_the_current_item_is_active(self):
         for url, expected in (('/catalog/', 'Каталог'),
                               ('/olympiads/', 'Олимпиады'),
+                              ('/vp/', 'Тренажёр ВП'),
                               ('/game/', 'Wecon Rush'),
                               ('/textbook/', 'Учебник')):
             html = self.client.get(url).content.decode('utf-8')
-            active = re.findall(r'class="nav-link is-active"[^>]*>([^<]+)</a>', html)
+            active = active_labels(html)
             self.assertEqual(set(active), {expected}, '%s → %s' % (url, active))
 
     def test_active_style_is_colour_and_underline_without_fill(self):
@@ -186,6 +219,181 @@ class ActiveItemTests(TestCase):
         glow = re.findall(r'--nav-accent-glow:\s*([^;]+);', html)
         self.assertEqual(len(glow), 2, glow)
         self.assertEqual(len(set(v.strip() for v in glow)), 1, glow)
+
+
+class VpItemTests(TestCase):
+    """Пункт «Тренажёр ВП»: подпись, метка NEW, состояние «раздел открыт» (22.09.2026).
+
+    ⚠️ ДАТЫ ВЫВЕДЕНЫ ИЗ `NEW_BADGE_UNTIL`, А НЕ ВПИСАНЫ. Метка гаснет по календарю,
+    и тест с вписанным «сегодня» сломался бы сам, в тот день, когда её срок выйдет. Время
+    двигается тем же патчем `timezone.now`, что и в тестах ВП (`vp/tests/helpers.at`);
+    граница считается по местной полуночи (`localdate()`), а не по UTC.
+    """
+
+    @staticmethod
+    def _edge():
+        """Местная полночь дня, когда метка гаснет."""
+        return timezone.make_aware(datetime.combine(NEW_BADGE_UNTIL, time.min))
+
+    def _get(self, url, moment, user=None):
+        if user is not None:
+            self.client.force_login(user)
+        # Настоящий `timezone.now()` отдаёт время в UTC — патчим им же, иначе проверка «по UTC
+        # вместо местной даты» проходила бы: `.date()` московского момента и так московский.
+        with mock.patch('django.utils.timezone.now', return_value=moment.astimezone(dt_timezone.utc)):
+            return self.client.get(url)
+
+    def _html(self, url='/catalog/', moment=None):
+        moment = moment or self._edge() - timedelta(days=1)
+        return self._get(url, moment).content.decode('utf-8')
+
+    @staticmethod
+    def _rows(html):
+        """Ряды ссылок страницы: в шапке и в панели ☰ (циклов ровно два)."""
+        return [block.split('</div>', 1)[0]
+                for block in html.split('<div class="nav-links">')[1:]]
+
+    def _vp_links(self, html):
+        """Пункт ВП в каждом из рядов: список множеств классов."""
+        links = []
+        for row in self._rows(html):
+            found = [set(classes.split()) for classes, inner in NAV_LINK.findall(row)
+                     if link_label(inner) == 'Тренажёр ВП']
+            self.assertEqual(len(found), 1, row)
+            links.append(found[0])
+        return links
+
+    def test_label_is_the_trainer_and_the_old_name_is_gone(self):
+        users = [None,
+                 User.objects.create_user(username='nav_vp_st', password=PASSWORD, role='student'),
+                 User.objects.create_user(username='nav_vp_te', password=PASSWORD, role='teacher')]
+        moment = self._edge() - timedelta(days=1)      # метка горит: хелперы обязаны её пережить
+        for user in users:
+            self.client.logout()
+            rows = self._rows(self._get('/catalog/', moment, user).content.decode('utf-8'))
+            self.assertEqual(len(rows), 2)
+            for row in rows:
+                labels = [link_label(inner) for _, inner in NAV_LINK.findall(row)]
+                self.assertIn('Тренажёр ВП', labels)
+                self.assertNotIn('Высшая проба', labels)
+
+    def test_flag_is_drawn_once_per_row(self):
+        """Ожидаемое число — ДВА на страницу: одна метка в шапке, одна в панели ☰."""
+        html = self._html()
+        self.assertEqual(html.count('<span class="nav-flag">NEW</span>'), 2)
+        for row in self._rows(html):
+            self.assertEqual(row.count('<span class="nav-flag">NEW</span>'), 1, row)
+
+    def test_helpers_see_the_flagged_item(self):
+        """Хелперы подписей видят пункт с меткой — иначе он пропадал бы из списков молча."""
+        html = self._html()
+        self.assertEqual(nav_labels(html),
+                         ['Каталог', 'Учебник', 'Олимпиады', 'Тренажёр ВП', 'Графики', 'Wecon Rush'])
+
+    def test_only_the_trainer_carries_the_new_class(self):
+        """Состав остальных пунктов не тронут: is-new только у ВП, в обоих рядах."""
+        html = self._html()
+        for row in self._rows(html):
+            marked = [link_label(inner) for classes, inner in NAV_LINK.findall(row)
+                      if 'is-new' in classes.split()]
+            self.assertEqual(marked, ['Тренажёр ВП'], row)
+        for classes in self._vp_links(html):
+            self.assertIn('is-new', classes)
+
+    def test_context_keys_are_defaulted_for_every_other_item(self):
+        response = self._get('/catalog/', self._edge() - timedelta(days=1))
+        items = {i['label']: i for i in response.context['nav_items']}
+        self.assertEqual((items['Тренажёр ВП']['is_new'], items['Тренажёр ВП']['flag']), (True, 'NEW'))
+        for label, item in items.items():
+            if label != 'Тренажёр ВП':
+                self.assertEqual((item['is_new'], item['flag']), (False, ''), label)
+
+    def test_flag_goes_out_by_date_and_the_item_stays_a_plain_link(self):
+        """С этого дня — ни класса is-new, ни метки; пункт на месте, с той же подписью."""
+        for moment in (self._edge(), self._edge() + timedelta(days=30)):
+            response = self._get('/catalog/', moment)
+            html = response.content.decode('utf-8')
+            self.assertNotIn('<span class="nav-flag"', html, moment)
+            for classes in self._vp_links(html):
+                self.assertNotIn('is-new', classes, moment)
+            self.assertIn('<a class="nav-link" href="/vp/">Тренажёр ВП</a>', html, moment)
+            item = [i for i in response.context['nav_items'] if i['label'] == 'Тренажёр ВП'][0]
+            self.assertEqual((item['is_new'], item['flag']), (False, ''), moment)
+
+    def test_the_boundary_is_local_midnight_not_utc(self):
+        """Секундой раньше границы метка ещё горит, на границе — уже нет.
+
+        Москва — UTC+3: местная полночь наступает в 21:00 UTC предыдущего дня. Проверка
+        по `now().date()` вместо `localdate()` ошиблась бы на три часа."""
+        one_second = timedelta(seconds=1)
+        self.assertIn('<span class="nav-flag">', self._html(moment=self._edge() - one_second))
+        self.assertNotIn('<span class="nav-flag"', self._html(moment=self._edge()))
+
+    def test_open_section_keeps_new_class_and_gets_the_canon_colour(self):
+        """На странице раздела пункт несёт is-active И is-new, а подпись — бирюзовая."""
+        html = self._html('/vp/')
+        for classes in self._vp_links(html):
+            self.assertLessEqual({'is-active', 'is-new'}, classes)
+        self.assertEqual(set(active_labels(html)), {'Тренажёр ВП'})
+        # Метка у открытого раздела остаётся: «новое» дальше несёт только она.
+        self.assertEqual(html.count('<span class="nav-flag">NEW</span>'), 2)
+
+        # ⚠️ Правило ищется от НАЧАЛА СТРОКИ: подстрока `.nav-link.is-new.is-active {` есть и в
+        # панельном `.nav-panel .nav-link.is-new.is-active {`, а у того цвет тот же — тест на
+        # подстроку проспал бы удаление общего правила (нашла проверка зубастости).
+        rule = re.search(r'^\.nav-link\.is-new\.is-active \{([^}]*)\}', html, re.M)
+        self.assertIsNotNone(rule, 'нет общего правила .nav-link.is-new.is-active')
+        self.assertIn('color: var(--nav-accent)', rule.group(1))
+
+    def test_hover_rules_of_the_new_item_do_not_beat_the_open_one(self):
+        """⚠️ Наведение на НОВЫЙ пункт не должно красить линию ОТКРЫТОГО раздела в янтарь.
+
+        Специфичность `.nav-link.is-new:hover::after` (0,3,1) выше, чем у
+        `.nav-link.is-active::after` (0,2,1): без `:not(.is-active)` неоновая линия
+        открытого раздела при наведении желтела бы."""
+        html = self._html()
+        self.assertNotIn('.nav-link.is-new:hover', html)
+        self.assertIn('.nav-link.is-new:not(.is-active):hover {', html)
+        self.assertIn('.nav-link.is-new:not(.is-active):hover::after {', html)
+
+    def test_panel_bar_belongs_to_the_open_section_only(self):
+        """В панели ☰: у открытого нового пункта риска бирюзовая, у невыбранного — прозрачная."""
+        html = self._html()
+        open_rule = html.split('.nav-panel .nav-link.is-new.is-active {', 1)[1].split('}', 1)[0]
+        self.assertIn('border-left-color: var(--nav-accent)', open_rule)
+        self.assertIn('color: var(--nav-accent)', open_rule)
+
+        new_rule = html.split('.nav-panel .nav-link.is-new {', 1)[1].split('}', 1)[0]
+        self.assertIn('color: var(--brand-amber)', new_rule)
+        # Риску новому пункту НЕ ставим: она осталась бы второй одинаковой в панели.
+        self.assertNotIn('border-left', new_rule)
+        base = html.split('.nav-panel .nav-link {', 1)[1].split('}', 1)[0]
+        self.assertIn('border-left: 2px solid transparent', base)
+
+    def test_flag_is_ink_on_amber_and_the_numbers_hold(self):
+        """Метка — чернила на янтаре (AAA 7,0), янтарная подпись на графите шапки (AA 4,5)."""
+        html = self._html()
+        rule = html.split('.nav-flag {', 1)[1].split('}', 1)[0]
+        self.assertIn('background: var(--brand-amber)', rule)
+        self.assertIn('color: var(--brand-amber-ink)', rule)
+
+        def token(name):
+            return re.search(r'--%s:\s*(#[0-9a-fA-F]{6})' % name, html).group(1)
+
+        def luminance(hex_colour):
+            channels = []
+            for i in (1, 3, 5):
+                c = int(hex_colour[i:i + 2], 16) / 255
+                channels.append(c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4)
+            return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2]
+
+        def contrast(a, b):
+            hi, lo = sorted((luminance(a), luminance(b)), reverse=True)
+            return (hi + 0.05) / (lo + 0.05)
+
+        self.assertGreaterEqual(contrast(token('brand-amber-ink'), token('brand-amber')), 7.0)
+        self.assertGreaterEqual(contrast(token('brand-amber'), token('nav-bg')), 4.5)
+        self.assertGreaterEqual(contrast(token('brand-amber-hover'), token('nav-bg')), 4.5)
 
 
 class VersionBadgeTests(TestCase):

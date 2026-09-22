@@ -1,0 +1,117 @@
+{% comment %}
+Выпадающий список вкладки «Аккаунт» — ОДИН партиал на все шесть полей.
+
+    {% include 'platform/_pf_dd.html' with field=form.grade label='Класс' kind='single' %}
+    {% include 'platform/_pf_dd.html' with field=form.level  label='…' kind='level' levels=levels %}
+    {% include 'platform/_pf_dd.html' with field=form.prep_mode label='…' kind='multi' %}
+    {% include 'platform/_pf_dd.html' with field=form.olympiad_history label='…'
+       kind='multi' groups=olympiad_groups none_code='none' %}
+
+⚠️ ЭТО `<details>`, А НЕ СВОЙ КОМПОНЕНТ. Список открывается и закрывается
+браузером, а поля внутри — обычные радиокнопки и галочки формы: без JS
+страница остаётся рабочей и отправляется как есть (решение владельца 22.09.2026).
+`profile.js` только улучшает поведение: закрывает соседей, обновляет надпись
+закрытого состояния, считает выбранное.
+
+⚠️ ЗАКРЫТОЕ СОСТОЯНИЕ РИСУЕТ СЕРВЕР. Иначе до загрузки скрипта человек видел
+бы «Не выбрано» там, где у него всё выбрано. Скрипт потом только поддерживает.
+
+Тексты вариантов приходят из модели и формы (`OLYMPIAD_GROUPS`, `LEVEL_HINTS`,
+`choices`); в шаблоне их нет.
+{% endcomment %}
+<span class="pf-label" id="pf-lbl-{{ field.name }}">{{ label }}</span>
+<details class="pf-dd" data-kind="{{ kind }}" data-field="{{ field.name }}">
+  <summary class="pf-dd-btn" aria-labelledby="pf-lbl-{{ field.name }}">
+    {% if kind == 'multi' %}
+    <span class="pf-dd-chips">
+      {% if field.value %}
+        {% for code, text in field.field.choices %}{% if code in field.value %}<span class="pf-chip">{{ text }}</span>{% endif %}{% endfor %}
+      {% else %}
+      <span class="pf-dd-value pf-dd-value--empty">Не выбрано</span>
+      {% endif %}
+    </span>
+    {% elif kind == 'level' %}
+    <span class="pf-dd-value{% if not field.value %} pf-dd-value--empty{% endif %}">
+      {% if field.value %}
+        {% for code, text, hint in levels %}{% if code == field.value %}<b>{{ text }}</b><span class="pf-dd-desc"> · {{ hint }}</span>{% endif %}{% endfor %}
+      {% else %}Не выбрано{% endif %}
+    </span>
+    {% else %}
+    <span class="pf-dd-value{% if not field.value %} pf-dd-value--empty{% endif %}">
+      {% if field.value %}{% for code, text in field.field.choices %}{% if code and code == field.value %}{{ text }}{% endif %}{% endfor %}{% else %}Не выбрано{% endif %}
+    </span>
+    {% endif %}
+    <span class="pf-dd-chev" aria-hidden="true">{% include '_icon.html' with name='chevron_down' %}</span>
+  </summary>
+
+  <div class="pf-dd-panel" role="group" aria-labelledby="pf-lbl-{{ field.name }}">
+    {% if kind == 'multi' %}
+      {% if groups %}
+      {% comment %}Олимпиады: группы с полными подписями, «Пока ни одной» отдельно внизу.{% endcomment %}
+      {% for title, options in groups %}
+      <p class="pf-group">{{ title }}</p>
+      {% for code, text in options %}
+      {% comment %}`data-chip` — КОРОТКАЯ подпись из `OLYMPIAD_HISTORY`: в раскрытом
+      списке подписи полные, а в плашку закрытого они не помещаются. Скрипт берёт
+      плашку отсюда, чтобы после первого же выбора она не подменилась длинной.{% endcomment %}
+      <label class="pf-opt">
+        <input class="pf-sr" type="checkbox" name="{{ field.name }}" value="{{ code }}"{% for c, short in field.field.choices %}{% if c == code %} data-chip="{{ short }}"{% endif %}{% endfor %}{% if code in field.value %} checked{% endif %}>
+        <span class="pf-box" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+        <span class="pf-opt-text"><span class="pf-opt-name">{{ text }}</span></span>
+      </label>
+      {% endfor %}
+      {% endfor %}
+      <div class="pf-sep" role="separator"></div>
+      {% for code, text in field.field.choices %}{% if code == none_code %}
+      <label class="pf-opt pf-opt--none">
+        <input class="pf-sr" type="checkbox" name="{{ field.name }}" value="{{ code }}"{% if code in field.value %} checked{% endif %}>
+        <span class="pf-box" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+        <span class="pf-opt-text"><span class="pf-opt-name">{{ text }}</span></span>
+      </label>
+      {% endif %}{% endfor %}
+      {% else %}
+      {% for code, text in field.field.choices %}
+      <label class="pf-opt">
+        <input class="pf-sr" type="checkbox" name="{{ field.name }}" value="{{ code }}"{% if code in field.value %} checked{% endif %}>
+        <span class="pf-box" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+        <span class="pf-opt-text"><span class="pf-opt-name">{{ text }}</span></span>
+      </label>
+      {% endfor %}
+      {% endif %}
+      <div class="pf-dd-foot">
+        <button type="button" class="pf-link-btn" data-dd-reset>Сбросить</button>
+        <span class="pf-dd-acts">
+          <span class="pf-dd-count" data-dd-count></span>
+          <button type="button" class="pf-btn-sm" data-dd-done>Готово</button>
+        </span>
+      </div>
+    {% else %}
+      {% comment %}Пустой вариант «Не выбрано» стоит первым у всех списков.{% endcomment %}
+      <label class="pf-opt pf-opt--none{% if not field.value %} is-sel{% endif %}">
+        <input class="pf-sr" type="radio" name="{{ field.name }}" value=""{% if not field.value %} checked{% endif %}>
+        <span class="pf-opt-text"><span class="pf-opt-name">Не выбрано</span></span>
+        <span class="pf-opt-tick" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+      </label>
+      {% if kind == 'level' %}
+      {% for code, text, hint in levels %}
+      <label class="pf-opt pf-opt--rich{% if code == field.value %} is-sel{% endif %}">
+        <input class="pf-sr" type="radio" name="{{ field.name }}" value="{{ code }}"{% if code == field.value %} checked{% endif %}>
+        <span class="pf-opt-text">
+          <span class="pf-opt-name">{{ text }}</span>
+          <span class="pf-opt-desc">{{ hint }}</span>
+        </span>
+        <span class="pf-opt-tick" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+      </label>
+      {% endfor %}
+      {% else %}
+      {% for code, text in field.field.choices %}{% if code %}
+      <label class="pf-opt{% if code == field.value %} is-sel{% endif %}">
+        <input class="pf-sr" type="radio" name="{{ field.name }}" value="{{ code }}"{% if code == field.value %} checked{% endif %}>
+        <span class="pf-opt-text"><span class="pf-opt-name">{{ text }}</span></span>
+        <span class="pf-opt-tick" aria-hidden="true">{% include '_icon.html' with name='check' %}</span>
+      </label>
+      {% endif %}{% endfor %}
+      {% endif %}
+    {% endif %}
+  </div>
+</details>
