@@ -127,3 +127,22 @@ def minutes(value):
 def grade_label(value):
     """'9-10' → «9–10 классы», '11' → «11 класс»."""
     return {'9-10': '9–10 классы', '11': '11 класс'}.get(value, f'{value} кл.')
+
+
+@register.filter
+def grade_chip(value):
+    """'9-10' → «9–10», '11' → «11»: класс в узкую колонку таблицы, без слова."""
+    return {'9-10': '9–10', '11': '11'}.get(value, str(value))
+
+
+@register.filter
+def plural_word(value, forms):
+    """«44|plural_word:"задание,задания,заданий"» → «задания»: слово без числа.
+
+    Нужно там, где число стоит отдельно и крупно (плитки фактов посадочной).
+    """
+    number = _decimal(value)
+    if number is None:
+        return ''
+    one, few, many = [form.strip() for form in forms.split(',')]
+    return _plural(number, one, few, many)

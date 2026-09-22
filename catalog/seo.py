@@ -192,6 +192,17 @@ def vp_landing_meta(has_demo):
     }
 
 
+def vp_variants_meta():
+    """`seo_title` и `seo_description` экрана выбора варианта `/vp/variants/`."""
+    return {
+        'seo_title': 'Варианты 1 тура «Высшей пробы» по экономике | %s' % BRAND,
+        'seo_description': (
+            'Варианты 1 тура отборочного этапа олимпиады «Высшая проба» по экономике '
+            'для 9\u201310 и 11 классов: демоверсии и пробные, на время или без таймера, '
+            'с автопроверкой и разбором.'),
+    }
+
+
 def vp_variant_meta(title, band_label, year):
     """`seo_title` и `seo_description` страницы варианта `/vp/<слаг>/`."""
     return {

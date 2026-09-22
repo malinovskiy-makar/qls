@@ -9,16 +9,23 @@
 """
 from decimal import Decimal
 
+from django.utils import timezone
+
 from vp import blocks, scoring
 from vp.config import BANDS
 from vp.loader import chain_letters
-from vp.models import VPVariant
+from vp.models import VPAttempt, VPVariant
 
 _ZERO = Decimal('0')
 _BAND_LABELS = dict(BANDS)
 
 _MONTHS = ('января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа',
            'сентября', 'октября', 'ноября', 'декабря')
+
+#: То же, но в плитку факта: «26 и 30 сент.». Месяцы, которые не сокращаются
+#: («мая», «июня», «июля»), остаются как есть – сокращать их не во что.
+_MONTHS_SHORT = ('янв.', 'февр.', 'мар.', 'апр.', 'мая', 'июня', 'июля', 'авг.',
+                 'сент.', 'окт.', 'нояб.', 'дек.')
 
 #: Чей вариант показывать в примере змейки в первую очередь. Пример открывает четыре
 #: настоящих ответа варианта, поэтому берём то, что не жалко: демонстрационный, потом
@@ -40,6 +47,21 @@ def dates_text(dates):
     if len({(d.year, d.month) for d in days}) == 1:
         return f'{_join([str(d.day) for d in days])} {_MONTHS[days[0].month - 1]} {days[0].year}'
     return _join([f'{d.day} {_MONTHS[d.month - 1]} {d.year}' for d in days])
+
+
+def dates_short(dates):
+    """Даты тура в плитку факта: «26 и 30 сент.»; пустой список — пустая строка.
+
+    Года здесь нет: плитка стоит рядом с заголовком, где год уже сказан, а
+    место в ней на одну строку. Разошлись месяцы — каждая дата со своим
+    («30 сент. и 2 окт.»), иначе месяц один на всех.
+    """
+    days = sorted(dates)
+    if not days:
+        return ''
+    if len({(d.year, d.month) for d in days}) == 1:
+        return f'{_join([str(d.day) for d in days])} {_MONTHS_SHORT[days[0].month - 1]}'
+    return _join([f'{d.day} {_MONTHS_SHORT[d.month - 1]}' for d in days])
 
 
 # ---------------------------------------------------------------- формат
@@ -154,3 +176,152 @@ def snake_example(published, length=4):
                 'words': [_marked(i.answer, n == len(best) - 1) for n, i in enumerate(best)],
             }
     return None
+
+
+# ------------------------------------------------------- «моё» на странице
+
+def _lapsed_finalized(attempt):
+    """Сдаёт попытку, если её время вышло, и говорит, жива ли она ещё.
+
+    ⚠️ ЛЕНИВЫЙ ИМПОРТ `views` НАМЕРЕННО: `views` импортирует этот модуль, и
+    импорт наверху файла замкнул бы круг. Правило автосдачи одно на весь
+    раздел и живёт в `views` вместе с самой сдачей — второй копии не заводим.
+    """
+    from vp import views
+
+    if views._lapsed(attempt):
+        views._finalize(attempt, auto=True)
+        return False
+    return True
+
+
+def current_attempt_any(request):
+    """Живая несданная попытка этого человека по ЛЮБОМУ варианту или `None`.
+
+    То же правило, что у `views._current_attempt`, но без фильтра по варианту:
+    посадочная зовёт человека продолжить ту работу, которую он бросил, какой бы
+    вариант это ни был. Просроченная сдаётся здесь же — показывать «продолжить»
+    у работы, время которой вышло, значило бы обманывать.
+    """
+    if not request.user.is_authenticated:
+        return None
+    attempts = (VPAttempt.objects
+                .filter(user=request.user, submitted_at__isnull=True)
+                .select_related('variant')
+                .order_by('-started_at', '-id'))
+    for attempt in attempts:
+        if _lapsed_finalized(attempt):
+            return attempt
+    return None
+
+
+def answered_count(attempt):
+    """Сколько заданий отвечено. «Пусто» — по правилу подсчёта баллов."""
+    return sum(1 for a in attempt.answers.all() if not scoring.is_blank(a.raw))
+
+
+def variant_status(user, variant):
+    """Что показать про вариант конкретному человеку.
+
+    Ключи: `kind` (`none` / `live` / `ranked` / `done`), `live` (несданная живая
+    попытка), `answered`, `count` (заданий в варианте), `best` (лучший балл среди
+    сданных), `ranked` (зачётная сданная попытка), `seconds`.
+
+    Гостю статуса нет вовсе: `None`. Он видит формат варианта, а не свою историю.
+    """
+    from vp import board
+
+    if user is None or not getattr(user, 'is_authenticated', False):
+        return None
+    attempts = list(VPAttempt.objects.filter(user=user, variant=variant)
+                    .prefetch_related('answers'))
+    live = next((a for a in sorted(attempts, key=lambda a: (a.started_at, a.pk), reverse=True)
+                 if a.submitted_at is None and _lapsed_finalized(a)), None)
+    submitted = [a for a in attempts if a.submitted_at is not None]
+    ranked = next((a for a in submitted if a.is_ranked), None)
+    best = max((a.score for a in submitted if a.score is not None), default=None)
+    if live is not None:
+        kind = 'live'
+    elif ranked is not None:
+        kind = 'ranked'
+    elif submitted:
+        kind = 'done'
+    else:
+        kind = 'none'
+    return {
+        'kind': kind,
+        'live': live,
+        'answered': answered_count(live) if live is not None else 0,
+        'count': variant.items.count(),
+        'best': best,
+        'ranked': ranked,
+        'seconds': board.spent_seconds(ranked) if ranked is not None else None,
+        'started': bool(attempts),
+    }
+
+
+def _dots(user, published):
+    """Квадратики «пройдено»: по одному на опубликованный вариант.
+
+    `ok` — есть сданная попытка, `half` — вариант начат, но не сдан, пусто —
+    не трогали. Порядок тот же, что в списке вариантов: по классам и `order`.
+    """
+    submitted = set(VPAttempt.objects
+                    .filter(user=user, submitted_at__isnull=False)
+                    .values_list('variant_id', flat=True))
+    started = set(VPAttempt.objects.filter(user=user).values_list('variant_id', flat=True))
+    dots, done = [], 0
+    for variant in published:
+        if variant.pk in submitted:
+            dots.append('ok')
+            done += 1
+        elif variant.pk in started:
+            dots.append('half')
+        else:
+            dots.append('')
+    return dots, done
+
+
+def _ordered(published):
+    """Опубликованные варианты в порядке страницы выбора: по классам, потом `order`."""
+    order = {code: n for n, (code, _) in enumerate(BANDS)}
+    return sorted(published, key=lambda v: (order.get(v.grade_band, len(order)), v.order, v.pk))
+
+
+def my_block(request, published):
+    """Полоса «моё» под сеткой: начатая работа, лучшая попытка, пройдено.
+
+    Гостю полоса не нужна — вернётся `None`, и шаблон покажет приглашение
+    зарегистрироваться. Все числа — из попыток этого человека, не из сессии.
+    """
+    from problems import exam_engine
+    from vp import board
+
+    user = request.user
+    if not user.is_authenticated:
+        return None
+    ordered = _ordered(published)
+
+    current = current_attempt_any(request)
+    dots, done = _dots(user, ordered)
+    untouched = [v for v, dot in zip(ordered, dots) if dot == '']
+    best_attempt, place = board.my_best(user)
+
+    return {
+        'current': current,
+        'current_answered': answered_count(current) if current is not None else 0,
+        'current_count': current.variant.items.count() if current is not None else 0,
+        # Остаток времени считает `exam_engine`, как везде в разделе: своей
+        # арифметики остатка в проекте нет и заводить её нельзя.
+        'current_left': (exam_engine.seconds_remaining(current, timezone.now())
+                         if current is not None and current.with_timer else None),
+        # Следующий вариант — первый, которого человек ещё не открывал.
+        'next_variant': untouched[0] if untouched else None,
+        'best': best_attempt,
+        'best_place': place,
+        'best_seconds': board.spent_seconds(best_attempt) if best_attempt else None,
+        'dots': dots,
+        'done': done,
+        'total': len(ordered),
+        'all_done': not untouched,
+    }

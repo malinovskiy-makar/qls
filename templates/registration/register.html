@@ -44,6 +44,12 @@
 
   <form method="post" novalidate>
     {% csrf_token %}
+    {% comment %}
+    Куда вернуть после регистрации. Заполняется, только когда человека сюда
+    привели с конкретной страницы (тренажёр ВП со своего варианта); адрес уже
+    проверен сервером на «свой», чужой сюда не доедет.
+    {% endcomment %}
+    {% if next %}<input type="hidden" name="next" value="{{ next }}">{% endif %}
 
     <div class="form-group">
       <label for="{{ form.username.id_for_label }}">Логин</label>

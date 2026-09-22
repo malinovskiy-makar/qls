@@ -375,6 +375,7 @@ class SeoTests(LandingBase):
         draft.save()
         attempt = submit(self.variant, {}, session_key='sitemap-guest')
         client = Client()
+        client.force_login(User.objects.create_user('vp_sitemap', password='p12345'))
         client.post(reverse('vp:start', args=['vp-land']))          # ещё и живая несданная попытка
         response = client.get('/sitemap.xml')
         self.assertEqual(response.status_code, 200)
@@ -390,6 +391,7 @@ class SeoTests(LandingBase):
     def test_06_result_and_attempt_pages_are_noindex_the_landing_is_not(self):
         attempt = submit(self.variant, {}, session_key='noindex-guest')
         owner = Client()
+        owner.force_login(User.objects.create_user('vp_noindex', password='p12345'))
         owner.post(reverse('vp:start', args=['vp-land']))
         started = owner.session['vp_attempts'][0]
         for client in (Client(), owner):                                        # чужой и владелец

@@ -1,0 +1,94 @@
+{% extends 'vp/base_vp.html' %}
+{% load static vp_extras %}
+{% comment %}
+Экран выбора класса и варианта `/vp/variants/`.
+
+⚠️ ПУБЛИЧНЫЙ. Гость видит карточки и состав варианта, но не свою историю –
+у него её нет. Статус («Начат», «в таблице», «Пройден») считает
+`landing.variant_status`, и он же стоит на посадочной – двух правил быть не должно.
+
+⚠️ КЛАСС ВЫБИРАЕТСЯ ССЫЛКОЙ `?band=`, без JS: экран должен работать у того, у кого
+скрипты не выполнились.
+{% endcomment %}
+{% block title %}Варианты 1 тура{% endblock %}
+{% block content %}
+<div class="vp-sel">
+
+  <div class="vp-sel-head">
+    <div>
+      <a class="vp-back" href="{% url 'vp:index' %}">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+        Тренажёр ВП
+      </a>
+      <h1 class="vp-sel-h1">Выберите класс и вариант</h1>
+      {% if user.is_authenticated %}
+      <p class="vp-sel-sub">Первая попытка по варианту с таймером идёт в таблицу лучших попыток. Повторные – тренировка.</p>
+      {% else %}
+      <p class="vp-sel-sub">Открыть можно любой. Чтобы начать прохождение, понадобится короткая бесплатная регистрация.</p>
+      {% endif %}
+    </div>
+    {% if bands|length > 1 %}
+    <div class="vp-seg" role="group" aria-label="Классы">
+      {% for band in bands %}
+      <a href="?band={{ band.code }}"{% if band.code == current.code %} aria-current="true"{% endif %}>{{ band.label }} <small>{{ band.count }}</small></a>
+      {% endfor %}
+    </div>
+    {% endif %}
+  </div>
+
+  {% if cards %}
+  <div class="vp-vgrid">
+    {% for card in cards %}
+    <article class="vp-vcard{% if card.status.kind == 'live' %} is-live{% endif %}">
+      <div class="vp-vcard-e">
+        <span>{{ card.eyebrow }}</span>
+        {% if card.variant.source_label %}
+        <span class="vp-vcard-src">Источник: <a class="vp-link" href="{{ card.variant.source_url }}" target="_blank" rel="noopener">{{ card.variant.source_label }}</a></span>
+        {% else %}
+        <span class="vp-vcard-src">{{ card.variant.year }}</span>
+        {% endif %}
+      </div>
+      <h2 class="vp-vcard-t"><a href="{% url 'vp:intro' card.variant.slug %}">{{ card.variant.title }}</a></h2>
+      <p class="vp-vcard-m">{{ card.variant.get_source_kind_display }}{% if card.variant.source_note %} · {{ card.variant.source_note }}{% endif %}{% if card.variant.author %} · {{ card.variant.author }}{% endif %}</p>
+
+      <div class="vp-vcard-f">
+        {% if not card.variant.is_published %}
+        <span class="vp-st is-draft">Не опубликован</span>
+        {% elif not card.status %}
+        <span class="vp-st">{{ card.count|plural:"задание,задания,заданий" }} · {{ card.minutes|plural:"минута,минуты,минут" }}</span>
+        {% elif card.status.kind == 'live' %}
+        <span class="vp-st is-live"><span class="vp-land-live"><i aria-hidden="true"></i></span>Начат · {{ card.status.answered }} из {{ card.status.count }}</span>
+        {% elif card.status.kind == 'ranked' %}
+        <span class="vp-st is-ok">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+          {{ card.status.ranked.score|num }} · {{ card.status.seconds|mmss }} · в таблице
+        </span>
+        {% elif card.status.kind == 'done' %}
+        <span class="vp-st">Пройден · лучший {{ card.status.best|num }}</span>
+        {% else %}
+        <span class="vp-st">Не решали</span>
+        {% endif %}
+
+        {% if card.status.kind == 'live' %}
+        <a class="vp-land-btn is-solid" href="{% url 'vp:take' card.status.live.public_code %}">Продолжить</a>
+        {% else %}
+        <a class="vp-land-btn" href="{% url 'vp:intro' card.variant.slug %}">Открыть</a>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="vp-land-empty">Опубликованных вариантов пока нет.</p>
+  {% endif %}
+
+  <div class="vp-sel-foot">
+    <span>Ответы сохраняются сами, проходить можно сколько угодно раз.</span>
+    {% if user.is_authenticated %}<a class="vp-link" href="{% url 'vp:my' %}">Мои попытки</a>{% endif %}
+    <a class="vp-link" href="{% url 'vp:index' %}#rules">Правила и формат</a>
+    <a class="vp-ext" href="https://olymp.hse.ru/mmo/materials-eco" target="_blank" rel="noopener">Материалы ВШЭ
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 4h6v6M20 4l-9 9M18 13v6H5V6h6"/></svg>
+    </a>
+  </div>
+</div>
+{% endblock %}

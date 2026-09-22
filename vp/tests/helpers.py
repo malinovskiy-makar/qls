@@ -63,6 +63,32 @@ def make_published(slug='vp-t'):
     return variant
 
 
+def guest_attempt(client, variant, remember=True):
+    """Гостевая попытка, какие заводились ДО стены регистрации (22.09.2026).
+
+    Через ORM, потому что через экран её больше не создать: `views.start` уводит
+    гостя на регистрацию. Такие попытки в базе есть, по ним живут старые ссылки
+    на результат, и владение у них по сессии – это и проверяют сценарии.
+    """
+    from datetime import timedelta
+
+    from django.utils import timezone
+
+    from vp import views
+
+    client.logout()
+    session = client.session
+    session.save()
+    attempt = VPAttempt.objects.create(
+        variant=variant, session_key=session.session_key, with_timer=True,
+        max_score=variant.max_score, public_code=views._new_code(),
+        expires_at=timezone.now() + timedelta(seconds=variant.duration_seconds))
+    if remember:
+        session['vp_attempts'] = [attempt.public_code]
+        session.save()
+    return attempt
+
+
 def at(moment):
     """Заморозить `timezone.now()` для всего проекта, пока идёт `with at(...)`.
 

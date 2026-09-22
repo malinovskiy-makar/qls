@@ -41,7 +41,11 @@ class EventsBase(TestCase):
     def setUp(self):
         cache.clear()
         self.variant = make_review_variant('vp-an')
+        # Стена регистрации (22.09.2026): старт и сдача бывают только у вошедшего,
+        # поэтому и воронка меряется на нём. Посадочную по-прежнему смотрит любой.
         self.guest = Client()
+        self.guest.force_login(
+            get_user_model().objects.create_user('vp_an', password='p12345'))
 
     def start(self, client=None, **post):
         client = client or self.guest

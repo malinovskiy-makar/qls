@@ -9,6 +9,7 @@
 События (имя: поля):
   vp_landing_open — открыл посадочную;
   vp_intro_open — открыл карточку варианта: variant;
+  vp_gate_shown — гостю показали окно «сначала регистрация»: variant;
   vp_start — начал НОВУЮ попытку: variant, with_timer (продолжение начатой не в счёт);
   vp_submit — сдал: variant, score, answered, seconds_used, auto — один раз на попытку
               на браузер (первое открытие её результата владельцем);

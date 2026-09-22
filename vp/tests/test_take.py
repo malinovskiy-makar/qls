@@ -17,7 +17,7 @@ from django.urls import reverse
 from problems import exam_engine
 from vp import scoring, views
 from vp.models import VPAnswer, VPAttempt
-from vp.tests.helpers import at, make_published
+from vp.tests.helpers import at, guest_attempt, make_published
 
 User = get_user_model()
 
@@ -25,16 +25,40 @@ T0 = datetime(2026, 9, 26, 10, 0, 0, tzinfo=dt_timezone.utc)
 
 
 class ViewBase(TestCase):
+    """Общая обвязка сценариев прохождения.
+
+    ⚠️ С 22.09.2026 попытку заводит ТОЛЬКО вошедший (стена регистрации,
+    `views.start`), поэтому `self.guest` – браузер вошедшего человека, а
+    `self.stranger` – браузер другого. Настоящие гостевые попытки в базе всё
+    ещё бывают: они заведены до стены, и владение у них по сессии. Такие
+    сценарии собирают попытку напрямую через ORM – `legacy_guest_attempt`.
+    """
+
     def setUp(self):
         self.variant = make_published()
+        self.me = User.objects.create_user('vp_me', password='p12345')
         self.guest = Client()
+        self.guest.force_login(self.me)
         self.stranger = Client()
+        self.stranger.force_login(User.objects.create_user('vp_them', password='p12345'))
 
     def start(self, client=None, **post):
         client = client or self.guest
         response = client.post(reverse('vp:start', args=[self.variant.slug]), post)
         self.assertEqual(response.status_code, 302, response.content[:300])
         return VPAttempt.objects.order_by('-id').first(), response
+
+    def fresh_client(self):
+        """Новый браузер нового человека: анонимному старт закрыт стеной."""
+        person = User.objects.create_user(
+            f'vp_p{User.objects.count():03d}', password='p12345')
+        client = Client()
+        client.force_login(person)
+        return client
+
+    def legacy_guest_attempt(self, client, remember=True):
+        """Гостевая попытка «до стены регистрации» – общий помощник тестов."""
+        return guest_attempt(client, self.variant, remember=remember)
 
     def take_url(self, attempt):
         return reverse('vp:take', args=[attempt.public_code])
@@ -82,7 +106,7 @@ class StartTests(ViewBase):
     def test_default_is_with_timer_and_zero_is_without(self):
         attempt, _ = self.start()
         self.assertTrue(attempt.with_timer)
-        other = Client()
+        other = self.fresh_client()
         attempt, _ = self.start(other, with_timer='0')
         self.assertFalse(attempt.with_timer)
 
@@ -91,6 +115,7 @@ class StartTests(ViewBase):
 
     def test_start_requires_csrf(self):
         strict = Client(enforce_csrf_checks=True)
+        strict.force_login(self.me)
         response = strict.post(reverse('vp:start', args=['vp-t']), {'with_timer': '1'})
         self.assertEqual(response.status_code, 403)
         self.assertEqual(VPAttempt.objects.count(), 0)
@@ -103,9 +128,11 @@ class StartTests(ViewBase):
     def test_draft_variant_is_closed_to_public_but_open_to_staff(self):
         self.variant.is_published = False
         self.variant.save()
+        anon = Client()
+        self.assertEqual(anon.get(reverse('vp:intro', args=['vp-t'])).status_code, 404)
         self.assertEqual(self.guest.get(reverse('vp:intro', args=['vp-t'])).status_code, 404)
         self.assertEqual(self.guest.post(reverse('vp:start', args=['vp-t'])).status_code, 404)
-        self.assertNotContains(self.guest.get(reverse('vp:index')), 'Тестовый вариант')
+        self.assertNotContains(anon.get(reverse('vp:index')), 'Тестовый вариант')
         staff = User.objects.create_user('vp_staff', password='p12345', is_staff=True)
         client = Client()
         client.force_login(staff)
@@ -114,13 +141,19 @@ class StartTests(ViewBase):
 
 
 class OwnerTests(ViewBase):
-    def test_guest_gets_a_session_and_the_code_is_remembered(self):
+    def test_start_remembers_the_code_in_the_session(self):
         attempt, _ = self.start()
         self.assertEqual(len(attempt.public_code), 12)
+        self.assertEqual(attempt.user, self.me)
+        self.assertEqual(self.guest.session['vp_attempts'], [attempt.public_code])
+
+    def test_legacy_guest_attempt_still_belongs_to_its_session(self):
+        """Попытка без пользователя открывается по ключу сессии и по коду в ней."""
+        attempt = self.legacy_guest_attempt(self.guest)
         self.assertIsNone(attempt.user)
         self.assertTrue(attempt.session_key)
         self.assertEqual(attempt.session_key, self.guest.session.session_key)
-        self.assertEqual(self.guest.session['vp_attempts'], [attempt.public_code])
+        self.assertEqual(self.guest.get(self.take_url(attempt)).status_code, 200)
 
     def test_logged_in_user_owns_by_user(self):
         user = User.objects.create_user('vp_u', password='p12345')
@@ -141,29 +174,33 @@ class OwnerTests(ViewBase):
 
     def test_guest_attempt_survives_login(self):
         """Ключ сессии при входе меняется, а код в данных сессии остаётся."""
-        attempt, _ = self.start()
-        user = User.objects.create_user('vp_late', password='p12345')
+        attempt = self.legacy_guest_attempt(self.guest)
+        User.objects.create_user('vp_late', password='p12345')
         self.assertTrue(self.guest.login(username='vp_late', password='p12345'))
         self.assertEqual(self.guest.get(self.take_url(attempt)).status_code, 200)
 
     def test_same_session_key_opens_a_guest_attempt_even_without_the_list(self):
-        attempt, _ = self.start()
-        session = self.guest.session
-        session['vp_attempts'] = []
-        session.save()
+        attempt = self.legacy_guest_attempt(self.guest, remember=False)
         self.assertEqual(self.guest.get(self.take_url(attempt)).status_code, 200)
 
     def test_list_in_session_opens_a_guest_attempt_after_key_rotation(self):
-        attempt, _ = self.start()
+        attempt = self.legacy_guest_attempt(self.guest)
         VPAttempt.objects.filter(pk=attempt.pk).update(session_key='другой-ключ')
         self.assertEqual(self.guest.get(self.take_url(attempt)).status_code, 200)
 
-    def test_two_guests_do_not_share_attempts(self):
+    def test_two_people_do_not_share_attempts(self):
         mine, _ = self.start(self.guest)
         theirs, _ = self.start(self.stranger)
         self.assertNotEqual(mine.pk, theirs.pk)
         self.assertEqual(self.guest.get(self.take_url(theirs)).status_code, 404)
         self.assertEqual(self.stranger.get(self.take_url(mine)).status_code, 404)
+
+    def test_two_guest_sessions_do_not_share_attempts(self):
+        """Старые гостевые попытки по-прежнему разделены ключом сессии."""
+        mine = self.legacy_guest_attempt(Client())
+        theirs = self.legacy_guest_attempt(Client())
+        self.assertNotEqual(mine.pk, theirs.pk)
+        self.assertEqual(Client().get(self.take_url(mine)).status_code, 404)
 
     def test_session_remembers_only_the_last_fifty_codes(self):
         request = SimpleNamespace(session={})
@@ -205,14 +242,14 @@ class IntroTests(ViewBase):
 
     def test_rules_ranges_and_penalty_example_follow_the_data(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        self.assertIn('Задания 1–35 и 43–44 — или полный балл, или ноль.', html)
+        self.assertIn('Задания 1–35 и 43–44 – или полный балл, или ноль.', html)
         self.assertIn('В заданиях 36–42 балл делится', html)
-        self.assertIn('верный даёт +1,5, лишний — −1', html)     # для трёхбалльных
+        self.assertIn('верный даёт +1,5, лишний – −1', html)     # для трёхбалльных
         for item in self.variant.items.filter(block__in=('multi', 'analytic')):
             item.points = D('6')
             item.save()
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
-        self.assertIn('верный даёт +3, лишний — −2', html)
+        self.assertIn('верный даёт +3, лишний – −2', html)
 
     def test_intro_shows_the_chain_example_and_mode_choice(self):
         html = self.guest.get(reverse('vp:intro', args=['vp-t'])).content.decode()
@@ -220,7 +257,7 @@ class IntroTests(ViewBase):
         self.assertIn('ликвидность', html)
         self.assertRegex(html, r'name="with_timer" value="1" checked')
         self.assertRegex(html, r'name="with_timer" value="0"')
-        self.assertIn('С таймером — 30 минут', html)
+        self.assertIn('С таймером – 30 минут', html)
         self.assertIn('Начать вариант', html)
 
     def test_intro_with_unfinished_attempt_offers_to_continue(self):
@@ -492,7 +529,7 @@ class ExpiryTests(TimeAndFinishBase):
         late = T0 + timedelta(seconds=1800 + 60)
         for name in ('take', 'save', 'time', 'finish', 'result'):
             with self.subTest(name):
-                self.guest = Client()
+                self.guest = self.fresh_client()
                 attempt = self.started(with_timer='1')
                 url = reverse(f'vp:{name}', args=[attempt.public_code])
                 with at(late):
@@ -730,7 +767,7 @@ class FinishTests(TimeAndFinishBase):
         early.refresh_from_db()
         self.assertFalse(early.is_auto_submitted)            # серверные часы не согласны
 
-        self.guest = Client()
+        self.guest = self.fresh_client()
         late = self.started(with_timer='1')
         with at(T0 + timedelta(seconds=1799)):
             self.finish(self.guest, late, auto='1')

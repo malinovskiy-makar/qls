@@ -3,6 +3,7 @@ import json
 import re
 from decimal import Decimal as D
 
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -19,6 +20,9 @@ class PageBase(TestCase):
     def setUp(self):
         self.variant = make_published()
         self.client = Client()
+        # Стена регистрации (22.09.2026): попытку заводит только вошедший.
+        self.client.force_login(
+            get_user_model().objects.create_user('vp_page', password='p12345'))
         self.attempt = self.start()
 
     def start(self, **post):
@@ -84,7 +88,10 @@ class LayoutTests(PageBase):
         self.assertRegex(html, r'id="vp-timer"[^>]*data-seconds="\d+"')
 
     def test_untimed_attempt_shows_the_words_instead_of_a_clock(self):
-        self.client.cookies.clear()
+        # Новый человек, а не «тот же браузер без печенек»: попытку заводит
+        # только вошедший, а у прежнего по этому варианту уже есть живая.
+        self.client.force_login(
+            get_user_model().objects.create_user('vp_page2', password='p12345'))
         self.attempt = self.start(with_timer='0')
         html = self.html()
         self.assertNotIn('id="vp-timer"', html)

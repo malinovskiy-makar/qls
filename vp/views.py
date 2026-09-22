@@ -1,11 +1,16 @@
 """Экраны тренажёра «Высшая проба»: список → вход → прохождение → результат.
 
-⚠️ ВХОД НЕ ТРЕБУЕТСЯ НИГДЕ, И ЭТО РЕШЕНИЕ, А НЕ ПРОПУСК: тренажёр открыт любому
-посетителю. Вошедшего узнаём по пользователю, гостя — по сессии. Публичны
-осознанно: список и вход (только опубликованные варианты), старт попытки и
-страница результата (владельцу — полный разбор, остальным — голый балл без
-ответов). Всё остальное принадлежит владельцу попытки: чужой код даёт 404 — как
-будто такой попытки нет.
+⚠️ ЧИТАТЬ МОЖНО ВСЕМ, ПРОХОДИТЬ — ТОЛЬКО ВОШЕДШЕМУ (решение владельца 22.09.2026,
+отменяет прежнее «вход не требуется нигде» от 21.09). Публичны осознанно:
+посадочная, список вариантов, интро, правила, таблица лучших попыток и страница
+результата (владельцу — полный разбор, остальным — голый балл без ответов).
+Вход требует ровно один адрес — `start`: попытка без аккаунта не попала бы в
+таблицу и потерялась бы при смене браузера. `my_attempts` — свой список, он тоже
+только для вошедшего. Всё остальное принадлежит владельцу попытки: чужой код
+даёт 404 — как будто такой попытки нет.
+
+⚠️ ГОСТЕВЫЕ ВЕТКИ `_owns` И `_current_attempt` ОСТАЮТСЯ И ПОСЛЕ СТЕНЫ: по ним
+живут старые ссылки на результаты гостевых попыток, заведённых до 22.09.
 
 ⚠️ ВЛАДЕЛЕЦ БЕРЁТСЯ ИЗ `request.user` И СЕССИИ, НИКОГДА ИЗ ДАННЫХ ЗАПРОСА. Адрес
 попытки (`public_code`) — не право доступа, а только адрес; его проверяет ровно
@@ -23,9 +28,11 @@ from datetime import timedelta
 from django.db.models import Q
 from django.db import transaction
 from django.http import Http404, JsonResponse
+from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 from django.templatetags.static import static
 from django.utils import timezone
+from django.utils.http import urlencode
 from django.views.decorators.cache import never_cache
 from django.urls import reverse
 from django.views.decorators.http import require_GET, require_POST
@@ -208,32 +215,199 @@ def _load_attempt(request, code):
 
 # --------------------------------------------------------- список и вход
 
-def index(request):
-    """Посадочная: что за тур, формат, как считаются баллы, змейка, варианты по классам.
+def _published(request=None):
+    """Опубликованные варианты с заданиями. Черновики сюда не попадают никогда:
+    числа страницы не должны меняться от того, кто её открыл."""
+    return list(VPVariant.objects.filter(is_published=True).prefetch_related('items'))
 
-    Публичный экран. Числа формата и пример змейки берутся из ОПУБЛИКОВАННЫХ вариантов, а
-    в списке персонал видит и черновики: страница не должна показывать другие числа тому,
-    кто открыл её вошедшим.
+
+def _source_links(published):
+    """Различные пары (подпись, ссылка) правообладателей — по одной ссылке на источник.
+
+    Для окна правил. Из данных: сегодня это один Олмат, завтра может быть два, а
+    без Олмата — ни одного, и раздел ссылок просто короче.
     """
-    variants = VPVariant.objects.all()
-    if not _is_staff(request):
-        variants = variants.filter(is_published=True)
-    variants = list(variants.prefetch_related('items'))
-    published = [v for v in variants if v.is_published]
-    bands = []
-    for code, label in BANDS:
-        chosen = [v for v in variants if v.grade_band == code]
-        if chosen:
-            bands.append({'label': label, 'variants': chosen})
+    seen, links = set(), []
+    for variant in published:
+        pair = (variant.source_label, variant.source_url)
+        if all(pair) and pair not in seen:
+            seen.add(pair)
+            links.append({'label': pair[0], 'url': pair[1]})
+    return links
+
+
+def index(request):
+    """Посадочная: тур слева, таблица лучших попыток справа, полоса «моё» внизу.
+
+    ⚠️ ЭКРАН БЕЗ ПРОКРУТКИ НА 1440×800 (образец — главная Wecon Rush). Всё, что не
+    влезает, живёт в окне «Правила и формат», а не растит страницу. Числа формата и
+    пример змейки — из ОПУБЛИКОВАННЫХ вариантов; список вариантов уехал на
+    отдельный экран `/vp/variants/`, здесь на него только ссылка.
+    """
+    published = _published()
     groups = landing.format_groups(published)
+    facts = landing.facts(groups)
+    snake = landing.snake_example(published)
+    rows, my_row, humans, attempts = board.top(me=request.user)
     has_demo = any(v.source_kind == VPVariant.SourceKind.DEMO for v in published)
+
+    # Диапазон номеров змейки — из таблицы блоков, а не из головы.
+    snake_row = next((r for g in groups for r in g['rows'] if r['block'] == 'snake'), None)
+    snake_total = 0
+    if snake is not None:
+        snake_total = sum(1 for i in snake['variant'].items.all() if i.block == 'snake')
+
+    guest_next = urlencode({'next': reverse('vp:index')})
     return render(request, 'vp/index.html', {
-        'bands': bands, 'groups': groups, 'facts': landing.facts(groups),
+        'groups': groups,
+        'facts': facts,
         'tour_dates': landing.dates_text(TOUR_DATES),
-        'has_snake': any(r['block'] == 'snake' for g in groups for r in g['rows']),
-        'snake': landing.snake_example(published),
+        'tour_dates_short': landing.dates_short(TOUR_DATES),
+        'has_snake': snake_row is not None,
+        'snake_range': snake_row['range'] if snake_row else '',
+        'snake': snake,
+        'snake_total': snake_total,
+        'rows': rows, 'my_row': my_row, 'board_humans': humans, 'board_attempts': attempts,
+        'mine': landing.my_block(request, published),
+        'source_links': _source_links(published),
+        'register_url': '' if request.user.is_authenticated else f"{reverse('register')}?{guest_next}",
+        'login_url': '' if request.user.is_authenticated else f"{reverse('login')}?{guest_next}",
         'vp_events': [tracking.event('vp_landing_open')],
         **seo.vp_landing_meta(has_demo),
+    })
+
+
+def _variant_eyebrow(variant, published):
+    """Надпись над названием карточки: «Демоверсия ВШЭ» или «Пробный · вариант k».
+
+    Номер k – порядковый номер АВТОРСКОГО варианта внутри своего класса, по
+    `order`. Он не хранится: список вариантов меняется, а номер должен идти
+    подряд от единицы в том порядке, в каком карточки стоят на экране.
+    """
+    if variant.source_kind == VPVariant.SourceKind.DEMO:
+        return 'Демоверсия ВШЭ'
+    same = [v for v in published
+            if v.grade_band == variant.grade_band
+            and v.source_kind != VPVariant.SourceKind.DEMO]
+    same.sort(key=lambda v: (v.order, v.pk))
+    return f'Пробный · вариант {same.index(variant) + 1}' if variant in same else 'Пробный'
+
+
+def variants(request):
+    """Экран выбора класса и варианта.
+
+    Публичный: гость видит карточки и формат, но вместо своего статуса – состав
+    варианта. Персонал видит и черновики, с плашкой. Класс выбирается ссылкой
+    `?band=`, без JS; неизвестное значение – первый класс, у которого есть варианты.
+    """
+    everything = VPVariant.objects.all()
+    if not _is_staff(request):
+        everything = everything.filter(is_published=True)
+    everything = list(everything.prefetch_related('items'))
+    published = [v for v in everything if v.is_published]
+
+    bands = []
+    for code, label in BANDS:
+        chosen = sorted((v for v in everything if v.grade_band == code),
+                        key=lambda v: (v.order, v.pk))
+        if chosen:
+            bands.append({'code': code, 'label': label, 'variants': chosen,
+                          'count': len(chosen)})
+    chosen_code = request.GET.get('band') or ''
+    current = next((b for b in bands if b['code'] == chosen_code), bands[0] if bands else None)
+
+    cards = []
+    for variant in (current['variants'] if current else []):
+        cards.append({
+            'variant': variant,
+            'eyebrow': _variant_eyebrow(variant, published),
+            'status': landing.variant_status(request.user, variant),
+            'count': variant.items.count(),
+            'minutes': variant.duration_seconds // 60,
+        })
+
+    return render(request, 'vp/variants.html', {
+        'bands': bands, 'current': current, 'cards': cards,
+        'vp_events': [tracking.event('vp_variants_open')],
+        **seo.vp_variants_meta(),
+    })
+
+
+ATTEMPT_FILTERS = (
+    ('all', 'Все'),
+    ('ranked', 'В таблице'),
+    ('training', 'Тренировка'),
+    ('open', 'Не сдана'),
+)
+
+
+def _attempt_kind(attempt, earlier):
+    """Что написать в колонке «Статус»: `ranked` / `training` / `open`.
+
+    `earlier` – есть ли у человека более ранняя попытка по этому же варианту:
+    от неё зависит, повтор это или просто тренировка без таймера.
+    """
+    if attempt.submitted_at is None:
+        return 'open'
+    return 'ranked' if attempt.is_ranked else 'training'
+
+
+@login_required
+def my_attempts(request):
+    """Свои попытки с разбором: всё, что человек прорешал, одним списком.
+
+    Только вошедшему: чужой истории тут нет и быть не может. Перед выборкой
+    просроченные попытки закрываются – иначе список врал бы про «не сдана».
+    """
+    live = (VPAttempt.objects
+            .filter(user=request.user, submitted_at__isnull=True)
+            .select_related('variant'))
+    for attempt in live:
+        if _lapsed(attempt):
+            _finalize(attempt, auto=True)
+
+    attempts = list(VPAttempt.objects
+                    .filter(user=request.user)
+                    .select_related('variant')
+                    .prefetch_related('answers')
+                    .order_by('-started_at', '-id'))
+
+    best_attempt, best_place = board.my_best(request.user)
+    seen = set()
+    rows = []
+    # Идём от старых к новым: «повтор» – это попытка, перед которой по тому же
+    # варианту уже была другая.
+    for attempt in reversed(attempts):
+        repeat = attempt.variant_id in seen
+        seen.add(attempt.variant_id)
+        kind = _attempt_kind(attempt, repeat)
+        rows.append({
+            'attempt': attempt,
+            'variant': attempt.variant,
+            'kind': kind,
+            'repeat': repeat,
+            'answered': _answered_count(attempt),
+            'count': attempt.variant.items.count(),
+            'seconds': board.spent_seconds(attempt) if attempt.submitted_at else None,
+            'place': (best_place if best_attempt is not None
+                      and attempt.pk == best_attempt.pk else None),
+        })
+    rows.reverse()
+
+    counts = {'all': len(rows)}
+    for code, _ in ATTEMPT_FILTERS[1:]:
+        counts[code] = sum(1 for r in rows if r['kind'] == code)
+    chosen = request.GET.get('f') or 'all'
+    if chosen not in counts:
+        chosen = 'all'
+    shown = rows if chosen == 'all' else [r for r in rows if r['kind'] == chosen]
+
+    return render(request, 'vp/my.html', {
+        'rows': shown, 'chosen': chosen,
+        'filters': [{'code': c, 'label': label, 'count': counts[c]}
+                    for c, label in ATTEMPT_FILTERS],
+        'seo_noindex': True,
+        'vp_events': [tracking.event('vp_my_open')],
     })
 
 
@@ -260,8 +434,24 @@ def intro(request, slug):
         example = scoring.penalty_example(sample.points)
 
     attempt = _current_attempt(request, variant)
+
+    # Прошлые попытки по ЭТОМУ варианту: короткий список над выбором режима.
+    # Порядок и содержание строк те же, что на `/vp/my/` – два разных вида
+    # одного списка были бы двумя правдами.
+    own = []
+    has_ranked = False
+    if request.user.is_authenticated:
+        for done in (VPAttempt.objects
+                     .filter(user=request.user, variant=variant, submitted_at__isnull=False)
+                     .order_by('-started_at', '-id')):
+            has_ranked = has_ranked or done.is_ranked
+            own.append({'attempt': done, 'seconds': board.spent_seconds(done),
+                        'kind': 'ranked' if done.is_ranked else 'training'})
+
     return render(request, 'vp/intro.html', {
         'variant': variant,
+        'own_attempts': own,
+        'has_ranked': has_ranked,
         'sections': sections,
         'items_count': len(items),
         'whole_ranges': blocks.merged_ranges(whole),
@@ -269,18 +459,40 @@ def intro(request, slug):
         'penalty_example': example,
         'attempt': attempt,
         'attempt_answered': _answered_count(attempt) if attempt else 0,
+        # Гостю — адреса стены регистрации; вошедшему они не нужны и в HTML не идут.
+        'register_url': '' if request.user.is_authenticated else _register_url(slug),
+        'login_url': '' if request.user.is_authenticated else _login_url(slug),
         'vp_events': [tracking.event('vp_intro_open', variant=variant.slug)],
         **seo.vp_variant_meta(variant.title, grade_label(variant.grade_band), variant.year),
     })
+
+
+def _register_url(slug):
+    """Регистрация с возвратом на интро этого варианта."""
+    return '%s?%s' % (reverse('register'),
+                      urlencode({'next': reverse('vp:intro', args=[slug])}))
+
+
+def _login_url(slug):
+    """Вход с возвратом на интро этого варианта."""
+    return '%s?%s' % (reverse('login'),
+                      urlencode({'next': reverse('vp:intro', args=[slug])}))
 
 
 @require_POST
 def start(request, slug):
     """Начинает попытку. Таймер запускает сервер в момент нажатия.
 
+    ⚠️ ЗДЕСЬ СТОИТ СТЕНА РЕГИСТРАЦИИ, И ПРОВЕРКА ИМЕННО СЕРВЕРНАЯ. Окно на интро —
+    только вежливое объяснение; без JS форма доедет сюда и получит этот редирект.
+    Гостю не заводится ни попытки, ни записи в сессии: он уходит на регистрацию и
+    возвращается на тот же вариант.
+
     Несданная попытка этого же человека не дублируется: нажатие возвращает в неё
     (двойной клик не плодит попыток).
     """
+    if not request.user.is_authenticated:
+        return redirect(_register_url(slug))
     variant = _variant_or_404(request, slug)
     if not variant.items.exists():
         raise Http404

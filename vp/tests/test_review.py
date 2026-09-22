@@ -19,7 +19,7 @@ from django.utils import timezone
 from vp import review, scoring, views
 from vp.loader import chain_letters
 from vp.models import VPAnswer, VPAttempt, VPItem
-from vp.tests.helpers import make_published
+from vp.tests.helpers import guest_attempt, make_published
 
 User = get_user_model()
 
@@ -488,6 +488,10 @@ class AdoptGuestAttemptsTests(TestCase):
         self.variant = make_published('vp-adopt')
 
     def start(self, client):
+        """Гостевая попытка через ORM: с 22.09.2026 гость её через экран не заводит."""
+        return guest_attempt(client, self.variant)
+
+    def start_as_user(self, client):
         response = client.post(reverse('vp:start', args=[self.variant.slug]), {'with_timer': '1'})
         self.assertEqual(response.status_code, 302)
         return VPAttempt.objects.order_by('-id').first()
@@ -531,7 +535,7 @@ class AdoptGuestAttemptsTests(TestCase):
         second = User.objects.create_user('vp_second', password='p12345')
         client = Client()
         client.force_login(first)
-        attempt = self.start(client)
+        attempt = self.start_as_user(client)
         self.assertEqual(attempt.user_id, first.pk)
         client.force_login(second)
         attempt.refresh_from_db()

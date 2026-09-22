@@ -13,6 +13,7 @@ from html.parser import HTMLParser
 from io import StringIO
 
 import yaml
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.management import call_command
 from django.core.management.base import CommandError
@@ -244,9 +245,13 @@ class TakeSourceTests(RenderingBase):
         # в <title> вкладки (взято из variant.title, который тест переименовал
         # для различения карточек). Важно — нет ни строки «Источник:», ни
         # самой ссылки на источник.
-        self.guest.post(reverse('vp:start', args=[self.olmat.slug]), {'with_timer': '0'})
+        # Стена регистрации (22.09.2026): попытку заводит только вошедший.
+        person = Client()
+        person.force_login(
+            get_user_model().objects.create_user('vp_src', password='p12345'))
+        person.post(reverse('vp:start', args=[self.olmat.slug]), {'with_timer': '0'})
         attempt = VPAttempt.objects.order_by('-id').first()
-        html = self.guest.get(reverse('vp:take', args=[attempt.public_code])).content.decode()
+        html = person.get(reverse('vp:take', args=[attempt.public_code])).content.decode()
         self.assertNotIn('Источник:', html)
         self.assertNotIn(OLMAT_URL, html)
 

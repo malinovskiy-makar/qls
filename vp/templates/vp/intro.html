@@ -1,5 +1,5 @@
 {% extends 'vp/base_vp.html' %}
-{% load vp_extras %}
+{% load static vp_extras %}
 {% comment %}
 Вход в вариант. Раскладка — макет Main.dc.html. ⚠️ ЧИСЛА ЗДЕСЬ — ТОЛЬКО ИЗ ДАННЫХ
 ВАРИАНТА: количество заданий, диапазоны номеров и суммы баллов по блокам считает
@@ -8,7 +8,11 @@
 {% endcomment %}
 {% block title %}{{ variant.title }}{% endblock %}
 {% block content %}
-<div class="vp-wrap">
+<div class="vp-wrap" data-variant="{{ variant.slug }}">
+  <a class="vp-back" href="{% url 'vp:variants' %}">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg>
+    Все варианты
+  </a>
   <div class="vp-head">
     <div class="vp-head-main">
       <div class="vp-eyebrow">Отборочный этап · {{ variant.tour }} тур</div>
@@ -41,10 +45,10 @@
     <div class="vp-card vp-card--rules">
       <h2 class="vp-h2">Как считаются баллы</h2>
       <div class="vp-stack">
-        {% if whole_ranges %}<div>Задания {{ whole_ranges|join:" и " }} — или полный балл, или ноль.</div>{% endif %}
+        {% if whole_ranges %}<div>Задания {{ whole_ranges|join:" и " }} – или полный балл, или ноль.</div>{% endif %}
         {% if partial_ranges %}
-        <div>В заданиях {{ partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд — гарантированный ноль.</div>
-        {% if penalty_example %}<div class="vp-note">Если в задании 2 верных и 3 неверных, верный даёт +{{ penalty_example.0|num }}, лишний — −{{ penalty_example.1|num }}. Ниже нуля за одно задание не уходим.</div>{% endif %}
+        <div>В заданиях {{ partial_ranges|join:" и " }} балл делится: каждый верный вариант приносит долю, <b>каждый лишний отнимает</b>. Отметить всё подряд – гарантированный ноль.</div>
+        {% if penalty_example %}<div class="vp-note">Если в задании 2 верных и 3 неверных, верный даёт +{{ penalty_example.0|num }}, лишний – −{{ penalty_example.1|num }}. Ниже нуля за одно задание не уходим.</div>{% endif %}
         {% endif %}
       </div>
     </div>
@@ -53,7 +57,7 @@
   {% if sections.0.block == 'snake' %}
   <div class="vp-card vp-mt">
     <h2 class="vp-h2">Что такое змейка</h2>
-    <p class="vp-text">Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов — со второй буквы первого слова. Это не только правило, но и проверка себя: не сходится буква — где-то ошибка.</p>
+    <p class="vp-text">Каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов – со второй буквы первого слова. Это не только правило, но и проверка себя: не сходится буква – где-то ошибка.</p>
     <div class="vp-chain-demo" aria-label="Пример цепочки">
       <span>л<b>а</b>г</span><i>→</i>
       <span>а<b>в</b>таркия</span><i>→</i>
@@ -61,6 +65,34 @@
       <span>а<b>л</b>ьтернативные издержки</span><i>→</i>
       <span>ликвидность</span>
     </div>
+  </div>
+  {% endif %}
+
+  {% if own_attempts %}
+  <div class="vp-iatt">
+    <h2>
+      <span>Ваши попытки по этому варианту</span>
+      <a class="vp-land-more" href="{% url 'vp:my' %}">Все попытки</a>
+    </h2>
+    <div class="vp-arow is-head">
+      <span>Дата</span><span>Режим</span><span class="is-num">Балл</span>
+      <span class="is-num">Время</span><span>Статус</span><span></span>
+    </div>
+    {% for r in own_attempts %}
+    <div class="vp-arow">
+      <span class="vp-arow-d">{{ r.attempt.started_at|date:"d.m, H:i" }}</span>
+      <span class="vp-arow-m">{% if r.attempt.with_timer %}с таймером{% else %}без таймера{% endif %}</span>
+      <span class="vp-arow-s">{{ r.attempt.score|num }}</span>
+      <span class="vp-arow-t">{{ r.seconds|mmss }}</span>
+      <span class="vp-arow-k{% if r.kind == 'ranked' %} is-ok{% endif %}">
+        {% if r.kind == 'ranked' %}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>
+        в таблице
+        {% else %}тренировка{% endif %}
+      </span>
+      <span class="vp-arow-a"><a class="vp-land-btn" href="{% url 'vp:result' r.attempt.public_code %}">Разбор</a></span>
+    </div>
+    {% endfor %}
   </div>
   {% endif %}
 
@@ -73,24 +105,55 @@
     </form>
   </div>
   {% else %}
-  <form method="post" action="{% url 'vp:start' variant.slug %}">
+  <form method="post" action="{% url 'vp:start' variant.slug %}" id="vp-start-form">
     {% csrf_token %}
     <fieldset class="vp-modes">
       <legend class="vp-sr">Режим прохождения</legend>
       <label class="vp-mode">
         <input type="radio" name="with_timer" value="1" checked>
-        <span><b>С таймером — {{ variant.duration_seconds|minutes }}</b><span>Как на олимпиаде. Время вышло — работа сдаётся сама.</span></span>
+        <span><b>С таймером – {{ variant.duration_seconds|minutes }}</b><span>Как на олимпиаде. Время вышло – работа сдаётся сама. {% if has_ranked %}Первая попытка по варианту уже в таблице; эта будет тренировкой.{% else %}Первая попытка идёт в таблицу лучших попыток.{% endif %}</span></span>
       </label>
       <label class="vp-mode">
         <input type="radio" name="with_timer" value="0">
-        <span><b>Без таймера</b><span>Разобраться в формате, не торопясь.</span></span>
+        <span><b>Без таймера</b><span>Разобраться в формате, не торопясь. В таблицу не идёт.</span></span>
       </label>
     </fieldset>
     <div class="vp-start">
       <button type="submit" class="vp-btn vp-btn--lg">Начать вариант</button>
-      <div class="vp-mute">Ответы сохраняются сами — можно закрыть вкладку и вернуться.<br>Проходить можно сколько угодно раз.</div>
+      {% if register_url %}
+      <div class="vp-mute">Пройти вариант можно только после короткой бесплатной регистрации.</div>
+      {% else %}
+      <div class="vp-mute">Ответы сохраняются сами – можно закрыть вкладку и вернуться.<br>Проходить можно сколько угодно раз.</div>
+      {% endif %}
     </div>
   </form>
   {% endif %}
+
+  {% if register_url %}
+  {% comment %}
+  Стена регистрации. ⚠️ Это ОБЪЯСНЕНИЕ, а не защита: настоящая проверка — в
+  `vp.views.start`, и без JS форма доедет туда и получит редирект на регистрацию.
+  Адреса возврата собирает сервер (`_register_url` / `_login_url`).
+  {% endcomment %}
+  <dialog class="vp-gate" id="vp-gate" aria-labelledby="vp-gate-h">
+    <button type="button" class="vp-gate-x" data-close aria-label="Закрыть">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+    <div class="vp-gate-i" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>
+    </div>
+    <h2 id="vp-gate-h">Сначала короткая регистрация</h2>
+    <p>Пройти вариант можно только после регистрации. Она бесплатная и занимает минуту: логин и пароль, без почты. После неё вернём вас на этот вариант.</p>
+    <div class="vp-gate-a">
+      <a class="vp-btn" href="{{ register_url }}">Зарегистрироваться</a>
+      <a class="vp-btn vp-btn--plain" href="{{ login_url }}">Уже есть аккаунт – войти</a>
+    </div>
+    <p class="vp-gate-fine">Первая попытка по варианту с таймером попадёт в таблицу лучших попыток.</p>
+  </dialog>
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_js %}{{ block.super }}
+{% if register_url %}<script src="{% static 'vp/js/intro.js' %}" defer></script>{% endif %}
 {% endblock %}
