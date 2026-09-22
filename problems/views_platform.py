@@ -198,6 +198,9 @@ def profile(request):
         # значит завести ещё одну общую вещь.
         'levels': [(value, label, UserProfile.LEVEL_HINTS.get(value, ''))
                    for value, label in UserProfile.Level.choices],
+        # Олимпиады в раскрытом списке — группами и полными подписями; закрытый
+        # список рисует короткие (`OLYMPIAD_HISTORY`). Оба набора — в модели.
+        'olympiad_groups': UserProfile.OLYMPIAD_GROUPS,
         'welcome': request.GET.get('welcome') == '1',
         'saved_ok': request.GET.get('saved') == '1',
         'password_changed': request.GET.get('changed') == '1',
