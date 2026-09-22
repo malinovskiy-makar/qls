@@ -479,7 +479,12 @@ class FullJourneyTests(MediaTempMixin, TestCase):
 
 
 class TelegramChannelCardTests(TestCase):
-    """18.09.2026: карточка канала в профиле ведёт на ленту, а не в личку."""
+    """18.09.2026: карточка канала в профиле ведёт на ленту, а не в личку.
+
+    22.09.2026: карточка переехала в колонку справа (`aside.pf-aside`) и стала
+    `.pf-cta` — рядом с ней вторая, про обратную связь. Правило прежнее:
+    ЛЕНТА канала, без `?direct`; личку открывает кружок в углу страницы.
+    """
 
     CHANNEL = 'href="https://t.me/weconomics_ru"'
 
@@ -491,11 +496,12 @@ class TelegramChannelCardTests(TestCase):
         self.client.force_login(self.user)
 
     def _card(self, html):
-        return html.split('class="card pf-card pf-tg"', 1)[1].split('</a>', 1)[0]
+        aside = html.split('<aside class="pf-aside"', 1)[1].split('</aside>', 1)[0]
+        return aside.split('class="pf-cta"', 1)[1].split('</a>', 1)[0]
 
     def test_profile_links_to_the_channel_feed(self):
         html = self.client.get('/profile/').content.decode('utf-8')
-        self.assertIn('class="card pf-card pf-tg" ' + self.CHANNEL, html)
+        self.assertIn('class="pf-cta" ' + self.CHANNEL, html)
 
     def test_channel_card_has_no_direct_suffix(self):
         html = self.client.get('/profile/').content.decode('utf-8')
@@ -570,9 +576,10 @@ class BetaProfileFieldsTests(TestCase):
                          {code for code, _ in UserProfile.Level.choices})
 
     def test_level_is_one_axis_of_furthest_stage(self):
-        self.assertEqual(UserProfile.Level('novice').label, 'Ещё не участвовал')
-        self.assertEqual(UserProfile.Level('final').label,
-                         'Заключительный этап ВсОШ или призёр перечневой')
+        """Ось прежняя, подписи с 22.09.2026 короткие, а объяснение — в подсказке."""
+        self.assertEqual(UserProfile.Level('novice').label, 'Новичок')
+        self.assertEqual(UserProfile.Level('final').label, 'Профи')
+        self.assertIn('ВсОШ', UserProfile.LEVEL_HINTS['final'])
 
     def test_not_a_schoolkid_is_named_in_teacher_group_list(self):
         from problems.models import StudentGroup

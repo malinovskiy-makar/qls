@@ -93,7 +93,11 @@
 /* ⚠️ ПОРЯДОК В РАЗМЕТКЕ: `aside` стоит ДО карточки формы, а на широком
    экране сетка переставляет его во вторую колонку. Так на планшете и
    телефоне, где колонка одна, карточки оказываются НАД формой. */
-.pf-layout { display: grid; gap: 20px; align-items: start; }
+/* ⚠️ `minmax(0, 1fr)`, а не `1fr`: у элемента сетки минимальная ширина по
+   умолчанию равна минимальной ширине содержимого, и на планшете колонка
+   распирала страницу шире окна (замер 834 px: дорожка 844 при окне 819). */
+.pf-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.pf-layout > * { min-width: 0; }
 @media (min-width: 960px) {
   .pf-layout { grid-template-columns: 660px minmax(0, 1fr); }
   .pf-aside { grid-column: 2; grid-row: 1; position: sticky; top: 72px; }

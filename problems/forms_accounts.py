@@ -139,7 +139,9 @@ class ProfileForm(forms.ModelForm):
     email = forms.EmailField(
         label='Почта', required=False,
         help_text='Необязательно, не подтверждается, нужно только для связи.')
-    telegram = forms.CharField(label='Telegram', required=False, max_length=64)
+    telegram = forms.CharField(
+        label='Telegram', required=False, max_length=64,
+        widget=forms.TextInput(attrs={'placeholder': '@username'}))
 
     # Множественный выбор — списком кодов. Варианты живут в модели, форма
     # их только читает.
