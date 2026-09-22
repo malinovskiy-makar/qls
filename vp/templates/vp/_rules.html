@@ -84,7 +84,7 @@
         <h3>Что такое змейка</h3>
         <p>В змейке каждый следующий ответ начинается <b>со второй буквы предыдущего</b>. Если ответ из двух слов, берётся вторая буква первого слова. Это не только правило, но и проверка себя: не сходится буква, значит, где-то ошибка.</p>
         {% if snake %}
-        <div class="vp-chain" role="img" aria-label="Пример цепочки: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
+        <div class="vp-land-chain" role="img" aria-label="Пример цепочки: {% for w in snake.words %}{{ w.before }}{{ w.mark }}{{ w.after }}{% if not forloop.last %}, {% endif %}{% endfor %}">
           {% for w in snake.words %}<span>{{ w.before }}{% if w.mark %}<b>{{ w.mark }}</b>{% endif %}{{ w.after }}</span>{% if not forloop.last %}<i aria-hidden="true">→</i>{% endif %}{% endfor %}
         </div>
         <p class="vp-rsec-note">Цепочка из варианта «{{ snake.variant.title }}». В прохождении связка не подсказывается, как на олимпиаде; вся цепочка раскрывается в разборе после сдачи.</p>

@@ -75,8 +75,12 @@ def source_link_rel(html, href=OLMAT_URL):
 
 
 def variant_card(html, title):
-    """Кусок разметки `<article class="vp-card vp-vrow">…</article>` с этим заголовком."""
-    for block in re.findall(r'<article class="vp-card vp-vrow">.*?</article>', html, re.S):
+    """Карточка варианта с этим заголовком на экране выбора `/vp/variants/`.
+
+    ⚠️ С 22.09.2026 карточки живут не на посадочной, а на отдельном экране:
+    `index_html` ниже ходит именно туда.
+    """
+    for block in re.findall(r'<article class="vp-vcard.*?</article>', html, re.S):
         if title in block:
             return block
     raise AssertionError(f'карточка варианта с заголовком {title!r} не найдена')
@@ -203,7 +207,8 @@ class RenderingBase(TestCase):
         self.guest = Client()
 
     def index_html(self):
-        response = self.guest.get(reverse('vp:index'))
+        """Экран, где стоят карточки вариантов: с 22.09.2026 это `/vp/variants/`."""
+        response = self.guest.get(reverse('vp:variants'))
         self.assertEqual(response.status_code, 200)
         return response.content.decode()
 

@@ -1,9 +1,16 @@
 /* Тренажёр ВП в настоящем браузере: пять ручных сценариев владельца, состояния
    таймера, «время вышло», офлайн и телефон.
 
-   Раннер ходит по живому серверу тестового прогона как обычный ГОСТЬ (без входа) и
-   печатает результат машинно-разбираемой строкой после ###VP-JSON###. Решение
-   «зелёный/красный» принимает питон-тест `vp/tests/test_browser.py`.
+   Раннер печатает результат машинно-разбираемой строкой после ###VP-JSON###.
+   Решение «зелёный/красный» принимает питон-тест `vp/tests/test_browser.py`.
+
+   ⚠️ ПРОХОЖДЕНИЕ ИДЁТ ОТ ВОШЕДШИХ (стена регистрации, 22.09.2026): питон логинит
+   клиентов и передаёт сюда их печеньки в `VP_SESSION*`, а раннер ставит их своим
+   контекстам — ровно как `RUSH_SESSION` у Wecon Rush. Людей четверо, и это не
+   роскошь: несданная попытка по варианту у человека одна, а `vp-ui` в раннере
+   заводят три разных сценария (десктоп, телефон, автосохранение) — под одним
+   аккаунтом второй и третий просто вернулись бы в первую попытку.
+   Гостевыми остаются проверки посадочной, окно регистрации на интро и чужой результат.
 
    Сценарии владельца:
      1. начать вариант с таймером, заполнить поля, перезагрузить — всё на месте;
@@ -16,6 +23,13 @@
    посадочная отдаёт события скрипту аналитики (что они доходят до базы, сверяет питон) и шапка
    персонала (8 пунктов) на десяти ширинах — новый пункт меню не должен распирать страницу.
 
+   Сессия 5 (22.09.2026): посадочная — три зоны на один экран. Главный инвариант —
+   НЕТ ВЕРТИКАЛЬНОЙ ПРОКРУТКИ на 1440×800, и у гостя, и у вошедшего в самом высоком
+   состоянии (начатая работа, своя лучшая попытка, место вне десятки, полная таблица).
+   Плюс: герой не обрезан, десятая строка таблицы видна целиком, окно правил
+   открывается и закрывается по Esc, на планшетах и телефоне нет горизонтальной
+   прокрутки, а гостю на интро открывается окно регистрации.
+
    Запуск руками против живого сервера:
      VP_BASE_URL=http://127.0.0.1:8000 VP_SHOT_DIR=/tmp/vp node vp/tests/browser_take.mjs
 
@@ -25,6 +39,15 @@ import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const BASE = process.env.VP_BASE_URL || 'http://127.0.0.1:8000';
+/* Печеньки вошедших: их выдаёт питон-тест. Пусто — попытки не заведутся (стена).
+   `main` проходит вариант и сценарии таймера, `phone` и `inv` — свои попытки по
+   тому же варианту, `me` смотрит посадочную в самом высоком состоянии. */
+const SESSIONS = {
+  main: process.env.VP_SESSION || '',
+  phone: process.env.VP_SESSION_PHONE || '',
+  inv: process.env.VP_SESSION_INV || '',
+  me: process.env.VP_SESSION_ME || '',
+};
 const SHOTS = process.env.VP_SHOT_DIR || '';
 const out = { checks: {}, attempts: {} };
 const check = (name, ok, detail) => { out.checks[name] = { ok: !!ok, detail: detail === undefined ? null : detail }; };
@@ -32,6 +55,14 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true });
 async function shot(page, name, full = false) {
   if (SHOTS) await page.screenshot({ path: `${SHOTS}/${name}.png`, fullPage: full });
+}
+
+/** Контекст вошедшего человека: в нём можно заводить попытки. */
+async function signedContext(who, options) {
+  const ctx = await browser.newContext(options);
+  const value = SESSIONS[who];
+  if (value) await ctx.addCookies([{ name: 'sessionid', value, url: BASE }]);
+  return ctx;
 }
 
 let browser;
@@ -45,6 +76,12 @@ try {
 // ---- общие помощники, исполняемые внутри страницы ---------------------------------
 const noHScroll = (page) => page.evaluate(() =>
   document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+/* ⚠️ Инвариант посадочной: экран помещается в окно целиком. Сравниваем со
+   `innerHeight`, а не с `clientHeight`: полосу прокрутки headless прячет. */
+const noVScroll = (page) => page.evaluate(() =>
+  document.documentElement.scrollHeight <= window.innerHeight);
+const scrollInfo = (page) => page.evaluate(() => ({
+  scrollHeight: document.documentElement.scrollHeight, innerHeight: window.innerHeight }));
 const activeInfo = (page) => page.evaluate(() => {
   const a = document.activeElement;
   const box = a && a.closest ? a.closest('.vp-item') : null;
@@ -125,8 +162,11 @@ const TAKE_SELECTORS = ['.vp-item-text', '.vp-input', '.vp-opt span', '.vp-timer
   '.vp-legend span', '.vp-rail-cap', '.vp-item-num'];
 const INTRO_SELECTORS = ['.vp-h1', '.vp-h2', '.vp-sub', '.vp-table td', '.vp-stack', '.vp-note', '.vp-mode b',
   '.vp-mode span span', '.vp-btn', '.vp-mute', '.vp-eyebrow', '.vp-big'];
-const LANDING_SELECTORS = ['.vp-h1', '.vp-lead', '.vp-h2', '.vp-h3', '.vp-stack p', '.vp-text', '.vp-table th',
-  '.vp-table td', '.vp-mute', '.vp-eyebrow', '.vp-btn', '.vp-vrow-main b', '.vp-chain-demo span', '.vp-pill'];
+const LANDING_SELECTORS = ['.vp-land-h1', '.vp-land-h1 small', '.vp-land-lead', '.vp-land-eyebrow',
+  '.vp-land-dates', '.vp-land-fact b', '.vp-land-fact span', '.vp-land-snake p', '.vp-land-snake-t',
+  '.vp-land-snake-t em', '.vp-land-chain span', '.vp-land-chain-more', '.vp-play', '.vp-ext',
+  '.vp-land-bt', '.vp-land-bsub', '.vp-land-bfoot', '.vp-land-gtxt b', '.vp-land-gtxt span',
+  '.vp-land-btn'];
 const RESULT_SELECTORS = ['.vp-score-num b', '.vp-score-num span', '.vp-mute', '.vp-h3', '.vp-brow-name',
   '.vp-brow-score', '.vp-brow-pct', '.vp-btn', '.vp-cmp-head', '.vp-cmp-axis span', '.vp-cmp-label',
   '.vp-crow-n', '.vp-crow-mine', '.vp-crow-right', '.vp-crow-right b', '.vp-crow-pts', '.vp-clink',
@@ -157,19 +197,28 @@ async function startAttempt(page, slug, timer = true) {
 
 try {
   // ==================================================================== ДЕСКТОП
-  const desktop = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const desktop = await signedContext('main', { viewport: { width: 1280, height: 900 } });
   await desktop.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: BASE });
   const page = await desktop.newPage();
 
-  // ---- посадочная /vp/
-  const lp = await desktop.newPage();
+  // ---- посадочная /vp/ глазами ГОСТЯ (вошедшего смотрим отдельно, ниже)
+  const guestCtx = await browser.newContext({ viewport: { width: 1440, height: 800 } });
+  const lp = await guestCtx.newPage();
   await lp.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
-  check('d.landing_six_sections', (await lp.locator('.vp-sec').count()) === 6, await lp.locator('.vp-sec h2').allInnerTexts());
-  check('d.landing_block_table_five_rows', (await lp.locator('.vp-table--blocks tbody tr').count()) === 5);
-  check('d.landing_chain_example_four_words', (await lp.locator('.vp-chain-demo span').count()) === 4,
-    await lp.locator('.vp-chain-demo').allInnerTexts());
-  check('d.landing_lists_four_variants', (await lp.locator('.vp-vrow').count()) === 4);
+  // Цепочка: четыре слова примера плюс хвост «… и так N заданий подряд».
+  check('d.landing_chain_example_four_words',
+    (await lp.locator('.vp-land-snake .vp-land-chain > span').count()) === 5,
+    await lp.locator('.vp-land-snake .vp-land-chain').allInnerTexts());
   check('d.landing_no_hscroll', await noHScroll(lp));
+  // ⚠️ ГЛАВНЫЙ ИНВАРИАНТ ЭКРАНА: на 1440×800 страница не прокручивается.
+  check('d.landing_no_vscroll_1440x800_guest', await noVScroll(lp), await scrollInfo(lp));
+  check('d.landing_hero_not_clipped', await lp.evaluate(() => {
+    const hero = document.querySelector('.vp-land-hero');
+    return hero.scrollHeight <= hero.clientHeight;
+  }), await lp.evaluate(() => {
+    const hero = document.querySelector('.vp-land-hero');
+    return { scrollHeight: hero.scrollHeight, clientHeight: hero.clientHeight };
+  }));
   check('d.landing_nav_item_is_active', await lp.evaluate(() => {
     // Подпись — первый текстовый узел: метка NEW у пункта лежит в <span>, и `textContent` был бы «Тренажёр ВПNEW».
     const active = [...document.querySelectorAll('nav.site-nav > .nav-links .nav-link.is-active')]
@@ -188,13 +237,65 @@ try {
     return !!node && JSON.parse(node.textContent).some((e) => e.name === 'vp_landing_open')
       && !!(window.weco && typeof window.weco.track === 'function');
   }));
-  await Promise.all([lp.waitForURL(/\/vp\/vp-ui\/$/, { timeout: 30000 }), lp.click('a[href="/vp/vp-ui/"]')]);
-  check('d.landing_go_opens_the_variant', /Пробный вариант/.test(await lp.textContent('h1')), await lp.textContent('h1'));
+  // Окно правил: открывается кнопкой и закрывается по Esc.
+  await lp.click('[data-open-rules]');
+  await sleep(150);
+  const rulesOpen = await lp.evaluate(() => document.getElementById('vp-rules').open);
+  await lp.keyboard.press('Escape');
+  await sleep(150);
+  const rulesClosed = await lp.evaluate(() => !document.getElementById('vp-rules').open);
+  check('d.landing_rules_dialog_opens_and_closes_by_esc', rulesOpen && rulesClosed,
+    { rulesOpen, rulesClosed });
+
+  // Гость на интро: «Начать вариант» открывает окно регистрации, попытка не заводится.
+  await lp.goto(`${BASE}/vp/vp-ui/`, { waitUntil: 'load', timeout: 30000 });
   check('d.intro_events_are_on_the_page', await lp.evaluate(() => {
     const node = document.getElementById('vp-events');
     return !!node && JSON.parse(node.textContent).some((e) => e.name === 'vp_intro_open' && e.props.variant === 'vp-ui');
   }));
+  await lp.click('#vp-start-form button[type=submit]');
+  await sleep(250);
+  check('d.intro_gate_opens_for_guest', await lp.evaluate(() => {
+    const dialog = document.getElementById('vp-gate');
+    if (!dialog || !dialog.open) return false;
+    const hrefs = [...dialog.querySelectorAll('a')].map((a) => a.getAttribute('href') || '');
+    return hrefs.some((h) => h.startsWith('/register/?next='))
+      && hrefs.some((h) => h.startsWith('/login/?next='));
+  }), lp.url());
   await lp.close();
+
+  // ---- посадочная ВОШЕДШЕМУ, в самом высоком состоянии: начатая работа, своя
+  // лучшая попытка, место вне десятки и полная таблица (данные готовит питон).
+  const meCtx = await signedContext('me', { viewport: { width: 1440, height: 800 } });
+  const mep = await meCtx.newPage();
+  await mep.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
+  const meState = await mep.evaluate(() => ({
+    rows: document.querySelectorAll('.vp-land-rows .vp-land-row:not(.is-head)').length,
+    mine: !!document.querySelector('.vp-land-pin'),
+    live: !!document.querySelector('.vp-land-cell.is-live'),
+    scrollHeight: document.documentElement.scrollHeight,
+    innerHeight: window.innerHeight,
+  }));
+  check('d.landing_no_vscroll_1440x800_user', await noVScroll(mep), meState);
+  check('d.landing_board_10_rows_visible', await mep.evaluate(() => {
+    const rows = [...document.querySelectorAll('.vp-land-rows .vp-land-row:not(.is-head)')];
+    if (rows.length !== 10) return false;
+    const card = document.querySelector('.vp-land-board').getBoundingClientRect();
+    const last = rows[rows.length - 1].getBoundingClientRect();
+    return last.bottom <= card.bottom + 0.5;
+  }), meState);
+  await mep.close();
+
+  // ---- планшеты: сетка перестраивается и вширь не вылезает
+  for (const [name, width, height] of [['t.landing_no_hscroll_1024', 1024, 768],
+                                       ['t.landing_no_hscroll_810', 810, 1080]]) {
+    const tab = await browser.newContext({ viewport: { width, height } });
+    const tp = await tab.newPage();
+    await tp.goto(`${BASE}/vp/`, { waitUntil: 'load', timeout: 30000 });
+    check(name, await noHScroll(tp), await tp.evaluate(() => ({
+      sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth })));
+    await tab.close();
+  }
 
   // ---- шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
   const staffSession = process.env.VP_STAFF_SESSION || '';
@@ -469,7 +570,7 @@ try {
   await desktop.close();
 
   // ============================================================ СЦЕНАРИЙ 4: ТЕЛЕФОН
-  const phone = await browser.newContext({
+  const phone = await signedContext('phone', {
     viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true,
     userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
   });
@@ -486,12 +587,6 @@ try {
   check('m.landing_burger_lists_the_item', await mlp.evaluate(() => [...document.querySelectorAll('.nav-panel .nav-link')]
     .some((a) => a.firstChild.textContent.trim() === 'Тренажёр ВП' && a.classList.contains('is-active'))));
   await mlp.click('.nav-burger');
-  const goButton = mlp.locator('.vp-vrow a.vp-btn').first();
-  await goButton.scrollIntoViewIfNeeded();
-  const goBox = await goButton.boundingBox();
-  check('m.landing_go_button_fits_and_is_tappable', !!goBox && goBox.height >= 44 && goBox.x >= 0 && goBox.x + goBox.width <= 390, goBox);
-  await Promise.all([mlp.waitForURL(/\/vp\/vp-[a-z]+\/$/, { timeout: 30000 }), goButton.tap()]);
-  check('m.landing_go_button_opens_a_variant', /\/vp\/vp-[a-z]+\/$/.test(mlp.url()), mlp.url());
   await mlp.close();
   await mp.goto(`${BASE}/vp/vp-ui/`, { waitUntil: 'load', timeout: 30000 });
   check('m.intro_no_hscroll', await noHScroll(mp));
@@ -559,7 +654,7 @@ try {
   await phone.close();
 
   // ================================================== ИНВАРИАНТ: 12 полей → 12 строк
-  const inv = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const inv = await signedContext('inv', { viewport: { width: 1280, height: 900 } });
   const ip = await inv.newPage();
   out.attempts.invariant = await startAttempt(ip, 'vp-ui');
   await ip.focus('#vp-in-1');
@@ -573,7 +668,7 @@ try {
   await inv.close();
 
   // ============================================================= СОСТОЯНИЯ ТАЙМЕРА
-  const tctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const tctx = await signedContext('main', { viewport: { width: 1280, height: 900 } });
   const tp = await tctx.newPage();
   out.attempts.warn = await startAttempt(tp, 'vp-warn');
   const warn = await tp.evaluate(() => ({
@@ -611,7 +706,7 @@ try {
   check('t.online_saved', back, await tp.textContent('#vp-save-state'));
   await tctx.close();
 
-  const dctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const dctx = await signedContext('main', { viewport: { width: 1280, height: 900 } });
   const dp = await dctx.newPage();
   out.attempts.danger = await startAttempt(dp, 'vp-danger');
   const danger = await dp.evaluate(() => ({
@@ -630,7 +725,7 @@ try {
   await dctx.close();
 
   // ============================================= ВРЕМЯ ВЫШЛО: сдалось само, введённое засчитано
-  const fctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const fctx = await signedContext('main', { viewport: { width: 1280, height: 900 } });
   const fp = await fctx.newPage();
   out.attempts.fast = await startAttempt(fp, 'vp-fast');
   await fp.fill('#vp-in-1', 'абум');

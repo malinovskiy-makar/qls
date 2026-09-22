@@ -1,8 +1,14 @@
 """Тренажёр ВП в настоящем браузере (Chromium через Playwright, `browser_take.mjs`).
 
 Пять ручных сценариев владельца + состояния таймера, «время вышло», офлайн и
-телефон — как обычный гость, без входа. После прогона проверяем и базу: то, что
-браузер «сохранил», должно лежать в ней.
+телефон. После прогона проверяем и базу: то, что браузер «сохранил», должно лежать в ней.
+
+⚠️ С 22.09.2026 ПОПЫТКУ ЗАВОДИТ ТОЛЬКО ВОШЕДШИЙ (стена регистрации). Тест логинит
+четырёх человек и отдаёт раннеру их печеньки в `VP_SESSION`, `VP_SESSION_PHONE`,
+`VP_SESSION_INV`, `VP_SESSION_ME` — тем же приёмом, каким `game` отдаёт
+`RUSH_SESSION`. Людей четверо, потому что несданная попытка по варианту у человека
+одна, а `vp-ui` заводят три сценария; четвёртый нужен для посадочной вошедшего.
+Гостевыми остаются проверки посадочной, окно регистрации на интро и чужой результат.
 
 Нет node или Playwright — тест ПРОПУСКАЕТСЯ, а не падает.
 """
@@ -10,7 +16,7 @@ import json
 import os
 import shutil
 import subprocess
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal as D
 from unittest import mock
 
@@ -30,13 +36,19 @@ RUNNER = os.path.join(os.path.dirname(__file__), 'browser_take.mjs')
 # Каждая проверка раннера обязана отработать: пустой или обрезанный прогон — не «зелено».
 EXPECTED = {
     # посадочная /vp/, сессия 4: десктоп и телефон
-    'd.landing_six_sections', 'd.landing_block_table_five_rows', 'd.landing_chain_example_four_words',
-    'd.landing_lists_four_variants', 'd.landing_no_hscroll', 'd.landing_nav_item_is_active',
+    'd.landing_chain_example_four_words',
+    'd.landing_no_hscroll', 'd.landing_nav_item_is_active',
     'd.landing.contrast_light', 'd.landing.contrast_dark', 'd.landing_events_are_on_the_page',
-    'd.landing_go_opens_the_variant', 'd.intro_events_are_on_the_page',
+    'd.intro_events_are_on_the_page',
     'm.landing_no_hscroll', 'm.landing.contrast_light', 'm.landing.contrast_dark',
-    'm.landing_burger_lists_the_item', 'm.landing_go_button_fits_and_is_tappable',
-    'm.landing_go_button_opens_a_variant',
+    'm.landing_burger_lists_the_item',
+    # посадочная, сессия 5: экран в один экран, и это главный инвариант раздела
+    'd.landing_no_vscroll_1440x800_guest', 'd.landing_no_vscroll_1440x800_user',
+    'd.landing_hero_not_clipped', 'd.landing_board_10_rows_visible',
+    'd.landing_rules_dialog_opens_and_closes_by_esc',
+    't.landing_no_hscroll_1024', 't.landing_no_hscroll_810',
+    # стена регистрации: гостю на интро открывается окно
+    'd.intro_gate_opens_for_guest',
     # шапка персонала: восемь пунктов не распирают страницу ни на одной ширине
     'd.nav_staff_has_eight_items_or_burger',
     *{f'd.nav_staff_fits_{w}' for w in (390, 821, 900, 1023, 1024, 1119, 1120, 1161, 1300, 1421, 1440, 1559, 1560, 1920)},
@@ -121,13 +133,60 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
                 variant=variant, public_code='fake-%02d' % i, session_key='fake-%02d' % i, score=D(i),
                 max_score=D('100'), submitted_at=now, expires_at=now)
 
+        # ⚠️ ЧЕТЫРЕ РАЗНЫХ ЧЕЛОВЕКА, А НЕ ОДИН: несданная попытка по варианту у
+        # человека одна, а `vp-ui` в раннере заводят три сценария.
+        self.sessions = {who: self._session('vp_br_%s' % who)
+                         for who in ('main', 'phone', 'inv', 'me')}
+        self._fill_board()
+
+    def _session(self, username):
+        person = get_user_model().objects.create_user(username, password='p12345')
+        client = Client()
+        client.force_login(person)
+        return client.cookies['sessionid'].value
+
+    def _fill_board(self):
+        """Самое высокое состояние посадочной для «me»: таблица полна, место вне десятки.
+
+        Тринадцать чужих зачётных попыток с баллом выше своей — значит, своя строка
+        придёт отдельной, под пунктиром, а в топе будет ровно десять строк. Плюс
+        живая несданная работа по ОТДЕЛЬНОМУ варианту (`vp-board`): на `vp-ui` её
+        ставить нельзя, там ходит сценарий десктопа.
+        """
+        browser_fixture.write(browser_fixture.rich_data(
+            slug='vp-board', duration=1800, title='Вариант для таблицы'))
+        board_variant = VPVariant.objects.get(slug='vp-board')
+        ui = VPVariant.objects.get(slug='vp-ui')
+        now = timezone.now()
+        User = get_user_model()
+
+        for i in range(13):
+            rival = User.objects.create_user('vp_br_rival%02d' % i, password='p12345')
+            VPAttempt.objects.create(
+                variant=ui, user=rival, public_code='rival-%02d' % i, with_timer=True,
+                is_ranked=True, score=D(90 - i), max_score=D('100'),
+                submitted_at=now, expires_at=now)
+
+        me = User.objects.get(username='vp_br_me')
+        VPAttempt.objects.create(
+            variant=ui, user=me, public_code='me-ranked', with_timer=True, is_ranked=True,
+            score=D('71.5'), max_score=D('100'), submitted_at=now, expires_at=now)
+        VPAttempt.objects.create(
+            variant=board_variant, user=me, public_code='me-live', with_timer=True,
+            max_score=D('100'), expires_at=now + timedelta(seconds=1500))
+
     def run_runner(self):
         node = shutil.which('node')
         if not node:
             self.skipTest('node не найден — браузерная проверка ВП не запускалась')
         if not os.path.isdir(os.path.join(settings.BASE_DIR, 'node_modules', 'playwright')):
             self.skipTest('playwright не установлен в node_modules')
-        env = dict(os.environ, VP_BASE_URL=self.live_server_url, VP_STAFF_SESSION=self.staff_session)
+        env = dict(os.environ, VP_BASE_URL=self.live_server_url,
+                   VP_STAFF_SESSION=self.staff_session,
+                   VP_SESSION=self.sessions['main'],
+                   VP_SESSION_PHONE=self.sessions['phone'],
+                   VP_SESSION_INV=self.sessions['inv'],
+                   VP_SESSION_ME=self.sessions['me'])
         try:
             # ⚠️ МЕТКА NEW ЗАКРЕПЛЕНА ВКЛЮЧЁННОЙ ПАТЧЕМ, А НЕ ПО КАЛЕНДАРЮ: живой сервер живёт в этом же
             # процессе, поэтому подмена даты гашения видна ему. Без неё после 1 октября замер шапки
@@ -159,7 +218,7 @@ class TakeInBrowserTest(StaticLiveServerTestCase):
 
         # Сценарии 1–3: гость дошёл до сдачи.
         desktop = attempt('desktop')
-        self.assertIsNone(desktop.user)
+        self.assertEqual(desktop.user.username, 'vp_br_main')   # стена: попытка вошедшего
         self.assertIsNotNone(desktop.submitted_at)
         self.assertFalse(desktop.is_auto_submitted)
         rows = {a.item.number: a for a in desktop.answers.select_related('item')}

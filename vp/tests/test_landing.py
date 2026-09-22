@@ -310,7 +310,7 @@ class SnakeExampleTests(TestCase):
         self.guest = Client()
 
     def chips(self, html):
-        chain = html.split('class="vp-chain"', 1)[1].split('</div>', 1)[0]
+        chain = html.split('class="vp-land-chain"', 1)[1].split('</div>', 1)[0]
         return [re.sub(r'<[^>]+>', '', span) for span in re.findall(r'<span>(.*?)</span>', chain)]
 
     def test_example_is_a_real_chain_of_four_from_a_published_variant(self):
@@ -318,7 +318,7 @@ class SnakeExampleTests(TestCase):
         html = page(self.guest)
         self.assertEqual(self.chips(html), [chain_word(n) for n in (1, 2, 3, 4)])
         # Вторая буква выделена у всех, кроме последнего слова: с неё начнётся следующее.
-        marks = re.findall(r'<b>(.)</b>', html.split('class="vp-chain"', 1)[1].split('</div>', 1)[0])
+        marks = re.findall(r'<b>(.)</b>', html.split('class="vp-land-chain"', 1)[1].split('</div>', 1)[0])
         self.assertEqual(marks, [chain_word(n)[1] for n in (1, 2, 3)])
         # Подпись честно называет вариант примера — и на странице, и в окне правил.
         self.assertIn('пример из варианта «Тестовый вариант»', html)
@@ -342,7 +342,7 @@ class SnakeExampleTests(TestCase):
         variant = make_review_variant('vp-broken')
         variant.items.filter(block='snake').update(answer='ба')                # связки нигде нет
         html = page(self.guest)
-        self.assertNotIn('class="vp-chain"', html)
+        self.assertNotIn('class="vp-land-chain"', html)
         self.assertIn('Что такое змейка', html)
 
     def test_draft_variants_never_feed_the_example(self):
@@ -352,7 +352,7 @@ class SnakeExampleTests(TestCase):
         make_published('vp-plain')                                              # опубликован, но связки нет
         staff = Client()
         staff.force_login(User.objects.create_user('vp_snake_staff', password='p12345', is_staff=True))
-        self.assertNotIn('class="vp-chain"', page(staff))
+        self.assertNotIn('class="vp-land-chain"', page(staff))
 
     def test_marked_letter_is_the_second_letter_of_the_first_word(self):
         self.assertEqual(landing._marked('валютный курс', False),

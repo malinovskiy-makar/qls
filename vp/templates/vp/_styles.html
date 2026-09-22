@@ -408,9 +408,19 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   max-width: 1440px; margin: 0 auto;
 }
 @media (min-width: 1100px) {
-  /* 48 px — высота шапки сайта. Минимум 660 не даёт сетке схлопнуться на
-     низком окне: там уже честнее показать прокрутку, чем сплющить таблицу. */
-  .vp-land { height: calc(100vh - 48px); min-height: 660px; }
+  /* ⚠️ ВЫСОТУ БЕРЁМ У ПОТОКА, А НЕ ИЗ `100vh - 48px`. Под сеткой стоит метка
+     версии сайта (`_site_version.html`, ~40 px), и вычитание одной только
+     шапки её не учитывало бы — страница уезжала бы в прокрутку ровно на её
+     высоту. `body` базового шаблона — flex-колонка во всю высоту окна,
+     поэтому `flex: 1` у `main` и `height: 100%` у сетки дают точный остаток.
+     Минимум 660 не даёт сетке схлопнуться на низком окне: там честнее
+     показать прокрутку, чем сплющить таблицу. */
+  /* ⚠️ Основа ИМЕННО 0, а не `auto`: с `auto` высота `main` считается от
+     содержимого, и `height: 100%` у сетки упирается в круг «размер от
+     содержимого → содержимое от размера». С нулевой основой `main`
+     получает ровно свободное место, и остаток становится определённым. */
+  body:has(> main .vp-land) > main { flex: 1 1 0; min-height: 0; }
+  .vp-land { height: 100%; min-height: 660px; }
 }
 .vp-land-card {
   background: var(--surface); border: var(--line, 1px) solid var(--border);
@@ -462,21 +472,21 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   color: var(--text3); font-weight: 500;
 }
 .vp-land-snake p { margin: 0; font-size: 14px; line-height: 1.5; max-width: 78ch; }
-.vp-chain {
+.vp-land-chain {
   display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px;
   font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   font-size: 16px; letter-spacing: .01em;
 }
-.vp-chain span {
+.vp-land-chain span {
   background: var(--surface); border: var(--line, 1px) solid var(--border);
   border-radius: 8px; padding: 5px 10px; white-space: nowrap;
 }
-.vp-chain b {
+.vp-land-chain b {
   color: var(--accent-ink); text-decoration: underline;
   text-decoration-thickness: 2px; text-underline-offset: 3px;
 }
-.vp-chain i { font-style: normal; color: var(--skip); }
-.vp-chain-more {
+.vp-land-chain i { font-style: normal; color: var(--skip); }
+.vp-land-chain-more {
   background: transparent; border-color: transparent; color: var(--text3);
   padding-left: 0; font-family: inherit; font-size: 13px;
 }
@@ -601,12 +611,17 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-land-cell.is-guest .vp-land-ca { grid-column: auto; grid-row: auto; margin: 0; }
 
 /* ── Окно «Правила и формат» ─────────────────────────────────────── */
+/* ⚠️ `display` — ТОЛЬКО У ОТКРЫТОГО ОКНА. У `<dialog>` без `open` браузер сам
+   ставит `display: none`; безусловный `display: flex` его перебивает, и закрытое
+   окно остаётся в потоке страницы. На посадочной это стоило 640 px высоты и
+   ломало главный инвариант «экран без прокрутки». */
 .vp-rules {
   border: var(--line, 1px) solid var(--border); border-radius: 16px;
   background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop);
   width: 920px; max-width: calc(100vw - 32px); height: 640px; max-height: calc(100vh - 48px);
-  padding: 0; margin: auto; display: flex; flex-direction: column; position: relative;
+  padding: 0; margin: auto; position: relative;
 }
+.vp-rules[open] { display: flex; flex-direction: column; }
 .vp-rules::backdrop { background: rgba(29, 26, 22, .55); }
 .vp-rules-x {
   position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; border-radius: 9px;
@@ -638,7 +653,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 .vp-rsec-h4 { margin: 14px 0 6px; font-size: 14.5px; font-weight: 600; color: var(--text2); }
 .vp-rsec p { margin: 0 0 8px; font-size: 14.5px; line-height: 1.55; max-width: 66ch; }
 .vp-rsec p:last-child { margin-bottom: 0; }
-.vp-rsec .vp-chain { font-size: 15px; margin-top: 6px; }
+.vp-rsec .vp-land-chain { font-size: 15px; margin-top: 6px; }
 .vp-rsec-note { color: var(--text3); font-size: 13px; margin-top: 10px; }
 .vp-rsec-lnk { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
 .vp-rsec-lnk a { color: var(--accent-ink); font-weight: 500; }
@@ -656,7 +671,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-land-lead { font-size: 14px; }
   .vp-land-fact b { font-size: 24px; }
   .vp-land-fact.is-date b { font-size: 15px; white-space: nowrap; }
-  .vp-chain { font-size: 14px; }
+  .vp-land-chain { font-size: 14px; }
   .vp-land-cta { margin-top: 6px; gap: 12px; }
   .vp-play { width: calc(50% - 6px); min-width: 0; }
   .vp-ext { margin-left: 0; }
@@ -674,7 +689,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-land { display: flex; flex-direction: column; height: auto; padding: 18px 24px 84px; gap: 14px; }
   .vp-land-hero { overflow: visible; padding: 22px 24px; }
   .vp-land-h1 { font-size: 32px; }
-  .vp-chain { font-size: 15px; }
+  .vp-land-chain { font-size: 15px; }
   .vp-land-cta { margin-top: 4px; gap: 12px; }
   .vp-play { width: calc(50% - 6px); min-width: 0; }
   .vp-ext { margin-left: 0; }
@@ -698,7 +713,7 @@ body.vp-is-timeup .vp-timeup { display: flex; }
   .vp-land-h1 small { font-size: 17px; }
   .vp-land-facts { grid-template-columns: 1fr 1fr; }
   .vp-land-fact.is-date b { font-size: 17px; }
-  .vp-chain { font-size: 14px; }
+  .vp-land-chain { font-size: 14px; }
   .vp-land-cta { margin-top: 4px; gap: 12px; }
   .vp-play { width: 100%; min-width: 0; height: 54px; }
   .vp-land-band { display: flex; flex-direction: column; }
@@ -866,12 +881,14 @@ body.vp-is-timeup .vp-timeup { display: flex; }
 
 /* ── Стена регистрации на интро (сессия 5) ───────────────────────── */
 /* Окно — объяснение, а не защита: стена стоит в `vp.views.start`. */
+/* ⚠️ `display` — только у открытого окна: см. комментарий у `.vp-rules`. */
 .vp-gate {
   border: var(--line, 1px) solid var(--border); border-radius: 16px;
   background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop);
   padding: 30px 32px 28px; width: 520px; max-width: calc(100vw - 32px); margin: auto;
-  display: flex; flex-direction: column; gap: 14px; position: relative;
+  position: relative;
 }
+.vp-gate[open] { display: flex; flex-direction: column; gap: 14px; }
 .vp-gate::backdrop { background: rgba(29, 26, 22, .55); }
 .vp-gate-x {
   position: absolute; top: 12px; right: 12px; width: 36px; height: 36px;

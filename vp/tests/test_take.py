@@ -132,12 +132,13 @@ class StartTests(ViewBase):
         self.assertEqual(anon.get(reverse('vp:intro', args=['vp-t'])).status_code, 404)
         self.assertEqual(self.guest.get(reverse('vp:intro', args=['vp-t'])).status_code, 404)
         self.assertEqual(self.guest.post(reverse('vp:start', args=['vp-t'])).status_code, 404)
-        self.assertNotContains(anon.get(reverse('vp:index')), 'Тестовый вариант')
+        # Список вариантов с 22.09.2026 живёт на `/vp/variants/`.
+        self.assertNotContains(anon.get(reverse('vp:variants')), 'Тестовый вариант')
         staff = User.objects.create_user('vp_staff', password='p12345', is_staff=True)
         client = Client()
         client.force_login(staff)
         self.assertEqual(client.get(reverse('vp:intro', args=['vp-t'])).status_code, 200)
-        self.assertContains(client.get(reverse('vp:index')), 'Не опубликован')
+        self.assertContains(client.get(reverse('vp:variants')), 'Не опубликован')
 
 
 class OwnerTests(ViewBase):
@@ -274,21 +275,25 @@ class IntroTests(ViewBase):
     def test_unknown_variant_is_404(self):
         self.assertEqual(self.guest.get(reverse('vp:intro', args=['net-takogo'])).status_code, 404)
 
-    def test_index_lists_published_variants_by_band(self):
+    def test_variants_screen_lists_published_variants_by_band(self):
+        """Список вариантов с 22.09.2026 живёт на `/vp/variants/`, а не на посадочной."""
         eleven = make_published('vp-eleven')
         eleven.grade_band = '11'
         eleven.title = 'Вариант для 11 класса'
         eleven.save()
-        html = self.guest.get(reverse('vp:index')).content.decode()
+        html = self.guest.get(reverse('vp:variants')).content.decode()
         self.assertIn('9–10 классы', html)
         self.assertIn('11 класс', html)
         self.assertIn(reverse('vp:intro', args=['vp-t']), html)
-        self.assertIn(reverse('vp:intro', args=['vp-eleven']), html)
+        # Одиннадцатый класс — на своей вкладке переключателя.
+        eleven_html = self.guest.get(reverse('vp:variants'), {'band': '11'}).content.decode()
+        self.assertIn(reverse('vp:intro', args=['vp-eleven']), eleven_html)
 
-    def test_empty_index_is_honest(self):
+    def test_empty_variants_screen_is_honest(self):
         self.variant.is_published = False
         self.variant.save()
-        self.assertContains(self.guest.get(reverse('vp:index')), 'Опубликованных вариантов пока нет')
+        self.assertContains(self.guest.get(reverse('vp:variants')),
+                            'Опубликованных вариантов пока нет')
 
 
 class PenaltyExampleTests(TestCase):
