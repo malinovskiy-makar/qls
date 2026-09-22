@@ -338,8 +338,12 @@ class VpItemTests(TestCase):
         # Метка у открытого раздела остаётся: «новое» дальше несёт только она.
         self.assertEqual(html.count('<span class="nav-flag">NEW</span>'), 2)
 
-        rule = html.split('.nav-link.is-new.is-active {', 1)[1].split('}', 1)[0]
-        self.assertIn('color: var(--nav-accent)', rule)
+        # ⚠️ Правило ищется от НАЧАЛА СТРОКИ: подстрока `.nav-link.is-new.is-active {` есть и в
+        # панельном `.nav-panel .nav-link.is-new.is-active {`, а у того цвет тот же — тест на
+        # подстроку проспал бы удаление общего правила (нашла проверка зубастости).
+        rule = re.search(r'^\.nav-link\.is-new\.is-active \{([^}]*)\}', html, re.M)
+        self.assertIsNotNone(rule, 'нет общего правила .nav-link.is-new.is-active')
+        self.assertIn('color: var(--nav-accent)', rule.group(1))
 
     def test_hover_rules_of_the_new_item_do_not_beat_the_open_one(self):
         """⚠️ Наведение на НОВЫЙ пункт не должно красить линию ОТКРЫТОГО раздела в янтарь.
