@@ -2,7 +2,9 @@
  *
  * ⚠️ «Дорешать» НИЧЕГО не сохраняет: ответ уходит в `practice_check`, а тот ни в базу, ни в
  * балл не пишет. Всё, что приходит с сервера, вставляется как ТЕКСТ (`textContent`), не как
- * разметка. Эталона на странице до проверки нет — его отдаёт только этот запрос.
+ * разметка. Эталона на странице до проверки нет — его отдаёт только этот запрос. KaTeX из
+ * общего конвейера (`catalog/base.html`) затем превращает уже вставленный текст в формулы —
+ * разметку с сервера по-прежнему не вставляем (`trust: false`).
  */
 (function () {
   'use strict';
@@ -70,6 +72,8 @@
 
   function show(out, text, tone) {
     out.textContent = text;
+    // Ответ может содержать формулы $…$: общий конвейер KaTeX из catalog/base.html.
+    if (typeof window.renderMathIn === 'function') window.renderMathIn(out);
     out.className = 'vp-practice-out' + (tone ? ' is-' + tone : '');
   }
 
