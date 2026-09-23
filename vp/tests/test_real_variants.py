@@ -16,9 +16,13 @@
 * разрыв цепочки змейки: `import_vp` без `--strict-chain` его только
   предупреждает.
 
-Черновики, которые не публикуются, перечислены в DRAFTS и не проверяются.
+Черновики из DRAFTS не проверяются, кроме шапки: её видит персонал.
 Тест не ходит в базу: читает файлы и разбирает их тем же `vp.loader`,
 что и `import_vp`.
+
+Отдельно: в шапке варианта (название и остальное, кроме `items`) длинного
+тире нет — она видна на сайте (карточки `/vp/variants/`, интро, `<title>`
+вкладки), а `scripts/check_em_dash.py` файлы `data/vp` не читает.
 """
 import pathlib
 import re
@@ -78,6 +82,20 @@ class RealVariantsContentTests(SimpleTestCase):
 
     def test_files_found(self):
         self.assertGreaterEqual(len(self.files), MIN_FILES)
+
+    def test_header_has_no_em_dash(self):
+        """Шапка варианта (всё, кроме items) видна на сайте: карточки /vp/variants/,
+        интро, <title> вкладки. Длинного тире там нет, а сканер check_em_dash.py
+        файлы data/vp не читает. Черновики тоже: их видит персонал. Тексты заданий
+        не проверяем: это материал олимпиады."""
+        files = sorted(DATA.glob('vp-1tur-*.yaml'))
+        # Пустая маска прошла бы молча: ноль файлов – ноль нарушений.
+        self.assertGreaterEqual(len(files), MIN_FILES + len(DRAFTS))
+        bad = [f'{path.name}: {key}'
+               for path in files
+               for key, value in load(path).items()
+               if key != 'items' and isinstance(value, str) and '—' in value]
+        self.assertEqual(bad, [])
 
     def test_gapfill_has_exactly_one_gap(self):
         problems = []

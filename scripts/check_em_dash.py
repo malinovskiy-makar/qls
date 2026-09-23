@@ -27,7 +27,7 @@ DASH = '—'
 
 # Каталоги приложений, чей текст видит пользователь.
 APP_DIRS = ['templates', 'problems', 'catalog', 'teacher', 'student',
-            'game', 'calc2', 'calendar_stub', 'shtrikh', 'config']
+            'game', 'calc2', 'calendar_stub', 'shtrikh', 'config', 'vp']
 
 # Что НЕ смотрим: документация, отчёты, служебное, сборки.
 SKIP_PARTS = ('docs', 'reports', 'scripts', '.claude', 'node_modules',
