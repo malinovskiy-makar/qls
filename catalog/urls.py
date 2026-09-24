@@ -31,6 +31,8 @@ urlpatterns = [
     path('api/rail/saved/',                     views.api_rail_saved,     name='api_rail_saved'),
     # «Как прошло?» и следы помощи (каталог «Стол», ADR 0119).
     path('api/progress/<int:problem_id>/',      views.api_progress,       name='api_progress'),
+    # «Решить заново»: чистит экран ученика, статистика та же (ADR 0130).
+    path('api/progress/<int:problem_id>/reset/', views.api_progress_reset, name='api_progress_reset'),
     # Решение и ответ к пункту — только вошедшему, POST (ADR 0129).
     path('api/solution/<int:problem_id>/',      views.api_solution,       name='api_solution'),
     path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),

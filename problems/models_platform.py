@@ -1083,6 +1083,16 @@ class ProblemProgress(models.Model):
                               default=Status.OPENED)
     hints_opened = models.PositiveSmallIntegerField('Открыто подсказок', default=0)
     solution_viewed = models.BooleanField('Смотрел решение', default=False)
+    # ⚠️ «РЕШИТЬ ЗАНОВО» — МЯГКИЙ СБРОС (решение владельца 24.09.2026, ADR 0130).
+    # Сброс чистит ЭКРАН ученика: `hints_opened`, `solution_viewed` и статус
+    # снова как у новой задачи. Что было до сброса, не теряется: максимум
+    # открытых подсказок и факт «смотрел решение» копятся здесь, и честный
+    # факт — это «до сброса ИЛИ после» (`catalog/progress.py`). Чат и попытки
+    # на экране — только новее `reset_at`; в базе не удаляется ничего.
+    reset_at = models.DateTimeField('Решить заново: когда', null=True, blank=True)
+    hints_before_reset = models.PositiveSmallIntegerField(
+        'Подсказок до сброса (максимум)', default=0)
+    solution_before_reset = models.BooleanField('Смотрел решение до сброса', default=False)
     updated_at = models.DateTimeField('Изменено', auto_now=True, db_index=True)
 
     class Meta:
@@ -1983,6 +1993,11 @@ class ChatTurn(models.Model):
     vision_input_tokens = models.PositiveIntegerField('Зрение: вход', default=0)
     vision_output_tokens = models.PositiveIntegerField('Зрение: выход', default=0)
     reply = models.TextField('Ответ помощника', blank=True)
+    # Цитата, с которой ушла реплика (24.09.2026): выделенный фрагмент
+    # условия или ответа помощника — «Ответить». Хранится, чтобы после
+    # перезагрузки пузырь ученика показывал её так же, как при отправке.
+    quote = models.TextField('Цитата', blank=True, default='')
+    quote_source = models.CharField('Откуда цитата', max_length=10, blank=True, default='')
     provider = models.CharField('Поставщик', max_length=20, blank=True)
     model = models.CharField('Модель', max_length=80, blank=True)
     input_tokens = models.PositiveIntegerField('Вход', default=0)

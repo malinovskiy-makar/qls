@@ -363,11 +363,11 @@
     if (what === 'focus') focusMode(!state.focus); else toggle(what);
   });
 
-  /* ── Лента: вкладки «Выдача / Похожие / Мои» ───────────────────────── */
+  /* ── Лента: вкладки «Лента / Похожие / Мои» ────────────────────────── */
   var tabs = rail.querySelectorAll('[data-rail-tab]');
   var similarHtml = list.innerHTML, savedHtml = null;
   function tabBtn(name) { return rail.querySelector('[data-rail-tab="' + name + '"]'); }
-  /* Выдача — строки блока результатов входа, один источник с ним. */
+  /* «Лента» — строки блока результатов входа, один источник с ним. */
   function resultsRows() {
     var box = document.getElementById('ct-rows');
     return box ? Array.prototype.slice.call(box.querySelectorAll('.rail-row')) : [];
@@ -422,7 +422,12 @@
   }
 
   /* ── Позиция «3 из 506», стрелки, соседи с названиями, «Дальше» ────── */
-  function titleOf(row) { var t = row.querySelector('.rail-title'); return t ? t.textContent.trim() : ''; }
+  /* Без задвоенных формул KaTeX — тот же помощник, что у цитат (stol_task.js). */
+  function titleOf(row) {
+    var t = row.querySelector('.rail-title');
+    if (!t) return '';
+    return window.weco && weco.plainText ? weco.plainText(t) : t.textContent.trim();
+  }
   function totalOfTab(rows) {
     if (state.tab === 'results') {
       var res = document.getElementById('ct-results');

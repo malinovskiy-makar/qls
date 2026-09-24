@@ -1241,6 +1241,11 @@ def api_chat(request):
     if len(quote) > chat.QUOTE_MAX:
         return JsonResponse({'error': 'quote', 'reply': 'Слишком длинный фрагмент: выделите короче.'},
                             status=400)
+    # Откуда цитата: условие или ответ помощника («Ответить», 24.09.2026).
+    quote_source = data.get('quote_source') or 'statement'
+    if quote_source not in chat.QUOTE_SOURCES:
+        return JsonResponse({'error': 'quote_source', 'reply': 'Непонятно, откуда цитата.'},
+                            status=400)
     message = str(data.get('message') or '').strip()
     if not message:
         return JsonResponse({'error': 'empty',
@@ -1255,13 +1260,16 @@ def api_chat(request):
         thread = uuid.UUID(str(data.get('thread') or ''))
     except ValueError:
         thread = None
-    last_attempt = (CatalogAttempt.objects
-                    .filter(user=request.user, problem=problem)
-                    .order_by('-created_at').first())
+    last_attempt = CatalogAttempt.objects.filter(user=request.user, problem=problem)
+    since = progress.reset_at(request.user, problem)
+    if since:
+        # После «Решить заново» прежняя попытка — не часть нового разговора.
+        last_attempt = last_attempt.filter(created_at__gt=since)
+    last_attempt = last_attempt.order_by('-created_at').first()
     try:
         reply = chat.answer(problem, message, data.get('history'), request.user,
                             last_attempt=last_attempt, mode=mode, attachments=attachments,
-                            thread=thread, quote=quote)
+                            thread=thread, quote=quote, quote_source=quote_source)
     except ai.AiUnavailable as exc:
         # Дневной денежный потолок чата и суточный лимит обращений — оба «limit»,
         # а сказать ученику надо разное.
@@ -1311,26 +1319,63 @@ def api_chat_upload(request):
 
 
 #: Сколько реплик отдаёт история чата — последние, удачные.
-CHAT_HISTORY_MAX = 20
+CHAT_HISTORY_MAX = 200
 
 
 def api_chat_history(request, problem_id):
-    """История СВОЕГО разговора по ЭТОЙ задаче (18.09.2026): последние 20
-    удачных реплик. Гостю 401; чужие реплики не отдаются никогда."""
-    from problems.models_platform import ChatTurn
+    """История СВОЕГО разговора по ЭТОЙ задаче: удачные реплики по времени.
+
+    ⚠️ ВСЯ ИСТОРИЯ, А НЕ ПОСЛЕДНИЕ 20 (24.09.2026): длинный разговор после
+    перезагрузки обрывался на середине. Предел — CHAT_HISTORY_MAX (200), от
+    самых новых; отдаются в хронологическом порядке, с цитатами. После
+    «Решить заново» — только реплики новее сброса. Гостю 401; чужие реплики
+    не отдаются никогда."""
+    from problems.models_platform import ChatTurn, ProblemProgress
 
     if not request.user.is_authenticated:
         return JsonResponse({'error': 'login'}, status=401)
     turns = (ChatTurn.objects.filter(user=request.user, problem_id=problem_id, error='')
-             .exclude(reply='').prefetch_related('attachments')
-             .order_by('-created_at')[:CHAT_HISTORY_MAX])
+             .exclude(reply='').prefetch_related('attachments'))
+    since = (ProblemProgress.objects.filter(user=request.user, problem_id=problem_id)
+             .values_list('reset_at', flat=True).first())
+    if since:
+        turns = turns.filter(created_at__gt=since)
+    turns = turns.order_by('-created_at', '-pk')[:CHAT_HISTORY_MAX]
     return JsonResponse({'turns': [
         {'message': t.user_text, 'reply': t.reply, 'mode': t.mode,
+         'quote': t.quote, 'quote_source': t.quote_source,
          'ts': t.created_at.isoformat(),
          'attachments': [{'id': a.pk, 'name': a.name, 'mime': a.mime,
                           'url': reverse('catalog:chat_attachment', args=[a.pk])}
                          for a in t.attachments.all()]}
         for t in reversed(list(turns))]})
+
+
+def _has_chat(user, problem, since=None):
+    """Есть ли у человека удачные реплики чата по задаче (после сброса)."""
+    from problems.models_platform import ChatTurn
+
+    if not getattr(user, 'is_authenticated', False):
+        return False
+    turns = ChatTurn.objects.filter(user=user, problem=problem, error='').exclude(reply='')
+    if since:
+        turns = turns.filter(created_at__gt=since)
+    return turns.exists()
+
+
+@require_POST
+def api_progress_reset(request, problem_id):
+    """«Решить заново» (решение владельца 24.09.2026, ADR 0130). Только вход.
+
+    Чистит экран ученика: подсказки, «смотрел решение», статус, чат и
+    попытки на экране. У репетитора в статистике — как было; в базе не
+    удаляется ничего (`catalog/progress.reset`). Повтор безопасен.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=403)
+    problem = _visible_problem(problem_id)
+    row = progress.reset(request.user, problem)
+    return JsonResponse(progress.as_json(row))
 
 
 def _ordered_hints(problem):
@@ -1427,11 +1472,15 @@ def _problem_context(request, problem):
     ai_available = ai.is_available()
     remaining = ai.remaining_today(request.user) if ai_available and request.user.is_authenticated else 0
     last_attempt = None
+    since = progress.reset_at(request.user, problem)
     if ai_available and request.user.is_authenticated:
         last_attempt = (CatalogAttempt.objects
                         .filter(user=request.user, problem=problem)
-                        .exclude(status=CatalogAttempt.Status.ERROR)
-                        .order_by('-created_at').first())
+                        .exclude(status=CatalogAttempt.Status.ERROR))
+        if since:
+            # «Решить заново»: экран — как у новой задачи (ADR 0130).
+            last_attempt = last_attempt.filter(created_at__gt=since)
+        last_attempt = last_attempt.order_by('-created_at').first()
     hint_total = len(_ordered_hints(problem))
     game = testplay.game_of(problem, parts)
     test = _test_context(problem, game, topics) if game else None
@@ -1477,6 +1526,7 @@ def _problem_context(request, problem):
         from problems.models_platform import ProblemProgress
         my_progress = ProblemProgress.objects.filter(user=request.user, problem=problem).first()
         cfg['progressUrl'] = reverse('catalog:api_progress', args=[problem.pk])
+        cfg['resetUrl'] = reverse('catalog:api_progress_reset', args=[problem.pk])
     # «Как прошло?» — не у тестов (статус ставит сам тест) и не у учителя.
     # У репетитора блока «Как прошло?» нет (README §7).
     show_how = request.user.is_authenticated and not game and not _is_tutor(request.user)
@@ -1527,8 +1577,11 @@ def _problem_context(request, problem):
             {'next': reverse('catalog:problem_detail', args=[problem.pk])})),
         'register_next_url': '%s?%s' % (reverse('register'), urlencode(
             {'next': reverse('catalog:problem_detail', args=[problem.pk])})),
-        # Лестница пуста, только пока человек ничем не пользовался.
-        'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt),
+        # Лестница пуста, только пока человек ничем не пользовался. Реплики чата
+        # тоже в счёт (24.09.2026): у кого разговор уже есть, стартовый блок не
+        # мелькает до прихода истории.
+        'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt
+                             or _has_chat(request.user, problem, since)),
         'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),
         # Как эту задачу решают в игре (строка под условием и в тесте).
         'game_stat':    _game_stat(problem.pk),

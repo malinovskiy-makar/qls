@@ -49,6 +49,10 @@ CHAT_MAX_TOKENS = 3000
 #: Не больше трёх файлов к одной реплике; страниц в модель зрения — всего пять.
 FILES_PER_TURN = 3
 QUOTE_MAX = 300
+#: Откуда цитата реплики (24.09.2026): выделенный фрагмент условия или
+#: фрагмент ответа помощника («Ответить», как в ChatGPT и Claude).
+QUOTE_SOURCES = ('statement', 'reply')
+QUOTE_LABELS = {'statement': 'Фрагмент условия', 'reply': 'Фрагмент ответа помощника'}
 CUT_MARK = ' …'
 #: Эталонное решение режима проверки — не больше, чтобы одна реплика не стоила как десять.
 REFERENCE_MAX = 8000
@@ -155,7 +159,7 @@ def pages_note(attachments):
 
 
 def build_prompt(problem, parts, message, history, last_attempt=None, homework=False,
-                 quote=''):
+                 quote='', quote_source='statement'):
     lines = ['УСЛОВИЕ:', (problem.statement or '').strip()]
     for part in parts:
         if (part.statement or '').strip():
@@ -185,7 +189,8 @@ def build_prompt(problem, parts, message, history, last_attempt=None, homework=F
     if quote:
         # Выделенный учеником кусок условия — текстом реплики, не системным
         # блоком: это его вопрос, а не наше правило.
-        lines.append('Фрагмент условия: «%s»' % quote)
+        lines.append('%s: «%s»' % (QUOTE_LABELS.get(quote_source, QUOTE_LABELS['statement']),
+                                   quote))
     lines += ['ВОПРОС УЧЕНИКА:', message.strip()]
     return '\n'.join(lines)
 
@@ -310,7 +315,7 @@ def _spent(result):
 # ─── Реплика ───────────────────────────────────────────────────────────────
 
 def answer(problem, message, history, user, last_attempt=None, mode='free',
-           attachments=(), thread=None, quote=''):
+           attachments=(), thread=None, quote='', quote_source='statement'):
     """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
 
     `attachments` — до FILES_PER_TURN своих вложений; картинки со всех подряд,
@@ -330,6 +335,7 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
     attachments = list(attachments)
     turn = ChatTurn(user=user, problem=problem, thread=thread, mode=mode,
                     user_text=message, attachment=attachments[0] if attachments else None,
+                    quote=quote or '', quote_source=quote_source if quote else '',
                     provider=provider.name, model=model or '')
     started = time.monotonic()
     try:
@@ -355,7 +361,8 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
                                                                  _digest(pictures))
         prompt = build_prompt(problem, list(problem.parts.all()), text, clean_history(history),
                               last_attempt=last_attempt,
-                              homework=in_active_homework(user, problem), quote=quote)
+                              homework=in_active_homework(user, problem), quote=quote,
+                              quote_source=quote_source)
         # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
         # кэша считается по тексту запроса — та же реплика в другом режиме
         # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.

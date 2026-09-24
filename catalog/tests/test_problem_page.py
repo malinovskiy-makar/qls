@@ -185,9 +185,12 @@ class ProblemPageTests(TestCase):
     def test_ai_card_needs_an_available_model(self):
         # Без ключа ИИ карточки нет вовсе (правило нуля); с моделью — есть.
         # С 15.09.2026 у чата свой поставщик (CATALOG_CHAT_PROVIDER), не AI_PROVIDER.
+        # С 24.09.2026 подсказка про выделение — вошедшему, строки про профиль нет.
+        self.client.force_login(make_user('ai_card_reader'))
         with self.settings(CATALOG_CHAT_PROVIDER='anthropic'):
             self.assertNotIn('Выделите фрагмент условия', self.client.get(_url(self.p_named)).content.decode())
         with self.settings(CATALOG_CHAT_PROVIDER='fake'):
             html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('Выделите фрагмент условия', html)
-        self.assertIn('Данные профиля ему не передаются', html)
+        self.assertIn('Выделите фрагмент условия, чтобы обсудить его с ИИ.', html)
+        self.assertNotIn('Данные профиля ему не передаются', html)
+        self.assertNotIn('class="ai-note"', html)

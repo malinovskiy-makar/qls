@@ -7,12 +7,14 @@
 import io
 import json
 import tempfile
+from datetime import timedelta
 from unittest import mock
 
 from django.core.cache import cache
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 from PIL import Image
 
 from catalog import chat
@@ -290,6 +292,91 @@ class HistoryAndQuoteTests(_ChatCase):
 
     def test_quote_over_three_hundred_is_refused(self):
         self.assertEqual(self._post(quote='я' * 301).status_code, 400)
+
+    # ── 24.09.2026: «Ответить» на фрагмент ответа помощника ──────────────
+    def test_reply_quote_is_labelled_as_the_assistants_answer(self):
+        with override_settings(AI_FAKE_REPLY=_reply('Ответ.')):
+            self._post(quote='приравняйте MR к MC', quote_source='reply')
+        self.assertIn('Фрагмент ответа помощника: «приравняйте MR к MC»', self._talk()['text'])
+        self.assertNotIn('Фрагмент условия', self._talk()['text'])
+
+    def test_statement_is_the_default_source(self):
+        with override_settings(AI_FAKE_REPLY=_reply('Ответ.')):
+            self._post(quote='монополист')
+        turn = ChatTurn.objects.get()
+        self.assertEqual((turn.quote, turn.quote_source), ('монополист', 'statement'))
+
+    def test_unknown_quote_source_is_400(self):
+        self.assertEqual(self._post(quote='кусок', quote_source='profile').status_code, 400)
+
+    def test_quote_is_saved_and_comes_back_with_history(self):
+        with override_settings(AI_FAKE_REPLY=_reply('Ответ.')):
+            self._post(message='Почему так?', quote='кусок ответа', quote_source='reply')
+        turn = self._history().json()['turns'][0]
+        self.assertEqual((turn['quote'], turn['quote_source']), ('кусок ответа', 'reply'))
+
+    # ── 24.09.2026: вся история задачи, по порядку ───────────────────────
+    def test_twenty_five_turns_all_come_back_in_order(self):
+        other = make_problem('Другая задача про олигополию.')
+        base = timezone.now() - timedelta(hours=1)
+        for n in range(25):
+            t = ChatTurn.objects.create(user=self.user, problem=self.problem,
+                                        user_text='Вопрос %d' % n, reply='Ответ %d' % n)
+            ChatTurn.objects.filter(pk=t.pk).update(created_at=base + timedelta(minutes=n))
+        ChatTurn.objects.create(user=self.user, problem=other, user_text='Чужая задача', reply='Нет')
+        ChatTurn.objects.create(user=make_user('сосед_25'), problem=self.problem,
+                                user_text='Чужой человек', reply='Нет')
+        turns = self._history().json()['turns']
+        self.assertEqual([t['message'] for t in turns], ['Вопрос %d' % n for n in range(25)])
+
+
+@override_settings(AI_PROVIDER='fake', CATALOG_CHAT_PROVIDER='fake', CATALOG_CHAT_MODEL='glm-5.3',
+                   CATALOG_CHAT_VISION_MODEL='', MEDIA_ROOT=MEDIA)
+class SolveAgainTests(_ChatCase):
+    """«Решить заново» (24.09.2026, ADR 0130): чистит экран, статистика та же."""
+
+    def _reset(self):
+        return self.client.post(reverse('catalog:api_progress_reset', args=[self.problem.pk]))
+
+    def test_guest_cannot_reset(self):
+        self.client.logout()
+        self.assertEqual(self._reset().status_code, 403)
+
+    def test_reset_clears_the_screen_but_keeps_the_facts(self):
+        from problems.models import Hint
+        from problems.models_platform import LearningEvent, ProblemProgress
+        for i in range(2):
+            Hint.objects.create(problem=self.problem, text='Подсказка %d.' % i, order=i)
+        with override_settings(AI_FAKE_REPLY=_reply('Ответ до сброса.')):
+            self._post(message='До сброса')
+        ProblemProgress.objects.update_or_create(user=self.user, problem=self.problem, defaults={
+            'hints_opened': 2, 'solution_viewed': True, 'status': 'failed'})
+        events = LearningEvent.objects.count()
+        turns = ChatTurn.objects.count()
+        self.assertEqual(self._reset().status_code, 200)
+        row = ProblemProgress.objects.get(user=self.user, problem=self.problem)
+        self.assertEqual((row.hints_opened, row.solution_viewed, row.status), (0, False, 'opened'))
+        self.assertEqual((row.hints_before_reset, row.solution_before_reset), (2, True))
+        self.assertIsNotNone(row.reset_at)
+        # История экрана пуста, переписка в базе — вся.
+        history = self.client.get(reverse('catalog:api_chat_history', args=[self.problem.pk]))
+        self.assertEqual(history.json()['turns'], [])
+        self.assertEqual(ChatTurn.objects.count(), turns)
+        self.assertEqual(LearningEvent.objects.count(), events)
+        html = self.client.get(reverse('catalog:problem_detail', args=[self.problem.pk])).content.decode()
+        self.assertIn('<div class="help-ladder" id="help-ladder">', html)
+        self.assertIn('Пока ничем не пользовались', html)
+        # Повтор безопасен и не теряет факты.
+        self.assertEqual(self._reset().status_code, 200)
+        row.refresh_from_db()
+        self.assertEqual((row.hints_before_reset, row.solution_before_reset), (2, True))
+
+    def test_new_replies_after_reset_are_shown(self):
+        self._reset()
+        with override_settings(AI_FAKE_REPLY=_reply('Новый ответ.')):
+            self._post(message='После сброса')
+        history = self.client.get(reverse('catalog:api_chat_history', args=[self.problem.pk])).json()
+        self.assertEqual([t['message'] for t in history['turns']], ['После сброса'])
 
 
 @override_settings(AI_PROVIDER='fake', CATALOG_CHAT_PROVIDER='fake', CATALOG_CHAT_MODEL='glm-5.3')

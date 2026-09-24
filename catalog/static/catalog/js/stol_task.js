@@ -1,7 +1,7 @@
 /* «Стол»: всё, что живёт внутри открытой задачи (README §3–§5).
  *
  * Центр: сохранить, скопировать ссылку, «Как прошло?», «спросить ИИ про этот
- * пункт», «Спросить об этом» по выделению условия, тест как игра.
+ * пункт», «Обсудить с ИИ» по выделению условия и «Ответить» по фрагменту ответа ИИ, тест как игра.
  * Помощь: лестница, одна лента по времени (подсказки, реплики, проверка
  * решения, подтверждение и решение, ответ по пункту), поле для разговора и
  * проверки решения с файлами, строка «что уже использовано».
@@ -55,6 +55,17 @@
     var t = root.querySelector('#' + id);
     return t ? t.content.firstElementChild.cloneNode(true) : null;
   }
+  /* ⚠️ ТЕКСТ БЕЗ ЗАДВОЕННЫХ ФОРМУЛ (24.09.2026). KaTeX рисует каждую формулу
+     дважды: невидимую копию MathML для чтецов экрана и видимую HTML. У
+     `innerText`/`textContent` и у выделения обе копии, и в цитату чата
+     уходило «x↵x и↵y↵y». Здесь копия MathML срезается. */
+  function plainText(node) {
+    if (!node) return '';
+    var copy = node.cloneNode(true);
+    Array.prototype.forEach.call(copy.querySelectorAll('.katex-mathml'), function (m) { m.remove(); });
+    return copy.textContent.replace(/\s+/g, ' ').trim();
+  }
+  window.weco.plainText = plainText;
   /* Карточка из разметки СЕРВЕРА (решение, ответ к пункту — ADR 0129): её
      рисуют наши партиалы с экранированием, как при загрузке страницы. */
   function fromHtml(html) {
@@ -191,6 +202,7 @@
     };
     t.feed = function (card) {
       if (ladder) ladder.hidden = true;
+      var tip = t.$('help-tip'); if (tip) tip.hidden = true;
       feed.appendChild(card);
       t.reveal(card);
       return card;
@@ -200,7 +212,9 @@
       var total = Number(used.getAttribute('data-total')) || 0, parts = [];
       if (t.hintsOpened) parts.push('подсказок ' + t.hintsOpened + ' из ' + total);
       if (t.solutionShown) parts.push('решение');
-      used.textContent = parts.length ? parts.join(' · ') : 'пока ничем не пользовались';
+      /* С заглавной (24.09.2026): «Подсказок 4 из 4 · решение», «Решение». */
+      var line = parts.length ? parts.join(' · ') : 'пока ничем не пользовались';
+      used.textContent = line.charAt(0).toUpperCase() + line.slice(1);
     }
     t.paintUsed = paintUsed;
 
@@ -296,6 +310,27 @@
       if (!once(b)) return;
       b.addEventListener('click', function () { t.step(b.getAttribute('data-step')); });
     });
+
+    /* «Решить заново» (решение владельца 24.09.2026, ADR 0130): подтверждение
+       карточкой в ленте, затем экран — как у новой задачи. Сервер чистит
+       только экран ученика; статистика репетитора и переписка в базе те же. */
+    var resetBtn = t.$('help-reset');
+    if (resetBtn && once(resetBtn) && t.cfg.resetUrl) resetBtn.addEventListener('click', function () {
+      if (window.weco.stol && weco.stol.openPanel) weco.stol.openPanel('help');
+      var shown = feed.querySelector('.feed-reset');
+      if (shown) { t.reveal(shown); return; }
+      var box = tpl(t.root, 'help-reset-tpl');
+      if (!box) return;
+      t.feed(box);
+      box.querySelector('[data-confirm="no"]').addEventListener('click', function () { box.remove(); });
+      box.querySelector('[data-confirm="yes"]').addEventListener('click', function () {
+        post(t.cfg.resetUrl, {}).then(function (d) {
+          if (d && d.error) { box.remove(); t.say('Не получилось начать заново, попробуйте ещё раз.'); return; }
+          if (window.weco.track) weco.track('help_reset', { problem_id: t.cfg.problemId });
+          location.reload();
+        }).catch(function () { box.remove(); t.say('Не получилось начать заново, попробуйте ещё раз.'); });
+      });
+    });
   }
   function step(t, what) {
     if (window.weco.stol && weco.stol.openPanel) weco.stol.openPanel('help');
@@ -322,7 +357,7 @@
         return (c === 'x' ? r : (r & 3 | 8)).toString(16);
       });
     var files = [];                          /* [{file, name}] — ещё не загружены */
-    var quote = '';
+    var quote = '', quoteSource = 'statement';  /* statement | reply («Ответить») */
     var clip = t.$('ai-clip'), fileIn = t.$('ai-file'), att = t.$('ai-att'), attStatus = t.$('ai-att-status');
     var quoteBox = t.$('ai-quote');
 
@@ -343,8 +378,9 @@
       att.hidden = !(files.length || label);
       if (clip) clip.disabled = files.length >= FILES_PER_TURN;
     }
-    function setQuote(text) {
+    function setQuote(text, source) {
       quote = String(text || '').replace(/\s+/g, ' ').trim().slice(0, QUOTE_MAX);
+      quoteSource = source === 'reply' ? 'reply' : 'statement';
       if (!quoteBox) return;
       quoteBox.querySelector('.ai-quote-t').textContent = quote ? '«' + quote + '»' : '';
       quoteBox.hidden = !quote;
@@ -394,7 +430,13 @@
     function sync() {
       aiIn.classList.toggle('has-text', aiText.value.trim().length > 0);
       aiText.style.height = 'auto';
+      /* ⚠️ Скрытая панель даёт scrollHeight = 0: высота прижималась к 24 px, и
+         одна строка переполняла поле — вылезала толстая системная полоса
+         (24.09.2026). Меряем только видимое поле; полоса — только когда
+         текст выше потолка 120 px. */
+      if (!aiText.scrollHeight) { aiText.style.height = ''; return; }
       aiText.style.height = Math.min(120, aiText.scrollHeight) + 'px';
+      aiText.style.overflowY = aiText.scrollHeight > 120 ? 'auto' : 'hidden';
     }
     /* Загрузить выбранные файлы туда, куда уходит реплика; ответ — [{id,…}]. */
     function sendFiles(url, extra) {
@@ -414,7 +456,7 @@
 
     function chat(text, mode) {
       if (!t.cfg.chatUrl) return;
-      var own = files.slice(), q = quote;
+      var own = files.slice(), q = quote, qs = quoteSource;
       showFiles(own.length ? 'Загружаем файл…' : '');
       var upl = own.length && t.cfg.chatUploadUrl
         ? sendFiles(t.cfg.chatUploadUrl, { problem_id: function () { return t.cfg.problemId; } })
@@ -426,7 +468,7 @@
         bubble(true, text, { quote: q, files: shown });
         var payload = { problem_id: t.cfg.problemId, message: text, mode: mode, thread: thread,
                         history: history.slice(-HISTORY_LIMIT) };
-        if (q) payload.quote = q;
+        if (q) { payload.quote = q; payload.quote_source = qs; }
         if (uploaded.length) payload.attachment_ids = uploaded.map(function (d) { return d.id; });
         if (window.weco.track) weco.track('chat_send', { problem_id: t.cfg.problemId, mode: mode, has_file: uploaded.length > 0, files: uploaded.length, quote: !!q });
         var wait = typing();
@@ -490,8 +532,8 @@
     t.chat = {
       send: function (text) { aiText.value = text; send('free'); },
       focus: function () { aiText.focus({ preventScroll: true }); },
-      prefill: function (prefix, q) {
-        if (q !== undefined) setQuote(q);
+      prefill: function (prefix, q, source) {
+        if (q !== undefined) setQuote(q, source);
         if (prefix && aiText.value.indexOf(prefix) !== 0) aiText.value = prefix + aiText.value;
         sync();
         aiText.focus({ preventScroll: true });
@@ -507,7 +549,7 @@
         .then(function (d) {
           if (cur !== t || !(d.turns || []).length) return;
           (d.turns || []).forEach(function (turn) {
-            bubble(true, turn.message, { files: turn.attachments });
+            bubble(true, turn.message, { files: turn.attachments, quote: turn.quote });
             bubble(false, turn.reply);
             history.push({ role: 'me', text: turn.message }, { role: 'ai', text: turn.reply });
           });
@@ -516,6 +558,7 @@
         .catch(function () { /* без истории поле работает как раньше */ });
     }
     aiText.addEventListener('input', sync);
+    aiText.addEventListener('focus', sync);
     aiText.addEventListener('keydown', function (e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send('free'); } });
     aiSend.addEventListener('click', function () { send('free'); });
     var sug = t.$('ai-sug');
@@ -696,7 +739,7 @@
     if (part && cur.chat) {
       var li = part.closest('.part');
       if (weco.stol && weco.stol.openPanel) weco.stol.openPanel('help');
-      cur.chat.prefill('Пункт ' + li.getAttribute('data-part-label') + ': ', li.querySelector('.math-content').textContent);
+      cur.chat.prefill('Пункт ' + li.getAttribute('data-part-label') + ': ', plainText(li.querySelector('.math-content')));
       return;
     }
     /* Телефон и полоска помощи зовут те же ступени, что и лестница. */
@@ -712,37 +755,44 @@
     if (cur.test.key(e)) e.preventDefault();
   });
 
-  /* «Спросить об этом»: выделил фрагмент условия — тёмная кнопка у выделения,
-     цитата до 300 знаков уходит в реплику (README §3). */
+  /* «Обсудить с ИИ»: выделил фрагмент условия — тёмная кнопка у выделения,
+     цитата до 300 знаков уходит в реплику (README §3). «Ответить» (24.09.2026,
+     как в ChatGPT и Claude): то же на фрагменте ответа помощника — цитата
+     уходит с пометкой «ответ помощника» (`quote_source: reply`). */
   var pop = null;
   function hidePop() { if (pop) pop.hidden = true; }
-  function selectionInStatement() {
+  function selectionHit() {
     var s = window.getSelection();
     if (!s || s.isCollapsed || !s.rangeCount) return null;
     var node = s.anchorNode && (s.anchorNode.nodeType === 1 ? s.anchorNode : s.anchorNode.parentElement);
-    var stm = node && node.closest && node.closest('#stol-center .stm');
-    var text = s.toString().replace(/\s+/g, ' ').trim();
-    return stm && text.length >= 2 ? { text: text, rect: s.getRangeAt(0).getBoundingClientRect() } : null;
+    if (!node || !node.closest) return null;
+    var source = node.closest('#stol-center .stm') ? 'statement'
+      : node.closest('#help-feed .ai-msg--ai') ? 'reply' : '';
+    if (!source) return null;
+    var box = document.createElement('div');
+    box.appendChild(s.getRangeAt(0).cloneContents());
+    var text = plainText(box);
+    return text.length >= 2 ? { text: text, source: source, rect: s.getRangeAt(0).getBoundingClientRect() } : null;
   }
   document.addEventListener('mouseup', function () {
     setTimeout(function () {
-      var hit = cur && cur.chat ? selectionInStatement() : null;
+      var hit = cur && cur.chat ? selectionHit() : null;
       if (!hit) { hidePop(); return; }
       if (!pop) {
         pop = document.createElement('button');
         pop.type = 'button';
         pop.className = 'ask-pop';
-        pop.textContent = 'Спросить об этом';
         pop.addEventListener('mousedown', function (e) { e.preventDefault(); });
         pop.addEventListener('click', function () {
-          var h = selectionInStatement();
+          var h = selectionHit();
           hidePop();
           if (!h || !cur || !cur.chat) return;
           if (weco.stol && weco.stol.openPanel) weco.stol.openPanel('help');
-          cur.chat.prefill('', h.text);
+          cur.chat.prefill('', h.text, h.source);
         });
         document.body.appendChild(pop);
       }
+      pop.textContent = hit.source === 'reply' ? 'Ответить' : 'Обсудить с ИИ';
       pop.hidden = false;
       pop.style.left = Math.max(8, hit.rect.left + hit.rect.width / 2 - 70 + window.scrollX) + 'px';
       pop.style.top = (hit.rect.top + window.scrollY - 44) + 'px';

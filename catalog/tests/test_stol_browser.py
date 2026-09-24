@@ -25,6 +25,11 @@ from problems.tests.factories import make_assignment, make_problem, make_topic, 
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_runner.mjs')
 
+
+def box_back_version(data):
+    """Видимость «Beta 1.0» после «назад» ко входу без перезагрузки."""
+    return data['no reload']['back'].get('version')
+
 #: README §2 (десктоп) и §8 (телефон).
 DESKTOP = (1280, 1440, 1600, 1920)
 PHONE = (360, 390, 430)
@@ -186,6 +191,15 @@ class StolNumbersBrowserTest(StaticLiveServerTestCase):
         for width in PHONE:
             box = data['desk %d' % width]
             check(box['scrollWidth'] <= box['innerWidth'], 'задача %d: шире окна (%d)' % (width, box['scrollWidth']))
+        # 24.09.2026: низ обеих панелей — у низа окна, «Beta 1.0» на задаче скрыта.
+        for size in ('1440x900', '900x1200'):
+            box = data['bottom ' + size]
+            check(not box['errors'], 'низ панелей %s: ошибки %s' % (size, box['errors']))
+            check(box['rail'] == box['inner'] and box['help'] == box['inner'],
+                  'низ панелей %s: лента %s, помощь %s, окно %s' % (size, box['rail'], box['help'], box['inner']))
+            check(box['version'] == 'none', 'низ панелей %s: «Beta 1.0» видна (%s)' % (size, box['version']))
+        check(opened['version'] == 'none', 'задача без перезагрузки: «Beta 1.0» видна')
+        check(box_back_version(data) != 'none', 'вернулись ко входу: «Beta 1.0» пропала')
 
         # README §4: ответ ИИ показывается целиком (5 000 знаков, ни одного шага не срезано).
         box = data['long reply']

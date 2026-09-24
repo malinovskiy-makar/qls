@@ -138,6 +138,8 @@ try {
     await page.waitForSelector('#stol-center .stm');
     const opened = await page.evaluate(() => ({
       boot: window.__stolBoot, path: location.pathname,
+      /* «Beta 1.0» прячется вместе со сменой вида, без перезагрузки. */
+      version: getComputedStyle(document.querySelector('.site-version')).display,
       view: document.getElementById('stol-app').dataset.view,
       statement: !!document.querySelector('#stol-center .stm .math-content'),
       helpOpen: document.getElementById('stol').dataset.help,
@@ -152,6 +154,7 @@ try {
     await page.goBack();
     await page.waitForFunction(() => document.getElementById('stol-app').dataset.view === 'entry');
     const back = await page.evaluate(() => ({ boot: window.__stolBoot, path: location.pathname + location.search,
+                                             version: getComputedStyle(document.querySelector('.site-version')).display,
                                              rows: document.querySelectorAll('#ct-rows .rail-row').length }));
     out['no reload'] = { boot, ids, opened, next, back, errors };
     await ctx.close();
@@ -184,6 +187,23 @@ try {
       const box = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       box.errors = errors;
       out['desk ' + width] = box;
+      await ctx.close();
+    }
+    /* 24.09.2026: прокрутка до конца — низ обеих панелей ровно у низа окна,
+       пустой полосы под ними нет; «Beta 1.0» на задаче не показывается. */
+    for (const [width, height] of [[1440, 900], [900, 1200]]) {
+      const { ctx, page, errors } = await fresh(width, { path: process.env.STOL_PROBLEM, height,
+                                                         panels: { rail: true, help: true } });
+      await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+      await page.waitForTimeout(250);
+      const box = await page.evaluate(() => {
+        const bottom = sel => { const el = document.querySelector(sel); return el ? Math.round(el.getBoundingClientRect().bottom) : null; };
+        const ver = document.querySelector('.site-version');
+        return { rail: bottom('.desk-side--rail'), help: bottom('.desk-side--help'), inner: window.innerHeight,
+                 version: ver ? getComputedStyle(ver).display : 'нет' };
+      });
+      box.errors = errors;
+      out['bottom ' + width + 'x' + height] = box;
       await ctx.close();
     }
   }

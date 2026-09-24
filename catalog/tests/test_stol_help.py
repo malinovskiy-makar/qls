@@ -46,14 +46,30 @@ class HelpPanelTests(TestCase):
 
     def test_empty_state_is_the_ladder_with_steps_only_from_data(self):
         panel = _help(self._page())
-        self.assertIn('Берите столько помощи, сколько нужно, и не больше.', panel)
+        self.assertIn('<p class="ladder-lead">История общения с ИИ-ассистентом останется здесь и после перезагрузки.</p>',
+                      panel)
+        self.assertNotIn('Берите столько помощи', panel)
         self.assertIn('<div class="help-ladder" id="help-ladder">', panel)
         self.assertIn('<b>Подсказка 1 из 3</b>', panel)
         self.assertIn('data-step="ai"', panel)
         self.assertIn('data-step="sol"', panel)
         # Ответов по пунктам нет — ступени нет (решение владельца 17.09).
         self.assertNotIn('data-step="part"', panel)
-        self.assertIn('пока ничем не пользовались', panel)
+        self.assertIn('Пока ничем не пользовались', panel)
+        self.assertIn('Выделите фрагмент условия, чтобы обсудить его с ИИ.', panel)
+
+    def test_start_block_hides_once_a_chat_exists_and_for_guests(self):
+        """24.09.2026: стартовые фразы — только пока лента пуста и только вошедшему."""
+        from problems.models_platform import ChatTurn
+        ChatTurn.objects.create(user=self.student, problem=self.problem, user_text='Вопрос',
+                                reply='Ответ помощника')
+        panel = _help(self._page())
+        self.assertIn('id="help-ladder" hidden', panel)
+        self.assertNotIn('Выделите фрагмент условия', panel)
+        self.client.logout()
+        guest = _help(self._page())
+        self.assertNotIn('История общения с ИИ-ассистентом', guest)
+        self.assertNotIn('Выделите фрагмент условия', guest)
 
     def test_part_answer_step_appears_with_data(self):
         ProblemPart.objects.create(problem=self.problem, label='а', order=0,
@@ -72,7 +88,7 @@ class HelpPanelTests(TestCase):
         self.assertIn('Подсказка номер 2.', panel)
         self.assertNotIn('Подсказка номер 3.', panel)
         self.assertIn('id="help-ladder" hidden', panel)
-        self.assertIn('подсказок 2 из 3 · решение', panel)
+        self.assertIn('Подсказок 2 из 3 · решение', panel)
         self.assertIn('<span class="n" id="hint-n">3 из 3</span>', panel)
         self.assertIn('class="feed-card feed-sol sol is-on"', panel)
         self.assertIn('id="sol-btn" data-step="sol" hidden', panel)

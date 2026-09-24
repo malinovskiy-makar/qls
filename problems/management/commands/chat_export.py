@@ -58,6 +58,8 @@ class Command(BaseCommand):
                 'created_at': turn.created_at.isoformat(),
                 'mode': turn.mode,
                 'user_text': turn.user_text,
+                'quote': turn.quote,
+                'quote_source': turn.quote_source,
                 'attachment': ({'id': attachment.pk, 'mime': attachment.mime,
                                 'pages': attachment.pages} if attachment else None),
                 'vision_text': turn.vision_text,

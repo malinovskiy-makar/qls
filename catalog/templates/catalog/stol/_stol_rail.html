@@ -2,10 +2,10 @@
 ЛЕНТА РЯДОМ С ЗАДАЧЕЙ (316 px, README §3).
 
 Поиск — карточка с отступами, не плашка в угол. Первая строка: «весь каталог»
-(сетка) · вкладки «Выдача / Похожие / Мои ★» · «свернуть». Под ней поле
+(сетка) · вкладки «Лента / Похожие / Мои ★» · «свернуть». Под ней поле
 поиска, «Фильтры · N» и короткая сводка выбранного.
 
-«Выдача» — те же строки, что на входе (один источник: блок результатов входа,
+«Лента» — те же строки, что на входе (один источник: блок результатов входа,
 `stol.js` переносит их узкой плотностью); вкладки нет, пока выдачи нет — по
 прямой ссылке лента открывается на «Похожих». «Похожие» рисует сервер (кэш
 M2M, за шлюзом качества) и присылает заново с каждой задачей. «Мои ★» —
@@ -18,7 +18,7 @@ M2M, за шлюзом качества) и присылает заново с �
     <div class="rail-top">
       <a class="stol-strip-btn" href="{% url 'catalog:problem_list' %}" data-stol-home aria-label="Весь каталог" title="Весь каталог">{% include '_icon.html' with name='grid' %}</a>
       <div class="rail-tabs" role="tablist" aria-label="Что показывать">
-        <button type="button" role="tab" class="rail-tab" data-rail-tab="results" aria-selected="{% if view == 'entry' %}true{% else %}false{% endif %}"{% if view != 'entry' %} hidden{% endif %}>Выдача</button>
+        <button type="button" role="tab" class="rail-tab" data-rail-tab="results" aria-selected="{% if view == 'entry' %}true{% else %}false{% endif %}"{% if view != 'entry' %} hidden{% endif %}>Лента</button>
         <button type="button" role="tab" class="rail-tab" data-rail-tab="similar" aria-selected="{% if view == 'entry' %}false{% else %}true{% endif %}">Похожие</button>
         {% if user.is_authenticated %}<button type="button" role="tab" class="rail-tab" data-rail-tab="saved" aria-selected="false">Мои ★</button>{% endif %}
       </div>

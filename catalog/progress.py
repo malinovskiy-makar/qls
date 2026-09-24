@@ -84,6 +84,36 @@ def update(user, problem, data):
     return row
 
 
+def reset(user, problem):
+    """«Решить заново»: экран ученика — как у новой задачи (ADR 0130).
+
+    Подсказки, «смотрел решение» и статус экрана обнуляются, а то, что было
+    до сброса, копится в `hints_before_reset` / `solution_before_reset` —
+    честные факты не теряются. Чат и попытки не удаляются: экран показывает
+    только то, что новее `reset_at`. Повторный вызов безопасен.
+    """
+    from django.utils import timezone
+
+    Progress = _model()
+    row, _created = Progress.objects.get_or_create(user=user, problem=problem)
+    row.hints_before_reset = max(row.hints_before_reset, row.hints_opened)
+    row.solution_before_reset = row.solution_before_reset or row.solution_viewed
+    row.hints_opened = 0
+    row.solution_viewed = False
+    row.status = Progress.Status.OPENED
+    row.reset_at = timezone.now()
+    row.save()
+    return row
+
+
+def reset_at(user, problem):
+    """Момент последнего «Решить заново» или None — для фильтра экрана."""
+    if not getattr(user, 'is_authenticated', False):
+        return None
+    return (_model().objects.filter(user=user, problem=problem)
+            .values_list('reset_at', flat=True).first())
+
+
 def note_test_result(user, problem, first_try):
     """Тест решён: с первой попытки без подсказок — «решил сам», иначе — «с подсказкой»."""
     if not getattr(user, 'is_authenticated', False):
