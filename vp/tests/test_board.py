@@ -130,7 +130,9 @@ class BoardRowsTests(TestCase):
     def test_06_unsubmitted_ranked_attempt_is_not_in_the_board_yet(self):
         """Начатая зачётная попытка в таблицу не идёт, пока не сдана."""
         person = _user('running')
-        _attempt(self.variant, person, score=0, seconds=0, submitted=False)
+        # Идёт прямо сейчас: с 24.09 просроченную зачётную таблица сдаёт сама.
+        _attempt(self.variant, person, score=0, seconds=0, submitted=False,
+                 started=timezone.now() - timedelta(minutes=1))
         self.assertEqual(board.rows(), [])
 
 
@@ -175,3 +177,47 @@ class StartMarksRankedTests(TestCase):
 
     # Гость зачётной попытки не заводит вовсе: старт уводит его на регистрацию.
     # Это проверяет `test_gate.py` — там же, где живёт сама стена.
+
+
+class BoardHardeningTests(TestCase):
+    """24.09.2026: брошенные зачётные сдаются, черновики не видны, перенос гостя."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.variant = make_published('hard-a')
+        cls.draft = make_published('hard-draft')
+        cls.draft.is_published = False
+        cls.draft.save(update_fields=['is_published'])
+
+    def test_lapsed_ranked_attempt_of_someone_else_is_closed_and_listed(self):
+        owner = _user('brosil')
+        attempt = _attempt(self.variant, owner, score=0, seconds=0, submitted=False,
+                           started=timezone.now() - timedelta(days=1))
+        rows = board.rows()
+        attempt.refresh_from_db()
+        self.assertIsNotNone(attempt.submitted_at)
+        self.assertTrue(attempt.is_auto_submitted)
+        self.assertEqual([r['name'] for r in rows], ['brosil'])
+
+    def test_live_ranked_attempt_is_not_closed(self):
+        owner = _user('reshaet')
+        attempt = _attempt(self.variant, owner, score=0, seconds=0, submitted=False,
+                           started=timezone.now() - timedelta(minutes=1))
+        board.rows()
+        attempt.refresh_from_db()
+        self.assertIsNone(attempt.submitted_at)
+
+    def test_attempts_on_unpublished_variant_are_not_on_the_board(self):
+        _attempt(self.draft, _user('sotrudnik'), score=90, seconds=100)
+        _attempt(self.variant, _user('uchenik'), score=50, seconds=100)
+        self.assertEqual([r['name'] for r in board.rows()], ['uchenik'])
+
+    def test_adopted_guest_attempt_does_not_take_the_ranked_right(self):
+        user = _user('byl_gostem')
+        guest = _attempt(self.variant, user, score=40, seconds=100, ranked=False)
+        VPAttempt.objects.filter(pk=guest.pk).update(session_key='gostevaya-sessiya')
+        self.client.force_login(user)
+        self.client.post(reverse('vp:start', args=[self.variant.slug]), {'with_timer': '1'})
+        fresh = VPAttempt.objects.filter(variant=self.variant, user=user).order_by('-id').first()
+        self.assertNotEqual(fresh.pk, guest.pk)
+        self.assertTrue(fresh.is_ranked)

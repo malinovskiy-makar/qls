@@ -40,10 +40,34 @@ def spent_seconds(attempt):
 
 
 def ranked_attempts():
-    """Сданные зачётные попытки вошедших — всё, из чего строится таблица."""
+    """Сданные зачётные попытки вошедших — всё, из чего строится таблица.
+
+    ⚠️ Только по ОПУБЛИКОВАННЫМ вариантам (24.09.2026): попытки сотрудников на
+    черновиках иначе попадали в публичную таблицу.
+    """
     return (VPAttempt.objects
-            .filter(is_ranked=True, submitted_at__isnull=False, user__isnull=False)
+            .filter(is_ranked=True, submitted_at__isnull=False, user__isnull=False,
+                    variant__is_published=True)
             .select_related('user', 'variant'))
+
+
+def close_lapsed_ranked():
+    """Сдать зачётные попытки, время которых вышло, — перед построением таблицы.
+
+    ⚠️ ЗАЧЕМ (24.09.2026). Фоновой задачи нет: просроченная попытка сдавалась,
+    только когда её владелец сам открывал страницу ВП. Чужая брошенная зачётная
+    попытка так и висела несданной и в таблицу не попадала. Одним запросом
+    находим кандидатов (срок прошёл), сдаёт их то же правило автосдачи, что и
+    везде (`views._lapsed` с запасом на последний ответ, `views._finalize`).
+    """
+    from django.utils import timezone
+
+    from vp import views
+
+    for attempt in VPAttempt.objects.filter(is_ranked=True, submitted_at__isnull=True,
+                                            expires_at__lt=timezone.now()):
+        if views._lapsed(attempt):
+            views._finalize(attempt, auto=True)
 
 
 def _key(attempt):
@@ -58,6 +82,7 @@ def rows():
     Ключи строки: `place`, `user`, `name` (логин, как в Wecon Rush), `band`
     (`variant.grade_band`), `score`, `seconds`, `attempt`.
     """
+    close_lapsed_ranked()
     best = {}
     for attempt in ranked_attempts():
         key = _key(attempt)

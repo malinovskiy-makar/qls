@@ -505,8 +505,12 @@ def start(request, slug):
         # Зачётность решается ОДИН РАЗ, здесь, и в базу уезжает вместе с попыткой:
         # первая попытка человека по этому варианту с таймером. Считать её задним
         # числом нельзя — смена правила переписала бы уже сыгранное (`vp/board.py`).
+        # ⚠️ Прежние попытки ГОСТЯ, перенесённые на аккаунт при входе
+        # (`vp/signals.py`, у них непустой `session_key`), зачётными не были и
+        # быть не могли — право на зачёт они не съедают (24.09.2026). Касается
+        # только попыток до стены регистрации 22.09.
         is_ranked = bool(user is not None and with_timer and not VPAttempt.objects.filter(
-            user=user, variant=variant, with_timer=True).exists())
+            user=user, variant=variant, with_timer=True, session_key='').exists())
         attempt = VPAttempt.objects.create(
             variant=variant,
             user=user,
