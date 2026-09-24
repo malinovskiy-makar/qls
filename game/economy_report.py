@@ -95,8 +95,8 @@ def report(min_attempts=None):
 
     # Причины незачётности — закрытым списком, в порядке проверки.
     reasons = collections.OrderedDict(
-        (key, {'key': key, 'text': text, 'n': 0})
-        for key, text in config.UNRANKED_REASONS)
+        (key, {'key': key, 'text': config.UNRANKED_TEXT[key], 'n': 0})
+        for key, _text in config.UNRANKED_REASONS)
     unranked = 0
     for r in rows:
         if r['ranked']:

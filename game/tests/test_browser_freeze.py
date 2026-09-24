@@ -22,7 +22,9 @@ from game.models import GameQuestion
 from problems.models import Problem
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'browser_freeze.mjs')
-CHECKS = {'toast_visible', 'second_click_sent', 'lost_overlay_visible', 'lost_button_home'}
+CHECKS = {'toast_visible', 'second_click_sent', 'lost_overlay_visible', 'lost_button_home',
+          # 24.09.2026: финиш с повторами и честная плашка.
+          'finish_retry_saved', 'finish_unsaved_plate'}
 
 
 # ⚠️ ПРИЧИНА МЕТКИ `serial`: класс поднимает живой сервер и гоняет по нему
@@ -70,3 +72,6 @@ class RushNetworkFailureBrowserTest(StaticLiveServerTestCase):
         self.assertEqual(set(data['checks']), CHECKS)
         failed = {k: v for k, v in data['checks'].items() if not v['ok']}
         self.assertEqual(failed, {}, 'сбой сети замораживает забег')
+        # Случай 3: повтор финиша дошёл — раунд в базе (незачётный, «вышел»).
+        from game.models import GameResult
+        self.assertEqual(GameResult.objects.filter(ended_reason='quit').count(), 1)

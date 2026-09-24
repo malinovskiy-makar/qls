@@ -3261,7 +3261,11 @@ body.on-final .rush-wrap { max-width: 1160px; }
         ? '/game/api/session/start_mistakes/'
         : '/game/api/session/start/?mode=' + encodeURIComponent(wantPractice ? 'practice' : mode)
           + '&' + filterQuery();
-    api(url)
+    /* ⚠️ СТАРТ — ЧЕРЕЗ ОЧЕРЕДЬ ЗАБЕГА (24.09.2026). Раньше он шёл мимо неё:
+       «Сыграть ещё раз», нажатое, пока финиш прошлого раунда ждал в очереди,
+       обгоняло финиш, и сервер закрывал уже НОВЫЙ раунд — старый не
+       сохранялся, новый сохранялся пустым. */
+    queueRun(function () { return api(url); })
       .then(function (d) {
         /* Сервер отказывается начинать забег из нуля вопросов (флаг
            выключил режим целиком или фильтр не оставил ни одного вопроса)
@@ -3269,6 +3273,8 @@ body.on-final .rush-wrap { max-width: 1160px; }
            и никакого экрана результатов (см. api_session_start). */
         if (!d.ok) { showStartNotice(d.error || 'Не удалось начать игру'); return; }
         hideStartNotice();
+        runId = d.run_id || null;   // ответы и финиш несут его (сервер сверяет)
+        finishSent = false;
         practice = !!d.mode.practice;
         document.body.classList.toggle('practice', practice);
         if (practice) { startPractice(d); return; }
@@ -3371,6 +3377,8 @@ body.on-final .rush-wrap { max-width: 1160px; }
   var pausedAt = null;
   var runQueue = Promise.resolve();
   var QUEUE_STALL_MS = 8000;
+  var runId = null;        // раунд, к которому относятся ответ и финиш
+  var finishSent = false;  // финиш этого раунда уже отправлен (endRun/pagehide)
 
   function queueRun(send) {
     var p = runQueue.then(send);
@@ -3378,6 +3386,25 @@ body.on-final .rush-wrap { max-width: 1160px; }
       .then(function () {}, function () {});
     return p;
   }
+
+  /* ⚠️ ЗАКРЫЛИ ВКЛАДКУ ПОСРЕДИ РАУНДА — ФИНИШ С keepalive (24.09.2026).
+     Раньше закрытие, перезагрузка и уход со страницы не сохраняли ничего, а
+     решение владельца — «брошенный раунд сохранять как незачётный». Причина
+     'quit'; если сервер уже закрыл раунд по жизням, он оставит 'lives' (и
+     такой раунд может попасть в таблицу). Сервер вдобавок сам дописывает
+     прежний незавершённый раунд при следующем старте. */
+  window.addEventListener('pagehide', function () {
+    if (!runId || finishSent || practice) return;
+    if (state !== 'playing' && !runOver) return;
+    finishSent = true;
+    try {
+      fetch('/game/api/session/finish/', {
+        method: 'POST', keepalive: true, credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken') },
+        body: JSON.stringify({ reason: 'quit', run_id: runId })
+      });
+    } catch (e) { /* старый браузер без keepalive — сохранит следующий старт */ }
+  });
 
   function tellServer(url) {
     queueRun(function () { return api(url, { method: 'POST' }); }).then(null, function () {});
@@ -4298,7 +4325,9 @@ body.on-final .rush-wrap { max-width: 1160px; }
     if (setRun) return setRun.kind === 'daily' ? 'вызов дня – одна попытка' : 'раунд по набору';
     if (!CFG.is_authenticated) return 'без входа – в таблицу не идёт';
     if (!runRanked) return 'фильтр по сложности – раунд тренировочный';
-    return runUnfiltered ? 'без фильтров – раунд зачётный' : 'с фильтрами – раунд зачётный';
+    /* С фильтрами раунд идёт только на доску очков: доски «верных» и
+       «скорости» берут раунды без фильтров (game/leaderboard.py). */
+    return runUnfiltered ? 'без фильтров – раунд зачётный' : 'с фильтрами – зачёт только по очкам';
   }
 
   function runCountdown(then) {
@@ -4384,6 +4413,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
     // сколько игрок думал над этим вопросом — считает клиент (он знает
     // момент показа карточки), сервер кладёт число в журнал забега
     payload.elapsed_ms = Math.round(performance.now() - questionShownAt);
+    if (runId) payload.run_id = runId;
     queueRun(function () {
       return api('/game/api/answer/', {
         method: 'POST',
@@ -5535,12 +5565,25 @@ body.on-final .rush-wrap { max-width: 1160px; }
       fetchHistory(function () { paintCompare(summary); });
     }
     // В очереди: последний ответ записан раньше, чем сервер закроет забег.
-    queueRun(function () {
-      return api('/game/api/session/finish/', {
-        method: 'POST',
-        body: JSON.stringify({ reason: endReason })
-      });
-    }).then(function (d) {
+    /* ⚠️ ТРИ ПОВТОРА С ПАУЗОЙ И ЧЕСТНАЯ ПЛАШКА (24.09.2026). Финиш уходил один
+       раз, а при ошибке (502 во время выкатки, мобильная сеть) рисовался
+       обычный итог из своих счётчиков — выглядело нормально, а в базе не было
+       ничего. Теперь: до трёх повторов; не вышло — итог с пометкой
+       «Результат не сохранён». Раунд, которого на сервере уже нет (`no_run`,
+       истёк, пока вкладка спала), повтором не вернуть — плашка сразу. */
+    finishSent = true;
+    var finishBody = JSON.stringify({ reason: endReason, run_id: runId });
+    function sendFinish(left) {
+      return api('/game/api/session/finish/', { method: 'POST', body: finishBody })
+        .then(null, function () { return { error: 'network' }; })
+        .then(function (d) {
+          if ((d && d.summary) || left <= 0 || (d && d.reason === 'no_run')) return d;
+          return new Promise(function (r) { setTimeout(r, 1500 * (4 - left)); })
+            .then(function () { return sendFinish(left - 1); });
+        });
+    }
+    queueRun(function () { return sendFinish(3); }).then(function (d) {
+      if (!(d && d.summary)) summary.unsaved = true;
       if (d && d.summary) {
         summary = d.summary;
         endReason = summary.ended_reason;
@@ -5711,6 +5754,8 @@ body.on-final .rush-wrap { max-width: 1160px; }
       /* ⚠️ ПОЧЕМУ РАУНД НЕ В ТАБЛИЦЕ — ОДНОЙ СТРОКОЙ, текстом с сервера
          (config.UNRANKED_REASONS): «просто не поехал» читается как поломка. */
       rn.textContent = 'Не в таблице: ' + s.unranked_text;
+    } else if (s.unsaved) {
+      rn.textContent = 'Результат не сохранён: сервер не ответил. Раунд не попал ни в таблицу, ни в статистику.';
     }
     rn.hidden = !rn.textContent;
 

@@ -103,6 +103,56 @@ try {
   }
   check('lost_button_home', home, { label, url: page2.url() });
   await ctx2.close();
+
+  /* Случаи 3 и 4 (24.09.2026): финиш раунда. Ответ на вопрос — настоящий,
+     раунд завершается выходом (крестик → «Выйти»): такой раунд с ответом
+     сохраняется незачётным. */
+  async function quitAfterOneAnswer(page) {
+    await startBlitz(page);
+    await page.click('#opts .opt');
+    await page.waitForTimeout(600);
+    await page.click('#btn-quit');
+    await page.click('#quit-yes');
+  }
+
+  /* Случай 3: первый финиш — 502, повтор уходит на сервер и сохраняет. */
+  const ctx3 = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page3 = await ctx3.newPage();
+  let finishCalls3 = 0;
+  await page3.route('**/game/api/session/finish/', (route) => {
+    finishCalls3 += 1;
+    if (finishCalls3 === 1) {
+      return route.fulfill({ status: 502, contentType: 'text/html', body: '<h1>502</h1>' });
+    }
+    return route.continue();
+  });
+  await quitAfterOneAnswer(page3);
+  const retried = await waitUntil(() => finishCalls3 >= 2, 8000);
+  await page3.waitForTimeout(800);
+  const note3 = (await page3.textContent('#ranked-note').catch(() => '')) || '';
+  check('finish_retry_saved', retried && !note3.includes('не сохранён'),
+        { finishCalls3, note3 });
+  await ctx3.close();
+
+  /* Случай 4: финиш не проходит никогда — честная плашка на итоге. */
+  const ctx4 = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const page4 = await ctx4.newPage();
+  let finishCalls4 = 0;
+  await page4.route('**/game/api/session/finish/', (route) => {
+    finishCalls4 += 1;
+    return route.fulfill({ status: 502, contentType: 'text/html', body: '<h1>502</h1>' });
+  });
+  await quitAfterOneAnswer(page4);
+  let plate = false;
+  try {
+    await page4.waitForFunction(() => {
+      const el = document.getElementById('ranked-note');
+      return el && !el.hidden && el.textContent.includes('Результат не сохранён');
+    }, null, { timeout: 15000 });
+    plate = true;
+  } catch (e) { plate = false; }
+  check('finish_unsaved_plate', plate && finishCalls4 === 4, { finishCalls4 });
+  await ctx4.close();
 } catch (e) {
   out.error = String((e && e.stack) || e);
 } finally {

@@ -180,6 +180,23 @@ class UnrankedReasonsTests(RunHelper):
             self.assertTrue(text and not text.isupper(), key)
         self.assertEqual(len(config.UNRANKED_TEXT), 9)
 
+    def test_reasons_say_what_happened_with_numbers(self):
+        u"""24.09: причина — целой фразой, с числами из настроек, без «{…}»."""
+        texts = config.UNRANKED_TEXT
+        self.assertFalse(any('{' in t for t in texts.values()))
+        self.assertIn('сегодня в этом режиме уже %d зачётных раундов' % config.RANKED_RUNS_PER_DAY,
+                      texts['quota_exceeded'])
+        self.assertIn('меньше %d верных' % config.RANKED_MIN_CORRECT, texts['too_few_correct'])
+        self.assertIn('снимите его на старте', texts['difficulty_filter'])
+        self.assertIn('вкладка в фоне', texts['time_overrun'])
+
+    def test_countdown_tells_the_truth_about_filters(self):
+        u"""С фильтрами раунд идёт только на доску очков — отсчёт так и говорит."""
+        from game.tests.test_page_js import page_source
+        source = page_source()
+        self.assertIn('с фильтрами – зачёт только по очкам', source)
+        self.assertNotIn('с фильтрами – раунд зачётный', source)
+
 
 def _req(client):
     u"""Запрос с тем же вошедшим пользователем, что у клиента."""

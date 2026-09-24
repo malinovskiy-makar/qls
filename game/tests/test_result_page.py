@@ -90,7 +90,7 @@ class ResultPageP6Tests(TestCase):
         unranked = self.result(user=self.sonya, ranked=False, unranked_reason='quit')
         html = self.page(unranked)
         self.assertNotIn('место в таблице', html)
-        self.assertIn('не в таблице: вы вышли из раунда', html)
+        self.assertIn('не в таблице: раунд прерван выходом', html)
 
     def test_lives_left_when_it_can_be_computed(self):
         self.assertIn('осталось 2 жизни из 3', self.page(self.result(wrong_count=1)))

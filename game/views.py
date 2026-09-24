@@ -1075,9 +1075,11 @@ def api_session_start(request):
         return JsonResponse({
             'ok': False, 'reason': 'pool_empty',
             'error': 'Под этими настройками вопросов нет. Измените фильтры'})
+    _save_abandoned_run(request)
     run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
+        'run_id': state['run_id'],
         'mode': _practice_payload() if practice else _mode_payload(mode),
         'lives': state['lives'],
         'filter': run_filter,
@@ -1335,13 +1337,18 @@ def api_answer(request):
                             status=400)
     if state.get('ended'):
         return JsonResponse({'error': 'Забег уже завершён'}, status=409)
+    try:
+        body = json.loads(request.body.decode('utf-8'))
+    except (ValueError, UnicodeDecodeError):
+        body = None
+    if _run_mismatch(state, body):
+        return _run_mismatch_response()
     if _close_pause(state, _now_ms()):
         run_state.save_run(request, state)
         return _paused_response()
     try:
-        body = json.loads(request.body.decode('utf-8'))
         qid = int(body['question_id'])
-    except (ValueError, KeyError, TypeError, json.JSONDecodeError):
+    except (ValueError, KeyError, TypeError):
         return JsonResponse({'error': 'Некорректный запрос'}, status=400)
     elapsed_ms = _parse_elapsed(body)
 
@@ -1412,6 +1419,10 @@ def api_answer(request):
     number = state['seen'].index(qid) + 1   # номер вопроса в забеге
     if state['lives'] <= 0:
         state['ended'] = 'lives'
+        # Момент конца — сейчас, а не когда клиент пришлёт finish: вкладку
+        # могли закрыть посреди «игра окончена», и позднее сохранение иначе
+        # раздуло бы `wall_ms` до ложного `time_overrun` (24.09.2026).
+        state['ended_at'] = time.time()
 
     # Журнал: всё, из чего потом считается сводка забега. Темы и сложность
     # берём из GameQuestion (они там денормализованы) — сводке не придётся
@@ -1628,9 +1639,11 @@ def api_session_start_mistakes(request):
     state['queue'] = queue
     state['mistakes_run'] = True
     gq = _pick_next(request, state)
+    _save_abandoned_run(request)
     run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
+        'run_id': state['run_id'],
         'mode': _mode_payload(mode),
         'lives': state['lives'],
         'mistakes_run': True,
@@ -1731,9 +1744,11 @@ def api_session_start_set(request, code):
         return JsonResponse({
             'ok': False, 'reason': 'pool_empty',
             'error': 'В этом наборе не осталось доступных вопросов'})
+    _save_abandoned_run(request)
     run_state.save_run(request, state)
     return JsonResponse({
         'ok': True,
+        'run_id': state['run_id'],
         'mode': _mode_payload(gset.mode),
         'lives': state['lives'],
         'filter': normalize_filter(gset.filter_snapshot),
@@ -2660,6 +2675,10 @@ def api_session_finish(request):
         body = json.loads(request.body.decode('utf-8')) if request.body else {}
     except json.JSONDecodeError:
         body = {}
+    if not isinstance(body, dict):
+        body = {}
+    if _run_mismatch(state, body):
+        return _run_mismatch_response()
     if state.get('practice'):
         # «Бесконечные тесты»: сводка без рекорда, без GameResult и без «работы
         # над ошибками» (LAST_KEY не пишется) — решение владельца 15.09.2026.
@@ -2680,6 +2699,7 @@ def api_session_finish(request):
     _close_pause(state, _now_ms())
     if not state.get('ended'):
         state['ended'] = _end_reason(state, body.get('reason'))
+        state['ended_at'] = time.time()
     run_state.save_run(request, state)
     # ⚠️ СОПЕРНИКУ ГОВОРИМ, ЧТО ЗАБЕГ КОНЧЕН. Без этого события его табло
     # застывало бы на последнем счёте и выглядело как «завис», а не как
@@ -2714,6 +2734,51 @@ def api_session_finish(request):
         summary['played_at'] = saved.created_at.isoformat(timespec='seconds')
         summary.update(_finish_extras(request, saved))
     return JsonResponse({'summary': summary, 'share': share})
+
+
+def _run_mismatch(state, body):
+    u"""Запрос прислан про ДРУГОЙ раунд, чем тот, на который указывает сессия.
+
+    ⚠️ ЗАЧЕМ (24.09.2026). Финиш не нёс `run_id`, и сервер завершал тот раунд,
+    на который СЕЙЧАС указывает сессия: «Сыграть ещё раз», нажатое, пока
+    финиш ждал в очереди, — и старый раунд не сохранялся, а новый
+    сохранялся пустым. Старый клиент `run_id` не шлёт — тогда проверки нет.
+    """
+    sent = body.get('run_id') if isinstance(body, dict) else None
+    return bool(sent) and sent != state.get('run_id')
+
+
+def _run_mismatch_response():
+    return JsonResponse({'error': 'Это другой раунд', 'reason': 'run_mismatch'},
+                        status=409)
+
+
+def _save_abandoned_run(request):
+    u"""Сохранить прежний раунд этой сессии, если его бросили без финиша.
+
+    ⚠️ ЗАЧЕМ (24.09.2026, решение владельца «брошенный раунд сохранять как
+    незачётный»). Закрытая вкладка, перезагрузка, уход со страницы — и раунд с
+    ответами пропадал бесследно: сохранял его только финиш. Теперь новый старт
+    сперва дописывает прежний: уже законченный сервером (жизни) — с его
+    причиной, иначе — как «вышел» (незачётный). Раунд по набору, вызову дня и
+    дуэли брошенным НЕ сохраняется: выход сжёг бы единственную попытку (то же
+    правило, что у `api_session_finish`). Без ответов и практику — не пишем.
+    """
+    prev = run_state.load_run(request)
+    if not prev or prev.get('practice') or prev.get('result_code') or not prev.get('log'):
+        return
+    if not prev.get('ended'):
+        if prev.get('set_code'):
+            return
+        prev['ended'] = 'quit'
+        prev['ended_at'] = time.time()
+    try:
+        _close_pause(prev, int(prev.get('ended_at', time.time()) * 1000))
+        summary = build_summary(prev)
+        _save_result(request, prev, summary)
+        _log_learning_events(request, prev)
+    except Exception:     # noqa: BLE001 — новый раунд важнее учёта старого
+        logging.getLogger(__name__).exception('Не удалось сохранить брошенный раунд')
 
 
 def _finish_extras(request, saved):
@@ -3092,7 +3157,10 @@ def _save_result(request, state, summary):
                  if r['outcome'] == 'correct' and r.get('elapsed_server_ms')]
     avg_correct_ms = int(sum(server_ms) / len(server_ms)) if server_ms else None
     started = state.get('started_at')
-    wall_ms = int((time.time() - started) * 1000) if started else None
+    # Стенное время — до МОМЕНТА КОНЦА раунда, а не до сохранения: сохранение
+    # бывает позже (закрытая вкладка, новый старт) — 24.09.2026.
+    finished = state.get('ended_at') or time.time()
+    wall_ms = int((finished - started) * 1000) if started else None
     ranked, unranked_reason = _rank_run(request, state, summary, wall_ms)
 
     if result is None:

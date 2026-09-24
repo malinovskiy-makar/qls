@@ -50,7 +50,7 @@ class QuitSavesAsUnrankedTests(RunHelper):
                          (False, 'quit', 'quit'))
         s = r.json()['summary']
         self.assertEqual((s['ended_reason'], s['unranked_reason']), ('quit', 'quit'))
-        self.assertEqual(s['unranked_text'], 'вы вышли из раунда')
+        self.assertEqual(s['unranked_text'], config.UNRANKED_TEXT['quit'])
         self.assertEqual(views._ranked_today(user, 'blitz'), before)
 
     def test_guest_quit_is_saved_with_the_first_reason_anonymous(self):

@@ -108,8 +108,10 @@ class PageJsTests(TestCase):
         served |= set(views.FINISH_EXTRA_FIELDS)
         # поля, которые клиент берёт у сводки: s.<имя>
         read = set(re.findall(r'\bs\.([a-z_]+)\b', self.js))
-        # offline — поле запасной сводки клиента, сервер его не шлёт
+        # offline — поле запасной сводки клиента, сервер его не шлёт;
+        # unsaved — пометка клиента «финиш так и не дошёл» (24.09.2026).
         read.discard('offline')
+        read.discard('unsaved')
         self.assertEqual(sorted(read - served), [])
 
     def test_no_dead_functions(self):
