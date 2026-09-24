@@ -106,15 +106,6 @@ def get_model():
     return _model
 
 
-def _deserialize(blob) -> np.ndarray:
-    """Десериализует BinaryField → numpy float32.
-
-    BinaryField Django возвращает memoryview, а не bytes.
-    bytes() обёртка обязательна — np.frombuffer(memoryview) падает.
-    """
-    return np.frombuffer(bytes(blob), dtype=np.float32)
-
-
 def index_queryset(scope='prod'):
     """Кого пускаем в индекс. Единственная точка правды на оба среза.
 

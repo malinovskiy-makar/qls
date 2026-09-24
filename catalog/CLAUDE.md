@@ -258,9 +258,9 @@ meta}` теми же партиалами; на `/catalog/map/` — `{html}` р�
 вытаскивал 14 458 ключей в питон и вкладывал их в SQL списком — секунда на
 каждой отрисовке.
 
-Старые теги шаблонов (`filter_param`, `set_param`, `remove_param` в
-`catalog/templatetags/catalog_filters.py`) новыми экранами НЕ используются:
-адреса собирает `filters.query()`. Живые — `spaceint` и `script_json`
+Старые теги шаблонов `filter_param`, `set_param`, `remove_param` удалены
+24.09.2026 (ни одной ссылки): адреса собирает `filters.query()`. Живые в
+`catalog/templatetags/catalog_filters.py` — `spaceint` и `script_json`
 (JSON для `<script type="application/json">` с кириллицей как есть).
 
 ---

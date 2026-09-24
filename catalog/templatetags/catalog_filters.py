@@ -7,42 +7,6 @@ from problems.rendering import render_markdown as _render_markdown
 register = template.Library()
 
 
-@register.simple_tag
-def filter_param(request, param, value):
-    """
-    Возвращает строку query-параметров: все текущие params плюс один изменённый.
-    Если param уже равен value — убирает его (toggle-поведение).
-    Всегда сбрасывает page, чтобы при смене фильтра начинать с 1-й страницы.
-    """
-    params = request.GET.copy()
-    params.pop('page', None)
-    if str(params.get(param, '')) == str(value):
-        params.pop(param, None)
-    else:
-        params[param] = value
-    return params.urlencode()
-
-
-@register.simple_tag
-def set_param(request, param, value):
-    """Текущие query-параметры с явно установленным param=value (page сброшен).
-    Для сортировки и переключателя вида — всегда задаёт значение (не toggle)."""
-    params = request.GET.copy()
-    params.pop('page', None)
-    params[param] = value
-    return params.urlencode()
-
-
-@register.simple_tag
-def remove_param(request, param):
-    """Текущие query-параметры без одного param (page сброшен).
-    Для крестика на чипе активного фильтра."""
-    params = request.GET.copy()
-    params.pop('page', None)
-    params.pop(param, None)
-    return params.urlencode()
-
-
 @register.filter
 def make_stars(value):
     """'3' → range(3) для рендера звёздочек через {% for %}."""

@@ -11,7 +11,7 @@
 """
 from fractions import Fraction
 
-from .base import F, fmt_num, linear_eq
+from .base import F, linear_eq
 
 # Сетки красивых опорных величин.
 P_GRID = list(range(10, 101, 5))          # P* — равновесная цена

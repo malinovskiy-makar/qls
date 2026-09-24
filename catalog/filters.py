@@ -34,8 +34,7 @@ from __future__ import annotations
 
 from collections import Counter
 
-from django.db.models import Count, Exists, OuterRef, Q, TextField
-from django.db.models.functions import Cast
+from django.db.models import Count, Exists, OuterRef, Q
 
 from problems import problem_types
 from problems.enrich import features as enrich_features
@@ -350,19 +349,6 @@ def _feature_keys(values):
             if key not in out:
                 out.append(key)
     return out
-
-
-def _with_features_text(qs):
-    """Особенности как текст — для вхождения ключа на любой базе.
-
-    ⚠️ НЕ `features__contains`: jsonb-вложение умеет только PostgreSQL, а
-    тесты живут на SQLite. Ключ в JSON всегда стоит в кавычках, поэтому
-    «"graph"» не совпадёт с чужим ключом; список плоский, вложенных
-    объектов в поле нет.
-    """
-    if 'features_text' in qs.query.annotations:
-        return qs
-    return qs.annotate(features_text=Cast('features', TextField()))
 
 
 def apply(qs, active, skip=()):

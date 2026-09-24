@@ -67,7 +67,6 @@ def normalize(name):
 
 _BLOCK_BY_NAME = {normalize(name): key
                   for key, _label, names in BLOCKS for name in names}
-_BLOCK_LABEL = {key: label for key, label, _names in BLOCKS}
 _warned = set()
 
 
@@ -107,11 +106,6 @@ def section_of(name):
         _warn_once(name)
         return FALLBACK_SECTION
     return key
-
-
-def block_label(key):
-    """Подпись блока по ключу."""
-    return _BLOCK_LABEL[key]
 
 
 def order_in_block(name):
