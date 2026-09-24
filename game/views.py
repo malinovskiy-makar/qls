@@ -1865,7 +1865,8 @@ def set_page(request, code):
             'me': me,
             'me_initials': initials(me),
         })
-    ctx['auto_set_json'] = json.dumps(ctx['auto_set'])
+    # ⚠️ Название набора печатает репетитор — только dumps_for_script (24.09).
+    ctx['auto_set_json'] = dumps_for_script(ctx['auto_set'])
     return render(request, 'game/game.html', ctx)
 
 

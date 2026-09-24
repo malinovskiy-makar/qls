@@ -406,6 +406,19 @@ class SetInvitationPageTests(TestCase):
         self.assertIn('id="screen-start"', html)
         self.assertIn('autostarting', html)
 
+    def test_set_title_cannot_close_the_script_tag(self):
+        u"""Хранимый XSS (24.09): название набора печатает любой «репетитор»,
+        а уезжает оно в `var AUTO_SET = …` внутри `<script>`. Сырой
+        `</script>` в названии закрыл бы наш скрипт и открыл свой."""
+        self.gset.title = '</script><script>alert(1)</script>'
+        self.gset.save(update_fields=['title'])
+        html = self.page(self.url + '?auto=1')
+        start = html.index('var AUTO_SET =')
+        line = html[start:html.index('\n', start)]
+        self.assertNotIn('</script>', line)
+        self.assertNotIn('<script>', line)
+        self.assertIn('\\u003C/script\\u003E', line)
+
     def test_wrong_code_is_a_game_page_with_status_404(self):
         for url in (reverse('game:set_page', args=['QQQQ1111']), reverse('game:set_board', args=['QQQQ1111'])):
             html = self.page(url, status=404)
