@@ -375,6 +375,9 @@
   .pf-crop-dlg { width: 100%; height: 100%; max-width: none; max-height: none;
                  border-radius: 0; padding: 0; display: flex; flex-direction: column; }
   .pf-crop-dlg[open] { display: flex; }
+  /* ⚠️ display:flex выше перебивает скрытие закрытого <dialog> браузером:
+     без этой строки окно обрезки на телефоне стояло на странице всегда. */
+  .pf-crop-dlg:not([open]) { display: none; }
   .pf-crop-head { height: 56px; margin: 0; padding: 0 8px;
                   border-bottom: .5px solid var(--border-soft); flex-direction: row-reverse;
                   justify-content: flex-end; gap: 8px; }
@@ -543,7 +546,13 @@
       </div>
     </div>
 
-    <form method="post">
+    {% comment %}
+    ⚠️ У ФОРМЫ ЕСТЬ id, И ОН НУЖЕН (24.09.2026). Поле «Имя пользователя» стоит
+    выше, рядом с аватаркой, то есть ВНЕ этой формы, и браузер его не
+    отправлял: сохранение падало с «Обязательное поле». Поле привязано к
+    форме атрибутом `form="pf-data-form"` (его ставит `ProfileForm`).
+    {% endcomment %}
+    <form method="post" id="pf-data-form">
       {% csrf_token %}
       <input type="hidden" name="action" value="data">
 

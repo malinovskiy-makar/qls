@@ -34,6 +34,35 @@ class UserProfileAdmin(admin.ModelAdmin):
     search_fields = ['user__username', 'user__email',
                      'user__first_name', 'user__last_name', 'school']
     raw_id_fields = ['user']
+    # ⚠️ АВАТАР — ЧЕРЕЗ ВЬЮХУ `avatar`, А НЕ ШТАТНЫМ ВИДЖЕТОМ (24.09.2026).
+    # Штатный виджет ссылается на /media/avatars/…, а nginx на /media/
+    # отвечает 404 намеренно (там фото решений детей, docs/SECURITY.md).
+    # Новую файловую вьюху не заводим: превью ведёт на ту же `avatar`.
+    exclude = ['avatar']
+    readonly_fields = ['avatar_preview']
+    actions = ['remove_avatar']
+
+    @admin.display(description='Аватар')
+    def avatar_preview(self, obj):
+        from django.urls import reverse
+        from django.utils.html import format_html
+
+        if not obj or not obj.avatar:
+            return '—'
+        url = reverse('avatar', args=[obj.user_id])
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">'
+            '<img src="{}" width="96" height="96" alt="" '
+            'style="border-radius:50%;object-fit:cover"></a>', url, url)
+
+    @admin.action(description='Удалить фото профиля')
+    def remove_avatar(self, request, queryset):
+        removed = 0
+        for profile in queryset:
+            if profile.avatar:
+                profile.avatar.delete(save=True)
+                removed += 1
+        self.message_user(request, 'Удалено фото: %d.' % removed)
 
 
 class CustomProblemOptionInline(admin.TabularInline):

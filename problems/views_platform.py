@@ -174,10 +174,17 @@ def profile(request):
             avatar_form = AvatarForm(request.POST, request.FILES)
             if avatar_form.is_valid():
                 # Имя файла НАШЕ, а не из запроса: `avatars/<id>.jpg`.
-                profile_obj.avatar.save(
-                    'avatars/%d.jpg' % request.user.pk,
-                    ContentFile(avatar_form.squared_jpeg().read()),
-                    save=True)
+                # ⚠️ (24.09.2026) Имя БЕЗ папки: `upload_to='avatars/'` ставит
+                # её сам, и прежнее 'avatars/%d.jpg' давало avatars/avatars/.
+                # Старый файл удаляем ДО записи: иначе хранилище, увидев
+                # занятое имя, добавляло суффикс, и у ребёнка копились копии
+                # фото. Старые пути на бою продолжают работать — вьюха
+                # `avatar` читает путь из поля.
+                squared = ContentFile(avatar_form.squared_jpeg().read())
+                if profile_obj.avatar:
+                    profile_obj.avatar.delete(save=False)
+                profile_obj.avatar.save('%d.jpg' % request.user.pk, squared,
+                                        save=True)
                 return redirect('/profile/?saved=1')
             avatar_error = ' '.join(
                 avatar_form.errors.get('avatar', ['Не получилось загрузить.']))

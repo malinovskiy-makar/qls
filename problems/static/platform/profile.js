@@ -225,15 +225,17 @@
 
   function start(url) {
     picture.onload = function () {
+      // ⚠️ СНАЧАЛА ПОКАЗАТЬ ОКНО, ПОТОМ МЕРИТЬ (24.09.2026). Закрытый
+      // <dialog> — это display:none и нулевые размеры: круг шириной 0 давал
+      // base = scale = 0, картинка схлопывалась в чёрный экран, ползунок
+      // множил ноль, а «Сохранить» слало crop_size=Infinity.
+      if (!dialog.open) dialog.showModal();
       measure();
       crop.base = crop.D / Math.min(picture.naturalWidth, picture.naturalHeight);
       crop.scale = crop.base;
       crop.tx = (crop.W - picture.naturalWidth * crop.scale) / 2;
       crop.ty = (crop.H - picture.naturalHeight * crop.scale) / 2;
       if (zoom) zoom.value = 1;
-      draw();
-      dialog.showModal();
-      measure();          // размеры круга известны только после показа окна
       draw();
     };
     picture.onerror = function () { complain('Это не картинка.'); };
@@ -256,7 +258,8 @@
         return;
       }
       if (avatarMenu) avatarMenu.open = false;
-      if (dialog.open) dialog.close();
+      // «Другое фото» — при открытом окне его НЕ закрываем: обработчик
+      // `close` чистит file.value, и сохранение ушло бы без файла.
       start(URL.createObjectURL(chosen));
     });
 
@@ -296,6 +299,12 @@
 
     if (saveButton && form) {
       saveButton.addEventListener('click', function () {
+        // Масштаб не посчитан (картинка не загрузилась, окно не измерено) —
+        // не отправляем мусор вида crop_size=Infinity.
+        if (!(crop.scale > 0) || !file.files || !file.files.length) {
+          complain('Не получилось подготовить фото. Выберите его ещё раз.');
+          return;
+        }
         var size = Math.round(crop.D / crop.scale);
         var x = Math.round((crop.cx0 - crop.tx) / crop.scale);
         var y = Math.round((crop.cy0 - crop.ty) / crop.scale);

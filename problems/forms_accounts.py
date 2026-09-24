@@ -106,7 +106,11 @@ class ProfileForm(forms.ModelForm):
     first_name = forms.CharField(label='Имя', max_length=150, required=False)
     last_name = forms.CharField(label='Фамилия', max_length=150, required=False)
     # Прежний «Логин»: имя осталось тем же, подпись стала человеческой.
-    username = forms.CharField(label='Имя пользователя', max_length=150)
+    # ⚠️ `form="pf-data-form"`: на странице поле стоит рядом с аватаркой, ВНЕ
+    # формы данных, и без атрибута браузер его не отправляет (24.09.2026).
+    username = forms.CharField(
+        label='Имя пользователя', max_length=150,
+        widget=forms.TextInput(attrs={'form': 'pf-data-form'}))
     email = forms.EmailField(
         label='Почта', required=False,
         help_text='Необязательно, не подтверждается, нужно только для связи.')
