@@ -39,14 +39,11 @@ channels==4.3.2
     #   channels-redis
 channels-redis==4.3.0
     # via -r requirements/base.in
-charset-normalizer==3.5.1
-    # via pdfminer-six
 constantly==23.10.4
     # via twisted
 cryptography==50.0.0
     # via
     #   autobahn
-    #   pdfminer-six
     #   pyopenssl
     #   service-identity
 daphne==4.2.3
@@ -60,9 +57,6 @@ django==5.2.17
     #   -r requirements/base.in
     #   channels
     #   dj-database-url
-    #   django-redis
-django-redis==7.0.0
-    # via -r requirements/base.in
 gunicorn==26.1.0
     # via -r requirements/base.in
 h11==0.16.0
@@ -103,8 +97,6 @@ openai==3.13.0
     # via -r requirements/base.in
 packaging==26.3
     # via incremental
-pdfminer-six==20260107
-    # via -r requirements/base.in
 pillow==12.3.0
     # via -r requirements/base.in
 psycopg[binary]==3.3.4
@@ -135,7 +127,6 @@ redis==8.1.0
     # via
     #   -r requirements/base.in
     #   channels-redis
-    #   django-redis
 service-identity==26.1.0
     # via twisted
 sniffio==1.3.1

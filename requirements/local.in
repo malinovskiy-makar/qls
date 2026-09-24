@@ -27,5 +27,5 @@ anthropic
 # core.run зовёт его на бою. Здесь его больше нет, но local.in по-прежнему
 # его ставит — строкой `-r base.in` выше.
 
-PyYAML
+# PyYAML — уже в base.in (импорт вариантов ВП), сюда приходит строкой `-r base.in`.
 cryptography

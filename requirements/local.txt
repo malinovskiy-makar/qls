@@ -49,9 +49,7 @@ channels==4.3.2
 channels-redis==4.3.0
     # via -r requirements/base.in
 charset-normalizer==3.5.1
-    # via
-    #   pdfminer-six
-    #   requests
+    # via requests
 colorama==0.4.6
     # via tqdm
 constantly==23.10.4
@@ -60,7 +58,6 @@ cryptography==50.0.0
     # via
     #   -r requirements/local.in
     #   autobahn
-    #   pdfminer-six
     #   pyopenssl
     #   service-identity
 daphne==4.2.3
@@ -76,9 +73,6 @@ django==5.2.17
     #   -r requirements/base.in
     #   channels
     #   dj-database-url
-    #   django-redis
-django-redis==7.0.0
-    # via -r requirements/base.in
 docstring-parser==0.18.0
     # via anthropic
 filelock==3.32.3
@@ -164,8 +158,6 @@ packaging==26.3
     #   huggingface-hub
     #   incremental
     #   transformers
-pdfminer-six==20260107
-    # via -r requirements/base.in
 pillow==12.3.0
     # via
     #   -r requirements/base.in
@@ -196,14 +188,13 @@ pypandoc==1.17
     # via -r requirements/base.in
 pyyaml==6.0.3
     # via
-    #   -r requirements/local.in
+    #   -r requirements/base.in
     #   huggingface-hub
     #   transformers
 redis==8.1.0
     # via
     #   -r requirements/base.in
     #   channels-redis
-    #   django-redis
 regex==2026.7.19
     # via transformers
 requests==2.34.2
