@@ -1622,6 +1622,48 @@ def _canonical_topics():
     )
 
 
+#: Больше задач в одной подборке не бывает (24.09.2026, ADR 0129): подборка —
+#: лист для урока, а не выгрузка банка.
+COLLECTION_MAX = 50
+#: Выгрузок подборки С ОТВЕТАМИ ИЛИ РЕШЕНИЯМИ в сутки на аккаунт.
+EXPORTS_WITH_ANSWERS_PER_DAY = 20
+
+
+def _answers_export_refusal(request, show_answers, show_solutions):
+    """Ответ-отказ, если выгрузка с ответами/решениями нельзя, иначе None.
+
+    ⚠️ ЗАЧЕМ (24.09.2026). Подборка анонимна (по ссылке), а `.tex` с флагами
+    `show_answers`/`show_solutions` отдавал ответы и решения всем — это та же
+    выгрузка банка, что и страница задачи. Теперь: только вошедшему и не
+    больше 20 выгрузок в сутки на аккаунт (счётчик в кэше, до конца суток).
+    Условия без ответов — как раньше, всем.
+    """
+    if not (show_answers or show_solutions):
+        return None
+    if not request.user.is_authenticated:
+        return HttpResponse('Ответы и решения в файле — после входа на сайт.',
+                            status=403, content_type='text/plain; charset=utf-8')
+    from datetime import timedelta
+    from django.core.cache import cache
+    from django.utils import timezone
+
+    now = timezone.localtime(timezone.now())
+    ttl = int(((now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
+               - now).total_seconds()) + 3600
+    key = 'colexp:%s:%s' % (now.strftime('%Y%m%d'), request.user.pk)
+    if not cache.add(key, 1, ttl):
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            cache.set(key, 1, ttl)
+            count = 1
+        if count > EXPORTS_WITH_ANSWERS_PER_DAY:
+            return HttpResponse('На сегодня выгрузок с ответами достаточно: '
+                                'попробуйте завтра.', status=429,
+                                content_type='text/plain; charset=utf-8')
+    return None
+
+
 def collection_new(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip() or 'Моя подборка'
@@ -1655,6 +1697,9 @@ def collection_from_basket(request):
     order = [pk for pk in wanted if pk in visible]
     if not order:
         return JsonResponse({'error': 'empty', 'refused': wanted}, status=400)
+    if len(order) > COLLECTION_MAX:
+        return JsonResponse({'error': 'many', 'message': 'В подборке не больше %d задач.'
+                             % COLLECTION_MAX}, status=400)
     collection = Collection.objects.create(name='Из корзины каталога', author=request.user,
                                            template_type=Collection.HOMEWORK, problem_order=order)
     collection.problems.add(*order)
@@ -1758,8 +1803,14 @@ def _parse_problem_id(request):
 def collection_add(request, token):
     collection  = get_object_or_404(Collection, token=token)
     problem_id  = _parse_problem_id(request)
-    problem     = get_object_or_404(Problem, pk=problem_id,
-                                    status=Problem.Status.PUBLISHED)
+    # ⚠️ (24.09.2026) Шлюз страницы задачи, а не «опубликована»: иначе в
+    # подборку попадала скрытая и непроверенная задача и уезжала в `.tex`.
+    problem     = _visible_problem(problem_id)
+    if (problem.pk not in collection.problem_order
+            and collection.problems.count() >= COLLECTION_MAX):
+        return JsonResponse({'status': 'error', 'error': 'many',
+                             'message': 'В подборке не больше %d задач.' % COLLECTION_MAX},
+                            status=400)
     collection.problems.add(problem)
     if problem_id not in collection.problem_order:
         collection.problem_order.append(problem_id)
@@ -1820,6 +1871,9 @@ def collection_download_pdf(request, token):
     collection     = get_object_or_404(Collection, token=token)
     show_answers   = request.POST.get('show_answers') == '1'
     show_solutions = request.POST.get('show_solutions') == '1'
+    refusal = _answers_export_refusal(request, show_answers, show_solutions)
+    if refusal:
+        return refusal
 
     tex       = generate_latex(collection, show_answers, show_solutions)
     pdf_bytes, error = compile_pdf(tex)
@@ -1841,6 +1895,9 @@ def collection_download_tex(request, token):
     collection     = get_object_or_404(Collection, token=token)
     show_answers   = request.GET.get('show_answers') == '1'
     show_solutions = request.GET.get('show_solutions') == '1'
+    refusal = _answers_export_refusal(request, show_answers, show_solutions)
+    if refusal:
+        return refusal
 
     tex  = generate_latex(collection, show_answers, show_solutions)
     resp = HttpResponse(tex, content_type='text/plain; charset=utf-8')

@@ -85,6 +85,11 @@ class CollectionExportTests(TestCase):
         cls.col.problem_order = [cls.p.pk, cls.p_flagged.pk]
         cls.col.save()
 
+    def setUp(self):
+        # С 24.09 ответы и решения в файле — только вошедшему (ADR 0129).
+        from problems.tests.factories import make_user
+        self.client.force_login(make_user('col_export_reader'))
+
     def test_export_page_opens(self):
         resp = self.client.get(
             reverse('catalog:collection_export', args=[self.col.token]))
@@ -117,3 +122,53 @@ class CollectionExportTests(TestCase):
         self.assertTrue(len(resp.content) > 0)
         self.assertIn(resp['Content-Type'],
                       ('application/pdf', 'text/plain; charset=utf-8'))
+
+
+class CollectionBankProtectionTests(TestCase):
+    """Подборка — лист для урока, а не выгрузка банка (24.09.2026, ADR 0129)."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        from catalog import views as catalog_views
+        from problems.tests.factories import make_problem, make_user
+
+        cache.clear()
+        self.views = catalog_views
+        self.make_problem = make_problem
+        self.user = make_user('col_exporter')
+        self.collection = Collection.objects.create(name='Лист')
+        self.visible = make_problem('Видимая задача подборки.', answer='42',
+                                    solution='Решение видимой задачи подборки длиннее тридцати.')
+        self.collection.problems.add(self.visible)
+        self.collection.problem_order = [self.visible.pk]
+        self.collection.save()
+
+    def _add(self, problem_id):
+        return self.client.post(reverse('catalog:collection_add', args=[self.collection.token]),
+                                {'problem_id': problem_id})
+
+    def test_hidden_problem_cannot_be_added(self):
+        hidden = self.make_problem('Непроверенная задача.', hidden_pending_review=True)
+        self.assertEqual(self._add(hidden.pk).status_code, 404)
+        self.assertFalse(self.collection.problems.filter(pk=hidden.pk).exists())
+
+    def test_no_more_than_fifty(self):
+        extra = [self.make_problem('Задача %d.' % i) for i in range(self.views.COLLECTION_MAX)]
+        statuses = [self._add(p.pk).status_code for p in extra]
+        self.assertEqual(statuses.count(200), self.views.COLLECTION_MAX - 1)
+        self.assertEqual(statuses[-1], 400)
+        self.assertEqual(self.collection.problems.count(), self.views.COLLECTION_MAX)
+
+    def test_answers_export_only_signed_in_and_limited(self):
+        tex = reverse('catalog:collection_download_tex', args=[self.collection.token])
+        # Условия без ответов — всем, как раньше.
+        self.assertEqual(self.client.get(tex).status_code, 200)
+        for flags in ({'show_answers': '1'}, {'show_solutions': '1'}):
+            self.assertEqual(self.client.get(tex, flags).status_code, 403)
+        self.client.force_login(self.user)
+        for _ in range(self.views.EXPORTS_WITH_ANSWERS_PER_DAY):
+            self.assertEqual(self.client.get(tex, {'show_answers': '1'}).status_code, 200)
+        self.assertEqual(self.client.get(tex, {'show_solutions': '1'}).status_code, 429)
+        # Без ответов — без счётчика.
+        self.assertEqual(self.client.get(tex).status_code, 200)

@@ -227,14 +227,16 @@
   <!-- Настройки -->
   <div class="section-label">Настройки экспорта</div>
   <div class="settings-card">
+    {% comment %}Ответы и решения в файле — только вошедшему (24.09.2026, ADR 0129).{% endcomment %}
     <label class="check-row">
-      <input type="checkbox" id="chk-answers" value="1">
+      <input type="checkbox" id="chk-answers" value="1"{% if not user.is_authenticated %} disabled{% endif %}>
       Включить ответы
     </label>
     <label class="check-row">
-      <input type="checkbox" id="chk-solutions" value="1">
+      <input type="checkbox" id="chk-solutions" value="1"{% if not user.is_authenticated %} disabled{% endif %}>
       Включить решения
     </label>
+    {% if not user.is_authenticated %}<p class="no-xelatex-note">Ответы и решения в файле — после <a href="{% url 'login' %}?next={{ request.path|urlencode }}">входа</a>.</p>{% endif %}
   </div>
 
   <!-- Кнопки скачивания -->
