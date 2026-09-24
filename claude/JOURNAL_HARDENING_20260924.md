@@ -330,6 +330,61 @@ https://app.notion.com/3e5b11c92bc1813eb587efa119842068
 1440×900 и 900×1200, «Beta 1.0» скрыта на задаче и при переходе без
 перезагрузки, телефон `top==120, bottom==0` — зелёный.
 
+## Фаза 8. Безопасная чистка — СДЕЛАНО
+
+Перед каждым удалением — grep по всему репозиторию (код, шаблоны, `docs/`,
+`deploy/`, `scripts/`, `.github/`); после каждого шага — `manage.py check`.
+
+| Шаг | Коммит | Что | Строк |
+|---|---|---|---|
+| 1 | `f148a5d7` | мёртвые функции: `visible_groups`, `eq_solution_steps`, `_figure_axes`, `duel_present`, `find_attempt` | −50 |
+| 2 | `9451e5e5` | повторный `import os` в `config/settings.py` (`sys` там нужен — оставлен) | −1 |
+| 3 | `ff405fd6` | шаблоны `student/progress.html`, `student/exam_result.html`, `calendar_student.html`, `calendar_teacher.html` (+ пометка в `docs/SECURITY-MATRIX.md`) | −394 |
+| 4 | `c2e61d6e` | `django-redis`, `pdfminer.six` из `base.in`, дубль `PyYAML` из `local.in`; lock-файлы `pip-compile` без `--upgrade` — дифф только убирает эти два пакета и `charset-normalizer` (исключительная зависимость pdfminer) из `base.txt`, смен версий 0; `pip-audit base.txt` — «No known vulnerabilities» | −34 |
+| 5 | `541c265c` | удалены `.playwright-mcp/` (32 файла) и `polish_screenshots/` (22); `git mv` в `claude/archive/root_20260924/`: 2 макета, 2 промпта, PDF «описание проблем в калке 2», папка `2025/` (4 PDF) | −15 107 (снимки/логи) |
+| 6 | `4ef8dca6` | `_with_features_text`, `_deserialize`, `block_label` (+ константа `_BLOCK_LABEL`), теги `filter_param`/`set_param`/`remove_param`; осиротевшие импорты `TextField`, `Cast`, `fmt_num`; `catalog/CLAUDE.md` | −70 |
+
+Кода Python/шаблонов удалено ≈ 545 строк; вместе со снимками инструментов —
+≈ 15 650. Инвариант: `catalog game olympiads student calendar_stub config` —
+**шаг A 1870 OK (skipped=1), шаг B 21 OK (skipped=4)**, код 0.
+
+**Оставлено с причиной:**
+- `Procfile` — промпт предполагал «две строки документации», на деле на него
+  опираются 5 мест `docs/MIGRATION-CHECKLIST.md` и 1 в `ARCHITECTURE.md` как на
+  описание запуска gunicorn; правка меняла бы смысл документа.
+- Давние неиспользуемые импорты (`typing.*` в `game/generators/base.py`,
+  `Fraction` в `_market.py`, `Q` в `catalog/filters.py`) — не мои, ruff
+  проекта F401 не включает; не трогал.
+- `student/submission_detail.html` — тоже осиротел по SECURITY-MATRIX, но в
+  списке кандидатов не было.
+- Пакет передачи Аничу, `scripts/anich_*`, `docker-compose.scoped-tests.yml`,
+  `venv/`/`venv312`, флаги, `.claude/`, `olympiads/services.py` — не трогал.
+
+**Management-команды, на имя которых нет ни одной ссылки вне своего файла
+(только список, не трогал):** `audit_megarecords`, `batch2_ns_sweep`,
+`batch2_unblock_post_apply_sample`, `blind_experiment_score`,
+`build_audit_links`, `build_econ_terms_df` (поиск остановлен на первых
+шести — полный список собрать отдельно, если понадобится).
+
+### Чистка: вопросы владельцу
+1. `Procfile` — удалять вместе с переписыванием `MIGRATION-CHECKLIST.md`
+   (Render отключён) или оставить как историю?
+2. `deploy/nginx/conf.d/weconomics.conf` в репозитории — устаревший снимок
+   (231 строка против 409 в `available/django.conf`, без dev-блока), на
+   сервер не монтируется. Удалить?
+3. `student/submission_detail.html` — удалить вслед за остальными?
+
+## Фаза 9. Финиш — проверки
+
+- `ruff check .` — All checks passed (код 0).
+- `bandit -r … -ll` — код 0, находок medium+ нет.
+- `manage.py check` — 0 ошибок; `makemigrations --check --dry-run` — «No
+  changes detected».
+- Итоговый `run_tests.py --scope-from-git f50266d` раскрывается в ПОЛНЫЙ
+  прогон (задет `config/settings.py`) — по правилу сессии не запускался;
+  вместо него все 9 приложений прогнаны по частям после своих правок (см.
+  фазы) + `problems calc2` отдельно в конце. Полный набор — CI после пуша.
+
 ## Предположения
 
 - `.env` в новую папку не копировал (секреты); для тестов не нужен.
@@ -342,4 +397,4 @@ https://app.notion.com/3e5b11c92bc1813eb587efa119842068
 
 ## Следующий шаг
 
-Фаза 8 — чистка, затем 9 — финиш.
+Фаза 9 — Notion (список владельцу), отчёт, CLAUDE_ARCHIVE и «Текущий фокус».
