@@ -494,10 +494,10 @@ TypeError: Field 'id' expected a number but got
 | Шаблон | Размер | Почему осиротел |
 |---|---|---|
 | `student/submission_detail.html` | 5 842 б | вьюха стала чистым редиректом |
-| `student/progress.html` | 7 105 б | то же |
-| `student/exam_result.html` | 5 799 б | то же |
-| `calendar_stub/calendar_student.html` | 2 728 б | `calendar_stub/views.py` рендерит только `calendar.html` |
-| `calendar_stub/calendar_teacher.html` | 2 728 б | то же |
+| ~~`student/progress.html`~~ | 7 105 б | то же — **удалён 24.09.2026** (чистка, фаза 8) |
+| ~~`student/exam_result.html`~~ | 5 799 б | то же — **удалён 24.09.2026** |
+| ~~`calendar_stub/calendar_student.html`~~ | 2 728 б | `calendar_stub/views.py` рендерит только `calendar.html` — **удалён 24.09.2026** |
+| ~~`calendar_stub/calendar_teacher.html`~~ | 2 728 б | то же — **удалён 24.09.2026** |
 
 Плюс `teacher/groups/student_stats.html` — формально ссылка есть, но
 **единственная**, и она из мёртвой `_student_stats_legacy`. Это та самая
