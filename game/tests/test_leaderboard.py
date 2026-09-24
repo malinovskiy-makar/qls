@@ -135,6 +135,37 @@ class BoardTests(TestCase):
                          ['boris'])
 
 
+class RecordRowTests(TestCase):
+    u"""Дата и равенство — по строке САМОГО рекорда (24.09.2026)."""
+
+    def setUp(self):
+        cache.clear()
+        self.a = User.objects.create_user(username='anya_rec', password='p12345')
+        self.b = User.objects.create_user(username='boris_rec', password='p12345')
+
+    def test_later_record_date_and_tie_by_who_reached_first(self):
+        u"""A: 300 десять дней назад и 500 день назад; B: 500 пять дней назад.
+        B добился 500 раньше — B выше; у A дата — день назад, а не десять."""
+        now = timezone.now()
+        run(self.a, score=300, when=now - datetime.timedelta(days=10))
+        rec_a = run(self.a, score=500, when=now - datetime.timedelta(days=1))
+        run(self.b, score=500, when=now - datetime.timedelta(days=5))
+        rows = lb.top('blitz', 'all', 'score')
+        self.assertEqual([r['username'] for r in rows], ['boris_rec', 'anya_rec'])
+        self.assertEqual(rows[1]['achieved_at'], rec_a.created_at.isoformat(timespec='seconds'))
+
+    def test_my_place_matches_the_list_for_equal_values(self):
+        now = timezone.now()
+        run(self.a, score=500, when=now - datetime.timedelta(days=1))
+        run(self.b, score=500, when=now - datetime.timedelta(days=5))
+        rows = lb.mark_me(lb.top('blitz', 'all', 'score'), self.a)
+        listed = [r['place'] for r in rows if r['is_me']][0]
+        mine = lb.my_row(self.a, 'blitz', 'all', 'score')
+        self.assertEqual((listed, mine['place']), (2, 2))
+        rec = GameResult.objects.filter(user=self.a).get()
+        self.assertEqual(mine['achieved_at'], rec.created_at.isoformat(timespec='seconds'))
+
+
 class MyRowTests(TestCase):
     def setUp(self):
         cache.clear()

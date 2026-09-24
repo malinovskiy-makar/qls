@@ -18,7 +18,8 @@ u"""Лидерборд Wecon Rush: агрегация по ЛИЧНЫМ РЕКО
 import datetime
 
 from django.core.cache import cache
-from django.db.models import Max, Min
+from django.db.models import F, Max, Min, Window
+from django.db.models.functions import RowNumber
 from django.utils import timezone
 
 from . import config
@@ -65,6 +66,31 @@ def base_queryset(mode, period, metric):
     return qs
 
 
+def _order(metric):
+    u"""Порядок «лучше → хуже»: значение, потом кто добился раньше, потом id."""
+    field, _agg, desc = METRICS[metric]
+    return [F(field).desc() if desc else F(field).asc(),
+            F('created_at').asc(), F('id').asc()]
+
+
+def records(mode, period, metric):
+    u"""Строки САМИХ рекордов: по одной на игрока, в порядке доски.
+
+    ⚠️ ДАТА И РАВЕНСТВО — ПО СТРОКЕ РЕКОРДА (24.09.2026). Раньше доска брала
+    `Min('created_at')` по всем зачётным раундам игрока: в таблице стояла
+    дата ПЕРВОГО раунда, а не рекорда («моей попытки нет» после нового
+    рекорда), и при равенстве выше оказывался тот, кто раньше начал играть,
+    а не кто раньше ДОБИЛСЯ. Теперь для каждого игрока берётся его лучший
+    раунд (оконная функция по игроку: значение, затем время), и дата, и
+    порядок при равенстве — его.
+    """
+    order = _order(metric)
+    return (base_queryset(mode, period, metric)
+            .annotate(rn=Window(RowNumber(), partition_by=[F('user')], order_by=order))
+            .filter(rn=1)
+            .order_by(*order))
+
+
 def _rows(mode, period, metric, limit=TOP_LIMIT):
     u"""Личные рекорды: по строке на игрока, отсортированные.
 
@@ -72,12 +98,9 @@ def _rows(mode, period, metric, limit=TOP_LIMIT):
     порядок одинаковых результатов зависел бы от базы и менялся сам собой
     между обновлениями страницы — а человек читает это как «меня обогнали».
     """
-    field, agg, desc = METRICS[metric]
-    rows = (base_queryset(mode, period, metric)
-            .values('user')
-            .annotate(best=agg(field), achieved=Min('created_at'))
-            .order_by(('-' if desc else '') + 'best', 'achieved'))[:limit]
-    rows = list(rows)
+    field, _agg, _desc = METRICS[metric]
+    rows = [{'user': r['user'], 'best': r[field], 'achieved': r['created_at']}
+            for r in records(mode, period, metric).values('user', field, 'created_at')[:limit]]
     if not rows:
         return []
     from problems.models import User
@@ -133,25 +156,21 @@ def my_row(user, mode, period, metric):
     """
     if not user or not user.is_authenticated:
         return None
-    field, agg, desc = METRICS[metric]
-    mine = (base_queryset(mode, period, metric).filter(user=user)
-            .aggregate(best=agg(field), achieved=Min('created_at')))
-    if mine['best'] is None:
-        return None
-    # Место — сколько игроков строго ЛУЧШЕ. Считаем по той же выборке.
-    better = (base_queryset(mode, period, metric)
-              .values('user').annotate(best=agg(field)))
-    if desc:
-        ahead = sum(1 for r in better if r['best'] > mine['best'])
-    else:
-        ahead = sum(1 for r in better if r['best'] < mine['best'])
-    return {
-        'place': ahead + 1,
-        'is_me': True,
-        'username': user.username,
-        'value': mine['best'],
-        'achieved_at': mine['achieved'].isoformat(timespec='seconds'),
-    }
+    field, _agg, desc = METRICS[metric]
+    # ⚠️ МЕСТО — ПО ТОМУ ЖЕ ПРАВИЛУ, ЧТО СПИСОК (24.09.2026). Раньше место
+    # считалось по «строго лучшим», а список ставил равных по времени: у
+    # равных место в своей подсвеченной строке расходилось со списком.
+    rows = list(records(mode, period, metric).values('user', field, 'created_at', 'id'))
+    for place, row in enumerate(rows, 1):
+        if row['user'] == user.pk:
+            return {
+                'place': place,
+                'is_me': True,
+                'username': user.username,
+                'value': row[field],
+                'achieved_at': row['created_at'].isoformat(timespec='seconds'),
+            }
+    return None
 
 
 def total_players(mode, period, metric):
