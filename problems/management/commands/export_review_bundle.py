@@ -197,7 +197,8 @@ class Command(BaseCommand):
                 skipped.append((problem.pk, resp.status_code))
                 continue
 
-            html = self._process_html(resp.content.decode('utf-8'), out_dir)
+            html = self._with_solution(resp.content.decode('utf-8'), problem)
+            html = self._process_html(html, out_dir)
             stamp = (f'<!-- qls-review-snapshot bundle={bundle_id} '
                      f'problem={problem.pk} -->\n')
             (out_dir / 'snapshots' / f'{problem.pk}.html').write_text(
@@ -245,6 +246,27 @@ class Command(BaseCommand):
             f'пропущено {len(skipped)}, размер {size_mb:.1f} МБ → {out_dir}'))
         if skipped:
             self.stdout.write(self.style.WARNING(f'Пропуски (id, код): {skipped[:20]}'))
+
+    def _with_solution(self, html, problem):
+        """Решение задачи — карточкой в ленте помощи снимка.
+
+        ⚠️ С 24.09.2026 (ADR 0129) страница задачи решения в разметке не
+        отдаёт никому: вошедшему оно приходит запросом, гостю — вовсе нет.
+        Ревьюеру снимка решение нужно всегда, поэтому пакет вставляет его сам
+        тем же партиалом (`_help_solution.html`) и тем же разбором
+        (`catalog.views._solution_block`), что показывает его на сайте.
+        """
+        from django.template.loader import render_to_string
+
+        from catalog.views import _solution_block
+
+        sol = _solution_block(problem, list(problem.parts.all()))
+        feed = '<div class="help-feed" id="help-feed" aria-live="polite">'
+        if not sol['has_any'] or feed not in html:
+            return html
+        card = render_to_string('catalog/stol/_help_solution.html',
+                                {'sol': sol, 'problem': problem})
+        return html.replace(feed, feed + card, 1)
 
     def _force_login(self, client: Client) -> Optional[object]:
         from problems.models import User

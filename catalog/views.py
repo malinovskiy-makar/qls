@@ -1702,7 +1702,7 @@ def _answers_export_refusal(request, show_answers, show_solutions):
     if not (show_answers or show_solutions):
         return None
     if not request.user.is_authenticated:
-        return HttpResponse('Ответы и решения в файле — после входа на сайт.',
+        return HttpResponse('Ответы и решения в файле – после входа на сайт.',
                             status=403, content_type='text/plain; charset=utf-8')
     from datetime import timedelta
     from django.core.cache import cache
