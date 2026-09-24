@@ -322,3 +322,84 @@ class LoginRedirectsBackToNextTests(TestCase):
             '/login/?next=https://evil.example.com/phish',
             {'username': 'realnyy_uchenik', 'password': GOOD_PASSWORD})
         self.assertRedirects(resp, '/student/', fetch_redirect_response=False)
+
+
+class ClientIpTests(TestCase):
+    """Адрес для лимитов — от nginx, не от клиента (24.09.2026).
+
+    Раньше брался ПЕРВЫЙ адрес из `X-Forwarded-For`, а nginx дописывал
+    настоящий в конец: первым стоял адрес, выдуманный клиентом.
+    """
+
+    def setUp(self):
+        from django.test import RequestFactory
+        self.rf = RequestFactory()
+
+    def test_real_ip_wins_over_forged_forwarded_for(self):
+        request = self.rf.get('/', HTTP_X_FORWARDED_FOR='1.2.3.4',
+                              HTTP_X_REAL_IP='5.6.7.8')
+        self.assertEqual(ratelimit.client_ip(request), '5.6.7.8')
+
+    def test_forwarded_for_alone_is_ignored(self):
+        request = self.rf.get('/', HTTP_X_FORWARDED_FOR='1.2.3.4',
+                              REMOTE_ADDR='9.9.9.9')
+        self.assertEqual(ratelimit.client_ip(request), '9.9.9.9')
+
+    def test_rotating_forwarded_for_does_not_escape_the_ip_counter(self):
+        """Перебор с новым `X-Forwarded-For` на каждой попытке."""
+        cache.clear()
+        User.objects.create_user('uchitel_ip', password=GOOD_PASSWORD)
+        for number in range(4):
+            Client().post(reverse('login'),
+                          {'username': 'kto-to-%d' % number,
+                           'password': WRONG_PASSWORD},
+                          HTTP_X_FORWARDED_FOR='10.0.0.%d' % number,
+                          HTTP_X_REAL_IP='5.6.7.8')
+        self.assertEqual(ratelimit.failures(SCOPE + ':ip', '5.6.7.8'), 4)
+        self.assertEqual(ratelimit.failures(SCOPE + ':ip', '10.0.0.1'), 0)
+
+
+class AdminLoginRateLimitTests(AuthTestCase):
+    """`/admin/login/` под тем же лимитом, что и `/login/` (24.09.2026)."""
+
+    def setUp(self):
+        super().setUp()
+        self.staff = User.objects.create_user(
+            'sotrudnik', password=GOOD_PASSWORD, is_staff=True)
+        self.admin_url = reverse('admin:login')
+
+    def try_admin(self, password, client):
+        return client.post(self.admin_url, {'username': 'sotrudnik',
+                                            'password': password,
+                                            'next': '/admin/'})
+
+    def test_admin_login_address_is_the_limited_view(self):
+        from django.urls import resolve
+        from problems import views_auth
+        self.assertIs(resolve(self.admin_url).func, views_auth.admin_login)
+
+    def test_sixth_wrong_password_is_blocked(self):
+        client = Client()
+        for number in range(5):
+            response = self.try_admin(WRONG_PASSWORD, client)
+            self.assertEqual(response.status_code, 200,
+                             'Попытка %d уже заперта — слишком рано' % number)
+        blocked = self.try_admin(GOOD_PASSWORD, client)
+        self.assertEqual(blocked.status_code, 429)
+        self.assertNotIn('_auth_user_id', client.session)
+
+    def test_counter_is_shared_with_the_main_login(self):
+        """Чередование двух входов не удваивает попыток."""
+        client = Client()
+        for _ in range(3):
+            self.try_admin(WRONG_PASSWORD, client)
+        for _ in range(2):
+            self.try_login('sotrudnik', WRONG_PASSWORD, client)
+        self.assertEqual(self.try_admin(WRONG_PASSWORD, client).status_code,
+                         429)
+
+    def test_good_admin_login_still_works(self):
+        client = Client()
+        response = self.try_admin(GOOD_PASSWORD, client)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn('_auth_user_id', client.session)

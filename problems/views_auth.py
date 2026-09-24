@@ -50,6 +50,37 @@ def wait_message(seconds):
     return 'Слишком много попыток входа. Попробуйте через %d с.' % seconds
 
 
+def admin_login(request, extra_context=None):
+    """Вход в админку под тем же счётчиком, что и `/login/`.
+
+    ⚠️ ЗАЧЕМ (24.09.2026). `/admin/login/` — штатная вьюха Django, и лимита
+    попыток у неё не было: перебор пароля сотрудника шёл мимо ступеней
+    `RoleBasedLoginView`. Имя счётчика ТО ЖЕ (`SCOPE`), иначе нападающий
+    чередовал бы два входа и получал вдвое больше попыток.
+
+    Экран админки не меняется: вьюха та же, `admin.site.login`, обёрнута
+    снаружи. Удачу и промах различаем по ответу: при успехе Django
+    перенаправляет (302), при промахе снова рисует форму (200).
+    """
+    from django.contrib import admin
+    from django.http import HttpResponse
+
+    if request.method != 'POST':
+        return admin.site.login(request, extra_context)
+    ident = (request.POST.get('username') or '').strip()
+    wait = ratelimit.check(SCOPE, request, ident)
+    if wait:
+        # Пароль не проверяется вовсе — как у основного входа.
+        return HttpResponse(wait_message(wait), status=429,
+                            content_type='text/plain; charset=utf-8')
+    response = admin.site.login(request, extra_context)
+    if response.status_code == 302:
+        ratelimit.register_success(SCOPE, request, ident)
+    else:
+        ratelimit.register_failure(SCOPE, request, ident)
+    return response
+
+
 class RoleBasedLoginView(LoginView):
     """Вход с ограничением частоты и разводкой по ролям."""
 

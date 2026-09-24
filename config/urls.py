@@ -20,6 +20,9 @@ from problems.views_auth import RoleBasedLoginView
 urlpatterns = [
     # Главная страница сайта: статистика, поиск, навигация.
     path('', catalog_views.home, name='home'),
+    # Вход в админку — под лимитом попыток (24.09). Стоит ВЫШЕ admin.site.urls:
+    # Django берёт первый подошедший маршрут.
+    path('admin/login/', views_auth.admin_login, name='admin_login_limited'),
     path('admin/', admin.site.urls),
     # Поисковым роботам: что не ходить (`?q=` каталога — платный ИИ-вызов) и
     # карта видимых задач. Через nginx проходят обычным `location /`.
