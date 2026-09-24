@@ -723,10 +723,13 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 
 /* ── Свойства: чипы тем и звёзды, строка «развёрнутая · …», «Теги · N ▸» ── */
 .pp-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin: 0 0 6px; }
-.pp-sub { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; font-size: 13px; color: var(--text2); margin: 0 0 14px; }
+/* Две части (24.09.2026): слова и источник переносятся слева, «Теги · N» справа
+   у первой строки, не переносится и не обрезается ни при какой ширине колонки. */
+.pp-sub { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 14px; align-items: start;
+          font-size: 13px; color: var(--text2); margin: 0 0 14px; }
+.pp-sub-words { display: flex; flex-wrap: wrap; align-items: center; row-gap: 4px; min-width: 0; padding-top: 3px; }
 .pp-sub a { color: inherit; text-decoration: none; }
 .pp-sub a:hover { color: var(--accent-ink); text-decoration: underline; }
-.pp-sub { column-gap: 0; }
 .pp-w + .pp-w::before { content: '·'; color: var(--text3); margin: 0 7px; }
 /* Источник в строке свойств — подчёркнутый текст со стрелкой (README §3, снимок 09), не пилюля. */
 .pp-sub .pp--src { margin-left: 12px; padding: 0; border: 0; background: none; font: inherit; color: var(--text2);
@@ -734,15 +737,15 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 .pp-sub span.pp--src { text-decoration: none; }
 .pp-sub .pp-src { color: var(--text2); text-decoration: underline; text-underline-offset: 3px; display: inline-flex; align-items: center; gap: 3px; }
 .pp-stars { color: var(--amber-ink); letter-spacing: 1px; font-size: 13px; text-decoration: none; }
-.pp-tags { margin-left: auto; }
-.pp-tags > summary { list-style: none; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;
-                     font: 600 12.5px/1 var(--font-ui); padding: 6px 10px; border-radius: var(--r-pill);
-                     border: .5px solid var(--border); background: var(--surface); color: var(--text2); }
-.pp-tags > summary::-webkit-details-marker { display: none; }
-.pp-tags > summary::after { content: '▸'; font-size: 10px; }
-.pp-tags[open] > summary::after { content: '▾'; }
-.pp-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 12px; width: 100%; }
-.pp-sub .pp-tags[open] { flex-basis: 100%; }
+.pp-sub .pp--src { max-width: 100%; overflow-wrap: anywhere; }
+.pp-tags-btn { cursor: pointer; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+               font: 600 12.5px/1 var(--font-ui); padding: 6px 10px; border-radius: var(--r-pill);
+               border: .5px solid var(--border); background: var(--surface); color: var(--text2); }
+.pp-tags-btn:hover { border-color: var(--accent); }
+.pp-tags-btn::after { content: '▸'; font-size: 10px; }
+.pp-tags-btn[aria-expanded="true"]::after { content: '▾'; }
+.pp-tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
+.pp-tag-list[hidden] { display: none; }
 
 /* ── Под условием: «Как прошло?» с «Дальше ›», соседи с названиями ───── */
 .how { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 12px; padding: 10px 14px;

@@ -90,7 +90,8 @@ class ProblemPageTests(TestCase):
         html = self.client.get(_url(self.p_cut)).content.decode()
         # Проверяем РАЗМЕТКУ (класс на элементе), а не текст страницы: правила
         # `.pp--tag` лежат в CSS и есть всегда.
-        for absent in ('class="pp pp--tag"', 'class="pp-stars"', 'class="pp pp--src"', 'class="pp-tags"'):
+        for absent in ('class="pp pp--tag"', 'class="pp-stars"', 'class="pp pp--src"', 'class="pp-tags-btn"',
+                       'id="pp-tags-list"'):
             self.assertNotIn(absent, html)
         self.assertIn('class="pp pp--topic"', html)
 

@@ -15,6 +15,9 @@ const BASE = process.env.POLISH_BASE_URL || 'http://127.0.0.1:8000';
 const SESSION = process.env.POLISH_SESSION || '';
 const P1 = process.env.POLISH_PROBLEM || '';
 const P2 = process.env.POLISH_PROBLEM2 || '';
+/* Задача с самой длинной строкой свойств (фаза 4): в тесте — синтетическая,
+   руками — самая длинная в локальной базе. */
+const PLONG = process.env.POLISH_LONG || '';
 
 let browser;
 try {
@@ -151,6 +154,51 @@ try {
       box.errors = errors;
       out['p3 ' + theme] = box;
       await ctx.close();
+    }
+  }
+
+  /* ── Фаза 4: «Теги · N» не прыгает; длинная строка свойств не вылезает ──── */
+  if (PLONG) {
+    const path = '/catalog/problem/' + PLONG + '/';
+    {
+      const { ctx, page, errors } = await fresh({ path, panels: { rail: true, help: true } });
+      const box = {};
+      box.before = await rect(page, '.pp-tags-btn');
+      await page.click('.pp-tags-btn');
+      box.open = await rect(page, '.pp-tags-btn');
+      box.expanded = await page.getAttribute('.pp-tags-btn', 'aria-expanded');
+      box.listShown = await shown(page, '#pp-tags-list');
+      box.listTop = (await rect(page, '#pp-tags-list')).top;
+      box.subBottom = (await rect(page, '.pp-sub')).bottom;
+      await page.click('.pp-tags-btn');
+      box.closed = await rect(page, '.pp-tags-btn');
+      box.listShownAfter = await shown(page, '#pp-tags-list');
+      box.expandedAfter = await page.getAttribute('.pp-tags-btn', 'aria-expanded');
+      box.errors = errors;
+      out.tags = box;
+      await ctx.close();
+    }
+    const states = { none: { rail: false, help: false }, rail: { rail: true, help: false },
+                     help: { rail: false, help: true }, both: { rail: true, help: true } };
+    out.propRow = {};
+    for (const width of [1440, 1280, 1100]) {
+      for (const [name, panels] of Object.entries(states)) {
+        const { ctx, page, errors } = await fresh({ width, path, panels });
+        const box = await page.evaluate(() => {
+          const col = document.querySelector('.desk-col');
+          const c = col.getBoundingClientRect();
+          const btn = document.querySelector('.pp-tags-btn');
+          const words = [...document.querySelectorAll('.pp-sub-words > *')].map(e => e.getBoundingClientRect());
+          return { colRight: c.right, btnRight: btn ? btn.getBoundingClientRect().right : null,
+                   wordsRight: Math.max(...words.map(r => r.right)), words: words.length,
+                   scrollWidth: col.scrollWidth, clientWidth: col.clientWidth,
+                   btnTop: btn ? btn.getBoundingClientRect().top : null,
+                   subTop: document.querySelector('.pp-sub').getBoundingClientRect().top };
+        });
+        box.errors = errors;
+        out.propRow[width + ' ' + name] = box;
+        await ctx.close();
+      }
     }
   }
 } catch (e) {

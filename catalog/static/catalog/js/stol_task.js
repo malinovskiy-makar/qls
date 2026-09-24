@@ -706,6 +706,18 @@
     render();
   }
 
+  /* «Теги · N»: список раскрывается строкой ниже, кнопка стоит на месте,
+     меняется только стрелка (24.09.2026). */
+  function bindTags(t) {
+    var btn = t.root.querySelector('.pp-tags-btn'), list = t.$('pp-tags-list');
+    if (!btn || !list || !once(btn)) return;
+    btn.addEventListener('click', function () {
+      var open = btn.getAttribute('aria-expanded') !== 'true';
+      btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      list.hidden = !open;
+    });
+  }
+
   /* ── Совет помощи один раз, дальше ⓘ у слова «Помощь» ──────────────────
      Решение владельца 24.09.2026. Сервер рисует и карточку, и ⓘ скрытыми —
      без мигания; здесь открывается одно из двух. Прочтением считается только
@@ -786,6 +798,7 @@
     };
     cur = t;
     bindBar(t);
+    bindTags(t);
     bindHow(t);
     bindHelp(t);
     bindTip(t);

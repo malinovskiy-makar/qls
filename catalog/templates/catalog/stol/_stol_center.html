@@ -59,17 +59,16 @@
   {% for c in clouds_1 %}{% if c.kind == 'topic' %}<a class="pp pp--topic" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}
   {% for c in clouds_2 %}{% if c.kind == 'diff' %}<a class="pp-stars" href="{{ c.url }}" aria-label="{{ c.label }}">{{ c.stars }}</a>{% endif %}{% endfor %}
 </div>
+{% comment %}Строка свойств — две части (24.09.2026): слева слова и источник переносятся внутри своей части, справа «Теги · N» всегда у правого края первой строки.{% endcomment %}
 <div class="pp-sub" aria-label="Свойства задачи">
+  <div class="pp-sub-words">
   {% for c in clouds_2 %}{% if c.kind == 'kind' or c.kind == 'char' or c.kind == 'feat' %}<a class="pp-w" href="{{ c.url }}">{{ c.label|lower }}</a>{% endif %}{% endfor %}
   {% for c in clouds_2 %}{% if c.kind == 'src' %}{% if c.url %}<a class="pp pp--src" href="{{ c.url }}" target="_blank" rel="noopener">{{ c.label }}<svg class="pp-ext" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9.5 2.5h4v4"/><path d="M13.5 2.5 7 9"/><path d="M12 9.5v4H2.5V4h4"/></svg></a>{% else %}<span class="pp pp--src">{{ c.label }}</span>{% endif %}{% endif %}{% endfor %}
-  {% if tags_total %}
-  {% comment %}Теги свёрнуты у всех (решение владельца 17.09: теги выдают метод); раскрываются без скрипта, каждый ведёт в каталог с этим фильтром.{% endcomment %}
-  <details class="pp-tags">
-    <summary>Теги · {{ tags_total }}</summary>
-    <div class="pp-tag-list">{% for c in clouds_1 %}{% if c.kind == 'tag' %}<a class="pp pp--tag" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}</div>
-  </details>
-  {% endif %}
+  </div>
+  {% comment %}Теги свёрнуты у всех (решение владельца 17.09: теги выдают метод); раскрываются кнопкой (stol_task.js) строкой ниже, кнопка не двигается (24.09.2026); каждый ведёт в каталог с этим фильтром.{% endcomment %}
+  {% if tags_total %}<button type="button" class="pp-tags-btn" aria-expanded="false" aria-controls="pp-tags-list">Теги · {{ tags_total }}</button>{% endif %}
 </div>
+{% if tags_total %}<div class="pp-tag-list" id="pp-tags-list" hidden>{% for c in clouds_1 %}{% if c.kind == 'tag' %}<a class="pp pp--tag" href="{{ c.url }}" style="--gc: var(--map-g-{{ c.section }})">{{ c.label }}</a>{% endif %}{% endfor %}</div>{% endif %}
 {% endif %}
 
 {% comment %}Строка из игры Wecon Rush — только когда попыток набралось достаточно (порог в game/config.py).{% endcomment %}

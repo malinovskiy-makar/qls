@@ -49,6 +49,10 @@ CATALOG_FEATURES = (
     ('есть_разбалловка', 'Есть разбалловка', BY_CODE),
 )
 
+#: Особенности, которых нет в строке свойств на карточке задачи (решение
+#: владельца 24.09.2026: дублирует чип источника). В фильтре каталога они есть.
+CARD_HIDDEN = ('с_реальной_олимпиады',)
+
 MODEL_KEYS = tuple(k for k, _l, by in CATALOG_FEATURES if by == BY_MODEL)
 CODE_KEYS = tuple(k for k, _l, by in CATALOG_FEATURES if by == BY_CODE)
 ALL_KEYS = tuple(k for k, _l, _by in CATALOG_FEATURES)

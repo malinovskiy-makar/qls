@@ -811,9 +811,10 @@ def _kind_cloud_label(problem_type):
     return 'Тест · ' + label if label else 'Тест'
 
 
-def _clouds(problem, topics, tags, sources):
+def _clouds(problem, topics, tags, sources, card_features=()):
     """Два ряда облачек-ссылок в каталог. Каждое — только при данных
-    (правило нуля); пустой ряд не рисуется."""
+    (правило нуля); пустой ряд не рисуется. `card_features` — канонические
+    особенности задачи (`Feature`) для строки свойств, уже без скрытых."""
     first_section = section_of(topics[0].name) if topics else 'other'
     row1 = [{'kind': 'topic', 'label': t.name, 'section': section_of(t.name),
              'url': _catalog_link(topics=[str(t.pk)])} for t in topics]
@@ -836,16 +837,12 @@ def _clouds(problem, topics, tags, sources):
         kind_changes['test_type'] = problem_types.test_kind(problem.problem_type)
     row2.append({'kind': 'kind', 'label': _kind_cloud_label(problem.problem_type),
                  'url': _catalog_link(**kind_changes)})
-    # ⚠️ Бейджики берут подпись у ВИТРИНЫ (`Problem.features`), а не у
-    # фильтра. Это разные словари, и намеренно: «Есть график» на карточке
-    # — объединение трёх особенностей, а в фильтре каждая из двенадцати
-    # стоит отдельной строкой со своей подписью. Ссылка ведёт по ключу
-    # витрины; `filters.parse` разворачивает его в те же три особенности.
-    for key in problem.features or ():
-        label = enrich_features.CATALOG_VIEW_LABELS.get(key)
-        if label:
-            row2.append({'kind': 'feat', 'label': label,
-                         'url': _catalog_link(features=[key])})
+    # Особенности задачи — канонические из `ProblemFeature`, каждая ссылкой
+    # на свой фильтр (решение владельца 24.09.2026). Бейджиков витрины («Есть
+    # график») на карточке больше нет: рядом с «график в условии» они повторяли бы его.
+    for feature in card_features:
+        row2.append({'kind': 'feat', 'label': feature.label,
+                     'url': _catalog_link(features=[feature.key])})
     if sources:
         row2.append({'kind': 'sep'})
         for ref in sources:
@@ -1459,7 +1456,11 @@ def _problem_context(request, problem):
     title = (problem.title or '').strip()
     show_title = bool(title) and not looks_like_statement_cut(title, problem.statement)
     heading = title if show_title else ('Задача: ' + topics[0].name if topics else 'Задача')
-    row1, row2 = _clouds(problem, topics, tags, sources)
+    # Особенности для строки свойств — одной выборкой, только для центра задачи.
+    card_features = [link.feature for link in problem.feature_links.select_related('feature')
+                     .order_by('feature__order', 'feature__key')
+                     if link.feature.key not in enrich_features.CARD_HIDDEN]
+    row1, row2 = _clouds(problem, topics, tags, sources, card_features)
 
     saved = False
     if request.user.is_authenticated:

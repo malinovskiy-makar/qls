@@ -10,11 +10,14 @@ import re
 
 from django.conf import settings
 from django.core.cache import cache
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
 from problems.ai import core
-from problems.models import AiUsageLog, Hint
+from problems.enrich import features as enrich_features
+from problems.models import AiUsageLog, Feature, Hint, ProblemFeature, Tag
 from problems.tests.factories import make_problem, make_topic, make_user
 
 TIP = ('История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, '
@@ -212,3 +215,78 @@ class LimitLineTests(TestCase):
         data = resp.json()
         self.assertIn('remaining', data)
         self.assertEqual(data['remaining'], 30 - 10 - 1)
+
+
+def _feature(key):
+    """Строка справочника `Feature` — в тестовой базе его заполняют сами тесты."""
+    for order, (k, label, by) in enumerate(enrich_features.CATALOG_FEATURES):
+        if k == key:
+            return Feature.objects.get_or_create(key=key, defaults={
+                'label': label, 'counted_by': by, 'order': order})[0]
+    raise KeyError(key)
+
+
+class CardFeaturesTests(TestCase):
+    """Фаза 4: особенности задачи в строке свойств, «Теги · N» кнопкой."""
+
+    def setUp(self):
+        cache.clear()
+        self.topic = make_topic('Монополия', is_canonical=True)
+        self.problem = make_problem('Фирма выбирает цену. Firm chooses price.', topic=self.topic,
+                                    title='Цена фирмы', features=['graph'])
+        for key in ('на_английском', 'бизнесовое', 'с_реальной_олимпиады'):
+            ProblemFeature.objects.create(problem=self.problem, feature=_feature(key), source='code')
+        for name in ('монополия', 'эластичность'):
+            self.problem.tags.add(Tag.objects.create(name=name, slug=name[:40], kind='canonical'))
+        self.bare = make_problem('Задача без особенностей.', topic=self.topic, title='Без особенностей')
+
+    def _words(self, problem):
+        html = _page(self.client, problem)
+        start = html.index('<div class="pp-sub-words">')
+        return html, html[start:html.index('</div>', start)]
+
+    def test_card_shows_canonical_features_as_filter_links(self):
+        html, words = self._words(self.problem)
+        links = dict((label, href) for href, label in re.findall(r'<a class="pp-w" href="([^"]+)">([^<]+)</a>', words))
+        # Порядок — `Feature.order`: вид задачи, потом особенности; «с реальной олимпиады» скрыта.
+        self.assertEqual(list(links), ['развёрнутая задача', 'бизнесовое', 'на английском'])
+        self.assertIn('feature=', links['бизнесовое'])
+        self.assertIn('feature=', links['на английском'])
+        self.assertNotIn('с реальной олимпиады', words.lower())
+        self.assertNotIn('есть график', html.lower())
+        # Ссылка ведёт в каталог, где эта задача есть.
+        listing = self.client.get(links['бизнесовое'].replace('&amp;', '&')).content.decode()
+        self.assertIn('/catalog/problem/%d/' % self.problem.pk, listing)
+        self.assertNotIn('/catalog/problem/%d/' % self.bare.pk, listing)
+
+    def test_card_hidden_constant_is_the_one_place(self):
+        self.assertEqual(enrich_features.CARD_HIDDEN, ('с_реальной_олимпиады',))
+
+    def test_problem_without_features_has_only_kind(self):
+        _html, words = self._words(self.bare)
+        labels = re.findall(r'<a class="pp-w" href="[^"]+">([^<]+)</a>', words)
+        self.assertEqual(labels, ['развёрнутая задача'])
+
+    def test_features_cost_one_query_not_one_per_feature(self):
+        _page(self.client, self.problem)          # прогрев кэшей страницы
+        with CaptureQueriesContext(connection) as rich:
+            _page(self.client, self.problem)
+        own = [q['sql'] for q in rich.captured_queries if 'problemfeature' in q['sql'].lower()]
+        self.assertEqual(len(own), 1, own)
+        # Та же задача без особенностей — запросов ровно столько же: выборка одна
+        # на задачу, а не по одной на особенность.
+        ProblemFeature.objects.filter(problem=self.problem).delete()
+        with CaptureQueriesContext(connection) as bare:
+            _page(self.client, self.problem)
+        self.assertEqual(len(rich.captured_queries), len(bare.captured_queries))
+
+    def test_tags_are_a_button_and_a_hidden_list_below(self):
+        html = _page(self.client, self.problem)
+        self.assertIn('<button type="button" class="pp-tags-btn" aria-expanded="false" '
+                      'aria-controls="pp-tags-list">Теги · 2</button>', html)
+        self.assertNotIn('<details class="pp-tags"', html)
+        start = html.index('<div class="pp-tag-list" id="pp-tags-list" hidden>')
+        tag_list = html[start:html.index('</div>', start)]
+        self.assertEqual(tag_list.count('class="pp pp--tag"'), 2)
+        # Список — после строки свойств, а не внутри неё.
+        self.assertLess(html.index('class="pp-tags-btn"'), start)

@@ -17,7 +17,9 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.test import override_settings, tag
 
-from problems.models import AiUsageLog, Hint, ProblemPart
+from problems.enrich import features as enrich_features
+from problems.models import (AiUsageLog, Feature, Hint, ProblemFeature, ProblemPart, Source,
+                             SourceReference, Tag)
 from problems.tests.factories import make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_polish_runner.mjs')
@@ -45,6 +47,17 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
         Hint.objects.create(problem=self.problem, text='Подсказка: начните с MR = MC.', order=0)
         self.other = make_problem('Фирма на конкурентном рынке. $TC = Q^2$.', topic=self.topic,
                                   title='Конкурентная фирма', difficulty=2)
+        # Худшая строка свойств: все показываемые особенности, длинный источник, теги.
+        self.long = make_problem('Фирма выбирает цену и выпуск. $TC = Q^2$.', topic=self.topic,
+                                 title='Длинная строка свойств', difficulty=3, character='quant')
+        for order, (key, label, by) in enumerate(enrich_features.CATALOG_FEATURES):
+            feature = Feature.objects.get_or_create(key=key, defaults={
+                'label': label, 'counted_by': by, 'order': order})[0]
+            ProblemFeature.objects.create(problem=self.long, feature=feature, source='code')
+        SourceReference.objects.create(problem=self.long, url='https://example.org/task/1',
+                                       source=Source.objects.create(name='Школково – банк задач по экономике'))
+        for name in ('монополия', 'эластичность', 'налоги'):
+            self.long.tags.add(Tag.objects.create(name=name, slug=name, kind='canonical'))
         student = make_user('polish_browser_student')
         # Остаток ИИ 6 из 30: строка лимита скрыта, после одной реплики — видна.
         AiUsageLog.objects.bulk_create([AiUsageLog(user=student, kind='catalog_chat', model_name='fake', ok=True)
@@ -59,7 +72,8 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
         if not os.path.isdir(os.path.join(settings.BASE_DIR, 'node_modules', 'playwright')):
             self.skipTest('playwright не установлен в node_modules')
         env = dict(os.environ, POLISH_BASE_URL=self.live_server_url, POLISH_SESSION=self.session,
-                   POLISH_PROBLEM=str(self.problem.pk), POLISH_PROBLEM2=str(self.other.pk))
+                   POLISH_PROBLEM=str(self.problem.pk), POLISH_PROBLEM2=str(self.other.pk),
+                   POLISH_LONG=str(self.long.pk))
         try:
             res = subprocess.run([node, RUNNER], env=env, cwd=str(settings.BASE_DIR),
                                  capture_output=True, text=True, encoding='utf-8',
@@ -130,5 +144,30 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
             check(ask['color'] == ask['accentInk'],
                   '%s: цвет значка %s, а --accent-ink %s' % (theme, ask['color'], ask['accentInk']))
             check(not box['errors'], '%s: ошибки страницы %s' % (theme, box['errors']))
+
+        # Фаза 4: «Теги · N» стоит на месте, список раскрывается строкой ниже.
+        tags = data['tags']
+        for key in ('open', 'closed'):
+            check(abs(tags[key]['left'] - tags['before']['left']) <= 1
+                  and abs(tags[key]['top'] - tags['before']['top']) <= 1,
+                  'теги: кнопка сдвинулась (%s: %s → %s)' % (key, tags['before'], tags[key]))
+        check(tags['expanded'] == 'true' and tags['listShown'] is True,
+              'теги: после клика список не раскрылся (%s)' % tags)
+        check(tags['listTop'] > tags['subBottom'],
+              'теги: список не ниже строки свойств (%s ≤ %s)' % (tags['listTop'], tags['subBottom']))
+        check(tags['expandedAfter'] == 'false' and tags['listShownAfter'] is False,
+              'теги: повторный клик не свернул список (%s)' % tags)
+        check(not tags['errors'], 'теги: ошибки страницы %s' % tags['errors'])
+        # Длинная строка свойств при любых панелях и ширинах окна.
+        for key, row in data['propRow'].items():
+            check(row['btnRight'] is not None and abs(row['btnRight'] - row['colRight']) <= 1,
+                  '%s: «Теги» не у правого края колонки (%s vs %s)' % (key, row['btnRight'], row['colRight']))
+            check(row['wordsRight'] <= row['colRight'] + 0.5,
+                  '%s: слова вылезли за колонку (%s > %s)' % (key, row['wordsRight'], row['colRight']))
+            check(row['scrollWidth'] <= row['clientWidth'],
+                  '%s: у колонки горизонтальная прокрутка (%s > %s)' % (key, row['scrollWidth'], row['clientWidth']))
+            check(abs(row['btnTop'] - row['subTop']) <= 1,
+                  '%s: «Теги» не в первой строке (%s vs %s)' % (key, row['btnTop'], row['subTop']))
+            check(not row['errors'], '%s: ошибки страницы %s' % (key, row['errors']))
 
         self.assertEqual(problems, [], '\n'.join(problems))

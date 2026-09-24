@@ -241,7 +241,9 @@ class StolProblemPageTests(TestCase):
 
     def test_tags_are_folded_for_everyone(self):
         html = self._html()
-        self.assertIn('<details class="pp-tags">', html)
+        # С 24.09.2026 — кнопка и список ниже строки свойств, свёрнуто.
+        self.assertIn('class="pp-tags-btn" aria-expanded="false" aria-controls="pp-tags-list"', html)
+        self.assertIn('<div class="pp-tag-list" id="pp-tags-list" hidden>', html)
         self.assertIn('Теги · 1', html)
 
     def test_guest_has_no_how_block_and_no_status_column(self):
