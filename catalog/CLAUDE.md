@@ -188,6 +188,15 @@ meta}` теми же партиалами; на `/catalog/map/` — `{html}` р�
 **Помощь** — лестница, потом одна лента по времени; переживает перезагрузку (ADR 0123).
 Прогресс ученика — `ProblemProgress`, правила только в `catalog/progress.py` (ADR 0119).
 
+**Полировка 24.09.2026 (ADR 0132).** Фокус: «Лента» и «Помощь» открываются поверх задачи —
+`state.focusPanels` в `stol.js`, атрибуты `data-focus-rail/help`, в `weco_stol` не пишется; Esc
+сначала закрывает панель, потом фокус. Строка свойств задачи: особенности из `ProblemFeature`
+(одна выборка в `_problem_context`), скрытые — `problems/enrich/features.py::CARD_HIDDEN`; теги
+раскрываются кнопкой (`stol_task.js::bindTags`). Строка лимита ИИ видна при остатке ≤
+`problems/ai/core.py::LIMIT_WARN_AT`; совет помощи один раз — ключ `weco_help_tip_seen`.
+Строка выдачи: метки в `rail-marks` у названия, в `rail-meta` только тема и звёзды (колонки 240/72).
+Замеры — `test_stol_polish_browser.py` + `stol_polish_runner.mjs`.
+
 **Корзина репетитора** (README §7): галочки в строках (`card.teach`), «в N домашках» (`card.in_hw`,
 один запрос на страницу строк), `localStorage` `weco_basket_<uid>`, «В домашку ▾» →
 `teacher.views.add_catalog_problems` (позиции `AssignmentItem` + M2M, шлюз), «PDF или TeX» →
