@@ -12,6 +12,7 @@ from datetime import datetime, time, timedelta
 from datetime import timezone as dt_timezone
 from unittest import mock
 
+from django.conf import settings
 from django.test import TestCase
 from django.utils import timezone
 
@@ -435,13 +436,13 @@ class VersionBadgeTests(TestCase):
             html = response.content.decode('utf-8')
             self.assertFalse('beta 0.0' in html, url)
             self.assertFalse('nav-version' in html, url)
-            self.assertEqual(html.count('<div class="site-version">Beta 1.0</div>'), 1, url)
+            self.assertEqual(html.count('<div class="site-version">%s</div>' % settings.SITE_VERSION), 1, url)
 
     def test_login_and_register_have_it_below(self):
         self.client.logout()
         for url in ('/login/', '/register/'):
             html = self.client.get(url).content.decode('utf-8')
-            self.assertTrue('<div class="site-version">Beta 1.0</div>' in html, url)
+            self.assertTrue('<div class="site-version">%s</div>' % settings.SITE_VERSION in html, url)
             self.assertFalse('auth-version' in html, url)
 
     def test_partial_is_included_in_every_base_template(self):

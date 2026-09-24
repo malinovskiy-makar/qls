@@ -121,7 +121,7 @@ class ProblemPageTests(TestCase):
         # С S3 (18.09.2026) подтверждение — карточка ленты помощи из шаблона.
         self.assertIn('<template id="help-confirm-tpl">', html)
         # Текст подтверждения — README §4 (прежний про «отправку попытки» убран).
-        self.assertIn('Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
+        self.assertIn('Открыть эталонное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
         self.assertIn('data-confirm="yes"', html)
         self.assertIn('data-confirm="no"', html)
 
@@ -191,6 +191,8 @@ class ProblemPageTests(TestCase):
             self.assertNotIn('Выделите фрагмент условия', self.client.get(_url(self.p_named)).content.decode())
         with self.settings(CATALOG_CHAT_PROVIDER='fake'):
             html = self.client.get(_url(self.p_named)).content.decode()
-        self.assertIn('Выделите фрагмент условия, чтобы обсудить его с ИИ.', html)
+        # С 24.09.2026 вместо постоянной подсказки — совет один раз карточкой.
+        self.assertNotIn('Выделите фрагмент условия, чтобы обсудить его с ИИ', html)
+        self.assertIn('История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, чтобы обсудить именно его.', html)
         self.assertNotIn('Данные профиля ему не передаются', html)
         self.assertNotIn('class="ai-note"', html)

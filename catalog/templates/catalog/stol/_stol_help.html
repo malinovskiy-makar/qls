@@ -28,26 +28,28 @@
 <aside class="help-panel" aria-label="Помощь по задаче">
   <div class="help-head">
     <span class="ic">{% include '_icon.html' with name='sparkle' %}</span>
-    <div><b>Помощь</b><small id="help-used" data-total="{{ hint_total }}">{% if opened_hints or solution_viewed %}{% if opened_hints %}Подсказок {{ opened_hints|length }} из {{ hint_total }}{% endif %}{% if opened_hints and solution_viewed %} · решение{% elif solution_viewed %}Решение{% endif %}{% else %}Пока ничем не пользовались{% endif %}</small></div>
+    <div><div class="help-title"><b>Помощь</b>{% if chat_available and user.is_authenticated %}<span class="help-info-wrap"><button type="button" class="help-info" id="help-info" aria-label="Как пользоваться помощью" aria-expanded="false" aria-describedby="help-info-pop" hidden>{% include '_icon.html' with name='info' %}</button><span class="help-info-pop" id="help-info-pop" role="tooltip" hidden>История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, чтобы обсудить именно его.</span></span>{% endif %}</div><small id="help-used" data-total="{{ hint_total }}">{% if opened_hints or solution_viewed %}{% if opened_hints %}Подсказок {{ opened_hints|length }} из {{ hint_total }}{% endif %}{% if opened_hints and solution_viewed %} · решение{% elif solution_viewed %}Решение{% endif %}{% else %}Пока ничем не пользовались{% endif %}</small></div>
     {% comment %}«Решить заново» (решение владельца 24.09.2026, ADR 0130): чистит экран ученика, статистика та же. Подтверждение — карточкой в ленте.{% endcomment %}
     {% if user.is_authenticated %}<button type="button" class="stol-strip-btn help-reset" id="help-reset" aria-label="Решить заново" title="Решить заново">{% include '_icon.html' with name='refresh' %}</button>{% endif %}
     <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button>
   </div>
 
   <div class="help-body" id="help-body">
+    {% comment %}Лестница — только если в ней есть хоть одна ступень (правило нуля): без подсказок, решения и ИИ пустой рамки нет.{% endcomment %}
+    {% if hint_total or chat_available or test or part_answers or sol.has_any %}
     <div class="help-ladder" id="help-ladder"{% if help_used %} hidden{% endif %}>
-      {% comment %}Стартовый блок (24.09.2026): только пока лента пуста и только вошедшему с чатом.{% endcomment %}
-      {% if chat_available and user.is_authenticated %}<p class="ladder-lead">История общения с ИИ-ассистентом останется здесь и после перезагрузки.</p>{% endif %}
-      {% if hint_total %}<button type="button" class="step step--main" data-step="hint">{% include '_icon.html' with name='bulb' %}<span><b>Подсказка 1 из {{ hint_total }}</b><small>наведёт на первый шаг, не раскрывая ход</small></span></button>{% endif %}
-      {% if chat_available %}<button type="button" class="step" data-step="ai">{% include '_icon.html' with name='sparkle' %}<span><b>Спросить ИИ</b><small>теория, план, проверка вашего решения по фото</small></span></button>{% endif %}
+      {% comment %}Совет один раз (решение владельца 24.09.2026): сервер рисует и карточку, и ⓘ в шапке скрытыми, `stol_task.js` открывает одно из двух по ключу `weco_help_tip_seen` в браузере. Текст — тот же, что у ⓘ.{% endcomment %}
+      {% if chat_available and user.is_authenticated %}<div class="help-tipcard" id="help-tipcard" hidden>{% include '_icon.html' with name='info' %}<div><p>История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, чтобы обсудить именно его.</p><button type="button" class="help-tipcard-ok" id="help-tip-ok">Понятно</button></div></div>{% endif %}
+      {% if hint_total %}<button type="button" class="step step--main" data-step="hint">{% include '_icon.html' with name='bulb' %}<span><b>Подсказка 1 из {{ hint_total }}</b><small>Поможет сделать первый шаг</small></span></button>{% endif %}
+      {% if chat_available %}<button type="button" class="step" data-step="ai">{% include '_icon.html' with name='sparkle' %}<span><b>Спросить ИИ</b><small>Обсуждение и проверка вашего решения</small></span></button>{% endif %}
       {% if test %}
       <button type="button" class="step" data-step="reveal">{% include '_icon.html' with name='check' %}<span><b>Показать ответ</b><small>верный вариант и разбор «почему так»</small></span></button>
       {% else %}
       {% if part_answers %}<button type="button" class="step" data-step="part">{% include '_icon.html' with name='target' %}<span><b>Ответ по одному пункту</b><small>ответ к пункту, который выберете</small></span></button>{% endif %}
-      {% if sol.has_any %}<button type="button" class="step" data-step="sol">{% include '_icon.html' with name='book' %}<span><b>Полное решение</b><small>в самом конце, когда остальное не помогло</small></span></button>{% endif %}
-      {% if not hint_total and not sol.has_any %}<p class="ladder-none">К этой задаче в банке нет ни подсказок, ни решения{% if chat_available %}: остаётся ИИ{% endif %}.</p>{% endif %}
+      {% if sol.has_any %}<button type="button" class="step" data-step="sol">{% include '_icon.html' with name='book' %}<span><b>Эталонное решение</b><small>Свериться с «ключом»</small></span></button>{% endif %}
       {% endif %}
     </div>
+    {% endif %}
 
     <div class="help-feed" id="help-feed" aria-live="polite">
       {% for h in opened_hints %}{% include "catalog/stol/_help_hint.html" %}{% endfor %}
@@ -58,7 +60,6 @@
 
   {% if chat_available or ai_available %}
   <div class="help-foot">
-    {% if chat_available and user.is_authenticated and not help_used %}<p class="help-tip" id="help-tip">Выделите фрагмент условия, чтобы обсудить его с ИИ.</p>{% endif %}
     <div class="help-quick">
       {% if hint_total %}<button type="button" class="quick-btn" id="hint-btn"{% if not hints_left %} hidden{% endif %}>{% include '_icon.html' with name='bulb' %}Подсказка <span class="n" id="hint-n">{{ next_hint }} из {{ hint_total }}</span></button>{% endif %}
       {% if test %}<button type="button" class="quick-link" data-step="reveal">Ответ</button>{% elif sol.has_any %}<button type="button" class="quick-link" id="sol-btn" data-step="sol"{% if solution_viewed %} hidden{% endif %}>Решение</button>{% endif %}
@@ -75,7 +76,7 @@
       <button class="ai-clip" type="button" id="ai-clip" aria-label="Прикрепить фото или PDF решения">{% include '_icon.html' with name='clip' %}</button>
       {% comment %}Список типов, а не `image/*`: звёздочка после косой черты открывает комментарий для сторожа стилей `test_css_comments`. Файл всё равно проверяет сервер.{% endcomment %}
       <input type="file" id="ai-file" multiple hidden accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf">
-      <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или фото" aria-label="Вопрос ИИ или решение на проверку"></textarea>
+      <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или решению" aria-label="Вопрос ИИ или решение на проверку"></textarea>
       <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">{% include '_icon.html' with name='arrow_up' %}</button>
     </div>
     {% if ai_available %}<p class="sv-limit">проверка решения · осталось сегодня <b id="sv-remaining">{{ remaining }}</b></p>{% endif %}
@@ -107,7 +108,7 @@
 {% if user.is_authenticated %}
 <template id="help-reset-tpl"><div class="feed-card feed-confirm feed-reset"><p>Начать задачу заново? История чата и открытые подсказки скроются у вас. У репетитора в статистике всё останется как было.</p><div class="feed-row"><button type="button" class="btn btn--main btn--sm" data-confirm="yes">Начать заново</button><button type="button" class="btn btn--quiet btn--sm" data-confirm="no">Отмена</button></div></div></template>
 {% if sol.has_any and not test %}
-<template id="help-confirm-tpl"><div class="feed-card feed-confirm"><p>Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».</p><div class="feed-row"><button type="button" class="btn btn--main btn--sm" data-confirm="yes">Открыть</button><button type="button" class="btn btn--quiet btn--sm" data-confirm="no">Ещё подумаю</button></div></div></template>
+<template id="help-confirm-tpl"><div class="feed-card feed-confirm"><p>Открыть эталонное решение? В статистике задача будет отмечена как «посмотрел решение».</p><div class="feed-row"><button type="button" class="btn btn--main btn--sm" data-confirm="yes">Открыть</button><button type="button" class="btn btn--quiet btn--sm" data-confirm="no">Ещё подумаю</button></div></div></template>
 {% endif %}
 {% if part_answers %}
 <template id="help-parts-tpl"><div class="feed-card feed-parts"><p class="feed-k-l">Ответ к какому пункту показать?</p><div class="feed-row">{% for p in part_answers %}<button type="button" class="btn btn--quiet btn--sm" data-part="{{ forloop.counter0 }}">{{ p.label|partlabel }}</button>{% endfor %}</div></div></template>

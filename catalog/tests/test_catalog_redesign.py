@@ -96,7 +96,7 @@ class SearchFieldTests(TestCase):
         html = self.client.get(CATALOG_URL).content.decode()
         for needle in ('<form class="ask"', 'id="ct-q"', 'class="ask-hint"',
                        'class="ask-busy"', 'id="ask-clear"', 'id="ask-go"',
-                       'Ищем по смыслу: точные слова не нужны'):
+                       'Поиск ищет по смыслу: точные слова не нужны'):
             self.assertIn(needle, html)
         # Отдельных кнопок «Найти» и «Очистить» больше нет.
         self.assertNotIn('>Найти<', html)

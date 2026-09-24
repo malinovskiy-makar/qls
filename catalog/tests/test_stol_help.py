@@ -46,8 +46,10 @@ class HelpPanelTests(TestCase):
 
     def test_empty_state_is_the_ladder_with_steps_only_from_data(self):
         panel = _help(self._page())
-        self.assertIn('<p class="ladder-lead">История общения с ИИ-ассистентом останется здесь и после перезагрузки.</p>',
-                      panel)
+        # Вводной фразы нет: вместо неё совет один раз (решение владельца 24.09.2026),
+        # сервер рисует его скрытым — открывает скрипт по ключу в браузере.
+        self.assertNotIn('ladder-lead', panel)
+        self.assertIn('<div class="help-tipcard" id="help-tipcard" hidden>', panel)
         self.assertNotIn('Берите столько помощи', panel)
         self.assertIn('<div class="help-ladder" id="help-ladder">', panel)
         self.assertIn('<b>Подсказка 1 из 3</b>', panel)
@@ -56,7 +58,8 @@ class HelpPanelTests(TestCase):
         # Ответов по пунктам нет — ступени нет (решение владельца 17.09).
         self.assertNotIn('data-step="part"', panel)
         self.assertIn('Пока ничем не пользовались', panel)
-        self.assertIn('Выделите фрагмент условия, чтобы обсудить его с ИИ.', panel)
+        # Постоянной подсказки внизу панели больше нет (24.09.2026).
+        self.assertNotIn('Выделите фрагмент условия, чтобы обсудить его с ИИ', panel)
 
     def test_start_block_hides_once_a_chat_exists_and_for_guests(self):
         """24.09.2026: стартовые фразы — только пока лента пуста и только вошедшему."""
@@ -65,10 +68,10 @@ class HelpPanelTests(TestCase):
                                 reply='Ответ помощника')
         panel = _help(self._page())
         self.assertIn('id="help-ladder" hidden', panel)
-        self.assertNotIn('Выделите фрагмент условия', panel)
+        self.assertNotIn('Выделите фрагмент условия, чтобы обсудить его с ИИ', panel)
         self.client.logout()
         guest = _help(self._page())
-        self.assertNotIn('История общения с ИИ-ассистентом', guest)
+        self.assertNotIn('help-tipcard', guest)
         self.assertNotIn('Выделите фрагмент условия', guest)
 
     def test_part_answer_step_appears_with_data(self):
@@ -100,7 +103,7 @@ class HelpPanelTests(TestCase):
 
     def test_confirmation_text_is_the_readme_one(self):
         html = self._page()
-        self.assertIn('Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
+        self.assertIn('Открыть эталонное решение? В статистике задача будет отмечена как «посмотрел решение».', html)
         self.assertNotIn('до отправки', html)
 
     def test_no_chat_key_means_no_conversation_but_hints_and_solution_stay(self):
@@ -113,10 +116,13 @@ class HelpPanelTests(TestCase):
         self.assertIn('data-step="sol"', panel)
         self.assertIn('id="hint-btn"', panel)
 
-    def test_nothing_in_the_bank_says_so(self):
+    def test_nothing_in_the_bank_draws_no_note(self):
+        """24.09.2026: фразы «нет ни подсказок, ни решения» нет — остаётся ступень ИИ."""
         bare = make_problem('Задача без подсказок и решения.')
         panel = _help(self._page(bare))
-        self.assertIn('К этой задаче в банке нет ни подсказок, ни решения: остаётся ИИ.', panel)
+        self.assertNotIn('ladder-none', panel)
+        self.assertNotIn('остаётся ИИ', panel)
+        self.assertIn('data-step="ai"', panel)
 
     def test_part_ask_button_only_with_the_chat(self):
         ProblemPart.objects.create(problem=self.problem, label='а', order=0, statement='Найдите цену.')

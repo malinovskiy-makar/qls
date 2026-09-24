@@ -17,7 +17,10 @@
   background: none;
   border: 0.5px solid rgba(255, 255, 255, .2);
   border-radius: var(--r);
-  padding: 5px 10px;
+  /* Ровно 30 px, как переключатель темы `.nav-icon-btn` (24.09.2026): на бою
+     было 27. Вертикальных отступов нет, по центру держит align-items. */
+  height: 30px; box-sizing: border-box;
+  padding: 0 10px;
   cursor: pointer;
   white-space: nowrap;
 }
@@ -41,7 +44,7 @@
    aria-label, а в панели ☰ слова есть всегда. */
 @media (max-width: 1420px) {
   .fb-btn .fb-btn-text { display: none; }
-  .fb-btn { padding: 5px 7px; }
+  .fb-btn { padding: 0 7px; }
 }
 /* В панели ☰ кнопка со словами — там места хватает. */
 .nav-panel .fb-btn .fb-btn-text { display: inline; }

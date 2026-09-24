@@ -38,9 +38,8 @@
         <textarea id="ct-q" name="q" rows="3" aria-label="Опишите задачу"
                   placeholder="{{ catalog_phrases.0.text }}">{{ query }}</textarea>
         <div class="ask-foot">
-          <span class="ask-hint">{% include '_icon.html' with name='sparkle' %}Ищем по смыслу: точные слова не нужны</span>
+          <span class="ask-hint">{% include '_icon.html' with name='sparkle' %}Поиск ищет по смыслу: точные слова не нужны</span>
           <span class="ask-busy" aria-live="polite"><i></i><span id="ask-busy-text">{{ search_busy_phrases.0 }}</span></span>
-          <span class="ask-kbd">Enter – найти</span>
           <button class="ask-clear" type="button" id="ask-clear" aria-label="Очистить запрос">{% include '_icon.html' with name='close' %}</button>
           {{ search_busy_phrases|json_script:"search-busy-phrases" }}
           <button class="ask-go" type="submit" id="ask-go" aria-label="Найти">{% include '_icon.html' with name='arrow_up' %}</button>
@@ -58,7 +57,7 @@
             <span class="se-chip-l" data-chip-label="topic">Тема</span>{% include '_icon.html' with name='chevron_down' %}
           </button>
           <div class="se-dd se-dd--topic" id="se-dd-topic" role="group" aria-label="Тема" hidden>
-            <div class="se-dd-head"><b>Тема</b><span>несколько тем складываются: «или»</span></div>
+            <div class="se-dd-head"><b>Тема</b></div>
             <div class="se-dd-body">
               {% for grp in g.groups %}
               <div class="se-dd-group" style="--gc: var(--map-g-{{ grp.section }})"><span class="se-dot"></span>{{ grp.label }}</div>
@@ -71,7 +70,7 @@
               {% endfor %}
               {% endfor %}
             </div>
-            <div class="se-dd-foot"><span class="se-dd-note">несколько тем складываются: «или»</span><span class="se-dd-busy" aria-live="polite"><i></i>Обновляю…</span><button class="se-done" type="button" data-dd-close>Готово</button></div>
+            <div class="se-dd-foot"><span class="se-dd-busy" aria-live="polite"><i></i>Обновляю…</span><button class="se-done" type="button" data-dd-close>Готово</button></div>
           </div>
         </div>
         {% endif %}{% endwith %}

@@ -70,7 +70,6 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
 @keyframes askSpin { to { transform: rotate(360deg); } }
 #ask-busy-text { transition: opacity .16s ease; }
 #ask-busy-text.is-fading { opacity: 0; }
-.ask-kbd { font-size: 12.5px; color: var(--text3); margin-right: 6px; }
 .ask-clear { border: 0; background: transparent; color: var(--text3); width: 32px; height: 32px;
              border-radius: var(--r-pill); cursor: pointer; display: none;
              align-items: center; justify-content: center; }
@@ -147,6 +146,8 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
 .is-loading .se-opt-n, .is-loading .ct-count { opacity: .45; transition: opacity .15s; }
 .se-done { border: 0; border-radius: 9px; padding: 8px 14px; background: var(--btn-bg);
            color: var(--on-btn); font: 600 13.5px/1 var(--font-ui); cursor: pointer; }
+/* «Готово» справа и тогда, когда пояснения в подвале нет («Тема», 24.09.2026). */
+.se-dd-foot .se-done { margin-left: auto; }
 
 /* Пилюля «Карта тем» под карточкой поиска. */
 .se-map { display: flex; width: max-content; align-items: center; gap: 8px; margin: 18px auto 0;
@@ -300,7 +301,6 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
   .se-title { font-size: 26px; margin-bottom: 16px; }
   .se-search { padding: 12px; border-radius: 18px; }
   .ask textarea { font-size: 17px; }
-  .ask-kbd { display: none; }
   .se-chips { flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto;
               margin-left: -12px; margin-right: -12px; padding: 0 12px; scrollbar-width: none; }
   .se-chip { height: 36px; flex: none; }
@@ -766,6 +766,21 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 .help-head .ic .qi { width: 16px; height: 16px; }
 .help-head b { display: block; font-size: 15.5px; }
 .help-head small { display: block; font-size: 12.5px; color: var(--text2); }
+/* ⓘ сразу после «Помощь» (совет уже прочитан, решение владельца 24.09.2026):
+   по наведению и нажатию — тёмная подсказка под значком со стрелкой. */
+.help-title { display: flex; align-items: center; gap: 4px; }
+.help-info-wrap { position: relative; display: inline-flex; }
+.help-info { width: 24px; height: 24px; padding: 0; border: 0; border-radius: 6px; background: none; color: var(--text2);
+             display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+.help-info[hidden] { display: none; }
+.help-info:hover, .help-info[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
+.help-info .qi { width: 18px; height: 18px; }
+.help-info-pop { position: absolute; top: calc(100% + 8px); left: -40px; width: 248px; z-index: 30; padding: 10px 12px;
+                 border-radius: 10px; background: var(--btn-bg); color: var(--on-btn); font-size: 13px; line-height: 1.45;
+                 font-weight: 400; box-shadow: var(--shadow-pop); }
+.help-info-pop::before { content: ''; position: absolute; top: -5px; left: 47px; width: 10px; height: 10px;
+                         background: var(--btn-bg); transform: rotate(45deg); }
+.help-info-pop[hidden] { display: none; }
 .help-head .stol-strip-btn { margin-left: auto; }
 /* «Решить заново» стоит перед «свернуть»: отступ съедает она, вторая — вплотную. */
 .help-head .help-reset + .stol-strip-btn { margin-left: 0; }
@@ -832,9 +847,14 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .help-body { padding: 14px; gap: 10px; }
 .help-ladder { display: flex; flex-direction: column; gap: 8px; }
 .help-ladder[hidden] { display: none; }
-.ladder-lead { font-size: 14.5px; line-height: 1.5; color: var(--text2); margin: 0 0 6px; }
-.ladder-lead b { color: var(--text); }
-.ladder-none { font-size: 14px; color: var(--text2); margin: 4px 0 0; }
+/* Совет один раз — первой карточкой лестницы (решение владельца 24.09.2026). */
+.help-tipcard { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border-radius: var(--r-card);
+                background: var(--accent-tint); border: .5px solid var(--accent-ring); }
+.help-tipcard[hidden] { display: none; }
+.help-tipcard > .qi { width: 18px; height: 18px; flex: none; color: var(--accent-ink); margin-top: 1px; }
+.help-tipcard p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--text); }
+.help-tipcard-ok { margin-top: 6px; padding: 2px 0; border: 0; background: none; font: 700 13px/1.3 var(--font-ui);
+                   color: var(--accent-ink); cursor: pointer; }
 .step { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 12px 14px;
         border-radius: 12px; border: .5px solid var(--border); background: var(--surface-2); color: var(--text);
         font: inherit; cursor: pointer; }
@@ -879,7 +899,6 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 .help-foot .ai-sug button { font: 600 13px/1 var(--font-ui); padding: 7px 11px; border-radius: var(--r-pill);
                             background: var(--surface-2); border: .5px solid var(--border); color: var(--text); cursor: pointer; }
 .help-foot .ai-sug button:hover { border-color: var(--accent); }
-.help-tip { font-size: 12.5px; color: var(--text2); margin: 0; }
 .help-quick { display: flex; align-items: center; gap: 12px; }
 .help-quick:empty { display: none; }
 .quick-btn { display: inline-flex; align-items: center; gap: 6px; font: 600 13px/1 var(--font-ui); padding: 8px 12px;
@@ -1107,6 +1126,7 @@ body:has(.stol-app[data-view="map"]) .basket { display: none; }
     padding: 10px 14px calc(14px + env(safe-area-inset-bottom)); }
   .se-dd-foot .se-dd-note { display: none; }
   .se-done { height: 52px; border-radius: 14px; font-size: 16px; }
+  .se-dd-foot .se-done { margin-left: 0; }
 
   /* Задача: строка над задачей */
   .tb-phone-only { display: inline-flex; }

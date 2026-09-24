@@ -202,7 +202,6 @@
     };
     t.feed = function (card) {
       if (ladder) ladder.hidden = true;
-      var tip = t.$('help-tip'); if (tip) tip.hidden = true;
       feed.appendChild(card);
       t.reveal(card);
       return card;
@@ -706,6 +705,67 @@
     render();
   }
 
+  /* ── Совет помощи один раз, дальше ⓘ у слова «Помощь» ──────────────────
+     Решение владельца 24.09.2026. Сервер рисует и карточку, и ⓘ скрытыми —
+     без мигания; здесь открывается одно из двух. Прочтением считается только
+     «Понятно»: взял подсказку сразу — карточка уходит вместе с лестницей и
+     покажется на следующей задаче. Помнит браузер ученика (`localStorage`),
+     в приватном окне хранилища может не быть — тогда совет просто
+     показывается снова. */
+  var TIP_KEY = 'weco_help_tip_seen';
+  function tipSeen() {
+    try { return !!window.localStorage.getItem(TIP_KEY); } catch (e) { return false; }
+  }
+  var tipPop = null;       /* открытая всплывающая подсказка ⓘ: { btn, pop, via } */
+  function closeTipPop() {
+    if (!tipPop) return;
+    tipPop.pop.hidden = true;
+    tipPop.btn.setAttribute('aria-expanded', 'false');
+    tipPop = null;
+  }
+  function openTipPop(btn, pop, via) {
+    if (tipPop && tipPop.pop !== pop) closeTipPop();
+    pop.hidden = false;
+    btn.setAttribute('aria-expanded', 'true');
+    tipPop = { btn: btn, pop: pop, via: via };
+  }
+  function bindTip(t) {
+    closeTipPop();         /* задачу подменили — подсказка прежней ушла с разметкой */
+    var card = t.$('help-tipcard'), info = t.$('help-info'), pop = t.$('help-info-pop');
+    var seen = tipSeen();
+    if (card) card.hidden = seen;
+    if (info) info.hidden = !seen;
+    var ok = t.$('help-tip-ok');
+    if (ok && once(ok)) ok.addEventListener('click', function () {
+      try { window.localStorage.setItem(TIP_KEY, '1'); } catch (e) { /* приватное окно */ }
+      if (card) card.hidden = true;
+      if (info) info.hidden = false;
+    });
+    if (!info || !pop || !once(info)) return;
+    info.addEventListener('pointerenter', function (e) {
+      if (e.pointerType === 'mouse' && !tipPop) openTipPop(info, pop, 'hover');
+    });
+    info.addEventListener('pointerleave', function (e) {
+      if (e.pointerType === 'mouse' && tipPop && tipPop.pop === pop) closeTipPop();
+    });
+    /* Палец и клавиатура: нажатие открывает и закрывает. Мышь уже открыла
+       наведением — нажатие подсказку не гасит. */
+    info.addEventListener('click', function () {
+      if (tipPop && tipPop.pop === pop) {
+        if (tipPop.via === 'hover') { tipPop.via = 'click'; return; }
+        closeTipPop();
+      } else openTipPop(info, pop, 'click');
+    });
+  }
+  /* Esc и клик мимо закрывают подсказку ⓘ. Перехват на `window` до слушателей
+     «Стола»: первый Esc гасит подсказку, а не выходит из фокуса. */
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && tipPop) { closeTipPop(); e.stopPropagation(); }
+  }, true);
+  document.addEventListener('click', function (e) {
+    if (tipPop && !tipPop.btn.contains(e.target)) closeTipPop();
+  });
+
   /* ── Вход: одна задача на экране, узлы ищутся внутри неё ─────────────── */
   function init(root) {
     root = root || document;
@@ -719,6 +779,7 @@
     bindBar(t);
     bindHow(t);
     bindHelp(t);
+    bindTip(t);
     bindComposer(t);
     bindTest(t);
     return t;

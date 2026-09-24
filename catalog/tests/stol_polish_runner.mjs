@@ -1,0 +1,95 @@
+/* Полировка «Стола» 24.09.2026 числами в настоящем браузере.
+
+   Решение «зелёный/красный» принимает `catalog/tests/test_stol_polish_browser.py`;
+   здесь только замеры. Журнал сессии — `claude/JOURNAL_STOL_POLISH_20260924.md`.
+
+   Запуск руками (нужны адрес, сессия вошедшего и id задач):
+     POLISH_BASE_URL=http://127.0.0.1:8000 POLISH_SESSION=… POLISH_PROBLEM=… \
+     POLISH_PROBLEM2=… node catalog/tests/stol_polish_runner.mjs
+
+   Печатает одну строку `###POLISH-JSON###{...}`. Коды возврата: 0 — прогон
+   дошёл до конца, 3 — браузер не поднялся. */
+import { chromium } from 'playwright';
+
+const BASE = process.env.POLISH_BASE_URL || 'http://127.0.0.1:8000';
+const SESSION = process.env.POLISH_SESSION || '';
+const P1 = process.env.POLISH_PROBLEM || '';
+const P2 = process.env.POLISH_PROBLEM2 || '';
+
+let browser;
+try {
+  browser = await chromium.launch();
+} catch (e) {
+  console.log('браузер не поднялся: ' + e.message);
+  process.exit(3);
+}
+
+const out = {};
+async function fresh(opts = {}) {
+  const ctx = await browser.newContext({
+    viewport: { width: opts.width || 1440, height: opts.height || 900 },
+    reducedMotion: 'reduce',
+  });
+  await ctx.addInitScript(`try { localStorage.setItem('theme', ${JSON.stringify(opts.theme || 'light')}); } catch (e) {}`);
+  if (opts.panels) {
+    await ctx.addInitScript(`try { if (!sessionStorage.getItem('__polishPanels')) { localStorage.setItem('weco_stol', ${JSON.stringify(JSON.stringify(opts.panels))}); sessionStorage.setItem('__polishPanels', '1'); } } catch (e) {}`);
+  }
+  if (opts.login !== false && SESSION) {
+    await ctx.addCookies([{ name: 'sessionid', value: SESSION, url: BASE }]);
+  }
+  const page = await ctx.newPage();
+  page.setDefaultTimeout(30000);
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto(BASE + (opts.path || '/catalog/'), { waitUntil: 'load' });
+  return { ctx, page, errors };
+}
+const shown = (page, sel) => page.evaluate(s => {
+  const el = document.querySelector(s);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return !el.hidden && getComputedStyle(el).display !== 'none' && r.width > 0 && r.height > 0;
+}, sel);
+const rect = (page, sel) => page.evaluate(s => {
+  const el = document.querySelector(s);
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
+}, sel);
+
+try {
+  /* ── Фаза 1: совет один раз, потом ⓘ ─────────────────────────────────── */
+  if (P1 && SESSION) {
+    const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P1 + '/', panels: { rail: false, help: true } });
+    const box = {};
+    box.cleanCard = await shown(page, '#help-tipcard');
+    box.cleanInfo = await shown(page, '#help-info');
+    await page.click('#help-tip-ok');
+    box.afterOkCard = await shown(page, '#help-tipcard');
+    box.afterOkInfo = await shown(page, '#help-info');
+    box.key = await page.evaluate(() => localStorage.getItem('weco_help_tip_seen'));
+    await page.reload({ waitUntil: 'load' });
+    box.reloadCard = await shown(page, '#help-tipcard');
+    box.reloadInfo = await shown(page, '#help-info');
+    await page.evaluate(id => weco.stol.open(Number(id)), P2);
+    await page.waitForFunction(id => weco.stol.state.problemId === Number(id), P2);
+    box.swapCard = await shown(page, '#help-tipcard');
+    box.swapInfo = await shown(page, '#help-info');
+    await page.hover('#help-info');
+    box.hoverPop = await shown(page, '#help-info-pop');
+    box.popText = await page.evaluate(() => document.querySelector('#help-info-pop').textContent);
+    box.cardText = await page.evaluate(() => document.querySelector('#help-tipcard p').textContent);
+    box.popTop = (await rect(page, '#help-info-pop')).top;
+    box.btnBottom = (await rect(page, '#help-info')).bottom;
+    box.expanded = await page.getAttribute('#help-info', 'aria-expanded');
+    await page.keyboard.press('Escape');
+    box.escPop = await shown(page, '#help-info-pop');
+    box.errors = errors;
+    out.tip = box;
+    await ctx.close();
+  }
+} catch (e) {
+  out.error = String(e && e.stack || e);
+}
+await browser.close();
+console.log('###POLISH-JSON###' + JSON.stringify(out));
