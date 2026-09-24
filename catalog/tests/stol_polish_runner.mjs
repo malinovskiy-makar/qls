@@ -62,11 +62,18 @@ const rect = (page, sel) => page.evaluate(s => {
   return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, width: r.width, height: r.height };
 }, sel);
 
+/* Секция — отдельный замер: её падение пишется строкой `fail <имя>` и не
+   обрывает остальные (иначе один дефект прятал бы, ловят ли что-то другие). */
+async function section(name, fn) {
+  try { await fn(); } catch (e) { out['fail ' + name] = String(e && e.message || e).split(/\r?\n/)[0].slice(0, 300); }
+}
+
 try {
   /* ── Фаза 1: совет один раз, потом ⓘ ─────────────────────────────────── */
-  if (P1 && SESSION) {
+  await section('tip', async () => {
+    if (!(P1 && SESSION)) return;
     const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P1 + '/', panels: { rail: false, help: true } });
-    const box = {};
+    const box = out.tip = { errors };
     box.cleanCard = await shown(page, '#help-tipcard');
     box.cleanInfo = await shown(page, '#help-info');
     await page.click('#help-tip-ok');
@@ -80,6 +87,7 @@ try {
     await page.waitForFunction(id => weco.stol.state.problemId === Number(id), P2);
     box.swapCard = await shown(page, '#help-tipcard');
     box.swapInfo = await shown(page, '#help-info');
+    if (!box.swapInfo) throw new Error('ⓘ не виден — навести не на что');
     await page.hover('#help-info');
     box.hoverPop = await shown(page, '#help-info-pop');
     box.popText = await page.evaluate(() => document.querySelector('#help-info-pop').textContent);
@@ -92,11 +100,12 @@ try {
     box.errors = errors;
     out.tip = box;
     await ctx.close();
-  }
+  });
 
   /* ── Фаза 2: строка лимита после ответа чата ─────────────────────────────
      Остаток до реплики — 6 (строка скрыта), после — 5 (строка видна). */
-  if (P2 && SESSION) {
+  await section('limit', async () => {
+    if (!(P2 && SESSION)) return;
     const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P2 + '/', panels: { rail: false, help: true } });
     const box = {};
     box.before = await page.evaluate(() => ({ hidden: document.querySelector('#sv-limit').hidden,
@@ -110,10 +119,11 @@ try {
     box.errors = errors;
     out.limit = box;
     await ctx.close();
-  }
+  });
 
   /* ── Фаза 3: «свернуть» слева, тонкие полосы, значок пункта без кружка ─── */
-  if (P1 && SESSION) {
+  await section('p3', async () => {
+    if (!(P1 && SESSION)) return;
     for (const theme of ['light', 'dark']) {
       const { ctx, page, errors } = await fresh({ theme, path: '/catalog/problem/' + P1 + '/', panels: { rail: true, help: true } });
       const box = await page.evaluate(() => {
@@ -155,10 +165,11 @@ try {
       out['p3 ' + theme] = box;
       await ctx.close();
     }
-  }
+  });
 
   /* ── Фаза 4: «Теги · N» не прыгает; длинная строка свойств не вылезает ──── */
-  if (PLONG) {
+  await section('tags', async () => {
+    if (!(PLONG)) return;
     const path = '/catalog/problem/' + PLONG + '/';
     {
       const { ctx, page, errors } = await fresh({ path, panels: { rail: true, help: true } });
@@ -200,10 +211,11 @@ try {
         await ctx.close();
       }
     }
-  }
+  });
 
   /* ── Фаза 5: в «Фокусе» панели открываются поверх, фокус остаётся ──────── */
-  if (P1 && SESSION) {
+  await section('focus', async () => {
+    if (!(P1 && SESSION)) return;
     const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P1 + '/', panels: { rail: false, help: true } });
     const snap = () => page.evaluate(() => {
       const vis = s => { const el = document.querySelector(s); if (!el) return false;
@@ -252,10 +264,11 @@ try {
     box.errors = errors;
     out.focus = box;
     await ctx.close();
-  }
+  });
 
   /* ── Фаза 6: метки у названия, ровные колонки темы и сложности ────────── */
-  if (SESSION) {
+  await section('rows', async () => {
+    if (!(SESSION)) return;
     const rowsBox = () => {
       const rows = [...document.querySelectorAll('#ct-rows .rail-row')];
       const R = el => el ? el.getBoundingClientRect() : null;
@@ -304,7 +317,7 @@ try {
       out.narrow.errors = errors;
       await ctx.close();
     }
-  }
+  });
 } catch (e) {
   out.error = String(e && e.stack || e);
 }

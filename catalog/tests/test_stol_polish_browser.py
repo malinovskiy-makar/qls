@@ -67,6 +67,8 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
                          title='Фирма %d' % i + (' с очень длинным названием про издержки и выпуск' if i == 4 else ''),
                          difficulty=1 + i % 5,
                          solution=('Решение длиной больше тридцати знаков: MC = P.' if i % 2 else ''))
+        # Без темы, но со сложностью: соседние колонки не должны съехать.
+        make_problem('Задача без темы: $TC = 2Q$.', title='Без темы', difficulty=3)
         test = make_problem('Кто устанавливает ключевую ставку?', topic=self.topic, title='Ставка',
                             problem_type='тест: один ответ', answer='b', difficulty=2,
                             solution='(b) Центральный банк устанавливает ключевую ставку.')
@@ -111,25 +113,33 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
             if not ok:
                 problems.append(text)
 
+        # Упавшие секции раннера — каждая своей строкой; остальные меряются дальше.
+        for key, message in data.items():
+            if key.startswith('fail '):
+                check(False, 'секция %s упала: %s' % (key[5:], message))
+
         # Фаза 1: совет один раз, потом ⓘ (решение владельца 24.09.2026).
-        tip = data['tip']
-        check(tip['cleanCard'] is True and tip['cleanInfo'] is False,
+        # Секция пишет свои числа по ходу: упала посередине — недостающее будет None.
+        tip = dict.fromkeys(('popTop', 'btnBottom'), 0)
+        tip.update(data.get('tip') or {})
+        tip = dict({'errors': []}, **tip)
+        check(tip.get('cleanCard') is True and tip.get('cleanInfo') is False,
               'совет: на чистом хранилище карточка должна быть видна, ⓘ скрыт (%s)' % tip)
-        check(tip['afterOkCard'] is False and tip['afterOkInfo'] is True,
+        check(tip.get('afterOkCard') is False and tip.get('afterOkInfo') is True,
               'совет: после «Понятно» карточка скрыта, ⓘ виден (%s)' % tip)
-        check(bool(tip['key']), 'совет: «Понятно» не записал weco_help_tip_seen')
-        check(tip['reloadCard'] is False and tip['reloadInfo'] is True,
+        check(bool(tip.get('key')), 'совет: «Понятно» не записал weco_help_tip_seen')
+        check(tip.get('reloadCard') is False and tip.get('reloadInfo') is True,
               'совет: после перезагрузки карточка вернулась или ⓘ пропал (%s)' % tip)
-        check(tip['swapCard'] is False and tip['swapInfo'] is True,
+        check(tip.get('swapCard') is False and tip.get('swapInfo') is True,
               'совет: на другой задаче без перезагрузки карточка вернулась (%s)' % tip)
-        check(tip['hoverPop'] is True, 'ⓘ: подсказка не открылась по наведению')
-        check(tip['popText'] == TIP and tip['cardText'] == TIP,
-              'ⓘ: текст подсказки не равен тексту совета (%r / %r)' % (tip['popText'], tip['cardText']))
-        check(tip['popTop'] > tip['btnBottom'],
-              'ⓘ: подсказка не под значком (верх %s, низ кнопки %s)' % (tip['popTop'], tip['btnBottom']))
-        check(tip['expanded'] == 'true', 'ⓘ: aria-expanded не true при открытой подсказке')
-        check(tip['escPop'] is False, 'ⓘ: Esc не закрыл подсказку')
-        check(not tip['errors'], 'совет: ошибки страницы %s' % tip['errors'])
+        check(tip.get('hoverPop') is True, 'ⓘ: подсказка не открылась по наведению')
+        check(tip.get('popText') == TIP and tip.get('cardText') == TIP,
+              'ⓘ: текст подсказки не равен тексту совета (%r / %r)' % (tip.get('popText'), tip.get('cardText')))
+        check(tip.get('popTop') > tip.get('btnBottom'),
+              'ⓘ: подсказка не под значком (верх %s, низ кнопки %s)' % (tip.get('popTop'), tip.get('btnBottom')))
+        check(tip.get('expanded') == 'true', 'ⓘ: aria-expanded не true при открытой подсказке')
+        check(tip.get('escPop') is False, 'ⓘ: Esc не закрыл подсказку')
+        check(not tip.get('errors'), 'совет: ошибки страницы %s' % tip.get('errors'))
 
         # Фаза 2: строка лимита — число и видимость после ответа чата.
         lim = data['limit']
