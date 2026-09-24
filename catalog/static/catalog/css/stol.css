@@ -241,9 +241,19 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
    многоточием текст сам показывает подсказку с полным текстом и берёт его из
    `innerText`, где KaTeX даёт каждую формулу дважды: «x↵x и↵y↵y…». Подсказку
    убрали совсем: обрезка `clip` и мягкое затухание к краю. */
+/* Название и метки одной строкой (24.09.2026): блок названия сжимается до своего
+   текста, поэтому затухание ложится на невидимый хвост 10 px (`::after`). Короткое
+   название не тускнеет, метки стоят в 10 px от него; обрезанное длинное — тает у
+   края, а метки не обрезаются и не переносятся. */
+.rail-line { display: flex; align-items: center; min-width: 0; }
 .rail-title { font-size: 13.5px; font-weight: 600; overflow: hidden; text-overflow: clip; white-space: nowrap;
-              -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
-              mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
+              flex: 0 1 auto; min-width: 0;
+              -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent);
+              mask-image: linear-gradient(to right, #000 calc(100% - 10px), transparent); }
+.rail-title::after { content: ''; display: inline-block; width: 10px; }
+.rail-marks { flex: none; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+              font-size: 12px; font-weight: 500; color: var(--text3); }
+.rail-marks:empty { display: none; }
 .rail-preview { display: none; }
 .rail-meta { display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; min-width: 0;
              font-size: 12px; color: var(--text3); }
@@ -258,9 +268,11 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
 .rail-stars { color: var(--amber); letter-spacing: 1px; flex: none; }
 .rail-star-off { font-weight: 400; }
 .rail-mark { flex: none; }
-.rail-mark--sol { color: var(--green-ink); }
-.rail-saved { flex: none; color: var(--amber); display: inline-flex; }
-.rail-saved .qi { width: 15px; height: 15px; }
+.rail-mark--sol { color: var(--green-ink); display: inline-flex; align-items: center; gap: 3px; }
+.rail-mark--sol .qi { width: 13px; height: 13px; stroke-width: 2.4; }
+/* ★ «сохранено» — залитая, цветом акцента: янтарный по канону значит сложность. */
+.rail-saved { flex: none; color: var(--accent-ink); display: inline-flex; }
+.rail-saved .qi { width: 15px; height: 15px; fill: currentColor; }
 .rail-empty { font-size: 13px; color: var(--text3); padding: 6px 8px; }
 
 /* Появление выдачи поиска (15.09.2026): лёгкий сдвиг снизу, первые двенадцать
@@ -279,21 +291,29 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
 .rail-row.ct-appear:nth-child(12) { animation-delay: 440ms; }
 @keyframes ctAppear { from { opacity: 0; transform: translateY(4px); } }
 
-/* Широкая строка входа: название 15/600 и строка условия; справа чип темы,
-   звёзды, «решение»/«тест», звезда «сохранено» (README §2). */
-.rail--wide .rail-row { grid-template-columns: auto minmax(0, 1fr) auto; align-items: center;
+/* Широкая строка входа: название 15/600 с метками и строка условия; справа две
+   колонки постоянной ширины — тема 240 и сложность 72, ровно по всей выдаче
+   (решение владельца 24.09.2026). `rail-meta` растворяется в сетке строки. */
+.rail--wide .rail-row { grid-template-columns: auto minmax(0, 1fr) 240px 72px; align-items: center;
                         padding: 10px 10px; column-gap: 16px; }
 .rail--wide .rail-row > .rail-status, .rail--wide .rail-row > .rail-check { grid-row: 1; }
-.rail--wide .rail-row > .rail-meta { grid-column: 3; grid-row: 1; gap: 14px; font-size: 13px; }
+.rail--wide .rail-row > .rail-meta { display: contents; font-size: 13px; }
+.rail--wide .rail-row > .rail-meta > .rail-topic { grid-column: 3; grid-row: 1; font-size: 13px; }
+.rail--wide .rail-row > .rail-meta > .rail-stars { grid-column: 4; grid-row: 1; justify-self: end; font-size: 13px; }
 .rail--wide .rail-title { font-size: 15px; }
+.rail--wide .rail-marks { font-size: 13px; }
 .rail--wide .rail-preview { display: block; font-size: 13px; color: var(--text2);
                             overflow: hidden; text-overflow: clip; white-space: nowrap;
                             -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent);
                             mask-image: linear-gradient(to right, #000 calc(100% - 24px), transparent); }
 .rail--wide .rail-preview .katex { font-size: 1em; }
-.rail--wide .rail-topic { max-width: 240px; padding: 3px 10px 3px 8px; border-radius: var(--r-pill);
+.rail--wide .rail-topic { width: 100%; box-sizing: border-box; padding: 3px 10px 3px 8px; border-radius: var(--r-pill);
                           color: var(--text);
                           background: color-mix(in srgb, var(--gc) 14%, var(--surface)); }
+/* Длинная тема — затуханием, как название; подпись тянется на весь чип. */
+.rail--wide .rail-topic-l { flex: 1 1 auto; min-width: 0; text-overflow: clip;
+                            -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent);
+                            mask-image: linear-gradient(to right, #000 calc(100% - 16px), transparent); }
 .rail--wide .rail-row:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); }
 
 @media (max-width: 759px) {
@@ -306,11 +326,16 @@ body:has(.stol-app[data-view="stol"]) .site-version { display: none; }
   .se-chip { height: 36px; flex: none; }
   .se-line { flex-wrap: wrap; margin-top: 28px; }
   .rail--wide .rail-row { grid-template-columns: auto minmax(0, 1fr); column-gap: 10px; }
-  .rail--wide .rail-row > .rail-meta { grid-column: 2; grid-row: 2; flex-wrap: wrap; font-size: 12px; }
+  .rail--wide .rail-row > .rail-meta { display: flex; grid-column: 2; grid-row: 2; flex-wrap: wrap; font-size: 12px; }
+  .rail--wide .rail-row > .rail-meta > .rail-topic, .rail--wide .rail-row > .rail-meta > .rail-stars { font-size: 12px; }
+  .rail--wide .rail-topic-l { -webkit-mask-image: none; mask-image: none; text-overflow: ellipsis; }
+  /* Название в две строки; метки, которым не хватило места, — строкой ниже. */
+  .rail--wide .rail-line { flex-wrap: wrap; row-gap: 2px; }
+  .rail--wide .rail-marks { font-size: 12px; }
   .rail--wide .rail-title { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2;
                             -webkit-box-orient: vertical; }
   .rail--wide .rail-preview { display: none; }
-  .rail--wide .rail-topic { max-width: 150px; padding: 0; background: none; color: var(--text3); }
+  .rail--wide .rail-topic { width: auto; max-width: 150px; padding: 0; background: none; color: var(--text3); }
 }
 @media (prefers-reduced-motion: reduce) {
   .se-head, .stol * { transition: none !important; }

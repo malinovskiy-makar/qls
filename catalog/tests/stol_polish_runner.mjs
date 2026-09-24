@@ -253,6 +253,58 @@ try {
     out.focus = box;
     await ctx.close();
   }
+
+  /* ── Фаза 6: метки у названия, ровные колонки темы и сложности ────────── */
+  if (SESSION) {
+    const rowsBox = () => {
+      const rows = [...document.querySelectorAll('#ct-rows .rail-row')];
+      const R = el => el ? el.getBoundingClientRect() : null;
+      return {
+        n: rows.length,
+        rows: rows.map(r => {
+          const t = R(r.querySelector('.rail-title')), m = r.querySelector('.rail-marks > *');
+          const topic = R(r.querySelector('.rail-topic')), stars = R(r.querySelector('.rail-stars'));
+          return { titleRight: t.right, markLeft: m ? R(m).left : null,
+                   topicLeft: topic ? topic.left : null, topicW: topic ? topic.width : null,
+                   starsRight: stars ? stars.right : null,
+                   metaMarks: r.querySelectorAll('.rail-meta .rail-mark, .rail-meta .rail-saved, .rail-meta .rail-hw').length,
+                   bg: getComputedStyle(r).backgroundColor };
+        }),
+        docW: document.documentElement.scrollWidth, winW: innerWidth,
+      };
+    };
+    for (const theme of ['light', 'dark']) {
+      const { ctx, page, errors } = await fresh({ theme, path: '/catalog/' });
+      await page.mouse.move(5, 5);
+      const box = await page.evaluate(rowsBox);
+      box.errors = errors;
+      out['rows ' + theme] = box;
+      await ctx.close();
+    }
+    for (const width of [1024, 390]) {
+      const { ctx, page } = await fresh({ width, height: width < 760 ? 844 : 900, path: '/catalog/' });
+      out['rows doc ' + width] = await page.evaluate(() => ({ docW: document.documentElement.scrollWidth, winW: innerWidth }));
+      await ctx.close();
+    }
+    /* Узкая лента рядом с задачей: те же строки, метки не наезжают на название. */
+    {
+      const { ctx, page, errors } = await fresh({ path: '/catalog/', panels: { rail: true, help: true } });
+      const first = await page.evaluate(() => Number(document.querySelector('#ct-rows .rail-row').getAttribute('data-id')));
+      await page.evaluate(id => weco.stol.open(id), first);
+      await page.waitForFunction(id => weco.stol.state.problemId === id && weco.stol.state.view === 'stol', first);
+      await page.waitForTimeout(300);
+      out.narrow = await page.evaluate(() => {
+        const rows = [...document.querySelectorAll('#stol-rail-list .rail-row')];
+        return { railW: document.querySelector('.stol-rail').getBoundingClientRect().width, n: rows.length,
+                 overlaps: rows.filter(r => { const m = r.querySelector('.rail-marks > *');
+                   return m && m.getBoundingClientRect().left < r.querySelector('.rail-title').getBoundingClientRect().right - 1; }).length,
+                 withMarks: rows.filter(r => r.querySelector('.rail-marks > *')).length,
+                 docW: document.documentElement.scrollWidth, winW: innerWidth };
+      });
+      out.narrow.errors = errors;
+      await ctx.close();
+    }
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }

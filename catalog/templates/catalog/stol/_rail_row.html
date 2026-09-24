@@ -11,21 +11,22 @@
 
 Правило нуля: чип темы — только при теме, звёзды — при сложности, «решение»
 и «тест» — из данных. Процента близости нет (решение владельца 17.09).
-Вся строка — ссылка на задачу; кнопок в строке нет (кроме галочки репетитора). Свойства (`rail-meta`) —
-соседом тела, а не внутри: широкая строка ставит их колонкой справа, узкая —
-второй строкой под названием.
+Вся строка — ссылка на задачу; кнопок в строке нет (кроме галочки репетитора).
+Устройство (решение владельца 24.09.2026, вариант A): метки «тест» / «✓ решение»,
+★ «сохранено» и «в N домашках» — группой `rail-marks` сразу за названием в
+`rail-line`; в `rail-meta` только тема и звёзды сложности. Широкая строка ставит
+их двумя колонками 240/72 справа, ровно по всей выдаче; узкая и телефон —
+второй строкой под названием. Группа меток пишется без пробелов внутри: пустая
+ловится `:empty`.
 {% endcomment %}
 <a class="rail-row{% if card.problem.pk == current_id %} is-current{% endif %}{% if appear and forloop.counter <= 12 %} ct-appear{% endif %}" href="{% url 'catalog:problem_detail' card.problem.pk %}" data-id="{{ card.problem.pk }}">
   {% if card.teach %}<span class="rail-check" role="checkbox" aria-checked="false" tabindex="0" aria-label="В корзину" data-basket="{{ card.problem.pk }}" data-basket-title="{% if card.show_title %}{{ card.title_display }}{% else %}{{ card.preview|truncatechars:80 }}{% endif %}">{% include '_icon.html' with name='check' %}</span>{% elif show_status %}<span class="rail-status rail-status--{{ status|default:'none' }}" aria-hidden="true">{% if status == 'solved_self' or status == 'solved_hint' %}{% include '_icon.html' with name='check' %}{% elif status == 'failed' %}{% include '_icon.html' with name='arrow_left' %}{% endif %}</span>{% endif %}
   <span class="rail-body">
-    <span class="rail-title">{% if card.show_title %}{{ card.title_display }}{% else %}{{ card.preview }}{% endif %}</span>
+    <span class="rail-line"><span class="rail-title">{% if card.show_title %}{{ card.title_display }}{% else %}{{ card.preview }}{% endif %}</span><span class="rail-marks">{% if card.is_test %}<span class="rail-mark">тест</span>{% elif card.has_solution %}<span class="rail-mark rail-mark--sol">{% include '_icon.html' with name='check' %}решение</span>{% endif %}{% if card.saved %}<span class="rail-saved" aria-label="сохранена">{% include '_icon.html' with name='star' %}</span>{% endif %}{% if card.in_hw %}<span class="rail-hw" data-hw-n="{{ card.in_hw }}">в {{ card.in_hw }} {{ card.in_hw|plural_ru:"домашке,домашках,домашках" }}</span>{% endif %}</span></span>
     {% if card.show_title %}<span class="rail-preview">{{ card.preview }}</span>{% endif %}
   </span>
   <span class="rail-meta">
     {% with topic=card.topics.0 %}{% if topic %}<span class="rail-topic" style="--gc: var(--map-g-{{ topic.section }})"><span class="rail-dot"></span><span class="rail-topic-l">{{ topic.name }}</span></span>{% endif %}{% endwith %}
     {% if card.difficulty %}<span class="rail-stars" role="img" aria-label="сложность {{ card.difficulty }}">{% for _ in card.difficulty_stars %}★{% endfor %}{% for _ in card.difficulty_empty %}<span class="rail-star-off">☆</span>{% endfor %}</span>{% endif %}
-    {% if card.is_test %}<span class="rail-mark">тест</span>{% elif card.has_solution %}<span class="rail-mark rail-mark--sol">решение</span>{% endif %}
-    {% if card.in_hw %}<span class="rail-hw" data-hw-n="{{ card.in_hw }}">в {{ card.in_hw }} {{ card.in_hw|plural_ru:"домашке,домашках,домашках" }}</span>{% endif %}
-    {% if card.saved %}<span class="rail-saved" aria-label="сохранена">{% include '_icon.html' with name='star' %}</span>{% endif %}
   </span>
 </a>

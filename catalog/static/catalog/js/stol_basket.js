@@ -186,13 +186,14 @@
       .then(function () { busy = false; });
   });
   function markAdded(id) {
-    qa('.rail-row[data-id="' + id + '"] .rail-meta').forEach(function (meta) {
-      var hw = meta.querySelector('.rail-hw');
+    /* Метки строки — группой у названия, «в N домашках» последней, после ★ (24.09.2026). */
+    qa('.rail-row[data-id="' + id + '"] .rail-marks').forEach(function (marks) {
+      var hw = marks.querySelector('.rail-hw');
       if (!hw) {
         hw = document.createElement('span');
         hw.className = 'rail-hw';
         hw.setAttribute('data-hw-n', '0');
-        meta.insertBefore(hw, meta.querySelector('.rail-saved'));
+        marks.appendChild(hw);
       }
       var n = Number(hw.getAttribute('data-hw-n')) + 1;
       hw.setAttribute('data-hw-n', String(n));

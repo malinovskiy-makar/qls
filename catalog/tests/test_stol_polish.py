@@ -17,8 +17,9 @@ from django.urls import reverse
 
 from problems.ai import core
 from problems.enrich import features as enrich_features
-from problems.models import AiUsageLog, Feature, Hint, ProblemFeature, Tag
-from problems.tests.factories import make_problem, make_topic, make_user
+from problems.models import AiUsageLog, Feature, Hint, ProblemFeature, ProblemPart, Tag
+from problems.models_platform import SavedProblem
+from problems.tests.factories import make_assignment, make_problem, make_topic, make_user
 
 TIP = ('История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, '
        'чтобы обсудить именно его.')
@@ -290,3 +291,79 @@ class CardFeaturesTests(TestCase):
         self.assertEqual(tag_list.count('class="pp pp--tag"'), 2)
         # Список — после строки свойств, а не внутри неё.
         self.assertLess(html.index('class="pp-tags-btn"'), start)
+
+
+def _row(html, problem):
+    start = html.index('data-id="%d"' % problem.pk)
+    return html[start:html.index('</a>', start)]
+
+
+def _part(row, cls):
+    """Содержимое `<span class="{cls}">…</span>` строки (без вложенных спанов того же класса)."""
+    start = row.index('<span class="%s"' % cls)
+    depth, i = 0, start
+    while True:
+        o, c = row.find('<span', i), row.find('</span>', i)
+        if o != -1 and o < c:
+            depth, i = depth + 1, o + 5
+        else:
+            depth, i = depth - 1, c + 7
+            if depth == 0:
+                return row[start:i]
+
+
+class RailRowMarksTests(TestCase):
+    """Фаза 6: метки у названия, в `rail-meta` только тема и сложность."""
+
+    def setUp(self):
+        cache.clear()
+        topic = make_topic('Монополия и ценовая дискриминация', is_canonical=True)
+        self.solved = make_problem('Монополист выбирает выпуск.', topic=topic, title='С решением',
+                                   difficulty=3, solution='Решение длиной больше тридцати знаков: MR = MC.')
+        self.test = make_problem('Кто устанавливает ставку?', topic=topic, title='Тест про ставку',
+                                 problem_type='тест: один ответ', answer='b',
+                                 solution='(b) Центральный банк устанавливает ключевую ставку.')
+        for i, label in enumerate('abcd'):
+            ProblemPart.objects.create(problem=self.test, label=label, order=i, statement='Вариант %s' % label)
+        self.bare = make_problem('Задача без темы и сложности.', title='Голая задача')
+        self.user = make_user('polish_rows')
+        SavedProblem.objects.create(owner=self.user, catalog_problem=self.solved)
+
+    def test_solution_and_saved_marks_sit_by_the_title_not_in_meta(self):
+        self.client.force_login(self.user)
+        row = _row(self.client.get('/catalog/').content.decode(), self.solved)
+        marks = _part(row, 'rail-marks')
+        meta = _part(row, 'rail-meta')
+        self.assertIn('rail-mark rail-mark--sol', marks)
+        self.assertIn('решение', marks)
+        self.assertIn('class="rail-saved" aria-label="сохранена"', marks)
+        for cls in ('rail-mark', 'rail-saved', 'rail-hw'):
+            self.assertNotIn(cls, meta)
+        # Группа меток — в одной строке с названием.
+        line = _part(row, 'rail-line')
+        self.assertIn('class="rail-title"', line)
+        self.assertIn('class="rail-marks"', line)
+        self.assertIn('class="rail-topic"', meta)
+        self.assertIn('class="rail-stars"', meta)
+
+    def test_test_has_test_mark_without_solution_mark(self):
+        row = _row(self.client.get('/catalog/').content.decode(), self.test)
+        marks = _part(row, 'rail-marks')
+        self.assertIn('<span class="rail-mark">тест</span>', marks)
+        self.assertNotIn('решение', marks)
+
+    def test_row_without_topic_and_difficulty_still_has_the_marks_group(self):
+        row = _row(self.client.get('/catalog/').content.decode(), self.bare)
+        self.assertIn('<span class="rail-marks"></span>', row)
+        self.assertNotIn('rail-topic', row)
+        self.assertNotIn('rail-stars', row)
+
+    def test_tutor_sees_homework_count_inside_the_marks_group(self):
+        teacher = make_user('polish_rows_teacher', role='teacher')
+        make_assignment(teacher, problems=[self.solved], name='ДЗ 1')
+        make_assignment(teacher, problems=[self.solved], name='ДЗ 2')
+        self.client.force_login(teacher)
+        row = _row(self.client.get('/catalog/').content.decode(), self.solved)
+        marks = _part(row, 'rail-marks')
+        self.assertIn('<span class="rail-hw" data-hw-n="2">в 2 домашках</span>', marks)
+        self.assertNotIn('rail-hw', _part(row, 'rail-meta'))

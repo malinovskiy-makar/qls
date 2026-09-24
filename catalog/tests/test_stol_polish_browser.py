@@ -20,6 +20,7 @@ from django.test import override_settings, tag
 from problems.enrich import features as enrich_features
 from problems.models import (AiUsageLog, Feature, Hint, ProblemFeature, ProblemPart, Source,
                              SourceReference, Tag)
+from problems.models_platform import SavedProblem
 from problems.tests.factories import make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_polish_runner.mjs')
@@ -58,7 +59,21 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
                                        source=Source.objects.create(name='Школково – банк задач по экономике'))
         for name in ('монополия', 'эластичность', 'налоги'):
             self.long.tags.add(Tag.objects.create(name=name, slug=name, kind='canonical'))
+        # Выдача не короче 12 строк: темы, сложности, решения, тест (фаза 6).
+        other_topic = make_topic('Совершенная конкуренция', is_canonical=True)
+        for i in range(12):
+            make_problem('Фирма %d выбирает выпуск: $TC = Q^2 + %d$.' % (i, i),
+                         topic=other_topic if i % 3 else self.topic,
+                         title='Фирма %d' % i + (' с очень длинным названием про издержки и выпуск' if i == 4 else ''),
+                         difficulty=1 + i % 5,
+                         solution=('Решение длиной больше тридцати знаков: MC = P.' if i % 2 else ''))
+        test = make_problem('Кто устанавливает ключевую ставку?', topic=self.topic, title='Ставка',
+                            problem_type='тест: один ответ', answer='b', difficulty=2,
+                            solution='(b) Центральный банк устанавливает ключевую ставку.')
+        for i, label in enumerate('abcd'):
+            ProblemPart.objects.create(problem=test, label=label, order=i, statement='Вариант %s' % label)
         student = make_user('polish_browser_student')
+        SavedProblem.objects.create(owner=student, catalog_problem=self.other)
         # Остаток ИИ 6 из 30: строка лимита скрыта, после одной реплики — видна.
         AiUsageLog.objects.bulk_create([AiUsageLog(user=student, kind='catalog_chat', model_name='fake', ok=True)
                                         for _ in range(24)])
@@ -193,5 +208,36 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
               and foc['normalAfter']['dataRail'] == foc['normalBefore']['dataRail'],
               'обычные панели после фокуса не те же: %s → %s' % (foc['normalBefore'], foc['normalAfter']))
         check(not foc['errors'], 'фокус: ошибки страницы %s' % foc['errors'])
+
+        # Фаза 6: метки у названия, ровные колонки, без чередования, без прокрутки.
+        for theme in ('light', 'dark'):
+            box = data['rows ' + theme]
+            rows = box['rows']
+            check(box['n'] >= 12, '%s: в выдаче %d строк, нужно не меньше 12' % (theme, box['n']))
+            lefts = [r['topicLeft'] for r in rows if r['topicLeft'] is not None]
+            widths = [r['topicW'] for r in rows if r['topicW'] is not None]
+            stars = [r['starsRight'] for r in rows if r['starsRight'] is not None]
+            check(lefts and max(lefts) - min(lefts) <= 1, '%s: левый край чипа темы гуляет %s' % (theme, sorted(set(lefts))))
+            check(widths and max(widths) - min(widths) <= 1, '%s: ширина чипа темы гуляет %s' % (theme, sorted(set(widths))))
+            check(stars and max(stars) - min(stars) <= 1, '%s: правый край звёзд гуляет %s' % (theme, sorted(set(stars))))
+            marked = [r for r in rows if r['markLeft'] is not None]
+            check(len(marked) >= 3, '%s: строк с метками %d' % (theme, len(marked)))
+            for r in marked:
+                check(r['markLeft'] > r['titleRight'] - 1 and (r['topicLeft'] is None or r['markLeft'] < r['topicLeft']),
+                      '%s: метка не у названия (%s)' % (theme, r))
+            check(sum(r['metaMarks'] for r in rows) == 0, '%s: метки остались в rail-meta' % theme)
+            bgs = [r['bg'] for r in rows]
+            check(all(a == b for a, b in zip(bgs, bgs[1:])), '%s: цвет строк чередуется %s' % (theme, sorted(set(bgs))))
+            check(box['docW'] <= box['winW'], '%s 1440: документ шире окна (%s > %s)' % (theme, box['docW'], box['winW']))
+            check(not box['errors'], '%s: ошибки страницы %s' % (theme, box['errors']))
+        for width in (1024, 390):
+            doc = data['rows doc %d' % width]
+            check(doc['docW'] <= doc['winW'], '%d: документ шире окна (%s > %s)' % (width, doc['docW'], doc['winW']))
+        narrow = data['narrow']
+        check(abs(narrow['railW'] - 316) <= 1, 'узкая лента шириной %s, нужно 316' % narrow['railW'])
+        check(narrow['n'] >= 12 and narrow['withMarks'] >= 3, 'узкая лента: строк %s, с метками %s' % (narrow['n'], narrow['withMarks']))
+        check(narrow['overlaps'] == 0, 'узкая лента: метки наезжают на название в %s строках' % narrow['overlaps'])
+        check(narrow['docW'] <= narrow['winW'], 'узкая лента: документ шире окна')
+        check(not narrow['errors'], 'узкая лента: ошибки страницы %s' % narrow['errors'])
 
         self.assertEqual(problems, [], '\n'.join(problems))
