@@ -306,6 +306,10 @@
     problemId: Number(desk.getAttribute('data-problem')) || null,
     panels: load() || { rail: false, help: true },
     focus: false,
+    /* Панели поверх задачи в «Фокусе» (решение владельца 24.09.2026) — своё
+       состояние, в `localStorage` не пишется: выход из фокуса возвращает
+       обычные панели ровно такими, какими они были до входа. */
+    focusPanels: { rail: false, help: false },
     tab: entry ? 'results' : 'similar',
     filters: F ? F.state : null,
     results: [],
@@ -318,11 +322,24 @@
     var p = panels();
     desk.setAttribute('data-rail', p.rail ? 'open' : 'closed');
     desk.setAttribute('data-help', p.help ? 'open' : 'closed');
+    desk.setAttribute('data-focus-rail', state.focus && state.focusPanels.rail ? 'open' : 'closed');
+    desk.setAttribute('data-focus-help', state.focus && state.focusPanels.help ? 'open' : 'closed');
     document.body.classList.toggle('stol-sheet-open', PHONE.matches && (p.rail || p.help));
+  }
+  /* В «Фокусе» на десктопе панели открываются поверх, фокус остаётся.
+     Телефон — прежняя логика шторок (там фокус выключается). */
+  function overFocus() { return state.focus && !PHONE.matches; }
+  function closeFocusPanels() {
+    if (!state.focusPanels.rail && !state.focusPanels.help) return false;
+    state.focusPanels.rail = false;
+    state.focusPanels.help = false;
+    paint();
+    return true;
   }
   if (PHONE.addEventListener) PHONE.addEventListener('change', paint);
   function focusMode(on) {
     state.focus = on;
+    if (!on) closeFocusPanels();
     document.body.classList.toggle('stol-is-focus', on);
     desk.querySelectorAll('.stol-focus-label').forEach(function (el) {
       el.textContent = on ? 'Выйти из фокуса' : 'Фокус';
@@ -330,7 +347,8 @@
     });
   }
   function toggle(panel) {
-    /* Из «Фокуса» кнопка панели её открывает, а не переключает вслепую. */
+    if (overFocus()) { state.focusPanels[panel] = !state.focusPanels[panel]; paint(); return; }
+    /* Телефон: из «Фокуса» кнопка панели её открывает, а не переключает вслепую. */
     var p = panels();
     if (state.focus) { focusMode(false); p[panel] = true; }
     else { p[panel] = !p[panel]; }
@@ -339,6 +357,10 @@
     paint();
   }
   function openPanel(panel) {
+    if (overFocus()) {
+      if (!state.focusPanels[panel]) { state.focusPanels[panel] = true; paint(); }
+      return;
+    }
     if (state.focus) focusMode(false);
     var p = panels();
     if (!p[panel]) {
@@ -355,6 +377,14 @@
     if (p.rail) { p.rail = false; changed = true; }
     if (window.innerWidth < 1100 && p.help) { p.help = false; changed = true; }
     if (changed) paint();
+  });
+  /* Панели поверх в «Фокусе» закрываются кликом мимо. Кнопки, которые сами
+     открывают помощь (выделение, пункт, подсказка), кликом мимо не считаются;
+     узел, убранный из разметки во время клика, — тоже. */
+  document.addEventListener('click', function (e) {
+    if (!overFocus() || !e.target.isConnected) return;
+    if (e.target.closest('.stol-rail, .help-panel, [data-stol], [data-help-open], [data-ask], [data-ask-part], .ask-pop')) return;
+    closeFocusPanels();
   });
   document.addEventListener('click', function (e) {
     var btn = e.target.closest('[data-stol]');
@@ -520,6 +550,8 @@
         if (weco.track) weco.track('problem_open', { problem_id: d.id, from: first ? 'entry' : 'stol' });
         if (PHONE.matches) { phonePanels.rail = false; phonePanels.help = false; paint(); }
         else if (OVERLAY.matches && state.panels.rail) { state.panels.rail = false; paint(); }
+        /* Задача из ленты поверх в «Фокусе»: фокус остаётся, лента уходит, как шторка. */
+        if (state.focus && state.focusPanels.rail) { state.focusPanels.rail = false; paint(); }
       })
       .catch(function () {
         if (mine !== seq) return;
@@ -654,7 +686,8 @@
     if (k === '[') { toggle('rail'); }
     else if (k === ']') { toggle('help'); }
     else if (k === 'f' || k === 'F' || k === 'а' || k === 'А') { focusMode(!state.focus); }
-    else if (k === 'Escape') { if (state.focus) focusMode(false); else if (entry) toEntry(); else return; }
+    /* Esc в «Фокусе»: сначала закрывает панели поверх, следующий — выходит из фокуса. */
+    else if (k === 'Escape') { if (state.focus) { if (!closeFocusPanels()) focusMode(false); } else if (entry) toEntry(); else return; }
     else if (k === 'j' || k === 'о' || k === 'ArrowDown') { move(1); }
     else if (k === 'k' || k === 'л' || k === 'ArrowUp') { move(-1); }
     else if (k === 'Enter' && cursor >= 0 && rowsOfTab()[cursor]) { open(idOf(rowsOfTab()[cursor].getAttribute('href'))); cursor = -1; }

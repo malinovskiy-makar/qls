@@ -800,6 +800,22 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 /* «Фокус» (F): скрыты обе панели, обе полоски и шапка сайта (README §1). */
 body.stol-is-focus .site-nav, body.stol-is-focus .desk-side { display: none !important; }
 body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
+/* В «Фокусе» «Лента» и «Помощь» открываются поверх задачи (решение владельца
+   24.09.2026): колонки остаются нулевыми, условие не сдвигается, шапки нет.
+   Полоски 52 px не показываются. Телефон — своя логика шторок ниже. */
+@media (min-width: 760px) {
+  body.stol-is-focus .desk[data-focus-rail="open"] .desk-side--rail,
+  body.stol-is-focus .desk[data-focus-help="open"] .desk-side--help {
+    display: block !important; position: static; height: 0; box-shadow: none; z-index: auto; }
+  body.stol-is-focus .desk[data-focus-rail="open"] .stol-strip--rail,
+  body.stol-is-focus .desk[data-focus-help="open"] .stol-strip--help { display: none !important; }
+  body.stol-is-focus .desk[data-focus-rail="open"] .stol-rail,
+  body.stol-is-focus .desk[data-focus-help="open"] .help-panel {
+    display: flex; position: fixed; top: 16px; bottom: 16px; height: auto; max-width: calc(100vw - 32px);
+    z-index: 120; background: var(--surface); box-shadow: var(--shadow-pop); border-radius: var(--r-panel); overflow: hidden; }
+  body.stol-is-focus .desk[data-focus-rail="open"] .stol-rail { left: 16px; width: 316px; }
+  body.stol-is-focus .desk[data-focus-help="open"] .help-panel { right: 16px; width: 392px; }
+}
 
 /* 1100–1399: лента не сдвигает задачу, а выезжает поверх шторкой от полоски. */
 @media (min-width: 1100px) and (max-width: 1399px) {

@@ -170,4 +170,28 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
                   '%s: «Теги» не в первой строке (%s vs %s)' % (key, row['btnTop'], row['subTop']))
             check(not row['errors'], '%s: ошибки страницы %s' % (key, row['errors']))
 
+        # Фаза 5: в «Фокусе» «Помощь» и «Лента» открываются поверх, Esc в два шага.
+        foc = data['focus']
+        for panel, width_key, width in (('help', 'helpW', 392), ('rail', 'railW', 316)):
+            run = foc[panel]
+            check(run['inFocus']['focus'] and not run['inFocus']['nav'], '%s: F не включил фокус (%s)' % (panel, run['inFocus']))
+            opened = run['opened']
+            check(opened['focus'] and not opened['nav'] and opened[panel],
+                  '%s: пилюля вывела из фокуса или панель не видна (%s)' % (panel, opened))
+            check(abs(opened[width_key] - width) <= 1, '%s: ширина панели %s, нужно %d' % (panel, opened[width_key], width))
+            check(abs(opened['colX'] - run['inFocus']['colX']) <= 1,
+                  '%s: колонка условия сдвинулась (%s → %s)' % (panel, run['inFocus']['colX'], opened['colX']))
+            check(run['esc1']['focus'] and not run['esc1'][panel],
+                  '%s: первый Esc должен закрыть панель и оставить фокус (%s)' % (panel, run['esc1']))
+            check(not run['esc2']['focus'], '%s: второй Esc не вышел из фокуса (%s)' % (panel, run['esc2']))
+        check(foc['keyOpen']['focus'] and foc['keyOpen']['help'], '] в фокусе: %s' % foc['keyOpen'])
+        check(foc['clickAway']['focus'] and not foc['clickAway']['help'], 'клик мимо: %s' % foc['clickAway'])
+        check(foc['askPop']['focus'] and foc['askPop']['help'], '«Обсудить с ИИ» в фокусе: %s' % foc['askPop'])
+        check(foc['storeBefore'] == foc['storeAfter'],
+              'weco_stol изменился: %s → %s' % (foc['storeBefore'], foc['storeAfter']))
+        check(foc['normalAfter']['dataHelp'] == foc['normalBefore']['dataHelp']
+              and foc['normalAfter']['dataRail'] == foc['normalBefore']['dataRail'],
+              'обычные панели после фокуса не те же: %s → %s' % (foc['normalBefore'], foc['normalAfter']))
+        check(not foc['errors'], 'фокус: ошибки страницы %s' % foc['errors'])
+
         self.assertEqual(problems, [], '\n'.join(problems))

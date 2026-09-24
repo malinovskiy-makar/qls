@@ -201,6 +201,58 @@ try {
       }
     }
   }
+
+  /* ── Фаза 5: в «Фокусе» панели открываются поверх, фокус остаётся ──────── */
+  if (P1 && SESSION) {
+    const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P1 + '/', panels: { rail: false, help: true } });
+    const snap = () => page.evaluate(() => {
+      const vis = s => { const el = document.querySelector(s); if (!el) return false;
+        const r = el.getBoundingClientRect(); return getComputedStyle(el).display !== 'none' && r.width > 0 && r.height > 0; };
+      const w = s => Math.round(document.querySelector(s).getBoundingClientRect().width * 10) / 10;
+      return { focus: document.body.classList.contains('stol-is-focus'), nav: vis('.site-nav'),
+               help: vis('.help-panel'), helpW: w('.help-panel'), rail: vis('.stol-rail'), railW: w('.stol-rail'),
+               colX: document.querySelector('.desk-col').getBoundingClientRect().left,
+               dataHelp: document.querySelector('.desk').getAttribute('data-help'),
+               dataRail: document.querySelector('.desk').getAttribute('data-rail') };
+    });
+    const store = () => page.evaluate(() => localStorage.getItem('weco_stol'));
+    const box = { storeBefore: await store(), normalBefore: await snap() };
+    for (const panel of ['help', 'rail']) {
+      await page.keyboard.press('f');
+      const inFocus = await snap();
+      await page.click('.tb-focus-only[data-stol="' + panel + '"]');
+      const opened = await snap();
+      await page.keyboard.press('Escape');
+      const esc1 = await snap();
+      await page.keyboard.press('Escape');
+      const esc2 = await snap();
+      box[panel] = { inFocus, opened, esc1, esc2 };
+    }
+    /* Клавиша ] и клик мимо. */
+    await page.keyboard.press('f');
+    await page.keyboard.press(']');
+    box.keyOpen = await snap();
+    await page.mouse.click(720, 600);
+    box.clickAway = await snap();
+    /* Выделение условия → «Обсудить с ИИ» → помощь поверх, фокус включён. */
+    await page.evaluate(() => {
+      const el = document.querySelector('.stm .math-content') || document.querySelector('.stm');
+      const range = document.createRange();
+      range.selectNodeContents(el);
+      const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(range);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    });
+    await page.waitForSelector('.ask-pop:not([hidden])', { timeout: 5000 });
+    await page.click('.ask-pop');
+    box.askPop = await snap();
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    box.normalAfter = await snap();
+    box.storeAfter = await store();
+    box.errors = errors;
+    out.focus = box;
+    await ctx.close();
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }
