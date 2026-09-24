@@ -572,6 +572,20 @@ REDIS_URL = os.environ.get('REDIS_URL', '').strip()
 # забывают выставить ровно тогда, когда это важнее всего.
 _TESTING = 'test' in sys.argv
 
+# ─── Квота РАЗНЫХ задач (catalog/scrape_guard.py, 24.09.2026, ADR 0129) ───
+# Гость — по адресу, вошедший — по аккаунту; уже открытая задача квоту не
+# тратит. Проверенные поисковые роботы (DNS) не ограничиваются.
+# ⚠️ В ПРОГОНЕ ТЕСТОВ ВЫКЛЮЧЕНА по умолчанию: тысячи открытий задач с одного
+# 127.0.0.1 упёрлись бы в неё посреди чужих тестов. Её собственные тесты
+# включают её явно (`override_settings`).
+SCRAPE_GUARD_ENABLED = (
+    os.environ.get('SCRAPE_GUARD_ENABLED', '0' if _TESTING else '1').strip().lower()
+    in ('1', 'true', 'yes', 'on'))
+SCRAPE_QUOTA_IP_HOUR = int(os.environ.get('SCRAPE_QUOTA_IP_HOUR', '150').strip() or 150)
+SCRAPE_QUOTA_IP_DAY = int(os.environ.get('SCRAPE_QUOTA_IP_DAY', '600').strip() or 600)
+SCRAPE_QUOTA_USER_HOUR = int(os.environ.get('SCRAPE_QUOTA_USER_HOUR', '300').strip() or 300)
+SCRAPE_QUOTA_USER_DAY = int(os.environ.get('SCRAPE_QUOTA_USER_DAY', '1000').strip() or 1000)
+
 
 def _redis_cache(db_index, prefix):
     """Один алиас кэша в отдельной базе Redis."""

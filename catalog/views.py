@@ -1548,6 +1548,14 @@ def problem_detail(request, pk):
                                 needs_quality_review=False,
                                 hidden_pending_review=False, content_status=Problem.ContentStatus.OK)
 
+    # ⚠️ Квота РАЗНЫХ задач (24.09.2026, ADR 0129, `catalog/scrape_guard.py`):
+    # выгрузка банка подряд упирается здесь, человек её не замечает.
+    from . import scrape_guard
+    if scrape_guard.check(request, problem.pk):
+        if request.GET.get('pane') == '1':
+            return JsonResponse({'error': 'scrape'}, status=429)
+        return render(request, '429.html', status=429)
+
     # Учебное событие и прогресс: задачу открыли — и прямой ссылкой, и на месте.
     # Записи неблокирующие (problems/event_log.py, catalog/progress.py).
     from problems.event_log import log_problem_event
@@ -1919,6 +1927,10 @@ def catalog_api_problem(request, pk):
         )
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)
+    # Тот же счёт разных задач, что у страницы задачи (ADR 0129).
+    from . import scrape_guard
+    if scrape_guard.check(request, problem.pk):
+        return JsonResponse({'error': 'scrape'}, status=429)
 
     d = problem.difficulty or 0
 

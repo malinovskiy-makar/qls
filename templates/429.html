@@ -1,0 +1,9 @@
+{% extends "_error_base.html" %}
+{% comment %}
+Страница 429: квота разных задач (catalog/scrape_guard.py, 24.09.2026, ADR 0129).
+Основа самостоятельная — почему, написано в _error_base.html.
+{% endcomment %}
+{% block title %}Слишком много задач подряд{% endblock %}
+{% block code %}Ошибка 429{% endblock %}
+{% block heading %}Слишком много задач подряд{% endblock %}
+{% block text %}С этого адреса или аккаунта за короткое время открыто больше задач, чем обычно решает человек. Войдите или вернитесь позже — лимит обновится.{% endblock %}
