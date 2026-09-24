@@ -447,6 +447,38 @@ def parse_cart(raw):
     return keys, catalog, custom
 
 
+#: Больше ключей одна корзина не принимает — столько же, сколько домашка из
+#: корзины каталога (`teacher.views.BASKET_MAX`).
+CART_MAX = 100
+
+
+def visible_catalog_ids(ids, owner):
+    """Какие задачи каталога этот репетитор вправе получить ЦЕЛИКОМ.
+
+    ⚠️ ЗАЧЕМ (24.09.2026). Корзина, окно «Целиком» и предпросмотр отдают
+    задачу вместе с ответами и решением, а фильтра видимости у них не было:
+    любой зарегистрировавшийся «репетитор» одним запросом со списком id
+    получал весь банк, включая скрытое и бракованное. Теперь — тот же шлюз,
+    что у подбора задач (`base_queryset('tutor')`), плюс задачи из
+    СОБСТВЕННЫХ работ репетитора: задача, скрытая после выдачи, не должна
+    пропадать из уже собранной работы.
+    """
+    from catalog import filters as F
+    from problems.models import AssignmentItem
+
+    ids = set(ids)
+    if not ids:
+        return set()
+    allowed = set(F.base_queryset('tutor').filter(pk__in=ids)
+                  .values_list('pk', flat=True))
+    rest = ids - allowed
+    if rest and owner is not None and getattr(owner, 'is_authenticated', False):
+        allowed |= set(AssignmentItem.objects.filter(
+            catalog_problem_id__in=rest, assignment__author=owner)
+            .values_list('catalog_problem_id', flat=True))
+    return allowed
+
+
 def cart_items(keys, owner, manual_order=False, points=None, suggest=False,
                rule=None):
     """Корзина → ПОЗИЦИИ будущей работы в памяти, в порядке показа.
@@ -483,10 +515,12 @@ def cart_items(keys, owner, manual_order=False, points=None, suggest=False,
     from problems.models import AssignmentItem, CustomProblem, Problem
     from problems.models_platform import default_points
 
-    keys = [key for key in keys if key]
+    keys = [key for key in keys if key][:CART_MAX]
     catalog_ids = [int(k) for k in keys if k.isdigit()]
     custom_ids = [int(k[1:]) for k in keys
                   if k.startswith('c') and k[1:].isdigit()]
+    # ⚠️ Только видимое или из своих работ — см. `visible_catalog_ids`.
+    catalog_ids = list(visible_catalog_ids(catalog_ids, owner))
     catalog = {p.pk: p for p in Problem.objects.filter(pk__in=catalog_ids)
                .prefetch_related('topics', 'source_references__source')}
     custom = {c.pk: c for c in CustomProblem.objects.filter(

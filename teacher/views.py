@@ -936,12 +936,16 @@ def api_problem_detail(request, key):
     # шлюзом задачу. Окно предпросмотра показывает то, что кладут в работу, а
     # подбор берёт только опубликованные — значит и окно обязано. Иначе
     # репетитор видит в предпросмотре задачу, которую положить не сможет.
+    # ⚠️ (24.09.2026) Шлюз — общий с корзиной: видимое для подбора (там и
+    # `content_status`, которого здесь не было) или задача из своих работ.
+    from .picker import visible_catalog_ids
+    if int(key) not in visible_catalog_ids([int(key)], request.user):
+        return JsonResponse({'error': 'Not found'}, status=404)
     try:
         problem = (
             Problem.objects
             .prefetch_related('topics', 'parts', 'source_references__source')
-            .get(pk=int(key), status=Problem.Status.PUBLISHED,
-                 needs_quality_review=False)
+            .get(pk=int(key))
         )
     except Problem.DoesNotExist:
         return JsonResponse({'error': 'Not found'}, status=404)

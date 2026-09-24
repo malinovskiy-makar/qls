@@ -483,6 +483,11 @@ def api_cart_rows(request):
         return JsonResponse({'error': 'only POST'}, status=405)
     keys = [key.strip() for key in
             (request.POST.get('keys') or '').split(',') if key.strip()]
+    from .picker import CART_MAX
+    if len(keys) > CART_MAX:
+        # Корзина больше домашки — это не корзина, а выгрузка (24.09.2026).
+        return JsonResponse({'error': 'Слишком много задач в корзине'},
+                            status=400)
     # ⚠️ БАЛЛЫ ЕДУТ НА СЕРВЕР ВМЕСТЕ С КОРЗИНОЙ. Состав части («3 вопроса ·
     # 6 баллов») считает питон, а балл репетитор правит прямо на экране;
     # без этого заголовок показывал бы баллы по умолчанию, пока в строках
