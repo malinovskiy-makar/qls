@@ -1467,10 +1467,9 @@ def _problem_context(request, problem):
         saved = SavedProblem.objects.filter(owner=request.user, catalog_problem=problem,
                                             is_deleted=False).exists()
 
-    # Проверка ИИ: кнопка и строка лимита — только при доступной модели и
-    # только для вошедших (правило нуля: без ключа их нет вовсе).
+    # Проверка ИИ: кнопка — только при доступной модели и только для вошедших
+    # (правило нуля: без ключа её нет вовсе).
     ai_available = ai.is_available()
-    remaining = ai.remaining_today(request.user) if ai_available and request.user.is_authenticated else 0
     last_attempt = None
     since = progress.reset_at(request.user, problem)
     if ai_available and request.user.is_authenticated:
@@ -1510,6 +1509,12 @@ def _problem_context(request, problem):
     # Чат живёт на своём поставщике (решение 15.09.2026): его карточка и кнопки,
     # которые в него пишут, зависят от чата, а не от модели проверки.
     chat_available = chat.is_available()
+    # Строка лимита (решение владельца 24.09.2026): счётчик ОБЩИЙ на все
+    # обращения к ИИ — и проверку, и чат, поэтому считается и тогда, когда
+    # доступен только чат. Видна при остатке ≤ `LIMIT_WARN_AT`.
+    remaining = (ai.remaining_today(request.user)
+                 if (ai_available or chat_available) and request.user.is_authenticated else 0)
+    cfg['limitWarnAt'] = ai.LIMIT_WARN_AT
     if chat_available:
         cfg['chatUrl'] = reverse('catalog:api_chat')
         cfg['chatCheckEmpty'] = chat.CHECK_EMPTY_TEXT
@@ -1553,6 +1558,7 @@ def _problem_context(request, problem):
         'hint_total':   hint_total,
         'test':         test,
         'remaining':    remaining,
+        'limit_warn_at': ai.LIMIT_WARN_AT,
         'last_attempt': last_attempt,
         'last_chk':     (_attempt_view(last_attempt, can_chat=chat_available)
                          if last_attempt else None),

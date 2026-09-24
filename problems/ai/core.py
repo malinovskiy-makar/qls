@@ -43,6 +43,9 @@ CACHE_WRITE_MULTIPLIER = Decimal('1.25')
 CACHE_READ_MULTIPLIER = Decimal('0.1')
 
 DEFAULT_DAILY_LIMIT = 30
+#: Строка лимита в панели помощи видна при остатке ≤ этого числа (решение
+#: владельца 24.09.2026). Шаблон и скрипт берут его из контекста и `task_cfg`.
+LIMIT_WARN_AT = 5
 #: Суточный денежный потолок по видам работ (`AiUsageLog.kind`), $ в сутки.
 #: Пусто — потолка нет, работает только счётчик обращений на пользователя.
 DEFAULT_DAILY_COST_CAPS = {}
@@ -174,7 +177,7 @@ def budget_exceeded(kind):
 
 
 def remaining_today(user):
-    """Сколько обращений осталось сегодня — для строки «осталось сегодня N»."""
+    """Сколько обращений осталось сегодня — для строки лимита в панели помощи."""
     if user is None or not getattr(user, 'is_authenticated', False):
         return 0
     return max(0, daily_limit() - used_today(user))

@@ -88,6 +88,24 @@ try {
     out.tip = box;
     await ctx.close();
   }
+
+  /* ── Фаза 2: строка лимита после ответа чата ─────────────────────────────
+     Остаток до реплики — 6 (строка скрыта), после — 5 (строка видна). */
+  if (P2 && SESSION) {
+    const { ctx, page, errors } = await fresh({ path: '/catalog/problem/' + P2 + '/', panels: { rail: false, help: true } });
+    const box = {};
+    box.before = await page.evaluate(() => ({ hidden: document.querySelector('#sv-limit').hidden,
+                                             n: document.querySelector('#sv-remaining').textContent }));
+    await page.fill('#ai-text', 'Как решать?');
+    await page.click('#ai-send');
+    await page.waitForFunction(() => document.querySelector('#sv-remaining').textContent !== '6', null, { timeout: 15000 }).catch(() => {});
+    box.after = await page.evaluate(() => ({ hidden: document.querySelector('#sv-limit').hidden,
+                                            n: document.querySelector('#sv-remaining').textContent,
+                                            text: document.querySelector('#sv-limit').textContent }));
+    box.errors = errors;
+    out.limit = box;
+    await ctx.close();
+  }
 } catch (e) {
   out.error = String(e && e.stack || e);
 }

@@ -79,7 +79,8 @@
       <textarea id="ai-text" rows="1" placeholder="Вопрос по задаче или решению" aria-label="Вопрос ИИ или решение на проверку"></textarea>
       <button class="ai-send" type="button" id="ai-send" aria-label="Отправить">{% include '_icon.html' with name='arrow_up' %}</button>
     </div>
-    {% if ai_available %}<p class="sv-limit">проверка решения · осталось сегодня <b id="sv-remaining">{{ remaining }}</b></p>{% endif %}
+    {% comment %}Строка лимита (решение владельца 24.09.2026): счётчик общий на проверку и чат, видна при остатке ≤ limit_warn_at (`ai.core.LIMIT_WARN_AT`); после ответа число и видимость обновляет `stol_task.js`.{% endcomment %}
+    <p class="sv-limit" id="sv-limit"{% if remaining > limit_warn_at %} hidden{% endif %}>Запросов к ИИ на сегодня: осталось <b id="sv-remaining">{{ remaining }}</b></p>
     {% else %}
     <a class="btn btn--quiet btn--sm" href="/login/?next={{ request.path|urlencode }}">Войти, чтобы спросить</a>
     {% endif %}

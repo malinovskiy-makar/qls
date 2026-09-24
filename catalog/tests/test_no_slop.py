@@ -217,7 +217,7 @@ class NoAiKeyProblemPageTests(TestCase):
             resp = self.client.get('/catalog/problem/%d/' % problem.pk)
         self.assertEqual(resp.status_code, 200)
         html = resp.content.decode()
-        for absent in ('id="sv-submit"', 'id="sv-remaining"', 'осталось сегодня',
+        for absent in ('id="sv-submit"', 'id="sv-remaining"', 'Запросов к ИИ на сегодня',
                        'Спросить ИИ', 'id="ai-text"', 'id="chk-busy"', 'attemptUrl', 'chatUrl'):
             self.assertNotIn(absent, html)
         self.assertEqual(numbers_in(visible_text(html)) - {'0'}, set())

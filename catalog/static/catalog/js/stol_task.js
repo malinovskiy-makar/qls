@@ -472,6 +472,7 @@
         if (window.weco.track) weco.track('chat_send', { problem_id: t.cfg.problemId, mode: mode, has_file: uploaded.length > 0, files: uploaded.length, quote: !!q });
         var wait = typing();
         return post(t.cfg.chatUrl, payload).then(function (d) {
+          t.limit(d.error === 'limit' ? 0 : d.remaining);
           var reply = d.reply || d.message || 'Не получилось ответить, попробуйте ещё раз.';
           rich(wait, reply);
           t.reveal(wait);
@@ -503,6 +504,7 @@
                                         solution_viewed_before: !!t.solutionViewedBefore });
       }).then(function (d) {
         if (busyCard) busyCard.remove();
+        if (d.error === 'limit') t.limit(0);
         if (d.error) { bubble(false, d.message || 'Проверка не удалась, попробуйте ещё раз.'); return; }
         var old = t.$('chk-holder'); if (old) old.removeAttribute('id');
         var card = document.createElement('div');
@@ -512,8 +514,7 @@
         card.innerHTML = d.html;
         math(t.feed(card));
         t.submitted = true;
-        var rest = t.$('sv-remaining');
-        if (rest && d.remaining !== undefined) rest.textContent = d.remaining;
+        t.limit(d.remaining);
       }).catch(function (err) {
         if (busyCard) busyCard.remove();
         bubble(false, (err && err.message) || 'Не удалось отправить решение, попробуйте ещё раз.');
@@ -775,6 +776,14 @@
     t.$ = function (id) { return root.querySelector('#' + id); };
     t.say = function (text) { if (text && t.feed) { var p = document.createElement('p'); p.className = 'feed-card feed-err'; p.textContent = text; t.feed(p); } };
     t.step = function (what) { step(t, what); };
+    /* Строка лимита ИИ (решение владельца 24.09.2026): счётчик общий на чат и
+       проверку; видна, когда осталось не больше `limitWarnAt`. */
+    t.limit = function (n) {
+      var line = t.$('sv-limit'), num = t.$('sv-remaining');
+      if (!line || !num || n === undefined || n === null) return;
+      num.textContent = n;
+      line.hidden = n > t.cfg.limitWarnAt;
+    };
     cur = t;
     bindBar(t);
     bindHow(t);

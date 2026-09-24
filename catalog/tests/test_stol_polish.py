@@ -5,6 +5,7 @@
 фокус с панелями поверх; строки выдачи с метками у названия. Здесь — то, что
 видно по разметке сервера; поведение в браузере — `stol_polish_runner.mjs`.
 """
+import json
 import re
 
 from django.conf import settings
@@ -12,7 +13,8 @@ from django.core.cache import cache
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from problems.models import Hint
+from problems.ai import core
+from problems.models import AiUsageLog, Hint
 from problems.tests.factories import make_problem, make_topic, make_user
 
 TIP = ('История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, '
@@ -136,3 +138,77 @@ class FeedbackButtonHeightTests(TestCase):
         self.assertIn('padding: 0 10px;', rule)
         narrow = src.split('@media (max-width: 1420px)', 1)[1].split('\n}', 1)[0]
         self.assertIn('.fb-btn { padding: 0 7px; }', narrow)
+
+
+@override_settings(CATALOG_CHAT_PROVIDER='fake', AI_PROVIDER='fake', AI_GENERATOR_DAILY_LIMIT=30)
+class LimitLineTests(TestCase):
+    """Фаза 2: строка лимита ИИ только при остатке ≤ 5, честная подпись."""
+
+    def setUp(self):
+        cache.clear()
+        self.problem = make_problem('Монополист выбирает выпуск.', title='Выпуск монополиста')
+        self.user = make_user('polish_limit')
+        self.client.force_login(self.user)
+
+    def _spend(self, n):
+        AiUsageLog.objects.bulk_create([AiUsageLog(user=self.user, kind='catalog_chat',
+                                                   model_name='fake', ok=True) for _ in range(n)])
+
+    def _line(self):
+        panel = _help(_page(self.client, self.problem))
+        m = re.search(r'<p class="sv-limit" id="sv-limit"( hidden)?>(.*?)</p>', panel)
+        return m
+
+    def test_30_left_is_hidden(self):
+        m = self._line()
+        self.assertIsNotNone(m)
+        self.assertEqual(m.group(1), ' hidden')
+        self.assertEqual(m.group(2), 'Запросов к ИИ на сегодня: осталось <b id="sv-remaining">30</b>')
+
+    def test_5_left_is_shown(self):
+        self._spend(25)
+        m = self._line()
+        self.assertIsNone(m.group(1))
+        self.assertEqual(re.sub(r'<.*?>', '', m.group(2)), 'Запросов к ИИ на сегодня: осталось 5')
+
+    def test_6_left_is_still_hidden(self):
+        self._spend(24)
+        self.assertEqual(self._line().group(1), ' hidden')
+
+    def test_0_left_is_shown(self):
+        self._spend(30)
+        m = self._line()
+        self.assertIsNone(m.group(1))
+        self.assertIn('осталось <b id="sv-remaining">0</b>', m.group(2))
+
+    def test_counted_with_chat_only(self):
+        """Доступен только чат (модель проверки без ключа) — число всё равно верное."""
+        self._spend(27)
+        with self.settings(AI_PROVIDER='anthropic', ANTHROPIC_API_KEY=''):
+            m = self._line()
+        self.assertIsNotNone(m)
+        self.assertIsNone(m.group(1))
+        self.assertIn('осталось <b id="sv-remaining">3</b>', m.group(2))
+
+    def test_guest_has_no_line(self):
+        self.client.logout()
+        html = _page(self.client, self.problem)
+        self.assertNotIn('sv-limit', _help(html))
+        self.assertNotIn('Запросов к ИИ на сегодня', html)
+
+    def test_task_cfg_carries_the_one_threshold(self):
+        self.assertEqual(core.LIMIT_WARN_AT, 5)
+        html = _page(self.client, self.problem)
+        cfg = re.search(r'<script type="application/json" class="stol-cfg">(.*?)</script>', html, re.S)
+        self.assertEqual(json.loads(cfg.group(1))['limitWarnAt'], core.LIMIT_WARN_AT)
+
+    def test_chat_answer_carries_remaining(self):
+        """Контракт, на который опирается скрипт: ответ чата несёт остаток."""
+        self._spend(10)
+        with self.settings(AI_FAKE_REPLY=json.dumps({'reply': 'Начните с MR = MC.'}, ensure_ascii=False)):
+            resp = self.client.post(reverse('catalog:api_chat'),
+                                    json.dumps({'problem_id': self.problem.pk, 'message': 'Как решать?'}),
+                                    content_type='application/json')
+        data = resp.json()
+        self.assertIn('remaining', data)
+        self.assertEqual(data['remaining'], 30 - 10 - 1)

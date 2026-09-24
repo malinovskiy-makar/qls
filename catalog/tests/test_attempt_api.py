@@ -46,7 +46,8 @@ class AttemptApiTests(TestCase):
         self.client.force_login(self.user)
         html = self.client.get(self.page).content.decode()
         self.assertIn('data-mode="check" data-prompt="Проверь моё решение"', html)
-        self.assertIn('осталось сегодня <b id="sv-remaining">30</b>', html)
+        # Остаток 30 > 5 — строка есть, но скрыта (решение владельца 24.09.2026).
+        self.assertIn('id="sv-limit" hidden>Запросов к ИИ на сегодня: осталось <b id="sv-remaining">30</b>', html)
         self.assertIn('<template id="help-busy-tpl">', html)
         self.assertIn('"attemptUrl": "/catalog/api/attempt/"', html)
         with override_settings(AI_FAKE_REPLY=_reply()):
@@ -93,7 +94,7 @@ class AttemptApiTests(TestCase):
         self.assertEqual(data['message'], 'Лимит проверок на сегодня исчерпан: завтра снова 1')
         self.assertEqual(CatalogAttempt.objects.filter(status='checked').count(), 1)
         html = self.client.get(self.page).content.decode()
-        self.assertIn('осталось сегодня <b id="sv-remaining">0</b>', html)
+        self.assertIn('id="sv-limit">Запросов к ИИ на сегодня: осталось <b id="sv-remaining">0</b>', html)
 
     @override_settings(AI_PROVIDER='fake')
     def test_off_schema_reply_is_an_error_attempt_with_a_message(self):

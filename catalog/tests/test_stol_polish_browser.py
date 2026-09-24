@@ -17,7 +17,7 @@ from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.core.cache import cache
 from django.test import override_settings, tag
 
-from problems.models import Hint, ProblemPart
+from problems.models import AiUsageLog, Hint, ProblemPart
 from problems.tests.factories import make_problem, make_topic, make_user
 
 RUNNER = os.path.join(os.path.dirname(__file__), 'stol_polish_runner.mjs')
@@ -29,7 +29,8 @@ TIP = ('История чата в этой задаче сохраняется.
 # Chromium отдельным процессом node — внешние ресурсы, поделить их между
 # воркерами шага A нельзя.
 @tag('catalog', 'browser', 'serial')
-@override_settings(CATALOG_CHAT_PROVIDER='fake', AI_PROVIDER='fake')
+@override_settings(CATALOG_CHAT_PROVIDER='fake', AI_PROVIDER='fake', AI_GENERATOR_DAILY_LIMIT=30,
+                   AI_FAKE_REPLY=json.dumps({'reply': 'Начните с MR = MC.'}, ensure_ascii=False))
 class StolPolishBrowserTest(StaticLiveServerTestCase):
 
     def setUp(self):
@@ -44,7 +45,11 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
         Hint.objects.create(problem=self.problem, text='Подсказка: начните с MR = MC.', order=0)
         self.other = make_problem('Фирма на конкурентном рынке. $TC = Q^2$.', topic=self.topic,
                                   title='Конкурентная фирма', difficulty=2)
-        self.client.force_login(make_user('polish_browser_student'))
+        student = make_user('polish_browser_student')
+        # Остаток ИИ 6 из 30: строка лимита скрыта, после одной реплики — видна.
+        AiUsageLog.objects.bulk_create([AiUsageLog(user=student, kind='catalog_chat', model_name='fake', ok=True)
+                                        for _ in range(24)])
+        self.client.force_login(student)
         self.session = self.client.cookies['sessionid'].value
 
     def _run(self):
@@ -96,5 +101,14 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
         check(tip['expanded'] == 'true', 'ⓘ: aria-expanded не true при открытой подсказке')
         check(tip['escPop'] is False, 'ⓘ: Esc не закрыл подсказку')
         check(not tip['errors'], 'совет: ошибки страницы %s' % tip['errors'])
+
+        # Фаза 2: строка лимита — число и видимость после ответа чата.
+        lim = data['limit']
+        check(lim['before'] == {'hidden': True, 'n': '6'}, 'лимит до реплики: %s' % lim['before'])
+        check(lim['after']['hidden'] is False and lim['after']['n'] == '5',
+              'лимит после ответа чата не обновился: %s' % lim['after'])
+        check(lim['after']['text'] == 'Запросов к ИИ на сегодня: осталось 5',
+              'лимит: подпись %r' % lim['after']['text'])
+        check(not lim['errors'], 'лимит: ошибки страницы %s' % lim['errors'])
 
         self.assertEqual(problems, [], '\n'.join(problems))
