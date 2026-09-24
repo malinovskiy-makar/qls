@@ -48,6 +48,15 @@ CRAWLER_MARKERS = (
     'baiduspider', 'facebookexternalhit', 'meta-externalagent', 'seznambot',
     'dataforseobot', 'barkrowler', 'blexbot', 'serpstatbot',
     'crawler', 'spider',
+    # ⚠️ Шире с 24.09.2026 — защита в глубину для платного поиска; главный
+    # барьер теперь не здесь, а в `catalog/rerank_gate.py` (платит только
+    # скрипт страницы). `yandex` — все агенты Яндекса разом; `bot/` и `bot;`
+    # — общий хвост «ИмяBot/1.0» без перечисления каждого; клиенты
+    # HTTP-библиотек и безголовые браузеры человеком не бывают.
+    'yandex', 'telegram', 'vkshare', 'whatsapp', 'mail.ru', 'siteauditbot',
+    'claude-', 'perplexity', 'mistralai', 'bot/', 'bot;', 'headless',
+    'python', 'curl', 'wget', 'scrapy', 'go-http', 'okhttp', 'java/',
+    'axios', 'node-fetch', 'lighthouse', 'uptimerobot',
 )
 
 
@@ -57,13 +66,27 @@ def is_crawler(request):
     return bool(agent) and any(marker in agent for marker in CRAWLER_MARKERS)
 
 
+def is_rerank_bot(request):
+    """Не платить за этот запрос: краулер ИЛИ пустой User-Agent.
+
+    Пустой User-Agent ботом считается ТОЛЬКО здесь — для платного
+    переранжирования. Страницу он получает как все (`is_crawler` его ботом
+    не считает): так ведут себя и некоторые живые клиенты.
+    """
+    return not (request.META.get('HTTP_USER_AGENT') or '').strip() or is_crawler(request)
+
+
 # ── robots.txt ──────────────────────────────────────────────────────────────
 ROBOTS_TXT = '\n'.join([
     'User-agent: *',
-    # Выдача по строке поиска: платный ИИ-вызов на каждый переход.
-    'Disallow: /catalog/?q=*',
+    # Любой адрес каталога со строкой поиска: выдача, карта тем, случайная
+    # задача, страница задачи с `?q=` (24.09.2026 — раньше закрыт был только
+    # `/catalog/?q=`). `*?q=` покрывает и сам `/catalog/?q=`.
+    'Disallow: /catalog/*?q=',
     # То же, когда `q` идёт не первым параметром (фильтры + запрос).
     'Disallow: /catalog/*&q=',
+    # Эндпоинты для скриптов страницы: ботам там читать нечего.
+    'Disallow: /catalog/api/',
     # Попытки «Высшей пробы» — личные страницы человека (чужому 404), ботам там нечего
     # искать. `/vp/r/` НЕ закрыт намеренно: результат открывается по ссылке, и бот
     # обязан дойти до страницы, чтобы прочитать её `noindex` (закрытый адрес индекс

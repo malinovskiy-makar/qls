@@ -4,7 +4,7 @@
 import re
 from unittest import mock
 
-from django.test import RequestFactory, TestCase
+from django.test import RequestFactory, TestCase, override_settings
 from django.urls import reverse
 
 from catalog import seo
@@ -46,7 +46,9 @@ class RobotsTests(TestCase):
         self.assertTrue(response['Content-Type'].startswith('text/plain'))
         text = response.content.decode()
         self.assertIn('User-agent: *', text)
-        self.assertIn('Disallow: /catalog/?q=*', text)
+        self.assertIn('Disallow: /catalog/*?q=', text)
+        self.assertIn('Disallow: /catalog/*&q=', text)
+        self.assertIn('Disallow: /catalog/api/', text)
         self.assertIn('Sitemap: https://weconomics.ai/sitemap.xml', text)
         # Остальное разрешено: общего запрета быть не должно.
         self.assertNotIn('Disallow: /\n', text)
@@ -119,6 +121,15 @@ class BotsDoNotSpendTheBudgetTests(TestCase):
                                        {'q': 'монополист выбирает цену'}, **extra)
         return response, apply
 
+    @override_settings(SMART_SEARCH_RERANK=True)
+    def test_bot_gets_results_but_no_rerank_and_no_log_flag_on(self):
+        for agent in (GOOGLEBOT, GOOGLEOTHER, AMAZONBOT):
+            response, apply = self._search(agent)
+            self.assertEqual(response.status_code, 200, agent)
+            apply.assert_not_called()
+            self.assertEqual(response['X-Smart-Search'], 'bot')
+        self.assertEqual(SearchLog.objects.count(), 0)
+
     def test_bot_gets_results_but_no_rerank_and_no_log(self):
         for agent in (GOOGLEBOT, GOOGLEOTHER, AMAZONBOT):
             response, apply = self._search(agent)
@@ -128,9 +139,21 @@ class BotsDoNotSpendTheBudgetTests(TestCase):
             self.assertEqual(response['X-Smart-Search'], 'off')
         self.assertEqual(SearchLog.objects.count(), 0)
 
-    def test_person_still_reranks_and_is_logged(self):
+    @override_settings(SMART_SEARCH_RERANK=True)
+    def test_person_reranks_through_the_page_script_and_is_logged(self):
+        """С 24.09 полная загрузка не платит: сортировку просит скрипт."""
         response, apply = self._search(BROWSER)
         self.assertEqual(response.status_code, 200)
+        apply.assert_not_called()
+        self.assertEqual(response['X-Smart-Search'], 'deferred')
+        self.assertEqual(SearchLog.objects.count(), 0)
+        ids = [p.pk for p in self.problems]
+        self.client.cookies['weco_vid'] = '0f8fad5b-d9cb-469f-a165-70867728950e'
+        with mock.patch('catalog.views._search_ids', return_value=(ids, {}, False)), \
+                mock.patch('catalog.rerank.apply', return_value=(None, 'fallback')) as apply:
+            response = self.client.get(reverse('catalog:api_filter_state'),
+                                       {'q': 'монополист выбирает цену', 'log': '1'},
+                                       HTTP_USER_AGENT=BROWSER, HTTP_X_WECO_SEARCH='1')
         apply.assert_called_once()
         self.assertEqual(response['X-Smart-Search'], 'fallback')
         self.assertEqual(SearchLog.objects.count(), 1)

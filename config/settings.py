@@ -450,6 +450,24 @@ SMART_SEARCH_RERANK_LEGS = frozenset(
     os.environ.get('SMART_SEARCH_RERANK_LEGS', 'dense,bm25').split(',')
     if leg.strip())
 
+# ⚠️ КТО ПЛАТИТ ЗА ПЕРЕРАНЖИРОВАНИЕ (24.09.2026, ADR 0128,
+# `catalog/rerank_gate.py`). Платный вызов делает только запрос собственного
+# скрипта страницы; сверх того — суточные квоты РЕАЛЬНО оплаченных вызовов
+# (попадание в общий кэш не считается) по московским суткам. IP щедрее всех:
+# за одним адресом бывает целая школа. Сверх квоты — бесплатный порядок,
+# статус `quota`. Потолок $0,50 в сутки (`AI_DAILY_COST_CAPS`) не меняется.
+SMART_SEARCH_QUOTA_VISITOR = int(
+    os.environ.get('SMART_SEARCH_QUOTA_VISITOR', '40').strip() or 40)
+SMART_SEARCH_QUOTA_USER = int(
+    os.environ.get('SMART_SEARCH_QUOTA_USER', '80').strip() or 80)
+SMART_SEARCH_QUOTA_IP = int(
+    os.environ.get('SMART_SEARCH_QUOTA_IP', '150').strip() or 150)
+# Сколько живёт УСПЕШНЫЙ результат в общем кэше (Redis): повтор того же
+# запроса кем угодно в эти сутки — $0.
+SMART_SEARCH_RERANK_CACHE_SECONDS = int(
+    os.environ.get('SMART_SEARCH_RERANK_CACHE_SECONDS', str(24 * 3600)).strip()
+    or 24 * 3600)
+
 # Прогрев воркера gunicorn (`catalog/warmup.py`, `config/gunicorn_conf.py`):
 # корпус bm25 и смысловой индекс строятся в фоновом потоке сразу после
 # старта воркера, а не на первом поиске человека. Замер 15.09.2026 на

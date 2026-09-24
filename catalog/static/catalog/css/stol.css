@@ -188,6 +188,16 @@
 
 /* Скелет на время запроса: шесть строк (README §2). */
 .rail-skel { display: flex; align-items: center; gap: 14px; padding: 14px 10px; }
+/* Отложенный умный поиск (24.09.2026, ADR 0128): полная загрузка страницы не
+   платит за сортировку, и порядок «по словам» до ответа скрипта не показываем
+   — выдача одна, после ожидания (решение владельца 11.09). Без JS список
+   виден как есть: правило только для браузера со скриптами. */
+@media (scripting: enabled) {
+  .ct-results[data-search-deferred] .ct-count,
+  .ct-results[data-search-deferred] .ct-more,
+  .ct-results[data-search-deferred] .ct-empty,
+  .ct-results[data-search-deferred] #ct-rows > :not(.rail-skel) { visibility: hidden; }
+}
 .rail-skel i { display: block; height: 10px; border-radius: 6px; background: color-mix(in srgb, var(--text) 9%, transparent); }
 .rail-skel .k1 { width: 18px; height: 18px; border-radius: 50%; flex: none; }
 .rail-skel .k2 { flex: 1 1 auto; display: flex; flex-direction: column; gap: 8px; }

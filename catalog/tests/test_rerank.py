@@ -151,8 +151,12 @@ class ИнтеграцияСВьюТесты(_База):
             mock.patch.object(rerank, '_get_provider',
                               return_value=_FakeProvider(script)):
             self.client.force_login(self.сотрудник)
-            response = self.client.get(reverse('catalog:problem_list'),
-                                       {'q': 'монополия'})
+            # С 24.09 платит только запрос скрипта страницы (rerank_gate).
+            self.client.cookies['weco_vid'] = '0f8fad5b-d9cb-469f-a165-70867728950e'
+            response = self.client.get(reverse('catalog:api_filter_state'),
+                                       {'q': 'монополия'},
+                                       HTTP_USER_AGENT='Mozilla/5.0 Chrome/150',
+                                       HTTP_X_WECO_SEARCH='1')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['X-Smart-Search'], 'rerank')
 

@@ -86,7 +86,9 @@ class DegradedNoteTests(TestCase):
                 mock.patch('catalog.rerank.apply', return_value=apply_result):
             return self.client.get('/catalog/', {'q': 'налог'}).content.decode('utf-8')
 
+    @override_settings(SMART_SEARCH_RERANK=True)
     def test_rerank_on_words_pool_says_so(self):
+        """С 24.09 страница приходит `deferred`: сортировку попросит скрипт."""
         html = self._page(([self.problem.pk], 'rerank'))
         self.assertTrue(RERANK_TEXT in html)
         self.assertFalse(WORDS_TEXT in html)

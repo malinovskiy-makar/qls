@@ -11,7 +11,7 @@
 вся строка ссылка на задачу, кнопок в ней нет, процента близости нет, модалки
 «Условие» и вида «Галерея» больше нет (решения владельца 17.09.2026).
 {% endcomment %}
-<section class="ct-results" id="ct-results" data-total="{{ total }}"{% if searched %} data-search-status="{{ smart_search_status }}" data-search-total="{{ total }}"{% if degraded %} data-search-degraded{% endif %}{% if search_log_id %} data-search-log="{{ search_log_id }}"{% endif %}{% endif %}>
+<section class="ct-results" id="ct-results" data-total="{{ total }}"{% if searched %} data-search-status="{{ smart_search_status }}" data-search-total="{{ total }}"{% if smart_search_status == 'deferred' %} data-search-deferred{% endif %}{% if degraded %} data-search-degraded{% endif %}{% if search_log_id %} data-search-log="{{ search_log_id }}"{% endif %}{% endif %}>
   <div class="ct-count">
     {% if searched %}
       {% comment %}

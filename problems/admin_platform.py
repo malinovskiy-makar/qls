@@ -8,6 +8,7 @@
 from django.contrib import admin
 
 from .models_platform import (
+    AiUsageLog,
     AnswerDraft,
     AssignmentItem,
     ChatTurn,
@@ -263,6 +264,30 @@ class SearchLogAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(AiUsageLog)
+class AiUsageLogAdmin(admin.ModelAdmin):
+    """Расход на ИИ (24.09.2026): только чтение, по дате и виду работы.
+
+    Сколько за сутки ушло на умный поиск и дошло ли до потолка — здесь или
+    командой `rerank_spend`."""
+
+    list_display = ('created_at', 'kind', 'user', 'model_name', 'cost_usd',
+                    'input_tokens', 'output_tokens', 'ok', 'seconds')
+    list_filter = ('kind', 'ok', ('created_at', admin.DateFieldListFilter))
+    date_hierarchy = 'created_at'
+    search_fields = ('kind', 'model_name', 'note')
+    raw_id_fields = ('user',)
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
         return False
 
 

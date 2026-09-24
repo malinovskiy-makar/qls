@@ -102,7 +102,10 @@
       if (opts.log) { query += (query ? '&' : '') + 'log=1'; }
       var mine = ++seq;
       fetch(boot.urls.state + (query ? '?' + query : ''),
-            { signal: controller.signal, headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            /* `X-Weco-Search` — платить за умную сортировку может только
+               запрос нашего скрипта (catalog/rerank_gate.py, 24.09.2026). */
+            { signal: controller.signal,
+              headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Weco-Search': '1' } })
         .then(function (r) { if (!r.ok) { throw new Error('HTTP ' + r.status); } return r.json(); })
         .then(function (data) { if (mine === seq) { applyResponse(data); } })
         .catch(function (err) {

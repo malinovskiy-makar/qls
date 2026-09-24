@@ -450,7 +450,7 @@ def _numeric_query(query):
     return found_id, ('' if found_id else query)
 
 
-def _catalog_context(request, missing_id=''):
+def _catalog_context(request, missing_id='', paid=False):
     """Контекст каталога — ОДИН на страницу и на эндпоинт живого состояния.
 
     ⚠️ СТРАНИЦА И `api_filter_state` СОБИРАЮТСЯ ОДНИМ КОДОМ И РИСУЮТ ОДНИ
@@ -462,6 +462,10 @@ def _catalog_context(request, missing_id=''):
     ⚠️ ПРИ ПУСТОМ ЗАПРОСЕ СМЫСЛОВОЙ ПОИСК НЕ ТРОГАЕТСЯ ВООБЩЕ. Модель
     грузится лениво, первый раз около семи секунд. Каталог — главный вход,
     и секунды достались бы каждому, кто просто зашёл посмотреть банк.
+
+    `paid` — можно ли платить за переранжирование. Его ставит ТОЛЬКО
+    `api_filter_state` (запрос скрипта страницы); полная загрузка страницы не
+    платит никогда (24.09.2026, `catalog/rerank_gate.py`).
     """
     active = filters.parse(request.GET)
     query = active['q']
@@ -515,17 +519,28 @@ def _catalog_context(request, missing_id=''):
         # `ranked` (плотная нога пула — БЕЗ порога близости, в отличие от
         # базовой выдачи), поэтому активные фильтры накладываются здесь же
         # заново — тем же способом, что и на `ids` выше.
-        # ⚠️ КРАУЛЕРУ ПЛАТНОЕ ПЕРЕРАНЖИРОВАНИЕ НЕ ДОСТАЁТСЯ (19.09.2026).
-        # Amazonbot и Googlebot по адресам `?q=…` выбирали суточный потолок
-        # $0,50 к 9:18 утра, и живые ученики до конца суток получали поиск
-        # без переранжирования. Бот получает обычную выдачу, статус `off`.
+        # ⚠️ ПЛАТИТ ТОЛЬКО СКРИПТ СТРАНИЦЫ (24.09.2026, ADR 0128). 19.09
+        # краулерам закрыли переранжирование проверкой User-Agent, но её
+        # подделывает кто угодно. Теперь полная загрузка страницы не платит
+        # никогда: статус `deferred`, страница показывает «ищем…» и сама
+        # просит `api_filter_state` с заголовком `X-Weco-Search`. Там —
+        # кука посетителя, User-Agent, квоты и потолок (`rerank_gate`).
+        # Бот, который ходит по ссылкам без JS, заплатить не может.
         from . import rerank as smart_rerank
+        from . import rerank_gate
         rerank_started = time.perf_counter()
-        if seo.is_crawler(request):
+        if not smart_rerank.is_available(request.user):
             pool_order, smart_search_status = None, 'off'
+        elif not paid:
+            pool_order = None
+            smart_search_status = 'bot' if seo.is_crawler(request) else 'deferred'
         else:
-            pool_order, smart_search_status = smart_rerank.apply(
-                request.user, query)
+            refused = rerank_gate.refusal(request)
+            if refused:
+                pool_order, smart_search_status = None, refused
+            else:
+                pool_order, smart_search_status = smart_rerank.apply(
+                    request.user, query, request=request)
         search_seconds += time.perf_counter() - rerank_started
         smart_search_ms = int(round(search_seconds * 1000))
         if pool_order:
@@ -672,11 +687,15 @@ def problem_list(request):
     visitor, new_visitor = search_log.visitor_for(request)
     # Краулер в журнал поиска не пишется: 25 строк из 30 в первый день
     # журнала были от Amazonbot и Google, а не от людей.
-    context['search_log_id'] = (None if seo.is_crawler(request)
+    # ⚠️ ОТЛОЖЕННЫЙ ПОИСК (`deferred`) ЖУРНАЛ НЕ ПИШЕТ: строку запишет запрос
+    # скрипта (`log=1`) — уже с настоящим статусом. Куку посетителя ставим
+    # сразу: без неё запрос скрипта платить не сможет (`rerank_gate`).
+    deferred = context['smart_search_status'] == 'deferred'
+    context['search_log_id'] = (None if seo.is_crawler(request) or deferred
                                 else search_log.log_search(request, context, visitor))
     context.update(_seo_context(context))
     response = render(request, 'catalog/stol.html', context)
-    if new_visitor and context['search_log_id']:
+    if new_visitor and (context['search_log_id'] or deferred):
         search_log.remember_visitor(response, visitor)
     response['X-Smart-Search'] = context['smart_search_status']
     response['X-Smart-Search-Ms'] = str(context['smart_search_ms'])
@@ -723,7 +742,7 @@ def api_filter_state(request):
     страница поставит в строку браузера. Разметку рисуют те же партиалы,
     что и страница, — из того же контекста.
     """
-    context = _catalog_context(request)
+    context = _catalog_context(request, paid=True)
     # Журнал поиска — только по явной просьбе (`log=1`): иначе каждое
     # нажатие фильтра под тем же запросом было бы новой строкой.
     visitor, new_visitor = search_log.visitor_for(request)
@@ -1972,7 +1991,16 @@ def topic_map(request):
     context.update(_entry_context(request, context))
     context.update(map_ctx)
     context['view'] = 'map'
-    return render(request, 'catalog/stol.html', context)
+    # Выдача по строке поиска — `noindex` и здесь (24.09.2026): карта с `?q=`
+    # была единственным адресом поиска без запрета индекса.
+    if context['query']:
+        context['seo_noindex'] = True
+    response = render(request, 'catalog/stol.html', context)
+    visitor, new_visitor = search_log.visitor_for(request)
+    if (new_visitor and context['smart_search_status'] == 'deferred'):
+        search_log.remember_visitor(response, visitor)
+    response['X-Smart-Search'] = context['smart_search_status']
+    return response
 
 
 def topic_map_preview_demo(request):

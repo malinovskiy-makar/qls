@@ -138,7 +138,8 @@
     <span id="se-map-total" hidden>Карта тем: {{ map_stats.themes|spaceint }}&nbsp;{{ map_stats.themes|plural_ru:"тема,темы,тем" }}, {{ map_stats.tags|spaceint }}&nbsp;{{ map_stats.tags|plural_ru:"тег,тега,тегов" }}</span>
 
     {% if degraded %}
-    {% if smart_search_status == 'rerank' %}
+    {% comment %}`deferred` — сортировку сейчас попросит скрипт страницы (24.09.2026).{% endcomment %}
+    {% if smart_search_status == 'rerank' or smart_search_status == 'deferred' %}
     <div class="ct-note">Ищем по словам с умной сортировкой. Поиск по смыслу пока выключен,
       результаты могут быть беднее обычного.</div>
     {% else %}

@@ -198,7 +198,7 @@
     var more = e.target.closest('[data-more]');
     if (!more || !F) return;
     e.preventDefault();
-    fetch(stateUrl + more.search, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    fetch(stateUrl + more.search, { headers: { 'X-Requested-With': 'XMLHttpRequest', 'X-Weco-Search': '1' } })
       .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
       .then(function (data) { replaceResults(data.results_html); })
       .catch(function () { location.href = more.href; });
@@ -250,6 +250,14 @@
 
   syncField();
   if (F) paintChips(F.state);
+  /* Отложенный умный поиск (24.09.2026): страница пришла с `?q=`, но без
+     сортировки — полная загрузка за неё не платит. Просим её сразу, под
+     индикатором; строку журнала поиска пишет этот запрос (`log=1`). */
+  var pending = results();
+  if (F && pending && pending.hasAttribute('data-search-deferred')) {
+    busy(true);
+    F.refresh({ log: true });
+  }
   weco.stol.entry = { closeDropdowns: closeAll, map: function () { return bgMap; } };
 })();
 

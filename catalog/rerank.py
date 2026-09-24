@@ -698,14 +698,18 @@ def _score_pool(query, pool_ids, rows, timeout):
         # пользователя дольше заявленного таймаута; поток доработает и
         # тихо отдаст результат в никуда.
         executor.shutdown(wait=False, cancel_futures=True)
+        # ОДНА строка расхода на поисковый запрос — здесь, в потоке запроса.
+        # ⚠️ ПИШЕТСЯ И ПРИ ПОЛОМКЕ (24.09.2026). Раньше строка писалась,
+        # только если ответили ВСЕ пачки: одна упала по таймауту — и деньги
+        # за остальные в потолок не попадали. Записываем фактически
+        # потраченное: ответившие пачки поставщик уже выставил.
+        if usages:
+            core.record_usage(USAGE_KIND, provider.name, model, usages,
+                              time.perf_counter() - pool_started)
 
     if len(chunks) != len(batches):
         raise TimeoutError('обработаны не все пачки (%d из %d)'
                            % (len(chunks), len(batches)))
-
-    # ОДНА строка расхода на поисковый запрос — здесь, в потоке запроса.
-    core.record_usage(USAGE_KIND, provider.name, model, usages,
-                      time.perf_counter() - pool_started)
 
     ranked = merge(chunks, all_ids=pool_ids)
     scores = {}
@@ -718,15 +722,46 @@ def _score_pool(query, pool_ids, rows, timeout):
     return ranked, usage, scores
 
 
-# ─── Кэш результата (час по нормализованному тексту запроса) ──────────────
-
-_CACHE_TTL_SECONDS = 3600
-_cache_lock = threading.Lock()
-_cache = {}
+# ─── Кэш результата: общий на все воркеры, только удачи ─────────────────
+#
+# ⚠️ ОБЩИЙ КЭШ В REDIS ВМЕСТО СЛОВАРЯ В ПАМЯТИ ВОРКЕРА (24.09.2026).
+# Словарь был у каждого воркера свой: один и тот же запрос оплачивался до
+# четырёх раз, кэш умирал вместе с воркером (перезапуск каждые 1000
+# запросов), и в нём лежали даже НЕУДАЧИ — один таймаут оставлял запрос без
+# переранжирования на час. Теперь: кэш Django (на бою Redis, база 0),
+# только успешные результаты, сутки. Ключ — хэш нормализованного запроса и
+# всего, что меняет пул: ноги, глубина, потолок, пачка, модель и версия
+# смыслового индекса (`semantic:index_version`).
 
 
 def _normalize_query(query):
     return ' '.join((query or '').strip().lower().split())
+
+
+def _cache_key(query):
+    from django.conf import settings
+
+    parts = [
+        _normalize_query(query),
+        ','.join(sorted(settings.SMART_SEARCH_RERANK_LEGS)),
+        str(settings.SMART_SEARCH_RERANK_LEG_DEPTH),
+        str(settings.SMART_SEARCH_RERANK_POOL_CAP),
+        str(settings.SMART_SEARCH_RERANK_BATCH_SIZE),
+        settings.SMART_SEARCH_RERANK_MODEL,
+        str(cache.get('semantic:index_version') or ''),
+    ]
+    digest = hashlib.sha256('\x1f'.join(parts).encode('utf-8')).hexdigest()
+    return 'rerank:v2:' + digest
+
+
+def _cached(query):
+    """Сохранённый успешный результат этого запроса или None."""
+    stored = cache.get(_cache_key(query))
+    if not stored:
+        return None
+    return RerankResult(stored['ids'], 'rerank', leg_sizes=stored['leg_sizes'],
+                        batches=stored['batches'],
+                        model_seconds=stored['model_seconds'], cache_hit=True)
 
 
 class RerankResult:
@@ -797,49 +832,63 @@ def _run(query):
 
 
 def rerank(query):
-    """Пул → модель → порядок пула, с кэшем на час по тексту запроса.
+    """Пул → модель → порядок пула, с общим кэшем удачных результатов.
 
     Никогда не бросает исключение наружу. На фолбэке `.ids` пуст —
     решение, что делать дальше, принимает `apply()`.
     """
-    key = _normalize_query(query)
-    now = time.time()
-    with _cache_lock:
-        cached = _cache.get(key)
-    if cached is not None and cached['expires'] > now:
-        source = cached['result']
-        result = RerankResult(
-            source.ids, source.status, reason=source.reason,
-            leg_sizes=source.leg_sizes, batches=source.batches,
-            model_seconds=source.model_seconds, total_seconds=0.0,
-            cost_usd=0.0, cache_hit=True)
-        _log(query, result)
-        return result
+    from django.conf import settings
+
+    cached = _cached(query)
+    if cached is not None:
+        _log(query, cached)
+        return cached
 
     result = _run(query)
-    with _cache_lock:
-        _cache[key] = {'result': result, 'expires': now + _CACHE_TTL_SECONDS}
+    if result.status == 'rerank' and result.ids:
+        cache.set(_cache_key(query), {
+            'ids': list(result.ids), 'leg_sizes': result.leg_sizes,
+            'batches': result.batches, 'model_seconds': result.model_seconds,
+        }, settings.SMART_SEARCH_RERANK_CACHE_SECONDS)
     _log(query, result)
     return result
 
 
 def clear_cache():
-    """Сбросить кэш результатов — для тестов."""
-    with _cache_lock:
-        _cache.clear()
+    """Сбросить кэш результатов — для тестов и замеров (кэш Django целиком)."""
+    cache.clear()
 
 
-def apply(user, query):
+def apply(user, query, request=None):
     """Точка входа для `catalog/views.py`.
 
     Возвращает `(порядок пула или None, статус для заголовка
     X-Smart-Search)`. `None` значит «ничего не менять» — вызывающая
     сторона идёт прежним путём один в один, поэтому фолбэк побайтово
     совпадает со старым поведением, а не просто похож на него.
+
+    ⚠️ ПОРЯДОК (24.09.2026, `catalog/rerank_gate.py`): общий кэш — бесплатно
+    и первым; потом квоты запроса (`quota`) и денежный потолок (`budget`);
+    только потом платный вызов, и он засчитывается в квоты. `request=None`
+    (офлайн-замеры, команды) — без квот.
     """
+    from . import rerank_gate
+
     if not is_available(user):
         return None, 'off'
+    cached = _cached(query)
+    if cached is not None:
+        _log(query, cached)
+        return cached.ids, 'rerank'
+    if request is not None and rerank_gate.over_quota(request):
+        return None, 'quota'
+    refused = rerank_gate.budget_refusal()
+    if refused:
+        return None, refused
     result = rerank(query)
+    if (request is not None and not result.cache_hit
+            and result.reason != 'пустой пул'):
+        rerank_gate.note_paid(request)
     if result.status != 'rerank':
         return None, result.status
     return result.ids, result.status
