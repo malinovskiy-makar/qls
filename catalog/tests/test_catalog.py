@@ -142,9 +142,11 @@ class ProblemDetailTests(TestCase):
             'Условие с решением в несколько абзацев.',
             solution=('Первый абзац решения.\n\n'
                       'Второй абзац <script>alert(1)</script> с нагрузкой.'))
-        resp = self.client.get(
-            reverse('catalog:problem_detail', args=[p.pk]))
-        html = resp.content.decode()
+        # С 24.09 решение — запросом вошедшего (ADR 0129), тем же партиалом.
+        from problems.tests.factories import make_user
+        self.client.force_login(make_user('linebreaks_reader'))
+        html = self.client.post(reverse('catalog:api_solution', args=[p.pk]), '{}',
+                                content_type='application/json').json()['html']
         self.assertIn('Первый абзац решения.<br><br>Второй абзац', html)
         self.assertNotIn('<script>alert(1)</script>', html)
         self.assertIn('&lt;script&gt;alert(1)&lt;/script&gt;', html)

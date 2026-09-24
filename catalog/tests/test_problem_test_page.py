@@ -36,8 +36,12 @@ class TestPageTests(TestCase):
         centre = main.split('id="stol-help"')[0]
         self.assertEqual(centre.count('Показать ответ'), 1)
         self.assertIn('data-step="reveal"', main.split('id="stol-help"')[1])
-        self.assertIn('Почему так', main)
-        self.assertIn('каждому своя цена', main)
+        # «Почему так» — решение теста: гостю его нет, вошедшему есть (ADR 0129).
+        self.assertNotIn('id="expl"', main)
+        self.client.force_login(make_user('tiles_reader'))
+        signed = self.client.get(self.url).content.decode().split('<main')[1]
+        self.assertIn('Почему так', signed)
+        self.assertIn('каждому своя цена', signed)
         for absent in ('id="sol-btn"', 'id="sv"', 'id="sv-text"', 'id="sol-confirm"',
                        '<ol class="parts">', 'id="chk-holder"', 'Ещё тест по этой теме',
                        'Спросить ИИ, почему так', 'решают верно'):
