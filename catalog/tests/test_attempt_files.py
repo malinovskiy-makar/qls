@@ -54,6 +54,20 @@ class AttemptFileTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(json.loads(resp.content)['message'], attachments.TOO_BIG)
 
+    def test_empty_pending_does_not_escape_the_daily_limit(self):
+        """Суточный потолок по базе, а не по списку клиента (24.09.2026)."""
+        for number in range(attachments.UPLOADS_PER_DAY):
+            FileAsset.objects.create(file='x%d.png' % number, uploaded_by=self.user,
+                                     kind=FileAsset.Kind.STUDENT_WORK)
+        resp = self._upload(_png(), pending='')
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(json.loads(resp.content)['message'], attachments.TOO_MANY_TODAY)
+        self.assertEqual(FileAsset.objects.filter(uploaded_by=self.user).count(),
+                         attachments.UPLOADS_PER_DAY)
+        # Чужие загрузки не считаются.
+        self.client.force_login(self.other)
+        self.assertEqual(self._upload(_png()).status_code, 200)
+
     def test_fourth_file_is_400(self):
         ids = []
         for _ in range(3):

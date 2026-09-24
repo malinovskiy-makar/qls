@@ -1058,6 +1058,9 @@ def api_attempt_file(request):
     pending = [x for x in (request.POST.get('pending') or '').split(',') if x.strip().isdigit()]
     if len(pending) >= attachments.MAX_FILES:
         return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY}, status=400)
+    if attachments.uploads_today(request.user) >= attachments.UPLOADS_PER_DAY:
+        return JsonResponse({'error': 'many', 'message': attachments.TOO_MANY_TODAY},
+                            status=429)
     uploaded = request.FILES.get('file')
     media_type, error = attachments.validate_upload(uploaded)
     if error:

@@ -27,6 +27,25 @@ ALLOWED = {'jpg': 'image/jpeg', 'jpeg': 'image/jpeg', 'png': 'image/png',
 TOO_BIG = 'Файл больше 10 МБ: сожмите фото или пришлите его частями.'
 WRONG_TYPE = 'Подойдёт фото (JPG, PNG, WebP) или PDF.'
 TOO_MANY = 'Не больше трёх файлов на попытку.'
+# ⚠️ СУТОЧНЫЙ ПОТОЛОК ЗАГРУЗОК НА ЧЕЛОВЕКА (24.09.2026). «Три на попытку»
+# сервер проверял по списку `pending`, который присылает сам клиент: пустой
+# список — и можно лить файлы по 10 МБ без конца. Считаем по базе, как у
+# вложений чата (`catalog.chat.UPLOADS_PER_DAY`).
+UPLOADS_PER_DAY = 30
+TOO_MANY_TODAY = 'На сегодня файлов достаточно: загрузить новые можно завтра.'
+
+
+def uploads_today(user):
+    """Сколько файлов к попыткам человек загрузил с начала суток."""
+    from django.utils import timezone
+
+    from problems.models import FileAsset
+
+    start = timezone.localtime(timezone.now()).replace(
+        hour=0, minute=0, second=0, microsecond=0)
+    return FileAsset.objects.filter(uploaded_by=user,
+                                    kind=FileAsset.Kind.STUDENT_WORK,
+                                    created_at__gte=start).count()
 
 OCR_SCHEMA = {
     'type': 'object',
