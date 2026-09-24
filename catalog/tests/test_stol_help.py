@@ -60,7 +60,9 @@ class HelpPanelTests(TestCase):
                                    statement='Найдите цену.', answer='$p = 10$')
         html = self._page()
         self.assertIn('data-step="part"', _help(html))
-        self.assertIn('Ответ к пункту а)', html)
+        # Сам ответ — запросом (24.09.2026, ADR 0129), в разметке только выбор пункта.
+        self.assertIn('<template id="help-parts-tpl">', html)
+        self.assertNotIn('$p = 10$', html)
 
     def test_reload_restores_opened_hints_and_the_solution(self):
         ProblemProgress.objects.create(user=self.student, problem=self.problem, status='opened',
@@ -124,6 +126,8 @@ class TestExplanationTests(TestCase):
             ProblemPart.objects.create(problem=self.test, label=label, order=i, statement=text)
 
     def test_why_has_no_repeat_and_no_score_on_the_live_example(self):
+        # «Почему так» — решение теста: только вошедшему (ADR 0129).
+        self.client.force_login(make_user('why_reader'))
         html = self.client.get(reverse('catalog:problem_detail', args=[self.test.pk])).content.decode()
         why = html[html.index('id="expl"'):]
         why = why[:why.index('</section>')]

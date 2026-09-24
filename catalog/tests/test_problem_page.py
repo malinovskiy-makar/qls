@@ -95,20 +95,28 @@ class ProblemPageTests(TestCase):
         self.assertIn('class="pp pp--topic"', html)
 
     def test_answer_and_solution_are_separate(self):
-        html = self.client.get(_url(self.p_named)).content.decode()
+        # С 24.09 решение — запросом вошедшего (ADR 0129), не в разметке.
+        self.client.force_login(make_user('sol_separate'))
+
+        def sol(problem):
+            return self.client.post(reverse('catalog:api_solution', args=[problem.pk]), '{}',
+                                    content_type='application/json').json()['html']
+
+        html = sol(self.p_named)
         self.assertIn('Ответ: <b class="math-content">1800</b>', html)
         self.assertNotIn('class="sol-body"', html)
         self.assertIn('<h3>Ответ</h3>', html)
-        html = self.client.get(_url(self.p_cut)).content.decode()
+        html = sol(self.p_cut)
         self.assertIn('<h3>Решение</h3>', html)
         self.assertIn('Полное решение задачи длиннее тридцати знаков.', html)
         self.assertIn('Ответ: <b class="math-content">42</b>', html)
-        html = self.client.get(_url(self.p_review)).content.decode()
+        html = sol(self.p_review)
         self.assertNotIn('ещё не проверено человеком', html)
         self.assertIn('Ответ: <b class="math-content">7</b>', html)
         self.assertNotIn('id="sol-btn"', self.client.get(_url(self.p_bare)).content.decode())
 
     def test_solution_needs_soft_confirmation_before_reveal(self):
+        self.client.force_login(make_user('sol_confirm'))
         html = self.client.get(_url(self.p_named)).content.decode()
         # С S3 (18.09.2026) подтверждение — карточка ленты помощи из шаблона.
         self.assertIn('<template id="help-confirm-tpl">', html)

@@ -1035,13 +1035,54 @@ def api_test_check(request, problem_id):
 
 @require_POST
 def api_test_reveal(request, problem_id):
-    """Показать ответ: верные метки; счётчик попыток сбрасывается."""
+    """Показать ответ: верные метки; счётчик попыток сбрасывается.
+
+    ⚠️ Только вошедшему (24.09.2026, ADR 0129): верный вариант — это ответ.
+    Гость проверяет свой выбор («верно / не то»), но правильный вариант не
+    получает; интерфейс показывает ему приглашение к регистрации.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=403)
     problem, game, error = _test_game_or_400(problem_id)
     if error:
         return error
     testplay.reset_attempts(request.session, problem.pk)
     progress.note_test_revealed(request.user, problem)
     return JsonResponse({'correct_labels': sorted(game['correct'])})
+
+
+@require_POST
+def api_solution(request, problem_id):
+    """Полное решение или ответ к одному пункту — только вошедшему (ADR 0129).
+
+    Тело JSON: пусто — полное решение (карточка `_help_solution.html`);
+    `{"part": n}` — ответ к n-му пункту из тех, у которых ответ заполнен
+    (порядок — как у кнопок «Ответ к какому пункту»). Ответ — `{html}`:
+    разметку рисует сервер теми же партиалами, что рисовали её раньше
+    внутри страницы. Гостю — 403: интерфейс показывает приглашение.
+    """
+    if not request.user.is_authenticated:
+        return JsonResponse({'error': 'login'}, status=403)
+    problem = _visible_problem(problem_id)
+    parts = list(problem.parts.all())
+    data = _json_body(request)
+    part = data.get('part') if isinstance(data, dict) else None
+    if part is None:
+        sol = _solution_block(problem, parts)
+        if not sol['has_any']:
+            return JsonResponse({'error': 'none'}, status=404)
+        html = render_to_string('catalog/stol/_help_solution.html',
+                                {'sol': sol, 'problem': problem}, request=request)
+        return JsonResponse({'html': html})
+    answers = [p for p in parts if (p.answer or '').strip()]
+    try:
+        chosen = answers[int(part)]
+    except (TypeError, ValueError, IndexError):
+        return JsonResponse({'error': 'part'}, status=400)
+    html = render_to_string('catalog/stol/_help_part_answer.html',
+                            {'p': chosen, 'index': int(part), 'problem': problem},
+                            request=request)
+    return JsonResponse({'html': html})
 
 
 @require_POST
@@ -1405,6 +1446,12 @@ def _problem_context(request, problem):
     if hint_total:
         cfg['hintUrl'] = reverse('catalog:api_hint', args=[problem.pk, 1])[:-2]
         cfg['hintTotal'] = hint_total
+    # Решение и ответы — запросом и только вошедшему (ADR 0129); гостю вместо
+    # них приглашение (`help-invite-tpl`).
+    if request.user.is_authenticated:
+        cfg['solutionUrl'] = reverse('catalog:api_solution', args=[problem.pk])
+    else:
+        cfg['guest'] = True
     if ai_available:
         cfg['attemptUrl'] = reverse('catalog:api_attempt')
         if request.user.is_authenticated:
@@ -1475,6 +1522,11 @@ def _problem_context(request, problem):
         'next_hint':    opened + 1,
         'solution_viewed': bool(my_progress and my_progress.solution_viewed and sol['has_any']),
         'part_answers': part_answers,
+        # Приглашение гостю: вход и регистрация с возвратом на эту задачу.
+        'login_next_url': '%s?%s' % (reverse('login'), urlencode(
+            {'next': reverse('catalog:problem_detail', args=[problem.pk])})),
+        'register_next_url': '%s?%s' % (reverse('register'), urlencode(
+            {'next': reverse('catalog:problem_detail', args=[problem.pk])})),
         # Лестница пуста, только пока человек ничем не пользовался.
         'help_used':    bool(opened or (my_progress and my_progress.solution_viewed) or last_attempt),
         'teacher_assignments': _teacher_assignments(request), 'is_tutor': _is_tutor(request.user),

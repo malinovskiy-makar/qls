@@ -95,13 +95,22 @@
 
 {% comment %}Шаблоны для сценария (`stol_task.js`): разметка наша, данные — через textContent.{% endcomment %}
 <template id="help-hint-tpl">{% include "catalog/stol/_help_hint.html" with h=None %}</template>
+{% comment %}
+⚠️ РЕШЕНИЯ И ОТВЕТОВ В РАЗМЕТКЕ НЕТ (24.09.2026, решение владельца, ADR 0129).
+Раньше полное решение и ответы к пунктам лежали здесь `<template>` у каждого,
+включая гостя: страница задачи отдавала весь банк решений любому, кто умеет
+читать HTML. Теперь вошедший получает их запросом `POST /catalog/api/solution/`
+после «Открыть», гость — карточку-приглашение к регистрации.
+{% endcomment %}
+{% if user.is_authenticated %}
 {% if sol.has_any and not test %}
 <template id="help-confirm-tpl"><div class="feed-card feed-confirm"><p>Открыть полное решение? В статистике задача будет отмечена как «посмотрел решение».</p><div class="feed-row"><button type="button" class="btn btn--main btn--sm" data-confirm="yes">Открыть</button><button type="button" class="btn btn--quiet btn--sm" data-confirm="no">Ещё подумаю</button></div></div></template>
-{% if not solution_viewed %}<template id="help-sol-tpl">{% include "catalog/stol/_help_solution.html" %}</template>{% endif %}
 {% endif %}
 {% if part_answers %}
 <template id="help-parts-tpl"><div class="feed-card feed-parts"><p class="feed-k-l">Ответ к какому пункту показать?</p><div class="feed-row">{% for p in part_answers %}<button type="button" class="btn btn--quiet btn--sm" data-part="{{ forloop.counter0 }}">{{ p.label|partlabel }}</button>{% endfor %}</div></div></template>
-<template id="help-part-answers-tpl">{% for p in part_answers %}<div class="feed-card feed-part" data-part="{{ forloop.counter0 }}"><div class="feed-k"><span class="feed-k-l">Ответ к пункту {{ p.label|partlabel }}</span></div><div class="feed-t math-content">{% include "catalog/_math_text.html" with text=p.answer %}</div></div>{% endfor %}</template>
+{% endif %}
+{% elif sol.has_any or part_answers or test %}
+<template id="help-invite-tpl"><div class="feed-card feed-confirm feed-invite"><p><b>Решение и ответы открываются после короткой бесплатной регистрации</b><br>Логин и пароль, без почты.</p><div class="feed-row"><a class="btn btn--main btn--sm" href="{{ register_next_url }}">Зарегистрироваться</a><a class="btn btn--quiet btn--sm" href="{{ login_next_url }}">Войти</a></div></div></template>
 {% endif %}
 {% if ai_available and user.is_authenticated %}
 <template id="help-busy-tpl"><div class="feed-card chk chk--wait is-on"><div class="chk-busy"><div class="line"><span class="spin" aria-hidden="true"></span>Проверяю решение: обычно 10–20 секунд</div><div class="bar" aria-hidden="true"><i></i></div><small>Сверяю с эталоном по шагам. Можно пока перечитать условие.</small></div></div></template>

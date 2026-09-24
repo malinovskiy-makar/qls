@@ -31,6 +31,8 @@ urlpatterns = [
     path('api/rail/saved/',                     views.api_rail_saved,     name='api_rail_saved'),
     # «Как прошло?» и следы помощи (каталог «Стол», ADR 0119).
     path('api/progress/<int:problem_id>/',      views.api_progress,       name='api_progress'),
+    # Решение и ответ к пункту — только вошедшему, POST (ADR 0129).
+    path('api/solution/<int:problem_id>/',      views.api_solution,       name='api_solution'),
     path('api/chat/history/<int:problem_id>/',  views.api_chat_history,   name='api_chat_history'),
     # Третья файловая вьюха: только владельцу или сотруднику (ADR 0118).
     path('chat/attachment/<int:pk>/',            chat_files.chat_attachment, name='chat_attachment'),

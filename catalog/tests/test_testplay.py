@@ -102,10 +102,17 @@ class TestCheckApiTests(TestCase):
         self.assertEqual(CatalogAttempt.objects.count(), 0)
 
     def test_reveal_gives_labels_and_resets(self):
+        # С 24.09 верный вариант — только вошедшему (ADR 0129).
+        self.client.force_login(make_user('reveal_user'))
         self._check(['в']); self._check(['г'])
         resp = self.client.post(self.reveal_url)
         self.assertEqual(json.loads(resp.content), {'correct_labels': ['а', 'б']})
         self.assertEqual(self._check(['г'])[1]['attempt'], 1)
+
+    def test_guest_gets_no_correct_labels(self):
+        resp = self.client.post(self.reveal_url)
+        self.assertEqual(resp.status_code, 403)
+        self.assertNotIn('correct_labels', json.loads(resp.content))
 
     def test_bad_requests(self):
         self.assertEqual(self._check([])[0], 400)

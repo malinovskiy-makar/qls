@@ -44,7 +44,8 @@
     <button class="quick-link" type="button" id="again-btn">Пройти заново</button>
   </div>
 </section>
-{% if test.expl %}
+{% comment %}«Почему так» — это решение теста: гостю его в разметке нет (24.09.2026).{% endcomment %}
+{% if test.expl and user.is_authenticated %}
 <section class="tq-expl" id="expl" aria-label="Почему так">
   <div class="h">Почему так</div>
   <div class="b math-content">{% include "catalog/_math_text.html" with text=test.expl %}</div>

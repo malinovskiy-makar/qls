@@ -55,6 +55,13 @@
     var t = root.querySelector('#' + id);
     return t ? t.content.firstElementChild.cloneNode(true) : null;
   }
+  /* Карточка из разметки СЕРВЕРА (решение, ответ к пункту — ADR 0129): её
+     рисуют наши партиалы с экранированием, как при загрузке страницы. */
+  function fromHtml(html) {
+    var box = document.createElement('template');
+    box.innerHTML = String(html || '').trim();
+    return box.content.firstElementChild;
+  }
 
   /* ── Ответ ИИ: лёгкая разметка узлами ─────────────────────────────────
      Сначала «экранирование» — текст кладётся только через textContent; потом
@@ -228,8 +235,18 @@
     };
     if (hintBtn && once(hintBtn)) hintBtn.addEventListener('click', t.askHint);
 
-    /* Решение: сначала подтверждение карточкой, потом само решение (README §4). */
+    /* Гостю вместо решения и ответов — приглашение к регистрации (ADR 0129). */
+    t.invite = function () {
+      var shown = feed.querySelector('.feed-invite');
+      if (shown) { t.reveal(shown); return; }
+      var card = tpl(t.root, 'help-invite-tpl');
+      if (card) t.feed(card);
+    };
+
+    /* Решение: сначала подтверждение карточкой, потом само решение (README §4).
+       Решения в разметке нет: оно приходит запросом после «Открыть». */
     t.askSolution = function () {
+      if (t.cfg.guest) { t.invite(); return; }
       if (t.solutionShown) { var s = feed.querySelector('.feed-sol'); t.reveal(s); return; }
       if (feed.querySelector('.feed-confirm')) return;
       var box = tpl(t.root, 'help-confirm-tpl');
@@ -237,22 +254,29 @@
       t.feed(box);
       box.querySelector('[data-confirm="yes"]').addEventListener('click', function () {
         box.remove();
-        var sol = tpl(t.root, 'help-sol-tpl');
-        if (!sol) return;
-        math(t.feed(sol));
-        t.solutionShown = true;
-        t.solutionViewedBefore = !t.submitted;
-        var solBtn = t.$('sol-btn'); if (solBtn) solBtn.hidden = true;
-        progress(t, { solution_viewed: true });
-        var self = t.$('how') && t.$('how').querySelector('[data-how="self"]');
-        if (self) { self.disabled = true; self.title = 'Решение уже открыто'; }
-        paintUsed();
+        post(t.cfg.solutionUrl, {}).then(function (d) {
+          var sol = d && d.html ? fromHtml(d.html) : null;
+          if (!sol) { t.say('Не удалось открыть решение, попробуйте ещё раз.'); return; }
+          shownSolution(sol);
+        }).catch(function () { t.say('Не удалось открыть решение, попробуйте ещё раз.'); });
       });
       box.querySelector('[data-confirm="no"]').addEventListener('click', function () { box.remove(); });
     };
+    function shownSolution(sol) {
+      math(t.feed(sol));
+      t.solutionShown = true;
+      t.solutionViewedBefore = !t.submitted;
+      var solBtn = t.$('sol-btn'); if (solBtn) solBtn.hidden = true;
+      progress(t, { solution_viewed: true });
+      var self = t.$('how') && t.$('how').querySelector('[data-how="self"]');
+      if (self) { self.disabled = true; self.title = 'Решение уже открыто'; }
+      paintUsed();
+    }
 
-    /* Ответ по одному пункту — только при ответах в данных (решение 17.09). */
+    /* Ответ по одному пункту — только при ответах в данных (решение 17.09).
+       Ответ приходит запросом, гостю — приглашение (ADR 0129). */
     t.askPart = function () {
+      if (t.cfg.guest) { t.invite(); return; }
       if (feed.querySelector('.feed-parts')) return;
       var box = tpl(t.root, 'help-parts-tpl');
       if (!box) return;
@@ -260,10 +284,11 @@
       box.addEventListener('click', function (e) {
         var b = e.target.closest('[data-part]');
         if (!b) return;
-        var all = t.root.querySelector('#help-part-answers-tpl').content;
-        var card = all.querySelector('[data-part="' + b.getAttribute('data-part') + '"]');
-        if (card) math(t.feed(card.cloneNode(true)));
         box.remove();
+        post(t.cfg.solutionUrl, { part: Number(b.getAttribute('data-part')) }).then(function (d) {
+          var card = d && d.html ? fromHtml(d.html) : null;
+          if (card) math(t.feed(card)); else t.say('Не удалось открыть ответ, попробуйте ещё раз.');
+        }).catch(function () { t.say('Не удалось открыть ответ, попробуйте ещё раз.'); });
       });
     };
 
@@ -598,6 +623,12 @@
     }
     function reveal() {
       if (isDone() || busy) return;
+      /* Верный вариант — это ответ: гостю приглашение (ADR 0129). */
+      if (t.cfg.guest) {
+        if (window.weco.stol && weco.stol.openPanel) weco.stol.openPanel('help');
+        if (t.invite) t.invite();
+        return;
+      }
       busy = true;
       post(tcfg.revealUrl, {})
         .then(function (d) {
