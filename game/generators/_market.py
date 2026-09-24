@@ -100,23 +100,3 @@ def setup_short(params, solved=None):
 def setup_short_bare(params, solved=None):
     return u'Спрос: {}, предложение: {} ($P$ в ден. ед., $Q$ в шт.).'.format(
         demand_eq(params), supply_eq(params))
-
-
-def eq_solution_steps(params, p_star, q_star, with_q=True):
-    """Общие шаги «найти равновесие» для решений архетипов Блока А."""
-    from .base import linear_rhs
-    steps = [
-        u'В равновесии $Q_d = Q_s$: ${} = {}$.'.format(
-            linear_rhs(params['a'], -F(params['b'])),
-            linear_rhs(params['c'], F(params['d']))),
-        u'Отсюда $P^* = {}$ ден. ед.'.format(fmt_num(p_star, latex=True)),
-    ]
-    if with_q:
-        b = F(params['b'])
-        b_part = fmt_num(p_star, latex=True) if b == 1 else \
-            u'{} \\cdot {}'.format(fmt_num(b, latex=True),
-                                   fmt_num(p_star, latex=True))
-        steps.append(u'Подставим в спрос: $Q^* = {} - {} = {}$ шт.'.format(
-            fmt_num(params['a'], latex=True), b_part,
-            fmt_num(q_star, latex=True)))
-    return steps

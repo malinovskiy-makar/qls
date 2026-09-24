@@ -62,14 +62,6 @@ def character_options(pool_counts=None):
     return []
 
 
-def visible_groups(**counts):
-    u"""Какие необязательные группы показывать. Пустая группа не рисуется."""
-    return {
-        'feature': bool(feature_options()),
-        'character': bool(character_options()),
-    }
-
-
 def canonical_topics():
     u"""Все темы раскладки одним плоским списком, в порядке разделов."""
     out = []

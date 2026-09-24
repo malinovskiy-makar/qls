@@ -409,10 +409,6 @@ def generate_question(arch, rng, question_type):
 FIGURE_CHOICE_OPTIONS = 4     # один верный + три неверных
 
 
-def _figure_axes(fig):
-    return Fraction(str(fig['xmax'])), Fraction(str(fig['ymax']))
-
-
 def _spoil_figure(fig, v_true, v_err):
     """Чертёж, на котором ИСКОМАЯ величина отмечена НЕВЕРНО.
 

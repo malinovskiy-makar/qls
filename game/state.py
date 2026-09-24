@@ -196,10 +196,6 @@ def duel_leave(code, user_id):
     return sorted(int(u) for u in room['present'])
 
 
-def duel_present(code):
-    return sorted(int(u) for u in _duel_room(code)['present'])
-
-
 def duel_start_at(code, at_ms):
     u"""Назначить момент общего старта дуэли, если его ещё нет, и вернуть его.
 

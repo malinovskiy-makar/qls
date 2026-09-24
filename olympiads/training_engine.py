@@ -235,20 +235,6 @@ def current_attempt(variant, user=None, session_key=''):
     return queryset.order_by('-started_at').first()
 
 
-def find_attempt(pk, variant, user=None, session_key=''):
-    """Попытка по номеру — но только СВОЯ. Чужую не отдаём."""
-    from .models import TrainingAttempt
-
-    queryset = TrainingAttempt.objects.filter(pk=pk, variant=variant)
-    if user is not None and user.is_authenticated:
-        queryset = queryset.filter(user=user)
-    elif session_key:
-        queryset = queryset.filter(user__isnull=True, session_key=session_key)
-    else:
-        return None
-    return queryset.first()
-
-
 def finalize_if_expired(attempt, now=None):
     """Ленивое завершение истёкшей попытки. Своё, не из `exam_engine`.
 
