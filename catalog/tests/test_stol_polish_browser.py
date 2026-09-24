@@ -111,4 +111,24 @@ class StolPolishBrowserTest(StaticLiveServerTestCase):
               'лимит: подпись %r' % lim['after']['text'])
         check(not lim['errors'], 'лимит: ошибки страницы %s' % lim['errors'])
 
+        # Фаза 3: «свернуть» у левого края, тонкие полосы, искра пункта без кружка.
+        for theme in ('light', 'dark'):
+            box = data['p3 ' + theme]
+            check(box['collapseFirst'] and box['collapseGap'] <= 16,
+                  '%s: «свернуть» не у левого края шапки (отступ %s)' % (theme, box['collapseGap']))
+            check(box['resetLeft'] is not None and box['resetLeft'] > box['titleRight'],
+                  '%s: «Решить заново» не правее «Помощь» (%s)' % (theme, box))
+            for sel, bar in box['bars'].items():
+                check(bar['over'] and bar['gutter'] == 5,
+                      '%s: полоса прокрутки %s шириной %s, нужно 5 (%s)' % (theme, sel, bar['gutter'], bar))
+            ask = box['ask']
+            check(ask['bg'] in ('rgba(0, 0, 0, 0)', 'transparent'), '%s: у значка пункта фон %s' % (theme, ask['bg']))
+            check(ask['border'] == '0px', '%s: у значка пункта рамка %s' % (theme, ask['border']))
+            check(round(ask['svgW']) == 19, '%s: искра %s px, нужно 19' % (theme, ask['svgW']))
+            check(round(ask['w']) == 32 and round(ask['h']) == 32,
+                  '%s: зона нажатия %sx%s, нужно 32x32' % (theme, ask['w'], ask['h']))
+            check(ask['color'] == ask['accentInk'],
+                  '%s: цвет значка %s, а --accent-ink %s' % (theme, ask['color'], ask['accentInk']))
+            check(not box['errors'], '%s: ошибки страницы %s' % (theme, box['errors']))
+
         self.assertEqual(problems, [], '\n'.join(problems))

@@ -27,11 +27,12 @@
 </nav>
 <aside class="help-panel" aria-label="Помощь по задаче">
   <div class="help-head">
+    {% comment %}«Свернуть» — у левого (внутреннего) края, зеркально ленте и панелям calc2 (24.09.2026).{% endcomment %}
+    <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button>
     <span class="ic">{% include '_icon.html' with name='sparkle' %}</span>
     <div><div class="help-title"><b>Помощь</b>{% if chat_available and user.is_authenticated %}<span class="help-info-wrap"><button type="button" class="help-info" id="help-info" aria-label="Как пользоваться помощью" aria-expanded="false" aria-describedby="help-info-pop" hidden>{% include '_icon.html' with name='info' %}</button><span class="help-info-pop" id="help-info-pop" role="tooltip" hidden>История чата в этой задаче сохраняется. Выделите фрагмент условия или ответа ИИ, чтобы обсудить именно его.</span></span>{% endif %}</div><small id="help-used" data-total="{{ hint_total }}">{% if opened_hints or solution_viewed %}{% if opened_hints %}Подсказок {{ opened_hints|length }} из {{ hint_total }}{% endif %}{% if opened_hints and solution_viewed %} · решение{% elif solution_viewed %}Решение{% endif %}{% else %}Пока ничем не пользовались{% endif %}</small></div>
     {% comment %}«Решить заново» (решение владельца 24.09.2026, ADR 0130): чистит экран ученика, статистика та же. Подтверждение — карточкой в ленте.{% endcomment %}
     {% if user.is_authenticated %}<button type="button" class="stol-strip-btn help-reset" id="help-reset" aria-label="Решить заново" title="Решить заново">{% include '_icon.html' with name='refresh' %}</button>{% endif %}
-    <button type="button" class="stol-strip-btn" data-stol="help" aria-label="Свернуть помощь" title="Свернуть (])">{% include '_icon.html' with name='chevron_right' %}</button>
   </div>
 
   <div class="help-body" id="help-body">

@@ -18,7 +18,9 @@ const P2 = process.env.POLISH_PROBLEM2 || '';
 
 let browser;
 try {
-  browser = await chromium.launch();
+  /* Без `--hide-scrollbars`: Playwright в безголовом режиме прячет полосы
+     прокрутки, и ширину тонкой полосы (фаза 3) было бы нечем мерить. */
+  browser = await chromium.launch({ ignoreDefaultArgs: ['--hide-scrollbars'] });
 } catch (e) {
   console.log('браузер не поднялся: ' + e.message);
   process.exit(3);
@@ -105,6 +107,51 @@ try {
     box.errors = errors;
     out.limit = box;
     await ctx.close();
+  }
+
+  /* ── Фаза 3: «свернуть» слева, тонкие полосы, значок пункта без кружка ─── */
+  if (P1 && SESSION) {
+    for (const theme of ['light', 'dark']) {
+      const { ctx, page, errors } = await fresh({ theme, path: '/catalog/problem/' + P1 + '/', panels: { rail: true, help: true } });
+      const box = await page.evaluate(() => {
+        const r = el => el.getBoundingClientRect();
+        const panel = document.querySelector('.help-panel');
+        const collapse = document.querySelector('.help-head [data-stol="help"]');
+        const title = document.querySelector('.help-head .help-title b');
+        const reset = document.querySelector('#help-reset');
+        /* Переполнить ленту помощи и список ленты, чтобы полоса появилась. */
+        const bars = {};
+        for (const sel of ['.help-body', '.rail-list']) {
+          const el = document.querySelector(sel);
+          const pad = document.createElement('div');
+          pad.style.cssText = 'height: 3000px; flex: none';
+          el.appendChild(pad);
+          bars[sel] = { gutter: el.offsetWidth - el.clientWidth, over: el.scrollHeight > el.clientHeight,
+                        width: el.offsetWidth };
+          pad.remove();
+        }
+        const ask = document.querySelector('.part-ask');
+        const cs = getComputedStyle(ask);
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--accent-ink)';
+        document.body.appendChild(probe);
+        const accentInk = getComputedStyle(probe).color;
+        probe.remove();
+        const svg = ask.querySelector('svg').getBoundingClientRect();
+        const ab = r(ask);
+        return {
+          collapseGap: r(collapse).left - r(panel).left,
+          collapseFirst: document.querySelector('.help-head').firstElementChild === collapse,
+          resetLeft: reset ? r(reset).left : null, titleRight: r(title).right,
+          bars,
+          ask: { bg: cs.backgroundColor, border: cs.borderTopWidth, svgW: svg.width, w: ab.width, h: ab.height,
+                 color: cs.color, accentInk },
+        };
+      });
+      box.errors = errors;
+      out['p3 ' + theme] = box;
+      await ctx.close();
+    }
   }
 } catch (e) {
   out.error = String(e && e.stack || e);

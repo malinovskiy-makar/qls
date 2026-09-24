@@ -622,15 +622,18 @@ span.pp--src:active { transform: none; }
 .ai-in:focus-within { border-color: var(--focus); background: var(--surface); box-shadow: 0 0 0 3px var(--focus-ring); }
 .ai-in textarea { flex: 1 1 auto; border: 0; background: transparent; resize: none; font: 400 14px/1.45 var(--font-ui); color: var(--text); outline: none; min-height: 24px; max-height: 120px; padding: 6px 0; }
 .ai-in textarea::placeholder { color: var(--text3); }
-/* Полоса прокрутки поля — тонкая, без стрелок (24.09.2026). ⚠️ Стандартные
-   `scrollbar-width/color` — только там, где нет `::-webkit-scrollbar`: в
-   Chrome 121+ они отключают `::-webkit-*` целиком. */
-.ai-in textarea::-webkit-scrollbar { width: 5px; }
-.ai-in textarea::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
-.ai-in textarea::-webkit-scrollbar-track { background: transparent; }
-.ai-in textarea::-webkit-scrollbar-button { display: none; }
+/* Полоса прокрутки поля, ленты помощи и списка левой ленты — тонкая, без
+   стрелок (24.09.2026). ⚠️ Стандартные `scrollbar-width/color` — только там,
+   где нет `::-webkit-scrollbar`: в Chrome 121+ они отключают `::-webkit-*` целиком. */
+.ai-in textarea::-webkit-scrollbar, .help-body::-webkit-scrollbar, .rail-list::-webkit-scrollbar { width: 5px; }
+.ai-in textarea::-webkit-scrollbar-thumb, .help-body::-webkit-scrollbar-thumb,
+.rail-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+.ai-in textarea::-webkit-scrollbar-track, .help-body::-webkit-scrollbar-track,
+.rail-list::-webkit-scrollbar-track { background: transparent; }
+.ai-in textarea::-webkit-scrollbar-button, .help-body::-webkit-scrollbar-button,
+.rail-list::-webkit-scrollbar-button { display: none; }
 @supports not selector(::-webkit-scrollbar) {
-  .ai-in textarea { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .ai-in textarea, .help-body, .rail-list { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 }
 
 
@@ -781,9 +784,8 @@ body.stol-is-focus .tb-focus-only { display: inline-flex; }
 .help-info-pop::before { content: ''; position: absolute; top: -5px; left: 47px; width: 10px; height: 10px;
                          background: var(--btn-bg); transform: rotate(45deg); }
 .help-info-pop[hidden] { display: none; }
-.help-head .stol-strip-btn { margin-left: auto; }
-/* «Решить заново» стоит перед «свернуть»: отступ съедает она, вторая — вплотную. */
-.help-head .help-reset + .stol-strip-btn { margin-left: 0; }
+/* «Свернуть» — первой слева, «Решить заново» — у правого края (24.09.2026). */
+.help-head .help-reset { margin-left: auto; }
 .help-body { flex: 1 1 auto; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
 .help-body .ai { border: 0; border-radius: 0; max-height: none; flex: 1 1 auto; }
 
@@ -918,11 +920,13 @@ body.stol-is-focus .desk { --rail-col: 0px; --help-col: 0px; --top: 0px; }
 
 /* «Спросить ИИ про этот пункт» и «Спросить об этом» по выделению (README §3). */
 .stm .part { position: relative; padding-right: 38px; }
-.part-ask { position: absolute; right: 0; top: 10px; width: 28px; height: 28px; border-radius: 50%;
-            border: .5px solid var(--border); background: var(--surface); color: var(--text2); cursor: pointer;
+/* Без кружка (пожелание владельца 24.09.2026): заметная искра цвета акцента в
+   обеих темах, зона нажатия 32×32 на уровне первой строки пункта. */
+.part-ask { position: absolute; right: 0; top: 8px; width: 32px; height: 32px; border-radius: 8px;
+            border: 0; background: transparent; color: var(--accent-ink); cursor: pointer; padding: 0;
             display: inline-flex; align-items: center; justify-content: center; }
-.part-ask:hover { color: var(--accent-ink); border-color: var(--accent); }
-.part-ask .qi { width: 14px; height: 14px; }
+.part-ask:hover { background: var(--accent-tint); }
+.part-ask .qi { width: 19px; height: 19px; }
 .ask-pop { position: absolute; z-index: 300; padding: 8px 12px; border-radius: 9px; border: 0;
            background: var(--btn-bg); color: var(--on-btn); font: 600 13px/1 var(--font-ui); cursor: pointer;
            box-shadow: var(--shadow-pop); }
