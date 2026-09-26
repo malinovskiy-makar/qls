@@ -225,6 +225,7 @@ docker compose stop ws
 | `CSRF_TRUSTED_ORIGINS` | они же со схемой `https://` |
 | `SEMANTIC_SEARCH_ENABLED` | `0` — см. [ADR 0012](adr/0012-semantic-search-flag-off-in-prod.md) |
 | `GUNICORN_WORKERS` | `4` |
+| `YANDEX_METRIKA_ID` | номер счётчика Метрики, только цифры; на площадке dev — пусто ([ADR 0133](adr/0133-yandex-metrika-and-signup-source.md)) |
 | `BACKUP_S3_*` | внешнее хранилище копий, пока пусто |
 
 ⚠️ **`DATABASE_URL` и `REDIS_URL` живут ТОЛЬКО в `.env`.** Раньше

@@ -183,6 +183,9 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'config.context_processors.site_meta',
+                # Номер счётчика Метрики и отложенная цель регистрации
+                # (ADR 0133). Без этой строки на бою счётчика не было бы.
+                'config.context_processors.metrika',
             ],
             'loaders': [
                 ('django.template.loaders.cached.Loader', [

@@ -6,6 +6,7 @@
 <title>Календарь · Weconomics</title>
 {% include '_seo_meta.html' %}
 {% include '_tokens.html' %}
+{% include '_metrika.html' with metrika_private=True %}
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: var(--font-ui);
@@ -233,6 +234,7 @@
 </style>
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 
 {% include '_nav.html' %}
 

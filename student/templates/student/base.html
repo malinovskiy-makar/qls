@@ -8,6 +8,7 @@
 
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
+  {% include '_metrika.html' with metrika_private=True %}
 
   <!-- KaTeX -->
   <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
@@ -147,6 +148,7 @@ a:focus-visible, button:focus-visible, input:focus-visible, select:focus-visible
   </style>
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 
 {% include '_nav.html' %}
 

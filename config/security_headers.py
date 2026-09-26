@@ -25,7 +25,12 @@
 Список источников намеренно **не** сделан «пошире, чтобы не шумело»:
 политика в режиме отчёта тем и ценна, что шумит. Тихая политика в отчёте
 не расскажет ничего, а в бою — не защитит.
+
+⚠️ **ЕДИНСТВЕННЫЙ ЧУЖОЙ АДРЕС — ЯНДЕКС МЕТРИКА (ADR 0133), И ТОЛЬКО ПРИ
+ЗАДАННОМ НОМЕРЕ СЧЁТЧИКА.** Без `YANDEX_METRIKA_ID` (локально, площадка
+dev, тесты) политика прежняя, без единого чужого адреса.
 """
+from django.conf import settings
 
 # Ни одной возможности браузера проекту не нужно. Пустой список источников
 # `()` означает «запрещено всем, включая саму страницу».
@@ -52,10 +57,11 @@ PERMISSIONS_POLICY = ', '.join([
 # Куда браузер шлёт отчёт о нарушении. Адрес заведён в config/urls.py.
 CSP_REPORT_PATH = '/csp-report/'
 
-# Внешних источников у проекта НЕТ НИ ОДНОГО. KaTeX, MathLive, D3, Math.js,
+# Внешних БИБЛИОТЕК у проекта НЕТ НИ ОДНОЙ. KaTeX, MathLive, D3, Math.js,
 # Chart.js, FullCalendar и html2canvas лежат в `static/vendor/` и едут с
 # нашего же адреса — решение владельца 04.09.2026 ради доступности сайта из
-# России. Отдельной переменной под чужой домен здесь больше не нужно.
+# России. Чужой адрес один — счётчик Метрики, и он ниже отдельным словарём:
+# от него страница не зависит (тег грузится асинхронно).
 
 CSP_DIRECTIVES = [
     "default-src 'self'",
@@ -82,6 +88,56 @@ CSP_DIRECTIVES = [
 
 CSP_REPORT_ONLY = '; '.join(CSP_DIRECTIVES)
 
+# ─── Яндекс Метрика (ADR 0133) ──────────────────────────────────────────────
+# Адреса сверены со справкой «Установка счетчика на сайт с CSP»
+# (yandex.ru/support/metrica/ru/code/install-counter-csp, 26.09.2026):
+# script-src — сам тег и его модули; img-src — картинка из noscript;
+# connect-src — отправка данных; child-src и frame-src с `blob:` — «для
+# правильной работы Вебвизора, карт кликов, ссылок и скроллинга».
+#
+# ⚠️ ИЗ ОБЩЕГО СПИСКА СПРАВКИ ВЗЯТ ТОЛЬКО mc.yandex.ru (+ yastatic.net у
+# скриптов). Весь список — 41 адрес на каждую из пяти директив — это около
+# 3 КБ заголовка на КАЖДОМ ответе. Вместе с кукой первого касания ответ
+# перевалил бы за буфер заголовков nginx по умолчанию (4 КБ, `proxy_buffer_size`
+# в конфиге не задан) — и посадочная страница отдала бы 502. Политика в
+# режиме отчёта ничего не блокирует: не хватит адреса — придёт отчёт на
+# /csp-report/, тогда и дописать его точечно.
+#
+# ⚠️ `frame-ancestors` НЕ ТРОНУТ. Справка просит пустить во фрейм кабинеты
+# Метрики (для Вебвизора и карт), но фрейм запрещает `X-Frame-Options: DENY`
+# (ADR 0013), а он, в отличие от этой политики, действует. Ослаблять его —
+# решение владельца, а не побочный эффект счётчика.
+METRIKA_SOURCES = {
+    'script-src': 'https://mc.yandex.ru https://yastatic.net',
+    'img-src': 'https://mc.yandex.ru',
+    'connect-src': 'https://mc.yandex.ru',
+    'frame-src': 'blob: https://mc.yandex.ru',
+    'child-src': 'blob: https://mc.yandex.ru',
+}
+
+
+def _with_metrika(directives):
+    """Политика с адресами Метрики: дописать их к своим директивам."""
+    result, present = [], set()
+    for directive in directives:
+        name, _, sources = directive.partition(' ')
+        present.add(name)
+        extra = METRIKA_SOURCES.get(name)
+        if extra is None:
+            result.append(directive)
+        elif sources == "'none'":
+            # «никому» с адресами не сочетается — заменяем, а не дописываем.
+            result.append('%s %s' % (name, extra))
+        else:
+            result.append('%s %s' % (directive, extra))
+    # Директив, которых в своей политике нет (child-src), — перед report-uri.
+    missing = ['%s %s' % (name, extra) for name, extra in METRIKA_SOURCES.items()
+               if name not in present]
+    return result[:-1] + missing + result[-1:]
+
+
+CSP_REPORT_ONLY_METRIKA = '; '.join(_with_metrika(CSP_DIRECTIVES))
+
 
 class SecurityHeadersMiddleware:
     """Проставляет `Permissions-Policy` и CSP в режиме отчёта.
@@ -99,6 +155,8 @@ class SecurityHeadersMiddleware:
         # странице отчёта, прислал бы отчёт о ней — и так по кругу.
         if request.path != CSP_REPORT_PATH:
             response.setdefault('Permissions-Policy', PERMISSIONS_POLICY)
-            response.setdefault('Content-Security-Policy-Report-Only',
-                                CSP_REPORT_ONLY)
+            response.setdefault(
+                'Content-Security-Policy-Report-Only',
+                CSP_REPORT_ONLY_METRIKA if settings.YANDEX_METRIKA_ID
+                else CSP_REPORT_ONLY)
         return response

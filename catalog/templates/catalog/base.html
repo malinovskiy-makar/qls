@@ -8,6 +8,7 @@
 
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
+  {% include '_metrika.html' %}
 
   <!-- KaTeX -->
   <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
@@ -129,6 +130,7 @@ button:focus-visible {
 {% block extra_head %}{% endblock %}
 </head>
 <body{% block body_attrs %}{% endblock %}>
+{% include '_metrika_noscript.html' %}
 
 {% include '_nav.html' %}
 

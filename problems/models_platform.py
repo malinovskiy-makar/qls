@@ -1905,6 +1905,55 @@ class SearchLog(models.Model):
         return self.query
 
 
+class SignupSource(models.Model):
+    """Откуда пришёл человек, заведший аккаунт: первая UTM-метка (ADR 0133).
+
+    Строка на КАЖДУЮ регистрацию, даже без метки: тогда метки пусты, а вид
+    регистрации заполнен — иначе «сколько пришло без метки» не посчитать.
+    Пишет `problems.signup_source.record_signup`, метку до регистрации держит
+    подписанная кука (`FirstTouchMiddleware`, 90 дней).
+
+    ⚠️ МЕТКА ПЕРВАЯ, А НЕ ПОСЛЕДНЯЯ: первое касание не перезаписывается,
+    последнее знает Метрика. ⚠️ Значения — строки из чужой ссылки, обрезаны
+    до 100 символов и на страницы сайта не выводятся; читает их только
+    админка.
+
+    ⚠️ `user` — CASCADE: удалили аккаунт — источник уходит вместе с ним.
+    """
+
+    class Kind(models.TextChoices):
+        TEACHER = 'teacher', 'Преподаватель'
+        STUDENT = 'student', 'Ученик сам'
+        INVITED = 'invited', 'Ученик по приглашению'
+
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE,
+        related_name='signup_source', verbose_name='Кто')
+    signup_kind = models.CharField('Вид регистрации', max_length=8,
+                                   choices=Kind.choices)
+    utm_source = models.CharField('utm_source', max_length=100, blank=True)
+    utm_medium = models.CharField('utm_medium', max_length=100, blank=True)
+    utm_campaign = models.CharField('utm_campaign', max_length=100, blank=True)
+    utm_content = models.CharField('utm_content', max_length=100, blank=True)
+    utm_term = models.CharField('utm_term', max_length=100, blank=True)
+    landing_path = models.CharField('Посадочная страница', max_length=100, blank=True)
+    referrer = models.CharField('Откуда перешёл (Referer)', max_length=100, blank=True)
+    first_seen_at = models.DateTimeField(
+        'Первый заход с меткой', null=True, blank=True,
+        help_text='Пусто — метки не было.')
+    created_at = models.DateTimeField('Зарегистрирован', auto_now_add=True,
+                                      db_index=True)
+
+    class Meta:
+        verbose_name = 'Источник регистрации'
+        verbose_name_plural = 'Источники регистраций'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return '%s · %s' % (self.get_signup_kind_display(),
+                            self.utm_source or 'без метки')
+
+
 # ===========================================================================
 # Чат на странице задачи: вложения и полный журнал реплик (15.09.2026)
 # ===========================================================================

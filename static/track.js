@@ -122,6 +122,10 @@
     shownAt = document.visibilityState === 'hidden' ? null : Date.now();
     pageView(location.origin + lastPath);
     lastPath = location.pathname;
+    // Тот же момент «экран сменился» — просмотр и в Метрике (ADR 0133). Сама
+    // она адреса без перезагрузки не видит; функцию ставит `_metrika.html`,
+    // и её нет, когда номера счётчика нет.
+    if (window.weco && window.weco.metrikaHit) window.weco.metrikaHit();
   }
 
   // Выдача поиска: состояние кладёт сервер в data-атрибуты секции результатов.

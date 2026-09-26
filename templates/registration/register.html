@@ -7,9 +7,11 @@
   {% include '_seo_meta.html' %}
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
+  {% include '_metrika.html' %}
   {% include 'registration/_auth_style.html' %}
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 <div class="auth-corner">
   {% comment %}
   Кнопка обратной связи есть и здесь: у не вошедшего чаще всего и ломается
@@ -42,6 +44,12 @@
   <div class="error-list">{{ form.non_field_errors|join:' ' }}</div>
   {% endif %}
 
+  {% comment %}
+  ⚠️ `ym-disable-keys` на КАЖДОМ поле ввода — Вебвизор Метрики пишет ввод
+  звёздочками (ADR 0133). Часть регистрирующихся — дети, и логин нередко
+  это имя и фамилия. Пароль Вебвизор не пишет и сам; класс там — чтобы
+  правило читалось одинаково для всех полей формы.
+  {% endcomment %}
   <form method="post" novalidate>
     {% csrf_token %}
     {% comment %}
@@ -54,6 +62,7 @@
     <div class="form-group">
       <label for="{{ form.username.id_for_label }}">Логин</label>
       <input type="text" name="username" id="{{ form.username.id_for_label }}"
+             class="ym-disable-keys"
              value="{{ form.username.value|default:'' }}"
              autocomplete="username" autofocus>
       <div class="field-hint">
@@ -67,7 +76,7 @@
     <div class="form-group">
       <label for="{{ form.password1.id_for_label }}">Пароль</label>
       <input type="password" name="password1" id="{{ form.password1.id_for_label }}"
-             autocomplete="new-password">
+             class="ym-disable-keys" autocomplete="new-password">
       {% for error in form.password1.errors %}
       <div class="field-error">{{ error }}</div>
       {% endfor %}
@@ -76,7 +85,7 @@
     <div class="form-group">
       <label for="{{ form.password2.id_for_label }}">Пароль ещё раз</label>
       <input type="password" name="password2" id="{{ form.password2.id_for_label }}"
-             autocomplete="new-password">
+             class="ym-disable-keys" autocomplete="new-password">
       {% for error in form.password2.errors %}
       <div class="field-error">{{ error }}</div>
       {% endfor %}

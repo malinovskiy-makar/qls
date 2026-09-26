@@ -35,6 +35,7 @@
   <meta name="twitter:image" content="{{ og_image }}">
 
   {% include '_tokens.html' %}
+  {% include '_metrika.html' %}
 
   <!-- KaTeX (как в каталоге) -->
   <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
@@ -2117,6 +2118,7 @@ body.on-final .rush-wrap { max-width: 1160px; }
 <script defer src="{% static 'game/chart_math.js' %}"></script>
 </head>
 <body class="on-start">
+{% include '_metrika_noscript.html' %}
 
 {% include '_nav.html' %}
 

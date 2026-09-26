@@ -460,7 +460,14 @@
     </a>
   </aside>
 
-  <div class="card pf-card pf-card--form">
+  {% comment %}
+  ⚠️ `ym-hide-content` — Вебвизор Метрики не записывает эту карточку вовсе
+  (ADR 0133): здесь аватар, логин, имя, почта, Telegram, школа и город, а
+  владельцы профилей — в том числе дети. Поля ввода вдобавок несут
+  `ym-disable-keys` (его ставит `ProfileForm`). Те же классы — у двух окон
+  с фото ниже.
+  {% endcomment %}
+  <div class="card pf-card pf-card--form ym-hide-content">
 
     {% comment %}
     Форма загрузки аватара — скрытая: видимого поля выбора файла на странице
@@ -646,7 +653,7 @@
 Окно обрезки и окно просмотра — в конце вкладки, чтобы не мешать порядку
 обхода формы. Разметку наполняет `profile.js`, математика обрезки — там же.
 {% endcomment %}
-<dialog class="pf-crop-dlg" id="pf-crop" aria-labelledby="pf-crop-h">
+<dialog class="pf-crop-dlg ym-hide-content" id="pf-crop" aria-labelledby="pf-crop-h">
   <div class="pf-crop-head">
     <h2 id="pf-crop-h">Фото профиля</h2>
     <button type="button" class="pf-icon-btn" data-close aria-label="Закрыть">{% include '_icon.html' with name='close' %}</button>
@@ -669,7 +676,7 @@
   </div>
 </dialog>
 
-<dialog class="pf-view-dlg" id="pf-view" aria-label="Фото профиля">
+<dialog class="pf-view-dlg ym-hide-content" id="pf-view" aria-label="Фото профиля">
   <button type="button" class="pf-view-close" data-close aria-label="Закрыть">{% include '_icon.html' with name='close' %}</button>
   {% if profile.avatar %}
   <img src="{% url 'avatar' profile.user_id %}?v={{ profile.updated_at|date:'U' }}" alt="Фото профиля">
@@ -677,7 +684,7 @@
 </dialog>
 
 {% elif tab == 'security' %}
-<div class="card pf-card">
+<div class="card pf-card ym-hide-content">{# Вебвизор: не записывать (ADR 0133) #}
   {% comment %}
   ⚠️ СТАРЫЙ ПАРОЛЬ НЕ СПРАШИВАЕТСЯ (решение владельца 04.09.2026, ADR 0073).
   Форма — штатная `SetPasswordForm`: своей формы пароля у нас нет и быть не

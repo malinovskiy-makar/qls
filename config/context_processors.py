@@ -154,6 +154,27 @@ def site_meta(request):
     }
 
 
+def metrika(request):
+    """Номер счётчика Яндекс Метрики и отложенная цель регистрации (ADR 0133).
+
+    Пустой номер — пустой ответ: `templates/_metrika.html` без номера не
+    выводит ничего, и сессию тогда не трогаем вовсе.
+
+    ⚠️ `metrika_goal` — ФУНКЦИЯ, А НЕ ЗНАЧЕНИЕ. Она забирает цель из сессии,
+    поэтому зовётся только тогда, когда шаблон счётчика её прочитает, и ровно
+    один раз (`{% with %}`). Посчитай её здесь — цель съел бы любой фрагмент,
+    отрисованный с контекстом запроса раньше страницы, и до счётчика она бы
+    не дошла.
+    """
+    if not settings.YANDEX_METRIKA_ID:
+        return {'metrika_id': ''}
+    from functools import partial
+
+    from problems.signup_source import pop_goal
+    return {'metrika_id': settings.YANDEX_METRIKA_ID,
+            'metrika_goal': partial(pop_goal, request)}
+
+
 def _problem_report_kinds():
     """Пары (значение, подпись) причин жалобы на задачу.
 

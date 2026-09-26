@@ -24,6 +24,7 @@ from .models_platform import (
     SavedGraph,
     SavedProblem,
     SearchLog,
+    SignupSource,
     UserProfile,
 )
 
@@ -259,6 +260,35 @@ class SearchLogAdmin(admin.ModelAdmin):
     readonly_fields = ('ts', 'user', 'visitor', 'session_key', 'query', 'status',
                        'ms', 'total', 'degraded', 'top_ids', 'rating', 'rated_at',
                        'rating_text')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(SignupSource)
+class SignupSourceAdmin(admin.ModelAdmin):
+    """Откуда пришли зарегистрировавшиеся (ADR 0133): только чтение.
+
+    Раз в неделю — без выгрузок: фильтр справа по виду регистрации, метке и
+    дате, у каждого значения фильтра — число строк (`show_facets`). Строки
+    заводит только регистрация: руками здесь не добавить и не поправить.
+    """
+
+    list_display = ('created_at', 'user', 'signup_kind', 'utm_source', 'utm_medium',
+                    'utm_campaign', 'utm_content', 'utm_term', 'landing_path',
+                    'referrer', 'first_seen_at')
+    list_filter = ('signup_kind', 'utm_source', 'utm_medium', 'utm_campaign',
+                   ('created_at', admin.DateFieldListFilter))
+    show_facets = admin.ShowFacets.ALWAYS
+    date_hierarchy = 'created_at'
+    search_fields = ('user__username', 'utm_source', 'utm_campaign', 'utm_content')
+    list_select_related = ('user',)
+    readonly_fields = ('user', 'signup_kind', 'utm_source', 'utm_medium', 'utm_campaign',
+                       'utm_content', 'utm_term', 'landing_path', 'referrer',
+                       'first_seen_at', 'created_at')
 
     def has_add_permission(self, request):
         return False

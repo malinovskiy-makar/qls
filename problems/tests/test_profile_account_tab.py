@@ -90,8 +90,10 @@ class PageTests(TestCase):
     def test_05_the_aside_cards_come_before_the_form_in_the_markup(self):
         """Порядок разметки решает, где карточки окажутся на телефоне."""
         html = self.page()
+        # Начало тега без закрывающей кавычки: с 26.09.2026 у карточки есть
+        # ещё класс `ym-hide-content` (Вебвизор, ADR 0133), порядок тот же.
         self.assertLess(html.index('<aside class="pf-aside"'),
-                        html.index('<div class="card pf-card pf-card--form">'))
+                        html.index('<div class="card pf-card pf-card--form'))
 
     def test_06_both_cards_link_out_safely(self):
         html = self.page()

@@ -20,6 +20,7 @@
      калькулятора больше нет (см. комментарий ниже).
   {% endcomment %}
   {% include '_tokens.html' %}
+  {% include '_metrika.html' %}
 
   <!-- ── Внешние библиотеки (вложены в репозиторий, без сборки) ─────────
        D3.js v7   — рисование SVG, оси, кривые, перетаскивание мышью.
@@ -72,6 +73,7 @@
   <link rel="stylesheet" href="{% calc2_static 'calc2/calc2.css' %}">
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 {% include '_nav.html' %}
 
 <!-- ── ЭКРАН 1 · ОКНО ВЫБОРА СЦЕНАРИЯ ──────────────────────────────────

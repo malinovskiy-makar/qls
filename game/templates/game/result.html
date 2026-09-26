@@ -33,6 +33,7 @@
   <meta name="twitter:image" content="{{ og_image }}">
 
   {% include '_tokens.html' %}
+  {% include '_metrika.html' %}
 {% load ru %}
   <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -119,6 +120,7 @@ h2 { font-size: 15px; font-weight: 700; }
   </style>
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 <div class="wrap">
   <header class="top">
     <a class="brand" href="{{ game_url }}"><span class="mark" aria-hidden="true">W</span>WECON {% include "_icon.html" with name="bolt" %} <b>RUSH</b><span class="brand-sub">· игра на скорость по олимпиадной экономике</span></a>

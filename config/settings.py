@@ -108,6 +108,9 @@ MIDDLEWARE = [
     # Permissions-Policy и CSP в режиме отчёта — своими настройками Django
     # их не задаёт. Подробности и обоснование — в config/security_headers.py.
     'config.security_headers.SecurityHeadersMiddleware',
+    # Первая UTM-метка посетителя — в подписанную куку на 90 дней, чтобы
+    # регистрация через неделю знала, откуда человек пришёл (ADR 0133).
+    'problems.signup_source.FirstTouchMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -130,6 +133,10 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'config.context_processors.site_meta',
+                # ⚠️ Тот же список повторён в settings_production.py: там
+                # TEMPLATES задан целиком заново (06.09.2026 так на бою уже
+                # терялся site_meta). Сверяет тест test_signup_source.
+                'config.context_processors.metrika',
             ],
             'loaders': [
                 'django.template.loaders.filesystem.Loader',
@@ -584,6 +591,23 @@ SCRAPE_QUOTA_IP_HOUR = int(os.environ.get('SCRAPE_QUOTA_IP_HOUR', '150').strip()
 SCRAPE_QUOTA_IP_DAY = int(os.environ.get('SCRAPE_QUOTA_IP_DAY', '600').strip() or 600)
 SCRAPE_QUOTA_USER_HOUR = int(os.environ.get('SCRAPE_QUOTA_USER_HOUR', '300').strip() or 300)
 SCRAPE_QUOTA_USER_DAY = int(os.environ.get('SCRAPE_QUOTA_USER_DAY', '1000').strip() or 1000)
+
+# ─── Яндекс Метрика (ADR 0133) ────────────────────────────────────────────────
+# Номер счётчика — ТОЛЬКО из окружения. Пусто — на страницах нет ни счётчика,
+# ни чужих адресов в CSP: так локально и на площадке dev.weconomics.ai (у неё
+# те же боевые настройки, отличает её только свой .env — туда номер не
+# вписывать, иначе просмотры команды смешаются с людьми).
+# ⚠️ ТОЛЬКО ЦИФРЫ. Номер вставляется прямо в скрипт и в адрес картинки
+# noscript; всё, что не число, выключает счётчик с предупреждением.
+# ⚠️ В ПРОГОНЕ ТЕСТОВ ВЫКЛЮЧЕН, даже если номер лежит в .env разработчика:
+# разметка страниц в тестах не должна зависеть от чужого .env. Тесты
+# Метрики включают номер явно (`override_settings`).
+_metrika_raw = os.environ.get('YANDEX_METRIKA_ID', '').strip()
+_metrika_ok = _metrika_raw.isascii() and _metrika_raw.isdigit()
+YANDEX_METRIKA_ID = _metrika_raw if _metrika_ok and not _TESTING else ''
+if _metrika_raw and not _metrika_ok:
+    print('[настройки] YANDEX_METRIKA_ID не число — счётчик Метрики выключен.',
+          file=sys.stderr)
 
 
 def _redis_cache(db_index, prefix):

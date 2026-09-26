@@ -12,6 +12,7 @@ _tokens.html и _nav.html — второй набор цветов заводи�
 
   {% include '_tokens.html' %}
   {% include '_favicon.html' %}
+  {% include '_metrika.html' with metrika_private=True %}
 
   <link rel="stylesheet" href="{% static 'vendor/katex-0.16.9/katex.min.css' %}">
   <script defer src="{% static 'vendor/katex-0.16.9/katex.min.js' %}"></script>
@@ -53,6 +54,7 @@ select:focus-visible, textarea:focus-visible {
   </style>
 </head>
 <body>
+{% include '_metrika_noscript.html' %}
 
 {% include '_nav.html' %}
 

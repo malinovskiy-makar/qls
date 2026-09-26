@@ -170,6 +170,14 @@ class ProfileForm(forms.ModelForm):
             choices=self.fields['level'].choices)
         if self.instance.telegram:
             self.initial['telegram'] = '@' + self.instance.telegram
+        # Вебвизор Метрики пишет ввод этих полей звёздочками (ADR 0133): имя,
+        # почта, Telegram и школа — персональные данные, а среди владельцев
+        # профилей есть дети. Карточка формы вдобавок целиком скрыта классом
+        # `ym-hide-content` в шаблоне: там же видны уже сохранённые значения.
+        for field in self.fields.values():
+            classes = field.widget.attrs.get('class', '').split()
+            if 'ym-disable-keys' not in classes:
+                field.widget.attrs['class'] = ' '.join(classes + ['ym-disable-keys'])
 
     @staticmethod
     def _known_codes(values, choices):

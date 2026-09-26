@@ -1,0 +1,6 @@
+{% comment %}
+Вторая половина счётчика Метрики (ADR 0133): картинка для тех, у кого
+выключен JavaScript. Первой строкой <body>, как велит справка Метрики: в
+<head> элемент div внутри noscript недопустим. Первая половина —
+`_metrika.html` в <head>.
+{% endcomment %}{% if metrika_id %}<noscript><div><img src="https://mc.yandex.ru/watch/{{ metrika_id }}" style="position:absolute; left:-9999px;" alt=""></div></noscript>{% endif %}

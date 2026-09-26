@@ -1,0 +1,63 @@
+{% comment %}
+Яндекс Метрика (ADR 0133): счётчик, цель регистрации и просмотр при смене
+экрана без перезагрузки. Стоит в <head> КАЖДОГО корневого шаблона сайта; его
+пара `_metrika_noscript.html` — первой строкой <body>.
+
+Номер — настройка YANDEX_METRIKA_ID через `config.context_processors.metrika`.
+Пусто (локально, площадка dev, тесты) — не выводится ничего.
+
+Код загрузки — из справки Метрики («Инициализация счетчика»). Параметры:
+Вебвизор включён (решение владельца), остальные — значения по умолчанию,
+выписанные явно, как их выписывает интерфейс Метрики.
+
+⚠️ `metrika_private` передают кабинеты (репетитор, ученик, профиль и
+родитель, календарь, печатный листок): в заголовках их страниц стоят имена
+детей, а Метрика по умолчанию пишет заголовок каждой страницы. Справка
+Метрики сама велит в таком случае `sendTitle: false`.
+
+⚠️ `metrika_goal` — ФУНКЦИЯ: она ЗАБИРАЕТ цель из сессии. Поэтому читается
+ровно один раз, через `with`, — так цель и срабатывает один раз на аккаунт.
+Скрипт вдобавок помнит метку цели в localStorage: страницу, открытую снова
+из кэша кнопкой «Назад», браузер исполнит заново, а второй цели быть не должно.
+
+⚠️ `weco.metrikaHit` зовёт `static/track.js` из `trackPage()` — в той же
+точке «экран сменился без перезагрузки», что и своя аналитика беты («Стол»,
+карта тем, «назад» по ним). Смена адреса через replaceState (фильтры,
+период статистики, чистка `?mode=`) просмотром НЕ считается: это тот же
+экран. По справке тег сам History API не отслеживает — для таких сайтов
+она велит звать `hit` вручную.
+{% endcomment %}{% if metrika_id %}{% with goal=metrika_goal %}<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+m[i].l=1*new Date();k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window, document, "script", "https://mc.yandex.ru/metrika/tag.js", "ym");
+ym({{ metrika_id }}, "init", {clickmap: true, trackLinks: true, accurateTrackBounce: true, webvisor: true{% if metrika_private %}, sendTitle: false{% endif %}});
+(function () {
+  var ID = {{ metrika_id }};
+  var weco = window.weco = window.weco || {};
+  /* Любой вызов Метрики — только если `ym` есть: блокировщик может вырезать
+     счётчик целиком, и страница от этого ломаться не должна. */
+  function send(args) {
+    if (typeof window.ym !== 'function') return;
+    try { window.ym.apply(window, [ID].concat(args)); } catch (e) { /* счётчик не роняет страницу */ }
+  }
+  weco.reachGoal = function (name) { send(['reachGoal', name]); };
+  weco.reachGoalOnce = function (name, token) {
+    var key = 'weco_goal_' + token;
+    try {
+      if (window.localStorage.getItem(key)) return;
+      window.localStorage.setItem(key, '1');
+    } catch (e) { /* хранилище закрыто: цель всё равно выдана сервером один раз */ }
+    weco.reachGoal(name);
+  };
+  var last = location.href;
+  weco.metrikaHit = function () {
+    var url = location.href;
+    if (url === last) return;
+    var options = {referer: last};{% if not metrika_private %}
+    options.title = document.title;{% endif %}
+    last = url;
+    send(['hit', url, options]);
+  };{% if goal %}
+  weco.reachGoalOnce('{{ goal.name }}', '{{ goal.token }}');{% endif %}
+})();
+</script>{% endwith %}{% endif %}

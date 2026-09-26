@@ -10,6 +10,7 @@ quirks mode, а KaTeX в quirks mode ОТКАЗЫВАЕТСЯ рисовать �
 <meta charset="utf-8">
 <title>{{ assignment.name }}{% if for_teacher %} · с ответами{% endif %}</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{% include '_metrika.html' with metrika_private=True %}
 
 {% comment %}
 ВЕРСИЯ ДЛЯ ПЕЧАТИ. Отдельная страница, а НЕ обычный экран с
@@ -163,6 +164,7 @@ KaTeX подключён РОВНО ТАК ЖЕ, как в `catalog/base.html`: 
   <span class="hint">Это предпросмотр: работа ещё не создана.</span>
   {% endif %}
 </div>
+{% include '_metrika_noscript.html' %}
 
 <div class="sheet">
   <h1>{{ assignment.name }}</h1>

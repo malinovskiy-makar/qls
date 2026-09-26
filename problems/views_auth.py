@@ -33,9 +33,9 @@ from django.shortcuts import redirect
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.generic.edit import FormView
 
-from problems import ratelimit
+from problems import ratelimit, signup_source
 from problems.forms_accounts import RegisterForm
-from problems.models_platform import UserProfile
+from problems.models_platform import SignupSource, UserProfile
 
 # Имя счётчика. Своё у каждого входа в систему: когда появятся регистрация
 # и восстановление пароля, они возьмут свои имена и свои ступени.
@@ -212,4 +212,12 @@ class RegisterView(FormView):
                                multiplier=1)
 
         login(self.request, user)   # cycle_key Django делает сам
+
+        # Источник регистрации и цель Метрики (ADR 0133) — ПОСЛЕ входа: цель
+        # ложится в сессию. Вид — по выбранной роли. ⚠️ `invited` отсюда не
+        # приходит: ссылки-приглашения в продукте нет, ученик вводит код
+        # занятия уже после регистрации (`student:join_group`).
+        kind = (SignupSource.Kind.TEACHER if profile_role == 'tutor'
+                else SignupSource.Kind.STUDENT)
+        signup_source.record_signup(self.request, user, kind)
         return redirect(self._next() or self.default_next)
