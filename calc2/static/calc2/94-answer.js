@@ -119,6 +119,7 @@ function txRow(blkId, label) {
 
 const ANSWER_OPEN = {};   // раскрытые вопросы «Разбора» по моделям
 let _answerSig = '';
+let _answerMarks = 0;
 let _answerQueued = false;
 function answerSignature() {
   const sb = document.getElementById('sb-body');
@@ -136,7 +137,10 @@ function buildAnswer() {
   const host = document.getElementById('ans-hero');
   if (!host) return;
   const sig = answerSignature();
-  if (sig === _answerSig) return;
+  /* Сцена может переписать табло тем же текстом (пометки is-hero при этом
+     пропадают): тогда собираем заново, хотя подпись та же. */
+  const marks = document.querySelectorAll('#sb-body .stat.is-hero').length;
+  if (sig === _answerSig && marks === _answerMarks) return;
   _answerSig = sig;
   document.querySelectorAll('#sb-body .stat.is-hero').forEach(s => s.classList.remove('is-hero'));
   host.innerHTML = '';
@@ -161,6 +165,7 @@ function buildAnswer() {
     }
   });
   host.hidden = !cells.length;
+  _answerMarks = document.querySelectorAll('#sb-body .stat.is-hero').length;
   // Заголовок группы результатов (README макета, 8): над главными числами.
   const tt = document.getElementById('ans-title');
   const src = document.querySelector('#sec-eq .section-title');
@@ -311,3 +316,16 @@ function buildExplainAccordion() {
   });
   ex._accSig = ex.innerHTML.length + ':' + STATE.sceneKey;
 }
+
+/* Табло пишут и вне перерисовки (отложенные расчёты сцен): «Ответ» следит
+   за ним сам. Пересборка всё равно откладывается на кадр и сравнивает
+   подпись содержимого, поэтому лишней работы на кадре протяжки нет. */
+(function watchScoreboard() {
+  const sb = document.getElementById('sb-body');
+  if (!sb || typeof MutationObserver !== 'function') return;
+  new MutationObserver((list) => {
+    // Свои пометки is-hero «Ответ» ставит сам — на них не отвечаем.
+    if (list.every(m => m.type === 'attributes')) return;
+    scheduleAnswer();
+  }).observe(sb, { childList: true, subtree: true, characterData: true });
+})();
