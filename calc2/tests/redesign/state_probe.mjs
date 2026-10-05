@@ -53,6 +53,12 @@ async function worker() {
         catch (e) { out.skipped.push(c.key + ': ' + String(e.message || e).slice(0, 80)); await L.layerClose(f.page); }
       }
       await L.layerClose(f.page);
+      /* Перед слепком A ленивые кэши (ключи …Sig) сбрасываются так же, как их
+         сбрасывает applyModelState, и перед слепком B ещё раз: ключ кэша
+         пересечений окна не знает, и пересечения, посчитанные на промежуточном
+         кадре (анимация окна прежней модели), расходились на шуме развёртки. Замер 06.10: «Кривая
+         Лаффера» после правок, ложные пересечения у Q ≈ 100 на плоском нуле. */
+      await f.page.evaluate(() => { Object.keys(STATE).forEach(k => { if (/Sig$/.test(k)) STATE[k] = null; }); redrawAll(); });
       await L.settle(f.page);
       const A = await L.observe(f.page);
       const s = await f.page.evaluate(() => JSON.stringify(collectModelState()));
@@ -64,6 +70,7 @@ async function worker() {
       await f.page.evaluate((js) => applyModelState(JSON.parse(js)), s);
       await L.settle(f.page);
       await layer.expand(f.page);
+      await f.page.evaluate(() => { Object.keys(STATE).forEach(k => { if (/Sig$/.test(k)) STATE[k] = null; }); redrawAll(); });
       await L.settle(f.page);
       const B = await L.observe(f.page);
       // Допуск 1e-9, как у инварианта «слепок STATE»: корни ищутся численно.
