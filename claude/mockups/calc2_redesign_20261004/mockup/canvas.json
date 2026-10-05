@@ -1,0 +1,334 @@
+{
+ "v": 3,
+ "attachments": {},
+ "boards": {
+  "AltPalette.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Другая палитра сайта — разметка та же",
+   "w": 1440,
+   "x": 3040,
+   "y": 1264
+  },
+  "Ceil.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Потолок цены: дефицит и потери",
+   "w": 1440,
+   "x": 4560,
+   "y": 2444
+  },
+  "Costs.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Издержки фирмы: убыток при P = 8",
+   "w": 1440,
+   "x": 1520,
+   "y": 2444
+  },
+  "Dark.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Тёмная тема",
+   "w": 1440,
+   "x": 1520,
+   "y": 1264
+  },
+  "Export.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Скачать: PNG, PDF, TeX",
+   "w": 1440,
+   "x": 4560,
+   "y": 3624
+  },
+  "FromProblem.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Графики, открытые из задачи",
+   "w": 1440,
+   "x": 1520,
+   "y": 4804
+  },
+  "KeyPoints.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Ключевые точки, свои точки и площади",
+   "w": 1440,
+   "x": 6080,
+   "y": 3624
+  },
+  "Kit.dc.html": {
+   "h": 1560,
+   "is_interactive": true,
+   "title": "Элементы и состояния",
+   "w": 1640,
+   "x": 4440,
+   "y": 5984
+  },
+  "Main.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Рабочий макет: выбор модели → работа (нажмите Play)",
+   "w": 1440,
+   "x": 0,
+   "y": 0
+  },
+  "Mono.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Монополия: налог и «было»",
+   "w": 1440,
+   "x": 0,
+   "y": 2444
+  },
+  "Moves.dc.html": {
+   "h": 3000,
+   "title": "Что куда переезжает",
+   "w": 1880,
+   "x": 0,
+   "y": 5984
+  },
+  "Narrow.dc.html": {
+   "h": 700,
+   "is_interactive": true,
+   "title": "Ноутбук 1280",
+   "w": 1280,
+   "x": 4560,
+   "y": 1264
+  },
+  "Phone.dc.html": {
+   "h": 844,
+   "is_interactive": true,
+   "title": "Телефон",
+   "w": 390,
+   "x": 3040,
+   "y": 0
+  },
+  "Problem.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Задача в каталоге: «Построить в Графиках»",
+   "w": 1440,
+   "x": 0,
+   "y": 4804
+  },
+  "Schematic.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Любая другая модель — тот же каркас (IS–LM)",
+   "w": 1440,
+   "x": 6080,
+   "y": 2444
+  },
+  "Search.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Поиск на экране выбора",
+   "w": 1440,
+   "x": 7600,
+   "y": 3624
+  },
+  "SelfCheck.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "«Сначала сам»: числа спрятаны, ответ проверяется",
+   "w": 1440,
+   "x": 0,
+   "y": 1264
+  },
+  "Share.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Поделиться ссылкой",
+   "w": 1440,
+   "x": 3040,
+   "y": 3624
+  },
+  "Skeleton.dc.html": {
+   "h": 4700,
+   "title": "Один каркас на 42 модели",
+   "w": 2400,
+   "x": 1960,
+   "y": 5984
+  },
+  "Switcher.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Смена модели из заголовка",
+   "w": 1440,
+   "x": 0,
+   "y": 3624
+  },
+  "Tangent.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Две панели: функция и производная",
+   "w": 1440,
+   "x": 3040,
+   "y": 2444
+  },
+  "ViewSettings.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Вид графика",
+   "w": 1440,
+   "x": 1520,
+   "y": 3624
+  },
+  "Work.dc.html": {
+   "h": 760,
+   "is_interactive": true,
+   "title": "Рабочий экран: налоги и субсидии",
+   "w": 1440,
+   "x": 1520,
+   "y": 0
+  },
+  "PwCard.dc.html": {
+   "x": 0,
+   "y": -1000,
+   "w": 1440,
+   "h": 760,
+   "title": "Кусочная функция: запись в карточке, правка в окне",
+   "is_interactive": true
+  },
+  "PwModal.dc.html": {
+   "x": 1520,
+   "y": -1000,
+   "w": 1440,
+   "h": 760,
+   "title": "Кусочная функция: окно-конструктор",
+   "is_interactive": true
+  },
+  "Keyboard.dc.html": {
+   "x": 3040,
+   "y": -1000,
+   "w": 1440,
+   "h": 760,
+   "title": "Клавиатура формул в карточке функции",
+   "is_interactive": true
+  },
+  "PwMono.dc.html": {
+   "x": 4560,
+   "y": -1000,
+   "w": 1440,
+   "h": 760,
+   "title": "Кусочный спрос у монополии: излом на графике, разрыв MR",
+   "is_interactive": true
+  },
+  "PhonePw.dc.html": {
+   "is_interactive": true,
+   "x": 6080,
+   "y": -1000,
+   "w": 1250,
+   "h": 844,
+   "title": "Телефон: ключевые точки и кусочная функция листом"
+  }
+ },
+ "createdOnFiles": {
+  "at": "2026-09-27T02:55:00Z",
+  "v": 1
+ },
+ "designSystems": [
+  {
+   "artifact": "https://claude.ai/artifact/Na6skckB6LAKFXc79H44FJ",
+   "copiedAt": "2026-09-27T02:55:00Z",
+   "namespace": "weconomics",
+   "title": "weconomics.ai дизайн система (ориентир)",
+   "version": "1790094453-0fba"
+  }
+ ],
+ "launch": {
+  "view": "canvas"
+ },
+ "notes": {
+  "rowA": {
+   "kind": "title1",
+   "maxW": 3430,
+   "text": "Главный сценарий: выбор модели → рабочий экран → телефон",
+   "w": 240,
+   "x": 0,
+   "y": -260
+  },
+  "rowB": {
+   "kind": "title1",
+   "maxW": 5840,
+   "text": "Рабочий экран: «Сначала сам», тёмная тема, другая палитра, 1280",
+   "w": 240,
+   "x": 0,
+   "y": 1004
+  },
+  "rowC": {
+   "kind": "title1",
+   "maxW": 7520,
+   "text": "Одна раскладка — любая из 42 моделей",
+   "w": 240,
+   "x": 0,
+   "y": 2184
+  },
+  "rowD": {
+   "kind": "title1",
+   "maxW": 8000,
+   "text": "Всплывающие окна, поиск, свои точки",
+   "w": 240,
+   "x": 0,
+   "y": 3364
+  },
+  "rowE": {
+   "kind": "title1",
+   "maxW": 2960,
+   "text": "Из задачи в каталоге — сразу в «Графики»",
+   "w": 240,
+   "x": 0,
+   "y": 4544
+  },
+  "rowF": {
+   "kind": "title1",
+   "maxW": 6080,
+   "text": "Спецификация переноса в calc2",
+   "w": 240,
+   "x": 0,
+   "y": 5724
+  },
+  "rowN": {
+   "kind": "title1",
+   "maxW": 7330,
+   "text": "Решения 04.10: кусочная функция в окне, клавиатура формул, телефон",
+   "w": 240,
+   "x": 0,
+   "y": -1260
+  }
+ },
+ "order": [
+  "PwCard.dc.html",
+  "PwModal.dc.html",
+  "Keyboard.dc.html",
+  "PwMono.dc.html",
+  "PhonePw.dc.html",
+  "Main.dc.html",
+  "Work.dc.html",
+  "Phone.dc.html",
+  "SelfCheck.dc.html",
+  "Dark.dc.html",
+  "AltPalette.dc.html",
+  "Narrow.dc.html",
+  "Mono.dc.html",
+  "Costs.dc.html",
+  "Tangent.dc.html",
+  "Ceil.dc.html",
+  "Schematic.dc.html",
+  "Switcher.dc.html",
+  "ViewSettings.dc.html",
+  "Share.dc.html",
+  "Export.dc.html",
+  "KeyPoints.dc.html",
+  "Search.dc.html",
+  "Problem.dc.html",
+  "FromProblem.dc.html",
+  "Moves.dc.html",
+  "Skeleton.dc.html",
+  "Kit.dc.html"
+ ],
+ "pages": [],
+ "title": "Графики — редизайн"
+}

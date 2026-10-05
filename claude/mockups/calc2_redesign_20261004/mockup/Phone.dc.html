@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Графики: телефон</title>
+<script src="./support.js"></script>
+<script src="./calc-core.js"></script>
+<script src="./calc-data.js"></script>
+<script src="./calc-models.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,400;0,500;0,600;0,700;1,400&amp;family=STIX+Two+Text:ital,wght@0,400;0,500;0,600;1,400;1,500&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div data-gx-root="1" style="width: 390px; height: 844px; position: relative; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; font-family: Montserrat, -apple-system, 'Segoe UI', Roboto, sans-serif; font-size: 15px; line-height: 1.45; color: var(--text); background: var(--bg); {{themeVars}}">
+
+  <nav aria-label="Разделы сайта" style="height: 48px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 12px; background: var(--nav-bg)">
+    <a href="#" onClick="{{noop}}" aria-label="Weconomics: на главную" style="display: flex; align-items: center; margin-right: auto">
+      <svg width="27" height="27" viewBox="462.93 309.68 518.88 518.88" aria-hidden="true"><circle cx="722.37" cy="569.12" r="259.44" fill="#fffce6"></circle><path fill="#00797a" d="M642.06,563.96c9.65,1.3,15.72-.48,19.34-2.17,33.6-15.63,8.24-93.38,37.43-103.25,2.14-.72,3.83-.83,5.3-.92,24.32-1.49,34.63,33.17,63.93,69.23,27.28,33.6,58.57,53.06,60.78,51.53,2.03-1.41-18.43-22.03-38.6-59.01-16.15-29.63-16.83-41.72-10.59-51.07,4.66-6.99,15.87-16.47,26.02-14.71,6.87,1.19,10.37,7.02,11.57,9.35,31,43.4,144.89,207.42,94.41,246.1-7.23,5.54-15.9,7.02-16.7,7.15-70.06,11.23-131.7-170.43-170.73-161.74-35.48,7.89-9.21,164.15-41.35,172.71-21.2,5.64-67.95-52.92-168.45-268.5-2.35-17.39-.72-27.19,4.86-29.42,14.43-5.76,55.36,39.16,122.78,134.73Z"></path></svg>
+    </a>
+    <button type="button" onClick="{{toggleTheme}}" aria-label="Сменить тему" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 15px; color: rgba(255,255,255,.7); background: none; border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; cursor: pointer">{{themeGlyph}}</button>
+    <span style="width: 34px; height: 34px; border-radius: 999px; background: rgba(255,255,255,.16); color: #ffffff; display: flex; align-items: center; justify-content: center">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21a8 8 0 0 1 16 0"></path></svg>
+    </span>
+    <button type="button" onClick="{{noop}}" aria-label="Меню" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; font-size: 16px; color: rgba(255,255,255,.7); background: none; border: 0.5px solid rgba(255,255,255,.2); border-radius: 6px; cursor: pointer">☰</button>
+  </nav>
+
+  <header style="height: 58px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 6px; box-sizing: border-box; background: var(--surface); border-bottom: 1px solid var(--border)">
+    <button type="button" onClick="{{openList}}" aria-label="Все модели" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"></rect><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"></rect><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"></rect></svg>
+    </button>
+    <button type="button" onClick="{{openList}}" aria-haspopup="dialog" style="flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: flex-start; padding: 2px 6px; font: inherit; color: inherit; text-align: left; background: transparent; border: 0; border-radius: 8px; cursor: pointer">
+      <span style="font-size: 12px; line-height: 1.3; font-weight: 500; color: var(--text3)">{{blockName}}</span>
+      <span style="display: flex; align-items: center; gap: 4px; max-width: 100%; font-size: 17px; line-height: 1.3; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{modelName}}<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0"><path d="m6 9 6 6 6-6"></path></svg></span>
+    </button>
+    <button type="button" onClick="{{undo}}" aria-label="Отменить" disabled="{{noUndo}}" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer; opacity: {{undoOp}}">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"></path></svg>
+    </button>
+    <button type="button" onClick="{{toggleMore}}" aria-label="Ещё действия" aria-haspopup="dialog" aria-expanded="{{moreStr}}" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.9"></circle><circle cx="12" cy="12" r="1.9"></circle><circle cx="19" cy="12" r="1.9"></circle></svg>
+    </button>
+    <button type="button" onClick="{{share}}" aria-label="Поделиться" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--on-btn); background: var(--btn-bg); border: 0; border-radius: 8px; cursor: pointer">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+    </button>
+  </header>
+
+  <div style="flex-shrink: 0; padding: 8px 8px 0; box-sizing: border-box">
+    <div style="position: relative; background: var(--canvas); border: 1px solid var(--border); border-radius: 12px; overflow: hidden">
+      <svg width="{{svgW}}" height="{{svgH}}" viewBox="0 0 {{svgW}} {{svgH}}" role="img" aria-label="{{chartAria}}" onPointerMove="{{svgMove}}" onPointerUp="{{svgUp}}" onPointerCancel="{{svgUp}}" onClick="{{bgTap}}" style="display: block; touch-action: none; user-select: none; font-family: 'STIX Two Text', 'Times New Roman', serif">
+        <defs><sc-for list="{{panels}}" as="pn"><clipPath id="{{pn.clipId}}"><rect x="{{pn.plot.x}}" y="{{pn.plot.y}}" width="{{pn.plot.w}}" height="{{pn.plot.h}}"></rect></clipPath></sc-for></defs>
+        <sc-for list="{{panels}}" as="pn">
+          <g>
+            <sc-if value="{{pn.hasTitle}}"><text x="{{pn.title.x}}" y="{{pn.title.y}}" style="font-family: Montserrat, sans-serif; font-size: 12px; font-weight: 600; fill: var(--ink-soft)">{{pn.title.t}}</text></sc-if>
+            <sc-for list="{{pn.grid}}" as="g"><line x1="{{g.x1}}" y1="{{g.y1}}" x2="{{g.x2}}" y2="{{g.y2}}" stroke="{{g.c}}" stroke-width="1"></line></sc-for>
+            <g clip-path="{{pn.clipUrl}}">
+              <sc-for list="{{pn.fills}}" as="f"><polygon points="{{f.pts}}" fill="{{f.fill}}"></polygon></sc-for>
+              <sc-for list="{{pn.dashes}}" as="d"><line x1="{{d.x1}}" y1="{{d.y1}}" x2="{{d.x2}}" y2="{{d.y2}}" stroke="var(--ink-soft)" stroke-width="1.2" stroke-dasharray="4 4"></line></sc-for>
+              <sc-for list="{{pn.curves}}" as="c"><path d="{{c.d}}" fill="none" stroke="{{c.color}}" stroke-width="{{c.w}}" stroke-dasharray="{{c.dash}}" stroke-linecap="round" stroke-linejoin="round"></path></sc-for>
+              <sc-for list="{{pn.segs}}" as="sg"><line x1="{{sg.x1}}" y1="{{sg.y1}}" x2="{{sg.x2}}" y2="{{sg.y2}}" stroke="{{sg.color}}" stroke-width="{{sg.w}}" stroke-dasharray="{{sg.dash}}" stroke-linecap="round"></line></sc-for>
+            </g>
+            <line x1="{{pn.axis.x.x1}}" y1="{{pn.axis.x.y1}}" x2="{{pn.axis.x.x2}}" y2="{{pn.axis.x.y2}}" stroke="var(--ink)" stroke-width="1.3"></line>
+            <line x1="{{pn.axis.y.x1}}" y1="{{pn.axis.y.y1}}" x2="{{pn.axis.y.x2}}" y2="{{pn.axis.y.y2}}" stroke="var(--ink)" stroke-width="1.3"></line>
+            <path d="{{pn.axis.arrowX}}" fill="var(--ink)"></path>
+            <path d="{{pn.axis.arrowY}}" fill="var(--ink)"></path>
+            <text x="{{pn.axis.nameX.x}}" y="{{pn.axis.nameX.y}}" text-anchor="start" style="font-size: 16px; font-style: italic; fill: var(--ink)">{{pn.axis.nameX.t}}</text>
+            <text x="{{pn.axis.nameY.x}}" y="{{pn.axis.nameY.y}}" text-anchor="middle" style="font-size: 16px; font-style: italic; fill: var(--ink)">{{pn.axis.nameY.t}}</text>
+            <sc-for list="{{pn.ticksX}}" as="t"><text x="{{t.x}}" y="{{t.y}}" text-anchor="middle" style="font-size: 11.5px; fill: var(--ink-soft)">{{t.t}}</text></sc-for>
+            <sc-for list="{{pn.ticksY}}" as="t"><text x="{{t.x}}" y="{{t.y}}" text-anchor="end" style="font-size: 11.5px; fill: var(--ink-soft)">{{t.t}}</text></sc-for>
+            <sc-for list="{{pn.labels}}" as="l"><text x="{{l.x}}" y="{{l.y}}" text-anchor="{{l.anchor}}" fill="{{l.color}}" style="{{l.st}}"><sc-for list="{{l.parts}}" as="p"><tspan style="{{p.style}}">{{p.t}}</tspan></sc-for></text></sc-for>
+            <sc-for list="{{pn.keyTicks}}" as="k"><text x="{{k.x}}" y="{{k.y}}" text-anchor="{{k.anchor}}" style="font-size: 12.5px; font-weight: 600; fill: var(--ink); paint-order: stroke; stroke: var(--halo); stroke-width: 4px; stroke-linejoin: round"><sc-for list="{{k.parts}}" as="p"><tspan style="{{p.style}}">{{p.t}}</tspan></sc-for></text></sc-for>
+            <sc-for list="{{pn.hits}}" as="h"><path d="{{h.d}}" fill="none" stroke="transparent" stroke-width="28" style="pointer-events: stroke" onClick="{{h.tap}}"></path></sc-for>
+            <sc-for list="{{pn.points}}" as="pt"><circle cx="{{pt.cx}}" cy="{{pt.cy}}" r="{{pt.r}}" fill="{{pt.fill}}" stroke="{{pt.stroke}}" stroke-width="{{pt.sw}}" style="pointer-events: none"></circle></sc-for>
+            <sc-for list="{{pn.handles}}" as="hd">
+              <g style="cursor: {{hd.cursor}}" onPointerDown="{{hd.down}}">
+                <circle cx="{{hd.cx}}" cy="{{hd.cy}}" r="22" fill="transparent"></circle>
+                <circle cx="{{hd.cx}}" cy="{{hd.cy}}" r="10" fill="var(--canvas)" stroke="var(--ink)" stroke-width="2"></circle>
+                <circle cx="{{hd.cx}}" cy="{{hd.cy}}" r="3.5" fill="var(--ink)"></circle>
+                <rect x="{{hd.px}}" y="{{hd.py}}" width="{{hd.pw}}" height="{{hd.ph}}" rx="12" fill="var(--btn-bg)"></rect>
+                <text x="{{hd.tx}}" y="{{hd.ty}}" text-anchor="middle" style="font-family: Montserrat, sans-serif; font-size: 12px; font-weight: 600; fill: var(--on-btn)">{{hd.text}}</text>
+              </g>
+            </sc-for>
+            <sc-for list="{{pn.kps}}" as="kp"><circle cx="{{kp.cx}}" cy="{{kp.cy}}" r="22" fill="transparent" onClick="{{kp.tap}}"></circle><circle cx="{{kp.cx}}" cy="{{kp.cy}}" r="{{kp.gr}}" fill="{{kp.color}}" opacity="{{kp.go}}" style="pointer-events: none"></circle><circle cx="{{kp.cx}}" cy="{{kp.cy}}" r="{{kp.r}}" fill="{{kp.color}}" stroke="var(--canvas)" stroke-width="1.5" style="pointer-events: none"></circle></sc-for>
+            <sc-if value="{{pn.hasTip}}"><g style="pointer-events: none"><rect x="{{pn.tip.px}}" y="{{pn.tip.py}}" width="{{pn.tip.pw}}" height="{{pn.tip.ph}}" rx="14" fill="var(--btn-bg)"></rect><text x="{{pn.tip.tx}}" y="{{pn.tip.ty}}" style="font-family: Montserrat, sans-serif; font-size: 13px; font-weight: 600; fill: var(--on-btn)">{{pn.tip.t}}</text></g></sc-if>
+          </g>
+        </sc-for>
+        <sc-if value="{{note.show}}">
+          <g transform="{{note.tf}}" fill="none" stroke-linecap="round">
+            <sc-for list="{{note.prims}}" as="p">
+              <sc-if value="{{p.isPath}}"><path d="{{p.d}}" stroke="{{p.stroke}}" stroke-width="{{p.sw2}}" fill="{{p.fill}}" stroke-dasharray="{{p.dash}}" vector-effect="non-scaling-stroke"></path></sc-if>
+              <sc-if value="{{p.isCircle}}"><circle cx="{{p.cx}}" cy="{{p.cy}}" r="{{p.r}}" stroke="{{p.stroke}}" fill="{{p.fill}}" vector-effect="non-scaling-stroke"></circle></sc-if>
+              <sc-if value="{{p.isRect}}"><rect x="{{p.x}}" y="{{p.y}}" width="{{p.w}}" height="{{p.h}}" rx="{{p.rx}}" stroke="{{p.stroke}}" stroke-width="{{p.sw2}}" fill="{{p.fill}}" vector-effect="non-scaling-stroke"></rect></sc-if>
+            </sc-for>
+          </g>
+        </sc-if>
+      </svg>
+    </div>
+  </div>
+
+  <div style="flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: 8px; background: var(--surface); border-top: 1px solid var(--border); border-radius: 14px 14px 0 0">
+    <div role="tablist" aria-label="Панели" style="flex-shrink: 0; display: flex; gap: 2px; margin: 8px 12px 0; padding: 3px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px">
+      <sc-for list="{{tabs}}" as="tb"><button type="button" role="tab" aria-selected="{{tb.sel}}" onClick="{{tb.pick}}" style="{{tb.st}}">{{tb.label}}</button></sc-for>
+    </div>
+    <div style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: 12px 12px 24px; display: flex; flex-direction: column; gap: 14px">
+      <sc-if value="{{tabLeft}}">
+        <sc-for list="{{left}}" as="sec">
+          <section aria-label="{{sec.title}}" style="flex-shrink: 0; display: flex; flex-direction: column; gap: 10px">
+            <h3 style="margin: 0; font-size: 15px; font-weight: 600">{{sec.title}}</h3>
+            <sc-if value="{{sec.isFns}}">
+              <sc-for list="{{sec.rows}}" as="r">
+                <div style="display: flex; flex-direction: column; gap: 8px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px">
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 999px; background: {{r.color}}"></span>
+                    <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 18px"><sc-for list="{{r.symT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                    <span style="flex: 1; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{r.name}}</span>
+                    <sc-if value="{{r.canHide}}"><button type="button" onClick="{{r.toggleVis}}" aria-pressed="{{r.hiddenStr}}" aria-label="{{r.visLabel}}" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text2); background: transparent; border: 0; border-radius: 8px; cursor: pointer; margin: -8px -6px -8px 0"><sc-if value="{{r.visible}}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12Z"></path><circle cx="12" cy="12" r="3"></circle></svg></sc-if><sc-if value="{{r.hidden}}"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"></path><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.5 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.2"></path><path d="M6.6 6.6C3.8 8.4 2 12 2 12s3.5 7 10 7c1.7 0 3.2-.5 4.5-1.2"></path></svg></sc-if></button></sc-if>
+                    <sc-if value="{{r.isExtra}}"><button type="button" onClick="{{r.remove}}" aria-label="Удалить функцию {{r.name}}" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text2); background: transparent; border: 0; border-radius: 8px; cursor: pointer; margin: -8px -8px -8px 0"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></sc-if>
+                  </div>
+                  <sc-if value="{{r.single}}">
+                    <label style="display: flex; align-items: center; gap: 8px; height: 46px; box-sizing: border-box; padding: 0 0 0 12px; background: var(--surface-2); border: 1px solid {{r.fieldBorder}}; border-radius: 8px">
+                      <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 17px; color: var(--text2); white-space: nowrap"><sc-for list="{{r.prefT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                      <input type="text" value="{{r.text}}" onChange="{{r.edit}}" onFocus="{{r.focus}}" onBlur="{{r.blur}}" readonly="{{r.ro}}" aria-label="Формула: {{r.name}}" spellcheck="false" autocomplete="off" style="flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: transparent; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 19px; color: var(--text)">
+                      <sc-if value="{{r.canPw}}"><button type="button" onClick="{{r.pwOn}}" aria-label="Задать кусками: {{r.name}}" style="width: 44px; height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0 0 3px; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 24px; line-height: 1; color: var(--text3); background: transparent; border: 0; border-radius: 8px; cursor: pointer">{{r.braceGlyph}}</button></sc-if>
+                    </label>
+                  </sc-if>
+                  <sc-if value="{{r.showRecord}}">
+                    <div role="{{r.recRole}}" tabindex="{{r.recTab}}" aria-label="{{r.recLabel}}" onClick="{{r.recClick}}" style="display: flex; align-items: center; gap: 5px; min-height: 46px; box-sizing: border-box; padding: 8px 4px 8px 12px; background: var(--surface-2); border: 1px solid {{r.fieldBorder}}; border-radius: 8px; cursor: {{r.recCursor}}">
+                      <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 17px; color: var(--text2); white-space: nowrap"><sc-for list="{{r.prefT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                      <svg width="10" height="{{r.recH}}" viewBox="0 0 10 {{r.recH}}" aria-hidden="true" style="flex-shrink: 0; overflow: visible"><path d="{{r.recBrace}}" fill="none" stroke="var(--text2)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                      <div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px">
+                        <sc-for list="{{r.rec}}" as="rc">
+                          <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 10px; height: 24px">
+                            <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 18px; white-space: nowrap"><sc-for list="{{rc.toks}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                            <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 14px; color: var(--text3); white-space: nowrap"><sc-for list="{{rc.cond}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                          </div>
+                        </sc-for>
+                      </div>
+                      <sc-if value="{{r.pw}}"><span aria-hidden="true" style="flex-shrink: 0; width: 40px; height: 40px; display: inline-flex; align-items: center; justify-content: center; color: var(--text3)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"></path><path d="m13.5 6.5 4 4"></path></svg></span></sc-if>
+                    </div>
+                  </sc-if>
+                  <sc-for list="{{r.notes}}" as="nt"><div style="font-size: 13px; line-height: 1.45; color: var(--amber-ink)">{{nt.t}}</div></sc-for>
+                  <sc-if value="{{r.hasError}}"><div role="alert" style="font-size: 13px; line-height: 1.45; color: var(--error-ink)">{{r.error}}. График держит последнюю верную запись.</div></sc-if>
+                  <sc-if value="{{r.isQP}}"><div style="font-size: 13px; color: var(--text2)">Q(P) · в расчётах <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 16px; color: var(--text)">{{r.canonText}}</span></div></sc-if>
+                </div>
+              </sc-for>
+              <sc-if value="{{sec.canAdd}}">
+                <button type="button" onClick="{{sec.add}}" style="display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; font: inherit; font-size: 15px; font-weight: 500; color: var(--text2); background: transparent; border: 1px dashed var(--border-strong); border-radius: 10px; cursor: pointer">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>{{sec.addLabel}}
+                </button>
+              </sc-if>
+            </sc-if>
+            <sc-if value="{{sec.hasItems}}">
+              <sc-for list="{{sec.items}}" as="it">
+                <sc-if value="{{it.isSeg}}">
+                  <div style="display: flex; flex-direction: column; gap: 6px">
+                    <sc-if value="{{it.hasLabel}}"><span style="font-size: 13px; font-weight: 500; color: var(--text2)">{{it.label}}</span></sc-if>
+                    <div role="group" aria-label="{{it.aria}}" style="display: flex; flex-wrap: wrap; gap: 2px; padding: 3px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 10px">
+                      <sc-for list="{{it.options}}" as="o"><button type="button" aria-pressed="{{o.pressed}}" onClick="{{o.pick}}" style="{{o.st}}">{{o.label}}</button></sc-for>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{it.isSlider}}">
+                  <div style="display: flex; flex-direction: column; gap: 4px">
+                    <div style="display: flex; align-items: baseline; gap: 8px">
+                      <span style="font-size: 13px; font-weight: 500; color: var(--text2)">{{it.label}}</span>
+                      <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 16px"><sc-for list="{{it.symT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                      <span style="flex: 1"></span>
+                      <span style="font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums">{{it.text}}{{it.unit}}</span>
+                    </div>
+                    <input type="range" min="{{it.min}}" max="{{it.max}}" step="{{it.step}}" value="{{it.value}}" onChange="{{it.slide}}" aria-label="{{it.label}}" style="width: 100%; height: 32px; margin: 0; accent-color: var(--accent)">
+                  </div>
+                </sc-if>
+                <sc-if value="{{it.isToggle}}">
+                  <label style="display: flex; align-items: center; gap: 12px; min-height: 44px; font-size: 15px; cursor: pointer">
+                    <input type="checkbox" checked="{{it.on}}" onChange="{{it.flip}}" disabled="{{it.dis}}" style="width: 22px; height: 22px; margin: 0; accent-color: var(--accent)">
+                    <sc-if value="{{it.hasSwatch}}"><span aria-hidden="true" style="width: 14px; height: 14px; border-radius: 4px; background: {{it.swatch}}; box-shadow: inset 0 0 0 1px var(--border-soft)"></span></sc-if>
+                    <span style="flex: 1">{{it.label}}</span>
+                  </label>
+                </sc-if>
+                <sc-if value="{{it.isStatic}}">
+                  <div style="display: flex; justify-content: space-between; gap: 12px; font-size: 14px"><span style="color: var(--text2)">{{it.label}}</span><span style="font-weight: 500">{{it.value}}</span></div>
+                </sc-if>
+              </sc-for>
+            </sc-if>
+          </section>
+        </sc-for>
+      </sc-if>
+
+      <sc-if value="{{tabAnswer}}">
+        <button type="button" onClick="{{toggleSelf}}" aria-pressed="{{selfStr}}" style="flex-shrink: 0; align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px 0 10px; font: inherit; font-size: 14px; font-weight: 500; color: var(--text); background: var(--surface); border: 1px solid {{selfBorder}}; border-radius: 999px; cursor: pointer">
+          <span aria-hidden="true" style="{{selfTrackSt}}"><span style="{{selfKnobSt}}"></span></span>Сначала сам: спрятать числа
+        </button>
+        <sc-if value="{{st.show}}"><div role="status" style="flex-shrink: 0; padding: 10px 12px; font-size: 14px; line-height: 1.5; color: {{st.color}}; background: {{st.bg}}; border: 1px solid {{st.border}}; border-radius: 10px">{{st.text}}</div></sc-if>
+        <div style="flex-shrink: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border: 1px solid var(--border); border-radius: 10px; overflow: hidden">
+          <sc-for list="{{heroes}}" as="h">
+            <div style="{{h.cellSt}}">
+              <div style="font-size: 13px; line-height: 1.35; font-weight: 500; color: var(--text2)">{{h.label}}</div>
+              <sc-if value="{{h.showVal}}">
+                <div style="display: flex; align-items: baseline; flex-wrap: wrap; gap: 0 6px; font-family: 'STIX Two Text', 'Times New Roman', serif">
+                  <span style="font-size: 16px; color: var(--text2); white-space: nowrap"><sc-for list="{{h.symT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for> =</span>
+                  <span style="font-size: {{h.vsize}}px; line-height: 1.15; font-weight: 500; white-space: nowrap">{{h.value}}</span>
+                </div>
+              </sc-if>
+              <sc-if value="{{h.ask}}">
+                <label style="display: flex; align-items: center; gap: 6px; font-family: 'STIX Two Text', 'Times New Roman', serif">
+                  <span style="font-size: 16px; color: var(--text2); white-space: nowrap"><sc-for list="{{h.symT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for> =</span>
+                  <input type="text" inputmode="decimal" value="{{h.guess}}" onChange="{{h.type}}" onKeyDown="{{h.key}}" placeholder="?" aria-label="Ваш ответ: {{h.label}}" style="width: 100%; min-width: 0; height: 44px; box-sizing: border-box; padding: 0 6px; text-align: center; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 19px; color: var(--text); background: var(--surface-2); border: 1px solid {{h.inputBorder}}; border-radius: 8px; outline: none">
+                </label>
+                <div style="display: flex; align-items: center; gap: 4px">
+                  <button type="button" onClick="{{h.check}}" style="flex: 1; min-height: 44px; padding: 0 6px; font: inherit; font-size: 14px; font-weight: 600; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer">Проверить</button>
+                  <button type="button" onClick="{{h.reveal}}" style="min-height: 44px; padding: 0 6px; font: inherit; font-size: 14px; font-weight: 500; color: var(--accent-ink); background: transparent; border: 0; cursor: pointer; text-decoration: underline; text-underline-offset: 3px">Показать</button>
+                </div>
+                <sc-if value="{{h.ok}}"><div role="status" style="align-self: flex-start; padding: 2px 9px; font-size: 13px; font-weight: 600; color: var(--green-ink); background: var(--green-tint); border: 1px solid var(--green-border); border-radius: 999px">✓ верно</div></sc-if>
+                <sc-if value="{{h.bad}}"><div role="status" style="align-self: flex-start; padding: 2px 9px; font-size: 13px; font-weight: 600; color: var(--error-ink); background: var(--error-tint); border: 1px solid var(--error-border); border-radius: 999px">✗ не сходится</div></sc-if>
+              </sc-if>
+              <sc-if value="{{h.hasWas}}"><div style="font-size: 13px; color: var(--text3); white-space: nowrap">было {{h.was}} · {{h.delta}}</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+        <sc-for list="{{tables}}" as="tb">
+          <div style="flex-shrink: 0; display: flex; flex-direction: column">
+            <div style="font-size: 15px; font-weight: 600; padding-bottom: 4px">{{tb.title}}</div>
+            <sc-for list="{{tb.rows}}" as="rw">
+              <div style="display: grid; grid-template-columns: {{tb.grid}}; gap: 8px; align-items: baseline; padding: 8px 0; border-bottom: 1px solid var(--border-soft); font-size: 14px">
+                <span>{{rw.label}}</span>
+                <sc-for list="{{rw.cells}}" as="cl"><span style="{{cl.st}}">{{cl.t}}</span></sc-for>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+        <sc-if value="{{ff.show}}">
+          <div style="flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px">
+            <div style="display: flex; flex-direction: column; gap: 2px">
+              <span style="font-size: 13px; font-weight: 500; color: var(--text2)">{{ff.name}}</span>
+              <sc-if value="{{ff.isOne}}"><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 20px"><sc-for list="{{ff.toks}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span></sc-if>
+              <sc-if value="{{ff.isRows}}">
+                <div style="display: flex; align-items: center; gap: 5px">
+                  <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 19px; white-space: nowrap"><sc-for list="{{ff.prefT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                  <svg width="10" height="{{ff.h}}" viewBox="0 0 10 {{ff.h}}" aria-hidden="true" style="flex-shrink: 0; overflow: visible"><path d="{{ff.brace}}" fill="none" stroke="var(--text2)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                  <div style="display: flex; flex-direction: column; gap: 4px">
+                    <sc-for list="{{ff.rows}}" as="rc">
+                      <div style="display: flex; align-items: baseline; gap: 12px; height: 24px; font-family: 'STIX Two Text', 'Times New Roman', serif; white-space: nowrap">
+                        <span style="font-size: 19px"><sc-for list="{{rc.toks}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                        <span style="font-size: 14px; color: var(--text3)"><sc-for list="{{rc.cond}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                      </div>
+                    </sc-for>
+                  </div>
+                </div>
+              </sc-if>
+            </div>
+            <button type="button" onClick="{{ff.copy}}" aria-label="Копировать итоговую функцию" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="11" height="11" rx="2"></rect><path d="M5 15V5a2 2 0 0 1 2-2h8"></path></svg>
+            </button>
+          </div>
+        </sc-if>
+      </sc-if>
+
+      <sc-if value="{{tabExplain}}">
+        <sc-for list="{{ex.items}}" as="e">
+          <div style="flex-shrink: 0; border-top: 1px solid var(--border-soft)">
+            <button type="button" onClick="{{e.toggle}}" aria-expanded="{{e.openStr}}" style="width: 100%; min-height: 48px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 0; text-align: left; font: inherit; font-size: 15px; font-weight: 600; color: var(--text); background: transparent; border: 0; cursor: pointer">
+              <span><sc-for list="{{e.q}}" as="sg"><sc-if value="{{sg.isText}}">{{sg.text}}</sc-if><sc-if value="{{sg.isMath}}"><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; white-space: nowrap"><sc-for list="{{sg.t}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span></sc-if></sc-for></span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex-shrink: 0; transform: rotate({{e.rot}}deg)"><path d="m6 9 6 6 6-6"></path></svg>
+            </button>
+            <sc-if value="{{e.open}}"><p style="margin: 0 0 12px; font-size: 15px; line-height: 1.6"><sc-for list="{{e.a}}" as="sg"><sc-if value="{{sg.isText}}">{{sg.text}}</sc-if><sc-if value="{{sg.isMath}}"><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; white-space: nowrap"><sc-for list="{{sg.t}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span></sc-if></sc-for></p></sc-if>
+          </div>
+        </sc-for>
+      </sc-if>
+    </div>
+  </div>
+
+  <sc-if value="{{listOpen}}" hint-placeholder-val="{{false}}">
+    <div role="dialog" aria-label="Все модели" style="position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; background: var(--surface)">
+      <div style="height: 58px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 0 6px 0 16px; border-bottom: 1px solid var(--border)">
+        <span style="flex: 1; font-size: 19px; font-weight: 600">Модели</span>
+        <button type="button" onClick="{{closeList}}" aria-label="Закрыть" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <div style="padding: 12px 12px 8px">
+        <label style="display: flex; align-items: center; gap: 10px; height: 46px; box-sizing: border-box; padding: 0 12px; background: var(--surface-2); border: 1px solid var(--border-strong); border-radius: 10px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text2)" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+          <input type="search" value="{{q}}" onChange="{{onQ}}" placeholder="Налог, КПВ, монополия…" aria-label="Поиск модели" style="flex: 1; min-width: 0; height: 100%; border: 0; outline: none; background: transparent; font: inherit; font-size: 16px; color: var(--text)">
+        </label>
+      </div>
+      <div style="flex: 1; min-height: 0; overflow-y: auto; padding: 0 12px 20px">
+        <sc-if value="{{showCont}}">
+          <button type="button" onClick="{{cont.open}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 2px; width: 100%; margin-top: 4px; padding: 10px 12px; box-sizing: border-box; text-align: left; font: inherit; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: 12px; cursor: pointer">
+            <span style="font-size: 13px; font-weight: 500; color: var(--text3)">Продолжить с того места · {{cont.when}}</span>
+            <span style="font-size: 16px; font-weight: 600">{{cont.name}}</span>
+            <span style="max-width: 100%; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 15px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis">{{cont.summary}}</span>
+          </button>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px; padding-top: 10px">
+            <sc-for list="{{recents}}" as="rc"><button type="button" onClick="{{rc.open}}" style="min-height: 40px; padding: 0 12px; font: inherit; font-size: 14px; color: var(--text); background: var(--chip-bg); border: 0; border-radius: 999px; cursor: pointer">{{rc.name}} <span style="font-size: 12.5px; color: var(--text3)">{{rc.when}}</span></button></sc-for>
+          </div>
+        </sc-if>
+        <sc-for list="{{groups}}" as="g">
+          <div style="display: flex; flex-direction: column; padding-top: 12px">
+            <div style="font-size: 13px; font-weight: 600; color: var(--text2); padding: 0 4px 4px">{{g.name}}</div>
+            <sc-for list="{{g.items}}" as="it">
+              <button type="button" onClick="{{it.pick}}" style="{{it.st}}">{{it.name}}</button>
+            </sc-for>
+            <sc-if value="{{g.hasSoon}}"><p style="margin: 4px 0 0; padding: 0 4px; font-size: 13px; line-height: 1.5; color: var(--text3)"><span style="display: inline-block; margin-right: 6px; padding: 0 7px; font-size: 12px; font-weight: 500; line-height: 1.6; border-radius: 999px; background: var(--chip-bg); color: var(--chip-text)">скоро</span>{{g.soonText}}</p></sc-if>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{pwd.show}}" hint-placeholder-val="{{false}}">
+    <div role="dialog" aria-modal="true" aria-label="Кусочная функция" style="position: absolute; inset: 0; z-index: 26; display: flex; flex-direction: column; background: var(--surface)">
+      <div style="min-height: 58px; flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 6px 6px 6px 16px; box-sizing: border-box; border-bottom: 1px solid var(--border)">
+        <div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+          <span style="font-size: 19px; line-height: 1.25; font-weight: 600">Кусочная функция</span>
+          <span style="display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis"><span aria-hidden="true" style="width: 10px; height: 10px; flex-shrink: 0; border-radius: 999px; background: {{pwd.color}}"></span><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 16px; color: var(--text)"><sc-for list="{{pwd.symT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>{{pwd.name}}</span>
+        </div>
+        <button type="button" onClick="{{pwd.cancel}}" aria-label="Закрыть без изменений" style="width: 44px; height: 44px; flex-shrink: 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg>
+        </button>
+      </div>
+      <div style="flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding: 12px 12px 16px">
+        <div style="font-size: 13.5px; line-height: 1.5; color: var(--text2)">Впишите формулу каждого куска и границы, в которых он действует. График изменится после «Готово».</div>
+        <div style="display: flex; align-items: center; gap: 6px">
+          <span style="flex: 1; font-size: 14.5px; font-weight: 500">Сколько кусков</span>
+          <button type="button" onClick="{{pwd.minus}}" disabled="{{pwd.noMinus}}" aria-label="Меньше кусков" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer; opacity: {{pwd.minusOp}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M5 12h14"></path></svg></button>
+          <span aria-live="polite" style="width: 34px; text-align: center; font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums">{{pwd.count}}</span>
+          <button type="button" onClick="{{pwd.plus}}" disabled="{{pwd.noPlus}}" aria-label="Больше кусков" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer; opacity: {{pwd.plusOp}}"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg></button>
+        </div>
+        <sc-for list="{{pwd.rows}}" as="rw">
+          <div style="display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px 12px; border: 1px solid var(--border); border-radius: 10px">
+            <div style="display: flex; align-items: center; justify-content: space-between; min-height: 30px">
+              <span style="font-size: 13px; font-weight: 500; color: var(--text3)">Кусок {{rw.n}}</span>
+              <sc-if value="{{rw.canDel}}"><button type="button" onClick="{{rw.del}}" aria-label="Убрать кусок {{rw.n}}" style="width: 44px; height: 36px; margin: -3px -8px -3px 0; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text3); background: transparent; border: 0; border-radius: 8px; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></sc-if>
+            </div>
+            <label style="display: flex; align-items: center; gap: 8px; height: 46px; box-sizing: border-box; padding: 0 10px 0 12px; background: var(--surface-2); border: 1px solid {{rw.exprLine}}; border-radius: 8px">
+              <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 17px; color: var(--text2); white-space: nowrap"><sc-for list="{{pwd.prefT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+              <input type="text" value="{{rw.text}}" onChange="{{rw.edit}}" onBlur="{{rw.blur}}" placeholder="Формула куска" aria-label="Формула куска {{rw.n}}" spellcheck="false" autocomplete="off" style="flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: transparent; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 19px; color: var(--text)">
+            </label>
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text2); white-space: nowrap">
+              <span>при</span><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-style: italic; font-size: 17px; color: var(--text)">{{pwd.v}}</span><span>от</span>
+              <input type="text" inputmode="decimal" value="{{rw.from}}" onChange="{{rw.editFrom}}" placeholder="{{rw.fromPh}}" aria-label="Начало участка {{rw.n}}" style="width: 72px; height: 44px; box-sizing: border-box; padding: 0 6px; text-align: center; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 18px; color: var(--text); background: var(--surface-2); border: 1px solid {{rw.fromLine}}; border-radius: 8px; outline: none">
+              <span>до</span>
+              <input type="text" inputmode="decimal" value="{{rw.to}}" onChange="{{rw.editTo}}" placeholder="{{rw.toPh}}" aria-label="Конец участка {{rw.n}}" style="width: 72px; height: 44px; box-sizing: border-box; padding: 0 6px; text-align: center; font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 18px; color: var(--text); background: var(--surface-2); border: 1px solid {{rw.toLine}}; border-radius: 8px; outline: none">
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{pwd.canAdd}}">
+          <button type="button" onClick="{{pwd.add}}" style="display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px; padding: 0 12px; font: inherit; font-size: 14.5px; font-weight: 500; color: var(--text2); background: transparent; border: 1px dashed var(--border-strong); border-radius: 8px; cursor: pointer"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>Добавить кусок</button>
+        </sc-if>
+        <sc-if value="{{pwd.hasError}}"><div role="alert" style="font-size: 13.5px; line-height: 1.45; color: var(--error-ink)">{{pwd.error}}.</div></sc-if>
+        <sc-for list="{{pwd.notes}}" as="nt"><div style="font-size: 13.5px; line-height: 1.45; color: var(--amber-ink)">{{nt.t}}</div></sc-for>
+        <sc-if value="{{pwd.hasPrev}}">
+          <div style="display: flex; flex-direction: column; gap: 6px">
+            <span style="font-size: 13px; font-weight: 500; color: var(--text2)">Что получится</span>
+            <div style="display: flex; align-items: center; gap: 5px; padding: 8px 12px; background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto">
+              <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 17px; color: var(--text2); white-space: nowrap"><sc-for list="{{pwd.prefT}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+              <svg width="10" height="{{pwd.prevH}}" viewBox="0 0 10 {{pwd.prevH}}" aria-hidden="true" style="flex-shrink: 0; overflow: visible"><path d="{{pwd.prevBrace}}" fill="none" stroke="var(--text2)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              <div style="display: flex; flex-direction: column; gap: 4px">
+                <sc-for list="{{pwd.prev}}" as="pv">
+                  <div style="display: flex; align-items: baseline; gap: 6px; height: 28px; white-space: nowrap">
+                    <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 18px; color: var(--text)"><sc-for list="{{pv.toks}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span>
+                    <sc-if value="{{pv.hasCond}}"><span style="font-size: 13.5px; color: var(--text2)">, если</span><span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 16px; color: var(--text)"><sc-for list="{{pv.cond}}" as="t"><span style="{{t.st}}">{{t.t}}</span></sc-for></span></sc-if>
+                    <sc-if value="{{pv.isRest}}"><span style="font-size: 13.5px; color: var(--text2)">, иначе</span></sc-if>
+                  </div>
+                </sc-for>
+              </div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+      <div style="flex-shrink: 0; display: flex; align-items: center; gap: 8px; padding: 10px 12px 14px; border-top: 1px solid var(--border); background: var(--surface)">
+        <sc-if value="{{pwd.canOne}}"><button type="button" onClick="{{pwd.one}}" style="min-height: 44px; padding: 0 8px; font: inherit; font-size: 14px; font-weight: 500; color: var(--text2); background: transparent; border: 0; border-radius: 8px; cursor: pointer">Одной формулой</button></sc-if>
+        <span style="flex: 1"></span>
+        <button type="button" onClick="{{pwd.cancel}}" style="min-height: 44px; padding: 0 16px; font: inherit; font-size: 15px; font-weight: 500; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; cursor: pointer">Отмена</button>
+        <button type="button" onClick="{{pwd.apply}}" style="min-height: 44px; padding: 0 20px; font: inherit; font-size: 15px; font-weight: 600; color: var(--on-btn); background: var(--btn-bg); border: 1px solid var(--btn-bg); border-radius: 8px; cursor: pointer; opacity: {{pwd.okOp}}">Готово</button>
+      </div>
+    </div>
+  </sc-if>
+
+  <sc-if value="{{sheetOpen}}" hint-placeholder-val="{{false}}">
+    <div onClick="{{closeSheet}}" style="position: absolute; inset: 0; z-index: 24; background: var(--scrim)"></div>
+    <div role="dialog" aria-label="{{sheetTitle}}" style="position: absolute; left: 0; right: 0; bottom: 0; z-index: 25; display: flex; flex-direction: column; gap: 2px; max-height: 70%; overflow-y: auto; padding: 10px 12px 18px; box-sizing: border-box; background: var(--surface); border-radius: 16px 16px 0 0; box-shadow: var(--shadow-pop)">
+      <div aria-hidden="true" style="align-self: center; width: 36px; height: 4px; margin-bottom: 8px; border-radius: 999px; background: var(--border-strong)"></div>
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 4px 6px">
+        <span style="font-size: 17px; font-weight: 600">{{sheetTitle}}</span>
+        <button type="button" onClick="{{closeSheet}}" aria-label="Закрыть" style="width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0; color: var(--text2); background: transparent; border: 0; border-radius: 8px; cursor: pointer"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"></path></svg></button>
+      </div>
+      <sc-if value="{{moreOpen}}">
+        <sc-for list="{{moreItems}}" as="mi">
+          <button type="button" onClick="{{mi.act}}" disabled="{{mi.dis}}" style="display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 0 8px; text-align: left; font: inherit; font-size: 16px; color: var(--text); background: transparent; border: 0; border-radius: 8px; cursor: pointer; opacity: {{mi.op}}">
+            <span style="flex: 1">{{mi.label}}</span><span style="font-size: 13px; color: var(--text3)">{{mi.hint}}</span>
+          </button>
+        </sc-for>
+      </sc-if>
+      <sc-if value="{{helpOpen}}">
+        <sc-for list="{{helpRows}}" as="hr">
+          <div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 10px; align-items: baseline; padding: 8px 4px; border-top: 1px solid var(--border-soft)">
+            <span style="font-family: 'STIX Two Text', 'Times New Roman', serif; font-size: 17px">{{hr.ex}}</span><span style="font-size: 14px; line-height: 1.45; color: var(--text2)">{{hr.say}}</span>
+          </div>
+        </sc-for>
+        <div style="padding: 8px 4px 0; font-size: 13px; line-height: 1.5; color: var(--text3)">Умножение можно не писать: 2Q = 2·Q. Ошибка в записи не ломает график: он держит последнюю верную запись, пока вы правите.</div>
+      </sc-if>
+    </div>
+  </sc-if>
+
+  <div aria-live="polite" style="position: absolute; left: 12px; right: 12px; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; pointer-events: none; z-index: 30">
+    <sc-for list="{{toasts}}" as="t"><div style="display: flex; align-items: center; gap: 12px; padding: 8px 8px 8px 14px; min-height: 44px; box-sizing: border-box; font-size: 14px; color: var(--on-btn); background: var(--btn-bg); border-radius: 10px; box-shadow: var(--shadow-pop); pointer-events: auto"><span>{{t.text}}</span><sc-if value="{{t.hasAction}}"><button type="button" onClick="{{t.act}}" style="min-height: 36px; padding: 0 10px; font: inherit; font-size: 14px; font-weight: 600; color: var(--on-btn); background: transparent; border: 1px solid currentColor; border-radius: 8px; cursor: pointer">{{t.action}}</button></sc-if></div></sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"model":{"editor":"enum","options":["taxes","sd","ceil","mono","costs","m-tangent","islm"],"default":"taxes"},"theme":{"editor":"enum","options":["light","dark"],"default":"light"},"tab":{"editor":"enum","options":["left","answer","explain"],"default":"left"},"ops":{"editor":"text","default":""},"pwFor":{"editor":"text","default":""},"hoverPoint":{"editor":"text","default":""},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    const p = props || {};
+    const E = window.CalcEngine;
+    const model = p.model || 'taxes';
+    const models = {};
+    if (E) models[model] = E.initModel(model);
+    // ops — те же правки по id, что у большого экрана: «fns.D.pieces=100 - 2Q||20/80 - Q|20|»
+    if (E && p.ops) String(p.ops).split(';').forEach((part) => {
+      const i = part.indexOf('='); if (i < 0) return;
+      let v = part.slice(i + 1).trim(); if (v === 'true') v = true; else if (v === 'false') v = false;
+      models[model] = E.setValue(model, models[model], part.slice(0, i).trim(), v);
+    });
+    const pwm0 = E && p.pwFor && models[model].fns && models[model].fns[p.pwFor] ? this.pwDraft(model, models[model], p.pwFor) : null;
+    this.state = { pwm: pwm0, model: model, models: models, tab: p.tab || 'left', theme: p.theme || 'light', selfCheck: false, list: false, q: '', drafts: {}, fxLive: null, past: [], future: [], drag: null, open: {}, toasts: [], hover: p.hoverPoint ? { curve: String(p.hoverPoint).split(':')[1], point: p.hoverPoint } : null, sheet: p.sheet || null, guess: {}, reveal: {} };
+    this.panels = []; this.svgW = 372; this.svgH = 300; this.tid = 0;
+  }
+  toast(text, action, act) {
+    const id = ++this.tid;
+    this.setState({ toasts: this.state.toasts.concat([{ id: id, text: text, action: action || '', act: act || null }]).slice(-1) });
+    setTimeout(() => this.setState({ toasts: this.state.toasts.filter((t) => t.id !== id) }), action ? 6500 : 2600);
+  }
+  commit(next) {
+    // история у каждой модели своя (как на десктопе)
+    const s = this.state, models = Object.assign({}, s.models);
+    const past = s.past.concat([{ model: s.model, ms: s.models[s.model] }]).slice(-120);
+    models[s.model] = next;
+    const g = {}; Object.keys(s.guess).forEach((k) => { g[k] = { text: s.guess[k].text, res: null }; });
+    this.setState({ models: models, past: past, future: s.future.filter((e) => e.model !== s.model), guess: g });
+  }
+  lastOf(list, model) { for (let j = list.length - 1; j >= 0; j--) if (list[j].model === model) return j; return -1; }
+  undo() {
+    const s = this.state, i = this.lastOf(s.past, s.model); if (i < 0) return;
+    const m = Object.assign({}, s.models), future = s.future.concat([{ model: s.model, ms: m[s.model] }]);
+    m[s.model] = s.past[i].ms;
+    this.setState({ models: m, past: s.past.slice(0, i).concat(s.past.slice(i + 1)), future: future });
+  }
+  redo() {
+    const s = this.state, i = this.lastOf(s.future, s.model); if (i < 0) return;
+    const m = Object.assign({}, s.models), past = s.past.concat([{ model: s.model, ms: m[s.model] }]);
+    m[s.model] = s.future[i].ms;
+    this.setState({ models: m, future: s.future.slice(0, i).concat(s.future.slice(i + 1)), past: past });
+  }
+  num(str) { return parseFloat(String(str).replace(/[\s\u00a0\u202f]/g, '').replace('\u2212', '-').replace(',', '.')); }
+  brace(h) {
+    const m = h / 2, x = 5, q = Math.min(6, h / 5), r = (v) => Math.round(v * 10) / 10;
+    return 'M9.5,0.7 Q' + x + ',0.7 ' + x + ',' + r(q) + ' L' + x + ',' + r(m - q) + ' Q' + x + ',' + r(m) + ' 0.7,' + r(m) + ' Q' + x + ',' + r(m) + ' ' + x + ',' + r(m + q) + ' L' + x + ',' + r(h - q) + ' Q' + x + ',' + r(h - 0.7) + ' 9.5,' + r(h - 0.7);
+  }
+  /* Кусочная функция: лист на весь экран. Правки живут в черновике, график меняется по «Готово». */
+  pwDraft(key, ms, id) {
+    const E = window.CalcEngine, fs = ms.fns[id];
+    const pieces = fs && fs.pieces && fs.pieces.length ? fs.pieces : E.setValue(key, ms, 'fns.' + id + '.pw.on', true).fns[id].pieces;
+    return { id: id, pieces: E.clone(pieces), was: !!(fs && fs.pieces && fs.pieces.length) };
+  }
+  openPw(id) { const s = this.state; this.setState({ pwm: this.pwDraft(s.model, s.models[s.model], id), sheet: null, fxLive: null }); }
+  pwmDo(op, value) {
+    const E = window.CalcEngine, s = this.state, d = s.pwm; if (!d) return;
+    const tmp = { fns: {} }; tmp.fns[d.id] = { expr: '', pieces: E.clone(d.pieces) };
+    const after = E.setValue(s.model, tmp, 'fns.' + d.id + '.pw.' + op, value).fns[d.id];
+    this.setState({ pwm: { id: d.id, pieces: after.pieces || d.pieces.slice(0, 1), was: d.was } });
+  }
+  pwmApply(axis) {
+    const E = window.CalcEngine, s = this.state, d = s.pwm; if (!d) return;
+    const info = E.piecesInfo(d.pieces, axis);
+    if (!info.ok) { this.toast(info.error); return; }
+    const one = d.pieces.length === 1 && !String(d.pieces[0].from || '').trim() && !String(d.pieces[0].to || '').trim();
+    const ms = s.models[s.model];
+    this.setState({ pwm: null, fxLive: null });
+    if (one) this.commit(E.setValue(s.model, E.setValue(s.model, ms, 'fns.' + d.id + '.pieces', null), 'fns.' + d.id + '.expr', d.pieces[0].expr));
+    else this.commit(E.setValue(s.model, ms, 'fns.' + d.id + '.pieces', d.pieces));
+  }
+  pwmOne() {
+    const s = this.state, d = s.pwm; if (!d) return;
+    this.setState({ pwm: null, fxLive: null });
+    this.set('fns.' + d.id + '.pw.off', true);
+    this.toast('Куски убраны, осталась формула первого куска', 'Вернуть', () => this.undo());
+  }
+  set(id, v) { const E = window.CalcEngine, s = this.state; this.commit(E.setValue(s.model, s.models[s.model], id, v)); }
+  svgXY(e) {
+    const el = e.currentTarget, svg = el.ownerSVGElement || el, r = svg.getBoundingClientRect();
+    return { x: (e.clientX - r.left) * this.svgW / r.width, y: (e.clientY - r.top) * this.svgH / r.height };
+  }
+  pick(k) {
+    const E = window.CalcEngine, m = Object.assign({}, this.state.models);
+    if (!m[k]) m[k] = k === 'taxes' ? E.setValue('taxes', E.initModel('taxes'), 'iv.rate', 30) : E.initModel(k);
+    this.setState({ model: k, models: m, list: false, q: '', tab: 'left', hover: null, sheet: null });
+  }
+  check(id, valueStr) {
+    const g = Object.assign({}, this.state.guess), cur = g[id] || { text: '' };
+    const a = this.num(cur.text), b = this.num(valueStr);
+    if (!isFinite(a)) { this.toast('Впишите число, можно с запятой'); return; }
+    g[id] = { text: cur.text, res: Math.abs(a - b) <= Math.max(0.011, Math.abs(b) * 0.0005) ? 'ok' : 'bad' };
+    this.setState({ guess: g });
+  }
+  renderVals() {
+    const E = window.CalcEngine;
+    const s = this.state;
+    const vals = { themeVars: E ? E.themeVars('weconomics', s.theme) : '', noop: (e) => { if (e && e.preventDefault) e.preventDefault(); } };
+    if (!E) return vals;
+    const key = s.model, card = E.card(key), live = E.isLive(key);
+    const ms = s.models[key] || E.initModel(key);
+    const mt = (toks) => {
+      const out = [];
+      (toks || []).forEach((t) => {
+        if (t.k === 'sup' || t.k === 'sub') { (t.items || []).forEach((it) => out.push({ t: it.t || '', st: 'font-size: .7em; vertical-align: ' + (t.k === 'sup' ? '.55em' : '-.3em') + '; font-style: ' + (it.k === 'v' ? 'italic' : 'normal') })); return; }
+        if (t.k === 'o') { out.push({ t: t.u ? t.t : ' ' + t.t + ' ', st: 'font-style: normal' }); return; }
+        out.push({ t: t.t, st: t.k === 'v' ? 'font-style: italic' : 'font-style: normal' });
+      });
+      return out;
+    };
+    const mts = (x) => mt(E.mathTokens(x));
+    const pretty = (x) => E.prettyExpr(String(x || '')).replace(/\^2(?![0-9.])/g, '²').replace(/\^3(?![0-9.])/g, '³');
+    const segSt = (on) => 'flex: 1 1 auto; min-width: 0; min-height: 44px; padding: 8px 10px; font: inherit; font-size: 14px; line-height: 1.3; font-weight: ' + (on ? 600 : 500) + '; color: ' + (on ? 'var(--text)' : 'var(--text2)') + '; background: ' + (on ? 'var(--surface)' : 'transparent') + '; border: 1px solid ' + (on ? 'var(--border-strong)' : 'transparent') + '; border-radius: 8px; cursor: pointer';
+    const svgW = 372, svgH = 300;
+    this.svgW = svgW; this.svgH = svgH;
+    // на телефоне кривую зажигает касание; вид точек и подписи — тот же, что на большом экране (точка с ореолом, тёмная капсула), но без закрепки
+    const ctx = { cw: svgW, ch: svgH, grid: 'plain', legend: false, labelScale: 0.9, uid: 'ph', hover: s.hover, armed: s.hover ? s.hover.curve : null, kp: 'b', noPin: true, selfCheck: s.selfCheck, margin: key === 'm-tangent' ? undefined : { l: 38, r: 28, t: 30, b: 28 } };
+    const v = E.view(key, ms, ctx);
+    const tx = (t) => [String(t)];
+    const parts = (ps) => (ps || []).map((q) => ({ style: q.style, t: tx(q.t) }));
+    const panels = (v.chart.panels || []).map((pn) => Object.assign({}, pn, {
+      clipUrl: 'url(#' + pn.clipId + ')', hasTitle: !!pn.title, title: pn.title ? { x: pn.title.x, y: pn.title.y, t: tx(pn.title.t) } : { x: 0, y: 0, t: [] },
+      axis: Object.assign({}, pn.axis, { nameX: Object.assign({}, pn.axis.nameX, { t: tx(pn.axis.nameX.t) }), nameY: Object.assign({}, pn.axis.nameY, { t: tx(pn.axis.nameY.t) }) }),
+      ticksX: pn.ticksX.filter((t) => !pn.keyTicks.some((k) => k.anchor === 'middle' && Math.abs(k.x - t.x) < 22)).map((t) => ({ x: t.x, y: t.y, t: tx(t.t) })),
+      ticksY: pn.ticksY.filter((t) => !pn.keyTicks.some((k) => k.anchor === 'end' && Math.abs(k.y - t.y) < 13)).map((t) => ({ x: t.x, y: t.y, t: tx(t.t) })),
+      keyTicks: pn.keyTicks.map((k) => ({ x: k.x, y: k.y, anchor: k.anchor, parts: parts(k.parts) })),
+      labels: pn.labels.map((l) => Object.assign({}, l, { parts: parts(l.parts), st: 'font-size: ' + l.size + 'px; font-weight: ' + l.weight + '; paint-order: stroke; stroke: var(--halo); stroke-width: 4px; stroke-linejoin: round' })),
+      hits: (pn.hits || []).map((h) => ({ d: h.d, tap: (e) => { if (e && e.stopPropagation) e.stopPropagation(); const hv = this.state.hover; this.setState({ hover: hv && hv.curve === h.id && !hv.point ? null : { curve: h.id, point: null } }); } })),
+      kps: (pn.kps || []).map((k) => Object.assign({}, k, { tap: (e) => { if (e && e.stopPropagation) e.stopPropagation(); this.setState({ hover: { curve: String(k.id).split(':')[1], point: k.id } }); } })),
+      // на касании закрепки нет: свои точки только на большом экране. Капсула короче: в ней одни координаты.
+      hasTip: !!pn.kpTip,
+      tip: pn.kpTip ? { t: tx(pn.kpTip.t), px: pn.kpTip.px, py: pn.kpTip.py, pw: pn.kpTip.pw, ph: pn.kpTip.ph, tx: pn.kpTip.tx, ty: pn.kpTip.ty } : { t: [], px: 0, py: 0, pw: 0, ph: 0, tx: 0, ty: 0 },
+      handles: pn.handles.map((hd) => Object.assign({}, hd, { text: tx(hd.text), down: (e) => { e.stopPropagation(); try { e.currentTarget.ownerSVGElement.setPointerCapture(e.pointerId); } catch (er) { /* ок */ } this.setState({ drag: { id: hd.id, pid: pn.id } }); } }))
+    }));
+    this.panels = panels;
+    const nt = v.chart.note;
+    let note = { show: false, prims: [] };
+    if (nt && nt.card) {
+      const nw = 300, nh = nw * 90 / 160;
+      note = { show: true, tf: 'translate(' + (svgW - nw) / 2 + ',' + (svgH - nh) / 2 + ') scale(' + (nw / 160).toFixed(4) + ')', prims: nt.card.prims.map((q) => Object.assign({}, q, { sw2: Math.max(1.4, (+q.sw || 1.5) * 1.2) })) };
+    }
+    const tabSt = (on) => 'flex: 1; min-height: 44px; padding: 8px 6px; font: inherit; font-size: 14.5px; font-weight: ' + (on ? 600 : 500) + '; color: ' + (on ? 'var(--text)' : 'var(--text2)') + '; background: ' + (on ? 'var(--surface)' : 'transparent') + '; border: 1px solid ' + (on ? 'var(--border-strong)' : 'transparent') + '; border-radius: 8px; cursor: pointer';
+    const recRows = (rows) => (rows || []).map((rc) => ({ toks: mt(rc.toks), cond: mt(rc.cond) }));
+    const rowOf = (r) => {
+      const dk = key + ':' + r.id, dr = s.drafts[dk];
+      const err = dr ? dr.error : (r.error || '');
+      const rec = recRows(r.record), recH = Math.max(1, rec.length) * 28 - 4;
+      const canEditPw = !!r.pw && live;
+      return {
+        pw: canEditPw, single: !r.pw, canPw: live && !r.record, braceGlyph: '{',
+        showRecord: rec.length > 0, rec: rec, recH: recH, recBrace: this.brace(recH),
+        recRole: canEditPw ? 'button' : 'group', recTab: canEditPw ? '0' : '-1', recCursor: canEditPw ? 'pointer' : 'default',
+        recLabel: canEditPw ? 'Изменить куски: ' + r.name : r.name, recClick: canEditPw ? () => this.openPw(r.id) : () => {},
+        notes: (r.notes || []).map((t) => ({ t: t })),
+        pwOn: () => this.openPw(r.id),
+        name: r.name, color: r.color, symT: mt(r.sym), prefT: r.prefix ? mts(r.prefix) : [], ro: !live,
+        text: dr ? dr.text : (s.fxLive && s.fxLive.dk === dk ? s.fxLive.text : pretty(r.expr)),
+        isQP: !!r.isQP && !dr, canonText: r.canonText || '', hasError: !!err, error: err, fieldBorder: err ? 'var(--error)' : 'var(--border)',
+        canHide: !!r.canHide && live, isExtra: !!r.isExtra && live, visible: r.visible !== false, hidden: r.visible === false, hiddenStr: r.visible === false ? 'true' : 'false',
+        visLabel: r.visible === false ? 'Показать кривую ' + r.name : 'Скрыть кривую ' + r.name,
+        toggleVis: () => this.set('fns.' + r.id + '.visible', r.visible === false),
+        remove: () => this.set('fns.' + r.id + '.remove', true),
+        focus: () => this.setState({ fxLive: null }), blur: () => this.setState({ fxLive: null }),
+        edit: (e) => {
+          if (!live) return;
+          const text = e.target.value, t = text.trim();
+          const c = t ? E.compileFn(text, r.axis || 'Q') : null;
+          const drafts = Object.assign({}, this.state.drafts);
+          this.setState({ fxLive: { dk: dk, text: text } });
+          if (c && c.ok) { delete drafts[dk]; this.setState({ drafts: drafts }); this.set('fns.' + r.id + '.expr', text); }
+          else { drafts[dk] = { text: text, error: c ? c.error : 'Формула пустая' }; this.setState({ drafts: drafts }); }
+        }
+      };
+    };
+    const itemOf = (it) => {
+      if (it.type === 'seg') return { isSeg: true, label: it.label, hasLabel: !!it.label, aria: it.label || 'Выбор', options: it.options.map((o) => ({ label: o.label, pressed: o.on ? 'true' : 'false', st: segSt(o.on), pick: () => this.set(it.id, o.id) })) };
+      if (it.type === 'slider') return { isSlider: true, label: it.label, symT: mt(it.sym), text: it.text, unit: it.unit ? ' ' + it.unit : '', value: it.value, min: it.min, max: it.max, step: it.step, slide: (e) => this.set(it.id, +e.target.value) };
+      if (it.type === 'toggle') return { isToggle: true, label: it.label, on: !!it.on, dis: !live, swatch: it.swatch || '', hasSwatch: !!it.swatch, flip: (e) => { if (live) this.set(it.id, e.target.checked); } };
+      if (it.type === 'button') return { isStatic: true, label: it.label, value: '' };
+      return { isStatic: true, label: it.label, value: it.value };
+    };
+    const left = (v.left || []).filter((sec) => sec.kind !== 'tools').map((sec) => ({
+      title: sec.title, isFns: sec.kind === 'fns', rows: sec.kind === 'fns' ? (sec.rows || []).map(rowOf) : [],
+      canAdd: sec.kind === 'fns' && !!sec.addLabel && live, addLabel: sec.addLabel || '', add: () => this.set('fns.add', ''),
+      hasItems: !!(sec.items && sec.items.length) || !!sec.pre, items: (sec.pre ? [itemOf(sec.pre)] : []).concat((sec.items || []).map(itemOf))
+    }));
+    const A = v.answer || {};
+    const tone = A.status ? A.status.tone : '';
+    const heroList = A.hero || [];
+    const heroes = heroList.map((h, i) => {
+      const id = key + ':' + h.id, g = s.guess[id] || { text: '', res: null };
+      const rev = !(s.selfCheck && live) || !!s.reveal[id];
+      return {
+      label: h.label, symT: mt(h.sym), value: h.value, showVal: rev, ask: !rev, was: h.was, delta: h.delta || '0', hasWas: !!h.hasWas && rev,
+      guess: g.text, ok: g.res === 'ok', bad: g.res === 'bad', inputBorder: g.res === 'ok' ? 'var(--green-border)' : g.res === 'bad' ? 'var(--error-border)' : 'var(--border-strong)',
+      type: (e) => { const gg = Object.assign({}, this.state.guess); gg[id] = { text: e.target.value, res: null }; this.setState({ guess: gg }); },
+      check: () => this.check(id, h.value), key: (e) => { if (e.key === 'Enter') this.check(id, h.value); },
+      reveal: () => { const r2 = Object.assign({}, this.state.reveal); r2[id] = true; this.setState({ reveal: r2 }); },
+      vsize: String(h.value).length <= 4 ? 26 : String(h.value).length <= 6 ? 22 : 19,
+      cellSt: 'display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 12px; border-right: ' + (i % 2 === 0 ? '1px solid var(--border-soft)' : '0') + '; border-bottom: ' + (i >= heroList.length - 2 ? '0' : '1px solid var(--border-soft)')
+      };
+    });
+    const cell = (t, strong) => ({ t: t, st: 'text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; color: ' + (strong ? 'var(--text)' : 'var(--text2)') + '; font-weight: ' + (strong ? 600 : 400) });
+    const tables = s.selfCheck && live ? [] : (A.tables || []).map((t) => ({
+      title: t.title, grid: t.cols ? 'minmax(0, 1fr) 54px 54px' : 'minmax(0, 1fr) auto',
+      rows: t.rows.map((rw) => ({ label: rw.label, cells: t.cols ? [cell(rw.hasWas ? rw.was : '–', false), cell(rw.value, true)] : [cell(rw.value, true)] }))
+    }));
+    const segs = (arr) => (arr || []).map((g) => g.isMath ? { isMath: true, isText: false, t: mt(g.toks) } : { isMath: false, isText: true, text: g.text });
+    const exv = A.explain || { items: [] };
+    const q = s.q.trim(), found = q ? (E.search(q) || []) : null, fs = {};
+    (found || []).forEach((k) => { fs[k] = 1; });
+    const groups = E.BLOCKS.map((b) => {
+      const cs = E.CARDS.filter((c) => c.block === b && (!found || fs[c.key]));
+      return {
+        name: b, hasSoon: cs.some((c) => c.soon), soonText: cs.filter((c) => c.soon).map((c) => c.name).join(' · '),
+        items: cs.filter((c) => !c.soon).map((c) => ({ name: c.name, st: 'display: block; width: 100%; min-height: 44px; padding: 10px 4px; text-align: left; font: inherit; font-size: 15.5px; color: var(--text); font-weight: ' + (c.key === key ? 600 : 400) + '; background: ' + (c.key === key ? 'var(--accent-tint)' : 'transparent') + '; border: 0; border-bottom: 1px solid var(--border-soft); cursor: pointer', pick: () => this.pick(c.key) }))
+      };
+    }).filter((g) => g.items.length || g.hasSoon);
+    let pwd = { show: false, rows: [], prev: [], notes: [], symT: [], prefT: [], v: [] };
+    if (s.pwm) {
+      const d = s.pwm, rws = [];
+      (v.left || []).forEach((sec) => { if (sec.kind === 'fns') (sec.rows || []).forEach((x) => rws.push(x)); });
+      const r = rws.filter((x) => x.id === d.id)[0] || { id: d.id, name: '', sym: [], prefix: 'P =', axis: 'Q', fromPh: '0', color: 'var(--text3)' };
+      const axis = r.axis || 'Q', info = E.piecesInfo(d.pieces, axis);
+      const c = info.ok ? E.compileFn(info.text, axis) : null;
+      const prows = c && c.ok ? (c.form === 'QP' ? c.rowsP : c.rows) || [] : [];
+      const n = d.pieces.length, prevH = Math.max(1, prows.length) * 32 - 4;
+      pwd = {
+        show: true, name: r.name, color: r.color, symT: mt(r.sym), prefT: mts(info.form === 'QP' ? 'Q =' : (r.prefix || 'P =')), v: [info.v],
+        count: String(n), noMinus: n <= 1, noPlus: n >= 12, minusOp: n <= 1 ? 0.35 : 1, plusOp: n >= 12 ? 0.35 : 1,
+        minus: () => this.pwmDo('count', n - 1), plus: () => this.pwmDo('count', n + 1),
+        rows: d.pieces.map((pc, i) => {
+          const errs = info.errors.filter((e) => e.i === i), bad = (f) => errs.some((e) => e.field === f), pk = 'pwm:' + i;
+          const line = (f) => bad(f) ? 'var(--error)' : 'var(--border)';
+          return {
+            n: String(i + 1), text: s.fxLive && s.fxLive.dk === pk ? s.fxLive.text : pretty(pc.expr), from: pc.from || '', to: pc.to || '',
+            exprLine: line('expr'), fromLine: line('from'), toLine: line('to'),
+            fromPh: i === 0 ? (r.fromPh || '0') : '', toPh: i === n - 1 ? '∞' : '',
+            edit: (e) => { this.setState({ fxLive: { dk: pk, text: e.target.value } }); this.pwmDo(i + '.expr', e.target.value); },
+            editFrom: (e) => this.pwmDo(i + '.from', e.target.value), editTo: (e) => this.pwmDo(i + '.to', e.target.value),
+            blur: () => this.setState({ fxLive: null }), del: () => this.pwmDo('del', i), canDel: n > 1
+          };
+        }),
+        add: () => this.pwmDo('add', true), canAdd: n < 12,
+        hasPrev: prows.length > 0, prevH: prevH, prevBrace: this.brace(prevH),
+        prev: prows.map((rw) => { const ct = E.condToks(rw, info.v); return { toks: mt(E.typesetAst(rw.ast)), cond: mt(ct), hasCond: ct.length > 0, isRest: !ct.length }; }),
+        hasError: !info.ok, error: info.error, notes: (info.ok ? info.notes || [] : []).map((t) => ({ t: t })),
+        canOne: !!d.was, one: () => this.pwmOne(),
+        cancel: () => this.setState({ pwm: null, fxLive: null }), apply: () => this.pwmApply(axis), okOp: info.ok ? 1 : 0.45
+      };
+    }
+    vals.pwd = pwd;
+    return Object.assign(vals, {
+      toggleTheme: () => this.setState({ theme: s.theme === 'dark' ? 'light' : 'dark' }), themeGlyph: s.theme === 'dark' ? '☀' : '☾',
+      openList: () => this.setState({ list: true, sheet: null }), closeList: () => this.setState({ list: false }), listOpen: s.list,
+      showCont: !q,
+      cont: { name: E.card('taxes').name, when: 'вчера, 21:40', summary: E.summary('taxes', E.setValue('taxes', E.initModel('taxes'), 'iv.rate', 30)).split(', ').join(' · '), open: () => this.pick('taxes') },
+      recents: [['sd', 'сегодня'], ['mono', 'вчера'], ['costs', 'в пн']].map((r) => ({ name: E.card(r[0]).name, when: r[1], open: () => this.pick(r[0]) })), q: s.q, onQ: (e) => this.setState({ q: e.target.value }), groups: groups,
+      blockName: card ? card.block : '', modelName: card ? card.name : key,
+      undo: () => this.undo(), noUndo: this.lastOf(s.past, key) < 0, undoOp: this.lastOf(s.past, key) < 0 ? 0.35 : 1,
+      toggleMore: () => this.setState({ sheet: s.sheet === 'more' ? null : 'more' }), moreStr: s.sheet === 'more' ? 'true' : 'false',
+      sheetOpen: !!s.sheet && !s.list, moreOpen: s.sheet === 'more', helpOpen: s.sheet === 'help', closeSheet: () => this.setState({ sheet: null }),
+      sheetTitle: s.sheet === 'help' ? 'Как писать формулы' : 'Действия',
+      moreItems: [
+        { label: 'Повторить', hint: 'вернуть отменённое', dis: this.lastOf(s.future, key) < 0, op: this.lastOf(s.future, key) < 0 ? 0.4 : 1, act: () => { this.redo(); this.setState({ sheet: null }); } },
+        { label: 'Сбросить модель', hint: 'к стартовым функциям', dis: false, op: 1, act: () => { const prev = this.state.models[key]; this.commit(E.initModel(key)); this.setState({ sheet: null }); this.toast('Модель сброшена', 'Вернуть', () => { const m = Object.assign({}, this.state.models); m[key] = prev; this.setState({ models: m }); }); } },
+        { label: 'Скачать картинку', hint: 'PNG', dis: false, op: 1, act: () => { this.setState({ sheet: null }); this.toast('Макет: здесь скачается «' + (card ? card.name : key) + '.png»'); } },
+        { label: 'Как писать формулы', hint: '', dis: false, op: 1, act: () => this.setState({ sheet: 'help' }) }
+      ],
+      helpRows: [['100 − 2Q', 'основная форма: цена от количества, P = f(Q)'], ['120 − 2P', 'количество от цены, Q = f(P): пересчитаем сами'], ['Qd = 120 − 2P', 'можно с левой частью, как в условии'], ['Q^2/100 + 5', 'степень через ^'], ['100 − aQ', 'буква станет ползунком'], ['0,5Q', 'дробь через запятую или точку']].map((x) => ({ ex: x[0], say: x[1] })),
+      bgTap: () => { if (this.state.hover) this.setState({ hover: null }); },
+      share: () => { const url = 'https://' + E.shareUrl(key, ms); try { if (navigator.clipboard) navigator.clipboard.writeText(url).catch(() => {}); } catch (er) { /* нет буфера */ } this.toast('Ссылка скопирована'); },
+      svgW: svgW, svgH: svgH, panels: panels, note: note, chartAria: 'График модели «' + (card ? card.name : key) + '»',
+      svgMove: (e) => {
+        const st = this.state; if (!st.drag) return;
+        const pn = this.panels.find((x) => x.id === st.drag.pid) || this.panels[0]; if (!pn) return;
+        const pt = this.svgXY(e), cur = st.models[st.model];
+        const next = E.drag(st.model, cur, st.drag.id, pn._P.ix(pt.x), pn._P.iy(pt.y));
+        if (JSON.stringify(next) !== JSON.stringify(cur)) { const m = Object.assign({}, st.models); m[st.model] = next; this.setState({ models: m }); }
+      },
+      svgUp: () => { if (this.state.drag) this.setState({ drag: null }); },
+      toggleSelf: () => this.setState({ selfCheck: !s.selfCheck }), selfStr: s.selfCheck ? 'true' : 'false',
+      selfBorder: s.selfCheck ? 'var(--accent)' : 'var(--border-strong)',
+      selfTrackSt: 'position: relative; width: 28px; height: 16px; flex-shrink: 0; border-radius: 999px; background: ' + (s.selfCheck ? 'var(--accent)' : 'var(--border-strong)'),
+      selfKnobSt: 'position: absolute; top: 2px; left: ' + (s.selfCheck ? '14px' : '2px') + '; width: 12px; height: 12px; border-radius: 999px; background: var(--surface)',
+      tabs: [['left', 'Условие'], ['answer', 'Ответ'], ['explain', 'Разбор']].map((t) => ({ label: t[1], sel: s.tab === t[0] ? 'true' : 'false', st: tabSt(s.tab === t[0]), pick: () => this.setState({ tab: t[0] }) })),
+      tabLeft: s.tab === 'left', tabAnswer: s.tab === 'answer', tabExplain: s.tab === 'explain',
+      left: left,
+      st: A.status ? { show: true, text: A.status.text, color: tone === 'error' ? 'var(--error-ink)' : 'var(--text)', bg: tone === 'error' ? 'var(--error-tint)' : 'var(--surface-2)', border: tone === 'error' ? 'var(--error-border)' : 'var(--border)' } : { show: false },
+      heroes: heroes, tables: tables,
+      ff: A.ff && live && !s.selfCheck ? { show: true, name: A.ff.name, isOne: !(A.ff.rows && A.ff.rows.length), isRows: !!(A.ff.rows && A.ff.rows.length), rows: recRows(A.ff.rows), h: Math.max(1, (A.ff.rows || []).length) * 28 - 4, brace: this.brace(Math.max(1, (A.ff.rows || []).length) * 28 - 4), prefT: mts(A.ff.prefix || ''), toks: mts(A.ff.prefix || '').concat(mt(A.ff.toks)), copy: () => { try { if (navigator.clipboard) navigator.clipboard.writeText(A.ff.copy).catch(() => {}); } catch (er) { /* нет буфера */ } this.toast('Скопировано: ' + A.ff.copy); } } : { show: false },
+      ex: { items: (exv.items || []).map((it, i) => { const k2 = key + ':' + it.id; const open = s.open[k2] === undefined ? i === 0 : !!s.open[k2]; return { q: segs(it.q), a: segs(it.a), open: open, openStr: open ? 'true' : 'false', rot: open ? 180 : 0, toggle: () => { const o = Object.assign({}, this.state.open); o[k2] = !open; this.setState({ open: o }); } }; }) },
+      toasts: s.toasts.map((t) => ({ text: t.text, hasAction: !!t.action, action: t.action, act: () => { if (t.act) t.act(); this.setState({ toasts: this.state.toasts.filter((x) => x.id !== t.id) }); } }))
+    });
+  }
+}
+</script>
+</body>
+</html>
