@@ -559,6 +559,8 @@ function pickScene(key) {
   STATE.curves = []; curveCounter = 0;
   const r = SCENE_ROUTE[key] || SCENE_ROUTE.sd;
   r.run();
+  // Стартовые записи кривых — для «Вернуть стартовую запись» в меню «…».
+  if (typeof rememberStartCurves === 'function') rememberStartCurves(key);
   // Возврат в модель, где уже работали: восстанавливаем именно её изменения.
   // Строго ПОСЛЕ run(): тот ставит сцене её стартовый вид, а снимок его
   // перекрывает. Между моделями при этом не течёт ничего — снимок свой у каждой.

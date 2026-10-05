@@ -3153,7 +3153,9 @@ function buildParamChip(box, name) {
   loLab.addEventListener('click', () => bounds.open('min'));
   hiLab.addEventListener('click', () => bounds.open('max'));
 
+  chip.dataset.param = name;   // по букве чип находит свою карточку (92-ui-kit.js)
   box.appendChild(chip);
+  return chip;
 }
 
 /* Цвета кривых сцены (издержки, производство, вееры, «Математика»).
@@ -3343,7 +3345,18 @@ function onEscClosePick(e) { if (e.key === 'Escape') closeColorMenu(); }
    иначе панель с прокруткой обрезала бы его по своему краю.
    ВАЖНО: из onChange нельзя перерисовывать список, в котором живёт эта кнопка,
    иначе нативная палитра «Своего цвета» захлопнется на первом же клике. */
-function makeColorPicker(value, onChange, title) {
+/* Двенадцать образцов окна «Цвет кривой» (редизайн 10.2026, README макета,
+   раздел 10): шесть цветов ролей и вторая шестёрка палитры групп сложения.
+   Значения — токены calc2.css, а не числа в коде. */
+const PALETTE_12 = [
+  ['--curve-d', 'Синий'], ['--curve-s', 'Кирпичный'], ['--curve-mr', 'Фиолетовый'],
+  ['--curve-mc', 'Бирюзовый'], ['--curve-tax', 'Зелёный'], ['--curve-reg', 'Охра'],
+  ['--sum-g2', 'Тёмная бирюза'], ['--sum-g4', 'Тёмно-зелёный'], ['--sum-g5', 'Маджента'],
+  ['--sum-g6', 'Сиреневый'], ['--sum-g7', 'Сланцевый'], ['--sum-g8', 'Пыльная роза'],
+];
+function paletteTwelve() { return PALETTE_12.map(([v, n]) => [normHex(cssVar(v)), n]); }
+function makeColorPicker(value, onChange, title, opts) {
+  opts = opts || {};
   const wrap = document.createElement('span');
   wrap.className = 'cpick';
 
@@ -3361,7 +3374,12 @@ function makeColorPicker(value, onChange, title) {
   const paint = () => { btn.style.background = cur; own.value = cur; };
   paint();
 
-  const apply = (hex) => { cur = normHex(hex); paint(); onChange(cur); };
+  // onChange может вернуть итоговый цвет (у «Цвета по умолчанию» его знает
+  // только хозяин: цвет роли кривой).
+  const apply = (hex) => {
+    const got = onChange(hex == null ? null : normHex(hex));
+    cur = normHex(got || hex || cur); paint();
+  };
   own.addEventListener('input', () => apply(own.value));
 
   btn.addEventListener('click', (e) => {
@@ -3373,28 +3391,47 @@ function makeColorPicker(value, onChange, title) {
     const menu = document.createElement('div');
     menu.className = 'cpick-menu';
     menu.setAttribute('role', 'dialog');
-    menu.setAttribute('aria-label', btn.title);
+    const head = opts.title || (title || 'Цвет кривой');
+    menu.setAttribute('aria-label', head);
+    const h = document.createElement('div');
+    h.className = 'cpick-title'; h.textContent = head;
+    menu.appendChild(h);
     const grid = document.createElement('div');
     grid.className = 'cpick-grid';
-    paletteSix().forEach((hex) => {
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Цвета');
+    paletteTwelve().forEach(([hex, name]) => {
       const sw = document.createElement('button');
       sw.type = 'button';
       sw.className = 'cpick-sw';
       sw.style.background = hex;
       sw.setAttribute('role', 'radio');
       sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
-      sw.setAttribute('data-tip', hex);
+      sw.setAttribute('aria-label', name);
+      sw.setAttribute('data-tip', name);
       sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
       grid.appendChild(sw);
     });
     menu.appendChild(grid);
 
+    const foot = document.createElement('div');
+    foot.className = 'cpick-foot';
     const ownRow = document.createElement('label');
     ownRow.className = 'cpick-own';
     own.style.display = '';
+    own.setAttribute('aria-label', 'Свой цвет');
     ownRow.append(own, document.createTextNode('Свой цвет'));
     ownRow.addEventListener('click', (ev) => ev.stopPropagation());
-    menu.appendChild(ownRow);
+    foot.appendChild(ownRow);
+    // «Цвет по умолчанию» — там, где хозяин его знает (у кривой это цвет роли).
+    if (typeof opts.dflt === 'function') {
+      const d = document.createElement('button');
+      d.type = 'button'; d.className = 'cpick-dflt';
+      d.textContent = 'Цвет по умолчанию';
+      d.addEventListener('click', (ev) => { ev.stopPropagation(); apply(null); closeColorMenu(); });
+      foot.appendChild(d);
+    }
+    menu.appendChild(foot);
 
     document.body.appendChild(menu);
     menu._owner = wrap;
@@ -4023,6 +4060,7 @@ function resetDecor() {
   const panel = document.getElementById('params-panel');
   if (panel) { panel._extraSig = PULT_REBUILD; panel._curveSig = PULT_REBUILD; }
   ['params-extra', 'params-curves'].forEach(id => {
+    if (typeof clearPultBox === 'function') { clearPultBox(id); return; }
     const box = document.getElementById(id);
     if (box) box.innerHTML = '';
   });

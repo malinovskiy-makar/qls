@@ -482,7 +482,9 @@ function buildPultCurveChips(list) {
     box.id = 'params-curves';
     if (body) body.insertBefore(box, body.firstChild);
   }
-  box.innerHTML = '';
+  // Чипы, уехавшие под карточки функций (92-ui-kit.js), убираем вместе с коробкой.
+  clearPultBox('params-curves');
+  let chipIdx = 0;
   // Заголовок группы нужен, только когда рядом есть вторая группа: буквы из формул.
   if (list.length && Object.keys(STATE.params || {}).length) {
     const t = document.createElement('div');
@@ -502,6 +504,7 @@ function buildPultCurveChips(list) {
     const base = curveShiftBase(c);
     const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(c.linear.b - base), c.color);
     chip.dataset.cid = c.id;
+    tagPultChip(chip, 'params-curves', chipIdx++);
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
     chip.setAttribute('data-tip',
@@ -558,10 +561,8 @@ function buildPultCurveChips(list) {
 // Обновить ТОЛЬКО значения существующих чипов (после перетаскивания/redraw) — без пересборки.
 // Слайдер, который пользователь держит прямо сейчас, не трогаем (чтобы не спорить с рукой).
 function syncPultCurveValues(list) {
-  const box = document.getElementById('params-curves');
-  if (!box) return;
   list.forEach(c => {
-    const chip = box.querySelector('.pchip[data-cid="' + c.id + '"]');
+    const chip = pultChip('params-curves', '[data-cid="' + c.id + '"]');
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
@@ -894,7 +895,7 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr,
 // Пересобрать сцен-слайдеры под текущую сцену.
 function buildPultExtra(sig) {
   const box = document.getElementById('params-extra'); if (!box) return;
-  box.innerHTML = '';
+  clearPultBox('params-extra');
   /* Две разные вещи, поэтому и две группы: сверху регуляторы самой модели
      (ставка, мировая цена, границы КПВ), ниже буквы, которые пользователь
      завёл своей формулой. В общий список их мешать нельзя. */
@@ -907,7 +908,7 @@ function buildPultExtra(sig) {
   const hasModel = /^(ppf1|ppf2|ineqM)$/.test(String(sig).split('|par:')[0]);
   if (names.length) {
     if (hasModel) addTitle('Буквы из формул');
-    names.forEach(n => buildParamChip(box, n));
+    names.forEach((n, i) => { const ch = buildParamChip(box, n); if (ch) tagPultChip(ch, 'params-extra', i); });
     if (hasModel) addTitle('Параметры модели');
   }
   sig = String(sig).split('|par:')[0];
@@ -985,8 +986,8 @@ function showPult(on) {
   const empty = null;   // «Ползунков нет» убрано (пункт (л))
   if (!on) {
     syncPultRegulators([]);   // все узлы — домой
-    const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
-    const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
+    clearPultBox('params-curves');
+    clearPultBox('params-extra');
     panel._curveSig = PULT_REBUILD; panel._extraSig = PULT_REBUILD;
   }
   if (empty) empty.style.display = on ? 'none' : '';
@@ -1024,6 +1025,8 @@ function updatePult() {
   // (3) экранные регуляторы сцены → в панель (после контейнеров).
   syncPultRegulators(pultRegulatorIds());
   showPult(true);
+  // Ползунки кривых — под свои карточки «Функций» (92-ui-kit.js).
+  if (typeof placeCurveSliders === 'function') placeCurveSliders();
 }
 
 /* ── ЖИВОЕ ПРИМЕНЕНИЕ ФОРМУЛ (редизайн 10.2026, фаза 4) ──────────────────

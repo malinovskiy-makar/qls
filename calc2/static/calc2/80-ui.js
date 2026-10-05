@@ -155,8 +155,64 @@ function setRole(curve, role) {
 }
 
 // Перерисовать список кривых в панели.
+/* ── КАРТОЧКА ФУНКЦИИ (редизайн 10.2026, фаза 5б; README макета, 6.1) ──
+   Верхний ряд: кружок цвета → окно «Цвет кривой», обозначение (D, S, MC, своя
+   подпись), имя роли, глаз «Скрыть кривую» и «…» с меню. Ниже поле формулы с
+   приставкой «P =» / «Q =» и кнопкой клавиатуры в правом конце, ошибка под
+   полем, под карточкой — её ползунки (сдвиг и буквы, 88-params.js).
+
+   ⚠️ ПОРЯДОК УЗЛОВ В РАЗМЕТКЕ НЕ МЕНЯЕТСЯ ЗРЯ. Кнопка «…» (бывший шеврон) и
+   крестик по-прежнему идут в строке друг за другом, теперь крестик живёт в
+   меню «…». Прибор паритета (calc2/tests/redesign) узнаёт органы по ближнему
+   id и порядку одинаковых узлов: лишняя перестановка разорвала бы сверку со
+   старым экраном, ничего не дав человеку.
+   Галочка видимости стала глазом (пункт (ж) закрытого списка). */
+const ROLE_HUMAN = { demand: 'Спрос', supply: 'Предложение', mc: 'Предельные издержки',
+                     tc: 'Общие издержки', atc: 'Средние общие издержки' };
+function curveHumanName(c) {
+  if (c.kind === 'sum') return c.role === 'supply' ? 'Суммарное предложение' : 'Суммарный спрос';
+  if (c.sumGroup) return (c.role === 'supply' ? 'Предложение' : 'Спрос') + ' группы';
+  if (c.role && ROLE_HUMAN[c.role]) return ROLE_HUMAN[c.role];
+  return 'Своя функция';
+}
+// Приставка поля: буква вертикальной оси для P(Q), горизонтальной для Q(P).
+function curvePrefix(c) {
+  const ax = (name, dflt) => { const m = /^[A-Za-z]+/.exec(String(name || '')); return m ? m[0] : dflt; };
+  return c.srcForm === 'QP' ? ax(STATE.axisXDefault, 'Q') + ' =' : ax(STATE.axisYDefault, 'P') + ' =';
+}
+/* Стартовые записи кривых модели — для пункта «Вернуть стартовую запись».
+   Пишутся при входе в модель сразу после её маршрута (84-picker.js), до
+   восстановления памяти: это запись, с которой модель открывается всегда. */
+const MODEL_START_CURVES = {};
+function rememberStartCurves(key) {
+  MODEL_START_CURVES[key] = STATE.curves.map(c => ({
+    id: c.id, role: c.role || null, kind: c.kind || '',
+    expr: c.srcForm === 'QP' ? (c.srcExpr || c.expr) : c.expr }));
+}
+function startExprOf(curve) {
+  const list = MODEL_START_CURVES[STATE.sceneKey] || [];
+  const hit = (curve.role && list.find(x => x.role === curve.role && !x.kind)) || list.find(x => x.id === curve.id && !x.kind);
+  return hit ? hit.expr : null;
+}
+function curveIsPiecewise(c) {
+  return !!(c && typeof pwParse === 'function' && pwParse(c.srcForm === 'QP' ? (c.srcExpr || c.expr) : c.expr, 'Q'));
+}
+const ICON_EYE = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+  + ' stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-6.5 10-6.5S22 12 22 12s-3.6 6.5-10 6.5S2 12 2 12z"/>'
+  + '<circle cx="12" cy="12" r="2.8"/></svg>';
+const ICON_EYE_OFF = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"'
+  + ' stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"/><path d="M10.6 5.6A10.6 10.6 0 0 1 12 5.5'
+  + 'c6.4 0 10 6.5 10 6.5a17 17 0 0 1-3.2 3.9M6.4 6.5C3.6 8.3 2 12 2 12s3.6 6.5 10 6.5c1.6 0 3-.4 4.2-1"/>'
+  + '<path d="M9.9 9.9a2.8 2.8 0 0 0 4 4"/></svg>';
+const ICON_DOTS = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.6"/>'
+  + '<circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg>';
+
 function renderCurveList() {
   const list = document.getElementById('curve-list');
+  // Ползунки кривых живут под карточками: перед пересборкой списка они уходят
+  // домой в «Параметры», иначе пропали бы вместе со старыми карточками.
+  if (typeof parkCurveSliders === 'function') parkCurveSliders();
+  if (typeof closeFcMenu === 'function') closeFcMenu();
   list.innerHTML = '';
   if (STATE.curves.length === 0) {
     list.innerHTML = '<div class="muted">Пока нет кривых.</div>';
@@ -164,172 +220,217 @@ function renderCurveList() {
   }
   STATE.curves.forEach(curve => {
     const row = document.createElement('div');
-    row.className = 'curve-row';
+    row.className = 'curve-row fc-card';
+    row.dataset.cid = curve.id;
+    if (!curve.visible) row.classList.add('is-hidden');
 
-    // Верхняя строка: галочка видимости, цвет, формула, удаление.
+    // Верхний ряд: цвет, обозначение, имя, глаз, «…».
     const top = document.createElement('div');
     top.className = 'crow-top';
 
-    const cb = document.createElement('input');
-    cb.type = 'checkbox'; cb.checked = curve.visible;
-    cb.setAttribute('data-tip', 'Показать/скрыть');
-    cb.addEventListener('change', () => { curve.visible = cb.checked; renderCurveList(); redrawAll(); });
-
-    // Цвет кривой (Фаза 2): пикер меняет цвет ТОЛЬКО у этого экземпляра.
-    // Палитра по умолчанию (--curve-*) не трогается: она остаётся точкой отсчёта,
-    // пользователь лишь перекрывает её локально на время сеанса.
-    //
-    // ВАЖНО: здесь НЕЛЬЗЯ вызывать renderCurveList(). Она чистит innerHTML
-    // списка и уничтожает тот самый input, к которому привязана открытая
-    // палитра браузера, поэтому окно выбора цвета захлопывалось на первом же
-    // клике по градиенту. Перерисовываем только график, а строку списка
-    // подкрашиваем на месте.
+    // Цвет кривой (Фаза 2): окно меняет цвет ТОЛЬКО у этого экземпляра.
+    // ВАЖНО: здесь нельзя вызывать renderCurveList(): «Свой цвет» держит
+    // системное окно выбора на input внутри окна «Цвет кривой».
     const sw = makeColorPicker(curve.color, (hex) => {
-      curve.color = hex; curve.colorCustom = true;
+      if (hex == null) { delete curve.colorCustom; curve.color = roleColor(curve.role) || curve.color; }
+      else { curve.color = hex; curve.colorCustom = true; }
       redrawAll();
+      return curve.color;
+    }, 'Цвет кривой: ' + curveHumanName(curve), {
+      title: 'Цвет кривой «' + curveHumanName(curve) + '»',
+      dflt: () => roleColor(curve.role) || null,
     });
 
-    /* ОБОЗНАЧЕНИЕ ПЕРЕД ИМЕНЕМ (Фаза 3). На холсте у кривой сложения стоит
-       короткое обозначение (D₁, S₂, D, S) — иначе шесть подписей по 137–181 px
-       читаются вдоль края одной строкой. Чтобы связь холста со списком
-       осталась однозначной, ТО ЖЕ обозначение стоит здесь, перед полным
-       именем, и в подписи ползунка справа. */
-    let tagEl = null;
+    /* ОБОЗНАЧЕНИЕ (Фаза 3 и макет 6.1): у кривой сложения короткое D₁, S₂
+       (тем же обозначением она подписана на холсте), у остальных D, S, MC или
+       своя подпись из меню «…». Набирается формулой. */
     const rowTag = (typeof sumTagOf === 'function' && typeof sumSceneOn === 'function' && sumSceneOn())
       ? sumTagOf(curve) : null;
-    if (rowTag) {
-      tagEl = document.createElement('span');
-      tagEl.className = 'crow-tag';
-      tagEl.style.color = curve.color;          // обозначение цветом своей линии
-      const tex = rowTag.replace(/_(\d)/, '_{$1}');
-      if (typeof katexInto === 'function') katexInto(tagEl, tex);
-      else tagEl.textContent = rowTag.replace('_', '');
-      tagEl.setAttribute('data-tip', 'Так эта кривая подписана на графике');
-    }
-
     const nm = document.createElement('span');
-    nm.className = 'curve-name';
-    paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
-    nm.setAttribute('data-tip', tipExpr(curve.expr));   // под именем — сама формула
-    if (!curve.visible) nm.style.opacity = '.4';
+    nm.className = 'curve-name fc-notation';
+    if (rowTag && !(curve.label || '').trim()) {
+      nm.classList.add('crow-tag');
+      nm.style.color = curve.color;
+      const tex = rowTag.replace(/_(\d)/, '_{$1}');
+      if (typeof katexInto === 'function') katexInto(nm, tex);
+      else nm.textContent = rowTag.replace('_', '');
+    } else {
+      paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
+    }
+    nm.setAttribute('data-tip', tipExpr(curve.expr));   // под обозначением — сама формула
+
+    const human = document.createElement('span');
+    human.className = 'fc-name';
+    human.textContent = curveHumanName(curve);
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
     let badge = null;
     if (curve.srcForm === 'QP') {
       badge = document.createElement('span');
       badge.className = 'form-badge'; badge.textContent = 'Q(P)';
-      /* Слова остаются словами, математика — формулой: «считается численно»
-         это пояснение, а «P = f(Q)» — запись, и набраны они по-разному. */
       const can = curve.linear
         ? ('$P = ' + fmtLinear(curve.linear.a, curve.linear.b) + '$')
         : '$P = f(Q)$ считается численно';
       badge.setAttribute('data-tip', 'Введено как $Q(P)$, в расчётах ' + can);
     }
 
+    // Глаз (пункт (ж)): тот же признак visible, что был у галочки.
+    const eye = document.createElement('button');
+    eye.type = 'button'; eye.className = 'fc-eye fc-ico';
+    const paintEye = () => {
+      eye.innerHTML = curve.visible ? ICON_EYE : ICON_EYE_OFF;
+      eye.setAttribute('aria-pressed', curve.visible ? 'false' : 'true');
+      const t = curve.visible ? 'Скрыть кривую' : 'Показать кривую';
+      eye.setAttribute('aria-label', t + ' ' + curveShortName(curve));
+      eye.setAttribute('data-tip', t);
+    };
+    paintEye();
+    eye.addEventListener('click', () => {
+      pushUndo(curve.visible ? 'Скрыть кривую' : 'Показать кривую');
+      curve.visible = !curve.visible;
+      renderCurveList(); redrawAll();
+    });
+
     /* ⚠️ КРЕСТИК ДЕЛАЕТ РАЗНОЕ У РАЗНЫХ КРИВЫХ (решение владельца 22.08).
-       У ДОБАВЛЕННОЙ кривой (роли нет) он удаляет — её завёл человек, ему и
-       убирать. У ШТАТНОЙ кривой модели (спрос, предложение, MC и прочие с
-       ролью) он ГАСИТ: удалённый спрос в «Спросе и предложении» оставляет
-       ученика с пустой моделью и без пути назад, кроме «Вернуть исходный
-       вид», который заодно снесёт все его правки.
-       Гашение — это уже написанный признак visible и та же галочка слева:
-       второго механизма видимости рядом с первым не заводим. */
+       У добавленной кривой (роли нет) он удаляет, у штатной кривой модели
+       гасит: удалённый спрос оставил бы ученика с пустой моделью. Теперь это
+       пункт меню «…»: «Удалить функцию» или «Убрать с графика». */
     const staff = !!curve.role;
     const del = document.createElement('button');
-    del.className = 'btn-icon'; del.textContent = '✕';
+    del.type = 'button';
+    del.className = 'btn-icon fc-mi' + (staff ? '' : ' fc-danger');
+    del.textContent = staff ? 'Убрать с графика' : 'Удалить функцию';
     del.setAttribute('data-tip',
-      staff ? 'Убрать кривую с графика (вернуть галочкой слева)' : 'Удалить кривую');
+      staff ? 'Убрать кривую с графика (вернуть глазом на карточке)' : 'Удалить кривую');
     del.addEventListener('click', () => {
-      pushUndo();
+      pushUndo(staff ? 'Убрать кривую' : 'Удалить функцию');
+      closeFcMenu();
       if (staff) { curve.visible = false; }
       else { STATE.curves = STATE.curves.filter(c => c.id !== curve.id); }
       renderCurveList();
       redrawAll();
     });
-    if (tagEl) top.append(cb, sw, tagEl, nm); else top.append(cb, sw, nm);
-    if (badge) top.append(badge);
-    top.append(del);
 
-    // Нижняя строка: роль кривой (обычная / спрос / предложение).
+    // «Роль кривой»: обычная / спрос / предложение / MC / TC / ATC (О9).
     const sel = document.createElement('select');
     sel.className = 'role-sel';
-    [['', 'обычная кривая'], ['demand', 'D, спрос'], ['supply', 'S, предложение'],
+    sel.setAttribute('aria-label', 'Роль кривой');
+    [['', 'Обычная кривая'], ['demand', 'D, спрос'], ['supply', 'S, предложение'],
      ['mc', 'MC, предельные издержки'], ['tc', 'TC, суммарные затраты'], ['atc', 'ATC, средние затраты']]
       .forEach(([v, t]) => {
         const o = document.createElement('option'); o.value = v; o.textContent = t;
         sel.appendChild(o);
       });
     sel.value = curve.role || '';
-    sel.addEventListener('change', () => setRole(curve, sel.value));
+    sel.addEventListener('change', () => { pushUndo('Роль кривой'); setRole(curve, sel.value); });
 
-    // Формула кривой правится прямо здесь: кривая остаётся в списке со своей
-    // записью, её не нужно удалять и заводить заново ради одной опечатки.
-    // Битую формулу не применяем: подсвечиваем поле и оставляем прежнюю кривую.
+    // Формула кривой правится прямо здесь; неверная остаётся черновиком в поле.
     let fInp = null;
-    /* ⚠️ У СУММАРНОЙ КРИВОЙ ПОЛЯ ФОРМУЛЫ НЕТ, И ЭТО НЕ ЗАБЫВЧИВОСТЬ.
-       Её запись считается из формул групп на каждой перерисовке (sumRebuild),
-       и правка руками жила бы ровно до следующей. Саму запись человек видит
-       рядом с именем — в подсказке строки и в аналитике. */
+    /* ⚠️ У СУММАРНОЙ КРИВОЙ ПОЛЯ ФОРМУЛЫ НЕТ: её запись считается из формул
+       групп на каждой перерисовке (sumRebuild). */
     if (curve.kind !== 'vertical' && curve.kind !== 'sum') {
       fInp = document.createElement('input');
       fInp.type = 'text'; fInp.className = 'curve-expr-inp';
       fInp.value = curve.srcForm === 'QP' ? (curve.srcExpr || curve.expr) : curve.expr;
       fInp.placeholder = curve.expr ? (curve.srcForm === 'QP' ? 'Q = f(P)' : 'P = f(Q)')
                                     : 'Например: 100 - Q';
-      fInp.setAttribute('data-tip', 'Формула кривой: правится на месте');
+      fInp.setAttribute('aria-label', 'Формула: ' + curveHumanName(curve));
       fInp.addEventListener('input', () => {
         pushUndo();
-        const err = updateCurveExpr(curve, fInp.value);
+        const raw = String(fInp.value || '').trim();
+        // Пустое поле у своей функции законно: кривой просто нет (макет 6.1).
+        const err = (!raw && !staff) ? null : updateCurveExpr(curve, fInp.value);
+        if (!raw && !staff) { curve.expr = ''; curve.compiled = null; curve.linear = null; }
         fInp.classList.toggle('bad', !!err);
-        fInp.setAttribute('data-tip',
-          err ? ('Пока не применено: ' + err) : 'Формула кривой: правится на месте');
+        fInp.setAttribute('aria-invalid', err ? 'true' : 'false');
+        if (typeof fieldProblem === 'function') {
+          fieldProblem(fInp, err ? (err.charAt(0).toUpperCase() + err.slice(1) + '. График держит последнюю верную запись.') : '');
+        }
         if (!err) {
-          nm.textContent = curveShortName(curve);
+          paintNotation(nm, curveShortName(curve));
           redrawAll();
           if (typeof updatePult === 'function') updatePult();
         }
       });
     }
 
-    // Своё имя кривой (Фаза 1). Если задано — идёт и в подпись на графике,
-    // и в список, и в чип пульта вместо родового «D»/«S».
+    // «Подпись на графике» (Фаза 1): своё имя идёт на холст, в карточку и в ползунок.
     const nameInp = document.createElement('input');
     nameInp.type = 'text'; nameInp.className = 'curve-label-inp';
     nameInp.value = curve.label || '';
-    nameInp.placeholder = 'Имя на графике, напр. D₁';
+    nameInp.placeholder = curveShortName(Object.assign({}, curve, { label: '' }));
+    nameInp.setAttribute('aria-label', 'Подпись на графике');
     nameInp.addEventListener('input', () => {
       curve.label = nameInp.value;
-      nm.textContent = curveShortName(curve);
+      paintNotation(nm, curveShortName(curve));
       redrawAll();
       if (typeof updatePult === 'function') updatePult();
     });
 
-    /* Плотность строки (Фаза 10). Раньше на каждую кривую приходилось четыре
-       контрола во всю ширину подряд, и три кривые занимали весь экран панели.
-       Главное в строке — формула, она встаёт наверх рядом с цветом. Своё имя
-       и роль нужны заметно реже, поэтому уходят во второй ряд под галочку. */
+    /* Меню «…» (макет, раздел 10): подпись на графике, куски, стартовая
+       запись, роль, удаление. Узел меню живёт в строке и открывается поверх
+       колонки, как всплывающее окно. */
     const more = document.createElement('div');
-    more.className = 'crow-more';
-    more.append(nameInp, sel);
+    more.className = 'crow-more fc-menu';
+    more.setAttribute('role', 'dialog');
+    more.setAttribute('aria-label', 'Настройки функции ' + curveShortName(curve));
+    const lab = document.createElement('label');
+    lab.className = 'fc-menu-lab'; lab.textContent = 'Подпись на графике';
+    const note = document.createElement('div');
+    note.className = 'fc-menu-note'; note.textContent = 'Индекс через «_»: D_1 → D₁. Пусто: обозначение по умолчанию.';
+    more.append(lab, nameInp, note);
+    const items = document.createElement('div');
+    items.className = 'fc-menu-items';
+    const mi = (text, fn, cls) => {
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'fc-mi' + (cls ? ' ' + cls : '');
+      b.textContent = text;
+      b.addEventListener('click', () => { closeFcMenu(); fn(); });
+      items.appendChild(b);
+      return b;
+    };
+    if (fInp) {
+      if (curveIsPiecewise(curve)) {
+        mi('Изменить куски', () => openPiecewise(fInp, pwVarForField(fInp, curvePrefix(curve)[0] === 'Q' ? 'P' : 'Q')));
+        mi('Одной формулой', () => curveToSingleFormula(curve, fInp));
+      } else {
+        mi('Задать кусками', () => openPiecewise(fInp, pwVarForField(fInp, curve.srcForm === 'QP' ? 'P' : 'Q'), { split: true }));
+      }
+    }
+    if (staff && fInp) {
+      mi('Вернуть стартовую запись', () => {
+        const ex = startExprOf(curve);
+        if (ex == null) { toast('Стартовой записи у этой кривой нет'); return; }
+        pushUndo('Вернуть стартовую запись');
+        setFieldValue(fInp, ex);
+      });
+    }
+    const roleBox = document.createElement('div');
+    roleBox.className = 'fc-menu-role';
+    const rl = document.createElement('div');
+    rl.className = 'fc-menu-lab'; rl.textContent = 'Роль кривой';
+    roleBox.append(rl, sel);
+    more.append(items, roleBox, del);
 
     const gear = document.createElement('button');
-    gear.type = 'button'; gear.className = 'btn-icon crow-gear';
-    gear.setAttribute('data-tip', 'Имя на графике и роль кривой');
+    gear.type = 'button'; gear.className = 'btn-icon crow-gear fc-ico';
+    gear.setAttribute('data-tip', 'Подпись на графике, стартовая запись, удаление');
+    gear.setAttribute('aria-label', 'Настройки функции ' + curveShortName(curve));
+    gear.setAttribute('aria-haspopup', 'dialog');
     gear.setAttribute('aria-expanded', 'false');
-    gear.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
-    gear.addEventListener('click', () => {
-      const open = more.classList.toggle('open');
-      gear.setAttribute('aria-expanded', open ? 'true' : 'false');
+    gear.innerHTML = ICON_DOTS;
+    gear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (more.classList.contains('open')) { closeFcMenu(); return; }
+      openFcMenu(gear, more);
     });
 
-    /* ── СТРОКА СУММАРНОЙ КРИВОЙ НЕ ДОЛЖНА ВЫГЛЯДЕТЬ ОБЛОМКОМ (Фаза 3) ──
-       Поля формулы у неё нет и быть не может: запись считается из формул
-       групп на каждой перерисовке, и правка руками жила бы до следующей.
-       Но пустое место на её месте читалось как недоделка (замер 25.08:
-       строка группы 115 px, строка суммы 66 — на экране просто короче и всё).
-       Ставим на место поля строку, которая прямо это и говорит, а в подсказке
-       показываем ту самую запись, по которой кривая считается. */
+    top.append(sw, nm, human);
+    if (badge) top.append(badge);
+    top.append(eye, gear);
+
+    /* Строка суммарной кривой: поля у неё нет и быть не может, на его месте
+       прямая надпись, а в подсказке — запись, по которой кривая считается. */
     let autoLine = null;
     if (curve.kind === 'sum') {
       autoLine = document.createElement('div');
@@ -340,39 +441,44 @@ function renderCurveList() {
         : 'Ни одна группа ещё не задана');
     }
 
+    const sliders = document.createElement('div');
+    sliders.className = 'crow-sliders';
     if (fInp) {
-      /* Формула занимает ОТДЕЛЬНУЮ строку во всю ширину (А66). Раньше она
-         стояла в одном ряду с галочкой, цветом, шестерёнкой и крестиком, и на
-         неё оставалось 82 пикселя из 215. Наверху остаётся имя кривой, снизу
-         сама запись — так она читается и правится, а не прокручивается по
-         букве. */
       const fLine = document.createElement('div');
       fLine.className = 'crow-formula';
-      fLine.appendChild(fInp);
-      top.insertBefore(gear, del);
-      row.append(top, fLine, more);
-      /* А66 · А6. Формула кривой правится ТЕМ ЖЕ полем, что и новая: набранная
-         запись, клавиатура, подсказка с примерами. Раньше в одном блоке жили
-         два способа ввода — у пресетных кривых обычное текстовое окошко
-         шириной 84px, у новой кривой поле с набором формул. Поле собирается
-         лениво (А56): пока строка не на экране, тяжёлый компонент не создаётся. */
+      const pre = document.createElement('span');
+      pre.className = 'fc-prefix';
+      pre.setAttribute('aria-hidden', 'true');
+      if (typeof katexInto === 'function') katexInto(pre, curvePrefix(curve).replace(' =', '\\,='));
+      else pre.textContent = curvePrefix(curve);
+      fLine.append(pre, fInp);
+      row.append(top, fLine, more, sliders);
       fInp.id = fInp.id || ('curve-expr-' + curve.id);
     } else if (autoLine) {
-      top.insertBefore(gear, del);
-      row.append(top, autoLine, more);
+      row.append(top, autoLine, more, sliders);
     } else {
-      top.insertBefore(gear, del);
-      row.append(top, more);
+      row.append(top, more, sliders);
     }
     list.appendChild(row);
     /* Оснащаем поле формулы ПОСЛЕ вставки строки в разметку: до этого
        getElementById его не найдёт, и оснащение молча не срабатывало. */
     if (fInp) equipFormulaField(fInp.id, () => (curve.srcForm === 'QP' ? 'QP' : 'PQ'));
   });
-  /* Поля формул собираются лениво и только когда видны, а строку мы добавили в
-     разметку только что — разбираем очередь здесь (А56 · А66). */
   if (typeof flushMathfields === 'function') flushMathfields();
-  if (typeof updatePult === 'function') updatePult();   // пересобрать слайдеры кривых в пульте
+  if (typeof updatePult === 'function') updatePult();   // пересобрать ползунки кривых
+  if (typeof placeCurveSliders === 'function') placeCurveSliders();
+}
+
+/* «Одной формулой»: куски убираются, остаётся формула первого куска;
+   тост с «Вернуть» (макет 6.6). Отдельный шаг истории. */
+function curveToSingleFormula(curve, fInp) {
+  const was = fInp.value;
+  const parsed = pwParse(was, 'Q');
+  if (!parsed || !parsed.rows.length) return;
+  pushUndo('Одной формулой');
+  setFieldValue(fInp, pwPrefixOf(was) + parsed.rows[0].f);
+  toast('Куски убраны, осталась формула первого куска', {
+    action: 'Вернуть', fn: () => { pushUndo('Вернуть куски'); setFieldValue(fInp, was); } });
 }
 
 /* ---------------------------------------------------------------------

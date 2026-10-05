@@ -2467,3 +2467,250 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 /* «Параметры» без единого ползунка не показываются: нечего показать — секции нет. */
 #sec-params:not(:has(#params-body input, #params-body button)) { display: none; }
 .sec-head b { font-weight: inherit; }   /* иначе <b> в заголовке 600 даёт 900 (вне шкалы канона) */
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · «УСЛОВИЕ» (фаза 5б; README макета, разделы 6, 10, 13)
+   Секции плоские, через тонкий разделитель; функция — карточка: цвет,
+   обозначение, имя, глаз, «…», поле формулы с приставкой и клавиатурой,
+   под ней её ползунки. Окна (меню «…», «Цвет кривой», «Как писать
+   формулы», «Поделиться») — одним видом: --surface, рамка, радиус 12,
+   тень только у всплывающего.
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --border-strong: rgba(45, 45, 45, .26);   /* поля, контурные кнопки, выбранное (на сайте нет) */
+  --scrim: rgba(29, 26, 22, .34);           /* подложка модального окна (на сайте нет) */
+}
+[data-theme="dark"] {
+  --border-strong: rgba(255, 255, 255, .24);
+  --scrim: rgba(0, 0, 0, .5);
+}
+
+/* Шапка колонки: «Условие» и тихая «Как писать формулы». */
+.col-quiet {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 8px;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2);
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.col-quiet svg { width: 16px; height: 16px; flex: 0 0 16px; }
+.col-quiet:hover, .col-quiet[aria-expanded="true"] { background: var(--chip-bg); color: var(--text); }
+.col-quiet:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.col-cond .col-head { border-bottom: 1px solid var(--border-soft); }
+
+/* Секции «Условия»: поля 14 16 16, сверху разделитель, заголовок 15/600. */
+#tools-panel .tools-body > .section.card,
+#tools-panel .tools-body > .section.card.open-card,
+#tools-panel .tools-body > .section.card.first-card {
+  margin: 0; padding: 14px 16px 16px; background: transparent;
+  border: 0; border-top: 1px solid var(--border-soft); border-radius: 0; box-shadow: none;
+}
+#tools-panel .tools-body > .section.card:first-child { border-top: 0; }
+#tools-panel .tools-body > .section.card > .fold-body { padding: 0; }
+#tools-panel .side-scroll, #tools-panel .side-part, #tools-panel .tools-body { padding: 0; margin: 0; }
+.col-cond .sec-head { padding: 0 0 12px; }
+.col-cond .sec-head .sec-ico { display: none; }
+
+/* ── Карточка функции (6.1) ───────────────────────────────────────── */
+#curve-list { display: flex; flex-direction: column; gap: 8px; }
+.curve-row.fc-card {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 10px 10px 10px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card);
+}
+.curve-row.fc-card:last-child { border-bottom: 1px solid var(--border); }
+.curve-row.fc-card.is-hot { border-color: var(--border-strong); }
+.fc-card > .crow-top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
+.fc-card .cpick-btn {
+  width: 20px; height: 20px; border-radius: 50%; border: 0;
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong);
+  margin-left: 2px;
+}
+.fc-card .cpick-btn:hover { transform: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--accent); }
+.fc-notation {
+  flex: 0 0 auto; font-family: inherit; font-size: 18px; line-height: 1; color: var(--text);
+  overflow: visible; white-space: nowrap; max-width: 40%;
+}
+.fc-notation .katex { font-size: 1em; }
+.fc-name {
+  flex: 1 1 auto; min-width: 0; font-size: 13px; font-weight: 500; color: var(--text2);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.fc-card.is-hidden .fc-notation, .fc-card.is-hidden .fc-name { opacity: .5; }
+.fc-ico {
+  flex: 0 0 30px; width: 30px; height: 30px; padding: 0; display: grid; place-items: center;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2); cursor: pointer;
+}
+.fc-ico svg { width: 18px; height: 18px; display: block; }
+.fc-ico:hover, .fc-ico[aria-expanded="true"] { background: var(--chip-bg); color: var(--text); }
+.fc-ico:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.crow-gear.fc-ico svg { transform: none; }
+.fc-card .form-badge { font-size: 12px; color: var(--chip-text); background: var(--chip-bg); }
+
+/* Поле формулы: 40, фон --surface-2, рамка, радиус 6; приставка «P =»;
+   кнопка клавиатуры в правом конце поля. */
+.fc-card > .crow-formula {
+  display: flex; flex-wrap: wrap; align-items: center; margin: 0;
+  min-height: 40px; padding: 0 4px 0 10px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.fc-card > .crow-formula:has(.is-bad) { border-color: var(--error); }
+.fc-card > .crow-formula:focus-within { border-color: var(--accent); }
+.fc-prefix { flex: 0 0 auto; margin-right: 8px; font-size: 17px; color: var(--text2); line-height: 1; }
+.fc-prefix .katex { font-size: 1em; }
+.fc-card > .crow-formula > .f-wrap { flex: 1 1 0; min-width: 0; display: contents; }
+.fc-card > .crow-formula .f-row { flex: 1 1 0; min-width: 0; width: auto; gap: 2px; align-items: center; }
+.fc-card > .crow-formula math-field,
+.fc-card > .crow-formula .f-typeset,
+.fc-card > .crow-formula .f-slot > input {
+  border: 0; background: transparent; padding: 6px 2px; font-size: 18px; min-height: 38px;
+}
+.fc-card > .crow-formula math-field:focus,
+.fc-card > .crow-formula math-field:focus-within { outline: none; }
+.fc-card > .crow-formula .f-kbd {
+  flex: 0 0 30px; width: 30px; height: 30px; border: 0; border-radius: var(--r);
+  background: transparent; color: var(--text3);
+}
+.fc-card > .crow-formula .f-kbd[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
+.fc-card > .crow-formula .f-kbd:hover { color: var(--text); background: var(--chip-bg); }
+/* Ошибка, клавиатура и примеры — под полем, на всю ширину карточки. */
+.fc-card > .crow-formula > .f-why,
+.fc-card > .crow-formula > .mkbd,
+.fc-card > .crow-formula > .f-pop { flex: 1 0 100%; margin-left: -10px; margin-right: -4px; }
+.fc-card .f-why { font-size: 13px; line-height: 1.55; min-height: 0; }
+.fc-card .f-why.is-bad { color: var(--error-ink); padding: 6px 10px 8px; }
+.fc-card .f-why:not(.is-bad) { display: none; }
+.fc-card > .crow-formula > .mkbd.open { margin-top: 6px; margin-bottom: 4px; }
+.fc-card > .crow-auto { margin: 0; font-size: 13px; }
+
+/* Ползунки под карточкой: сдвиг и буквы своей формулы. */
+.crow-sliders:empty { display: none; }
+.crow-sliders { display: flex; flex-direction: column; gap: 10px; padding: 2px 2px 0; }
+.crow-sliders .pchip-dot { display: none; }
+.param-track input[type="range"] { accent-color: var(--accent) !important; height: 22px; }
+
+/* Меню «…» (раздел 10): 270, подпись на графике, пункты по 34. */
+.fc-menu {
+  display: none; position: fixed; z-index: var(--z-pop); width: 270px;
+  padding: 12px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+}
+.fc-menu.open { display: block; }
+.fc-menu-lab { display: block; font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 6px; }
+.fc-menu .curve-label-inp {
+  width: 100%; height: 34px; padding: 0 10px; font-size: 17px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.fc-menu-note { margin-top: 6px; font-size: 12px; color: var(--text3); line-height: 1.45; }
+.fc-menu-items { margin: 10px -12px 0; padding: 6px 6px 0; border-top: 1px solid var(--border-soft); }
+.fc-menu-items:empty { display: none; }
+.fc-menu .fc-mi {
+  display: block; width: 100%; height: 34px; padding: 0 10px; text-align: left;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text);
+  font: inherit; font-size: 14.5px; font-weight: 400; cursor: pointer; line-height: 34px;
+}
+.fc-menu .fc-mi:hover { background: var(--chip-bg); color: var(--text); }
+.fc-menu .fc-mi.fc-danger { color: var(--error-ink); }
+.fc-menu .fc-mi.fc-danger:hover { background: var(--error-tint); color: var(--error-ink); }
+.fc-menu-role { margin: 8px 0 0; padding-top: 10px; border-top: 1px solid var(--border-soft); }
+.fc-menu > .btn-icon.fc-mi { margin-top: 6px; }
+.fc-menu .sel-btn { height: 34px; font-size: 14.5px; font-weight: 400; }
+
+/* «Добавить функцию»: во всю ширину, 38, пунктир, радиус 10, «+». */
+#btn-add-curve {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; height: 38px; margin-top: 8px; padding: 0 12px;
+  background: transparent; color: var(--text2); border: 1px dashed var(--border-strong);
+  border-radius: var(--r-card); font: inherit; font-size: 14.5px; font-weight: 500; box-shadow: none;
+}
+#btn-add-curve::before { content: '+'; font-size: 18px; font-weight: 400; line-height: 1; }
+#btn-add-curve:hover { background: var(--chip-bg); color: var(--text); }
+
+/* Сегмент (один вид везде, 6.3): подложка --surface-2, радиус 10. */
+.seg {
+  display: flex; gap: 2px; padding: 3px; background: var(--surface-2);
+  border: 1px solid var(--border-soft); border-radius: var(--r-card);
+}
+.seg-btn {
+  padding: 6px 10px; border: 1px solid transparent; border-radius: var(--r);
+  background: transparent; color: var(--text2); font-size: 13.5px; font-weight: 500;
+}
+.seg-btn.active, .seg-btn[aria-pressed="true"] {
+  background: var(--surface); color: var(--text); border-color: var(--border-strong); font-weight: 600;
+}
+.seg-btn.active:hover { color: var(--text); }
+
+/* Галочка (COVERAGE, раздел 5): своя и без заливки. */
+.chk input[type=checkbox], .col-cond input[type=checkbox], .pop input[type=checkbox] {
+  -webkit-appearance: none; appearance: none; flex: 0 0 18px;
+  width: 18px; height: 18px; margin: 0; position: relative; cursor: pointer;
+  background: var(--surface); border: 1.5px solid var(--border-strong); border-radius: var(--r-sm);
+}
+.chk input[type=checkbox]:checked, .col-cond input[type=checkbox]:checked, .pop input[type=checkbox]:checked {
+  background: var(--surface); border-color: var(--accent);
+}
+.chk input[type=checkbox]:checked::after, .col-cond input[type=checkbox]:checked::after, .pop input[type=checkbox]:checked::after {
+  content: ''; position: absolute; left: 5px; top: 1.5px; width: 4.5px; height: 9px;
+  border: solid var(--accent); border-width: 0 2px 2px 0; transform: rotate(42deg); background: none;
+}
+.chk input[type=checkbox]:hover, .col-cond input[type=checkbox]:hover { border-color: var(--accent); }
+.chk input[type=checkbox]:focus-visible, .col-cond input[type=checkbox]:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* ── Окна (раздел 10) ─────────────────────────────────────────────── */
+.pop {
+  display: none; position: fixed; z-index: var(--z-pop);
+  padding: 14px 16px 16px; background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--r-panel); box-shadow: var(--shadow-pop); color: var(--text);
+}
+.pop.open { display: block; }
+.pop-title { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.pop-text { margin: 0 0 12px; font-size: 14px; font-weight: 400; line-height: 1.45; color: var(--text2); }
+.howto-pop { width: 372px; max-height: calc(100vh - 140px); overflow-y: auto; }
+.howto-rows { display: flex; flex-direction: column; }
+.howto-row { display: grid; grid-template-columns: 124px 1fr; gap: 10px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--border-soft); }
+.howto-row:first-child { border-top: 0; }
+.howto-ex { font-size: 15px; font-weight: 500; color: var(--text); overflow-x: auto; font-variant-numeric: tabular-nums; }
+.howto-note { font-size: 13px; color: var(--text2); line-height: 1.55; }
+.howto-sub { margin: 10px 0 2px; font-size: 13px; font-weight: 600; color: var(--text2); }
+.howto-foot { margin-top: 10px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+.share-pop { width: 440px; }
+.share-row { display: flex; gap: 8px; }
+.share-row input {
+  flex: 1 1 auto; width: auto; min-width: 0; height: 38px; padding: 0 10px; font-size: 13px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.share-row .btn { height: 38px; flex: 0 0 auto; width: auto; margin: 0; padding: 0 16px; }
+.share-self { display: flex; align-items: flex-start; gap: 10px; margin-top: 12px; font-size: 14px; color: var(--text); }
+.share-self small { display: block; font-size: 13px; color: var(--text3); }
+#btn-share.is-open { background: var(--chip-bg); color: var(--text); border-color: var(--border-strong); }
+
+/* «Цвет кривой» (244): 12 кружков по 6 в ряд, «Свой цвет», «Цвет по умолчанию». */
+.cpick-menu { width: 244px; padding: 12px; border-radius: var(--r-panel); }
+.cpick-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 10px; }
+.cpick-menu .cpick-grid { grid-template-columns: repeat(6, 28px); gap: 8px 8px; justify-content: space-between; }
+.cpick-menu .cpick-sw { width: 28px; height: 28px; border-radius: 50%; border: 0; }
+.cpick-menu .cpick-sw:hover { transform: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong); }
+.cpick-menu .cpick-sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+.cpick-menu .cpick-sw[aria-checked="true"]::after { display: none; }
+.cpick-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
+.cpick-menu .cpick-own { width: 100%; margin: 0; padding: 4px 8px; background: transparent; font-size: 13px; white-space: nowrap; }
+.cpick-menu .cpick-own input[type="color"] { width: 44px; height: 28px; border-radius: var(--r); }
+.cpick-dflt {
+  border: 0; background: transparent; padding: 4px 2px; color: var(--accent-ink);
+  font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Тосты (раздел 10): снизу по центру, графитовые, 14,5 px, радиус 10. */
+.toast {
+  left: 50%; right: auto; bottom: 18px; transform: translateX(-50%);
+  max-width: 640px; padding: 10px 14px; border-radius: var(--r-card);
+  background: var(--btn-bg); color: var(--on-btn); font-size: 14.5px; font-weight: 500;
+  display: none; align-items: center; gap: 12px;
+}
+.toast.show { display: flex; }
+.toast .toast-act {
+  border: 1px solid currentColor; background: transparent; color: inherit; border-radius: var(--r);
+  padding: 4px 10px; font: inherit; font-size: 14.5px; font-weight: 500; cursor: pointer;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .pop.open, .fc-menu.open { animation: fpop .14s var(--ease); }
+}

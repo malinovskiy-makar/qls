@@ -63,15 +63,7 @@ function wireShell() {
   const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
   if (u) u.addEventListener('click', () => { if (typeof historyUndo === 'function') historyUndo(); });
   if (r) r.addEventListener('click', () => { if (typeof historyRedo === 'function') historyRedo(); });
-  const sh = document.getElementById('btn-share');
-  if (sh) sh.addEventListener('click', async () => {
-    try {
-      const link = await shareLinkOf();
-      let ok = false;
-      try { await navigator.clipboard.writeText(link); ok = true; } catch (e) { ok = false; }
-      toast(ok ? 'Ссылка скопирована' : 'Не получилось скопировать: разрешите доступ к буферу обмена');
-    } catch (e) { toast('Не получилось собрать ссылку'); }
-  });
+  // «Поделиться» открывает окно со ссылкой (92-ui-kit.js, фаза 5б).
   const fb = document.getElementById('btn-focus');
   if (fb) fb.addEventListener('click', () => setFocusMode(!document.body.classList.contains('cv-focus')));
   // Статус сохранения: «Сохраняю…» на время записи, через 650 мс снова «Сохранено».

@@ -765,7 +765,7 @@
     <span class="mh-sep" aria-hidden="true"></span>
     <button class="mh-btn mh-quiet" id="btn-model-reset" type="button" data-tip="Вернуть стартовые функции и параметры">Сбросить</button>
     <button class="mh-btn mh-outline" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg><span>Скачать</span></button>
-    <button class="mh-btn mh-main" id="btn-share" type="button" data-tip="Ссылка на это состояние модели"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><span>Поделиться</span></button>
+    <button class="mh-btn mh-main" id="btn-share" type="button" data-tip="Ссылка на это состояние модели" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><span>Поделиться</span></button>
   </div>
 
   <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ ────────────────────────────────── -->
@@ -776,6 +776,9 @@
            заголовок этой панели, и оно крупное. -->
       <div class="side-head col-head">
         <h2>Условие</h2>
+        <!-- Редизайн 10.2026, фаза 5б: тихая «Как писать формулы» → окно
+             с примерами (README макета, раздел 10; 92-ui-kit.js). -->
+        <button class="col-quiet" id="btn-howto" type="button" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.4a2.5 2.5 0 0 1 4.8.9c0 1.7-2.4 2.2-2.4 3.7"/><path d="M12 17h.01"/></svg><span>Как писать формулы</span></button>
       </div>
       <!-- П9. Вернуть модель к исходному виду. По канону 2.8 у необратимого
            действия три слоя: объяснение последствия ДО действия, обычная
@@ -862,7 +865,7 @@
         </div>
         <div class="error" id="social-error" style="display:none;"></div>
       </div>
-      <button class="btn" id="btn-add-curve">Добавить кривую</button>
+      <button class="btn" id="btn-add-curve" type="button">Добавить функцию</button>
     </div>
 
     <!-- Построение графиков: чистый список функций, экономики здесь нет.
@@ -2400,6 +2403,20 @@
        Движок понимает кусочные записи через условие «? :», но набирать их
        руками неудобно и страшно. Здесь спрашиваем число кусков и рисуем
        фигурную скобку: в каждой строке своя формула и своя граница. -->
+  <!-- ── ВСПЛЫВАЮЩИЕ ОКНА «УСЛОВИЯ» (редизайн 10.2026, фаза 5б) ─────────
+       Одно окно за раз; Esc, щелчок мимо и повторный щелчок по якорю
+       закрывают (92-ui-kit.js). -->
+  <div class="pop howto-pop" id="howto-pop" role="dialog" aria-label="Как писать формулы"></div>
+  <div class="pop share-pop" id="share-pop" role="dialog" aria-label="Ссылка на этот график">
+    <div class="pop-title">Ссылка на этот график</div>
+    <p class="pop-text">В ссылке сохранены модель, функции и все ползунки. У того, кто откроет, будет ровно то, что сейчас у вас.</p>
+    <div class="share-row">
+      <input type="text" id="share-url" readonly aria-label="Ссылка">
+      <button class="btn" id="share-copy" type="button">Копировать</button>
+    </div>
+    <label class="chk share-self"><input type="checkbox" id="share-self"><span>Открыть в режиме «Сначала сам»<small>числа ответа спрятаны, удобно для домашки</small></span></label>
+  </div>
+
   <div class="modal" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-title" inert>
     <div class="modal-card">
       <h2 class="modal-title" id="pw-title">Кусочная функция</h2>
@@ -2498,6 +2515,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/89-model-state.js' %}"></script>
 <script src="{% calc2_static 'calc2/90-explain.js' %}"></script>
 <script src="{% calc2_static 'calc2/91-session.js' %}"></script>
+<script src="{% calc2_static 'calc2/92-ui-kit.js' %}"></script>
 <script src="{% calc2_static 'calc2/93-shell.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
 

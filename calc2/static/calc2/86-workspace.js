@@ -1490,7 +1490,9 @@ function markNotationsIn(root) {
      Её и так набирает формулой paintEqLabel, а имя для неё читается обратно из
      той же подписи. Разметив её здесь, мы кормили бы чтение собственным
      выводом: «Цена P» → «Цена $P$» → на экране «Цена PPP» (замер 24.08). */
-  const SKIP = '.katex, math-field, input, textarea, code, script, style, '
+  /* select и option — тоже (COVERAGE О29): в <option> разметка не набирается,
+     и «D, спрос» превращался в «DDD, спрос». */
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, select, option, '
              + '.f-typeset, .mf-hidden, .param-eq, .pchip-label, .reg-eq';
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {

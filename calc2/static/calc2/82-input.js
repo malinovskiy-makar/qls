@@ -472,10 +472,41 @@ function pwParse(text, fallbackVar) {
    перестаёт течь между полями: он ничего не помнит со страницы, а спрашивает
    само поле. Либо разбор того, что в нём стоит, либо значения по умолчанию с
    буквой этого поля — третьего не дано. */
-function openPiecewise(inp, v) {
+/* «Задать кусками» у обычной формулы (редизайн 10.2026, README макета 6.6):
+   конструктор начинает с ТОЙ ЖЕ формулы, разрезанной на два одинаковых куска.
+   Граница — половина первого положительного корня, округлённая до одной
+   значащей цифры; корня нет — 50. График не меняется, пока не нажато
+   «Готово»: два одинаковых куска и есть прежняя функция. */
+function pwSplitRows(text, v) {
+  const pfx = pwPrefixOf(text);
+  const f = String(text || '').slice(pfx.length).trim();
+  if (!f) return null;
+  let border = 50;
+  try {
+    const code = math.compile(prepExpr(f));
+    const scope = (typeof paramScope === 'function') ? paramScope() : {};
+    const at = (x) => { const o = Object.assign({}, scope); o[v] = x; const y = code.evaluate(o); return typeof y === 'number' ? y : NaN; };
+    let prev = at(0), root = null;
+    for (let i = 1; i <= 4000 && root == null; i++) {
+      const x = i * 0.25, y = at(x);
+      if (isFinite(prev) && isFinite(y) && (prev === 0 || prev * y < 0)) root = prev === 0 ? x - 0.25 : x;
+      prev = y;
+    }
+    if (root != null && root > 0) {
+      const half = root / 2, p = Math.pow(10, Math.floor(Math.log10(half)));
+      border = Math.round(half / p) * p;
+    }
+  } catch (e) { /* формулу не разобрали — граница по умолчанию */ }
+  const b = String(+border.toPrecision(6));
+  return [{ f, a: '', b }, { f, a: b, b: '' }];
+}
+
+function openPiecewise(inp, v, opts) {
   PW.inp = inp; PW.v = v || 'Q';
   const parsed = pwParse(inp ? inp.value : '', PW.v);
+  const split = (!parsed && opts && opts.split) ? pwSplitRows(inp ? inp.value : '', PW.v) : null;
   if (parsed) { PW.v = parsed.v || PW.v; PW.rows = parsed.rows; }
+  else if (split) { PW.rows = split; }
   else { PW.rows = pwDefaultRows(PW.v); }
   PW.n = PW.rows.length;
   const m = document.getElementById('pw-modal');
