@@ -239,6 +239,16 @@ function autosaveModel(s) {
   }
   if (typeof window.CustomEvent === 'function') window.dispatchEvent(new CustomEvent('calc2:saved', { detail: { ok } }));
 }
+function forgetAutosaves() {
+  try {
+    const ks = [];
+    for (let i = 0; i < window.localStorage.length; i++) {
+      const k = window.localStorage.key(i);
+      if (k && k.indexOf(STORE_PREFIX) === 0) ks.push(k);
+    }
+    ks.forEach(k => window.localStorage.removeItem(k));
+  } catch (e) { /* хранилища нет — забывать нечего */ }
+}
 function savedModel(key) {
   try {
     const r = JSON.parse(storeGet('model.' + key) || 'null');

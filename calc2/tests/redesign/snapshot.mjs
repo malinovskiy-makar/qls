@@ -275,6 +275,10 @@ async function worker() {
     try { rec = await snapKey(browser, key); } catch (e) {
       rec = { key, fatal: String(e.stack || e).slice(0, 800), failures: [key + ': ' + String(e.message || e)] };
     }
+    /* Ошибки страницы — без повторов: одна и та же ошибка старого кода (путь
+       с NaN в «Сложении») печаталась то четыре, то пять раз в зависимости от
+       числа перерисовок, и файл снимка дрожал. */
+    if (rec.errors) rec.errors = [...new Set(rec.errors.map(e => e.replace(/(Expected number, ").*$/, '$1…')))];
     fs.writeFileSync(path.join(OUT, key + '.json'), dump(rec));
     failures.push(...(rec.failures || []));
     if (rec.errors && rec.errors.length) failures.push(...rec.errors.map(e => key + ' · ошибка страницы: ' + e));
