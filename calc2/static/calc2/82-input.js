@@ -1362,7 +1362,9 @@ function formulaInputError(inp) {
     const r = parsePpfEquation(v);
     return r && r.error ? r.error : null;
   }
-  const parts = v.split(/<=|>=|≤|≥|=|<|>/);
+  // Запись целиком (в том числе кусочная «x < 50 ? … : …») — первым делом.
+  try { math.parse(v.replace(/≤/g, '<=').replace(/≥/g, '>=')); return null; } catch (e) { /* дальше по частям */ }
+  const parts = v.split(/(?<![<>=!])=(?!=)/);
   if (parts.length > 2) return 'В записи больше одного знака равенства';
   for (const part of parts) {
     if (!part.trim()) return 'По одну сторону знака равенства пусто';

@@ -186,7 +186,8 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.ppfSumData = null;
-          var b=document.getElementById('btn-ppfsum-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить сумму» нет; её действие —
+          // сброс ppfSumData и перерисовка — стоит здесь явно.
           redrawAll();
           // сэмплируем сумму при X=10 и сравниваем с √(324−100)=√224≈14.966
           var d = STATE.ppfSumData; if(!d||!d.ok||!d.points) return { yAt10: null };
@@ -201,7 +202,8 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.ppfSumData = null;
-          var b=document.getElementById('btn-ppfsum-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить сумму» нет; её действие —
+          // сброс ppfSumData и перерисовка — стоит здесь явно.
           redrawAll();
           var ks = (STATE.ppfSumKinks||[]).slice().sort(function(a,c){return a.x-c.x;});
           var k0 = ks[0]||{}, k1 = ks[ks.length-1]||{};
@@ -216,7 +218,9 @@ const CASES = [
           var i1=document.getElementById('inp-ppf1'); if(i1)i1.value=STATE.ppf1;
           var i2=document.getElementById('inp-ppf2'); if(i2)i2.value=STATE.ppf2;
           STATE.tradeBData = null;
-          var b=document.getElementById('btn-tb-apply'); if(b)b.click();
+          // Перенацелено (фаза 5а): кнопки «Построить торговлю» нет, запись полей
+          // применяет Enter в поле (то же applyTradeB).
+          document.getElementById('inp-tb1').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
           redrawAll();
           var t = STATE.tradeBData || {};
           return { Pweq: t.Pweq, Pw: t.Pw };`,
@@ -821,7 +825,7 @@ const CASES = [
     run: `setMode('inequality'); setIneqInput('formula');
           var inp = document.getElementById('ineq-formula');
           inp.value = 'p^2';
-          document.getElementById('ineq-formula-apply').click();
+          inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить»
           var before = STATE.ineqFormula;
           openPiecewise(inp, 'p');
           PW.n = 2;
@@ -1076,7 +1080,8 @@ const CASES = [
     run: `openPicker(); pickScene('trade'); closePicker();
           STATE.params = {};
           var inp = document.getElementById('inp-ppft');
-          var apply = document.getElementById('btn-ppft-apply');
+          // Перенацелено (фаза 5а): кнопки «Построить КТВ» нет, применяет Enter в поле.
+          var apply = { click: function () { inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); } };
           inp.value = '100 - X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
           var plain = STATE.ppfTradeData.Xmax;
           inp.value = '100 - a*X'; inp.dispatchEvent(new Event('input', { bubbles: true })); apply.click();
@@ -1250,7 +1255,7 @@ const CASES = [
           var inp = document.getElementById('inp-ppf');
           inp.value = 'y = x < 50 ? 100 - x : 75 - 0.5*x';
           inp.dispatchEvent(new Event('input', { bubbles: true }));
-          document.getElementById('btn-ppf-apply').click();
+          inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить»
           var f = parsePpfEquation(STATE.ppfFormula).f;
           var ex = document.getElementById('ex-body');
           var qs = [].map.call(ex.querySelectorAll('p > b'), function (b) { return b.textContent.trim(); });
@@ -1980,7 +1985,8 @@ const CASES = [
             if (el.scrollWidth > el.clientWidth + 1) cut++;
             if (el.scrollHeight > el.clientHeight + 1) cut++;
             if (cs.textOverflow === 'ellipsis') cut++;
-            heads[Math.round(document.querySelector('.side-head').getBoundingClientRect().height)] = 1;
+            // Перенацелено (фаза 5а): имя модели живёт в шапке модели.
+            heads[Math.round(document.querySelector('.mhead').getBoundingClientRect().height)] = 1;
           });
           pickScene('sd');
           return { cut: cut, headSizes: Object.keys(heads).length };`,
@@ -2303,7 +2309,7 @@ const CASES = [
     //   AP = 30L − L²  → максимум в L = 15, AP = 225; там же MP = 60·15 − 3·225 = 225.
     //   TP максимален там, где MP = 0: L = 20, TP = 30·400 − 8000 = 4000.
     name: 'Б2 · Производственная функция: перегиб, max AP = MP, max TP',
-    run: `pickScene('production');
+    run: `pickScene('prod');   /* перенацелено (фаза 5а): ключа 'production' нет — маршрут падал на «Спрос и предложение», а числа брались из устаревшего STATE.prod прошлых случаев */
           STATE.prodExpr = '30*L^2 - L^3'; redrawAll();
           var p = STATE.prod || {};
           return { mpL: (p.maxMP||{}).L, mpV: (p.maxMP||{}).val,
@@ -3133,7 +3139,7 @@ const CASES = [
     run: `return (async function () {
             resetSceneMemory(); pickScene('ppf');
             document.getElementById('inp-ppf').value = 'y=100-a*x';
-            document.getElementById('btn-ppf-apply').click();
+            document.getElementById('inp-ppf').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а)
             syncParams();
             var frame = function () { return new Promise(function (r) { requestAnimationFrame(r); }); };
             await frame(); await frame();
@@ -4322,7 +4328,7 @@ const CASES = [
             ['input', 'change'].forEach(function (t) { f.dispatchEvent(new Event(t, { bubbles: true })); });
             var p = document.getElementById('inp-ppft-price');
             p.value = String(price); p.dispatchEvent(new Event('change', { bubbles: true }));
-            document.getElementById('btn-ppft-apply').click();
+            f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));   // перенацелено (фаза 5а): Enter вместо «Построить КТВ»
             redrawAll();
             var d = STATE.ppfTradeData || {};
             return { xp: d.xp, yp: d.yp, xint: d.xint, yint: d.yint, regime: d.regime };
@@ -6317,10 +6323,11 @@ await gesture('(в) ползунок меняет геометрию КТВ бе
     const f = document.getElementById('inp-ppft');
     f.value = '100 - a*X';
     document.getElementById('inp-ppft-price').value = '1.5';
-    document.getElementById('btn-ppft-apply').click(); await w(400);
+    f.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true })); await w(400);   // перенацелено (фаза 5а): Enter вместо «Построить КТВ»
     const before = geom();
     const d0 = STATE.ppfTradeData ? { Xmax: STATE.ppfTradeData.Xmax, yint: STATE.ppfTradeData.yint } : null;
-    const sl = [...document.querySelectorAll('#params-panel input[type=range]')]
+    // Перенацелено (фаза 5а): ползунки букв живут в «Параметрах» колонки «Условие».
+    const sl = [...document.querySelectorAll('#params-body input[type=range]')]
       .find(x => (x.id || '').indexOf('ppft') < 0);
     if (!sl) return { none: true };
     sl.value = String(Math.min(parseFloat(sl.max), 2));

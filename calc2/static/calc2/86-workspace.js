@@ -342,6 +342,20 @@ function cardifySections() {
     if (sec._card) return;
     sec._card = true;
     sec.classList.add('card', 'open-card');
+    // Складная кнопка уже стояла в разметке («Точки на графике», «Площади»):
+    // она становится заголовком на месте, тело раскрывается.
+    const had0 = sec.querySelector(':scope > .fold-btn');
+    if (had0) {
+      const h0 = document.createElement('h3');
+      h0.className = 'sec-head';
+      const txt0 = (had0.querySelector(':scope > span') || had0).textContent.trim();
+      h0.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+      h0.querySelector('span > b').textContent = txt0;
+      const box0 = document.getElementById(had0.getAttribute('aria-controls'));
+      if (box0) box0.classList.add('open');
+      had0.replaceWith(h0);
+      return;
+    }
     if (!sec.querySelector(':scope > .section-title')) {
       const vs = sec.querySelector(':scope > .vsub');
       if (vs) { vs.classList.add('section-title'); vs.classList.remove('vsub'); }
@@ -503,7 +517,7 @@ function syncFirstCard() {
     if (!b) return;
     if (s === named) {
       if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
-      b.textContent = 'Ввод функций';
+      b.textContent = 'Функции';
     } else if (b.dataset.ownName !== undefined) {
       b.textContent = b.dataset.ownName;
     }

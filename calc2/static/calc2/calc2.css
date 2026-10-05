@@ -2415,8 +2415,10 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 }
 .mh-switch:hover, .mh-switch[aria-expanded="true"] { background: var(--chip-bg); }
 .mh-block { font-size: 12px; font-weight: 500; color: var(--text3); line-height: 1.2; }
-.mh-name { display: inline-flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 600; line-height: 1.25; max-width: 360px; }
-.mh-name .side-scene { font: inherit; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; }
+/* Имя модели не обрезается (решение штаба 13.08, проверка «Заголовок» в
+   calc2_math): самое длинное имя помещается в шапку и при 1280. */
+.mh-name { display: inline-flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 600; line-height: 1.25; }
+.mh-name .side-scene { font: inherit; color: inherit; white-space: nowrap; padding: 0; }
 .mh-name svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text2); }
 .mh-saved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text3); white-space: nowrap; }
 .mh-saved svg { width: 14px; height: 14px; color: var(--accent); }
@@ -2464,3 +2466,4 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .col-head h2 { flex: 1 1 auto; text-align: left; }
 /* «Параметры» без единого ползунка не показываются: нечего показать — секции нет. */
 #sec-params:not(:has(#params-body input, #params-body button)) { display: none; }
+.sec-head b { font-weight: inherit; }   /* иначе <b> в заголовке 600 даёт 900 (вне шкалы канона) */

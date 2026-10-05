@@ -2237,7 +2237,7 @@ function updatePpfSumPanel() {
   showPaneError('ppfsum-error', (d && !d.ok) ? (d.error || 'Не удалось построить.') : '');
   if (!d) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
-    box.innerHTML = '<div class="muted">Введите кривые и нажмите «Построить сумму».</div>'; return;
+    box.innerHTML = '<div class="muted">Введите кривые.</div>'; return;
   }
   if (!d.ok) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
@@ -2338,7 +2338,7 @@ function updatePpfSumPanel() {
      первой карточкой «Ключевых значений» (см. setFinalFunctions выше).
      Внутри этой врезки она снова уехала бы в «Объяснение модели» вместе со
      всеми `.sb-note` (moveExplanations в 86-workspace.js). */
-  html += '<p>Саму запись суммарной кривой ищите в «Ключевых значениях», '
+  html += '<p>Саму запись суммарной кривой ищите в «Ответе», '
         + 'первым блоком «Итоговая функция»: по ней кривая и построена.</p>';
   html += '</div>';
   box.innerHTML = html;
@@ -2612,7 +2612,7 @@ function updatePpfTradePanel() {
   showPaneError('ppft-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
   if (!d) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
-    box.innerHTML = '<div class="muted">Введите КПВ и мировую цену, нажмите «Построить КТВ».</div>'; return;
+    box.innerHTML = '<div class="muted">Введите КПВ и мировую цену.</div>'; return;
   }
   if (!d.ok) {
     if (typeof setFinalFunctions === 'function') setFinalFunctions([]);
@@ -2970,7 +2970,7 @@ function updateTradeBPanel() {
   const box = document.getElementById('info-tb'); if (!box) return;
   const d = STATE.tradeBData;
   showPaneError('tb-error', (d && !d.ok) ? (d.error || 'Не удалось.') : '');
-  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ и нажмите «Построить торговлю».</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="muted">Введите две КПВ.</div>'; return; }
   if (!d.ok) { box.innerHTML = '<div class="warn">' + (d.error || 'Не удалось.') + '</div>'; return; }
   let html = '';
   if (d.noTradeMsg) html += `<div class="warn" style="margin-bottom:6px;">${d.noTradeMsg}</div>`;

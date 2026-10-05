@@ -306,7 +306,10 @@ class CanonSourceChecks(SimpleTestCase):
         # И сама expandAll обязана раскрывать складные блоки, а не быть заглушкой.
         i = src.find("async function expandAll(")
         eb = src[i:i + 1600]
-        for need in ("fold-btn[aria-controls]", "setToolsOpen", "setParamsOpen"):
+        # Редизайн 10.2026: колонки не сворачиваются, но «Развернуть график»
+        # прячет их, а тела секций обязаны быть раскрыты — это тоже раскрытие.
+        for need in ("fold-btn[aria-controls]", "setToolsOpen", "setParamsOpen",
+                     "setFocusMode", ".fold-body"):
             if need not in eb:
                 self.fail("expandAll больше не раскрывает «%s» — раскрытие "
                           "выхолощено, замер снова частичный" % need)

@@ -3,10 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  {% with seo_title='Графический калькулятор по экономике — онлайн | Weconomics.ai' seo_description='Бесплатный графический калькулятор по экономике: кривые спроса и предложения, эластичность, монополия и другие модели — стройте графики онлайн на Weconomics.ai.' %}
+  {% comment %}
+     Заголовок и описание SEO даёт представление (Calc2View, из catalog/seo.py):
+     в шаблоне их литералы несли длинное тире, а сканер типографики берёт любой
+     .html под calc2/. Строки при этом дословно те, что требует
+     catalog/tests/test_seo.py.
+  {% endcomment %}
   <title>{{ seo_title }}</title>
   {% include '_seo_meta.html' %}
-  {% endwith %}
 
   {% comment %}
      ⚠️ ТОКЕНЫ ПЛАТФОРМЫ — ПЕРВЫМИ И ДО ВСЕГО ОСТАЛЬНОГО (канон 5.1).
@@ -797,7 +801,7 @@
          Раньше карточек было от трёх до пяти, и имя «Ввод функций» доставалось
          первой видимой из реестра INPUT_CARDS. -->
     <div class="section" id="sec-input">
-      <div class="section-title">Ввод функций</div>
+      <div class="section-title">Функции</div>
     <div class="section" id="sec-curves">
       <!-- Своего заголовка у блока нет: его называет карточка «Ввод функций».
 
@@ -875,7 +879,7 @@
           со своим цветом; строк можно завести сколько угодно.</p>
         <p>Незнакомая буква в формуле («a*x + b») превращается в ползунок: двигая его, видно,
           как буква меняет график. Нули функции, её вершины и точки пересечения кривых
-          считаются сами и показаны в «Ключевых значениях» справа.</p>
+          считаются сами и показаны в «Ответе».</p>
       </div>
       <div id="graph-rows"></div>
       <div class="error" id="graph-error"></div>
@@ -1032,7 +1036,6 @@
             <input type="text" id="inp-d3-2" value="80 - 2*Q" autocomplete="off"></div>
           <div class="field"><label>Общие предельные издержки MC (число или f(Q))</label>
             <input type="text" id="inp-d3-mc" value="20" autocomplete="off"></div>
-          <button class="btn" id="btn-d3-apply">Построить</button>
           <div class="hint">Фирма распределяет выпуск так, что MR₁&nbsp;=&nbsp;MR₂&nbsp;=&nbsp;MC.
             На менее эластичном рынке цена выше. Два мини-графика рынков стоят бок о бок.</div>
           <div class="error" id="d3-error" style="display:none;"></div>
@@ -1070,7 +1073,6 @@
           </div>
           <div class="field" style="margin-top:8px;"><label>Предельные издержки MC (число или f(Q))</label>
             <input type="text" id="inp-kink-mc" value="20" autocomplete="off"></div>
-          <button class="btn" id="btn-kink-apply">Построить</button>
           <div class="hint">MR на каждом куске своя прямая (вдвое круче спроса), в изломах MR
             разрывается вниз. Оптимум выбирается по <b>максимуму прибыли</b> среди кандидатов
             (пересечения MR&nbsp;=&nbsp;MC и сами изломы), а не по первому пересечению.</div>
@@ -1149,7 +1151,6 @@
           </div>
           <div class="f-pop" id="fp-tc" role="region" aria-label="Примеры формул TC"></div>
         </div>
-        <button class="btn" id="btn-costs-apply">Построить</button>
         <button class="btn-sm" id="btn-costs-preset" style="margin-top:6px;width:100%;">Стандартные издержки</button>
         <div class="hint">Постоянные затраты не вводятся отдельно: FC&nbsp;=&nbsp;TC(0). Дальше
           VC&nbsp;=&nbsp;TC&nbsp;−&nbsp;FC, ATC&nbsp;=&nbsp;TC/Q, AVC&nbsp;=&nbsp;VC/Q,
@@ -1162,7 +1163,6 @@
           <input type="text" id="inp-catc" value="Q^2 - 6*Q + 15 + 18/Q" autocomplete="off"></div>
         <div class="field"><label>Средние переменные AVC(Q)</label>
           <input type="text" id="inp-cavc" value="Q^2 - 6*Q + 15" autocomplete="off"></div>
-        <button class="btn" id="btn-cparts-apply">Построить</button>
         <div class="hint">Для олимпиадных условий, где сразу даны MC и ATC, а функция TC не дана.
           Пустое поле значит, что кривой нет: здесь ничего не выводится одно из другого. Если заданы
           и ATC, и AVC, постоянные затраты берутся как (ATC&nbsp;−&nbsp;AVC)·Q. Несогласованные
@@ -1222,7 +1222,6 @@
           </div>
           <div class="f-pop" id="fp-prod" role="region" aria-label="Примеры производственных функций"></div>
         </div>
-        <button class="btn" id="btn-prod-apply">Построить</button>
         <div style="margin-top:10px;">
           <label class="chk"><input type="checkbox" id="chk-tp" checked>
             <input type="color" class="swatch swatch-pick" data-col="prodTP" data-tip="Цвет $TP$"> TP (общий продукт)</label>
@@ -1270,7 +1269,6 @@
           <input type="text" id="inp-pl1" value="Q^2" autocomplete="off"></div>
         <div class="field"><label>Затраты завода 2: TC₂(Q₂)</label>
           <input type="text" id="inp-pl2" value="2*Q^2" autocomplete="off"></div>
-        <button class="btn" id="btn-pl-apply">Построить</button>
         <div class="seg" style="margin-top:8px;">
           <button class="seg-btn active" id="plv-tc">Издержки TC</button>
           <button class="seg-btn" id="plv-mc">Предельные MC</button>
@@ -1388,7 +1386,6 @@
           <label>Доходы (через запятую)</label>
           <input type="text" id="ineq-incomes" value="10, 20, 30, 40, 100" autocomplete="off">
         </div>
-        <button class="btn" id="ineq-incomes-apply">Построить</button>
         <div id="ineq-note-incomes" class="hint" style="display:none;color:#b45309;">
           Доходы переставлены по возрастанию: кривая Лоренца всегда идёт от бедных к богатым.</div>
         <div class="hint">Каждое число это доход одного человека. Сортируются по возрастанию,
@@ -1400,7 +1397,6 @@
           <label>Функция Лоренца L(p), p∈[0,1]</label>
           <input type="text" id="ineq-formula" value="p^2" autocomplete="off">
         </div>
-        <button class="btn" id="ineq-formula-apply">Построить</button>
         <!-- Задача 3: ползунок параметра α для семейства L(p)=p^α. -->
         <div class="field" id="ineq-alpha-field" style="margin-top:8px;">
           <label>Параметр α = <b id="ineq-alpha-val">2</b> &nbsp;<span style="color:var(--text2);">(L(p)=p^α)</span></label>
@@ -1533,11 +1529,10 @@
           </div>
         </div>
 
-        <button class="btn" id="btn-ppf-apply" style="margin-top:8px;width:100%;">Построить</button>
         <div class="hint">По осям стоят два товара: X (горизонталь), Y (вертикаль).
           Строка принимает уравнение целиком в любой из трёх форм: $y = 100 - x$,
           $x = 50 - 0.5y$ и неявную вроде $x^2 + y^2 = 25$. Буква в формуле
-          становится ползунком в «Основных параметрах».</div>
+          становится ползунком в «Параметрах».</div>
         <div class="error" id="ppf-error"></div>
 
         <!-- П4: кривая комплектов. Поля пустые, без кнопки ничего
@@ -1572,7 +1567,6 @@
           <label>Суммарная кривая <span class="swatch-slot" id="ppfsum-color"></span></label>
           <input type="text" id="inp-ppfsum-name" placeholder="Имя на графике, напр. Сумма" autocomplete="off">
         </div>
-        <button class="btn" id="btn-ppfsum-apply" style="width:100%;">Построить сумму</button>
         <div class="hint">Совместная КПВ: при каждом суммарном выпуске X производство делится
           так, чтобы общий Y был максимален. X наращивает тот, у кого альтернативные издержки X
           меньше. Это НЕ вертикальная сумма кривых.</div>
@@ -1607,7 +1601,6 @@
             <input type="range" id="ppft-price-slider" min="0.1" max="4" step="0.01" value="2">
             <input type="number" id="inp-ppft-price" min="0.1" step="0.05" value="2">
           </div>
-          <button class="btn" id="btn-ppft-apply">Построить КТВ</button>
           <!-- П4: кривая комплектов есть во всех моделях блока КПВ и КТВ.
                Здесь она обязана пересечь и КПВ, и КТВ. -->
           <label class="chk bundle-chk"><input type="checkbox" id="chk-bundle-t"> Кривая комплектов</label>
@@ -1633,7 +1626,6 @@
             <label>КПВ страны&nbsp;2: Y&nbsp;=&nbsp;f₂(X)</label>
             <input type="text" id="inp-tb2" value="100 - 2*X" autocomplete="off">
           </div>
-          <button class="btn" id="btn-tb-apply">Построить торговлю</button>
           <!-- Задача 2: своя мировая цена — ползунок + синхронное поле + сброс к равновесной. -->
           <div class="field" id="tb-price-field" style="margin-top:8px;">
             <label for="inp-tb-price">Мировая цена Pw = <b id="tb-price-val">Не найдена</b></label>

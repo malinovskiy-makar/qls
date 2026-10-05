@@ -335,35 +335,35 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-05. HEAD: `04f113a1`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-05. HEAD: `f607a838`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
 | Путь | Строк | КБ | Тип |
 |---|---:|---:|---|
 | `calc2/urls.py` | 19 | 0.6 | python |
-| `calc2/views.py` | 219 | 13.1 | python |
-| `calc2/templates/calc2/calc2.html` | 2527 | 206.4 | шаблон |
-| `calc2/static/calc2/calc2.css` | 2463 | 176.8 | CSS |
+| `calc2/views.py` | 224 | 13.4 | python |
+| `calc2/templates/calc2/calc2.html` | 2519 | 205.3 | шаблон |
+| `calc2/static/calc2/calc2.css` | 2469 | 177.3 | CSS |
 | `calc2/static/calc2/00-config.js` | 563 | 48.5 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
 | `calc2/static/calc2/20-plane.js` | 991 | 67.2 | JS |
 | `calc2/static/calc2/30-curves.js` | 1323 | 96.7 | JS |
-| `calc2/static/calc2/40-scenes-market.js` | 3722 | 265.4 | JS |
-| `calc2/static/calc2/42-scenes-mono.js` | 1677 | 121.3 | JS |
+| `calc2/static/calc2/40-scenes-market.js` | 3722 | 265.3 | JS |
+| `calc2/static/calc2/42-scenes-mono.js` | 1677 | 121.2 | JS |
 | `calc2/static/calc2/44-scenes-firm.js` | 1207 | 80.0 | JS |
 | `calc2/static/calc2/46-scenes-labor.js` | 736 | 53.1 | JS |
 | `calc2/static/calc2/48-scenes-consumer.js` | 261 | 15.7 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 416 | 28.4 | JS |
 | `calc2/static/calc2/52-modes.js` | 932 | 63.6 | JS |
-| `calc2/static/calc2/54-scenes-ppf.js` | 3093 | 198.4 | JS |
+| `calc2/static/calc2/54-scenes-ppf.js` | 3093 | 198.2 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 530 | 34.1 | JS |
 | `calc2/static/calc2/60-overlays.js` | 4475 | 280.6 | JS |
 | `calc2/static/calc2/70-scenes-math.js` | 2450 | 155.8 | JS |
 | `calc2/static/calc2/80-ui.js` | 526 | 33.2 | JS |
-| `calc2/static/calc2/82-input.js` | 2007 | 118.4 | JS |
+| `calc2/static/calc2/82-input.js` | 2009 | 118.7 | JS |
 | `calc2/static/calc2/84-picker.js` | 585 | 43.6 | JS |
-| `calc2/static/calc2/86-workspace.js` | 1918 | 123.1 | JS |
+| `calc2/static/calc2/86-workspace.js` | 1938 | 124.4 | JS |
 | `calc2/static/calc2/88-params.js` | 1913 | 128.9 | JS |
 | `calc2/static/calc2/89-model-state.js` | 319 | 18.7 | JS |
 | `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
@@ -371,7 +371,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/93-shell.js` | 88 | 5.2 | JS |
 | `calc2/static/calc2/99-boot.js` | 105 | 8.7 | JS |
 
-**Итого: 29 файлов, 36958 строк, 2541.6 КБ.**
+**Итого: 29 файлов, 36983 строк, 2542.7 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1355,22 +1355,22 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 1308 — `buildKeyboard`
 - строка 1313 — `closeAllKeyboardsExcept`
 - строка 1352 — `formulaInputError`
-- строка 1373 — `markFormulaField`
-- строка 1380 — `onFormulaInput`
-- строка 1402 — `scheduleParamsSync`
-- строка 1408 — `registerFormulaField`
-- строка 1425 — `fieldActive`
-- строка 1434 — `liveFormulaTexts`
-- строка 1461 — `equipFormulaField`
-- строка 1498 — `equipAllFormulaFields`
-- строка 1502 — `attachFormulaHelp`
-- строка 1692 — `makeEditableValue`
-- строка 1797 — `makeToggle`
-- строка 1839 — `segToToggle`
-- строка 1871 — `closeAllSelectMenus`
-- строка 1875 — `upgradeSelect`
-- строка 1976 — `upgradeTextField`
-- строка 1999 — `upgradeTextFieldsIn`
+- строка 1375 — `markFormulaField`
+- строка 1382 — `onFormulaInput`
+- строка 1404 — `scheduleParamsSync`
+- строка 1410 — `registerFormulaField`
+- строка 1427 — `fieldActive`
+- строка 1436 — `liveFormulaTexts`
+- строка 1463 — `equipFormulaField`
+- строка 1500 — `equipAllFormulaFields`
+- строка 1504 — `attachFormulaHelp`
+- строка 1694 — `makeEditableValue`
+- строка 1799 — `makeToggle`
+- строка 1841 — `segToToggle`
+- строка 1873 — `closeAllSelectMenus`
+- строка 1877 — `upgradeSelect`
+- строка 1978 — `upgradeTextField`
+- строка 2001 — `upgradeTextFieldsIn`
 
 #### `calc2/static/calc2/84-picker.js`
 
@@ -1396,62 +1396,62 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 144 — `setParamsOpen`
 - строка 154 — `hasAnalytics`
 - строка 161 — `moveExplanations`
-- строка 240 — `syncAnalyticsPanel`
-- строка 323 — `sectionIcon`
-- строка 334 — `cardifySections`
-- строка 409 — `collapseCards`
-- строка 427 — `syncLabelSizeSeg`
-- строка 438 — `openSection`
-- строка 475 — `cardWithFormula`
-- строка 488 — `syncFirstCard`
-- строка 507 — `wireScene`
-- строка 668 — `resetCurrentScene`
-- строка 678 — `setWrenchOpen`
-- строка 688 — `applyViewBounds`
-- строка 715 — `quadWindow`
-- строка 720 — `quadSameWindow`
-- строка 739 — `offQuadShownPoints`
-- строка 769 — `fitWindowToOffQuad`
-- строка 791 — `setFirstQuad`
-- строка 841 — `setGridMode`
-- строка 859 — `hintTip`
-- строка 886 — `fitTipMath`
-- строка 904 — `showHintTip`
-- строка 956 — `hideHintTip`
-- строка 981 — `tipText`
-- строка 1010 — `tipTex`
-- строка 1020 — `tipName`
-- строка 1037 — `tipExpr`
-- строка 1047 — `tipPlain`
-- строка 1076 — `ffEsc`
-- строка 1086 — `ffLatexOf`
-- строка 1108 — `finalFunctionHtml`
-- строка 1133 — `ffParseCases`
-- строка 1155 — `ffCondCompact`
-- строка 1179 — `ffMathHtml`
-- строка 1203 — `ffKatexW`
-- строка 1219 — `ffFitCases`
-- строка 1306 — `fitFinalMath`
-- строка 1335 — `ffCopyText`
-- строка 1343 — `ffCopyFallback`
-- строка 1355 — `wireFinalCopy`
-- строка 1388 — `ffOpenExpand`
-- строка 1409 — `ffCloseExpand`
-- строка 1421 — `setFinalFunctions`
-- строка 1439 — `refitFinalMathSoon`
-- строка 1467 — `markNotationsIn`
-- строка 1497 — `paintNotation`
-- строка 1507 — `showTipFor`
-- строка 1513 — `wireTips`
-- строка 1552 — `syncTipLabels`
-- строка 1565 — `hintAnchor`
-- строка 1643 — `fitPanelMath`
-- строка 1673 — `syncHintDots`
-- строка 1684 — `hintsToDots`
-- строка 1722 — `wireHintButtons`
-- строка 1764 — `wireWrench`
-- строка 1843 — `fillPrintBlocks`
-- строка 1871 — `setPrintViewBox`
+- строка 246 — `syncAnalyticsPanel`
+- строка 329 — `sectionIcon`
+- строка 340 — `cardifySections`
+- строка 429 — `collapseCards`
+- строка 447 — `syncLabelSizeSeg`
+- строка 458 — `openSection`
+- строка 495 — `cardWithFormula`
+- строка 508 — `syncFirstCard`
+- строка 527 — `wireScene`
+- строка 688 — `resetCurrentScene`
+- строка 698 — `setWrenchOpen`
+- строка 708 — `applyViewBounds`
+- строка 735 — `quadWindow`
+- строка 740 — `quadSameWindow`
+- строка 759 — `offQuadShownPoints`
+- строка 789 — `fitWindowToOffQuad`
+- строка 811 — `setFirstQuad`
+- строка 861 — `setGridMode`
+- строка 879 — `hintTip`
+- строка 906 — `fitTipMath`
+- строка 924 — `showHintTip`
+- строка 976 — `hideHintTip`
+- строка 1001 — `tipText`
+- строка 1030 — `tipTex`
+- строка 1040 — `tipName`
+- строка 1057 — `tipExpr`
+- строка 1067 — `tipPlain`
+- строка 1096 — `ffEsc`
+- строка 1106 — `ffLatexOf`
+- строка 1128 — `finalFunctionHtml`
+- строка 1153 — `ffParseCases`
+- строка 1175 — `ffCondCompact`
+- строка 1199 — `ffMathHtml`
+- строка 1223 — `ffKatexW`
+- строка 1239 — `ffFitCases`
+- строка 1326 — `fitFinalMath`
+- строка 1355 — `ffCopyText`
+- строка 1363 — `ffCopyFallback`
+- строка 1375 — `wireFinalCopy`
+- строка 1408 — `ffOpenExpand`
+- строка 1429 — `ffCloseExpand`
+- строка 1441 — `setFinalFunctions`
+- строка 1459 — `refitFinalMathSoon`
+- строка 1487 — `markNotationsIn`
+- строка 1517 — `paintNotation`
+- строка 1527 — `showTipFor`
+- строка 1533 — `wireTips`
+- строка 1572 — `syncTipLabels`
+- строка 1585 — `hintAnchor`
+- строка 1663 — `fitPanelMath`
+- строка 1693 — `syncHintDots`
+- строка 1704 — `hintsToDots`
+- строка 1742 — `wireHintButtons`
+- строка 1784 — `wireWrench`
+- строка 1863 — `fillPrintBlocks`
+- строка 1891 — `setPrintViewBox`
 
 #### `calc2/static/calc2/88-params.js`
 

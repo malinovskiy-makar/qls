@@ -1324,7 +1324,7 @@ function updateDiscr3Panel() {
   const box = document.getElementById('info-d3'); if (!box) return;
   const d = STATE.discr3;
   const world = !!STATE.d3World;
-  if (!d) { box.innerHTML = '<div class="muted">Введите ' + (world ? 'внутренний спрос, мировую цену и MC' : 'два спроса и MC') + ', нажмите «Построить».</div>'; return; }
+  if (!d) { box.innerHTML = '<div class="muted">Введите ' + (world ? 'внутренний спрос, мировую цену и MC' : 'два спроса и MC') + '.</div>'; return; }
   if (!d.found) {
     // Фаза 4г: вырожденный случай мировой торговли — если предельные издержки НИГДЕ
     // не дорастают до мировой цены, оптимальный экспорт математически не ограничен.
@@ -1573,7 +1573,7 @@ function drawKinkedFull() {
 function updateKinkPanel() {
   const box = document.getElementById('info-kink'); if (!box) return;
   const k = STATE.kinked;
-  if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC, нажмите «Построить».</div>'; return; }
+  if (!k) { box.innerHTML = '<div class="muted">Введите спрос и MC.</div>'; return; }
   if (!k.found) { box.innerHTML = '<div class="warn">Оптимум не найден (нет кандидатов).</div>'; return; }
   let html = '';
   html += `<div class="stat"><span>$Q^*$ (выпуск)</span><b>${fmt(k.Qstar)}</b></div>`;
