@@ -89,6 +89,12 @@ export async function actOverride(page, c) {
     }));
     return done.length ? 'галочки ' + done.join(' и ') : 'галочек CS и PS в этой модели нет';
   }
-  if (f.letter === 'л' || f.letter === 'м') return 'убрано по закрытому списку';
+  if (f.letter === 'л' || f.letter === 'м') {
+    /* (м) — сегмент из одной кнопки «Квота» в модели «Квоты». В монополии та
+       же кнопка — настоящий выбор инструмента, и там она остаётся: если орган
+       на экране, действуем как обычно. */
+    const shown = await page.evaluate((k) => !!(window.__RD.findControl(k)), c.key);
+    return shown ? null : 'убрано по закрытому списку';
+  }
   return null;   // (в), (е), (ж), (и), (к): у замены свой орган — щёлкаем его
 }

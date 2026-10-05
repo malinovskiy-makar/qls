@@ -77,3 +77,30 @@ node calc2/tests/calc2_math.mjs
   узле у кривой ИЗЛОМ: наклоны слева и справа разные, и значения законно
   расходятся на |Δнаклона|·2ε. Правило другое: скачок обязан СТРЕМИТЬСЯ К НУЛЮ
   вместе с шагом. Считаем его при двух шагах и смотрим на отношение.
+
+## Редизайн 10.2026: приборы паритета нового экрана
+
+Задание и макет — `claude/mockups/calc2_redesign_20261004/`; решения — ADR 0134–0138.
+Все приборы — в `calc2/tests/redesign/`, ходят на живой сервер (`CALC2_BASE_URL`).
+
+| Прибор | Что доказывает | Запуск |
+|---|---|---|
+| `snapshot.mjs` | базовый снимок старого экрана (`--layer old`) или повтор его сценария на новом (`--layer new --replay baseline`) | `node calc2/tests/redesign/snapshot.mjs --layer new --replay calc2/tests/redesign/baseline --width 1440 --height 760 --out <папка> --jobs 4` |
+| `compare.mjs` | сверка снимков: старт, каждый шаг правки, жесты, печать; что сознательно не сверяется — в комментариях (раскладка, кэши, `px`) | `node calc2/tests/redesign/compare.mjs --base calc2/tests/redesign/baseline --cur <папка>` |
+| `parity.mjs` | таблица `PARITY.md`: судьба каждого органа, строки ответа, ноль строк без судьбы | `node calc2/tests/redesign/parity.mjs --base calc2/tests/redesign/baseline` |
+| `parity_quick.mjs` | быстрый паритет (в CI через `test_calc2_parity.py`): органы старта и числа старта у 44 ключей, меньше двух минут | `node calc2/tests/redesign/parity_quick.mjs` |
+| `order_probe.mjs` | модель открывается одинаково при любом порядке; память «ушёл и вернулся» | `node calc2/tests/redesign/order_probe.mjs --out <папка>`, затем `compare.mjs --cur <папка>/forward --start-only` |
+| `state_probe.mjs` | собрать → сбросить → применить состояние, 44 из 44 | `node calc2/tests/redesign/state_probe.mjs` |
+| `session_probe.mjs` | история (отмена, повтор, склейка), автосохранение, ссылка | `node calc2/tests/redesign/session_probe.mjs` |
+| `answer_probe.mjs` | главные числа «Ответа» равны своим строкам табло, предупреждения стоят статусом | `node calc2/tests/redesign/answer_probe.mjs` |
+| `site_shots.mjs` | контактные листы «макет │ сайт» | `node calc2/tests/redesign/site_shots.mjs` |
+
+⚠️ Базовый снимок (`baseline/`) снят на нетронутом коде `6b79758` и пересниматься
+не должен: он и есть «как было». Два прогона снимка совпали байт в байт.
+
+### Зубастость приборов редизайна
+
+| Возвращённый дефект | Что краснеет |
+|---|---|
+| убрать `forgetAutosaves()` из `resetSceneMemory()` | `calc2_ui.mjs`: 7 проверок (роль кривой, магнит у кривой и у пересечения, скольжение точки, вершина в особой точке, звёздочка в подписях, «у каждой кривой поле формулы») |
+| поменять местами две ячейки главных чисел (`94-answer.js`) | `answer_probe.mjs`: `taxes` — «Платит покупатель» 40 ≠ 60, «Получает продавец» 60 ≠ 40 |
