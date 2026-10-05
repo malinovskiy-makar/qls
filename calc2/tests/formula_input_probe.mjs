@@ -121,6 +121,71 @@ deaf.forEach(r => { (uniq[r.id] = uniq[r.id] || []).push(r.scene); });
 Object.keys(uniq).forEach(id => console.log('  ГЛУХОЕ ПОЛЕ ' + id + ' — сцены: ' + uniq[id].join(', ')));
 cmp('полей, слышащих только change', Object.keys(uniq).length, 0);
 
+/* ── Живое применение (редизайн 10.2026, фаза 4) ──────────────────────────
+   Кнопок «Построить» больше нет: каждое поле формул применяется при наборе.
+   Для КАЖДОГО видимого поля всех сцен: верная запись меняет состояние модели
+   (collectModelState), неверная («… +») оставляет его прежним, поле помечено
+   ошибкой и под ним есть текст. Сцена при неверной записи не опустошается. */
+head('Живое применение: набор меняет модель, неверная запись — нет');
+const silent = [], broken = [], unmarked = [];
+let liveFields = 0;
+for (const key of scenes) {
+  await page.evaluate((k) => { resetSceneMemory(); pickScene(k); redrawAll(); }, key);
+  await expandAll();
+  const rows = await page.evaluate(async (k) => {
+    const wait = () => new Promise(r => setTimeout(r, 800));
+    const st = () => { const s = collectModelState().state; ['crosses', 'zoomLock', 'viewDirty'].forEach(x => delete s[x]); Object.keys(s).forEach(x => { if (/Sig$/.test(x)) delete s[x]; }); return JSON.stringify(s); };
+    const out = [];
+    const fields = (typeof FORMULA_FIELDS !== 'undefined' ? FORMULA_FIELDS : [])
+      .filter(i => i.isConnected && typeof fieldActive === 'function' && fieldActive(i) && !i.disabled);
+    for (const inp of fields) {
+      const id = inp.id || '(без id)';
+      const was = inp.value;
+      const good = (was && was.trim()) ? (was + ' + 1') : '1';
+      const s0 = st();
+      inp.value = good; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      await wait();
+      const s1 = st();
+      inp.value = good + ' +'; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      await wait();
+      const s2 = st();
+      const host = inp.closest('.f-wrap') || inp.closest('.f-slot, .field, .grow') || inp.parentElement;
+      const marked = inp.classList.contains('bad') || inp.getAttribute('aria-invalid') === 'true'
+        || !!(host && host._problem && host._problem.textContent.trim());
+      inp.value = was; inp.dispatchEvent(new Event('input', { bubbles: true }));
+      inp.dispatchEvent(new Event('change', { bubbles: true }));
+      await wait();
+      out.push({ scene: k, id, меняет: s1 !== s0, держит: s2 === s1, помечено: marked });
+    }
+    return out;
+  }, key);
+  rows.forEach(r => {
+    liveFields++;
+    if (!r.меняет) silent.push(r.scene + ' ' + r.id);
+    if (!r.держит) broken.push(r.scene + ' ' + r.id);
+    if (!r.помечено) unmarked.push(r.scene + ' ' + r.id);
+  });
+}
+console.log('  полей проверено: ' + liveFields);
+silent.forEach(x => console.log('  НЕ МЕНЯЕТ МОДЕЛЬ ' + x));
+broken.forEach(x => console.log('  НЕВЕРНАЯ ЗАПИСЬ МЕНЯЕТ МОДЕЛЬ ' + x));
+unmarked.forEach(x => console.log('  ОШИБКА НЕ ПОКАЗАНА ' + x));
+cmp('полей, где верная запись не меняет модель', silent.length, 0);
+cmp('полей, где неверная запись меняет модель', broken.length, 0);
+cmp('полей, где ошибка не показана', unmarked.length, 0);
+
+/* Время пересчёта в тяжёлых моделях (журнал фазы 4): среднее по пяти
+   полным перерисовкам. Число от машины зависит, порога здесь нет. */
+head('Время пересчёта тяжёлых моделей');
+for (const k of ['ppfsum', 'plants', 'ineq']) {
+  const ms = await page.evaluate((key) => {
+    resetSceneMemory(); pickScene(key); redrawAll();
+    const t = []; for (let i = 0; i < 5; i++) { const a = performance.now(); redrawAll(); t.push(performance.now() - a); }
+    return t.reduce((x, y) => x + y, 0) / t.length;
+  }, k);
+  console.log('  ' + k.padEnd(10) + ms.toFixed(1) + ' мс на перерисовку');
+}
+
 /* ── Контрольное число внешних эффектов ──────────────────────────────── */
 head('Внешние эффекты: MSB и MSC слышат набранное');
 const r = await page.evaluate(async () => {

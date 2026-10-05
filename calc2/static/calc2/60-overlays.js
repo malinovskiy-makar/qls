@@ -251,7 +251,11 @@ function renderMmRows() {
     inp.value = mmGet(i);
     inp.placeholder = i === 0 ? 'Например: x^2' : 'Например: 4 - x';
     inp.setAttribute('aria-label', 'Функция ' + mmLabel(i));
-    inp.addEventListener('input', () => { mmSet(i, inp.value); redrawAll(); });
+    // Неверная запись в модель не уходит (82-input.js, formulaInputError).
+    inp.addEventListener('input', () => {
+      const err = formulaInputError(inp); markFormulaField(inp, err); if (err) return;
+      mmSet(i, inp.value); redrawAll();
+    });
     slot.appendChild(inp);
     line.appendChild(slot);
     row.appendChild(line);

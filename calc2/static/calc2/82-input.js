@@ -1337,8 +1337,49 @@ function closeAllKeyboardsExcept(slot) {
 
    Один помощник на все поля: четырнадцать копий этой подписки разошлись бы. */
 const FORMULA_INPUT_DELAY = 220;
-function onFormulaInput(inp, apply) {
-  if (!inp || typeof apply !== 'function') return;
+/* ⚠️ НЕВЕРНАЯ ЗАПИСЬ В МОДЕЛЬ НЕ УХОДИТ (редизайн 10.2026, фаза 4).
+   Раньше живые поля (математика, сумма КПВ, изокванта, макро) применяли
+   каждый символ, и «x² − 4 +» опустошало сцену до конца набора. Теперь запись
+   сначала проверяется: синтаксис по частям уравнения (знак равенства и
+   неравенства допустимы — у ограничения и неявных кривых он есть), у КПВ —
+   её собственный разбор, у списка доходов — числа через запятую. Неверная
+   остаётся черновиком в поле с пометкой и текстом под ним; модель держит
+   последнюю верную. Пустое поле законно только там, где оно значит «кривой
+   нет» (FORMULA_EMPTY_OK). Смысловые ошибки (неизвестная функция) по-прежнему
+   ловит сам движок. */
+const FORMULA_EMPTY_OK = /^(inp-cmc|inp-catc|inp-cavc|inp-ki-3|inp-msb|inp-msc|graph-f-\d+|mm-f\d+)$/;
+const FORMULA_PPF = /^(inp-ppf|inp-ppf2b|inp-ppft|inp-tb1|inp-tb2|inp-ppfsum-\d+)$/;
+function formulaInputError(inp) {
+  const v = String((inp && inp.value) || '').trim();
+  const id = (inp && inp.id) || '';
+  if (!v) return FORMULA_EMPTY_OK.test(id) ? null : 'Поле пустое';
+  if (id === 'ineq-incomes') {
+    const xs = (typeof parseNumberList === 'function' ? parseNumberList(v) : []).filter(x => x >= 0);
+    return xs.length >= 2 ? null : 'Нужно хотя бы два дохода через запятую';
+  }
+  if (FORMULA_PPF.test(id) && typeof parsePpfEquation === 'function') {
+    if (id === 'inp-ppf2b' && !STATE.ppfCompare) return null;
+    const r = parsePpfEquation(v);
+    return r && r.error ? r.error : null;
+  }
+  const parts = v.split(/<=|>=|≤|≥|=|<|>/);
+  if (parts.length > 2) return 'В записи больше одного знака равенства';
+  for (const part of parts) {
+    if (!part.trim()) return 'По одну сторону знака равенства пусто';
+    try { math.parse(part); } catch (e) { return String(e.message || e).replace(/\s*\(char \d+\)/, ''); }
+  }
+  return null;
+}
+function markFormulaField(inp, err) {
+  if (!inp) return;
+  inp.classList.toggle('bad', !!err);
+  inp.setAttribute('aria-invalid', err ? 'true' : 'false');
+  if (typeof fieldProblem === 'function' && !inp.dataset.texUnknown) fieldProblem(inp, err ? (err + '. График держит последнюю верную запись.') : '');
+}
+
+function onFormulaInput(inp, rawApply) {
+  if (!inp || typeof rawApply !== 'function') return;
+  const apply = () => { const err = formulaInputError(inp); markFormulaField(inp, err); if (!err) rawApply(); };
   let timer = null;
   const now = () => { if (timer) { clearTimeout(timer); timer = null; } apply(); };
   inp.addEventListener('input', () => {

@@ -1022,6 +1022,26 @@ function updatePult() {
   showPult(true);
 }
 
+/* ── ЖИВОЕ ПРИМЕНЕНИЕ ФОРМУЛ (редизайн 10.2026, фаза 4) ──────────────────
+   Двенадцать групп полей применялись только кнопкой «Построить» (CODE_NOTES,
+   раздел 6). Теперь запись уходит в модель при наборе — тем же дребезгом
+   220 мс, что у остальных полей формул (onFormulaInput), — но ТОЛЬКО верная.
+   Неверная или недописанная остаётся черновиком в поле: поле помечено, под
+   ним сказано, что не так, а модель и график держат последнюю верную запись.
+   Иначе каждый промежуточный символ («100 −») опустошал бы сцену.
+   Применение — те же функции, что у кнопок: своей математики здесь нет. */
+/* Группа полей применяется одной функцией: только когда верны ВСЕ поля
+   группы (проверка — formulaInputError в 82-input.js, общая для всех полей). */
+function liveFormula(fields, apply) {
+  const list = fields.filter(Boolean);
+  const run = () => {
+    let bad = false;
+    list.forEach(el => { const err = formulaInputError(el); markFormulaField(el, err); if (err) bad = true; });
+    if (!bad) apply();
+  };
+  list.forEach(el => onFormulaInput(el, run));
+}
+
 function wireControls() {
   // Окно выбора сценария: клик по карточке → соответствующий пресет движка.
   const picker = document.getElementById('scene-picker');
@@ -1153,6 +1173,7 @@ function wireControls() {
   const d3btn = document.getElementById('btn-d3-apply');
   if (d3btn) d3btn.addEventListener('click', applyD3);
   [d3a, d3b, d3m].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyD3(); }); });
+  liveFormula([d3a, d3b, d3m], applyD3);
 
   // Ломаный спрос (Задача 6): переключатель ввода + поля + кнопка «Построить».
   const kiI = document.getElementById('ki-indiv'), kiP = document.getElementById('ki-piece');
@@ -1168,6 +1189,7 @@ function wireControls() {
   const kbtn = document.getElementById('btn-kink-apply');
   if (kbtn) kbtn.addEventListener('click', applyKink);
   [ki1, ki2, ki3, kp1, kp2, kmc].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyKink(); }); });
+  liveFormula([ki1, ki2, ki3, kp1, kp2, kmc], applyKink);
 
   // Потолок/пол цены в монополии (Фаза 2) задаются ОБЩИМ блоком «Вмешательство»
   // (сегменты «Потолок»/«Пол» + ползунок pc-slider → setPReg), отдельной галочки больше нет.
@@ -1332,6 +1354,7 @@ function wireControls() {
     applyCosts();
   });
   if (tcInp) tcInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyCosts(); });
+  liveFormula([tcInp], applyCosts);
   // Второй способ ввода: кривые по отдельности.
   const cmcInp = document.getElementById('inp-cmc'), catcInp = document.getElementById('inp-catc'),
         cavcInp = document.getElementById('inp-cavc');
@@ -1355,6 +1378,8 @@ function wireControls() {
   [cmcInp, catcInp, cavcInp].forEach(e => {
     if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyCostParts(); });
   });
+  // Пустое поле здесь — законное «этой кривой нет».
+  liveFormula([cmcInp, catcInp, cavcInp], applyCostParts);
   const cmTc = document.getElementById('cm-tc'), cmCur = document.getElementById('cm-curves');
   if (cmTc) cmTc.addEventListener('click', () => setCostsInputMode('tc'));
   if (cmCur) cmCur.addEventListener('click', () => setCostsInputMode('curves'));
@@ -1371,6 +1396,7 @@ function wireControls() {
   const plBtn = document.getElementById('btn-pl-apply');
   if (plBtn) plBtn.addEventListener('click', applyPl);
   [pl1, pl2].forEach(e => { if (e) e.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') applyPl(); }); });
+  liveFormula([pl1, pl2], applyPl);
   [['plv-tc', 'tc'], ['plv-mc', 'mc']].forEach(([id, v]) => {
     const b = document.getElementById(id); if (b) b.addEventListener('click', () => setPlantsView(v));
   });
@@ -1394,6 +1420,7 @@ function wireControls() {
   const prodBtn = document.getElementById('btn-prod-apply');
   if (prodBtn) prodBtn.addEventListener('click', applyProd);
   if (prodInp) prodInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyProd(); });
+  liveFormula([prodInp], applyProd);
   attachFormulaHelp('fh-prod', 'fp-prod', 'inp-prod', 'PROD');
   // 9б: изокванты и изокосты.
   const isoInp = document.getElementById('inp-iso');
@@ -1428,6 +1455,9 @@ function wireControls() {
   if (pApply) pApply.addEventListener('click', applyPpf);
   if (ppfInp) ppfInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
   if (ppfInp2) ppfInp2.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpf(); });
+  // Вторая КПВ проверяется, только когда сравнение включено: спрятанное поле
+  // не должно держать первую кривую.
+  liveFormula([ppfInp, ppfInp2], applyPpf);
 
   // Вторая КПВ: кнопка показывает второе поле и строит обе кривые (Фаза 12.2).
   const cmp = document.getElementById('btn-ppf-compare');
@@ -1525,6 +1555,7 @@ function wireControls() {
   const tApply = document.getElementById('btn-ppft-apply');
   if (tApply) tApply.addEventListener('click', applyPpfTrade);
   if (ppftInp) ppftInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') applyPpfTrade(); });
+  liveFormula([ppftInp], applyPpfTrade);
   // Смена мировой цены полем — анимируем переезд осей (как и ползунком).
   if (ppftPriceInp) ppftPriceInp.addEventListener('change', () => { _wantRangeAnim = true; applyPpfTrade(); });
   // Задача 2: ползунок мировой цены Px/Py — основное управление, синхронен с полем.
@@ -1547,6 +1578,7 @@ function wireControls() {
   const tbApply = document.getElementById('btn-tb-apply');
   if (tbApply) tbApply.addEventListener('click', applyTradeB);
   [tb1, tb2].forEach(el => { if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') applyTradeB(); }); });
+  liveFormula([tb1, tb2], applyTradeB);
   // Задача 2: своя мировая цена — ползунок + поле + сброс к равновесной (всё синхронно).
   const tbPrice = document.getElementById('inp-tb-price');
   if (tbPrice) tbPrice.addEventListener('change', () => {
@@ -1583,7 +1615,11 @@ function wireControls() {
   [['inp-mathf', 'mathFormula'],
    ['inp-mathfc', 'mathFC']].forEach(([id, key]) => {
     const e = document.getElementById(id);
-    if (e) e.addEventListener('input', () => { STATE[key] = e.value; redrawAll(); });
+    // Неверная запись в модель не уходит (82-input.js, formulaInputError).
+    if (e) e.addEventListener('input', () => {
+      const err = formulaInputError(e); markFormulaField(e, err); if (err) return;
+      STATE[key] = e.value; redrawAll();
+    });
   });
 
   // Точка касания: ползунок, числовое поле (её же тянут мышью по кривой).
@@ -1637,6 +1673,7 @@ function wireControls() {
   // Ограничение сменилось — окно подгоняется заново, дальше им распоряжается человек.
   const gcField = document.getElementById('inp-mathgc');
   if (gcField) gcField.addEventListener('input', () => {
+    const err = formulaInputError(gcField); markFormulaField(gcField, err); if (err) return;
     STATE.mathGC = gcField.value;
     constraintFit();
     redrawAll();
@@ -1767,11 +1804,13 @@ function wireControls() {
   const ineqIncBtn = document.getElementById('ineq-incomes-apply');
   if (ineqIncBtn) ineqIncBtn.addEventListener('click', applyIneqInc);
   if (ineqInc) ineqInc.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqInc(); });
+  liveFormula([ineqInc], applyIneqInc);
   const ineqFm = document.getElementById('ineq-formula');
   const applyIneqFm = () => { if (ineqFm) STATE.ineqFormula = ineqFm.value; redrawAll(); };
   const ineqFmBtn = document.getElementById('ineq-formula-apply');
   if (ineqFmBtn) ineqFmBtn.addEventListener('click', applyIneqFm);
   if (ineqFm) ineqFm.addEventListener('keydown', e => { if (e.key === 'Enter') applyIneqFm(); });
+  liveFormula([ineqFm], applyIneqFm);
   // Задача 3: ползунок и поле α для семейства L(p)=p^α.
   const ineqAlpha = document.getElementById('ineq-alpha');
   if (ineqAlpha) ineqAlpha.addEventListener('input', () => setIneqAlpha(ineqAlpha.value));
