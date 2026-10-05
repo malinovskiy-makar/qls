@@ -2943,3 +2943,49 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 }
 #info-final .ff-copy::first-letter, #info-final .ff-expand::first-letter { text-transform: uppercase; }
 #info-final .ff-copy:hover, #info-final .ff-expand:hover { background: var(--chip-bg); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · ХОЛСТ (фаза 7; README макета, раздел 13)
+   Холст берёт цвет сайта: в светлой теме --canvas = --surface, в тёмной
+   --canvas = --bg. Остальные токены холста — тёплая семья макета. Два
+   цвета кривых стали темнее ради контраста 3 : 1 («было» и FC), TC и VC
+   светлеют на тёмном холсте, два тона слагаемых «Сложения» — тоже (04.10).
+   ═══════════════════════════════════════════════════════════════════ */
+:root {
+  --canvas: var(--surface);
+  --halo: var(--surface);
+  --ink: #2d2d2d;
+  --ink-soft: #6b6457;
+  --grid: rgba(92, 83, 70, .13);
+  --grid-strong: rgba(92, 83, 70, .17);
+  --curve-ghost: #948C7E;
+  --cost-fc: #838C9C;
+}
+[data-theme="dark"] {
+  --canvas: var(--bg);
+  --halo: var(--bg);
+  --ink: #efe8d6;
+  --ink-soft: #b5ab99;
+  --grid: rgba(242, 236, 217, .07);
+  --grid-strong: rgba(242, 236, 217, .13);
+  --cost-tc: #e8e2d2;
+  --cost-vc: #a8a295;
+  --sum-g1: #9048E1;
+  --sum-g5: #C03899;
+}
+/* Инструмент холста (7.1): сегмент слева на панели холста. */
+.cv-tools { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-2); border-radius: var(--r); }
+.cv-tool {
+  display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 10px;
+  border: 1px solid transparent; border-radius: var(--r); background: transparent; color: var(--text2);
+  font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+}
+.cv-tool svg { width: 16px; height: 16px; }
+.cv-tool:hover { color: var(--text); }
+.cv-tool[aria-pressed="true"] { background: var(--surface); border-color: var(--border-strong); color: var(--text); font-weight: 600; }
+.cv-tool:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* Плашка режима (7.6): --surface, рамка --border-strong, радиус 10; кнопка
+   «Готово» контурная — графитовая кнопка на экране одна («Поделиться»). */
+.cv-mode { left: 56px; top: 54px; padding: 6px 6px 6px 12px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-card); box-shadow: var(--shadow-pop); font-size: 13.5px; }
+.cv-mode__stop { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r); height: 30px; padding: 0 12px; font-weight: 600; }
+.cv-mode__stop:hover { background: var(--chip-bg); }

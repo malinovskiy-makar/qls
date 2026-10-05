@@ -2172,6 +2172,13 @@
          Стоит ВНЕ #graph-wrap: на обёртке холста висят колесо, протяжка и
          двойной щелчок (52-modes.js), и под кнопками они сдвигали бы график. -->
     <div class="cv-bar" id="canvas-bar" role="toolbar" aria-label="Холст">
+      <!-- Инструмент холста (README макета, 7.1): те же режимы, что «Добавить
+           точку» и «Между точками» в «Своих точках и площадях» (93-shell.js). -->
+      <div class="cv-tools" role="group" aria-label="Инструмент">
+        <button class="cv-tool" id="tool-cursor" type="button" aria-pressed="true" data-tip="Тянуть ручки и двигать график"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 3l14 7-6 2-2 6z"/></svg><span>Курсор</span></button>
+        <button class="cv-tool" id="tool-point" type="button" aria-pressed="false" data-tip="Поставить свою точку"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v4M12 17v4M3 12h4M17 12h4"/></svg><span>Точка</span></button>
+        <button class="cv-tool" id="tool-area" type="button" aria-pressed="false" data-tip="Посчитать площадь по вершинам"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5 18l3-12 11 4-4 8z"/></svg><span>Площадь</span></button>
+      </div>
       <span class="cv-gap"></span>
       <span class="cv-zoom" id="zoom-level" aria-live="polite">100&nbsp;%</span>
       <button class="gt-btn" id="btn-zoomout" type="button"

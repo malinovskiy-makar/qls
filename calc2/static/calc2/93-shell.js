@@ -57,7 +57,34 @@ function afterColumnShown() {
   });
 }
 
+/* Инструмент холста: «Курсор», «Точка», «Площадь» (README макета, 7.1).
+   Своих режимов нет — это прежние «Добавить точку → Указать на графике» и
+   «Площади → Между точками»; состояние спрашивается у canvasMode(). */
+function syncToolSeg() {
+  const m = (typeof canvasMode === 'function') ? canvasMode() : 'look';
+  [['tool-cursor', 'look'], ['tool-point', 'mark'], ['tool-area', 'vert']].forEach(([id, want]) => {
+    const b = document.getElementById(id);
+    if (b) b.setAttribute('aria-pressed', m === want ? 'true' : 'false');
+  });
+}
+function setTool(which) {
+  if (STATE.markArm && which !== 'mark' && typeof cancelMarkDraft === 'function') cancelMarkDraft();
+  if (STATE.vertArm && which !== 'vert' && typeof armVerts === 'function') armVerts(false);
+  if (which === 'mark' && !STATE.markArm) {
+    if (typeof startMarkDraft === 'function') startMarkDraft();
+    const m = (typeof pendingMark === 'function') ? pendingMark() : null;
+    if (m) { m.mode = 'graph'; if (typeof renderMarkList === 'function') renderMarkList(); }
+    if (typeof armMark === 'function') armMark(true);
+  }
+  if (which === 'vert' && !STATE.vertArm && typeof setAreaCalcMode === 'function') setAreaCalcMode('poly');
+  syncToolSeg();
+}
+
 function wireShell() {
+  [['tool-cursor', 'look'], ['tool-point', 'mark'], ['tool-area', 'vert']].forEach(([id, w]) => {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', () => setTool(w));
+  });
   const sw = document.getElementById('model-switch');
   if (sw) sw.addEventListener('click', () => openPicker());
   const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
