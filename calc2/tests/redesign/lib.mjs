@@ -175,10 +175,17 @@ export function mutateFormula(val, key, sceneKey) {
   return null;   // непустое поле: дописываем «+5» в конец (см. act)
 }
 
+/* Орган ищется до трёх раз с паузой: под нагрузкой машины меню или окно,
+   открытое прошлым шагом, дорисовывается не сразу, и первый поиск промахивался
+   (второй прогон снимка 05.10: «орган не найден» у elast и ext). */
 export async function handleOf(page, key) {
-  const h = await page.evaluateHandle((k) => window.__RD.findControl(k), key);
-  const el = h.asElement();
-  return el;
+  for (let i = 0; i < 3; i++) {
+    const h = await page.evaluateHandle((k) => window.__RD.findControl(k), key);
+    const el = h.asElement();
+    if (el) return el;
+    await page.waitForTimeout(400);
+  }
+  return null;
 }
 
 /* Прокрутка до органа — ДО щелчка и с паузой: выпадающий список calc2
@@ -187,7 +194,9 @@ export async function handleOf(page, key) {
 export async function clickHandle(page, el) {
   try { await el.scrollIntoViewIfNeeded({ timeout: 1500 }); } catch (e) {}
   await page.waitForTimeout(120);
-  try { await el.click({ timeout: 2500 }); return 'click'; } catch (e) {
+  /* 8 с, а не 2,5: под нагрузкой Playwright не успевал дождаться готовности
+     органа, прибор щёлкал программно, и шаг шёл другим путём событий. */
+  try { await el.click({ timeout: 8000 }); return 'click'; } catch (e) {
     await el.evaluate(x => x.click());
     return 'click(js)';
   }

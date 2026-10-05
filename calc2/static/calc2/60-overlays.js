@@ -4163,6 +4163,11 @@ function resetSceneMemory() {
   Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; });
   // И историю моделей: прогоны приборов начинают каждый случай с нуля.
   if (typeof historyClearAll === 'function') historyClearAll();
+  /* И автосохранения моделей (91-session.js): щелчок по карточке теперь
+     поднимает сохранённое состояние, и прибор, открывающий модель щелчком,
+     получал бы правки собственных прошлых случаев. Человек эту функцию не
+     вызывает: её зовут приборы, чтобы начать с чистого листа (COVERAGE О34). */
+  if (typeof forgetAutosaves === 'function') forgetAutosaves();
 }
 
 function saveSceneSnapshot(key) {

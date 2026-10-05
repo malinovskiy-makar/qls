@@ -39,8 +39,8 @@ async function freshPage() {
   page.setDefaultTimeout(5000);
   const errors = [];
   page.on('pageerror', e => errors.push(String(e).slice(0, 300)));
-  await page.goto(BASE_URL + '/calc2/', { waitUntil: 'load' });
-  await page.waitForFunction(() => typeof pickScene === 'function');
+  await page.goto(BASE_URL + '/calc2/', { waitUntil: 'load', timeout: 30000 });
+  await page.waitForFunction(() => typeof pickScene === 'function', null, { timeout: 30000 });
   await page.addScriptTag({ content: INPAGE });
   await page.evaluate((l) => { window.__RD_LAYER = l; }, LAYER);
   await page.evaluate(async () => { const a = []; document.fonts.forEach(f => a.push(f.load().catch(() => null))); await Promise.all(a); });
