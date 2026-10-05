@@ -43,7 +43,8 @@ const r = await page.evaluate(async () => {
     /* Только ВИДИМЫЕ дорожки. В правой панели с недавних пор живёт и блок
        вмешательства государства, а в нём спрятано поле неактивного
        инструмента: у скрытого элемента рамка нулевая, и он портил бы замер. */
-    const rows = [...document.querySelectorAll('#params-panel .param-track')]
+    // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
+    const rows = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(t => t.offsetParent !== null && t.getBoundingClientRect().width > 0);
     return rows.map(t => {
       const s = t.querySelector('input[type=range]');

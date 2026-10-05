@@ -34,7 +34,9 @@ const r = await page.evaluate(async () => {
   const dirty = { curves: STATE.curves.map(c => c.expr), geom: geom(),
                   params: Object.keys(STATE.params || {}), aVal: (STATE.params.a || {}).value };
   // кнопка «Вернуть исходный вид»
-  document.getElementById('btn-scene-reset').click();
+  // ПЕРЕНАЦЕЛЕНО (фаза 5а): «Вернуть исходный вид» модели теперь кнопка
+  // «Сбросить» в шапке модели (#btn-model-reset), с тостом «Вернуть».
+  document.getElementById('btn-model-reset').click();
   await wait(500);
   const back = { curves: STATE.curves.map(c => c.expr), geom: geom(), params: Object.keys(STATE.params || {}) };
   return { start, dirty, back };

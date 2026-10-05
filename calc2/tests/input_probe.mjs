@@ -148,7 +148,12 @@ function ipDots() {
     var txt = host.textContent.replace(/[?\\s]/g, '');
     return txt.length === 0;
   });
-  var hints = [].slice.call(panel.querySelectorAll('.hint')).filter(function (h) {
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): карточка вмешательства
+     переехала из правой панели в левую, и с ней три текста-ИСТОЧНИКА
+     (.sb-note-src: tax-hint, pc-hint, quota-hint). Под знак «?» они не идут
+     по правилу calc2/CLAUDE.md: абзац собирается в «Объяснении модели».
+     Раньше они в замер не попадали (лежали справа), не попадают и теперь. */
+  var hints = [].slice.call(panel.querySelectorAll('.hint:not(.sb-note-src)')).filter(function (h) {
     return h.style.display !== 'none' && fieldActive(h.parentElement || h);
   });
   return {

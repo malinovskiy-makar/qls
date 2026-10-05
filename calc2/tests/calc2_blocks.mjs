@@ -255,7 +255,13 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
    вровень. Всё три — сквозные правила, поэтому проверяются перебором сцен, а
    не на одной удобной. */
 
-const WANT_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): регуляторы больше не уезжают в
+   правую панель, и по макету у «Условия» две карточки сверх трёх прежних —
+   «Параметры» и «Вмешательство государства», каждая только там, где ей есть
+   что показать. Порядок по-прежнему один на все сцены; обязательные три
+   карточки на месте в каждой сцене. */
+const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-view', 'sec-areascalc'];
+const MUST_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
 const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const panelSweep = await page.evaluate(async (FORB) => {
@@ -267,10 +273,12 @@ const panelSweep = await page.evaluate(async (FORB) => {
       .filter(s => s.style.display !== 'none' && s.offsetParent !== null)
       .map(s => {
         const btn = s.querySelector(':scope > .fold-btn');
+        const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: btn ? btn.querySelector('span > b').textContent.trim() : '',
-                 open: btn ? btn.getAttribute('aria-expanded') === 'true' : null,
+                 name: head ? head.textContent.trim() : '',
+                 fold: !!btn,
+                 open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
                                     .filter(e => e.offsetParent !== null).length : 0 };
       });
@@ -290,19 +298,24 @@ const panelSweep = await page.evaluate(async (FORB) => {
   return rows;
 }, FORBIDDEN_HEADS);
 
-// (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
-await t('(г) в каждой из 44 сцен три карточки панели в одном порядке', async () => {
-  const bad = panelSweep.filter(r =>
-    r.cards.map(c => c.id).join() !== WANT_CARDS.join()
-    || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
-    || r.cards[0].name !== 'Ввод функций'
-    || r.cards[0].controls === 0);
+// (г) Карточки «Условия» в одном порядке, три обязательные есть везде,
+//     все раскрыты и без кнопки сворачивания, первая — «Функции» с органами.
+await t('(г) в каждой из 44 сцен карточки «Условия» в одном порядке', async () => {
+  const bad = panelSweep.filter(r => {
+    const ids = r.cards.map(c => c.id);
+    return ids.join() !== WANT_CARDS.filter(id => ids.indexOf(id) >= 0).join()
+      || ids.some(id => WANT_CARDS.indexOf(id) < 0)
+      || MUST_CARDS.some(id => ids.indexOf(id) < 0)
+      || r.cards.some(c => c.fold || c.open !== true)
+      || r.cards[0].name !== 'Функции'
+      || r.cards[0].controls === 0;
+  });
   // 44 маршрута: 41 прежняя сцена, ключ 'taxes' (объединённый сюжет налогов,
   // рядом с которым 'tax' и 'tax-adv' оставлены синонимами), 'quota' и
   // 'sdsum' — сложение спросов и предложений (ночная сессия 24.08).
   if (panelSweep.length !== 44) return `сцен ${panelSweep.length}, а не 44`;
   return bad.length === 0
-    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
+    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-') + (c.fold ? '(кнопка)' : '')).join(' ') + '] первая «' + (r.cards[0] || {}).name + '»').join('; ');
 });
 
 // (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.
@@ -331,7 +344,8 @@ await t('(ж) левый край дорожек всех ползунков п�
     const inp = document.querySelector('#curve-list .curve-expr-inp');
     inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
     await w(600); redrawAll(); await w(400);
-    const tracks = [...document.querySelectorAll('#params-panel .param-track')]
+    // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
+    const tracks = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(el => el.offsetParent !== null && el.getBoundingClientRect().width > 0);
     return tracks.map(el => {
       const s = el.querySelector('input[type=range]');

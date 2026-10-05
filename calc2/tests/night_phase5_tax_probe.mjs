@@ -23,7 +23,9 @@ const where = await page.evaluate(() => {
   return { inRight: !!(t && document.getElementById('params-panel').contains(t)),
            inLeft: !!(t && document.getElementById('tools-panel').contains(t)) };
 });
-rep('блок лежит в правой панели', where.inRight && !where.inLeft, JSON.stringify(where));
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): по макету вмешательство —
+   карточка «Условия» (левая колонка), справа только «Ответ». */
+rep('блок лежит в «Условии», не в «Ответе»', !where.inRight && where.inLeft, JSON.stringify(where));
 
 // Видимость по сценам: где блок был доступен раньше, там доступен и теперь.
 const vis = await page.evaluate(async () => {

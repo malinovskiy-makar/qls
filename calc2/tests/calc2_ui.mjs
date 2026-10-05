@@ -543,17 +543,22 @@ await t('своё имя кривой заменяет родовое D на г�
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('sd'); closePicker(); });
 await page.waitForTimeout(350);
 
-await t('монопольные поля в «Вводе функций», вмешательство — в аналитике', () => page.evaluate(() => {
+await t('монопольные поля в «Функциях», вмешательство — своей карточкой «Условия»', () => page.evaluate(() => {
   /* Обёртка «Что изучаем» убрана (решение владельца 22.08): поля монополии
-     лежат прямо в единой карточке ввода, а блок вмешательства государства
-     переехал в правую панель — он управляется ползунками, а не набирается. */
+     лежат прямо в единой карточке ввода.
+     ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): блок вмешательства государства
+     по макету — отдельная карточка левой колонки «Условие» (README макета,
+     раздел 6), а не правая панель: справа теперь только «Ответ». Строгость
+     прежняя в обе стороны: карточка вмешательства не внутри ввода и не в
+     «Ответе». */
   const inp = document.getElementById('sec-input');
-  const right = document.getElementById('params-panel');
+  const cond = document.getElementById('tools-panel');
+  const ans = document.getElementById('params-panel');
   if (!inp) return 'карточки #sec-input нет';
   const mono = inp.contains(document.getElementById('sec-mono'));
-  const tax = right.contains(document.getElementById('sec-tax'))
-           && !inp.contains(document.getElementById('sec-tax'));
-  return (mono && tax) || ('монополия в вводе: ' + mono + ', вмешательство справа: ' + tax);
+  const taxEl = document.getElementById('sec-tax');
+  const tax = !!taxEl && cond.contains(taxEl) && !inp.contains(taxEl) && !ans.contains(taxEl);
+  return (mono && tax) || ('монополия в вводе: ' + mono + ', вмешательство своей карточкой «Условия»: ' + tax);
 }));
 
 await t('заголовок верхнего уровня в панели один', () => page.evaluate(() => {
@@ -566,10 +571,12 @@ await t('заголовок верхнего уровня в панели оди
     if (b) return b.textContent.trim();
     return [...n.childNodes].filter(x => x.nodeType === 3).map(x => x.nodeValue).join('').trim();
   };
-  const head = document.querySelector('#sec-input > .fold-btn > span');
+  /* ПЕРЕНАЦЕЛЕНО (фаза 5а): карточки больше не сворачиваются, заголовок
+     секции — h3.sec-head, а не складная кнопка; имя по макету «Функции». */
+  const head = document.querySelector('#sec-input > .sec-head');
   const inner = document.querySelectorAll('#sec-input .section-title').length;
-  if (!head) return 'у секции нет складного заголовка';
-  if (own(head) !== 'Ввод функций') return 'заголовок: ' + own(head);
+  if (!head) return 'у секции нет заголовка';
+  if (own(head) !== 'Функции') return 'заголовок: ' + own(head);
   return inner === 0 || 'внутри ещё ' + inner + ' заголовков верхнего уровня';
 }));
 
@@ -802,18 +809,23 @@ await t('панели не перекрывают график', () => page.eval
 
    Спрашиваем то, что правило и обещает: орган управления найден внутри
    `#params-panel` и НЕ остался в левой панели инструментов. */
-await t('регуляторы сцены живут в правой панели', () => page.evaluate(() => {
-  const panel = document.getElementById('params-panel');
-  if (!panel) return 'правой панели нет вовсе';
-  const n = panel.querySelectorAll('.pchip, .field, #tax-field, #pc-field, #quota-field').length;
-  if (!n) return 'в правой панели ни одного органа управления';
-  const tools = document.getElementById('tools-panel');
-  const strayIds = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxside-row'];
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): пульт больше не переносит регуляторы в правую
+   панель — по макету они живут в «Условии», в карточках «Параметры» и
+   «Вмешательство государства», а справа только «Ответ». Строгость прежняя:
+   органы найдены в своём месте, и ни один не остался в чужой колонке. */
+await t('регуляторы сцены живут в «Условии», в «Ответе» их нет', () => page.evaluate(() => {
+  const cond = document.getElementById('tools-panel');
+  const ans = document.getElementById('params-panel');
+  if (!cond || !ans) return 'колонок нет';
+  const n = cond.querySelectorAll('#sec-params .pchip, #sec-params .field, #tax-field, #pc-field, #quota-field').length;
+  if (!n) return 'в «Условии» ни одного регулятора';
+  const strayIds = ['tax-field', 'pc-field', 'quota-field', 'quota-price-field', 'taxside-row', 'params-body'];
   const stray = strayIds.filter(id => {
     const e = document.getElementById(id);
-    return e && tools && tools.contains(e);
+    return e && ans.contains(e);
   });
-  return !stray.length || 'в «Инструментах» остались: ' + stray.join(', ');
+  const chips = ans.querySelectorAll('.pchip, input[type=range]').length;
+  return (!stray.length && !chips) || ('в «Ответе» остались: ' + stray.join(', ') + (chips ? ' и ползунков ' + chips : ''));
 }));
 
 /* ⚠️ ПРОВЕРКА ПЕРЕСЧИТАНА ПОД КАНОН, А НЕ ОТКЛЮЧЕНА (фаза 6, п. 50).
@@ -1526,28 +1538,40 @@ await t('в других сценах «Аналитика» вернулась'
 /* ── Фаза 4. Правая панель — «Аналитика» ──────────────────────────────
    Ползунки сверху и всегда открыты, ниже два свёрнутых блока: расчёты и
    разбор. Кнопки «включить аналитику» в полосе иконок больше нет. */
-await t('правая панель называется «Аналитика»', () => page.evaluate(() => {
-  const h = document.querySelector('#params-panel .side-head h2');
-  return (h && h.textContent.trim() === 'Аналитика') || 'заголовок: ' + (h ? h.textContent : 'нет');
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): по макету колонки называются «Условие» и «Ответ». */
+await t('колонки называются «Условие» и «Ответ»', () => page.evaluate(() => {
+  const l = document.querySelector('#tools-panel .col-head h2');
+  const h = document.querySelector('#params-panel .col-head h2');
+  const ok = l && l.textContent.trim() === 'Условие' && h && h.textContent.trim() === 'Ответ';
+  return ok || 'заголовки: ' + (l ? l.textContent : 'нет') + ' / ' + (h ? h.textContent : 'нет');
 }));
 
 await t('кнопки аналитики в полосе иконок нет', () => page.evaluate(() =>
   !document.getElementById('dock-score') || 'кнопка ещё есть'));
 
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): сворачивание карточек ушло совсем (README макета,
+   раздел 5). Ползунки по-прежнему открыты и не сворачиваются: блок с ними
+   раскрыт, кнопки сворачивания у него нет. */
 await t('ползунки открыты и не сворачиваются', () => page.evaluate(() => {
   const body = document.getElementById('params-body');
   if (!body) return 'нет #params-body';
-  if (body.closest('.fold-body')) return 'ползунки внутри складного блока';
+  const fold = body.closest('.fold-body');
+  if (fold && !fold.classList.contains('open')) return 'ползунки внутри свёрнутого блока';
+  const sec = body.closest('.section');
+  if (sec && sec.querySelector(':scope > .fold-btn')) return 'у блока ползунков осталась кнопка сворачивания';
   return getComputedStyle(body).display !== 'none' || 'ползунки спрятаны';
 }));
 
-await t('расчёты и разбор свёрнуты по умолчанию', () => page.evaluate(() => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): прежнее правило «расчёты и разбор свёрнуты»
+   заменено правилом макета «карточки не сворачиваются»: оба блока раскрыты,
+   кнопок сворачивания нет. */
+await t('расчёты и разбор раскрыты, кнопок сворачивания нет', () => page.evaluate(() => {
   const bad = [];
   [['sb-btn', 'sb-fold'], ['ex-btn', 'ex-fold']].forEach(([b, f]) => {
     const btn = document.getElementById(b), box = document.getElementById(f);
-    if (!btn || !box) { bad.push(b + ': нет узла'); return; }
-    if (btn.getAttribute('aria-expanded') !== 'false') bad.push(b + ': развёрнут');
-    if (box.classList.contains('open')) bad.push(f + ': открыт');
+    if (!box) { bad.push(f + ': нет узла'); return; }
+    if (btn) bad.push(b + ': кнопка сворачивания осталась');
+    if (!box.classList.contains('open')) bad.push(f + ': свёрнут');
   });
   return !bad.length || bad.join('; ');
 }));
@@ -1564,13 +1588,18 @@ await t('блок «Ключевые значения» раскрывается
   return (r.open && r.len > 0) || JSON.stringify(r);
 });
 
-await t('панели левая и правая одной ширины', async () => {
-  await page.evaluate(() => { setToolsOpen(true); setParamsOpen(true); });
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): ширины колонок задаёт макет, и они разные:
+   «Условие» 337 px и «Ответ» 349 px от 1400 px окна, 305 и 317 уже
+   (README макета, раздел 3). Допуск прежний, полтора пикселя. */
+await t('колонки «Условие» и «Ответ» по ширинам макета', async () => {
+  await page.evaluate(() => { if (typeof setFocusMode === 'function') setFocusMode(false); });
   await page.waitForTimeout(320);
   return await page.evaluate(() => {
     const l = document.getElementById('tools-panel').getBoundingClientRect().width;
     const r = document.getElementById('params-panel').getBoundingClientRect().width;
-    return Math.abs(l - r) < 1.5 || `слева ${Math.round(l)}, справа ${Math.round(r)}`;
+    const wide = window.innerWidth >= 1400;
+    const wl = wide ? 337 : 305, wr = wide ? 349 : 317;
+    return (Math.abs(l - wl) < 1.5 && Math.abs(r - wr) < 1.5) || `слева ${Math.round(l)} (нужно ${wl}), справа ${Math.round(r)} (нужно ${wr})`;
   });
 });
 
@@ -1590,25 +1619,24 @@ await t('разбор уезжает из расчётов в «Объяснен
 /* ── Фаза 5. Панель ввода — список карточек ───────────────────────────
    Все блоки закрыты, у каждого свой заголовок, раскрытый меняет фон,
    первая видимая карточка выделена. */
-await t('«Ввод функций» раскрыт, «Точки» и «Площади» свёрнуты', async () => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): решение 22.08 «ввод раскрыт, остальные свёрнуты»
+   заменено правилом макета «карточки «Условия» не сворачиваются» (README,
+   раздел 5). Проверка прежней силы: у каждой видимой карточки есть непустой
+   заголовок, её содержимое раскрыто, кнопки сворачивания нет. */
+await t('карточки «Условия» с заголовками и всегда раскрыты', async () => {
   await page.evaluate(() => { resetSceneMemory(); openPicker(); });
   await clickUI('.scard[data-scene="sd"]');
   await page.waitForTimeout(340);
-  await page.evaluate(() => setToolsOpen(true));
-  await page.waitForTimeout(200);
   return await page.evaluate(() => {
-    /* Решение владельца 22.08: карточка ввода раскрыта в КАЖДОЙ модели, две
-       остальные свёрнуты. Раньше правило было «все закрыты», и одна модель
-       («Построение графиков») из него выбивалась своим openSection. */
     const bad = [];
-    document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
-      const btn = sec.querySelector(':scope > .fold-btn');
-      if (!btn) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
-      const want = (sec.id === 'sec-input') ? 'true' : 'false';
-      if (btn.getAttribute('aria-expanded') !== want) {
-        bad.push((sec.id || '?') + (want === 'true' ? ': свёрнут, а должен быть раскрыт' : ': раскрыт'));
-      }
-      if (!(btn.querySelector('span') || {}).textContent) bad.push((sec.id || '?') + ': заголовок пуст');
+    const secs = [...document.querySelectorAll('#tools-panel .tools-body > .section')].filter(s => s.offsetParent);
+    if (!secs.length) return 'видимых карточек нет';
+    secs.forEach(sec => {
+      const h = sec.querySelector(':scope > .sec-head');
+      if (!h) { bad.push((sec.id || '?') + ': нет заголовка'); return; }
+      if (!h.textContent.trim()) bad.push((sec.id || '?') + ': заголовок пуст');
+      if (sec.querySelector(':scope > .fold-btn')) bad.push((sec.id || '?') + ': осталась кнопка сворачивания');
+      sec.querySelectorAll(':scope > .fold-body').forEach(f => { if (!f.classList.contains('open')) bad.push((sec.id || '?') + ': свёрнута'); });
     });
     return !bad.length || bad.join('; ');
   });
@@ -1801,7 +1829,9 @@ await t('«производство» спрятано и всплывает п�
   return getComputedStyle(lab).display === 'none' || 'подпись видна сразу';
 }));
 
-await t('регулятор мировой цены собран в правой панели', async () => {
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а): пульт регуляторы не переносит; поле мировой
+   цены живёт в своей карточке «Условия». Собрано по-прежнему в одном месте. */
+await t('регулятор мировой цены собран в одном месте «Условия»', async () => {
   await page.evaluate(() => { setTradeScenario('B'); redrawAll(); });
   await page.waitForTimeout(260);
   return await page.evaluate(() => {
@@ -1809,7 +1839,7 @@ await t('регулятор мировой цены собран в правой
     if (!f) return 'поля цены нет';
     if (!f.querySelector('#tb-price-slider')) return 'ползунка нет в поле';
     if (!f.querySelector('#inp-tb-price')) return 'точного поля нет рядом';
-    return !!f.closest('#params-body') || 'поле не в правой панели';
+    return (!!f.closest('#tools-panel') && !f.closest('#params-panel')) || 'поле не в «Условии»';
   });
 });
 

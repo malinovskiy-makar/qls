@@ -8,7 +8,12 @@ const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const bArg = process.argv.indexOf('--before');
 const BEFORE = bArg > 0 ? JSON.parse(fs.readFileSync(process.argv[bArg + 1], 'utf8')) : null;
 
-const WANT = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): у «Условия» по макету две
+   карточки сверх трёх прежних — «Параметры» и «Вмешательство государства»
+   (только там, где им есть что показать); карточки больше не сворачиваются,
+   первая называется «Функции». Обязательные три — в каждой сцене. */
+const WANT = ['sec-input', 'sec-params', 'sec-tax', 'sec-view', 'sec-areascalc'];
+const MUST = ['sec-input', 'sec-view', 'sec-areascalc'];
 const FORBIDDEN = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const browser = await chromium.launch();
@@ -32,10 +37,12 @@ const data = await page.evaluate(async (FORB) => {
       .filter(s => s.style.display !== 'none' && s.offsetParent !== null)
       .map(s => {
         const btn = s.querySelector(':scope > .fold-btn');
+        const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: btn ? btn.querySelector('span > b').textContent.trim() : '(без заголовка)',
-                 open: btn ? btn.getAttribute('aria-expanded') === 'true' : null,
+                 name: head ? head.textContent.trim() : '(без заголовка)',
+                 fold: !!btn,
+                 open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
                                     .filter(e => e.offsetParent !== null).length : 0 };
       });
@@ -63,25 +70,24 @@ const data = await page.evaluate(async (FORB) => {
 
 let ok = true;
 const fail = (m) => { console.log('FAIL ' + m); ok = false; };
-const badCount = data.filter(r => r.cards.length !== 3);
-const badOrder = data.filter(r => r.cards.map(c => c.id).join() !== WANT.join());
-const badOpen  = data.filter(r => !(r.cards[0] && r.cards[0].open === true
-                                 && r.cards[1] && r.cards[1].open === false
-                                 && r.cards[2] && r.cards[2].open === false));
-const badName  = data.filter(r => !r.cards[0] || r.cards[0].name !== 'Ввод функций');
+const ids = r => r.cards.map(c => c.id);
+const badCount = data.filter(r => MUST.some(id => ids(r).indexOf(id) < 0) || ids(r).some(id => WANT.indexOf(id) < 0));
+const badOrder = data.filter(r => ids(r).join() !== WANT.filter(id => ids(r).indexOf(id) >= 0).join());
+const badOpen  = data.filter(r => !r.cards.length || r.cards.some(c => c.fold || c.open !== true));
+const badName  = data.filter(r => !r.cards[0] || r.cards[0].name !== 'Функции');
 const badForb  = data.filter(r => r.forbidden.length);
 const empty    = data.filter(r => !r.cards[0] || r.cards[0].controls === 0);
 
 console.log('сцен проверено: ' + data.length);
-console.log('карточек ровно три:            ' + (data.length - badCount.length) + '/' + data.length);
-console.log('порядок sec-input→view→areas:  ' + (data.length - badOrder.length) + '/' + data.length);
-console.log('«Ввод функций» раскрыт, две свёрнуты: ' + (data.length - badOpen.length) + '/' + data.length);
-console.log('первая карточка названа «Ввод функций»: ' + (data.length - badName.length) + '/' + data.length);
+console.log('обязательные три на месте, чужих нет: ' + (data.length - badCount.length) + '/' + data.length);
+console.log('порядок input→params→tax→view→areas: ' + (data.length - badOrder.length) + '/' + data.length);
+console.log('все карточки раскрыты, кнопок сворачивания нет: ' + (data.length - badOpen.length) + '/' + data.length);
+console.log('первая карточка названа «Функции»: ' + (data.length - badName.length) + '/' + data.length);
 console.log('без запрещённых заголовков:    ' + (data.length - badForb.length) + '/' + data.length);
 console.log('в «Вводе функций» есть органы управления: ' + (data.length - empty.length) + '/' + data.length);
-if (badCount.length) fail('не три карточки: ' + badCount.map(r => r.key + '(' + r.cards.length + ')').join(', '));
+if (badCount.length) fail('не тот набор карточек: ' + badCount.map(r => r.key + '(' + ids(r).join(',') + ')').join(', '));
 if (badOrder.length) fail('другой порядок: ' + badOrder.map(r => r.key + ' [' + r.cards.map(c=>c.id).join('→') + ']').join('; '));
-if (badOpen.length)  fail('не то состояние раскрытия: ' + badOpen.map(r => r.key + ' [' + r.cards.map(c=>c.open).join(',') + ']').join('; '));
+if (badOpen.length)  fail('не то состояние раскрытия: ' + badOpen.map(r => r.key + ' [' + r.cards.map(c=>c.open + (c.fold ? '(кнопка)' : '')).join(',') + ']').join('; '));
 if (badName.length)  fail('первая карточка названа иначе: ' + badName.map(r => r.key + ' «' + (r.cards[0]||{}).name + '»').join('; '));
 if (badForb.length)  fail('видны убранные заголовки: ' + badForb.map(r => r.key + ' ' + JSON.stringify(r.forbidden)).join('; '));
 if (empty.length)    fail('пустой «Ввод функций»: ' + empty.map(r => r.key).join(', '));
