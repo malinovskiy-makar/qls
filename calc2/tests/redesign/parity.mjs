@@ -14,7 +14,7 @@ import { fileURLToPath } from 'url';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '../../../claude/mockups/calc2_redesign_20261004');
-const BASE = path.join(HERE, 'baseline');
+const BASE = process.argv.includes('--base') ? path.resolve(process.argv[process.argv.indexOf('--base') + 1]) : path.join(HERE, 'baseline');
 
 /* Закрытый список (COVERAGE.md, раздел 0, п. 2). */
 const LETTERS = {

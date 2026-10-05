@@ -179,7 +179,11 @@ for (const key of files) {
   if (!fs.existsSync(cp)) { report[key] = { n: 1, issues: ['нет снимка нового экрана'] }; total++; bad++; continue; }
   const c = JSON.parse(fs.readFileSync(cp, 'utf8'));
   if (c.fatal) issues.push('прибор упал: ' + c.fatal.slice(0, 200));
-  (c.errors || []).forEach(e => issues.push('ошибка страницы: ' + e));
+  // Ошибки страницы, которые были и на старом экране (тот же текст), — не
+  // расхождение: это поведение старого кода (дефект «Сложения» с NaN в пути).
+  const errKey = (e) => String(e).replace(/^.*?(console|pageerror): /, '$1: ').replace(/[\d.]+/g, '#');
+  const oldErr = new Set((b.errors || []).map(errKey));
+  (c.errors || []).forEach(e => { if (!oldErr.has(errKey(e))) issues.push('ошибка страницы: ' + e); });
   // Старт.
   n++; const ws = whereDiff(b.start.state, c.start.state, 1e-9); if (ws) issues.push('старт STATE' + ws);
   n++; const ww = whereDiff(b.start.windows, c.start.windows, 1e-9); if (ww) issues.push('старт окна' + ww);
