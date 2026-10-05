@@ -2370,52 +2370,68 @@
   </aside>
 
   <!-- ── ОКНО ЭКСПОРТА (Фаза 5) ─────────────────────────────────────── -->
+  <!-- ── ОКНО «СКАЧАТЬ ГРАФИК» (редизайн 10.2026, фаза 7; README макета,
+       раздел 10). Слева — предпросмотр белого листа (то, что уйдёт в файл),
+       справа — заголовок, подпись, главные числа, формат и ОДНА кнопка
+       «Скачать …» (пункт (к) закрытого списка вместо трёх кнопок). -->
   <div class="modal" id="export-modal" role="dialog" aria-modal="true"
        aria-labelledby="export-title" inert>
-    <div class="modal-card">
-      <!-- п. 69. Заголовок окна называет ровно то, что окно делает. Прежний
-           совпадал по слову с соседней кнопкой полосы, которая обещала
-           сохранение в профиль: два разных действия под одним именем. Список
-           форматов в подписи не перечисляем — кнопки внизу перечисляют себя
-           сами, а PDF есть не в каждом окружении. -->
-      <h2 class="modal-title" id="export-title">Скачать график</h2>
-      <p class="modal-sub">Заголовок попадёт в подпись под картинкой. Размер картинки
-        постоянный, 12 на 8 сантиметров: файл собирается обычным pdfLaTeX.</p>
-
-      <div class="field">
-        <label id="exp-title-lab">Заголовок</label>
-        <span id="exp-title-slot"></span>
-        <input type="hidden" id="exp-title">
-      </div>
-      <div class="field">
-        <div class="hint-row">
-          <span class="hint-lead">Метка для перекрёстной ссылки</span>
-          <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
+    <div class="modal-card exp-card">
+      <div class="exp-left">
+        <div class="exp-sheet" id="exp-sheet">
+          <div class="exp-sheet-title" id="exp-sheet-title"></div>
+          <img class="exp-sheet-img" id="exp-sheet-img" alt="Предпросмотр графика">
+          <div class="exp-sheet-cap" id="exp-sheet-cap"></div>
+          <div class="exp-sheet-nums" id="exp-sheet-nums"></div>
         </div>
-        <div class="hint-pop" id="hp-exp-label">
-          <p>Нужна только тем, кто вставляет график в большой документ: по
-            метке на картинку потом ссылаются из текста, и номер рисунка
-            проставляется сам. Для одиночной картинки поле можно не трогать.</p>
+        <div class="exp-what">
+          <div class="exp-what-lab">Что уйдёт в файл</div>
+          <div class="exp-preview" id="exp-preview" aria-live="polite"></div>
         </div>
-        <span id="exp-label-slot"></span>
-        <input type="hidden" id="exp-label">
       </div>
-
-      <div class="field">
-        <label>Что уйдёт в файл</label>
-        <div class="exp-preview" id="exp-preview" aria-live="polite"></div>
-      </div>
-
-      <div class="modal-opts">
-        <button class="btn" id="exp-png" type="button">Скачать PNG</button>
-        <button class="btn btn-ghost" id="exp-tex" type="button">Скачать .tex</button>
-        {% if has_pdflatex %}
-          <button class="btn btn-ghost" id="exp-pdf" type="button">Скачать PDF</button>
-        {% endif %}
-      </div>
-
-      <div class="modal-foot">
-        <button class="btn-sm" id="exp-close" type="button">Закрыть</button>
+      <div class="exp-right">
+        <div class="exp-head">
+          <h2 class="modal-title" id="export-title">Скачать график</h2>
+          <button class="pw-x" id="exp-x" type="button" aria-label="Закрыть">×</button>
+        </div>
+        <div class="field">
+          <label id="exp-title-lab">Заголовок</label>
+          <span id="exp-title-slot"></span>
+          <input type="hidden" id="exp-title">
+        </div>
+        <div class="field">
+          <label for="exp-caption">Подпись под графиком</label>
+          <input type="text" id="exp-caption" placeholder="Например: рис. 1 к задаче 3" autocomplete="off">
+        </div>
+        <label class="chk exp-nums-row"><input type="checkbox" id="exp-nums" checked>Главные числа ответа под графиком</label>
+        <div class="field">
+          <label>Формат</label>
+          <div class="seg exp-fmt" id="exp-fmt" role="radiogroup" aria-label="Формат">
+            <button class="seg-btn active" type="button" role="radio" aria-checked="true" data-fmt="png">PNG</button>
+            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-fmt="pdf"{% if not has_pdflatex or not user.is_authenticated %} disabled aria-disabled="true"{% endif %}>PDF</button>
+            <button class="seg-btn" type="button" role="radio" aria-checked="false" data-fmt="tex">TeX</button>
+          </div>
+          <div class="exp-fmt-note" id="exp-fmt-note">Картинка с двойной чёткостью для презентации и конспекта.</div>
+          {% if not has_pdflatex %}<div class="exp-fmt-off">PDF собирает сервер, а здесь компилятора LaTeX нет: скачайте TeX и соберите его у себя.</div>
+          {% elif not user.is_authenticated %}<div class="exp-fmt-off">Войдите, чтобы скачать PDF.</div>{% endif %}
+        </div>
+        <div class="field exp-label-field" id="exp-label-field" hidden>
+          <div class="hint-row">
+            <span class="hint-lead">Метка для перекрёстной ссылки</span>
+            <button class="hint-btn" type="button" data-pop="hp-exp-label" aria-label="Зачем метка">?</button>
+          </div>
+          <div class="hint-pop" id="hp-exp-label">
+            <p>Нужна только тем, кто вставляет график в большой документ: по
+              метке на картинку потом ссылаются из текста, и номер рисунка
+              проставляется сам. Для одиночной картинки поле можно не трогать.</p>
+          </div>
+          <span id="exp-label-slot"></span>
+          <input type="hidden" id="exp-label">
+        </div>
+        <div class="modal-foot exp-foot">
+          <button class="btn-sm" id="exp-close" type="button">Отмена</button>
+          <button class="btn" id="exp-go" type="button">Скачать PNG</button>
+        </div>
       </div>
     </div>
   </div>

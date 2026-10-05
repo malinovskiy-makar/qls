@@ -71,6 +71,7 @@ function redrawAll() {
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
   if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
   if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
+  markServiceNodes();
 }
 
 function redrawScene() {
@@ -1964,6 +1965,28 @@ const CANVAS_MODE_TEXT = {
     return { what: '<b>Отмечаете вершины</b> <span>' + tail + '</span>', stop: 'Готово' };
   },
 };
+
+/* Служебные узлы холста (COVERAGE, 6.8): ручки (кружки, которые тянут
+   мышью), зажжённые ключевые точки, кружок прилипания. В файл они не идут:
+   PNG вырезает их из клона по признаку data-service, TeX пропускает по
+   data-skip-export. Метка ставится после каждой перерисовки: ручки рисуют
+   семнадцать мест в восьми файлах, и признак в каждом разошёлся бы. */
+function markServiceNodes() {
+  const el = document.getElementById('chart');
+  if (!el) return;
+  const mark = (c) => { c.setAttribute('data-service', 'handle'); c.setAttribute('data-skip-export', '1'); };
+  const knob = (c) => c && c.tagName === 'circle' && !c.classList.contains('kp-mark')
+    && +c.getAttribute('r') > 0 && +c.getAttribute('r') <= 10 && !/^(none|transparent)$/.test(c.getAttribute('fill') || 'none');
+  el.querySelectorAll('*').forEach(c => {
+    if (!(c.__on && c.__on.some(o => o.name === 'drag'))) return;
+    if (c.tagName === 'circle') { mark(c); return; }
+    // Захват — прозрачная полоса, а видимый кружок ручки стоит сразу за ней
+    // (перед ней бывает точка модели радиусом 4 — её не трогаем).
+    const n = c.nextElementSibling;
+    if (knob(n) && +n.getAttribute('r') >= 5) mark(n);
+  });
+  el.querySelectorAll('g.crosses, #snap-hint').forEach(g => { g.setAttribute('data-service', 'kp'); g.setAttribute('data-skip-export', '1'); });
+}
 
 function syncCanvasMode() {
   if (typeof syncToolSeg === 'function') syncToolSeg();   // кнопки инструмента в панели холста (93-shell.js)

@@ -620,12 +620,8 @@ function wireScene() {
     }
     closePiecewise();
   });
-  const expPng = document.getElementById('exp-png');
-  if (expPng) expPng.addEventListener('click', () => exportPNG(2));   // 2× — читаемо в печати
-  const expTex = document.getElementById('exp-tex');
-  if (expTex) expTex.addEventListener('click', () => exportTex());
-  const expPdf = document.getElementById('exp-pdf');
-  if (expPdf) expPdf.addEventListener('click', () => exportPDF());
+  // Окно «Скачать»: формат и одна кнопка (70-scenes-math.js, wireExport).
+  if (typeof wireExport === 'function') wireExport();
 
   // «Ко всем моделям».
   const back = document.getElementById('scene-back');

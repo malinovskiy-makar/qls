@@ -2989,3 +2989,41 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cv-mode { left: 56px; top: 54px; padding: 6px 6px 6px 12px; background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-card); font-size: 13.5px; }
 .cv-mode__stop { background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: var(--r); height: 30px; padding: 0 12px; font-weight: 600; }
 .cv-mode__stop:hover { background: var(--chip-bg); }
+
+/* Белый лист выгрузки (README макета, раздел 13): токен, а не число в коде. */
+:root { --paper: #ffffff; }
+
+/* Ручка (7.4): кружок фоном холста с обводкой --ink. */
+#chart circle[data-service="handle"] { fill: var(--canvas); stroke: var(--ink); stroke-width: 2px; }
+
+/* ── Окно «Скачать график» (раздел 10): 860×548, слева белый лист ── */
+#export-modal { background: var(--scrim); }
+#export-modal .modal-card.exp-card {
+  width: min(860px, 96vw); max-height: calc(100vh - 32px); padding: 0; display: grid;
+  grid-template-columns: minmax(0, 1fr) 312px; border-radius: var(--r-panel); overflow: hidden;
+}
+.exp-left { padding: 20px; background: var(--surface-2); overflow-y: auto; }
+.exp-sheet { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; color: #2d2d2d; }
+.exp-sheet-title { text-align: center; font-size: 15px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
+[data-theme="dark"] .exp-sheet-title, [data-theme="dark"] .exp-sheet-nums { color: #2d2d2d; }
+.exp-sheet-img { display: block; width: 100%; height: auto; }
+.exp-sheet-cap { text-align: center; font-size: 13px; color: #6b6457; margin-top: 8px; }
+.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(45, 45, 45, .14); color: #2d2d2d; font-variant-numeric: tabular-nums; }
+.exp-sheet-title[hidden], .exp-sheet-cap[hidden], .exp-sheet-nums[hidden] { display: none; }
+.exp-what { margin-top: 12px; }
+.exp-what-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 4px; }
+.exp-right { display: flex; flex-direction: column; gap: 12px; padding: 18px 20px 16px; overflow-y: auto; }
+.exp-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.exp-head .modal-title { margin: 0; font-size: 19px; font-weight: 600; }
+.exp-right .field { margin: 0; }
+.exp-right .field > label, .exp-right .hint-lead { font-size: 13px; font-weight: 500; color: var(--text2); }
+#exp-caption { width: 100%; height: 34px; padding: 0 10px; font-size: 14px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); color: var(--text); }
+.exp-nums-row { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--text); }
+.exp-fmt { margin-top: 4px; }
+.exp-fmt .seg-btn { flex: 1 1 0; }
+.exp-fmt .seg-btn[disabled] { opacity: .45; cursor: not-allowed; }
+.exp-fmt-note { margin-top: 6px; font-size: 13px; color: var(--text2); line-height: 1.55; }
+.exp-fmt-off { margin-top: 4px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+.exp-label-field[hidden] { display: none; }
+.exp-foot { margin-top: auto; display: flex; justify-content: flex-end; gap: 8px; padding: 0; border: 0; }
+.exp-foot .btn, .exp-foot .btn-sm { height: 40px; padding: 0 16px; width: auto; margin: 0; font-size: 14.5px; }
