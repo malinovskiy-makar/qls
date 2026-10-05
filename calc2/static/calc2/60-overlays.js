@@ -70,6 +70,7 @@ function redrawAll() {
   // а не на каждом кадре протяжки.
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
   if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
+  if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
 }
 
 function redrawScene() {

@@ -2810,3 +2810,136 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .col-cond .f-row:not(.fc-card .f-row) .f-kbd[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
 .col-cond .f-row:not(.fc-card .f-row) .f-kbd:hover { background: var(--chip-bg); color: var(--text); }
 .col-cond .f-why.is-bad { font-size: 13px; color: var(--error-ink); line-height: 1.55; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · «ОТВЕТ» (фаза 6; README макета, раздел 8)
+   Тело: поля 0 16 20, промежуток 18. Статус словами (канон 2.5: серая
+   плашка, цветная полоса слева и значок, без заливки -tint), главные числа
+   2×2, бремя, таблицы групп, итоговая функция, «Разбор» аккордеоном.
+   ═══════════════════════════════════════════════════════════════════ */
+.col-answer .col-head { border-bottom: 0; }
+.col-note { font-size: 13px; font-weight: 500; color: var(--text3); white-space: nowrap; }
+#params-panel .side-scroll { padding: 0 16px 20px; }
+#params-panel .side-part, #params-panel .side-part.open-card {
+  margin: 0; padding: 0; background: transparent; border: 0; border-radius: 0; box-shadow: none;
+}
+#params-panel #sb-fold { display: flex; flex-direction: column; gap: 18px; padding: 0; }
+#params-panel #explain { margin-top: 18px; }
+
+/* Статус */
+.ans-status-box { display: flex; flex-direction: column; gap: 8px; }
+.ans-status-box[hidden] { display: none; }
+.ans-status {
+  position: relative; padding: 10px 12px 10px 36px; font-size: 14px; line-height: 1.55; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border-soft); border-left: 3px solid var(--amber);
+  border-radius: var(--r);
+}
+.ans-status::before {
+  content: '!'; position: absolute; left: 11px; top: 10px; width: 16px; height: 16px; border-radius: 50%;
+  display: grid; place-items: center; font-size: 11px; font-weight: 700; line-height: 1;
+  color: var(--amber-ink); border: 1.5px solid var(--amber-ink);
+}
+#sb-body .warn { display: none; }   /* источник статуса: строка выше показывает его словами */
+
+/* Главные числа 2×2 */
+.ans-hero {
+  display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
+  border-radius: var(--r-card); overflow: hidden; background: var(--surface);
+}
+.ans-hero[hidden] { display: none; }
+.ans-hero.ans-hero--one { grid-template-columns: 1fr; }
+.ans-cell { padding: 12px 14px; min-width: 0; border-top: 1px solid var(--border-soft); }
+.ans-cell:nth-child(-n+2) { border-top: 0; }
+.ans-cell:nth-child(2n) { border-left: 1px solid var(--border-soft); }
+.ans-hero.ans-hero--one .ans-cell { border-left: 0; }
+.ans-hero > .ans-cell:last-child:nth-child(odd) { grid-column: 1 / -1; }
+.ans-lab { font-size: 13px; font-weight: 500; color: var(--text2); line-height: 1.35; min-height: 18px; }
+.ans-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.ans-not { font-size: 17px; color: var(--text2); }
+.ans-not .katex { font-size: 1em; }
+.ans-eq { font-size: 17px; color: var(--text2); }
+.ans-val { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; }
+.ans-val--l { font-size: 28px; }
+.ans-val--m { font-size: 24px; }
+.ans-val--s { font-size: 20px; }
+.ans-val .katex { font-size: 1em; }
+.ans-was { margin-top: 4px; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+#sb-body .stat.is-hero { display: none; }   /* главное число в таблице не повторяется */
+
+/* Бремя */
+.ans-burden[hidden] { display: none; }
+.ans-burden .col-sub { margin: 0 0 10px; }
+.burden-bar { height: 10px; border-radius: var(--r-pill); background: var(--border-strong); overflow: hidden; }
+.burden-b { display: block; height: 100%; background: var(--btn-bg); }
+.burden-cols { display: flex; justify-content: space-between; margin-top: 8px; }
+.burden-col.is-seller { text-align: right; }
+.burden-name { font-size: 13px; font-weight: 500; color: var(--text2); display: inline-flex; align-items: center; gap: 6px; }
+.burden-name::before { content: ''; width: 9px; height: 9px; border-radius: 2px; background: var(--btn-bg); }
+.is-seller .burden-name::before { background: var(--border-strong); }
+.burden-val { font-size: 15px; font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; margin-top: 2px; }
+.burden-note { margin-top: 8px; font-size: 13px; color: var(--text3); line-height: 1.55; }
+
+/* Таблицы групп: заголовок 15/600, строка 14 px, подпись слева, число 600 справа. */
+#sb-body { display: flex; flex-direction: column; gap: 18px; }
+#sb-body > [id^="info-"]:empty, #sb-body > #sec-eq:empty { display: none; }
+#sb-body .section-title, #sec-eq .section-title { font-size: 15px; font-weight: 600; color: var(--text); margin: 0 0 6px; text-transform: none; letter-spacing: 0; }
+.sb-body .stat, .sb-body .stat.stat-eq {
+  display: flex; flex-wrap: nowrap; justify-content: space-between; align-items: baseline; gap: 12px;
+  padding: 6px 0; border-bottom: 1px solid var(--border-soft); line-height: 1.55; font-size: 14px;
+}
+.sb-body .stat > span, .sb-body .stat.stat-eq > span { font-size: 14px; font-weight: 400; color: var(--text); flex: 1 1 auto; }
+.sb-body .stat > b, .sb-body .stat.stat-eq > b { font-size: 14px; font-weight: 600; color: var(--text); text-align: right; flex: 0 0 auto; max-width: 55%; }
+.sb-body .stat .stat-sign { display: none; }
+.sb-body .hint, .sb-body .muted { font-size: 13px; color: var(--text3); line-height: 1.55; margin-top: 6px; }
+.tx-table { font-size: 14px; margin-top: 6px; }
+.tx-table th { font-size: 13px; font-weight: 500; color: var(--text3); border-bottom: 1px solid var(--border); }
+.tx-table td { padding: 6px 0 6px 6px; border-bottom: 1px solid var(--border-soft); line-height: 1.55; }
+.tx-table td:last-child, .tx-table td:nth-child(2) { color: var(--text2); }
+.tx-table td:nth-child(3) { font-weight: 600; color: var(--text); }
+/* Заголовки групп, у которых своего заголовка в табло нет (94-answer.js, ANSWER_GROUP). */
+#info-areas:not(:empty)::before { content: 'Излишки'; }
+#info-tax:not(:empty)::before { content: 'Вмешательство'; }
+#info-mono:not(:empty)::before { content: 'Монополия'; }
+#info-costs:not(:empty)::before { content: 'Издержки'; }
+#info-labor:not(:empty)::before { content: 'Рынок труда'; }
+#info-macro:not(:empty)::before { content: 'Равновесие'; }
+#info-areas::before, #info-tax::before, #info-mono::before, #info-costs::before, #info-labor::before, #info-macro::before {
+  display: block; margin: 0 0 6px; font-size: 15px; font-weight: 600; color: var(--text);
+}
+
+/* Итоговая функция — карточка (8.7). */
+#info-final .ff { padding: 12px 14px; border: 1px solid var(--border); border-left: 1px solid var(--border); border-radius: var(--r-card); background: var(--surface); }
+#info-final .ff-name { font-size: 13px; font-weight: 500; color: var(--text2); }
+
+/* «Разбор» аккордеоном (8.8). */
+#explain .col-sub { font-size: 15px; font-weight: 600; margin: 0 0 4px; }
+#ex-body .sb-note { padding: 0; background: transparent; border: 0; font-size: 14.5px; line-height: 1.6; color: var(--text); }
+#ex-body .sb-note p { margin: 0; }
+#ex-body .sb-note p.ex-q { border-bottom: 1px solid var(--border-soft); padding: 0 0 10px; margin: 0 0 10px; }
+#ex-body .sb-note p.ex-q > b {
+  display: block; position: relative; margin: 0; padding: 4px 26px 4px 0;
+  font-size: 14.5px; font-weight: 600; color: var(--text); cursor: pointer;
+}
+#ex-body .sb-note p.ex-q > b::after {
+  content: ''; position: absolute; right: 4px; top: 9px; width: 8px; height: 8px;
+  border: solid var(--text2); border-width: 0 1.6px 1.6px 0; transform: rotate(45deg); transition: transform .18s var(--ease);
+}
+#ex-body .sb-note p.ex-q.ex-open > b::after { transform: rotate(225deg); top: 13px; }
+#ex-body .sb-note p.ex-q > b:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+#ex-body .sb-note p.ex-q > .ex-a { display: none; padding-top: 6px; }
+#ex-body .sb-note p.ex-q.ex-open > .ex-a { display: block; }
+#ex-body .sb-note p.ex-out { margin: 4px 0 0; padding: 12px 14px; background: var(--surface-2); border-radius: var(--r-card); }
+#ex-body .sb-note p.ex-out > b { display: inline; font-weight: 600; }
+@media (prefers-reduced-motion: reduce) { #ex-body .sb-note p.ex-q > b::after { transition: none; } }
+#ex-body .sb-note b, #ex-body .sb-note p.ex-q > b, #ex-body .sb-note p.ex-out > b { text-transform: none; letter-spacing: 0; font-size: 14.5px; }
+.ans-title { margin: 0 0 -8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.ans-title[hidden] { display: none; }
+#sec-eq > .section-title { display: none; }   /* показан над главными числами (#ans-title) */
+#info-final .ff-eyebrow { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: none; letter-spacing: 0; }
+#info-final .ff-name { font-size: 13px; font-weight: 500; color: var(--text); margin-top: 2px; }
+#info-final .ff-copy, #info-final .ff-expand {
+  height: 28px; padding: 0 10px; border: 1px solid var(--border-strong); border-radius: var(--r);
+  background: var(--surface); color: var(--text); font-size: 13px; font-weight: 500; text-decoration: none; text-transform: none;
+}
+#info-final .ff-copy::first-letter, #info-final .ff-expand::first-letter { text-transform: uppercase; }
+#info-final .ff-copy:hover, #info-final .ff-expand:hover { background: var(--chip-bg); }

@@ -2327,11 +2327,18 @@
        поверх них (фаза 6). -->
   <aside class="side side-right col-answer" id="params-panel" aria-label="Ответ">
     <div class="side-inner">
-      <div class="side-head col-head"><h2>Ответ</h2></div>
+      <div class="side-head col-head"><h2>Ответ</h2><span class="col-note">пересчитывается сразу</span></div>
       <div class="side-scroll">
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
         <section class="side-part" id="scoreboard">
           <div class="fold-body open" id="sb-fold">
+            <!-- «Ответ» (редизайн 10.2026, фаза 6; 94-answer.js): статус словами,
+                 главные числа 2×2, бремя. Собираются поверх табло и только
+                 читают его: сцены по-прежнему пишут свои блоки #info-*. -->
+            <div class="ans-status-box" id="ans-status" hidden></div>
+            <h3 class="col-sub ans-title" id="ans-title" hidden></h3>
+            <div class="ans-hero" id="ans-hero" hidden></div>
+            <div class="ans-burden" id="ans-burden" hidden></div>
             <div class="sb-body" id="sb-body"><!-- JS переносит сюда #info-* и блок равновесия -->
               <!-- ⚠️ ИТОГОВАЯ ФУНКЦИЯ СТОИТ ПЕРВОЙ, И ДЕРЖИТСЯ ЭТО ТЕМ, ЧТО ЕЁ
                    НЕТ В RESULT_IDS. relocateForScene делает appendChild для
@@ -2538,6 +2545,7 @@ const CALC2_HAS_PDFLATEX = {% if has_pdflatex %}true{% else %}false{% endif %};
 <script src="{% calc2_static 'calc2/91-session.js' %}"></script>
 <script src="{% calc2_static 'calc2/92-ui-kit.js' %}"></script>
 <script src="{% calc2_static 'calc2/93-shell.js' %}"></script>
+<script src="{% calc2_static 'calc2/94-answer.js' %}"></script>
 <script src="{% calc2_static 'calc2/99-boot.js' %}"></script>
 
 {% comment %}
