@@ -131,6 +131,13 @@ function geomMatch(g0, g1, win0, issues, where) {
 }
 
 /* ── Ответ ─────────────────────────────────────────────────────────── */
+/* Разбор, исправленный в фазе 1 (журнал, «Принято без вопроса», п. 12): на
+   старом экране пять моделей показывали разбор своей СЕМЬИ (ключ кэша
+   moveExplanations был общий на семью), хотя в реестре SCENE_EXPLAIN у каждой
+   свой текст. Новый экран показывает текст самой модели. Абзацы разбора у
+   этих пяти ключей не сверяются, а сверка печатает строку «исправлено». */
+const EXPLAIN_FIXED = { isoquant: 'costs', plants: 'costs', prod: 'costs', 'mono-d3': 'mono', 'tax-adv': 'tax' };
+let CUR_KEY = '';
 function answerMatch(a0, a1, issues, where) {
   let n = 0;
   const b1 = new Map((a1.blocks || []).map(b => [b.id, b]));
@@ -154,7 +161,11 @@ function answerMatch(a0, a1, issues, where) {
   });
   n++; if (normText(a0.title) !== normText(a1.title)) issues.push(where + ': заголовок группы «' + a0.title + '» → «' + a1.title + '»');
   const e1 = (a1.explain || []).map(normText);
-  (a0.explain || []).forEach(p => { n++; if (!e1.includes(normText(p))) issues.push(where + ': абзац разбора пропал: «' + p.slice(0, 70) + '»'); });
+  if (EXPLAIN_FIXED[CUR_KEY]) {
+    n++; if (!e1.length) issues.push(where + ': разбор пуст');
+  } else {
+    (a0.explain || []).forEach(p => { n++; if (!e1.includes(normText(p))) issues.push(where + ': абзац разбора пропал: «' + p.slice(0, 70) + '»'); });
+  }
   const t1 = new Set((a1.tips || []).map(normText));
   (a0.tips || []).forEach(t => { n++; if (!t1.has(normText(t))) issues.push(where + ': подсказка пропала: «' + t.slice(0, 70) + '»'); });
   return n;
@@ -178,6 +189,7 @@ const files = fs.readdirSync(BASE).filter(f => f.endsWith('.json')).map(f => f.r
 let total = 0, bad = 0;
 const report = {};
 for (const key of files) {
+  CUR_KEY = key;
   const issues = [];
   let n = 0;
   const b = JSON.parse(fs.readFileSync(path.join(BASE, key + '.json'), 'utf8'));
@@ -190,7 +202,10 @@ for (const key of files) {
   const errKey = (e) => String(e).replace(/^.*?(console|pageerror): /, '$1: ').replace(/[\d.]+/g, '#');
   const oldErr = new Set((b.errors || []).map(errKey));
   (c.errors || []).forEach(e => { if (!oldErr.has(errKey(e))) issues.push('ошибка страницы: ' + e); });
-  // Старт.
+  // Старт. Место легенды (legendSpot) — кэш раскладки: когда страница не
+  // свежая (обход подряд, order_probe), оно зависит от того, что было нарисовано
+  // раньше. Модель оно не описывает; в --start-only не сверяется.
+  if (START_ONLY) { delete b.start.state.legendSpot; delete c.start.state.legendSpot; }
   n++; const ws = whereDiff(b.start.state, c.start.state, 1e-9); if (ws) issues.push('старт STATE' + ws);
   n++; const ww = whereDiff(b.start.windows, c.start.windows, 1e-9); if (ww) issues.push('старт окна' + ww);
   n += answerMatch(b.start.answer, c.start.answer, issues, 'старт');
@@ -261,6 +276,7 @@ Object.entries(report).forEach(([k, r]) => {
   if (!r.issues.length) okKeys++;
   console.log((r.issues.length ? '✗ ' : '✓ ') + k + ': проверок ' + r.n + ', расхождений ' + r.issues.length);
   r.issues.slice(0, MAXSHOW).forEach(x => console.log('    ' + x));
+  if (EXPLAIN_FIXED[k]) console.log('    разбор: исправлено в фазе 1 — свой текст модели вместо разбора семьи «' + EXPLAIN_FIXED[k] + '»');
 });
 console.log(`\nключей ${okKeys} из ${files.length} без расхождений; проверок ${total}, расхождений ${bad}`);
 process.exit(bad ? 1 : 0);
