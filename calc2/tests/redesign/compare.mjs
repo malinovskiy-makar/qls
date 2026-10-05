@@ -116,6 +116,10 @@ function geomMatch(g0, g1, win0, issues, where) {
     (g1[k] || []).forEach((q, i) => { if (!usedK.has(i)) issues.push(where + ': лишний ' + k + ' ' + q.panel); });
   });
   n++;
+  // Ключевые точки — набор: порядок по округлённым координатам (шум 1e-10 его менял).
+  const srt = (o) => Object.fromEntries(Object.entries(o || {}).map(([id, l]) => [id, Array.isArray(l) ? l.slice().sort((p, q) =>
+    (Math.round(p[0] * 1e6) - Math.round(q[0] * 1e6)) || (Math.round(p[1] * 1e6) - Math.round(q[1] * 1e6)) || String(p[2]).localeCompare(String(q[2]))) : l]));
+  g0 = Object.assign({}, g0, { keyPoints: srt(g0.keyPoints) }); g1 = Object.assign({}, g1, { keyPoints: srt(g1.keyPoints) });
   if (!near(g0.keyPoints || {}, g1.keyPoints || {}, 1e-9)) issues.push(where + ': ключевые точки: ' + whereDiff(g0.keyPoints || {}, g1.keyPoints || {}, 1e-9));
   return n;
 }

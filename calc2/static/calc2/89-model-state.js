@@ -154,6 +154,26 @@ function rerenderModelLists() {
   if (typeof renderVertList === 'function') renderVertList();
 }
 
+/* Узлы, которые сцены пишут ТЕКСТОМ по состоянию (пояснения каскада
+   вмешательства, подписи способа ввода издержек и т. п.): в форме их нет,
+   поэтому после возврата входов их пересобирают те же функции, что и при
+   обычной правке. Каждая только читает STATE и пишет разметку. */
+/* После возврата входов пульт обязан пересобраться: чипы букв держат ссылку
+   на объект параметра, с которым их собрали, и после замены STATE.params
+   показывали бы прежние границы. Тот же приём, что в resetDecor. Кэши
+   расчёта, привязанные к подписи входов (costsSig и т. п.), гасим: их данные
+   (скомпилированные формулы) в простом состоянии не хранятся. */
+function forceRebuildAfterApply() {
+  const panel = document.getElementById('params-panel');
+  if (panel && typeof PULT_REBUILD !== 'undefined') { panel._extraSig = PULT_REBUILD; panel._curveSig = PULT_REBUILD; }
+  Object.keys(STATE).forEach(k => { if (/Sig$/.test(k)) STATE[k] = null; });
+}
+
+function syncUiFromState() {
+  ['applyIntervCascade', 'syncTaxHint', 'syncPcHint', 'syncQuotaHint', 'syncLabelSizeSeg', 'syncCostsInputMode']
+    .forEach(fn => { if (typeof window[fn] === 'function') window[fn](); });
+}
+
 /* ── Чистый старт ───────────────────────────────────────────────────── */
 let _pristine = null;
 function capturePristine() {
@@ -162,6 +182,9 @@ function capturePristine() {
     state: captureStatePlain(),
     form: captureForm(),
     view: { Qmin: CONFIG.Qmin, Qmax: CONFIG.Qmax, Pmin: CONFIG.Pmin, Pmax: CONFIG.Pmax },
+    /* Поля графика тоже: сцены «Математики» берут CONFIG.margin как есть, и
+       «Касательная» после «Спроса и предложения» получала поля на 2 px уже. */
+    margin: Object.assign({}, CONFIG.margin),
   };
 }
 function restorePristine() {
@@ -173,6 +196,7 @@ function restorePristine() {
   applyStatePlain(_pristine.state);
   CONFIG.Qmin = _pristine.view.Qmin; CONFIG.Qmax = _pristine.view.Qmax;
   CONFIG.Pmin = _pristine.view.Pmin; CONFIG.Pmax = _pristine.view.Pmax;
+  Object.assign(CONFIG.margin, _pristine.margin);
   rerenderModelLists();
 }
 
@@ -186,11 +210,110 @@ function restorePristine() {
 function captureMemory() {
   const st = {};
   Object.keys(STATE).forEach(k => { if (!MODEL_STATE_SKIP.has(k)) st[k] = STATE[k]; });
-  return { state: st, form: captureForm() };
+  return { state: st, form: captureForm(), margin: Object.assign({}, CONFIG.margin) };
 }
 function applyMemory(m) {
   if (!m) return;
   applyForm(m.form);
   Object.keys(m.state).forEach(k => { STATE[k] = m.state[k]; });
+  if (m.margin) Object.assign(CONFIG.margin, m.margin);
+  forceRebuildAfterApply();
+  syncUiFromState();
   rerenderModelLists();
+}
+
+/* ── Слой состояния: собрать модель в простой объект и применить обратно ──
+   (редизайн 10.2026, фаза 2). Этим объектом пользуются история, автосохранение
+   и ссылка «Поделиться». В нём ПОЛНЫЕ входы модели, а не отличия от старта:
+   ссылка обязана открывать то же самое и после того, как стартовые значения
+   в коде поменяются.
+
+   Кривые — единственный вход, в котором лежат скомпилированные формулы. Они
+   сохраняются простыми полями (запись, форма, роль, цвет, имя, видимость,
+   разбор прямой), а формула при применении пересобирается теми же функциями,
+   что и при наборе: compileFormula и buildCurveFromQP. Суммарные кривые
+   «Сложения» пересобирает sumRebuild на первой же перерисовке. */
+const MODEL_STATE_VERSION = 1;
+const CURVE_CODE_KEYS = new Set(['compiled', 'fn', 'srcCompiled']);
+function serializeCurves(list) {
+  return (list || []).map(c => {
+    const o = {};
+    // Какие служебные поля у кривой были: пересборка заводит ровно их.
+    o._code = Object.keys(c).filter(k => CURVE_CODE_KEYS.has(k));
+    Object.keys(c).forEach(k => {
+      if (CURVE_CODE_KEYS.has(k)) return;
+      const x = plainCopy(c[k], 0);
+      if (x !== NO_COPY) o[k] = x;
+    });
+    return o;
+  });
+}
+function rebuildCurves(list) {
+  return (list || []).map(o => {
+    const c = plainCopy(o, 0);
+    const code = c._code || ['compiled', 'fn'];
+    delete c._code;
+    code.forEach(k => { c[k] = null; });
+    if (c.kind === 'sum' || c.kind === 'vertical' || !c.expr) return c;
+    if (c.srcForm === 'QP') {
+      const b = buildCurveFromQP(c.expr);
+      if (!b.error) { c.fn = b.fn; c.srcCompiled = b.srcCompiled; }
+    } else {
+      const r = compileFormula(c.expr);
+      if (!r.error) c.compiled = r.compiled;
+    }
+    return c;
+  });
+}
+
+/* Ключ модели для хранения: синонимы tax и tax-adv — та же модель «Налоги и
+   субсидии» (84-picker.js), и в автосохранении и ссылке у неё один ключ. */
+function modelKeyOf(key) {
+  const k = key || STATE.sceneKey;
+  return (k === 'tax' || k === 'tax-adv') ? 'taxes' : k;
+}
+
+function collectModelState() {
+  const state = captureStatePlain();
+  state.curves = serializeCurves(STATE.curves);
+  return {
+    v: MODEL_STATE_VERSION,
+    key: modelKeyOf(),
+    // Маршрут-синоним (tax, tax-adv) хранится отдельно: у них свои тексты разбора.
+    route: STATE.sceneKey,
+    state,
+    form: captureForm(),
+    view: { Qmin: CONFIG.Qmin, Qmax: CONFIG.Qmax, Pmin: CONFIG.Pmin, Pmax: CONFIG.Pmax },
+    margin: Object.assign({}, CONFIG.margin),
+    counters: { curve: curveCounter, mark: markCounter, area: areaCalcCounter },
+  };
+}
+
+/* Применить собранное: модель открывается с канонического старта (pickScene
+   без памяти сессии), затем поверх кладутся входы. Порядок обязателен: форма
+   (границы ползунков раньше значений), потом STATE, потом пересборка
+   списков, пульта и холста. */
+function applyModelState(s) {
+  if (!s || s.v !== MODEL_STATE_VERSION || !s.key || !SCENE_ROUTE[s.key]) return false;
+  const route = (s.route && SCENE_ROUTE[s.route] && modelKeyOf(s.route) === s.key) ? s.route : s.key;
+  forgetSceneSnapshot(route);
+  pickScene(route);
+  applyForm(s.form);
+  Object.keys(s.state).forEach(k => {
+    if (k === 'curves') return;
+    STATE[k] = plainCopy(s.state[k], 0);
+  });
+  STATE.curves = rebuildCurves(s.state.curves);
+  STATE._sumSig = null;   // суммарные кривые пересобрать заново
+  forceRebuildAfterApply();
+  if (s.margin) Object.assign(CONFIG.margin, s.margin);
+  if (s.view) { CONFIG.Qmin = s.view.Qmin; CONFIG.Qmax = s.view.Qmax; CONFIG.Pmin = s.view.Pmin; CONFIG.Pmax = s.view.Pmax; }
+  if (s.counters) { curveCounter = s.counters.curve; markCounter = s.counters.mark; areaCalcCounter = s.counters.area; }
+  syncUiFromState();
+  rerenderModelLists();
+  renderCurveList();
+  if (typeof updatePult === 'function') updatePult();
+  redrawAll();
+  if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+  return true;
 }
