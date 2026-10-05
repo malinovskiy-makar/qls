@@ -2787,3 +2787,26 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .pw-kbd-toggle[aria-expanded="true"] { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
 #pw-apply { font-weight: 600; }
 #pw-apply.is-off { opacity: .45; }
+
+/* Поля формул сцен (TC, КПВ, U(x, y), L(p), «Математика»…) — тем же видом,
+   что поле карточки функции: 40, фон --surface-2, клавиатура в правом конце
+   (COVERAGE, раздел 1: «поле формулы → карточка в «Функциях»»). */
+.col-cond .f-row:not(.fc-card .f-row) {
+  align-items: center; gap: 2px; min-height: 40px; padding: 0 4px 0 6px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+.col-cond .f-row:not(.fc-card .f-row):focus-within { border-color: var(--accent); }
+.col-cond .f-row:not(.fc-card .f-row):has(.is-bad) { border-color: var(--error); }
+.col-cond .f-row:not(.fc-card .f-row) math-field,
+.col-cond .f-row:not(.fc-card .f-row) .f-slot > input,
+.col-cond .f-row:not(.fc-card .f-row) .f-typeset {
+  border: 0; background: transparent; font-size: 17px; min-height: 38px; padding: 5px 4px;
+}
+.col-cond .f-row:not(.fc-card .f-row) math-field:focus,
+.col-cond .f-row:not(.fc-card .f-row) math-field:focus-within { outline: none; }
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd {
+  flex: 0 0 30px; width: 30px; height: 30px; border: 0; background: transparent; color: var(--text3); border-radius: var(--r);
+}
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd[aria-expanded="true"] { color: var(--accent-ink); background: var(--accent-tint); }
+.col-cond .f-row:not(.fc-card .f-row) .f-kbd:hover { background: var(--chip-bg); color: var(--text); }
+.col-cond .f-why.is-bad { font-size: 13px; color: var(--error-ink); line-height: 1.55; }
