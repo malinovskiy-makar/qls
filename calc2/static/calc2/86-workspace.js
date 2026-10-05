@@ -621,7 +621,10 @@ function wireScene() {
          конца и здесь. */
       PW.inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }
+    const inList = PW.inp && PW.inp.closest('#curve-list');
     closePiecewise();
+    // Карточка функции показывает кусочную запись скобкой: пересобираем список.
+    if (inList && typeof renderCurveList === 'function') renderCurveList();
   });
   // Окно «Скачать»: формат и одна кнопка (70-scenes-math.js, wireExport).
   if (typeof wireExport === 'function') wireExport();

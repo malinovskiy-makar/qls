@@ -265,17 +265,6 @@ function renderCurveList() {
     }
     nm.setAttribute('data-tip', tipExpr(curve.expr));   // под обозначением — сама формула
 
-    // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
-    let badge = null;
-    if (curve.srcForm === 'QP') {
-      badge = document.createElement('span');
-      badge.className = 'form-badge'; badge.textContent = 'Q(P)';
-      const can = curve.linear
-        ? ('$P = ' + fmtLinear(curve.linear.a, curve.linear.b) + '$')
-        : '$P = f(Q)$ считается численно';
-      badge.setAttribute('data-tip', 'Введено как $Q(P)$, в расчётах ' + can);
-    }
-
     // Глаз (пункт (ж)): тот же признак visible, что был у галочки.
     const eye = document.createElement('button');
     eye.type = 'button'; eye.className = 'fc-eye fc-ico';
@@ -350,6 +339,7 @@ function renderCurveList() {
         }
         if (!err) {
           if (!rowTag) paintNotation(nm, curveShortName(curve));
+          syncQpLine();
           redrawAll();
           if (typeof updatePult === 'function') updatePult();
         }
@@ -444,6 +434,26 @@ function renderCurveList() {
 
     const sliders = document.createElement('div');
     sliders.className = 'crow-sliders';
+    /* Q(P): под полем строка «Q(P) · в расчётах P = …» (README макета, 6.1).
+       Перерисовывается на месте при каждой верной правке: набрал «120 − 2P» —
+       строка появилась, не дожидаясь пересборки списка. */
+    let qpLine = null;
+    function syncQpLine() {
+      if (curve.srcForm !== 'QP') { if (qpLine) { qpLine.remove(); qpLine = null; } return; }
+      if (!qpLine) {
+        qpLine = document.createElement('div');
+        qpLine.className = 'fc-qp';
+        const fl = row.querySelector(':scope > .crow-formula');
+        if (fl) fl.after(qpLine); else row.insertBefore(qpLine, more);
+      }
+      qpLine.innerHTML = '';
+      const chip = document.createElement('span'); chip.className = 'form-badge'; chip.textContent = 'Q(P)';
+      const mid = document.createElement('span'); mid.className = 'fc-qp-mid'; mid.textContent = 'в расчётах';
+      const tail = document.createElement('span'); tail.className = 'fc-qp-math';
+      if (curve.linear && typeof renderTexRaw === 'function') renderTexRaw(tail, 'P = ' + mathToTex(fmtLinear(curve.linear.a, curve.linear.b)));
+      else tail.textContent = 'P = f(Q), обратная функция, считаем численно';
+      qpLine.append(chip, mid, tail);
+    }
     if (fInp) {
       const fLine = document.createElement('div');
       fLine.className = 'crow-formula';
@@ -479,22 +489,10 @@ function renderCurveList() {
         pwRec.addEventListener('click', openPw);
         pwRec.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPw(); } });
       }
-      /* Q(P): под полем строка «Q(P) · в расчётах P = …» (README макета, 6.1). */
-      let qpLine = null;
-      if (badge) {
-        qpLine = document.createElement('div');
-        qpLine.className = 'fc-qp';
-        const tail = document.createElement('span'); tail.className = 'fc-qp-math';
-        if (curve.linear && typeof renderTexRaw === 'function') renderTexRaw(tail, 'P = ' + mathToTex(fmtLinear(curve.linear.a, curve.linear.b)));
-        else tail.textContent = 'P = f(Q), обратная функция, считаем численно';
-        const mid = document.createElement('span'); mid.className = 'fc-qp-mid'; mid.textContent = 'в расчётах';
-        qpLine.append(badge, mid, tail);
-      }
       row.append(top);
       if (pwRec) row.append(pwRec);
-      row.append(fLine);
-      if (qpLine) row.append(qpLine);
-      row.append(more, sliders);
+      row.append(fLine, more, sliders);
+      syncQpLine();
       fInp.id = fInp.id || ('curve-expr-' + curve.id);
     } else if (autoLine) {
       row.append(top, autoLine, more, sliders);
