@@ -50,9 +50,12 @@ const RENAME = {
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];
-  // (ж) галочка видимости кривой → глаз на её карточке, тот же номер строки.
-  const eye = /^#curve-list>input(\[\d+\])?$/.exec(key);
-  if (eye) return '#curve-list>button.fc-eye' + (eye[1] || '');
+  /* (ж) галочка видимости кривой → глаз на её карточке. Номер в старом ключе
+     считал ВСЕ поля списка: на строку кривой их два (глаз и поле записи), и
+     во всех 44 базовых снимках глаза идут через два — 0, 2, 4… Глаз k-й
+     кривой — номер 2k, на новом экране это k-я кнопка .fc-eye. */
+  const eye = /^#curve-list>input(?:\[(\d+)\])?$/.exec(key);
+  if (eye) { const k = Math.floor((+eye[1] || 0) / 2); return '#curve-list>button.fc-eye' + (k ? '[' + k + ']' : ''); }
   return key;
 }
 

@@ -235,7 +235,10 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
     await L.settle(p); await p.evaluate(() => redrawAll()); await L.settle(p);
     const st = await p.evaluate(() => window.__RD.stateDump());
     const d = L.stateDiff(rec.start.state, st);
-    const real = Object.keys(d).filter(x => !['crosses', 'sceneKey'].includes(x) && !/Sig$/.test(x));
+    /* Производное от размера холста (место легенды, касательные «Касательной»,
+       пересечения) сверка не сравнивает — тот же список, что VIEW_KEYS в
+       compare.mjs: холст нового экрана другого размера, а старт тот же. */
+    const real = Object.keys(d).filter(x => !['crosses', 'sceneKey', 'legendSpot', 'tanTop', 'tanBot'].includes(x) && !/Sig$/.test(x));
     if (real.length) { bad++; fails.push('заполненное хранилище: ' + k + ' старт разошёлся: ' + real.slice(0, 5).join(', ')); }
   }
   console.log('заполненное хранилище: моделей с иным стартом ' + bad + ' из ' + keys2.length);

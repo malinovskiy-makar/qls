@@ -251,6 +251,7 @@ function renderCurveList() {
     if (rowTag) {
       // Сложение: обозначение D₁ — как на холсте, полное имя группы — рядом.
       nm.className = 'crow-tag fc-notation';
+      nm.setAttribute('data-tip', 'Так эта кривая подписана на графике');
       nm.style.color = curve.color;
       const tex = rowTag.replace(/_(\d)/, '_{$1}');
       if (typeof katexInto === 'function') katexInto(nm, tex);

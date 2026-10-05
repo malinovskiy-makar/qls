@@ -2031,7 +2031,8 @@
             <label>Цена внутри коридора = <b id="quota-price-val">…</b></label>
             <input type="range" id="quota-price-slider" min="0" max="100" step="1" value="50"
                    style="width:100%;margin-top:4px;">
-            <div class="hint" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
+            <!-- Живое показание, не справка: под «?» не уходит (hint-keep, 86-workspace.js). -->
+            <div class="hint hint-keep" id="quota-price-range" style="margin-top:2px;">коридора нет</div>
           </div>
           <div class="hint sb-note-src" id="quota-hint">Квота ограничивает объём напрямую.
             Если она НИЖЕ равновесного количества, рыночная цена не определена однозначно: подойдёт

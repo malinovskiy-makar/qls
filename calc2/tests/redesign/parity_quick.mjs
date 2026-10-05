@@ -59,13 +59,7 @@ for (const key of keys) {
   await page.waitForFunction(() => window.__RD.settled(), null, { timeout: 6000 }).catch(() => null);
   await page.waitForTimeout(120);
   // 1. Органы старта.
-  const wantC = (rec.controls || rec.start.controls || []).filter(c => !c.picker);
-  const want = wantC.map(c => c.key);
-  /* Глаз кривой: на старом экране номер в ключе «#curve-list>input[n]» считал
-     все поля списка (глаз, поле записи), на новом глаз — своя кнопка в
-     карточке. Сопоставляем по порядку глаз: k-й глаз старого — k-й новый. */
-  const eyes = wantC.filter(c => /^#curve-list>input(\[\d+\])?$/.test(c.key) && c.kind === 'input:checkbox').map(c => c.key);
-  const eyeKey = (k) => { const j = eyes.indexOf(k); return j < 0 ? null : '#curve-list>button.fc-eye' + (j ? '[' + j + ']' : ''); };
+  const want = (rec.controls || rec.start.controls || []).filter(c => !c.picker).map(c => c.key);
   const res = await page.evaluate(async (list) => {
     // Выезд панели и смена вкладки видны не в тот же миг: видимость у
     // потомков панели меняется переходом (до 0,2 с).
@@ -96,7 +90,7 @@ for (const key of keys) {
   }, want.filter(k => {
     const f = fateOf(k);
     return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдк]$/.test(f.letter)));
-  }).map(k => ({ orig: k, mapped: eyeKey(k) || layerNew.mapKey(k.replace(/~\d+$/, '')) })));
+  }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })));
   checks += want.length;
   res.forEach(k => { bad++; issues.push(key + ': орган ' + k + ' не найден'); });
   // 2. Числа старта.
