@@ -2026,7 +2026,10 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
      находят проверки: свой тег и общие имена шапки платформы. */
   nav, header, .site-header, #site-nav,
   .dock, .side, .graph-tools, .wrench, .picker, .modal, .toast,
-  #pult, .cv-mode, .side-arrow, .kbd, .mkbd { display: none !important; }
+  #pult, .cv-mode, .side-arrow, .kbd, .mkbd,
+  /* Редизайн 10.2026: шапка модели, панель холста и колонки на лист не идут. */
+  .mhead, .cv-bar, .col-cond, .col-answer { display: none !important; }
+  .cv-col, .cv-card { display: block !important; padding: 0 !important; border: none !important; background: #fff !important; height: auto !important; }
   .app { display: block !important; height: auto !important; }
   .stage, .graph-wrap {
     display: block !important; width: 100% !important; height: auto !important;
@@ -2357,3 +2360,107 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   border: none; border-bottom: 1px dashed var(--border); border-radius: 0;
 }
 .title-edit input[type="text"]:focus { outline: none; border-bottom-color: var(--accent); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   РЕДИЗАЙН 10.2026 · КАРКАС (фаза 5а; README, разделы 3, 5, 7)
+   Шапка модели 56 сверху на всю ширину, под ней три колонки: «Условие»,
+   холст, «Ответ». Колонки не сворачиваются: вместо этого «Развернуть
+   график» (пункт (в) закрытого списка). Узлы сцен и их id переехали в
+   колонки как есть; вид компонентов меняют следующие фазы.
+   Размеры: окно ≥ 1400 — колонки 336 и 348 (плюс граница 1), 1240–1399 —
+   304 и 316; холст забирает остаток. SVG = колонка − 22 по ширине и
+   колонка − 22 − 44 (панель холста) по высоте: при 1440×760 это 732×590.
+   ═══════════════════════════════════════════════════════════════════ */
+.app {
+  display: grid;
+  grid-template-columns: 337px minmax(0, 1fr) 349px;
+  grid-template-rows: 56px minmax(0, 1fr);
+  height: calc(100vh - 48px); overflow: hidden; background: var(--bg);
+}
+@media (max-width: 1399px) { .app { grid-template-columns: 305px minmax(0, 1fr) 317px; } }
+body.cv-focus .app { grid-template-columns: 0 minmax(0, 1fr) 0; }
+body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
+
+/* Шапка модели */
+.mhead {
+  grid-column: 1 / -1; grid-row: 1; min-width: 0;
+  display: flex; align-items: center; gap: 10px; padding: 0 14px 0 10px;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+  position: relative; z-index: var(--z-float);
+}
+.mh-gap { flex: 1 1 auto; }
+.mh-sep { width: 1px; height: 26px; background: var(--border); flex: 0 0 1px; }
+.mh-btn {
+  display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px;
+  border-radius: var(--r); border: 1px solid transparent; background: transparent; color: var(--text);
+  font: inherit; font-size: 14.5px; font-weight: 500; white-space: nowrap; cursor: pointer;
+}
+.mh-btn svg, .mh-icon svg { width: 18px; height: 18px; flex: 0 0 18px; }
+.mh-quiet:hover { background: var(--chip-bg); }
+.mh-outline { background: var(--surface); border-color: var(--border-strong); }
+.mh-outline:hover { background: var(--chip-bg); }
+.mh-main { background: var(--btn-bg); color: var(--on-btn); font-weight: 600; }
+.mh-main:hover { filter: brightness(1.08); }
+.mh-icon {
+  width: 36px; height: 36px; display: grid; place-items: center; border-radius: var(--r);
+  border: 0; background: transparent; color: var(--text2); cursor: pointer;
+}
+.mh-icon:hover:not(:disabled) { background: var(--chip-bg); color: var(--text); }
+.mh-icon:disabled { opacity: .35; cursor: default; }
+.mh-switch {
+  display: inline-flex; flex-direction: column; align-items: flex-start; gap: 1px; min-width: 0;
+  padding: 4px 8px; border: 0; border-radius: var(--r); background: transparent; color: var(--text);
+  font: inherit; cursor: pointer; text-align: left;
+}
+.mh-switch:hover, .mh-switch[aria-expanded="true"] { background: var(--chip-bg); }
+.mh-block { font-size: 12px; font-weight: 500; color: var(--text3); line-height: 1.2; }
+.mh-name { display: inline-flex; align-items: center; gap: 4px; font-size: 17px; font-weight: 600; line-height: 1.25; max-width: 360px; }
+.mh-name .side-scene { font: inherit; color: inherit; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; }
+.mh-name svg { width: 16px; height: 16px; flex: 0 0 16px; color: var(--text2); }
+.mh-saved { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text3); white-space: nowrap; }
+.mh-saved svg { width: 14px; height: 14px; color: var(--accent); }
+.mhead button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+
+/* Колонки «Условие» и «Ответ» */
+.app > .side { width: auto; min-width: 0; flex: none; transition: none; }
+#tools-panel { grid-column: 1; grid-row: 2; }
+#params-panel { grid-column: 3; grid-row: 2; }
+.col-head { padding: 12px 10px 10px 16px; display: flex; align-items: center; justify-content: space-between; }
+.col-head h2 { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.3; color: var(--text); }
+.col-sub { margin: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.sec-head { margin: 0; padding: 0 0 8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.sec-head span { display: inline-flex; align-items: center; gap: 8px; }
+.sec-head .sec-ico { width: 18px; height: 18px; color: var(--text2); }
+.app .fold-body { display: block; }
+
+/* Колонка холста: поля 10 на фоне страницы, карточка с рамкой и радиусом 12,
+   сверху панель 44. */
+.cv-col { grid-column: 2; grid-row: 2; min-width: 0; min-height: 0; padding: 10px; display: flex; background: var(--bg); }
+.cv-card {
+  position: relative; flex: 1 1 auto; min-width: 0; min-height: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--canvas); border: 1px solid var(--border); border-radius: 12px;
+}
+.cv-bar {
+  flex: 0 0 44px; height: 44px; display: flex; align-items: center; gap: 4px; padding: 0 8px;
+  background: var(--surface); border-bottom: 1px solid var(--border-soft); position: relative; z-index: var(--z-float);
+}
+.cv-gap { flex: 1 1 auto; }
+.cv-zoom { font-size: 13px; font-weight: 500; color: var(--text2); min-width: 46px; text-align: right; font-variant-numeric: tabular-nums; }
+.cv-bar .gt-btn {
+  position: static; width: auto; min-width: 32px; height: 32px; padding: 0 8px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 0; border-radius: var(--r); background: transparent; color: var(--text2); box-shadow: none; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 500;
+}
+.cv-bar .gt-btn:hover { background: var(--chip-bg); color: var(--text); }
+.cv-bar .gt-btn[aria-expanded="true"], .cv-bar .gt-btn[aria-pressed="true"] { background: var(--chip-bg); color: var(--text); }
+.cv-bar .gt-btn svg { width: 18px; height: 18px; }
+.cv-bar .gt-btn.is-off { visibility: visible; opacity: 1; }
+.cv-card > .graph-wrap { flex: 1 1 auto; min-width: 0; min-height: 0; border-radius: 0; }
+/* «Вид графика» — окно у своей кнопки, над холстом (вне #graph-wrap). */
+.cv-card > .wrench { top: 48px; right: 8px; }
+.col-head h2 { flex: 1 1 auto; text-align: left; }
+/* «Параметры» без единого ползунка не показываются: нечего показать — секции нет. */
+#sec-params:not(:has(#params-body input, #params-body button)) { display: none; }

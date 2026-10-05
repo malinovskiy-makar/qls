@@ -114,6 +114,12 @@ function dockActive(id, on) {
    полосы со стрелкой — график при этом становится шире, поэтому после
    анимации ширины его надо перерисовать (этим занимается ResizeObserver). */
 function setSideOpen(panelId, btnId, open) {
+  /* Редизайн 10.2026: колонки «Условие» и «Ответ» не сворачиваются (их место
+     занял «Развернуть график», пункт (в) закрытого списка). Функция осталась:
+     её зовут приборы и прежние места кода, а поля формул после показа колонки
+     по-прежнему надо собрать. */
+  if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+  return;
   const p = document.getElementById(panelId);
   if (p) {
     p.classList.toggle('collapsed', !open);
@@ -244,10 +250,10 @@ function syncAnalyticsPanel() {
   if (expl) expl.classList.toggle('hidden', !hasExplain);
   const body = document.getElementById('params-body');
   const hasKnobs = !!body && !!body.querySelector('input, select, button');
-  const empty = document.getElementById('params-empty');
-  if (empty) empty.style.display = (hasKnobs || !(hasValues || hasExplain)) ? 'none' : '';
-  const panel = document.getElementById('params-panel');
-  if (panel) panel.classList.toggle('empty', !(hasKnobs || hasValues || hasExplain));
+  /* Редизайн 10.2026: колонка «Ответ» на экране всегда (пустая колонка — это
+     пустой «Ответ», а не пропавшая панель); пустого состояния «Ползунков нет»
+     больше нет вовсе (пункт (л) закрытого списка). */
+  void hasKnobs;
 }
 
 /* ── Панель ввода: список карточек (Фаза 5) ──────────────────────────
@@ -264,6 +270,8 @@ const FOLD_CHEVRON = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" st
 
 // Имена для секций, у которых своего заголовка в разметке нет.
 const SECTION_NAMES = {
+  'sec-tax': 'Вмешательство государства',
+  'sec-params': 'Параметры',
   'sec-costs': 'Фирма',
   'sec-labor': 'Рынок труда',
   'sec-inequality': 'Неравенство доходов',
@@ -319,11 +327,36 @@ function sectionIcon(secId) {
        + 'stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
 }
 
+/* ⚠️ РЕДИЗАЙН 10.2026: КАРТОЧКИ БОЛЬШЕ НЕ СВОРАЧИВАЮТСЯ (пункт (д) закрытого
+   списка). Скелет «заголовок + тело» остаётся (на нём стоят селекторы
+   `:scope > .fold-body` по всему коду), но заголовок — просто заголовок, а не
+   кнопка, и тело раскрыто всегда: колонка «Условие» прокручивается целиком. */
 function cardifySections() {
   document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     if (sec._card) return;
     sec._card = true;
-    sec.classList.add('card');
+    sec.classList.add('card', 'open-card');
+    if (!sec.querySelector(':scope > .section-title')) {
+      const vs = sec.querySelector(':scope > .vsub');
+      if (vs) { vs.classList.add('section-title'); vs.classList.remove('vsub'); }
+    }
+    const title0 = sec.querySelector(':scope > .section-title');
+    const name0 = (title0 ? title0.textContent.trim() : '') || SECTION_NAMES[sec.id] || 'Настройки';
+    const body0 = document.createElement('div');
+    body0.className = 'fold-body open';
+    body0.id = (sec.id || 'sec') + '-fold';
+    const h = document.createElement('h3');
+    h.className = 'sec-head';
+    h.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+    h.querySelector('span > b').textContent = name0;
+    if (title0) title0.remove();
+    while (sec.firstChild) body0.appendChild(sec.firstChild);
+    sec.appendChild(h);
+    sec.appendChild(body0);
+  });
+  syncFirstCard();
+  if (cardifySections._legacy !== true) return;
+  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     const had = sec.querySelector(':scope > .fold-btn');
     if (had) {                                   // складной заголовок уже был
       had.setAttribute('aria-expanded', 'false');
@@ -374,6 +407,7 @@ function cardifySections() {
    ⚠️ Прибор, считающий что-либо на экране, обязан раскрывать карточки САМ —
    правило записано в calc2/CLAUDE.md, и теперь оно касается обеих панелей. */
 function collapseCards() {
+  return;   // редизайн 10.2026: карточки не сворачиваются (пункт (д))
   document.querySelectorAll('#tools-panel .tools-body > .section, #params-panel .side-part')
     .forEach(sec => {
       const btn = sec.querySelector(':scope > .fold-btn');
@@ -404,6 +438,9 @@ function syncLabelSizeSeg() {
 function openSection(secId) {
   const sec = document.getElementById(secId);
   if (!sec) return;
+  // Редизайн 10.2026: раскрывать нечего, секция всегда открыта; показываем её.
+  if (secId !== 'sec-input' && sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest' });
+  return;
   const btn = sec.querySelector(':scope > .fold-btn');
   const box = sec.querySelector(':scope > .fold-body');
   if (btn) btn.setAttribute('aria-expanded', 'true');
@@ -468,7 +505,8 @@ function syncFirstCard() {
 }
 
 function wireScene() {
-  const rst = document.getElementById('btn-scene-reset');
+  // «Сбросить» в шапке модели (пункт (и): прежняя «Вернуть исходный вид»).
+  const rst = document.getElementById('btn-model-reset');
   if (rst) rst.addEventListener('click', resetCurrentScene);
 
   const tools = document.getElementById('tools-panel');
@@ -639,7 +677,7 @@ function resetCurrentScene() {
 
 function setWrenchOpen(open) {
   const pop = document.getElementById('wrench-pop');
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   if (!pop) return;
   pop.classList.toggle('open', open);
   if (btn) { btn.classList.toggle('on', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
@@ -1724,7 +1762,7 @@ function wireHintButtons() {
 }
 
 function wireWrench() {
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   const pop = document.getElementById('wrench-pop');
   if (btn) btn.addEventListener('click', (e) => {
     e.stopPropagation();

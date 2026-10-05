@@ -617,8 +617,12 @@ function syncPultRegulators(activeIds) {
        (applyIntervCascade), поэтому display здесь не трогаем: иначе лента
        показала бы поле, которое каскад только что спрятал. */
     if (PULT_STAY_HOME.has(id)) { upgradeRegulator(n); return; }
-    if (!body) return;
-    if (n.parentElement !== body) body.appendChild(n);
+    /* ⚠️ РЕДИЗАЙН 10.2026: РЕГУЛЯТОР ОСТАЁТСЯ НА МЕСТЕ (пункт (з)). Пульт больше
+       не переносит его в правую панель: ползунок стоит рядом со своим смыслом
+       в «Условии». Отключён ТОЛЬКО перенос: снять спрятанность и довести
+       регулятор (границы на дорожке, точный ввод, число с запятой) — как
+       раньше, иначе 16 регуляторов потеряли бы доводку (CODE_NOTES 13.1). */
+    void body;
     n.style.display = '';
     upgradeRegulator(n);
   });
@@ -978,7 +982,7 @@ function buildIneqMasterChip(box) {
 function showPult(on) {
   const panel = document.getElementById('params-panel');
   if (!panel) return;
-  const empty = document.getElementById('params-empty');
+  const empty = null;   // «Ползунков нет» убрано (пункт (л))
   if (!on) {
     syncPultRegulators([]);   // все узлы — домой
     const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
