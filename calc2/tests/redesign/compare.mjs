@@ -16,6 +16,7 @@
    Код возврата 0 — всё сошлось, 1 — есть расхождения (список печатается).  */
 import fs from 'fs';
 import path from 'path';
+import { fateOf } from './fates.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf('--' + k); return i >= 0 ? argv[i + 1] : d; };
@@ -204,6 +205,10 @@ for (const key of files) {
     if (!t) { issues.push('шаг ' + id + ': не выполнен'); return; }
     if (t.error) { issues.push('шаг ' + id + ': ' + t.error); return; }
     if (s.effect !== 'model' && s.effectVsOpener !== 'model') return;   // вид, а не модель: судьба органа решается в PARITY
+    /* Органы, заменённые по закрытому списку видом рабочего места (в — колонки,
+       г — окно выбора, д — карточки, к — кнопки экспорта): их шаг меняет
+       раскладку, а не модель, и его паритет — судьба в PARITY.md. */
+    if (s.path.some(k => { const f = fateOf(k); return f.fate !== 'на месте' && /^[вгдк]$/.test(f.letter); })) return;
     const st0 = stateAfter(b.start.state, s.state), st1 = stateAfter(c.start.state, t.state);
     n++; const d1 = whereDiff(st0, st1, 1e-9); if (d1) issues.push('шаг ' + id + ' STATE' + d1);
     n++; const d2 = whereDiff(s.windows || b.start.windows, t.windows || c.start.windows, 1e-9); if (d2) issues.push('шаг ' + id + ' окна' + d2);

@@ -16,43 +16,7 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PKG = path.resolve(HERE, '../../../claude/mockups/calc2_redesign_20261004');
 const BASE = process.argv.includes('--base') ? path.resolve(process.argv[process.argv.indexOf('--base') + 1]) : path.join(HERE, 'baseline');
 
-/* Закрытый список (COVERAGE.md, раздел 0, п. 2). */
-const LETTERS = {
-  'а': '12 кнопок «Построить» → поля применяются при наборе',
-  'б': 'переключатели подрежимов → отдельные модели, переход переключателем модели',
-  'в': 'сворачивание боковых панелей и корешки → «Развернуть график»',
-  'г': 'двухуровневое окно выбора → экран выбора одним экраном',
-  'д': 'сворачивание карточек-секций → секции всегда раскрыты, колонка прокручивается',
-  'е': 'общая галочка «Показать излишки» в гаечном ключе → отдельные галочки CS и PS в «Показать на графике»',
-  'ж': 'галочка видимости кривой в списке → глаз в карточке функции',
-  'з': 'перенос регуляторов в правую панель → регулятор рядом со своим смыслом в «Условии»',
-  'и': '«Вернуть исходный вид» → «Сбросить»; гаечный ключ → «Вид графика»',
-  'к': 'три кнопки окна экспорта → выбор формата и одна кнопка «Скачать …»',
-  'л': 'пустое состояние «Ползунков в этой модели нет» (без замены)',
-  'м': 'сегмент из одной кнопки «Квота» (без замены)',
-};
-
-const CHECK = 'snapshot.mjs (layer new) + compare.mjs';
-/* [выражение по ключу органа, судьба, буква, чем заменён, чем проверено] */
-const FATES = [
-  [/^#(btn-(d3|kink|costs|cparts|pl|prod|ppf|ppfsum|ppft|tb)-apply|ineq-(incomes|formula)-apply)$/, 'заменён', 'а', 'набор в поле над кнопкой применяется сам (живое применение)', 'formula_input_probe.mjs (расширенный) + compare.mjs: шаг «набор» без нажатия'],
-  [/^#(costs-seg|mono-submode|labor-seg|macro-seg|math-seg|ppf-seg)\b/, 'заменён', 'б', 'переключатель модели в шапке', 'snapshot.mjs: все 44 ключа открываются'],
-  [/^#(tools-toggle|params-toggle)$/, 'заменён', 'в', '«Развернуть график» в панели холста', 'compare.mjs: шаг «Развернуть график»'],
-  [/^#scene-picker|picker-|^#pgrid-|\.scard|\.bcard/, 'заменён', 'г', 'экран выбора одним экраном (поиск, блоки, «Продолжить»)', 'snapshot.mjs: все 44 ключа, ручная приёмка п. 1'],
-  [/fold-btn|^#(sb-btn|ex-btn|marks-btn|areascalc-btn)$/, 'заменён', 'д', 'секции всегда раскрыты, колонка прокручивается', 'compare.mjs: органы секции видны без раскрытия'],
-  [/^#chk-areas$/, 'заменён', 'е', 'галочки #chk-cs и #chk-ps в «Показать на графике»', 'compare.mjs: шаги CS/PS'],
-  [/^#curve-list>input(\[\d+\])?$/, 'заменён', 'ж', 'глаз в карточке функции (.fc-eye)', 'compare.mjs: шаг «глаз»'],
-  [/^#btn-scene-reset$/, 'заменён', 'и', '«Сбросить» в шапке модели (#btn-model-reset)', 'compare.mjs: шаг «Сбросить» + история'],
-  [/^#btn-wrench$/, 'заменён', 'и', '«Вид графика» в панели холста (#btn-view)', 'compare.mjs: органы «Вида графика»'],
-  [/^#exp-(png|tex|pdf)$/, 'заменён', 'к', 'выбор формата и кнопка «Скачать …» (#exp-go)', 'export_audit.mjs + compare.mjs'],
-  [/^#params-empty/, 'убран', 'л', '', 'compare.mjs: элемента нет'],
-  [/^#seg-quota$/, 'убран', 'м', '', 'compare.mjs: в «Квотах» сегмента нет, квота задаётся ползунком'],
-];
-function fateOf(key) {
-  const k = key.replace(/^mf:/, '');
-  for (const [re, fate, letter, by, check] of FATES) if (re.test(k)) return { fate, letter, by, check };
-  return { fate: 'на месте', letter: '', by: '', check: CHECK };
-}
+import { LETTERS, CHECK, FATES, fateOf } from './fates.mjs';
 
 const rows = [];
 const nofate = [];

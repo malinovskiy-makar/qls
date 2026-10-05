@@ -167,7 +167,13 @@ function moveExplanations() {
   /* ⚠️ В КЛЮЧЕ ЕЩЁ И ВИД ВМЕШАТЕЛЬСТВА. Пояснение под ползунком переехало
      сюда (01.09), а вид вмешательства меняется БЕЗ смены сцены: с одним
      только именем сцены абзац «про потолок» остался бы висеть у пола. */
+  /* ⚠️ И САМА МОДЕЛЬ, А НЕ ТОЛЬКО БАЗОВАЯ СЦЕНА (редизайн 10.2026, фаза 1).
+     Тексты разбора у моделей одной семьи свои (SCENE_EXPLAIN: labor и
+     labor-mono, consumer и cons-slutsky), а базовая сцена у них одна: после
+     «Рынка труда» «Монопсония» показывала чужой разбор, и модель открывалась
+     по-разному в зависимости от того, что открывали до неё. */
   const scene = String(STATE.mode) + '|' + (typeof baseScene === 'function' ? baseScene() : '')
+              + '|' + String(STATE.sceneKey || '')
               + '|' + (typeof intervHintKey === 'function' ? intervHintKey() : '');
   const changed = (typeof panelsChangedSinceLastPass === 'function') ? panelsChangedSinceLastPass() : true;
   if (!changed && to._explainFor === scene && to.children.length) return;
