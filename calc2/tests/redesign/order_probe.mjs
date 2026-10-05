@@ -132,7 +132,7 @@ for (const key of order) {
   const pick = (list) => list.find(x => x.key === c.key) || list.filter(x => pat.test(x.key))[0];
   const ca = pick(after.controls), cb = pick(back.controls);
   const sameCtl = JSON.stringify(ca && ca.props) === JSON.stringify(cb && cb.props);
-  const diff = Object.keys(after.state).filter(k => JSON.stringify(after.state[k]) !== JSON.stringify(back.state[k]) && !/crosses|viewDirty/.test(k));
+  const diff = Object.keys(after.state).filter(k => JSON.stringify(after.state[k]) !== JSON.stringify(back.state[k]) && !/crosses|viewDirty|legendSpot|Sig$/.test(k));   // подписи кэшей и место легенды — не входы
   const ab = after.answer.blocks || [], bb = back.answer.blocks || [];
   // Значения сравниваются без пробелов: KaTeX набирает «(105; 0)» как «(105;0)».
   const norm = (b) => b ? JSON.stringify(b).replace(/\s|\\u200b|\u200b/g, '') : '';
