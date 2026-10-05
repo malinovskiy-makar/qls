@@ -538,6 +538,11 @@ function plural(n, forms) {
 function pickScene(key) {
   // П51: уходя из модели, кладём её состояние на полку — вернёмся, достанем.
   if (STATE.sceneKey && STATE.sceneKey !== key) saveSceneSnapshot(STATE.sceneKey);
+  /* Канонический старт (89-model-state.js): все входы — и в STATE, и в форме —
+     возвращаются к свежей странице, и только потом маршрут ставит обстановку
+     модели. Без этого 22 маршрута, которые лишь переключают режим, наследовали
+     входы своей семьи от модели, открытой раньше. */
+  if (typeof restorePristine === 'function') restorePristine();
   resetDecor();           // П20: новая модель начинается с чистого состояния
   STATE.zoomLock = false; // и своего масштаба, а не унаследованного от колеса
   if (typeof resetPanelWins === 'function') resetPanelWins();   // и окон её панелей

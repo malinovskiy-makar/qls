@@ -4152,6 +4152,10 @@ function saveSceneSnapshot(key) {
   SNAPSHOT_KEYS.forEach(k => { snap[k] = STATE[k]; });
   snap._view = { Qmin: CONFIG.Qmin, Qmax: CONFIG.Qmax, Pmin: CONFIG.Pmin, Pmax: CONFIG.Pmax };
   snap._counters = { mark: markCounter, area: areaCalcCounter };
+  /* Полные входы модели (89-model-state.js): вход в модель теперь сбрасывает
+     всё к чистому старту, поэтому память обязана хранить и то, что раньше
+     переживало уход только потому, что его никто не сбрасывал. */
+  if (typeof captureMemory === 'function') snap._full = captureMemory();
   _sceneSnaps[key] = snap;
 }
 
@@ -4164,6 +4168,7 @@ function restoreSceneSnapshot(key) {
     CONFIG.Pmin = snap._view.Pmin; CONFIG.Pmax = snap._view.Pmax;
   }
   if (snap._counters) { markCounter = snap._counters.mark; areaCalcCounter = snap._counters.area; }
+  if (snap._full && typeof applyMemory === 'function') applyMemory(snap._full);
   if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
   // Способ ввода издержек — часть обстановки модели, поэтому его переключатель
   // и поля надо вернуть в согласие с восстановленным состоянием (Б24).

@@ -42,6 +42,9 @@ const JOBS = +arg('jobs', '4');
 const W = +arg('width', '1324'), H = +arg('height', '638');
 const layer = await import(path.join(HERE, 'layer_' + LAYER + '.mjs'));
 const INPAGE = fs.readFileSync(path.join(HERE, 'inpage.js'), 'utf8');
+/* Повтор: новый экран проходит РОВНО шаги базового снимка (а не открывает
+   органы заново), иначе сравнивать было бы нечего. --replay <папка снимка>. */
+const REPLAY = arg('replay', '');
 
 /* ── Браузер и страница ─────────────────────────────────────────────── */
 async function fresh(browser, theme) {
@@ -222,6 +225,9 @@ async function clickHandle(page, el) {
 /* Привести орган в другое значение так, как это сделал бы человек.
    Возвращает описание действия или бросает исключение «не найден». */
 async function act(page, c, sceneKey) {
+  // Слой нового экрана сам выполняет действие над органом, заменённым по
+  // закрытому списку (например, «Построить» → набор уже применён).
+  if (layer.actOverride) { const r = await layer.actOverride(page, c, sceneKey); if (r != null) return r; }
   const el = await handleOf(page, layer.mapKey(c.key));
   if (!el) throw new Error('орган не найден: ' + c.key);
   const k = c.kind;
@@ -382,7 +388,15 @@ async function snapKey(browser, key) {
 
   // Сценарий правок.
   rec.steps = [];
-  if (!flag('no-steps')) {
+  if (REPLAY && !flag('no-steps')) {
+    const bl = JSON.parse(fs.readFileSync(path.join(REPLAY, key + '.json'), 'utf8'));
+    const desc = (k) => (bl.controls || []).find(c => c.key === k) || (bl.inventory && bl.inventory[k] ? { key: k, ...bl.inventory[k] } : null);
+    for (const st of bl.steps || []) {
+      const pathCtl = st.path.map(desc);
+      if (pathCtl.some(x => !x)) { rec.failures.push(key + ' · ' + st.path.join(' → ') + ': нет описания органа в снимке'); continue; }
+      await runStep(browser, key, start, pathCtl, rec, 9);
+    }
+  } else if (!flag('no-steps')) {
     const list = kbdFamily(start.controls.filter(c => steppable(c, start.controls)));
     for (const c of list) {
       await runStep(browser, key, start, [c], rec);
@@ -457,9 +471,13 @@ async function runStep(browser, key, start, pathCtl, rec, depth = 1, parent = nu
     rec.steps.push(step);
     await f.ctx.close();
     // Второй уровень: орган открыл меню, окно или редактор — правим то, что открылось.
-    if (depth === 1 && cd.revealed.length && step.effect !== 'model') {
-      const subs = kbdFamily(cd.revealed.filter(c => steppable(c, cd.revealed)));
-      for (const s of subs) await runStep(browser, key, start, [...pathCtl, s], rec, 2, o);
+    /* Третий уровень — только внутрь окна (.modal): конструктор кусочной
+       функции открывается из меню поля («?» → «Собрать кусочную функцию»). */
+    const subOk = (c) => depth === 1 || (depth === 2 && /^#(pw|export|ff)-|modal/.test(c.section || ''));
+    if (depth <= 2 && cd.revealed.length && step.effect !== 'model') {
+      const fresh_ = parent ? controlsDiff(parent.controls, o.controls).revealed : cd.revealed;
+      const subs = kbdFamily(fresh_.filter(c => steppable(c, fresh_) && subOk(c)));
+      for (const s of subs) await runStep(browser, key, start, [...pathCtl, s], rec, depth + 1, o);
     }
   } catch (e) {
     step.error = String(e.message || e).slice(0, 300);

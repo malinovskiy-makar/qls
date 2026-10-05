@@ -68,6 +68,17 @@
 
 Логи: `reports/calc2_redesign/before/` (не в git).
 
+**Остальные 34 прибора с кодом возврата** (одна пачка, `reports/calc2_redesign/before_rest/`): зелёные 24 —
+`check_font_scale`, `eq_title_audit`, `interv_baseline_probe`, `interv_phase2..5_probe`, `labels_audit`,
+`night_panel_check`, `night_phase11_ring_probe`, `night_phase3_reset_probe`, `night_phase6_areas_probe`,
+`night_phase7_input_probe`, `night_phase8_labels_probe`, `overlap_audit`, `pct_tax_probe`, `phase1_forcepan_probe`,
+`phase1_notbroken_probe`, `phase2_ktv_piecewise_probe`, `phase4_empty_field_probe`, `phase5_hint_hover_probe`,
+`priyomka31_probe`, `quadrant_probe`, `title_audit`. **Были красными до** (10): `final_fn_probe` (S до 220 вместо 180:
+старое правило, отменённое 31.08), `interv_phase1_probe` (акциз t=20: ждёт числа потоварного налога, прибор старше
+ADR 0018), `night_phase10_elabel_probe`, `night_phase5_tax_probe` (список сцен вмешательства), `night_phase9_sliders_probe`
+(левый край дорожек — та же карточка Notion, что `calc2_blocks`), `panel_audit`, `pdf_probe` (503: нет `pdflatex`),
+`phase3_kink_keypoint_probe`, `phase5_coord_prefix_probe`, `priyomka_probe` (запись КПВ набрана не KaTeX).
+
 ## Фазы
 | Фаза | Статус | Коммит |
 |---|---|---|

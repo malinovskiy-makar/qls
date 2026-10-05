@@ -80,7 +80,9 @@
     (STATE.panels || []).forEach(p => {
       try {
         const w = viewWindow(p.id);
-        out.panels[p.id] = { x0: num(w.x0), x1: num(w.x1), y0: num(w.y0), y1: num(w.y1) };
+        // px — размер панели в пикселях: по нему считается допуск геометрии (0,002 px).
+        out.panels[p.id] = { x0: num(w.x0), x1: num(w.x1), y0: num(w.y0), y1: num(w.y1),
+                             px: [Math.round(p.x1 - p.x0), Math.round(p.y1 - p.y0)] };
       } catch (e) { out.panels[p.id] = 'ошибка'; }
     });
     return out;
