@@ -28,6 +28,14 @@ function checkGuess(answer, truth) {
   return Math.abs(a - b) <= Math.max(0.011, 0.0005 * Math.abs(b));
 }
 
+// Текст узла без невидимой половины KaTeX (calc2/CLAUDE.md, ловушки).
+function selfText(el) {
+  if (!el) return '';
+  const c = el.cloneNode(true);
+  c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove());
+  return c.textContent.replace(/\s+/g, ' ').trim();
+}
+
 function selfKey() { return (typeof modelKeyOf === 'function' ? modelKeyOf(STATE.sceneKey) : STATE.sceneKey) || ''; }
 
 function setSelfMode(on) {
@@ -48,7 +56,7 @@ function selfCell(cell, idx) {
   const id = k + '#' + idx;
   let box = cell.querySelector(':scope > .self-box');
   const val = cell.querySelector('.ans-val');
-  const truth = val ? (val.textContent || '').trim() : '';
+  const truth = selfText(val);
   const numeric = selfNum(truth) != null;
   const opened = SELF.all || SELF.open[id] || !numeric;
   cell.classList.toggle('self-hidden', SELF.on && !opened);
@@ -72,7 +80,7 @@ function selfCell(cell, idx) {
     inp.classList.toggle('is-ok', v === true); inp.classList.toggle('is-bad', v === false);
   };
   const check = () => {
-    const cur = (cell.querySelector('.ans-val') || {}).textContent || '';
+    const cur = selfText(cell.querySelector('.ans-val'));
     const r = checkGuess(inp.value, cur);
     if (r == null) { toast('Впишите число, можно с запятой'); return; }
     SELF.verdict[id] = r; paintVerdict(); selfAfterAnswer();
@@ -96,7 +104,7 @@ function selfAfterAnswer() {
   if (!cells.length) return;
   const done = cells.every((c, i) => {
     const id = k + '#' + i;
-    const truth = ((c.querySelector('.ans-val') || {}).textContent || '').trim();
+    const truth = selfText(c.querySelector('.ans-val'));
     return SELF.open[id] || SELF.verdict[id] === true || selfNum(truth) == null;
   });
   if (done) {
@@ -128,15 +136,23 @@ function selfCanvas() {
   const chart = document.getElementById('chart');
   if (!chart) return;
   const heroes = [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => ({
-    not: ((c.querySelector('.ans-not') || {}).textContent || '').replace(/\s+/g, '').trim(),
-    v: selfNum(((c.querySelector('.ans-val') || {}).textContent || '').trim()),
+    not: selfText(c.querySelector('.ans-not')).replace(/\s+/g, ''),
+    v: selfNum(selfText(c.querySelector('.ans-val'))),
   })).filter(h => h.v != null);
+  const yName = String(STATE.axisYDefault || 'P').charAt(0), xName = String(STATE.axisXDefault || 'Q').charAt(0);
+  const svgBox = chart.getBoundingClientRect();
   chart.querySelectorAll('text.coord-num').forEach(t => {
-    // Подпись может нести индекс («60_b»): число — её начало.
-    const m = /^\s*(-?[\d\s\u202f.,\u2212]+)/.exec(t.textContent || '');
+    // Подпись может нести индекс («60_b», «40₁» — индекс отдельным узлом):
+    // число — первый узел текста.
+    const first = t.firstChild ? (t.firstChild.textContent || '') : '';
+    const m = /^\s*(-?[\d\s\u202f.,\u2212]+)/.exec(first);
     const v = m ? selfNum(m[1]) : null;
     if (v == null) return;
-    const h = heroes.find(x => Math.abs(x.v - v) <= Math.max(0.011, 0.0005 * Math.abs(x.v)));
+    // Ось подписи: у вертикальной оси подпись стоит левее поля графика.
+    const r = t.getBoundingClientRect();
+    const onY = (r.right - svgBox.left) < (CONFIG.margin ? CONFIG.margin.left + 2 : 60);
+    const near = heroes.filter(x => Math.abs(x.v - v) <= Math.max(0.011, 0.0005 * Math.abs(x.v)));
+    const h = near.find(x => x.not.charAt(0) === (onY ? yName : xName)) || near[0];
     t.textContent = h && h.not ? h.not : '?';
   });
   chart.querySelectorAll('g.cross-label text').forEach(t => { t.textContent = '(?; ?)'; });
