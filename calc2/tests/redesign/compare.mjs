@@ -138,6 +138,7 @@ function geomMatch(g0, g1, win0, issues, where) {
    этих пяти ключей не сверяются, а сверка печатает строку «исправлено». */
 const EXPLAIN_FIXED = { isoquant: 'costs', plants: 'costs', prod: 'costs', 'mono-d3': 'mono', 'tax-adv': 'tax' };
 let CUR_KEY = '';
+let REPLACED_TIPS = new Set();
 const noPx = (w) => JSON.parse(JSON.stringify(w || {}, (k, v) => k === 'px' ? undefined : v));
 const RESET_NOTES = [];
 function answerMatch(a0, a1, issues, where) {
@@ -169,7 +170,9 @@ function answerMatch(a0, a1, issues, where) {
     (a0.explain || []).forEach(p => { n++; if (!e1.includes(normText(p))) issues.push(where + ': абзац разбора пропал: «' + p.slice(0, 70) + '»'); });
   }
   const t1 = new Set((a1.tips || []).map(normText));
-  (a0.tips || []).forEach(t => { n++; if (!t1.has(normText(t))) issues.push(where + ': подсказка пропала: «' + t.slice(0, 70) + '»'); });
+  // Подсказки органов, заменённых или убранных по закрытому списку, ушли вместе
+  // с органом («Настройки координатной плоскости» у гаечного ключа и т. п.).
+  (a0.tips || []).forEach(t => { n++; if (!t1.has(normText(t)) && !REPLACED_TIPS.has(normText(t))) issues.push(where + ': подсказка пропала: «' + t.slice(0, 70) + '»'); });
   return n;
 }
 function answerAfter(start, d) {
@@ -184,7 +187,21 @@ function answerAfter(start, d) {
   if (d.tips) { const s = new Set(a.tips || []); d.tips.del.forEach(x => s.delete(x)); d.tips.add.forEach(x => s.add(x)); a.tips = [...s].sort(); }
   return a;
 }
-function stateAfter(start, d) { const s = Object.assign({}, start); Object.entries(d || {}).forEach(([k, v]) => { if (v === '∅') delete s[k]; else s[k] = v; }); return s; }
+/* Ключи состояния, которые описывают РАСКЛАДКУ, а не модель: выбранный угол
+   легенды (legendSpot) и место подписей касательной (tanTop, tanBot). Их
+   выбирает отрисовка по свободному месту холста, а холст на новом экране
+   другого размера и с другими соседями. Окно модели сверяется строго. */
+/* crosses — кэш нарисованных пересечений: то, что человек видит, сверяется
+   строже, ключевыми точками геометрии (keyTargets). Сам кэш старый код
+   держал непоследовательно: в «Производстве» смена сетки в гаечном ключе
+   стирала пересечение в начале координат, хотя на холсте оно оставалось. */
+const VIEW_KEYS = new Set(['legendSpot', 'tanTop', 'tanBot', 'crosses']);
+function stateAfter(start, d) {
+  const s = Object.assign({}, start);
+  Object.entries(d || {}).forEach(([k, v]) => { if (v === '∅') delete s[k]; else s[k] = v; });
+  VIEW_KEYS.forEach(k => delete s[k]);
+  return s;
+}
 
 /* ── Обход ─────────────────────────────────────────────────────────── */
 const files = fs.readdirSync(BASE).filter(f => f.endsWith('.json')).map(f => f.replace(/\.json$/, '')).filter(k => !KEYS.length || KEYS.includes(k)).sort();
@@ -195,6 +212,7 @@ for (const key of files) {
   const issues = [];
   let n = 0;
   const b = JSON.parse(fs.readFileSync(path.join(BASE, key + '.json'), 'utf8'));
+  REPLACED_TIPS = new Set((b.controls || []).filter(c => fateOf(c.key).fate !== 'на месте').map(c => normText(c.label)));
   const cp = path.join(CUR, key + '.json');
   if (!fs.existsSync(cp)) { report[key] = { n: 1, issues: ['нет снимка нового экрана'] }; total++; bad++; continue; }
   const c = JSON.parse(fs.readFileSync(cp, 'utf8'));
@@ -208,7 +226,7 @@ for (const key of files) {
   // свежая (обход подряд, order_probe), оно зависит от того, что было нарисовано
   // раньше. Модель оно не описывает; в --start-only не сверяется.
   if (START_ONLY) { delete b.start.state.legendSpot; delete c.start.state.legendSpot; }
-  n++; const ws = whereDiff(b.start.state, c.start.state, 1e-9); if (ws) issues.push('старт STATE' + ws);
+  n++; const ws = whereDiff(stateAfter(b.start.state, {}), stateAfter(c.start.state, {}), 1e-9); if (ws) issues.push('старт STATE' + ws);
   n++; const ww = whereDiff(noPx(b.start.windows), noPx(c.start.windows), 1e-9); if (ww) issues.push('старт окна' + ww);
   n += answerMatch(b.start.answer, c.start.answer, issues, 'старт');
   n += geomMatch(b.start.geometry, c.start.geometry, b.start.windows, issues, 'старт');
@@ -238,7 +256,7 @@ for (const key of files) {
        сбрасывалась память, а маршрут модели не повторялся). Шаг сверяется
        со стартом базового снимка, расхождение старого кода печатается. */
     if (s.path[s.path.length - 1] === '#btn-scene-reset') {
-      const was = whereDiff(stateAfter(b.start.state, s.state), b.start.state, 1e-9);
+      const was = whereDiff(stateAfter(b.start.state, s.state), stateAfter(b.start.state, {}), 1e-9);
       if (was) RESET_NOTES.push(CUR_KEY + ': старый «Вернуть исходный вид» давал не старт (STATE' + was.slice(0, 80) + '), «Сбросить» сверен со стартом');
       s = { path: s.path, effect: s.effect };
     }
