@@ -573,7 +573,7 @@ await t('заголовок верхнего уровня в панели оди
   };
   /* ПЕРЕНАЦЕЛЕНО (фаза 5а): карточки больше не сворачиваются, заголовок
      секции — h3.sec-head, а не складная кнопка; имя по макету «Функции». */
-  const head = document.querySelector('#sec-input > .sec-head');
+  const head = document.querySelector('#sec-input > .sec-head > span');
   const inner = document.querySelectorAll('#sec-input .section-title').length;
   if (!head) return 'у секции нет заголовка';
   if (own(head) !== 'Функции') return 'заголовок: ' + own(head);
