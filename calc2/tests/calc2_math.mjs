@@ -3258,7 +3258,12 @@ const CASES = [
           document.querySelectorAll('.fold-btn').forEach(function (b) {
             if (b.getAttribute('aria-expanded') !== 'true') b.click();
           });
-          var t = document.getElementById('sec-eq').querySelector('.section-title');
+          /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 6): заголовок группы результатов
+             стоит над главными числами «Ответа» (#ans-title, копия заголовка
+             табло); в табло он спрятан. Меряем видимый. */
+          if (typeof buildAnswer === 'function') { _answerSig = ''; buildAnswer(); }
+          var t = document.getElementById('ans-title');
+          if (!t || t.hidden) t = document.getElementById('sec-eq').querySelector('.section-title');
           var textNode = Array.prototype.filter.call(t.childNodes, function (n) { return n.nodeType === 3; })[0];
           var texSpan = t.querySelector('.tex');
           var range = document.createRange();
@@ -3521,7 +3526,8 @@ const CASES = [
        и ручка упиралась в левый край. */
     name: 'Четыре дефекта (в) правка формулы обнуляет сдвиг и центрирует ручку',
     run: `var chip = function () {
-            var ch = document.querySelector('#params-curves .pchip[data-cid="1"]');
+            // Ползунок сдвига стоит под карточкой своей кривой (фаза 5б): ищем по коробке пульта.
+            var ch = document.querySelector('.pchip[data-pult-box="params-curves"][data-cid="1"]');
             if (!ch) return { shift: NaN, pos: NaN };
             var sl = ch.querySelector('input[type=range]');
             var mn = parseFloat(sl.min), mx = parseFloat(sl.max), v = parseFloat(sl.value);
@@ -3537,7 +3543,7 @@ const CASES = [
           resetSceneMemory(); pickScene('sd'); redrawAll();
           var start = chip();
           // Сдвигаем на +20 ползунком — тем же путём, что и человек.
-          var sl = document.querySelector('#params-curves .pchip[data-cid="1"] input[type=range]');
+          var sl = document.querySelector('.pchip[data-pult-box="params-curves"][data-cid="1"] input[type=range]');
           sl.value = '20'; sl.dispatchEvent(new Event('input', { bubbles: true }));
           var shifted = chip();
           // Переписываем формулу: свободный член меняется со 120 на 50.
@@ -4733,10 +4739,12 @@ const CASES = [
           open('curve-expr-1');
           var back = PW.rows.map(function (r) { return r.f + '|' + r.a + '|' + r.b; }).join(' ; ');
           closePiecewise();
-          return { midDefault: (mid === '100 - Q') ? 1 : 0,
+          /* ПЕРЕНАЦЕЛЕНО (README макета 6.6): конструктор у обычной формулы
+             начинает с ЭТОЙ формулы двумя кусками; в чужом поле (S = Q) — Q. */
+          return { midDefault: (mid === 'Q') ? 1 : 0,
                    back: back,
                    ok: (back === '90 - Q|0|30 ; 60 - 0.5*Q|30|') ? 1 : 0 };`,
-    checks: [['чужое поле показало значения по умолчанию (флаг)', 'midDefault', 1, 0],
+    checks: [['чужое поле показало свою формулу, а не чужие куски (флаг)', 'midDefault', 1, 0],
              ['разбор вернул те же два куска (флаг)', 'ok', 1, 0]],
   },
   {
@@ -4943,7 +4951,8 @@ const CASES = [
     run: `resetSceneMemory(); pickScene('sdsum');
           sumSetCount('D', 3); sumSetCount('S', 2); redrawAll();
           if (typeof updatePult === 'function') updatePult();
-          var chips = [].slice.call(document.querySelectorAll('#params-curves .pchip'));
+          // Ползунки сдвига стоят под карточками групп (фаза 5б): ищем по коробке пульта.
+          var chips = [].slice.call(document.querySelectorAll('.pchip[data-pult-box="params-curves"]'));
           var cut = 0, seen = {}, dupText = 0, bright = 0;
           var lum = function (c) { var f = c.map(function (x) { x /= 255;
             return x <= 0.03928 ? x/12.92 : Math.pow((x+0.055)/1.055, 2.4); });

@@ -85,11 +85,13 @@ const ANSWER_GROUP = {
 function heroLabel(t) {
   const s = String(t || '').replace(/\u200b/g, '').trim();
   const cap = (x) => x ? x.charAt(0).toUpperCase() + x.slice(1) : x;
-  let m = /^([A-Za-zА-Яа-я][^\s()]{0,7})\s*\((.+)\)$/.exec(s);
+  // «Q∗ (количество)»: обозначение, ПРОБЕЛ, слова в скобках. «f(x0)» — запись
+  // функции, а не подпись со словами: её не режем.
+  let m = /^([A-Za-zА-Яа-я][^\s()]{0,7})\s+\((.+)\)$/.exec(s);
   if (m && /[A-Za-z]/.test(m[1])) return { caption: cap(m[2].trim()), not: m[1] };
   m = /^(.+?)\s+([A-Za-z][A-Za-z0-9_*∗′]{0,5})$/.exec(s);
   if (m && /[А-Яа-я]/.test(m[1])) return { caption: cap(m[1].trim()), not: m[2] };
-  return { caption: cap(s), not: '' };
+  return { caption: /^[A-Za-z]/.test(s) ? s : cap(s), not: '' };
 }
 
 /* Обозначение из подписи табло → TeX: заглавные в несколько букв (MC, DWL,

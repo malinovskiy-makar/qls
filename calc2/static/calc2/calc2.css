@@ -2754,14 +2754,14 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .pw-step.is-edge { opacity: .35; }
 .pw-count-field input#pw-count { width: 44px; height: 34px; text-align: center; font-size: 15px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0; }
 .pw-range { font-size: 13px; color: var(--text3); }
-.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
+.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
 .pw-cols span:nth-child(2), .pw-cols span:nth-child(3) { text-align: center; }
 .pw-cols i { font-family: 'KaTeX_Math', 'Times New Roman', serif; font-size: 15px; }
 .pw-brace { display: flex; gap: 6px; align-items: stretch; margin: 0 0 10px; }
 .pw-prefix { flex: 0 0 auto; align-self: center; font-size: 20px; color: var(--text2); min-width: 32px; }
 .pw-brace-mark { flex: 0 0 10px; align-self: stretch; color: var(--text2); min-height: 40px; }
 .pw-rows { flex: 1 1 auto; display: grid; gap: 6px; min-width: 0; }
-.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px 30px; gap: 8px; align-items: center; }
+.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px 30px; gap: 8px; align-items: center; }
 .pw-row .f-slot { min-width: 0; }
 .pw-row math-field, .pw-row .f-slot > input { min-height: 40px; font-size: 18px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 4px 10px; }
 .pw-row .f-slot.is-bad math-field, .pw-row .f-slot.is-bad > input { border-color: var(--error); }
@@ -2888,7 +2888,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
   padding: 6px 0; border-bottom: 1px solid var(--border-soft); line-height: 1.55; font-size: 14px;
 }
 .sb-body .stat > span, .sb-body .stat.stat-eq > span { font-size: 14px; font-weight: 400; color: var(--text); flex: 1 1 auto; }
-.sb-body .stat > b, .sb-body .stat.stat-eq > b { font-size: 14px; font-weight: 600; color: var(--text); text-align: right; flex: 0 0 auto; max-width: 55%; }
+.sb-body .stat > b, .sb-body .stat.stat-eq > b { font-size: 14px; font-weight: 700; color: var(--text); text-align: right; flex: 0 0 auto; max-width: 55%; }
 .sb-body .stat .stat-sign { display: none; }
 .sb-body .hint, .sb-body .muted { font-size: 13px; color: var(--text3); line-height: 1.55; margin-top: 6px; }
 .tx-table { font-size: 14px; margin-top: 6px; }

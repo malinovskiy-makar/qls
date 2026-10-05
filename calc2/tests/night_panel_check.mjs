@@ -40,7 +40,7 @@ const data = await page.evaluate(async (FORB) => {
         const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: head ? head.textContent.trim() : '(без заголовка)',
+                 name: head ? ((head.querySelector('span > b') || head).textContent.trim()) : '(без заголовка)',
                  fold: !!btn,
                  open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]

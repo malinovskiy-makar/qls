@@ -1817,6 +1817,13 @@ function sumSignature() {
    и от движения окна не зависит вовсе, поэтому подписи достаточно. */
 function sumRebuild() {
   if (!sumSceneOn()) { STATE._sumSig = null; return; }
+  /* Цвет группы — из палитры ТЕКУЩЕЙ темы (редизайн 10.2026): у тёмного
+     холста два тона слагаемых свои (calc2.css), а цвет, записанный в кривую
+     при её создании, оставался бы светлым. Свой цвет человека не трогаем.
+     Это вид, а не расчёт: подпись кэша (_sumSig) цвета не знает. */
+  STATE.curves.forEach(c => {
+    if (c.sumGroup && c.kind !== 'sum' && !c.colorCustom) c.color = sumGroupColor(c.sumGroup, c.sumIdx || 0);
+  });
   const sig = sumSignature();
   if (sig === STATE._sumSig) return;
   STATE._sumSig = sig;

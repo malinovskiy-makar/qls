@@ -247,21 +247,23 @@ function renderCurveList() {
     const rowTag = (typeof sumTagOf === 'function' && typeof sumSceneOn === 'function' && sumSceneOn())
       ? sumTagOf(curve) : null;
     const nm = document.createElement('span');
-    nm.className = 'curve-name fc-notation';
-    if (rowTag && !(curve.label || '').trim()) {
-      nm.classList.add('crow-tag');
+    const human = document.createElement('span');
+    if (rowTag) {
+      // Сложение: обозначение D₁ — как на холсте, полное имя группы — рядом.
+      nm.className = 'crow-tag fc-notation';
       nm.style.color = curve.color;
       const tex = rowTag.replace(/_(\d)/, '_{$1}');
       if (typeof katexInto === 'function') katexInto(nm, tex);
       else nm.textContent = rowTag.replace('_', '');
+      human.className = 'curve-name fc-name';
+      paintNotation(human, curveShortName(curve));
     } else {
+      nm.className = 'curve-name fc-notation';
       paintNotation(nm, curveShortName(curve));   // «D», «MC» — формулой, своё имя — текстом
+      human.className = 'fc-name';
+      human.textContent = curveHumanName(curve);
     }
     nm.setAttribute('data-tip', tipExpr(curve.expr));   // под обозначением — сама формула
-
-    const human = document.createElement('span');
-    human.className = 'fc-name';
-    human.textContent = curveHumanName(curve);
 
     // Бейдж формы записи (Фаза 1б): видно, что кривая введена как «объём от цены».
     let badge = null;
@@ -347,7 +349,7 @@ function renderCurveList() {
           fieldProblem(fInp, err ? (err.charAt(0).toUpperCase() + err.slice(1) + '. График держит последнюю верную запись.') : '');
         }
         if (!err) {
-          paintNotation(nm, curveShortName(curve));
+          if (!rowTag) paintNotation(nm, curveShortName(curve));
           redrawAll();
           if (typeof updatePult === 'function') updatePult();
         }
@@ -362,7 +364,7 @@ function renderCurveList() {
     nameInp.setAttribute('aria-label', 'Подпись на графике');
     nameInp.addEventListener('input', () => {
       curve.label = nameInp.value;
-      paintNotation(nm, curveShortName(curve));
+      paintNotation(rowTag ? human : nm, curveShortName(curve));
       redrawAll();
       if (typeof updatePult === 'function') updatePult();
     });

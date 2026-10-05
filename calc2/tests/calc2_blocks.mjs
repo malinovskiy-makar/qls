@@ -46,38 +46,36 @@ const t = async (name, fn) => {
 await t('в окне ровно десять блоков', async () =>
   (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
-await t('Математика идёт первой карточкой блока', async () =>
-  (await page.locator('.bcard-name').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого списка):
+   двухуровневого окна нет — десять блоков и модели на одном экране. Смысл
+   прежних трёх проверок тот же: порядок блоков, у моделей есть картинка (она
+   теперь в превью), номеров нет, модель блока видна и открывается. */
+await t('Математика идёт первым блоком экрана', async () =>
+  (await page.locator('#scene-picker .pk-bname').first().textContent()).trim() === 'Математика' || 'первый не Математика');
 
-/* П2: главный экран — десять больших карточек блоков с картинками, по две в
-   ряд, без нумерации; ни один блок не раскрыт, кнопки возврата не видно. */
-await t('главный экран — карточки блоков с картинками', () => page.evaluate(() => {
-  const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
+await t('главный экран — десять блоков, у каждой модели картинка для превью', () => page.evaluate(() => {
+  const blocks = [...document.querySelectorAll('#scene-picker .pk-block')];
   const bad = [];
-  if (cards.length !== 10) bad.push('карточек ' + cards.length);
-  cards.forEach(c => {
-    const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
-    if (!c.querySelector('.bcard-spec svg')) bad.push('без картинки: ' + nm.trim());
+  if (blocks.length !== 10) bad.push('блоков ' + blocks.length);
+  blocks.forEach(g => {
+    const nm = (g.querySelector('.pk-bname') || {}).textContent || '';
     if (/^\s*\d+\s*·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
+    g.querySelectorAll('.scard.pk-row:not(.soon):not([disabled])').forEach(c => {
+      if (!c.querySelector('.scard-spec svg')) bad.push('без картинки: ' + ((c.querySelector('.scard-name') || {}).textContent || '').trim());
+    });
   });
-  if (document.querySelectorAll('#scene-picker .picker-group.open').length) bad.push('блок уже раскрыт');
-  if (document.getElementById('picker-back').classList.contains('shown')) bad.push('кнопка возврата видна');
+  if (document.getElementById('picker-blocks')) bad.push('лестница блоков ещё в разметке');
   return !bad.length || bad.join('; ');
 }));
 
-await t('щелчок по блоку показывает его модели и возврат', () => page.evaluate(() => {
-  const card = document.querySelectorAll('#picker-blocks .bcard')[1];
-  card.click();
-  const open = document.querySelectorAll('#scene-picker .picker-group.open');
-  const hidden = document.getElementById('picker-blocks').classList.contains('hidden');
-  const back = document.getElementById('picker-back');
-  const shown = back.classList.contains('shown');
-  const models = open.length ? open[0].querySelectorAll('.scard').length : 0;
-  back.click();                                   // и возврат работает
-  const restored = !document.getElementById('picker-blocks').classList.contains('hidden')
-                && !document.querySelectorAll('#scene-picker .picker-group.open').length;
-  return (open.length === 1 && hidden && shown && models > 0 && restored)
-    || `открыто ${open.length}, блоки скрыты ${hidden}, возврат ${shown}, моделей ${models}, вернулись ${restored}`;
+await t('модель блока видна сразу, превью показывает её картинку и имя', () => page.evaluate(() => {
+  const row = document.querySelector('#scene-picker .pk-block:nth-child(1) .scard.pk-row:not(.soon)');
+  if (!row || row.offsetParent === null) return 'строки модели не видно';
+  row.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  const pv = document.getElementById('picker-preview');
+  const ok = pv && !pv.hidden && pv.querySelector('svg') && (pv.querySelector('.pk-pv-name') || {}).textContent;
+  row.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+  return !!ok || 'превью не показало картинку и имя';
 }));
 
 await t('модель «Потребление в комплектах» вырезана', () => page.evaluate(() =>
@@ -276,7 +274,7 @@ const panelSweep = await page.evaluate(async (FORB) => {
         const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: head ? head.textContent.trim() : '',
+                 name: head ? ((head.querySelector('span > b') || head).textContent.trim()) : '',
                  fold: !!btn,
                  open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]

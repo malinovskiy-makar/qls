@@ -1676,61 +1676,56 @@ await t('раскрытая карточка отличается фоном', a
   return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
 });
 
-/* ── П2. Первый экран: десять карточек блоков по две в ряд ───────────
-   Щелчок по карточке убирает остальные и показывает модели этого блока. */
-await t('карточки блоков без номеров, ни один блок не раскрыт', async () => {
-  // Первый вход: сцены ещё не выбирали, поэтому видна полная карта блоков.
-  // Возврат ИЗ сюжета ведёт в его блок — это проверяет следующий случай (Н5).
+/* ── П2 · Н5 · ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого
+   списка). Двухуровневого окна выбора больше нет: десять блоков и все модели
+   на одном экране (README макета, раздел 4). Прежние три проверки (карточки
+   блоков без номеров; из сюжета — в его блок; открыт один блок за раз)
+   заменены проверками того же смысла для одного экрана: блоки без номеров и с
+   числом моделей, модель после возврата видна сразу и стоит в «Продолжить»,
+   ни одна модель не спрятана за щелчком. */
+await t('на экране выбора все десять блоков сразу, без номеров, с числом моделей', async () => {
   await page.evaluate(() => { resetSceneMemory(); STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
-    const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
-    if (cards.length !== 10) bad.push('карточек ' + cards.length);
-    cards.forEach(c => {
-      const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
+    const blocks = [...document.querySelectorAll('#scene-picker .pk-block')].filter(b => b.offsetParent !== null);
+    if (blocks.length !== 10) bad.push('блоков на экране ' + blocks.length);
+    blocks.forEach(b => {
+      const nm = (b.querySelector('.pk-bname') || {}).textContent || '';
+      const n = (b.querySelector('.pk-bcount') || {}).textContent || '';
+      if (!nm.trim()) bad.push('блок без имени');
       if (/^ *[0-9]+ *·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
+      if (!/^\d+$/.test(n.trim())) bad.push('у «' + nm.trim() + '» нет числа моделей');
     });
-    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
-    if (open) bad.push('раскрыто блоков: ' + open);
     return !bad.length || bad.join('; ');
   });
 });
 
-/* Н5. Из сюжета «назад» ведёт РОВНО на предыдущий экран: в тот блок, где этот
-   сюжет лежит, а не в общий список десяти. Прежнее правило (П2, всегда полная
-   карта) отменено. */
-await t('из сюжета возврат ведёт в его блок (Н5)', async () => {
+await t('из модели «Все модели» ведёт на экран, где она видна и стоит в «Продолжить» (Н5)', async () => {
   return await page.evaluate(() => {
     const bad = [];
-    [['laffer', 'Избранные сюжеты'], ['mono-nat', 'Несовершенная конкуренция'],
-     ['m-tangent', 'Математика']].forEach(([key, want]) => {
+    [['laffer', 'Кривая Лаффера'], ['mono-nat', 'Естественная монополия'],
+     ['m-tangent', 'Функция и её производная наглядно']].forEach(([key, name]) => {
       closePicker(); pickScene(key); openPicker();
-      const g = document.querySelector('#scene-picker .picker-group.open');
-      const got = g ? (g.querySelector('.picker-group-open-name') || {}).textContent : null;
-      if (got !== want) bad.push(key + ': «' + got + '» вместо «' + want + '»');
-      if (!document.getElementById('picker-blocks').classList.contains('hidden')) {
-        bad.push(key + ': список блоков не спрятан');
-      }
+      const row = document.querySelector('#scene-picker .scard[data-scene="' + key + '"]');
+      if (!row || row.offsetParent === null) bad.push(key + ': строки модели не видно');
+      const cont = document.querySelector('#picker-continue .pk-cname');
+      if (!cont || cont.textContent.trim() !== name) bad.push(key + ': в «Продолжить» «' + (cont ? cont.textContent : '—') + '»');
     });
     closePicker();
     return !bad.length || bad.join('; ');
   });
 });
 
-await t('открыт один блок за раз, есть возврат', async () => {
+await t('ни одна рабочая модель не спрятана за щелчком по блоку', async () => {
   await page.evaluate(() => { STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(120);
-  await page.click('#picker-blocks .bcard:nth-child(1)');
-  await page.waitForTimeout(160);
-  await page.evaluate(() => document.getElementById('picker-back').click());
-  await page.waitForTimeout(120);
-  await page.click('#picker-blocks .bcard:nth-child(2)');
-  await page.waitForTimeout(160);
   return await page.evaluate(() => {
-    const open = document.querySelectorAll('#scene-picker .picker-group.open').length;
-    const back = document.getElementById('picker-back').classList.contains('shown');
-    return (open === 1 && back) || `открытых блоков: ${open}, возврат ${back}`;
+    const all = [...document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')];
+    const hidden = all.filter(c => c.offsetParent === null);
+    const r = (!hidden.length && all.length === 42) || `моделей ${all.length}, спрятано ${hidden.length}`;
+    closePicker();
+    return r;
   });
 });
 

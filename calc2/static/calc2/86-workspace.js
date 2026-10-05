@@ -354,6 +354,8 @@ function cardifySections() {
       h0.querySelector('span > b').textContent = txt0;
       const box0 = document.getElementById(had0.getAttribute('aria-controls'));
       if (box0) box0.classList.add('open');
+      // Значок «?» заголовка (hintsToDots) переезжает в новый заголовок (О6).
+      had0.querySelectorAll('.help-dot').forEach(d => h0.querySelector('span').appendChild(d));
       had0.replaceWith(h0);
       return;
     }
@@ -370,6 +372,7 @@ function cardifySections() {
     h.className = 'sec-head';
     h.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
     h.querySelector('span > b').textContent = name0;
+    if (title0) title0.querySelectorAll('.help-dot').forEach(d => h.querySelector('span').appendChild(d));
     if (title0) title0.remove();
     while (sec.firstChild) body0.appendChild(sec.firstChild);
     sec.appendChild(h);
@@ -1613,6 +1616,9 @@ function hintAnchor(hint) {
      обе подсказки оставались без якоря и получали по пустой строке с «?». */
   let sec = hint.closest('.section');
   while (sec) {
+    // Заголовок карточки после редизайна 10.2026 — h3.sec-head (cardifySections).
+    const head = sec.querySelector(':scope > .sec-head > span');
+    if (head) return head;
     const fold = sec.querySelector(':scope > .fold-btn > span');
     if (fold) return fold;
     const title = sec.querySelector(':scope > .section-title');

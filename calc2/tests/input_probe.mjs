@@ -678,34 +678,29 @@ if (need('Ф') || need('F')) {
   const fresh = await ctx.newPage();
   await fresh.goto(`${BASE}/calc2/`, { waitUntil: 'networkidle' });
   await fresh.waitForTimeout(1200);
-  const cards = await fresh.$$('#picker-blocks .bcard');
-  const read = async (i) => {
-    await cards[i].hover();
-    await fresh.waitForTimeout(250);
-    return fresh.evaluate((n) => {
-      const c = document.querySelectorAll('#picker-blocks .bcard')[n];
-      const cs = getComputedStyle(c);
-      return { border: cs.borderColor, outline: cs.outlineStyle + ' ' + cs.outlineWidth,
-               ring: c.classList.contains('no-init-ring'), name: (c.textContent || '').trim().slice(0, 30) };
-    }, i);
-  };
-  const c0 = await read(0), c1 = await read(1);
-  console.log(`     карточка 1 («${c0.name}») при наведении: border ${c0.border}, кольцо «${c0.outline}», no-init-ring=${c0.ring}`);
-  console.log(`     карточка 2 («${c1.name}») при наведении: border ${c1.border}, кольцо «${c1.outline}»`);
-  flag('border первой карточки при наведении совпадает со второй', c0.border === c1.border,
-    `${c0.border} != ${c1.border}`);
-  // ⚠️ ПОСЛЕ НАВЕДЕНИЯ КОЛЬЦА БЫТЬ НЕ ДОЛЖНО: мышь не клавиатура.
-  flag('после наведения мышью кольца на первой карточке нет', c0.outline.indexOf('none') === 0, c0.outline);
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8): карточек блоков нет, экран
+     выбора одним экраном, и при открытии фокус стоит в поиске (О2). Правило
+     прежнее: программный фокус кольца не рисует, наведение мышью тоже, а Tab —
+     рисует. */
+  const read = () => fresh.evaluate(() => {
+    const a = document.activeElement;
+    const cs = a ? getComputedStyle(a) : null;
+    return { id: a ? (a.id || a.className || a.tagName) : '?', outline: cs ? cs.outlineStyle + ' ' + cs.outlineWidth : '?',
+             ring: !!(a && a.classList && a.classList.contains('no-init-ring')) };
+  });
+  const c0 = await read();
+  console.log(`     фокус при открытии на «${c0.id}», кольцо «${c0.outline}», no-init-ring=${c0.ring}`);
+  flag('при открытии фокус в поиске', c0.id === 'picker-search', c0.id);
+  flag('программный фокус кольца не рисует', c0.outline.indexOf('none') === 0, c0.outline);
+  const row = await fresh.$('#scene-picker .scard.pk-row:not(.soon)');
+  if (row) { await row.hover(); await fresh.waitForTimeout(250); }
+  const c1 = await read();
+  flag('после наведения мышью кольца нет', c1.outline.indexOf('none') === 0, c1.outline);
   // А после Tab — обязано появиться.
   await fresh.keyboard.press('Tab');
   await fresh.waitForTimeout(250);
-  const afterTab = await fresh.evaluate(() => {
-    const a = document.activeElement;
-    const cs = a ? getComputedStyle(a) : null;
-    return { tag: a ? (a.className || a.tagName) : '?', outline: cs ? cs.outlineStyle + ' ' + cs.outlineWidth : '?',
-             ring: !!(a && a.classList && a.classList.contains('no-init-ring')) };
-  });
-  console.log(`     после Tab фокус на «${afterTab.tag}», кольцо «${afterTab.outline}», no-init-ring=${afterTab.ring}`);
+  const afterTab = await read();
+  console.log(`     после Tab фокус на «${afterTab.id}», кольцо «${afterTab.outline}», no-init-ring=${afterTab.ring}`);
   flag('после Tab кольцо есть', afterTab.outline.indexOf('solid') === 0, afterTab.outline);
   await fresh.close();
 
