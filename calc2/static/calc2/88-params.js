@@ -1105,10 +1105,11 @@ function wireControls() {
      остались — их читают заливки в четырёх местах 40-scenes-market.js, — но
      переключаются вместе: порознь их не включал никто, а излишки монополии
      живут на своих галочках #chk-mono-* и сюда не относятся. */
-  const areasChk = document.getElementById('chk-areas');
-  if (areasChk) areasChk.addEventListener('change', () => {
-    STATE.showCS = areasChk.checked; STATE.showPS = areasChk.checked;
-    redrawAll();
+  /* Редизайн 10.2026 (пункт (е)): общая галочка ушла, излишки включаются
+     порознь — #chk-cs и #chk-ps в «Показать на графике». */
+  [['chk-cs', 'showCS'], ['chk-ps', 'showPS']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
   });
 
   // Галочки областей монополии (Задача 1): CS / VC / PS.

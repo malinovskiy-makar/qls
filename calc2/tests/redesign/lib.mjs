@@ -208,7 +208,9 @@ export async function act(page, c, sceneKey) {
   // Слой нового экрана сам выполняет действие над органом, заменённым по
   // закрытому списку (например, «Построить» → набор уже применён).
   if (layer.actOverride) { const r = await layer.actOverride(page, c, sceneKey); if (r != null) return r; }
-  const el = await handleOf(page, layer.mapKey(c.key));
+  let el = await handleOf(page, layer.mapKey(c.key));
+  // Орган переехал в закрытое меню (новый экран): слой открывает меню и ищет снова.
+  if (!el && layer.reveal && await layer.reveal(page, layer.mapKey(c.key))) el = await handleOf(page, layer.mapKey(c.key));
   if (!el) throw new Error('орган не найден: ' + c.key);
   const k = c.kind;
   if (k === 'input:range') {

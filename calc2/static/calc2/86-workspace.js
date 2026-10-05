@@ -278,6 +278,7 @@ const FOLD_CHEVRON = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" st
 const SECTION_NAMES = {
   'sec-tax': 'Вмешательство государства',
   'sec-params': 'Параметры',
+  'sec-show': 'Показать на графике',
   'sec-costs': 'Фирма',
   'sec-labor': 'Рынок труда',
   'sec-inequality': 'Неравенство доходов',

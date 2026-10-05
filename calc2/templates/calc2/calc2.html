@@ -1103,13 +1103,12 @@
         </div>
         <!-- Галочки областей монополии (Задача 1). Видны только в режиме монополии. -->
         <div id="mono-areas-chk" style="display:none;margin-top:8px;">
-          <label class="chk"><input type="checkbox" id="chk-mono-cs" checked>
-            <span class="swatch" style="background:var(--curve-d)"></span> Показывать CS</label>
-          <label class="chk"><input type="checkbox" id="chk-mono-vc" checked>
-            <span class="swatch" style="background:var(--curve-dwl)"></span> Показывать VC</label>
-          <label class="chk"><input type="checkbox" id="chk-mono-ps" checked>
-            <span class="swatch" style="background:var(--curve-s)"></span> Показывать PS
-            <span class="nowrap">(TR&nbsp;−&nbsp;VC)</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-cs" checked>
+            <span class="show-sw" data-area="CS"></span><span class="show-name">Излишек покупателя</span><span class="show-not">CS</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-ps" checked>
+            <span class="show-sw" data-area="PS"></span><span class="show-name">Излишек производителя <span class="nowrap">(TR&nbsp;−&nbsp;VC)</span></span><span class="show-not">PS</span></label>
+          <label class="chk show-row"><input type="checkbox" id="chk-mono-vc" checked>
+            <span class="show-sw" data-area="VC"></span><span class="show-name">Переменные издержки</span><span class="show-not">VC</span></label>
         </div>
         <!-- Вмешательство государства в монополии (Фаза 2) задаётся ОБЩИМ блоком
              «Вмешательство государства» вверху панели — здесь только подсказка. -->
@@ -2049,9 +2048,22 @@
             <span class="swatch" style="background:var(--curve-ghost);"></span> Исходное состояние (было&nbsp;→&nbsp;стало)</label>
           <div id="info-tax" style="margin-top:8px;"></div>
         </div>
+    <!-- «ПОКАЗАТЬ НА ГРАФИКЕ» (редизайн 10.2026, фаза 5б; README макета, 6.4).
+         Галочки CS и PS заменили общую «Показать излишки» гаечного ключа
+         (пункт (е) закрытого списка); галочки областей монополии переезжают
+         сюда же (92-ui-kit.js, syncShowSection). Нечего показать — секции нет. -->
+    <div class="section" id="sec-show" style="display:none;">
+      <div class="section-title">Показать на графике</div>
+      <div id="show-list">
+        <label class="chk show-row" id="show-cs-row"><input type="checkbox" id="chk-cs" checked>
+          <span class="show-sw" data-area="CS"></span><span class="show-name">Излишек покупателя</span><span class="show-not">CS</span></label>
+        <label class="chk show-row" id="show-ps-row"><input type="checkbox" id="chk-ps" checked>
+          <span class="show-sw" data-area="PS"></span><span class="show-name">Излишек продавца</span><span class="show-not">PS</span></label>
+      </div>
+    </div>
     <div class="section" id="sec-view">
       <button class="fold-btn" id="marks-btn" type="button" aria-expanded="true" aria-controls="marks-body">
-        <span>Точки на графике</span>
+        <span>Свои точки и площади</span>
         <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
       </button>
       <!-- П28: список точек и кнопка «Добавить точку» собираются целиком в
@@ -2265,11 +2277,6 @@
            Прежние две галочки (CS и PS по отдельности) схлопнуты в одну:
            порознь их никто не включал, а области монополии считаются своими
            галочками #chk-mono-cs/#chk-mono-ps/#chk-mono-vc и не тронуты. -->
-      <div class="wrench-group">
-        <div class="wrench-title">Излишки</div>
-        <label class="chk"><input type="checkbox" id="chk-areas" checked>
-          Показать излишки</label>
-      </div>
 
       <div class="wrench-group">
         <div class="wrench-title">Сетка</div>

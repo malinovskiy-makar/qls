@@ -69,6 +69,7 @@ function redrawAll() {
   // История и автосохранение (91-session.js): сверка состояния после затишья,
   // а не на каждом кадре протяжки.
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
+  if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
 }
 
 function redrawScene() {

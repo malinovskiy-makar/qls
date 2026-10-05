@@ -426,7 +426,29 @@
     out.forEach(c => { const k = c.key; const i = n.get(k) || 0; n.set(k, i + 1); if (i) c.key = k + '~' + i; });
     return out;
   }
+  /* Ползунки кривых на новом экране живут под карточками функций, а не в
+     коробках пульта #params-curves / #params-extra (фаза 5б). Чип помнит
+     коробку и место (data-pult-box, data-pult-idx): прежний ключ органа
+     «#params-curves>роль[i]» ищется по чипам этой коробки в их прежнем
+     порядке — где бы они сейчас ни стояли. */
+  function roleOf(x) {
+    const c2 = (x.className && typeof x.className === 'string') ? x.className.split(/\s+/).filter(c => c && !/^(open|active|on|bad|no-init-ring|is-)/.test(c))[0] || '' : '';
+    return [x.tagName.toLowerCase(), c2, x.dataset.col || x.dataset.cid || x.dataset.scene || x.dataset.mode || ''].filter(Boolean).join('.');
+  }
+  function findPultVirtual(key) {
+    const m = /^#(params-curves|params-extra)>([^\[~]+)(?:\[(\d+)\])?$/.exec(key);
+    if (!m) return null;
+    const chips = [...document.querySelectorAll('.pchip[data-pult-box="' + m[1] + '"]')]
+      .sort((a, b) => (+a.dataset.pultIdx) - (+b.dataset.pultIdx));
+    const all = [];
+    chips.forEach(ch => ch.querySelectorAll(CTRL_SEL).forEach(el => all.push(el)));
+    const same = all.filter(el => roleOf(el) === m[2]);
+    const el = same[+(m[3] || 0)];
+    return el && visible(el) ? el : null;
+  }
   function findControl(key) {
+    const v = /^#params-(curves|extra)>/.test(key) && document.querySelector('.crow-sliders .pchip[data-pult-box]') ? findPultVirtual(key) : null;
+    if (v) return v;
     const list = [];
     const seen = new Set();
     roots().forEach(r => r && r.querySelectorAll(CTRL_SEL).forEach(el => {
@@ -437,6 +459,21 @@
     for (const el of list) {
       let k = ctrlKey(el); const i = n.get(k) || 0; n.set(k, i + 1); if (i) k = k + '~' + i;
       if (k === key) return el;
+    }
+    return null;
+  }
+
+  // Тот же поиск, но и среди невидимых: слой нового экрана по нему узнаёт,
+  // в каком закрытом меню лежит орган, и открывает его (layer_new.reveal).
+  function findControlAny(key) {
+    const n = new Map();
+    for (const r of roots()) {
+      if (!r) continue;
+      for (const el of r.querySelectorAll(CTRL_SEL)) {
+        if (el.closest('#chart')) continue;
+        let k = ctrlKey(el); const i = n.get(k) || 0; n.set(k, i + 1); if (i) k = k + '~' + i;
+        if (k === key) return el;
+      }
     }
     return null;
   }
@@ -480,5 +517,5 @@
     return out.sort();
   }
 
-  window.__RD = { popups, stateDump, windows, geometry, answerOld, tipsOld, controls, findControl, settled, handles, text, visible, shownByScene };
+  window.__RD = { popups, stateDump, windows, geometry, answerOld, tipsOld, controls, findControl, findControlAny, settled, handles, text, visible, shownByScene };
 })();

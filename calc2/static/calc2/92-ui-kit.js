@@ -259,3 +259,52 @@ function wireUiKit() {
     });
   }
 }
+
+/* ── «Показать на графике» (README макета, 6.4) ───────────────────────────
+   Галочки CS и PS показываются в той модели, которая эти излишки рисует:
+   модель хоть раз нарисовала область CS (метка data-legend на холсте) — у неё
+   есть галочка CS. Видимость помнится по модели: снятая галочка гасит заливку,
+   а строка остаётся, иначе вернуть заливку было бы нечем. Галочки областей
+   монополии живут здесь же; их видимость по-прежнему решает сцена монополии
+   (display у #mono-areas-chk), а в монополии общих CS и PS нет. */
+const SHOW_SEEN = {};
+function syncShowSection() {
+  const sec = document.getElementById('sec-show');
+  const list = document.getElementById('show-list');
+  if (!sec || !list) return;
+  const mono = document.getElementById('mono-areas-chk');
+  if (mono && mono.parentElement !== list) list.appendChild(mono);
+  const monoOn = !!(mono && mono.style.display !== 'none' && STATE.market === 'monopoly');
+  if (mono && !monoOn && mono.style.display !== 'none') mono.style.display = 'none';
+  const key = STATE.sceneKey || '';
+  const seen = SHOW_SEEN[key] || (SHOW_SEEN[key] = {});
+  const colors = {};
+  if (typeof svg !== 'undefined' && svg) {
+    svg.selectAll('[data-legend]').each(function () {
+      const raw = this.getAttribute('data-legend');
+      const full = (typeof areaKey === 'function') ? areaKey(raw) : raw;
+      const k = (typeof areaShort === 'function') ? areaShort(full) : full;   // «Излишек покупателя (CS)» → «CS»
+      if (!k || colors[k]) return;
+      colors[k] = this.getAttribute('fill') || '';
+    });
+  }
+  ['CS', 'PS', 'VC'].forEach(k => { if (colors[k]) seen[k] = colors[k]; });
+  const rows = [['show-cs-row', 'chk-cs', 'CS', 'showCS'], ['show-ps-row', 'chk-ps', 'PS', 'showPS']];
+  let any = false;
+  rows.forEach(([rowId, chkId, k, st]) => {
+    const row = document.getElementById(rowId), chk = document.getElementById(chkId);
+    if (!row) return;
+    const on = !monoOn && !!seen[k];
+    row.hidden = !on;
+    if (on) any = true;
+    if (chk && document.activeElement !== chk) chk.checked = !!STATE[st];
+  });
+  if (monoOn) any = true;
+  // Образец каждой строки — тем же цветом, что заливка на холсте.
+  list.querySelectorAll('.show-sw[data-area]').forEach(sw => {
+    const c = seen[sw.dataset.area] || colors[sw.dataset.area];
+    if (c) sw.style.background = c;
+  });
+  const want = any ? '' : 'none';
+  if (sec.style.display !== want) sec.style.display = want;
+}

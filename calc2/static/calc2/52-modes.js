@@ -46,8 +46,9 @@ function syncViewFields() {
   /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
      showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
      иначе показывало бы прежнее положение. */
-  const ac = document.getElementById('chk-areas');
-  if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
+  const ac = document.getElementById('chk-cs'), ap = document.getElementById('chk-ps');
+  if (ac) ac.checked = !!STATE.showCS;
+  if (ap) ap.checked = !!STATE.showPS;
   /* «Было → стало» — та же болезнь, что была у излишков: SCENE_DEFAULTS гасит
      showGhost при входе в модель, а галочка в разметке стоит отмеченной. Тумблер
      врал: отмечен, а бледного исходного равновесия на графике нет, и первое

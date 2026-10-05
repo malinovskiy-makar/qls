@@ -2714,3 +2714,17 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .pop.open, .fc-menu.open { animation: fpop .14s var(--ease); }
 }
+
+/* «Показать на графике»: строка от 28, галочка, образец 14×14 цветом
+   заливки, имя 14,5, обозначение справа (README макета, 6.4). */
+#show-list { display: flex; flex-direction: column; gap: 4px; }
+#show-list #mono-areas-chk { display: flex; flex-direction: column; gap: 4px; margin: 0 !important; }
+#show-list #mono-areas-chk[style*="none"] { display: none !important; }
+.show-row { display: flex !important; align-items: center; gap: 10px; min-height: 28px; margin: 0; font-size: 14.5px; color: var(--text); }
+.show-row[hidden] { display: none !important; }
+.show-sw { flex: 0 0 14px; width: 14px; height: 14px; border-radius: var(--r-sm); background: var(--chip-bg); border: 1px solid var(--border-soft); }
+.show-name { flex: 1 1 auto; min-width: 0; }
+.show-not { flex: 0 0 auto; font-size: 15px; font-weight: 400; color: var(--text2); font-family: 'KaTeX_Main', 'Times New Roman', serif; }
+/* «Свои точки и площади» — одна секция из двух прежних блоков. */
+#tools-panel .tools-body > #sec-areascalc.section.card { border-top: 0; padding-top: 0; }
+#sec-areascalc > .sec-head { display: none; }
