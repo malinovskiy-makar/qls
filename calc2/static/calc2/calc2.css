@@ -2061,7 +2061,14 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   opacity: 0; pointer-events: none;
   transition: opacity .2s var(--ease), transform .2s var(--ease);
 }
-.toast.show { opacity: 1; transform: translate(-50%, 0); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+/* Кнопка действия в тосте («Вернуть» после «Сбросить», 91-session.js). */
+.toast { display: flex; align-items: center; gap: 12px; }
+.toast-act {
+  border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600;
+  text-decoration: underline; cursor: pointer; padding: 6px 2px; min-height: 36px;
+}
+.toast-act:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 
 /* ── Модальное окно (экспорт, Фаза 5) ────────────────────────────────── */
 .modal {

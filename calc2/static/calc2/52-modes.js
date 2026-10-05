@@ -745,7 +745,8 @@ function initZoom() {
        браузера, и перехватывать её нельзя. */
     if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === 'z' || e.key === 'Z' ||
         e.code === 'KeyZ')) {
-      if (e.shiftKey) return;          // Shift+Z это «вернуть», а его мы не делаем
+      // Shift+Z — «Повторить» (редизайн 10.2026, 91-session.js).
+      if (e.shiftKey) { if (typeof historyRedo === 'function' && historyRedo()) e.preventDefault(); return; }
       if (typeof undoLast === 'function' && undoLast()) e.preventDefault();
       return;
     }

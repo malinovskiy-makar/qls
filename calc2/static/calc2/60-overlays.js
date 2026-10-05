@@ -66,6 +66,9 @@ function redrawAll() {
      («окно идёт за формулой, а не за буквой») остаётся в силе: рычаг
      по-прежнему видимо двигает кривую внутри выбранного окна. */
   if (typeof growWindowToModel === 'function') growWindowToModel();
+  // История и автосохранение (91-session.js): сверка состояния после затишья,
+  // а не на каждом кадре протяжки.
+  if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
 }
 
 function redrawScene() {
@@ -4109,7 +4112,14 @@ function _undoCopy(v) {
    которые действительно меняют модель: сдвиг кривой, вынос и удаление точки,
    удаление кривой, переименование, правка формулы, значение и границы
    параметра. Тихо ничего не делает, пока сцена не открыта. */
-function pushUndo() {
+/* ⚠️ С РЕДИЗАЙНА 10.2026 ИСТОРИЯ ЖИВЁТ В 91-session.js: у каждой модели свой
+   стек, есть «Повторить», шаг пишется после ЛЮБОГО изменения модели (ползунки,
+   ручки, вмешательство, галочки, цвета), а не только здесь. pushUndo остаётся
+   единой дверью «сейчас будет правка» для прежних мест вызова: она отдаёт метку
+   склейки. Старый стек ниже больше не используется и оставлен только как
+   запасной путь на случай, если 91-session.js не загрузился. */
+function pushUndo(label) {
+  if (typeof historyMark === 'function') { historyMark(label); return; }
   if (!STATE.sceneKey) return;
   const snap = { scene: STATE.sceneKey, data: {} };
   SNAPSHOT_KEYS.forEach(k => { snap.data[k] = _undoCopy(STATE[k]); });
@@ -4120,6 +4130,7 @@ function pushUndo() {
 /* Шаг назад. Снимок чужой модели не применяем: человек ушёл в другую сцену,
    и вернуть туда состояние отсюда значило бы менять то, чего он не видит. */
 function undoLast() {
+  if (typeof historyUndo === 'function') return historyUndo();
   while (_undoStack.length) {
     const snap = _undoStack.pop();
     if (snap.scene !== STATE.sceneKey) continue;
@@ -4144,7 +4155,11 @@ function clearUndo() { _undoStack.length = 0; }
    Без этого pickScene тут же восстановил бы то, что мы только что отменили. */
 function forgetSceneSnapshot(key) { delete _sceneSnaps[key]; }
 
-function resetSceneMemory() { Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; }); }
+function resetSceneMemory() {
+  Object.keys(_sceneSnaps).forEach(k => { delete _sceneSnaps[k]; });
+  // И историю моделей: прогоны приборов начинают каждый случай с нуля.
+  if (typeof historyClearAll === 'function') historyClearAll();
+}
 
 function saveSceneSnapshot(key) {
   if (!key) return;

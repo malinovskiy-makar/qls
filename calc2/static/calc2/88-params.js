@@ -1027,7 +1027,8 @@ function wireControls() {
   const picker = document.getElementById('scene-picker');
   if (picker) picker.addEventListener('click', (e) => {
     const card = e.target.closest('.scard');
-    if (card && card.dataset.scene) pickScene(card.dataset.scene);
+    // Человек выбрал модель: поднимаем и её автосохранение (91-session.js).
+    if (card && card.dataset.scene) (typeof openModelByUser === 'function' ? openModelByUser : pickScene)(card.dataset.scene);
   });
   // Клавиатура в окне выбора: Escape закрывает, Tab «закольцован» по карточкам.
   document.addEventListener('keydown', (e) => {

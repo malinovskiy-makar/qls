@@ -89,12 +89,21 @@ function clearResultPanels() {
   // только «Убрать» рядом с кнопкой расчёта.
 }
 
-// Маленький тост для заглушек («сохранить/экспорт — скоро»).
-function toast(msg) {
+// Маленький тост. opts.action и opts.fn — кнопка действия («Вернуть» после
+// «Сбросить»); с действием тост живёт дольше (opts.ms, по умолчанию 6,5 с).
+function toast(msg, opts) {
   let t = document.getElementById('calc2-toast');
-  if (!t) { t = document.createElement('div'); t.id = 'calc2-toast'; t.className = 'toast'; document.body.appendChild(t); }
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), 2400);
+  if (!t) { t = document.createElement('div'); t.id = 'calc2-toast'; t.className = 'toast'; t.setAttribute('role', 'status'); document.body.appendChild(t); }
+  t.textContent = '';
+  const span = document.createElement('span'); span.textContent = msg; t.appendChild(span);
+  if (opts && opts.action && typeof opts.fn === 'function') {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'toast-act'; b.textContent = opts.action;
+    b.addEventListener('click', () => { t.classList.remove('show'); opts.fn(); });
+    t.appendChild(b);
+  }
+  t.classList.add('show');
+  clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove('show'), (opts && opts.ms) || (opts && opts.action ? 6500 : 2400));
 }
 
 function dockActive(id, on) {
@@ -619,6 +628,8 @@ function wireScene() {
    же восстановит ровно то, что мы отменяем. Другие модели не трогаем: у
    каждой снимок свой. */
 function resetCurrentScene() {
+  // Редизайн 10.2026: сброс обратим — шаг истории и «Вернуть» в тосте.
+  if (typeof resetModelWithUndo === 'function') { resetModelWithUndo(); return; }
   const key = STATE.sceneKey;
   if (!key) return;
   if (typeof forgetSceneSnapshot === 'function') forgetSceneSnapshot(key);

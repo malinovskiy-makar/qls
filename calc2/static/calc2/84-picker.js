@@ -578,5 +578,8 @@ function pickScene(key) {
   // виден сразу, а разворачивается только нужное.
   setToolsOpen(true);
   closePicker();
+  // Адрес показывает модель (?m=): перезагрузка вернёт её (91-session.js).
+  if (typeof writeModelToUrl === 'function') writeModelToUrl(typeof modelKeyOf === 'function' ? modelKeyOf(key) : key);
+  if (typeof historyBaseline === 'function') historyBaseline();
 }
 
