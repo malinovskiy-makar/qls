@@ -573,8 +573,7 @@ function wireScene() {
        функцию, определённую ТОЛЬКО на отрезке (вне его кривой нет). Нижняя
        граница была 2 и отрезала этот случай без причины. */
     if (!isFinite(n) || n < 1 || n > 12) return;
-    PW.n = n;
-    renderPw();
+    pwSetCount(n);
   });
   /* Сколько групп спроса и сколько предложения (сюжет сложения). Меняем
      число — добавляются или убираются ТОЛЬКО хвостовые группы, уже набранные
@@ -588,9 +587,19 @@ function wireScene() {
       if (typeof sumSetCount === 'function') sumSetCount(side, n);
     });
   });
+  const pwX = document.getElementById('pw-x');
+  if (pwX) pwX.addEventListener('click', () => closePiecewise());
+  const pwMinus = document.getElementById('pw-minus'), pwPlus = document.getElementById('pw-plus');
+  if (pwMinus) pwMinus.addEventListener('click', () => pwSetCount(PW.n - 1));
+  if (pwPlus) pwPlus.addEventListener('click', () => pwSetCount(PW.n + 1));
+  const pwAdd = document.getElementById('pw-add');
+  if (pwAdd) pwAdd.addEventListener('click', () => pwAddRow());
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
+    // С ошибкой «Готово» запись не применяет: тост с текстом ошибки (раздел 10).
+    if (PW.error) { toast(PW.error); return; }
     if (PW.inp) {
+      if (typeof pushUndo === 'function') pushUndo('Кусочная функция');
       // Движку — цепочку условий, полю — одну фигурную скобку. Правится она
       // прямо в строке: разбор скобки обратно в выражение умеет latexToMath.
       // Приставка («y = », «P = ») читается из ТЕКУЩЕГО значения поля и

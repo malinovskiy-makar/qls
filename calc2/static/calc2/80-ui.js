@@ -389,12 +389,13 @@ function renderCurveList() {
       items.appendChild(b);
       return b;
     };
+    const pwTitle = curveHumanName(curve) + ' ' + curveShortName(curve);
     if (fInp) {
       if (curveIsPiecewise(curve)) {
-        mi('Изменить куски', () => openPiecewise(fInp, pwVarForField(fInp, curvePrefix(curve)[0] === 'Q' ? 'P' : 'Q')));
+        mi('Изменить куски', () => openPiecewise(fInp, pwVarForField(fInp, curve.srcForm === 'QP' ? 'P' : 'Q'), { name: pwTitle }));
         mi('Одной формулой', () => curveToSingleFormula(curve, fInp));
       } else {
-        mi('Задать кусками', () => openPiecewise(fInp, pwVarForField(fInp, curve.srcForm === 'QP' ? 'P' : 'Q'), { split: true }));
+        mi('Задать кусками', () => openPiecewise(fInp, pwVarForField(fInp, curve.srcForm === 'QP' ? 'P' : 'Q'), { split: true, name: pwTitle }));
       }
     }
     if (staff && fInp) {

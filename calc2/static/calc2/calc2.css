@@ -2728,3 +2728,62 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 /* «Свои точки и площади» — одна секция из двух прежних блоков. */
 #tools-panel .tools-body > #sec-areascalc.section.card { border-top: 0; padding-top: 0; }
 #sec-areascalc > .sec-head { display: none; }
+
+/* ── Окно «Кусочная функция» (README макета, 6.6 и раздел 10) ─────────
+   640, с клавиатурой 992; высота до «окно − 32», тело прокручивается. */
+#pw-modal { background: var(--scrim); }
+#pw-modal .modal-card.pw-card {
+  width: min(640px, 94vw); max-height: calc(100vh - 32px); display: flex; flex-direction: column;
+  padding: 0; border-radius: var(--r-panel); overflow: hidden;
+}
+#pw-modal.kbd-open .modal-card.pw-card { width: min(992px, 96vw); }
+.pw-head { display: flex; align-items: flex-start; gap: 12px; padding: 18px 14px 0 20px; }
+.pw-head .modal-title { flex: 1 1 auto; margin: 0; font-size: 19px; font-weight: 600; }
+.pw-name { color: var(--text2); font-weight: 600; }
+.pw-x { flex: 0 0 32px; width: 32px; height: 32px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 22px; line-height: 1; cursor: pointer; }
+.pw-x:hover { background: var(--chip-bg); color: var(--text); }
+#pw-modal .modal-sub { margin: 6px 20px 0; font-size: 14px; color: var(--text2); line-height: 1.45; }
+.pw-body { display: flex; gap: 16px; padding: 14px 20px 16px; overflow-y: auto; min-height: 0; }
+.pw-main { flex: 1 1 auto; min-width: 0; }
+#pw-kbd { display: none; flex: 0 0 330px; align-self: flex-start; margin: 0; }
+#pw-kbd.open { display: block; }
+.pw-count-field { display: flex; align-items: center; gap: 8px; margin: 0 0 14px; }
+.pw-count-field label { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 4px 0 0; }
+.pw-step { width: 34px; height: 34px; border: 1px solid var(--border-strong); border-radius: var(--r); background: var(--surface); color: var(--text); font-size: 18px; line-height: 1; cursor: pointer; }
+.pw-step:hover { background: var(--chip-bg); }
+.pw-step.is-edge { opacity: .35; }
+.pw-count-field input#pw-count { width: 44px; height: 34px; text-align: center; font-size: 15px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0; }
+.pw-range { font-size: 13px; color: var(--text3); }
+.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
+.pw-cols span:nth-child(2), .pw-cols span:nth-child(3) { text-align: center; }
+.pw-cols i { font-family: 'KaTeX_Math', 'Times New Roman', serif; font-size: 15px; }
+.pw-brace { display: flex; gap: 6px; align-items: stretch; margin: 0 0 10px; }
+.pw-prefix { flex: 0 0 auto; align-self: center; font-size: 20px; color: var(--text2); min-width: 32px; }
+.pw-brace-mark { flex: 0 0 10px; align-self: stretch; color: var(--text2); min-height: 40px; }
+.pw-rows { flex: 1 1 auto; display: grid; gap: 6px; min-width: 0; }
+.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 76px 76px 30px; gap: 8px; align-items: center; }
+.pw-row .f-slot { min-width: 0; }
+.pw-row math-field, .pw-row .f-slot > input { min-height: 40px; font-size: 18px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 4px 10px; }
+.pw-row .f-slot.is-bad math-field, .pw-row .f-slot.is-bad > input { border-color: var(--error); }
+.pw-row input.pw-bound { width: 100%; height: 40px; text-align: center; font-size: 16px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0 4px; }
+.pw-row input.pw-bound.is-bad { border-color: var(--error); color: var(--error-ink); }
+.pw-del { width: 30px; height: 30px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 18px; line-height: 1; cursor: pointer; }
+.pw-del:hover { background: var(--chip-bg); color: var(--text); }
+.pw-add { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; margin: 0 0 12px 50px; border: 1px dashed var(--border-strong); border-radius: var(--r); background: transparent; color: var(--text2); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; }
+.pw-add::before { content: '+'; font-size: 17px; line-height: 1; }
+.pw-add:hover { background: var(--chip-bg); color: var(--text); }
+.pw-add[hidden] { display: none; }
+.pw-error { margin: 0 0 10px; font-size: 13.5px; color: var(--error-ink); line-height: 1.55; }
+.pw-notes { margin: 0 0 10px; font-size: 13.5px; color: var(--amber-ink); line-height: 1.55; }
+.pw-error[hidden], .pw-notes[hidden], .pw-preview[hidden] { display: none; }
+.pw-preview { padding: 12px 14px 14px; background: var(--surface-2); border-radius: var(--r-card); }
+.pw-preview-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 6px; }
+.pw-preview .f-preview.has { padding: 0; background: transparent; border: 0; font-size: 18px; }
+.pw-foot { display: flex; align-items: center; gap: 8px; margin: 0; padding: 12px 20px 16px; border-top: 1px solid var(--border-soft); }
+.pw-gap { flex: 1 1 auto; }
+.pw-foot .btn-sm, .pw-foot .btn { height: 40px; padding: 0 16px; font-size: 14.5px; width: auto; margin: 0; }
+.pw-kbd-toggle { display: inline-flex; align-items: center; gap: 8px; }
+.pw-kbd-toggle svg { width: 18px; height: 18px; }
+.pw-kbd-toggle[aria-expanded="true"] { background: var(--accent-tint); border-color: var(--accent); color: var(--accent-ink); }
+#pw-apply { font-weight: 600; }
+#pw-apply.is-off { opacity: .45; }

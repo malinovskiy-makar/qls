@@ -259,12 +259,15 @@ function renderPw() {
   const cnt = document.getElementById('pw-count');
   if (cnt && document.activeElement !== cnt) cnt.value = PW.n;
   while (PW.rows.length < PW.n) PW.rows.push({ f: '', a: '', b: '' });
+  PW.rows.length = PW.n;
+  pwSyncHead();
   const box = document.getElementById('pw-rows');
   if (box) {
     box.innerHTML = '';
     for (let i = 0; i < PW.n; i++) {
       const row = document.createElement('div');
       row.className = 'pw-row';
+      row.dataset.i = i;
       // Формула куска набирается тем же движком, что и в панели: пользователь
       // пишет 0.5*x и сразу видит точку умножения, дробь рисуется дробью.
       const slot = document.createElement('div');
@@ -274,61 +277,175 @@ function renderPw() {
       f.setAttribute('aria-label', 'Формула куска ' + (i + 1));
       f.addEventListener('input', () => { PW.rows[i].f = f.value; pwPreview(); });
       slot.appendChild(f);
-      const from = document.createElement('span'); from.className = 'pw-when'; from.textContent = 'От';
-      const a = document.createElement('input');
-      a.type = 'text'; a.className = 'pw-bound'; a.value = PW.rows[i].a;
-      a.placeholder = i === 0 ? '0' : '';
-      a.setAttribute('aria-label', 'Начало участка ' + (i + 1));
-      a.addEventListener('input', () => { PW.rows[i].a = a.value; pwPreview(); });
-      const to = document.createElement('span'); to.className = 'pw-when'; to.textContent = 'До';
-      const b = document.createElement('input');
-      b.type = 'text'; b.className = 'pw-bound'; b.value = PW.rows[i].b;
-      b.placeholder = i === PW.n - 1 ? '∞' : '';
-      b.setAttribute('aria-label', 'Конец участка ' + (i + 1));
-      b.addEventListener('input', () => { PW.rows[i].b = b.value; pwPreview(); });
-      row.append(slot, from, a, to, b);
+      /* Соседние границы связаны (README макета, 6.6): правка «до» куска
+         двигает «от» следующего, пока они совпадали, и наоборот. */
+      const bound = (key, label, ph) => {
+        const e = document.createElement('input');
+        e.type = 'text'; e.className = 'pw-bound'; e.value = PW.rows[i][key];
+        e.placeholder = ph; e.setAttribute('aria-label', label + ' ' + (i + 1));
+        e.inputMode = 'decimal';
+        e.addEventListener('input', () => {
+          const was = PW.rows[i][key];
+          PW.rows[i][key] = e.value;
+          const j = key === 'b' ? i + 1 : i - 1, other = key === 'b' ? 'a' : 'b';
+          if (PW.rows[j] && String(PW.rows[j][other]).trim() === String(was).trim()) {
+            PW.rows[j][other] = e.value;
+            const peer = box.querySelector('.pw-row[data-i="' + j + '"] .pw-bound[data-k="' + other + '"]');
+            if (peer) peer.value = e.value;
+          }
+          pwPreview();
+        });
+        e.dataset.k = key;
+        return e;
+      };
+      const a = bound('a', 'Начало участка', i === 0 ? '0' : '');
+      const b = bound('b', 'Конец участка', i === PW.n - 1 ? '∞' : '');
+      row.append(slot, a, b);
+      if (PW.n > 1) {
+        const del = document.createElement('button');
+        del.type = 'button'; del.className = 'pw-del';
+        del.setAttribute('aria-label', 'Убрать кусок ' + (i + 1));
+        del.setAttribute('data-tip', 'Убрать кусок');
+        del.textContent = '×';
+        del.addEventListener('click', () => pwRemoveRow(i));
+        row.appendChild(del);
+      }
       box.appendChild(row);
       upgradeFormulaField(f);
-      // Клавиатура переезжает в ту строку, где стоит курсор (Фаза 7).
+      // Клавиатура пишет в ту строку, где стоит курсор (Фаза 7).
       const focusRow = () => pwAttachKeyboard(row, f);
       f.addEventListener('focus', focusRow);
       if (f._mf) f._mf.addEventListener('focusin', focusRow);
       if (i === 0) focusRow();
     }
   }
+  const add = document.getElementById('pw-add');
+  if (add) add.hidden = PW.n >= 12;
   pwPreview();
 }
 
+/* Шапка окна: имя и обозначение функции, приставка «P =» у скобки, буква в
+   подписях колонок, кнопки «−» и «+» на краю диапазона бледнее. */
+function pwSyncHead() {
+  const v = pwVar();
+  const pfx = (PW.inp ? pwPrefixOf(PW.inp.value) : '').trim().replace(/=\s*$/, '').trim();
+  const pre = document.getElementById('pw-prefix');
+  if (pre) { const t = (pfx || (PW.prefixDefault || 'P')) + '\\,='; if (typeof katexInto === 'function') katexInto(pre, t); else pre.textContent = t.replace('\\,', ' '); }
+  ['pw-col-from', 'pw-col-to'].forEach((id, k) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = (k ? 'До ' : 'От ') + '<i>' + v + '</i>';
+  });
+  const nm = document.getElementById('pw-name');
+  if (nm) nm.textContent = PW.name ? ' · ' + PW.name : '';
+  const minus = document.getElementById('pw-minus'), plus = document.getElementById('pw-plus');
+  if (minus) minus.classList.toggle('is-edge', PW.n <= 1);
+  if (plus) plus.classList.toggle('is-edge', PW.n >= 12);
+}
+function pwSetCount(n) {
+  n = Math.max(1, Math.min(12, n | 0));
+  if (n === PW.n) return;
+  if (n > PW.n) { while (PW.n < n) pwAddRow(true); renderPw(); return; }
+  PW.n = n; PW.rows.length = n;
+  if (PW.rows[n - 1]) PW.rows[n - 1].b = '';
+  renderPw();
+}
+/* «Добавить кусок» продолжает последний: закрывает его открытую границу на
+   шаг дальше (длина предыдущего участка, иначе значение «от», иначе 10) и
+   добавляет кусок с той же формулой (README макета, 6.6). */
+function pwAddRow(quiet) {
+  if (PW.n >= 12) return;
+  const last = PW.rows[PW.n - 1] || { f: '', a: '', b: '' };
+  const num = (t) => { const x = parseFloat(String(t).replace(',', '.')); return isFinite(x) ? x : null; };
+  let to = num(last.b);
+  if (to == null) {
+    const a = num(last.a), prev = PW.rows[PW.n - 2];
+    const len = prev && num(prev.a) != null && num(prev.b) != null ? num(prev.b) - num(prev.a) : null;
+    to = (a != null ? a : 0) + (len && len > 0 ? len : (a ? a : 10));
+    last.b = String(+to.toPrecision(6));
+  }
+  PW.rows[PW.n - 1] = last;
+  PW.rows.push({ f: last.f, a: last.b, b: '' });
+  PW.n++;
+  if (!quiet) renderPw();
+}
+// Удалённый кусок отдаёт участок соседу сверху (у первого — снизу): дыр нет.
+function pwRemoveRow(i) {
+  if (PW.n <= 1) return;
+  const gone = PW.rows[i];
+  if (i > 0) PW.rows[i - 1].b = gone.b;
+  else if (PW.rows[1]) PW.rows[1].a = gone.a;
+  PW.rows.splice(i, 1);
+  PW.n--;
+  renderPw();
+}
+/* Проверка записи по кускам (README макета, 6.6): ошибка — первая, текстом;
+   замечания (перекрытие, дыра) — не ошибки. */
+function pwCheck() {
+  const rows = pwRows();
+  const v = pwVar();
+  const num = (t) => { const x = parseFloat(String(t).replace(',', '.')); return isFinite(x) ? x : null; };
+  const out = { error: '', bad: [], notes: [] };
+  const err = (i, what, msg) => { if (!out.error) out.error = msg; out.bad.push([i, what]); };
+  rows.forEach((r, i) => {
+    const n = 'Кусок ' + (i + 1) + ': ';
+    if (!r.f) err(i, 'f', n + 'впишите формулу');
+    else { try { math.parse(prepExpr(r.f)); } catch (e) { const m = String(e.message || e).replace(/\s*\(char \d+\)/, ''); err(i, 'f', n + m.charAt(0).toLowerCase() + m.slice(1)); } }
+    if (r.a !== '' && num(r.a) == null) err(i, 'a', n + 'граница «от» должна быть числом');
+    if (r.b !== '' && num(r.b) == null) err(i, 'b', n + 'граница «до» должна быть числом');
+    if (num(r.a) != null && num(r.b) != null && num(r.a) >= num(r.b)) err(i, 'a', n + '«от» должно быть меньше «до»');
+  });
+  for (let i = 0; i + 1 < rows.length; i++) {
+    const b = num(rows[i].b), a = num(rows[i + 1].a);
+    if (b != null && a != null && a < b) out.notes.push('Куски ' + (i + 1) + ' и ' + (i + 2) + ' перекрываются при ' + v + ' от ' + fmt(a) + ' до ' + fmt(b) + ': там считается кусок ' + (i + 1) + '.');
+    if (b != null && a != null && a > b) out.notes.push('При ' + v + ' от ' + fmt(b) + ' до ' + fmt(a) + ' функция не задана.');
+  }
+  return out;
+}
 /* Одна кнопка клавиатуры на весь редактор: она переезжает к строке, в которой
    стоит курсор. Пять иконок на пять кусков читались как пять разных настроек,
    хотя клавиатура нужна ровно одной строке за раз. */
 function pwAttachKeyboard(row, inp) {
   const kbd = document.getElementById('pw-kbd');
   if (!kbd) return;
-  let btn = document.getElementById('pw-kbd-btn');
-  if (!btn) {
-    btn = document.createElement('button');
-    btn.type = 'button'; btn.id = 'pw-kbd-btn'; btn.className = 'f-help f-kbd';
-    btn.setAttribute('data-tip', 'Клавиатура');
-    btn.setAttribute('aria-label', 'Открыть математическую клавиатуру');
-    btn.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
-      + ' stroke-width="1.8" stroke-linecap="round"><rect x="2.5" y="6" width="19" height="12" rx="2"/>'
-      + '<path d="M6 9.5h.01M9.5 9.5h.01M13 9.5h.01M16.5 9.5h.01M6 12.8h.01M9.5 12.8h.01M13 12.8h.01M16.5 12.8h.01"/>'
-      + '<path d="M8.2 15.6h7.6"/></svg>';
+  /* Редизайн 10.2026 (README макета, раздел 10): кнопка «Клавиатура» стоит
+     внизу окна, а клавиатура открывается колонкой справа от строк и пишет в
+     то поле, где стоит курсор. */
+  const btn = document.getElementById('pw-kbd-btn');
+  if (!btn) return;
+  if (!btn._wired) {
+    btn._wired = true;
     btn.addEventListener('click', () => {
       const open = kbd.classList.toggle('open');
       btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      const m = document.getElementById('pw-modal');
+      if (m) m.classList.toggle('kbd-open', open);
       if (open && btn._inp) buildKeyboard(kbd, btn._inp);
     });
   }
-  if (btn.parentElement !== row) row.appendChild(btn);
   btn._inp = inp;
   if (kbd.classList.contains('open')) buildKeyboard(kbd, inp);
 }
 
 function pwPreview() {
   const prev = document.getElementById('pw-preview');
+  const chk = pwCheck();
   if (prev) renderTexRaw(prev, pwLatex());
+  const box = document.getElementById('pw-preview-box');
+  if (box) box.hidden = !!chk.error;
+  const e = document.getElementById('pw-error');
+  if (e) { e.textContent = chk.error; e.hidden = !chk.error; }
+  const nt = document.getElementById('pw-notes');
+  if (nt) { nt.innerHTML = ''; chk.notes.forEach(t => { const d = document.createElement('div'); d.textContent = t; nt.appendChild(d); }); nt.hidden = !chk.notes.length; }
+  document.querySelectorAll('#pw-rows .pw-row').forEach(r => r.querySelectorAll('.is-bad').forEach(x => x.classList.remove('is-bad')));
+  chk.bad.forEach(([i, what]) => {
+    const r = document.querySelector('#pw-rows .pw-row[data-i="' + i + '"]');
+    if (!r) return;
+    const el = what === 'f' ? r.querySelector('.f-slot') : r.querySelector('.pw-bound[data-k="' + what + '"]');
+    if (el) el.classList.add('is-bad');
+  });
+  const ap = document.getElementById('pw-apply');
+  if (ap) ap.classList.toggle('is-off', !!chk.error);
+  PW.error = chk.error;
 }
 
 /* Какой буквой сцена ДЕЙСТВИТЕЛЬНО пишет это поле — читаем из его текущей
@@ -509,6 +626,7 @@ function openPiecewise(inp, v, opts) {
   else if (split) { PW.rows = split; }
   else { PW.rows = pwDefaultRows(PW.v); }
   PW.n = PW.rows.length;
+  PW.name = (opts && opts.name) || '';
   const m = document.getElementById('pw-modal');
   if (!m) return;
   // Окно открываем ДО сборки полей: MathLive, собранный внутри inert-подложки,
@@ -1330,7 +1448,8 @@ function keyboardAdapter(inp, box) {
     },
     piecewise: function () {
       box.classList.remove('open');
-      openPiecewise(inp, pwVarForField(inp, box._var || 'x'));
+      // Тот же вход, что «Задать кусками»: конструктор начинает с формулы поля.
+      openPiecewise(inp, pwVarForField(inp, box._var || 'x'), { split: true });
     },
   };
 }
