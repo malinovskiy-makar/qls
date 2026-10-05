@@ -428,9 +428,7 @@ function renderCurveList() {
       openFcMenu(gear, more);
     });
 
-    top.append(sw, nm, human);
-    if (badge) top.append(badge);
-    top.append(eye, gear);
+    top.append(sw, nm, human, eye, gear);
 
     /* Строка суммарной кривой: поля у неё нет и быть не может, на его месте
        прямая надпись, а в подсказке — запись, по которой кривая считается. */
@@ -455,7 +453,48 @@ function renderCurveList() {
       if (typeof katexInto === 'function') katexInto(pre, curvePrefix(curve).replace(' =', '\\,='));
       else pre.textContent = curvePrefix(curve);
       fLine.append(pre, fInp);
-      row.append(top, fLine, more, sliders);
+      /* Кусочная функция: на месте поля — запись скобкой с карандашом; вся
+         запись — кнопка и открывает окно «Кусочная функция» (README макета,
+         6.6). Поле остаётся в разметке: его значение — источник записи. */
+      let pwRec = null;
+      const pwParsed = (curve.srcForm !== 'QP') && typeof pwParse === 'function' ? pwParse(curve.expr, 'Q') : null;
+      if (pwParsed && pwParsed.rows.length) {
+        row.classList.add('is-pw');
+        pwRec = document.createElement('div');
+        pwRec.className = 'fc-pwrec';
+        pwRec.setAttribute('role', 'button');
+        pwRec.tabIndex = 0;
+        pwRec.setAttribute('aria-label', 'Изменить куски: ' + curveHumanName(curve));
+        const v = pwParsed.v || 'Q';
+        const cond = (r) => (r.a !== '' && r.b !== '') ? mathToTex(r.a) + ' \\le ' + v + ' < ' + mathToTex(r.b)
+          : (r.a !== '' ? v + ' \\ge ' + mathToTex(r.a) : (r.b !== '' ? v + ' < ' + mathToTex(r.b) : '\\text{иначе}'));
+        const tex = curvePrefix(curve).replace(' =', '\\,=') + '\\begin{cases}'
+          + pwParsed.rows.map(r => mathToTex(r.f) + ' & {\\scriptstyle ' + cond(r) + '}').join('\\\\') + '\\end{cases}';
+        const m = document.createElement('span'); m.className = 'fc-pwrec-math';
+        if (typeof renderTexRaw === 'function') renderTexRaw(m, tex); else m.textContent = curve.expr;
+        const pen = document.createElement('span'); pen.className = 'fc-pwrec-pen'; pen.setAttribute('aria-hidden', 'true');
+        pen.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M14 6l4 4"/></svg>';
+        pwRec.append(m, pen);
+        const openPw = () => openPiecewise(fInp, pwVarForField(fInp, 'Q'), { name: curveHumanName(curve) + ' ' + curveShortName(curve) });
+        pwRec.addEventListener('click', openPw);
+        pwRec.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPw(); } });
+      }
+      /* Q(P): под полем строка «Q(P) · в расчётах P = …» (README макета, 6.1). */
+      let qpLine = null;
+      if (badge) {
+        qpLine = document.createElement('div');
+        qpLine.className = 'fc-qp';
+        const tail = document.createElement('span'); tail.className = 'fc-qp-math';
+        if (curve.linear && typeof renderTexRaw === 'function') renderTexRaw(tail, 'P = ' + mathToTex(fmtLinear(curve.linear.a, curve.linear.b)));
+        else tail.textContent = 'P = f(Q), обратная функция, считаем численно';
+        const mid = document.createElement('span'); mid.className = 'fc-qp-mid'; mid.textContent = 'в расчётах';
+        qpLine.append(badge, mid, tail);
+      }
+      row.append(top);
+      if (pwRec) row.append(pwRec);
+      row.append(fLine);
+      if (qpLine) row.append(qpLine);
+      row.append(more, sliders);
       fInp.id = fInp.id || ('curve-expr-' + curve.id);
     } else if (autoLine) {
       row.append(top, autoLine, more, sliders);

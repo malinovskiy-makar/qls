@@ -31,7 +31,13 @@ const t0 = Date.now();
 
 let browser;
 try { browser = await chromium.launch(); } catch (e) { console.error('Playwright не запустился: ' + e.message); process.exit(4); }
-const ctx = await browser.newContext({ viewport: { width: 1440, height: 760 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+/* Ширина окна: 1440 (по умолчанию), 1024, 390 — паритет органов проверяется на
+   всех трёх (задание редизайна, инварианты). На узких ширинах орган может
+   жить в выезжающем «Ответе» или на другой вкладке телефона: «достижим»
+   значит «виден сам или после выезда панели / смены вкладки». */
+const VW = +(process.env.PQ_WIDTH || 1440), VH = +(process.env.PQ_HEIGHT || 760);
+const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, reducedMotion: 'reduce', locale: 'ru-RU',
+  isMobile: VW < 760, hasTouch: VW < 760 });
 await ctx.addInitScript(() => { try { localStorage.setItem('theme', 'light'); } catch (e) {} });
 const page = await ctx.newPage();
 const errors = [];
@@ -55,7 +61,18 @@ for (const key of keys) {
   // 1. Органы старта.
   const want = (rec.controls || rec.start.controls || []).filter(c => !c.picker).map(c => c.key);
   const res = await page.evaluate((list) => list.map(k => {
-    const el = window.__RD.findControl(k.mapped) || window.__RD.findControlAny(k.mapped);
+    let el = window.__RD.findControl(k.mapped);
+    if (!el) {
+      // Узкая ширина: выезжающий «Ответ» или вкладки телефона.
+      const tabs = [...document.querySelectorAll('#ph-tabs .ph-tab')].filter(b => b.offsetParent !== null);
+      for (const t of tabs) { t.click(); el = window.__RD.findControl(k.mapped); if (el) break; }
+      if (!el && document.querySelector('#btn-answer') && document.querySelector('#btn-answer').offsetParent !== null) {
+        document.body.classList.add('ans-open'); el = window.__RD.findControl(k.mapped); document.body.classList.remove('ans-open');
+      }
+      if (tabs.length) tabs[0].click();
+    }
+    // Орган в закрытом меню «…» своей карточки — достижим открытием меню.
+    if (!el) { const any = window.__RD.findControlAny(k.mapped); if (any && any.closest('.fc-menu')) el = any; }
     return el ? null : k.orig;
   }).filter(Boolean), want.filter(k => {
     const f = fateOf(k);
@@ -87,5 +104,5 @@ for (const key of keys) {
 await browser.close();
 const sec = ((Date.now() - t0) / 1000).toFixed(1);
 issues.slice(0, 60).forEach(x => console.log('  ✗ ' + x));
-console.log((bad ? 'ПАРИТЕТ НАРУШЕН' : 'ПАРИТЕТ ЦЕЛ') + ': ключей ' + keys.length + ', проверок ' + checks + ', расхождений ' + bad + ', ' + sec + ' с');
+console.log((bad ? 'ПАРИТЕТ НАРУШЕН' : 'ПАРИТЕТ ЦЕЛ') + ' (' + VW + '×' + VH + '): ключей ' + keys.length + ', проверок ' + checks + ', расхождений ' + bad + ', ' + sec + ' с');
 process.exit(bad ? 1 : 0);

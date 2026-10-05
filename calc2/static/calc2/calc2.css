@@ -2754,14 +2754,14 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .pw-step.is-edge { opacity: .35; }
 .pw-count-field input#pw-count { width: 44px; height: 34px; text-align: center; font-size: 15px; font-weight: 600; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 0; }
 .pw-range { font-size: 13px; color: var(--text3); }
-.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
+.pw-cols { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px 30px; gap: 8px; margin: 0 0 6px 50px; font-size: 13px; font-weight: 500; color: var(--text2); }
 .pw-cols span:nth-child(2), .pw-cols span:nth-child(3) { text-align: center; }
 .pw-cols i { font-family: 'KaTeX_Math', 'Times New Roman', serif; font-size: 15px; }
 .pw-brace { display: flex; gap: 6px; align-items: stretch; margin: 0 0 10px; }
 .pw-prefix { flex: 0 0 auto; align-self: center; font-size: 20px; color: var(--text2); min-width: 32px; }
 .pw-brace-mark { flex: 0 0 10px; align-self: stretch; color: var(--text2); min-height: 40px; }
 .pw-rows { flex: 1 1 auto; display: grid; gap: 6px; min-width: 0; }
-.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 90px 90px 30px; gap: 8px; align-items: center; }
+.pw-row { display: grid; grid-template-columns: minmax(0, 1fr) 96px 96px 30px; gap: 8px; align-items: center; }
 .pw-row .f-slot { min-width: 0; }
 .pw-row math-field, .pw-row .f-slot > input { min-height: 40px; font-size: 18px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); padding: 4px 10px; }
 .pw-row .f-slot.is-bad math-field, .pw-row .f-slot.is-bad > input { border-color: var(--error); }
@@ -2932,7 +2932,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 #ex-body .sb-note p.ex-out > b { display: inline; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { #ex-body .sb-note p.ex-q > b::after { transition: none; } }
 #ex-body .sb-note b, #ex-body .sb-note p.ex-q > b, #ex-body .sb-note p.ex-out > b { text-transform: none; letter-spacing: 0; font-size: 14.5px; }
-.ans-title { margin: 0 0 -8px; font-size: 15px; font-weight: 600; color: var(--text); }
+.ans-title { margin: 0 0 -8px; font-size: 15px; font-weight: 600; color: var(--text); display: flex; align-items: center; flex-wrap: wrap; column-gap: .28em; }   /* как .section-title: зазор на стыке слова и формулы */
 .ans-title[hidden] { display: none; }
 #sec-eq > .section-title { display: none; }   /* показан над главными числами (#ans-title) */
 #info-final .ff-eyebrow { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: none; letter-spacing: 0; }
@@ -3193,7 +3193,7 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
   .mhead .mh-btn, .mhead .mh-icon, .mh-self { min-width: 44px; height: 44px; padding: 0 10px; justify-content: center; }
   .mh-switch { flex: 1 1 auto; min-width: 0; }
   .mh-name .side-scene { overflow: hidden; text-overflow: ellipsis; max-width: 52vw; display: inline-block; }
-  .cv-col { order: 1; flex: 0 0 auto; height: 360px; padding: 8px 8px 0; }
+  .cv-col { order: 1; flex: 0 0 auto; height: 354px; padding: 8px 8px 0; }   /* SVG 372×300 (README макета, 3) */
   .cv-bar { overflow-x: auto; }
   .cv-tool > span, .cv-zoom, #btn-zoomin, #btn-zoomout, #btn-focus { display: none; }
   .ph-tabs { order: 2; display: flex; gap: 4px; padding: 8px 8px 0; background: var(--bg); position: sticky; top: 0; z-index: var(--z-float); }
@@ -3228,3 +3228,26 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
 /* При запросе блоки с находками встают подряд, без пустых колонок (4.2). */
 .pk-cols.pk-searching .pk-col { display: contents; }
 .pk-cols.pk-searching { grid-auto-flow: row; }
+
+/* Кусочная функция в карточке (README макета, 6.6): запись скобкой с
+   карандашом вместо поля; поле остаётся источником записи, но не видно. */
+.fc-card.is-pw > .crow-formula { display: none; }
+.fc-pwrec {
+  display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 6px 8px 6px 10px; cursor: pointer;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-size: 16px; color: var(--text);
+}
+.fc-pwrec:hover { border-color: var(--border-strong); }
+.fc-pwrec:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.fc-pwrec-math { flex: 1 1 auto; min-width: 0; overflow-x: auto; }
+.fc-pwrec-math .katex { font-size: 1em; }
+.fc-pwrec-pen { flex: 0 0 15px; width: 15px; height: 15px; color: var(--text2); }
+.fc-pwrec-pen svg { width: 15px; height: 15px; display: block; }
+/* Q(P): чип, «в расчётах», канон записи (README макета, 6.1). */
+.fc-qp { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; font-size: 13px; color: var(--text2); line-height: 1.55; }
+.fc-qp .form-badge { font-size: 12px; font-weight: 600; padding: 1px 6px; border-radius: var(--r-sm); background: var(--chip-bg); color: var(--chip-text); }
+.fc-qp-math { font-size: 16px; color: var(--text); }
+.fc-qp-math .katex { font-size: 1em; }
+/* Телефон: «Вид графика» листом снизу (COVERAGE, раздел 8). */
+@media (max-width: 759px) {
+  .cv-card > .wrench, #wrench-pop { position: fixed !important; left: 0 !important; right: 0 !important; bottom: 0 !important; top: auto !important; width: auto !important; max-height: 85vh; overflow-y: auto; border-radius: 16px 16px 0 0; z-index: var(--z-pop); }
+}

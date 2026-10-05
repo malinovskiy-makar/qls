@@ -294,7 +294,9 @@ function editEqValue(lab, name, current, apply) {
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
-  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 1) + 'ch'; };
+  /* Поле по содержимому: длина числа плюс полсимвола под курсор. Целый
+     запасной символ делал поле у «114» шире 40 px (ширина четырёх цифр). */
+  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 0.5) + 'ch'; };
   fitWidth();
   inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое

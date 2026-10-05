@@ -713,7 +713,8 @@ if (need('Ф') || need('F')) {
   await esc.keyboard.press('Escape');
   await esc.waitForTimeout(250);
   const afterEsc = await esc.evaluate(() => {
-    const c = document.querySelectorAll('#picker-blocks .bcard')[0];
+    // ПЕРЕНАЦЕЛЕНО (фаза 8): служебный фокус при открытии стоит в поиске.
+    const c = document.getElementById('picker-search');
     const cs = getComputedStyle(c);
     return { outline: cs.outlineStyle + ' ' + cs.outlineWidth, ring: c.classList.contains('no-init-ring') };
   });

@@ -1584,16 +1584,15 @@ await t('расчёты и разбор раскрыты, кнопок свор�
   return !bad.length || bad.join('; ');
 }));
 
-await t('блок «Ключевые значения» раскрывается щелчком', async () => {
-  await clickUI('#sb-btn');
-  await page.waitForTimeout(180);
+/* ПЕРЕНАЦЕЛЕНО (фаза 5а, пункт (д)): кнопки сворачивания расчётов нет —
+   блок раскрыт сразу, без щелчка, и в нём есть содержимое. */
+await t('блок расчётов «Ответа» раскрыт без щелчка и не пуст', async () => {
   const r = await page.evaluate(() => {
     const box = document.getElementById('sb-fold');
     const txt = document.getElementById('sb-body').textContent;
-    return { open: box.classList.contains('open'), len: txt.trim().length };
+    return { open: box.classList.contains('open'), len: txt.trim().length, btn: !!document.getElementById('sb-btn') };
   });
-  await clickUI('#sb-btn');
-  return (r.open && r.len > 0) || JSON.stringify(r);
+  return (r.open && r.len > 0 && !r.btn) || JSON.stringify(r);
 });
 
 /* ПЕРЕНАЦЕЛЕНО (фаза 5а): ширины колонок задаёт макет, и они разные:
@@ -1661,19 +1660,19 @@ await t('первая видимая карточка выделена одна'
 /* Карточка теперь одна на весь ввод (#sec-input), и на входе в модель она уже
    раскрыта. Поэтому сначала закрываем её, потом открываем щелчком — иначе
    проба меряла бы «раскрытую» и «раскрытую». */
-await t('раскрытая карточка отличается фоном', async () => {
-  await clickUI('#sec-input > .fold-btn');           // закрыть
-  await page.waitForTimeout(180);
-  const closed = await page.evaluate(() => getComputedStyle(document.getElementById('sec-input')).backgroundColor);
-  await clickUI('#sec-input > .fold-btn');           // открыть обратно
-  await page.waitForTimeout(180);
+/* ПЕРЕНАЦЕЛЕНО (фаза 5б, пункт (д)): секции не сворачиваются, и «раскрытой
+   карточки» больше нет. Смысл прежней проверки — карточка читается отдельным
+   предметом на фоне колонки: у карточки функции свой фон или рамка
+   (README макета, 6.1). */
+await t('карточка функции отличается от колонки фоном или рамкой', async () => {
   const r = await page.evaluate(() => {
-    const sec = document.getElementById('sec-input');
-    const body = sec.querySelector(':scope > .fold-body');
-    return { open: body.classList.contains('open'), card: sec.classList.contains('open-card'),
-             bg: getComputedStyle(sec).backgroundColor };
+    const card = document.querySelector('#curve-list .fc-card');
+    const col = document.getElementById('tools-panel');
+    if (!card || !col) return { card: !!card };
+    const cs = getComputedStyle(card), ks = getComputedStyle(col);
+    return { card: true, bg: cs.backgroundColor, colBg: ks.backgroundColor, border: cs.borderTopWidth + ' ' + cs.borderTopStyle };
   });
-  return (r.open && r.card && r.bg !== closed) || JSON.stringify(r) + ' закрытая ' + closed;
+  return (r.card && (r.bg !== r.colBg || /^[1-9].* solid/.test(r.border))) || JSON.stringify(r);
 });
 
 /* ── П2 · Н5 · ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого

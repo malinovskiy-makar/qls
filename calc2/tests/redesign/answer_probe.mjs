@@ -35,6 +35,10 @@ for (const key of keys) {
   const e0 = errors.length;
   await page.evaluate((k) => { resetSceneMemory(); pickScene(k); closePicker(); redrawAll(); }, key);
   await page.waitForTimeout(450);
+  // «Ответ» пересобирается на кадр позже табло (и после отложенных расчётов
+  // сцены): ждём два кадра, чтобы читать устоявшийся экран.
+  await page.evaluate(() => new Promise(res => requestAnimationFrame(() => requestAnimationFrame(res))));
+  await page.waitForTimeout(150);
   const r = await page.evaluate(() => {
     const t = (el) => { if (!el) return ''; const c = el.cloneNode(true); c.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return c.textContent.replace(/[\s  ​]+/g, ' ').trim(); };
     const cells = [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => {

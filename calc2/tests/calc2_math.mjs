@@ -3227,7 +3227,10 @@ const CASES = [
           var field = document.getElementById('labmin-field');
           var eq = field.querySelector('.reg-eq');
           var eqWidth = eq.getBoundingClientRect().width;
-          var panelWidth = document.getElementById('params-body').getBoundingClientRect().width;
+          /* ПЕРЕНАЦЕЛЕНО (фаза 5а): регулятор живёт в «Условии», а не в ленте
+             #params-body правой панели; «панель» — колонка, где он стоит. */
+          var host = field.closest('#tools-panel, #params-panel, #params-body');
+          var panelWidth = host ? host.getBoundingClientRect().width : 0;
           eq.click();
           var inp = field.querySelector('input.param-eq-input');
           var cs = getComputedStyle(inp);

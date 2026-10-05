@@ -195,7 +195,10 @@ function buildAnswer() {
     d.dataset.src = c.src;
     // Подпись ячейки словами, ниже «обозначение = число» (README макета, 8.3).
     const parts = heroLabel(c.lab ? plainText(c.lab) : c.labText);
-    const l = document.createElement('div'); l.className = 'ans-lab'; l.textContent = parts.caption;
+    const l = document.createElement('div'); l.className = 'ans-lab';
+    // Подпись, которую не разобрали на слова и обозначение, переезжает как есть,
+    // вместе с набранными формулой обозначениями («Рынок 1: (q₁; P₁)»).
+    if (!parts.not && c.lab) l.innerHTML = c.lab.innerHTML; else l.textContent = parts.caption;
     const line = document.createElement('div'); line.className = 'ans-line';
     if (parts.not) {
       const n = document.createElement('span'); n.className = 'ans-not';
