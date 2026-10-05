@@ -47,9 +47,19 @@ function edits(rec) {
 async function sig(page) {
   return page.evaluate(() => {
     const s = window.__RD.stateDump();
-    ['crosses', 'zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'mcFlat', 'sceneKey'].forEach(k => delete s[k]);
+    /* mathRes — итоги «Математики», их сцена пересчитывает на каждой
+       перерисовке по ОКНУ (точки ограничения берутся по окну x). Окно в
+       историю не входит (журнал, «Принято без вопроса», п. 7): после отмены
+       оно остаётся раздвинутым, и производное от него сверять нечего. Окно
+       «Математики» (mathXmin…mathYmax) — то же окно, только своими полями. */
+    ['crosses', 'zoomLock', 'viewDirty', 'panelWin', 'tanTop', 'tanBot', 'mcFlat', 'sceneKey', 'mathRes', 'mathXmin', 'mathXmax', 'mathYmin', 'mathYmax'].forEach(k => delete s[k]);
     Object.keys(s).forEach(k => { if (/Sig$/.test(k)) delete s[k]; });
-    const c = window.__RD.controls().filter(x => /^input|math-field|select|exact|edval|switch/.test(x.kind)).map(x => x.key.replace(/graph-f-\d+/g, 'graph-f') + '=' + JSON.stringify(x.props));
+    // Границы ползунка сдвига — ±Pmax/2, то есть тоже от окна (88-params.js).
+    const c = window.__RD.controls().filter(x => /^input|math-field|select|exact|edval|switch/.test(x.kind)).map(x => {
+      const p = Object.assign({}, x.props);
+      if (/^#params-curves>/.test(x.key) && x.kind === 'input:range') { delete p.min; delete p.max; }
+      return x.key.replace(/graph-f-\d+/g, 'graph-f') + '=' + JSON.stringify(p);
+    });
     return JSON.stringify([s, c.sort()]);
   });
 }
