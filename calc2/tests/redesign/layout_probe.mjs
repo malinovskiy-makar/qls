@@ -63,14 +63,17 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     '«Сначала сам»: 1 245 к 1 250 — нет; 11,35 и 11,354 к 11,35 — да; 11,3 — нет', JSON.stringify(g));
   // Печать.
   await page.emulateMedia({ media: 'print' });
+  // Строки чисел и название лист получает в обработчике beforeprint
+  // (fillPrintBlocks): эмуляция печатной среды его не вызывает.
+  await page.evaluate(() => window.dispatchEvent(new Event('beforeprint')));
   const pr = await page.evaluate(() => {
     const vis = (s) => { const e = document.querySelector(s); if (!e) return false; const cs = getComputedStyle(e); return cs.display !== 'none' && cs.visibility !== 'hidden' && e.getBoundingClientRect().height > 0; };
     const stats = document.getElementById('print-stats');
     return { chart: vis('#chart'), head: vis('#model-head'), bar: vis('#canvas-bar'), cond: vis('#tools-panel'), ans: vis('#params-panel'),
-             lines: stats ? stats.innerText.split('\n').filter(x => /\d/.test(x)).length : 0, title: stats ? (stats.querySelector('h1, h2, .print-title') || {}).textContent || '' : '' };
+             lines: stats ? stats.innerText.split('\n').filter(x => /\d/.test(x)).length : 0, title: (document.getElementById('print-title') || {}).textContent || '' };
   });
   console.log('печать:', JSON.stringify(pr));
-  ok(pr.chart && !pr.head && !pr.bar && !pr.cond && !pr.ans && pr.lines > 0, 'печать: холст и строки чисел, без шапок и колонок', JSON.stringify(pr));
+  ok(pr.chart && !pr.head && !pr.bar && !pr.cond && !pr.ans && pr.lines > 0 && pr.title.trim().length > 0, 'печать: холст и строки чисел, без шапок и колонок', JSON.stringify(pr));
   await ctx.close();
 }
 // 1280×700
@@ -122,7 +125,7 @@ const box = (page, sel) => page.evaluate((s) => { const e = document.querySelect
     });
     s.forEach(x => small.push(tab + ': ' + x));
   }
-  console.log('телефон: органов меньше 44×44 — ' + small.length + (small.length ? ': ' + small.slice(0, 12).join('; ') : ''));
+  console.log('телефон: органов меньше 44×44 — ' + small.length + (small.length ? ': ' + small.join('; ') : ''));
   ok(small.length === 0, 'телефон: зона касания каждого органа ≥ 44×44', small.length);
   await ctx.close();
 }

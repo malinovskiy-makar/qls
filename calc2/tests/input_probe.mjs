@@ -510,7 +510,28 @@ if (need('Ш') || need('SH')) {
     `);
     if (w.err) { bad++; console.log('FAIL ' + w.err); continue; }
     await page.waitForTimeout(700);
-    const m = await run(`
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.6): у кусочной функции
+       на месте поля стоит запись скобкой (.fc-pwrec), поле спрятано. Те же
+       правила прикладываются к записи: прокрутки нет, содержимое не вылезает,
+       запись выросла в высоту, по строке на кусок (узкого вида у записи нет). */
+    const rec = await run(`
+      var i = document.getElementById('curve-expr-1');
+      var card = i.closest('.fc-card');
+      var rec = card && card.classList.contains('is-pw') ? card.querySelector('.fc-pwrec') : null;
+      if (!rec) return null;
+      var math = rec.querySelector('.fc-pwrec-math');
+      var k = math.querySelector('.katex-html') || math;
+      var ann = math.querySelector('annotation');
+      var tex = ann ? ann.textContent : '';
+      // По строке на кусок: в каждой строке cases ровно один «&».
+      var rows = tex.indexOf('begin{cases}') >= 0 ? tex.split('&').length - 1 : 0;
+      var r = rec.getBoundingClientRect(), mr = math.getBoundingClientRect(), kr = k.getBoundingClientRect();
+      return { fieldW: r.width, fieldH: r.height, contentW: kr.width, contentR: kr.right, fieldR: r.right,
+               scrollW: math.scrollWidth, clientW: math.clientWidth, fontSize: getComputedStyle(math).fontSize,
+               slotW: mr.width, slotOverflow: getComputedStyle(math).overflowX, rowH: r.height,
+               innerTag: 'fc-pwrec', contentBoxR: mr.right, narrow: rows !== ${n}, mf: false, value: i.value, rows: rows };
+    `);
+    const m = rec || await run(`
       var i = document.getElementById('curve-expr-1');
       var host = i._mf || i;
       var r = host.getBoundingClientRect();
@@ -538,7 +559,7 @@ if (need('Ш') || need('SH')) {
         mf: !!i._mf, value: i.value,
       };
     `);
-    console.log(`   ${n} куска:`);
+    console.log(`   ${n} куска:` + (rec ? ` запись скобкой, строк ${rec.rows}` : ''));
     console.log(`     поле ${num(m.fieldW)}×${num(m.fieldH)} px, было по высоте ${num(w.base.h)} px`);
     console.log(`     содержимое ${num(m.contentW)} px, правый край содержимого ${num(m.contentR)} против края видимой области ${num(m.contentBoxR)}`);
     console.log(`     scrollWidth ${num(m.scrollW)} / clientWidth ${num(m.clientW)}  (MathLive: ${m.mf}, кегль ${m.fontSize}, узкий вид ${m.narrow})`);
@@ -610,41 +631,41 @@ if (need('Ш') || need('SH')) {
   await page.waitForTimeout(900);
   if (narrow.err) { bad++; console.log('FAIL ' + narrow.err); }
   else {
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.6): у кусочной функции
+       на месте поля стоит запись скобкой с карандашом (кнопка, открывает окно),
+       а не само поле в «узком виде». Правило прежнее: на узком окне запись
+       не вылезает за колонку и либо помещается, либо прокручивается внутри, а
+       стоящее в поле значение разбирается обратно в ту же цепочку кусков. */
     const m380 = await run(`
       var i = document.getElementById('curve-expr-1');
-      var host = i._mf || i;
-      var sr = host.shadowRoot || host;
-      var content = sr.querySelector ? sr.querySelector('.ML__content') : null;
+      var card = i.closest('.fc-card');
+      var rec = card && card.querySelector('.fc-pwrec');
+      var math = rec && rec.querySelector('.fc-pwrec-math');
       var panel = document.getElementById('tools-panel').getBoundingClientRect();
-      var row = i.closest('.f-row').getBoundingClientRect();
-      return {
-        h: host.getBoundingClientRect().height,
-        scrollW: content ? content.scrollWidth : null, clientW: content ? content.clientWidth : null,
-        fontSize: content ? getComputedStyle(content).fontSize : null,
-        rowR: row.right, panelR: panel.right, panelW: panel.width,
-      };
+      var r = rec ? rec.getBoundingClientRect() : null;
+      var k = math ? math.querySelector('.katex') : null;
+      return { rec: !!rec, recR: r ? r.right : 0, panelR: panel.right, panelW: panel.width,
+               scrollW: math ? math.scrollWidth : null, clientW: math ? math.clientWidth : null,
+               scrolls: math ? (/(auto|scroll)/.test(getComputedStyle(math).overflowX) ? 1 : 0) : 0,
+               fontSize: k ? getComputedStyle(k).fontSize : null };
     `);
-    console.log(`     панель ${num(m380.panelW)} px; поле высотой ${num(m380.h)}, кегль ${m380.fontSize}, ` +
-      `scroll ${num(m380.scrollW)}/${num(m380.clientW)}; строка правым краем ${num(m380.rowR)} против панели ${num(m380.panelR)}`);
-    flag('380 px: горизонтальной прокрутки нет', m380.scrollW <= m380.clientW + 1, `${m380.scrollW} > ${m380.clientW}`);
-    flag('380 px: строка не вылезла за панель', m380.rowR <= m380.panelR + 1, `${num(m380.rowR)} > ${num(m380.panelR)}`);
-    flag('380 px: кегль не ниже предела 11 px', parseFloat(m380.fontSize) >= 10.99, m380.fontSize);
-    /* Узкая запись обязана разбираться обратно в ту же цепочку условий:
-       иначе правка формулы прямо в поле молча испортила бы кривую. */
+    console.log(`     панель ${num(m380.panelW)} px; запись скобкой ${m380.rec}, правым краем ${num(m380.recR)} против панели ${num(m380.panelR)}, ` +
+      `scroll ${num(m380.scrollW)}/${num(m380.clientW)}, кегль ${m380.fontSize}`);
+    flag('380 px: у кусочной на месте поля запись скобкой', m380.rec, String(m380.rec));
+    flag('380 px: запись не вылезла за колонку', m380.recR <= m380.panelR + 1, `${num(m380.recR)} > ${num(m380.panelR)}`);
+    flag('380 px: запись помещается или прокручивается внутри', m380.scrollW <= m380.clientW + 1 || m380.scrolls === 1, `${m380.scrollW} > ${m380.clientW}`);
+    flag('380 px: кегль записи не ниже 11 px', parseFloat(m380.fontSize) >= 10.99, m380.fontSize);
     const rt = await run(`
       var i = document.getElementById('curve-expr-1');
-      var mf = i._mf;
-      var back = latexToMath(mf.value);
+      var p = pwParse(i.value, 'Q');
       var c = STATE.curves.find(function (x) { return x.role === 'demand'; });
-      return { narrow: isNarrowCases(mf.value), tex: mf.value, field: i.value, back: back,
-               same: back.replace(/\\s/g, '') === String(i.value || '').replace(/\\s/g, ''),
-               at20: evalCurve(c, 20), at60: evalCurve(c, 60) };
+      return { rows: p ? p.rows.map(function (r) { return r.f + '|' + r.a + '|' + r.b; }).join(' ; ') : null,
+               field: i.value, at20: evalCurve(c, 20), at60: evalCurve(c, 60) };
     `);
-    console.log(`     узкий вид: ${rt.narrow}; разбор обратно: ${rt.back}`);
-    flag('380 px: запись перешла в узкий вид', rt.narrow === true, String(rt.narrow));
-    flag('380 px: узкая запись разбирается в ту же цепочку', rt.same, rt.back + '  vs  ' + rt.field);
-    show('380 px: D(20) после узкой записи', rt.at20, 80, 0.001);
-    show('380 px: D(60) после узкой записи', rt.at60, 50, 0.001);
+    console.log(`     в поле: ${rt.field}; разбор: ${rt.rows}`);
+    flag('380 px: запись в поле разбирается в те же два куска', rt.rows === '100 - Q|0|40 ; 80 - 0.5*Q|40|', rt.rows);
+    show('380 px: D(20) после кусочной записи', rt.at20, 80, 0.001);
+    show('380 px: D(60) после кусочной записи', rt.at60, 50, 0.001);
   }
   await page.setViewportSize({ width: 1440, height: 950 });
   await page.waitForTimeout(300);

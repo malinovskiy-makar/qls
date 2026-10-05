@@ -59,25 +59,44 @@ for (const key of keys) {
   await page.waitForFunction(() => window.__RD.settled(), null, { timeout: 6000 }).catch(() => null);
   await page.waitForTimeout(120);
   // 1. Органы старта.
-  const want = (rec.controls || rec.start.controls || []).filter(c => !c.picker).map(c => c.key);
-  const res = await page.evaluate((list) => list.map(k => {
-    let el = window.__RD.findControl(k.mapped);
-    if (!el) {
-      // Узкая ширина: выезжающий «Ответ» или вкладки телефона.
-      const tabs = [...document.querySelectorAll('#ph-tabs .ph-tab')].filter(b => b.offsetParent !== null);
-      for (const t of tabs) { t.click(); el = window.__RD.findControl(k.mapped); if (el) break; }
-      if (!el && document.querySelector('#btn-answer') && document.querySelector('#btn-answer').offsetParent !== null) {
-        document.body.classList.add('ans-open'); el = window.__RD.findControl(k.mapped); document.body.classList.remove('ans-open');
+  const wantC = (rec.controls || rec.start.controls || []).filter(c => !c.picker);
+  const want = wantC.map(c => c.key);
+  /* Глаз кривой: на старом экране номер в ключе «#curve-list>input[n]» считал
+     все поля списка (глаз, поле записи), на новом глаз — своя кнопка в
+     карточке. Сопоставляем по порядку глаз: k-й глаз старого — k-й новый. */
+  const eyes = wantC.filter(c => /^#curve-list>input(\[\d+\])?$/.test(c.key) && c.kind === 'input:checkbox').map(c => c.key);
+  const eyeKey = (k) => { const j = eyes.indexOf(k); return j < 0 ? null : '#curve-list>button.fc-eye' + (j ? '[' + j + ']' : ''); };
+  const res = await page.evaluate(async (list) => {
+    // Выезд панели и смена вкладки видны не в тот же миг: видимость у
+    // потомков панели меняется переходом (до 0,2 с).
+    const pause = () => new Promise(r => setTimeout(r, 260));
+    const out = [];
+    for (const k of list) {
+      let el = window.__RD.findControl(k.mapped);
+      if (!el) {
+        // Узкая ширина: выезжающий «Ответ» или вкладки телефона.
+        const tabs = [...document.querySelectorAll('#ph-tabs .ph-tab')].filter(b => b.offsetParent !== null);
+        for (const t of tabs) { t.click(); await pause(); el = window.__RD.findControl(k.mapped); if (el) break; }
+        if (!el && document.querySelector('#btn-answer') && document.querySelector('#btn-answer').offsetParent !== null) {
+          document.body.classList.add('ans-open'); await pause(); el = window.__RD.findControl(k.mapped); document.body.classList.remove('ans-open');
+        }
+        // Телефон: лист «Действия» за «⋯» (README макета, раздел 3).
+        const more = document.getElementById('btn-ph-more');
+        if (!el && more && more.offsetParent !== null) {
+          more.click(); await pause(); el = window.__RD.findControl(k.mapped);
+          if (typeof closePop === 'function') closePop();
+        }
+        if (tabs.length) tabs[0].click();
       }
-      if (tabs.length) tabs[0].click();
+      // Орган в закрытом меню «…» своей карточки — достижим открытием меню.
+      if (!el) { const any = window.__RD.findControlAny(k.mapped); if (any && any.closest('.fc-menu')) el = any; }
+      if (!el) out.push(k.orig);
     }
-    // Орган в закрытом меню «…» своей карточки — достижим открытием меню.
-    if (!el) { const any = window.__RD.findControlAny(k.mapped); if (any && any.closest('.fc-menu')) el = any; }
-    return el ? null : k.orig;
-  }).filter(Boolean), want.filter(k => {
+    return out;
+  }, want.filter(k => {
     const f = fateOf(k);
     return !(f.fate === 'убран' || (f.fate === 'заменён' && /^[авгдк]$/.test(f.letter)));
-  }).map(k => ({ orig: k, mapped: layerNew.mapKey(k.replace(/~\d+$/, '')) })));
+  }).map(k => ({ orig: k, mapped: eyeKey(k) || layerNew.mapKey(k.replace(/~\d+$/, '')) })));
   checks += want.length;
   res.forEach(k => { bad++; issues.push(key + ': орган ' + k + ' не найден'); });
   // 2. Числа старта.
@@ -103,6 +122,6 @@ for (const key of keys) {
 }
 await browser.close();
 const sec = ((Date.now() - t0) / 1000).toFixed(1);
-issues.slice(0, 60).forEach(x => console.log('  ✗ ' + x));
+issues.slice(0, 400).forEach(x => console.log('  ✗ ' + x));
 console.log((bad ? 'ПАРИТЕТ НАРУШЕН' : 'ПАРИТЕТ ЦЕЛ') + ' (' + VW + '×' + VH + '): ключей ' + keys.length + ', проверок ' + checks + ', расхождений ' + bad + ', ' + sec + ' с');
 process.exit(bad ? 1 : 0);

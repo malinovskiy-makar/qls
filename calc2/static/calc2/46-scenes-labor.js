@@ -597,7 +597,15 @@ function setLaborStruct(mode) {
   // (в двусторонней монополии показывается диапазон, поверх него МРОТ только запутал бы).
   const up = document.getElementById('union-pane'); if (up) up.style.display = (mode === 'union') ? '' : 'none';
   const lb = document.getElementById('labmin-block');
-  if (lb) lb.style.display = (mode === 'union' || mode === 'bilateral') ? 'none' : '';
+  if (lb) {
+    lb.style.display = (mode === 'union') ? 'none' : '';
+    /* Редизайн 10.2026: регулятор больше не уезжает в пульт, а стоит на месте
+       (пункт (з)). В двусторонней монополии галочки МРОТ нет, как и было, но
+       включённый пресетом МРОТ виден своим регулятором — раньше его
+       показывал пульт (прибор паритета, labor-bilat). */
+    const lc = lb.querySelector(':scope > label.chk');
+    if (lc) lc.style.display = (mode === 'bilateral') ? 'none' : '';
+  }
   if (mode === 'union') setUnionModel(STATE.unionModel);   // синхронизировать под-модель/поля
   if (typeof updatePult === 'function') updatePult();   // зарплата профсоюза / МРОТ в пульт
   redrawAll();

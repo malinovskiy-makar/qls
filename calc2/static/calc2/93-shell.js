@@ -94,11 +94,26 @@ function wireShell() {
   }
   // 760–1239 px: «Ответ» выезжает панелью справа.
   const ab = document.getElementById('btn-answer');
-  if (ab) ab.addEventListener('click', () => {
-    const on = document.body.classList.toggle('ans-open');
-    ab.setAttribute('aria-expanded', on ? 'true' : 'false');
+  const setAns = (on) => {
+    document.body.classList.toggle('ans-open', on);
+    if (ab) ab.setAttribute('aria-expanded', on ? 'true' : 'false');
     if (on) afterColumnShown();
+  };
+  if (ab) ab.addEventListener('click', () => setAns(!document.body.classList.contains('ans-open')));
+  /* Открытая панель ложится поверх правого края холста вместе с кнопкой
+     «Ответ»: закрывают её крестик в шапке, Esc и щелчок мимо панели. */
+  const ax = document.getElementById('ans-x');
+  if (ax) ax.addEventListener('click', () => { setAns(false); if (ab && ab.offsetParent) ab.focus({ preventScroll: true }); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !document.body.classList.contains('ans-open')) return;
+    if (document.querySelector('.pop.open, .modal.open, .cpick-menu.open')) return;
+    setAns(false);
   });
+  document.addEventListener('pointerdown', (e) => {
+    if (!document.body.classList.contains('ans-open')) return;
+    if (e.target.closest('#params-panel, #btn-answer, .pop, .modal, .cpick-menu, #hint-tip')) return;
+    setAns(false);
+  }, true);
   // Телефон: вкладки «Условие» / «Ответ» / «Разбор»; каждая показанная колонка
   // достраивает поля формул и перемеряет формулы (COVERAGE, раздел 8).
   const tabs = document.querySelectorAll('#ph-tabs .ph-tab');
@@ -126,4 +141,53 @@ function wireShell() {
   window.addEventListener('calc2:history', syncModelHead);
   window.addEventListener('calc2:changing', syncZoomLevel);
   syncModelHead();
+  wirePhoneMore();
+}
+
+/* ── Телефон: лист «Действия» за кнопкой «⋯» (README макета, раздел 3) ─────
+   На узком экране в шапке модели и в панели холста места нет, поэтому
+   «Повторить», «Сбросить» и кнопки масштаба переезжают строками в лист. Узлы
+   те же (с теми же id и обработчиками), не копии: шире 759 px они
+   возвращаются на прежнее место. «Сбросить» и «Повторить» закрывают лист,
+   масштаб — нет: его жмут подряд. */
+const PH_MORE = [['btn-redo', 'Повторить'], ['btn-model-reset', null], ['btn-zoomout', 'Отдалить'], ['btn-zoomin', 'Приблизить']];
+const _phHome = {};
+function phMoreLayout(phone) {
+  const list = document.getElementById('ph-more-list');
+  if (!list) return;
+  if (!phone && typeof closePop === 'function') {
+    const pop = document.getElementById('ph-more-pop');
+    if (pop && pop.classList.contains('open')) closePop();
+  }
+  PH_MORE.forEach(([id, label]) => {
+    const b = document.getElementById(id);
+    if (!b) return;
+    if (!_phHome[id]) _phHome[id] = { parent: b.parentElement, next: b.nextSibling };
+    if (label && !b.querySelector(':scope > .ph-lab')) {
+      const t = document.createElement('span');
+      t.className = 'ph-lab'; t.textContent = label;
+      b.appendChild(t);
+    }
+    if (phone) { if (b.parentElement !== list) list.appendChild(b); return; }
+    const h = _phHome[id];
+    if (b.parentElement === h.parent) return;
+    if (h.next && h.next.parentElement === h.parent) h.parent.insertBefore(b, h.next);
+    else h.parent.appendChild(b);
+  });
+}
+function wirePhoneMore() {
+  const btn = document.getElementById('btn-ph-more');
+  const pop = document.getElementById('ph-more-pop');
+  if (!btn || !pop) return;
+  btn.addEventListener('click', (e) => { e.stopPropagation(); openPop(btn, pop, { noFocus: true }); });
+  const x = document.getElementById('ph-more-x');
+  if (x) x.addEventListener('click', () => closePop());
+  pop.addEventListener('click', (e) => {
+    const b = e.target.closest('#btn-redo, #btn-model-reset');
+    if (b) setTimeout(() => { if (pop.classList.contains('open')) closePop(); }, 0);
+  });
+  const mq = window.matchMedia('(max-width: 759px)');
+  phMoreLayout(mq.matches);
+  const on = () => phMoreLayout(mq.matches);
+  if (mq.addEventListener) mq.addEventListener('change', on); else mq.addListener(on);
 }

@@ -865,6 +865,9 @@ function applyLabelSize() {
    на 12 пикселей, а возвращается обратно, лишь когда до края остаётся столько
    же с другой стороны. На самой границе подпись больше не мигает. */
 const _labelPos = new Map();
+/* Ширина подписи по замеру прошлого кадра (px): грубая оценка «6,3 px на
+   знак» не знает набора формулой, и «MC» вылезала за правый край холста. */
+const _labelW = new Map();
 const LABEL_EASE = 0.35;       // доля пути к новому месту за одну перерисовку
 const LABEL_JUMP = 60;         // дальше этого едем сразу: масштаб сменился резко
 const FLIP_HYST = 12;          // запас на переворот выравнивания, px
@@ -904,7 +907,7 @@ function requestLabelFrame() {
   _labelFrame = requestAnimationFrame(() => { _labelFrame = null; redrawKeepingWindow(); });
 }
 // Сцена сменилась — прошлые места подписей к ней отношения не имеют.
-function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); }
+function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); _labelW.clear(); }
 
 /* ТОЧКА ПОСТАНОВКИ ПОДПИСИ И САМА ПОДПИСЬ — ОДНО ПРАВИЛО, ДВА ПОТРЕБИТЕЛЯ.
    Зовут её отрисовка (drawCurves) и выгрузка в .tex (buildTexFromState).
@@ -929,7 +932,7 @@ function labelCurve(g, f, txt, color, opts) {
   if (!a) return null;
   const m = CONFIG.margin;
   const right = W - m.right;
-  const wide = txt.length * 6.3 + 8;              // грубая ширина текста, px
+  const wide = (_labelW.get(anchorKey) || txt.length * 6.3) + 8;   // ширина текста, px: замер или оценка
   const rawPx = sx(a.q), rawPy = sy(a.v);
   // Переворот с запасом: у самой границы решение не меняется туда-сюда.
   const over = rawPx + wide - right;
@@ -972,9 +975,24 @@ function labelCurve(g, f, txt, color, opts) {
   // А28: название кривой набирается как величина (MC, S + t, Q_d), а не
   // обычным текстом. Решает общий разбор, тот же, что у панели и у файла.
   renderLabelText(t, txt);
+  /* Набранная подпись шире оценки: если она всё же вылезла за правый край
+     области графика, переворачиваем её влево сразу, в этом же кадре, и
+     запоминаем ширину — следующий кадр решит сторону уже по замеру. */
+  let txFinal = tx;
+  try {
+    const bb = t.node().getBBox();
+    if (bb.width > 0) {
+      _labelW.set(anchorKey, bb.width);
+      if (!toLeft && bb.x + bb.width > right + 1) {
+        txFinal = px - 6;
+        t.attr('text-anchor', 'end').attr('x', txFinal);
+        sm.toLeft = true; _labelPos.set(key, sm);
+      }
+    }
+  } catch (e) { /* холст не в документе (выгрузка) — замерять нечего */ }
   // Название кривой правится двойным щелчком прямо на графике.
   if (o.curve) {
-    makeRenamable(t, txt, tx, y, (v) => {
+    makeRenamable(t, txt, txFinal, y, (v) => {
       if (v) o.curve.label = v; else delete o.curve.label;
       renderCurveList();
     }, curveShortName(o.curve));   // одиночный щелчок по имени взводит саму кривую

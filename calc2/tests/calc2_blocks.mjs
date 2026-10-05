@@ -331,7 +331,7 @@ await t('(д) «Что изучаем», «Структура рынка» и «
   return bad.length === 0 || bad.map(r => r.key + ' ' + JSON.stringify(r.seen)).join('; ');
 });
 
-// (ж) Левый край дорожек всех ползунков панели совпадает до пикселя.
+// (ж) Левый край дорожек ползунков совпадает до пикселя (в карточках — между собой, в секции — между собой).
 await t('(ж) левый край дорожек всех ползунков панели совпадает', async () => {
   const r = await page.evaluate(async () => {
     const w = ms => new Promise(res => setTimeout(res, ms));
@@ -345,17 +345,27 @@ await t('(ж) левый край дорожек всех ползунков п�
     // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
     const tracks = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(el => el.offsetParent !== null && el.getBoundingClientRect().width > 0);
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): ползунок кривой
+       стоит внутри её карточки, регулятор сцены — прямо в секции, и карточка
+       сдвигает дорожку на свой внутренний отступ. Вровень обязаны стоять
+       дорожки одного вида контейнера: все карточные между собой (разные
+       карточки и разные границы «−10» / «−50») и все секционные. */
     return tracks.map(el => {
       const s = el.querySelector('input[type=range]');
       return { left: Math.round(s.getBoundingClientRect().left * 100) / 100,
+               group: el.closest('.fc-card') ? 'карточки' : 'секция',
                bound: (el.querySelector('.param-bound') || {}).textContent };
     });
   });
   if (r.length < 3) return 'дорожек всего ' + r.length + ' — проба ничего не проверила';
-  const uniq = [...new Set(r.map(x => x.left))];
-  return uniq.length === 1
-    || `дорожек ${r.length}, разных координат ${uniq.length}: ${uniq.join(', ')}`
-       + ` | границы: ${r.map(x => x.bound).join(', ')}`;
+  const card = r.filter(x => x.group === 'карточки');
+  if (card.length < 2 || new Set(card.map(x => x.bound)).size < 2) return 'в карточках меньше двух дорожек с разными границами — проба ничего не проверила';
+  const bad = ['карточки', 'секция'].map(g => {
+    const u = [...new Set(r.filter(x => x.group === g).map(x => x.left))];
+    return u.length > 1 ? g + ': разных координат ' + u.length + ' (' + u.join(', ') + ')' : '';
+  }).filter(Boolean);
+  return bad.length === 0
+    || bad.join('; ') + ` | границы: ${r.map(x => x.group + ' ' + x.bound).join(', ')}`;
 });
 
 /* ═══ ПРОВЕРКИ ЗАКРЫВАЮЩЕЙ НОЧНОЙ СЕССИИ (24.08) ══════════════════════════

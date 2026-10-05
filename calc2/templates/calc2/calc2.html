@@ -762,12 +762,16 @@
     <span class="mh-gap"></span>
     <button class="mh-icon" id="btn-undo" type="button" data-tip="Отменить (Ctrl+Z)" aria-label="Отменить" disabled><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/></svg></button>
     <button class="mh-icon" id="btn-redo" type="button" data-tip="Повторить (Ctrl+Shift+Z)" aria-label="Повторить" disabled><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14l5-5-5-5"/><path d="M20 9H9a5 5 0 0 0 0 10h3"/></svg></button>
+    <!-- Телефон: «Ещё действия» (README макета, раздел 3; COVERAGE, раздел 8). На
+         узком экране «Повторить», «Сбросить» и кнопки масштаба переезжают в лист
+         #ph-more-pop (93-shell.js); на большом кнопки «⋯» нет. -->
+    <button class="mh-icon ph-more-btn" id="btn-ph-more" type="button" aria-label="Ещё действия" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg></button>
     <span class="mh-sep" aria-hidden="true"></span>
     <!-- «Сначала сам» (фаза 9; README макета, 5.6 и 9): пилюля с переключателем. -->
-    <button class="mh-self" id="btn-self" type="button" aria-pressed="false" data-tip="Спрятать числа ответа и проверить себя"><span class="mh-self-track" aria-hidden="true"></span><span>Сначала сам</span></button>
+    <button class="mh-self" id="btn-self" type="button" aria-pressed="false" aria-label="Сначала сам" data-tip="Спрятать числа ответа и проверить себя"><span class="mh-self-track" aria-hidden="true"></span><span>Сначала сам</span></button>
     <button class="mh-btn mh-quiet" id="btn-model-reset" type="button" data-tip="Вернуть стартовые функции и параметры">Сбросить</button>
     <button class="mh-btn mh-outline" id="dock-export" type="button" data-tip="Скачать график" aria-label="Скачать"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v10"/><path d="M8 10l4 4 4-4"/><path d="M5 18h14"/></svg><span>Скачать</span></button>
-    <button class="mh-btn mh-main" id="btn-share" type="button" data-tip="Ссылка на это состояние модели" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><span>Поделиться</span></button>
+    <button class="mh-btn mh-main" id="btn-share" type="button" data-tip="Ссылка на это состояние модели" aria-label="Поделиться" aria-haspopup="dialog" aria-expanded="false"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 14a4 4 0 0 0 5.66 0l3-3a4 4 0 0 0-5.66-5.66l-1 1"/><path d="M14 10a4 4 0 0 0-5.66 0l-3 3a4 4 0 0 0 5.66 5.66l1-1"/></svg><span>Поделиться</span></button>
   </div>
 
   <!-- ── ЛЕВАЯ ПАНЕЛЬ: ВВОД ФУНКЦИЙ ────────────────────────────────── -->
@@ -2346,7 +2350,7 @@
        поверх них (фаза 6). -->
   <aside class="side side-right col-answer" id="params-panel" aria-label="Ответ">
     <div class="side-inner">
-      <div class="side-head col-head"><h2>Ответ</h2><span class="col-note">пересчитывается сразу</span><button type="button" id="self-showall" hidden>Показать всё</button></div>
+      <div class="side-head col-head"><h2>Ответ</h2><span class="col-note">пересчитывается сразу</span><button type="button" id="self-showall" hidden>Показать всё</button><button type="button" class="btn-icon ans-x" id="ans-x" aria-label="Закрыть «Ответ»"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
       <div class="side-scroll">
         <!-- Расчёты сцены: сюда JS переносит блок равновесия и все #info-*. -->
         <section class="side-part" id="scoreboard">
@@ -2467,6 +2471,11 @@
       <button class="btn" id="share-copy" type="button">Копировать</button>
     </div>
     <label class="chk share-self"><input type="checkbox" id="share-self"><span>Открыть в режиме «Сначала сам»<small>числа ответа спрятаны, удобно для домашки</small></span></label>
+  </div>
+
+  <div class="pop ph-more" id="ph-more-pop" role="dialog" aria-label="Действия">
+    <div class="ph-more-head"><div class="pop-title">Действия</div><button class="btn-icon" id="ph-more-x" type="button" aria-label="Закрыть"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div class="ph-more-list" id="ph-more-list"></div>
   </div>
 
   <div class="modal" id="pw-modal" role="dialog" aria-modal="true" aria-labelledby="pw-title" inert>
