@@ -2520,11 +2520,11 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .curve-row.fc-card.is-hot { border-color: var(--border-strong); }
 .fc-card > .crow-top { display: flex; align-items: center; gap: 8px; min-height: 28px; }
 .fc-card .cpick-btn {
-  width: 20px; height: 20px; border-radius: 50%; border: 0;
-  box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong);
-  margin-left: 2px;
+  width: 20px; height: 20px; border-radius: 50%; border: 0; box-shadow: none;
+  outline: 1px solid var(--border-strong); outline-offset: 2px; margin: 0 2px 0 4px;
 }
-.fc-card .cpick-btn:hover { transform: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--accent); }
+.fc-card .cpick-btn:hover { transform: none; outline-color: var(--accent); }
+.fc-card .cpick-btn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .fc-notation {
   flex: 0 0 auto; font-family: inherit; font-size: 18px; line-height: 1; color: var(--text);
   overflow: visible; white-space: nowrap; max-width: 40%;
@@ -2615,7 +2615,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .fc-menu .sel-btn { height: 34px; font-size: 14.5px; font-weight: 400; }
 
 /* «Добавить функцию»: во всю ширину, 38, пунктир, радиус 10, «+». */
-#btn-add-curve {
+#btn-add-curve, #btn-add-curve.fc-add {
   display: flex; align-items: center; justify-content: center; gap: 8px;
   width: 100%; height: 38px; margin-top: 8px; padding: 0 12px;
   background: transparent; color: var(--text2); border: 1px dashed var(--border-strong);
@@ -2687,8 +2687,8 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cpick-title { font-size: 13px; font-weight: 600; color: var(--text); margin: 0 0 10px; }
 .cpick-menu .cpick-grid { grid-template-columns: repeat(6, 28px); gap: 8px 8px; justify-content: space-between; }
 .cpick-menu .cpick-sw { width: 28px; height: 28px; border-radius: 50%; border: 0; }
-.cpick-menu .cpick-sw:hover { transform: none; box-shadow: 0 0 0 2px var(--surface), 0 0 0 3px var(--border-strong); }
-.cpick-menu .cpick-sw[aria-checked="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text); }
+.cpick-menu .cpick-sw:hover { transform: none; outline: 1px solid var(--border-strong); outline-offset: 2px; }
+.cpick-menu .cpick-sw[aria-checked="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
 .cpick-menu .cpick-sw[aria-checked="true"]::after { display: none; }
 .cpick-foot { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; margin-top: 12px; }
 .cpick-menu .cpick-own { width: 100%; margin: 0; padding: 4px 8px; background: transparent; font-size: 13px; white-space: nowrap; }
