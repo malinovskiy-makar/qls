@@ -985,7 +985,10 @@ r = await run(PANEL + `resetSceneMemory(); pickScene('sd'); redrawAll();
   var before = opened('#params-panel .side-part > .fold-body');
   resetSceneMemory(); pickScene('mono'); redrawAll();
   var after = opened('#params-panel .side-part > .fold-body');
-  var leftOpen = opened('#tools-panel .tools-body > .section > .fold-body');
+  /* Считаются только ВИДИМЫЕ секции: «Параметры» без ползунков не
+     показываются вовсе (ползунки кривых стоят под карточками, фаза 5б). */
+  var leftOpen = Array.prototype.filter.call(document.querySelectorAll('#tools-panel .tools-body > .section'), vis)
+    .filter(function (s) { var f = s.querySelector(':scope > .fold-body'); return f && f.classList.contains('open'); }).length;
   var leftAll = count('#tools-panel .tools-body > .section');
   var inp = document.getElementById('sec-input');
   var inpOpen = (inp && inp.querySelector(':scope > .fold-body').classList.contains('open')) ? 1 : 0;

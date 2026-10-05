@@ -258,17 +258,23 @@ await t('ключи цвета уникальны (MP ≠ MC и т.п.)', () => 
 }));
 
 /* --- П34: шесть предложенных цветов везде, где выбирают цвет ------------ */
-await t('в меню цвета шесть образцов и «Свой цвет»', () => page.evaluate(() => {
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5б; COVERAGE Р23): окно «Цвет кривой»
+   по макету — 12 образцов с именами (шесть цветов ролей и вторая шестёрка
+   палитры групп) и «Свой цвет». Строгость прежняя: число образцов точное, у
+   каждого есть имя, «Свой цвет» на месте, окно в body. */
+await t('в меню цвета двенадцать образцов с именами и «Свой цвет»', () => page.evaluate(() => {
   const btn = document.querySelector('.cpick[data-col="costMC"] .cpick-btn');
   if (!btn) return 'кнопки цвета нет';
   btn.click();
   const menu = document.querySelector('.cpick-menu');
   if (!menu) return 'меню не открылось';
-  const n = menu.querySelectorAll('.cpick-sw').length;
+  const sws = [...menu.querySelectorAll('.cpick-sw')];
+  const n = sws.length;
+  const named = sws.every(x => (x.getAttribute('aria-label') || '').trim());
   const own = !!menu.querySelector('.cpick-own input[type=color]');
   const inBody = menu.parentElement === document.body;   // не обрезается панелью
   closeColorMenu();
-  return (n === 6 && own && inBody) || `образцов ${n}, свой ${own}, в body ${inBody}`;
+  return (n === 12 && named && own && inBody) || `образцов ${n}, с именами ${named}, свой ${own}, в body ${inBody}`;
 }));
 
 await t('светлая и тёмная тема дают разные шесть цветов', () => page.evaluate(() => {
@@ -850,8 +856,10 @@ await t('панель параметров наполняется и в сцен
   await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('labor'); closePicker(); });
   await page.waitForTimeout(450);
   return await page.evaluate(() => {
-    const n = document.querySelectorAll('#params-body .pchip, #params-body .field').length;
-    return n > 0 || 'в панели параметров пусто';
+    /* ПЕРЕНАЦЕЛЕНО (фаза 5б): ползунки кривых стоят под их карточками
+       «Функций» (README макета, 6.1), остальные — в «Параметрах». */
+    const n = document.querySelectorAll('#params-body .pchip, #params-body .field, #curve-list .crow-sliders .pchip').length;
+    return n > 0 || 'ползунков сцены нет ни в «Параметрах», ни под карточками';
   });
 });
 

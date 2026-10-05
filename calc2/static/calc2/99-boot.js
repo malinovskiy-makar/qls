@@ -51,10 +51,12 @@ function init() {
   relocateForScene();   // перенести блоки результатов в панель аналитики
   cardifySections();    // панель ввода — список закрытых карточек
   foldPickerGroups();   // окно сценариев — десять закрытых блоков
+  if (typeof buildPickerScreen === 'function') buildPickerScreen();   // …одним экраном (95-picker-screen.js)
   wireControls();
   wireScene();          // полоса иконок, панели, меню плоскости, тема
   if (typeof wireShell === 'function') wireShell();   // шапка модели и панель холста (93-shell.js)
   if (typeof wireUiKit === 'function') wireUiKit();   // окна «Условия» (92-ui-kit.js)
+  if (typeof wireSelf === 'function') wireSelf();     // «Сначала сам» (96-self.js)
   // Н50, Н73: пары сегментных кнопок показываем настоящим тумблером. Идёт после
   // wireControls: к самим кнопкам к этому моменту уже привязаны обработчики.
   /* А34 · А67. Все настоящие бинарные переключатели показываем одним и тем же

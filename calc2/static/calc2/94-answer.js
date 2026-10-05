@@ -92,6 +92,21 @@ function heroLabel(t) {
   return { caption: cap(s), not: '' };
 }
 
+/* Обозначение из подписи табло → TeX: заглавные в несколько букв (MC, DWL,
+   CS) — прямым шрифтом; иначе буква и индекс («Qm» → Q_m, «X0» → X_0,
+   «Wп» → W_п); звёздочка — верхним индексом. Не разобрали — null. */
+function notationTex(t) {
+  let s = String(t || '').replace(/[\u200b\s]/g, '');
+  if (!s) return null;
+  const star = /[∗*]$/.test(s); s = s.replace(/[∗*]$/, '');
+  const sup = star ? '^{*}' : '';
+  if (/^[A-Z]{2,4}$/.test(s)) return '\\mathrm{' + s + '}' + sup;
+  const m = /^([A-Za-z])([A-Za-z0-9А-Яа-я]{0,4})$/.exec(s);
+  if (!m) return null;
+  const sub = m[2] ? '_{' + (/[А-Яа-я]/.test(m[2]) ? '\\text{' + m[2] + '}' : m[2]) + '}' : '';
+  return m[1] + sub + sup;
+}
+
 function plainText(el) {
   if (!el) return '';
   const c = el.cloneNode(true);
@@ -182,10 +197,9 @@ function buildAnswer() {
     const line = document.createElement('div'); line.className = 'ans-line';
     if (parts.not) {
       const n = document.createElement('span'); n.className = 'ans-not';
-      // «Q∗» из табло — звёздочка верхним индексом, как в макете (Q* =).
-      const star = /[∗*]$/.test(parts.not);
-      const base = parts.not.replace(/[∗*]$/, '');
-      if (star && typeof katexInto === 'function' && /^[A-Za-z]{1,3}$/.test(base)) katexInto(n, base + '^{*}');
+      // Обозначение — всегда формулой (правило 46 DESIGN.md): «Q∗» → Q*, «X0» → X₀.
+      const tex = notationTex(parts.not);
+      if (tex && typeof katexInto === 'function') katexInto(n, tex);
       else if (typeof paintNotation === 'function') paintNotation(n, parts.not); else n.textContent = parts.not;
       const eq = document.createElement('span'); eq.className = 'ans-eq'; eq.textContent = '=';
       line.append(n, eq);
@@ -206,6 +220,21 @@ function buildAnswer() {
   buildStatus();
   buildBurden();
   buildExplainAccordion();
+  // Строка главных чисел над холстом (760–1239 px, «Ответ» выезжает).
+  const strip = document.getElementById('ans-strip');
+  if (strip) {
+    strip.innerHTML = '';
+    host.querySelectorAll('.ans-cell').forEach(c => {
+      const s = document.createElement('span');
+      const n = c.querySelector('.ans-not'), v = c.querySelector('.ans-val'), l = c.querySelector('.ans-lab');
+      s.textContent = (n && plainText(n) ? plainText(n) : (l ? plainText(l) : '')) + ' = ';
+      const b = document.createElement('b'); b.textContent = v ? plainText(v) : '';
+      s.appendChild(b); strip.appendChild(s);
+    });
+  }
+  // Обозначения в подписях ячеек («Весь ресурс на X») — формулой, как во всей панели.
+  if (typeof markNotationsIn === 'function') markNotationsIn(host);
+  if (typeof applySelf === 'function') applySelf();
 }
 
 /* «Кто несёт налог» / «Кому достаётся субсидия» (README макета, 8.5): доли
@@ -259,7 +288,7 @@ function buildStatus() {
     const t = plainText(w);
     if (!t) return;
     const p = document.createElement('div');
-    p.className = 'ans-status';
+    p.className = 'ans-status' + (/\d/.test(t) ? ' has-num' : '');
     p.setAttribute('role', 'status');
     p.innerHTML = w.innerHTML;
     box.appendChild(p);

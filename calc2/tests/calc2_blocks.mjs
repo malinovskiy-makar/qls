@@ -260,7 +260,7 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
    «Параметры» и «Вмешательство государства», каждая только там, где ей есть
    что показать. Порядок по-прежнему один на все сцены; обязательные три
    карточки на месте в каждой сцене. */
-const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-view', 'sec-areascalc'];
+const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-show', 'sec-view', 'sec-areascalc'];
 const MUST_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
 const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
 

@@ -12,7 +12,7 @@ const BEFORE = bArg > 0 ? JSON.parse(fs.readFileSync(process.argv[bArg + 1], 'ut
    карточки сверх трёх прежних — «Параметры» и «Вмешательство государства»
    (только там, где им есть что показать); карточки больше не сворачиваются,
    первая называется «Функции». Обязательные три — в каждой сцене. */
-const WANT = ['sec-input', 'sec-params', 'sec-tax', 'sec-view', 'sec-areascalc'];
+const WANT = ['sec-input', 'sec-params', 'sec-tax', 'sec-show', 'sec-view', 'sec-areascalc'];
 const MUST = ['sec-input', 'sec-view', 'sec-areascalc'];
 const FORBIDDEN = ['Что изучаем', 'Структура рынка', 'Излишки'];
 

@@ -72,6 +72,7 @@ function redrawAll() {
   if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
   if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
   markServiceNodes();
+  if (typeof selfCanvas === 'function') selfCanvas();   // «Сначала сам»: обозначения вместо чисел (96-self.js)
 }
 
 function redrawScene() {

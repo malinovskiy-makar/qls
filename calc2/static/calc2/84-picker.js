@@ -173,28 +173,12 @@ function openPicker() {
   p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
-  /* Н5. Из сюжета возвращаемся РОВНО на предыдущий экран, то есть в тот блок,
-     где этот сюжет лежит, а не в общий список десяти блоков. (Прежнее правило
-     П2 говорило обратное; оно отменено.) Блок ищем по самой карточке текущей
-     сцены: так он верен всегда, в том числе после восстановления состояния.
-     Если сцены ещё не выбирали, открывается полная карта. */
-  const blocks = document.getElementById('picker-blocks');
-  const back = document.getElementById('picker-back');
-  p.querySelectorAll('.picker-group').forEach(g => g.classList.remove('open'));
-  const card = STATE.sceneKey
-    ? p.querySelector('.scard[data-scene="' + CSS.escape(STATE.sceneKey) + '"]') : null;
-  const group = card ? card.closest('.picker-group') : null;
-  if (group) {
-    group.classList.add('open');
-    if (blocks) blocks.classList.add('hidden');
-    if (back) back.classList.add('shown');
-  } else {
-    if (blocks) blocks.classList.remove('hidden');
-    if (back) back.classList.remove('shown');
-  }
-  const first = group
-    ? (group.querySelector('.scard:not([disabled])') || p.querySelector('.bcard'))
-    : (p.querySelector('.bcard') || p.querySelector('.scard:not([disabled])'));
+  /* Редизайн 10.2026 (фаза 8): экран выбора одним экраном — блоков-ступенек
+     больше нет. Сверху «Продолжить» и «Недавние», фокус в поиске (О2). */
+  if (typeof renderPickerContinue === 'function') renderPickerContinue();
+  const q = document.getElementById('picker-search');
+  if (typeof pickerFilter === 'function') pickerFilter(q ? q.value : '');
+  const first = q || p.querySelector('.scard:not([disabled])');
   /* ⚠️ ПРОГРАММНЫЙ ФОКУС — НЕ ЗНАЧИТ ВИДИМОЕ КОЛЬЦО. focus() здесь нужен ради
      доступности: открыли окно — Tab и стрелки сразу работают, не нужно
      проходить всю шапку сайта заново. Но браузер не различает «фокус дала

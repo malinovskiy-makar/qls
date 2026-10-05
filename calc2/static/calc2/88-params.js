@@ -1061,7 +1061,14 @@ function wireControls() {
   document.addEventListener('keydown', (e) => {
     const p = document.getElementById('scene-picker');
     if (!p || p.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { e.preventDefault(); closePicker(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // О1: Esc сначала очищает запрос, при пустом — возвращает в модель.
+      const q = document.getElementById('picker-search');
+      if (q && q.value) { q.value = ''; if (typeof pickerFilter === 'function') pickerFilter(''); return; }
+      if (STATE.sceneKey) closePicker();
+      return;
+    }
     if (e.key === 'Tab') {
       // Карточки «скоро» отключены (disabled) и в кольцо фокуса не входят.
       const cards = p.querySelectorAll('.scard:not([disabled])');

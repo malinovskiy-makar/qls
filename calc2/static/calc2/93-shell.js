@@ -86,7 +86,29 @@ function wireShell() {
     if (b) b.addEventListener('click', () => setTool(w));
   });
   const sw = document.getElementById('model-switch');
-  if (sw) sw.addEventListener('click', () => openPicker());
+  if (sw) {
+    sw.setAttribute('aria-haspopup', 'dialog');
+    sw.setAttribute('aria-expanded', 'false');
+    // Переключатель модели — окно под шапкой (README макета, раздел 10).
+    sw.addEventListener('click', (e) => { e.stopPropagation(); (typeof openSwitcher === 'function') ? openSwitcher(sw) : openPicker(); });
+  }
+  // 760–1239 px: «Ответ» выезжает панелью справа.
+  const ab = document.getElementById('btn-answer');
+  if (ab) ab.addEventListener('click', () => {
+    const on = document.body.classList.toggle('ans-open');
+    ab.setAttribute('aria-expanded', on ? 'true' : 'false');
+    if (on) afterColumnShown();
+  });
+  // Телефон: вкладки «Условие» / «Ответ» / «Разбор»; каждая показанная колонка
+  // достраивает поля формул и перемеряет формулы (COVERAGE, раздел 8).
+  const tabs = document.querySelectorAll('#ph-tabs .ph-tab');
+  const setTab = (name) => {
+    ['cond', 'ans', 'ex'].forEach(t => document.body.classList.toggle('ph-' + t, t === name));
+    tabs.forEach(b => b.setAttribute('aria-selected', b.dataset.tab === name ? 'true' : 'false'));
+    afterColumnShown();
+  };
+  tabs.forEach(b => b.addEventListener('click', () => setTab(b.dataset.tab)));
+  setTab('cond');
   const u = document.getElementById('btn-undo'), r = document.getElementById('btn-redo');
   if (u) u.addEventListener('click', () => { if (typeof historyUndo === 'function') historyUndo(); });
   if (r) r.addEventListener('click', () => { if (typeof historyRedo === 'function') historyRedo(); });
