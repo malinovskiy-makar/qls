@@ -51,8 +51,8 @@ const ST = [
   { file: 'tool_area.png', key: 'sd', run: click('#tool-area') },
   { file: 'pw_card.png', key: 'taxes', run: ev(pie) },
   // Окно кусочной у кусочной функции открывается щелчком по записи скобкой (README 6.6).
-  { file: 'pw_modal.png', key: 'taxes', run: seq(ev(pie), click('#curve-list .fc-card:nth-child(2) .fc-pwrec')) },
-  { file: 'pw_modal_dark.png', key: 'taxes', theme: 'dark', run: seq(ev(pie), click('#curve-list .fc-card:nth-child(2) .fc-pwrec')) },
+  { file: 'pw_modal.png', key: 'taxes', run: seq(ev(pie), ev('renderCurveList();'), click('#curve-list .fc-card:nth-child(2) .fc-pwrec')) },
+  { file: 'pw_modal_dark.png', key: 'taxes', theme: 'dark', run: seq(ev(pie), ev('renderCurveList();'), click('#curve-list .fc-card:nth-child(2) .fc-pwrec')) },
   { file: 'kbd.png', key: 'sd', run: click('#curve-list .fc-card:nth-child(1) .f-kbd') },
   { file: 'pop_switcher.png', key: 'taxes', run: click('#model-switch') },
   { file: 'pop_view.png', key: 'taxes', run: click('#btn-view') },
