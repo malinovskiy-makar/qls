@@ -1602,7 +1602,8 @@ function drawCrossPoints() {
       if (pin) return;
       const btnBg = cssVar('--btn-bg'), onBtn = cssVar('--on-btn');
       const font = getComputedStyle(document.body).fontFamily;
-      const txt = lab.append('text').attr('font-size', 13).attr('font-weight', 600)
+      // Кегль — ступень шкалы FS (макет даёт 13; шкала проекта сильнее картинки).
+      const txt = lab.append('text').attr('font-size', FS.base).attr('font-weight', 600)
         .attr('font-family', font).attr('fill', onBtn).attr('dominant-baseline', 'central')
         .text('(' + fmt(p.x) + '; ' + fmt(p.y) + ')');
       const tw = txt.node().getComputedTextLength ? txt.node().getComputedTextLength() : 7 * txt.text().length;

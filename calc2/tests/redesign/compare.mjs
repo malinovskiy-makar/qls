@@ -215,7 +215,10 @@ function keyPointsMatch(g0, g1, issues, where) {
   return 1;
 }
 function geomMatch(g0, g1, win0, issues, where, win1) {
-  if (win1 && !sameCanvas(win0, win1)) return geomMatchLoose(g0, g1, win0, win1, issues, where);
+  if (win1 && !sameCanvas(win0, win1)) {
+    noteOnce('холст другого размера: геометрия сверена как картинка (1,5 px), а не по допуску 0,002 px — снимите новый экран при 1440×760');
+    return geomMatchLoose(g0, g1, win0, win1, issues, where);
+  }
   let n = 0;
   const used = new Set();
   (g0.paths || []).forEach(p => {

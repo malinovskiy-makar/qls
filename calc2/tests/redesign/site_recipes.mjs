@@ -85,3 +85,16 @@ PH.forEach(k => [['left', 'cond'], ['answer', 'ans'], ['explain', 'ex']].forEach
 }));
 RECIPES.phone.push({ file: 'taxes_dark.png', w: 390, h: 844, dpr: 2, mobile: true, key: 'taxes', theme: 'dark' });
 RECIPES.models_1280 = N1280.map(k => ({ file: k + '.png', w: 1280, h: 700, key: k }));
+
+/* Приёмка (фаза 11): все 42 модели в тёмной теме (у макета тёмных досок 9 —
+   у остальных в листе «эталона нет»), ширина 1024 с закрытым и открытым
+   «Ответом», лист «Действия» на телефоне. */
+RECIPES.models_dark_all = KEYS.map(k => ({ file: k + '.png', w: 1440, h: 760, key: k, theme: 'dark',
+  note: DARK.includes(k) ? '' : 'тёмной доски в макете нет' }));
+const N1024 = ['sd', 'taxes', 'mono', 'costs', 'm-tangent', 'islm'];
+RECIPES.w1024 = [];
+N1024.forEach(k => {
+  RECIPES.w1024.push({ file: k + '.png', w: 1024, h: 768, key: k });
+  RECIPES.w1024.push({ file: k + '_answer.png', w: 1024, h: 768, key: k, run: click('#btn-answer') });
+});
+RECIPES.phone.push({ file: 'taxes_more.png', w: 390, h: 844, dpr: 2, mobile: true, key: 'taxes', run: click('#btn-ph-more') });

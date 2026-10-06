@@ -83,13 +83,18 @@ node calc2/tests/calc2_math.mjs
 Задание и макет — `claude/mockups/calc2_redesign_20261004/`; решения — ADR 0134–0138.
 Все приборы — в `calc2/tests/redesign/`, ходят на живой сервер (`CALC2_BASE_URL`).
 
+⚠️ **Размер окна задаёт холст 732×590 у обоих экранов:** старый — 1324×638, новый — 1440×760
+(`lib.viewportFor`, умолчание `snapshot.mjs`, `order_probe.mjs`). На другом холсте геометрия сверяется
+только «как картинка» (1,5 px) и `compare.mjs` об этом не молчит — строгий допуск 0,002 px из задания
+действует лишь на равном холсте.
+
 | Прибор | Что доказывает | Запуск |
 |---|---|---|
 | `snapshot.mjs` | базовый снимок старого экрана (`--layer old`) или повтор его сценария на новом (`--layer new --replay baseline`) | `node calc2/tests/redesign/snapshot.mjs --layer new --replay calc2/tests/redesign/baseline --width 1440 --height 760 --out <папка> --jobs 4` |
-| `compare.mjs` | сверка снимков: старт, каждый шаг правки, жесты, печать; что сознательно не сверяется — в комментариях (раскладка, кэши, `px`) | `node calc2/tests/redesign/compare.mjs --base calc2/tests/redesign/baseline --cur <папка>` |
+| `compare.mjs` | сверка снимков: старт, каждый шаг правки, жесты, печать; что сознательно не сверяется — в комментариях (раскладка, кэши, `px`) | `node calc2/tests/redesign/compare.mjs --base calc2/tests/redesign/baseline --cur <папка> --layer new` (для нового экрана: осознанные отличия шагов печатаются строками «(новый экран)», служебные узлы не сверяются) |
 | `parity.mjs` | таблица `PARITY.md`: судьба каждого органа, строки ответа, ноль строк без судьбы | `node calc2/tests/redesign/parity.mjs --base calc2/tests/redesign/baseline` |
 | `parity_quick.mjs` | быстрый паритет (в CI через `test_calc2_parity.py`): органы старта и числа старта у 44 ключей, меньше двух минут | `node calc2/tests/redesign/parity_quick.mjs` |
-| `order_probe.mjs` | модель открывается одинаково при любом порядке; память «ушёл и вернулся» | `node calc2/tests/redesign/order_probe.mjs --out <папка>`, затем `compare.mjs --cur <папка>/forward --start-only` |
+| `order_probe.mjs` | модель открывается одинаково при любом порядке; память «ушёл и вернулся» | `node calc2/tests/redesign/order_probe.mjs --layer new --out <папка>`, затем `compare.mjs --cur <папка>/forward --start-only --layer new` |
 | `state_probe.mjs` | собрать → сбросить → применить состояние, 44 из 44 | `node calc2/tests/redesign/state_probe.mjs` |
 | `session_probe.mjs` | история (отмена, повтор, склейка), автосохранение, ссылка | `node calc2/tests/redesign/session_probe.mjs` |
 | `answer_probe.mjs` | главные числа «Ответа» равны своим строкам табло, предупреждения стоят статусом | `node calc2/tests/redesign/answer_probe.mjs` |
