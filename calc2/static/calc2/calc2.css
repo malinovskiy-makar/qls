@@ -3352,3 +3352,37 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
   .ff-copy, .ff-expand { min-height: 44px; }
   #ex-body .sb-note p.ex-q > b { min-height: 44px; padding-top: 10px; padding-bottom: 10px; }
 }
+
+/* «Сначала сам» (README макета, 9): свои точки без координат, площади «?».
+   Текст прячется цветом, на его месте — «?»; правка точки по-прежнему возможна. */
+body.self-on:not(.self-all) .mark-xy .edval,
+body.self-on:not(.self-all) #info-areacalc .stat > b { color: transparent !important; position: relative; }
+body.self-on:not(.self-all) .mark-xy .edval .katex,
+body.self-on:not(.self-all) #info-areacalc .stat > b .katex { visibility: hidden; }
+body.self-on:not(.self-all) .mark-xy .edval::after,
+body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; position: absolute; right: 0; top: 0; color: var(--text2); }
+
+/* «Вид графика» по README макета, раздел 10: окно 330, заголовок 15/600,
+   поля 2×2 по 34 px с подписью 13/500, внизу «Вид по умолчанию». */
+.cv-card > .wrench, .wrench { width: 330px; }
+.wrench-head { font-size: 15px; font-weight: 600; color: var(--text); padding: 10px 0 2px; }
+.wrench .seg-btn { font-size: 13px; font-weight: 500; }
+.wrench .chk + .chk { margin-top: 8px; }
+.wrench-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; padding: 10px 0 4px; border-top: 1px solid var(--border-soft); }
+.wrench-more .wrench-grid { border-top: 0; padding-top: 0; }
+.wrench-field { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.wrench-field > span:first-child { font-size: 13px; font-weight: 500; color: var(--text2); }
+.wrench-field input[type="number"], .wrench-field input[type="text"] {
+  height: 34px; min-width: 0; width: 100%; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text);
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums;
+}
+.wrench-field input:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+.wrench-title-field { padding: 4px 0 0; }
+.wrench-title-field .wrench-row { display: flex; align-items: center; gap: 8px; }
+.wrench-title-field .wrench-row input[type="text"] { flex: 1; height: 34px; padding: 0 8px; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface-2); font-size: 14px; }
+.wrench-defaults { width: 100%; margin-top: 12px; }
+
+/* Отрезок «Наибольшего и наименьшего»: «от [ ] до [ ]» одной строкой. */
+.opt-range-row { display: flex; align-items: center; gap: 8px; }
+.opt-range-row > span { font-size: 14px; color: var(--text2); }
+.opt-range-row input { width: 0; flex: 1 1 0; height: 34px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums; }

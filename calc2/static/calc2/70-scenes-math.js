@@ -1230,7 +1230,8 @@ function paperChartClone() {
 function exportNumbersLine() {
   return [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => {
     const t = (el) => { if (!el) return ''; const k = el.cloneNode(true); k.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return k.textContent.replace(/\s+/g, ' ').trim(); };
-    const n = t(c.querySelector('.ans-not')), v = t(c.querySelector('.ans-val'));
+    const n = t(c.querySelector('.ans-not'));
+    const v = (typeof selfMasked === 'function' && selfMasked()) ? '?' : t(c.querySelector('.ans-val'));   // «Сначала сам»
     return (n ? n + ' = ' : t(c.querySelector('.ans-lab')) + ': ') + v;
   }).filter(Boolean).join('    ');
 }

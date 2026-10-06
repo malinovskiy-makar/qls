@@ -1814,6 +1814,15 @@
 
       <!-- 7б. Оптимизация -->
       <div id="math-pane-optimum" style="display:none;">
+        <!-- Отрезок поиска наибольшего и наименьшего (COVERAGE, раздел 3): это
+             границы окна по x, поэтому поля связаны с окном в обе стороны. -->
+        <div class="field opt-range">
+          <label>Отрезок</label>
+          <div class="opt-range-row">
+            <span>от</span><input type="number" id="opt-a" step="any" aria-label="Отрезок от">
+            <span>до</span><input type="number" id="opt-b" step="any" aria-label="Отрезок до">
+          </div>
+        </div>
         <label class="chk"><input type="checkbox" id="chk-convex" checked>
           <span class="swatch" style="background:var(--curve-d)"></span> Выпуклость и вогнутость</label>
         <label class="chk"><input type="checkbox" id="chk-inflect" checked>
@@ -1824,7 +1833,7 @@
         </div>
         <div class="hint-pop" id="hp-optimum">
           <p>Пишите функцию от x в поле выше: x^2, x^3 - 3*x, sqrt(x), 1/x.
-            Отрезок задают границы окна в настройках плоскости.</p>
+            Отрезок задают поля «от» и «до»; это и границы окна по x.</p>
           <p>Подписи на графике читаются так: x* это точка на оси x, y* это
             значение функции в ней.</p>
         </div>
@@ -2240,96 +2249,61 @@
          Сюда переехали бывшие секции «Все настройки» и «Сетка», а из
          «Инструментов» — всё, что относится к оформлению плоскости,
          а не к модели. -->
-    <div class="wrench" id="wrench-pop" role="dialog" aria-label="Настройки координатной плоскости">
-
-      <div class="wrench-group">
-        <div class="wrench-title">Ось X</div>
-        <div class="wrench-row">
-          <label for="inp-qmin">От</label>
-          <input type="number" id="inp-qmin" step="any" value="0">
-          <label for="inp-qmax">До</label>
-          <input type="number" id="inp-qmax" step="any" value="100">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-xstep">Шаг делений</label>
-          <input type="number" id="inp-xstep" step="any" min="0" placeholder="Авто">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-xname">Название оси</label>
-          <input type="text" id="inp-xname" placeholder="Q" autocomplete="off">
-        </div>
-      </div>
-
-      <div class="wrench-group">
-        <div class="wrench-title">Ось Y</div>
-        <div class="wrench-row">
-          <label for="inp-pmin">От</label>
-          <input type="number" id="inp-pmin" step="any" value="0">
-          <label for="inp-pmax">До</label>
-          <input type="number" id="inp-pmax" step="any" value="100">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-ystep">Шаг делений</label>
-          <input type="number" id="inp-ystep" step="any" min="0" placeholder="Авто">
-        </div>
-        <div class="wrench-row">
-          <label for="inp-yname">Название оси</label>
-          <input type="text" id="inp-yname" placeholder="P" autocomplete="off">
-        </div>
-        <!-- П46: серых пояснений в ключе больше нет. Смысл «оставьте пустым —
-             возьмём то, что даёт сцена» показывает сам плейсхолдер поля. -->
-      </div>
-
-      <div class="wrench-group">
-        <!-- П49: «Область» → «Область значений». -->
-        <div class="wrench-title">Область значений</div>
-        <label class="chk"><input type="checkbox" id="chk-quad" checked>
-          Только первая четверть</label>
-      </div>
-
-      <!-- ИЗЛИШКИ (решение владельца 22.08). Карточка «Излишки» ушла из левой
-           панели, а показ заливок остался нужен — он живёт здесь, рядом с
-           сеткой и первой четвертью: это настройка ВИДА графика, а не ввод
-           модели. Цвета и названия областей не дублируем — они в «Площадях».
-           Прежние две галочки (CS и PS по отдельности) схлопнуты в одну:
-           порознь их никто не включал, а области монополии считаются своими
-           галочками #chk-mono-cs/#chk-mono-ps/#chk-mono-vc и не тронуты. -->
+    <!-- «Вид графика» (README макета, раздел 10): сетка, размер подписей, две
+         галочки, поля 2×2, заголовок; ниже — «от» у осей и шаг делений (из
+         прежнего гаечного ключа); «Вид по умолчанию» сбрасывает вид текущей
+         модели, окно и масштаб. Все id прежние — по ним работают сцены и приборы. -->
+    <div class="wrench" id="wrench-pop" role="dialog" aria-label="Вид графика">
+      <div class="wrench-head">Вид графика</div>
 
       <div class="wrench-group">
         <div class="wrench-title">Сетка</div>
         <div class="seg" id="grid-seg">
-          <button class="seg-btn" id="grid-dense" type="button">Подробная</button>
-          <button class="seg-btn active" id="grid-plain" type="button">Упрощённая</button>
-          <button class="seg-btn" id="grid-off" type="button">Нет</button>
+          <button class="seg-btn" id="grid-dense" type="button">Частая</button>
+          <button class="seg-btn active" id="grid-plain" type="button">Обычная</button>
+          <button class="seg-btn" id="grid-off" type="button">Без сетки</button>
         </div>
       </div>
 
       <div class="wrench-group">
-        <div class="wrench-title">Подписи</div>
-        <label class="chk"><input type="checkbox" id="chk-legend" checked>
-          Легенда закрашенных областей</label>
-        <div class="wrench-row" style="margin-top:8px;">
-          <input type="text" id="inp-gtitle" placeholder="Название графика" autocomplete="off">
-          <span id="gtitle-color-slot"></span>
-        </div>
-        <!-- п. 33. Что можно сделать с названием прямо на графике, сказано
-             здесь, рядом с полем, а не подсказкой браузера поверх самой
-             надписи: та перехватывала бы указатель и мешала её взять. -->
-        <div class="wrench-note">На графике название можно перенести мышью, а двойной щелчок по нему открывает правку.</div>
-        <!-- П50: размер задаётся тремя буквами А, а не числом в поле, и меняет
-             ВСЁ внутри графика, кроме отметок координат на осях. -->
-        <div class="wrench-row" style="margin-top:8px;">
-          <label>Размер подписей</label>
-          <div class="seg lblsize-seg" id="lblsize-seg">
-            <button class="seg-btn" id="lbl-s" type="button" aria-label="Мелкие подписи"
-                    style="font-size:10px;font-weight:700;">А</button>
-            <button class="seg-btn active" id="lbl-m" type="button" aria-label="Средние подписи"
-                    style="font-size:14px;font-weight:700;">А</button>
-            <button class="seg-btn" id="lbl-l" type="button" aria-label="Крупные подписи"
-                    style="font-size:18px;font-weight:700;">А</button>
-          </div>
+        <div class="wrench-title">Подписи на графике</div>
+        <!-- П50: размер меняет ВСЁ внутри графика, кроме отметок координат на осях. -->
+        <div class="seg lblsize-seg" id="lblsize-seg">
+          <button class="seg-btn" id="lbl-s" type="button">Мелкие</button>
+          <button class="seg-btn active" id="lbl-m" type="button">Средние</button>
+          <button class="seg-btn" id="lbl-l" type="button">Крупные</button>
         </div>
       </div>
+
+      <div class="wrench-group">
+        <label class="chk"><input type="checkbox" id="chk-legend" checked>
+          Легенда закрашенных областей</label>
+        <label class="chk"><input type="checkbox" id="chk-quad" checked>
+          Только первая четверть</label>
+      </div>
+
+      <div class="wrench-grid">
+        <label class="wrench-field"><span>Ось x до</span><input type="number" id="inp-qmax" step="any" value="100"></label>
+        <label class="wrench-field"><span>Ось y до</span><input type="number" id="inp-pmax" step="any" value="100"></label>
+        <label class="wrench-field"><span>Имя оси x</span><input type="text" id="inp-xname" placeholder="Q" autocomplete="off"></label>
+        <label class="wrench-field"><span>Имя оси y</span><input type="text" id="inp-yname" placeholder="P" autocomplete="off"></label>
+      </div>
+      <label class="wrench-field wrench-title-field"><span>Заголовок на графике</span>
+        <span class="wrench-row"><input type="text" id="inp-gtitle" placeholder="Например: Налог t = 20" autocomplete="off"><span id="gtitle-color-slot"></span></span></label>
+      <!-- п. 33. Что можно сделать с названием прямо на графике, сказано здесь. -->
+      <div class="wrench-note">На графике заголовок можно перенести мышью, а двойной щелчок по нему открывает правку.</div>
+
+      <div class="wrench-group wrench-more">
+        <div class="wrench-title">Дополнительно</div>
+        <div class="wrench-grid">
+          <label class="wrench-field"><span>Ось x от</span><input type="number" id="inp-qmin" step="any" value="0"></label>
+          <label class="wrench-field"><span>Ось y от</span><input type="number" id="inp-pmin" step="any" value="0"></label>
+          <label class="wrench-field"><span>Шаг делений x</span><input type="number" id="inp-xstep" step="any" min="0" placeholder="Авто"></label>
+          <label class="wrench-field"><span>Шаг делений y</span><input type="number" id="inp-ystep" step="any" min="0" placeholder="Авто"></label>
+        </div>
+      </div>
+
+      <button class="btn btn-quiet wrench-defaults" id="view-defaults" type="button">Вид по умолчанию</button>
 
       <!-- Сюда JS складывает вторичные секции сцены, если они есть. -->
       <div id="tools-advanced"></div>

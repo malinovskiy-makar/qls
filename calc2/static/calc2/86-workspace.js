@@ -1832,6 +1832,20 @@ function wireWrench() {
     const e = document.getElementById(id);
     if (e) e.addEventListener('change', () => applyViewBounds());
   });
+  /* Отрезок «Наибольшего и наименьшего» (COVERAGE, раздел 3): меняет окно по x
+     тем же путём, что поля «Вида графика»; y остаётся. */
+  ['opt-a', 'opt-b'].forEach(id => {
+    const e = document.getElementById(id);
+    if (!e) return;
+    e.addEventListener('change', () => {
+      const a = parseFloat(String(document.getElementById('opt-a').value).replace(',', '.'));
+      const b = parseFloat(String(document.getElementById('opt-b').value).replace(',', '.'));
+      if (!(isFinite(a) && isFinite(b) && b > a)) { syncViewFields(); return; }
+      setMathWindow(a, b, STATE.mathYmin, STATE.mathYmax);
+      if (typeof markViewDirty === 'function') markViewDirty();
+      redrawAll();
+    });
+  });
   [['inp-xstep', 'xStep'], ['inp-ystep', 'yStep']].forEach(([id, key]) => {
     const e = document.getElementById(id);
     if (e) e.addEventListener('input', () => {
@@ -1865,6 +1879,12 @@ function wireWrench() {
     });
   });
   syncLabelSizeSeg();
+  // «Вид по умолчанию» (README макета, раздел 10): вид ТЕКУЩЕЙ модели —
+  // сетка, подписи, легенда, первая четверть, имена и шаги осей, заголовок —
+  // к её старту, окно и масштаб — к вписанному. Модель (функции, ползунки)
+  // не трогается. Один шаг истории.
+  const vd = document.getElementById('view-defaults');
+  if (vd) vd.addEventListener('click', () => { if (typeof viewDefaults === 'function') viewDefaults(); });
   // Цвет заголовка — тем же пикером, что и у кривых.
   const slot = document.getElementById('gtitle-color-slot');
   if (slot && !slot.firstChild) {
@@ -1894,8 +1914,10 @@ function fillPrintBlocks() {
   const src = document.getElementById('sb-body');
   if (!src) return;
   // Берём только строки со значениями: разбор на бумаге ни к чему.
+  const masked = typeof selfMasked === 'function' && selfMasked();   // «Сначала сам»: на листе те же «?»
   src.querySelectorAll('.stat').forEach(row => {
     const clone = row.cloneNode(true);
+    if (masked) clone.querySelectorAll(':scope > b').forEach(b => { b.textContent = '?'; });
     stats.appendChild(clone);
   });
 }

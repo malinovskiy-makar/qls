@@ -129,6 +129,9 @@ function applySelf() {
   if (showAll) showAll.hidden = !(SELF.on && !SELF.all);
   const pending = document.querySelector('.col-answer .col-note');
   if (pending) pending.hidden = SELF.on && !SELF.all;
+  // «Ответ» собирается кадром позже холста: обозначения на осях берём из
+  // этой, свежей сборки (раньше холст размечался по прошлой).
+  selfCanvas();
 }
 
 /* Холст: выделенные значения на осях — обозначениями главных чисел, у
@@ -158,7 +161,27 @@ function selfCanvas() {
     t.textContent = h && h.not ? h.not : '?';
   });
   chart.querySelectorAll('g.cross-label text').forEach(t => { t.textContent = '(?; ?)'; });
+  /* Прочие подписи холста с числами ответа (README макета, 9): «Δy = ?»,
+     «f′(x₀) = ?», координаты точек «(?; ?)», площади «S₁ = ?», «дефицит ?».
+     Деления осей, имена осей и кривых, легенда и ставки («t = 20» — их задал
+     сам человек) не трогаются. */
+  const skip = 'g.tick, .tick, .axis-name, .curve-name, .legend, [data-legend-box], .chart-title, .graph-title, g.cross-label, text.coord-num';
+  chart.querySelectorAll('text').forEach(t => {
+    if (t.closest(skip)) return;
+    const s = t.textContent || '';
+    let out = null;
+    if (/^\s*(Δy|Δ\s*y)\s*=/.test(s)) out = 'Δy = ?';
+    else if (/f\s*['′]/.test(s) && /=/.test(s)) out = s.replace(/=.*$/, '= ?');
+    else if (/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/.test(s)) out = s.replace(/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/g, '(?; ?)');
+    else if (/^\s*S\s*[₀-₉\d]*\s*=/.test(s)) out = s.replace(/=.*$/, '= ?');
+    else if (/^\s*(дефицит|избыток)\b/i.test(s)) out = s.replace(/[−\-]?\d[\d\s.,\u202f]*/g, '?');
+    if (out != null && out !== s) t.textContent = out;
+  });
 }
+
+// Режим прячет числа (включён и «Показать всё» не нажато): этим пользуются
+// выгрузка и печать — там те же «?», что на экране (поправка 04.10, README 9).
+function selfMasked() { return !!(SELF.on && !SELF.all); }
 
 function wireSelf() {
   const b = document.getElementById('btn-self');

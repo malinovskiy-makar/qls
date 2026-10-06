@@ -363,6 +363,48 @@ function restoreOnLoad() {
 
 /* «Сбросить»: стартовое состояние модели одним шагом истории, тост с
    «Вернуть» возвращает прежнее; запись автосохранения заменяется стартовой. */
+/* «Вид по умолчанию» в окне «Вид графика» (README макета, раздел 10): вид
+   текущей модели — к её старту, окно и масштаб — к вписанному; функции,
+   ползунки и вмешательство остаются. Старт берётся тем же маршрутом, что у
+   «Сбросить», только из него переносятся ключи вида. Один шаг истории. */
+const VIEW_DEFAULT_KEYS = ['showGrid', 'gridDense', 'xStep', 'yStep', 'firstQuad', 'showLegend', 'labelSize',
+  'graphTitle', 'titleColor', 'axisXName', 'axisYName', 'graphTitlePos'];
+function viewDefaults() {
+  const key = STATE.sceneKey;
+  if (!key) return;
+  clearTimeout(_histTimer); historyCheck();
+  const h = histOf();
+  const before = h.last || collectModelState();
+  const ui = captureOpenUi();
+  _histMute++;
+  let start = null;
+  try {
+    if (typeof forgetSceneSnapshot === 'function') forgetSceneSnapshot(key);
+    pickScene(key);
+    start = collectModelState();
+    const t = JSON.parse(JSON.stringify(before));
+    VIEW_DEFAULT_KEYS.forEach(k => { if (k in start.state) t.state[k] = start.state[k]; else delete t.state[k]; });
+    applyModelState(t);
+    if (typeof resetZoom === 'function') resetZoom();
+    if (typeof setGridMode === 'function') setGridMode(STATE.showGrid ? (STATE.gridDense ? 'dense' : 'plain') : 'off');
+    if (typeof syncLabelSizeSeg === 'function') syncLabelSizeSeg();
+    ['inp-xstep', 'inp-ystep', 'inp-xname', 'inp-yname', 'inp-gtitle'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    const leg = document.getElementById('chk-legend'); if (leg) leg.checked = !!STATE.showLegend;
+    if (typeof syncViewFields === 'function') syncViewFields();
+    redrawAll();
+  } finally { _histMute--; }
+  restoreOpenUi(ui);
+  const now = collectModelState();
+  if (histSig(now) !== histSig(before)) {
+    h.undo.push(before);
+    if (h.undo.length > HIST_MAX) h.undo.shift();
+    h.redo.length = 0;
+  }
+  h.last = now; h.lastSig = histSig(now); h.label = null;
+  autosaveModel(now);
+  notifyHistory();
+}
+
 function resetModelWithUndo() {
   const key = STATE.sceneKey;
   if (!key) return;
