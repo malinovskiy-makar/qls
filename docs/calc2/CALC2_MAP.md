@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `a7c140f0`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `d8ea9697`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -344,7 +344,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
 | `calc2/templates/calc2/calc2.html` | 2590 | 216.8 | шаблон |
-| `calc2/static/calc2/calc2.css` | 3388 | 247.4 | CSS |
+| `calc2/static/calc2/calc2.css` | 3404 | 248.4 | CSS |
 | `calc2/static/calc2/00-config.js` | 563 | 48.5 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
 | `calc2/static/calc2/20-plane.js` | 991 | 67.2 | JS |
@@ -369,13 +369,13 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
 | `calc2/static/calc2/91-session.js` | 441 | 22.2 | JS |
 | `calc2/static/calc2/92-ui-kit.js` | 336 | 19.2 | JS |
-| `calc2/static/calc2/93-shell.js` | 193 | 11.1 | JS |
+| `calc2/static/calc2/93-shell.js` | 207 | 12.0 | JS |
 | `calc2/static/calc2/94-answer.js` | 391 | 24.5 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 397 | 21.5 | JS |
 | `calc2/static/calc2/96-self.js` | 197 | 11.9 | JS |
 | `calc2/static/calc2/99-boot.js` | 108 | 9.0 | JS |
 
-**Итого: 33 файлов, 40064 строк, 2748.7 КБ.**
+**Итого: 33 файлов, 40094 строк, 2750.5 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1608,8 +1608,8 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 63 — `syncToolSeg`
 - строка 70 — `setTool`
 - строка 83 — `wireShell`
-- строка 155 — `phMoreLayout`
-- строка 178 — `wirePhoneMore`
+- строка 158 — `phMoreLayout`
+- строка 192 — `wirePhoneMore`
 
 #### `calc2/static/calc2/94-answer.js`
 

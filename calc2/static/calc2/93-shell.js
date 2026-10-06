@@ -150,7 +150,10 @@ function wireShell() {
    те же (с теми же id и обработчиками), не копии: шире 759 px они
    возвращаются на прежнее место. «Сбросить» и «Повторить» закрывают лист,
    масштаб — нет: его жмут подряд. */
-const PH_MORE = [['btn-redo', 'Повторить'], ['btn-model-reset', null], ['btn-zoomout', 'Отдалить'], ['btn-zoomin', 'Приблизить']];
+const PH_MORE = [['btn-redo', 'Повторить'], ['btn-model-reset', null], ['dock-export', null], ['btn-zoomout', 'Отдалить'], ['btn-zoomin', 'Приблизить']];
+/* «Сначала сам» на телефоне — в шапке «Ответа» (README макета, 9): в шапке
+   модели места нет (README 3: «Все модели», имя, «Отменить», «⋯», «Поделиться»). */
+const PH_ANSWER = ['btn-self'];
 const _phHome = {};
 function phMoreLayout(phone) {
   const list = document.getElementById('ph-more-list');
@@ -159,6 +162,17 @@ function phMoreLayout(phone) {
     const pop = document.getElementById('ph-more-pop');
     if (pop && pop.classList.contains('open')) closePop();
   }
+  const ansHead = document.querySelector('#params-panel .col-head');
+  PH_ANSWER.forEach(id => {
+    const b = document.getElementById(id);
+    if (!b || !ansHead) return;
+    if (!_phHome[id]) _phHome[id] = { parent: b.parentElement, next: b.nextSibling };
+    if (phone) { if (b.parentElement !== ansHead) ansHead.appendChild(b); return; }
+    const h = _phHome[id];
+    if (b.parentElement === h.parent) return;
+    if (h.next && h.next.parentElement === h.parent) h.parent.insertBefore(b, h.next);
+    else h.parent.appendChild(b);
+  });
   PH_MORE.forEach(([id, label]) => {
     const b = document.getElementById(id);
     if (!b) return;
@@ -183,7 +197,7 @@ function wirePhoneMore() {
   const x = document.getElementById('ph-more-x');
   if (x) x.addEventListener('click', () => closePop());
   pop.addEventListener('click', (e) => {
-    const b = e.target.closest('#btn-redo, #btn-model-reset');
+    const b = e.target.closest('#btn-redo, #btn-model-reset, #dock-export');
     if (b) setTimeout(() => { if (pop.classList.contains('open')) closePop(); }, 0);
   });
   const mq = window.matchMedia('(max-width: 759px)');

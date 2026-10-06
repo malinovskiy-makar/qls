@@ -3386,3 +3386,19 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .opt-range-row { display: flex; align-items: center; gap: 8px; }
 .opt-range-row > span { font-size: 14px; color: var(--text2); }
 .opt-range-row input { width: 0; flex: 1 1 0; height: 34px; padding: 0 8px; font: inherit; font-size: 14px; color: var(--text); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r); font-variant-numeric: tabular-nums; }
+
+/* Телефон: имя модели не вылезает на кнопки шапки — многоточие; «Сначала сам»
+   в шапке «Ответа» подписан словами (там места хватает). */
+@media (max-width: 759px) {
+  .mh-switch { overflow: hidden; }
+  .mh-switch .mh-block, .mh-switch .mh-name { display: flex; min-width: 0; white-space: nowrap; }
+  .mh-switch .mh-block { overflow: hidden; text-overflow: ellipsis; display: block; }
+  .mh-name .side-scene { max-width: none; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .mh-name > svg { flex: 0 0 auto; }
+  .mh-switch > * { max-width: 100%; }
+  #params-panel .col-head h2 { white-space: nowrap; }
+  body.ph-ans #params-panel .col-head .col-note { display: none; }
+  #params-panel .col-head .mh-self { margin-left: auto; height: 44px; padding: 0 12px; }
+  #params-panel .col-head .mh-self > span:last-child { display: inline; }
+  #ph-more-list > #dock-export > span { display: inline; }
+}
