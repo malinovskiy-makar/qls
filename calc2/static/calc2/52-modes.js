@@ -46,8 +46,9 @@ function syncViewFields() {
   /* Тумблер излишков ставим в согласие с состоянием: новая модель обнуляет
      showCS/showPS через SCENE_DEFAULTS, и меню, открытое после смены сцены,
      иначе показывало бы прежнее положение. */
-  const ac = document.getElementById('chk-areas');
-  if (ac) ac.checked = !!(STATE.showCS || STATE.showPS);
+  const ac = document.getElementById('chk-cs'), ap = document.getElementById('chk-ps');
+  if (ac) ac.checked = !!STATE.showCS;
+  if (ap) ap.checked = !!STATE.showPS;
   /* «Было → стало» — та же болезнь, что была у излишков: SCENE_DEFAULTS гасит
      showGhost при входе в модель, а галочка в разметке стоит отмеченной. Тумблер
      врал: отмечен, а бледного исходного равновесия на графике нет, и первое
@@ -70,6 +71,10 @@ function syncViewFields() {
 function updateResetViewBtn() {
   const b = document.getElementById('btn-resetview');
   if (!b) return;
+  // Редизайн 10.2026: «Вписать» в панели холста доступна всегда; признак
+  // «окно сдвинуто» только меняет её вид.
+  b.classList.toggle('is-dirty', !!STATE.viewDirty);
+  return;
   const show = !!STATE.viewDirty;
   if (show === !b.classList.contains('is-off')) return;
   b.classList.toggle('is-off', !show);
@@ -662,7 +667,7 @@ function initZoom() {
       return;
     }
     const t = e.target;
-    if (t && t.closest && t.closest('.graph-tools, .wrench')) return;
+    if (t && t.closest && t.closest('.graph-tools, .wrench, .cv-bar')) return;
     const tag = (t && t.tagName || '').toLowerCase();
     /* ⚠️ ОДНО НАЖАТИЕ — ОДИН СМЫСЛ, манипуляторы сцены (замер владельца 21.08,
        ручка налога в «Потоварных налогах»). Клин налога t, потолок/пол цены,

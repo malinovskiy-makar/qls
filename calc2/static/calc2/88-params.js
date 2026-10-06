@@ -294,7 +294,9 @@ function editEqValue(lab, name, current, apply) {
   /* Ширина поля идёт за содержимым: подчёркивание должно стоять ровно под
      числом, а не тянуться до края строки. У input[type=number] нет усадки
      по содержимому, поэтому считаем сами. */
-  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 1) + 'ch'; };
+  /* Поле по содержимому: длина числа плюс полсимвола под курсор. Целый
+     запасной символ делал поле у «114» шире 40 px (ширина четырёх цифр). */
+  const fitWidth = () => { inp.style.width = Math.max(2, String(inp.value || '').length + 0.5) + 'ch'; };
   fitWidth();
   inp.addEventListener('input', fitWidth);
   /* ⚠️ СОДЕРЖИМОЕ ВЫДЕЛЯЕТСЯ ЦЕЛИКОМ: первый набранный символ заменяет старое
@@ -482,7 +484,9 @@ function buildPultCurveChips(list) {
     box.id = 'params-curves';
     if (body) body.insertBefore(box, body.firstChild);
   }
-  box.innerHTML = '';
+  // Чипы, уехавшие под карточки функций (92-ui-kit.js), убираем вместе с коробкой.
+  clearPultBox('params-curves');
+  let chipIdx = 0;
   // Заголовок группы нужен, только когда рядом есть вторая группа: буквы из формул.
   if (list.length && Object.keys(STATE.params || {}).length) {
     const t = document.createElement('div');
@@ -502,6 +506,7 @@ function buildPultCurveChips(list) {
     const base = curveShiftBase(c);
     const { chip, lab, val } = makePchip(shiftChipLabel(c), fmt(c.linear.b - base), c.color);
     chip.dataset.cid = c.id;
+    tagPultChip(chip, 'params-curves', chipIdx++);
     // Подсказку вешаем на сам чип: подпись .pchip-label заменяет
     // upgradeRegulator строкой «имя = значение», и title на ней пропал бы.
     chip.setAttribute('data-tip',
@@ -558,10 +563,8 @@ function buildPultCurveChips(list) {
 // Обновить ТОЛЬКО значения существующих чипов (после перетаскивания/redraw) — без пересборки.
 // Слайдер, который пользователь держит прямо сейчас, не трогаем (чтобы не спорить с рукой).
 function syncPultCurveValues(list) {
-  const box = document.getElementById('params-curves');
-  if (!box) return;
   list.forEach(c => {
-    const chip = box.querySelector('.pchip[data-cid="' + c.id + '"]');
+    const chip = pultChip('params-curves', '[data-cid="' + c.id + '"]');
     if (!chip) return;
     const sl = chip.querySelector('input[type="range"]');
     const val = chip.querySelector('.pchip-val');
@@ -617,8 +620,12 @@ function syncPultRegulators(activeIds) {
        (applyIntervCascade), поэтому display здесь не трогаем: иначе лента
        показала бы поле, которое каскад только что спрятал. */
     if (PULT_STAY_HOME.has(id)) { upgradeRegulator(n); return; }
-    if (!body) return;
-    if (n.parentElement !== body) body.appendChild(n);
+    /* ⚠️ РЕДИЗАЙН 10.2026: РЕГУЛЯТОР ОСТАЁТСЯ НА МЕСТЕ (пункт (з)). Пульт больше
+       не переносит его в правую панель: ползунок стоит рядом со своим смыслом
+       в «Условии». Отключён ТОЛЬКО перенос: снять спрятанность и довести
+       регулятор (границы на дорожке, точный ввод, число с запятой) — как
+       раньше, иначе 16 регуляторов потеряли бы доводку (CODE_NOTES 13.1). */
+    void body;
     n.style.display = '';
     upgradeRegulator(n);
   });
@@ -890,7 +897,7 @@ function addPultXChip(box, label, value, color, min, max, step, onInput, idAttr,
 // Пересобрать сцен-слайдеры под текущую сцену.
 function buildPultExtra(sig) {
   const box = document.getElementById('params-extra'); if (!box) return;
-  box.innerHTML = '';
+  clearPultBox('params-extra');
   /* Две разные вещи, поэтому и две группы: сверху регуляторы самой модели
      (ставка, мировая цена, границы КПВ), ниже буквы, которые пользователь
      завёл своей формулой. В общий список их мешать нельзя. */
@@ -903,7 +910,7 @@ function buildPultExtra(sig) {
   const hasModel = /^(ppf1|ppf2|ineqM)$/.test(String(sig).split('|par:')[0]);
   if (names.length) {
     if (hasModel) addTitle('Буквы из формул');
-    names.forEach(n => buildParamChip(box, n));
+    names.forEach((n, i) => { const ch = buildParamChip(box, n); if (ch) tagPultChip(ch, 'params-extra', i); });
     if (hasModel) addTitle('Параметры модели');
   }
   sig = String(sig).split('|par:')[0];
@@ -978,11 +985,11 @@ function buildIneqMasterChip(box) {
 function showPult(on) {
   const panel = document.getElementById('params-panel');
   if (!panel) return;
-  const empty = document.getElementById('params-empty');
+  const empty = null;   // «Ползунков нет» убрано (пункт (л))
   if (!on) {
     syncPultRegulators([]);   // все узлы — домой
-    const cc = document.getElementById('params-curves'); if (cc) cc.innerHTML = '';
-    const ce = document.getElementById('params-extra'); if (ce) ce.innerHTML = '';
+    clearPultBox('params-curves');
+    clearPultBox('params-extra');
     panel._curveSig = PULT_REBUILD; panel._extraSig = PULT_REBUILD;
   }
   if (empty) empty.style.display = on ? 'none' : '';
@@ -1020,6 +1027,8 @@ function updatePult() {
   // (3) экранные регуляторы сцены → в панель (после контейнеров).
   syncPultRegulators(pultRegulatorIds());
   showPult(true);
+  // Ползунки кривых — под свои карточки «Функций» (92-ui-kit.js).
+  if (typeof placeCurveSliders === 'function') placeCurveSliders();
 }
 
 /* ── ЖИВОЕ ПРИМЕНЕНИЕ ФОРМУЛ (редизайн 10.2026, фаза 4) ──────────────────
@@ -1054,7 +1063,14 @@ function wireControls() {
   document.addEventListener('keydown', (e) => {
     const p = document.getElementById('scene-picker');
     if (!p || p.classList.contains('hidden')) return;
-    if (e.key === 'Escape') { e.preventDefault(); closePicker(); return; }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      // О1: Esc сначала очищает запрос, при пустом — возвращает в модель.
+      const q = document.getElementById('picker-search');
+      if (q && q.value) { q.value = ''; if (typeof pickerFilter === 'function') pickerFilter(''); return; }
+      if (STATE.sceneKey) closePicker();
+      return;
+    }
     if (e.key === 'Tab') {
       // Карточки «скоро» отключены (disabled) и в кольцо фокуса не входят.
       const cards = p.querySelectorAll('.scard:not([disabled])');
@@ -1098,10 +1114,11 @@ function wireControls() {
      остались — их читают заливки в четырёх местах 40-scenes-market.js, — но
      переключаются вместе: порознь их не включал никто, а излишки монополии
      живут на своих галочках #chk-mono-* и сюда не относятся. */
-  const areasChk = document.getElementById('chk-areas');
-  if (areasChk) areasChk.addEventListener('change', () => {
-    STATE.showCS = areasChk.checked; STATE.showPS = areasChk.checked;
-    redrawAll();
+  /* Редизайн 10.2026 (пункт (е)): общая галочка ушла, излишки включаются
+     порознь — #chk-cs и #chk-ps в «Показать на графике». */
+  [['chk-cs', 'showCS'], ['chk-ps', 'showPS']].forEach(([id, key]) => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', () => { STATE[key] = el.checked; redrawAll(); });
   });
 
   // Галочки областей монополии (Задача 1): CS / VC / PS.

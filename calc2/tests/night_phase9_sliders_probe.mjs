@@ -19,7 +19,10 @@ const r = await page.evaluate(async () => {
   const wait = ms => new Promise(res => setTimeout(res, ms));
   const out = {};
   resetSceneMemory(); pickScene('sd'); await wait(500);
-  const chips = () => [...document.querySelectorAll('#params-curves .pchip')];
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): ползунки сдвига стоят
+     под карточками своих кривых; чип помнит коробку пульта и место в ней. */
+  const chips = () => [...document.querySelectorAll('.pchip[data-pult-box="params-curves"]')]
+    .sort((a, b) => (+a.dataset.pultIdx) - (+b.dataset.pultIdx));
   const eqText = () => chips().map(c => (c.querySelector('.reg-eq') || {}).textContent || '');
   out.labels = eqText();
   out.hasKatex = chips().map(c => !!(c.querySelector('.reg-eq .katex')));
@@ -43,11 +46,13 @@ const r = await page.evaluate(async () => {
     /* Только ВИДИМЫЕ дорожки. В правой панели с недавних пор живёт и блок
        вмешательства государства, а в нём спрятано поле неактивного
        инструмента: у скрытого элемента рамка нулевая, и он портил бы замер. */
-    const rows = [...document.querySelectorAll('#params-panel .param-track')]
+    // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
+    const rows = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(t => t.offsetParent !== null && t.getBoundingClientRect().width > 0);
     return rows.map(t => {
       const s = t.querySelector('input[type=range]');
       return { left: Math.round(s.getBoundingClientRect().left * 100) / 100,
+               group: t.closest('.fc-card') ? 'карточки' : 'секция',
                bound: (t.querySelector('.param-bound') || {}).textContent };
     });
   };
@@ -77,13 +82,17 @@ rep('сдвиг +20 двигает кривую, а не задаёт b=20',
     'b было ' + r.bStart[0] + ', стало ' + r.afterDrag.b + ', подпись «' + r.afterDrag.label + '»');
 rep('возврат ползунка в центр возвращает кривую', Math.abs(r.backToZero - r.bStart[0]) < 1e-6,
     'b=' + r.backToZero);
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026): вровень стоят дорожки одного вида
+   контейнера — карточные между собой, секционные между собой (карточка
+   сдвигает дорожку на свой внутренний отступ, см. calc2_blocks (ж)). */
 [['без буквы', r.tracksPlain], ['с буквой в формуле', r.tracks]].forEach(([what, tr]) => {
-  const lefts = tr.map(t => t.left);
-  const uniq = [...new Set(lefts)];
-  rep('левый край дорожки совпадает у всех ползунков панели (' + what + ')',
-      tr.length >= 2 && uniq.length === 1,
-      'дорожек ' + lefts.length + ', разных координат ' + uniq.length + ': ' + uniq.join(', ')
-        + ' | границы: ' + tr.map(t => t.bound).join(', '));
+  const card = tr.filter(t => t.group === 'карточки');
+  const uniqOf = (g) => [...new Set(tr.filter(t => t.group === g).map(t => t.left))];
+  const uc = uniqOf('карточки'), us = uniqOf('секция');
+  rep('левый край дорожки совпадает у ползунков одного вида (' + what + ')',
+      card.length >= 2 && uc.length === 1 && us.length <= 1,
+      'дорожек ' + tr.length + '; в карточках разных координат ' + uc.length + ' (' + uc.join(', ') + '), в секциях '
+        + us.length + ' (' + us.join(', ') + ') | границы: ' + tr.map(t => t.group + ' ' + t.bound).join(', '));
 });
 if (errs.length) rep('без ошибок страницы', false, errs.slice(0, 3).join(' | '));
 await browser.close();

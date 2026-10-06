@@ -69,6 +69,10 @@ function redrawAll() {
   // История и автосохранение (91-session.js): сверка состояния после затишья,
   // а не на каждом кадре протяжки.
   if (typeof historyAfterRedraw === 'function') historyAfterRedraw();
+  if (typeof syncShowSection === 'function') syncShowSection();   // «Показать на графике» (92-ui-kit.js)
+  if (typeof scheduleAnswer === 'function') scheduleAnswer();     // «Ответ» поверх табло (94-answer.js)
+  markServiceNodes();
+  if (typeof selfCanvas === 'function') selfCanvas();   // «Сначала сам»: обозначения вместо чисел (96-self.js)
 }
 
 function redrawScene() {
@@ -1468,7 +1472,7 @@ function keyTargets(panelId) {
 const KEY_SNAP_PX = 22;
 /* Запас попадания по кружку ключевой точки. Больше половины ширины полосы
    кривой (16 px): иначе зазора между «взял точку» и «взял кривую» нет вовсе. */
-const KEY_HIT_PX = 11;
+const KEY_HIT_PX = 12;   // зона попадания по ключевой точке (README макета, 7.5; было 11)
 /* п. 33. ВОЗМОЖНОСТЬ, О КОТОРОЙ ЗНАЕТ ТОЛЬКО НАВЕДЕНИЕ МЫШИ, НЕ СУЩЕСТВУЕТ.
 
    «Двойной щелчок, чтобы переименовать», «Добавить в список точек» и
@@ -1581,44 +1585,70 @@ function drawCrossPoints() {
        пикселей уносил руку в кривую вместо точки. Прозрачный круг радиусом 11
        лежит выше полос (см. порядок в drawOverlays), и пока курсор внутри
        него, кривая на указатель не отзывается. */
+    /* ── ВИД Б (решение владельца 04.10; README макета, 7.5) ───────────────
+       Точка — кружок цветом кривой в мягком ореоле того же цвета; координаты —
+       графитовая капсула, как у ручек, со значком закрепки за тонкой чертой.
+       Капсула читается одинаково в обеих темах: её цвета — токены кнопки. */
+    const halo = item.append('circle').attr('cx', px).attr('cy', py)
+      .attr('fill', litColor).style('pointer-events', 'none');
     item.append('circle').attr('cx', px).attr('cy', py).attr('r', KEY_HIT_PX)
       .attr('fill', 'transparent').attr('data-skip-export', '1').style('cursor', 'pointer');
     const dot = item.append('circle').attr('cx', px).attr('cy', py)
       .style('cursor', 'pointer');
-    // Подпись живёт в своей группе: её показываем и прячем, не трогая остальное.
+    // Капсула собирается при первом показе: ширину текста меряем у видимого узла.
     const lab = item.append('g').attr('class', 'cross-label').style('display', 'none');
-    haloText(lab, px + 9, py - 9, '(' + fmt(p.x) + '; ' + fmt(p.y) + ')', 'start', 'auto');
-    // «Закрепка» рядом с координатами: кладёт точку в список своих точек.
-    const pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer');
-    pin.append('rect').attr('x', px + 9).attr('y', py - 5).attr('width', 15).attr('height', 15)
-      .attr('rx', 3).attr('fill', COL.halo).attr('stroke', COL.inkSoft).attr('stroke-width', 1);
-    pin.append('path')
-      .attr('d', `M${px + 12.5},${py + 7} l0,-3 l6,-6 l3,3 l-6,6 z`)
-      .attr('fill', 'none').attr('stroke', COL.inkSoft).attr('stroke-width', 1.2)
-      .attr('stroke-linejoin', 'round');
-    /* Значок без подписи и без пояснения — просто точка (решение владельца).
-       Он единственный выносит точку в список насовсем. */
-    pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
+    let pin = null;
+    const buildCapsule = () => {
+      if (pin) return;
+      const btnBg = cssVar('--btn-bg'), onBtn = cssVar('--on-btn');
+      const font = getComputedStyle(document.body).fontFamily;
+      const txt = lab.append('text').attr('font-size', 13).attr('font-weight', 600)
+        .attr('font-family', font).attr('fill', onBtn).attr('dominant-baseline', 'central')
+        .text('(' + fmt(p.x) + '; ' + fmt(p.y) + ')');
+      const tw = txt.node().getComputedTextLength ? txt.node().getComputedTextLength() : 7 * txt.text().length;
+      const cw = 12 + tw + 9 + 28, ch = 28;
+      // Место: справа сверху, у края поля — зеркально (за край поля не выходит).
+      const m = CONFIG.margin, right = W - m.right, topY = m.top;
+      let x = px + 10, y = py - 10 - ch;
+      if (x + cw > right) x = px - 10 - cw;
+      if (y < topY) y = py + 10;
+      lab.insert('rect', 'text').attr('x', x).attr('y', y).attr('width', cw).attr('height', ch)
+        .attr('rx', ch / 2).attr('fill', btnBg);
+      txt.attr('x', x + 12).attr('y', y + ch / 2);
+      lab.append('line').attr('x1', x + 12 + tw + 9).attr('x2', x + 12 + tw + 9)
+        .attr('y1', y + 6).attr('y2', y + ch - 6).attr('stroke', onBtn).attr('stroke-opacity', 0.3).attr('stroke-width', 1);
+      // Закрепка: контурная канцелярская кнопка 14 px; зона нажатия шире значка.
+      pin = lab.append('g').attr('class', 'cross-pin').style('cursor', 'pointer')
+        .attr('data-tip', 'Сохранить в свои точки')
+        .attr('transform', 'translate(' + (x + cw - 21) + ',' + (y + 7) + ')');
+      pin.append('rect').attr('x', -5).attr('y', -5).attr('width', 24).attr('height', 24).attr('fill', 'transparent');
+      pin.append('path').attr('d', 'M5 1.5h4l-.6 4.2 2.6 2.3v1.4H3v-1.4l2.6-2.3zM7 9.4v4.1')
+        .attr('fill', 'none').attr('stroke', onBtn).attr('stroke-width', 2.1)
+        .attr('stroke-linejoin', 'round').attr('stroke-linecap', 'round');
+      /* Значок без подписи и без пояснения — просто точка (решение владельца).
+         Он единственный выносит точку в список насовсем. */
+      pin.on('click', (ev) => { ev.stopPropagation(); pinKeyPoint(p); });
+    };
 
-    /* Точка взведённой кривой горит цветом этой кривой и жирнее обычного, но
-       БЕЗ координат: координаты показывает наведение и только оно. */
+    /* Точка взведённой кривой горит цветом этой кривой, БЕЗ координат:
+       координаты показывает наведение и только оно. */
     const paint = () => {
       const hover = (STATE.hoverCross === i);
-      dot.attr('r', hover ? 5.5 : 4.5)
-         .attr('fill', hover ? litColor : COL.halo)
-         .attr('stroke', litColor)
-         .attr('stroke-width', hover ? 2.6 : 2.2)
+      halo.attr('r', hover ? 13 : 9.5).attr('opacity', hover ? 0.28 : 0.2);
+      dot.attr('r', hover ? 4.8 : 4)
+         .attr('fill', litColor)
+         .attr('stroke', COL.halo)
+         .attr('stroke-width', 1.5)
          .attr('opacity', 1);
+      if (hover) buildCapsule();
       lab.style('display', hover ? null : 'none');
-      pin.style('display', hover ? null : 'none');
     };
     paint();
     /* ⚠️ ПЛАШКА ОБЯЗАНА ПЕРЕЖИТЬ ПЕРЕХОД С ТОЧКИ НА ЗНАЧОК.
        Значок лежит внутри плашки, то есть в стороне от кружка. Скрой плашку
-       сразу по уходу курсора с кружка — и до значка не дотянуться никогда:
-       он исчезает ровно в тот момент, когда рука к нему движется. Поэтому
-       уход даёт короткую отсрочку, а вход в саму плашку её отменяет.
-       Второй раз в проекте: тем же способом лечится любая плашка с кнопкой. */
+       сразу по уходу курсора с кружка — и до значка не дотянуться никогда.
+       Поэтому уход даёт отсрочку 220 мс (README макета, 7.5), а вход в саму
+       плашку её отменяет. */
     let leaveTimer = null;
     const show = () => {
       if (leaveTimer) { clearTimeout(leaveTimer); leaveTimer = null; }
@@ -1629,7 +1659,7 @@ function drawCrossPoints() {
       leaveTimer = setTimeout(() => {
         leaveTimer = null;
         if (STATE.hoverCross === i) { STATE.hoverCross = null; paint(); }
-      }, 160);
+      }, 220);
     };
     item.on('pointerenter', show).on('pointerleave', hide);
     /* Щелчок по самой точке НЕ закрепляет её: закрепки больше нет, выносит
@@ -1963,7 +1993,30 @@ const CANVAS_MODE_TEXT = {
   },
 };
 
+/* Служебные узлы холста (COVERAGE, 6.8): ручки (кружки, которые тянут
+   мышью), зажжённые ключевые точки, кружок прилипания. В файл они не идут:
+   PNG вырезает их из клона по признаку data-service, TeX пропускает по
+   data-skip-export. Метка ставится после каждой перерисовки: ручки рисуют
+   семнадцать мест в восьми файлах, и признак в каждом разошёлся бы. */
+function markServiceNodes() {
+  const el = document.getElementById('chart');
+  if (!el) return;
+  const mark = (c) => { c.setAttribute('data-service', 'handle'); c.setAttribute('data-skip-export', '1'); };
+  const knob = (c) => c && c.tagName === 'circle' && !c.classList.contains('kp-mark')
+    && +c.getAttribute('r') > 0 && +c.getAttribute('r') <= 10 && !/^(none|transparent)$/.test(c.getAttribute('fill') || 'none');
+  el.querySelectorAll('*').forEach(c => {
+    if (!(c.__on && c.__on.some(o => o.name === 'drag'))) return;
+    if (c.tagName === 'circle') { mark(c); return; }
+    // Захват — прозрачная полоса, а видимый кружок ручки стоит сразу за ней
+    // (перед ней бывает точка модели радиусом 4 — её не трогаем).
+    const n = c.nextElementSibling;
+    if (knob(n) && +n.getAttribute('r') >= 5) mark(n);
+  });
+  el.querySelectorAll('g.crosses, #snap-hint').forEach(g => { g.setAttribute('data-service', 'kp'); g.setAttribute('data-skip-export', '1'); });
+}
+
 function syncCanvasMode() {
+  if (typeof syncToolSeg === 'function') syncToolSeg();   // кнопки инструмента в панели холста (93-shell.js)
   // Пока вершины отмечаются, закончить набор предлагает полоса режима над
   // холстом; кнопка в панели на это время уходит, чтобы одно и то же действие
   // не стояло на экране дважды. Состояние у обеих одно — `canvasMode()`.
@@ -3153,7 +3206,9 @@ function buildParamChip(box, name) {
   loLab.addEventListener('click', () => bounds.open('min'));
   hiLab.addEventListener('click', () => bounds.open('max'));
 
+  chip.dataset.param = name;   // по букве чип находит свою карточку (92-ui-kit.js)
   box.appendChild(chip);
+  return chip;
 }
 
 /* Цвета кривых сцены (издержки, производство, вееры, «Математика»).
@@ -3343,7 +3398,18 @@ function onEscClosePick(e) { if (e.key === 'Escape') closeColorMenu(); }
    иначе панель с прокруткой обрезала бы его по своему краю.
    ВАЖНО: из onChange нельзя перерисовывать список, в котором живёт эта кнопка,
    иначе нативная палитра «Своего цвета» захлопнется на первом же клике. */
-function makeColorPicker(value, onChange, title) {
+/* Двенадцать образцов окна «Цвет кривой» (редизайн 10.2026, README макета,
+   раздел 10): шесть цветов ролей и вторая шестёрка палитры групп сложения.
+   Значения — токены calc2.css, а не числа в коде. */
+const PALETTE_12 = [
+  ['--curve-d', 'Синий'], ['--curve-s', 'Кирпичный'], ['--curve-mr', 'Фиолетовый'],
+  ['--curve-mc', 'Бирюзовый'], ['--curve-tax', 'Зелёный'], ['--curve-reg', 'Охра'],
+  ['--sum-g2', 'Тёмная бирюза'], ['--sum-g4', 'Тёмно-зелёный'], ['--sum-g5', 'Маджента'],
+  ['--sum-g6', 'Сиреневый'], ['--sum-g7', 'Сланцевый'], ['--sum-g8', 'Пыльная роза'],
+];
+function paletteTwelve() { return PALETTE_12.map(([v, n]) => [normHex(cssVar(v)), n]); }
+function makeColorPicker(value, onChange, title, opts) {
+  opts = opts || {};
   const wrap = document.createElement('span');
   wrap.className = 'cpick';
 
@@ -3361,7 +3427,12 @@ function makeColorPicker(value, onChange, title) {
   const paint = () => { btn.style.background = cur; own.value = cur; };
   paint();
 
-  const apply = (hex) => { cur = normHex(hex); paint(); onChange(cur); };
+  // onChange может вернуть итоговый цвет (у «Цвета по умолчанию» его знает
+  // только хозяин: цвет роли кривой).
+  const apply = (hex) => {
+    const got = onChange(hex == null ? null : normHex(hex));
+    cur = normHex(got || hex || cur); paint();
+  };
   own.addEventListener('input', () => apply(own.value));
 
   btn.addEventListener('click', (e) => {
@@ -3373,28 +3444,47 @@ function makeColorPicker(value, onChange, title) {
     const menu = document.createElement('div');
     menu.className = 'cpick-menu';
     menu.setAttribute('role', 'dialog');
-    menu.setAttribute('aria-label', btn.title);
+    const head = opts.title || (title || 'Цвет кривой');
+    menu.setAttribute('aria-label', head);
+    const h = document.createElement('div');
+    h.className = 'cpick-title'; h.textContent = head;
+    menu.appendChild(h);
     const grid = document.createElement('div');
     grid.className = 'cpick-grid';
-    paletteSix().forEach((hex) => {
+    grid.setAttribute('role', 'radiogroup');
+    grid.setAttribute('aria-label', 'Цвета');
+    paletteTwelve().forEach(([hex, name]) => {
       const sw = document.createElement('button');
       sw.type = 'button';
       sw.className = 'cpick-sw';
       sw.style.background = hex;
       sw.setAttribute('role', 'radio');
       sw.setAttribute('aria-checked', hex.toLowerCase() === cur.toLowerCase() ? 'true' : 'false');
-      sw.setAttribute('data-tip', hex);
+      sw.setAttribute('aria-label', name);
+      sw.setAttribute('data-tip', name);
       sw.addEventListener('click', (ev) => { ev.stopPropagation(); apply(hex); closeColorMenu(); });
       grid.appendChild(sw);
     });
     menu.appendChild(grid);
 
+    const foot = document.createElement('div');
+    foot.className = 'cpick-foot';
     const ownRow = document.createElement('label');
     ownRow.className = 'cpick-own';
     own.style.display = '';
+    own.setAttribute('aria-label', 'Свой цвет');
     ownRow.append(own, document.createTextNode('Свой цвет'));
     ownRow.addEventListener('click', (ev) => ev.stopPropagation());
-    menu.appendChild(ownRow);
+    foot.appendChild(ownRow);
+    // «Цвет по умолчанию» — там, где хозяин его знает (у кривой это цвет роли).
+    if (typeof opts.dflt === 'function') {
+      const d = document.createElement('button');
+      d.type = 'button'; d.className = 'cpick-dflt';
+      d.textContent = 'Цвет по умолчанию';
+      d.addEventListener('click', (ev) => { ev.stopPropagation(); apply(null); closeColorMenu(); });
+      foot.appendChild(d);
+    }
+    menu.appendChild(foot);
 
     document.body.appendChild(menu);
     menu._owner = wrap;
@@ -4023,6 +4113,7 @@ function resetDecor() {
   const panel = document.getElementById('params-panel');
   if (panel) { panel._extraSig = PULT_REBUILD; panel._curveSig = PULT_REBUILD; }
   ['params-extra', 'params-curves'].forEach(id => {
+    if (typeof clearPultBox === 'function') { clearPultBox(id); return; }
     const box = document.getElementById(id);
     if (box) box.innerHTML = '';
   });

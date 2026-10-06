@@ -66,6 +66,11 @@ async function expandAll(page) {
     });
     /* Поля формул собираются лениво (А56): пока карточка была свёрнута, поле
        стояло в очереди и было бы замерено как голое текстовое окошко. */
+    /* Редизайн 10.2026: карточки не сворачиваются, но «Развернуть график»
+       прячет обе колонки — замер идёт при выключенном режиме и со всеми телами
+       секций раскрытыми. */
+    if (typeof setFocusMode === 'function') setFocusMode(false);
+    document.querySelectorAll('.app .fold-body').forEach(b => { if (!b.classList.contains('open')) { n += 1; b.classList.add('open'); } });
     if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
     return n;
   });
@@ -212,7 +217,8 @@ const inPage = (theme) => {
 
   /* 5. Не более одной главной кнопки на экран. Главная — залитая акцентом или
      графитом кнопка действия; в калькуляторе это `.btn` без `.btn-quiet`. */
-  const mains = all.filter(el => el.matches('.btn:not(.btn-quiet):not(.btn-sm), .k-btn--main'));
+  /* Редизайн 10.2026: графитовая кнопка шапки модели («Поделиться») — тоже главная. */
+  const mains = all.filter(el => el.matches('.btn:not(.btn-quiet):not(.btn-sm), .k-btn--main, .mh-main'));
   if (mains.length > 1) add('one_main_button', mains.length + ' шт: ' + mains.slice(0, 4).map(name).join(', '));
 
   /* 6. У выключенной кнопки есть видимый текстовый сосед: почему она заперта,
@@ -262,7 +268,12 @@ const inPage = (theme) => {
     '13/400', '13/500', '13/600', '13/700',
     '14/400', '14/600', '14/700',
     '15/600', '15/700', '22/600',
-    '26/700', '56/800', '10/700']);
+    '26/700', '56/800', '10/700',
+    /* Редизайн 10.2026 (COVERAGE.md, раздел 5; DESIGN.md 5.1): макет нарисован
+       в размерах нового сайта (14,5 / 13,5 / 17 px), и шкала для /calc2/
+       расширена ЗАКРЫТЫМ списком из восьми сочетаний. Кегль округляется до
+       целого: 13,5 считается как 14, 14,5 как 15. Других сочетаний нет. */
+    '14/500', '15/400', '15/500', '16/400', '16/600', '17/600', '19/600', '32/600']);
   all.forEach(el => {
     const own = Array.from(el.childNodes).filter(n => n.nodeType === 3).map(n => n.nodeValue).join('').trim();
     if (own.length < 2 || inNav(el) || el.closest('svg') || el.closest('.katex')) return;
@@ -289,7 +300,8 @@ const inPage = (theme) => {
      оттенка делает плашку вторым акцентом экрана (канон 2.4). */
   const TINT = ['--accent-tint', '--amber-tint', '--green-tint', '--error-tint']
     .map(v => px(cs0.getPropertyValue(v).trim())).filter(Boolean);
-  Array.from(document.querySelectorAll('.warn, .err, .error, .state, .k-state, .notice')).filter(vis).forEach(el => {
+  // Редизайн 10.2026: строка статуса «Ответа» (.ans-status) — та же плашка состояния.
+  Array.from(document.querySelectorAll('.warn, .err, .error, .state, .k-state, .notice, .ans-status')).filter(vis).forEach(el => {
     const bg = px(getComputedStyle(el).backgroundColor);
     if (!bg || bg[3] < 0.05) return;
     if (TINT.some(t => Math.abs(t[0] - bg[0]) + Math.abs(t[1] - bg[1]) + Math.abs(t[2] - bg[2]) < 12))
@@ -517,6 +529,9 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
       if (prevTick != null && st.tick != null) tickMoved = Math.max(tickMoved, Math.abs(st.tick - prevTick));
       prevY = st.y; if (prevTick == null) prevTick = st.tick;
     }
+    /* Замер обязан состояться: подпись не нашлась (разметка сменилась) —
+       это нарушение, а не тихий ноль (COVERAGE.md, раздел 5). */
+    if (prevY == null) put('label_shake', 'm-graph', 'замер не состоялся: подпись кривой не найдена');
     if (worst > 2) put('label_shake', 'm-graph',
                        'скачок ' + worst.toFixed(1) + ' px за шаг при сдвиге плоскости ' +
                        tickMoved.toFixed(1) + ' px');

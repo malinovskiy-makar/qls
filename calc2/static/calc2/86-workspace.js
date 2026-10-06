@@ -114,6 +114,12 @@ function dockActive(id, on) {
    полосы со стрелкой — график при этом становится шире, поэтому после
    анимации ширины его надо перерисовать (этим занимается ResizeObserver). */
 function setSideOpen(panelId, btnId, open) {
+  /* Редизайн 10.2026: колонки «Условие» и «Ответ» не сворачиваются (их место
+     занял «Развернуть график», пункт (в) закрытого списка). Функция осталась:
+     её зовут приборы и прежние места кода, а поля формул после показа колонки
+     по-прежнему надо собрать. */
+  if (typeof flushMathfieldsSoon === 'function') flushMathfieldsSoon();
+  return;
   const p = document.getElementById(panelId);
   if (p) {
     p.classList.toggle('collapsed', !open);
@@ -250,10 +256,10 @@ function syncAnalyticsPanel() {
   if (expl) expl.classList.toggle('hidden', !hasExplain);
   const body = document.getElementById('params-body');
   const hasKnobs = !!body && !!body.querySelector('input, select, button');
-  const empty = document.getElementById('params-empty');
-  if (empty) empty.style.display = (hasKnobs || !(hasValues || hasExplain)) ? 'none' : '';
-  const panel = document.getElementById('params-panel');
-  if (panel) panel.classList.toggle('empty', !(hasKnobs || hasValues || hasExplain));
+  /* Редизайн 10.2026: колонка «Ответ» на экране всегда (пустая колонка — это
+     пустой «Ответ», а не пропавшая панель); пустого состояния «Ползунков нет»
+     больше нет вовсе (пункт (л) закрытого списка). */
+  void hasKnobs;
 }
 
 /* ── Панель ввода: список карточек (Фаза 5) ──────────────────────────
@@ -270,6 +276,9 @@ const FOLD_CHEVRON = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" st
 
 // Имена для секций, у которых своего заголовка в разметке нет.
 const SECTION_NAMES = {
+  'sec-tax': 'Вмешательство государства',
+  'sec-params': 'Параметры',
+  'sec-show': 'Показать на графике',
   'sec-costs': 'Фирма',
   'sec-labor': 'Рынок труда',
   'sec-inequality': 'Неравенство доходов',
@@ -325,11 +334,53 @@ function sectionIcon(secId) {
        + 'stroke="currentColor" stroke-linecap="round" stroke-linejoin="round">' + d + '</svg>';
 }
 
+/* ⚠️ РЕДИЗАЙН 10.2026: КАРТОЧКИ БОЛЬШЕ НЕ СВОРАЧИВАЮТСЯ (пункт (д) закрытого
+   списка). Скелет «заголовок + тело» остаётся (на нём стоят селекторы
+   `:scope > .fold-body` по всему коду), но заголовок — просто заголовок, а не
+   кнопка, и тело раскрыто всегда: колонка «Условие» прокручивается целиком. */
 function cardifySections() {
   document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     if (sec._card) return;
     sec._card = true;
-    sec.classList.add('card');
+    sec.classList.add('card', 'open-card');
+    // Складная кнопка уже стояла в разметке («Точки на графике», «Площади»):
+    // она становится заголовком на месте, тело раскрывается.
+    const had0 = sec.querySelector(':scope > .fold-btn');
+    if (had0) {
+      const h0 = document.createElement('h3');
+      h0.className = 'sec-head';
+      const txt0 = (had0.querySelector(':scope > span') || had0).textContent.trim();
+      h0.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+      h0.querySelector('span > b').textContent = txt0;
+      const box0 = document.getElementById(had0.getAttribute('aria-controls'));
+      if (box0) box0.classList.add('open');
+      // Значок «?» заголовка (hintsToDots) переезжает в новый заголовок (О6).
+      had0.querySelectorAll('.help-dot').forEach(d => h0.querySelector('span').appendChild(d));
+      had0.replaceWith(h0);
+      return;
+    }
+    if (!sec.querySelector(':scope > .section-title')) {
+      const vs = sec.querySelector(':scope > .vsub');
+      if (vs) { vs.classList.add('section-title'); vs.classList.remove('vsub'); }
+    }
+    const title0 = sec.querySelector(':scope > .section-title');
+    const name0 = (title0 ? title0.textContent.trim() : '') || SECTION_NAMES[sec.id] || 'Настройки';
+    const body0 = document.createElement('div');
+    body0.className = 'fold-body open';
+    body0.id = (sec.id || 'sec') + '-fold';
+    const h = document.createElement('h3');
+    h.className = 'sec-head';
+    h.innerHTML = '<span>' + sectionIcon(sec.id) + '<b></b></span>';
+    h.querySelector('span > b').textContent = name0;
+    if (title0) title0.querySelectorAll('.help-dot').forEach(d => h.querySelector('span').appendChild(d));
+    if (title0) title0.remove();
+    while (sec.firstChild) body0.appendChild(sec.firstChild);
+    sec.appendChild(h);
+    sec.appendChild(body0);
+  });
+  syncFirstCard();
+  if (cardifySections._legacy !== true) return;
+  document.querySelectorAll('#tools-panel .tools-body > .section').forEach(sec => {
     const had = sec.querySelector(':scope > .fold-btn');
     if (had) {                                   // складной заголовок уже был
       had.setAttribute('aria-expanded', 'false');
@@ -380,6 +431,7 @@ function cardifySections() {
    ⚠️ Прибор, считающий что-либо на экране, обязан раскрывать карточки САМ —
    правило записано в calc2/CLAUDE.md, и теперь оно касается обеих панелей. */
 function collapseCards() {
+  return;   // редизайн 10.2026: карточки не сворачиваются (пункт (д))
   document.querySelectorAll('#tools-panel .tools-body > .section, #params-panel .side-part')
     .forEach(sec => {
       const btn = sec.querySelector(':scope > .fold-btn');
@@ -410,6 +462,9 @@ function syncLabelSizeSeg() {
 function openSection(secId) {
   const sec = document.getElementById(secId);
   if (!sec) return;
+  // Редизайн 10.2026: раскрывать нечего, секция всегда открыта; показываем её.
+  if (secId !== 'sec-input' && sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest' });
+  return;
   const btn = sec.querySelector(':scope > .fold-btn');
   const box = sec.querySelector(':scope > .fold-body');
   if (btn) btn.setAttribute('aria-expanded', 'true');
@@ -466,7 +521,7 @@ function syncFirstCard() {
     if (!b) return;
     if (s === named) {
       if (b.dataset.ownName === undefined) b.dataset.ownName = b.textContent;
-      b.textContent = 'Ввод функций';
+      b.textContent = 'Функции';
     } else if (b.dataset.ownName !== undefined) {
       b.textContent = b.dataset.ownName;
     }
@@ -474,7 +529,8 @@ function syncFirstCard() {
 }
 
 function wireScene() {
-  const rst = document.getElementById('btn-scene-reset');
+  // «Сбросить» в шапке модели (пункт (и): прежняя «Вернуть исходный вид»).
+  const rst = document.getElementById('btn-model-reset');
   if (rst) rst.addEventListener('click', resetCurrentScene);
 
   const tools = document.getElementById('tools-panel');
@@ -520,8 +576,7 @@ function wireScene() {
        функцию, определённую ТОЛЬКО на отрезке (вне его кривой нет). Нижняя
        граница была 2 и отрезала этот случай без причины. */
     if (!isFinite(n) || n < 1 || n > 12) return;
-    PW.n = n;
-    renderPw();
+    pwSetCount(n);
   });
   /* Сколько групп спроса и сколько предложения (сюжет сложения). Меняем
      число — добавляются или убираются ТОЛЬКО хвостовые группы, уже набранные
@@ -535,9 +590,19 @@ function wireScene() {
       if (typeof sumSetCount === 'function') sumSetCount(side, n);
     });
   });
+  const pwX = document.getElementById('pw-x');
+  if (pwX) pwX.addEventListener('click', () => closePiecewise());
+  const pwMinus = document.getElementById('pw-minus'), pwPlus = document.getElementById('pw-plus');
+  if (pwMinus) pwMinus.addEventListener('click', () => pwSetCount(PW.n - 1));
+  if (pwPlus) pwPlus.addEventListener('click', () => pwSetCount(PW.n + 1));
+  const pwAdd = document.getElementById('pw-add');
+  if (pwAdd) pwAdd.addEventListener('click', () => pwAddRow());
   const pwApply = document.getElementById('pw-apply');
   if (pwApply) pwApply.addEventListener('click', () => {
+    // С ошибкой «Готово» запись не применяет: тост с текстом ошибки (раздел 10).
+    if (PW.error) { toast(PW.error); return; }
     if (PW.inp) {
+      if (typeof pushUndo === 'function') pushUndo('Кусочная функция');
       // Движку — цепочку условий, полю — одну фигурную скобку. Правится она
       // прямо в строке: разбор скобки обратно в выражение умеет latexToMath.
       // Приставка («y = », «P = ») читается из ТЕКУЩЕГО значения поля и
@@ -556,14 +621,13 @@ function wireScene() {
          конца и здесь. */
       PW.inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     }
+    const inList = PW.inp && PW.inp.closest('#curve-list');
     closePiecewise();
+    // Карточка функции показывает кусочную запись скобкой: пересобираем список.
+    if (inList && typeof renderCurveList === 'function') renderCurveList();
   });
-  const expPng = document.getElementById('exp-png');
-  if (expPng) expPng.addEventListener('click', () => exportPNG(2));   // 2× — читаемо в печати
-  const expTex = document.getElementById('exp-tex');
-  if (expTex) expTex.addEventListener('click', () => exportTex());
-  const expPdf = document.getElementById('exp-pdf');
-  if (expPdf) expPdf.addEventListener('click', () => exportPDF());
+  // Окно «Скачать»: формат и одна кнопка (70-scenes-math.js, wireExport).
+  if (typeof wireExport === 'function') wireExport();
 
   // «Ко всем моделям».
   const back = document.getElementById('scene-back');
@@ -645,7 +709,7 @@ function resetCurrentScene() {
 
 function setWrenchOpen(open) {
   const pop = document.getElementById('wrench-pop');
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   if (!pop) return;
   pop.classList.toggle('open', open);
   if (btn) { btn.classList.toggle('on', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false'); }
@@ -1438,7 +1502,9 @@ function markNotationsIn(root) {
      Её и так набирает формулой paintEqLabel, а имя для неё читается обратно из
      той же подписи. Разметив её здесь, мы кормили бы чтение собственным
      выводом: «Цена P» → «Цена $P$» → на экране «Цена PPP» (замер 24.08). */
-  const SKIP = '.katex, math-field, input, textarea, code, script, style, '
+  /* select и option — тоже (COVERAGE О29): в <option> разметка не набирается,
+     и «D, спрос» превращался в «DDD, спрос». */
+  const SKIP = '.katex, math-field, input, textarea, code, script, style, select, option, '
              + '.f-typeset, .mf-hidden, .param-eq, .pchip-label, .reg-eq';
   const walk = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (n) => {
@@ -1553,6 +1619,9 @@ function hintAnchor(hint) {
      обе подсказки оставались без якоря и получали по пустой строке с «?». */
   let sec = hint.closest('.section');
   while (sec) {
+    // Заголовок карточки после редизайна 10.2026 — h3.sec-head (cardifySections).
+    const head = sec.querySelector(':scope > .sec-head > span');
+    if (head) return head;
     const fold = sec.querySelector(':scope > .fold-btn > span');
     if (fold) return fold;
     const title = sec.querySelector(':scope > .section-title');
@@ -1730,7 +1799,7 @@ function wireHintButtons() {
 }
 
 function wireWrench() {
-  const btn = document.getElementById('btn-wrench');
+  const btn = document.getElementById('btn-view');   // «Вид графика» вместо гаечного ключа (пункт (и))
   const pop = document.getElementById('wrench-pop');
   if (btn) btn.addEventListener('click', (e) => {
     e.stopPropagation();

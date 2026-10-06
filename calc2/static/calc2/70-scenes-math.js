@@ -1190,22 +1190,81 @@ function exportBaseName() {
   return String(t).trim().replace(/[\\/:*?"<>|]+/g, '-').slice(0, 60) || 'график';
 }
 
-function exportPNG(scale) {
-  const node = document.getElementById('chart');
-  if (!node) return;
-  const w = node.clientWidth || W, h = node.clientHeight || H;
-  const clone = node.cloneNode(true);
-  clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-  clone.setAttribute('width', w); clone.setAttribute('height', h);
+/* ── БЕЛЫЙ ЛИСТ (редизайн 10.2026, README макета, раздел 13) ──────────────
+   В файл график уходит светлыми токенами на белом, какая бы тема ни стояла
+   на экране: картинка уходит в чужой документ и на бумагу. Холст на миг
+   перерисовывается в светлой теме с белым фоном, клонируется, и тема
+   возвращается — всё в одной задаче браузера, поэтому экран не мигает.
+   Из клона вырезаются служебные узлы (data-service: ручки, зажжённые
+   ключевые точки, кружок прилипания) — в файл они не идут (COVERAGE, 6.8). */
+function paperChartClone() {
+  const root = document.documentElement;
+  const theme = root.getAttribute('data-theme');
+  const paper = cssVar('--paper');
+  root.setAttribute('data-theme', 'light');
+  root.style.setProperty('--canvas', paper);
+  root.style.setProperty('--halo', paper);
+  let clone = null, w = W, h = H;
+  try {
+    refreshColors(); redrawAll();
+    const node = document.getElementById('chart');
+    if (node) {
+      w = node.clientWidth || W; h = node.clientHeight || H;
+      clone = node.cloneNode(true);
+      clone.querySelectorAll('[data-service]').forEach(n => n.remove());
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+      clone.setAttribute('width', w); clone.setAttribute('height', h);
+    }
+  } finally {
+    if (theme) root.setAttribute('data-theme', theme); else root.removeAttribute('data-theme');
+    root.style.removeProperty('--canvas');
+    root.style.removeProperty('--halo');
+    refreshColors(); redrawAll();
+  }
+  return { clone, w, h, paper };
+}
+// Главные числа ответа строкой: «Q = 40   Pb = 60 …» (ячейки «Ответа»).
+function exportNumbersLine() {
+  return [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => {
+    const t = (el) => { if (!el) return ''; const k = el.cloneNode(true); k.querySelectorAll('.katex-mathml, annotation').forEach(x => x.remove()); return k.textContent.replace(/\s+/g, ' ').trim(); };
+    const n = t(c.querySelector('.ans-not')), v = t(c.querySelector('.ans-val'));
+    return (n ? n + ' = ' : t(c.querySelector('.ans-lab')) + ': ') + v;
+  }).filter(Boolean).join('    ');
+}
+function exportExtras() {
+  const title = expValue('exp-title').trim();
+  const cap = expValue('exp-caption').trim();
+  const nb = document.getElementById('exp-nums');
+  const nums = (nb && nb.checked) ? exportNumbersLine() : '';
+  return { title, cap, nums };
+}
+
+function exportPNG(scale, toPreview) {
+  const { clone, w, h, paper } = paperChartClone();
+  if (!clone) return;
   const src = new XMLSerializer().serializeToString(clone);
+  const url = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  if (toPreview) { toPreview.src = url; return; }
+  const ex = exportExtras();
+  const font = getComputedStyle(document.body).fontFamily;
+  const ink = cssVar('--ink') || 'black';
+  const inkSoft = cssVar('--ink-soft') || ink;
   const img = new Image();
   img.onload = () => {
+    const top = ex.title ? 34 : 0;
+    const below = (ex.cap ? 24 : 0) + (ex.nums ? 26 : 0) + ((ex.cap || ex.nums) ? 8 : 0);
     const cv = document.createElement('canvas');
-    cv.width = Math.round(w * scale); cv.height = Math.round(h * scale);
+    cv.width = Math.round(w * scale); cv.height = Math.round((h + top + below) * scale);
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = cssVar('--canvas') || '#ffffff';   // фон под тему, иначе прозрачный
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    ctx.drawImage(img, 0, 0, cv.width, cv.height);
+    ctx.scale(scale, scale);
+    ctx.fillStyle = paper || 'white';     // белый лист, в любой теме
+    ctx.fillRect(0, 0, w, h + top + below);
+    ctx.drawImage(img, 0, top, w, h);
+    ctx.textAlign = 'center';
+    if (ex.title) { ctx.fillStyle = ink; ctx.font = '600 15px ' + font; ctx.fillText(ex.title, w / 2, 22); }
+    let y = top + h + 18;
+    if (ex.cap) { ctx.fillStyle = inkSoft; ctx.font = '400 13px ' + font; ctx.fillText(ex.cap, w / 2, y); y += 24; }
+    if (ex.nums) { ctx.fillStyle = ink; ctx.font = '500 14px ' + font; ctx.fillText(ex.nums, w / 2, y); }
     cv.toBlob(b => {
       if (!b) { toast('Не получилось собрать картинку'); return; }
       downloadBlob(b, exportBaseName() + '.png');
@@ -1213,7 +1272,7 @@ function exportPNG(scale) {
     });
   };
   img.onerror = () => toast('Не получилось собрать картинку');
-  img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(src);
+  img.src = url;
 }
 
 // ── .tex ────────────────────────────────────────────────────────────────
@@ -2256,7 +2315,7 @@ function exportTex() {
 function exportPDF() {
   const title = (document.getElementById('exp-title') || {}).value || '';
   const label = (document.getElementById('exp-label') || {}).value || '';
-  const btn = document.getElementById('exp-pdf');
+  const btn = document.getElementById('exp-go');
   if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
   const body = new FormData();
   body.append('tex', buildTex(title, label));
@@ -2266,7 +2325,7 @@ function exportPDF() {
     .then(r => r.ok ? r.blob() : r.text().then(t => { throw new Error(t.slice(0, 200)); }))
     .then(b => { downloadBlob(b, exportBaseName() + '.pdf'); toast('PDF готов'); })
     .catch(e => toast('PDF не собрался: ' + e.message))
-    .finally(() => { if (btn) { btn.disabled = false; btn.textContent = 'Скачать PDF'; } });
+    .finally(() => { if (btn) { btn.disabled = false; syncExportFormat(); } });
 }
 
 /* Поля окна экспорта правятся НА МЕСТЕ, как и всё остальное в калькуляторе
@@ -2282,7 +2341,7 @@ function buildExportFields() {
     slot.appendChild(makeEditableValue({
       kind: 'text',
       get: () => inp.value || '',
-      set: (v) => { inp.value = String(v == null ? '' : v).trim(); refreshExportPreview(); },
+      set: (v) => { inp.value = String(v == null ? '' : v).trim(); refreshExportPreview(); refreshExportSheet(); },
       fmt: (v) => (String(v || '').trim() || hint),
       title: 'Щёлкните, чтобы изменить',
     }));
@@ -2326,6 +2385,62 @@ function refreshExportPreview() {
 
 function expValue(id) { const el = document.getElementById(id); return el ? el.value : ''; }
 
+/* Формат и одна кнопка «Скачать …» (README макета, раздел 10). */
+const EXPORT_FORMATS = {
+  png: { btn: 'Скачать PNG', note: 'Картинка с двойной чёткостью для презентации и конспекта.' },
+  pdf: { btn: 'Скачать PDF', note: 'Лист A4 с полями для печати и домашки.' },
+  tex: { btn: 'Скачать TeX', note: 'Код TikZ для LaTeX: вставьте в свою работу как есть.' },
+};
+let exportFormat = 'png';
+function syncExportFormat() {
+  const f = EXPORT_FORMATS[exportFormat] || EXPORT_FORMATS.png;
+  document.querySelectorAll('#exp-fmt .seg-btn').forEach(b => {
+    const on = b.dataset.fmt === exportFormat;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+  });
+  const go = document.getElementById('exp-go'); if (go) go.textContent = f.btn;
+  const note = document.getElementById('exp-fmt-note'); if (note) note.textContent = f.note;
+  // Метка для перекрёстной ссылки нужна только файлу LaTeX (К4).
+  const lf = document.getElementById('exp-label-field'); if (lf) lf.hidden = (exportFormat === 'png');
+}
+function refreshExportSheet() {
+  const ex = exportExtras();
+  const tt = document.getElementById('exp-sheet-title'); if (tt) { tt.textContent = ex.title; tt.hidden = !ex.title; }
+  const cp = document.getElementById('exp-sheet-cap'); if (cp) { cp.textContent = ex.cap; cp.hidden = !ex.cap; }
+  const nm = document.getElementById('exp-sheet-nums'); if (nm) { nm.textContent = ex.nums; nm.hidden = !ex.nums; }
+  const img = document.getElementById('exp-sheet-img');
+  if (img) exportPNG(1, img);
+}
+function wireExport() {
+  document.querySelectorAll('#exp-fmt .seg-btn').forEach(b => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    exportFormat = b.dataset.fmt; syncExportFormat(); refreshExportPreview();
+  }));
+  const go = document.getElementById('exp-go');
+  if (go) go.addEventListener('click', () => {
+    if (exportFormat === 'tex') exportTex();
+    else if (exportFormat === 'pdf') exportPDF();
+    else exportPNG(2);   // 2× — читаемо в печати
+  });
+  const x = document.getElementById('exp-x'); if (x) x.addEventListener('click', () => closeExport());
+  ['exp-caption', 'exp-nums'].forEach(id => {
+    const e = document.getElementById(id);
+    if (e) e.addEventListener(e.type === 'checkbox' ? 'change' : 'input', () => refreshExportSheet());
+  });
+  // Окно модальное: Tab ходит по кругу внутри (DESIGN.md 2.15).
+  const m = document.getElementById('export-modal');
+  if (m) m.addEventListener('keydown', (e) => {
+    if (e.key !== 'Tab') return;
+    const list = [...m.querySelectorAll('button:not([disabled]), input:not([type=hidden]), [tabindex="0"]')].filter(el => el.offsetParent !== null);
+    if (!list.length) return;
+    const first = list[0], last = list[list.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+  syncExportFormat();
+}
+
 function openExport() {
   const m = document.getElementById('export-modal');
   if (!m) return;
@@ -2341,6 +2456,8 @@ function openExport() {
   const ed2 = slot2 && slot2.querySelector('.edval');
   if (ed2 && ed2._repaint) ed2._repaint();
   refreshExportPreview();
+  syncExportFormat();
+  refreshExportSheet();
   if (ed) ed.focus();
 }
 function closeExport() {

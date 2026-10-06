@@ -46,38 +46,36 @@ const t = async (name, fn) => {
 await t('в окне ровно десять блоков', async () =>
   (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
-await t('Математика идёт первой карточкой блока', async () =>
-  (await page.locator('.bcard-name').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого списка):
+   двухуровневого окна нет — десять блоков и модели на одном экране. Смысл
+   прежних трёх проверок тот же: порядок блоков, у моделей есть картинка (она
+   теперь в превью), номеров нет, модель блока видна и открывается. */
+await t('Математика идёт первым блоком экрана', async () =>
+  (await page.locator('#scene-picker .pk-bname').first().textContent()).trim() === 'Математика' || 'первый не Математика');
 
-/* П2: главный экран — десять больших карточек блоков с картинками, по две в
-   ряд, без нумерации; ни один блок не раскрыт, кнопки возврата не видно. */
-await t('главный экран — карточки блоков с картинками', () => page.evaluate(() => {
-  const cards = [...document.querySelectorAll('#picker-blocks .bcard')];
+await t('главный экран — десять блоков, у каждой модели картинка для превью', () => page.evaluate(() => {
+  const blocks = [...document.querySelectorAll('#scene-picker .pk-block')];
   const bad = [];
-  if (cards.length !== 10) bad.push('карточек ' + cards.length);
-  cards.forEach(c => {
-    const nm = (c.querySelector('.bcard-name') || {}).textContent || '';
-    if (!c.querySelector('.bcard-spec svg')) bad.push('без картинки: ' + nm.trim());
+  if (blocks.length !== 10) bad.push('блоков ' + blocks.length);
+  blocks.forEach(g => {
+    const nm = (g.querySelector('.pk-bname') || {}).textContent || '';
     if (/^\s*\d+\s*·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
+    g.querySelectorAll('.scard.pk-row:not(.soon):not([disabled])').forEach(c => {
+      if (!c.querySelector('.scard-spec svg')) bad.push('без картинки: ' + ((c.querySelector('.scard-name') || {}).textContent || '').trim());
+    });
   });
-  if (document.querySelectorAll('#scene-picker .picker-group.open').length) bad.push('блок уже раскрыт');
-  if (document.getElementById('picker-back').classList.contains('shown')) bad.push('кнопка возврата видна');
+  if (document.getElementById('picker-blocks')) bad.push('лестница блоков ещё в разметке');
   return !bad.length || bad.join('; ');
 }));
 
-await t('щелчок по блоку показывает его модели и возврат', () => page.evaluate(() => {
-  const card = document.querySelectorAll('#picker-blocks .bcard')[1];
-  card.click();
-  const open = document.querySelectorAll('#scene-picker .picker-group.open');
-  const hidden = document.getElementById('picker-blocks').classList.contains('hidden');
-  const back = document.getElementById('picker-back');
-  const shown = back.classList.contains('shown');
-  const models = open.length ? open[0].querySelectorAll('.scard').length : 0;
-  back.click();                                   // и возврат работает
-  const restored = !document.getElementById('picker-blocks').classList.contains('hidden')
-                && !document.querySelectorAll('#scene-picker .picker-group.open').length;
-  return (open.length === 1 && hidden && shown && models > 0 && restored)
-    || `открыто ${open.length}, блоки скрыты ${hidden}, возврат ${shown}, моделей ${models}, вернулись ${restored}`;
+await t('модель блока видна сразу, превью показывает её картинку и имя', () => page.evaluate(() => {
+  const row = document.querySelector('#scene-picker .pk-block:nth-child(1) .scard.pk-row:not(.soon)');
+  if (!row || row.offsetParent === null) return 'строки модели не видно';
+  row.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
+  const pv = document.getElementById('picker-preview');
+  const ok = pv && !pv.hidden && pv.querySelector('svg') && (pv.querySelector('.pk-pv-name') || {}).textContent;
+  row.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
+  return !!ok || 'превью не показало картинку и имя';
 }));
 
 await t('модель «Потребление в комплектах» вырезана', () => page.evaluate(() =>
@@ -255,7 +253,13 @@ await t('baseScene сводит подрежим к базе', () => page.evalua
    вровень. Всё три — сквозные правила, поэтому проверяются перебором сцен, а
    не на одной удобной. */
 
-const WANT_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): регуляторы больше не уезжают в
+   правую панель, и по макету у «Условия» две карточки сверх трёх прежних —
+   «Параметры» и «Вмешательство государства», каждая только там, где ей есть
+   что показать. Порядок по-прежнему один на все сцены; обязательные три
+   карточки на месте в каждой сцене. */
+const WANT_CARDS = ['sec-input', 'sec-params', 'sec-tax', 'sec-show', 'sec-view', 'sec-areascalc'];
+const MUST_CARDS = ['sec-input', 'sec-view', 'sec-areascalc'];
 const FORBIDDEN_HEADS = ['Что изучаем', 'Структура рынка', 'Излишки'];
 
 const panelSweep = await page.evaluate(async (FORB) => {
@@ -267,10 +271,12 @@ const panelSweep = await page.evaluate(async (FORB) => {
       .filter(s => s.style.display !== 'none' && s.offsetParent !== null)
       .map(s => {
         const btn = s.querySelector(':scope > .fold-btn');
+        const head = s.querySelector(':scope > .sec-head');
         const body = s.querySelector(':scope > .fold-body');
         return { id: s.id,
-                 name: btn ? btn.querySelector('span > b').textContent.trim() : '',
-                 open: btn ? btn.getAttribute('aria-expanded') === 'true' : null,
+                 name: head ? ((head.querySelector('span > b') || head).textContent.trim()) : '',
+                 fold: !!btn,
+                 open: body ? body.classList.contains('open') : null,
                  controls: body ? [...body.querySelectorAll('input,select,button,textarea')]
                                     .filter(e => e.offsetParent !== null).length : 0 };
       });
@@ -290,19 +296,24 @@ const panelSweep = await page.evaluate(async (FORB) => {
   return rows;
 }, FORBIDDEN_HEADS);
 
-// (г) Ровно три карточки в заданном порядке, первая раскрыта, две свёрнуты.
-await t('(г) в каждой из 44 сцен три карточки панели в одном порядке', async () => {
-  const bad = panelSweep.filter(r =>
-    r.cards.map(c => c.id).join() !== WANT_CARDS.join()
-    || !(r.cards[0].open === true && r.cards[1].open === false && r.cards[2].open === false)
-    || r.cards[0].name !== 'Ввод функций'
-    || r.cards[0].controls === 0);
+// (г) Карточки «Условия» в одном порядке, три обязательные есть везде,
+//     все раскрыты и без кнопки сворачивания, первая — «Функции» с органами.
+await t('(г) в каждой из 44 сцен карточки «Условия» в одном порядке', async () => {
+  const bad = panelSweep.filter(r => {
+    const ids = r.cards.map(c => c.id);
+    return ids.join() !== WANT_CARDS.filter(id => ids.indexOf(id) >= 0).join()
+      || ids.some(id => WANT_CARDS.indexOf(id) < 0)
+      || MUST_CARDS.some(id => ids.indexOf(id) < 0)
+      || r.cards.some(c => c.fold || c.open !== true)
+      || r.cards[0].name !== 'Функции'
+      || r.cards[0].controls === 0;
+  });
   // 44 маршрута: 41 прежняя сцена, ключ 'taxes' (объединённый сюжет налогов,
   // рядом с которым 'tax' и 'tax-adv' оставлены синонимами), 'quota' и
   // 'sdsum' — сложение спросов и предложений (ночная сессия 24.08).
   if (panelSweep.length !== 44) return `сцен ${panelSweep.length}, а не 44`;
   return bad.length === 0
-    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-')).join(' ') + ']').join('; ');
+    || bad.map(r => r.key + ' [' + r.cards.map(c => c.id + (c.open ? '+' : '-') + (c.fold ? '(кнопка)' : '')).join(' ') + '] первая «' + (r.cards[0] || {}).name + '»').join('; ');
 });
 
 // (д) Убранные блоки не показываются НИ В ОДНОЙ сцене.
@@ -320,7 +331,7 @@ await t('(д) «Что изучаем», «Структура рынка» и «
   return bad.length === 0 || bad.map(r => r.key + ' ' + JSON.stringify(r.seen)).join('; ');
 });
 
-// (ж) Левый край дорожек всех ползунков панели совпадает до пикселя.
+// (ж) Левый край дорожек ползунков совпадает до пикселя (в карточках — между собой, в секции — между собой).
 await t('(ж) левый край дорожек всех ползунков панели совпадает', async () => {
   const r = await page.evaluate(async () => {
     const w = ms => new Promise(res => setTimeout(res, ms));
@@ -331,19 +342,30 @@ await t('(ж) левый край дорожек всех ползунков п�
     const inp = document.querySelector('#curve-list .curve-expr-inp');
     inp.value = '100 - a*Q'; inp.dispatchEvent(new Event('input', { bubbles: true }));
     await w(600); redrawAll(); await w(400);
-    const tracks = [...document.querySelectorAll('#params-panel .param-track')]
+    // ПЕРЕНАЦЕЛЕНО (фаза 5а): ползунки живут в «Условии», а не в правой панели.
+    const tracks = [...document.querySelectorAll('#tools-panel .param-track')]
       .filter(el => el.offsetParent !== null && el.getBoundingClientRect().width > 0);
+    /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): ползунок кривой
+       стоит внутри её карточки, регулятор сцены — прямо в секции, и карточка
+       сдвигает дорожку на свой внутренний отступ. Вровень обязаны стоять
+       дорожки одного вида контейнера: все карточные между собой (разные
+       карточки и разные границы «−10» / «−50») и все секционные. */
     return tracks.map(el => {
       const s = el.querySelector('input[type=range]');
       return { left: Math.round(s.getBoundingClientRect().left * 100) / 100,
+               group: el.closest('.fc-card') ? 'карточки' : 'секция',
                bound: (el.querySelector('.param-bound') || {}).textContent };
     });
   });
   if (r.length < 3) return 'дорожек всего ' + r.length + ' — проба ничего не проверила';
-  const uniq = [...new Set(r.map(x => x.left))];
-  return uniq.length === 1
-    || `дорожек ${r.length}, разных координат ${uniq.length}: ${uniq.join(', ')}`
-       + ` | границы: ${r.map(x => x.bound).join(', ')}`;
+  const card = r.filter(x => x.group === 'карточки');
+  if (card.length < 2 || new Set(card.map(x => x.bound)).size < 2) return 'в карточках меньше двух дорожек с разными границами — проба ничего не проверила';
+  const bad = ['карточки', 'секция'].map(g => {
+    const u = [...new Set(r.filter(x => x.group === g).map(x => x.left))];
+    return u.length > 1 ? g + ': разных координат ' + u.length + ' (' + u.join(', ') + ')' : '';
+  }).filter(Boolean);
+  return bad.length === 0
+    || bad.join('; ') + ` | границы: ${r.map(x => x.group + ' ' + x.bound).join(', ')}`;
 });
 
 /* ═══ ПРОВЕРКИ ЗАКРЫВАЮЩЕЙ НОЧНОЙ СЕССИИ (24.08) ══════════════════════════

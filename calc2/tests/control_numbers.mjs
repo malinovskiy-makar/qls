@@ -971,26 +971,35 @@ const PANEL = `
   };
 `;
 
-head('Сессия 01.09 (3) · карточки справа сворачиваются при смене модели');
+/* ⚠️ ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а; журнал, «Перенацеленные проверки»).
+   Было правило прежней раскладки: «после смены модели справа раскрытых карточек
+   ноль, слева ровно одна». Сворачивание карточек убрано по закрытому списку
+   (пункт (д)): секции всегда раскрыты, колонка прокручивается. Новое правило про
+   то же самое — смена модели не прячет ни одной секции: в обеих колонках каждая
+   видимая секция раскрыта, кнопок сворачивания нет. Второй край у каждой
+   проверки (секций больше нуля), чтобы пустая разметка не прошла вхолостую. */
+head('Сессия 01.09 (3) · карточки не сворачиваются: смена модели ничего не прячет');
 r = await run(PANEL + `resetSceneMemory(); pickScene('sd'); redrawAll();
-  openSection('scoreboard'); openSection('explain');
+  var vis = function (e) { return e.offsetParent !== null && e.getClientRects().length > 0; };
+  var count = function (sel) { return Array.prototype.filter.call(document.querySelectorAll(sel), vis).length; };
   var before = opened('#params-panel .side-part > .fold-body');
   resetSceneMemory(); pickScene('mono'); redrawAll();
   var after = opened('#params-panel .side-part > .fold-body');
-  var left = opened('#tools-panel .tools-body > .section > .fold-body');
+  /* Считаются только ВИДИМЫЕ секции: «Параметры» без ползунков не
+     показываются вовсе (ползунки кривых стоят под карточками, фаза 5б). */
+  var leftOpen = Array.prototype.filter.call(document.querySelectorAll('#tools-panel .tools-body > .section'), vis)
+    .filter(function (s) { var f = s.querySelector(':scope > .fold-body'); return f && f.classList.contains('open'); }).length;
+  var leftAll = count('#tools-panel .tools-body > .section');
   var inp = document.getElementById('sec-input');
   var inpOpen = (inp && inp.querySelector(':scope > .fold-body').classList.contains('open')) ? 1 : 0;
-  return { before: before, after: after, left: left, inpOpen: inpOpen };`);
-cmp('раскрыли две карточки справа', r.before, 2, 0);
-cmp('после смены модели справа раскрытых нет', r.after, 0, 0);
-/* Слева раскрытой остаётся РОВНО ОДНА карточка — «Ввод функций»: она открыта
-   всегда и во всех моделях (решение владельца 22.08), и правило это. */
-cmp('слева раскрыт ровно «Ввод функций»', r.left, 1, 0);
-cmp('и это именно он', r.inpOpen, 1, 0);
-r = await run(PANEL + `resetSceneMemory(); pickScene('mono'); redrawAll();
-  openSection('scoreboard');
-  return { ok: opened('#params-panel .side-part > .fold-body') };`);
-cmp('прибор по-прежнему может раскрыть карточку сам', r.ok, 1, 0);
+  return { before: before, after: after, leftOpen: leftOpen, leftAll: leftAll, inpOpen: inpOpen,
+           folds: document.querySelectorAll('.app .fold-btn').length };`);
+cmp('в «Ответе» обе части раскрыты', r.before, 2, 0);
+cmp('после смены модели в «Ответе» раскрыты обе', r.after, 2, 0);
+cmp('в «Условии» видимых секций больше нуля', r.leftAll > 0 ? 1 : 0, 1, 0);
+cmp('в «Условии» раскрыта каждая видимая секция', r.leftOpen, r.leftAll, 0);
+cmp('«Функции» раскрыты', r.inpOpen, 1, 0);
+cmp('кнопок сворачивания нет', r.folds, 0, 0);
 
 head('Сессия 01.09 (3) · пояснения вмешательства переехали в «Объяснение модели»');
 for (const [tag, setup, mark] of [
@@ -1149,7 +1158,7 @@ cmp('пол 101: потери общества', r.dwl, 2500, 1e-3);
 /* ================================================================
    СЕССИЯ 01.09 (3) · РАЗДЕЛ «МАТЕМАТИКА».
    ================================================================ */
-head('Сессия 01.09 (3) · производная: регуляторы переехали в аналитику');
+head('Сессия 01.09 (3) · производная: регуляторы рядом со смыслом, в «Условии»');
 r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
   var inSide = function (id, panel) {
     var e = document.getElementById(id);
@@ -1165,10 +1174,13 @@ r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
            inputLeft: inSide('inp-mathf', '#tools-panel'),
            numHidden: document.getElementById('mathx0-input').classList.contains('reg-num-hidden') ? 1 : 0,
            eq: !!document.querySelector('#mathx0-field .reg-eq') };`);
-cmp('ползунок x₀ в правой панели', r.x0right, 1, 0);
-cmp('его в левой больше нет', r.x0left, 0, 0);
-cmp('секущая тоже справа', r.secRight, 1, 0);
-cmp('её ползунок Δx уехал вместе с ней', r.dxRight, 1, 0);
+/* ⚠️ ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 5а): было «регуляторы переехали в
+   правую панель». Решение владельца 27.09: ползунок стоит рядом со своим смыслом
+   в «Условии», правая колонка — «Ответ» (пункт (з) закрытого списка). */
+cmp('ползунок x₀ в «Условии»', r.x0left, 1, 0);
+cmp('в «Ответе» его нет', r.x0right, 0, 0);
+cmp('секущая тоже в «Условии»', r.secRight, 0, 0);
+cmp('её ползунок Δx не в «Ответе»', r.dxRight, 0, 0);
 cmp('и показался вместе с галочкой', r.dxShown, 1, 0);
 cmp('ввод функции остался слева', r.inputLeft, 1, 0);
 cmp('x₀ получил общий компонент регулятора', r.eq, true, 0);

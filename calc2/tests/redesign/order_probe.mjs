@@ -33,7 +33,9 @@ const BLR = Object.fromEntries(KEYS.map(k => [k, JSON.parse(fs.readFileSync(path
 const browser = await chromium.launch();
 
 async function freshPage() {
-  const ctx = await browser.newContext({ viewport: { width: 1324, height: 638 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  // Холст 732×590 на обоих экранах: старый — окно 1324×638, новый — 1440×760.
+  const [VW, VH] = LAYER === 'new' ? [1440, 760] : [1324, 638];
+  const ctx = await browser.newContext({ viewport: { width: VW, height: VH }, reducedMotion: 'reduce', locale: 'ru-RU' });
   await ctx.addInitScript(() => { try { localStorage.setItem('theme', 'light'); } catch (e) {} });
   const page = await ctx.newPage();
   page.setDefaultTimeout(5000);
