@@ -229,6 +229,9 @@ function geomMatch(g0, g1, win0, issues, where, win1) {
   ['lines', 'rects', 'dots'].forEach(k => {
     const usedK = new Set();
     (g0[k] || []).forEach(e => {
+      /* Кружок ручки (r ≥ 7) на новом экране служебный (data-service, в файл
+         не идёт); положение ручек сверяют handles и жесты. */
+      if (LAYER_NEW && k === 'dots' && e.r >= 7) return;
       n++;
       const [tx, ty] = tolOf(win0, e.panel);
       const pts = (x) => k === 'dots' ? [x.c] : [x.a, x.b];

@@ -39,7 +39,9 @@ const LAYER = arg('layer', 'old');
 const OUT = arg('out', path.join(HERE, LAYER === 'old' ? 'baseline' : 'current'));
 const SHOTS = arg('shots', '');
 const JOBS = +arg('jobs', '4');
-const W = +arg('width', '1324'), H = +arg('height', '638');
+// Холст 732×590: старый экран — окно 1324×638, новый — 1440×760.
+const NEWL = arg('layer', 'old') === 'new';
+const W = +arg('width', NEWL ? '1440' : '1324'), H = +arg('height', NEWL ? '760' : '638');
 const layer = await import(path.join(HERE, 'layer_' + LAYER + '.mjs'));
 /* Повтор: новый экран проходит РОВНО шаги базового снимка (а не открывает
    органы заново), иначе сравнивать было бы нечего. --replay <папка снимка>. */
@@ -79,7 +81,7 @@ async function snapKey(browser, key) {
     for (const st of bl.steps || []) {
       const pathCtl = st.path.map(desc);
       if (pathCtl.some(x => !x)) { rec.failures.push(key + ' · ' + st.path.join(' → ') + ': нет описания органа в снимке'); continue; }
-      await runStep(browser, key, start, pathCtl, rec, 9);
+      await runStep(browser, key, start, pathCtl, rec, 9, null, st);
     }
   } else if (!flag('no-steps')) {
     const list = kbdFamily(start.controls.filter(c => steppable(c, start.controls)));
@@ -102,7 +104,7 @@ async function snapKey(browser, key) {
   return rec;
 }
 
-async function runStep(browser, key, start, pathCtl, rec, depth = 1, parent = null) {
+async function runStep(browser, key, start, pathCtl, rec, depth = 1, parent = null, expected = null) {
   const f = await openKey(browser, key, 'light');
   const step = { path: pathCtl.map(c => c.key), kind: pathCtl[pathCtl.length - 1].kind };
   try {
@@ -148,7 +150,12 @@ async function runStep(browser, key, start, pathCtl, rec, depth = 1, parent = nu
         : (Object.keys(pc.props).length ? 'props' : (pc.revealed.length || pc.hidden.length || pp || pa ? 'ui' : 'none'));
     }
     if ((parent ? step.effectVsOpener : step.effect) === 'none') {
-      const why = noEffectReason(pathCtl[pathCtl.length - 1], start);
+      /* Повтор сценария (--replay) идёт от старта, без «открывшего» шага: если
+         и в базовом снимке шаг относительно старта ничего не менял (закрыть
+         окно, которое сам же открыл), «ничего» и есть его действие. */
+      const asBase = expected && expected.effect === 'none'
+        ? 'как в базовом снимке: шаг возвращает к старту (относительно открывшего — ' + (expected.effectVsOpener || 'none') + ')' : null;
+      const why = noEffectReason(pathCtl[pathCtl.length - 1], start) || acts.find(a => L.OVERRIDDEN.has(a)) || asBase;
       if (why) step.noEffect = why;
       else rec.failures.push(key + ' · ' + step.path.join(' → ') + ': шаг без наблюдаемого эффекта (' + step.action + ')');
     }

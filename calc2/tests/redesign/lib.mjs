@@ -9,7 +9,16 @@ import { fileURLToPath } from 'url';
 export const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const INPAGE = fs.readFileSync(path.join(HERE, 'inpage.js'), 'utf8');
 let layer = null, BASE = '', LAYER = 'old', W = 1324, H = 638;
-export function configure(o) { layer = o.layer; BASE = o.base; LAYER = o.layerName; W = o.w || W; H = o.h || H; }
+/* Размер окна, при котором холст 732×590 (CODE_NOTES 12): старый экран —
+   1324×638, новый — 1440×760 (инвариант раскладки). На равном холсте
+   геометрия сверяется строго, с допуском 0,002 px. */
+export const viewportFor = (layerName) => layerName === 'new' ? [1440, 760] : [1324, 638];
+export function configure(o) {
+  layer = o.layer; BASE = o.base; LAYER = o.layerName;
+  const [w, h] = viewportFor(o.layerName);
+  W = o.w || w; H = o.h || h;
+}
+export const viewport = () => ({ width: W, height: H });
 
 /* ── Браузер и страница ─────────────────────────────────────────────── */
 export async function fresh(browser, theme) {
@@ -132,6 +141,10 @@ export function geomDiff(a, b) {
 export const NO_EFFECT = [
   [/^#(sb-btn|ex-btn)$|fold-btn/, 'сворачивание карточки: прибор раскрыл всё заранее, закрытая карточка в перечне органов остаётся (пункт (д) закрытого списка)'],
 ];
+/* Описания действий, которыми слой нового экрана заменил орган по закрытому
+   списку (layer_new.actOverride): «секция всегда раскрыта», «кнопки нет,
+   запись уже в модели». Такой шаг законно ничего не меняет. */
+export const OVERRIDDEN = new Set();
 export function noEffectReason(c, start) {
   for (const [re, why] of NO_EFFECT) if (re.test(c.key)) return why;
   if (c.key === '#ac-clear' && start && !(start.state.areaCalcList || []).length && !(start.state.areaVerts || []).length)
@@ -207,7 +220,7 @@ export async function clickHandle(page, el) {
 export async function act(page, c, sceneKey) {
   // Слой нового экрана сам выполняет действие над органом, заменённым по
   // закрытому списку (например, «Построить» → набор уже применён).
-  if (layer.actOverride) { const r = await layer.actOverride(page, c, sceneKey); if (r != null) return r; }
+  if (layer.actOverride) { const r = await layer.actOverride(page, c, sceneKey); if (r != null) { OVERRIDDEN.add(r); return r; } }
   let el = await handleOf(page, layer.mapKey(c.key));
   // Орган переехал в закрытое меню (новый экран): слой открывает меню и ищет снова.
   if (!el && layer.reveal && await layer.reveal(page, layer.mapKey(c.key))) el = await handleOf(page, layer.mapKey(c.key));

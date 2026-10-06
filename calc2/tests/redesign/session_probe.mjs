@@ -124,7 +124,7 @@ async function worker() {
       // Ссылка в чистом браузере.
       const link = await f.page.evaluate(() => shareLinkOf());
       r.linkLen = link.length;
-      const g = await browser.newContext({ viewport: { width: 1324, height: 638 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+      const g = await browser.newContext({ viewport: L.viewport(), reducedMotion: 'reduce', locale: 'ru-RU' });
       const p = await g.newPage();
       const perr = []; p.on('pageerror', e => perr.push(String(e)));
       await p.goto(link, { waitUntil: 'load' });
@@ -214,7 +214,7 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
 }
 // 8. Заполненное хранилище не меняет программный старт.
 {
-  const g = await browser.newContext({ viewport: { width: 1324, height: 638 }, reducedMotion: 'reduce', locale: 'ru-RU' });
+  const g = await browser.newContext({ viewport: L.viewport(), reducedMotion: 'reduce', locale: 'ru-RU' });
   const keys2 = all;
   await g.addInitScript((ks) => {
     try {

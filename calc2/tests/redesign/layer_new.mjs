@@ -65,6 +65,14 @@ export function mapKey(key) {
 export async function reveal(page, key) {
   return page.evaluate((k) => {
     const el = window.__RD.findControlAny ? window.__RD.findControlAny(k) : null;
+    /* Окно «Скачать»: поле «Метка» и его «?» видны у форматов с файлом TeX
+       (у PNG метки нет, README макета, раздел 10) — выбрать TeX. */
+    const lf = el && el.closest('#exp-label-field');
+    if (lf && lf.hidden) {
+      const tex = document.querySelector('#exp-fmt [data-fmt="tex"]');
+      if (tex) tex.click();
+      return !lf.hidden;
+    }
     const menu = el && el.closest('.fc-menu');
     if (!menu) return false;
     const row = menu.closest('.fc-card');
@@ -83,6 +91,7 @@ export async function actOverride(page, c) {
   if (f.letter === 'а') return 'живое применение: кнопки нет, запись уже в модели';
   if (f.letter === 'д') return 'секция всегда раскрыта: сворачивать нечего';
   if (f.letter === 'г') return 'экран выбора одним экраном: проверяется обходом 44 ключей';
+  if (f.letter === 'к') return 'выгрузка: формат сегментом и «Скачать» (#exp-go); проверяет export_audit.mjs';
   if (f.letter === 'е') {
     // Общая галочка излишков → две галочки CS и PS: то же действие — обе разом.
     const done = await page.evaluate(() => ['chk-cs', 'chk-ps'].filter(id => {

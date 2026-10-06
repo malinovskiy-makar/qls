@@ -104,3 +104,13 @@ node calc2/tests/calc2_math.mjs
 |---|---|
 | убрать `forgetAutosaves()` из `resetSceneMemory()` | `calc2_ui.mjs`: 7 проверок (роль кривой, магнит у кривой и у пересечения, скольжение точки, вершина в особой точке, звёздочка в подписях, «у каждой кривой поле формулы») |
 | поменять местами две ячейки главных чисел (`94-answer.js`) | `answer_probe.mjs`: `taxes` — «Платит покупатель» 40 ≠ 60, «Получает продавец» 60 ≠ 40 |
+| спрятать «Добавить функцию» (`style="display:none"` в шаблоне) | `redesign/parity_quick.mjs`: 17 расхождений «орган #btn-add-curve не найден», код 1 |
+| живое применение без проверки записи (`82-input.js`: `rawApply()` и при ошибке) | `formula_input_probe.mjs`: «полей, где неверная запись меняет модель» 14 вместо 0, код 1 |
+| `applyModelState` не применяет форму (`89-model-state.js`) | `redesign/state_probe.mjs --keys sd,taxes,mono`: сошлось 0 из 3 (органы формы и STATE после применения не те) |
+| `historyUndo` ничего не делает (`91-session.js`) | `redesign/session_probe.mjs --keys sd,taxes`: «2 отмен не вернули старт», «склейка», «сброс: не стартовое состояние» |
+| не возвращать чистую страницу перед маршрутом (`84-picker.js`: без `restorePristine()`) | `redesign/order_probe.mjs` + `compare.mjs --start-only --layer new`: старт STATE расходится (D, mathSub, elastQ, окно Qmin) |
+| поменять местами два числа табло и спрятать «Добавить функцию» после перерисовки (`60-overlays.js`) | `redesign/snapshot.mjs --keys taxes` + `compare.mjs`: расхождения в шагах и органах, код 1 |
+
+⚠️ **Код сверки не прятать за `| tail`**: в первой версии случая «порядок» команда
+кончалась `compare.mjs … | tail -5`, и код возврата был кодом `tail` (0) — дефект
+выглядел непойманным. Сверку зовут без конвейера, вывод режут `--show N`.

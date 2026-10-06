@@ -264,7 +264,9 @@ function renderCurveList() {
       human.className = 'fc-name';
       human.textContent = curveHumanName(curve);
     }
-    nm.setAttribute('data-tip', tipExpr(curve.expr));   // под обозначением — сама формула
+    // Под обозначением — сама формула; в «Сложении» обозначение говорит, как
+    // кривая подписана на холсте, а формула — под полным именем группы.
+    (rowTag ? human : nm).setAttribute('data-tip', tipExpr(curve.expr));
 
     // Глаз (пункт (ж)): тот же признак visible, что был у галочки.
     const eye = document.createElement('button');
