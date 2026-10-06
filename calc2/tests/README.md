@@ -94,6 +94,7 @@ node calc2/tests/calc2_math.mjs
 | `compare.mjs` | сверка снимков: старт, каждый шаг правки, жесты, печать; что сознательно не сверяется — в комментариях (раскладка, кэши, `px`) | `node calc2/tests/redesign/compare.mjs --base calc2/tests/redesign/baseline --cur <папка> --layer new` (для нового экрана: осознанные отличия шагов печатаются строками «(новый экран)», служебные узлы не сверяются) |
 | `parity.mjs` | таблица `PARITY.md`: судьба каждого органа, строки ответа, ноль строк без судьбы | `node calc2/tests/redesign/parity.mjs --base calc2/tests/redesign/baseline` |
 | `parity_quick.mjs` | быстрый паритет (в CI через `test_calc2_parity.py`): органы старта и числа старта у 44 ключей, меньше двух минут | `node calc2/tests/redesign/parity_quick.mjs` |
+| `contrast_probe.mjs` | контраст каждой линии холста (путь без заливки от 1,5 px) к фону `--canvas` не ниже 3 : 1 в обеих темах, 44 модели | `node calc2/tests/redesign/contrast_probe.mjs` (код 0 — все линии не ниже 3 : 1) |
 | `order_probe.mjs` | модель открывается одинаково при любом порядке; память «ушёл и вернулся» | `node calc2/tests/redesign/order_probe.mjs --layer new --out <папка>`, затем `compare.mjs --cur <папка>/forward --start-only --layer new` |
 | `state_probe.mjs` | собрать → сбросить → применить состояние, 44 из 44 | `node calc2/tests/redesign/state_probe.mjs` |
 | `session_probe.mjs` | история (отмена, повтор, склейка), автосохранение, ссылка | `node calc2/tests/redesign/session_probe.mjs` |

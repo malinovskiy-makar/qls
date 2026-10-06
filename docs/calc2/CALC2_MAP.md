@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `3e07e4aa`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `0cc7cf39`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -351,15 +351,15 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/30-curves.js` | 1341 | 97.9 | JS |
 | `calc2/static/calc2/40-scenes-market.js` | 3729 | 266.0 | JS |
 | `calc2/static/calc2/42-scenes-mono.js` | 1677 | 121.2 | JS |
-| `calc2/static/calc2/44-scenes-firm.js` | 1207 | 80.0 | JS |
+| `calc2/static/calc2/44-scenes-firm.js` | 1209 | 80.3 | JS |
 | `calc2/static/calc2/46-scenes-labor.js` | 744 | 53.7 | JS |
-| `calc2/static/calc2/48-scenes-consumer.js` | 261 | 15.7 | JS |
+| `calc2/static/calc2/48-scenes-consumer.js` | 263 | 16.0 | JS |
 | `calc2/static/calc2/50-scenes-macro.js` | 416 | 28.4 | JS |
 | `calc2/static/calc2/52-modes.js` | 933 | 63.6 | JS |
-| `calc2/static/calc2/54-scenes-ppf.js` | 3093 | 198.2 | JS |
+| `calc2/static/calc2/54-scenes-ppf.js` | 3093 | 198.3 | JS |
 | `calc2/static/calc2/56-scenes-inequality.js` | 530 | 34.1 | JS |
 | `calc2/static/calc2/60-overlays.js` | 4572 | 287.7 | JS |
-| `calc2/static/calc2/70-scenes-math.js` | 2567 | 162.2 | JS |
+| `calc2/static/calc2/70-scenes-math.js` | 2570 | 162.6 | JS |
 | `calc2/static/calc2/80-ui.js` | 675 | 41.6 | JS |
 | `calc2/static/calc2/82-input.js` | 2159 | 126.7 | JS |
 | `calc2/static/calc2/84-picker.js` | 571 | 42.9 | JS |
@@ -375,7 +375,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/96-self.js` | 172 | 9.9 | JS |
 | `calc2/static/calc2/99-boot.js` | 108 | 9.0 | JS |
 
-**Итого: 33 файлов, 39925 строк, 2736.5 КБ.**
+**Итого: 33 файлов, 39932 строк, 2737.5 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -784,19 +784,19 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 869 — `updateProdPanel`
 - строка 893 — `recomputeIsoquant`
 - строка 904 — `redrawIsoquant`
-- строка 918 — `updateIsoPanel`
-- строка 956 — `plantMC`
-- строка 962 — `plantTC`
-- строка 968 — `plantQatMC`
-- строка 984 — `recomputePlants`
-- строка 1018 — `plantsAt`
-- строка 1035 — `redrawPlants`
-- строка 1116 — `updatePlantsPanel`
-- строка 1147 — `setPlantsView`
-- строка 1154 — `setPlantsQ`
-- строка 1165 — `setCostsInputMode`
-- строка 1173 — `syncCostsInputMode`
-- строка 1187 — `setCostsSub`
+- строка 920 — `updateIsoPanel`
+- строка 958 — `plantMC`
+- строка 964 — `plantTC`
+- строка 970 — `plantQatMC`
+- строка 986 — `recomputePlants`
+- строка 1020 — `plantsAt`
+- строка 1037 — `redrawPlants`
+- строка 1118 — `updatePlantsPanel`
+- строка 1149 — `setPlantsView`
+- строка 1156 — `setPlantsQ`
+- строка 1167 — `setCostsInputMode`
+- строка 1175 — `syncCostsInputMode`
+- строка 1189 — `setCostsSub`
 
 #### `calc2/static/calc2/46-scenes-labor.js`
 
@@ -844,9 +844,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 118 — `attachBudgetHandles`
 - строка 143 — `setConsumerNum`
 - строка 152 — `redrawConsumer`
-- строка 184 — `updateConsumerPanel`
-- строка 235 — `applyConsumerTypeUI`
-- строка 249 — `setConsumerType`
+- строка 186 — `updateConsumerPanel`
+- строка 237 — `applyConsumerTypeUI`
+- строка 251 — `setConsumerType`
 
 #### `calc2/static/calc2/50-scenes-macro.js`
 
@@ -1250,49 +1250,49 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 805 — `optimizeAlongCurve`
 - строка 818 — `constraintFit`
 - строка 836 — `drawMathConstraint`
-- строка 890 — `drawLevelCurveOn`
-- строка 901 — `mathOptimumReasoning`
-- строка 938 — `updateMathPanel`
-- строка 1077 — `redrawMath`
-- строка 1116 — `setMathSub`
-- строка 1139 — `setMathWindow`
-- строка 1153 — `setMathX0`
-- строка 1178 — `downloadBlob`
-- строка 1187 — `exportBaseName`
-- строка 1200 — `paperChartClone`
-- строка 1227 — `exportNumbersLine`
-- строка 1234 — `exportExtras`
-- строка 1242 — `exportPNG`
-- строка 1279 — `texEscape`
-- строка 1286 — `r2`
-- строка 1317 — `texPlotSize`
-- строка 1341 — `texText`
-- строка 1354 — `labelPlainText`
-- строка 1386 — `quantityTex`
-- строка 1403 — `texHex`
-- строка 1418 — `texSamplePath`
-- строка 1450 — `texResample`
-- строка 1493 — `mathToPgf`
-- строка 1541 — `pgfStroke`
-- строка 1580 — `texDashPattern`
-- строка 1592 — `texCondBounds`
-- строка 1603 — `texCondPieces`
-- строка 1625 — `buildTexFromState`
-- строка 1948 — `buildTexLegacy`
-- строка 2296 — `texWantState`
-- строка 2300 — `buildTex`
-- строка 2307 — `exportTex`
-- строка 2315 — `exportPDF`
-- строка 2335 — `buildExportFields`
-- строка 2352 — `refreshExportPreview`
-- строка 2386 — `expValue`
-- строка 2395 — `syncExportFormat`
-- строка 2407 — `refreshExportSheet`
-- строка 2415 — `wireExport`
-- строка 2444 — `openExport`
-- строка 2463 — `closeExport`
-- строка 2482 — `updateGraphPanel`
-- строка 2539 — `graphExplainNote`
+- строка 892 — `drawLevelCurveOn`
+- строка 904 — `mathOptimumReasoning`
+- строка 941 — `updateMathPanel`
+- строка 1080 — `redrawMath`
+- строка 1119 — `setMathSub`
+- строка 1142 — `setMathWindow`
+- строка 1156 — `setMathX0`
+- строка 1181 — `downloadBlob`
+- строка 1190 — `exportBaseName`
+- строка 1203 — `paperChartClone`
+- строка 1230 — `exportNumbersLine`
+- строка 1237 — `exportExtras`
+- строка 1245 — `exportPNG`
+- строка 1282 — `texEscape`
+- строка 1289 — `r2`
+- строка 1320 — `texPlotSize`
+- строка 1344 — `texText`
+- строка 1357 — `labelPlainText`
+- строка 1389 — `quantityTex`
+- строка 1406 — `texHex`
+- строка 1421 — `texSamplePath`
+- строка 1453 — `texResample`
+- строка 1496 — `mathToPgf`
+- строка 1544 — `pgfStroke`
+- строка 1583 — `texDashPattern`
+- строка 1595 — `texCondBounds`
+- строка 1606 — `texCondPieces`
+- строка 1628 — `buildTexFromState`
+- строка 1951 — `buildTexLegacy`
+- строка 2299 — `texWantState`
+- строка 2303 — `buildTex`
+- строка 2310 — `exportTex`
+- строка 2318 — `exportPDF`
+- строка 2338 — `buildExportFields`
+- строка 2355 — `refreshExportPreview`
+- строка 2389 — `expValue`
+- строка 2398 — `syncExportFormat`
+- строка 2410 — `refreshExportSheet`
+- строка 2418 — `wireExport`
+- строка 2447 — `openExport`
+- строка 2466 — `closeExport`
+- строка 2485 — `updateGraphPanel`
+- строка 2542 — `graphExplainNote`
 
 #### `calc2/static/calc2/80-ui.js`
 

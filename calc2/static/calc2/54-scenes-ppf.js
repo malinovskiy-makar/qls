@@ -2191,7 +2191,7 @@ function drawPpfSumCurves(d) {
   (d.parts || []).forEach((pts, i) => {
     const c = ppfSumColor(i);
     g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
-      .attr('stroke-dasharray', '5 4').attr('opacity', 0.6).attr('d', line);
+      .attr('stroke-dasharray', '5 4').attr('opacity', 0.95).attr('d', line);   // как слагаемые «Сложения»: 0,6 давало 2 : 1 к холсту
     labelCurve(g, (x) => interpY(pts, x), ppfSumName(i), c, { below: i % 2 === 1 });
   });
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));

@@ -879,7 +879,9 @@ function drawMathConstraint() {
   STATE.mathRes = { opt, wantMax: STATE.mathConsWantMax !== false, conPts: pts };
   if (opt) {
     // Веер линий уровня + линия, проходящая через оптимум (она и касается ограничения).
-    [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.5, 0.32));
+    // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
+    // при прозрачности 0,35 контраст к холсту был 1,5 : 1 (инвариант 3 : 1, contrast_probe.mjs).
+    [0.55, 0.78, 1.25].forEach(k => drawLevelCurveOn(g, mx, my, f, opt.value * k, COL.D, 1.6, 0.95, '5 4'));
     drawLevelCurveOn(g, mx, my, f, opt.value, COL.D, 2.6, 1);
     mathDot(g, mx, my, opt.a, opt.b, COL.ink,
       (STATE.mathConsWantMax === false ? 'минимум (' : 'максимум (') + fmt(opt.a) + '; ' + fmt(opt.b) + ')', null, 'opt');
@@ -887,12 +889,13 @@ function drawMathConstraint() {
   updateMathPanel();
 }
 // Линия уровня F = const на своих шкалах (движок трассировки — общий).
-function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity) {
+function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity, dash) {
   const pts = traceLevelCurve(f, level, mx.domain()[1], my.domain()[1], 220);
   if (!pts || pts.length < 2) return;
   const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
+  const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
+  if (dash) p.attr('stroke-dasharray', dash);
 }
 
 /* Разбор «как получен ответ» для сюжета с экстремумами. Не пересказ учебника,

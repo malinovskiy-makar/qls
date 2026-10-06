@@ -908,7 +908,9 @@ function redrawIsoquant() {
   addDefs(); drawGrid(); drawAxes('L', 'K');
   const iso = STATE.iso;
   if (!iso) { updateIsoPanel(); return; }
-  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.isoq, 1.6, 0.35));
+  // Веер соседних уровней — как слагаемые «Сложения»: непрозрачно (0,95), пунктир 5 4, 1,6 px:
+  // при прозрачности 0,35 контраст к холсту был 1,5 : 1 (инвариант 3 : 1, contrast_probe.mjs).
+  if (STATE.isoFan && iso.Q > 0) [0.62, 0.8, 1.22].forEach(m => drawLevelCurve(iso.f, iso.Q * m, COL.isoq, 1.6, 0.95, '5 4'));
   drawBudgetLine({ xInt: iso.Lint, yInt: iso.Kint }, COL.reg, false, 'изокоста');
   drawLevelCurve(iso.f, iso.Q, COL.isoq, 2.6, 1);
   drawChoicePoint(iso.L, iso.K, COL.ink, 'E');
