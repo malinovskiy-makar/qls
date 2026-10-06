@@ -154,7 +154,11 @@ async function runStep(browser, key, start, pathCtl, rec, depth = 1, parent = nu
          и в базовом снимке шаг относительно старта ничего не менял (закрыть
          окно, которое сам же открыл), «ничего» и есть его действие. */
       const asBase = expected && expected.effect === 'none'
-        ? 'как в базовом снимке: шаг возвращает к старту (относительно открывшего — ' + (expected.effectVsOpener || 'none') + ')' : null;
+        ? 'как в базовом снимке: шаг возвращает к старту (относительно открывшего — ' + (expected.effectVsOpener || 'none') + ')'
+        /* Цвет для строки без кривой (пустая строка «Построения графиков»):
+           модель не меняется и в базовом снимке, там менялся только вид кнопки. */
+        : (expected && expected.effect !== 'model' && /cpick-sw/.test(step.path[step.path.length - 1])
+          ? 'как в базовом снимке: цвет строки без кривой модель не меняет' : null);
       const why = noEffectReason(pathCtl[pathCtl.length - 1], start) || acts.find(a => L.OVERRIDDEN.has(a)) || asBase;
       if (why) step.noEffect = why;
       else rec.failures.push(key + ' · ' + step.path.join(' → ') + ': шаг без наблюдаемого эффекта (' + step.action + ')');
