@@ -228,18 +228,30 @@ function geomMatch(g0, g1, win0, issues, where, win1) {
   (g1.paths || []).forEach((q, i) => { if (!used.has('p' + i)) issues.push(where + ': лишний путь панели ' + q.panel + ' (' + q.n + ' точек)'); });
   ['lines', 'rects', 'dots'].forEach(k => {
     const usedK = new Set();
+    /* Служебные узлы на новом экране (сверка нового экрана, --layer new):
+       кружок ручки (r ≥ 7) — data-service, в файл не идёт, положение ручек
+       сверяют handles и жесты; маленький прямоугольник до 80×40 px — зона
+       щелчка подписи кривой (старый экран после перерисовки записывал её в
+       слепок как залитую). Ищутся как обычно; ненайденные не считаются. */
+    const svc = (x) => {
+      if (!LAYER_NEW) return false;
+      if (k === 'dots') return x.r >= 7;
+      if (k !== 'rects') return false;
+      const w = win0 && win0.panels && win0.panels[x.panel];
+      if (!w || !w.px) return false;
+      const pw = Math.abs(x.b[0] - x.a[0]) / Math.abs(w.x1 - w.x0) * w.px[0], ph = Math.abs(x.b[1] - x.a[1]) / Math.abs(w.y1 - w.y0) * w.px[1];
+      return pw <= 80 && ph <= 40;
+    };
     (g0[k] || []).forEach(e => {
-      /* Кружок ручки (r ≥ 7) на новом экране служебный (data-service, в файл
-         не идёт); положение ручек сверяют handles и жесты. */
-      if (LAYER_NEW && k === 'dots' && e.r >= 7) return;
-      n++;
       const [tx, ty] = tolOf(win0, e.panel);
       const pts = (x) => k === 'dots' ? [x.c] : [x.a, x.b];
       const j = (g1[k] || []).findIndex((q, i) => !usedK.has(i) && q.panel === e.panel && samePts(pts(e), pts(q), tx, ty));
-      if (j < 0) issues.push(where + ': ' + k + ' ' + JSON.stringify(pts(e)) + ' не найден');
-      else usedK.add(j);
+      if (j >= 0) { n++; usedK.add(j); return; }
+      if (svc(e)) return;
+      n++;
+      issues.push(where + ': ' + k + ' ' + JSON.stringify(pts(e)) + ' не найден');
     });
-    (g1[k] || []).forEach((q, i) => { if (!usedK.has(i)) issues.push(where + ': лишний ' + k + ' ' + q.panel); });
+    (g1[k] || []).forEach((q, i) => { if (!usedK.has(i) && !svc(q)) issues.push(where + ': лишний ' + k + ' ' + q.panel); });
   });
   n++;
   // Ключевые точки — набор: порядок по округлённым координатам (шум 1e-10 его менял).
@@ -261,6 +273,8 @@ let CUR_KEY = '';
 let REPLACED_TIPS = new Set();
 const noPx = (w) => JSON.parse(JSON.stringify(w || {}, (k, v) => k === 'px' ? undefined : v));
 const RESET_NOTES = [];
+const NOTED = new Set();
+const noteOnce = (x) => { if (!NOTED.has(x)) { NOTED.add(x); RESET_NOTES.push('(новый экран) ' + x); } };
 /* Тексты вариантов, исправленные редизайном (боевой дефект из списка 13:
    в выпадающих списках печаталось «UUU = …» и «DDD = …» вместо «U», «D»).
    Значение органа сверяется строго; заменяется только этот текст. */
@@ -320,7 +334,8 @@ function answerAfter(start, d) {
    строже, ключевыми точками геометрии (keyTargets). Сам кэш старый код
    держал непоследовательно: в «Производстве» смена сетки в гаечном ключе
    стирала пересечение в начале координат, хотя на холсте оно оставалось. */
-const VIEW_KEYS = new Set(['legendSpot', 'tanTop', 'tanBot', 'crosses']);
+// crossesPanel — панель, над которой был указатель (зажжённые точки): вид, как crosses.
+const VIEW_KEYS = new Set(['legendSpot', 'tanTop', 'tanBot', 'crosses', 'crossesPanel']);
 function stateAfter(start, d) {
   const s = Object.assign({}, start);
   Object.entries(d || {}).forEach(([k, v]) => { if (v === '∅') delete s[k]; else s[k] = v; });
@@ -338,6 +353,8 @@ for (const key of files) {
   let n = 0;
   const b = JSON.parse(fs.readFileSync(path.join(BASE, key + '.json'), 'utf8'));
   REPLACED_TIPS = new Set((b.controls || []).filter(c => fateOf(c.key).fate !== 'на месте' || (LAYER_NEW && /^#curve-list>/.test(c.key))).map(c => normText(c.label)));
+  // То же для органов, которые открывались шагами (перечень rec.inventory).
+  if (LAYER_NEW) Object.entries(b.inventory || {}).forEach(([k, v]) => { if (/^#curve-list>/.test(k) && v && v.label) REPLACED_TIPS.add(normText(v.label)); });
   const cp = path.join(CUR, key + '.json');
   if (!fs.existsSync(cp)) { report[key] = { n: 1, issues: ['нет снимка нового экрана'] }; total++; bad++; continue; }
   const c = JSON.parse(fs.readFileSync(cp, 'utf8'));
@@ -393,13 +410,58 @@ for (const key of files) {
       if (was) RESET_NOTES.push(CUR_KEY + ': старый «Вернуть исходный вид» давал не старт (STATE' + was.slice(0, 80) + '), «Сбросить» сверен со стартом');
       s = { path: s.path, effect: s.effect };
     }
-    const st0 = stateAfter(b.start.state, s.state), st1 = stateAfter(c.start.state, t.state);
+    /* Осознанные отличия нового экрана в шагах (журнал, «Принято без вопроса»):
+       сверяются точно, кроме названного поля, и печатаются строкой. */
+    let dropKeys = null;
+    if (LAYER_NEW) {
+      const last = s.path[s.path.length - 1];
+      if (/cpick-sw/.test(last)) {
+        dropKeys = ['color'];
+        noteOnce('палитра «Цвета кривой» — 12 цветов макета (README 6.1): образцы другие, цвет сверяется только тем, что сменился');
+        if (t.effect !== 'model') issues.push('шаг ' + id + ': выбор цвета ничего не поменял');
+      } else if (/role-sel/.test(last) && /sum$/.test(CUR_KEY)) {
+        dropKeys = ['color'];
+        noteOnce('«Сложение»: цвет группы берётся из палитры темы при пересчёте (п. 25 «Принято без вопроса»), смена роли красит кривую в цвет группы');
+      } else if (s.path.includes('#chk-areas') && !(/chk-cs/.test(t.action || '') && /chk-ps/.test(t.action || ''))) {
+        // Галочка есть только у заливки, которую модель рисует (README 6.4).
+        dropKeys = [/chk-cs/.test(t.action || '') ? null : 'showCS', /chk-ps/.test(t.action || '') ? null : 'showPS'].filter(Boolean);
+        noteOnce('общая галочка излишков (е): галочки CS и PS есть только у заливок, которые модель рисует; скрытый флаг без галочки не переключается');
+      } else if (s.path[0] === '#btn-wrench' && /^#inp-/.test(last)) {
+        /* Старый экран: тройной щелчок прибора по полю «Вида графика» доходил до
+           холста двойным щелчком и возвращал масштаб, а в «Математике» возврат
+           масштаба давал окно не стартовое (x до 12 вместо 10). Окно после шага
+           — след этого дефекта, его повторять нечего; сверяется, что поле
+           применилось (шаг меняет модель). */
+        noteOnce('«Вид графика» → поле границы или шага: на старом экране двойной щелчок из поля доходил до холста и сбрасывал масштаб (в «Математике» окно 0…12 вместо 0…10, в «Сумме КПВ» Q до 150); новый экран так не делает, сверено, что поле применилось');
+        if (t.effect !== 'model') issues.push('шаг ' + id + ': поле границы не применилось');
+        return;
+      } else if (last === '#pw-apply' && s.path.length === 3) {
+        noteOnce('«Кусочная функция» открывается с текущей формулой, разрезанной на два куска (README 6.6), а не с примером «100 − Q | 80 − 0,5Q»: «Готово» без правки не меняет кривую');
+        return;
+      }
+    }
+    // 'color' снимает и составные цветовые поля (areaColor, markColor…).
+    const dropK = (k) => dropKeys.some(d => d === 'color' ? /colou?r/i.test(k) : d === k);
+    const drop = (o) => dropKeys ? JSON.parse(JSON.stringify(o, (k, v) => dropK(k) ? undefined : v)) : o;
+    const st0 = drop(stateAfter(b.start.state, s.state)), st1 = drop(stateAfter(c.start.state, t.state));
     n++; const d1 = whereDiff(st0, st1, 1e-9); if (d1) issues.push('шаг ' + id + ' STATE' + d1);
     /* Размер панели в пикселях (px) — вид, а не модель: поля графика зависят
        от ширины подписей и истории перерисовок (fitMargins), как и в приборе
        слоя состояния. Окно в единицах модели сверяется строго. */
     n++; const d2 = whereDiff(noPx(s.windows || b.start.windows), noPx(t.windows || c.start.windows), 1e-9); if (d2) issues.push('шаг ' + id + ' окна' + d2);
     n += answerMatch(answerAfter(b.start.answer, s.answer), answerAfter(c.start.answer, t.answer), issues, 'шаг ' + id);
+    /* «Торговля по ценам», старый экран: любая перерисовка после старта
+       переносила две кривые первой панели во вторую (старт и перерисовка
+       расходились — тот же дефект, что фаза 1 нашла у «Вернуть исходный вид»).
+       Если шаг модель не менял, а новый экран картинку оставил стартовой,
+       геометрия сверяется со стартом базового снимка. */
+    const onlyMoved = s.geometry && Object.keys(s.geometry).every(k => k === 'paths')
+      && (s.geometry.paths.add || []).length && (s.geometry.paths.add || []).every(q => q.panel === 'trade-2')
+      && (s.geometry.paths.add || []).length === (s.geometry.paths.del || []).length;
+    if (LAYER_NEW && CUR_KEY === 'tradeprice' && onlyMoved && !t.geometry) {
+      noteOnce('«Торговля по ценам»: на старом экране перерисовка переносила две кривые первой панели во вторую; новый экран рисует как на старте, геометрия шага сверена со стартом');
+      n += geomMatch(b.start.geometry, applyGeomDiff(c.start.geometry, t.geometry), b.start.windows, issues, 'шаг ' + id, t.windows || c.start.windows);
+    } else
     n += geomMatch(applyGeomDiff(b.start.geometry, s.geometry), applyGeomDiff(c.start.geometry, t.geometry), s.windows || b.start.windows, issues, 'шаг ' + id, t.windows || c.start.windows);
   });
   // Жесты: значение из пикселя — допуск в один пиксель шкалы.

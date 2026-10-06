@@ -47,6 +47,8 @@ const RENAME = {
   '#btn-wrench': '#btn-view',
   '#tools-toggle': '#btn-focus',
   '#params-toggle': '#btn-focus',
+  // «?» у метки: поле «Метка» получило свой id, ключ органа считается от него.
+  '#export-modal>button.hint-btn': '#exp-label-field>button.hint-btn',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];
@@ -55,7 +57,7 @@ export function mapKey(key) {
      во всех 44 базовых снимках глаза идут через два — 0, 2, 4… Глаз k-й
      кривой — номер 2k, на новом экране это k-я кнопка .fc-eye. */
   const eye = /^#curve-list>input(?:\[(\d+)\])?$/.exec(key);
-  if (eye) { const k = Math.floor((+eye[1] || 0) / 2); return '#curve-list>button.fc-eye' + (k ? '[' + k + ']' : ''); }
+  if (eye) { const k = Math.ceil((+eye[1] || 0) / 2); return '#curve-list>button.fc-eye' + (k ? '[' + k + ']' : ''); }
   return key;
 }
 

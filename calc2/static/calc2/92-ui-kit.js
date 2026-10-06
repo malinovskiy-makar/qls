@@ -101,7 +101,16 @@ function clearPultBox(boxId) {
 function pultChip(boxId, sel) {
   return document.querySelector('.pchip[data-pult-box="' + boxId + '"]' + (sel || ''));
 }
+/* ⚠️ ФОКУС ПЕРЕЖИВАЕТ ПЕРЕЕЗД ПОЛЗУНКА. Карточки пересобираются при каждой
+   правке кривой, и ползунок под карточкой уезжает в пульт и обратно. Узел,
+   вынутый из документа, теряет фокус: первое «→» с клавиатуры сдвигало
+   кривую, а следующие уже двигали окно графика (прибор полной сверки:
+   «→»×3 давало +1 вместо +3). Орган с фокусом запоминается при парковке и
+   получает фокус обратно, когда встал на место. */
+let _sliderFocus = null;
 function parkCurveSliders() {
+  const a = document.activeElement;
+  if (a && a.closest && a.closest('.crow-sliders .pchip[data-pult-box]')) _sliderFocus = a;
   ['params-curves', 'params-extra'].forEach(boxId => {
     const box = document.getElementById(boxId);
     if (!box) return;
@@ -138,6 +147,10 @@ function placeCurveSliders() {
     const slot = card ? card.querySelector(':scope > .crow-sliders') : null;
     if (slot && chip.parentElement !== slot) slot.appendChild(chip);
   });
+  if (_sliderFocus) {
+    const f = _sliderFocus; _sliderFocus = null;
+    if (f.isConnected && document.activeElement !== f) f.focus({ preventScroll: true });
+  }
   // Заголовок группы «Сдвиг кривых» / «Буквы из формул» без своих чипов не нужен.
   ['params-curves', 'params-extra'].forEach(boxId => {
     const box = document.getElementById(boxId);
