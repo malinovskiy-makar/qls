@@ -40,7 +40,9 @@ const r = await page.evaluate(async () => {
   setBoth(true);
   await wait(350);
   const back = fills();
-  // Состояние модели → галочки: признак сняли в модели, галочка это показывает.
+  // Смена модели обнуляет состояние — галочки обязаны это показать (как было:
+  // уход в другую модель, признаки сняты в модели, меню синхронизировано).
+  pickScene('taxes'); await wait(350);
   STATE.showCS = false; STATE.showPS = false;
   syncViewFields();
   const afterSync = cs.checked || ps.checked;

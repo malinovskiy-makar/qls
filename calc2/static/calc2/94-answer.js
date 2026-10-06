@@ -309,7 +309,12 @@ function buildStatus() {
   const box = document.getElementById('ans-status');
   if (!box) return;
   box.innerHTML = '';
-  const warns = [...document.querySelectorAll('#sb-body .warn')].filter(w => w.offsetParent !== null || w.closest('#sb-body'));
+  /* Предупреждение в табло спрятано стилем (оно стоит здесь строкой), поэтому
+     по offsetParent не судим: отсеиваем только то, что спрятала САМА СЦЕНА —
+     hidden, инлайновый display:none или scoped-off у узла и предков (блок
+     чужой сцены). Прежнее условие было истинно всегда. */
+  const sceneHidden = (w) => { for (let n = w; n && n.id !== 'sb-body'; n = n.parentElement) { if (n.hidden || (n.style && n.style.display === 'none') || n.classList.contains('scoped-off')) return true; } return false; };
+  const warns = [...document.querySelectorAll('#sb-body .warn')].filter(w => !sceneHidden(w));
   warns.forEach(w => {
     const t = plainText(w);
     if (!t) return;

@@ -1169,7 +1169,9 @@ r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
   return { x0right: inSide('mathx0-field', '#params-panel'),
            x0left: inSide('mathx0-field', '#tools-panel'),
            secRight: inSide('math-secant-row', '#params-panel'),
+           secLeft: inSide('math-secant-row', '#tools-panel'),
            dxRight: inSide('mathdx-field', '#params-panel'),
+           dxLeft: inSide('mathdx-field', '#tools-panel'),
            dxShown: (document.getElementById('mathdx-field').style.display !== 'none') ? 1 : 0,
            inputLeft: inSide('inp-mathf', '#tools-panel'),
            numHidden: document.getElementById('mathx0-input').classList.contains('reg-num-hidden') ? 1 : 0,
@@ -1179,8 +1181,10 @@ r = await run(`resetSceneMemory(); pickScene('m-tangent'); redrawAll();
    в «Условии», правая колонка — «Ответ» (пункт (з) закрытого списка). */
 cmp('ползунок x₀ в «Условии»', r.x0left, 1, 0);
 cmp('в «Ответе» его нет', r.x0right, 0, 0);
-cmp('секущая тоже в «Условии»', r.secRight, 0, 0);
+cmp('секущей нет в «Ответе»', r.secRight, 0, 0);
+cmp('секущая тоже в «Условии»', r.secLeft, 1, 0);   // положительный край (независимое ревью фазы 11)
 cmp('её ползунок Δx не в «Ответе»', r.dxRight, 0, 0);
+cmp('её ползунок Δx в «Условии»', r.dxLeft, 1, 0);
 cmp('и показался вместе с галочкой', r.dxShown, 1, 0);
 cmp('ввод функции остался слева', r.inputLeft, 1, 0);
 cmp('x₀ получил общий компонент регулятора', r.eq, true, 0);

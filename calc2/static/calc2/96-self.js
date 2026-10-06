@@ -61,7 +61,8 @@ function selfCell(cell, idx) {
   const opened = SELF.all || SELF.open[id] || !numeric;
   cell.classList.toggle('self-hidden', SELF.on && !opened);
   if (!SELF.on || opened) { if (box) box.remove(); return; }
-  if (box) return;
+  // Ячейка уже с полем: вердикт мог сброситься правкой — перекрашиваем.
+  if (box) { if (box._paint) box._paint(); return; }
   box = document.createElement('div');
   box.className = 'self-box';
   const inp = document.createElement('input');
@@ -90,6 +91,7 @@ function selfCell(cell, idx) {
   chk.addEventListener('click', check);
   show.addEventListener('click', () => { SELF.open[id] = true; applySelf(); selfAfterAnswer(); });
   row.append(chk, show, pill);
+  box._paint = paintVerdict;
   box.append(inp, row);
   cell.appendChild(box);
   paintVerdict();

@@ -253,6 +253,16 @@ function wireUiKit() {
   if (sb && sp) {
     sb.addEventListener('click', async (e) => {
       e.stopPropagation();
+      /* Телефон (COVERAGE, раздел 8; README 3): кнопка сразу копирует ссылку,
+         окна с галочкой «Сначала сам» на телефоне нет. */
+      if (window.matchMedia && window.matchMedia('(max-width: 759px)').matches) {
+        const self = sp.querySelector('#share-self'); if (self) self.checked = false;
+        const link = await shareFill(sp);
+        let ok = false;
+        try { await navigator.clipboard.writeText(link); ok = !!link; } catch (err) { ok = false; }
+        toast(ok ? 'Ссылка скопирована' : 'Не получилось скопировать ссылку');
+        return;
+      }
       if (sp.classList.contains('open')) { closePop(); return; }
       openPop(sb, sp, { alignRight: true, noFocus: true, onClose: () => sb.classList.remove('is-open') });
       sb.classList.add('is-open');

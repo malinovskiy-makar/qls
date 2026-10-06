@@ -2992,7 +2992,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cv-mode__stop:hover { background: var(--chip-bg); }
 
 /* Белый лист выгрузки (README макета, раздел 13): токен, а не число в коде. */
-:root { --paper: #ffffff; --paper-ink: #2d2d2d; --paper-ink-2: #6b6457; }   /* белый лист «Скачать» в обеих темах */
+:root { --paper: #ffffff; --paper-ink: #2d2d2d; --paper-ink-2: #6b6457; --paper-line: rgba(45, 45, 45, .14); }   /* белый лист «Скачать» в обеих темах */
 
 /* Ручка (7.4): кружок фоном холста с обводкой --ink. */
 #chart circle[data-service="handle"] { fill: var(--canvas); stroke: var(--ink); stroke-width: 2px; }
@@ -3009,7 +3009,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 [data-theme="dark"] .exp-sheet-title, [data-theme="dark"] .exp-sheet-nums { color: var(--paper-ink); }
 .exp-sheet-img { display: block; width: 100%; height: auto; }
 .exp-sheet-cap { text-align: center; font-size: 13px; color: var(--paper-ink-2); margin-top: 8px; }
-.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(45, 45, 45, .14); color: var(--paper-ink); font-variant-numeric: tabular-nums; }
+.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--paper-line); color: var(--paper-ink); font-variant-numeric: tabular-nums; }
 .exp-sheet-title[hidden], .exp-sheet-cap[hidden], .exp-sheet-nums[hidden] { display: none; }
 .exp-what { margin-top: 12px; }
 .exp-what-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 4px; }

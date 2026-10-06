@@ -386,6 +386,8 @@ function resetModelWithUndo() {
   if (typeof toast === 'function') toast('Модель сброшена к стартовым функциям', {
     action: 'Вернуть', ms: 6500,
     fn: () => {
+      // Успели уйти в другую модель — «Вернуть» прежней модели здесь не к месту.
+      if (STATE.sceneKey !== key) return;
       const hh = histOf();
       hh.undo.push(hh.last);
       applyKeepView(before);
