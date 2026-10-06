@@ -304,7 +304,8 @@ async function shareLinkOf(s) {
   return u.origin + u.pathname + '?' + u.searchParams.toString() + '#s=1' + tag + b64urlEncode(bytes);
 }
 async function decodeShare(hash) {
-  const m = /^#s=1([zj])([A-Za-z0-9_-]+)$/.exec(hash || '');
+  // После данных может стоять «&self=1» (галочка «Сначала сам» в окне «Поделиться»).
+  const m = /^#s=1([zj])([A-Za-z0-9_-]+)(?:&[A-Za-z0-9_=&-]*)?$/.exec(hash || '');
   if (!m) throw new Error('не тот формат');
   let bytes = b64urlDecode(m[2]);
   if (m[1] === 'z') {

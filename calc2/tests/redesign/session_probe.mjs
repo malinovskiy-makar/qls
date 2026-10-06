@@ -188,6 +188,30 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
   ok(r[0] === 'ceil' && !r[1] && /Ссылка повреждена/.test(r[2]), 'битая ссылка: ' + JSON.stringify(r));
   await g.close();
 }
+// 5б. Окно «Поделиться»: ссылка не растёт от открытия к открытию (поля окон —
+//     не состояние модели), а ссылка с галочкой «Сначала сам» (…&self=1)
+//     открывает то же состояние в режиме «Сначала сам» (независимое ревью фазы 11).
+{
+  const g = await browser.newContext({ viewport: L.viewport() }); const p = await g.newPage();
+  await p.goto(BASE + '/calc2/?m=taxes', { waitUntil: 'load' });
+  await p.waitForFunction(() => typeof pickScene === 'function'); await p.waitForTimeout(1200);
+  await p.evaluate(() => { setTax(30); redrawAll(); }); await p.waitForTimeout(400);
+  const lens = [];
+  for (let i = 0; i < 3; i++) {
+    await p.click('#btn-share'); await p.waitForTimeout(400);
+    lens.push(await p.evaluate(() => document.getElementById('share-url').value.length));
+    await p.keyboard.press('Escape'); await p.waitForTimeout(300);
+  }
+  ok(lens.length === 3 && lens.every(x => x === lens[0] && x > 100), '«Поделиться»: длина ссылки меняется от открытия к открытию ' + JSON.stringify(lens));
+  await p.click('#btn-share'); await p.waitForTimeout(300); await p.check('#share-self'); await p.waitForTimeout(400);
+  const link = await p.evaluate(() => document.getElementById('share-url').value);
+  const g2 = await browser.newContext({ viewport: L.viewport() }); const p2 = await g2.newPage();
+  await p2.goto(link, { waitUntil: 'load' });
+  await p2.waitForFunction(() => typeof pickScene === 'function'); await p2.waitForTimeout(1800);
+  const r = await p2.evaluate(() => [STATE.sceneKey, STATE.tax, document.body.classList.contains('self-on'), (document.getElementById('calc2-toast') || {}).textContent || '']);
+  ok(/&self=1$/.test(link) && r[0] === 'taxes' && r[1] === 30 && r[2] === true && !/повреждена/.test(r[3]), 'ссылка «Сначала сам»: ' + JSON.stringify(r));
+  await g.close(); await g2.close();
+}
 // 6. ?texState=1 жив.
 {
   const g = await browser.newContext(); const p = await g.newPage();

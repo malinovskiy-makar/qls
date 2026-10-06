@@ -54,11 +54,15 @@ function plainCopy(v, depth) {
    и шаг ползунков, пометка «границы поставил человек», инлайновая
    видимость узлов (ею setMode и обработчики галочек прячут секции и
    регуляторы — CODE_NOTES, раздел 1: менять её способ нельзя), нажатость
-   кнопок-сегментов и тумблеров. Холст и окно выбора не входят. */
+   кнопок-сегментов и тумблеров. Холст и окно выбора не входят.
+   ⚠️ Окна (.modal, .pop: «Поделиться», «Скачать», «Кусочная функция»,
+   «Как писать формулы»…) тоже не входят: их поля — не модель. Иначе ссылка
+   «Поделиться» несла в себе текст прошлой ссылки и росла от раза к разу, а
+   открытие окна давало пустой шаг «Отменить» (независимое ревью фазы 11). */
 function formNodes() {
   const app = document.querySelector('.app');
   if (!app) return [];
-  return [...app.querySelectorAll('[id]')].filter(el => !el.closest('#chart, #graph-wrap svg'));
+  return [...app.querySelectorAll('[id]')].filter(el => !el.closest('#chart, #graph-wrap svg, .modal, .pop'));
 }
 function captureForm() {
   const out = {};

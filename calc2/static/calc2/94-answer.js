@@ -82,8 +82,12 @@ const ANSWER_GROUP = {
 /* Подпись строки табло → подпись ячейки и обозначение. «Q* (количество)» →
    «Количество», «Q*»; «Равновесный выпуск Y» → «Равновесный выпуск», «Y»;
    иначе подпись целиком и без обозначения. */
+/* Голое сокращение в подписи табло («DWL») — в ячейке словами и обозначением,
+   как в макете: «Потери общества», «DWL = 225» (README 8.3). */
+const HERO_WORDS = { DWL: 'Потери общества', CS: 'Излишек покупателя', PS: 'Излишек продавца' };
 function heroLabel(t) {
   const s = String(t || '').replace(/\u200b/g, '').trim();
+  if (HERO_WORDS[s]) return { caption: HERO_WORDS[s], not: s };
   const cap = (x) => x ? x.charAt(0).toUpperCase() + x.slice(1) : x;
   // «Q∗ (количество)»: обозначение, ПРОБЕЛ, слова в скобках. «f(x0)» — запись
   // функции, а не подпись со словами: её не режем.
@@ -120,8 +124,11 @@ function statRows(blk) {
 }
 /* Строка таблицы «До / После / Δ» по подписи первой ячейки. */
 function txRow(blkId, label) {
-  const blk = document.getElementById(blkId) || document.getElementById('info-tax');
-  const tables = blk ? blk.querySelectorAll('table.tx-table') : [];
+  // Таблица «До / После» живёт в блоке вмешательства, а строка главного числа —
+  // в блоке равновесия (Q, цены): ищем в своём блоке, потом во вмешательстве.
+  const own = document.getElementById(blkId);
+  let tables = own ? [...own.querySelectorAll('table.tx-table')] : [];
+  if (!tables.length) { const tx = document.getElementById('info-tax'); tables = tx ? [...tx.querySelectorAll('table.tx-table')] : []; }
   for (const t of tables) {
     const head = [...(t.querySelector('tr') || { children: [] }).children].map(plainText);
     for (const tr of t.querySelectorAll('tr')) {
