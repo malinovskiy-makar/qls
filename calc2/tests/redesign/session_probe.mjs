@@ -57,7 +57,8 @@ async function sig(page) {
     // Границы ползунка сдвига — ±Pmax/2, то есть тоже от окна (88-params.js).
     const c = window.__RD.controls().filter(x => /^input|math-field|select|exact|edval|switch/.test(x.kind)).map(x => {
       const p = Object.assign({}, x.props);
-      if (/^#params-curves>/.test(x.key) && x.kind === 'input:range') { delete p.min; delete p.max; }
+      // Ползунок сдвига стоит под карточкой (#curve-list>…) или в пульте — границы от окна у обоих.
+      if (/^#(params-curves|curve-list)>/.test(x.key) && x.kind === 'input:range') { delete p.min; delete p.max; }
       return x.key.replace(/graph-f-\d+/g, 'graph-f') + '=' + JSON.stringify(p);
     });
     return JSON.stringify([s, c.sort()]);

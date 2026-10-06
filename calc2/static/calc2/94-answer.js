@@ -211,8 +211,22 @@ function buildAnswer() {
     }
     const v = document.createElement('span'); v.className = 'ans-val';
     if (c.val) v.innerHTML = c.val.innerHTML; else v.textContent = c.valText;
+    /* Число набирается формулой прямым шрифтом, как в макете («число STIX 500»,
+       README 8.3) и как обозначение рядом. Кегль 28/24/20 при этом не попадает в
+       шкалу интерфейса канона: шкала (COVERAGE, раздел 5) — для текста, а это
+       набранная величина. Только «голое» число («40», «1 250», «−10», «11,35»,
+       «50 %»); всё прочее остаётся как в табло. Пробелы — неразрывные (~), чтобы
+       в тексте ячейки осталось «1 250», как в строке-источнике. */
+    const raw = plainText(v);
+    const pureNum = /^[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(\s?%)?$/.test(raw);
+    if (typeof katexInto === 'function' && pureNum) {
+      const tx = raw.replace(/^-/, '−').replace(/[\s\u00a0\u202f\u2009]+/g, '~').replace(/,/g, '{,}').replace(/%/g, '\\%').replace(/−/g, '\\text{−}');   // запятая дроби без отбивки
+      katexInto(v, '\\mathrm{' + tx + '}');
+    }
     const len = plainText(v).replace(/\s/g, '').length;
-    v.classList.add(len <= 4 ? 'ans-val--l' : (len <= 6 ? 'ans-val--m' : 'ans-val--s'));
+    /* Смешанное значение («L = 10, MP = 300») остаётся текстом и получает
+       сочетание из закрытого списка шкалы — 17/600 (README хотел бы 20). */
+    v.classList.add(!pureNum ? 'ans-val--x' : (len <= 4 ? 'ans-val--l' : (len <= 6 ? 'ans-val--m' : 'ans-val--s')));
     line.appendChild(v);
     d.append(l, line);
     if (c.tx && c.tx.before) {

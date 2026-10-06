@@ -30,6 +30,9 @@ async function checkHover(popId, btnAriaControls, sectionBtnId) {
   await page.waitForTimeout(200);
   const box = await page.evaluate((pid) => {
     const btn = document.querySelector('[data-pop="' + pid + '"]');
+    // ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, пункт (д)): секции всегда раскрыты и
+    // колонка прокручивается — «?» нижней секции может быть ниже края окна.
+    btn.scrollIntoView({ block: 'center' });
     const r = btn.getBoundingClientRect();
     return { x: r.x + r.width / 2, y: r.y + r.height / 2 };
   }, popId);

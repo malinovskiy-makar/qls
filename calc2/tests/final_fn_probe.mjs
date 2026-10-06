@@ -67,7 +67,10 @@ async function shot(name) {
 /* Помощники, живущие в СТРАНИЦЕ. Ставятся один раз на загрузку. */
 const HELP = `
 function ffExpandAll() {
-  document.querySelectorAll('.crow-more').forEach(function (m) { m.classList.add('open'); });
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.1): .crow-more карточки —
+     всплывающее меню «…» (.fc-menu), а не раскрывающаяся часть строки;
+     раскрывать его нечего, открытое оно ложится поверх соседних строк. */
+  document.querySelectorAll('.crow-more:not(.fc-menu)').forEach(function (m) { m.classList.add('open'); });
   document.querySelectorAll('details').forEach(function (d) { d.open = true; });
   document.querySelectorAll('.sb-card.folded, .card.folded, .pchip-param.folded')
     .forEach(function (e) { e.classList.remove('folded'); });

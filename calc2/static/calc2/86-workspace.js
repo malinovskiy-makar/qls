@@ -966,6 +966,11 @@ function showHintTip(dot, html) {
   ];
   const controls = Array.from(document.querySelectorAll(
     'button, input, select, textarea, a[href], [data-tip]'));
+  /* Холст — тоже препятствие (то же правило): карточка функции широкая, и
+     место «справа» у неё приходилось ровно на холст (прибор final_fn_probe,
+     «плашка не залезает на холст»). Подсказки самого холста его не избегают. */
+  const chartEl = document.getElementById('chart');
+  if (chartEl && !chartEl.contains(dot)) controls.push(chartEl);
   const covers = (x, y) => controls.some(el => {
     if (el === dot || el.contains(dot) || dot.contains(el)) return false;
     const r = el.getBoundingClientRect();

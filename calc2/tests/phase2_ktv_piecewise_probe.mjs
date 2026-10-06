@@ -68,7 +68,15 @@ await page.waitForTimeout(150);
 const modalOpen = await page.evaluate(() => document.getElementById('pw-modal').classList.contains('open'));
 report('окно конструктора открылось', modalOpen);
 
-// Готовые значения по умолчанию (излом в 40) уже стоят — просто «Поставить в поле».
+/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.6): окно открывается не с
+   примером «излом в 40», а с текущей записью, разрезанной на два одинаковых
+   куска (график не меняется). Куски с изломом в 40 ставим в окно сами — тем же
+   состоянием окна, что пишут его поля, — и жмём настоящую кнопку «Готово». */
+await page.evaluate(() => {
+  PW.n = 2;
+  PW.rows = [{ f: '100 - X', a: '0', b: '40' }, { f: '80 - 0.5*X', a: '40', b: '' }];
+  renderPw();
+});
 await page.click('#pw-apply');
 await page.waitForTimeout(200);
 

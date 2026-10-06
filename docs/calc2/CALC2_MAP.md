@@ -335,7 +335,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 
 <!-- AUTO:START -->
 
-*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `a49d0e8c`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
+*Автоматически собрано командой `manage.py calc2_map`. Дата: 2026-10-06. HEAD: `3e07e4aa`. Не редактировать руками — вся эта часть файла, от отметки начала автосекции и до отметки её конца, перезаписывается заново при каждом запуске команды.*
 
 ### Файлы (маршрут → представление → шаблон → статика)
 
@@ -344,7 +344,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/urls.py` | 19 | 0.6 | python |
 | `calc2/views.py` | 224 | 13.4 | python |
 | `calc2/templates/calc2/calc2.html` | 2616 | 217.6 | шаблон |
-| `calc2/static/calc2/calc2.css` | 3353 | 244.3 | CSS |
+| `calc2/static/calc2/calc2.css` | 3354 | 244.6 | CSS |
 | `calc2/static/calc2/00-config.js` | 563 | 48.5 | JS |
 | `calc2/static/calc2/10-math-core.js` | 1126 | 73.5 | JS |
 | `calc2/static/calc2/20-plane.js` | 991 | 67.2 | JS |
@@ -363,19 +363,19 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 | `calc2/static/calc2/80-ui.js` | 675 | 41.6 | JS |
 | `calc2/static/calc2/82-input.js` | 2159 | 126.7 | JS |
 | `calc2/static/calc2/84-picker.js` | 571 | 42.9 | JS |
-| `calc2/static/calc2/86-workspace.js` | 1955 | 126.0 | JS |
+| `calc2/static/calc2/86-workspace.js` | 1960 | 126.5 | JS |
 | `calc2/static/calc2/88-params.js` | 1926 | 130.0 | JS |
 | `calc2/static/calc2/89-model-state.js` | 319 | 18.7 | JS |
 | `calc2/static/calc2/90-explain.js` | 381 | 63.1 | JS |
 | `calc2/static/calc2/91-session.js` | 396 | 19.7 | JS |
-| `calc2/static/calc2/92-ui-kit.js` | 323 | 18.2 | JS |
+| `calc2/static/calc2/92-ui-kit.js` | 326 | 18.5 | JS |
 | `calc2/static/calc2/93-shell.js` | 193 | 11.1 | JS |
-| `calc2/static/calc2/94-answer.js` | 365 | 21.6 | JS |
+| `calc2/static/calc2/94-answer.js` | 379 | 23.0 | JS |
 | `calc2/static/calc2/95-picker-screen.js` | 397 | 21.5 | JS |
 | `calc2/static/calc2/96-self.js` | 172 | 9.9 | JS |
 | `calc2/static/calc2/99-boot.js` | 108 | 9.0 | JS |
 
-**Итого: 33 файлов, 39902 строк, 2733.9 КБ.**
+**Итого: 33 файлов, 39925 строк, 2736.5 КБ.**
 
 ### Индекс функций (объявления верхнего уровня, по возрастанию строки)
 
@@ -1441,41 +1441,41 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 891 — `hintTip`
 - строка 918 — `fitTipMath`
 - строка 936 — `showHintTip`
-- строка 988 — `hideHintTip`
-- строка 1013 — `tipText`
-- строка 1042 — `tipTex`
-- строка 1052 — `tipName`
-- строка 1069 — `tipExpr`
-- строка 1079 — `tipPlain`
-- строка 1108 — `ffEsc`
-- строка 1118 — `ffLatexOf`
-- строка 1140 — `finalFunctionHtml`
-- строка 1165 — `ffParseCases`
-- строка 1187 — `ffCondCompact`
-- строка 1211 — `ffMathHtml`
-- строка 1235 — `ffKatexW`
-- строка 1251 — `ffFitCases`
-- строка 1338 — `fitFinalMath`
-- строка 1367 — `ffCopyText`
-- строка 1375 — `ffCopyFallback`
-- строка 1387 — `wireFinalCopy`
-- строка 1420 — `ffOpenExpand`
-- строка 1441 — `ffCloseExpand`
-- строка 1453 — `setFinalFunctions`
-- строка 1471 — `refitFinalMathSoon`
-- строка 1499 — `markNotationsIn`
-- строка 1531 — `paintNotation`
-- строка 1541 — `showTipFor`
-- строка 1547 — `wireTips`
-- строка 1586 — `syncTipLabels`
-- строка 1599 — `hintAnchor`
-- строка 1680 — `fitPanelMath`
-- строка 1710 — `syncHintDots`
-- строка 1721 — `hintsToDots`
-- строка 1759 — `wireHintButtons`
-- строка 1801 — `wireWrench`
-- строка 1880 — `fillPrintBlocks`
-- строка 1908 — `setPrintViewBox`
+- строка 993 — `hideHintTip`
+- строка 1018 — `tipText`
+- строка 1047 — `tipTex`
+- строка 1057 — `tipName`
+- строка 1074 — `tipExpr`
+- строка 1084 — `tipPlain`
+- строка 1113 — `ffEsc`
+- строка 1123 — `ffLatexOf`
+- строка 1145 — `finalFunctionHtml`
+- строка 1170 — `ffParseCases`
+- строка 1192 — `ffCondCompact`
+- строка 1216 — `ffMathHtml`
+- строка 1240 — `ffKatexW`
+- строка 1256 — `ffFitCases`
+- строка 1343 — `fitFinalMath`
+- строка 1372 — `ffCopyText`
+- строка 1380 — `ffCopyFallback`
+- строка 1392 — `wireFinalCopy`
+- строка 1425 — `ffOpenExpand`
+- строка 1446 — `ffCloseExpand`
+- строка 1458 — `setFinalFunctions`
+- строка 1476 — `refitFinalMathSoon`
+- строка 1504 — `markNotationsIn`
+- строка 1536 — `paintNotation`
+- строка 1546 — `showTipFor`
+- строка 1552 — `wireTips`
+- строка 1591 — `syncTipLabels`
+- строка 1604 — `hintAnchor`
+- строка 1685 — `fitPanelMath`
+- строка 1715 — `syncHintDots`
+- строка 1726 — `hintsToDots`
+- строка 1764 — `wireHintButtons`
+- строка 1806 — `wireWrench`
+- строка 1885 — `fillPrintBlocks`
+- строка 1913 — `setPrintViewBox`
 
 #### `calc2/static/calc2/88-params.js`
 
@@ -1595,7 +1595,7 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 125 — `placeCurveSliders`
 - строка 180 — `howToBuild`
 - строка 231 — `wireUiKit`
-- строка 284 — `syncShowSection`
+- строка 283 — `syncShowSection`
 
 #### `calc2/static/calc2/93-shell.js`
 
@@ -1620,9 +1620,9 @@ AD–AS, кривая Филлипса, денежный рынок, рынок 
 - строка 141 — `answerSignature`
 - строка 147 — `scheduleAnswer`
 - строка 153 — `buildAnswer`
-- строка 248 — `buildBurden`
-- строка 287 — `buildStatus`
-- строка 307 — `buildExplainAccordion`
+- строка 262 — `buildBurden`
+- строка 301 — `buildStatus`
+- строка 321 — `buildExplainAccordion`
 
 #### `calc2/static/calc2/95-picker-screen.js`
 

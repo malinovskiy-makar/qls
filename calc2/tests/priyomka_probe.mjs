@@ -65,7 +65,8 @@ function head(s) { console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 66 - 
 const HELP = `
 /* Раскрыть ВСЁ, что сцена свернула, и сбросить прокрутку панелей. */
 function pfExpandAll() {
-  document.querySelectorAll('.crow-more').forEach(function (m) { m.classList.add('open'); });
+  // .crow-more карточки — всплывающее меню «…» (.fc-menu), раскрывать нечего (README 6.1).
+  document.querySelectorAll('.crow-more:not(.fc-menu)').forEach(function (m) { m.classList.add('open'); });
   document.querySelectorAll('details').forEach(function (d) { d.open = true; });
   document.querySelectorAll('.sb-card.folded, .card.folded, .pchip-param.folded')
     .forEach(function (e) { e.classList.remove('folded'); });
@@ -182,7 +183,13 @@ function pfPwOpen(n) {
     inp = slot || null;
   }
   openPiecewise(inp, 'Q');
+  /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 6.6): пустой кусок — ошибка,
+     и окно прячет «Что получится». Чтобы мерить, помещается ли предпросмотр,
+     куски заполняются верными формулами на смежных участках. */
   PW.n = n;
+  PW.rows = Array.from({ length: n }, function (_, i) {
+    return { f: (100 - 5 * i) + ' - Q', a: String(20 * i), b: i === n - 1 ? '' : String(20 * (i + 1)) };
+  });
   renderPw();
   return true;
 }

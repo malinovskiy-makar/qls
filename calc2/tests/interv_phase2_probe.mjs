@@ -31,15 +31,19 @@ function flag(label, cond, detail) {
   console.log((cond ? 'OK   ' : 'FAIL ') + label + (detail ? '  -> ' + detail : ''));
 }
 
-const price = async (type, p) => page.evaluate(`(function(){
+const price = async (type, p) => page.evaluate(`(async function(){
   resetSceneMemory(); pickScene('ceil');
   setType('${type}'); setPReg(${p}); redrawAll();
+  await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });   // «Ответ» собирается на кадр позже табло
   var pc = STATE.pc || {};
   return { Qd: pc.Qd, Qs: pc.Qs, gap: pc.gap, dwl: pc.dwl, Qtrade: pc.Qtrade,
            binding: pc.binding ? 1 : 0, active: STATE.pcActive ? 1 : 0,
            eqQ: (STATE.eq||{}).Q, eqP: (STATE.eq||{}).P,
            ghost: document.querySelectorAll('#chart g.ghost').length,
-           info: ((document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
+           /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, README макета 8.1): предупреждение сцены —
+              строка статуса «Ответа» (#ans-status), в блоке табло оно спрятано, чтобы
+              не повторяться. «Панель честно говорит» = видимый текст колонки «Ответ». */
+           info: ((document.getElementById('params-panel')||document.getElementById('info-tax')||{}).innerText || '').replace(/\\s+/g,' ') };
 })()`);
 
 // --- 1. Потолок 30 — связывает, дефицит 40 -----------------------------

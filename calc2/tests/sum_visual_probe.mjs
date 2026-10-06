@@ -95,7 +95,8 @@ function svSetup(dExprs, sExprs) {
 /* Раскрыть ВСЁ, что сцена свернула, и сбросить прокрутку обеих панелей.
    Иначе замер считает только то, что случайно оказалось на экране. */
 function svExpandAll() {
-  document.querySelectorAll('.crow-more').forEach(function (m) { m.classList.add('open'); });
+  // .crow-more карточки — всплывающее меню «…» (.fc-menu), раскрывать нечего (README 6.1).
+  document.querySelectorAll('.crow-more:not(.fc-menu)').forEach(function (m) { m.classList.add('open'); });
   document.querySelectorAll('details').forEach(function (d) { d.open = true; });
   document.querySelectorAll('.sb-card.folded, .card.folded, .pchip-param.folded')
     .forEach(function (e) { e.classList.remove('folded'); });

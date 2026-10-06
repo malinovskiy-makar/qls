@@ -2862,6 +2862,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .ans-val--l { font-size: 28px; }
 .ans-val--m { font-size: 24px; }
 .ans-val--s { font-size: 20px; }
+.ans-val--x { font-size: 17px; font-weight: 600; }   /* смешанное значение текстом: 17/600 из закрытого списка шкалы */
 .ans-val .katex { font-size: 1em; }
 .ans-was { margin-top: 4px; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
 #sb-body .stat.is-hero { display: none; }   /* главное число в таблице не повторяется */
@@ -2991,7 +2992,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cv-mode__stop:hover { background: var(--chip-bg); }
 
 /* Белый лист выгрузки (README макета, раздел 13): токен, а не число в коде. */
-:root { --paper: #ffffff; }
+:root { --paper: #ffffff; --paper-ink: #2d2d2d; --paper-ink-2: #6b6457; }   /* белый лист «Скачать» в обеих темах */
 
 /* Ручка (7.4): кружок фоном холста с обводкой --ink. */
 #chart circle[data-service="handle"] { fill: var(--canvas); stroke: var(--ink); stroke-width: 2px; }
@@ -3003,12 +3004,12 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
   grid-template-columns: minmax(0, 1fr) 312px; border-radius: var(--r-panel); overflow: hidden;
 }
 .exp-left { padding: 20px; background: var(--surface-2); overflow-y: auto; }
-.exp-sheet { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; color: #2d2d2d; }
+.exp-sheet { background: var(--paper); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; color: var(--paper-ink); }
 .exp-sheet-title { text-align: center; font-size: 15px; font-weight: 600; margin: 0 0 8px; color: var(--ink); }
-[data-theme="dark"] .exp-sheet-title, [data-theme="dark"] .exp-sheet-nums { color: #2d2d2d; }
+[data-theme="dark"] .exp-sheet-title, [data-theme="dark"] .exp-sheet-nums { color: var(--paper-ink); }
 .exp-sheet-img { display: block; width: 100%; height: auto; }
-.exp-sheet-cap { text-align: center; font-size: 13px; color: #6b6457; margin-top: 8px; }
-.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(45, 45, 45, .14); color: #2d2d2d; font-variant-numeric: tabular-nums; }
+.exp-sheet-cap { text-align: center; font-size: 13px; color: var(--paper-ink-2); margin-top: 8px; }
+.exp-sheet-nums { text-align: center; font-size: 15px; font-weight: 500; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(45, 45, 45, .14); color: var(--paper-ink); font-variant-numeric: tabular-nums; }
 .exp-sheet-title[hidden], .exp-sheet-cap[hidden], .exp-sheet-nums[hidden] { display: none; }
 .exp-what { margin-top: 12px; }
 .exp-what-lab { font-size: 13px; font-weight: 500; color: var(--text2); margin: 0 0 4px; }

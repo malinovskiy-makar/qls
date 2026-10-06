@@ -88,7 +88,11 @@ async function worker() {
       /* Строки «Построения графиков» нумеруются счётчиком (graph-f-N) и при
          пересборке получают новые номера: ключи органов сравниваем по порядку. */
       const renum = (list) => { const m = new Map(); let n = 0; return list.map(c => { const k = c.key.replace(/graph-f-(\d+)/g, (_, d) => { if (!m.has(d)) m.set(d, ++n); return 'graph-f-#' + m.get(d); }); return Object.assign({}, c, { key: k }); }); };
-      A.controls = renum(A.controls); B.controls = renum(B.controls);
+      /* Кнопки истории («Отменить», «Повторить») показывают историю страницы, а
+         не состояние модели (ADR 0136): в странице-источнике после правок есть что
+         отменять, в чистой странице с применённым состоянием — нет. */
+      const HIST = /^#btn-(undo|redo)$/;
+      A.controls = renum(A.controls.filter(c => !HIST.test(c.key))); B.controls = renum(B.controls.filter(c => !HIST.test(c.key)));
       Object.keys(sd).forEach(k => {
         const a = A.state[k], b = B.state[k];
         let where = '';
