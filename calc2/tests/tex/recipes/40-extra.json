@@ -1,0 +1,31 @@
+{
+ "_about": "Состояния, которых не было в наборах разведки (PROMPT.md, фаза 0, п. 1): «Сначала сам» в моделях разных семей, свои точки и посчитанные площади, заголовок с опасными знаками (заголовок окна «Скачать» — поле title), выключенная легенда, кусочная запись через окно «Кусочная функция», Q = f(P) прямая и непрямая, параметр буквой. Значение — код, который выполняется в странице после открытия модели, либо { code, title, label }.",
+ "mono": {
+  "self": "setSelfMode(true);",
+  "self-tax": "setType('tax'); setTax(20); setSelfMode(true);"
+ },
+ "costs": { "self": "setSelfMode(true);" },
+ "m-tangent": { "self": "setSelfMode(true);" },
+ "labor-mono": { "self": "setSelfMode(true);" },
+ "prod": { "self": "setSelfMode(true);" },
+ "sd": {
+  "marks-area": "STATE.marks.push(newMark(30, 70, null, 'coords')); STATE.marks.push(newMark(60, 20, null, 'coords')); if (typeof renderMarkList === 'function') renderMarkList(); syncAreaCalcUI(); var sel = document.getElementById('ac-pick'); sel.value = areaTargets()[0].name; STATE.acFrom = 10; STATE.acTo = 40; runAreaCalc();",
+  "area-poly": "STATE.areaVerts = [{ x: 10, y: 10 }, { x: 40, y: 10 }, { x: 40, y: 60 }, { x: 15, y: 45 }]; STATE.areaCalcMode = 'poly'; runAreaCalc();",
+  "pw-window": "openPiecewise(document.getElementById('curve-expr-1'), 'Q', { split: true }); document.getElementById('pw-apply').click();",
+  "qp-nl": "SETF('curve-expr-1', '1000/(P + 10)');",
+  "title-pct": { "code": "", "title": "50% & выше" },
+  "title-sub": { "code": "", "title": "a_b", "label": "fig:a_b" },
+  "title-pow": { "code": "", "title": "x^2" },
+  "title-brace": { "code": "", "title": "{" },
+  "title-input": { "code": "", "title": "\\input{x}", "label": "\\input{x}" },
+  "title-canvas": { "code": "STATE.graphTitle = 'Рынок хлеба: 50% & выше';", "title": "Рынок хлеба: 50% & выше", "label": "fig:bread" }
+ },
+ "taxes": {
+  "nolegend": "STATE.showLegend = false;",
+  "pw-window": "openPiecewise(document.getElementById('curve-expr-2'), 'Q', { split: true }); document.getElementById('pw-apply').click();",
+  "qp": "SETF('curve-expr-1', '120 - 2*P');",
+  "param": "SETF('curve-expr-2', 'b*Q + c');",
+  "self-nl": "SETF('curve-expr-1', '2000/(Q+10) - 10'); SETF('curve-expr-2', 'Q^2/80 + 5'); setSelfMode(true);"
+ },
+ "mono-d3": { "nolegend": "STATE.showLegend = false;" }
+}
