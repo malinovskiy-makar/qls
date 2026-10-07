@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-07 (сессия «Экзамен A»: команда `ai_exam_candidates`,
+> **Обновлён:** 2026-10-07 (сессия «Экзамен A2»: формат разметки экзамена 2,
 > docs/AI_EXAM.md; блок «Текущий фокус»)
 > **Статус:** актуален
 
@@ -236,7 +236,7 @@ import_olympiads_data             # настоящие факты раздела
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
 import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
-ai_exam_candidates [--recon] [--count N --chunks K --seed S] [--force] [--dir D]  # экзамен ИИ v0: воронка, кандидаты, страницы проверки; файлы ВНЕ репозитория (ADR 0134)
+ai_exam_candidates [--recon] [--count N --chunks K --seed S] [--force] [--dir D]  # экзамен ИИ v0: воронка, кандидаты, страницы проверки (разметка ai_exam_review/2); файлы ВНЕ репозитория (ADR 0134)
 calc2_map                         # пересобрать docs/calc2/CALC2_MAP.md (сторожит test_calc2_map)
 search_eval                       # измеритель поиска на эталонных наборах A/B/C (docs/EMBEDDINGS.md)
 human_review_mark [--apply/--revert]     # approved/defect по вердиктам ReviewVerdict
@@ -435,12 +435,12 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 
 <!-- NOTION-SYNC:START — генерируется из Notion, руками не править -->
 
-**Обновлено: 2026-10-07 (сессия «Экзамен A»)** ·
+**Обновлено: 2026-10-07 (сессия «Экзамен A2»)** ·
 [Notion-штаб](https://app.notion.com/p/39ab11c92bc181f7bbe1efa8a89e38a9)
 
 **В работе (7):**
 - **ИИ, шаг 0: экзамен v0, данные беты, правки чата, выбор модели (8–28 октября)** –
-  Макар + Claude Code; сессия «Экзамен A» сделана (ветка `feat/ai-exam-v0`, не запушена)
+  Макар + Claude Code; сессии «Экзамен A» и «A2» (формат ключа, страницы перевыпущены) сделаны (ветка `feat/ai-exam-v0`, не запушена)
 - Первая волна починки: Сборник АА (131 задача) – Анич
 - Разбор вердиктов МатЭк (2 632 задачи, 35,1 % брака) – Claude Code
 - Эксперимент: чинит ли модель по указке человека – Анич
