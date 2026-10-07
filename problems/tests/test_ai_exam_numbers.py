@@ -54,6 +54,22 @@ PROPOSE = [
     ('вырастет', 'none', None, '', False),
     ('', 'none', None, '', False),
     ('10^3', 'none', None, '', False),
+    # Заведомый мусор: неравенства и коэффициенты формул.
+    ('A>25', 'none', None, '', False),
+    ('P ≥ 5', 'none', None, '', False),
+    ('P \\geq 5', 'none', None, '', False),
+    ('$Q \\le 12$', 'none', None, '', False),
+    ('Q < 3', 'none', None, '', False),
+    ('TC=240Q', 'none', None, '', False),
+    ('TC = 240 \\cdot Q', 'none', None, '', False),
+    ('TC = 240·Q', 'none', None, '', False),
+    ('TC = 240*Q', 'none', None, '', False),
+    ('240Q', 'none', None, '', False),
+    ('2x', 'none', None, '', False),
+    # Прежнее поведение рядом с мусором не сломано.
+    ('5кг', 'exact', Fraction(5), 'кг', False),
+    ('5 kg', 'exact', Fraction(5), 'kg', False),
+    ('Q = 20 ед.', 'extracted', Fraction(20), '', False),
 ]
 
 

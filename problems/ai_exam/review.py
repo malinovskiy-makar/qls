@@ -1,4 +1,4 @@
-"""Формат файла разметки `ai_exam_review/1` и его проверка.
+"""Формат файла разметки `ai_exam_review/2` и его проверка.
 
 Файл отдаёт страница проверки (`problems/ai_exam/page.py`), принимает —
 следующая сессия («Экзамен B»). Проверка здесь, рядом с форматом, чтобы
@@ -8,16 +8,22 @@
 если соседние плохи. Человек проверял полсотни задач, и одна опечатка в
 ключе не должна выбрасывать остальные.
 
-    {"format": "ai_exam_review/1", "seed": 20261007, "chunk": 1,
+У вопроса может быть несколько чисел (цена и количество), у каждого своя
+подпись; вопрос, ответ на который не число («объясните», «постройте
+график»), помечается `skip` и из проверки выпадает. Формат 1 (одно число на
+вопрос) не принимается: файлов в нём не существует.
+
+    {"format": "ai_exam_review/2", "seed": 20261007, "chunk": 1,
      "reviewer": "…", "exported_at": "…",
      "rows": [{"id": 123, "verdict": "ok" | "bad" | "skip",
                "reason": "", "comment": "",
-               "key": [{"part_id": null, "value": "12.5", "unit": "",
-                        "percent": false, "tol": ""}]}]}
+               "asks": [{"part_id": null, "skip": false,
+                         "values": [{"label": "P", "value": "5", "unit": "",
+                                     "percent": false, "tol": ""}]}]}]}
 """
 from problems.ai_exam.numbers import parse_tol, to_number
 
-FORMAT = 'ai_exam_review/1'
+FORMAT = 'ai_exam_review/2'
 
 VERDICTS = ('ok', 'bad', 'skip')
 
@@ -32,7 +38,7 @@ REASONS = (
 )
 REASON_KEYS = tuple(key for key, _label in REASONS)
 
-#: Семь видов жалоб.
+#: Десять видов жалоб.
 UNKNOWN_ID = 'unknown_id'
 UNKNOWN_VERDICT = 'unknown_verdict'
 KEY_SHAPE = 'key_shape'
@@ -40,6 +46,9 @@ KEY_VALUE = 'key_value'
 BAD_TOL = 'bad_tol'
 NO_REASON = 'no_reason'
 NO_REVIEWER = 'no_reviewer'
+NO_VALUES = 'no_values'
+LABELS = 'labels'
+ALL_SKIPPED = 'all_skipped'
 
 
 def _complaint(kind, row_id, text):
@@ -62,23 +71,48 @@ def _row_complaints(row, candidates_by_id):
     if verdict == 'skip':
         return []
 
-    complaints = []
-    keys = row.get('key') or []
+    asks = row.get('asks')
+    asks = asks if isinstance(asks, list) else []
     expected = sorted(str(ask.get('part_id')) for ask in candidate['asks'])
-    got = sorted(str(k.get('part_id')) for k in keys)
+    got = sorted(str(a.get('part_id')) if isinstance(a, dict) else '?' for a in asks)
     if got != expected:
-        complaints.append(_complaint(
+        return [_complaint(
             KEY_SHAPE, row_id,
-            'ключей %d при %d вопросах, или вопрос чужой' % (len(keys), len(expected))))
-    for key in keys:
-        if to_number(key.get('value')) is None:
+            'вопросов в разметке %d при %d в задаче, или вопрос чужой'
+            % (len(asks), len(expected)))]
+
+    complaints = []
+    for ask in asks:
+        if ask.get('skip'):
+            continue
+        values = ask.get('values')
+        values = [v for v in values if isinstance(v, dict)]             if isinstance(values, list) else []
+        if not values:
             complaints.append(_complaint(
-                KEY_VALUE, row_id, 'ключ не число: %r' % (key.get('value'),)))
-        try:
-            parse_tol(key.get('tol'))
-        except ValueError:
-            complaints.append(_complaint(
-                BAD_TOL, row_id, 'допуск не положительное число: %r' % (key.get('tol'),)))
+                NO_VALUES, row_id,
+                'у вопроса %s нет ни одного числа и нет пометки «не проверяется»'
+                % (ask.get('part_id'),)))
+            continue
+        if len(values) > 1:
+            labels = [str(v.get('label') or '').strip().casefold() for v in values]
+            if '' in labels or len(set(labels)) != len(labels):
+                complaints.append(_complaint(
+                    LABELS, row_id,
+                    'у вопроса %s несколько чисел, а подписи пустые или повторяются'
+                    % (ask.get('part_id'),)))
+        for item in values:
+            if to_number(item.get('value')) is None:
+                complaints.append(_complaint(
+                    KEY_VALUE, row_id, 'ключ не число: %r' % (item.get('value'),)))
+            try:
+                parse_tol(item.get('tol'))
+            except ValueError:
+                complaints.append(_complaint(
+                    BAD_TOL, row_id,
+                    'допуск не положительное число: %r' % (item.get('tol'),)))
+    if all(ask.get('skip') for ask in asks):
+        complaints.append(_complaint(
+            ALL_SKIPPED, row_id, 'все вопросы «не проверяется» — проверять нечего'))
     return complaints
 
 

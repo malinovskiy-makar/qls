@@ -14,6 +14,18 @@ from problems.ai_exam.sampling import candidate_row, prepare
 SEED = 20261007
 #: Метки, которых на слепой странице быть не должно ни в каком виде.
 OPINION_MARK = 'ОТВЕТ-МОДЕЛИ-31337'
+#: Инструкция в шапке — дословно по заданию сессии «Экзамен A2».
+VERBATIM_INSTRUCTION = (
+    'Задача годится для экзамена, если: 1) условие полное и понятно без '
+    'картинки; 2) вы согласны с ответом — решили сами или проверили решение '
+    'банка; 3) в ней есть хотя бы одно число, которое можно проверить. Если '
+    'в вопросе просят несколько чисел — нажмите «+ ещё число» и подпишите '
+    'каждое (P, Q, прибыль). Если пункт просит объяснить, построить график '
+    'или вывести формулу — отметьте у него «не проверяется». Число — без '
+    'единиц; проценты — числом процентов (25, а не 0,25) и галочка. Ни '
+    'одного проверяемого числа — «Не годится». Сомневаетесь — «Пропустить» '
+    'и комментарий.'
+)
 
 
 def record(pk, answer='20', parts=()):
@@ -91,43 +103,76 @@ class PageTests(SimpleTestCase):
         self.assertEqual([a['part_id'] for a in data['cards'][2]['asks']], [501, 502])
 
     def test_instruction_verbatim_and_reserve_word(self):
+        self.assertEqual(INSTRUCTION, VERBATIM_INSTRUCTION)
         self.assertIn(INSTRUCTION, self.html)
         self.assertNotIn('резерв', self.html)
         last = build_page(self.rows, self.records, 4, 4, SEED)
         self.assertIn('резерв', last)
         self.assertTrue(page_data(last)['reserve'])
 
-    def test_key_prefilled_and_doubtful_key_flagged(self):
+    def test_proposal_in_data_and_hint_per_kind(self):
         cards = self.html.split('<section class="qx-card"')[1:]
-        hint = 'ключ извлечён программой — проверьте'
-        self.assertNotIn(hint, cards[0])          # 20 — exact
-        self.assertIn(hint, cards[1])             # Q = 7 — extracted
-        self.assertIn('value="7"', cards[1])
-        self.assertIn('value="25"', cards[2])     # 25% — число процентов
-        self.assertIn('checked', cards[2])        # и галочка «это проценты»
+        data = page_data(self.html)['cards']
+        hints = {'extracted': 'ключ извлечён программой — проверьте',
+                 'none': 'ответа в банке нет — впишите из решения'}
+        # 20 — exact: подписи нет; Q = 7 — extracted; 25% — проценты с галочкой.
+        self.assertEqual(data[0]['asks'][0]['kind'], 'exact')
+        for text in hints.values():
+            self.assertNotIn(text, cards[0])
+        self.assertEqual(data[1]['asks'][0]['kind'], 'extracted')
+        self.assertIn(hints['extracted'], cards[1])
+        self.assertEqual(data[1]['asks'][0]['value'], '7')
+        self.assertEqual((data[2]['asks'][1]['value'], data[2]['asks'][1]['percent']),
+                         ('25', True))
 
-    def test_state_key_holds_seed_and_chunk(self):
-        self.assertIn("'qls-ai-exam-v0-' + DATA.seed + '-chunk' + DATA.chunk", self.html)
+    def test_none_kind_gets_its_own_hint(self):
+        record_none = record(104, answer='вырастет')
+        topic = {'id': 1, 'name': 'Тема', 'order': 1}
+        row = candidate_row(record_none, topic, 1, 4, SEED)
+        self.assertEqual(row['asks'][0]['kind'], 'none')
+        html = build_page([row], {104: record_none}, 1, 4, SEED)
+        self.assertIn('ответа в банке нет — впишите из решения', html)
+        self.assertNotIn('ключ извлечён программой', html)
+
+    def test_every_ask_has_skip_and_add_controls(self):
+        self.assertEqual(self.html.count('class="qx-ask"'), 4)   # 1 + 1 + 2 вопроса
+        self.assertEqual(self.html.count('не проверяется (ответ не число)'), 4)
+        self.assertEqual(self.html.count('class="qx-add"'), 4)
+
+    def test_state_key_has_version_suffix(self):
+        self.assertIn(
+            "'qls-ai-exam-v0-' + DATA.seed + '-chunk' + DATA.chunk + '-f2'", self.html)
         self.assertIn("'ai_exam_review_chunk' + DATA.chunk + '_' + name + '.json'", self.html)
+
+    def test_warnings_cover_missing_number_and_unlabelled_numbers(self):
+        self.assertIn('нет числа', self.html)
+        self.assertIn('без подписей', self.html)
+
+
+def value(v, label='', unit='', percent=False, tol=''):
+    return {'label': label, 'value': v, 'unit': unit, 'percent': percent, 'tol': tol}
 
 
 def sample_export():
-    """Образец выгрузки страницы — ровно та форма, что собирает payload()."""
+    """Образец выгрузки страницы — ровно та форма, что собирает payload().
+
+    101 — одно число без подписи; 102 — «не годится»; 103 — подпункт «а» с
+    двумя подписанными числами и подпункт «б» с процентами.
+    """
     return {
         'format': review.FORMAT, 'seed': SEED, 'chunk': 1, 'reviewer': 'Анна',
         'exported_at': '2026-10-08T10:00:00.000Z',
         'rows': [
             {'id': 101, 'verdict': 'ok', 'reason': '', 'comment': '',
-             'key': [{'part_id': None, 'value': '20', 'unit': '', 'percent': False,
-                      'tol': ''}]},
+             'asks': [{'part_id': None, 'skip': False, 'values': [value('20')]}]},
             {'id': 102, 'verdict': 'bad', 'reason': 'not_numeric', 'comment': 'формула',
-             'key': [{'part_id': None, 'value': '7', 'unit': '', 'percent': False,
-                      'tol': ''}]},
+             'asks': [{'part_id': None, 'skip': False, 'values': [value('7')]}]},
             {'id': 103, 'verdict': 'ok', 'reason': '', 'comment': '',
-             'key': [{'part_id': 501, 'value': '30', 'unit': 'руб.', 'percent': False,
-                      'tol': '0,5'},
-                     {'part_id': 502, 'value': '25', 'unit': '', 'percent': True,
-                      'tol': ''}]},
+             'asks': [{'part_id': 501, 'skip': False,
+                       'values': [value('30', 'P', 'руб.', tol='0,5'),
+                                  value('12', 'Q')]},
+                      {'part_id': 502, 'skip': False,
+                       'values': [value('25', percent=True)]}]},
         ],
     }
 
@@ -147,21 +192,63 @@ class ValidateReviewTests(SimpleTestCase):
         mutate(payload)
         return review.validate_review(payload, self.by_id)
 
+    def test_one_number_without_label_is_fine(self):
+        good, complaints = review.validate_review(sample_export(), self.by_id)
+        self.assertEqual(complaints, [])
+        self.assertEqual(good[0]['asks'][0]['values'][0]['label'], '')
+
+    def test_two_labelled_numbers_in_one_ask_are_fine(self):
+        good, complaints = review.validate_review(sample_export(), self.by_id)
+        self.assertEqual(complaints, [])
+        self.assertEqual(len(good[2]['asks'][0]['values']), 2)
+
+    def test_one_skipped_and_one_filled_ask_are_fine(self):
+        def mutate(p):
+            p['rows'][2]['asks'][0] = {'part_id': 501, 'skip': True, 'values': []}
+        good, complaints = self.broken(mutate)
+        self.assertEqual(complaints, [])
+        self.assertEqual(len(good), 3)
+
+    def test_two_numbers_plus_skipped_ask_is_fine(self):
+        # Ровно то, что отдаёт страница: у «а» два подписанных числа, «б» не проверяется.
+        def mutate(p):
+            p['rows'][2]['asks'][1] = {'part_id': 502, 'skip': True, 'values': []}
+        good, complaints = self.broken(mutate)
+        self.assertEqual(complaints, [])
+        self.assertEqual([len(a['values']) for a in good[2]['asks']], [2, 0])
+
+    def test_skipped_ask_ignores_leftover_values(self):
+        # Страница гасит строки пропущенного вопроса, но не обязана их стирать.
+        def mutate(p):
+            p['rows'][2]['asks'][0]['skip'] = True
+            p['rows'][2]['asks'][0]['values'] = [value('мусор')]
+        _good, complaints = self.broken(mutate)
+        self.assertEqual(complaints, [])
+
     def test_each_complaint_kind(self):
         def row(p, i):
             return p['rows'][i]
 
+        def ask(p, i, j=0):
+            return p['rows'][i]['asks'][j]
+
         cases = [
             (review.UNKNOWN_ID, lambda p: row(p, 0).update(id=999)),
             (review.UNKNOWN_VERDICT, lambda p: row(p, 0).update(verdict='maybe')),
-            (review.KEY_SHAPE, lambda p: row(p, 2)['key'].pop()),
-            (review.KEY_SHAPE, lambda p: row(p, 2)['key'][1].update(part_id=777)),
-            (review.KEY_VALUE, lambda p: row(p, 0)['key'][0].update(value='двадцать')),
-            (review.KEY_VALUE, lambda p: row(p, 0)['key'][0].update(value='')),
-            (review.BAD_TOL, lambda p: row(p, 0)['key'][0].update(tol='-1')),
-            (review.BAD_TOL, lambda p: row(p, 0)['key'][0].update(tol='много')),
+            (review.KEY_SHAPE, lambda p: row(p, 2)['asks'].pop()),
+            (review.KEY_SHAPE, lambda p: ask(p, 2, 1).update(part_id=777)),
+            (review.KEY_VALUE, lambda p: ask(p, 0)['values'][0].update(value='двадцать')),
+            (review.KEY_VALUE, lambda p: ask(p, 0)['values'][0].update(value='')),
+            (review.BAD_TOL, lambda p: ask(p, 0)['values'][0].update(tol='-1')),
+            (review.BAD_TOL, lambda p: ask(p, 0)['values'][0].update(tol='много')),
             (review.NO_REASON, lambda p: row(p, 1).update(reason='')),
             (review.NO_REVIEWER, lambda p: p.update(reviewer='  ')),
+            # Новые виды формата 2.
+            (review.NO_VALUES, lambda p: ask(p, 0).update(values=[])),
+            (review.LABELS, lambda p: ask(p, 2)['values'][1].update(label='')),
+            (review.LABELS, lambda p: ask(p, 2)['values'][1].update(label=' p ')),
+            (review.ALL_SKIPPED,
+             lambda p: [ask(p, 2, 0).update(skip=True), ask(p, 2, 1).update(skip=True)]),
         ]
         for kind, mutate in cases:
             with self.subTest(kind=kind):
@@ -171,17 +258,23 @@ class ValidateReviewTests(SimpleTestCase):
                     # Соседние годные строки не пропадают.
                     self.assertEqual(len(good), 2)
 
+    def test_format_one_is_no_longer_accepted(self):
+        payload = sample_export()
+        payload['format'] = 'ai_exam_review/1'
+        with self.assertRaises(ValueError):
+            review.validate_review(payload, self.by_id)
+
     def test_not_a_review_file_is_an_error(self):
         for payload in (None, [], {'format': 'other/1', 'rows': []},
                         {'format': review.FORMAT}):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 review.validate_review(payload, self.by_id)
 
-    def test_skip_and_bad_rows_need_no_key(self):
+    def test_skip_and_bad_rows_need_no_asks(self):
         payload = sample_export()
-        payload['rows'][1]['key'] = []
+        payload['rows'][1]['asks'] = []
         payload['rows'].append({'id': 103, 'verdict': 'skip', 'reason': '',
-                                'comment': 'не уверен', 'key': []})
+                                'comment': 'не уверен', 'asks': []})
         good, complaints = review.validate_review(payload, self.by_id)
         self.assertEqual(complaints, [])
         self.assertEqual(len(good), 4)

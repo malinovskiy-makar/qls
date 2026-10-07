@@ -45,6 +45,14 @@ _FIND_RE = re.compile(
     r'(?:(?<![\w)\]])(-))?(?<![^\W\d_])(?<![\d.,/])'
     r'(\d+(?:[.,]\d+)?(?:/\d+)?)(?!\d)(\s*%)?')
 
+#: Заведомо не ключ: знак неравенства («A>25», «P ≥ 5», \le, \geq …).
+_INEQUALITY_RE = re.compile(
+    r'[<>≤≥]|\\(?:leqslant|geqslant|leq|geq|le|ge|lt|gt)(?![A-Za-z])')
+#: Заведомо не ключ: число — коэффициент формулы, то есть стоит вплотную
+#: к латинской букве или умножается на неё («240Q», «2x», «240·Q»).
+#: Кириллический хвост вплотную («5кг») — это единицы, сюда не попадает.
+_COEFFICIENT_RE = re.compile(r'\d\s*[·*×]\s*[A-Za-z]|\d[A-Za-z]')
+
 #: Нижняя граница допуска по умолчанию — полсотой.
 _MIN_TOL = Fraction(5, 1000)
 
@@ -130,7 +138,13 @@ def propose_key(raw_answer):
 
     exact — вся строка после чистки это одно число (хвост единиц допустим);
     extracted — в тексте ровно одно число; none — иначе (ключ впишет человек).
+
+    none и для заведомого мусора — неравенства и коэффициенты формул: такой
+    «ключ» не ответ, а ловушка для проверяющего, который поверит подсказке.
     """
+    if (_INEQUALITY_RE.search(str(raw_answer or ''))
+            or _COEFFICIENT_RE.search(_normalize(raw_answer))):
+        return {'value': '', 'unit': '', 'percent': False, 'kind': 'none'}
     value, core, unit, percent = _parse(raw_answer)
     if value is not None:
         return {'value': _canon(core), 'unit': unit, 'percent': percent,

@@ -2,7 +2,7 @@
 
 Образец — `dedup_human_review_html`: открывается двойным щелчком с file://
 без сети, KaTeX вшит, ответы копятся в localStorage, выгрузка одним JSON
-в формате `ai_exam_review/1` (`problems/ai_exam/review.py`).
+в формате `ai_exam_review/2` (`problems/ai_exam/review.py`).
 `katex_head` и `render_field` берутся оттуда импортом: отрисовка задачи
 на странице обязана совпадать с той, что видит ученик.
 
@@ -24,13 +24,21 @@ SITE = 'https://weconomics.ai/catalog/problem/%s/'
 
 INSTRUCTION = (
     'Задача годится для экзамена, если: 1) условие полное и понятно без '
-    'картинки; 2) вы согласны с ответом банка — решили сами или проверили '
-    'решение; 3) ответ — число (или по числу на пункт), и ясно, в каких '
-    'единицах; 4) это расчёт, а не «объясните». Хоть одно не так — «Не '
-    'годится» и причина. Ключ: число без единиц; проценты — числом '
-    'процентов (25, а не 0,25) и галочка. Сомневаетесь — «Пропустить» и '
-    'комментарий.'
+    'картинки; 2) вы согласны с ответом — решили сами или проверили решение '
+    'банка; 3) в ней есть хотя бы одно число, которое можно проверить. Если '
+    'в вопросе просят несколько чисел — нажмите «+ ещё число» и подпишите '
+    'каждое (P, Q, прибыль). Если пункт просит объяснить, построить график '
+    'или вывести формулу — отметьте у него «не проверяется». Число — без '
+    'единиц; проценты — числом процентов (25, а не 0,25) и галочка. Ни '
+    'одного проверяемого числа — «Не годится». Сомневаетесь — «Пропустить» '
+    'и комментарий.'
 )
+
+#: Подписи к предложению программы: exact — без подписи.
+HINTS = {
+    'extracted': 'ключ извлечён программой — проверьте',
+    'none': 'ответа в банке нет — впишите из решения',
+}
 
 PAGE_CSS = """
 :root{--ink:#2c2925;--muted:#6f675d;--line:#ded7cb;--bg:#f6f3ec;--card:#fffdf8;
@@ -78,12 +86,21 @@ button.qx-on[data-v="skip"]{background:var(--skip);border-color:var(--skip);colo
 select,input[type=text],textarea{font:inherit;padding:4px 6px;border:1px solid var(--line);
 border-radius:6px;background:#fff;color:var(--ink)}
 textarea{width:100%;min-height:34px;margin:8px 0 0}
-.qx-keys{margin:10px 0 0;display:grid;gap:6px}
-.qx-key{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-.qx-key .qx-plabel{min-width:60px;font-weight:600}
-.qx-key input.qx-v{width:130px}
-.qx-key input.qx-u{width:110px}
-.qx-key input.qx-t{width:90px}
+.qx-keys{margin:10px 0 0;display:grid;gap:12px}
+.qx-ask{border-left:3px solid var(--line);padding:2px 0 2px 10px}
+.qx-askhead{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 4px}
+.qx-plabel{min-width:60px;font-weight:600}
+.qx-skipbox{font-size:13px;color:var(--muted)}
+.qx-ask[data-skip="1"]{opacity:.6}
+.qx-ask[data-skip="1"] .qx-vals{opacity:.35}
+.qx-val{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 6px}
+.qx-val input.qx-l{width:150px}
+.qx-val input.qx-v{width:120px}
+.qx-val input.qx-u{width:100px}
+.qx-val input.qx-t{width:80px}
+.qx-rm{padding:2px 9px;line-height:1.2}
+button:disabled{opacity:.35;cursor:default}
+button:disabled:hover{border-color:var(--line)}
 .qx-hint{background:var(--hintbg);color:var(--hint);font-size:12px;border-radius:4px;
 padding:1px 6px}
 .qx-figure{max-width:100%;height:auto}
@@ -93,7 +110,8 @@ td,th{border:1px solid var(--line);padding:3px 7px}
 
 PAGE_JS = r"""
 var DATA = JSON.parse(document.getElementById('qx-data').textContent);
-var KEY = 'qls-ai-exam-v0-' + DATA.seed + '-chunk' + DATA.chunk;
+// Суффикс -f2 — формат разметки 2: состояние страницы прежней версии не подхватывается.
+var KEY = 'qls-ai-exam-v0-' + DATA.seed + '-chunk' + DATA.chunk + '-f2';
 var state = {reviewer: '', rows: {}};
 try {
   var saved = JSON.parse(localStorage.getItem(KEY) || 'null');
@@ -108,16 +126,22 @@ function save() {
   refresh();
 }
 
+function blankValue() {
+  return {label: '', value: '', unit: '', percent: false, tol: ''};
+}
+
+// Предложение программы — первая строка числа каждого вопроса.
 function proposal(card) {
   return card.asks.map(function (a) {
-    return {part_id: a.part_id, value: a.value, unit: a.unit,
-            percent: !!a.percent, tol: ''};
+    var v = blankValue();
+    v.value = a.value; v.unit = a.unit; v.percent = !!a.percent;
+    return {part_id: a.part_id, skip: false, values: [v]};
   });
 }
 
 function row(id) {
   if (!state.rows[id]) {
-    state.rows[id] = {verdict: null, reason: '', comment: '', key: proposal(CARDS[id])};
+    state.rows[id] = {verdict: null, reason: '', comment: '', asks: proposal(CARDS[id])};
   }
   return state.rows[id];
 }
@@ -128,34 +152,97 @@ function setVerdict(id, v) {
   paint(id); save();
 }
 
-function setField(el) {
-  var card = el.closest('.qx-card');
-  var r = row(Number(card.dataset.id));
+function mk(tag, props, data) {
+  var el = document.createElement(tag);
+  Object.keys(props || {}).forEach(function (k) { el[k] = props[k]; });
+  Object.keys(data || {}).forEach(function (k) { el.dataset[k] = data[k]; });
+  return el;
+}
+
+function field(cls, f, i, j, placeholder, value, disabled) {
+  return mk('input', {type: 'text', className: cls, placeholder: placeholder,
+                      value: value || '', disabled: disabled},
+            {f: f, i: i, j: j});
+}
+
+function valueRow(i, j, v, ask) {
+  var dis = !!ask.skip;
+  var box = mk('div', {className: 'qx-val'});
+  box.appendChild(field('qx-l', 'label', i, j, 'что это (P, Q, прибыль)', v.label, dis));
+  box.appendChild(field('qx-v', 'value', i, j, 'число', v.value, dis));
+  box.appendChild(field('qx-u', 'unit', i, j, 'единицы', v.unit, dis));
+  var lab = mk('label');
+  var cb = mk('input', {type: 'checkbox', checked: !!v.percent, disabled: dis},
+              {f: 'percent', i: i, j: j});
+  lab.appendChild(cb); lab.appendChild(document.createTextNode(' это проценты'));
+  box.appendChild(lab);
+  box.appendChild(field('qx-t', 'tol', i, j, 'допуск', v.tol, dis));
+  // Последнюю строку убрать нельзя.
+  box.appendChild(mk('button', {type: 'button', className: 'qx-rm', textContent: '×',
+                                title: 'убрать это число',
+                                disabled: dis || ask.values.length < 2},
+                     {rm: '1', i: i, j: j}));
+  return box;
+}
+
+function renderAsk(box, r, i) {
+  var ask = r.asks[i];
+  var el = box.querySelector('.qx-ask[data-i="' + i + '"]');
+  if (!el) return;
+  el.dataset.skip = ask.skip ? '1' : '';
+  el.querySelector('input[data-f="skip"]').checked = !!ask.skip;
+  el.querySelector('.qx-add').disabled = !!ask.skip;
+  var wrap = el.querySelector('.qx-vals');
+  wrap.innerHTML = '';
+  ask.values.forEach(function (v, j) { wrap.appendChild(valueRow(i, j, v, ask)); });
+}
+
+function onField(el) {
+  var box = el.closest('.qx-card');
+  var r = row(Number(box.dataset.id));
   var f = el.dataset.f;
-  if (f === 'reason' || f === 'comment') { r[f] = el.value; }
-  else {
-    var k = r.key[Number(el.dataset.i)];
-    k[f] = (f === 'percent') ? el.checked : el.value;
+  if (f === 'reason' || f === 'comment') {
+    r[f] = el.value;
+  } else if (f === 'skip') {
+    r.asks[Number(el.dataset.i)].skip = el.checked;
+    renderAsk(box, r, Number(el.dataset.i));
+  } else {
+    var v = r.asks[Number(el.dataset.i)].values[Number(el.dataset.j)];
+    v[f] = (f === 'percent') ? el.checked : el.value;
   }
+  save();
+}
+
+function addValue(box, i) {
+  var r = row(Number(box.dataset.id));
+  r.asks[i].values.push(blankValue());
+  renderAsk(box, r, i);
+  var last = box.querySelectorAll('.qx-ask[data-i="' + i + '"] .qx-val');
+  last[last.length - 1].querySelector('.qx-l').focus();
+  save();
+}
+
+function removeValue(box, i, j) {
+  var r = row(Number(box.dataset.id));
+  if (r.asks[i].values.length < 2) return;
+  r.asks[i].values.splice(j, 1);
+  renderAsk(box, r, i);
   save();
 }
 
 function paint(id) {
   var box = document.querySelector('.qx-card[data-id="' + id + '"]');
-  var r = state.rows[id];
+  var r = row(id);
   if (!box) return;
-  box.dataset.verdict = (r && r.verdict) || '';
+  box.dataset.verdict = r.verdict || '';
   box.querySelectorAll('button[data-v]').forEach(function (b) {
-    b.classList.toggle('qx-on', !!r && r.verdict === b.dataset.v);
+    b.classList.toggle('qx-on', r.verdict === b.dataset.v);
   });
-  if (!r) return;
-  box.querySelectorAll('[data-f]').forEach(function (el) {
-    var f = el.dataset.f, val;
-    if (f === 'reason' || f === 'comment') val = r[f] || '';
-    else val = (r.key[Number(el.dataset.i)] || {})[f];
-    if (f === 'percent') el.checked = !!val;
-    else if (el.value !== (val == null ? '' : String(val))) el.value = val == null ? '' : val;
+  box.querySelectorAll('[data-f="reason"],[data-f="comment"]').forEach(function (el) {
+    var val = r[el.dataset.f] || '';
+    if (el.value !== val) el.value = val;
   });
+  r.asks.forEach(function (_a, i) { renderAsk(box, r, i); });
 }
 
 function refresh() {
@@ -170,13 +257,35 @@ function refresh() {
   if (name.value !== state.reviewer) name.value = state.reviewer || '';
 }
 
+function askName(card, i) {
+  var a = card.asks[i];
+  return a.label ? 'пункт «' + a.label + '»' : (card.asks.length > 1 ? 'вопрос ' + (i + 1) : 'вопрос');
+}
+
+// Предупреждения при выгрузке; выгрузку они не блокируют.
 function problems() {
   var out = [];
   DATA.cards.forEach(function (c) {
     var r = state.rows[c.id];
     if (!r || r.verdict !== 'ok') return;
-    if (r.key.some(function (k) { return !String(k.value || '').trim(); }))
-      out.push('№' + c.n + ' (#' + c.id + '): «Годится», но ключ пустой');
+    var head = '№' + c.n + ' (#' + c.id + '): ';
+    var checked = 0;
+    r.asks.forEach(function (ask, i) {
+      if (ask.skip) return;
+      checked++;
+      var filled = ask.values.filter(function (v) { return String(v.value || '').trim(); });
+      if (!filled.length) {
+        out.push(head + 'у вопроса (' + askName(c, i) + ') нет числа');
+        return;
+      }
+      if (filled.length > 1) {
+        var labels = filled.map(function (v) { return String(v.label || '').trim().toLowerCase(); });
+        var uniq = labels.filter(function (l, k) { return l && labels.indexOf(l) === k; });
+        if (uniq.length !== labels.length)
+          out.push(head + 'у вопроса (' + askName(c, i) + ') несколько чисел без подписей');
+      }
+    });
+    if (!checked) out.push(head + '«Годится», но все вопросы «не проверяется»');
   });
   if (!String(state.reviewer || '').trim()) out.unshift('не указано имя проверяющего');
   return out;
@@ -187,8 +296,18 @@ function payload() {
   DATA.cards.forEach(function (c) {
     var r = state.rows[c.id];
     if (!r || !r.verdict) return;
+    var asks = r.asks.map(function (ask) {
+      var values = ask.skip ? [] : ask.values.filter(function (v) {
+        return String(v.value || '').trim();
+      }).map(function (v) {
+        return {label: String(v.label || '').trim(), value: String(v.value).trim(),
+                unit: String(v.unit || '').trim(), percent: !!v.percent,
+                tol: String(v.tol || '').trim()};
+      });
+      return {part_id: ask.part_id, skip: !!ask.skip, values: values};
+    });
     rows.push({id: c.id, verdict: r.verdict, reason: r.verdict === 'bad' ? (r.reason || '') : '',
-               comment: r.comment || '', key: r.key});
+               comment: r.comment || '', asks: asks});
   });
   return {format: DATA.format, seed: DATA.seed, chunk: DATA.chunk,
           reviewer: String(state.reviewer || '').trim(),
@@ -241,9 +360,19 @@ document.querySelectorAll('.qx-card').forEach(function (box, j) {
     });
   });
 });
-document.querySelectorAll('[data-f]').forEach(function (el) {
-  el.addEventListener(el.type === 'checkbox' || el.tagName === 'SELECT' ? 'change' : 'input',
-                      function () { setField(el); });
+// Поля создаются заново при каждой перерисовке вопроса, поэтому слушатели — на документе.
+['input', 'change'].forEach(function (type) {
+  document.addEventListener(type, function (ev) {
+    var el = ev.target;
+    if (el.dataset && el.dataset.f && el.closest('.qx-card')) onField(el);
+  });
+});
+document.addEventListener('click', function (ev) {
+  var el = ev.target.closest('button');
+  if (!el || !el.closest('.qx-card')) return;
+  var box = el.closest('.qx-card');
+  if (el.dataset.add !== undefined) addValue(box, Number(el.dataset.add));
+  else if (el.dataset.rm) removeValue(box, Number(el.dataset.i), Number(el.dataset.j));
 });
 document.getElementById('qx-name').addEventListener('input', function () {
   state.reviewer = this.value; save();
@@ -270,27 +399,24 @@ def _block(label, html, cls=''):
     return '<div class="qx-lbl">%s</div>%s' % (label, inner)
 
 
-def _key_rows(candidate):
-    rows = []
+def _asks_html(candidate):
+    """Вопросы задачи: подпись, подсказка о ключе, «не проверяется» и «+ ещё
+    число». Строки чисел рисует JS по состоянию: их может быть сколько угодно."""
+    many = len(candidate['asks']) > 1
+    blocks = []
     for i, ask in enumerate(candidate['asks']):
-        label = ask['label'] and escape(ask['label']) or ('ответ' if len(candidate['asks']) == 1 else '—')
-        hint = ''
-        if ask['kind'] != 'exact':
-            hint = '<span class="qx-hint">ключ извлечён программой — проверьте</span>'
-        rows.append(
-            '<div class="qx-key"><span class="qx-plabel">%(label)s</span>'
-            '<input type="text" class="qx-v" data-f="value" data-i="%(i)d" '
-            'placeholder="число" value="%(value)s">'
-            '<input type="text" class="qx-u" data-f="unit" data-i="%(i)d" '
-            'placeholder="единицы" value="%(unit)s">'
-            '<label><input type="checkbox" data-f="percent" data-i="%(i)d"%(checked)s> '
-            'это проценты</label>'
-            '<input type="text" class="qx-t" data-f="tol" data-i="%(i)d" '
-            'placeholder="допуск">%(hint)s</div>'
-            % {'label': label, 'i': i, 'value': escape(ask['value']),
-               'unit': escape(ask['unit']),
-               'checked': ' checked' if ask['percent'] else '', 'hint': hint})
-    return ''.join(rows)
+        label = escape(ask['label']) if ask['label'] else ('—' if many else 'ответ')
+        hint = HINTS.get(ask['kind'])
+        hint = '<span class="qx-hint">%s</span>' % hint if hint else ''
+        blocks.append(
+            '<div class="qx-ask" data-i="%(i)d">'
+            '<div class="qx-askhead"><span class="qx-plabel">%(label)s</span>%(hint)s'
+            '<label class="qx-skipbox"><input type="checkbox" data-f="skip" '
+            'data-i="%(i)d"> не проверяется (ответ не число)</label></div>'
+            '<div class="qx-vals"></div>'
+            '<button type="button" class="qx-add" data-add="%(i)d">+ ещё число</button>'
+            '</div>' % {'i': i, 'label': label, 'hint': hint})
+    return ''.join(blocks)
 
 
 def card_html(candidate, record):
@@ -322,7 +448,7 @@ def card_html(candidate, record):
         '</div>'
         '<div class="qx-why"><select data-f="reason">'
         '<option value="">— причина —</option>%(reasons)s</select></div>'
-        '<div class="qx-lbl">ключ</div><div class="qx-keys">%(keys)s</div>'
+        '<div class="qx-lbl">ключи (числа для проверки)</div><div class="qx-keys">%(keys)s</div>'
         '<textarea data-f="comment" rows="1" placeholder="комментарий"></textarea>'
         '</div></section>'
     ) % {
@@ -334,7 +460,7 @@ def card_html(candidate, record):
         'parts': ''.join(parts_html),
         'answer': _block('ответ банка', answer, 'qx-answer'),
         'solution': solution or '<p>решения нет</p>',
-        'reasons': reasons, 'keys': _key_rows(candidate),
+        'reasons': reasons, 'keys': _asks_html(candidate),
     }
 
 
