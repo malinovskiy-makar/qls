@@ -987,8 +987,8 @@ function updateMonoInterventionPanel() {
 function makeCurve(expr) {
   const { compiled, error } = compileFormula((expr || '').trim());
   if (error) return { error };
-  // expr — для записи при рисовании (выгрузка .tex): формула кривой строкой, как набрана
-  return { compiled, linear: detectLinear(compiled), error: null, expr: (expr || '').trim() };
+  // expr — для записи при рисовании (выгрузка .tex): формула кривой строкой, как набрана (texTag: в состояние не входит)
+  return texTag({ compiled, linear: detectLinear(compiled), error: null }, 'expr', (expr || '').trim());
 }
 
 /* Формула куска спроса строкой (для записи при рисовании, 72-export-tex.js):

@@ -40,7 +40,7 @@ function evalVar(compiled, v, names) {
 function macroCurveY(expr, names) {
   const { compiled, error } = compileVar(expr, names);
   if (error) return { error };
-  return { fn: (v) => evalVar(compiled, v, names), rec: { expr, v: names[0] } };
+  return texTag({ fn: (v) => evalVar(compiled, v, names) }, 'rec', { expr, v: names[0] });   // запись для .tex — вне состояния
 }
 
 // Кривая, заданная как x = g(y) («количество от ставки»). Приводим к y = f(x):
@@ -55,9 +55,9 @@ function macroCurveInv(expr, names, yMax) {
   const d12 = (f2 - f1) / (y2 - y1), d23 = (f3 - f2) / (y3 - y2);
   if (isFinite(d12) && isFinite(d23) && Math.abs(d12 - d23) < 1e-6 * (1 + Math.abs(d12)) && Math.abs(d12) > 1e-9) {
     const d = d12, c = f1 - d * y1;          // x = c + d·y  ⇒  y = (x − c)/d
-    return { fn: (v) => (v - c) / d, inv: { c, d }, rec: { expr, v: names[0], axis: 'y' } };
+    return texTag({ fn: (v) => (v - c) / d, inv: { c, d } }, 'rec', { expr, v: names[0], axis: 'y' });
   }
-  return { rec: { expr, v: names[0], axis: 'y' }, fn: (v) => {
+  return texTag({ fn: (v) => {
     const h = (y) => { const q = g(y); return isNaN(q) ? NaN : q - v; };
     const hi = Math.max(1, yMax * 3);
     let prevY = 0, prevH = h(0);
@@ -67,7 +67,7 @@ function macroCurveInv(expr, names, yMax) {
       prevY = y; prevH = cur;
     }
     return NaN;
-  } };
+  } }, 'rec', { expr, v: names[0], axis: 'y' });
 }
 
 // Реестр моделей: подписи осей и пресеты полей. Поля живут в STATE.macro[model].
@@ -113,7 +113,7 @@ function recomputeMacro() {
   if (m === 'phillips') {
     // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\\ \\pi_e)$.
     const f = (u) => P.pe - P.beta * (u - P.ustar);
-    const sr = { fn: f, rec: { expr: '(' + P.pe + ') - (' + P.beta + ') * (u - (' + P.ustar + '))', v: 'u' } };
+    const sr = texTag({ fn: f }, 'rec', { expr: '(' + P.pe + ') - (' + P.beta + ') * (u - (' + P.ustar + '))', v: 'u' });
     const lrp = makeVerticalCurve(P.ustar);
     STATE.macroRes = { kind: 'phillips', curves: [['SRPC', sr, COL.D]],
                        vertical: [['LRPC', lrp, COL.MC]],
@@ -139,8 +139,8 @@ function recomputeMacro() {
     // ставки нет вовсе: государству нужны эти ΔG при любой ставке, то есть там
     // кривая вертикальна и как r = f(Q) не выражается. Возвращаем NaN, чтобы не
     // рисовать вместо неё ложную горизонтальную полку на уровне запретительной ставки.
-    const dTot = { fn: (x) => (x < P.dg) ? NaN : dv.fn(x - P.dg),
-                   rec: { expr: '(' + dv.rec.expr + ') + (' + P.dg + ')', v: dv.rec.v, axis: 'y' } };
+    const dTot = texTag({ fn: (x) => (x < P.dg) ? NaN : dv.fn(x - P.dg) },
+                        'rec', { expr: '(' + dv.rec.expr + ') + (' + P.dg + ')', v: dv.rec.v, axis: 'y' });
     const base = findEquilibrium(dv, sv, MACRO_SEARCH);
     const after = findEquilibrium(dTot, sv, MACRO_SEARCH);
     if (!base || !after) return fail('Равновесие на рынке заёмных средств не найдено.');
@@ -198,7 +198,7 @@ function recomputeMacro() {
     if (D.linear && S.linear && S.linear.a - D.linear.a > 0) {
       rec = 'x * max(0, ((' + D.linear.b + ') - (' + S.linear.b + ') - x) / (' + (S.linear.a - D.linear.a) + '))';
     }
-    STATE.macroRes = { kind: 'laffer', pts, best, tMax, rec };
+    STATE.macroRes = texTag({ kind: 'laffer', pts, best, tMax }, 'rec', rec);
     applyAutoRanges(niceMax(tMax), niceMax(Math.max(best.rev, 1) * 1.25));
     return;
   }

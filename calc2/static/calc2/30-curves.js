@@ -293,6 +293,16 @@ function markPoly(sel, why, name) {
   return sel.attr('data-poly', String(why || 'ломаная по вершинам'));
 }
 
+/* Запись для .tex на ОБЪЕКТЕ РАСЧЁТА (кривая в STATE.macroRes, STATE.discr3,
+   STATE.kinked) ставится НЕПЕРЕЧИСЛИМЫМ свойством: рисователь её читает
+   (c.rec, c.expr), а снимок состояния модели, история и сверка редизайна со
+   старым экраном видят объект прежним. Замер 08.10: перечислимое поле меняло
+   старт 14 моделей в session_probe (п. 8, «заполненное хранилище»). */
+function texTag(obj, key, value) {
+  if (obj && typeof obj === 'object') Object.defineProperty(obj, key, { value, enumerable: false, configurable: true, writable: true });
+  return obj;
+}
+
 /* Формула кривой как функции горизонтальной величины, строкой на языке
    Math.js; null, если такой записи у кривой нет (вертикаль, сумма по точкам,
    непрямая кривая, введённая как Q = f(P)). */
@@ -996,7 +1006,8 @@ function requestLabelFrame() {
 function resetLabelPositions() { _labelPos.clear(); _anchorQ.clear(); _labelW.clear(); }
 
 /* ТОЧКА ПОСТАНОВКИ ПОДПИСИ И САМА ПОДПИСЬ — ОДНО ПРАВИЛО, ДВА ПОТРЕБИТЕЛЯ.
-   Зовут её отрисовка (drawCurves) и выгрузка в .tex (buildTexFromState).
+   Звали её отрисовка (drawCurves) и прежняя выгрузка в .tex «от состояния»
+   (удалена 08.10, ADR 0139: файл теперь читает подпись с самого холста).
    Пока каждый считал место сам, выгрузка ставила подпись не туда, куда экран,
    а сверить это было нечем: экран брал якорь у curveAnchor, а файл — у
    пикселей нарисованного узла.
