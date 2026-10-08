@@ -523,13 +523,19 @@ class Command(BaseCommand):
                 plan.skip(external_id, 'задание закроет новая строка или правка '
                                        f'(задача #{assumed[(event_id, number)]})')
                 continue
-            title, points, statement, solution = clean_pdf_task(
-                row['raw_text'], row.get('solution_text', ''),
-                combined=row.get('tasks_pdf') == row.get('solutions_pdf'))
-            figure_path = None
+            figure_path, drop_lines = None, []
             if _truthy(row.get('has_figure')):
                 candidate = os.path.join(figures_dir, f'{event_id}_{number}.png')
                 figure_path = candidate if os.path.isfile(candidate) else None
+                sidecar = os.path.join(figures_dir, f'{event_id}_{number}.json')
+                if figure_path and os.path.isfile(sidecar):
+                    # Подписи внутри вырезки: на картинке они есть, в тексте лишние.
+                    with open(sidecar, encoding='utf-8') as handle:
+                        drop_lines = json.load(handle).get('drop_lines', [])
+            title, points, statement, solution = clean_pdf_task(
+                row['raw_text'], row.get('solution_text', ''),
+                combined=row.get('tasks_pdf') == row.get('solutions_pdf'),
+                drop_lines=drop_lines)
             plan.imports.append({
                 'row': row, 'external_id': external_id, 'title': title,
                 'points': points, 'statement': statement, 'solution': solution,

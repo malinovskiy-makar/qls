@@ -328,6 +328,31 @@ class ImportAndRollbackTests(AuditTestBase):
         self.run_cmd(import_queue=self.queue, **APPROVE)
         self.assertEqual(snapshot()[1:], after[1:])
 
+    def test_9c_figure_attached_and_caption_dropped(self):
+        """Рисунок: картинка ложится в ProblemFigure, маркер — в условие,
+        подпись с картинки из текста убирается, формат markdown."""
+        figures = os.path.join(self.tmp.name, 'figures')
+        os.makedirs(figures)
+        with open(os.path.join(figures, 'vp-2020-final-9-v1_4.png'), 'wb') as handle:
+            handle.write(b'png-bytes')
+        with open(os.path.join(figures, 'vp-2020-final-9-v1_4.json'), 'w',
+                  encoding='utf-8') as handle:
+            json.dump({'drop_lines': ['Рис. 1: налоговое бремя']}, handle, ensure_ascii=False)
+        with open(self.queue, 'w', encoding='utf-8') as handle:
+            handle.write(json.dumps({
+                'event_id': 'vp-2020-final-9-v1', 'number': '4', 'year': '2020',
+                'academic_year': '2019/2020', 'grade': '9', 'max_score': '25.0',
+                'raw_text': TEXT['D'] + '\nРис. 1: налоговое бремя\nНайдите доли.',
+                'solution_text': 'Решение', 'has_figure': True,
+                'source_url': URL['vp-2020-final-9-v1']}, ensure_ascii=False) + '\n')
+        self.run_cmd(import_queue=self.queue, figures_dir=figures, **APPROVE)
+        problem = Problem.objects.get(source_references__source__name=OFFICIAL_SOURCE_NAME)
+        figure = problem.figures.get()
+        self.assertIn(f'[[FIGURE:{figure.tikz_hash}]]', problem.statement)
+        self.assertNotIn('Рис. 1', problem.statement)
+        self.assertEqual((problem.content_format, problem.needs_quality_review),
+                         ('markdown', False))
+
     def test_9b_task_already_linked_is_not_imported(self):
         """Задание уже привязано к задаче банка правками существующих строк
         (raw_meta['official_event_id'] + номер) — импорт его не создаёт."""

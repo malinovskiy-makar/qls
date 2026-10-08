@@ -297,6 +297,40 @@ def parse_header(lines):
     return title, points, remaining
 
 
+def _drop_figure_text(lines, drop_lines):
+    """Убрать строки, лежащие внутри вырезанного рисунка (подписи осей,
+    подписи к рисунку): их текст есть на картинке.
+
+    Строка — подпись, если совпадает с подписью без учёта пробелов или
+    целиком состоит из её слов. Короткая (до 5 знаков: «1», «45,»)
+    убирается, только если соседняя непустая строка — тоже подпись:
+    одиночная цифра в тексте может быть номером пункта.
+    """
+    if not drop_lines:
+        return lines
+    keys = {re.sub(r'\s+', '', s) for s in drop_lines}
+    tokens = {t for s in drop_lines for t in s.split()}
+
+    def is_figure(line):
+        key = re.sub(r'\s+', '', line)
+        return bool(key) and (key in keys or all(t in tokens for t in line.split()))
+
+    marks = [is_figure(line) for line in lines]
+    filled = [i for i, line in enumerate(lines) if line.strip()]
+    keep = []
+    for pos, i in enumerate(filled):
+        if not marks[i]:
+            continue
+        if len(re.sub(r'\s+', '', lines[i])) >= 6:
+            continue
+        neighbours = [filled[j] for j in (pos - 1, pos + 1) if 0 <= j < len(filled)]
+        if not any(marks[j] for j in neighbours):
+            keep.append(i)
+    for i in keep:
+        marks[i] = False
+    return [line for line, mark in zip(lines, marks) if not mark]
+
+
 def split_combined(lines):
     """Условие и решение в ОДНОМ PDF: всё с «Возможные варианты ответов» /
     «Ответ» / «Решение» уходит в решение."""
@@ -306,14 +340,16 @@ def split_combined(lines):
     return lines, []
 
 
-def clean_pdf_task(raw_text, solution_text, combined=False):
+def clean_pdf_task(raw_text, solution_text, combined=False, drop_lines=()):
     """Текст задания из PDF → (название, баллы, условие, решение) в markdown.
 
-    Только детерминированные правки формы: колонтитулы, шапка, переносы
-    строк, курсивные буквы, экранирование. Слова не меняются.
+    Только детерминированные правки формы: колонтитулы, шапка, подписи
+    вырезанного рисунка (`drop_lines`), переносы строк, курсивные буквы,
+    экранирование. Слова не меняются.
     """
     lines = _plain_math_letters(raw_text or '').splitlines()
     lines = _drop_colontitles(lines)
+    lines = _drop_figure_text(lines, [_plain_math_letters(s) for s in drop_lines])
     title, points, lines = parse_header(lines)
     extra_solution = []
     if combined:
