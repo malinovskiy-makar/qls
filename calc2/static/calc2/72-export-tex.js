@@ -824,19 +824,37 @@ const TexExport = (function () {
       };
       for (let k = 0; k < n; k += step) check(data[k][A], data[k][B]);
       if ((n - 1) % step) check(data[n - 1][A], data[n - 1][B]);
+      /* Разрыв формулы (полюс, скачок) между соседними узлами: экран рисует
+         там прямой отрезок между узлами, а формула уходит от него дальше
+         четверти размаха окна. Замер 08.10, m-graph@nl: у 1/x перемычка на
+         экране от −7 до 12,5, а pgfplots своей сеткой вытягивал выброс до
+         края окна. Такие отрезки запись не покрывает: сборка режет её по этим
+         узлам и ставит перемычку тем же отрезком, что на экране. Середина
+         проверяется у каждого отрезка, подозрительный — ещё 16 точками. */
+      const cuts = [], isCut = new Set();
+      const offAt = (k, t) => {
+        const b0 = data[k][B], b1 = data[k + 1][B], w = f(data[k][A] + (data[k + 1][A] - data[k][A]) * t);
+        return isFinite(w) ? Math.max(Math.min(b0, b1) - w, w - Math.max(b0, b1), 0) : Infinity;
+      };
+      for (let k = 0; k + 1 < n; k++) {
+        let off = offAt(k, 0.5);
+        if (off <= spanB / 16) continue;
+        for (let j = 1; j < 16 && off <= spanB / 4; j++) off = Math.max(off, offAt(k, j / 16));
+        if (off > spanB / 4) { cuts.push(k); isCut.add(k); }
+      }
       /* Между соседними узлами формула не должна уходить в сторону, иначе в
          файле окажется то, чего на экране нет: колебания чаще сетки пути
          либо вторая ветвь у записи «по вертикали». */
       let between = 0;
       for (let k = 0; k + 1 < n; k += step) {
         const b0 = data[k][B], b1 = data[k + 1][B];
-        if (b0 < lo || b0 > hi || b1 < lo || b1 > hi) continue;
+        if (isCut.has(k) || b0 < lo || b0 > hi || b1 < lo || b1 > hi) continue;
         const v = f((data[k][A] + data[k + 1][A]) / 2);
         if (!isFinite(v)) { between = Math.max(between, 1); continue; }
         between = Math.max(between, Math.max(Math.min(b0, b1) - v, v - Math.max(b0, b1), 0) / spanB);
       }
       const ok = (exact + beyond) > 0 && maxErr < VERIFY_TOL && between < BETWEEN_TOL;
-      return { ok, maxErr, between, f, pgf, A, B, why: ok ? '' : (maxErr >= VERIFY_TOL ? 'формула не проходит через нарисованные узлы' : 'между узлами формула уходит от нарисованной линии') };
+      return { ok, maxErr, between, f, pgf, A, B, cuts, why: ok ? '' : (maxErr >= VERIFY_TOL ? 'формула не проходит через нарисованные узлы' : 'между узлами формула уходит от нарисованной линии') };
     };
     /* Сверка записи области: каждый узел пути лежит на одной из двух границ
        и внутри отрезка, а площадь нарисованного многоугольника равна
@@ -1093,7 +1111,22 @@ const TexExport = (function () {
                   for (let k = 0; covered && k <= 200; k++) { const x = a0 + (a1 - a0) * k / 200; if (isFinite(v.f(x)) && !cut.some(c => x >= c.a - spanA * 1e-9 && x <= c.b + spanA * 1e-9)) covered = false; }
                   if (same && covered) pieces = cut;
                 }
+                // разрывы формулы между узлами (v.cuts): запись не покрывает эти отрезки
+                if (v.cuts.length) {
+                  const gaps = v.cuts.map(k => [Math.min(data[k][A], data[k + 1][A]), Math.max(data[k][A], data[k + 1][A])]);
+                  pieces = pieces.flatMap(pc => {
+                    let segs = [[pc.a, pc.b]];
+                    gaps.forEach(([g0, g1]) => { segs = segs.flatMap(([s0, s1]) => (g1 <= s0 || g0 >= s1) ? [[s0, s1]] : [[s0, g0], [g1, s1]].filter(([u, w]) => w > u)); });
+                    return segs.map(([s0, s1]) => Object.assign({}, pc, { a: s0, b: s1 }));
+                  });
+                }
                 let zi = 0, any = false;
+                // перемычка через разрыв — тот же отрезок, что на экране (за расширенным окном его режет clipLine)
+                v.cuts.forEach(k => clipLine([data[k], data[k + 1]], bx0, bx1, by0, by1).forEach(piece => {
+                  const it = mk(piece, { nodes: { kind: 'poly', why: 'перемычка через разрыв формулы: на экране отрезок между соседними узлами', name: decl.name || '' } });
+                  it.z = base.z + (zi++) * 1e-3;
+                  p.items.push(it); any = true;
+                }));
                 pieces.filter(pc => pc.b > pc.a).forEach(pc => {
                   visibleRuns(pc.a, pc.b, pc.f, eB0, eB1, decOf(spanA) + 3).forEach(r => {
                     const it = mk(data, { rec: { ok: true, src: decl.src, expr: pc.expr, v: decl.v, axis: A ? 'y' : 'x', pgf: pc.pgf, maxErr: v.maxErr, lo: r[0], hi: r[1], samples: pickSamples(pc.f, r[0], r[1], wB[0], wB[1], spanB), name: [decl.name || '', pc.tag].filter(Boolean).join(', '), bLo: eB0, bHi: eB1, far, probe: probeOf(pc.f, r[0], r[1]), span: spanB } });
