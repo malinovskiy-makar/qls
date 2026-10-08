@@ -229,13 +229,40 @@ function drawInequalityCaptions() {
     .attr('font-size', FS.base).attr('fill', COL.inkSoft).text('I, %');
 }
 
+/* Запись для .tex. По группам и по доходам кривая Лоренца — ломаная по
+   точкам (доля населения; доля дохода): это её точный вид, а не приближение.
+   По формуле L(p) — та же формула на осях в процентах: 100·L(x/100); буква p
+   (и синоним x) подставляется деревом Math.js. */
+function lorenzPlotExpr(pts) {
+  if (STATE.ineqInput !== 'formula' || pts !== STATE.ineqLorenz) return null;
+  try {
+    return '100 * (' + math.parse(prepExpr(String(STATE.ineqFormula))).transform(n => (n.isSymbolNode && (n.name === 'p' || n.name === 'x'))
+      ? math.parse('(x / 100)') : n).toString() + ')';
+  } catch (e) { return null; }
+}
+function lorenzMark(sel, pts) {
+  const e = lorenzPlotExpr(pts);
+  if (e) return markExpr(sel, e, 'x', null, { name: 'кривая Лоренца' });
+  if (STATE.ineqInput === 'formula' && pts === STATE.ineqLorenz) return markNumeric(sel, 'формула L(p) не переводится в запись: кривая по точкам расчёта', 'кривая Лоренца');
+  return markPoly(sel, 'кривая Лоренца по группам: ломаная по точкам (доля населения; доля дохода)', 'кривая Лоренца');
+}
+// Площадь A (between: между диагональю и кривой) или B (под кривой).
+function lorenzMarkArea(sel, pts, between) {
+  const e = lorenzPlotExpr(pts);
+  const ok = pts.every(d => !isNaN(d[1]));
+  if (e && ok) return markArea(sel, { from: 0, to: 100, lo: between ? e : 0, hi: between ? 'x' : e, v: 'x' });
+  if (STATE.ineqInput === 'formula') return markNumeric(sel, 'граница площади (кривая Лоренца) без записи формулой: площадь по точкам расчёта');
+  return markPoly(sel, between ? 'площадь A между диагональю и ломаной Лоренца: многоугольник по вершинам'
+    : 'площадь B под ломаной Лоренца: многоугольник по вершинам', between ? 'площадь A' : 'площадь B');
+}
+
 // Заливки A (между диагональю и кривой) и B (под кривой) — смысл Джини.
 function drawInequalityAreas(pts) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const bArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(sy(0)).y1(d => sy(d[1] * 100));
-  g.append('path').datum(pts).attr('d', bArea).attr('fill', COL.dwl).attr('opacity', 0.15);
+  lorenzMarkArea(g.append('path').datum(pts).attr('d', bArea).attr('fill', COL.dwl).attr('opacity', 0.15), pts, false);
   const aArea = d3.area().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y0(d => sy(d[0] * 100)).y1(d => sy(d[1] * 100));
-  g.append('path').datum(pts).attr('d', aArea).attr('fill', COL.D).attr('opacity', 0.12);
+  lorenzMarkArea(g.append('path').datum(pts).attr('d', aArea).attr('fill', COL.D).attr('opacity', 0.12), pts, true);
   g.append('text').attr('x', sx(33)).attr('y', sy(52)).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.D).attr('opacity', 0.85).text('A');
   g.append('text').attr('x', sx(66)).attr('y', sy(18)).attr('font-size', FS.large).attr('font-weight', 600).attr('fill', COL.dwl).attr('opacity', 0.85).text('B');
 }
@@ -246,6 +273,7 @@ function drawLorenzCurve(pts, color, dashed) {
   const line = d3.line().defined(d => !isNaN(d[1])).x(d => sx(d[0] * 100)).y(d => sy(d[1] * 100));
   const path = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
   if (dashed) path.attr('stroke-dasharray', '6 4').attr('opacity', 0.75);
+  lorenzMark(path, pts);
 }
 
 // Вертикальный отрезок Робин Гуда в p* (макс. разрыв диагональ−кривая) + подпись.
@@ -342,8 +370,8 @@ function drawRedistArrow(base, redist) {
   const x = sx(p * 100), y0 = sy(Lb * 100), y1 = sy(Lr * 100);
   g.append('line').attr('x1', x).attr('y1', y0).attr('x2', x).attr('y2', y1)
     .attr('stroke', COL.tax).attr('stroke-width', 1.6);
-  g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
-    .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.6);
+  markPoly(g.append('path').attr('d', `M${x - 4},${y1 + 6} L${x},${y1} L${x + 4},${y1 + 6}`)
+    .attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 1.6), 'наконечник стрелки «к равенству»: ломаная по трём точкам');
   g.append('text').attr('x', x + 8).attr('y', (y0 + y1) / 2).attr('font-size', FS.small).attr('font-weight', 600).attr('fill', COL.tax)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('К равенству');
 }
