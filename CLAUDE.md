@@ -236,6 +236,10 @@ import_olympiads_data             # настоящие факты раздела
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
 import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
+olympiad_official_sources [--apply]            # Source «официальный архив» ВП + карточки vp-fingram, vp-ob (после --wipe олимпиад — снова)
+apply_olympiad_audit --new-refs|--update-existing|--import|--rollback F  # итоги аудита олимпиады по официальному
+                                  # эталону: сухой по умолчанию, запись --apply --yes-i-have-owner-approval, журнал
+                                  # и откат (docs/OLYMPIAD_AUDIT.md, ADR 0141)
 ai_exam_candidates [--recon] [--count N --chunks K --seed S] [--force] [--dir D]  # экзамен ИИ v0: воронка, кандидаты, страницы проверки (разметка ai_exam_review/2); файлы ВНЕ репозитория (ADR 0134)
 ai_exam_build [--mark-safe [--force]] [--dir D]  # экзамен ИИ: сейф (заранее, один раз) и сборка из reviews_in/ → BUILD.md, exam.jsonl+safe.jsonl или exam_draft.jsonl
 ai_exam_run --suite solve|leak|both --set work|draft|smoke|safe [--limit N --max-usd X --label L] [--yes]  # прогон; без --yes только план; в базу не пишет; safe — с --open-safe "ОТКРЫВАЮ СЕЙФ"
@@ -358,6 +362,9 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 квадрата приходят от клиента и только прижимаются к границам, поворот по EXIF
 применяется до обрезки ([docs/SECURITY.md](docs/SECURITY.md)).
 
+⚠️ **Аудит олимпиад:** номер SolveHub — позиция в их списке, НЕ официальный номер (123 из 573 строк ВП были неверны).
+⚠️ **Косинус «вектор банка ↔ голый текст PDF» не работает** (1 % верных пар) — сверять текстом, вектор эталона строить по формуле банка. [docs/OLYMPIAD_AUDIT.md](docs/OLYMPIAD_AUDIT.md).
+
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
 её в `problems/models*.py`, а не у себя. Исключений **три**, все записаны:
 `game.GameQuestion` — игровой пул намеренно отделён от банка, чтобы удаление
@@ -413,6 +420,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 | Банк задач: цифры, конвейеры, брак | [docs/DATA.md](docs/DATA.md) |
 | **Игра: механика, экономика, таблица, анти-чит, дуэль в реальном времени** | [docs/GAME.md](docs/GAME.md) |
 | **Тренажёр «Высшая проба»: маршруты, доступ к попытке, время, сохранение, тесты** | [docs/VP.md](docs/VP.md) |
+| **Аудит олимпиад по официальному эталону: файлы, команды записи, откат, близнецы** | [docs/OLYMPIAD_AUDIT.md](docs/OLYMPIAD_AUDIT.md) |
 | **Экзамен для ИИ: отбор, страницы проверки, форматы, правило сравнения чисел** | [docs/AI_EXAM.md](docs/AI_EXAM.md) |
 | **Данные беты ИИ: копия боя, отчёт A–K, определения, читалка диалогов** | [docs/AI_BETA.md](docs/AI_BETA.md) |
 | Цвета, типографика, правила экранов (канон, части 0–5) | [DESIGN.md](DESIGN.md) |
@@ -441,7 +449,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 
 <!-- NOTION-SYNC:START — генерируется из Notion, руками не править -->
 
-**Обновлено: 2026-10-08 (сессия «Экзамен B»)** ·
+**Обновлено: 2026-10-09 (сессия «Пилот ВП, сессия 3»)** ·
 [Notion-штаб](https://app.notion.com/p/39ab11c92bc181f7bbe1efa8a89e38a9)
 
 **В работе (9):**
@@ -449,7 +457,8 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
   Макар + Claude Code; «Экзамен A», «A2» (ветка `feat/ai-exam-v0`), «Данные беты 1»
   (`feat/ai-beta-data`) и «Экзамен B» (`feat/ai-exam-b`: сборка и сейф, прогонщик,
   отчёт «было → стало», проба трубы) сделаны, не запушены; ждём разметку людей
-- **Полный аудит олимпиад → полный исторический банк** – пилот ВП, сессия 1 выполнена
+- **Полный аудит олимпиад → полный исторический банк** – пилот ВП, сессии 1–3 выполнены
+  (сессия 3 записала привязки и импорт на домашней базе; `feat/olympiad-vp-write`, не запушена)
 - **Завести личные аккаунты на проде, затем закрыть общий вход makar** – Андрей (сервер) + Макар
 - Первая волна починки: Сборник АА (131 задача) – Анич
 - Разбор вердиктов МатЭк (2 632 задачи, 35,1 % брака) – Claude Code
