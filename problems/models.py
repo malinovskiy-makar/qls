@@ -1807,6 +1807,11 @@ class OlympiadRef(models.Model):
     внешним индексом SolveHub/ILE. Ничего не меняет в Problem/SourceReference —
     чисто дополнительная информация, источник на сайте не переключает.
 
+    source_site='official' — привязка по официальному архиву самой олимпиады
+    (PDF организатора, команда apply_olympiad_audit, docs/OLYMPIAD_AUDIT.md).
+    У такой строки event_id и number — официальные (vp-<год>-final-<класс>-v1),
+    а не агрегаторские: номер SolveHub — позиция в их списке.
+
     Одна Problem может встречаться в НЕСКОЛЬКИХ турах одной или разных
     олимпиад (задачу могли переиздать) — поэтому problem не unique сама
     по себе, unique пара (problem, event_id).
@@ -1818,7 +1823,10 @@ class OlympiadRef(models.Model):
 
     source_site = models.CharField(
         'Откуда взято сопоставление', max_length=20,
-        choices=[('solvehub', 'SolveHub'), ('ile', 'ILE / iloveeconomics.ru')])
+        choices=[('solvehub', 'SolveHub'), ('ile', 'ILE / iloveeconomics.ru'),
+                 ('official', 'Официальный архив')],
+        help_text='official — сверено с официальным PDF организатора, '
+                  'а не с агрегатором.')
 
     olympiad_slug = models.CharField('Слаг олимпиады', max_length=50)
     olympiad_name = models.CharField('Название олимпиады', max_length=300, blank=True)
