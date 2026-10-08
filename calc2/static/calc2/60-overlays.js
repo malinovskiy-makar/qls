@@ -2250,10 +2250,11 @@ function drawAreaVerts() {
        Раньше пунктир соединял вершины в порядке щелчков, а площадь считалась
        по другому обходу — картинка и число расходились. */
     const ring = bestAreaRing(list).ring;
-    g.append('path')
+    markPoly(g.append('path')
       .attr('d', 'M' + ring.map(p => mx(p.x) + ',' + my(p.y)).join('L') + 'Z')
       .attr('fill', COL.reg).attr('fill-opacity', 0.1)
-      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4');
+      .attr('stroke', COL.reg).attr('stroke-width', 1.4).attr('stroke-dasharray', '5 4'),
+    'контур площади: многоугольник по вершинам, поставленным человеком', 'контур площади');
   } else if (list.length === 2) {
     g.append('line').attr('x1', mx(list[0].x)).attr('y1', my(list[0].y))
       .attr('x2', mx(list[1].x)).attr('y2', my(list[1].y))
@@ -2455,13 +2456,19 @@ function drawAreaCalc() {
       const yBase = Math.max(my.domain()[0], Math.min(0, my.domain()[1]));
       const ar = d3.area().x(d => mx(d)).y0(my(yBase))
         .y1(d => my(Math.max(0, t.f(d) || 0)));
-      g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
+      /* запись для .tex: верхняя граница — формула кривой из списка привязки,
+         прижатая к нулю (так и считается число); у кривой списка без формулы
+         (сумма по точкам, кривая уровня, расчёт сцены) — узлы с причиной */
+      const tE = t.curve ? curveFormula(t.curve) : null;
+      const ap = g.append('path').datum(pts).attr('d', ar).attr('fill', color).attr('opacity', 0.2)
         .attr('data-legend', r.label);
+      if (tE) markArea(ap, { from: r.a, to: r.b, lo: yBase, hi: tE, floor0: 'hi' });
+      else markNumeric(ap, 'площадь под кривой, у которой в списке привязки нет записи формулой: по точкам расчёта');
     } else if (r.ring && r.ring.length > 2) {
       const line = d3.line().x(d => mx(d[0])).y(d => my(d[1]));
-      g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
+      markPoly(g.append('path').datum(r.ring.concat([r.ring[0]])).attr('d', line)
         .attr('fill', color).attr('opacity', 0.2).attr('stroke', color).attr('stroke-width', 1.5)
-        .attr('data-legend', r.label);
+        .attr('data-legend', r.label), 'посчитанная площадь: многоугольник по вершинам', r.label);
     }
   });
   updateAreaCalcPanel();
