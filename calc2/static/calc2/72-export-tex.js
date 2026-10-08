@@ -1300,7 +1300,9 @@ const TexExport = (function () {
       areasBounds: 0, areasPoly: 0, areasPolyRec: 0, areasNoRecPoly: 0, areasNumeric: 0, areasNoRecSampled: 0, areasMismatch: 0, outlines: 0,
       rects: 0, segs: 0, dots: 0, texts: 0, legendRows: 0, pairs: 0,
       // что видно на листе, но в файле стоит настройкой оси, а не своей строкой
-      tickLabels: 0, tickMarks: 0, zeroLabels: 0, axisNames: 0 };
+      tickLabels: 0, tickMarks: 0, zeroLabels: 0, axisNames: 0,
+      // сколько линий сетки нарисует сам pgfplots (от делений, extra ticks, minor): сверяется с холстом
+      gridDrawn: 0 };
     // опись окна «Скачать»: по одному на нарисованный предмет (у кривой с разрывом или кусками строк несколько)
     const seenCurves = new Set(), seenAreas = new Set();
     let needFillBetween = false, needPatterns = false, areaSeq = 0;
@@ -1421,6 +1423,12 @@ const TexExport = (function () {
         const gs = 'line width=' + ((ax.gridW || 1) * 0.4).toFixed(2) + 'pt, ' + col(ax.gridColor || 'D9D4C7');
         a.push('xmajorgrids=' + onX, 'ymajorgrids=' + onY, 'grid style={' + gs + (ax.gridOp < 0.985 ? ', opacity=' + ax.gridOp.toFixed(2) : '') + '}');
         if (hasMinor) a.push('xminorgrids=' + (ax.gxm.length > 0), 'yminorgrids=' + (ax.gym.length > 0));
+        /* Линии сетки, которые pgfplots нарисует сам: от делений (если сетка у
+           делений включена), extra ticks и minor. Прибор сверяет это число с
+           линиями сетки холста: лишняя линия от деления не на сетке больше не
+           проходит незамеченной (находка ревью 08.10). */
+        stats.gridDrawn += (onX ? tx.vals.length : 0) + (onY ? ty.vals.length : 0) + ex.length + ey.length
+          + (hasMinor ? ax.gxm.length + ax.gym.length : 0);
         if (hasMinor) a.push('minor grid style={' + gs + ', opacity=' + (ax.gridMinorOp != null ? ax.gridMinorOp : (ax.gridOp || 1) * 0.45).toFixed(2) + '}');
       }
       // имена осей: у конца стрелки, буква стоит прямо (rotate у ylabel положил бы её набок)

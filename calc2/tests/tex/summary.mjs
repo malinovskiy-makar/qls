@@ -73,7 +73,8 @@ const itemsDiff = (r) => {
   cmp('точек', v.dots, s.dots);
   cmp('легенды', v.legendRows, s.legendRows);
   cmp('осей', v.axisLines, s.axisLines);
-  cmp('сетки', v.gridLines, s.gridLines);
+  // сетка: что нарисует pgfplots (gridDrawn), а не перепись холста — иначе лишняя линия от деления не видна
+  cmp('сетки', v.gridLines, s.gridDrawn != null ? s.gridDrawn : s.gridLines);
   return d.length ? d.join(', ') : null;
 };
 const itemsBad = cnt(r => itemsDiff(r));
