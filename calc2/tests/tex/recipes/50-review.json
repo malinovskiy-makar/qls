@@ -1,0 +1,10 @@
+{
+ "_about": "Состояния из независимого ревью выгрузки 08.10: у предельного дохода два участка MR ≥ 0 (второй кусок за корнем основной части не должен пропадать из файла); предложение Q = (P − 5)² с двумя ветвями (в файле не должно быть дуги, которой нет на экране); подписи и имена, которые набирает человек, с двойным индексом, двойной степенью, штрихом после степени, словами латиницей и дефисом (файл обязан собраться pdflatex); обратный слэш в имени кривой (комментарий файла не должен стать командой).",
+ "mono": { "mr-two": "SETF('curve-expr-1','(10 - 0.1*Q)^2'); CONFIG.Qmax = 120; STATE.zoomLock = true;" },
+ "sd": {
+  "qp-two": "SETF('curve-expr-2','(P-5)^2');",
+  "names": "STATE.curves[0].label = 'Qd1'; STATE.curves[1].label = 'Q**'; STATE.axisXName = 'Market for bread'; STATE.axisYName = 'P*′';",
+  "names2": "STATE.curves[0].label = 'Wmin2'; STATE.curves[1].label = 'x^2^3 AD-AS'; STATE.marks.push(newMark(30, 70, null, 'coords')); STATE.marks[STATE.marks.length - 1].name = 'E**';",
+  "slash": "STATE.curves[0].label = '\\\\input{x}';"
+ }
+}

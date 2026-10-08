@@ -340,40 +340,62 @@ const TexExport = (function () {
   }
   function mathTex(src) {
     const s = String(src); let out = '', i = 0, prevSym = false;
+    /* У атома (буква, число, скобка) не больше одного индекса и одной степени:
+       «Qd1», «Wmin2», «Q**», «P*′», «x^2^3» — второй вешается на пустую группу
+       {}, иначе pdflatex падает с «Double subscript/superscript» (находка ревью
+       08.10: подписи и имена, которые набирает человек). Пробел TeX в формуле
+       пропускает, поэтому атом пробелом не сбрасывается. */
+    let hasSub = false, hasSup = false;
+    const atom = () => { hasSub = false; hasSup = false; };
+    const sub = (t) => { out += (hasSub ? '{}' : '') + '_{' + t + '}'; hasSub = true; };
+    const sup = (t) => { out += (hasSup ? '{}' : '') + '^{' + t + '}'; hasSup = true; };
     const group = () => {                               // { … } либо один знак/пробег
       if (s[i] === '{') { let d = 0, j = i; for (; j < s.length; j++) { if (s[j] === '{') d++; else if (s[j] === '}' && --d === 0) break; } const body = s.slice(i + 1, j); i = j + 1; return body; }
       const m = /^[A-Za-z]+|^[0-9]+|^./.exec(s.slice(i)); const body = m ? m[0] : ''; i += body.length; return body;
     };
     while (i < s.length) {
       const ch = s[i];
-      if (/[A-Za-z]/.test(ch)) { let run = ''; while (i < s.length && /[A-Za-z]/.test(s[i])) run += s[i++]; out += latinTex(run); prevSym = true; continue; }
+      if (/[A-Za-z]/.test(ch)) { let run = ''; while (i < s.length && /[A-Za-z]/.test(s[i])) run += s[i++]; const t = latinTex(run); atom(); out += t; hasSub = /_\{/.test(t); prevSym = true; continue; }
       if (/[0-9]/.test(ch)) {
         let run = '';
         while (i < s.length && (/[0-9.,]/.test(s[i]) || (SPACES.test(s[i]) && /[0-9]/.test(s[i + 1] || '') && /[0-9]/.test(s[i - 1] || '') && s[i] !== ' '))) run += s[i++];
         // хвостовая запятая или точка — знак препинания, а не дробная часть
         let tailP = ''; const mt = /[.,]+$/.exec(run); if (mt) { tailP = mt[0]; run = run.slice(0, -tailP.length); }
         // цифры сразу за буквой — индекс (Q1, D2)
-        if (prevSym && /^[0-9]+$/.test(run) && /[A-Za-z}]$/.test(out)) out += '_{' + run + '}';
-        else out += run.replace(/,/g, '{,}').replace(new RegExp(SPACES.source, 'g'), '\\,');
+        if (prevSym && /^[0-9]+$/.test(run) && /[A-Za-z}]$/.test(out)) sub(run);
+        else { atom(); out += run.replace(/,/g, '{,}').replace(new RegExp(SPACES.source, 'g'), '\\,'); }
         out += tailP; prevSym = false; continue;
       }
-      if (ch === '_') { i++; const g = idxTex(group(), 'sub'); out += g.charAt(0) === '\u0001' ? g : '_{' + g + '}'; continue; }
-      if (ch === '^') { i++; const g = idxTex(group(), 'sup'); out += g.charAt(0) === '\u0001' ? g : '^{' + g + '}'; continue; }
-      if (SUBD[ch]) { let r = ''; while (SUBD[s[i]]) r += SUBD[s[i++]]; out += '_{' + r + '}'; continue; }
-      if (SUPD[ch]) { let r = ''; while (SUPD[s[i]]) r += SUPD[s[i++]]; out += '^{' + r + '}'; continue; }
-      if (GREEK[ch]) { out += '\\' + GREEK[ch] + ' '; prevSym = true; i++; continue; }
-      if (ch === '*' || ch === '∗') { out += prevSym ? '^{*}' : '\\ast '; i++; continue; }
-      if (OPS[ch] !== undefined) { out += OPS[ch]; prevSym = false; i++; continue; }
-      if (ch === '=') { out += ' = '; prevSym = false; i++; continue; }
+      if (ch === '_') { i++; const g = idxTex(group(), 'sub'); if (g.charAt(0) === '\u0001') out += g; else sub(g); continue; }
+      if (ch === '^') { i++; const g = idxTex(group(), 'sup'); if (g.charAt(0) === '\u0001') out += g; else sup(g); continue; }
+      if (SUBD[ch]) { let r = ''; while (SUBD[s[i]]) r += SUBD[s[i++]]; sub(r); continue; }
+      if (SUPD[ch]) { let r = ''; while (SUPD[s[i]]) r += SUPD[s[i++]]; sup(r); continue; }
+      if (GREEK[ch]) { atom(); out += '\\' + GREEK[ch] + ' '; prevSym = true; i++; continue; }
+      /* Звёздочка, как на экране: сразу за знаком или числом — верхний индекс
+         («E*», «40*», «Q1*»), отдельно стоящая — знак операции. */
+      if (ch === '*' || ch === '∗') {
+        const pv = s[i - 1];
+        if (pv !== undefined && !SPACES.test(pv) && !/[+\-=<>(]/.test(pv)) sup('*'); else { atom(); out += '\\ast '; }
+        i++; continue;
+      }
+      // штрих — тоже верхний индекс: после степени он вешается на пустую группу
+      if (ch === '′' || ch === '″') { out += (hasSup ? '{}' : '') + (ch === '′' ? "'" : "''"); i++; continue; }
+      if (ch === '°') { sup('\\circ'); i++; continue; }
+      if (OPS[ch] !== undefined) { atom(); out += OPS[ch]; prevSym = false; i++; continue; }
+      if (ch === '=') { atom(); out += ' = '; prevSym = false; i++; continue; }
       /* Двоеточие после слова — знак препинания («max: (0; 1)»), а в математике
          TeX считает его отношением и ставит пробел с обеих сторон. */
-      if (ch === ':') { const nx = s[i + 1]; out += (nx === undefined || SPACES.test(nx)) ? '\\colon ' : ':'; prevSym = false; i++; continue; }
-      // неразрывный пробел внутри формулы («20 %») — тонкая шпация: обычный пробел в математике пропадает
-      if (SPACES.test(ch)) { out += (ch === ' ' ? ' ' : '\\,'); i++; continue; }
-      if (ch === '{' || ch === '}') { out += '\\' + ch; i++; continue; }
-      if (ch === '\\') { out += '\\backslash '; i++; continue; }
-      if (CYR.test(ch)) { let run = ''; while (i < s.length && CYR.test(s[i])) run += s[i++]; out += TXT('txt', proseTex(run)); prevSym = false; continue; }
-      if (ch.charCodeAt(0) < 128) { out += ch; prevSym = (ch === ')' || ch === ']'); i++; continue; }
+      if (ch === ':') { const nx = s[i + 1]; atom(); out += (nx === undefined || SPACES.test(nx)) ? '\\colon ' : ':'; prevSym = false; i++; continue; }
+      /* Пробел между словами («Market for bread») — пробел TeX: обычный в
+         формуле пропадает. Неразрывный внутри формулы («20 %») — тонкая шпация. */
+      if (ch === ' ') { out += (/[A-Za-z0-9)]/.test(s[i - 1] || '') && /[A-Za-z]/.test(s[i + 1] || '')) ? '\\ ' : ' '; i++; continue; }
+      if (SPACES.test(ch)) { out += '\\,'; i++; continue; }
+      if (ch === '{' || ch === '}') { atom(); out += '\\' + ch; i++; continue; }
+      if (ch === '\\') { atom(); out += '\\backslash '; i++; continue; }
+      if (CYR.test(ch)) { let run = ''; while (i < s.length && CYR.test(s[i])) run += s[i++]; atom(); out += TXT('txt', proseTex(run)); prevSym = false; continue; }
+      // дефис между буквами («AD-AS») — дефис, как на экране, а не минус
+      if (ch === '-' && /[A-Za-z]/.test(s[i - 1] || '') && /[A-Za-z]/.test(s[i + 1] || '')) { atom(); out += '\\mbox{-}'; prevSym = false; i++; continue; }
+      if (ch.charCodeAt(0) < 128) { atom(); out += ch; prevSym = (ch === ')' || ch === ']'); i++; continue; }
       out += '?'; i++;
     }
     return out.replace(/ {2,}/g, ' ').trim();
@@ -416,6 +438,8 @@ const TexExport = (function () {
       else if (GREEK[ch]) out += GREEK[ch];
       else if (/[    ]/.test(ch)) out += ' ';
       else if (ch === '\n' || ch === '\r') out += ' ';
+      // обратный слэш: «% \input…» в комментарии сервер (_TEX_FORBIDDEN) не отличит от команды
+      else if (ch === '\\') out += '/';
       else if ((ch.charCodeAt(0) >= 32 && ch.charCodeAt(0) < 127) || CYR.test(ch) || '«»\u2014–№'.indexOf(ch) >= 0) out += ch;
       else out += '?';
     }
@@ -472,7 +496,7 @@ const TexExport = (function () {
             return (lead && parentPrec < 4) ? s : '(' + s + ')';
           }
           if (n.args.length !== 2) { bad = true; return ''; }
-          if (n.op === '%' || n.fn === 'mod') return 'mod(' + walk(n.args[0], 0, false, true) + ', ' + walk(n.args[1], 0, false, true) + ')';
+          if (n.op === '%' || n.fn === 'mod') return 'Mod(' + walk(n.args[0], 0, false, true) + ', ' + walk(n.args[1], 0, false, true) + ')';
           if (PREC[n.op] == null) { bad = true; return ''; }
           const pr = PREC[n.op];
           // скобки: приоритет ниже родителя; равный приоритет справа; под степенью и под унарным минусом — всегда
@@ -495,7 +519,7 @@ const TexExport = (function () {
           if (name === 'log' && A.length === 1) return 'ln(' + arg(0) + ')';
           if (name === 'log' && A.length === 2) return '(ln(' + arg(0) + ') / ln(' + arg(1) + '))';
           if (name === 'pow' && A.length === 2) return '((' + arg(0) + ')^(' + arg(1) + '))';
-          if (name === 'mod' && A.length === 2) return 'mod(' + arg(0) + ', ' + arg(1) + ')';
+          if (name === 'mod' && A.length === 2) return 'Mod(' + arg(0) + ', ' + arg(1) + ')';   // Math.js mod — с округлением вниз, как Mod у pgfmath
           if (PGF_TRIG[name] && A.length === 1) return PGF_TRIG[name] + '(deg(' + arg(0) + '))';
           if (PGF_ATRIG[name] && A.length === 1) return 'rad(' + PGF_ATRIG[name] + '(' + arg(0) + '))';
           const f = PGF_FN[name];
@@ -824,37 +848,32 @@ const TexExport = (function () {
       };
       for (let k = 0; k < n; k += step) check(data[k][A], data[k][B]);
       if ((n - 1) % step) check(data[n - 1][A], data[n - 1][B]);
-      /* Разрыв формулы (полюс, скачок) между соседними узлами: экран рисует
-         там прямой отрезок между узлами, а формула уходит от него дальше
-         четверти размаха окна. Замер 08.10, m-graph@nl: у 1/x перемычка на
-         экране от −7 до 12,5, а pgfplots своей сеткой вытягивал выброс до
-         края окна. Такие отрезки запись не покрывает: сборка режет её по этим
-         узлам и ставит перемычку тем же отрезком, что на экране. Середина
-         проверяется у каждого отрезка, подозрительный — ещё 16 точками. */
+      /* Каждая пара соседних узлов (не каждая шестая: скачок между двумя узлами
+         иначе ловился с вероятностью 1/6 — находка ревью 08.10, Q = (P − 5)²).
+         Отклонение формулы от прямой между узлами меряется серединой, а у
+         подозрительного отрезка — ещё 16 точками.
+         • больше 1/16 размаха окна — разрыв (полюс, скачок): экран рисует там
+           прямой отрезок между узлами, и сборка ставит его же перемычкой, а
+           запись режет по этим узлам (m-graph@nl: у 1/x перемычка на экране от
+           −7 до 12,5, pgfplots своей сеткой вытягивал выброс до края окна);
+         • иначе внутри окна — between: колебания чаще сетки пути или вторая
+           ветвь у записи «по вертикали» валят запись. */
       const cuts = [], isCut = new Set();
       const offAt = (k, t) => {
         const b0 = data[k][B], b1 = data[k + 1][B], w = f(data[k][A] + (data[k + 1][A] - data[k][A]) * t);
         return isFinite(w) ? Math.max(Math.min(b0, b1) - w, w - Math.max(b0, b1), 0) : Infinity;
       };
+      let between = 0;
       for (let k = 0; k + 1 < n; k++) {
         let off = offAt(k, 0.5);
-        if (off <= spanB / 16) continue;
-        for (let j = 1; j < 16 && off <= spanB / 4; j++) off = Math.max(off, offAt(k, j / 16));
-        if (off > spanB / 4) { cuts.push(k); isCut.add(k); }
-      }
-      /* Между соседними узлами формула не должна уходить в сторону, иначе в
-         файле окажется то, чего на экране нет: колебания чаще сетки пути
-         либо вторая ветвь у записи «по вертикали». */
-      let between = 0;
-      for (let k = 0; k + 1 < n; k += step) {
+        if (off > spanB * BETWEEN_TOL) for (let j = 1; j < 16 && off <= spanB / 16; j++) off = Math.max(off, offAt(k, j / 16));
+        if (off > spanB / 16) { cuts.push(k); isCut.add(k); continue; }
         const b0 = data[k][B], b1 = data[k + 1][B];
-        if (isCut.has(k) || b0 < lo || b0 > hi || b1 < lo || b1 > hi) continue;
-        const v = f((data[k][A] + data[k + 1][A]) / 2);
-        if (!isFinite(v)) { between = Math.max(between, 1); continue; }
-        between = Math.max(between, Math.max(Math.min(b0, b1) - v, v - Math.max(b0, b1), 0) / spanB);
+        if (b0 < lo || b0 > hi || b1 < lo || b1 > hi) continue;
+        between = Math.max(between, off / spanB);
       }
       const ok = (exact + beyond) > 0 && maxErr < VERIFY_TOL && between < BETWEEN_TOL;
-      return { ok, maxErr, between, f, pgf, A, B, cuts, why: ok ? '' : (maxErr >= VERIFY_TOL ? 'формула не проходит через нарисованные узлы' : 'между узлами формула уходит от нарисованной линии') };
+      return { ok, maxErr, between, f, pgf, A, B, cuts, isCut, why: ok ? '' : (maxErr >= VERIFY_TOL ? 'формула не проходит через нарисованные узлы' : 'между узлами формула уходит от нарисованной линии') };
     };
     /* Сверка записи области: каждый узел пути лежит на одной из двух границ
        и внутри отрезка, а площадь нарисованного многоугольника равна
@@ -875,6 +894,11 @@ const TexExport = (function () {
         const e = Math.min(nodeMiss(lo.f, x, y, sxn, syn), nodeMiss(hi.f, x, y, sxn, syn));
         maxErr = Math.max(maxErr, isFinite(e) ? e : 1);
       });
+      /* Узлы покрывают весь отрезок [a, b]: при сдвинутом конце записи площадь
+         могла сойтись в пределах 0,5 %, а в файле появился бы лишний кусок
+         (находка ревью 08.10). */
+      const xs = data.map(q => q[0]);
+      if (Math.min.apply(null, xs) > a + sxn * 2e-3 || Math.max.apply(null, xs) < b - sxn * 2e-3) maxErr = Math.max(maxErr, 1);
       let poly = 0;
       for (let i = 0; i < data.length; i++) { const q = data[i], w = data[(i + 1) % data.length]; poly += q[0] * w[1] - w[0] * q[1]; }
       poly = Math.abs(poly) / 2;
@@ -1080,65 +1104,81 @@ const TexExport = (function () {
             // 1) кривая с записью формулы: сверяем с нарисованным и пишем формулой
             if (decl && decl.kind === 'expr' && st && !fl) {
               const v = verifyCurve(data, decl, win, sxn, syn);
+              let bad = v.ok ? '' : v.why;
               if (v.ok) {
                 const A = v.A, spanA = A ? syn : sxn, spanB = A ? sxn : syn, wA = A ? win.y : win.x, wB = A ? win.x : win.y;
                 const eB0 = A ? bx0 : by0, eB1 = A ? bx1 : by1;
+                const inWin = (q) => q[0] >= win.x[0] - sxn * 1e-3 && q[0] <= win.x[1] + sxn * 1e-3 && q[1] >= win.y[0] - syn * 1e-3 && q[1] <= win.y[1] + syn * 1e-3;
+                /* Участки аргумента, которые путь действительно проходит: отрезки
+                   между соседними узлами, кроме перемычек через разрыв (v.cuts).
+                   У записи «по вертикали» аргумент вдоль пути бывает немонотонным
+                   (Q = f(P) с двумя ветвями: экран рисует ветку и скачок), и
+                   «от первого узла до последнего» дало бы в файле дугу, которой на
+                   экране нет (находка ревью 08.10). */
+                let cov = [];
+                for (let k = 0; k + 1 < data.length; k++) if (!v.isCut.has(k)) cov.push([Math.min(data[k][A], data[k + 1][A]), Math.max(data[k][A], data[k + 1][A])]);
+                cov.sort((x, y) => x[0] - y[0]);
+                cov = cov.reduce((m, [u, w]) => { const l = m[m.length - 1]; if (l && u <= l[1] + spanA * 1e-9) l[1] = Math.max(l[1], w); else m.push([u, w]); return m; }, []);
                 const args = data.map(q => q[A]);
-                let a0 = Math.min.apply(null, args), a1 = Math.max.apply(null, args);
-                /* Отрезок записи вправе выйти за крайние узлы не дальше полутора
-                   шагов сетки пути: у корня предельной кривой основная часть и
-                   хвост рисуются разными путями, и между их крайними узлами на
-                   экране щель в шаг сетки (49,8 и 50,1 при корне 50). */
-                const h = (a1 - a0) / Math.max(1, data.length - 1);
-                if (isFinite(decl.from) && isFinite(decl.to)) {
+                const h = (Math.max.apply(null, args) - Math.min.apply(null, args)) / Math.max(1, data.length - 1);
+                if (cov.length && isFinite(decl.from) && isFinite(decl.to)) {
                   const f0 = Math.min(decl.from, decl.to), f1 = Math.max(decl.from, decl.to);
-                  a0 = (f0 < a0 && a0 - f0 <= h * 1.5) ? f0 : Math.max(a0, f0);
-                  a1 = (f1 > a1 && f1 - a1 <= h * 1.5) ? f1 : Math.min(a1, f1);
+                  const c0 = cov[0][0], c1 = cov[cov.length - 1][1];
+                  /* Свой отрезок записи режет только тот кусок пути, с которым
+                     пересекается: у предельной кривой с двумя участками MR ≥ 0
+                     второй кусок лежит за корнем основной части (находка ревью
+                     08.10). Конец вправе выйти за крайний узел не дальше полутора
+                     шагов сетки пути: у корня основная часть и хвост — разные пути,
+                     и между их крайними узлами на экране щель в шаг сетки (49,8 и
+                     50,1 при корне 50). Видимый узел вне отрезка — запись его не
+                     покрывает: запасной путь и дефект, а не тихая потеря. */
+                  if (f1 >= c0 - h * 1.5 && f0 <= c1 + h * 1.5) {
+                    if (f0 < c0 && c0 - f0 <= h * 1.5) cov[0][0] = f0;
+                    if (f1 > c1 && f1 - c1 <= h * 1.5) cov[cov.length - 1][1] = f1;
+                    if (data.some(q => (q[A] < f0 - h * 1.5 || q[A] > f1 + h * 1.5) && inWin(q))) bad = 'видимые узлы пути вне отрезка записи';
+                    cov = cov.map(([u, w]) => [Math.max(u, f0), Math.min(w, f1)]).filter(([u, w]) => w > u);
+                  }
                 }
                 // и не дальше окна плюс 30 % по оси аргумента (у записи «по вертикали» это вертикальная ось)
-                a0 = Math.max(a0, wA[0] - EXT * spanA); a1 = Math.min(a1, wA[1] + EXT * spanA);
-                /* Кусочная запись уходит по куску на участок: у каждого куска
-                   своя формула и точные границы из условия. Запись сверена
-                   целиком выше; не разобралась на куски или куски не сошлись с
-                   целой записью — одной формулой с условиями. */
-                let pieces = [{ expr: decl.expr, f: v.f, pgf: v.pgf, a: a0, b: a1, tag: '' }];
-                const cp = /\?/.test(decl.expr) ? condPieces(decl.expr, decl.v) : null;
-                if (cp) {
-                  const cut = cp.map((c, k) => ({ expr: c.expr, f: exprFn(c.expr, decl.v), pgf: exprToPgf(c.expr, decl.v, A ? 't' : 'x'), a: Math.max(a0, c.lo), b: Math.min(a1, c.hi), tag: 'кусок ' + (k + 1) })).filter(c => c.b > c.a);
-                  // каждый кусок на своём участке равен целой записи, и куски покрывают всё, где запись определена
-                  const same = cut.length > 0 && cut.every(c => c.f && c.pgf && [0.05, 0.3, 0.5, 0.7, 0.95].every(t => { const x = c.a + (c.b - c.a) * t, w = v.f(x), q = c.f(x); return (!isFinite(w) && !isFinite(q)) || Math.abs(w - q) <= spanB * 1e-9; }));
-                  let covered = same;
-                  for (let k = 0; covered && k <= 200; k++) { const x = a0 + (a1 - a0) * k / 200; if (isFinite(v.f(x)) && !cut.some(c => x >= c.a - spanA * 1e-9 && x <= c.b + spanA * 1e-9)) covered = false; }
-                  if (same && covered) pieces = cut;
-                }
-                // разрывы формулы между узлами (v.cuts): запись не покрывает эти отрезки
-                if (v.cuts.length) {
-                  const gaps = v.cuts.map(k => [Math.min(data[k][A], data[k + 1][A]), Math.max(data[k][A], data[k + 1][A])]);
-                  pieces = pieces.flatMap(pc => {
-                    let segs = [[pc.a, pc.b]];
-                    gaps.forEach(([g0, g1]) => { segs = segs.flatMap(([s0, s1]) => (g1 <= s0 || g0 >= s1) ? [[s0, s1]] : [[s0, g0], [g1, s1]].filter(([u, w]) => w > u)); });
-                    return segs.map(([s0, s1]) => Object.assign({}, pc, { a: s0, b: s1 }));
-                  });
-                }
-                let zi = 0, any = false;
-                // перемычка через разрыв — тот же отрезок, что на экране (за расширенным окном его режет clipLine)
-                v.cuts.forEach(k => clipLine([data[k], data[k + 1]], bx0, bx1, by0, by1).forEach(piece => {
-                  const it = mk(piece, { nodes: { kind: 'poly', why: 'перемычка через разрыв формулы: на экране отрезок между соседними узлами', name: decl.name || '' } });
-                  it.z = base.z + (zi++) * 1e-3;
-                  p.items.push(it); any = true;
-                }));
-                pieces.filter(pc => pc.b > pc.a).forEach(pc => {
-                  visibleRuns(pc.a, pc.b, pc.f, eB0, eB1, decOf(spanA) + 3).forEach(r => {
-                    const it = mk(data, { rec: { ok: true, src: decl.src, expr: pc.expr, v: decl.v, axis: A ? 'y' : 'x', pgf: pc.pgf, maxErr: v.maxErr, lo: r[0], hi: r[1], samples: pickSamples(pc.f, r[0], r[1], wB[0], wB[1], spanB), name: [decl.name || '', pc.tag].filter(Boolean).join(', '), bLo: eB0, bHi: eB1, far, probe: probeOf(pc.f, r[0], r[1]), span: spanB } });
+                cov = cov.map(([u, w]) => [Math.max(u, wA[0] - EXT * spanA), Math.min(w, wA[1] + EXT * spanA)]).filter(([u, w]) => w > u);
+                if (!bad) {
+                  const a0 = cov.length ? cov[0][0] : 0, a1 = cov.length ? cov[cov.length - 1][1] : 0;
+                  /* Кусочная запись уходит по куску на участок: у каждого куска
+                     своя формула и точные границы из условия. Запись сверена
+                     целиком выше; не разобралась на куски или куски не сошлись с
+                     целой записью — одной формулой с условиями. */
+                  let pieces = [{ expr: decl.expr, f: v.f, pgf: v.pgf, a: a0, b: a1, tag: '' }];
+                  const cp = (cov.length && /\?/.test(decl.expr)) ? condPieces(decl.expr, decl.v) : null;
+                  if (cp) {
+                    const cut = cp.map((c, k) => ({ expr: c.expr, f: exprFn(c.expr, decl.v), pgf: exprToPgf(c.expr, decl.v, A ? 't' : 'x'), a: Math.max(a0, c.lo), b: Math.min(a1, c.hi), tag: 'кусок ' + (k + 1) })).filter(c => c.b > c.a);
+                    // каждый кусок на своём участке равен целой записи, и куски покрывают всё, где запись определена
+                    const same = cut.length > 0 && cut.every(c => c.f && c.pgf && [0.05, 0.3, 0.5, 0.7, 0.95].every(t => { const x = c.a + (c.b - c.a) * t, w = v.f(x), q = c.f(x); return (!isFinite(w) && !isFinite(q)) || Math.abs(w - q) <= spanB * 1e-9; }));
+                    let covered = same;
+                    for (let k = 0; covered && k <= 200; k++) { const x = a0 + (a1 - a0) * k / 200; if (isFinite(v.f(x)) && !cut.some(c => x >= c.a - spanA * 1e-9 && x <= c.b + spanA * 1e-9)) covered = false; }
+                    if (same && covered) pieces = cut;
+                  }
+                  // куски — только на участках, которые путь проходит
+                  pieces = pieces.flatMap(pc => cov.map(([u, w]) => Object.assign({}, pc, { a: Math.max(pc.a, u), b: Math.min(pc.b, w) }))).filter(pc => pc.b > pc.a);
+                  let zi = 0, any = false;
+                  // перемычка через разрыв — тот же отрезок, что на экране (за расширенным окном его режет clipLine)
+                  v.cuts.forEach(k => clipLine([data[k], data[k + 1]], bx0, bx1, by0, by1).forEach(piece => {
+                    const it = mk(piece, { nodes: { kind: 'poly', why: 'перемычка через разрыв формулы: на экране отрезок между соседними узлами', name: decl.name || '' } });
                     it.z = base.z + (zi++) * 1e-3;
                     p.items.push(it); any = true;
+                  }));
+                  pieces.forEach(pc => {
+                    visibleRuns(pc.a, pc.b, pc.f, eB0, eB1, decOf(spanA) + 3).forEach(r => {
+                      const it = mk(data, { rec: { ok: true, src: decl.src, expr: pc.expr, v: decl.v, axis: A ? 'y' : 'x', pgf: pc.pgf, maxErr: v.maxErr, lo: r[0], hi: r[1], samples: pickSamples(pc.f, r[0], r[1], wB[0], wB[1], spanB), name: [decl.name || '', pc.tag].filter(Boolean).join(', '), bLo: eB0, bHi: eB1, far, probe: probeOf(pc.f, r[0], r[1]), span: spanB } });
+                      it.z = base.z + (zi++) * 1e-3;
+                      p.items.push(it); any = true;
+                    });
                   });
-                });
-                if (any) return;
-                // запись верна, но видимой части в расширенном окне нет: на экране кривая за краем
-                return;
+                  // запись верна, но видимой части в расширенном окне нет: на экране кривая за краем
+                  if (any || !data.some(inWin)) return;
+                  bad = 'запись не покрывает нарисованный кусок пути';
+                }
               }
-              extra = { rec: { ok: false, src: decl.src, expr: decl.expr, v: decl.v, maxErr: v.maxErr, between: v.between, why: v.why, name: decl.name || '' } };
+              extra = { rec: { ok: false, src: decl.src, expr: decl.expr, v: decl.v, maxErr: v.maxErr, between: v.between, why: bad, name: decl.name || '' } };
             }
             // 2) область с записью границ: сверяем и пишем границами
             else if (decl && decl.kind === 'area' && fl) {
@@ -1235,6 +1275,7 @@ const TexExport = (function () {
       }
     }
     return { W, H, plot, panels: panels.map(p => { const q = Object.assign({}, p); delete q.mx; delete q.my; return q; }), warn,
+      self: !!(typeof selfMasked === 'function' && selfMasked()),
       scene: STATE.sceneKey || '', name: (typeof SCENE_NAMES === 'object' && SCENE_NAMES[STATE.sceneKey]) || '', mode: STATE.mode };
   }
 
@@ -1302,7 +1343,15 @@ const TexExport = (function () {
       const lineSt = (ax.xLine || ax.yLine || {}).st || null;
       stats.axisLines += (ax.xLine ? 1 : 0) + (ax.yLine ? 1 : 0);
       stats.gridLines += ax.gx.length + ax.gy.length + ax.gxm.length + ax.gym.length;
-      a.push('axis x line=' + (ax.xLine ? 'middle' : 'bottom'), 'axis y line=' + (ax.yLine ? 'middle' : 'left'));
+      /* Линия оси стоит там, где на холсте: в нуле — middle; у края поля —
+         bottom/top, left/right (мини-рынки «Дискриминации», панели
+         «Производственной функции» рисуют оси по краю при любом окне; находка
+         ревью 08.10, mono-d3#93: в файле оси пересекались внутри поля). */
+      const zx = p.x0 + (0 - p.xd[0]) / (p.xd[1] - p.xd[0]) * (p.x1 - p.x0), zy = p.y1 - (0 - p.yd[0]) / (p.yd[1] - p.yd[0]) * (p.y1 - p.y0);
+      const near = (u, w) => Math.abs(u - w) < 1.5;
+      const xAt = !ax.xLine ? 'bottom' : near(ax.xLine.px[1], zy) ? 'middle' : near(ax.xLine.px[1], p.y1) ? 'bottom' : near(ax.xLine.px[1], p.y0) ? 'top' : 'middle';
+      const yAt = !ax.yLine ? 'left' : near(ax.yLine.px[0], zx) ? 'middle' : near(ax.yLine.px[0], p.x0) ? 'left' : near(ax.yLine.px[0], p.x1) ? 'right' : 'middle';
+      a.push('axis x line=' + xAt, 'axis y line=' + yAt);
       if (lineSt) a.push('axis line style={' + col(lineSt.color) + ', line width=' + (lineSt.w * K_LINE).toFixed(2) + 'pt, -{Stealth[length=5pt]}}');
       else a.push('axis line style={draw=none}');
       if (lineSt && !ax.xLine) a.push('x axis line style={draw=none}');
@@ -1350,7 +1399,16 @@ const TexExport = (function () {
       if (hasGrid) {
         // линии сетки, на которых нет деления с числом
         const only = (g, vals, d, span) => { const u = []; g.map(v => nn(snap(v, span), d)).forEach(v => { if (vals.indexOf(v) < 0 && u.indexOf(v) < 0) u.push(v); }); return u.sort((p1, p2) => p1 - p2); };
-        const ex = only(ax.gx, tx.vals, dx, sx), ey = only(ax.gy, ty.vals, dy, sy);
+        /* Линии сетки идут от делений, только если КАЖДОЕ деление стоит на линии
+           сетки холста. Иначе (мини-рынки «Дискриминации», КПВ «Торговли по цене»:
+           числа на ¼, ½, ¾ окна, сетка шагом 20) grid у делений провёл бы линии,
+           которых на экране нет (находка ревью 08.10) — тогда все линии сетки
+           идут отдельными extra ticks. */
+        const gv = (g, d, span) => g.map(v => nn(snap(v, span), d));
+        const gxv = gv(ax.gx, dx, sx), gyv = gv(ax.gy, dy, sy);
+        const onX = ax.gx.length > 0 && tx.vals.every(v => gxv.indexOf(v) >= 0);
+        const onY = ax.gy.length > 0 && ty.vals.every(v => gyv.indexOf(v) >= 0);
+        const ex = only(ax.gx, onX ? tx.vals : [], dx, sx), ey = only(ax.gy, onY ? ty.vals : [], dy, sy);
         if (ex.length) a.push('extra x ticks={' + ex.join(',') + '}', 'extra x tick labels={}');
         if (ey.length) a.push('extra y ticks={' + ey.join(',') + '}', 'extra y tick labels={}');
         if (ex.length + ey.length) a.push('extra tick style={grid=major, major tick length=0pt}');
@@ -1361,13 +1419,16 @@ const TexExport = (function () {
           a.push('minor tick length=0pt');
         }
         const gs = 'line width=' + ((ax.gridW || 1) * 0.4).toFixed(2) + 'pt, ' + col(ax.gridColor || 'D9D4C7');
-        a.push('grid=' + (hasMinor ? 'both' : 'major'), 'grid style={' + gs + (ax.gridOp < 0.985 ? ', opacity=' + ax.gridOp.toFixed(2) : '') + '}');
+        a.push('xmajorgrids=' + onX, 'ymajorgrids=' + onY, 'grid style={' + gs + (ax.gridOp < 0.985 ? ', opacity=' + ax.gridOp.toFixed(2) : '') + '}');
+        if (hasMinor) a.push('xminorgrids=' + (ax.gxm.length > 0), 'yminorgrids=' + (ax.gym.length > 0));
         if (hasMinor) a.push('minor grid style={' + gs + ', opacity=' + (ax.gridMinorOp != null ? ax.gridMinorOp : (ax.gridOp || 1) * 0.45).toFixed(2) + '}');
       }
       // имена осей: у конца стрелки, буква стоит прямо (rotate у ylabel положил бы её набок)
       const endShift = (k, v) => (Math.abs(v) > 0.75 ? ', ' + k + '=' + (v * PX2PT).toFixed(1) + 'pt' : '');
-      if (ax.xName) a.push('xlabel={' + ax.xName.tex + '}', 'xlabel style={at={(current axis.right of origin)}, anchor=west' + endShift('xshift', xEnd) + ', font=' + font(ax.xName.step) + ', text=' + col(ax.xName.color) + '}');
-      if (ax.yName) a.push('ylabel={' + ax.yName.tex + '}', 'ylabel style={at={(current axis.above origin)}, anchor=south' + endShift('yshift', yEnd) + ', font=' + font(ax.yName.step) + ', text=' + col(ax.yName.color) + '}');
+      const xlAt = xAt === 'middle' ? 'right of origin' : xAt === 'top' ? 'north east' : 'south east';
+      const ylAt = yAt === 'middle' ? 'above origin' : yAt === 'right' ? 'north east' : 'north west';
+      if (ax.xName) a.push('xlabel={' + ax.xName.tex + '}', 'xlabel style={at={(current axis.' + xlAt + ')}, anchor=west' + endShift('xshift', xEnd) + ', font=' + font(ax.xName.step) + ', text=' + col(ax.xName.color) + '}');
+      if (ax.yName) a.push('ylabel={' + ax.yName.tex + '}', 'ylabel style={at={(current axis.' + ylAt + ')}, anchor=south' + endShift('yshift', yEnd) + ', font=' + font(ax.yName.step) + ', text=' + col(ax.yName.color) + '}');
       if (p.legend) {
         const L = p.legend;
         a.push('legend style={at={(' + L.rx.toFixed(3) + ',' + L.ry.toFixed(3) + ')}, anchor=north west, draw=' + (L.boxed ? col('C9C3B5') : 'none') + ', fill=white, fill opacity=0.9, text opacity=1, font=' + font('base') + ', cells={anchor=west}, row sep=0.5pt, inner sep=3pt}');
@@ -1437,8 +1498,12 @@ const TexExport = (function () {
           stats.texts++;
           const dxp = it.shift[0], dyp = it.shift[1], at = it.at;
           const anch = ({ top: 'north', mid: '', base: 'base' }[it.v] + ' ' + ({ start: 'west', middle: '', end: 'east' }[it.h] || '')).trim() || 'center';
-          // жирное в математике — через font=…\boldmath: {\boldmath $…$} внутри axis роняет сборку
-          const opt = ['anchor=' + anch, 'inner sep=' + (it.halo && !dxp && !dyp ? '1pt' : '0pt'), 'font=' + font(it.step) + (it.bold ? '\\boldmath' : ''), 'text=' + col(it.color)];
+          /* Жирное — через font=…\boldmath: {\boldmath $…$} внутри axis роняет
+             сборку. Подпись с кириллицей жирной не делается вовсе: жирного T2A в
+             8 и 6 pt без домашней папки (сервер) нет — сборка падала на labx0800
+             и labx0600, — а \boldmath без \bfseries давал «КПВ 1» наполовину
+             жирным (находка ревью 08.10). Начертание — не расхождение (SPEC). */
+          const opt = ['anchor=' + anch, 'inner sep=' + (it.halo && !dxp && !dyp ? '1pt' : '0pt'), 'font=' + font(it.step) + (it.bold && !CYR.test(it.tex) ? '\\boldmath' : ''), 'text=' + col(it.color)];
           if (Math.abs(dxp) > 0.05) opt.push('xshift=' + dxp.toFixed(1) + 'pt');
           if (Math.abs(dyp) > 0.05) opt.push('yshift=' + dyp.toFixed(1) + 'pt');
           out.push('\\node[' + opt.join(', ') + '] at ' + P(at) + ' {' + it.tex + '};');
@@ -1457,7 +1522,8 @@ const TexExport = (function () {
               if (it.fl.hatch) needPatterns = true;
               const dom = ['domain=' + DX(A.da) + ':' + DX(A.db), 'samples=' + A.samples].concat(A.far ? ['restrict y to domain*=' + Y(A.bLo) + ':' + Y(A.bHi)] : []);
               const what = (s) => s.num != null ? Y(s.num) : s.expr;
-              const about = name + ': от ' + X(A.a) + ' до ' + X(A.b) + ', между ' + what(A.lo) + ' и ' + what(A.hi);
+              // «Сначала сам»: границы области в комментарии назвали бы ответ числами
+              const about = list.self ? name : name + ': от ' + X(A.a) + ' до ' + X(A.b) + ', между ' + what(A.lo) + ' и ' + what(A.hi);
               // дальше расширенного окна всё срезает \clip: число-граница прижимается к нему без изменения картинки
               const yIn = (v) => Math.max(A.bLo, Math.min(A.bHi, v));
               if (A.lo.num != null && A.hi.num != null) {

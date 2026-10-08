@@ -1018,5 +1018,10 @@
  {"id":"taxes@qp","key":"taxes","src":"recipe","recipe":"taxes@qp","file":"40-extra.json"},
  {"id":"taxes@param","key":"taxes","src":"recipe","recipe":"taxes@param","file":"40-extra.json"},
  {"id":"taxes@self-nl","key":"taxes","src":"recipe","recipe":"taxes@self-nl","file":"40-extra.json"},
- {"id":"mono-d3@nolegend","key":"mono-d3","src":"recipe","recipe":"mono-d3@nolegend","file":"40-extra.json"}
+ {"id":"mono-d3@nolegend","key":"mono-d3","src":"recipe","recipe":"mono-d3@nolegend","file":"40-extra.json"},
+ {"id":"mono@mr-two","key":"mono","src":"recipe","recipe":"mono@mr-two","file":"50-review.json"},
+ {"id":"sd@qp-two","key":"sd","src":"recipe","recipe":"sd@qp-two","file":"50-review.json"},
+ {"id":"sd@names","key":"sd","src":"recipe","recipe":"sd@names","file":"50-review.json"},
+ {"id":"sd@names2","key":"sd","src":"recipe","recipe":"sd@names2","file":"50-review.json"},
+ {"id":"sd@slash","key":"sd","src":"recipe","recipe":"sd@slash","file":"50-review.json"}
 ]
