@@ -185,8 +185,37 @@ function planeTicksY(g, my, ox) {
   });
 }
 
+/* Запись для .tex графика «Математики»: rec.expr — формула от x (запись
+   человека или собранная из неё), иначе узлы расчёта с причиной rec.why. */
+function mathMark(sel, rec) {
+  if (rec && rec.expr) return markExpr(sel, rec.expr, 'x', null, { name: rec.name || '' });
+  return markNumeric(sel, (rec && rec.why) || 'график посчитан по точкам: записи формулой у него нет', (rec && rec.name) || '');
+}
+// Формула expr с подстановкой вместо x (деревом Math.js, а не правкой строки); null — не разобралась.
+function mathSubst(expr, by) {
+  try {
+    return math.parse(prepExpr(String(expr))).transform(n => (n.isSymbolNode && n.name === 'x') ? math.parse(by) : n).toString();
+  } catch (e) { return null; }
+}
+// Запись деформации графика: та же формула f(x), собранная по виду деформации.
+function mathTransformExpr(expr, kind, a) {
+  const A = '(' + a + ')';
+  switch (kind) {
+    case 'up':     return '(' + expr + ') + ' + A;
+    case 'left':   return mathSubst(expr, '(x + ' + A + ')');
+    case 'scaleY': return A + ' * (' + expr + ')';
+    case 'scaleX': return mathSubst(expr, '(' + A + ' * x)');
+    case 'negY':   return '-(' + expr + ')';
+    case 'negX':   return mathSubst(expr, '(-x)');
+    case 'absY':   return 'abs(' + expr + ')';
+    case 'absX':   return mathSubst(expr, 'abs(x)');
+    default:       return expr;
+  }
+}
+
 // Кривая на полном плане: разрывы (NaN или далеко за окном) режут линию.
-function mathLine(g, f, mx, my, color, width, dash) {
+// rec — запись для .tex (mathMark).
+function mathLine(g, f, mx, my, color, width, dash, rec) {
   const [lo, hi] = mx.domain(), [ylo, yhi] = my.domain();
   const pad = (yhi - ylo) * 2;
   const line = d3.line().defined(d => d !== null).x(d => mx(d[0])).y(d => my(d[1]));
@@ -198,6 +227,7 @@ function mathLine(g, f, mx, my, color, width, dash) {
   const p = g.append('path').datum(pts).attr('fill', 'none')
     .attr('stroke', color).attr('stroke-width', width || 2.5).attr('d', line);
   if (dash) p.attr('stroke-dasharray', dash);
+  mathMark(p, rec);
   return pts;
 }
 
@@ -520,8 +550,9 @@ function drawMathTangent(f) {
       .attr('font-size', FS.large).attr('font-weight', 700).attr('fill', COL.tanD),
     "$f'(x)$, производная");
 
-  mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6);
-  mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4);
+  mathLine(gTop, f, s1.mx, s1.my, COL.tanF, 2.6, null, { expr: STATE.mathFormula, name: 'f(x)' });
+  mathLine(gBot, dfun, s2.mx, s2.my, COL.tanD, 2.4, null,
+    { expr: derivativeExpr(STATE.mathFormula, 'x'), name: 'производная', why: 'производная посчитана численно: символьной записи у неё нет' });
 
   const x0 = STATE.mathX0, y0 = f(x0), k = dfun(x0);
   STATE.mathRes = { x0, y0, k, secant: null };
@@ -529,14 +560,16 @@ function drawMathTangent(f) {
 
   // Касательная: y = y0 + k·(x − x0).
   if (!isNaN(k)) {
-    mathLine(gTop, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null);
+    mathLine(gTop, (x) => y0 + k * (x - x0), s1.mx, s1.my, COL.reg, 2, null,
+      { expr: '(' + y0 + ') + (' + k + ') * (x - (' + x0 + '))', name: 'касательная' });
     // Треугольник Δx / Δy — наглядное «отношение катетов = тангенс = производная».
     const dx = Math.min(STATE.mathDx, (wTop.xmax - wTop.xmin) * 0.25);
     const xa = x0, xb = x0 + dx, ya = y0, yb = y0 + k * dx;
     const tri = [[s1.mx(xa), s1.my(ya)], [s1.mx(xb), s1.my(ya)], [s1.mx(xb), s1.my(yb)]];
-    gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
+    markPoly(gTop.append('path').attr('d', 'M' + tri.map(p => p.join(',')).join('L') + 'Z')
       .attr('fill', COL.reg).attr('opacity', 0.14)
-      .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3');
+      .attr('stroke', COL.reg).attr('stroke-width', 1.2).attr('stroke-dasharray', '4 3'),
+    'треугольник приращений Δx и Δy: по трём вершинам', 'треугольник приращений');
     gTop.append('text').attr('x', (s1.mx(xa) + s1.mx(xb)) / 2).attr('y', s1.my(ya) + 13)
       .attr('text-anchor', 'middle').attr('font-size', FS.small).attr('fill', COL.reg)
       .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.4)
@@ -552,7 +585,8 @@ function drawMathTangent(f) {
     const dx = STATE.mathDx, y1 = f(x0 + dx);
     if (!isNaN(y1)) {
       const ks = (y1 - y0) / dx;
-      mathLine(gTop, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4');
+      mathLine(gTop, (x) => y0 + ks * (x - x0), s1.mx, s1.my, COL.tax, 1.8, '6 4',
+        { expr: '(' + y0 + ') + (' + ks + ') * (x - (' + x0 + '))', name: 'секущая' });
       mathDot(gTop, s1.mx, s1.my, x0 + dx, y1, COL.tax, null);
       STATE.mathRes.secant = ks;
     }
@@ -597,7 +631,7 @@ function drawMathOptimum(f) {
         .attr('fill', s > 0 ? COL.D : COL.S).attr('opacity', 0.055);
     }
   }
-  mathLine(g, f, mx, my, COL.D, 2.8);
+  mathLine(g, f, mx, my, COL.D, 2.8, null, { expr: STATE.mathFormula, name: 'f(x)' });
 
   const a = mathAnalyse(f, lo, hi);
   STATE.mathRes = a;
@@ -624,8 +658,9 @@ function drawMathTransform(f) {
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
   const t = mathTransformed(f, STATE.mathTrans, paramValue('a', 1));
-  mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4');   // исходная — бледным пунктиром
-  mathLine(g, t, mx, my, COL.D, 2.8);
+  mathLine(g, f, mx, my, COL.ghost, 2.2, '6 4', { expr: STATE.mathFormula, name: 'исходная' });   // исходная — бледным пунктиром
+  mathLine(g, t, mx, my, COL.D, 2.8, null,
+    { expr: mathTransformExpr(STATE.mathFormula, STATE.mathTrans, paramValue('a', 1)), name: MATH_TRANS[STATE.mathTrans] ? MATH_TRANS[STATE.mathTrans].tex : '' });
   labelCurveMath(g, f, mx, my, 'Исходная', COL.ghost);
   labelCurveMath(g, t, mx, my, MATH_TRANS[STATE.mathTrans].tex, COL.D);
   STATE.mathRes = { trans: STATE.mathTrans, a: paramValue('a', 1) };
@@ -691,13 +726,13 @@ function drawMathMinMax(f) {
   const g = svg.append('g');
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
-  const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0) }];
+  const parts = [{ fn: f, name: mmLabel(0), color: mmColor(0), expr: STATE.mathFormula }];
   for (let i = 1; i < mmSlots(); i++) {
     const expr = mmGet(i);
     if (!expr.trim()) continue;
     const { compiled } = compileMath(expr, 'x');
     if (!compiled) continue;
-    parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i) });
+    parts.push({ fn: (x) => evalMathAt(compiled, 'x', x), name: mmLabel(i), color: mmColor(i), expr });
   }
   if (parts.length < 2) { STATE.mathRes = { error: 'Нужна хотя бы вторая функция.' }; updateMathPanel(); return; }
   const isMin = (STATE.mathMinMax === 'min');
@@ -712,12 +747,14 @@ function drawMathMinMax(f) {
     return best;
   };
   parts.forEach(p => {
-    mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4');
+    mathLine(g, p.fn, mx, my, p.color, 1.8, '5 4', { expr: p.expr, name: p.name });
     labelCurveMath(g, p.fn, mx, my, p.name, p.color);
   });
   const zName = (STATE.mmName || 'Z').trim() || 'Z';
   const zColor = COL.mmZ || COL.MC;
-  mathLine(g, z, mx, my, zColor, 3.2);
+  // запись Z: наименьшая или наибольшая из тех же формул
+  mathLine(g, z, mx, my, zColor, 3.2, null,
+    { expr: (isMin ? 'min(' : 'max(') + parts.map(p => '(' + p.expr + ')').join(', ') + ')', name: zName });
   labelCurveMath(g, z, mx, my, zName, zColor);
   // Точки, где ветви меняются местами: корни разности каждой пары, но в зачёт
   // идут только те, где обе функции в этот момент и есть итоговая Z.
@@ -861,8 +898,15 @@ function drawMathConstraint() {
   // Рисуем ту часть ограничения, что попала в окно.
   const pts = constraintPointsIn(G, x0, x1, y0, y1);
   if (pts.length > 1) {
-    g.append('path').datum(pts).attr('fill', 'none')
+    const cp = g.append('path').datum(pts).attr('fill', 'none')
       .attr('stroke', COL.S).attr('stroke-width', 2.6).attr('d', line);
+    /* запись для .tex — по форме ввода ограничения (тот же разбор, что у
+       строки КПВ): y = f(x) — формула, x = g(y) — «по вертикали», общее
+       уравнение — узлы трассировки с причиной */
+    const r = parsePpfEquation(STATE.mathGC);
+    if (!r.error && r.kind === 'explicit') markExpr(cp, r.src, 'x', null, { name: 'ограничение' });
+    else if (!r.error && r.kind === 'inverse') markExpr(cp, r.src, 'y', null, { axis: 'y', name: 'ограничение' });
+    else markNumeric(cp, 'ограничение задано общим уравнением и найдено численно (трассировкой): формулы y = f(x) у него нет', 'ограничение');
   }
   /* А ищем по всей задаче, а не по видимому куску: приблизили картинку — ответ
      не должен меняться. Область поиска это размах ограничения, объединённый с
@@ -896,6 +940,8 @@ function drawLevelCurveOn(g, mx, my, f, level, color, width, opacity, dash) {
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width).attr('opacity', opacity).attr('d', line);
   if (dash) p.attr('stroke-dasharray', dash);
+  // запись для .tex: формулы y = f(x) у линии уровня нет, в файл идут узлы трассировки
+  markNumeric(p, 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
 }
 
 /* Разбор «как получен ответ» для сюжета с экстремумами. Не пересказ учебника,

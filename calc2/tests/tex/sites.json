@@ -113,9 +113,9 @@
   {"file":"60-overlays.js","fn":"drawAreaVerts","n":1,"fate":"record","kind":"poly","why":"","what":"область"},
   {"file":"60-overlays.js","fn":"drawAreaCalc","n":1,"fate":"record","kind":"area","why":"","what":"область"},
   {"file":"60-overlays.js","fn":"drawAreaCalc","n":2,"fate":"record","kind":"poly","why":"","what":"область"},
-  {"file":"70-scenes-math.js","fn":"mathLine","n":1,"fate":"todo","kind":"expr","why":"","what":"кривая"},
-  {"file":"70-scenes-math.js","fn":"drawMathTangent","n":1,"fate":"todo","kind":"area","why":"","what":"область"},
-  {"file":"70-scenes-math.js","fn":"drawMathConstraint","n":1,"fate":"todo","kind":"expr","why":"","what":"кривая"},
-  {"file":"70-scenes-math.js","fn":"drawLevelCurveOn","n":1,"fate":"todo","kind":"expr","why":"","what":"кривая"}
+  {"file":"70-scenes-math.js","fn":"mathLine","n":1,"fate":"record","kind":"helper","why":"","what":"кривая","check":"\\bmathMark\\(p, rec\\)"},
+  {"file":"70-scenes-math.js","fn":"drawMathTangent","n":1,"fate":"record","kind":"poly","why":"","what":"область"},
+  {"file":"70-scenes-math.js","fn":"drawMathConstraint","n":1,"fate":"record","kind":"helper","why":"","what":"кривая","check":"parsePpfEquation\\(STATE\\.mathGC\\)"},
+  {"file":"70-scenes-math.js","fn":"drawLevelCurveOn","n":1,"fate":"record","kind":"numeric","why":"","what":"кривая"}
  ]
 }
