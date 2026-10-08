@@ -764,7 +764,7 @@ node calc2/tests/export_audit.mjs       # выгрузка: дверь buildTex,
 node calc2/tests/tex/ci_quick.mjs       # .tex: 44 старта без дефектов записи, два окна (идёт в CI: test_calc2_tex)
 ```
 
-Приборы выгрузки `.tex` по всему набору (1 020 состояний: аудит, сборка `pdflatex`
+Приборы выгрузки `.tex` по всему набору (1 025 состояний: аудит, сборка `pdflatex`
 с листами, формулы настоящим `pgfmath`, перепись мест, отпечаток путей) — в
 [`tests/README.md`](tests/README.md), раздел «Выгрузка .tex».
 

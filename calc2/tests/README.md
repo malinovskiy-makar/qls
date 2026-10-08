@@ -132,7 +132,7 @@ node calc2/tests/calc2_math.mjs
 
 | Прибор | Запуск |
 |---|---|
-| набор состояний (1 020) | `node calc2/tests/tex/make_states.mjs` (пересобрать `states.json`) |
+| набор состояний (1 025: 1 020 фазы 0 и 5 рецептов ревью, `recipes/50-review.json`) | `node calc2/tests/tex/make_states.mjs` (пересобрать `states.json`) |
 | аудит по набору | `OUT=reports/calc2_tex/audit JOBS=3 node calc2/tests/tex/audit.mjs`, затем `node calc2/tests/tex/summary.mjs reports/calc2_tex/audit [--strict] [--fallback]` |
 | сборка `pdflatex` и листы | `./venv313/bin/python calc2/tests/tex/compile.py reports/calc2_tex/audit [--sheets '*#start']` |
 | формулы настоящим `pgfmath` | `./venv313/bin/python calc2/tests/tex/formulas.py reports/calc2_tex/audit` |
@@ -165,4 +165,7 @@ node calc2/tests/calc2_math.mjs
 | край области записи не учитывается сверкой (`nodeMiss`) | `summary.mjs --strict`, `ppfsum#88`: суммарная КПВ «не сошлась», код 1 |
 | место рисования без судьбы в `sites.json` | `sites.mjs`: «МЕСТО БЕЗ СУДЬБЫ … drawLevelCurve», код 1 |
 | рисунок сдвинут (401 узел у кривой макромодели вместо 400) | `paths.mjs WITH=paths_e165aff.json`: пути `adas`, `islm` другие, код 1 |
-| запись области-треугольника снята (фаза 2: НЕ краснело — дыра прибора; закрыта счётчиком «обл:БЕЗмн» в фазе 3) | см. строки фазы 3–4 ниже |
+| подпись, срезанная окном обрезки группы, снова идёт в файл (фаза 3) | `summary.mjs --strict`, `m-tangent@zoom`: «ПРЕДМЕТЫ подписей 28≠35», код 1 |
+| запись области «Излишек работников» снята (`drawLaborMinWelfare`) | `summary.mjs --strict`, `labor#start`: `areasNoRecPoly 1`, код 1; `tex/ci_quick.mjs`: «ПРОВАЛ labor, labor-mono: areasNoRecPoly 1». До счётчика «обл:БЕЗмн» (фаза 3) такая область-многоугольник не краснила ничего |
+| выражение запрещённых команд в `tex/lint.mjs` разошлось с `calc2/views.py` | `calc2.tests.test_calc2_tex.TexLintMatchesServerTests`: FAIL |
+| сетка снова от всех делений (мини-рынки, КПВ «Торговли по цене»: лишние линии) | `summary.mjs --strict`: «ПРЕДМЕТЫ сетки 27≠29» (`mono-d3#start`), «24≠25» (`tradeprice#start`) — сборка считает линии, которые нарисует pgfplots (`gridDrawn`) |
