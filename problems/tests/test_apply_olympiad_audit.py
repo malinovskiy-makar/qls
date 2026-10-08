@@ -36,8 +36,13 @@ TEXT = {
           'Покажите на графике, как распределится налоговое бремя между '
           'продавцами и покупателями при неэластичном спросе на сигареты.'),
 }
+# E — близнец, у которого текст банка отличается от PDF сильнее порога:
+# PDF 8 и 9 класса совпадают между собой, а банк — с вставкой.
+TEXT['E'] = TEXT['A'] + ' Ответ обоснуйте графиком и расчётом излишков обеих групп.'
+BANK_E = TEXT['A'] + ' Указание: начните с условия первого порядка для фирмы.'
 URL = {ev: f'https://olymp.hse.ru/data/{ev}.pdf' for ev in (
-    'vp-2020-final-10-v1', 'vp-2020-final-11-v1', 'vp-2020-final-9-v1')}
+    'vp-2020-final-10-v1', 'vp-2020-final-11-v1', 'vp-2020-final-9-v1',
+    'vp-2020-final-8-v1')}
 
 # Эталон: A — близнец (есть и в 10, и в 11 классе), B — №2 десятого,
 # C — №3 одиннадцатого, D — №2 девятого.
@@ -47,6 +52,8 @@ REFERENCE = [
     ('vp-2020-final-11-v1', '1', '11', 'A'),
     ('vp-2020-final-11-v1', '3', '11', 'C'),
     ('vp-2020-final-9-v1', '2', '9', 'D'),
+    ('vp-2020-final-8-v1', '4', '8', 'E'),
+    ('vp-2020-final-9-v1', '4', '9', 'E'),
 ]
 
 
@@ -255,6 +262,30 @@ class UpdateTests(AuditTestBase):
         self.assertEqual((r_lone.grade, r_lone.number, r_lone.official_url),
                          ('11', '3', URL['vp-2020-final-11-v1']))
         self.assertEqual(r_lone.raw_meta['aggregator_grade'], '10')
+
+    def test_8b_twin_by_pdf_to_pdf(self):
+        """Текст банка не дотягивает до 0,90 к своему комплекту, но два PDF
+        между собой совпадают: буквальное правило переводит класс, флаг
+        --twin-pdf-to-pdf оставляет строку на своём классе."""
+        from problems.text_dedup import fuzzy_ratio
+        self.assertLess(fuzzy_ratio(normalize_for_compare(BANK_E),
+                                    normalize_for_compare(TEXT['E'])), 0.90)
+        p = Problem.objects.create(statement=BANK_E)
+        ref = self.aggregator_ref(p, grade='9', number='1')
+        upd = self.update_csv([{
+            'ref_id': ref.pk, 'problem_id': p.pk, 'action': 'check',
+            'coord_status': 'other_event',
+            'reason': ('текст совпал с vp-2020-final-8-v1 №4 (0.85), а координаты '
+                       'строки ведут в vp-2020-final-9-v1 №1')}])
+        md = self.review_md()
+        self.run_cmd(update_existing=upd, confirmed_by=md)   # буквальное правило
+        dry = json.load(open(os.path.join(self.out, self.journals('_dryrun')[-1]),
+                             encoding='utf-8'))
+        self.assertIn({'id': ref.pk, 'field': 'grade', 'new': '8'}, dry['planned_updates'])
+        self.run_cmd(update_existing=upd, confirmed_by=md, twin_pdf_to_pdf=True, **APPROVE)
+        ref.refresh_from_db()
+        self.assertEqual((ref.grade, ref.number, ref.official_url),
+                         ('9', '4', URL['vp-2020-final-9-v1']))
 
 
 class ImportAndRollbackTests(AuditTestBase):

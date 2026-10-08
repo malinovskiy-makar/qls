@@ -140,6 +140,15 @@ class Command(BaseCommand):
                             help='Файл проверки Claude (claude_review_*.md).')
         parser.add_argument('--include-eyeball', action='store_true',
                             help='Применить и перенумеровки «на глаза».')
+        parser.add_argument('--twin-pdf-to-pdf', action='store_true',
+                            help='Близнец, если задание своего класса похоже '
+                                 '(≥ 0,90) на найденное задание соседнего — '
+                                 'сравниваются два PDF между собой, а не '
+                                 'текст банка с PDF.')
+        parser.add_argument('--assume-updates', metavar='JOURNAL',
+                            help='Только сухой прогон импорта: считать правки '
+                                 'из журнала сухого прогона --update-existing '
+                                 'уже записанными.')
         parser.add_argument('--reference', metavar='JSONL',
                             help='Эталон (reference_problems_full.jsonl); по '
                                  'умолчанию — рядом с входным файлом.')
@@ -438,6 +447,13 @@ class Command(BaseCommand):
         found_ev, found_no, own_ev, _own_no = parsed
         bank = texts.get(ref.problem_id, '')
         number, score = self.reference.best_in_event(bank, own_ev)
+        if score < TWIN_THRESHOLD and self.options['twin_pdf_to_pdf']:
+            # Текст банка не дотянул до своего комплекта (шапка «(20 баллов)»
+            # против «(25 баллов)», вёрстка PDF) — сравниваем найденное
+            # задание соседнего класса с заданиями своего: два PDF одной
+            # вёрстки между собой.
+            found_text = self.reference.tasks[(found_ev, found_no)]['norm_text']
+            number, score = self.reference.best_in_event(found_text, own_ev)
         meta = dict(ref.raw_meta or {})
         if score >= TWIN_THRESHOLD:
             self.twin_stats['класс верен (близнец)'] += 1
@@ -475,6 +491,13 @@ class Command(BaseCommand):
                               'сначала olympiad_official_sources --apply')
         done = set(SourceReference.objects.filter(source=source)
                    .values_list('problem_number', flat=True)) if source else set()
+        assumed = {}
+        if self.options['assume_updates']:
+            if self.apply:
+                raise CommandError('--assume-updates — только для сухого прогона')
+            assumed = _assumed_official_tasks(self.options['assume_updates'])
+            plan.notes.append(f'правки из {self.options["assume_updates"]} '
+                              f'считаются записанными: {len(assumed)} заданий')
         figures_dir = self.options['figures_dir'] or os.path.join(
             os.path.dirname(self.input_dir), 'session3', 'figures')
         for row in read_jsonl(path):
@@ -493,6 +516,10 @@ class Command(BaseCommand):
             if taken:
                 plan.skip(external_id, f'в банке уже есть задача с этим заданием '
                                        f'(#{taken[0]})')
+                continue
+            if (event_id, number) in assumed:
+                plan.skip(external_id, 'задание закроет правка существующей строки '
+                                       f'(задача #{assumed[(event_id, number)]})')
                 continue
             title, points, statement, solution = clean_pdf_task(
                 row['raw_text'], row.get('solution_text', ''),
@@ -786,6 +813,25 @@ class Command(BaseCommand):
         w(self.style.SUCCESS(f'Откат выполнен. Отчёт: {out}'))
         for name, value in after.items():
             w(f'  {name}: {value} ({value - before[name]:+d})')
+
+
+def _assumed_official_tasks(path):
+    """(event_id, номер) → задача: куда укажут строки после правок из
+    журнала сухого прогона --update-existing."""
+    with open(path, encoding='utf-8') as handle:
+        journal = json.load(handle)
+    planned = defaultdict(dict)
+    for change in journal.get('planned_updates', []):
+        planned[change['id']][change['field']] = change['new']
+    refs = OlympiadRef.objects.in_bulk(list(planned))
+    result = {}
+    for ref_id, changes in planned.items():
+        ref = refs.get(ref_id)
+        meta = changes.get('raw_meta') or (ref.raw_meta if ref else None) or {}
+        event_id = meta.get('official_event_id')
+        if ref and event_id:
+            result[(event_id, changes.get('number', ref.number))] = ref.problem_id
+    return result
 
 
 def _truthy(value):
