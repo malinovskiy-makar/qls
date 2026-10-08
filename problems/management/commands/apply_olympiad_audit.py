@@ -145,10 +145,10 @@ class Command(BaseCommand):
                                  '(≥ 0,90) на найденное задание соседнего — '
                                  'сравниваются два PDF между собой, а не '
                                  'текст банка с PDF.')
-        parser.add_argument('--assume-updates', metavar='JOURNAL',
-                            help='Только сухой прогон импорта: считать правки '
-                                 'из журнала сухого прогона --update-existing '
-                                 'уже записанными.')
+        parser.add_argument('--assume-updates', metavar='JOURNAL', nargs='+',
+                            help='Только сухой прогон импорта: считать новые '
+                                 'строки и правки из журналов сухих прогонов '
+                                 '--new-refs / --update-existing уже записанными.')
         parser.add_argument('--reference', metavar='JSONL',
                             help='Эталон (reference_problems_full.jsonl); по '
                                  'умолчанию — рядом с входным файлом.')
@@ -495,9 +495,11 @@ class Command(BaseCommand):
         if self.options['assume_updates']:
             if self.apply:
                 raise CommandError('--assume-updates — только для сухого прогона')
-            assumed = _assumed_official_tasks(self.options['assume_updates'])
-            plan.notes.append(f'правки из {self.options["assume_updates"]} '
-                              f'считаются записанными: {len(assumed)} заданий')
+            for journal_path in self.options['assume_updates']:
+                assumed.update(_assumed_official_tasks(journal_path))
+            plan.notes.append(f'журналы сухих прогонов считаются записанными '
+                              f'({len(self.options["assume_updates"])}): '
+                              f'{len(assumed)} заданий эталона будут привязаны')
         figures_dir = self.options['figures_dir'] or os.path.join(
             os.path.dirname(self.input_dir), 'session3', 'figures')
         for row in read_jsonl(path):
@@ -518,7 +520,7 @@ class Command(BaseCommand):
                                        f'(#{taken[0]})')
                 continue
             if (event_id, number) in assumed:
-                plan.skip(external_id, 'задание закроет правка существующей строки '
+                plan.skip(external_id, 'задание закроет новая строка или правка '
                                        f'(задача #{assumed[(event_id, number)]})')
                 continue
             title, points, statement, solution = clean_pdf_task(
@@ -816,15 +818,16 @@ class Command(BaseCommand):
 
 
 def _assumed_official_tasks(path):
-    """(event_id, номер) → задача: куда укажут строки после правок из
-    журнала сухого прогона --update-existing."""
+    """(event_id, номер) → задача: куда укажут новые строки и строки после
+    правок из журнала сухого прогона --new-refs / --update-existing."""
     with open(path, encoding='utf-8') as handle:
         journal = json.load(handle)
+    result = {(c['event_id'], c['number']): c['problem_id']
+              for c in journal.get('planned_creates', [])}
     planned = defaultdict(dict)
     for change in journal.get('planned_updates', []):
         planned[change['id']][change['field']] = change['new']
     refs = OlympiadRef.objects.in_bulk(list(planned))
-    result = {}
     for ref_id, changes in planned.items():
         ref = refs.get(ref_id)
         meta = changes.get('raw_meta') or (ref.raw_meta if ref else None) or {}
