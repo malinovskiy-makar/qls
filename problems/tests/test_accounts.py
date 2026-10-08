@@ -441,7 +441,8 @@ class FullJourneyTests(MediaTempMixin, TestCase):
 
         # 2. В шапке появилась плашка профиля
         html = self.client.get('/catalog/').content.decode('utf-8')
-        self.assertIn('class="nav-user"', html)
+        # Без закрывающей кавычки: у плашки есть ещё класс `ym-hide-content`.
+        self.assertIn('class="nav-user', html)
 
         # 3. Заполнил данные и сменил логин
         self.client.post('/profile/', {

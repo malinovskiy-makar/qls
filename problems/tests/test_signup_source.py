@@ -18,6 +18,9 @@
 корневой шаблон подключает обе половины; кабинеты не отдают Метрике
 заголовков (в них имена детей).
 
+**Вебвизор пишет только публичные страницы.** В кабинетах `webvisor: false`;
+на публичных страницах имя вошедшего в шапке стоит внутри `ym-hide-content`.
+
 Таблица «ресурс × роль × действие» (проверка границ доступа):
 
 | Ресурс | Аноним | Ученик / репетитор | Персонал |
@@ -293,6 +296,73 @@ class CounterOnPagesTests(TestCase):
         self.client.force_login(user)
         html = self.client.get('/profile/').content.decode()
         self.assertIn('sendTitle: false', html)
+
+
+@override_settings(YANDEX_METRIKA_ID=METRIKA_ID)
+class WebvisorTests(TestCase):
+    """Вебвизор пишет только публичные страницы (решение владельца 08.10.2026).
+
+    В кабинетах на экране имена и оценки школьников, а запись Вебвизора — копия
+    экрана целиком. На публичных страницах из личного остаётся только имя
+    вошедшего в шапке, и его Вебвизор не записывает (`ym-hide-content`).
+    """
+
+    NAME = 'Иван Петров'
+
+    def _init_line(self, html):
+        line = re.search(r'ym\(%s, "init", \{[^}]*\}\);' % METRIKA_ID, html)
+        self.assertIsNotNone(line, 'нет вызова init')
+        return line.group(0)
+
+    def _login(self, username, role):
+        user = User.objects.create_user(username, password=PASSWORD, role=role,
+                                        first_name='Иван', last_name='Петров')
+        self.client.force_login(user)
+        return user
+
+    def test_cabinets_have_no_webvisor(self):
+        """Все четыре корня кабинетов: репетитор, ученик, профиль, календарь."""
+        self._login('prepod_vv', 'teacher')
+        for url in (reverse('teacher:groups'), '/profile/', '/calendar/'):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                init = self._init_line(response.content.decode())
+                self.assertIn('webvisor: false', init)
+                self.assertNotIn('webvisor: true', init)
+                self.assertIn('sendTitle: false', init)
+        self._login('uchenik_vv', 'student')
+        response = self.client.get('/student/')
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('webvisor: false', self._init_line(response.content.decode()))
+
+    def test_public_page_keeps_webvisor_for_logged_in(self):
+        self._login('uchenik_pub', 'student')
+        init = self._init_line(self.client.get('/catalog/').content.decode())
+        self.assertIn('webvisor: true', init)
+        self.assertNotIn('webvisor: false', init)
+        self.assertNotIn('sendTitle', init)
+        # Остальные параметры решение не трогало.
+        self.assertIn('clickmap: true, trackLinks: true, accurateTrackBounce: true', init)
+
+    def test_header_name_is_hidden_from_webvisor_on_public_pages(self):
+        """Каталог («Стол»), Rush, ВП, калькулятор: шапка одна — `_nav.html`."""
+        self._login('uchenik_hide', 'student')
+        for url in ('/catalog/', '/game/', '/vp/', '/calc2/'):
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                html = response.content.decode()
+                self.assertIn('webvisor: true', self._init_line(html))
+                chip = re.search(r'<a class="([^"]*)" href="/profile/">(.*?)</a>', html, re.S)
+                self.assertIsNotNone(chip, 'нет плашки профиля в шапке')
+                classes = chip.group(1).split()
+                self.assertIn('nav-user', classes)
+                self.assertIn('ym-hide-content', classes)
+                self.assertIn(self.NAME, chip.group(2))
+                self.assertIn('ИП', chip.group(2))
+                # Имя в шапке — единственное место на странице, где оно видно.
+                self.assertEqual(html.count(self.NAME), 1)
 
 
 class EveryRootTemplateTests(SimpleTestCase):
