@@ -20,6 +20,7 @@
 import json
 import logging
 import os
+import time
 
 
 class Reply(object):
@@ -897,6 +898,11 @@ class FakeProvider(BaseProvider):
                  timeout=None, images=None):
         from django.conf import settings
 
+        # Медленный подставной ИИ для стенда нагрузки: держит поток, как
+        # настоящий вызов. У настоящих поставщиков задержки нет.
+        delay = float(getattr(settings, 'AI_FAKE_DELAY_SECONDS', 0) or 0)
+        if delay > 0:
+            time.sleep(delay)
         self.last_images = list(images or [])
         reply = getattr(settings, 'AI_FAKE_REPLY', None)
         if callable(reply):

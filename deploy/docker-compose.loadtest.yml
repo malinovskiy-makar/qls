@@ -1,0 +1,40 @@
+# Стенд нагрузки «Сайт не встаёт» — ЛОКАЛЬНЫЙ, к бою отношения не имеет.
+#
+# Один сервис web: тот же Dockerfile и тот же entrypoint.sh, что на бою
+# (миграции, collectstatic, gunicorn с теми же флагами). ИИ — подставной
+# поставщик `fake` с задержкой (AI_FAKE_DELAY_SECONDS): держит воркер, как
+# настоящий вызов, и ничего не стоит. База и Redis — локальные из
+# docker-compose.dev.yml (PostgreSQL 55432, Redis 56379) через
+# host.docker.internal; база стенда — weco_loadtest, копия копии боя.
+#
+# ⚠️ Порт ТОЛЬКО на 127.0.0.1: стенд не для чужих глаз и не для VPN.
+# ⚠️ Замеры — зондом ВНУТРИ контейнера (docker exec … ai_load_probe), а не с
+#    машины: сетевые пробы снаружи искажает постоянный VPN владельца.
+#
+# Порядок — docs/SERVER.md, «Воркеры и потоки», «Как перемерить».
+#   docker compose -f deploy/docker-compose.loadtest.yml up -d --build
+#   docker compose -f deploy/docker-compose.loadtest.yml down
+name: weco-loadtest
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    image: weconomics-web:loadtest
+    container_name: weco-loadtest-web
+    # Настоящие значения — deploy/env.loadtest (в .gitignore), образец —
+    # deploy/env.loadtest.example. Секретов боя там нет и быть не должно.
+    env_file:
+      - env.loadtest
+    ports:
+      - "127.0.0.1:8000:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - static:/app/staticfiles
+      - media:/app/media
+
+volumes:
+  static:
+  media:
