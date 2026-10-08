@@ -143,7 +143,7 @@ def main():
     names = {}
     for t in texs:
         src = t.read_text(encoding='utf-8')
-        h = hashlib.sha1(src.encode('utf-8')).hexdigest()[:16]
+        h = hashlib.sha1(src.encode('utf-8'), usedforsecurity=False).hexdigest()[:16]   # ключ кэша сборки, не защита
         names[t.stem] = h
         if h in cache and (not cache[h]['ok'] or (bdir / (h + '.pdf')).exists()):
             continue
