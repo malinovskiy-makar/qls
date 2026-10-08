@@ -1,0 +1,59 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Процентные налоги и субсидии.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{cC9C3B5}{HTML}{C9C3B5}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{cE0563B}{HTML}{E0563B}
+\definecolor{c2E9E44}{HTML}{2E9E44}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{cD13E21}{HTML}{D13E21}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель main: x от 0 до 100, y от 0 до 100
+\begin{axis}[name=panelA, at={(44.3pt,33.0pt)}, anchor=south west, width=340.5pt, height=226.5pt, scale only axis, clip=false, xmin=0, xmax=100, ymin=0, ymax=100, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={10,20,30,40,50,60,70,80,90}, ytick={20,40,60,80}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={100}, extra x tick labels={}, extra y ticks={100}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}, xlabel={$Q$}, xlabel style={at={(current axis.right of origin)}, anchor=west, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, ylabel={$P$}, ylabel style={at={(current axis.above origin)}, anchor=south, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, legend style={at={(0.847,0.825)}, anchor=north west, draw=cC9C3B5, fill=white, fill opacity=0.9, text opacity=1, font=\fontsize{9}{10.3}\selectfont, cells={anchor=west}, row sep=0.5pt, inner sep=3pt}]
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:100,100);
+\fill[c2F6FED, opacity=0.16] (axis cs:0,100) -- (axis cs:45.455,54.545) -- (axis cs:0,54.545) -- cycle;   % Излишек покупателя (CS): многоугольник, вершины точные
+\fill[cE0563B, opacity=0.16] (axis cs:0,45.455) -- (axis cs:45.455,45.455) -- (axis cs:0,0) -- cycle;   % Излишек продавца (PS): многоугольник, вершины точные
+\fill[c2E9E44, opacity=0.22] (axis cs:0,54.545) -- (axis cs:45.455,54.545) -- (axis cs:45.455,45.455) -- (axis cs:0,45.455) -- cycle;   % Сбор бюджета: многоугольник, вершины точные
+\fill[c6B6457, opacity=0.28] (axis cs:45.455,54.545) -- (axis cs:50,50) -- (axis cs:45.455,45.455) -- cycle;   % Потери общества (DWL): многоугольник, вершины точные
+\addplot[c2F6FED, line width=1.13pt, domain=0:100, samples=2, forget plot] {100 - x};   % D
+\addplot[cE0563B, line width=1.13pt, domain=0:100, samples=2, forget plot] {x};   % S
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2A6CED] at (axis cs:95.678,5.318) {$D$};
+\node[anchor=base east, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=cD13E21] at (axis cs:95.678,92.364) {$S$};
+\addplot[cE0563B, line width=0.90pt, dash pattern=on 3.6pt off 2.4pt, domain=0:100, samples=2, forget plot] {1.2 * x};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=cD13E21] at (axis cs:82.988,93.364) {$S\cdot (1+\tau )$};
+\end{scope}
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:45.455,54.545) -- (axis cs:45.455,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:45.455,54.545) -- (axis cs:0,54.545);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:45.455,45.455) -- (axis cs:0,45.455);
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,54.545) {$54{,}55_{b}$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,45.455) {$45{,}45_{s}$};
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, yshift=-6.0pt] at (axis cs:45.455,0) {$45{,}45_{1}$};
+\fill[c2F6FED] (axis cs:45.455,54.545) circle[radius=2.4pt];
+\fill[cE0563B] (axis cs:45.455,45.455) circle[radius=2.4pt];
+\draw[c2D2D2D, line width=1.13pt] (axis cs:45.455,45.455) -- (axis cs:45.455,54.545);
+\node[anchor=west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D] at (axis cs:48.979,50) {$\tau = 20 \%$};
+\node[anchor=north east, inner sep=0pt, xshift=-4pt, yshift=-4pt, font=\fontsize{8}{9.2}\selectfont, text=c6B6457] at (axis cs:0,0) {$0$};
+\addlegendimage{legend image code/.code={\fill[c2F6FED, opacity=0.35] (0cm,-0.09cm) rectangle (0.42cm,0.11cm);}} \addlegendentry{$\mathrm{CS}$}
+\addlegendimage{legend image code/.code={\fill[cE0563B, opacity=0.35] (0cm,-0.09cm) rectangle (0.42cm,0.11cm);}} \addlegendentry{$\mathrm{PS}$}
+\addlegendimage{legend image code/.code={\fill[c2E9E44, opacity=0.44] (0cm,-0.09cm) rectangle (0.42cm,0.11cm);}} \addlegendentry{$T_{x}$}
+\addlegendimage{legend image code/.code={\fill[c6B6457, opacity=0.56] (0cm,-0.09cm) rectangle (0.42cm,0.11cm);}} \addlegendentry{$\mathrm{DWL}$}
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

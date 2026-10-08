@@ -1,0 +1,43 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: IS–LM.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{cE0563B}{HTML}{E0563B}
+\definecolor{cD13E21}{HTML}{D13E21}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель main: x от 0 до 300, y от 0 до 10
+\begin{axis}[name=panelA, at={(40.5pt,33.0pt)}, anchor=south west, width=340.5pt, height=226.5pt, scale only axis, clip=false, xmin=0, xmax=300, ymin=0, ymax=10, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={50,100,150,200,250}, ytick={2,4,6,8}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={300}, extra x tick labels={}, extra y ticks={10}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}, xlabel={$Y$}, xlabel style={at={(current axis.right of origin)}, anchor=west, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}, ylabel={$r, \%$}, ylabel style={at={(current axis.above origin)}, anchor=south, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D}]
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:300,10);
+\draw[c2F6FED, line width=1.17pt] (axis cs:70,13) -- (axis cs:230,-3);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=c2A6CED] at (axis cs:150,5.1987) {$\mathrm{IS}$};
+\draw[cE0563B, line width=1.17pt] (axis cs:40,-3) -- (axis cs:300,10);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\node[anchor=base west, inner sep=1pt, font=\fontsize{9}{10.3}\selectfont, text=cD13E21] at (axis cs:258,8.0987) {$\mathrm{LM}$};
+\end{scope}
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:166.67,3.3333) -- (axis cs:166.67,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:166.67,3.3333) -- (axis cs:0,3.3333);
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, yshift=-6.0pt] at (axis cs:166.67,0) {$166{,}67$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D, xshift=-6.0pt] at (axis cs:0,3.3333) {$3{,}33$};
+\fill[c2D2D2D] (axis cs:166.67,3.3333) circle[radius=2.7pt];
+\node[anchor=base west, inner sep=1pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:171.95,3.5982) {$E$};
+\node[anchor=north east, inner sep=0pt, xshift=-4pt, yshift=-4pt, font=\fontsize{8}{9.2}\selectfont, text=c6B6457] at (axis cs:0,0) {$0$};
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

@@ -1,0 +1,61 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: Дискриминация 3-й степени.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c6B6457}{HTML}{6B6457}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c00797A}{HTML}{00797A}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{c8B3FE0}{HTML}{8B3FE0}
+\definecolor{cE0563B}{HTML}{E0563B}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель mini-1: x от 0 до 120, y от 0 до 120
+\begin{axis}[name=panelA, at={(82.5pt,31.5pt)}, anchor=south west, width=189.0pt, height=192.0pt, scale only axis, clip=false, xmin=0, xmax=120, ymin=0, ymax=120, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={60,90,120}, ytick={30,90,120}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={20,40,80,100}, extra x tick labels={}, extra y ticks={20,40,60,80,100}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\node[anchor=base, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c2D2D2D, yshift=9.0pt] at (axis cs:60,120) {Рынок $1$};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c6B6457, xshift=3.0pt] at (axis cs:120,4.219) {$Q$};
+\node[anchor=base east, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c6B6457, xshift=-3.0pt, yshift=11.3pt] at (axis cs:0,120) {$P$};
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:40,60) -- (axis cs:40,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:40,60) -- (axis cs:0,60);
+\fill[c2D2D2D] (axis cs:40,60) circle[radius=2.7pt];
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, yshift=-9.0pt] at (axis cs:40,0) {$40$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, xshift=-3.8pt] at (axis cs:0,60) {$60$};
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:120,120);
+\draw[c2F6FED, line width=1.13pt] (axis cs:0,100) -- (axis cs:100,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[c8B3FE0, line width=0.90pt, dash pattern=on 3.6pt off 2.4pt] (axis cs:0,100) -- (axis cs:50,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[cE0563B, line width=0.90pt] (axis cs:0,20) -- (axis cs:120,20);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\end{scope}
+\draw[c5C5346, line width=0.45pt, opacity=0.13] (axis cs:128.571,125.625) -- (axis cs:128.571,-5.625);
+\end{axis}
+% -- Панель mini-2: x от 0 до 50, y от 0 до 100
+\begin{axis}[name=panelB, at={(319.5pt,31.5pt)}, anchor=south west, width=189.0pt, height=192.0pt, scale only axis, clip=false, xmin=0, xmax=50, ymin=0, ymax=100, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.68pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={25,37.5,50}, xticklabels={{$25$},{$37{,}5$},{$50$}}, ytick={25,75,100}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c6B6457}, extra x ticks={5,10,15,20,30,35,40,45}, extra x tick labels={}, extra y ticks={20,40,60,80}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\node[anchor=base, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c2D2D2D, yshift=9.0pt] at (axis cs:25,100) {Рынок $2$};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c6B6457, xshift=3.0pt, yshift=-3.0pt] at (axis cs:50,0) {$Q$};
+\node[anchor=base east, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont, text=c6B6457, xshift=-3.0pt, yshift=11.3pt] at (axis cs:0,100) {$P$};
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:15,50) -- (axis cs:15,0);
+\draw[c6B6457, line width=0.45pt, dash pattern=on 2.4pt off 1.8pt] (axis cs:15,50) -- (axis cs:0,50);
+\fill[c2D2D2D] (axis cs:15,50) circle[radius=2.7pt];
+\node[anchor=north, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, yshift=-9.0pt] at (axis cs:15,0) {$15$};
+\node[anchor=east, inner sep=0pt, font=\fontsize{8}{9.2}\selectfont\boldmath, text=c00797A, xshift=-3.8pt] at (axis cs:0,50) {$50$};
+\begin{scope}
+\clip (axis cs:0,0) rectangle (axis cs:50,100);
+\draw[c2F6FED, line width=1.13pt] (axis cs:0,80) -- (axis cs:40,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[c8B3FE0, line width=0.90pt, dash pattern=on 3.6pt off 2.4pt] (axis cs:0,80) -- (axis cs:20,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[cE0563B, line width=0.90pt] (axis cs:0,20) -- (axis cs:50,20);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\end{scope}
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

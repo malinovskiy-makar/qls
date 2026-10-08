@@ -1,0 +1,54 @@
+% Собран калькулятором Weconomics. Компилируется обычным pdflatex.
+% Модель: КТВ. Две страны-партнёра.
+\documentclass[12pt,a4paper]{article}
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english,russian]{babel}
+\usepackage{amsmath}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usetikzlibrary{arrows.meta}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\definecolor{c2D2D2D}{HTML}{2D2D2D}
+\definecolor{c5C5346}{HTML}{5C5346}
+\definecolor{c2F6FED}{HTML}{2F6FED}
+\definecolor{cB5791F}{HTML}{B5791F}
+\definecolor{c2A6CED}{HTML}{2A6CED}
+\definecolor{cE0563B}{HTML}{E0563B}
+\definecolor{cD13E21}{HTML}{D13E21}
+\begin{document}
+\begin{figure}[h]
+\centering
+\begin{tikzpicture}
+% -- Панель trade-1: x от 0 до 108, y от 0 до 152.735
+\begin{axis}[name=panelA, at={(46.5pt,33.0pt)}, anchor=south west, width=210.4pt, height=212.3pt, scale only axis, clip=false, xmin=0, xmax=108, ymin=0, ymax=152.735, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.63pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={50,100}, ytick={50,100,150}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D}, extra x ticks={20,40,60,80}, extra x tick labels={}, extra y ticks={20,40,60,80,120,140}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\begin{scope}
+\clip (axis cs:-0.77,-1.079) rectangle (axis cs:111.85,157.053);
+\node[anchor=base east, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:107.23,3.778) {$X$};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:2.695,146.798) {$Y$};
+\draw[c2F6FED, line width=0.99pt] (axis cs:0,100) -- (axis cs:100,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[cB5791F, line width=0.99pt] (axis cs:100,0) -- (axis cs:29.289,100) -- (axis cs:0.289,129);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\fill[c2F6FED] (axis cs:100,0) circle[radius=3.0pt];
+\draw[cB5791F, line width=1.08pt, fill=white] (axis cs:29.289,100) circle[radius=2.7pt];
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D] at (axis cs:32.37,104.318) {предел обмена};
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D] at (axis cs:66.955,53.238) {КТВ};
+\end{scope}
+\node[anchor=base, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont\boldmath, text=c2A6CED, yshift=4.5pt] at (axis cs:54,152.735) {КПВ $1$};
+\end{axis}
+% -- Панель trade-2: x от 0 до 76.368, y от 0 до 108
+\begin{axis}[name=panelB, at={(289.9pt,33.0pt)}, anchor=south west, width=210.4pt, height=212.3pt, scale only axis, clip=false, xmin=0, xmax=76.368, ymin=0, ymax=108, axis x line=middle, axis y line=middle, axis line style={c2D2D2D, line width=0.63pt, -{Stealth[length=5pt]}}, tick align=outside, major tick length=3pt, scaled ticks=false, tick style={c2D2D2D, line width=0.4pt}, xtick={20,40,60}, ytick={50,100}, tick label style={font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D}, extra x ticks={10,30,50,70}, extra x tick labels={}, extra y ticks={20,40,60,80}, extra y tick labels={}, extra tick style={grid=major, major tick length=0pt}, grid=major, grid style={line width=0.40pt, c5C5346, opacity=0.13}]
+\begin{scope}
+\clip (axis cs:-0.545,-0.763) rectangle (axis cs:79.09,111.053);
+\node[anchor=base east, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:75.823,2.671) {$X$};
+\node[anchor=base west, inner sep=0pt, font=\fontsize{10}{11.5}\selectfont, text=c2D2D2D] at (axis cs:1.906,103.802) {$Y$};
+\draw[cE0563B, line width=0.99pt] (axis cs:0,100) -- (axis cs:50,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\draw[cB5791F, line width=0.99pt] (axis cs:0,100) -- (axis cs:70.711,0);   % БЕЗ ЗАПИСИ: ломаная, вершины точные
+\fill[cE0563B] (axis cs:0,100) circle[radius=3.0pt];
+\node[anchor=base west, inner sep=1pt, font=\fontsize{8}{9.2}\selectfont, text=c2D2D2D] at (axis cs:36.989,52.29) {КТВ};
+\end{scope}
+\node[anchor=base, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont\boldmath, text=cD13E21, yshift=4.5pt] at (axis cs:38.184,108) {КПВ $2$};
+\end{axis}
+\end{tikzpicture}
+\end{figure}
+\end{document}

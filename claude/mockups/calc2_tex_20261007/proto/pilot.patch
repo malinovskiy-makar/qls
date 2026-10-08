@@ -1,0 +1,347 @@
+diff --git a/calc2/static/calc2/30-curves.js b/calc2/static/calc2/30-curves.js
+index e093092..c4f199a 100644
+--- a/calc2/static/calc2/30-curves.js
++++ b/calc2/static/calc2/30-curves.js
+@@ -209,13 +209,31 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
+     main.push(inMain ? [q, v] : null);
+     tail.push(inTail ? [q, v] : null);
+   }
++  /* Запись для выгрузки. У основной части и у продолжения формула одна, а
++     отрезок свой: граница между ними — ТОЧНЫЙ корень, а не ближайший узел
++     сетки (на экране между крайними узлами частей остаётся щель в шаг сетки). */
++  let cut = null;
++  if (o.expr) {
++    for (let i = 1; i <= N && cut == null; i++) {
++      let a = from + (end - from) * (i - 1) / N, b = from + (end - from) * i / N;
++      const va = fn(a), vb = fn(b);
++      if (!isFinite(va) || !isFinite(vb) || !(va > 0 && vb <= 0)) continue;
++      for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (fn(m) > 0) a = m; else b = m; }
++      cut = (a + b) / 2;
++    }
++  }
++  const record = (sel, lo, hi) => {
++    if (o.expr) markExpr(sel, o.expr, 'Q', [lo, hi], { name: o.name || '' });
++    else if (o.why) markNumeric(sel, o.why);
++    return sel;
++  };
+   if (tail.some(p => p !== null)) {
+-    g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
++    record(g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
+       .attr('stroke-width', Math.max(1, width * 0.55)).attr('stroke-dasharray', dash)
+-      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line);
++      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line), cut != null ? cut : from, stop);
+   }
+-  const p = g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
+-    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line);
++  const p = record(g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
++    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line), from, cut != null ? Math.min(cut, to) : to);
+   return p;
+ }
+ 
+@@ -239,13 +257,16 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
+    зная про экспорт. Кривые, у которых аналитического выражения нет вовсе
+    (изокванта, сумма КПВ по Минковскому, горизонтальная сумма заводов),
+    по-прежнему честно уходят точками. */
+-function markExpr(sel, curveOrExpr, varName, domain) {
++function markExpr(sel, curveOrExpr, varName, domain, opt) {
+   const expr = (curveOrExpr && typeof curveOrExpr === 'object')
+     ? (curveOrExpr.texExpr || curveOrExpr.expr)
+     : curveOrExpr;
+   if (expr) {
+     sel.attr('data-expr', String(expr));
+     if (varName) sel.attr('data-expr-var', varName);
++    // Запись «по вертикали»: горизонтальная координата есть функция вертикальной.
++    if (opt && opt.axis === 'y') sel.attr('data-expr-axis', 'y');
++    if (opt && opt.name) sel.attr('data-expr-name', opt.name);
+     /* Свой отрезок построения (Б5). Нужен кусочным кривым: у совокупных
+        издержек двух заводов каждый гладкий кусок живёт на своём промежутке,
+        и без этого pgfplots рисовал бы обе формулы во всю ширину. */
+@@ -256,6 +277,44 @@ function markExpr(sel, curveOrExpr, varName, domain) {
+   return sel;
+ }
+ 
++/* ── Остальные записи для выгрузки в LaTeX (пилот «запись при рисовании») ──
++   Запись живёт на нарисованном узле, как и у markExpr: место рисования
++   сообщает, ЧТО оно нарисовало, а выгрузка сверяет запись с рисунком и
++   пишет её в файл. Картинку эти помощники не меняют. */
++
++// «Формулы у этой кривой нет»: в файл уйдут узлы расчёта модели и причина.
++function markNumeric(sel, why) { return sel.attr('data-numeric', String(why || 'посчитано по точкам')); }
++// «Это ломаная, заданная вершинами».
++function markPoly(sel, why) { return sel.attr('data-poly', String(why || 'ломаная по вершинам')); }
++
++/* Формула кривой как функции горизонтальной величины, строкой на языке
++   Math.js; null, если такой записи у кривой нет (вертикаль, сумма по точкам,
++   непрямая кривая, введённая как Q = f(P)). */
++function curveFormula(c) {
++  if (!c || typeof c !== 'object') return null;
++  if (c.kind === 'vertical' || c.sumNumeric) return null;
++  if (c.srcForm === 'QP') return c.linear ? ('(' + c.linear.a + ') * Q + (' + c.linear.b + ')') : null;
++  return c.texExpr || c.expr || null;
++}
++
++/* Область «между нижней и верхней границей на отрезке [from, to]».
++   Граница — число, объект кривой или строка формулы. floor0: граница-кривая
++   прижата к нулю снизу (нарисована через quadPrice или mcFloor); true — обе
++   границы, 'lo' или 'hi' — одна. У границы нет формулы — область честно
++   уходит узлами расчёта, с причиной. */
++function markArea(sel, rec) {
++  const side = (b, floor) => {
++    if (typeof b === 'number') return isFinite(b) ? b : null;
++    const e = (b && typeof b === 'object') ? curveFormula(b) : (b ? String(b) : null);
++    return e ? (floor ? 'max(0, ' + e + ')' : e) : null;
++  };
++  const lo = side(rec.lo, rec.floor0 === true || rec.floor0 === 'lo');
++  const hi = side(rec.hi, rec.floor0 === true || rec.floor0 === 'hi');
++  if (lo == null || hi == null) return markNumeric(sel, 'у границы области нет записи формулой');
++  if (!isFinite(rec.from) || !isFinite(rec.to)) return sel;
++  return sel.attr('data-area', JSON.stringify({ from: rec.from, to: rec.to, lo, hi, v: rec.v || 'Q' }));
++}
++
+ /* Производная формулы В ВИДЕ ФОРМУЛЫ (Б4). Предельные величины движок считает
+    численно — это правильно, потому что работает для любой функции. Но в файл
+    такая кривая уходила таблицей из шестидесяти точек, хотя для обычной записи
+diff --git a/calc2/static/calc2/40-scenes-market.js b/calc2/static/calc2/40-scenes-market.js
+index 0ae51fa..bd00b9f 100644
+--- a/calc2/static/calc2/40-scenes-market.js
++++ b/calc2/static/calc2/40-scenes-market.js
+@@ -623,11 +623,13 @@ function drawOpenAreas() {
+   const qS = (o.Qs1 != null) ? o.Qs1 : o.Qs;
+   if (STATE.showCS && qD > 0) {
+     const a = d3.area().x(d => sx(d)).y0(sy(Pdom)).y1(d => sy(evalCurve(D, d)));
+-    g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
++    markArea(g.append('path').datum(samp(0, qD)).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
++      { from: 0, to: qD, lo: Pdom, hi: D });
+   }
+   if (STATE.showPS && qS > 0) {
+     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Pdom));
+-    g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
++    markArea(g.append('path').datum(samp(0, qS)).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
++      { from: 0, to: qS, lo: S, hi: Pdom });
+   }
+   if (o.P1 == null) return;
+   /* Прямоугольник денег: между Pw и внутренней ценой, шириной в фактический
+@@ -650,7 +652,8 @@ function drawOpenAreas() {
+       const a1 = Math.min(lo, hi), b1 = Math.max(lo, hi);
+       if (!(b1 > a1 + 1e-9)) return;
+       const a = d3.area().x(d => sx(d)).y0(sy(o.Pw)).y1(d => sy(evalCurve(curve, d)));
+-      g.append('path').datum(samp(a1, b1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)');
++      markArea(g.append('path').datum(samp(a1, b1)).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.38).attr('data-legend', 'Потери общества (DWL)'),
++        { from: a1, to: b1, lo: o.Pw, hi: curve });
+     };
+     band(o.Qs, o.Qs1, S);
+     band(o.Qd1, o.Qd, D);
+@@ -2142,12 +2145,14 @@ function drawAreas() {
+   // CS — между ценой P* (низ) и кривой спроса (верх).
+   if (STATE.showCS && STATE.D) {
+     const csArea = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(quadPrice(STATE.D, d)));
+-    g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
++    markArea(g.append('path').datum(samples).attr('d', csArea).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
++      { from: 0, to: Q, lo: P, hi: STATE.D, floor0: true });
+   }
+   // PS — между кривой предложения (низ) и ценой P* (верх).
+   if (STATE.showPS && STATE.S) {
+     const psArea = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(P));
+-    g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
++    markArea(g.append('path').datum(samples).attr('d', psArea).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
++      { from: 0, to: Q, lo: STATE.S, hi: P, floor0: true });
+   }
+ }
+ 
+@@ -2345,24 +2350,28 @@ function drawTaxAreas() {
+ 
+   if (STATE.showCS) {   // CS: между ценой покупателя Pb и спросом
+     const a = d3.area().x(d => sx(d)).y0(sy(Pb)).y1(d => sy(quadPrice(STATE.D, d)));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
++      { from: 0, to: Q, lo: Pb, hi: STATE.D, floor0: true });
+   }
+   if (STATE.showPS) {   // PS: между предложением и ценой продавца Ps
+     const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Ps));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
++      { from: 0, to: Q, lo: STATE.S, hi: Ps, floor0: true });
+   }
+   // Деньги бюджета (сбор налога / расход на субсидию) — прямоугольник между Pb и Ps
+   // на [0, Q1]. По фиксированной палитре налог/субсидия/бюджет — один зелёный цвет.
+   const lowP = Math.min(Pb, Ps), highP = Math.max(Pb, Ps);
+   const aTx = d3.area().x(d => sx(d)).y0(sy(lowP)).y1(sy(highP));
+-  g.append('path').datum(s1).attr('d', aTx)
+-    .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета');
++  markArea(g.append('path').datum(s1).attr('d', aTx)
++    .attr('fill', COL.tax).attr('opacity', 0.22).attr('data-legend', STATE.intervType === 'subsidy' ? 'Расход бюджета' : 'Сбор бюджета'),
++    { from: 0, to: Q, lo: lowP, hi: highP });
+   // DWL — между D и S на интервале между старым и новым Q (налог: [Q1,Q0]; субсидия: [Q0,Q1]).
+   const lo = (Q0 == null) ? 0 : Math.min(Q, Q0), hi = (Q0 == null) ? 0 : Math.max(Q, Q0);
+   if (hi > lo) {
+     const s2 = samp(lo, hi);
+     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
+-    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
++    markArea(g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
++      { from: lo, to: hi, lo: STATE.S, hi: STATE.D });
+   }
+ }
+ 
+@@ -3057,8 +3066,8 @@ function drawElasticityZones() {
+   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
+   const samp = (a, b) => { const o = []; for (let i = 0; i <= 100; i++) o.push(a + (b - a) * i / 100); return o; };
+   const area = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(evalCurve(D, d)));
+-  g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.10);          // эластичный
+-  g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', COL.reg).attr('opacity', 0.10);    // неэластичный
++  markArea(g.append('path').datum(samp(0, e.unit.Q)).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.10), { from: 0, to: e.unit.Q, lo: 0, hi: D });                // эластичный
++  markArea(g.append('path').datum(samp(e.unit.Q, e.qDmax)).attr('d', area).attr('fill', COL.reg).attr('opacity', 0.10), { from: e.unit.Q, to: e.qDmax, lo: 0, hi: D });    // неэластичный
+   // Подписи зон у оси Q.
+   const oy = sy(0);
+   const elText = (q, txt, color) => g.append('text').attr('x', sx(q)).attr('y', oy - 8).attr('text-anchor', 'middle')
+@@ -3205,7 +3214,9 @@ function drawExtAreas(e) {
+   if (hi <= lo) return;   // оптимум совпал с рынком — терять нечего
+   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
+   const aD = d3.area().x(d => sx(d)).y0(d => sy(e.msc(d))).y1(d => sy(e.msb(d)));
+-  g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери от внешнего эффекта (DWL)');
++  // общественная кривая задана своей формулой, а пока её галочка выключена — совпадает с частной
++  markArea(g.append('path').datum(samp).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери от внешнего эффекта (DWL)'),
++    { from: lo, to: hi, lo: (STATE.mscOn && STATE.mscCompiled) ? STATE.mscExpr : STATE.S, hi: (STATE.msbOn && STATE.msbCompiled) ? STATE.msbExpr : STATE.D });
+ }
+ 
+ // Общественная кривая MSC (эффект на издержках) либо MSB (эффект на выгоде)
+@@ -3219,11 +3230,11 @@ function drawExtCurves(e) {
+      своей частной парой, и вторая линия поверх D или S ничего не сообщала бы,
+      а только путала: на графике оказались бы две кривые в одном месте. */
+   if (e.mscOn) {
+-    g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line);
++    markExpr(g.append('path').datum(pts(e.msc)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2.5).attr('d', line), STATE.mscExpr, 'Q', null, { name: 'MSC' });
+     labelCurve(g, e.msc, 'MSC', COL.reg, { from: 0.9 });
+   }
+   if (e.msbOn) {
+-    g.append('path').datum(pts(e.msb)).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('d', line);
++    markExpr(g.append('path').datum(pts(e.msb)).attr('fill', 'none').attr('stroke', COL.MR).attr('stroke-width', 2.5).attr('d', line), STATE.msbExpr, 'Q', null, { name: 'MSB' });
+     labelCurve(g, e.msb, 'MSB', COL.MR, { from: 0.9 });
+   }
+   // Корректирующий инструмент: налог поднимает предложение, субсидия — опускает (зелёный пунктир).
+@@ -3413,18 +3424,21 @@ function drawPcAreas() {
+   const s1 = samp(0, Qtrade);
+   if (STATE.showCS) {   // CS — между ценой Preg (низ) и спросом (верх)
+     const a = d3.area().x(d => sx(d)).y0(sy(Preg)).y1(d => sy(quadPrice(STATE.D, d)));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
++      { from: 0, to: Qtrade, lo: Preg, hi: STATE.D, floor0: true });
+   }
+   if (STATE.showPS) {   // PS — между предложением (низ) и ценой Preg (верх)
+     const a = d3.area().x(d => sx(d)).y0(d => sy(quadPrice(STATE.S, d))).y1(sy(Preg));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек продавца (PS)'),
++      { from: 0, to: Qtrade, lo: STATE.S, hi: Preg, floor0: true });
+   }
+   // DWL — площадь между D и S от Q_trade до Q* (потери от нерасчищенного рынка).
+   const lo = Math.min(Qtrade, STATE.eq.Q), hi = Math.max(Qtrade, STATE.eq.Q);
+   if (hi > lo) {
+     const s2 = samp(lo, hi);
+     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
+-    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
++    markArea(g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
++      { from: lo, to: hi, lo: STATE.S, hi: STATE.D });
+   }
+ }
+ 
+@@ -3581,21 +3595,21 @@ function drawQuotaAreas() {
+   const s1 = samp(0, Qq);
+   if (STATE.showCS) {   // CS — между выбранной ценой (низ) и спросом (верх)
+     const a = d3.area().x(d => sx(d)).y0(sy(P)).y1(d => sy(evalCurve(STATE.D, d)));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16)
+-      .attr('data-legend', 'Излишек покупателя (CS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16)
++      .attr('data-legend', 'Излишек покупателя (CS)'), { from: 0, to: Qq, lo: P, hi: STATE.D });
+   }
+   if (STATE.showPS) {   // PS — между предложением (низ) и выбранной ценой (верх)
+     const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(sy(P));
+-    g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16)
+-      .attr('data-legend', 'Излишек продавца (PS)');
++    markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16)
++      .attr('data-legend', 'Излишек продавца (PS)'), { from: 0, to: Qq, lo: STATE.S, hi: P });
+   }
+   // Потери — площадь между D и S от квоты до равновесного объёма.
+   const lo = Math.min(Qq, STATE.eq.Q), hi = Math.max(Qq, STATE.eq.Q);
+   if (hi > lo) {
+     const s2 = samp(lo, hi);
+     const aD = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(STATE.S, d))).y1(d => sy(evalCurve(STATE.D, d)));
+-    g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28)
+-      .attr('data-legend', 'Потери общества (DWL)');
++    markArea(g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28)
++      .attr('data-legend', 'Потери общества (DWL)'), { from: lo, to: hi, lo: STATE.S, hi: STATE.D });
+   }
+ }
+ 
+diff --git a/calc2/static/calc2/42-scenes-mono.js b/calc2/static/calc2/42-scenes-mono.js
+index 28f7689..0ee1511 100644
+--- a/calc2/static/calc2/42-scenes-mono.js
++++ b/calc2/static/calc2/42-scenes-mono.js
+@@ -50,6 +50,20 @@ function mcAt(q) {
+    1-й степени: Qcomp ищется по mcAt, а прибыль меряется от нуля. */
+ function mcFloor(v) { return (v > 0) ? v : 0; }
+ 
++/* Формулы для записи в файл (пилот «запись при рисовании»): те же величины,
++   что считают mcAt и marginalRevenue, но строкой. Нет записи — null, и кривая
++   честно уходит узлами расчёта с причиной. */
++function mcFormula() {
++  const direct = mcSourceCurve();
++  if (direct) return curveFormula(direct);
++  const e = curveFormula(curveByRole('tc'));
++  return e ? derivativeExpr(e, 'Q') : null;            // MC = d(TC)/dQ
++}
++function mrFormula(D) {
++  const e = curveFormula(D);
++  return e ? derivativeExpr('(' + e + ') * Q', 'Q') : null;   // MR = d(P·Q)/dQ
++}
++
+ // Предельный доход MR(Q) = d(TR)/dQ, где TR = P(Q)·Q = D(Q)·Q.
+ // Центральная разность точна для линейного спроса (даёт MR = a − 2bQ).
+ function marginalRevenue(D, q) {
+@@ -72,15 +86,18 @@ function drawMonopolyAreas() {
+     const s1 = samp(0, m.Qm);
+     if (STATE.showMonoVC) {   // VC — под кривой MC (от оси P=0 до MC). Нейтральный серо-голубой.
+       const a = d3.area().x(d => sx(d)).y0(sy(0)).y1(d => sy(mcFloor(mcAt(d))));
+-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)');
++      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.dwl).attr('opacity', 0.22).attr('data-legend', 'Переменные издержки (VC)'),
++        { from: 0, to: m.Qm, lo: 0, hi: mcFormula(), floor0: 'hi' });
+     }
+     if (STATE.showMonoPS) {   // PS (TR − VC) — между MC (низ) и ценой Pm (верх). Красный, как PS конкуренции.
+       const a = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(sy(m.Pm));
+-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)');
++      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек производителя (TR - VC)'),
++        { from: 0, to: m.Qm, lo: mcFormula(), hi: m.Pm, floor0: 'lo' });
+     }
+     if (STATE.showMonoCS) {   // CS — между ценой Pm (низ) и спросом D (верх). Синий, как CS конкуренции.
+       const a = d3.area().x(d => sx(d)).y0(sy(m.Pm)).y1(d => sy(evalCurve(STATE.D, d)));
+-      g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)');
++      markArea(g.append('path').datum(s1).attr('d', a).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек покупателя (CS)'),
++        { from: 0, to: m.Qm, lo: m.Pm, hi: STATE.D });
+     }
+   }
+ 
+@@ -90,7 +107,8 @@ function drawMonopolyAreas() {
+     if (hi > lo) {
+       const s2 = samp(lo, hi);
+       const aD = d3.area().x(d => sx(d)).y0(d => sy(mcFloor(mcAt(d)))).y1(d => sy(evalCurve(STATE.D, d)));
+-      g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
++      markArea(g.append('path').datum(s2).attr('d', aD).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
++        { from: lo, to: hi, lo: mcFormula(), hi: STATE.D, floor0: 'lo' });
+     }
+   }
+ }
+@@ -107,11 +125,14 @@ function drawMonopoly() {
+   };
+   // MR — фиолетовый пунктир. Продолжение ниже оси Q рисует общий помощник
+   // (см. drawMarginalCurve в 30-curves.js): до нуля породившего спроса.
+-  drawMarginalCurve(g, q => marginalRevenue(STATE.D, q), STATE.D, COL.MR, { width: 2 });
++  drawMarginalCurve(g, q => marginalRevenue(STATE.D, q), STATE.D, COL.MR,
++    { width: 2, expr: mrFormula(STATE.D), name: 'MR', why: 'предельный доход посчитан численно: записи формулой у него нет' });
+   // Если MC выведена из TC (нет явной кривой mc/S) — нарисуем её красным.
+   if (!mcSourceCurve() && curveByRole('tc')) {
+-    g.append('path').datum(sample(mcAt))
++    const mcPath = g.append('path').datum(sample(mcAt))
+       .attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
++    const mcE = mcFormula();
++    if (mcE) markExpr(mcPath, mcE, 'Q', null, { name: 'MC' }); else markNumeric(mcPath, 'предельные издержки посчитаны численно: записи формулой у них нет');
+   }
+ }
+ 
