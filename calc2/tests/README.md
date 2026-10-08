@@ -123,3 +123,34 @@ node calc2/tests/calc2_math.mjs
 ⚠️ **Код сверки не прятать за `| tail`**: в первой версии случая «порядок» команда
 кончалась `compare.mjs … | tail -5`, и код возврата был кодом `tail` (0) — дефект
 выглядел непойманным. Сверку зовут без конвейера, вывод режут `--show N`.
+
+## Выгрузка .tex из записи при рисовании (10.2026)
+
+Задание и спецификация — `claude/mockups/calc2_tex_20261007/`; приборы — `calc2/tests/tex/` (что каждый делает и как
+запускать — в шапке каждого файла и в журнале `claude/PROGRESS_CALC2_TEX_20261007.md`). Ходят на живой сервер
+(`CALC2_BASE_URL`), вход не нужен; сборка `pdflatex` — в окружении сервера (`compile.py`, `server_env()`).
+
+| Прибор | Запуск |
+|---|---|
+| набор состояний (1 020) | `node calc2/tests/tex/make_states.mjs` (пересобрать `states.json`) |
+| аудит по набору | `OUT=reports/calc2_tex/audit JOBS=3 node calc2/tests/tex/audit.mjs`, затем `node calc2/tests/tex/summary.mjs reports/calc2_tex/audit [--strict] [--fallback]` |
+| сборка `pdflatex` и листы | `./venv313/bin/python calc2/tests/tex/compile.py reports/calc2_tex/audit [--sheets '*#start']` |
+| формулы настоящим `pgfmath` | `./venv313/bin/python calc2/tests/tex/formulas.py reports/calc2_tex/audit` |
+| корпус подписей | `./venv313/bin/python calc2/tests/tex/labels.py reports/calc2_tex/audit` |
+| один файл при 4 окнах, 2 темах и обычных переходах | `KEYS=all node calc2/tests/tex/stable.mjs` |
+| статическая перепись мест рисования | `node calc2/tests/tex/sites.mjs [--final]` |
+| отпечаток путей холста | `WITH=calc2/tests/tex/paths_e165aff.json node calc2/tests/tex/paths.mjs` |
+| проверка текста без TeX | `node calc2/tests/tex/lint.mjs ПАПКА` |
+
+### Зубастость приборов выгрузки
+
+| Возвращённый дефект | Что краснеет |
+|---|---|
+| прототип: упрощение узлов убрано | `audit.mjs` + `summary.mjs`, 10 стартов: пар координат 4 190 → 8 001 |
+| прототип: перевод степени `a^b` печатается как `b^a` | `formulas.py`, 10 нелинейных состояний: расхождений 0 → 49, код 1 |
+| кириллица в индексе снова через `\text{}` (`72-export-tex.js`, `idxTex`) | `summary.mjs --strict`: «кириллица в математике через \text» у `labor-bilat#start`, `quota#start`; `compile.py`: собралось 0 из 2 (T2A в 5 pt нет без домашней папки) |
+| история не заглушена на бумажном прогоне (`_histMute++` убран) | `summary.mjs --strict`: «событий «изменено» было 1» (`mono#start`: `calc2:changing` 3), код 1 |
+| свой замерщик подписей на прогоне убран | `stable.mjs KEYS=taxes,prod`: «моделей с расхождением: 1 из 2» (файл при «меньше движения» и при обычных переходах разный) |
+| «Сначала сам» не меняет `data-raw` (`96-self.js`, `selfMaskText`) | `summary.mjs --strict`: «подписей с числом в разметке… 6 в 3 состояниях» |
+| прямоугольник за краем холста без окна обрезки | `summary.mjs --strict`: проверка текста у `quota#116` — «точка (40, 60) далеко за окном» |
+| знак `%` в подписи не экранирован (`OPS['%']`) | `calc2_ui.mjs`: «.tex экранирует опасные символы в подписях» — «Доля $50% \&$ выше» |
