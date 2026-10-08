@@ -24,6 +24,12 @@
   </div>
 
   {% if rows %}
+  {% comment %}
+  Список попыток с баллами и местами Вебвизор не пишет (ADR 0133); шапка и
+  фильтры над ним остаются в записи. Обёртка — обычный блок: раскладку задают
+  сами строки `.vp-arow`.
+  {% endcomment %}
+  <div class="ym-hide-content">
   <div class="vp-arow is-head">
     <span>Дата</span><span>Вариант</span><span>Режим</span>
     <span class="is-num">Балл</span><span class="is-num">Время</span><span>Статус</span><span></span>
@@ -54,6 +60,7 @@
     </span>
   </div>
   {% endfor %}
+  </div>
   {% else %}
   <p class="vp-land-empty">Здесь пока пусто. <a class="vp-link" href="{% url 'vp:variants' %}">Выберите вариант</a>, и попытка появится в списке.</p>
   {% endif %}

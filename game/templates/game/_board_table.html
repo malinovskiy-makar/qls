@@ -10,11 +10,14 @@
     foot         — строка под таблицей.
   ⚠️ Слов «сегодня» и «будь первым» у прошедшего дня быть не может — выбирает
   страница, подставляя свои empty_title/empty_text.
+  ⚠️ `ym-hide-content` на таблице: чужие логины в запись Вебвизора не попадают
+  (решение владельца 08.10.2026, ADR 0133). Таблица общая — так скрыты и доска
+  набора, и доска дня.
 {% endcomment %}<section class="gb-card gb-pane gb-board" aria-labelledby="gb-table-h">
   <div class="gb-ph"><h2 id="gb-table-h">{{ title|default:"Таблица" }}</h2><span>по счёту; при равенстве выше тот, кто закончил раньше</span></div>
   {% if rows %}
   <div class="gb-scroll">
-    <table class="gb-table">
+    <table class="gb-table ym-hide-content">
       <thead><tr><th scope="col"><span class="gb-sr">Место</span></th><th scope="col">Игрок</th><th scope="col" class="num">Счёт</th><th scope="col" class="num">Точность</th><th scope="col" class="num c-combo">Макс. комбо</th><th scope="col" class="c-end">Чем кончилось</th></tr></thead>
       <tbody>
         {% for r in rows %}<tr class="{% if r.is_me %}me{% elif r.place == 1 %}first{% endif %}"><td>{% if r.place <= 3 %}{% include "game/_medal.html" with place=r.place %}{% else %}{{ r.place }}{% endif %}</td><td class="who{% if r.anon %} anon{% endif %}">{% if r.is_me %}Вы · {% endif %}{{ r.name }}</td><td class="num sc">{{ r.score }}</td><td class="num">{{ r.accuracy }}&nbsp;%</td><td class="num c-combo">{{ r.combo }}</td><td class="end c-end">{{ r.ending }}</td></tr>

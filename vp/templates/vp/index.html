@@ -80,7 +80,8 @@
     <p class="vp-land-bsub">Первая попытка по варианту, с таймером. При равных баллах выше тот, кто сдал быстрее.</p>
 
     {% if rows %}
-    <div class="vp-land-rows">
+    {# `ym-hide-content` — логины в запись Вебвизора не попадают (ADR 0133). #}
+    <div class="vp-land-rows ym-hide-content">
       <div class="vp-land-row is-head"><span>#</span><span>Игрок</span><span>Класс</span><span class="is-num">Балл</span><span class="is-num">Время</span></div>
       {% for r in rows %}
       <div class="vp-land-row">
@@ -93,7 +94,7 @@
       {% endfor %}
     </div>
     {% if my_row %}
-    <div class="vp-land-pin">
+    <div class="vp-land-pin ym-hide-content">
       <div class="vp-land-row is-me">
         <span class="vp-land-pl">{{ my_row.place }}</span>
         <span class="vp-land-who">Вы · {{ my_row.name }}</span>
