@@ -1053,6 +1053,9 @@ function drawLegend() {
    место: выбору места легенды и разведению подписей. Второго списка «кто над
    холстом висит» не заводим — он разъехался бы с разметкой. */
 function floatRects() {
+  /* На бумажном прогоне выгрузки .tex плавающих блоков нет: файл не должен
+     зависеть от того, взведён ли инструмент (полоса режима #cv-mode). */
+  if (typeof texPaperActive === 'function' && texPaperActive()) return [];
   const node = svg.node();
   const wrap = document.getElementById('graph-wrap');
   if (!node || !wrap) return [];

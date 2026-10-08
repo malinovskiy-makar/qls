@@ -65,10 +65,13 @@ const itemsDiff = (r) => {
   return d.length ? d.join(', ') : null;
 };
 const itemsBad = cnt(r => itemsDiff(r));
+const selfLeak = cnt(r => r.seen && r.seen.selfLeak);
 console.log('после выгрузки: состояние изменилось', changed.length, '| узлы холста другие', domBad.length,
   '| стек «Отменить» другой', histBad.length, '| localStorage другой', lsBad.length, '| событий «изменено» было', evBad.length);
 console.log('предметов на листе (холст) и в файле не поровну:', itemsBad.length, 'состояний', ok.some(r => r.stats.tickLabels == null) ? '(у прототипа нет счётчиков настроек оси — сравнение не идёт)' : '');
 itemsBad.slice(0, 8).forEach(r => console.log('   ПРЕДМЕТЫ', r.id, itemsDiff(r)));
+console.log('«Сначала сам»: подписей с числом в разметке, которого нет на холсте:', selfLeak.reduce((a, r) => a + r.seen.selfLeak, 0), 'в', selfLeak.length, 'состояниях');
+selfLeak.slice(0, 6).forEach(r => console.log('   ЧИСЛО ОТВЕТА', r.id, r.seen.selfLeak));
 console.log('повторная сборка дала другой файл', repBad.length, '| дверь buildTex ≠ сборка', doorBad.length, '| проверка текста не прошла', lintBad.length, '| ошибок страницы', pageErr.length);
 [['СОСТОЯНИЕ', changed, r => r.stateDiff.slice(0, 3).join('; ')], ['ХОЛСТ', domBad, r => r.dom.why], ['ИСТОРИЯ', histBad, r => JSON.stringify(r.hist)],
  ['ХРАНИЛИЩЕ', lsBad, () => ''], ['СОБЫТИЯ', evBad, r => JSON.stringify(r.events)], ['ПОВТОР', repBad, () => ''], ['ДВЕРЬ', doorBad, () => ''],
@@ -96,5 +99,5 @@ if (FALLBACK) {
   console.log('\nУшли узлами или ломаной (модель | что | имя | как | причина — состояний):');
   Object.keys(fb).sort().forEach(k => console.log('   ' + k + ' — ' + fb[k].length + ' (' + fb[k].slice(0, 3).join(', ') + ')'));
 }
-const failed = itemsBad.length + bad.length + DEF.reduce((s, d) => s + (T[d] || 0), 0) + changed.length + domBad.length + histBad.length + lsBad.length + evBad.length + repBad.length + doorBad.length + lintBad.length;
+const failed = selfLeak.length + itemsBad.length + bad.length + DEF.reduce((s, d) => s + (T[d] || 0), 0) + changed.length + domBad.length + histBad.length + lsBad.length + evBad.length + repBad.length + doorBad.length + lintBad.length;
 if (STRICT) process.exit(failed ? 1 : 0);

@@ -45,6 +45,18 @@ def find_pdflatex():
     return None
 
 
+def server_env():
+    """Окружение сборки — как у сервера (calc2/views.py, compile_pdf_pdflatex):
+    только PATH и запреты чтения, записи и оболочки, БЕЗ домашней папки. Так
+    TeX не находит шрифты, которые сам дорисовал раньше в ~/Library/texlive
+    (mktextfm), и файл, который собирается лишь с ними, здесь не соберётся —
+    как и на сервере. Замер 08.10: T2A в 5 pt («$33{,}33_{\\text{м}}$»)."""
+    path = os.environ.get('PATH', '')
+    if '/Library/TeX/texbin' not in path:
+        path += ':/Library/TeX/texbin'
+    return {'PATH': path, 'openin_any': 'p', 'openout_any': 'p', 'shell_escape': 'f'}
+
+
 def pdf_to_png(pdf: Path, png: Path) -> bool:
     """Первая страница PDF → PNG. Три способа, от лучшего к запасному."""
     if shutil.which('pdftoppm'):
@@ -89,7 +101,7 @@ def build_one(binary, bdir: Path, sha: str, src: str, want_png: bool):
     tex.write_text(src.replace('\\begin{document}', '\\begin{document}\n\\pagestyle{empty}', 1), encoding='utf-8')
     try:
         p = subprocess.run([binary, '-no-shell-escape', '-interaction=nonstopmode', '-halt-on-error', tex.name],
-                           cwd=bdir, capture_output=True, text=True, errors='replace', timeout=240)
+                           cwd=bdir, capture_output=True, text=True, errors='replace', timeout=240, env=server_env())
         ok = (bdir / (sha + '.pdf')).exists() and p.returncode == 0
         stdout = p.stdout
     except subprocess.TimeoutExpired:

@@ -1,4 +1,4 @@
-// Замер содержимого выгрузки .tex (фаза 2, пункты А45–А49).
+// Замер содержимого выгрузки .tex (фаза 2, пункты А45–А49; с 08.10 — новая выгрузка, ADR 0139).
 // Печатает по сцене: размер картинки, кегли, сколько кривых формулой против
 // таблиц координат, сколько подписей математикой, совпадает ли набор подписей
 // с тем, что видно на экране.
@@ -9,8 +9,10 @@ const BASE = process.env.CALC2_BASE_URL || 'http://127.0.0.1:8099';
 const USER = process.env.CALC2_USER || 'admin';
 const PASS = process.env.CALC2_PASS || 'admin12345';
 const SCENES = (process.env.SCENES || 'sd,tax,mono,adas,isoquant,costs').split(',');
-/* Сцены, для которых генератор ОТ СОСТОЯНИЯ обязан выдать полноценный файл.
-   Их и требует приёмка 26.08: сложение D и S, сложение КПВ, налог. */
+/* Сцены, для которых выгрузка обязана выдать полноценный файл (приёмка 26.08):
+   сложение D и S, сложение КПВ, налог. ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: проверки, писанные
+   для сборщика от состояния (buildTexFromState), теперь стерегут то же самое у
+   настоящей двери buildTex — бумажный прогон, опись, сборка (72-export-tex.js). */
 const STATE_SCENES = (process.env.STATE_SCENES || 'sdsum,ppfsum,taxes').split(',');
 
 const browser = await chromium.launch();
@@ -38,7 +40,7 @@ const measure = async (key) => page.evaluate(async (k) => {
   pickScene(k);
   await new Promise(r => setTimeout(r, 450));
   const tex = buildTex('Проба', '');
-  const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
+  const size = /width=([\d.]+)pt, height=([\d.]+)pt/.exec(tex);
   const plots = tex.match(/\\addplot\[[^\]]*\]/g) || [];
   const tableBlocks = [...tex.matchAll(/\\addplot\[[^\]]*\] *coordinates \{([^}]*)\}/g)]
     .map(m => (m[1].match(/\(/g) || []).length);
@@ -68,12 +70,12 @@ const measure = async (key) => page.evaluate(async (k) => {
   };
 }, key);
 
-console.log('сцена       картинка   форм/крив+отр  подписей(мат.)  видимых  кегли(pt)  легенд');
+console.log('сцена       поле графика   форм/крив+отр  подписей(мат.)  видимых  кегли(pt)  легенд');
 for (const key of SCENES) {
   const r = await measure(key);
   console.log(
     key.padEnd(11) +
-    `${r.w}×${r.h}см`.padEnd(11) +
+    `${r.w}×${r.h}pt`.padEnd(15) +
     `${r.formulas}/${r.bigTables}+${r.segs}`.padEnd(15) +
     `${r.nodes} (${r.mathNodes})`.padEnd(16) +
     String(r.visible).padEnd(9) +
@@ -95,8 +97,10 @@ console.log('\nОдинаков ли .tex при разной ширине ок�
 same.forEach(([k, eq, la, lb]) => console.log(`  ${k.padEnd(6)} ${eq ? 'да' : 'НЕТ'}  (${la} против ${lb} знаков)`));
 
 /* ═══════════════════════════════════════════════════════════════════════
-   ГЕНЕРАТОР ОТ СОСТОЯНИЯ (26.08). Правила, которых у старого сборщика не было
-   и быть не могло: он снимал координаты с пикселей экрана.
+   ВЫГРУЗКА ОТ НАРИСОВАННОГО С ЗАПИСЬЮ (08.10, ADR 0139). Правила те же, что
+   ставились сборщику от состояния 26.08: кривые формулами, у каждой толщина,
+   нет заливки цветом холста, сборка не спрашивает экран, файл не зависит от
+   окна.
    ═══════════════════════════════════════════════════════════════════════ */
 let bad = 0;
 const flag = (ok, label, detail) => {
@@ -121,11 +125,11 @@ const buildState = async (k, w) => {
     (new Function('k', src))(key);
     redrawAll();
     await new Promise(r => setTimeout(r, 450));
-    return buildTexFromState('Проба', '');
+    return buildTex('Проба', '');
   }, [k, '(' + setupFor.toString() + ')(k)']);
 };
 
-console.log('\n=== Генератор .tex от состояния ===');
+console.log('\n=== Выгрузка .tex (дверь buildTex) ===');
 for (const key of STATE_SCENES) {
   const tex = await buildState(key, 1200);
   console.log('\n  -- сцена ' + key + ', ' + tex.length + ' знаков');
@@ -143,7 +147,12 @@ for (const key of STATE_SCENES) {
   const draws = (tex.match(/\\addplot\[[^\]]*\][^;]*\{[^;]*\};/g) || [])
     .filter(l => !/draw=none/.test(l) && !/only marks/.test(l));
   const noWidth = draws.filter(l => !/line width=/.test(l));
-  flag(draws.length > 0, 'кривые в файле есть', 'кривых: ' + draws.length);
+  /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: «кривые в файле есть» — это кривые холста (опись окна
+     «Скачать»), а не только строки \addplot{формула}: у кривой без записи
+     (сложение КПВ до записей фазы 2) в файле точная ломаная. Формулами ли они
+     ушли — считает аудит выгрузки (calc2/tests/tex/summary.mjs, дефекты записи). */
+  const curves = await page.evaluate(() => (buildTex._tally || {}).curves || 0);
+  flag(curves > 0, 'кривые в файле есть', 'кривых холста в файле: ' + curves + ', из них формулой ' + draws.length);
   flag(noWidth.length === 0, 'у каждой кривой указана толщина',
        noWidth.length ? noWidth[0].slice(0, 90) : '');
   const widths = [...new Set((tex.match(/line width=([\d.]+)pt/g) || []))];
@@ -153,43 +162,37 @@ for (const key of STATE_SCENES) {
 
   /* 3. Заливки цветом холста на бумаге быть не должно (старая ловушка Б6):
         на белом листе это тёмное пятно на пустом месте. */
-  const canvasHex = await page.evaluate(() =>
-    texHex(getComputedStyle(document.documentElement).getPropertyValue('--canvas')));
+  const canvasHex = await page.evaluate(() => {
+    const m = getComputedStyle(document.documentElement).getPropertyValue('--canvas').trim();
+    const t = document.createElement('i'); t.style.color = m; document.body.appendChild(t);
+    const c = getComputedStyle(t).color.match(/\d+/g).slice(0, 3); t.remove();
+    return c.map(v => (+v).toString(16).toUpperCase().padStart(2, '0')).join('');
+  });
   flag(tex.indexOf('c' + canvasHex) < 0, 'нет заливки цветом холста', 'цвет холста ' + canvasHex);
 
-  /* 4. Итоговая функция сцены обязана быть и в файле. */
-  const shows = await page.evaluate(() => {
-    const ff = document.getElementById('info-final');
-    return !!(ff && ff.querySelector('.ff-math'));
-  });
-  if (shows) flag(/\\\[/.test(tex), 'итоговая функция есть в файле');
-  else console.log('       итоговой функции сцена не показывает — и в файле её нет');
+  /* 4. ⚠️ СНЯТО 08.10: «итоговая функция есть в файле». Её дописывал под рисунком
+        только сборщик от состояния, а он по умолчанию не работал, и в файлах,
+        которые получали люди, её не было. Новая выгрузка повторяет холст, а
+        запись итоговой функции живёт в «Ответе», не на холсте (решение 07.10). */
 
-  /* 5. Ни одного следа обхода холста: генератор не имеет права спрашивать
-        браузер о пикселях. Проверяем по коду самой функции. */
-  const src = await page.evaluate(() => String(buildTexFromState));
-  ['getComputedStyle', 'getBoundingClientRect', 'querySelectorAll(\'#chart', 'getElementById(\'chart'].forEach(bad2 => {
-    flag(src.indexOf(bad2) < 0, 'в генераторе нет ' + bad2);
+  /* 5. Сборка — чистая функция: опись → текст, экран она не спрашивает. Холст
+        читает опись на бумажном прогоне, и это по замыслу (решение 07.10);
+        проверяем по коду самой сборки. */
+  const src = await page.evaluate(() => String(TexExport.emit));
+  ['getComputedStyle', 'getBoundingClientRect', 'document.', 'STATE.'].forEach(bad2 => {
+    flag(src.indexOf(bad2) < 0, 'в сборке нет ' + bad2);
   });
 
-  /* 6. Файл не зависит от ширины окна: всё, кроме границ окна, побайтово то же.
-        Раньше это было НЕ так — старый сборщик снимал координаты с пикселей. */
+  /* 6. Файл не зависит от ширины окна: побайтово тот же, ВКЛЮЧАЯ границы
+        окна (холст на листе постоянного размера). */
   const wide = await buildState(key, 1600);
-  const strip = (t) => t.replace(/xmin=[^\]]*?ymax=[^,\]]*/, 'ОКНО');
-  flag(strip(tex) === strip(wide), 'файл при окне 1200 и 1600 px одинаков (кроме границ окна)',
-       tex.length + ' против ' + wide.length + ' знаков');
+  flag(tex === wide, 'файл при окне 1200 и 1600 px одинаков', tex.length + ' против ' + wide.length + ' знаков');
 }
-/* ═══ ОХВАТ: ГДЕ НОВЫЙ ГЕНЕРАТОР ПОКА МОЛЧИТ ═══════════════════════════
-   Генератор от состояния рисует то, что в состоянии ЕСТЬ. Кривые двадцати
-   двух сцен из сорока четырёх живут не в STATE.curves, а внутри самих сцен
-   (издержки, макро, труд, потребитель, «Математика», КПВ и КТВ), и для них
-   файл выходит пустым. Пока это так, переключать выгрузку по умолчанию
-   нельзя: половина калькулятора выгружала бы чистый лист.
-
-   ⚠️ ЧИСЛО ЗДЕСЬ — ХРАПОВИК, А НЕ ЦЕЛЬ. Оно имеет право только УМЕНЬШАТЬСЯ:
-   каждая сцена, объявившая свои кривые в состоянии, снимает единицу. Выросло
-   — значит сцену сломали или завели новую, которая рисует мимо состояния. */
-const COVER_MAX = 22;
+/* ═══ ОХВАТ: ПУСТОГО ЛИСТА НЕТ НИ У ОДНОЙ МОДЕЛИ ════════════════════════
+   ⚠️ ПЕРЕНАЦЕЛЕНО 08.10. Здесь стоял храповик 22 пустых листов у сборщика
+   от состояния. Новая выгрузка читает всё нарисованное, поэтому пустых
+   листов у неё ноль из 44, и это число больше не храповик, а требование. */
+const COVER_MAX = 0;
 await page.setViewportSize({ width: 1280, height: 900 });
 const keys = await page.evaluate(() => Object.keys(SCENE_ROUTE));
 const empty = [];
@@ -197,26 +200,18 @@ for (const k of keys) {
   const r = await page.evaluate(async (k) => {
     resetSceneMemory(); pickScene(k);
     await new Promise(r => setTimeout(r, 260)); redrawAll();
-    const cnt = (t) => (t.match(/\\addplot\[/g) || []).length + (t.match(/\\node\[/g) || []).length;
-    let a = 0, l = 0;
-    try { a = cnt(buildTexFromState('t', '')); } catch (e) { a = 0; }
-    try { l = cnt(buildTexLegacy('t', '')); } catch (e) { l = 0; }
-    return { a, l };
+    const cnt = (t) => (t.match(/\\addplot\[/g) || []).length + (t.match(/\\node\[/g) || []).length + (t.match(/\\fill\[/g) || []).length;
+    let a = 0;
+    try { a = cnt(buildTex('t', '')); } catch (e) { a = 0; }
+    return { a };
   }, k);
-  if (r.a === 0 && r.l > 0) empty.push(k);
+  if (r.a === 0) empty.push(k);
 }
-console.log('\n=== Охват генератора от состояния ===');
-console.log('  сцен, где файл выходит ПУСТЫМ, а у старого сборщика нет: '
-            + empty.length + ' из ' + keys.length);
-console.log('  ' + empty.join(', '));
-flag(empty.length <= COVER_MAX, 'охват не ухудшился (храповик ' + COVER_MAX + ')',
-     'сейчас ' + empty.length);
-if (empty.length > 0) {
-  console.log('  ⚠️ пока это число не ноль, выгрузка по умолчанию остаётся СТАРОЙ:');
-  console.log('     новый генератор включается параметром адреса ?texState=1');
-}
+console.log('\n=== Охват: пустой лист ===');
+console.log('  моделей, где файл выходит ПУСТЫМ: ' + empty.length + ' из ' + keys.length + (empty.length ? ' — ' + empty.join(', ') : ''));
+flag(empty.length <= COVER_MAX, 'пустых листов нет', 'сейчас ' + empty.length);
 
-console.log('\n' + (bad ? ('ПРОВАЛОВ: ' + bad) : 'Генератор от состояния: всё сошлось'));
+console.log('\n' + (bad ? ('ПРОВАЛОВ: ' + bad) : 'Выгрузка .tex: всё сошлось'));
 
 await browser.close();
 process.exit(bad ? 1 : 0);

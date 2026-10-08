@@ -111,8 +111,11 @@
       let o = 1; for (let n = el; n && n !== chart && n.nodeType === 1; n = n.parentNode) { const v = parseFloat(getComputedStyle(n).opacity); if (isFinite(v)) o *= v; }
       if (o < 0.02) return true;
       const r = el.getBoundingClientRect();
-      return !(r.width > 0.5 || r.height > 0.5);
+      if (!(r.width > 0.5 || r.height > 0.5)) return true;
+      // целиком за краем холста: на экране его срезает сам SVG
+      return r.right < box.left - 0.5 || r.left > box.right + 0.5 || r.bottom < box.top - 0.5 || r.top > box.bottom + 0.5;
     };
+    const box = chart.getBoundingClientRect();
     const legend = chart.querySelector('g.legend');
     chart.querySelectorAll('text').forEach(t => {
       if (t.closest('defs') || hidden(t)) return;
@@ -130,6 +133,19 @@
     chart.querySelectorAll('circle').forEach(c => { if (!c.closest('defs') && !(legend && legend.contains(c)) && !hidden(c)) out.dots++; });
     chart.querySelectorAll('path').forEach(p => { if (!p.closest('defs') && !(legend && legend.contains(p)) && !hidden(p)) out.paths++; });
     chart.querySelectorAll('rect').forEach(r => { if (!r.closest('defs') && !r.closest('clipPath') && !(legend && legend.contains(r)) && !hidden(r)) out.rects++; });
+    /* «Сначала сам»: число, спрятанное на холсте, не должно жить в разметке
+       подписи (data-raw) — из неё выгрузка берёт текст. Сравниваются цифры
+       разметки и видимого текста (подстрочные цифры видимого — как обычные). */
+    out.selfLeak = 0;
+    if (typeof selfMasked === 'function' && selfMasked()) {
+      const SUB = { '₀': '0', '₁': '1', '₂': '2', '₃': '3', '₄': '4', '₅': '5', '₆': '6', '₇': '7', '₈': '8', '₉': '9' };
+      const digits = (x) => (String(x).replace(/[₀-₉]/g, c => SUB[c]).match(/\d/g) || []).join('');
+      chart.querySelectorAll('text[data-raw]').forEach(t => {
+        if (hidden(t)) return;
+        const k = t.cloneNode(true); k.querySelectorAll('title,desc').forEach(n => n.remove());
+        if (digits(t.getAttribute('data-raw')) !== digits(k.textContent)) out.selfLeak++;
+      });
+    }
     return out;
   }
 

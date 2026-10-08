@@ -20,7 +20,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from compile import find_pdflatex  # noqa: E402
+from compile import find_pdflatex, server_env  # noqa: E402
 
 HEAD = r"""\documentclass[10pt,a4paper]{article}
 \usepackage[T2A]{fontenc}
@@ -60,13 +60,13 @@ def main():
         body.append(r'\noindent\begin{tikzpicture}')
         for j, (tex, _) in enumerate(items[k:k + per]):
             n = k + j + 1
-            body.append(r'\node[anchor=base east, font=\tiny] at (0,%.2f) {%d};' % (-j * 0.6, n))
+            body.append(r'\node[anchor=base east, font=\fontsize{7}{8}\selectfont] at (0,%.2f) {%d};' % (-j * 0.6, n))
             body.append(r'\node[anchor=base west, inner sep=0pt, font=\fontsize{9}{10.3}\selectfont] at (0.2,%.2f) {%s};' % (-j * 0.6, tex))
         body.append(r'\end{tikzpicture}\newpage')
     (out / 'corpus.tex').write_text(HEAD + '\n'.join(body) + '\n\\end{document}\n', encoding='utf-8')
     (out / 'corpus.txt').write_text('\n'.join('%d\t%s\t%s\t%s' % (i + 1, raw, tex, sid) for i, (tex, (raw, sid)) in enumerate(items)) + '\n', encoding='utf-8')
     p = subprocess.run([binary, '-no-shell-escape', '-interaction=nonstopmode', '-halt-on-error', 'corpus.tex'], cwd=out,
-                       capture_output=True, text=True, errors='replace', timeout=900)
+                       capture_output=True, text=True, errors='replace', timeout=900, env=server_env())
     ok = p.returncode == 0 and (out / 'corpus.pdf').exists()
     if ok and shutil.which('pdftoppm'):
         subprocess.run(['pdftoppm', '-r', '110', '-png', str(out / 'corpus.pdf'), str(out / 'corpus')], capture_output=True)

@@ -1169,10 +1169,10 @@ function setMathX0(x) {
    ЭКСПОРТ (Фаза 5). Три формата:
      PNG — целиком на клиенте: SVG → картинка → canvas → файл. Работает
            всегда, сервер не нужен.
-     TeX — нарисованный холст переводится в TikZ (buildTex): на бумаге
-           выходит ровно то же, что на экране, в том же масштабе и сразу для
-           любой сцены. Чистый TikZ без pgfplots, поэтому файл собирается
-           обычным pdflatex.
+     TeX — buildTex: холст на миг перерисовывается на белом листе
+           постоянного размера, опись нарисованного (кривые — формулами по
+           записи места рисования, области — границами) собирается в pgfplots
+           (72-export-tex.js). Файл собирается обычным pdflatex.
      PDF — тот же .tex компилируется на сервере (calc2/views.export_pdf).
            На бесплатном тарифе Render компилятора нет, поэтому кнопка там
            отключена и об этом написано прямо в окне.
@@ -2301,19 +2301,33 @@ function texWantState() {
   try { return new URLSearchParams(location.search).get('texState') === '1'; }
   catch (e) { return false; }
 }
+/* ЕДИНСТВЕННАЯ ДВЕРЬ ВЫГРУЗКИ .tex (решение владельца 07.10.2026): бумажный
+   прогон → опись → сборка (72-export-tex.js). Её зовут «Скачать TeX», «Скачать
+   PDF», окно «Скачать» и приборы. Прежние сборщики (buildTexLegacy,
+   buildTexFromState) остаются в коде только для сравнения и уходят последним
+   шагом работы. */
 function buildTex(title, label) {
-  const fromState = texWantState();
-  const out = fromState ? buildTexFromState(title, label) : buildTexLegacy(title, label);
-  buildTex._tally = (fromState ? buildTexFromState._tally : buildTexLegacy._tally) || {};
-  return out;
+  const r = texEmit(texInventory(), { title: title || '', label: label || '' });
+  buildTex._tally = r.tally;      // опись окна «Скачать»
+  buildTex._stats = r.stats;      // счётчики сборки (приборы и тесты)
+  return r.tex;
+}
+
+/* Шрифты — до бумажного прогона: поля холста считаются по измеренной ширине
+   подписей, и кадр до загрузки шрифтов даёт поля на 3–5 px другие. */
+function afterFonts(fn) {
+  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(fn, fn);
+  else fn();
 }
 
 function exportTex() {
-  const title = (document.getElementById('exp-title') || {}).value || '';
-  const label = (document.getElementById('exp-label') || {}).value || '';
-  const tex = buildTex(title, label);
-  downloadBlob(new Blob([tex], { type: 'text/plain;charset=utf-8' }), exportBaseName() + '.tex');
-  toast('Файл .tex сохранён');
+  afterFonts(() => {
+    const title = (document.getElementById('exp-title') || {}).value || '';
+    const label = (document.getElementById('exp-label') || {}).value || '';
+    const tex = buildTex(title, label);
+    downloadBlob(new Blob([tex], { type: 'text/plain;charset=utf-8' }), exportBaseName() + '.tex');
+    toast('Файл .tex сохранён');
+  });
 }
 
 function exportPDF() {
@@ -2321,6 +2335,9 @@ function exportPDF() {
   const label = (document.getElementById('exp-label') || {}).value || '';
   const btn = document.getElementById('exp-go');
   if (btn) { btn.disabled = true; btn.textContent = 'Собираю…'; }
+  afterFonts(() => exportPDFSend(title, label, btn));
+}
+function exportPDFSend(title, label, btn) {
   const body = new FormData();
   body.append('tex', buildTex(title, label));
   body.append('name', exportBaseName());
@@ -2352,23 +2369,31 @@ function buildExportFields() {
   });
 }
 
-/* Предпросмотр: что именно уйдёт в файл. Раньше человек жал «Скачать» вслепую. */
+/* Предпросмотр: что именно уйдёт в файл. Раньше человек жал «Скачать» вслепую.
+   Опись холста берётся ОДИН раз на открытие окна: бумажный прогон стоит
+   100–600 мс, а окно перестраивает опись на каждую правку поля заголовка;
+   под окном модель не меняется, на правку идёт только сборка. */
+let _expList = null;
 function refreshExportPreview() {
   const box = document.getElementById('exp-preview');
   if (!box) return;
-  let tex = '';
-  try { tex = buildTex(expValue('exp-title'), expValue('exp-label')); } catch (e) { tex = ''; }
-  if (!tex) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
-  const size = /width=([\d.]+)cm, height=([\d.]+)cm/.exec(tex);
+  let r = null;
+  try {
+    if (!_expList) _expList = texInventory();
+    r = texEmit(_expList, { title: expValue('exp-title'), label: expValue('exp-label') });
+  } catch (e) { r = null; }
+  if (!r || !r.tex || !_expList.panels.length) { box.textContent = 'Пока нечего выгружать: на графике ничего не построено.'; return; }
+  const cm = (v) => String(v).replace('.', ',');
+  const size = r.tally.plotCm ? [cm(r.tally.plotCm[0]), cm(r.tally.plotCm[1])] : null;
   /* п. 70. Опись перечисляет то, что человек видит на графике, и его словами.
      «Кривых формулой» и «Кривых точками» — это про устройство файла: у одной
      и той же кривой разрыв даёт несколько записей, и на экране с двумя
      кривыми стояло «Кривых точками 10». Как именно кривая записана в файле,
      человека не касается: он выбирает, скачивать или нет. */
-  const t = buildTex._tally || {};
+  const t = r.tally || {};
   const cap = expValue('exp-title');
   const rows = [
-    ['Размер картинки', size ? size[1] + ' на ' + size[2] + ' см' : 'по умолчанию'],
+    ['Размер картинки', size ? size[0] + ' на ' + size[1] + ' см' : 'по умолчанию'],
     ['Кривых', String(t.curves || 0)],
     ['Закрашенных областей', String(t.areas || 0)],
     ['Точек', String(t.dots || 0)],
@@ -2453,6 +2478,8 @@ function openExport() {
   m.classList.add('open');
   m.removeAttribute('inert');
   buildExportFields();
+  _expList = null;                 // опись — заново на каждое открытие окна
+  if (document.fonts && document.fonts.status !== 'loaded') document.fonts.ready.then(() => { _expList = null; refreshExportPreview(); });
   const slot = document.getElementById('exp-title-slot');
   const ed = slot && slot.querySelector('.edval');
   if (ed && ed._repaint) ed._repaint();
@@ -2469,6 +2496,7 @@ function closeExport() {
   if (!m) return;
   m.classList.remove('open');
   m.setAttribute('inert', '');
+  _expList = null;
   const b = document.getElementById('dock-export'); if (b) b.focus();
 }
 

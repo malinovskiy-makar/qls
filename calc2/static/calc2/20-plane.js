@@ -10,6 +10,8 @@ let sx, sy;                       // D3-шкалы: данные -> пиксел
 
 // Размер SVG берём из контейнера (обновляется при изменении окна).
 function computeSize() {
+  // Бумажный прогон выгрузки .tex: поле графика постоянного размера (72-export-tex.js).
+  if (typeof texPaperActive === 'function' && texPaperActive()) { texPaperComputeSize(); return; }
   const wrap = document.getElementById('graph-wrap');
   W = wrap.clientWidth;
   H = wrap.clientHeight;

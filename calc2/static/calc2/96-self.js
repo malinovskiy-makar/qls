@@ -158,9 +158,9 @@ function selfCanvas() {
     const onY = (r.right - svgBox.left) < (CONFIG.margin ? CONFIG.margin.left + 2 : 60);
     const near = heroes.filter(x => Math.abs(x.v - v) <= Math.max(0.011, 0.0005 * Math.abs(x.v)));
     const h = near.find(x => x.not.charAt(0) === (onY ? yName : xName)) || near[0];
-    t.textContent = h && h.not ? h.not : '?';
+    selfMaskText(t, h && h.not ? h.not : '?');
   });
-  chart.querySelectorAll('g.cross-label text').forEach(t => { t.textContent = '(?; ?)'; });
+  chart.querySelectorAll('g.cross-label text').forEach(t => { selfMaskText(t, '(?; ?)'); });
   /* Прочие подписи холста с числами ответа (README макета, 9): «Δy = ?»,
      «f′(x₀) = ?», координаты точек «(?; ?)», площади «S₁ = ?», «дефицит ?».
      Деления осей, имена осей и кривых, легенда и ставки («t = 20» — их задал
@@ -175,8 +175,18 @@ function selfCanvas() {
     else if (/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/.test(s)) out = s.replace(/\(\s*[−\-]?[\d.,\s\u202f]+;\s*[−\-]?[\d.,\s\u202f]+\)/g, '(?; ?)');
     else if (/^\s*S\s*[₀-₉\d]*\s*=/.test(s)) out = s.replace(/=.*$/, '= ?');
     else if (/^\s*(дефицит|избыток)\b/i.test(s)) out = s.replace(/[−\-]?\d[\d\s.,\u202f]*/g, '?');
-    if (out != null && out !== s) t.textContent = out;
+    if (out != null && out !== s) selfMaskText(t, out);
   });
+}
+
+/* Спрятать число в подписи холста. Вместе с видимым текстом меняется и
+   исходная разметка data-raw: из неё выгрузка .tex берёт текст подписи
+   (72-export-tex.js), и без этого в файл уходило число, которого на экране
+   нет. Холст перерисовывается заново на каждом кадре, так что разметка
+   живёт до следующей перерисовки, как и сам текст. */
+function selfMaskText(t, text) {
+  t.textContent = text;
+  if (t.hasAttribute('data-raw')) t.setAttribute('data-raw', text);
 }
 
 // Режим прячет числа (включён и «Показать всё» не нажато): этим пользуются

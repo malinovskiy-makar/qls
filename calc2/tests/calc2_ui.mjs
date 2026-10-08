@@ -625,10 +625,15 @@ await t('окно экспорта открывается по кнопке до
 await t('заголовок подставился из названия сцены', async () =>
   (await page.inputValue('#exp-title')).length > 0 || 'поле пустое');
 
+/* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (новая выгрузка, ADR 0139). Было «\addplot не меньше
+   четырёх»: старый сборщик давал \addplot и на заливки отсчётами. Смысл тот же —
+   в файле есть оси и кривые модели: каждая кривая холста (опись окна «Скачать»)
+   стоит в файле своим \addplot, а их здесь три (D, S, S + t). */
 await t('.tex собирается и содержит кривые', () => page.evaluate(() => {
   const tex = buildTex('Рынок хлеба', 'fig:bread');
   const plots = (tex.match(/\\addplot/g) || []).length;
-  return (plots >= 4 && tex.includes('\\begin{axis}')) || `\\addplot: ${plots}`;
+  const curves = (buildTex._tally || {}).curves || 0;
+  return (curves >= 3 && plots >= curves && tex.includes('\\begin{axis}')) || `\\addplot: ${plots}, кривых: ${curves}`;
 }));
 
 await t('кривая с формулой выгружается формулой, а не точками', () => page.evaluate(() => {
@@ -677,7 +682,11 @@ await t('.tex экранирует опасные символы в подпис
   redrawAll();
   const tex = buildTex('', '');
   STATE.axisXName = ''; redrawAll();
-  return tex.includes('50\\% \\& выше') || 'нет экранирования';
+  /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: имя оси уходит настройкой xlabel, а знаки — внутрь
+     математики («Доля $50\% \&$ выше»). Смысл тот же: каждый % и & текста
+     человека экранирован, ни одного голого. */
+  const m = /xlabel=\{(.*?)\}, xlabel style/.exec(tex);
+  return (m && /50\\%/.test(m[1]) && /\\&/.test(m[1]) && /выше/.test(m[1]) && !/(^|[^\\])[%&]/.test(m[1])) || 'нет экранирования: ' + (m ? m[1] : 'нет xlabel');
 }));
 
 await t('label чистится от посторонних символов', () => page.evaluate(() => {
@@ -692,7 +701,8 @@ await t('пунктирная кривая S+t попала в .tex при на�
   await page.waitForTimeout(300);
   return await page.evaluate(() => {
     const tex = buildTex('', '');
-    return tex.includes('dashed') || 'нет пунктира';
+    // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: пунктир на экране — пунктир в файле, теперь штрихом холста (dash pattern)
+    return /\\addplot\[[^\]]*dash pattern=on/.test(tex) || 'нет пунктира';
   });
 });
 
@@ -709,7 +719,9 @@ await t('в режиме издержек выгружаются кривые и
   /* Названия кривых уходят в .tex подписями узлов, как и на экране, и с А46
      они набраны МАТЕМАТИКОЙ: было {MC}, стало {$MC$}. Проверка ждала прежнюю
      запись и потому падала на верном поведении. */
-  return (tex.includes('{$MC$}') && tex.includes('{$ATC$}')) || tex.slice(0, 200);
+  /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: пробег заглавных набирается прямым начертанием, как
+     на холсте ($\mathrm{MC}$), а не курсивом ($MC$). */
+  return (tex.includes('$\\mathrm{MC}$') && tex.includes('$\\mathrm{ATC}$')) || tex.slice(0, 200);
 }));
 
 // Раньше .tex собирался из формул рыночной сцены, поэтому во всех остальных
@@ -1133,8 +1145,12 @@ await t('легенда попадает в экспорт вместе с гр�
     /* Подписи легенды тоже набраны математикой (А46): было {Tx} и {DWL},
        стало {$T_x$} и {$DWL$}. Заодно убеждаемся, что вторая легенда, которую
        рисовал сам pgfplots, из файла ушла (А48). */
-    return (tex.includes('{$T_x$}') && tex.includes('{$DWL$}')
-            && !tex.includes('addlegendentry')) || 'подписей нет в .tex';
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: легенда теперь строки легенды pgfplots, как на
+       экране (\addlegendentry{$T_{x}$}), а вторую, собственную легенду
+       pgfplots гасит forget plot у каждого \addplot. */
+    const plots = tex.match(/\\addplot\[[^\n]*/g) || [];
+    return (tex.includes('\\addlegendentry{$T_{x}$}') && tex.includes('\\addlegendentry{$\\mathrm{DWL}$}')
+            && plots.every(l => l.includes('forget plot'))) || 'подписей нет в .tex';
   });
 });
 

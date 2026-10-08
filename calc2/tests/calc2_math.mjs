@@ -1801,11 +1801,15 @@ const CASES = [
        окно, что на экране; меняется только форма поля.
 
        Проверяем новое требование: размер постоянный и заявленный. */
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (новая выгрузка, ADR 0139): размер поля задаётся в
+       пунктах — 340,5 × 226,5 pt, это прежние 12 × 8 см с точностью до
+       полумиллиметра (454 × 302 px холста при 1 px = 0,75 pt). Смысл тот же:
+       размер постоянный, окно файла равно окну экрана. */
     name: 'Экспорт · размер картинки постоянный и не зависит от окна',
     run: `pickScene('tax');
           var tex = buildTex('Проверка', 'fig:t');
           var ax = /xmin=([-\\d.]+), xmax=([-\\d.]+), ymin=([-\\d.]+), ymax=([-\\d.]+)/.exec(tex);
-          var sz = /width=([\\d.]+)cm, height=([\\d.]+)cm/.exec(tex);
+          var sz = /width=([\\d.]+)pt, height=([\\d.]+)pt/.exec(tex);
           var s = mainScales();
           var xd = s.mx.domain(), yd = s.my.domain();
           return { w: +sz[1], h: +sz[2],
@@ -1813,7 +1817,7 @@ const CASES = [
                    xmin: +ax[1], xmax: +ax[2], ymin: +ax[3], ymax: +ax[4],
                    wantXmin: xd[0], wantXmax: xd[1], wantYmin: yd[0], wantYmax: yd[1],
                    only: tex.indexOf('scale only axis') >= 0 ? 1 : 0 };`,
-    checks: [['ширина, см', 'w', 12, 0], ['высота, см', 'h', 8, 0],
+    checks: [['ширина, pt', 'w', 340.5, 0], ['высота, pt', 'h', 226.5, 0],
              ['левая граница', 'xmin', 'WANTXMIN', 0.02],
              ['правая граница', 'xmax', 'WANTXMAX', 0.02],
              ['нижняя граница', 'ymin', 'WANTYMIN', 0.02],
@@ -1906,9 +1910,19 @@ const CASES = [
           });
           pickScene('tax');
           var tex = buildTex('', '');
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: число точки на месте деления уходит подписью
+             деления ($60_{b}$ в yticklabels), а не отдельным узлом; число узлов
+             поэтому меньше прежних 11. Смысл «подписи не пропали» — подписей в
+             файле (узлы, подписи делений, имена осей) столько же, сколько видимых
+             на холсте. */
+          var vis = [].filter.call(document.querySelectorAll('#chart text'), function (t) {
+            if (t.closest('.legend') || t.closest('[data-service]')) return false;
+            var r = t.getBoundingClientRect(); return (r.width > 0.5 || r.height > 0.5) && labelPlainText(t).trim();
+          }).length;
+          var st = buildTex._stats;
           return { glued: glued, withSub: withSub,
-                   texPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
-                   texNodes: (tex.match(/\\\\node\\[/g) || []).length };`,
+                   texPb: tex.indexOf('$60_{b}$') >= 0 ? 1 : 0,
+                   texNodes: st.texts + st.tickLabels + st.zeroLabels + st.axisNames - vis };`,
     /* ⚠️ ОЖИДАНИЕ ПЕРЕСЧИТАНО 19.08. Значения координат уехали за оси и потеряли
        имя оси: вместо «P_b = 60» на оси стоит «60» с индексом «b». Требование
        осталось тем же по сути — индекс обязан доехать до бумаги, — но искать
@@ -1925,7 +1939,7 @@ const CASES = [
     checks: [['слипшихся величин', 'glued', 0, 0],
              ['подписей с индексом', 'withSub', 61, 28],
              ['в файле цена покупателя с индексом', 'texPb', 1, 0],
-             ['подписи из файла не пропали', 'texNodes', 11, 4]],
+             ['подписей в файле столько же, сколько на холсте (разница)', 'texNodes', 0, 0]],
   },
   {
     /* А60. Подписи не налезают друг на друга.
@@ -2132,16 +2146,23 @@ const CASES = [
             nodes: nodes.length,
             mathAll: (nodes.length && math === nodes.length) ? 1 : 0,
             // Координата уехала за ось и стоит одним числом с индексом (19.08).
-            hasPb: tex.indexOf('$60_b$') >= 0 ? 1 : 0,
-            hasPs: tex.indexOf('$40_s$') >= 0 ? 1 : 0,
-            // Своя легенда одна: вторую, от pgfplots, убрали.
-            legend: (tex.match(/addlegendentry/g) || []).length,
+            /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): индекс набирается в фигурных
+               скобках ($60_{b}$), а число точки на месте деления — подписью
+               деления, не узлом; поэтому узлов меньше прежних 10. Легенда —
+               строки легенды pgfplots, как на экране: их столько же, сколько
+               строк нарисованной легенды, а свою вторую легенду pgfplots гасит
+               forget plot. */
+            hasPb: tex.indexOf('$60_{b}$') >= 0 ? 1 : 0,
+            hasPs: tex.indexOf('$40_{s}$') >= 0 ? 1 : 0,
+            legend: (tex.match(/addlegendentry/g) || []).length - document.querySelectorAll('#chart .legend text').length,
+            forget: ((tex.match(/\\\\addplot\\[[^\\n]*/g) || []).every(function (l) { return l.indexOf('forget plot') >= 0; })) ? 1 : 0,
           };`,
-    checks: [['подписей на холсте', 'nodes', 10, 4],
+    checks: [['подписей-узлов в файле', 'nodes', 5, 2],
              ['все математикой', 'mathAll', 1, 0],
              ['цена покупателя с индексом', 'hasPb', 1, 0],
              ['цена продавца с индексом', 'hasPs', 1, 0],
-             ['лишней легенды нет', 'legend', 0, 0]],
+             ['строк легенды столько же, сколько на холсте (разница)', 'legend', 0, 0],
+             ['у каждого \\\\addplot forget plot', 'forget', 1, 0]],
   },
   {
     /* А49. Кривая, у которой есть выражение, уходит формулой, а не таблицей
@@ -2523,10 +2544,18 @@ const CASES = [
        проверяется прямо: тот же ключ читается ДО и ПОСЛЕ чужой сцены. */
     name: 'Б37 · Подпись оси в .tex совпадает со сценой',
     run: `resetSceneMemory();
-          var yl = function (k) { pickScene(k); redrawAll();
-            var m = /ylabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
-          var xl = function (k) { pickScene(k); redrawAll();
-            var m = /xlabel=\\{([^}]*)\\}/.exec(buildTex('', '')); return m ? m[1] : ''; };
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): имя оси набрано математикой
+             (ylabel={$P$}); сравнивается буква без долларов. Панели со своими
+             осями («Производственная функция») ставят имя оси сами, обычной
+             подписью у конца оси: тогда имя — подпись-узел в конце оси. */
+          var bare = function (s) { return s.replace(/\\$|\\\\mathrm|[{}]/g, ''); };
+          var node = function (tex, re) { var m = re.exec(tex); return m ? bare(m[1]) : ''; };
+          var yl = function (k) { pickScene(k); redrawAll(); var tex = buildTex('', '');
+            var m = /ylabel=\\{([^}]*)\\}/.exec(tex);
+            return m ? bare(m[1]) : node(tex, /yshift=[\\d.]+pt\\] at \\(axis cs:[\\d.]+,[\\d.]+\\) \\{(.*)\\};/); };
+          var xl = function (k) { pickScene(k); redrawAll(); var tex = buildTex('', '');
+            var m = /xlabel=\\{([^}]*)\\}/.exec(tex);
+            return m ? bare(m[1]) : node(tex, /xshift=[\\d.]+pt, yshift=-?[\\d.]+pt\\] at \\(axis cs:[\\d.]+,0\\) \\{(.*)\\};/); };
           var costs = yl('costs'), plants = yl('plants'), prodY = yl('prod'), prodX = xl('prod');
           var sd = yl('sd');
           var costsAfterProd = yl('costs'), prodAfterCosts = yl('prod');
@@ -2584,7 +2613,14 @@ const CASES = [
     run: `resetSceneMemory(); pickScene('tax'); redrawAll();
           var tex = buildTex('', '');
           var thin = /\\u202F/.test(tex) ? 1 : 0;
-          var shifted = /at \\(axis cs:0,60\\)/.test(tex) && /anchor=east[^;]*xshift=-3pt[^;]*at \\(axis cs:0,60\\)/.test(tex) ? 1 : 0;
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): число точки на делении 60 стало
+             подписью деления; подпись у оси с привязкой к точке на оси и сдвигом в
+             пунктах (Т5) проверяется на числе МЕЖДУ делениями — ставка 25,
+             цена покупателя 62,5. */
+          setTax(25); redrawAll();
+          var tex25 = buildTex('', '');
+          setTax(20); redrawAll();
+          var shifted = /anchor=[a-z ]*east[^\\n]*xshift=-[\\d.]+pt[^\\n]*at \\(axis cs:0,62\\.5\\)/.test(tex25) ? 1 : 0;
           var num = quantityTex('30\\u202F000');
           var plain = quantityTex('12');
           return { thin: thin, shifted: shifted,
@@ -2988,7 +3024,8 @@ const CASES = [
                \\addplot есть и «domain=», и «restrict y to domain=», и без
                запятой перед словом в счёт попадали оба. */
             var domains = (tex.match(/, domain=[\\d.]+:[\\d.]+/g) || []).length;
-            var notes = (tex.match(/выгружена точками/g) || []).length;
+            // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): кривая без формулы уходит узлами расчёта модели с причиной
+            var notes = (tex.match(/узлы расчёта модели/g) || []).length;
             return { formulas: formulas, tables: tables, domains: domains, notes: notes };
           };
           var c = f('costs'), pr = f('prod'), pl = f('plants');
