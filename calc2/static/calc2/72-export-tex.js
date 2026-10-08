@@ -368,7 +368,8 @@ const TexExport = (function () {
       /* Двоеточие после слова — знак препинания («max: (0; 1)»), а в математике
          TeX считает его отношением и ставит пробел с обеих сторон. */
       if (ch === ':') { const nx = s[i + 1]; out += (nx === undefined || SPACES.test(nx)) ? '\\colon ' : ':'; prevSym = false; i++; continue; }
-      if (SPACES.test(ch)) { out += ' '; i++; continue; }
+      // неразрывный пробел внутри формулы («20 %») — тонкая шпация: обычный пробел в математике пропадает
+      if (SPACES.test(ch)) { out += (ch === ' ' ? ' ' : '\\,'); i++; continue; }
       if (ch === '{' || ch === '}') { out += '\\' + ch; i++; continue; }
       if (ch === '\\') { out += '\\backslash '; i++; continue; }
       if (CYR.test(ch)) { let run = ''; while (i < s.length && CYR.test(s[i])) run += s[i++]; out += TXT('txt', proseTex(run)); prevSym = false; continue; }
@@ -385,7 +386,9 @@ const TexExport = (function () {
     const words = s.split(/ +/);
     const segs = [];
     words.forEach(w => {
-      const prose = CYR.test(w) && !/[_^]/.test(w);
+      /* Слово из одних знаков препинания («&» в «50% & выше», «%» в «τ = 20 %») —
+         текст: в математике пробел перед ним пропал бы. */
+      const prose = (CYR.test(w) && !/[_^]/.test(w)) || /^[&%,;:!?.«»()\u2014\u2013…]+$/.test(w);
       const last = segs[segs.length - 1];
       if (last && last.prose === prose) last.w.push(w); else segs.push({ prose, w: [w] });
     });
@@ -861,8 +864,21 @@ const TexExport = (function () {
       let da = ca, db = cb;
       [lo, hi].forEach(s => { if (s.num != null) return; if (!isFinite(s.f(pr(ca)))) da = ca + (cb - ca) * 1e-6; if (!isFinite(s.f(pr(cb)))) db = cb - (cb - ca) * 1e-6; });
       const out = (s) => ({ num: s.num, expr: s.expr, pgf: s.pgf, lin: lin(s), at: [s.f(ca), s.f(cb)], probe: s.pgf ? probeOf(s.f, da, db) : null });
-      return { ok: ok && cb > ca, maxErr, areaErr, a, b, ca, cb, da, db, lo: out(lo), hi: out(hi), span: syn, samples: Math.max(smp(lo), smp(hi)), far, bLo: win.y[0] - EXT * syn, bHi: win.y[1] + EXT * syn,
-        why: ok ? (cb > ca ? '' : 'область целиком за окном') : (maxErr >= VERIFY_TOL ? 'узлы области не лежат на записанных границах' : 'площадь области не равна интегралу между границами') };
+      /* Запись верна, но вся область лежит за окном плюс 30 % (обе границы выше
+         или обе ниже на всём отрезке, либо отрезок вне окна): на экране её
+         срезает обрезка, в файл она не идёт и дефектом не считается. */
+      const yLo = win.y[0] - EXT * syn, yHi = win.y[1] + EXT * syn;
+      let hidden = !(cb > ca);
+      if (!hidden) {
+        hidden = true;
+        for (let i = 0; i <= 80 && hidden; i++) {
+          const x = ca + (cb - ca) * i / 80, u = lo.f(x), w = hi.f(x);
+          if (!isFinite(u) || !isFinite(w)) { hidden = false; break; }
+          if (!((u > yHi && w > yHi) || (u < yLo && w < yLo))) hidden = false;
+        }
+      }
+      return { ok, hidden, maxErr, areaErr, a, b, ca, cb, da, db, lo: out(lo), hi: out(hi), span: syn, samples: Math.max(smp(lo), smp(hi)), far, bLo: yLo, bHi: yHi, bx0: win.x[0] - EXT * sxn, bx1: win.x[1] + EXT * sxn,
+        why: ok ? '' : (maxErr >= VERIFY_TOL ? 'узлы области не лежат на записанных границах' : 'площадь области не равна интегралу между границами') };
     };
 
     const legendRoot = chart.querySelector('g.legend');
@@ -872,8 +888,13 @@ const TexExport = (function () {
       for (const el of node.children) {
         const tag = el.tagName.toLowerCase();
         if (tag === 'defs' || tag === 'title' || tag === 'desc' || tag === 'clippath' || tag === 'marker') continue;
-        // служебное (ручки, зажжённые точки) и невидимые полосы попадания в файл не идут — с потомками
-        if (el.getAttribute('data-skip-export') || el.getAttribute('data-service')) continue;
+        /* Служебное (ручки, зажжённые точки) и невидимые полосы попадания в файл
+           не идут — с потомками. Кроме кружка своей точки (g.marks): его тянут
+           мышью, и markServiceNodes считает его ручкой, но это сама точка
+           человека, и она видна на холсте (COVERAGE редизайна, 6.8: свои точки
+           уходят в файл). */
+        const ownPoint = tag === 'circle' && el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('marks');
+        if ((el.getAttribute('data-skip-export') || el.getAttribute('data-service')) && !ownPoint) continue;
         const cls = String(el.getAttribute('class') || '');
         if (tag === 'g') {
           if (el === legendRoot) continue;                 // легенда разбирается отдельно
@@ -1068,7 +1089,7 @@ const TexExport = (function () {
             // 2) область с записью границ: сверяем и пишем границами
             else if (decl && decl.kind === 'area' && fl) {
               const v = verifyArea(data, decl, win, sxn, syn);
-              if (v.ok) { p.items.push(mk(data, { area: v })); return; }
+              if (v.ok) { if (!v.hidden) p.items.push(mk(data, { area: v })); return; }
               extra = { area: { ok: false, why: v.why, maxErr: v.maxErr, areaErr: v.areaErr } };
             }
             // 3) узлы расчёта или ломаная с названной причиной
@@ -1350,8 +1371,9 @@ const TexExport = (function () {
             seenAreas.add('p' + el);
             const A = it.area, name = it.legend || 'область';
             if (A && A.ok) {
-              stats.areasBounds++;
               const DX = (v) => nn(v, dx + 3);
+              if (+DX(A.da) >= +DX(A.db)) return;              // отрезок нулевой длины: не виден, а pgfplots на нём падает
+              stats.areasBounds++;
               // углы — с той же точностью, что и отрезок построения: общий край соседних областей сходится знак в знак
               const corner = (x, y) => { stats.pairs++; return '(axis cs:' + DX(x) + ',' + nn(y, dy + 3) + ')'; };
               const po = it.fl.hatch ? ['draw=none', 'pattern=north east lines', 'pattern color=' + col(it.fl.color)] : ['draw=none', 'fill=' + col(it.fl.color), 'fill opacity=' + Math.max(0.03, it.fl.op).toFixed(2)];
@@ -1359,15 +1381,19 @@ const TexExport = (function () {
               const dom = ['domain=' + DX(A.da) + ':' + DX(A.db), 'samples=' + A.samples].concat(A.far ? ['restrict y to domain*=' + Y(A.bLo) + ':' + Y(A.bHi)] : []);
               const what = (s) => s.num != null ? Y(s.num) : s.expr;
               const about = name + ': от ' + X(A.a) + ' до ' + X(A.b) + ', между ' + what(A.lo) + ' и ' + what(A.hi);
+              // дальше расширенного окна всё срезает \clip: число-граница прижимается к нему без изменения картинки
+              const yIn = (v) => Math.max(A.bLo, Math.min(A.bHi, v));
               if (A.lo.num != null && A.hi.num != null) {
-                out.push('\\fill[' + fillOpts(it.fl).join(', ') + '] ' + corner(A.ca, A.lo.num) + ' rectangle ' + corner(A.cb, A.hi.num) + ';' + note(about));
-              } else if (A.lo.lin && A.hi.lin) {              // обе границы прямые: углы по записи
-                const cs4 = [[A.ca, A.lo.at[0]], [A.cb, A.lo.at[1]], [A.cb, A.hi.at[1]], [A.ca, A.hi.at[0]]];
-                const uniq = cs4.filter((c, i) => { const q = cs4[(i + 3) % 4]; return Math.abs(c[0] - q[0]) > sx * 1e-9 || Math.abs(c[1] - q[1]) > sy * 1e-9; });
-                out.push('\\fill[' + fillOpts(it.fl).join(', ') + '] ' + uniq.map(c => corner(c[0], c[1])).join(' -- ') + ' -- cycle;' + note(about));
+                out.push('\\fill[' + fillOpts(it.fl).join(', ') + '] ' + corner(A.ca, yIn(A.lo.num)) + ' rectangle ' + corner(A.cb, yIn(A.hi.num)) + ';' + note(about));
+              } else if (A.lo.lin && A.hi.lin) {              // обе границы прямые: углы по записи, многоугольник обрезан расширенным окном
+                const cs4 = clipPoly([[A.ca, A.lo.at[0]], [A.cb, A.lo.at[1]], [A.cb, A.hi.at[1]], [A.ca, A.hi.at[0]]], A.bx0, A.bx1, A.bLo, A.bHi);
+                const uniq = cs4.filter((c, i) => { const q = cs4[(i + cs4.length - 1) % cs4.length]; return Math.abs(c[0] - q[0]) > sx * 1e-9 || Math.abs(c[1] - q[1]) > sy * 1e-9; });
+                if (uniq.length >= 3) out.push('\\fill[' + fillOpts(it.fl).join(', ') + '] ' + uniq.map(c => corner(c[0], c[1])).join(' -- ') + ' -- cycle;' + note(about));
               } else if (A.lo.lin || A.hi.lin) {              // одна граница кривая: формула и два угла по прямой границе
                 const cur = A.lo.lin ? A.hi : A.lo, flat = A.lo.lin ? A.lo : A.hi;
-                out.push('\\addplot[' + po.concat(dom, ['forget plot']).join(', ') + '] {' + cur.pgf + '} -- ' + corner(A.cb, flat.at[1]) + ' -- ' + corner(A.ca, flat.at[0]) + ' -- cycle;' + note(about));
+                // горизонтальную прямую прижать к окну можно без изменения картинки, наклонную — нельзя
+                const fy = (v) => (flat.num != null ? yIn(v) : v);
+                out.push('\\addplot[' + po.concat(dom, ['forget plot']).join(', ') + '] {' + cur.pgf + '} -- ' + corner(A.cb, fy(flat.at[1])) + ' -- ' + corner(A.ca, fy(flat.at[0])) + ' -- cycle;' + note(about));
               } else {                                        // обе границы кривые
                 const id = 'area' + String.fromCharCode(65 + pi) + (++areaSeq);
                 needFillBetween = true;
@@ -1388,9 +1414,13 @@ const TexExport = (function () {
             if (!it.fl) seenCurves.add(el);
             const r = it.rec, so = strokeOpts(it.st);
             if (r && r.ok) {
-              stats.curvesFormula++;
               const vert = r.axis === 'y';
               const DA = (v) => nn(v, (vert ? dy : dx) + 3);
+              /* Кусок нулевой длины после округления («domain=50:50» у хвоста MR
+                 при кусочном спросе) не виден, а pgfplots на нём исчерпывает
+                 память TeX: в файл не идёт. */
+              if (+DA(r.lo) >= +DA(r.hi)) return;
+              stats.curvesFormula++;
               const opts2 = ['domain=' + DA(r.lo) + ':' + DA(r.hi), 'samples=' + r.samples];
               if (vert) {
                 opts2.push('variable=\\t');

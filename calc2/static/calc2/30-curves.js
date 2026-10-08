@@ -209,13 +209,31 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
     main.push(inMain ? [q, v] : null);
     tail.push(inTail ? [q, v] : null);
   }
-  if (tail.some(p => p !== null)) {
-    g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
-      .attr('stroke-width', Math.max(1, width * 0.55)).attr('stroke-dasharray', dash)
-      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line);
+  /* Запись для выгрузки. У основной части и у продолжения формула одна, а
+     отрезок свой: граница между ними — ТОЧНЫЙ корень, а не ближайший узел
+     сетки (на экране между крайними узлами частей остаётся щель в шаг сетки). */
+  let cut = null;
+  if (o.expr) {
+    for (let i = 1; i <= N && cut == null; i++) {
+      let a = from + (end - from) * (i - 1) / N, b = from + (end - from) * i / N;
+      const va = fn(a), vb = fn(b);
+      if (!isFinite(va) || !isFinite(vb) || !(va > 0 && vb <= 0)) continue;
+      for (let k = 0; k < 60; k++) { const m = (a + b) / 2; if (fn(m) > 0) a = m; else b = m; }
+      cut = (a + b) / 2;
+    }
   }
-  const p = g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
-    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line);
+  const record = (sel, lo, hi) => {
+    if (o.expr) markExpr(sel, o.expr, 'Q', [lo, hi], { name: o.name || '' });
+    else if (o.why) markNumeric(sel, o.why, o.name || '');
+    return sel;
+  };
+  if (tail.some(p => p !== null)) {
+    record(g.append('path').datum(tail).attr('fill', 'none').attr('stroke', color)
+      .attr('stroke-width', Math.max(1, width * 0.55)).attr('stroke-dasharray', dash)
+      .attr('opacity', 0.45).attr('data-marginal-tail', '1').attr('d', line), cut != null ? cut : from, stop);
+  }
+  const p = record(g.append('path').datum(main).attr('fill', 'none').attr('stroke', color)
+    .attr('stroke-width', width).attr('stroke-dasharray', dash).attr('d', line), from, cut != null ? Math.min(cut, to) : to);
   return p;
 }
 
@@ -239,13 +257,16 @@ function drawMarginalCurve(g, fn, parent, color, opts) {
    зная про экспорт. Кривые, у которых аналитического выражения нет вовсе
    (изокванта, сумма КПВ по Минковскому, горизонтальная сумма заводов),
    по-прежнему честно уходят точками. */
-function markExpr(sel, curveOrExpr, varName, domain) {
+function markExpr(sel, curveOrExpr, varName, domain, opt) {
   const expr = (curveOrExpr && typeof curveOrExpr === 'object')
     ? (curveOrExpr.texExpr || curveOrExpr.expr)
     : curveOrExpr;
   if (expr) {
     sel.attr('data-expr', String(expr));
     if (varName) sel.attr('data-expr-var', varName);
+    // Запись «по вертикали»: горизонтальная координата есть функция вертикальной.
+    if (opt && opt.axis === 'y') sel.attr('data-expr-axis', 'y');
+    if (opt && opt.name) sel.attr('data-expr-name', opt.name);
     /* Свой отрезок построения (Б5). Нужен кусочным кривым: у совокупных
        издержек двух заводов каждый гладкий кусок живёт на своём промежутке,
        и без этого pgfplots рисовал бы обе формулы во всю ширину. */
@@ -254,6 +275,63 @@ function markExpr(sel, curveOrExpr, varName, domain) {
     }
   }
   return sel;
+}
+
+/* ── Остальные записи для выгрузки в LaTeX (пилот «запись при рисовании») ──
+   Запись живёт на нарисованном узле, как и у markExpr: место рисования
+   сообщает, ЧТО оно нарисовало, а выгрузка сверяет запись с рисунком и
+   пишет её в файл. Картинку эти помощники не меняют. */
+
+// «Формулы у этой кривой нет»: в файл уйдут узлы расчёта модели и причина.
+function markNumeric(sel, why, name) {
+  if (name) sel.attr('data-expr-name', name);
+  return sel.attr('data-numeric', String(why || 'посчитано по точкам'));
+}
+// «Это ломаная, заданная вершинами».
+function markPoly(sel, why, name) {
+  if (name) sel.attr('data-expr-name', name);
+  return sel.attr('data-poly', String(why || 'ломаная по вершинам'));
+}
+
+/* Формула кривой как функции горизонтальной величины, строкой на языке
+   Math.js; null, если такой записи у кривой нет (вертикаль, сумма по точкам,
+   непрямая кривая, введённая как Q = f(P)). */
+function curveFormula(c) {
+  if (!c || typeof c !== 'object') return null;
+  if (c.kind === 'vertical' || c.sumNumeric) return null;
+  if (c.srcForm === 'QP') return c.linear ? ('(' + c.linear.a + ') * Q + (' + c.linear.b + ')') : null;
+  return c.texExpr || c.expr || null;
+}
+
+/* Запись для пути, нарисованного по кривой списка (продолжение, поворот,
+   участок вне четверти): формула от Q на отрезке domain; у непрямой кривой,
+   введённой как Q = f(P), — запись человека «по вертикали»; у суммы,
+   посчитанной по точкам, — узлы с причиной. */
+function markCurve(sel, c, domain, name) {
+  if (c && c.srcForm === 'QP' && c.srcExpr && !c.linear) return markExpr(sel, c.srcExpr, 'P', null, { axis: 'y', name: name || '' });
+  const e = curveFormula(c);
+  if (e) return markExpr(sel, e, 'Q', domain, { name: name || '' });
+  return markNumeric(sel, c && c.sumNumeric
+    ? 'сумма посчитана по точкам: среди слагаемых есть непрямая, записи формулой у суммы нет'
+    : 'у кривой нет записи формулой', name || '');
+}
+
+/* Область «между нижней и верхней границей на отрезке [from, to]».
+   Граница — число, объект кривой или строка формулы. floor0: граница-кривая
+   прижата к нулю снизу (нарисована через quadPrice или mcFloor); true — обе
+   границы, 'lo' или 'hi' — одна. У границы нет формулы — область честно
+   уходит узлами расчёта, с причиной. */
+function markArea(sel, rec) {
+  const side = (b, floor) => {
+    if (typeof b === 'number') return isFinite(b) ? b : null;
+    const e = (b && typeof b === 'object') ? curveFormula(b) : (b ? String(b) : null);
+    return e ? (floor ? 'max(0, ' + e + ')' : e) : null;
+  };
+  const lo = side(rec.lo, rec.floor0 === true || rec.floor0 === 'lo');
+  const hi = side(rec.hi, rec.floor0 === true || rec.floor0 === 'hi');
+  if (lo == null || hi == null) return markNumeric(sel, 'у границы области нет записи формулой');
+  if (!isFinite(rec.from) || !isFinite(rec.to)) return sel;
+  return sel.attr('data-area', JSON.stringify({ from: rec.from, to: rec.to, lo, hi, v: rec.v || 'Q' }));
 }
 
 /* Производная формулы В ВИДЕ ФОРМУЛЫ (Б4). Предельные величины движок считает
@@ -269,7 +347,15 @@ function derivativeExpr(expr, varName) {
     // Производную берёт Math.js, значит и здесь запись обязана быть на его
     // языке: символьное дифференцирование разбирает строку само.
     const src = prepExpr(String(expr)).replace(/\bx\b/g, v).replace(/\bQ\b/g, v).replace(/\bL\b/g, v);
-    const d = math.derivative(src, v).toString();
+    /* Запись с условиями (окно «Кусочная функция»): условие поднимается наверх
+       (liftConditional), и каждая ветка дифференцируется отдельно; «функции
+       нет» (NaN) остаётся собой. math.derivative условий не понимает. */
+    const dn = (node) => {
+      const n = unwrapParens(node);
+      if (n.type === 'ConditionalNode') return new math.ConditionalNode(n.condition, dn(n.trueExpr), isNaNNode(n.falseExpr) ? n.falseExpr : dn(n.falseExpr));
+      return math.derivative(n, v);
+    };
+    const d = (/\?/.test(src) ? dn(liftConditional(math.parse(src))) : math.derivative(src, v)).toString();
     // Пробное вычисление: символьная производная бывает верной, но незаписываемой.
     const c = math.parse(d).compile();
     const probe = c.evaluate(paramScope(axisScope(1, { [v]: 1 })));

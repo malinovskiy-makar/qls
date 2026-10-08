@@ -12,6 +12,8 @@
        домашней папки (сервер сборки PDF) нет;
      • список настроек \begin{axis}[…] — одной строкой (пустая строка внутри
        роняет pgfplots, а браузер шлёт CRLF);
+     • отрезок domain= не нулевой длины (на «domain=50:50» pgfplots исчерпывает
+       память TeX);
      • координаты (axis cs:…) и отрезки domain= не уходят дальше двух размахов
        окна панели: дальше pgfplots падает с «Dimension too large».
 
@@ -75,6 +77,7 @@ export function lintTex(text) {
     const re = /axis cs:(-?[\d.]+(?:e-?\d+)?),(-?[\d.]+(?:e-?\d+)?)/g; let c;
     while ((c = re.exec(line))) if (!inX(+c[1]) || !inY(+c[2])) { add('строка ' + (i + 1) + ': точка (' + c[1] + ', ' + c[2] + ') далеко за окном'); break; }
     const d = /domain=(-?[\d.]+(?:e-?\d+)?):(-?[\d.]+(?:e-?\d+)?)/.exec(line);
+    if (d && +d[1] >= +d[2]) add('строка ' + (i + 1) + ': отрезок domain=' + d[1] + ':' + d[2] + ' нулевой длины (pgfplots на нём исчерпывает память TeX)');
     if (d) {
       const vert = /variable=\\t/.test(line);
       const ok = vert ? (inY(+d[1]) && inY(+d[2])) : (inX(+d[1]) && inX(+d[2]));

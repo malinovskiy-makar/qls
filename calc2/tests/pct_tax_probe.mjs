@@ -365,12 +365,15 @@ if (need('О') || need('O')) {
                valText: s.valText, inputValue: s.inputValue,
                keysText: s.keysText, taxText: s.taxText,
                wedge: svgText.filter(function (t) { return /^[tsτ]\s*=/.test(t); }),
-               texLen: tex.length, texPct: /\\\\tau\\s*=\\s*[\\d.,]+\\s*(\\\\,)?\\\\%/.test(tex),
+               /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): отдельный знак «%» после пробела
+                  набирается текстом («$\\tau = 20$ \\%»), чтобы пробел перед ним, как
+                  на холсте, не пропал; число и знак процента — те же. */
+               texLen: tex.length, texPct: /\\\\tau\\s*=\\s*[\\d.,]+\\$?\\s*(\\\\,)?\\\\%/.test(tex),
                /* Ставка попадает в .tex ТОЛЬКО подписью-узлом \node{$...$}.
                   Опции pgfplots (height=8cm, samples=120) не в счёт: там «t=»
                   это хвост слова, а не буква ставки. */
-               texNodes: (tex.match(/\\\\node[^\\n]*\\{\\$([^$]*)\\$\\}/g) || [])
-                 .map(function (l) { return (l.match(/\\{\\$([^$]*)\\$\\}/) || [])[1] || ''; }) };
+               texNodes: (tex.match(/\\\\node\\[[^\\n]*?\\] at \\([^)]*\\) \\{[^\\n]*\\};/g) || [])
+                 .map(function (l) { return (l.match(/\\) \\{(.*)\\};$/) || [])[1] || ''; }) };
     `);
     const rub = /(^|[^%\d])[ts]\s*=\s*\d/;   // «t=50» без процента — рублёвая запись
     console.log(`  ${name}: буква «${m.letter}», поле «${m.inputValue}», клин ${JSON.stringify(m.wedge)}, ` +

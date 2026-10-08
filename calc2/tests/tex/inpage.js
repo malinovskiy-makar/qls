@@ -103,7 +103,9 @@
     const Wc = +chart.getAttribute('width') || chart.clientWidth, Hc = +chart.getAttribute('height') || chart.clientHeight;
     const out = { texts: 0, lines: 0, axisLines: 0, gridLines: 0, dots: 0, legendRows: 0, paths: 0, rects: 0 };
     const hidden = (el) => {
-      for (let n = el; n && n !== chart; n = n.parentNode) {
+      // кружок своей точки — сама точка, хоть его и тянут мышью (как в описи выгрузки)
+      const own = el.tagName === 'circle' && el.parentNode && el.parentNode.classList && el.parentNode.classList.contains('marks');
+      for (let n = el; n && n !== chart && !own; n = n.parentNode) {
         if (n.getAttribute && (n.getAttribute('data-service') || n.getAttribute('data-skip-export'))) return true;
       }
       const cs = getComputedStyle(el);
