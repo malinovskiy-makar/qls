@@ -785,7 +785,19 @@ const TexExport = (function () {
        вертикали давала ложное «не сошлось» у крутой кривой (Q^2 в окне 250 на 5). */
     const nodeMiss = (f, a, b, spanA, spanB) => {
       const e = spanA * VERIFY_TOL;
-      const vs = [f(a - e), f(a), f(a + e)].filter(isFinite);
+      const xs = [a - e, a, a + e], fs = xs.map(f);
+      const vs = fs.filter(isFinite);
+      /* Узел у края области записи (условие «X ≤ 120») округлён за край: в
+         окрестности есть точки и с записью, и без неё. Край области — тоже
+         точка записи, он находится делением пополам. Замер 08.10: сумма КПВ
+         в окне «от 1,5», узел (120,00002; 0) при наклоне −3 давал промах
+         4,9·10⁻⁵ по одной точке (120 − e). */
+      for (let k = 0; k < 2; k++) {
+        if (isFinite(fs[k]) === isFinite(fs[k + 1])) continue;
+        let p = isFinite(fs[k]) ? xs[k] : xs[k + 1], q = isFinite(fs[k]) ? xs[k + 1] : xs[k];
+        for (let i = 0; i < 40; i++) { const m = (p + q) / 2; if (isFinite(f(m))) p = m; else q = m; }
+        vs.push(f(p));
+      }
       if (!vs.length) return 1;
       return Math.max(Math.min.apply(null, vs) - b, b - Math.max.apply(null, vs), 0) / spanB;
     };

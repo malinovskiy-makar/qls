@@ -273,6 +273,35 @@ function tradeBundleGain(d) {
   return { aut: { x: aut.x, y: aut.y }, tr, dx: tr.x - aut.x, dy: tr.y - aut.y };
 }
 
+/* Запись для .tex по строке КПВ (общий ввод блока, тот же разбор, что у
+   сцены): явная y = f(x) — формула; обратная x = g(y) — запись «по вертикали»,
+   как её вводит человек; неявная — узлы, найденные численно, с причиной. */
+function ppfMark(sel, src, name) {
+  const r = parsePpfEquation(src);
+  if (r.error) return markNumeric(sel, 'у кривой нет записи формулой', name);
+  if (r.kind === 'explicit') return markExpr(sel, r.src, 'x', null, { name });
+  if (r.kind === 'inverse') return markExpr(sel, r.src, 'y', null, { axis: 'y', name });
+  return markNumeric(sel, 'граница задана неявным уравнением и найдена численно: формулы y = f(x) у неё нет', name);
+}
+/* Запись области под или над КПВ: граница — формула y = f(x) (expr) на
+   отрезке, где нарисованы узлы pts. Нет формулы y = f(x) или узлы рвутся —
+   область уходит узлами с причиной. side: 'under' — от 0 до кривой,
+   'over' — от кривой до top. */
+function ppfMarkArea(sel, expr, pts, side, top) {
+  const ok = (pts || []).map(p => !!(p && isFinite(p[1])));
+  const a = ok.indexOf(true), b = ok.lastIndexOf(true);
+  if (!expr) return markNumeric(sel, 'граница области не задана формулой y = f(x): область посчитана по точкам');
+  if (a < 0 || ok.slice(a, b + 1).some(v => !v)) return markNumeric(sel, 'граница области прерывается: область посчитана по точкам');
+  return markArea(sel, side === 'over'
+    ? { from: pts[a][0], to: pts[b][0], lo: expr, hi: top, v: 'x' }
+    : { from: pts[a][0], to: pts[b][0], lo: 0, hi: expr, v: 'x' });
+}
+// Формула y = f(x) строки КПВ или null (обратная и неявная её не дают).
+function ppfExplicitExpr(src) {
+  const r = parsePpfEquation(src);
+  return (!r.error && r.kind === 'explicit') ? r.src : null;
+}
+
 // Кривая КПВ, вторая кривая сравнения, области и луч комплектов.
 function drawPpfCurve() {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
@@ -294,21 +323,23 @@ function drawPpfCurve() {
   if (STATE.ppfShowOut) {
     const out = d3.area().defined(d => d !== null).x(d => sx(d[0]))
       .y0(d => sy(d[1])).y1(sy(CONFIG.Pmax));
-    g.append('path').datum(pts).attr('d', out)
+    ppfMarkArea(g.append('path').datum(pts).attr('d', out)
       .attr('fill', STATE.areaColor.ppfOut || COL.DWL).attr('opacity', 0.13)
-      .attr('data-legend', 'Недостижимые наборы');
+      .attr('data-legend', 'Недостижимые наборы'), ppfExplicitExpr(STATE.ppfFormula), pts, 'over', CONFIG.Pmax);
   }
   if (STATE.ppfShowIn) {
-    g.append('path').datum(pts).attr('d', area)
+    ppfMarkArea(g.append('path').datum(pts).attr('d', area)
       .attr('fill', STATE.areaColor.ppfIn || c1).attr('opacity', 0.1)
-      .attr('data-legend', 'Достижимые наборы');
+      .attr('data-legend', 'Достижимые наборы'), ppfExplicitExpr(STATE.ppfFormula), pts, 'under');
   }
-  g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line);
+  ppfMark(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c1).attr('stroke-width', 2.5).attr('d', line),
+    STATE.ppfFormula, STATE.ppfName1 || 'КПВ');
   labelCurve(g, evalPpf, STATE.ppfName1 || 'КПВ', c1, {});
 
   if (STATE.ppfF2) {
     const p2 = mk(evalPpf2);
-    g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line);
+    ppfMark(g.append('path').datum(p2).attr('fill', 'none').attr('stroke', c2).attr('stroke-width', 2.5).attr('d', line),
+      STATE.ppfFormula2, STATE.ppfName2 || 'КПВ 2');
     labelCurve(g, evalPpf2, STATE.ppfName2 || 'КПВ 2', c2, { below: true });
   }
 
@@ -2190,15 +2221,26 @@ function drawPpfSumCurves(d) {
   // Все слагаемые бледным пунктиром, каждое своим цветом и со своим именем.
   (d.parts || []).forEach((pts, i) => {
     const c = ppfSumColor(i);
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
-      .attr('stroke-dasharray', '5 4').attr('opacity', 0.95).attr('d', line);   // как слагаемые «Сложения»: 0,6 давало 2 : 1 к холсту
+    ppfMark(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', c).attr('stroke-width', 1.6)
+      .attr('stroke-dasharray', '5 4').attr('opacity', 0.95).attr('d', line), ppfSumGet(i), ppfSumName(i));   // как слагаемые «Сложения»: 0,6 давало 2 : 1 к холсту
     labelCurve(g, (x) => interpY(pts, x), ppfSumName(i), c, { below: i % 2 === 1 });
   });
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
   const sumC = STATE.ppfSumColor || COL.D;
-  g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
+  /* Запись суммы — та же formulaExpr, что в блоке «Итоговая функция»: она
+     уже сверена с численным Минковским (verifyFormula). Записи нет (смешанный
+     набор, параметрический участок) — узлы суммы с названной причиной. */
+  const sumWhy = d.formulaText || 'сумма построена численно (по Минковскому)';
+  const sa = g.append('path').datum(d.points).attr('d', area).attr('fill', sumC).attr('opacity', 0.07)
     .attr('data-legend', 'Достижимые наборы');
-  g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d', line);
+  const sc = g.append('path').datum(d.points).attr('fill', 'none').attr('stroke', sumC).attr('stroke-width', 2.8).attr('d', line);
+  if (d.formulaExpr) {
+    ppfMarkArea(sa, d.formulaExpr, d.points, 'under');
+    markExpr(sc, d.formulaExpr, 'x', null, { name: 'суммарная КПВ' });
+  } else {
+    markNumeric(sa, sumWhy);
+    markNumeric(sc, sumWhy, 'суммарная КПВ');
+  }
   if (STATE.bundleOn) drawBundleRay(g, (x) => interpY(d.points, x), sumC);
 }
 
@@ -2557,11 +2599,14 @@ function drawPpfTrade(d) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const line = d3.line().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y(p => sy(p[1]));
   const area = d3.area().defined(p => p && !isNaN(p[1])).x(p => sx(p[0])).y0(sy(0)).y1(p => sy(p[1]));
-  g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06);
-  g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line);
+  ppfMarkArea(g.append('path').datum(d.ppfPts).attr('d', area).attr('fill', COL.D).attr('opacity', 0.06),
+    ppfExplicitExpr(STATE.ppftFormula), d.ppfPts, 'under');
+  ppfMark(g.append('path').datum(d.ppfPts).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.5).attr('d', line),
+    STATE.ppftFormula, 'КПВ');
   if (d.line) {
     const pts = [[0, d.line.intercept], [d.xint, 0]];          // прямая КТВ от (0,c0) до (xint,0)
-    g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line);
+    markExpr(g.append('path').datum(pts).attr('fill', 'none').attr('stroke', COL.S).attr('stroke-width', 2.5).attr('d', line),
+      '(' + d.line.intercept + ') - (' + d.line.slope + ') * x', 'x', [0, d.xint], { name: 'КТВ' });
     // Задача 2: линия цены больше не перетаскивается мышью — управление ползунком Px/Py.
   }
   /* П4: в сцене есть и КПВ, и КТВ — луч комплектов обязан пересечь ОБЕ,
@@ -2863,6 +2908,26 @@ function tradeCpfPoints(co) {
   return pts.concat(cut.sort((a, b) => useX ? (b[0] - a[0]) : (a[0] - b[0])));
 }
 
+/* Запись КТВ страны для .tex — тем же устройством, что tradeCpfPoints:
+   прямая от точки производства до излома, за изломом (если партнёра не
+   хватило) своя КПВ, сдвинутая на вектор торговли: f(x − s₀) + s₁. Формула
+   своей КПВ подставляется деревом Math.js, а не правкой строки. */
+function tradeCpfMark(sel, co, src) {
+  const k = co.limit, p = co.prod;
+  const dx = k.kink[0] - p[0];
+  if (!(Math.abs(dx) > 1e-12)) return markPoly(sel, 'отрезок торговых возможностей по двум точкам', 'КТВ');
+  const lineE = '(' + p[1] + ') + (' + ((k.kink[1] - p[1]) / dx) + ') * (x - (' + p[0] + '))';
+  if (!k.binding) return markExpr(sel, lineE, 'x', null, { name: 'КТВ' });
+  let tail;
+  try {
+    tail = math.parse(prepExpr(String(src))).transform(n => (n.isSymbolNode && (n.name === 'x' || n.name === 'X'))
+      ? math.parse('(x - (' + k.shift[0] + '))') : n).toString();
+  } catch (e) { return markNumeric(sel, 'у своей КПВ нет записи формулой', 'КТВ'); }
+  const tailE = '(' + tail + ') + (' + k.shift[1] + ')';
+  const cond = (co.exports === 'X') ? ('x < ' + k.kink[0]) : ('x > ' + k.kink[0]);
+  return markExpr(sel, cond + ' ? (' + tailE + ') : (' + lineE + ')', 'x', null, { name: 'КТВ' });
+}
+
 /* Два графика рядом: слева страна 1, справа страна 2 (Фаза 15.3). У каждой
    свои шкалы и своя область отрисовки с обрезкой, поэтому кривые одной страны
    не заезжают на территорию другой. Устроено как две панели у производной. */
@@ -2929,12 +2994,15 @@ function drawTradeB(d) {
       .attr('fill', co.color).text(tbName(co.idx));
 
     // КПВ и КТВ обе сплошные (Фаза 15.4): пунктир читался как «ненастоящая».
-    g.append('path').datum(co.ppts).attr('fill', 'none')
-      .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line);
+    const ownSrc = co.idx === 1 ? STATE.tbF1 : STATE.tbF2;
+    markExpr(g.append('path').datum(co.ppts).attr('fill', 'none')
+      .attr('stroke', co.color).attr('stroke-width', 2.2).attr('d', line), ownSrc, 'x', null, { name: tbName(co.idx) });
     // Торговли нет — нет и линии возможностей: рисовать её значило бы показывать
     // обмен, которого при такой цене не будет.
-    if (!d.noTrade) g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
-      .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line);
+    if (!d.noTrade) {
+      tradeCpfMark(g.append('path').datum(tradeCpfPoints(co)).attr('fill', 'none')
+        .attr('stroke', COL.reg).attr('stroke-width', 2.2).attr('d', line), co, ownSrc);
+    }
 
     // Точка производства и точка предела торговли.
     if (d.noTrade) return;      // дальше только про состоявшийся обмен
