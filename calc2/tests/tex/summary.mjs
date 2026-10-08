@@ -7,7 +7,7 @@
    (с причиной), для отчёта владельцу.
 
    Код возврата с --strict: 1, если есть сбой, дефект записи (без записи, не
-   сошлась), изменение состояния/холста/истории/хранилища, событие во время
+   сошлась; кроме дефектов сцены из scene_defects.json), изменение состояния/холста/истории/хранилища, событие во время
    выгрузки, разный файл при повторе, расхождение двери и сборки, непрошедшая
    проверка текста. Без --strict — всегда 0 (сводка для журнала). */
 import fs from 'node:fs';
@@ -26,6 +26,18 @@ const DEF = ['curvesNoRecPoly', 'curvesNoRecSampled', 'curvesMismatch', 'areasNo
 const COLS = [['состояний', null], ['форм', 'curvesFormula'], ['числ', 'curvesNumeric'], ['(модели)', 'numericExact'], ['лом+', 'curvesPolyRec'],
   ['БЕЗ:лом', 'curvesNoRecPoly'], ['БЕЗ:отсч', 'curvesNoRecSampled'], ['НЕСОШ', 'curvesMismatch'],
   ['обл:гран', 'areasBounds'], ['обл:мн', 'areasPoly'], ['обл:числ', 'areasNumeric'], ['обл:БЕЗ', 'areasNoRecSampled'], ['обл:НЕСОШ', 'areasMismatch'], ['пар', 'pairs']];
+/* Именной список дефектов сцены (scene_defects.json): там запись не сошлась
+   потому, что неверно нарисовано на экране. Такие кривые вычитаются из
+   «не сошлось» и печатаются отдельной строкой — поимённо, с причиной. */
+const SD = JSON.parse(fs.readFileSync(path.join(path.dirname(new URL(import.meta.url).pathname), 'scene_defects.json'), 'utf8'));
+const known = [];
+all.filter(r => r.stats && SD[r.id]).forEach(r => (r.fallback || []).forEach(x => {
+  const why = x.kind === 'не сошлась' && SD[r.id][x.name || ''];
+  if (!why) return;
+  const k = x.what === 'область' ? 'areasMismatch' : 'curvesMismatch';
+  r.stats = Object.assign({}, r.stats, { [k]: r.stats[k] - 1 });
+  known.push(r.id + ' | ' + (x.name || '(без имени)') + ' — ' + why);
+}));
 const sum = (list) => { const t = {}; list.forEach(r => Object.entries(r.stats).forEach(([k, v]) => { t[k] = (t[k] || 0) + v; })); return t; };
 // Состояния рецептов делятся по файлам рецептов (states.json, поле file).
 let stFile = {};
@@ -93,6 +105,8 @@ console.log('дефекты записи: моделей', defModels.length, '�
 defModels.forEach(k => { const c = by[k]; console.log('   ' + k.padEnd(14) + [c.curvesNoRecPoly, c.curvesNoRecSampled, c.areasNoRecSampled, c.curvesMismatch + c.areasMismatch].map(v => String(v).padStart(3)).join(' /')); });
 const defStates = ok.filter(r => DEF.some(d => r.stats[d]));
 console.log('состояний с дефектом записи', defStates.length, 'из', ok.length, '| суммы:', DEF.map(d => d + ' ' + (T[d] || 0)).join(', '));
+console.log('известные дефекты сцены (именной список scene_defects.json, в «не сошлось» не входят):', known.length);
+known.forEach(k => console.log('   СЦЕНА', k.slice(0, 260)));
 if (FALLBACK) {
   const fb = {};
   ok.forEach(r => (r.fallback || []).forEach(x => { const k = [r.key, x.what, x.name || '(без имени)', x.kind, x.why].join(' | '); (fb[k] = fb[k] || []).push(r.id); }));

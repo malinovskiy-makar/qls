@@ -40,7 +40,7 @@ function evalVar(compiled, v, names) {
 function macroCurveY(expr, names) {
   const { compiled, error } = compileVar(expr, names);
   if (error) return { error };
-  return { fn: (v) => evalVar(compiled, v, names) };
+  return { fn: (v) => evalVar(compiled, v, names), rec: { expr, v: names[0] } };
 }
 
 // Кривая, заданная как x = g(y) («количество от ставки»). Приводим к y = f(x):
@@ -55,9 +55,9 @@ function macroCurveInv(expr, names, yMax) {
   const d12 = (f2 - f1) / (y2 - y1), d23 = (f3 - f2) / (y3 - y2);
   if (isFinite(d12) && isFinite(d23) && Math.abs(d12 - d23) < 1e-6 * (1 + Math.abs(d12)) && Math.abs(d12) > 1e-9) {
     const d = d12, c = f1 - d * y1;          // x = c + d·y  ⇒  y = (x − c)/d
-    return { fn: (v) => (v - c) / d, inv: { c, d } };
+    return { fn: (v) => (v - c) / d, inv: { c, d }, rec: { expr, v: names[0], axis: 'y' } };
   }
-  return { fn: (v) => {
+  return { rec: { expr, v: names[0], axis: 'y' }, fn: (v) => {
     const h = (y) => { const q = g(y); return isNaN(q) ? NaN : q - v; };
     const hi = Math.max(1, yMax * 3);
     let prevY = 0, prevH = h(0);
@@ -113,7 +113,7 @@ function recomputeMacro() {
   if (m === 'phillips') {
     // $\pi = \pi_e - \beta(u - u^*)$: прямая с наклоном −β через точку $(u^*;\\ \\pi_e)$.
     const f = (u) => P.pe - P.beta * (u - P.ustar);
-    const sr = { fn: f };
+    const sr = { fn: f, rec: { expr: '(' + P.pe + ') - (' + P.beta + ') * (u - (' + P.ustar + '))', v: 'u' } };
     const lrp = makeVerticalCurve(P.ustar);
     STATE.macroRes = { kind: 'phillips', curves: [['SRPC', sr, COL.D]],
                        vertical: [['LRPC', lrp, COL.MC]],
@@ -139,7 +139,8 @@ function recomputeMacro() {
     // ставки нет вовсе: государству нужны эти ΔG при любой ставке, то есть там
     // кривая вертикальна и как r = f(Q) не выражается. Возвращаем NaN, чтобы не
     // рисовать вместо неё ложную горизонтальную полку на уровне запретительной ставки.
-    const dTot = { fn: (x) => (x < P.dg) ? NaN : dv.fn(x - P.dg) };
+    const dTot = { fn: (x) => (x < P.dg) ? NaN : dv.fn(x - P.dg),
+                   rec: { expr: '(' + dv.rec.expr + ') + (' + P.dg + ')', v: dv.rec.v, axis: 'y' } };
     const base = findEquilibrium(dv, sv, MACRO_SEARCH);
     const after = findEquilibrium(dTot, sv, MACRO_SEARCH);
     if (!base || !after) return fail('Равновесие на рынке заёмных средств не найдено.');
@@ -190,7 +191,14 @@ function recomputeMacro() {
       pts.push([t, rev]);
       if (rev > best.rev) best = { t, rev, Q: e ? e.Q : null };
     }
-    STATE.macroRes = { kind: 'laffer', pts, best, tMax };
+    /* запись для .tex: у линейных D: P = aD·Q + bD и S: P = aS·Q + bS равновесие
+       с налогом t — Q = (bD − bS − t)/(aS − aD), доход t·Q, ноль там, где рынка нет.
+       Иначе кривая честно посчитана по точкам (своё равновесие на каждой ставке). */
+    let rec = null;
+    if (D.linear && S.linear && S.linear.a - D.linear.a > 0) {
+      rec = 'x * max(0, ((' + D.linear.b + ') - (' + S.linear.b + ') - x) / (' + (S.linear.a - D.linear.a) + '))';
+    }
+    STATE.macroRes = { kind: 'laffer', pts, best, tMax, rec };
     applyAutoRanges(niceMax(tMax), niceMax(Math.max(best.rev, 1) * 1.25));
     return;
   }
@@ -222,6 +230,9 @@ function drawMacroCurve(c, color, dash, label) {
   for (let i = 0; i <= 400; i++) { const q = CONFIG.Qmax * i / 400; const v = evalCurve(c, q); pts.push(isNaN(v) ? null : [q, v]); }
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color).attr('stroke-width', 2.6).attr('d', line);
   if (dash) p.attr('stroke-dasharray', '6 4');
+  // запись для .tex: формула человека; у x = g(y) — «по вертикали», как её и вводят
+  if (c.rec) markExpr(p, c.rec.expr, c.rec.v, null, { axis: c.rec.axis, name: label || '' });
+  else markNumeric(p, 'у кривой нет записи формулой', label || '');
   if (label) {
     for (const t of [0.86, 0.7, 0.5, 0.3, 0.14]) {
       const q = CONFIG.Qmax * t, v = evalCurve(c, q);
@@ -251,8 +262,16 @@ function redrawMacro() {
     const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
     const line = d3.line().x(d => sx(d[0])).y(d => sy(d[1]));
     const area = d3.area().x(d => sx(d[0])).y0(sy(0)).y1(d => sy(d[1]));
-    g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12).attr('data-legend', 'Поступления бюджета');
-    g.append('path').datum(r.pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2.8).attr('d', line);
+    const why = 'доход бюджета посчитан по точкам: на каждой ставке своё равновесие с налогом, формулы у кривой нет';
+    const ar = g.append('path').datum(r.pts).attr('d', area).attr('fill', COL.tax).attr('opacity', 0.12).attr('data-legend', 'Поступления бюджета');
+    const cv = g.append('path').datum(r.pts).attr('fill', 'none').attr('stroke', COL.tax).attr('stroke-width', 2.8).attr('d', line);
+    if (r.rec) {
+      markArea(ar, { from: 0, to: r.tMax, lo: 0, hi: r.rec, v: 't' });
+      markExpr(cv, r.rec, 't', null, { name: 'Кривая Лаффера' });
+    } else {
+      markNumeric(ar, why);
+      markNumeric(cv, why, 'Кривая Лаффера');
+    }
     const og = svg.append('g'), ox = sx(0), oy = sy(0);
     const [px, py] = toPx(r.best.t, r.best.rev);
     og.append('line').attr('x1', px).attr('y1', oy).attr('x2', px).attr('y2', py)

@@ -100,6 +100,8 @@ function drawLevelCurve(f, level, color, width, opacity, dash) {
   const p = g.append('path').datum(pts).attr('fill', 'none').attr('stroke', color)
     .attr('stroke-width', width || 2.2).attr('opacity', opacity == null ? 1 : opacity).attr('d', line);
   if (dash) p.attr('stroke-dasharray', dash);
+  // запись для .tex: формулы y = f(x) у линии уровня нет, в файл идут узлы трассировки
+  markNumeric(p, 'линия уровня функции двух переменных найдена численно (трассировкой): формулы y = f(x) у неё нет');
 }
 
 // Точка выбора с проекциями и подписью.
