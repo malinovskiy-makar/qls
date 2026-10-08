@@ -161,9 +161,10 @@ class DryRunAndApprovalTests(AuditTestBase):
 
 class NewRefTests(AuditTestBase):
     def test_3_official_row_and_no_duplicate_pair(self):
-        """Новая строка — official и официальный event_id; дубль пары не заводится."""
+        """Новая строка — official и официальный event_id; дубль пары не заводится
+        ни внутри одного файла, ни повторным запуском."""
         p = self.problem('B')
-        auto = self.auto_csv([(p.pk, 'vp-2020-final-10-v1', '2')])
+        auto = self.auto_csv([(p.pk, 'vp-2020-final-10-v1', '2')] * 2)
         self.run_cmd(new_refs=auto, tier='auto', **APPROVE)
         ref = OlympiadRef.objects.get(problem=p)
         self.assertEqual(
@@ -290,8 +291,21 @@ class ImportAndRollbackTests(AuditTestBase):
                          ('official', 'vp-2020-final-9-v1', '4'))
         after = snapshot()
         self.assertEqual(after[1:], (before[1] + 1, before[2] + 1, before[3] + 1, before[4]))
+        # Повтор узнаётся по привязке к источнику, даже если строку
+        # OlympiadRef кто-то снял.
+        ref.delete()
         self.run_cmd(import_queue=self.queue, **APPROVE)
         self.assertEqual(snapshot()[1:], after[1:])
+
+    def test_9b_task_already_linked_is_not_imported(self):
+        """Задание уже привязано к задаче банка правками существующих строк
+        (raw_meta['official_event_id'] + номер) — импорт его не создаёт."""
+        p = self.problem('D')
+        self.aggregator_ref(p, grade='9', number='4',
+                            raw_meta={'official_event_id': 'vp-2020-final-9-v1'})
+        before = snapshot()
+        self.run_cmd(import_queue=self.queue, **APPROVE)
+        self.assertEqual(snapshot(), before)
 
     def test_7_rollback_restores_exactly(self):
         """Откат по журналу возвращает базу до единицы — и привязки, и импорт."""

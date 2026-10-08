@@ -53,6 +53,7 @@ from datetime import datetime
 
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 
 from problems.corpus_converter.ingest import create_problem
 from problems.models import (
@@ -482,8 +483,13 @@ class Command(BaseCommand):
             if external_id in done:
                 plan.skip(external_id, 'уже импортировано (SourceReference)')
                 continue
+            # Задание уже привязано к задаче банка — строкой с официальным
+            # event_id или строкой агрегатора, переведённой на официальный
+            # комплект правками (raw_meta['official_event_id']). Поэтому
+            # импорт идёт ПОСЛЕ --update-existing.
             taken = OlympiadRef.objects.filter(
-                event_id=event_id, number=number).values_list('problem_id', flat=True)
+                Q(event_id=event_id) | Q(raw_meta__official_event_id=event_id),
+                number=number).values_list('problem_id', flat=True)
             if taken:
                 plan.skip(external_id, f'в банке уже есть задача с этим заданием '
                                        f'(#{taken[0]})')
