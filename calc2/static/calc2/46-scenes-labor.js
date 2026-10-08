@@ -228,10 +228,12 @@ function drawLaborSurpluses() {
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(eq.Q * i / 100);
   // Излишек рабочих — между предложением (низ) и зарплатой W (верх).
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(W));
-  g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников');
+  markArea(g.append('path').datum(samp).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников'),
+    { from: 0, to: eq.Q, lo: S, hi: W, v: 'L' });
   // Излишек фирм — между зарплатой W (низ) и спросом D=MRPL (верх).
   const fA = d3.area().x(d => sx(d)).y0(sy(W)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм');
+  markArea(g.append('path').datum(samp).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм'),
+    { from: 0, to: eq.Q, lo: W, hi: D, v: 'L' });
 }
 
 // Благосостояние при связывающем МРОТ (Задача 3): перестроенные излишки + DWL.
@@ -246,16 +248,19 @@ function drawLaborMinWelfare() {
   const s1 = samp(0, Lstar);
   // Излишек рабочих — между предложением S (низ) и фактической зарплатой (верх), до L*.
   const wA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(sy(Wfact));
-  g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников');
+  markArea(g.append('path').datum(s1).attr('d', wA).attr('fill', COL.S).attr('opacity', 0.16).attr('data-legend', 'Излишек работников'),
+    { from: 0, to: Lstar, lo: S, hi: Wfact, v: 'L' });
   // Излишек фирм — между фактической зарплатой (низ) и спросом D (верх), до L*.
   const fA = d3.area().x(d => sx(d)).y0(sy(Wfact)).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм');
+  markArea(g.append('path').datum(s1).attr('d', fA).attr('fill', COL.D).attr('opacity', 0.16).attr('data-legend', 'Излишек фирм'),
+    { from: 0, to: Lstar, lo: Wfact, hi: D, v: 'L' });
   // DWL — между D и S от L* до конкурентной занятости Lk (недозанятость/безработица).
   const Lk = eq.Q, lo = Math.min(Lstar, Lk), hi = Math.max(Lstar, Lk);
   if (hi > lo) {
     const s2 = samp(lo, hi);
     const dA = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-    g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
+    markArea(g.append('path').datum(s2).attr('d', dA).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
+      { from: lo, to: hi, lo: S, hi: D, v: 'L' });
   }
 }
 
@@ -272,7 +277,11 @@ function drawLaborMCL() {
   const line = d3.line().defined(d => d !== null).x(d => sx(d[0])).y(d => sy(d[1]));
   // (1) Настоящая MCL — всегда во всю длину.
   const ptsFull = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; const v = laborMCL(S, l); ptsFull.push(isNaN(v) ? null : [l, v]); }
-  g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line);
+  // запись для .tex: MCL = d(W_s(L)·L)/dL символьно, как MR (laborMCL считает ту же величину численно)
+  const sE = curveFormula(S), mclE = sE ? derivativeExpr('(' + sE + ') * L', 'L') : null;
+  const mark = (sel) => (mclE ? markExpr(sel, mclE, 'L', null, { name: 'MCL' })
+    : markNumeric(sel, 'предельные издержки труда посчитаны численно: записи формулой у них нет', 'MCL'));
+  mark(g.append('path').datum(ptsFull).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line));
   const ql = CONFIG.Qmax * 0.85, vl = laborMCL(S, ql);
   if (!isNaN(vl) && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.reg)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MCL');
@@ -285,7 +294,7 @@ function drawLaborMCL() {
       .attr('stroke', COL.warn).attr('stroke-width', 3.5);
     // Дальше L̂ MCL_eff совпадает с настоящей MCL — подчёркиваем сплошной поверх пунктира.
     const ptsBeyond = []; for (let i = 0; i <= 400; i++) { const l = CONFIG.Qmax * i / 400; if (l < min.Lhat) { ptsBeyond.push(null); continue; } const v = laborMCL(S, l); ptsBeyond.push(isNaN(v) ? null : [l, v]); }
-    g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', COL.warn).attr('stroke-width', 3).attr('d', line);
+    mark(g.append('path').datum(ptsBeyond).attr('fill', 'none').attr('stroke', COL.warn).attr('stroke-width', 3).attr('d', line));
     // Вертикальный скачок в L̂ от W_min к настоящей MCL.
     const mclHat = laborMCL(S, min.Lhat);
     if (!isNaN(mclHat)) g.append('line').attr('x1', sx(min.Lhat)).attr('y1', yW).attr('x2', sx(min.Lhat)).attr('y2', sy(mclHat))
@@ -305,7 +314,8 @@ function drawLaborDWL(Lfrom) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
+  markArea(g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
+    { from: lo, to: hi, lo: S, hi: D, v: 'L' });
 }
 
 // Точки монопсонии: оптимум на MCL=D, зарплата вниз на S, ориентир «К».
@@ -436,7 +446,8 @@ function drawLaborUnionMRL() {
   const D = STATE.laborD; if (!D) return;
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   // Продолжение ниже оси — общим помощником, до нуля породившего спроса на труд.
-  drawMarginalCurve(g, l => marginalRevenue(D, l), D, COL.MR, { width: 2 });
+  drawMarginalCurve(g, l => marginalRevenue(D, l), D, COL.MR,
+    { width: 2, expr: mrFormula(D), name: 'MRL', why: 'предельный доход профсоюза посчитан численно: записи формулой у него нет' });
   const ql = CONFIG.Qmax * 0.28, vl = marginalRevenue(D, ql);
   if (!isNaN(vl) && vl >= 0 && vl <= CONFIG.Pmax) g.append('text').attr('x', sx(ql)).attr('y', sy(vl) - 4).attr('font-size', FS.base).attr('font-weight', 600).attr('fill', COL.MR)
     .attr('paint-order', 'stroke').attr('stroke', COL.halo).attr('stroke-width', 2.5).text('MRL');
@@ -449,7 +460,8 @@ function drawLaborGapDWL(La, Lb) {
   const g = svg.append('g').attr('clip-path', 'url(#plot-clip)');
   const samp = []; for (let i = 0; i <= 100; i++) samp.push(lo + (hi - lo) * i / 100);
   const a = d3.area().x(d => sx(d)).y0(d => sy(evalCurve(S, d))).y1(d => sy(evalCurve(D, d)));
-  g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)');
+  markArea(g.append('path').datum(samp).attr('d', a).attr('fill', COL.inkSoft).attr('opacity', 0.28).attr('data-legend', 'Потери общества (DWL)'),
+    { from: lo, to: hi, lo: S, hi: D, v: 'L' });
 }
 
 // Точки профсоюза: оптимум монополиста (MRL=S, зарплата вверх на D) или диктат зарплаты.

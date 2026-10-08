@@ -1071,7 +1071,7 @@ function redrawPlants() {
        предельных затрат), замкнутой формулы у неё в общем случае нет. Говорим
        об этом в самом файле, а не выдаём таблицу точек за формулу (Б5). */
     g.append('path').datum(p.table.map(r => [r.Q, r.m])).attr('fill', 'none').attr('stroke', COL.MC).attr('stroke-width', 2.8).attr('d', line)
-      .attr('data-numeric', 'совокупная MC получена горизонтальным сложением, замкнутой формулы у неё нет');
+      .attr('data-numeric', 'совокупная MC получена горизонтальным сложением, замкнутой формулы у неё нет').attr('data-expr-name', 'MC совокупная');
     label(p.qMax * 0.5, plantMC(p.c1, p.qMax * 0.5), 'MC₁', COL.tax);
     label(p.qMax * 0.34, plantMC(p.c2, p.qMax * 0.34), 'MC₂', COL.reg);
     const mid = plantsAt(p.Qtot * 0.6); if (mid) label(mid.Q, mid.m, 'MC совокупная', COL.MC);
@@ -1083,7 +1083,7 @@ function redrawPlants() {
     markExpr(g.append('path').datum(mkTC(p.c2)).attr('fill', 'none').attr('stroke', COL.reg).attr('stroke-width', 2).attr('stroke-dasharray', '6 4').attr('d', line),
              STATE.pl2, 'Q', [0, p.qMax]);
     g.append('path').datum(p.table.map(r => [r.Q, r.tcDirect])).attr('fill', 'none').attr('stroke', COL.D).attr('stroke-width', 2.8).attr('d', line)
-      .attr('data-numeric', 'совокупная TC это минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет');
+      .attr('data-numeric', 'совокупная TC это минимум суммы затрат по всем способам разделить выпуск, замкнутой формулы у неё нет').attr('data-expr-name', 'TC совокупная');
     label(p.qMax * 0.7, plantTC(p.c1, p.qMax * 0.7), 'TC₁', COL.tax);
     label(p.qMax * 0.45, plantTC(p.c2, p.qMax * 0.45), 'TC₂', COL.reg);
     const mid = plantsAt(p.Qtot * 0.7); if (mid) label(mid.Q, mid.tcDirect, 'TC совокупная', COL.D);
