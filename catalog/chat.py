@@ -314,6 +314,38 @@ def _spent(result):
 
 # ─── Реплика ───────────────────────────────────────────────────────────────
 
+def ask_model(problem, parts, text, history, mode, homework, *, user=None,
+              last_attempt=None, images=None, quote='', quote_source='statement',
+              provider=None, model=None, log=True, check_budget=True,
+              check_limit=True, parse=None, timeout=None):
+    """Текстовая часть реплики: промпт → `core.run` → (текст ответа, AiResult).
+
+    Ровно то, что `answer()` делает после шага зрения. Вынесено как шов для
+    экзамена ИИ (`problems/ai_exam/runner.py`): прогонщик ходит в модель ТЕМ
+    ЖЕ путём, что и чат на сайте, а не его копией. Ни базы, ни `ChatTurn`
+    здесь нет — `parts` и `homework` вызывающий готовит сам.
+
+    Пустой ответ не ошибка ЗДЕСЬ: `answer()` сначала записывает токены и
+    деньги реплики, а потом уже отказывает «Помощник не ответил».
+    """
+    mode = mode if mode in MODES else 'free'
+    provider = provider if provider is not None else chat_provider()
+    if model is None:
+        model = getattr(settings, 'CATALOG_CHAT_MODEL', '') or None
+    prompt = build_prompt(problem, parts, text, clean_history(history),
+                          last_attempt=last_attempt, homework=homework, quote=quote,
+                          quote_source=quote_source)
+    # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
+    # кэша считается по тексту запроса — та же реплика в другом режиме
+    # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
+    result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
+                      provider=provider, model=model, system=system_for(problem, mode),
+                      cache_seconds=0, max_tokens=CHAT_MAX_TOKENS, log=log,
+                      check_budget=check_budget, check_limit=check_limit, parse=parse,
+                      timeout=timeout)
+    return str((result.data or {}).get('reply') or '').strip(), result
+
+
 def answer(problem, message, history, user, last_attempt=None, mode='free',
            attachments=(), thread=None, quote='', quote_source='statement'):
     """Одна реплика помощника → текст ответа. Поднимает `core.AiUnavailable`.
@@ -359,20 +391,13 @@ def answer(problem, message, history, user, last_attempt=None, mode='free',
                 images = pictures
                 text = '%s\n\n[фото: картинок %d, sha256 %s]' % (text, len(pictures),
                                                                  _digest(pictures))
-        prompt = build_prompt(problem, list(problem.parts.all()), text, clean_history(history),
-                              last_attempt=last_attempt,
-                              homework=in_active_homework(user, problem), quote=quote,
-                              quote_source=quote_source)
-        # ⚠️ Без кэша ответов: режим и эталон живут в системных блоках, а ключ
-        # кэша считается по тексту запроса — та же реплика в другом режиме
-        # получила бы чужой ответ. Шаг зрения кэшируется: там в тексте хеш файла.
-        result = core.run(PROFILE, prompt, CHAT_SCHEMA, user, images=images,
-                          provider=provider, model=model, system=system_for(problem, mode),
-                          cache_seconds=0, max_tokens=CHAT_MAX_TOKENS)
+        reply, result = ask_model(problem, list(problem.parts.all()), text, history, mode,
+                                  in_active_homework(user, problem), user=user,
+                                  last_attempt=last_attempt, images=images, quote=quote,
+                                  quote_source=quote_source, provider=provider, model=model)
         turn.input_tokens = (result.usage or {}).get('input_tokens', 0)
         turn.output_tokens = (result.usage or {}).get('output_tokens', 0)
         turn.cost_usd += _spent(result)
-        reply = str((result.data or {}).get('reply') or '').strip()
         if not reply:
             raise core.AiUnavailable('Помощник не ответил. Попробуйте спросить иначе.')
         turn.reply = cut_reply(reply, CHECK_REPLY_MAX if mode == 'check' else REPLY_MAX)
