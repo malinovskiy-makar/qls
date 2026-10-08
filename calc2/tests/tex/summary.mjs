@@ -22,10 +22,10 @@ const rows = fs.readFileSync(path.join(DIR, 'audit.jsonl'), 'utf8').split('\n').
 const byId = new Map(); rows.forEach(r => byId.set(r.id, r));
 const all = [...byId.values()];
 const ok = all.filter(r => r.stats), bad = all.filter(r => r.err), excl = all.filter(r => r.excluded);
-const DEF = ['curvesNoRecPoly', 'curvesNoRecSampled', 'curvesMismatch', 'areasNoRecSampled', 'areasMismatch'];
+const DEF = ['curvesNoRecPoly', 'curvesNoRecSampled', 'curvesMismatch', 'areasNoRecPoly', 'areasNoRecSampled', 'areasMismatch'];
 const COLS = [['состояний', null], ['форм', 'curvesFormula'], ['числ', 'curvesNumeric'], ['(модели)', 'numericExact'], ['лом+', 'curvesPolyRec'],
   ['БЕЗ:лом', 'curvesNoRecPoly'], ['БЕЗ:отсч', 'curvesNoRecSampled'], ['НЕСОШ', 'curvesMismatch'],
-  ['обл:гран', 'areasBounds'], ['обл:мн', 'areasPoly'], ['обл:числ', 'areasNumeric'], ['обл:БЕЗ', 'areasNoRecSampled'], ['обл:НЕСОШ', 'areasMismatch'], ['пар', 'pairs']];
+  ['обл:гран', 'areasBounds'], ['обл:мн', 'areasPoly'], ['обл:БЕЗмн', 'areasNoRecPoly'], ['обл:числ', 'areasNumeric'], ['обл:БЕЗ', 'areasNoRecSampled'], ['обл:НЕСОШ', 'areasMismatch'], ['пар', 'pairs']];
 /* Именной список дефектов сцены (scene_defects.json): там запись не сошлась
    потому, что неверно нарисовано на экране. Такие кривые вычитаются из
    «не сошлось» и печатаются отдельной строкой — поимённо, с причиной. */
@@ -102,7 +102,7 @@ const by = {};
 ok.forEach(r => { const c = by[r.key] = by[r.key] || {}; DEF.forEach(k => { c[k] = Math.max(c[k] || 0, r.stats[k] || 0); }); });
 const defModels = Object.keys(by).filter(k => DEF.some(d => by[k][d])).sort();
 console.log('дефекты записи: моделей', defModels.length, '— наибольшее на одно состояние (ломаная без записи / отсчёты без записи / область без записи / не сошлось):');
-defModels.forEach(k => { const c = by[k]; console.log('   ' + k.padEnd(14) + [c.curvesNoRecPoly, c.curvesNoRecSampled, c.areasNoRecSampled, c.curvesMismatch + c.areasMismatch].map(v => String(v).padStart(3)).join(' /')); });
+defModels.forEach(k => { const c = by[k]; console.log('   ' + k.padEnd(14) + [c.curvesNoRecPoly, c.curvesNoRecSampled, (c.areasNoRecSampled || 0) + (c.areasNoRecPoly || 0), c.curvesMismatch + c.areasMismatch].map(v => String(v).padStart(3)).join(' /')); });
 const defStates = ok.filter(r => DEF.some(d => r.stats[d]));
 console.log('состояний с дефектом записи', defStates.length, 'из', ok.length, '| суммы:', DEF.map(d => d + ' ' + (T[d] || 0)).join(', '));
 console.log('известные дефекты сцены (именной список scene_defects.json, в «не сошлось» не входят):', known.length);

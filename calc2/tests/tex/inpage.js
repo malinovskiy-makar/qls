@@ -114,6 +114,20 @@
       if (o < 0.02) return true;
       const r = el.getBoundingClientRect();
       if (!(r.width > 0.5 || r.height > 0.5)) return true;
+      // подпись, срезанная окном обрезки своей группы (по центру рамки), не видна — как в описи выгрузки
+      if (el.tagName === 'text') {
+        let cp = null;
+        for (let n = el; n && n !== chart && !cp; n = n.parentNode) {
+          const a = n.getAttribute && n.getAttribute('clip-path'), m = a && /url\(["']?#([^)"']+)/.exec(a);
+          if (m) cp = m[1];
+        }
+        const rr = cp && chart.querySelector('clipPath#' + CSS.escape(cp) + ' rect');
+        if (rr) {
+          const b = el.getBBox(), cx = b.x + b.width / 2, cy = b.y + b.height / 2;
+          const x = +rr.getAttribute('x'), y = +rr.getAttribute('y'), w = +rr.getAttribute('width'), h = +rr.getAttribute('height');
+          if (cx < x || cx > x + w || cy < y || cy > y + h) return true;
+        }
+      }
       // целиком за краем холста: на экране его срезает сам SVG
       return r.right < box.left - 0.5 || r.left > box.right + 0.5 || r.bottom < box.top - 0.5 || r.top > box.bottom + 0.5;
     };

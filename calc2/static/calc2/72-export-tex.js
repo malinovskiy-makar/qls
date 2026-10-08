@@ -985,6 +985,15 @@ const TexExport = (function () {
           const x = +el.getAttribute('x') || 0, y = +el.getAttribute('y') || 0;
           const bb = el.getBBox();
           if (bb.x + bb.width < 0 || bb.x > W || bb.y + bb.height < 0 || bb.y > H) continue;   // целиком за краем холста
+          /* Подпись, которую на холсте срезает окно обрезки её группы, на листе
+             не видна и в файл не идёт: числа делений верхней панели «Производной»
+             уходят за край поля, когда окно сдвинули и ось X легла на край
+             (замер 08.10, m-tangent@zoom). Сверка по центру рамки: срезанная
+             наполовину остаётся и в файле режется тем же \clip. */
+          if (clipR) {
+            const cx = bb.x + bb.width / 2, cy = bb.y + bb.height / 2;
+            if (cx < clipR.x || cx > clipR.x + clipR.w || cy < clipR.y || cy > clipR.y + clipR.h) continue;
+          }
           const p = panelOf(bb.x + bb.width / 2, bb.y + bb.height / 2);
           const anchorH = cs.textAnchor || 'start';
           const bl = el.getAttribute('dominant-baseline') || cs.dominantBaseline || 'auto';
@@ -1207,12 +1216,14 @@ const TexExport = (function () {
     const defs = [];
     const col = (h) => { const key = 'c' + h; const line = '\\definecolor{' + key + '}{HTML}{' + h + '}'; if (defs.indexOf(line) < 0) defs.push(line); return key; };
     /* Дефекты: curvesNoRecPoly, curvesNoRecSampled, curvesMismatch,
-       areasNoRecSampled, areasMismatch. Многоугольник без записи у области
-       (areasPoly) дефектом не считается: три точные вершины треугольника и
-       есть его полное описание. */
+       areasNoRecPoly, areasNoRecSampled, areasMismatch. areasPoly — все
+       области-многоугольники; из них с записью (markPoly) — areasPolyRec, без
+       записи — areasNoRecPoly: вершины точные, но запись сцена обязана оставить
+       и у них (фаза 2: «без записи ноль и у кривых, и у областей»; замер 08.10 —
+       снятая запись у треугольника излишка не краснила ни один прибор). */
     const stats = { panels: list.panels.length, axisLines: 0, gridLines: 0, ticks: 0,
       curvesFormula: 0, curvesNumeric: 0, numericExact: 0, curvesPolyRec: 0, curvesNoRecPoly: 0, curvesNoRecSampled: 0, curvesMismatch: 0,
-      areasBounds: 0, areasPoly: 0, areasNumeric: 0, areasNoRecSampled: 0, areasMismatch: 0, outlines: 0,
+      areasBounds: 0, areasPoly: 0, areasPolyRec: 0, areasNoRecPoly: 0, areasNumeric: 0, areasNoRecSampled: 0, areasMismatch: 0, outlines: 0,
       rects: 0, segs: 0, dots: 0, texts: 0, legendRows: 0, pairs: 0,
       // что видно на листе, но в файле стоит настройкой оси, а не своей строкой
       tickLabels: 0, tickMarks: 0, zeroLabels: 0, axisNames: 0 };
@@ -1263,6 +1274,26 @@ const TexExport = (function () {
       else a.push('axis line style={draw=none}');
       if (lineSt && !ax.xLine) a.push('x axis line style={draw=none}');
       if (lineSt && !ax.yLine) a.push('y axis line style={draw=none}');
+      /* Линия оси на холсте длиннее или короче поля панели: у «Неравенства»
+         общая drawAxes ведёт ось X до правого края холста, а поле — квадрат
+         0…100. pgfplots тянет линию от края до края поля; разница уходит
+         сдвигом концов (отрицательный shorten удлиняет линию). */
+      const shorten = (lo, hi) => {
+        const s = [];
+        if (Math.abs(lo) > 0.75) s.push('shorten <=' + (lo * PX2PT).toFixed(1) + 'pt');
+        if (Math.abs(hi) > 0.75) s.push('shorten >=' + (hi * PX2PT).toFixed(1) + 'pt');
+        return s.join(', ');
+      };
+      // имя оси стоит у конца линии на холсте — у удлинённой оси оно уезжает вместе с концом
+      let xEnd = 0, yEnd = 0;
+      if (ax.xLine) {
+        const [x1, , x2] = ax.xLine.px, sh = shorten(Math.min(x1, x2) - p.x0, p.x1 - Math.max(x1, x2));
+        if (sh) { a.push('x axis line style={' + sh + '}'); xEnd = Math.max(x1, x2) - p.x1; }
+      }
+      if (ax.yLine) {
+        const [, y1, , y2] = ax.yLine.px, sh = shorten(p.y1 - Math.max(y1, y2), Math.min(y1, y2) - p.y0);
+        if (sh) { a.push('y axis line style={' + sh + '}'); yEnd = p.y0 - Math.min(y1, y2); }
+      }
       a.push('tick align=outside', 'major tick length=3pt', 'scaled ticks=false');
       if (lineSt) a.push('tick style={' + col(lineSt.color) + ', line width=0.4pt}');
       const ticks = (arr, d, span) => {
@@ -1301,8 +1332,9 @@ const TexExport = (function () {
         if (hasMinor) a.push('minor grid style={' + gs + ', opacity=' + (ax.gridMinorOp != null ? ax.gridMinorOp : (ax.gridOp || 1) * 0.45).toFixed(2) + '}');
       }
       // имена осей: у конца стрелки, буква стоит прямо (rotate у ylabel положил бы её набок)
-      if (ax.xName) a.push('xlabel={' + ax.xName.tex + '}', 'xlabel style={at={(current axis.right of origin)}, anchor=west, font=' + font(ax.xName.step) + ', text=' + col(ax.xName.color) + '}');
-      if (ax.yName) a.push('ylabel={' + ax.yName.tex + '}', 'ylabel style={at={(current axis.above origin)}, anchor=south, font=' + font(ax.yName.step) + ', text=' + col(ax.yName.color) + '}');
+      const endShift = (k, v) => (Math.abs(v) > 0.75 ? ', ' + k + '=' + (v * PX2PT).toFixed(1) + 'pt' : '');
+      if (ax.xName) a.push('xlabel={' + ax.xName.tex + '}', 'xlabel style={at={(current axis.right of origin)}, anchor=west' + endShift('xshift', xEnd) + ', font=' + font(ax.xName.step) + ', text=' + col(ax.xName.color) + '}');
+      if (ax.yName) a.push('ylabel={' + ax.yName.tex + '}', 'ylabel style={at={(current axis.above origin)}, anchor=south' + endShift('yshift', yEnd) + ', font=' + font(ax.yName.step) + ', text=' + col(ax.yName.color) + '}');
       if (p.legend) {
         const L = p.legend;
         a.push('legend style={at={(' + L.rx.toFixed(3) + ',' + L.ry.toFixed(3) + ')}, anchor=north west, draw=' + (L.boxed ? col('C9C3B5') : 'none') + ', fill=white, fill opacity=0.9, text opacity=1, font=' + font('base') + ', cells={anchor=west}, row sep=0.5pt, inner sep=3pt}');
@@ -1381,7 +1413,7 @@ const TexExport = (function () {
           const el = Math.floor(it.z);
           if (it.fl) {                                        // ── закрашенная область
             seenAreas.add('p' + el);
-            const A = it.area, name = it.legend || 'область';
+            const A = it.area, name = it.legend || (it.nodes && it.nodes.name) || 'область';
             if (A && A.ok) {
               const DX = (v) => nn(v, dx + 3);
               if (+DX(A.da) >= +DX(A.db)) return;              // отрезок нулевой длины: не виден, а pgfplots на нём падает
@@ -1417,7 +1449,8 @@ const TexExport = (function () {
               let why;
               if (A) { stats.areasMismatch++; why = 'ЗАПИСЬ НЕ СОШЛАСЬ (' + A.why + '): узлы пути'; }
               else if (it.nodes && it.nodes.kind === 'numeric') { stats.areasNumeric++; why = 'узлы расчёта модели: ' + it.nodes.why; }
-              else if (it.shape === 'poly') { stats.areasPoly++; why = 'многоугольник, вершины точные'; }
+              else if (it.nodes && it.nodes.kind === 'poly') { stats.areasPoly++; stats.areasPolyRec++; why = 'многоугольник: ' + it.nodes.why; }
+              else if (it.shape === 'poly') { stats.areasPoly++; stats.areasNoRecPoly++; why = 'БЕЗ ЗАПИСИ: многоугольник, вершины точные'; }
               else { stats.areasNoRecSampled++; why = 'БЕЗ ЗАПИСИ: по отсчётам (' + it.pts.length + ' узлов)'; }
               out.push('\\fill[' + fillOpts(it.fl).join(', ') + '] ' + it.pts.map(P).join(' -- ') + ' -- cycle;' + note(name + ': ' + why));
             }
