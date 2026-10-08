@@ -11,8 +11,9 @@ const PASS = process.env.CALC2_PASS || 'admin12345';
 const SCENES = (process.env.SCENES || 'sd,tax,mono,adas,isoquant,costs').split(',');
 /* Сцены, для которых выгрузка обязана выдать полноценный файл (приёмка 26.08):
    сложение D и S, сложение КПВ, налог. ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: проверки, писанные
-   для сборщика от состояния (buildTexFromState), теперь стерегут то же самое у
-   настоящей двери buildTex — бумажный прогон, опись, сборка (72-export-tex.js). */
+   для прежнего сборщика «от состояния» (ADR 0030, удалён), теперь стерегут то же
+   самое у настоящей двери buildTex — бумажный прогон, опись, сборка
+   (72-export-tex.js, ADR 0139). */
 const STATE_SCENES = (process.env.STATE_SCENES || 'sdsum,ppfsum,taxes').split(',');
 
 const browser = await chromium.launch();

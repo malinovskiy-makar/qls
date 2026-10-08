@@ -9,7 +9,7 @@
    Один раз на весь прогон:
      4. склейка: две правки одного органа с паузой 300 мс — один шаг;
      5. битая ссылка — модель по умолчанию и тост;
-     6. ?texState=1 жив после входа в модель;
+     6. посторонний параметр адреса (?keep=1) жив после входа в модель;
      7. без localStorage страница работает и считает;
      8. с ЗАПОЛНЕННЫМ хранилищем программный pickScene даёт тот же старт, что и
         базовый снимок (приборы не зависят от того, что лежит в браузере).
@@ -212,14 +212,17 @@ await Promise.all(Array.from({ length: Math.min(JOBS, keys.length) }, worker));
   ok(/&self=1$/.test(link) && r[0] === 'taxes' && r[1] === 30 && r[2] === true && !/повреждена/.test(r[3]), 'ссылка «Сначала сам»: ' + JSON.stringify(r));
   await g.close(); await g2.close();
 }
-// 6. ?texState=1 жив.
+// 6. Посторонний параметр адреса жив.
+/* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): прежний переключатель выгрузки .tex снят
+   (COVERAGE, О22), правило осталось — страница, дописывая ?m=, чужой параметр
+   адреса не стирает. Проверяется на нейтральном ?keep=1. */
 {
   const g = await browser.newContext(); const p = await g.newPage();
-  await p.goto(BASE + '/calc2/?texState=1', { waitUntil: 'load' });
+  await p.goto(BASE + '/calc2/?keep=1', { waitUntil: 'load' });
   await p.waitForFunction(() => typeof pickScene === 'function');
   await p.evaluate(() => openModelByUser('sd')); await p.waitForTimeout(800);
-  const r = await p.evaluate(() => [location.search, typeof texFromStateOn === 'function' ? texFromStateOn() : new URLSearchParams(location.search).get('texState')]);
-  ok(/texState=1/.test(r[0]) && /m=sd/.test(r[0]), '?texState=1: ' + JSON.stringify(r));
+  const r = await p.evaluate(() => [location.search, new URLSearchParams(location.search).get('keep')]);
+  ok(/keep=1/.test(r[0]) && /m=sd/.test(r[0]), '?keep=1: ' + JSON.stringify(r));
   await g.close();
 }
 // 7. Без localStorage.

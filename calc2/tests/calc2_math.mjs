@@ -776,15 +776,24 @@ const CASES = [
     checks: [['x', 'x', 50, 0.2], ['y', 'y', 50, 0.2], ['всего точек', 'n', 4, 0]],
   },
   {
-    name: 'Формула в pgfplots · 100 − 2*Q ⇒ (100 - (2 * x))',
+    /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): прежний переводчик mathToPgf удалён
+       вместе со старыми сборщиками; формулу в pgfplots печатает
+       TexExport.exprToPgf. Скобки — по приоритету, а не вокруг каждой
+       операции; условие переводится условием pgfmath (кусочную запись сборка
+       делит по кускам сама), а не отклоняется; степень pgfmath
+       левоассоциативна — вложенная степень в скобках (SPEC, раздел 8). */
+    name: 'Формула в pgfplots · 100 − 2*Q ⇒ 100 - 2 * x',
     run: `loadScene('sd');
-          var got = mathToPgf('100 - 2*Q', 'Q');
-          var bad = mathToPgf('Q < 20 ? 100 - Q : 60', 'Q');
-          var root = mathToPgf('sqrt(Q)', 'Q');
-          return { ok: (got === '(100 - (2 * x))') ? 1 : 0,
+          var got = TexExport.exprToPgf('100 - 2*Q', 'Q');
+          var cond = TexExport.exprToPgf('Q < 20 ? 100 - Q : 60', 'Q');
+          var root = TexExport.exprToPgf('sqrt(Q)', 'Q');
+          var pow = TexExport.exprToPgf('2^3^2', 'Q');
+          return { ok: (got === '100 - 2 * x') ? 1 : 0,
                    rootOk: (root === 'sqrt(x)') ? 1 : 0,
-                   badIsNull: (bad === null) ? 1 : 0 };`,
-    checks: [['линейная', 'ok', 1, 0], ['корень', 'rootOk', 1, 0], ['кусочная отклонена', 'badIsNull', 1, 0]],
+                   condOk: (cond === '(x < 20 ? 100 - x : 60)') ? 1 : 0,
+                   powOk: (pow === '2^(3^2)') ? 1 : 0 };`,
+    checks: [['линейная', 'ok', 1, 0], ['корень', 'rootOk', 1, 0], ['условие переведено', 'condOk', 1, 0],
+             ['вложенная степень в скобках', 'powOk', 1, 0]],
   },
   {
     name: 'Кусочная функция · три куска с двумя границами ⇒ 90 / 60 / 20',
@@ -1368,7 +1377,10 @@ const CASES = [
                  разложена на tspan'ы, и firstChild у неё элемент, а не текст.
                  Ожидаемые размеры прежние — меняется только способ найти
                  подпись. Подсказку в <title> отбрасываем. */
-              var s = labelPlainText(n).trim();
+              /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: помощник страницы labelPlainText ушёл вместе со
+                 старыми сборщиками .tex — то же чтение здесь: разметка data-raw или
+                 текст без подсказки <title>. */
+              var s = (n.getAttribute('data-raw') || (function (k) { k.querySelectorAll('title,desc').forEach(function (x) { x.remove(); }); return k.textContent; })(n.cloneNode(true))).trim();
               if (s === 'S' && curve === null) curve = +n.getAttribute('font-size');
               else if (other === null) other = +n.getAttribute('font-size');
             });
@@ -1917,7 +1929,8 @@ const CASES = [
              на холсте. */
           var vis = [].filter.call(document.querySelectorAll('#chart text'), function (t) {
             if (t.closest('.legend') || t.closest('[data-service]')) return false;
-            var r = t.getBoundingClientRect(); return (r.width > 0.5 || r.height > 0.5) && labelPlainText(t).trim();
+            // ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: текст подписи — data-raw или текст без <title> (labelPlainText ушёл)
+            var r = t.getBoundingClientRect(); return (r.width > 0.5 || r.height > 0.5) && (t.getAttribute('data-raw') || (function (k) { k.querySelectorAll('title,desc').forEach(function (x) { x.remove(); }); return k.textContent; })(t.cloneNode(true))).trim();
           }).length;
           var st = buildTex._stats;
           return { glued: glued, withSub: withSub,
@@ -2621,8 +2634,10 @@ const CASES = [
           var tex25 = buildTex('', '');
           setTax(20); redrawAll();
           var shifted = /anchor=[a-z ]*east[^\\n]*xshift=-[\\d.]+pt[^\\n]*at \\(axis cs:0,62\\.5\\)/.test(tex25) ? 1 : 0;
-          var num = quantityTex('30\\u202F000');
-          var plain = quantityTex('12');
+          /* ⚠️ ПЕРЕНАЦЕЛЕНО 08.10 (ADR 0139): прежний quantityTex удалён; подпись
+             холста переводит TexExport.labelTex — ожидания те же. */
+          var num = TexExport.labelTex('30\\u202F000');
+          var plain = TexExport.labelTex('12');
           return { thin: thin, shifted: shifted,
                    num: num === '$30\\\\,000$' ? 1 : 0, plain: plain === '$12$' ? 1 : 0 };`,
     checks: [['узкого пробела в файле нет', 'thin', 0, 0],

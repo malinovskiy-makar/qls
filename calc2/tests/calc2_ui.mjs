@@ -331,9 +331,11 @@ await t('издержки: min AVC при Q=3 не сломан', () => page.eva
    со всплывающей подсказкой, и он попадает в textContent, поэтому его
    отбрасываем. Собственными текстовыми узлами тоже не обойтись: с А28
    величина разложена на tspan'ы (символ, индекс, остаток), и такой сбор давал
-   пустые строки на месте MC, ATC и AVC. Читаем ту же функцию, что и страница. */
+   пустые строки на месте MC, ATC и AVC. ⚠️ ПЕРЕНАЦЕЛЕНО 08.10: помощник
+   страницы labelPlainText ушёл вместе со старыми сборщиками .tex — то же
+   чтение здесь: разметка data-raw или текст без подсказки <title>. */
 const svgTexts = () => page.evaluate(() => [...document.querySelectorAll('#chart text')]
-  .map(n => (typeof labelPlainText === 'function' ? labelPlainText(n) : n.textContent)));
+  .map(n => n.getAttribute('data-raw') || (k => { k.querySelectorAll('title,desc').forEach(x => x.remove()); return k.textContent; })(n.cloneNode(true))));
 
 await t('подписи MC/ATC/AVC видны при обычном масштабе', async () => {
   const tx = await svgTexts();
