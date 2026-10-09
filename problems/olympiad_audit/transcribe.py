@@ -224,7 +224,10 @@ def repeated_lines(page_layers):
     """Колонтитулы файла (ключи `footer_key`): строки У КРАЯ страницы,
     стоящие на половине страниц и больше (файл от 3 страниц), с буквенной
     частью от 5 знаков. ⚠️ Только у края: без цифр одинаковы и шапки
-    заданий «Задача # (# баллов)» в середине страниц — их срезать нельзя."""
+    заданий «Задача # (# баллов)» в середине страниц — их срезать нельзя.
+    А у края `layer_body` срезает такую строку, только если в ней стоит
+    номер самой страницы: у МОШ задание часто начинается с верха страницы,
+    и шапка «Задача 3 (20 баллов)» иначе ушла бы как колонтитул."""
     if len(page_layers) < 3:
         return set()
     edge, exact = Counter(), Counter()
@@ -241,7 +244,7 @@ def repeated_lines(page_layers):
 _HYPHEN_BREAK = re.compile(r'(\w)[-‐]\s*\n\s*(\w)')
 
 
-def layer_body(layer, footers=()):
+def layer_body(layer, footers=(), page=None):
     """Текстовый слой страницы без колонтитулов, номеров страниц и
     переносов слов по ширине строки («много-\\nлет» → «многолет» — так же,
     как слово стоит в расшифровке)."""
@@ -252,7 +255,8 @@ def layer_body(layer, footers=()):
     lines = []
     for i, norm in enumerate(raw):
         if (_PAGE_NUM.match(norm) or '=' + norm in footers
-                or (i in edge and footer_key(norm) in footers)):
+                or (i in edge and footer_key(norm) in footers
+                    and (page is None or str(page) in _DIGITS.findall(norm)))):
             continue
         lines.append(norm)
     return '\n'.join(lines)
@@ -303,7 +307,7 @@ def _word_f1(model_key, layer_key):
     return 2 * recall * precision / (recall + precision)
 
 
-def layer_metrics(blocks, layer, footers=()):
+def layer_metrics(blocks, layer, footers=(), page=None):
     """(layer_ratio, numbers_ok, недостающие числа, лишние числа, layer_fuzz).
 
     `layer_ratio` — совпадение СЛОВ расшифровки и слоя (F1 по словам от
@@ -318,7 +322,7 @@ def layer_metrics(blocks, layer, footers=()):
     одиночной строкой на странице с рисунком: это подписи осей внутри
     векторного графика, модель их в текст не переносит. Числа шапки (год,
     класс) не считаются лишними."""
-    body = layer_body(layer, footers)
+    body = layer_body(layer, footers, page)
     text, head = transcript_text(blocks), transcript_text(blocks, header=True)
     model_key = markup_free_key(text)
     layer_key = markup_free_key(body, pdf=True)
@@ -437,7 +441,8 @@ def rescore(job, root):
         record = json.load(handle)
     if record.get('status') not in ('ok', 'needs_eyes') or not job.has_layer:
         return record.get('status')
-    metrics = layer_metrics(clean_blocks(record.get('blocks')), job.layer, job.footers)
+    metrics = layer_metrics(clean_blocks(record.get('blocks')), job.layer, job.footers,
+                            job.page)
     record.update({'layer_ratio': metrics[0], 'numbers_ok': metrics[1],
                    'numbers_missing': metrics[2][:50], 'numbers_extra': metrics[3][:50],
                    'layer_fuzz': metrics[4]})
@@ -668,7 +673,7 @@ class Transcriber:
     def _attempt(self, job, data, usage, retry):
         blocks = clean_blocks(data.get('blocks'))
         flags = {k: bool(data.get(k)) for k in ('has_formulas', 'has_table', 'has_figure')}
-        metrics = (layer_metrics(blocks, job.layer, job.footers) if job.has_layer
+        metrics = (layer_metrics(blocks, job.layer, job.footers, job.page) if job.has_layer
                    else (None, None, [], [], None))
         return {'blocks': blocks, 'flags': flags, 'metrics': metrics, 'retry': retry,
                 'parse_error': data.get('_parse_error', ''),

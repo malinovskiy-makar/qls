@@ -365,8 +365,13 @@ class LayerArtifactTests(SimpleTestCase):
                  'text': PARA[0] + '\nБлагосостояние $SW = 45^2/2$ при цене 17.'}]
         lost = [{'type': 'solution',
                  'text': PARA[0] + '\nБлагосостояние $SW = 45^2/2$ при цене.'}]
-        ok = transcribe.layer_metrics(transcribe.clean_blocks(good), layer, footers)
-        bad = transcribe.layer_metrics(transcribe.clean_blocks(lost), layer, footers)
+        ok = transcribe.layer_metrics(transcribe.clean_blocks(good), layer, footers, 14)
+        bad = transcribe.layer_metrics(transcribe.clean_blocks(lost), layer, footers, 14)
+        # Шапка задания у верха страницы («Задача 3 (20 баллов)» на каждой
+        # странице) — не колонтитул: номера страницы в ней нет.
+        heads = [f'Задача {n} (20 баллов)\nТекст {n}' for n in (1, 2, 3)]
+        body = transcribe.layer_body(heads[2], transcribe.repeated_lines(heads), page=7)
+        self.assertIn('Задача 3 (20 баллов)', body)
         self.assertEqual((ok[1], ok[2]), (True, []))
         self.assertEqual(bad[2], ['17'])
 
