@@ -260,6 +260,30 @@ class AssembleTests(DigitizeBase):
         self.assertEqual(report['solution: сопоставлено по названию'], 1)
         self.assertEqual(report['criteria: не сопоставлено'], 1)
 
+    def test_9c_preamble_fragments_subparts_and_solution_figure(self):
+        """Безномерной «задание» до первого — вступление комплекта, после —
+        кусок текущего задания; «1.1» из файла решений ложится на задание 1;
+        рисунок сразу за повторённым условием — рисунок условия задания без
+        своих рисунков, внутри решения — рисунок решения."""
+        self.write_page('pages/t', 1, [
+            {'type': 'task', 'title': 'Время выполнения 90 минут', 'text': 'Правила.'},
+            {'type': 'task', 'number': '1', 'text': 'Условие 1.'},
+            {'type': 'task', 'number': 'г', 'text': '(г) Ещё вопрос.'}])
+        self.write_page('pages/t', 2, [])
+        self.write_page('pages/s', 1, [
+            {'type': 'task', 'number': '1', 'text': 'Условие 1.'},
+            {'type': 'figure', 'number': '1', 'bbox': [0, 0, 500, 500]},
+            {'type': 'solution', 'number': '1.1', 'text': 'Решение пункта 1.1'},
+            {'type': 'figure', 'bbox': [0, 500, 500, 1000]}])
+        event = self.event()
+        tasks, report, _ = assemble.build_event(self.root, event, 'figs', crop=False)
+        self.assertEqual([t.number for t in tasks], ['1'])
+        task = tasks[0]
+        self.assertEqual(task.statement, ['Условие 1.', '(г) Ещё вопрос.'])
+        self.assertEqual(event['preamble'], ['Правила.'])
+        self.assertEqual(task.solution, ['Решение пункта 1.1'])
+        self.assertEqual((len(task.figures), len(task.solution_figures)), (1, 1))
+
     def test_9b_test_answer_from_answers_file(self):
         """Файл ответов повторяет вопрос теста (блок task) с отмеченным
         ответом: ответ ложится на задание с тем же номером И вариантом."""

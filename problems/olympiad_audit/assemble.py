@@ -70,6 +70,8 @@ class Task:
         self.statement, self.solution, self.criteria = [], [], []
         self.answer = ''
         self.figures = []           # (page_dir, page, bbox, caption)
+        self.solution_figures = []  # рисунки из решения — так же
+        self.own_figures = False    # были ли рисунки из файла условий
         self.pages = []             # (file, page) — откуда условие
         self.solution_pages, self.criteria_pages = [], []
         self.criteria_points = None
@@ -106,6 +108,7 @@ def build_event(root, event, figures_dir, crop=True):
     tasks = OrderedDict()
     report = Counter()
     missing_pages = []
+    event['preamble'] = []
 
     def task_for(number, variant='', create=True):
         key = (number, variant)
@@ -121,8 +124,22 @@ def build_event(root, event, figures_dir, crop=True):
             continue
         kind = block['type']
         number = _block_number(block)
+        if kind == 'task' and not _real_number(number):
+            # Блок «задание» без номера (или «0», «intro», буква подпункта):
+            # до первого задания — вступление комплекта («Время выполнения —
+            # 90 минут…»), после — кусок текущего задания («(б) …»), который
+            # модель пометила заданием. Пилот ВП: 23 лишних «задания» v2.
+            if current is None:
+                event['preamble'].append(block.get('text') or block.get('title') or '')
+                report['вступление комплекта'] += 1
+            else:
+                current.statement.append(block.get('text') or '')
+                current.pages.append((entry['file'], page))
+                current.quality.append(record)
+                report['безномерной кусок → к заданию'] += 1
+            continue
         if kind == 'task':
-            current = task_for(number or f'?{len(tasks) + 1}', block.get('task_variant') or '')
+            current = task_for(number, block.get('task_variant') or '')
             current.title = current.title or (block.get('title') or '').strip()
             if block.get('points') not in (None, ''):
                 current.points = block.get('points')
@@ -147,6 +164,7 @@ def build_event(root, event, figures_dir, crop=True):
                 continue
             target.figures.append((entry['page_dir'], page, block.get('bbox'),
                                    block.get('caption') or ''))
+            target.own_figures = True
         elif kind in ('solution', 'criteria'):
             _attach_answer(tasks, current, block, kind, entry, page, report)
 
@@ -154,6 +172,7 @@ def build_event(root, event, figures_dir, crop=True):
     for role, files in (('solution', event.get('solution_files') or []),
                         ('criteria', event.get('criteria_files') or [])):
         last = None
+        in_statement = False      # сразу после повторённого условия
         for entry, page, record, block in collect(root, files, role):
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
@@ -162,16 +181,34 @@ def build_event(root, event, figures_dir, crop=True):
             if kind in ('footer', 'noise', 'header'):
                 continue
             if kind == 'figure':
-                continue      # рисунок решения в условие не тащим
+                # Рисунок сразу за условием, повторённым в файле решений
+                # (у ВП условия часто только там), — рисунок условия, если
+                # своих у задания нет; внутри решения — рисунок решения.
+                target = last or (list(tasks.values())[-1] if tasks else None)
+                if target is None:
+                    report['рисунок без задания'] += 1
+                    continue
+                figure = (entry['page_dir'], page, block.get('bbox'), block.get('caption') or '')
+                if in_statement and not target.own_figures:
+                    target.figures.append(figure)
+                else:
+                    target.solution_figures.append(figure)
+                continue
+            in_statement = kind == 'task'
             if kind == 'task':
                 # Условие, повторённое в файле решений: запоминаем как
                 # последнее задание; если условия нет нигде — берём его.
                 number = _block_number(block)
                 target = _find_task(tasks, number, block.get('title') or '',
                                     block.get('task_variant') or '')
+                if target is None and not _real_number(number):
+                    # Подпункт, повторённый в файле решений («г», «(а)»): к
+                    # последнему заданию, нового не заводим.
+                    last = last or (list(tasks.values())[-1] if tasks else None)
+                    report['безномерной кусок решения → к заданию'] += 1
+                    continue
                 if target is None:
-                    target = task_for(number or f'?{len(tasks) + 1}',
-                                      block.get('task_variant') or '')
+                    target = task_for(number, block.get('task_variant') or '')
                     target.from_solution_only = True
                     target.title = (block.get('title') or '').strip()
                     report['условие только из файла решений'] += 1
@@ -196,17 +233,27 @@ def build_event(root, event, figures_dir, crop=True):
 
     # Рисунки: вырезка.
     for task in tasks.values():
-        task.figure_files = []
-        for k, (page_dir, page, bbox, caption) in enumerate(task.figures, 1):
-            name = f'{event_id}_{task.number}_{k}.png'.replace('/', '-')
-            path = os.path.join(figures_dir, name)
-            flag = crop_figure(os.path.join(root, page_dir, f'p{page}.png'), bbox, path) \
-                if crop else 'не вырезано'
-            task.figure_files.append({'path': os.path.relpath(path, root).replace('\\', '/'),
-                                      'caption': caption, 'flag': flag, 'page': page})
-            report[f'рисунок: {flag or "вырезан"}'] += 1
+        # Номер-заглушка и прочие знаки, которых Windows не терпит в имени
+        # файла, → «_».
+        safe = re.sub(r'[^\w.-]', '_', f'{task.number}{task.task_variant and "v" + task.task_variant}')
+        for attr, out, suffix in (('figures', 'figure_files', ''),
+                                  ('solution_figures', 'solution_figure_files', 's')):
+            files = []
+            for k, (page_dir, page, bbox, caption) in enumerate(getattr(task, attr), 1):
+                path = os.path.join(figures_dir, f'{event_id}_{safe}_{suffix}{k}.png')
+                flag = crop_figure(os.path.join(root, page_dir, f'p{page}.png'), bbox, path) \
+                    if crop else 'не вырезано'
+                files.append({'path': os.path.relpath(path, root).replace('\\', '/'),
+                              'caption': caption, 'flag': flag, 'page': page})
+                report[f'рисунок: {flag or "вырезан"}'] += 1
+            setattr(task, out, files)
     report['страниц без расшифровки'] = len(missing_pages)
     return list(tasks.values()), report, missing_pages
+
+
+def _real_number(number):
+    """Номер задания — с цифрой и не «0» (вступление/подпункт — нет)."""
+    return bool(number) and any(ch.isdigit() for ch in number) and number != '0'
 
 
 def _find_task(tasks, number, title, variant=''):
@@ -214,6 +261,13 @@ def _find_task(tasks, number, title, variant=''):
         return tasks[(number, variant)]
     if number and (number, '') in tasks:
         return tasks[(number, '')]
+    if number and '.' in number:
+        # «1.1» без своего задания — подпункт задания 1 (у ВП); у МОШ, где
+        # «1.1» — самостоятельное задание, оно найдётся точным ключом выше.
+        parent = number.split('.')[0]
+        found = tasks.get((parent, variant)) or tasks.get((parent, ''))
+        if found is not None:
+            return found
     title = (title or '').strip().lower()
     if not title:
         return None
@@ -318,6 +372,7 @@ def task_record(task, event, model):
         'stage': event.get('stage'), 'grade': event.get('grade'),
         'statement_md': statement, 'parts': split_parts(statement),
         'tables': count_tables(statement), 'figures': task.figure_files,
+        'solution_figures': task.solution_figure_files,
         'solution_md': solution, 'answer': task.answer, 'criteria_md': criteria,
         'max_score': max_score,
         'source_file': sorted({f for f, _p in task.pages}),
@@ -373,6 +428,7 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
             'with_criteria': sum(bool(r['criteria_md']) for r in records),
             'needs_eyes': sum(r['needs_eyes'] for r in records),
             'pages_missing': len(missing), 'new': bool(event.get('new')),
+            'preamble_md': '\n\n'.join(p for p in event.get('preamble') or [] if p),
         })
         summary[f'комплектов {status}'] += 1
         if len(records) != v1_counts.get(event_id, 0):
