@@ -1447,14 +1447,14 @@
            «Построение графиков». У «С ограничением» строки нет. -->
       <div class="field opt-range" id="ans-seg-row">
         <div class="hint-row">
-          <label for="ans-a">Ответ ищем на отрезке x</label>
+          <label for="ans-a">Ответ ищем на отрезке</label>
           <button class="hint-btn" type="button" data-pop="hp-ans-seg" aria-label="Что это за отрезок">?</button>
         </div>
         <div class="hint-pop" id="hp-ans-seg">
           <p>Корни, вершины и пересечения считаются на этом отрезке. Масштаб графика на ответ не влияет.</p>
         </div>
         <div class="opt-range-row">
-          <span>от</span><input type="text" inputmode="decimal" id="ans-a" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: от">
+          <span class="ans-seg-var" aria-hidden="true">x</span><span>от</span><input type="text" inputmode="decimal" id="ans-a" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: от">
           <span>до</span><input type="text" inputmode="decimal" id="ans-b" data-plain="1" autocomplete="off" aria-label="Отрезок ответа: до">
         </div>
         <button type="button" class="ans-seg-auto" id="ans-seg-auto" hidden>Вернуть по формуле</button>
@@ -2015,11 +2015,15 @@
         <section class="side-part" id="scoreboard">
           <div class="fold-body open" id="sb-fold">
             <!-- «Ответ» (редизайн 10.2026, фаза 6; 94-answer.js): статус словами,
-                 главные числа 2×2, бремя. Собираются поверх табло и только
+                 главные величины строками по группам (ADR 0144), бремя. Собираются поверх табло и только
                  читают его: сцены по-прежнему пишут свои блоки #info-*. -->
             <p class="self-note" id="self-note" hidden>Числа спрятаны, на осях только обозначения. Впишите свой ответ и проверьте; любое число можно открыть отдельно.</p>
+            <!-- Строка об отрезке ответа (ADR 0144): только «Математика» и
+                 «Построение графиков», числа живые (buildSegNote, 94-answer.js). -->
+            <p class="ans-seg-note" id="ans-seg-note" hidden></p>
             <div class="ans-status-box" id="ans-status" hidden></div>
-            <h3 class="col-sub ans-title" id="ans-title" hidden></h3>
+            <!-- Главные величины строками по группам (ADR 0144): у группы
+                 заголовок .ans-ghead, в ней строки .ans-cell. -->
             <div class="ans-hero" id="ans-hero" hidden></div>
             <button class="self-gate" id="self-gate" type="button" hidden>Таблица «было → стало» и итоговая функция: после ответа</button>
             <div class="ans-burden" id="ans-burden" hidden></div>

@@ -82,6 +82,10 @@ function selfText(el) {
   return c.textContent.replace(/\s+/g, ' ').trim();
 }
 
+/* Обозначение величины строки («x», «Q*»): по нему узнаётся ось. У
+   математики оно в значение не выносится и живёт в data-not (ADR 0144). */
+function selfNot(c) { return (c.dataset.not || selfText(c.querySelector('.ans-not'))).replace(/\s+/g, ''); }
+
 function selfKey() { return (typeof modelKeyOf === 'function' ? modelKeyOf(STATE.sceneKey) : STATE.sceneKey) || ''; }
 
 function setSelfMode(on) {
@@ -195,7 +199,7 @@ function selfCanvas() {
   // Значения главных ячеек: у списка и точки — каждое число по отдельности.
   const heroes = [];
   document.querySelectorAll('#ans-hero .ans-cell').forEach(c => {
-    const not = selfText(c.querySelector('.ans-not')).replace(/\s+/g, '');
+    const not = selfNot(c);
     const p = selfParse(selfText(c.querySelector('.ans-val')));
     if (p) p.items.forEach(it => it.forEach(v => heroes.push({ not, v })));
   });
@@ -266,7 +270,7 @@ function selfOpenValues() {
     if (!(SELF.open[id] || SELF.verdict[id] === true)) return;
     const p = selfParse(selfText(c.querySelector('.ans-val')));
     if (!p) return;
-    const not = selfText(c.querySelector('.ans-not')).replace(/\s+/g, '').charAt(0).toLowerCase();
+    const not = selfNot(c).charAt(0).toLowerCase();
     if (p.pts) { p.items.forEach(it => o.pts.push(it)); return; }
     const box = (not && not === xL) ? o.X : ((not && not === yL) ? o.Y : o.any);
     p.items.forEach(it => box.push(it[0]));

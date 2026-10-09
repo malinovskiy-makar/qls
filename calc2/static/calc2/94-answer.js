@@ -4,10 +4,12 @@
    этим живут печать, «Объяснение модели» и десятки проверок.
    «Ответ» собирается ПОВЕРХ них и только читает:
      · статус словами — предупреждения сцены (.warn) строкой над числами;
-     · главные числа 2×2 — выбранные строки табло (HERO ниже); у ячейки
-       «было · Δ» из таблицы «До / После / Δ» той же модели;
-     · дальше прежние блоки как группы с заголовками; строка, ставшая главным
-       числом, в группе не повторяется (класс .is-hero);
+     · главные величины — выбранные строки табло (HERO ниже) СТРОКАМИ ПО
+       ГРУППАМ (решение владельца 09.10, ADR 0144): у группы заголовок, в
+       группе одна величина на строку, подпись слева, значение справа, один
+       кегль у всех значений; у строки «было · Δ» из таблицы «До / После / Δ»;
+     · дальше прежние блоки тем же видом строк; строка, ставшая главной, в
+       блоке не повторяется (класс .is-hero), блок без своих строк прячется;
      · «Разбор» — абзацы #ex-body аккордеоном.
    Уже набранный KaTeX не разбирается: значение ячейки — копия узла значения
    той же строки, а у ячейки стоит data-src="блок#номер", по которому прибор
@@ -34,7 +36,12 @@ const HERO = {
   'ppfsum': [['info-ppfsum', 1], ['info-ppfsum', 2], ['info-ppfsum', 3]],
   'trade': [['info-ppft', 3], ['info-ppft', 4], ['info-ppft', 5]],
   'tradeprice': [['info-tb', 2], ['info-tb', 3]],
-  'sd': [['sec-eq', 0], ['sec-eq', 1]],
+  /* Четвёртый элемент — [подпись, обозначение] вместо разбора подписи табло:
+     «CS (потребитель)» в «Ответе» читается как «Излишек потребителя», CS = … */
+  'sd': [['sec-eq', 0], ['sec-eq', 1],
+    ['info-areas', 0, null, ['Излишек потребителя', 'CS']],
+    ['info-areas', 1, null, ['Излишек производителя', 'PS']],
+    ['info-areas', 2, null, ['Общественное благосостояние', 'SW']]],
   'sdsum': [['sec-eq', 0], ['sec-eq', 1]],
   'taxes': [['sec-eq', 0, 'Q'], ['sec-eq', 1, 'P покупателя'], ['sec-eq', 2, 'P продавца'], ['info-tax', 'DWL']],
   'tax': [['sec-eq', 0, 'Q'], ['sec-eq', 1, 'P покупателя'], ['sec-eq', 2, 'P продавца'], ['info-tax', 'DWL']],
@@ -69,13 +76,15 @@ const HERO = {
   'ineq': [['info-inequality', 0], ['info-inequality', 1]],
 };
 
-/* Заголовки групп табло в «Ответе». Блок без записи идёт без заголовка. */
+/* Заголовки групп «Ответа» по блоку табло. Блок без записи идёт без
+   заголовка; у #sec-eq заголовок свой (копия .section-title); у «Математики»
+   группы задают сами строки (data-ans-group, 70-scenes-math.js). */
 const ANSWER_GROUP = {
   'info-areas': 'Излишки', 'info-tax': 'Вмешательство', 'info-sum': 'По группам',
   'info-mono': 'Монополия', 'info-nat': 'Естественная монополия', 'info-costs': 'Издержки',
   'info-prod': 'Производство', 'info-iso': 'Изокванта', 'info-plants': 'Два завода',
   'info-labor': 'Рынок труда', 'info-inequality': 'Неравенство', 'info-consumer': 'Выбор потребителя',
-  'info-macro': 'Макро', 'info-math': 'Математика', 'info-elast': 'Эластичность',
+  'info-macro': 'Равновесие', 'info-math': 'Математика', 'info-elast': 'Эластичность',
   'info-ext': 'Внешние эффекты', 'info-open': 'Открытая экономика', 'info-d3': 'Дискриминация',
   'info-kink': 'Составной спрос', 'info-ppf': 'КПВ', 'info-ppfsum': 'Сумма КПВ',
   'info-ppft': 'Торговля', 'info-tb': 'Торговля двух стран', 'info-graph': 'Функция',
@@ -151,12 +160,131 @@ function answerSignature() {
   const sb = document.getElementById('sb-body');
   const ex = document.getElementById('ex-body');
   return String(STATE.sceneKey) + '|' + (sb ? sb.textContent.length + ':' + sb.textContent.slice(0, 4000) : '')
-    + '|' + (ex ? ex.innerHTML.length : 0) + '|' + STATE.incBuyer + '|' + STATE.incSeller;
+    + '|' + (ex ? ex.innerHTML.length : 0) + '|' + STATE.incBuyer + '|' + STATE.incSeller
+    // Отрезок ответа: ручной отрезок с теми же числами ответа меняет строку под шапкой.
+    + '|' + (typeof _ansSeg !== 'undefined' && _ansSeg ? _ansSeg.a + ':' + _ansSeg.b : '');
 }
 function scheduleAnswer() {
   if (_answerQueued) return;
   _answerQueued = true;
   requestAnimationFrame(() => { _answerQueued = false; buildAnswer(); });
+}
+
+/* Модель «Математики» и «Построения графиков»: у её строк обозначение из
+   подписи в значение не выносится («Пересекает ось x» → «−2; 2»). */
+function answerIsMath() { return STATE.mode === 'math' || STATE.mode === 'graph'; }
+
+/* Копия подписи строки табло без приписки .ans-ctx («, кривая f»): в
+   «Ответе» её роль у заголовка группы. */
+function labelCopy(lab) {
+  const c = lab.cloneNode(true);
+  c.querySelectorAll('.ans-ctx').forEach(x => x.remove());
+  return c;
+}
+
+/* Значение строки «Ответа». Число — формулой прямым шрифтом; список и точки
+   — по куску на значение, куски не рвутся, перенос (если весь список не
+   влез даже в строку целиком) — только между ними; «нет» — приглушённо;
+   прочее (фраза, «L = 10, MP = 300») — копией табло. Текст значения тот же,
+   что у строки-источника: по нему сверяют паритет и «Сначала сам». */
+const ANS_ITEM = /^\(?[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(;[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?)?\)?(°|∘|\s?%)?$/;
+function answerValueInto(v, srcEl, srcText) {
+  const raw = srcEl ? plainText(srcEl) : String(srcText || '');
+  if (/^нет$/i.test(raw)) { v.textContent = 'нет'; v.classList.add('ans-val--none'); return; }
+  const pureNum = /^[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(\s?%)?$/.test(raw);
+  if (typeof katexInto === 'function' && pureNum) {
+    /* Пробелы — неразрывные (~), чтобы в тексте осталось «1 250», как в
+       строке-источнике; запятая дроби без отбивки. */
+    const tx = raw.replace(/^-/, '−').replace(/[\s\u00a0\u202f\u2009]+/g, '~').replace(/,/g, '{,}').replace(/%/g, '\\%').replace(/−/g, '\\text{−}');
+    katexInto(v, '\\mathrm{' + tx + '}');
+    return;
+  }
+  // Список чисел или точек через «;»: делим по «;» вне скобок.
+  const items = [];
+  let depth = 0, cur = '';
+  for (const ch of raw) {
+    if (ch === '(') depth++;
+    if (ch === ')') depth--;
+    if (ch === ';' && depth === 0) { items.push(cur.trim()); cur = ''; } else cur += ch;
+  }
+  items.push(cur.trim());
+  if (items.length > 1 && typeof katexInto === 'function' && typeof statToTex === 'function'
+      && items.every(it => ANS_ITEM.test(it.replace(/;\s+/g, ';')))) {
+    v.innerHTML = '';
+    items.forEach((it, k) => {
+      const u = document.createElement('span'); u.className = 'ans-item';
+      katexInto(u, statToTex(it));
+      if (k < items.length - 1) {
+        const sep = document.createElement('span'); sep.className = 'ans-sep'; sep.textContent = ';';
+        u.appendChild(sep);
+      }
+      v.appendChild(u);
+      // Место переноса без пробела в тексте: текст значения — побайтно табло («−2;2»).
+      if (k < items.length - 1) v.appendChild(document.createElement('wbr'));
+    });
+    return;
+  }
+  if (srcEl) v.innerHTML = srcEl.innerHTML; else v.textContent = raw;
+}
+
+/* Заголовок группы: у кривой «Построения графиков» — цветная точка и запись
+   «f(x) = x² − 4» (строка табло data-ans-head); иначе — текст, в котором
+   $…$ набирается формулой, или готовая разметка заголовка табло. */
+function answerGroupHead(g) {
+  const h = document.createElement('h3');
+  h.className = 'ans-ghead';
+  if (g.head) {
+    const dot = document.createElement('span'); dot.className = 'ans-gdot'; dot.setAttribute('aria-hidden', 'true');
+    if (g.head.dataset.color) dot.style.background = g.head.dataset.color;
+    const f = document.createElement('span'); f.className = 'ans-gform';
+    if (!(typeof katexInto === 'function' && katexInto(f, g.head.dataset.tex || ''))) f.textContent = g.head.dataset.tex || '';
+    h.append(dot, f);
+  } else if (g.html) {
+    h.innerHTML = g.html;
+  } else {
+    h.textContent = g.title;
+    if (/\$/.test(g.title) && typeof renderMathIn === 'function') renderMathIn(h);
+  }
+  return h;
+}
+
+/* Строка об отрезке ответа под шапкой (только «Математика» и «Построение
+   графиков», у «С ограничением» отрезка нет): числа живые, из _ansSeg. */
+function buildSegNote() {
+  const note = document.getElementById('ans-seg-note');
+  if (!note) return;
+  const row = document.getElementById('ans-seg-row');
+  const on = answerIsMath() && typeof _ansSeg !== 'undefined' && _ansSeg && row && row.style.display !== 'none';
+  note.hidden = !on;
+  if (!on) { note.textContent = ''; return; }
+  const f = (typeof ansFmt === 'function') ? ansFmt : fmt;
+  note.textContent = 'Ищем на отрезке $x$ от ' + f(_ansSeg.a) + ' до ' + f(_ansSeg.b) + '. Масштаб графика на ответ не влияет.';
+  if (typeof renderMathIn === 'function') renderMathIn(note);
+}
+
+/* Блок табло, все строки которого ушли в «Ответ» (или в заголовок группы),
+   не показывается вовсе: иначе от него оставался голый заголовок
+   («Излишки» без строк у «Спроса и предложения»). */
+function hideDrainedBlocks() {
+  const sb = document.getElementById('sb-body');
+  if (!sb) return;
+  /* Та же величина второй строкой в другом блоке (у потолка цены «Дефицит 40»
+     стоит и в равновесии, и под таблицей «До / После»): в колонке — один раз.
+     Сравниваются подпись и значение строки-источника главной величины. */
+  const key = (r) => plainText(r.querySelector(':scope > span')).replace(/\s+/g, '') + '=' + plainText(r.querySelector(':scope > b')).replace(/\s+/g, '');
+  const heroKeys = new Set([...sb.querySelectorAll('.stat.is-hero')].map(key));
+  sb.querySelectorAll('.stat').forEach(r => {
+    r.classList.toggle('ans-dup', !r.classList.contains('is-hero') && heroKeys.has(key(r)));
+  });
+  const ownText = (el) => [...el.childNodes].some(n => n.nodeType === 3 && /\S/.test(n.nodeValue));
+  [...sb.children].forEach(blk => {
+    if (!blk.id) return;
+    blk.classList.remove('ans-drained');
+    if (!blk.querySelector('.stat.is-hero, .stat[data-ans-head], .stat.ans-dup')) return;
+    const left = [...blk.querySelectorAll('*')].some(el => !el.closest('.section-title, .katex-mathml')
+      && el.getClientRects().length && ownText(el));
+    if (!left) blk.classList.add('ans-drained');
+  });
 }
 
 function buildAnswer() {
@@ -182,7 +310,7 @@ function buildAnswer() {
     } else specRows.push(h);
   });
   specRows.forEach(h => {
-    const [blkId, i, tbl] = h;
+    const [blkId, i, tbl, over] = h;
     const blk = document.getElementById(blkId);
     if (!blk || !blk.isConnected || blk.style.display === 'none') return;
     if (typeof i === 'number') {
@@ -191,69 +319,49 @@ function buildAnswer() {
       const lab = row.querySelector(':scope > span'), val = row.querySelector(':scope > b');
       if (!val || !plainText(val)) return;
       row.classList.add('is-hero');
-      cells.push({ src: blkId + '#' + i, lab, val, tx: tbl ? txRow(blkId, tbl) : null });
+      cells.push({ src: blkId + '#' + i, blk, row, lab, val, over, group: row.dataset.ansGroup || '', tx: tbl ? txRow(blkId, tbl) : null });
     } else {
       // Главное число из таблицы «До / После / Δ» (потери общества у налогов).
       const r = txRow(blkId, i);
       if (!r || !r.after) return;
-      cells.push({ src: blkId + '@' + i, labText: i, valText: r.after, tx: r });
+      cells.push({ src: blkId + '@' + i, blk, labText: i, valText: r.after, tx: r, tableRow: true });
     }
   });
   host.hidden = !cells.length;
   _answerMarks = document.querySelectorAll('#sb-body .stat.is-hero').length;
-  // Заголовок группы результатов (README макета, 8): над главными числами.
-  const tt = document.getElementById('ans-title');
-  const src = document.querySelector('#sec-eq .section-title');
-  const shown = src && src.closest('#sec-eq') && document.getElementById('sec-eq').style.display !== 'none' && plainText(src);
-  if (tt) { tt.innerHTML = shown ? src.innerHTML : ''; tt.hidden = !shown; }
-  host.classList.toggle('ans-hero--one', cells.length === 1);
+  const isMath = answerIsMath();
+  /* Группы: строки подряд с одним ключом. Ключ — data-ans-group строки
+     (математика) или блок табло; строка из таблицы «До / После» стоит в группе
+     предыдущей строки (потери общества — в «Рынке после налога»). */
+  const eqTitle = document.querySelector('#sec-eq > .section-title');
+  const eqShown = eqTitle && document.getElementById('sec-eq').style.display !== 'none' && plainText(eqTitle);
+  const groups = [];
   cells.forEach(c => {
-    const d = document.createElement('div');
-    d.className = 'ans-cell';
-    d.dataset.src = c.src;
-    // Подпись ячейки словами, ниже «обозначение = число» (README макета, 8.3).
-    const parts = heroLabel(c.lab ? plainText(c.lab) : c.labText);
-    const l = document.createElement('div'); l.className = 'ans-lab';
-    // Подпись, которую не разобрали на слова и обозначение, переезжает как есть,
-    // вместе с набранными формулой обозначениями («Рынок 1: (q₁; P₁)»).
-    if (!parts.not && c.lab) l.innerHTML = c.lab.innerHTML; else l.textContent = parts.caption;
-    const line = document.createElement('div'); line.className = 'ans-line';
-    if (parts.not) {
-      const n = document.createElement('span'); n.className = 'ans-not';
-      // Обозначение — всегда формулой (правило 46 DESIGN.md): «Q∗» → Q*, «X0» → X₀.
-      const tex = notationTex(parts.not);
-      if (tex && typeof katexInto === 'function') katexInto(n, tex);
-      else if (typeof paintNotation === 'function') paintNotation(n, parts.not); else n.textContent = parts.not;
-      const eq = document.createElement('span'); eq.className = 'ans-eq'; eq.textContent = '=';
-      line.append(n, eq);
+    let key, g = null;
+    if (c.tableRow && groups.length) key = groups[groups.length - 1].key;
+    else if (c.group) key = 'g:' + c.group;
+    else key = 'b:' + c.src.replace(/[#@].*$/, '');
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) { last.cells.push(c); return; }
+    g = { key, cells: [c], title: '' };
+    if (c.group) {
+      g.head = [...c.blk.querySelectorAll('.stat[data-ans-head]')].find(x => x.dataset.ansHead === c.group) || null;
+      g.title = c.group;
+    } else {
+      const blkId = c.src.replace(/[#@].*$/, '');
+      if (blkId === 'sec-eq' && eqShown) g.html = eqTitle.innerHTML;
+      else g.title = ANSWER_GROUP[blkId] || '';
     }
-    const v = document.createElement('span'); v.className = 'ans-val';
-    if (c.val) v.innerHTML = c.val.innerHTML; else v.textContent = c.valText;
-    /* Число набирается формулой прямым шрифтом, как в макете («число STIX 500»,
-       README 8.3) и как обозначение рядом. Кегль 28/24/20 при этом не попадает в
-       шкалу интерфейса канона: шкала (COVERAGE, раздел 5) — для текста, а это
-       набранная величина. Только «голое» число («40», «1 250», «−10», «11,35»,
-       «50 %»); всё прочее остаётся как в табло. Пробелы — неразрывные (~), чтобы
-       в тексте ячейки осталось «1 250», как в строке-источнике. */
-    const raw = plainText(v);
-    const pureNum = /^[−-]?\d[\d\s\u00a0\u202f\u2009]*([.,]\d+)?(\s?%)?$/.test(raw);
-    if (typeof katexInto === 'function' && pureNum) {
-      const tx = raw.replace(/^-/, '−').replace(/[\s\u00a0\u202f\u2009]+/g, '~').replace(/,/g, '{,}').replace(/%/g, '\\%').replace(/−/g, '\\text{−}');   // запятая дроби без отбивки
-      katexInto(v, '\\mathrm{' + tx + '}');
-    }
-    const len = plainText(v).replace(/\s/g, '').length;
-    /* Смешанное значение («L = 10, MP = 300») остаётся текстом и получает
-       сочетание из закрытого списка шкалы — 17/600 (README хотел бы 20). */
-    v.classList.add(!pureNum ? 'ans-val--x' : (len <= 4 ? 'ans-val--l' : (len <= 6 ? 'ans-val--m' : 'ans-val--s')));
-    line.appendChild(v);
-    d.append(l, line);
-    if (c.tx && c.tx.before) {
-      const w = document.createElement('div'); w.className = 'ans-was';
-      w.textContent = 'было ' + c.tx.before + (c.tx.delta ? ' · ' + c.tx.delta.replace(/^-/, '−') : '');
-      d.appendChild(w);
-    }
-    host.appendChild(d);
+    groups.push(g);
   });
+  groups.forEach(g => {
+    const box = document.createElement('div');
+    box.className = 'ans-group';
+    if (g.head || g.html || g.title) box.appendChild(answerGroupHead(g));
+    g.cells.forEach(c => box.appendChild(answerRow(c, isMath)));
+    host.appendChild(box);
+  });
+  buildSegNote();
   buildStatus();
   buildBurden();
   buildExplainAccordion();
@@ -269,9 +377,54 @@ function buildAnswer() {
       s.appendChild(b); strip.appendChild(s);
     });
   }
-  // Обозначения в подписях ячеек («Весь ресурс на X») — формулой, как во всей панели.
+  // Обозначения в подписях строк («Весь ресурс на X») — формулой, как во всей панели.
   if (typeof markNotationsIn === 'function') markNotationsIn(host);
+  hideDrainedBlocks();
   if (typeof applySelf === 'function') applySelf();
+}
+
+/* Строка «Ответа»: подпись слева, значение справа, «было · Δ» под значением.
+   Классы .ans-cell / .ans-lab / .ans-not / .ans-val / .ans-was и data-src —
+   прежние (меняется вид, а не смысл): по ним работают паритет и «Сначала сам».
+   data-not — обозначение величины («x», «Q*»): по нему «Сначала сам» узнаёт
+   ось, даже когда обозначение не выносится в значение (математика). */
+function answerRow(c, isMath) {
+  const d = document.createElement('div');
+  d.className = 'ans-cell';
+  d.dataset.src = c.src;
+  const labText = c.lab ? plainText(labelCopy(c.lab)) : c.labText;
+  let parts = c.over ? { caption: c.over[0], not: c.over[1] } : heroLabel(labText);
+  /* Значение со своим «=» («L = 15, AP = 225»): обозначение остаётся в
+     подписи («Максимум AP»), иначе выходило «AP = L = 15, AP = 225». */
+  if (!c.over && parts.not && /=/.test(c.val ? plainText(c.val) : String(c.valText || ''))) parts = { caption: labText, not: '', keep: parts.not };
+  if (parts.not || parts.keep) d.dataset.not = parts.not || parts.keep;
+  const l = document.createElement('div'); l.className = 'ans-lab';
+  const line = document.createElement('div'); line.className = 'ans-line';
+  if (isMath || (!parts.not && c.lab)) {
+    // Подпись как в табло, вместе с набранными формулой обозначениями.
+    if (c.lab) l.append(...labelCopy(c.lab).childNodes); else l.textContent = labText;
+  } else {
+    l.textContent = parts.caption;
+  }
+  if (parts.not && !isMath) {
+    const n = document.createElement('span'); n.className = 'ans-not';
+    // Обозначение — всегда формулой (правило 46 DESIGN.md): «Q∗» → Q*, «X0» → X₀.
+    const tex = notationTex(parts.not);
+    if (tex && typeof katexInto === 'function') katexInto(n, tex);
+    else if (typeof paintNotation === 'function') paintNotation(n, parts.not); else n.textContent = parts.not;
+    const eq = document.createElement('span'); eq.className = 'ans-eq'; eq.textContent = '=';
+    line.append(n, eq);
+  }
+  const v = document.createElement('span'); v.className = 'ans-val';
+  answerValueInto(v, c.val || null, c.valText);
+  line.appendChild(v);
+  d.append(l, line);
+  if (c.tx && c.tx.before) {
+    const w = document.createElement('div'); w.className = 'ans-was';
+    w.textContent = 'было ' + c.tx.before + (c.tx.delta ? ' · ' + c.tx.delta.replace(/^-/, '−') : '');
+    d.appendChild(w);
+  }
+  return d;
 }
 
 /* «Кто несёт налог» / «Кому достаётся субсидия» (README макета, 8.5): доли

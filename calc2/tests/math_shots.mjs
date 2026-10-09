@@ -51,7 +51,8 @@ await page.screenshot({ path: `${DIR}/2-self-hover-root.png` });
 
 // Верный ответ на ось x: «2; −2».
 const cellInput = await page.evaluateHandle(() => {
-  const c = [...document.querySelectorAll('#ans-hero .ans-cell')].find(c => /ось/.test(c.textContent) && /x/.test(c.querySelector('.ans-not') ? c.querySelector('.ans-not').textContent : ''));
+  // Ось величины — data-not (с сессии 3 у математики обозначение не выносится в значение, ADR 0144).
+  const c = [...document.querySelectorAll('#ans-hero .ans-cell')].find(c => /ось/.test(c.textContent) && c.dataset.not === 'x');
   return c ? c.querySelector('.self-inp') : null;
 });
 if (cellInput && (await cellInput.evaluate(e => !!e))) {

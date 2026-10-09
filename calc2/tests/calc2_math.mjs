@@ -3316,9 +3316,12 @@ const CASES = [
           /* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 6): заголовок группы результатов
              стоит над главными числами «Ответа» (#ans-title, копия заголовка
              табло); в табло он спрятан. Меряем видимый. */
+          /* ПЕРЕНАЦЕЛЕНО (сессия 3, ADR 0144): «Ответ» строками по группам —
+             заголовок раздела равновесия стоит заголовком первой группы
+             (.ans-ghead, копия заголовка табло); #ans-title больше нет. */
           if (typeof buildAnswer === 'function') { _answerSig = ''; buildAnswer(); }
-          var t = document.getElementById('ans-title');
-          if (!t || t.hidden) t = document.getElementById('sec-eq').querySelector('.section-title');
+          var t = document.querySelector('#ans-hero .ans-ghead');
+          if (!t) t = document.getElementById('sec-eq').querySelector('.section-title');
           var textNode = Array.prototype.filter.call(t.childNodes, function (n) { return n.nodeType === 3; })[0];
           var texSpan = t.querySelector('.tex');
           var range = document.createRange();

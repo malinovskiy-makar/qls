@@ -1134,13 +1134,13 @@ math-field::part(virtual-keyboard-toggle), math-field::part(menu-toggle) { displ
 
 /* Табло результатов (равновесие, площади, налог) */
 .stat { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 4px 0; font-size: 13px; }
-.stat span { color: var(--text2); }
+.stat > span { color: var(--text2); }   /* только подпись: внутренние узлы KaTeX значения не красим (ADR 0144) */
 .stat b { font-variant-numeric: tabular-nums; color: var(--text); }
 /* В табло результатов число — главное, что человек ищет глазами, поэтому оно
    крупнее и тяжелее подписи. В «Инструментах» те же .stat остаются мелкими:
    там они справочные, а не отсчёт прибора. */
 .sb-body .stat { padding: 5px 0; }
-.sb-body .stat span { font-size: 12px; font-weight: 600; }
+.sb-body .stat > span { font-size: 12px; font-weight: 600; }
 .sb-body .stat b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; }
 .warn { font-size: 12px; color: var(--c-warn); line-height: 1.4; }
 
@@ -1582,7 +1582,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .sb-body .section:last-child { margin-bottom: 0; }
 .sb-body .section-title { margin-top: 8px; }
 .sb-body .stat { padding: 5px 0; align-items: baseline; gap: 10px; }
-.sb-body .stat span { font-size: 12px; }
+.sb-body .stat > span { font-size: 12px; }
 .sb-body .stat b { font-size: 13px; font-weight: 700; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
 .sb-empty { font-size: 13px; color: var(--text2); line-height: 1.5; padding: 6px 0; }
 /* Пустое состояние по канону 3.13: заголовок 13/600, текст 13/400, по центру.
@@ -2841,30 +2841,8 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 }
 #sb-body .warn { display: none; }   /* источник статуса: строка выше показывает его словами */
 
-/* Главные числа 2×2 */
-.ans-hero {
-  display: grid; grid-template-columns: 1fr 1fr; border: 1px solid var(--border);
-  border-radius: var(--r-card); overflow: hidden; background: var(--surface);
-}
-.ans-hero[hidden] { display: none; }
-.ans-hero.ans-hero--one { grid-template-columns: 1fr; }
-.ans-cell { padding: 12px 14px; min-width: 0; border-top: 1px solid var(--border-soft); }
-.ans-cell:nth-child(-n+2) { border-top: 0; }
-.ans-cell:nth-child(2n) { border-left: 1px solid var(--border-soft); }
-.ans-hero.ans-hero--one .ans-cell { border-left: 0; }
-.ans-hero > .ans-cell:last-child:nth-child(odd) { grid-column: 1 / -1; }
-.ans-lab { font-size: 13px; font-weight: 500; color: var(--text2); line-height: 1.35; min-height: 18px; }
-.ans-line { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
-.ans-not { font-size: 17px; color: var(--text2); }
-.ans-not .katex { font-size: 1em; }
-.ans-eq { font-size: 17px; color: var(--text2); }
-.ans-val { color: var(--text); font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.2; overflow-wrap: anywhere; }
-.ans-val--l { font-size: 28px; }
-.ans-val--m { font-size: 24px; }
-.ans-val--s { font-size: 20px; }
-.ans-val--x { font-size: 17px; font-weight: 600; }   /* смешанное значение текстом: 17/600 из закрытого списка шкалы */
-.ans-val .katex { font-size: 1em; }
-.ans-was { margin-top: 4px; font-size: 13px; color: var(--text3); font-variant-numeric: tabular-nums; }
+/* Главные величины — строками по группам (ADR 0144); вид строк — в конце файла,
+   раздел «ОТВЕТ СТРОКАМИ». */
 #sb-body .stat.is-hero { display: none; }   /* главное число в таблице не повторяется */
 
 /* Бремя */
@@ -2933,9 +2911,7 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 #ex-body .sb-note p.ex-out > b { display: inline; font-weight: 600; }
 @media (prefers-reduced-motion: reduce) { #ex-body .sb-note p.ex-q > b::after { transition: none; } }
 #ex-body .sb-note b, #ex-body .sb-note p.ex-q > b, #ex-body .sb-note p.ex-out > b { text-transform: none; letter-spacing: 0; font-size: 14.5px; }
-.ans-title { margin: 0 0 -8px; font-size: 15px; font-weight: 600; color: var(--text); display: flex; align-items: center; flex-wrap: wrap; column-gap: .28em; }   /* как .section-title: зазор на стыке слова и формулы */
-.ans-title[hidden] { display: none; }
-#sec-eq > .section-title { display: none; }   /* показан над главными числами (#ans-title) */
+#sec-eq > .section-title { display: none; }   /* показан заголовком группы главных величин (.ans-ghead) */
 #info-final .ff-eyebrow { font-size: 13px; font-weight: 500; color: var(--text2); text-transform: none; letter-spacing: 0; }
 #info-final .ff-name { font-size: 13px; font-weight: 500; color: var(--text); margin-top: 2px; }
 #info-final .ff-copy, #info-final .ff-expand {
@@ -3474,3 +3450,61 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
   #params-panel .col-head .mh-self > span:last-child { display: inline; }
   #ph-more-list > #dock-export > span { display: inline; }
 }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   ОТВЕТ СТРОКАМИ (сессия 3, 10.2026; решение владельца 09.10, ADR 0144)
+   Все модели: группы с заголовком, в группе одна величина на строку —
+   подпись слева, значение справа, тонкая линия между строками, высота от
+   44 px. Крупных плиток нет. Пары кегля из шкалы канона (COVERAGE, раздел 5):
+   подпись 13,5/400 (проверка шкалы считает 14/400), значение 16/400 одним
+   формульным шрифтом KaTeX_Main с цифрами одной ширины, заголовок группы
+   15/600, «было · Δ» 13/400. Те же строки и кегли — у остальных строк табло.
+   Не влезает значение рядом с подписью — строка в два этажа: подпись
+   сверху, значение под ней по правому краю (перенос гибкой строки, подпись
+   не уже 11em). Значение посередине не рвётся: число и точка — целым
+   куском, длинный список — только между значениями (.ans-item).
+   ═══════════════════════════════════════════════════════════════════ */
+.ans-hero { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.ans-hero[hidden] { display: none; }
+.ans-group { display: flex; flex-direction: column; min-width: 0; }
+.ans-ghead {
+  display: flex; align-items: center; flex-wrap: wrap; column-gap: .28em; margin: 0; padding: 0 0 8px;
+  border-bottom: 1px solid var(--border); font-size: 15px; font-weight: 600; line-height: 1.55; color: var(--text);
+}
+.ans-gdot { flex: 0 0 10px; width: 10px; height: 10px; margin-right: .35em; border-radius: 50%; background: var(--text2); }
+.ans-gform { font-weight: 400; }
+.ans-gform .katex { font-size: 1.1em; }
+.ans-cell, #params-panel .sb-body .stat, #params-panel .sb-body .stat.stat-eq, #params-panel .sb-body .stat.stat-stack {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-start; column-gap: 12px; row-gap: 2px;
+  min-width: 0; min-height: 44px; padding: 10px 0; box-sizing: border-box; border-bottom: 1px solid var(--border-soft);
+  line-height: 1.45;
+}
+.ans-lab, #params-panel .sb-body .stat > span, #params-panel .sb-body .stat.stat-eq > span {
+  flex: 1 1 11em; min-width: 0; font-size: 13.5px; font-weight: 400; line-height: 1.45; color: var(--text2);
+  text-align: left; overflow-wrap: break-word; hyphens: none;
+}
+.ans-lab .katex, #params-panel .sb-body .stat > span .katex { font-size: 1.1em; }
+.ans-line, #params-panel .sb-body .stat > b, #params-panel .sb-body .stat.stat-eq > b {
+  flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; text-align: right; white-space: nowrap;
+  font-family: 'KaTeX_Main', var(--font-ui); font-size: 16px; font-weight: 400; line-height: 1.4; color: var(--text);
+  font-variant-numeric: tabular-nums; letter-spacing: 0;
+}
+.ans-line { display: flex; align-items: baseline; justify-content: flex-end; gap: .3em; }
+.ans-not, .ans-eq, .ans-val { font-size: 1em; color: var(--text); }
+.ans-not .katex, .ans-val .katex, #params-panel .sb-body .stat > b .katex { font-size: 1em; }
+.ans-val { min-width: 0; white-space: nowrap; }
+.ans-val:has(> .ans-item) { white-space: normal; }
+.ans-item { display: inline-block; white-space: nowrap; }
+.ans-sep { margin-right: .3em; }
+.ans-val--none { color: var(--text3); }
+.ans-was { flex: 1 0 100%; text-align: right; font-size: 13px; line-height: 1.45; color: var(--text3); font-variant-numeric: tabular-nums; }
+#params-panel .sb-body .stat .stat-line { display: block; }
+#params-panel .tx-table td:not(:first-child) { font-family: 'KaTeX_Main', var(--font-ui); }
+.ans-drained { display: none !important; }
+.ans-seg-note { margin: 0; font-size: 13px; line-height: 1.55; color: var(--text3); }
+.ans-seg-note[hidden] { display: none; }
+/* Строка, ушедшая в «Ответ», и источник заголовка группы в табло не
+   повторяются. ⚠️ Правило стоит ПОСЛЕ вида строк выше: та же специфичность
+   иначе возвращала им display: flex, и величина показывалась дважды. */
+#params-panel #sb-body .stat.is-hero, #params-panel #sb-body .stat[data-ans-head], #params-panel #sb-body .stat.ans-dup { display: none; }

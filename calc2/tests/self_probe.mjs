@@ -52,7 +52,11 @@ window.__sp = {
     setSelfMode(true); await __sp.wait(600);
   },
   cells: () => [...document.querySelectorAll('#ans-hero .ans-cell')].map((c, i) => ({
-    i, lab: __sp.t(c.querySelector('.ans-lab')) + (c.querySelector('.ans-not') ? ':' + __sp.t(c.querySelector('.ans-not')) : ''),
+    // «подпись:обозначение». С сессии 3 (ADR 0144) у математики обозначение не
+    // выносится в значение: оно в data-not и в конце подписи — снимаем его оттуда.
+    i, lab: c.querySelector('.ans-not') ? __sp.t(c.querySelector('.ans-lab')) + ':' + __sp.t(c.querySelector('.ans-not'))
+      : (c.dataset.not ? __sp.t(c.querySelector('.ans-lab')).replace(new RegExp(c.dataset.not.replace(/[*∗]/g, '.') + '$'), '') + ':' + c.dataset.not
+        : __sp.t(c.querySelector('.ans-lab'))),
     val: __sp.t(c.querySelector('.ans-val')), field: !!c.querySelector('.self-inp'),
     hidden: c.classList.contains('self-hidden') })),
   // Ячейка по подписи «слова:обозначение».

@@ -359,11 +359,29 @@ function answerSeg() {
 /* Две главные строки «Ответа» любой модели вида y = f(x): локальные
    максимум и минимум на отрезке ответа (решение владельца 09.10). Точкой
    «(x; y)», несколько — через «; », нет — «нет». tail — приписка к подписи
-   (обозначение кривой, когда кривых несколько). */
-function ansExtremaRows(r, tail) {
+   (обозначение кривой, когда кривых несколько), group — группа строк в
+   колонке «Ответ» (data-ans-group, 94-answer.js; ADR 0144). */
+function ansExtremaRows(r, tail, group) {
   const t = tail || '';
-  return `<div class="stat ans-main"><span>Локальный максимум${t}</span><b>${ansPts(r.max)}</b></div>`
-       + `<div class="stat ans-main"><span>Локальный минимум${t}</span><b>${ansPts(r.min)}</b></div>`;
+  const g = group ? ` data-ans-group="${ansAttr(group)}"` : '';
+  return `<div class="stat ans-main"${g}><span>Локальный максимум${t}</span><b>${ansPts(r.max)}</b></div>`
+       + `<div class="stat ans-main"${g}><span>Локальный минимум${t}</span><b>${ansPts(r.min)}</b></div>`;
+}
+/* Текст для атрибута разметки (группа, запись кривой). */
+function ansAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+/* Приписка к подписи, которую табло и печать показывают, а колонка «Ответ»
+   снимает: там её роль у заголовка группы (ADR 0144). */
+function ansCtx(t) { return t ? `<span class="ans-ctx">${t}</span>` : ''; }
+/* Имя кривой в подписи: одна латинская буква — формулой, иначе текстом. */
+function ansNameMd(name) { return /^[A-Za-z]$/.test(name) ? '$' + name + '$' : name; }
+/* Запись кривой для заголовка группы: «f(x) = x² − 4». Уравнение со своим
+   знаком равенства («y = …», неявная кривая) идёт как есть. */
+function graphHeadTex(c, name) {
+  const e = String(c.expr || '').trim();
+  let body = e;
+  try { body = mathToLatexField(e); } catch (er) { body = e; }
+  if (/=/.test(e)) return body;
+  return (/^[A-Za-z]$/.test(name) ? name : '\\text{' + name + '}') + '(x) = ' + body;
 }
 
 /* Отрезок кадра: считается один раз в начале перерисовки модели и тут же
@@ -402,6 +420,9 @@ function syncAnsSegUI(seg) {
   });
   const back = document.getElementById('ans-seg-auto');
   if (back) back.hidden = !seg.hand;
+  // Буква оси в начале строки «x от … до …» — формулой (ADR 0144).
+  const xv = row.querySelector('.ans-seg-var');
+  if (xv && !xv.querySelector('.katex') && typeof katexInto === 'function') katexInto(xv, 'x');
   // Ползунок точки касания ходит по отрезку ответа, а не по окну.
   if (STATE.mode === 'math' && STATE.mathSub === 'tangent') {
     const sl = document.getElementById('mathx0-slider');
@@ -1341,16 +1362,17 @@ function updateMathPanel() {
     if (isNaN(r.y0)) html = '<div class="warn">В этой точке функция не определена.</div>';
     else {
       html += `<div class="stat"><span>Точка $x_0$</span><b>${fmt(r.x0)}</b></div>`;
-      html += `<div class="stat ans-main"><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
-      html += `<div class="stat ans-main"><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
-      html += `<div class="stat ans-main"><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
+      const tg = ' data-ans-group="Касательная в точке $x_0$"';
+      html += `<div class="stat ans-main"${tg}><span>$f(x_0)$</span><b>${fmt(r.y0)}</b></div>`;
+      html += `<div class="stat ans-main"${tg}><span>Наклон касательной $f'(x_0)$</span><b>${fmt(r.k)}</b></div>`;
+      html += `<div class="stat ans-main"${tg}><span>Угол наклона</span><b>${fmt(Math.atan(r.k) * 180 / Math.PI)}°</b></div>`;
       if (r.secant != null) {
         html += `<div class="stat"><span>Наклон секущей</span><b>${fmt(r.secant)}</b></div>`;
         html += `<div class="stat"><span>Разница с касательной</span><b>${fmt(Math.abs(r.secant - r.k))}</b></div>`;
       }
       html += `<div class="stat"><span>Касательная</span><b>y = ${fmt(r.y0)} ${r.k >= 0 ? '+' : '-'} ${fmt(Math.abs(r.k))}·(x ${r.x0 >= 0 ? '-' : '+'} ${fmt(Math.abs(r.x0))})</b></div>`;
       // Экстремумы f — ПОСЛЕ прежних строк: их номера держит паритет со старым экраном.
-      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b)); }
+      { const f = mathF(), seg = _ansSeg || answerSeg(); if (f) html += ansExtremaRows(ansAnalyse(f, seg.a, seg.b), '', 'Экстремумы функции'); }
       // Разбор: откуда взялось это число и что показывает треугольник.
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Что вообще такое производная?</b> Это скорость: на сколько меняется y, если x подвинуть чуть-чуть. `
@@ -1378,9 +1400,10 @@ function updateMathPanel() {
   } else if (STATE.mathSub === 'optimum') {
     /* Всё точкой «(x*; y*)», как в задачах: «y* = 18 при x* = 3» ответом в
        формате «Сначала сам» не читалось (ADR 0143). */
-    if (r.gMax) html += `<div class="stat ans-main"><span>Наибольшее на отрезке</span><b>${ansPt(r.gMax.x, r.gMax.y)}</b></div>`;
-    if (r.gMin) html += `<div class="stat ans-main"><span>Наименьшее на отрезке</span><b>${ansPt(r.gMin.x, r.gMin.y)}</b></div>`;
-    html += ansExtremaRows({ max: (r.ext || []).filter(p => p.kind === 'max'), min: (r.ext || []).filter(p => p.kind === 'min') });
+    const og = ' data-ans-group="Наибольшее и наименьшее на отрезке"';
+    if (r.gMax) html += `<div class="stat ans-main"${og}><span>Наибольшее на отрезке</span><b>${ansPt(r.gMax.x, r.gMax.y)}</b></div>`;
+    if (r.gMin) html += `<div class="stat ans-main"${og}><span>Наименьшее на отрезке</span><b>${ansPt(r.gMin.x, r.gMin.y)}</b></div>`;
+    html += ansExtremaRows({ max: (r.ext || []).filter(p => p.kind === 'max'), min: (r.ext || []).filter(p => p.kind === 'min') }, '', 'Экстремумы функции');
     html += `<div class="stat"><span>Перегибы</span><b>${ansPts(r.inf || [])}</b></div>`;
     // Разбор: как машина к этому пришла, шаг за шагом и с числами.
     html += mathOptimumReasoning(r);
@@ -1393,7 +1416,7 @@ function updateMathPanel() {
     /* Главные величины — экстремумы ИТОГОВОЙ функции; параметр a — вход,
        ответом он не был (раньше стоял единственной главной ячейкой). */
     { const f = mathF(), seg = _ansSeg || answerSeg();
-      if (f) html += ansExtremaRows(ansAnalyse(mathTransformed(f, STATE.mathTrans, a), seg.a, seg.b)); }
+      if (f) html += ansExtremaRows(ansAnalyse(mathTransformed(f, STATE.mathTrans, a), seg.a, seg.b), '', 'Экстремумы новой функции'); }
     html += `<div class="hint">${t.note}</div>`;
     // А53: у сюжета не было разбора вовсе, блок «Объяснение модели» открывался пустым.
     html += '<div class="sb-note"><b>Как это получилось</b>'
@@ -1425,10 +1448,11 @@ function updateMathPanel() {
       for (let i = 0; i < mmSlots(); i++) if (mmGet(i).trim()) names.push(mmLabel(i));
       html += `<div class="stat"><span>Строим</span><b>${nm} = ${r.isMin ? 'min' : 'max'}(${names.join(', ')})</b></div>`;
       html += `<div class="stat"><span>Функций участвует</span><b>${r.count}</b></div>`;
-      html += `<div class="stat ans-main"><span>Кривые меняются местами</span><b>${ansList(r.switches || [])}</b></div>`;
+      const zg = 'Огибающая ' + ansNameMd(nm);
+      html += `<div class="stat ans-main" data-ans-group="${ansAttr(zg)}"><span>Кривые меняются местами</span><b>${ansList(r.switches || [])}</b></div>`;
       // Экстремумы итоговой огибающей Z на отрезке ответа (излом тоже экстремум).
       { const f = mathF(), seg = _ansSeg || answerSeg();
-        if (f) html += ansExtremaRows(ansAnalyse(mmParts(f).z, seg.a, seg.b)); }
+        if (f) html += ansExtremaRows(ansAnalyse(mmParts(f).z, seg.a, seg.b), '', zg); }
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Как строится итоговая кривая?</b> В каждой точке x берётся ${r.isMin ? 'наименьшее' : 'наибольшее'} из значений всех функций. `
         + `Получается ломаная из кусков исходных кривых: ${r.isMin ? 'нижняя' : 'верхняя'} огибающая. `
@@ -1450,9 +1474,10 @@ function updateMathPanel() {
     if (r.error) html = `<div class="warn">${r.error}</div>`;
     else if (!r.opt) html = '<div class="muted">Точка не нашлась: проверьте формулы и границы окна.</div>';
     else {
-      html += `<div class="stat ans-main"><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
-      html += `<div class="stat ans-main"><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
-      html += `<div class="stat ans-main"><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
+      const cg = ' data-ans-group="Условный оптимум"';
+      html += `<div class="stat ans-main"${cg}><span>$x^*$</span><b>${fmt(r.opt.a)}</b></div>`;
+      html += `<div class="stat ans-main"${cg}><span>$y^*$</span><b>${fmt(r.opt.b)}</b></div>`;
+      html += `<div class="stat ans-main"${cg}><span>$f(x^*,\, y^*)$</span><b>${fmt(r.opt.value)}</b></div>`;
       /* Строки «Ищем = максимум» здесь больше нет (решение владельца 01.09):
          переключатель «Какую функцию ищем» стоит в левой панели, и повторять
          его выбор среди ПОСЧИТАННЫХ величин незачем. Слово осталось в разборе
@@ -1918,31 +1943,37 @@ function updateGraphPanel() {
     fns.push(f);
     const name = curveShortName(c);
     const r = ansAnalyse(f, lo, hi);
-    // Кривых несколько — у подписи величины обозначение кривой.
-    const tail = many ? ', кривая ' + name : '';
-    html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
+    /* Кривых несколько — у подписи величины обозначение кривой. В колонке
+       «Ответ» приписка снимается: строки кривой стоят под её заголовком —
+       цветная точка и запись (строка «Кривая» — источник заголовка, ADR 0144). */
+    const tail = many ? ansCtx(', кривая ' + name) : '';
+    const g = ` data-ans-group="${ansAttr(name)}"`;
+    html += `<div class="stat" data-ans-head="${ansAttr(name)}" data-color="${ansAttr(c.color || '')}" data-tex="${ansAttr(graphHeadTex(c, name))}"><span>Кривая</span><b>${name}</b></div>`;
     /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
        Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
        была десятичным знаком, прочитать это невозможно. Десятичная запятая —
        требование канона 2.1, значит менять надо разделитель. Стало «0; 1».
        ⚠️ fmt не отдавать в .map напрямую: второй довод у fmt — число знаков. */
-    html += `<div class="stat ans-main"><span>Пересекает ось $x$${tail}</span><b>${ansList(r.zeros)}</b></div>`;
-    html += `<div class="stat ans-main"><span>Пересекает ось $y$${tail}</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
+    html += `<div class="stat ans-main"${g}><span>Пересекает ось $x$${tail}</span><b>${ansList(r.zeros)}</b></div>`;
+    html += `<div class="stat ans-main"${g}><span>Пересекает ось $y$${tail}</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
     // «Вершины» второстепенной строкой больше нет: максимум и минимум — главные величины.
-    html += ansExtremaRows(r, tail);
+    html += ansExtremaRows(r, tail, name);
   });
   /* Пересечения кривых между собой — нули разности на том же отрезке (раньше
      брались у ключевых точек холста, то есть тоже по окну).
      ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ: строки нет. */
+  /* По строке на пару (решение владельца 09.10, ADR 0144): «f и g» →
+     «(−2; 0); (3; 5)», пара без общих точек → «нет». */
   if (fns.length > 1) {
-    const cr = [];
+    const names = shown.map(c => curveShortName(c));
     for (let i = 0; i < fns.length; i++) for (let j = i + 1; j < fns.length; j++) {
+      const cr = [];
       ansCrosses(fns[i], fns[j], lo, hi).forEach(p => {
         if (!cr.some(q => Math.abs(q.x - p.x) < (hi - lo) * 1e-6 && Math.abs(q.y - p.y) < 1e-6 * (1 + Math.abs(p.y)))) cr.push(p);
       });
+      cr.sort((a, b) => a.x - b.x);
+      html += `<div class="stat ans-main" data-ans-group="Пересечения кривых"><span>${ansCtx('Пересечения кривых ')}${ansNameMd(names[i])} и ${ansNameMd(names[j])}</span><b>${ansPts(cr)}</b></div>`;
     }
-    cr.sort((a, b) => a.x - b.x);
-    html += `<div class="stat ans-main"><span>Пересечения кривых</span><b>${ansPts(cr)}</b></div>`;
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }
