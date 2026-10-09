@@ -82,18 +82,15 @@
 
 <!-- ── ЭКРАН 1 · ОКНО ВЫБОРА СЦЕНАРИЯ ──────────────────────────────────
      Карточки вызывают уже существующие пресеты движка (loadScene/setMode/
-     setPpfSub). Мини-графики нарисованы цветами кривых через var(--curve-*),
-     поэтому подхватывают тему. -->
-<div class="picker bg-pattern-host" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title">
+     setPpfSub). Превью моделей — настоящие графики стандартного старта
+     (previews.json, ADR 0141), их вставляет 95-picker-screen.js встроенным
+     SVG цветами токенов темы; ручных схем в разметке больше нет. -->
+<div class="picker" id="scene-picker" role="dialog" aria-modal="true" aria-labelledby="picker-title" data-previews="{% calc2_static 'calc2/previews.json' %}">
   <div class="picker-inner">
     <header class="picker-head">
-      <h1 class="picker-title" id="picker-title">Это графики.</h1>
+      <h1 class="picker-title" id="picker-title">Графики</h1>
       <!-- п. 66. Слов ровно два и они не меняются нигде: БЛОК — это группа
-           моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. «Раздел»,
-           «сценарий» и «сцена» из интерфейса убраны: четыре слова на две
-           сущности заставляли догадываться, одно это и то же или разное. -->
-      <p class="picker-sub">Откройте блок и выберите модель. Исследуйте возможности,
-        решайте привычные задачи графически и прокачивайтесь в экономике!</p>
+           моделей на этом экране, МОДЕЛЬ — один сюжет внутри блока. -->
     </header>
 
     <!-- ── БЛОК 1 · МАТЕМАТИКА ────────────────────────────────────────
@@ -103,59 +100,26 @@
       <div class="picker-group-label">Математика</div>
       <div class="picker-grid">
         <button class="scard" data-scene="m-graph">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 24 Q60 78 96 34 T144 22" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 58 L144 30" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="106" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Построение графиков</span>
           <span class="scard-desc">Любое число кривых, свои точки, подписи и масштаб. Без экономики.</span>
         </button>
         <button class="scard" data-scene="m-transform">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M40 14 Q84 92 128 14" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 14 Q66 92 110 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Деформации графика</span>
           <span class="scard-desc">Сдвиги, растяжения, отражения и модули; один ползунок и обе кривые сразу.</span>
         </button>
         <button class="scard" data-scene="m-optimum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 50 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 74 C 52 6, 68 82, 84 50 C 100 18, 116 84, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="46" cy="24" r="3.6" fill="var(--curve-s)" stroke="none"/>
-            <circle cx="66" cy="70" r="3.6" fill="var(--curve-mc)" stroke="none"/>
-            <circle cx="84" cy="50" r="3.6" fill="var(--curve-mr)" stroke="none"/></g></svg></span>
           <span class="scard-name">Максимумы и минимумы</span>
           <span class="scard-desc">Экстремумы, точки перегиба, выпуклые и вогнутые участки разным цветом.</span>
         </button>
         <button class="scard" data-scene="m-tangent">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 66 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M84 84 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 16 Q84 96 142 16" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M84 62 L146 34" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M110 48 H130 V39" stroke="var(--curve-reg)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <circle cx="110" cy="48" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Функция и её производная наглядно</span>
           <span class="scard-desc">Точка на кривой, треугольник Δx и Δy, график производной снизу.</span>
         </button>
         <button class="scard" data-scene="m-minmax">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 70 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 70 V10" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 20 L142 66" stroke="var(--curve-d)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M24 64 L142 18" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M24 64 L83 42 L142 66" stroke="var(--curve-mc)" stroke-width="2.6" stroke-linejoin="round"/>
-            <circle cx="83" cy="42" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
           <span class="scard-name">Функции min и max</span>
           <span class="scard-desc">Нижняя или верхняя огибающая нескольких функций; излом в точке смены ветви.</span>
         </button>
         <button class="scard" data-scene="m-constraint">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 20 L136 74" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M34 66 Q56 34 96 26" stroke="var(--curve-d)" stroke-width="1.5" stroke-opacity=".4"/>
-            <path d="M44 74 Q72 44 116 36" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="74" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Оптимум при ограничении</span>
           <span class="scard-desc">Максимум или минимум цели при заданном ограничении: касание линий уровня.</span>
         </button>
@@ -167,37 +131,18 @@
       <div class="picker-group-label">КПВ и КТВ</div>
       <div class="picker-grid">
         <button class="scard" data-scene="ppf">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 16 Q132 22 140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="92" cy="36" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Построение КПВ</span>
           <span class="scard-desc">Граница производства, альтернативные издержки, выпуклость.</span>
         </button>
         <button class="scard" data-scene="ppfsum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 24 L92 40 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
-            <path d="M26 24 L92 40" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Сложение КПВ</span>
           <span class="scard-desc">Совместная граница с изломом: сравнительное преимущество каждой стороны.</span>
         </button>
         <button class="scard" data-scene="trade">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 22 Q120 30 132 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 34 L140 70" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="78" cy="46" r="3.6" fill="var(--curve-s)" stroke="none"/></g></svg></span>
           <span class="scard-name">КТВ. Одна страна</span>
           <span class="scard-desc">Точка производства на КПВ и выигрыш от торговли при известной мировой цене.</span>
         </button>
         <button class="scard" data-scene="tradeprice">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L96 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 46 L128 74" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 16 L140 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 34 L140 74" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/></g></svg></span>
           <span class="scard-name">КТВ. Две страны-партнёра</span>
           <span class="scard-desc">Мировая цена не задана, а найдена: точка внутри промежутка автарктических цен.</span>
         </button>
@@ -209,20 +154,10 @@
       <div class="picker-group-label">Совершенная конкуренция</div>
       <div class="picker-grid">
         <button class="scard" data-scene="sd">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Спрос и предложение</span>
           <span class="scard-desc">Равновесие, излишки CS и PS, общественное благосостояние.</span>
         </button>
         <button class="scard" data-scene="sdsum">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L74 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 34 L96 74" stroke="var(--curve-d)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".4"/>
-            <path d="M22 20 L48 47 L144 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/></g></svg></span>
           <span class="scard-name">Сложение спросов и предложений</span>
           <span class="scard-desc">Горизонтальное сложение по количеству: рыночная кривая с изломами.</span>
         </button>
@@ -230,65 +165,26 @@
              выбирается внутри сюжета, в правой панели. Ключи 'tax' и
              'tax-adv' остались рабочими синонимами этой же сцены. -->
         <button class="scard" data-scene="taxes">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="22" y="36" width="52" height="22" fill="var(--curve-tax)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 58 L120 12" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 72 L112 12" stroke="var(--curve-s)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".5"/></g></svg></span>
           <span class="scard-name">Налоги и субсидии</span>
           <span class="scard-desc">Потоварный налог, НДС, акциз и субсидии: клин между ценами, сбор бюджета, потери DWL.</span>
         </button>
         <button class="scard" data-scene="ceil">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 56 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Пол и потолок цены</span>
           <span class="scard-desc">Фиксированная цена, дефицит или избыток, объём торговли по короткой стороне.</span>
         </button>
         <button class="scard" data-scene="quota">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="30" width="46" height="26" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M64 78 V12" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Квоты</span>
           <span class="scard-desc">Прямое ограничение объёма: цена не определена однозначно, а лежит в коридоре.</span>
         </button>
         <button class="scard" data-scene="elast">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="12" width="52" height="66" fill="var(--curve-tax)" opacity=".16"/>
-            <rect x="70" y="12" width="66" height="66" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 16 L136 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 45 H70" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <path d="M70 45 V78" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <circle cx="70" cy="45" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Эластичность</span>
           <span class="scard-desc">Точечная |Ed| и |Es|, единичная точка, связь с выручкой.</span>
         </button>
         <button class="scard" data-scene="ext">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M63 41 L88 55 L88 27 Z" fill="var(--curve-dwl)" opacity=".16" stroke="none"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 56 L140 6" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Внешние эффекты</span>
           <span class="scard-desc">MSC или MSB против частных, потери DWL, налог или субсидия Пигу.</span>
         </button>
         <button class="scard soon" data-scene="firmmarket" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 18 L68 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 70 L68 18" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M90 44 H148" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M96 34 Q116 74 142 22" stroke="var(--cost-atc)" stroke-width="2.2"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Рынок и фирма в СК</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Два графика рядом: цена рынка и она же горизонтальный спрос для фирмы.</span>
         </button>
@@ -300,38 +196,18 @@
       <div class="picker-group-label">Теория фирмы</div>
       <div class="picker-grid">
         <button class="scard" data-scene="prod">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 C 56 66, 74 22, 116 18 T 146 26" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 70 Q66 26 146 62" stroke="var(--cost-mc)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="74" cy="41" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Производственная функция</span>
           <span class="scard-desc">TP, MP и AP от труда: точка перегиба и убывающая предельная отдача.</span>
         </button>
         <button class="scard" data-scene="costs">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 40 Q60 78 96 50 T150 20" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <path d="M26 70 Q70 64 150 16" stroke="var(--cost-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Издержки фирмы</span>
           <span class="scard-desc">MC, ATC, AVC, AFC; точки закрытия и безубыточности, прибыль при цене P.</span>
         </button>
         <button class="scard" data-scene="plants">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 L78 16" stroke="var(--curve-mc)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 74 L54 16" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 74 L142 24" stroke="var(--cost-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Сложение заводов</span>
           <span class="scard-desc">Горизонтальная сумма предельных издержек, условие MC₁ = MC₂.</span>
         </button>
         <button class="scard" data-scene="isoquant">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L128 74" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-mc)" stroke-width="2.6"/>
-            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-mc)" stroke-width="1.5" opacity=".4"/>
-            <circle cx="63" cy="41" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Изокванта и изокоста</span>
           <span class="scard-desc">Один выпуск разными наборами L и K, касание в точке MRTS = w / r.</span>
         </button>
@@ -343,59 +219,26 @@
       <div class="picker-group-label">Несовершенная конкуренция</div>
       <div class="picker-grid">
         <button class="scard" data-scene="mono">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L88 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Стандартная монополия</span>
           <span class="scard-desc">MR = MC, монопольная цена, потери общества против конкуренции.</span>
         </button>
         <button class="scard" data-scene="mono-nat">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 16 Q56 62 146 66" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <path d="M18 70 H150" stroke="var(--curve-mc)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Естественная монополия</span>
           <span class="scard-desc">Большие постоянные издержки, убывающая ATC, ориентиры P = MC и P = ATC.</span>
         </button>
         <button class="scard" data-scene="mono-d1">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L118 52 L22 52 Z" fill="var(--curve-s)" opacity=".16" stroke="none"/>
-            <path d="M22 18 L140 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 52 H150" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Дискриминация 1-й степени</span>
           <span class="scard-desc">Каждая единица по своей цене спроса: нулевой излишек покупателя, нулевые потери.</span>
         </button>
         <button class="scard" data-scene="mono-d3">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 18 L68 66" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M18 18 L43 66" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 30 L144 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M94 30 L119 70" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-name">Дискриминация 3-й степени</span>
           <span class="scard-desc">Два сегмента рынка, общие издержки: MR1 = MR2 = MC, цены разные.</span>
         </button>
         <button class="scard soon" data-scene="monopcomp" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L128 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M26 26 Q72 74 146 30" stroke="var(--cost-atc)" stroke-width="2.6"/>
-            <circle cx="70" cy="44" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Монополистическая конкуренция</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Долгий период: касание спроса и ATC, нулевая экономическая прибыль.</span>
         </button>
         <button class="scard" data-scene="mono-kink">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 16 L74 44 L140 74" stroke="var(--curve-d)" stroke-width="2.6" stroke-linejoin="round"/>
-            <path d="M22 16 L48 44" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M74 44 L107 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="74" cy="44" r="3.6" fill="var(--curve-d)" stroke="none"/></g></svg></span>
           <span class="scard-name">Составной спрос</span>
           <span class="scard-desc">Спрос из двух сегментов, излом кривой и разрыв предельной выручки.</span>
         </button>
@@ -407,11 +250,6 @@
       <div class="picker-group-label">Рынок труда</div>
       <div class="picker-grid">
         <button class="scard" data-scene="labor">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="46" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <!-- п. 67. Имя карточки и заголовок модели — одна строка. Прежде
                карточка звалась так же, как ЦЕЛЫЙ блок каталога («Совершенная
                конкуренция»), а открывалась моделью с другим именем. -->
@@ -419,30 +257,14 @@
           <span class="scard-desc">Спрос на труд как MRPL и предложение труда: оси L и W.</span>
         </button>
         <button class="scard" data-scene="labor-mono">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M22 74 L96 22" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="63" cy="62" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Монопсония</span>
           <span class="scard-desc">Один наниматель: предельные издержки труда выше предложения, занятость ниже.</span>
         </button>
         <button class="scard" data-scene="labor-union">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 32 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Вмешательство профсоюза</span>
           <span class="scard-desc">Профсоюз как монополист труда или заданный пол зарплаты; занятость ниже.</span>
         </button>
         <button class="scard" data-scene="labor-bilat">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <rect x="18" y="30" width="132" height="30" fill="var(--curve-reg)" opacity=".16"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Двусторонняя монополия</span>
           <span class="scard-desc">Наниматель против профсоюза: диапазон зарплат вместо единственной точки.</span>
         </button>
@@ -460,36 +282,14 @@
              Обещание «Скоро» стоило внимания ученика каждый раз, когда он сюда
              заходил, и не отдавало ничего. -->
         <button class="scard" data-scene="smallopen">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 60 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <rect x="52" y="57" width="56" height="6" fill="var(--curve-dwl)" opacity=".4"/></g></svg></span>
           <span class="scard-name">Малая открытая экономика</span>
           <span class="scard-desc">Мировая цена, импорт или экспорт, тариф и квота, потери общества.</span>
         </button>
         <button class="scard soon" data-scene="bigopen" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M12 78 H58" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M12 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M16 20 L54 66" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M16 68 L54 24" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M68 78 H104" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M68 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M70 24 L102 62" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M70 64 L102 28" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M116 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M116 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M118 22 L148 64" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M118 66 L148 26" stroke="var(--curve-s)" stroke-width="2.2"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Большие открытые экономики</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Три графика: два внутренних рынка и мировой, встреча экспорта и импорта.</span>
         </button>
         <button class="scard" data-scene="monoexport">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 18 L100 74" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 18 L61 74" stroke="var(--curve-mr)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M18 48 H150" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M22 74 L140 20" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Монополист и внешний рынок</span>
           <span class="scard-desc">Дома своя цена, за рубежом мировая: MR внутри = Pw = MC на общем выпуске.</span>
         </button>
@@ -501,101 +301,38 @@
       <div class="picker-group-label">Выбор потребителя</div>
       <div class="picker-grid">
         <button class="scard" data-scene="consumer">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L128 74" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <path d="M28 70 Q46 38 96 30" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M24 78 Q44 26 110 20" stroke="var(--curve-d)" stroke-width="1.5" opacity=".4"/>
-            <circle cx="63" cy="41" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривые безразличия</span>
           <span class="scard-desc">Бюджетная линия, веер кривых безразличия, оптимум и MRS в нём.</span>
         </button>
         <button class="scard soon" data-scene="cons-demand" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 78 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 20 L68 70" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 66 Q36 38 62 32" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <circle cx="42" cy="44" r="3.6" fill="var(--ink)" stroke="none"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 20 L144 70" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Оптимальное потребление и спрос</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Оптимумы при разных ценах и собранная по ним маршаллианская кривая спроса.</span>
         </button>
         <button class="scard" data-scene="cons-slutsky">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 24 L138 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 16 L82 74" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 44 L62 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <circle cx="72" cy="46" r="3.6" fill="var(--curve-d)" stroke="none"/>
-            <circle cx="47" cy="42" r="3.6" fill="var(--curve-s)" stroke="none"/>
-            <circle cx="38" cy="62" r="3.6" fill="var(--curve-mc)" stroke="none"/></g></svg></span>
           <span class="scard-name">Декомпозиция по Слуцкому</span>
           <span class="scard-desc">Три бюджетные линии: эффект замещения и эффект дохода по отдельности.</span>
         </button>
         <button class="scard soon" data-scene="cons-hicks" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 24 L138 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M22 44 L62 74" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M28 70 Q48 36 104 28" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="72" cy="46" r="3.6" fill="var(--curve-d)" stroke="none"/>
-            <circle cx="42" cy="52" r="3.6" fill="var(--curve-s)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Декомпозиция по Хиксу</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Компенсация до прежней полезности, а не до прежнего набора: точка на той же кривой.</span>
         </button>
         <button class="scard soon" data-scene="cons-risk" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 70 Q70 24 140 18" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M32 62 L128 22" stroke="var(--curve-s)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <circle cx="32" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="128" cy="22" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="80" cy="42" r="3.6" fill="var(--curve-reg)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Выбор в условиях неопределённости и риск</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Вогнутая полезность денег: надёжный доход против лотереи с тем же средним.</span>
         </button>
         <button class="scard soon" data-scene="cons-icc" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 52 L70 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 36 L104 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L138 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M34 64 Q62 46 104 30" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="38" cy="62" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="66" cy="44" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая доход-потребление</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Рост дохода при прежних ценах, линия оптимумов ICC.</span>
         </button>
         <button class="scard soon" data-scene="cons-pcc" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L62 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L98 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M22 20 L140 74" stroke="var(--curve-reg)" stroke-width="1.5" opacity=".4"/>
-            <path d="M38 56 Q72 44 116 52" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="40" cy="55" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="78" cy="45" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая цена-потребление</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Поворот бюджетной линии при смене цены, линия оптимумов PCC.</span>
         </button>
         <button class="scard soon" data-scene="cons-engel" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M24 72 Q78 60 138 18" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <circle cx="60" cy="65" r="3.6" fill="var(--ink)" stroke="none"/>
-            <circle cx="106" cy="43" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Кривая Энгеля</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Количество блага при разном доходе: нормальное благо и товар низшей категории.</span>
         </button>
         <button class="scard soon" data-scene="cons-marshall" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 44 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 44 V8" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 12 L74 42" stroke="var(--curve-reg)" stroke-width="2.2"/>
-            <path d="M26 40 Q42 22 68 18" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M18 84 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 84 V50" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 52 L140 80" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M48 30 V78" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связь кривых и маршаллианского спроса</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Два графика друг под другом: точка PCC сверху и точка спроса снизу.</span>
         </button>
@@ -607,85 +344,38 @@
       <div class="picker-group-label">Макроэкономика</div>
       <div class="picker-grid">
         <button class="scard" data-scene="adas">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 70 L140 22" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M96 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">AD–AS</span>
           <span class="scard-desc">Совокупный спрос и предложение, потенциал LRAS, разрыв выпуска.</span>
         </button>
         <button class="scard" data-scene="islm">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 74 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="81" cy="46" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">IS–LM</span>
           <span class="scard-desc">Товарный и денежный рынок вместе: пара (Y, r), равновесная для обоих.</span>
         </button>
         <button class="scard" data-scene="phillips">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 18 L140 66" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M84 78 V12" stroke="var(--curve-mc)" stroke-width="2.6"/>
-            <circle cx="84" cy="42" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Филлипса</span>
           <span class="scard-desc">Размен инфляции и безработицы в коротком периоде и его исчезновение в долгом.</span>
         </button>
         <button class="scard" data-scene="money">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 70" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M88 78 V12" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <circle cx="88" cy="48" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-name">Денежный рынок</span>
           <span class="scard-desc">Спрос на деньги, фиксированное предложение ЦБ, равновесная ставка.</span>
         </button>
         <button class="scard" data-scene="loanable">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 22 L120 72" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M46 22 L144 72" stroke="var(--curve-reg)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 72 L140 20" stroke="var(--curve-s)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Рынок заёмных средств</span>
           <span class="scard-desc">Дефицит бюджета, рост ставки, вытеснение частных инвестиций.</span>
         </button>
         <button class="scard soon" data-scene="cycle" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 66 L142 22" stroke="var(--curve-ghost)" stroke-width="2.2" stroke-dasharray="5 4"/>
-            <path d="M22 66 C 46 34, 62 74, 82 44 C 102 14, 118 52, 142 22" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Деловой цикл</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Колебания выпуска вокруг тренда: подъём, пик, спад, дно и фазы между ними.</span>
         </button>
         <button class="scard soon" data-scene="cycle-adas" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M14 44 H72" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M14 44 V8" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M18 36 C 32 14, 44 44, 68 16" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M90 78 H148" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M90 78 V42" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M94 46 L146 74" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M94 76 L146 46" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M40 22 L108 58" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связь делового цикла с AD–AS</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Фаза цикла сверху и соответствующее ей положение AD и AS снизу.</span>
         </button>
         <button class="scard soon" data-scene="macrolink" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <rect x="14" y="10" width="58" height="30" rx="4" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <rect x="88" y="10" width="58" height="30" rx="4" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <rect x="14" y="52" width="58" height="30" rx="4" stroke="var(--curve-mc)" stroke-width="2.2"/>
-            <rect x="88" y="52" width="58" height="30" rx="4" stroke="var(--curve-mr)" stroke-width="2.2"/>
-            <path d="M72 25 H88 M72 67 H88 M43 40 V52 M117 40 V52" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Связка четырёх моделей</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Цикл, IS–LM–BP, денежный рынок и AD–AS на одном экране: один шок во всех.</span>
         </button>
         <button class="scard" data-scene="fx">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 20 L140 68" stroke="var(--curve-d)" stroke-width="2.6"/>
-            <path d="M22 72 L140 24" stroke="var(--curve-s)" stroke-width="2.6"/>
-            <path d="M18 58 H150" stroke="var(--curve-reg)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Валютный рынок</span>
           <span class="scard-desc">Плавающий и фиксированный курс; интервенции при разрыве.</span>
         </button>
@@ -697,31 +387,14 @@
       <div class="picker-group-label">Избранные сюжеты</div>
       <div class="picker-grid">
         <button class="scard" data-scene="ineq">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 74 L140 14" stroke="var(--ink-soft)" stroke-width="1.5" stroke-dasharray="5 4"/>
-            <path d="M22 74 Q108 70 140 14" stroke="var(--curve-d)" stroke-width="2.6"/></g></svg></span>
           <span class="scard-name">Неравенство доходов</span>
           <span class="scard-desc">Кривая Лоренца, коэффициент Джини, коэффициент фондов, перераспределение.</span>
         </button>
         <button class="scard" data-scene="laffer">
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <path d="M18 78 H150" stroke="var(--ink-soft)" stroke-width="1.5"/><path d="M18 78 V12" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M22 76 Q84 6 146 76" stroke="var(--curve-tax)" stroke-width="2.6"/>
-            <!-- А71: точка стоит НА вершине кривой (максимум поступлений), а не
-                 висит над ней ни к чему не привязанной. Вершина квадратичной
-                 кривой Безье при t=0.5 это (84; 41), а не (84; 24). -->
-            <circle cx="84" cy="41" r="3.6" fill="var(--curve-tax)" stroke="none"/></g></svg></span>
           <span class="scard-name">Кривая Лаффера</span>
           <span class="scard-desc">Поступления бюджета как функция ставки; строится прогоном самой модели налога.</span>
         </button>
         <button class="scard soon" data-scene="exchange" disabled>
-          <span class="scard-spec" aria-hidden="true"><svg viewBox="0 0 160 90"><g fill="none" stroke-linecap="round">
-            <rect x="20" y="14" width="120" height="62" stroke="var(--ink-soft)" stroke-width="1.5"/>
-            <path d="M26 68 Q52 34 88 26" stroke="var(--curve-d)" stroke-width="2.2"/>
-            <path d="M72 64 Q108 56 134 22" stroke="var(--curve-s)" stroke-width="2.2"/>
-            <path d="M20 76 Q74 58 140 14" stroke="var(--curve-reg)" stroke-width="2.6"/>
-            <circle cx="76" cy="49" r="3.6" fill="var(--ink)" stroke="none"/></g></svg></span>
           <span class="scard-head"><span class="scard-name">Экономика обмена</span><span class="scard-soon">Скоро</span></span>
           <span class="scard-desc">Коробка Эджворта: два участника, кривая контрактов, область взаимной выгоды.</span>
         </button>

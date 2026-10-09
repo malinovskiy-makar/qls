@@ -1072,8 +1072,11 @@ function wireControls() {
       return;
     }
     if (e.key === 'Tab') {
-      // Карточки «скоро» отключены (disabled) и в кольцо фокуса не входят.
-      const cards = p.querySelectorAll('.scard:not([disabled])');
+      // Кольцо фокуса — по ВИДИМЫМ органам экрана: поиск, «Продолжить»,
+      // выбранная вкладка, карточки открытого блока (карточки других вкладок
+      // скрыты и фокуса не принимают). «Скоро» отключены и в кольцо не входят.
+      const cards = [...p.querySelectorAll('input, button:not([disabled])')]
+        .filter(el => el.offsetParent !== null && el.tabIndex >= 0);
       if (!cards.length) return;
       const first = cards[0], last = cards[cards.length - 1];
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }

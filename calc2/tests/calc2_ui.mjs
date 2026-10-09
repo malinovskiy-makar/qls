@@ -784,18 +784,16 @@ await t('опасные команды в .tex отклоняются серве
 });
 
 // ── Фаза 6: полировка ───────────────────────────────────────────────────
-await t('иконки карточек: три толщины линий, не одиннадцать', () => page.evaluate(() => {
-  const w = new Set();
-  document.querySelectorAll('#scene-picker .scard-spec [stroke-width]')
-    .forEach(n => w.add(n.getAttribute('stroke-width')));
-  const arr = [...w].sort();
-  return arr.length <= 3 || 'толщин ' + arr.length + ': ' + arr.join(',');
-}));
-await t('иконки: один радиус маркеров и один пунктир', () => page.evaluate(() => {
-  const r = new Set(), d = new Set();
-  document.querySelectorAll('#scene-picker .scard-spec circle[r]').forEach(n => r.add(n.getAttribute('r')));
-  document.querySelectorAll('#scene-picker .scard-spec [stroke-dasharray]').forEach(n => d.add(n.getAttribute('stroke-dasharray')));
-  return (r.size <= 1 && d.size <= 1) || `радиусов ${r.size}, пунктиров ${d.size}`;
+/* Ручных схем .scard-spec больше нет (решение 09.10, ADR 0141): две прежние
+   проверки «три толщины, один радиус и один пунктир» стерегли их рисунок.
+   Превью теперь собирается из записи при рисовании; правило о нём — без
+   текста и у каждой рабочей модели (состав сторожит test_calc2_previews). */
+await t('превью карточек: у каждой из 42 рабочих моделей, без текста', () => page.evaluate(() => {
+  const cards = [...document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')];
+  const noPv = cards.filter(c => !c.querySelector('.pk-well svg.pk-pv path'));
+  const txt = document.querySelectorAll('#scene-picker svg.pk-pv text').length;
+  return (cards.length === 42 && !noPv.length && !txt && !document.querySelector('.scard-spec'))
+    || `моделей ${cards.length}, без превью ${noPv.length}, текстов ${txt}`;
 }));
 
 await page.evaluate(() => { resetSceneMemory(); openPicker(); pickScene('tax'); closePicker(); });
@@ -1693,24 +1691,21 @@ await t('карточка функции отличается от колонк�
   return (r.card && (r.bg !== r.colBg || /^[1-9].* solid/.test(r.border))) || JSON.stringify(r);
 });
 
-/* ── П2 · Н5 · ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого
-   списка). Двухуровневого окна выбора больше нет: десять блоков и все модели
-   на одном экране (README макета, раздел 4). Прежние три проверки (карточки
-   блоков без номеров; из сюжета — в его блок; открыт один блок за раз)
-   заменены проверками того же смысла для одного экрана: блоки без номеров и с
-   числом моделей, модель после возврата видна сразу и стоит в «Продолжить»,
-   ни одна модель не спрятана за щелчком. */
-await t('на экране выбора все десять блоков сразу, без номеров, с числом моделей', async () => {
+/* ── П2 · Н5 · ПЕРЕНАЦЕЛЕНО дважды: редизайн 10.2026 (фаза 8) свёл окно в
+   один экран, решение 09.10 (ADR 0141) — во вкладки блоков. Смысл тот же:
+   блоки без номеров и с числом моделей, модель после возврата видна сразу и
+   стоит в «Продолжить · <когда>», каждая рабочая модель достижима. */
+await t('на экране выбора десять вкладок блоков, без номеров, с числом моделей', async () => {
   await page.evaluate(() => { resetSceneMemory(); STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(200);
   return await page.evaluate(() => {
     const bad = [];
-    const blocks = [...document.querySelectorAll('#scene-picker .pk-block')].filter(b => b.offsetParent !== null);
-    if (blocks.length !== 10) bad.push('блоков на экране ' + blocks.length);
-    blocks.forEach(b => {
-      const nm = (b.querySelector('.pk-bname') || {}).textContent || '';
-      const n = (b.querySelector('.pk-bcount') || {}).textContent || '';
-      if (!nm.trim()) bad.push('блок без имени');
+    const tabs = [...document.querySelectorAll('#picker-tabs .pk-tab')].filter(b => b.offsetParent !== null);
+    if (tabs.length !== 10) bad.push('вкладок на экране ' + tabs.length);
+    tabs.forEach(b => {
+      const nm = (b.querySelector('.pk-tname') || {}).textContent || '';
+      const n = (b.querySelector('.pk-tcount') || {}).textContent || '';
+      if (!nm.trim()) bad.push('вкладка без имени');
       if (/^ *[0-9]+ *·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
       if (!/^\d+$/.test(n.trim())) bad.push('у «' + nm.trim() + '» нет числа моделей');
     });
@@ -1728,19 +1723,28 @@ await t('из модели «Все модели» ведёт на экран, �
       if (!row || row.offsetParent === null) bad.push(key + ': строки модели не видно');
       const cont = document.querySelector('#picker-continue .pk-cname');
       if (!cont || cont.textContent.trim() !== name) bad.push(key + ': в «Продолжить» «' + (cont ? cont.textContent : '—') + '»');
+      // Подпись — ровно «Продолжить · <когда>» (решение 09.10).
+      const when = document.querySelector('#picker-continue .pk-when');
+      if (!when || !/^Продолжить · (только что|\d+ мин назад|\d+ ч назад|вчера|\d+ (день|дня|дней) назад)$/.test(when.textContent))
+        bad.push(key + ': подпись «' + (when ? when.textContent : '—') + '»');
     });
     closePicker();
     return !bad.length || bad.join('; ');
   });
 });
 
-await t('ни одна рабочая модель не спрятана за щелчком по блоку', async () => {
+await t('каждая рабочая модель видна во вкладке своего блока (42 по десяти вкладкам)', async () => {
   await page.evaluate(() => { STATE.sceneKey = null; openPicker(); });
   await page.waitForTimeout(120);
   return await page.evaluate(() => {
-    const all = [...document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')];
-    const hidden = all.filter(c => c.offsetParent === null);
-    const r = (!hidden.length && all.length === 42) || `моделей ${all.length}, спрятано ${hidden.length}`;
+    const seen = new Set();
+    document.querySelectorAll('#picker-tabs .pk-tab').forEach(tb => {
+      tb.click();
+      document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])')
+        .forEach(c => { if (c.offsetParent !== null) seen.add(c.dataset.scene); });
+    });
+    const all = document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])').length;
+    const r = (seen.size === 42 && all === 42) || `моделей ${all}, видно по вкладкам ${seen.size}`;
     closePicker();
     return r;
   });

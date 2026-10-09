@@ -46,36 +46,35 @@ const t = async (name, fn) => {
 await t('в окне ровно десять блоков', async () =>
   (await page.locator('.picker-group').count()) === 10 || 'групп: ' + (await page.locator('.picker-group').count()));
 
-/* ПЕРЕНАЦЕЛЕНО (редизайн 10.2026, фаза 8; пункт (г) закрытого списка):
-   двухуровневого окна нет — десять блоков и модели на одном экране. Смысл
-   прежних трёх проверок тот же: порядок блоков, у моделей есть картинка (она
-   теперь в превью), номеров нет, модель блока видна и открывается. */
+/* ПЕРЕНАЦЕЛЕНО дважды: редизайн 10.2026 (фаза 8) свёл двухуровневое окно в
+   один экран, решение 09.10 (ADR 0141) — во вкладки блоков с сеткой карточек.
+   Смысл трёх проверок тот же: порядок блоков, у моделей есть картинка (теперь
+   — настоящее превью из записи при рисовании), номеров нет, модель блока
+   видна и открывается. */
 await t('Математика идёт первым блоком экрана', async () =>
-  (await page.locator('#scene-picker .pk-bname').first().textContent()).trim() === 'Математика' || 'первый не Математика');
+  (await page.locator('#scene-picker .pk-tname').first().textContent()).trim() === 'Математика' || 'первый не Математика');
 
-await t('главный экран — десять блоков, у каждой модели картинка для превью', () => page.evaluate(() => {
-  const blocks = [...document.querySelectorAll('#scene-picker .pk-block')];
+await t('главный экран — десять вкладок блоков, у каждой рабочей модели превью', () => page.evaluate(() => {
+  const tabs = [...document.querySelectorAll('#picker-tabs .pk-tab')];
   const bad = [];
-  if (blocks.length !== 10) bad.push('блоков ' + blocks.length);
-  blocks.forEach(g => {
-    const nm = (g.querySelector('.pk-bname') || {}).textContent || '';
+  if (tabs.length !== 10) bad.push('вкладок ' + tabs.length);
+  tabs.forEach(tb => {
+    const nm = (tb.querySelector('.pk-tname') || {}).textContent || '';
     if (/^\s*\d+\s*·/.test(nm)) bad.push('номер в «' + nm.trim() + '»');
-    g.querySelectorAll('.scard.pk-row:not(.soon):not([disabled])').forEach(c => {
-      if (!c.querySelector('.scard-spec svg')) bad.push('без картинки: ' + ((c.querySelector('.scard-name') || {}).textContent || '').trim());
-    });
   });
+  document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled])').forEach(c => {
+    if (!c.querySelector('.pk-well svg.pk-pv path')) bad.push('без превью: ' + ((c.querySelector('.scard-name') || {}).textContent || '').trim());
+  });
+  if (document.querySelector('.scard-spec')) bad.push('ручная схема .scard-spec ещё в разметке');
   if (document.getElementById('picker-blocks')) bad.push('лестница блоков ещё в разметке');
   return !bad.length || bad.join('; ');
 }));
 
-await t('модель блока видна сразу, превью показывает её картинку и имя', () => page.evaluate(() => {
-  const row = document.querySelector('#scene-picker .pk-block:nth-child(1) .scard.pk-row:not(.soon)');
-  if (!row || row.offsetParent === null) return 'строки модели не видно';
-  row.dispatchEvent(new PointerEvent('pointerover', { bubbles: true }));
-  const pv = document.getElementById('picker-preview');
-  const ok = pv && !pv.hidden && pv.querySelector('svg') && (pv.querySelector('.pk-pv-name') || {}).textContent;
-  row.dispatchEvent(new PointerEvent('pointerout', { bubbles: true }));
-  return !!ok || 'превью не показало картинку и имя';
+await t('модели выбранного блока видны сразу, у карточки превью и имя', () => page.evaluate(() => {
+  const card = document.querySelector('#scene-picker .pk-block.open .scard:not(.soon)');
+  if (!card || card.offsetParent === null) return 'карточки модели не видно';
+  const ok = card.querySelector('.pk-well svg.pk-pv') && (card.querySelector('.scard-name') || {}).textContent;
+  return !!ok || 'у карточки нет превью или имени';
 }));
 
 await t('модель «Потребление в комплектах» вырезана', () => page.evaluate(() =>

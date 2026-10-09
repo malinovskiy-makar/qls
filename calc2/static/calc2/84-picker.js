@@ -173,9 +173,10 @@ function openPicker() {
   p.removeAttribute('inert');
   const app = document.querySelector('.app');
   if (app) app.setAttribute('inert', '');   // рабочее место под окном — не фокусируется
-  /* Редизайн 10.2026 (фаза 8): экран выбора одним экраном — блоков-ступенек
-     больше нет. Сверху «Продолжить» и «Недавние», фокус в поиске (О2). */
+  /* Редизайн 10.2026 (фаза 8) и решение 09.10: блоков-ступенек нет. Сверху
+     «Продолжить» и недавние, ниже вкладки блоков, фокус в поиске (О2). */
   if (typeof renderPickerContinue === 'function') renderPickerContinue();
+  if (typeof pickerOpenTab === 'function') pickerOpenTab();   // вкладка блока при входе (95-picker-screen.js)
   const q = document.getElementById('picker-search');
   if (typeof pickerFilter === 'function') pickerFilter(q ? q.value : '');
   const first = q || p.querySelector('.scard:not([disabled])');

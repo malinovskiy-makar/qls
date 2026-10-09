@@ -3030,86 +3030,156 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .exp-foot .btn, .exp-foot .btn-sm { height: 40px; padding: 0 16px; width: auto; margin: 0; font-size: 14.5px; }
 
 /* ═══════════════════════════════════════════════════════════════════
-   РЕДИЗАЙН 10.2026 · ЭКРАН ВЫБОРА (фаза 8; README макета, раздел 4)
-   Все блоки на одном экране, пять колонок по два блока; строки моделей;
-   поиск, «Продолжить», «Недавние»; превью при наведении и фокусе.
+   ЭКРАН ВЫБОРА: ВКЛАДКИ БЛОКОВ И СЕТКА КАРТОЧЕК (решение 09.10, ADR 0141)
+   Макет claude/mockups/calc2_picker_20261009/ (тёмная тема); светлая — те
+   же размеры на светлых токенах. Кегли и скругления макета сведены к
+   канону /calc2/ (DESIGN.md 1.2, 1.5 и «Редизайн 10.2026»): 30/700 → 32/600,
+   18/600 → 17/600, 15,5/600 → 16/600, 12,5 → 13; радиусы 14 → 12 (--r-panel).
+   Колодец превью — цвет холста (--canvas): контраст кривой к нему тот же,
+   что на настоящем графике (≥ 3 : 1 в обеих темах).
    ═══════════════════════════════════════════════════════════════════ */
-.pk-screen .picker-inner { max-width: 1440px; padding: 24px 56px 40px; }
-.pk-screen .picker-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin: 0 0 20px; }
+.pk-screen .picker-inner { max-width: 1440px; padding: 32px 56px 48px; }
+.pk-screen .picker-head { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 0 0 24px; }
 .pk-screen .picker-title { font-size: 32px; font-weight: 600; letter-spacing: 0; margin: 0; }
-.pk-screen .picker-sub { font-size: 16px; color: var(--text2); margin: 6px 0 0; max-width: 60ch; }
-.pk-search { position: relative; flex: 0 0 440px; max-width: 100%; display: flex; align-items: center; }
+.pk-search { position: relative; flex: 0 1 460px; max-width: 100%; display: flex; align-items: center; }
 .pk-search svg { position: absolute; left: 14px; width: 18px; height: 18px; color: var(--text3); pointer-events: none; }
 .pk-search input {
   width: 100%; height: 46px; padding: 0 44px 0 42px; font: inherit; font-size: 16px; color: var(--text);
-  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-card);
+  background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--r-panel);
 }
 .pk-search input:focus { outline: 2px solid var(--focus); outline-offset: 2px; border-color: var(--accent); }
 .pk-search input::-webkit-search-cancel-button { display: none; }
 .pk-clear { position: absolute; right: 7px; width: 32px; height: 32px; border: 0; border-radius: var(--r); background: transparent; color: var(--text2); font-size: 20px; cursor: pointer; }
 .pk-clear:hover { background: var(--chip-bg); }
 .pk-clear[hidden] { display: none; }
-.pk-cont { display: flex; align-items: center; gap: 20px; flex-wrap: wrap; margin: 0 0 20px; }
+
+/* Ряд «Продолжить» и недавних: одна сетка 2 : 1 : 1 : 1. */
+.pk-cont { display: grid; grid-template-columns: 2fr 1fr 1fr 1fr; gap: 14px; margin: 0 0 28px; }
 .pk-cont[hidden] { display: none; }
-.pk-continue {
-  display: flex; align-items: center; gap: 14px; min-width: 520px; padding: 10px 12px 10px 10px; text-align: left;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); cursor: pointer; font: inherit; color: var(--text);
+.pk-recents { display: contents; }
+.pk-ccard {
+  display: flex; align-items: center; gap: 14px; min-width: 0; min-height: 104px; padding: 12px; text-align: left;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel);
+  cursor: pointer; font: inherit; color: var(--text);
 }
-.pk-continue:hover { border-color: var(--border-strong); }
-.pk-continue:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
-.pk-mini { flex: 0 0 96px; width: 96px; height: 54px; border: 1px solid var(--border-soft); border-radius: var(--r); background: var(--canvas); overflow: hidden; }
-.pk-mini svg { display: block; width: 100%; height: 100%; }
-.pk-ctext { flex: 1 1 auto; display: flex; flex-direction: column; min-width: 0; }
-.pk-when { font-size: 13px; font-weight: 500; color: var(--text3); }
-.pk-cname { font-size: 17px; font-weight: 600; }
-.pk-go { flex: 0 0 auto; padding: 8px 14px; border-radius: var(--r-pill); background: var(--chip-bg); color: var(--text); font-size: 14px; font-weight: 600; border: 1px solid var(--border-strong); }
-.pk-recent { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pk-recent-lab { font-size: 13px; font-weight: 500; color: var(--text3); margin-right: 4px; }
-.pk-chip { display: inline-flex; align-items: baseline; gap: 8px; padding: 6px 12px; border: 1px solid transparent; border-radius: var(--r-pill); background: var(--chip-bg); font: inherit; font-size: 14.5px; color: var(--text); cursor: pointer; }
-.pk-chip:hover { border-color: var(--border-strong); }
-.pk-chip-when { font-size: 13px; font-weight: 500; color: var(--text3); }
+.pk-ccard:hover { border-color: var(--border-strong); }
+.pk-ccard:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pk-continue { background: linear-gradient(var(--accent-tint), var(--accent-tint)), var(--surface); border-color: var(--accent); }
+.pk-continue:hover { border-color: var(--accent); background: linear-gradient(var(--accent-tint), var(--accent-tint)), linear-gradient(var(--accent-tint), var(--accent-tint)), var(--surface); }
+.pk-thumb {
+  flex: 0 0 auto; display: flex; width: 120px; height: 80px; padding: 6px 8px;
+  background: var(--canvas); border: 1px solid var(--border-soft); border-radius: var(--r-card); overflow: hidden;
+}
+.pk-continue .pk-thumb { width: 150px; height: 84px; }
+.pk-thumb svg, .pk-well svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.pk-ctext { flex: 1 1 auto; display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.pk-when { font-size: 13px; font-weight: 400; color: var(--text3); }
+.pk-continue .pk-when { font-size: 12px; font-weight: 600; color: var(--accent-ink); }
+.pk-cname { font-size: 15px; font-weight: 600; line-height: 1.3; overflow-wrap: normal; }
+.pk-recent { gap: 12px; padding: 10px; }
+.pk-continue .pk-cname { font-size: 17px; }
+.pk-go {
+  flex: 0 0 auto; display: inline-flex; align-items: center; height: 40px; padding: 0 14px;
+  border-radius: var(--r); background: var(--accent); color: var(--act-ink-solid); font-size: 14px; font-weight: 600; white-space: nowrap;
+}
+
+/* Вкладки блоков: «пилюли» с переносом; выбранная залита акцентом (2.14,
+   выбор из равноправных). Число — рабочие модели блока. */
+.pk-tabs { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 24px; }
+.pk-tabs[hidden] { display: none; }
+.pk-tab {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 16px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: transparent;
+  font: inherit; font-size: 15px; font-weight: 500; color: var(--text); cursor: pointer; white-space: nowrap;
+}
+.pk-tab:hover { background: var(--chip-bg); }
+.pk-tab:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.pk-tcount { font-size: 13px; font-weight: 400; color: var(--text3); }
+.pk-tab[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--act-ink-solid); font-weight: 600; }
+.pk-tab[aria-selected="true"] .pk-tcount { color: var(--act-ink-solid); }
+
 .pk-found { display: flex; align-items: center; gap: 12px; margin: 0 0 16px; font-size: 14px; color: var(--text2); }
-.pk-found[hidden], .pk-none[hidden], .pk-cols[hidden] { display: none; }
+.pk-found[hidden], .pk-none[hidden], .pk-panels[hidden] { display: none; }
 .pk-enter { padding: 3px 10px; border-radius: var(--r-pill); background: var(--chip-bg); font-size: 13px; font-weight: 500; color: var(--text); }
 .pk-none { padding: 24px 0; }
 .pk-none-title { font-size: 19px; font-weight: 600; color: var(--text); }
 .pk-none p { margin: 6px 0 0; font-size: 14px; color: var(--text2); max-width: 60ch; line-height: 1.55; }
-.pk-cols { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 28px; align-items: start; }
-.pk-col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.pk-screen .picker-group.pk-block { display: block; }
-.pk-screen .picker-group.pk-block.pk-miss { display: none; }
-.pk-screen .picker-group-open-name { display: none; }
-.pk-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0 0 6px; padding: 0; font-size: 15px; font-weight: 600; color: var(--text); text-transform: none; letter-spacing: 0; }
-.pk-bcount { font-size: 13px; font-weight: 500; color: var(--text3); }
-.pk-screen .picker-grid.pk-list { display: flex; flex-direction: column; gap: 0; margin: 0 -8px; grid-template-columns: none; }
-.pk-screen .scard.pk-row {
-  display: block; width: 100%; min-height: 0; padding: 5px 8px; text-align: left; transform: none;
-  background: transparent; border: 0; border-radius: var(--r); box-shadow: none; cursor: pointer;
+
+/* Сетка карточек выбранного блока: 4 / 3 / 2 колонки. Видим только
+   открытый блок (.open); во время поиска блоки и их сетки растворяются
+   (display: contents), и находки встают одной сеткой. */
+.pk-screen .picker-group.pk-block { display: none; }
+.pk-screen .picker-group.pk-block.open { display: block; }
+.pk-screen .picker-grid.pk-cards,
+.pk-panels.pk-searching { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; padding: 0; }
+.pk-panels.pk-searching .picker-group.pk-block,
+.pk-panels.pk-searching .picker-grid.pk-cards { display: contents; }
+.pk-screen .scard.pk-miss { display: none; }
+.pk-screen .scard {
+  display: flex; flex-direction: column; gap: 0; min-width: 0; padding: 8px 8px 11px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel);
+  transition: border-color .16s var(--ease);
 }
-.pk-screen .scard.pk-row:hover, .pk-screen .scard.pk-row:focus-visible { background: var(--accent-tint); transform: none; box-shadow: none; }
-.pk-screen .scard.pk-row:focus-visible { outline: 2px solid var(--focus); outline-offset: 0; }
-.pk-screen .scard.pk-row .scard-spec, .pk-screen .scard.pk-row .scard-desc { display: none; }
-.pk-screen .scard.pk-row .scard-name { font-size: 14.5px; font-weight: 400; color: var(--text); letter-spacing: 0; }
-.pk-screen .scard.pk-soon-card { display: none; }
-.pk-screen .scard.pk-row.pk-miss { display: none; }
-.pk-screen .scard.pk-row.pk-first { background: var(--accent-tint); position: relative; padding-right: 56px; }
-.pk-screen .scard.pk-row.pk-first::after { content: 'Enter'; position: absolute; right: 8px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: 600; color: var(--text2); border: 1px solid var(--border-strong); border-radius: var(--r-sm); padding: 0 5px; }
+.pk-screen .scard:hover { transform: none; box-shadow: none; border-color: var(--accent); }
+.pk-screen .scard:focus-visible { transform: none; }
+.pk-screen .scard:active { transform: none; }
+.pk-well {
+  display: flex; height: 178px; padding: 12px 14px;
+  background: var(--canvas); border: 1px solid var(--border-soft); border-radius: var(--r-card); overflow: hidden;
+}
+.pk-cblock { display: none; margin: 10px 4px 0; font-size: 12px; font-weight: 400; color: var(--text3); }
+.pk-panels.pk-searching .pk-cblock { display: block; }
+.pk-screen .scard-head { display: block; }
+.pk-screen .scard-name { display: block; margin: 10px 4px 0; font-size: 16px; font-weight: 600; line-height: 1.3; letter-spacing: 0; color: var(--text); }
+.pk-panels.pk-searching .scard-name { margin-top: 2px; }
+.pk-screen .scard-desc {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  margin: 4px 4px 0; font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--text2);
+}
+.pk-screen .scard.pk-first { border-color: var(--accent); }
 .pk-mark { background: transparent; color: var(--accent-ink); font-weight: 600; }
+/* «Скоро»: та же карточка, приглушённая; вместо превью пунктир и пилюля. */
+.pk-screen .scard.soon { opacity: .5; background: var(--surface); border-style: solid; cursor: default; }
+.pk-screen .scard.soon:hover { border-color: var(--border); }
+.pk-screen .scard.soon .scard-soon { display: none; }
+.pk-screen .scard.soon .scard-name, .pk-screen .scard.soon .scard-desc { color: var(--text2); }
+.pk-well-soon { align-items: center; justify-content: center; background: transparent; border: 1px dashed var(--border-strong); }
+.pk-pill { display: inline-block; padding: 0 8px; border-radius: var(--r-pill); background: var(--chip-bg); font-size: 12px; font-weight: 400; color: var(--text2); }
+.pk-well-soon .pk-pill { padding: 2px 12px; border: 1px solid var(--border-strong); background: transparent; font-size: 13px; }
+/* Строка «скоро» в переключателе модели (buildSwitcher) — прежняя. */
 .pk-soon { margin: 4px 0 0; padding: 0 0 0 0; font-size: 13px; color: var(--text3); line-height: 1.55; }
 .pk-soon[hidden] { display: none; }
-.pk-pill { display: inline-block; padding: 0 8px; border-radius: var(--r-pill); background: var(--chip-bg); font-size: 12px; font-weight: 500; color: var(--text2); }
-.pk-preview {
-  position: fixed; z-index: calc(var(--z-picker) + 1); width: 300px; padding: 14px; pointer-events: none;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-panel); box-shadow: var(--shadow-pop);
+
+@media (max-width: 1199px) {
+  .pk-screen .picker-inner { padding: 24px 24px 40px; }
+  .pk-screen .picker-grid.pk-cards, .pk-panels.pk-searching { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pk-cont { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pk-continue { grid-column: 1 / -1; }
+  .pk-recent .pk-thumb { width: 96px; height: 64px; }
+  .pk-recent .pk-cname { font-size: 14px; }
 }
-.pk-preview[hidden] { display: none; }
-.pk-pv-spec { display: block; width: 270px; height: 140px; background: var(--canvas); border: 1px solid var(--border-soft); border-radius: var(--r); overflow: hidden; }
-.pk-pv-spec svg { display: block; width: 100%; height: 100%; }
-.pk-pv-block { margin-top: 10px; font-size: 12px; font-weight: 500; color: var(--text3); }
-.pk-pv-name { font-size: 17px; font-weight: 600; color: var(--text); margin-top: 2px; }
-.pk-pv-desc { font-size: 14px; color: var(--text2); line-height: 1.55; margin-top: 4px; }
-@media (max-width: 1239px) { .pk-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); } .pk-screen .picker-inner { padding: 20px 24px 40px; } .pk-continue { min-width: 0; flex: 1 1 100%; } }
-@media (max-width: 759px) { .pk-cols { grid-template-columns: minmax(0, 1fr); } .pk-screen .picker-head { flex-direction: column; } .pk-search { flex: 1 1 auto; width: 100%; } }
+@media (max-width: 759px) {
+  .pk-screen .picker-inner { padding: 20px 16px 40px; }
+  .pk-screen .picker-head { flex-direction: column; align-items: stretch; gap: 14px; margin-bottom: 18px; }
+  .pk-search { flex: 1 1 auto; width: 100%; }
+  .pk-screen .picker-grid.pk-cards, .pk-panels.pk-searching { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  /* «Продолжить» сверху во всю ширину, недавние — лентой с прокруткой вбок. */
+  .pk-cont { display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; }
+  .pk-continue { flex-wrap: wrap; gap: 12px; }
+  .pk-continue .pk-ctext { flex: 1 1 0; }
+  .pk-continue .pk-thumb { width: 120px; height: 72px; }
+  .pk-continue .pk-go { flex: 1 1 100%; justify-content: center; height: 44px; }
+  .pk-recents { display: flex; gap: 10px; overflow-x: auto; margin: 0 -16px; padding: 0 16px 4px; scroll-snap-type: x proximity; }
+  .pk-recent { flex: 0 0 248px; min-height: 92px; scroll-snap-align: start; }
+  .pk-recent .pk-thumb { width: 96px; height: 64px; }
+  /* Вкладки — одной строкой с прокруткой вбок. */
+  .pk-tabs { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px 18px; padding: 0 16px 4px; scrollbar-width: none; }
+  .pk-tabs::-webkit-scrollbar { display: none; }
+  .pk-tab { min-height: 44px; flex: 0 0 auto; }
+  .pk-well { height: 112px; padding: 8px; }
+  .pk-screen .scard { padding: 6px 6px 10px; }
+  .pk-screen .scard-name { font-size: 15px; margin-top: 8px; }
+}
 
 /* ── Переключатель модели (раздел 10): 660, поиск и блоки в две колонки ── */
 .switch-pop { width: 660px; max-height: calc(100vh - 120px); display: none; flex-direction: column; padding: 14px 16px 12px; }
@@ -3211,7 +3281,7 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
   /* Цели касания не меньше 44×44 (README макета, 3). */
   .fc-ico, .fc-card .cpick-btn + *, .pw-step, .pw-del, .pk-clear, .self-check, .cv-mode__stop { min-width: 44px; min-height: 44px; }
   .fc-card .cpick { width: 44px; height: 44px; display: inline-grid; place-items: center; }
-  .seg-btn, .cv-tool, .chk, .show-row, .fc-mi, .sw-row, .pk-chip { min-height: 44px; }
+  .seg-btn, .cv-tool, .chk, .show-row, .fc-mi, .sw-row { min-height: 44px; }
   .fc-card > .crow-formula { min-height: 46px; }
   .chk input[type=checkbox], .col-cond input[type=checkbox] { width: 22px; height: 22px; flex-basis: 22px; }
   .chk input[type=checkbox]:checked::after, .col-cond input[type=checkbox]:checked::after { left: 7px; top: 2.5px; width: 5px; height: 11px; }
@@ -3226,9 +3296,6 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
 }
 /* О2: фокус в поиске при открытии без кольца, пока человек не нажал Tab. */
 #picker-search.no-init-ring:focus { outline: none; border-color: var(--border-strong); }
-/* При запросе блоки с находками встают подряд, без пустых колонок (4.2). */
-.pk-cols.pk-searching .pk-col { display: contents; }
-.pk-cols.pk-searching { grid-auto-flow: row; }
 
 /* Кусочная функция в карточке (README макета, 6.6): запись скобкой с
    карандашом вместо поля; поле остаётся источником записи, но не видно. */

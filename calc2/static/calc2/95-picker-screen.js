@@ -1,18 +1,20 @@
-// Экран выбора одним экраном и переключатель модели (редизайн 10.2026, фаза 8).
+// Экран выбора: вкладки блоков и сетка карточек с превью; переключатель модели.
 /* ---------------------------------------------------------------------
-   README макета, разделы 4 и 10. Прежнее окно выбора было двухуровневым:
-   десять карточек блоков, щелчок — сетка моделей блока (пункт (г)
-   закрытого списка). Теперь все блоки на одном экране, в пяти колонках;
-   над ними поиск, «Продолжить» и «Недавние».
+   Решение владельца 09.10 (макет claude/mockups/calc2_picker_20261009/,
+   ADR 0141; заменяет вид списка из фазы 8 редизайна 10.2026): сверху
+   «Графики» и поиск, ряд «Продолжить · <когда>» и до трёх недавних, ряд
+   вкладок из десяти блоков, под ним сетка карточек выбранного блока —
+   превью, название, две строки описания; «скоро» — приглушённые карточки
+   в конце блока.
 
    Карточки моделей НЕ создаются заново: это те же кнопки .scard из
    шаблона (их слушает 88-params.js, по ним открывают модели приборы).
-   Меняются только раскладка и вид: строка — имя модели; схема и описание
-   уходят в превью при наведении и фокусе. Запланированные модели («скоро»)
-   — одной приглушённой строкой в конце блока.
+   Меняются только раскладка и вид; превью — настоящие графики
+   стандартного старта из previews.json (ниже, «Превью моделей»).
    --------------------------------------------------------------------- */
 
-/* Блоки в колонках: [первый, второй] сверху вниз (README макета, 4.4). */
+/* Порядок блоков (README макета 04.10, 4.4): по нему стоят вкладки экрана
+   и колонки переключателя модели. */
 const PICKER_COLUMNS = [
   ['Математика', 'КПВ и КТВ'],
   ['Совершенная конкуренция', 'Теория фирмы'],
@@ -69,130 +71,99 @@ function buildPickerScreen() {
   inner._screen = true;
   p.classList.add('pk-screen');
 
-  // Шапка: «Графики», строка про модели, справа поиск.
+  // Шапка: «Графики» слева, поиск справа (строки про число моделей нет).
   const head = inner.querySelector('.picker-head');
-  const working = pickerModels().filter(m => !m.soon).length;
   if (head) {
     const t = head.querySelector('.picker-title'); if (t) t.textContent = 'Графики';
-    const sub = head.querySelector('.picker-sub');
-    if (sub) sub.textContent = working + ' ' + plural(working, ['модель', 'модели', 'моделей'])
-      + ' олимпиадной экономики. Меняете функции, и график с ответом сразу пересчитываются.';
+    head.querySelectorAll('.picker-sub').forEach(x => x.remove());
     const search = document.createElement('div');
     search.className = 'pk-search';
     search.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>'
       + '<input type="search" id="picker-search" autocomplete="off" placeholder="Найти модель: налог, КПВ, монополия…" aria-label="Найти модель">'
       + '<button type="button" class="pk-clear" id="picker-clear" aria-label="Очистить поиск" hidden>×</button>';
-    const left = document.createElement('div');
-    left.className = 'pk-headtext';
-    while (head.firstChild) left.appendChild(head.firstChild);
-    head.append(left, search);
+    head.appendChild(search);
   }
 
-  // «Продолжить» и «Недавние», строка найденного.
+  // Ряд «Продолжить» и недавних, вкладки блоков, строка найденного.
   const cont = document.createElement('div');
   cont.className = 'pk-cont'; cont.id = 'picker-cont';
+  const tabs = document.createElement('div');
+  tabs.className = 'pk-tabs'; tabs.id = 'picker-tabs';
+  tabs.setAttribute('role', 'tablist'); tabs.setAttribute('aria-label', 'Блоки моделей');
   const found = document.createElement('div');
   found.className = 'pk-found'; found.id = 'picker-found'; found.hidden = true;
   const none = document.createElement('div');
   none.className = 'pk-none'; none.id = 'picker-none'; none.hidden = true;
   none.innerHTML = '<div class="pk-none-title">Такой модели нет</div><p>Поиск идёт по названиям, описаниям и словам из олимпиадных условий. Попробуйте «налог», «эластичность», «монополия» или «КПВ».</p>';
 
-  // Пять колонок по два блока.
-  const cols = document.createElement('div');
-  cols.className = 'pk-cols'; cols.id = 'picker-cols';
+  // Блоки — панели вкладок в порядке PICKER_COLUMNS (сверху вниз, слева направо).
+  const panels = document.createElement('div');
+  panels.className = 'pk-panels'; panels.id = 'picker-panels';
   const groups = [...inner.querySelectorAll('.picker-group')];
-  const byName = new Map(groups.map(g => [g.getAttribute('aria-label') || '', g]));
-  PICKER_COLUMNS.forEach(names => {
-    const col = document.createElement('div');
-    col.className = 'pk-col';
-    names.forEach(n => {
-      const g = byName.get(n);
-      if (!g) return;
-      byName.delete(n);
-      col.appendChild(g);
-    });
-    cols.appendChild(col);
-  });
-  // Блок, которого нет в раскладке (появится новый) — в последнюю колонку.
-  byName.forEach(g => cols.lastChild.appendChild(g));
-
-  groups.forEach((g, i) => {
-    g.classList.add('open', 'pk-block');
-    // Подпись блока: прежняя лестница (foldPickerGroups) её снимает и ставит
-    // свою «открытую» — берём имя из aria-label и собираем заголовок заново.
-    g.querySelectorAll(':scope > .picker-group-open-name').forEach(x => x.remove());
-    let lab = g.querySelector(':scope > .picker-group-label');
-    if (!lab) {
-      lab = document.createElement('div');
-      lab.className = 'picker-group-label';
-      lab.textContent = g.getAttribute('aria-label') || '';
-      g.insertBefore(lab, g.firstChild);
-    }
+  const order = PICKER_COLUMNS.flat();
+  const rank = (g) => { const i = order.indexOf(g.getAttribute('aria-label') || ''); return i < 0 ? order.length : i; };
+  groups.slice().sort((a, b) => rank(a) - rank(b)).forEach((g, i) => {
+    const name = g.getAttribute('aria-label') || '';
+    g.classList.add('pk-block');
+    g.classList.remove('open');
+    // Подпись блока теперь на вкладке: прежние заголовки (из шаблона и из
+    // лестницы foldPickerGroups) убираем.
+    g.querySelectorAll(':scope > .picker-group-label, :scope > .picker-group-open-name').forEach(x => x.remove());
+    if (!g.id) g.id = 'pk-block-' + i;
     const grid = g.querySelector(':scope > .picker-grid');
-    if (grid && !grid.id) grid.id = 'pgrid-' + i;
-    if (grid) grid.classList.add('open', 'pk-list');
-    const n = grid ? grid.querySelectorAll('.scard:not(.soon):not([disabled])').length : 0;
-    if (lab) {
-      lab.classList.add('pk-head');
-      const name = lab.textContent.trim();
-      lab.innerHTML = '';
-      const a = document.createElement('span'); a.className = 'pk-bname'; a.textContent = name;
-      const b = document.createElement('span'); b.className = 'pk-bcount'; b.textContent = String(n);
-      lab.append(a, b);
-    }
-    // «Скоро» — одной приглушённой строкой в конце блока.
-    const soon = grid ? [...grid.querySelectorAll('.scard.soon, .scard[disabled]')] : [];
-    if (soon.length) {
-      const line = document.createElement('div');
-      line.className = 'pk-soon';
-      line.innerHTML = '<span class="pk-pill">скоро</span> ';
-      const names = document.createElement('span');
-      names.className = 'pk-soon-names';
-      names.textContent = soon.map(c => ((c.querySelector('.scard-name') || {}).textContent || '').trim()).join(' · ');
-      line.appendChild(names);
-      soon.forEach(c => { c.classList.add('pk-soon-card'); });
-      g.appendChild(line);
-    }
-    grid && grid.querySelectorAll('.scard').forEach(c => c.classList.add('pk-row'));
+    if (grid) grid.classList.add('open', 'pk-cards');
+    const cards = grid ? [...grid.querySelectorAll('.scard')] : [];
+    // «Скоро» — в конце блока (лестница их уже переставила, повторяем на случай без неё).
+    cards.filter(c => c.classList.contains('soon') || c.disabled).forEach(c => grid.appendChild(c));
+    cards.forEach(c => {
+      const soon = c.classList.contains('soon') || c.disabled;
+      if (!c.querySelector(':scope > .pk-well')) {
+        const well = document.createElement('span');
+        well.className = 'pk-well' + (soon ? ' pk-well-soon' : '');
+        well.setAttribute('aria-hidden', 'true');
+        if (soon) well.innerHTML = '<span class="pk-pill">скоро</span>';
+        c.insertBefore(well, c.firstChild);
+      }
+      // Имя блока над названием: видно только во время поиска.
+      const blk = document.createElement('span');
+      blk.className = 'pk-cblock'; blk.textContent = name;
+      const nameHost = c.querySelector(':scope > .scard-head') || c.querySelector(':scope > .scard-name');
+      if (nameHost) c.insertBefore(blk, nameHost);
+    });
+    const n = cards.filter(c => !(c.classList.contains('soon') || c.disabled)).length;
+    const tab = document.createElement('button');
+    tab.type = 'button'; tab.className = 'pk-tab'; tab.id = 'pk-tab-' + i;
+    tab.setAttribute('role', 'tab'); tab.setAttribute('aria-selected', 'false');
+    tab.setAttribute('aria-controls', g.id); tab.tabIndex = -1;
+    tab.dataset.block = name;
+    const a = document.createElement('span'); a.className = 'pk-tname'; a.textContent = name;
+    const b = document.createElement('span'); b.className = 'pk-tcount'; b.textContent = String(n);
+    tab.append(a, b);
+    tab.addEventListener('click', () => selectPickerTab(name, true));
+    tabs.appendChild(tab);
+    g.setAttribute('role', 'tabpanel'); g.setAttribute('aria-labelledby', tab.id);
+    panels.appendChild(g);
+  });
+  // Клавиатура вкладок: стрелки и Home/End переходят и сразу открывают блок.
+  tabs.addEventListener('keydown', (e) => {
+    const list = [...tabs.querySelectorAll('.pk-tab')];
+    const i = list.indexOf(document.activeElement);
+    if (i < 0) return;
+    let j = -1;
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % list.length;
+    else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + list.length) % list.length;
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = list.length - 1;
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); selectPickerTab(list[i].dataset.block, true); return; }
+    if (j < 0) return;
+    e.preventDefault();
+    selectPickerTab(list[j].dataset.block, true);
+    list[j].focus();
   });
 
-  const firstGroup = groups[0];
-  const anchor = inner.querySelector('#picker-blocks') || firstGroup;
-  inner.insertBefore(cont, anchor);
-  inner.insertBefore(found, anchor);
-  inner.insertBefore(none, anchor);
-  inner.insertBefore(cols, anchor);
+  const anchor = inner.querySelector('#picker-blocks') || inner.querySelector('.picker-group') || null;
+  [cont, tabs, found, none, panels].forEach(x => inner.insertBefore(x, anchor && anchor.parentNode === inner ? anchor : null));
   ['picker-blocks', 'picker-back'].forEach(id => { const e = document.getElementById(id); if (e) e.remove(); });
-
-  // Превью при наведении и фокусе на строке.
-  const pv = document.createElement('div');
-  pv.className = 'pk-preview'; pv.id = 'picker-preview';
-  pv.setAttribute('role', 'tooltip'); pv.hidden = true;
-  p.appendChild(pv);
-  const showPv = (card) => {
-    const m = pickerModels().find(x => x.card === card);
-    if (!m || m.soon) { pv.hidden = true; return; }
-    pv.innerHTML = '';
-    const spec = card.querySelector('.scard-spec');
-    if (spec) { const s = spec.cloneNode(true); s.className = 'pk-pv-spec'; pv.appendChild(s); }
-    const b = document.createElement('div'); b.className = 'pk-pv-block'; b.textContent = m.block;
-    const n = document.createElement('div'); n.className = 'pk-pv-name'; n.textContent = m.name;
-    const d = document.createElement('div'); d.className = 'pk-pv-desc'; d.textContent = m.desc;
-    pv.append(b, n, d);
-    pv.hidden = false;
-    const r = card.getBoundingClientRect();
-    const colIdx = [...cols.children].indexOf(card.closest('.pk-col'));
-    let left = colIdx >= 3 ? r.left - 314 : r.right + 14;
-    left = Math.max(8, Math.min(left, window.innerWidth - pv.offsetWidth - 8));
-    let top = Math.max(8, Math.min(r.top - 28, window.innerHeight - pv.offsetHeight - 8));
-    pv.style.left = left + 'px'; pv.style.top = top + 'px';
-  };
-  const hidePv = () => { pv.hidden = true; };
-  cols.addEventListener('pointerover', (e) => { const c = e.target.closest('.scard.pk-row'); if (c) showPv(c); });
-  cols.addEventListener('pointerout', (e) => { const c = e.target.closest('.scard.pk-row'); if (c && !c.contains(e.relatedTarget)) hidePv(); });
-  cols.addEventListener('focusin', (e) => { const c = e.target.closest('.scard.pk-row'); if (c) showPv(c); });
-  cols.addEventListener('focusout', hidePv);
-  p.addEventListener('scroll', hidePv, true);
 
   // Поиск.
   const inp = document.getElementById('picker-search');
@@ -201,49 +172,146 @@ function buildPickerScreen() {
     inp.addEventListener('input', () => pickerFilter(inp.value));
     inp.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
-        const first = cols.querySelector('.scard.pk-first');
+        const first = panels.querySelector('.scard.pk-first');
         if (first) { e.preventDefault(); first.click(); }
       }
     });
   }
   if (clr) clr.addEventListener('click', () => { inp.value = ''; pickerFilter(''); inp.focus(); });
+
+  selectPickerTab(pickerDefaultTab(), false);
+  loadPickerPreviews(p.dataset.previews);
 }
 
-/* Отбор по запросу: в блоке только найденные строки, блоки с находками
-   встают подряд; совпавший кусок имени выделен; первая рабочая находка
-   подсвечена и открывается по Enter. */
+/* ── Вкладки блоков ─────────────────────────────────────────────────────
+   Видимый блок — панель с классом .open (тот же класс открывают приборы,
+   которым нужна карточка чужого блока). Последняя выбранная вкладка
+   помнится в хранилище калькулятора (storeGet / storeSet, 91-session.js:
+   обёрнуты в try/catch; resetSceneMemory приборов её стирает). */
+function selectPickerTab(name, remember) {
+  const tabs = [...document.querySelectorAll('#picker-tabs .pk-tab')];
+  if (!tabs.length) return;
+  if (!tabs.some(t => t.dataset.block === name)) name = tabs[0].dataset.block;
+  tabs.forEach(t => {
+    const on = t.dataset.block === name;
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+    t.tabIndex = on ? 0 : -1;
+  });
+  document.querySelectorAll('#scene-picker .pk-block').forEach(g => g.classList.toggle('open', (g.getAttribute('aria-label') || '') === name));
+  if (remember && typeof storeSet === 'function') storeSet('pickerTab', name);
+}
+function pickerSelectedTab() {
+  const t = document.querySelector('#picker-tabs .pk-tab[aria-selected="true"]');
+  return t ? t.dataset.block : '';
+}
+/* Какая вкладка открыта при входе на экран: из модели («Все модели») —
+   блок этой модели; иначе последняя выбранная; иначе блок модели из
+   «Продолжить»; без истории — «Математика». */
+function pickerDefaultTab() {
+  const blockOf = (k) => { const m = pickerModels().find(x => x.key === k); return m ? m.block : ''; };
+  if (STATE.sceneKey) { const b = blockOf(modelKeyOf(STATE.sceneKey)); if (b) return b; }
+  const saved = (typeof storeGet === 'function') ? storeGet('pickerTab') : null;
+  if (saved && PICKER_COLUMNS.flat().includes(saved)) return saved;
+  const rec = (typeof recentModels === 'function') ? recentModels() : [];
+  if (rec[0]) { const b = blockOf(rec[0].k); if (b) return b; }
+  return 'Математика';
+}
+// Зовёт openPicker (84-picker.js) при каждом входе на экран.
+function pickerOpenTab() {
+  const q = document.getElementById('picker-search');
+  if (q && q.value) return;          // запрос остаётся — вкладки под ним не трогаем
+  selectPickerTab(pickerDefaultTab(), false);
+}
+
+/* ── Превью моделей (ADR 0141) ──────────────────────────────────────────
+   previews.json собирает заранее calc2/tests/previews/make_previews.mjs из
+   записи при рисовании стандартного старта: кривые и закраски без чисел и
+   подписей, цвета — ИМЕНАМИ токенов холста. Картинка вставляется встроенным
+   SVG: через <img> переменные темы не работают, а так превью само
+   перекрашивается при смене темы. Стили — через CSSOM (style.setProperty):
+   атрибут style строкой мог бы упереться в политику безопасности. */
+let _pkPreviews = null;
+function loadPickerPreviews(url) {
+  if (!url || _pkPreviews || typeof fetch !== 'function') return;
+  fetch(url, { credentials: 'same-origin' })
+    .then(r => (r.ok ? r.json() : null))
+    .then(j => { if (!j) return; _pkPreviews = j; fillPickerWells(); renderPickerContinue(); })
+    .catch(() => { /* без превью экран остаётся рабочим: пустые колодцы */ });
+}
+const PK_SVGNS = 'http://www.w3.org/2000/svg';
+function pickerPreviewSvg(key) {
+  const pv = _pkPreviews && _pkPreviews[key];
+  if (!pv) return null;
+  const svg = document.createElementNS(PK_SVGNS, 'svg');
+  svg.setAttribute('viewBox', pv.vb);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.setAttribute('class', 'pk-pv');
+  svg.dataset.model = key;
+  pv.p.forEach(q => {
+    const el = document.createElementNS(PK_SVGNS, 'path');
+    el.setAttribute('d', q.d);
+    // толщина в пикселях экрана при любом размере превью
+    el.setAttribute('vector-effect', 'non-scaling-stroke');
+    const s = el.style;
+    if (q.f) { s.setProperty('fill', 'var(--' + q.f + ')'); s.setProperty('fill-opacity', String(q.fo)); }
+    else s.setProperty('fill', 'none');
+    if (q.s) {
+      s.setProperty('stroke', 'var(--' + q.s + ')');
+      s.setProperty('stroke-width', q.w + 'px');
+      if (q.o != null) s.setProperty('stroke-opacity', String(q.o));
+      if (q.da) s.setProperty('stroke-dasharray', q.da);
+    } else s.setProperty('stroke', 'none');
+    svg.appendChild(el);
+  });
+  return svg;
+}
+function fillPickerWells() {
+  document.querySelectorAll('#scene-picker .scard:not(.soon):not([disabled]) > .pk-well').forEach(w => {
+    if (w.querySelector('svg')) return;
+    const svg = pickerPreviewSvg(w.parentNode.dataset.scene);
+    if (svg) w.appendChild(svg);
+  });
+}
+
+/* Отбор по запросу: вкладки прячутся, сетка показывает находки из всех
+   блоков подряд (у каждой над названием имя блока), лучшие вперёд;
+   совпавший кусок имени выделен; первая рабочая находка подсвечена и
+   открывается по Enter. Очистка возвращает вкладки и прежний блок. */
 function pickerFilter(q) {
   const words = pkNorm(q).split(/\s+/).filter(Boolean);
   const clr = document.getElementById('picker-clear'); if (clr) clr.hidden = !words.length;
   const cont = document.getElementById('picker-cont');
+  const tabs = document.getElementById('picker-tabs');
   const found = document.getElementById('picker-found');
   const none = document.getElementById('picker-none');
-  const cols = document.getElementById('picker-cols');
+  const panels = document.getElementById('picker-panels');
   const models = pickerModels();
   models.forEach(m => {
     const nm = m.card.querySelector('.scard-name');
     if (nm) nm.textContent = m.name;
     m.card.classList.remove('pk-first', 'pk-hit', 'pk-miss');
+    m.card.style.removeProperty('order');
   });
-  document.querySelectorAll('#scene-picker .pk-block').forEach(g => g.classList.remove('pk-miss'));
-  if (cols) cols.classList.toggle('pk-searching', !!words.length);
+  if (panels) panels.classList.toggle('pk-searching', !!words.length);
   if (!words.length) {
     if (cont) cont.hidden = !cont.childElementCount;
+    if (tabs) tabs.hidden = false;
     if (found) found.hidden = true;
     if (none) none.hidden = true;
-    if (cols) cols.hidden = false;
+    if (panels) panels.hidden = false;
+    selectPickerTab(pickerSelectedTab(), false);
     return;
   }
   if (cont) cont.hidden = true;
-  const hits = models.map(m => ({ m, s: pickerScore(m, words) })).filter(x => x.s > 0);
+  if (tabs) tabs.hidden = true;
+  const hits = models.map((m, i) => ({ m, i, s: pickerScore(m, words) })).filter(x => x.s > 0);
   const hitSet = new Set(hits.map(x => x.m.card));
-  models.forEach(m => m.card.classList.toggle(hitSet.has(m.card) ? 'pk-hit' : 'pk-miss', true));
-  document.querySelectorAll('#scene-picker .pk-block').forEach(g => {
-    const any = [...g.querySelectorAll('.scard')].some(c => hitSet.has(c));
-    g.classList.toggle('pk-miss', !any);
-    const soon = g.querySelector('.pk-soon');
-    if (soon) soon.hidden = ![...g.querySelectorAll('.scard.pk-soon-card')].some(c => hitSet.has(c));
-  });
+  models.forEach(m => m.card.classList.add(hitSet.has(m.card) ? 'pk-hit' : 'pk-miss'));
+  // Порядок в сетке: рабочие по очкам, «скоро» следом; при равенстве — как в блоках.
+  hits.slice().sort((a, b) => (a.m.soon - b.m.soon) || (b.s - a.s) || (a.i - b.i))
+    .forEach((x, k) => x.m.card.style.setProperty('order', String(k)));
   // Совпавший кусок имени — 600 --accent-ink.
   hits.forEach(({ m }) => {
     const nm = m.card.querySelector('.scard-name');
@@ -257,9 +325,9 @@ function pickerFilter(q) {
     const b = document.createElement('mark'); b.className = 'pk-mark'; b.textContent = m.name.slice(i, i + w.length);
     nm.append(b, document.createTextNode(m.name.slice(i + w.length)));
   });
-  const working = hits.filter(x => !x.m.soon).sort((a, b) => b.s - a.s);
+  const working = hits.filter(x => !x.m.soon).sort((a, b) => (b.s - a.s) || (a.i - b.i));
   if (working[0]) working[0].m.card.classList.add('pk-first');
-  const n = hits.filter(x => !x.m.soon).length;
+  const n = working.length;
   if (found) {
     found.hidden = !n;
     found.innerHTML = '';
@@ -270,11 +338,13 @@ function pickerFilter(q) {
     }
   }
   if (none) none.hidden = !!n;
-  if (cols) cols.hidden = !n;
+  if (panels) panels.hidden = !n;
 }
 
-/* «Продолжить» и «Недавние» (README макета, 4.3): только без запроса, нет
-   сохранённых моделей — ряда нет. Щелчок открывает модель с её состоянием. */
+/* «Продолжить» и недавние — один ряд карточек (решение 09.10): большая
+   «Продолжить · <когда>» с превью и кнопкой, рядом до трёх недавних моделей
+   с превью и временем. Только без запроса; нет истории — ряда нет вовсе.
+   Щелчок открывает модель с её состоянием (openModelByUser). */
 function renderPickerContinue() {
   const cont = document.getElementById('picker-cont');
   if (!cont) return;
@@ -283,40 +353,43 @@ function renderPickerContinue() {
   const models = pickerModels();
   const nameOf = (k) => { const m = models.find(x => x.key === k); return m ? m.name : (SCENE_NAMES[k] || k); };
   const open = (k) => (typeof openModelByUser === 'function' ? openModelByUser : pickScene)(k);
+  const thumb = (k) => {
+    const t = document.createElement('span'); t.className = 'pk-thumb'; t.setAttribute('aria-hidden', 'true');
+    const svg = pickerPreviewSvg(k); if (svg) t.appendChild(svg);
+    return t;
+  };
   const first = STATE.sceneKey ? { k: modelKeyOf(STATE.sceneKey), t: Date.now() } : rec[0];
   if (first && SCENE_ROUTE[first.k]) {
     const card = document.createElement('button');
-    card.type = 'button'; card.className = 'pk-continue'; card.id = 'picker-continue';
-    const m = models.find(x => x.key === first.k);
-    const spec = m && m.card.querySelector('.scard-spec');
-    const mini = document.createElement('span'); mini.className = 'pk-mini';
-    if (spec) mini.appendChild(spec.cloneNode(true));
+    card.type = 'button'; card.className = 'pk-ccard pk-continue'; card.id = 'picker-continue';
     const txt = document.createElement('span'); txt.className = 'pk-ctext';
     const when = document.createElement('span'); when.className = 'pk-when';
-    when.textContent = 'Продолжить с того места' + (first.t ? ' · ' + whenText(first.t) : '');
+    when.textContent = 'Продолжить · ' + whenText(first.t || Date.now());
     const nm = document.createElement('span'); nm.className = 'pk-cname'; nm.textContent = nameOf(first.k);
     txt.append(when, nm);
     const go = document.createElement('span'); go.className = 'pk-go'; go.textContent = 'Продолжить →';
-    card.append(mini, txt, go);
+    card.append(thumb(first.k), txt, go);
     card.addEventListener('click', () => open(first.k));
     cont.appendChild(card);
   }
-  const chips = rec.filter(x => !first || x.k !== first.k).slice(0, 3);
-  if (chips.length) {
-    const box = document.createElement('div'); box.className = 'pk-recent';
-    const lab = document.createElement('span'); lab.className = 'pk-recent-lab'; lab.textContent = 'Недавние';
-    box.appendChild(lab);
-    chips.forEach(x => {
-      const c = document.createElement('button'); c.type = 'button'; c.className = 'pk-chip';
-      const a = document.createElement('span'); a.textContent = nameOf(x.k);
-      const b = document.createElement('span'); b.className = 'pk-chip-when'; b.textContent = whenText(x.t);
-      c.append(a, b);
+  const recent = rec.filter(x => !first || x.k !== first.k).slice(0, 3);
+  if (recent.length) {
+    const box = document.createElement('div'); box.className = 'pk-recents';
+    recent.forEach(x => {
+      const c = document.createElement('button'); c.type = 'button'; c.className = 'pk-ccard pk-recent';
+      c.dataset.scene = x.k;
+      const txt = document.createElement('span'); txt.className = 'pk-ctext';
+      const w = document.createElement('span'); w.className = 'pk-when'; w.textContent = whenText(x.t);
+      const nm = document.createElement('span'); nm.className = 'pk-cname'; nm.textContent = nameOf(x.k);
+      txt.append(w, nm);
+      c.append(thumb(x.k), txt);
       c.addEventListener('click', () => open(x.k));
       box.appendChild(c);
     });
     cont.appendChild(box);
   }
-  cont.hidden = !cont.childElementCount;
+  const q = document.getElementById('picker-search');
+  cont.hidden = !cont.childElementCount || !!(q && q.value.trim());
 }
 
 /* ── Переключатель модели (README макета, раздел 10) ───────────────────────

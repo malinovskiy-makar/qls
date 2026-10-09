@@ -714,7 +714,7 @@ if (need('Ф') || need('F')) {
   console.log(`     фокус при открытии на «${c0.id}», кольцо «${c0.outline}», no-init-ring=${c0.ring}`);
   flag('при открытии фокус в поиске', c0.id === 'picker-search', c0.id);
   flag('программный фокус кольца не рисует', c0.outline.indexOf('none') === 0, c0.outline);
-  const row = await fresh.$('#scene-picker .scard.pk-row:not(.soon)');
+  const row = await fresh.$('#scene-picker .pk-block.open .scard:not(.soon)');
   if (row) { await row.hover(); await fresh.waitForTimeout(250); }
   const c1 = await read();
   flag('после наведения мышью кольца нет', c1.outline.indexOf('none') === 0, c1.outline);
