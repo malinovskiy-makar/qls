@@ -1,0 +1,887 @@
+{
+ "m-graph": [
+  {
+   "src": "info-graph#1",
+   "cap": "Пересекает ось",
+   "not": "x",
+   "val": "−2;2",
+   "was": ""
+  },
+  {
+   "src": "info-graph#2",
+   "cap": "Пересекает ось",
+   "not": "y",
+   "val": "−4",
+   "was": ""
+  },
+  {
+   "src": "info-graph#3",
+   "cap": "Локальный максимум",
+   "not": "",
+   "val": "нет",
+   "was": ""
+  },
+  {
+   "src": "info-graph#4",
+   "cap": "Локальный минимум",
+   "not": "",
+   "val": "(0;−4)",
+   "was": ""
+  }
+ ],
+ "m-tangent": [
+  {
+   "src": "info-math#1",
+   "cap": "f(x0 )",
+   "not": "",
+   "val": "1",
+   "was": ""
+  },
+  {
+   "src": "info-math#2",
+   "cap": "Наклон касательной f′(x0 )",
+   "not": "",
+   "val": "2",
+   "was": ""
+  },
+  {
+   "src": "info-math#3",
+   "cap": "Угол наклона",
+   "not": "",
+   "val": "63,43∘",
+   "was": ""
+  },
+  {
+   "src": "info-math#5",
+   "cap": "Локальный максимум",
+   "not": "",
+   "val": "нет",
+   "was": ""
+  },
+  {
+   "src": "info-math#6",
+   "cap": "Локальный минимум",
+   "not": "",
+   "val": "(0;0)",
+   "was": ""
+  }
+ ],
+ "m-optimum": [
+  {
+   "src": "info-math#0",
+   "cap": "Наибольшее на отрезке",
+   "not": "",
+   "val": "(5;110)",
+   "was": ""
+  },
+  {
+   "src": "info-math#1",
+   "cap": "Наименьшее на отрезке",
+   "not": "",
+   "val": "(−5;−110)",
+   "was": ""
+  },
+  {
+   "src": "info-math#2",
+   "cap": "Локальный максимум",
+   "not": "",
+   "val": "(−1;2)",
+   "was": ""
+  },
+  {
+   "src": "info-math#3",
+   "cap": "Локальный минимум",
+   "not": "",
+   "val": "(1;−2)",
+   "was": ""
+  }
+ ],
+ "m-transform": [
+  {
+   "src": "info-math#2",
+   "cap": "Локальный максимум",
+   "not": "",
+   "val": "нет",
+   "was": ""
+  },
+  {
+   "src": "info-math#3",
+   "cap": "Локальный минимум",
+   "not": "",
+   "val": "(0;1)",
+   "was": ""
+  }
+ ],
+ "m-minmax": [
+  {
+   "src": "info-math#2",
+   "cap": "Кривые меняются местами",
+   "not": "",
+   "val": "−2,562; 1,562",
+   "was": ""
+  },
+  {
+   "src": "info-math#3",
+   "cap": "Локальный максимум",
+   "not": "",
+   "val": "(1,562;2,438)",
+   "was": ""
+  },
+  {
+   "src": "info-math#4",
+   "cap": "Локальный минимум",
+   "not": "",
+   "val": "(0;0)",
+   "was": ""
+  }
+ ],
+ "m-constraint": [
+  {
+   "src": "info-math#0",
+   "cap": "x∗",
+   "not": "",
+   "val": "5",
+   "was": ""
+  },
+  {
+   "src": "info-math#1",
+   "cap": "y∗",
+   "not": "",
+   "val": "5",
+   "was": ""
+  },
+  {
+   "src": "info-math#2",
+   "cap": "f(x∗,,y∗)",
+   "not": "",
+   "val": "5",
+   "was": ""
+  }
+ ],
+ "ppf": [
+  {
+   "src": "info-ppf#1",
+   "cap": "Весь ресурс на X",
+   "not": "Xmax",
+   "val": "100",
+   "was": ""
+  },
+  {
+   "src": "info-ppf#2",
+   "cap": "Весь ресурс на Y",
+   "not": "Ymax",
+   "val": "100",
+   "was": ""
+  }
+ ],
+ "ppfsum": [
+  {
+   "src": "info-ppfsum#1",
+   "cap": "Xmax суммарной",
+   "not": "",
+   "val": "120",
+   "was": ""
+  },
+  {
+   "src": "info-ppfsum#2",
+   "cap": "Ymax суммарной",
+   "not": "",
+   "val": "160",
+   "was": ""
+  },
+  {
+   "src": "info-ppfsum#3",
+   "cap": "Точка излома 1",
+   "not": "",
+   "val": "100;60",
+   "was": ""
+  }
+ ],
+ "trade": [
+  {
+   "src": "info-ppft#3",
+   "cap": "Производство (Xп ;Yп )",
+   "not": "",
+   "val": "(100;0)",
+   "was": ""
+  },
+  {
+   "src": "info-ppft#4",
+   "cap": "Предел потребления Xмакс",
+   "not": "",
+   "val": "100",
+   "was": ""
+  },
+  {
+   "src": "info-ppft#5",
+   "cap": "Предел потребления Yмакс",
+   "not": "",
+   "val": "200",
+   "was": ""
+  }
+ ],
+ "tradeprice": [
+  {
+   "src": "info-tb#2",
+   "cap": "Мировая цена",
+   "not": "Pw",
+   "val": "1,41",
+   "was": ""
+  },
+  {
+   "src": "info-tb#3",
+   "cap": "Экспортируют",
+   "not": "",
+   "val": "КПВ 1 → X, КПВ 2 → Y",
+   "was": ""
+  }
+ ],
+ "sd": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Количество",
+   "not": "Q∗",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Цена",
+   "not": "P∗",
+   "val": "50",
+   "was": ""
+  }
+ ],
+ "sdsum": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Количество",
+   "not": "Q∗",
+   "val": "70",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Цена",
+   "not": "P∗",
+   "val": "45",
+   "was": ""
+  }
+ ],
+ "taxes": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Объём торговли",
+   "not": "Q",
+   "val": "40",
+   "was": "было 50 · −10"
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Платит покупатель",
+   "not": "Pb",
+   "val": "60",
+   "was": "было 50 · +10"
+  },
+  {
+   "src": "sec-eq#2",
+   "cap": "Получает продавец",
+   "not": "Ps",
+   "val": "40",
+   "was": "было 50 · −10"
+  },
+  {
+   "src": "info-tax@DWL",
+   "cap": "Потери общества",
+   "not": "DWL",
+   "val": "100",
+   "was": "было 0 · +100"
+  }
+ ],
+ "tax": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Объём торговли",
+   "not": "Q",
+   "val": "40",
+   "was": "было 50 · −10"
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Платит покупатель",
+   "not": "Pb",
+   "val": "60",
+   "was": "было 50 · +10"
+  },
+  {
+   "src": "sec-eq#2",
+   "cap": "Получает продавец",
+   "not": "Ps",
+   "val": "40",
+   "was": "было 50 · −10"
+  },
+  {
+   "src": "info-tax@DWL",
+   "cap": "Потери общества",
+   "not": "DWL",
+   "val": "100",
+   "was": "было 0 · +100"
+  }
+ ],
+ "tax-adv": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Объём торговли",
+   "not": "Q",
+   "val": "45,45",
+   "was": "было 50 · −4,55"
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Платит покупатель",
+   "not": "Pb",
+   "val": "54,55",
+   "was": "было 50 · +4,55"
+  },
+  {
+   "src": "sec-eq#2",
+   "cap": "Получает продавец",
+   "not": "Ps",
+   "val": "45,45",
+   "was": "было 50 · −4,55"
+  },
+  {
+   "src": "info-tax@DWL",
+   "cap": "Потери общества",
+   "not": "DWL",
+   "val": "20,66",
+   "was": "было 0 · +20,66"
+  }
+ ],
+ "ceil": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Потолок цены",
+   "not": "Pc",
+   "val": "30",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#2",
+   "cap": "Величина предложения",
+   "not": "Qs",
+   "val": "30",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#3",
+   "cap": "Дефицит",
+   "not": "",
+   "val": "40",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#4",
+   "cap": "Потери общества",
+   "not": "DWL",
+   "val": "400",
+   "was": ""
+  }
+ ],
+ "quota": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Объём торговли",
+   "not": "Q",
+   "val": "40",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Выбранная цена",
+   "not": "P",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#2",
+   "cap": "Коридор возможных цен",
+   "not": "",
+   "val": "40…60",
+   "was": ""
+  }
+ ],
+ "elast": [
+  {
+   "src": "info-elast#1",
+   "cap": "∣Ed ∣",
+   "not": "",
+   "val": "1",
+   "was": ""
+  },
+  {
+   "src": "info-elast#7",
+   "cap": "∣Es ∣",
+   "not": "",
+   "val": "1",
+   "was": ""
+  }
+ ],
+ "ext": [
+  {
+   "src": "sec-eq#0",
+   "cap": "Количество",
+   "not": "Q∗",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "sec-eq#1",
+   "cap": "Цена",
+   "not": "P∗",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "info-ext#1",
+   "cap": "Оптимум (MSB = MSC)",
+   "not": "",
+   "val": "Q = 50, P = 50",
+   "was": ""
+  },
+  {
+   "src": "info-ext#2",
+   "cap": "Потери",
+   "not": "DWL",
+   "val": "0",
+   "was": ""
+  }
+ ],
+ "costs": [
+  {
+   "src": "info-costs#4",
+   "cap": "Выпуск Q (P = MC)",
+   "not": "",
+   "val": "4",
+   "was": ""
+  },
+  {
+   "src": "info-costs#6",
+   "cap": "Прибыль (P − ATC)·Q",
+   "not": "",
+   "val": "14",
+   "was": ""
+  }
+ ],
+ "prod": [
+  {
+   "src": "info-prod#0",
+   "cap": "Перегиб TP (max MP)",
+   "not": "",
+   "val": "L = 10, MP = 300",
+   "was": ""
+  },
+  {
+   "src": "info-prod#1",
+   "cap": "Максимум",
+   "not": "AP",
+   "val": "L = 15, AP = 225",
+   "was": ""
+  }
+ ],
+ "plants": [
+  {
+   "src": "info-plants#0",
+   "cap": "Совокупный выпуск",
+   "not": "Q",
+   "val": "30",
+   "was": ""
+  },
+  {
+   "src": "info-plants#1",
+   "cap": "Завод 1:",
+   "not": "Q1",
+   "val": "20",
+   "was": ""
+  },
+  {
+   "src": "info-plants#2",
+   "cap": "Завод 2:",
+   "not": "Q2",
+   "val": "10",
+   "was": ""
+  },
+  {
+   "src": "info-plants#3",
+   "cap": "MC1 =MC2 =MC(Q)",
+   "not": "",
+   "val": "40",
+   "was": ""
+  }
+ ],
+ "isoquant": [
+  {
+   "src": "info-iso#0",
+   "cap": "Оптимум (L∗;K∗)",
+   "not": "",
+   "val": "(50;25)",
+   "was": ""
+  },
+  {
+   "src": "info-iso#1",
+   "cap": "Выпуск",
+   "not": "Q",
+   "val": "35,36",
+   "was": ""
+  }
+ ],
+ "mono": [
+  {
+   "src": "info-mono#0",
+   "cap": "Монополия",
+   "not": "Qm",
+   "val": "40",
+   "was": ""
+  },
+  {
+   "src": "info-mono#1",
+   "cap": "Цена",
+   "not": "Pm",
+   "val": "60",
+   "was": ""
+  },
+  {
+   "src": "info-mono#4",
+   "cap": "Потери",
+   "not": "DWL",
+   "val": "800",
+   "was": ""
+  },
+  {
+   "src": "info-mono#5",
+   "cap": "Потребитель",
+   "not": "CS",
+   "val": "800",
+   "was": ""
+  }
+ ],
+ "mono-nat": [
+  {
+   "src": "info-mono#0",
+   "cap": "Монополия",
+   "not": "Qm",
+   "val": "40",
+   "was": ""
+  },
+  {
+   "src": "info-mono#1",
+   "cap": "Цена",
+   "not": "Pm",
+   "val": "60",
+   "was": ""
+  },
+  {
+   "src": "info-nat#2",
+   "cap": "(ATC(Qm ); прибыль)",
+   "not": "",
+   "val": "(40;800)",
+   "was": ""
+  }
+ ],
+ "mono-d1": [
+  {
+   "src": "info-mono#0",
+   "cap": "Выпуск (= конкурентному)",
+   "not": "",
+   "val": "80",
+   "was": ""
+  },
+  {
+   "src": "info-mono#1",
+   "cap": "Прибыль (весь излишек)",
+   "not": "",
+   "val": "3200",
+   "was": ""
+  }
+ ],
+ "mono-d3": [
+  {
+   "src": "info-d3#0",
+   "cap": "Рынок 1: (q₁; P1 )",
+   "not": "",
+   "val": "(40;60)",
+   "was": ""
+  },
+  {
+   "src": "info-d3#1",
+   "cap": "Рынок 2: (q₂; P2 )",
+   "not": "",
+   "val": "(15;50)",
+   "was": ""
+  }
+ ],
+ "mono-kink": [
+  {
+   "src": "info-kink#0",
+   "cap": "Выпуск",
+   "not": "Q∗",
+   "val": "60",
+   "was": ""
+  },
+  {
+   "src": "info-kink#1",
+   "cap": "Цена",
+   "not": "P∗",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "info-kink#2",
+   "cap": "Прибыль π",
+   "not": "",
+   "val": "1800",
+   "was": ""
+  }
+ ],
+ "labor": [
+  {
+   "src": "info-labor#0",
+   "cap": "Занятость",
+   "not": "Lk",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "info-labor#1",
+   "cap": "Зарплата",
+   "not": "Wk",
+   "val": "50",
+   "was": ""
+  }
+ ],
+ "labor-mono": [
+  {
+   "src": "info-labor#0",
+   "cap": "Занятость",
+   "not": "Lм",
+   "val": "33,33",
+   "was": ""
+  },
+  {
+   "src": "info-labor#1",
+   "cap": "Зарплата",
+   "not": "Wм",
+   "val": "33,33",
+   "was": ""
+  },
+  {
+   "src": "info-labor#4",
+   "cap": "Недозанятость",
+   "not": "DWL",
+   "val": "277,78",
+   "was": ""
+  }
+ ],
+ "labor-union": [
+  {
+   "src": "info-labor#0",
+   "cap": "Занятость",
+   "not": "Lп",
+   "val": "33,33",
+   "was": ""
+  },
+  {
+   "src": "info-labor#1",
+   "cap": "Зарплата",
+   "not": "Wп",
+   "val": "66,67",
+   "was": ""
+  }
+ ],
+ "labor-bilat": [
+  {
+   "src": "info-labor#0",
+   "cap": "Нижняя граница Wм (монопсония)",
+   "not": "",
+   "val": "33,33",
+   "was": ""
+  },
+  {
+   "src": "info-labor#1",
+   "cap": "Верхняя граница Wп (профсоюз)",
+   "not": "",
+   "val": "66,67",
+   "was": ""
+  }
+ ],
+ "smallopen": [
+  {
+   "src": "info-open#2",
+   "cap": "При Pw : (Qd ; Qs )",
+   "not": "",
+   "val": "(70;30)",
+   "was": ""
+  },
+  {
+   "src": "info-open#3",
+   "cap": "Импорт",
+   "not": "",
+   "val": "40",
+   "was": ""
+  }
+ ],
+ "monoexport": [
+  {
+   "src": "info-d3#0",
+   "cap": "Внутри: (q₁; P1 )",
+   "not": "",
+   "val": "(25;75)",
+   "was": ""
+  },
+  {
+   "src": "info-d3#1",
+   "cap": "Экспорт q₂ (по Pw )",
+   "not": "",
+   "val": "25/50",
+   "was": ""
+  }
+ ],
+ "consumer": [
+  {
+   "src": "info-consumer#0",
+   "cap": "Оптимум (x∗;y∗)",
+   "not": "",
+   "val": "(50;25)",
+   "was": ""
+  },
+  {
+   "src": "info-consumer#1",
+   "cap": "Полезность",
+   "not": "U",
+   "val": "35,36",
+   "was": ""
+  }
+ ],
+ "cons-slutsky": [
+  {
+   "src": "info-consumer#5",
+   "cap": "A: старый выбор (Px =1)",
+   "not": "",
+   "val": "50/25",
+   "was": ""
+  },
+  {
+   "src": "info-consumer#6",
+   "cap": "B: компенсированный (I′=250)",
+   "not": "",
+   "val": "31,25/62,5",
+   "was": ""
+  },
+  {
+   "src": "info-consumer#7",
+   "cap": "C: новый выбор (Px =4)",
+   "not": "",
+   "val": "12,5/25",
+   "was": ""
+  }
+ ],
+ "adas": [
+  {
+   "src": "info-macro#0",
+   "cap": "Краткосрочно: (Y; P)",
+   "not": "",
+   "val": "(100;60)",
+   "was": ""
+  },
+  {
+   "src": "info-macro#1",
+   "cap": "Потенциальный выпуск",
+   "not": "Y∗",
+   "val": "100",
+   "was": ""
+  }
+ ],
+ "islm": [
+  {
+   "src": "info-macro#0",
+   "cap": "Равновесный выпуск",
+   "not": "Y",
+   "val": "166,67",
+   "was": ""
+  },
+  {
+   "src": "info-macro#1",
+   "cap": "Равновесная ставка",
+   "not": "r",
+   "val": "3,33",
+   "was": ""
+  }
+ ],
+ "phillips": [],
+ "money": [
+  {
+   "src": "info-macro#1",
+   "cap": "Равновесная ставка",
+   "not": "i",
+   "val": "20",
+   "was": ""
+  }
+ ],
+ "loanable": [
+  {
+   "src": "info-macro#0",
+   "cap": "База: (r; объём)",
+   "not": "",
+   "val": "(20;90)",
+   "was": ""
+  }
+ ],
+ "fx": [
+  {
+   "src": "info-macro#0",
+   "cap": "Плавающий курс",
+   "not": "e",
+   "val": "16",
+   "was": ""
+  },
+  {
+   "src": "info-macro#1",
+   "cap": "Объём при плавающем",
+   "not": "",
+   "val": "68",
+   "was": ""
+  }
+ ],
+ "ineq": [
+  {
+   "src": "info-inequality#0",
+   "cap": "Коэффициент Джини",
+   "not": "",
+   "val": "0,3",
+   "was": ""
+  },
+  {
+   "src": "info-inequality#1",
+   "cap": "Робин Гуда (Гувера)",
+   "not": "",
+   "val": "0,24",
+   "was": ""
+  }
+ ],
+ "laffer": [
+  {
+   "src": "info-macro#0",
+   "cap": "Ставка максимума",
+   "not": "t",
+   "val": "50",
+   "was": ""
+  },
+  {
+   "src": "info-macro#1",
+   "cap": "Максимальные поступления",
+   "not": "",
+   "val": "1250",
+   "was": ""
+  }
+ ]
+}
