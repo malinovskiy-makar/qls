@@ -335,6 +335,24 @@ class AssembleTests(DigitizeBase):
                          [('1', 'Нефтяная республика', ['Р1'], ['К1'])])
         self.assertTrue(assemble.task_record(tasks[0], event, 'm')['needs_eyes'])
 
+    def test_9g_test_file_numbers_apart(self):
+        """Файл задач и файл теста одного комплекта нумеруют с 1: вопрос
+        теста — «тест-1», к задаче 1 не клеится, вступление теста — не
+        продолжение задачи."""
+        self.write_page('pages/t', 1, [{'type': 'task', 'number': '1', 'text': 'Задача 1.'}])
+        self.write_page('pages/t', 2, [])
+        self.write_page('pages/q', 1, [
+            {'type': 'task', 'title': 'Время выполнения 20 минут', 'text': 'Тест.'},
+            {'type': 'task', 'number': '1', 'text': 'Вопрос 1.'}])
+        event = self.event()
+        event['task_files'] = event['task_files'] + [
+            {'file': 'raw/pdf/x__tasks-econ-10-test-final-2012-3.pdf', 'page_dir': 'pages/q',
+             'pages': 1}]
+        tasks, _r, _ = assemble.build_event(self.root, event, 'figs', crop=False)
+        self.assertEqual({t.number: t.statement for t in tasks},
+                         {'1': ['Задача 1.'], 'тест-1': ['Вопрос 1.']})
+        self.assertEqual(event['preamble'], ['Тест.'])
+
     def test_9b_test_answer_from_answers_file(self):
         """Файл ответов повторяет вопрос теста (блок task) с отмеченным
         ответом: ответ ложится на задание с тем же номером И вариантом."""

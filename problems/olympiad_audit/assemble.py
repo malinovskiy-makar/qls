@@ -40,8 +40,11 @@ _LIST_ITEM = re.compile(r'^\s*(?:[-*]\s*)?(\(?[а-яa-z]\)|\d{1,2}[.)])\s+(.*)$'
 
 
 def norm_number(value):
-    """«Задача 3.» → «3», «2,1» → «2.1»; без цифр — как есть в нижнем регистре."""
+    """«Задача 3.» → «3», «2,1» → «2.1»; без цифр — как есть в нижнем
+    регистре; «тест-4» остаётся «тест-4»."""
     text = str(value or '').strip()
+    if text.startswith('тест-'):
+        return text
     match = _NUM.search(text)
     if not match:
         return text.lower()
@@ -122,10 +125,16 @@ def build_event(root, event, figures_dir, crop=True, shared=()):
 
     # 1. Условия (и всё, что лежит в файлах условий / смешанных).
     current = None
+    current_file = None
     for entry, page, record, block in collect(root, event.get('task_files') or [], 'tasks'):
+        if entry['file'] != current_file:
+            # Продолжение и вступление не переходят через границу файла:
+            # у МОШ задачи и тест — два файла одного комплекта.
+            current, current_file = None, entry['file']
         if record is None:
             missing_pages.append(f'{entry["page_dir"]}/p{page}')
             continue
+        block = _test_number(block, entry['file'])
         kind = block['type']
         number = _block_number(block)
         if kind == 'task' and not _real_number(number):
@@ -321,6 +330,19 @@ def _own_grade_number(block, grades):
     return block
 
 
+_TEST_FILE = re.compile(r'(^|[-_/])test[-_]', re.IGNORECASE)
+
+
+def _test_number(block, filename):
+    """Файл теста МОШ («tasks-econ-10-test-final-…») нумерует вопросы с 1,
+    как и файл задач того же комплекта: номер вопроса → «тест-N» (как в
+    v1), иначе вопрос 1 сольётся с задачей 1 (МОШ 2013, финал 10 кл.)."""
+    number = _block_number(block)
+    if not _TEST_FILE.search(filename.rsplit('__', 1)[-1]) or not _real_number(number):
+        return block
+    return dict(block, number=f'тест-{number}')
+
+
 def _real_number(number):
     """Номер задания — с цифрой и не «0» (вступление/подпункт — нет)."""
     return bool(number) and any(ch.isdigit() for ch in number) and number != '0'
@@ -428,7 +450,7 @@ def count_tables(markdown):
 
 
 def task_record(task, event, model):
-    statement = '\n\n'.join(t.strip() for t in task.statement if t.strip())
+    statement = join_pieces(task.statement)
     solution = '\n\n'.join(t.strip() for t in task.solution if t.strip())
     criteria = '\n\n'.join(t.strip() for t in task.criteria if t.strip())
     pages = task.quality
@@ -457,6 +479,21 @@ def task_record(task, event, model):
         'official': event.get('official', True), 'source': event.get('source', 'official'),
         'digitized_by': {'model': model, 'date': date.today().isoformat()},
     }
+
+
+def join_pieces(pieces):
+    """Куски условия по порядку страниц. Кусок со строчной буквы —
+    продолжение предложения, разорванного границей страницы («…и ценой, |
+    назначенной…»): клеится пробелом, остальные — абзацем."""
+    out = ''
+    for piece in (p.strip() for p in pieces):
+        if not piece:
+            continue
+        if out and piece[0].islower():
+            out += ' ' + piece
+        else:
+            out += ('\n\n' if out else '') + piece
+    return out
 
 
 def docx_records(event, v1_rows):
