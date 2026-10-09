@@ -58,12 +58,15 @@ def _read_jsonl(path):
         return [json.loads(line) for line in handle if line.strip()]
 
 
-def load_page(root, page_dir, page):
+def load_page(root, page_dir, page, overlay=None):
+    """Запись страницы v2; `overlay` (triage.PageOverlay) накладывает на неё
+    заплатки разбора очереди «на глаза» (pages_v3). Файл v2 не меняется."""
     path = os.path.join(root, page_dir, f'p{page}.json')
     if not os.path.isfile(path):
         return None
     with open(path, encoding='utf-8') as handle:
-        return json.load(handle)
+        record = json.load(handle)
+    return overlay.apply(page_dir, page, record) if overlay else record
 
 
 class Task:
@@ -92,7 +95,7 @@ def _block_number(block):
     return norm_number(block.get('number')) if block.get('number') not in (None, '') else ''
 
 
-def collect(root, files, role):
+def collect(root, files, role, overlay=None):
     """Блоки файлов комплекта по порядку страниц: [(файл, страница,
     запись страницы, блок)]. role — tasks/solutions/criteria."""
     out = []
@@ -100,7 +103,7 @@ def collect(root, files, role):
         if not entry.get('page_dir'):
             continue      # docx: текст напрямую, страниц нет (см. docx_records)
         for page in range(1, int(entry.get('pages') or 0) + 1):
-            record = load_page(root, entry['page_dir'], page)
+            record = load_page(root, entry['page_dir'], page, overlay)
             if record is None:
                 out.append((entry, page, None, None))
                 continue
@@ -109,7 +112,7 @@ def collect(root, files, role):
     return out
 
 
-def build_event(root, event, figures_dir, crop=True, shared=()):
+def build_event(root, event, figures_dir, crop=True, shared=(), overlay=None):
     """Комплект → (задания по порядку, отчёт комплекта)."""
     event_id = event['event_id']
     tasks = OrderedDict()
@@ -126,7 +129,7 @@ def build_event(root, event, figures_dir, crop=True, shared=()):
     # 1. Условия (и всё, что лежит в файлах условий / смешанных).
     current = None
     current_file = None
-    for entry, page, record, block in collect(root, event.get('task_files') or [], 'tasks'):
+    for entry, page, record, block in collect(root, event.get('task_files') or [], 'tasks', overlay):
         if entry['file'] != current_file:
             # Продолжение и вступление не переходят через границу файла:
             # у МОШ задачи и тест — два файла одного комплекта.
@@ -222,7 +225,7 @@ def build_event(root, event, figures_dir, crop=True, shared=()):
                                       if f['page_dir'] not in seen_dirs])):
         last = None
         in_statement = False      # сразу после повторённого условия
-        for entry, page, record, block in collect(root, files, role):
+        for entry, page, record, block in collect(root, files, role, overlay):
             if record is None:
                 missing_pages.append(f'{entry["page_dir"]}/p{page}')
                 continue
@@ -557,12 +560,17 @@ def completeness(records):
     return 'partial'
 
 
-def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop=True):
-    """Собрать всё. Возвращает сводку; файлы пишет в `digitized`."""
+def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop=True,
+             overlay=None, out_dir=None, suffix='v2'):
+    """Собрать всё. Возвращает сводку; файлы пишет в `out_dir` (по умолчанию
+    `digitized`) с именами `reference_problems_<suffix>.jsonl` и т. д.
+    Страницы читаются из `digitized`, поверх них — заплатки `overlay`."""
+    out_dir = out_dir or digitized
+    os.makedirs(out_dir, exist_ok=True)
     events_files = {e['event_id']: e for e in _read_jsonl(
         os.path.join(digitized, 'events_files.jsonl'))}
     meta = {e['event_id']: e for e in reference_events}
-    figures_dir = os.path.join(digitized, 'figures')
+    figures_dir = os.path.join(out_dir, 'figures')
     v1_counts = Counter(r['event_id'] for r in v1_rows)
     # Файлы решений, общие для нескольких комплектов (один PDF на 5–7 кл.).
     usage = Counter(f.get('page_dir') for e in events_files.values()
@@ -585,7 +593,7 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
             event[key] = files.get(key) or []
         event['event_id'] = event_id
         tasks, report, missing = build_event(digitized, event, figures_dir, crop=crop,
-                                             shared=shared)
+                                             shared=shared, overlay=overlay)
         records = [task_record(t, event, model) for t in tasks]
         if not records and any(f.get('docx_md') for f in event['task_files']):
             # Условия только в docx (дистанционный тур МОШ 2017/18): текст
@@ -614,22 +622,22 @@ def assemble(digitized, reference_events, v1_rows, model, only_events=None, crop
             compare.append({'event_id': event_id, 'v1': v1_counts.get(event_id, 0),
                             'v2': len(records),
                             'v2_numbers': ' '.join(r['number'] for r in records)})
-    with open(os.path.join(digitized, 'reference_problems_v2.jsonl'), 'w',
+    with open(os.path.join(out_dir, f'reference_problems_{suffix}.jsonl'), 'w',
               encoding='utf-8') as handle:
         for row in out_rows:
             handle.write(json.dumps(row, ensure_ascii=False) + '\n')
-    with open(os.path.join(digitized, 'events_v2.jsonl'), 'w', encoding='utf-8') as handle:
+    with open(os.path.join(out_dir, f'events_{suffix}.jsonl'), 'w', encoding='utf-8') as handle:
         for row in out_events:
             handle.write(json.dumps(row, ensure_ascii=False) + '\n')
-    with open(os.path.join(digitized, 'compare_v1_v2.csv'), 'w', encoding='utf-8-sig',
+    with open(os.path.join(out_dir, f'compare_v1_{suffix}.csv'), 'w', encoding='utf-8-sig',
               newline='') as handle:
         writer = csv.DictWriter(handle, fieldnames=['event_id', 'v1', 'v2', 'v2_numbers'])
         writer.writeheader()
         writer.writerows(compare)
-    with open(os.path.join(digitized, 'unmatched_solutions.txt'), 'w',
+    with open(os.path.join(out_dir, 'unmatched_solutions.txt'), 'w',
               encoding='utf-8') as handle:
         handle.write('\n'.join(unmatched) + '\n')
-    summary['заданий v2'] = len(out_rows)
+    summary[f'заданий {suffix}'] = len(out_rows)
     summary['заданий v1'] = sum(v1_counts.values())
     summary['комплектов'] = len(out_events)
     summary['комплектов с другим числом заданий'] = len(compare)
