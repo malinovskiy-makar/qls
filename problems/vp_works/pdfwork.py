@@ -69,3 +69,15 @@ def first_page_text(path):
         return doc[0].get_text()
     finally:
         doc.close()
+
+
+def first_page_words(path):
+    """Слова первой страницы с координатами и высота страницы (pt)."""
+    import fitz
+
+    doc = fitz.open(path)
+    try:
+        page = doc[0]
+        return page.get_text('words'), page.rect.height
+    finally:
+        doc.close()

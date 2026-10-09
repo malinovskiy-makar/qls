@@ -85,6 +85,9 @@ class Command(BaseCommand):
                 p.add_argument('--limit', type=int, default=0)
                 p.add_argument('--only', default='',
                                help='work_id через запятую или @файл (по строке на номер)')
+            if name == 'download':
+                p.add_argument('--stop-after-fails', type=int, default=0,
+                               help='выйти после N неудач подряд (сайт лёг); 0 — правило пауз')
             if name == 'scores':
                 p.add_argument('--max-usd', type=float, default=3.0)
                 p.add_argument('--yes', action='store_true',
@@ -183,12 +186,15 @@ class Command(BaseCommand):
             # Сохраняем ВЕСЬ index, даже когда качаем часть (`--only`).
             stats = fetch.download_all(
                 batch, data_dir, client, limit=opts.get('limit') or 0,
-                log=self.say, save=lambda _rows: write_jsonl(path, records), **kwargs)
+                log=self.say, save=lambda _rows: write_jsonl(path, records),
+                stop_after_fails=opts.get('stop_after_fails') or 0, **kwargs)
         except hse.Blocked:
             self.say('Сайт отказал — index сохранён, докачка продолжит с места.')
             raise
         check = fetch.check_download(records, data_dir)
         self.say()
+        if stats.get('stopped'):
+            self.say('ОСТАНОВЛЕНО: %s' % stats['stopped'])
         self.say('скачано сейчас %d, уже было %d, ошибок %d, пауз %d'
                  % (stats['downloaded'], stats['skipped_existing'], stats['failed'],
                     stats['pauses']))
@@ -216,9 +222,9 @@ class Command(BaseCommand):
 
         text_layer = [r for r in todo if r.get('has_text_layer')]
         no_layout = [r for r in todo if not r.get('has_text_layer')
-                     and scores.layout_for(r['season']) is None]
+                     and scores.layout_for(r['season'], r['subject']) is None]
         to_model = [r for r in todo if not r.get('has_text_layer')
-                    and scores.layout_for(r['season']) is not None]
+                    and scores.layout_for(r['season'], r['subject']) is not None]
 
         self.say('работ к разбору: %d; с текстовым слоем: %d; без раскладки бланка: %d; '
                  'в модель: %d' % (len(todo), len(text_layer), len(no_layout), len(to_model)))
@@ -226,12 +232,28 @@ class Command(BaseCommand):
                  'прогоны $%.2f' % (scores.estimate_usd(len(to_model)), spent_before,
                                      opts['max_usd']))
 
-        for rec in text_layer + no_layout:
-            # Путь (а) у ВП не встретился ни разу (сканы без текста) — такие
-            # работы честно уходят в очередь, а не угадываются.
-            rec.update({'scores_status': 'review',
-                        'scores_reason': 'text_layer' if rec.get('has_text_layer')
-                        else 'no_layout'})
+        # Путь (а): текстовый слой (цифры, впечатанные жюри на компьютере).
+        # Сошлось с баллом из списка — ok без модели; нет — путь (б), если
+        # вырез этой пары проверен, иначе очередь.
+        text_ok = 0
+        for rec in text_layer:
+            words, height = pdfwork.first_page_words(os.path.join(data_dir, rec['pdf_path']))
+            data = scores.text_scores(words, height)
+            status, details = scores.verdict(data, rec.get('score_before')) if data                 else ('review', {'reason': 'text_unparsed'})
+            if status == 'ok':
+                text_ok += 1
+                rec.update({'scores_status': 'ok', 'scores_reason': '', 'scores_source': 'text',
+                            'scores_tasks': details['tasks'], 'scores_sum': details['sum'],
+                            'scores_model_total': details.get('model_total'),
+                            'scores_cost': 0.0})
+            elif scores.layout_for(rec['season'], rec['subject']) is not None:
+                to_model.append(rec)
+            else:
+                no_layout.append(rec)
+        for rec in no_layout:
+            rec.update({'scores_status': 'review', 'scores_reason': 'no_layout'})
+        self.say('путь (а), текстовый слой: ok %d из %d; итого в модель: %d'
+                 % (text_ok, len(text_layer), len(to_model)))
 
         crops_dir = os.path.join(data_dir, 'crops')
         for rec in to_model:
@@ -304,7 +326,7 @@ class Command(BaseCommand):
                 else:
                     errors_in_row = 0
                     status, details = scores.verdict(data, rec.get('score_before'))
-                    rec.update({'scores_status': status,
+                    rec.update({'scores_status': status, 'scores_source': 'model',
                                 'scores_reason': details.get('reason', ''),
                                 'scores_tasks': details.get('tasks'),
                                 'scores_sum': details.get('sum'),
@@ -338,7 +360,7 @@ class Command(BaseCommand):
         if not os.path.exists(out):
             os.makedirs(os.path.dirname(out), exist_ok=True)
             image = pdfwork.render_page(os.path.join(data_dir, rec['pdf_path']), 0, dpi=150)
-            crop = scores.crop_scores(image, scores.layout_for(rec['season']))
+            crop = scores.crop_scores(image, scores.layout_for(rec['season'], rec['subject']))
             with open(out, 'wb') as fh:
                 fh.write(scores.png_bytes(crop))
         return rel

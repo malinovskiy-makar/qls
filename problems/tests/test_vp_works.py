@@ -285,6 +285,14 @@ class DownloadTests(TempDirMixin, SimpleTestCase):
         self.assertEqual(len(rows), 5)
         self.assertEqual([r.get('status') for r in rows], [None, 'ok', None, 'ok', None])
 
+    def test_stop_after_fails_exits_without_pauses(self):
+        recs = [make_record(str(i)) for i in range(10)]
+        slept = []
+        client = FakeClient(fail=True)
+        stats = fetch.download_all(recs, self.dir, client, log=lambda m: None,
+                                   sleep=slept.append, stop_after_fails=3)
+        self.assertEqual((stats['stopped'], len(client.pdf_calls), slept), ('site_down', 3, []))
+
     def test_fail_streak_pauses_then_stops(self):
         recs = [make_record(str(i)) for i in range(10)]
         slept = []
@@ -327,6 +335,19 @@ class VerdictTests(SimpleTestCase):
         self.assertTrue(scores.tolerant_parse('')['_format_error'])
         self.assertEqual(scores.to_number('7,5'), 7.5)
 
+    def test_text_layer_table_by_position(self):
+        """Путь (а): цифры в клетках → задачи по столбцам, правая группа — итог."""
+        w = lambda x, y, t: (x, y, x + 5, y + 11, t)  # noqa: E731
+        words = [w(159, 338, '1'), w(170, 338, '0'), w(205, 340, '1'), w(216, 340, '2'),
+                 w(260, 339, '7'), w(352, 338, '4'), w(462, 338, '1'), w(476, 337, '3'),
+                 w(164, 377, '5'), w(212, 378, '5'),       # коды жюри — ряд ниже
+                 w(183, 709, '3')]                          # «Итоговый балл» внизу
+        data = scores.text_scores(words, 842)
+        self.assertEqual([t['score'] for t in data['tasks']], ['10', '12', '7', '', '4'])
+        self.assertEqual(data['total'], '13')
+        self.assertEqual(scores.verdict(data, 33)[0], 'ok')
+        self.assertIsNone(scores.text_scores([w(100, 100, '5')], 842))
+
     def test_blank_cell_is_zero_but_null_is_unreadable(self):
         data = {'tasks': [{'n': 1, 'score': '23'}, {'n': 2, 'score': ''}], 'readable': True}
         self.assertEqual(scores.verdict(data, 23)[0], 'ok')
@@ -337,8 +358,8 @@ class VerdictTests(SimpleTestCase):
         for bands in scores.LAYOUTS.values():
             for x0, y0, x1, y1 in bands:
                 self.assertTrue(0 <= x0 < x1 <= 1 and 0 <= y0 < y1 <= 1)
-        self.assertIsNone(scores.layout_for('2014/2015'))
-        self.assertEqual(scores.layout_for('2025/2026'), 'v3_2026')
+        self.assertIsNone(scores.layout_for('2014/2015', 'economics'))
+        self.assertEqual(scores.layout_for('2025/2026', 'fingram'), 'protocol')
 
 
 TEST_LAYOUT = {'test': ((0.05, 0.35, 0.95, 0.40), (0.05, 0.55, 0.95, 0.65))}
@@ -347,7 +368,7 @@ GOOD_REPLY = json.dumps({'tasks': [{'n': 1, 'score': '40'}, {'n': 2, 'score': '3
 
 
 @mock.patch.object(scores, 'LAYOUTS', TEST_LAYOUT)
-@mock.patch.object(scores, 'layout_for', lambda season: 'test')
+@mock.patch.object(scores, 'layout_for', lambda season, subject: 'test')
 @mock.patch.dict(os.environ, {'VP_WORKS_WORKERS': '1'})
 class ScoresCommandTests(TempDirMixin, TestCase):
     def prepare(self, n=3):

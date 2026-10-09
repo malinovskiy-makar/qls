@@ -27,7 +27,7 @@ USER_AGENT = ('WeconomicsResearchBot/1.0 (+https://weconomics.ai; '
               'olympiad works corpus for research; max 1 request/second)')
 MIN_INTERVAL = 1.0
 RETRY_PAUSES = (5, 15, 45)
-TIMEOUT = 120
+TIMEOUT = 60
 
 
 class Blocked(Exception):

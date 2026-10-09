@@ -17,12 +17,14 @@ MAX_STREAK_PAUSES = 3
 
 
 def download_all(records, data_dir, client, *, limit=0, log=print,
-                 sleep=time.sleep, save=None, save_every=10):
+                 sleep=time.sleep, save=None, save_every=10, stop_after_fails=0):
     """Пройти index и скачать недостающее. Возвращает счётчики.
 
     `save(records)` зовётся каждые `save_every` файлов и в конце — чтобы
     прерванный ночью прогон не потерял сведения о скачанном.
     `hse.Blocked` не ловится: вызывающий сохраняет и останавливается.
+    `stop_after_fails=N` — после N неудач подряд выйти (сайт лёг), не
+    тратя часы на повторы; ждёт и перезапускает внешний цикл.
     """
     stats = {'downloaded': 0, 'skipped_existing': 0, 'failed': 0, 'pauses': 0}
     streak = 0
@@ -57,6 +59,10 @@ def download_all(records, data_dir, client, *, limit=0, log=print,
                 stats['failed'] += 1
                 streak += 1
                 log('  не скачалось %s: %s' % (rec['work_id'], rec.get('reason')))
+                if stop_after_fails and streak >= stop_after_fails:
+                    log('СТОП: %d неудач подряд — сайт не отвечает, выхожу.' % streak)
+                    stats['stopped'] = 'site_down'
+                    break
                 if streak >= FAIL_STREAK:
                     if stats['pauses'] >= MAX_STREAK_PAUSES:
                         log('СТОП: %d неудач подряд после %d пауз.'
