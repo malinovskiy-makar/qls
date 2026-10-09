@@ -406,8 +406,14 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 закрыто `@legal.guards.ai_consent_required` (403, код `ai_consent_required`). ⚠️ В прогоне тестов
 экран и защита ВЫКЛЮЧЕНЫ (`LEGAL_ENFORCEMENT_ENABLED`, как `SCRAPE_GUARD_ENABLED`): прежние тесты ходят
 вошедшим без записи; тесты `legal/` включают флаг сами. Новое место вызова `core.run` обязано попасть
-в `legal/tests/test_ai_consent.py::CallSiteInventoryTests`. Часть Б (окно cookie, удаление данных,
-сроки хранения) — не сделана; тексты документов описывают состояние ПОСЛЕ неё.
+в `legal/tests/test_ai_consent.py::CallSiteInventoryTests`. Часть Б (ветка `feat/legal-b-20261009`, 09.10.2026) сделана: окно cookie и кука `weco_consent`
+(`templates/_cookie_bar.html`, `static/cookie_bar.js`, `legal/cookie_consent.py`) — счётчик Метрики,
+noscript и `weco_src` только при `all`, сервер решает при сборке страницы (`analytics_allowed`),
+Вебвизор только у гостя; `manage.py erase_user` (`problems/erasure.py`, журнал `ErasureLog`) и
+`manage.py purge_expired` (`problems/retention.py`, срок `DATA_RETENTION_MONTHS`, таймер в
+`deploy/systemd/`, включение — `docs/SERVER.md`); отзыв согласия на помощника удаляет диалоги чата;
+поле `UserProfile.phone` удалено (`problems/0081`). ⚠️ Окно cookie обязано стоять в каждом корневом
+шаблоне рядом с `_metrika.html` (сторожит `legal/tests/test_cookie_bar.py`).
 
 Локальные правила слоёв (читаются вместе с кодом, который правите):
 [`problems/ai/`](problems/ai/CLAUDE.md) ·
