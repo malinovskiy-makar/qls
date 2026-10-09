@@ -242,6 +242,8 @@ apply_olympiad_audit --olympiad vp|mosh --new-refs|--update-existing|--import|--
                                   # --yes-i-have-owner-approval, журнал и откат (docs/OLYMPIAD_AUDIT.md, ADR 0141)
 olympiad_digitize inventory|render|transcribe|rescore|assemble --olympiad X  # эталон v2 зрячей моделью; transcribe —
                                   # деньги: без --yes только план, --max-usd обязателен; в базу не пишет
+                                  # + очередь «на глаза»: triage|judge|reread|report|review-pack|control-pack, assemble --v3
+                                  # (pages_v3, v2 не трогается; docs/OLYMPIAD_AUDIT.md)
 ai_exam_candidates [--recon] [--count N --chunks K --seed S] [--force] [--dir D]  # экзамен ИИ v0: воронка, кандидаты, страницы проверки (разметка ai_exam_review/2); файлы ВНЕ репозитория (ADR 0134)
 ai_exam_build [--mark-safe [--force]] [--dir D]  # экзамен ИИ: сейф (заранее, один раз) и сборка из reviews_in/ → BUILD.md, exam.jsonl+safe.jsonl или exam_draft.jsonl
 ai_exam_run --suite solve|leak|both --set work|draft|smoke|safe [--limit N --max-usd X --label L] [--yes]  # прогон; без --yes только план; в базу не пишет; safe — с --open-safe "ОТКРЫВАЮ СЕЙФ"
