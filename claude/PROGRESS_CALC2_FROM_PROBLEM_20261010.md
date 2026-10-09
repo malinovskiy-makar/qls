@@ -91,3 +91,44 @@
   кроме синонима `tax`).
 - Команда на копии базы владельца: видимых 5 090, с кнопкой 0 (0,0 %), строк нет в базе 119 —
   ожидаемо, база старая.
+
+## Фаза 0. Разведка — ГОТОВО (только чтение)
+
+Шла после фазы 1 (указание владельца: начать с коммита черновика вместе с тестами).
+
+**Каталог.**
+- `_problem_context` (`catalog/views.py`) уже держит `topics` (полные объекты `problem.topics.all()`,
+  отфильтрованные `is_known`) и `tags = list(problem.tags.all())`: поля `kind` и `is_canonical`
+  есть в памяти — `calc2_link.links_for(problem.pk, tags, topics)` обходится без запросов.
+- `_stol_center.html`: тест — `section.stm.stm--q` + `_problem_test.html`; обычная задача —
+  `section.stm`, потом `.how`. Кнопку ставим сразу после `section.stm` в обеих ветках (у теста —
+  до вариантов, у обычной — до «Как прошло?»).
+- `?pane=1` рендерит тот же партиал в `center_html` — кнопка попадает туда сама.
+- `stol.css`: `.how` (поверхность, рамка .5px), телефон — `@media (max-width: 759px)`.
+  ⚠️ Токена `--border-strong` в `templates/_tokens.html` НЕТ: он только в `calc2.css`
+  (`rgba(45,45,45,.26)` / `rgba(255,255,255,.24)`).
+  Решено без владельца: рамка пилюли — `1px solid var(--border)` (токен сайта; заводить новый токен
+  сайта ради одной кнопки — правка общего файла `_tokens.html`, вне задачи). Откат: одна строка в `stol.css`.
+- Значок `chart` в `_icon.html` есть.
+
+**Графики.**
+- `restoreOnLoad` (`91-session.js`): `#s=` → `decodeShare`, `_fromLink = true` (в хранилище не
+  пишем до первой правки), `?m=` → `openModelByUser` (поднимает автосохранение).
+- `historyCheck` на первой правке: `_fromLink = false`, `dropShareHash()`, `autosaveModel`.
+- `pickScene` (`84-picker.js`) в конце зовёт `writeModelToUrl(modelKeyOf(key))` — точка, где видна
+  смена модели.
+- План `from`: в `restoreOnLoad`, если `?m=` — модель и `from` — `^\d{1,9}$` и нет `#s=`:
+  `pickScene(want)` без автосохранения + `_fromLink = true` + `historyBaseline()`; показать строку
+  возврата. В `historyCheck` рядом с `dropShareHash` — `dropFromParam()`. В `writeModelToUrl`:
+  модель сменилась — строку убрать и `from` из адреса снять.
+- Строка «← Вернуться к задаче» — `<a class="cv-back" id="cv-back" hidden>` в `.cv-card` над
+  `.cv-bar` (вне `#graph-wrap`: на обёртке висят колесо и протяжка). Показывается до первого
+  рисунка, поэтому холст не прыгает. На телефоне `.cv-col` 354 px — с открытой строкой высота
+  колонки +28, чтобы SVG остался 372×300.
+- Версия статики считается сама (`calc2_static_version`, хеш содержимого); после правки —
+  `manage.py calc2_map`.
+
+**Приборы, которые может задеть:** `calc2_ui.mjs` (158 проверок), `redesign/session_probe.mjs`
+(адрес, `#s=`, автосохранение), `redesign/state_probe.mjs`, `redesign/layout_probe.mjs` (высоты
+холста 390/760/1440), `canon_checks.mjs`, `check_font_scale.mjs`; каталог — `test_stol_browser.py`
+(ширины центра, телефон), `test_no_slop.py`, `test_icons.py`.
