@@ -67,3 +67,30 @@ class ConsentRecord(models.Model):
     @property
     def is_active(self):
         return self.revoked_at is None and self.superseded_at is None
+
+
+class ErasureLog(models.Model):
+    """Журнал удалений данных (Правовой контур, часть Б, 09.10.2026).
+
+    Одна строка на выполненное удаление аккаунта командой `erase_user`: дата,
+    ВНУТРЕННИЙ номер пользователя (число, не ссылка: пользователя уже нет),
+    сколько строк базы и сколько файлов удалено. Ни логина, ни почты, ни
+    содержимого здесь нет и быть не должно: журнал сам не должен стать
+    хранилищем того, что только что стёрли. Нужен, чтобы по запросу
+    Роскомнадзора или человека показать, что удаление выполнено и когда.
+    """
+
+    created_at = models.DateTimeField('Когда', default=timezone.now, db_index=True)
+    user_pk = models.PositiveBigIntegerField('Внутренний номер пользователя')
+    rows_deleted = models.PositiveIntegerField('Строк базы удалено')
+    files_deleted = models.PositiveIntegerField('Файлов удалено')
+
+    class Meta:
+        verbose_name = 'Удаление данных'
+        verbose_name_plural = 'Журнал удалений данных'
+        ordering = ['-created_at', '-pk']
+
+    def __str__(self):
+        return '%s · №%s · строк %s · файлов %s' % (
+            self.created_at.date(), self.user_pk, self.rows_deleted, self.files_deleted)
+
