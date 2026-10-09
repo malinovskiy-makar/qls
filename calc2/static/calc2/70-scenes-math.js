@@ -378,7 +378,7 @@ function refreshAnswerSeg() {
 function ansSegText(v) { return String(+(+v).toFixed(6)).replace('.', ',').replace(/^-/, '−'); }
 function ansSegParse(t) {
   const s = String(t == null ? '' : t).replace(/[\s  ]+/g, '').replace(/[−–]/g, '-').replace(',', '.');
-  if (!/^-?\d+(\.\d+)?$|^-?\.\d+$/.test(s)) return null;
+  if (!/^-?(\d+(\.\d+)?|\.\d+)$/.test(s)) return null;
   return parseFloat(s);
 }
 

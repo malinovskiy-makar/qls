@@ -22,11 +22,55 @@ function selfNum(t) {
   if (!/^-?\d+(\.\d+)?$/.test(s)) return null;
   return parseFloat(s);
 }
-function checkGuess(answer, truth) {
-  const a = selfNum(answer), b = selfNum(truth);
-  if (a == null || b == null) return null;
-  return Math.abs(a - b) <= Math.max(0.011, 0.0005 * Math.abs(b));
+/* ОТВЕТ — НЕ ТОЛЬКО ОДНО ЧИСЛО (решение владельца 09.10, ADR 0143).
+   Ответом считается: число; список чисел через «;»; точка «(x; y)»; список
+   точек через «;»; «нет» (пустой список). Одно число — частный случай списка,
+   поэтому экономические ячейки работают как раньше.
+   Разбор: пробелы (и U+00A0, U+202F) не важны; «−», «–» и «-» — минус;
+   запятая внутри числа — десятичная; «;» разделяет и список, и координаты
+   внутри скобок; регистр «нет» не важен. Хвост «°» («∘») или «%» у числа ячейки
+   (угол наклона, ставка) — подпись единицы, а не часть ответа.
+   Вернёт { pts: bool, items: [[x], …] | [[x, y], …] } или null — не разобрали. */
+const SELF_NUM = '-?\\d+(?:[.,]\\d+)?';
+function selfParse(t) {
+  let s = String(t == null ? '' : t).replace(/[\s\u00a0\u202f\u2009\u200b]+/g, '').replace(/[−–—]/g, '-').toLowerCase();
+  if (!s) return null;
+  if (s === 'нет') return { pts: null, items: [] };
+  s = s.replace(/;$/, '');
+  const num = (x) => parseFloat(x.replace(',', '.'));
+  const PT = new RegExp('^\\((' + SELF_NUM + ');(' + SELF_NUM + ')\\)$');
+  const N1 = new RegExp('^(' + SELF_NUM + ')[°∘%]?$');   // ∘ — градус, набранный KaTeX
+  if (s.charAt(0) === '(') {
+    const parts = s.match(/\([^()]*\)/g);
+    if (!parts || parts.join(';') !== s) return null;
+    const items = [];
+    for (const p of parts) { const m = PT.exec(p); if (!m) return null; items.push([num(m[1]), num(m[2])]); }
+    return { pts: true, items };
+  }
+  const items = [];
+  for (const p of s.split(';')) { const m = N1.exec(p); if (!m) return null; items.push([num(m[1])]); }
+  return { pts: false, items };
 }
+function selfClose(a, b) { return Math.abs(a - b) <= Math.max(0.011, 0.0005 * Math.abs(b)); }
+/* Сравнение как мультимножеств: порядок не важен, число значений обязано
+   совпасть, каждая координата — с прежним допуском. «нет» = пустой список.
+   null — ответ человека не разобрался (вердикта нет). */
+function checkGuess(answer, truth) {
+  const a = selfParse(answer), b = selfParse(truth);
+  if (a == null || b == null) return null;
+  if (a.items.length !== b.items.length) return false;
+  if (!b.items.length) return true;
+  if (a.pts !== b.pts) return false;
+  const used = new Array(b.items.length).fill(false);
+  return a.items.every(g => {
+    const k = b.items.findIndex((w, i) => !used[i] && w.every((v, j) => selfClose(g[j], v)));
+    if (k < 0) return false;
+    used[k] = true;
+    return true;
+  });
+}
+// Значение ячейки — ответ (а не поясняющий текст)?
+function selfIsAnswer(truth) { return selfParse(truth) != null; }
 
 // Текст узла без невидимой половины KaTeX (calc2/CLAUDE.md, ловушки).
 function selfText(el) {
@@ -57,8 +101,8 @@ function selfCell(cell, idx) {
   let box = cell.querySelector(':scope > .self-box');
   const val = cell.querySelector('.ans-val');
   const truth = selfText(val);
-  const numeric = selfNum(truth) != null;
-  const opened = SELF.all || SELF.open[id] || !numeric;
+  // Без поля и открытой остаётся только ячейка, значение которой не ответ вовсе.
+  const opened = SELF.all || SELF.open[id] || !selfIsAnswer(truth);
   cell.classList.toggle('self-hidden', SELF.on && !opened);
   if (!SELF.on || opened) { if (box) box.remove(); return; }
   // Ячейка уже с полем: вердикт мог сброситься правкой — перекрашиваем.
@@ -66,7 +110,7 @@ function selfCell(cell, idx) {
   box = document.createElement('div');
   box.className = 'self-box';
   const inp = document.createElement('input');
-  inp.type = 'text'; inp.className = 'self-inp'; inp.inputMode = 'decimal'; inp.placeholder = '?';
+  inp.type = 'text'; inp.className = 'self-inp'; inp.placeholder = '?';
   const lab = (cell.querySelector('.ans-lab') || {}).textContent || '';
   inp.setAttribute('aria-label', 'Ваш ответ: ' + lab);
   inp.value = SELF.typed[id] || '';
@@ -83,8 +127,13 @@ function selfCell(cell, idx) {
   const check = () => {
     const cur = selfText(cell.querySelector('.ans-val'));
     const r = checkGuess(inp.value, cur);
-    if (r == null) { toast('Впишите число, можно с запятой'); return; }
+    // Не разобрали — подсказка формата, вердикта нет. Неверно — только «не
+    // сходится»: сколько значений не хватает, не выдаём.
+    if (r == null) { toast('Впишите числа через «;», точку как (x; y) или «нет»'); return; }
     SELF.verdict[id] = r; paintVerdict(); selfAfterAnswer();
+    /* Перерисовки здесь НЕТ намеренно: подпись ключевой точки собирается при
+       каждом наведении и сама видит новый вердикт. Перерисовка будила проверку
+       истории, та рассылала calc2:history, и вердикт тут же стирался. */
   };
   inp.addEventListener('input', () => { SELF.typed[id] = inp.value; delete SELF.verdict[id]; paintVerdict(); });
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
@@ -107,7 +156,7 @@ function selfAfterAnswer() {
   const done = cells.every((c, i) => {
     const id = k + '#' + i;
     const truth = selfText(c.querySelector('.ans-val'));
-    return SELF.open[id] || SELF.verdict[id] === true || selfNum(truth) == null;
+    return SELF.open[id] || SELF.verdict[id] === true || !selfIsAnswer(truth);
   });
   if (done) {
     SELF.all = true; applySelf(); if (typeof redrawAll === 'function') redrawAll();
@@ -140,10 +189,13 @@ function selfCanvas() {
   if (!SELF.on || SELF.all) return;
   const chart = document.getElementById('chart');
   if (!chart) return;
-  const heroes = [...document.querySelectorAll('#ans-hero .ans-cell')].map(c => ({
-    not: selfText(c.querySelector('.ans-not')).replace(/\s+/g, ''),
-    v: selfNum(selfText(c.querySelector('.ans-val'))),
-  })).filter(h => h.v != null);
+  // Значения главных ячеек: у списка и точки — каждое число по отдельности.
+  const heroes = [];
+  document.querySelectorAll('#ans-hero .ans-cell').forEach(c => {
+    const not = selfText(c.querySelector('.ans-not')).replace(/\s+/g, '');
+    const p = selfParse(selfText(c.querySelector('.ans-val')));
+    if (p) p.items.forEach(it => it.forEach(v => heroes.push({ not, v })));
+  });
   const yName = String(STATE.axisYDefault || 'P').charAt(0), xName = String(STATE.axisXDefault || 'Q').charAt(0);
   const svgBox = chart.getBoundingClientRect();
   chart.querySelectorAll('text.coord-num').forEach(t => {
