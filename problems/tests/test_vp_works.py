@@ -14,7 +14,9 @@ from unittest import mock
 from django.core.management import call_command
 from django.test import SimpleTestCase, TestCase, override_settings
 
-from problems.management.commands.vp_works import Command, read_jsonl, write_jsonl
+from problems.management.commands.vp_works import (
+    Command, load_records, read_jsonl, write_jsonl,
+)
 from problems.vp_works import fetch, hse, listing, pdfwork, scores
 
 FAKE_NAME = 'Пупкинсон Вася Петрович'
@@ -271,6 +273,18 @@ class DownloadTests(TempDirMixin, SimpleTestCase):
         check = fetch.check_download([rec], self.dir)
         self.assertEqual((check['ok'], check['failed']), (0, 1))
 
+    def test_only_downloads_subset_but_keeps_whole_index(self):
+        recs = [make_record(str(i)) for i in range(5)]
+        path = os.path.join(self.dir, 'index.jsonl')
+        write_jsonl(path, recs)
+        client = FakeClient()
+        Command(stdout=io.StringIO()).do_download(
+            self.dir, {'only': '1,3', 'limit': 0}, client=client)
+        self.assertEqual(sorted(client.pdf_calls), ['1', '3'])
+        rows = read_jsonl(path)
+        self.assertEqual(len(rows), 5)
+        self.assertEqual([r.get('status') for r in rows], [None, 'ok', None, 'ok', None])
+
     def test_fail_streak_pauses_then_stops(self):
         recs = [make_record(str(i)) for i in range(10)]
         slept = []
@@ -364,8 +378,11 @@ class ScoresCommandTests(TempDirMixin, TestCase):
     def test_yes_reads_and_checks_sum(self):
         self.prepare(n=2)
         call_command('vp_works', 'scores', '--dir', self.dir, '--yes', stdout=io.StringIO())
-        rows = read_jsonl(os.path.join(self.dir, 'index.jsonl'))
+        rows = load_records(self.dir)
         self.assertEqual([r['scores_status'] for r in rows], ['ok', 'ok'])
+        # index.jsonl баллов не содержит: его пишет только download.
+        self.assertTrue(all('scores_status' not in r
+                            for r in read_jsonl(os.path.join(self.dir, 'index.jsonl'))))
         self.assertEqual(rows[0]['scores_tasks'], [40.0, 34.0])
 
     @override_settings(VP_WORKS_PROVIDER='fake', AI_FAKE_REPLY=GOOD_REPLY,
@@ -376,10 +393,13 @@ class ScoresCommandTests(TempDirMixin, TestCase):
         out = io.StringIO()
         call_command('vp_works', 'scores', '--dir', self.dir, '--yes', '--max-usd', '0.01',
                      stdout=out)
-        rows = read_jsonl(os.path.join(self.dir, 'index.jsonl'))
-        called = [r for r in rows if r.get('scores_status')]
+        called = [r for r in load_records(self.dir) if r.get('scores_status')]
         self.assertEqual(len(called), 1)
         self.assertIn('ОСТАНОВЛЕНО', out.getvalue())
+        # Потолок общий на все прогоны: второй запуск не делает ни одного вызова.
+        call_command('vp_works', 'scores', '--dir', self.dir, '--yes', '--max-usd', '0.01',
+                     stdout=io.StringIO())
+        self.assertEqual(len([r for r in load_records(self.dir) if r.get('scores_status')]), 1)
 
     def test_data_dir_inside_repo_is_refused(self):
         from django.core.management.base import CommandError

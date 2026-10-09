@@ -28,6 +28,37 @@ def read_jsonl(path):
         return [json.loads(line) for line in fh if line.strip()]
 
 
+def only_ids(arg):
+    """`--only 1,2,3` или `--only @файл` → множество work_id (пусто — все)."""
+    arg = (arg or '').strip()
+    if arg.startswith('@'):
+        with open(arg[1:], encoding='utf-8') as fh:
+            arg = fh.read().replace('\n', ',')
+    return {w.strip() for w in arg.split(',') if w.strip()}
+
+
+def load_records(data_dir):
+    """index.jsonl + результаты баллов из scores.jsonl (по work_id).
+
+    Баллы живут ОТДЕЛЬНЫМ файлом: download (часы) и scores могут идти
+    одновременно, а index пишет только download — иначе два процесса
+    затирали бы поля друг друга.
+    """
+    records = read_jsonl(os.path.join(data_dir, 'index.jsonl'))
+    extra = {r['work_id']: r for r in read_jsonl(os.path.join(data_dir, 'scores.jsonl'))}
+    for rec in records:
+        rec.update({k: v for k, v in extra.get(rec['work_id'], {}).items()
+                    if k.startswith('scores_')})
+    return records
+
+
+def save_scores(data_dir, records):
+    rows = [dict({'work_id': r['work_id']},
+                 **{k: v for k, v in r.items() if k.startswith('scores_')})
+            for r in records if r.get('scores_status')]
+    write_jsonl(os.path.join(data_dir, 'scores.jsonl'), rows)
+
+
 def write_jsonl(path, rows):
     """Атомарно: сначала во временный файл, потом подмена."""
     tmp = path + '.tmp'
@@ -52,12 +83,12 @@ class Command(BaseCommand):
                                help='только эти сезоны, через запятую: 2019/2020,…')
             if name in ('download', 'scores'):
                 p.add_argument('--limit', type=int, default=0)
+                p.add_argument('--only', default='',
+                               help='work_id через запятую или @файл (по строке на номер)')
             if name == 'scores':
                 p.add_argument('--max-usd', type=float, default=3.0)
                 p.add_argument('--yes', action='store_true',
                                help='без него — только план, ни одного вызова модели')
-                p.add_argument('--only', default='',
-                               help='work_id через запятую (проба)')
 
     def say(self, message=''):
         self.stdout.write(message)
@@ -146,10 +177,13 @@ class Command(BaseCommand):
             raise CommandError('index.jsonl пуст — сначала vp_works index.')
         client = client or hse.Client(log=self.say)
         kwargs = {'sleep': sleep} if sleep else {}
+        wanted = only_ids(opts.get('only'))
+        batch = [r for r in records if r['work_id'] in wanted] if wanted else records
         try:
+            # Сохраняем ВЕСЬ index, даже когда качаем часть (`--only`).
             stats = fetch.download_all(
-                records, data_dir, client, limit=opts.get('limit') or 0,
-                log=self.say, save=lambda rows: write_jsonl(path, rows), **kwargs)
+                batch, data_dir, client, limit=opts.get('limit') or 0,
+                log=self.say, save=lambda _rows: write_jsonl(path, records), **kwargs)
         except hse.Blocked:
             self.say('Сайт отказал — index сохранён, докачка продолжит с места.')
             raise
@@ -169,12 +203,12 @@ class Command(BaseCommand):
         import random
         from concurrent.futures import ThreadPoolExecutor
 
-        path = os.path.join(data_dir, 'index.jsonl')
-        records = read_jsonl(path)
+        records = load_records(data_dir)
+        spent_before = sum(r.get('scores_cost') or 0 for r in records)
         todo = [r for r in records if r.get('status') == 'ok'
                 and r.get('scores_status') not in ('ok', 'review')]
-        if opts.get('only'):
-            wanted = {w.strip() for w in opts['only'].split(',')}
+        wanted = only_ids(opts.get('only'))
+        if wanted:
             todo = [r for r in todo if r['work_id'] in wanted]
         if opts.get('limit'):
             # Проба — случайная, но воспроизводимая, из разных сезонов.
@@ -188,8 +222,9 @@ class Command(BaseCommand):
 
         self.say('работ к разбору: %d; с текстовым слоем: %d; без раскладки бланка: %d; '
                  'в модель: %d' % (len(todo), len(text_layer), len(no_layout), len(to_model)))
-        self.say('смета: ~$%.2f (потолок $%.2f)'
-                 % (scores.estimate_usd(len(to_model)), opts['max_usd']))
+        self.say('смета: ~$%.2f; уже потрачено прежними прогонами $%.4f; потолок на все '
+                 'прогоны $%.2f' % (scores.estimate_usd(len(to_model)), spent_before,
+                                     opts['max_usd']))
 
         for rec in text_layer + no_layout:
             # Путь (а) у ВП не встретился ни разу (сканы без текста) — такие
@@ -207,7 +242,7 @@ class Command(BaseCommand):
                      % crops_dir)
             return None
         if text_layer or no_layout:
-            write_jsonl(path, records)
+            save_scores(data_dir, records)
 
         from django.conf import settings
         from django.db import connection, transaction
@@ -249,7 +284,7 @@ class Command(BaseCommand):
             running = set()
             while queue or running:
                 while queue and len(running) < workers and not stopped:
-                    if spent >= opts['max_usd']:
+                    if spent_before + spent >= opts['max_usd']:
                         stopped = 'потолок $%.2f достигнут' % opts['max_usd']
                         break
                     running.add(pool.submit(call, queue.pop(0)))
@@ -277,11 +312,11 @@ class Command(BaseCommand):
                                 'scores_raw': None if status == 'ok' else data,
                                 'scores_cost': round(cost, 6)})
                 if done % 20 == 0:
-                    write_jsonl(path, records)
+                    save_scores(data_dir, records)
                     self.say('  разобрано %d из %d, $%.4f' % (done, len(to_model), spent))
                 if stopped and queue:
                     queue.clear()
-        write_jsonl(path, records)
+        save_scores(data_dir, records)
         self._write_review(data_dir, records)
         batch = [r for r in to_model if r.get('scores_status')]
         ok = sum(1 for r in batch if r['scores_status'] == 'ok')
@@ -326,7 +361,7 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------ report
     def do_report(self, data_dir, opts):
-        records = read_jsonl(os.path.join(data_dir, 'index.jsonl'))
+        records = load_records(data_dir)
         by = Counter()
         for r in records:
             by[(r['subject'], r['season'], 'listed')] += 1
