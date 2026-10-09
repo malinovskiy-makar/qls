@@ -3508,3 +3508,25 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
    повторяются. ⚠️ Правило стоит ПОСЛЕ вида строк выше: та же специфичность
    иначе возвращала им display: flex, и величина показывалась дважды. */
 #params-panel #sb-body .stat.is-hero, #params-panel #sb-body .stat[data-ans-head], #params-panel #sb-body .stat.ans-dup { display: none; }
+
+/* «Сначала сам» в столбик (сессия 3, ADR 0144): подпись строкой во всю ширину,
+   под ней поле на всю ширину и «Проверить» справа одной строкой; ниже вердикт
+   слева («✓ верно» / «✗ не сходится» цветом, без заливки) и «Показать» справа.
+   Строка вердикта держит своё место и пустой: высота строки до и после
+   проверки одна. Поле 16/400 (шкала), кнопка 13/600. */
+.ans-cell.self-hidden .ans-lab { flex-basis: 100%; }
+/* ⚠️ У поля ввода своя «естественная» ширина (~20 знаков): с основой auto строка
+   «поле + Проверить» выходила на 11 px шире колонки, и колонка уезжала вбок при
+   фокусе. Основа поля нулевая, коробка может сжиматься (min-width: 0). */
+.ans-cell .self-box { flex: 1 0 100%; min-width: 0; display: flex; flex-direction: column; gap: 4px; margin-top: 6px; }
+.self-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.self-row .self-inp {
+  flex: 1 1 0; width: 0; min-width: 0; height: 36px; padding: 0 12px; text-align: left;
+  font: inherit; font-size: 16px; font-weight: 400; font-variant-numeric: tabular-nums;
+}
+.self-row .self-check { flex: 0 0 auto; height: 36px; padding: 0 14px; }
+.ans-cell .self-acts { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 20px; flex-wrap: nowrap; }
+.ans-cell .self-pill, .ans-cell .self-pill:empty { display: inline; padding: 0; border: 0; background: none; font-size: 13px; font-weight: 600; line-height: 20px; }
+.ans-cell .self-pill.is-ok { color: var(--green-ink); }
+.ans-cell .self-pill.is-bad { color: var(--error-ink); }
+.ans-cell .self-show { margin-left: auto; line-height: 20px; }

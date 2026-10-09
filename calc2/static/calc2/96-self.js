@@ -121,6 +121,11 @@ function selfCell(cell, idx) {
   const lab = (cell.querySelector('.ans-lab') || {}).textContent || '';
   inp.setAttribute('aria-label', 'Ваш ответ: ' + lab);
   inp.value = SELF.typed[id] || '';
+  /* В столбик (решение владельца 09.10, ADR 0144): подпись строкой (это
+     .ans-lab строки), под ней поле на всю ширину и «Проверить» справа; ниже
+     вердикт слева и «Показать» справа. Место под вердикт стоит всегда: строка
+     не прыгает, когда он появляется. */
+  const line = document.createElement('div'); line.className = 'self-row';
   const row = document.createElement('div'); row.className = 'self-acts';
   const chk = document.createElement('button'); chk.type = 'button'; chk.className = 'self-check'; chk.textContent = 'Проверить';
   const show = document.createElement('button'); show.type = 'button'; show.className = 'self-show'; show.textContent = 'Показать';
@@ -146,9 +151,10 @@ function selfCell(cell, idx) {
   inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); check(); } });
   chk.addEventListener('click', check);
   show.addEventListener('click', () => { SELF.open[id] = true; applySelf(); selfAfterAnswer(); });
-  row.append(chk, show, pill);
+  line.append(inp, chk);
+  row.append(pill, show);
   box._paint = paintVerdict;
-  box.append(inp, row);
+  box.append(line, row);
   cell.appendChild(box);
   paintVerdict();
 }
@@ -180,7 +186,14 @@ function applySelf() {
   const gate = document.getElementById('self-gate');
   if (gate) gate.hidden = !(SELF.on && !SELF.all);
   const note = document.getElementById('self-note');
-  if (note) note.hidden = !SELF.on;
+  if (note) {
+    note.hidden = !SELF.on;
+    // Формат ответа словами: у математики — список, точка, «нет»; у экономики — число.
+    const t = (typeof answerIsMath === 'function' && answerIsMath())
+      ? 'Впишите ответ: числа через «;», точку как (x; y) или «нет».'
+      : 'Впишите ответ числом и проверьте. Числа на осях спрятаны; любое можно открыть кнопкой «Показать».';
+    if (note.textContent !== t) note.textContent = t;
+  }
   const showAll = document.getElementById('self-showall');
   if (showAll) showAll.hidden = !(SELF.on && !SELF.all);
   const pending = document.querySelector('.col-answer .col-note');

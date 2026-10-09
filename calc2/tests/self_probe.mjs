@@ -13,6 +13,11 @@
      В. Подпись ключевой точки при наведении — «(?; ?)», пока её координаты не
         открыты верным ответом или «Показать»; закрепка до того недоступна.
         «Показать всё» открывает все; выключенный режим — всё как без него.
+     Г. Столбик (сессия 3, ADR 0144): подпись строкой, поле на всю ширину и
+        «Проверить» справа, ниже вердикт и «Показать». У всех полей колонки одна
+        ширина (разброс ≤ 1 px), поле не уже 60 % строки; подписей, обрезанных
+        многоточием, нет; высота строки до и после вердикта одна; пояснение
+        формата ответа у математики и у экономики своё.
 */
 import { chromium } from 'playwright';
 
@@ -207,6 +212,42 @@ if (want('В')) {
   await answer('P', '50');
   await ev(async () => { if (!STATE.armedCurve) { const t = snapTargets()[0]; armCurve(t.name); } await __sp.wait(150); });
   eq('после верных Q* и P*: равновесие', (await ev(() => __sp.hoverAt(50, 50))).label, '(50; 50)');
+  await ev(() => setSelfMode(false));
+}
+
+/* ── Г. Раскладка в столбик ───────────────────────────────────────── */
+if (want('Г')) {
+  head('Г. Столбик: подпись, поле на всю ширину, вердикт под полем');
+  const geo = () => ev(() => [...document.querySelectorAll('#ans-hero .ans-cell')].filter(c => c.querySelector('.self-inp')).map(c => {
+    const r = c.getBoundingClientRect(), inp = c.querySelector('.self-inp').getBoundingClientRect();
+    const lab = c.querySelector('.ans-lab'), chk = c.querySelector('.self-check').getBoundingClientRect();
+    const acts = c.querySelector('.self-acts').getBoundingClientRect(), lr = lab.getBoundingClientRect();
+    const cs = getComputedStyle(lab);
+    return { h: r.height, w: inp.width, rowW: r.width, sameLine: Math.abs((inp.top + inp.bottom) - (chk.top + chk.bottom)) < 2,
+      chkRight: chk.right <= r.right + 0.5, labAbove: lr.bottom <= inp.top + 0.5, actsBelow: acts.top >= inp.bottom - 0.5,
+      ellipsis: cs.textOverflow === 'ellipsis' && lab.scrollWidth > lab.clientWidth };
+  }));
+  const widths = [];
+  for (const key of KEYS) {
+    await ev(async (key) => { await __sp.open(key); }, key);
+    const g = await geo();
+    g.forEach(x => widths.push(x.w));
+    ok(key + ': поле не уже 60 % строки', g.length > 0 && g.every(x => x.w >= 0.6 * x.rowW), g.map(x => Math.round(x.w) + '/' + Math.round(x.rowW)).join(' '));
+    ok(key + ': подпись над полем, «Проверить» в строке поля, вердикт и «Показать» под ним', g.every(x => x.labAbove && x.sameLine && x.chkRight && x.actsBelow));
+    ok(key + ': подписей, обрезанных многоточием, нет', g.every(x => !x.ellipsis));
+  }
+  ok('у всех полей одна ширина (разброс ≤ 1 px)', Math.max(...widths) - Math.min(...widths) <= 1, Math.min(...widths).toFixed(1) + '…' + Math.max(...widths).toFixed(1));
+  await ev(async () => { await __sp.open('m-graph'); });
+  const h0 = (await geo()).map(x => x.h);
+  await answer('Пересекаетось:x', '2; −2');
+  await answer('Пересекаетось:y', '4');
+  const h1 = (await geo()).map(x => x.h);
+  ok('высота строки до и после вердикта одна (✓ и ✗)', h0.length && h0.every((h, i) => Math.abs(h - h1[i]) < 0.5), h0.map(Math.round).join(',') + ' → ' + h1.map(Math.round).join(','));
+  const note = await ev(() => document.getElementById('self-note').textContent);
+  eq('пояснение у математики', note, 'Впишите ответ: числа через «;», точку как (x; y) или «нет».');
+  await ev(async () => { await __sp.open('sd'); });
+  const note2 = await ev(() => document.getElementById('self-note').textContent);
+  ok('пояснение у экономики — числом, своё', /^Впишите ответ числом/.test(note2), note2);
   await ev(() => setSelfMode(false));
 }
 
