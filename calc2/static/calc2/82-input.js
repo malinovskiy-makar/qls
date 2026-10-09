@@ -2154,6 +2154,7 @@ function upgradeTextFieldsIn(root) {
   box.querySelectorAll('input[type="text"]').forEach(inp => {
     if (inp._equipped || inp._mfDone) return;      // это поле формулы, у него свой вид
     if (inp.classList.contains('curve-expr-inp')) return;
+    if (inp.dataset.plain) return;                 // числовое поле (отрезок ответа): остаётся окошком
     upgradeTextField(inp);
   });
 }

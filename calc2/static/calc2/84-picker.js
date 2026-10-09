@@ -239,8 +239,11 @@ const SCENE_ROUTE = {
      экран нечего покрутить, и первое, что видел человек, — чистый холст.
      Парабола x² − 4 выбрана нарочно: у неё видны оба нуля и вершина, то есть
      сразу заполнены «Ключевые значения». */
+  /* Окно — по функции (ADR 0143): вершина и оба нуля внутри с запасом, ось y
+     посередине. Прежний экономический подбор раздвигал его до 100 × 100. */
   'm-graph':      { run: () => { STATE.curves = []; curveCounter = 0; STATE.params = {};
-                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows(); } },
+                                 setMode('graph'); addCurve('x^2-4'); renderGraphRows();
+                                 setGraphWindow(graphFitWindow()); redrawAll(); } },
   'm-tangent':    { run: () => { setMode('math'); setMathSub('tangent'); },    lock: ['math-seg'] },
   'm-optimum':    { run: () => { setMode('math'); setMathSub('optimum'); },    lock: ['math-seg'] },
   'm-transform':  { run: () => { setMode('math'); setMathSub('transform'); },  lock: ['math-seg'] },

@@ -254,25 +254,95 @@ function answerSpec() {
   if (STATE.mode === 'graph') {
     const fs = STATE.curves.filter(c => c.visible && !isVertical(c)).map(c => (x) => evalCurve(c, x));
     if (!fs.length) return null;
-    const diff = [];
-    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) diff.push((x) => fs[i](x) - fs[j](x));
-    return { keyFns: fs, diffFns: diff };
+    const diff = [], pairs = [];
+    for (let i = 0; i < fs.length; i++) for (let j = i + 1; j < fs.length; j++) {
+      diff.push((x) => fs[i](x) - fs[j](x)); pairs.push([fs[i], fs[j]]);
+    }
+    return { keyFns: fs, diffFns: diff, pairs };
   }
   if (STATE.mode !== 'math' || STATE.mathSub === 'constraint') return null;
   const f = mathF();
   if (!f) return null;
-  if (STATE.mathSub === 'transform') return { keyFns: [mathTransformed(f, STATE.mathTrans, paramValue('a', 1))], diffFns: [] };
+  if (STATE.mathSub === 'transform') return { keyFns: [mathTransformed(f, STATE.mathTrans, paramValue('a', 1))], diffFns: [], pairs: [] };
   if (STATE.mathSub === 'minmax') {
     const mm = mmParts(f);
-    if (mm.parts.length < 2) return { keyFns: [f], diffFns: [] };
-    const diff = [];
+    if (mm.parts.length < 2) return { keyFns: [f], diffFns: [], pairs: [] };
+    const diff = [], pairs = [];
     for (let i = 0; i < mm.parts.length; i++) for (let j = i + 1; j < mm.parts.length; j++) {
       const a = mm.parts[i].fn, b = mm.parts[j].fn;
-      diff.push((x) => a(x) - b(x));
+      diff.push((x) => a(x) - b(x)); pairs.push([a, b]);
     }
-    return { keyFns: [mm.z], diffFns: diff };
+    return { keyFns: [mm.z], diffFns: diff, pairs };
   }
-  return { keyFns: [f], diffFns: [] };
+  return { keyFns: [f], diffFns: [], pairs: [] };
+}
+
+/* Ключевые точки ответа на отрезке: нули, локальные экстремумы, пересечение
+   с осью y, пересечения кривых. По ним строится окно (фаза 3, ADR 0143). */
+function answerKeyPoints(spec, seg) {
+  spec = spec || answerSpec();
+  seg = seg || answerSeg();
+  if (!spec) return [];
+  const out = [];
+  const add = (x, y) => { if (isFinite(x) && isFinite(y)) out.push({ x, y }); };
+  spec.keyFns.forEach(f => {
+    const r = ansAnalyse(f, seg.a, seg.b);
+    r.zeros.forEach(x => add(x, 0));
+    r.max.concat(r.min).forEach(p => add(p.x, p.y));
+    if (r.y0 != null) add(0, r.y0);
+  });
+  (spec.pairs || []).forEach(([f, g]) => ansCrosses(f, g, seg.a, seg.b).forEach(p => add(p.x, p.y)));
+  return out;
+}
+
+/* ОКНО ПО ФУНКЦИИ («Построение графиков»: старт, «Вписать», «Вернуть
+   исходный вид»). Полный план, все четыре четверти:
+     · по x — отрезок ответа; шире, если ключевая точка не помещается с запасом;
+     · по y — ключевые точки, ноль (ось x видна) и основная масса значений
+       кривых на этом отрезке (5–95 %: полюс 1/x не раздувает окно);
+     · запас 10 % с каждой стороны: у любой ключевой точки до края ≥ 8 %.
+   Кривых нет — привычные −10…10 по обеим осям. */
+function graphFitWindow() {
+  const spec = answerSpec();
+  if (!spec) return { x0: -10, x1: 10, y0: -10, y1: 10 };
+  const seg = answerSeg();
+  const pts = answerKeyPoints(spec, seg);
+  let x0 = seg.a, x1 = seg.b;
+  for (let k = 0; k < 3; k++) {                  // ключевые точки по x — с запасом
+    const m = (x1 - x0) * 0.1;
+    pts.forEach(p => { x0 = Math.min(x0, p.x - m); x1 = Math.max(x1, p.x + m); });
+  }
+  const vals = [];
+  spec.keyFns.forEach(f => {
+    for (let i = 0; i <= 400; i++) { const v = f(x0 + (x1 - x0) * i / 400); if (isFinite(v)) vals.push(v); }
+  });
+  vals.sort((a, b) => a - b);
+  const q = (t) => vals.length ? vals[Math.min(vals.length - 1, Math.max(0, Math.round(t * (vals.length - 1))))] : 0;
+  let lo = Math.min(0, q(0.05)), hi = Math.max(0, q(0.95));
+  pts.forEach(p => { lo = Math.min(lo, p.y); hi = Math.max(hi, p.y); });
+  if (!(hi - lo > 1e-9)) { lo -= 1; hi += 1; }
+  const pad = (hi - lo) * 0.1;
+  let y0 = lo - pad, y1 = hi + pad;
+  if (STATE.firstQuad) { x0 = Math.max(0, x0); y0 = Math.max(0, y0); }
+  return { x0, x1, y0, y1 };
+}
+
+// Поставить окно «Построения графиков» ровно (старт и «Вписать»).
+function setGraphWindow(w) {
+  CONFIG.Qmin = w.x0; CONFIG.Qmax = w.x1; CONFIG.Pmin = w.y0; CONFIG.Pmax = w.y1;
+  syncViewFields();
+}
+// Раздвинуть, но не сжать (правило ADR 0087): новая функция вышла за край —
+// окно растёт до неё; окно, выбранное человеком (zoomLock), не трогаем.
+function growGraphWindow() {
+  if (STATE.zoomLock) return;
+  const w = graphFitWindow();
+  const n = { x0: Math.min(CONFIG.Qmin, w.x0), x1: Math.max(CONFIG.Qmax, w.x1),
+              y0: Math.min(CONFIG.Pmin, w.y0), y1: Math.max(CONFIG.Pmax, w.y1) };
+  if (n.x0 < CONFIG.Qmin - 1e-9 || n.x1 > CONFIG.Qmax + 1e-9 || n.y0 < CONFIG.Pmin - 1e-9 || n.y1 > CONFIG.Pmax + 1e-9) {
+    setGraphWindow(n);
+    redrawAll();
+  }
 }
 
 // Отрезок ответа текущей модели: свой у человека или подобранный по формуле.

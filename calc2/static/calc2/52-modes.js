@@ -536,6 +536,10 @@ function growWindowToModel() {
   if (_rangeAnimating) return;            // кадром анимации распоряжается сама анимация
   if (STATE.mode === 'math') return;
   if (STATE.zoomLock) return;
+  /* «Построение графиков» — полный план и окно по функции (ADR 0143), а не
+     экономический запас 100 × 100 от нуля вправо-вверх: тот прижимал параболу
+     x² − 4 к левому краю. */
+  if (STATE.mode === 'graph') { growGraphWindow(); return; }
   const w = wantedRanges();
   growRanges(w.qmax, w.pmax);
 }
@@ -554,8 +558,22 @@ function resetZoom() {
       let [x0, x1, y0, y1] = p.win;
       const b = boundsOfDrawn(x1, y1);
       if (b) { x1 = Math.max(x1, b.qmax); y1 = Math.max(y1, b.pmax); }
+      /* Ключевая точка ответа (корень, вершина, пересечение) на отрезке
+         ответа, не влезающая в окно пресета, раздвигает его до себя — с тем
+         же запасом 8 %, что у окна «Построения графиков» (ADR 0143). */
+      if (STATE.mathSub !== 'constraint' && typeof answerKeyPoints === 'function') {
+        for (let k = 0; k < 3; k++) {
+          const mx = (x1 - x0) * 0.09, my = (y1 - y0) * 0.09;
+          answerKeyPoints().forEach(q => {
+            x0 = Math.min(x0, q.x - mx); x1 = Math.max(x1, q.x + mx);
+            y0 = Math.min(y0, q.y - my); y1 = Math.max(y1, q.y + my);
+          });
+        }
+      }
       setMathWindow(x0, x1, y0, y1);
     }
+  } else if (STATE.mode === 'graph') {
+    setGraphWindow(graphFitWindow());   // окно по функции (ADR 0143)
   } else {
     /* Порядок Н20 · Н21 живёт в wantedRanges — там же, откуда его берёт
        авто-расширение окна. Возврат ставит эти границы РОВНО, то есть умеет и
