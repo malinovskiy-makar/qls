@@ -1,5 +1,5 @@
 > **Владелец:** Claude Code
-> **Обновлён:** 2026-10-09 (пилот «Высшая проба», сессия 3)
+> **Обновлён:** 2026-10-09 (МОШ, сессия 2: реестр олимпиад, запись привязок МОШ, оцифровка эталона ВП + МОШ зрячей моделью)
 > **Статус:** актуален
 
 # Аудит олимпиад по официальному эталону
@@ -30,29 +30,56 @@
 (`problems/text_dedup.normalize_for_compare`). Сравнение текста банка с
 эталоном — `fuzzy_ratio` по условию вместе с подпунктами.
 
+## Реестр олимпиад
+
+`problems/olympiad_audit/registry.py` — одна запись на слаг (`vp`,
+`vp-fingram`, `vp-ob`, `mosh`): название строк `OlympiadRef` (как у уже
+записанных строк слага), официальный `Source`, официальный сайт и хосты
+PDF, допустимые этапы (`vp` — `final`; `mosh` — `qualifying`/`final`),
+префикс `event_id`, папка аудита, папка журналов (`session3` у ВП,
+`session2` у МОШ), метка сессии и `reviewed_by`, способ сравнения текста
+(`norm` у ВП; `markup_free` у МОШ — банк в LaTeX, PDF простым текстом).
+Все команды аудита требуют `--olympiad <слаг>`; без него — отказ.
+
 ## Команды
 
 ```bash
-manage.py olympiad_official_sources [--apply]
+manage.py olympiad_official_sources --olympiad vp|mosh [--apply]
 ```
-Справочные строки: `Source` «Высшая проба: официальный архив» и карточки
-`olympiads.Olympiad` для `vp-fingram`, `vp-ob` (НЕопубликованные). Данные,
-а не миграция. ⚠️ `import_olympiads_data --wipe` и `seed_olympiads_demo
+Справочные строки: `Source` «<олимпиада>: официальный архив» из реестра;
+у ВП ещё карточки `olympiads.Olympiad` для `vp-fingram`, `vp-ob`
+(НЕопубликованные), у остальных — проверка карточки своего слага (пустой
+официальный сайт дописывается). Данные, а не миграция. ⚠️ `import_olympiads_data --wipe` и `seed_olympiads_demo
 --wipe` сносят все карточки `Olympiad` — после них запустить снова.
 
 ```bash
-manage.py apply_olympiad_audit --new-refs proposed_new_refs.csv --tier auto
-manage.py apply_olympiad_audit --new-refs review_queue.csv --tier high --confirmed-by claude_review.md
-manage.py apply_olympiad_audit --update-existing proposed_updates_existing.csv --confirmed-by claude_review.md [--include-eyeball] [--twin-pdf-to-pdf]
-manage.py apply_olympiad_audit --import import_queue.jsonl [--figures-dir DIR] [--assume-updates ЖУРНАЛ…]
-manage.py apply_olympiad_audit --rollback session3\apply_<время>_<режим>.json
+manage.py apply_olympiad_audit --olympiad vp --new-refs proposed_new_refs.csv --tier auto
+manage.py apply_olympiad_audit --olympiad vp --new-refs review_queue.csv --tier high --confirmed-by claude_review.md
+manage.py apply_olympiad_audit --olympiad vp --update-existing proposed_updates_existing.csv --confirmed-by claude_review.md [--include-eyeball] [--twin-pdf-to-pdf]
+manage.py apply_olympiad_audit --olympiad vp --import import_queue.jsonl [--figures-dir DIR] [--assume-updates ЖУРНАЛ…]
+manage.py apply_olympiad_audit --olympiad mosh --delete-refs ID,ID --out-dir DIR
+manage.py apply_olympiad_audit --olympiad vp --rollback session3\apply_<время>_<режим>.json
 ```
 
 По умолчанию — сухой прогон: таблица «создать / обновить / пропустить,
 почему» с числами и примерами, журнал `…_dryrun.json`. Запись — только
 `--apply --yes-i-have-owner-approval` вместе (фраза = «владелец сказал да
 на стоп-гейте»). Эталон ищется рядом с входным файлом (`--reference`),
-журналы — в `session3` рядом с папкой входного файла (`--out-dir`).
+журналы — в папке журналов из реестра рядом с папкой входного файла
+(`--out-dir`).
+
+Флаги многоэтапной олимпиады (так записан МОШ, сессия 2):
+`--stage-from catalog_vs_official.csv` — пустой этап заполняется только у
+комплектов агрегатора с этапом, доказанным текстом (`stage_established`
+без «?»; id вида `…__propagated…` сводится к базовому);
+`--renumber-by-containment` — сомнительные перенумеровки из файла проверки
+(список «- id event текущий→предложенный …») применяются, только если текст
+банка входит в задание под новым номером (≥ 0,90) и не входит под текущим;
+`--text-check existing_refs_text_check.csv` — найденный комплект для
+близнецов, когда в CSV правок нет причины (у МОШ её нет); `--assume-updates
+ЖУРНАЛ…` работает и для правок — сухой прогон видит итог высокого яруса.
+`--delete-refs` снимает только строки своей олимпиады; полная копия строки
+— в журнале, `--rollback` возвращает её с тем же id.
 
 **Порядок важен:** `--new-refs` (оба яруса) → `--update-existing` →
 `--import`. Импорт пропускает задание, к которому уже привязана задача
@@ -64,9 +91,11 @@ manage.py apply_olympiad_audit --rollback session3\apply_<время>_<режи�
 
 ### Что пишет каждый режим
 
-- **Новые привязки** — `source_site='official'`, `olympiad_slug='vp'`,
-  официальный `event_id`, `stage='final'`, класс, номер, ссылка на PDF,
-  учебный год в формате банка. AUTO: `match_method='text_fuzzy_numeric'`,
+- **Новые привязки** — `source_site='official'`, слаг и название из
+  реестра, официальный `event_id`, этап из эталона (у ВП всегда `final`),
+  класс, номер, ссылка на PDF, учебный год в формате банка; вариант
+  задания — в `raw_meta['task_variant']` и хвостом `record_id`, тур
+  (`tour2`) — в `raw_meta['tour']`. AUTO: `match_method='text_fuzzy_numeric'`,
   `reviewed_by_human=False`. Высокий ярус: только пары из таблицы
   подтверждений, `manual`, `reviewed_by_human=True`,
   `raw_meta['reviewed_by']`.
@@ -136,11 +165,87 @@ manage.py apply_olympiad_audit --rollback session3\apply_<время>_<режи�
 устаревает. Пересчёт — `build_embeddings --stale` (в пилоте устаревших
 было ровно 437 = затронутые сессией).
 
+⚠️ **«На глаза» в файле проверки — только строка, НАЧИНАЮЩАЯСЯ с этих
+слов.** У МОШ слова «на глаза» стоят и в пояснении перед таблицей
+подтверждённых — по вхождению все 657 пар ушли бы в «на глаза» (поймано
+сухим прогоном).
+
+⚠️ **Пустой класс «подходит» любому комплекту.** Две строки ILE без класса
+у одной задачи (`…-10-1` и `…-9-3`) — пару высокого яруса дописывает строка,
+чей комплект агрегатора назван классом пары; одну строку не дописывают две
+пары. Строка, уже сверенная с ДРУГИМ официальным комплектом (в том числе с
+соседним вариантом v1/v2 того же тура), — не «та же строка тура»: при
+записи МОШ 09.10 пары варианта v2 переписали ссылку трёх строк v1, запись
+откачена журналом и повторена после правки.
+
+⚠️ **Инвариант дублей — один официальный комплект И пересекающийся
+класс.** Строки 8 и 9 класса на общий комплект `8-9` — не дубль; две
+строки агрегаторов (ILE + SolveHub) одного класса — дубль, вторая правками
+не трогается и уходит в отчёт.
+
+## Оцифровка зрячей моделью
+
+Текст, вытащенный из PDF программно (v1), для банка «идеального качества»
+не годится: формулы рассыпаются, таблицы идут в столбик, отборочные МОШ
+2020/21–2024/25 — сканы без слоя. Поэтому эталон v2 строится зрячей
+моделью: страница PDF → PNG → GLM-5.3-Flash → JSON-блоки. **Эталон v2 —
+источник правды для импорта; v1 больше не использовать.**
+
+```bash
+manage.py olympiad_digitize inventory --olympiad vp|mosh     # опись raw\ → digitized\inventory.jsonl, events_files.jsonl
+manage.py olympiad_digitize render --olympiad X              # PDF → pages\<sha16>\p<N>.png + .txt (слой), 200 dpi
+manage.py olympiad_digitize transcribe --olympiad X --max-usd 20 [--limit N] [--pages-file F [--redo]] [--workers 20] [--yes]
+manage.py olympiad_digitize rescore --olympiad X             # пересчёт мерила слоя без модели
+manage.py olympiad_digitize assemble --olympiad X            # → reference_problems_v2.jsonl, events_v2.jsonl, figures\
+```
+
+Пишет только `weconomics-data\olympiads\<audit>\digitized\`, в базу —
+ничего. Папка страниц — по первым 16 знакам sha256 файла (дубль попадает
+туда же, путь короче 260 знаков Windows). Протоколы и списки участников в
+модель не идут (инвентарь, `exclude_reason`).
+
+**Деньги.** Без `--yes` — только план и смета; `--max-usd` обязателен и
+останавливает прогон с запасом на вызовы в полёте; расход каждого вызова
+— строкой в `transcribe_cost.jsonl` до разбора ответа (терпимый разбор не
+бросает исключений, сбой формата не теряет расход). Повтор на 429 — 5/15/45
+с; готовые страницы (`ok`/`needs_eyes`) не вызываются повторно. Замер
+пилота 09.10: вызов ≈ $0,0013 (≈ 6 300 токенов входа — в основном
+картинка, 600–900 выхода), страница с повторами и судьёй ≈ $0,002.
+
+**Флаги качества страницы** (`p<N>.json`):
+- `layer_ratio` — совпадение СЛОВ расшифровки и текстового слоя PDF в обе
+  стороны (F1 по словам от трёх букв, ключ без разметки). Ловит пропуск
+  абзаца и лишний текст; формулы в него не входят — в слое они
+  рассыпаны. `layer_fuzz` — посимвольное сходство (`token_sort_ratio`), для
+  сравнения: на дословной расшифровке страницы с формулами Cambria Math
+  оно 0,78;
+- `numbers_ok` — множества чисел без знака совпали (с полями номера и
+  баллов; числа шапки не лишние; одиночные числа слоя на странице с
+  рисунком — подписи осей — не требуются);
+- не сошлось (`layer_ratio < 0,90` или числа) — один повтор с усиленной
+  инструкцией, затем `needs_eyes`;
+- сканы без слоя: каждая 5-я — `needs_eyes`; страницы с формулами,
+  таблицами, рисунками — второй вызов «модель-судья», замечание судьи —
+  `needs_eyes`.
+
+**Сборка.** `task_continuation` без номера дописывается к последнему
+заданию файла; решения и критерии ложатся на задание по (номер, вариант
+задания), без номера — по названию (≥ 0,85); ответ теста из файла
+ответов-скана берётся из поля `answer`; рисунок вырезается по рамке
+(доли 0..1000) с запасом 2 %, пустая вырезка — флаг. Сверка с v1 —
+`compare_v1_v2.csv`, несопоставленные решения — `unmatched_solutions.txt`.
+
+⚠️ `core.run` пишет `AiUsageLog` при отказе поставщика даже с `log=False`
+— на время прогона `transcribe` подменяет `core._log` подсчётом без
+записи. ⚠️ Клиент openai внутри GLMProvider сам повторяет запрос до двух
+раз — таймаут вызова щедрый (240 с).
+
 ## Следующая олимпиада
 
 Переиспользуется как есть: `apply_olympiad_audit` целиком (режимы, защиты,
 журнал, откат), правило близнецов, чистка PDF, вырезка рисунков (скрипт
 сессии 3 — координаты прямоугольника задаются руками по странице).
-Дописать под олимпиаду: `OLYMPIAD_NAMES` и `OFFICIAL_SOURCE_NAME` в
-`problems/olympiad_official.py` сейчас под ВП; разбор шапки задания под
-вёрстку организатора; `olympiad_official_sources` — свой `Source`.
+Дописать под олимпиаду: запись в реестре `problems/olympiad_audit/registry.py`
+(название как у существующих строк слага, `Source`, этапы, папка аудита);
+`olympiad_official_sources --olympiad <слаг> --apply`; эталон — сразу
+оцифровкой (`olympiad_digitize`), а не нарезкой текста PDF.

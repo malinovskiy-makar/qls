@@ -236,10 +236,12 @@ import_olympiads_data             # настоящие факты раздела
 import_problem_attributes         # характер и особенности задач из файла разметки (облачка каталога)
 import_vp <yaml> [--dry-run] [--strict-chain] [--publish]  # вариант 1 тура «Высшей пробы» из data/vp/ (идемпотентно, ADR 0124)
 vp_funnel [--since D] [--until D]              # воронка ВП: посадочная -> старт -> сдача, люди по cookie (ADR 0127)
-olympiad_official_sources [--apply]            # Source «официальный архив» ВП + карточки vp-fingram, vp-ob (после --wipe олимпиад — снова)
-apply_olympiad_audit --new-refs|--update-existing|--import|--rollback F  # итоги аудита олимпиады по официальному
-                                  # эталону: сухой по умолчанию, запись --apply --yes-i-have-owner-approval, журнал
-                                  # и откат (docs/OLYMPIAD_AUDIT.md, ADR 0141)
+olympiad_official_sources --olympiad vp|mosh [--apply]  # Source «официальный архив» из реестра (+ у ВП карточки vp-fingram, vp-ob)
+apply_olympiad_audit --olympiad vp|mosh --new-refs|--update-existing|--import|--delete-refs|--rollback F  # итоги аудита
+                                  # олимпиады по официальному эталону: сухой по умолчанию, запись --apply
+                                  # --yes-i-have-owner-approval, журнал и откат (docs/OLYMPIAD_AUDIT.md, ADR 0141)
+olympiad_digitize inventory|render|transcribe|rescore|assemble --olympiad X  # эталон v2 зрячей моделью; transcribe —
+                                  # деньги: без --yes только план, --max-usd обязателен; в базу не пишет
 ai_exam_candidates [--recon] [--count N --chunks K --seed S] [--force] [--dir D]  # экзамен ИИ v0: воронка, кандидаты, страницы проверки (разметка ai_exam_review/2); файлы ВНЕ репозитория (ADR 0134)
 ai_exam_build [--mark-safe [--force]] [--dir D]  # экзамен ИИ: сейф (заранее, один раз) и сборка из reviews_in/ → BUILD.md, exam.jsonl+safe.jsonl или exam_draft.jsonl
 ai_exam_run --suite solve|leak|both --set work|draft|smoke|safe [--limit N --max-usd X --label L] [--yes]  # прогон; без --yes только план; в базу не пишет; safe — с --open-safe "ОТКРЫВАЮ СЕЙФ"
@@ -364,6 +366,7 @@ sources_tidy | titles_from_candidates | tags_merge_legacy | parts_relabel_letter
 
 ⚠️ **Аудит олимпиад:** номер SolveHub — позиция в их списке, НЕ официальный номер (123 из 573 строк ВП были неверны).
 ⚠️ **Косинус «вектор банка ↔ голый текст PDF» не работает** (1 % верных пар) — сверять текстом, вектор эталона строить по формуле банка. [docs/OLYMPIAD_AUDIT.md](docs/OLYMPIAD_AUDIT.md).
+⚠️ **Эталон олимпиады для импорта — v2 (`digitized\reference_problems_v2.jsonl`, оцифровка зрячей моделью); v1 (нарезка текста PDF) больше не использовать** — в нём рассыпанные формулы, таблицы в столбик, сканы без текста. Команды аудита требуют `--olympiad` (реестр `problems/olympiad_audit/registry.py`).
 
 **Модели живут только в `problems`.** Приложению нужна новая сущность — заводит
 её в `problems/models*.py`, а не у себя. Исключений **три**, все записаны:

@@ -309,6 +309,25 @@ class CommandTests(DigitizeBase):
             self.assertEqual(provider.calls, 1)
 
 
+class LayerArtifactTests(SimpleTestCase):
+    def test_12_footer_with_page_number_and_power(self):
+        """Колонтитул с меняющимся номером страницы — колонтитул; степень,
+        склеенная в слое с основанием («452» = 45²), — не пропуск, если
+        модель записала `45^2`; настоящий пропуск числа ловится."""
+        footer = 'Олимпиада «Высшая проба» 2019, 2 этап {}'
+        layers = [f'Текст страницы {n}\n' + footer.format(n) for n in (12, 13, 14)]
+        footers = transcribe.repeated_lines(layers)
+        layer = PARA[0] + '\nБлагосостояние SW = 452 / 2 при цене 17.\n' + footer.format(14)
+        good = [{'type': 'solution',
+                 'text': PARA[0] + '\nБлагосостояние $SW = 45^2/2$ при цене 17.'}]
+        lost = [{'type': 'solution',
+                 'text': PARA[0] + '\nБлагосостояние $SW = 45^2/2$ при цене.'}]
+        ok = transcribe.layer_metrics(transcribe.clean_blocks(good), layer, footers)
+        bad = transcribe.layer_metrics(transcribe.clean_blocks(lost), layer, footers)
+        self.assertEqual((ok[1], ok[2]), (True, []))
+        self.assertEqual(bad[2], ['17'])
+
+
 class ParseTests(SimpleTestCase):
     def test_11_tolerant_parse(self):
         """Обрамление ```, массив вместо объекта, мусор — всё без исключений."""

@@ -202,16 +202,40 @@ _PAGE_NUM = re.compile(r'^\s*(?:стр\.?|страница|page)?\s*\d{1,3}\s*(?
                        re.IGNORECASE)
 
 
+_DIGITS = re.compile(r'\d+')
+
+
+def footer_key(line):
+    """Строка колонтитула без цифр: «…«Высшая проба» 2019, 2 этап 14» и
+    «… 15» — один колонтитул с разным номером страницы."""
+    return _DIGITS.sub('#', ' '.join(line.split()))
+
+
+#: Колонтитул ищется только у края страницы: первые и последние строки.
+EDGE_LINES = 3
+
+
+def _edge(lines):
+    lines = [line for line in lines if line.strip()]
+    return lines[:EDGE_LINES] + lines[-EDGE_LINES:]
+
+
 def repeated_lines(page_layers):
-    """Колонтитулы файла: строки, стоящие на половине страниц и больше
-    (файл от 3 страниц). Модель их не переписывает, а в слое они есть."""
+    """Колонтитулы файла (ключи `footer_key`): строки У КРАЯ страницы,
+    стоящие на половине страниц и больше (файл от 3 страниц), с буквенной
+    частью от 5 знаков. ⚠️ Только у края: без цифр одинаковы и шапки
+    заданий «Задача # (# баллов)» в середине страниц — их срезать нельзя."""
     if len(page_layers) < 3:
         return set()
-    counts = Counter()
+    edge, exact = Counter(), Counter()
     for layer in page_layers:
-        counts.update({' '.join(line.split()) for line in (layer or '').splitlines()
-                       if line.strip()})
-    return {line for line, n in counts.items() if n >= len(page_layers) / 2}
+        lines = (layer or '').splitlines()
+        edge.update({footer_key(line) for line in _edge(lines)
+                     if len(re.sub(r'[^A-Za-zА-Яа-яЁё]', '', line)) >= 5})
+        exact.update({'=' + ' '.join(line.split()) for line in lines if line.strip()})
+    half = len(page_layers) / 2
+    return ({key for key, n in edge.items() if n >= half}
+            | {key for key, n in exact.items() if n >= half})
 
 
 _HYPHEN_BREAK = re.compile(r'(\w)[-‐]\s*\n\s*(\w)')
@@ -221,10 +245,14 @@ def layer_body(layer, footers=()):
     """Текстовый слой страницы без колонтитулов, номеров страниц и
     переносов слов по ширине строки («много-\\nлет» → «многолет» — так же,
     как слово стоит в расшифровке)."""
+    raw = [' '.join(line.split()) for line in
+           _HYPHEN_BREAK.sub(r'\1\2', layer or '').splitlines()]
+    raw = [line for line in raw if line]
+    edge = set(range(EDGE_LINES)) | set(range(len(raw) - EDGE_LINES, len(raw)))
     lines = []
-    for line in _HYPHEN_BREAK.sub(r'\1\2', layer or '').splitlines():
-        norm = ' '.join(line.split())
-        if not norm or norm in footers or _PAGE_NUM.match(norm):
+    for i, norm in enumerate(raw):
+        if (_PAGE_NUM.match(norm) or '=' + norm in footers
+                or (i in edge and footer_key(norm) in footers)):
             continue
         lines.append(norm)
     return '\n'.join(lines)
@@ -253,6 +281,7 @@ def transcript_text(blocks, header=False):
 _DECIMAL = re.compile(r'(\d)[.,](\d)')
 _WORD = re.compile(r'[а-яёa-z]{3,}')
 _LONE_NUMBER = re.compile(r'^[\s\d.,%−–-]+$')
+_POWER = re.compile(r'(\d+(?:[.,]\d+)?)\)?\s*\^\s*\{?(\d)')
 
 
 def _numbers(text):
@@ -303,8 +332,17 @@ def layer_metrics(blocks, layer, footers=()):
         lone = set().union(*[_numbers(line) for line in body.splitlines()
                              if _LONE_NUMBER.match(line)] or [set()])
         want -= lone - got
+    # Степень в слое PDF склеена с основанием: 45² → «452», 3,2² → «3.22».
+    # Если модель записала `45^2`, склейка — найдена, а показатель — не
+    # лишнее число.
+    glued = {}
+    for base, exp in _POWER.findall(text):
+        for form in _numbers(base + exp):
+            glued[form] = _numbers(base) | {exp}
+    got |= {form for form in glued if form in want}
+    parts = set().union(*[p for form, p in glued.items() if form in want] or [set()])
     missing = sorted(want - got - _numbers(head))
-    extra = sorted(got - want)
+    extra = sorted(got - want - parts)
     if ratio is None:
         return None, None, missing, extra, fuzz_ratio
     return round(ratio, 4), not missing and not extra, missing, extra, fuzz_ratio
