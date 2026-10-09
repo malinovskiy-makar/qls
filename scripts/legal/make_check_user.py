@@ -39,7 +39,10 @@ for name in ('check_old', 'check_ai'):
 ai_user = User.objects.get(username='check_ai')
 consent.grant(ai_user, ConsentRecord.Kind.PD, ConsentRecord.Source.REGISTER)
 consent.grant(ai_user, ConsentRecord.Kind.AI, ConsentRecord.Source.CHAT)
-problem = Problem.objects.filter(status='published').order_by('pk').first()
+# Задача, видимая в каталоге (те же признаки, что у `catalog.views._visible_problem`).
+problem = Problem.objects.filter(
+    status=Problem.Status.PUBLISHED, needs_quality_review=False, hidden_pending_review=False,
+    content_status=Problem.ContentStatus.OK).exclude(statement='').order_by('pk').first()
 ChatTurn.objects.filter(user=ai_user).delete()
 ChatTurn.objects.create(user=ai_user, problem=problem, user_text='Проверка: эта реплика исчезнет после отзыва согласия')
-print('check_ai: согласия pd и ai даны; реплика чата на задаче №%d' % problem.pk)
+print('check_ai: согласия pd и ai даны; реплика чата на задаче №%d: /catalog/problem/%d/' % (problem.pk, problem.pk))
