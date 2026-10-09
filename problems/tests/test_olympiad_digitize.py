@@ -284,6 +284,25 @@ class AssembleTests(DigitizeBase):
         self.assertEqual(task.solution, ['Решение пункта 1.1'])
         self.assertEqual((len(task.figures), len(task.solution_figures)), (1, 1))
 
+    def test_9d_mixed_file_once_and_solution_only_task(self):
+        """Смешанный файл (и условия, и решения) читается один раз —
+        решение не задваивается; блок «решение» с номером без задания
+        заводит задание с пустым условием (на глаза)."""
+        self.write_page('pages/t', 1, [
+            {'type': 'task', 'number': '1', 'text': 'Условие 1.'},
+            {'type': 'solution', 'number': '1', 'text': 'Решение 1.'},
+            {'type': 'solution', 'number': '2', 'title': 'Репетиторы', 'text': 'Всё вместе.'}])
+        self.write_page('pages/t', 2, [])
+        event = self.event()
+        event['solution_files'] = event['task_files']
+        tasks, _report, _ = assemble.build_event(self.root, event, 'figs', crop=False)
+        by_no = {t.number: t for t in tasks}
+        self.assertEqual(by_no['1'].solution, ['Решение 1.'])
+        self.assertEqual((by_no['2'].statement, by_no['2'].solution, by_no['2'].title),
+                         ([], ['Всё вместе.'], 'Репетиторы'))
+        record = assemble.task_record(by_no['2'], event, 'm')
+        self.assertTrue(record['needs_eyes'])
+
     def test_9b_test_answer_from_answers_file(self):
         """Файл ответов повторяет вопрос теста (блок task) с отмеченным
         ответом: ответ ложится на задание с тем же номером И вариантом."""

@@ -166,11 +166,26 @@ def build_event(root, event, figures_dir, crop=True):
                                    block.get('caption') or ''))
             target.own_figures = True
         elif kind in ('solution', 'criteria'):
+            if (kind == 'solution' and _real_number(number) and _find_task(
+                    tasks, number, block.get('title') or '',
+                    block.get('task_variant') or '') is None):
+                # Задание целиком (условие + решение) модель положила одним
+                # блоком «решение» (ВП 2012, 10 кл., №4): заводим задание с
+                # пустым условием — оно уйдёт «на глаза», а не потеряется.
+                current = task_for(number, block.get('task_variant') or '')
+                current.title = (block.get('title') or '').strip()
+                current.quality.append(record)
+                report['задание только блоком решения'] += 1
             _attach_answer(tasks, current, block, kind, entry, page, report)
 
     # 2. Решения и 3. критерии из своих файлов.
-    for role, files in (('solution', event.get('solution_files') or []),
-                        ('criteria', event.get('criteria_files') or [])):
+    # Смешанный файл стоит и в task_files, и в solution_files: его решения
+    # уже легли при проходе условий — второй раз их не берём.
+    seen_dirs = {entry['page_dir'] for entry in event.get('task_files') or []}
+    for role, files in (('solution', [f for f in event.get('solution_files') or []
+                                      if f['page_dir'] not in seen_dirs]),
+                        ('criteria', [f for f in event.get('criteria_files') or []
+                                      if f['page_dir'] not in seen_dirs])):
         last = None
         in_statement = False      # сразу после повторённого условия
         for entry, page, record, block in collect(root, files, role):
@@ -286,7 +301,7 @@ def _attach_answer(tasks, last, block, kind, entry, page, report):
     number = _block_number(block)
     target = _find_task(tasks, number, block.get('title') or '', block.get('task_variant') or '')
     how = 'по номеру' if target is not None and number else 'по названию'
-    if target is None and not number and last is not None:
+    if target is None and not _real_number(number) and last is not None:
         target, how = last, 'продолжение'
     if target is None:
         report[f'{kind}: не сопоставлено'] += 1
