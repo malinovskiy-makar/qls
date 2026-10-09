@@ -81,6 +81,18 @@
       "port": 8099
     },
     {
+      "name": "calc2-check",
+      "runtimeExecutable": "/Users/makarmalinovskiy/Downloads/qls_platform/venv313/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8099",
+        "--noreload",
+        "--settings=config.settings_check"
+      ],
+      "port": 8099
+    },
+    {
       "name": "dev-windows",
       "runtimeExecutable": "venv313/Scripts/python.exe",
       "runtimeArgs": [
