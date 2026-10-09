@@ -503,12 +503,13 @@ class Command(BaseCommand):
         self._say(f'Пакет просмотра: {result["packs"]}; {result["index"]}; {result["csv"]}')
 
     def _control_pack(self, options):
-        candidates, context = [], {}
+        candidates, context, seen = [], {}, set()
         for slug in sorted(registry.REGISTRY):
             digitized = self.root / registry.get(slug).audit_dir / 'digitized'
             plan_path = digitized / 'triage_plan.csv'
-            if not plan_path.is_file():
-                continue
+            if digitized in seen or not plan_path.is_file():
+                continue          # vp-ob, vp-fingram — та же папка аудита, что и vp
+            seen.add(digitized)
             plan_rows = triage.read_plan(plan_path)
             plan = {r['страница']: r for r in plan_rows}
             records = {triage.page_key(r): r for r in triage.iter_page_records(str(digitized))}
