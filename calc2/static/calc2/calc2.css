@@ -1744,6 +1744,8 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
 .ac-range { display: block; margin-top: 6px; font-size: 12px; color: var(--text2);
   font-variant-numeric: tabular-nums; line-height: 1.5; }
 .ac-range:empty { display: none; }
+/* Числа отрезка — вплотную к скобкам и «;»: запасная ширина .edval давала «[0 ;100]». */
+.ac-range .edval { min-width: 0; }
 /* Кнопка расчёта не горит, пока считать нечего. */
 #ac-calc:disabled { opacity: .45; cursor: not-allowed; }
 
@@ -2028,7 +2030,7 @@ input[type="range"] { width: 100%; accent-color: var(--accent); margin-top: 2px;
   .dock, .side, .graph-tools, .wrench, .picker, .modal, .toast,
   #pult, .cv-mode, .side-arrow, .kbd, .mkbd,
   /* Редизайн 10.2026: шапка модели, панель холста и колонки на лист не идут. */
-  .mhead, .cv-bar, .col-cond, .col-answer { display: none !important; }
+  .mhead, .cv-bar, .cv-back, .col-cond, .col-answer { display: none !important; }
   .cv-col, .cv-card { display: block !important; padding: 0 !important; border: none !important; background: #fff !important; height: auto !important; }
   .app { display: block !important; height: auto !important; }
   .stage, .graph-wrap {
@@ -2463,6 +2465,17 @@ body.cv-focus .col-cond, body.cv-focus .col-answer { display: none; }
 .cv-card > .graph-wrap { flex: 1 1 auto; min-width: 0; min-height: 0; border-radius: 0; }
 /* «Вид графика» — окно у своей кнопки, над холстом (вне #graph-wrap). */
 .cv-card > .wrench { top: 48px; right: 8px; }
+/* «← Вернуться к задаче» (вход из задачи, ADR 0145): тонкая строка над панелью
+   холста, вне #graph-wrap. Пока она открыта, окно «Вид графика» ниже на её высоту. */
+.cv-back {
+  flex: 0 0 30px; height: 30px; display: flex; align-items: center; padding: 0 12px;
+  font-size: 13px; font-weight: 500; color: var(--accent-ink); text-decoration: none;
+  background: var(--surface); border-bottom: 1px solid var(--border-soft);
+}
+.cv-back[hidden] { display: none; }
+.cv-back:hover { text-decoration: underline; }
+.cv-back:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.cv-card:has(> .cv-back:not([hidden])) > .wrench { top: 78px; }
 .col-head h2 { flex: 1 1 auto; text-align: left; }
 /* «Параметры» без единого ползунка не показываются: нечего показать — секции нет. */
 #sec-params:not(:has(#params-body input, #params-body button)) { display: none; }
@@ -3241,6 +3254,9 @@ body.self-on:not(.self-all) #ans-status .ans-status.has-num { display: none; }
   .mh-switch { flex: 1 1 auto; min-width: 0; }
   .mh-name .side-scene { overflow: hidden; text-overflow: ellipsis; max-width: 52vw; display: inline-block; }
   .cv-col { order: 1; flex: 0 0 auto; height: 354px; padding: 8px 8px 0; }   /* SVG 372×300 (README макета, 3) */
+  /* Строка «← Вернуться к задаче» — цель касания 44; колонка выше на столько же, SVG прежний. */
+  .cv-back { flex-basis: 44px; height: 44px; }
+  .cv-col:has(.cv-back:not([hidden])) { height: 398px; }
   .cv-bar { overflow-x: auto; }
   .cv-tool > span, .cv-zoom, .cv-bar > #btn-zoomin, .cv-bar > #btn-zoomout, #btn-focus { display: none; }
   .ph-tabs { order: 2; display: flex; gap: 4px; padding: 8px 8px 0; background: var(--bg); position: sticky; top: 0; z-index: var(--z-float); }

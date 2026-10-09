@@ -34,6 +34,7 @@ let _histLabel = null;        // орган последнего действи�
 let _histTimer = null;
 let _histMute = 0;            // > 0 — изменения не пишутся (применение снимка)
 let _fromLink = false;        // модель открыта ссылкой: в хранилище не пишем до первой правки
+let _fromProblem = null;      // вошли из задачи (?from=, ADR 0145): { id, key } — строка «← Вернуться к задаче»
 /* Было ли действие человека (ввод, нажатие, pushUndo) с последней сверки.
    Сцены досчитывают себя и после входа (сложение КПВ заводит свои данные
    на следующем кадре): такое изменение — не правка, его история впитывает
@@ -125,6 +126,7 @@ function historyCheck() {
   h.last = s; h.lastSig = sig; h.at = now; h.label = _histLabel;
   _fromLink = false;
   dropShareHash();
+  dropFromParam();
   autosaveModel(s);
   notifyHistory();
 }
@@ -262,6 +264,8 @@ function recentModels() {
 /* ── Адрес: ?m= модели и #s= ссылки ───────────────────────────────────
    Прочие параметры адреса сохраняются (О22: посторонний параметр не стирается). */
 function writeModelToUrl(key) {
+  // Сменили модель — строка «← Вернуться к задаче» уходит вместе с `from`.
+  if (_fromProblem && key !== _fromProblem.key) { hideBackToProblem(); dropFromParam(); }
   try {
     const u = new URL(location.href);
     if (u.searchParams.get('m') === key) return;
@@ -274,6 +278,49 @@ function dropShareHash() {
     if (!/^#s=/.test(location.hash)) return;
     history.replaceState(history.state, '', location.pathname + location.search);
   } catch (e) { /* ничего */ }
+}
+
+/* ── Вход из задачи: ?m=<модель>&from=<id задачи> (ADR 0145) ───────────
+   Живёт как открытая ссылка «Поделиться»: модель в СТАРТОВОМ виде,
+   автосохранение этой модели не поднимается и не затирается, пока человек
+   не начнёт править (_fromLink). С первой правки это его состояние модели,
+   а `from` уходит из адреса, чтобы перезагрузка не вернула старт. Над
+   холстом строка «← Вернуться к задаче»; номер задачи нигде не пишем
+   (правило каталога: номер только в адресе). `from` — только целое число
+   из 1–9 цифр, иначе строки нет и модель открывается как по обычному ?m=. */
+const FROM_PROBLEM_RE = /^[0-9]{1,9}$/;
+function fromProblemOf(params) {
+  const f = params && params.get('from');
+  return f && FROM_PROBLEM_RE.test(f) ? f : null;
+}
+function dropFromParam() {
+  try {
+    const u = new URL(location.href);
+    if (!u.searchParams.has('from')) return;
+    u.searchParams.delete('from');
+    const q = u.searchParams.toString();
+    history.replaceState(history.state, '', u.pathname + (q ? '?' + q : '') + u.hash);
+  } catch (e) { /* адрес не обязателен */ }
+}
+function showBackToProblem(id) {
+  const a = document.getElementById('cv-back');
+  if (!a) return;
+  // Шаблон отдаёт адрес задачи с нулём на месте номера (data-href), номер — отсюда.
+  a.href = (a.getAttribute('data-href') || '/catalog/problem/0/').replace(/0\/$/, id + '/');
+  a.hidden = false;
+}
+function hideBackToProblem() {
+  _fromProblem = null;
+  const a = document.getElementById('cv-back');
+  if (a) a.hidden = true;
+}
+function openFromProblem(key, id) {
+  // Строка — ДО первого рисунка: холст сразу ложится на свою высоту и не прыгает.
+  showBackToProblem(id);
+  _fromProblem = { id, key: modelKeyOf(key) };
+  _fromLink = true;
+  pickScene(key);          // старт модели; автосохранение не поднимаем
+  historyBaseline();
 }
 
 /* Ссылка: JSON состояния, сжатый deflate-raw (если браузер умеет), в base64url.
@@ -336,7 +383,8 @@ function openModelByUser(key) {
 /* ── Загрузка страницы ────────────────────────────────────────────────
    #s= — открыть состояние из ссылки (в хранилище ничего не пишется, пока
    человек не начнёт править; адрес с #s= уходит после первой правки);
-   ?m= — открыть модель с её автосохранением (перезагрузка возвращает модель).
+   ?m= — открыть модель с её автосохранением (перезагрузка возвращает модель);
+   ?m=&from= — вход из задачи: старт модели, как ссылка (openFromProblem).
    Ничего из этого нет — окно выбора, как раньше. Возвращает true, если
    модель открыта (асинхронная ссылка — тоже true: модель откроется сама). */
 function restoreOnLoad() {
@@ -344,6 +392,8 @@ function restoreOnLoad() {
   const mKey = params && params.get('m');
   const want = mKey && SCENE_ROUTE[mKey] ? mKey : null;
   if (/^#s=/.test(location.hash || '')) {
+    // Ссылка «Поделиться» сильнее входа из задачи: `from` при ней не в счёт.
+    dropFromParam();
     const fallback = want || 'sd';
     decodeShare(location.hash).then(s => {
       _fromLink = true;
@@ -357,6 +407,8 @@ function restoreOnLoad() {
     });
     return true;
   }
+  const fromId = want && fromProblemOf(params);
+  if (fromId) { openFromProblem(want, fromId); return true; }
   if (want) { openModelByUser(want); return true; }
   return false;
 }

@@ -2228,12 +2228,15 @@ function syncAreaRangeLabel() {
     tex: (v, text) => text,
     title: key === 'acFrom' ? 'Начало отрезка' : 'Конец отрезка',
   });
+  /* «на отрезке [0; 100]»: пробел перед скобкой и после «;», а у самих
+     чисел здесь нет запасной ширины .edval (1,6em) — она ставила зазор между
+     «0» и «;» (карточка «на отрезке[0 ;100]», 10.10.2026). */
   const word = document.createElement('span');
   word.className = 'ac-range-word'; word.textContent = 'на отрезке';
   const open = document.createElement('span'); open.textContent = '[';
-  const semi = document.createElement('span'); semi.textContent = ';';
+  const semi = document.createElement('span'); semi.textContent = '; ';
   const close = document.createElement('span'); close.textContent = ']';
-  el.append(word, open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
+  el.append(word, ' ', open, bound('acFrom', () => r.a), semi, bound('acTo', () => r.b), close);
 }
 
 /* п. 29. ИМЯ ВЕРШИНЫ УСТАРЕВАЕТ ВМЕСТЕ С КАРТИНКОЙ.
