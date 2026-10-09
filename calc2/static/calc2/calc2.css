@@ -3478,16 +3478,16 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .ans-cell, #params-panel .sb-body .stat, #params-panel .sb-body .stat.stat-eq, #params-panel .sb-body .stat.stat-stack {
   display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-start; column-gap: 12px; row-gap: 2px;
   min-width: 0; min-height: 44px; padding: 10px 0; box-sizing: border-box; border-bottom: 1px solid var(--border-soft);
-  line-height: 1.45;
+  line-height: 1.55;   /* текст с формулой — не теснее 1,55 (канон, math_line_height) */
 }
 .ans-lab, #params-panel .sb-body .stat > span, #params-panel .sb-body .stat.stat-eq > span {
-  flex: 1 1 11em; min-width: 0; font-size: 13.5px; font-weight: 400; line-height: 1.45; color: var(--text2);
+  flex: 1 1 11em; min-width: 0; font-size: 13.5px; font-weight: 400; line-height: 1.55; color: var(--text2);
   text-align: left; overflow-wrap: break-word; hyphens: none;
 }
 .ans-lab .katex, #params-panel .sb-body .stat > span .katex { font-size: 1.1em; }
 .ans-line, #params-panel .sb-body .stat > b, #params-panel .sb-body .stat.stat-eq > b {
   flex: 0 1 auto; min-width: 0; max-width: 100%; margin-left: auto; text-align: right; white-space: nowrap;
-  font-family: 'KaTeX_Main', var(--font-ui); font-size: 16px; font-weight: 400; line-height: 1.4; color: var(--text);
+  font-family: 'KaTeX_Main', var(--font-ui); font-size: 16px; font-weight: 400; line-height: 1.55; color: var(--text);
   font-variant-numeric: tabular-nums; letter-spacing: 0;
 }
 .ans-line { display: flex; align-items: baseline; justify-content: flex-end; gap: .3em; }
@@ -3498,7 +3498,7 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .ans-item { display: inline-block; white-space: nowrap; }
 .ans-sep { margin-right: .3em; }
 .ans-val--none { color: var(--text3); }
-.ans-was { flex: 1 0 100%; text-align: right; font-size: 13px; line-height: 1.45; color: var(--text3); font-variant-numeric: tabular-nums; }
+.ans-was { flex: 1 0 100%; text-align: right; font-size: 13px; line-height: 1.55; color: var(--text3); font-variant-numeric: tabular-nums; }
 #params-panel .sb-body .stat .stat-line { display: block; }
 #params-panel .tx-table td:not(:first-child) { font-family: 'KaTeX_Main', var(--font-ui); }
 .ans-drained { display: none !important; }
