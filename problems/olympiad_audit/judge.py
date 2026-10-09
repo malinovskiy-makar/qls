@@ -77,8 +77,11 @@ class BadVerdict(ValueError):
 
 # ── Что видит судья ──────────────────────────────────────────────────────
 
-def judge_transcript(blocks):
-    """Блоки расшифровки → читаемый текст для судьи (не сырой JSON)."""
+def judge_transcript(blocks, with_answer=True):
+    """Блоки расшифровки → читаемый текст (не сырой JSON). Судье поле `answer`
+    НЕ показывается (`with_answer=False`): оно дублирует текст блока или
+    отметку «(отмечено)», а строки «Ответ: …» на картинке нет — судья
+    принимал дубль за лишнее (стоп-гейт 1, 10 из 15 срабатываний контроля)."""
     parts = []
     for block in blocks:
         kind = block.get('type')
@@ -100,7 +103,7 @@ def judge_transcript(blocks):
                 lines.append(f'{key}: {block[key]}')
         if block.get('text'):
             lines.append(block['text'])
-        if block.get('answer'):
+        if with_answer and block.get('answer'):
             lines.append(f'Ответ: {block["answer"]}')
         if block.get('caption'):
             lines.append(f'Подпись рисунка: {block["caption"]}')
@@ -109,7 +112,7 @@ def judge_transcript(blocks):
 
 
 def judge_user_text(key, blocks, expected_numbers):
-    text = f'Страница {key}. Расшифровка:\n\n{judge_transcript(blocks)}'
+    text = f'Страница {key}. Расшифровка:\n\n{judge_transcript(blocks, with_answer=False)}'
     if expected_numbers:
         text += ('\n\nЧисла для проверки (по текстовому слою PDF их не хватает в '
                  'расшифровке): ' + ', '.join(str(n) for n in expected_numbers))
@@ -247,11 +250,14 @@ class JudgeRunner(JudgeBase):
         expected = list(record.get('numbers_missing') or []) if job.has_layer else []
         verdict, error, cost = self.judge_blocks(job, record.get('blocks') or [],
                                                  expected, 'judge2')
+        previous = triage.read_json(self.v3(job)) or {}
         patch = {'file': job.file, 'page_dir': job.page_dir, 'page': job.page,
                  'phase': 'judge', 'tier': row.get('ярус', ''),
                  'control': row.get('контроль') == 'да', 'judge': verdict,
                  'error': error, 'cost_usd': round(cost, 6), 'at': _now()}
         patch['status'] = decide_status(verdict) if verdict else 'judge_error'
+        if previous.get('judge'):          # пересуд: прежнее заключение — рядом
+            patch['judge_prev'] = previous['judge']
         triage.write_json_atomic(self.v3(job), patch)
         return patch['status']
 
@@ -308,6 +314,16 @@ def judge_todo(keys, digitized):
     """Страницы, у которых судья ещё не отработал (`judge_error` — повторить)."""
     return [key for key in keys if (triage.read_json(_patch_path(digitized, key)) or {})
             .get('status') not in JUDGE_DONE]
+
+
+def answer_artifact_pages(patches):
+    """Страницы, где судья, видевший поле `answer`, сделал замечание про
+    строку «Ответ» (подозрение на артефакт подачи): их надо пересудить
+    без поля `answer`. Уже пересуженные (`judge_prev`) — мимо."""
+    return sorted(key for key, patch in patches.items()
+                  if patch.get('phase') == 'judge' and 'judge_prev' not in patch
+                  and any('ответ' in str(i.get('detail', '')).lower()
+                          for i in (patch.get('judge') or {}).get('issues') or []))
 
 
 def select_for_reread(keys, digitized):

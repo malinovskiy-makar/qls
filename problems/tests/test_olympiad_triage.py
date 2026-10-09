@@ -142,6 +142,21 @@ class VerdictTests(SimpleTestCase):
         self.assertIn('6 баллов', text)
         self.assertNotIn('Колонтитул', text)
 
+    def test_7a_judge_does_not_see_answer_field(self):
+        """Поле answer дублирует текст; судья его не видит (строки «Ответ:» на
+        картинке нет), а человеку в пакете оно показывается."""
+        blocks = [{'type': 'task', 'number': '1', 'text': 'Выберите (отмечено) вариант 2',
+                   'answer': 'ОТВЕТ-ДУБЛЬ'}]
+        self.assertNotIn('ОТВЕТ-ДУБЛЬ', judge.judge_user_text('pages/a/p1', blocks, []))
+        self.assertIn('ОТВЕТ-ДУБЛЬ', judge.judge_transcript(blocks))
+        patches = {
+            'p1': {'phase': 'judge', 'judge': {'issues': [{'detail': 'Строка «Ответ: 2» лишняя'}]}},
+            'p2': {'phase': 'judge', 'judge': {'issues': [{'detail': 'нет таблицы'}]}},
+            'p3': {'phase': 'judge', 'judge_prev': {}, 'judge': {
+                'issues': [{'detail': 'Ответ'}]}},
+            'p4': {'phase': 'reread', 'judge': {'issues': [{'detail': 'Ответ'}]}}}
+        self.assertEqual(judge.answer_artifact_pages(patches), ['p1'])
+
 
 class HintProvider(StubProvider):
     """Заглушка, запоминающая тексты запросов."""

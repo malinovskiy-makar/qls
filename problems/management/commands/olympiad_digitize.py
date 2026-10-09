@@ -133,6 +133,10 @@ class Command(BaseCommand):
                                 help='Докачка (готовые страницы и так пропускаются).')
             runner.add_argument('--yes', action='store_true',
                                 help='Действительно вызывать модель (без флага — только план).')
+            if name == 'judge':
+                runner.add_argument('--redo-answer-artifact', action='store_true',
+                                    help='Пересудить страницы с замечанием про «Ответ» '
+                                         '(судья теперь не видит поле answer).')
         common(sub.add_parser('report', help='Сводка судьи для стоп-гейта.'))
         common(sub.add_parser('review-pack', help='Остаток → пакет для просмотра глазами.'))
 
@@ -453,7 +457,10 @@ class Command(BaseCommand):
 
     def _judge(self, options):
         setup = self._runner_setup(options)
-        keys = judge.judge_todo(triage.pages_to_judge(setup[0]), str(self.digitized))
+        if options.get('redo_answer_artifact'):
+            keys = judge.answer_artifact_pages(judge.v3_statuses(str(self.digitized)))
+        else:
+            keys = judge.judge_todo(triage.pages_to_judge(setup[0]), str(self.digitized))
         self._run_phase(options, judge.JudgeRunner, keys, setup, estimate=0.0016,
                         per_page=0.0012, label='judge')
 
