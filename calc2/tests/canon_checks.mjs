@@ -500,7 +500,16 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
 
        Порог 2 px за шаг: подпись имеет право ЕХАТЬ вслед за кривой, но не
        имеет права прыгать туда-сюда. До правки замер давал до 16 px при
-       неподвижной плоскости. */
+       неподвижной плоскости.
+
+       ⚠️ МЕРИТСЯ ПОДПИСЬ ОТНОСИТЕЛЬНО КРИВОЙ, А НЕ ЭКРАНА (10.10.2026). Окно
+       «Построения графиков» от параметра не растёт (ADR 0143), и кривая
+       a·x² − 3x сама уходит вверх на 5–11 px за шаг. Подпись стоит на ней в
+       той же точке x и едет следом — ровно то, что правило разрешает, — а
+       прежняя мерка (сдвиг по экрану) звала это «скачком 11,1 px». Теперь
+       скачок — это перемена отрыва подписи от кривой под её якорем (y кривой
+       на x якоря, по самому пути) или сдвиг якоря вбок: так ловится и прыжок
+       на соседний узел перебора проб, ради которого проверка заведена. */
     await openScene(page, 'm-graph', 'light');
     await page.evaluate(() => {
       const box = document.getElementById('graph-rows');
@@ -509,7 +518,7 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
       if (inp) { inp.value = 'a*x^2 - 3*x'; inp.dispatchEvent(new Event('input', { bubbles: true })); }
     });
     await page.waitForTimeout(900);
-    let prevY = null, prevTick = null, worst = 0, tickMoved = 0;
+    let prev = null, prevTick = null, worst = 0, tickMoved = 0, measured = false;
     for (let i = 0; i <= 20; i++) {
       await page.evaluate((v) => {
         if (STATE.params && STATE.params.a) STATE.params.a.value = v;
@@ -518,23 +527,50 @@ const KEYS = ['dark_white_on_accent', 'contrast_text', 'appearance_auto', 'one_m
       await page.waitForTimeout(200);
       const st = await page.evaluate(() => {
         const lab = document.querySelector('#chart text.curve-name');
-        const box = document.querySelector('#chart').getBoundingClientRect();
         const tick = Array.from(document.querySelectorAll('#chart text.axis-num'))
           .filter(t => t.textContent.trim() === '2')[0];
-        return { y: lab ? lab.getBoundingClientRect().top - box.top : null,
-                 tick: tick ? tick.getBoundingClientRect().left - box.left : null };
+        const box = document.querySelector('#chart').getBoundingClientRect();
+        const tickX = tick ? tick.getBoundingClientRect().left - box.left : null;
+        if (!lab) return { x: null, off: null, tick: tickX };
+        // Якорь подписи (x − 4, y − 7 от точки на кривой, 70-scenes-math.js).
+        const ax = +lab.getAttribute('x') + 4, ay = +lab.getAttribute('y') + 7;
+        // y кривой на x якоря: отрезок пути, где x пересекает ax, и бисекция по длине.
+        let curveY = null;
+        document.querySelectorAll('#chart path').forEach(pth => {
+          if ((+pth.getAttribute('stroke-width') || 0) < 2 || pth.getAttribute('fill') !== 'none') return;
+          const L = pth.getTotalLength(); if (!L) return;
+          const N = 400; let q0 = pth.getPointAtLength(0);
+          for (let k = 1; k <= N; k++) {
+            const q1 = pth.getPointAtLength(L * k / N);
+            if ((q0.x - ax) * (q1.x - ax) <= 0 && q0.x !== q1.x) {
+              let lo = L * (k - 1) / N, hi = L * k / N;
+              const sgn = Math.sign(q1.x - q0.x);
+              for (let t = 0; t < 40; t++) {
+                const mid = (lo + hi) / 2;
+                if ((pth.getPointAtLength(mid).x - ax) * sgn < 0) lo = mid; else hi = mid;
+              }
+              const y = pth.getPointAtLength((lo + hi) / 2).y;
+              if (curveY == null || Math.abs(y - ay) < Math.abs(curveY - ay)) curveY = y;
+            }
+            q0 = q1;
+          }
+        });
+        return { x: ax, off: curveY == null ? null : ay - curveY, tick: tickX };
       });
-      if (st.y == null) continue;
-      if (prevY != null) worst = Math.max(worst, Math.abs(st.y - prevY));
+      if (st.x == null || st.off == null) continue;
+      measured = true;
+      if (prev) worst = Math.max(worst, Math.abs(st.x - prev.x), Math.abs(st.off - prev.off));
       if (prevTick != null && st.tick != null) tickMoved = Math.max(tickMoved, Math.abs(st.tick - prevTick));
-      prevY = st.y; if (prevTick == null) prevTick = st.tick;
+      prev = st; if (prevTick == null) prevTick = st.tick;
     }
+    const prevY = measured ? 0 : null;
     /* Замер обязан состояться: подпись не нашлась (разметка сменилась) —
        это нарушение, а не тихий ноль (COVERAGE.md, раздел 5). */
     if (prevY == null) put('label_shake', 'm-graph', 'замер не состоялся: подпись кривой не найдена');
     if (worst > 2) put('label_shake', 'm-graph',
-                       'скачок ' + worst.toFixed(1) + ' px за шаг при сдвиге плоскости ' +
+                       'скачок ' + worst.toFixed(1) + ' px за шаг относительно кривой при сдвиге плоскости ' +
                        tickMoved.toFixed(1) + ' px');
+    console.log('label_shake: наибольший скачок подписи относительно кривой ' + worst.toFixed(2) + ' px за шаг');
 
     /* 9. Страница не едет вбок ни на одной из четырёх ширин (канон 1.9.1). */
     await openScene(page, SCENES[0], 'light');
