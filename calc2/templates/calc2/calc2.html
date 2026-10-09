@@ -1807,9 +1807,11 @@
           <p>Счёт численный (трапеции и формула площади многоугольника), поэтому годится любая кривая.</p>
         </div>
 
-        <div class="seg" id="ac-mode">
-          <button class="seg-btn active" id="ac-curve">Под кривой</button>
-          <button class="seg-btn" id="ac-poly">Между точками</button>
+        <!-- Сегмент «Под кривой | Между точками» (ADR 0144): две половины, как
+             переключатель формата в окне «Скачать», а не тумблер. -->
+        <div class="seg ac-mode" id="ac-mode" role="radiogroup" aria-label="Как считаем площадь">
+          <button class="seg-btn active" id="ac-curve" type="button" role="radio" aria-checked="true">Под кривой</button>
+          <button class="seg-btn" id="ac-poly" type="button" role="radio" aria-checked="false">Между точками</button>
         </div>
 
         <!-- П41: выбор кривой узкий, справа от него — отрезок в скобках.
@@ -1820,8 +1822,12 @@
              переносилось по одному знаку в полосу шириной в два десятка
              пикселей, а хвост обрезался краем панели. -->
         <div id="ac-pane-curve">
+          <!-- Выбор кривой — кнопками с цветной точкой (ADR 0144). Скрытый
+               select остаётся источником правды: его значение читают сцены,
+               форма модели и приборы; кнопки пишут в него и шлют change. -->
           <div class="ac-pick-row">
-            <select id="ac-pick"></select>
+            <div class="ac-cbtns" id="ac-pick-btns" role="radiogroup" aria-label="Кривая, под которой считается площадь"></div>
+            <select id="ac-pick" hidden aria-hidden="true" tabindex="-1"></select>
           </div>
           <div class="ac-range" id="ac-range"></div>
         </div>

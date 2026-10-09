@@ -118,7 +118,12 @@ function applyForm(f) {
     if (r.aria) Object.entries(r.aria).forEach(([a, v]) => { if (el.getAttribute(a) !== v) el.setAttribute(a, v); });
   });
   const tg = [...document.querySelectorAll('.app .tgl-sw')];
-  (f['@toggles'] || []).forEach((x, i) => {
+  /* Тумблеры применяются по номеру. Сохранение или ссылка, сделанные при
+     другом их числе (10.2026: «Под кривой | Между точками» стал сегментом,
+     ADR 0144), сдвинули бы все номера — такой список не применяем: тумблер и
+     так повторяет свои кнопки (segToToggle следит за их классом). */
+  const tgSaved = f['@toggles'] || [];
+  (tgSaved.length === tg.length ? tgSaved : []).forEach((x, i) => {
     const el = tg[i]; if (!el) return;
     if (el.className !== x[0]) el.className = x[0];
     if (x[1] != null && el.getAttribute('aria-checked') !== x[1]) el.setAttribute('aria-checked', x[1]);

@@ -13,7 +13,12 @@
         группа «Пересечения кривых» с одной строкой «f и g» → (−2; 0); (3; 5);
         строка об отрезке ответа под шапкой с живыми числами;
      Т  телефон 390: горизонтальной прокрутки нет ни в одной модели (вкладка
-        «Ответ»); полоса главных чисел на 1000 px — по пункту на главную строку.
+        «Ответ»); полоса главных чисел на 1000 px — по пункту на главную строку;
+     В  левая колонка: кнопки кривых площади (по кнопке на кривую во всех
+        моделях, радио-группа, ни одна не выбрана на старте, стрелки, «Посчитать
+        площадь под D» → то же число, что прежде через список), сегмент «Под
+        кривой | Между точками» вместо тумблера, строка «x от … до …» и
+        «Вернуть по формуле» только при ручном отрезке.
 
    node calc2/tests/redesign/answer_rows_probe.mjs [--only Р,К] [--keys a,b]
    Код 0 — всё сошлось.                                                     */
@@ -36,6 +41,7 @@ function ok(label, cond, detail) {
   total++; if (!cond) bad++;
   console.log('  ' + (cond ? 'OK  ' : 'FAIL') + ' ' + label + (detail ? '  — ' + detail : ''));
 }
+function eq0(label, got, want) { ok(label, got === want, 'ожидалось «' + want + '», получилось «' + got + '»'); }
 const head = (s) => console.log('\n=== ' + s + ' ' + '='.repeat(Math.max(0, 60 - s.length)));
 const norm = (s) => String(s == null ? '' : s).replace(/[\s   ​]+/g, '').replace(/[−–]/g, '-');
 
@@ -294,6 +300,66 @@ if (want('Т')) {
   }
   ok('1000: в полосе по пункту на главную строку', !miss.length, miss.slice(0, 6).join(' | '));
   await p2.ctx.close();
+}
+
+/* ── В: левая колонка ──────────────────────────────────────────────── */
+if (want('В')) {
+  head('В. Кнопки кривых, сегмент, отрезок ответа');
+  const { ctx, page, errors } = await openPage(1440, 900);
+  const miss = [];
+  for (const key of MODELS) {
+    await openKey(page, key);
+    const r = await page.evaluate(() => ({
+      want: areaTargets().map(t => t.name),
+      got: [...document.querySelectorAll('#ac-pick-btns .ac-cbtn')].map(b => b.dataset.name),
+      checked: document.querySelectorAll('#ac-pick-btns [aria-checked="true"]').length,
+      roles: [...document.querySelectorAll('#ac-pick-btns .ac-cbtn')].every(b => b.getAttribute('role') === 'radio'),
+      sel: document.getElementById('ac-pick').value }));
+    if (r.want.join('|') !== r.got.join('|')) miss.push(key + ': кривых ' + r.want.join(',') + ', кнопок ' + r.got.join(','));
+    if (r.checked || r.sel) miss.push(key + ': на старте выбрана ' + r.sel);
+    if (!r.roles) miss.push(key + ': у кнопки нет role=radio');
+  }
+  ok('кнопок столько же, сколько кривых, во всех моделях; на старте ни одна не выбрана', !miss.length, miss.slice(0, 5).join(' | '));
+  await openKey(page, 'sd');
+  const t0 = await page.evaluate(() => ({ text: __ar.t(document.getElementById('ac-calc')), dis: document.getElementById('ac-calc').disabled,
+    group: document.getElementById('ac-pick-btns').getAttribute('role'), selHidden: document.getElementById('ac-pick').hidden,
+    upgraded: !!document.querySelector('#ac-pane-curve .sel-btn') }));
+  ok('группа кнопок — radiogroup, список спрятан и своей кнопки поверх нет', t0.group === 'radiogroup' && t0.selHidden && !t0.upgraded, JSON.stringify(t0));
+  eq0('кнопка расчёта до выбора', t0.text + (t0.dis ? ' (выкл.)' : ''), 'Сначала выберите кривую (выкл.)');
+  await page.click('#ac-pick-btns .ac-cbtn[data-name="D"]');
+  await page.waitForTimeout(250);
+  const t1 = await page.evaluate(() => ({ text: __ar.t(document.getElementById('ac-calc')), dis: document.getElementById('ac-calc').disabled,
+    sel: document.getElementById('ac-pick').value, checked: [...document.querySelectorAll('#ac-pick-btns [aria-checked="true"]')].map(b => b.dataset.name) }));
+  ok('щелчок по D: выбрана D, список = D, «Посчитать площадь под D»', t1.sel === 'D' && t1.checked.join() === 'D' && t1.text === 'Посчитать площадь под D' && !t1.dis, JSON.stringify(t1));
+  await page.click('#ac-calc');
+  await page.waitForTimeout(300);
+  const area = await page.evaluate(() => { const a = (STATE.areaCalcList || [])[0]; return a ? a.value : null; });
+  ok('площадь под D — 5000, как через список до сессии', Math.abs(area - 5000) < 1e-9, String(area));
+  await page.focus('#ac-pick-btns .ac-cbtn[data-name="D"]');
+  await page.keyboard.press('ArrowRight');
+  await page.waitForTimeout(200);
+  const t2 = await page.evaluate(() => ({ sel: document.getElementById('ac-pick').value, focus: document.activeElement && document.activeElement.dataset.name }));
+  ok('стрелка вправо: выбрана и в фокусе S', t2.sel === 'S' && t2.focus === 'S', JSON.stringify(t2));
+  const seg = await page.evaluate(() => ({ role: document.getElementById('ac-mode').getAttribute('role'),
+    shown: getComputedStyle(document.getElementById('ac-mode')).display !== 'none',
+    tgl: !!document.querySelector('#areascalc-body > .tgl-sw, #ac-mode + .tgl-sw') || [...document.querySelectorAll('.tgl-sw')].some(t => /Под кривой/.test(t.textContent)),
+    c: document.getElementById('ac-curve').getAttribute('aria-checked') }));
+  ok('сегмент «Под кривой | Между точками» вместо тумблера', seg.role === 'radiogroup' && seg.shown && !seg.tgl && seg.c === 'true', JSON.stringify(seg));
+  await page.click('#ac-poly');
+  await page.waitForTimeout(200);
+  const seg2 = await page.evaluate(() => [document.getElementById('ac-curve').getAttribute('aria-checked'), document.getElementById('ac-poly').getAttribute('aria-checked'), __ar.t(document.getElementById('ac-calc'))]);
+  ok('«Между точками»: отметка переехала, кнопка «Посчитать площадь»', seg2.join('|') === 'false|true|Посчитать площадь', seg2.join(' | '));
+  await page.click('#ac-curve');
+  await openKey(page, 'm-graph');
+  const a0 = await page.evaluate(() => ({ lab: __ar.t(document.querySelector('#ans-seg-row label')), row: __ar.t(document.querySelector('#ans-seg-row .opt-range-row')),
+    back: !document.getElementById('ans-seg-auto').hidden }));
+  ok('«Ответ ищем на отрезке», строка «x от … до …», «Вернуть по формуле» спрятана', a0.lab === 'Ответ ищем на отрезке' && /^x\s*от/.test(a0.row) && !a0.back, JSON.stringify(a0));
+  await page.evaluate(() => { STATE.ansHand = true; STATE.ansA = -3; STATE.ansB = 4; redrawAll(); });
+  await settle(page);
+  const a1 = await page.evaluate(() => { const b = document.getElementById('ans-seg-auto'); const r = b.getBoundingClientRect(), row = document.querySelector('#ans-seg-row .opt-range-row').getBoundingClientRect(); return { back: !b.hidden && !!r.width, below: r.top >= row.bottom - 0.5 }; });
+  ok('ручной отрезок: «Вернуть по формуле» видна, отдельной строкой', a1.back && a1.below, JSON.stringify(a1));
+  ok('ошибок страницы нет', !errors.length, errors.slice(0, 3).join(' | '));
+  await ctx.close();
 }
 
 await browser.close();

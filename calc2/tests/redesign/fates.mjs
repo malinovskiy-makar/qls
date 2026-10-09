@@ -15,6 +15,9 @@ export const LETTERS = {
   'к': 'три кнопки окна экспорта → выбор формата и одна кнопка «Скачать …»',
   'л': 'пустое состояние «Ползунков в этой модели нет» (без замены)',
   'м': 'сегмент из одной кнопки «Квота» (без замены)',
+  // Сессия 3 (решение владельца 09.10, ADR 0144):
+  'н': 'выбор кривой площади списком → кнопки кривых с цветной точкой',
+  'о': 'тумблер «Под кривой | Между точками» → сегмент из двух половин',
 };
 
 export const CHECK = 'snapshot.mjs (layer new) + compare.mjs';
@@ -32,6 +35,8 @@ export const FATES = [
   [/^#exp-(png|tex|pdf)$/, 'заменён', 'к', 'выбор формата и кнопка «Скачать …» (#exp-go)', 'export_audit.mjs + compare.mjs'],
   [/^#params-empty/, 'убран', 'л', '', 'compare.mjs: элемента нет'],
   [/^#seg-quota$/, 'убран', 'м', '', 'compare.mjs: в «Квотах» сегмента нет, квота задаётся ползунком'],
+  [/^#ac-pane-curve>button\.sel-btn$/, 'заменён', 'н', 'кнопки кривых #ac-pick-btns (скрытый #ac-pick — источник правды)', 'redesign/answer_rows_probe.mjs + control_numbers.mjs (площади)'],
+  [/^#areascalc-body>button\.tgl-sw$/, 'заменён', 'о', 'сегмент #ac-mode (#ac-curve, #ac-poly)', 'parity_quick.mjs: орган #ac-curve'],
 ];
 export function fateOf(key) {
   const k = key.replace(/^mf:/, '');

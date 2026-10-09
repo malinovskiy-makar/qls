@@ -49,6 +49,11 @@ const RENAME = {
   '#params-toggle': '#btn-focus',
   // «?» у метки: поле «Метка» получило свой id, ключ органа считается от него.
   '#export-modal>button.hint-btn': '#exp-label-field>button.hint-btn',
+  /* (н) список кривых площади → кнопки кривых, (о) тумблер «Под кривой» →
+     сегмент (решение владельца 09.10, ADR 0144). У модели без кривых площади
+     кнопок нет, как не было и пунктов списка. */
+  '#ac-pane-curve>button.sel-btn': '#ac-pick-btns>button.ac-cbtn',
+  '#areascalc-body>button.tgl-sw': '#ac-curve',
 };
 export function mapKey(key) {
   if (RENAME[key]) return RENAME[key];

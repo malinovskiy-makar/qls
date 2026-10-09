@@ -2165,6 +2165,20 @@ function syncAreaCalcButton() {
   btn.setAttribute('data-tip', ready ? '' : (STATE.areaCalcMode === 'poly'
     ? 'Отметьте на графике хотя бы три точки'
     : 'Сначала выберите кривую'));
+  /* Подпись говорит, что именно посчитается (ADR 0144): «Сначала выберите
+     кривую» → «Посчитать площадь под f». Имя кривой — как во всей панели. */
+  const name = (STATE.areaCalcMode === 'poly') ? '' : ((areaPickedCurve() || {}).name || '');
+  const text = (STATE.areaCalcMode === 'poly') ? 'Посчитать площадь'
+    : (name ? 'Посчитать площадь под ' + name : 'Сначала выберите кривую');
+  if (btn._text !== text) {
+    btn._text = text;
+    btn.textContent = name ? 'Посчитать площадь под ' : text;
+    if (name) {
+      const nm = document.createElement('span'); nm.className = 'ac-cname';
+      curveNameInto(nm, name);
+      btn.appendChild(nm);
+    }
+  }
 }
 
 function areaPickedCurve() {
@@ -2595,8 +2609,10 @@ function syncAreaCalcUI() {
   document.querySelectorAll('.ac-var').forEach(el => { el.textContent = v; });
   const sel = document.getElementById('ac-pick');
   if (sel) {
-    const names = areaTargets().map(t => t.name);
-    const sig = names.join('|');
+    const targets = areaTargets();
+    const names = targets.map(t => t.name);
+    // Цвет — в подписи списка: перекрасили кривую — перекрасилась точка её кнопки.
+    const sig = targets.map(t => t.name + ':' + (t.color || '')).join('|');
     if (sel._sig !== sig) {
       sel._sig = sig;
       const prev = sel.value;
@@ -2614,7 +2630,9 @@ function syncAreaCalcUI() {
       sel.value = (names.indexOf(prev) >= 0) ? prev : '';
       // Список пересобран: своя кнопка выбора должна показать новое значение.
       if (typeof sel._paint === 'function') sel._paint();
+      buildAreaCurveButtons();
     }
+    syncAreaCurveButtons();
   }
   renderVertList();
   syncAreaRangeLabel();
@@ -2625,11 +2643,79 @@ function syncAreaCalcUI() {
 // Сколько вершин набрано — говорит полоса режима над холстом (п. 80).
 function updateQuickArea() { syncCanvasMode(); }
 
+/* ВЫБОР КРИВОЙ ДЛЯ ПЛОЩАДИ — КНОПКАМИ (решение владельца 09.10, ADR 0144).
+   Кнопка на кривую: цветная точка и имя, набранное как во всей панели (внутри
+   кнопки разметка обозначений работает, в <option> — нет). Группа — радио:
+   role="radiogroup", у кнопки role="radio" и aria-checked, стрелки ходят по
+   кнопкам. Ни одна не выбрана на старте (П41: выбор осознанный). Источник
+   правды — скрытый select#ac-pick: кнопка пишет в него значение и шлёт change,
+   поэтому сцены, форма модели и приборы читают его, как раньше. */
+// Имя кривой в кнопке: одна латинская буква («f») — формулой, прочее — как во всей панели.
+function curveNameInto(el, name) {
+  if (/^[A-Za-z]$/.test(name) && typeof katexInto === 'function') { katexInto(el, name); return; }
+  if (typeof paintNotation === 'function') paintNotation(el, name); else el.textContent = name;
+}
+function buildAreaCurveButtons() {
+  const box = document.getElementById('ac-pick-btns');
+  const sel = document.getElementById('ac-pick');
+  if (!box || !sel) return;
+  box.innerHTML = '';
+  areaTargets().forEach(t => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'ac-cbtn';
+    b.setAttribute('role', 'radio');
+    b.dataset.name = t.name;
+    const dot = document.createElement('span'); dot.className = 'ac-cdot'; dot.setAttribute('aria-hidden', 'true');
+    if (t.color) dot.style.background = t.color;
+    const nm = document.createElement('span'); nm.className = 'ac-cname';
+    curveNameInto(nm, t.name);
+    b.setAttribute('aria-label', t.name);
+    b.append(dot, nm);
+    b.addEventListener('click', () => pickAreaCurve(t.name));
+    b.addEventListener('keydown', (e) => {
+      const list = [...box.querySelectorAll('.ac-cbtn')];
+      const i = list.indexOf(b);
+      let j = -1;
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % list.length;
+      else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + list.length) % list.length;
+      else if (e.key === 'Home') j = 0;
+      else if (e.key === 'End') j = list.length - 1;
+      if (j < 0) return;
+      e.preventDefault();
+      pickAreaCurve(list[j].dataset.name);
+      list[j].focus();
+    });
+    box.appendChild(b);
+  });
+  syncAreaCurveButtons();
+}
+function pickAreaCurve(name) {
+  const sel = document.getElementById('ac-pick');
+  if (!sel || sel.value === name) return;
+  sel.value = name;
+  sel.dispatchEvent(new Event('change', { bubbles: true }));
+  syncAreaCurveButtons();
+}
+// Отметка выбранной и «бегущий» tabindex: в группу заходят одним Tab.
+function syncAreaCurveButtons() {
+  const box = document.getElementById('ac-pick-btns');
+  const sel = document.getElementById('ac-pick');
+  if (!box || !sel) return;
+  const list = [...box.querySelectorAll('.ac-cbtn')];
+  const cur = list.find(b => b.dataset.name === sel.value);
+  list.forEach((b, i) => {
+    const on = b === cur;
+    b.setAttribute('aria-checked', on ? 'true' : 'false');
+    b.classList.toggle('active', on);
+    b.tabIndex = (cur ? on : i === 0) ? 0 : -1;
+  });
+}
+
 function setAreaCalcMode(mode) {
   STATE.areaCalcMode = (mode === 'poly') ? 'poly' : 'curve';
   const c = document.getElementById('ac-curve'), p = document.getElementById('ac-poly');
-  if (c) c.classList.toggle('active', STATE.areaCalcMode === 'curve');
-  if (p) p.classList.toggle('active', STATE.areaCalcMode === 'poly');
+  if (c) { c.classList.toggle('active', STATE.areaCalcMode === 'curve'); c.setAttribute('aria-checked', STATE.areaCalcMode === 'curve' ? 'true' : 'false'); }
+  if (p) { p.classList.toggle('active', STATE.areaCalcMode === 'poly'); p.setAttribute('aria-checked', STATE.areaCalcMode === 'poly' ? 'true' : 'false'); }
   const pc = document.getElementById('ac-pane-curve'), pp = document.getElementById('ac-pane-poly');
   if (pc) pc.style.display = (STATE.areaCalcMode === 'curve') ? '' : 'none';
   if (pp) pp.style.display = (STATE.areaCalcMode === 'poly') ? '' : 'none';
@@ -2676,7 +2762,7 @@ function wireAreaCalc() {
   if (clr) clr.addEventListener('click', () => clearAreaCalc());
   // Выбрали кривую — сразу видно, на каком отрезке считаем, и кнопка загорается.
   const pick = document.getElementById('ac-pick');
-  if (pick) pick.addEventListener('change', () => { syncAreaRangeLabel(); syncAreaCalcButton(); });
+  if (pick) pick.addEventListener('change', () => { syncAreaCurveButtons(); syncAreaRangeLabel(); syncAreaCalcButton(); });
   const vClear = document.getElementById('ac-vert-clear');
   if (vClear) vClear.addEventListener('click', () => clearAreaVerts());
   const vArm = document.getElementById('ac-vert-arm');

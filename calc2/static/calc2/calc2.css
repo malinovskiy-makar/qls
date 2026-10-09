@@ -3530,3 +3530,52 @@ body.self-on:not(.self-all) #info-areacalc .stat > b::after { content: '?'; posi
 .ans-cell .self-pill.is-ok { color: var(--green-ink); }
 .ans-cell .self-pill.is-bad { color: var(--error-ink); }
 .ans-cell .self-show { margin-left: auto; line-height: 20px; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   ЛЕВАЯ КОЛОНКА: ОТРЕЗОК ОТВЕТА, СЕГМЕНТ ПЛОЩАДИ, КНОПКИ КРИВЫХ
+   (сессия 3, 10.2026; решение владельца 09.10, ADR 0144)
+   ═══════════════════════════════════════════════════════════════════ */
+/* «Ответ ищем на отрезке»: карточка, как карточка функции; строка
+   «x от [ ] до [ ]» — буква оси в начале, поля в рамке; «Вернуть по
+   формуле» — ссылкой отдельной строкой, только при ручном отрезке. */
+#ans-seg-row {
+  padding: 10px 12px 12px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-card);
+}
+#ans-seg-row .hint-row label { font-size: 13.5px; font-weight: 400; color: var(--text2); }
+#ans-seg-row .opt-range-row { margin-top: 8px; gap: 8px; }
+#ans-seg-row .opt-range-row > span { flex: 0 0 auto; font-size: 14px; color: var(--text2); }
+#ans-seg-row .opt-range-row > .ans-seg-var { color: var(--text); }
+#ans-seg-row .opt-range-row > .ans-seg-var .katex { font-size: 1.1em; }
+#ans-seg-row .opt-range-row input[type="text"] {
+  flex: 1 1 0; width: 0; min-width: 0; max-width: 88px; height: 36px; padding: 0 10px; text-align: center;
+  font: inherit; font-size: 15px; font-weight: 400; color: var(--text); font-variant-numeric: tabular-nums;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--r);
+}
+#ans-seg-row .opt-range-row input[type="text"]:focus { outline: 2px solid var(--focus); outline-offset: 1px; }
+#ans-seg-row .ans-seg-auto { display: block; margin-top: 8px; text-decoration: none; color: var(--accent-ink); }
+#ans-seg-row .ans-seg-auto:hover { text-decoration: underline; }
+#ans-seg-row .ans-seg-auto[hidden] { display: none; }
+
+/* «Под кривой | Между точками»: две половины поровну, выбранная подсвечена —
+   тот же сегмент, что формат в окне «Скачать». */
+.seg.ac-mode { margin: 4px 0 10px; }
+.seg.ac-mode .seg-btn { flex: 1 1 0; min-height: 36px; }
+
+/* Кнопки кривых: точка цвета кривой и имя; выбранная — подложка акцента и
+   рамка акцентом (сплошной акцент держим за главной кнопкой экрана). Не
+   влезают в строку — переносятся. */
+.ac-pick-row { display: block; }
+.ac-cbtns { display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-cbtn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 14px 0 12px;
+  border: 1px solid var(--border-strong); border-radius: var(--r-pill); background: var(--surface);
+  color: var(--text); font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap;
+}
+.ac-cbtn:hover { background: var(--chip-bg); }
+.ac-cbtn[aria-checked="true"] { background: var(--accent-tint); border-color: var(--accent); }
+.ac-cbtn:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ac-cdot { flex: 0 0 10px; width: 10px; height: 10px; border-radius: 50%; background: var(--text2); }
+.ac-cname .katex { font-size: 1.1em; }
+#ac-calc .ac-cname { margin-left: .25em; }
+@media (max-width: 759px) { .ac-cbtn, .seg.ac-mode .seg-btn, #ans-seg-row .opt-range-row input[type="text"] { min-height: 44px; } }
