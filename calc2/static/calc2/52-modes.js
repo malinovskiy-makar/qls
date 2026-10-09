@@ -361,9 +361,11 @@ function zoomBy(factor, px, py) {
     if (!(span > 1e-6 && span < 1e9)) return;
     const xc = x0 + (x1 - x0) * tx;
     const yc = y1 - (y1 - y0) * ty;
+    // Пометка «окно человека» — ДО перерисовки внутри setMathWindow: иначе
+    // индикатор масштаба брал за 100 % уже приближенное окно.
+    markViewDirty();
     setMathWindow(xc - (xc - x0) * factor, xc + (x1 - xc) * factor,
                   yc - (yc - y0) * factor, yc + (y1 - yc) * factor);
-    markViewDirty();
     redrawAll();
     return;
   }

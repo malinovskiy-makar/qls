@@ -80,10 +80,11 @@ function rootsOf(g, lo, hi, N) {
 // Экстремумы и перегибы. Экстремум — нуль первой производной, тип определяет
 // знак второй; перегиб — смена знака второй производной.
 function mathAnalyse(f, lo, hi) {
-  const ext = rootsOf((x) => dNum(f, x), lo, hi).map(x => {
-    const s = d2Num(f, x);
-    return { x, y: f(x), kind: (s > 0 ? 'min' : (s < 0 ? 'max' : 'flat')) };
-  }).filter(p => !isNaN(p.y));
+  /* Локальные экстремумы — те же, что в «Ответе» любой модели (ansAnalyse):
+     смена знака производной внутри отрезка. Прежняя проверка знаком второй
+     производной объявляла «плато» узел, где f′ = 0 без смены знака. */
+  const an = ansAnalyse(f, lo, hi);
+  const ext = an.max.concat(an.min).sort((a, b) => a.x - b.x);
   const inf = rootsOf((x) => d2Num(f, x), lo, hi)
     .map(x => ({ x, y: f(x) })).filter(p => !isNaN(p.y));
   // Глобальные — с учётом концов отрезка: у школьных задач ответ часто на краю.
@@ -115,8 +116,20 @@ const ANS_PROBE = [-7.31, -2.17, -0.53, 0.37, 1.13, 2.71, 4.49, 9.07];
 let _ansSeg = null;            // отрезок текущего кадра (ставит refreshAnswerSeg)
 const _ansCache = new Map();
 
-// Число ответа в записи сайта: запятая, настоящий минус.
-function ansFmt(v) { return fmt(v).replace(/^-/, '−'); }
+/* Число ответа: запятая, настоящий минус, ТРИ знака после запятой (лишние
+   нули срезаются). Корни и вершины — иррациональные числа, и двух знаков
+   общего fmt мало, чтобы сверить свой ответ: «1,73» и «1,74» оба верны в
+   пределах сотой. Так записаны и контрольные числа «Математики» (−1,732). */
+function ansFmt(v) {
+  if (!isFinite(v)) return String(v);
+  let r = Math.round(v * 1000) / 1000;
+  if (r === 0) r = 0;                       // −0 не печатаем
+  const a = Math.abs(r), whole = Math.floor(a);
+  let s = String(whole).replace(/\B(?=(\d{3})+(?!\d))/g, NBTHIN);
+  const frac = String(Math.round((a - whole) * 1000)).padStart(3, '0').replace(/0+$/, '');
+  if (frac) s += ',' + frac;
+  return (r < 0 ? '−' : '') + s;
+}
 function ansPt(x, y) { return '(' + ansFmt(x) + '; ' + ansFmt(y) + ')'; }
 // Несколько значений — через «; », нет ни одного — «нет» (решение владельца 09.10).
 function ansList(xs) { return xs.length ? xs.map(v => ansFmt(v)).join('; ') : 'нет'; }
@@ -864,7 +877,8 @@ function drawMathOptimum(f) {
   const g = svg.append('g');
   drawGrid(mx, my, g);
   drawPlaneAxes(g, mx, my, 'x', 'y');
-  const lo = STATE.mathXmin, hi = STATE.mathXmax;
+  const lo = STATE.mathXmin, hi = STATE.mathXmax;   // окно — только для заливки
+  const seg = _ansSeg || answerSeg();               // ответ — на отрезке (ADR 0143)
 
   // Заливка по знаку второй производной: вверх выпуклая или вниз.
   if (STATE.mathConvex) {
@@ -879,7 +893,7 @@ function drawMathOptimum(f) {
   }
   mathLine(g, f, mx, my, COL.D, 2.8, null, { expr: STATE.mathFormula, name: 'f(x)' });
 
-  const a = mathAnalyse(f, lo, hi);
+  const a = mathAnalyse(f, seg.a, seg.b);
   STATE.mathRes = a;
   /* Подпись «максимум 2» не говорила, что это: координата точки или значение
      функции. Пишем обе величины и называем их: x* — где, y* — сколько. */
@@ -1011,14 +1025,16 @@ function drawMathMinMax(f) {
   labelCurveMath(g, z, mx, my, zName, zColor);
   // Точки, где ветви меняются местами: корни разности каждой пары, но в зачёт
   // идут только те, где обе функции в этот момент и есть итоговая Z.
+  const seg = _ansSeg || answerSeg();
   const sw = [];
   for (let a = 0; a < parts.length; a++) {
     for (let b2 = a + 1; b2 < parts.length; b2++) {
-      rootsOf((x) => parts[a].fn(x) - parts[b2].fn(x), STATE.mathXmin, STATE.mathXmax).forEach(x => {
+      // На отрезке ответа, а не в окне (ADR 0143): точка вне окна просто не видна.
+      ansZeros((x) => parts[a].fn(x) - parts[b2].fn(x), seg.a, seg.b, ANS_N).forEach(x => {
         const y = parts[a].fn(x);
         if (isNaN(y)) return;
         if (Math.abs(y - z(x)) > Math.max(1e-6, Math.abs(y) * 1e-6)) return;   // ветвь не главная
-        if (sw.some(v => Math.abs(v - x) < (STATE.mathXmax - STATE.mathXmin) * 1e-4)) return;
+        if (sw.some(v => Math.abs(v - x) < (seg.b - seg.a) * 1e-4)) return;
         sw.push(x);
         mathDot(g, mx, my, x, y, COL.MC, null);
       });
@@ -1161,14 +1177,13 @@ function drawMathConstraint() {
     else if (!r.error && r.kind === 'inverse') markExpr(cp, r.src, 'y', null, { axis: 'y', name: 'ограничение' });
     else markNumeric(cp, 'ограничение задано общим уравнением и найдено численно (трассировкой): формулы y = f(x) у него нет', 'ограничение');
   }
-  /* А ищем по всей задаче, а не по видимому куску: приблизили картинку — ответ
-     не должен меняться. Область поиска это размах ограничения, объединённый с
-     текущим окном. */
+  /* А ищем по всей задаче, а не по видимому куску: приблизили или сдвинули
+     картинку — ответ не меняется (ADR 0143). Область поиска — размах самого
+     ограничения (consFit, считается при входе и смене формулы), БЕЗ окна:
+     объединение с окном меняло шаг сетки при отдалении и сдвиге. */
   const fit = STATE.consFit || { xMax: x1, yMax: y1 };
-  const sx0 = Math.min(x0, 0), sx1 = Math.max(x1, fit.xMax);
-  const sy0 = Math.min(y0, 0), sy1 = Math.max(y1, fit.yMax);
-  const searchPts = (sx0 === x0 && sx1 === x1 && sy0 === y0 && sy1 === y1)
-    ? pts : constraintPointsIn(G, sx0, sx1, sy0, sy1);
+  const searchPts = (x0 === 0 && x1 === fit.xMax && y0 === 0 && y1 === fit.yMax)
+    ? pts : constraintPointsIn(G, 0, fit.xMax, 0, fit.yMax);
   const opt = optimizeAlongCurve(f, searchPts, STATE.mathConsWantMax !== false);
   /* Точки ограничения кладём в состояние: по ним катается точка и по ним же
      ищутся ключевые точки сюжета (Н66). Пересчитывать их второй раз в
@@ -1258,7 +1273,7 @@ function updateMathPanel() {
       html += '<div class="sb-note"><b>Как это получилось</b>'
         + `<p><b>Что вообще такое производная?</b> Это скорость: на сколько меняется y, если x подвинуть чуть-чуть. `
         + `Берём две близкие точки слева и справа от x₀ и делим прирост y на прирост x. `
-        + `Шаг подбирается от ширины окна, поэтому счёт одинаково точен и на отрезке 0…0.1, и на 0…1000.</p>`
+        + `Шаг подбирается от ширины отрезка ответа, поэтому счёт одинаково точен и на отрезке 0…0.1, и на 0…1000, а масштаб графика на него не влияет.</p>`
         + `<p><b>При чём здесь треугольник?</b> Он и есть это отношение: горизонтальный катет Δx, `
         + `вертикальный Δy = ${fmt(r.k)}·Δx. Их частное не зависит от размера треугольника, `
         + `оно и равно наклону.</p>`
@@ -1801,46 +1816,41 @@ function updateGraphPanel() {
       + graphExplainNote(0);
     return;
   }
-  const { mx } = mainScales();
-  const [lo, hi] = mx.domain();
+  /* ⚠️ ОТВЕТ СЧИТАЕТСЯ НА ОТРЕЗКЕ ОТВЕТА, А НЕ В ОКНЕ (ADR 0143). Раньше
+     здесь стояло mx.domain(): приближение к вершине x² − 4 меняло «−2; 2» на
+     «в окне не пересекает», и колонка «Ответ» дёргалась от колеса. */
+  const seg = _ansSeg || answerSeg();
+  const lo = seg.a, hi = seg.b;
   let html = '';
+  const fns = [];
   shown.forEach(c => {
     const f = (x) => evalCurve(c, x);
+    fns.push(f);
     const name = curveShortName(c);
-    const zeros = rootsOf(f, lo, hi, 700).filter(x => isFinite(f(x)));
-    const y0 = f(0);
-    // Экстремумы: нули производной со сменой знака (тот же приём, что в «Оптимизации»).
-    const h = (hi - lo) * 1e-4;
-    const d1 = (x) => (f(x + h) - f(x - h)) / (2 * h);
-    const ext = rootsOf(d1, lo, hi, 500).filter(x => isFinite(f(x)));
+    const r = ansAnalyse(f, lo, hi);
     html += `<div class="stat"><span>Кривая</span><b>${name}</b></div>`;
     /* ⚠️ РАЗДЕЛИТЕЛЬ СПИСКА — ТОЧКА С ЗАПЯТОЙ, ПОТОМУ ЧТО ЗАПЯТАЯ ЗАНЯТА.
        Корни 0 и 1 печатались как «0, 1,0»: запятая разделяла список и она же
        была десятичным знаком, прочитать это невозможно. Десятичная запятая —
-       требование канона 2.1, значит менять надо разделитель. Стало «0; 1». */
-    /* ⚠️ `.map(fmt)` ПЕРЕДАЁТ В fmt НОМЕР ЭЛЕМЕНТА ВТОРЫМ ДОВОДОМ, а второй
-       довод у fmt — «сколько знаков после запятой печатать не меньше». Поэтому
-       первый корень печатался как «0», а второй тем же числом знаков, что его
-       номер: «1,0». Именно это и увидел владелец в записи «0, 1,0» — половина
-       беды была не в разделителе списка, а здесь. */
-    html += `<div class="stat"><span>Пересекает ось $x$</span><b>${
-      zeros.length ? zeros.map(v => fmt(v)).join('; ') : 'в окне не пересекает'}</b></div>`;
-    html += `<div class="stat"><span>Пересекает ось $y$</span><b>${
-      (lo <= 0 && hi >= 0 && isFinite(y0)) ? fmt(y0) : 'ось вне окна'}</b></div>`;
-    if (ext.length) {
-      html += `<div class="stat"><span>Вершины</span><b>${
-        ext.map(x => '(' + fmt(x) + '; ' + fmt(f(x)) + ')').join('; ')}</b></div>`;
-    }
+       требование канона 2.1, значит менять надо разделитель. Стало «0; 1».
+       ⚠️ fmt не отдавать в .map напрямую: второй довод у fmt — число знаков. */
+    html += `<div class="stat"><span>Пересекает ось $x$</span><b>${ansList(r.zeros)}</b></div>`;
+    html += `<div class="stat"><span>Пересекает ось $y$</span><b>${r.y0 == null ? 'нет' : ansFmt(r.y0)}</b></div>`;
+    const ext = r.max.concat(r.min).sort((a, b) => a.x - b.x);
+    if (ext.length) html += `<div class="stat"><span>Вершины</span><b>${ansPts(ext)}</b></div>`;
   });
-  // Пересечения кривых между собой — их уже считает общий движок ключевых точек.
-  const crosses = (typeof keyTargets === 'function' ? keyTargets() : [])
-    .filter(p => p.kind === 'cross');
-  /* ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ. Строка выводилась всегда и
-     повторяла точки пересечения с осями под другим заголовком: те же числа
-     дважды, причём второй раз под названием, которое их не описывает. */
-  if (crosses.length && shown.length > 1) {
-    html += `<div class="stat"><span>Кривые пересекаются</span><b>${
-      crosses.map(p => '(' + fmt(p.x) + '; ' + fmt(p.y) + ')').join('; ')}</b></div>`;
+  /* Пересечения кривых между собой — нули разности на том же отрезке (раньше
+     брались у ключевых точек холста, то есть тоже по окну).
+     ⚠️ ПРИ ОДНОЙ КРИВОЙ ПЕРЕСЕКАТЬСЯ НЕЧЕМУ: строки нет. */
+  if (fns.length > 1) {
+    const cr = [];
+    for (let i = 0; i < fns.length; i++) for (let j = i + 1; j < fns.length; j++) {
+      ansCrosses(fns[i], fns[j], lo, hi).forEach(p => {
+        if (!cr.some(q => Math.abs(q.x - p.x) < (hi - lo) * 1e-6 && Math.abs(q.y - p.y) < 1e-6 * (1 + Math.abs(p.y)))) cr.push(p);
+      });
+    }
+    cr.sort((a, b) => a.x - b.x);
+    html += `<div class="stat"><span>Кривые пересекаются</span><b>${ansPts(cr)}</b></div>`;
   }
   box.innerHTML = html + graphExplainNote(shown.length);
 }
