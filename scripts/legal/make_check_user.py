@@ -6,10 +6,12 @@
     $env:CHECK_PASSWORD = "<пароль для тестовых аккаунтов>"
     venv313\Scripts\python.exe manage.py shell -c "exec(open('scripts/legal/make_check_user.py', encoding='utf-8').read())"
 
-Создаёт (или обновляет) двух учеников:
-  check_old – НИКАКИХ записей согласия: на первом входе экран «Правила обработки данных»;
-  check_ai  – согласия на документы и на помощника даны, на первой опубликованной задаче
-              есть одна реплика чата: видно, что отзыв согласия её удаляет.
+Создаёт (или обновляет) трёх учеников:
+  check_old    – НИКАКИХ записей согласия: на первом входе экран «Правила обработки данных»;
+  check_ai     – согласия на документы и на помощника даны, на первой видимой задаче
+                 есть одна реплика чата: видно, что отзыв согласия её удаляет;
+  check_new_ai – согласие на документы дано, на помощника нет: панель показывает блок
+                 согласия («Да, согласен» / «Нет, не согласен»).
 
 ⚠️ Только для локальной базы. Тестовые пароли публично известны (CLAUDE.md): перед показом
 кому-либо `manage.py lockdown_dev_accounts --apply`.
@@ -28,13 +30,18 @@ if len(password) < 8:
     raise SystemExit('Задайте $env:CHECK_PASSWORD (не короче 8 знаков) и повторите.')
 
 User = get_user_model()
-for name in ('check_old', 'check_ai'):
+for name in ('check_old', 'check_ai', 'check_new_ai'):
     user, created = User.objects.get_or_create(username=name)
     user.set_password(password)
     user.save()
     UserProfile.objects.update_or_create(user=user, defaults={'role': 'student'})
     ConsentRecord.objects.filter(user=user).delete()
     print(name, 'создан' if created else 'обновлён')
+
+consent.grant(User.objects.get(username='check_new_ai'), ConsentRecord.Kind.PD,
+              ConsentRecord.Source.REGISTER)
+ChatTurn.objects.filter(user__username='check_new_ai').delete()
+print('check_new_ai: согласие на документы дано, на помощника нет')
 
 ai_user = User.objects.get(username='check_ai')
 consent.grant(ai_user, ConsentRecord.Kind.PD, ConsentRecord.Source.REGISTER)
