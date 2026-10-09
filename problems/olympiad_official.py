@@ -22,6 +22,9 @@ import json
 import re
 import unicodedata
 
+from rapidfuzz import fuzz
+
+from problems.olympiad_audit.registry import REGISTRY
 from problems.text_dedup import (
     fuzzy_ratio, normalize_for_compare, problem_identity_text,
 )
@@ -29,23 +32,13 @@ from problems.text_dedup import (
 #: Порог «то же задание» для правила близнецов и проверок на месте.
 TWIN_THRESHOLD = 0.90
 
-#: Источник для заданий, импортированных из официального PDF организатора.
-OFFICIAL_SOURCE_NAME = 'Высшая проба: официальный архив'
-OFFICIAL_SOURCE_DEFAULTS = {
-    'author': 'НИУ «Высшая школа экономики»',
-    'kind': 'олимпиада',
-    'note': ('Официальные задания и решения заключительного этапа олимпиады '
-             '«Высшая проба» по экономике, опубликованные организатором: '
-             'https://olymp.hse.ru/mmo/tasks-eco. У каждой задачи — ссылка '
-             'на PDF в привязке к источнику.'),
-}
+#: Источник для заданий ВП, импортированных из официального PDF организатора.
+#: Для других олимпиад — `registry.get(slug).official_source_name`.
+OFFICIAL_SOURCE_NAME = REGISTRY['vp'].official_source_name
+OFFICIAL_SOURCE_DEFAULTS = REGISTRY['vp'].official_source_defaults
 
 #: Названия олимпиад в строках OlympiadRef — как у уже записанных строк.
-OLYMPIAD_NAMES = {
-    'vp': 'Олимпиада школьников «Высшая проба» по экономике',
-    'vp-fingram': 'Олимпиада школьников «Высшая проба» по финансовой грамотности',
-    'vp-ob': 'Олимпиада школьников «Высшая проба» по основам бизнеса',
-}
+OLYMPIAD_NAMES = {slug: entry.olympiad_name for slug, entry in REGISTRY.items()}
 
 
 # ── Файлы аудита ─────────────────────────────────────────────────────────
@@ -75,15 +68,40 @@ def variant_of(event_id):
 
 
 class Reference:
-    """Эталон: задания официальных комплектов по (event_id, номер)."""
+    """Эталон: задания официальных комплектов по (event_id, номер).
+
+    ⚠️ У отборочных МОШ внутри одного PDF бывают «Задание N. Вариант K» —
+    одна пара (комплект, номер) на несколько заданий. Такие строки лежат по
+    ключу (event_id, номер, вариант задания); по паре (event_id, номер)
+    доступны только задания без варианта — как было у ВП.
+    """
 
     def __init__(self, rows):
         self.tasks = {}
         self.by_event = {}
         for row in rows:
-            key = (row['event_id'], str(row['number']))
-            self.tasks[key] = row
+            number, variant = str(row['number']), str(row.get('task_variant') or '')
+            self.tasks[(row['event_id'], number, variant)] = row
+            if not variant:
+                self.tasks[(row['event_id'], number)] = row
             self.by_event.setdefault(row['event_id'], []).append(row)
+
+    def task(self, event_id, number, task_variant=''):
+        return self.tasks.get((event_id, str(number), str(task_variant or '')))
+
+    def events(self):
+        """Комплекты эталона: event_id → (год, этап, класс) первой строки."""
+        return {ev: rows[0] for ev, rows in self.by_event.items()}
+
+    def best_in_event_by(self, text, event_id, score):
+        """(номер, вариант задания, сходство) лучшего задания комплекта;
+        `score(text, row)` — функция сходства."""
+        best = (None, '', 0.0)
+        for row in self.by_event.get(event_id) or []:
+            value = score(text, row)
+            if value > best[2]:
+                best = (str(row['number']), str(row.get('task_variant') or ''), value)
+        return best
 
     @classmethod
     def load(cls, path):
@@ -116,41 +134,134 @@ def bank_norm_text(problem):
     return normalize_for_compare(problem_identity_text(problem))
 
 
-_REVIEW_ROW = re.compile(r'^\|\s*(\d+)\s*\|\s*(vp-[\w-]+)\s*\|\s*(\d+)\s*\|(.*)\|\s*$')
+# ── Ключ «без разметки» (МОШ: банк в LaTeX, PDF простым текстом) ─────────
+
+_FIG = re.compile(r'\[\[figure:[^\]]*\]\]', re.IGNORECASE)
+_TEXTCMD = re.compile(
+    r'\\(?:text|mathrm|textbf|textit|mathbf|operatorname|mbox)\s*\{([^{}]*)\}')
+_FRAC = re.compile(r'\\[dt]?frac\s*\{([^{}]*)\}\s*\{([^{}]*)\}')
+_CMD = re.compile(r'\\[a-zA-Z]+')
+#: «КофеиN ные» → «кофейные»: глиф «й» в части PDF МОШ извлекается так.
+_PDF_Y = re.compile(r'и[nN] ?(?=[а-яё])')
+_KEEP = re.compile(r'[^0-9a-zа-яё=+\-*/<>%]+')
+_OPS = re.compile(r' ?([=+\-*/<>]) ?')
+
+
+def markup_free_key(text, pdf=False):
+    """Ключ сравнения без разметки: LaTeX, маркеры рисунков, пунктуация и
+    регистр не различаются; числа и буквы остаются. Тот же ключ, что у
+    сверки МОШ-1 (tools/s1_p3_match.py) и проверки Claude 09.10 — иначе
+    пороги команды и проверки разъехались бы. Только для сравнения."""
+    t = unicodedata.normalize('NFKC', text or '')
+    if pdf:
+        t = _PDF_Y.sub('й', t)
+    t = (_FIG.sub(' ', t).replace('\\cdot', '*').replace('\\times', '*')
+         .replace('\\le', '<=').replace('\\ge', '>='))
+    for _ in range(2):
+        t = _TEXTCMD.sub(r' \1 ', t)
+        t = _FRAC.sub(r'(\1)/(\2)', t)
+    t = _CMD.sub(' ', t).lower().replace('ё', 'е')
+    t = re.sub('[‐‑‒–—―−]', '-', t)
+    t = _KEEP.sub(' ', t)
+    t = _OPS.sub(r'\1', t)
+    return ' '.join(t.split())
+
+
+#: Короче этого ключа частичное сходство врёт (совпадёт с любым куском).
+CONTAINMENT_MIN_LEN = 150
+
+
+def containment(bank_key, task_key):
+    """Насколько текст банка сидит внутри задания эталона (0..1): частичное
+    сходство первых 600 знаков банка. Нужно там, где нарезка агрегатора
+    склеила или разрезала задания. Короткий текст банка — 0 (не судим)."""
+    if len(bank_key) < CONTAINMENT_MIN_LEN or not task_key:
+        return 0.0
+    return fuzz.partial_ratio(bank_key[:600], task_key) / 100.0
+
+
+#: Номер задания эталона: `3`, у МОШ ещё `1.2` и `тест-4`.
+_NUMBER = r'[\w.\-]+'
+_EVENT = r'[a-z]+(?:-[\w]+)+'
+_REVIEW_ROW = re.compile(
+    rf'^\|\s*(\d+)\s*\|\s*({_EVENT})\s*\|\s*({_NUMBER})\s*\|(.*)\|\s*$')
+_REVIEW_BULLET = re.compile(
+    rf'^-\s*(\d+)\s+({_EVENT})\s+({_NUMBER})\s*→\s*(\S*)\s')
+
+
+class ClaudeReview:
+    """Разобранный файл проверки Claude (claude_review_*.md).
+
+    * `high` — подтверждённые пары высокого яруса: (problem_id, event_id,
+      номер, вариант задания). Вариант — из колонки «вариант», если она есть
+      в шапке таблицы (у МОШ), иначе пусто (у ВП).
+    * `high_eyeball` — пары высокого яруса из таблицы «на глаза» внутри
+      того же раздела: НЕ подтверждены, не пишутся.
+    * `renumber_eyeball` — {problem_id: [(event_id, текущий, предложенный)]}
+      из раздела «Перенумеровка»: таблица (ВП) или список «- id event
+      текущий→предложенный …» (МОШ, «сомнительные»).
+    """
+
+    def __init__(self):
+        self.high = set()
+        self.high_eyeball = set()
+        self.renumber_eyeball = {}
+
+    def is_renumber_eyeball(self, problem_id, event_id):
+        return any(ev == event_id for ev, _cur, _new
+                   in self.renumber_eyeball.get(problem_id, ()))
 
 
 def parse_claude_review(path):
-    """Файл проверки Claude → (подтверждённые высокие, перенумеровки «на глаза»).
+    """Файл проверки Claude → `ClaudeReview`.
 
-    Высокие: множество (problem_id, event_id, номер) из таблицы раздела
-    «Высокий ярус». На глаза: {problem_id: (event_id, текущий, предложенный)}
-    из таблицы раздела «Перенумеровка». Разделы различаются по заголовку
-    `## `, строки таблиц — по виду `| id | vp-… | № | … |`.
+    Разделы различаются по заголовку `## ` («Высокий ярус», «Перенумеровка»).
+    Внутри высокого яруса строка со словами «на глаза» открывает таблицу
+    НЕподтверждённых пар — у ВП её не было, у МОШ она есть (16 пар).
     """
-    high, eyeball = set(), {}
-    section = None
+    review = ClaudeReview()
+    section, eyeball_table, variant_col = None, False, False
     with open(path, encoding='utf-8') as handle:
         for line in handle:
+            stripped = line.strip()
             if line.startswith('## '):
                 lowered = line.lower()
                 section = ('high' if 'высокий ярус' in lowered else
                            'renumber' if 'перенумер' in lowered else None)
+                eyeball_table, variant_col = False, False
                 continue
-            match = _REVIEW_ROW.match(line.strip())
-            if not match or section is None:
+            if section == 'high' and not stripped.startswith('|') \
+                    and 'на глаза' in stripped.lower():
+                eyeball_table = True
                 continue
-            pid, event_id, number, rest = match.groups()
-            if section == 'high':
-                high.add((int(pid), event_id, number))
-            else:
+            if stripped.startswith('|') and 'event_id' in stripped:
+                # Шапка таблицы: есть ли колонка варианта задания.
+                variant_col = 'вариант' in [c.strip().lower()
+                                            for c in stripped.strip('|').split('|')]
+                continue
+            match = _REVIEW_ROW.match(stripped)
+            if match and section == 'high':
+                pid, event_id, number, rest = match.groups()
+                variant = rest.split('|')[0].strip() if variant_col else ''
+                key = (int(pid), event_id, number, variant)
+                (review.high_eyeball if eyeball_table else review.high).add(key)
+            elif match and section == 'renumber':
+                pid, event_id, number, rest = match.groups()
                 proposed = rest.split('|')[0].strip()
-                eyeball[int(pid)] = (event_id, number, proposed)
-    return high, eyeball
+                review.renumber_eyeball.setdefault(int(pid), []).append(
+                    (event_id, number, proposed))
+            elif section == 'renumber':
+                bullet = _REVIEW_BULLET.match(stripped)
+                if bullet:
+                    pid, event_id, number, proposed = bullet.groups()
+                    review.renumber_eyeball.setdefault(int(pid), []).append(
+                        (event_id, number, proposed))
+    return review
 
 
 _OTHER_EVENT = re.compile(
-    r'текст совпал с (?P<found>vp-[\w-]+) №(?P<found_no>\d+).*'
-    r'координаты строки ведут в (?P<own>vp-[\w-]+) №(?P<own_no>\d+)')
+    rf'текст совпал с (?P<found>{_EVENT}) №(?P<found_no>{_NUMBER}).*'
+    rf'координаты строки ведут в (?P<own>{_EVENT}) №(?P<own_no>{_NUMBER})')
 
 
 def parse_other_event_reason(reason):

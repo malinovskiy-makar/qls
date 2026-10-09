@@ -104,7 +104,10 @@ class AuditTestBase(TestCase):
         fields.update(kw)
         return OlympiadRef.objects.create(problem=problem, **fields)
 
+    olympiad = 'vp'
+
     def run_cmd(self, **kw):
+        kw.setdefault('olympiad', self.olympiad)
         call_command('apply_olympiad_audit', out_dir=self.out, **kw)
 
     def journals(self, suffix=''):
@@ -291,7 +294,7 @@ class UpdateTests(AuditTestBase):
 class ImportAndRollbackTests(AuditTestBase):
     def setUp(self):
         super().setUp()
-        call_command('olympiad_official_sources', apply=True)
+        call_command('olympiad_official_sources', olympiad='vp', apply=True)
         self.queue = os.path.join(self.s2, 'import_queue_vp.jsonl')
         with open(self.queue, 'w', encoding='utf-8') as handle:
             handle.write(json.dumps({
