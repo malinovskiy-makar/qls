@@ -10,6 +10,7 @@ app_name = 'legal'
 urlpatterns = [
     path('', views.index, name='index'),
     path('accept/', views.accept, name='accept'),
+    path('metrika.js', views.metrika_boot, name='metrika_boot'),
     path('ai/grant/', views.ai_grant, name='ai_grant'),
     path('ai/revoke/', views.ai_revoke, name='ai_revoke'),
     path('<slug:slug>/', views.document, name='document'),

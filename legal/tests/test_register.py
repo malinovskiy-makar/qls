@@ -27,6 +27,9 @@ class RegisterConsentTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertFalse(User.objects.filter(username='novichok').exists())
         self.assertEqual(ConsentRecord.objects.count(), 0)
+        html = response.content.decode('utf-8')
+        self.assertIn('Без согласия зарегистрироваться нельзя.', html)
+        self.assertNotIn('зарегистрировать нельзя', html)
 
     def test_user_and_record_are_one_transaction(self):
         """Сбой записи согласия не оставляет аккаунт без доказательства."""

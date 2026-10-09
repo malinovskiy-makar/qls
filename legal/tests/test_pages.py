@@ -100,11 +100,10 @@ class RootTemplateFooterTests(SimpleTestCase):
     руками: новый корневой шаблон без футера краснит этот тест.
     """
 
-    #: Исключения: в футер не помещаются, ссылка «Документы» стоит в шапке.
-    NAV_LINK_ONLY = {
-        'game/templates/game/game.html',
-        'calc2/templates/calc2/calc2.html',
-    }
+    #: Исключений нет: с части Б (09.10.2026) строка документов стоит и в игре, и на
+    #: калькуляторе, в нижней строке рядом с меткой версии. Раньше там была только
+    #: ссылка «Документы» в шапке (иконка без подписи).
+    NAV_LINK_ONLY = set()
     #: 12 корневых шаблонов из отчёта инвентаризации (раздел 3.1), по умолчанию
     #: подключающих счётчик, плюс экран согласия, добавленный этой работой.
     INVENTORY_ROOTS = 12
@@ -142,15 +141,13 @@ class RootTemplateFooterTests(SimpleTestCase):
 
 
 class FooterRenderTests(TestCase):
-    LINE = ('© 2026 Weconomics', 'Документы', 'Политика', 'Соглашение', 'Рекомендации', '12+')
+    LINE = ('© 2026 Weconomics', 'Документы', 'Политика', 'Соглашение', 'Рекомендации',
+            'Настройки cookie', '12+')
 
     def test_footer_is_on_public_pages(self):
-        for url in ('/', '/catalog/', '/login/', '/register/', '/legal/privacy/', '/game/'):
+        for url in ('/', '/catalog/', '/login/', '/register/', '/legal/privacy/', '/game/', '/calc2/'):
             response = self.client.get(url, follow=True)
             html = response.content.decode('utf-8')
-            if url in ('/game/',):
-                self.assertIn('href="/legal/"', html, url)
-                continue
             block = html.split('<p class="legal-foot">', 1)
             self.assertEqual(len(block), 2, url)
             text = re.sub(r'<[^>]+>', ' ', block[1].split('</p>', 1)[0])
@@ -158,6 +155,16 @@ class FooterRenderTests(TestCase):
                 self.assertIn(part, text, url)
             for href in ('/legal/', '/legal/privacy/', '/legal/terms/', '/legal/recommendations/'):
                 self.assertIn('href="%s"' % href, block[1].split('</p>', 1)[0], url)
+
+    def test_game_and_calculator_have_the_footer_line_with_visible_text(self):
+        """Часть Б: строка документов стоит и в игре, и на калькуляторе (с подписью, не значком)."""
+        for url in ('/game/', '/calc2/'):
+            html = self.client.get(url).content.decode('utf-8')
+            block = html.split('<p class="legal-foot">', 1)
+            self.assertEqual(len(block), 2, url)
+            self.assertIn('>Документы</a>', block[1].split('</p>', 1)[0], url)
+            # Метка версии и строка документов рядом: в одном месте страницы.
+            self.assertLess(html.index('class="site-version"'), html.index('<p class="legal-foot">'))
 
     def test_calculator_has_the_docs_link_in_the_header(self):
         from problems.tests.factories import make_user

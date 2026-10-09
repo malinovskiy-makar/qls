@@ -142,6 +142,8 @@ TEMPLATES = [
                 # TEMPLATES задан целиком заново (06.09.2026 так на бою уже
                 # терялся site_meta). Сверяет тест test_signup_source.
                 'config.context_processors.metrika',
+                # Выбор в окне cookie: от него зависит Метрика (часть Б).
+                'config.context_processors.cookie_consent',
             ],
             'loaders': [
                 'django.template.loaders.filesystem.Loader',

@@ -71,12 +71,18 @@ def _register(client, username, role='student'):
         'role': role, 'consent': 'on'})
 
 
-def _request(cookie=None):
-    """Запрос с сессией и, если дали, с кукой первого касания."""
+def _request(cookie=None, consent='all'):
+    """Запрос с сессией и, если дали, с кукой первого касания.
+
+    `consent` – значение куки выбора в окне cookie (часть Б): по умолчанию
+    аналитика разрешена, `None` – человек ещё не выбирал.
+    """
     request = RequestFactory().get('/')
     SessionMiddleware(lambda r: None).process_request(request)
     if cookie is not None:
         request.COOKIES[COOKIE] = cookie
+    if consent is not None:
+        request.COOKIES['weco_consent'] = consent
     return request
 
 
@@ -136,6 +142,7 @@ class FirstTouchTests(TestCase):
 
     def setUp(self):
         cache.clear()   # счётчик регистраций с одного адреса живёт в кэше
+        self.client.cookies['weco_consent'] = 'all'   # аналитика разрешена (часть Б)
 
     def test_utm_link_sets_signed_cookie_for_90_days(self):
         response = self.client.get(
@@ -206,6 +213,7 @@ class SignupRecordTests(TestCase):
 
     def setUp(self):
         cache.clear()
+        self.client.cookies['weco_consent'] = 'all'   # аналитика разрешена (часть Б)
 
     def test_teacher_signup_records_first_touch(self):
         self.client.get(_landing(utm_source='telegram', utm_medium='post',
@@ -264,6 +272,7 @@ class GoalTests(TestCase):
 
     def setUp(self):
         cache.clear()
+        self.client.cookies['weco_consent'] = 'all'   # аналитика разрешена (часть Б)
 
     def _first_page_after(self, username, role):
         response = _register(self.client, username, role=role)
@@ -326,6 +335,9 @@ class NoCounterTests(TestCase):
 class CounterOnPagesTests(TestCase):
     """Обе половины счётчика на месте; кабинет не отдаёт заголовков."""
 
+    def setUp(self):
+        self.client.cookies['weco_consent'] = 'all'   # аналитика разрешена (часть Б)
+
     @override_settings(YANDEX_METRIKA_ID=METRIKA_ID)
     def test_public_page_has_both_halves_in_their_places(self):
         html = self.client.get(LANDING).content.decode()
@@ -357,6 +369,9 @@ class WebvisorTests(TestCase):
 
     NAME = 'Иван Петров'
 
+    def setUp(self):
+        self.client.cookies['weco_consent'] = 'all'   # аналитика разрешена (часть Б)
+
     def _init_line(self, html):
         line = re.search(r'ym\(%s, "init", \{[^}]*\}\);' % METRIKA_ID, html)
         self.assertIsNotNone(line, 'нет вызова init')
@@ -384,14 +399,24 @@ class WebvisorTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('webvisor: false', self._init_line(response.content.decode()))
 
-    def test_public_page_keeps_webvisor_for_logged_in(self):
+    def test_public_page_has_no_webvisor_for_logged_in(self):
+        """Вошедший не записывается нигде, в том числе на публичной странице
+        (часть Б: на странице задачи там его чат с ИИ). Заголовок страницы
+        при этом уходит, как раньше: `sendTitle` только в кабинетах."""
         self._login('uchenik_pub', 'student')
+        for url in ('/catalog/', '/catalog/map/', '/game/', '/calc2/', '/vp/'):
+            with self.subTest(url=url):
+                init = self._init_line(self.client.get(url).content.decode())
+                self.assertIn('webvisor: false', init)
+                self.assertNotIn('webvisor: true', init)
+                self.assertNotIn('sendTitle', init)
+                self.assertIn('clickmap: true, trackLinks: true, accurateTrackBounce: true', init)
+
+    def test_public_page_keeps_webvisor_for_guests(self):
         init = self._init_line(self.client.get('/catalog/').content.decode())
         self.assertIn('webvisor: true', init)
         self.assertNotIn('webvisor: false', init)
         self.assertNotIn('sendTitle', init)
-        # Остальные параметры решение не трогало.
-        self.assertIn('clickmap: true, trackLinks: true, accurateTrackBounce: true', init)
 
     def test_header_name_is_hidden_from_webvisor_on_public_pages(self):
         """Каталог («Стол»), Rush, ВП, калькулятор: шапка одна — `_nav.html`."""
@@ -401,7 +426,9 @@ class WebvisorTests(TestCase):
                 response = self.client.get(url)
                 self.assertEqual(response.status_code, 200)
                 html = response.content.decode()
-                self.assertIn('webvisor: true', self._init_line(html))
+                # Вошедшего Вебвизор не пишет вовсе (часть Б); класс остаётся
+                # вторым рубежом на случай, если правило когда-нибудь ослабят.
+                self.assertIn('webvisor: false', self._init_line(html))
                 chip = re.search(r'<a class="([^"]*)" href="/profile/">(.*?)</a>', html, re.S)
                 self.assertIsNotNone(chip, 'нет плашки профиля в шапке')
                 classes = chip.group(1).split()

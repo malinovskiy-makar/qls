@@ -2,13 +2,14 @@
 """Страницы документов, экран согласия и согласие на помощника."""
 from django.conf import settings
 from django.contrib.auth.decorators import login_required
-from django.http import Http404, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.utils.safestring import mark_safe
 from django.utils.http import url_has_allowed_host_and_scheme
+from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from . import consent, documents
+from . import consent, cookie_consent, documents
 from problems.models_legal import ConsentRecord
 
 PROFILE_URL = '/profile/?tab=data'
@@ -103,3 +104,20 @@ def ai_revoke(request):
     if _wants_json(request):
         return JsonResponse({'ok': True})
     return redirect(PROFILE_URL)
+
+
+@never_cache
+def metrika_boot(request):
+    """Код счётчика Метрики файлом: окно cookie подгружает его после «Разрешить».
+
+    Без номера счётчика или без куки `weco_consent=all` отдаёт пустой файл:
+    адрес Яндекса без согласия не выдаётся никому. Код тот же, что вставляет
+    в страницу `_metrika.html` (общий шаблон `_metrika_code.js`); кабинет
+    окно сообщает параметром `private=1`, вошедший определяется по сессии.
+    """
+    js = 'application/javascript; charset=utf-8'
+    if not (settings.YANDEX_METRIKA_ID and cookie_consent.analytics_allowed(request)):
+        return HttpResponse('/* аналитика не разрешена */', content_type=js)
+    return render(request, '_metrika_code.js',
+                  {'metrika_private': request.GET.get('private') == '1'},
+                  content_type=js)

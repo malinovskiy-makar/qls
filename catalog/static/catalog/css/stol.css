@@ -13,7 +13,9 @@
 /* Высота шапки сайта — 48 (templates/_nav.html). `100dvh` — для iPad и
    iPhone, где `100vh` уходит под панель браузера; старые браузеры берут
    строку с `100vh` (24.09.2026). */
-.stol-app { position: relative; min-height: calc(100vh - 48px); min-height: calc(100dvh - 48px); }
+/* `--ck-h` – высота окна cookie, пока оно открыто (`static/cookie_bar.js`); иначе 0:
+   экран не уезжает под закреплённую полосу (часть Б, 09.10.2026). */
+.stol-app { position: relative; min-height: calc(100vh - 48px - var(--ck-h, 0px)); min-height: calc(100dvh - 48px - var(--ck-h, 0px)); }
 /* ⚠️ «Beta 1.0» на странице задачи не показывается (решение владельца
    24.09.2026): обычной строкой после <main> она давала пустую полосу под
    панелями. Правило следует за видом «Стола» (`data-view`), а не за
@@ -674,10 +676,10 @@ span.pp--src:active { transform: none; }
 .stol-app[data-view="stol"] .stol-entry { display: none; }
 .desk { --rail-col: 52px; --help-col: 392px; --top: 48px;
         display: grid; grid-template-columns: var(--rail-col) minmax(0, 1fr) var(--help-col);
-        align-items: start; min-height: calc(100vh - var(--top)); min-height: calc(100dvh - var(--top)); }
+        align-items: start; min-height: calc(100vh - var(--top) - var(--ck-h, 0px)); min-height: calc(100dvh - var(--top) - var(--ck-h, 0px)); }
 .desk[data-rail="open"] { --rail-col: 316px; }
 .desk[data-help="closed"] { --help-col: 52px; }
-.desk-side { position: sticky; top: var(--top); height: calc(100vh - var(--top)); height: calc(100dvh - var(--top)); min-width: 0; }
+.desk-side { position: sticky; top: var(--top); height: calc(100vh - var(--top) - var(--ck-h, 0px)); height: calc(100dvh - var(--top) - var(--ck-h, 0px)); min-width: 0; }
 .desk-side--rail { grid-column: 1; box-shadow: 1px 0 0 var(--border); background: var(--surface); z-index: 1; }
 .desk-side--help { grid-column: 3; box-shadow: -1px 0 0 var(--border); background: var(--surface); z-index: 1; }
 .desk-center { grid-column: 2; min-width: 0; padding: 18px 20px 80px; display: flex; justify-content: center; }

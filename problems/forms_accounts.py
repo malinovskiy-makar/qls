@@ -53,7 +53,7 @@ class RegisterForm(UserCreationForm):
         # подпись поля для служебных мест (админка, сообщения формы).
         label='Принимаю Пользовательское соглашение и даю Согласие на обработку персональных данных',
         required=True,
-        error_messages={'required': 'Без согласия зарегистрировать нельзя.'},
+        error_messages={'required': 'Без согласия зарегистрироваться нельзя.'},
     )
 
     class Meta(UserCreationForm.Meta):

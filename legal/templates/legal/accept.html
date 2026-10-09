@@ -55,7 +55,7 @@
     <div class="form-group">
       <label class="consent">
         <input type="checkbox" name="agree" id="accept-agree" value="1">
-        <span>{% include 'legal/_agree_label.html' %}</span>
+        <span>{% include 'legal/_agree_label.html' with variant='accept' %}</span>
       </label>
     </div>
     <div class="accept-actions">
@@ -81,6 +81,7 @@
   sync();
 })();
 </script>
+{% include '_cookie_bar.html' %}
 {% include '_site_version.html' %}
 {% include '_legal_footer.html' %}
 </body>
