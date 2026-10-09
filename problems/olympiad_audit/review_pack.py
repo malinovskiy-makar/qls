@@ -16,6 +16,7 @@ from __future__ import annotations
 import csv
 import html
 import os
+import random
 import shutil
 
 from problems.olympiad_audit import triage
@@ -181,3 +182,82 @@ def build_pack(digitized, items, out_root=None):
         writer.writeheader()
         writer.writerows(rows)
     return {'packs': written, 'csv': csv_path, 'index': os.path.join(out_root, 'index.html')}
+
+
+# ── Контроль судьи ───────────────────────────────────────────────────────
+
+#: Seed выборки контроля судьи (записан в отчёт); 30 страниц яруса A,
+#: которые судья пропустил (`ok_judge`). Человек не видит пометки судьи и
+#: считает, сколько ошибок расшифровки судья пропустил.
+CONTROL_PACK_SEED = 20261009
+CONTROL_PACK_SIZE = 30
+CONTROL_MARK_COLUMNS = ['страница', 'олимпиада', 'ошибок найдено', 'какие']
+
+
+def control_candidates(plan_rows, patches):
+    """Ключи страниц яруса A со статусом `ok_judge` (решение судьи фазы 2)."""
+    plan = {r['страница']: r for r in plan_rows}
+    return sorted(key for key, patch in patches.items()
+                  if patch.get('status') == 'ok_judge' and patch.get('phase') == 'judge'
+                  and plan.get(key, {}).get('ярус') == triage.TIER_A)
+
+
+def pick_control(candidates, seed=CONTROL_PACK_SEED, size=CONTROL_PACK_SIZE):
+    """Воспроизводимая выборка: кандидаты — пары (олимпиада, ключ страницы)."""
+    candidates = sorted(candidates)
+    return sorted(random.Random(f'control-{seed}').sample(candidates,
+                                                          min(size, len(candidates))))
+
+
+def render_control_html(items):
+    """Раздел «контроль»: то же, что пакет, но без статуса, срочности, яруса и
+    замечаний судьи."""
+    e = html.escape
+    out = ['<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+           f'<title>Контроль</title><style>{CSS}</style></head><body><h1>Контроль</h1>',
+           f'<p class="meta">Страниц: {len(items)}. Для каждой посчитайте ошибки расшифровки '
+           '(пропуск, лишнее, искажение чисел/формул/слов) и впишите в '
+           '<b>control_marks.csv</b>.</p>',
+           '<table><tr><th>#</th><th>страница</th><th>олимпиада</th><th>комплект</th>'
+           '<th>номер задания</th></tr>']
+    for n, item in enumerate(items, 1):
+        tasks = [t.rpartition('#') for t in item['tasks'].split()]
+        events = ', '.join(sorted({t[0] for t in tasks})) or item['events'] or '—'
+        out.append(f'<tr><td>{n}</td><td><a href="#p{n}">{e(item["key"])}</a></td>'
+                   f'<td>{e(item["olympiad"])}</td><td>{e(events)}</td>'
+                   f'<td>{e(", ".join(t[2] for t in tasks) or "—")}</td></tr>')
+    out.append('</table>')
+    for n, item in enumerate(items, 1):
+        out.append(f'<section id="p{n}"><h2>{n}. {e(item["olympiad"])} · {e(item["key"])}</h2>'
+                   f'<div class="grid"><div><img src="img/{e(item["image"])}" alt=""></div>'
+                   f'<div><pre>{e(judge_transcript(item["blocks"]))}</pre></div></div></section>')
+    out.append('</body></html>')
+    return '\n'.join(out)
+
+
+def build_control_pack(entries, out_root):
+    """entries: словари {olympiad, digitized, key, blocks, tasks, events}.
+    Пишет `out_root\index.html`, `img\`, `control_marks.csv` (пустой бланк) и
+    `control_pages.csv` (какие страницы вошли — для сверки с судьёй)."""
+    os.makedirs(os.path.join(out_root, 'img'), exist_ok=True)
+    items = []
+    for entry in entries:
+        page_dir, _, page = entry['key'].rpartition('/p')
+        image = f'{entry["olympiad"]}_{_image_name(entry["key"])}'
+        source = os.path.join(entry['digitized'], page_dir, f'p{page}.png')
+        if os.path.isfile(source):
+            shutil.copy2(source, os.path.join(out_root, 'img', image))
+        items.append({**entry, 'image': image})
+    with open(os.path.join(out_root, 'index.html'), 'w', encoding='utf-8') as handle:
+        handle.write(render_control_html(items))
+    for name, rows in (('control_marks.csv', [{'страница': i['key'], 'олимпиада': i['olympiad']}
+                                              for i in items]),
+                       ('control_pages.csv', [{'страница': i['key'], 'олимпиада': i['olympiad'],
+                                               'seed': CONTROL_PACK_SEED} for i in items])):
+        with open(os.path.join(out_root, name), 'w', encoding='utf-8-sig', newline='') as handle:
+            writer = csv.DictWriter(handle, fieldnames=list(CONTROL_MARK_COLUMNS if
+                                                            name == 'control_marks.csv'
+                                                            else rows[0]))
+            writer.writeheader()
+            writer.writerows(rows)
+    return {'pages': len(items), 'index': os.path.join(out_root, 'index.html')}

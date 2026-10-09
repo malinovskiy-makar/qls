@@ -36,7 +36,10 @@
         needs_fix → одно перечитывание с подсказкой → пересчёт мерила →
         повторный судья → fixed / human; деньги; старые страницы не меняет;
     review-pack --olympiad X
-        остаток (human) → human_review\\index.html + human_review.csv.
+        остаток (human) → human_review\\index.html + human_review.csv;
+    control-pack
+        30 случайных страниц яруса A со статусом ok_judge (обе олимпиады, seed
+        зафиксирован) → human_review_control\\ без пометок судьи.
 
 Корень данных: `--data-root`, иначе переменная `OLYMPIAD_DATA_ROOT`,
 иначе `<родитель BASE_DIR>\\weconomics-data\\olympiads`.
@@ -74,6 +77,7 @@ _SUBCOMMANDS = {
     'report': '_report',
     'reread': '_reread',
     'review-pack': '_review_pack',
+    'control-pack': '_control_pack',
 }
 
 PROGRESS_EVERY_PAGES = 100
@@ -139,6 +143,8 @@ class Command(BaseCommand):
                                          '(судья теперь не видит поле answer).')
         common(sub.add_parser('report', help='Сводка судьи для стоп-гейта.'))
         common(sub.add_parser('review-pack', help='Остаток → пакет для просмотра глазами.'))
+        common(sub.add_parser('control-pack', help='30 страниц яруса A, пропущенных судьёй '
+                                                   '(обе олимпиады) → пакет контроля.'))
 
     # ── Вход ────────────────────────────────────────────────────────────
 
@@ -158,6 +164,7 @@ class Command(BaseCommand):
         if not (self.audit_dir / 'raw').is_dir():
             raise CommandError(f'Нет папки raw\\ аудита: {self.audit_dir}')
         self.digitized = self.audit_dir / 'digitized'
+        self.root = root
         return getattr(self, _SUBCOMMANDS[name])(options)
 
     def _say(self, text=''):
@@ -485,3 +492,28 @@ class Command(BaseCommand):
         items = review_pack.build_items(plan_rows, patches, records)
         result = review_pack.build_pack(str(self.digitized), items)
         self._say(f'Пакет просмотра: {result["packs"]}; {result["index"]}; {result["csv"]}')
+
+    def _control_pack(self, options):
+        candidates, context = [], {}
+        for slug in sorted(registry.REGISTRY):
+            digitized = self.root / registry.get(slug).audit_dir / 'digitized'
+            plan_path = digitized / 'triage_plan.csv'
+            if not plan_path.is_file():
+                continue
+            plan_rows = triage.read_plan(plan_path)
+            plan = {r['страница']: r for r in plan_rows}
+            records = {triage.page_key(r): r for r in triage.iter_page_records(str(digitized))}
+            for key in review_pack.control_candidates(
+                    plan_rows, judge.v3_statuses(str(digitized))):
+                candidates.append((slug, key))
+                context[(slug, key)] = (digitized, plan[key], records[key])
+        picked = review_pack.pick_control(candidates)
+        entries = []
+        for slug, key in picked:
+            digitized, row, record = context[(slug, key)]
+            entries.append({'olympiad': slug, 'digitized': str(digitized), 'key': key,
+                            'blocks': record.get('blocks') or [], 'tasks': row['задания'],
+                            'events': row['комплекты']})
+        result = review_pack.build_control_pack(entries, str(self.root / 'human_review_control'))
+        self._say(f'Контроль судьи: кандидатов {len(candidates)}, выбрано {result["pages"]} '
+                  f'(seed {review_pack.CONTROL_PACK_SEED}); {result["index"]}')

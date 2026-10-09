@@ -382,3 +382,43 @@ class ReviewPackTests(DigitizeBase):
                                                          'index.html')))
         with open(result['index'], encoding='utf-8') as handle:
             self.assertIn('urgent/index.html', handle.read())
+
+
+class ControlPackTests(DigitizeBase):
+    def test_23_candidates_are_judge_passed_tier_a(self):
+        plan = [{'страница': f'pages/a/p{n}', 'ярус': tier}
+                for n, tier in enumerate('AAABA', 1)]
+        patches = {
+            'pages/a/p1': {'status': 'ok_judge', 'phase': 'judge'},
+            'pages/a/p2': {'status': 'needs_fix', 'phase': 'judge'},
+            'pages/a/p3': {'status': 'fixed', 'phase': 'reread'},
+            'pages/a/p4': {'status': 'ok_judge', 'phase': 'judge'},      # ярус B
+            'pages/a/p5': {'status': 'ok_judge', 'phase': 'judge'}}
+        self.assertEqual(review_pack.control_candidates(plan, patches),
+                         ['pages/a/p1', 'pages/a/p5'])
+
+    def test_24_pick_is_reproducible_and_sized(self):
+        pool = [('vp', f'pages/a/p{n}') for n in range(100)] + \
+               [('mosh', f'pages/b/p{n}') for n in range(100)]
+        picked = review_pack.pick_control(pool)
+        self.assertEqual(len(picked), 30)
+        self.assertEqual(picked, review_pack.pick_control(list(reversed(pool))))
+        self.assertNotEqual(picked, review_pack.pick_control(pool, seed=1))
+        self.assertEqual(len(review_pack.pick_control(pool[:5])), 5)
+
+    def test_25_control_pack_hides_judge_marks(self):
+        digitized = os.path.join(self.root, 'dig')
+        make_png(os.path.join(digitized, 'pages/abc/p1.png'))
+        entry = {'olympiad': 'vp', 'digitized': digitized, 'key': 'pages/abc/p1',
+                 'blocks': SHORT, 'tasks': 'e1#3', 'events': 'e1'}
+        out = os.path.join(self.root, 'control')
+        review_pack.build_control_pack([entry], out)
+        with open(os.path.join(out, 'index.html'), encoding='utf-8') as handle:
+            page = handle.read()
+        for hidden in ('ok_judge', 'срочн', 'ярус', 'прошл'):
+            self.assertNotIn(hidden, page)
+        self.assertIn('pages/abc/p1', page)
+        self.assertTrue(os.path.isfile(os.path.join(out, 'img', 'vp_abc_p1.png')))
+        with open(os.path.join(out, 'control_marks.csv'), encoding='utf-8-sig') as handle:
+            self.assertIn('ошибок найдено', handle.read())
+
